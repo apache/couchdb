@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<!--
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License.  You may obtain a copy of the
+License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations under the License.
+
+-->
+<html lang="en">
+  <head>
+    <title>View Document</title>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <link rel="stylesheet" href="../style/layout.css" type="text/css">
+    <script src="../script/json2.js"></script>
+    <script src="../script/jquery.js"></script>
+    <script src="../script/jquery.cookies.js"></script>
+    <script src="../script/jquery.dialog.js"></script>
+    <script src="../script/jquery.resizer.js"></script>
+    <script src="../script/couch.js"></script>
+    <script src="../script/browse.js"></script>
+    <script src="../script/pprint.js"></script>
+    <script>
+      var page = new CouchDocumentPage();
+      if (window != parent) {
+        var dbLink = $("h1 a.dbname").get(0);
+        parent.updateNavigation(
+          location.pathname.replace(/document\.html/, "database.html"),
+          location.search.split("/")[0]
+        );
+      }
+
+      $(function() {
+        $("h1 a.dbname").text(page.dbName).attr("href", "database.html?" + page.dbName);
+        $("h1 strong").text(page.doc._id);
+        page.updateFieldListing();
+        $("#toolbar button.save").click(page.saveDocument);
+        $("#toolbar button.add").click(page.addField);
+        $("#toolbar button.delete").click(page.deleteDocument);
+      });
+    </script>
+  </head>
+
+  <body>
+    <h1>
+      <a href="index.html">Overview</a>
+      <a class="dbname" href="#">?</a>
+      <strong>?</strong>
+    </h1>
+    <div id="wrap">
+      <ul id="toolbar">
+        <li><button class="save">Save Document</button></li>
+        <li><button class="add">Add Field</button></li>
+        <li><button class="delete">Delete Document</button></li>
+      </ul>
+
+      <table id="fields" class="listing" cellspacing="0">
+        <col class="field"><col class="value">
+        <caption>Fields</caption>
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Value</th>
+          </tr>
+        </thead>
+        <tbody class="content">
+        </tbody>
+        <tbody class="footer">
+          <tr>
+            <td colspan="2">
+              <div id="paging">
+                <a class="prev">← Previous Version</a> | <a class="next">Next Version →</a>
+              </div>
+              <span></span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+    </div>
+  </body>
+</html>

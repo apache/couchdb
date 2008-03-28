@@ -1,0 +1,343 @@
+Apache CouchDB Readme
+=====================
+
+Documentation
+-------------
+
+Visit the wiki <http://www.couchdbwiki.com/> for more documentation.
+
+Building From Subversion
+------------------------
+
+Dependencies
+~~~~~~~~~~~~
+
+To build Apache CouchDB from checkout you need some of the following installed:
+
+ * GNU Automake (>=1.6.3) <http://www.gnu.org/software/automake/> (required)
+ * GNU Autoconf (>=2.59) <http://www.gnu.org/software/autoconf/> (required)
+ * GNU Libtool <http://www.gnu.org/software/libtool/> (required)
+ * svn2cl <http://ch.tudelft.nl/~arthur/svn2cl/> (optional)
+ * xsltproc <http://xmlsoft.org/XSLT/xsltproc2.html> (optional)
+ * help2man <http://www.gnu.org/software/help2man/> (optional)
+
+If you are running a Debian GNU/Linux system (or a derivative such as Ubuntu
+GNU/Linux) you can install these dependencies using the `apt-get' command:
+
+--------------------------------------------------------------------------------
+apt-get install automake autoconf libtool subversion-tools help2man
+--------------------------------------------------------------------------------
+
+If you are running OS X and have MacPorts <http://www.macports.org/> installed
+you can install some of these dependencies by using the `port' command:
+
+--------------------------------------------------------------------------------
+port install automake autoconf libtool help2man
+--------------------------------------------------------------------------------
+
+Note: OS X users should already have Automake, Autoconf and Libtool installed.
+
+Note: MacPorts users will need to install svn2cl by hand.
+
+Bootstrapping
+~~~~~~~~~~~~~
+
+Note: You must repeat this step every time you update your Subversion checkout.
+
+Bootstrap the pristine source by running the following command:
+
+--------------------------------------------------------------------------------
+./bootstrap
+--------------------------------------------------------------------------------
+
+You can use the `-C' option to generate a dummy `ChangeLog' file.
+
+Installation And First Run
+--------------------------
+
+You will need the following installed:
+
+ * Erlang OTP <http://erlang.org/> (required)
+ * ICU <http://icu.sourceforge.net/> (required)
+ * Mozilla SpiderMonkey <http://www.mozilla.org/js/spidermonkey/> (required)
+ * GNU Make <http://www.gnu.org/software/make/> (required)
+ * GNU Compiler Collection <http://gcc.gnu.org/> (required)
+
+UNIX-like Operating Systems (inc. OS X)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Dependencies
+^^^^^^^^^^^^
+
+Debian-based (inc. Ubuntu) Systems
+++++++++++++++++++++++++++++++++++
+
+If you are running a Debian GNU/Linux system (or a derivative such as Ubuntu
+GNU/Linux) you can install the dependencies using the `apt-get' command:
+
+--------------------------------------------------------------------------------
+apt-get install build-essential erlang libicu36 libicu36-dev libmozjs-dev
+--------------------------------------------------------------------------------
+
+If you get an error regarding the `libicu36' or `libicu36-dev' be sure to check
+the version used by your distribution (using `apt-cache search libicu') and
+install those packages instead.
+
+OS X
+++++
+
+To install GNU Make and the GNU Compiler Collection on OS X you should install
+the Xcode Tools metapackage by running the following command:
+
+--------------------------------------------------------------------------------
+open /Applications/Installers/Xcode\ Tools/XcodeTools.mpkg
+--------------------------------------------------------------------------------
+
+We recommend that you satisfy the other dependancies by installing MacPorts
+<http://www.macports.org/> and running the following command:
+
+--------------------------------------------------------------------------------
+port install icu erlang spidermonkey
+--------------------------------------------------------------------------------
+
+Note: Don't forget to open a new terminal after you have installed MacPorts
+as it updates your PATH and you will not be able to run the `port' command
+without the effects of this change.
+
+To update your `locate' database you may want to run the following command:
+
+--------------------------------------------------------------------------------
+sudo /usr/libexec/locate.updatedb
+--------------------------------------------------------------------------------
+
+Installing
+^^^^^^^^^^
+
+Once you have satisfied dependencies you should run the following command:
+
+--------------------------------------------------------------------------------
+./configure
+--------------------------------------------------------------------------------
+
+Note: Apache CouchDB is installed into `/usr/local' by default. If you want to
+change where Apache CouchDB is installed (or where to find Erlang) be sure to
+read the output from running the `./configure --help' command.
+
+Note: All the examples assume you have installed into `/usr/local'.
+
+If everything was successful you should see the following message:
+
+--------------------------------------------------------------------------------
+You have configured Apache CouchDB. Time to relax.
+--------------------------------------------------------------------------------
+
+Relax.
+
+To install Apache CouchDB you should then run the following command:
+
+--------------------------------------------------------------------------------
+make && sudo make install
+--------------------------------------------------------------------------------
+
+If you do not wish to be prompted to overwrite any existing Apache CouchDB
+configuration files you should run the following command:
+
+--------------------------------------------------------------------------------
+sudo make && yes | sudo make install
+--------------------------------------------------------------------------------
+
+Note: Use of the `sudo' command is only required if you are installing into a
+system owned directory. You do not need to do this if you are installing
+elsewhere, such as your home directory.
+
+More options can be found by reading the `INSTALL' file.
+
+Security Considerations
+^^^^^^^^^^^^^^^^^^^^^^^
+
+It is not advisable to run Apache CouchDB as the superuser. We strongly
+recommend that you create a specific user to run Apache CouchDB and own the
+data/log directories.
+
+You can use whatever tool your system provides to create a new `couchdb' user.
+
+On many UNIX-like systems you can run the following command:
+
+--------------------------------------------------------------------------------
+adduser couchdb
+--------------------------------------------------------------------------------
+
+OS X provides the standard Accounts option from the System Preferences
+application or you can optionally use the Workgroup Manager application which
+can be downloaded as part of the Server Admin Tools
+<http://www.apple.com/support/downloads/serveradmintools1047.html>.
+
+You should set the home directory of the `couchdb' user to
+`/usr/local/var/lib/couchdb' which is the Apache CouchDB database directory.
+
+Make sure to change the ownership of the Apache CouchDB data directories by
+running the following commands:
+
+--------------------------------------------------------------------------------
+chown -R couchdb /usr/local/var/lib/couchdb
+chown -R couchdb /usr/local/var/log/couchdb
+--------------------------------------------------------------------------------
+
+Running Manually
+^^^^^^^^^^^^^^^^
+
+To start the Apache CouchDB server you should run the following command:
+
+--------------------------------------------------------------------------------
+sudo -u couchdb couchdb
+--------------------------------------------------------------------------------
+
+This uses the `sudo' command to run the `couchdb' command as the `couchdb' user.
+
+When Apache CouchDB starts it should eventually display the following message:
+
+--------------------------------------------------------------------------------
+Apache CouchDB has started. Time to relax.
+--------------------------------------------------------------------------------
+
+Relax.
+
+To check that everything has worked point your web browser to
+<http://localhost:5984/_utils/index.html> and run the test suite.
+
+OS X
+++++
+
+If you get error when running Apache CouchDB that look like the following:
+
+--------------------------------------------------------------------------------
+dyld: Library not loaded: libicuuc.38.dy
+--------------------------------------------------------------------------------
+
+You should make sure that your `~/.profile' file contains the following line:
+
+--------------------------------------------------------------------------------
+export DYLD_LIBRARY_PATH=/opt/local/lib:$DYLD_LIBRARY_PATH
+--------------------------------------------------------------------------------
+
+This should have been added for you by MacPorts but may be missing.
+
+Running as a Daemon
+^^^^^^^^^^^^^^^^^^^
+
+Note: These instructions assume you have created the `couchdb' user. See the
+specific system information included below to learn how to reconfigure this.
+
+Note: If any of these methods report a failure you can run the `couchdb'
+command manually to see the error messages it is displaying.
+
+The `/usr/local/etc/logrotate.d/couchdb' file is provided as a logrotate
+configuration that you can use to rotate Apache CouchDB's logs.
+
+SysV/BSD-style Systems
+++++++++++++++++++++++
+
+Depending on your system the `couchdb' init script will be installed into a
+direcory called `init.d' (for SysV-style systems) or `rc.d' (for BSD-style
+systems). These examples use the `[init.d|rc.d]' notation to indicate this.
+
+You can control the Apache CouchDB daemon by running the following command:
+
+--------------------------------------------------------------------------------
+/usr/local/etc/[init.d|rc.d]/couchdb [start|stop|restart|force-reload|status]
+--------------------------------------------------------------------------------
+
+If you wish to configure how the init script works, such as which user to run
+Apache CouchDB as, you must edit the `/usr/local/etc/default/couchdb' file as
+appropriate. If you are running the init script as a non-superuser you need to
+remove the line with the `COUCHDB_USER' setting.
+
+If you wish the ApacheCouchDB daemon to run as a system service you need to copy
+the `/usr/local/etc/[init.d|rc.d]/couchdb' script into your system wide
+`/etc/[init.d|rc.d]' directory and update your system configuration as
+appropriate.  Consult your system documentation for more information.
+
+If you are running a Debian GNU/Linux system (or a derivative such as Ubuntu
+GNU/Linux) you can configure your system using the following command:
+
+--------------------------------------------------------------------------------
+sudo update-rc.d couchdb defaults
+--------------------------------------------------------------------------------
+
+OS X
+++++
+
+You can use the `launchctl' command to control the Apache CouchDB daemon.
+
+To load the launchd configuration you must run the following command:
+
+--------------------------------------------------------------------------------
+sudo launchctl load /usr/local/Library/LaunchDaemons/org.apache.couchdb
+--------------------------------------------------------------------------------
+
+You can stop the Apache CouchDB daemon by running the following command:
+
+--------------------------------------------------------------------------------
+sudo launchctl unload /usr/local/Library/LaunchDaemons/org.apache.couchdb
+--------------------------------------------------------------------------------
+
+If you wish to change the launchd configuration, such as which user to run
+Apache CouchDB as, you must edit the
+`/usr/local/Library/LaunchDaemons/org.apache.couchdb.plist' file as
+appropriate.
+
+If you wish the Apache CouchDB daemon to run as a system service you need to
+copy the `/usr/local/Library/LaunchDaemons/org.apache.couchdb.plist' file into
+your system wide `/Library/LaunchDaemons' directory.
+
+Windows
+~~~~~~~
+
+Windows documentation is incomplete. Please submit suggestions.
+
+Development and Distribution
+----------------------------
+
+Reconfiguring the Build System
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you have edited any of the files used by the build system, such as the
+`Makefile.am' files, you will need to reconfigure your source.
+
+To reconfigure the source run the following command from the root directory:
+
+--------------------------------------------------------------------------------
+autoreconf && ./confgure
+--------------------------------------------------------------------------------
+
+Checking In Changes
+~~~~~~~~~~~~~~~~~~~
+
+If your source directory has been configured or built you will need to clean
+the generated files before checking into the repository by running the
+following command:
+
+--------------------------------------------------------------------------------
+make local-clean
+--------------------------------------------------------------------------------
+
+If everything was successful you should now have a pristine checkout.
+
+Preparing For Distribution
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To build the source for distribution you should then run the following command:
+
+--------------------------------------------------------------------------------
+./configure && make distcheck
+--------------------------------------------------------------------------------
+
+If everything was successful you should see a `zip' file and/or a `tar.gz' file
+sitting in the root directory ready for distribution.
+
+Release Checklist
+~~~~~~~~~~~~~~~~~
+
+ 1. Update this file with important information.
+ 2. Update the `NEWS' file with change information.
+ 3. Update the `acinclude.m4' file with version information.

@@ -1,0 +1,21 @@
+Apache CouchDB Thanks
+=====================
+
+Credits
+-------
+
+Apache CouchDB was originally developed by Damien Katz <damien_katz@yahoo.com>
+and a number of other contributors. Many people further contributed to Apache
+CouchDB by reporting problems, suggesting various improvements or submitting
+changes. A list of these people is included below.
+
+ * Benoit Chesneau <bchesneau@gmail.com>
+ * Till Klampaeckel <till@klampaeckel.de>
+ * Roger Leigh <rleigh@debian.org>
+ * Sam Ruby <rubys@intertwingly.net>
+ * Carlos Valiente <superdupont@gmail.com>
+
+See Also
+--------
+
+For a list of authors see the `AUTHORS' file.

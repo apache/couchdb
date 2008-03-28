@@ -1,0 +1,19 @@
+; @configure_input@
+
+[Couch]
+
+ConsoleStartupMsg=Apache CouchDB is starting.
+
+DbRootDir=%pkgstatelibdir%
+
+LogFile=%pkgstatelogdir%/couch.log
+
+HttpConfigFile=%pkgconfdir%/couch_httpd.conf
+
+UtilDriverDir=%couchprivlibdir%
+
+LogLevel=info
+
+[Couch Query Servers]
+
+text/javascript=%bindir%/%couchjs_command_name% %pkgdatadir%/server/main.js

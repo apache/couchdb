@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<!--
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License.  You may obtain a copy of the
+License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations under the License.
+
+-->
+<html lang="en">
+  <head>
+    <title>Test Suite</title>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <link rel="stylesheet" href="style/layout.css" type="text/css">
+    <script src="script/json2.js"></script>
+    <script src="script/jquery.js"></script>
+    <script src="script/couch.js"></script>
+    <script src="script/pprint.js"></script>
+    <script>
+      $(document).ready(function() {
+        $("#toolbar button.load").click(function() {
+          location.reload(true);
+        });
+      });
+    </script>
+    <script src="script/couch_tests.js"></script>
+    <script>
+      $(document).ready(function() {
+        updateTestsListing();
+        $("#toolbar button.run").click(runAllTests);
+        if (window != parent) parent.updateNavigation();
+      });
+    </script>
+  </head>
+  <body>
+    <h1>
+      <a href="browse/index.html">Overview</a>
+      <strong>Test Suite</strong>
+    </h1>
+    <div id="wrap">
+      <ul id="toolbar">
+        <li><button class="run">Run All</button></li>
+        <li><button class="load">Reload</button></li>
+      </ul>
+      <table class="listing" id="tests" cellspacing="0">
+        <caption>Tests</caption>
+        <thead>
+          <tr>
+            <th class="name">Name</th>
+            <th class="status">Status</th>
+            <th class="duration">Elapsed Time</th>
+            <th class="details">Details</th>
+          </tr>
+        </thead>
+        <tbody class="content">
+        </tbody>
+        <tbody class="footer">
+          <tr>
+            <td colspan="4"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </body>
+</html>

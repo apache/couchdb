@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<!--
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License.  You may obtain a copy of the
+License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations under the License.
+
+-->
+<html lang="en">
+  <head>
+    <title>Replicator</title>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <link rel="stylesheet" href="style/layout.css" type="text/css">
+    <script src="script/json2.js"></script>
+    <script src="script/jquery.js"></script>
+    <script src="script/couch.js"></script>
+    <script src="script/pprint.js"></script>
+    <script>
+      $(document).ready(function() {
+        if (window !== parent) parent.updateNavigation();
+
+        $("fieldset input[type=radio]").click(function() {
+          var radio = this;
+          var fieldset = $(this).parents("fieldset").get(0);
+          $("input[type=text]", fieldset).each(function() {
+            this.disabled = radio.value == "local";
+            if (!this.disabled) this.focus();
+          });
+          $("select", fieldset).each(function() {
+            this.disabled = radio.value == "remote";
+            if (!this.disabled) this.focus();
+          });
+        });
+
+        var allDbs = CouchDB.allDbs();
+        $("fieldset select").each(function() {
+          for (var i = 0; i < allDbs.length; i++) {
+            $("<option></option>").text(allDbs[i]).appendTo(this);
+          }
+          this.selectedIndex = 0;
+        });
+
+        $("button#swap").click(function() {
+          var fromName = $("#source select").val();
+          $("#source select").val($("#target select").val());
+          $("#target select").val(fromName);
+
+          var fromUrl = $("#source input[type=text]").val();
+          $("#source input[type=text]").val($("#target input[type=text]").val());
+          $("#target input[type=text]").val(fromUrl);
+
+          var fromType = $("#source input[type=radio]").filter(function() {
+            return this.checked;
+          }).val();
+          var toType = $("#target input[type=radio]").filter(function() {
+            return this.checked;
+          }).val();
+          $("#source input[value=" + toType + "]").click();
+          $("#target input[value=" + fromType + "]").click();
+
+          $("#replicate").get(0).focus();
+          return false;
+        });
+
+        $("button#replicate").click(function() {
+          $("#records tbody.content").empty();
+          var source = $("#from_local")[0].checked ? $("#from_name").val() : $("#from_url").val();
+          var target = $("#to_local")[0].checked ? $("#to_name").val() : $("#to_url").val();
+          try {
+            var results = CouchDB.replicate(source, target);
+          } catch (e) {
+            alert(e.reason);
+            return;
+          }
+          for (var i = 0; i < results.history.length; i++) {
+            var record = results.history[i];
+            $("<tr><th></th><td class='seq'></td>" +
+              "<td class='read'></td><td class='copied'></td></tr>")
+              .find("th").text(record.start_time).end()
+              .find("td.seq").text(record.start_last_seq + "–" + record.end_last_seq).end()
+              .find("td.read").text(record.docs_read + " (" + record.read_errors + " errors)").end()
+              .find("td.copied").text(record.docs_copied + " (" + record.copy_errors + " errors)").end()
+              .appendTo("#records tbody.content");
+          }
+          $("#records tbody tr").removeClass("odd").filter(":odd").addClass("odd");
+          $("#records tbody.footer td").text("Replication session " + results.session_id);
+        });
+      });
+    </script>
+  </head>
+  <body>
+    <h1>
+      <a href="browse/index.html">Overview</a>
+      <strong>Replicator</strong>
+    </h1>
+    <div id="wrap">
+
+      <form id="replicator">
+        <fieldset id="source">
+          <legend>Replicate changes from:</legend>
+          <p>
+            <label><input type="radio" id="from_local" name="from_type" value="local" checked> Local</label>
+            <label>database: <select id="from_name" name="from_name"></select></label>
+          </p><p>
+            <label><input type="radio" id="from_to_remote" name="from_type" value="remote"> Remote</label>
+            <label>database: <input type="text" id="from_url" name="from_url" size="30" value="http://" disabled></label>
+          </p>
+        </fieldset>
+        <p class="swap"><button id="swap" tabindex="99">⇄</button></p>
+        <fieldset id="target">
+          <legend>to:</legend>
+          <p>
+            <label><input type="radio" id="to_local" name="to_type" value="local" checked> Local</label>
+            <label>database: <select id="to_name" name="to_name"></select></label>
+          </p><p>
+            <label><input type="radio" id="to_remote" name="to_type" value="remote"> Remote</label>
+            <label>database: <input type="text" id="to_url" name="to_url" size="30" value="http://" disabled></label>
+          </p>
+        </fieldset>
+        <p class="actions">
+          <button id="replicate" type="button">Replicate</button>
+        </p>
+      </form>
+
+      <table id="records" class="listing">
+        <caption>Replication History</caption>
+        <thead><tr>
+          <th>When</th>
+          <th>Sequences</th>
+          <th>Documents read</th>
+          <th>Documents copied</th>
+        </tr></thead>
+        <tbody class="content"></tbody>
+        <tbody class="footer"><tr>
+          <td colspan="4">No replication</td>
+        </tr></tbody>
+      </table>
+
+    </div>
+  </body>
+</html>

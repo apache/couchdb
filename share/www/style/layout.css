@@ -1,0 +1,405 @@
+/*
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License.  You may obtain a copy of the
+License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations under the License.
+
+*/
+
+/* General styles */
+
+html, body { background: transparent; color: #000;
+  font: normal 90% Arial,Helvetica,sans-serif; margin: 0;
+}
+:link, :visited { color: #ba1e16; text-decoration: none; }
+:link img, :visited img { border: none; }
+
+h1 { background: #666 url(../image/hgrad.gif) 100% 0 repeat-y;
+  border-bottom: 1px solid #333; color: #999;
+  font: 125% normal Arial,Helvetica,sans-serif;
+  line-height: 1.8em; margin: 0 0 1em; padding: 0 0 0 1em;
+}
+h1 :link, h1 :visited, h1 strong { padding: .4em .5em; }
+h1 :link, h1 :visited {
+  background: url(../image/path.gif) 100% 50% no-repeat; padding-right: 2em;
+}
+h1 :link, h1 :visited { color: #bbb; cursor: pointer;
+  text-shadow: #333 2px 2px 1px;
+}
+h1 strong { color: #fff; text-shadow: #000 2px 2px 4px; }
+
+hr { border: 1px solid #999; border-width: 1px 0 0; }
+dl dt { font-weight: bold; }
+code, tt { font-family: "DejaVu Sans Mono",Monaco,monospace; }
+
+button { font-size: 100%; -webkit-appearance: square-button; }
+input, select, textarea { background: #fff; border: 1px solid;
+  border-color: #999 #ddd #ddd #999; margin: 0; padding: 1px;
+}
+textarea { font-family: "DejaVu Sans Mono",Monaco,monospace; font-size: 100%; }
+fieldset { border: none; font-size: 95%; margin: 0; padding: .2em 0 0; }
+fieldset legend { color: #666; font-weight: bold; padding: 0; }
+fieldset input, fieldset select { font-size: 95%; }
+fieldset p { margin: .4em; }
+
+/* Tabular listings */
+
+table.listing { border-collapse: separate; border-spacing: 0;
+  border: 1px solid #a7a7a7; clear: both; width: 100%;
+}
+table.listing caption { display: none; }
+table.listing th, table.listing td { padding: .2em .5em; }
+table.listing thead th { background: #dadada url(../image/thead.gif) repeat-x;
+  border: 1px solid #a7a7a7; border-width: 0 0 1px 1px; color: #333;
+  font-size: 95%; font-weight: normal; text-align: left;
+  text-shadow: #999 2px 1px 2px; text-transform: capitalize;
+  white-space: nowrap;
+}
+table.listing thead th:first-child { border-left: none; }
+table.listing thead th.key {
+  background: #a7afb6 url(../image/thead-key.gif) 0 0 repeat-x;
+  padding-top: 2px;
+}
+table.listing thead th.key div {
+  background: url(../image/order-asc.gif) 100% 3px no-repeat; cursor: pointer;
+}
+table.listing thead th.desc div {
+  background-image: url(../image/order-desc.gif);
+}
+table.listing tbody tr th, table.listing tbody tr td { background: #feffea; }
+table.listing tbody tr.odd th, table.listing tbody tr.odd td,
+table.listing tbody.odd tr th, table.listing tbody.odd tr td {
+  background: #fff;
+}
+table.listing tbody th, table.listing tbody td {
+  border-left: 1px solid #d9d9d9; padding: .4em .5em; vertical-align: top;
+}
+table.listing tbody th:first-child, table.listing tbody td:first-child {
+  border-left: none;
+}
+table.listing tbody th { text-align: left; }
+table.listing tbody th :link, table.listing tbody th :visited {
+  display: block;
+}
+table.listing tbody.content th button {
+  background: transparent no-repeat; border: none; cursor: pointer;
+  float: left; margin: 0 5px 0 -20px; padding: 0; width: 15px; height: 15px;
+}
+table.listing tbody.content th button:hover { background-position: -15px 0; }
+table.listing tbody.footer tr td { background: #e9e9e9;
+  border-top: 1px solid #a7a7a7; color: #999; font-size: 90%;
+  line-height: 1.8em;
+}
+table.listing tbody.footer #paging { float: right; }
+table.listing tbody.footer #paging a,
+table.listing tbody.footer #paging label {
+  padding: 0 .5em;
+}
+table.listing tbody.footer #paging label { color: #666; }
+table.listing tbody.footer #paging select { font-size: 90%; padding: 0; }
+
+/* Resizer grippies */
+
+div.grippie { background: #e9e9e9 url(../image/grippie.gif) 50% 50% no-repeat;
+  border: 1px solid #aaa; border-top: none; cursor: row-resize;
+  min-height: 10px;
+}
+
+/* Suggest results */
+
+ul.suggest-dropdown { border: 1px solid #999; background-color: #eee;
+  padding: 0; margin: 0; list-style: none; opacity: .85; position: absolute;
+  z-index: 10000; display: none; -webkit-box-shadow: 2px 2px 10px #333;
+}
+ul.suggest-dropdown li { padding: 2px 5px; white-space: nowrap; color: #101010;
+  text-align: left;
+}
+ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
+  color: HighlightText;
+}
+
+/* Logo & Navigation */
+
+#wrap { padding: 0 20px 3em; }
+
+#logo { position: absolute; top: 20px; right: 20px; }
+
+#nav { color: #333; font-size: 110%; font-weight: bold; list-style: none;
+  margin: 0; overflow: auto; padding: 0; position: absolute; top: 185px;
+  bottom: 20px; right: 0; width: 210px;
+}
+#nav ul { list-style: none; margin: 0; padding: 0; }
+#nav li { color: #999; margin: 5px 0 0; padding: 3px 0; }
+#nav li span { padding: 0 20px; }
+#nav li.selected { background: #e9e9e9; }
+#nav li li { font-size: 90%; font-weight: normal; margin: 0;
+  padding: 2px 20px 2px 40px;
+}
+#nav li li:hover { background: #e4e4e4; }
+#nav li.selected li:hover { background: #d7d7d7; }
+#nav li li :link, #nav li li :visited { color: #333; display: block;
+  text-decoration: none;
+}
+#nav li li :link:hover, #nav li li :visited:hover { color: #000; }
+#nav li li :link:focus, #nav li li :visited:focus { outline: none; }
+#nav li li.selected { background: #aaa !important; border-top: 1px solid #999;
+  color: #fff; padding-top: 1px;
+}
+#nav li li.selected :link, #nav li li.selected :visited { color: #fff; }
+#nav li li.selected :link:hover, #nav li li.selected :visited:hover {
+  color: #fff;
+}
+
+#footer { background: #ddd; border-top: 1px solid #bbb; color: #000;
+  font-size: 80%; opacity: .7; padding: 5px 10px; position: absolute; right: 0;
+  bottom: 0; height: 10px; width: 190px; text-align: right;
+}
+#view { position: absolute; left: 0; right: 210px; top: 0; bottom: 0;
+  height: 100%;
+}
+
+/* Toolbar */
+
+#toolbar { font-size: 90%; line-height: 16px; list-style: none;
+  margin: 0 0 .5em; padding: 5px 5px 5px 3px;
+}
+#toolbar li { display: inline; }
+#toolbar button { background: transparent 2px 2px no-repeat; border: none;
+  color: #666; margin: 0; padding: 2px 1em 2px 22px; cursor: pointer;
+  font-size: 95%; font-weight: bold; line-height: 16px;
+}
+#toolbar button:hover { background-position: 2px -30px; color: #000; }
+#toolbar button:active { background-position: 2px -62px; color: #000; }
+#toolbar button.add { background-image: url(../image/add.gif); }
+#toolbar button.delete { background-image: url(../image/delete.gif); }
+#toolbar button.edit { background-image: url(../image/edit.gif); }
+#toolbar button.load { background-image: url(../image/load.gif); }
+#toolbar button.run { background-image: url(../image/run.gif); }
+#toolbar button.save { background-image: url(../image/save.gif); }
+
+/* Dialogs */
+
+#overlay { background: #bbb; cursor: wait; position: fixed; width: 100%;
+  height: 100%; top: 0; left: 0;
+}
+*html #overlay { position: absolute;
+  width: expression(document.body.clientWidth + 'px');
+  height: expression(document.body.clientHeight + 'px');
+}
+#dialog { background: #333  url(../image/spinner.gif) 50% 50% no-repeat;
+  color: #f4f4f4; overflow: hidden; opacity: .95; max-width: 33em;
+  padding: 1em 1em 0; -moz-border-radius: 7px; -webkit-border-radius: 7px;
+  -webkit-box-shadow: 4px 4px 6px #333;
+}
+*html #dialog { width: 33em; }
+#dialog.loading { width: 220px; height: 80px; }
+#dialog.loaded { background-image: none; }
+#dialog h2 { background: #666; border-top: 1px solid #555;
+  border-bottom: 1px solid #777; color: #ccc; font-size: 110%;
+  font-weight: bold; margin: 0 -2em; padding: .35em 2em;
+}
+#dialog fieldset { background: #222; border-top: 1px solid #111;
+  margin: 0 0 1em; padding: .5em 1em 1em;
+  -moz-border-radius-bottomleft: 7px; -moz-border-radius-bottomright: 7px;
+  -webkit-border-bottom-left-radius: 7px;
+  -webkit-border-bottom-right-radius: 7px;
+}
+#dialog p.help { color: #bbb; margin: 0 0 1em; }
+#dialog fieldset table { margin-top: 1em; }
+#dialog fieldset th, #dialog fieldset td { padding: .5em;
+  vertical-align: top;
+}
+#dialog fieldset th { color: #999; font-weight: bold;
+  text-align: right;
+}
+#dialog fieldset input { background: #e9e9e9; vertical-align: middle; }
+#dialog fieldset input.error { background: #f9e4e4; }
+#dialog fieldset div.error { padding-top: .3em; color: #b33; }
+#dialog .buttons { padding: 0 .5em .5em; text-align: right; }
+#dialog .buttons button { background: #444; border: 1px solid #aaa;
+  color: #ddd; cursor: pointer; font-size: 90%; font-weight: normal;
+  margin: 0 0 0 5px; padding: .2em 2em; -moz-border-radius: 10px;
+  -webkit-border-radius: 10px;
+}
+#dialog .buttons button[type=submit] { font-weight: bold; }
+#dialog .buttons button:hover { background: #555; }
+#dialog .buttons button:active { background: #333; color: #fff; }
+
+/* View selector */
+
+#switch { color: #666; float: right; font-size: 90%; font-weight: bold;
+  line-height: 16px; padding: 5px;
+}
+#switch select { font-size: 90%; }
+
+/* View function editing */
+
+#viewcode { background: #fff; border: 1px solid;
+  border-color: #999 #ddd #ddd #999; margin: 0 0 1em; padding: 0 .5em;
+}
+#viewcode div { background-color: #e9e9e9; border: 1px solid;
+  border-color: #ddd #ddd #e9e9e9 #ddd; color: #333; margin: 0 -.5em;
+  padding: 0 .5em 2px;
+}
+#viewcode .top { color: #aaa; font-size: 95%; }
+#viewcode .top a { float: right; font-size: 90%; line-height: 1.4em;
+  padding: 2px 2px 0 0;
+}
+#viewcode .top a:link, #viewcode .top a:visited { color: #999; }
+#viewcode label { background: url(../image/twisty.gif) 0 3px no-repeat;
+  color: #666; cursor: pointer; display: block; padding: 2px 0 0 15px;
+}
+#viewcode div.bottom, #viewcode textarea { display: none; }
+#viewcode textarea { border: none; color: #333; max-width: 100%;
+  min-height: 50px; padding: .5em 0; width: 100%;
+}
+#viewcode div.bottom { border-bottom: none; padding: 1px 3px; }
+#viewcode div.bottom button { font-size: 90%; margin: 0 1em 0 0;
+  padding-left: 2em; padding-right: 2em;
+}
+*html #viewcode div.bottom button { padding: 0 .5em; }
+*+html #viewcode div.bottom button { padding: 0 .5em; }
+#viewcode div.bottom button.revert, #viewcode div.bottom button.save,
+#viewcode div.bottom button.saveas {
+  float: right; margin: 0 0 0 1em;
+}
+#viewcode div.bottom button.save { font-weight: bold; }
+#viewcode.expanded label { background-position: 0 -96px; }
+#viewcode.expanded textarea, #viewcode.expanded div.bottom { display: block; }
+
+/* Documents table */
+
+#documents thead th { width: 50%; }
+#documents tbody.content td { color: #666;
+  font: normal 11px "DejaVu Sans Mono",Monaco,monospace;
+}
+#documents tbody.content td.key { color: #333; }
+#documents tbody.content td.key a { display: block; }
+#documents tbody.content td.key em { font-style: normal; }
+#documents tbody.content td.key span.docid { color: #999;
+  font: normal 10px Arial,Helvetica,sans-serif;
+}
+#documents tbody.content td.value { font-size: 10px; }
+
+/* Document fields table */
+
+#fields { table-layout: fixed; }
+#fields col.field { width: 33%; }
+#fields tbody.content th { padding-left: 25px; padding-right: 48px; }
+#fields tbody.content th button {
+  background-image: url(../image/delete-mini.gif);
+}
+#fields tbody.content th b { display: block; padding: 2px; }
+#fields tbody.content td { padding-left: 14px; padding-right: 48px; }
+#fields tbody.content td code { color: #999; display: block; font-size: 11px;
+  padding: 2px;
+}
+#fields tbody.content td code.string { color: #393; }
+#fields tbody.content td code.number, #fields tbody.content td code.boolean {
+  color: #339;
+}
+#fields tbody.content td dl { margin: 0; padding: 0; }
+#fields tbody.content td dt {
+  background: transparent url(../image/toggle-collapse.gif) 0 3px no-repeat;
+  clear: left; cursor: pointer; line-height: 1em; margin-left: -12px;
+  padding-left: 14px;
+}
+#fields tbody.content td dd { line-height: 1em; margin: 0;
+  padding: 0 0 0 1em;
+}
+#fields tbody.content td dt.collapsed {
+  background-image: url(../image/toggle-expand.gif);
+}
+#fields tbody.content td dt.inline { background-image: none; cursor: default;
+  float: left; margin-left: 0; padding-left: 2px; padding-right: .5em;
+  padding-top: 2px;
+}
+#fields tbody.content input, #fields tbody.content textarea {
+  background: #fff; border: 1px solid; border-color: #999 #ddd #ddd #999;
+  margin: 0; padding: 1px; width: 100%;
+}
+#fields tbody.content th input { font-family: inherit; font-size: inherit;
+  font-weight: bold;
+}
+#fields tbody.content td input, #fields tbody.content td textarea {
+  font: 10px normal "DejaVu Sans Mono",Monaco,monospace;
+}
+#fields tbody.content input.invalid,
+#fields tbody.content textarea.invalid {
+  background: #f9f4f4; border-color: #b66 #ebb #ebb #b66;
+}
+#fields tbody.content div.tools { margin: 2px 2px 0; float: right;
+  margin-right: -45px;
+}
+#fields tbody.content div.tools button { background: transparent 0 0 no-repeat;
+  border: none; cursor: pointer; display: block; float: left; margin: 0 .2em;
+  width: 11px; height: 11px;
+}
+#fields tbody.content div.tools button:hover { background-position: 0 -22px; }
+#fields tbody.content div.tools button:active { background-position: 0 -44px; }
+#fields tbody.content div.tools button.apply {
+  background-image: url(../image/apply.gif);
+}
+#fields tbody.content div.tools button.cancel {
+  background-image: url(../image/cancel.gif);
+}
+#fields tbody.content div.error { color: #d33; }
+
+/* Test suite */
+
+#tests { table-layout: fixed; }
+#tests thead th.name { width: 20%; }
+#tests thead th.status { padding-left: 20px; width: 10em; }
+#tests thead th.duration { text-align: right; width: 7em; }
+#tests tbody.content th { cursor: help; padding-left: 25px;
+  white-space: nowrap;
+}
+#tests tbody.content th button {
+  background-image: url(../image/run-mini.gif);
+}
+#tests tbody.content td.duration { text-align: right; width: 6em; }
+#tests tbody.content td.status { background-position: 5px 8px;
+  background-repeat: no-repeat; color: #999; padding-left: 20px;
+}
+#tests tbody.content td.details { width: 50%; overflow: auto; }
+#tests tbody.content td.details a { border-bottom: 1px dashed #ccc;
+  color: #999; float: right; font-size: 85%;
+}
+#tests tbody.content td.details ol { color: #999; margin: 0;
+  padding: 0 0 0 1.5em;
+}
+#tests tbody.content td.details ol b { color: #333; font-weight: normal; }
+#tests tbody.content td.details ol code { color: #c00; font-size: 100%; }
+#tests tbody.content td.details ol code.error { white-space: pre; }
+#tests tbody.content td.running {
+  background-image: url(../image/running.gif); color: #333;
+}
+#tests tbody.content td.success {
+  background-image: url(../image/test_success.gif); color: #060;
+}
+#tests tbody.content td.error, #tests tbody.content td.failure {
+  background-image: url(../image/test_failure.gif); color: #c00;
+}
+
+/* Replication */
+
+form#replicator { background: #f4f4f4; border: 1px solid;
+  border-color: #999 #ccc #ccc #999; margin: .5em 1em 1.5em; padding: .5em;
+  -moz-border-radius: 7px; -webkit-border-radius: 7px;
+}
+form#replicator fieldset { float: left; padding: 1px; }
+form#replicator p.swap { float: left; margin: 2em 0 0; padding: 1px 1em; }
+form#replicator p.swap button { background: transparent; border: none;
+  color: #666; cursor: pointer; font-size: 150%;
+}
+form#replicator p.swap button:hover { color: #000; }
+form#replicator p.actions { padding: 1px; clear: left; margin: 0;
+  text-align: right;
+}

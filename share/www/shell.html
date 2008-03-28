@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<!--
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License.  You may obtain a copy of the
+License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations under the License.
+
+-->
+<html lang="en" onclick="keepFocusInTextbox(event)">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+    <title>JavaScript Shell 1.4</title>
+    <link rel="stylesheet" href="style/layout.css" type="text/css">
+    <script src="script/shell.js"></script>
+    <!-- for http://ted.mielczarek.org/code/mozilla/extensiondev/ -->
+    <script type="text/javascript" src="chrome://extensiondev/content/rdfhistory.js"></script>
+    <script type="text/javascript" src="chrome://extensiondev/content/chromeShellExtras.js"></script>
+    <script type='text/javascript' src='script/json2.js'></script>
+    <script type='text/javascript' src='script/couch.js'></script>
+    <style type="text/css">
+      #help { border-bottom: 1px solid #eee; color: #666; margin: 0 0 1em; }
+      /* Preserve line breaks, but wrap too if browser supports it */
+      #output { white-space: pre; white-space: -moz-pre-wrap; }
+      form { margin: 0; padding: 0; }
+      #input { background: transparent; border: none;
+        border-left: 2px solid #999; font: bold 110% monospace;
+        margin: .5em 0 0 -12px; overflow: auto; padding: 0 0 0 10px;
+        width: 100%;
+      }
+      .input { color: #000; font: bold 110% monospace; margin-top: .5em; }
+      .normalOutput, .print, .error, .propList, .message, .tabcomplete {
+        background: #e4e4e4; margin: 0 1em; padding: 2px;
+      }
+      .normalOutput { color: #666; font-family: monospace; }
+      .print { color: #666; }
+      .error { color: #f00; background: #f9e4e4; }
+      .propList { color: #0a0; }
+      .message { color: #0d0; }
+      .tabcomplete { color: #d0d; }
+    </style>
+  </head>
+  <body onload="init()">
+    <h1>
+      <a href="browse/index.html">Overview</a>
+      <strong>Javascript Shell</strong>
+    </h1>
+    <div id="wrap">
+      <div id="help">
+        <p>
+          Features: auto-completion of property names using Tab, multiline input
+          using Shift+Enter, input history with (Ctrl+)Up/Down,
+          <a accesskey="M" href="javascript:go('scope(Math); mathHelp();');" title="Accesskey: M">Math</a>,
+          <a accesskey="H" href="http://www.squarefree.com/shell/?ignoreReferrerFrom=shell1.4" title="Accesskey: H" target="_blank">help</a>
+          <br>
+          Values and functions: ans, print(string),
+          <code><a accesskey="P" href="javascript:go('props(ans)')" title="Accesskey: P">props(object)</a></code>,
+          <code><a accesskey="B" href="javascript:go('blink(ans)')" title="Accesskey: B">blink(node)</a></code>,
+          <code><a accesskey="C" href="javascript:go('clear()')" title="Accesskey: C">clear()</a></code>,
+          <code>load(scriptURL)</code>, <code>scope(object)</code>
+        </p>
+      </div>
+      <div id="output"></div>
+      <div>
+        <textarea id="input" class="input" wrap="off" onkeydown="inputKeydown(event)" rows="1"></textarea>
+      </div>
+
+    </div>
+  </body>
+  <script>
+    if (parent !== window) parent.updateNavigation();
+  </script>
+</html>

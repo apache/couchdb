@@ -1,0 +1,340 @@
+#! /bin/sh -e
+
+# @configure_input@
+
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not
+# use this file except in compliance with the License.  You may obtain a copy of
+# the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+# License for the specific language governing permissions and limitations under
+# the License.
+
+SCRIPT_OK=0
+SCRIPT_ERROR=1
+
+INTERACTIVE_BOOLEAN=false
+BACKGROUND_BOOLEAN=false
+KILL_BOOLEAN=false
+SHUTDOWN_BOOLEAN=false
+RECURSED_BOOLEAN=false
+
+RESPAWN_TIMEOUT=0
+
+LIB_DIRECTORY=%pkgstatelibdir%
+LOG_DIRECTORY=%pkgstatelogdir%
+
+INI_FILE=%pkgconfdir%/couch.ini
+PID_FILE=%localstatedir%/run/couchdb.pid
+
+STDOUT_FILE=couchdb.stdout
+STDERR_FILE=couchdb.stderr
+
+HEART_COMMAND="%bindir%/%couchdb_command_name% -k"
+HEART_BEAT_TIMEOUT=11
+
+basename=$(basename $0)
+
+display_version () {
+    # Display version and copyright information.
+
+    cat << EOF
+$basename - %package_name% %version%
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License.  You may obtain a copy of the
+License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations under the License.
+EOF
+ }
+
+display_help () {
+    # Display a short description of the script's behaviour.
+
+    cat << EOF
+Usage: $basename [OPTION]
+
+The $basename command runs the %package_name% server.
+
+The exit status is 0 for success or 1 for failure.
+
+The \`-s' option will exit 0 for running and 1 for not running.
+
+Options:
+
+  -h          display a short help message and exit
+  -V          display version information and exit
+  -c FILE     set the configuration FILE (defaults to $INI_FILE)
+  -i          use the interactive Erlang shell
+  -b          spawn as a background process
+  -p FILE     set the background PID FILE (defaults to $PID_FILE)
+  -r SECONDS  respawn background process after SECONDS (defaults to no respawn)
+  -o FILE     redirect background stdout to FILE (defaults to $STDOUT_FILE)
+  -e FILE     redirect background stderr to FILE (defaults to $STDERR_FILE)
+  -s          display the status of the background process
+  -k          kill the background process, will respawn if needed
+  -d          shutdown the background process
+
+Report bugs via the web at <%list_uri%>.
+
+Report bugs via email to <%list_address%>.
+EOF
+}
+
+display_error () {
+    # Display a short instruction referring users to further documentation.
+
+    if test -n "$1"; then
+        echo $1 >&2
+    fi
+    echo >&2
+    echo "Try \`"$basename" -h' for more information." >&2
+    exit $SCRIPT_ERROR
+}
+
+_load_configuration () {
+    # Load ini configuration and overwrite default variables.
+
+    dbrootdir_ini_value=$(awk -F = "/^DbRootDir=/{print \$2}" < $INI_FILE)
+    if test -n "$dbrootdir_ini_value"; then
+        LIB_DIRECTORY=$dbrootdir_ini_value
+    fi
+    logfile_ini_value=$(awk -F = "/^LogFile=/{print \$2}" < $INI_FILE)
+    if test -n "$logfile_ini_value"; then
+        LOG_DIRECTORY=$(dirname $logfile_ini_value)
+    fi
+}
+
+_get_pid () {
+    if test -f $PID_FILE; then
+        PID=$(cat $PID_FILE)
+    fi
+    if test -z "$PID"; then
+        # Resort to searching for the running process manually.
+        PID=$(ps auxww | grep erlang | grep -- "couch_server:start()" | \
+            grep -v grep | awk "{print \$2}")
+    fi
+    echo $PID
+}
+
+check_status () {
+    # Check the status of the running Apache CouchDB process.
+
+    PID=$(_get_pid)
+    if test -n "$PID"; then
+        if kill -0 $PID 2> /dev/null; then
+            echo "Apache CouchDB is running as process $PID. Time to relax."
+            return $SCRIPT_OK
+        else
+            echo >&2 << EOF
+Apache CouchDB is not running but a stale PID file exists: $PID_FILE"
+EOF
+        fi
+    else
+        echo "Apache CouchDB is not running." >&2
+    fi
+    return $SCRIPT_ERROR
+}
+
+check_environment () {
+    # Check the environment for common problems to prevent nasty backtraces.
+
+    message_prefix="Apache CouchDB needs write permission on the"
+    if test ! -w $LIB_DIRECTORY; then
+        echo "$message_prefix data directory: $LIB_DIRECTORY" >&2
+        exit $SCRIPT_ERROR
+    fi
+    if test ! -w $LOG_DIRECTORY; then
+        echo "$message_prefix log directory: $LOG_DIRECTORY" >&2
+        exit $SCRIPT_ERROR
+    fi
+    message_prefix="Apache CouchDB needs write permission on data file"
+    for file in $(find $LIB_DIRECTORY -type f); do
+        if test ! -w $file; then
+            echo "$message_prefix: $file" >&2
+            exit $SCRIPT_ERROR
+        fi
+    done
+    message_prefix="Apache CouchDB needs write permission on log file"
+    for file in $(find $LOG_DIRECTORY -type f); do
+        if test ! -w $file; then
+            echo "$message_prefix: $file" >&2
+            exit $SCRIPT_ERROR
+        fi
+    done
+    if test "$BACKGROUND_BOOLEAN" = "true"; then
+        touch $PID_FILE 2> /dev/null || true
+        touch $STDOUT_FILE 2> /dev/null || true
+        touch $STDERR_FILE 2> /dev/null || true
+        message_prefix="Apache CouchDB needs write permission on the"
+        if test ! -w $PID_FILE; then
+            echo "$message_prefix PID file: $PID_FILE" >&2
+            exit $SCRIPT_ERROR
+        fi
+        if test ! -w $STDOUT_FILE; then
+            echo "$message_prefix STDOUT file: $STDOUT_FILE" >&2
+            exit $SCRIPT_ERROR
+        fi
+        if test ! -w $STDERR_FILE; then
+            echo "$message_prefix STDERR file: $STDERR_FILE" >&2
+            exit $SCRIPT_ERROR
+        fi
+        message_prefix="Apache CouchDB needs a regular"
+        if ! echo 2> /dev/null >> $PID_FILE; then
+            echo "$message_prefix PID file: $PID_FILE" >&2
+            exit $SCRIPT_ERROR
+        fi
+        if ! echo 2> /dev/null >> $STDOUT_FILE; then
+            echo "$message_prefix STDOUT file: $STDOUT_FILE" >&2
+            exit $SCRIPT_ERROR
+        fi
+        if ! echo 2> /dev/null >> $STDERR_FILE; then
+            echo "$message_prefix STDERR file: $STDERR_FILE" >&2
+            exit $SCRIPT_ERROR
+        fi
+    fi
+}
+
+start_couchdb () {
+    # Start Apache CouchDB with the Erlang interpreter.
+
+    if test ! "$RECURSED_BOOLEAN" = "true"; then
+        if check_status 2> /dev/null; then
+            exit $SCRIPT_OK
+        fi
+        check_environment
+    fi
+    interactive_option="+Bd -noinput"
+    if test "$INTERACTIVE_BOOLEAN" = "true"; then
+        interactive_option=""
+    fi
+    if test "$BACKGROUND_BOOLEAN" = "true"; then
+        touch $PID_FILE
+        interactive_option="+Bd -noinput"
+    fi
+    command="`%ICU_CONFIG% --invoke` \
+        %ERL% $interactive_option -sasl errlog_type error \
+        -pa %erlanglibdir%/couch-%version%/ebin \
+            %erlanglibdir%/couch_inets-4.7.5/ebin \
+        -eval \"application:load(couch)\" \
+        -eval \"couch_server:start(), receive done -> done end.\" \
+        -couchini $INI_FILE"
+    if test "$BACKGROUND_BOOLEAN" = "true" \
+        -a "$RECURSED_BOOLEAN" = "false"; then
+        # Recursively call and detach a duplicate couchdb command.
+        $0 -c $INI_FILE -b -r $RESPAWN_TIMEOUT -p $PID_FILE \
+            -o $STDOUT_FILE -e $STDERR_FILE -R &
+        echo "Apache CouchDB has started. Time to relax."
+    else
+        if test "$RECURSED_BOOLEAN" = "true"; then
+            while true; do
+                export HEART_COMMAND
+                export HEART_BEAT_TIMEOUT
+                $(eval $command -pidfile $PID_FILE -heart \
+                    > $STDOUT_FILE 2> $STDERR_FILE) || true
+                PID=$(_get_pid)
+                if test -n "$PID"; then
+                    if kill -0 $PID 2> /dev/null; then
+                        # Found an existing process, do not respawn.
+                        return $SCRIPT_ERROR
+                    fi
+                    # Stale PID file, we should respawn.
+                else
+                    # No PID file, do not respawn.
+                    return $SCRIPT_OK
+                fi
+                if test "$RESPAWN_TIMEOUT" = "0"; then
+                    # RESPAWN_TIMEOUT is zero, do not respawn.
+                    return $SCRIPT_OK
+                fi
+                if test "$RESPAWN_TIMEOUT" != "1"; then
+                    plural_ending="s"
+                fi
+                cat << EOF
+Apache CouchDB crashed, restarting in $RESPAWN_TIMEOUT second$plural_ending.
+EOF
+                sleep $RESPAWN_TIMEOUT
+            done
+        else
+            eval exec $command
+        fi
+    fi
+}
+
+stop_couchdb () {
+    # Send SIGHUP to the running Apache CouchDB process.
+
+    PID=$(_get_pid)
+    if test -n "$PID"; then
+        # Clean up PID file or leave stale for respawn.
+        if test "$1" = "false"; then
+            echo > $PID_FILE
+        fi
+        if kill -0 $PID 2> /dev/null; then
+            if kill -1 $PID 2> /dev/null; then
+                if test "$1" = "false"; then
+                    echo "Apache CouchDB has been shutdown."
+                else
+                    echo "Apache CouchDB has been killed."
+                fi
+                return $SCRIPT_OK
+            else
+                echo "Apache CouchDB could not be killed." >&2
+                return $SCRIPT_ERROR
+            fi
+            if test "$1" = "false"; then
+                echo "Stale PID file exists but Apache CouchDB is not running."
+            else
+                echo "Stale PID file existed but Apache CouchDB is not running."
+            fi
+        fi
+    else
+        echo "Apache CouchDB is not running."
+    fi
+}
+
+parse_script_option_list () {
+    # Parse the script option list and take the appropriate action.
+
+    if ! argument_list=$(getopt hVc:ibp:r:Ro:e:skd $@); then
+        display_error
+    fi
+    eval set -- "$argument_list"
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -h) shift; display_help; exit $SCRIPT_OK;;
+            -V) shift; display_version; exit $SCRIPT_OK;;
+            -c) shift; INI_FILE=$1; shift;;
+            -i) shift; INTERACTIVE_BOOLEAN=true;;
+            -b) shift; BACKGROUND_BOOLEAN=true;;
+            -r) shift; RESPAWN_TIMEOUT=$1; shift;;
+            -R) shift; RECURSED_BOOLEAN=true;;
+            -p) shift; PID_FILE=$1; shift;;
+            -o) shift; STDOUT_FILE=$1; shift;;
+            -e) shift; STDERR_FILE=$1; shift;;
+            -s) shift; check_status; exit $SCRIPT_OK;;
+            -k) shift; KILL_BOOLEAN=true;;
+            -d) shift; SHUTDOWN_BOOLEAN=true;;
+            --) shift; break;;
+            *) display_error "Unknown option: $1" >&2;;
+        esac
+    done
+    _load_configuration
+    if test "$KILL_BOOLEAN" = "true" -o "$SHUTDOWN_BOOLEAN" = "true"; then
+        stop_couchdb $KILL_BOOLEAN
+    else
+        start_couchdb
+    fi
+}
+
+parse_script_option_list $@

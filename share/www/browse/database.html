@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<!--
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License.  You may obtain a copy of the
+License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations under the License.
+
+-->
+<html lang="en">
+  <head>
+    <title>Browse Database</title>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <link rel="stylesheet" href="../style/layout.css" type="text/css">
+    <script src="../script/json2.js"></script>
+    <script src="../script/jquery.js"></script>
+    <script src="../script/jquery.cookies.js"></script>
+    <script src="../script/jquery.dialog.js"></script>
+    <script src="../script/jquery.resizer.js"></script>
+    <script src="../script/jquery.suggest.js"></script>
+    <script src="../script/couch.js"></script>
+    <script src="../script/browse.js"></script>
+    <script src="../script/pprint.js"></script>
+    <script>
+      var page = new CouchDatabasePage();
+      if (window != parent) {
+        parent.updateNavigation(location.pathname, location.search.split("/", 2)[0]);
+      }
+
+      $(document).ready(function() {
+        $("h1 strong").text(page.dbName);
+        $("#viewcode label").click(function() {
+          $("#viewcode").toggleClass("expanded");
+        });
+        $("#viewcode button.run").click(function() {
+          page.updateDocumentListing();
+        });
+        $("#viewcode button.revert").click(function() {
+          page.revertViewChanges();
+        });
+        $("#viewcode button.save").click(function() {
+          page.saveViewChanges();
+        });
+        $("#viewcode button.saveas").click(function() {
+          page.saveViewAs();
+        });
+        $("#viewcode textarea").resizable({grippie: $("#viewcode .bottom")});
+
+        // Restore preferences/state from cookies
+        var query = $.cookies.get(page.dbName + ".query");
+        if (query) $("#viewcode textarea").val(query);
+        var desc = $.cookies.get(page.dbName + ".desc");
+        if (desc) $("#documents thead th.key").addClass("desc");
+        var rowsPerPage = $.cookies.get(page.dbName + ".perpage");
+        if (rowsPerPage) $("#perpage").val(rowsPerPage);
+
+        page.populateViewsMenu();
+        page.populateViewEditor();
+        page.updateDocumentListing();
+
+        $("#switch select").change(function() {
+          var viewName = $(this).val();
+          if (!viewName) $.cookies.remove(page.dbName + ".view");
+          location.href = "?" + page.dbName + (viewName ? "/" + viewName  : "");
+        });
+        $("#documents thead th.key").click(function() {
+          $(this).toggleClass("desc");
+          page.updateDocumentListing();
+        });
+        $("#perpage").change(function() {
+          page.updateDocumentListing();
+          $.cookies.set(page.dbName + ".perpage", this.value);
+        });
+        $("#toolbar button.add").click(page.addDocument);
+        $("#toolbar button.delete").click(page.deleteDatabase);
+      });
+    </script>
+  </head>
+
+  <body>
+    <h1>
+      <a href="index.html">Overview</a>
+      <strong>?</strong>
+    </h1>
+    <div id="wrap">
+      <div id="switch">
+        <label>Select view: <select>
+          <option value="">All documents</option>
+          <option value="_design_docs">Design documents</option>
+          <option value="_temp_view">Custom query…</option>
+        </select></label>
+      </div>
+      <ul id="toolbar">
+        <li><button class="add">Create Document …</button></li>
+        <li><button class="delete">Delete Database</button></li>
+      </ul>
+
+      <div id="viewcode" style="display: none">
+        <div class="top">
+          <a id="designdoc-link"></a>
+          <label for="viewcode_textarea">View Function</label>
+        </div>
+        <textarea id="viewcode_textarea" rows="5" cols="79" spellcheck="false" wrap="off">function(doc) {
+  map(null, doc);
+}</textarea>
+        <div class="bottom">
+          <button class="save" type="button" disabled>Save</button>
+          <button class="saveas" type="button">Save As…</button>
+          <button class="revert" type="button" disabled>Revert</button>
+          <button class="run" type="button">Run</button>
+        </div>
+      </div>
+
+      <table id="documents" class="listing" cellspacing="0">
+        <caption>Documents</caption>
+        <thead>
+          <tr>
+            <th class="key"><div>Key</div></th>
+            <th class="value">Value</th>
+          </tr>
+        </thead>
+        <tbody class="content">
+        </tbody>
+        <tbody class="footer">
+          <tr>
+            <td colspan="4">
+              <div id="paging">
+                <a class="prev">← Previous Page</a> |
+                <label>Rows per page: <select id="perpage">
+                  <option selected>10</option>
+                  <option>25</option>
+                  <option>50</option>
+                  <option>100</option>
+                </select></label> |
+                <a class="next">Next Page →</a>
+              </div>
+              <span></span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+    </div>
+  </body>
+</html>

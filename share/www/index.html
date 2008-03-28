@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<!--
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License.  You may obtain a copy of the
+License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations under the License.
+
+-->
+<html lang="en">
+  <head>
+    <title>Apache CouchDB: Futon Utility Client</title>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <link rel="stylesheet" href="style/layout.css" type="text/css">
+    <style type="text/css">
+      html { height: 100%; overflow: hidden; }
+      body { background: #fff url(image/bg.png) 100% 0 repeat-y;
+        padding: 0 185px 0 0; height: 100%; overflow: hidden;
+      }
+      * html body { padding-right: 210px; }
+      iframe { background: transparent; border: none; width: 100%; height: 100%; }
+    </style>
+    <script src="script/json2.js"></script>
+    <script src="script/jquery.js"></script>
+    <script src="script/couch.js"></script>
+    <script>
+      function updateDatabaseList() {
+        var dbs = CouchDB.allDbs();
+        $("#dbs").empty();
+        for (var i = 0; i < dbs.length; i++) {
+          var dbname = dbs[i];
+          $("#dbs").append("<li><a href='browse/database.html?" + dbname +
+            "' target='content'>" + dbname + "</a></li>");
+        }
+      }
+      function updateNavigation(path, queryString) {
+        function fixupPath(path) { // hack for IE/Win
+          return (path.charAt(0) != "/") ? ("/" + path) : path;
+        }
+        if (path == null) {
+          var l = frames["content"].location;
+          path = l.pathname;
+          if (queryString == null) {
+            queryString = l.search;
+          }
+        }
+        var href = fixupPath(path + queryString);
+        $("#nav li li a").each(function() {
+          if (fixupPath(this.pathname) + this.search == href) {
+            $(this).parent("li").addClass("selected");
+          } else {
+            $(this).parent("li").removeClass("selected");
+          }
+        });
+        $("#nav>li").each(function() {
+          if ($(this).is(":has(li.selected)")) {
+            $(this).addClass("selected");
+          } else {
+            $(this).removeClass("selected");
+          }
+        });
+      }
+      $(function() {
+        $("#version").text(CouchDB.getVersion());
+        updateDatabaseList();
+      });
+    </script>
+  </head>
+  <body>
+    <a href="browse/index.html" target="content">
+      <img id="logo" src="image/logo.png" width="170" height="151" alt="Apache CouchDB: Relax">
+    </a>
+    <ul id="nav">
+      <li><span>Tools</span><ul>
+        <li><a href="browse/index.html" target="content">Overview</a></li>
+        <li><a href="shell.html" target="content">Javascript Shell</a></li>
+        <li><a href="replicator.html" target="content">Replicator</a></li>
+        <li><a href="couch_tests.html" target="content">Test Suite</a></li>
+      </ul></li>
+      <li><span>Databases</span>
+        <ul id="dbs"></ul>
+      </li>
+    </ul>
+    <div id="footer">Futon on Apache CouchDB <span id="version">?</span></div>
+    <div id="view">
+      <iframe name="content" src="browse/index.html" allowtransparency="true">
+    </div>
+  </body>
+</html>
