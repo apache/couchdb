@@ -14,6 +14,11 @@ datarootdir = @prefix@/share
 
 nobase_dist_pkgdata_DATA = \
     server/main.js \
+    www/browse/_create_database.html \
+    www/browse/_create_document.html \
+    www/browse/_delete_database.html \
+    www/browse/_delete_document.html \
+    www/browse/_save_view_as.html \
     www/browse/database.html \
     www/browse/document.html \
     www/browse/index.html \
@@ -25,6 +30,7 @@ nobase_dist_pkgdata_DATA = \
     www/image/cancel.gif \
     www/image/delete-mini.gif \
     www/image/delete.gif \
+    www/image/grippie.gif \
     www/image/hgrad.gif \
     www/image/load.gif \
     www/image/logo.png \
@@ -35,6 +41,7 @@ nobase_dist_pkgdata_DATA = \
     www/image/run.gif \
     www/image/running.gif \
     www/image/save.gif \
+    www/image/spinner.gif \
     www/image/test_failure.gif \
     www/image/test_success.gif \
     www/image/thead.gif \
@@ -49,6 +56,9 @@ nobase_dist_pkgdata_DATA = \
     www/script/couch_tests.js \
     www/script/jquery.js \
     www/script/jquery.cookies.js \
+    www/script/jquery.dialog.js \
+    www/script/jquery.resizer.js \
+    www/script/jquery.suggest.js \
     www/script/json2.js \
     www/script/pprint.js \
     www/script/shell.js \
