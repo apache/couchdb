@@ -335,12 +335,12 @@ ReadLine(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval
         JS_free(context, chars);
         return JS_FALSE;
     }
+    JS_free(context, bytes);
     chars[charslen] = '\0';
 
     /* Initialize a JSString object */
     str = JS_NewUCString(context, chars, charslen - 1);
     if (!str) {
-        JS_free(context, bytes);
         JS_free(context, chars);
         return JS_FALSE;
     }
@@ -386,15 +386,10 @@ ExecuteScript(JSContext *context, JSObject *obj, const char *filename) {
 }
 
 static uint32 gBranchCount = 0;
-static uint32 gBranchLimit = 100 * 1024;
 
 static JSBool
 BranchCallback(JSContext *context, JSScript *script) {
-    if (++gBranchCount == gBranchLimit) {
-        gBranchCount = 0;
-        return JS_FALSE;
-    }
-    if ((gBranchCount & 0x3fff) == 1) {
+    if ((++gBranchCount & 0x3fff) == 1) {
         JS_MaybeGC(context);
     }
     return JS_TRUE;
