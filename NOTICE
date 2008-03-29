@@ -32,19 +32,3 @@ src/couch_inets
 ~~~~~~~~~~~~~~~
 
  * Copyright (C) 1999 Ericsson Utvecklings AB
-
-src/js
-~~~~~~
-
- * Copyright (C) 1999 Netscape Communications Corporation
-
-src/js/editline
-~~~~~~~~~~~~~~~
-
- * Copyright (C) 1993 Simmule Turner
- * Copyright (C) 1993 Rich Salz
-
-src/js/fdlibm
-~~~~~~~~~~~~~
-
- * Copyright (C) 1993 by Sun Microsystems, Inc
