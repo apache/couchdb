@@ -1,6 +1,6 @@
 # Notice #
 
-Developed at [The Apache Software Foundation](http://www.apache.org/).
+Developed at [The Apache Software Foundation][1].
 
 Core software:
 
@@ -15,3 +15,5 @@ Supporting software:
  * share/www/script/jquery.js (Copyright (C) 2008 John Resig.)
  * share/www/script/json2.js (This file is in the public domain.)
  * src/couch_inets (Copyright (C) 1999 Ericsson Utvecklings AB.)
+
+[1]: http://www.apache.org/

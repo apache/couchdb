@@ -33,7 +33,7 @@ COPYING_FILE="COPYING"
 LICENSE_COMPRESSED_FILE="build-contrib/apache_2.txt.gz"
 M4_DIRECTORY="m4"
 M4_AC_CHECK_ICU_FILE="m4/ac_check_icu.m4"
-REPOSITORY_URI="http://couchdb.googlecode.com/svn/trunk/"
+REPOSITORY_URI="http://svn.apache.org/repos/asf/incubator/couchdb/trunk"
 
 ACLOCAL_EXECUTABLE=$(which aclocal || true)
 AUTOCONF_EXECUTABLE=$(which autoconf || true)

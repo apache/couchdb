@@ -11,7 +11,7 @@ dnl License for the specific language governing permissions and limitations
 dnl under the License.
 
 m4_define([LOCAL_PACKAGE_AUTHOR_NAME], [Damien Katz])
-m4_define([LOCAL_PACKAGE_AUTHOR_ADDRESS], [damien_katz@yahoo.com])
+m4_define([LOCAL_PACKAGE_AUTHOR_ADDRESS], [damien@apache.org])
 m4_define([LOCAL_PACKAGE_IDENTIFIER], [couchdb])
 m4_define([LOCAL_PACKAGE_NAME], [Apache CouchDB])
 
@@ -27,5 +27,6 @@ m4_define([LOCAL_VERSION_SECONDARY],
 m4_define([LOCAL_VERSION],
     [LOCAL_VERSION_PRIMARY[]LOCAL_VERSION_SECONDARY])
 
-m4_define([LOCAL_LIST_ADDRESS], [couchdb@googlegroups.com])
-m4_define([LOCAL_LIST_URI], [http://groups.google.com/group/couchdb])
+m4_define([LOCAL_LIST_ADDRESS], [couchdb-user@incubator.apache.org])
+m4_define([LOCAL_LIST_URI],
+    [http://mail-archives.apache.org/mod_mbox/incubator-couchdb-user/])

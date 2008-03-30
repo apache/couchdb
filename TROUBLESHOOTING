@@ -4,7 +4,7 @@
 
 Have you built CouchDB from the Subversion repository?
 
-Did you do a svn up that seemed to break everything?
+Did you do a `svn up` that seemed to break everything?
 
 After every update you must run the following command:
 
@@ -24,11 +24,9 @@ output of each step.
 
   2. Note down the installed versions of CouchDB's dependancies.
 
-  3. Checkout a fresh version from Subversion:
+  3. Follow the [checkout instructions][1] to get a fresh copy of trunk.
 
-        svn checkout http://couchdb.googlecode.com/svn/trunk/ couchdb
-
-  4. Bootstrap from the couchdb directory:
+  4. Bootstrap from the `couchdb` directory:
 
         ./bootstrap -C
 
@@ -50,3 +48,5 @@ output of each step.
     2. Please add documentation for your system...
 
   8. Report back to the mailing list (or IRC) with the output from each step.
+
+[1]:  http://incubator.apache.org/couchdb/community/code.html
