@@ -26,19 +26,19 @@ output of each step.
 
   3. Checkout a fresh version from Subversion:
 
-         svn checkout http://couchdb.googlecode.com/svn/trunk/ couchdb
+        svn checkout http://couchdb.googlecode.com/svn/trunk/ couchdb
 
   4. Bootstrap from the couchdb directory:
 
-         ./bootstrap -C
+        ./bootstrap -C
 
   5. Build into a temporary directory:
 
-         ./configure --prefix=/tmp/couchdb && make && make install
+        ./configure --prefix=/tmp/couchdb && make && make install
 
   6. Run the couchdb command and log the output:
 
-         /tmp/couchdb/bin/couchdb
+        /tmp/couchdb/bin/couchdb
 
   7. Use your system's kernel trace tool and log the output of the above
      command.
