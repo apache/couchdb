@@ -1,34 +1,17 @@
-Apache CouchDB Notice
-=====================
+# Notice #
 
-Core Software
--------------
+Developed at [The Apache Software Foundation](http://www.apache.org/).
 
- * Copyright (C) 2008 Damien Katz <damien_katz@yahoo.com>
- * Copyright (C) 2008 Jan Lehnardt <jan@php.net>
- * Copyright (C) 2008 Noah Slater <nslater@bytesexual.org>
+Core software:
 
-Developed at The Apache Software Foundation <http://www.apache.org/>.
+ * Copyright (C) 2008 Damien Katz <damien@apache.org>.
+ * Copyright (C) 2008 Jan Lehnardt <jan@apache.org>.
+ * Copyright (C) 2008 Christopher Lenz <cmlenz@apache.org>.
+ * Copyright (C) 2008 Noah Slater <nslater@apache.org>.
 
-Supporting Software
--------------------
+Supporting software:
 
-m4/ac_check_icu.m4
-~~~~~~~~~~~~~~~~~~
-
- * Copyright (C) 2005 Akos Maroy <darkeye@tyrell.hu>
-
-share/www/script/jquery.js
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
- * Copyright (C) 2008 John Resig
-
-share/www/script/json2.js
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-This file is in the public domain.
-
-src/couch_inets
-~~~~~~~~~~~~~~~
-
- * Copyright (C) 1999 Ericsson Utvecklings AB
+ * m4/ac_check_icu.m4 (Copyright (C) 2005 Akos Maroy <darkeye@tyrell.hu>.)
+ * share/www/script/jquery.js (Copyright (C) 2008 John Resig.)
+ * share/www/script/json2.js (This file is in the public domain.)
+ * src/couch_inets (Copyright (C) 1999 Ericsson Utvecklings AB.)

@@ -1,24 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <authors>
-  <author uid="willbeh">
-    William Beh &lt;willbeh@gmail.com&gt;
+  <author uid="damien">
+    Damien Katz &lt;damien@apache.org&gt;
   </author>
-  <author uid="damienkatz">
-    Damien Katz &lt;damien_katz@yahoo.com&gt;
-  </author>
-  <author uid="JanLehnardt">
-    Jan Lehnardt &lt;janlehnardt@gmail.com&gt;
+  <author uid="jan">
+    Jan Lehnardt &lt;jan@apache.org&gt;
   </author>
   <author uid="cmlenz">
-    Christopher Lenz &lt;cmlenz@gmx.de&gt;
-  </author>
-  <author uid="DirkSchalge">
-    Dirk Schalge &lt;dirk@epd-me.net&gt;
+    Christopher Lenz &lt;cmlenz@apache.org&gt;
   </author>
   <author uid="nslater">
-    Noah Slater &lt;nslater@bytesexual.org&gt;
-  </author>
-  <author uid="nslater@bytesexual.org">
-    Noah Slater &lt;nslater@bytesexual.org&gt;
+    Noah Slater &lt;nslater@apache.org&gt;
   </author>
 </authors>

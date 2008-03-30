@@ -1,0 +1,35 @@
+# Development #
+
+## Reconfiguring the Build System ##
+
+If you have edited any of the files used by the build system, such as the
+`Makefile.am` files, you will need to reconfigure your source.
+
+To reconfigure the source run the following command from the root directory:
+
+    autoreconf && ./confgure
+
+## Checking In Changes ##
+
+If your source directory has been configured or built you will need to clean
+the generated files before checking into the repository by running the
+following command:
+
+    make local-clean
+
+If everything was successful you should now have a pristine checkout.
+
+## Preparing For Distribution ##
+
+To build the source for distribution you should then run the following command:
+
+    ./configure && make distcheck
+
+If everything was successful you should see a `zip` file and/or a `tar.gz` file
+sitting in the root directory ready for distribution.
+
+## Release Checklist ##
+
+ 1. Update the `README` file with important information.
+ 2. Update the `NEWS` file with change information.
+ 3. Update the `acinclude.m4` file with version information.

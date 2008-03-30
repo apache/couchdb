@@ -1,25 +1,15 @@
-Apache CouchDB Authors
-======================
+# Authors #
 
-Project Lead
-------------
-
-Apache CouchDB was originally developed by Damien Katz <damien_katz@yahoo.com>
-and he remains the project lead.
-
-Contributers
-------------
+Apache CouchDB was originally developed by Damien Katz <damien@apache.org> and
+he remains the project lead.
 
 A number of people have contributed directly to Apache CouchDB by writing
 documentation or developing software. A list of these people is included below.
 
  * William Beh <willbeh@gmail.com>
- * Jan Lehnardt <janlehnardt@gmail.com>
- * Christopher Lenz <cmlenz@gmx.de>
+ * Jan Lehnardt <jan@apache.org>
+ * Christopher Lenz <cmlenz@apache.org>
  * Dirk Schalge <dirk@epd-me.net>
- * Noah Slater <nslater@bytesexual.org>
+ * Noah Slater <nslater@apache.org>
 
-See Also
---------
-
-For a list of other credits see the `THANKS' file.
+For a list of other credits see the `THANKS` file.
