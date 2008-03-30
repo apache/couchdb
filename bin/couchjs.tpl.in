@@ -55,9 +55,7 @@ Options:
   -h  display a short help message and exit
   -V  display version information and exit
 
-Report bugs via the web at <%list_uri%>.
-
-Report bugs via email to <%list_address%>.
+Report bugs at <%bug_uri%>.
 EOF
 }
 

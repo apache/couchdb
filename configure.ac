@@ -12,8 +12,7 @@ dnl under the License.
 
 m4_include([m4/ac_check_icu.m4])
 
-AC_INIT([LOCAL_PACKAGE_NAME], [LOCAL_VERSION], [LOCAL_LIST_ADDRESS],
-    [LOCAL_PACKAGE_IDENTIFIER])
+AC_INIT([LOCAL_PACKAGE_NAME], [LOCAL_VERSION], [], [LOCAL_PACKAGE_IDENTIFIER])
 
 AC_PREREQ([2.59])
 
@@ -197,8 +196,7 @@ AC_SUBST([version_revision], ["LOCAL_VERSION_REVISION"])
 AC_SUBST([version_stage], ["LOCAL_VERSION_STAGE"])
 AC_SUBST([version_release], ["LOCAL_VERSION_RELEASE"])
 
-AC_SUBST([list_address], ["LOCAL_LIST_ADDRESS"])
-AC_SUBST([list_uri], ["LOCAL_LIST_URI"])
+AC_SUBST([bug_uri], ["LOCAL_BUG_URI"])
 
 AC_SUBST([pkgconfdir], [${sysconfdir}/${PACKAGE_TARNAME}])
 AC_SUBST([pkgdatadir], [${datadir}/${PACKAGE_TARNAME}])

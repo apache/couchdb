@@ -85,9 +85,7 @@ Options:
   -k          kill the background process, will respawn if needed
   -d          shutdown the background process
 
-Report bugs via the web at <%list_uri%>.
-
-Report bugs via email to <%list_address%>.
+Report bugs at <%bug_uri%>.
 EOF
 }
 

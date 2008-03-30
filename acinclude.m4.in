@@ -27,6 +27,4 @@ m4_define([LOCAL_VERSION_SECONDARY],
 m4_define([LOCAL_VERSION],
     [LOCAL_VERSION_PRIMARY[]LOCAL_VERSION_SECONDARY])
 
-m4_define([LOCAL_LIST_ADDRESS], [couchdb-user@incubator.apache.org])
-m4_define([LOCAL_LIST_URI],
-    [http://mail-archives.apache.org/mod_mbox/incubator-couchdb-user/])
+m4_define([LOCAL_BUG_URI], [https://issues.apache.org/jira/browse/COUCHDB])

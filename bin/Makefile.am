@@ -34,8 +34,7 @@ couchdb: couchdb.tpl
 	    -e "s|%pkgstatelogdir%|@pkgstatelogdir@|g" \
 	    -e "s|%pkgstatelibdir%|@pkgstatelibdir@|g" \
 	    -e "s|%localstatedir%|@localstatedir@|g" \
-	    -e "s|%list_address%|@list_address@|g" \
-	    -e "s|%list_uri%|@list_uri@|g" \
+	    -e "s|%bug_uri%|@bug_uri@|g" \
 	    -e "s|%package_author_address%|@package_author_address@|g" \
 	    -e "s|%package_author_name%|@package_author_name@|g" \
 	    -e "s|%package_name%|@package_name@|g" \
@@ -46,8 +45,7 @@ couchdb: couchdb.tpl
 
 couchjs: couchjs.tpl
 	sed -e "s|%libbindir%|@libbindir@|g" \
-	    -e "s|%list_address%|@list_address@|g" \
-	    -e "s|%list_uri%|@list_uri@|g" \
+	    -e "s|%bug_uri%|@bug_uri@|g" \
 	    -e "s|%package_author_address%|@package_author_address@|g" \
 	    -e "s|%package_author_name%|@package_author_name@|g" \
 	    -e "s|%package_name%|@package_name@|g" \
