@@ -2,6 +2,13 @@
 
 ## Building From Subversion ##
 
+You can skip this section if you are installing from a release tarball.
+
+### Checking Out ###
+
+See the [http://incubator.apache.org/couchdb/community/code.html](instructions)
+on how to check out the source code.
+
 ### Dependencies ###
 
 To build Apache CouchDB from checkout you need some of the following installed:
