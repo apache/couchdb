@@ -1,6 +1,8 @@
-# News #
+Apache CouchDB NEWS
+===================
 
-## Version 0.7.3a1 ##
+Version 0.7.3a1
+---------------
 
 This version is unreleased and only available from the source repository.
 
@@ -13,16 +15,19 @@ This version is unreleased and only available from the source repository.
  * System logrotate configuration provided.
  * Improved handling of ICU shared libraries.
 
-## Version 0.7.2 ##
+Version 0.7.2
+-------------
 
  * Small changes to build process and `couchdb` command.
  * Database server official port is now 5984 TCP/UDP instead of 8888.
 
-## Version 0.7.1 ##
+Version 0.7.1
+-------------
 
  * Small compatibility issue with Firefox 3 fixed.
 
-## Version 0.7.0 ##
+Version 0.7.0
+-------------
 
  * Infrastructure rewritten to use the GNU build system for portability.
  * The built-in database browsing tool has been rewritten to provide a much
@@ -30,19 +35,22 @@ This version is unreleased and only available from the source repository.
  * XML and Fabric have been replaced with JSON and JavaScript for data
    transport and View definitions.
 
-## Version 0.6.0 ##
+Version 0.6.0
+-------------
 
  * A replication facility is now available.
  * CouchPeek can now create, delete and view documents.
  * Building from source is easier and less error prone.
 
-## Version 0.5.0 ##
+Version 0.5.0
+-------------
 
  * A built-in CouchPeek utility.
  * A full install kit buildable from a single command.
  * A new GNU/Linux version is available. An OS X version is coming soon.
 
-## Version 0.4.0 ##
+Version 0.4.0
+-------------
 
  * Non-existant variables are now nil lists.
  * Couch error codes and messages are no longer sent in the HTTP fields,
@@ -57,7 +65,8 @@ This version is unreleased and only available from the source repository.
  * Support for Perl/Ruby like regular expressions.
  * Added `total_rows` and `result_start` attributes to tables.
 
-## Version 0.3.0 ##
+Version 0.3.0
+-------------
 
  * CouchDB now fully supports Unicode and locale specific collation via the ICU
    library, both in the Fabric engine and computed tables.

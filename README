@@ -1,6 +1,8 @@
-# Readme #
+Apache CouchDB README
+=====================
 
-## Building From Subversion ##
+Building From Subversion
+------------------------
 
 You can skip this section if you are installing from a release tarball.
 
@@ -40,7 +42,8 @@ running the following command:
 
 You can use the `-C` option to generate a dummy `ChangeLog` file.
 
-## Installation And First Run ##
+Installation And First Run
+--------------------------
 
 You will need the following installed:
 
@@ -233,7 +236,8 @@ your system wide `/Library/LaunchDaemons` directory.
 
 Windows documentation is incomplete. Please submit suggestions.
 
-## Development ##
+Development
+-----------
 
 ### Reconfiguring the Build System ###
 
