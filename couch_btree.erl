@@ -12,7 +12,7 @@
 
 -module(couch_btree).
 
--export([open/2, open/3, query_modify/4, add_remove/3, foldl/3, foldl/4]).
+-export([open/2, open/3, query_modify/4, add/2, add_remove/3, foldl/3, foldl/4]).
 -export([foldr/3, foldr/4, fold/4, fold/5, row_count/1]).
 -export([lookup/2, get_state/1, test/1, test/0]).
 
@@ -85,9 +85,12 @@ fold(Bt, Key, Dir, Fun, Acc) ->
     {_ContinueFlag, Acc2} = stream_node(Bt, 0, Bt#btree.root, Key, Dir, convert_fun_arity(Fun), Acc),
     {ok, Acc2}.
 
+add(Bt, InsertKeyValues) ->
+    add_remove(Bt, InsertKeyValues, []).
+
 add_remove(Bt, InsertKeyValues, RemoveKeys) ->
-    {Result, [], Bt2} = query_modify(Bt, [], InsertKeyValues, RemoveKeys),
-    {Result, Bt2}.
+    {ok, [], Bt2} = query_modify(Bt, [], InsertKeyValues, RemoveKeys),
+    {ok, Bt2}.
 
 query_modify(Bt, LookupKeys, InsertValues, RemoveKeys) ->
     #btree{root=Root} = Bt,

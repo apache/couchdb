@@ -20,9 +20,6 @@
 
 -include("couch_db.hrl").
 
-% arbitrarily chosen amount of memory to use before flushing to disk
--define(FLUSH_MAX_MEM, 10000000).
-
 -record(group,
     {db,
     fd,
@@ -68,12 +65,11 @@ get_updated_group(Pid) ->
 	    receive
     	{Pid, Response} ->
     	    erlang:demonitor(Mref),
-    	    receive 
-    		{'DOWN', Mref, _, _, _} -> 
-    		    Response
-    	    after 0 -> 
-    		    Response
-    	    end;
+    	    receive
+        		{'DOWN', Mref, _, _, _} -> ok
+        	    after 0 -> ok
+    	    end,
+    	    Response;
     	{'DOWN', Mref, _, _, Reason} ->
     	    throw(Reason)
         end
@@ -201,7 +197,10 @@ handle_info({'EXIT', FromPid, Reason}, #server{root_dir=RootDir}=Server) ->
     [{_, {DbName, GroupId}}] ->
         delete_from_ets(FromPid, DbName, GroupId)
     end,
-    {noreply, Server}.
+    {noreply, Server};
+handle_info(Msg, _Server) ->
+    couch_log:error("Bad message received for view module: ~p", [Msg]),
+    exit({error, Msg}).
     
 add_to_ets(Pid, DbName, GroupId) ->
     true = ets:insert(couch_views_by_updater, {Pid, {DbName, GroupId}}),
@@ -215,11 +214,6 @@ delete_from_ets(Pid, DbName, GroupId) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
-start_update_loop(RootDir, DbName, GroupId) ->
-    % wait for a notify request before doing anything. This way, we can just
-    % exit and any exits will be noticed by the callers.
-    start_update_loop(RootDir, DbName, GroupId, get_notify_pids(1000)).
 
 
 start_temp_update_loop(DbName, Fd, Lang, Query) ->
@@ -243,7 +237,12 @@ temp_update_loop(Group, NotifyPids) ->
     {ok, Group2} = update_group(Group),
     [Pid ! {self(), {ok, Group2}} || Pid <- NotifyPids],
     garbage_collect(),
-    temp_update_loop(Group2, get_notify_pids(100000)).
+    temp_update_loop(Group2, get_notify_pids(10000)).
+
+start_update_loop(RootDir, DbName, GroupId) ->
+    % wait for a notify request before doing anything. This way, we can just
+    % exit and any exits will be noticed by the callers.
+    start_update_loop(RootDir, DbName, GroupId, get_notify_pids(1000)).
     
 start_update_loop(RootDir, DbName, GroupId, NotifyPids) ->
     {Db, DefLang, Defs} =
@@ -284,13 +283,16 @@ update_loop(#group{fd=Fd}=Group, NotifyPids) ->
     update_loop(Group2).
     
 update_loop(Group) ->
-    update_loop(Group, get_notify_pids()).
+    update_loop(Group, get_notify_pids(100000)).
 
 % wait for the first request to come in.
 get_notify_pids(Wait) ->
     receive
     {Pid, get_updated} ->
-        [Pid | get_notify_pids()]
+        [Pid | get_notify_pids()];
+    Else ->
+        couch_log:error("Unexpected message in view updater: ~p", [Else]),
+        exit({error, Else})
     after Wait ->
         exit(wait_timeout)
 	end.
@@ -526,15 +528,15 @@ process_doc(Db, DocInfo, {Docs, #group{name=GroupId}=Group, ViewKVs, DocIdViewId
             {ok, Doc} = couch_db:open_doc(Db, DocInfo, [conflicts, deleted_conflicts]),
             {[Doc | Docs], DocIdViewIdKeys}
         end,
-        case process_info(self(), memory) of
-        {memory, Mem} when Mem > ?FLUSH_MAX_MEM ->
+        case couch_util:should_flush() of
+        true ->
             {Group1, Results} = view_compute(Group, Docs2),
             {ViewKVs3, DocIdViewIdKeys3} = view_insert_query_results(Docs2, Results, ViewKVs, DocIdViewIdKeys2),
             {ok, Group2} = write_changes(Group1, ViewKVs3, DocIdViewIdKeys3, Seq),
             garbage_collect(),
             ViewEmptyKeyValues = [{View, []} || View <- Group2#group.views],
             {ok, {[], Group2, ViewEmptyKeyValues, [], Seq}};
-        _Else ->
+        false ->
             {ok, {Docs2, Group, ViewKVs, DocIdViewIdKeys2, Seq}}
         end
     end.

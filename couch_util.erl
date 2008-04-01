@@ -14,7 +14,7 @@
 -behaviour(gen_server).
 
 -export([start_link/0,start_link/1]).
--export([parse_ini/1]).
+-export([parse_ini/1,should_flush/0, should_flush/1]).
 -export([new_uuid/0, rand32/0, implode/2, collate/2, collate/3]).
 -export([abs_pathname/1,abs_pathname/2, trim/1, ascii_lower/1, test/0]).
 -export([encodeBase64/1, decodeBase64/1]).
@@ -22,6 +22,8 @@
 -export([init/1, terminate/2, handle_call/3]).
 -export([handle_cast/2,code_change/3,handle_info/2]).
 
+% arbitrarily chosen amount of memory to use before flushing to disk
+-define(FLUSH_MAX_MEM, 10000000).
 
 start_link() ->
     start_link("").
@@ -246,6 +248,22 @@ collate(A, B, Options) when is_list(A), is_list(B) ->
         [2] -> 0
     end.
 
+should_flush() ->
+    should_flush(?FLUSH_MAX_MEM).
+    
+should_flush(MemThreshHold) ->
+    case process_info(self(), memory) of
+    {memory, Mem} when Mem > 2*MemThreshHold ->
+        garbage_collect(),
+        case process_info(self(), memory) of
+        {memory, Mem} when Mem > MemThreshHold ->
+            true;
+        _ ->
+            false
+        end;
+    _ ->
+        false
+    end.
 
 
 
