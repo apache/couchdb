@@ -83,7 +83,7 @@ copy(#stream{pid = _Pid, fd = Fd}, Sp, Num, DestStream) ->
 copy(Fd, Sp, Num, DestStream) ->
     {ok, NewSp, _Sp2} = stream_data(Fd, Sp, Num, ?HUGE_CHUNK,
         fun(Bin, AccPointer) ->
-            {ok, NewPointer} = write(Bin, DestStream),
+            {ok, NewPointer} = write(DestStream, Bin),
             if AccPointer == null -> NewPointer; true -> AccPointer end
         end,
         null),
