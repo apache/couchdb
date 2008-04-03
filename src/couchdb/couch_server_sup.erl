@@ -136,7 +136,7 @@ start_server(InputIniFilename) ->
                 permanent,
                 1000,
                 supervisor,
-                [httpd]}]
+                [couch_ft_query]}]
         end,
 
     io:format("couch ~s (LogLevel=~s)~n", [couch_server:get_version(), LogLevel]),
