@@ -142,8 +142,7 @@ close(Fd) ->
 
 
 write_header(Fd, Prefix, Data) ->
-    % The leading bytes in every db file, the sig and the file version:
-    %the actual header data
+    ok = sync(Fd),
     TermBin = term_to_binary(Data),
     % the size of all the bytes written to the header, including the md5 signature (16 bytes)
     FilledSize = size(Prefix) + size(TermBin) + 16,
@@ -159,7 +158,8 @@ write_header(Fd, Prefix, Data) ->
         WriteBin = <<Prefix/binary, TermBin/binary, PadZeros/binary, Sig/binary>>,
         ?HEADER_SIZE = size(WriteBin), % sanity check
         DblWriteBin = [WriteBin, WriteBin],
-        ok = pwrite(Fd, 0, DblWriteBin)
+        ok = pwrite(Fd, 0, DblWriteBin),
+        ok = sync(Fd)
     end.
 
 

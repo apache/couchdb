@@ -500,14 +500,7 @@ handle_replication_request(#mod{entity_body=RawJson}=Mod) ->
 send_database_info(Mod, #uri_parts{db=DbName}=Parts) ->
     Db = open_db(Parts),
     {ok, InfoList} = couch_db:get_db_info(Db),
-    ok = send_header(Mod, 200, resp_json_header(Mod)),
-    DocCount = proplists:get_value(doc_count, InfoList),
-    LastUpdateSequence = proplists:get_value(last_update_seq, InfoList),
-    ok = send_chunk(Mod, "{\"db_name\": \"" ++ DbName ++
-        "\", \"doc_count\":" ++ integer_to_list(DocCount) ++
-        ", \"update_seq\":" ++ integer_to_list(LastUpdateSequence)++"}"),
-    ok = send_final_chunk(Mod),
-    {ok, 200}.
+    send_json(Mod, 200, {obj, [{db_name, DbName} | InfoList]}).
 
 send_doc(#mod{parsed_header=Headers}=Mod,
         #uri_parts{doc=DocId,querystr=QueryStr}=Parts) ->

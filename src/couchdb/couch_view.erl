@@ -179,9 +179,12 @@ handle_cast({reset_indexes, DbName}, #server{root_dir=Root}=Server) ->
     file:delete(Root ++ "/." ++ DbName ++ "_temp"),
     {noreply, Server}.
 
+handle_info({'EXIT', _FromPid, normal}, Server) ->
+    {noreply, Server};
 handle_info({'EXIT', FromPid, Reason}, #server{root_dir=RootDir}=Server) ->
     case ets:lookup(couch_views_by_updater, FromPid) of
     [] -> % non-updater linked process must have died, we propagate the error
+        couch_log:error("Exit on non-updater process: ~p", [Reason]),
         exit(Reason);
     [{_, {DbName, "_temp_" ++ _ = GroupId}}] ->
         delete_from_ets(FromPid, DbName, GroupId),

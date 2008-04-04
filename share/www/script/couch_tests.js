@@ -191,10 +191,13 @@ var tests = {
 
     // keep number lowish for now to keep tests fasts. Crank up manually to
     // to really test.
-    var numDocsToCreate = 500;
+    var numDocsToCreate = 5000;
 
-    var docs = makeDocs(numDocsToCreate);
-    T(db.bulkSave(docs).ok);
+    for(var i=0; i < numDocsToCreate; i += 100) {
+        var createNow = Math.min(numDocsToCreate - i, 100);
+        var docs = makeDocs(i, i + createNow);
+        T(db.bulkSave(docs).ok);
+    }
 
     // query all documents, and return the doc.integer member as a key.
     results = db.query(function(doc){ map(doc.integer, null) });
@@ -401,7 +404,7 @@ var tests = {
     }
     T(db.save(designDoc).ok);
 
-    T(db.bulkSave(makeDocs(numDocs)).ok);
+    T(db.bulkSave(makeDocs(1, numDocs)).ok);
 
     for (var loop = 0; loop < 2; loop++) {
       var rows = db.view("test/all_docs").rows
@@ -543,7 +546,7 @@ var tests = {
     db.createDb();
     if (debug) debugger;
 
-    var docs = makeDocs(100);
+    var docs = makeDocs(0, 100);
     T(db.bulkSave(docs).ok);
 
     var queryFun = function(doc) { map(doc.integer, null) };
@@ -607,7 +610,7 @@ var tests = {
     db.createDb();
     if (debug) debugger;
 
-    var docs = makeDocs(2);
+    var docs = makeDocs(1, 2);
     T(db.bulkSave(docs).ok);
 
     // make sure that attempting to change the document throws an error
@@ -689,7 +692,7 @@ var tests = {
       dbB.deleteDb();
       dbB.createDb();
 
-      var docs = makeDocs(numDocs);
+      var docs = makeDocs(1, numDocs);
       T(dbA.bulkSave(docs).ok);
 
       T(CouchDB.replicate(A, B).ok);
@@ -840,10 +843,10 @@ var tests = {
 
 };
 
-function makeDocs(n, templateDoc) {
+function makeDocs(start, end, templateDoc) {
   var templateDocSrc = templateDoc ? templateDoc.toSource() : "{}"
   var docs = []
-  for(var i=0; i<n; i++) {
+  for(var i=start; i<end; i++) {
     var newDoc = eval("(" + templateDocSrc + ")");
     newDoc._id = (i).toString();
     newDoc.integer = i
