@@ -404,11 +404,11 @@ var tests = {
     }
     T(db.save(designDoc).ok);
 
-    T(db.bulkSave(makeDocs(1, numDocs)).ok);
+    T(db.bulkSave(makeDocs(0, numDocs)).ok);
 
     for (var loop = 0; loop < 2; loop++) {
-      var rows = db.view("test/all_docs").rows
-      for (var i=0; i < numDocs; i++) {
+      var rows = db.view("test/all_docs").rows;
+      for (var i = 0; i < numDocs; i++) {
         T(rows[i].key == i);
       }
       T(db.view("test/no_docs").total_rows == 0)
@@ -692,7 +692,7 @@ var tests = {
       dbB.deleteDb();
       dbB.createDb();
 
-      var docs = makeDocs(1, numDocs);
+      var docs = makeDocs(0, numDocs);
       T(dbA.bulkSave(docs).ok);
 
       T(CouchDB.replicate(A, B).ok);
