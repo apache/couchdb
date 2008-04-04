@@ -72,7 +72,7 @@ start_link0(DbName, Filepath, Options) ->
             ok = file:rename(Filepath ++ ".compact", Filepath),
             Fd0;
         {error, enoent} ->
-            throw({error, notfound})
+            throw({error, not_found})
         end;
     Else ->
         throw(Else)
