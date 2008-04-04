@@ -191,7 +191,7 @@ var tests = {
 
     // keep number lowish for now to keep tests fasts. Crank up manually to
     // to really test.
-    var numDocsToCreate = 5000;
+    var numDocsToCreate = 500;
 
     for(var i=0; i < numDocsToCreate; i += 100) {
         var createNow = Math.min(numDocsToCreate - i, 100);
