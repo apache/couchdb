@@ -15,7 +15,7 @@
 
 -export([test/1]).
 -export([open/1, open/2, close/1, read/3, read_term/2, write/2, write_term/2, get_state/1, foldl/5]).
--export([copy/4]).
+-export([copy/4, copy_to_new_stream/4]).
 -export([ensure_buffer/2, set_min_buffer/2]).
 -export([init/1, terminate/2, handle_call/3]).
 -export([handle_cast/2,code_change/3,handle_info/2]).
@@ -78,10 +78,16 @@ read(Fd, Sp, Num) ->
     Bin = list_to_binary(lists:reverse(RevBin)),
     {ok, Bin, Sp2}.
 
-copy(#stream{pid = _Pid, fd = Fd}, Sp, Num, DestStream) ->
-    copy(Fd, Sp, Num, DestStream);
-copy(Fd, Sp, Num, DestStream) ->
-    {ok, NewSp, _Sp2} = stream_data(Fd, Sp, Num, ?HUGE_CHUNK,
+copy_to_new_stream(Src, Sp, Len, DestFd) ->
+    Dest = open(DestFd),
+    {ok, NewSp} = copy(Src, Sp, Len, Dest),
+    close(Dest),
+    {ok, NewSp}.
+
+copy(#stream{pid = _Pid, fd = Fd}, Sp, Len, DestStream) ->
+    copy(Fd, Sp, Len, DestStream);
+copy(Fd, Sp, Len, DestStream) ->
+    {ok, NewSp, _Sp2} = stream_data(Fd, Sp, Len, ?HUGE_CHUNK,
         fun(Bin, AccPointer) ->
             {ok, NewPointer} = write(DestStream, Bin),
             if AccPointer == null -> NewPointer; true -> AccPointer end
