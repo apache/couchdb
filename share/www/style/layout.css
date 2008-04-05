@@ -159,7 +159,8 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
 
 #footer { background: #ddd; border-top: 1px solid #bbb; color: #000;
   font-size: 80%; opacity: .7; padding: 5px 10px; position: absolute; right: 0;
-  bottom: 0; height: 10px; width: 190px; text-align: right;
+  bottom: 0; height: 1.3em; width: 190px; text-align: right;
+  white-space: nowrap;
 }
 #view { position: absolute; left: 0; right: 210px; top: 0; bottom: 0;
   height: 100%;
@@ -273,6 +274,13 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
 #viewcode div.bottom button.save { font-weight: bold; }
 #viewcode.expanded label { background-position: 0 -96px; }
 #viewcode.expanded textarea, #viewcode.expanded div.bottom { display: block; }
+
+/* Database table */
+
+#databases thead th.size, #databases thead th.count, #databases thead th.seq,
+#databases tbody td.size, #databases tbody td.count, #databases tbody td.seq {
+  text-align: right;
+}
 
 /* Documents table */
 

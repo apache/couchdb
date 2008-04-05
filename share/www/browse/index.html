@@ -24,6 +24,7 @@ specific language governing permissions and limitations under the License.
     <script src="../script/jquery.dialog.js"></script>
     <script src="../script/couch.js"></script>
     <script src="../script/browse.js"></script>
+    <script src="../script/pprint.js"></script>
     <script>
       var page = new CouchIndexPage();
       $(document).ready(function() {
@@ -47,15 +48,16 @@ specific language governing permissions and limitations under the License.
         <thead>
           <tr>
             <th>Name</th>
-            <th>Number of Documents</th>
-            <th>Update Seq</th>
+            <th class="size">Size</th>
+            <th class="count">Number of Documents</th>
+            <th class="seq">Update Seq</th>
           </tr>
         </thead>
         <tbody class="content">
         </tbody>
         <tbody class="footer">
           <tr>
-            <td colspan="3"></td>
+            <td colspan="4"></td>
           </tr>
         </tbody>
       </table>

@@ -41,8 +41,9 @@ function CouchIndexPage() {
       var info = new CouchDB(dbName).info();
       $("#databases tbody.content").append(
         "<tr><th><a href='database.html?" + dbName + "'>" +
-        dbName + "</a></th><td>" + info.doc_count +"</td><td>" +
-        info.update_seq + "</td></tr>");
+        dbName + "</a></th><td class='size'>" + prettyPrintSize(info.size) +
+        "</td><td class='count'>" + info.doc_count +
+        "</td><td class='seq'>" + info.update_seq + "</td></tr>");
       $("#databases tbody tr:odd").addClass("odd");
       $("#databases tbody.footer tr td").text(allDbs.length + " database(s)");
     }
