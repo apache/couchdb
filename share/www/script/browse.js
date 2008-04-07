@@ -41,7 +41,7 @@ function CouchIndexPage() {
       var info = new CouchDB(dbName).info();
       $("#databases tbody.content").append(
         "<tr><th><a href='database.html?" + dbName + "'>" +
-        dbName + "</a></th><td class='size'>" + prettyPrintSize(info.size) +
+        dbName + "</a></th><td class='size'>" + prettyPrintSize(info.disk_size) +
         "</td><td class='count'>" + info.doc_count +
         "</td><td class='seq'>" + info.update_seq + "</td></tr>");
       $("#databases tbody tr:odd").addClass("odd");
