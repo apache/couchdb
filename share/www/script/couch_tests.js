@@ -839,8 +839,33 @@ var tests = {
       headers: {"if-match": etag}
     });
     T(xhr.status == 202)
-  }
+  },
 
+  compact: function(debug) {
+    var db = new CouchDB("test_suite_db");
+    db.deleteDb();
+    db.createDb();
+    if (debug) debugger;
+    var docs = makeDocs(0, 10);
+    var saveResult = db.bulkSave(docs);
+    T(saveResult.ok);
+    var originalsize = db.info().disk_size;
+    
+    for(var i in docs) {
+        db.deleteDoc(docs[i]);
+    }
+    var deletesize = db.info().disk_size;
+    T(deletesize > originalsize);
+    
+    var xhr = CouchDB.request("POST", "/test_suite_db/_compact");
+    T(xhr.status == 202);
+    //compaction isn't instantaneous, loop until done
+    while(db.info().compact_running) {};
+    
+    var compactedsize = db.info().disk_size;
+    
+    T(deletesize > originalsize);
+    }
 };
 
 function makeDocs(start, end, templateDoc) {

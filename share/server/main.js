@@ -68,7 +68,7 @@ while (cmd = eval(readline())) {
       // [
       //  [["Key","Value"]],                    <- fun 1 returned 1 key value
       //  [],                                   <- fun 2 returned 0 key values
-      //  [["Key1","Value1"],["Key2","Value2"]],<- fun 3 returned 2 key values
+      //  [["Key1","Value1"],["Key2","Value2"]] <- fun 3 returned 2 key values
       // ]
       //
       var doc = cmd[1];

@@ -87,6 +87,9 @@ function CouchDB(name) {
     var result = JSON.parse(req.responseText);
     if (req.status != 201)
       throw result;
+    for(i in docs) {
+        docs[i]._rev = result.new_revs[i].rev;
+    }
     return result;
   }
 
@@ -127,6 +130,14 @@ function CouchDB(name) {
     var req = request("GET", this.uri + "_all_docs" + encodeOptions(options));
     var result = JSON.parse(req.responseText);
     if (req.status != 200)
+      throw result;
+    return result;
+  }
+  
+  this.compact = function() {
+    var req = request("POST", this.uri + "_compact");
+    var result = JSON.parse(req.responseText);
+    if (req.status != 202)
       throw result;
     return result;
   }

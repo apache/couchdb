@@ -195,6 +195,8 @@ do(#mod{method="POST"}=Mod, #uri_parts{db="_restart", doc=""}) ->
     send_ok(Mod, 201);
 do(#mod{method="POST"}=Mod, #uri_parts{doc="_missing_revs"}=Parts) ->
     handle_missing_revs_request(Mod, Parts);
+do(#mod{method="POST"}=Mod, #uri_parts{doc="_compact"}=Parts) ->
+    handle_compact(Mod, Parts);
 do(#mod{method="PUT"}=Mod, #uri_parts{doc=""}=Parts) ->
     handle_db_create(Mod, Parts);
 do(#mod{method="DELETE"}=Mod, #uri_parts{doc=""}=Parts) ->
@@ -486,6 +488,10 @@ handle_missing_revs_request(#mod{entity_body=RawJson}=Mod, Parts) ->
     {ok, Results} = couch_db:get_missing_revs(Db, DocIdRevs),
     JsonResults = [{Id, list_to_tuple(Revs)} || {Id, Revs} <- Results],
     send_json(Mod, 200, {obj, [{missing_revs, {obj, JsonResults}}]}).
+
+handle_compact(Mod, Parts) ->
+    ok = couch_db:start_compact(open_db(Parts)),
+    send_ok(Mod, 202).
 
 handle_replication_request(#mod{entity_body=RawJson}=Mod) ->
     {obj, Props} = cjson:decode(RawJson),
