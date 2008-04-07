@@ -36,8 +36,6 @@ readline(Port) ->
     readline(Port, []).
 
 readline(Port, Acc) ->
-    Timer = erlang:send_after(timeout(), self(), timeout),
-    Result =
     receive
     {Port, {data, {noeol, Data}}} ->
         readline(Port, [Data|Acc]);
@@ -45,20 +43,11 @@ readline(Port, Acc) ->
         lists:flatten(lists:reverse(Acc, Data));
     {Port, Err} ->
         catch port_close(Port),
-        erlang:cancel_timer(Timer),
-        throw({map_process_error, Err});
-    timeout ->
+        throw({map_process_error, Err})
+    after timeout() ->
         catch port_close(Port),
         throw({map_process_error, "map function timed out"})
-    end,
-    case erlang:cancel_timer(Timer) of
-    false ->
-        % message already sent. clear it
-        receive timeout -> ok end;
-    _ ->
-        ok
-    end,
-    Result.
+    end.
 
 read_json(Port) ->
     case cjson:decode(readline(Port)) of
@@ -108,8 +97,7 @@ start_doc_map(Lang, Functions) ->
 
 map_docs({_Lang, Port}, Docs) ->
     % send the documents
-    Results =
-    lists:map(
+    Results = lists:map(
         fun(Doc) ->
             Json = couch_doc:to_json_obj(Doc, []),
             case prompt(Port, {"map_doc", Json}) of

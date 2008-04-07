@@ -14,7 +14,7 @@
 
 -include("couch_db.hrl").
 
--export([replicate/2, replicate/3, test/0, test_write_docs/3]).
+-export([replicate/2, replicate/3]).
 
 -record(stats, {
     docs_read=0,
@@ -117,8 +117,7 @@ replicate(Source, Target, Options) ->
     end.
 
 pull_rep(DbTarget, DbSource, SourceSeqNum, Stats) ->
-    {ok, NewSeq} =
-    enum_docs_since(DbSource, SourceSeqNum,
+    {ok, NewSeq} = enum_docs_since(DbSource, SourceSeqNum,
         fun(#doc_info{update_seq=Seq}=SrcDocInfo, _, {_, AccStats}) ->
             Stats2 = maybe_save_docs(DbTarget, DbSource, SrcDocInfo, AccStats),
             {ok, {Seq, Stats2}}
@@ -136,23 +135,15 @@ maybe_save_docs(DbTarget, DbSource,
     [] ->
         Stats;
     _Else ->
-        % the 'ok' below validates no unrecoverable errors (like network failure, etc).
         {ok, DocResults} = open_doc_revs(DbSource, Id, MissingRevs, [latest]),
+        % only save successful reads
+        Docs = [RevDoc || {ok, RevDoc} <- DocResults],
+        ok = save_docs(DbTarget, Docs, []),
 
-        Docs = [RevDoc || {ok, RevDoc} <- DocResults], % only match successful loads
-
-        Stats2 = Stats#stats{
+        Stats#stats{
             docs_read=Stats#stats.docs_read + length(Docs),
-            read_errors=Stats#stats.read_errors + length(DocResults) - length(Docs)},
-
-        case Docs of
-        [] ->
-            Stats2;
-        _ ->
-            % the 'ok' below validates no unrecoverable errors (like network failure, etc).
-            ok = save_docs(DbTarget, Docs, []),
-            Stats2#stats{docs_copied=Stats2#stats.docs_copied+length(Docs)}
-        end
+            read_errors=Stats#stats.read_errors + length(DocResults) - length(Docs),
+            docs_copied=Stats#stats.docs_copied + length(Docs)}
     end.
 
 
@@ -280,29 +271,3 @@ open_doc_revs(Db, DocId, Revs, Options) ->
     couch_db:open_doc_revs(Db, DocId, Revs, Options).
 
 
-
-
-
-test() ->
-    couch_server:start(),
-    %{ok, LocalA} = couch_server:open("replica_a"),
-    {ok, LocalA} = couch_server:create("replica_a", [overwrite]),
-    {ok, _} = couch_server:create("replica_b", [overwrite]),
-    %DbA = "replica_a",
-    DbA = "http://localhost:5984/replica_a/",
-    %DbB = "replica_b",
-    DbB = "http://localhost:5984/replica_b/",
-    _DocUnids = test_write_docs(10, LocalA, []),
-    replicate(DbA, DbB),
-    %{ok, _Rev} = couch_db:delete_doc(LocalA, lists:nth(1, DocUnids), any),
-    % replicate(DbA, DbB),
-    ok.
-
-test_write_docs(0, _Db, Output) ->
-    lists:reverse(Output);
-test_write_docs(N, Db, Output) ->
-    Doc = #doc{
-        id=integer_to_list(N),
-        body={obj, [{"foo", integer_to_list(N)}, {"num", N}, {"bar", "blah"}]}},
-    couch_db:save_doc(Db, Doc, []),
-    test_write_docs(N-1, Db, [integer_to_list(N) | Output]).

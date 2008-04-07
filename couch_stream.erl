@@ -79,7 +79,7 @@ read(Fd, Sp, Num) ->
     {ok, Bin, Sp2}.
 
 copy_to_new_stream(Src, Sp, Len, DestFd) ->
-    Dest = open(DestFd),
+    {ok, Dest} = open(DestFd),
     {ok, NewSp} = copy(Src, Sp, Len, Dest),
     close(Dest),
     {ok, NewSp}.
