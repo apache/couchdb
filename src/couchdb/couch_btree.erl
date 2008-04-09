@@ -289,17 +289,20 @@ write_node(Bt, NodeType, NodeList) ->
     ],
     {ok, ResultList, Bt}.
 
+
 modify_kpnode(Bt, KPs, [], ResultNode, QueryOutput) ->
     % processed all queries for the current tree
     {ok, lists:reverse(ResultNode, KPs), QueryOutput, Bt};
+
+modify_kpnode(Bt, [], Actions, [], QueryOutput) ->
+    modify_node(Bt, nil, Actions, QueryOutput);
 
 modify_kpnode(Bt, [], Actions, [{_Key, PointerInfo} | ResultNode], QueryOutput) ->
     {ok, ChildKPs, QueryOutput2, Bt2} = modify_node(Bt, PointerInfo, Actions, QueryOutput),
     {ok, lists:reverse(ResultNode, ChildKPs), QueryOutput2, Bt2};
 
 modify_kpnode(Bt, [{Key,PointerInfo} | RestKPs], Actions, ResultNode, QueryOutput) ->
-    % Split the actions into two lists, queries of values less
-    % than equals, and greater than the current key
+    % Split the actions into two lists, queries of values <= and > than the current key
     SplitFun = fun({_ActionType, ActionKey, _ActionValue}) ->
             not less(Bt, Key, ActionKey)
         end,
