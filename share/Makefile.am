@@ -14,6 +14,7 @@ datarootdir = @prefix@/share
 
 nobase_dist_pkgdata_DATA = \
     server/main.js \
+    www/browse/_compact_database.html \
     www/browse/_create_database.html \
     www/browse/_create_document.html \
     www/browse/_delete_database.html \
@@ -28,6 +29,7 @@ nobase_dist_pkgdata_DATA = \
     www/image/apply.gif \
     www/image/bg.png \
     www/image/cancel.gif \
+    www/image/compact.gif \
     www/image/delete-mini.gif \
     www/image/delete.gif \
     www/image/grippie.gif \

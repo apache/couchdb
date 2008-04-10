@@ -78,6 +78,7 @@ specific language governing permissions and limitations under the License.
           $.cookies.set(page.dbName + ".perpage", this.value);
         });
         $("#toolbar button.add").click(page.addDocument);
+        $("#toolbar button.compact").click(page.compactDatabase);
         $("#toolbar button.delete").click(page.deleteDatabase);
       });
     </script>
@@ -98,6 +99,7 @@ specific language governing permissions and limitations under the License.
       </div>
       <ul id="toolbar">
         <li><button class="add">Create Document …</button></li>
+        <li><button class="compact">Compact Database</button></li>
         <li><button class="delete">Delete Database</button></li>
       </ul>
 

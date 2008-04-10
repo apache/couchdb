@@ -179,6 +179,7 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
 #toolbar button:hover { background-position: 2px -30px; color: #000; }
 #toolbar button:active { background-position: 2px -62px; color: #000; }
 #toolbar button.add { background-image: url(../image/add.gif); }
+#toolbar button.compact { background-image: url(../image/compact.gif); }
 #toolbar button.delete { background-image: url(../image/delete.gif); }
 #toolbar button.edit { background-image: url(../image/edit.gif); }
 #toolbar button.load { background-image: url(../image/load.gif); }

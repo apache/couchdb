@@ -84,6 +84,14 @@ function CouchDatabasePage() {
     });
   }
 
+  this.compactDatabase = function() {
+    $.showDialog("_compact_database.html", {
+      submit: function() {
+        db.compact();
+      }
+    });
+  }
+
   this.deleteDatabase = function() {
     $.showDialog("_delete_database.html", {
       submit: function() {

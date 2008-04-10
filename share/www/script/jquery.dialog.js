@@ -76,7 +76,7 @@
             data[field.name] = field.value;
           });
           var errors = options.submit(data);
-          if (errors == {}) {
+          if (errors == null || errors == {}) {
             dismiss();
           } else {
             for (var name in errors) {
