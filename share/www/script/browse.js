@@ -58,10 +58,11 @@ function CouchDatabasePage() {
   var urlParts = location.search.substr(1).split("/");
   var dbName = urlParts.shift();
   var viewName = (urlParts.length > 0) ? urlParts.join("/") : null;
-  if (!viewName) {
-    viewName = $.cookies.get(dbName + ".view") || "";
-  } else {
+  if (viewName) {
+    viewName = decodeURIComponent(viewName);
     $.cookies.set(dbName + ".view", viewName);
+  } else {
+    viewName = $.cookies.get(dbName + ".view") || "";
   }
   var db = new CouchDB(dbName);
 
@@ -376,7 +377,7 @@ function CouchDocumentPage() {
   var urlParts = location.search.substr(1).split("/");
   var dbName = urlParts.shift();
   var idParts = urlParts.join("/").split("@", 2);
-  var docId = idParts[0];
+  var docId = decodeURIComponent(idParts[0]);
   var docRev = (idParts.length > 1) ? idParts[1] : null;
   var db = new CouchDB(dbName);
   var doc = db.open(docId, {revs_info: true});
