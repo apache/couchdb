@@ -29,7 +29,7 @@ CONFIG_GUESS_COMPRESSED_FILE="build-contrib/config.guess_2007-09-12.gz"
 CONFIG_GUESS_FILE="build-aux/config.guess"
 CONFIG_SUB_COMPRESSED_FILE="build-contrib/config.sub_2007-09-12.gz"
 CONFIG_SUB_FILE="build-aux/config.sub"
-COPYING_FILE="COPYING"
+LICENCE_FILE="LICENCE"
 LICENSE_COMPRESSED_FILE="build-contrib/apache_2.txt.gz"
 M4_DIRECTORY="m4"
 M4_AC_CHECK_ICU_FILE="m4/ac_check_icu.m4"
@@ -192,8 +192,8 @@ generate_acinclude () {
 process_file_collection () {
     # Process files required to complete the bootstrap.
 
-    echo "Installing \`"$COPYING_FILE"'"
-    gzip --decompress --stdout $LICENSE_COMPRESSED_FILE > $COPYING_FILE
+    echo "Installing \`"$LICENCE_FILE"'"
+    gzip --decompress --stdout $LICENSE_COMPRESSED_FILE > $LICENCE_FILE
     echo "Installing \`"$BUILD_AUX_DIRECTORY"'"
     mkdir -p $BUILD_AUX_DIRECTORY
     echo "Installing \`"$CONFIG_GUESS_FILE"'"

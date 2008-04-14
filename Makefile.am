@@ -20,7 +20,7 @@ CLEANFILES = $(doc_DATA)
 
 DISTCLEANFILES = $(pkgdoc_DATA)
 
-EXTRA_DIST = AUTHORS BUGS ChangeLog NEWS README THANKS
+EXTRA_DIST = AUTHORS BUGS ChangeLog LICENCE NEWS README THANKS
 
 AUTHORS.gz: $(top_srcdir)/AUTHORS
 	-gzip -9 < $< > $@
@@ -43,7 +43,7 @@ THANKS.gz: $(top_srcdir)/THANKS
 local-clean: maintainer-clean
 	@echo "This command is intended for maintainers to use;"
 	@echo "it deletes files that may need special tools to rebuild."
-	rm -f COPYING
+	rm -f LICENCE
 	rm -f ChangeLog
 	rm -f INSTALL
 	rm -f acinclude.m4
