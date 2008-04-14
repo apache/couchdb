@@ -16,8 +16,6 @@ SUBDIRS = bin etc src share var
 
 pkgdoc_DATA = AUTHORS.gz BUGS.gz changelog.gz NEWS.gz README.gz THANKS.gz
 
-CLEANFILES = $(doc_DATA)
-
 DISTCLEANFILES = $(pkgdoc_DATA)
 
 EXTRA_DIST = AUTHORS BUGS ChangeLog LICENCE NEWS README THANKS
@@ -43,7 +41,6 @@ THANKS.gz: $(top_srcdir)/THANKS
 local-clean: maintainer-clean
 	@echo "This command is intended for maintainers to use;"
 	@echo "it deletes files that may need special tools to rebuild."
-	rm -f LICENCE
 	rm -f ChangeLog
 	rm -f INSTALL
 	rm -f acinclude.m4
