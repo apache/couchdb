@@ -10,4 +10,27 @@
 ## License for the specific language governing permissions and limitations
 ## under the License.
 
-## This file intentionally left blank.
+datarootdir = @prefix@/share
+
+pkgconf_DATA = couch.ini couch_httpd.conf
+
+nobase_dist_pkgconf_DATA = conf/mime.types
+
+CLEANFILES = $(pkgconf_DATA) $(dist_pkgconf_DATA)
+
+couch.ini: couch.ini.tpl
+	sed -e "s|%bindir%|@bindir@|g" \
+	    -e "s|%pkgconfdir%|@pkgconfdir@|g" \
+	    -e "s|%pkgdatadir%|@pkgdatadir@|g" \
+	    -e "s|%pkgstatelibdir%|@pkgstatelibdir@|g" \
+	    -e "s|%pkgstatelogdir%|@pkgstatelogdir@|g" \
+	    -e "s|%couchprivlibdir%|$(couchprivlibdir)|g" \
+	    -e "s|%couchjs_command_name%|$(couchjs_command_name)|g" \
+	< $< > $@
+
+couch_httpd.conf: couch_httpd.conf.tpl
+	sed -e "s|%pkgconfdir%|@pkgconfdir@|g" \
+	    -e "s|%pkgdatadir%|@pkgdatadir@|g" \
+	    -e "s|%pkgstatelogdir%|@pkgstatelogdir@|g" \
+	< $< > $@
+
