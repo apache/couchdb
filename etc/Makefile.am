@@ -33,7 +33,6 @@ CLEANFILES = $(init_DATA) $(nobase_sysconf_DATA) $(launchd_DATA)
 
 transform = @program_transform_name@
 couchdb_command_name = `echo couchdb | sed '$(transform)'`
-couchjs_command_name = `echo couchjs | sed '$(transform)'`
 
 default/couchdb: default/couchdb.tpl
 	if test "$(mkdir_p)"; then \

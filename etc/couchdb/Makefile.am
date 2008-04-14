@@ -18,6 +18,9 @@ nobase_dist_pkgconf_DATA = conf/mime.types
 
 CLEANFILES = $(pkgconf_DATA) $(dist_pkgconf_DATA)
 
+transform = @program_transform_name@
+couchjs_command_name = `echo couchjs | sed '$(transform)'`
+
 couch.ini: couch.ini.tpl
 	sed -e "s|%bindir%|@bindir@|g" \
 	    -e "s|%pkgconfdir%|@pkgconfdir@|g" \
