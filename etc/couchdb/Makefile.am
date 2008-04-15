@@ -12,11 +12,9 @@
 
 datarootdir = @prefix@/share
 
-pkgconf_DATA = couch.ini couch_httpd.conf
+pkgconf_DATA = couch.ini
 
-nobase_dist_pkgconf_DATA = conf/mime.types
-
-CLEANFILES = $(pkgconf_DATA) $(dist_pkgconf_DATA)
+CLEANFILES = $(pkgconf_DATA)
 
 transform = @program_transform_name@
 couchjs_command_name = `echo couchjs | sed '$(transform)'`
@@ -32,10 +30,3 @@ couch.ini: couch.ini.tpl
 	    -e "s|%couchprivlibdir%|$(couchprivlibdir)|g" \
 	    -e "s|%couchjs_command_name%|$(couchjs_command_name)|g" \
 	< $< > $@
-
-couch_httpd.conf: couch_httpd.conf.tpl
-	sed -e "s|%pkgconfdir%|@pkgconfdir@|g" \
-	    -e "s|%pkgdatadir%|@pkgdatadir@|g" \
-	    -e "s|%pkgstatelogdir%|@pkgstatelogdir@|g" \
-	< $< > $@
-

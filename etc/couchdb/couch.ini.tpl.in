@@ -6,9 +6,13 @@ ConsoleStartupMsg=Apache CouchDB is starting.
 
 DbRootDir=%pkgstatelibdir%
 
-LogFile=%pkgstatelogdir%/couch.log
+Port=5984
 
-HttpConfigFile=%pkgconfdir%/couch_httpd.conf
+BindAddress=127.0.0.1
+
+DocumentRoot=%pkgdatadir%/www
+
+LogFile=%pkgstatelogdir%/couch.log
 
 UtilDriverDir=%couchprivlibdir%
 

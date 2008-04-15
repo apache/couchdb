@@ -382,7 +382,7 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
 #tests tbody.content td.status { background-position: 5px 8px;
   background-repeat: no-repeat; color: #999; padding-left: 20px;
 }
-#tests tbody.content td.details { width: 50%; overflow: auto; }
+#tests tbody.content td.details { width: 50%; }
 #tests tbody.content td.details a { border-bottom: 1px dashed #ccc;
   color: #999; float: right; font-size: 85%;
 }

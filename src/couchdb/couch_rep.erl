@@ -154,6 +154,15 @@ do_http_request(Url, Action, JsonBody) ->
     couch_log:debug("couch_rep HTTP client request:"),
     couch_log:debug("\tAction: ~p", [Action]),
     couch_log:debug("\tUrl: ~p", [Url]),
+
+    % ensure that the inets application is running
+    case application:start(inets) of
+        ok ->
+            ok;
+        {error, {already_started, inets}} ->
+            ok
+    end,
+
     Request =
     case JsonBody of
     [] ->

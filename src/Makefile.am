@@ -12,4 +12,4 @@
 
 datarootdir = @prefix@/share
 
-SUBDIRS = couch_inets couchdb
+SUBDIRS = couchdb mochiweb

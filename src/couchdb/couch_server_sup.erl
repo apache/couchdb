@@ -65,7 +65,9 @@ start_server(InputIniFilename) ->
     ConsoleStartupMsg = proplists:get_value({"Couch", "ConsoleStartupMsg"}, Ini, "Apache CouchDB is starting."),
     LogLevel = list_to_atom(proplists:get_value({"Couch", "LogLevel"}, Ini, "error")),
     DbRootDir = proplists:get_value({"Couch", "DbRootDir"}, Ini, "."),
-    HttpConfigFile = proplists:get_value({"Couch", "HttpConfigFile"}, Ini, "couch_httpd.conf"),
+    BindAddress = proplists:get_value({"Couch", "BindAddress"}, Ini, any),
+    Port = proplists:get_value({"Couch", "Port"}, Ini, 5984),
+    DocumentRoot = proplists:get_value({"Couch", "DocumentRoot"}, Ini, "share/www"),
     LogFile = proplists:get_value({"Couch", "LogFile"}, Ini, "couchdb.log"),
     UtilDriverDir = proplists:get_value({"Couch", "UtilDriverDir"}, Ini, ""),
     UpdateNotifierExes = proplists:get_all_values({"Couch", "DbUpdateNotificationProcess"}, Ini),
@@ -111,12 +113,12 @@ start_server(InputIniFilename) ->
             brutal_kill,
             worker,
             [couch_view]},
-        {httpd,
-            {httpd, start_link, [HttpConfigFile]},
+        {couch_httpd,
+            {couch_httpd, start_link, [BindAddress, Port, DocumentRoot]},
             permanent,
             1000,
             supervisor,
-            [httpd]}
+            [couch_httpd]}
         ] ++
         lists:map(fun(UpdateNotifierExe) ->
             {UpdateNotifierExe,
@@ -148,7 +150,9 @@ start_server(InputIniFilename) ->
 
     ConfigInfo = io_lib:format("Config Info ~s:~n\tCurrentWorkingDir=~s~n" ++
         "\tDbRootDir=~s~n" ++
-        "\tHttpConfigFile=~s~n" ++
+        "\tBindAddress=~p~n" ++
+        "\tPort=~p~n" ++
+        "\tDocumentRoot=~s~n" ++
         "\tLogFile=~s~n" ++
         "\tUtilDriverDir=~s~n" ++
         "\tDbUpdateNotificationProcesses=~s~n" ++
@@ -157,7 +161,9 @@ start_server(InputIniFilename) ->
             [IniFilename,
             Cwd,
             DbRootDir,
-            HttpConfigFile,
+            BindAddress,
+            Port,
+            DocumentRoot,
             LogFile,
             UtilDriverDir,
             UpdateNotifierExes,

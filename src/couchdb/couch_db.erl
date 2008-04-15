@@ -246,6 +246,7 @@ prepare_doc_for_new_edit(Db, #doc{id=Id,revs=[NewRev|PrevRevs]}=Doc, OldFullDocI
     end.
 
 update_docs(MainPid, Docs, Options) ->
+    % go ahead and generate the new revision ids for the documents.
     Docs2 = lists:map(
         fun(#doc{id=Id,revs=Revs}=Doc) ->
             case Id of
@@ -261,7 +262,7 @@ update_docs(MainPid, Docs, Options) ->
     Ids = [Id || [#doc{id=Id}|_] <- DocBuckets],
     Db = get_db(MainPid),
     
-    % first things first, lookup the doc by id and get the most recent
+    % lookup the doc by id and get the most recent
     
     ExistingDocs = get_full_doc_infos(Db, Ids),
     
@@ -276,7 +277,6 @@ update_docs(MainPid, Docs, Options) ->
             [prepare_doc_for_new_edit(Db, Doc, OldFullDocInfo, LeafRevsDict) || Doc <- Bucket]
         end,
         DocBuckets, ExistingDocs),
-    
     % flush unwritten binaries to disk.
     DocBuckets3 = [[doc_flush_binaries(Doc, Db#db.fd) || Doc <- Bucket] || Bucket <- DocBuckets2],
 
@@ -607,7 +607,7 @@ open_doc_int(Db, #doc_info{id=Id,rev=Rev,deleted=IsDeleted,summary_pointer=Sp}=D
     Doc = make_doc(Db, Id, IsDeleted, Sp, [Rev]),
     {ok, Doc#doc{meta=doc_meta_info(DocInfo, [], Options)}};
 open_doc_int(Db, #full_doc_info{id=Id,rev_tree=RevTree}=FullDocInfo, Options) ->
-    #doc_info{deleted=IsDeleted,rev=Rev, summary_pointer=Sp} = DocInfo =
+    #doc_info{deleted=IsDeleted,rev=Rev,summary_pointer=Sp} = DocInfo =
         couch_doc:to_doc_info(FullDocInfo),
     {[{_Rev,_Value, Revs}], []} = couch_key_tree:get(RevTree, [Rev]),
     Doc = make_doc(Db, Id, IsDeleted, Sp, Revs),
@@ -626,7 +626,14 @@ doc_meta_info(DocInfo, RevTree, Options) ->
     true ->
         {[RevPath],[]} = 
             couch_key_tree:get_full_key_paths(RevTree, [DocInfo#doc_info.rev]),
-        [{revs_info, [{Rev, Deleted} || {Rev, {Deleted, _Sp0}} <- RevPath]}]
+        [{revs_info, lists:map(
+            fun({Rev, {true, _Sp}}) -> 
+                {Rev, deleted};
+            ({Rev, {false, _Sp}}) ->
+                {Rev, available};
+            ({Rev, ?REV_MISSING}) ->
+                {Rev, missing}
+            end, RevPath)}]
     end ++
     case lists:member(conflicts, Options) of
     false -> [];

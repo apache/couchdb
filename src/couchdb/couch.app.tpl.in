@@ -13,7 +13,7 @@
                         couch_key_tree,
                         couch_view,
                         couch_util,
-                        mod_couch,
+                        couch_httpd,
                         couch_event_sup,
                         couch_db_update_notifier,
                         couch_ft_query,
@@ -25,5 +25,4 @@
                            couch_view,
                            couch_query_servers,
                            couch_ft_query]},
-              {applications,[kernel,stdlib,xmerl,couch_inets]},
-              {mod,{couch_server,[]}}]}.
+              {applications,[kernel,stdlib,xmerl,inets,mochiweb]}]}.
