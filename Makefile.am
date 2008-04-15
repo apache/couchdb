@@ -36,6 +36,7 @@ couch_file_collection = \
     couch_doc.erl \
     couch_event_sup.erl \
     couch_file.erl \
+    couch_httpd.erl \
     couch_ft_query.erl \
     couch_key_tree.erl \
     couch_log.erl \
@@ -45,8 +46,7 @@ couch_file_collection = \
     couch_server_sup.erl \
     couch_stream.erl \
     couch_util.erl \
-    couch_view.erl \
-    mod_couch.erl
+    couch_view.erl
 
 couchebin_DATA = \
     cjson.beam \
@@ -58,6 +58,7 @@ couchebin_DATA = \
     couch_event_sup.beam \
     couch_file.beam \
     couch_ft_query.beam \
+    couch_httpd.beam \
     couch_key_tree.beam \
     couch_log.beam \
     couch_query_servers.beam \
@@ -66,8 +67,7 @@ couchebin_DATA = \
     couch_server_sup.beam \
     couch_stream.beam \
     couch_util.beam \
-    couch_view.beam \
-    mod_couch.beam
+    couch_view.beam
 
 couchinclude_DATA = couch_db.hrl
 

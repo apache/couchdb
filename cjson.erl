@@ -410,7 +410,7 @@ tokenize([], S=#decoder{state=trim}) ->
 tokenize([L | Rest], S) when is_list(L) ->
     tokenize(L ++ Rest, S);
 tokenize([B | Rest], S) when is_binary(B) ->
-    tokenize(xmerl_ucs:from_utf8(B) ++ Rest, S);
+    tokenize(xmerl_ucs:from_utf8(B) ++ Rest, S#decoder{input_encoding=unicode});
 tokenize("\r\n" ++ Rest, S) ->
     tokenize(Rest, ?INC_LINE(S));
 tokenize("\n" ++ Rest, S) ->

@@ -128,13 +128,12 @@ to_doc_info(#full_doc_info{id=Id,update_seq=Seq,rev_tree=Tree}) ->
     [{RevId, {IsDeleted, SummaryPointer}, _Path} | Rest] = SortedLeafRevs,
 
     {ConflictRevTuples, DeletedConflictRevTuples} =
-        lists:splitwith(fun({_ConflictRevId, {IsDeleted1, _SummaryPointer}, _}) ->
+        lists:splitwith(fun({_ConflictRevId, {IsDeleted1, _Sp}, _}) ->
                 not IsDeleted1
             end, Rest),
 
     ConflictRevs = [RevId1  || {RevId1, _, _} <- ConflictRevTuples],
     DeletedConflictRevs = [RevId2   || {RevId2, _, _} <- DeletedConflictRevTuples],
-
     #doc_info{
         id=Id,
         update_seq=Seq,
