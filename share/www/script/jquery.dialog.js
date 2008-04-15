@@ -75,14 +75,15 @@
           $.each($("form :input", dialog).serializeArray(), function(i, field) {
             data[field.name] = field.value;
           });
-          var errors = options.submit(data);
-          if (errors == null || errors == {}) {
-            dismiss();
-          } else {
-            for (var name in errors) {
-              showError(name, errors[name]);
+          options.submit(data, function callback(errors) {
+            if (errors == null || errors == {}) {
+              dismiss();
+            } else {
+              for (var name in errors) {
+                showError(name, errors[name]);
+              }
             }
-          }
+          });
           return false;
         });
       });

@@ -28,16 +28,20 @@ specific language governing permissions and limitations under the License.
     </style>
     <script src="script/json2.js"></script>
     <script src="script/jquery.js"></script>
-    <script src="script/couch.js"></script>
+    <script src="script/jquery.couch.js"></script>
     <script>
       function updateDatabaseList() {
-        var dbs = CouchDB.allDbs();
-        $("#dbs").empty();
-        for (var i = 0; i < dbs.length; i++) {
-          var dbname = dbs[i];
-          $("#dbs").append("<li><a href='browse/database.html?" + dbname +
-            "' target='content'>" + dbname + "</a></li>");
-        }
+        var list = $("#dbs").empty();
+        var dbs = $.couch.allDbs({
+          success: function(dbs, status) {
+            for (var i = 0; i < dbs.length; i++) {
+              var dbName = dbs[i];
+              list.append("<li><a href='browse/database.html?" +
+                encodeURIComponent(dbName) + "' target='content'>" + dbName +
+                "</a></li>");
+            }
+          }
+        });
       }
       function updateNavigation(path, queryString) {
         function fixupPath(path) { // hack for IE/Win
@@ -67,7 +71,11 @@ specific language governing permissions and limitations under the License.
         });
       }
       $(function() {
-        $("#version").text(CouchDB.getVersion());
+        $.couch.info({
+          success: function(info, status) {
+            $("#version").text(info.version);
+          }
+        });
         updateDatabaseList();
       });
     </script>

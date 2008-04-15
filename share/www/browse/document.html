@@ -21,9 +21,9 @@ specific language governing permissions and limitations under the License.
     <script src="../script/json2.js"></script>
     <script src="../script/jquery.js"></script>
     <script src="../script/jquery.cookies.js"></script>
+    <script src="../script/jquery.couch.js"></script>
     <script src="../script/jquery.dialog.js"></script>
     <script src="../script/jquery.resizer.js"></script>
-    <script src="../script/couch.js"></script>
     <script src="../script/browse.js"></script>
     <script src="../script/pprint.js"></script>
     <script>
@@ -32,13 +32,14 @@ specific language governing permissions and limitations under the License.
         var dbLink = $("h1 a.dbname").get(0);
         parent.updateNavigation(
           location.pathname.replace(/document\.html/, "database.html"),
-          location.search.split("/")[0]
+          encodeURIComponent(location.search.split("/")[0])
         );
       }
 
       $(function() {
-        $("h1 a.dbname").text(page.dbName).attr("href", "database.html?" + page.dbName);
-        $("h1 strong").text(page.doc._id);
+        $("h1 a.dbname").text(page.dbName)
+          .attr("href", "database.html?" + encodeURIComponent(page.db.name));
+        $("h1 strong").text(page.docId);
         page.updateFieldListing();
         $("#toolbar button.save").click(page.saveDocument);
         $("#toolbar button.add").click(page.addField);

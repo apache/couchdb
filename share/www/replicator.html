@@ -20,7 +20,7 @@ specific language governing permissions and limitations under the License.
     <link rel="stylesheet" href="style/layout.css" type="text/css">
     <script src="script/json2.js"></script>
     <script src="script/jquery.js"></script>
-    <script src="script/couch.js"></script>
+    <script src="script/jquery.couch.js"></script>
     <script src="script/pprint.js"></script>
     <script>
       $(document).ready(function() {
@@ -39,12 +39,17 @@ specific language governing permissions and limitations under the License.
           });
         });
 
-        var allDbs = CouchDB.allDbs();
-        $("fieldset select").each(function() {
-          for (var i = 0; i < allDbs.length; i++) {
-            $("<option></option>").text(allDbs[i]).appendTo(this);
+        
+        $.couch.allDbs({
+          success: function(dbs) {
+            $("fieldset select").each(function() {
+              var select = this;
+              $.each(dbs, function(idx, dbName) {
+                $("<option></option>").text(dbName).appendTo(select);
+              });
+              select.selectedIndex = 0;
+            });
           }
-          this.selectedIndex = 0;
         });
 
         $("button#swap").click(function() {
@@ -73,24 +78,23 @@ specific language governing permissions and limitations under the License.
           $("#records tbody.content").empty();
           var source = $("#from_local")[0].checked ? $("#from_name").val() : $("#from_url").val();
           var target = $("#to_local")[0].checked ? $("#to_name").val() : $("#to_url").val();
-          try {
-            var results = CouchDB.replicate(source, target);
-          } catch (e) {
-            alert(e.reason);
-            return;
-          }
-          for (var i = 0; i < results.history.length; i++) {
-            var record = results.history[i];
-            $("<tr><th></th><td class='seq'></td>" +
-              "<td class='read'></td><td class='copied'></td></tr>")
-              .find("th").text(record.start_time).end()
-              .find("td.seq").text(record.start_last_seq + "–" + record.end_last_seq).end()
-              .find("td.read").text(record.docs_read + " (" + record.read_errors + " errors)").end()
-              .find("td.copied").text(record.docs_copied + " (" + record.copy_errors + " errors)").end()
-              .appendTo("#records tbody.content");
-          }
-          $("#records tbody tr").removeClass("odd").filter(":odd").addClass("odd");
-          $("#records tbody.footer td").text("Replication session " + results.session_id);
+          $(document.body).addClass("loading");
+          $.couch.replicate(source, target, {
+            success: function(resp) {
+              $.each(resp.history, function(idx, record) {
+                $("<tr><th></th><td class='seq'></td>" +
+                  "<td class='read'></td><td class='copied'></td></tr>")
+                  .find("th").text(record.start_time).end()
+                  .find("td.seq").text(record.start_last_seq + "–" + record.end_last_seq).end()
+                  .find("td.read").text(record.docs_read + " (" + record.read_errors + " errors)").end()
+                  .find("td.copied").text(record.docs_copied + " (" + record.copy_errors + " errors)").end()
+                  .appendTo("#records tbody.content");
+              });
+              $("#records tbody tr").removeClass("odd").filter(":odd").addClass("odd");
+              $("#records tbody.footer td").text("Replication session " + resp.session_id);
+              $(document.body).removeClass("loading");
+            }
+          });
         });
       });
     </script>

@@ -21,20 +21,21 @@ specific language governing permissions and limitations under the License.
     <script src="../script/json2.js"></script>
     <script src="../script/jquery.js"></script>
     <script src="../script/jquery.cookies.js"></script>
+    <script src="../script/jquery.couch.js"></script>
     <script src="../script/jquery.dialog.js"></script>
     <script src="../script/jquery.resizer.js"></script>
     <script src="../script/jquery.suggest.js"></script>
-    <script src="../script/couch.js"></script>
     <script src="../script/browse.js"></script>
     <script src="../script/pprint.js"></script>
     <script>
       var page = new CouchDatabasePage();
       if (window != parent) {
-        parent.updateNavigation(location.pathname, location.search.split("/", 2)[0]);
+        parent.updateNavigation(location.pathname,
+          encodeURIComponent(location.search.split("/", 2)[0]));
       }
 
       $(document).ready(function() {
-        $("h1 strong").text(page.dbName);
+        $("h1 strong").text(page.db.name);
         $("#viewcode label").click(function() {
           $("#viewcode").toggleClass("expanded");
         });
@@ -53,11 +54,11 @@ specific language governing permissions and limitations under the License.
         $("#viewcode textarea").resizable({grippie: $("#viewcode .bottom")});
 
         // Restore preferences/state from cookies
-        var query = $.cookies.get(page.dbName + ".query");
+        var query = $.cookies.get(page.db.name + ".query");
         if (query) $("#viewcode textarea").val(query);
-        var desc = $.cookies.get(page.dbName + ".desc");
+        var desc = $.cookies.get(page.db.name + ".desc");
         if (desc) $("#documents thead th.key").addClass("desc");
-        var rowsPerPage = $.cookies.get(page.dbName + ".perpage");
+        var rowsPerPage = $.cookies.get(page.db.name + ".perpage");
         if (rowsPerPage) $("#perpage").val(rowsPerPage);
 
         page.populateViewsMenu();
@@ -66,8 +67,9 @@ specific language governing permissions and limitations under the License.
 
         $("#switch select").change(function() {
           var viewName = $(this).val();
-          if (!viewName) $.cookies.remove(page.dbName + ".view");
-          location.href = "?" + page.dbName + (viewName ? "/" + viewName  : "");
+          if (!viewName) $.cookies.remove(page.db.name + ".view");
+          location.href = "?" + encodeURIComponent(page.db.name) +
+            (viewName ? "/" + encodeURIComponent(viewName)  : "");
         });
         $("#documents thead th.key").click(function() {
           $(this).toggleClass("desc");
@@ -75,7 +77,7 @@ specific language governing permissions and limitations under the License.
         });
         $("#perpage").change(function() {
           page.updateDocumentListing();
-          $.cookies.set(page.dbName + ".perpage", this.value);
+          $.cookies.set(page.db.name + ".perpage", this.value);
         });
         $("#toolbar button.add").click(page.addDocument);
         $("#toolbar button.compact").click(page.compactDatabase);
@@ -91,7 +93,7 @@ specific language governing permissions and limitations under the License.
     </h1>
     <div id="wrap">
       <div id="switch">
-        <label>Select view: <select>
+        <label>Select view: <select autocomplete="false">
           <option value="">All documents</option>
           <option value="_design_docs">Design documents</option>
           <option value="_temp_view">Custom query…</option>

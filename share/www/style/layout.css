@@ -33,7 +33,10 @@ h1 :link, h1 :visited {
 h1 :link, h1 :visited { color: #bbb; cursor: pointer;
   text-shadow: #333 2px 2px 1px;
 }
-h1 strong { color: #fff; text-shadow: #000 2px 2px 4px; }
+h1 strong { color: #fff; padding-right: 25px; text-shadow: #000 2px 2px 4px; }
+body.loading h1 strong {
+  background: url(../image/spinner.gif) right center no-repeat;
+}
 
 hr { border: 1px solid #999; border-width: 1px 0 0; }
 dl dt { font-weight: bold; }
@@ -48,6 +51,8 @@ fieldset { border: none; font-size: 95%; margin: 0; padding: .2em 0 0; }
 fieldset legend { color: #666; font-weight: bold; padding: 0; }
 fieldset input, fieldset select { font-size: 95%; }
 fieldset p { margin: .4em; }
+
+p.help { color: #999; font-size: 90%; margin: 0 2em 1em; }
 
 /* Tabular listings */
 
@@ -195,7 +200,7 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
   width: expression(document.body.clientWidth + 'px');
   height: expression(document.body.clientHeight + 'px');
 }
-#dialog { background: #333  url(../image/spinner.gif) 50% 50% no-repeat;
+#dialog { background: #333  url(../image/progress.gif) 50% 50% no-repeat;
   color: #f4f4f4; overflow: hidden; opacity: .95; max-width: 33em;
   padding: 1em 1em 0; -moz-border-radius: 7px; -webkit-border-radius: 7px;
   -webkit-box-shadow: 4px 4px 6px #333;
@@ -213,7 +218,7 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
   -webkit-border-bottom-left-radius: 7px;
   -webkit-border-bottom-right-radius: 7px;
 }
-#dialog p.help { color: #bbb; margin: 0 0 1em; }
+#dialog p.help { color: #bbb; font-size: 95%; margin: 0 0 1em; }
 #dialog fieldset table { margin-top: 1em; }
 #dialog fieldset th, #dialog fieldset td { padding: .5em;
   vertical-align: top;

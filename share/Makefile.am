@@ -39,6 +39,7 @@ nobase_dist_pkgdata_DATA = \
     www/image/order-asc.gif \
     www/image/order-desc.gif \
     www/image/path.gif \
+    www/image/progress.gif \
     www/image/run-mini.gif \
     www/image/run.gif \
     www/image/running.gif \
@@ -58,6 +59,7 @@ nobase_dist_pkgdata_DATA = \
     www/script/couch_tests.js \
     www/script/jquery.js \
     www/script/jquery.cookies.js \
+    www/script/jquery.couch.js \
     www/script/jquery.dialog.js \
     www/script/jquery.resizer.js \
     www/script/jquery.suggest.js \
