@@ -12,8 +12,6 @@
 
 datarootdir = @prefix@/share
 
-couchprivlibdir = $(erlanglibdir)/couch-$(version)/priv/lib
-
 SUBDIRS = couchdb default init launchd logrotate.d
 
 default_sysconf_data = logrotate.d/couchdb

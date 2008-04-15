@@ -21,6 +21,8 @@ CLEANFILES = $(pkgconf_DATA) $(dist_pkgconf_DATA)
 transform = @program_transform_name@
 couchjs_command_name = `echo couchjs | sed '$(transform)'`
 
+couchprivlibdir = $(erlanglibdir)/couch-$(version)/priv/lib
+
 couch.ini: couch.ini.tpl
 	sed -e "s|%bindir%|@bindir@|g" \
 	    -e "s|%pkgconfdir%|@pkgconfdir@|g" \
