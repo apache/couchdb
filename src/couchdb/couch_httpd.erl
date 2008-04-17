@@ -57,6 +57,7 @@ handle_request(Req, DocumentRoot) ->
     % removed, but URL quoting left intact
     {Path, _, _} = mochiweb_util:urlsplit_path(Req:get(raw_path)),
 
+    couch_log:debug("Version:     ~p", [Req:get(version)]),
     couch_log:debug("Method:      ~p", [Method]),
     couch_log:debug("Request URI: ~p", [Path]),
     couch_log:debug("Headers: ~p", [mochiweb_headers:to_list(Req:get(headers))]),
