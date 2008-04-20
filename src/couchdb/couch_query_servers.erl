@@ -53,7 +53,7 @@ read_json(Port) ->
     case cjson:decode(readline(Port)) of
     {obj, [{"log", Msg}]} when is_list(Msg) ->
         % we got a message to log. Log it and continue
-        couch_log:info("Query Server Log Message: ~s", [Msg]),
+        ?LOG_INFO("Query Server Log Message: ~s", [Msg]),
         read_json(Port);
     Else ->
         Else
@@ -75,7 +75,7 @@ start_doc_map(Lang, Functions) ->
         link(Port0),
         Port0;
     {empty, Cmd} ->
-        couch_log:info("Spawning new ~s instance.", [Lang]),
+        ?LOG_INFO("Spawning new ~s instance.", [Lang]),
         open_port({spawn, Cmd}, [stream,
                                     {line, 1000},
                                     exit_status,
@@ -170,11 +170,11 @@ handle_info({Port, {exit_status, Status}}, {QueryServerList, LangPorts}) ->
     {value, {Lang, _}} ->
         case Status of
         0 -> ok;
-        _ -> couch_log:error("Abnormal shutdown of ~s query server process (exit_status: ~w).", [Lang, Status])
+        _ -> ?LOG_ERROR("Abnormal shutdown of ~s query server process (exit_status: ~w).", [Lang, Status])
         end,
         {noreply, {QueryServerList,  lists:keydelete(Port, 2, LangPorts)}};
     _ ->
-        couch_log:error("Unknown linked port/process crash: ~p", [Port])
+        ?LOG_ERROR("Unknown linked port/process crash: ~p", [Port])
     end;
 handle_info(_Whatever, {Cmd, Ports}) ->
     {noreply, {Cmd, Ports}}.

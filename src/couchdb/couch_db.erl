@@ -68,7 +68,7 @@ start_link0(DbName, Filepath, Options) ->
         % crashed during the file switch.
         case couch_file:open(Filepath ++ ".compact") of
         {ok, Fd0} ->
-            couch_log:info("Found ~s~s compaction file, using as primary storage.", [Filepath, ".compact"]),
+            ?LOG_INFO("Found ~s~s compaction file, using as primary storage.", [Filepath, ".compact"]),
             ok = file:rename(Filepath ++ ".compact", Filepath),
             Fd0;
         {error, enoent} ->
@@ -85,7 +85,7 @@ start_link0(DbName, Filepath, Options) ->
         % We successfully opened the db, delete old storage files if around
         case file:delete(Filepath ++ ".old") of
         ok ->
-            couch_log:info("Deleted old storage file ~s~s", [Filepath, ".old"]);
+            ?LOG_INFO("Deleted old storage file ~s~s", [Filepath, ".old"]);
         {error, enoent} ->
             ok  % normal result
         end;
@@ -461,7 +461,7 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 handle_info(Msg, Db) ->
-    couch_log:error("Bad message received for db ~s: ~p", [Db#db.name, Msg]),
+    ?LOG_ERROR("Bad message received for db ~s: ~p", [Db#db.name, Msg]),
     exit({error, Msg}).
 
 
@@ -508,7 +508,7 @@ update_loop(#db{fd=Fd,name=Name,filepath=Filepath, main_pid=MainPid}=Db) ->
     compact ->
         case Db#db.compactor_pid of
         nil ->
-            couch_log:info("Starting compaction for db \"~s\"", [Name]),
+            ?LOG_INFO("Starting compaction for db \"~s\"", [Name]),
             Pid = spawn_link(couch_db, start_copy_compact_int, [Db, true]),
             Db2 = Db#db{compactor_pid=Pid},
             ok = gen_server:call(MainPid, {db_updated, Db2}),
@@ -523,7 +523,7 @@ update_loop(#db{fd=Fd,name=Name,filepath=Filepath, main_pid=MainPid}=Db) ->
                 init_db(Name, CompactFilepath, NewFd, NewHeader),
         case Db#db.update_seq == NewSeq of
         true ->
-            couch_log:debug("CouchDB swapping files ~s and ~s.", [Filepath, CompactFilepath]),
+            ?LOG_DEBUG("CouchDB swapping files ~s and ~s.", [Filepath, CompactFilepath]),
             ok = file:rename(Filepath, Filepath ++ ".old"),
             ok = file:rename(CompactFilepath, Filepath),
             
@@ -544,10 +544,10 @@ update_loop(#db{fd=Fd,name=Name,filepath=Filepath, main_pid=MainPid}=Db) ->
                 end),
                 
             ok = gen_server:call(MainPid, {db_updated, NewDb2}),
-            couch_log:info("Compaction for db ~p completed.", [Name]),
+            ?LOG_INFO("Compaction for db ~p completed.", [Name]),
             update_loop(NewDb2#db{compactor_pid=nil});
         false ->
-            couch_log:info("Compaction file still behind main file "
+            ?LOG_INFO("Compaction file still behind main file "
                 "(update seq=~p. compact update seq=~p). Retrying.",
                 [Db#db.update_seq, NewSeq]),
             Pid = spawn_link(couch_db, start_copy_compact_int, [Db, false]),
@@ -555,7 +555,7 @@ update_loop(#db{fd=Fd,name=Name,filepath=Filepath, main_pid=MainPid}=Db) ->
             update_loop(Db2)
         end;
     Else ->
-        couch_log:error("Unknown message received in db ~s:~p", [Db#db.name, Else]),
+        ?LOG_ERROR("Unknown message received in db ~s:~p", [Db#db.name, Else]),
         exit({error, Else})
     end.
 
@@ -701,7 +701,7 @@ flush_trees(#db{fd=Fd}=Db, [Unflushed | RestUnflushed], AccFlushed) ->
                 _ ->
                     % BinFd must not equal our Fd. This can happen when a database
                     % is being updated during a compaction
-                    couch_log:debug("File where the attachments are written has changed. Possibly retrying."),
+                    ?LOG_DEBUG("File where the attachments are written has changed. Possibly retrying.", []),
                     throw(retry)
                 end,
                 {ok, NewSummaryPointer} = couch_stream:write_term(Db#db.summary_stream, {Doc#doc.body, Bins}),
@@ -876,6 +876,7 @@ commit_data(#db{fd=Fd, header=Header} = Db) ->
     if Header == Header2 ->
         Db; % unchanged. nothing to do
     true ->
+        %ok = couch_file:sync(Fd),
         ok = couch_file:write_header(Fd, <<$g, $m, $k, 0>>, Header2),
         Db#db{header = Header2}
     end.
@@ -941,10 +942,10 @@ copy_compact_docs(Db, NewDb) ->
 
 start_copy_compact_int(#db{name=Name,filepath=Filepath}=Db, CopyLocal) ->
     CompactFile = Filepath ++ ".compact",
-    couch_log:debug("Compaction process spawned for db \"~s\"", [Name]),
+    ?LOG_DEBUG("Compaction process spawned for db \"~s\"", [Name]),
     case couch_file:open(CompactFile) of
     {ok, Fd} ->
-        couch_log:debug("Found existing compaction file for db \"~s\"", [Name]),
+        ?LOG_DEBUG("Found existing compaction file for db \"~s\"", [Name]),
         {ok, Header} = couch_file:read_header(Fd, <<$g, $m, $k, 0>>);
     {error, enoent} -> %
         {ok, Fd} = couch_file:open(CompactFile, [create]),

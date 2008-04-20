@@ -14,7 +14,7 @@
 -behaviour(gen_event).
 
 -export([start_link/2,stop/0]).
--export([error/1,error/2,info/1,info/2,debug/1,debug/2,get_level/0,get_level_integer/0, set_level/1]).
+-export([debug_on/0,info_on/0,get_level/0,get_level_integer/0, set_level/1]).
 -export([init/1, handle_event/2, terminate/2, code_change/3, handle_info/2, handle_call/2]).
 
 -define(LEVEL_ERROR, 3).
@@ -44,33 +44,11 @@ init({Filename, Level}) ->
     {ok, Fd} = file:open(Filename, [append]),
     {ok, {Fd, level_integer(Level)}}.
 
-error(Msg) ->
-    error("~s", [Msg]).
+debug_on() ->
+    get_level_integer() =< ?LEVEL_DEBUG.
 
-error(Format, Args) ->
-    error_logger:error_report(couch_error, {Format, Args}).
-
-info(Msg) ->
-    info("~s", [Msg]).
-
-info(Format, Args) ->
-    case get_level_integer() =< ?LEVEL_INFO of
-    true ->
-        error_logger:info_report(couch_info, {Format, Args});
-    false ->
-        ok
-    end.
-
-debug(Msg) ->
-    debug("~s", [Msg]).
-
-debug(Format, Args) ->
-    case get_level_integer() =< ?LEVEL_DEBUG of
-    true ->
-        error_logger:info_report(couch_debug, {Format, Args});
-    false ->
-        ok
-    end.
+info_on() ->
+    get_level_integer() =< ?LEVEL_INFO.
 
 set_level(LevelAtom) ->
     set_level_integer(level_integer(LevelAtom)).

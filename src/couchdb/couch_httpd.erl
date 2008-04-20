@@ -57,11 +57,11 @@ handle_request(Req, DocumentRoot) ->
     % removed, but URL quoting left intact
     {Path, _, _} = mochiweb_util:urlsplit_path(Req:get(raw_path)),
 
-    couch_log:debug("Version:     ~p", [Req:get(version)]),
-    couch_log:debug("Method:      ~p", [Method]),
-    couch_log:debug("Request URI: ~p", [Path]),
-    couch_log:debug("Headers: ~p", [mochiweb_headers:to_list(Req:get(headers))]),
-
+    ?LOG_DEBUG("Version:     ~p", [Req:get(version)]),
+    ?LOG_DEBUG("Method:      ~p", [Method]),
+    ?LOG_DEBUG("Request URI: ~p", [Path]),
+    ?LOG_DEBUG("Headers: ~p", [mochiweb_headers:to_list(Req:get(headers))]),
+    
     {ok, Resp} = case catch(handle_request(Req, DocumentRoot, Method, Path)) of
         {ok, Resp0} ->
             {ok, Resp0};
@@ -69,13 +69,19 @@ handle_request(Req, DocumentRoot) ->
             send_error(Req, Error)
     end,
 
-    couch_log:info("~s - - ~p ~B", [
+    ?LOG_INFO("~s - - ~p ~B", [
         Req:get(peer),
         atom_to_list(Req:get(method)) ++ " " ++ Path,
         Resp:get(code)
     ]).
 
 handle_request(Req, DocumentRoot, Method, Path) ->
+    Start = erlang:now(),
+    X = handle_request0(Req, DocumentRoot, Method, Path),
+    io:format("now_diff:~p~n", [timer:now_diff(erlang:now(), Start)]),
+    X.
+    
+handle_request0(Req, DocumentRoot, Method, Path) ->
     case Path of
         "/" ->
             handle_welcome_request(Req, Method);
@@ -431,7 +437,7 @@ handle_doc_request(Req, 'GET', _DbName, Db, DocId) ->
                 JsonDoc = couch_doc:to_json_obj(Doc, Options),
                 AdditionalHeaders =
                     case Doc#doc.meta of
-                    [] -> [{"Etag", Etag}]; % output etag when we have no meta
+                    [] -> [{"XEtag", Etag}]; % output etag when we have no meta
                     _ -> []
                     end,
                 send_json(Req, 200, AdditionalHeaders, JsonDoc);
@@ -498,7 +504,7 @@ handle_doc_request(Req, 'PUT', _DbName, Db, DocId) ->
     Doc = couch_doc:from_json_obj(Json),
 
     {ok, NewRev} = couch_db:update_doc(Db, Doc#doc{id=DocId, revs=Revs}, []),
-    send_json(Req, 201, [{"Etag", "\"" ++ NewRev ++ "\""}], {obj, [
+    send_json(Req, 201, [{"XEtag", "\"" ++ NewRev ++ "\""}], {obj, [
         {ok, true},
         {id, DocId},
         {rev, NewRev}
@@ -791,12 +797,12 @@ error_to_json0(Error) ->
 send_error(Req, {method_not_allowed, Methods}) ->
     {ok, Req:respond({405, [{"Allow", Methods}], <<>>})};
 send_error(Req, {modified, Etag}) ->
-    {ok, Req:respond({412, [{"Etag", Etag}], <<>>})};
+    {ok, Req:respond({412, [{"XEtag", Etag}], <<>>})};
 send_error(Req, {not_modified, Etag}) ->
-    {ok, Req:respond({304, [{"Etag", Etag}], <<>>})};
+    {ok, Req:respond({304, [{"XEtag", Etag}], <<>>})};
 send_error(Req, Error) ->
     {Code, Json} = error_to_json(Error),
-    couch_log:info("HTTP Error (code ~w): ~p", [Code, Error]),
+    ?LOG_INFO("HTTP Error (code ~w): ~p", [Code, Error]),
     send_error(Req, Code, Json).
 
 send_error(Req, Code, Json) ->
