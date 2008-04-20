@@ -23,6 +23,7 @@ specific language governing permissions and limitations under the License.
 #ifndef WIN32
 #include <string.h> // for memcpy
 #endif
+#include <uuid/uuid.h>
 
 typedef struct {
     ErlDrvPort port;
@@ -92,51 +93,65 @@ static int couch_drv_control(ErlDrvData drv_data, unsigned int command, const ch
 {
     #define COLLATE 0
     #define COLLATE_NO_CASE 1
+    #define UUID 2
 
     couch_drv_data* pData = (couch_drv_data*)drv_data;
+    switch(command) {
+    case UUID:
+        {
+        uuid_t uuid;
+        uuid_generate(uuid);
+        return return_control_result(&uuid, sizeof(uuid), rbuf, rlen);
+        }
+    
+    case COLLATE:
+    case COLLATE_NO_CASE:
+        {
+        UErrorCode status = U_ZERO_ERROR;
+        int collResult;
+        char response;
+        UCharIterator iterA;
+        UCharIterator iterB;
+        int32_t length;
 
-    UErrorCode status = U_ZERO_ERROR;
-    int collResult;
-    char response;
-    UCharIterator iterA;
-    UCharIterator iterB;
-    int32_t length;
+        // 2 strings are in the buffer, consecutively
+        // The strings begin first with a 32 bit integer byte length, then the actual
+        // string bytes follow.
 
-    // 2 strings are in the buffer, consecutively
-    // The strings begin first with a 32 bit integer byte length, then the actual
-    // string bytes follow.
+        // first 32bits are the length
+        memcpy(&length, pBuf, sizeof(length));
+        pBuf += sizeof(length);
 
-    // first 32bits are the length
-    memcpy(&length, pBuf, sizeof(length));
-    pBuf += sizeof(length);
+        // point the iterator at it.
+        uiter_setUTF8(&iterA, pBuf, length);
 
-    // point the iterator at it.
-    uiter_setUTF8(&iterA, pBuf, length);
+        pBuf += length; // now on to string b
 
-    pBuf += length; // now on to string b
+        // first 32bits are the length
+        memcpy(&length, pBuf, sizeof(length));
+        pBuf += sizeof(length);
 
-    // first 32bits are the length
-    memcpy(&length, pBuf, sizeof(length));
-    pBuf += sizeof(length);
+        // point the iterator at it.
+        uiter_setUTF8(&iterB, pBuf, length);
 
-    // point the iterator at it.
-    uiter_setUTF8(&iterB, pBuf, length);
+        if (command == COLLATE)
+          collResult = ucol_strcollIter(pData->coll, &iterA, &iterB, &status);
+        else if (command == COLLATE_NO_CASE)
+          collResult = ucol_strcollIter(pData->collNoCase, &iterA, &iterB, &status);
 
-    if (command == COLLATE)
-        collResult = ucol_strcollIter(pData->coll, &iterA, &iterB, &status);
-    else if (command == COLLATE_NO_CASE)
-        collResult = ucol_strcollIter(pData->collNoCase, &iterA, &iterB, &status);
-    else
+        if (collResult < 0)
+          response = 0; //lt
+        else if (collResult > 0)
+          response = 1; //gt
+        else
+          response = 2; //eq
+
+        return return_control_result(&response, sizeof(response), rbuf, rlen);
+        }
+      
+    default:
         return -1;
-
-    if (collResult < 0)
-        response = 0; //lt
-    else if (collResult > 0)
-        response = 1; //gt
-    else
-        response = 2; //eq
-
-    return return_control_result(&response, sizeof(response), rbuf, rlen);
+    }
 }
 
 ErlDrvEntry couch_driver_entry = {

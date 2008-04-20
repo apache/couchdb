@@ -15,6 +15,21 @@
 -define(DESIGN_DOC_PREFIX, "_design/").
 
 -define(DEFAULT_ATTACHMENT_CONTENT_TYPE, "application/octet-stream").
+        
+-define(LOG_DEBUG(Format, Args),
+    case couch_log:debug_on() of
+        true -> error_logger:info_report(couch_debug, {Format, Args});
+        false -> ok
+    end).
+
+-define(LOG_INFO(Format, Args),
+    case couch_log:info_on() of
+        true -> error_logger:info_report(couch_info, {Format, Args});
+        false -> ok
+    end).
+
+-define(LOG_ERROR(Format, Args),
+    error_logger:info_report(couch_error, {Format, Args})).
 
 -record(doc_info,
     {
@@ -53,4 +68,3 @@
     % couch_db:open_doc(Db, Id, Options).
     meta = []
     }).
-    

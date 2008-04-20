@@ -13,6 +13,8 @@
 -module(couch_file).
 -behaviour(gen_server).
 
+-include("couch_db.hrl").
+
 -define(HEADER_SIZE, 2048). % size of each segment of the doubly written header
 
 -export([open/1, open/2, close/1, pread/3, pwrite/3, expand/2, bytes/1, sync/1]).
@@ -178,12 +180,12 @@ read_header(Fd, Prefix) ->
             false ->
                 % To get here we must have two different header versions with signatures intact.
                 % It's weird but possible (a commit failure right at the 2k boundary). Log it and take the first.
-                couch_log:info("Header version differences.~nPrimary Header: ~p~nSecondary Header: ~p", [Header1, Header2]),
+                ?LOG_INFO("Header version differences.~nPrimary Header: ~p~nSecondary Header: ~p", [Header1, Header2]),
                 {ok, Header1}
             end;
         {error, Error} ->
             % error reading second header. It's ok, but log it.
-            couch_log:info("Secondary header corruption (error: ~p). Using primary header.", [Error]),
+            ?LOG_INFO("Secondary header corruption (error: ~p). Using primary header.", [Error]),
             {ok, Header1}
         end;
     {error, Error} ->
@@ -191,7 +193,7 @@ read_header(Fd, Prefix) ->
         case extract_header(Prefix, Bin2) of
         {ok, Header2} ->
             % log corrupt primary header. It's ok since the secondary is still good.
-            couch_log:info("Primary header corruption (error: ~p). Using secondary header.", [Error]),
+            ?LOG_INFO("Primary header corruption (error: ~p). Using secondary header.", [Error]),
             {ok, Header2};
         _ ->
             % error reading secondary header too

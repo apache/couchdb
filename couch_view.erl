@@ -141,7 +141,7 @@ handle_call({start_temp_updater, DbName, Lang, Query}, _From, #server{root_dir=R
         [{_, Fd, Count}] ->
             ok
         end,
-        couch_log:debug("Spawning new temp update process for db ~s.", [DbName]),
+        ?LOG_DEBUG("Spawning new temp update process for db ~s.", [DbName]),
         NewPid = spawn_link(couch_view, start_temp_update_loop, [DbName, Fd, Lang, Query]),
         true = ets:insert(couch_views_temp_fd_by_db, {DbName, Fd, Count + 1}),
         add_to_ets(NewPid, DbName, Name),
@@ -154,7 +154,7 @@ handle_call({start_updater, DbName, GroupId}, _From, #server{root_dir=Root}=Serv
     Pid = 
     case ets:lookup(couch_views_by_name, {DbName, GroupId}) of
     [] ->
-        couch_log:debug("Spawning new update process for view group ~s in database ~s.", [GroupId, DbName]),
+        ?LOG_DEBUG("Spawning new update process for view group ~s in database ~s.", [GroupId, DbName]),
         NewPid = spawn_link(couch_view, start_update_loop, [Root, DbName, GroupId]),
         add_to_ets(NewPid, DbName, GroupId),
         NewPid;
@@ -168,7 +168,7 @@ handle_cast({reset_indexes, DbName}, #server{root_dir=Root}=Server) ->
     Names = ets:lookup(couch_views_by_db, DbName),
     lists:foreach(
         fun({_DbName, GroupId}) ->
-            couch_log:debug("Killing update process for view group ~s. in database ~s.", [GroupId, DbName]),
+            ?LOG_DEBUG("Killing update process for view group ~s. in database ~s.", [GroupId, DbName]),
             [{_, Pid}] = ets:lookup(couch_views_by_name, {DbName, GroupId}),
             exit(Pid, kill),
             receive {'EXIT', Pid, _} ->
@@ -184,7 +184,7 @@ handle_info({'EXIT', _FromPid, normal}, Server) ->
 handle_info({'EXIT', FromPid, Reason}, #server{root_dir=RootDir}=Server) ->
     case ets:lookup(couch_views_by_updater, FromPid) of
     [] -> % non-updater linked process must have died, we propagate the error
-        couch_log:error("Exit on non-updater process: ~p", [Reason]),
+        ?LOG_ERROR("Exit on non-updater process: ~p", [Reason]),
         exit(Reason);
     [{_, {DbName, "_temp_" ++ _ = GroupId}}] ->
         delete_from_ets(FromPid, DbName, GroupId),
@@ -202,7 +202,7 @@ handle_info({'EXIT', FromPid, Reason}, #server{root_dir=RootDir}=Server) ->
     end,
     {noreply, Server};
 handle_info(Msg, _Server) ->
-    couch_log:error("Bad message received for view module: ~p", [Msg]),
+    ?LOG_ERROR("Bad message received for view module: ~p", [Msg]),
     exit({error, Msg}).
     
 add_to_ets(Pid, DbName, GroupId) ->
@@ -294,7 +294,7 @@ get_notify_pids(Wait) ->
     {Pid, get_updated} ->
         [Pid | get_notify_pids()];
     Else ->
-        couch_log:error("Unexpected message in view updater: ~p", [Else]),
+        ?LOG_ERROR("Unexpected message in view updater: ~p", [Else]),
         exit({error, Else})
     after Wait ->
         exit(wait_timeout)

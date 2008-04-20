@@ -17,6 +17,8 @@
 
 -export([start_link/1,stop/0]).
 
+-include("couch_db.hrl").
+
 %% supervisor callbacks
 -export([init/1]).
 
@@ -169,7 +171,7 @@ start_server(InputIniFilename) ->
             UpdateNotifierExes,
             FtSearchQueryServer,
             [lists:flatten(io_lib:format("\t~s=~s~n", [Lang, QueryExe])) || {Lang, QueryExe} <- QueryServers]]),
-    couch_log:debug("~s", [ConfigInfo]),
+    ?LOG_DEBUG("~s", [ConfigInfo]),
 
     case StartResult of
     {ok,_} ->

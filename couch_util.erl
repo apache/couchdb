@@ -40,11 +40,25 @@ start_link(LibDir) ->
 
 
 new_uuid() ->
-    gen_server:call(couch_util, new_uuid).
+    to_hex(erlang:port_control(drv_port(), 2, <<>>)).
+
+to_hex([]) ->
+    [];
+to_hex([H|T]) ->
+    Digit1 = H div 16,
+    Digit2 = H rem 16,
+    [to_digit(Digit1), to_digit(Digit2) | to_hex(T)].
+
+to_digit(N) when N < 10 ->
+    $0 + N;
+to_digit(N) ->
+    $a + N-10.
+    
 
 % returns a random integer
 rand32() ->
-    gen_server:call(couch_util, rand32).
+    [A,B,C,D|_] = erlang:port_control(drv_port(), 2, <<>>),
+    (A bsl 24) + (B bsl 16) + (C bsl 8) + D.
 
 % given a pathname "../foo/bar/" it gives back the fully qualified
 % absolute pathname.
@@ -190,8 +204,6 @@ init([]) ->
 terminate(_Reason, _Server) ->
     ok.
 
-handle_call(new_uuid, _From, Server) ->
-    {reply, new_uuid_int(), Server};
 handle_call(rand32, _From, Server) ->
     {reply, rand32_int(), Server}.
 
@@ -205,14 +217,6 @@ handle_info(_Info, State) ->
     {noreply, State}.
 
 
-new_uuid_int() ->
-    % eventually make this a C callout for a real guid (collisions are far less likely
-    % when using a proper generation function). For now we just fake it.
-    Num1 = random:uniform(16#FFFFFFFF + 1) - 1,
-    Num2 = random:uniform(16#FFFFFFFF + 1) - 1,
-    Num3 = random:uniform(16#FFFFFFFF + 1) - 1,
-    Num4 = random:uniform(16#FFFFFFFF + 1) - 1,
-    lists:flatten(io_lib:format("~8.16.0B~8.16.0B~8.16.0B~8.16.0B", [Num1, Num2, Num3, Num4])).
 
 
 
