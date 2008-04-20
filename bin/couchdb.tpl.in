@@ -224,7 +224,11 @@ start_couchdb () {
         %ERL% $interactive_option -sasl errlog_type error \
         -pa %erlanglibdir%/couch-%version%/ebin \
             %erlanglibdir%/mochiweb-r64/ebin \
+        -eval \"application:load(inets)\" \
+        -eval \"application:load(crypto)\" \
         -eval \"application:load(couch)\" \
+        -eval \"crypto:start()\" \
+        -eval \"inets:start()\" \
         -eval \"couch_server:start(), receive done -> done end.\" \
         -couchini $INI_FILE"
     if test "$BACKGROUND_BOOLEAN" = "true" \

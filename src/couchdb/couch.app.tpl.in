@@ -25,4 +25,4 @@
                            couch_view,
                            couch_query_servers,
                            couch_ft_query]},
-              {applications,[kernel,stdlib,xmerl,inets,mochiweb]}]}.
+              {applications,[kernel,stdlib,crypto,inets,mochiweb]}]}.

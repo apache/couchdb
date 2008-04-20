@@ -437,7 +437,7 @@ handle_doc_request(Req, 'GET', _DbName, Db, DocId) ->
                 JsonDoc = couch_doc:to_json_obj(Doc, Options),
                 AdditionalHeaders =
                     case Doc#doc.meta of
-                    [] -> [{"XEtag", Etag}]; % output etag when we have no meta
+                    [] -> [{"Etag", Etag}]; % output etag when we have no meta
                     _ -> []
                     end,
                 send_json(Req, 200, AdditionalHeaders, JsonDoc);
@@ -504,7 +504,7 @@ handle_doc_request(Req, 'PUT', _DbName, Db, DocId) ->
     Doc = couch_doc:from_json_obj(Json),
 
     {ok, NewRev} = couch_db:update_doc(Db, Doc#doc{id=DocId, revs=Revs}, []),
-    send_json(Req, 201, [{"XEtag", "\"" ++ NewRev ++ "\""}], {obj, [
+    send_json(Req, 201, [{"Etag", "\"" ++ NewRev ++ "\""}], {obj, [
         {ok, true},
         {id, DocId},
         {rev, NewRev}
@@ -797,9 +797,9 @@ error_to_json0(Error) ->
 send_error(Req, {method_not_allowed, Methods}) ->
     {ok, Req:respond({405, [{"Allow", Methods}], <<>>})};
 send_error(Req, {modified, Etag}) ->
-    {ok, Req:respond({412, [{"XEtag", Etag}], <<>>})};
+    {ok, Req:respond({412, [{"Etag", Etag}], <<>>})};
 send_error(Req, {not_modified, Etag}) ->
-    {ok, Req:respond({304, [{"XEtag", Etag}], <<>>})};
+    {ok, Req:respond({304, [{"Etag", Etag}], <<>>})};
 send_error(Req, Error) ->
     {Code, Json} = error_to_json(Error),
     ?LOG_INFO("HTTP Error (code ~w): ~p", [Code, Error]),

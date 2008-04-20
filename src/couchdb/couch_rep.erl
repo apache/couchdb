@@ -155,14 +155,6 @@ do_http_request(Url, Action, JsonBody) ->
     ?LOG_DEBUG("\tAction: ~p", [Action]),
     ?LOG_DEBUG("\tUrl: ~p", [Url]),
 
-    % ensure that the inets application is running
-    case application:start(inets) of
-        ok ->
-            ok;
-        {error, {already_started, inets}} ->
-            ok
-    end,
-
     Request =
     case JsonBody of
     [] ->
