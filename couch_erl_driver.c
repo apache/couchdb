@@ -23,7 +23,6 @@ specific language governing permissions and limitations under the License.
 #ifndef WIN32
 #include <string.h> // for memcpy
 #endif
-#include <uuid/uuid.h>
 
 typedef struct {
     ErlDrvPort port;
@@ -91,21 +90,11 @@ static int return_control_result(void* pLocalResult, int localLen, char **ppRetB
 static int couch_drv_control(ErlDrvData drv_data, unsigned int command, const char *pBuf,
              int bufLen, char **rbuf, int rlen)
 {
-    #define COLLATE 0
-    #define COLLATE_NO_CASE 1
-    #define UUID 2
 
     couch_drv_data* pData = (couch_drv_data*)drv_data;
     switch(command) {
-    case UUID:
-        {
-        uuid_t uuid;
-        uuid_generate(uuid);
-        return return_control_result(&uuid, sizeof(uuid), rbuf, rlen);
-        }
-    
-    case COLLATE:
-    case COLLATE_NO_CASE:
+    case 0: // COLLATE
+    case 1: // COLLATE_NO_CASE:
         {
         UErrorCode status = U_ZERO_ERROR;
         int collResult;
@@ -134,9 +123,9 @@ static int couch_drv_control(ErlDrvData drv_data, unsigned int command, const ch
         // point the iterator at it.
         uiter_setUTF8(&iterB, pBuf, length);
 
-        if (command == COLLATE)
+        if (command == 0) // COLLATE
           collResult = ucol_strcollIter(pData->coll, &iterA, &iterB, &status);
-        else if (command == COLLATE_NO_CASE)
+        else              // COLLATE_NO_CASE
           collResult = ucol_strcollIter(pData->collNoCase, &iterA, &iterB, &status);
 
         if (collResult < 0)

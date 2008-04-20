@@ -145,6 +145,11 @@ start_server(InputIniFilename) ->
 
     io:format("couch ~s (LogLevel=~s)~n", [couch_server:get_version(), LogLevel]),
     io:format("~s~n", [ConsoleStartupMsg]),
+    
+    
+    % ensure these applications are running
+    application:start(inets),
+    application:start(crypto),
 
     process_flag(trap_exit, true),
     StartResult = (catch supervisor:start_link(

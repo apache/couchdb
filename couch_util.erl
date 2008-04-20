@@ -40,7 +40,7 @@ start_link(LibDir) ->
 
 
 new_uuid() ->
-    to_hex(erlang:port_control(drv_port(), 2, <<>>)).
+    to_hex(binary_to_list(crypto:rand_bytes(16))).
 
 to_hex([]) ->
     [];
@@ -57,8 +57,7 @@ to_digit(N) ->
 
 % returns a random integer
 rand32() ->
-    [A,B,C,D|_] = erlang:port_control(drv_port(), 2, <<>>),
-    (A bsl 24) + (B bsl 16) + (C bsl 8) + D.
+    crypto:rand_uniform(0, 16#100000000).
 
 % given a pathname "../foo/bar/" it gives back the fully qualified
 % absolute pathname.
