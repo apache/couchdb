@@ -5,16 +5,16 @@ Developed at [The Apache Software Foundation][1].
 
 Core software:
 
- * Copyright 2008 Damien Katz <damien@apache.org>
- * Copyright 2008 Jan Lehnardt <jan@apache.org>
- * Copyright 2008 Christopher Lenz <cmlenz@apache.org>
- * Copyright 2008 Noah Slater <nslater@apache.org>
+ * Copyright 2008, Damien Katz <damien@apache.org>
+ * Copyright 2008, Jan Lehnardt <jan@apache.org>
+ * Copyright 2008, Christopher Lenz <cmlenz@apache.org>
+ * Copyright 2008, Noah Slater <nslater@apache.org>
 
 Supporting software:
 
- * m4/ac_check_icu.m4 - Copyright 2005 Akos Maroy <darkeye@tyrell.hu>
- * share/www/script/jquery.js - Copyright 2008 John Resig
- * share/www/script/json2.js - Public domain
- * src/mochiweb - Copyright 2007 Mochi Media, Inc.
+ * m4/ac_check_icu.m4 - Copyright 2005, Akos Maroy <darkeye@tyrell.hu>
+ * share/www/script/jquery.js - Copyright 2008, John Resig
+ * share/www/script/json2.js - In the public domain
+ * src/mochiweb - Copyright 2007, Mochi Media Coporation
 
 [1]: http://www.apache.org/
