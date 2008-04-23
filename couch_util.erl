@@ -11,32 +11,25 @@
 % the License.
 
 -module(couch_util).
--behaviour(gen_server).
 
--export([start_link/0,start_link/1]).
+-export([start_driver/1]).
 -export([parse_ini/1,should_flush/0, should_flush/1]).
 -export([new_uuid/0, rand32/0, implode/2, collate/2, collate/3]).
--export([abs_pathname/1,abs_pathname/2, trim/1, ascii_lower/1, test/0]).
+-export([abs_pathname/1,abs_pathname/2, trim/1, ascii_lower/1]).
 -export([encodeBase64/1, decodeBase64/1]).
 
--export([init/1, terminate/2, handle_call/3]).
--export([handle_cast/2,code_change/3,handle_info/2]).
 
 % arbitrarily chosen amount of memory to use before flushing to disk
 -define(FLUSH_MAX_MEM, 10000000).
 
-start_link() ->
-    start_link("").
-
-start_link("") ->
-    start_link(filename:join(code:priv_dir(couch), "lib"));
-start_link(LibDir) ->
+start_driver("") ->
+    start_driver(filename:join(code:priv_dir(couch), "lib"));
+start_driver(LibDir) ->
     case erl_ddll:load_driver(LibDir, "couch_erl_driver") of
     ok -> ok;
     {error, already_loaded} -> ok;
-    {error, ErrorDesc} -> exit({error, ErrorDesc})
-    end,
-    gen_server:start_link({local, couch_util}, couch_util, [], []).
+    Error -> exit(Error)
+    end.
 
 
 new_uuid() ->
@@ -45,9 +38,7 @@ new_uuid() ->
 to_hex([]) ->
     [];
 to_hex([H|T]) ->
-    Digit1 = H div 16,
-    Digit2 = H rem 16,
-    [to_digit(Digit1), to_digit(Digit2) | to_hex(T)].
+    [to_digit(H div 16), to_digit(H rem 16) | to_hex(T)].
 
 to_digit(N) when N < 10 ->
     $0 + N;
@@ -195,33 +186,6 @@ parse_ini(FileContents) ->
         end, {"", []}, Lines),
     {ok, lists:reverse(ParsedIniValues)}.
 
-init([]) ->
-    {A,B,C} = erlang:now(),
-    random:seed(A,B,C),
-    {ok, dummy_server}.
-
-terminate(_Reason, _Server) ->
-    ok.
-
-handle_call(rand32, _From, Server) ->
-    {reply, rand32_int(), Server}.
-
-handle_cast(_Msg, State) ->
-    {noreply,State}.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
-
-handle_info(_Info, State) ->
-    {noreply, State}.
-
-
-
-
-
-rand32_int() ->
-    random:uniform(16#FFFFFFFF + 1) - 1.
-
 drv_port() ->
     case get(couch_drv_port) of
     undefined ->
@@ -331,7 +295,3 @@ dec(C) ->
     62*?st(C,43) + ?st(C,47) + (C-59)*?st(C,48) - 69*?st(C,65) - 6*?st(C,97).
 
 
-
-test() ->
-    start_link("debug"),
-    collate("a","b",[]).

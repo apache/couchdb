@@ -97,12 +97,6 @@ start_server(InputIniFilename) ->
             brutal_kill,
             worker,
             [couch_server]},
-        {couch_util,
-            {couch_util, start_link, [UtilDriverDir]},
-            permanent,
-            brutal_kill,
-            worker,
-            [couch_util]},
         {couch_query_servers,
             {couch_query_servers, start_link, [QueryServers]},
             permanent,
@@ -146,6 +140,7 @@ start_server(InputIniFilename) ->
     io:format("couch ~s (LogLevel=~s)~n", [couch_server:get_version(), LogLevel]),
     io:format("~s~n", [ConsoleStartupMsg]),
     
+    couch_util:start_driver(UtilDriverDir),
     
     % ensure these applications are running
     application:start(inets),

@@ -133,7 +133,8 @@ open_doc(MainPid, Id, Options) ->
     end.
 
 open_doc_revs(MainPid, Id, Revs, Options) ->
-    open_doc_revs_int(get_db(MainPid), Id, Revs, Options).
+    [Result] = open_doc_revs_int(get_db(MainPid), [{Id, Revs}], Options),
+    Result.
 
 get_missing_revs(MainPid, IdRevsList) ->
     Ids = [Id1 || {Id1, _Revs} <- IdRevsList],
@@ -148,7 +149,9 @@ get_missing_revs(MainPid, IdRevsList) ->
             end
         end,
         IdRevsList, FullDocInfoResults),
-    {ok, Results}.
+    % strip out the non-missing ids
+    Missing = [{Id, Revs} || {Id, Revs} <- Results, Revs /= []],
+    {ok, Missing}.
 
 get_doc_info(Db, Id) ->
     case get_full_doc_info(Db, Id) of
@@ -563,38 +566,44 @@ get_db(MainPid) ->
     {ok, Db} = gen_server:call(MainPid, get_db),
     Db.
 
-open_doc_revs_int(Db, Id, Revs, Options) ->
-    case get_full_doc_info(Db, Id) of
-    {ok, #full_doc_info{rev_tree=RevTree}} ->
-        {FoundRevs, MissingRevs} =
-        case Revs of
-        all ->
-            {couch_key_tree:get_all_leafs(RevTree), []};
-        _ ->
-            case lists:member(latest, Options) of
-            true ->
-                couch_key_tree:get_key_leafs(RevTree, Revs);
-            false ->
-                couch_key_tree:get(RevTree, Revs)
+open_doc_revs_int(Db, IdRevs, Options) ->
+    Ids = [Id || {Id, _Revs} <- IdRevs],
+    LookupResults = get_full_doc_infos(Db, Ids),
+    lists:zipwith(
+        fun({Id, Revs}, Lookup) ->
+            case Lookup of
+            {ok, #full_doc_info{rev_tree=RevTree}} ->
+                {FoundRevs, MissingRevs} =
+                case Revs of
+                all ->
+                    {couch_key_tree:get_all_leafs(RevTree), []};
+                _ ->
+                    case lists:member(latest, Options) of
+                    true ->
+                        couch_key_tree:get_key_leafs(RevTree, Revs);
+                    false ->
+                        couch_key_tree:get(RevTree, Revs)
+                    end
+                end,
+                FoundResults =
+                lists:map(fun({Rev, Value, FoundRevPath}) ->
+                    case Value of
+                    ?REV_MISSING ->
+                        % we have the rev in our list but know nothing about it
+                        {{not_found, missing}, Rev};
+                    {IsDeleted, SummaryPtr} ->
+                        {ok, make_doc(Db, Id, IsDeleted, SummaryPtr, FoundRevPath)}
+                    end
+                end, FoundRevs),
+                Results = FoundResults ++ [{{not_found, missing}, MissingRev} || MissingRev <- MissingRevs],
+                {ok, Results};
+            not_found when Revs == all ->
+                {ok, []};
+            not_found ->
+                {ok, [{{not_found, missing}, Rev} || Rev <- Revs]}
             end
         end,
-        FoundResults =
-        lists:map(fun({Rev, Value, FoundRevPath}) ->
-            case Value of
-            ?REV_MISSING ->
-                % we have the rev in our list but know nothing about it
-                {{not_found, missing}, Rev};
-            {IsDeleted, SummaryPtr} ->
-                {ok, make_doc(Db, Id, IsDeleted, SummaryPtr, FoundRevPath)}
-            end
-        end, FoundRevs),
-        Results = FoundResults ++ [{{not_found, missing}, MissingRev} || MissingRev <- MissingRevs],
-        {ok, Results};
-    not_found when Revs == all ->
-        {ok, []};
-    not_found ->
-        {ok, [{{not_found, missing}, Rev} || Rev <- Revs]}
-    end.
+        IdRevs, LookupResults).
 
 open_doc_int(Db, ?LOCAL_DOC_PREFIX ++ _ = Id, _Options) ->
     case couch_btree:lookup(Db#db.local_docs_btree, [Id]) of
