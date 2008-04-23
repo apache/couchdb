@@ -833,8 +833,7 @@ update_docs_int(Db, DocsList, Options) ->
         docinfo_by_seq_btree = DocInfoBySeqBTree2,
         update_seq = NewSeq,
         doc_count = FullDocCount + NewDocsCount - OldCount,
-        doc_del_count = FullDelCount + NewDelCount - OldDelCount
-        },
+        doc_del_count = FullDelCount + NewDelCount - OldDelCount},
 
     case lists:member(delay_commit, Options) of
     true ->

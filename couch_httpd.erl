@@ -696,7 +696,7 @@ finish_view_fold(Req, FoldResult) ->
         % send empty view
         send_json(Req, 200, {obj, [
             {total_rows, TotalRows},
-            {rows, []}
+            {rows, {}}
         ]});
     {ok, _TotalRows, {_, _, Resp, AccRevRows}} ->
         % end the view
