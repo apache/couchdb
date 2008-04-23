@@ -52,7 +52,7 @@ find_missing(_Tree, []) ->
 find_missing([], Keys) ->
     Keys;
 find_missing([{Key, _, SubTree} | RestTree], Keys) ->
-    SrcKeys2 = Keys -- Key,
+    SrcKeys2 = Keys -- [Key],
     SrcKeys3 = find_missing(SubTree, SrcKeys2),
     find_missing(RestTree, SrcKeys3).
     

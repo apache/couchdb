@@ -82,12 +82,8 @@ specific language governing permissions and limitations under the License.
           $.couch.replicate(source, target, {
             success: function(resp) {
               $.each(resp.history, function(idx, record) {
-                $("<tr><th></th><td class='seq'></td>" +
-                  "<td class='read'></td><td class='copied'></td></tr>")
-                  .find("th").text(record.start_time).end()
-                  .find("td.seq").text(record.start_last_seq + "–" + record.end_last_seq).end()
-                  .find("td.read").text(record.docs_read + " (" + record.read_errors + " errors)").end()
-                  .find("td.copied").text(record.docs_copied + " (" + record.copy_errors + " errors)").end()
+                $("<tr><th></th></tr>")
+                  .find("th").text(JSON.stringify(record)).end()
                   .appendTo("#records tbody.content");
               });
               $("#records tbody tr").removeClass("odd").filter(":odd").addClass("odd");
@@ -136,10 +132,7 @@ specific language governing permissions and limitations under the License.
       <table id="records" class="listing">
         <caption>Replication History</caption>
         <thead><tr>
-          <th>When</th>
-          <th>Sequences</th>
-          <th>Documents read</th>
-          <th>Documents copied</th>
+          <th>Event</th>
         </tr></thead>
         <tbody class="content"></tbody>
         <tbody class="footer"><tr>
@@ -148,5 +141,6 @@ specific language governing permissions and limitations under the License.
       </table>
 
     </div>
+    <div id="dump"></div>
   </body>
 </html>

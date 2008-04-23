@@ -76,9 +76,9 @@ handle_request(Req, DocumentRoot) ->
     ]).
 
 handle_request(Req, DocumentRoot, Method, Path) ->
-    Start = erlang:now(),
+    % Start = erlang:now(),
     X = handle_request0(Req, DocumentRoot, Method, Path),
-    io:format("now_diff:~p~n", [timer:now_diff(erlang:now(), Start)]),
+    % io:format("now_diff:~p~n", [timer:now_diff(erlang:now(), Start)]),
     X.
     
 handle_request0(Req, DocumentRoot, Method, Path) ->
