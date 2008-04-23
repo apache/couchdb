@@ -690,8 +690,9 @@ make_doc(Db, Id, Deleted, SummaryPointer, RevisionPath) ->
 
 flush_trees(_Db, [], AccFlushedTrees) ->
     {ok, lists:reverse(AccFlushedTrees)};
-flush_trees(#db{fd=Fd}=Db, [Unflushed | RestUnflushed], AccFlushed) ->
-       Flushed = couch_key_tree:map(
+flush_trees(#db{fd=Fd}=Db, [InfoUnflushed | RestUnflushed], AccFlushed) ->
+        #full_doc_info{rev_tree=Unflushed} = InfoUnflushed,
+        Flushed = couch_key_tree:map(
         fun(_Rev, Value) ->
             case Value of
             #doc{attachments=Atts,deleted=IsDeleted}=Doc ->
@@ -719,40 +720,46 @@ flush_trees(#db{fd=Fd}=Db, [Unflushed | RestUnflushed], AccFlushed) ->
                 Value
             end
         end, Unflushed),
-    flush_trees(Db, RestUnflushed, [Flushed | AccFlushed]).
+    flush_trees(Db, RestUnflushed, [InfoUnflushed#full_doc_info{rev_tree=Flushed} | AccFlushed]).
 
-merge_rev_trees(_NoConflicts, [], [], AccNewTrees) ->
-    {ok, lists:reverse(AccNewTrees)};
-merge_rev_trees(NoConflicts, [NewDocs | RestDocsList],
-        [OldTree | RestOldTrees], AccNewTrees) ->
+merge_rev_trees(_NoConflicts, [], [], AccNewInfos, AccSeq) ->
+    {ok, lists:reverse(AccNewInfos), AccSeq};
+merge_rev_trees(NoConflicts, [NewDocs|RestDocsList],
+        [OldDocInfo|RestOldInfo], AccNewInfos, AccSeq) ->
+    #full_doc_info{id=Id,rev_tree=OldTree}=OldDocInfo,
     UpdatesRevTree = lists:foldl(
         fun(NewDoc, AccTree) ->
             couch_key_tree:merge(AccTree, doc_to_tree(NewDoc))
         end,
         [], NewDocs),
     NewRevTree = couch_key_tree:merge(OldTree, UpdatesRevTree),
-    if NoConflicts andalso OldTree == [] ->
-        OldConflicts = couch_key_tree:count_leafs(OldTree),
-        NewConflicts = couch_key_tree:count_leafs(NewRevTree),
-        if NewConflicts > OldConflicts ->
-            throw(conflict);
+    if NewRevTree == OldTree ->
+        % nothing changed
+        merge_rev_trees(NoConflicts, RestDocsList, RestOldInfo, AccNewInfos, AccSeq);
+    true ->
+        if NoConflicts andalso OldTree /= [] ->
+            OldConflicts = couch_key_tree:count_leafs(OldTree),
+            NewConflicts = couch_key_tree:count_leafs(NewRevTree),
+            if NewConflicts > OldConflicts ->
+                throw(conflict);
+            true -> ok
+            end;
         true -> ok
-        end;
-    true -> ok
-    end,
-    merge_rev_trees(NoConflicts, RestDocsList, RestOldTrees, [NewRevTree | AccNewTrees]).
+        end,
+        NewInfo = #full_doc_info{id=Id,update_seq=AccSeq+1,rev_tree=NewRevTree},
+        merge_rev_trees(NoConflicts, RestDocsList,RestOldInfo, 
+                [NewInfo|AccNewInfos],AccSeq+1)
+    end.
 
-new_index_entries([], [], Seq, DocCount, DelCount, AccById, AccBySeq) ->
-    {ok, Seq, DocCount, DelCount, AccById, AccBySeq};
-new_index_entries([Id|RestIds], [RevTree|RestTrees], Seq0, DocCount, DelCount, AccById, AccBySeq) ->
-    Seq = Seq0 + 1,
-    FullDocInfo = #full_doc_info{id=Id, update_seq=Seq, rev_tree=RevTree},
+new_index_entries([], DocCount, DelCount, AccById, AccBySeq) ->
+    {ok, DocCount, DelCount, AccById, AccBySeq};
+new_index_entries([FullDocInfo|RestInfos], DocCount, DelCount, AccById, AccBySeq) ->
     #doc_info{deleted=Deleted} = DocInfo = couch_doc:to_doc_info(FullDocInfo),
     {DocCount2, DelCount2} =
     if Deleted -> {DocCount, DelCount + 1};
     true -> {DocCount + 1, DelCount} 
     end,
-    new_index_entries(RestIds, RestTrees, Seq, DocCount2, DelCount2, [FullDocInfo|AccById], [DocInfo|AccBySeq]).
+    new_index_entries(RestInfos, DocCount2, DelCount2, [FullDocInfo|AccById], [DocInfo|AccBySeq]).
 
 update_docs_int(Db, DocsList, Options) ->
     #db{
@@ -779,13 +786,13 @@ update_docs_int(Db, DocsList, Options) ->
     
     % lookup up the existing documents, if they exist.
     OldDocLookups = couch_btree:lookup(DocInfoByIdBTree, Ids),
-    OldDocTrees = lists:map(
-        fun({ok, #full_doc_info{rev_tree=OldRevTree}}) ->
-            OldRevTree;
-        (not_found) ->
-            []
+    OldDocInfos = lists:zipwith(
+        fun(_Id, {ok, FullDocInfo}) ->
+            FullDocInfo;
+        (Id, not_found) ->
+            #full_doc_info{id=Id}
         end,
-        OldDocLookups),
+        Ids, OldDocLookups),
     
     {OldCount, OldDelCount} = lists:foldl(
         fun({ok, FullDocInfo}, {OldCountAcc, OldDelCountAcc}) ->
@@ -793,7 +800,7 @@ update_docs_int(Db, DocsList, Options) ->
             #doc_info{deleted=false} ->
                 {OldCountAcc + 1, OldDelCountAcc};
             _ ->
-                {OldCountAcc , OldDelCountAcc + 1}
+                {OldCountAcc, OldDelCountAcc + 1}
             end;
         (not_found, Acc) ->
             Acc
@@ -801,9 +808,10 @@ update_docs_int(Db, DocsList, Options) ->
     
     % Merge the new docs into the revision trees.
     NoConflicts = lists:member(no_conflicts, Options),
-    {ok, NewRevTrees} = merge_rev_trees(NoConflicts, DocsList2, OldDocTrees, []),
+    {ok, NewDocInfos, NewSeq} = merge_rev_trees(NoConflicts, DocsList2, OldDocInfos, [], LastSeq),
     
-    RemoveSeqs = [ OldSeq || {ok, #full_doc_info{update_seq=OldSeq}} <- OldDocLookups],
+    RemoveSeqs =
+        [ OldSeq || {ok, #full_doc_info{update_seq=OldSeq}} <- OldDocLookups],
     
     % All regular documents are now ready to write.
     
@@ -811,10 +819,10 @@ update_docs_int(Db, DocsList, Options) ->
     {ok, Db2}  = update_local_docs(Db, NonRepDocs),
     
     % Write out the documents summaries (they are stored in the nodes of the rev trees)
-    {ok, FlushedRevTrees} = flush_trees(Db2, NewRevTrees, []),
+    {ok, FlushedDocInfos} = flush_trees(Db2, NewDocInfos, []),
     
-    {ok, NewSeq, NewDocsCount, NewDelCount, InfoById, InfoBySeq} =
-        new_index_entries(Ids, FlushedRevTrees, LastSeq, 0, 0, [], []),
+    {ok, NewDocsCount, NewDelCount, InfoById, InfoBySeq} =
+        new_index_entries(FlushedDocInfos, 0, 0, [], []),
 
     % and the indexes to the documents
     {ok, DocInfoBySeqBTree2} = couch_btree:add_remove(DocInfoBySeqBTree, InfoBySeq, RemoveSeqs),
