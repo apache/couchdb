@@ -48,35 +48,42 @@ replicate(Source, Target, Options) ->
 
     RepRecKey = ?LOCAL_DOC_PREFIX ++ HostName ++ ":" ++ Source ++ ":" ++ Target,
     StartTime = httpd_util:rfc1123_date(),
-    RepRecSrc =
-    case open_doc(DbSrc, RepRecKey, []) of
-    {ok, SrcDoc} -> SrcDoc;
-    _ -> #doc{id=RepRecKey}
-    end,
+    
+    case proplists:get_value(full, Options, false)
+        orelse proplists:get_value("full", Options, false) of
+    true ->
+         RepRecSrc = RepRecTgt = #doc{id=RepRecKey};
+    false ->
+        RepRecSrc =
+        case open_doc(DbSrc, RepRecKey, []) of
+        {ok, SrcDoc} ->
+            ?LOG_DEBUG("Found existing replication record on source", []),
+            SrcDoc;
+        _ -> #doc{id=RepRecKey}
+        end,
 
-    RepRecTgt =
-    case open_doc(DbTgt, RepRecKey, []) of
-    {ok, TgtDoc} -> TgtDoc;
-    _ -> #doc{id=RepRecKey}
+        RepRecTgt =
+        case open_doc(DbTgt, RepRecKey, []) of
+        {ok, TgtDoc} ->
+            ?LOG_DEBUG("Found existing replication record on target", []),
+            TgtDoc;
+        _ -> #doc{id=RepRecKey}
+        end
     end,
 
     #doc{body={obj,OldRepHistoryProps}} = RepRecSrc,
     #doc{body={obj,OldRepHistoryPropsTrg}} = RepRecTgt,
 
-    SeqNum0 =
+    SeqNum =
     case OldRepHistoryProps == OldRepHistoryPropsTrg of
     true ->
         % if the records are identical, then we have a valid replication history
         proplists:get_value("source_last_seq", OldRepHistoryProps, 0);
     false ->
+        ?LOG_INFO("Replication records differ. "
+                "Performing full replication instead of incremental.", []),
+        ?LOG_DEBUG("Record on source:~p~nRecord on target:~p~n", [OldRepHistoryProps, OldRepHistoryPropsTrg]),
         0
-    end,
-
-    SeqNum =
-    case proplists:get_value(full, Options, false)
-        orelse proplists:get_value("full", Options, false) of
-    true -> 0;
-    false -> SeqNum0
     end,
 
     {NewSeqNum, Stats} = pull_rep(DbTgt, DbSrc, SeqNum),
@@ -154,8 +161,8 @@ get_missing_revs_loop(Parent, DbTarget, OpenDocsPid, RevsChecked, MissingFound) 
                 RevsChecked + length(Changed),
                 MissingFound + length(Missing));
     shutdown ->
-        Parent ! {done, self(), [{missing_checked, RevsChecked},
-                                 {missing_found, MissingFound}]}
+        Parent ! {done, self(), [{"missing_checked", RevsChecked},
+                                 {"missing_found", MissingFound}]}
     end.
     
 
@@ -168,7 +175,7 @@ open_doc_revs_loop(Parent, DbSource, SaveDocsPid, DocsRead) ->
         SaveDocsPid ! Docs,
         open_doc_revs_loop(Parent, DbSource, SaveDocsPid, DocsRead + length(Docs));
     shutdown ->
-        Parent ! {done, self(), [{docs_read, DocsRead}]}
+        Parent ! {done, self(), [{"docs_read", DocsRead}]}
     end.
 
 
@@ -187,7 +194,7 @@ save_docs_loop(Parent, DbTarget, DocsWritten) ->
         ok = save_docs(DbTarget, Docs, []),
         save_docs_loop(Parent, DbTarget, DocsWritten + length(Docs));
     shutdown ->
-        Parent ! {done, self(), [{docs_written, DocsWritten}]}
+        Parent ! {done, self(), [{"docs_written", DocsWritten}]}
     end.
 
 
