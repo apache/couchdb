@@ -22,14 +22,12 @@ GNU/Linux) you can install these dependencies using the `apt-get` command:
 
     apt-get install automake autoconf libtool subversion-tools help2man
 
-If you are running OS X and have [MacPorts][07] installed you can install some of
-these dependencies by using the `port` command:
+The OS X version of these dependencies may be out of date so it is recommended
+that you use [MacPorts][07] to install newer versions using the `port` command:
 
     port install automake autoconf libtool help2man
 
-Note: OS X users should already have Automake, Autoconf and Libtool installed.
-
-Note: MacPorts users will need to install svn2cl by hand.
+Note: MacPorts users will need to install svn2cl by hand if they wish to use it.
 
 ### Bootstrapping ###
 
