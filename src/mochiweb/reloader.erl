@@ -80,16 +80,7 @@ doit(From, To) ->
     [case file:read_file_info(Filename) of
          {ok, FileInfo} when FileInfo#file_info.mtime >= From,
                              FileInfo#file_info.mtime < To ->
-             io:format("Reloading ~p ...", [Module]),
-             code:purge(Module),
-             case code:load_file(Module) of
-                 {module, Module} ->
-                     io:format(" ok.~n"),
-                     reload;
-                 {error, Reason} ->
-                     io:format(" ~p.~n", [Reason]),
-                     error
-             end;
+             reload(Module);
          {ok, _} ->
              unmodified;
          {error, enoent} ->
@@ -102,6 +93,32 @@ doit(From, To) ->
                        [Filename, Reason]),
              error
      end || {Module, Filename} <- code:all_loaded(), is_list(Filename)].
+
+reload(Module) ->
+    io:format("Reloading ~p ...", [Module]),
+    code:purge(Module),
+    case code:load_file(Module) of
+        {module, Module} ->
+            io:format(" ok.~n"),
+            case erlang:function_exported(Module, test, 0) of
+                true ->
+                    io:format(" - Calling ~p:test() ...", [Module]),
+                    case catch Module:test() of
+                        ok ->
+                            io:format(" ok.~n"),
+                            reload;
+                        Reason ->
+                            io:format(" fail: ~p.~n", [Reason]),
+                            reload_but_test_failed
+                    end;
+                false ->
+                    reload
+            end;
+        {error, Reason} ->
+            io:format(" fail: ~p.~n", [Reason]),
+            error
+    end.
+
 
 stamp() ->
     erlang:localtime().

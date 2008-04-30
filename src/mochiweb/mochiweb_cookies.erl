@@ -9,15 +9,15 @@
 -define(QUOTE, $\").
 
 -define(IS_WHITESPACE(C),
-	(C =:= $\s orelse C =:= $\t orelse C =:= $\r orelse C =:= $\n)).
+        (C =:= $\s orelse C =:= $\t orelse C =:= $\r orelse C =:= $\n)).
 
 %% RFC 2616 separators (called tspecials in RFC 2068)
 -define(IS_SEPARATOR(C),
-	(C < 32 orelse
-	 C =:= $\s orelse C =:= $\t orelse
-	 C =:= $( orelse C =:= $) orelse C =:= $< orelse C =:= $> orelse
-	 C =:= $@ orelse C =:= $, orelse C =:= $; orelse C =:= $: orelse
-	 C =:= $\\ orelse C =:= $\" orelse C =:= $/ orelse
+        (C < 32 orelse
+         C =:= $\s orelse C =:= $\t orelse
+         C =:= $( orelse C =:= $) orelse C =:= $< orelse C =:= $> orelse
+         C =:= $@ orelse C =:= $, orelse C =:= $; orelse C =:= $: orelse
+         C =:= $\\ orelse C =:= $\" orelse C =:= $/ orelse
          C =:= $[ orelse C =:= $] orelse C =:= $? orelse C =:= $= orelse
          C =:= ${ orelse C =:= $})).
 
@@ -137,13 +137,13 @@ parse_cookie([], Acc) ->
 parse_cookie(String, Acc) -> 
     {{Token, Value}, Rest} = read_pair(String),
     Acc1 = case Token of
-	       "" ->
-		   Acc;
-	       "$" ++ _ ->
-		   Acc;
-	       _ ->
-		   [{Token, Value} | Acc]
-	   end,
+               "" ->
+                   Acc;
+               "$" ++ _ ->
+                   Acc;
+               _ ->
+                   [{Token, Value} | Acc]
+           end,
     parse_cookie(Rest, Acc1).
 
 read_pair(String) ->
@@ -154,10 +154,10 @@ read_pair(String) ->
 read_value([$= | Value]) ->
     Value1 = skip_whitespace(Value),
     case Value1 of
-	[?QUOTE | _] ->
-	    read_quoted(Value1);
-	_ ->
-	    read_token(Value1)
+        [?QUOTE | _] ->
+            read_quoted(Value1);
+        _ ->
+            read_token(Value1)
     end;
 read_value(String) ->
     {"", String}.
@@ -221,30 +221,30 @@ any_to_list(V) when is_integer(V) ->
 
 cookie_test() ->
     C1 = {"Set-Cookie",
-	  "Customer=WILE_E_COYOTE; "
-	  "Version=1; "
-	  "Path=/acme"},
+          "Customer=WILE_E_COYOTE; "
+          "Version=1; "
+          "Path=/acme"},
     C1 = cookie("Customer", "WILE_E_COYOTE", [{path, "/acme"}]),
     C1 = cookie("Customer", "WILE_E_COYOTE",
-		[{path, "/acme"}, {badoption, "negatory"}]),
+                [{path, "/acme"}, {badoption, "negatory"}]),
     C1 = cookie('Customer', 'WILE_E_COYOTE', [{path, '/acme'}]),
     C1 = cookie(<<"Customer">>, <<"WILE_E_COYOTE">>, [{path, <<"/acme">>}]),
 
     {"Set-Cookie","=NoKey; Version=1"} = cookie("", "NoKey", []),
-	
-	LocalTime = calendar:universal_time_to_local_time({{2007, 5, 15}, {13, 45, 33}}), 
+        
+        LocalTime = calendar:universal_time_to_local_time({{2007, 5, 15}, {13, 45, 33}}), 
     C2 = {"Set-Cookie",
-	  "Customer=WILE_E_COYOTE; "
-	  "Version=1; "
-	  "Expires=Tue, 15 May 2007 13:45:33 GMT; "
-	  "Max-Age=0"},
+          "Customer=WILE_E_COYOTE; "
+          "Version=1; "
+          "Expires=Tue, 15 May 2007 13:45:33 GMT; "
+          "Max-Age=0"},
     C2 = cookie("Customer", "WILE_E_COYOTE",
-		[{max_age, -111}, {local_time, LocalTime}]),
+                [{max_age, -111}, {local_time, LocalTime}]),
     C3 = {"Set-Cookie",
-	  "Customer=WILE_E_COYOTE; "
-	  "Version=1; "
-	  "Expires=Wed, 16 May 2007 13:45:50 GMT; "
-	  "Max-Age=86417"},
+          "Customer=WILE_E_COYOTE; "
+          "Version=1; "
+          "Expires=Wed, 16 May 2007 13:45:50 GMT; "
+          "Max-Age=86417"},
     C3 = cookie("Customer", "WILE_E_COYOTE",
-		[{max_age, 86417}, {local_time, LocalTime}]),
+                [{max_age, 86417}, {local_time, LocalTime}]),
     ok.

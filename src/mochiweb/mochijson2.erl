@@ -31,7 +31,7 @@
                           offset=1+S#decoder.offset}
         end).
 -define(IS_WHITESPACE(C),
- 	(C =:= $\s orelse C =:= $\t orelse C =:= $\r orelse C =:= $\n)).
+        (C =:= $\s orelse C =:= $\t orelse C =:= $\r orelse C =:= $\n)).
 
 %% @type iolist() = [char() | binary() | iolist()]
 %% @type iodata() = iolist() | binary()
@@ -45,10 +45,10 @@
 -record(encoder, {handler=null}).
 
 -record(decoder, {object_hook=null,
-		  offset=0,
+                  offset=0,
                   line=1,
-		  column=1,
-		  state=null}).
+                  column=1,
+                  state=null}).
 
 %% @spec encoder([encoder_option()]) -> function()
 %% @doc Create an encoder/1 with the given options.
@@ -115,8 +115,8 @@ json_encode_array([], _State) ->
     <<"[]">>;
 json_encode_array(L, State) ->
     F = fun (O, Acc) ->
-		[$,, json_encode(O, State) | Acc]
-	end,
+                [$,, json_encode(O, State) | Acc]
+        end,
     [$, | Acc1] = lists:foldl(F, "[", L),
     lists:reverse([$\] | Acc1]).
 
@@ -124,10 +124,10 @@ json_encode_proplist([], _State) ->
     <<"{}">>;
 json_encode_proplist(Props, State) ->
     F = fun ({K, V}, Acc) ->
-		KS = json_encode_string(K, State),
-		VS = json_encode(V, State),
-		[$,, VS, $:, KS | Acc]
-	end,
+                KS = json_encode_string(K, State),
+                VS = json_encode(V, State),
+                [$,, VS, $:, KS | Acc]
+        end,
     [$, | Acc1] = lists:foldl(F, "{", Props),
     lists:reverse([$\} | Acc1]).
 
@@ -144,8 +144,8 @@ json_encode_string_unicode([], Acc) ->
     lists:reverse([$\" | Acc]);
 json_encode_string_unicode([C | Cs], Acc) ->
     Acc1 = case C of
-	       ?Q ->
-		   [?Q, $\\ | Acc];
+               ?Q ->
+                   [?Q, $\\ | Acc];
                %% Escaping solidus is only useful when trying to protect
                %% against "</script>" injection attacks which are only
                %% possible when JSON is inserted into a HTML document
@@ -153,28 +153,28 @@ json_encode_string_unicode([C | Cs], Acc) ->
                %% if you do insert directly into HTML then you need to
                %% uncomment the following case or escape the output of encode.
                %%
-	       %% $/ ->
-	       %%    [$/, $\\ | Acc];
+               %% $/ ->
+               %%    [$/, $\\ | Acc];
                %%
-	       $\\ ->
-		   [$\\, $\\ | Acc];
-	       $\b ->
-		   [$b, $\\ | Acc];
-	       $\f ->
-		   [$f, $\\ | Acc];
-	       $\n ->
-		   [$n, $\\ | Acc];
-	       $\r ->
-		   [$r, $\\ | Acc];
-	       $\t ->
-		   [$t, $\\ | Acc];
-	       C when C >= 0, C < $\s; C >= 16#7f, C =< 16#10FFFF ->
-		   [unihex(C) | Acc];
-	       C when C < 16#7f ->
-		   [C | Acc];
-	       _ ->
-		   exit({json_encode, {bad_char, C}})
-	   end,
+               $\\ ->
+                   [$\\, $\\ | Acc];
+               $\b ->
+                   [$b, $\\ | Acc];
+               $\f ->
+                   [$f, $\\ | Acc];
+               $\n ->
+                   [$n, $\\ | Acc];
+               $\r ->
+                   [$r, $\\ | Acc];
+               $\t ->
+                   [$t, $\\ | Acc];
+               C when C >= 0, C < $\s; C >= 16#7f, C =< 16#10FFFF ->
+                   [unihex(C) | Acc];
+               C when C < 16#7f ->
+                   [C | Acc];
+               _ ->
+                   exit({json_encode, {bad_char, C}})
+           end,
     json_encode_string_unicode(Cs, Acc1).
 
 hexdigit(C) when C >= 0, C =< 9 ->
@@ -201,12 +201,12 @@ json_decode(B, S) ->
 
 decode1(B, S=#decoder{state=null}) ->
     case tokenize(B, S#decoder{state=any}) of
-	{{const, C}, S1} ->
-	    {C, S1};
-	{start_array, S1} ->
-	    decode_array(B, S1);
-	{start_object, S1} ->
-	    decode_object(B, S1)
+        {{const, C}, S1} ->
+            {C, S1};
+        {start_array, S1} ->
+            decode_array(B, S1);
+        {start_object, S1} ->
+            decode_object(B, S1)
     end.
 
 make_object(V, #decoder{object_hook=null}) ->
@@ -219,21 +219,21 @@ decode_object(B, S) ->
 
 decode_object(B, S=#decoder{state=key}, Acc) ->
     case tokenize(B, S) of
-	{end_object, S1} ->
-	    V = make_object({struct, lists:reverse(Acc)}, S1),
-	    {V, S1#decoder{state=null}};
-	{{const, K}, S1} ->
-	    {colon, S2} = tokenize(B, S1),
-	    {V, S3} = decode1(B, S2#decoder{state=null}),
-	    decode_object(B, S3#decoder{state=comma}, [{K, V} | Acc])
+        {end_object, S1} ->
+            V = make_object({struct, lists:reverse(Acc)}, S1),
+            {V, S1#decoder{state=null}};
+        {{const, K}, S1} ->
+            {colon, S2} = tokenize(B, S1),
+            {V, S3} = decode1(B, S2#decoder{state=null}),
+            decode_object(B, S3#decoder{state=comma}, [{K, V} | Acc])
     end;
 decode_object(B, S=#decoder{state=comma}, Acc) ->
     case tokenize(B, S) of
-	{end_object, S1} ->
-	    V = make_object({struct, lists:reverse(Acc)}, S1),
-	    {V, S1#decoder{state=null}};
-	{comma, S1} ->
-	    decode_object(B, S1#decoder{state=key}, Acc)
+        {end_object, S1} ->
+            V = make_object({struct, lists:reverse(Acc)}, S1),
+            {V, S1#decoder{state=null}};
+        {comma, S1} ->
+            decode_object(B, S1#decoder{state=key}, Acc)
     end.
 
 decode_array(B, S) ->
@@ -241,23 +241,23 @@ decode_array(B, S) ->
 
 decode_array(B, S=#decoder{state=any}, Acc) ->
     case tokenize(B, S) of
-	{end_array, S1} ->
-	    {lists:reverse(Acc), S1#decoder{state=null}};
-	{start_array, S1} ->
-	    {Array, S2} = decode_array(B, S1),
-	    decode_array(B, S2#decoder{state=comma}, [Array | Acc]);
-	{start_object, S1} ->
-	    {Array, S2} = decode_object(B, S1),
-	    decode_array(B, S2#decoder{state=comma}, [Array | Acc]);
-	{{const, Const}, S1} ->
-	    decode_array(B, S1#decoder{state=comma}, [Const | Acc])
+        {end_array, S1} ->
+            {lists:reverse(Acc), S1#decoder{state=null}};
+        {start_array, S1} ->
+            {Array, S2} = decode_array(B, S1),
+            decode_array(B, S2#decoder{state=comma}, [Array | Acc]);
+        {start_object, S1} ->
+            {Array, S2} = decode_object(B, S1),
+            decode_array(B, S2#decoder{state=comma}, [Array | Acc]);
+        {{const, Const}, S1} ->
+            decode_array(B, S1#decoder{state=comma}, [Const | Acc])
     end;
 decode_array(B, S=#decoder{state=comma}, Acc) ->
     case tokenize(B, S) of
-	{end_array, S1} ->
-	    {lists:reverse(Acc), S1#decoder{state=null}};
-	{comma, S1} ->
-	    decode_array(B, S1#decoder{state=any}, Acc)
+        {end_array, S1} ->
+            {lists:reverse(Acc), S1#decoder{state=null}};
+        {comma, S1} ->
+            decode_array(B, S1#decoder{state=any}, Acc)
     end.
 
 tokenize_string(B, S) ->
@@ -400,10 +400,10 @@ obj_new() ->
 
 is_obj({struct, Props}) ->
     F = fun ({K, _}) when is_binary(K) ->
-		true;
-	    (_) ->
-		false
-	end,	
+                true;
+            (_) ->
+                false
+        end,    
     lists:all(F, Props).
 
 obj_from_list(Props) ->
@@ -422,8 +422,8 @@ equiv({struct, Props1}, {struct, Props2}) ->
     equiv_object(Props1, Props2);
 equiv(L1, L2) when is_list(L1), is_list(L2) ->
     equiv_list(L1, L2);
-equiv(N1, N2) when is_number(N1), is_number(N2)	-> N1 == N2;
-equiv(B1, B2) when is_binary(B1), is_binary(B2)	-> B1 == B2;
+equiv(N1, N2) when is_number(N1), is_number(N2) -> N1 == N2;
+equiv(B1, B2) when is_binary(B1), is_binary(B2) -> B1 == B2;
 equiv(true, true) -> true;
 equiv(false, false) -> true;
 equiv(null, null) -> true.
@@ -445,10 +445,10 @@ equiv_list([], []) ->
     true;
 equiv_list([V1 | L1], [V2 | L2]) ->
     case equiv(V1, V2) of
-	true ->
-	    equiv_list(L1, L2);
-	false ->
-	    false
+        true ->
+            equiv_list(L1, L2);
+        false ->
+            false
     end.
 
 test_all() ->

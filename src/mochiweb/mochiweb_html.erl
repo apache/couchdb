@@ -31,13 +31,13 @@
         end).
 
 -define(IS_WHITESPACE(C),
- 	(C =:= $\s orelse C =:= $\t orelse C =:= $\r orelse C =:= $\n)).
+        (C =:= $\s orelse C =:= $\t orelse C =:= $\r orelse C =:= $\n)).
 -define(IS_LITERAL_SAFE(C),
         ((C >= $A andalso C =< $Z) orelse (C >= $a andalso C =< $z)
          orelse (C >= $0 andalso C =< $9))).
                                 
 -record(decoder, {line=1,
-		  column=1,
+                  column=1,
                   offset=0}).
 
 %% @type html_node() = {string(), [html_attr()], [html_node() | string()]}

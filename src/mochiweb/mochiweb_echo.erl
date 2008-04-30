@@ -12,20 +12,20 @@ stop() ->
     
 start() ->
     mochiweb_socket_server:start([{name, ?MODULE},
-				  {port, 6789},
-				  {ip, "127.0.0.1"},
-				  {max, 1},
-				  {loop, {?MODULE, loop}}]).
+                                  {port, 6789},
+                                  {ip, "127.0.0.1"},
+                                  {max, 1},
+                                  {loop, {?MODULE, loop}}]).
 
 loop(Socket) ->
     case gen_tcp:recv(Socket, 0, 30000) of
-	{ok, Data} ->
-	    case gen_tcp:send(Socket, Data) of
-		ok ->
-		    loop(Socket);
-		_ ->
-		    exit(normal)
-	    end;
-	_Other ->
-	    exit(normal)
+        {ok, Data} ->
+            case gen_tcp:send(Socket, Data) of
+                ok ->
+                    loop(Socket);
+                _ ->
+                    exit(normal)
+            end;
+        _Other ->
+            exit(normal)
     end.

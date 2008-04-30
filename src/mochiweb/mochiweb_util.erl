@@ -16,13 +16,13 @@
 -define(PERCENT, 37).  % $\%
 -define(FULLSTOP, 46). % $\.
 -define(IS_HEX(C), ((C >= $0 andalso C =< $9) orelse
-		    (C >= $a andalso C =< $f) orelse
-		    (C >= $A andalso C =< $F))).
+                    (C >= $a andalso C =< $f) orelse
+                    (C >= $A andalso C =< $F))).
 -define(QS_SAFE(C), ((C >= $a andalso C =< $z) orelse
-		     (C >= $A andalso C =< $Z) orelse
-		     (C >= $0 andalso C =< $9) orelse
-		     (C =:= ?FULLSTOP orelse C =:= $- orelse C =:= $~ orelse
-		      C =:= $_))).
+                     (C >= $A andalso C =< $Z) orelse
+                     (C >= $0 andalso C =< $9) orelse
+                     (C =:= ?FULLSTOP orelse C =:= $- orelse C =:= $~ orelse
+                      C =:= $_))).
 
 hexdigit(C) when C < 10 -> $0 + C;
 hexdigit(C) when C < 16 -> $A + (C - 10).
@@ -92,8 +92,8 @@ quote_plus([C | Rest], Acc) ->
 %% @doc URL encode the property list.
 urlencode(Props) ->
     RevPairs = lists:foldl(fun ({K, V}, Acc) ->
-				   [[quote_plus(K), $=, quote_plus(V)] | Acc]
-			   end, [], Props),
+                                   [[quote_plus(K), $=, quote_plus(V)] | Acc]
+                           end, [], Props),
     lists:flatten(revjoin(RevPairs, $&, [])).
 
 %% @spec parse_qs(string() | binary()) -> [{Key, Value}]
@@ -204,15 +204,15 @@ path_split([C | Rest], Acc) ->
 %% @doc Assemble a URL from the 5-tuple. Path must be absolute.
 urlunsplit({Scheme, Netloc, Path, Query, Fragment}) ->
     lists:flatten([case Scheme of "" -> "";  _ -> [Scheme, "://"] end,
-		   Netloc,
-		   urlunsplit_path({Path, Query, Fragment})]).
+                   Netloc,
+                   urlunsplit_path({Path, Query, Fragment})]).
 
 %% @spec urlunsplit_path({Path, Query, Fragment}) -> string()
 %% @doc Assemble a URL path from the 3-tuple.
 urlunsplit_path({Path, Query, Fragment}) ->
     lists:flatten([Path,
-		   case Query of "" -> ""; _ -> [$? | Query] end,
-		   case Fragment of "" -> ""; _ -> [$# | Fragment] end]).
+                   case Query of "" -> ""; _ -> [$? | Query] end,
+                   case Fragment of "" -> ""; _ -> [$# | Fragment] end]).
 
 %% @spec urlsplit_path(Url) -> {Path, Query, Fragment}
 %% @doc Return a 3-tuple, does not expand % escapes. Only supports HTTP style
@@ -244,36 +244,36 @@ urlsplit_query([C | Rest], Acc) ->
 %% @doc  Guess the mime type of a file by the extension of its filename.
 guess_mime(File) ->
     case filename:extension(File) of
-	".html" ->
-	    "text/html";
-	".xhtml" ->
-	    "application/xhtml+xml";
-	".xml" ->
-	    "application/xml";
-	".css" ->
-	    "text/css";
-	".js" ->
-	    "application/x-javascript";
-	".jpg" ->
-	    "image/jpeg";
-	".gif" ->
-	    "image/gif";
-	".png" ->
-	    "image/png";
-	".swf" ->
-	    "application/x-shockwave-flash";
-	".zip" ->
-	    "application/zip";
-	".bz2" ->
-	    "application/x-bzip2";
-	".gz" ->
-	    "application/x-gzip";
-	".tar" ->
-	    "application/x-tar";
-	".tgz" ->
-	    "application/x-gzip";
-	".txt" ->
-	    "text/plain";
+        ".html" ->
+            "text/html";
+        ".xhtml" ->
+            "application/xhtml+xml";
+        ".xml" ->
+            "application/xml";
+        ".css" ->
+            "text/css";
+        ".js" ->
+            "application/x-javascript";
+        ".jpg" ->
+            "image/jpeg";
+        ".gif" ->
+            "image/gif";
+        ".png" ->
+            "image/png";
+        ".swf" ->
+            "application/x-shockwave-flash";
+        ".zip" ->
+            "application/zip";
+        ".bz2" ->
+            "application/x-bzip2";
+        ".gz" ->
+            "application/x-gzip";
+        ".tar" ->
+            "application/x-tar";
+        ".tgz" ->
+            "application/x-gzip";
+        ".txt" ->
+            "text/plain";
         ".doc" ->
             "application/msword";
         ".pdf" ->
@@ -314,18 +314,18 @@ parse_header(String) ->
     %%       Should parse properly like mochiweb_cookies.
     [Type | Parts] = [string:strip(S) || S <- string:tokens(String, ";")],
     F = fun (S, Acc) ->
-		case lists:splitwith(fun (C) -> C =/= $= end, S) of
-		    {"", _} ->
-			%% Skip anything with no name
-			Acc;
-		    {_, ""} ->
-			%% Skip anything with no value
-			Acc;
-		    {Name, [$\= | Value]} ->
-			[{string:to_lower(string:strip(Name)),
-			  unquote_header(string:strip(Value))} | Acc]
-		end
-	end,
+                case lists:splitwith(fun (C) -> C =/= $= end, S) of
+                    {"", _} ->
+                        %% Skip anything with no name
+                        Acc;
+                    {_, ""} ->
+                        %% Skip anything with no value
+                        Acc;
+                    {Name, [$\= | Value]} ->
+                        [{string:to_lower(string:strip(Name)),
+                          unquote_header(string:strip(Value))} | Acc]
+                end
+        end,
     {string:to_lower(Type),
      lists:foldr(F, [], Parts)}.
 
@@ -401,7 +401,7 @@ test_cmd_string() ->
 
 test_parse_header() ->
     {"multipart/form-data", [{"boundary", "AaB03x"}]} =
-	parse_header("multipart/form-data; boundary=AaB03x"),
+        parse_header("multipart/form-data; boundary=AaB03x"),
     ok.
 
 test_guess_mime() ->
@@ -422,7 +422,7 @@ test_path_split() ->
 test_urlsplit() ->
     {"", "", "/foo", "", "bar?baz"} = urlsplit("/foo#bar?baz"),
     {"http", "host:port", "/foo", "", "bar?baz"} =
-	urlsplit("http://host:port/foo#bar?baz"),
+        urlsplit("http://host:port/foo#bar?baz"),
     ok.
 
 test_urlsplit_path() ->
@@ -437,7 +437,7 @@ test_urlsplit_path() ->
 test_urlunsplit() ->
     "/foo#bar?baz" = urlunsplit({"", "", "/foo", "", "bar?baz"}),
     "http://host:port/foo#bar?baz" =
-	urlunsplit({"http", "host:port", "/foo", "", "bar?baz"}),
+        urlunsplit({"http", "host:port", "/foo", "", "bar?baz"}),
     ok.
 
 test_urlunsplit_path() ->
@@ -476,11 +476,11 @@ test_unquote() ->
 
 test_urlencode() ->
     "foo=bar&baz=wibble+%0D%0A&z=1" = urlencode([{foo, "bar"},
-						 {"baz", "wibble \r\n"},
-						 {z, 1}]),
+                                                 {"baz", "wibble \r\n"},
+                                                 {z, 1}]),
     ok.
 
 test_parse_qs() ->
     [{"foo", "bar"}, {"baz", "wibble \r\n"}, {"z", "1"}] =
-	parse_qs("foo=bar&baz=wibble+%0D%0A&z=1"),
+        parse_qs("foo=bar&baz=wibble+%0D%0A&z=1"),
     ok.

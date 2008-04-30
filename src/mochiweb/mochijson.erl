@@ -39,13 +39,13 @@
 %% @type binary_decoder_option() = {object_hook, function()}
 
 -record(encoder, {input_encoding=unicode,
-		  handler=null}).
+                  handler=null}).
 
 -record(decoder, {input_encoding=utf8,
-		  object_hook=null,
-		  line=1,
-		  column=1,
-		  state=null}).
+                  object_hook=null,
+                  line=1,
+                  column=1,
+                  state=null}).
 
 %% @spec encoder([encoder_option()]) -> function()
 %% @doc Create an encoder/1 with the given options.
@@ -136,8 +136,8 @@ json_encode_array([], _State) ->
     "[]";
 json_encode_array(L, State) ->
     F = fun (O, Acc) ->
-		[$,, json_encode(O, State) | Acc]
-	end,
+                [$,, json_encode(O, State) | Acc]
+        end,
     [$, | Acc1] = lists:foldl(F, "[", L),
     lists:reverse([$\] | Acc1]).
 
@@ -145,17 +145,17 @@ json_encode_proplist([], _State) ->
     "{}";
 json_encode_proplist(Props, State) ->
     F = fun ({K, V}, Acc) ->
-		KS = case K of 
-			 K when is_atom(K) ->
-			     json_encode_string_utf8(atom_to_list(K));
-			 K when is_integer(K) ->
-			     json_encode_string(integer_to_list(K), State);
-			 K when is_list(K); is_binary(K) ->
-			     json_encode_string(K, State)
-		     end,
-		VS = json_encode(V, State),
-		[$,, VS, $:, KS | Acc]
-	end,
+                KS = case K of 
+                         K when is_atom(K) ->
+                             json_encode_string_utf8(atom_to_list(K));
+                         K when is_integer(K) ->
+                             json_encode_string(integer_to_list(K), State);
+                         K when is_list(K); is_binary(K) ->
+                             json_encode_string(K, State)
+                     end,
+                VS = json_encode(V, State),
+                [$,, VS, $:, KS | Acc]
+        end,
     [$, | Acc1] = lists:foldl(F, "{", Props),
     lists:reverse([$\} | Acc1]).
 
@@ -241,12 +241,12 @@ json_decode(L, S) ->
 
 decode1(L, S=#decoder{state=null}) ->
     case tokenize(L, S#decoder{state=any}) of
-	{{const, C}, L1, S1} ->
-	    {C, L1, S1};
-	{start_array, L1, S1} ->
-	    decode_array(L1, S1#decoder{state=any}, []);
-	{start_object, L1, S1} ->
-	    decode_object(L1, S1#decoder{state=key}, [])
+        {{const, C}, L1, S1} ->
+            {C, L1, S1};
+        {start_array, L1, S1} ->
+            decode_array(L1, S1#decoder{state=any}, []);
+        {start_object, L1, S1} ->
+            decode_object(L1, S1#decoder{state=key}, [])
     end.
 
 make_object(V, #decoder{object_hook=null}) ->
@@ -256,42 +256,42 @@ make_object(V, #decoder{object_hook=Hook}) ->
 
 decode_object(L, S=#decoder{state=key}, Acc) ->
     case tokenize(L, S) of
-	{end_object, Rest, S1} ->
-	    V = make_object({struct, lists:reverse(Acc)}, S1),
-	    {V, Rest, S1#decoder{state=null}};
-	{{const, K}, Rest, S1} when is_list(K) ->
-	    {colon, L2, S2} = tokenize(Rest, S1),
-	    {V, L3, S3} = decode1(L2, S2#decoder{state=null}),
-	    decode_object(L3, S3#decoder{state=comma}, [{K, V} | Acc])
+        {end_object, Rest, S1} ->
+            V = make_object({struct, lists:reverse(Acc)}, S1),
+            {V, Rest, S1#decoder{state=null}};
+        {{const, K}, Rest, S1} when is_list(K) ->
+            {colon, L2, S2} = tokenize(Rest, S1),
+            {V, L3, S3} = decode1(L2, S2#decoder{state=null}),
+            decode_object(L3, S3#decoder{state=comma}, [{K, V} | Acc])
     end;
 decode_object(L, S=#decoder{state=comma}, Acc) ->
     case tokenize(L, S) of
-	{end_object, Rest, S1} ->
-	    V = make_object({struct, lists:reverse(Acc)}, S1),
-	    {V, Rest, S1#decoder{state=null}};
-	{comma, Rest, S1} ->
-	    decode_object(Rest, S1#decoder{state=key}, Acc)
+        {end_object, Rest, S1} ->
+            V = make_object({struct, lists:reverse(Acc)}, S1),
+            {V, Rest, S1#decoder{state=null}};
+        {comma, Rest, S1} ->
+            decode_object(Rest, S1#decoder{state=key}, Acc)
     end.
 
 decode_array(L, S=#decoder{state=any}, Acc) ->
     case tokenize(L, S) of
-	{end_array, Rest, S1} ->
-	    {{array, lists:reverse(Acc)}, Rest, S1#decoder{state=null}};
-	{start_array, Rest, S1} ->
-	    {Array, Rest1, S2} = decode_array(Rest, S1#decoder{state=any}, []),
-	    decode_array(Rest1, S2#decoder{state=comma}, [Array | Acc]);
-	{start_object, Rest, S1} ->
-	    {Array, Rest1, S2} = decode_object(Rest, S1#decoder{state=key}, []),
-	    decode_array(Rest1, S2#decoder{state=comma}, [Array | Acc]);
-	{{const, Const}, Rest, S1} ->
-	    decode_array(Rest, S1#decoder{state=comma}, [Const | Acc])
+        {end_array, Rest, S1} ->
+            {{array, lists:reverse(Acc)}, Rest, S1#decoder{state=null}};
+        {start_array, Rest, S1} ->
+            {Array, Rest1, S2} = decode_array(Rest, S1#decoder{state=any}, []),
+            decode_array(Rest1, S2#decoder{state=comma}, [Array | Acc]);
+        {start_object, Rest, S1} ->
+            {Array, Rest1, S2} = decode_object(Rest, S1#decoder{state=key}, []),
+            decode_array(Rest1, S2#decoder{state=comma}, [Array | Acc]);
+        {{const, Const}, Rest, S1} ->
+            decode_array(Rest, S1#decoder{state=comma}, [Const | Acc])
     end;
 decode_array(L, S=#decoder{state=comma}, Acc) ->
     case tokenize(L, S) of
-	{end_array, Rest, S1} ->
-	    {{array, lists:reverse(Acc)}, Rest, S1#decoder{state=null}};
-	{comma, Rest, S1} ->
-	    decode_array(Rest, S1#decoder{state=any}, Acc)
+        {end_array, Rest, S1} ->
+            {{array, lists:reverse(Acc)}, Rest, S1#decoder{state=null}};
+        {comma, Rest, S1} ->
+            decode_array(Rest, S1#decoder{state=any}, Acc)
     end.
 
 tokenize_string(IoList=[C | _], S=#decoder{input_encoding=utf8}, Acc)
@@ -319,9 +319,9 @@ tokenize_string("\\t" ++ Rest, S, Acc) ->
 tokenize_string([$\\, $u, C3, C2, C1, C0 | Rest], S, Acc) ->
     % coalesce UTF-16 surrogate pair?
     C = dehex(C0) bor
-	(dehex(C1) bsl 4) bor
-	(dehex(C2) bsl 8) bor 
-	(dehex(C3) bsl 12),
+        (dehex(C1) bsl 4) bor
+        (dehex(C2) bsl 8) bor 
+        (dehex(C3) bsl 12),
     tokenize_string(Rest, ?ADV_COL(S, 6), [C | Acc]);
 tokenize_string([C | Rest], S, Acc) when C >= $\s; C < 16#10FFFF ->
     tokenize_string(Rest, ?ADV_COL(S, 1), [C | Acc]).
@@ -400,10 +400,10 @@ tokenize("\"" ++ Rest, S) ->
     {{const, String}, Rest1, S1};
 tokenize(L=[C | _], S) when C >= $0, C =< $9; C == $- ->
     case tokenize_number(L, sign, S, []) of
-	{{int, Int}, Rest, S1} ->
-	    {{const, list_to_integer(Int)}, Rest, S1};
-	{{float, Float}, Rest, S1} ->
-	    {{const, list_to_float(Float)}, Rest, S1}
+        {{int, Int}, Rest, S1} ->
+            {{const, list_to_integer(Int)}, Rest, S1};
+        {{float, Float}, Rest, S1} ->
+            {{const, list_to_float(Float)}, Rest, S1}
     end.
 
 %% testing constructs borrowed from the Yaws JSON implementation.
@@ -415,10 +415,10 @@ obj_new() ->
 
 is_obj({struct, Props}) ->
     F = fun ({K, _}) when is_list(K) ->
-		true;
-	    (_) ->
-		false
-	end,	
+                true;
+            (_) ->
+                false
+        end,    
     lists:all(F, Props).
 
 obj_from_list(Props) ->
@@ -437,8 +437,8 @@ equiv({struct, Props1}, {struct, Props2}) ->
     equiv_object(Props1, Props2);
 equiv({array, L1}, {array, L2}) ->
     equiv_list(L1, L2);
-equiv(N1, N2) when is_number(N1), is_number(N2)	-> N1 == N2;
-equiv(S1, S2) when is_list(S1), is_list(S2)	-> S1 == S2;
+equiv(N1, N2) when is_number(N1), is_number(N2) -> N1 == N2;
+equiv(S1, S2) when is_list(S1), is_list(S2)     -> S1 == S2;
 equiv(true, true) -> true;
 equiv(false, false) -> true;
 equiv(null, null) -> true.
@@ -451,7 +451,7 @@ equiv_object(Props1, Props2) ->
     L2 = lists:keysort(1, Props2),
     Pairs = lists:zip(L1, L2),
     true = lists:all(fun({{K1, V1}, {K2, V2}}) ->
-	equiv(K1, K2) and equiv(V1, V2)
+        equiv(K1, K2) and equiv(V1, V2)
     end, Pairs).
 
 %% Recursively compare tuple elements for equivalence.
@@ -460,10 +460,10 @@ equiv_list([], []) ->
     true;
 equiv_list([V1 | L1], [V2 | L2]) ->
     case equiv(V1, V2) of
-	true ->
-	    equiv_list(L1, L2);
-	false ->
-	    false
+        true ->
+            equiv_list(L1, L2);
+        false ->
+            false
     end.
 
 test_all() ->

@@ -65,25 +65,25 @@ all_loaded(Base) ->
 %% @doc Return a mochiweb_request data structure.
 new_request({Socket, {Method, {abs_path, Uri}, Version}, Headers}) ->
     mochiweb_request:new(Socket,
-			 Method,
-			 Uri,
-			 Version,
-			 mochiweb_headers:make(Headers));
+                         Method,
+                         Uri,
+                         Version,
+                         mochiweb_headers:make(Headers));
 % this case probably doesn't "exist".
 new_request({Socket, {Method, {absoluteURI, _Protocol, _Host, _Port, Uri},
-		      Version}, Headers}) ->
+                      Version}, Headers}) ->
     mochiweb_request:new(Socket,
-			 Method,
-			 Uri,
-			 Version,
-			 mochiweb_headers:make(Headers)).
+                         Method,
+                         Uri,
+                         Version,
+                         mochiweb_headers:make(Headers)).
 
 %% @spec new_response({Request, integer(), Headers}) -> MochiWebResponse
 %% @doc Return a mochiweb_response data structure.
 new_response({Request, Code, Headers}) ->
     mochiweb_response:new(Request,
-			  Code,
-			  mochiweb_headers:make(Headers)).
+                          Code,
+                          mochiweb_headers:make(Headers)).
 
 %% Internal API
 
@@ -94,8 +94,8 @@ test_request() ->
 
 ensure_started(App) ->
     case application:start(App) of
-	ok ->
-	    ok;
-	{error, {already_started, App}} ->
-	    ok
+        ok ->
+            ok;
+        {error, {already_started, App}} ->
+            ok
     end.

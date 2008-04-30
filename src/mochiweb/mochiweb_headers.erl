@@ -71,11 +71,11 @@ default_from_list(List, T) ->
 %%      preserved).
 to_list(T) ->
     F = fun ({K, {array, L}}, Acc) ->
-		L1 = lists:reverse(L),
-		lists:foldl(fun (V, Acc1) -> [{K, V} | Acc1] end, Acc, L1);
-	    (Pair, Acc) ->
-		[Pair | Acc]
-	end,
+                L1 = lists:reverse(L),
+                lists:foldl(fun (V, Acc1) -> [{K, V} | Acc1] end, Acc, L1);
+            (Pair, Acc) ->
+                [Pair | Acc]
+        end,
     lists:reverse(lists:foldl(F, [], gb_trees:values(T))).
 
 %% @spec get_value(key(), headers()) -> string() | undefined
@@ -83,10 +83,10 @@ to_list(T) ->
 %%      undefined will be returned for keys that are not present.
 get_value(K, T) ->
     case lookup(K, T) of
-	{value, {_, V}} ->
-	    expand(V);
-	none ->
-	    undefined
+        {value, {_, V}} ->
+            expand(V);
+        none ->
+            undefined
     end.
 
 %% @spec get_primary_value(key(), headers()) -> string() | undefined
@@ -107,10 +107,10 @@ get_primary_value(K, T) ->
 %%      not present.
 lookup(K, T) ->
     case gb_trees:lookup(normalize(K), T) of
-	{value, {K0, V}} ->
-	    {value, {K0, expand(V)}};
-	none ->
-	    none
+        {value, {K0, V}} ->
+            {value, {K0, expand(V)}};
+        none ->
+            none
     end.
 
 %% @spec default(key(), value(), headers()) -> headers()
@@ -120,8 +120,8 @@ default(K, V, T) ->
     V1 = any_to_list(V),
     try gb_trees:insert(K1, {K, V1}, T)
     catch
-	error:{key_exists, _} ->
-	    T
+        error:{key_exists, _} ->
+            T
     end.
 
 %% @spec enter(key(), value(), headers()) -> headers()
@@ -139,10 +139,10 @@ insert(K, V, T) ->
     V1 = any_to_list(V),
     try gb_trees:insert(K1, {K, V1}, T)
     catch
-	error:{key_exists, _} ->
-	    {K0, V0} = gb_trees:get(K1, T),
-	    V2 = merge(K1, V1, V0),
-	    gb_trees:update(K1, {K0, V2}, T)
+        error:{key_exists, _} ->
+            {K0, V0} = gb_trees:get(K1, T),
+            V2 = merge(K1, V1, V0),
+            gb_trees:update(K1, {K0, V2}, T)
     end.
 
 %% Internal API

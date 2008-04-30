@@ -29,6 +29,7 @@
 -define(SAVE_BODY_LENGTH, mochiweb_request_body_length).
 -define(SAVE_POST, mochiweb_request_post).
 -define(SAVE_COOKIE, mochiweb_request_cookie).
+-define(SAVE_FORCE_CLOSE, mochiweb_request_force_close).
 
 %% @type iolist() = [iolist() | binary() | char()].
 %% @type iodata() = binary() | iolist().
@@ -68,32 +69,32 @@ get(headers) ->
     Headers;
 get(peer) ->
     case inet:peername(Socket) of
-	{ok, {Addr={10, _, _, _}, _Port}} ->
-	    case get_header_value("x-forwarded-for") of
-		undefined ->
-		    inet_parse:ntoa(Addr);
-		Hosts ->
-		    string:strip(lists:last(string:tokens(Hosts, ",")))
-	    end;
-	{ok, {{127, 0, 0, 1}, _Port}} ->
-	    case get_header_value("x-forwarded-for") of
-		undefined ->
-		    "127.0.0.1";
-		Hosts ->
-		    string:strip(lists:last(string:tokens(Hosts, ",")))
-	    end;
-	{ok, {Addr, _Port}} ->
-	    inet_parse:ntoa(Addr)
+        {ok, {Addr={10, _, _, _}, _Port}} ->
+            case get_header_value("x-forwarded-for") of
+                undefined ->
+                    inet_parse:ntoa(Addr);
+                Hosts ->
+                    string:strip(lists:last(string:tokens(Hosts, ",")))
+            end;
+        {ok, {{127, 0, 0, 1}, _Port}} ->
+            case get_header_value("x-forwarded-for") of
+                undefined ->
+                    "127.0.0.1";
+                Hosts ->
+                    string:strip(lists:last(string:tokens(Hosts, ",")))
+            end;
+        {ok, {Addr, _Port}} ->
+            inet_parse:ntoa(Addr)
     end;
 get(path) ->
     case erlang:get(?SAVE_PATH) of
-	undefined ->
-	    {Path0, _, _} = mochiweb_util:urlsplit_path(RawPath),
+        undefined ->
+            {Path0, _, _} = mochiweb_util:urlsplit_path(RawPath),
             Path = mochiweb_util:unquote(Path0),
-	    put(?SAVE_PATH, Path),
-	    Path;
-	Cached ->
-	    Cached
+            put(?SAVE_PATH, Path),
+            Path;
+        Cached ->
+            Cached
     end;
 get(body_length) ->
     erlang:get(?SAVE_BODY_LENGTH);
@@ -110,18 +111,18 @@ get(range) ->
 %%      for debugging/inspection purposes.
 dump() ->
     {?MODULE, [{method, Method},
-	       {version, Version},
-	       {raw_path, RawPath},
-	       {headers, mochiweb_headers:to_list(Headers)}]}.
+               {version, Version},
+               {raw_path, RawPath},
+               {headers, mochiweb_headers:to_list(Headers)}]}.
 
 %% @spec send(iodata()) -> ok
 %% @doc Send data over the socket.
 send(Data) ->
     case gen_tcp:send(Socket, Data) of
-	ok ->
-	    ok;
-	_ ->
-	    exit(normal)
+        ok ->
+            ok;
+        _ ->
+            exit(normal)
     end.
 
 %% @spec recv(integer()) -> binary()
@@ -135,11 +136,11 @@ recv(Length) ->
 %%      Timeout in msec.
 recv(Length, Timeout) ->
     case gen_tcp:recv(Socket, Length, Timeout) of
-	{ok, Data} ->
-	    put(?SAVE_RECV, true),
-	    Data;
-	_ ->
-	    exit(normal)
+        {ok, Data} ->
+            put(?SAVE_RECV, true),
+            Data;
+        _ ->
+            exit(normal)
     end.
 
 %% @spec body_length() -> undefined | chunked | unknown_transfer_encoding | integer()
@@ -201,7 +202,7 @@ recv_body(MaxBody) ->
 start_response({Code, ResponseHeaders}) ->
     HResponse = mochiweb_headers:make(ResponseHeaders),
     HResponse1 = mochiweb_headers:default_from_list(server_headers(),
-						    HResponse),
+                                                    HResponse),
     start_raw_response({Code, HResponse1}).
 
 %% @spec start_raw_response({integer(), headers()}) -> response()
@@ -209,10 +210,10 @@ start_response({Code, ResponseHeaders}) ->
 %%      ResponseHeaders.
 start_raw_response({Code, ResponseHeaders}) ->
     F = fun ({K, V}, Acc) ->
-		[make_io(K), <<": ">>, V, <<"\r\n">> | Acc]
-	end,
+                [make_io(K), <<": ">>, V, <<"\r\n">> | Acc]
+        end,
     End = lists:foldl(F, [<<"\r\n">>],
-		      mochiweb_headers:to_list(ResponseHeaders)),
+                      mochiweb_headers:to_list(ResponseHeaders)),
     send([make_version(Version), make_code(Code), <<"\r\n">> | End]),
     mochiweb:new_response({THIS, Code, ResponseHeaders}).
 
@@ -245,24 +246,32 @@ respond({Code, ResponseHeaders, {file, IoDevice}}) ->
 respond({Code, ResponseHeaders, chunked}) ->
     HResponse = mochiweb_headers:make(ResponseHeaders),
     HResponse1 = case Method of
-		     'HEAD' ->
-			 %% This is what Google does, http://www.google.com/
-			 %% is chunked but HEAD gets Content-Length: 0.
-			 %% The RFC is ambiguous so emulating Google is smart.
-			 mochiweb_headers:enter("Content-Length", "0",
-						HResponse);
-		     _ ->
-			 mochiweb_headers:enter("Transfer-Encoding", "chunked",
-						HResponse)
-		 end,
+                     'HEAD' ->
+                         %% This is what Google does, http://www.google.com/
+                         %% is chunked but HEAD gets Content-Length: 0.
+                         %% The RFC is ambiguous so emulating Google is smart.
+                         mochiweb_headers:enter("Content-Length", "0",
+                                                HResponse);
+                     _ when Version >= {1, 1} ->
+                         %% Only use chunked encoding for HTTP/1.1
+                         mochiweb_headers:enter("Transfer-Encoding", "chunked",
+                                                HResponse);
+                     _ ->
+                         %% For pre-1.1 clients we send the data as-is
+                         %% without a Content-Length header and without
+                         %% chunk delimiters. Since the end of the document
+                         %% is now ambiguous we must force a close.
+                         put(?SAVE_FORCE_CLOSE, true),
+                         HResponse
+                 end,
     start_response({Code, HResponse1});
 respond({Code, ResponseHeaders, Body}) ->
     Response = start_response_length({Code, ResponseHeaders, iolist_size(Body)}),
     case Method of
-	'HEAD' ->
-	    ok;
-	_ ->
-	    send(Body)
+        'HEAD' ->
+            ok;
+        _ ->
+            send(Body)
     end,
     Response.
 
@@ -306,40 +315,42 @@ ok({ContentType, ResponseHeaders, Body}) ->
 %% @doc Return true if the connection must be closed. If false, using
 %%      Keep-Alive should be safe.
 should_close() ->
+    ForceClose = erlang:get(mochiweb_request_force_close) =/= undefined,
     DidNotRecv = erlang:get(mochiweb_request_recv) =:= undefined,
-    Version < {1, 0}
-        % Connection: close
-	orelse get_header_value("connection") =:= "close"
-        % HTTP 1.0 requires Connection: Keep-Alive
-	orelse (Version =:= {1, 0}
-		andalso get_header_value("connection") /= "Keep-Alive")
-        % unread data left on the socket, can't safely continue
-	orelse (DidNotRecv
-		andalso get_header_value("content-length") /= undefined).
+    ForceClose orelse Version < {1, 0}
+        %% Connection: close
+        orelse get_header_value("connection") =:= "close"
+        %% HTTP 1.0 requires Connection: Keep-Alive
+        orelse (Version =:= {1, 0}
+                andalso get_header_value("connection") =/= "Keep-Alive")
+        %% unread data left on the socket, can't safely continue
+        orelse (DidNotRecv
+                andalso get_header_value("content-length") =/= undefined).
 
 %% @spec cleanup() -> ok
 %% @doc Clean up any junk in the process dictionary, required before continuing
 %%      a Keep-Alive request.
 cleanup() ->
     [erase(K) || K <- [?SAVE_QS,
-		       ?SAVE_PATH,
-		       ?SAVE_RECV,
-		       ?SAVE_BODY,
-		       ?SAVE_POST,
-		       ?SAVE_COOKIE]],
+                       ?SAVE_PATH,
+                       ?SAVE_RECV,
+                       ?SAVE_BODY,
+                       ?SAVE_POST,
+                       ?SAVE_COOKIE,
+                       ?SAVE_FORCE_CLOSE]],
     ok.
 
 %% @spec parse_qs() -> [{Key::string(), Value::string()}]
 %% @doc Parse the query string of the URL.
 parse_qs() ->
     case erlang:get(?SAVE_QS) of
-	undefined ->
-	    {_, QueryString, _} = mochiweb_util:urlsplit_path(RawPath),
-	    Parsed = mochiweb_util:parse_qs(QueryString),
-	    put(?SAVE_QS, Parsed),
-	    Parsed;
-	Cached ->
-	    Cached
+        undefined ->
+            {_, QueryString, _} = mochiweb_util:urlsplit_path(RawPath),
+            Parsed = mochiweb_util:parse_qs(QueryString),
+            put(?SAVE_QS, Parsed),
+            Parsed;
+        Cached ->
+            Cached
     end.
 
 %% @spec get_cookie_value(Key::string) -> string() | undefined
@@ -351,17 +362,17 @@ get_cookie_value(Key) ->
 %% @doc Parse the cookie header.
 parse_cookie() ->
     case erlang:get(?SAVE_COOKIE) of
-	undefined ->
-	    Cookies = case get_header_value("cookie") of
-			  undefined ->
-			      [];
-			  Value ->
-			      mochiweb_cookies:parse_cookie(Value)
-		      end,
-	    put(?SAVE_COOKIE, Cookies),
-	    Cookies;
-	Cached ->
-	    Cached
+        undefined ->
+            Cookies = case get_header_value("cookie") of
+                          undefined ->
+                              [];
+                          Value ->
+                              mochiweb_cookies:parse_cookie(Value)
+                      end,
+            put(?SAVE_COOKIE, Cookies),
+            Cookies;
+        Cached ->
+            Cached
     end.
 
 %% @spec parse_post() -> [{Key::string(), Value::string()}]
@@ -369,33 +380,33 @@ parse_cookie() ->
 %%      has the side-effect of calling recv_body().
 parse_post() ->
     case erlang:get(?SAVE_POST) of
-	undefined ->
-	    Parsed = case recv_body() of
-			 undefined ->
-			     [];
-			 Binary ->
-			     case get_primary_header_value("content-type") of
-				 "application/x-www-form-urlencoded" ->
-				     mochiweb_util:parse_qs(Binary);
-				 _ ->
-				     []
-			     end
-		     end,
-	    put(?SAVE_POST, Parsed),
-	    Parsed;
-	Cached ->
-	    Cached
+        undefined ->
+            Parsed = case recv_body() of
+                         undefined ->
+                             [];
+                         Binary ->
+                             case get_primary_header_value("content-type") of
+                                 "application/x-www-form-urlencoded" ->
+                                     mochiweb_util:parse_qs(Binary);
+                                 _ ->
+                                     []
+                             end
+                     end,
+            put(?SAVE_POST, Parsed),
+            Parsed;
+        Cached ->
+            Cached
     end.
 
 read_chunked_body(Max, Acc) ->
     case read_chunk_length() of
-	0 ->
-	    read_chunk(0),
-	    iolist_to_binary(lists:reverse(Acc));
-	Length when Length > Max ->
-	    exit({body_too_large, chunked});
-	Length ->
-	    read_chunked_body(Max - Length, [read_chunk(Length) | Acc])
+        0 ->
+            read_chunk(0),
+            iolist_to_binary(lists:reverse(Acc));
+        Length when Length > Max ->
+            exit({body_too_large, chunked});
+        Length ->
+            read_chunked_body(Max - Length, [read_chunk(Length) | Acc])
     end.
 
 %% @spec read_chunk_length() -> integer()
@@ -421,14 +432,14 @@ read_chunk(0) ->
     inet:setopts(Socket, [{packet, line}]),
     F = fun (F1, Acc) ->
                 case gen_tcp:recv(Socket, 0, ?IDLE_TIMEOUT) of
-		    {ok, <<"\r\n">>} ->
-			Acc;
-		    {ok, Footer} ->
-			F1(F1, [Footer | Acc]);
+                    {ok, <<"\r\n">>} ->
+                        Acc;
+                    {ok, Footer} ->
+                        F1(F1, [Footer | Acc]);
                     _ ->
                         exit(normal)
-		end
-	end,
+                end
+        end,
     Footers = F(F, []),
     inet:setopts(Socket, [{packet, raw}]),
     Footers;
@@ -445,24 +456,35 @@ read_chunk(Length) ->
 serve_file(Path, DocRoot) ->
     FullPath = filename:join([DocRoot, Path]),
     File = case filelib:is_dir(FullPath) of
-	       true ->
-		   filename:join([FullPath, "index.html"]);
-	       false ->
-		   FullPath
-	   end,
+               true ->
+                   filename:join([FullPath, "index.html"]);
+               false ->
+                   FullPath
+           end,
     case lists:prefix(DocRoot, File) of
-	true ->
-	    case file:open(File, [raw, binary]) of
-		{ok, IoDevice} ->
-		    ContentType = mochiweb_util:guess_mime(File),
-		    Res = ok({ContentType, {file, IoDevice}}),
-                    file:close(IoDevice),
-                    Res;
-		_ ->
-		    not_found()
-	    end;
-	false ->
-	    not_found()
+        true ->
+            case file:read_file_info(File) of
+                {ok, FileInfo} ->
+                    LastModified = httpd_util:rfc1123_date(FileInfo#file_info.mtime),
+                    case get_header_value("if-modified-since") of
+                        LastModified ->
+                            respond({304, [], ""});
+                        _ ->
+                            case file:open(File, [raw, binary]) of
+                                {ok, IoDevice} ->
+                                    ContentType = mochiweb_util:guess_mime(File),
+                                    Res = ok({ContentType, [{"last-modified", LastModified}], {file, IoDevice}}),
+                                    file:close(IoDevice),
+                                    Res;
+                                _ ->
+                                    not_found()
+                            end
+                    end;
+                {error, _} ->
+                    not_found()
+            end;
+        false ->
+            not_found()
     end.
 
 
