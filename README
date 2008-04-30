@@ -45,7 +45,7 @@ Installation And First Run
 
 You will need the following installed:
 
- * [Erlang OTP][09] (required)
+ * [Erlang OTP][09] (>=R12B) (required)
  * [ICU][10] (required)
  * [Mozilla SpiderMonkey][11] (required)
  * [GNU Make][12] (required)
