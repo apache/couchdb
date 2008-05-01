@@ -698,3 +698,25 @@ function go(s)
   // Evaluate Shell.question using _win's eval (this is why eval isn't in the |with|, IIRC).
   _win.location.href = "javascript:try{ Shell.printAnswer(eval('with(Shell._scope) with(Shell.shellCommands) {' + Shell.question + String.fromCharCode(10) + '}')); } catch(er) { Shell.printError(er); }; setTimeout(Shell.refocus, 0); void 0";
 }
+
+function T(Bool) {
+    if(!Bool) {
+        throw "Error!";
+    }
+}
+
+
+function makeDocs(start, end, templateDoc) {
+  var templateDocSrc = templateDoc ? templateDoc.toSource() : "{}"
+  var docs = []
+  for(var i=start; i<end; i++) {
+    var newDoc = eval("(" + templateDocSrc + ")");
+    newDoc._id = (i).toString();
+    newDoc.integer = i
+    newDoc.string = (i).toString();
+    docs.push(newDoc)
+  }
+  return docs;
+}
+
+

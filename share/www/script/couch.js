@@ -87,7 +87,7 @@ function CouchDB(name) {
     var result = JSON.parse(req.responseText);
     if (req.status != 201)
       throw result;
-    for(i in docs) {
+    for(var i in docs) {
         docs[i]._rev = result.new_revs[i].rev;
     }
     return result;

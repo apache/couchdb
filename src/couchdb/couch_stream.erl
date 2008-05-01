@@ -90,7 +90,7 @@ copy(Fd, Sp, Len, DestStream) ->
     {ok, NewSp, _Sp2} = stream_data(Fd, Sp, Len, ?HUGE_CHUNK,
         fun(Bin, AccPointer) ->
             {ok, NewPointer} = write(DestStream, Bin),
-            if AccPointer == null -> NewPointer; true -> AccPointer end
+            {ok, if AccPointer == null -> NewPointer; true -> AccPointer end}
         end,
         null),
     {ok, NewSp}.
