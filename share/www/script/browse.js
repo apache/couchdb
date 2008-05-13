@@ -40,6 +40,10 @@ function CouchIndexPage() {
     $(document.body).addClass("loading");
     $.couch.allDbs({
       success: function(dbs) {
+        if(dbs.length == 0) {
+          $(document.body).removeClass("loading");
+        }
+        
         $.each(dbs, function(idx, dbName) {
           $("#databases tbody.content").append("<tr>" + 
             "<th><a href='database.html?" + encodeURIComponent(dbName) + "'>" +
