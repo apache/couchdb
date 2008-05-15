@@ -13,7 +13,7 @@
 -module(couch_httpd).
 -include("couch_db.hrl").
 
--export([start_link/3, stop/0]).
+-export([start_link/3, stop/0, handle_request/2]).
 
 -record(doc_query_args, {
     options = [],
@@ -35,7 +35,7 @@
 }).
 
 start_link(BindAddress, Port, DocumentRoot) ->
-    Loop = fun (Req) -> handle_request(Req, DocumentRoot) end,
+    Loop = fun (Req) -> apply(couch_httpd, handle_request, [Req, DocumentRoot]) end,
     mochiweb_http:start([
         {loop, Loop},
         {name, ?MODULE},
@@ -47,6 +47,7 @@ stop() ->
     mochiweb_http:stop(?MODULE).
 
 handle_request(Req, DocumentRoot) ->
+    
     % alias HEAD to GET as mochiweb takes care of stripping the body
     Method = case Req:get(method) of
         'HEAD' -> 'GET';
@@ -263,18 +264,19 @@ handle_db_request(Req, 'GET', {_DbName, Db, ["_all_docs"]}) ->
     true -> StartDocId
     end,
 
-    FoldlFun = make_view_fold_fun(Req, QueryArgs),
+    FoldlFun = make_view_fold_fun(Req, QueryArgs, TotalRowCount,
+        fun couch_db:enum_docs_reduce_to_count/1),
     AdapterFun = fun(#full_doc_info{id=Id}=FullDocInfo, Offset, Acc) ->
         case couch_doc:to_doc_info(FullDocInfo) of
         #doc_info{deleted=false, rev=Rev} ->
-            FoldlFun(Id, Id, {obj, [{rev, Rev}]}, Offset, TotalRowCount, Acc);
+            FoldlFun({{Id, Id}, {obj, [{rev, Rev}]}}, Offset, Acc);
         #doc_info{deleted=true} ->
             {ok, Acc}
         end
     end,
     {ok, FoldResult} = couch_db:enum_docs(Db, StartId, Dir, AdapterFun,
             {Count, SkipCount, undefined, []}),
-    finish_view_fold(Req, {ok, TotalRowCount, FoldResult});
+    finish_view_fold(Req, TotalRowCount, {ok, FoldResult});
 
 handle_db_request(_Req, _Method, {_DbName, _Db, ["_all_docs"]}) ->
     throw({method_not_allowed, "GET,HEAD"});
@@ -290,7 +292,8 @@ handle_db_request(Req, 'GET', {_DbName, Db, ["_all_docs_by_seq"]}) ->
     {ok, Info} = couch_db:get_db_info(Db),
     TotalRowCount = proplists:get_value(doc_count, Info),
 
-    FoldlFun = make_view_fold_fun(Req, QueryArgs),
+    FoldlFun = make_view_fold_fun(Req, QueryArgs, TotalRowCount,
+            fun couch_db:enum_docs_since_reduce_to_count/1),
     StartKey2 = case StartKey of
         nil -> 0;
         <<>> -> 100000000000;
@@ -321,9 +324,9 @@ handle_db_request(Req, 'GET', {_DbName, Db, ["_all_docs_by_seq"]}) ->
                     false -> []
                 end
             },
-            FoldlFun(Id, UpdateSeq, Json, Offset, TotalRowCount, Acc)
+            FoldlFun({{UpdateSeq, Id}, Json}, Offset, Acc)
         end, {Count, SkipCount, undefined, []}),
-    finish_view_fold(Req, {ok, TotalRowCount, FoldResult});
+    finish_view_fold(Req, TotalRowCount, {ok, FoldResult});
 
 handle_db_request(_Req, _Method, {_DbName, _Db, ["_all_docs_by_seq"]}) ->
     throw({method_not_allowed, "GET,HEAD"});
@@ -331,17 +334,31 @@ handle_db_request(_Req, _Method, {_DbName, _Db, ["_all_docs_by_seq"]}) ->
 handle_db_request(Req, 'GET', {DbName, _Db, ["_view", DocId, ViewName]}) ->
     #view_query_args{
         start_key = StartKey,
+        end_key = EndKey,
         count = Count,
         skip = SkipCount,
         direction = Dir,
-        start_docid = StartDocId
-    } = QueryArgs = parse_view_query(Req),
-    View = {DbName, "_design/" ++ DocId, ViewName},
-    Start = {StartKey, StartDocId},
-    FoldlFun = make_view_fold_fun(Req, QueryArgs),
-    FoldAccInit = {Count, SkipCount, undefined, []},
-    FoldResult = couch_view:fold(View, Start, Dir, FoldlFun, FoldAccInit),
-    finish_view_fold(Req, FoldResult);
+        start_docid = StartDocId,
+        end_docid = EndDocId
+        } = QueryArgs = parse_view_query(Req),
+    case couch_view:get_map_view({DbName, "_design/" ++ DocId, ViewName}) of
+    {ok, View} ->
+        {ok, RowCount} = couch_view:get_row_count(View),
+        Start = {StartKey, StartDocId},
+        FoldlFun = make_view_fold_fun(Req, QueryArgs, RowCount,
+                fun couch_view:reduce_to_count/1),
+        FoldAccInit = {Count, SkipCount, undefined, []},
+        FoldResult = couch_view:fold(View, Start, Dir, FoldlFun, FoldAccInit),
+        finish_view_fold(Req, RowCount, FoldResult);
+    {not_found, Reason} ->
+        case couch_view:get_reduce_view({DbName, "_design/" ++ DocId, ViewName}) of
+        {ok, View} ->
+            {ok, Value} = couch_view:reduce(View, {StartKey, StartDocId}, {EndKey, EndDocId}),
+            send_json(Req, {obj, [{ok,true}, {result, Value}]});
+        _ ->
+            throw({not_found, Reason})
+        end
+    end;
 
 handle_db_request(_Req, _Method, {_DbName, _Db, ["_view", _DocId, _ViewName]}) ->
     throw({method_not_allowed, "GET,HEAD"});
@@ -358,10 +375,12 @@ handle_db_request(Req, 'POST', {_DbName, Db, ["_missing_revs"]}) ->
 handle_db_request(Req, 'POST', {DbName, _Db, ["_temp_view"]}) ->
     #view_query_args{
         start_key = StartKey,
+        end_key = EndKey,
         count = Count,
         skip = SkipCount,
         direction = Dir,
-        start_docid = StartDocId
+        start_docid = StartDocId,
+        end_docid = EndDocId
     } = QueryArgs = parse_view_query(Req),
 
     ContentType = case Req:get_primary_header_value("content-type") of
@@ -370,13 +389,25 @@ handle_db_request(Req, 'POST', {DbName, _Db, ["_temp_view"]}) ->
         Else ->
             Else
     end,
-
-    View = {temp, DbName, ContentType, Req:recv_body()},
-    Start = {StartKey, StartDocId},
-    FoldlFun = make_view_fold_fun(Req, QueryArgs),
-    FoldAccInit = {Count, SkipCount, undefined, []},
-    FoldResult = couch_view:fold(View, Start, Dir, FoldlFun, FoldAccInit),
-    finish_view_fold(Req, FoldResult);
+    case cjson:decode(Req:recv_body()) of
+    {obj, Props} ->
+        MapSrc = proplists:get_value("map",Props),
+        RedSrc = proplists:get_value("reduce",Props),
+        {ok, View} = couch_view:get_reduce_view(
+                {temp, DbName, ContentType, MapSrc, RedSrc}),
+        {ok, Value} = couch_view:reduce(View, {StartKey, StartDocId}, {EndKey, EndDocId}),
+        send_json(Req, {obj, [{ok,true}, {result, Value}]});
+    Src when is_list(Src) ->
+        
+        {ok, View} = couch_view:get_map_view({temp, DbName, ContentType, Src}),
+        Start = {StartKey, StartDocId},
+        {ok, TotalRows} = couch_view:get_row_count(View),
+        FoldlFun = make_view_fold_fun(Req, QueryArgs, TotalRows,
+                fun couch_view:reduce_to_count/1),
+        FoldAccInit = {Count, SkipCount, undefined, []},
+        FoldResult = couch_view:fold(View, Start, Dir, FoldlFun, FoldAccInit),
+        finish_view_fold(Req, TotalRows, FoldResult)
+    end;
 
 handle_db_request(_Req, _Method, {_DbName, _Db, ["_temp_view"]}) ->
     throw({method_not_allowed, "POST"});
@@ -618,7 +649,8 @@ parse_view_query(Req) ->
         end
     end, #view_query_args{}, QueryList).
 
-make_view_fold_fun(Req, QueryArgs) ->
+
+make_view_fold_fun(Req, QueryArgs, TotalViewCount, ReduceCountFun) ->
     #view_query_args{
         end_key = EndKey,
         end_docid = EndDocId,
@@ -626,7 +658,8 @@ make_view_fold_fun(Req, QueryArgs) ->
         count = Count
     } = QueryArgs,
 
-    PassedEndFun = case Dir of
+    PassedEndFun =
+    case Dir of
     fwd ->
         fun(ViewKey, ViewId) ->
             couch_view:less_json({EndKey, EndDocId}, {ViewKey, ViewId})
@@ -636,10 +669,11 @@ make_view_fold_fun(Req, QueryArgs) ->
             couch_view:less_json({ViewKey, ViewId}, {EndKey, EndDocId})
         end
     end,
-
-    NegCountFun = fun(Id, Key, Value, Offset, TotalViewCount,
+    
+    NegCountFun = fun({{Key, DocId}, Value}, OffsetReds,
                       {AccCount, AccSkip, Resp, AccRevRows}) ->
-        PassedEnd = PassedEndFun(Key, Id),
+        Offset = ReduceCountFun(OffsetReds),
+        PassedEnd = PassedEndFun(Key, DocId),
         case {PassedEnd, AccCount, AccSkip, Resp} of
         {true, _, _, _} -> % The stop key has been passed, stop looping.
             {stop, {AccCount, AccSkip, Resp, AccRevRows}};
@@ -654,17 +688,18 @@ make_view_fold_fun(Req, QueryArgs) ->
             JsonBegin = io_lib:format("{\"total_rows\":~w,\"offset\":~w,\"rows\":[",
                     [TotalViewCount, Offset2]),
             Resp2:write_chunk(lists:flatten(JsonBegin)),
-            JsonObj = {obj, [{id, Id}, {key, Key}, {value, Value}]},
+            JsonObj = {obj, [{id, DocId}, {key, Key}, {value, Value}]},
             {ok, {AccCount + 1, 0, Resp2, [cjson:encode(JsonObj) | AccRevRows]}};
         {_, AccCount, _, Resp} ->
-            JsonObj = {obj, [{id, Id}, {key, Key}, {value, Value}]},
+            JsonObj = {obj, [{id, DocId}, {key, Key}, {value, Value}]},
             {ok, {AccCount + 1, 0, Resp, [cjson:encode(JsonObj), "," | AccRevRows]}}
         end
     end,
 
-    PosCountFun = fun(Id, Key, Value, Offset, TotalViewCount,
+    PosCountFun = fun({{Key, DocId}, Value}, OffsetReds,
                       {AccCount, AccSkip, Resp, AccRevRows}) ->
-        PassedEnd = PassedEndFun(Key, Id),
+        Offset = ReduceCountFun(OffsetReds),
+        PassedEnd = PassedEndFun(Key, DocId),
         case {PassedEnd, AccCount, AccSkip, Resp} of
         {true, _, _, _} ->
             % The stop key has been passed, stop looping.
@@ -678,11 +713,11 @@ make_view_fold_fun(Req, QueryArgs) ->
             Resp2 = start_json_response(Req, 200),
             JsonBegin = io_lib:format("{\"total_rows\":~w,\"offset\":~w,\"rows\":[\r\n",
                     [TotalViewCount, Offset]),
-            JsonObj = {obj, [{id, Id}, {key, Key}, {value, Value}]},
+            JsonObj = {obj, [{id, DocId}, {key, Key}, {value, Value}]},
             Resp2:write_chunk(lists:flatten(JsonBegin ++ cjson:encode(JsonObj))),
             {ok, {AccCount - 1, 0, Resp2, AccRevRows}};
         {_, AccCount, _, Resp} when (AccCount > 0) ->
-            JsonObj = {obj, [{"id", Id}, {"key", Key}, {"value", Value}]},
+            JsonObj = {obj, [{"id", DocId}, {"key", Key}, {"value", Value}]},
             Resp:write_chunk(",\r\n" ++  lists:flatten(cjson:encode(JsonObj))),
             {ok, {AccCount - 1, 0, Resp, AccRevRows}}
         end
@@ -692,16 +727,16 @@ make_view_fold_fun(Req, QueryArgs) ->
     false ->    NegCountFun
     end.
 
-finish_view_fold(Req, FoldResult) ->
+finish_view_fold(Req, TotalRows, FoldResult) ->
     case FoldResult of
-    {ok, TotalRows, {_, _, undefined, _}} ->
+    {ok, {_, _, undefined, _}} ->
         % nothing found in the view, nothing has been returned
         % send empty view
         send_json(Req, 200, {obj, [
             {total_rows, TotalRows},
             {rows, {}}
         ]});
-    {ok, _TotalRows, {_, _, Resp, AccRevRows}} ->
+    {ok, {_, _, Resp, AccRevRows}} ->
         % end the view
         Resp:write_chunk(lists:flatten(AccRevRows) ++ "\r\n]}"),
         end_json_response(Resp);

@@ -17,9 +17,17 @@
 -export([save_docs/2, save_docs/3, get_db_info/1, update_doc/3, update_docs/2, update_docs/3]).
 -export([delete_doc/3,open_doc/2,open_doc/3,enum_docs_since/4,enum_docs_since/5]).
 -export([enum_docs/4,enum_docs/5, open_doc_revs/4, get_missing_revs/2]).
+-export([enum_docs_since_reduce_to_count/1,enum_docs_reduce_to_count/1]).
 -export([start_update_loop/2]).
 -export([init/1,terminate/2,handle_call/3,handle_cast/2,code_change/3,handle_info/2]).
 -export([start_copy_compact_int/2]).
+
+-export([btree_by_id_split/1,
+            btree_by_id_join/2,
+            btree_by_id_reduce/2,
+            btree_by_seq_split/1,
+            btree_by_seq_join/2,
+            btree_by_seq_reduce/2]).
 
 -include("couch_db.hrl").
 
@@ -363,6 +371,12 @@ doc_flush_binaries(Doc, Fd) ->
 
     Doc#doc{attachments = NewBins}.
 
+enum_docs_since_reduce_to_count(Reds) ->
+    couch_btree:final_reduce(fun btree_by_seq_reduce/2, Reds).
+
+enum_docs_reduce_to_count(Reds) ->
+    couch_btree:final_reduce(fun btree_by_id_reduce/2, Reds).
+
 enum_docs_since(MainPid, SinceSeq, Direction, InFun, Ctx) ->
     Db = get_db(MainPid),
     couch_btree:fold(Db#db.docinfo_by_seq_btree, SinceSeq + 1, Direction, InFun, Ctx).
@@ -407,22 +421,38 @@ btree_by_seq_join(Seq,{Id, Rev, Sp, Conflicts, DelConflicts, Deleted}) ->
         deleted_conflict_revs = DelConflicts,
         deleted = Deleted}.
 
-btree_by_name_split(#full_doc_info{id=Id, update_seq=Seq, rev_tree=Tree}) ->
-    {Id, {Seq, Tree}}.
+btree_by_id_split(#full_doc_info{id=Id, update_seq=Seq,
+        deleted=Deleted, rev_tree=Tree}) ->
+    {Id, {Seq, case Deleted of true -> 1; false-> 0 end, Tree}}.
 
-btree_by_name_join(Id, {Seq, Tree}) ->
-    #full_doc_info{id=Id, update_seq=Seq, rev_tree=Tree}.
+btree_by_id_join(Id, {Seq, Deleted, Tree}) ->
+    #full_doc_info{id=Id, update_seq=Seq, deleted=Deleted==1, rev_tree=Tree}.
     
+
+
+btree_by_id_reduce(reduce, FullDocInfos) ->
+    % count the number of deleted documents
+    length([1 || #full_doc_info{deleted=false} <- FullDocInfos]);
+btree_by_id_reduce(combine, Reds) ->
+    lists:sum(Reds).
+            
+btree_by_seq_reduce(reduce, DocInfos) ->
+    % count the number of deleted documents
+    length(DocInfos);
+btree_by_seq_reduce(combine, Reds) ->
+    lists:sum(Reds).
 
 init_db(DbName, Filepath, Fd, Header) ->
     {ok, SummaryStream} = couch_stream:open(Header#db_header.summary_stream_state, Fd),
     ok = couch_stream:set_min_buffer(SummaryStream, 10000),
     {ok, IdBtree} = couch_btree:open(Header#db_header.fulldocinfo_by_id_btree_state, Fd,
-        [{split, fun(V) -> btree_by_name_split(V) end},
-        {join, fun(K,V) -> btree_by_name_join(K,V) end}] ),
+        [{split, fun btree_by_id_split/1},
+        {join, fun btree_by_id_join/2},
+        {reduce, fun btree_by_id_reduce/2}]),
     {ok, SeqBtree} = couch_btree:open(Header#db_header.docinfo_by_seq_btree_state, Fd,
-            [{split, fun(V) -> btree_by_seq_split(V) end},
-            {join, fun(K,V) -> btree_by_seq_join(K,V) end}] ),
+            [{split, fun btree_by_seq_split/1},
+            {join, fun btree_by_seq_join/2},
+            {reduce, fun btree_by_seq_reduce/2}]),
     {ok, LocalDocsBtree} = couch_btree:open(Header#db_header.local_docs_btree_state, Fd),
 
     #db{
@@ -437,8 +467,7 @@ init_db(DbName, Filepath, Fd, Header) ->
         doc_count = Header#db_header.doc_count,
         doc_del_count = Header#db_header.doc_del_count,
         name = DbName,
-        filepath=Filepath
-        }.
+        filepath=Filepath }.
 
 close_db(#db{fd=Fd,summary_stream=Ss}) ->
     couch_file:close(Fd),
@@ -759,7 +788,9 @@ new_index_entries([FullDocInfo|RestInfos], DocCount, DelCount, AccById, AccBySeq
     if Deleted -> {DocCount, DelCount + 1};
     true -> {DocCount + 1, DelCount} 
     end,
-    new_index_entries(RestInfos, DocCount2, DelCount2, [FullDocInfo|AccById], [DocInfo|AccBySeq]).
+    new_index_entries(RestInfos, DocCount2, DelCount2, 
+        [FullDocInfo#full_doc_info{deleted=Deleted}|AccById],
+        [DocInfo|AccBySeq]).
 
 update_docs_int(Db, DocsList, Options) ->
     #db{

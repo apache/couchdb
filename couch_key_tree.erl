@@ -18,7 +18,7 @@
 -export([map/2, get_all_leafs/1, get_leaf_keys/1, count_leafs/1]).
 
 % a key tree looks like this:
-% Tree -> [] or [{Key, Value, Tree} | SiblingTree]
+% Tree -> [] or [{Key, Value, ChildTree} | SiblingTree]
 % ChildTree -> Tree
 % SiblingTree -> [] or [{SiblingKey, Value, Tree} | Tree]
 % And each Key < SiblingKey

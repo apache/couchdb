@@ -45,6 +45,7 @@
 -record(full_doc_info,
     {id = "",
     update_seq = 0,
+    deleted = false,
     rev_tree = []
     }).
 
