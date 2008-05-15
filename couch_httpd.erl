@@ -599,6 +599,9 @@ parse_view_query(Req) ->
             _ ->
                 Args %already reversed
             end;
+        {"descending", "false"} ->
+          % ignore
+          Args;
         {"skip", Value} ->
             case (catch list_to_integer(Value)) of
             Count when is_integer(Count) ->
