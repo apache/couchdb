@@ -423,6 +423,9 @@ var tests = {
     restartServer();
     T(db.open(designDoc._id) == null);
     T(db.view("test/no_docs") == null);
+    
+    
+    
   },
 
   view_collation: function(debug) {
@@ -600,6 +603,19 @@ var tests = {
       var j;
       for (j = 0; j < 10; j++) {
         T(queryResults.rows[j].key == i + 9 - j);
+      }
+    }
+    
+    // ignore decending=false. CouchDB should just ignore that.
+    for (i = 0; i < docs.length; i += 10) {
+      var queryResults = db.query(queryFun, {startkey:i, startkey_docid:i, 
+                                             descending:false, count:10});
+      T(queryResults.rows.length == 10)
+      T(queryResults.total_rows == docs.length)
+      T(queryResults.offset == i)
+      var j;
+      for (j = 0; j < 10;j++) {
+        T(queryResults.rows[j].key == i + j);
       }
     }
   },
