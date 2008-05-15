@@ -176,7 +176,7 @@ start_server(InputIniFilename) ->
     case StartResult of
     {ok,_} ->
         % only output when startup was successful
-        io:format("Find Futon, the management interface, at:~nhttp://~s:~s/_utils/index.html~n~n", [BindAddress, Port]),
+        %io:format("Find Futon, the management interface, at:~nhttp://~s:~s/_utils/index.html~n~n", [BindAddress, Port]),
         io:format("Apache CouchDB has started. Time to relax.~n");
     _ ->
         % Since we failed startup, unconditionally dump configuration data to console

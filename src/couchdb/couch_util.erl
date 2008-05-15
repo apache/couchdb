@@ -16,7 +16,7 @@
 -export([parse_ini/1,should_flush/0, should_flush/1]).
 -export([new_uuid/0, rand32/0, implode/2, collate/2, collate/3]).
 -export([abs_pathname/1,abs_pathname/2, trim/1, ascii_lower/1]).
--export([encodeBase64/1, decodeBase64/1]).
+-export([encodeBase64/1, decodeBase64/1, to_hex/1]).
 
 
 % arbitrarily chosen amount of memory to use before flushing to disk
@@ -30,20 +30,21 @@ start_driver(LibDir) ->
     {error, already_loaded} -> ok;
     Error -> exit(Error)
     end.
-
-
+    
+    
+    
 new_uuid() ->
-    to_hex(binary_to_list(crypto:rand_bytes(16))).
-
+    to_hex(crypto:rand_bytes(16)).
+    
 to_hex([]) ->
     [];
+to_hex(Bin) when is_binary(Bin) ->
+    to_hex(binary_to_list(Bin));
 to_hex([H|T]) ->
     [to_digit(H div 16), to_digit(H rem 16) | to_hex(T)].
 
-to_digit(N) when N < 10 ->
-    $0 + N;
-to_digit(N) ->
-    $a + N-10.
+to_digit(N) when N < 10 -> $0 + N;
+to_digit(N)             -> $a + N-10.
     
 
 % returns a random integer

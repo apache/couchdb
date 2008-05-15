@@ -91,7 +91,15 @@ var tests = {
     // 1 more document should now be in the result.
     T(results.total_rows == 3);
     T(db.info().doc_count == 6);
+    
+    var reduceFunction = function(keys, values){
+        return sum(values);
+    };
+    
+    result = db.reduce_query(mapFunction, reduceFunction);
 
+    T(result.result == 33);
+      
    // delete a document
     T(db.deleteDoc(existingDoc).ok);
 
@@ -217,6 +225,39 @@ var tests = {
     // validate the keys are ordered descending
     for(var i=0; i<numDocsToCreate; i++) {
       T(results.rows[numDocsToCreate-1-i].key==i);
+    }
+  },
+  
+  reduce: function(debug) {
+    var db = new CouchDB("test_suite_db");
+    db.deleteDb();
+    db.createDb();
+    if (debug) debugger;
+    var numDocs = 500
+    var docs = makeDocs(1,numDocs + 1);
+    T(db.bulkSave(docs).ok);
+    var summate = function(N) {return (N+1)*N/2;};
+    
+    var map = function (doc) {map(doc.integer, doc.integer)};
+    var reduce = function (keys, values) { return sum(values); }; 
+    var result = db.reduce_query(map, reduce).result;
+    T(result == summate(numDocs));
+    
+    result = db.reduce_query(map, reduce, {startkey:4,endkey:4}).result;
+    
+    T(result == 4);
+    
+    result = db.reduce_query(map, reduce, {startkey:4,endkey:5}).result;
+    
+    T(result == 9);
+    
+    result = db.reduce_query(map, reduce, {startkey:4,endkey:6}).result;
+    
+    T(result == 15);
+    
+    for(var i=1; i<numDocs/2; i+=30) {
+      result = db.reduce_query(map, reduce, {startkey:i,endkey:numDocs-i}).result;
+      T(result == summate(numDocs-i) - summate(i-1));
     }
   },
 
@@ -391,7 +432,7 @@ var tests = {
     db.createDb();
     if (debug) debugger;
 
-    var numDocs = 50;
+    var numDocs = 500;
 
     var designDoc = {
       _id:"_design/test",
@@ -399,21 +440,45 @@ var tests = {
       views: {
         all_docs: "function(doc) { map(doc.integer, null) }",
         no_docs: "function(doc) {}",
-        single_doc: "function(doc) { if (doc._id == \"1\") { map(1, null) }}"
+        single_doc: "function(doc) { if (doc._id == \"1\") { map(1, null) }}",
+        summate: {map:"function (doc) {map(doc.integer, doc.integer)};",
+                        reduce:"function (keys, values) { return sum(values); };"}
       }
     }
     T(db.save(designDoc).ok);
 
-    T(db.bulkSave(makeDocs(0, numDocs)).ok);
+    T(db.bulkSave(makeDocs(1, numDocs + 1)).ok);
 
     for (var loop = 0; loop < 2; loop++) {
       var rows = db.view("test/all_docs").rows;
-      for (var i = 0; i < numDocs; i++) {
-        T(rows[i].key == i);
+      for (var i = 1; i <= numDocs; i++) {
+        T(rows[i-1].key == i);
       }
       T(db.view("test/no_docs").total_rows == 0)
       T(db.view("test/single_doc").total_rows == 1)
       restartServer();
+    }
+    
+    
+    var summate = function(N) {return (N+1)*N/2;};
+    var result = db.view("test/summate").result;
+    T(result == summate(numDocs));
+    
+    result = db.view("test/summate", {startkey:4,endkey:4}).result;
+    
+    T(result == 4);
+    
+    result = db.view("test/summate", {startkey:4,endkey:5}).result;
+    
+    T(result == 9);
+    
+    result =db.view("test/summate", {startkey:4,endkey:6}).result;
+    
+    T(result == 15);
+    
+    for(var i=1; i<numDocs/2; i+=30) {
+      result = db.view("test/summate", {startkey:i,endkey:numDocs-i}).result;
+      T(result == summate(numDocs-i) - summate(i-1));
     }
 
     T(db.deleteDoc(designDoc).ok);
@@ -423,8 +488,6 @@ var tests = {
     restartServer();
     T(db.open(designDoc._id) == null);
     T(db.view("test/no_docs") == null);
-    
-    
     
   },
 

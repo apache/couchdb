@@ -11,21 +11,30 @@
 // the License.
 
 var cmd;
-var map_funs = [];        // The map functions to compute against documents
-var map_results = [];
+var funs = [];        // holds functions used for computation
+var map_results = []; // holds temporary emitted values during doc map
+
+var sandbox = null;
+
+map = function(key, value) {
+    map_results.push([key, value]);
+  }
+  
+sum = function(values) {
+    var values_sum=0;
+    for(var i in values) {
+      values_sum += values[i];
+    }
+    return values_sum;
+  }
+
 
 try {
-  var sandbox = evalcx('');
-  sandbox.map = function(key, value) {
-    map_results.push([key, value]);
-  }
-} catch (e) {
-  // fallback for older versions of spidermonkey that don't have evalcx
-  var sandbox = null;
-  map = function(key, value) {
-    map_results.push([key, value]);
-  }
-}
+  // if possible, use evalcx (not always available)
+  sandbox = evalcx('');
+  sandbox.map = map;
+  sandbox.sum = sum;
+} catch (e) {}
 
 // Commands are in the form of json arrays:
 // ["commandname",..optional args...]\n
@@ -33,83 +42,132 @@ try {
 // Responses are json values followed by a new line ("\n")
 
 while (cmd = eval(readline())) {
-  switch (cmd[0]) {
-    case "reset":
-      // clear the map_functions and run gc
-      map_funs = [];
-      gc();
-      print("true"); // indicates success
-      break;
-    case "add_fun":
-      // The second arg is a string that will compile to a function.
-      // and then we add it to map_functions array
-      try {
-        var functionObject = sandbox ? evalcx(cmd[1], sandbox) : eval(cmd[1]);
-      } catch (err) {
-        print(toJSON({error: {id: "map_compilation_error",
-          reason: err.toString() + " (" + toJSON(cmd[1]) + ")"}}));
+  try {
+    switch (cmd[0]) {
+      case "reset":
+        // clear the globals and run gc
+        funs = [];
+        gc();
+        print("true"); // indicates success
         break;
-      }
-      if (typeof(functionObject) == "function") {
-        map_funs.push(functionObject);
-        print("true");
-      } else {
-        print(toJSON({error: "map_compilation_error",
-          reason: "expression does not eval to a function. (" + cmd[1] + ")"}));
-      }
-      break;
-    case "map_doc":
-      // The second arg is a document. We compute all the map functions against
-      // it.
-      //
-      // Each function can output multiple keys value, pairs for each document
-      //
-      // Example output of map_doc after three functions set by add_fun cmds:
-      // [
-      //  [["Key","Value"]],                    <- fun 1 returned 1 key value
-      //  [],                                   <- fun 2 returned 0 key values
-      //  [["Key1","Value1"],["Key2","Value2"]] <- fun 3 returned 2 key values
-      // ]
-      //
-      var doc = cmd[1];
-      seal(doc); // seal to prevent map functions from changing doc
-      var buf = [];
-      for (var i = 0; i < map_funs.length; i++) {
-        map_results = [];
-        try {
-          map_funs[i](doc);
-          buf.push(map_results.filter(function(pair) {
-            return pair[0] !== undefined && pair[1] !== undefined;
-          }));
-        } catch (err) {
-          if (err == "fatal_error") {
-            // Only if it's a "fatal_error" do we exit. What's a fatal error?
-            // That's for the query to decide.
-            //
-            // This will make it possible for queries to completely error out,
-            // by catching their own local exception and rethrowing a
-            // fatal_error. But by default if they don't do error handling we
-            // just eat the exception and carry on.
-            print(toJSON({error: "map_runtime_error",
-                reason: "function raised fatal exception"}));
-            quit();
+      case "add_fun":
+        // The second arg is a string that will compile to a function.
+        // and then we add it to funs array
+          funs.push(safe_compile_function(cmd[1]));
+          print("true");
+        break;
+      case "map_doc":
+        // The second arg is a document. We compute all the map functions against
+        // it.
+        //
+        // Each function can output multiple keys value, pairs for each document
+        //
+        // Example output of map_doc after three functions set by add_fun cmds:
+        // [
+        //  [["Key","Value"]],                    <- fun 1 returned 1 key value
+        //  [],                                   <- fun 2 returned 0 key values
+        //  [["Key1","Value1"],["Key2","Value2"]] <- fun 3 returned 2 key values
+        // ]
+        //
+        var doc = cmd[1];
+        seal(doc); // seal to prevent map functions from changing doc
+        var buf = [];
+        for (var i = 0; i < funs.length; i++) {
+          map_results = [];
+          try {
+            funs[i](doc);
+            buf.push(map_results.filter(function(pair) {
+              return pair[0] !== undefined && pair[1] !== undefined;
+            }));
+          } catch (err) {
+            if (err == "fatal_error") {
+              // Only if it's a "fatal_error" do we exit. What's a fatal error?
+              // That's for the query to decide.
+              //
+              // This will make it possible for queries to completely error out,
+              // by catching their own local exception and rethrowing a
+              // fatal_error. But by default if they don't do error handling we
+              // just eat the exception and carry on.
+              throw {error: "map_runtime_error",
+                  reason: "function raised fatal exception"};
+            }
+            print(toJSON({log: "function raised exception (" + err + ")"}));
+            buf.push([]);
           }
-          print(toJSON({log: "function raised exception (" + err + ")"}));
-          buf.push([]);
         }
-      }
-      print(toJSON(buf));
-      break;
-    default:
-      print(toJSON({error: "query_server_error",
-          reason: "unknown command '" + cmd[0] + "'"}));
-      quit();
+        print(toJSON(buf));
+        break;
+      
+      case "combine":
+      case "reduce":
+        {  
+        var keys = null;
+        var values = null;
+        var reduceFuns = cmd[1];
+        var is_combine = false;
+        if (cmd[0] == "reduce") {
+          var kvs = cmd[2];
+          keys = new Array(kvs.length);
+          values = new Array(kvs.length);
+          for (var i = 0; i < kvs.length; i++) {
+              keys[i] = kvs[i][0];
+              values[i] = kvs[i][1];
+          }
+        } else {
+          values = cmd[2];
+          is_combine = true;
+        }
+        
+        for(var i in reduceFuns) {
+          reduceFuns[i] = safe_compile_function(reduceFuns[i]);
+        }
+        
+        var reductions = new Array(funs.length);
+        for (var i = 0; i < reduceFuns.length; i++) {
+          try {
+            reductions[i] = reduceFuns[i](keys, values, is_combine);
+          } catch (err) {
+            if (err == "fatal_error") {
+              throw {error: "reduce_runtime_error",
+                  reason: "function raised fatal exception"};
+            }
+            print(toJSON({log: "function raised exception (" + err + ")"}));
+            reductions[i] = null;
+          }
+        }
+        print("[true," + toJSON(reductions) + "]");
+        }
+        break;
+     
+      default:
+        print(toJSON({error: "query_server_error",
+            reason: "unknown command '" + cmd[0] + "'"}));
+        quit();
+    }
+  } catch(exception) {
+    print(toJSON(exception));
+  }
+}
+
+
+function safe_compile_function(Src) {
+  try {
+    var functionObject = sandbox ? evalcx(Src, sandbox) : eval(Src);
+  } catch (err) {
+    throw {error: "compilation_error",
+      reason: err.toString() + " (" + Src + ")"};
+  }
+  if (typeof(functionObject) == "function") {
+    return functionObject;
+  } else {
+    throw {error: "compilation_error",
+      reason: "expression does not eval to a function. (" + Src + ")"};
   }
 }
 
 function toJSON(val) {
   if (typeof(val) == "undefined") {
-    throw new TypeError("Cannot encode undefined value as JSON");
+    throw {error:"bad_value", reason:"Cannot encode 'undefined' value as JSON"};
   }
   var subs = {'\b': '\\b', '\t': '\\t', '\n': '\\n', '\f': '\\f',
               '\r': '\\r', '"' : '\\"', '\\': '\\\\'};
