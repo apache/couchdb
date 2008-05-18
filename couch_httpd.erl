@@ -96,6 +96,8 @@ handle_request0(Req, DocumentRoot, Method, Path) ->
             {ok, Req:respond({301, [{"Location", "/_utils/"}], <<>>})};
         "/_utils/" ++ PathInfo ->
             {ok, Req:serve_file(PathInfo, DocumentRoot)};
+        "/_" ++ UnknownPrivatePath ->
+            handle_unkown_private_uri_request(Req, Method, UnknownPrivatePath);
         _Else ->
             handle_db_request(Req, Method, {Path})
     end.
@@ -129,6 +131,19 @@ handle_replicate_request(Req, 'POST') ->
 handle_replicate_request(_Req, _Method) ->
     throw({method_not_allowed, "POST"}).
 
+handle_unkown_private_uri_request(Req, _Method, UnknownPrivatePath) ->    
+  KnownPrivatePaths = ["_utils"],
+  Msg = {obj, 
+    [
+      {error, "Sorry, we could not find the private path '_" ++ 
+        mochiweb_util:unquote(UnknownPrivatePath) ++ 
+        "' you are looking for. We only know about the following path(s): '" ++ 
+        lists:flatten(KnownPrivatePaths) ++ "'"}
+    ]
+  },
+  io:format("Debug: ~p~n", [Msg]),
+  send_error(Req, 404, Msg).
+  
 % Database request handlers
 
 handle_db_request(Req, Method, {Path}) ->
@@ -631,7 +646,10 @@ parse_view_query(Req) ->
                 Args %already reversed
             end;
         {"descending", "false"} ->
-          % ignore
+          % The descending=false behaviour is the default behaviour, so we
+          % simpply ignore it. This is only for convenience when playing with
+          % the HTTP API, so that a user doesn't get served an error when 
+          % flipping true to false in the descending option.
           Args;
         {"skip", Value} ->
             case (catch list_to_integer(Value)) of
