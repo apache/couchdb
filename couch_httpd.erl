@@ -141,7 +141,6 @@ handle_unkown_private_uri_request(Req, _Method, UnknownPrivatePath) ->
         lists:flatten(KnownPrivatePaths) ++ "'"}
     ]
   },
-  io:format("Debug: ~p~n", [Msg]),
   send_error(Req, 404, Msg).
   
 % Database request handlers
