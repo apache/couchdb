@@ -116,7 +116,7 @@ reduce({reduce, NthRed, Lang, #view{btree=Bt, reduce_funs=RedFuns}}, Key1, Key2)
             {ok, Reduced} = couch_query_servers:combine(Lang, [FunSrc], UserReds),
             {0, PreResultPadding ++ Reduced ++ PostResultPadding}
         end,
-    {0, [FinalReduction]} = couch_btree:final_reduce(ReduceFun, PartialReductions),
+    {_, [FinalReduction]} = couch_btree:final_reduce(ReduceFun, PartialReductions),
     {ok, FinalReduction}.
         
 get_key_pos(_Key, [], _N) ->
