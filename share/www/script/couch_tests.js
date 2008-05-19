@@ -970,7 +970,7 @@ var tests = {
 function makeDocs(start, end, templateDoc) {
   var templateDocSrc = templateDoc ? templateDoc.toSource() : "{}"
   var docs = []
-  for(var i=start; i<=end; i++) {
+  for(var i=start; i<end; i++) {
     var newDoc = eval("(" + templateDocSrc + ")");
     newDoc._id = (i).toString();
     newDoc.integer = i
