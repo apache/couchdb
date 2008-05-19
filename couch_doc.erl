@@ -172,7 +172,7 @@ bin_to_binary({Fd, Sp, Len}) ->
     Bin.
 
 get_view_functions(#doc{body={obj, Fields}}) ->
-    Lang = proplists:get_value("language", Fields, "text/javascript"),
+    Lang = proplists:get_value("language", Fields, "javascript"),
     {obj, Views} = proplists:get_value("views", Fields, {obj, []}),
     {Lang, [{ViewName, Value} || {ViewName, Value} <- Views, is_list(Value)]};
 get_view_functions(_Doc) ->

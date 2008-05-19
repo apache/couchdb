@@ -397,30 +397,30 @@ handle_db_request(Req, 'POST', {DbName, _Db, ["_temp_view"]}) ->
         end_docid = EndDocId
     } = QueryArgs = parse_view_query(Req),
 
-    ContentType = case Req:get_primary_header_value("content-type") of
-        undefined ->
-            "text/javascript";
-        Else ->
-            Else
+    case Req:get_primary_header_value("content-type") of
+        undefined -> ok;
+        "application/json" -> ok;
+        Else -> throw({incorrect_mime_type, Else})
     end,
-    case cjson:decode(Req:recv_body()) of
-    {obj, Props} ->
-        MapSrc = proplists:get_value("map",Props),
-        RedSrc = proplists:get_value("reduce",Props),
-        {ok, View} = couch_view:get_reduce_view(
-                {temp, DbName, ContentType, MapSrc, RedSrc}),
-        {ok, Value} = couch_view:reduce(View, {StartKey, StartDocId}, {EndKey, EndDocId}),
-        send_json(Req, {obj, [{ok,true}, {result, Value}]});
-    Src when is_list(Src) ->
-        
-        {ok, View} = couch_view:get_map_view({temp, DbName, ContentType, Src}),
+    {obj, Props} = cjson:decode(Req:recv_body()),
+    Language = proplists:get_value("language", Props, "javascript"),
+    MapSrc = proplists:get_value("map", Props),
+    case proplists:get_value("reduce", Props, null) of
+    null ->
+        {ok, View} = couch_view:get_map_view({temp, DbName, Language, MapSrc}),
         Start = {StartKey, StartDocId},
         {ok, TotalRows} = couch_view:get_row_count(View),
         FoldlFun = make_view_fold_fun(Req, QueryArgs, TotalRows,
                 fun couch_view:reduce_to_count/1),
         FoldAccInit = {Count, SkipCount, undefined, []},
         FoldResult = couch_view:fold(View, Start, Dir, FoldlFun, FoldAccInit),
-        finish_view_fold(Req, TotalRows, FoldResult)
+        finish_view_fold(Req, TotalRows, FoldResult);
+
+    RedSrc ->
+        {ok, View} = couch_view:get_reduce_view(
+                {temp, DbName, Language, MapSrc, RedSrc}),
+        {ok, Value} = couch_view:reduce(View, {StartKey, StartDocId}, {EndKey, EndDocId}),
+        send_json(Req, {obj, [{ok,true}, {result, Value}]})
     end;
 
 handle_db_request(_Req, _Method, {_DbName, _Db, ["_temp_view"]}) ->
