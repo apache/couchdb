@@ -98,8 +98,8 @@ function CouchDB(name) {
     if (typeof(mapFun) != "string")
       mapFun = mapFun.toSource ? mapFun.toSource() : "(" + mapFun.toString() + ")";
     var req = request("POST", this.uri + "_temp_view" + encodeOptions(options), {
-      headers: {"Content-Type": "text/javascript"},
-      body: JSON.stringify(mapFun)
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({language:"javascript",map:mapFun})
     });
     var result = JSON.parse(req.responseText);
     if (req.status != 200)
@@ -114,8 +114,8 @@ function CouchDB(name) {
     if (typeof(reduceFun) != "string")
       reduceFun = reduceFun.toSource ? reduceFun.toSource() : "(" + reduceFun.toString() + ")";
     var req = request("POST", this.uri + "_temp_view" + encodeOptions(options), {
-      headers: {"Content-Type": "text/javascript"},
-      body: JSON.stringify({map:mapFun, reduce:reduceFun})
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({language:"javascript",map:mapFun,reduce:reduceFun})
     });
     var result = JSON.parse(req.responseText);
     if (req.status != 200)

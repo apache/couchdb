@@ -179,7 +179,7 @@
             fun = fun.toSource ? fun.toSource() : "(" + fun.toString() + ")";
           $.ajax({
             type: "POST", url: this.uri + "_temp_view" + encodeOptions(options),
-            contentType: "text/javascript", data: fun, dataType: "json",
+            contentType: "javascript", data: fun, dataType: "json",
             complete: function(req) {
               var resp = $.httpData(req, "json");
               if (req.status == 200 && options.success) {

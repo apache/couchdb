@@ -436,7 +436,7 @@ var tests = {
 
     var designDoc = {
       _id:"_design/test",
-      language: "text/javascript",
+      language: "javascript",
       views: {
         all_docs: "function(doc) { map(doc.integer, null) }",
         no_docs: "function(doc) {}",

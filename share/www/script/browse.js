@@ -277,7 +277,7 @@ function CouchDatabasePage() {
           var viewCode = $("#viewcode textarea").val();
           var docId = ["_design", data.docid].join("/");
           function save(doc) {
-            if (!doc) doc = {_id: docId, language: "text/javascript"};
+            if (!doc) doc = {_id: docId, language: "javascript"};
             if (doc.views === undefined) doc.views = {};
             doc.views[data.name] = viewCode;
             db.saveDoc(doc, {

@@ -153,7 +153,7 @@ reduce_to_count(Reductions) ->
                 
 
 design_doc_to_view_group(#doc{id=Id,body={obj, Fields}}) ->
-    Language = proplists:get_value("language", Fields, "text/javascript"),
+    Language = proplists:get_value("language", Fields, "javascript"),
     {obj, RawViews} = proplists:get_value("views", Fields, {obj, []}),
     
     % extract the map/reduce views from the json fields and into lists
