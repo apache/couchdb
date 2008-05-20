@@ -94,12 +94,19 @@ function CouchDB(name) {
   }
 
   // Applies the map function to the contents of database and returns the results.
-  this.query = function(mapFun, options) {
+  this.query = function(mapFun, reduceFun, options) {
+    var body = {language: "javascript"};
     if (typeof(mapFun) != "string")
       mapFun = mapFun.toSource ? mapFun.toSource() : "(" + mapFun.toString() + ")";
+    body.map = mapFun;
+    if (reduceFun != null) {
+      if (typeof(reduceFun) != "string")
+        reduceFun = reduceFun.toSource ? reduceFun.toSource() : "(" + reduceFun.toString() + ")";
+      body.reduce = reduceFun;
+    }
     var req = request("POST", this.uri + "_temp_view" + encodeOptions(options), {
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({language:"javascript",map:mapFun})
+      body: JSON.stringify(body)
     });
     var result = JSON.parse(req.responseText);
     if (req.status != 200)
@@ -107,22 +114,6 @@ function CouchDB(name) {
     return result;
   }
   
-  // Applies the map function to the contents of database and returns the results.
-  this.reduce_query = function(mapFun, reduceFun, options) {
-    if (typeof(mapFun) != "string")
-      mapFun = mapFun.toSource ? mapFun.toSource() : "(" + mapFun.toString() + ")";
-    if (typeof(reduceFun) != "string")
-      reduceFun = reduceFun.toSource ? reduceFun.toSource() : "(" + reduceFun.toString() + ")";
-    var req = request("POST", this.uri + "_temp_view" + encodeOptions(options), {
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({language:"javascript",map:mapFun,reduce:reduceFun})
-    });
-    var result = JSON.parse(req.responseText);
-    if (req.status != 200)
-      throw result;
-    return result;
-  }
-
   this.view = function(viewname, options) {
     var req = request("GET", this.uri + "_view/" + viewname + encodeOptions(options));
     if (req.status == 404)
