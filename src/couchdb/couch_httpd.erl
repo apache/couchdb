@@ -870,25 +870,33 @@ send_json(Req, Code, Value) ->
     send_json(Req, Code, [], Value).
 
 send_json(Req, Code, Headers, Value) ->
-    Resp = start_json_response(Req, Code, Headers),
-    Resp:write_chunk(cjson:encode(Value)),
-    end_json_response(Resp),
+    ContentType = negotiate_content_type(Req),
+    Body = cjson:encode(Value),
+    Resp = Req:respond({Code, [{"Content-Type", ContentType}] ++ Headers,
+                        Body}),
     {ok, Resp}.
 
 start_json_response(Req, Code) ->
     start_json_response(Req, Code, []).
 
 start_json_response(Req, Code, Headers) ->
-    AcceptedTypes = case Req:get_header_value("Accept") of
-        undefined       -> [];
-        AcceptHeader    -> string:tokens(AcceptHeader, ", ")
-    end,
-    ContentType = case lists:member("application/json", AcceptedTypes) of
-        true  -> "application/json";
-        false -> "text/plain;charset=utf-8"
-    end,
+    ContentType = negotiate_content_type(Req),
     Req:respond({Code, [{"Content-Type", ContentType}] ++ Headers, chunked}).
 
 end_json_response(Resp) ->
     Resp:write_chunk(""),
     {ok, Resp}.
+
+negotiate_content_type(Req) ->
+    %% Determine the appropriate Content-Type header for a JSON response
+    %% depending on the Accept header in the request. A request that explicitly
+    %% lists the correct JSON MIME type will get that type, otherwise the
+    %% response will have the generic MIME type "text/plain"
+    AcceptedTypes = case Req:get_header_value("Accept") of
+        undefined       -> [];
+        AcceptHeader    -> string:tokens(AcceptHeader, ", ")
+    end,
+    case lists:member("application/json", AcceptedTypes) of
+        true  -> "application/json";
+        false -> "text/plain;charset=utf-8"
+    end.
