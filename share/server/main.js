@@ -16,7 +16,7 @@ var map_results = []; // holds temporary emitted values during doc map
 
 var sandbox = null;
 
-map = function(key, value) {
+emit = function(key, value) {
     map_results.push([key, value]);
   }
   
@@ -32,7 +32,7 @@ sum = function(values) {
 try {
   // if possible, use evalcx (not always available)
   sandbox = evalcx('');
-  sandbox.map = map;
+  sandbox.emit = emit;
   sandbox.sum = sum;
 } catch (e) {}
 

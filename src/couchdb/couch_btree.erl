@@ -419,7 +419,7 @@ collect_node(Bt, {P, R}, KeyStart, KeyEnd) ->
         true -> % got full node, return the already calculated reduction
             {[], [{nil, {P, R}}]};
         false -> % otherwise return the keyvalues for later reduction
-            {KVs2, []}
+            {[assemble(Bt,K,V) || {K,V} <- KVs2], []}
         end
     end.
 
@@ -568,9 +568,10 @@ stream_kv_node(Bt, Reds, KVs, StartKey, Dir, Fun, Acc) ->
 stream_kv_node2(_Bt, _Reds, _PrevKVs, [], _Dir, _Fun, Acc) ->
     {ok, Acc};
 stream_kv_node2(Bt, Reds, PrevKVs, [{K,V} | RestKVs], Dir, Fun, Acc) ->
-    case Fun(assemble(Bt, K, V), {PrevKVs, Reds}, Acc) of
+    AssembledKV = assemble(Bt, K, V),
+    case Fun(AssembledKV, {PrevKVs, Reds}, Acc) of
     {ok, Acc2} ->
-        stream_kv_node2(Bt, Reds, [{K,V} | PrevKVs], RestKVs, Dir, Fun, Acc2);
+        stream_kv_node2(Bt, Reds, [AssembledKV | PrevKVs], RestKVs, Dir, Fun, Acc2);
     {stop, Acc2} ->
         {stop, Acc2}
     end.
