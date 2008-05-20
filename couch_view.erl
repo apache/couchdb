@@ -155,32 +155,26 @@ reduce_to_count(Reductions) ->
 design_doc_to_view_group(#doc{id=Id,body={obj, Fields}}) ->
     Language = proplists:get_value("language", Fields, "javascript"),
     {obj, RawViews} = proplists:get_value("views", Fields, {obj, []}),
-    
-    % extract the map/reduce views from the json fields and into lists
-    MapViewsRaw = [{Name, Src, nil} || {Name, Src} <- RawViews, is_list(Src)],
-    MapReduceViewsRaw =
-        [{Name,
-            proplists:get_value("map", MRFuns),
-            proplists:get_value("reduce", MRFuns)}
-            || {Name, {obj, MRFuns}} <- RawViews],
             
     % add the views to a dictionary object, with the map source as the key
     DictBySrc =
     lists:foldl(
-        fun({Name, MapSrc, RedSrc}, DictBySrcAcc) ->
+        fun({Name, {obj, MRFuns}}, DictBySrcAcc) ->
+            MapSrc = proplists:get_value("map", MRFuns),
+            RedSrc = proplists:get_value("reduce", MRFuns, null),
             View =
             case dict:find(MapSrc, DictBySrcAcc) of
                 {ok, View0} -> View0;
                 error -> #view{def=MapSrc} % create new view object
             end,
             View2 =
-            if RedSrc == nil ->
+            if RedSrc == null ->
                 View#view{map_names=[Name|View#view.map_names]};
             true ->
                 View#view{reduce_funs=[{Name,RedSrc}|View#view.reduce_funs]}
             end,
             dict:store(MapSrc, View2, DictBySrcAcc)
-        end, dict:new(), MapViewsRaw ++ MapReduceViewsRaw),
+        end, dict:new(), RawViews),
     % number the views
     {Views, _N} = lists:mapfoldl(
         fun({_Src, View}, N) ->
