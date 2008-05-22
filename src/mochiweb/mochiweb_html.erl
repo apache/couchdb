@@ -35,7 +35,7 @@
 -define(IS_LITERAL_SAFE(C),
         ((C >= $A andalso C =< $Z) orelse (C >= $a andalso C =< $z)
          orelse (C >= $0 andalso C =< $9))).
-                                
+
 -record(decoder, {line=1,
                   column=1,
                   offset=0}).
@@ -202,7 +202,7 @@ attrs_to_html([{K, V} | Rest], Acc) ->
     attrs_to_html(Rest,
                   [[<<" ">>, escape(K), <<"=\"">>,
                     escape_attr(V), <<"\"">>] | Acc]).
-    
+
 test_escape() ->
     <<"&amp;quot;\"word &lt;&lt;up!&amp;quot;">> =
         escape(<<"&quot;\"word <<up!&quot;">>),
@@ -299,6 +299,14 @@ test_tokens() ->
         tokens(<<"<foo bar=baz wibble='wibble' alice=bob/>">>),
     [{comment, <<"[if lt IE 7]>\n<style type=\"text/css\">\n.no_ie { display: none; }\n</style>\n<![endif]">>}] =
         tokens(<<"<!--[if lt IE 7]>\n<style type=\"text/css\">\n.no_ie { display: none; }\n</style>\n<![endif]-->">>),
+    [{start_tag, <<"script">>, [{<<"type">>, <<"text/javascript">>}], false},
+     {data, <<" A= B <= C ">>, false},
+     {end_tag, <<"script">>}] =
+        tokens(<<"<script type=\"text/javascript\"> A= B <= C </script>">>),
+    [{start_tag, <<"textarea">>, [], false},
+     {data, <<"<html></body>">>, false},
+     {end_tag, <<"textarea">>}] =
+        tokens(<<"<textarea><html></body></textarea>">>),
     ok.
 
 tokens(B, S=#decoder{offset=O}, Acc) ->
@@ -307,8 +315,29 @@ tokens(B, S=#decoder{offset=O}, Acc) ->
             lists:reverse(Acc);
         _ ->
             {Tag, S1} = tokenize(B, S),
-            tokens(B, S1, [Tag | Acc])
+            case parse_flag(Tag) of
+                script ->
+                    {Tag2, S2} = tokenize_script(B, S1),
+                    tokens(B, S2, [Tag2, Tag | Acc]);
+                textarea ->
+                    {Tag2, S2} = tokenize_textarea(B, S1),
+                    tokens(B, S2, [Tag2, Tag | Acc]);
+                none ->
+                    tokens(B, S1, [Tag | Acc])
+            end
     end.
+
+parse_flag({start_tag, B, _, false}) ->
+    case string:to_lower(binary_to_list(B)) of
+        "script" ->
+            script;
+        "textarea" ->
+            textarea;
+        _ ->
+            none
+    end;
+parse_flag(_) ->
+    none.
 
 tokenize(B, S=#decoder{offset=O}) ->
     case B of
@@ -330,7 +359,7 @@ tokenize(B, S=#decoder{offset=O}) ->
             {S2, _} = find_gt(B, S1),
             {{end_tag, Tag}, S2};
         <<_:O/binary, "<", C, _/binary>> when ?IS_WHITESPACE(C) ->
-            %% This isn't really strict HTML but we want this for markdown
+            %% This isn't really strict HTML
             tokenize_data(B, ?INC_COL(S));
         <<_:O/binary, "<", _/binary>> ->
             {Tag, S1} = tokenize_literal(B, ?INC_COL(S)),
@@ -524,7 +553,7 @@ append_stack_child(StartTag, [{Name, Attrs, Acc} | Stack]) ->
 
 destack(TagName, Stack) when is_list(Stack) ->
     F = fun (X) ->
-                case X of 
+                case X of
                     {TagName, _, _} ->
                         false;
                     _ ->
@@ -542,7 +571,7 @@ destack(TagName, Stack) when is_list(Stack) ->
             %% Unfurl up to the tag, then accumulate it
             [{T0, A0, [destack(Pre ++ [T]) | Acc0]} | Post]
     end.
-    
+
 destack([{Tag, Attrs, Acc}]) ->
     {Tag, Attrs, lists:reverse(Acc)};
 destack([{T1, A1, Acc1}, {T0, A0, Acc0} | Rest]) ->
@@ -655,7 +684,7 @@ find_gt(Bin, S=#decoder{offset=O}, HasSlash) ->
 
 tokenize_charref(Bin, S=#decoder{offset=O}) ->
     tokenize_charref(Bin, S, O).
-    
+
 tokenize_charref(Bin, S=#decoder{offset=O}, Start) ->
     case Bin of
         <<_:O/binary>> ->
@@ -757,4 +786,50 @@ tokenize_comment(Bin, S=#decoder{offset=O}, Start) ->
             tokenize_comment(Bin, ?INC_CHAR(S, C), Start);
         <<_:Start/binary, Raw/binary>> ->
             {{comment, Raw}, S}
+    end.
+
+tokenize_script(Bin, S=#decoder{offset=O}) ->
+    tokenize_script(Bin, S, O).
+
+tokenize_script(Bin, S=#decoder{offset=O}, Start) ->
+    case Bin of
+        %% Just a look-ahead, we want the end_tag separately
+        <<_:O/binary, $<, $/, SS, CC, RR, II, PP, TT, _/binary>>
+        when (SS =:= $s orelse SS =:= $S) andalso
+             (CC =:= $c orelse CC =:= $C) andalso
+             (RR =:= $r orelse RR =:= $R) andalso
+             (II =:= $i orelse II =:= $I) andalso
+             (PP =:= $p orelse PP =:= $P) andalso
+             (TT=:= $t orelse TT =:= $T) ->
+            Len = O - Start,
+            <<_:Start/binary, Raw:Len/binary, _/binary>> = Bin,
+            {{data, Raw, false}, S};
+        <<_:O/binary, C, _/binary>> ->
+            tokenize_script(Bin, ?INC_CHAR(S, C), Start);
+        <<_:Start/binary, Raw/binary>> ->
+            {{data, Raw, false}, S}
+    end.
+
+tokenize_textarea(Bin, S=#decoder{offset=O}) ->
+    tokenize_textarea(Bin, S, O).
+
+tokenize_textarea(Bin, S=#decoder{offset=O}, Start) ->
+    case Bin of
+        %% Just a look-ahead, we want the end_tag separately
+        <<_:O/binary, $<, $/, TT, EE, XX, TT2, AA, RR, EE2, AA2, _/binary>>
+        when (TT =:= $t orelse TT =:= $T) andalso
+             (EE =:= $e orelse EE =:= $E) andalso
+             (XX =:= $x orelse XX =:= $X) andalso
+             (TT2 =:= $t orelse TT2 =:= $T) andalso
+             (AA =:= $a orelse AA =:= $A) andalso
+             (RR =:= $r orelse RR =:= $R) andalso
+             (EE2 =:= $e orelse EE2 =:= $E) andalso
+             (AA2 =:= $a orelse AA2 =:= $A) ->
+            Len = O - Start,
+            <<_:Start/binary, Raw:Len/binary, _/binary>> = Bin,
+            {{data, Raw, false}, S};
+        <<_:O/binary, C, _/binary>> ->
+            tokenize_textarea(Bin, ?INC_CHAR(S, C), Start);
+        <<_:Start/binary, Raw/binary>> ->
+            {{data, Raw, false}, S}
     end.

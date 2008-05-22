@@ -103,7 +103,8 @@ init(State=#mochiweb_socket_server{ip=Ip, port=Port, backlog=Backlog}) ->
                 {packet, 0},
                 {backlog, Backlog},
                 {recbuf, 8192},
-                {active, false}],
+                {active, false},
+                {nodelay, true}],
     Opts = case Ip of
                any ->
                    BaseOpts;

@@ -35,6 +35,7 @@ test() ->
     mochijson:test(),
     mochiweb_charref:test(),
     mochiweb_html:test(),
+    mochifmt:test(),
     test_request(),
     ok.
 

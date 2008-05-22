@@ -223,7 +223,7 @@ start_couchdb () {
     command="`%ICU_CONFIG% --invoke` \
         %ERL% $interactive_option -sasl errlog_type error \
         -pa %erlanglibdir%/couch-%version%/ebin \
-            %erlanglibdir%/mochiweb-r64/ebin \
+            %erlanglibdir%/mochiweb-r73/ebin \
         -eval \"application:load(inets)\" \
         -eval \"application:load(crypto)\" \
         -eval \"application:load(couch)\" \

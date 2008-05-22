@@ -12,9 +12,12 @@
 
 datarootdir = @prefix@/share
 
-mochiwebebindir = $(erlanglibdir)/mochiweb-r64/ebin
+mochiwebebindir = $(erlanglibdir)/mochiweb-r73/ebin
 
 mochiweb_file_collection = \
+    mochifmt.erl \
+    mochifmt_records.erl \
+    mochifmt_std.erl \
     mochihex.erl \
     mochijson.erl \
     mochijson2.erl \
@@ -39,6 +42,9 @@ mochiweb_file_collection = \
 mochiwebebin_static_file = mochiweb.app
 
 mochiwebebin_make_generated_file_list = \
+    mochifmt.beam \
+    mochifmt_records.beam \
+    mochifmt_std.beam \
     mochihex.beam \
     mochijson.beam \
     mochijson2.beam \

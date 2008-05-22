@@ -386,7 +386,7 @@ parse_post() ->
                              [];
                          Binary ->
                              case get_primary_header_value("content-type") of
-                                 "application/x-www-form-urlencoded" ->
+                                 "application/x-www-form-urlencoded" ++ _ ->
                                      mochiweb_util:parse_qs(Binary);
                                  _ ->
                                      []

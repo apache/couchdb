@@ -6,7 +6,7 @@
 -module(mochiweb_multipart).
 -author('bob@mochimedia.com').
 
--export([parse_form/2]).
+-export([parse_form/1, parse_form/2]).
 -export([parse_multipart_request/2]).
 -export([test/0]).
 
@@ -15,6 +15,9 @@
 -record(mp, {state, boundary, length, buffer, callback, req}).
 
 %% TODO: DOCUMENT THIS MODULE.
+
+parse_form(Req) ->
+    parse_form(Req, fun default_file_handler/2).
 
 parse_form(Req, FileHandler) ->
     Callback = fun (Next) -> parse_form_outer(Next, FileHandler, []) end,
@@ -55,6 +58,17 @@ parse_form_file(body_end, {Name, Handler}, FileHandler, State) ->
 parse_form_file({body, Data}, {Name, Handler}, FileHandler, State) ->
     H1 = Handler(Data),
     fun (Next) -> parse_form_file(Next, {Name, H1}, FileHandler, State) end.
+
+default_file_handler(Filename, ContentType) ->
+    default_file_handler_1(Filename, ContentType, []).
+
+default_file_handler_1(Filename, ContentType, Acc) ->
+    fun(eof) ->
+            Value = iolist_to_binary(lists:reverse(Acc)),
+            {Filename, ContentType, Value};
+       (Next) ->
+            default_file_handler_1(Filename, ContentType, [Next | Acc])
+    end.
 
 parse_multipart_request(Req, Callback) ->
     %% TODO: Support chunked?
@@ -295,19 +309,6 @@ test_parse2() ->
     ok = with_socket_server(ServerFun, ClientFun),
     ok.
 
-handler_test(Filename, ContentType) ->
-    fun (Next) ->
-            handler_test_read(Next, {Filename, ContentType}, [])
-    end.
-
-handler_test_read(eof, {Filename, ContentType}, Acc) ->
-    Value = iolist_to_binary(lists:reverse(Acc)),
-    {Filename, ContentType, Value};
-handler_test_read(Data, H, Acc) ->
-    Acc1 = [Data | Acc],
-    fun (Next) -> handler_test_read(Next, H, Acc1) end.
-
-
 test_parse_form() ->
     ContentType = "multipart/form-data; boundary=AaB03x",
     "AaB03x" = get_boundary(ContentType),
@@ -334,7 +335,7 @@ test_parse_form() ->
     ClientFun = fun (Socket) ->
                         Req = fake_request(Socket, ContentType,
                                            size(BinContent)),
-                        Res = parse_form(Req, fun handler_test/2),
+                        Res = parse_form(Req),
                         [{"submit-name", "Larry"},
                          {"files", {"file1.txt", {"text/plain",[]},
                                     <<"... contents of file1.txt ...">>}
