@@ -47,7 +47,7 @@ stop() ->
     mochiweb_http:stop(?MODULE).
 
 handle_request(Req, DocumentRoot) ->
-    
+
     % alias HEAD to GET as mochiweb takes care of stripping the body
     Method = case Req:get(method) of
         'HEAD' -> 'GET';
@@ -62,7 +62,7 @@ handle_request(Req, DocumentRoot) ->
     ?LOG_DEBUG("Method:      ~p", [Method]),
     ?LOG_DEBUG("Request URI: ~p", [Path]),
     ?LOG_DEBUG("Headers: ~p", [mochiweb_headers:to_list(Req:get(headers))]),
-    
+
     {ok, Resp} = case catch(handle_request(Req, DocumentRoot, Method, Path)) of
         {ok, Resp0} ->
             {ok, Resp0};
@@ -81,7 +81,7 @@ handle_request(Req, DocumentRoot, Method, Path) ->
     X = handle_request0(Req, DocumentRoot, Method, Path),
     % io:format("now_diff:~p~n", [timer:now_diff(erlang:now(), Start)]),
     X.
-    
+
 handle_request0(Req, DocumentRoot, Method, Path) ->
     case Path of
         "/" ->
@@ -131,25 +131,25 @@ handle_replicate_request(Req, 'POST') ->
 handle_replicate_request(_Req, _Method) ->
     throw({method_not_allowed, "POST"}).
 
-handle_unkown_private_uri_request(Req, _Method, UnknownPrivatePath) ->    
+handle_unkown_private_uri_request(Req, _Method, UnknownPrivatePath) ->
   KnownPrivatePaths = ["_utils"],
-  Msg = {obj, 
+  Msg = {obj,
     [
-      {error, "Sorry, we could not find the private path '_" ++ 
-        mochiweb_util:unquote(UnknownPrivatePath) ++ 
-        "' you are looking for. We only know about the following path(s): '" ++ 
+      {error, "Could not find the private path '_" ++
+        mochiweb_util:unquote(UnknownPrivatePath) ++
+        "'. Known private path(s): '" ++
         lists:flatten(KnownPrivatePaths) ++ "'"}
     ]
   },
   send_error(Req, 404, Msg).
-  
+
 % Database request handlers
 
 handle_db_request(Req, Method, {Path}) ->
     UriParts = string:tokens(Path, "/"),
     [DbName|Rest] = UriParts,
     handle_db_request(Req, Method, {mochiweb_util:unquote(DbName), Rest});
-    
+
 handle_db_request(Req, 'PUT', {DbName, []}) ->
     case couch_server:create(DbName, []) of
         {ok, _Db} ->
@@ -250,7 +250,7 @@ handle_db_request(_Req, _Method, {_DbName, _Db, ["_compact"]}) ->
     throw({method_not_allowed, "POST"});
 
 handle_db_request(Req, 'GET', {DbName, _Db, ["_search"]}) ->
-    case Req:parse_qs() of 
+    case Req:parse_qs() of
         [{"q", Query}] when (length(Query) > 0) ->
             {ok, Response} = couch_ft_query:execute(DbName, Query),
             send_json(Req, {obj, [{ok, true} | Response]});
@@ -647,7 +647,7 @@ parse_view_query(Req) ->
         {"descending", "false"} ->
           % The descending=false behaviour is the default behaviour, so we
           % simpply ignore it. This is only for convenience when playing with
-          % the HTTP API, so that a user doesn't get served an error when 
+          % the HTTP API, so that a user doesn't get served an error when
           % flipping true to false in the descending option.
           Args;
         {"skip", Value} ->
@@ -686,7 +686,7 @@ make_view_fold_fun(Req, QueryArgs, TotalViewCount, ReduceCountFun) ->
             couch_view:less_json({ViewKey, ViewId}, {EndKey, EndDocId})
         end
     end,
-    
+
     NegCountFun = fun({{Key, DocId}, Value}, OffsetReds,
                       {AccCount, AccSkip, Resp, AccRevRows}) ->
         Offset = ReduceCountFun(OffsetReds),
