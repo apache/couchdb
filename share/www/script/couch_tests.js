@@ -441,7 +441,9 @@ var tests = {
         no_docs: {map: "function(doc) {}"},
         single_doc: {map: "function(doc) { if (doc._id == \"1\") { emit(1, null) }}"},
         summate: {map:"function (doc) {emit(doc.integer, doc.integer)};",
-                        reduce:"function (keys, values) { return sum(values); };"}
+                  reduce:"function (keys, values) { return sum(values); };"},
+        summate2: {map:"function (doc) {emit(doc.integer, doc.integer)};",
+                  reduce:"function (keys, values) { return sum(values); };"}
       }
     }
     T(db.save(designDoc).ok);
@@ -464,15 +466,17 @@ var tests = {
     T(result == summate(numDocs));
 
     result = db.view("test/summate", {startkey:4,endkey:4}).result;
-
     T(result == 4);
 
     result = db.view("test/summate", {startkey:4,endkey:5}).result;
-
     T(result == 9);
 
-    result =db.view("test/summate", {startkey:4,endkey:6}).result;
+    result = db.view("test/summate", {startkey:4,endkey:6}).result;
+    T(result == 15);
 
+    // Verify that a shared index (view def is an exact copy of "summate")
+    // does not confuse the reduce stage
+    result = db.view("test/summate2", {startkey:4,endkey:6}).result;
     T(result == 15);
 
     for(var i=1; i<numDocs/2; i+=30) {
