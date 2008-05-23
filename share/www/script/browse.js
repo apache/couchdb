@@ -145,7 +145,8 @@ function CouchDatabasePage() {
           clearTimeout(dirtyTimeout);
           dirtyTimeout = setTimeout(function() {
             var buttons = $("#viewcode button.save, #viewcode button.revert");
-            page.isDirty = $("#viewcode textarea").val() != page.storedViewCode;
+            page.isDirty = ($("#viewcode_map").val() != page.storedViewCode.map)
+              || ($("#viewcode_reduce").val() != page.storedViewCode.reduce);
             if (page.isDirty) {
               buttons.removeAttr("disabled");
             } else {
@@ -153,7 +154,7 @@ function CouchDatabasePage() {
             }
           }, 100);
         }
-        $("#viewcode textarea").bind("input", updateDirtyState);
+        $("#viewcode_map").bind("input", updateDirtyState);
         if ($.browser.msie) { // sorry, browser detection
           $("#viewcode textarea").get(0).onpropertychange = updateDirtyState
         } else if ($.browser.safari) {
@@ -214,13 +215,15 @@ function CouchDatabasePage() {
         },
         success: function(resp) {
           page.storedViewCode = resp.views[localViewName];
-          $("#viewcode textarea").val(page.storedViewCode);
+          $("#viewcode_map").val(page.storedViewCode.map);
+          $("#viewcode_reduce").val(page.storedViewCode.reduce || "");
           $("#viewcode button.revert, #viewcode button.save").attr("disabled", "disabled");
           if (callback) callback();
         }
       });
     } else {
-      $("#viewcode textarea").val(page.storedViewCode);
+      $("#viewcode_map").val(page.storedViewCode.map);
+      $("#viewcode_reduce").val(page.storedViewCode.reduce || "");
       page.isDirty = false;
       $("#viewcode button.revert, #viewcode button.save").attr("disabled", "disabled");
       if (callback) callback();
@@ -274,7 +277,10 @@ function CouchDatabasePage() {
           if (!data.name) errors.name = "Please enter a view name";
           callback(errors);
         } else {
-          var viewCode = $("#viewcode textarea").val();
+          var viewCode = {
+            map: $("#viewcode_map").val(),
+            reduce: $("#viewcode_map").val() || undefined
+          };
           var docId = ["_design", data.docid].join("/");
           function save(doc) {
             if (!doc) doc = {_id: docId, language: "javascript"};
@@ -311,7 +317,9 @@ function CouchDatabasePage() {
     $(document.body).addClass("loading");
     db.openDoc(["_design", designDocId].join("/"), {
       success: function(doc) {
-        doc.views[localViewName] = $("#viewcode textarea").val();
+        var viewDef = doc.views[localViewName];
+        viewDef.map = $("#viewcode_map").val();
+        viewDef.reduce = $("#viewcode_reduce").val() || undefined;
         db.saveDoc(doc, {
           success: function(resp) {
             page.isDirty = false;
@@ -410,8 +418,9 @@ function CouchDatabasePage() {
       $(document.body).removeClass("loading");
     }
     options.success = handleResults;
-    options.error = function(error, reason) {
-      alert(reason);
+    options.error = function(status, error, reason) {
+      alert("Error: " + error + "\n\n" + reason);
+      $(document.body).removeClass("loading");
     }
 
     if (!viewName) {
@@ -420,16 +429,22 @@ function CouchDatabasePage() {
     } else {
       if (viewName == "_temp_view") {
         $("#viewcode").show().addClass("expanded");
-        var query = $("#viewcode textarea").val();
-        $.cookies.set(db.name + ".query", query);
-        db.query(query, options);
+        var mapFun = $("#viewcode_map").val();
+        $.cookies.set(db.name + ".map", mapFun);
+        var reduceFun = $("#viewcode_reduce").val() || null;
+        if (reduceFun != null) {
+          $.cookies.set(db.name + ".reduce", reduceFun);
+        } else {
+          $.cookies.remove(db.name + ".reduce");
+        }
+        db.query(mapFun, reduceFun, null, options);
       } else if (viewName == "_design_docs") {
         options.startkey = options.descending ? "_design/ZZZZ" : "_design/";
         options.endkey = options.descending ? "_design/" : "_design/ZZZZ";
         db.allDocs(options);
       } else {
         $("#viewcode").show();
-        var currentViewCode = $("#viewcode textarea").val();
+        var currentViewCode = $("#viewcode_map").val();
         if (page.isDirty) {
           db.query(currentViewCode, options);
         } else {

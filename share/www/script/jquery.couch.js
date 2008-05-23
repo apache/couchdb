@@ -15,6 +15,7 @@
   $.fn.extend($.couch, {
 
     allDbs: function(options) {
+      options = options || {};
       $.ajax({
         type: "GET", url: "/_all_dbs",
         complete: function(req) {
@@ -37,6 +38,7 @@
         uri: "/" + encodeURIComponent(name) + "/",
 
         compact: function(options) {
+          options = options || {};
           $.ajax({
             type: "POST", url: this.uri + "_compact", dataType: "json",
             complete: function(req) {
@@ -52,6 +54,7 @@
           });
         },
         create: function(options) {
+          options = options || {};
           $.ajax({
             type: "PUT", url: this.uri, dataType: "json",
             complete: function(req) {
@@ -67,6 +70,7 @@
           });
         },
         drop: function(options) {
+          options = options || {};
           $.ajax({
             type: "DELETE", url: this.uri, dataType: "json",
             complete: function(req) {
@@ -82,6 +86,7 @@
           });
         },
         info: function(options) {
+          options = options || {};
           $.ajax({
             type: "GET", url: this.uri, dataType: "json",
             complete: function(req) {
@@ -98,6 +103,7 @@
           });
         },
         allDocs: function(options) {
+          options = options || {};
           $.ajax({
             type: "GET", url: this.uri + "_all_docs" + encodeOptions(options),
             dataType: "json",
@@ -115,6 +121,7 @@
           });
         },
         openDoc: function(docId, options) {
+          options = options || {};
           $.ajax({
             type: "GET",
             url: this.uri + encodeURIComponent(docId) + encodeOptions(options),
@@ -132,6 +139,7 @@
           });
         },
         saveDoc: function(doc, options) {
+          options = options || {};
           if (doc._id === undefined) {
             var method = "POST";
             var uri = this.uri;
@@ -158,6 +166,7 @@
           });
         },
         removeDoc: function(doc, options) {
+          options = options || {};
           $.ajax({
             type: "DELETE",
             url: this.uri + encodeURIComponent(doc._id) + encodeOptions({rev: doc._rev}),
@@ -174,14 +183,22 @@
             }
           });
         },
-        query: function(fun, options) {
-          if (typeof(fun) != "string")
-            fun = fun.toSource ? fun.toSource() : "(" + fun.toString() + ")";
+        query: function(mapFun, reduceFun, language, options) {
+          options = options || {};
+          language = language || "javascript"
+          if (typeof(mapFun) != "string") {
+            mapFun = mapFun.toSource ? mapFun.toSource() : "(" + mapFun.toString() + ")";
+          }
+          var body = {language: language, map: mapFun};
+          if (reduceFun != null) {
+            if (typeof(reduceFun) != "string")
+              reduceFun = reduceFun.toSource ? reduceFun.toSource() : "(" + reduceFun.toString() + ")";
+            body.reduce = reduceFun;
+          }
           $.ajax({
             type: "POST", url: this.uri + "_temp_view" + encodeOptions(options),
             contentType: "application/json",
-            data: toJSON({language:"javascript", map:fun}),
-            dataType: "json",
+            data: toJSON(body), dataType: "json",
             complete: function(req) {
               var resp = $.httpData(req, "json");
               if (req.status == 200 && options.success) {
@@ -195,6 +212,7 @@
           });
         },
         view: function(name, options) {
+          options = options || {};
           $.ajax({
             type: "GET", url: this.uri + "_view/" + name + encodeOptions(options),
             dataType: "json",
@@ -214,6 +232,7 @@
     },
 
     info: function(options) {
+      options = options || {};
       $.ajax({
         type: "GET", url: "/", dataType: "json",
         complete: function(req) {
@@ -230,6 +249,7 @@
     },
 
     replicate: function(source, target, options) {
+      options = options || {};
       $.ajax({
         type: "POST", url: "/_replicate", dataType: "json",
         data: JSON.stringify({source: source, target: target}),

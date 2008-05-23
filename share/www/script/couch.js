@@ -113,7 +113,7 @@ function CouchDB(name) {
       throw result;
     return result;
   }
-  
+
   this.view = function(viewname, options) {
     var req = request("GET", this.uri + "_view/" + viewname + encodeOptions(options));
     if (req.status == 404)
@@ -140,7 +140,7 @@ function CouchDB(name) {
       throw result;
     return result;
   }
-  
+
   this.compact = function() {
     var req = request("POST", this.uri + "_compact");
     var result = JSON.parse(req.responseText);

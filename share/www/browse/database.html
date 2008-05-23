@@ -36,7 +36,7 @@ specific language governing permissions and limitations under the License.
 
       $(document).ready(function() {
         $("h1 strong").text(page.db.name);
-        $("#viewcode label").click(function() {
+        $("#viewcode span").click(function() {
           $("#viewcode").toggleClass("expanded");
         });
         $("#viewcode button.run").click(function() {
@@ -51,11 +51,14 @@ specific language governing permissions and limitations under the License.
         $("#viewcode button.saveas").click(function() {
           page.saveViewAs();
         });
-        $("#viewcode textarea").resizable({grippie: $("#viewcode .bottom")});
+        $("#viewcode textarea").resizable({
+          always: true,
+          grippie: $("#viewcode .bottom")
+        });
 
         // Restore preferences/state from cookies
         var query = $.cookies.get(page.db.name + ".query");
-        if (query) $("#viewcode textarea").val(query);
+        if (query) $("#viewcode_map").val(query);
         var desc = $.cookies.get(page.db.name + ".desc");
         if (desc) $("#documents thead th.key").addClass("desc");
         var rowsPerPage = $.cookies.get(page.db.name + ".perpage");
@@ -108,11 +111,18 @@ specific language governing permissions and limitations under the License.
       <div id="viewcode" style="display: none">
         <div class="top">
           <a id="designdoc-link"></a>
-          <label for="viewcode_textarea">View Function</label>
+          <span id="view-toggle">View Function</span>
         </div>
-        <textarea id="viewcode_textarea" rows="5" cols="79" spellcheck="false" wrap="off">function(doc) {
+        <div class="code map">
+          <label>Map Function:</label>
+          <textarea id="viewcode_map" class="map" rows="5" cols="79" spellcheck="false" wrap="off">function(doc) {
   emit(null, doc);
 }</textarea>
+        </div>
+        <div class="code reduce">
+          <label>Reduce Function (optional):</label>
+          <textarea id="viewcode_reduce" class="reduce" rows="5" cols="79" spellcheck="false" wrap="off"></textarea>
+        </div>
         <div class="bottom">
           <button class="save" type="button" disabled>Save</button>
           <button class="saveas" type="button">Save As…</button>

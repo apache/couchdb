@@ -13,12 +13,14 @@
 (function($) {
 
   $.fn.resizable = function(options) {
-    if ($.browser.safari && parseInt($.browser.version) >= 522)
-      return this; // safari3 and later provides textarea resizing natively
     options = options || {};
+    options.always = options.always || false;
     options.grippie = options.grippie || null;
     options.minHeight = options.minHeight || 32;
     options.maxHeight = options.maxHeight || null;
+
+    if (!options.always && $.browser.safari && parseInt($.browser.version) >= 522)
+      return this; // safari3 and later provides textarea resizing natively
 
     return this.each(function() {
       var grippie = options.grippie;
