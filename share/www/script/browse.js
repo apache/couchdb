@@ -363,7 +363,7 @@ function CouchDatabasePage() {
       if (resp.offset === undefined) {
         resp.offset = 0;
       }
-      if (resp.offset > 0) {
+      if (resp.total_rows !== null && resp.offset > 0) {
         $("#paging a.prev").attr("href", "#" + (resp.offset - options.count)).click(function() {
           var firstDoc = resp.rows[0];
           page.updateDocumentListing({
@@ -377,7 +377,7 @@ function CouchDatabasePage() {
       } else {
         $("#paging a.prev").removeAttr("href");
       }
-      if (resp.total_rows - resp.offset > options.count) {
+      if (resp.total_rows !== null && resp.total_rows - resp.offset > options.count) {
         $("#paging a.next").attr("href", "#" + (resp.offset + options.count)).click(function() {
           var lastDoc = resp.rows[resp.rows.length - 1];
           page.updateDocumentListing({
@@ -392,29 +392,41 @@ function CouchDatabasePage() {
         $("#paging a.next").removeAttr("href");
       }
 
-      for (var i = 0; i < resp.rows.length; i++) {
-        var row = resp.rows[i];
+      if (resp.total_rows != null) {
+        for (var i = 0; i < resp.rows.length; i++) {
+          var row = resp.rows[i];
+          var tr = $("<tr></tr>");
+          var key = row.key;
+          $("<td class='key'><a href='document.html?" + encodeURIComponent(db.name) +
+            "/" + encodeURIComponent(row.id) + "'><em></em><br>" +
+            "<span class='docid'>ID:&nbsp;" + row.id + "</span></a></td>")
+            .find("em").text(key !== null ? prettyPrintJSON(key, 0, "") : "null").end()
+            .appendTo(tr);
+          var value = row.value;
+          $("<td class='value'></td>").text(
+            value !== null ? prettyPrintJSON(value, 0, "") : "null"
+          ).appendTo(tr).dblclick(function() {
+            location.href = this.previousSibling.firstChild.href;
+          });
+          tr.appendTo("#documents tbody.content");
+        }
+        $("#documents tbody.footer td span").text(
+          "Showing " + Math.min(resp.total_rows, resp.offset + 1) + "-" +
+          (resp.offset + resp.rows.length) + " of " + resp.total_rows +
+          " document" + (resp.total_rows != 1 ? "s" : ""));
+        $("#documents").removeClass("reduced");
+      } else {
         var tr = $("<tr></tr>");
-        var key = row.key;
-        $("<td class='key'><a href='document.html?" + encodeURIComponent(db.name) +
-          "/" + encodeURIComponent(row.id) + "'><em></em><br>" +
-          "<span class='docid'>ID:&nbsp;" + row.id + "</span></a></td>")
-          .find("em").text(key !== null ? prettyPrintJSON(key, 0, "") : "null").end()
-          .appendTo(tr);
-        var value = row.value;
+        $("<td class='key'></td>").appendTo(tr);
         $("<td class='value'></td>").text(
-          value !== null ? prettyPrintJSON(value, 0, "") : "null"
-        ).appendTo(tr).dblclick(function() {
-          location.href = this.previousSibling.firstChild.href;
-        });
+          resp.result !== null ? prettyPrintJSON(resp.result) : "null"
+        ).appendTo(tr);
         tr.appendTo("#documents tbody.content");
+        $("#documents tbody.footer td span").text("Showing reduce result");
+        $("#documents").addClass("reduced");
       }
-
       $("#documents tbody tr:odd").addClass("odd");
-      $("#documents tbody.footer td span").text(
-        "Showing " + Math.min(resp.total_rows, resp.offset + 1) + "-" +
-        (resp.offset + resp.rows.length) + " of " + resp.total_rows +
-        " document" + (resp.total_rows != 1 ? "s" : ""));
+
       $(document.body).removeClass("loading");
     }
     options.success = handleResults;

@@ -308,6 +308,12 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
 }
 #documents tbody.content td.value { font-size: 10px; }
 
+#documents.reduced th.key, #documents.reduced td.key,
+#documents.reduced #paging {
+  display: none;
+}
+#documents.reduced td.value { white-space: pre; }
+
 /* Document fields table */
 
 #fields { table-layout: fixed; }
