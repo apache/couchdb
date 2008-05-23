@@ -104,8 +104,8 @@ if test x${ERL} = x; then
     AC_MSG_ERROR([Could not find the `erl' executable. Is Erlang installed?])
 fi
 
-if test $(${ERL} -version 2>&1 | sed "s/[[^0-9]]//g") -le 560; then
-    AC_MSG_ERROR([The installed Erlang version is less than 5.6.0 (R12B).])
+if test $(${ERL} -version 2>&1 | sed "s/[[^0-9]]//g") -le 550; then
+    AC_MSG_ERROR([The installed Erlang version is less than 5.5.0 (R11B).])
 fi
 
 AC_PATH_PROG([ERLC], [erlc])
