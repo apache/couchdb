@@ -154,7 +154,7 @@ function CouchDatabasePage() {
             }
           }, 100);
         }
-        $("#viewcode_map").bind("input", updateDirtyState);
+        $("#viewcode textarea").bind("input", updateDirtyState);
         if ($.browser.msie) { // sorry, browser detection
           $("#viewcode textarea").get(0).onpropertychange = updateDirtyState
         } else if ($.browser.safari) {
@@ -279,7 +279,7 @@ function CouchDatabasePage() {
         } else {
           var viewCode = {
             map: $("#viewcode_map").val(),
-            reduce: $("#viewcode_map").val() || undefined
+            reduce: $("#viewcode_reduce").val() || undefined
           };
           var docId = ["_design", data.docid].join("/");
           function save(doc) {
