@@ -359,7 +359,7 @@ function CouchDatabasePage() {
     $("#documents tbody.content").empty();
     this.updateDesignDocLink();
 
-    function handleResults(resp) {
+    options.success = function(resp) {
       if (resp.offset === undefined) {
         resp.offset = 0;
       }
@@ -426,10 +426,8 @@ function CouchDatabasePage() {
         $("#documents").addClass("reduced");
       }
       $("#documents tbody tr:odd").addClass("odd");
-
       $(document.body).removeClass("loading");
     }
-    options.success = handleResults;
     options.error = function(status, error, reason) {
       alert("Error: " + error + "\n\n" + reason);
       $(document.body).removeClass("loading");
@@ -444,6 +442,7 @@ function CouchDatabasePage() {
         var mapFun = $("#viewcode_map").val();
         $.cookies.set(db.name + ".map", mapFun);
         var reduceFun = $("#viewcode_reduce").val() || null;
+        window.console.log(reduceFun);
         if (reduceFun != null) {
           $.cookies.set(db.name + ".reduce", reduceFun);
         } else {
@@ -456,9 +455,10 @@ function CouchDatabasePage() {
         db.allDocs(options);
       } else {
         $("#viewcode").show();
-        var currentViewCode = $("#viewcode_map").val();
+        var currentMapCode = $("#viewcode_map").val();
+        var currentReduceCode = $("#viewcode_reduce").val() || null;
         if (page.isDirty) {
-          db.query(currentViewCode, options);
+          db.query(currentMapCode, currentReduceCode, null, options);
         } else {
           db.view(viewName.substr(8), options);
         }
