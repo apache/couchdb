@@ -104,11 +104,12 @@ while (cmd = eval(readline())) {
         var values = null;
         var reduceFuns = cmd[1];
         var is_combine = false;
+        
         if (cmd[0] == "reduce") {
           var kvs = cmd[2];
           keys = new Array(kvs.length);
           values = new Array(kvs.length);
-          for (var i = 0; i < kvs.length; i++) {
+          for(var i = 0; i < kvs.length; i++) {
               keys[i] = kvs[i][0];
               values[i] = kvs[i][1];
           }
@@ -122,7 +123,7 @@ while (cmd = eval(readline())) {
         }
 
         var reductions = new Array(funs.length);
-        for (var i = 0; i < reduceFuns.length; i++) {
+        for(var i = 0; i < reduceFuns.length; i++) {
           try {
             reductions[i] = reduceFuns[i](keys, values, is_combine);
           } catch (err) {
