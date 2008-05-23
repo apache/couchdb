@@ -216,7 +216,7 @@ start_couchdb () {
         interactive_option="+Bd -noinput"
     fi
     command="`%ICU_CONFIG% --invoke` \
-        %ERL% $interactive_option -sasl errlog_type error \
+        %ERL% $interactive_option -smp auto -sasl errlog_type error \
         -pa %erlanglibdir%/couch-%version%/ebin \
             %erlanglibdir%/mochiweb-r73/ebin \
         -eval \"application:load(inets)\" \
