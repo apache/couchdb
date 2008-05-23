@@ -297,7 +297,7 @@ convert2(Arg, #conversion{ctype=oct}) ->
 convert2(Arg, #conversion{ctype=upper_hex}) ->
     erlang:integer_to_list(Arg, 16);
 convert2(Arg, #conversion{ctype=hex}) ->
-    string:to_lower(erlang:integer_to_list(Arg, 16));
+    mochiweb_util:to_lower(erlang:integer_to_list(Arg, 16));
 convert2(Arg, #conversion{ctype=char}) when Arg < 16#80 ->
     [Arg];
 convert2(Arg, #conversion{ctype=char}) ->

@@ -11,6 +11,7 @@
 -export([guess_mime/1, parse_header/1]).
 -export([shell_quote/1, cmd/1, cmd_string/1, cmd_port/2]).
 -export([record_to_proplist/2, record_to_proplist/3]).
+-export([to_lower/1]).
 -export([test/0]).
 
 -define(PERCENT, 37).  % $\%
@@ -170,7 +171,7 @@ urlsplit_scheme(Url) ->
 urlsplit_scheme([], Acc) ->
     {"", lists:reverse(Acc)};
 urlsplit_scheme(":" ++ Rest, Acc) ->
-    {string:to_lower(lists:reverse(Acc)), Rest};
+    {to_lower(lists:reverse(Acc)), Rest};
 urlsplit_scheme([C | Rest], Acc) ->
     urlsplit_scheme(Rest, [C | Acc]).
 
@@ -322,11 +323,11 @@ parse_header(String) ->
                         %% Skip anything with no value
                         Acc;
                     {Name, [$\= | Value]} ->
-                        [{string:to_lower(string:strip(Name)),
+                        [{to_lower(string:strip(Name)),
                           unquote_header(string:strip(Value))} | Acc]
                 end
         end,
-    {string:to_lower(Type),
+    {to_lower(Type),
      lists:foldr(F, [], Parts)}.
 
 unquote_header("\"" ++ Rest) ->
@@ -368,6 +369,20 @@ shell_quote([C | Rest], Acc) when C =:= $\" orelse C =:= $\` orelse
     shell_quote(Rest, [C, $\\ | Acc]);
 shell_quote([C | Rest], Acc) ->
     shell_quote(Rest, [C | Acc]).
+
+to_lower_char(C) when is_integer(C),  C >= $A, C =< $Z ->
+    C + 32;
+to_lower_char(C) when is_integer(C),  C >= 16#C1, C =< 16#D6 ->
+    C + 32;
+to_lower_char(C) when is_integer(C),  C >= 16#D8, C =< 16#DE ->
+    C + 32;
+to_lower_char(C) ->
+    C.
+
+to_lower(S) when is_list(S) ->
+    [to_lower_char(C) || C <- S];
+to_lower(C) when is_integer(C) ->
+    to_lower_char(C).
 
 test() ->
     test_join(),

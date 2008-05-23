@@ -103,7 +103,7 @@ parse_headers(Binary, Acc) ->
 split_header(Line) ->
     {Name, [$: | Value]} = lists:splitwith(fun (C) -> C =/= $: end,
                                            binary_to_list(Line)),
-    {string:to_lower(string:strip(Name)),
+    {mochiweb_util:to_lower(string:strip(Name)),
      mochiweb_util:parse_header(Value)}.
 
 read_chunk(Req, Length) when Length > 0 ->

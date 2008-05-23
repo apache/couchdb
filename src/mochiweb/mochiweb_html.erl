@@ -328,7 +328,7 @@ tokens(B, S=#decoder{offset=O}, Acc) ->
     end.
 
 parse_flag({start_tag, B, _, false}) ->
-    case string:to_lower(binary_to_list(B)) of
+    case mochiweb_util:to_lower(binary_to_list(B)) of
         "script" ->
             script;
         "textarea" ->
@@ -521,7 +521,7 @@ norm({Tag, Attrs}) ->
 norm(Tag) when is_binary(Tag) ->
     Tag;
 norm(Tag) ->
-    list_to_binary(string:to_lower(Tag)).
+    list_to_binary(mochiweb_util:to_lower(Tag)).
 
 test_destack() ->
     {<<"a">>, [], []} =
