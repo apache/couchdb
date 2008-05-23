@@ -121,7 +121,7 @@ start_compact(MainPid) ->
 
 delete_doc(MainPid, Id, Revisions) ->
     DeletedDocs = [#doc{id=Id, revs=[Rev], deleted=true} || Rev <- Revisions],
-    {ok, [Result]} = update_docs(MainPid, DeletedDocs, [new_edits]),
+    {ok, [Result]} = update_docs(MainPid, DeletedDocs, []),
     {ok, Result}.
 
 open_doc(MainPid, IdOrDocInfo) ->
@@ -291,13 +291,13 @@ update_docs(MainPid, Docs, Options) ->
     % flush unwritten binaries to disk.
     DocBuckets3 = [[doc_flush_binaries(Doc, Db#db.fd) || Doc <- Bucket] || Bucket <- DocBuckets2],
 
-    case gen_server:call(MainPid, {update_docs, DocBuckets3, Options}) of
+    case gen_server:call(MainPid, {update_docs, DocBuckets3, [new_edits | Options]}) of
     ok -> {ok, NewRevs};
     retry ->
         Db2 = get_db(MainPid),
         DocBuckets4 = [[doc_flush_binaries(Doc, Db2#db.fd) || Doc <- Bucket] || Bucket <- DocBuckets3],
         % We only retry once
-        case gen_server:call(MainPid, {update_docs, DocBuckets4, Options}) of
+        case gen_server:call(MainPid, {update_docs, DocBuckets4, [new_edits | Options]}) of
         ok -> {ok, NewRevs};
         Else -> throw(Else)
         end;
@@ -838,7 +838,7 @@ update_docs_int(Db, DocsList, Options) ->
         end, {0, 0}, OldDocLookups),
     
     % Merge the new docs into the revision trees.
-    NoConflicts = lists:member(no_conflicts, Options),
+    NoConflicts = lists:member(new_edits, Options),
     {ok, NewDocInfos, NewSeq} = merge_rev_trees(NoConflicts, DocsList2, OldDocInfos, [], LastSeq),
     
     RemoveSeqs =
