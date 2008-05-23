@@ -442,7 +442,6 @@ function CouchDatabasePage() {
         var mapFun = $("#viewcode_map").val();
         $.cookies.set(db.name + ".map", mapFun);
         var reduceFun = $("#viewcode_reduce").val() || null;
-        window.console.log(reduceFun);
         if (reduceFun != null) {
           $.cookies.set(db.name + ".reduce", reduceFun);
         } else {
