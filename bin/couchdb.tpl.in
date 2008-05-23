@@ -117,11 +117,6 @@ _get_pid () {
     if test -f $PID_FILE; then
         PID=$(cat $PID_FILE)
     fi
-    if test -z "$PID"; then
-        # Resort to searching for the running process manually.
-        PID=$(ps auxww | grep erlang | grep -- "couch_server:start()" | \
-            grep -v grep | awk "{print \$2}")
-    fi
     echo $PID
 }
 
