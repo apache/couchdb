@@ -770,15 +770,16 @@ var tests = {
 
   replication: function(debug) {
     if (debug) debugger;
+    var host = window.location.host;
     var dbPairs = [
       {source:"test_suite_db_a",
         target:"test_suite_db_b"},
       {source:"test_suite_db_a",
-        target:"http://localhost:5984/test_suite_db_b"},
-      {source:"http://localhost:5984/test_suite_db_a",
+        target:"http://" + host + "/test_suite_db_b"},
+      {source:"http://" + host + "/test_suite_db_a",
         target:"test_suite_db_b"},
-      {source:"http://localhost:5984/test_suite_db_a",
-        target:"http://localhost:5984/test_suite_db_b"}
+      {source:"http://" + host + "/test_suite_db_a",
+        target:"http://" + host + "/test_suite_db_b"}
     ]
     var dbA = new CouchDB("test_suite_db_a");
     var dbB = new CouchDB("test_suite_db_b");
