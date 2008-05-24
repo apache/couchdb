@@ -66,6 +66,8 @@ Usage: $basename [OPTION]
 
 The $basename command runs the %package_name% server.
 
+Erlang inherits the environment of this command.
+
 The exit status is 0 for success or 1 for failure.
 
 The \`-s' option will exit 0 for running and 1 for not running.
