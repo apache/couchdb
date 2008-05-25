@@ -20,8 +20,8 @@
         type: "GET", url: "/_all_dbs",
         complete: function(req) {
           var resp = $.httpData(req, "json");
-          if (req.status == 200 && options.success) {
-            options.success(resp);
+          if (req.status == 200) {
+            if (options.success) options.success(resp);
           } else if (options.error) {
             options.error(req.status, resp.error, resp.reason);
           } else {
@@ -43,8 +43,8 @@
             type: "POST", url: this.uri + "_compact", dataType: "json",
             complete: function(req) {
               var resp = $.httpData(req, "json");
-              if (req.status == 202 && options.success) {
-                options.success(resp);
+              if (req.status == 202) {
+                if (options.success) options.success(resp);
               } else if (options.error) {
                 options.error(req.status, resp.error, resp.reason);
               } else {
@@ -59,8 +59,8 @@
             type: "PUT", url: this.uri, dataType: "json",
             complete: function(req) {
               var resp = $.httpData(req, "json");
-              if (req.status == 201 && options.success) {
-                options.success(resp);
+              if (req.status == 201) {
+                if (options.success) options.success(resp);
               } else if (options.error) {
                 options.error(req.status, resp.error, resp.reason);
               } else {
@@ -75,8 +75,8 @@
             type: "DELETE", url: this.uri, dataType: "json",
             complete: function(req) {
               var resp = $.httpData(req, "json");
-              if (req.status == 202 && options.success) {
-                options.success(resp);
+              if (req.status == 202) {
+                if (options.success) options.success(resp);
               } else if (options.error) {
                 options.error(req.status, resp.error, resp.reason);
               } else {
@@ -91,8 +91,8 @@
             type: "GET", url: this.uri, dataType: "json",
             complete: function(req) {
               var resp = $.httpData(req, "json");
-              if (req.status == 200 && options.success) {
-                options.success(resp);
+              if (req.status == 200) {
+                if (options.success) options.success(resp);
               } else  if (options.error) {
                 options.error(req.status, resp.error, resp.reason);
               } else {
@@ -109,8 +109,8 @@
             dataType: "json",
             complete: function(req) {
               var resp = $.httpData(req, "json");
-              if (req.status == 200 && options.success) {
-                options.success(resp);
+              if (req.status == 200) {
+                if (options.success) options.success(resp);
               } else if (options.error) {
                 options.error(req.status, resp.error, resp.reason);
               } else {
@@ -128,8 +128,8 @@
             dataType: "json",
             complete: function(req) {
               var resp = $.httpData(req, "json");
-              if (req.status == 200 && options.success) {
-                options.success(resp);
+              if (req.status == 200) {
+                if (options.success) options.success(resp);
               } else if (options.error) {
                 options.error(req.status, resp.error, resp.reason);
               } else {
@@ -155,8 +155,8 @@
               var resp = $.httpData(req, "json")
               doc._id = resp.id;
               doc._rev = resp.rev;
-              if (req.status == 201 && options.success) {
-                options.success(resp);
+              if (req.status == 201) {
+                if (options.success) options.success(resp);
               } else if (options.error) {
                 options.error(req.status, resp.error, resp.reason);
               } else {
@@ -173,8 +173,8 @@
             dataType: "json",
             complete: function(req) {
               var resp = $.httpData(req, "json");
-              if (req.status == 202 && options.success) {
-                options.success(resp);
+              if (req.status == 202) {
+                if (options.success) options.success(resp);
               } else if (options.error) {
                 options.error(req.status, resp.error, resp.reason);
               } else {
@@ -201,8 +201,8 @@
             data: toJSON(body), dataType: "json",
             complete: function(req) {
               var resp = $.httpData(req, "json");
-              if (req.status == 200 && options.success) {
-                options.success(resp);
+              if (req.status == 200) {
+                if (options.success) options.success(resp);
               } else if (options.error) {
                 options.error(req.status, resp.error, resp.reason);
               } else {
@@ -218,8 +218,8 @@
             dataType: "json",
             complete: function(req) {
               var resp = $.httpData(req, "json");
-              if (req.status == 200 && options.success) {
-                options.success(resp);
+              if (req.status == 200) {
+                if (options.success) options.success(resp);
               } else if (options.error) {
                 options.error(req.status, resp.error, resp.reason);
               } else {
@@ -237,8 +237,8 @@
         type: "GET", url: "/", dataType: "json",
         complete: function(req) {
           var resp = $.httpData(req, "json");
-          if (req.status == 200 && options.success) {
-            options.success(resp);
+          if (req.status == 200) {
+            if (options.success) options.success(resp);
           } else if (options.error) {
             options.error(req.status, resp.error, resp.reason);
           } else {
@@ -256,8 +256,8 @@
         contentType: "application/json",
         complete: function(req) {
           var resp = $.httpData(req, "json");
-          if (req.status == 200 && options.success) {
-            options.success(resp);
+          if (req.status == 200) {
+            if (options.success) options.success(resp);
           } else if (options.error) {
             options.error(req.status, resp.error, resp.reason);
           } else {
