@@ -474,31 +474,30 @@ handle_doc_request(Req, 'GET', _DbName, Db, DocId) ->
     case Revs of
     [] ->
         case Rev of
-        "" ->
-            % open most recent rev
+        "" -> % open most recent rev
             case couch_db:open_doc(Db, DocId, Options) of
-            {ok, #doc{revs=[DocRev|_]}=Doc} ->
-                Etag = none_match(Req, DocRev),
-                JsonDoc = couch_doc:to_json_obj(Doc, Options),
-                AdditionalHeaders =
-                    case Doc#doc.meta of
-                    [] -> [{"Etag", Etag}]; % output etag when we have no meta
-                    _ -> []
-                    end,
-                send_json(Req, 200, AdditionalHeaders, JsonDoc);
-            Error ->
-                throw(Error)
+                {ok, #doc{revs=[DocRev|_]}=Doc} ->
+                    true;
+                Error ->
+                    Doc = DocRev = undefined,
+                    throw(Error)
             end;
-        _ ->
-            % open a specific rev (deletions come back as stubs)
+        _ -> % open a specific rev (deletions come back as stubs)
             case couch_db:open_doc_revs(Db, DocId, [Rev], Options) of
-            {ok, [{ok, Doc}]} ->
-                send_json(Req, 200, [],
-                          couch_doc:to_json_obj(Doc, Options));
-            {ok, [Else]} ->
-                throw(Else)
+                {ok, [{ok, Doc}]} ->
+                    DocRev = Rev;
+                {ok, [Else]} ->
+                    Doc = DocRev = undefined,
+                    throw(Else)
             end
-        end;
+        end,
+        Etag = none_match(Req, DocRev),
+        AdditionalHeaders = case Doc#doc.meta of
+            [] -> [{"Etag", Etag}]; % output etag when we have no meta
+            _ -> []
+        end,
+        JsonDoc = couch_doc:to_json_obj(Doc, Options),
+        send_json(Req, 200, AdditionalHeaders, JsonDoc);
     _ ->
         {ok, Results} = couch_db:open_doc_revs(Db, DocId, Revs, Options),
         Resp = start_json_response(Req, 200),
