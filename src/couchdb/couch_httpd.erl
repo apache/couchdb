@@ -15,6 +15,9 @@
 
 -export([start_link/3, stop/0, handle_request/2]).
 
+% Maximum size of document PUT request body (4GB)
+-define(MAX_DOC_SIZE, (4*1024*1024*1024)).
+
 -record(doc_query_args, {
     options = [],
     rev = "",
@@ -354,7 +357,7 @@ handle_db_request(Req, 'GET', {DbName, _Db, ["_view", DocId, ViewName]}) ->
         direction = Dir,
         start_docid = StartDocId,
         end_docid = EndDocId
-        } = QueryArgs = parse_view_query(Req),
+    } = QueryArgs = parse_view_query(Req),
     case couch_view:get_map_view({DbName, "_design/" ++ DocId, ViewName}) of
     {ok, View} ->
         {ok, RowCount} = couch_view:get_row_count(View),
@@ -524,7 +527,7 @@ handle_doc_request(Req, 'GET', _DbName, Db, DocId) ->
     end;
 
 handle_doc_request(Req, 'PUT', _DbName, Db, DocId) ->
-    Json = {obj, DocProps} = cjson:decode(Req:recv_body()),
+    Json = {obj, DocProps} = cjson:decode(Req:recv_body(?MAX_DOC_SIZE)),
     DocRev = proplists:get_value("_rev", DocProps),
     Etag = case Req:get_header_value("If-Match") of
         undefined ->
