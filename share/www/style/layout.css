@@ -380,6 +380,28 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
 }
 #fields tbody.content div.error { color: #d33; }
 
+#fields tbody.content td ul.attachments { list-style: none; margin: 0;
+  padding: 0;
+}
+#fields tbody.content td ul.attachments li {
+  margin-bottom: .3em; min-height: 20px; padding-left: 20px;
+}
+#fields tbody.content td ul.attachments tt { font-size: 95%; }
+#fields tbody.content td ul.attachments li span.info { color: #666;
+  display: block; font-size: 95%;
+}
+#fields tbody.content td ul.attachments li button {
+  background: transparent no-repeat; border: none; cursor: pointer;
+  float: left; margin: 0 2px 0 -20px; padding: 0; width: 15px; height: 15px;
+  vertical-align: middle;
+}
+#fields tbody.content td ul.attachments li button:hover {
+  background-position: -15px 0;
+}
+#fields tbody.content td ul.attachments li button.delete {
+  background-image: url(../image/delete-mini.gif);
+}
+
 /* Test suite */
 
 #tests { table-layout: fixed; }

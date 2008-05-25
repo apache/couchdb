@@ -40,10 +40,10 @@ function CouchIndexPage() {
     $(document.body).addClass("loading");
     $.couch.allDbs({
       success: function(dbs) {
-        if(dbs.length == 0) {
+        if (dbs.length == 0) {
           $(document.body).removeClass("loading");
         }
-        
+
         $.each(dbs, function(idx, dbName) {
           $("#databases tbody.content").append("<tr>" + 
             "<th><a href='database.html?" + encodeURIComponent(dbName) + "'>" +
@@ -505,6 +505,19 @@ function CouchDocumentPage() {
     _editKey(page.doc, row.find("th"), fieldName);
   }
 
+  var _sortFields = function(a, b) {
+    var a0 = a.charAt(0), b0 = b.charAt(0);
+    if (a0 == "_" && b0 != "_") {
+      return -1;
+    } else if (a0 != "_" && b0 == "_") {
+      return 1;
+    } else if (a == "_attachments" || b == "_attachments") {
+      return a0 == "_attachments" ? 1 : -1;
+    } else {
+      return a < b ? -1 : a != b ? 1 : 0;
+    }
+  }
+
   this.updateFieldListing = function() {
     $(document.body).addClass("loading");
     $("#fields tbody.content").empty();
@@ -517,16 +530,7 @@ function CouchDocumentPage() {
         propNames.push(prop);
       }
       // Order properties alphabetically, but put internal fields first
-      propNames.sort(function(a, b) {
-        var a0 = a.charAt(0), b0 = b.charAt(0);
-        if (a0 == "_" && b0 != "_") {
-          return -1;
-        } else if (a0 != "_" && b0 == "_") {
-          return 1;
-        } else {
-          return a < b ? -1 : a != b ? 1 : 0;
-        }
-      });
+      propNames.sort(_sortFields);
       for (var pi = 0; pi < propNames.length; pi++) {
         _addRowForField(doc, propNames[pi]);
       }
@@ -609,20 +613,27 @@ function CouchDocumentPage() {
   }
 
   function _addRowForField(doc, fieldName) {
-    var value = _renderValue(doc[fieldName]);
-    var row = $("<tr><th></th><td></td></tr>")
-      .find("th").append($("<b></b>").text(fieldName)).dblclick(function() {
-        _editKey(doc, this, $(this).text());
-      }).end()
-      .find("td").append(value).dblclick(function() {
-        _editValue(doc, this, $(this).prev("th").text());
-      }).end()
-      .appendTo("#fields tbody.content");
-    if (fieldName != "_id" && fieldName != "_rev") {
-      row.find("th, td").attr("title", "Double click to edit");
-      _initKey(doc, row, fieldName);
-      _initValue(value);
+    var row = $("<tr><th></th><td></td></tr>").find("th").append($("<b></b>").text(fieldName)).end();
+    if (fieldName == "_attachments") {
+      row
+        .find("td").append(_renderAttachmentList(doc[fieldName]));
+    } else {
+      var value = _renderValue(doc[fieldName]);
+      row
+        .find("th b").dblclick(function() {
+          _editKey(doc, this, $(this).text());
+        }).end()
+        .find("td").append(value).dblclick(function() {
+          _editValue(doc, this, $(this).prev("th").text());
+        }).end()
+        
+      if (fieldName != "_id" && fieldName != "_rev") {
+        row.find("th, td").attr("title", "Double click to edit");
+        _initKey(doc, row, fieldName);
+        _initValue(value);
+      }
     }
+    row.appendTo("#fields tbody.content");
     $("#fields tbody tr").removeClass("odd").filter(":odd").addClass("odd");
     return row;
   }
@@ -764,6 +775,33 @@ function CouchDocumentPage() {
         value !== null ? JSON.stringify(value) : "null"
       );
     }
+  }
+
+  function _renderAttachmentList(attachments) {
+    var ul = $("<ul></ul>").addClass("attachments");
+    $.each(attachments, function(idx, attachment) {
+      _renderAttachmentItem(idx, attachment).appendTo(ul);
+    });
+    return ul;
+  }
+
+  function _renderAttachmentItem(name, attachment) {
+    var li = $("<li></li>");
+    $("<a href='' title='Download file' target='_top'></a>").text(name)
+      .attr("href", db.uri + encodeURIComponent(docId) + "/" + encodeURIComponent(name))
+      .wrapInner("<tt></tt>").appendTo(li);
+    $("<span>()</span>").text("" + prettyPrintSize(attachment.length) + 
+      ", " + attachment["content-type"]).addClass("info").appendTo(li);
+    _initAttachmentItem(name, attachment, li);
+    return li;
+  }
+
+  function _initAttachmentItem(name, attachment, li) {
+    $("<button type='button' class='delete' title='Delete attachment'></button>").click(function() {
+      delete page.doc._attachments[name];
+      li.remove();
+      page.isDirty = true;
+    }).prependTo($("a", li));
   }
 
 }
