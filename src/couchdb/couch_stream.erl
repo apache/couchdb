@@ -80,6 +80,7 @@ read(Fd, Sp, Num) ->
 
 copy_to_new_stream(Src, Sp, Len, DestFd) ->
     {ok, Dest} = open(DestFd),
+    ok = set_min_buffer(Dest, 0),
     {ok, NewSp} = copy(Src, Sp, Len, Dest),
     close(Dest),
     {ok, NewSp}.
