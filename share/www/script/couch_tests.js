@@ -491,7 +491,6 @@ var tests = {
     restartServer();
     T(db.open(designDoc._id) == null);
     T(db.view("test/no_docs") == null);
-
   },
 
   view_collation: function(debug) {
