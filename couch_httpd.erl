@@ -92,16 +92,18 @@ handle_request0(Req, DocumentRoot, Method, Path) ->
             handle_welcome_request(Req, Method);
         "/_all_dbs" ->
             handle_all_dbs_request(Req, Method);
-        "/favicon.ico" ->
-            {ok, Req:serve_file("favicon.ico", DocumentRoot)};
         "/_replicate" ->
             handle_replicate_request(Req, Method);
+        "/_restart" ->
+            handle_restart_request(Req, Method);
         "/_utils" ->
             {ok, Req:respond({301, [{"Location", "/_utils/"}], <<>>})};
         "/_utils/" ++ PathInfo ->
             {ok, Req:serve_file(PathInfo, DocumentRoot)};
         "/_" ++ _Path ->
             throw({not_found, unknown_private_path});
+        "/favicon.ico" ->
+            {ok, Req:serve_file("favicon.ico", DocumentRoot)};
         _Else ->
             handle_db_request(Req, Method, {Path})
     end.
@@ -133,6 +135,13 @@ handle_replicate_request(Req, 'POST') ->
     send_json(Req, {obj, [{ok, true} | JsonResults]});
 
 handle_replicate_request(_Req, _Method) ->
+    throw({method_not_allowed, "POST"}).
+
+handle_restart_request(Req, 'POST') ->
+    couch_server:remote_restart(),
+    send_json(Req, {obj, [{ok, true}]});
+
+handle_restart_request(_Req, _Method) ->
     throw({method_not_allowed, "POST"}).
 
 % Database request handlers
