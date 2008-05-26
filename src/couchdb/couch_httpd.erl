@@ -50,7 +50,6 @@ stop() ->
     mochiweb_http:stop(?MODULE).
 
 handle_request(Req, DocumentRoot) ->
-
     % alias HEAD to GET as mochiweb takes care of stripping the body
     Method = case Req:get(method) of
         'HEAD' -> 'GET';
@@ -61,10 +60,12 @@ handle_request(Req, DocumentRoot) ->
     % removed, but URL quoting left intact
     {Path, _, _} = mochiweb_util:urlsplit_path(Req:get(raw_path)),
 
-    ?LOG_DEBUG("Version:     ~p", [Req:get(version)]),
-    ?LOG_DEBUG("Method:      ~p", [Method]),
-    ?LOG_DEBUG("Request URI: ~p", [Path]),
-    ?LOG_DEBUG("Headers: ~p", [mochiweb_headers:to_list(Req:get(headers))]),
+    ?LOG_DEBUG("~s ~s ~p~nHeaders: ~p", [
+        atom_to_list(Req:get(method)),
+        Path,
+        Req:get(version),
+        mochiweb_headers:to_list(Req:get(headers))
+    ]),
 
     {ok, Resp} = case catch(handle_request(Req, DocumentRoot, Method, Path)) of
         {ok, Resp0} ->
