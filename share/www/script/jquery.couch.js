@@ -78,7 +78,7 @@
             type: "DELETE", url: this.uri, dataType: "json",
             complete: function(req) {
               var resp = $.httpData(req, "json");
-              if (req.status == 202) {
+              if (req.status == 200) {
                 if (options.success) options.success(resp);
               } else if (options.error) {
                 options.error(req.status, resp.error, resp.reason);
@@ -176,7 +176,7 @@
             dataType: "json",
             complete: function(req) {
               var resp = $.httpData(req, "json");
-              if (req.status == 202) {
+              if (req.status == 200) {
                 if (options.success) options.success(resp);
               } else if (options.error) {
                 options.error(req.status, resp.error, resp.reason);

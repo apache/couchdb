@@ -388,11 +388,11 @@ var tests = {
     if (debug) debugger;
 
     var binAttDoc = {
-      _id:"bin_doc",
+      _id: "bin_doc",
       _attachments:{
         "foo.txt": {
-          "content-type":"text/plain",
-          "data": "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+          content_type:"text/plain",
+          data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
         }
       }
     }
@@ -401,7 +401,7 @@ var tests = {
 
     var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt");
     T(xhr.responseText == "This is a base64 encoded text")
-    T(xhr.getResponseHeader("content-type") == "text/plain")
+    T(xhr.getResponseHeader("Content-Type") == "text/plain")
   },
 
   content_negotiation: function(debug) {
@@ -954,11 +954,11 @@ var tests = {
 
 
     var binAttDoc = {
-      _id:"bin_doc",
+      _id: "bin_doc",
       _attachments:{
         "foo.txt": {
-          "content-type":"text/plain",
-          "data": "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+          content_type:"text/plain",
+          data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
         }
       }
     }
@@ -982,7 +982,7 @@ var tests = {
 
     var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt");
     T(xhr.responseText == "This is a base64 encoded text")
-    T(xhr.getResponseHeader("content-type") == "text/plain")
+    T(xhr.getResponseHeader("Content-Type") == "text/plain")
 
     var compactedsize = db.info().disk_size;
 

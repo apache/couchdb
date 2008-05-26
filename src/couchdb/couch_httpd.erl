@@ -164,7 +164,7 @@ handle_db_request(Req, Method, {DbName, Rest}) ->
 
 handle_db_request(Req, 'DELETE', {DbName, _Db, []}) ->
     ok = couch_server:delete(DbName),
-    send_json(Req, 202, {obj, [
+    send_json(Req, 200, {obj, [
         {ok, true}
     ]});
 
@@ -451,7 +451,7 @@ handle_doc_request(Req, 'DELETE', _DbName, Db, DocId) ->
         throw({bad_request, "Document rev and etag have different values"})
     end,
     {ok, NewRev} = couch_db:delete_doc(Db, DocId, [RevToDelete]),
-    send_json(Req, 202, {obj, [
+    send_json(Req, 200, {obj, [
         {ok, true},
         {id, DocId},
         {rev, NewRev}

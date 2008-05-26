@@ -33,7 +33,7 @@ function CouchDB(name) {
     if (req.status == 404)
       return false;
     var result = JSON.parse(req.responseText);
-    if (req.status != 202)
+    if (req.status != 200)
       throw result;
     return result;
   }
@@ -73,7 +73,7 @@ function CouchDB(name) {
   this.deleteDoc = function(doc) {
     var req = request("DELETE", this.uri + encodeURIComponent(doc._id) + "?rev=" + doc._rev);
     var result = JSON.parse(req.responseText);
-    if (req.status != 202)
+    if (req.status != 200)
       throw result;
     doc._rev = result.rev; //record rev in input document
     doc._deleted = true;

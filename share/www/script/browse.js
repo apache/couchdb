@@ -791,7 +791,7 @@ function CouchDocumentPage() {
       .attr("href", db.uri + encodeURIComponent(docId) + "/" + encodeURIComponent(name))
       .wrapInner("<tt></tt>").appendTo(li);
     $("<span>()</span>").text("" + prettyPrintSize(attachment.length) + 
-      ", " + attachment["content-type"]).addClass("info").appendTo(li);
+      ", " + attachment.content_type).addClass("info").appendTo(li);
     _initAttachmentItem(name, attachment, li);
     return li;
   }

@@ -51,8 +51,10 @@ to_json_obj(#doc{id=Id,deleted=Del,body=Body,revs=Revs,meta=Meta}=Doc,Options)->
         true -> % return the full rev list and the binaries as strings.
             BinProps = lists:map(
                 fun({Name, {Type, BinValue}}) ->
-                    {Name, {obj, [{"content-type", Type},
-                                    {"data", couch_util:encodeBase64(bin_to_binary(BinValue))}]}}
+                    {Name, {obj, [
+                        {"content_type", Type},
+                        {"data", couch_util:encodeBase64(bin_to_binary(BinValue))}
+                    ]}}
                 end,
                 Doc#doc.attachments),
             case BinProps of
@@ -62,8 +64,11 @@ to_json_obj(#doc{id=Id,deleted=Del,body=Body,revs=Revs,meta=Meta}=Doc,Options)->
         false ->
             BinProps = lists:map(
                 fun({Name, {Type, BinValue}}) ->
-                    {Name, {obj, [{"stub", true}, {"content-type", Type},
-                                    {"length", bin_size(BinValue)}]}}
+                    {Name, {obj, [
+                        {"stub", true},
+                        {"content_type", Type},
+                        {"length", bin_size(BinValue)}
+                    ]}}
                 end,
                 Doc#doc.attachments),
             case BinProps of
@@ -81,7 +86,7 @@ from_json_obj({obj, Props}) ->
             [{Name, stub}];
         _ ->
             Value = proplists:get_value("data", BinProps),
-            Type = proplists:get_value("content-type", BinProps,
+            Type = proplists:get_value("content_type", BinProps,
                     ?DEFAULT_ATTACHMENT_CONTENT_TYPE),
             [{Name, {Type, couch_util:decodeBase64(Value)}}]
         end
