@@ -951,7 +951,6 @@ var tests = {
     var saveResult = db.bulkSave(docs);
     T(saveResult.ok);
 
-
     var binAttDoc = {
       _id: "bin_doc",
       _attachments:{
@@ -974,10 +973,8 @@ var tests = {
 
     var xhr = CouchDB.request("POST", "/test_suite_db/_compact");
     T(xhr.status == 202);
-    //compaction isn't instantaneous, loop until done
-    while(db.info().compact_running) {};
-
-
+    // compaction isn't instantaneous, loop until done
+    while (db.info().compact_running) {};
 
     var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt");
     T(xhr.responseText == "This is a base64 encoded text")
@@ -985,8 +982,8 @@ var tests = {
 
     var compactedsize = db.info().disk_size;
 
-    T(deletesize > originalsize);
-    }
+    T(compactedsize < deletesize);
+  }
 };
 
 function makeDocs(start, end, templateDoc) {
