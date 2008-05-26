@@ -99,8 +99,8 @@ handle_request0(Req, DocumentRoot, Method, Path) ->
             {ok, Req:respond({301, [{"Location", "/_utils/"}], <<>>})};
         "/_utils/" ++ PathInfo ->
             {ok, Req:serve_file(PathInfo, DocumentRoot)};
-        "/_" ++ UnknownPrivatePath ->
-            handle_unkown_private_uri_request(Req, Method, UnknownPrivatePath);
+        "/_" ++ _Path ->
+            throw({not_found, unknown_private_path});
         _Else ->
             handle_db_request(Req, Method, {Path})
     end.
@@ -133,18 +133,6 @@ handle_replicate_request(Req, 'POST') ->
 
 handle_replicate_request(_Req, _Method) ->
     throw({method_not_allowed, "POST"}).
-
-handle_unkown_private_uri_request(Req, _Method, UnknownPrivatePath) ->
-  KnownPrivatePaths = ["_utils"],
-  Msg = {obj,
-    [
-      {error, "Could not find the private path '_" ++
-        mochiweb_util:unquote(UnknownPrivatePath) ++
-        "'. Known private path(s): '" ++
-        lists:flatten(KnownPrivatePaths) ++ "'"}
-    ]
-  },
-  send_error(Req, 404, Msg).
 
 % Database request handlers
 
