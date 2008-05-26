@@ -12,7 +12,7 @@
 
 datarootdir = @prefix@/share
 
-mochiwebebindir = $(erlanglibdir)/mochiweb-r73/ebin
+mochiwebebindir = $(erlanglibdir)/mochiweb-r76/ebin
 
 mochiweb_file_collection = \
     mochifmt.erl \

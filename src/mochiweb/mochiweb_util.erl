@@ -11,6 +11,7 @@
 -export([guess_mime/1, parse_header/1]).
 -export([shell_quote/1, cmd/1, cmd_string/1, cmd_port/2]).
 -export([record_to_proplist/2, record_to_proplist/3]).
+-export([safe_relative_path/1, partition/2]).
 -export([to_lower/1]).
 -export([test/0]).
 
@@ -31,6 +32,69 @@ hexdigit(C) when C < 16 -> $A + (C - 10).
 unhexdigit(C) when C >= $0, C =< $9 -> C - $0;
 unhexdigit(C) when C >= $a, C =< $f -> C - $a + 10;
 unhexdigit(C) when C >= $A, C =< $F -> C - $A + 10.
+
+%% @spec partition(String, Sep) -> {String, [], []} | {Prefix, Sep, Postfix}
+%% @doc Inspired by Python 2.5's str.partition:
+%%      partition("foo/bar", "/") = {"foo", "/", "bar"},
+%%      partition("foo", "/") = {"foo", "", ""}.
+partition(String, Sep) ->
+    case partition(String, Sep, []) of
+        undefined ->
+            {String, "", ""};
+        Result ->
+            Result
+    end.
+
+partition("", _Sep, _Acc) ->
+    undefined;
+partition(S, Sep, Acc) ->
+    case partition2(S, Sep) of
+        undefined ->
+            [C | Rest] = S,
+            partition(Rest, Sep, [C | Acc]);
+        Rest ->
+            {lists:reverse(Acc), Sep, Rest}
+    end.
+
+partition2(Rest, "") ->
+    Rest;
+partition2([C | R1], [C | R2]) ->
+    partition2(R1, R2);
+partition2(_S, _Sep) ->
+    undefined.
+
+
+
+%% @spec safe_relative_path(string()) -> string() | undefined
+%% @doc Return the reduced version of a relative path or undefined if it
+%%      is not safe. safe relative paths can be joined with an absolute path
+%%      and will result in a subdirectory of the absolute path.
+safe_relative_path("/" ++ _) ->
+    undefined;
+safe_relative_path(P) ->
+    safe_relative_path(P, []).
+
+safe_relative_path("", Acc) ->
+    case Acc of
+        [] ->
+            "";
+        _ ->
+            join(lists:reverse(Acc), "/")
+    end;
+safe_relative_path(P, Acc) ->
+    case partition(P, "/") of
+        {"", "/", _} ->
+            %% /foo or foo//bar
+            undefined;
+        {"..", _, _} when Acc =:= [] ->
+            undefined;
+        {"..", _, Rest} ->
+            safe_relative_path(Rest, tl(Acc));
+        {Part, "/", ""} ->
+            safe_relative_path("", ["", Part | Acc]);
+        {Part, _, Rest} ->
+            safe_relative_path(Rest, [Part | Acc])
+    end.
 
 %% @spec shell_quote(string()) -> string()
 %% @doc Quote a string according to UNIX shell quoting rules, returns a string
@@ -400,6 +464,8 @@ test() ->
     test_shell_quote(),
     test_cmd(),
     test_cmd_string(),
+    test_partition(),
+    test_safe_relative_path(),
     ok.
 
 test_shell_quote() ->
@@ -498,4 +564,26 @@ test_urlencode() ->
 test_parse_qs() ->
     [{"foo", "bar"}, {"baz", "wibble \r\n"}, {"z", "1"}] =
         parse_qs("foo=bar&baz=wibble+%0D%0A&z=1"),
+    ok.
+
+test_partition() ->
+    {"foo", "", ""} = partition("foo", "/"),
+    {"foo", "/", "bar"} = partition("foo/bar", "/"),
+    {"foo", "/", ""} = partition("foo/", "/"),
+    {"", "/", "bar"} = partition("/bar", "/"),
+    {"f", "oo/ba", "r"} = partition("foo/bar", "oo/ba"),
+    ok.
+
+test_safe_relative_path() ->
+    "foo" = safe_relative_path("foo"),
+    "foo/" = safe_relative_path("foo/"),
+    "foo" = safe_relative_path("foo/bar/.."),
+    "bar" = safe_relative_path("foo/../bar"),
+    "bar/" = safe_relative_path("foo/../bar/"),
+    "" = safe_relative_path("foo/.."),
+    "" = safe_relative_path("foo/../"),
+    undefined = safe_relative_path("/foo"),
+    undefined = safe_relative_path("../foo"),
+    undefined = safe_relative_path("foo/../.."),
+    undefined = safe_relative_path("foo//"),
     ok.

@@ -325,7 +325,8 @@ should_close() ->
                 andalso get_header_value("connection") =/= "Keep-Alive")
         %% unread data left on the socket, can't safely continue
         orelse (DidNotRecv
-                andalso get_header_value("content-length") =/= undefined).
+                andalso get_header_value("content-length") =/= undefined
+                andalso list_to_integer(get_header_value("content-length")) > 0).
 
 %% @spec cleanup() -> ok
 %% @doc Clean up any junk in the process dictionary, required before continuing
@@ -454,15 +455,17 @@ read_chunk(Length) ->
 %% @spec serve_file(Path, DocRoot) -> Response
 %% @doc Serve a file relative to DocRoot.
 serve_file(Path, DocRoot) ->
-    FullPath = filename:join([DocRoot, Path]),
-    File = case filelib:is_dir(FullPath) of
-               true ->
-                   filename:join([FullPath, "index.html"]);
-               false ->
-                   FullPath
-           end,
-    case lists:prefix(DocRoot, File) of
-        true ->
+    case mochiweb_util:safe_relative_path(Path) of
+        undefined ->
+            not_found();
+        RelPath ->
+            FullPath = filename:join([DocRoot, RelPath]),
+            File = case filelib:is_dir(FullPath) of
+                       true ->
+                           filename:join([FullPath, "index.html"]);
+                       false ->
+                           FullPath
+                   end,
             case file:read_file_info(File) of
                 {ok, FileInfo} ->
                     LastModified = httpd_util:rfc1123_date(FileInfo#file_info.mtime),
@@ -482,9 +485,7 @@ serve_file(Path, DocRoot) ->
                     end;
                 {error, _} ->
                     not_found()
-            end;
-        false ->
-            not_found()
+            end
     end.
 
 
