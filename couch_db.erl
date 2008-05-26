@@ -18,6 +18,7 @@
 -export([delete_doc/3,open_doc/2,open_doc/3,enum_docs_since/4,enum_docs_since/5]).
 -export([enum_docs/4,enum_docs/5, open_doc_revs/4, get_missing_revs/2]).
 -export([enum_docs_since_reduce_to_count/1,enum_docs_reduce_to_count/1]).
+-export([increment_update_seq/1]).
 -export([start_update_loop/2]).
 -export([init/1,terminate/2,handle_call/3,handle_cast/2,code_change/3,handle_info/2]).
 -export([start_copy_compact_int/2]).
@@ -61,6 +62,8 @@
 
 % small value used in revision trees to indicate the revision isn't stored
 -define(REV_MISSING, []).
+
+-define(HEADER_SIG, <<$g, $m, $k, 0>>).
 
 start_link(DbName, Filepath, Options) ->
     catch start_link0(DbName, Filepath, Options).
@@ -180,6 +183,10 @@ get_full_doc_infos(MainPid, Ids) when is_pid(MainPid) ->
 get_full_doc_infos(#db{}=Db, Ids) ->
     couch_btree:lookup(Db#db.fulldocinfo_by_id_btree, Ids).
 
+increment_update_seq(MainPid) ->
+    gen_server:call(MainPid, increment_update_seq).
+        
+        
 get_db_info(MainPid) when is_pid(MainPid) ->
     get_db_info(get_db(MainPid));
 get_db_info(Db) ->
@@ -479,6 +486,9 @@ terminate(_Reason, Db) ->
 handle_call({update_docs, DocActions, Options}, From, #db{update_pid=Updater}=Db) ->
     Updater ! {From, update_docs, DocActions, Options},
     {noreply, Db};
+handle_call(increment_update_seq, From, #db{update_pid=Updater}=Db) ->
+    Updater ! {From, increment_update_seq},
+    {noreply, Db};
 handle_call(get_db, _From, Db) ->
     {reply, {ok, Db}, Db};
 handle_call({db_updated, NewDb}, _From, _OldDb) ->
@@ -506,12 +516,12 @@ start_update_loop(MainPid, {DbName, Filepath, Fd, Options}) ->
     true ->
         % create a new header and writes it to the file
         Header =  #db_header{},
-        ok = couch_file:write_header(Fd, <<$g, $m, $k, 0>>, Header),
+        ok = couch_file:write_header(Fd, ?HEADER_SIG, Header),
         % delete any old compaction files that might be hanging around
         file:delete(Filepath ++ ".compact"),
         file:delete(Filepath ++ ".old");
     false ->
-        {ok, Header} = couch_file:read_header(Fd, <<$g, $m, $k, 0>>)
+        {ok, Header} = couch_file:read_header(Fd, ?HEADER_SIG)
     end,
     
     Db = init_db(DbName, Filepath, Fd, Header),
@@ -519,7 +529,10 @@ start_update_loop(MainPid, {DbName, Filepath, Fd, Options}) ->
     MainPid ! {initialized, Db2},
     update_loop(Db2).
     
-update_loop(#db{fd=Fd,name=Name,filepath=Filepath, main_pid=MainPid}=Db) ->
+update_loop(#db{fd=Fd,name=Name,
+            filepath=Filepath,
+            main_pid=MainPid,
+            update_seq=UpdateSeq}=Db) ->
     receive
     {OrigFrom, update_docs, DocActions, Options} ->
         case (catch update_docs_int(Db, DocActions, Options)) of
@@ -550,7 +563,7 @@ update_loop(#db{fd=Fd,name=Name,filepath=Filepath, main_pid=MainPid}=Db) ->
         end;
     {compact_done, CompactFilepath} ->
         {ok, NewFd} = couch_file:open(CompactFilepath),
-        {ok, NewHeader} = couch_file:read_header(NewFd, <<$g, $m, $k, 0>>),
+        {ok, NewHeader} = couch_file:read_header(NewFd, ?HEADER_SIG),
         #db{update_seq=NewSeq}= NewDb =
                 init_db(Name, CompactFilepath, NewFd, NewHeader),
         case Db#db.update_seq == NewSeq of
@@ -586,6 +599,12 @@ update_loop(#db{fd=Fd,name=Name,filepath=Filepath, main_pid=MainPid}=Db) ->
             Db2 = Db#db{compactor_pid=Pid},
             update_loop(Db2)
         end;
+    {OrigFrom, increment_update_seq} ->
+        Db2 = commit_data(Db#db{update_seq=UpdateSeq+1}),
+        ok = gen_server:call(MainPid, {db_updated, Db2}),
+        gen_server:reply(OrigFrom, {ok, UpdateSeq+1}),
+        couch_db_update_notifier:notify({updated, Name}),
+        update_loop(Db2);
     Else ->
         ?LOG_ERROR("Unknown message received in db ~s:~p", [Db#db.name, Else]),
         exit({error, Else})
@@ -923,8 +942,7 @@ commit_data(#db{fd=Fd, header=Header} = Db) ->
     if Header == Header2 ->
         Db; % unchanged. nothing to do
     true ->
-        %ok = couch_file:sync(Fd),
-        ok = couch_file:write_header(Fd, <<$g, $m, $k, 0>>, Header2),
+        ok = couch_file:write_header(Fd, ?HEADER_SIG, Header2),
         Db#db{header = Header2}
     end.
 
@@ -993,11 +1011,11 @@ start_copy_compact_int(#db{name=Name,filepath=Filepath}=Db, CopyLocal) ->
     case couch_file:open(CompactFile) of
     {ok, Fd} ->
         ?LOG_DEBUG("Found existing compaction file for db \"~s\"", [Name]),
-        {ok, Header} = couch_file:read_header(Fd, <<$g, $m, $k, 0>>);
+        {ok, Header} = couch_file:read_header(Fd, ?HEADER_SIG);
     {error, enoent} -> %
         {ok, Fd} = couch_file:open(CompactFile, [create]),
         Header =  #db_header{},
-        ok = couch_file:write_header(Fd, <<$g, $m, $k, 0>>, Header)
+        ok = couch_file:write_header(Fd, ?HEADER_SIG, Header)
     end,
     NewDb = init_db(Name, CompactFile, Fd, Header),
     NewDb2 = copy_compact_docs(Db, NewDb),

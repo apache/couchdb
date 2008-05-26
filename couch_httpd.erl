@@ -387,6 +387,14 @@ handle_db_request(Req, 'POST', {_DbName, Db, ["_missing_revs"]}) ->
         {missing_revs, {obj, JsonResults}}
     ]});
 
+handle_db_request(Req, 'POST', {_DbName, Db, ["_increment_update_seq"]}) ->
+    % NOTE, use at own risk. This functionality is experimental
+    % and might go away entirely.
+    {ok, NewSeq} = couch_db:increment_update_seq(Db),
+    send_json(Req, {obj, [{ok, true},
+        {update_seq, NewSeq}
+    ]});
+
 handle_db_request(Req, 'POST', {DbName, _Db, ["_temp_view"]}) ->
     #view_query_args{
         start_key = StartKey,
