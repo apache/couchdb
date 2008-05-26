@@ -40,7 +40,9 @@
         compact: function(options) {
           options = options || {};
           $.ajax({
-            type: "POST", url: this.uri + "_compact", dataType: "json",
+            type: "POST", url: this.uri + "_compact",
+            contentType: "application/json",
+            dataType: "json", data: "", processData: false, 
             complete: function(req) {
               var resp = $.httpData(req, "json");
               if (req.status == 202) {
@@ -56,7 +58,8 @@
         create: function(options) {
           options = options || {};
           $.ajax({
-            type: "PUT", url: this.uri, dataType: "json",
+            type: "PUT", url: this.uri, contentType: "application/json",
+            dataType: "json", data: "", processData: false, 
             complete: function(req) {
               var resp = $.httpData(req, "json");
               if (req.status == 201) {
@@ -149,8 +152,8 @@
           }
           $.ajax({
             type: method, url: uri + encodeOptions(options),
-            dataType: "json", data: toJSON(doc),
             contentType: "application/json",
+            dataType: "json", data: toJSON(doc),
             complete: function(req) {
               var resp = $.httpData(req, "json")
               doc._id = resp.id;

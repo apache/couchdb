@@ -218,6 +218,6 @@ CouchDB.request = function(method, uri, options) {
       req.setRequestHeader(headerName, headers[headerName]);
     }
   }
-  req.send(options.body || null);
+  req.send(options.body || "");
   return req;
 }
