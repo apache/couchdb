@@ -28,11 +28,16 @@ sum = function(values) {
   return rv;
 }
 
+log = function(message) {
+  print(toJSON({log: toJSON(message)}));  
+}
+
 try {
   // if possible, use evalcx (not always available)
   sandbox = evalcx('');
   sandbox.emit = emit;
   sandbox.sum = sum;
+  sandbox.log = log;
 } catch (e) {}
 
 // Commands are in the form of json arrays:
