@@ -940,7 +940,7 @@ var tests = {
     xhr = CouchDB.request("DELETE", "/test_suite_db/1", {
       headers: {"if-match": etag}
     });
-    T(xhr.status == 202)
+    T(xhr.status == 200)
   },
 
   compact: function(debug) {
