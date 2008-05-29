@@ -17,7 +17,7 @@
 
 -export([start_link/1,fold/4,fold/5,less_json/2, start_update_loop/3, start_temp_update_loop/5]).
 -export([init/1,terminate/2,handle_call/3,handle_cast/2,handle_info/2,code_change/3]).
--export([get_reduce_view/1, get_map_view/1,get_row_count/1,reduce_to_count/1, reduce/3]).
+-export([get_reduce_view/1, get_map_view/1,get_row_count/1,reduce_to_count/1, fold_reduce/7]).
 
 -include("couch_db.hrl").
 
@@ -79,8 +79,8 @@ get_updated_group(Pid) ->
     end.
 
 get_row_count(#view{btree=Bt}) ->
-    {ok, Reds} = couch_btree:partial_reduce(Bt, nil, nil),
-    {ok, reduce_to_count(Reds)}.
+    {ok, {Count, _Reds}} = couch_btree:full_reduce(Bt),
+    {ok, Count}.
 
 get_reduce_view({temp, DbName, Type, MapSrc, RedSrc}) ->
     {ok, #group{views=[View]}} = get_updated_group(get_temp_updater(DbName, Type, MapSrc, RedSrc)),
@@ -98,16 +98,20 @@ get_reduce_view0(Name, Lang, [#view{reduce_funs=RedFuns}=View|Rest]) ->
         N -> {ok, {reduce, N, Lang, View}}
     end.
 
-reduce({temp_reduce, #view{btree=Bt}}, Key1, Key2) ->
-    {ok, {_Count, [Reduction]}} = couch_btree:reduce(Bt, Key1, Key2),
-    {ok, Reduction};
+fold_reduce({temp_reduce, #view{btree=Bt}}, Dir, StartKey, EndKey, GroupFun, Fun, Acc) ->
 
-reduce({reduce, NthRed, Lang, #view{btree=Bt, reduce_funs=RedFuns}}, Key1, Key2) ->
-    {ok, PartialReductions} = couch_btree:partial_reduce(Bt, Key1, Key2),
+    WrapperFun = fun({GroupedKey, _}, PartialReds, Acc0) ->
+            {_, [Red]} = couch_btree:final_reduce(Bt, PartialReds),
+            Fun(GroupedKey, Red, Acc0)
+        end,
+    couch_btree:fold_reduce(Bt, Dir, StartKey, EndKey, GroupFun,
+            WrapperFun, Acc);
+
+fold_reduce({reduce, NthRed, Lang, #view{btree=Bt, reduce_funs=RedFuns}}, Dir, StartKey, EndKey, GroupFun, Fun, Acc) ->
     PreResultPadding = lists:duplicate(NthRed - 1, []),
     PostResultPadding = lists:duplicate(length(RedFuns) - NthRed, []),
     {_Name, FunSrc} = lists:nth(NthRed,RedFuns),
-    ReduceFun = 
+    ReduceFun =
         fun(reduce, KVs) ->
             {ok, Reduced} = couch_query_servers:reduce(Lang, [FunSrc], KVs),
             {0, PreResultPadding ++ Reduced ++ PostResultPadding};
@@ -116,8 +120,12 @@ reduce({reduce, NthRed, Lang, #view{btree=Bt, reduce_funs=RedFuns}}, Key1, Key2)
             {ok, Reduced} = couch_query_servers:combine(Lang, [FunSrc], UserReds),
             {0, PreResultPadding ++ Reduced ++ PostResultPadding}
         end,
-    {_, FinalReds} = couch_btree:final_reduce(ReduceFun, PartialReductions),
-    {ok, lists:nth(NthRed, FinalReds)}.
+    WrapperFun = fun({GroupedKey, _}, PartialReds, Acc0) ->
+            {_, Reds} = couch_btree:final_reduce(ReduceFun, PartialReds),
+            Fun(GroupedKey, lists:nth(NthRed, Reds), Acc0)
+        end,
+    couch_btree:fold_reduce(Bt, Dir, StartKey, EndKey, GroupFun,
+            WrapperFun, Acc).
         
 get_key_pos(_Key, [], _N) ->
     0;
@@ -365,7 +373,7 @@ start_update_loop(RootDir, DbName, GroupId, NotifyPids) ->
  	Group =
     case couch_file:open(FileName) of
     {ok, Fd} ->
-        case couch_file:read_header(Fd, <<$r, $c, $k, 0>>) of
+        case (catch couch_file:read_header(Fd, <<$r, $c, $k, 0>>)) of
         {ok, ExistingDiskGroup} ->
             % validate all the view definitions in the index are correct.
             case reset_group(ExistingDiskGroup) == reset_group(DbGroup) of

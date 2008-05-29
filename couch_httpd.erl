@@ -34,7 +34,8 @@
     direction = fwd,
     start_docid = nil,
     end_docid = <<>>,
-    skip = 0
+    skip = 0,
+    group_level = 0
 }).
 
 start_link(BindAddress, Port, DocumentRoot) ->
@@ -349,12 +350,10 @@ handle_db_request(_Req, _Method, {_DbName, _Db, ["_all_docs_by_seq"]}) ->
 handle_db_request(Req, 'GET', {DbName, _Db, ["_view", DocId, ViewName]}) ->
     #view_query_args{
         start_key = StartKey,
-        end_key = EndKey,
         count = Count,
         skip = SkipCount,
         direction = Dir,
-        start_docid = StartDocId,
-        end_docid = EndDocId
+        start_docid = StartDocId
     } = QueryArgs = parse_view_query(Req),
     case couch_view:get_map_view({DbName, "_design/" ++ DocId, ViewName}) of
     {ok, View} ->
@@ -368,8 +367,7 @@ handle_db_request(Req, 'GET', {DbName, _Db, ["_view", DocId, ViewName]}) ->
     {not_found, Reason} ->
         case couch_view:get_reduce_view({DbName, "_design/" ++ DocId, ViewName}) of
         {ok, View} ->
-            {ok, Value} = couch_view:reduce(View, {StartKey, StartDocId}, {EndKey, EndDocId}),
-            send_json(Req, {obj, [{ok,true}, {result, Value}]});
+            output_reduce_view(Req, View);
         _ ->
             throw({not_found, Reason})
         end
@@ -398,12 +396,10 @@ handle_db_request(Req, 'POST', {_DbName, Db, ["_increment_update_seq"]}) ->
 handle_db_request(Req, 'POST', {DbName, _Db, ["_temp_view"]}) ->
     #view_query_args{
         start_key = StartKey,
-        end_key = EndKey,
         count = Count,
         skip = SkipCount,
         direction = Dir,
-        start_docid = StartDocId,
-        end_docid = EndDocId
+        start_docid = StartDocId
     } = QueryArgs = parse_view_query(Req),
 
     case Req:get_primary_header_value("content-type") of
@@ -428,8 +424,7 @@ handle_db_request(Req, 'POST', {DbName, _Db, ["_temp_view"]}) ->
     RedSrc ->
         {ok, View} = couch_view:get_reduce_view(
                 {temp, DbName, Language, MapSrc, RedSrc}),
-        {ok, Value} = couch_view:reduce(View, {StartKey, StartDocId}, {EndKey, EndDocId}),
-        send_json(Req, {obj, [{ok,true}, {result, Value}]})
+        output_reduce_view(Req, View)
     end;
 
 handle_db_request(_Req, _Method, {_DbName, _Db, ["_temp_view"]}) ->
@@ -446,6 +441,53 @@ handle_db_request(Req, Method, {DbName, Db, [DocId, FileName]}) ->
     UnquotedFileName = mochiweb_util:unquote(FileName),
     handle_attachment_request(Req, Method, DbName, Db, UnquotedDocId,
                               UnquotedFileName).
+
+output_reduce_view(Req, View) ->
+    #view_query_args{
+        start_key = StartKey,
+        end_key = EndKey,
+        count = Count,
+        skip = Skip,
+        direction = Dir,
+        start_docid = StartDocId,
+        end_docid = EndDocId,
+        group_level = GroupLevel
+    } = parse_view_query(Req),
+    GroupRowsFun =
+        fun({_Key1,_}, {_Key2,_}) when GroupLevel == 0 ->
+            true;
+        ({Key1,_}, {Key2,_})
+                when is_integer(GroupLevel) and is_tuple(Key1) and is_tuple(Key2) ->
+            lists:sublist(tuple_to_list(Key1), GroupLevel) == lists:sublist(tuple_to_list(Key2), GroupLevel);
+        ({Key1,_}, {Key2,_}) ->
+            Key1 == Key2
+        end,
+    Resp = start_json_response(Req, 200),
+    Resp:write_chunk("{\"rows\":["),
+    {ok, _} = couch_view:fold_reduce(View, Dir, {StartKey, StartDocId}, {EndKey, EndDocId},
+        GroupRowsFun,
+        fun(_Key, _Red, {AccSeparator,AccSkip,AccCount}) when AccSkip > 0 ->
+            {ok, {AccSeparator,AccSkip-1,AccCount}};
+        (_Key, _Red, {AccSeparator,0,AccCount}) when AccCount == 0 ->
+            {stop,{AccSeparator,0,AccCount}};
+        (_Key, Red, {AccSeparator,0,AccCount}) when GroupLevel == 0 ->
+            Json = lists:flatten(cjson:encode({obj, [{key, null}, {value, Red}]})),
+            Resp:write_chunk(AccSeparator ++ Json),
+            {ok, {",",0,AccCount-1}};
+        (Key, Red, {AccSeparator,0,AccCount})
+                when is_tuple(Key) and is_integer(GroupLevel) ->
+            Json = lists:flatten(cjson:encode(
+                {obj, [{key, list_to_tuple(lists:sublist(tuple_to_list(Key), GroupLevel))},
+                        {value, Red}]})),
+            Resp:write_chunk(AccSeparator ++ Json),
+            {ok, {",",0,AccCount-1}};
+        (Key, Red, {AccSeparator,0,AccCount}) ->
+            Json = lists:flatten(cjson:encode({obj, [{key, Key}, {value, Red}]})),
+            Resp:write_chunk(AccSeparator ++ Json),
+            {ok, {",",0,AccCount-1}}
+        end, {"", Skip, Count}),
+    Resp:write_chunk("]}"),
+    end_json_response(Resp).
 
 handle_doc_request(Req, 'DELETE', _DbName, Db, DocId) ->
     QueryRev = proplists:get_value("rev", Req:parse_qs()),
@@ -667,6 +709,10 @@ parse_view_query(Req) ->
                 "Bad URL query value, number expected: skip=~s", [Value])),
                 throw({query_parse_error, Msg})
             end;
+        {"group", "true"} ->
+            Args#view_query_args{group_level=exact};
+        {"group_level", LevelStr} ->
+            Args#view_query_args{group_level=list_to_integer(LevelStr)};
         _ -> % unknown key
             Msg = lists:flatten(io_lib:format(
                 "Bad URL query key:~s", [Key])),
