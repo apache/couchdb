@@ -88,6 +88,7 @@ function CouchDB(name) {
     if (req.status != 201)
       throw result;
     for(var i in docs) {
+        docs[i]._id = result.new_revs[i].id;
         docs[i]._rev = result.new_revs[i].rev;
     }
     return result;

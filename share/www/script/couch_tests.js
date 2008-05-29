@@ -96,9 +96,9 @@ var tests = {
         return sum(values);
     };
 
-    result = db.query(mapFunction, reduceFunction);
+    results = db.query(mapFunction, reduceFunction);
 
-    T(result.result == 33);
+    T(results.rows[0].value == 33);
 
    // delete a document
     T(db.deleteDoc(existingDoc).ok);
@@ -242,21 +242,67 @@ var tests = {
 
     var map = function (doc) {emit(doc.integer, doc.integer)};
     var reduce = function (keys, values) { return sum(values); };
-    var result = db.query(map, reduce).result;
-    T(result == summate(numDocs));
+    var result = db.query(map, reduce);
+    T(result.rows[0].value == summate(numDocs));
 
-    result = db.query(map, reduce, {startkey: 4, endkey: 4}).result;
-    T(result == 4);
+    result = db.query(map, reduce, {startkey: 4, endkey: 4});
+    T(result.rows[0].value == 4);
 
-    result = db.query(map, reduce, {startkey: 4, endkey: 5}).result;
-    T(result == 9);
+    result = db.query(map, reduce, {startkey: 4, endkey: 5});
+    T(result.rows[0].value == 9);
 
-    result = db.query(map, reduce, {startkey: 4, endkey: 6}).result;
-    T(result == 15);
+    result = db.query(map, reduce, {startkey: 4, endkey: 6});
+    T(result.rows[0].value == 15);
 
     for(var i=1; i<numDocs/2; i+=30) {
-      result = db.query(map, reduce, {startkey: i, endkey: numDocs - i}).result;
-      T(result == summate(numDocs-i) - summate(i-1));
+      result = db.query(map, reduce, {startkey: i, endkey: numDocs - i});
+      T(result.rows[0].value == summate(numDocs-i) - summate(i-1));
+    }
+
+    for(var i=1; i <= 5; i++) {
+      
+      for(var j=0; j < 10; j++) {
+        // these docs are in the order of the keys collation, for clarity
+        var docs = [];
+        docs.push({keys:["a"]});
+        docs.push({keys:["a"]});
+        docs.push({keys:["a", "b"]});
+        docs.push({keys:["a", "b"]});
+        docs.push({keys:["a", "b", "c"]});
+        docs.push({keys:["a", "b", "d"]});
+        docs.push({keys:["a", "c", "d"]});
+        docs.push({keys:["d"]});
+        docs.push({keys:["d", "a"]});
+        docs.push({keys:["d", "b"]});
+        docs.push({keys:["d", "c"]});
+        T(db.bulkSave(docs).ok);
+      }
+      
+      map = function (doc) {emit(doc.keys, 1)};
+      reduce = function (keys, values) { return sum(values); };
+    
+      var results = db.query(map, reduce, {group:true});
+      
+      //group by exact key match
+      T(equals(results.rows[0], {key:["a"],value:20*i}));
+      T(equals(results.rows[1], {key:["a","b"],value:20*i}));
+      T(equals(results.rows[2], {key:["a", "b", "c"],value:10*i}));
+      T(equals(results.rows[3], {key:["a", "b", "d"],value:10*i}));
+      
+      //group by the first element in the key array
+      var results = db.query(map, reduce, {group_level:1});
+      T(equals(results.rows[0], {key:["a"],value:70*i}));
+      T(equals(results.rows[1], {key:["d"],value:40*i}));
+      
+      //group by the first 2 elements in the key array
+      var results = db.query(map, reduce, {group_level:2});
+      T(equals(results.rows[0], {key:["a"],value:20*i}));
+      T(equals(results.rows[1], {key:["a","b"],value:40*i}));
+      T(equals(results.rows[2], {key:["a","c"],value:10*i}));
+      T(equals(results.rows[3], {key:["d"],value:10*i}));
+      T(equals(results.rows[4], {key:["d","a"],value:10*i}));
+      T(equals(results.rows[5], {key:["d","b"],value:10*i}));
+      T(equals(results.rows[6], {key:["d","c"],value:10*i}));
     }
   },
 
@@ -462,26 +508,26 @@ var tests = {
 
 
     var summate = function(N) {return (N+1)*N/2;};
-    var result = db.view("test/summate").result;
-    T(result == summate(numDocs));
+    var result = db.view("test/summate");
+    T(result.rows[0].value == summate(numDocs));
 
-    result = db.view("test/summate", {startkey:4,endkey:4}).result;
-    T(result == 4);
+    result = db.view("test/summate", {startkey:4,endkey:4});
+    T(result.rows[0].value == 4);
 
-    result = db.view("test/summate", {startkey:4,endkey:5}).result;
-    T(result == 9);
+    result = db.view("test/summate", {startkey:4,endkey:5});
+    T(result.rows[0].value == 9);
 
-    result = db.view("test/summate", {startkey:4,endkey:6}).result;
-    T(result == 15);
+    result = db.view("test/summate", {startkey:4,endkey:6});
+    T(result.rows[0].value == 15);
 
     // Verify that a shared index (view def is an exact copy of "summate")
     // does not confuse the reduce stage
-    result = db.view("test/summate2", {startkey:4,endkey:6}).result;
-    T(result == 15);
+    result = db.view("test/summate2", {startkey:4,endkey:6});
+    T(result.rows[0].value == 15);
 
     for(var i=1; i<numDocs/2; i+=30) {
-      result = db.view("test/summate", {startkey:i,endkey:numDocs-i}).result;
-      T(result == summate(numDocs-i) - summate(i-1));
+      result = db.view("test/summate", {startkey:i,endkey:numDocs-i});
+      T(result.rows[0].value == summate(numDocs-i) - summate(i-1));
     }
 
     T(db.deleteDoc(designDoc).ok);

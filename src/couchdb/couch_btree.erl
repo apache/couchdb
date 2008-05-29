@@ -13,8 +13,8 @@
 -module(couch_btree).
 
 -export([open/2, open/3, query_modify/4, add/2, add_remove/3, foldl/3, foldl/4]).
--export([foldr/3, foldr/4, fold/4, fold/5, reduce/3, partial_reduce/3, final_reduce/2]).
--export([lookup/2, get_state/1, set_options/2, test/1, test/0]).
+-export([foldr/3, foldr/4, fold/4, fold/5, full_reduce/1, final_reduce/2]).
+-export([fold_reduce/7, lookup/2, get_state/1, set_options/2, test/1, test/0]).
 
 -define(CHUNK_THRESHOLD, 16#fff).
 
@@ -68,25 +68,33 @@ final_reduce(Reduce, {[], Reductions}) ->
 final_reduce(Reduce, {KVs, Reductions}) ->
     Red = Reduce(reduce, KVs),
     final_reduce(Reduce, {[], [Red | Reductions]}).
-
-reduce(Bt, Key1, Key2) ->
-    {ok, Reds} = partial_reduce(Bt, Key1, Key2),
-    {ok, final_reduce(Bt, Reds)}.
     
-partial_reduce(#btree{root=Root}=Bt, Key1, Key2) ->
-    {KeyStart, KeyEnd} =
-    case Key1 == nil orelse Key2 == nil orelse less(Bt, Key1, Key2) of
-        true -> {Key1, Key2};
-        false -> {Key2, Key1}
+fold_reduce(Bt, StartKey, EndKey, KeyGroupFun, Fun, Acc) ->
+    fold_reduce(Bt, fwd, StartKey, EndKey, KeyGroupFun, Fun, Acc).
+
+fold_reduce(#btree{root=Root}=Bt, Dir, StartKey, EndKey, KeyGroupFun, Fun, Acc) ->
+    {StartKey2, EndKey2} =
+    case Dir of
+        rev -> {EndKey, StartKey};
+        fwd -> {StartKey, EndKey}
     end,
-    case Root of
-    nil ->
-        {ok, {[], []}};
-    _ ->
-        {KVs, Nodes} = collect_node(Bt, Root, KeyStart, KeyEnd),
-        {ok, {KVs, [Red || {_K,{_P,Red}} <- Nodes]}}
+    {ok, Acc2, GroupedRedsAcc2, GroupedKVsAcc2, GroupedKey2} =
+        reduce_stream_node(Bt, Dir, Root, StartKey2, EndKey2, nil, [], [],
+        KeyGroupFun, Fun, Acc),
+    if GroupedKey2 == nil ->
+        {ok, Acc2};
+    true ->
+        case (catch Fun(GroupedKey2, {GroupedKVsAcc2, GroupedRedsAcc2}, Acc2)) of
+            {ok, Acc3} -> {ok, Acc3};
+            {stop, Acc3} -> {ok, Acc3};
+            Else -> throw(Else)
+        end
     end.
-        
+
+full_reduce(#btree{root=nil,reduce=Reduce}) ->
+    {ok, Reduce(reduce, [])};
+full_reduce(#btree{root={_P, Red}}) ->
+    {ok, Red}.
 
 foldl(Bt, Fun, Acc) ->
     fold(Bt, fwd, Fun, Acc).
@@ -390,17 +398,21 @@ modify_kvnode(Bt, [{Key, Value} | RestKVs], [{ActionType, ActionKey, ActionValue
     end.
 
 
-collect_node(_Bt, {P, R}, nil, nil) ->
-    {[], [{nil, {P,R}}]};
-collect_node(Bt, {P, R}, KeyStart, KeyEnd) ->
+reduce_stream_node(Bt, Dir, {P, _R}, KeyStart, KeyEnd, GroupedKey, GroupedKVsAcc, 
+        GroupedRedsAcc, KeyGroupFun, Fun, Acc) ->
     case get_node(Bt, P) of
     {kp_node, NodeList} ->
-        collect_kp_node(Bt, NodeList, KeyStart, KeyEnd);
+        reduce_stream_kp_node(Bt, Dir, NodeList, KeyStart, KeyEnd, GroupedKey,
+                GroupedKVsAcc, GroupedRedsAcc, KeyGroupFun, Fun, Acc);
     {kv_node, KVs} ->
-        collect_kv_node(Bt, {P,R}, KVs, KeyStart, KeyEnd)
+        reduce_stream_kv_node(Bt, Dir, KVs, KeyStart, KeyEnd, GroupedKey,
+                GroupedKVsAcc, GroupedRedsAcc, KeyGroupFun, Fun, Acc)
     end.
 
-collect_kv_node(Bt, {P,R}, KVs, KeyStart, KeyEnd) ->
+reduce_stream_kv_node(Bt, Dir, KVs, KeyStart, KeyEnd,
+                        GroupedKey, GroupedKVsAcc, GroupedRedsAcc,
+                        KeyGroupFun, Fun, Acc) ->
+
     GTEKeyStartKVs =
     case KeyStart of
     nil ->
@@ -413,20 +425,45 @@ collect_kv_node(Bt, {P,R}, KVs, KeyStart, KeyEnd) ->
     nil ->
         GTEKeyStartKVs;
     _ ->
-        lists:dropwhile(
-            fun({Key,_}) -> 
-                less(Bt, KeyEnd, Key)
-            end, lists:reverse(GTEKeyStartKVs))
+        lists:takewhile(
+            fun({Key,_}) ->
+                not less(Bt, KeyEnd, Key)
+            end, GTEKeyStartKVs)
     end,
-    case length(KVs2) == length(KVs) of
-    true -> % got full node, return the already calculated reduction
-        {[], [{nil, {P, R}}]};
-    false -> % otherwise return the keyvalues for later reduction
-        {[assemble(Bt,K,V) || {K,V} <- KVs2], []}
+    reduce_stream_kv_node2(Bt, adjust_dir(Dir, KVs2), GroupedKey, GroupedKVsAcc, GroupedRedsAcc,
+                        KeyGroupFun, Fun, Acc).
+
+
+reduce_stream_kv_node2(_Bt, [], GroupedKey, GroupedKVsAcc, GroupedRedsAcc,
+        _KeyGroupFun, _Fun, Acc) ->
+    {ok, Acc, GroupedRedsAcc, GroupedKVsAcc, GroupedKey};
+reduce_stream_kv_node2(Bt, [{Key, Value}| RestKVs], GroupedKey, GroupedKVsAcc,
+        GroupedRedsAcc, KeyGroupFun, Fun, Acc) ->
+    case GroupedKey of
+    nil ->
+        reduce_stream_kv_node2(Bt, RestKVs, Key,
+                [assemble(Bt,Key,Value)], [], KeyGroupFun, Fun, Acc);
+    _ ->
+    
+        case KeyGroupFun(GroupedKey, Key) of
+        true ->
+            reduce_stream_kv_node2(Bt, RestKVs, GroupedKey,
+                [assemble(Bt,Key,Value)|GroupedKVsAcc], GroupedRedsAcc, KeyGroupFun,
+                Fun, Acc);
+        false ->
+            case Fun(GroupedKey, {GroupedKVsAcc, GroupedRedsAcc}, Acc) of
+            {ok, Acc2} ->
+                reduce_stream_kv_node2(Bt, RestKVs, Key, [assemble(Bt,Key,Value)],
+                    [], KeyGroupFun, Fun, Acc2);
+            {stop, Acc2} ->
+                throw({stop, Acc2})
+            end
+        end
     end.
-        
-        
-collect_kp_node(Bt, NodeList, KeyStart, KeyEnd) ->   
+
+reduce_stream_kp_node(Bt, Dir, NodeList, KeyStart, KeyEnd,
+                        GroupedKey, GroupedKVsAcc, GroupedRedsAcc,
+                        KeyGroupFun, Fun, Acc) ->
     Nodes =
     case KeyStart of
     nil ->
@@ -437,47 +474,51 @@ collect_kp_node(Bt, NodeList, KeyStart, KeyEnd) ->
                 less(Bt, Key, KeyStart)
             end, NodeList)
     end,
-    
+    NodesInRange =
     case KeyEnd of
     nil ->
-        case Nodes of
-        [] -> 
-            {[], []};
-        [{_, StartNodeInfo}|RestNodes] ->    
-            {DownKVs, DownNodes} = collect_node(Bt, StartNodeInfo, KeyStart, KeyEnd),
-            {DownKVs, DownNodes ++ RestNodes}
-        end;
+        Nodes;
     _ ->
-        {GTEKeyEndNodes, LTKeyEndNodes} = lists:splitwith(
+        {InRange, MaybeInRange} = lists:splitwith(
             fun({Key,_}) ->
-                not less(Bt, Key, KeyEnd)
-            end, lists:reverse(Nodes)),
-        
-        {MatchingKVs, MatchingNodes} =
-        case lists:reverse(LTKeyEndNodes) of
-        [{_, StartNodeInfo}] ->
-             collect_node(Bt, StartNodeInfo, KeyStart, KeyEnd);
-        [{_, StartNodeInfo}|RestLTNodes] ->
-            % optimization, since we have more KP nodes in range, we don't need
-            % to provide the endkey when searching the start node, making
-            % collecting the node faster.
-            {DownKVs, DownNodes} = collect_node(Bt, StartNodeInfo, KeyStart, nil),
-            {DownKVs, DownNodes ++ RestLTNodes};
-        [] ->
-            {[], []}
-        end,
-        
-        case lists:reverse(GTEKeyEndNodes) of
-        [{_, EndNodeInfo} | _] when LTKeyEndNodes == [] ->
-            collect_node(Bt, EndNodeInfo, KeyStart, KeyEnd);
-        [{_, EndNodeInfo} | _] ->
-            {KVs1, DownNodes1} = collect_node(Bt, EndNodeInfo, nil, KeyEnd),
-            {KVs1 ++ MatchingKVs, DownNodes1 ++ MatchingNodes};
-        [] ->
-            {MatchingKVs, MatchingNodes}
-        end
-    end.
+                less(Bt, Key, KeyEnd)
+            end, Nodes),
+        InRange ++ case MaybeInRange of [] -> []; [FirstMaybe|_] -> [FirstMaybe] end
+    end,
+    reduce_stream_kp_node2(Bt, Dir, adjust_dir(Dir, NodesInRange), KeyStart, KeyEnd,
+        GroupedKey, GroupedKVsAcc, GroupedRedsAcc, KeyGroupFun, Fun, Acc).
 
+
+reduce_stream_kp_node2(Bt, Dir, [{_Key, NodeInfo} | RestNodeList], KeyStart, KeyEnd,
+                        nil, [], [], KeyGroupFun, Fun, Acc) ->
+    {ok, Acc2, GroupedRedsAcc2, GroupedKVsAcc2, GroupedKey2} =
+            reduce_stream_node(Bt, Dir, NodeInfo, KeyStart, KeyEnd, nil,
+                [], [], KeyGroupFun, Fun, Acc),
+    reduce_stream_kp_node2(Bt, Dir, RestNodeList, KeyStart, KeyEnd, GroupedKey2,
+            GroupedKVsAcc2, GroupedRedsAcc2, KeyGroupFun, Fun, Acc2);
+reduce_stream_kp_node2(Bt, Dir, NodeList, KeyStart, KeyEnd,
+        GroupedKey, GroupedKVsAcc, GroupedRedsAcc, KeyGroupFun, Fun, Acc) ->
+    {Grouped0, Ungrouped0} = lists:splitwith(fun({Key,_}) ->
+        KeyGroupFun(GroupedKey, Key) end, NodeList),
+    {GroupedNodes, UngroupedNodes} = 
+    case Grouped0 of
+    [] ->
+        {Grouped0, Ungrouped0};
+    _ ->
+        [FirstGrouped | RestGrouped] = lists:reverse(Grouped0),
+        {RestGrouped, [FirstGrouped | Ungrouped0]}
+    end,
+    GroupedReds = [R || {_, {_,R}} <- GroupedNodes],
+    case UngroupedNodes of
+    [{_Key, NodeInfo}|RestNodes] ->
+        {ok, Acc2, GroupedRedsAcc2, GroupedKVsAcc2, GroupedKey2} = 
+            reduce_stream_node(Bt, Dir, NodeInfo, KeyStart, KeyEnd, GroupedKey,
+                GroupedKVsAcc, GroupedReds ++ GroupedRedsAcc, KeyGroupFun, Fun, Acc),
+        reduce_stream_kp_node2(Bt, Dir, RestNodes, KeyStart, KeyEnd, GroupedKey2,
+                GroupedKVsAcc2, GroupedRedsAcc2, KeyGroupFun, Fun, Acc2);
+    [] ->
+        {ok, Acc, GroupedReds ++ GroupedRedsAcc, GroupedKVsAcc, GroupedKey}
+    end.
 
 adjust_dir(fwd, List) ->
     List;
@@ -624,22 +665,10 @@ test_btree(KeyValues) ->
 
     
     Len = length(KeyValues),
-    
-    {ok, Len} = reduce(Btree10, nil, nil),
-    
-    % Count of all from start to Val1
-    Val1 = Len div 3,
-    {ok, Val1} = reduce(Btree10, nil, Val1),
-    % Count of all from Val1 to end
-    CountVal1ToEnd = Len - Val1 + 1,
-    {ok, CountVal1ToEnd} = reduce(Btree10, Val1, nil),
-    
-    % Count of all from Val1 to Val2
-    Val2 = 2*Len div 3,
-    CountValRange = Val2 - Val1 + 1,
-    {ok, CountValRange} = reduce(Btree10, Val1, Val2),
 
     % get the leading reduction as we foldl/r
+    % and count of all from start to Val1
+    Val1 = Len div 3,
     {ok, true} = foldl(Btree10, Val1, fun(_X, LeadingReds, _Acc) ->
             CountToStart = Val1 - 1,
             CountToStart = final_reduce(Btree10, LeadingReds),
@@ -706,8 +735,44 @@ test_btree(KeyValues) ->
 
     % verify the remaining
     ok = test_keys(Btree80, A),
+    
+    {ok, Btree90} = test_remove(Btree80, A),
+    
+    EvenOdd = fun(V) when V rem 2 == 1 -> "odd"; (_) -> "even" end,
+    
+    EvenOddKVs = [{{EvenOdd(Key),Key}, 1} || {Key, _} <- KeyValues],
 
+    {ok, Btree100} = test_add(Btree90, EvenOddKVs),
+    GroupingFun = fun({K1, _},{K2,_}) -> K1 == K2 end,
+    FoldFun = fun(GroupedKey, Unreduced, Acc) ->
+            {ok, [{GroupedKey, final_reduce(Btree100, Unreduced)} | Acc]}
+        end,
+        
+    Half = Len div 2,
+    
+    {ok, [{{"odd", _}, Half}, {{"even",_}, Half}]} =
+        fold_reduce(Btree100, nil, nil, GroupingFun, FoldFun, []),
+    
+    {ok, [{{"even",_}, Half}, {{"odd", _}, Half}]} =
+        fold_reduce(Btree100, rev, nil, nil, GroupingFun, FoldFun, []),
+        
+    {ok, [{{"even",_}, Half}]} =
+        fold_reduce(Btree100, fwd, {"even", -1}, {"even", foo}, GroupingFun, FoldFun, []),
+        
+    {ok, [{{"even",_}, Half}]} =
+        fold_reduce(Btree100, rev, {"even", foo}, {"even", -1}, GroupingFun, FoldFun, []),
+        
+    {ok, [{{"odd",_}, Half}]} =
+        fold_reduce(Btree100, fwd, {"odd", -1}, {"odd", foo}, GroupingFun, FoldFun, []),
+    
+    {ok, [{{"odd",_}, Half}]} =
+        fold_reduce(Btree100, rev, {"odd", foo}, {"odd", -1}, GroupingFun, FoldFun, []),
+    
+    {ok, [{{"odd", _}, Half}, {{"even",_}, Half}]} =
+        fold_reduce(Btree100, {"even", -1}, {"odd", foo}, GroupingFun, FoldFun, []),
+    
     ok = couch_file:close(Fd).
+    
 
 
 
