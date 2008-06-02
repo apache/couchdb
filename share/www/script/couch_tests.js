@@ -93,14 +93,14 @@ var tests = {
     T(db.info().doc_count == 6);
 
     var reduceFunction = function(keys, values){
-        return sum(values);
+      return sum(values);
     };
 
     results = db.query(mapFunction, reduceFunction);
 
     T(results.rows[0].value == 33);
 
-   // delete a document
+    // delete a document
     T(db.deleteDoc(existingDoc).ok);
 
     // make sure we can't open the doc

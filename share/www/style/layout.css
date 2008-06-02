@@ -304,17 +304,11 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
 }
 #documents tbody.content td.key { color: #333; }
 #documents tbody.content td.key a { display: block; }
-#documents tbody.content td.key em { font-style: normal; }
+#documents tbody.content td.key a strong { font-weight: normal; }
 #documents tbody.content td.key span.docid { color: #999;
   font: normal 10px Arial,Helvetica,sans-serif;
 }
 #documents tbody.content td.value { font-size: 10px; }
-
-#documents.reduced th.key, #documents.reduced td.key,
-#documents.reduced #paging {
-  display: none;
-}
-#documents.reduced td.value { white-space: pre; }
 
 /* Document fields table */
 
