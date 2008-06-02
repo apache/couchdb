@@ -37,7 +37,7 @@ specific language governing permissions and limitations under the License.
       $(document).ready(function() {
         $("h1 strong").text(page.db.name);
         $("#viewcode span").click(function() {
-          $("#viewcode").toggleClass("expanded");
+          $("#viewcode").toggleClass("collapsed");
         });
         $("#viewcode button.run").click(function() {
           page.updateDocumentListing();
@@ -51,9 +51,15 @@ specific language governing permissions and limitations under the License.
         $("#viewcode button.saveas").click(function() {
           page.saveViewAs();
         });
-        $("#viewcode textarea").resizable({
+        $("#viewcode textarea").makeResizable({
           always: true,
-          grippie: $("#viewcode .bottom")
+          grippie: $("#viewcode .bottom"),
+          vertical: true
+        });
+        $("#viewcode td.map").makeResizable({
+          always: true,
+          grippie: $("#viewcode td.splitter"),
+          horizontal: true
         });
 
         // Restore preferences/state from cookies
@@ -108,21 +114,24 @@ specific language governing permissions and limitations under the License.
         <li><button class="delete">Delete Database</button></li>
       </ul>
 
-      <div id="viewcode" style="display: none">
+      <div id="viewcode" class="collapsed" style="display: none">
         <div class="top">
           <a id="designdoc-link"></a>
           <span id="view-toggle">View Code</span>
         </div>
-        <div class="code map">
-          <label for="viewcode_map">Map Function:</label>
-          <textarea id="viewcode_map" class="map" rows="5" cols="79" spellcheck="false" wrap="off">function(doc) {
+        <table summary="View functions"><tr>
+          <td class="code map">
+            <label for="viewcode_map">Map Function:</label>
+            <textarea id="viewcode_map" class="map" rows="5" cols="20" spellcheck="false" wrap="off">function(doc) {
   emit(null, doc);
 }</textarea>
-        </div>
-        <div class="code reduce">
-          <label for="viewcode_reduce">Reduce Function (optional):</label>
-          <textarea id="viewcode_reduce" class="reduce" rows="5" cols="79" spellcheck="false" wrap="off"></textarea>
-        </div>
+          </td>
+          <td class="splitter"></td>
+          <td class="code reduce">
+            <label for="viewcode_reduce">Reduce Function (optional):</label>
+            <textarea id="viewcode_reduce" class="reduce" rows="5" cols="20" spellcheck="false" wrap="off"></textarea>
+          </td>
+        </tr></table>
         <div class="bottom">
           <button class="save" type="button" disabled>Save</button>
           <button class="saveas" type="button">Save As…</button>

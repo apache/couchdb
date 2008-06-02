@@ -12,10 +12,12 @@
 
 (function($) {
 
-  $.fn.resizable = function(options) {
+  $.fn.makeResizable = function(options) {
     options = options || {};
     options.always = options.always || false;
     options.grippie = options.grippie || null;
+    options.minWidth = options.minWidth || 100;
+    options.maxWidth = options.maxWidth || null;
     options.minHeight = options.minHeight || 32;
     options.maxHeight = options.maxHeight || null;
 
@@ -28,19 +30,33 @@
       grippie.addClass("grippie");
       var elem = $(this);
       grippie.mousedown(function(e) {
-        var pos = e.screenY;
-        var height = elem.height();
+        var pos = {x: e.screenX, y: e.screenY};
+        var dimensions = {width: elem.width(), height: elem.height()};
         $(document)
           .mousemove(function(e) {
-            var offset = e.screenY - pos;
-            if (offset) {
-              var newHeight = height + offset;
-              if (newHeight >= options.minHeight &&
-                  (!options.maxHeight || newHeight <= options.maxHeight)) {
-                elem.height(newHeight);
-                height = newHeight;
+            if (options.horizontal) {
+              var offset = e.screenX - pos.x;
+              if (offset) {
+                var newWidth = dimensions.width + offset;
+                if (newWidth >= options.minWidth &&
+                    (!options.maxWidth || newWidth <= options.maxWidth)) {
+                  elem.width(newWidth);
+                  dimensions.width = newWidth;
+                }
+                pos.x = e.screenX;
               }
-              pos = e.screenY;
+            }
+            if (options.vertical) {
+              var offset = e.screenY - pos.y;
+              if (offset) {
+                var newHeight = dimensions.height + offset;
+                if (newHeight >= options.minHeight &&
+                    (!options.maxHeight || newHeight <= options.maxHeight)) {
+                  elem.height(newHeight);
+                  dimensions.height = newHeight;
+                }
+                pos.y = e.screenY;
+              }
             }
             document.onselectstart = function() { return false }; // for IE
             return false;

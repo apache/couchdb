@@ -214,10 +214,14 @@ function CouchDatabasePage() {
           }
         },
         success: function(resp) {
-          page.storedViewCode = resp.views[localViewName];
-          $("#viewcode_map").val(page.storedViewCode.map);
-          $("#viewcode_reduce").val(page.storedViewCode.reduce || "");
+          var viewCode = resp.views[localViewName];
+          $("#viewcode_map").val(viewCode.map);
+          $("#viewcode_reduce").val(viewCode.reduce || "");
+          var lines = Math.max(viewCode.map.split("\n").length,
+                               (viewCode.reduce ? viewCode.reduce.split("\n").length : 1));
+          $("#viewcode textarea").attr("rows", Math.min(15, Math.max(3, lines)));
           $("#viewcode button.revert, #viewcode button.save").attr("disabled", "disabled");
+          page.storedViewCode = viewCode;
           if (callback) callback();
         }
       });
@@ -744,7 +748,7 @@ function CouchDocumentPage() {
     tools.appendTo(td);
     input.val(prettyPrintJSON(value)).appendTo(td);
     input.each(function() { this.focus(); this.select(); });
-    if (needsTextarea) input.resizable();
+    if (needsTextarea) input.makeResizable({vertical: true});
   }
 
   function _initKey(doc, row, fieldName) {

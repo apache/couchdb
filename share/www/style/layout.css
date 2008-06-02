@@ -249,13 +249,13 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
 /* View function editing */
 
 #viewcode { background: #fff; border: 1px solid;
-  border-color: #999 #ddd #ddd #999; margin: 0 0 1em; padding: 0 .5em;
+  border-color: #999 #ddd #ddd #999; margin: 0 0 1em; overflow: hidden;
 }
 #viewcode .top, #viewcode .bottom { background-color: #e9e9e9;
   border: 1px solid; border-color: #ddd #ddd #e9e9e9 #ddd; color: #333;
-  margin: 0 -.5em; padding: 0 .5em 2px;
+  padding: 0 .5em 2px;
 }
-#viewcode .top {  color: #aaa; font-size: 95%; }
+#viewcode .top { border-bottom: 1px solid #ddd; color: #aaa; font-size: 95%; }
 #viewcode .top span { background: url(../image/twisty.gif) 0 3px no-repeat;
   border: none; color: #666; cursor: pointer; display: block; font-size: 90%;
   margin: 0; padding: 2px 0 0 15px;
@@ -264,15 +264,22 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
   padding: 2px 2px 0 0;
 }
 #viewcode .top a:link, #viewcode .top a:visited { color: #999; }
-#viewcode .code, #viewcode .bottom { display: none; }
-#viewcode .code { float: left; padding: .2em 0; width: 49%; }
-#viewcode .code label { font-size: 90%; color: #999; }
-#viewcode .code textarea { border: none; border-top: 1px solid #ccc;
-  color: #333; margin: 0 0 .4em; min-height: 50px; max-width: 98%;
-  padding: .2em 0; resize: none;
+#viewcode table { border-collapse: separate; border-spacing: 0;
+  margin: 0; table-layout: fixed; width: 100%; max-width: 100%;
 }
-#viewcode .code textarea:focus { background: #ffffe9; }
-#viewcode div.map { border-right: 3px double #ccc; margin-right: .5em; }
+#viewcode table td.splitter { background: #e9e9e9; cursor: col-resize;
+  width: 4px;
+}
+#viewcode table td.map { border-right: 1px solid #ccc; }
+#viewcode table td.reduce { border-left: 1px solid #ccc; }
+#viewcode .code label { font-size: 90%; color: #999; padding: 0 .5em;
+  white-space: nowrap;
+}
+#viewcode .code textarea { border: none; border-top: 1px solid #ccc;
+  color: #333; margin: 0; min-height: 50px; padding: .4em 0 0; resize: none;
+  width: 100%;
+}
+#viewcode .code textarea:focus { background: #e9e9ff; }
 #viewcode .bottom { border-bottom: none; clear: left; padding: 1px 3px; }
 #viewcode .bottom button { font-size: 90%; margin: 0 1em 0 0;
   padding-left: 2em; padding-right: 2em;
@@ -284,10 +291,10 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
   float: right; margin: 0 0 0 1em;
 }
 #viewcode .bottom button.save { font-weight: bold; }
-#viewcode .grippie { background-position: 49% 50%; }
-#viewcode.expanded .top { border-bottom: 1px solid #ddd; }
-#viewcode.expanded .top span { background-position: 0 -96px; }
-#viewcode.expanded .code, #viewcode.expanded .bottom { display: block; }
+#viewcode .grippie { background-position: 50% 50%; }
+#viewcode.collapsed .top { border-bottom: none; }
+#viewcode.collapsed .top span { background-position: 0 -96px; }
+#viewcode.collapsed table, #viewcode.collapsed .bottom { display: none; }
 
 /* Database table */
 
