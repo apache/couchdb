@@ -184,7 +184,7 @@ handle_db_request(Req, 'GET', {DbName, Db, []}) ->
 
 handle_db_request(Req, 'POST', {_DbName, Db, []}) ->
     % TODO: Etag handling
-    Json = cjson:decode(Req:recv_body()),
+    Json = cjson:decode(Req:recv_body(?MAX_DOC_SIZE)),
     Doc = couch_doc:from_json_obj(Json),
     DocId = couch_util:new_uuid(),
     {ok, NewRev} = couch_db:update_doc(Db, Doc#doc{id=DocId, revs=[]}, []),
@@ -199,7 +199,7 @@ handle_db_request(_Req, _Method, {_DbName, _Db, []}) ->
 
 handle_db_request(Req, 'POST', {_DbName, Db, ["_bulk_docs"]}) ->
     Options = [], % put options here.
-    {obj, JsonProps} = cjson:decode(Req:recv_body()),
+    {obj, JsonProps} = cjson:decode(Req:recv_body(?MAX_DOC_SIZE)),
     DocsArray = proplists:get_value("docs", JsonProps),
     % convert all the doc elements to native docs
     case proplists:get_value("new_edits", JsonProps, true) of
