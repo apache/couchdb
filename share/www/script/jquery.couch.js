@@ -11,7 +11,7 @@
 // the License.
 
 (function($) {
-  $.couch = $.couch || {}
+  $.couch = $.couch || {};
   $.fn.extend($.couch, {
 
     allDbs: function(options) {
@@ -120,7 +120,7 @@
                 alert("An error occurred retrieving a list of all documents: " +
                   resp.reason);
               }
-            },
+            }
           });
         },
         openDoc: function(docId, options) {

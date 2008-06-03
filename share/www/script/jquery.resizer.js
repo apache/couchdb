@@ -16,18 +16,29 @@
     options = options || {};
     options.always = options.always || false;
     options.grippie = options.grippie || null;
+    options.horizontal = options.horizontal || false;
     options.minWidth = options.minWidth || 100;
     options.maxWidth = options.maxWidth || null;
+    options.vertical = options.vertical || false;
     options.minHeight = options.minHeight || 32;
     options.maxHeight = options.maxHeight || null;
 
-    if (!options.always && $.browser.safari && parseInt($.browser.version) >= 522)
-      return this; // safari3 and later provides textarea resizing natively
-
     return this.each(function() {
+      if ($(this).is("textarea") && !options.always &&
+          $.browser.safari && parseInt($.browser.version) >= 522)
+        return this; // safari3 and later provides textarea resizing natively
+
       var grippie = options.grippie;
       if (!grippie) grippie = $("<div></div>").appendTo(this.parentNode);
       grippie.addClass("grippie");
+      if (options.horizontal && options.vertical) {
+        grippie.css("cursor", "nwse-resize");
+      } else if (options.horizontal) {
+        grippie.css("cursor", "col-resize");
+      } else if (options.vertical) {
+        grippie.css("cursor", "row-resize");
+      }
+
       var elem = $(this);
       grippie.mousedown(function(e) {
         var pos = {x: e.screenX, y: e.screenY};
