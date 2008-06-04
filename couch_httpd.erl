@@ -432,6 +432,12 @@ handle_db_request(_Req, _Method, {_DbName, _Db, ["_temp_view"]}) ->
 
 % Document request handlers
 
+handle_db_request(Req, Method, {DbName, Db, ["_design", DesignName]}) ->
+    % Special case to enable using an unencoded in the URL of design docs, as
+    % slashes in document IDs must otherwise be URL encoded
+    DocId = mochiweb_util:join(["_design", DesignName], "/"),
+    handle_db_request(Req, Method, {DbName, Db, [DocId]});
+
 handle_db_request(Req, Method, {DbName, Db, [DocId]}) ->
     UnquotedDocId = mochiweb_util:unquote(DocId),
     handle_doc_request(Req, Method, DbName, Db, UnquotedDocId);
