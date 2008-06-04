@@ -190,6 +190,42 @@ var tests = {
     }
   },
 
+  bulk_docs: function(debug) {
+    var db = new CouchDB("test_suite_db");
+    db.deleteDb();
+    db.createDb();
+    if (debug) debugger;
+
+    var docs = makeDocs(5);
+
+    // Create the docs
+    var result = db.bulkSave(docs);
+    T(result.ok);
+    T(result.new_revs.length == 5);
+    for (var i = 0; i < 5; i++) {
+      T(result.new_revs[i].id == docs[i]._id);
+      T(result.new_revs[i].rev);
+      docs[i].string = docs[i].string + ".00";
+    }
+
+    // Update the docs
+    result = db.bulkSave(docs);
+    T(result.ok);
+    T(result.new_revs.length == 5);
+    for (i = 0; i < 5; i++) {
+      T(result.new_revs[i].id == i.toString());
+      docs[i]._deleted = true;
+    }
+
+    // Delete the docs
+    result = db.bulkSave(docs);
+    T(result.ok);
+    T(result.new_revs.length == 5);
+    for (i = 0; i < 5; i++) {
+      T(db.open(docs[i]._id) == null);
+    }
+  },
+
   // test saving a semi-large quanitity of documents and do some view queries.
   lots_of_docs: function(debug) {
     var db = new CouchDB("test_suite_db");
@@ -1034,8 +1070,12 @@ var tests = {
 
 function makeDocs(start, end, templateDoc) {
   var templateDocSrc = templateDoc ? templateDoc.toSource() : "{}"
+  if (end === undefined) {
+    end = start;
+    start = 0;
+  }
   var docs = []
-  for(var i=start; i<end; i++) {
+  for (var i = start; i < end; i++) {
     var newDoc = eval("(" + templateDocSrc + ")");
     newDoc._id = (i).toString();
     newDoc.integer = i
