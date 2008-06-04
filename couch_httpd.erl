@@ -762,14 +762,14 @@ make_view_fold_fun(Req, QueryArgs, TotalViewCount, ReduceCountFun) ->
             Resp2 = start_json_response(Req, 200),
             Offset2 = TotalViewCount - Offset -
                 lists:min([TotalViewCount - Offset, - AccCount]),
-            JsonBegin = io_lib:format("{\"total_rows\":~w,\"offset\":~w,\"rows\":[",
+            JsonBegin = io_lib:format("{\"total_rows\":~w,\"offset\":~w,\"rows\":[\r\n",
                     [TotalViewCount, Offset2]),
             Resp2:write_chunk(lists:flatten(JsonBegin)),
             JsonObj = {obj, [{id, DocId}, {key, Key}, {value, Value}]},
             {ok, {AccCount + 1, 0, Resp2, [cjson:encode(JsonObj) | AccRevRows]}};
         {_, AccCount, _, Resp} ->
             JsonObj = {obj, [{id, DocId}, {key, Key}, {value, Value}]},
-            {ok, {AccCount + 1, 0, Resp, [cjson:encode(JsonObj), "," | AccRevRows]}}
+            {ok, {AccCount + 1, 0, Resp, [cjson:encode(JsonObj), ",\r\n" | AccRevRows]}}
         end
     end,
 
