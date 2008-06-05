@@ -65,6 +65,4 @@ nobase_dist_pkgdata_DATA = \
     www/script/jquery.suggest.js \
     www/script/json2.js \
     www/script/pprint.js \
-    www/script/shell.js \
-    www/shell.html \
     www/style/layout.css
