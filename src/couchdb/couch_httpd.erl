@@ -251,18 +251,6 @@ handle_db_request(Req, 'POST', {_DbName, Db, ["_compact"]}) ->
 handle_db_request(_Req, _Method, {_DbName, _Db, ["_compact"]}) ->
     throw({method_not_allowed, "POST"});
 
-handle_db_request(Req, 'GET', {DbName, _Db, ["_search"]}) ->
-    case Req:parse_qs() of
-        [{"q", Query}] when (length(Query) > 0) ->
-            {ok, Response} = couch_ft_query:execute(DbName, Query),
-            send_json(Req, {obj, [{ok, true} | Response]});
-        _Error ->
-            throw({no_fulltext_query, "Empty Query String"})
-    end;
-
-handle_db_request(_Req, _Method, {_DbName, _Db, ["_search"]}) ->
-    throw({method_not_allowed, "GET,HEAD"});
-
 % View request handlers
 
 handle_db_request(Req, 'GET', {_DbName, Db, ["_all_docs"]}) ->
