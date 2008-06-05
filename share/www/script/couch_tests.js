@@ -294,6 +294,9 @@ var tests = {
       result = db.query(map, reduce, {startkey: i, endkey: numDocs - i});
       T(result.rows[0].value == summate(numDocs-i) - summate(i-1));
     }
+    
+    db.deleteDb();
+    db.createDb();
 
     for(var i=1; i <= 5; i++) {
       
@@ -340,6 +343,68 @@ var tests = {
       T(equals(results.rows[5], {key:["d","b"],value:10*i}));
       T(equals(results.rows[6], {key:["d","c"],value:10*i}));
     }
+    
+    // now test out more complex reductions that need to use the combine option.
+    
+    db.deleteDb();
+    db.createDb();
+
+      
+    var map = function (doc) {emit(null, doc.val)};
+    var reduceCombine = function (keys, values, combine) {
+        // this computes the standard deviation
+        
+        var stdDeviation=0;
+        var count=0;
+        var total=0;
+        var sqrTotal=0;
+          
+        if (combine) {
+          for(var i in values) {
+            count = count + values[i].count;
+            total = total + values[i].total;
+            sqrTotal = sqrTotal + (values[i].sqrTotal * values[i].sqrTotal);
+          }
+          var variance =  (sqrTotal - ((total * total)/count)) / count;
+          stdDeviation = Math.sqrt(variance);
+          
+          return {"stdDeviation":stdDeviation,"count":count,
+              "total":total,"sqrTotal":sqrTotal};
+        }
+        else {
+          for(var i in values) {
+            total = total + values[i]
+            sqrTotal = sqrTotal + (values[i] * values[i])
+          }
+          count = values.length;
+          var variance =  (sqrTotal - ((total * total)/count)) / count;
+          stdDeviation = Math.sqrt(variance);
+        }
+          
+        return {"stdDeviation":stdDeviation,"count":count,
+            "total":total,"sqrTotal":sqrTotal};
+      };
+      
+      for(var j=0; j < 10; j++) {
+        // these docs are in the order of the keys collation, for clarity
+        var docs = [];
+        docs.push({val:10});
+        docs.push({val:20});
+        docs.push({val:30});
+        docs.push({val:40});
+        docs.push({val:50});
+        docs.push({val:60});
+        docs.push({val:70});
+        docs.push({val:80});
+        docs.push({val:90});
+        docs.push({val:100});
+        T(db.bulkSave(docs).ok);
+      }
+      
+      var results = db.query(map, reduceCombine);
+      //account for floating point error
+      T(results.rows[0].value.stdDeviation == 28.722813232690143);
+      
   },
 
   multiple_rows: function(debug) {

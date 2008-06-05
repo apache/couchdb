@@ -255,7 +255,7 @@ chunkify(_Bt, [], _ChunkThreshold, OutList, _OutListSize, OutputChunks) ->
     lists:reverse([lists:reverse(OutList) | OutputChunks]);
 chunkify(Bt, [InElement | RestInList], ChunkThreshold, OutList, OutListSize, OutputChunks) ->
     case size(term_to_binary(InElement)) of
-    Size when (Size + OutListSize) > ChunkThreshold ->
+    Size when (Size + OutListSize) > ChunkThreshold andalso OutList /= [] ->
         chunkify(Bt, RestInList, ChunkThreshold, [], 0, [lists:reverse([InElement | OutList]) | OutputChunks]);
     Size ->
         chunkify(Bt, RestInList, ChunkThreshold, [InElement | OutList], OutListSize + Size, OutputChunks)
@@ -398,6 +398,9 @@ modify_kvnode(Bt, [{Key, Value} | RestKVs], [{ActionType, ActionKey, ActionValue
     end.
 
 
+reduce_stream_node(_Bt, _Dir, nil, _KeyStart, _KeyEnd, GroupedKey, GroupedKVsAcc, 
+        GroupedRedsAcc, _KeyGroupFun, _Fun, Acc) ->
+    {ok, Acc, GroupedRedsAcc, GroupedKVsAcc, GroupedKey}; 
 reduce_stream_node(Bt, Dir, {P, _R}, KeyStart, KeyEnd, GroupedKey, GroupedKVsAcc, 
         GroupedRedsAcc, KeyGroupFun, Fun, Acc) ->
     case get_node(Bt, P) of
