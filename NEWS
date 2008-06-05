@@ -1,6 +1,27 @@
 Apache CouchDB NEWS
 ===================
 
+Version 0.8.0
+-------------
+This version is the first released under the patronage of the Apache 
+Software Foundation Incubator.
+
+ * Swapped out Erlang's inets HTTP server for the Mochiweb HTTP server. Re-
+   moved couch_httpd.ini in the process.
+ * Added support for incremental map/reduce view definitions.
+ * Changed database file format.
+ * Changed _design document syntax and view HTTP API to accommodate
+   incremental map/reduce.
+ * Changed format of bulk requests to reflect that they are now atomic.
+ * Renamed the map() function in view definitions to emit() to avoid
+   confusion.
+ * Stripped the mime-type prefix from "Couch Query Server" entries in 
+   couch.ini.
+ * Added bits of awesome.
+
+See http://wiki.apache.org/couchdb/BreakingChanges for a more detailed 
+description of the changes.
+
 Version 0.7.3a
 --------------
 
