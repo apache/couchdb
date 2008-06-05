@@ -469,7 +469,9 @@ output_reduce_view(Req, View) ->
             Resp:write_chunk(AccSeparator ++ Json),
             {ok, {",",0,AccCount-1}};
         (Key, Red, {AccSeparator,0,AccCount})
-                when is_tuple(Key) and is_integer(GroupLevel) ->
+                when is_integer(GroupLevel) 
+                andalso is_tuple(Key) 
+                andalso element(1, Key) /= obj  ->
             Json = lists:flatten(cjson:encode(
                 {obj, [{key, list_to_tuple(lists:sublist(tuple_to_list(Key), GroupLevel))},
                         {value, Red}]})),
@@ -557,8 +559,7 @@ handle_doc_request(Req, 'GET', _DbName, Db, DocId) ->
                     Json = lists:flatten(cjson:encode({obj, [{ok, JsonDoc}]})),
                     Resp:write_chunk(AccSeparator ++ Json);
                 {{not_found, missing}, RevId} ->
-                    Json = {obj, [{"missing", RevId}]},
-                    Json = lists:flatten(cjson:encode(Json)),
+                    Json = lists:flatten(cjson:encode({obj, [{"missing", RevId}]})),
                     Resp:write_chunk(AccSeparator ++ Json)
                 end,
                 "," % AccSeparator now has a comma
