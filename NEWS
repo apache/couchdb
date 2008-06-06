@@ -3,26 +3,22 @@ Apache CouchDB NEWS
 
 Version 0.8.0
 -------------
+This version is the first released under the patronage of the Apache 
+Software Foundation Incubator.
 
- * Released under the patronage of the Apache Software Foundation Incubator.
- * Changed core licensing to the Apache License 2.0.
- * Miscellaneous refactoring of the core Erlang database engine.
- * Miscellaneous refactoring of the core Erlang view engine.
- * Miscellaneous improvements to Futon, the web administration console.
- * Miscellaneous improvements to the `couchdb` command.
- * Database server can automatically respawn following a server crash.
- * Database server no longer refuses to start with a stale PID file.
- * System logrotate configuration provided.
- * Improved handling of ICU shared libraries.
- * Swapped out Erlang's inets HTTP server for the Mochiweb HTTP server.
- * Removed the couch_httpd.ini configuration file.
- * Added support for incremental map/reduce view definitions.
+ * Changed core licensing to the Apache Software License 2.0.
+ * Refactoring of the core view and storage engines.
+ * Added support for incremental map/reduce views.
  * Changed database file format.
- * Changed _design document syntax and view API to for incremental map/reduce.
- * Changed format of bulk requests to reflect that they are now atomic.
- * Renamed the `map` function in view definitions to `emit` to avoid confusion.
- * Stripped the mime-type prefix from "Couch Query Server" entries in couch.ini.
+ * Many improvements to Futon, the web administration interface.
+ * Swapped out Erlang's inets HTTP server for the Mochiweb HTTP server.
+ * SpiderMonkey is no longer included with CouchDB, but rather treated as
+   an external dependendancy.
  * Added bits of awesome.
+
+Please note that there have been many backwards incomatible changes in
+this release. See http://wiki.apache.org/couchdb/BreakingChanges for more
+information and some tips for upgrading.
 
 Version 0.7.2
 -------------
