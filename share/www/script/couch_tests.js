@@ -361,14 +361,11 @@ var tests = {
         if (combine) {
           // This is the combine phase, we are re-reducing previosuly returned
           // reduce values.
-          
           for(var i in values) {
             count = count + values[i].count;
             total = total + values[i].total;
             sqrTotal = sqrTotal + (values[i].sqrTotal * values[i].sqrTotal);
           }
-          var variance =  (sqrTotal - ((total * total)/count)) / count;
-          stdDeviation = Math.sqrt(variance);
         }
         else {
           // This is the reduce phase, we are reducing over emitted values from
@@ -378,12 +375,13 @@ var tests = {
             sqrTotal = sqrTotal + (values[i] * values[i])
           }
           count = values.length;
-          var variance =  (sqrTotal - ((total * total)/count)) / count;
-          stdDeviation = Math.sqrt(variance);
         }
         
-        // the reduce results. It contains enough information to compute
-        // further reduce results, and the final output values.
+        var variance =  (sqrTotal - ((total * total)/count)) / count;
+        stdDeviation = Math.sqrt(variance);
+          
+        // the reduce result. It contains enough information to combine with 
+        // more reduce results, and the final output values.
         return {"stdDeviation":stdDeviation,"count":count,
             "total":total,"sqrTotal":sqrTotal};
       };
