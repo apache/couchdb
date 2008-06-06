@@ -1,10 +1,15 @@
 Apache CouchDB NEWS
 ===================
 
+For details on backwards incompatible changes between releases, please see:
+
+  http://wiki.apache.org/couchdb/BreakingChanges
+
 Version 0.8.0
 -------------
-This version is the first released under the patronage of the Apache 
-Software Foundation Incubator.
+
+This version is the first released under the patronage of the Apache Software
+Foundation Incubator.
 
  * Changed core licensing to the Apache Software License 2.0.
  * Refactoring of the core view and storage engines.
@@ -12,13 +17,13 @@ Software Foundation Incubator.
  * Changed database file format.
  * Many improvements to Futon, the web administration interface.
  * Swapped out Erlang's inets HTTP server for the Mochiweb HTTP server.
- * SpiderMonkey is no longer included with CouchDB, but rather treated as
-   an external dependendancy.
+ * SpiderMonkey is no longer included with CouchDB, but rather treated as an
+   external dependendancy.
  * Added bits of awesome.
 
-Please note that there have been many backwards incomatible changes in
-this release. See http://wiki.apache.org/couchdb/BreakingChanges for more
-information and some tips for upgrading.
+Please note that there have been many backwards incomatible changes in this
+release. See http://wiki.apache.org/couchdb/BreakingChanges for more information
+and some tips for upgrading.
 
 Version 0.7.2
 -------------
