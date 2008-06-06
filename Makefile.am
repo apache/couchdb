@@ -14,11 +14,11 @@ datarootdir = @prefix@/share
 
 SUBDIRS = bin etc src share var
 
-pkgdoc_DATA = AUTHORS.gz BUGS.gz changelog.gz NEWS.gz README.gz THANKS.gz
+pkgdoc_DATA = AUTHORS.gz BUGS.gz CHANGES.gz NEWS.gz README.gz THANKS.gz
 
 DISTCLEANFILES = $(pkgdoc_DATA)
 
-EXTRA_DIST = AUTHORS BUGS ChangeLog LICENCE NEWS README THANKS
+EXTRA_DIST = AUTHORS BUGS CHANGES LICENCE NEWS README THANKS
 
 AUTHORS.gz: $(top_srcdir)/AUTHORS
 	-gzip -9 < $< > $@
@@ -26,7 +26,7 @@ AUTHORS.gz: $(top_srcdir)/AUTHORS
 BUGS.gz: $(top_srcdir)/BUGS
 	-gzip -9 < $< > $@
 
-changelog.gz: $(top_srcdir)/ChangeLog
+CHANGES.gz: $(top_srcdir)/CHANGES
 	-gzip -9 < $< > $@
 
 NEWS.gz: $(top_srcdir)/NEWS
@@ -41,7 +41,6 @@ THANKS.gz: $(top_srcdir)/THANKS
 local-clean: maintainer-clean
 	@echo "This command is intended for maintainers to use;"
 	@echo "it deletes files that may need special tools to rebuild."
-	rm -f ChangeLog
 	rm -f INSTALL
 	rm -f acinclude.m4
 	rm -f aclocal.m4
