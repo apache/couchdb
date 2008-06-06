@@ -8,8 +8,7 @@ For details on backwards incompatible changes between releases, please see:
 Version 0.8.0
 -------------
 
-This version is the first released under the patronage of the Apache Software
-Foundation Incubator.
+Released under the patronage of the Apache Software Foundation Incubator.
 
  * Changed core licensing to the Apache Software License 2.0.
  * Refactoring of the core view and storage engines.
