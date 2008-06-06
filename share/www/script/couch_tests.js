@@ -352,14 +352,16 @@ var tests = {
       
     var map = function (doc) {emit(null, doc.val)};
     var reduceCombine = function (keys, values, combine) {
-        // this computes the standard deviation
-        
+        // This computes the standard deviation of the mapped results
         var stdDeviation=0;
         var count=0;
         var total=0;
         var sqrTotal=0;
           
         if (combine) {
+          // This is the combine phase, we are re-reducing previosuly returned
+          // reduce values.
+          
           for(var i in values) {
             count = count + values[i].count;
             total = total + values[i].total;
@@ -367,11 +369,10 @@ var tests = {
           }
           var variance =  (sqrTotal - ((total * total)/count)) / count;
           stdDeviation = Math.sqrt(variance);
-          
-          return {"stdDeviation":stdDeviation,"count":count,
-              "total":total,"sqrTotal":sqrTotal};
         }
         else {
+          // This is the reduce phase, we are reducing over emitted values from
+          // the map functions.
           for(var i in values) {
             total = total + values[i]
             sqrTotal = sqrTotal + (values[i] * values[i])
@@ -380,13 +381,15 @@ var tests = {
           var variance =  (sqrTotal - ((total * total)/count)) / count;
           stdDeviation = Math.sqrt(variance);
         }
-          
+        
+        // the reduce results. It contains enough information to compute
+        // further reduce results, and the final output values.
         return {"stdDeviation":stdDeviation,"count":count,
             "total":total,"sqrTotal":sqrTotal};
       };
       
+      // Save a bunch a docs.
       for(var j=0; j < 10; j++) {
-        // these docs are in the order of the keys collation, for clarity
         var docs = [];
         docs.push({val:10});
         docs.push({val:20});
@@ -402,8 +405,10 @@ var tests = {
       }
       
       var results = db.query(map, reduceCombine);
-      //account for floating point error
-      T(results.rows[0].value.stdDeviation == 28.722813232690143);
+      
+      var difference = results.rows[0].value.stdDeviation - 28.722813232690143;
+      // account for floating point rounding error
+      T(Math.abs(difference) < 0.0000000001);
       
   },
 
