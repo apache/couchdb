@@ -3,9 +3,8 @@ Apache CouchDB NEWS
 
 Version 0.8.0
 -------------
-This version is the first released under the patronage of the Apache 
-Software Foundation Incubator.
 
+ * Released under the patronage of the Apache Software Foundation Incubator.
  * Changed core licensing to the Apache License 2.0.
  * Miscellaneous refactoring of the core Erlang database engine.
  * Miscellaneous refactoring of the core Erlang view engine.
@@ -16,20 +15,14 @@ Software Foundation Incubator.
  * System logrotate configuration provided.
  * Improved handling of ICU shared libraries.
  * Swapped out Erlang's inets HTTP server for the Mochiweb HTTP server.
-   Removed couch_httpd.ini in the process.
+ * Removed the couch_httpd.ini configuration file.
  * Added support for incremental map/reduce view definitions.
  * Changed database file format.
- * Changed _design document syntax and view HTTP API to accommodate
-   incremental map/reduce.
+ * Changed _design document syntax and view API to for incremental map/reduce.
  * Changed format of bulk requests to reflect that they are now atomic.
- * Renamed the `map()` function in view definitions to `emit()` to avoid
-   confusion.
- * Stripped the mime-type prefix from "Couch Query Server" entries in 
-   couch.ini.
+ * Renamed the `map` function in view definitions to `emit` to avoid confusion.
+ * Stripped the mime-type prefix from "Couch Query Server" entries in couch.ini.
  * Added bits of awesome.
-
-See http://wiki.apache.org/couchdb/BreakingChanges for a more detailed 
-description of the changes.
 
 Version 0.7.2
 -------------
