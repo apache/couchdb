@@ -6,14 +6,23 @@ Version 0.8.0
 This version is the first released under the patronage of the Apache 
 Software Foundation Incubator.
 
- * Swapped out Erlang's inets HTTP server for the Mochiweb HTTP server. Re-
-   moved couch_httpd.ini in the process.
+ * Changed core licensing to the Apache License 2.0.
+ * Miscellaneous refactoring of the core Erlang database engine.
+ * Miscellaneous refactoring of the core Erlang view engine.
+ * Miscellaneous improvements to Futon, the web administration console.
+ * Miscellaneous improvements to the `couchdb` command.
+ * Database server can automatically respawn following a server crash.
+ * Database server no longer refuses to start with a stale PID file.
+ * System logrotate configuration provided.
+ * Improved handling of ICU shared libraries.
+ * Swapped out Erlang's inets HTTP server for the Mochiweb HTTP server.
+   Removed couch_httpd.ini in the process.
  * Added support for incremental map/reduce view definitions.
  * Changed database file format.
  * Changed _design document syntax and view HTTP API to accommodate
    incremental map/reduce.
  * Changed format of bulk requests to reflect that they are now atomic.
- * Renamed the map() function in view definitions to emit() to avoid
+ * Renamed the `map()` function in view definitions to `emit()` to avoid
    confusion.
  * Stripped the mime-type prefix from "Couch Query Server" entries in 
    couch.ini.
@@ -21,20 +30,6 @@ Software Foundation Incubator.
 
 See http://wiki.apache.org/couchdb/BreakingChanges for a more detailed 
 description of the changes.
-
-Version 0.7.3a
---------------
-
-This version is unreleased and only available from the source repository.
-
- * Changed core licensing to the Apache License 2.0.
- * Miscellaneous refactoring of the core Erlang database engine.
- * Miscellaneous improvements to Futon, the web administration console.
- * Miscellaneous improvements to the `couchdb` command.
- * Database server can automatically respawn following a server crash.
- * Database server no longer refuses to start with a stale PID file.
- * System logrotate configuration provided.
- * Improved handling of ICU shared libraries.
 
 Version 0.7.2
 -------------
