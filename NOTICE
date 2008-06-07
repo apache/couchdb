@@ -1,27 +1,23 @@
-Apache CouchDB NOTICE
-=====================
+Apache CouchDB
+Copyright 2008 The Apache Software Foundation
 
-Developed at the The Apache Software Foundation <http://www.apache.org/>:
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
 
- * Copyright 2008, Damien Katz <damien@apache.org>
- * Copyright 2008, Jan Lehnardt <jan@apache.org>
- * Copyright 2008, Christopher Lenz <cmlenz@apache.org>
- * Copyright 2008, Noah Slater <nslater@apache.org>
+This product also includes the following third-party components:
 
-Third-party components:
+ac_check_icu.m4 (http://autoconf-archive.cryp.to/ac_check_icu.html)
 
-ac_check_icu.m4 <http://autoconf-archive.cryp.to/ac_check_icu.html>
+  Copyright 2005, Akos Maroy <darkeye@tyrell.hu>
 
- * Copyright 2005, Akos Maroy <darkeye@tyrell.hu>
+jQuery (http://jquery.com/)
 
-jQuery <http://jquery.com/>
+  Copyright 2008, John Resig
 
- * Copyright 2008, John Resig
+json2.js (http://www.json.org/)
 
-json2.js <http://www.json.org/>
+  In the public domain
 
- * Public domain
+MochiWeb (http://code.google.com/p/mochiweb/)
 
-MochiWeb <http://code.google.com/p/mochiweb/>
-
- * Copyright 2007, Mochi Media Coporation
+  Copyright 2007, Mochi Media Coporation
