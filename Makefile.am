@@ -82,7 +82,7 @@ couch.app: couch.app.tpl
 	chmod +x $@
 
 %.beam: %.erl
-	erlc $<
+	$(ERLC) $<
 
 install-data-hook:
 	if test -f "$(DESTDIR)/$(couchprivlibdir)/couch_erl_driver"; then \
