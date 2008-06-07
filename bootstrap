@@ -17,14 +17,11 @@
 SCRIPT_OK=0
 SCRIPT_ERROR=1
 
-CHANGELOG_PREDICATE=true
-
 ACINCLUDE_FILE="acinclude.m4"
 ACINCLUDE_IN_FILE="acinclude.m4.in"
 AC_CHECK_ICU_COMPRESSED_FILE="build-contrib/ac_check_icu.m4_2007-09-12.gz"
 AUTHORS_FILE="authors.xml"
 BUILD_AUX_DIRECTORY="build-aux"
-CHANGELOG_FILE="ChangeLog"
 CONFIG_GUESS_COMPRESSED_FILE="build-contrib/config.guess_2007-09-12.gz"
 CONFIG_GUESS_FILE="build-aux/config.guess"
 CONFIG_SUB_COMPRESSED_FILE="build-contrib/config.sub_2007-09-12.gz"
@@ -40,7 +37,6 @@ AUTOMAKE_EXECUTABLE=$(which automake || true)
 GLIBTOOLIZE_EXECUTABLE=$(which glibtoolize || true)
 LIBTOOLIZE_EXECUTABLE=$(which libtoolize || true)
 SVN_EXECUTABLE=$(which svn || true)
-SVN2CL_EXECUTABLE=$(which svn2cl || true)
 
 basename=$(basename $0)
 
@@ -96,7 +92,6 @@ Options:
 
   -h  display a short help message and exit
   -v  display version information and exit
-  -C  do not generate a ChangeLog from Subversion
 
 Environment variables:
 
@@ -117,13 +112,6 @@ display_error () {
     exit $SCRIPT_ERROR
 }
 
-generate_dummy_changelog () {
-    # Generate a dummy ChangLog file.
-
-    echo "Warning: Generating a dummy ChangeLog file."
-    touch $CHANGELOG_FILE
-}
-
 check_svn_environment () {
     # Check the Subversion environment for sanity.
 
@@ -139,27 +127,6 @@ check_svn_environment () {
     fi > /dev/null
     if test "$SVN_CHECKOUT_BOOLEAN" != "true"; then
         echo "Warning: Unable to determine checkout information."
-    fi
-}
-
-generate_changelog () {
-    # Generate the ChangLog file using the Subversion repository.
-
-    if test "$SVN_CHECKOUT_BOOLEAN" = "true"; then
-        SVN2CL_COMMAND_ARGUMENT="."
-    fi
-    if test -n "$REPOSITORY_REVISION"; then
-        SVN2CL_COMMAND_ARGUMENT="--revision $REPOSITORY_REVISION:1 $REPOSITORY_URI"
-    fi
-    if test -z "$SVN2CL_COMMAND_ARGUMENT"; then
-        return
-    fi
-    if test ! -x "$SVN2CL_EXECUTABLE"; then
-        echo "Warning: Unable to find the svn2cl command."
-        generate_dummy_changelog
-    else
-        echo "Generating \`"$CHANGELOG_FILE"' (may take a while)"
-        $SVN2CL_EXECUTABLE --authors=$AUTHORS_FILE $SVN2CL_COMMAND_ARGUMENT
     fi
 }
 
@@ -298,7 +265,6 @@ parse_script_option_list () {
         case "$1" in
             -v) shift; display_version; exit $SCRIPT_OK;;
             -h) shift; display_help; exit $SCRIPT_OK;;
-            -C) shift; CHANGELOG_PREDICATE=false;;
             --) shift; break;;
             *) display_error "Unknown option: $1" >&2;;
         esac
@@ -306,11 +272,6 @@ parse_script_option_list () {
     cd $(dirname $0)
     process_file_collection
     check_svn_environment || true
-    if test "$CHANGELOG_PREDICATE" = "true"; then
-        generate_changelog
-    else
-        generate_dummy_changelog
-    fi
     generate_acinclude
     run_command_collection
 }

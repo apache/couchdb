@@ -13,43 +13,37 @@ To build Apache CouchDB from checkout you need some of the following installed:
  * [GNU Automake][01] (>=1.6.3) (required)
  * [GNU Autoconf][02] (>=2.59) (required)
  * [GNU Libtool][03] (required)
- * [svn2cl][04] (optional)
- * [xsltproc][05] (optional)
- * [help2man][06] (optional)
+ * [help2man][04] (optional)
 
 If you are running a Debian GNU/Linux system (or a derivative such as Ubuntu
 GNU/Linux) you can install these dependencies using the `apt-get` command:
 
-    apt-get install automake autoconf libtool subversion-tools help2man
+    apt-get install automake autoconf libtool help2man
 
 The OS X version of these dependencies may be out of date so it is recommended
-that you use [MacPorts][07] to install newer versions using the `port` command:
+that you use [MacPorts][05] to install newer versions using the `port` command:
 
     port install automake autoconf libtool help2man
-
-Note: MacPorts users will need to install svn2cl by hand if they wish to use it.
 
 ### Bootstrapping ###
 
 Note: You must repeat this step every time you update your Subversion checkout.
 
-Follow the [check out instructions][08] and bootstrap the pristine source by
+Follow the [check out instructions][06] and bootstrap the pristine source by
 running the following command:
 
     ./bootstrap
-
-You can use the `-C` option to generate a dummy `ChangeLog` file.
 
 Installation And First Run
 --------------------------
 
 You will need the following installed:
 
- * [Erlang OTP][09] (>=R11B) (required)
- * [ICU][10] (required)
- * [Mozilla SpiderMonkey][11] (required)
- * [GNU Make][12] (required)
- * [GNU Compiler Collection][13] (required)
+ * [Erlang OTP][07] (>=R11B) (required)
+ * [ICU][08] (required)
+ * [Mozilla SpiderMonkey][09] (required)
+ * [GNU Make][10] (required)
+ * [GNU Compiler Collection][11] (required)
 
 ### UNIX-like Operating Systems (inc. OS X) ###
 
@@ -134,7 +128,7 @@ On many UNIX-like systems you can run the following command:
 
 OS X provides the standard Accounts option from the System Preferences
 application or you can optionally use the Workgroup Manager application which
-can be downloaded as part of the [Server Admin Tools][14].
+can be downloaded as part of the [Server Admin Tools][12].
 
 You should make sure that the `couchdb` user has a working POSIX shell and set
 the home directory to `/usr/local/var/lib/couchdb` which is the Apache CouchDB
@@ -161,7 +155,7 @@ When Apache CouchDB starts it should eventually display the following message:
 Relax.
 
 To check that everything has worked point your web browser to
-[http://localhost:5984/_utils/index.html][15] and run the test suite.
+[http://localhost:5984/_utils/index.html][13] and run the test suite.
 
 ##### OS X #####
 
@@ -276,15 +270,13 @@ sitting in the root directory ready for distribution.
 [01]: http://www.gnu.org/software/automake/
 [02]: http://www.gnu.org/software/autoconf/
 [03]: http://www.gnu.org/software/libtool/
-[04]: http://ch.tudelft.nl/~arthur/svn2cl/
-[05]: http://xmlsoft.org/XSLT/xsltproc2.html
-[06]: http://www.gnu.org/software/help2man/
-[07]: http://www.macports.org/
-[08]: http://incubator.apache.org/couchdb/community/code.html
-[09]: http://erlang.org/
-[10]: http://icu.sourceforge.net/
-[11]: http://www.mozilla.org/js/spidermonkey/
-[12]: http://www.gnu.org/software/make/
-[13]: http://gcc.gnu.org/
-[14]: http://www.apple.com/support/downloads/serveradmintools1047.html
-[15]: http://localhost:5984/_utils/index.html
+[04]: http://www.gnu.org/software/help2man/
+[05]: http://www.macports.org/
+[06]: http://incubator.apache.org/couchdb/community/code.html
+[07]: http://erlang.org/
+[08]: http://icu.sourceforge.net/
+[09]: http://www.mozilla.org/js/spidermonkey/
+[10]: http://www.gnu.org/software/make/
+[11]: http://gcc.gnu.org/
+[12]: http://www.apple.com/support/downloads/serveradmintools1047.html
+[13]: http://localhost:5984/_utils/index.html
