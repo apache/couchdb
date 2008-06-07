@@ -10,8 +10,6 @@
 ## License for the specific language governing permissions and limitations
 ## under the License.
 
-datarootdir = @prefix@/share
-
 SUBDIRS = couchdb default init launchd logrotate.d
 
 default_sysconf_data = logrotate.d/couchdb

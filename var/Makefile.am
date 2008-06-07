@@ -10,8 +10,6 @@
 ## License for the specific language governing permissions and limitations
 ## under the License.
 
-datarootdir = @prefix@/share
-
 install-data-hook:
 	if test ! "$(mkdir_p)" = ""; then \
 	    $(mkdir_p) "$(DESTDIR)$(pkgstatelibdir)"; \

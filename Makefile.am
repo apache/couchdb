@@ -10,8 +10,6 @@
 ## License for the specific language governing permissions and limitations
 ## under the License.
 
-datarootdir = @prefix@/share
-
 SUBDIRS = bin etc src share var
 
 pkgdoc_DATA = AUTHORS.gz BUGS.gz CHANGES.gz NEWS.gz README.gz THANKS.gz

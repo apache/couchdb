@@ -10,8 +10,6 @@
 ## License for the specific language governing permissions and limitations
 ## under the License.
 
-datarootdir = @prefix@/share
-
 ICU_LOCAL_FLAGS = $(ICU_LOCAL_CFLAGS) $(ICU_LOCAL_LDFLAGS)
 
 couchprivlibdir = $(erlanglibdir)/couch-$(version)/priv/lib

@@ -10,8 +10,6 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
-datarootdir = @prefix@/share
-
 mochiwebebindir = $(erlanglibdir)/mochiweb-r76/ebin
 
 mochiweb_file_collection = \

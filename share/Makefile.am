@@ -10,8 +10,6 @@
 ## License for the specific language governing permissions and limitations
 ## under the License.
 
-datarootdir = @prefix@/share
-
 nobase_dist_pkgdata_DATA = \
     server/main.js \
     www/browse/_compact_database.html \

@@ -10,8 +10,6 @@
 ## License for the specific language governing permissions and limitations
 ## under the License.
 
-datarootdir = @prefix@/share
-
 bin_SCRIPTS = couchdb couchjs
 
 if HELP2MAN
