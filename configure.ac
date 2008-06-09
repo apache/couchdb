@@ -12,7 +12,7 @@ dnl under the License.
 
 m4_include([m4/ac_check_icu.m4])
 
-AC_INIT([LOCAL_PACKAGE_NAME], [LOCAL_VERSION], [], [LOCAL_PACKAGE_IDENTIFIER])
+AC_INIT([LOCAL_PACKAGE_NAME], [LOCAL_VERSION], [], [LOCAL_PACKAGE_TARNAME])
 
 AC_PREREQ([2.59])
 
@@ -199,6 +199,7 @@ AM_CONDITIONAL([HELP2MAN], [test x${help2man_enabled} = xtrue])
 AC_SUBST([package_author_name], ["LOCAL_PACKAGE_AUTHOR_NAME"])
 AC_SUBST([package_author_address], ["LOCAL_PACKAGE_AUTHOR_ADDRESS"])
 AC_SUBST([package_identifier], ["LOCAL_PACKAGE_IDENTIFIER"])
+AC_SUBST([package_tarname], ["LOCAL_PACKAGE_TARNAME"])
 AC_SUBST([package_name], ["LOCAL_PACKAGE_NAME"])
 
 AC_SUBST([version], ["LOCAL_VERSION"])
@@ -210,12 +211,12 @@ AC_SUBST([version_release], ["LOCAL_VERSION_RELEASE"])
 
 AC_SUBST([bug_uri], ["LOCAL_BUG_URI"])
 
-AC_SUBST([pkgconfdir], [${sysconfdir}/${PACKAGE_TARNAME}])
-AC_SUBST([pkgdatadir], [${datadir}/${PACKAGE_TARNAME}])
-AC_SUBST([pkgdocdir], [${datadir}/doc/${PACKAGE_TARNAME}])
-AC_SUBST([pkglibdir], [${libdir}/${PACKAGE_TARNAME}])
-AC_SUBST([pkgstatelibdir], [${localstatedir}/lib/${PACKAGE_TARNAME}])
-AC_SUBST([pkgstatelogdir], [${localstatedir}/log/${PACKAGE_TARNAME}])
+AC_SUBST([pkgconfdir], [${sysconfdir}/${package_identifier}])
+AC_SUBST([pkgdatadir], [${datadir}/${package_identifier}])
+AC_SUBST([pkgdocdir], [${datadir}/doc/${package_identifier}])
+AC_SUBST([pkglibdir], [${libdir}/${package_identifier}])
+AC_SUBST([pkgstatelibdir], [${localstatedir}/lib/${package_identifier}])
+AC_SUBST([pkgstatelogdir], [${localstatedir}/log/${package_identifier}])
 AC_SUBST([libbindir], [${pkglibdir}/bin])
 AC_SUBST([erlangbindir], [${pkglibdir}/erlang/bin])
 AC_SUBST([erlanglibdir], [${pkglibdir}/erlang/lib])
