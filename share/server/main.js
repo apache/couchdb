@@ -102,13 +102,13 @@ while (cmd = eval(readline())) {
         print(toJSON(buf));
         break;
 
-      case "combine":
+      case "rereduce":
       case "reduce":
         {
         var keys = null;
         var values = null;
         var reduceFuns = cmd[1];
-        var is_combine = false;
+        var rereduce = false;
         
         if (cmd[0] == "reduce") {
           var kvs = cmd[2];
@@ -120,7 +120,7 @@ while (cmd = eval(readline())) {
           }
         } else {
           values = cmd[2];
-          is_combine = true;
+          rereduce = true;
         }
 
         for (var i in reduceFuns) {
@@ -130,7 +130,7 @@ while (cmd = eval(readline())) {
         var reductions = new Array(funs.length);
         for(var i = 0; i < reduceFuns.length; i++) {
           try {
-            reductions[i] = reduceFuns[i](keys, values, is_combine);
+            reductions[i] = reduceFuns[i](keys, values, rereduce);
           } catch (err) {
             if (err == "fatal_error") {
               throw {error: "reduce_runtime_error",

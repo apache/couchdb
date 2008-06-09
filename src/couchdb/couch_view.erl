@@ -115,9 +115,9 @@ fold_reduce({reduce, NthRed, Lang, #view{btree=Bt, reduce_funs=RedFuns}}, Dir, S
         fun(reduce, KVs) ->
             {ok, Reduced} = couch_query_servers:reduce(Lang, [FunSrc], KVs),
             {0, PreResultPadding ++ Reduced ++ PostResultPadding};
-        (combine, Reds) ->
+        (rereduce, Reds) ->
             UserReds = [[lists:nth(NthRed, UserRedsList)] || {_, UserRedsList} <- Reds],
-            {ok, Reduced} = couch_query_servers:combine(Lang, [FunSrc], UserReds),
+            {ok, Reduced} = couch_query_servers:rereduce(Lang, [FunSrc], UserReds),
             {0, PreResultPadding ++ Reduced ++ PostResultPadding}
         end,
     WrapperFun = fun({GroupedKey, _}, PartialReds, Acc0) ->
@@ -154,7 +154,7 @@ reduce_to_count(Reductions) ->
     couch_btree:final_reduce(
         fun(reduce, KVs) ->
             {length(KVs), []};
-        (combine, Reds) ->
+        (rereduce, Reds) ->
             {lists:sum([Count0 || {Count0, _} <- Reds]), []}
         end, Reductions),
     Count.
@@ -485,10 +485,10 @@ disk_group_to_mem(Db, Fd, #group{id_btree=IdState,def_lang=Lang,views=Views}=Gro
                 fun(reduce, KVs) ->
                     {ok, Reduced} = couch_query_servers:reduce(Lang, FunSrcs, KVs),
                     {length(KVs), Reduced};
-                (combine, Reds) ->
+                (rereduce, Reds) ->
                     Count = lists:sum([Count0 || {Count0, _} <- Reds]),
                     UserReds = [UserRedsList || {_, UserRedsList} <- Reds],
-                    {ok, Reduced} = couch_query_servers:combine(Lang, FunSrcs, UserReds),
+                    {ok, Reduced} = couch_query_servers:rereduce(Lang, FunSrcs, UserReds),
                     {Count, Reduced}
                 end,
             {ok, Btree} = couch_btree:open(BtreeState, Fd,
