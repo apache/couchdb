@@ -315,6 +315,7 @@ var tests = {
         docs.push({keys:["d", "b"]});
         docs.push({keys:["d", "c"]});
         T(db.bulkSave(docs).ok);
+        T(db.info().doc_count == ((i - 1) * 10 * 11) + ((j + 1) * 11));
       }
       
       map = function (doc) {emit(doc.keys, 1)};
