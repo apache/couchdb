@@ -17,7 +17,7 @@
 
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2,code_change/3,stop/0]).
 -export([start_doc_map/2, map_docs/2, stop_doc_map/1]).
--export([reduce/3, combine/3]).
+-export([reduce/3, rereduce/3]).
 -export([test/0, test/1]).
 
 -include("couch_db.hrl").
@@ -141,15 +141,15 @@ group_reductions_results(List) ->
      [Heads | group_reductions_results(Tails)]
     end.
 
-combine(_Lang, [], _ReducedValues) ->
+rereduce(_Lang, [], _ReducedValues) ->
     {ok, []};
-combine(Lang, RedSrcs, ReducedValues) ->
+rereduce(Lang, RedSrcs, ReducedValues) ->
     Port = get_linked_port(Lang),
     Grouped = group_reductions_results(ReducedValues),
     Results = lists:zipwith(
         fun(FunSrc, Values) ->
             {true, {Result}} = 
-                prompt(Port, {"combine", {FunSrc}, list_to_tuple(Values)}),
+                prompt(Port, {"rereduce", {FunSrc}, list_to_tuple(Values)}),
             Result
         end, RedSrcs, Grouped),
         

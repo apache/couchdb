@@ -440,13 +440,13 @@ btree_by_id_join(Id, {Seq, Deleted, Tree}) ->
 btree_by_id_reduce(reduce, FullDocInfos) ->
     % count the number of deleted documents
     length([1 || #full_doc_info{deleted=false} <- FullDocInfos]);
-btree_by_id_reduce(combine, Reds) ->
+btree_by_id_reduce(rereduce, Reds) ->
     lists:sum(Reds).
             
 btree_by_seq_reduce(reduce, DocInfos) ->
     % count the number of deleted documents
     length(DocInfos);
-btree_by_seq_reduce(combine, Reds) ->
+btree_by_seq_reduce(rereduce, Reds) ->
     lists:sum(Reds).
 
 init_db(DbName, Filepath, Fd, Header) ->
