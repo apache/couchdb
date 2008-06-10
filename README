@@ -268,9 +268,9 @@ If everything was successful you should now have a pristine checkout.
 
 The following steps should be taken prior to preparing the release:
 
-    svn cp trunk branches/X.X.X
-    svn cp branches/X.X.X tags/X.X.X
-    svn export tags/0.8.0 export
+    svn cp trunk branches/Y.Y.x
+    svn cp branches/Y.Y.x tags/Y.Y.Y
+    svn export tags/Y.Y.Y export
 
 You must then use the `export` directory to prepare the release.
 
