@@ -264,13 +264,21 @@ following command:
 
 If everything was successful you should now have a pristine checkout.
 
-### Preparing For Distribution ###
+### Making a Release ###
+
+The following steps should be taken prior to preparing the release:
+
+    svn cp trunk branches/X.X.X
+    svn cp branches/X.X.X tags/X.X.X
+    svn export tags/0.8.0 export
+
+You must then use the `export` directory to prepare the release.
 
 To build the source for distribution you should then run the following command:
 
     ./configure && make distcheck
 
-If everything was successful you should see a `zip` file and/or a `tar.gz` file
+If everything was successful you should see an appropriately named `tar.gz` file
 sitting in the root directory ready for distribution.
 
 ### Release Checklist ###
