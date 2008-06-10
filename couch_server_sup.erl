@@ -77,7 +77,7 @@ start_server(InputIniFilename) ->
     RemoteRestart = list_to_atom(proplists:get_value({"Couch", "AllowRemoteRestart"}, Ini, "undefined")),
     ServerOptions = [{remote_restart, RemoteRestart}],
     QueryServers = [{Lang, QueryExe} || {{"Couch Query Servers", Lang}, QueryExe} <- Ini],
-    
+
     ChildProcesses =
         [{couch_log,
             {couch_log, start_link, [LogFile, LogLevel]},
@@ -137,11 +137,11 @@ start_server(InputIniFilename) ->
                 [couch_ft_query]}]
         end,
 
-    io:format("couch ~s (LogLevel=~s)~n", [couch_server:get_version(), LogLevel]),
+    io:format("Apache CouchDB ~s (LogLevel=~s)~n", [couch_server:get_version(), LogLevel]),
     io:format("~s~n~n", [ConsoleStartupMsg]),
-    
+
     couch_util:start_driver(UtilDriverDir),
-    
+
     % ensure these applications are running
     application:start(inets),
     application:start(crypto),
