@@ -1,6 +1,10 @@
 Apache CouchDB README
 =====================
 
+Apache CouchDB is alpha software and still under heavy development. Please be
+aware that important areas such as the public API or internal database format
+may see backwards incompatible changes between versions.
+
 Building From Subversion
 ------------------------
 
