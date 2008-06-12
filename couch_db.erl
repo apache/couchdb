@@ -597,6 +597,7 @@ update_loop(#db{fd=Fd,name=Name,
                 [Db#db.update_seq, NewSeq]),
             Pid = spawn_link(couch_db, start_copy_compact_int, [Db, false]),
             Db2 = Db#db{compactor_pid=Pid},
+            couch_file:close(NewFd),
             update_loop(Db2)
         end;
     {OrigFrom, increment_update_seq} ->
