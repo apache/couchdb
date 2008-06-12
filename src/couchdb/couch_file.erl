@@ -93,7 +93,19 @@ expand(Fd, Bytes) when Bytes > 0 ->
 %%----------------------------------------------------------------------
 
 append_term(Fd, Term) ->
-    gen_server:call(Fd, {append_term, Term}).
+    append_binary(Fd, term_to_binary(Term, [compressed])).
+
+
+%%----------------------------------------------------------------------
+%% Purpose: To append an Erlang binary to the end of the file.
+%% Args:    Erlang term to serialize and append to the file.
+%% Returns: {ok, Pos} where Pos is the file offset to the beginning the
+%%  serialized  term. Use pread_term to read the term back.
+%%  or {error, Reason}.
+%%----------------------------------------------------------------------
+    
+append_binary(Fd, Bin) ->
+    gen_server:call(Fd, {append_bin, Bin}).
 
 
 %%----------------------------------------------------------------------
@@ -104,7 +116,18 @@ append_term(Fd, Term) ->
 %%----------------------------------------------------------------------
 
 pread_term(Fd, Pos) ->
-    gen_server:call(Fd, {pread_term, Pos}).
+    {ok, Bin} = pread_binary(Fd, Pos),
+    {ok, binary_to_term(Bin)}.
+
+%%----------------------------------------------------------------------
+%% Purpose: Reads a binrary from a file that was written with append_binary
+%% Args:    Pos, the offset into the file where the term is serialized.
+%% Returns: {ok, Term}
+%%  or {error, Reason}.
+%%----------------------------------------------------------------------
+
+pread_binary(Fd, Pos) ->
+    gen_server:call(Fd, {pread_bin, Pos}).
 
 
 %%----------------------------------------------------------------------
@@ -144,30 +167,35 @@ close(Fd) ->
 
 
 write_header(Fd, Prefix, Data) ->
-    ok = sync(Fd),
     TermBin = term_to_binary(Data),
     % the size of all the bytes written to the header, including the md5 signature (16 bytes)
     FilledSize = size(Prefix) + size(TermBin) + 16,
+    {TermBin2, FilledSize2} =
     case FilledSize > ?HEADER_SIZE of
     true ->
         % too big!
-        {error, error_header_too_large};
+        {ok, Pos} = append_binary(Fd, TermBin),
+        PtrBin = term_to_binary({pointer_to_header_data, Pos}),
+        {PtrBin, size(Prefix) + size(PtrBin) + 16};
     false ->
-        % pad out the header with zeros, then take the md5 hash
-        PadZeros = <<0:(8*(?HEADER_SIZE - FilledSize))>>,
-        Sig = erlang:md5([TermBin, PadZeros]),
-        % now we assemble the final header binary and write to disk
-        WriteBin = <<Prefix/binary, TermBin/binary, PadZeros/binary, Sig/binary>>,
-        ?HEADER_SIZE = size(WriteBin), % sanity check
-        DblWriteBin = [WriteBin, WriteBin],
-        ok = pwrite(Fd, 0, DblWriteBin),
-        ok = sync(Fd)
-    end.
+        {TermBin, FilledSize}
+    end,
+    ok = sync(Fd),
+    % pad out the header with zeros, then take the md5 hash
+    PadZeros = <<0:(8*(?HEADER_SIZE - FilledSize2))>>,
+    Sig = erlang:md5([TermBin2, PadZeros]),
+    % now we assemble the final header binary and write to disk
+    WriteBin = <<Prefix/binary, TermBin2/binary, PadZeros/binary, Sig/binary>>,
+    ?HEADER_SIZE = size(WriteBin), % sanity check
+    DblWriteBin = [WriteBin, WriteBin],
+    ok = pwrite(Fd, 0, DblWriteBin),
+    ok = sync(Fd).
 
 
 read_header(Fd, Prefix) ->
     {ok, Bin} = couch_file:pread(Fd, 0, 2*(?HEADER_SIZE)),
     <<Bin1:(?HEADER_SIZE)/binary, Bin2:(?HEADER_SIZE)/binary>> = Bin,
+    Result =
     % read the first header
     case extract_header(Prefix, Bin1) of
     {ok, Header1} ->
@@ -200,9 +228,14 @@ read_header(Fd, Prefix) ->
             % return the error, no need to log anything as the caller will be responsible for dealing with the error.
             {error, Error}
         end
+    end,
+    case Result of
+    {ok, {pointer_to_header_data, Ptr}} ->
+        pread_term(Fd, Ptr);
+    _ ->
+        Result
     end.
-
-
+    
 extract_header(Prefix, Bin) ->
     SizeOfPrefix = size(Prefix),
     SizeOfTermBin = ?HEADER_SIZE -
@@ -300,17 +333,16 @@ handle_call(sync, _From, Fd) ->
 handle_call({truncate, Pos}, _From, Fd) ->
     {ok, Pos} = file:position(Fd, Pos),
     {reply, file:truncate(Fd), Fd};
-handle_call({append_term, Term}, _From, Fd) ->
-    Bin = term_to_binary(Term, [compressed]),
-    TermLen = size(Bin),
-    Bin2 = <<TermLen:32, Bin/binary>>,
+handle_call({append_bin, Bin}, _From, Fd) ->
+    Len = size(Bin),
+    Bin2 = <<Len:32, Bin/binary>>,
     {ok, Pos} = file:position(Fd, eof),
     {reply, {file:pwrite(Fd, Pos, Bin2), Pos}, Fd};
-handle_call({pread_term, Pos}, _From, Fd) ->
+handle_call({pread_bin, Pos}, _From, Fd) ->
     {ok, <<TermLen:32>>}
         = file:pread(Fd, Pos, 4),
     {ok, Bin} = file:pread(Fd, Pos + 4, TermLen),
-    {reply, {ok, binary_to_term(Bin)}, Fd}.
+    {reply, {ok, Bin}, Fd}.
 
 
 handle_cast(close, Fd) ->
