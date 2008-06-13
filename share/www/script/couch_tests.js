@@ -583,6 +583,14 @@ var tests = {
     if (debug) debugger;
 
     var numDocs = 500;
+    
+    function makebigstring(power) {
+      var str = "a";
+      while(power-- > 0) {
+        str = str + str;
+      }
+      return str;
+    }
 
     var designDoc = {
       _id:"_design/test",
@@ -594,7 +602,9 @@ var tests = {
         summate: {map:"function (doc) {emit(doc.integer, doc.integer)};",
                   reduce:"function (keys, values) { return sum(values); };"},
         summate2: {map:"function (doc) {emit(doc.integer, doc.integer)};",
-                  reduce:"function (keys, values) { return sum(values); };"}
+                  reduce:"function (keys, values) { return sum(values); };"},
+        huge_src_and_results: {map: "function(doc) { if (doc._id == \"1\") { emit(\"" + makebigstring(16) + "\", null) }}",
+                  reduce:"function (keys, values) { return \"" + makebigstring(16) + "\"; };"}
       }
     }
     T(db.save(designDoc).ok);
