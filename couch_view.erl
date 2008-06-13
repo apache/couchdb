@@ -481,7 +481,7 @@ init_group(Db, Fd, #group{def_lang=Lang,views=Views}=Group,
         {Seq, IdBtreeState, ViewStates} = _IndexHeaderData) ->
     {ok, IdBtree} = couch_btree:open(IdBtreeState, Fd),
     Views2 = lists:zipwith(
-        fun(BtreeState, #view{btree=BtreeState,reduce_funs=RedFuns}=View) ->
+        fun(BtreeState, #view{reduce_funs=RedFuns}=View) ->
             FunSrcs = [FunSrc || {_Name, FunSrc} <- RedFuns],
             ReduceFun = 
                 fun(reduce, KVs) ->
