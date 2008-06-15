@@ -30,12 +30,6 @@ CLEANFILES = $(init_DATA) $(nobase_sysconf_DATA) $(launchd_DATA)
 transform = @program_transform_name@
 couchdb_command_name = `echo couchdb | sed '$(transform)'`
 
-abs_bindir = $(abspath $(bindir))
-abs_localstatedir = $(abspath $(localstatedir))
-abs_sysconfdir = $(abspath $(sysconfdir))
-abs_pkgconfdir = $(abspath $(pkgconfdir))
-abs_erlangbindir = $(abspath $(erlangbindir))
-
 default/couchdb: default/couchdb.tpl
 	if test "$(mkdir_p)"; then \
 	    $(mkdir_p) default; \
@@ -45,9 +39,9 @@ default/couchdb: default/couchdb.tpl
 	    fi \
 	fi
 	sed -e "s|%configure_input%|$@. Generated from $< by configure.|" \
-	    -e "s|%pkgconfdir%|$(abs_pkgconfdir)|g" \
-	    -e "s|%sysconfdir%|$(abs_sysconfdir)|" \
-	    -e "s|%localstatedir%|$(abs_localstatedir)|" \
+	    -e "s|%pkgconfdir%|$(pkgconfdir)|g" \
+	    -e "s|%sysconfdir%|$(sysconfdir)|" \
+	    -e "s|%localstatedir%|$(localstatedir)|" \
 	< $< > $@
 
 init/couchdb: init/couchdb.tpl
@@ -59,9 +53,9 @@ init/couchdb: init/couchdb.tpl
 	    fi \
 	fi
 	sed -e "s|%configure_input%|$@. Generated from $< by configure.|" \
-	    -e "s|%bindir%|$(abs_bindir)|" \
-	    -e "s|%sysconfdir%|$(abs_sysconfdir)|" \
-	    -e "s|%erlangbindir%|$(abs_erlangbindir)|" \
+	    -e "s|%bindir%|$(bindir)|" \
+	    -e "s|%sysconfdir%|$(sysconfdir)|" \
+	    -e "s|%erlangbindir%|$(erlangbindir)|" \
 	    -e "s|%couchdb_command_name%|$(couchdb_command_name)|" \
 	< $< > $@
 
@@ -77,7 +71,7 @@ launchd/org.apache.couchdb.plist: launchd/org.apache.couchdb.plist.tpl
 	    fi \
 	fi
 	sed -e "s|%configure_input%|$@. Generated from $< by configure.|" \
-	    -e "s|%bindir%|$(abs_bindir)|" \
+	    -e "s|%bindir%|$(bindir)|" \
 	    -e "s|%couchdb_command_name%|$(couchdb_command_name)|" \
 	< $< > $@
 
