@@ -30,16 +30,6 @@ M4_DIRECTORY="m4"
 M4_AC_CHECK_ICU_FILE="m4/ac_check_icu.m4"
 REPOSITORY_URI="http://svn.apache.org/repos/asf/incubator/couchdb/trunk"
 
-ACLOCAL_EXECUTABLE=`which aclocal || true`
-AUTOCONF_EXECUTABLE=`which autoconf || true`
-AUTOHEADER_EXECUTABLE=`which autoheader || true`
-AUTOMAKE_EXECUTABLE=`which automake || true`
-GLIBTOOLIZE_EXECUTABLE=`which glibtoolize || true`
-M4_EXECUTABLE=`which m4 || true`
-GM4_EXECUTABLE=`which gm4 || true`
-LIBTOOLIZE_EXECUTABLE=`which libtoolize || true`
-SVN_EXECUTABLE=`which svn || true`
-
 basename=`basename $0`
 
 extract_configuration_variable () {
@@ -50,11 +40,11 @@ extract_configuration_variable () {
     echo "changequote(\`[', \`]')" > $temporary_file
     sed "s/m4_//" < $ACINCLUDE_IN_FILE >> $temporary_file
     echo $variable_name >> $temporary_file
-    if test -n "$M4_EXECUTABLE"; then
-        $M4_EXECUTABLE $temporary_file | grep -v "^$"
+    if test -f `which m4`; then
+        `which m4` $temporary_file | grep -v "^$"
     else
-        if test -n "$GM4_EXECUTABLE"; then
-            $GM4_EXECUTABLE $temporary_file | grep -v "^$"
+        if test -f `which gm4`; then
+            `which gm4` $temporary_file | grep -v "^$"
         fi
     fi
     rm -f $temporary_file
@@ -119,14 +109,14 @@ display_error () {
 check_svn_environment () {
     # Check the Subversion environment for sanity.
 
-    if test -z "$SVN_EXECUTABLE"; then
+    if test -f `which svn`; then
         echo "Warning: Unable to find the svn command."
         return $SCRIPT_ERROR
     fi
     if test -n "$REPOSITORY_REVISION"; then
         return
     fi
-    if test -n "`$SVN_EXECUTABLE info . 2> /dev/null`"; then
+    if test -n "`\`which svn\` info . 2> /dev/null`"; then
        SVN_CHECKOUT_BOOLEAN="true"
     fi
     if test "$SVN_CHECKOUT_BOOLEAN" != "true"; then
@@ -147,7 +137,7 @@ generate_acinclude () {
         sed "s/%release%//" < $ACINCLUDE_IN_FILE > $ACINCLUDE_FILE
     else
         if test "$SVN_CHECKOUT_BOOLEAN" = "true"; then
-            revision_number=`$SVN_EXECUTABLE info . | \
+            revision_number=`\`which svn\` info . | \
                 awk "/Revision:/{print \\$2}"`
         fi
         if test -n "$REPOSITORY_REVISION"; then
@@ -179,9 +169,9 @@ process_file_collection () {
 run_aclocal () {
     # Run the correct version of aclocal.
 
-    if test -x "$ACLOCAL_EXECUTABLE"; then
-        echo "Running $ACLOCAL_EXECUTABLE"
-        $ACLOCAL_EXECUTABLE -I m4
+    if test -f `which aclocal`; then
+        echo "Running aclocal"
+        `which aclocal` -I m4
     else
         echo "Can't find aclocal"
         exit $SCRIPT_ERROR
@@ -191,13 +181,13 @@ run_aclocal () {
 run_libtoolize () {
     # Run the correct version of libtoolize.
 
-    if test -x "$LIBTOOLIZE_EXECUTABLE"; then
-        echo "Running $LIBTOOLIZE_EXECUTABLE"
-        $LIBTOOLIZE_EXECUTABLE -f -c
+    if test -f `which libtoolize`; then
+        echo "Running libtoolize"
+        `which libtoolize` -f -c
     else
-        if test -x "`which $GLIBTOOLIZE_EXECUTABLE`"; then
-            echo "Running $GLIBTOOLIZE_EXECUTABLE"
-            $GLIBTOOLIZE_EXECUTABLE -f -c
+        if test -f `which glibtoolize`; then
+            echo "Running glibtoolize"
+            `which glibtoolize` -f -c
         else
             echo "Can't find libtoolize or glibtoolize"
             exit $SCRIPT_ERROR
@@ -208,9 +198,9 @@ run_libtoolize () {
 run_autoheader () {
     # Run the correct version of autoheader.
 
-    if test -x "$AUTOHEADER_EXECUTABLE"; then
-        echo "Running $AUTOHEADER_EXECUTABLE"
-        $AUTOHEADER_EXECUTABLE -f
+    if test -f `which autoheader`; then
+        echo "Running autoheader"
+        `which autoheader` -f
     else
         echo "Can't find autoheader"
         exit $SCRIPT_ERROR
@@ -221,9 +211,9 @@ run_automake () {
     # Run the correct version of automake.
 
     AUTOMAKE_OPTION_COLLECTION=""
-    if test -x "$AUTOMAKE_EXECUTABLE"; then
-        echo "Running $AUTOMAKE_EXECUTABLE"
-        $AUTOMAKE_EXECUTABLE -f -c -a --gnits
+    if test -f `which automake`; then
+        echo "Running automake"
+        `which automake` -f -c -a --gnits
     else
         echo "Can't find automake"
         exit $SCRIPT_ERROR
@@ -233,9 +223,9 @@ run_automake () {
 run_autoconf () {
     # Run the correct version of autoconf.
 
-    if test -x "$AUTOCONF_EXECUTABLE"; then
-        echo "Running $AUTOCONF_EXECUTABLE"
-        $AUTOCONF_EXECUTABLE -f
+    if test -f `which autoconf`; then
+        echo "Running autoconf"
+        `which autoconf` -f
     else
         echo "Can't find autoconf"
         exit $SCRIPT_ERROR
