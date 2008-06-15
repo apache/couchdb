@@ -35,6 +35,8 @@ AUTOCONF_EXECUTABLE=`which autoconf || true`
 AUTOHEADER_EXECUTABLE=`which autoheader || true`
 AUTOMAKE_EXECUTABLE=`which automake || true`
 GLIBTOOLIZE_EXECUTABLE=`which glibtoolize || true`
+M4_EXECUTABLE=`which m4 || true`
+GM4_EXECUTABLE=`which gm4 || true`
 LIBTOOLIZE_EXECUTABLE=`which libtoolize || true`
 SVN_EXECUTABLE=`which svn || true`
 
@@ -48,7 +50,13 @@ extract_configuration_variable () {
     echo "changequote(\`[', \`]')" > $temporary_file
     sed "s/m4_//" < $ACINCLUDE_IN_FILE >> $temporary_file
     echo $variable_name >> $temporary_file
-    m4 $temporary_file | grep -v "^$"
+    if -n "$M4_EXECUTABLE"; then
+        $M4_EXECUTABLE $temporary_file | grep -v "^$"
+    else
+        if -n "$GM4_EXECUTABLE"; then
+            $GM4_EXECUTABLE $temporary_file | grep -v "^$"
+        fi
+    fi
     rm -f $temporary_file
 }
 
