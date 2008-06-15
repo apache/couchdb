@@ -124,7 +124,7 @@ check_svn_environment () {
     fi
     if test -n "`$SVN_EXECUTABLE info . 2> /dev/null`"; then
        SVN_CHECKOUT_BOOLEAN="true"
-    fi > /dev/null
+    fi
     if test "$SVN_CHECKOUT_BOOLEAN" != "true"; then
         echo "Warning: Unable to determine checkout information."
     fi
@@ -144,7 +144,7 @@ generate_acinclude () {
     else
         if test "$SVN_CHECKOUT_BOOLEAN" = "true"; then
             revision_number=`$SVN_EXECUTABLE info . | \
-                awk "/Revision:/{print \$2}"`
+                awk "/Revision:/{print \\$2}"`
         fi
         if test -n "$REPOSITORY_REVISION"; then
             revision_number="$REPOSITORY_REVISION"
