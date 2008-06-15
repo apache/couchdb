@@ -45,10 +45,6 @@ extract_configuration_variable () {
 
     variable_name=$1
     temporary_file=`mktemp`
-    if [ $? -ne 0 ]; then
-        echo "Error: Unable to create a temporary file."
-        exit $SCRIPT_ERROR
-    fi
     echo "changequote(\`[', \`]')" > $temporary_file
     sed "s/m4_//" < $ACINCLUDE_IN_FILE >> $temporary_file
     echo $variable_name >> $temporary_file
