@@ -105,11 +105,11 @@ display_error () {
 _load_configuration () {
     # Load ini configuration and overwrite default variables.
 
-    dbrootdir_ini_value=`awk -F = "/^DbRootDir=/{print \$2}" < $INI_FILE`
+    dbrootdir_ini_value=`%AWK% -F = "/^DbRootDir=/{print \$2}" < $INI_FILE`
     if test -n "$dbrootdir_ini_value"; then
         LIB_DIRECTORY=$dbrootdir_ini_value
     fi
-    logfile_ini_value=`awk -F = "/^LogFile=/{print \$2}" < $INI_FILE`
+    logfile_ini_value=`%AWK% -F = "/^LogFile=/{print \$2}" < $INI_FILE`
     if test -n "$logfile_ini_value"; then
         LOG_DIRECTORY=`dirname $logfile_ini_value`
     fi
