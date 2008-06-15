@@ -106,13 +106,13 @@ fi
 
 erlang_version_error="The installed Erlang version is less than 5.5.0 (R11B)."
 
-version=$(${ERL} -version 2>&1 | ${SED} "s/[[^0-9]]/ /g")
+version=`${ERL} -version 2>&1 | ${SED} "s/[[^0-9]]/ /g"`
 
-if test $(echo $version | ${AWK} "{print \$1}") -lt 5; then
+if test `echo $version | ${AWK} "{print \$1}"` -lt 5; then
     AC_MSG_ERROR([$erlang_version_error])
 fi
 
-if test $(echo $version | ${AWK} "{print \$2}") -lt 5; then
+if test `echo $version | ${AWK} "{print \$2}"` -lt 5; then
     AC_MSG_ERROR([$erlang_version_error])
 fi
 

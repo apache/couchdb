@@ -19,7 +19,7 @@ SCRIPT_ERROR=1
 
 DEFAULT_VERSION=170
 
-basename=$(basename $0)
+basename=`basename $0`
 
 display_version () {
     # Display version and copyright information.
@@ -79,7 +79,7 @@ run_couchjs () {
 parse_script_option_list () {
     # Parse the script option list and take the appropriate action.
 
-    if ! argument_list=$(getopt hV $@); then
+    if test ! argument_list=`getopt hV $@`; then
         display_error
     fi
     eval set -- "$argument_list"
@@ -91,7 +91,7 @@ parse_script_option_list () {
             *) break;;
         esac
     done
-    option_list=$(echo $@ | sed 's/--//')
+    option_list=`echo $@ | sed 's/--//'`
     if test -z "$option_list"; then
         display_error "You must specify a FILE."
     fi

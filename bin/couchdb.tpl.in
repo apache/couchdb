@@ -37,7 +37,7 @@ STDERR_FILE=couchdb.stderr
 HEART_COMMAND="%bindir%/%couchdb_command_name% -k"
 HEART_BEAT_TIMEOUT=11
 
-basename=$(basename $0)
+basename=`basename $0`
 
 display_version () {
     # Display version and copyright information.
@@ -105,19 +105,19 @@ display_error () {
 _load_configuration () {
     # Load ini configuration and overwrite default variables.
 
-    dbrootdir_ini_value=$(awk -F = "/^DbRootDir=/{print \$2}" < $INI_FILE)
+    dbrootdir_ini_value=`awk -F = "/^DbRootDir=/{print \$2}" < $INI_FILE`
     if test -n "$dbrootdir_ini_value"; then
         LIB_DIRECTORY=$dbrootdir_ini_value
     fi
-    logfile_ini_value=$(awk -F = "/^LogFile=/{print \$2}" < $INI_FILE)
+    logfile_ini_value=`awk -F = "/^LogFile=/{print \$2}" < $INI_FILE`
     if test -n "$logfile_ini_value"; then
-        LOG_DIRECTORY=$(dirname $logfile_ini_value)
+        LOG_DIRECTORY=`dirname $logfile_ini_value`
     fi
 }
 
 _get_pid () {
     if test -f $PID_FILE; then
-        PID=$(cat $PID_FILE)
+        PID=`cat $PID_FILE`
     fi
     echo $PID
 }
@@ -125,7 +125,7 @@ _get_pid () {
 check_status () {
     # Check the status of the running Apache CouchDB process.
 
-    PID=$(_get_pid)
+    PID=`_get_pid`
     if test -n "$PID"; then
         if kill -0 $PID 2> /dev/null; then
             echo "Apache CouchDB is running as process $PID. Time to relax."
@@ -154,14 +154,14 @@ check_environment () {
         exit $SCRIPT_ERROR
     fi
     message_prefix="Apache CouchDB needs write permission on data file"
-    for file in $(find $LIB_DIRECTORY -type f); do
+    for file in `find $LIB_DIRECTORY -type f`; do
         if test ! -w $file; then
             echo "$message_prefix: $file" >&2
             exit $SCRIPT_ERROR
         fi
     done
     message_prefix="Apache CouchDB needs write permission on log file"
-    for file in $(find $LOG_DIRECTORY -type f); do
+    for file in `find $LOG_DIRECTORY -type f`; do
         if test ! -w $file; then
             echo "$message_prefix: $file" >&2
             exit $SCRIPT_ERROR
@@ -239,9 +239,9 @@ start_couchdb () {
             while true; do
                 export HEART_COMMAND
                 export HEART_BEAT_TIMEOUT
-                $(eval $command -pidfile $PID_FILE -heart \
-                    > $STDOUT_FILE 2> $STDERR_FILE) || true
-                PID=$(_get_pid)
+                `eval $command -pidfile $PID_FILE -heart \
+                    > $STDOUT_FILE 2> $STDERR_FILE` || true
+                PID=`_get_pid`
                 if test -n "$PID"; then
                     if kill -0 $PID 2> /dev/null; then
                         # Found an existing process, do not respawn.
@@ -273,7 +273,7 @@ EOF
 stop_couchdb () {
     # Send SIGHUP to the running Apache CouchDB process.
 
-    PID=$(_get_pid)
+    PID=`_get_pid`
     if test -n "$PID"; then
         # Clean up PID file or leave stale for respawn.
         if test "$1" = "false"; then
@@ -305,7 +305,7 @@ stop_couchdb () {
 parse_script_option_list () {
     # Parse the script option list and take the appropriate action.
 
-    if ! argument_list=$(getopt hVc:ibp:r:Ro:e:skd $@); then
+    if test ! argument_list=`getopt hVc:ibp:r:Ro:e:skd $@`; then
         display_error
     fi
     eval set -- "$argument_list"
