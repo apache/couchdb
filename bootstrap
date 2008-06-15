@@ -50,10 +50,10 @@ extract_configuration_variable () {
     echo "changequote(\`[', \`]')" > $temporary_file
     sed "s/m4_//" < $ACINCLUDE_IN_FILE >> $temporary_file
     echo $variable_name >> $temporary_file
-    if -n "$M4_EXECUTABLE"; then
+    if test -n "$M4_EXECUTABLE"; then
         $M4_EXECUTABLE $temporary_file | grep -v "^$"
     else
-        if -n "$GM4_EXECUTABLE"; then
+        if test -n "$GM4_EXECUTABLE"; then
             $GM4_EXECUTABLE $temporary_file | grep -v "^$"
         fi
     fi
