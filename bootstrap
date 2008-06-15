@@ -1,4 +1,4 @@
-#! /bin/sh -e
+#!/bin/sh -e
 
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License.  You may obtain a copy of
@@ -30,21 +30,21 @@ M4_DIRECTORY="m4"
 M4_AC_CHECK_ICU_FILE="m4/ac_check_icu.m4"
 REPOSITORY_URI="http://svn.apache.org/repos/asf/incubator/couchdb/trunk"
 
-ACLOCAL_EXECUTABLE=$(which aclocal || true)
-AUTOCONF_EXECUTABLE=$(which autoconf || true)
-AUTOHEADER_EXECUTABLE=$(which autoheader || true)
-AUTOMAKE_EXECUTABLE=$(which automake || true)
-GLIBTOOLIZE_EXECUTABLE=$(which glibtoolize || true)
-LIBTOOLIZE_EXECUTABLE=$(which libtoolize || true)
-SVN_EXECUTABLE=$(which svn || true)
+ACLOCAL_EXECUTABLE=`which aclocal || true`
+AUTOCONF_EXECUTABLE=`which autoconf || true`
+AUTOHEADER_EXECUTABLE=`which autoheader || true`
+AUTOMAKE_EXECUTABLE=`which automake || true`
+GLIBTOOLIZE_EXECUTABLE=`which glibtoolize || true`
+LIBTOOLIZE_EXECUTABLE=`which libtoolize || true`
+SVN_EXECUTABLE=`which svn || true`
 
-basename=$(basename $0)
+basename=`basename $0`
 
 extract_configuration_variable () {
     # Extract variables from the local M4 configuration.
 
     variable_name=$1
-    temporary_file=$(mktemp)
+    temporary_file=`mktemp`
     if [ $? -ne 0 ]; then
         echo "Error: Unable to create a temporary file."
         exit $SCRIPT_ERROR
@@ -59,8 +59,8 @@ extract_configuration_variable () {
 display_version () {
     # Display version and copyright information.
 
-    package_name=$(extract_configuration_variable LOCAL_PACKAGE_NAME)
-    version=$(extract_configuration_variable LOCAL_VERSION)
+    package_name=`extract_configuration_variable LOCAL_PACKAGE_NAME`
+    version=`extract_configuration_variable LOCAL_VERSION`
     cat << EOF
 $basename - $package_name $version
 
@@ -80,7 +80,7 @@ EOF
 display_help () {
     # Display a short description of the script's behaviour.
 
-    bug_uri=$(extract_configuration_variable LOCAL_BUG_URI)
+    bug_uri=`extract_configuration_variable LOCAL_BUG_URI`
     cat << EOF
 Usage: $basename [OPTION]...
 
@@ -122,7 +122,7 @@ check_svn_environment () {
     if test -n "$REPOSITORY_REVISION"; then
         return
     fi
-    if test -n "$($SVN_EXECUTABLE info . 2> /dev/null)"; then
+    if test -n "`$SVN_EXECUTABLE info . 2> /dev/null`"; then
        SVN_CHECKOUT_BOOLEAN="true"
     fi > /dev/null
     if test "$SVN_CHECKOUT_BOOLEAN" != "true"; then
@@ -133,8 +133,8 @@ check_svn_environment () {
 generate_acinclude () {
     # Generate the acinclude.m4 file using the Subversion repository.
 
-    release_code=$(sed -e "s/\[//g" -e "s/\]//g" -e "s/(//g" -e "s/)//g" \
-        < $ACINCLUDE_IN_FILE | awk "/LOCAL_VERSION_STAGE, /{print \$2}")
+    release_code=`sed -e "s/\[//g" -e "s/\]//g" -e "s/(//g" -e "s/)//g" \
+        < $ACINCLUDE_IN_FILE | awk "/LOCAL_VERSION_STAGE, /{print \$2}"`
     repository_boolean=false
     if test -n "$REPOSITORY_REVISION" -o "$SVN_CHECKOUT_BOOLEAN" = "true"; then
         repository_boolean=true
@@ -143,8 +143,8 @@ generate_acinclude () {
         sed "s/%release%//" < $ACINCLUDE_IN_FILE > $ACINCLUDE_FILE
     else
         if test "$SVN_CHECKOUT_BOOLEAN" = "true"; then
-            revision_number=$($SVN_EXECUTABLE info . | \
-                awk "/Revision:/{print \$2}")
+            revision_number=`$SVN_EXECUTABLE info . | \
+                awk "/Revision:/{print \$2}"`
         fi
         if test -n "$REPOSITORY_REVISION"; then
             revision_number="$REPOSITORY_REVISION"
@@ -257,7 +257,7 @@ EOF
 parse_script_option_list () {
     # Parse the script option list and take the appropriate action.
 
-    if ! argument_list=$(getopt vhC $@); then
+    if test ! argument_list=`getopt vhC $@`; then
         display_error
     fi
     eval set -- "$argument_list"
@@ -269,7 +269,7 @@ parse_script_option_list () {
             *) display_error "Unknown option: $1" >&2;;
         esac
     done
-    cd $(dirname $0)
+    cd `dirname $0`
     process_file_collection
     check_svn_environment || true
     generate_acinclude
