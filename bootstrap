@@ -40,10 +40,10 @@ extract_configuration_variable () {
     echo "changequote(\`[', \`]')" > $temporary_file
     sed "s/m4_//" < $ACINCLUDE_IN_FILE >> $temporary_file
     echo $variable_name >> $temporary_file
-    if test -f `which m4`; then
+    if test -x `which m4 || true`; then
         `which m4` $temporary_file | grep -v "^$"
     else
-        if test -f `which gm4`; then
+        if test -x `which gm4 || true`; then
             `which gm4` $temporary_file | grep -v "^$"
         fi
     fi
@@ -109,7 +109,7 @@ display_error () {
 check_svn_environment () {
     # Check the Subversion environment for sanity.
 
-    if test -f `which svn`; then
+    if test -x `which svn || true`; then
         echo "Warning: Unable to find the svn command."
         return $SCRIPT_ERROR
     fi
@@ -169,7 +169,7 @@ process_file_collection () {
 run_aclocal () {
     # Run the correct version of aclocal.
 
-    if test -f `which aclocal`; then
+    if test -x `which aclocal || true`; then
         echo "Running aclocal"
         `which aclocal` -I m4
     else
@@ -181,11 +181,11 @@ run_aclocal () {
 run_libtoolize () {
     # Run the correct version of libtoolize.
 
-    if test -f `which libtoolize`; then
+    if test -x `which libtoolize || true`; then
         echo "Running libtoolize"
         `which libtoolize` -f -c
     else
-        if test -f `which glibtoolize`; then
+        if test -x `which glibtoolize || true`; then
             echo "Running glibtoolize"
             `which glibtoolize` -f -c
         else
@@ -198,7 +198,7 @@ run_libtoolize () {
 run_autoheader () {
     # Run the correct version of autoheader.
 
-    if test -f `which autoheader`; then
+    if test -x `which autoheader || true`; then
         echo "Running autoheader"
         `which autoheader` -f
     else
@@ -211,7 +211,7 @@ run_automake () {
     # Run the correct version of automake.
 
     AUTOMAKE_OPTION_COLLECTION=""
-    if test -f `which automake`; then
+    if test -x `which automake || true`; then
         echo "Running automake"
         `which automake` -f -c -a --gnits
     else
@@ -223,7 +223,7 @@ run_automake () {
 run_autoconf () {
     # Run the correct version of autoconf.
 
-    if test -f `which autoconf`; then
+    if test -x `which autoconf || true`; then
         echo "Running autoconf"
         `which autoconf` -f
     else
