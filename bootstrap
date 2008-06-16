@@ -196,7 +196,7 @@ EOF
 
 parse_script_option_list () {
     set +e
-    options=`getopt vhC $@`
+    options=`getopt hVC $@`
     if test ! $? -eq 0; then
         display_error
     fi
@@ -204,8 +204,8 @@ parse_script_option_list () {
     eval set -- $options
     while [ $# -gt 0 ]; do
         case "$1" in
-            -v) shift; display_version; exit $SCRIPT_OK;;
             -h) shift; display_help; exit $SCRIPT_OK;;
+            -V) shift; display_version; exit $SCRIPT_OK;;
             --) shift; break;;
             *) display_error "Unknown option: $1" >&2;;
         esac
