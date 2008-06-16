@@ -287,7 +287,7 @@ parse_script_option_list () {
         display_error
     fi
     set -e
-    eval set -- "$options"
+    eval set -- $options
     while [ $# -gt 0 ]; do
         case "$1" in
             -h) shift; display_help; exit $SCRIPT_OK;;

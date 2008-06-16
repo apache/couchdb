@@ -32,27 +32,27 @@ REPOSITORY_URI="http://svn.apache.org/repos/asf/incubator/couchdb/trunk"
 
 basename=`basename $0`
 
-extract_configuration_variable () {
+get () {
     variable_name=$1
     temporary_file=`mktemp`
     echo "changequote(\`[', \`]')" > $temporary_file
-    sed "s/m4_//" < $ACINCLUDE_IN_FILE >> $temporary_file
+    sed -e "s/m4_//" < $ACINCLUDE_IN_FILE >> $temporary_file
     echo $variable_name >> $temporary_file
-    if test -x `which m4 || true`; then
+    if test -x "`which m4 || true`"; then
         `which m4` $temporary_file | grep -v "^$"
     else
-        if test -x `which gm4 || true`; then
+        if test -x "`which gm4 || true`"; then
             `which gm4` $temporary_file | grep -v "^$"
+        else
+            echo unknown
         fi
     fi
     rm -f $temporary_file
 }
 
 display_version () {
-    package_name=`extract_configuration_variable LOCAL_PACKAGE_NAME`
-    version=`extract_configuration_variable LOCAL_VERSION`
     cat << EOF
-$basename - $package_name $version
+$basename - `get LOCAL_PACKAGE_NAME` `get LOCAL_VERSION_PRIMARY`
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use
 this file except in compliance with the License.  You may obtain a copy of the
@@ -68,7 +68,6 @@ EOF
 }
 
 display_help () {
-    bug_uri=`extract_configuration_variable LOCAL_BUG_URI`
     cat << EOF
 Usage: $basename [OPTION]...
 
@@ -83,9 +82,9 @@ Options:
 
 Environment variables:
 
-  REPOSITORY_REVISION  manual override for revision information
+  REVISION  manual override for revision information
 
-Report bugs at <$bug_uri>.
+Report bugs at <`get LOCAL_BUG_URI`>.
 EOF
 }
 
@@ -98,41 +97,14 @@ display_error () {
     exit $SCRIPT_ERROR
 }
 
-check_svn_environment () {
-    if test -x `which svn || true`; then
-        echo "Warning: Unable to find the svn command."
-        return $SCRIPT_ERROR
-    fi
-    if test -n "$REPOSITORY_REVISION"; then
-        return
-    fi
-    if test -n "`\`which svn\` info . 2> /dev/null`"; then
-       SVN_CHECKOUT_BOOLEAN="true"
-    fi
-    if test "$SVN_CHECKOUT_BOOLEAN" != "true"; then
-        echo "Warning: Unable to determine checkout information."
-    fi
-}
-
 generate_acinclude () {
-    release_code=`sed -e "s/\[//g" -e "s/\]//g" -e "s/(//g" -e "s/)//g" \
-        < $ACINCLUDE_IN_FILE | awk "/LOCAL_VERSION_STAGE, /{print \$2}"`
-    repository_boolean=false
-    if test -n "$REPOSITORY_REVISION" -o "$SVN_CHECKOUT_BOOLEAN" = "true"; then
-        repository_boolean=true
+    if test -z "$REVISION"; then
+        REVISION=`\`which svn\` info . 2> /dev/null | awk "/Revision:/{print \\$2}"`
     fi
-    if test -z "$release_code" -o "$repository_boolean" = "false"; then
+    if test -z "`get LOCAL_VERSION_STAGE`" -o -z "$REVISION"; then
         sed "s/%release%//" < $ACINCLUDE_IN_FILE > $ACINCLUDE_FILE
     else
-        if test "$SVN_CHECKOUT_BOOLEAN" = "true"; then
-            revision_number=`\`which svn\` info . | \
-                awk "/Revision:/{print \\$2}"`
-        fi
-        if test -n "$REPOSITORY_REVISION"; then
-            revision_number="$REPOSITORY_REVISION"
-        fi
-        sed "s/%release%/$revision_number/" \
-            < $ACINCLUDE_IN_FILE > $ACINCLUDE_FILE
+        sed "s/%release%/$REVISION/" < $ACINCLUDE_IN_FILE > $ACINCLUDE_FILE
     fi
 }
 
@@ -153,7 +125,7 @@ process_file_collection () {
 }
 
 run_aclocal () {
-    if test -x `which aclocal || true`; then
+    if test -x "`which aclocal || true`"; then
         echo "Running aclocal"
         `which aclocal` -I m4
     else
@@ -163,11 +135,11 @@ run_aclocal () {
 }
 
 run_libtoolize () {
-    if test -x `which libtoolize || true`; then
+    if test -x "`which libtoolize || true`"; then
         echo "Running libtoolize"
         `which libtoolize` -f -c
     else
-        if test -x `which glibtoolize || true`; then
+        if test -x "`which glibtoolize || true`"; then
             echo "Running glibtoolize"
             `which glibtoolize` -f -c
         else
@@ -178,7 +150,7 @@ run_libtoolize () {
 }
 
 run_autoheader () {
-    if test -x `which autoheader || true`; then
+    if test -x "`which autoheader || true`"; then
         echo "Running autoheader"
         `which autoheader` -f
     else
@@ -189,7 +161,7 @@ run_autoheader () {
 
 run_automake () {
     AUTOMAKE_OPTION_COLLECTION=""
-    if test -x `which automake || true`; then
+    if test -x "`which automake || true`"; then
         echo "Running automake"
         `which automake` -f -c -a --gnits
     else
@@ -199,7 +171,7 @@ run_automake () {
 }
 
 run_autoconf () {
-    if test -x `which autoconf || true`; then
+    if test -x "`which autoconf || true`"; then
         echo "Running autoconf"
         `which autoconf` -f
     else
@@ -229,7 +201,7 @@ parse_script_option_list () {
         display_error
     fi
     set -e
-    eval set -- "$options"
+    eval set -- $options
     while [ $# -gt 0 ]; do
         case "$1" in
             -v) shift; display_version; exit $SCRIPT_OK;;
@@ -240,7 +212,6 @@ parse_script_option_list () {
     done
     cd `dirname $0`
     process_file_collection
-    check_svn_environment || true
     generate_acinclude
     run_command_collection
 }
