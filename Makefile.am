@@ -20,7 +20,7 @@ couch_erl_driver_la_LDFLAGS = -module -avoid-version $(ICU_LOCAL_FLAGS)
 couch_erl_driver_la_CFLAGS = $(ICU_LOCAL_FLAGS)
 couch_erl_driver_la_LIBADD = -licuuc -licudata -licui18n
 
-libbin_PROGRAMS = couchjs
+locallibbin_PROGRAMS = couchjs
 couchjs_SOURCES = couch_js.c
 
 couchebindir = $(localerlanglibdir)/couch-$(version)/ebin
