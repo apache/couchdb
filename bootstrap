@@ -39,10 +39,10 @@ get () {
     sed -e "s/m4_//" < $ACINCLUDE_IN_FILE >> $temporary_file
     echo $variable_name >> $temporary_file
     if test -x "`which m4 || true`"; then
-        `which m4` $temporary_file | grep -v "^$"
+        `which m4` $temporary_file | grep -v "^$" || true
     else
         if test -x "`which gm4 || true`"; then
-            `which gm4` $temporary_file | grep -v "^$"
+            `which gm4` $temporary_file | grep -v "^$" || true
         else
             echo unknown
         fi
