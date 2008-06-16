@@ -305,10 +305,13 @@ stop_couchdb () {
 parse_script_option_list () {
     # Parse the script option list and take the appropriate action.
 
-    if test ! argument_list=`getopt hVc:ibp:r:Ro:e:skd $@`; then
+    set +e
+    options=`getopt hVc:ibp:r:Ro:e:skd $@`
+    if test ! $? -eq 0; then
         display_error
     fi
-    eval set -- "$argument_list"
+    set -e
+    eval set -- "$options"
     while [ $# -gt 0 ]; do
         case "$1" in
             -h) shift; display_help; exit $SCRIPT_OK;;
