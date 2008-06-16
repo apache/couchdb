@@ -19,6 +19,7 @@ SCRIPT_ERROR=1
 
 ACINCLUDE_FILE="acinclude.m4"
 ACINCLUDE_IN_FILE="acinclude.m4.in"
+ACINCLUDE_TMP_FILE="acinclude.m4.tmp"
 AC_CHECK_ICU_COMPRESSED_FILE="build-contrib/ac_check_icu.m4_2008-06-07.gz"
 AUTHORS_FILE="authors.xml"
 BUILD_AUX_DIRECTORY="build-aux"
@@ -34,20 +35,19 @@ basename=`basename $0`
 
 get () {
     variable_name=$1
-    temporary_file=`mktemp`
-    echo "changequote(\`[', \`]')" > $temporary_file
-    sed -e "s/m4_//" < $ACINCLUDE_IN_FILE >> $temporary_file
-    echo $variable_name >> $temporary_file
+    echo "changequote(\`[', \`]')" > $ACINCLUDE_TMP_FILE
+    sed -e "s/m4_//" < $ACINCLUDE_IN_FILE >> $ACINCLUDE_TMP_FILE
+    echo $variable_name >> $ACINCLUDE_TMP_FILE
     if test -x "`which m4 || true`"; then
-        `which m4` $temporary_file | grep -v "^$" || true
+        `which m4` $ACINCLUDE_TMP_FILE | grep -v "^$" || true
     else
         if test -x "`which gm4 || true`"; then
-            `which gm4` $temporary_file | grep -v "^$" || true
+            `which gm4` $ACINCLUDE_TMP_FILE | grep -v "^$" || true
         else
             echo unknown
         fi
     fi
-    rm -f $temporary_file
+    rm -f $ACINCLUDE_TMP_FILE
 }
 
 display_version () {
