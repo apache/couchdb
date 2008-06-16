@@ -10,9 +10,9 @@
 ## License for the specific language governing permissions and limitations
 ## under the License.
 
-pkgconf_DATA = couch.ini
+localconf_DATA = couch.ini
 
-CLEANFILES = $(pkgconf_DATA)
+CLEANFILES = $(localconf_DATA)
 
 transform = @program_transform_name@
 couchjs_command_name = `echo couchjs | sed '$(transform)'`
