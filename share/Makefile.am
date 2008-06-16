@@ -10,7 +10,7 @@
 ## License for the specific language governing permissions and limitations
 ## under the License.
 
-nobase_dist_pkgdata_DATA = \
+nobase_dist_localdata_DATA = \
     server/main.js \
     www/browse/_compact_database.html \
     www/browse/_create_database.html \

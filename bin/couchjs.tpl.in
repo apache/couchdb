@@ -65,7 +65,7 @@ display_error () {
 }
 
 run_couchjs () {
-    exec %libbindir%/%couchjs_command_name% $@
+    exec %locallibbindir%/%couchjs_command_name% $@
 }
 
 parse_script_option_list () {

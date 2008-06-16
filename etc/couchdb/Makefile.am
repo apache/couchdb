@@ -10,21 +10,21 @@
 ## License for the specific language governing permissions and limitations
 ## under the License.
 
-pkgconf_DATA = couch.ini
+localconf_DATA = couch.ini
 
-CLEANFILES = $(pkgconf_DATA)
+CLEANFILES = $(localconf_DATA)
 
 transform = @program_transform_name@
 couchjs_command_name = `echo couchjs | sed '$(transform)'`
 
-couchprivlibdir = $(erlanglibdir)/couch-$(version)/priv/lib
+couchprivlibdir = $(localerlanglibdir)/couch-$(version)/priv/lib
 
 couch.ini: couch.ini.tpl
 	sed -e "s|%bindir%|$(bindir)|g" \
-	    -e "s|%pkgconfdir%|$(pkgconfdir)|g" \
-	    -e "s|%pkgdatadir%|$(pkgdatadir)|g" \
-	    -e "s|%pkgstatelibdir%|$(pkgstatelibdir)|g" \
-	    -e "s|%pkgstatelogdir%|$(pkgstatelogdir)|g" \
+	    -e "s|%localconfdir%|$(localconfdir)|g" \
+	    -e "s|%localdatadir%|$(localdatadir)|g" \
+	    -e "s|%localstatelibdir%|$(localstatelibdir)|g" \
+	    -e "s|%localstatelogdir%|$(localstatelogdir)|g" \
 	    -e "s|%couchprivlibdir%|$(couchprivlibdir)|g" \
 	    -e "s|%couchjs_command_name%|$(couchjs_command_name)|g" \
 	< $< > $@
