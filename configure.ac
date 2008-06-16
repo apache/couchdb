@@ -21,7 +21,7 @@ AC_CONFIG_AUX_DIR([build-aux])
 
 AM_CONFIG_HEADER([config.h])
 
-AM_INIT_AUTOMAKE([1.6.3 foreign check-news -Wno-portability])
+AM_INIT_AUTOMAKE([1.6.3 foreign check-news])
 
 AC_GNU_SOURCE
 AC_ENABLE_SHARED

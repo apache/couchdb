@@ -65,14 +65,15 @@ Javascript View Server:
    renamed to `emit(key, value)`.
  * Fixed handling of exceptions raised by view functions.
 
-Build, Scripts, and System Integration:
+Packaging and System Integration:
 
  * CouchDB can automatically respawn following a server crash.
  * Database server no longer refuses to start with a stale PID file.
  * System logrotate configuration provided.
  * Improved handling of ICU shared libraries.
- * The `couchdb` script now automatically enables SMP support in Erlang if
-   available.
+ * The `couchdb` script now automatically enables SMP support in Erlang.
+ * The `couchdb` and `couchjs` scripts have been improved for portability.
+ * The build and install system has been improved for portability.
 
 Futon Utility Client:
 

@@ -15,6 +15,7 @@ Released under the patronage of the Apache Software Foundation Incubator.
  * Added support for incremental map/reduce views.
  * Changed database file format.
  * Many improvements to Futon, the web administration interface.
+ * Miscellaneous improvements to system integration and portability.
  * Swapped out Erlang's inets HTTP server for the Mochiweb HTTP server.
  * SpiderMonkey is no longer included with CouchDB, but rather treated as an
    external dependendancy.
