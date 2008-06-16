@@ -12,12 +12,12 @@
 
 install-data-hook:
 	if test ! "$(mkdir_p)" = ""; then \
-	    $(mkdir_p) "$(DESTDIR)$(pkgstatelibdir)"; \
-	    $(mkdir_p) "$(DESTDIR)$(pkgstatelogdir)"; \
+	    $(mkdir_p) "$(DESTDIR)$(localstatelibdir)"; \
+	    $(mkdir_p) "$(DESTDIR)$(localstatelogdir)"; \
 	    $(mkdir_p) "$(DESTDIR)$(localstatedir)/run"; \
 	else \
 	    echo "WARNING: You may have to create these directories by hand."; \
-	    mkdir -p "$(DESTDIR)$(pkgstatelibdir)"; \
-	    mkdir -p "$(DESTDIR)$(pkgstatelogdir)"; \
+	    mkdir -p "$(DESTDIR)$(localstatelibdir)"; \
+	    mkdir -p "$(DESTDIR)$(localstatelogdir)"; \
 	    mkdir -p "$(DESTDIR)$(localstatedir)/run"; \
 	fi

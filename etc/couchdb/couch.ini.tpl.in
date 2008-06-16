@@ -4,15 +4,15 @@
 
 ConsoleStartupMsg=Apache CouchDB is starting.
 
-DbRootDir=%pkgstatelibdir%
+DbRootDir=%localstatelibdir%
 
 Port=5984
 
 BindAddress=127.0.0.1
 
-DocumentRoot=%pkgdatadir%/www
+DocumentRoot=%localdatadir%/www
 
-LogFile=%pkgstatelogdir%/couch.log
+LogFile=%localstatelogdir%/couch.log
 
 UtilDriverDir=%couchprivlibdir%
 
@@ -20,4 +20,4 @@ LogLevel=info
 
 [Couch Query Servers]
 
-javascript=%bindir%/%couchjs_command_name% %pkgdatadir%/server/main.js
+javascript=%bindir%/%couchjs_command_name% %localdatadir%/server/main.js

@@ -5,7 +5,7 @@ Port 5984
 ServerName localhost
 SocketType ip_comm
 Modules mod_couch mod_get mod_log
-ServerRoot %pkgconfdir%
-DocumentRoot %pkgdatadir%/www
-ErrorLog %pkgstatelogdir%/http_error.log
-TransferLog %pkgstatelogdir%/http_access.log
+ServerRoot %localconfdir%
+DocumentRoot %localdatadir%/www
+ErrorLog %localstatelogdir%/http_error.log
+TransferLog %localstatelogdir%/http_access.log

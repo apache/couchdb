@@ -39,7 +39,7 @@ default/couchdb: default/couchdb.tpl
 	    fi \
 	fi
 	sed -e "s|%configure_input%|$@. Generated from $< by configure.|" \
-	    -e "s|%pkgconfdir%|$(pkgconfdir)|g" \
+	    -e "s|%localconfdir%|$(localconfdir)|g" \
 	    -e "s|%sysconfdir%|$(sysconfdir)|" \
 	    -e "s|%localstatedir%|$(localstatedir)|" \
 	< $< > $@
@@ -55,12 +55,12 @@ init/couchdb: init/couchdb.tpl
 	sed -e "s|%configure_input%|$@. Generated from $< by configure.|" \
 	    -e "s|%bindir%|$(bindir)|" \
 	    -e "s|%sysconfdir%|$(sysconfdir)|" \
-	    -e "s|%erlangbindir%|$(erlangbindir)|" \
+	    -e "s|%localerlangbindir%|$(localerlangbindir)|" \
 	    -e "s|%couchdb_command_name%|$(couchdb_command_name)|" \
 	< $< > $@
 
 logrotate.d/couchdb: logrotate.d/couchdb.tpl
-	sed -e "s|%pkgstatelogdir%|@pkgstatelogdir@|g" < $< > $@
+	sed -e "s|%localstatelogdir%|@localstatelogdir@|g" < $< > $@
 
 launchd/org.apache.couchdb.plist: launchd/org.apache.couchdb.plist.tpl
 	if test "$(mkdir_p)"; then \

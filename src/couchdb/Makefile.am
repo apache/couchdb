@@ -12,7 +12,7 @@
 
 ICU_LOCAL_FLAGS = $(ICU_LOCAL_CFLAGS) $(ICU_LOCAL_LDFLAGS)
 
-couchprivlibdir = $(erlanglibdir)/couch-$(version)/priv/lib
+couchprivlibdir = $(localerlanglibdir)/couch-$(version)/priv/lib
 
 couchprivlib_LTLIBRARIES = couch_erl_driver.la
 couch_erl_driver_la_SOURCES = couch_erl_driver.c
@@ -23,8 +23,8 @@ couch_erl_driver_la_LIBADD = -licuuc -licudata -licui18n
 libbin_PROGRAMS = couchjs
 couchjs_SOURCES = couch_js.c
 
-couchebindir = $(erlanglibdir)/couch-$(version)/ebin
-couchincludedir = $(erlanglibdir)/couch-$(version)/include
+couchebindir = $(localerlanglibdir)/couch-$(version)/ebin
+couchincludedir = $(localerlanglibdir)/couch-$(version)/include
 
 couch_file_collection = \
     cjson.erl \

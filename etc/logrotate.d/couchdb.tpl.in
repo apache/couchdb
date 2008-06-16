@@ -1,4 +1,4 @@
-%pkgstatelogdir%/*.log {
+%localstatelogdir%/*.log {
        weekly
        rotate 10
        copytruncate
