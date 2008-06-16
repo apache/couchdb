@@ -33,8 +33,6 @@ REPOSITORY_URI="http://svn.apache.org/repos/asf/incubator/couchdb/trunk"
 basename=`basename $0`
 
 extract_configuration_variable () {
-    # Extract variables from the local M4 configuration.
-
     variable_name=$1
     temporary_file=`mktemp`
     echo "changequote(\`[', \`]')" > $temporary_file
@@ -51,8 +49,6 @@ extract_configuration_variable () {
 }
 
 display_version () {
-    # Display version and copyright information.
-
     package_name=`extract_configuration_variable LOCAL_PACKAGE_NAME`
     version=`extract_configuration_variable LOCAL_VERSION`
     cat << EOF
@@ -72,8 +68,6 @@ EOF
 }
 
 display_help () {
-    # Display a short description of the script's behaviour.
-
     bug_uri=`extract_configuration_variable LOCAL_BUG_URI`
     cat << EOF
 Usage: $basename [OPTION]...
@@ -96,8 +90,6 @@ EOF
 }
 
 display_error () {
-    # Display a short instruction referring users to further documentation.
-
     if test -n "$1"; then
         echo $1 >&2
     fi
@@ -107,8 +99,6 @@ display_error () {
 }
 
 check_svn_environment () {
-    # Check the Subversion environment for sanity.
-
     if test -x `which svn || true`; then
         echo "Warning: Unable to find the svn command."
         return $SCRIPT_ERROR
@@ -125,8 +115,6 @@ check_svn_environment () {
 }
 
 generate_acinclude () {
-    # Generate the acinclude.m4 file using the Subversion repository.
-
     release_code=`sed -e "s/\[//g" -e "s/\]//g" -e "s/(//g" -e "s/)//g" \
         < $ACINCLUDE_IN_FILE | awk "/LOCAL_VERSION_STAGE, /{print \$2}"`
     repository_boolean=false
@@ -149,8 +137,6 @@ generate_acinclude () {
 }
 
 process_file_collection () {
-    # Process files required to complete the bootstrap.
-
     echo "Installing \`"$BUILD_AUX_DIRECTORY"'"
     mkdir -p $BUILD_AUX_DIRECTORY
     echo "Installing \`"$CONFIG_GUESS_FILE"'"
@@ -167,8 +153,6 @@ process_file_collection () {
 }
 
 run_aclocal () {
-    # Run the correct version of aclocal.
-
     if test -x `which aclocal || true`; then
         echo "Running aclocal"
         `which aclocal` -I m4
@@ -179,8 +163,6 @@ run_aclocal () {
 }
 
 run_libtoolize () {
-    # Run the correct version of libtoolize.
-
     if test -x `which libtoolize || true`; then
         echo "Running libtoolize"
         `which libtoolize` -f -c
@@ -196,8 +178,6 @@ run_libtoolize () {
 }
 
 run_autoheader () {
-    # Run the correct version of autoheader.
-
     if test -x `which autoheader || true`; then
         echo "Running autoheader"
         `which autoheader` -f
@@ -208,8 +188,6 @@ run_autoheader () {
 }
 
 run_automake () {
-    # Run the correct version of automake.
-
     AUTOMAKE_OPTION_COLLECTION=""
     if test -x `which automake || true`; then
         echo "Running automake"
@@ -221,8 +199,6 @@ run_automake () {
 }
 
 run_autoconf () {
-    # Run the correct version of autoconf.
-
     if test -x `which autoconf || true`; then
         echo "Running autoconf"
         `which autoconf` -f
@@ -233,8 +209,6 @@ run_autoconf () {
 }
 
 run_command_collection () {
-    # Run commands required to complete the bootstrap.
-
     run_libtoolize
     run_aclocal
     run_autoheader
@@ -249,15 +223,13 @@ EOF
 }
 
 parse_script_option_list () {
-    # Parse the script option list and take the appropriate action.
-
     set +e
-    argument_list=`getopt vhC $@`
+    options=`getopt vhC $@`
     if test ! $? -eq 0; then
         display_error
     fi
     set -e
-    eval set -- "$argument_list"
+    eval set -- "$options"
     while [ $# -gt 0 ]; do
         case "$1" in
             -v) shift; display_version; exit $SCRIPT_OK;;
