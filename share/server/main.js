@@ -94,10 +94,10 @@ while (cmd = eval(readline())) {
                   reason: "function raised fatal exception"};
             }
             print(toJSON({log: "function raised exception (" + err + ")"}));
-            buf.push([]);
+            buf.push("[]");
           }
         }
-        print(toJSON(buf));
+        print("[" + buf.join(", ") + "]");
         break;
 
       case "rereduce":
