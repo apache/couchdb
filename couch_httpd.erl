@@ -463,7 +463,7 @@ output_reduce_view(Req, View) ->
         fun(_Key, _Red, {AccSeparator,AccSkip,AccCount}) when AccSkip > 0 ->
             {ok, {AccSeparator,AccSkip-1,AccCount}};
         (_Key, _Red, {AccSeparator,0,AccCount}) when AccCount == 0 ->
-            {stop,{AccSeparator,0,AccCount}};
+            {ok, {AccSeparator,0,AccCount}};
         (_Key, Red, {AccSeparator,0,AccCount}) when GroupLevel == 0 ->
             Json = lists:flatten(cjson:encode({obj, [{key, null}, {value, Red}]})),
             Resp:write_chunk(AccSeparator ++ Json),
