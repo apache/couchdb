@@ -58,7 +58,7 @@ var tests = {
     // create a map function that selects all documents whose "a" member
     // has a value of 4, and then returns the document's b value.
     var mapFunction = function(doc){
-      if(doc.a==4)
+      if (doc.a==4)
         emit(null, doc.b);
     };
 
@@ -767,6 +767,38 @@ var tests = {
       }
     });
     T(results.rows[0].value[0] == conflictRev);
+  },
+
+  view_errors: function(debug) {
+    var db = new CouchDB("test_suite_db");
+    db.deleteDb();
+    db.createDb();
+    if (debug) debugger;
+
+    var doc = {integer: 1, string: "1", array: [1, 2, 3]};
+    T(db.save(doc).ok);
+
+    // emitting a key value that is undefined should result in that row not
+    // being included in the view results
+    var results = db.query(function(doc) {
+      emit(doc.undef, null);
+    });
+    T(results.total_rows == 0);
+
+    // if a view function throws an exception, its results are not included in
+    // the view index, but the view does not itself raise an error
+    var results = db.query(function(doc) {
+      doc.undef(); // throws an error
+    });
+    T(results.total_rows == 0);
+
+    // if a view function includes an undefined value in the emitted key or
+    // value, an error is logged and the result is not included in the view
+    // index, and the view itself does not raise an error
+    var results = db.query(function(doc) {
+      emit([doc._id, doc.undef], null);
+    });
+    T(results.total_rows == 0);
   },
 
   view_pagination: function(debug) {

@@ -80,9 +80,7 @@ while (cmd = eval(readline())) {
           map_results = [];
           try {
             funs[i](doc);
-            buf.push(map_results.filter(function(pair) {
-              return pair[0] !== undefined && pair[1] !== undefined;
-            }));
+            buf.push(toJSON(map_results));
           } catch (err) {
             if (err == "fatal_error") {
               // Only if it's a "fatal_error" do we exit. What's a fatal error?
@@ -150,7 +148,7 @@ while (cmd = eval(readline())) {
         quit();
     }
   } catch (exception) {
-    print(toJSON(exception.toString()));
+    print(toJSON(exception));
   }
 }
 
@@ -181,7 +179,7 @@ function recursivelySeal(obj) {
 
 function toJSON(val) {
   if (typeof(val) == "undefined") {
-    throw {error:"bad_value", reason:"Cannot encode 'undefined' value as JSON"};
+    throw "Cannot encode 'undefined' value as JSON";
   }
   var subs = {'\b': '\\b', '\t': '\\t', '\n': '\\n', '\f': '\\f',
               '\r': '\\r', '"' : '\\"', '\\': '\\\\'};
