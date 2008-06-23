@@ -328,7 +328,12 @@ var tests = {
       T(equals(results.rows[1], {key:["a","b"],value:20*i}));
       T(equals(results.rows[2], {key:["a", "b", "c"],value:10*i}));
       T(equals(results.rows[3], {key:["a", "b", "d"],value:10*i}));
-      
+
+      // test to make sure group reduce and count params provide valid json
+      var results = db.query(map, reduce, {group: true, count: 2});
+      T(equals(results.rows[0], {key: ["a"], value: 20*i}));
+      T(equals(results.rows.length, 2));
+
       //group by the first element in the key array
       var results = db.query(map, reduce, {group_level:1});
       T(equals(results.rows[0], {key:["a"],value:70*i}));
@@ -1146,7 +1151,7 @@ var tests = {
     db.deleteDb();
     db.createDb();
     if (debug) debugger;
-    var docs = makeDocs(0, 25);
+    var docs = makeDocs(0, 10);
     var saveResult = db.bulkSave(docs);
     T(saveResult.ok);
 
