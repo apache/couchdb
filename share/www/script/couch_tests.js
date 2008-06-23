@@ -1146,7 +1146,7 @@ var tests = {
     db.deleteDb();
     db.createDb();
     if (debug) debugger;
-    var docs = makeDocs(0, 10);
+    var docs = makeDocs(0, 25);
     var saveResult = db.bulkSave(docs);
     T(saveResult.ok);
 
