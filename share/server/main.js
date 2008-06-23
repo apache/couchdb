@@ -74,7 +74,7 @@ while (cmd = eval(readline())) {
         // ]
         //
         var doc = cmd[1];
-        seal(doc); // seal to prevent map functions from changing doc
+        seal(doc, true); // seal to prevent map functions from changing doc
         var buf = [];
         for (var i = 0; i < funs.length; i++) {
           map_results = [];

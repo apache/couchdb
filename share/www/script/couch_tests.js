@@ -871,12 +871,18 @@ var tests = {
     db.createDb();
     if (debug) debugger;
 
-    var docs = makeDocs(1, 2);
-    T(db.bulkSave(docs).ok);
+    var doc = {integer: 1, string: "1", array: [1, 2, 3]};
+    T(db.save(doc).ok);
 
     // make sure that attempting to change the document throws an error
     var results = db.query(function(doc) {
-      doc._id = "foo";
+      doc.integer = 2;
+      emit(null, doc);
+    });
+    T(results.total_rows == 0);
+
+    var results = db.query(function(doc) {
+      doc.array[0] = 0;
       emit(null, doc);
     });
     T(results.total_rows == 0);
