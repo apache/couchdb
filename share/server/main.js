@@ -74,7 +74,7 @@ while (cmd = eval(readline())) {
         // ]
         //
         var doc = cmd[1];
-        seal(doc, true); // seal to prevent map functions from changing doc
+        recursivelySeal(doc); // seal to prevent map functions from changing doc
         var buf = [];
         for (var i = 0; i < funs.length; i++) {
           map_results = [];
@@ -150,7 +150,7 @@ while (cmd = eval(readline())) {
         quit();
     }
   } catch (exception) {
-    print(toJSON(exception));
+    print(toJSON(exception.toString()));
   }
 }
 
@@ -167,6 +167,15 @@ function compileFunction(source) {
   } else {
     throw {error: "compilation_error",
       reason: "expression does not eval to a function. (" + source + ")"};
+  }
+}
+
+function recursivelySeal(obj) {
+  seal(obj);
+  for (var propname in obj) {
+    if (typeof doc[propname] == "object") {
+      recursivelySeal(doc[propname]);
+    }
   }
 }
 
