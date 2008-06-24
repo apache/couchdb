@@ -101,7 +101,7 @@ to_html(Node) when is_tuple(Node) ->
 to_html(Tokens) when is_list(Tokens) ->
     to_html(Tokens, []).
 
-%% @spec escape(string() | binary()) -> string()
+%% @spec escape(string() | atom() | binary()) -> binary()
 %% @doc Escape a string such that it's safe for HTML (amp; lt; gt;).
 escape(B) when is_binary(B) ->
     escape(binary_to_list(B), []);
@@ -110,7 +110,7 @@ escape(A) when is_atom(A) ->
 escape(S) when is_list(S) ->
     escape(S, []).
 
-%% @spec escape_attr(S::string()) -> string()
+%% @spec escape_attr(string() | binary() | atom() | integer() | float()) -> binary()
 %% @doc Escape a string such that it's safe for HTML attrs
 %%      (amp; lt; gt; quot;).
 escape_attr(B) when is_binary(B) ->

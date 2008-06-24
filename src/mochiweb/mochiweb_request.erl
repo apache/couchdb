@@ -15,11 +15,11 @@
 -export([send/1, recv/1, recv/2, recv_body/0, recv_body/1]).
 -export([start_response/1, start_response_length/1, start_raw_response/1]).
 -export([respond/1, ok/1]).
--export([not_found/0]).
+-export([not_found/0, not_found/1]).
 -export([parse_post/0, parse_qs/0]).
 -export([should_close/0, cleanup/0]).
 -export([parse_cookie/0, get_cookie_value/1]).
--export([serve_file/2]).
+-export([serve_file/2, serve_file/3]).
 -export([test/0]).
 
 -define(SAVE_QS, mochiweb_request_qs).
@@ -276,9 +276,16 @@ respond({Code, ResponseHeaders, Body}) ->
     Response.
 
 %% @spec not_found() -> response()
-%% @doc respond({404, [{"Content-Type", "text/plain"}], "Not found."}).
+%% @doc Alias for <code>not_found([])</code>.
 not_found() ->
-    respond({404, [{"Content-Type", "text/plain"}], <<"Not found.">>}).
+    not_found([]).
+
+%% @spec not_found(ExtraHeaders) -> response()
+%% @doc Alias for <code>respond({404, [{"Content-Type", "text/plain"}
+%% | ExtraHeaders], &lt;&lt;"Not found."&gt;&gt;})</code>.
+not_found(ExtraHeaders) ->
+    respond({404, [{"Content-Type", "text/plain"} | ExtraHeaders],
+             <<"Not found.">>}).
 
 %% @spec ok({value(), iodata()} | {value(), ioheaders(), iodata() | {file, IoDevice}}) ->
 %%           response()
@@ -326,7 +333,9 @@ should_close() ->
         %% unread data left on the socket, can't safely continue
         orelse (DidNotRecv
                 andalso get_header_value("content-length") =/= undefined
-                andalso list_to_integer(get_header_value("content-length")) > 0).
+                andalso list_to_integer(get_header_value("content-length")) > 0)
+        orelse (DidNotRecv
+                andalso get_header_value("transfer-encoding") =:= "chunked").
 
 %% @spec cleanup() -> ok
 %% @doc Clean up any junk in the process dictionary, required before continuing
@@ -455,9 +464,14 @@ read_chunk(Length) ->
 %% @spec serve_file(Path, DocRoot) -> Response
 %% @doc Serve a file relative to DocRoot.
 serve_file(Path, DocRoot) ->
+    serve_file(Path, DocRoot, []).
+
+%% @spec serve_file(Path, DocRoot, ExtraHeaders) -> Response
+%% @doc Serve a file relative to DocRoot.
+serve_file(Path, DocRoot, ExtraHeaders) ->
     case mochiweb_util:safe_relative_path(Path) of
         undefined ->
-            not_found();
+            not_found(ExtraHeaders);
         RelPath ->
             FullPath = filename:join([DocRoot, RelPath]),
             File = case filelib:is_dir(FullPath) of
@@ -471,20 +485,23 @@ serve_file(Path, DocRoot) ->
                     LastModified = httpd_util:rfc1123_date(FileInfo#file_info.mtime),
                     case get_header_value("if-modified-since") of
                         LastModified ->
-                            respond({304, [], ""});
+                            respond({304, ExtraHeaders, ""});
                         _ ->
                             case file:open(File, [raw, binary]) of
                                 {ok, IoDevice} ->
                                     ContentType = mochiweb_util:guess_mime(File),
-                                    Res = ok({ContentType, [{"last-modified", LastModified}], {file, IoDevice}}),
+                                    Res = ok({ContentType,
+                                              [{"last-modified", LastModified}
+                                               | ExtraHeaders],
+                                              {file, IoDevice}}),
                                     file:close(IoDevice),
                                     Res;
                                 _ ->
-                                    not_found()
+                                    not_found(ExtraHeaders)
                             end
                     end;
                 {error, _} ->
-                    not_found()
+                    not_found(ExtraHeaders)
             end
     end.
 
