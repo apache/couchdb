@@ -98,9 +98,11 @@ handle_request0(Req, DocumentRoot, Method, Path) ->
         "/_restart" ->
             handle_restart_request(Req, Method);
         "/_utils" ->
-            {ok, Req:respond({301, [{"Location", "/_utils/"}], <<>>})};
+            {ok, Req:respond({301, [
+                {"Location", "/_utils/"}
+            ] ++ server_header(), <<>>})};
         "/_utils/" ++ PathInfo ->
-            {ok, Req:serve_file(PathInfo, DocumentRoot)};
+            {ok, Req:serve_file(PathInfo, DocumentRoot, server_header())};
         "/_" ++ _Path ->
             throw({not_found, unknown_private_path});
         "/favicon.ico" ->
@@ -613,9 +615,10 @@ handle_attachment_request(Req, 'GET', _DbName, Db, DocId, FileName) ->
             throw({not_found, missing});
         {Type, Bin} ->
             Resp = Req:respond({200, [
-                {"content-type", Type},
-                {"content-length", integer_to_list(couch_doc:bin_size(Bin))}
-            ], chunked}),
+                {"Cache-Control", "must-revalidate"},
+                {"Content-Type", Type},
+                {"Content-Length", integer_to_list(couch_doc:bin_size(Bin))}
+            ] ++ server_header(), chunked}),
             couch_doc:bin_foldl(Bin,
                 fun(BinSegment, []) ->
                     ok = Resp:write_chunk(BinSegment),
@@ -899,11 +902,11 @@ error_to_json0(Error) ->
     {500, error, Error}.
 
 send_error(Req, {method_not_allowed, Methods}) ->
-    {ok, Req:respond({405, [{"Allow", Methods}], <<>>})};
+    {ok, Req:respond({405, [{"Allow", Methods}] ++ server_header(), <<>>})};
 send_error(Req, {modified, Etag}) ->
-    {ok, Req:respond({412, [{"Etag", Etag}], <<>>})};
+    {ok, Req:respond({412, [{"Etag", Etag}] ++ server_header(), <<>>})};
 send_error(Req, {not_modified, Etag}) ->
-    {ok, Req:respond({304, [{"Etag", Etag}], <<>>})};
+    {ok, Req:respond({304, [{"Etag", Etag}] ++ server_header(), <<>>})};
 send_error(Req, Error) ->
     {Code, Json} = error_to_json(Error),
     ?LOG_INFO("HTTP Error (code ~w): ~p", [Code, Error]),
@@ -919,18 +922,23 @@ send_json(Req, Code, Value) ->
     send_json(Req, Code, [], Value).
 
 send_json(Req, Code, Headers, Value) ->
-    ContentType = negotiate_content_type(Req),
+    DefaultHeaders = [
+        {"Content-Type", negotiate_content_type(Req)},
+        {"Cache-Control", "must-revalidate"}
+    ] ++ server_header(),
     Body = cjson:encode(Value),
-    Resp = Req:respond({Code, [{"Content-Type", ContentType}] ++ Headers,
-                        Body}),
+    Resp = Req:respond({Code, DefaultHeaders ++ Headers, Body}),
     {ok, Resp}.
 
 start_json_response(Req, Code) ->
     start_json_response(Req, Code, []).
 
 start_json_response(Req, Code, Headers) ->
-    ContentType = negotiate_content_type(Req),
-    Req:respond({Code, [{"Content-Type", ContentType}] ++ Headers, chunked}).
+    DefaultHeaders = [
+        {"Content-Type", negotiate_content_type(Req)},
+        {"Cache-Control", "must-revalidate"}
+    ] ++ server_header(),
+    Req:respond({Code, DefaultHeaders ++ Headers, chunked}).
 
 end_json_response(Resp) ->
     Resp:write_chunk(""),
@@ -949,3 +957,7 @@ negotiate_content_type(Req) ->
         true  -> "application/json";
         false -> "text/plain;charset=utf-8"
     end.
+
+server_header() ->
+    [{"Server", "CouchDB/" ++ couch_server:get_version() ++
+                " (Erlang OTP/" ++ erlang:system_info(otp_release) ++ ")"}].
