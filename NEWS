@@ -18,7 +18,7 @@ Released under the patronage of the Apache Software Foundation Incubator.
  * Miscellaneous improvements to system integration and portability.
  * Swapped out Erlang's inets HTTP server for the Mochiweb HTTP server.
  * SpiderMonkey is no longer included with CouchDB, but rather treated as an
-   external dependendancy.
+   external dependency.
  * Added bits of awesome.
 
 Please note that there have been many backwards incomatible changes in this
