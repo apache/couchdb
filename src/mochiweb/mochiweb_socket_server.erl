@@ -96,6 +96,14 @@ start_server(State=#mochiweb_socket_server{name=Name}) ->
             gen_server:start_link(Name, ?MODULE, State, [])
     end.
 
+ipv6_supported() ->
+    case (catch inet:getaddr("localhost", inet6)) of
+        {ok, _Addr} ->
+            true;
+        {error, _} ->
+            false
+    end.
+
 init(State=#mochiweb_socket_server{ip=Ip, port=Port, backlog=Backlog}) ->
     process_flag(trap_exit, true),
     BaseOpts = [binary, 
@@ -106,11 +114,16 @@ init(State=#mochiweb_socket_server{ip=Ip, port=Port, backlog=Backlog}) ->
                 {active, false},
                 {nodelay, true}],
     Opts = case Ip of
-               any ->
-                   BaseOpts;
-               Ip ->
-                   [{ip, Ip} | BaseOpts]
-           end,
+        any ->
+            case ipv6_supported() of % IPv4, and IPv6 if supported
+                true -> [inet, inet6 | BaseOpts];
+                _ -> BaseOpts
+            end;
+        {_, _, _, _} -> % IPv4
+            [inet, {ip, Ip} | BaseOpts];
+        {_, _, _, _, _, _, _, _} -> % IPv6
+            [inet6, {ip, Ip} | BaseOpts]
+    end,
     case gen_tcp_listen(Port, Opts, State) of
         {stop, eacces} ->
             case Port < 1024 of 

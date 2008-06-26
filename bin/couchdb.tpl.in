@@ -206,7 +206,7 @@ start_couchdb () {
     command="`%ICU_CONFIG% --invoke` \
         %ERL% $interactive_option -smp auto -sasl errlog_type error \
         -pa %localerlanglibdir%/couch-%version%/ebin \
-            %localerlanglibdir%/mochiweb-r76/ebin \
+            %localerlanglibdir%/mochiweb-r82/ebin \
         -eval \"application:load(inets)\" \
         -eval \"application:load(crypto)\" \
         -eval \"application:load(couch)\" \

@@ -58,7 +58,7 @@ var tests = {
     // create a map function that selects all documents whose "a" member
     // has a value of 4, and then returns the document's b value.
     var mapFunction = function(doc){
-      if(doc.a==4)
+      if (doc.a==4)
         emit(null, doc.b);
     };
 
@@ -328,7 +328,12 @@ var tests = {
       T(equals(results.rows[1], {key:["a","b"],value:20*i}));
       T(equals(results.rows[2], {key:["a", "b", "c"],value:10*i}));
       T(equals(results.rows[3], {key:["a", "b", "d"],value:10*i}));
-      
+
+      // test to make sure group reduce and count params provide valid json
+      var results = db.query(map, reduce, {group: true, count: 2});
+      T(equals(results.rows[0], {key: ["a"], value: 20*i}));
+      T(equals(results.rows.length, 2));
+
       //group by the first element in the key array
       var results = db.query(map, reduce, {group_level:1});
       T(equals(results.rows[0], {key:["a"],value:70*i}));
@@ -769,6 +774,38 @@ var tests = {
     T(results.rows[0].value[0] == conflictRev);
   },
 
+  view_errors: function(debug) {
+    var db = new CouchDB("test_suite_db");
+    db.deleteDb();
+    db.createDb();
+    if (debug) debugger;
+
+    var doc = {integer: 1, string: "1", array: [1, 2, 3]};
+    T(db.save(doc).ok);
+
+    // emitting a key value that is undefined should result in that row not
+    // being included in the view results
+    var results = db.query(function(doc) {
+      emit(doc.undef, null);
+    });
+    T(results.total_rows == 0);
+
+    // if a view function throws an exception, its results are not included in
+    // the view index, but the view does not itself raise an error
+    var results = db.query(function(doc) {
+      doc.undef(); // throws an error
+    });
+    T(results.total_rows == 0);
+
+    // if a view function includes an undefined value in the emitted key or
+    // value, an error is logged and the result is not included in the view
+    // index, and the view itself does not raise an error
+    var results = db.query(function(doc) {
+      emit([doc._id, doc.undef], null);
+    });
+    T(results.total_rows == 0);
+  },
+
   view_pagination: function(debug) {
     var db = new CouchDB("test_suite_db");
     db.deleteDb();
@@ -871,12 +908,18 @@ var tests = {
     db.createDb();
     if (debug) debugger;
 
-    var docs = makeDocs(1, 2);
-    T(db.bulkSave(docs).ok);
+    var doc = {integer: 1, string: "1", array: [1, 2, 3]};
+    T(db.save(doc).ok);
 
     // make sure that attempting to change the document throws an error
     var results = db.query(function(doc) {
-      doc._id = "foo";
+      doc.integer = 2;
+      emit(null, doc);
+    });
+    T(results.total_rows == 0);
+
+    var results = db.query(function(doc) {
+      doc.array[0] = 0;
       emit(null, doc);
     });
     T(results.total_rows == 0);
