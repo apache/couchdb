@@ -900,6 +900,54 @@ var tests = {
         T(queryResults.rows[j].key == i + j);
       }
     }
+    
+    // test endkey_docid
+    var queryResults = db.query(function(doc) { emit(null, null);}, null, {
+      startkey: null,
+      startkey_docid: 1,
+      endkey: null,
+      endkey_docid: 40
+    });
+    
+    T(queryResults.rows.length == 35)
+    T(queryResults.total_rows == docs.length)
+    T(queryResults.offset == 1)
+    T(queryResults.rows[0].id == "1");
+    T(queryResults.rows[1].id == "10");
+    T(queryResults.rows[2].id == "11");
+    T(queryResults.rows[3].id == "12");
+    T(queryResults.rows[4].id == "13");
+    T(queryResults.rows[5].id == "14");
+    T(queryResults.rows[6].id == "15");
+    T(queryResults.rows[7].id == "16");
+    T(queryResults.rows[8].id == "17");
+    T(queryResults.rows[9].id == "18");
+    T(queryResults.rows[10].id == "19");
+    T(queryResults.rows[11].id == "2");
+    T(queryResults.rows[12].id == "20");
+    T(queryResults.rows[13].id == "21");
+    T(queryResults.rows[14].id == "22");
+    T(queryResults.rows[15].id == "23");
+    T(queryResults.rows[16].id == "24");
+    T(queryResults.rows[17].id == "25");
+    T(queryResults.rows[18].id == "26");
+    T(queryResults.rows[19].id == "27");
+    T(queryResults.rows[20].id == "28");
+    T(queryResults.rows[21].id == "29");
+    T(queryResults.rows[22].id == "3");
+    T(queryResults.rows[23].id == "30");
+    T(queryResults.rows[24].id == "31");
+    T(queryResults.rows[25].id == "32");
+    T(queryResults.rows[26].id == "33");
+    T(queryResults.rows[27].id == "34");
+    T(queryResults.rows[28].id == "35");
+    T(queryResults.rows[29].id == "36");
+    T(queryResults.rows[30].id == "37");
+    T(queryResults.rows[31].id == "38");
+    T(queryResults.rows[32].id == "39");
+    T(queryResults.rows[33].id == "4");
+    T(queryResults.rows[34].id == "40");
+
   },
 
   view_sandboxing: function(debug) {

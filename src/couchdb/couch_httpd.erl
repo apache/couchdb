@@ -653,6 +653,8 @@ parse_view_query(Req) ->
             Args#view_query_args{start_key=JsonKey,end_key=JsonKey};
         {"startkey_docid", DocId} ->
             Args#view_query_args{start_docid=DocId};
+        {"endkey_docid", DocId} ->
+            Args#view_query_args{end_docid=DocId};
         {"startkey", Value} ->
             Args#view_query_args{start_key=cjson:decode(Value)};
         {"endkey", Value} ->
