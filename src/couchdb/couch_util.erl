@@ -28,7 +28,7 @@ start_driver(LibDir) ->
     case erl_ddll:load_driver(LibDir, "couch_erl_driver") of
     ok -> ok;
     {error, already_loaded} -> ok;
-    Error -> exit(Error)
+    {error, Error} -> exit(erl_ddll:format_error(Error))
     end.
     
     
