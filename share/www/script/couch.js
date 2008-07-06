@@ -80,6 +80,16 @@ function CouchDB(name) {
     return result;
   }
 
+  // Deletes an attachment from a document
+  this.deleteDocAttachment = function(doc, attachment_name) {
+    var req = request("DELETE", this.uri + encodeURIComponent(doc._id) + "/" + attachment_name + "?rev=" + doc._rev);
+    var result = JSON.parse(req.responseText);
+    if (req.status != 200)
+      throw result;
+    doc._rev = result.rev; //record rev in input document
+    return result;
+  }
+  
   this.bulkSave = function(docs, options) {
     var req = request("POST", this.uri + "_bulk_docs" + encodeOptions(options), {
       body: JSON.stringify({"docs": docs})

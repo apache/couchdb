@@ -556,8 +556,59 @@ var tests = {
     T(db.save(binAttDoc).ok);
 
     var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt");
-    T(xhr.responseText == "This is a base64 encoded text")
-    T(xhr.getResponseHeader("Content-Type") == "text/plain")
+    T(xhr.responseText == "This is a base64 encoded text");
+    T(xhr.getResponseHeader("Content-Type") == "text/plain");
+    
+    // test RESTful doc API
+    
+    // test without rev, should fail
+    var xhr = CouchDB.request("DELETE", "/test_suite_db/bin_doc/foo.txt");
+    T(xhr.status == 412);
+    
+    db.deleteDocAttachment({_id:"bin_doc"}, "foo.txt");
+    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt");
+    T(xhr.status == 404);
+    
+    var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc/foo.txt", {
+      body: "This is not base64 encoded text",
+      headers:{"Content-Type":"text/plain;charset=utf-8"}
+    });
+    T(xhr.status == 201);
+
+    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt");
+    T(xhr.responseText == "This is not base64 encoded text");
+    T(xhr.getResponseHeader("Content-Type") == "text/plain;charset=utf-8");
+
+    // test binary data
+    var xhr = CouchDB.request("GET", "/favicon.ico");
+    var bin_data = xhr.responseText;
+    // bin_data = 123;
+    var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc/favicon.ico", {
+      headers:{"Content-Type":"image/vnd.microsoft.icon"},
+      body:bin_data
+    });
+    T(xhr.status == 201);
+    var rev = JSON.parse(xhr.responseText).rev;
+
+    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/favicon.ico");
+    T(xhr.responseText == bin_data);
+    T(xhr.getResponseHeader("Content-Type") == "image/vnd.microsoft.icon");
+    
+     var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc/favicon.ico", {
+      headers:{"Content-Type":"image/vnd.microsoft.icon"},
+      body:bin_data
+    });
+    T(xhr.status == 412);
+
+    var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc/favicon.ico?rev="+rev, {
+      headers:{"Content-Type":"image/vnd.microsoft.icon"},
+      body:bin_data
+    });
+    T(xhr.status == 201);
+    var rev = JSON.parse(xhr.responseText).rev;
+
+    var xhr = CouchDB.request("DELETE", "/test_suite_db/bin_doc/foo.txt?rev="+rev);
+    T(xhr.status == 200);
   },
 
   content_negotiation: function(debug) {
