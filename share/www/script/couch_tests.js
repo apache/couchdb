@@ -561,54 +561,65 @@ var tests = {
     
     // test RESTful doc API
     
-    // test without rev, should fail
-    var xhr = CouchDB.request("DELETE", "/test_suite_db/bin_doc/foo.txt");
-    T(xhr.status == 412);
-    
-    db.deleteDocAttachment({_id:"bin_doc"}, "foo.txt");
-    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt");
-    T(xhr.status == 404);
-    
-    var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc/foo.txt", {
-      body: "This is not base64 encoded text",
-      headers:{"Content-Type":"text/plain;charset=utf-8"}
+    var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc2/foo2.txt", {
+      body:"This is no base64 encoded text",
+      headers:{"Content-Type": "text/plain;charset=utf-8"}
     });
     T(xhr.status == 201);
+    var rev = JSON.parse(xhr.responseText).rev;
+    
+    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc2/foo2.txt");
+    T(xhr.responseText == "This is no base64 encoded text");
+    T(xhr.getResponseHeader("Content-Type") == "text/plain;charset=utf-8");
+    
+    // test without rev, should fail
+    var xhr = CouchDB.request("DELETE", "/test_suite_db/bin_doc2/foo2.txt");
+    T(xhr.status == 412);
 
-    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt");
-    T(xhr.responseText == "This is not base64 encoded text");
+    // test with rev, should not fail
+    var xhr = CouchDB.request("DELETE", "/test_suite_db/bin_doc2/foo2.txt?rev=" + rev);
+    T(xhr.status == 200);
+    
+    
+    // test binary data
+    var bin_data = "JHAPDO*AU£PN ){(3u[d 93DQ9¡€])}    ææøo'∂ƒæ≤çæππ•¥∫¶®#†π¶®¥π€ª®˙π8np";
+    var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc3/attachment.txt", {
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:bin_data
+    });
+    T(xhr.status == 201);
+    var rev = JSON.parse(xhr.responseText).rev;
+    
+    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc3/attachment.txt");
+    T(xhr.responseText == bin_data);
+    T(xhr.getResponseHeader("Content-Type") == "text/plain;charset=utf-8");
+    
+    var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc3/attachment.txt", {
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:bin_data
+    });
+    T(xhr.status == 412);
+
+    var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc3/attachment.txt?rev=" + rev, {
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:bin_data
+    });
+    T(xhr.status == 201);
+    var rev = JSON.parse(xhr.responseText).rev;
+
+    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc3/attachment.txt");
+    T(xhr.responseText == bin_data);
     T(xhr.getResponseHeader("Content-Type") == "text/plain;charset=utf-8");
 
-    // test binary data
-    var xhr = CouchDB.request("GET", "/favicon.ico");
-    var bin_data = xhr.responseText;
-    // bin_data = 123;
-    var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc/favicon.ico", {
-      headers:{"Content-Type":"image/vnd.microsoft.icon"},
-      body:bin_data
-    });
-    T(xhr.status == 201);
-    var rev = JSON.parse(xhr.responseText).rev;
-
-    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/favicon.ico");
+    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc3/attachment.txt?rev=" + rev);
     T(xhr.responseText == bin_data);
-    T(xhr.getResponseHeader("Content-Type") == "image/vnd.microsoft.icon");
-    
-     var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc/favicon.ico", {
-      headers:{"Content-Type":"image/vnd.microsoft.icon"},
-      body:bin_data
-    });
-    T(xhr.status == 412);
+    T(xhr.getResponseHeader("Content-Type") == "text/plain;charset=utf-8");
 
-    var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc/favicon.ico?rev="+rev, {
-      headers:{"Content-Type":"image/vnd.microsoft.icon"},
-      body:bin_data
-    });
-    T(xhr.status == 201);
-    var rev = JSON.parse(xhr.responseText).rev;
-
-    var xhr = CouchDB.request("DELETE", "/test_suite_db/bin_doc/foo.txt?rev="+rev);
+    var xhr = CouchDB.request("DELETE", "/test_suite_db/bin_doc3/attachment.txt?rev=" + rev);
     T(xhr.status == 200);
+    
+    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc3/attachment.txt?rev=" + rev);
+    T(xhr.status == 404);
   },
 
   content_negotiation: function(debug) {
