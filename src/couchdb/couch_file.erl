@@ -156,7 +156,7 @@ truncate(Fd, Pos) ->
 %%----------------------------------------------------------------------
 
 sync(Fd) ->
-    gen_server:call(Fd, sync).
+    gen_server:call(Fd, sync, infinity).
 
 %%----------------------------------------------------------------------
 %% Purpose: Close the file. Is performed asynchronously.

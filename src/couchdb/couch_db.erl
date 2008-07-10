@@ -298,13 +298,13 @@ update_docs(MainPid, Docs, Options) ->
     % flush unwritten binaries to disk.
     DocBuckets3 = [[doc_flush_binaries(Doc, Db#db.fd) || Doc <- Bucket] || Bucket <- DocBuckets2],
 
-    case gen_server:call(MainPid, {update_docs, DocBuckets3, [new_edits | Options]}) of
+    case gen_server:call(MainPid, {update_docs, DocBuckets3, [new_edits | Options]}, infinity) of
     ok -> {ok, NewRevs};
     retry ->
         Db2 = get_db(MainPid),
         DocBuckets4 = [[doc_flush_binaries(Doc, Db2#db.fd) || Doc <- Bucket] || Bucket <- DocBuckets3],
         % We only retry once
-        case gen_server:call(MainPid, {update_docs, DocBuckets4, [new_edits | Options]}) of
+        case gen_server:call(MainPid, {update_docs, DocBuckets4, [new_edits | Options]}, infinity) of
         ok -> {ok, NewRevs};
         Else -> throw(Else)
         end;
@@ -320,7 +320,7 @@ save_docs(MainPid, Docs, Options) ->
     Db = get_db(MainPid),
     DocBuckets = group_alike_docs(Docs),
     DocBuckets2 = [[doc_flush_binaries(Doc, Db#db.fd) || Doc <- Bucket] || Bucket <- DocBuckets],
-    ok = gen_server:call(MainPid, {update_docs, DocBuckets2, Options}).
+    ok = gen_server:call(MainPid, {update_docs, DocBuckets2, Options}, infinity).
 
 
 doc_flush_binaries(Doc, Fd) ->
