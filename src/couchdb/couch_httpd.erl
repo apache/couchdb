@@ -653,9 +653,9 @@ handle_attachment_request(Req, Method, _DbName, Db, DocId, FileName)
     missing_rev -> % make the new doc
         #doc{id=DocId};
     _ ->
-        case couch_db:open_doc(Db, DocId, []) of
-        {ok, Doc0}   -> Doc0#doc{revs=[Rev]};
-        Error       -> throw(Error)
+        case couch_db:open_doc_revs(Db, DocId, [Rev], []) of
+        {ok, [{ok, Doc0}]}   -> Doc0#doc{revs=[Rev]};
+        {ok, [Error]}       -> throw(Error)
         end
     end,
     
