@@ -105,7 +105,7 @@ append_term(Fd, Term) ->
 %%----------------------------------------------------------------------
     
 append_binary(Fd, Bin) ->
-    gen_server:call(Fd, {append_bin, Bin}).
+    gen_server:call(Fd, {append_bin, Bin}, infinity).
 
 
 %%----------------------------------------------------------------------
@@ -127,7 +127,7 @@ pread_term(Fd, Pos) ->
 %%----------------------------------------------------------------------
 
 pread_binary(Fd, Pos) ->
-    gen_server:call(Fd, {pread_bin, Pos}).
+    gen_server:call(Fd, {pread_bin, Pos}, infinity).
 
 
 %%----------------------------------------------------------------------
