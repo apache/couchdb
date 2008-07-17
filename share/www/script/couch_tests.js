@@ -558,7 +558,25 @@ var tests = {
     var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt");
     T(xhr.responseText == "This is a base64 encoded text");
     T(xhr.getResponseHeader("Content-Type") == "text/plain");
-    
+
+
+    // empty attachment
+    var binAttDoc2 = {
+      _id: "bin_doc5",
+      _attachments:{
+        "foo.txt": {
+          content_type:"text/plain",
+          data: ""
+        }
+      }
+    }
+
+    T(db.save(binAttDoc2).ok);
+
+    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc5/foo.txt");
+    T(xhr.responseText.length == 0);
+    T(xhr.getResponseHeader("Content-Type") == "text/plain");
+       
     // test RESTful doc API
     
     var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc2/foo2.txt", {
@@ -620,6 +638,30 @@ var tests = {
     
     var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc3/attachment.txt?rev=" + rev);
     T(xhr.status == 404);
+
+    // empty attachments
+    var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc4/attachment.txt", {
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:""
+    });
+    T(xhr.status == 201);
+    var rev = JSON.parse(xhr.responseText).rev;
+
+    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc4/attachment.txt");
+    T(xhr.status == 200);
+    T(xhr.responseText.length == 0);
+    
+    // overwrite previsously empty attachment
+    var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc4/attachment.txt?rev=" + rev, {
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:"This is a string"
+    });
+    T(xhr.status == 201);
+
+    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc4/attachment.txt");
+    T(xhr.status == 200);
+    T(xhr.responseText == "This is a string");
+    
   },
 
   content_negotiation: function(debug) {

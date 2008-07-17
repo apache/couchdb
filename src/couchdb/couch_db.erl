@@ -367,7 +367,7 @@ doc_flush_binaries(Doc, Fd) ->
                     end,
                     {{0,0}, 0}),
                 {Fd, NewStreamPointer, Len};
-            Bin when is_binary(Bin), size(Bin) > 0 ->
+            Bin when is_binary(Bin) ->
                 {ok, StreamPointer} = couch_stream:write(OutputStream, Bin),
                 {Fd, StreamPointer, size(Bin)}
             end,
