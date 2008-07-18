@@ -110,13 +110,18 @@ from_json_obj({obj, Props}) ->
     Revs0 ->
         Revs0
     end,
-    #doc{
-        id = proplists:get_value("_id", Props, ""),
-        revs = Revs,
-        deleted = proplists:get_value("_deleted", Props, false),
-        body = {obj, [{Key, Value} || {[FirstChar|_]=Key, Value} <- Props, FirstChar /= $_]},
-        attachments = Bins
-        }.
+    case proplists:get_value("_id", Props, "") of
+    Id when is_list(Id) ->
+        #doc{
+            id = Id,
+            revs = Revs,
+            deleted = proplists:get_value("_deleted", Props, false),
+            body = {obj, [{Key, Value} || {[FirstChar|_]=Key, Value} <- Props, FirstChar /= $_]},
+            attachments = Bins
+            };
+    _ ->
+        throw({invalid_document_id, "Document id is not a string"})
+    end.
 
 
 to_doc_info(#full_doc_info{id=Id,update_seq=Seq,rev_tree=Tree}) ->

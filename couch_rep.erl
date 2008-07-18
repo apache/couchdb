@@ -241,7 +241,7 @@ open_db(DbName)->
 
 
 enum_docs_since(DbUrl, StartSeq, InFun, InAcc) when is_list(DbUrl) ->
-    Url = DbUrl ++ "_all_docs_by_seq?count=4&startkey=" ++ integer_to_list(StartSeq),
+    Url = DbUrl ++ "_all_docs_by_seq?count=100&startkey=" ++ integer_to_list(StartSeq),
     {obj, Results} = do_http_request(Url, get),
     DocInfoList=
     lists:map(fun({obj, RowInfoList}) ->
