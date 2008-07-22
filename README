@@ -53,9 +53,10 @@ You will need the following installed:
 
  * [Erlang OTP][07] (>=R11B) (required)
  * [ICU][08] (required)
- * [Mozilla SpiderMonkey][09] (required)
- * [GNU Make][10] (required)
- * [GNU Compiler Collection][11] (required)
+ * [OpenSSL][09] (required)
+ * [Mozilla SpiderMonkey][10] (required)
+ * [GNU Make][11] (required)
+ * [GNU Compiler Collection][12] (required)
 
 ### UNIX-like Operating Systems (inc. OS X) ###
 
@@ -140,7 +141,7 @@ On many UNIX-like systems you can run the following command:
 
 OS X provides the standard Accounts option from the System Preferences
 application or you can optionally use the Workgroup Manager application which
-can be downloaded as part of the [Server Admin Tools][12].
+can be downloaded as part of the [Server Admin Tools][13].
 
 You should make sure that the `couchdb` user has a working POSIX shell and set
 the home directory to `/usr/local/var/lib/couchdb` which is the Apache CouchDB
@@ -167,7 +168,7 @@ When Apache CouchDB starts it should eventually display the following message:
 Relax.
 
 To check that everything has worked point your web browser to
-[http://localhost:5984/_utils/index.html][13] and run the test suite.
+[http://localhost:5984/_utils/index.html][14] and run the test suite.
 
 ##### OS X #####
 
@@ -250,8 +251,9 @@ Windows documentation is incomplete. Please submit suggestions.
 [06]: http://incubator.apache.org/couchdb/community/code.html
 [07]: http://erlang.org/
 [08]: http://icu.sourceforge.net/
-[09]: http://www.mozilla.org/js/spidermonkey/
-[10]: http://www.gnu.org/software/make/
-[11]: http://gcc.gnu.org/
-[12]: http://www.apple.com/support/downloads/serveradmintools1047.html
-[13]: http://localhost:5984/_utils/index.html
+[09]: http://www.openssl.org/
+[10]: http://www.mozilla.org/js/spidermonkey/
+[11]: http://www.gnu.org/software/make/
+[12]: http://gcc.gnu.org/
+[13]: http://www.apple.com/support/downloads/serveradmintools1047.html
+[14]: http://localhost:5984/_utils/index.html
