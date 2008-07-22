@@ -1331,14 +1331,13 @@ var tests = {
     T(xhr.status == 202);
     // compaction isn't instantaneous, loop until done
     while (db.info().compact_running) {};
-
+    
+    restartServer();
     var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt");
     T(xhr.responseText == "This is a base64 encoded text")
     T(xhr.getResponseHeader("Content-Type") == "text/plain")
-
-    var compactedsize = db.info().disk_size;
-
-    T(compactedsize < deletesize);
+    T(db.info().doc_count == 1);
+    T(db.info().disk_size < deletesize);
   }
 };
 
