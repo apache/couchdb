@@ -178,9 +178,12 @@ function CouchDatabasePage() {
           db.openDoc(resp.rows[i].id, {
             success: function(doc) {
               var optGroup = $("<optgroup></optgroup>").attr("label", doc._id.substr(8));
+              var optGroup = $(document.createElement("optgroup"))
+                .attr("label", doc._id.substr(8));
               for (var name in doc.views) {
                 if (!doc.views.hasOwnProperty(name)) continue;
-                var option = $("<option></option>").attr("value", doc._id + "/" + name).text(name)
+                var option = $(document.createElement("option"))
+                  .attr("value", doc._id + "/" + name).text(name)
                   .appendTo(optGroup);
                 if (doc._id + "/" + name == viewName) {
                   option[0].selected = true;
