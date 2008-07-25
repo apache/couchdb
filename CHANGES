@@ -1,6 +1,14 @@
 Apache CouchDB CHANGES
 ======================
 
+Version 0.8.1-incubating
+------------------------
+
+Packaging and System Integration:
+
+ * The `couchdb` script no longer uses `awk` for configuration checks as this
+   was causing portability problems.
+
 Version 0.8.0-incubating
 ------------------------
 
