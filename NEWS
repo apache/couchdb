@@ -13,7 +13,8 @@ This release is still under development.
 Version 0.8.1-incubating
 ------------------------
 
- * Minor fixes for the `couchdb` command.
+ * Various bug fixes for replication, compaction, the HTTP interface and the
+   Javascript View Server.
 
 Version 0.8.0-incubating
 ------------------------

@@ -4,10 +4,43 @@ Apache CouchDB CHANGES
 Version 0.8.1-incubating
 ------------------------
 
+Database Core:
+
+ * Fix for replication problems where the write queues can get backed up if the
+   writes aren't happening fast enough to keep up with the reads. For a large
+   replication, this can exhaust memory and crash, or slow down the machine
+   dramatically. The fix keeps only one document in the write queue at a time.
+ * Fix for databases sometimes incorrectly reporting that they contain 0
+   documents after compaction.
+
+HTTP Interface:
+
+ * Fix for chunked responses where chunks were always being split into multiple
+   TCP packets, which caused problems with the test suite under Safari, and in
+   some other cases.
+ * Fix for an invalid JSON response body being returned for some kinds of
+   views. (COUCHDB-84)
+ * Fix for connections not getting closed after rejecting a chunked request.
+   (COUCHDB-55)
+ * CouchDB can now be bound to IPv6 addresses.
+ * The HTTP Server header now contains the versions of CouchDB and Erlang.
+
+Javascript View Server:
+
+ * Fix for sealing of nested data structure in documents in the Javascript view
+   server.
+ * Improve error handling for undefined values emitted by map functions.
+   (COUCHDB-83)
+
 Packaging and System Integration:
 
  * The `couchdb` script no longer uses `awk` for configuration checks as this
    was causing portability problems.
+
+Futon Utility Client:
+
+ * The view selector dropdown should now work in Opera and Internet Explorer
+   even when it includes optgroups for design documents. (COUCHDB-81)
 
 Version 0.8.0-incubating
 ------------------------
