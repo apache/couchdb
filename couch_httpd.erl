@@ -1014,4 +1014,4 @@ negotiate_content_type(Req) ->
 
 server_header() ->
     [{"Server", "CouchDB/" ++ couch_server:get_version() ++
-                " (Erlang OTP/" ++ erlang:system_info(otp_release) ++ ")"}].
+                " (Erlang OTP/R" ++ erlang:system_info(compat_rel) ++ "B)"}].
