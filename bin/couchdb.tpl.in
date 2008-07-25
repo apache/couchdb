@@ -96,17 +96,6 @@ display_error () {
     exit $SCRIPT_ERROR
 }
 
-_load_configuration () {
-    dbrootdir_ini_value=`%AWK% -F = "/^DbRootDir=/{print \\$2}" < $INI_FILE`
-    if test -n "$dbrootdir_ini_value"; then
-        LIB_DIRECTORY=$dbrootdir_ini_value
-    fi
-    logfile_ini_value=`%AWK% -F = "/^LogFile=/{print \\$2}" < $INI_FILE`
-    if test -n "$logfile_ini_value"; then
-        LOG_DIRECTORY=`dirname $logfile_ini_value`
-    fi
-}
-
 _get_pid () {
     if test -f $PID_FILE; then
         PID=`cat $PID_FILE`
@@ -132,59 +121,37 @@ EOF
 }
 
 check_environment () {
+    if test "$BACKGROUND_BOOLEAN" != "true"; then
+        return
+    fi
+    touch $PID_FILE 2> /dev/null || true
+    touch $STDOUT_FILE 2> /dev/null || true
+    touch $STDERR_FILE 2> /dev/null || true
     message_prefix="Apache CouchDB needs write permission on the"
-    if test ! -w $LIB_DIRECTORY; then
-        echo "$message_prefix data directory: $LIB_DIRECTORY" >&2
+    if test ! -w $PID_FILE; then
+        echo "$message_prefix PID file: $PID_FILE" >&2
         exit $SCRIPT_ERROR
     fi
-    if test ! -w $LOG_DIRECTORY; then
-        echo "$message_prefix log directory: $LOG_DIRECTORY" >&2
+    if test ! -w $STDOUT_FILE; then
+        echo "$message_prefix STDOUT file: $STDOUT_FILE" >&2
         exit $SCRIPT_ERROR
     fi
-    message_prefix="Apache CouchDB needs write permission on data file"
-    for file in `find $LIB_DIRECTORY -type f`; do
-        if test ! -w $file; then
-            echo "$message_prefix: $file" >&2
-            exit $SCRIPT_ERROR
-        fi
-    done
-    message_prefix="Apache CouchDB needs write permission on log file"
-    for file in `find $LOG_DIRECTORY -type f`; do
-        if test ! -w $file; then
-            echo "$message_prefix: $file" >&2
-            exit $SCRIPT_ERROR
-        fi
-    done
-    if test "$BACKGROUND_BOOLEAN" = "true"; then
-        touch $PID_FILE 2> /dev/null || true
-        touch $STDOUT_FILE 2> /dev/null || true
-        touch $STDERR_FILE 2> /dev/null || true
-        message_prefix="Apache CouchDB needs write permission on the"
-        if test ! -w $PID_FILE; then
-            echo "$message_prefix PID file: $PID_FILE" >&2
-            exit $SCRIPT_ERROR
-        fi
-        if test ! -w $STDOUT_FILE; then
-            echo "$message_prefix STDOUT file: $STDOUT_FILE" >&2
-            exit $SCRIPT_ERROR
-        fi
-        if test ! -w $STDERR_FILE; then
-            echo "$message_prefix STDERR file: $STDERR_FILE" >&2
-            exit $SCRIPT_ERROR
-        fi
-        message_prefix="Apache CouchDB needs a regular"
-        if ! echo 2> /dev/null >> $PID_FILE; then
-            echo "$message_prefix PID file: $PID_FILE" >&2
-            exit $SCRIPT_ERROR
-        fi
-        if ! echo 2> /dev/null >> $STDOUT_FILE; then
-            echo "$message_prefix STDOUT file: $STDOUT_FILE" >&2
-            exit $SCRIPT_ERROR
-        fi
-        if ! echo 2> /dev/null >> $STDERR_FILE; then
-            echo "$message_prefix STDERR file: $STDERR_FILE" >&2
-            exit $SCRIPT_ERROR
-        fi
+    if test ! -w $STDERR_FILE; then
+        echo "$message_prefix STDERR file: $STDERR_FILE" >&2
+        exit $SCRIPT_ERROR
+    fi
+    message_prefix="Apache CouchDB needs a regular"
+    if ! echo 2> /dev/null >> $PID_FILE; then
+        echo "$message_prefix PID file: $PID_FILE" >&2
+        exit $SCRIPT_ERROR
+    fi
+    if ! echo 2> /dev/null >> $STDOUT_FILE; then
+        echo "$message_prefix STDOUT file: $STDOUT_FILE" >&2
+        exit $SCRIPT_ERROR
+    fi
+    if ! echo 2> /dev/null >> $STDERR_FILE; then
+        echo "$message_prefix STDERR file: $STDERR_FILE" >&2
+        exit $SCRIPT_ERROR
     fi
 }
 
@@ -307,7 +274,6 @@ parse_script_option_list () {
             *) display_error "Unknown option: $1" >&2;;
         esac
     done
-    _load_configuration
     if test "$KILL_BOOLEAN" = "true" -o "$SHUTDOWN_BOOLEAN" = "true"; then
         stop_couchdb $KILL_BOOLEAN
     else

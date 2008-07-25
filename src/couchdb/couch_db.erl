@@ -298,13 +298,13 @@ update_docs(MainPid, Docs, Options) ->
     % flush unwritten binaries to disk.
     DocBuckets3 = [[doc_flush_binaries(Doc, Db#db.fd) || Doc <- Bucket] || Bucket <- DocBuckets2],
 
-    case gen_server:call(MainPid, {update_docs, DocBuckets3, [new_edits | Options]}) of
+    case gen_server:call(MainPid, {update_docs, DocBuckets3, [new_edits | Options]}, infinity) of
     ok -> {ok, NewRevs};
     retry ->
         Db2 = get_db(MainPid),
         DocBuckets4 = [[doc_flush_binaries(Doc, Db2#db.fd) || Doc <- Bucket] || Bucket <- DocBuckets3],
         % We only retry once
-        case gen_server:call(MainPid, {update_docs, DocBuckets4, [new_edits | Options]}) of
+        case gen_server:call(MainPid, {update_docs, DocBuckets4, [new_edits | Options]}, infinity) of
         ok -> {ok, NewRevs};
         Else -> throw(Else)
         end;
@@ -320,7 +320,7 @@ save_docs(MainPid, Docs, Options) ->
     Db = get_db(MainPid),
     DocBuckets = group_alike_docs(Docs),
     DocBuckets2 = [[doc_flush_binaries(Doc, Db#db.fd) || Doc <- Bucket] || Bucket <- DocBuckets],
-    ok = gen_server:call(MainPid, {update_docs, DocBuckets2, Options}).
+    ok = gen_server:call(MainPid, {update_docs, DocBuckets2, Options}, infinity).
 
 
 doc_flush_binaries(Doc, Fd) ->
@@ -367,7 +367,7 @@ doc_flush_binaries(Doc, Fd) ->
                     end,
                     {{0,0}, 0}),
                 {Fd, NewStreamPointer, Len};
-            Bin when is_binary(Bin), size(Bin) > 0 ->
+            Bin when is_binary(Bin) ->
                 {ok, StreamPointer} = couch_stream:write(OutputStream, Bin),
                 {Fd, StreamPointer, size(Bin)}
             end,
@@ -568,15 +568,16 @@ update_loop(#db{fd=Fd,name=Name,
                 init_db(Name, CompactFilepath, NewFd, NewHeader),
         case Db#db.update_seq == NewSeq of
         true ->
+            NewDb2 = commit_data(
+                NewDb#db{
+                    main_pid = Db#db.main_pid,
+                    doc_count = Db#db.doc_count,
+                    doc_del_count = Db#db.doc_del_count,
+                    filepath = Filepath}),
+                
             ?LOG_DEBUG("CouchDB swapping files ~s and ~s.", [Filepath, CompactFilepath]),
             ok = file:rename(Filepath, Filepath ++ ".old"),
             ok = file:rename(CompactFilepath, Filepath),
-            
-            NewDb2 = NewDb#db{
-                main_pid = Db#db.main_pid,
-                doc_count = Db#db.doc_count,
-                doc_del_count = Db#db.doc_del_count,
-                filepath = Filepath},
             
             couch_stream:close(Db#db.summary_stream),
             % close file handle async.

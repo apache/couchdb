@@ -50,8 +50,7 @@ write_chunk(Data) ->
     case Request:get(version) of
         Version when Version >= {1, 1} ->
             Length = iolist_size(Data),
-            send(io_lib:format("~.16b\r\n", [Length])),
-            send([Data, <<"\r\n">>]);
+            send([io_lib:format("~.16b\r\n", [Length]), Data, <<"\r\n">>]);
         _ ->
             send(Data)
     end.

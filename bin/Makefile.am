@@ -25,7 +25,6 @@ couchjs_command_name = `echo couchjs | sed '$(transform)'`
 couchdb: couchdb.tpl
 	sed -e "s|%ERL%|$(ERL)|g" \
 	    -e "s|%ICU_CONFIG%|$(ICU_CONFIG)|g" \
-	    -e "s|%AWK%|$(AWK)|g" \
 	    -e "s|%bindir%|@bindir@|g" \
 	    -e "s|%localerlangbindir%|@localerlangbindir@|g" \
 	    -e "s|%localerlanglibdir%|@localerlanglibdir@|g" \
