@@ -16,7 +16,7 @@
 -export([foldr/3, foldr/4, fold/4, fold/5, full_reduce/1, final_reduce/2]).
 -export([fold_reduce/7, lookup/2, get_state/1, set_options/2, test/1, test/0]).
 
--define(CHUNK_THRESHOLD, 16#fff).
+-define(CHUNK_THRESHOLD, 16#4ff).
 
 -record(btree,
     {fd,
