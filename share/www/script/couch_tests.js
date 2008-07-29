@@ -290,6 +290,10 @@ var tests = {
     result = db.query(map, reduce, {startkey: 4, endkey: 6});
     T(result.rows[0].value == 15);
 
+    result = db.query(map, reduce, {count: 3});
+    console.log(result.rows[0].value);
+    T(result.rows[0].value == 6);
+
     for(var i=1; i<numDocs/2; i+=30) {
       result = db.query(map, reduce, {startkey: i, endkey: numDocs - i});
       T(result.rows[0].value == summate(numDocs-i) - summate(i-1));
@@ -356,13 +360,13 @@ var tests = {
     db.createDb();
 
       
-    var map = function (doc) {emit(null, doc.val)};
+    var map = function (doc) {emit(doc.val, doc.val)};
     var reduceCombine = function (keys, values, rereduce) {
         // This computes the standard deviation of the mapped results
-        var stdDeviation=0;
+        var stdDeviation=0.0;
         var count=0;
-        var total=0;
-        var sqrTotal=0;
+        var total=0.0;
+        var sqrTotal=0.0;
           
         if (!rereduce) {
           // This is the reduce phase, we are reducing over emitted values from
@@ -379,7 +383,7 @@ var tests = {
           for(var i in values) {
             count = count + values[i].count;
             total = total + values[i].total;
-            sqrTotal = sqrTotal + (values[i].sqrTotal * values[i].sqrTotal);
+            sqrTotal = sqrTotal + values[i].sqrTotal;
           }
         }
         
@@ -393,26 +397,34 @@ var tests = {
       };
       
       // Save a bunch a docs.
+    for(var i=0; i < 10; i++) {
+      var docs = [];
+      docs.push({val:10});
+      docs.push({val:20});
+      docs.push({val:30});
+      docs.push({val:40});
+      docs.push({val:50});
+      docs.push({val:60});
+      docs.push({val:70});
+      docs.push({val:80});
+      docs.push({val:90});
+      docs.push({val:100});
+      T(db.bulkSave(docs).ok);
+    }
+    
+    var results = db.query(map, reduceCombine);
+    
+    var difference = results.rows[0].value.stdDeviation - 28.722813232690143;
+    // account for floating point rounding error
+    T(Math.abs(difference) < 0.0000000001);
+    
+    var rows = db.query(map).rows;
+    console.log(JSON.stringify(rows))
+    for(var i=0; i < 10; i++) {
       for(var j=0; j < 10; j++) {
-        var docs = [];
-        docs.push({val:10});
-        docs.push({val:20});
-        docs.push({val:30});
-        docs.push({val:40});
-        docs.push({val:50});
-        docs.push({val:60});
-        docs.push({val:70});
-        docs.push({val:80});
-        docs.push({val:90});
-        docs.push({val:100});
-        T(db.bulkSave(docs).ok);
+        T(rows[(i*10) + j].value == (i+1)*10);
       }
-      
-      var results = db.query(map, reduceCombine);
-      
-      var difference = results.rows[0].value.stdDeviation - 28.722813232690143;
-      // account for floating point rounding error
-      T(Math.abs(difference) < 0.0000000001);
+    }
       
   },
 
