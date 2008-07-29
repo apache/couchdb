@@ -290,10 +290,6 @@ var tests = {
     result = db.query(map, reduce, {startkey: 4, endkey: 6});
     T(result.rows[0].value == 15);
 
-    result = db.query(map, reduce, {count: 3});
-    console.log(result.rows[0].value);
-    T(result.rows[0].value == 6);
-
     for(var i=1; i<numDocs/2; i+=30) {
       result = db.query(map, reduce, {startkey: i, endkey: numDocs - i});
       T(result.rows[0].value == summate(numDocs-i) - summate(i-1));
@@ -418,14 +414,6 @@ var tests = {
     // account for floating point rounding error
     T(Math.abs(difference) < 0.0000000001);
     
-    var rows = db.query(map).rows;
-    console.log(JSON.stringify(rows))
-    for(var i=0; i < 10; i++) {
-      for(var j=0; j < 10; j++) {
-        T(rows[(i*10) + j].value == (i+1)*10);
-      }
-    }
-      
   },
 
   multiple_rows: function(debug) {
