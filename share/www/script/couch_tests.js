@@ -290,6 +290,12 @@ var tests = {
     result = db.query(map, reduce, {startkey: 4, endkey: 6});
     T(result.rows[0].value == 15);
 
+    result = db.query(map, reduce, {group:true, count:3});
+    T(result.rows.length == 3);
+    T(result.rows[0].value == 1);
+    T(result.rows[1].value == 2);
+    T(result.rows[2].value == 3);
+
     for(var i=1; i<numDocs/2; i+=30) {
       result = db.query(map, reduce, {startkey: i, endkey: numDocs - i});
       T(result.rows[0].value == summate(numDocs-i) - summate(i-1));
