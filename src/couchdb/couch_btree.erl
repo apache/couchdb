@@ -78,17 +78,20 @@ fold_reduce(#btree{root=Root}=Bt, Dir, StartKey, EndKey, KeyGroupFun, Fun, Acc) 
         rev -> {EndKey, StartKey};
         fwd -> {StartKey, EndKey}
     end,
-    {ok, Acc2, GroupedRedsAcc2, GroupedKVsAcc2, GroupedKey2} =
-        reduce_stream_node(Bt, Dir, Root, StartKey2, EndKey2, nil, [], [],
-        KeyGroupFun, Fun, Acc),
-    if GroupedKey2 == nil ->
-        {ok, Acc2};
-    true ->
-        case (catch Fun(GroupedKey2, {GroupedKVsAcc2, GroupedRedsAcc2}, Acc2)) of
+    try
+        {ok, Acc2, GroupedRedsAcc2, GroupedKVsAcc2, GroupedKey2} =
+            reduce_stream_node(Bt, Dir, Root, StartKey2, EndKey2, nil, [], [],
+            KeyGroupFun, Fun, Acc),
+        if GroupedKey2 == nil ->
+            {ok, Acc2};
+        true ->
+            case Fun(GroupedKey2, {GroupedKVsAcc2, GroupedRedsAcc2}, Acc2) of
             {ok, Acc3} -> {ok, Acc3};
-            {stop, Acc3} -> {ok, Acc3};
-            Else -> throw(Else)
+            {stop, Acc3} -> {ok, Acc3}
+            end
         end
+    catch
+        throw:{stop, AccDone} -> {ok, AccDone}
     end.
 
 full_reduce(#btree{root=nil,reduce=Reduce}) ->
