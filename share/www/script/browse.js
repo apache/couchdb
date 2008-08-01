@@ -626,7 +626,8 @@ function CouchDocumentPage() {
   }
 
   function _addRowForField(doc, fieldName) {
-    var row = $("<tr><th></th><td></td></tr>").find("th").append($("<b></b>").text(fieldName)).end();
+    var row = $("<tr><th></th><td></td></tr>").find("th").append($("<b></b>")
+      .text(fieldName)).end().appendTo("#fields tbody.content");
     if (fieldName == "_attachments") {
       row
         .find("td").append(_renderAttachmentList(doc[fieldName]));
@@ -638,15 +639,13 @@ function CouchDocumentPage() {
         }).end()
         .find("td").append(value).dblclick(function() {
           _editValue(doc, this, $(this).prev("th").text());
-        }).end()
-        
+        }).end();
       if (fieldName != "_id" && fieldName != "_rev") {
         row.find("th, td").attr("title", "Double click to edit");
         _initKey(doc, row, fieldName);
         _initValue(value);
       }
     }
-    row.appendTo("#fields tbody.content");
     $("#fields tbody tr").removeClass("odd").filter(":odd").addClass("odd");
     return row;
   }
@@ -766,8 +765,8 @@ function CouchDocumentPage() {
   }
 
   function _initValue(value) {
-    value.find("dd").filter(":has(dl)").hide().prev("dt").addClass("collapsed");
-    value.find("dd").not(":has(dl)").addClass("inline").prev().addClass("inline");
+    value.find("dd:has(dl)").hide().prev("dt").addClass("collapsed");
+    value.find("dd:not(:has(dl))").addClass("inline").prev().addClass("inline");
     value.find("dt.collapsed").click(function() {
       $(this).toggleClass("collapsed").next().toggle();
     });
