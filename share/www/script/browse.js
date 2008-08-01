@@ -507,6 +507,9 @@ function CouchDocumentPage() {
   page = this;
 
   this.addField = function() {
+    if (!$("#fields tbody.content:visible").length) {
+      $("#tabs li.tabular a").click(); // switch to tabular view
+    }
     var fieldName = "unnamed";
     var fieldIdx = 1;
     while (page.doc.hasOwnProperty(fieldName)) {

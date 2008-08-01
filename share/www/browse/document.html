@@ -41,6 +41,24 @@ specific language governing permissions and limitations under the License.
           .attr("href", "database.html?" + encodeURIComponent(page.db.name));
         $("h1 strong").text(page.docId);
         page.updateFieldListing();
+
+        $("#tabs li.tabular a").click(function() {
+          $("#tabs li").removeClass("active");
+          $(this).parent().addClass("active");
+          $("#fields thead th:first").text("Field").attr("colspan", 1).next().show();
+          $("#fields tbody.content").show();
+          $("#fields tbody.source").hide();
+        });
+        $("#tabs li.source a").click(function() {
+          $("#tabs li").removeClass("active");
+          $(this).parent().addClass("active");
+          $("#fields thead th:first").text("Source").attr("colspan", 2).next().hide();
+          $("#fields tbody.content").hide();
+          $("#fields tbody.source").find("td").each(function() {
+            $(this).html($("<code></code>").text(prettyPrintJSON(page.doc)));
+          }).end().show();
+        });
+
         $("#toolbar button.save").click(page.saveDocument);
         $("#toolbar button.add").click(page.addField);
         $("#toolbar button.delete").click(page.deleteDocument);
@@ -61,6 +79,10 @@ specific language governing permissions and limitations under the License.
         <li><button class="delete">Delete Document</button></li>
       </ul>
 
+      <ul id="tabs">
+        <li class="active tabular"><a href="#tabular">Fields</a></li>
+        <li class="source"><a href="#source">Source</a></li>
+      </ul>
       <table id="fields" class="listing" cellspacing="0">
         <col class="field"><col class="value">
         <caption>Fields</caption>
@@ -71,6 +93,9 @@ specific language governing permissions and limitations under the License.
           </tr>
         </thead>
         <tbody class="content">
+        </tbody>
+        <tbody class="source" style="display: none">
+          <tr><td colspan="2"></td></tr>
         </tbody>
         <tbody class="footer">
           <tr>
