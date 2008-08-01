@@ -451,7 +451,7 @@ function CouchDatabasePage() {
       db.allDocs(options);
     } else {
       if (viewName == "_temp_view") {
-        $("#viewcode").show().addClass("expanded");
+        $("#viewcode").show().removeClass("collapsed");
         var mapFun = $("#viewcode_map").val();
         $.cookies.set(db.name + ".map", mapFun);
         var reduceFun = $("#viewcode_reduce").val() || null;
