@@ -426,7 +426,7 @@ get_notify_pids(Wait) ->
         [Pid | get_notify_pids()];
     {'DOWN', _MonitorRef, _Type, _Pid, _Info} ->
         ?LOG_DEBUG("View monitor received parent db shutdown notification. Shutting down instance.", []),
-        exit(normal);
+        exit(db_shutdown);
     Else ->
         ?LOG_ERROR("Unexpected message in view updater: ~p", [Else]),
         exit({error, Else})
