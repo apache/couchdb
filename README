@@ -157,7 +157,7 @@ running the following commands:
 
 To start the Apache CouchDB server you should run the following command:
 
-    sudo -u couchdb couchdb
+    sudo -i -u couchdb couchdb
 
 This uses the `sudo` command to run the `couchdb` command as the `couchdb` user.
 
