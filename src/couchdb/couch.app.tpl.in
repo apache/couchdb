@@ -4,6 +4,7 @@
               {modules,[couch_btree,
                         cjson,
                         couch_db,
+                        couch_db_updater,
                         couch_doc,
                         couch_query_servers,
                         couch_file,
