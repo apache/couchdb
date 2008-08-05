@@ -141,8 +141,9 @@ handle_replicate_request(_Req, _Method) ->
     throw({method_not_allowed, "POST"}).
 
 handle_restart_request(Req, 'POST') ->
-    couch_server:remote_restart(),
-    send_json(Req, {obj, [{ok, true}]});
+    Response = send_json(Req, {obj, [{ok, true}]}),
+    spawn(fun() -> couch_server:remote_restart() end),
+    Response;
 
 handle_restart_request(_Req, _Method) ->
     throw({method_not_allowed, "POST"}).
