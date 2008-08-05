@@ -156,7 +156,8 @@ handle_db_request(Req, Method, {Path}) ->
 
 handle_db_request(Req, 'PUT', {DbName, []}) ->
     case couch_server:create(DbName, []) of
-        {ok, _Db} ->
+        {ok, Db} ->
+            couch_db:close(Db),
             send_json(Req, 201, {obj, [{ok, true}]});
         {error, database_already_exists} ->
             Msg = io_lib:format("Database ~p already exists.", [DbName]),
@@ -167,9 +168,13 @@ handle_db_request(Req, 'PUT', {DbName, []}) ->
     end;
 
 handle_db_request(Req, Method, {DbName, Rest}) ->
-    case couch_server:open(DbName) of
+    case couch_db:open(DbName, []) of
         {ok, Db} ->
-            handle_db_request(Req, Method, {DbName, Db, Rest});
+            try 
+                handle_db_request(Req, Method, {DbName, Db, Rest})
+            after
+                couch_db:close(Db)
+            end;
         Error ->
             throw(Error)
     end;

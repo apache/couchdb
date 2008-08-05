@@ -69,3 +69,40 @@
     % couch_db:open_doc(Db, Id, Options).
     meta = []
     }).
+    
+    
+
+
+
+-record(db_header,
+    {write_version = 0,
+     update_seq = 0,
+     summary_stream_state = nil,
+     fulldocinfo_by_id_btree_state = nil,
+     docinfo_by_seq_btree_state = nil,
+     local_docs_btree_state = nil,
+     doc_count=0,
+     doc_del_count=0
+    }).
+
+-record(db,
+    {main_pid=nil,
+    update_pid=nil,
+    compactor_pid=nil,
+    fd,
+    header = #db_header{},
+    summary_stream,
+    fulldocinfo_by_id_btree,
+    docinfo_by_seq_btree,
+    local_docs_btree,
+    update_seq,
+    doc_count,
+    doc_del_count,
+    name,
+    filepath
+    }).
+    
+    
+
+% small value used in revision trees to indicate the revision isn't stored
+-define(REV_MISSING, []).
