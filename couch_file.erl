@@ -396,15 +396,15 @@ handle_info(Info, Fd) ->
 
 should_close(Fd) ->
     case process_info(self(), links) of
-    {links, [Fd]} ->
-        % no linkers left (except our fd). What about monitors?
+    {links, [_]} ->
+        % no linkers left (except our fd port). What about monitors?
         case process_info(self(), monitors) of
         {monitors, []} ->
             true;
         _ ->
             false
         end;
-    {links,  Links} when length(Links) > 1 ->
+    {links,  [_|_]} ->
         false
     end.
 
