@@ -36,8 +36,8 @@ Packaging and System Integration:
 
  * The `couchdb` script no longer uses `awk` for configuration checks as this
    was causing portability problems.
- * Updated `sudo` example to use `-i` option in the README, fixes problems when
-   invoking from a directory the `couchdb` user cannot access.
+ * Updated `sudo` example in the README to use the `-i` option, this fixes
+   problems when invoking from a directory the `couchdb` user cannot access.
 
 Futon Utility Client:
 
