@@ -74,8 +74,9 @@ start_server(InputIniFilename) ->
     UtilDriverDir = proplists:get_value({"Couch", "UtilDriverDir"}, Ini, ""),
     UpdateNotifierExes = proplists:get_all_values({"Couch", "DbUpdateNotificationProcess"}, Ini),
     FtSearchQueryServer = proplists:get_value({"Couch", "FullTextSearchQueryServer"}, Ini, ""),
-    RemoteRestart = list_to_atom(proplists:get_value({"Couch", "AllowRemoteRestart"}, Ini, "undefined")),
-    ServerOptions = [{remote_restart, RemoteRestart}],
+    RemoteRestart = list_to_atom(proplists:get_value({"Couch", "AllowRemoteRestart"}, Ini, "false")),
+    MaxDbsOpen = proplists:get_value({"Couch", "MaxDbsOpen"}, Ini, 100),
+    ServerOptions = [{remote_restart, RemoteRestart}, {max_dbs_open, MaxDbsOpen}],
     QueryServers = [{Lang, QueryExe} || {{"Couch Query Servers", Lang}, QueryExe} <- Ini],
 
     ChildProcesses =

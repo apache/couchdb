@@ -43,7 +43,18 @@ replicate(DbNameA, DbNameB) ->
 
 replicate(Source, Target, Options) ->
     {ok, DbSrc} = open_db(Source),
-    {ok, DbTgt} = open_db(Target),
+    try
+        {ok, DbTgt} = open_db(Target),
+        try
+            replicate2(Source, DbSrc, Target, DbTgt, Options)
+        after
+            close_db(DbTgt)
+        end        
+    after
+        close_db(DbSrc)
+    end.
+    
+replicate2(Source, DbSrc, Target, DbTgt, Options) ->
     {ok, HostName} = inet:gethostname(),
 
     RepRecKey = ?LOCAL_DOC_PREFIX ++ HostName ++ ":" ++ Source ++ ":" ++ Target,
@@ -237,7 +248,12 @@ open_db("http" ++ DbName)->
         {ok, "http" ++ DbName ++ "/"}
     end;
 open_db(DbName)->
-    couch_server:open(DbName).
+    couch_db:open(DbName, []).
+
+close_db("http" ++ _)->
+    ok;
+close_db(DbName)->
+    couch_db:close(DbName).
 
 
 enum_docs_since(DbUrl, StartSeq, InFun, InAcc) when is_list(DbUrl) ->

@@ -15,7 +15,7 @@
 -behaviour(application).
 
 -export([start/0,start/1,start/2,stop/0,stop/1]).
--export([open/1,create/2,delete/1,all_databases/0,get_version/0]).
+-export([open/2,create/2,delete/1,all_databases/0,get_version/0]).
 -export([init/1, handle_call/3,sup_start_link/2]).
 -export([handle_cast/2,code_change/3,handle_info/2,terminate/2]).
 -export([dev_start/0,remote_restart/0]).
@@ -25,7 +25,9 @@
 -record(server,{
     root_dir = [],
     dbname_regexp,
-    options=[]
+    remote_restart=[],
+    max_dbs_open=100,
+    current_dbs_open=0
     }).
 
 start() ->
@@ -64,33 +66,41 @@ get_version() ->
 sup_start_link(RootDir, Options) ->
     gen_server:start_link({local, couch_server}, couch_server, {RootDir, Options}, []).
 
-open(Filename) ->
-    gen_server:call(couch_server, {open, Filename}).
+open(DbName, Options) ->
+    gen_server:call(couch_server, {open, DbName, Options}).
 
-create(Filename, Options) ->
-    gen_server:call(couch_server, {create, Filename, Options}).
+create(DbName, Options) ->
+    gen_server:call(couch_server, {create, DbName, Options}).
 
-delete(Filename) ->
-    gen_server:call(couch_server, {delete, Filename}).
+delete(DbName) ->
+    gen_server:call(couch_server, {delete, DbName}).
 
 remote_restart() ->
     gen_server:call(couch_server, remote_restart).
 
-init({RootDir, Options}) ->
-    {ok, RegExp} = regexp:parse("^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*$"),
-    {ok, #server{root_dir=RootDir, dbname_regexp=RegExp, options=Options}}.
-
-check_filename(#server{dbname_regexp=RegExp}, Filename) ->
-    case regexp:match(Filename, RegExp) of
+check_dbname(#server{dbname_regexp=RegExp}, DbName) ->
+    case regexp:match(DbName, RegExp) of
     nomatch ->
         {error, illegal_database_name};
     _Match ->
         ok
     end.
 
-get_full_filename(Server, Filename) ->
-    filename:join([Server#server.root_dir, "./" ++ Filename ++ ".couch"]).
+get_full_filename(Server, DbName) ->
+    filename:join([Server#server.root_dir, "./" ++ DbName ++ ".couch"]).
 
+init({RootDir, Options}) ->
+    {ok, RegExp} = regexp:parse("^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*$"),
+    ets:new(couch_dbs_by_name, [set, private, named_table]),
+    ets:new(couch_dbs_by_pid, [set, private, named_table]),
+    ets:new(couch_dbs_by_lru, [ordered_set, private, named_table]),
+    process_flag(trap_exit, true),
+    MaxDbsOpen = proplists:get_value(max_dbs_open, Options),
+    RemoteRestart = proplists:get_value(remote_restart, Options),
+    {ok, #server{root_dir=RootDir,
+                dbname_regexp=RegExp,
+                max_dbs_open=MaxDbsOpen,
+                remote_restart=RemoteRestart}}.
 
 terminate(_Reason, _Server) ->
     ok.
@@ -109,107 +119,141 @@ all_databases() ->
     {ok, Filenames}.
 
 
-handle_call(get_root, _From, #server{root_dir=Root}=Server) ->
-    {reply, {ok, Root}, Server};
-handle_call({open, Filename}, From, Server) ->
-    case check_filename(Server, Filename) of
-    {error, Error} ->
-        {reply, {error, Error}, Server};
-    ok ->
-        Filepath = get_full_filename(Server, Filename),
-        Result = supervisor:start_child(couch_server_sup,
-            {Filename,
-                {couch_db, open, [Filename, Filepath]},
-                transient ,
-                infinity,
-                supervisor,
-                [couch_db]}),
-        case Result of
-        {ok, Db} ->
-            {reply, {ok, Db}, Server};
-        {error, already_present} ->
-            ok = supervisor:delete_child(couch_server_sup, Filename),
-            % call self recursively
-            handle_call({open, Filename}, From, Server);
-        {error, {already_started, Db}} ->
-            {reply, {ok, Db}, Server};
-        {error, {not_found, _}} ->
-            {reply, not_found, Server};
-        {error, {Error, _}} ->
-            {reply, {error, Error}, Server}
-        end
-    end;
-handle_call({create, Filename, Options}, _From, Server) ->
-    case check_filename(Server, Filename) of
-    {error, Error} ->
-        {reply, {error, Error}, Server};
-    ok ->
-        Filepath = get_full_filename(Server, Filename),
-        ChildSpec = {Filename,
-                {couch_db, create, [Filename, Filepath, Options]},
-                transient,
-                infinity,
-                supervisor,
-                [couch_db]},
-        Result =
-        case supervisor:delete_child(couch_server_sup, Filename) of
-        ok ->
-            sup_start_child(couch_server_sup, ChildSpec);
-        {error, not_found} ->
-            sup_start_child(couch_server_sup, ChildSpec);
-        {error, running} ->
-            % a server process for this database already started. Maybe kill it
-            case lists:member(overwrite, Options) of
-            true ->
-                supervisor:terminate_child(couch_server_sup, Filename),
-                ok = supervisor:delete_child(couch_server_sup, Filename),
-                sup_start_child(couch_server_sup, ChildSpec);
-            false ->
-                {error, database_already_exists}
-            end
-        end,
-        case Result of
-        {ok, _Db} -> couch_db_update_notifier:notify({created, Filename});
-        _ -> ok
-        end,
-        {reply, Result, Server}
-    end;
-handle_call({delete, Filename}, _From, Server) ->
-    FullFilepath = get_full_filename(Server, Filename),
-    supervisor:terminate_child(couch_server_sup, Filename),
-    supervisor:delete_child(couch_server_sup, Filename),
-    case file:delete(FullFilepath) of
-    ok ->
-        couch_db_update_notifier:notify({deleted, Filename}),
-        {reply, ok, Server};
-    {error, enoent} ->
-        {reply, not_found, Server};
-    Else ->
-        {reply, Else, Server}
-    end;
-handle_call(remote_restart, _From, #server{options=Options}=Server) ->
-    case proplists:get_value(remote_restart, Options) of
-    true ->
-        exit(self(), restart);
-    _ ->
-        ok
-    end,
-    {reply, ok, Server}.
-
-% this function is just to strip out the child spec error stuff if hit
-sup_start_child(couch_server_sup, ChildSpec) ->
-    case supervisor:start_child(couch_server_sup, ChildSpec) of
-    {error, {Error, _ChildInfo}} ->
-        {error, Error};
-    Else ->
-        Else
+maybe_close_lru_db(#server{current_dbs_open=NumOpen, max_dbs_open=MaxOpen}=Server)
+        when NumOpen < MaxOpen ->
+    {ok, Server};
+maybe_close_lru_db(#server{current_dbs_open=NumOpen}=Server) ->
+    % must free up the lru db.
+    case try_close_lru(now()) of
+    ok -> {ok, Server#server{current_dbs_open=NumOpen-1}};
+    Error -> Error
     end.
 
-handle_cast(_Msg, State) ->
-    {noreply,State}.
+try_close_lru(StartTime) ->
+    LruTime = ets:first(couch_dbs_by_lru),
+    if LruTime > StartTime ->
+        % this means we've looped through all our opened dbs and found them
+        % all in use.
+        {error, all_dbs_active};
+    true ->
+        [{_, DbName}] = ets:lookup(couch_dbs_by_lru, LruTime),
+        [{_, {MainPid, LruTime}}] = ets:lookup(couch_dbs_by_name, DbName),
+        case couch_db:num_refs(MainPid) of
+        0 ->
+            exit(MainPid, kill),
+            receive {'EXIT', MainPid, _Reason} -> ok end,
+            true = ets:delete(couch_dbs_by_lru, LruTime),
+            true = ets:delete(couch_dbs_by_name, DbName),
+            true = ets:delete(couch_dbs_by_pid, MainPid),
+            ok;
+        _NumRefs ->
+            % this still has referrers. Go ahead and give it a current lru time
+            % and try the next one in the table.
+            NewLruTime = now(),
+            true = ets:insert(couch_dbs_by_name, {DbName, {MainPid, NewLruTime}}),
+            true = ets:insert(couch_dbs_by_pid, {MainPid, DbName}),
+            true = ets:delete(couch_dbs_by_lru, LruTime),
+            true = ets:insert(couch_dbs_by_lru, {NewLruTime, DbName}),
+            try_close_lru(StartTime)
+        end
+    end.
+
+
+handle_call(get_root, _From, #server{root_dir=Root}=Server) ->
+    {reply, {ok, Root}, Server};
+handle_call({open, DbName, Options}, {FromPid,_}, Server) ->
+    Filepath = get_full_filename(Server, DbName),
+    LruTime = now(),
+    case ets:lookup(couch_dbs_by_name, DbName) of
+    [] ->    
+        case maybe_close_lru_db(Server) of
+        {ok, Server2} ->
+            case couch_db:start_link(DbName, Filepath, Options) of
+            {ok, MainPid} ->
+                true = ets:insert(couch_dbs_by_name, {DbName, {MainPid, LruTime}}),
+                true = ets:insert(couch_dbs_by_pid, {MainPid, DbName}),
+                true = ets:insert(couch_dbs_by_lru, {LruTime, DbName}),
+                DbsOpen = Server2#server.current_dbs_open + 1,
+                {reply,
+                    couch_db:open_ref_counted(MainPid, FromPid),
+                    Server2#server{current_dbs_open=DbsOpen}};
+            CloseError ->
+                {reply, CloseError, Server2}
+            end;
+        Error ->
+            {reply, Error, Server}
+        end;
+    [{_, {MainPid, PrevLruTime}}] ->
+        true = ets:insert(couch_dbs_by_name, {DbName, {MainPid, LruTime}}),
+        true = ets:delete(couch_dbs_by_lru, PrevLruTime),
+        true = ets:insert(couch_dbs_by_lru, {LruTime, DbName}),
+        {reply, couch_db:open_ref_counted(MainPid, FromPid), Server}
+    end;
+handle_call({create, DbName, Options}, {FromPid,_}, Server) ->
+    case check_dbname(Server, DbName) of
+    ok ->
+        Filepath = get_full_filename(Server, DbName),
+
+        case ets:lookup(couch_dbs_by_name, DbName) of
+        [] ->
+            case couch_db:start_link(DbName, Filepath, [create|Options]) of
+            {ok, MainPid} ->
+                LruTime = now(),
+                true = ets:insert(couch_dbs_by_name, {DbName, {MainPid, LruTime}}),
+                true = ets:insert(couch_dbs_by_pid, {MainPid, DbName}),
+                true = ets:insert(couch_dbs_by_lru, {LruTime, DbName}),
+                DbsOpen = Server#server.current_dbs_open + 1,
+                {reply,
+                    couch_db:open_ref_counted(MainPid, FromPid), 
+                    Server#server{current_dbs_open=DbsOpen}};
+            Error ->
+                {reply, Error, Server}
+            end;
+        [_AlreadyRunningDb] ->
+            {reply, {error, file_exists}, Server}
+        end;
+    Error ->
+        {reply, Error, Server}
+    end;
+handle_call({delete, DbName}, _From, Server) ->
+    FullFilepath = get_full_filename(Server, DbName),
+    Server2 = 
+    case ets:lookup(couch_dbs_by_name, DbName) of
+    [] -> Server;
+    [{_, {Pid, LruTime}}] ->
+        exit(Pid, kill),
+        receive {'EXIT', Pid, _Reason} -> ok end,
+        true = ets:delete(couch_dbs_by_name, DbName),
+        true = ets:delete(couch_dbs_by_pid, Pid),
+        true = ets:delete(couch_dbs_by_lru, LruTime),
+        DbsOpen = Server#server.current_dbs_open - 1,
+        Server#server{current_dbs_open=DbsOpen}
+    end,
+    case file:delete(FullFilepath) of
+    ok ->
+        couch_db_update_notifier:notify({deleted, DbName}),
+        {reply, ok, Server2};
+    {error, enoent} ->
+        {reply, not_found, Server2};
+    Else ->
+        {reply, Else, Server2}
+    end;
+handle_call(remote_restart, _From, #server{remote_restart=false}=Server) ->
+    {reply, ok, Server};
+handle_call(remote_restart, _From, #server{remote_restart=true}=Server) ->
+    exit(couch_server_sup, restart),
+    {reply, ok, Server}.
+
+handle_cast(Msg, _Server) ->
+    exit({unknown_cast_message, Msg}).
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-handle_info(_Info, State) ->
-    {noreply, State}.
+handle_info({'EXIT', Pid, _Reason}, Server) ->
+    [{Pid, DbName}] = ets:lookup(couch_dbs_by_pid, Pid),
+    true = ets:delete(couch_dbs_by_pid, Pid),
+    true = ets:delete(couch_dbs_by_name, DbName),
+    {noreply, Server};
+handle_info(Info, _Server) ->
+    exit({unknown_message, Info}).
