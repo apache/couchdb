@@ -16,6 +16,10 @@ var tests = {
   basics: function(debug) {
     var db = new CouchDB("test_suite_db");
     db.deleteDb();
+
+    // bug COUCHDB-100: DELETE on non-existent DB returns 500 instead of 404
+    db.deleteDb();
+    
     db.createDb();
     if (debug) debugger;
 
