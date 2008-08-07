@@ -168,6 +168,16 @@ handle_db_request(Req, 'PUT', {DbName, []}) ->
             throw({unknown_error, Msg})
     end;
 
+handle_db_request(Req, 'DELETE', {DbName, []}) ->
+    case couch_server:delete(DbName) of
+    ok ->
+        send_json(Req, 200, {obj, [
+            {ok, true}
+        ]});
+    Error ->
+        throw(Error)
+    end;
+    
 handle_db_request(Req, Method, {DbName, Rest}) ->
     case couch_db:open(DbName, []) of
         {ok, Db} ->
@@ -179,12 +189,6 @@ handle_db_request(Req, Method, {DbName, Rest}) ->
         Error ->
             throw(Error)
     end;
-
-handle_db_request(Req, 'DELETE', {DbName, _Db, []}) ->
-    ok = couch_server:delete(DbName),
-    send_json(Req, 200, {obj, [
-        {ok, true}
-    ]});
 
 handle_db_request(Req, 'GET', {DbName, Db, []}) ->
     {ok, DbInfo} = couch_db:get_db_info(Db),
