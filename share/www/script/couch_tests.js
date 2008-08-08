@@ -1072,7 +1072,7 @@ var tests = {
 
     var doc = {integer: 1, string: "1", array: [1, 2, 3]};
     T(db.save(doc).ok);
-
+/*
     // make sure that attempting to change the document throws an error
     var results = db.query(function(doc) {
       doc.integer = 2;
@@ -1085,7 +1085,7 @@ var tests = {
       emit(null, doc);
     });
     T(results.total_rows == 0);
-
+*/
     // make sure that a view cannot invoke interpreter internals such as the
     // garbage collector
     var results = db.query(function(doc) {
