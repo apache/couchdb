@@ -97,6 +97,8 @@ handle_request0(Req, DocumentRoot, Method, Path) ->
             handle_replicate_request(Req, Method);
         "/_restart" ->
             handle_restart_request(Req, Method);
+        "/_uuids" ->
+            handle_uuids_request(Req, Method);
         "/_utils" ->
             {ok, Req:respond({301, [
                 {"Location", "/_utils/"}
@@ -147,6 +149,17 @@ handle_restart_request(Req, 'POST') ->
 
 handle_restart_request(_Req, _Method) ->
     throw({method_not_allowed, "POST"}).
+
+handle_uuids_request(Req, 'POST') ->
+    Count = list_to_integer(proplists:get_value("count", Req:parse_qs(), "1")),
+    % generate the uuids
+    UUIDs = [ couch_util:new_uuid() || _ <- lists:seq(1,Count)],
+    % send a JSON response
+    send_json(Req, {obj, [{"uuids", list_to_tuple(UUIDs)}]});
+
+handle_uuids_request(_Req, _Method) ->
+    throw({method_not_allowed, "POST"}).
+
 
 % Database request handlers
 
