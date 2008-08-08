@@ -42,18 +42,14 @@ function CouchDB(name) {
   this.save = function(doc, options) {
     var req;
     if (doc._id == undefined)
-      req = request("POST", this.uri + encodeOptions(options), {
-        body: JSON.stringify(doc)
-      });
-    else
-      req = request("PUT", this.uri  + encodeURIComponent(doc._id) + encodeOptions(options), {
-        body: JSON.stringify(doc)
-      });
+      doc._id = CouchDB.newUuids(1)[0];
+
+    req = request("PUT", this.uri  + encodeURIComponent(doc._id) + encodeOptions(options), {
+      body: JSON.stringify(doc)
+    });
     var result = JSON.parse(req.responseText);
     if (req.status != 201)
       throw result;
-    // set the _id and _rev members on the input object, for caller convenience.
-    doc._id = result.id;
     doc._rev = result.rev;
     return result;
   }
@@ -91,6 +87,18 @@ function CouchDB(name) {
   }
   
   this.bulkSave = function(docs, options) {
+    // first prepoulate the UUIDs for new documents
+    var newCount = 0
+    for (var i=0; i<docs.length; i++) {
+      if (docs[i]._id == undefined)
+        newCount++;
+    }
+    var newUuids = CouchDB.newUuids(docs.length);
+    var newCount = 0
+    for (var i=0; i<docs.length; i++) {
+      if (docs[i]._id == undefined)
+        docs[i]._id = newUuids.pop();
+    }
     var req = request("POST", this.uri + "_bulk_docs" + encodeOptions(options), {
       body: JSON.stringify({"docs": docs})
     });
@@ -98,7 +106,6 @@ function CouchDB(name) {
     if (req.status != 201)
       throw result;
     for (var i = 0; i < docs.length; i++) {
-        docs[i]._id = result.new_revs[i].id;
         docs[i]._rev = result.new_revs[i].rev;
     }
     return result;
@@ -232,3 +239,26 @@ CouchDB.request = function(method, uri, options) {
   req.send(options.body || "");
   return req;
 }
+
+CouchDB.uuids_cache = [];
+
+CouchDB.newUuids = function(n) {
+    if (CouchDB.uuids_cache.length >= n) {
+      var uuids = CouchDB.uuids_cache.slice(CouchDB.uuids_cache.length - n);
+      if(CouchDB.uuids_cache.length - n == 0) {
+        CouchDB.uuids_cache = [];
+      } else {
+        CouchDB.uuids_cache =
+            CouchDB.uuids_cache.slice(0, CouchDB.uuids_cache.length - n);
+      }
+      return uuids;
+    } else {
+      var req = CouchDB.request("POST", "/_uuids?count=" + (100 + n));
+      var result = JSON.parse(req.responseText);
+      if (req.status != 200)
+        throw result;
+      CouchDB.uuids_cache =
+          CouchDB.uuids_cache.concat(result.uuids.slice(0, 100));
+      return result.uuids.slice(100);
+    }
+  }

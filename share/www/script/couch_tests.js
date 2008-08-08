@@ -194,6 +194,42 @@ var tests = {
     }
   },
 
+  uuids: function(debug) {
+    var db = new CouchDB("test_suite_db");
+    db.deleteDb();
+    db.createDb();
+    if (debug) debugger;
+    
+    // a single UUID without an explicit count
+    var xhr = CouchDB.request("POST", "/_uuids");
+    T(xhr.status == 200);
+    var result = JSON.parse(xhr.responseText);
+    T(result.uuids.length == 1);
+    var first = result.uuids[0];
+
+    // a single UUID with an explicit count
+    xhr = CouchDB.request("POST", "/_uuids?count=1");
+    T(xhr.status == 200);
+    result = JSON.parse(xhr.responseText);
+    T(result.uuids.length == 1);
+    var second = result.uuids[0];
+    T(first != second);
+
+    // no collisions with 1,000 UUIDs
+    xhr = CouchDB.request("POST", "/_uuids?count=1000");
+    T(xhr.status == 200);
+    result = JSON.parse(xhr.responseText);
+    T( result.uuids.length == 1000 );
+    var seen = {};
+    for(var i in result.uuids) {
+      var id = result.uuids[i];
+      T(seen[id] === undefined);
+      seen[id] = 1;
+    }
+    
+    // check our library
+  },
+  
   bulk_docs: function(debug) {
     var db = new CouchDB("test_suite_db");
     db.deleteDb();
