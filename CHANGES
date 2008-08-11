@@ -27,10 +27,11 @@ HTTP Interface:
 
 Javascript View Server:
 
- * Fix for sealing of nested data structure in documents in the Javascript view
-   server.
+ * Sealing of documents has been disabled due to an incompatibility with
+   SpiderMonkey 1.9.
  * Improve error handling for undefined values emitted by map functions.
    (COUCHDB-83)
+ 
 
 Packaging and System Integration:
 
