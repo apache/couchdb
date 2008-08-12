@@ -115,6 +115,53 @@ var tests = {
     // 1 less document should now be in the results.
     T(results.total_rows == 2);
     T(db.info().doc_count == 5);
+    
+    // copy a doc
+    T(db.save({_id:"doc_to_be_copied",v:1}).ok);
+    var xhr = CouchDB.request("COPY", "/test_suite_db/doc_to_be_copied", {
+      headers: {"Destination":"doc_that_was_copied"}
+    });
+
+    T(xhr.status == 201);
+    T(db.open("doc_that_was_copied").v == 1);
+
+    // move a doc
+
+    // test error condition
+    var xhr = CouchDB.request("MOVE", "/test_suite_db/doc_to_be_copied", {
+      headers: {"Destination":"doc_that_was_moved"}
+    });
+    T(xhr.status == 400); // bad request, MOVE requires source rev.
+
+    var rev = db.open("doc_to_be_copied")._rev;
+    var xhr = CouchDB.request("MOVE", "/test_suite_db/doc_to_be_copied?rev=" + rev, {
+      headers: {"Destination":"doc_that_was_moved"}
+    });
+
+    T(xhr.status == 201);
+    T(db.open("doc_that_was_moved").v == 1);
+    T(db.open("doc_to_be_copied") == null);
+
+    // COPY with existing target
+    T(db.save({_id:"doc_to_be_copied",v:1}).ok);
+    var doc = db.save({_id:"doc_to_be_overwritten",v:1});
+    T(doc.ok);
+
+    // error condition
+    var xhr = CouchDB.request("COPY", "/test_suite_db/doc_to_be_copied", {
+	    headers: {"Destination":"doc_to_be_overwritten"}
+	});
+    T(xhr.status == 412); // conflict
+
+    var rev = db.open("doc_to_be_overwritten")._rev;
+    var xhr = CouchDB.request("COPY", "/test_suite_db/doc_to_be_copied", {
+      headers: {"Destination":"doc_to_be_overwritten?rev=" + rev}
+    });
+    T(xhr.status == 201);
+
+    var newRev = db.open("doc_to_be_overwritten")._rev;
+    T(rev != newRev);
+
   },
 
   // Do some edit conflict detection tests
@@ -414,8 +461,8 @@ var tests = {
           // This is the reduce phase, we are reducing over emitted values from
           // the map functions.
           for(var i in values) {
-            total = total + values[i]
-            sqrTotal = sqrTotal + (values[i] * values[i])
+            total = total + values[i];
+            sqrTotal = sqrTotal + (values[i] * values[i]);
           }
           count = values.length;
         }
