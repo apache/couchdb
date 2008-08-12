@@ -54,15 +54,21 @@ handle_request(Req, DocumentRoot) ->
     % alias HEAD to GET as mochiweb takes care of stripping the body
     Method = case Req:get(method) of
         'HEAD' -> 'GET';
-        Other -> Other
+        Other -> 
+          % handling of non standard HTTP verbs. Should be fixe din gen_tcp:recv()
+          case Other of
+            "COPY" -> 'COPY';
+            "MOVE" -> 'MOVE';
+            StandardMethod -> StandardMethod
+          end
     end,
 
     % for the path, use the raw path with the query string and fragment
     % removed, but URL quoting left intact
     {Path, _, _} = mochiweb_util:urlsplit_path(Req:get(raw_path)),
 
-    ?LOG_DEBUG("~s ~s ~p~nHeaders: ~p", [
-        atom_to_list(Req:get(method)),
+    ?LOG_DEBUG("~p ~s ~p~nHeaders: ~p", [
+        Method,
         Path,
         Req:get(version),
         mochiweb_headers:to_list(Req:get(headers))
@@ -75,9 +81,10 @@ handle_request(Req, DocumentRoot) ->
             send_error(Req, Error)
     end,
 
-    ?LOG_INFO("~s - - ~p ~B", [
+    ?LOG_INFO("~s - - ~p ~s ~B", [
         Req:get(peer),
-        atom_to_list(Req:get(method)) ++ " " ++ Path,
+        Method,
+        Path,
         Resp:get(code)
     ]).
 
@@ -545,24 +552,7 @@ handle_doc_request(Req, 'GET', _DbName, Db, DocId) ->
     } = parse_doc_query(Req),
     case Revs of
     [] ->
-        case Rev of
-        "" -> % open most recent rev
-            case couch_db:open_doc(Db, DocId, Options) of
-                {ok, #doc{revs=[DocRev|_]}=Doc} ->
-                    true;
-                Error ->
-                    Doc = DocRev = undefined,
-                    throw(Error)
-            end;
-        _ -> % open a specific rev (deletions come back as stubs)
-            case couch_db:open_doc_revs(Db, DocId, [Rev], Options) of
-                {ok, [{ok, Doc}]} ->
-                    DocRev = Rev;
-                {ok, [Else]} ->
-                    Doc = DocRev = undefined,
-                    throw(Else)
-            end
-        end,
+        {Doc, DocRev} = couch_doc_open(Db, DocId, Rev, Options),
         Etag = none_match(Req, DocRev),
         AdditionalHeaders = case Doc#doc.meta of
             [] -> [{"Etag", Etag}]; % output etag when we have no meta
@@ -625,8 +615,94 @@ handle_doc_request(Req, 'PUT', _DbName, Db, DocId) ->
         {rev, NewRev}
     ]});
 
+handle_doc_request(Req, 'COPY', _DbName, Db, SourceDocId) ->
+  SourceRev = case extract_header_rev(Req) of
+    missing_rev -> [];
+    Rev -> Rev
+  end,
+  
+  {TargetDocId, TargetRev} = parse_copy_destination_header(Req),
+  
+  % open revision Rev or Current
+  {Doc, _DocRev} = couch_doc_open(Db, SourceDocId, SourceRev, []),
+
+  % save new doc
+  {ok, NewTargetRev} = couch_db:update_doc(Db, Doc#doc{id=TargetDocId, revs=TargetRev}, []),
+
+  send_json(Req, 201, [{"Etag", "\"" ++ NewTargetRev ++ "\""}], {obj, [
+      {ok, true},
+      {id, TargetDocId},
+      {rev, NewTargetRev}
+  ]});
+
+handle_doc_request(Req, 'MOVE', _DbName, Db, SourceDocId) ->
+  SourceRev = case extract_header_rev(Req) of
+    missing_rev -> 
+      throw({
+        bad_request, 
+        "MOVE requires a specified rev parameter for the origin resource."}
+      );
+    Rev -> Rev
+  end,
+  
+  {TargetDocId, TargetRev} = parse_copy_destination_header(Req),
+
+  % open revision Rev or Current
+  {Doc, _DocRev} = couch_doc_open(Db, SourceDocId, SourceRev, []),
+
+  % save new doc & delete old doc in one operation
+  Docs = [
+    Doc#doc{id=TargetDocId, revs=TargetRev},
+    #doc{id=SourceDocId, revs=[SourceRev], deleted=true}
+  ],
+
+  {ok, ResultRevs} = couch_db:update_docs(Db, Docs, []),
+
+  DocResults = lists:zipwith(
+      fun(FDoc, NewRev) ->
+          {obj, [{"id", FDoc#doc.id}, {"rev", NewRev}]}
+      end,
+      Docs, ResultRevs),
+  send_json(Req, 201, {obj, [
+      {ok, true},
+      {new_revs, list_to_tuple(DocResults)}
+  ]});
+
 handle_doc_request(_Req, _Method, _DbName, _Db, _DocId) ->
-    throw({method_not_allowed, "DELETE,GET,HEAD,PUT"}).
+    throw({method_not_allowed, "DELETE,GET,HEAD,PUT,COPY,MOVE"}).
+
+% Useful for debugging
+% couch_doc_open(Db, DocId) ->
+%   couch_doc_open(Db, DocId, [], []).
+  
+couch_doc_open(Db, DocId, Rev, Options) ->
+  case Rev of
+  "" -> % open most recent rev
+      case couch_db:open_doc(Db, DocId, Options) of
+          {ok, #doc{revs=[DocRev|_]}=Doc} ->
+              {Doc, DocRev};
+          Error ->
+              throw(Error)
+      end;
+  _ -> % open a specific rev (deletions come back as stubs)
+      case couch_db:open_doc_revs(Db, DocId, [Rev], Options) of
+          {ok, [{ok, Doc}]} ->
+              {Doc, Rev};
+          {ok, [Else]} ->
+              throw(Else)
+      end
+  end.
+
+parse_copy_destination_header(Req) ->
+  Destination = Req:get_header_value("Destination"),
+  case regexp:match(Destination, "\\?") of
+    nomatch -> 
+      {Destination, []};
+    {match, _, _} ->
+      {ok, [DocId, RevQueryOptions]} = regexp:split(Destination, "\\?"),
+      {ok, [_RevQueryKey, Rev]} = regexp:split(RevQueryOptions, "="),
+      {DocId, [Rev]}
+  end.
 
 % Attachment request handlers
 
