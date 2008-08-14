@@ -31,7 +31,6 @@ Javascript View Server:
    SpiderMonkey 1.9.
  * Improve error handling for undefined values emitted by map functions.
    (COUCHDB-83)
- 
 
 Packaging and System Integration:
 
