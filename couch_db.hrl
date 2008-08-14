@@ -52,7 +52,7 @@
 -record(doc,
     {
     id = "",
-    revs = [], % in the form [{RevId, IsAvailable}, ...]
+    revs = [],
 
     % the json body object.
     body = {obj, []},
