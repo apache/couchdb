@@ -1,6 +1,14 @@
 Apache CouchDB CHANGES
 ======================
 
+Version 0.8.2-incubating
+------------------------
+
+Packaging and System Integration:
+
+ * Manually linked `libm` for portability with FreeBSD 7.0.
+ * Extended default library paths in `configure.ac` file.
+
 Version 0.8.1-incubating
 ------------------------
 
