@@ -59,24 +59,28 @@ AC_ARG_WITH([erlang], [AC_HELP_STRING([--with-erlang=PATH],
 
 AC_ARG_WITH([js-include], [AC_HELP_STRING([--with-js-include=PATH],
     [set PATH to the SpiderMonkey include directory])], [
-    JS_INCLUDE_FLAGS="-I$withval"
+    JS_FLAGS="-I$withval"
 ], [
-    JS_INCLUDE_FLAGS="-I/usr/include/js"
-    JS_INCLUDE_FLAGS="$JS_INCLUDE_FLAGS -I/usr/include/mozjs"
-    JS_INCLUDE_FLAGS="$JS_INCLUDE_FLAGS -I/usr/local/include/js"
-    JS_INCLUDE_FLAGS="$JS_INCLUDE_FLAGS -I/opt/local/include/js"
+    JS_FLAGS="-I/usr/include"
+    JS_FLAGS="$JS_FLAGS -I/usr/include/js"
+    JS_FLAGS="$JS_FLAGS -I/usr/include/mozjs"
+    JS_FLAGS="$JS_FLAGS -I/usr/local/include"
+    JS_FLAGS="$JS_FLAGS -I/opt/local/include"
+    JS_FLAGS="$JS_FLAGS -I/usr/local/include/js"
+    JS_FLAGS="$JS_FLAGS -I/opt/local/include/js"
 ])
 
 AC_ARG_WITH([js-lib], [AC_HELP_STRING([--with-js-lib=PATH],
     [set PATH to the SpiderMonkey library directory])],
     [JS_LIB_FLAGS="-L$withval"], [])
 
-# XP_UNIX required for jsapi.h and has been tested to work on Linux and Darwin.
 LIB_FLAGS="-L/usr/local/lib -L/opt/local/lib $JS_LIB_FLAGS"
 LIBS="$LIB_FLAGS $LIBS"
-FLAGS="$LIB_FLAGS $ERLANG_FLAGS $JS_INCLUDE_FLAGS -DXP_UNIX $FLAGS"
+# XP_UNIX required for jsapi.h and has been tested to work on Linux and Darwin.
+FLAGS="$LIB_FLAGS $ERLANG_FLAGS $JS_FLAGS -DXP_UNIX $FLAGS"
 CPPFLAGS="$FLAGS $CPPFLAGS"
-LDFLAGS="$FLAGS $LDFLAGS"
+# manually linking libm is requred for FreeBSD 7.0
+LDFLAGS="$FLAGS -lm $LDFLAGS"
 
 AC_CHECK_LIB([js], [JS_NewContext], [], [
     AC_CHECK_LIB([mozjs], [JS_NewContext], [], [
@@ -87,7 +91,7 @@ Is the Mozilla SpiderMonkey library installed?])])])
 AC_CHECK_HEADER([jsapi.h], [], [
     AC_MSG_ERROR([Could not find the jsapi header.
 
-Are Mozilla SpiderMonkey headers installed?])])
+Are the Mozilla SpiderMonkey headers installed?])])
 
 AC_CHECK_ICU([3])
 
