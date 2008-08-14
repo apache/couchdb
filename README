@@ -124,6 +124,9 @@ Note: Use of the `sudo` command is only required if you are installing into a
 system owned directory. You do not need to do this if you are installing
 elsewhere, such as your home directory.
 
+If you are having problems running `make` you may want to try running `gmake` if
+it is available on your system.
+
 More options can be found by reading the `INSTALL` file.
 
 #### Security Considerations ####
