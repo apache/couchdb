@@ -363,29 +363,30 @@ var tests = {
     T(db.bulkSave(docs).ok);
     var summate = function(N) {return (N+1)*N/2;};
 
-    var map = function (doc) {emit(doc.integer, doc.integer)};
+    var map = function (doc) {
+        emit(doc.integer, doc.integer);
+        emit(doc.integer, doc.integer)};
     var reduce = function (keys, values) { return sum(values); };
     var result = db.query(map, reduce);
-    T(result.rows[0].value == summate(numDocs));
+    T(result.rows[0].value == 2*summate(numDocs));
 
     result = db.query(map, reduce, {startkey: 4, endkey: 4});
-    T(result.rows[0].value == 4);
+    T(result.rows[0].value == 8);
 
     result = db.query(map, reduce, {startkey: 4, endkey: 5});
-    T(result.rows[0].value == 9);
+    T(result.rows[0].value == 18);
 
     result = db.query(map, reduce, {startkey: 4, endkey: 6});
-    T(result.rows[0].value == 15);
+    T(result.rows[0].value == 30);
 
     result = db.query(map, reduce, {group:true, count:3});
-    T(result.rows.length == 3);
-    T(result.rows[0].value == 1);
-    T(result.rows[1].value == 2);
-    T(result.rows[2].value == 3);
+    T(result.rows[0].value == 2);
+    T(result.rows[1].value == 4);
+    T(result.rows[2].value == 6);
 
     for(var i=1; i<numDocs/2; i+=30) {
       result = db.query(map, reduce, {startkey: i, endkey: numDocs - i});
-      T(result.rows[0].value == summate(numDocs-i) - summate(i-1));
+      T(result.rows[0].value == 2*(summate(numDocs-i) - summate(i-1)));
     }
     
     db.deleteDb();
@@ -798,7 +799,7 @@ var tests = {
       _id:"_design/test",
       language: "javascript",
       views: {
-        all_docs: {map: "function(doc) { emit(doc.integer, null) }"},
+        all_docs: {map: "function(doc) { emit(doc.integer, null); emit(doc.integer, null) }"},
         no_docs: {map: "function(doc) {}"},
         single_doc: {map: "function(doc) { if (doc._id == \"1\") { emit(1, null) }}"},
         summate: {map:"function (doc) {emit(doc.integer, doc.integer)};",
@@ -814,9 +815,11 @@ var tests = {
     T(db.bulkSave(makeDocs(1, numDocs + 1)).ok);
 
     for (var loop = 0; loop < 2; loop++) {
+      if (db.view("test/all_docs") == null) throw "fuck";
       var rows = db.view("test/all_docs").rows;
-      for (var i = 1; i <= numDocs; i++) {
-        T(rows[i-1].key == i);
+      for (var i = 0; i < numDocs; i++) {
+        T(rows[2*i].key == i+1);
+        T(rows[(2*i)+1].key == i+1);
       }
       T(db.view("test/no_docs").total_rows == 0)
       T(db.view("test/single_doc").total_rows == 1)

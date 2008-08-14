@@ -96,6 +96,14 @@ get_reduce_view0(Name, Lang, [#view{reduce_funs=RedFuns}=View|Rest]) ->
         N -> {ok, {reduce, N, Lang, View}}
     end.
 
+expand_dups([], Acc) ->
+    lists:reverse(Acc);
+expand_dups([{Key, {dups, Vals}} | Rest], Acc) ->
+    Expanded = [{Key, Val} || Val <- Vals],
+    expand_dups(Rest, Expanded ++ Acc);
+expand_dups([KV | Rest], Acc) ->
+    expand_dups(Rest, [KV | Acc]).
+
 fold_reduce({temp_reduce, #view{btree=Bt}}, Dir, StartKey, EndKey, GroupFun, Fun, Acc) ->
 
     WrapperFun = fun({GroupedKey, _}, PartialReds, Acc0) ->
@@ -111,7 +119,7 @@ fold_reduce({reduce, NthRed, Lang, #view{btree=Bt, reduce_funs=RedFuns}}, Dir, S
     {_Name, FunSrc} = lists:nth(NthRed,RedFuns),
     ReduceFun =
         fun(reduce, KVs) ->
-            {ok, Reduced} = couch_query_servers:reduce(Lang, [FunSrc], KVs),
+            {ok, Reduced} = couch_query_servers:reduce(Lang, [FunSrc], expand_dups(KVs, [])),
             {0, PreResultPadding ++ Reduced ++ PostResultPadding};
         (rereduce, Reds) ->
             UserReds = [[lists:nth(NthRed, UserRedsList)] || {_, UserRedsList} <- Reds],
@@ -151,7 +159,10 @@ reduce_to_count(Reductions) ->
     {Count, _} = 
     couch_btree:final_reduce(
         fun(reduce, KVs) ->
-            {length(KVs), []};
+            Count = lists:sum(
+                [case V of {dups, Vals} -> length(Vals); _ -> 1 end
+                || {_,V} <- KVs]),
+            {Count, []};
         (rereduce, Reds) ->
             {lists:sum([Count0 || {Count0, _} <- Reds]), []}
         end, Reductions),
@@ -190,13 +201,25 @@ design_doc_to_view_group(#doc{id=Id,body={obj, Fields}}) ->
     Group = #group{name=Id, views=Views, def_lang=Language},
     Group#group{sig=erlang:md5(term_to_binary(Group))}.
     
-
+fold_fun(_Fun, [], _, Acc) ->
+    {ok, Acc};
+fold_fun(Fun, [KV|Rest], {KVReds, Reds}, Acc) ->
+    case Fun(KV, {KVReds, Reds}, Acc) of
+    {ok, Acc2} ->
+        fold_fun(Fun, Rest, {[KV|KVReds], Reds}, Acc2);
+    {stop, Acc2} ->
+        {stop, Acc2}
+    end.
 
 fold(#view{btree=Btree}, Dir, Fun, Acc) ->
-    {ok, _AccResult} = couch_btree:fold(Btree, Dir, Fun, Acc).
+    fold(Btree, nil, Dir, Fun, Acc).
 
 fold(#view{btree=Btree}, StartKey, Dir, Fun, Acc) ->
-    {ok, _AccResult} = couch_btree:fold(Btree, StartKey, Dir, Fun, Acc).
+    WrapperFun =
+        fun(KV, Reds, Acc2) ->
+            fold_fun(Fun, expand_dups([KV],[]), Reds, Acc2)
+        end,
+    {ok, _AccResult} = couch_btree:fold(Btree, StartKey, Dir, WrapperFun, Acc).
 
 
 init(RootDir) ->
@@ -496,8 +519,9 @@ init_group(Db, Fd, #group{def_lang=Lang,views=Views}=Group,
             FunSrcs = [FunSrc || {_Name, FunSrc} <- RedFuns],
             ReduceFun = 
                 fun(reduce, KVs) ->
-                    {ok, Reduced} = couch_query_servers:reduce(Lang, FunSrcs, KVs),
-                    {length(KVs), Reduced};
+                    KVs2 = expand_dups(KVs,[]),
+                    {ok, Reduced} = couch_query_servers:reduce(Lang, FunSrcs, KVs2),
+                    {length(KVs2), Reduced};
                 (rereduce, Reds) ->
                     Count = lists:sum([Count0 || {Count0, _} <- Reds]),
                     UserReds = [UserRedsList || {_, UserRedsList} <- Reds],
@@ -643,8 +667,25 @@ view_insert_query_results([Doc|RestDocs], [QueryResults | RestResults], ViewKVs,
 view_insert_doc_query_results(_Doc, [], [], ViewKVsAcc, ViewIdKeysAcc) ->
     {lists:reverse(ViewKVsAcc), lists:reverse(ViewIdKeysAcc)};
 view_insert_doc_query_results(#doc{id=DocId}=Doc, [ResultKVs|RestResults], [{View, KVs}|RestViewKVs], ViewKVsAcc, ViewIdKeysAcc) ->
-    NewKVs = [{{Key, DocId}, Value} || {Key, Value} <- ResultKVs],
-    NewViewIdKeys = [{View#view.id_num, Key} || {Key, _Value} <- ResultKVs],
+    % Take any identical keys and combine the values
+    ResultKVs2 = lists:foldl(
+        fun({Key,Value}, [{PrevKey,PrevVal}|AccRest]) ->
+            case Key == PrevKey of
+            true ->
+                case PrevVal of
+                {dups, Dups} ->
+                    [{PrevKey, {dups, [Value|Dups]}} | AccRest];
+                _ ->
+                    [{PrevKey, {dups, [Value,PrevVal]}} | AccRest]
+                end;
+            false ->
+                [{Key,Value},{PrevKey,PrevVal}|AccRest]
+            end;
+        (KV, []) ->
+           [KV] 
+        end, [], lists:sort(ResultKVs)),
+    NewKVs = [{{Key, DocId}, Value} || {Key, Value} <- ResultKVs2],
+    NewViewIdKeys = [{View#view.id_num, Key} || {Key, _Value} <- ResultKVs2],
     NewViewKVsAcc = [{View, NewKVs ++ KVs} | ViewKVsAcc],
     NewViewIdKeysAcc = NewViewIdKeys ++ ViewIdKeysAcc,
     view_insert_doc_query_results(Doc, RestResults, RestViewKVs, NewViewKVsAcc, NewViewIdKeysAcc).
@@ -661,6 +702,7 @@ view_compute(#group{def_lang=DefLang, query_server=QueryServerIn}=Group, Docs) -
         {ok, QueryServerIn}
     end,
     {ok, Results} = couch_query_servers:map_docs(QueryServer, Docs),
+    
     {Group#group{query_server=QueryServer}, Results}.
 
 
