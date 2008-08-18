@@ -6,8 +6,9 @@ Version 0.9.0-incubating
 
 Packaging and System Integration:
 
- * Manually linked `libm` for portability with FreeBSD 7.0.
- * Extended default library paths in `configure.ac` file.
+ * Updated `configure.ac` to manually linked `libm` for portability.
+ * Updated `configure.ac` to extended default library paths.
+ * Deleted old inets configuration files.
 
 Version 0.8.1-incubating
 ------------------------
