@@ -40,21 +40,23 @@ THANKS.gz: $(top_srcdir)/THANKS
 local-clean: maintainer-clean
 	@echo "This command is intended for maintainers to use;"
 	@echo "it deletes files that may need special tools to rebuild."
-	-rm -f INSTALL
-	-rm -f acinclude.m4
-	-rm -f aclocal.m4
-	-rm -f config.h.in
-	-rm -f configure
-	-rm -f *.tar.gz
-	-rm -f *.tar.gz.asc
-	-rm -f *.tar.gz.md5
-	-rm -f *.tar.gz.sha
-	-rm -fr build-aux
-	-rm -fr m4
-	-find $(top_srcdir) -name Makefile.in | xargs rm
+	rm -f $(top_srcdir)/INSTALL
+	rm -f $(top_srcdir)/acinclude.m4
+	rm -f $(top_srcdir)/aclocal.m4
+	rm -f $(top_srcdir)/config.h.in
+	rm -f $(top_srcdir)/configure
+	rm -f $(top_srcdir)/*.tar.gz
+	rm -f $(top_srcdir)/*.tar.gz.*
+	rm -fr $(top_srcdir)/build-aux
+	rm -fr $(top_srcdir)/m4
+	find $(top_srcdir) -name Makefile.in -exec rm {} \;
 
 .PHONY: distsign
 distsign: distcheck
-	gpg --armor --detach-sig < $(distdir).tar.gz > $(distdir).tar.gz.asc
-	md5sum $(distdir).tar.gz > $(distdir).tar.gz.md5
-	sha1sum $(distdir).tar.gz > $(distdir).tar.gz.sha
+	gpg --armor --detach-sig \
+	    < $(top_srcdir)/$(distdir).tar.gz \
+	    > $(top_srcdir)/$(distdir).tar.gz.asc
+	md5sum $(top_srcdir)/$(distdir).tar.gz \
+	    > $(top_srcdir)/$(distdir).tar.gz.md5
+	sha1sum $(top_srcdir)/$(distdir).tar.gz \
+	    > $(top_srcdir)/$(distdir).tar.gz.sha
