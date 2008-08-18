@@ -1,9 +1,0 @@
-Port 5984
-#BindAddress 127.0.0.1
-ServerName localhost
-SocketType ip_comm
-Modules mod_couch mod_get mod_log
-ServerRoot %localconfdir%
-DocumentRoot %localdatadir%/www
-ErrorLog %localstatelogdir%/http_error.log
-TransferLog %localstatelogdir%/http_access.log
