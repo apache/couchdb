@@ -1,9 +1,10 @@
-Apache CouchDB NOTICE
-=====================
+Apache CouchDB
+Copyright 2008 The Apache Software Foundation
 
-Copyright 2008, The Apache Software Foundation (http://www.apache.org/)
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
 
-This product includes the following third-party components:
+This product also includes the following third-party components:
 
  * ac_check_icu.m4 (http://autoconf-archive.cryp.to/ac_check_icu.html)
 
