@@ -6,7 +6,7 @@ Version 0.9.0-incubating
 
 Packaging and System Integration:
 
- * Updated `configure.ac` to manually linked `libm` for portability.
+ * Updated `configure.ac` to manually link `libm` for portability.
  * Updated `configure.ac` to extended default library paths.
  * Removed inets configuration files.
 
@@ -32,7 +32,7 @@ HTTP Interface:
  * Fix for connections not getting closed after rejecting a chunked request.
    (COUCHDB-55)
  * CouchDB can now be bound to IPv6 addresses.
- * The HTTP Server header now contains the versions of CouchDB and Erlang.
+ * The HTTP `Server` header now contains the versions of CouchDB and Erlang.
 
 Javascript View Server:
 
