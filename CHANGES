@@ -8,7 +8,7 @@ Packaging and System Integration:
 
  * Updated `configure.ac` to manually linked `libm` for portability.
  * Updated `configure.ac` to extended default library paths.
- * Deleted old inets configuration files.
+ * Removed inets configuration files.
 
 Version 0.8.1-incubating
 ------------------------
