@@ -34,7 +34,7 @@ HTTP Interface:
  * CouchDB can now be bound to IPv6 addresses.
  * The HTTP `Server` header now contains the versions of CouchDB and Erlang.
 
-Javascript View Server:
+JavaScript View Server:
 
  * Sealing of documents has been disabled due to an incompatibility with
    SpiderMonkey 1.9.
@@ -103,13 +103,13 @@ HTTP Interface:
  * The status code of responses to `DELETE` requests is now 200 to reflect that
    that the deletion is performed synchronously.
 
-Javascript View Server:
+JavaScript View Server:
 
  * SpiderMonkey is no longer included with CouchDB, but rather treated as a
    normal external dependency. A simple C program (`_couchjs`) is provided that
    links against an existing SpiderMonkey installation and uses the interpreter
    embedding API.
- * View functions using the default Javascript view server can now do logging
+ * View functions using the default JavaScript view server can now do logging
    using the global `log(message)` function. Log messages are directed into the
    CouchDB log at `INFO` level. (COUCHDB-59)
  * The global `map(key, value)` function made available to view code has been
@@ -146,4 +146,4 @@ Futon Utility Client:
  * Fixed portential double encoding of document IDs and other URI segments in
    many instances. (COUCHDB-39)
  * Improved display of attachments.
- * The Javascript Shell has been removed due to unresolved licensing issues.
+ * The JavaScript Shell has been removed due to unresolved licensing issues.
