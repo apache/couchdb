@@ -144,18 +144,28 @@ static int couch_drv_control(ErlDrvData drv_data, unsigned int command, const ch
 }
 
 ErlDrvEntry couch_driver_entry = {
-        NULL,                                               /* F_PTR init, N/A */
-        couch_drv_start,                    /* L_PTR start, called when port is opened */
-        couch_drv_stop,                     /* F_PTR stop, called when port is closed */
-        NULL,                   /* F_PTR output, called when erlang has sent */
-        NULL,                                               /* F_PTR ready_input, called when input descriptor ready */
-        NULL,                                               /* F_PTR ready_output, called when output descriptor ready */
-        "couch_erl_driver",                          /* char *driver_name, the argument to open_port */
-        NULL,                                               /* F_PTR finish, called when unloaded */
-        NULL,                       /* Not used */
-        couch_drv_control,               /* F_PTR control, port_command callback */
-        NULL,                                               /* F_PTR timeout, reserved */
-        NULL                                                /* F_PTR outputv, reserved */
+        NULL,               /* F_PTR init, N/A */
+        couch_drv_start,    /* L_PTR start, called when port is opened */
+        couch_drv_stop,     /* F_PTR stop, called when port is closed */
+        NULL,               /* F_PTR output, called when erlang has sent */
+        NULL,               /* F_PTR ready_input, called when input descriptor ready */
+        NULL,               /* F_PTR ready_output, called when output descriptor ready */
+        "couch_erl_driver", /* char *driver_name, the argument to open_port */
+        NULL,               /* F_PTR finish, called when unloaded */
+        NULL,               /* Not used */
+        couch_drv_control,  /* F_PTR control, port_command callback */
+        NULL,               /* F_PTR timeout, reserved */
+        NULL,               /* F_PTR outputv, reserved */
+        NULL,               /* F_PTR ready_async */
+        NULL,               /* F_PTR flush */
+        NULL,               /* F_PTR call */
+        NULL,               /* F_PTR event */
+        ERL_DRV_EXTENDED_MARKER,
+        ERL_DRV_EXTENDED_MAJOR_VERSION,
+        ERL_DRV_EXTENDED_MINOR_VERSION,
+        ERL_DRV_FLAG_USE_PORT_LOCKING,
+        NULL,               /* Reserved -- Used by emulator internally */
+        NULL,               /* F_PTR process_exit */
 };
 
 DRIVER_INIT(couch_erl_driver) /* must match name in driver_entry */
