@@ -13,7 +13,7 @@
 -module(couch_util).
 
 -export([start_driver/1]).
--export([parse_ini/1,should_flush/0, should_flush/1]).
+-export([should_flush/0, should_flush/1]).
 -export([new_uuid/0, rand32/0, implode/2, collate/2, collate/3]).
 -export([abs_pathname/1,abs_pathname/2, trim/1, ascii_lower/1]).
 -export([encodeBase64/1, decodeBase64/1, to_hex/1]).
@@ -22,17 +22,18 @@
 % arbitrarily chosen amount of memory to use before flushing to disk
 -define(FLUSH_MAX_MEM, 10000000).
 
-start_driver("") ->
-    start_driver(filename:join(code:priv_dir(couch), "lib"));
 start_driver(LibDir) ->
+    % read config and register for configuration changes
+    
     case erl_ddll:load_driver(LibDir, "couch_erl_driver") of
-    ok -> ok;
-    {error, already_loaded} -> ok;
-    {error, Error} -> exit(erl_ddll:format_error(Error))
+    ok ->
+        ok;
+    {error, already_loaded} ->
+        ok = erl_ddll:reload_driver(LibDir, "couch_erl_driver");
+    {error, Error} ->
+        exit(erl_ddll:format_error(Error))
     end.
-    
-    
-    
+
 new_uuid() ->
     to_hex(crypto:rand_bytes(16)).
     
@@ -158,34 +159,6 @@ implode([H|T], Sep, Acc) ->
 % {{"Another Section", "oops"}, "\"it doesn't qet quoted strings with semis quite right"}]
 %
 
-parse_ini(FileContents) ->
-    {ok, Lines} = regexp:split(FileContents, "\r\n|\n|\r|\032"),
-    {_, ParsedIniValues} =
-    lists:foldl(fun(Line, {AccSectionName, AccValues}) ->
-            case string:strip(Line) of
-            "[" ++ Rest ->
-                case regexp:split(Rest, "\\]") of
-                {ok, [NewSectionName, ""]} ->
-                    {NewSectionName, AccValues};
-                _Else -> % end bracket not at end, ignore this line
-                    {AccSectionName, AccValues}
-                end;
-            ";" ++ _Comment ->
-                {AccSectionName, AccValues};
-            Line2 ->
-                case regexp:split(Line2, "=") of
-                {ok, [_SingleElement]} -> % no "=" found, ignore this line
-                    {AccSectionName, AccValues};
-                {ok, [""|_LineValues]} -> % line begins with "=", ignore
-                    {AccSectionName, AccValues};
-                {ok, [ValueName|LineValues]} -> % yeehaw, got a line!
-                    RemainingLine = implode(LineValues, "="),
-                    {ok, [LineValue | _Rest]} = regexp:split(RemainingLine, " ;|\t;"), % removes comments
-                    {AccSectionName, [{{AccSectionName, ValueName}, LineValue} | AccValues]}
-                end
-            end
-        end, {"", []}, Lines),
-    {ok, lists:reverse(ParsedIniValues)}.
 
 drv_port() ->
     case get(couch_drv_port) of
@@ -294,5 +267,3 @@ enc(C) ->
 
 dec(C) ->
     62*?st(C,43) + ?st(C,47) + (C-59)*?st(C,48) - 69*?st(C,65) - 6*?st(C,97).
-
-

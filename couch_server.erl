@@ -14,9 +14,9 @@
 -behaviour(gen_server).
 -behaviour(application).
 
--export([start/0,start/1,start/2,stop/0,stop/1]).
+-export([start/0,start/1,start/2,stop/0,stop/1,restart/0]).
 -export([open/2,create/2,delete/1,all_databases/0,get_version/0]).
--export([init/1, handle_call/3,sup_start_link/2]).
+-export([init/1, handle_call/3,sup_start_link/0]).
 -export([handle_cast/2,code_change/3,handle_info/2,terminate/2]).
 -export([dev_start/0,remote_restart/0]).
 
@@ -31,18 +31,18 @@
     }).
 
 start() ->
-    start("").
+    start(["couch.ini"]).
 
-start(IniFile) when is_atom(IniFile) ->
-    couch_server_sup:start_link(atom_to_list(IniFile) ++ ".ini");
-start(IniNum) when is_integer(IniNum) ->
-    couch_server_sup:start_link("couch" ++ integer_to_list(IniNum) ++ ".ini");
-start(IniFile) ->
-    couch_server_sup:start_link(IniFile).
+start(IniFiles) ->
+    couch_server_sup:start_link(IniFiles).
 
 start(_Type, _Args) ->
     start().
 
+restart() ->
+    stop(),
+    start().
+    
 stop() ->
     couch_server_sup:stop().
 
@@ -63,8 +63,8 @@ get_version() ->
         "0.0.0"
     end.
 
-sup_start_link(RootDir, Options) ->
-    gen_server:start_link({local, couch_server}, couch_server, {RootDir, Options}, []).
+sup_start_link() ->
+    gen_server:start_link({local, couch_server}, couch_server, [], []).
 
 open(DbName, Options) ->
     gen_server:call(couch_server, {open, DbName, Options}).
@@ -89,7 +89,21 @@ check_dbname(#server{dbname_regexp=RegExp}, DbName) ->
 get_full_filename(Server, DbName) ->
     filename:join([Server#server.root_dir, "./" ++ DbName ++ ".couch"]).
 
-init({RootDir, Options}) ->
+init([]) ->
+    % read config and register for configuration changes
+    
+    % just stop if one of the config settings change. couch_server_sup
+    % will restart us and then we will pick up the new settings.
+
+    RootDir = couch_config:get({"CouchDB", "RootDirectory"}, "."),
+    Options = couch_config:get({"CouchDB", "ServerOptions"}, []),
+    Self = self(),
+    ok = couch_config:register(
+        fun({"CouchDB", "RootDirectory"}) ->
+            exit(Self, config_change);
+        ({"CouchDB", "ServerOptions"}) ->
+            exit(Self, config_change)
+        end),
     {ok, RegExp} = regexp:parse("^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*$"),
     ets:new(couch_dbs_by_name, [set, private, named_table]),
     ets:new(couch_dbs_by_pid, [set, private, named_table]),

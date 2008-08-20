@@ -7,12 +7,15 @@
 ## Unless required by applicable law or agreed to in writing, software
 ## distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 ## WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
-## License for the specific language governing permissions and limitations
-## under the License.
+## License for the specific language governing permissions and limitations under
+## the License.
 
 ICU_LOCAL_FLAGS = $(ICU_LOCAL_CFLAGS) $(ICU_LOCAL_LDFLAGS)
 
+devdocdir = $(localdocdir)/developer/couchdb
 couchprivlibdir = $(localerlanglibdir)/couch-$(version)/priv/lib
+couchincludedir = $(localerlanglibdir)/couch-$(version)/include
+couchebindir = $(localerlanglibdir)/couch-$(version)/ebin
 
 couchprivlib_LTLIBRARIES = couch_erl_driver.la
 couch_erl_driver_la_SOURCES = couch_erl_driver.c
@@ -23,14 +26,24 @@ couch_erl_driver_la_LIBADD = -licuuc -licudata -licui18n
 locallibbin_PROGRAMS = couchjs
 couchjs_SOURCES = couch_js.c
 
-couchebindir = $(localerlanglibdir)/couch-$(version)/ebin
-couchincludedir = $(localerlanglibdir)/couch-$(version)/include
+couchinclude_DATA = couch_db.hrl
 
-couch_file_collection = \
+couchebin_DATA = $(compiled_files)
+
+dist_devdoc_DATA = $(doc_base) $(doc_modules)
+
+EXTRA_DIST = $(couch_files)
+
+CLEANFILES = $(compiled_files) $(doc_base) $(doc_modules) edoc-info
+
+source_files = \
     cjson.erl \
     couch_btree.erl \
+    couch_config.erl \
+    couch_config_writer.erl \
     couch_db.erl \
     couch_db_update_notifier.erl \
+    couch_db_update_notifier_sup.erl \
     couch_doc.erl \
     couch_event_sup.erl \
     couch_file.erl \
@@ -47,12 +60,15 @@ couch_file_collection = \
     couch_view.erl \
     couch_db_updater.erl
 
-couchebin_DATA = \
+compiled_files = \
     cjson.beam \
     couch.app \
     couch_btree.beam \
+    couch_config.beam \
+    couch_config_writer.beam \
     couch_db.beam \
     couch_db_update_notifier.beam \
+    couch_db_update_notifier_sup.beam \
     couch_doc.beam \
     couch_event_sup.beam \
     couch_file.beam \
@@ -69,17 +85,51 @@ couchebin_DATA = \
     couch_view.beam \
     couch_db_updater.beam
 
-couchinclude_DATA = couch_db.hrl
+doc_base = \
+    erlang.png \
+    index.html \
+    modules-frame.html \
+    overview-summary.html \
+    packages-frame.html \
+    stylesheet.css
 
-EXTRA_DIST = $(couch_file_collection) $(couchinclude_DATA)
-
-CLEANFILES = $(couchebin_DATA)
+doc_modules = \
+    cjson.html \
+    couch_btree.html \
+    couch_config.html \
+    couch_config_writer.html \
+    couch_db.html \
+    couch_db_update_notifier.html \
+    couch_db_update_notifier_sup.html \
+    couch_doc.html \
+    couch_event_sup.html \
+    couch_file.html \
+    couch_ft_query.html \
+    couch_httpd.html \
+    couch_key_tree.html \
+    couch_log.html \
+    couch_query_servers.html \
+    couch_rep.html \
+    couch_server.html \
+    couch_server_sup.html \
+    couch_stream.html \
+    couch_util.html \
+    couch_view.html
 
 couch.app: couch.app.tpl
 	sed -e "s|%package_name%|@package_name@|g" \
 	    -e "s|%version%|@version@|g" > \
 	$@ < $<
 	chmod +x $@
+
+$(dist_devdoc_DATA): $(source_files)
+	for file in $(source_files); do \
+	    if test -n "$$edoc_files"; then \
+	        edoc_files="$$edoc_files, "; \
+	    fi; \
+	    edoc_files="$$edoc_files \"$$file\""; \
+	done; \
+	erl -noshell -run edoc_run files ["$$edoc_files"]
 
 %.beam: %.erl
 	$(ERLC) $<
