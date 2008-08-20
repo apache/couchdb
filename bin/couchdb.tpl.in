@@ -26,7 +26,9 @@ RESPAWN_TIMEOUT=0
 LIB_DIRECTORY=%localstatelibdir%
 LOG_DIRECTORY=%localstatelogdir%
 
-INI_FILE=%localconfdir%/couch.ini
+DEFAULT_INI_FILE=%localconfdir%/default.ini
+LOCAL_INI_FILE=%localconfdir%/local.ini
+
 PID_FILE=%localstatedir%/run/couchdb.pid
 
 STDOUT_FILE=couchdb.stdout
@@ -70,10 +72,10 @@ Options:
 
   -h          display a short help message and exit
   -V          display version information and exit
-  -c FILE     set the configuration FILE (defaults to $INI_FILE)
+  -c FILE     use configuration FILE (chainable, resets system default)
   -i          use the interactive Erlang shell
   -b          spawn as a background process
-  -p FILE     set the background PID FILE (defaults to $PID_FILE)
+  -p FILE     set the background PID FILE (overrides system default)
   -r SECONDS  respawn background process after SECONDS (defaults to no respawn)
   -o FILE     redirect background stdout to FILE (defaults to $STDOUT_FILE)
   -e FILE     redirect background stderr to FILE (defaults to $STDERR_FILE)
@@ -105,7 +107,7 @@ check_status () {
     PID=`_get_pid`
     if test -n "$PID"; then
         if kill -0 $PID 2> /dev/null; then
-            echo "Apache CouchDB is running as process $PID. Time to relax."
+            echo "Apache CouchDB is running as process $PID, time to relax."
             return $SCRIPT_OK
         else
             echo >&2 << EOF
@@ -168,6 +170,17 @@ start_couchdb () {
         touch $PID_FILE
         interactive_option="+Bd -noinput"
     fi
+    if test -n "$INI_FILES"; then
+        ini_files="$INI_FILES"
+    else
+        ini_files="$DEFAULT_INI_FILE $LOCAL_INI_FILE"
+    fi
+    for file in $ini_files; do
+        if test -n "$start_arguments"; then
+            start_arguments="$start_arguments, ";
+        fi
+        start_arguments="$start_arguments \\\"$file\\\""
+    done
     command="`%ICU_CONFIG% --invoke` \
         %ERL% $interactive_option -smp auto -sasl errlog_type error \
         -pa %localerlanglibdir%/couch-%version%/ebin \
@@ -177,13 +190,12 @@ start_couchdb () {
         -eval \"application:load(couch)\" \
         -eval \"crypto:start()\" \
         -eval \"inets:start()\" \
-        -eval \"couch_server:start(), receive done -> done end.\" \
-        -couchini $INI_FILE"
+        -eval \"couch_server:start([$start_arguments]), receive done -> done end.\" "
     if test "$BACKGROUND_BOOLEAN" = "true" \
         -a "$RECURSED_BOOLEAN" = "false"; then
         $0 -c $INI_FILE -b -r $RESPAWN_TIMEOUT -p $PID_FILE \
             -o $STDOUT_FILE -e $STDERR_FILE -R &
-        echo "Apache CouchDB has started. Time to relax."
+        echo "Apache CouchDB has started, time to relax."
     else
         if test "$RECURSED_BOOLEAN" = "true"; then
             while true; do
@@ -257,7 +269,7 @@ parse_script_option_list () {
         case "$1" in
             -h) shift; display_help; exit $SCRIPT_OK;;
             -V) shift; display_version; exit $SCRIPT_OK;;
-            -c) shift; INI_FILE=$1; shift;;
+            -c) shift; INI_FILES="$INI_FILES $1"; shift;;
             -i) shift; INTERACTIVE_BOOLEAN=true;;
             -b) shift; BACKGROUND_BOOLEAN=true;;
             -r) shift; RESPAWN_TIMEOUT=$1; shift;;

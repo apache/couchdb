@@ -114,7 +114,7 @@ Note: All the examples assume you have installed into `/usr/local`.
 
 If everything was successful you should see the following message:
 
-    You have configured Apache CouchDB. Time to relax.
+    You have configured Apache CouchDB, time to relax.
 
 Relax.
 
@@ -177,7 +177,7 @@ This uses the `sudo` command to run the `couchdb` command as the `couchdb` user.
 
 When Apache CouchDB starts it should eventually display the following message:
 
-    Apache CouchDB has started. Time to relax.
+    Apache CouchDB has started, time to relax. See http://localhost:5984/_utils/index.html
 
 Relax.
 

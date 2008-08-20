@@ -394,7 +394,7 @@ handle_info(Info, Fd) ->
 
 
 
-should_close(Fd) ->
+should_close(_Fd) ->
     case process_info(self(), links) of
     {links, [_]} ->
         % no linkers left (except our fd port). What about monitors?

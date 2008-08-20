@@ -10,16 +10,16 @@
 ## License for the specific language governing permissions and limitations
 ## under the License.
 
-localconf_DATA = couch.ini
+couchprivlibdir = $(localerlanglibdir)/couch-$(version)/priv/lib
+
+localconf_DATA = default.ini
 
 CLEANFILES = $(localconf_DATA)
 
 transform = @program_transform_name@
 couchjs_command_name = `echo couchjs | sed '$(transform)'`
 
-couchprivlibdir = $(localerlanglibdir)/couch-$(version)/priv/lib
-
-couch.ini: couch.ini.tpl
+default.ini: default.ini.tpl
 	sed -e "s|%bindir%|$(bindir)|g" \
 	    -e "s|%localconfdir%|$(localconfdir)|g" \
 	    -e "s|%localdatadir%|$(localdatadir)|g" \
@@ -28,3 +28,11 @@ couch.ini: couch.ini.tpl
 	    -e "s|%couchprivlibdir%|$(couchprivlibdir)|g" \
 	    -e "s|%couchjs_command_name%|$(couchjs_command_name)|g" \
 	< $< > $@
+
+install-data-hook:
+	if test ! -f "$(localconfdir)/local.ini"; then \
+	    cp local.ini $(localconfdir)/local.ini; \
+	fi
+
+uninstall-local:
+	rm -f $(localconfdir)/local.ini

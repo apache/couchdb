@@ -188,7 +188,7 @@ run_command_collection () {
     run_autoconf
     cat << EOF
 
-You have bootstrapped Apache CouchDB. Time to relax.
+You have bootstrapped Apache CouchDB, time to relax.
 
 Run \`./configure' to configure the source before you install.
 EOF

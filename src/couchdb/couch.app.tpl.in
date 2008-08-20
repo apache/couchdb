@@ -17,6 +17,7 @@
                         couch_httpd,
                         couch_event_sup,
                         couch_db_update_notifier,
+                        couch_db_update_notifier_sup,
                         couch_ft_query,
                         couch_log,
                         couch_rep]},
@@ -24,5 +25,6 @@
                            couch_server_sup,
                            couch_view,
                            couch_query_servers,
-                           couch_ft_query]},
+                           couch_ft_query,
+                           couch_db_update_notifier_sup]},
               {applications,[kernel,stdlib,crypto,inets,mochiweb]}]}.

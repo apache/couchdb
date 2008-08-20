@@ -13,7 +13,7 @@
 -module(couch_httpd).
 -include("couch_db.hrl").
 
--export([start_link/3, stop/0, handle_request/2]).
+-export([start_link/0, stop/0, handle_request/1, handle_request/2]).
 
 % Maximum size of document PUT request body (4GB)
 -define(MAX_DOC_SIZE, (4*1024*1024*1024)).
@@ -38,17 +38,40 @@
     group_level = 0
 }).
 
-start_link(BindAddress, Port, DocumentRoot) ->
+start_link() ->
+    % read config and register for configuration changes
+    
+    % just stop if one of the config settings change. couch_server_sup
+    % will restart us and then we will pick up the new settings.
+    
+    BindAddress = couch_config:get({"HTTPd", "BindAddress"}, any),
+    Port = couch_config:get({"HTTPd", "Port"}, "5984"),
+    DocumentRoot = couch_config:get({"HTTPd", "DocumentRoot"}, "../../share/www"),
+    
+    % and off we go
     Loop = fun (Req) -> apply(couch_httpd, handle_request, [Req, DocumentRoot]) end,
-    mochiweb_http:start([
+    {ok, Pid} = mochiweb_http:start([
         {loop, Loop},
         {name, ?MODULE},
         {ip, BindAddress},
         {port, Port}
-    ]).
+    ]),
+    ok = couch_config:register(
+        fun({"HTTPd", "BindAddress"}) ->
+            ?MODULE:stop();
+        ({"HTTPd", "Port"}) ->
+            ?MODULE:stop();
+        ({"HTTPd", "DocumentRoot"}) ->
+            ?MODULE:stop()
+        end, Pid),
+    
+    {ok, Pid}.
 
 stop() ->
     mochiweb_http:stop(?MODULE).
+
+handle_request(config_change) ->
+    stop().
 
 handle_request(Req, DocumentRoot) ->
     % alias HEAD to GET as mochiweb takes care of stripping the body
@@ -87,7 +110,7 @@ handle_request(Req, DocumentRoot) ->
         Path,
         Resp:get(code)
     ]).
-
+    
 handle_request(Req, DocumentRoot, Method, Path) ->
     % Start = erlang:now(),
     X = handle_request0(Req, DocumentRoot, Method, Path),
@@ -112,6 +135,8 @@ handle_request0(Req, DocumentRoot, Method, Path) ->
             ] ++ server_header(), <<>>})};
         "/_utils/" ++ PathInfo ->
             {ok, Req:serve_file(PathInfo, DocumentRoot, server_header())};
+        "/_config/" ++ Config ->
+            handle_config_request(Req, Method, {config, Config});
         "/_" ++ _Path ->
             throw({not_found, unknown_private_path});
         "/favicon.ico" ->
@@ -771,7 +796,6 @@ handle_attachment_request(Req, Method, _DbName, Db, DocId, FileName)
 handle_attachment_request(_Req, _Method, _DbName, _Db, _DocId, _FileName) ->
     throw({method_not_allowed, "GET,HEAD,DELETE,PUT"}).
 
-
 extract_header_rev(Req) ->
     QueryRev = proplists:get_value("rev", Req:parse_qs()),
     Etag = case Req:get_header_value("If-Match") of
@@ -786,6 +810,69 @@ extract_header_rev(Req) ->
     _ ->
         throw({bad_request, "Document rev and etag have different values"})
     end.
+
+% Config request handlers
+
+handle_config_request(_Req, Method, {config, Config}) ->
+    [Module, Key] = string:tokens(Config, "/"),
+    handle_config_request(_Req, Method, {[Module, Key]});
+
+
+% PUT /_config/Module/Key
+% "value"
+handle_config_request(_Req, 'PUT', {[Module, Key]}) ->
+     handle_config_request(_Req, 'POST', {[Module, Key]});
+
+% POST,PUT /_config/Module/Key
+% "value"
+ 
+handle_config_request(Req, 'POST', {[Module, Key]}) ->
+    Value = binary_to_list(Req:recv_body()),
+    ok = couch_config:store({Module, Key}, Value),
+    send_json(Req, 200, {obj, [
+        {ok, true},
+        {module, Module},
+        {key, Key},
+        {value, Value}
+    ]});
+    
+% GET /_config/Module/Key
+handle_config_request(Req, 'GET', {[Module, Key]}) ->
+    case couch_config:get({Module, Key},null) of
+    null ->
+        throw({not_found, unknown_config_value});
+    Value ->
+        send_json(Req, 200, {obj, [
+            {ok, true},
+            {module, Module},
+            {key, Key},
+            {value, Value}
+         ]})
+    end;
+
+    
+% DELETE /_config/Key
+handle_config_request(Req, 'DELETE', {[Module, Key]}) ->
+    case couch_config:get({Module, Key}, null) of
+    null ->
+        throw({not_found, unknown_config_value});
+    OldValue ->
+        couch_config:unset({Module, Key}),
+        send_json(Req, 200, {obj, [
+            {ok, true},
+            {module, Module},
+            {key, Key},
+            {old_value, OldValue}
+         ]})
+    end.
+
+
+% TODO:
+% POST,PUT /_config/
+% [{Key, Value}, {K2, V2}, {K3, V3}]
+% 
+% POST,PUT/_config/Key?value=Value
+
 
 % View request handling internals
 

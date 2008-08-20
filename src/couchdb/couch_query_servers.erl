@@ -13,21 +13,17 @@
 -module(couch_query_servers).
 -behaviour(gen_server).
 
--export([start_link/1]).
+-export([start_link/0]).
 
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2,code_change/3,stop/0]).
 -export([start_doc_map/2, map_docs/2, stop_doc_map/1]).
 -export([reduce/3, rereduce/3]).
--export([test/0, test/1]).
+-export([test/0]).
 
 -include("couch_db.hrl").
 
-timeout() ->
-    % hardcoded 5 sec timeout per document
-    5000.
-
-start_link(QueryServerList) ->
-    gen_server:start_link({local, couch_query_servers}, couch_query_servers, QueryServerList, []).
+start_link() ->
+    gen_server:start_link({local, couch_query_servers}, couch_query_servers, [], []).
 
 stop() ->
     exit(whereis(couch_query_servers), close).
@@ -36,6 +32,14 @@ readline(Port) ->
     readline(Port, []).
 
 readline(Port, Acc) ->
+    
+    case get(query_server_timeout) of
+    undefined ->
+        Timeout = list_to_integer(couch_config:get(
+            {"CouchDB Query Server Options", "QueryTimeout"}, "5000")),
+        put(timeout, Timeout);
+    Timeout -> ok
+    end,
     receive
     {Port, {data, {noeol, Data}}} ->
         readline(Port, [Data|Acc]);
@@ -44,7 +48,7 @@ readline(Port, Acc) ->
     {Port, Err} ->
         catch port_close(Port),
         throw({map_process_error, Err})
-    after timeout() ->
+    after Timeout ->
         catch port_close(Port),
         throw({map_process_error, "map function timed out"})
     end.
@@ -166,7 +170,21 @@ reduce(Lang, RedSrcs, KVs) ->
     {ok, tuple_to_list(Results)}.
 
 
-init(QueryServerList) ->
+init([]) ->
+    
+    % read config and register for configuration changes
+    
+    % just stop if one of the config settings change. couch_server_sup
+    % will restart us and then we will pick up the new settings.
+    
+    ok = couch_config:register(
+        fun({"CouchDB Query Server" ++ _, _}) ->
+            ?MODULE:stop()
+        end),
+        
+    QueryServerList = couch_config:lookup_match(
+            {{"CouchDB Query Servers", '$1'}, '$2'}, []),
+        
     {ok, {QueryServerList, []}}.
 
 terminate(_Reason, _Server) ->
@@ -216,18 +234,16 @@ handle_info({Port, {exit_status, Status}}, {QueryServerList, LangPorts}) ->
         {noreply, {QueryServerList,  lists:keydelete(Port, 2, LangPorts)}};
     _ ->
         ?LOG_ERROR("Unknown linked port/process crash: ~p", [Port])
-    end;
-handle_info(_Whatever, {Cmd, Ports}) ->
-    {noreply, {Cmd, Ports}}.
+    end.
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-test() ->
-    test("../js/js -f main.js").
+% test() ->
+%     test("../js/js -f main.js").
 
-test(Cmd) ->
-    start_link(Cmd),
+test() ->
+    start_link(),
     {ok, DocMap} = start_doc_map("javascript", ["function(doc) {if (doc[0] == 'a') return doc[1];}"]),
     {ok, Results} = map_docs(DocMap, [#doc{body={"a", "b"}}, #doc{body={"c", "d"}},#doc{body={"a", "c"}}]),
     io:format("Results: ~w~n", [Results]),

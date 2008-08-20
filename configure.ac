@@ -232,7 +232,7 @@ AC_CONFIG_FILES([bin/couchjs.tpl])
 AC_CONFIG_FILES([bin/couchdb.tpl])
 AC_CONFIG_FILES([bin/Makefile])
 AC_CONFIG_FILES([etc/couchdb/Makefile])
-AC_CONFIG_FILES([etc/couchdb/couch.ini.tpl])
+AC_CONFIG_FILES([etc/couchdb/default.ini.tpl])
 AC_CONFIG_FILES([etc/default/couchdb.tpl])
 AC_CONFIG_FILES([etc/default/Makefile])
 AC_CONFIG_FILES([etc/init/couchdb.tpl])
@@ -246,12 +246,12 @@ AC_CONFIG_FILES([share/Makefile])
 AC_CONFIG_FILES([src/couchdb/couch.app.tpl])
 AC_CONFIG_FILES([src/couchdb/Makefile])
 AC_CONFIG_FILES([src/mochiweb/Makefile])
-AC_CONFIG_FILES([src/Makefile])
+AC_CONFIG_FILES([test/Makefile])
 AC_CONFIG_FILES([var/Makefile])
 
 AC_OUTPUT
 
 echo
-echo "You have configured Apache CouchDB. Time to relax."
+echo "You have configured Apache CouchDB, time to relax."
 echo
 echo "Run \`make && make install' to install."

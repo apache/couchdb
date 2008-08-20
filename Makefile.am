@@ -10,7 +10,7 @@
 ## License for the specific language governing permissions and limitations
 ## under the License.
 
-SUBDIRS = bin etc src share var
+SUBDIRS = bin etc src/couchdb src/mochiweb share test var
 
 localdoc_DATA = AUTHORS.gz BUGS.gz CHANGES.gz NEWS.gz README.gz THANKS.gz
 
