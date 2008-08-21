@@ -77,5 +77,5 @@ launchd/org.apache.couchdb.plist: launchd/org.apache.couchdb.plist.tpl
 
 install-data-hook:
 	if test -n "$(init_DATA)"; then \
-	    chmod 755 "$(DESTDIR)$(initdir)/couchdb"; \
+	    chmod +x "$(DESTDIR)$(initdir)/couchdb"; \
 	fi
