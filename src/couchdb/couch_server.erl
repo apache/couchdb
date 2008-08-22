@@ -25,7 +25,6 @@
 -record(server,{
     root_dir = [],
     dbname_regexp,
-    remote_restart=[],
     max_dbs_open=100,
     current_dbs_open=0
     }).
@@ -96,7 +95,7 @@ init([]) ->
     % will restart us and then we will pick up the new settings.
 
     RootDir = couch_config:get({"CouchDB", "RootDirectory"}, "."),
-    Options = couch_config:get({"CouchDB", "ServerOptions"}, []),
+    MaxDbsOpen = couch_config:get({"CouchDB", "MaxDbsOpen"}, "100"),
     Self = self(),
     ok = couch_config:register(
         fun({"CouchDB", "RootDirectory"}) ->
@@ -109,12 +108,9 @@ init([]) ->
     ets:new(couch_dbs_by_pid, [set, private, named_table]),
     ets:new(couch_dbs_by_lru, [ordered_set, private, named_table]),
     process_flag(trap_exit, true),
-    MaxDbsOpen = proplists:get_value(max_dbs_open, Options),
-    RemoteRestart = proplists:get_value(remote_restart, Options),
     {ok, #server{root_dir=RootDir,
                 dbname_regexp=RegExp,
-                max_dbs_open=MaxDbsOpen,
-                remote_restart=RemoteRestart}}.
+                max_dbs_open=MaxDbsOpen}}.
 
 terminate(_Reason, _Server) ->
     ok.
@@ -264,10 +260,13 @@ handle_call({delete, DbName}, _From, Server) ->
     Error ->
         {reply, Error, Server}
     end;
-handle_call(remote_restart, _From, #server{remote_restart=false}=Server) ->
-    {reply, ok, Server};
-handle_call(remote_restart, _From, #server{remote_restart=true}=Server) ->
-    exit(couch_server_sup, restart),
+handle_call(remote_restart, _From, Server) ->
+    case couch_config:get({"CouchDB", "AllowRemoteRestart"}, "false") of
+    "true" ->
+        exit(couch_server_sup, restart);
+    _ ->
+        ok
+    end,
     {reply, ok, Server}.
 
 handle_cast(Msg, _Server) ->

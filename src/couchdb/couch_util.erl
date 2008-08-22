@@ -136,30 +136,6 @@ implode([H|T], Sep, Acc) ->
     implode(T, Sep, [Sep,H|Acc]).
 
 
-% This is a simple ini parser. it just converts the string
-% contents of a file like this:
-%
-%; comments are ignored
-%;commentedoutvariable=foo
-%this is line that gets ignored because it has no equals sign
-%[this line gets ignored because it starts with a bracket but doesn't end with one
-%bloodtype=Ragu
-%[Some Section]
-%timeout=30
-%Default=zuh ; another comment (leading space or tab before a semi is necessary to be a comment if not at beginning of line)
-%[Another Section]
-%key with spaces=a value with stuff; and no comment
-%oops="it doesn't qet quoted strings with semis quite right ; it thinks it's part comment"
-%
-%And converts it into this:
-%[{{"","bloodtype"},"Ragu"},
-% {{"Some Section","timeout"},"30"},
-% {{"Some section","Default"}, "zuh"},
-% {{"Another Section", "key with spaces"}, "a value with stuff; and no comment"},
-% {{"Another Section", "oops"}, "\"it doesn't qet quoted strings with semis quite right"}]
-%
-
-
 drv_port() ->
     case get(couch_drv_port) of
     undefined ->
