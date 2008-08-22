@@ -45,6 +45,11 @@ open(Filepath, Options) ->
         {FdPid, ok} ->
             {ok, FdPid};
         {FdPid, Error} ->
+            case process_info(self(), trap_exit) of
+            {trap_exit, true} ->
+                receive {'EXIT', FdPid, _} -> ok end;
+            _ -> ok
+            end,
             Error
         end;
     Error ->
