@@ -182,7 +182,7 @@ start_couchdb () {
         start_arguments="$start_arguments \\\"$file\\\""
     done
     command="`%ICU_CONFIG% --invoke` \
-        %ERL% $interactive_option -smp auto -sasl errlog_type error \
+        %ERL% $interactive_option -smp auto -sasl errlog_type error +K true \
         -pa %localerlanglibdir%/couch-%version%/ebin \
             %localerlanglibdir%/mochiweb-r82/ebin \
         -eval \"application:load(inets)\" \
