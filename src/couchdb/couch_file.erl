@@ -363,12 +363,16 @@ handle_call({append_bin, Bin}, _From, Fd) ->
     {ok, Pos} = file:position(Fd, eof),
     {reply, {file:pwrite(Fd, Pos, Bin2), Pos}, Fd};
 handle_call({pread_bin, Pos}, _From, Fd) ->
-    {ok, <<TermLen:32>>}
-        = file:pread(Fd, Pos, 4),
+    {ok, <<TermLen:32>>} = file:pread(Fd, Pos, 4),
     {ok, Bin} = file:pread(Fd, Pos + 4, TermLen),
     {reply, {ok, Bin}, Fd};
 handle_call({add_ref, Pid},_From, Fd) ->
-    undefined = put(Pid, erlang:monitor(process, Pid)),
+    case get(Pid) of
+    undefined ->
+        put(Pid, {erlang:monitor(process, Pid), 1});
+    {MonRef, RefCnt} ->
+        put(Pid, {MonRef, RefCnt + 1})
+    end,
     {reply, ok, Fd};
 handle_call(num_refs, _From, Fd) ->
     {monitors, Monitors} =  process_info(self(), monitors),
@@ -382,9 +386,15 @@ handle_cast({close_maybe, Pid}, Fd) ->
     catch unlink(Pid),
     maybe_close_async(Fd);
 handle_cast({drop_ref, Pid}, Fd) ->
-    % don't check return of demonitor. The process could haved crashed causing
-    % the {'DOWN', ...} message to be sent and the process unmonitored.
-    erlang:demonitor(erase(Pid), [flush]),
+    case get(Pid) of
+    {MonRef, 1} ->
+        erase(Pid),
+        % don't check return of demonitor. The process could haved crashed causing
+        % the {'DOWN', ...} message to be sent and the process unmonitored.
+        erlang:demonitor(MonRef, [flush]);
+    {MonRef, Num} ->
+        put(Pid, {MonRef, Num-1})
+    end,
     maybe_close_async(Fd).
 
 
@@ -392,7 +402,7 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 handle_info({'DOWN', MonitorRef, _Type, Pid, _Info}, Fd) ->
-    MonitorRef = erase(Pid),
+    {MonitorRef, _RefCount} = erase(Pid),
     maybe_close_async(Fd);
 handle_info(Info, Fd) ->
     exit({error, {Info, Fd}}).
