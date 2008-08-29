@@ -327,6 +327,7 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
 #tabs .active :link, #tabs .active :visited { background: #e9e9e9;
   border-bottom-color: #e9e9e9; color: #333;
 }
+#tabs :link:focus, #tabs :visited:focus { outline: none; }
 
 /* Document fields table */
 
