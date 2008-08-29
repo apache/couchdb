@@ -28,7 +28,15 @@ specific language governing permissions and limitations under the License.
     <script>
       var page = new CouchIndexPage();
       $(document).ready(function() {
+        var dbsPerPage = $.cookies.get("perpage");
+        if (dbsPerPage) $("#perpage").val(dbsPerPage);
+        $("#perpage").change(function() {
+          page.updateDatabaseListing();
+          $.cookies.set("perpage", this.value);
+        });
+
         page.updateDatabaseListing();
+
         $("#toolbar button.add").click(function() {
           page.addDatabase();
         });
@@ -57,7 +65,19 @@ specific language governing permissions and limitations under the License.
         </tbody>
         <tbody class="footer">
           <tr>
-            <td colspan="4"></td>
+            <td colspan="4">
+              <div id="paging">
+                <a class="prev">← Previous Page</a> |
+                <label>Rows per page: <select id="perpage">
+                  <option selected>10</option>
+                  <option>25</option>
+                  <option>50</option>
+                  <option>100</option>
+                </select></label> |
+                <a class="next">Next Page →</a>
+              </div>
+              <span></span>
+            </td>
           </tr>
         </tbody>
       </table>

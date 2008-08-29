@@ -36,15 +36,22 @@ function CouchIndexPage() {
     return false;
   }
 
-  this.updateDatabaseListing = function() {
+  this.updateDatabaseListing = function(offset) {
+    offset |= 0;
     $(document.body).addClass("loading");
+    var maxPerPage = parseInt($("#perpage").val(), 10);
+
     $.couch.allDbs({
       success: function(dbs) {
+        $("#paging a").unbind();
+        $("#databases tbody.content").empty();
+
         if (dbs.length == 0) {
           $(document.body).removeClass("loading");
         }
+        var dbsOnPage = dbs.slice(offset, offset + maxPerPage);
 
-        $.each(dbs, function(idx, dbName) {
+        $.each(dbsOnPage, function(idx, dbName) {
           $("#databases tbody.content").append("<tr>" + 
             "<th><a href='database.html?" + encodeURIComponent(dbName) + "'>" +
               dbName + "</a></th>" +
@@ -56,14 +63,34 @@ function CouchIndexPage() {
                 .find("td.size").text(prettyPrintSize(info.disk_size)).end()
                 .find("td.count").text(info.doc_count).end()
                 .find("td.seq").text(info.update_seq);
-              if (idx == dbs.length - 1) {
+              if (idx == dbsOnPage.length - 1) {
                 $(document.body).removeClass("loading");
               }
             }
           });
         });
         $("#databases tbody tr:odd").addClass("odd");
-        $("#databases tbody.footer tr td").text(dbs.length + " database(s)");
+
+        if (offset > 0) {
+          $("#paging a.prev").attr("href", "#" + (offset - maxPerPage)).click(function() {
+            page.updateDatabaseListing(offset - maxPerPage);
+          });
+        } else {
+          $("#paging a.prev").removeAttr("href");
+        }
+        if (offset + maxPerPage < dbs.length) {
+          $("#paging a.next").attr("href", "#" + (offset + maxPerPage)).click(function() {
+            page.updateDatabaseListing(offset + maxPerPage);
+          });
+        } else {
+          $("#paging a.next").removeAttr("href");
+        }
+
+        var firstNum = offset + 1;
+        var lastNum = firstNum + dbsOnPage.length - 1;
+        $("#databases tbody.footer tr td span").text(
+          "Showing " + firstNum + "-" + lastNum + " of " + dbs.length +
+          " databases");
       }
     });
   }
