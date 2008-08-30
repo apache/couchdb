@@ -11,9 +11,9 @@
 % the License.
 
 %% @doc Reads CouchDB's ini file and gets queried for configuration parameters.
-%%      This module is initialized with a list of ini files that it 
-%%      consecutively reads Key/Value pairs from and saves them in an ets 
-%%      table. If more an one ini file is specified, the last one is used to 
+%%      This module is initialized with a list of ini files that it
+%%      consecutively reads Key/Value pairs from and saves them in an ets
+%%      table. If more an one ini file is specified, the last one is used to
 %%      write changes that are made with store/2 back to that ini file.
 
 -module(couch_config).
@@ -21,13 +21,13 @@
 
 -behaviour(gen_server).
 -export([start_link/1, init/1,
-    handle_call/3, handle_cast/2, handle_info/2, 
+    handle_call/3, handle_cast/2, handle_info/2,
     terminate/2, code_change/3]).
--export([store/2, register/1, register/2, 
+-export([store/2, register/1, register/2,
     get/1, get/2,
     lookup_match/1, lookup_match/2,
     all/0, unset/1, load_ini_file/1]).
-    
+
 -record(config,
     {notify_funs=[],
     writeback_filename=""
@@ -37,7 +37,7 @@
 
 %% @type etstable() = integer().
 
-start_link(IniFiles) -> gen_server:start_link({local, ?MODULE}, ?MODULE, IniFiles, []).  
+start_link(IniFiles) -> gen_server:start_link({local, ?MODULE}, ?MODULE, IniFiles, []).
 
 %% @spec store(Key::any(), Value::any()) -> {ok, Tab::etsatable()}
 %% @doc Public API function that triggers storage of a Key/Value pair into the
@@ -57,12 +57,12 @@ get(Key, Default) ->
     fix_lookup_result(ets:lookup(?MODULE, Key), Default).
 
 %% @spec lookup_match(Key::any()) -> Value::any() | undefined:atom()
-%% @doc Lets you look for a Key's Value specifying a pattern that gets passed 
+%% @doc Lets you look for a Key's Value specifying a pattern that gets passed
 %%      to ets::match(). Returns undefined::atom() if no Key is found.
 lookup_match(Key) -> gen_server:call(?MODULE, {lookup_match, Key}).
 
 %% @spec lookup_match(Key::any(), Default::any()) -> Value::any() | Default
-%% @doc Lets you look for a Key's Value specifying a pattern that gets passed 
+%% @doc Lets you look for a Key's Value specifying a pattern that gets passed
 %%      to ets::match(). Returns Default::any() if no Key is found
 lookup_match(Key, Default) -> gen_server:call(?MODULE, {lookup_match, Key, Default}).
 
@@ -74,7 +74,7 @@ register(Fun) -> gen_server:call(?MODULE, {register, Fun, self()}).
 register(Fun, Pid) -> gen_server:call(?MODULE, {register, Fun, Pid}).
 
 %% @spec unset(Key::any) -> ok
-%% @doc Public API call to remove the configuration entry from the internal 
+%% @doc Public API call to remove the configuration entry from the internal
 %%      ets table. This change is _not_ written to the storage ini file.
 unset(Key) -> gen_server:call(?MODULE, {unset, Key}).
 
@@ -115,7 +115,7 @@ handle_call(all, _From, Config) ->
 handle_call({register, Fun, Pid}, _From, #config{notify_funs=PidFuns}=Config) ->
     erlang:monitor(process, Pid),
     {reply, ok, Config#config{notify_funs=[{Pid, Fun}|PidFuns]}}.
-    
+
 
 fix_lookup_result([{_Key, Value}], _Default) ->
     Value;
@@ -125,7 +125,7 @@ fix_lookup_result(Values, _Default) ->
     [list_to_tuple(Value) || Value <- Values].
 
 %% @spec insert_and_commit(Tab::etstable(), Config::any()) -> ok
-%% @doc Inserts a Key/Value pair into the ets table, writes it to the storage 
+%% @doc Inserts a Key/Value pair into the ets table, writes it to the storage
 %%      ini file and calls all registered callback functions for Key.
 insert_and_commit(Config, KV) ->
     true = ets:insert(?MODULE, KV),
@@ -146,7 +146,7 @@ load_ini_file(IniFile) ->
            io:format("~s~n", [Msg]),
            throw({startup_error, Msg})
     end,
-    
+
     {ok, Lines} = regexp:split(binary_to_list(IniBin), "\r\n|\n|\r|\032"),
     {_, ParsedIniValues} =
     lists:foldl(fun(Line, {AccSectionName, AccValues}) ->
@@ -173,7 +173,7 @@ load_ini_file(IniFile) ->
                 end
             end
         end, {"", []}, Lines),
-        
+
         [ets:insert(?MODULE, {Key, Value}) || {Key, Value} <- ParsedIniValues],
     ok.
 

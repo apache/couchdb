@@ -40,14 +40,14 @@
 
 start_link() ->
     % read config and register for configuration changes
-    
+
     % just stop if one of the config settings change. couch_server_sup
     % will restart us and then we will pick up the new settings.
-    
+
     BindAddress = couch_config:get({"HTTPd", "BindAddress"}, any),
     Port = couch_config:get({"HTTPd", "Port"}, "5984"),
     DocumentRoot = couch_config:get({"HTTPd", "DocumentRoot"}, "../../share/www"),
-    
+
     % and off we go
     Loop = fun (Req) -> apply(couch_httpd, handle_request, [Req, DocumentRoot]) end,
     {ok, Pid} = mochiweb_http:start([
@@ -64,7 +64,7 @@ start_link() ->
         ({"HTTPd", "DocumentRoot"}) ->
             ?MODULE:stop()
         end, Pid),
-    
+
     {ok, Pid}.
 
 stop() ->
@@ -77,7 +77,7 @@ handle_request(Req, DocumentRoot) ->
     % alias HEAD to GET as mochiweb takes care of stripping the body
     Method = case Req:get(method) of
         'HEAD' -> 'GET';
-        Other -> 
+        Other ->
           % handling of non standard HTTP verbs. Should be fixe din gen_tcp:recv()
           case Other of
             "COPY" -> 'COPY';
@@ -110,7 +110,7 @@ handle_request(Req, DocumentRoot) ->
         Path,
         Resp:get(code)
     ]).
-    
+
 handle_request(Req, DocumentRoot, Method, Path) ->
     % Start = erlang:now(),
     X = handle_request0(Req, DocumentRoot, Method, Path),
@@ -222,11 +222,11 @@ handle_db_request(Req, 'DELETE', {DbName, []}) ->
     Error ->
         throw(Error)
     end;
-    
+
 handle_db_request(Req, Method, {DbName, Rest}) ->
     case couch_db:open(DbName, []) of
         {ok, Db} ->
-            try 
+            try
                 handle_db_request(Req, Method, {DbName, Db, Rest})
             after
                 couch_db:close(Db)
@@ -526,8 +526,8 @@ output_reduce_view(Req, View) ->
             Resp:write_chunk(AccSeparator ++ Json),
             {ok, {",",0,AccCount-1}};
         (Key, Red, {AccSeparator,0,AccCount})
-                when is_integer(GroupLevel) 
-                andalso is_tuple(Key) 
+                when is_integer(GroupLevel)
+                andalso is_tuple(Key)
                 andalso element(1, Key) /= obj  ->
             Json = lists:flatten(cjson:encode(
                 {obj, [{key, list_to_tuple(lists:sublist(tuple_to_list(Key), GroupLevel))},
@@ -641,57 +641,57 @@ handle_doc_request(Req, 'PUT', _DbName, Db, DocId) ->
     ]});
 
 handle_doc_request(Req, 'COPY', _DbName, Db, SourceDocId) ->
-  SourceRev = case extract_header_rev(Req) of
-    missing_rev -> [];
-    Rev -> Rev
-  end,
-  
-  {TargetDocId, TargetRev} = parse_copy_destination_header(Req),
-  
-  % open revision Rev or Current
-  {Doc, _DocRev} = couch_doc_open(Db, SourceDocId, SourceRev, []),
+    SourceRev = case extract_header_rev(Req) of
+      missing_rev -> [];
+      Rev -> Rev
+    end,
 
-  % save new doc
-  {ok, NewTargetRev} = couch_db:update_doc(Db, Doc#doc{id=TargetDocId, revs=TargetRev}, []),
+    {TargetDocId, TargetRev} = parse_copy_destination_header(Req),
 
-  send_json(Req, 201, [{"Etag", "\"" ++ NewTargetRev ++ "\""}], {obj, [
-      {ok, true},
-      {id, TargetDocId},
-      {rev, NewTargetRev}
-  ]});
+    % open revision Rev or Current
+    {Doc, _DocRev} = couch_doc_open(Db, SourceDocId, SourceRev, []),
+
+    % save new doc
+    {ok, NewTargetRev} = couch_db:update_doc(Db, Doc#doc{id=TargetDocId, revs=TargetRev}, []),
+
+    send_json(Req, 201, [{"Etag", "\"" ++ NewTargetRev ++ "\""}], {obj, [
+        {ok, true},
+        {id, TargetDocId},
+        {rev, NewTargetRev}
+    ]});
 
 handle_doc_request(Req, 'MOVE', _DbName, Db, SourceDocId) ->
-  SourceRev = case extract_header_rev(Req) of
-    missing_rev -> 
-      throw({
-        bad_request, 
-        "MOVE requires a specified rev parameter for the origin resource."}
-      );
-    Rev -> Rev
-  end,
-  
-  {TargetDocId, TargetRev} = parse_copy_destination_header(Req),
+    SourceRev = case extract_header_rev(Req) of
+      missing_rev ->
+        throw({
+          bad_request,
+          "MOVE requires a specified rev parameter for the origin resource."}
+        );
+      Rev -> Rev
+    end,
 
-  % open revision Rev or Current
-  {Doc, _DocRev} = couch_doc_open(Db, SourceDocId, SourceRev, []),
+    {TargetDocId, TargetRev} = parse_copy_destination_header(Req),
 
-  % save new doc & delete old doc in one operation
-  Docs = [
-    Doc#doc{id=TargetDocId, revs=TargetRev},
-    #doc{id=SourceDocId, revs=[SourceRev], deleted=true}
-  ],
+    % open revision Rev or Current
+    {Doc, _DocRev} = couch_doc_open(Db, SourceDocId, SourceRev, []),
 
-  {ok, ResultRevs} = couch_db:update_docs(Db, Docs, []),
+    % save new doc & delete old doc in one operation
+    Docs = [
+      Doc#doc{id=TargetDocId, revs=TargetRev},
+      #doc{id=SourceDocId, revs=[SourceRev], deleted=true}
+    ],
 
-  DocResults = lists:zipwith(
-      fun(FDoc, NewRev) ->
-          {obj, [{"id", FDoc#doc.id}, {"rev", NewRev}]}
-      end,
-      Docs, ResultRevs),
-  send_json(Req, 201, {obj, [
-      {ok, true},
-      {new_revs, list_to_tuple(DocResults)}
-  ]});
+    {ok, ResultRevs} = couch_db:update_docs(Db, Docs, []),
+
+    DocResults = lists:zipwith(
+        fun(FDoc, NewRev) ->
+            {obj, [{"id", FDoc#doc.id}, {"rev", NewRev}]}
+        end,
+        Docs, ResultRevs),
+    send_json(Req, 201, {obj, [
+        {ok, true},
+        {new_revs, list_to_tuple(DocResults)}
+    ]});
 
 handle_doc_request(_Req, _Method, _DbName, _Db, _DocId) ->
     throw({method_not_allowed, "DELETE,GET,HEAD,PUT,COPY,MOVE"}).
@@ -699,35 +699,24 @@ handle_doc_request(_Req, _Method, _DbName, _Db, _DocId) ->
 % Useful for debugging
 % couch_doc_open(Db, DocId) ->
 %   couch_doc_open(Db, DocId, [], []).
-  
-couch_doc_open(Db, DocId, Rev, Options) ->
-  case Rev of
-  "" -> % open most recent rev
-      case couch_db:open_doc(Db, DocId, Options) of
-          {ok, #doc{revs=[DocRev|_]}=Doc} ->
-              {Doc, DocRev};
-          Error ->
-              throw(Error)
-      end;
-  _ -> % open a specific rev (deletions come back as stubs)
-      case couch_db:open_doc_revs(Db, DocId, [Rev], Options) of
-          {ok, [{ok, Doc}]} ->
-              {Doc, Rev};
-          {ok, [Else]} ->
-              throw(Else)
-      end
-  end.
 
-parse_copy_destination_header(Req) ->
-  Destination = Req:get_header_value("Destination"),
-  case regexp:match(Destination, "\\?") of
-    nomatch -> 
-      {Destination, []};
-    {match, _, _} ->
-      {ok, [DocId, RevQueryOptions]} = regexp:split(Destination, "\\?"),
-      {ok, [_RevQueryKey, Rev]} = regexp:split(RevQueryOptions, "="),
-      {DocId, [Rev]}
-  end.
+couch_doc_open(Db, DocId, Rev, Options) ->
+    case Rev of
+    "" -> % open most recent rev
+        case couch_db:open_doc(Db, DocId, Options) of
+            {ok, #doc{revs=[DocRev|_]}=Doc} ->
+                {Doc, DocRev};
+            Error ->
+                throw(Error)
+        end;
+    _ -> % open a specific rev (deletions come back as stubs)
+        case couch_db:open_doc_revs(Db, DocId, [Rev], Options) of
+            {ok, [{ok, Doc}]} ->
+                {Doc, Rev};
+            {ok, [Else]} ->
+                throw(Else)
+        end
+    end.
 
 % Attachment request handlers
 
@@ -761,7 +750,7 @@ handle_attachment_request(Req, Method, _DbName, Db, DocId, FileName)
     when (Method == 'PUT') or (Method == 'DELETE') ->
 
     Rev = extract_header_rev(Req),
-    
+
     NewAttachment = case Method of
         'DELETE' ->
             [];
@@ -772,20 +761,20 @@ handle_attachment_request(Req, Method, _DbName, Db, DocId, FileName)
             }}]
     end,
 
-    Doc =
-    case Rev of
-    missing_rev -> % make the new doc
-        #doc{id=DocId};
-    _ ->
-        case couch_db:open_doc_revs(Db, DocId, [Rev], []) of
-        {ok, [{ok, Doc0}]}   -> Doc0#doc{revs=[Rev]};
-        {ok, [Error]}       -> throw(Error)
-        end
+    Doc = case Rev of
+        missing_rev -> % make the new doc
+            #doc{id=DocId};
+        _ ->
+            case couch_db:open_doc_revs(Db, DocId, [Rev], []) of
+            {ok, [{ok, Doc0}]}   -> Doc0#doc{revs=[Rev]};
+            {ok, [Error]}       -> throw(Error)
+            end
     end,
-    
+
     #doc{attachments=Attachments} = Doc,
     DocEdited = Doc#doc{
-        attachments = NewAttachment ++ proplists:delete(FileName, Attachments)},
+        attachments = NewAttachment ++ proplists:delete(FileName, Attachments)
+    },
     {ok, UpdatedRev} = couch_db:update_doc(Db, DocEdited, []),
     send_json(Req, case Method of 'DELETE' -> 200; _ -> 201 end, {obj, [
         {ok, true},
@@ -796,27 +785,11 @@ handle_attachment_request(Req, Method, _DbName, Db, DocId, FileName)
 handle_attachment_request(_Req, _Method, _DbName, _Db, _DocId, _FileName) ->
     throw({method_not_allowed, "GET,HEAD,DELETE,PUT"}).
 
-extract_header_rev(Req) ->
-    QueryRev = proplists:get_value("rev", Req:parse_qs()),
-    Etag = case Req:get_header_value("If-Match") of
-        undefined -> undefined;
-        Tag -> string:strip(Tag, both, $")
-    end,
-    case {QueryRev, Etag} of
-    {undefined, undefined} -> missing_rev;
-    {_, undefined} -> QueryRev;
-    {undefined, _} -> Etag;
-    _ when QueryRev == Etag -> Etag;
-    _ ->
-        throw({bad_request, "Document rev and etag have different values"})
-    end.
-
 % Config request handlers
 
 handle_config_request(_Req, Method, {config, Config}) ->
     [Module, Key] = string:tokens(Config, "/"),
     handle_config_request(_Req, Method, {[Module, Key]});
-
 
 % PUT /_config/Module/Key
 % "value"
@@ -825,7 +798,6 @@ handle_config_request(_Req, 'PUT', {[Module, Key]}) ->
 
 % POST,PUT /_config/Module/Key
 % "value"
- 
 handle_config_request(Req, 'POST', {[Module, Key]}) ->
     Value = binary_to_list(Req:recv_body()),
     ok = couch_config:store({Module, Key}, Value),
@@ -835,7 +807,7 @@ handle_config_request(Req, 'POST', {[Module, Key]}) ->
         {key, Key},
         {value, Value}
     ]});
-    
+
 % GET /_config/Module/Key
 handle_config_request(Req, 'GET', {[Module, Key]}) ->
     case couch_config:get({Module, Key},null) of
@@ -850,8 +822,7 @@ handle_config_request(Req, 'GET', {[Module, Key]}) ->
          ]})
     end;
 
-    
-% DELETE /_config/Key
+% DELETE /_config/Module/Key
 handle_config_request(Req, 'DELETE', {[Module, Key]}) ->
     case couch_config:get({Module, Key}, null) of
     null ->
@@ -870,7 +841,7 @@ handle_config_request(Req, 'DELETE', {[Module, Key]}) ->
 % TODO:
 % POST,PUT /_config/
 % [{Key, Value}, {K2, V2}, {K3, V3}]
-% 
+%
 % POST,PUT/_config/Key?value=Value
 
 
@@ -1140,6 +1111,32 @@ error_to_json0({Id, Reason}) when is_atom(Id) ->
     {500, Id, Reason};
 error_to_json0(Error) ->
     {500, error, Error}.
+
+extract_header_rev(Req) ->
+    QueryRev = proplists:get_value("rev", Req:parse_qs()),
+    Etag = case Req:get_header_value("If-Match") of
+        undefined -> undefined;
+        Tag -> string:strip(Tag, both, $")
+    end,
+    case {QueryRev, Etag} of
+    {undefined, undefined} -> missing_rev;
+    {_, undefined} -> QueryRev;
+    {undefined, _} -> Etag;
+    _ when QueryRev == Etag -> Etag;
+    _ ->
+        throw({bad_request, "Document rev and etag have different values"})
+    end.
+
+parse_copy_destination_header(Req) ->
+    Destination = Req:get_header_value("Destination"),
+    case regexp:match(Destination, "\\?") of
+        nomatch ->
+            {Destination, []};
+        {match, _, _} ->
+            {ok, [DocId, RevQueryOptions]} = regexp:split(Destination, "\\?"),
+            {ok, [_RevQueryKey, Rev]} = regexp:split(RevQueryOptions, "="),
+            {DocId, [Rev]}
+    end.
 
 send_error(Req, {method_not_allowed, Methods}) ->
     {ok, Req:respond({405, [{"Allow", Methods}] ++ server_header(), <<>>})};
