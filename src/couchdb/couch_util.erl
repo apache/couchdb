@@ -23,8 +23,6 @@
 -define(FLUSH_MAX_MEM, 10000000).
 
 start_driver(LibDir) ->
-    % read config and register for configuration changes
-    
     case erl_ddll:load_driver(LibDir, "couch_erl_driver") of
     ok ->
         ok;

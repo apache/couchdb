@@ -29,7 +29,7 @@
 %% @doc Saves a Module/Key/Value triple to the ini file File::filename()
 save_to_file({{Module, Variable}, Value}, File) ->
 
-    ?LOG_DEBUG("saving to file '~s', Congif: '~p'", [File, {{Module, Variable}, Value}]),
+    ?LOG_DEBUG("saving to file '~s', Config: '~p'", [File, {{Module, Variable}, Value}]),
 
     % open file and create a list of lines
     {ok, Stream} = file:read_file(File),
@@ -84,7 +84,7 @@ save_loop({{Module, Variable}, Value}, [Line|Rest], OldCurrentModule, Contents, 
             case lists:member(Variable, DoneVariables) of
                 false ->
                     DoneVariables2 = [Variable|DoneVariables],
-                    Variable ++ "=" ++ Value ++ "\n" ++ Line;
+                    Variable ++ " = " ++ Value ++ "\n" ++ Line;
                 true ->
                     DoneVariables2 = DoneVariables,
                     Line

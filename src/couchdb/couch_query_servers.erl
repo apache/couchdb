@@ -36,7 +36,7 @@ readline(Port, Acc) ->
     case get(query_server_timeout) of
     undefined ->
         Timeout = list_to_integer(couch_config:get(
-            {"CouchDB Query Server Options", "QueryTimeout"}, "5000")),
+            {"couchdb", "view_timeout"}, "5000")),
         put(timeout, Timeout);
     Timeout -> ok
     end,
@@ -178,12 +178,12 @@ init([]) ->
     % will restart us and then we will pick up the new settings.
     
     ok = couch_config:register(
-        fun({"CouchDB Query Server" ++ _, _}) ->
+        fun({"query_servers" ++ _, _}) ->
             ?MODULE:stop()
         end),
         
     QueryServerList = couch_config:lookup_match(
-            {{"CouchDB Query Servers", '$1'}, '$2'}, []),
+            {{"query_servers", '$1'}, '$2'}, []),
         
     {ok, {QueryServerList, []}}.
 

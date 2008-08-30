@@ -2,22 +2,20 @@
 
 ; Upgrading CouchDB will overwrite this file.
 
-[CouchDB]
-RootDirectory=%localstatelibdir%
-UtilDriverDir=%couchprivlibdir%
-MaximumDocumentSize=4294967296 ; 4 GB
+[couchdb]
+database_dir = %localstatelibdir%
+util_driver_dir = %couchprivlibdir%
+max_document_size = 4294967296 ; 4 GB
+view_timeout = 5000 ; 5 seconds
 
-[HTTPd]
-Port=5984
-BindAddress=127.0.0.1
-DocumentRoot=%localdatadir%/www
+[httpd]
+port = 5984
+bind_address = 127.0.0.1
+utils_dir = %localdatadir%/www
 
-[Log]
-File=%localstatelogdir%/couch.log
-Level=info
+[log]
+file = %localstatelogdir%/couch.log
+level = info
 
-[CouchDB Query Servers]
-javascript=%bindir%/%couchjs_command_name% %localdatadir%/server/main.js
-
-[CouchDB Query Server Options]
-QueryTimeout=5000 ; 5 seconds
+[query_servers]
+javascript = %bindir%/%couchjs_command_name% %localdatadir%/server/main.js

@@ -44,9 +44,9 @@ start_link() ->
     % just stop if one of the config settings change. couch_server_sup
     % will restart us and then we will pick up the new settings.
 
-    BindAddress = couch_config:get({"HTTPd", "BindAddress"}, any),
-    Port = couch_config:get({"HTTPd", "Port"}, "5984"),
-    DocumentRoot = couch_config:get({"HTTPd", "DocumentRoot"}, "../../share/www"),
+    BindAddress = couch_config:get({"httpd", "bind_address"}, any),
+    Port = couch_config:get({"httpd", "port"}, "5984"),
+    DocumentRoot = couch_config:get({"httpd", "utils_dir"}, "../../share/www"),
 
     % and off we go
     Loop = fun (Req) -> apply(couch_httpd, handle_request, [Req, DocumentRoot]) end,
@@ -57,11 +57,11 @@ start_link() ->
         {port, Port}
     ]),
     ok = couch_config:register(
-        fun({"HTTPd", "BindAddress"}) ->
+        fun({"httpd", "bind_address"}) ->
             ?MODULE:stop();
-        ({"HTTPd", "Port"}) ->
+        ({"httpd", "port"}) ->
             ?MODULE:stop();
-        ({"HTTPd", "DocumentRoot"}) ->
+        ({"httpd", "utils_dir"}) ->
             ?MODULE:stop()
         end, Pid),
 
