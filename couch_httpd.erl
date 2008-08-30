@@ -812,51 +812,51 @@ handle_attachment_request(_Req, _Method, _DbName, _Db, _DocId, _FileName) ->
 % Config request handlers
 
 handle_config_request(_Req, Method, {config, Config}) ->
-    [Module, Key] = string:tokens(Config, "/"),
-    handle_config_request(_Req, Method, {[Module, Key]});
+    [Section, Option] = string:tokens(Config, "/"),
+    handle_config_request(_Req, Method, {[Section, Option]});
 
-% PUT /_config/Module/Key
+% PUT /_config/Section/Option
 % "value"
-handle_config_request(_Req, 'PUT', {[Module, Key]}) ->
-     handle_config_request(_Req, 'POST', {[Module, Key]});
+handle_config_request(_Req, 'PUT', {[Section, Option]}) ->
+     handle_config_request(_Req, 'POST', {[Section, Option]});
 
-% POST,PUT /_config/Module/Key
+% POST,PUT /_config/Section/Option
 % "value"
-handle_config_request(Req, 'POST', {[Module, Key]}) ->
+handle_config_request(Req, 'POST', {[Section, Option]}) ->
     Value = binary_to_list(Req:recv_body()),
-    ok = couch_config:store({Module, Key}, Value),
+    ok = couch_config:store({Section, Option}, Value),
     send_json(Req, 200, {obj, [
         {ok, true},
-        {module, Module},
-        {key, Key},
+        {section, Section},
+        {name, Option},
         {value, Value}
     ]});
 
-% GET /_config/Module/Key
-handle_config_request(Req, 'GET', {[Module, Key]}) ->
-    case couch_config:get({Module, Key},null) of
+% GET /_config/Section/Option
+handle_config_request(Req, 'GET', {[Section, Option]}) ->
+    case couch_config:get({Section, Option},null) of
     null ->
         throw({not_found, unknown_config_value});
     Value ->
         send_json(Req, 200, {obj, [
             {ok, true},
-            {module, Module},
-            {key, Key},
+            {section, Section},
+            {name, Option},
             {value, Value}
          ]})
     end;
 
-% DELETE /_config/Module/Key
-handle_config_request(Req, 'DELETE', {[Module, Key]}) ->
-    case couch_config:get({Module, Key}, null) of
+% DELETE /_config/Section/Option
+handle_config_request(Req, 'DELETE', {[Section, Option]}) ->
+    case couch_config:get({Section, Option}, null) of
     null ->
         throw({not_found, unknown_config_value});
     OldValue ->
-        couch_config:unset({Module, Key}),
+        couch_config:unset({Section, Option}),
         send_json(Req, 200, {obj, [
             {ok, true},
-            {module, Module},
-            {key, Key},
+            {section, Section},
+            {name, Option},
             {old_value, OldValue}
          ]})
     end.
