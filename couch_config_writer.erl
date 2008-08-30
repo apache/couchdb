@@ -108,7 +108,7 @@ save_loop(_Config, [], _OldModule, NewFileContents, _DoneVariable) ->
     NewFileContents.
 
 append_new_ini_section({{ModuleName, Variable}, Value}, OldFileContents) ->
-    OldFileContents ++ "\n\n" ++ ModuleName ++ "\n" ++  Variable ++ "=" ++ Value ++ "\n".
+    OldFileContents ++ "\n\n" ++ ModuleName ++ "\n" ++  Variable ++ " = " ++ Value ++ "\n".
 
 %% @spec parse_module(Lins::string(), OldModule::string()) -> string()
 %% @doc Tries to match a line against a pattern specifying a ini module or
@@ -130,14 +130,14 @@ parse_module(Line, OldModule) ->
 %%      Variable is not found. Returns a new line composed of the Variable and
 %%      Value otherwise.
 parse_variable(Line, Variable, Value) ->
-    case regexp:match(Line, "^" ++ Variable ++ "=") of
+    case regexp:match(Line, "^" ++ Variable ++ "\s?=") of
         nomatch ->
             nomatch;
         {error, Error}->
             io:format("ini file regex error variable: '~s'~n", [Error]),
             nomatch;
         {match, _Start, _Length} ->
-            Variable ++ "=" ++ Value
+            Variable ++ " = " ++ Value
     end.
 
 %% @spec save_file(File::filename(), Contents::string()) ->
