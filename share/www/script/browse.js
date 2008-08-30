@@ -843,6 +843,7 @@ function CouchDocumentPage() {
       delete page.doc._attachments[name];
       li.remove();
       page.isDirty = true;
+      return false;
     }).prependTo($("a", li));
   }
 
