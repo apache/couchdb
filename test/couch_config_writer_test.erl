@@ -17,47 +17,47 @@ replace_existing_variable() ->
     Contents = "; etc/couchdb/couch.ini.tpl.  Generated from couch.ini.tpl.in by configure.
 
 [CouchDB]
-RootDirectory=/Users/jan/Work/runcouch/conf9/var/lib/couchdb
-UtilDriverDir=/Users/jan/Work/runcouch/conf9/lib/couchdb/erlang/lib/couch-0.7.3a663206/priv/lib
-MaximumDocumentSize=4294967296 ; 4 GB
+RootDirectory = /Users/jan/Work/runcouch/conf9/var/lib/couchdb
+UtilDriverDir = /Users/jan/Work/runcouch/conf9/lib/couchdb/erlang/lib/couch-0.7.3a663206/priv/lib
+MaximumDocumentSize = 4294967296 ; 4 GB
 
 [HTTPd]
-Port=5984
-BindAddress=127.0.0.1
-DocumentRoot=/Users/jan/Work/runcouch/conf9/share/couchdb/www
+Port = 5984
+BindAddress = 127.0.0.1
+DocumentRoot = /Users/jan/Work/runcouch/conf9/share/couchdb/www
 
 [Log]
-File=/Users/jan/Work/runcouch/conf9/var/log/couchdb/couch.log
-Level=info
+File = /Users/jan/Work/runcouch/conf9/var/log/couchdb/couch.log
+Level = info
 
 [CouchDB Query Servers]
-javascript=/Users/jan/Work/runcouch/conf9/bin/couchjs /Users/jan/Work/runcouch/conf9/share/couchdb/server/main.js
+javascript = /Users/jan/Work/runcouch/conf9/bin/couchjs /Users/jan/Work/runcouch/conf9/share/couchdb/server/main.js
 
 [CouchDB Query Server Options]
-QueryTimeout=5000 ; 5 seconds
+QueryTimeout = 5000 ; 5 seconds
 ",
 
     Expect = "; etc/couchdb/couch.ini.tpl.  Generated from couch.ini.tpl.in by configure.
 
 [CouchDB]
-RootDirectory=/Users/jan/Work/runcouch/conf9/var/lib/couchdb
-UtilDriverDir=/Users/jan/Work/runcouch/conf9/lib/couchdb/erlang/lib/couch-0.7.3a663206/priv/lib
-MaximumDocumentSize=4294967296 ; 4 GB
+RootDirectory = /Users/jan/Work/runcouch/conf9/var/lib/couchdb
+UtilDriverDir = /Users/jan/Work/runcouch/conf9/lib/couchdb/erlang/lib/couch-0.7.3a663206/priv/lib
+MaximumDocumentSize = 4294967296 ; 4 GB
 
 [HTTPd]
-Port=5985
-BindAddress=127.0.0.1
-DocumentRoot=/Users/jan/Work/runcouch/conf9/share/couchdb/www
+Port = 5985
+BindAddress = 127.0.0.1
+DocumentRoot = /Users/jan/Work/runcouch/conf9/share/couchdb/www
 
 [Log]
-File=/Users/jan/Work/runcouch/conf9/var/log/couchdb/couch.log
-Level=info
+File = /Users/jan/Work/runcouch/conf9/var/log/couchdb/couch.log
+Level = info
 
 [CouchDB Query Servers]
-javascript=/Users/jan/Work/runcouch/conf9/bin/couchjs /Users/jan/Work/runcouch/conf9/share/couchdb/server/main.js
+javascript = /Users/jan/Work/runcouch/conf9/bin/couchjs /Users/jan/Work/runcouch/conf9/share/couchdb/server/main.js
 
 [CouchDB Query Server Options]
-QueryTimeout=5000 ; 5 seconds
+QueryTimeout = 5000 ; 5 seconds
 ",
     run_operation_and_compare_results(Contents, Expect, {{"HTTPd", "Port"}, "5985"}).
 
@@ -67,48 +67,48 @@ append_new_variable() ->
     Contents = "; etc/couchdb/couch.ini.tpl.  Generated from couch.ini.tpl.in by configure.
 
 [CouchDB]
-RootDirectory=/Users/jan/Work/runcouch/conf9/var/lib/couchdb
-UtilDriverDir=/Users/jan/Work/runcouch/conf9/lib/couchdb/erlang/lib/couch-0.7.3a663206/priv/lib
-MaximumDocumentSize=4294967296 ; 4 GB
+RootDirectory = /Users/jan/Work/runcouch/conf9/var/lib/couchdb
+UtilDriverDir = /Users/jan/Work/runcouch/conf9/lib/couchdb/erlang/lib/couch-0.7.3a663206/priv/lib
+MaximumDocumentSize = 4294967296 ; 4 GB
 
 [HTTPd]
-Port=5984
-BindAddress=127.0.0.1
-DocumentRoot=/Users/jan/Work/runcouch/conf9/share/couchdb/www
+Port = 5984
+BindAddress = 127.0.0.1
+DocumentRoot = /Users/jan/Work/runcouch/conf9/share/couchdb/www
 
 [Log]
-File=/Users/jan/Work/runcouch/conf9/var/log/couchdb/couch.log
-Level=info
+File = /Users/jan/Work/runcouch/conf9/var/log/couchdb/couch.log
+Level = info
 
 [CouchDB Query Servers]
-javascript=/Users/jan/Work/runcouch/conf9/bin/couchjs /Users/jan/Work/runcouch/conf9/share/couchdb/server/main.js
+javascript = /Users/jan/Work/runcouch/conf9/bin/couchjs /Users/jan/Work/runcouch/conf9/share/couchdb/server/main.js
 
 [CouchDB Query Server Options]
-QueryTimeout=5000 ; 5 seconds
+QueryTimeout = 5000 ; 5 seconds
 ",
 
     Expect = "; etc/couchdb/couch.ini.tpl.  Generated from couch.ini.tpl.in by configure.
 
 [CouchDB]
-RootDirectory=/Users/jan/Work/runcouch/conf9/var/lib/couchdb
-UtilDriverDir=/Users/jan/Work/runcouch/conf9/lib/couchdb/erlang/lib/couch-0.7.3a663206/priv/lib
-MaximumDocumentSize=4294967296 ; 4 GB
+RootDirectory = /Users/jan/Work/runcouch/conf9/var/lib/couchdb
+UtilDriverDir = /Users/jan/Work/runcouch/conf9/lib/couchdb/erlang/lib/couch-0.7.3a663206/priv/lib
+MaximumDocumentSize = 4294967296 ; 4 GB
 
 [HTTPd]
-Port=5984
-BindAddress=127.0.0.1
-DocumentRoot=/Users/jan/Work/runcouch/conf9/share/couchdb/www
+Port = 5984
+BindAddress = 127.0.0.1
+DocumentRoot = /Users/jan/Work/runcouch/conf9/share/couchdb/www
 
-FantasyConfiguration=Citation Needed
+FantasyConfiguration = Citation Needed
 [Log]
-File=/Users/jan/Work/runcouch/conf9/var/log/couchdb/couch.log
-Level=info
+File = /Users/jan/Work/runcouch/conf9/var/log/couchdb/couch.log
+Level = info
 
 [CouchDB Query Servers]
-javascript=/Users/jan/Work/runcouch/conf9/bin/couchjs /Users/jan/Work/runcouch/conf9/share/couchdb/server/main.js
+javascript = /Users/jan/Work/runcouch/conf9/bin/couchjs /Users/jan/Work/runcouch/conf9/share/couchdb/server/main.js
 
 [CouchDB Query Server Options]
-QueryTimeout=5000 ; 5 seconds
+QueryTimeout = 5000 ; 5 seconds
 ",
     run_operation_and_compare_results(Contents, Expect, {{"HTTPd", "FantasyConfiguration"}, "Citation Needed"}).
 
@@ -118,49 +118,49 @@ append_new_module() ->
     Contents = "; etc/couchdb/couch.ini.tpl.  Generated from couch.ini.tpl.in by configure.
 
 [CouchDB]
-RootDirectory=/Users/jan/Work/runcouch/conf9/var/lib/couchdb
-UtilDriverDir=/Users/jan/Work/runcouch/conf9/lib/couchdb/erlang/lib/couch-0.7.3a663206/priv/lib
-MaximumDocumentSize=4294967296 ; 4 GB
+RootDirectory = /Users/jan/Work/runcouch/conf9/var/lib/couchdb
+UtilDriverDir = /Users/jan/Work/runcouch/conf9/lib/couchdb/erlang/lib/couch-0.7.3a663206/priv/lib
+MaximumDocumentSize = 4294967296 ; 4 GB
 
 [HTTPd]
-Port=5984
-BindAddress=127.0.0.1
-DocumentRoot=/Users/jan/Work/runcouch/conf9/share/couchdb/www
+Port = 5984
+BindAddress = 127.0.0.1
+DocumentRoot = /Users/jan/Work/runcouch/conf9/share/couchdb/www
 
 [Log]
-File=/Users/jan/Work/runcouch/conf9/var/log/couchdb/couch.log
-Level=info
+File = /Users/jan/Work/runcouch/conf9/var/log/couchdb/couch.log
+Level = info
 
 [CouchDB Query Servers]
-javascript=/Users/jan/Work/runcouch/conf9/bin/couchjs /Users/jan/Work/runcouch/conf9/share/couchdb/server/main.js
+javascript = /Users/jan/Work/runcouch/conf9/bin/couchjs /Users/jan/Work/runcouch/conf9/share/couchdb/server/main.js
 
 [CouchDB Query Server Options]
-QueryTimeout=5000 ; 5 seconds",
+QueryTimeout = 5000 ; 5 seconds",
 
     Expect = "; etc/couchdb/couch.ini.tpl.  Generated from couch.ini.tpl.in by configure.
 
 [CouchDB]
-RootDirectory=/Users/jan/Work/runcouch/conf9/var/lib/couchdb
-UtilDriverDir=/Users/jan/Work/runcouch/conf9/lib/couchdb/erlang/lib/couch-0.7.3a663206/priv/lib
-MaximumDocumentSize=4294967296 ; 4 GB
+RootDirectory = /Users/jan/Work/runcouch/conf9/var/lib/couchdb
+UtilDriverDir = /Users/jan/Work/runcouch/conf9/lib/couchdb/erlang/lib/couch-0.7.3a663206/priv/lib
+MaximumDocumentSize = 4294967296 ; 4 GB
 
 [HTTPd]
-Port=5984
-BindAddress=127.0.0.1
-DocumentRoot=/Users/jan/Work/runcouch/conf9/share/couchdb/www
+Port = 5984
+BindAddress = 127.0.0.1
+DocumentRoot = /Users/jan/Work/runcouch/conf9/share/couchdb/www
 
 [Log]
-File=/Users/jan/Work/runcouch/conf9/var/log/couchdb/couch.log
-Level=info
+File = /Users/jan/Work/runcouch/conf9/var/log/couchdb/couch.log
+Level = info
 
 [CouchDB Query Servers]
-javascript=/Users/jan/Work/runcouch/conf9/bin/couchjs /Users/jan/Work/runcouch/conf9/share/couchdb/server/main.js
+javascript = /Users/jan/Work/runcouch/conf9/bin/couchjs /Users/jan/Work/runcouch/conf9/share/couchdb/server/main.js
 
 [CouchDB Query Server Options]
-QueryTimeout=5000 ; 5 seconds
+QueryTimeout = 5000 ; 5 seconds
 
 [Erlang]
-Option=Value
+Option = Value
 ",
     run_operation_and_compare_results(Contents, Expect, {{"Erlang", "Option"}, "Value"}).
   
@@ -176,6 +176,6 @@ run_operation_and_compare_results(Contents, Expect, Config) ->
     Result = binary_to_list(Result_),
 
     % clean up
-    % file:delete(Filename),
+    file:delete(Filename),
     
     Result = Expect.

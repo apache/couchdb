@@ -30,6 +30,9 @@ store_tuple_key() ->
 
     
 store(Key2, Value2) ->
+    Filename = "local.ini",
+    file:write_file(Filename, ""),
+
     Key = binary_to_list(term_to_binary(Key2)),
     Value = binary_to_list(term_to_binary(Value2)),
 
@@ -40,4 +43,8 @@ store(Key2, Value2) ->
     couch_config:unset(Key),
 
     couch_config:terminate(end_of_test, ok),
+
+    % clean up
+    file:delete(Filename),
+
     Value = Result.
