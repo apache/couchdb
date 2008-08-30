@@ -180,6 +180,7 @@ start_couchdb () {
             start_arguments="$start_arguments, ";
         fi
         start_arguments="$start_arguments \\\"$file\\\""
+        background_start_arguments="$background_start_arguments -c \\\"$file\\\""
     done
     command="`%ICU_CONFIG% --invoke` \
         %ERL% $interactive_option -smp auto -sasl errlog_type error +K true \
@@ -193,7 +194,7 @@ start_couchdb () {
         -eval \"couch_server:start([$start_arguments]), receive done -> done end.\" "
     if test "$BACKGROUND_BOOLEAN" = "true" \
         -a "$RECURSED_BOOLEAN" = "false"; then
-        $0 -c $ini_files -b -r $RESPAWN_TIMEOUT -p $PID_FILE \
+        $0 $background_start_arguments -b -r $RESPAWN_TIMEOUT -p $PID_FILE \
             -o $STDOUT_FILE -e $STDERR_FILE -R &
         echo "Apache CouchDB has started, time to relax."
     else
