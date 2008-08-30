@@ -177,13 +177,13 @@ This uses the `sudo` command to run the `couchdb` command as the `couchdb` user.
 
 When Apache CouchDB starts it should eventually display the following message:
 
-    Apache CouchDB has started, time to relax. See http://localhost:5984/_utils/index.html
+    Apache CouchDB has started, time to relax. See http://127.0.0.1:5984/_utils/index.html
 
 Relax.
 
 To check that everything has worked, point your web browser to:
 
-  http://localhost:5984/_utils/index.html
+  http://127.0.0.1:5984/_utils/index.html
 
 From here you should run the test suite.
 
