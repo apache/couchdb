@@ -10,11 +10,11 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-%% @doc Saves a Key/Value pair to a ini file. The Key consists of a Module
-%%      and Variable combination. If that combination is found in the ini file
-%%      the new value replaces the old value. If only the Module is found the
-%%      Variable and value combination is appended to the Module. If the Module
-%%      does not yet exist in the ini file, it is added and the Variable/Value
+%% @doc Saves a Key/Value pair to a ini file. The Key consists of a Section
+%%      and Option combination. If that combination is found in the ini file
+%%      the new value replaces the old value. If only the Section is found the
+%%      Option and value combination is appended to the Section. If the Section
+%%      does not yet exist in the ini file, it is added and the Option/Value
 %%      pair is appended.
 %% @see couch_config
 
@@ -24,12 +24,12 @@
 -export([save_to_file/2]).
 
 %% @spec save_to_file(
-%%           Config::{{Module::string(), Variable::string()}, Value::string()},
+%%           Config::{{Section::string(), Option::string()}, Value::string()},
 %%           File::filename()) -> ok
-%% @doc Saves a Module/Key/Value triple to the ini file File::filename()
-save_to_file({{Module, Variable}, Value}, File) ->
+%% @doc Saves a Section/Key/Value triple to the ini file File::filename()
+save_to_file({{Section, Option}, Value}, File) ->
 
-    ?LOG_DEBUG("saving to file '~s', Config: '~p'", [File, {{Module, Variable}, Value}]),
+    ?LOG_DEBUG("saving to file '~s', Config: '~p'", [File, {{Section, Option}, Value}]),
 
     % open file and create a list of lines
     {ok, Stream} = file:read_file(File),
@@ -37,16 +37,16 @@ save_to_file({{Module, Variable}, Value}, File) ->
     {ok, Lines} = regexp:split(OldFileContents, "\r\n|\n|\r|\032"),
 
     % prepare input variables
-    ModuleName = "[" ++ Module ++ "]",
-    VariableList = Variable,
+    SectionName = "[" ++ Section ++ "]",
+    OptionList = Option,
 
     % produce the contents for the config file
     NewFileContents =
-    case NewFileContents2 = save_loop({{ModuleName, VariableList}, Value}, Lines, "", "", []) of
+    case NewFileContents2 = save_loop({{SectionName, OptionList}, Value}, Lines, "", "", []) of
         % we didn't change anything, that means we couldn't find a matching
         % [ini section] in which case we just append a new one.
         OldFileContents ->
-            append_new_ini_section({{ModuleName, VariableList}, Value}, OldFileContents);
+            append_new_ini_section({{SectionName, OptionList}, Value}, OldFileContents);
         _ ->
             NewFileContents2
     end,
@@ -58,40 +58,40 @@ save_to_file({{Module, Variable}, Value}, File) ->
 
 %% @doc Iterates over the lines of an ini file and replaces or adds a new
 %%      configuration directive.
-save_loop({{Module, Variable}, Value}, [Line|Rest], OldCurrentModule, Contents, DoneVariables) ->
+save_loop({{Section, Option}, Value}, [Line|Rest], OldCurrentSection, Contents, DoneOptions) ->
 
-    % if we find a new [ini section] (Module), save that for reference
-    NewCurrentModule = parse_module(Line, OldCurrentModule),
+    % if we find a new [ini section] (Section), save that for reference
+    NewCurrentSection = parse_module(Line, OldCurrentSection),
 
-    % if the current Module is the one we want to change, try to match
-    % each line with the Variable
-    NewContents = case Module of
-        NewCurrentModule ->
+    % if the current Section is the one we want to change, try to match
+    % each line with the Option
+    NewContents = case Section of
+        NewCurrentSection ->
             % see if the current line matches the variable we want to substitute
-            case parse_variable(Line, Variable, Value) of
+            case parse_variable(Line, Option, Value) of
                 % nope, return original line
                 nomatch ->
-                    DoneVariables2 = DoneVariables,
+                    DoneOptions2 = DoneOptions,
                     Line;
                 % got em! return new line
                 NewLine ->
-                    DoneVariables2 = [Variable|DoneVariables],
+                    DoneOptions2 = [Option|DoneOptions],
                     NewLine
             end;
         % if the variable we want to change couldn't be replaced, we append it
         % in the proper module section
-        OldCurrentModule ->
-            case lists:member(Variable, DoneVariables) of
+        OldCurrentSection ->
+            case lists:member(Option, DoneOptions) of
                 false ->
-                    DoneVariables2 = [Variable|DoneVariables],
-                    Variable ++ " = " ++ Value ++ "\n" ++ Line;
+                    DoneOptions2 = [Option|DoneOptions],
+                    Option ++ " = " ++ Value ++ "\n" ++ Line;
                 true ->
-                    DoneVariables2 = DoneVariables,
+                    DoneOptions2 = DoneOptions,
                     Line
             end;
         % otherwise we just print out the original line
         _ ->
-            DoneVariables2 = DoneVariables,
+            DoneOptions2 = DoneOptions,
             Line
         end,
     % clumsy way to only append a newline character
@@ -101,43 +101,43 @@ save_loop({{Module, Variable}, Value}, [Line|Rest], OldCurrentModule, Contents, 
     Contents2 = case Contents of "" -> ""; _ -> Contents ++ "\n" end,
 
     % go to next line
-    save_loop({{Module, Variable}, Value}, Rest, NewCurrentModule, Contents2 ++ NewContents, DoneVariables2);
+    save_loop({{Section, Option}, Value}, Rest, NewCurrentSection, Contents2 ++ NewContents, DoneOptions2);
 
-save_loop(_Config, [], _OldModule, NewFileContents, _DoneVariable) ->
+save_loop(_Config, [], _OldSection, NewFileContents, _DoneOption) ->
     % we're out of new lines, just return the new file's contents
     NewFileContents.
 
-append_new_ini_section({{ModuleName, Variable}, Value}, OldFileContents) ->
-    OldFileContents ++ "\n\n" ++ ModuleName ++ "\n" ++  Variable ++ " = " ++ Value ++ "\n".
+append_new_ini_section({{SectionName, Option}, Value}, OldFileContents) ->
+    OldFileContents ++ "\n\n" ++ SectionName ++ "\n" ++  Option ++ " = " ++ Value ++ "\n".
 
-%% @spec parse_module(Lins::string(), OldModule::string()) -> string()
+%% @spec parse_module(Lins::string(), OldSection::string()) -> string()
 %% @doc Tries to match a line against a pattern specifying a ini module or
-%%      section ("[Module]"). Returns OldModule if no match is found.
-parse_module(Line, OldModule) ->
+%%      section ("[Section]"). Returns OldSection if no match is found.
+parse_module(Line, OldSection) ->
     case regexp:match(Line, "^\\[([a-zA-Z0-9_-]*)\\]$") of
         nomatch ->
-            OldModule;
+            OldSection;
         {error, Error} ->
             io:format("ini file regex error module: '~s'~n", [Error]),
-            OldModule;
+            OldSection;
         {match, Start, Length} ->
             string:substr(Line, Start, Length)
     end.
 
-%% @spec parse_variable(Line::string(), Variable::string(), Value::string()) ->
+%% @spec parse_variable(Line::string(), Option::string(), Value::string()) ->
 %%         string() | nomatch
 %% @doc Tries to match a variable assignment in Line. Returns nomatch if the
-%%      Variable is not found. Returns a new line composed of the Variable and
+%%      Option is not found. Returns a new line composed of the Option and
 %%      Value otherwise.
-parse_variable(Line, Variable, Value) ->
-    case regexp:match(Line, "^" ++ Variable ++ "\s?=") of
+parse_variable(Line, Option, Value) ->
+    case regexp:match(Line, "^" ++ Option ++ "\s?=") of
         nomatch ->
             nomatch;
         {error, Error}->
             io:format("ini file regex error variable: '~s'~n", [Error]),
             nomatch;
         {match, _Start, _Length} ->
-            Variable ++ " = " ++ Value
+            Option ++ " = " ++ Value
     end.
 
 %% @spec save_file(File::filename(), Contents::string()) ->
