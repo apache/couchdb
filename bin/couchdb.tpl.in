@@ -193,7 +193,7 @@ start_couchdb () {
         -eval \"couch_server:start([$start_arguments]), receive done -> done end.\" "
     if test "$BACKGROUND_BOOLEAN" = "true" \
         -a "$RECURSED_BOOLEAN" = "false"; then
-        $0 -c $INI_FILE -b -r $RESPAWN_TIMEOUT -p $PID_FILE \
+        $0 -c $ini_files -b -r $RESPAWN_TIMEOUT -p $PID_FILE \
             -o $STDOUT_FILE -e $STDERR_FILE -R &
         echo "Apache CouchDB has started, time to relax."
     else
