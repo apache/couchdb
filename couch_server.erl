@@ -30,7 +30,7 @@
     }).
 
 start() ->
-    start(["couch.ini"]).
+    start(["default.ini"]).
 
 start(IniFiles) ->
     couch_server_sup:start_link(IniFiles).
@@ -94,13 +94,13 @@ init([]) ->
     % just stop if one of the config settings change. couch_server_sup
     % will restart us and then we will pick up the new settings.
 
-    RootDir = couch_config:get({"CouchDB", "RootDirectory"}, "."),
-    MaxDbsOpen = couch_config:get({"CouchDB", "MaxDbsOpen"}, "100"),
+    RootDir = couch_config:get({"couchdb", "database_dir"}, "."),
+    MaxDbsOpen = couch_config:get({"couchdb", "max_open_databases"}, "100"),
     Self = self(),
     ok = couch_config:register(
-        fun({"CouchDB", "RootDirectory"}) ->
+        fun({"couchdb", "database_dir"}) ->
             exit(Self, config_change);
-        ({"CouchDB", "ServerOptions"}) ->
+        ({"couchdb", "server_options"}) ->
             exit(Self, config_change)
         end),
     {ok, RegExp} = regexp:parse("^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*$"),
@@ -261,7 +261,7 @@ handle_call({delete, DbName}, _From, Server) ->
         {reply, Error, Server}
     end;
 handle_call(remote_restart, _From, Server) ->
-    case couch_config:get({"CouchDB", "AllowRemoteRestart"}, "false") of
+    case couch_config:get({"couchdb", "allow_remote_restart"}, "false") of
     "true" ->
         exit(couch_server_sup, restart);
     _ ->

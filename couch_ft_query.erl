@@ -28,11 +28,11 @@ execute(DatabaseName, QueryString) ->
 
 init([]) ->
     ok = couch_config:register(
-        fun({"Search", "QueryServer"}) ->
+        fun({"search", "query_server"}) ->
             ?MODULE:stop()
         end),
     
-    case couch_config:get({"Search", "QueryServer"}, none) of
+    case couch_config:get({"search", "query_server"}, none) of
     none ->
         {ok, none};
     QueryExec ->

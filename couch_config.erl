@@ -161,7 +161,7 @@ load_ini_file(IniFile) ->
             ";" ++ _Comment ->
                 {AccSectionName, AccValues};
             Line2 ->
-                case regexp:split(Line2, "=") of
+                case regexp:split(Line2, "\s?=\s?") of
                 {ok, [_SingleElement]} -> % no "=" found, ignore this line
                     {AccSectionName, AccValues};
                 {ok, [""|_LineValues]} -> % line begins with "=", ignore
