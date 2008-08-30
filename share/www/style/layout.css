@@ -198,7 +198,7 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
   width: expression(document.body.clientWidth + 'px');
   height: expression(document.body.clientHeight + 'px');
 }
-#dialog { background: #333  url(../image/progress.gif) 50% 50% no-repeat;
+#dialog { background: #333 url(../image/progress.gif) 50% 50% no-repeat;
   color: #f4f4f4; overflow: hidden; opacity: .95; max-width: 33em;
   padding: 1em 1em 0; -moz-border-radius: 7px; -webkit-border-radius: 7px;
   -webkit-box-shadow: 4px 4px 6px #333;
@@ -236,6 +236,11 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
 #dialog .buttons button[type=submit] { font-weight: bold; }
 #dialog .buttons button:hover { background: #555; }
 #dialog .buttons button:active { background: #333; color: #fff; }
+
+#dialog fieldset td#progress {
+  background: url(../image/progress.gif) 50% 50% no-repeat;
+  visibility: hidden;
+}
 
 /* View selector */
 

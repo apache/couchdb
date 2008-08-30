@@ -23,6 +23,7 @@ specific language governing permissions and limitations under the License.
     <script src="../script/jquery.cookies.js?0.8.0"></script>
     <script src="../script/jquery.couch.js?0.8.0"></script>
     <script src="../script/jquery.dialog.js?0.8.0"></script>
+    <script src="../script/jquery.form.js?0.8.0"></script>
     <script src="../script/jquery.resizer.js?0.8.0"></script>
     <script src="../script/browse.js?0.8.0"></script>
     <script src="../script/pprint.js?0.8.0"></script>
@@ -61,6 +62,7 @@ specific language governing permissions and limitations under the License.
 
         $("#toolbar button.save").click(page.saveDocument);
         $("#toolbar button.add").click(page.addField);
+        $("#toolbar button.load").click(page.uploadAttachment);
         $("#toolbar button.delete").click(page.deleteDocument);
       });
     </script>
@@ -76,6 +78,7 @@ specific language governing permissions and limitations under the License.
       <ul id="toolbar">
         <li><button class="save">Save Document</button></li>
         <li><button class="add">Add Field</button></li>
+        <li><button class="load">Upload Attachment</button></li>
         <li><button class="delete">Delete Document</button></li>
       </ul>
 

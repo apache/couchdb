@@ -75,6 +75,9 @@
           $.each($("form :input", dialog).serializeArray(), function(i, field) {
             data[field.name] = field.value;
           });
+          $("form :file", dialog).each(function() {
+            data[this.name] = this.value; // file inputs need special handling
+          });
           options.submit(data, function callback(errors) {
             if (errors == null || errors == {}) {
               dismiss();

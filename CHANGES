@@ -10,6 +10,11 @@ Packaging and System Integration:
  * Updated `configure.ac` to extended default library paths.
  * Removed inets configuration files.
 
+Futon Utility Client:
+
+ * Added pagination to the database listing page.
+ * Implemented attachment uploading from the document page.
+
 Version 0.8.1-incubating
 ------------------------
 

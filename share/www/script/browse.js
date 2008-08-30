@@ -648,6 +648,36 @@ function CouchDocumentPage() {
     });
   }
 
+  this.uploadAttachment = function() {
+    if (page.isDirty) {
+      alert("You need to save or revert any changes you have made to the " +
+            "document before you can attach a new file.");
+      return false;
+    }
+    $.showDialog("_upload_attachment.html", {
+      load: function(elem) {
+        $("input[name='_rev']", elem).val(page.doc._rev);
+      },
+      submit: function(data, callback) {
+        if (!data._attachments || data._attachments.length == 0) {
+          callback({_attachments: "Please select a file to upload."});
+          return;
+        }
+        var form = $("#upload-form");
+        form.find("#progress").css("visibility", "visible");
+        form.ajaxSubmit({
+          url: db.uri + encodeURIComponent(page.docId),
+          success: function(resp) {
+            form.find("#progress").css("visibility", "hidden");
+            page.isDirty = false;
+            location.href = "?" + encodeURIComponent(dbName) +
+              "/" + encodeURIComponent(docId);
+          }
+        });
+      }
+    });
+  }
+
   window.onbeforeunload = function() {
     if (page.isDirty) {
       return "You've made changes to this document that have not been " +

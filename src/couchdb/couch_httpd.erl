@@ -609,6 +609,30 @@ handle_doc_request(Req, 'GET', _DbName, Db, DocId) ->
         end_json_response(Resp)
     end;
 
+handle_doc_request(Req, 'POST', _DbName, Db, DocId) ->
+    Form = mochiweb_multipart:parse_form(Req),
+    Rev = proplists:get_value("_rev", Form),
+    NewAttachments = [{Name, {ContentType, Content}} ||
+                      {Name, {ContentType, _}, Content} <-
+                      proplists:get_all_values("_attachments", Form)],
+
+    Doc = case couch_db:open_doc_revs(Db, DocId, [Rev], []) of
+        {ok, [{ok, Doc0}]}  -> Doc0#doc{revs=[Rev]};
+        {ok, [Error]}       -> throw(Error)
+    end,
+
+    #doc{attachments=Attachments} = Doc,
+    NewDoc = Doc#doc{
+        attachments = Attachments ++ NewAttachments
+    },
+    {ok, NewRev} = couch_db:update_doc(Db, NewDoc, []),
+
+    send_json(Req, 201, [{"Etag", "\"" ++ NewRev ++ "\""}], {obj, [
+        {ok, true},
+        {id, DocId},
+        {rev, NewRev}
+    ]});
+
 handle_doc_request(Req, 'PUT', _DbName, Db, DocId) ->
     Json = {obj, DocProps} = cjson:decode(Req:recv_body(?MAX_DOC_SIZE)),
     DocRev = proplists:get_value("_rev", DocProps),
@@ -694,7 +718,7 @@ handle_doc_request(Req, 'MOVE', _DbName, Db, SourceDocId) ->
     ]});
 
 handle_doc_request(_Req, _Method, _DbName, _Db, _DocId) ->
-    throw({method_not_allowed, "DELETE,GET,HEAD,PUT,COPY,MOVE"}).
+    throw({method_not_allowed, "DELETE,GET,HEAD,POST,PUT,COPY,MOVE"}).
 
 % Useful for debugging
 % couch_doc_open(Db, DocId) ->
