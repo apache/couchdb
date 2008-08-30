@@ -33,7 +33,7 @@ store(Key2, Value2) ->
     Key = binary_to_list(term_to_binary(Key2)),
     Value = binary_to_list(term_to_binary(Value2)),
 
-    couch_config:start_link(["couch.ini"]),
+    couch_config:start_link(["local.ini"]),
 
     couch_config:store({"test_module", Key}, Value),
     Result = couch_config:get({"test_module", Key}),

@@ -165,7 +165,7 @@ Option=Value
     run_operation_and_compare_results(Contents, Expect, {{"Erlang", "Option"}, "Value"}).
   
 run_operation_and_compare_results(Contents, Expect, Config) ->
-    Filename = "couch.ini",
+    Filename = "local.ini",
     file:write_file(Filename, Contents),
 
     % call replace function
