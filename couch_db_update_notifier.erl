@@ -25,6 +25,8 @@
 -export([start_link/1, notify/1]).
 -export([init/1, terminate/2, handle_event/2, handle_call/2, handle_info/2, code_change/3,stop/1]).
 
+-include("couch_db.hrl").
+
 start_link(Exec) ->
     couch_event_sup:start_link(couch_db_update, {couch_db_update_notifier, make_ref()}, Exec).
 
@@ -50,8 +52,8 @@ handle_event(Event, {Fun, FunAcc}) ->
     FunAcc2 = Fun(Event, FunAcc),
     {ok, {Fun, FunAcc2}};
 handle_event({EventAtom, DbName}, Port) ->
-    Obj = {obj, [{type, atom_to_list(EventAtom)}, {db, DbName}]},
-    true = port_command(Port, cjson:encode(Obj) ++ "\n"),
+    Obj = {[{type, atom_to_list(EventAtom)}, {db, DbName}]},
+    true = port_command(Port, ?JSON_ENCODE(Obj) ++ "\n"),
     {ok, Port}.
 
 handle_call(_Request, State) ->

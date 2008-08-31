@@ -131,9 +131,9 @@ static int couch_drv_control(ErlDrvData drv_data, unsigned int command, const ch
         if (collResult < 0)
           response = 0; //lt
         else if (collResult > 0)
-          response = 1; //gt
+          response = 2; //gt
         else
-          response = 2; //eq
+          response = 1; //eq
 
         return return_control_result(&response, sizeof(response), rbuf, rlen);
         }

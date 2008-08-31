@@ -18,6 +18,7 @@
 -export([abs_pathname/1,abs_pathname/2, trim/1, ascii_lower/1]).
 -export([encodeBase64/1, decodeBase64/1, to_hex/1]).
 
+-include("couch_db.hrl").
 
 % arbitrarily chosen amount of memory to use before flushing to disk
 -define(FLUSH_MAX_MEM, 10000000).
@@ -33,7 +34,7 @@ start_driver(LibDir) ->
     end.
 
 new_uuid() ->
-    to_hex(crypto:rand_bytes(16)).
+    list_to_binary(to_hex(crypto:rand_bytes(16))).
     
 to_hex([]) ->
     [];
@@ -141,27 +142,30 @@ drv_port() ->
         put(couch_drv_port, Port),
         Port;
     Port ->
-     Port
+        Port
     end.
 
 collate(A, B) ->
     collate(A, B, []).
 
-collate(A, B, Options) when is_list(A), is_list(B) ->
+collate(A, B, Options) when is_binary(A), is_binary(B) ->
     Operation =
     case lists:member(nocase, Options) of
         true -> 1; % Case insensitive
         false -> 0 % Case sensitive
     end,
-    Port = drv_port(),
-    LenA = length(A),
-    LenB = length(B),
-    Bin = list_to_binary([<<LenA:32/native>>, A, <<LenB:32/native>>, B]),
-    case erlang:port_control(Port, Operation, Bin) of
-        [0] -> -1;
-        [1] -> 1;
-        [2] -> 0
-    end.
+
+    SizeA = size(A),
+    SizeB = size(B),
+    Bin = <<SizeA:32/native, A/binary, SizeB:32/native, B/binary>>,
+    [Result] = erlang:port_control(drv_port(), Operation, Bin),
+    % Result is 0 for lt, 1 for eq and 2 for gt. Subtract 1 to return the
+    % expected typical -1, 0, 1
+    Result - 1;
+
+collate(A, B, _Options) ->
+    io:format("-----A,B:~p,~p~n", [A,B]),
+    throw({error, badtypes}).
 
 should_flush() ->
     should_flush(?FLUSH_MAX_MEM).
@@ -187,7 +191,6 @@ should_flush(MemThreshHold) ->
 %%% erlang ssl library
 
 -define(st(X,A), ((X-A+256) div 256)).
--define(CHARS, 64).
 
 %% A PEM encoding consists of characters A-Z, a-z, 0-9, +, / and
 %% =. Each character encodes a 6 bits value from 0 to 63 (A = 0, / =
@@ -195,42 +198,47 @@ should_flush(MemThreshHold) ->
 %%
 
 %%
-%% encode64(Bytes|Binary) -> Chars
+%% encode64(Bytes|Binary) -> binary
 %%
 %% Take 3 bytes a time (3 x 8 = 24 bits), and make 4 characters out of
 %% them (4 x 6 = 24 bits).
 %%
 encodeBase64(Bs) when list(Bs) ->
-    encodeBase64(list_to_binary(Bs));
-encodeBase64(<<B:3/binary, Bs/binary>>) ->
+    encodeBase64(list_to_binary(Bs), <<>>);
+encodeBase64(Bs) ->
+    encodeBase64(Bs, <<>>).
+    
+encodeBase64(<<B:3/binary, Bs/binary>>, Acc) ->
     <<C1:6, C2:6, C3:6, C4:6>> = B,
-    [enc(C1), enc(C2), enc(C3), enc(C4)| encodeBase64(Bs)];
-encodeBase64(<<B:2/binary>>) ->
+    encodeBase64(Bs, <<Acc/binary, (enc(C1)), (enc(C2)), (enc(C3)), (enc(C4))>>);
+encodeBase64(<<B:2/binary>>, Acc) ->
     <<C1:6, C2:6, C3:6, _:6>> = <<B/binary, 0>>,
-    [enc(C1), enc(C2), enc(C3), $=];
-encodeBase64(<<B:1/binary>>) ->
+    <<Acc/binary, (enc(C1)), (enc(C2)), (enc(C3)), $=>>;
+encodeBase64(<<B:1/binary>>, Acc) ->
     <<C1:6, C2:6, _:12>> = <<B/binary, 0, 0>>,
-    [enc(C1), enc(C2), $=, $=];
-encodeBase64(<<>>) ->
-    [].
+    <<Acc/binary, (enc(C1)), (enc(C2)), $=, $=>>;
+encodeBase64(<<>>, Acc) ->
+    Acc.
 
 %%
-%% decodeBase64(Chars) -> Binary
+%% decodeBase64(BinaryChars) -> Binary
 %%
+decodeBase64(Cs) when is_list(Cs)->
+    decodeBase64(list_to_binary(Cs));
 decodeBase64(Cs) ->
-    list_to_binary(decode1(Cs)).
+    decode1(Cs, <<>>).
 
-decode1([C1, C2, $=, $=]) ->
+decode1(<<C1, C2, $=, $=>>, Acc) ->
     <<B1, _:16>> = <<(dec(C1)):6, (dec(C2)):6, 0:12>>,
-    [B1];
-decode1([C1, C2, C3, $=]) ->
+    <<Acc/binary, B1>>;
+decode1(<<C1, C2, C3, $=>>, Acc) ->
     <<B1, B2, _:8>> = <<(dec(C1)):6, (dec(C2)):6, (dec(C3)):6, (dec(0)):6>>,
-    [B1, B2];
-decode1([C1, C2, C3, C4| Cs]) ->
-    Bin = <<(dec(C1)):6, (dec(C2)):6, (dec(C3)):6, (dec(C4)):6>>,
-    [Bin| decode1(Cs)];
-decode1([]) ->
-    [].
+    <<Acc/binary, B1, B2>>;
+decode1(<<C1, C2, C3, C4, Cs/binary>>, Acc) ->
+    Bin = <<Acc/binary, (dec(C1)):6, (dec(C2)):6, (dec(C3)):6, (dec(C4)):6>>,
+    decode1(Cs, Bin);
+decode1(<<>>, Acc) ->
+    Acc.
 
 %% enc/1 and dec/1
 %%

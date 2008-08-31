@@ -124,7 +124,7 @@ all_databases() ->
             [$/ | RelativeFilename] -> ok;
             RelativeFilename -> ok
             end,
-            [filename:rootname(RelativeFilename, ".couch") | AccIn]
+            [list_to_binary(filename:rootname(RelativeFilename, ".couch")) | AccIn]
         end, []),
     {ok, Filenames}.
 
@@ -174,9 +174,10 @@ handle_call(get_server, _From, Server) ->
 handle_call(get_root, _From, #server{root_dir=Root}=Server) ->
     {reply, {ok, Root}, Server};
 handle_call({open, DbName, Options}, {FromPid,_}, Server) ->
-    case check_dbname(Server, DbName) of
+    DbNameList = binary_to_list(DbName),
+    case check_dbname(Server, DbNameList) of
     ok ->
-        Filepath = get_full_filename(Server, DbName),
+        Filepath = get_full_filename(Server, DbNameList),
         LruTime = now(),
         case ets:lookup(couch_dbs_by_name, DbName) of
         [] ->    
@@ -207,9 +208,10 @@ handle_call({open, DbName, Options}, {FromPid,_}, Server) ->
         {reply, Error, Server}
     end;
 handle_call({create, DbName, Options}, {FromPid,_}, Server) ->
-    case check_dbname(Server, DbName) of
+    DbNameList = binary_to_list(DbName),
+    case check_dbname(Server, DbNameList) of
     ok ->
-        Filepath = get_full_filename(Server, DbName),
+        Filepath = get_full_filename(Server, DbNameList),
 
         case ets:lookup(couch_dbs_by_name, DbName) of
         [] ->
@@ -233,9 +235,10 @@ handle_call({create, DbName, Options}, {FromPid,_}, Server) ->
         {reply, Error, Server}
     end;
 handle_call({delete, DbName}, _From, Server) ->
-    case check_dbname(Server, DbName) of
+    DbNameList = binary_to_list(DbName),
+    case check_dbname(Server, DbNameList) of
     ok ->
-        FullFilepath = get_full_filename(Server, DbName),
+        FullFilepath = get_full_filename(Server, DbNameList),
         Server2 = 
         case ets:lookup(couch_dbs_by_name, DbName) of
         [] -> Server;

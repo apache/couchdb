@@ -94,6 +94,13 @@ get_reduce_view0(Name, Lang, [#view{reduce_funs=RedFuns}=View|Rest]) ->
         N -> {ok, {reduce, N, Lang, View}}
     end.
 
+detuple_kvs([], Acc) ->
+    lists:reverse(Acc);
+detuple_kvs([KV | Rest], Acc) ->
+    {{Key,Id},Value} = KV,
+    NKV = [[Key, Id], Value],
+    detuple_kvs(Rest, [NKV | Acc]).
+
 expand_dups([], Acc) ->
     lists:reverse(Acc);
 expand_dups([{Key, {dups, Vals}} | Rest], Acc) ->
@@ -111,13 +118,13 @@ fold_reduce({temp_reduce, #view{btree=Bt}}, Dir, StartKey, EndKey, GroupFun, Fun
     couch_btree:fold_reduce(Bt, Dir, StartKey, EndKey, GroupFun,
             WrapperFun, Acc);
 
-fold_reduce({reduce, NthRed, Lang, #view{btree=Bt, reduce_funs=RedFuns}}, Dir, StartKey, EndKey, GroupFun, Fun, Acc) ->
+fold_reduce({reduce, NthRed, Lang, #view{btree=Bt, reduce_funs=RedFuns}}, Dir, StartKey, EndKey, GroupFun, Fun, Acc) ->    
     PreResultPadding = lists:duplicate(NthRed - 1, []),
     PostResultPadding = lists:duplicate(length(RedFuns) - NthRed, []),
     {_Name, FunSrc} = lists:nth(NthRed,RedFuns),
     ReduceFun =
         fun(reduce, KVs) ->
-            {ok, Reduced} = couch_query_servers:reduce(Lang, [FunSrc], expand_dups(KVs, [])),
+            {ok, Reduced} = couch_query_servers:reduce(Lang, [FunSrc], detuple_kvs(expand_dups(KVs, []),[])),
             {0, PreResultPadding ++ Reduced ++ PostResultPadding};
         (rereduce, Reds) ->
             UserReds = [[lists:nth(NthRed, UserRedsList)] || {_, UserRedsList} <- Reds],
@@ -167,16 +174,16 @@ reduce_to_count(Reductions) ->
     Count.
                 
 
-design_doc_to_view_group(#doc{id=Id,body={obj, Fields}}) ->
-    Language = proplists:get_value("language", Fields, "javascript"),
-    {obj, RawViews} = proplists:get_value("views", Fields, {obj, []}),
+design_doc_to_view_group(#doc{id=Id,body={Fields}}) ->
+    Language = proplists:get_value(<<"language">>, Fields, <<"javascript">>),
+    {RawViews} = proplists:get_value(<<"views">>, Fields, {[]}),
             
     % add the views to a dictionary object, with the map source as the key
     DictBySrc =
     lists:foldl(
-        fun({Name, {obj, MRFuns}}, DictBySrcAcc) ->
-            MapSrc = proplists:get_value("map", MRFuns),
-            RedSrc = proplists:get_value("reduce", MRFuns, null),
+        fun({Name, {MRFuns}}, DictBySrcAcc) ->
+            MapSrc = proplists:get_value(<<"map">>, MRFuns),
+            RedSrc = proplists:get_value(<<"reduce">>, MRFuns, null),
             View =
             case dict:find(MapSrc, DictBySrcAcc) of
                 {ok, View0} -> View0;
@@ -248,15 +255,15 @@ terminate(_Reason,_State) ->
     ok.
 
 
-handle_call({start_temp_updater, DbName, Lang, MapSrc, RedSrc}, _From, #server{root_dir=Root}=Server) ->
-    <<SigInt:128/integer>> = erlang:md5(Lang ++ [0] ++ MapSrc ++ [0] ++ RedSrc),
+handle_call({start_temp_updater, DbName, Lang, MapSrc, RedSrc}, _From, #server{root_dir=Root}=Server) ->    
+    <<SigInt:128/integer>> = erlang:md5(term_to_binary({Lang, MapSrc, RedSrc})),
     Name = lists:flatten(io_lib:format("_temp_~.36B",[SigInt])),
     Pid = 
     case ets:lookup(couch_views_by_name, {DbName, Name}) of
     [] ->
         case ets:lookup(couch_views_temp_fd_by_db, DbName) of
         [] ->
-            FileName = Root ++ "/." ++ DbName ++ "_temp",
+            FileName = Root ++ "/." ++ binary_to_list(DbName) ++ "_temp",
             {ok, Fd} = couch_file:open(FileName, [create, overwrite]),
             Count = 0;
         [{_, Fd, Count}] ->
@@ -298,7 +305,7 @@ handle_cast({reset_indexes, DbName}, #server{root_dir=Root}=Server) ->
             end
         end, Names),
     delete_index_dir(Root, DbName),
-    file:delete(Root ++ "/." ++ DbName ++ "_temp"),
+    file:delete(Root ++ "/." ++ binary_to_list(DbName) ++ "_temp"),
     {noreply, Server}.
 
 handle_info({'EXIT', _FromPid, normal}, Server) ->
@@ -314,7 +321,7 @@ handle_info({'EXIT', FromPid, Reason}, #server{root_dir=RootDir}=Server) ->
         case Count of
         1 -> % Last ref
             couch_file:close(Fd),
-            file:delete(RootDir ++ "/." ++ DbName ++ "_temp"),
+            file:delete(RootDir ++ "/." ++ binary_to_list(DbName) ++ "_temp"),
             true = ets:delete(couch_views_temp_fd_by_db, DbName);
         _ ->
             true = ets:insert(couch_views_temp_fd_by_db, {DbName, Fd, Count - 1})
@@ -398,7 +405,8 @@ start_update_loop(RootDir, DbName, GroupId, NotifyPids) ->
         delete_index_file(RootDir, DbName, GroupId),
         exit(Else)
     end,
-    FileName = RootDir ++ "/." ++ DbName ++ GroupId ++".view",
+    FileName = RootDir ++ "/." ++ binary_to_list(DbName) ++ 
+            binary_to_list(GroupId) ++".view",
     Group2 =
     case couch_file:open(FileName) of
     {ok, Fd} ->
@@ -481,7 +489,6 @@ update_group(#group{db=Db,current_seq=CurrentSeq, views=Views}=Group) ->
             fun(DocInfo, _, Acc) -> process_doc(Db, DocInfo, Acc) end,
             {[], Group, ViewEmptyKVs, [], CurrentSeq}
             ),
-
     {Group3, Results} = view_compute(Group2, UncomputedDocs),
     {ViewKVsToAdd2, DocIdViewIdKeys2} = view_insert_query_results(UncomputedDocs, Results, ViewKVsToAdd, DocIdViewIdKeys),
     couch_query_servers:stop_doc_map(Group3#group.query_server),
@@ -493,7 +500,7 @@ update_group(#group{db=Db,current_seq=CurrentSeq, views=Views}=Group) ->
     end.
     
 delete_index_dir(RootDir, DbName) ->
-    nuke_dir(RootDir ++ "/." ++ DbName ++ "_design").
+    nuke_dir(RootDir ++ "/." ++ binary_to_list(DbName) ++ "_design").
 
 nuke_dir(Dir) ->
     case file:list_dir(Dir) of
@@ -513,7 +520,8 @@ nuke_dir(Dir) ->
     end.
 
 delete_index_file(RootDir, DbName, GroupId) ->
-    file:delete(RootDir ++ "/." ++ DbName ++ GroupId ++ ".view").
+    file:delete(RootDir ++ "/." ++ binary_to_list(DbName)
+            ++ binary_to_list(GroupId) ++ ".view").
 
 init_group(Db, Fd, #group{views=Views}=Group, nil = _IndexHeaderData) ->
     init_group(Db, Fd, Group, {0, nil, [nil || _ <- Views]});
@@ -526,8 +534,9 @@ init_group(Db, Fd, #group{def_lang=Lang,views=Views}=Group,
             ReduceFun = 
                 fun(reduce, KVs) ->
                     KVs2 = expand_dups(KVs,[]),
-                    {ok, Reduced} = couch_query_servers:reduce(Lang, FunSrcs, KVs2),
-                    {length(KVs2), Reduced};
+                    KVs3 = detuple_kvs(KVs2,[]),
+                    {ok, Reduced} = couch_query_servers:reduce(Lang, FunSrcs, KVs3),
+                    {length(KVs3), Reduced};
                 (rereduce, Reds) ->
                     Count = lists:sum([Count0 || {Count0, _} <- Reds]),
                     UserReds = [UserRedsList || {_, UserRedsList} <- Reds],
@@ -535,7 +544,7 @@ init_group(Db, Fd, #group{def_lang=Lang,views=Views}=Group,
                     {Count, Reduced}
                 end,
             {ok, Btree} = couch_btree:open(BtreeState, Fd,
-                        [{less, fun less_json/2},{reduce, ReduceFun}]),
+                        [{less, fun less_json_keys/2},{reduce, ReduceFun}]),
             View#view{btree=Btree}
         end,
         ViewStates, Views),
@@ -546,14 +555,17 @@ get_index_header_data(#group{current_seq=Seq,id_btree=IdBtree,views=Views}) ->
     ViewStates = [couch_btree:get_state(Btree) || #view{btree=Btree} <- Views],
     {Seq, couch_btree:get_state(IdBtree), ViewStates}.
 
-
+% keys come back in the language of btree - tuples.
+less_json_keys(A, B) ->
+    less_json(tuple_to_list(A), tuple_to_list(B)).
 
 less_json(A, B) ->
     TypeA = type_sort(A),
     TypeB = type_sort(B),
     if
     TypeA == TypeB ->
-        less_same_type(A,B);
+        Less = less_same_type(A,B),
+        Less;
     true ->
         TypeA < TypeB
     end.
@@ -561,36 +573,35 @@ less_json(A, B) ->
 type_sort(V) when is_atom(V) -> 0;
 type_sort(V) when is_integer(V) -> 1;
 type_sort(V) when is_float(V) -> 1;
-type_sort(V) when is_list(V) -> 2;
-type_sort({obj, _}) -> 4; % must come before tuple test below
-type_sort(V) when is_tuple(V) -> 3;
-type_sort(V) when is_binary(V) -> 5.
+type_sort(V) when is_binary(V) -> 2;
+type_sort(V) when is_list(V) -> 3;
+type_sort({V}) when is_list(V) -> 4; % must come before tuple test below
+type_sort(V) when is_tuple(V) -> 5.
+
 
 atom_sort(nil) -> 0;
 atom_sort(null) -> 1;
 atom_sort(false) -> 2;
 atom_sort(true) -> 3.
 
+
 less_same_type(A,B) when is_atom(A) ->
-    atom_sort(A) < atom_sort(B);
-less_same_type(A,B) when is_list(A) ->
-    couch_util:collate(A, B) < 0;
-less_same_type({obj, AProps}, {obj, BProps}) ->
-    less_props(AProps, BProps);
-less_same_type(A, B) when is_tuple(A) ->
-    less_list(tuple_to_list(A),tuple_to_list(B));
+  atom_sort(A) < atom_sort(B);
+less_same_type(A,B) when is_binary(A) ->
+  couch_util:collate(A, B) < 0;
+less_same_type({AProps}, {BProps}) ->
+  less_props(AProps, BProps);
+less_same_type(A, B) when is_list(A) ->
+  less_list(A, B);
 less_same_type(A, B) ->
     A < B.
-
-ensure_list(V) when is_list(V) -> V;
-ensure_list(V) when is_atom(V) -> atom_to_list(V).
-
+	
 less_props([], [_|_]) ->
     true;
 less_props(_, []) ->
     false;
 less_props([{AKey, AValue}|RestA], [{BKey, BValue}|RestB]) ->
-    case couch_util:collate(ensure_list(AKey), ensure_list(BKey)) of
+    case couch_util:collate(AKey, BKey) of
     -1 -> true;
     1 -> false;
     0 ->
@@ -639,7 +650,7 @@ process_doc(Db, DocInfo, {Docs, #group{sig=Sig,name=GroupId}=Group, ViewKVs, Doc
         {not_found, deleted} ->
             throw(restart)
         end;
-    ?DESIGN_DOC_PREFIX ++ _ -> % we skip design docs
+    <<?DESIGN_DOC_PREFIX, _>> -> % we skip design docs
         {ok, {Docs, Group, ViewKVs, DocIdViewIdKeys, Seq}};
     _ ->
         {Docs2, DocIdViewIdKeys2} =
@@ -708,7 +719,6 @@ view_compute(#group{def_lang=DefLang, query_server=QueryServerIn}=Group, Docs) -
         {ok, QueryServerIn}
     end,
     {ok, Results} = couch_query_servers:map_docs(QueryServer, Docs),
-    
     {Group#group{query_server=QueryServer}, Results}.
 
 
@@ -726,7 +736,6 @@ write_changes(Group, ViewKeyValuesToAdd, DocIdViewIdKeys, NewSeq) ->
     AddDocIdViewIdKeys = [{DocId, ViewIdKeys} || {DocId, ViewIdKeys} <- DocIdViewIdKeys, ViewIdKeys /= []],
     RemoveDocIds = [DocId || {DocId, ViewIdKeys} <- DocIdViewIdKeys, ViewIdKeys == []],
     LookupDocIds = [DocId || {DocId, _ViewIdKeys} <- DocIdViewIdKeys],
-
     {ok, LookupResults, IdBtree2}
         = couch_btree:query_modify(IdBtree, LookupDocIds, AddDocIdViewIdKeys, RemoveDocIds),
     KeysToRemoveByView = lists:foldl(

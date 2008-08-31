@@ -14,7 +14,10 @@
 -define(DESIGN_DOC_PREFIX0, "_design").
 -define(DESIGN_DOC_PREFIX, "_design/").
 
--define(DEFAULT_ATTACHMENT_CONTENT_TYPE, "application/octet-stream").
+-define(JSON_ENCODE(V), mochijson2:encode(V)).
+-define(JSON_DECODE(V), mochijson2:decode(V)).
+
+-define(DEFAULT_ATTACHMENT_CONTENT_TYPE, <<"application/octet-stream">>).
         
 -define(LOG_DEBUG(Format, Args),
     case couch_log:debug_on() of
@@ -33,8 +36,8 @@
 
 -record(doc_info,
     {
-    id = "",
-    rev = "",
+    id = <<"">>,
+    rev = <<"">>,
     update_seq = 0,
     summary_pointer = nil,
     conflict_revs = [],
@@ -43,7 +46,7 @@
     }).
 
 -record(full_doc_info,
-    {id = "",
+    {id = <<"">>,
     update_seq = 0,
     deleted = false,
     rev_tree = []
@@ -51,11 +54,11 @@
 
 -record(doc,
     {
-    id = "",
+    id = <<"">>,
     revs = [],
 
     % the json body object.
-    body = {obj, []},
+    body = {[]},
 
     % each attachment contains:
     %    {data, Type, <<binary>>}

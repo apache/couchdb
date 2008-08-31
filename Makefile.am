@@ -37,7 +37,6 @@ EXTRA_DIST = $(couch_files)
 CLEANFILES = $(compiled_files) $(doc_base) $(doc_modules) edoc-info
 
 source_files = \
-    cjson.erl \
     couch_btree.erl \
     couch_config.erl \
     couch_config_writer.erl \
@@ -61,7 +60,6 @@ source_files = \
     couch_db_updater.erl
 
 compiled_files = \
-    cjson.beam \
     couch.app \
     couch_btree.beam \
     couch_config.beam \
@@ -94,7 +92,6 @@ doc_base = \
     stylesheet.css
 
 doc_modules = \
-    cjson.html \
     couch_btree.html \
     couch_config.html \
     couch_config_writer.html \

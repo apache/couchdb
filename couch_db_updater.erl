@@ -96,7 +96,7 @@ handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
         file:delete(Filepath ++ ".old"),
             
         ok = gen_server:call(Db#db.main_pid, {db_updated, NewDb2}),
-        ?LOG_INFO("Compaction for db ~p completed.", [Db#db.name]),
+        ?LOG_INFO("Compaction for db \"~s\" completed.", [Db#db.name]),
         {noreply, NewDb2#db{compactor_pid=nil}};
     false ->
         ?LOG_INFO("Compaction file still behind main file "
@@ -287,7 +287,7 @@ update_docs_int(Db, DocsList, Options) ->
     {DocsList2, NonRepDocs} = lists:foldl(
         fun([#doc{id=Id}=Doc | Rest]=Docs, {DocsListAcc, NonRepDocsAcc}) ->
             case Id of
-            ?LOCAL_DOC_PREFIX ++ _ when Rest==[] ->
+            <<?LOCAL_DOC_PREFIX, _/binary>> when Rest==[] ->
                 % when saving NR (non rep) documents, you can only save a single rev
                 {DocsListAcc, [Doc | NonRepDocsAcc]};
             Id->
@@ -363,7 +363,7 @@ update_local_docs(#db{local_docs_btree=Btree}=Db, Docs) ->
             NewRev =
             case Revs of
                 [] -> 0;
-                [RevStr|_] -> list_to_integer(RevStr)
+                [RevStr|_] -> list_to_integer(binary_to_list(RevStr))
             end,
             OldRev =
             case OldDocLookup of
