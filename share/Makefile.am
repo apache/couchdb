@@ -18,6 +18,7 @@ nobase_dist_localdata_DATA = \
     www/browse/_delete_database.html \
     www/browse/_delete_document.html \
     www/browse/_save_view_as.html \
+    www/browse/_upload_attachment.html \
     www/browse/database.html \
     www/browse/document.html \
     www/browse/index.html \
@@ -59,6 +60,7 @@ nobase_dist_localdata_DATA = \
     www/script/jquery.cookies.js \
     www/script/jquery.couch.js \
     www/script/jquery.dialog.js \
+    www/script/jquery.form.js \
     www/script/jquery.resizer.js \
     www/script/jquery.suggest.js \
     www/script/json2.js \
