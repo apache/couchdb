@@ -787,24 +787,32 @@ handle_attachment_request(_Req, _Method, _DbName, _Db, _DocId, _FileName) ->
 % Config request handlers
 
 handle_config_request(_Req, Method, {config, Config}) ->
-    [Section, Option] = string:tokens(Config, "/"),
-    handle_config_request(_Req, Method, {[Section, Option]});
+    Parts = string:tokens(Config, "/"),
+    handle_config_request(_Req, Method, {Parts});
+
+% GET /_config/Section
+handle_config_request(Req, 'GET', {[Section]}) ->
+    Options = [
+        {[{name, list_to_binary(Option)}, {value, list_to_binary(Value)}]} ||
+        {Option, Value} <-
+        couch_config:lookup_match({{Section, '$1'}, '$2'}, [])
+    ],
+    send_json(Req, 200, {[
+        {ok, true},
+        {section, list_to_binary(Section)},
+        {options, Options}
+    ]});
 
 % PUT /_config/Section/Option
 % "value"
-handle_config_request(_Req, 'PUT', {[Section, Option]}) ->
-     handle_config_request(_Req, 'POST', {[Section, Option]});
-
-% POST,PUT /_config/Section/Option
-% "value"
-handle_config_request(Req, 'POST', {[Section, Option]}) ->
+handle_config_request(Req, 'PUT', {[Section, Option]}) ->
     Value = binary_to_list(Req:recv_body()),
     ok = couch_config:store({Section, Option}, Value),
-    send_json(Req, 200, {obj, [
+    send_json(Req, 200, {[
         {ok, true},
-        {section, Section},
-        {name, Option},
-        {value, Value}
+        {section, list_to_binary(Section)},
+        {name, list_to_binary(Option)},
+        {value, list_to_binary(Value)}
     ]});
 
 % GET /_config/Section/Option
@@ -813,11 +821,11 @@ handle_config_request(Req, 'GET', {[Section, Option]}) ->
     null ->
         throw({not_found, unknown_config_value});
     Value ->
-        send_json(Req, 200, {obj, [
+        send_json(Req, 200, {[
             {ok, true},
-            {section, Section},
-            {name, Option},
-            {value, Value}
+            {section, list_to_binary(Section)},
+            {name, list_to_binary(Option)},
+            {value, list_to_binary(Value)}
          ]})
     end;
 
@@ -828,11 +836,11 @@ handle_config_request(Req, 'DELETE', {[Section, Option]}) ->
         throw({not_found, unknown_config_value});
     OldValue ->
         couch_config:unset({Section, Option}),
-        send_json(Req, 200, {obj, [
+        send_json(Req, 200, {[
             {ok, true},
-            {section, Section},
-            {name, Option},
-            {old_value, OldValue}
+            {section, list_to_binary(Section)},
+            {name, list_to_binary(Option)},
+            {value, list_to_binary(OldValue)}
          ]})
     end.
 
