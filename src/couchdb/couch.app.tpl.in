@@ -2,7 +2,6 @@
              [{description,"@package_name@"},
               {vsn,"@version@"},
               {modules,[couch_btree,
-                        cjson,
                         couch_db,
                         couch_db_updater,
                         couch_doc,

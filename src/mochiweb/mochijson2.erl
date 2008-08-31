@@ -104,7 +104,7 @@ json_encode(S, State) when is_binary(S); is_atom(S) ->
     json_encode_string(S, State);
 json_encode(Array, State) when is_list(Array) ->
     json_encode_array(Array, State);
-json_encode({struct, Props}, State) when is_list(Props) ->
+json_encode({Props}, State) when is_list(Props) ->
     json_encode_proplist(Props, State);
 json_encode(Bad, #encoder{handler=null}) ->
     exit({json_encode, {bad_term, Bad}});
@@ -220,7 +220,7 @@ decode_object(B, S) ->
 decode_object(B, S=#decoder{state=key}, Acc) ->
     case tokenize(B, S) of
         {end_object, S1} ->
-            V = make_object({struct, lists:reverse(Acc)}, S1),
+            V = make_object({lists:reverse(Acc)}, S1),
             {V, S1#decoder{state=null}};
         {{const, K}, S1} ->
             {colon, S2} = tokenize(B, S1),
@@ -230,7 +230,7 @@ decode_object(B, S=#decoder{state=key}, Acc) ->
 decode_object(B, S=#decoder{state=comma}, Acc) ->
     case tokenize(B, S) of
         {end_object, S1} ->
-            V = make_object({struct, lists:reverse(Acc)}, S1),
+            V = make_object({lists:reverse(Acc)}, S1),
             {V, S1#decoder{state=null}};
         {comma, S1} ->
             decode_object(B, S1#decoder{state=key}, Acc)
@@ -396,9 +396,9 @@ tokenize(B, S=#decoder{offset=O}) ->
 %% Create an object from a list of Key/Value pairs.
 
 obj_new() ->
-    {struct, []}.
+    {[]}.
 
-is_obj({struct, Props}) ->
+is_obj({Props}) ->
     F = fun ({K, _}) when is_binary(K) ->
                 true;
             (_) ->
@@ -407,7 +407,7 @@ is_obj({struct, Props}) ->
     lists:all(F, Props).
 
 obj_from_list(Props) ->
-    Obj = {struct, Props},
+    Obj = {Props},
     case is_obj(Obj) of
         true -> Obj;
         false -> exit({json_bad_object, Obj})
@@ -418,7 +418,7 @@ obj_from_list(Props) ->
 %% compare unequal as erlang terms, so we need to carefully recurse
 %% through aggregates (tuples and objects).
 
-equiv({struct, Props1}, {struct, Props2}) ->
+equiv({Props1}, {Props2}) ->
     equiv_object(Props1, Props2);
 equiv(L1, L2) when is_list(L1), is_list(L2) ->
     equiv_list(L1, L2);

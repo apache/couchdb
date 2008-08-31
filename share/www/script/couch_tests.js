@@ -14,6 +14,9 @@ var tests = {
 
   // Do some basic tests.
   basics: function(debug) {
+    var result = JSON.parse(CouchDB.request("GET", "/").responseText);
+    T(result.couchdb == "Welcome"); 
+    
     var db = new CouchDB("test_suite_db");
     db.deleteDb();
 
@@ -144,7 +147,7 @@ var tests = {
 
     // COPY with existing target
     T(db.save({_id:"doc_to_be_copied",v:1}).ok);
-    var doc = db.save({_id:"doc_to_be_overwritten",v:1});
+    var doc = db.save({_id:"doc_to_be_overwritten",v:2});
     T(doc.ok);
 
     // error condition
@@ -159,9 +162,9 @@ var tests = {
     });
     T(xhr.status == 201);
 
-    var newRev = db.open("doc_to_be_overwritten")._rev;
-    T(rev != newRev);
-
+    var over = db.open("doc_to_be_overwritten");
+    T(rev != over._rev);
+    T(over.v == 1);
   },
 
   // Do some edit conflict detection tests
@@ -311,6 +314,15 @@ var tests = {
     for (i = 0; i < 5; i++) {
       T(db.open(docs[i]._id) == null);
     }
+    
+    // verify creating a document with no id returns a new id
+    var req = CouchDB.request("POST", "/test_suite_db/_bulk_docs", {
+      body: JSON.stringify({"docs": [{"foo":"bar"}]})
+    });
+    result = JSON.parse(req.responseText);
+    
+    T(result.new_revs[0].id != "");
+    T(result.new_revs[0].rev != "");
   },
 
   // test saving a semi-large quanitity of documents and do some view queries.
@@ -815,8 +827,11 @@ var tests = {
 
     T(db.bulkSave(makeDocs(1, numDocs + 1)).ok);
 
+    // test that the _all_docs view returns correctly with keys
+    var results = db.allDocs({startkey:"_design%2F", endkey:"_design%2FZZZ"});
+    T(results.rows.length == 1);
+
     for (var loop = 0; loop < 2; loop++) {
-      if (db.view("test/all_docs") == null) throw "fuck";
       var rows = db.view("test/all_docs").rows;
       for (var i = 0; i < numDocs; i++) {
         T(rows[2*i].key == i+1);
@@ -825,8 +840,19 @@ var tests = {
       T(db.view("test/no_docs").total_rows == 0)
       T(db.view("test/single_doc").total_rows == 1)
       restartServer();
-    }
-
+    };
+    
+    // test when language not specified, Javascript is implied
+    var designDoc2 = {
+      _id:"_design/test2",
+      // language: "javascript", 
+      views: {
+        single_doc: {map: "function(doc) { if (doc._id == \"1\") { emit(1, null) }}"}
+      }
+    };
+    
+    T(db.save(designDoc2).ok);
+    T(db.view("test2/single_doc").total_rows == 1);
 
     var summate = function(N) {return (N+1)*N/2;};
     var result = db.view("test/summate");

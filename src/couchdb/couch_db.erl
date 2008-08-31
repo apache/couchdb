@@ -228,11 +228,11 @@ update_docs(#db{update_pid=UpdatePid}=Db, Docs, Options) ->
     Docs2 = lists:map(
         fun(#doc{id=Id,revs=Revs}=Doc) ->
             case Id of
-            ?LOCAL_DOC_PREFIX ++ _ ->
-                Rev = case Revs of [] -> 0; [Rev0|_] -> list_to_integer(Rev0) end,
-                Doc#doc{revs=[integer_to_list(Rev + 1)]};
+            <<?LOCAL_DOC_PREFIX, _/binary>> ->
+                Rev = case Revs of [] -> 0; [Rev0|_] -> list_to_integer(binary_to_list(Rev0)) end,
+                Doc#doc{revs=[list_to_binary(integer_to_list(Rev + 1))]};
             _ ->
-                Doc#doc{revs=[integer_to_list(couch_util:rand32()) | Revs]}
+                Doc#doc{revs=[list_to_binary(integer_to_list(couch_util:rand32())) | Revs]}
             end
         end, Docs),
     NewRevs = [NewRev || #doc{revs=[NewRev|_]} <- Docs2],
@@ -429,10 +429,10 @@ open_doc_revs_int(Db, IdRevs, Options) ->
         end,
         IdRevs, LookupResults).
 
-open_doc_int(Db, ?LOCAL_DOC_PREFIX ++ _ = Id, _Options) ->
+open_doc_int(Db, <<?LOCAL_DOC_PREFIX, _/binary>> = Id, _Options) ->
     case couch_btree:lookup(Db#db.local_docs_btree, [Id]) of
     [{ok, {_, {Rev, BodyData}}}] ->
-        {ok, #doc{id=Id, revs=[integer_to_list(Rev)], body=BodyData}};
+        {ok, #doc{id=Id, revs=[list_to_binary(integer_to_list(Rev))], body=BodyData}};
     [not_found] ->
         {not_found, missing}
     end;

@@ -19,109 +19,116 @@
 -include("couch_db.hrl").
 
 to_json_obj(#doc{id=Id,deleted=Del,body=Body,revs=Revs,meta=Meta}=Doc,Options)->
-    {obj, [{"_id", Id}] ++
+    {[{<<"_id">>, Id}] ++
         case Revs of
         [] -> [];
-        _ -> [{"_rev", lists:nth(1, Revs)}]
+        _ -> [{<<"_rev">>, lists:nth(1, Revs)}]
         end ++
         case Del of
         false ->
-            {obj, BodyProps} = Body,
+            {BodyProps} = Body,
             BodyProps;
         true ->
-            [{"_deleted", true}]
+            [{<<"_deleted">>, true}]
         end ++
         case lists:member(revs, Options) of
         false -> [];
         true ->
-            [{"_revs", list_to_tuple(Revs)}]
+            [{<<"_revs">>, Revs}]
         end ++
         lists:map(
             fun({revs_info, RevsInfo}) ->
                 JsonRevsInfo =
-                [{obj, [{rev, Rev}, {status, atom_to_list(Status)}]} ||
+                [{[{rev, Rev}, {status, atom_to_list(Status)}]} ||
                     {Rev, Status} <- RevsInfo],
-                {"_revs_info", list_to_tuple(JsonRevsInfo)};
+                {<<"_revs_info">>, JsonRevsInfo};
             ({conflicts, Conflicts}) ->
-                {"_conflicts", list_to_tuple(Conflicts)};
+                {<<"_conflicts">>, Conflicts};
             ({deleted_conflicts, Conflicts}) ->
-                {"_deleted_conflicts", list_to_tuple(Conflicts)}
+                {<<"_deleted_conflicts">>, Conflicts}
             end, Meta) ++
         case lists:member(attachments, Options) of
         true -> % return the full rev list and the binaries as strings.
             BinProps = lists:map(
                 fun({Name, {Type, BinValue}}) ->
-                    {Name, {obj, [
-                        {"content_type", Type},
-                        {"data", couch_util:encodeBase64(bin_to_binary(BinValue))}
+                    {Name, {[
+                        {<<"content_type">>, Type},
+                        {<<"data">>, couch_util:encodeBase64(bin_to_binary(BinValue))}
                     ]}}
                 end,
                 Doc#doc.attachments),
             case BinProps of
             [] -> [];
-            _ -> [{"_attachments", {obj, BinProps}}]
+            _ -> [{<<"_attachments">>, {BinProps}}]
             end;
         false ->
             BinProps = lists:map(
                 fun({Name, {Type, BinValue}}) ->
-                    {Name, {obj, [
-                        {"stub", true},
-                        {"content_type", Type},
-                        {"length", bin_size(BinValue)}
+                    {Name, {[
+                        {<<"stub">>, true},
+                        {<<"content_type">>, Type},
+                        {<<"length">>, bin_size(BinValue)}
                     ]}}
                 end,
                 Doc#doc.attachments),
             case BinProps of
                 [] -> [];
-                _ -> [{"_attachments", {obj, BinProps}}]
+                _ -> [{<<"_attachments">>, {BinProps}}]
             end
         end
         }.
 
-from_json_obj({obj, Props}) ->
-    {obj,JsonBins} = proplists:get_value("_attachments", Props, {obj, []}),
-    Bins = lists:flatmap(fun({Name, {obj, BinProps}}) ->
-        case proplists:get_value("stub", BinProps) of
+from_json_obj({Props}) ->
+    {JsonBins} = proplists:get_value(<<"_attachments">>, Props, {[]}),
+    Bins = lists:flatmap(fun({Name, {BinProps}}) ->
+        case proplists:get_value(<<"stub">>, BinProps) of
         true ->
             [{Name, stub}];
         _ ->
-            Value = proplists:get_value("data", BinProps),
-            Type = proplists:get_value("content_type", BinProps,
+            Value = proplists:get_value(<<"data">>, BinProps),
+            Type = proplists:get_value(<<"content_type">>, BinProps,
                     ?DEFAULT_ATTACHMENT_CONTENT_TYPE),
             [{Name, {Type, couch_util:decodeBase64(Value)}}]
         end
     end, JsonBins),
-    AllowedSpecialMembers = ["id", "revs", "rev", "attachments", "revs_info",
-        "conflicts", "deleted_conflicts", "deleted"],
+    AllowedSpecialMembers = [<<"id">>, <<"revs">>, <<"rev">>, <<"attachments">>, <<"revs_info">>,
+        <<"conflicts">>, <<"deleted_conflicts">>, <<"deleted">>],
+    % collect all the doc-members that start with "_"
+    % if any aren't in the AllowedSpecialMembers list 
+    % then throw a doc_validation error
     [case lists:member(Name, AllowedSpecialMembers) of
         true ->
             ok;
         false ->
             throw({doc_validation, io_lib:format("Bad special document member: _~s", [Name])})
         end
-         || {[$_|Name], _Value} <- Props],
+         || {<<$_,Name/binary>>, _Value} <- Props],
     Revs =
-    case tuple_to_list(proplists:get_value("_revs", Props, {})) of
+    case proplists:get_value(<<"_revs">>, Props, []) of
     [] ->
-        case proplists:get_value("_rev", Props) of
+        case proplists:get_value(<<"_rev">>, Props) of
         undefined -> [];
         Rev -> [Rev]
         end;
     Revs0 ->
         Revs0
     end,
-    case proplists:get_value("_id", Props, "") of
-    Id when is_list(Id) ->
-        #doc{
-            id = Id,
-            revs = Revs,
-            deleted = proplists:get_value("_deleted", Props, false),
-            body = {obj, [{Key, Value} || {[FirstChar|_]=Key, Value} <- Props, FirstChar /= $_]},
-            attachments = Bins
-            };
-    _ ->
+    case proplists:get_value(<<"_id">>, Props, <<>>) of
+    Id when is_binary(Id) -> ok;
+    Id ->
+        ?LOG_DEBUG("Document id is not a string: ~p", [Id]),
         throw({invalid_document_id, "Document id is not a string"})
-    end.
+    end,
+    
+    % strip out the all props beginning with _
+    NewBody = {[{K, V} || {<<First,_/binary>>=K, V} <- Props, First /= $_]},
+    #doc{
+        id = Id,
+        revs = Revs,
+        deleted = proplists:get_value(<<"_deleted">>, Props, false),
+        body = NewBody,
+        attachments = Bins
+        }.
 
 
 to_doc_info(#full_doc_info{id=Id,update_seq=Seq,rev_tree=Tree}) ->
@@ -181,9 +188,9 @@ bin_to_binary({Fd, Sp, Len}) ->
     {ok, Bin, _Sp2} = couch_stream:read(Fd, Sp, Len),
     Bin.
 
-get_view_functions(#doc{body={obj, Fields}}) ->
-    Lang = proplists:get_value("language", Fields, "javascript"),
-    {obj, Views} = proplists:get_value("views", Fields, {obj, []}),
+get_view_functions(#doc{body={Fields}}) ->
+    Lang = proplists:get_value(<<"language">>, Fields, <<"javascript">>),
+    {Views} = proplists:get_value(<<"views">>, Fields, {[]}),
     {Lang, [{ViewName, Value} || {ViewName, Value} <- Views, is_list(Value)]};
 get_view_functions(_Doc) ->
     none.
