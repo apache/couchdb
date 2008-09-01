@@ -23,9 +23,6 @@ RECURSED_BOOLEAN=false
 
 RESPAWN_TIMEOUT=0
 
-LIB_DIRECTORY=%localstatelibdir%
-LOG_DIRECTORY=%localstatelogdir%
-
 DEFAULT_INI_FILE=%localconfdir%/default.ini
 LOCAL_INI_FILE=%localconfdir%/local.ini
 
