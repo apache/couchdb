@@ -56,9 +56,15 @@ var tests = {
     var results = db.allDocs();
     var rows = results.rows;
 
+    T(results.total_rows == results.rows.length);
+
     for(var i=0; i < rows.length; i++) {
       T(rows[i].id >= "0" && rows[i].id <= "4");
     }
+    
+    // Check _all_docs with descending=true
+    var desc = db.allDocs({descending:true});
+    T(desc.total_rows == desc.rows.length);
 
     // Test a simple map functions
 

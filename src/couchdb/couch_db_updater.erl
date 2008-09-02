@@ -147,13 +147,13 @@ btree_by_id_join(Id, {Seq, Deleted, Tree}) ->
 
 
 btree_by_id_reduce(reduce, FullDocInfos) ->
-    % count the number of deleted documents
+    % count the number of not deleted documents
     length([1 || #full_doc_info{deleted=false} <- FullDocInfos]);
 btree_by_id_reduce(rereduce, Reds) ->
     lists:sum(Reds).
             
 btree_by_seq_reduce(reduce, DocInfos) ->
-    % count the number of deleted documents
+    % count the number of documents
     length(DocInfos);
 btree_by_seq_reduce(rereduce, Reds) ->
     lists:sum(Reds).
@@ -161,10 +161,18 @@ btree_by_seq_reduce(rereduce, Reds) ->
 init_db(DbName, Filepath, Fd, Header) ->
     {ok, SummaryStream} = couch_stream:open(Header#db_header.summary_stream_state, Fd),
     ok = couch_stream:set_min_buffer(SummaryStream, 10000),
+    Less =
+        fun(A,B) when A==B -> false;
+        (nil, _) -> true; % nil - special key sorts before all
+        ({}, _) -> false; % {} -> special key sorts after all
+        (A, B) -> A < B
+        end,
+            
     {ok, IdBtree} = couch_btree:open(Header#db_header.fulldocinfo_by_id_btree_state, Fd,
         [{split, fun(X) -> btree_by_id_split(X) end},
         {join, fun(X,Y) -> btree_by_id_join(X,Y) end},
-        {reduce, fun(X,Y) -> btree_by_id_reduce(X,Y) end}]),
+        {reduce, fun(X,Y) -> btree_by_id_reduce(X,Y) end},
+        {less, Less}]),
     {ok, SeqBtree} = couch_btree:open(Header#db_header.docinfo_by_seq_btree_state, Fd,
             [{split, fun(X) -> btree_by_seq_split(X) end},
             {join, fun(X,Y) -> btree_by_seq_join(X,Y) end},
