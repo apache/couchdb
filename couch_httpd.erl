@@ -88,12 +88,13 @@ handle_request(Req, DocumentRoot) ->
 
     % for the path, use the raw path with the query string and fragment
     % removed, but URL quoting left intact
-    {Path, _, _} = mochiweb_util:urlsplit_path(Req:get(raw_path)),
+    {Path, QueryString, _} = mochiweb_util:urlsplit_path(Req:get(raw_path)),
 
-    ?LOG_DEBUG("~p ~s ~p~nHeaders: ~p", [
+    ?LOG_DEBUG("~p ~s ~p~nQuery String: ~p~nHeaders: ~p", [
         Req:get(method),
         Path,
         Req:get(version),
+        QueryString,
         mochiweb_headers:to_list(Req:get(headers))
     ]),
 
@@ -1057,7 +1058,7 @@ parse_doc_query(Req) ->
             Options = [deleted_conflicts | Args#doc_query_args.options],
             Args#doc_query_args{options=Options};
         {"rev", Rev} ->
-            Args#doc_query_args{rev=Rev};
+            Args#doc_query_args{rev=list_to_binary(Rev)};
         {"open_revs", "all"} ->
             Args#doc_query_args{open_revs=all};
         {"open_revs", RevsJsonStr} ->
