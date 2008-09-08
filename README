@@ -147,7 +147,7 @@ You can use whatever tool your system provides to create a new `couchdb` user.
 
 On many UNIX-like systems you can run the following command:
 
-    adduser --system --home /var/lib/couchdb --no-create-home \
+    adduser --system --home /usr/local/var/lib/couchdb --no-create-home \
             --shell /bin/bash --group --gecos "CouchDB Administrator" couchdb
 
 OS X provides the standard Accounts option from the System Preferences
