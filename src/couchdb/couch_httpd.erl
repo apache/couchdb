@@ -731,7 +731,7 @@ handle_attachment_request(Req, 'GET', _DbName, Db, DocId, FileName) ->
         {Type, Bin} ->
             Resp = Req:respond({200, [
                 {"Cache-Control", "must-revalidate"},
-                {"Content-Type", Type},
+                {"Content-Type", binary_to_list(Type)},
                 {"Content-Length", integer_to_list(couch_doc:bin_size(Bin))}
             ] ++ server_header(), chunked}),
             couch_doc:bin_foldl(Bin,
@@ -756,7 +756,7 @@ handle_attachment_request(Req, Method, _DbName, Db, DocId, FileName)
             [];
         _ ->
             [{FileName, {
-                Req:get_header_value("Content-Type"),
+                list_to_binary(Req:get_header_value("Content-Type")),
                 Req:recv_body()
             }}]
     end,

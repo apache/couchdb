@@ -682,10 +682,9 @@ var tests = {
     T(xhr.responseText == "This is a base64 encoded text");
     T(xhr.getResponseHeader("Content-Type") == "text/plain");
 
-
     // empty attachment
     var binAttDoc2 = {
-      _id: "bin_doc5",
+      _id: "bin_doc2",
       _attachments:{
         "foo.txt": {
           content_type:"text/plain",
@@ -696,19 +695,26 @@ var tests = {
 
     T(db.save(binAttDoc2).ok);
 
-    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc5/foo.txt");
+    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc2/foo.txt");
     T(xhr.responseText.length == 0);
     T(xhr.getResponseHeader("Content-Type") == "text/plain");
-       
+
     // test RESTful doc API
-    
-    var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc2/foo2.txt", {
+
+    var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc2/foo2.txt?rev=" + binAttDoc2._rev, {
       body:"This is no base64 encoded text",
       headers:{"Content-Type": "text/plain;charset=utf-8"}
     });
     T(xhr.status == 201);
     var rev = JSON.parse(xhr.responseText).rev;
-    
+
+    binAttDoc2 = db.open("bin_doc2");
+    console.log(JSON.stringify(binAttDoc2));
+    T(binAttDoc2._attachments["foo.txt"] !== undefined);
+    T(binAttDoc2._attachments["foo2.txt"] !== undefined);
+    T(binAttDoc2._attachments["foo2.txt"].content_type == "text/plain;charset=utf-8");
+    T(binAttDoc2._attachments["foo2.txt"].length == 30);
+
     var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc2/foo2.txt");
     T(xhr.responseText == "This is no base64 encoded text");
     T(xhr.getResponseHeader("Content-Type") == "text/plain;charset=utf-8");

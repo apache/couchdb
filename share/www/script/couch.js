@@ -243,22 +243,22 @@ CouchDB.request = function(method, uri, options) {
 CouchDB.uuids_cache = [];
 
 CouchDB.newUuids = function(n) {
-    if (CouchDB.uuids_cache.length >= n) {
-      var uuids = CouchDB.uuids_cache.slice(CouchDB.uuids_cache.length - n);
-      if(CouchDB.uuids_cache.length - n == 0) {
-        CouchDB.uuids_cache = [];
-      } else {
-        CouchDB.uuids_cache =
-            CouchDB.uuids_cache.slice(0, CouchDB.uuids_cache.length - n);
-      }
-      return uuids;
+  if (CouchDB.uuids_cache.length >= n) {
+    var uuids = CouchDB.uuids_cache.slice(CouchDB.uuids_cache.length - n);
+    if(CouchDB.uuids_cache.length - n == 0) {
+      CouchDB.uuids_cache = [];
     } else {
-      var req = CouchDB.request("POST", "/_uuids?count=" + (100 + n));
-      var result = JSON.parse(req.responseText);
-      if (req.status != 200)
-        throw result;
       CouchDB.uuids_cache =
-          CouchDB.uuids_cache.concat(result.uuids.slice(0, 100));
-      return result.uuids.slice(100);
+          CouchDB.uuids_cache.slice(0, CouchDB.uuids_cache.length - n);
     }
+    return uuids;
+  } else {
+    var req = CouchDB.request("POST", "/_uuids?count=" + (100 + n));
+    var result = JSON.parse(req.responseText);
+    if (req.status != 200)
+      throw result;
+    CouchDB.uuids_cache =
+        CouchDB.uuids_cache.concat(result.uuids.slice(0, 100));
+    return result.uuids.slice(100);
   }
+}
