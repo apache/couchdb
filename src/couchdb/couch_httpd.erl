@@ -310,6 +310,21 @@ handle_db_request(Req, 'POST', {_DbName, Db, [<<"_compact">>]}) ->
 handle_db_request(_Req, _Method, {_DbName, _Db, [<<"_compact">>]}) ->
     throw({method_not_allowed, "POST"});
 
+handle_db_request(Req, 'POST', {_DbName, Db, [<<"_purge">>]}) ->
+    {IdsRevs} = ?JSON_DECODE(Req:recv_body(?MAX_DOC_SIZE)),
+    % validate the json input
+    [{_Id, [_|_]=_Revs} = IdRevs || IdRevs <- IdsRevs],
+    
+    case couch_db:purge_docs(Db, IdsRevs) of
+    {ok, PurgeSeq, PurgedIdsRevs} ->
+        send_json(Req, 200, {[{<<"purge_seq">>, PurgeSeq}, {<<"purged">>, {PurgedIdsRevs}}]});
+    Error ->
+        throw(Error)
+    end;
+
+handle_db_request(_Req, _Method, {_DbName, _Db, [<<"_purge">>]}) ->
+    throw({method_not_allowed, "POST"});
+
 % View request handlers
 
 handle_db_request(Req, 'GET', {_DbName, Db, [<<"_all_docs">>]}) ->

@@ -28,6 +28,7 @@
     views,
     id_btree=nil,
     current_seq=0,
+    purge_seq=0,
     query_server=nil
     }).
 
@@ -42,6 +43,14 @@
 -record(server,
     {root_dir
     }).
+
+-record(index_header,
+    {seq=0,
+    purge_seq=0,
+    id_btree_state=nil,
+    view_states=nil
+    }).
+    
 
 start_link() ->
     gen_server:start_link({local, couch_view}, couch_view, [], []).
@@ -412,9 +421,17 @@ start_update_loop(RootDir, DbName, GroupId, NotifyPids) ->
     {ok, Fd} ->
         Sig = Group#group.sig,
         case (catch couch_file:read_header(Fd, <<$r, $c, $k, 0>>)) of
-        {ok, {Sig, HeaderInfo}} ->
+        {ok, {Sig, #index_header{purge_seq=PurgeSeq}=HeaderInfo}} ->
             % sigs match!
-            init_group(Db, Fd, Group, HeaderInfo);
+            DbPurgeSeq = couch_db:get_purge_seq(Db),
+            case (PurgeSeq == DbPurgeSeq) or ((PurgeSeq + 1) == DbPurgeSeq) of
+            true ->
+                % We can only use index with the same, or next purge seq as the
+                % db.
+                init_group(Db, Fd, Group, HeaderInfo);
+            false ->
+                reset_file(Db, Fd, DbName, Group)
+            end;
         _ ->
             reset_file(Db, Fd, DbName, Group)
         end;
@@ -424,6 +441,7 @@ start_update_loop(RootDir, DbName, GroupId, NotifyPids) ->
         Error    -> throw(Error)
         end
     end,
+    
     couch_db:monitor(Db),
     couch_db:close(Db),
     update_loop(RootDir, DbName, GroupId, Group2, NotifyPids).
@@ -479,24 +497,67 @@ get_notify_pids() ->
         []
     end.
     
-update_group(#group{db=Db,current_seq=CurrentSeq, views=Views}=Group) ->
-    ViewEmptyKVs = [{View, []} || View <- Views],
+purge(#group{db=Db, views=Views, id_btree=IdBtree}=Group) ->
+    {ok, PurgedIdsRevs} = couch_db:get_last_purged(Db),
+    Ids = [Id || {Id, _Revs} <- PurgedIdsRevs],
+    {ok, Lookups, IdBtree2} = couch_btree:query_modify(IdBtree, Ids, [], Ids),
+
+    % now populate the dictionary with all the keys to delete
+    ViewKeysToRemoveDict = lists:foldl(
+        fun({ok,{DocId,ViewNumRowKeys}}, ViewDictAcc) ->
+            lists:foldl(
+                fun({ViewNum, RowKey}, ViewDictAcc2) ->
+                    dict:append(ViewNum, {RowKey, DocId}, ViewDictAcc2)
+                end, ViewDictAcc, ViewNumRowKeys);
+        ({not_found, _}, ViewDictAcc) ->
+            ViewDictAcc
+        end, dict:new(), Lookups),
+    
+    % Now remove the values from the btrees
+    Views2 = lists:map(
+        fun(#view{id_num=Num,btree=Btree}=View) ->
+            case dict:find(Num, ViewKeysToRemoveDict) of
+            {ok, RemoveKeys} ->
+                {ok, Btree2} = couch_btree:add_remove(Btree, [], RemoveKeys),
+                View#view{btree=Btree2};
+            error -> % no keys to remove in this view
+                View
+            end
+        end, Views),
+    Group#group{id_btree=IdBtree2,
+            views=Views2,
+            purge_seq=couch_db:get_purge_seq(Db)}.
+    
+    
+update_group(#group{db=Db,current_seq=CurrentSeq,
+        purge_seq=GroupPurgeSeq}=Group) ->
+    ViewEmptyKVs = [{View, []} || View <- Group#group.views],
     % compute on all docs modified since we last computed.
-    {ok, {UncomputedDocs, Group2, ViewKVsToAdd, DocIdViewIdKeys, NewSeq}}
+    DbPurgeSeq = couch_db:get_purge_seq(Db),
+    Group2 =
+    case DbPurgeSeq of
+    GroupPurgeSeq -> 
+        Group;
+    DbPurgeSeq when GroupPurgeSeq + 1 == DbPurgeSeq ->
+        purge(Group);
+    _ ->
+        throw(restart)
+    end,
+    {ok, {UncomputedDocs, Group3, ViewKVsToAdd, DocIdViewIdKeys, NewSeq}}
         = couch_db:enum_docs_since(
             Db,
             CurrentSeq,
             fun(DocInfo, _, Acc) -> process_doc(Db, DocInfo, Acc) end,
-            {[], Group, ViewEmptyKVs, [], CurrentSeq}
+            {[], Group2, ViewEmptyKVs, [], CurrentSeq}
             ),
-    {Group3, Results} = view_compute(Group2, UncomputedDocs),
+    {Group4, Results} = view_compute(Group3, UncomputedDocs),
     {ViewKVsToAdd2, DocIdViewIdKeys2} = view_insert_query_results(UncomputedDocs, Results, ViewKVsToAdd, DocIdViewIdKeys),
-    couch_query_servers:stop_doc_map(Group3#group.query_server),
+    couch_query_servers:stop_doc_map(Group4#group.query_server),
     if CurrentSeq /= NewSeq ->
-        {ok, Group4} = write_changes(Group3, ViewKVsToAdd2, DocIdViewIdKeys2, NewSeq),
-        {ok, Group4#group{query_server=nil}};
+        {ok, Group5} = write_changes(Group4, ViewKVsToAdd2, DocIdViewIdKeys2, NewSeq),
+        {ok, Group5#group{query_server=nil}};
     true ->
-        {ok, Group3#group{query_server=nil}}
+        {ok, Group4#group{query_server=nil}}
     end.
     
 delete_index_dir(RootDir, DbName) ->
@@ -523,10 +584,13 @@ delete_index_file(RootDir, DbName, GroupId) ->
     file:delete(RootDir ++ "/." ++ binary_to_list(DbName)
             ++ binary_to_list(GroupId) ++ ".view").
 
-init_group(Db, Fd, #group{views=Views}=Group, nil = _IndexHeaderData) ->
-    init_group(Db, Fd, Group, {0, nil, [nil || _ <- Views]});
-init_group(Db, Fd, #group{def_lang=Lang,views=Views}=Group,
-        {Seq, IdBtreeState, ViewStates} = _IndexHeaderData) ->
+init_group(Db, Fd, #group{views=Views}=Group, nil) ->
+    init_group(Db, Fd, Group,
+        #index_header{seq=0, purge_seq=couch_db:get_purge_seq(Db),
+            id_btree_state=nil, view_states=[nil || _ <- Views]});
+init_group(Db, Fd, #group{def_lang=Lang,views=Views}=Group, IndexHeader) ->
+     #index_header{seq=Seq, purge_seq=PurgeSeq,
+            id_btree_state=IdBtreeState, view_states=ViewStates} = IndexHeader,
     {ok, IdBtree} = couch_btree:open(IdBtreeState, Fd),
     Views2 = lists:zipwith(
         fun(BtreeState, #view{reduce_funs=RedFuns}=View) ->
@@ -548,12 +612,17 @@ init_group(Db, Fd, #group{def_lang=Lang,views=Views}=Group,
             View#view{btree=Btree}
         end,
         ViewStates, Views),
-    Group#group{db=Db, fd=Fd, current_seq=Seq, id_btree=IdBtree, views=Views2}.
+    Group#group{db=Db, fd=Fd, current_seq=Seq, purge_seq=PurgeSeq,
+        id_btree=IdBtree, views=Views2}.
 
 
-get_index_header_data(#group{current_seq=Seq,id_btree=IdBtree,views=Views}) ->
+get_index_header_data(#group{current_seq=Seq, purge_seq=PurgeSeq, 
+            id_btree=IdBtree,views=Views}) ->
     ViewStates = [couch_btree:get_state(Btree) || #view{btree=Btree} <- Views],
-    {Seq, couch_btree:get_state(IdBtree), ViewStates}.
+    #index_header{seq=Seq,
+            purge_seq=PurgeSeq,
+            id_btree_state=couch_btree:get_state(IdBtree),
+            view_states=ViewStates}.
 
 % keys come back in the language of btree - tuples.
 less_json_keys(A, B) ->
@@ -575,7 +644,7 @@ type_sort(V) when is_integer(V) -> 1;
 type_sort(V) when is_float(V) -> 1;
 type_sort(V) when is_binary(V) -> 2;
 type_sort(V) when is_list(V) -> 3;
-type_sort({V}) when is_list(V) -> 4; % must come before tuple test below
+type_sort({V}) when is_list(V) -> 4;
 type_sort(V) when is_tuple(V) -> 5.
 
 
@@ -702,8 +771,8 @@ view_insert_doc_query_results(#doc{id=DocId}=Doc, [ResultKVs|RestResults], [{Vie
            [KV] 
         end, [], lists:sort(ResultKVs)),
     NewKVs = [{{Key, DocId}, Value} || {Key, Value} <- ResultKVs2],
-    NewViewIdKeys = [{View#view.id_num, Key} || {Key, _Value} <- ResultKVs2],
     NewViewKVsAcc = [{View, NewKVs ++ KVs} | ViewKVsAcc],
+    NewViewIdKeys = [{View#view.id_num, Key} || {Key, _Value} <- ResultKVs2],
     NewViewIdKeysAcc = NewViewIdKeys ++ ViewIdKeysAcc,
     view_insert_doc_query_results(Doc, RestResults, RestViewKVs, NewViewKVsAcc, NewViewIdKeysAcc).
 

@@ -13,7 +13,7 @@
 -module(couch_key_tree).
 
 -export([merge/2, find_missing/2, get_key_leafs/2, get_full_key_paths/2, get/2]).
--export([map/2, get_all_leafs/1, get_leaf_keys/1, count_leafs/1]).
+-export([map/2, get_all_leafs/1, get_leaf_keys/1, count_leafs/1, remove_leafs/2]).
 
 % a key tree looks like this:
 % Tree -> [] or [{Key, Value, ChildTree} | SiblingTree]
@@ -53,7 +53,40 @@ find_missing([{Key, _, SubTree} | RestTree], Keys) ->
     SrcKeys2 = Keys -- [Key],
     SrcKeys3 = find_missing(SubTree, SrcKeys2),
     find_missing(RestTree, SrcKeys3).
+
+
+get_all_key_paths_rev([], KeyPathAcc) ->
+    KeyPathAcc;
+get_all_key_paths_rev([{Key, Value, SubTree} | RestTree], KeyPathAcc) ->
+    get_all_key_paths_rev(SubTree, [{Key, Value} | KeyPathAcc]) ++
+        get_all_key_paths_rev(RestTree, KeyPathAcc).
+        
     
+% Removes any branches from the tree whose leaf node(s) are in the Keys
+remove_leafs(Tree, Keys) ->
+    % flatten each branch in a tree into a tree path
+    Paths = get_all_key_paths_rev(Tree, []),
+    
+    % filter out any that are in the keys list.
+    {FoundKeys, FilteredPaths} = lists:mapfoldl(
+        fun(Key, PathsAcc) ->
+            case [Path || [{LeafKey,_}|_]=Path <- PathsAcc, LeafKey /= Key] of
+            PathsAcc ->
+                {nil, PathsAcc};
+            PathsAcc2 ->
+                {Key, PathsAcc2}
+            end
+        end, Paths, Keys),
+        
+    % convert paths back to trees
+    NewTree = lists:foldl(
+        fun(Path,TreeAcc) ->
+            SingleTree = lists:foldl(
+                fun({K,V},NewTreeAcc) -> [{K,V,NewTreeAcc}] end, [], Path),
+            merge(TreeAcc, SingleTree)
+        end, [], FilteredPaths),
+    {NewTree, FoundKeys}.
+
 
 % get the leafs in the tree matching the keys. The matching key nodes can be
 % leafs or an inner nodes. If an inner node, then the leafs for that node
@@ -83,7 +116,7 @@ get(Tree, KeysToGet) ->
     {KeyPaths, KeysNotFound} = get_full_key_paths(Tree, KeysToGet),
     FixedResults = [ {Key, Value, [Key0 || {Key0, _} <- Path]} || [{Key, Value}|_] = Path <- KeyPaths],
     {FixedResults, KeysNotFound}.
-
+    
 get_full_key_paths(Tree, Keys) ->
     get_full_key_paths(Tree, Keys, []).
     

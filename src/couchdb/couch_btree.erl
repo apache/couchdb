@@ -298,8 +298,8 @@ reduce_node(#btree{reduce=nil}, _NodeType, _NodeList) ->
     [];
 reduce_node(#btree{reduce=R}, kp_node, NodeList) ->
     R(rereduce, [Red || {_K, {_P, Red}} <- NodeList]);
-reduce_node(#btree{reduce=R}, kv_node, NodeList) ->
-    R(reduce, NodeList).
+reduce_node(#btree{reduce=R}=Bt, kv_node, NodeList) ->
+    R(reduce, [assemble(Bt, K, V) || {K, V} <- NodeList]).
 
 
 get_node(#btree{fd = Fd}, NodePos) ->

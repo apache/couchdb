@@ -126,7 +126,7 @@ var tests = {
     T(db.info().doc_count == 5);
 
     // make sure we can still open the old rev of the deleted doc
-    T(db.open(existingDoc._id, {rev: existingDoc._rev}).ok);
+    T(db.open(existingDoc._id, {rev: existingDoc._rev}) != null);
   },
 
   // Do some edit conflict detection tests
@@ -834,7 +834,7 @@ var tests = {
       _id:"_design/test",
       language: "javascript",
       views: {
-        all_docs: {map: "function(doc) { emit(doc.integer, null); emit(doc.integer, null) }"},
+        all_docs_twice: {map: "function(doc) { emit(doc.integer, null); emit(doc.integer, null) }"},
         no_docs: {map: "function(doc) {}"},
         single_doc: {map: "function(doc) { if (doc._id == \"1\") { emit(1, null) }}"},
         summate: {map:"function (doc) {emit(doc.integer, doc.integer)};",
@@ -854,7 +854,7 @@ var tests = {
     T(results.rows.length == 1);
 
     for (var loop = 0; loop < 2; loop++) {
-      var rows = db.view("test/all_docs").rows;
+      var rows = db.view("test/all_docs_twice").rows;
       for (var i = 0; i < numDocs; i++) {
         T(rows[2*i].key == i+1);
         T(rows[(2*i)+1].key == i+1);
@@ -1483,6 +1483,84 @@ var tests = {
     T(xhr.getResponseHeader("Content-Type") == "text/plain")
     T(db.info().doc_count == 1);
     T(db.info().disk_size < deletesize);
+  },
+  
+  purge: function(debug) {
+    var db = new CouchDB("test_suite_db");
+    db.deleteDb();
+    db.createDb();
+    if (debug) debugger;
+
+    var numDocs = 10;
+
+    var designDoc = {
+      _id:"_design/test",
+      language: "javascript",
+      views: {
+        all_docs_twice: {map: "function(doc) { emit(doc.integer, null); emit(doc.integer, null) }"},
+        single_doc: {map: "function(doc) { if (doc._id == \"1\") { emit(1, null) }}"}
+      }
+    }
+    
+    T(db.save(designDoc).ok);
+
+    T(db.bulkSave(makeDocs(1, numDocs + 1)).ok);
+
+    // go ahead and validate the views before purging
+    var rows = db.view("test/all_docs_twice").rows;
+    for (var i = 0; i < numDocs; i++) {
+      T(rows[2*i].key == i+1);
+      T(rows[(2*i)+1].key == i+1);
+    }
+    T(db.view("test/single_doc").total_rows == 1);
+    
+    var doc1 = db.open("1");
+    var doc2 = db.open("2");
+    
+    // purge the documents
+    var xhr = CouchDB.request("POST", "/test_suite_db/_purge", {
+      body: JSON.stringify({"1":[doc1._rev], "2":[doc2._rev]}),
+    });
+    T(xhr.status == 200);
+    
+    var result = JSON.parse(xhr.responseText);
+    T(result.purged["1"][0] == doc1._rev);
+    T(result.purged["2"][0] == doc2._rev);
+    
+    T(db.open("1") == null);
+    T(db.open("2") == null);
+    
+    var rows = db.view("test/all_docs_twice").rows;
+    for (var i = 2; i < numDocs; i++) {
+      T(rows[2*(i-2)].key == i+1);
+      T(rows[(2*(i-2))+1].key == i+1);
+    }
+    T(db.view("test/single_doc").total_rows == 0);
+    
+    // purge documents twice in a row without loading views
+    // (causes full view rebuilds)
+    
+    var doc3 = db.open("3");
+    var doc4 = db.open("4");
+    
+    xhr = CouchDB.request("POST", "/test_suite_db/_purge", {
+      body: JSON.stringify({"3":[doc3._rev]}),
+    });
+    
+    T(xhr.status == 200);
+    
+    xhr = CouchDB.request("POST", "/test_suite_db/_purge", {
+      body: JSON.stringify({"4":[doc4._rev]}),
+    });
+    
+    T(xhr.status == 200);
+    
+    var rows = db.view("test/all_docs_twice").rows;
+    for (var i = 4; i < numDocs; i++) {
+      T(rows[2*(i-4)].key == i+1);
+      T(rows[(2*(i-4))+1].key == i+1);
+    }
+    T(db.view("test/single_doc").total_rows == 0);
   }
 };
 
