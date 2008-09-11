@@ -20,7 +20,7 @@
 -export([get_missing_revs/2]).
 -export([enum_docs/4,enum_docs/5,enum_docs_since/4,enum_docs_since/5]).
 -export([enum_docs_since_reduce_to_count/1,enum_docs_reduce_to_count/1]).
--export([increment_update_seq/1]).
+-export([increment_update_seq/1,get_purge_seq/1,purge_docs/2,get_last_purged/1]).
 -export([start_link/3]).
 -export([init/1,terminate/2,handle_call/3,handle_cast/2,code_change/3,handle_info/2]).
 
@@ -148,18 +148,31 @@ get_full_doc_infos(Db, Ids) ->
 
 increment_update_seq(#db{update_pid=UpdatePid}) ->
     gen_server:call(UpdatePid, increment_update_seq).
-        
+
+purge_docs(#db{update_pid=UpdatePid}, IdsRevs) ->
+    gen_server:call(UpdatePid, {purge_docs, IdsRevs}).
+    
+
+get_purge_seq(#db{header=#db_header{purge_seq=PurgeSeq}})->
+    PurgeSeq.
+
+get_last_purged(#db{header=#db_header{purged_docs=nil}}) ->
+    {ok, []};
+get_last_purged(#db{fd=Fd, header=#db_header{purged_docs=PurgedPointer}}) ->
+    couch_file:pread_term(Fd, PurgedPointer).
+
 get_db_info(Db) ->
     #db{fd=Fd,
         compactor_pid=Compactor,
-        doc_count=Count,
-        doc_del_count=DelCount,
-        update_seq=SeqNum} = Db,
+        update_seq=SeqNum,
+        fulldocinfo_by_id_btree=FullDocBtree} = Db,
     {ok, Size} = couch_file:bytes(Fd),
+    {ok, {Count, DelCount}} = couch_btree:full_reduce(FullDocBtree),
     InfoList = [
         {doc_count, Count},
         {doc_del_count, DelCount},
         {update_seq, SeqNum},
+        {purge_seq, couch_db:get_purge_seq(Db)},
         {compact_running, Compactor/=nil},
         {disk_size, Size}
         ],
@@ -263,7 +276,7 @@ update_docs(#db{update_pid=UpdatePid}=Db, Docs, Options) ->
         Db2 = open_ref_counted(Db#db.main_pid, self()),
         DocBuckets4 = [[doc_flush_binaries(Doc, Db2#db.fd) || Doc <- Bucket] || Bucket <- DocBuckets3],
         % We only retry once
-        ok = close(Db2),
+        close(Db2),
         case gen_server:call(UpdatePid, {update_docs, DocBuckets4, [new_edits | Options]}, infinity) of
         ok -> {ok, NewRevs};
         Else -> throw(Else)
@@ -335,10 +348,13 @@ doc_flush_binaries(Doc, Fd) ->
     Doc#doc{attachments = NewBins}.
 
 enum_docs_since_reduce_to_count(Reds) ->
-    couch_btree:final_reduce(fun couch_db_updater:btree_by_seq_reduce/2, Reds).
+    couch_btree:final_reduce(
+            fun couch_db_updater:btree_by_seq_reduce/2, Reds).
 
 enum_docs_reduce_to_count(Reds) ->
-    couch_btree:final_reduce(fun couch_db_updater:btree_by_id_reduce/2, Reds).
+    {Count, _DelCount} = couch_btree:final_reduce(
+            fun couch_db_updater:btree_by_id_reduce/2, Reds),
+    Count.
 
 enum_docs_since(Db, SinceSeq, Direction, InFun, Ctx) ->
     couch_btree:fold(Db#db.docinfo_by_seq_btree, SinceSeq + 1, Direction, InFun, Ctx).

@@ -84,8 +84,8 @@
      fulldocinfo_by_id_btree_state = nil,
      docinfo_by_seq_btree_state = nil,
      local_docs_btree_state = nil,
-     doc_count=0,
-     doc_del_count=0
+     purge_seq = 0,
+     purged_docs = nil
     }).
 
 -record(db,
@@ -99,8 +99,6 @@
     docinfo_by_seq_btree,
     local_docs_btree,
     update_seq,
-    doc_count,
-    doc_del_count,
     name,
     filepath
     }).
