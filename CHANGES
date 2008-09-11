@@ -6,6 +6,8 @@ Version 0.9.0-incubating
 
 Packaging and System Integration:
 
+ * Added COUCHDB_OPTIONS to etc/default/couchdb file.
+ * Remove COUCHDB_INI_FILE and COUCHDB_PID_FILE from etc/default/couchdb file.
  * Updated `configure.ac` to manually link `libm` for portability.
  * Updated `configure.ac` to extended default library paths.
  * Removed inets configuration files.
