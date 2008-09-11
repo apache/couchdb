@@ -63,12 +63,6 @@ start_couchdb () {
     # Start Apache CouchDB as a background process.
 
     command="$COUCHDB -b"
-    if test -n "$COUCHDB_INI_FILE"; then
-        command="$command -c $COUCHDB_INI_FILE"
-    fi
-    if test -n "$COUCHDB_PID_FILE"; then
-        command="$command -p $COUCHDB_PID_FILE"
-    fi
     if test -n "$COUCHDB_STDOUT_FILE"; then
         command="$command -o $COUCHDB_STDOUT_FILE"
     fi
@@ -78,11 +72,10 @@ start_couchdb () {
     if test -n "$COUCHDB_RESPAWN_TIMEOUT"; then
         command="$command -r $COUCHDB_RESPAWN_TIMEOUT"
     fi
+    if test -n "$COUCHDB_OPTIONS"; then
+        command="$command $COUCHDB_OPTIONS"
+    fi
     if test -n "$COUCHDB_USER"; then
-        if test -n "$COUCHDB_PID_FILE"; then
-            touch $COUCHDB_PID_FILE
-            chown $COUCHDB_USER $COUCHDB_PID_FILE
-        fi
         if su $COUCHDB_USER -c "$command" > /dev/null; then
             return $SCRIPT_OK
         else
@@ -101,8 +94,8 @@ stop_couchdb () {
     # Stop the running Apache CouchDB process.
 
     command="$COUCHDB -d"
-    if test -n "$COUCHDB_PID_FILE"; then
-        command="$command -p $COUCHDB_PID_FILE"
+    if test -n "$COUCHDB_OPTIONS"; then
+        command="$command $COUCHDB_OPTIONS"
     fi
     if test -n "$COUCHDB_USER"; then
         if su $COUCHDB_USER -c "$command" > /dev/null; then
