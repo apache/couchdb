@@ -30,20 +30,6 @@ CLEANFILES = $(init_DATA) $(nobase_sysconf_DATA) $(launchd_DATA)
 transform = @program_transform_name@
 couchdb_command_name = `echo couchdb | sed '$(transform)'`
 
-default/couchdb: default/couchdb.tpl
-	if test "$(mkdir_p)"; then \
-	    $(mkdir_p) default; \
-	else \
-	    if test ! -d default; then \
-	        mkdir default; \
-	    fi \
-	fi
-	sed -e "s|%configure_input%|$@. Generated from $< by configure.|" \
-	    -e "s|%localconfdir%|$(localconfdir)|g" \
-	    -e "s|%sysconfdir%|$(sysconfdir)|" \
-	    -e "s|%localstatedir%|$(localstatedir)|" \
-	< $< > $@
-
 init/couchdb: init/couchdb.tpl
 	if test "$(mkdir_p)"; then \
 	    $(mkdir_p) init; \
