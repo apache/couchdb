@@ -709,7 +709,7 @@ var tests = {
     var rev = JSON.parse(xhr.responseText).rev;
 
     binAttDoc2 = db.open("bin_doc2");
-    console.log(JSON.stringify(binAttDoc2));
+
     T(binAttDoc2._attachments["foo.txt"] !== undefined);
     T(binAttDoc2._attachments["foo2.txt"] !== undefined);
     T(binAttDoc2._attachments["foo2.txt"].content_type == "text/plain;charset=utf-8");
