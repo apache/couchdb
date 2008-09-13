@@ -19,3 +19,10 @@ level = info
 
 [query_servers]
 javascript = %bindir%/%couchjs_command_name% %localdatadir%/server/main.js
+
+[daemons]
+view_manager={couch_view, start_link, []}
+db_update_notifier={couch_db_update_notifier_sup, start_link, []}
+full_text_query={couch_ft_query, start_link, []}
+query_servers={couch_query_servers, start_link, []}
+httpd={couch_httpd, start_link, []}
