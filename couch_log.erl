@@ -46,14 +46,14 @@ init([]) ->
     % just stop if one of the config settings change. couch_server_sup
     % will restart us and then we will pick up the new settings.
     ok = couch_config:register(
-        fun({"log", "file"}) ->
+        fun("log", "file") ->
             ?MODULE:stop();
-        ({"log", "level"}) ->
+        ("log", "level") ->
             ?MODULE:stop()
         end),
     
-    Filename = couch_config:get({"log", "file"}, "couchdb.log"),
-    Level = couch_config:get({"log", "level"},"info"),
+    Filename = couch_config:get("log", "file", "couchdb.log"),
+    Level = couch_config:get("log", "level", "info"),
 
     {ok, Fd} = file:open(Filename, [append]),
     {ok, {Fd, level_integer(list_to_atom(Level))}}.
