@@ -49,7 +49,7 @@ start_server(IniFiles) ->
     
     {ok, ConfigPid} = couch_config:start_link(IniFiles),
     
-    LogLevel = couch_config:get({"log", "level"}, "info"),
+    LogLevel = couch_config:get("log", "level", "info"),
     % announce startup
     io:format("Apache CouchDB ~s (LogLevel=~s) is starting.~n", [
         couch_server:get_version(),
@@ -64,7 +64,7 @@ start_server(IniFiles) ->
     end,
     
     LibDir =
-    case couch_config:get({"couchdb", "util_driver_dir"}, null) of
+    case couch_config:get("couchdb", "util_driver_dir", null) of
     null ->
         filename:join(code:priv_dir(couch), "lib");
     LibDir0 -> LibDir0
@@ -100,7 +100,7 @@ start_server(IniFiles) ->
     % just restart if one of the config settings change.
 
     couch_config:register(
-        fun({"couchdb", "util_driver_dir"}) ->
+        fun("couchdb", "util_driver_dir") ->
             ?MODULE:stop()
         end, Pid),
     

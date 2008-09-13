@@ -31,12 +31,11 @@ start_link() ->
 init([]) ->
     Self = self(),
     ok = couch_config:register(
-        fun({"update_notification", _}) ->
+        fun("update_notification", _) ->
             exit(Self, reload_config)
         end),
     
-    UpdateNotifierExes = couch_config:lookup_match(
-            {{"update_notification", '$1'}, '$2'}, []),
+    UpdateNotifierExes = couch_config:get("update_notification"),
 
     {ok,
         {{one_for_one, 10, 3600}, 

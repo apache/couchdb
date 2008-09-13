@@ -44,12 +44,13 @@ start_link() ->
     % just stop if one of the config settings change. couch_server_sup
     % will restart us and then we will pick up the new settings.
 
-    BindAddress = couch_config:get({"httpd", "bind_address"}, any),
-    Port = couch_config:get({"httpd", "port"}, "5984"),
-    DocumentRoot = couch_config:get({"httpd", "utils_dir"}, "../../share/www"),
+    BindAddress = couch_config:get("httpd", "bind_address", any),
+    Port = couch_config:get("httpd", "port", "5984"),
+    DocumentRoot = couch_config:get("httpd", "utils_dir", "../../share/www"),
 
     % and off we go
-    Loop = fun (Req) -> apply(couch_httpd, handle_request, [Req, DocumentRoot]) end,
+    Loop = fun (Req) -> apply(couch_httpd, handle_request,
+                [Req, DocumentRoot]) end,
     {ok, Pid} = mochiweb_http:start([
         {loop, Loop},
         {name, ?MODULE},
@@ -57,11 +58,11 @@ start_link() ->
         {port, Port}
     ]),
     ok = couch_config:register(
-        fun({"httpd", "bind_address"}) ->
+        fun("httpd", "bind_address") ->
             ?MODULE:stop();
-        ({"httpd", "port"}) ->
+        ("httpd", "port") ->
             ?MODULE:stop();
-        ({"httpd", "utils_dir"}) ->
+        ("httpd", "utils_dir") ->
             ?MODULE:stop()
         end, Pid),
 
@@ -77,13 +78,11 @@ handle_request(Req, DocumentRoot) ->
     % alias HEAD to GET as mochiweb takes care of stripping the body
     Method = case Req:get(method) of
         'HEAD' -> 'GET';
-        Other ->
-          % handling of non standard HTTP verbs. Should be fixe din gen_tcp:recv()
-          case Other of
-            "COPY" -> 'COPY';
-            "MOVE" -> 'MOVE';
-            StandardMethod -> StandardMethod
-          end
+        
+        % handling of non standard HTTP verbs. Should be fixed in gen_tcp:recv()
+        "COPY" -> 'COPY';
+        "MOVE" -> 'MOVE';
+        StandardMethod -> StandardMethod
     end,
 
     % for the path, use the raw path with the query string and fragment
@@ -808,64 +807,40 @@ handle_config_request(_Req, Method, {config, Config}) ->
 
 % GET /_config/Section
 handle_config_request(Req, 'GET', {[Section]}) ->
-    Options = [
-        {[{name, list_to_binary(Option)}, {value, list_to_binary(Value)}]} ||
-        {Option, Value} <-
-        couch_config:lookup_match({{Section, '$1'}, '$2'}, [])
+    KVs = [
+        {list_to_binary(Key), list_to_binary(Value)} ||
+        {Key, Value} <-
+        couch_config:get(Section)
     ],
-    send_json(Req, 200, {[
-        {ok, true},
-        {section, list_to_binary(Section)},
-        {options, Options}
-    ]});
+    send_json(Req, 200, {KVs});
 
-% PUT /_config/Section/Option
+% PUT /_config/Section/Key
 % "value"
-handle_config_request(Req, 'PUT', {[Section, Option]}) ->
+handle_config_request(Req, 'PUT', {[Section, Key]}) ->
     Value = binary_to_list(Req:recv_body()),
-    ok = couch_config:store({Section, Option}, Value),
+    ok = couch_config:set(Section, Key, Value),
     send_json(Req, 200, {[
-        {ok, true},
-        {section, list_to_binary(Section)},
-        {name, list_to_binary(Option)},
-        {value, list_to_binary(Value)}
+        {ok, true}
     ]});
 
-% GET /_config/Section/Option
-handle_config_request(Req, 'GET', {[Section, Option]}) ->
-    case couch_config:get({Section, Option},null) of
+% GET /_config/Section/Key
+handle_config_request(Req, 'GET', {[Section, Key]}) ->
+    case couch_config:get(Section, Key, null) of
     null ->
         throw({not_found, unknown_config_value});
     Value ->
-        send_json(Req, 200, {[
-            {ok, true},
-            {section, list_to_binary(Section)},
-            {name, list_to_binary(Option)},
-            {value, list_to_binary(Value)}
-         ]})
+        send_json(Req, 200, list_to_binary(Value))
     end;
 
-% DELETE /_config/Section/Option
-handle_config_request(Req, 'DELETE', {[Section, Option]}) ->
-    case couch_config:get({Section, Option}, null) of
+% DELETE /_config/Section/Key
+handle_config_request(Req, 'DELETE', {[Section, Key]}) ->
+    case couch_config:get(Section, Key, null) of
     null ->
         throw({not_found, unknown_config_value});
     OldValue ->
-        couch_config:unset({Section, Option}),
-        send_json(Req, 200, {[
-            {ok, true},
-            {section, list_to_binary(Section)},
-            {name, list_to_binary(Option)},
-            {value, list_to_binary(OldValue)}
-         ]})
+        couch_config:delete(Section, Key),
+        send_json(Req, 200, list_to_binary(OldValue))
     end.
-
-
-% TODO:
-% POST,PUT /_config/
-% [{Key, Value}, {K2, V2}, {K3, V3}]
-%
-% POST,PUT/_config/Key?value=Value
 
 
 % View request handling internals

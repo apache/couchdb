@@ -5,45 +5,28 @@
 % that run the actual tests.
 couch_config_test() ->
     [
-        fun() -> store_tuples() end, 
-        fun() -> store_strings() end,
-        fun() -> store_numbers() end,
-        fun() -> store_tuple_key() end
+        fun() -> store_strings() end
     ].
 
 
 % test functions
-
-% test storing different types and see if they come back
-% the same way there put in.
-store_tuples() ->
-    store(key, value).
   
 store_strings() ->
-    store("key", "value").
-
-store_numbers() ->
-    store("number_key", 12345).
-
-store_tuple_key() ->
-    store({key, subkey}, value).
-
-    
-store(Key2, Value2) ->
-    Filename = "local.ini",
+    Filename = "test.ini",
     file:write_file(Filename, ""),
 
-    Key = binary_to_list(term_to_binary(Key2)),
-    Value = binary_to_list(term_to_binary(Value2)),
+    Key = "foo",
+    Value = "bar",
 
-    couch_config:start_link(["local.ini"]),
+    {ok, Proc} = couch_config:start_link([Filename]),
 
-    couch_config:store({"test_module", Key}, Value),
-    Result = couch_config:get({"test_module", Key}),
-    couch_config:unset(Key),
+    couch_config:set("test_module", Key, Value),
+    Result = couch_config:get("test_module", Key),
+    couch_config:delete("test_module", Key),
 
-    couch_config:terminate(end_of_test, ok),
-
+    exit(Proc, kill),
+    receive {'EXIT', Proc, _} -> ok end,
+    
     % clean up
     file:delete(Filename),
 

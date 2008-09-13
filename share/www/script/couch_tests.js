@@ -1490,6 +1490,11 @@ var tests = {
     db.deleteDb();
     db.createDb();
     if (debug) debugger;
+    
+    /*
+     purge is not to be confused with a document deletion.  It removes the
+     document and all edit history from the local instance of the database.
+    */
 
     var numDocs = 10;
 
