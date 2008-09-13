@@ -14,7 +14,7 @@
 -behaviour(supervisor).
 
 
--export([start_link/1,stop/0,couch_config_start_link_wrapper/2,start_primary_services/0]).
+-export([start_link/1,stop/0,couch_config_start_link_wrapper/2,start_primary_services/0,start_secondary_services/0]).
 
 -include("couch_db.hrl").
 
@@ -72,7 +72,7 @@ start_server(IniFiles) ->
     
     ok = couch_util:start_driver(LibDir),
     
-    BaseServices =
+    BaseChildSpecs =
     {{one_for_all, 10, 3600}, 
         [{couch_config,
             {couch_server_sup, couch_config_start_link_wrapper, [IniFiles, ConfigPid]},
@@ -85,6 +85,12 @@ start_server(IniFiles) ->
             permanent,
             infinity,
             supervisor,
+            [couch_server_sup]},
+        {couch_secondary_services,
+            {couch_server_sup, start_secondary_services, []},
+            permanent,
+            infinity,
+            supervisor,
             [couch_server_sup]}
         ]},
    
@@ -94,13 +100,15 @@ start_server(IniFiles) ->
     application:start(crypto),
 
     {ok, Pid} = supervisor:start_link(
-        {local, couch_server_sup}, couch_server_sup, BaseServices),
+        {local, couch_server_sup}, couch_server_sup, BaseChildSpecs),
 
     % launch the icu bridge
     % just restart if one of the config settings change.
 
     couch_config:register(
         fun("couchdb", "util_driver_dir") ->
+            ?MODULE:stop();
+        ("daemons", _) ->
             ?MODULE:stop()
         end, Pid),
     
@@ -119,48 +127,38 @@ start_primary_services() ->
                 brutal_kill,
                 worker,
                 [couch_log]},
-            {couch_db_update_event,
-                {gen_event, start_link, [{local, couch_db_update}]},
-                permanent,
-                brutal_kill,
-                supervisor,
-                dynamic},
             {couch_server,
                 {couch_server, sup_start_link, []},
                 permanent,
                 brutal_kill,
                 supervisor,
                 [couch_server]},
-            {couch_query_servers,
-                {couch_query_servers, start_link, []},
+            {couch_db_update_event,
+                {gen_event, start_link, [{local, couch_db_update}]},
                 permanent,
                 brutal_kill,
                 supervisor,
-                [couch_query_servers]},
-            {couch_view,
-                {couch_view, start_link, []},
+                dynamic}]}).
+
+
+start_secondary_services() ->
+    DaemonChildSpecs = [
+        begin
+            {ok, Tokens, _} = erl_scan:string(SpecStr ++ "."),
+            {ok, {Module, Fun, Args}} = erl_parse:parse_term(Tokens),
+            
+            {list_to_atom(Name),
+                {Module, Fun, Args},
                 permanent,
                 brutal_kill,
-                supervisor,
-                [couch_view]},
-            {couch_httpd,
-                {couch_httpd, start_link, []},
-                permanent,
-                brutal_kill,
-                supervisor,
-                [couch_httpd]},
-            {couch_ft_query,
-                {couch_ft_query, start_link, []},
-                permanent,
-                brutal_kill,
-                supervisor,
-                [couch_ft_query]},
-            {couch_db_update_notifier_sup,
-                {couch_db_update_notifier_sup, start_link, []},
-                permanent,
-                brutal_kill,
-                supervisor,
-                [couch_db_update_notifier_sup]}]}).
+                worker,
+                [Module]}                
+        end
+        || {Name, SpecStr}
+        <- couch_config:get("daemons"), SpecStr /= ""],
+        
+    supervisor:start_link(couch_server_sup,
+        {{one_for_one, 10, 3600}, DaemonChildSpecs}).
 
 stop() ->
     catch exit(whereis(couch_server_sup), normal).
