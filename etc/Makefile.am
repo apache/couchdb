@@ -25,7 +25,7 @@ endif
 
 nobase_sysconf_DATA = $(default_sysconf_data) $(init_sysconf_data)
 
-CLEANFILES = $(init_DATA) $(nobase_sysconf_DATA) $(launchd_DATA)
+CLEANFILES = $(init_DATA) $(default_sysconf_data) $(launchd_DATA)
 
 transform = @program_transform_name@
 couchdb_command_name = `echo couchdb | sed '$(transform)'`
