@@ -273,7 +273,7 @@ update_docs(#db{update_pid=UpdatePid}=Db, Docs, Options) ->
     case gen_server:call(UpdatePid, {update_docs, DocBuckets3, [new_edits | Options]}, infinity) of
     ok -> {ok, NewRevs};
     retry ->
-        Db2 = open_ref_counted(Db#db.main_pid, self()),
+        {ok, Db2} = open_ref_counted(Db#db.main_pid, self()),
         DocBuckets4 = [[doc_flush_binaries(Doc, Db2#db.fd) || Doc <- Bucket] || Bucket <- DocBuckets3],
         % We only retry once
         close(Db2),
