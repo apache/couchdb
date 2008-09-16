@@ -52,6 +52,7 @@ nobase_dist_localdata_DATA = \
     www/image/toggle-expand.gif \
     www/image/twisty.gif \
     www/index.html \
+    www/config.html \
     www/replicator.html \
     www/script/browse.js \
     www/script/couch.js \
