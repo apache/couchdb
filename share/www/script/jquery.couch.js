@@ -32,6 +32,23 @@
       });
     },
 
+    config: function(options, section, option, value) {
+      $.ajax({
+        type: "GET", url: "/_config/",
+        complete: function(req) {
+          var resp = $.httpData(req, "json");
+          if (req.status == 200) {
+            if (options.success) options.success(resp);
+          } else if (options.error) {
+            options.error(req.status, resp.error, resp.reason);
+          } else {
+            alert("An error occurred retrieving the server configuration: " +
+              resp.reason);
+          }
+        }
+      });
+    },
+
     db: function(name) {
       return {
         name: name,

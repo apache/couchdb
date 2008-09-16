@@ -207,10 +207,14 @@ handle_db_request(Req, 'PUT', {DbName, []}) ->
             couch_db:close(Db),
             send_json(Req, 201, {[{ok, true}]});
         {error, database_already_exists} ->
-            Msg = io_lib:format("Database ~p already exists.", [DbName]),
+            Msg = io_lib:format("Database ~p already exists.", [
+                binary_to_list(DbName)
+            ]),
             throw({database_already_exists, Msg});
         Error ->
-            Msg = io_lib:format("Error creating database ~p: ~p", [DbName, Error]),
+            Msg = io_lib:format("Error creating database ~p: ~p", [
+                binary_to_list(DbName), Error
+            ]),
             throw({unknown_error, Msg})
     end;
 
@@ -804,6 +808,22 @@ handle_attachment_request(_Req, _Method, _DbName, _Db, _DocId, _FileName) ->
 handle_config_request(_Req, Method, {config, Config}) ->
     Parts = string:tokens(Config, "/"),
     handle_config_request(_Req, Method, {Parts});
+
+% GET /_config
+handle_config_request(Req, 'GET', {[]}) ->
+    send_json(Req, 200, {dict:to_list(dict:map(
+        fun(_, Value) -> {Value} end,
+        lists:foldl(
+            fun({{Section, Option}, Value}, Acc) ->
+                SecBin = list_to_binary(Section),
+                OptBin = list_to_binary(Option),
+                ValBin = list_to_binary(Value),
+                dict:append(SecBin, {OptBin, ValBin}, Acc)
+            end,
+            dict:new(),
+            couch_config:all()
+        )
+    ))});
 
 % GET /_config/Section
 handle_config_request(Req, 'GET', {[Section]}) ->

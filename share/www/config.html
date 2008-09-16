@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<!--
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License.  You may obtain a copy of the
+License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations under the License.
+
+-->
+<html lang="en">
+  <head>
+    <title>Configuration</title>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <link rel="stylesheet" href="style/layout.css?0.8.0" type="text/css">
+    <script src="script/json2.js"></script>
+    <script src="script/jquery.js?1.2.6"></script>
+    <script src="script/jquery.couch.js?0.8.0"></script>
+    <script src="script/pprint.js?0.8.0"></script>
+    <script>
+      $(document).ready(function() {
+        if (window !== parent) parent.updateNavigation();
+
+        $(document.body).addClass("loading");
+        $.couch.config({
+          success: function(resp) {
+            var sections = [];
+            for (var sectionName in resp) {
+              sections.push(sectionName);
+            }
+            sections.sort();
+            $.each(sections, function(idx, sectionName) {
+              var row = $("<tr><th></th></tr>")
+                .find("th").text(sectionName).end()
+                .appendTo("#config tbody.content");
+              var section = resp[sectionName]
+              var options = [];
+              for (var option in section) {
+                options.push(option);
+              }
+              options = options.sort();
+              var prev = null;
+              $.each(options, function(idx, optionName) {
+                var cur = idx == 0 ? row : $("<tr></tr>");
+                $("<td class='name'></td>").text(optionName).appendTo(cur);
+                $("<td class='value'></td>").text(section[optionName]).appendTo(cur);
+                if (cur !== row) cur.insertAfter(prev);
+                prev = cur;
+              });
+              row.find("th").attr("rowspan", options.length);
+            });
+            $("#config tbody tr").removeClass("odd").filter(":odd").addClass("odd");
+            $(document.body).removeClass("loading");
+          }
+        });
+      });
+    </script>
+  </head>
+  <body>
+    <h1>
+      <a href="browse/index.html">Overview</a>
+      <strong>Configuration</strong>
+    </h1>
+    <div id="wrap">
+
+      <table id="config" class="listing">
+        <caption>Configuration</caption>
+        <thead><tr>
+          <th>Section</th>
+          <th>Option</th>
+          <th>Value</th>
+        </tr></thead>
+        <tbody class="content"></tbody>
+      </table>
+
+    </div>
+    <div id="dump"></div>
+  </body>
+</html>

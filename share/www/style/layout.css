@@ -459,6 +459,18 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
   background-image: url(../image/test_failure.gif); color: #c00;
 }
 
+/* Configuration */
+
+table#config tbody th { background: #e6e6e6; border-right: none;
+  border-top: 1px solid #d9d9d9;
+}
+table#config tbody td.name { border-left: 1px solid #d9d9d9; color: #333;
+  font-weight: bold;
+}
+table#config tbody td.value {
+  font-family: "DejaVu Sans Mono",Monaco,monospace;
+}
+
 /* Replication */
 
 form#replicator { background: #f4f4f4; border: 1px solid;
