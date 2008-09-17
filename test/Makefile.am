@@ -16,5 +16,5 @@ check_PROGRAMS = runner.beam
 
 CLEANFILES = test.ini
 
-runner.beam: runner.erl
+runner.beam$(EXEEXT): runner.erl
 	$(ERLC) $<
