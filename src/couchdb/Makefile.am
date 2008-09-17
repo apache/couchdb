@@ -32,8 +32,6 @@ couchebin_DATA = $(compiled_files)
 
 dist_devdoc_DATA = $(doc_base) $(doc_modules)
 
-EXTRA_DIST = $(couch_files)
-
 CLEANFILES = $(compiled_files) $(doc_base) $(doc_modules) edoc-info
 
 source_files = \
