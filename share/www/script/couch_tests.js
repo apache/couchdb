@@ -539,6 +539,40 @@ var tests = {
     
   },
 
+  reduce_false: function(debug) {
+    var db = new CouchDB("test_suite_db");
+    db.deleteDb();
+    db.createDb();
+    if (debug) debugger;
+
+    var numDocs = 5;
+    var docs = makeDocs(1,numDocs + 1);
+    T(db.bulkSave(docs).ok);
+    var summate = function(N) {return (N+1)*N/2;};
+
+    var designDoc = {
+      _id:"_design/test",
+      language: "javascript",
+      views: {
+        summate: {map:"function (doc) {emit(doc.integer, doc.integer)};",
+                  reduce:"function (keys, values) { return sum(values); };"},
+      }
+    };
+    T(db.save(designDoc).ok);
+
+    // Test that the reduce works
+    var res = db.view('test/summate');
+    T(res.rows.length == 1 && res.rows[0].value == summate(5));
+    
+    //Test that we get our docs back
+    res = db.view('test/summate', {reduce: false});
+    T(res.rows.length == 5);
+    for(var i=0; i<5; i++)
+    {
+      T(res.rows[i].value == i+1);
+    }
+  },
+
   multiple_rows: function(debug) {
     var db = new CouchDB("test_suite_db");
     db.deleteDb();
