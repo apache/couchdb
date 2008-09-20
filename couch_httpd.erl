@@ -35,7 +35,8 @@
     start_docid = nil,
     end_docid = {},
     skip = 0,
-    group_level = 0
+    group_level = 0,
+    reduce = true
 }).
 
 start_link() ->
@@ -418,7 +419,8 @@ handle_db_request(Req, 'GET', {DbName, _Db, [<<"_view">>, DocId, ViewName]}) ->
         count = Count,
         skip = SkipCount,
         direction = Dir,
-        start_docid = StartDocId
+        start_docid = StartDocId,
+        reduce = Reduce
     } = QueryArgs = parse_view_query(Req),
     
     case couch_view:get_map_view({DbName, <<"_design/", DocId/binary>>, ViewName}) of
@@ -433,7 +435,19 @@ handle_db_request(Req, 'GET', {DbName, _Db, [<<"_view">>, DocId, ViewName]}) ->
     {not_found, Reason} ->
         case couch_view:get_reduce_view({DbName, <<"_design/", DocId/binary>>, ViewName}) of
         {ok, View} ->
-            output_reduce_view(Req, View);
+            case Reduce of
+            false ->
+                {reduce, _N, _Lang, MapView} = View,
+                {ok, RowCount} = couch_view:get_row_count(MapView),
+                Start = {StartKey, StartDocId},
+                FoldlFun = make_view_fold_fun(Req, QueryArgs, RowCount,
+                    fun couch_view:reduce_to_count/1),
+                FoldAccInit = {Count, SkipCount, undefined, []},
+                FoldResult = couch_view:fold(MapView, Start, Dir, FoldlFun, FoldAccInit),
+                finish_view_fold(Req, RowCount, FoldResult);
+            _ ->
+                output_reduce_view(Req, View)
+            end;
         _ ->
             throw({not_found, Reason})
         end
@@ -940,6 +954,10 @@ parse_view_query(Req) ->
             Args#view_query_args{group_level=exact};
         {"group_level", LevelStr} ->
             Args#view_query_args{group_level=list_to_integer(LevelStr)};
+        {"reduce", "true"} ->
+            Args#view_query_args{reduce=true};
+        {"reduce", "false"} ->
+            Args#view_query_args{reduce=false};
         _ -> % unknown key
             Msg = lists:flatten(io_lib:format(
                 "Bad URL query key:~s", [Key])),
