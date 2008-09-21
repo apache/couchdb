@@ -93,11 +93,8 @@ json_encode(false, _State) ->
     <<"false">>;
 json_encode(null, _State) ->
     <<"null">>;
-json_encode(I, _State) when is_integer(I) andalso I >= -2147483648 andalso I =< 2147483647 ->
-    %% Anything outside of 32-bit integers should be encoded as a float
-    integer_to_list(I);
 json_encode(I, _State) when is_integer(I) ->
-    mochinum:digits(float(I));
+    integer_to_list(I);
 json_encode(F, _State) when is_float(F) ->
     mochinum:digits(F);
 json_encode(S, State) when is_binary(S); is_atom(S) ->
