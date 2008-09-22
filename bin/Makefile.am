@@ -54,7 +54,7 @@ couchjs: couchjs.tpl
 
 HELP2MAN_OPTION=--no-info --help-option="-h" --version-option="-V"
 
-# XXX: Because the scripts are made at bulid time for the user we need to
+# XXX: Because the scripts are made at build time for the user we need to
 # XXX: depend on the original templates so as not to cause the rebuilding of
 # XXX: the man pages.
 
