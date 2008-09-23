@@ -54,6 +54,7 @@ save_to_file({{Section, Option}, Value}, File) ->
     % do the save, close the config file and get out
     save_file(File, NewFileContents),
     file:close(Stream),
+
     ok.
 
 %% @doc Iterates over the lines of an ini file and replaces or adds a new
@@ -62,59 +63,79 @@ save_loop({{Section, Option}, Value}, [Line|Rest], OldCurrentSection, Contents, 
 
     % if we find a new [ini section] (Section), save that for reference
     NewCurrentSection = parse_module(Line, OldCurrentSection),
-
     % if the current Section is the one we want to change, try to match
     % each line with the Option
-    NewContents = case Section of
-        NewCurrentSection ->
-            % see if the current line matches the variable we want to substitute
-            case parse_variable(Line, Option, Value) of
-                % nope, return original line
+    NewContents = 
+    case NewCurrentSection of
+    Section ->
+        case OldCurrentSection of
+        NewCurrentSection -> % we already were in [Section]
+            case lists:member(Option, DoneOptions) of
+            true -> % we already replaced Option, do nothing
+                DoneOptions2 = DoneOptions,
+                Line;
+            _ -> % we haven't written our Option yet
+                case parse_variable(Line, Option, Value) of
                 nomatch ->
                     DoneOptions2 = DoneOptions,
                     Line;
-                % got em! return new line
                 NewLine ->
                     DoneOptions2 = [Option|DoneOptions],
                     NewLine
+                end
             end;
-        % if the variable we want to change couldn't be replaced, we append it
-        % in the proper module section
-        OldCurrentSection ->
-            case lists:member(Option, DoneOptions) of
-                false ->
-                    DoneOptions2 = [Option|DoneOptions],
-                    Option ++ " = " ++ Value ++ "\n" ++ Line;
-                true ->
-                    DoneOptions2 = DoneOptions,
-                    Line
-            end;
-        % otherwise we just print out the original line
-        _ ->
-            DoneOptions2 = DoneOptions,
-            Line
-        end,
-    % clumsy way to only append a newline character
-    % if the line is not empty. We need this to not
-    % avoid haveing a newline inserted at the top
-    % of the target file each time we save it.
+        _ -> % we got into a new [section]
+            {NewLine, DoneOptions2} = append_var_to_section(
+                {{Section, Option}, Value}, 
+                Line, 
+                OldCurrentSection, 
+                DoneOptions),
+            NewLine
+        end;
+    _ -> % we are reading [NewCurrentSection]
+        {NewLine, DoneOptions2} = append_var_to_section(
+            {{Section, Option}, Value}, 
+            Line, 
+            OldCurrentSection, 
+            DoneOptions),
+        NewLine
+    end,
+    % clumsy way to only append a newline character if the line is not empty. We need this to 
+    % avoid having a newline inserted at the top of the target file each time we save it.
     Contents2 = case Contents of "" -> ""; _ -> Contents ++ "\n" end,
-
     % go to next line
     save_loop({{Section, Option}, Value}, Rest, NewCurrentSection, Contents2 ++ NewContents, DoneOptions2);
 
-save_loop(_Config, [], _OldSection, NewFileContents, _DoneOption) ->
-    % we're out of new lines, just return the new file's contents
-    NewFileContents.
+save_loop({{Section, Option}, Value}, [], OldSection, NewFileContents, DoneOptions) ->
+    case lists:member(Option, DoneOptions) of
+        % append Deferred Option
+        false when Section == OldSection -> 
+            NewFileContents ++ "\n" ++ Option ++ " = " ++ Value ++ "\n";
+        % we're out of new lines, just return the new file's contents
+        _ -> NewFileContents
+    end.
 
 append_new_ini_section({{SectionName, Option}, Value}, OldFileContents) ->
-    OldFileContents ++ "\n\n" ++ SectionName ++ "\n" ++  Option ++ " = " ++ Value ++ "\n".
+    OldFileContents ++ "\n" ++ SectionName ++ "\n" ++  Option ++ " = " ++ Value ++ "\n".
 
-%% @spec parse_module(Lins::string(), OldSection::string()) -> string()
+append_var_to_section({{Section, Option}, Value}, Line, OldCurrentSection, DoneOptions) ->
+    case OldCurrentSection of
+        Section -> % append Option to Section
+            case lists:member(Option, DoneOptions) of
+            false ->
+                {Option ++ " = " ++ Value ++ "\n\n" ++ Line, [Option|DoneOptions]};
+            _ ->
+                {Line, DoneOptions}
+            end;
+        _ ->
+            {Line, DoneOptions}
+        end.
+    
+%% @spec parse_module(Line::string(), OldSection::string()) -> string()
 %% @doc Tries to match a line against a pattern specifying a ini module or
 %%      section ("[Section]"). Returns OldSection if no match is found.
 parse_module(Line, OldSection) ->
-    case regexp:match(Line, "^\\[([a-zA-Z0-9_-]*)\\]$") of
+    case regexp:match(Line, "^\\[([a-zA-Z0-9\_-]*)\\]$") of
         nomatch ->
             OldSection;
         {error, Error} ->
