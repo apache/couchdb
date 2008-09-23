@@ -789,7 +789,7 @@ handle_attachment_request(Req, Method, _DbName, Db, DocId, FileName)
         _ ->
             [{FileName, {
                 list_to_binary(Req:get_header_value("Content-Type")),
-                Req:recv_body()
+                Req:recv_body(?MAX_DOC_SIZE)
             }}]
     end,
 
