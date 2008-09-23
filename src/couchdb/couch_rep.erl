@@ -110,17 +110,17 @@ replicate2(Source, DbSrc, Target, DbTgt, Options) ->
     false ->
         HistEntries =[
             {
-                [{start_time, list_to_binary(StartTime)},
-                {end_time, list_to_binary(httpd_util:rfc1123_date())},
-                {start_last_seq, SeqNum},
-                {end_last_seq, NewSeqNum} | Stats]}
+                [{<<"start_time">>, list_to_binary(StartTime)},
+                {<<"end_time">>, list_to_binary(httpd_util:rfc1123_date())},
+                {<<"start_last_seq">>, SeqNum},
+                {<<"end_last_seq">>, NewSeqNum} | Stats]}
             | proplists:get_value("history", OldRepHistoryProps, [])],
         % something changed, record results
         NewRepHistory =
             {
-                [{session_id, couch_util:new_uuid()},
-                {source_last_seq, NewSeqNum},
-                {history, lists:sublist(HistEntries, 50)}]},
+                [{<<"session_id">>, couch_util:new_uuid()},
+                {<<"source_last_seq">>, NewSeqNum},
+                {<<"history">>, lists:sublist(HistEntries, 50)}]},
 
         {ok, _} = update_doc(DbSrc, RepRecSrc#doc{body=NewRepHistory}, []),
         {ok, _} = update_doc(DbTgt, RepRecTgt#doc{body=NewRepHistory}, []),
@@ -184,8 +184,8 @@ get_missing_revs_loop(DbTarget, OpenDocsPid, RevsChecked, MissingFound) ->
                 RevsChecked + length(Revs),
                 MissingFound + length(MissingRevs));
     {Src, shutdown} ->
-        Src ! {done, self(), [{missing_checked, RevsChecked},
-                                 {missing_found, MissingFound}]}
+        Src ! {done, self(), [{<<"missing_checked">>, RevsChecked},
+                                 {<<"missing_found">>, MissingFound}]}
     end.
     
 
@@ -200,7 +200,7 @@ open_doc_revs_loop(DbSource, SaveDocsPid, DocsRead) ->
         SaveDocsPid ! {self(), docs, Docs},
         open_doc_revs_loop(DbSource, SaveDocsPid, DocsRead + length(Docs));
     {Src, shutdown} ->
-        Src ! {done, self(), [{docs_read, DocsRead}]}
+        Src ! {done, self(), [{<<"docs_read">>, DocsRead}]}
     end.
 
 
@@ -212,7 +212,7 @@ save_docs_loop(DbTarget, DocsWritten) ->
         ok = save_docs(DbTarget, Docs, []),
         save_docs_loop(DbTarget, DocsWritten + length(Docs));
     {Src, shutdown} ->
-        Src ! {done, self(), [{docs_written, DocsWritten}]}
+        Src ! {done, self(), [{<<"docs_written">>, DocsWritten}]}
     end.
 
 
