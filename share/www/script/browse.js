@@ -386,10 +386,11 @@ function CouchDatabasePage() {
       options.group = true;
     }
     if ($("#documents thead th.key").is(".desc")) {
-      options.descending = true;
+      if (typeof options.descending == 'undefined') options.descending = true;
+      var descend = true;
       $.cookies.set(dbName + ".desc", "1");
     } else {
-      if (options.descending !== undefined) delete options.descending;
+      var descend = false;
       $.cookies.remove(dbName + ".desc");
     }
     $("#paging a").unbind();
@@ -400,27 +401,37 @@ function CouchDatabasePage() {
       if (resp.offset === undefined) {
         resp.offset = 0;
       }
-      if (resp.rows !== null && resp.offset > 0) {
+      var decending_reverse = ((options.descending && !descend) || (descend && (options.descending === false)));
+      if (decending_reverse && resp.rows) {
+        resp.rows = resp.rows.reverse();
+      }
+      if (resp.rows !== null && (decending_reverse ? 
+        (resp.total_rows - resp.offset > options.count) :
+        (resp.offset > 0))) {
         $("#paging a.prev").attr("href", "#" + (resp.offset - options.count)).click(function() {
           var firstDoc = resp.rows[0];
           page.updateDocumentListing({
             startkey: firstDoc.key !== undefined ? firstDoc.key : null,
             startkey_docid: firstDoc.id,
             skip: 1,
-            count: -options.count
+            descending: !descend,
+            count: options.count
           });
           return false;
         });
       } else {
         $("#paging a.prev").removeAttr("href");
       }
-      if (resp.rows !== null && resp.total_rows - resp.offset > options.count) {
+      if (resp.rows !== null && (decending_reverse ? 
+        (resp.offset - resp.total_rows < options.count) : 
+        (resp.total_rows - resp.offset > options.count))) {
         $("#paging a.next").attr("href", "#" + (resp.offset + options.count)).click(function() {
           var lastDoc = resp.rows[resp.rows.length - 1];
           page.updateDocumentListing({
             startkey: lastDoc.key !== undefined ? lastDoc.key : null,
             startkey_docid: lastDoc.id,
             skip: 1,
+            descending: descend,
             count: options.count
           });
           return false;
@@ -455,8 +466,13 @@ function CouchDatabasePage() {
       var firstNum = 1;
       var lastNum = totalNum = resp.rows.length;
       if (resp.total_rows != null) {
-        firstNum = Math.min(resp.total_rows, resp.offset + 1);
-        lastNum = firstNum + resp.rows.length - 1;
+        if (decending_reverse) {
+          lastNum = Math.min(resp.total_rows, resp.total_rows - resp.offset);
+          firstNum = lastNum - resp.rows.length + 1;          
+        } else {
+          firstNum = Math.min(resp.total_rows, resp.offset + 1);
+          lastNum = firstNum + resp.rows.length - 1;
+        }
         totalNum = resp.total_rows;
         $("#paging").show();
       } else {
