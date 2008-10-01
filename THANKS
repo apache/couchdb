@@ -1,10 +1,10 @@
 Apache CouchDB THANKS
 =====================
 
-Apache CouchDB was originally developed by Damien Katz <damien_katz@yahoo.com>
-and a number of other contributors. Many people further contributed to Apache
-CouchDB by reporting problems, suggesting various improvements or submitting
-changes. A list of these people is included below.
+A number of people have contributed to Apache CouchDB by reporting problems,
+suggesting improvements or submitting changes.
+
+Some of these people are:
 
  * William Beh <willbeh@gmail.com>
  * Yoan Blanc <yoan.blanc@gmail.com>

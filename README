@@ -13,8 +13,8 @@ manner consistent with other successful ASF projects. While incubation status is
 not necessarily a reflection of the completeness or stability of the code, it
 does indicate that the project has yet to be fully endorsed by the ASF.
 
-Building From Subversion
-------------------------
+Building From Checkout
+----------------------
 
 You can skip this section if you are installing from a release tarball.
 
@@ -23,13 +23,13 @@ Dependencies
 
 To build Apache CouchDB from checkout you need some of the following installed:
 
- * GNU Automake (>=1.6.3) (required) (http://www.gnu.org/software/automake/)
- * GNU Autoconf (>=2.59)  (required) (http://www.gnu.org/software/autoconf/)
- * GNU Libtool (required) (http://www.gnu.org/software/libtool/)
- * help2man (optional) (http://www.gnu.org/software/help2man/)
+ * GNU Automake (>=1.6.3) (http://www.gnu.org/software/automake/)
+ * GNU Autoconf (>=2.59)  (http://www.gnu.org/software/autoconf/)
+ * GNU Libtool            (http://www.gnu.org/software/libtool/)
+ * GNU help2man           (http://www.gnu.org/software/help2man/)
 
-If you are running a Debian GNU/Linux system (or a derivative such as Ubuntu
-GNU/Linux) you can install these dependencies using the `apt-get` command:
+If you are running a Debian GNU/Linux based system you can install these
+dependencies using the `apt-get` command:
 
     apt-get install automake autoconf libtool help2man
 
@@ -42,29 +42,29 @@ the `port` command:
 Bootstrapping
 ~~~~~~~~~~~~~
 
-Note: You must repeat this step every time you update your Subversion checkout.
+Note: You must repeat this step every time you update your checkout.
 
 Bootstrap the pristine source by running the following command:
 
     ./bootstrap
 
-Installation And First Run
+Installation and First Run
 --------------------------
-
-You will need the following installed:
-
- * Erlang OTP (>=R11B) (required) (http://erlang.org/)
- * ICU (required) (http://icu.sourceforge.net/)
- * OpenSSL (required) (http://www.openssl.org/)
- * Mozilla SpiderMonkey (required) (http://www.mozilla.org/js/spidermonkey/)
- * GNU Make (required) (http://www.gnu.org/software/make/)
- * GNU Compiler Collection (required) (http://gcc.gnu.org/)
 
 UNIX-like Operating Systems (inc. OS X)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Dependencies
 ^^^^^^^^^^^^
+
+To build and install apache CouchDB you will need the following installed:
+
+ * Erlang OTP (>=R11B)     (http://erlang.org/)
+ * ICU                     (http://icu.sourceforge.net/)
+ * OpenSSL                 (http://www.openssl.org/)
+ * Mozilla SpiderMonkey    (http://www.mozilla.org/js/spidermonkey/)
+ * GNU Make                (http://www.gnu.org/software/make/)
+ * GNU Compiler Collection (http://gcc.gnu.org/)
 
 Debian-based (inc. Ubuntu) Systems
 ++++++++++++++++++++++++++++++++++
@@ -102,7 +102,7 @@ To update your `locate` database you may want to run the following command:
 Installing
 ^^^^^^^^^^
 
-Once you have satisfied dependencies you should run the following command:
+Once you have satisfied the dependencies you should run the following command:
 
     ./configure
 
@@ -127,12 +127,12 @@ configuration files you should run the following command:
 
     sudo make && yes | sudo make install
 
-Note: Use of the `sudo` command is only required if you are installing into a
+Note: The use of the `sudo` command is only required if you are installing into a
 system owned directory. You do not need to do this if you are installing
 elsewhere, such as your home directory.
 
 If you are having problems running `make` you may want to try running `gmake` if
-it is available on your system.
+this is available on your system.
 
 More options can be found by reading the `INSTALL` file.
 
