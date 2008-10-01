@@ -32,6 +32,13 @@ specific language governing permissions and limitations under the License.
       if (window != parent) {
         parent.updateNavigation(location.pathname,
           encodeURIComponent(location.search.split("/", 2)[0]));
+        var recentDbs = $.cookies.get("recent", "").split(",");
+        if ($.inArray(page.db.name, recentDbs) == -1) {
+          recentDbs.unshift(page.db.name);
+          if (recentDbs.length > 10) recentDbs.length = 10;
+          $.cookies.set("recent", recentDbs.join(","), parent.location.pathname);
+          parent.updateRecentDatabasesList();
+        }
       }
 
       $(document).ready(function() {

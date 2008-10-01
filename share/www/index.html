@@ -28,19 +28,17 @@ specific language governing permissions and limitations under the License.
     </style>
     <script src="script/json2.js"></script>
     <script src="script/jquery.js?1.2.6"></script>
+    <script src="script/jquery.cookies.js?0.8.0"></script>
     <script src="script/jquery.couch.js?0.8.0"></script>
     <script>
-      function updateDatabaseList() {
-        var list = $("#dbs").empty();
-        var dbs = $.couch.allDbs({
-          success: function(dbs, status) {
-            for (var i = 0; i < dbs.length; i++) {
-              var dbName = dbs[i];
-              list.append("<li><a href='browse/database.html?" +
-                encodeURIComponent(dbName) + "' target='content'>" + dbName +
-                "</a></li>");
-            }
-          }
+      function updateRecentDatabasesList() {
+        $("#dbs").empty();
+        var recentDbs = $.cookies.get("recent", "").split(",");
+        recentDbs.sort();
+        $.each(recentDbs, function(idx, name) {
+          $("#dbs").append("<li><a href='browse/database.html?" +
+            encodeURIComponent(name) + "' target='content'>" + name +
+            "</a></li>");
         });
       }
       function updateNavigation(path, queryString) {
@@ -76,7 +74,7 @@ specific language governing permissions and limitations under the License.
             $("#version").text(info.version);
           }
         });
-        updateDatabaseList();
+        updateRecentDatabasesList();
       });
     </script>
   </head>
@@ -91,7 +89,7 @@ specific language governing permissions and limitations under the License.
         <li><a href="config.html" target="content">Configuration</a></li>
         <li><a href="couch_tests.html" target="content">Test Suite</a></li>
       </ul></li>
-      <li><span>Databases</span>
+      <li><span>Recent Databases</span>
         <ul id="dbs"></ul>
       </li>
     </ul>

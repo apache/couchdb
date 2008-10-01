@@ -26,7 +26,6 @@ function CouchIndexPage() {
         $.couch.db(data.name).create({
           error: function(status, id, reason) { callback({name: reason}) },
           success: function(resp) {
-            if (window !== parent) parent.setTimeout("updateDatabaseList()", 500);
             location.href = "database.html?" + encodeURIComponent(data.name);
             callback();
           }

@@ -16,7 +16,7 @@ specific language governing permissions and limitations under the License.
 /* General styles */
 
 html, body { background: transparent; color: #000;
-  font: normal 90% Arial,Helvetica,sans-serif; margin: 0;
+  font: normal 90% Arial,Helvetica,sans-serif; margin: 0; padding: 0;
 }
 :link, :visited { color: #ba1e16; text-decoration: none; }
 :link img, :visited img { border: none; }
