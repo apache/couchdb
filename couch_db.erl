@@ -17,7 +17,7 @@
 -export([open_ref_counted/2,num_refs/1,monitor/1]).
 -export([save_docs/3,update_doc/3,update_docs/2,update_docs/3,delete_doc/3]).
 -export([get_doc_info/2,open_doc/2,open_doc/3,open_doc_revs/4]).
--export([get_missing_revs/2]).
+-export([get_missing_revs/2,name/1]).
 -export([enum_docs/4,enum_docs/5,enum_docs_since/4,enum_docs_since/5]).
 -export([enum_docs_since_reduce_to_count/1,enum_docs_reduce_to_count/1]).
 -export([increment_update_seq/1,get_purge_seq/1,purge_docs/2,get_last_purged/1]).
@@ -27,44 +27,47 @@
 
 -include("couch_db.hrl").
 
+
 start_link(DbName, Filepath, Options) ->
-    catch start_link0(DbName, Filepath, Options).
-        
-start_link0(DbName, Filepath, Options) ->
-    Fd = 
+    case open_db_file(Filepath, Options) of
+    {ok, Fd} ->
+        StartResult = gen_server:start_link(couch_db, {DbName, Filepath, Fd, Options}, []),
+        unlink(Fd),
+        case StartResult of
+        {ok, _} ->
+            % We successfully opened the db, delete old storage files if around
+            case file:delete(Filepath ++ ".old") of
+            ok ->
+                ?LOG_INFO("Deleted old storage file ~s~s", [Filepath, ".old"]);
+            {error, enoent} ->
+                ok  % normal result
+            end,
+            StartResult;
+        Error ->
+            Error
+        end;
+    Else ->
+        Else
+    end.
+
+open_db_file(Filepath, Options) ->
     case couch_file:open(Filepath, Options) of
-    {ok, Fd0} ->
-        Fd0;
+    {ok, Fd} ->
+        {ok, Fd};
     {error, enoent} ->
         % couldn't find file. is there a compact version? This can happen if
         % crashed during the file switch.
         case couch_file:open(Filepath ++ ".compact") of
-        {ok, Fd0} ->
+        {ok, Fd} ->
             ?LOG_INFO("Found ~s~s compaction file, using as primary storage.", [Filepath, ".compact"]),
             ok = file:rename(Filepath ++ ".compact", Filepath),
-            Fd0;
+            {ok, Fd};
         {error, enoent} ->
-            throw(not_found)
+            not_found
         end;
-    Else ->
-        throw(Else)
-    end,
-    
-    StartResult = gen_server:start_link(couch_db, {DbName, Filepath, Fd, Options}, []),
-    unlink(Fd),
-    case StartResult of
-    {ok, _} ->
-        % We successfully opened the db, delete old storage files if around
-        case file:delete(Filepath ++ ".old") of
-        ok ->
-            ?LOG_INFO("Deleted old storage file ~s~s", [Filepath, ".old"]);
-        {error, enoent} ->
-            ok  % normal result
-        end;
-    _ ->
-        ok
-    end,
-    StartResult.
+    Error ->
+        Error
+    end.
 
 
 create(DbName, Options) ->
@@ -178,6 +181,9 @@ get_db_info(Db) ->
         ],
     {ok, InfoList}.
 
+name(#db{name=Name}) ->
+    Name.
+    
 update_doc(Db, Doc, Options) ->
     {ok, [NewRev]} = update_docs(Db, [Doc], Options),
     {ok, NewRev}.

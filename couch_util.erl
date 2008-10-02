@@ -16,7 +16,7 @@
 -export([should_flush/0, should_flush/1]).
 -export([new_uuid/0, rand32/0, implode/2, collate/2, collate/3]).
 -export([abs_pathname/1,abs_pathname/2, trim/1, ascii_lower/1]).
--export([encodeBase64/1, decodeBase64/1, to_hex/1]).
+-export([encodeBase64/1, decodeBase64/1, to_hex/1,parse_term/1,dict_find/3]).
 
 -include("couch_db.hrl").
 
@@ -45,6 +45,13 @@ to_hex([H|T]) ->
 
 to_digit(N) when N < 10 -> $0 + N;
 to_digit(N)             -> $a + N-10.
+
+
+parse_term(Bin) when is_binary(Bin)->
+    parse_term(binary_to_list(Bin));
+parse_term(List) ->
+    {ok, Tokens, _} = erl_scan:string(List ++ "."),
+    erl_parse:parse_term(Tokens).
     
 
 % returns a random integer
@@ -249,3 +256,12 @@ enc(C) ->
 
 dec(C) ->
     62*?st(C,43) + ?st(C,47) + (C-59)*?st(C,48) - 69*?st(C,65) - 6*?st(C,97).
+
+
+dict_find(Key, Dict, DefaultValue) ->
+    case dict:find(Key, Dict) of
+    {ok, Value} ->
+        Value;
+    error ->
+        DefaultValue
+    end.

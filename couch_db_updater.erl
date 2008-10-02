@@ -478,28 +478,40 @@ copy_rev_tree(SrcFd, DestFd, DestStream, [{RevId, _, SubTree} | RestTree]) ->
     % inner node, only copy info/data from leaf nodes
     [{RevId, ?REV_MISSING, copy_rev_tree(SrcFd, DestFd, DestStream, SubTree)} | copy_rev_tree(SrcFd, DestFd, DestStream, RestTree)].
     
-copy_docs(#db{fd=SrcFd}=Db, #db{fd=DestFd,summary_stream=DestStream}=NewDb, InfoBySeq) ->
+copy_docs(#db{fd=SrcFd}=Db, #db{fd=DestFd,summary_stream=DestStream}=NewDb, InfoBySeq, Retry) ->
     Ids = [Id || #doc_info{id=Id} <- InfoBySeq],
     LookupResults = couch_btree:lookup(Db#db.fulldocinfo_by_id_btree, Ids),
     NewFullDocInfos = lists:map(
         fun({ok, #full_doc_info{rev_tree=RevTree}=Info}) ->
             Info#full_doc_info{rev_tree=copy_rev_tree(SrcFd, DestFd, DestStream, RevTree)}
         end, LookupResults),
-    NewDocInfos = [couch_doc:to_doc_info(FullDocInfo) || FullDocInfo <- NewFullDocInfos],
-    {ok, DocInfoBTree} =
-        couch_btree:add_remove(NewDb#db.docinfo_by_seq_btree, NewDocInfos, []),
-    {ok, FullDocInfoBTree} =
-        couch_btree:add_remove(NewDb#db.fulldocinfo_by_id_btree, NewFullDocInfos, []),
-    NewDb#db{fulldocinfo_by_id_btree=FullDocInfoBTree, docinfo_by_seq_btree=DocInfoBTree}.
+    NewDocInfos = [couch_doc:to_doc_info(Info) || Info <- NewFullDocInfos],
+    RemoveSeqs =
+    case Retry of
+    false ->
+        [];
+    true ->
+        % We are retrying a compaction, meaning the documents we are copying may
+        % already exist in our file and must be removed from the by_seq index.
+        Existing = couch_btree:lookup(NewDb#db.fulldocinfo_by_id_btree, Ids),
+        [Seq || {ok, #full_doc_info{update_seq=Seq}} <- Existing]
+    end,
+        
+    {ok, DocInfoBTree} = couch_btree:add_remove(
+            NewDb#db.docinfo_by_seq_btree, NewDocInfos, RemoveSeqs),
+    {ok, FullDocInfoBTree} = couch_btree:add_remove(
+            NewDb#db.fulldocinfo_by_id_btree, NewFullDocInfos, []),
+    NewDb#db{ fulldocinfo_by_id_btree=FullDocInfoBTree,
+              docinfo_by_seq_btree=DocInfoBTree}.
 
 
           
-copy_compact_docs(Db, NewDb) ->
+copy_compact_docs(Db, NewDb, Retry) ->
     EnumBySeqFun =
     fun(#doc_info{update_seq=Seq}=DocInfo, _Offset, {AccNewDb, AccUncopied}) ->
         case couch_util:should_flush() of
         true ->
-            NewDb2 = copy_docs(Db, AccNewDb, lists:reverse([DocInfo | AccUncopied])),
+            NewDb2 = copy_docs(Db, AccNewDb, lists:reverse([DocInfo | AccUncopied]), Retry),
             {ok, {commit_data(NewDb2#db{update_seq=Seq}), []}};
         false ->    
             {ok, {AccNewDb, [DocInfo | AccUncopied]}}
@@ -511,7 +523,7 @@ copy_compact_docs(Db, NewDb) ->
     case Uncopied of
     [#doc_info{update_seq=LastSeq} | _] ->
         commit_data( copy_docs(Db, NewDb2#db{update_seq=LastSeq},
-            lists:reverse(Uncopied)));
+            lists:reverse(Uncopied), Retry));
     [] ->
         NewDb2
     end.
@@ -522,13 +534,15 @@ start_copy_compact_int(#db{name=Name,filepath=Filepath}=Db) ->
     case couch_file:open(CompactFile) of
     {ok, Fd} ->
         ?LOG_DEBUG("Found existing compaction file for db \"~s\"", [Name]),
+        Retry = true,
         {ok, Header} = couch_file:read_header(Fd, ?HEADER_SIG);
     {error, enoent} ->
         {ok, Fd} = couch_file:open(CompactFile, [create]),
+        Retry = false,
         ok = couch_file:write_header(Fd, ?HEADER_SIG, Header=#db_header{})
     end,
     NewDb = init_db(Name, CompactFile, Fd, Header),
-    NewDb2 = commit_data(copy_compact_docs(Db, NewDb)),
+    NewDb2 = copy_compact_docs(Db, NewDb, Retry),
     close_db(NewDb2),
     
     gen_server:cast(Db#db.update_pid, {compact_done, CompactFile}).
