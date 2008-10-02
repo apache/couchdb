@@ -11,7 +11,6 @@ view_timeout = 5000 ; 5 seconds
 [httpd]
 port = 5984
 bind_address = 127.0.0.1
-utils_dir = %localdatadir%/www
 
 [log]
 file = %localstatelogdir%/couch.log
@@ -26,3 +25,16 @@ db_update_notifier={couch_db_update_notifier_sup, start_link, []}
 full_text_query={couch_ft_query, start_link, []}
 query_servers={couch_query_servers, start_link, []}
 httpd={couch_httpd, start_link, []}
+
+
+[httpd_global_handlers]
+/ = {couch_httpd_misc_handlers, handle_welcome_req, <<"Welcome">>}
+_utils = {couch_httpd_misc_handlers, handle_utils_dir_req, "%localdatadir%/www"}
+_all_dbs = {couch_httpd_misc_handlers, handle_all_dbs_req}
+_config = {couch_httpd_misc_handlers, handle_config_req}
+_replicate = {couch_httpd_misc_handlers, handle_replicate_req}
+_uuids = {couch_httpd_misc_handlers, handle_uuids_req}
+
+[httpd_db_handlers]
+_view = {couch_httpd_view, handle_view_req}
+_temp_view = {couch_httpd_view, handle_temp_view_req}

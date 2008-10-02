@@ -229,7 +229,7 @@ handle_call({create, DbName, Options}, {FromPid,_}, Server) ->
                 {reply, Error, Server}
             end;
         [_AlreadyRunningDb] ->
-            {reply, {error, file_exists}, Server}
+            {reply, file_exists, Server}
         end;
     Error ->
         {reply, Error, Server}

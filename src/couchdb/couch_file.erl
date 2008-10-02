@@ -315,7 +315,7 @@ init({Filepath, Options, ReturnPid}) ->
                     init_status_ok(ReturnPid, Fd);
                 false ->
                     ok = file:close(Fd),
-                    init_status_error(ReturnPid, {error, file_exists})
+                    init_status_error(ReturnPid, file_exists)
                 end;
             false ->
                 init_status_ok(ReturnPid, Fd)

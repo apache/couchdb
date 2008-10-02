@@ -52,6 +52,14 @@
     rev_tree = []
     }).
 
+-record(httpd,
+    {mochi_req,
+    method,
+    path_parts,
+    db_url_handlers
+    }).
+    
+
 -record(doc,
     {
     id = <<"">>,
@@ -103,7 +111,22 @@
     filepath
     }).
     
-    
+
+-record(view_query_args, {
+    start_key = nil,
+    end_key = {},
+    count = 10000000000, % a huge huge default number. Picked so we don't have
+                         % to do different logic for when there is no count
+                         % limit
+    update = true,
+    direction = fwd,
+    start_docid = nil,
+    end_docid = {},
+    skip = 0,
+    group_level = 0,
+    reduce = true
+}).
+
 
 % small value used in revision trees to indicate the revision isn't stored
 -define(REV_MISSING, []).

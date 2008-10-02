@@ -144,8 +144,7 @@ start_primary_services() ->
 start_secondary_services() ->
     DaemonChildSpecs = [
         begin
-            {ok, Tokens, _} = erl_scan:string(SpecStr ++ "."),
-            {ok, {Module, Fun, Args}} = erl_parse:parse_term(Tokens),
+            {ok, {Module, Fun, Args}} = couch_util:parse_term(SpecStr),
             
             {list_to_atom(Name),
                 {Module, Fun, Args},

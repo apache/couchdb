@@ -791,13 +791,6 @@ view_compute(#group{def_lang=DefLang, query_server=QueryServerIn}=Group, Docs) -
     {Group#group{query_server=QueryServer}, Results}.
 
 
-dict_find(Key, DefaultValue, Dict) ->
-    case dict:find(Key, Dict) of
-    {ok, Value} ->
-        Value;
-    error ->
-        DefaultValue
-    end.
 
 write_changes(Group, ViewKeyValuesToAdd, DocIdViewIdKeys, NewSeq) ->
     #group{id_btree=IdBtree} = Group,
@@ -824,7 +817,7 @@ write_changes(Group, ViewKeyValuesToAdd, DocIdViewIdKeys, NewSeq) ->
 
     Views2 = [
         begin
-            KeysToRemove = dict_find(View#view.id_num, [], KeysToRemoveByView),
+            KeysToRemove = couch_util:dict_find(View#view.id_num, KeysToRemoveByView, []),
             {ok, ViewBtree2} = couch_btree:add_remove(View#view.btree, AddKeyValues, KeysToRemove),
             View#view{btree = ViewBtree2}
         end
