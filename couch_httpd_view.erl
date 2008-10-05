@@ -24,24 +24,13 @@
 
 handle_view_req(#httpd{method='GET',path_parts=[_,_, Id, ViewName]}=Req, Db) ->
     #view_query_args{
-        start_key = StartKey,
-        count = Count,
-        skip = SkipCount,
-        direction = Dir,
-        start_docid = StartDocId,
         reduce = Reduce
     } = QueryArgs = parse_view_query(Req),
     
     case couch_view:get_map_view({couch_db:name(Db), 
             <<"_design/", Id/binary>>, ViewName}) of
     {ok, View} ->    
-        {ok, RowCount} = couch_view:get_row_count(View),
-        Start = {StartKey, StartDocId},
-        FoldlFun = make_view_fold_fun(Req, QueryArgs, RowCount,
-                fun couch_view:reduce_to_count/1),
-        FoldAccInit = {Count, SkipCount, undefined, []},
-        FoldResult = couch_view:fold(View, Start, Dir, FoldlFun, FoldAccInit),
-        finish_view_fold(Req, RowCount, FoldResult);
+        output_map_view(Req, View, QueryArgs);
     {not_found, Reason} ->
         case couch_view:get_reduce_view({couch_db:name(Db),
                 <<"_design/", Id/binary>>, ViewName}) of
@@ -49,13 +38,7 @@ handle_view_req(#httpd{method='GET',path_parts=[_,_, Id, ViewName]}=Req, Db) ->
             case Reduce of
             false ->
                 {reduce, _N, _Lang, MapView} = View,
-                {ok, RowCount} = couch_view:get_row_count(MapView),
-                Start = {StartKey, StartDocId},
-                FoldlFun = make_view_fold_fun(Req, QueryArgs, RowCount,
-                    fun couch_view:reduce_to_count/1),
-                FoldAccInit = {Count, SkipCount, undefined, []},
-                FoldResult = couch_view:fold(MapView, Start, Dir, FoldlFun, FoldAccInit),
-                finish_view_fold(Req, RowCount, FoldResult);
+                output_map_view(Req, MapView, QueryArgs);
             _ ->
                 output_reduce_view(Req, View)
             end;
@@ -68,13 +51,7 @@ handle_view_req(Req, _Db) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
-    #view_query_args{
-        start_key = StartKey,
-        count = Count,
-        skip = SkipCount,
-        direction = Dir,
-        start_docid = StartDocId
-    } = QueryArgs = parse_view_query(Req),
+    QueryArgs = parse_view_query(Req),
 
     case couch_httpd:primary_header_value(Req, "content-type") of
         undefined -> ok;
@@ -87,18 +64,7 @@ handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
     case proplists:get_value(<<"reduce">>, Props, null) of
     null ->
         {ok, View} = couch_view:get_map_view({temp, couch_db:name(Db), Language, MapSrc}),
-        Start = {StartKey, StartDocId},
-        
-        {ok, TotalRows} = couch_view:get_row_count(View),
-        
-        FoldlFun = make_view_fold_fun(Req, QueryArgs, TotalRows,
-                fun couch_view:reduce_to_count/1),
-        FoldAccInit = {Count, SkipCount, undefined, []},
-        FoldResult = couch_view:fold(View, Start, Dir, fun(A, B, C) ->
-            FoldlFun(A, B, C)
-        end, FoldAccInit),
-        finish_view_fold(Req, TotalRows, FoldResult);
-
+        output_map_view(Req, View, QueryArgs);
     RedSrc ->
         {ok, View} = couch_view:get_reduce_view(
                 {temp,  couch_db:name(Db), Language, MapSrc, RedSrc}),
@@ -108,6 +74,21 @@ handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
 handle_temp_view_req(Req, _Db) ->
     send_method_not_allowed(Req, "POST").
 
+output_map_view(Req, View, QueryArgs) ->
+    #view_query_args{
+        count = Count,
+        direction = Dir,
+        skip = SkipCount,
+        start_key = StartKey,
+        start_docid = StartDocId
+    } = QueryArgs,
+    {ok, RowCount} = couch_view:get_row_count(View),
+    Start = {StartKey, StartDocId},
+    FoldlFun = make_view_fold_fun(Req, QueryArgs, RowCount,
+            fun couch_view:reduce_to_count/1),
+    FoldAccInit = {Count, SkipCount, undefined, []},
+    FoldResult = couch_view:fold(View, Start, Dir, FoldlFun, FoldAccInit),
+    finish_view_fold(Req, RowCount, FoldResult).
 
 output_reduce_view(Req, View) ->
     #view_query_args{
