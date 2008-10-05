@@ -15,40 +15,47 @@
 
 -export([handle_view_req/2,handle_temp_view_req/2]).
 
--export([parse_view_query/1,make_view_fold_fun/4,finish_view_fold/3]).
+-export([parse_view_query/1,parse_view_query/2,make_view_fold_fun/4,finish_view_fold/3]).
 
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
     start_json_response/2,send_chunk/2,end_json_response/1]).
 
-
-handle_view_req(#httpd{method='GET',path_parts=[_,_, Id, ViewName]}=Req, Db) ->
-    #view_query_args{
-        reduce = Reduce
-    } = QueryArgs = parse_view_query(Req),
-    
+design_doc_view(Req, Db, Id, ViewName, Keys) ->
     case couch_view:get_map_view({couch_db:name(Db), 
             <<"_design/", Id/binary>>, ViewName}) of
     {ok, View} ->    
-        output_map_view(Req, View, QueryArgs);
+        QueryArgs = parse_view_query(Req, Keys),
+        output_map_view(Req, View, QueryArgs, Keys);
     {not_found, Reason} ->
         case couch_view:get_reduce_view({couch_db:name(Db),
                 <<"_design/", Id/binary>>, ViewName}) of
         {ok, View} ->
+            #view_query_args{
+                reduce = Reduce
+            } = QueryArgs = parse_view_query(Req, Keys, true),
             case Reduce of
             false ->
                 {reduce, _N, _Lang, MapView} = View,
-                output_map_view(Req, MapView, QueryArgs);
+                output_map_view(Req, MapView, QueryArgs, Keys);
             _ ->
-                output_reduce_view(Req, View)
+                output_reduce_view(Req, View, QueryArgs, Keys)
             end;
         _ ->
             throw({not_found, Reason})
         end
-    end;
+    end.
+
+handle_view_req(#httpd{method='GET',path_parts=[_,_, Id, ViewName]}=Req, Db) ->
+    design_doc_view(Req, Db, Id, ViewName, nil);
+
+handle_view_req(#httpd{method='POST',path_parts=[_,_, Id, ViewName]}=Req, Db) ->
+    {Props} = couch_httpd:json_body(Req),
+    Keys = proplists:get_value(<<"keys">>, Props, nil),
+    design_doc_view(Req, Db, Id, ViewName, Keys);
 
 handle_view_req(Req, _Db) ->
-    send_method_not_allowed(Req, "GET,HEAD").
+    send_method_not_allowed(Req, "GET,POST,HEAD").
 
 handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
     QueryArgs = parse_view_query(Req),
@@ -61,20 +68,21 @@ handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
     {Props} = couch_httpd:json_body(Req),
     Language = proplists:get_value(<<"language">>, Props, <<"javascript">>),
     MapSrc = proplists:get_value(<<"map">>, Props),
+    Keys = proplists:get_value(<<"keys">>, Props, nil),
     case proplists:get_value(<<"reduce">>, Props, null) of
     null ->
         {ok, View} = couch_view:get_map_view({temp, couch_db:name(Db), Language, MapSrc}),
-        output_map_view(Req, View, QueryArgs);
+        output_map_view(Req, View, QueryArgs, Keys);
     RedSrc ->
         {ok, View} = couch_view:get_reduce_view(
                 {temp,  couch_db:name(Db), Language, MapSrc, RedSrc}),
-        output_reduce_view(Req, View)
+        output_reduce_view(Req, View, QueryArgs, Keys)
     end;
 
 handle_temp_view_req(Req, _Db) ->
     send_method_not_allowed(Req, "POST").
 
-output_map_view(Req, View, QueryArgs) ->
+output_map_view(Req, View, QueryArgs, nil) ->
     #view_query_args{
         count = Count,
         direction = Dir,
@@ -88,9 +96,30 @@ output_map_view(Req, View, QueryArgs) ->
             fun couch_view:reduce_to_count/1),
     FoldAccInit = {Count, SkipCount, undefined, []},
     FoldResult = couch_view:fold(View, Start, Dir, FoldlFun, FoldAccInit),
+    finish_view_fold(Req, RowCount, FoldResult);
+    
+output_map_view(Req, View, QueryArgs, Keys) ->
+    #view_query_args{
+        count = Count,
+        direction = Dir,
+        skip = SkipCount,
+        start_docid = StartDocId
+    } = QueryArgs,
+    {ok, RowCount} = couch_view:get_row_count(View),
+    FoldAccInit = {Count, SkipCount, undefined, []},
+    FoldResult = lists:foldl(
+        fun(Key, {ok, FoldAcc}) ->
+            Start = {Key, StartDocId},
+            FoldlFun = make_view_fold_fun(Req,
+                QueryArgs#view_query_args{
+                    start_key = Key,
+                    end_key = Key
+                }, RowCount, fun couch_view:reduce_to_count/1),
+            couch_view:fold(View, Start, Dir, FoldlFun, FoldAcc)
+        end, {ok, FoldAccInit}, Keys),
     finish_view_fold(Req, RowCount, FoldResult).
 
-output_reduce_view(Req, View) ->
+output_reduce_view(Req, View, QueryArgs, nil) ->
     #view_query_args{
         start_key = StartKey,
         end_key = EndKey,
@@ -100,7 +129,39 @@ output_reduce_view(Req, View) ->
         start_docid = StartDocId,
         end_docid = EndDocId,
         group_level = GroupLevel
-    } = parse_view_query(Req),
+    } = QueryArgs,
+    {ok, Resp} = start_json_response(Req, 200),
+    {ok, GroupRowsFun, RespFun} = make_reduce_fold_funs(Resp, GroupLevel),
+    send_chunk(Resp, "{\"rows\":["),
+    {ok, _} = couch_view:fold_reduce(View, Dir, {StartKey, StartDocId}, 
+        {EndKey, EndDocId}, GroupRowsFun, RespFun, {"", Skip, Count}),
+    send_chunk(Resp, "]}"),
+    end_json_response(Resp);
+    
+output_reduce_view(Req, View, QueryArgs, Keys) ->
+    #view_query_args{
+        count = Count,
+        skip = Skip,
+        direction = Dir,
+        start_docid = StartDocId,
+        end_docid = EndDocId,
+        group_level = GroupLevel
+    } = QueryArgs,
+    {ok, Resp} = start_json_response(Req, 200),
+    {ok, GroupRowsFun, RespFun} = make_reduce_fold_funs(Resp, GroupLevel),
+    send_chunk(Resp, "{\"rows\":["),
+    lists:foldl(
+        fun(Key, AccSeparator) ->
+            {ok, _} = couch_view:fold_reduce(View, Dir, {Key, StartDocId}, 
+                {Key, EndDocId}, GroupRowsFun, RespFun, 
+                {AccSeparator, Skip, Count}),
+            "," % Switch to comma
+        end,
+    "", Keys), % Start with no comma
+    send_chunk(Resp, "]}"),
+    end_json_response(Resp).
+    
+make_reduce_fold_funs(Resp, GroupLevel) ->
     GroupRowsFun =
         fun({_Key1,_}, {_Key2,_}) when GroupLevel == 0 ->
             true;
@@ -110,55 +171,76 @@ output_reduce_view(Req, View) ->
         ({Key1,_}, {Key2,_}) ->
             Key1 == Key2
         end,
-    {ok, Resp} = start_json_response(Req, 200),
-    send_chunk(Resp, "{\"rows\":["),
-    {ok, _} = couch_view:fold_reduce(View, Dir, {StartKey, StartDocId}, {EndKey, EndDocId},
-        GroupRowsFun,
-        fun(_Key, _Red, {AccSeparator,AccSkip,AccCount}) when AccSkip > 0 ->
-            {ok, {AccSeparator,AccSkip-1,AccCount}};
-        (_Key, _Red, {AccSeparator,0,AccCount}) when AccCount == 0 ->
-            {stop, {AccSeparator,0,AccCount}};
-        (_Key, Red, {AccSeparator,0,AccCount}) when GroupLevel == 0 ->
-            Json = ?JSON_ENCODE({[{key, null}, {value, Red}]}),
-            send_chunk(Resp, AccSeparator ++ Json),
-            {ok, {",",0,AccCount-1}};
-        (Key, Red, {AccSeparator,0,AccCount})
-                when is_integer(GroupLevel) 
-                andalso is_list(Key) ->
-            Json = ?JSON_ENCODE(
-                {[{key, lists:sublist(Key, GroupLevel)},{value, Red}]}),
-            send_chunk(Resp, AccSeparator ++ Json),
-            {ok, {",",0,AccCount-1}};
-        (Key, Red, {AccSeparator,0,AccCount}) ->
-            Json = ?JSON_ENCODE({[{key, Key}, {value, Red}]}),
-            send_chunk(Resp, AccSeparator ++ Json),
-            {ok, {",",0,AccCount-1}}
-        end, {"", Skip, Count}),
-    send_chunk(Resp, "]}"),
-    end_json_response(Resp).
+    RespFun = fun(_Key, _Red, {AccSeparator,AccSkip,AccCount}) when AccSkip > 0 ->
+        {ok, {AccSeparator,AccSkip-1,AccCount}};
+    (_Key, _Red, {AccSeparator,0,AccCount}) when AccCount == 0 ->
+        {stop, {AccSeparator,0,AccCount}};
+    (_Key, Red, {AccSeparator,0,AccCount}) when GroupLevel == 0 ->
+        Json = ?JSON_ENCODE({[{key, null}, {value, Red}]}),
+        send_chunk(Resp, AccSeparator ++ Json),
+        {ok, {",",0,AccCount-1}};
+    (Key, Red, {AccSeparator,0,AccCount})
+            when is_integer(GroupLevel) 
+            andalso is_list(Key) ->
+        Json = ?JSON_ENCODE(
+            {[{key, lists:sublist(Key, GroupLevel)},{value, Red}]}),
+        send_chunk(Resp, AccSeparator ++ Json),
+        {ok, {",",0,AccCount-1}};
+    (Key, Red, {AccSeparator,0,AccCount}) ->
+        Json = ?JSON_ENCODE({[{key, Key}, {value, Red}]}),
+        send_chunk(Resp, AccSeparator ++ Json),
+        {ok, {",",0,AccCount-1}}
+    end,
+    {ok, GroupRowsFun, RespFun}.
     
+
+
 
 reverse_key_default(nil) -> {};
 reverse_key_default({}) -> nil;
 reverse_key_default(Key) -> Key.
 
 parse_view_query(Req) ->
+    parse_view_query(Req, nil, nil).
+parse_view_query(Req, Keys) ->
+    parse_view_query(Req, Keys, nil).
+parse_view_query(Req, Keys, IsReduce) ->
     QueryList = couch_httpd:qs(Req),
-    lists:foldl(fun({Key,Value}, Args) ->
+    #view_query_args{
+        group_level = GroupLevel
+    } = QueryArgs = lists:foldl(fun({Key,Value}, Args) ->
         case {Key, Value} of
         {"", _} ->
             Args;
         {"key", Value} ->
-            JsonKey = ?JSON_DECODE(Value),
-            Args#view_query_args{start_key=JsonKey,end_key=JsonKey};
+            case Keys of
+            nil ->
+                JsonKey = ?JSON_DECODE(Value),
+                Args#view_query_args{start_key=JsonKey,end_key=JsonKey};
+            _ ->
+                Msg = io_lib:format("Query parameter \"~s\" not compatible with multi key mode.", [Key]),
+                throw({query_parse_error, Msg})
+            end;
         {"startkey_docid", DocId} ->
             Args#view_query_args{start_docid=list_to_binary(DocId)};
         {"endkey_docid", DocId} ->
             Args#view_query_args{end_docid=list_to_binary(DocId)};
         {"startkey", Value} ->
-            Args#view_query_args{start_key=?JSON_DECODE(Value)};
+            case Keys of
+            nil ->
+                Args#view_query_args{start_key=?JSON_DECODE(Value)};
+            _ ->
+                Msg = io_lib:format("Query parameter \"~s\" not compatible with multi key mode.", [Key]),
+                throw({query_parse_error, Msg})
+            end;
         {"endkey", Value} ->
-            Args#view_query_args{end_key=?JSON_DECODE(Value)};
+            case Keys of
+            nil ->
+                Args#view_query_args{end_key=?JSON_DECODE(Value)};
+            _ ->
+                Msg = io_lib:format("Query parameter \"~s\" not compatible with multi key mode.", [Key]),
+                throw({query_parse_error, Msg})
+            end;
         {"count", Value} ->
             case (catch list_to_integer(Value)) of
             Count when is_integer(Count) ->
@@ -201,10 +283,24 @@ parse_view_query(Req) ->
                 "Bad URL query value, number expected: skip=~s", [Value])),
                 throw({query_parse_error, Msg})
             end;
-        {"group", "true"} ->
-            Args#view_query_args{group_level=exact};
+        {"group", Value} ->
+            case Value of
+            "true" ->
+                Args#view_query_args{group_level=exact};
+            "false" ->
+                Args#view_query_args{group_level=0};
+            _ ->
+                Msg = "Bad URL query value for 'group' expected \"true\" or \"false\".",
+                throw({query_parse_error, Msg})
+            end;
         {"group_level", LevelStr} ->
-            Args#view_query_args{group_level=list_to_integer(LevelStr)};
+            case Keys of
+            nil ->
+                Args#view_query_args{group_level=list_to_integer(LevelStr)};
+            _ ->
+                Msg = lists:flatten(io_lib:format("Multi-key fetches for a reduce view must include group=true", [])),
+                throw({query_parse_error, Msg})
+            end;
         {"reduce", "true"} ->
             Args#view_query_args{reduce=true};
         {"reduce", "false"} ->
@@ -214,7 +310,25 @@ parse_view_query(Req) ->
                 "Bad URL query key:~s", [Key])),
             throw({query_parse_error, Msg})
         end
-    end, #view_query_args{}, QueryList).
+    end, #view_query_args{}, QueryList),
+    case Keys of
+    nil ->
+        QueryArgs;
+    _ ->
+        case IsReduce of
+        nil ->
+            QueryArgs;
+        _ ->
+            case GroupLevel of
+            exact ->
+                QueryArgs;
+            _ ->
+                Msg = lists:flatten(io_lib:format(
+                    "Multi-key fetches for a reduce view must include group=true", [])),
+                throw({query_parse_error, Msg})
+            end
+        end
+    end.
 
 
 make_view_fold_fun(Req, QueryArgs, TotalViewCount, ReduceCountFun) ->
@@ -253,12 +367,21 @@ make_view_fold_fun(Req, QueryArgs, TotalViewCount, ReduceCountFun) ->
             {ok, Resp2} = start_json_response(Req, 200),
             JsonBegin = io_lib:format("{\"total_rows\":~w,\"offset\":~w,\"rows\":[\r\n",
                     [TotalViewCount, Offset]),
-            JsonObj = {[{id, DocId}, {key, Key}, {value, Value}]},
-            
+            JsonObj = case DocId of
+            error ->
+                {[{key, Key}, {error, Value}]};
+            _ ->
+                {[{id, DocId}, {key, Key}, {value, Value}]}
+            end,            
             send_chunk(Resp2, JsonBegin ++ ?JSON_ENCODE(JsonObj)),
             {ok, {AccCount - 1, 0, Resp2, AccRevRows}};
         {_, AccCount, _, Resp} when (AccCount > 0) ->
-            JsonObj = {[{id, DocId}, {key, Key}, {value, Value}]},
+            JsonObj = case DocId of
+            error ->
+                {[{key, Key}, {error, Value}]};
+            _ ->
+                {[{id, DocId}, {key, Key}, {value, Value}]}
+            end,
             send_chunk(Resp, ",\r\n" ++  ?JSON_ENCODE(JsonObj)),
             {ok, {AccCount - 1, 0, Resp, AccRevRows}}
         end

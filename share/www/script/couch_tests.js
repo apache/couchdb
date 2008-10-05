@@ -1089,6 +1089,187 @@ var tests = {
     T(results.total_rows == 0);
   },
 
+  view_multi_key_all_docs: function(debug) {
+    var db = new CouchDB("test_suite_db");
+    db.deleteDb();
+    db.createDb();
+    if (debug) debugger;
+
+    var docs = makeDocs(0, 100);
+    T(db.bulkSave(docs).ok);
+
+    var keys = ["10","15","30","37","50"];
+    var rows = db.allDocs({},keys).rows;
+    T(rows.length == keys.length);
+    for(var i=0; i<rows.length; i++)
+      T(rows[i].id == keys[i]);
+
+    rows = db.allDocs({count: 1}, keys).rows;
+    T(rows.length == 1);
+    T(rows[0].id == keys[0]);
+
+    rows = db.allDocs({skip: 2}, keys).rows;
+    T(rows.length == 3);
+    for(var i=0; i<rows.length; i++)
+        T(rows[i].id == keys[i+2]);
+
+    rows = db.allDocs({descending: "true"}, keys).rows;
+    T(rows.length == keys.length);
+    for(var i=0; i<rows.length; i++)
+        T(rows[i].id == keys[keys.length-i-1]);
+
+    rows = db.allDocs({descending: "true", skip: 3, count:1}, keys).rows;
+    T(rows.length == 1);
+    T(rows[0].id == keys[1]);
+
+    // Check we get invalid rows when the key doesn't exist
+    rows = db.allDocs({}, [1, "i_dont_exist", "0"]).rows;
+    T(rows.length == 3);
+    T(rows[0].error == "not_found");
+    T(rows[1].error == "not_found");
+    T(rows[2].id == rows[2].key && rows[2].key == "0");
+  },
+
+  view_multi_key_design: function(debug) {
+    var db = new CouchDB("test_suite_db");
+    db.deleteDb();
+    db.createDb();
+    if (debug) debugger;
+
+    var docs = makeDocs(0, 100);
+    T(db.bulkSave(docs).ok);
+
+    var designDoc = {
+      _id:"_design/test",
+      language: "javascript",
+      views: {
+        all_docs: {
+          map: "function(doc) { emit(doc.integer, doc.string) }"
+        },
+        multi_emit: {
+          map: "function(doc) {for(var i = 0 ; i < 3 ; i++) { emit(i, doc.integer) ; } }"
+        },
+        summate: {
+          map:"function (doc) {emit(doc.integer, doc.integer)};",
+          reduce:"function (keys, values) { return sum(values); };"
+        }
+      }
+    }
+    T(db.save(designDoc).ok);
+
+    // First, the goods:
+    var keys = [10,15,30,37,50];
+    var rows = db.view("test/all_docs",{},keys).rows;
+    for(var i=0; i<rows.length; i++) {
+      T(keys.indexOf(rows[i].key) != -1);
+      T(rows[i].key == rows[i].value);
+    }
+    
+    var reduce = db.view("test/summate",{group:true},keys).rows;
+    T(reduce.length == keys.length);
+    for(var i=0; i<reduce.length; i++) {
+      T(keys.indexOf(reduce[i].key) != -1);
+      T(rows[i].key == rows[i].value);
+    }
+
+    // Test that invalid parameter combinations get rejected
+    var badargs = [{startkey:0}, {endkey:0}, {key: 0}, {group_level: 2}];
+    for(var i in badargs)
+    {
+        try {
+            db.view("test/all_docs",badargs[i],keys);
+            T(0==1);
+        } catch (e) {
+            T(e.error == "query_parse_error");
+        }
+    }
+
+    try {
+        db.view("test/summate",{},keys);
+        T(0==1);
+    } catch (e) {
+        T(e.error == "query_parse_error");
+    }
+
+    // Check that limiting by startkey_docid and endkey_docid get applied
+    // as expected.
+    var curr = db.view("test/multi_emit", {startkey_docid: 21, endkey_docid: 23}, [0, 2]).rows;
+    var exp_key = [ 0,  0,  0,  2,  2,  2] ;
+    var exp_val = [21, 22, 23, 21, 22, 23] ;
+    T(curr.length == 6);
+    for( var i = 0 ; i < 6 ; i++)
+    {
+        T(curr[i].key == exp_key[i]);
+        T(curr[i].value == exp_val[i]);
+    }
+
+    // Check count works
+    curr = db.view("test/all_docs", {count: 1}, keys).rows;
+    T(curr.length == 1);
+    T(curr[0].key == 10);
+
+    // Check offset works
+    curr = db.view("test/multi_emit", {skip: 1}, [0]).rows;
+    T(curr.length == 99);
+    T(curr[0].value == 1);
+
+    // Check that dir works
+    curr = db.view("test/multi_emit", {descending: "true"}, [1]).rows;
+    T(curr.length == 100);
+    T(curr[0].value == 99);
+    T(curr[99].value == 0);
+
+    // Check a couple combinations
+    curr = db.view("test/multi_emit", {descending: "true", skip: 3, count: 2}, [2]).rows;
+    T(curr.length, 2);
+    T(curr[0].value == 96);
+    T(curr[1].value == 95);
+
+    curr = db.view("test/multi_emit", {skip: 2, count: 3, startkey_docid: "13"}, [0]).rows;
+    T(curr.length == 3);
+    T(curr[0].value == 15);
+    T(curr[1].value == 16);
+    T(curr[2].value == 17);
+
+    curr = db.view("test/multi_emit",
+            {skip: 1, count: 5, startkey_docid: "25", endkey_docid: "27"}, [1]).rows;
+    T(curr.length == 2);
+    T(curr[0].value == 26);
+    T(curr[1].value == 27);
+
+    curr = db.view("test/multi_emit",
+            {skip: 1, count: 5, startkey_docid: "28", endkey_docid: "26", descending: "true"}, [1]).rows;
+    T(curr.length == 2);
+    T(curr[0].value == 27);
+    T(curr[1].value == 26);
+  },
+
+  view_multi_key_temp: function(debug) {
+    var db = new CouchDB("test_suite_db");
+    db.deleteDb();
+    db.createDb();
+    if (debug) debugger;
+
+    var docs = makeDocs(0, 100);
+    T(db.bulkSave(docs).ok);
+
+    var queryFun = function(doc) { emit(doc.integer, doc.integer) };
+    var reduceFun = function (keys, values) { return sum(values); };
+
+    var keys = [10,15,30,37,50];
+    var rows = db.query(queryFun, null, {}, keys).rows;
+    for(var i=0; i<rows.length; i++) {
+      T(keys.indexOf(rows[i].key) != -1);
+      T(rows[i].key == rows[i].value);
+    }
+    
+    var reduce = db.query(queryFun, reduceFun, {group:true}, keys).rows;
+    for(var i=0; i<reduce.length; i++) {
+      T(keys.indexOf(reduce[i].key) != -1);
+      T(reduce[i].key == reduce[i].value);
+    }
+  },
+
   view_pagination: function(debug) {
     var db = new CouchDB("test_suite_db");
     db.deleteDb();

@@ -112,8 +112,11 @@ function CouchDB(name) {
   }
 
   // Applies the map function to the contents of database and returns the results.
-  this.query = function(mapFun, reduceFun, options) {
+  this.query = function(mapFun, reduceFun, options, keys) {
     var body = {language: "javascript"};
+    if(keys) {
+      body.keys = keys ;      
+    }
     if (typeof(mapFun) != "string")
       mapFun = mapFun.toSource ? mapFun.toSource() : "(" + mapFun.toString() + ")";
     body.map = mapFun;
@@ -132,8 +135,16 @@ function CouchDB(name) {
     return result;
   }
 
-  this.view = function(viewname, options) {
-    var req = request("GET", this.uri + "_view/" + viewname + encodeOptions(options));
+  this.view = function(viewname, options, keys) {
+    var req = null ;
+    if(!keys) {
+      req = request("GET", this.uri + "_view/" + viewname + encodeOptions(options));      
+    } else {
+      req = request("POST", this.uri + "_view/" + viewname + encodeOptions(options), {
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({keys:keys})
+      });      
+    }
     if (req.status == 404)
       return null;
     var result = JSON.parse(req.responseText);
@@ -151,8 +162,16 @@ function CouchDB(name) {
     return result;
   }
 
-  this.allDocs = function(options) {
-    var req = request("GET", this.uri + "_all_docs" + encodeOptions(options));
+  this.allDocs = function(options,keys) {
+    var req = null;
+    if(!keys) {
+      req = request("GET", this.uri + "_all_docs" + encodeOptions(options));      
+    } else {
+      req = request("POST", this.uri + "_all_docs" + encodeOptions(options), {
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({keys:keys})
+      });      
+    }
     var result = JSON.parse(req.responseText);
     if (req.status != 200)
       throw result;
