@@ -1101,7 +1101,7 @@ var tests = {
     var queryFun = function(doc) { emit(doc.integer, null) };
     var i;
 
-    // page through the view ascending and going forward
+    // page through the view ascending
     for (i = 0; i < docs.length; i += 10) {
       var queryResults = db.query(queryFun, null, {
         startkey: i,
@@ -1117,23 +1117,7 @@ var tests = {
       }
     }
 
-    // page through the view ascending and going backward
-    for (i = docs.length - 1; i >= 0; i -= 10) {
-      var queryResults = db.query(queryFun, null, {
-        startkey: i,
-        startkey_docid: i,
-        count:-10
-      });
-      T(queryResults.rows.length == 10)
-      T(queryResults.total_rows == docs.length)
-      T(queryResults.offset == i - 9)
-      var j;
-      for (j = 0; j < 10;j++) {
-        T(queryResults.rows[j].key == i - 9 + j);
-      }
-    }
-
-    // page through the view descending and going forward
+    // page through the view descending
     for (i = docs.length - 1; i >= 0; i -= 10) {
       var queryResults = db.query(queryFun, null, {
         startkey: i,
@@ -1147,23 +1131,6 @@ var tests = {
       var j;
       for (j = 0; j < 10; j++) {
         T(queryResults.rows[j].key == i - j);
-      }
-    }
-
-    // page through the view descending and going backward
-    for (i = 0; i < docs.length; i += 10) {
-      var queryResults = db.query(queryFun, null, {
-        startkey: i,
-        startkey_docid: i,
-        descending: true,
-        count:-10
-      });
-      T(queryResults.rows.length == 10)
-      T(queryResults.total_rows == docs.length)
-      T(queryResults.offset == docs.length - i - 10)
-      var j;
-      for (j = 0; j < 10; j++) {
-        T(queryResults.rows[j].key == i + 9 - j);
       }
     }
 
