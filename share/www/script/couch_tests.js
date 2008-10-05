@@ -1089,6 +1089,102 @@ var tests = {
     T(results.total_rows == 0);
   },
 
+  view_include_docs: function(debug) {
+    var db = new CouchDB("test_suite_db");
+    db.deleteDb();
+    db.createDb();
+    if (debug) debugger;
+
+    var docs = makeDocs(0, 100);
+    T(db.bulkSave(docs).ok);
+
+    var designDoc = {
+      _id:"_design/test",
+      language: "javascript",
+      views: {
+        all_docs: {
+          map: "function(doc) { emit(doc.integer, doc.string) }"
+        },
+        with_prev: {
+          map: "function(doc){if(doc.prev) emit(doc._id,{'_rev':doc.prev}); else emit(doc._id,{'_rev':doc._rev});}"
+        },
+        summate: {
+          map:"function (doc) {emit(doc.integer, doc.integer)};",
+          reduce:"function (keys, values) { return sum(values); };"
+        }
+      }
+    }
+    T(db.save(designDoc).ok);
+
+    var resp = db.view('test/all_docs', {include_docs: true, count: 2});
+    T(resp.rows.length == 2);
+    T(resp.rows[0].id == "0");
+    T(resp.rows[0].doc._id == "0");
+    T(resp.rows[1].id == "1");
+    T(resp.rows[1].doc._id == "1");
+
+    resp = db.view('test/all_docs', {include_docs: true}, [29, 74]);
+    T(resp.rows.length == 2);
+    T(resp.rows[0].doc._id == "29");
+    T(resp.rows[1].doc.integer == 74);
+
+    resp = db.allDocs({count: 2, skip: 1, include_docs: true});
+    T(resp.rows.length == 2);
+    T(resp.rows[0].doc.integer == 1);
+    T(resp.rows[1].doc.integer == 10);
+
+    resp = db.allDocs({include_docs: true}, ['not_a_doc']);
+    T(resp.rows.length == 1);
+    T(!resp.rows[0].doc);
+
+    resp = db.allDocs({include_docs: true}, ["1", "foo"]);
+    T(resp.rows.length == 2);
+    T(resp.rows[0].doc.integer == 1);
+    T(!resp.rows[1].doc);
+
+    resp = db.allDocs({include_docs: true, count: 0});
+    T(resp.rows.length == 0);
+
+    // No reduce support
+    try {
+        resp = db.view('test/summate', {include_docs: true});
+        alert(JSON.stringify(resp));
+        T(0==1);
+    } catch (e) {
+        T(e.error == 'query_parse_error');
+    }
+
+    // Check emitted _rev controls things
+    resp = db.allDocs({include_docs: true}, ["0"]);
+    var before = resp.rows[0].doc;
+    var after = db.open("0");
+    after.integer = 100
+    after.prev = after._rev;
+    db.save(after);
+    after = db.open("0");
+    T(after._rev != after.prev);
+    T(after.integer == 100);
+
+    // should emit the previous revision
+    resp = db.view("test/with_prev", {include_docs: true}, ["0"]);
+    T(resp.rows[0].doc._id == "0");
+    T(resp.rows[0].doc._rev == before._rev);
+    T(!resp.rows[0].doc.prev);
+    T(resp.rows[0].doc.integer == 0);
+
+    var xhr = CouchDB.request("POST", "/test_suite_db/_compact");
+    T(xhr.status == 202)
+    while (db.info().compact_running) {}
+
+    resp = db.view("test/with_prev", {include_docs: true}, ["0", "23"]);
+    T(resp.rows.length == 2);
+    T(resp.rows[0].key == "0");
+    T(resp.rows[0].id == "0");
+    T(!resp.rows[0].doc);
+    T(resp.rows[0].error == "missing");
+    T(resp.rows[1].doc.integer == 23);
+  },
+
   view_multi_key_all_docs: function(debug) {
     var db = new CouchDB("test_suite_db");
     db.deleteDb();
@@ -1126,7 +1222,9 @@ var tests = {
     rows = db.allDocs({}, [1, "i_dont_exist", "0"]).rows;
     T(rows.length == 3);
     T(rows[0].error == "not_found");
+    T(!rows[0].id);
     T(rows[1].error == "not_found");
+    T(!rows[1].id);
     T(rows[2].id == rows[2].key && rows[2].key == "0");
   },
 

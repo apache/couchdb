@@ -15,7 +15,7 @@
 
 -export([handle_view_req/2,handle_temp_view_req/2]).
 
--export([parse_view_query/1,parse_view_query/2,make_view_fold_fun/4,finish_view_fold/3]).
+-export([parse_view_query/1,parse_view_query/2,make_view_fold_fun/5,finish_view_fold/3]).
 
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
@@ -26,7 +26,7 @@ design_doc_view(Req, Db, Id, ViewName, Keys) ->
             <<"_design/", Id/binary>>, ViewName}) of
     {ok, View} ->    
         QueryArgs = parse_view_query(Req, Keys),
-        output_map_view(Req, View, QueryArgs, Keys);
+        output_map_view(Req, View, Db, QueryArgs, Keys);
     {not_found, Reason} ->
         case couch_view:get_reduce_view({couch_db:name(Db),
                 <<"_design/", Id/binary>>, ViewName}) of
@@ -37,7 +37,7 @@ design_doc_view(Req, Db, Id, ViewName, Keys) ->
             case Reduce of
             false ->
                 {reduce, _N, _Lang, MapView} = View,
-                output_map_view(Req, MapView, QueryArgs, Keys);
+                output_map_view(Req, MapView, Db, QueryArgs, Keys);
             _ ->
                 output_reduce_view(Req, View, QueryArgs, Keys)
             end;
@@ -72,7 +72,7 @@ handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
     case proplists:get_value(<<"reduce">>, Props, null) of
     null ->
         {ok, View} = couch_view:get_map_view({temp, couch_db:name(Db), Language, MapSrc}),
-        output_map_view(Req, View, QueryArgs, Keys);
+        output_map_view(Req, View, Db, QueryArgs, Keys);
     RedSrc ->
         {ok, View} = couch_view:get_reduce_view(
                 {temp,  couch_db:name(Db), Language, MapSrc, RedSrc}),
@@ -82,7 +82,7 @@ handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
 handle_temp_view_req(Req, _Db) ->
     send_method_not_allowed(Req, "POST").
 
-output_map_view(Req, View, QueryArgs, nil) ->
+output_map_view(Req, View, Db, QueryArgs, nil) ->
     #view_query_args{
         count = Count,
         direction = Dir,
@@ -92,13 +92,13 @@ output_map_view(Req, View, QueryArgs, nil) ->
     } = QueryArgs,
     {ok, RowCount} = couch_view:get_row_count(View),
     Start = {StartKey, StartDocId},
-    FoldlFun = make_view_fold_fun(Req, QueryArgs, RowCount,
+    FoldlFun = make_view_fold_fun(Req, QueryArgs, Db, RowCount,
             fun couch_view:reduce_to_count/1),
     FoldAccInit = {Count, SkipCount, undefined, []},
     FoldResult = couch_view:fold(View, Start, Dir, FoldlFun, FoldAccInit),
     finish_view_fold(Req, RowCount, FoldResult);
     
-output_map_view(Req, View, QueryArgs, Keys) ->
+output_map_view(Req, View, Db, QueryArgs, Keys) ->
     #view_query_args{
         count = Count,
         direction = Dir,
@@ -114,7 +114,7 @@ output_map_view(Req, View, QueryArgs, Keys) ->
                 QueryArgs#view_query_args{
                     start_key = Key,
                     end_key = Key
-                }, RowCount, fun couch_view:reduce_to_count/1),
+                }, Db, RowCount, fun couch_view:reduce_to_count/1),
             couch_view:fold(View, Start, Dir, FoldlFun, FoldAcc)
         end, {ok, FoldAccInit}, Keys),
     finish_view_fold(Req, RowCount, FoldResult).
@@ -305,6 +305,23 @@ parse_view_query(Req, Keys, IsReduce) ->
             Args#view_query_args{reduce=true};
         {"reduce", "false"} ->
             Args#view_query_args{reduce=false};
+        {"include_docs", Value} ->
+            case IsReduce of
+            true ->
+                Msg = lists:flatten(io_lib:format("Bad URL query key for reduce operation: ~s", [Key])),
+                throw({query_parse_error, Msg});
+            _ ->
+                ok
+            end,
+            case Value of
+            "true" ->
+                Args#view_query_args{include_docs=true};
+            "false" ->
+                Args#view_query_args{include_docs=false};
+            _ ->
+                Msg1 = "Bad URL query value for 'include_docs' expected \"true\" or \"false\".",
+                throw({query_parse_error, Msg1})
+            end;
         _ -> % unknown key
             Msg = lists:flatten(io_lib:format(
                 "Bad URL query key:~s", [Key])),
@@ -331,10 +348,11 @@ parse_view_query(Req, Keys, IsReduce) ->
     end.
 
 
-make_view_fold_fun(Req, QueryArgs, TotalViewCount, ReduceCountFun) ->
+make_view_fold_fun(Req, QueryArgs, Db, TotalViewCount, ReduceCountFun) ->
     #view_query_args{
         end_key = EndKey,
         end_docid = EndDocId,
+        include_docs = IncludeDocs,
         direction = Dir
     } = QueryArgs,
 
@@ -367,23 +385,45 @@ make_view_fold_fun(Req, QueryArgs, TotalViewCount, ReduceCountFun) ->
             {ok, Resp2} = start_json_response(Req, 200),
             JsonBegin = io_lib:format("{\"total_rows\":~w,\"offset\":~w,\"rows\":[\r\n",
                     [TotalViewCount, Offset]),
-            JsonObj = case DocId of
-            error ->
-                {[{key, Key}, {error, Value}]};
-            _ ->
-                {[{id, DocId}, {key, Key}, {value, Value}]}
-            end,            
+            JsonObj = view_row_obj(Db, {{Key, DocId}, Value}, IncludeDocs),
             send_chunk(Resp2, JsonBegin ++ ?JSON_ENCODE(JsonObj)),
             {ok, {AccCount - 1, 0, Resp2, AccRevRows}};
         {_, AccCount, _, Resp} when (AccCount > 0) ->
-            JsonObj = case DocId of
-            error ->
-                {[{key, Key}, {error, Value}]};
-            _ ->
-                {[{id, DocId}, {key, Key}, {value, Value}]}
-            end,
+            JsonObj = view_row_obj(Db, {{Key, DocId}, Value}, IncludeDocs),
             send_chunk(Resp, ",\r\n" ++  ?JSON_ENCODE(JsonObj)),
             {ok, {AccCount - 1, 0, Resp, AccRevRows}}
+        end
+    end.
+
+view_row_obj(Db, {{Key, DocId}, Value}, IncludeDocs) ->
+    case DocId of
+    error ->
+        {[{key, Key}, {error, Value}]};
+    _ ->
+        case IncludeDocs of
+        true ->
+            Rev = case Value of
+            {Props} ->
+                case is_list(Props) of
+                true ->
+                    proplists:get_value(<<"_rev">>, Props, []);
+                _ ->
+                    []
+                end;
+            _ ->
+                []
+            end,
+            ?LOG_DEBUG("Include Doc: ~p ~p", [DocId, Rev]),
+            case (catch couch_httpd_db:couch_doc_open(Db, DocId, 
+                Rev, [])) of
+            {{not_found, missing}, _} ->
+                {[{id, DocId}, {key, Key}, {value, Value}, {error, missing}]};
+            Doc ->
+                JsonDoc = couch_doc:to_json_obj(Doc, []),
+                {[{id, DocId}, {key, Key}, {value, Value}, {doc, JsonDoc}]}
+            end;
+        _ ->
+            {[{id, DocId}, {key, Key}, {value, Value}]}
         end
     end.
 
