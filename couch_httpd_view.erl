@@ -182,16 +182,8 @@ parse_view_query(Req) ->
             case (catch list_to_integer(Value)) of
             Count when is_integer(Count) ->
                 if Count < 0 ->
-                    Args#view_query_args {
-                        direction =
-                        if Args#view_query_args.direction == rev -> fwd;
-                        true -> rev
-                        end,
-                        count=Count,
-                        start_key = reverse_key_default(Args#view_query_args.start_key),
-                        start_docid = reverse_key_default(Args#view_query_args.start_docid),
-                        end_key = reverse_key_default(Args#view_query_args.end_key),
-                        end_docid =  reverse_key_default(Args#view_query_args.end_docid)};
+                    Msg = io_lib:format("Count must be a positive integer: count=~s", [Value]),
+                    throw({query_parse_error, Msg});
                 true ->
                     Args#view_query_args{count=Count}
                 end;
@@ -248,8 +240,7 @@ make_view_fold_fun(Req, QueryArgs, TotalViewCount, ReduceCountFun) ->
     #view_query_args{
         end_key = EndKey,
         end_docid = EndDocId,
-        direction = Dir,
-        count = Count
+        direction = Dir
     } = QueryArgs,
 
     PassedEndFun =
@@ -264,33 +255,7 @@ make_view_fold_fun(Req, QueryArgs, TotalViewCount, ReduceCountFun) ->
         end
     end,
 
-    NegCountFun = fun({{Key, DocId}, Value}, OffsetReds,
-                      {AccCount, AccSkip, Resp, AccRevRows}) ->
-        Offset = ReduceCountFun(OffsetReds),
-        PassedEnd = PassedEndFun(Key, DocId),
-        case {PassedEnd, AccCount, AccSkip, Resp} of
-        {true, _, _, _} -> % The stop key has been passed, stop looping.
-            {stop, {AccCount, AccSkip, Resp, AccRevRows}};
-        {_, 0, _, _} -> % we've done "count" rows, stop foldling
-            {stop, {0, 0, Resp, AccRevRows}};
-        {_, _, AccSkip, _} when AccSkip > 0 ->
-            {ok, {AccCount, AccSkip - 1, Resp, AccRevRows}};
-        {_, _, _, undefined} ->
-            {ok, Resp2} = start_json_response(Req, 200),
-            Offset2 = TotalViewCount - Offset -
-                lists:min([TotalViewCount - Offset, - AccCount]),
-            JsonBegin = io_lib:format("{\"total_rows\":~w,\"offset\":~w,\"rows\":[\r\n",
-                    [TotalViewCount, Offset2]),
-            send_chunk(Resp2, JsonBegin),
-            JsonObj = {[{id, DocId}, {key, Key}, {value, Value}]},
-            {ok, {AccCount + 1, 0, Resp2, [?JSON_ENCODE(JsonObj) | AccRevRows]}};
-        {_, AccCount, _, Resp} ->
-            JsonObj = {[{id, DocId}, {key, Key}, {value, Value}]},
-            {ok, {AccCount + 1, 0, Resp, [?JSON_ENCODE(JsonObj), ",\r\n" | AccRevRows]}}
-        end
-    end,
-
-    PosCountFun = fun({{Key, DocId}, Value}, OffsetReds,
+    fun({{Key, DocId}, Value}, OffsetReds,
                       {AccCount, AccSkip, Resp, AccRevRows}) ->
         Offset = ReduceCountFun(OffsetReds), % I think we only need this call once per view
         PassedEnd = PassedEndFun(Key, DocId),
@@ -316,10 +281,6 @@ make_view_fold_fun(Req, QueryArgs, TotalViewCount, ReduceCountFun) ->
             send_chunk(Resp, ",\r\n" ++  ?JSON_ENCODE(JsonObj)),
             {ok, {AccCount - 1, 0, Resp, AccRevRows}}
         end
-    end,
-    case Count > 0 of
-    true ->     PosCountFun;
-    false ->    NegCountFun
     end.
 
 finish_view_fold(Req, TotalRows, FoldResult) ->
