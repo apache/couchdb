@@ -13,7 +13,7 @@
 -module(couch_httpd_db).
 -include("couch_db.hrl").
 
--export([handle_request/1, db_req/2]).
+-export([handle_request/1, db_req/2, couch_doc_open/4]).
 
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
@@ -179,8 +179,8 @@ db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs_by_seq">>]}=Req, Db) ->
     {ok, Info} = couch_db:get_db_info(Db),
     TotalRowCount = proplists:get_value(doc_count, Info),
 
-    FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, TotalRowCount,
-            fun couch_db:enum_docs_since_reduce_to_count/1),
+    FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, Db,
+        TotalRowCount, fun couch_db:enum_docs_since_reduce_to_count/1),
     StartKey2 = case StartKey of
         nil -> 0;
         <<>> -> 100000000000;
@@ -247,7 +247,7 @@ all_docs_view(Req, Db, Keys) ->
         count = Count,
         skip = SkipCount,
         direction = Dir
-    } = QueryArgs = couch_httpd_view:parse_view_query(Req, Keys),
+    } = QueryArgs = couch_httpd_view:parse_view_query(Req, Keys),    
     {ok, Info} = couch_db:get_db_info(Db),
     TotalRowCount = proplists:get_value(doc_count, Info),
     StartId = if is_binary(StartKey) -> StartKey;
@@ -257,7 +257,7 @@ all_docs_view(Req, Db, Keys) ->
     
     case Keys of
     nil ->
-        FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, 
+        FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, Db,
             TotalRowCount, fun couch_db:enum_docs_reduce_to_count/1),
         AdapterFun = fun(#full_doc_info{id=Id}=FullDocInfo, Offset, Acc) ->
             case couch_doc:to_doc_info(FullDocInfo) of
@@ -271,7 +271,7 @@ all_docs_view(Req, Db, Keys) ->
             AdapterFun, FoldAccInit),
         couch_httpd_view:finish_view_fold(Req, TotalRowCount, {ok, FoldResult});
     _ ->
-        FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, 
+        FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, Db,
             TotalRowCount, fun(Offset) -> Offset end),
         KeyFoldFun = case Dir of
         fwd ->

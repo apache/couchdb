@@ -124,7 +124,8 @@
     end_docid = {},
     skip = 0,
     group_level = 0,
-    reduce = true
+    reduce = true,
+    include_docs = false
 }).
 
 
