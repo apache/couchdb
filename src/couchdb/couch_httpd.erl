@@ -253,7 +253,7 @@ send_error(Req, conflict) ->
 send_error(Req, {doc_validation, Msg}) ->
     send_error(Req, 406, <<"doc_validation">>, Msg);
 send_error(Req, file_exists) ->
-    send_error(Req, 409, <<"file_exists">>, <<"The database could not be"
+    send_error(Req, 409, <<"file_exists">>, <<"The database could not be "
         "created, the file already exists.">>);
 send_error(Req, {Error, Reason}) ->
     send_error(Req, 500, Error, Reason);
