@@ -127,6 +127,9 @@ var tests = {
 
     // make sure we can still open the old rev of the deleted doc
     T(db.open(existingDoc._id, {rev: existingDoc._rev}) != null);
+    
+    // make sure restart works
+    T(restartServer().ok);
   },
 
   // Do some edit conflict detection tests
@@ -2033,8 +2036,9 @@ function repr(val) {
 }
 
 function restartServer() {
-  var xhr = CouchDB.request("POST", "/_restart");
+  var reply = CouchDB.request("POST", "/_restart");
   do {
-    xhr = CouchDB.request("GET", "/");
+    var xhr = CouchDB.request("GET", "/");
   } while(xhr.status != 200);
+  return JSON.parse(reply.responseText);
 }

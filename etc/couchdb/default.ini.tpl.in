@@ -34,6 +34,7 @@ _all_dbs = {couch_httpd_misc_handlers, handle_all_dbs_req}
 _config = {couch_httpd_misc_handlers, handle_config_req}
 _replicate = {couch_httpd_misc_handlers, handle_replicate_req}
 _uuids = {couch_httpd_misc_handlers, handle_uuids_req}
+_restart = {couch_httpd_misc_handlers, handle_restart_req}
 
 [httpd_db_handlers]
 _view = {couch_httpd_view, handle_view_req}
