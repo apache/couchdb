@@ -26,6 +26,9 @@ var tests = {
     db.createDb();
     if (debug) debugger;
 
+    // Get the database info, check the db_name
+    T(db.info().db_name == "test_suite_db");
+
     // Get the database info, check the doc_count
     T(db.info().doc_count == 0);
 
