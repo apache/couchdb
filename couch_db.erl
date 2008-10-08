@@ -168,10 +168,12 @@ get_db_info(Db) ->
     #db{fd=Fd,
         compactor_pid=Compactor,
         update_seq=SeqNum,
+        name=Name,
         fulldocinfo_by_id_btree=FullDocBtree} = Db,
     {ok, Size} = couch_file:bytes(Fd),
     {ok, {Count, DelCount}} = couch_btree:full_reduce(FullDocBtree),
     InfoList = [
+        {db_name, Name},
         {doc_count, Count},
         {doc_del_count, DelCount},
         {update_seq, SeqNum},
