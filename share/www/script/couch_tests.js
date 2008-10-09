@@ -10,6 +10,11 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+// Used by replication test
+CouchDB.host = (typeof window == 'undefined' || !window) ? 
+                  "127.0.0.1" : window.location.host;
+CouchDB.port = 5984;
+
 var tests = {
 
   // Do some basic tests.
@@ -1556,7 +1561,7 @@ var tests = {
 
   replication: function(debug) {
     if (debug) debugger;
-    var host = window.location.host;
+    var host = CouchDB.host;
     var dbPairs = [
       {source:"test_suite_db_a",
         target:"test_suite_db_b"},

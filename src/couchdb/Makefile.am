@@ -24,7 +24,8 @@ couch_erl_driver_la_CFLAGS = $(ICU_LOCAL_FLAGS)
 couch_erl_driver_la_LIBADD = -licuuc -licudata -licui18n
 
 locallibbin_PROGRAMS = couchjs
-couchjs_SOURCES = couch_js.c
+couchjs_SOURCES = couch_js.c curlhelper.c
+couchjs_LDADD = -lcurl -lgssapi_krb5
 
 couchinclude_DATA = couch_db.hrl
 
