@@ -1857,6 +1857,36 @@ var tests = {
       T(rows[(2*(i-4))+1].key == i+1);
     }
     T(db.view("test/single_doc").total_rows == 0);
+  },
+  
+  config : function(debug) {
+    var db = new CouchDB("test_suite_db");
+    db.deleteDb();
+    db.createDb();
+    if (debug) debugger;
+    
+    // test that /_config returns all the settings
+    var xhr = CouchDB.request("GET", "/_config");
+    var config = JSON.parse(xhr.responseText);
+    T(config.couchdb.database_dir);
+    T(config.httpd.port == CouchDB.port);
+    T(config.daemons.httpd);
+    T(config.httpd_global_handlers._config);
+    T(config.log.level);
+    T(config.query_servers.javascript);
+    
+    // test that settings can be altered
+    xhr = CouchDB.request("PUT", "/_config/test/foo",{
+      body : "bar"
+    });
+    T(xhr.status == 200);
+    xhr = CouchDB.request("GET", "/_config/test");
+    config = JSON.parse(xhr.responseText);
+    T(config.foo == "bar");
+
+    // you can get a single key
+    xhr = CouchDB.request("GET", "/_config/test/foo");
+    T(xhr.responseText == '"bar"');
   }
 };
 
