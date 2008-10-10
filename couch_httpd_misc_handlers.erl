@@ -93,8 +93,17 @@ handle_uuids_req(Req) ->
 % GET /_config/
 % GET /_config
 handle_config_req(#httpd{method='GET', path_parts=[_]}=Req) ->
-    KVs = [{list_to_binary(Key), list_to_binary(Value)}
-            || {Key, Value} <- couch_config:all()],
+    Grouped = lists:foldl(fun({{Section, Key}, Value}, Acc) ->
+        case dict:is_key(Section, Acc) of
+        true ->
+            dict:append(Section, {list_to_binary(Key), list_to_binary(Value)}, Acc);
+        false ->
+            dict:store(Section, [{list_to_binary(Key), list_to_binary(Value)}], Acc)
+        end
+    end, dict:new(), couch_config:all()),
+    KVs = dict:fold(fun(Section, Values, Acc) ->
+        [{list_to_binary(Section), {Values}} | Acc]
+    end, [], Grouped),
     send_json(Req, 200, {KVs});
 % GET /_config/Section
 handle_config_req(#httpd{method='GET', path_parts=[_,Section]}=Req) ->

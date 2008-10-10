@@ -20,12 +20,8 @@
 -include("couch_db.hrl").
 
 -behaviour(gen_server).
--export([start_link/1, init/1,
-    handle_call/3, handle_cast/2, handle_info/2,
-    terminate/2, code_change/3]).
--export([set/3, register/1, register/2,
-    get/1, get/2, get/3,
-    all/0, delete/2, load_ini_file/1]).
+-export([start_link/1, init/1, handle_call/3, handle_cast/2, handle_info/2,terminate/2, code_change/3]).
+-export([all/0, get/1, get/2, get/3, delete/2, set/3, register/1, register/2,load_ini_file/1]).
 
 -record(config,
     {notify_funs=[],
@@ -36,32 +32,39 @@
 
 %% @type etstable() = integer().
 
-start_link(IniFiles) -> gen_server:start_link({local, ?MODULE}, ?MODULE, IniFiles, []).
+start_link(IniFiles) ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, IniFiles, []).
 
+all() ->
+    gen_server:call(?MODULE, all).
+get(Section) when is_binary(Section) ->
+    gen_server:call(?MODULE, {fetch, binary_to_list(Section)});
+get(Section) ->
+    gen_server:call(?MODULE, {fetch, Section}).
+get(Section, Key) when is_binary(Section) and is_binary(Key) ->
+    get(binary_to_list(Section), binary_to_list(Key), undefined);
+get(Section, Key) ->
+    get(Section, Key, undefined).
+get(Section, Key, Default) when is_binary(Section) and is_binary(Key) ->
+    gen_server:call(?MODULE, {fetch, binary_to_list(Section), binary_to_list(Key), Default});
+get(Section, Key, Default) ->
+    gen_server:call(?MODULE, {fetch, Section, Key, Default}).
+
+set(Section, Key, Value) when is_binary(Section) and is_binary(Key)  ->
+    gen_server:call(?MODULE, {set, [{{binary_to_list(Section), binary_to_list(Key)}, Value}]});
 set(Section, Key, Value) ->
     gen_server:call(?MODULE, {set, [{{Section, Key}, Value}]}).
 
+delete(Section, Key) when is_binary(Section) and is_binary(Key) ->
+    gen_server:call(?MODULE, {delete, {binary_to_list(Section), binary_to_list(Key)}});
 delete(Section, Key) ->
     gen_server:call(?MODULE, {delete, {Section, Key}}).
 
-get(Section, Key) ->
-    get(Section, Key, undefined).
+register(Fun) ->
+    ?MODULE:register(Fun, self()).
 
-get(Section, Key, Default) ->
-    case ets:lookup(?MODULE, {Section, Key}) of
-    [] -> Default;
-    [{_,Result}] -> Result
-    end.
-    
-get(Section) ->
-    Matches = ets:match(?MODULE, {{Section, '$1'}, '$2'}),
-    [{Key, Value} || [Key, Value] <- Matches].
-
-all() -> gen_server:call(?MODULE, all).
-
-register(Fun) -> ?MODULE:register(Fun, self()).
-
-register(Fun, Pid) -> gen_server:call(?MODULE, {register, Fun, Pid}).
+register(Fun, Pid) ->
+    gen_server:call(?MODULE, {register, Fun, Pid}).
 
 %% Private API %%
 
@@ -72,6 +75,20 @@ init(IniFiles) ->
     [ok = load_ini_file(IniFile) || IniFile <- IniFiles],
     {ok, #config{writeback_filename=lists:last(IniFiles)}}.
 
+handle_call(all, _From, Config) ->
+    {reply, lists:sort(ets:tab2list(?MODULE)), Config};
+
+handle_call({fetch, Section}, _From, Config) ->
+    Matches = ets:match(?MODULE, {{Section, '$1'}, '$2'}),
+    {reply, [{Key, Value} || [Key, Value] <- Matches], Config};
+
+handle_call({fetch, Section, Key, Default}, _From, Config) ->
+    Ret = case ets:lookup(?MODULE, {Section, Key}) of
+    [] -> Default;
+    [{_,Result}] -> Result
+    end,
+    {reply, Ret, Config};
+
 handle_call({set, KVs}, _From, Config) ->
     [ok = insert_and_commit(Config, KV) || KV <- KVs],
     {reply, ok, Config};
@@ -80,15 +97,9 @@ handle_call({delete, Key}, _From, Config) ->
     ets:delete(?MODULE, Key),
     {reply, ok, Config};
 
-handle_call(all, _From, Config) ->
-    {reply, lists:sort(ets:tab2list(?MODULE)), Config};
-
 handle_call({register, Fun, Pid}, _From, #config{notify_funs=PidFuns}=Config) ->
     erlang:monitor(process, Pid),
     {reply, ok, Config#config{notify_funs=[{Pid, Fun}|PidFuns]}}.
-
-
-    
 
 %% @spec insert_and_commit(Tab::etstable(), Config::any()) -> ok
 %% @doc Inserts a Key/Value pair into the ets table, writes it to the storage
