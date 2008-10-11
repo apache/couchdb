@@ -12,8 +12,7 @@
 
 // Used by replication test
 CouchDB.host = (typeof window == 'undefined' || !window) ? 
-                  "127.0.0.1" : window.location.host;
-CouchDB.port = 5984;
+                  "127.0.0.1:5984" : window.location.host;
 
 var tests = {
 
@@ -1868,8 +1867,9 @@ var tests = {
     // test that /_config returns all the settings
     var xhr = CouchDB.request("GET", "/_config");
     var config = JSON.parse(xhr.responseText);
+    var port = CouchDB.host.split(':').pop()
     T(config.couchdb.database_dir);
-    T(config.httpd.port == CouchDB.port);
+    T(config.httpd.port == port);
     T(config.daemons.httpd);
     T(config.httpd_global_handlers._config);
     T(config.log.level);

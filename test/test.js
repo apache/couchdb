@@ -118,11 +118,10 @@ var HTTP = (function() {
 
 // Monkeypatches to CouchDB client for use of curl.
 
-CouchDB.host = (typeof window == 'undefined' || !window) ? "127.0.0.1" : window;
-CouchDB.port = 5984;
+CouchDB.host = (typeof window == 'undefined' || !window) ? "127.0.0.1:5984" : window;
 
 CouchDB.request = function(method, uri, options) {
-  var full_uri = "http://" + CouchDB.host + ":" + CouchDB.port + uri;
+  var full_uri = "http://" + CouchDB.host + uri;
   options = options || {};
   var response = HTTP[method](full_uri, options.body, options.headers);
   return response;
@@ -239,7 +238,6 @@ function T(arg1, arg2) {
 
 p("Running CouchDB Test Suite\n");
 p("Host: "+CouchDB.host);
-p("Port: "+CouchDB.port);
 
 try {
   p("Version: "+CouchDB.getVersion()+"\n");
