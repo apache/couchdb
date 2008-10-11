@@ -30,9 +30,9 @@ default.ini: default.ini.tpl
 	< $< > $@
 
 install-data-hook:
-	if test ! -f "$(localconfdir)/local.ini"; then \
-	    cp local.ini "$(localconfdir)/local.ini"; \
+	if test ! -f "$(DESTDIR)/$(localconfdir)/local.ini"; then \
+	    cp local.ini "$(DESTDIR)/$(localconfdir)/local.ini"; \
 	fi
 
 uninstall-local:
-	rm -f "$(localconfdir)/local.ini"
+	rm -f "$(DESTDIR)/$(localconfdir)/local.ini"
