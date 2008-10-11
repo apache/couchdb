@@ -52,7 +52,7 @@ handle_event(Event, {Fun, FunAcc}) ->
     FunAcc2 = Fun(Event, FunAcc),
     {ok, {Fun, FunAcc2}};
 handle_event({EventAtom, DbName}, Port) ->
-    Obj = {[{type, atom_to_list(EventAtom)}, {db, DbName}]},
+    Obj = {[{type, list_to_binary(atom_to_list(EventAtom))}, {db, DbName}]},
     true = port_command(Port, ?JSON_ENCODE(Obj) ++ "\n"),
     {ok, Port}.
 
