@@ -63,6 +63,7 @@ To build and install apache CouchDB you will need the following installed:
  * ICU                     (http://icu.sourceforge.net/)
  * OpenSSL                 (http://www.openssl.org/)
  * Mozilla SpiderMonkey    (http://www.mozilla.org/js/spidermonkey/)
+ * libcurl                 (http://curl.haxx.se/libcurl/)
  * GNU Make                (http://www.gnu.org/software/make/)
  * GNU Compiler Collection (http://gcc.gnu.org/)
 
@@ -72,7 +73,7 @@ Debian-based (inc. Ubuntu) Systems
 If you are running a Debian GNU/Linux system (or a derivative such as Ubuntu
 GNU/Linux) you can install the dependencies using the `apt-get` command:
 
-    apt-get install build-essential erlang libicu38 libicu-dev libmozjs-dev
+    apt-get install build-essential erlang libicu38 libicu-dev libmozjs-dev libcurl-dev
 
 If you get an error regarding the `libicu38` or `libicu-dev` be sure to check
 the version used by your distribution (using `apt-cache search libicu`) and
@@ -89,7 +90,7 @@ the Xcode Tools metapackage by running the following command:
 We recommend that you satisfy the other dependancies by installing
 [MacPorts][07] and running the following command:
 
-    port install icu erlang spidermonkey
+    port install icu erlang spidermonkey curl
 
 Note: Don't forget to open a new terminal after you have installed MacPorts
 as it updates your PATH and you will not be able to run the `port` command
