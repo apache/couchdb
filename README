@@ -73,11 +73,14 @@ Debian-based (inc. Ubuntu) Systems
 If you are running a Debian GNU/Linux system (or a derivative such as Ubuntu
 GNU/Linux) you can install the dependencies using the `apt-get` command:
 
-    apt-get install build-essential erlang libicu38 libicu-dev libmozjs-dev libcurl-dev
+    apt-get install build-essential erlang libicu38 libicu-dev libmozjs-dev \
+            libcurl4-openssl-dev
 
 If you get an error regarding the `libicu38` or `libicu-dev` be sure to check
 the version used by your distribution (using `apt-cache search libicu`) and
-install those packages instead.
+install those packages instead. `libcurl4-openssl-dev` is the current version of
+`libcurl-dev` supplied by Ubuntu. You may need to specify an alternate package
+name for libcurl bindings.
 
 OS X
 ++++
@@ -128,8 +131,8 @@ configuration files you should run the following command:
 
     sudo make && yes | sudo make install
 
-Note: The use of the `sudo` command is only required if you are installing into a
-system owned directory. You do not need to do this if you are installing
+Note: The use of the `sudo` command is only required if you are installing into
+a system owned directory. You do not need to do this if you are installing
 elsewhere, such as your home directory.
 
 If you are having problems running `make` you may want to try running `gmake` if
