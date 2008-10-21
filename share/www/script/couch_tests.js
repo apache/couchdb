@@ -28,6 +28,10 @@ var tests = {
     db.deleteDb();
     
     db.createDb();
+
+    // PUT on existing DB should return 409 instead of 500
+    xhr = CouchDB.request("PUT", "/test_suite_db/");
+    T(xhr.status == 409);
     if (debug) debugger;
 
     // Get the database info, check the db_name
