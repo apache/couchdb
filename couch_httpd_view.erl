@@ -370,7 +370,6 @@ make_view_fold_fun(Req, QueryArgs, Db, TotalViewCount, ReduceCountFun) ->
 
     fun({{Key, DocId}, Value}, OffsetReds,
                       {AccCount, AccSkip, Resp, AccRevRows}) ->
-        Offset = ReduceCountFun(OffsetReds), % I think we only need this call once per view
         PassedEnd = PassedEndFun(Key, DocId),
         case {PassedEnd, AccCount, AccSkip, Resp} of
         {true, _, _, _} ->
@@ -383,6 +382,8 @@ make_view_fold_fun(Req, QueryArgs, Db, TotalViewCount, ReduceCountFun) ->
             {ok, {AccCount, AccSkip - 1, Resp, AccRevRows}};
         {_, _, _, undefined} ->
             {ok, Resp2} = start_json_response(Req, 200),
+            io:format("OffsetReds:~p~n", [OffsetReds]),
+            Offset = ReduceCountFun(OffsetReds),
             JsonBegin = io_lib:format("{\"total_rows\":~w,\"offset\":~w,\"rows\":[\r\n",
                     [TotalViewCount, Offset]),
             JsonObj = view_row_obj(Db, {{Key, DocId}, Value}, IncludeDocs),
