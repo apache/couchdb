@@ -1172,6 +1172,10 @@ var tests = {
         T(e.error == 'query_parse_error');
     }
 
+    // Reduce support when reduce=false
+    resp = db.view('test/summate', {reduce: false, include_docs: true});
+    T(resp.rows.length == 100);
+
     // Check emitted _rev controls things
     resp = db.allDocs({include_docs: true}, ["0"]);
     var before = resp.rows[0].doc;
