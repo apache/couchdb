@@ -637,7 +637,8 @@ stream_kv_node(Bt, Reds, KVs, StartKey, Dir, Fun, Acc) ->
         fun({Key, _}) -> less(Bt, StartKey, Key) end
     end,
     {LTKVs, GTEKVs} = lists:splitwith(DropFun, KVs),
-    stream_kv_node2(Bt, Reds, LTKVs, GTEKVs, Dir, Fun, Acc).
+    AssembleLTKVs = [assemble(Bt,K,V) || {K,V} <- LTKVs],
+    stream_kv_node2(Bt, Reds, AssembleLTKVs, GTEKVs, Dir, Fun, Acc).
 
 stream_kv_node2(_Bt, _Reds, _PrevKVs, [], _Dir, _Fun, Acc) ->
     {ok, Acc};

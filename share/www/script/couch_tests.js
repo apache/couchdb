@@ -72,6 +72,10 @@ var tests = {
     // Check _all_docs with descending=true
     var desc = db.allDocs({descending:true});
     T(desc.total_rows == desc.rows.length);
+ 
+    // Check _all_docs offset
+    var all = db.allDocs({startkey:"2"});
+    T(all.offset == 2);
 
     // Test a simple map functions
 
