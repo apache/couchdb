@@ -1311,6 +1311,10 @@ var tests = {
         T(e.error == "query_parse_error");
     }
 
+    // Test that a map & reduce containing func support keys when reduce=false
+    resp = db.view("test/summate", {reduce: false}, keys);
+    T(resp.rows.length == 5);
+
     // Check that limiting by startkey_docid and endkey_docid get applied
     // as expected.
     var curr = db.view("test/multi_emit", {startkey_docid: 21, endkey_docid: 23}, [0, 2]).rows;

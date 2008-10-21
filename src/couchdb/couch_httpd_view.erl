@@ -346,9 +346,15 @@ parse_view_query(Req, Keys, IsReduce) ->
             exact ->
                 QueryArgs;
             _ ->
-                Msg = lists:flatten(io_lib:format(
-                    "Multi-key fetches for a reduce view must include group=true", [])),
-                throw({query_parse_error, Msg})
+                #view_query_args{reduce=OptReduce} = QueryArgs,
+                case OptReduce of
+                true ->
+                    Msg = lists:flatten(io_lib:format(
+                        "Multi-key fetches for a reduce view must include group=true", [])),
+                    throw({query_parse_error, Msg});
+                _ -> 
+                    QueryArgs
+                end
             end
         end
     end.
