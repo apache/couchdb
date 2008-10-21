@@ -308,8 +308,14 @@ parse_view_query(Req, Keys, IsReduce) ->
         {"include_docs", Value} ->
             case IsReduce of
             true ->
-                Msg = lists:flatten(io_lib:format("Bad URL query key for reduce operation: ~s", [Key])),
-                throw({query_parse_error, Msg});
+                #view_query_args{reduce=OptReduce} = Args,
+                case OptReduce of
+                    true ->
+                        Msg = lists:flatten(io_lib:format("Bad URL query key for reduce operation: ~s", [Key])),
+                        throw({query_parse_error, Msg});
+                _ ->
+                    ok
+                end;
             _ ->
                 ok
             end,
