@@ -232,10 +232,10 @@ Apache CouchDB as, you must edit the `/usr/local/etc/default/couchdb` file as
 appropriate. If you are running the init script as a non-superuser you need to
 remove the line with the `COUCHDB_USER` setting.
 
-If you wish the ApacheCouchDB daemon to run as a system service you need to copy
-the `/usr/local/etc/[init.d|rc.d]/couchdb` script into your system wide
+If you wish the Apache CouchDB daemon to run as a system service you need to
+copy the `/usr/local/etc/[init.d|rc.d]/couchdb` script into your system wide
 `/etc/[init.d|rc.d]` directory and update your system configuration as
-appropriate.  Consult your system documentation for more information.
+appropriate. Consult your system documentation for more information.
 
 If you are running a Debian GNU/Linux system (or a derivative such as Ubuntu
 GNU/Linux) you can configure your system using the following command:
@@ -249,11 +249,15 @@ You can use the `launchctl` command to control the Apache CouchDB daemon.
 
 To load the launchd configuration you must run the following command:
 
-    sudo launchctl load /usr/local/Library/LaunchDaemons/org.apache.couchdb
+    sudo launchctl load /usr/local/Library/LaunchDaemons/org.apache.couchdb.plist
+
+Then you can start Apache CouchDB by running :
+
+    sudo launchctl start org.apache.couchdb
 
 You can stop the Apache CouchDB daemon by running the following command:
 
-    sudo launchctl unload /usr/local/Library/LaunchDaemons/org.apache.couchdb
+    sudo launchctl unload /usr/local/Library/LaunchDaemons/org.apache.couchdb.plist
 
 If you wish to change the launchd configuration, such as which user to run
 Apache CouchDB as, you must edit the
