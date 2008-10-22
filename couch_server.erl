@@ -18,7 +18,7 @@
 -export([open/2,create/2,delete/1,all_databases/0,get_version/0]).
 -export([init/1, handle_call/3,sup_start_link/0]).
 -export([handle_cast/2,code_change/3,handle_info/2,terminate/2]).
--export([dev_start/0,remote_restart/0]).
+-export([dev_start/0,remote_restart/0,is_admin/2,has_admins/0]).
 
 -include("couch_db.hrl").
 
@@ -85,8 +85,30 @@ check_dbname(#server{dbname_regexp=RegExp}, DbName) ->
         ok
     end.
 
+is_admin(User, ClearPwd) ->
+    case couch_config:get("admins", User) of
+    "-hashed-" ++ HashedPwdAndSalt ->
+        [HashedPwd, Salt] = string:tokens(HashedPwdAndSalt, ","),
+        couch_util:to_hex(crypto:sha(ClearPwd ++ Salt)) == HashedPwd;
+    _Else ->
+        false
+    end.
+
+has_admins() ->
+    couch_config:get("admins") /= [].
+
 get_full_filename(Server, DbName) ->
     filename:join([Server#server.root_dir, "./" ++ DbName ++ ".couch"]).
+
+hash_admin_passwords() ->
+    lists:foreach(
+        fun({_User, "-hashed-" ++ _}) ->
+            ok; % already hashed
+        ({User, ClearPassword}) ->
+            Salt = ?b2l(couch_util:new_uuid()),
+            Hashed = couch_util:to_hex(crypto:sha(ClearPassword ++ Salt)),
+            couch_config:set("admins", User, "-hashed-" ++ Hashed ++ "," ++ Salt)
+        end, couch_config:get("admins")).
 
 init([]) ->
     % read config and register for configuration changes
@@ -103,6 +125,11 @@ init([]) ->
         ("couchdb", "server_options") ->
             exit(Self, config_change)
         end),
+    ok = couch_config:register(
+        fun("admins", _) ->
+            hash_admin_passwords()
+        end),
+    hash_admin_passwords(),
     {ok, RegExp} = regexp:parse("^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*$"),
     ets:new(couch_dbs_by_name, [set, private, named_table]),
     ets:new(couch_dbs_by_pid, [set, private, named_table]),

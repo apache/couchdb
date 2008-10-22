@@ -15,7 +15,8 @@
 
 -export([start_link/0, stop/0, handle_request/3]).
 
--export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,path/1,unquote/1]).
+-export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,path/1]).
+-export([check_is_admin/1,unquote/1]).
 -export([parse_form/1,json_body/1,body/1,doc_etag/1]).
 -export([primary_header_value/2,partition/1,serve_file/3]).
 -export([start_chunked_response/3,send_chunk/2]).
@@ -85,6 +86,7 @@ start_link() ->
 
 stop() ->
     mochiweb_http:stop(?MODULE).
+    
 
 handle_request(MochiReq, UrlHandlers, DbUrlHandlers) ->
 
@@ -195,6 +197,30 @@ json_body(#httpd{mochi_req=MochiReq}) ->
 doc_etag(#doc{revs=[DiskRev|_]}) ->
      "\"" ++ binary_to_list(DiskRev) ++ "\"".
 
+check_is_admin(Req) ->
+    IsNamedAdmin =
+    case header_value(Req, "Authorization") of
+    "Basic " ++ Base64Value ->
+        [User, Pass] =
+            string:tokens(?b2l(couch_util:decodeBase64(Base64Value)),":"),
+        couch_server:is_admin(User, Pass);
+    _ ->
+        false
+    end,
+    
+    case IsNamedAdmin of
+    true ->
+        ok;
+    false ->
+        case couch_server:has_admins() of
+        true ->
+            throw(admin_auth_error);
+        false ->
+            % if no admins, then everyone is admin! Yay, admin party!
+            ok
+        end
+    end.
+
 start_chunked_response(#httpd{mochi_req=MochiReq}, Code, Headers) ->
     {ok, MochiReq:respond({Code, Headers ++ server_header(), chunked})}.
 
@@ -250,6 +276,11 @@ send_error(Req, {not_found, Reason}) ->
     send_error(Req, 404, <<"not_found">>, Reason);
 send_error(Req, conflict) ->
     send_error(Req, 412, <<"conflict">>, <<"Document update conflict.">>);
+send_error(Req, admin_auth_error) ->
+    send_json(Req, 401,
+        [{"WWW-Authenticate", "Basic realm=\"admin\""}],
+        {[{<<"error">>,  <<"auth_error">>},
+         {<<"reason">>, <<"Admin user name and password required">>}]});
 send_error(Req, {doc_validation, Msg}) ->
     send_error(Req, 406, <<"doc_validation">>, Msg);
 send_error(Req, file_exists) ->

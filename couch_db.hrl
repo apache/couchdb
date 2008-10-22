@@ -17,6 +17,9 @@
 -define(JSON_ENCODE(V), mochijson2:encode(V)).
 -define(JSON_DECODE(V), mochijson2:decode(V)).
 
+-define(b2l(V), binary_to_list(V)).
+-define(l2b(V), list_to_binary(V)).
+
 -define(DEFAULT_ATTACHMENT_CONTENT_TYPE, <<"application/octet-stream">>).
         
 -define(LOG_DEBUG(Format, Args),
