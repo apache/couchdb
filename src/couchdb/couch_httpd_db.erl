@@ -42,6 +42,7 @@ handle_request(#httpd{path_parts=[DbName|RestParts],method=Method,
     end.
 
 create_db_req(Req, DbName) ->
+    ok = couch_httpd:check_is_admin(Req),
     case couch_server:create(DbName, []) of
     {ok, Db} ->
         couch_db:close(Db),
@@ -51,6 +52,7 @@ create_db_req(Req, DbName) ->
     end.
 
 delete_db_req(Req, DbName) ->
+    ok = couch_httpd:check_is_admin(Req),
     case couch_server:delete(DbName) of
     ok ->
         send_json(Req, 200, {[{ok, true}]});
