@@ -249,6 +249,7 @@ handle_call({create, DbName, Options}, {FromPid,_}, Server) ->
                 true = ets:insert(couch_dbs_by_pid, {MainPid, DbName}),
                 true = ets:insert(couch_dbs_by_lru, {LruTime, DbName}),
                 DbsOpen = Server#server.current_dbs_open + 1,
+                couch_db_update_notifier:notify({created, DbName}),
                 {reply,
                     couch_db:open_ref_counted(MainPid, FromPid), 
                     Server#server{current_dbs_open=DbsOpen}};
