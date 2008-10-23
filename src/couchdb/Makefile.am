@@ -124,7 +124,9 @@ couch.app: couch.app.tpl
 	$@ < $<
 	chmod +x $@
 
-$(dist_devdoc_DATA): $(source_files)
+$(dist_devdoc_DATA): edoc-info
+
+edoc-info: $(source_files)
 	for file in $(source_files); do \
 	    if test -n "$$edoc_files"; then \
 	        edoc_files="$$edoc_files, "; \
