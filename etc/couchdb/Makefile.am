@@ -13,6 +13,7 @@
 couchprivlibdir = $(localerlanglibdir)/couch-$(version)/priv/lib
 
 localconf_DATA = default.ini
+EXTRA_DIST = local.ini
 
 CLEANFILES = $(localconf_DATA)
 
