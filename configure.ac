@@ -21,11 +21,7 @@ AC_CONFIG_AUX_DIR([build-aux])
 
 AM_CONFIG_HEADER([config.h])
 
-if test x${NIGHTLY}; then
-    AM_INIT_AUTOMAKE([1.6.3 foreign])
-else
-    AM_INIT_AUTOMAKE([1.6.3 foreign check-news])
-fi
+AM_INIT_AUTOMAKE([1.6.3 foreign])
 
 AC_GNU_SOURCE
 AC_ENABLE_SHARED
