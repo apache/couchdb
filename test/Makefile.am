@@ -12,9 +12,4 @@
 
 TESTS = runner.sh
 
-check_PROGRAMS = runner.beam
-
-CLEANFILES = test.ini
-
-runner.beam: runner.erl
-	$(ERLC) $<
+CLEANFILES = runner.beam test.ini
