@@ -10,7 +10,7 @@
 ## License for the specific language governing permissions and limitations
 ## under the License.
 
-SUBDIRS = bin etc src/couchdb src/mochiweb share test var
+SUBDIRS = bin etc src/couchdb src/mochiweb share test var utils
 
 localdoc_DATA = AUTHORS.gz BUGS.gz CHANGES.gz NEWS.gz README.gz THANKS.gz
 
@@ -36,6 +36,14 @@ README.gz: $(top_srcdir)/README
 THANKS.gz: $(top_srcdir)/THANKS
 	-gzip -9 < $< > $@
 
+dev: all
+	@echo "This command is intended for developers to use;"
+	@echo "it creates development ini files as well as a"
+	@echo "$(top_srcdir)/tmp structure for development runtime files"
+	mkdir -p $(top_srcdir)/tmp/lib
+	mkdir -p $(top_srcdir)/tmp/log
+	mkdir -p $(top_srcdir)/tmp/run
+
 .PHONY: local-clean
 local-clean: maintainer-clean
 	@echo "This command is intended for maintainers to use;"
@@ -49,6 +57,7 @@ local-clean: maintainer-clean
 	rm -f $(top_srcdir)/*.tar.gz.*
 	rm -fr $(top_srcdir)/build-aux
 	rm -fr $(top_srcdir)/m4
+	rm -fr $(top_srcdir)/tmp
 	find $(top_srcdir) -name Makefile.in -exec rm {} \;
 
 .PHONY: distsign

@@ -11,14 +11,17 @@
 ## under the License.
 
 couchprivlibdir = $(localerlanglibdir)/couch-$(version)/priv/lib
+devcouchprivlibdir = $(abs_top_srcdir)/src/couchdb/.libs
 
 localconf_DATA = default.ini
 EXTRA_DIST = local.ini
+noinst_DATA = default_dev.ini
 
-CLEANFILES = $(localconf_DATA)
+CLEANFILES = $(localconf_DATA) $(noinst_DATA)
 
 transform = @program_transform_name@
 couchjs_command_name = `echo couchjs | sed '$(transform)'`
+couchjs_dev_command_name = `echo couchjs_dev | sed '$(transform)'`
 
 default.ini: default.ini.tpl
 	sed -e "s|%bindir%|$(bindir)|g" \
@@ -28,6 +31,16 @@ default.ini: default.ini.tpl
 	    -e "s|%localstatelogdir%|$(localstatelogdir)|g" \
 	    -e "s|%couchprivlibdir%|$(couchprivlibdir)|g" \
 	    -e "s|%couchjs_command_name%|$(couchjs_command_name)|g" \
+	< $< > $@
+
+default_dev.ini: default.ini.tpl
+	sed -e "s|%bindir%|$(abs_top_srcdir)/bin|g" \
+	    -e "s|%localconfdir%|$(abs_top_srcdir)/etc/couchdb|g" \
+	    -e "s|%localdatadir%|$(abs_top_srcdir)/share|g" \
+	    -e "s|%localstatelibdir%|$(abs_top_srcdir)/tmp/lib|g" \
+	    -e "s|%localstatelogdir%|$(abs_top_srcdir)/tmp/log|g" \
+	    -e "s|%couchprivlibdir%|$(devcouchprivlibdir)|g" \
+	    -e "s|%couchjs_command_name%|$(couchjs_dev_command_name)|g" \
 	< $< > $@
 
 install-data-hook:

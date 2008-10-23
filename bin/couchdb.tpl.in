@@ -23,8 +23,8 @@ RECURSED_BOOLEAN=false
 
 RESPAWN_TIMEOUT=0
 
-DEFAULT_INI_FILE=%localconfdir%/default.ini
-LOCAL_INI_FILE=%localconfdir%/local.ini
+DEFAULT_INI_FILE=%localconfdir%/%defaultini%
+LOCAL_INI_FILE=%localconfdir%/%localini%
 
 PID_FILE=%localstatedir%/run/couchdb.pid
 
@@ -181,8 +181,8 @@ start_couchdb () {
     done
     command="`%ICU_CONFIG% --invoke` \
         %ERL% $interactive_option -smp auto -sasl errlog_type error +K true \
-        -pa %localerlanglibdir%/couch-%version%/ebin \
-            %localerlanglibdir%/mochiweb-r82/ebin \
+        -pa %localerlanglibdir%/%couchdbebindir% \
+            %localerlanglibdir%/%mochiwebebindir% \
         -eval \"application:load(inets)\" \
         -eval \"application:load(crypto)\" \
         -eval \"application:load(couch)\" \

@@ -11,12 +11,13 @@
 ## under the License.
 
 bin_SCRIPTS = couchdb couchjs
+noinst_SCRIPTS = couchjs_dev
 
 if HELP2MAN
 dist_man1_MANS = couchdb.1 couchjs.1
 endif
 
-CLEANFILES = $(bin_SCRIPTS) $(dist_man1_MANS)
+CLEANFILES = $(bin_SCRIPTS) $(dist_man1_MANS) $(noinst_SCRIPTS)
 
 transform = @program_transform_name@
 couchdb_command_name = `echo couchdb | sed '$(transform)'`
@@ -26,8 +27,11 @@ couchdb: couchdb.tpl
 	sed -e "s|%ERL%|$(ERL)|g" \
 	    -e "s|%ICU_CONFIG%|$(ICU_CONFIG)|g" \
 	    -e "s|%bindir%|@bindir@|g" \
-	    -e "s|%localerlangbindir%|@localerlangbindir@|g" \
 	    -e "s|%localerlanglibdir%|@localerlanglibdir@|g" \
+	    -e "s|%mochiwebebindir%|couch-@version@/ebin|g" \
+	    -e "s|%couchdbebindir%|mochiweb-r82/ebin|g" \
+	    -e "s|%defaultini%|default.ini|g" \
+	    -e "s|%localini%|local.ini|g" \
 	    -e "s|%localconfdir%|@localconfdir@|g" \
 	    -e "s|%localstatelogdir%|@localstatelogdir@|g" \
 	    -e "s|%localstatelibdir%|@localstatelibdir@|g" \
@@ -43,6 +47,17 @@ couchdb: couchdb.tpl
 
 couchjs: couchjs.tpl
 	sed -e "s|%locallibbindir%|@locallibbindir@|g" \
+	    -e "s|%bug_uri%|@bug_uri@|g" \
+	    -e "s|%package_author_address%|@package_author_address@|g" \
+	    -e "s|%package_author_name%|@package_author_name@|g" \
+	    -e "s|%package_name%|@package_name@|g" \
+	    -e "s|%version%|@version@|g" \
+	    -e "s|%couchjs_command_name%|$(couchjs_command_name)|g" > \
+	$@ < $<
+	chmod +x $@
+
+couchjs_dev: couchjs.tpl
+	sed -e "s|%locallibbindir%|$(abs_top_srcdir)/src/couchdb|g" \
 	    -e "s|%bug_uri%|@bug_uri@|g" \
 	    -e "s|%package_author_address%|@package_author_address@|g" \
 	    -e "s|%package_author_name%|@package_author_name@|g" \
