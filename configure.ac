@@ -21,7 +21,11 @@ AC_CONFIG_AUX_DIR([build-aux])
 
 AM_CONFIG_HEADER([config.h])
 
-AM_INIT_AUTOMAKE([1.6.3 foreign check-news])
+if test x${NIGHTLY} = xyes; then
+    AM_INIT_AUTOMAKE([1.6.3 foreign])
+else
+    AM_INIT_AUTOMAKE([1.6.3 foreign check-news])
+fi
 
 AC_GNU_SOURCE
 AC_ENABLE_SHARED
@@ -73,6 +77,8 @@ AC_ARG_WITH([js-include], [AC_HELP_STRING([--with-js-include=PATH],
 AC_ARG_WITH([js-lib], [AC_HELP_STRING([--with-js-lib=PATH],
     [set PATH to the SpiderMonkey library directory])],
     [JS_LIB_FLAGS="-L$withval"], [])
+
+AC_ARG_VAR([FLAGS], [general flags to prepend to LDFLAGS and CPPFLAGS])
 
 LIB_FLAGS="-L/usr/local/lib -L/opt/local/lib $JS_LIB_FLAGS"
 LIBS="$LIB_FLAGS $LIBS"
