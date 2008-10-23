@@ -21,7 +21,7 @@ AC_CONFIG_AUX_DIR([build-aux])
 
 AM_CONFIG_HEADER([config.h])
 
-if test x${NIGHTLY} = xyes; then
+if test x${NIGHTLY}; then
     AM_INIT_AUTOMAKE([1.6.3 foreign])
 else
     AM_INIT_AUTOMAKE([1.6.3 foreign check-news])
