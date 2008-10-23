@@ -61,6 +61,8 @@ source_files = \
     couch_view.erl \
     couch_db_updater.erl
 
+EXTRA_DIST = $(source_files) couch_db.hrl
+
 compiled_files = \
     couch.app \
     couch_btree.beam \
