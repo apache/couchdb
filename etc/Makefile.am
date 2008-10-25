@@ -15,7 +15,7 @@ SUBDIRS = couchdb default init launchd logrotate.d
 default_sysconf_data = logrotate.d/couchdb
 
 if INIT
-init_sysconf_data = default/couchdb
+dist_init_sysconf_data = default/couchdb
 init_DATA = init/couchdb
 endif
 
