@@ -17,6 +17,5 @@ CLEANFILES = runner.beam test.ini
 EXTRA_DIST = \
     couch_config_test.erl \
     couch_config_writer_test.erl \
-    local.ini \
     runner.erl \
     test.js
