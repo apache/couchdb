@@ -15,6 +15,7 @@ noinst_SCRIPTS = couchjs_dev
 
 bin_PROGRAMS = couchpw
 couchpw_SOURCES = couchpw.c
+couchpw_LDADD = -lcrypt
 
 if HELP2MAN
 dist_man1_MANS = couchdb.1 couchjs.1
