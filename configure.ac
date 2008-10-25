@@ -108,6 +108,12 @@ AC_CHECK_CURL(7.16.0)
 AC_SUBST(CURL_CFLAGS) 
 AC_SUBST(CURL_LIBS) 
 
+case "$(uname -s)" in
+  Linux | *BSD)
+    LIBS="$LIBS -lcrypt"
+  ;;
+esac
+
 AC_PATH_PROG([ERL], [erl])
 
 if test x${ERL} = x; then
