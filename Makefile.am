@@ -130,17 +130,9 @@ couch.app: couch.app.tpl
 
 $(dist_devdoc_DATA): edoc-info
 
-edoc-info: $(source_files)
-	for file in $(source_files); do \
-	    if test -n "$$edoc_files"; then \
-	        edoc_files="$$edoc_files, "; \
-	    fi; \
-	    edoc_files="$$edoc_files \"$$file\""; \
-	done; \
-	erl -noshell -run edoc_run files ["$$edoc_files"]
-
 %.beam: %.erl
 	$(ERLC) $<
+	$(ERL) -noshell -run edoc_run files [\"$<\"]
 
 install-data-hook:
 	if test -f "$(DESTDIR)/$(couchprivlibdir)/couch_erl_driver"; then \
