@@ -12,7 +12,7 @@
 
 ICU_LOCAL_FLAGS = $(ICU_LOCAL_CFLAGS) $(ICU_LOCAL_LDFLAGS)
 
-devdocdir = $(localdocdir)/developer/couchdb
+# devdocdir = $(localdocdir)/developer/couchdb
 couchprivlibdir = $(localerlanglibdir)/couch-$(version)/priv/lib
 couchincludedir = $(localerlanglibdir)/couch-$(version)/include
 couchebindir = $(localerlanglibdir)/couch-$(version)/ebin
@@ -33,9 +33,11 @@ couchinclude_DATA = couch_db.hrl
 
 couchebin_DATA = $(compiled_files)
 
-dist_devdoc_DATA = $(doc_base) $(doc_modules)
+# dist_devdoc_DATA = $(doc_base) $(doc_modules)
 
-CLEANFILES = $(compiled_files) $(doc_base) $(doc_modules) edoc-info
+CLEANFILES = $(compiled_files) $(doc_base)
+
+# CLEANFILES = $(doc_modules) edoc-info
 
 source_files = \
     couch_btree.erl \
@@ -92,35 +94,35 @@ compiled_files = \
     couch_view.beam \
     couch_db_updater.beam
 
-doc_base = \
-    erlang.png \
-    index.html \
-    modules-frame.html \
-    overview-summary.html \
-    packages-frame.html \
-    stylesheet.css
+# doc_base = \
+#     erlang.png \
+#     index.html \
+#     modules-frame.html \
+#     overview-summary.html \
+#     packages-frame.html \
+#     stylesheet.css
 
-doc_modules = \
-    couch_btree.html \
-    couch_config.html \
-    couch_config_writer.html \
-    couch_db.html \
-    couch_db_update_notifier.html \
-    couch_db_update_notifier_sup.html \
-    couch_doc.html \
-    couch_event_sup.html \
-    couch_file.html \
-    couch_ft_query.html \
-    couch_httpd.html \
-    couch_key_tree.html \
-    couch_log.html \
-    couch_query_servers.html \
-    couch_rep.html \
-    couch_server.html \
-    couch_server_sup.html \
-    couch_stream.html \
-    couch_util.html \
-    couch_view.html
+# doc_modules = \
+#     couch_btree.html \
+#     couch_config.html \
+#     couch_config_writer.html \
+#     couch_db.html \
+#     couch_db_update_notifier.html \
+#     couch_db_update_notifier_sup.html \
+#     couch_doc.html \
+#     couch_event_sup.html \
+#     couch_file.html \
+#     couch_ft_query.html \
+#     couch_httpd.html \
+#     couch_key_tree.html \
+#     couch_log.html \
+#     couch_query_servers.html \
+#     couch_rep.html \
+#     couch_server.html \
+#     couch_server_sup.html \
+#     couch_stream.html \
+#     couch_util.html \
+#     couch_view.html
 
 couch.app: couch.app.tpl
 	sed -e "s|%package_name%|@package_name@|g" \
@@ -128,11 +130,12 @@ couch.app: couch.app.tpl
 	$@ < $<
 	chmod +x $@
 
-$(dist_devdoc_DATA): edoc-info
+# $(dist_devdoc_DATA): edoc-info
+
+# $(ERL) -noshell -run edoc_run files [\"$<\"]
 
 %.beam: %.erl
 	$(ERLC) $<
-	$(ERL) -noshell -run edoc_run files [\"$<\"]
 
 install-data-hook:
 	if test -f "$(DESTDIR)/$(couchprivlibdir)/couch_erl_driver"; then \
