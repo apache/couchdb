@@ -39,7 +39,7 @@ to_json_obj(#doc{id=Id,deleted=Del,body=Body,revs=Revs,meta=Meta}=Doc,Options)->
         lists:map(
             fun({revs_info, RevsInfo}) ->
                 JsonRevsInfo =
-                [{[{rev, Rev}, {status, atom_to_list(Status)}]} ||
+                [{[{rev, Rev}, {status, list_to_binary(atom_to_list(Status))}]} ||
                     {Rev, Status} <- RevsInfo],
                 {<<"_revs_info">>, JsonRevsInfo};
             ({conflicts, Conflicts}) ->

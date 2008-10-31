@@ -54,6 +54,10 @@ var tests = {
 
     var id = result.id; // save off the id for later
 
+    // make sure the revs_info status is good
+    var doc = db.open(id, {revs_info:true});
+    T(doc._revs_info[0].status == "available");
+
     // Create some more documents.
     // Notice the use of the ok member on the return result.
     T(db.save({_id:"1",a:2,b:4}).ok);
