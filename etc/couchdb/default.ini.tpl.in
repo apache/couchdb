@@ -29,6 +29,8 @@ httpd={couch_httpd, start_link, []}
 
 [httpd_global_handlers]
 / = {couch_httpd_misc_handlers, handle_welcome_req, <<"Welcome">>}
+favicon.ico = {couch_httpd_misc_handlers, handle_favicon_req, "%localdatadir%/www"}
+
 _utils = {couch_httpd_misc_handlers, handle_utils_dir_req, "%localdatadir%/www"}
 _all_dbs = {couch_httpd_misc_handlers, handle_all_dbs_req}
 _config = {couch_httpd_misc_handlers, handle_config_req}

@@ -12,7 +12,7 @@
 
 -module(couch_httpd_misc_handlers).
 
--export([handle_welcome_req/2,handle_utils_dir_req/2,handle_all_dbs_req/1,
+-export([handle_welcome_req/2,handle_favicon_req/2,handle_utils_dir_req/2,handle_all_dbs_req/1,
     handle_replicate_req/1,handle_restart_req/1,handle_uuids_req/1,
     handle_config_req/1]).
     
@@ -36,7 +36,11 @@ handle_welcome_req(#httpd{method='GET'}=Req, WelcomeMessage) ->
 handle_welcome_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
-
+handle_favicon_req(#httpd{method='GET'}=Req, DocumentRoot) ->
+    couch_httpd:serve_file(Req, "favicon.ico", DocumentRoot);
+handle_favicon_req(Req, _) ->
+    send_method_not_allowed(Req, "GET,HEAD").
+    
 handle_utils_dir_req(#httpd{method='GET'}=Req, DocumentRoot) ->
     "/" ++ UrlPath = couch_httpd:path(Req),
     case couch_httpd:partition(UrlPath) of
