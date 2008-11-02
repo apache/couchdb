@@ -39,7 +39,8 @@ THANKS.gz: $(top_srcdir)/THANKS
 dev: all
 	@echo "This command is intended for developers to use;"
 	@echo "it creates development ini files as well as a"
-	@echo "$(top_srcdir)/tmp structure for development runtime files"
+	@echo "$(top_srcdir)/tmp structure for development runtime files."
+	@echo "Use ./utils/run to launch CouchDB from the source tree."
 	mkdir -p $(top_srcdir)/tmp/lib
 	mkdir -p $(top_srcdir)/tmp/log
 	mkdir -p $(top_srcdir)/tmp/run
