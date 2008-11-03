@@ -382,7 +382,7 @@ start_temp_update_loop(DbName, Fd, Lang, MapSrc, RedSrc) ->
 
 temp_update_loop(DbName, Group, NotifyPids) ->
     {ok, Db} = couch_db:open(DbName, []),
-    {ok, Group2} = update_group(Group#group{db=Db}),
+    {_Updated, Group2} = update_group(Group#group{db=Db}),
     couch_db:close(Db),
     [Pid ! {self(), {ok, Group2}} || Pid <- NotifyPids],
     garbage_collect(),
@@ -463,7 +463,10 @@ update_loop(RootDir, DbName, GroupId, #group{sig=Sig,fd=Fd}=Group, NotifyPids) -
         couch_db:close(Db)
     end,
     case Result of
-    {ok, Group2} ->
+    {same, Group2} ->
+        [Pid ! {self(), {ok, Group2}} || Pid <- NotifyPids],
+        update_loop(RootDir, DbName, GroupId, Group2, get_notify_pids(100000));
+    {updated, Group2} ->
         HeaderData = {Sig, get_index_header_data(Group2)},
         ok = couch_file:write_header(Fd, <<$r, $c, $k, 0>>, HeaderData),
         [Pid ! {self(), {ok, Group2}} || Pid <- NotifyPids],
@@ -555,9 +558,9 @@ update_group(#group{db=Db,current_seq=CurrentSeq,
     couch_query_servers:stop_doc_map(Group4#group.query_server),
     if CurrentSeq /= NewSeq ->
         {ok, Group5} = write_changes(Group4, ViewKVsToAdd2, DocIdViewIdKeys2, NewSeq),
-        {ok, Group5#group{query_server=nil}};
+        {updated, Group5#group{query_server=nil}};
     true ->
-        {ok, Group4#group{query_server=nil}}
+        {same, Group4#group{query_server=nil}}
     end.
     
 delete_index_dir(RootDir, DbName) ->
