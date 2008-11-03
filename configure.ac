@@ -240,6 +240,10 @@ AC_SUBST([locallibbindir], [${locallibdir}/bin])
 AC_SUBST([localerlangbindir], [${locallibdir}/erlang/bin])
 AC_SUBST([localerlanglibdir], [${locallibdir}/erlang/lib])
 
+# fix for older autotools that don't define "abs_top_YYY" by default
+AC_SUBST(abs_top_srcdir)
+AC_SUBST(abs_top_builddir)
+
 AC_REVISION([LOCAL_VERSION])
 
 AC_CONFIG_FILES([Makefile])
