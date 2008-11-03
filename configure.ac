@@ -109,8 +109,11 @@ AC_SUBST(CURL_CFLAGS)
 AC_SUBST(CURL_LIBS) 
 
 case "$(uname -s)" in
-  Linux | *BSD)
+  Linux | FreeBSD)
     LIBS="$LIBS -lcrypt"
+    ;;
+  OpenBSD)
+    LIBS="$LIBS -lcrypto"
   ;;
 esac
 
