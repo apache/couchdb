@@ -17,6 +17,11 @@ specific language governing permissions and limitations under the License.
 // means of calling into C code, however unlike the Fabric engine, coding
 // errors in this module can crash the entire Erlang server.
 
+#ifdef DARWIN
+#define U_HIDE_DRAFT_API 1
+#define U_DISABLE_RENAMING 1
+#endif
+
 #include "erl_driver.h"
 #include "unicode/ucol.h"
 #include "unicode/ucasemap.h"
@@ -87,7 +92,7 @@ static int return_control_result(void* pLocalResult, int localLen, char **ppRetB
     return localLen;
 }
 
-static int couch_drv_control(ErlDrvData drv_data, unsigned int command, const char *pBuf,
+static int couch_drv_control(ErlDrvData drv_data, unsigned int command, char *pBuf,
              int bufLen, char **rbuf, int rlen)
 {
 
