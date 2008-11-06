@@ -109,7 +109,11 @@ AC_SUBST(CURL_CFLAGS)
 AC_SUBST(CURL_LIBS) 
 
 case "$(uname -s)" in
-  Linux | FreeBSD)
+  Linux)
+    LIBS="$LIBS -lcrypt"
+    CPPFLAGS="-D_XOPEN_SOURCE $CPPFLAGS"
+    ;;
+  FreeBSD)
     LIBS="$LIBS -lcrypt"
     ;;
   OpenBSD)
