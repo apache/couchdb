@@ -21,19 +21,19 @@ html, body { background: transparent; color: #000;
 :link, :visited { color: #ba1e16; text-decoration: none; }
 :link img, :visited img { border: none; }
 
-h1 { background: #666 url(../image/hgrad.gif) 100% 0 repeat-y;
+h1 { background: #333; border-right: 2px solid #111;
   border-bottom: 1px solid #333; color: #999;
   font: 125% normal Arial,Helvetica,sans-serif;
   line-height: 1.8em; margin: 0 0 1em; padding: 0 0 0 1em;
 }
 h1 :link, h1 :visited, h1 strong { padding: .4em .5em; }
-h1 :link, h1 :visited {
-  background: url(../image/path.gif) 100% 50% no-repeat; padding-right: 2em;
+h1 :link:after, h1 :visited:after { color: #666; content: "›"; font-size: 100%;
+  padding-left: 1.2em;
 }
 h1 :link, h1 :visited { color: #bbb; cursor: pointer;
   text-shadow: #333 2px 2px 1px;
 }
-h1 strong { color: #fff; padding-right: 25px; text-shadow: #000 2px 2px 4px; }
+h1 strong { color: #fff; font-weight: normal; padding-right: 25px; }
 body.loading h1 strong {
   background: url(../image/spinner.gif) right center no-repeat;
 }
