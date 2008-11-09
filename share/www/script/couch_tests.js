@@ -1615,6 +1615,17 @@ var tests = {
         T(docA._rev == docB._rev);
       }
 
+      // check documents with a '/' in the ID
+      // need to re-encode the slash when replicating from a remote source
+      dbA.save({ _id:"abc/def", val:"one" });
+      
+      T(CouchDB.replicate(A, B).ok);
+      T(CouchDB.replicate(B, A).ok);
+      
+      docA = dbA.open("abc/def");
+      docB = dbB.open("abc/def");
+      T(docA._rev == docB._rev);
+      
       // now check binary attachments
       var binDoc = {
         _id:"bin_doc",

@@ -343,7 +343,7 @@ open_doc_revs(DbUrl, DocId, Revs, Options) when is_list(DbUrl) ->
             "latest=true"
         end, Options),
     RevsQueryStrs = lists:flatten(?JSON_ENCODE(Revs)),
-    Url = DbUrl ++ binary_to_list(DocId) ++ "?" ++ couch_util:implode(["revs=true", "attachments=true", "open_revs=" ++ RevsQueryStrs ] ++ QueryOptionStrs, "&"),
+    Url = DbUrl ++ url_encode(DocId) ++ "?" ++ couch_util:implode(["revs=true", "attachments=true", "open_revs=" ++ RevsQueryStrs ] ++ QueryOptionStrs, "&"),
     JsonResults = do_http_request(Url, get, []),
     Results =
     lists:map(
