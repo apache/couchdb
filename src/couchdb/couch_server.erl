@@ -15,7 +15,7 @@
 -behaviour(application).
 
 -export([start/0,start/1,start/2,stop/0,stop/1,restart/0]).
--export([open/2,create/2,delete/1,all_databases/0,get_version/0]).
+-export([open/2,create/2,delete/2,all_databases/0,get_version/0]).
 -export([init/1, handle_call/3,sup_start_link/0]).
 -export([handle_cast/2,code_change/3,handle_info/2,terminate/2]).
 -export([dev_start/0,remote_restart/0,is_admin/2,has_admins/0]).
@@ -71,8 +71,8 @@ open(DbName, Options) ->
 create(DbName, Options) ->
     gen_server:call(couch_server, {create, DbName, Options}).
 
-delete(DbName) ->
-    gen_server:call(couch_server, {delete, DbName}).
+delete(DbName, Options) ->
+    gen_server:call(couch_server, {delete, DbName, Options}).
 
 remote_restart() ->
     gen_server:call(couch_server, remote_restart).
@@ -202,6 +202,7 @@ handle_call(get_root, _From, #server{root_dir=Root}=Server) ->
     {reply, {ok, Root}, Server};
 handle_call({open, DbName, Options}, {FromPid,_}, Server) ->
     DbNameList = binary_to_list(DbName),
+    UserCreds = proplists:get_value(creds, Options, nil),
     case check_dbname(Server, DbNameList) of
     ok ->
         Filepath = get_full_filename(Server, DbNameList),
@@ -217,7 +218,7 @@ handle_call({open, DbName, Options}, {FromPid,_}, Server) ->
                     true = ets:insert(couch_dbs_by_lru, {LruTime, DbName}),
                     DbsOpen = Server2#server.current_dbs_open + 1,
                     {reply,
-                        couch_db:open_ref_counted(MainPid, FromPid),
+                        couch_db:open_ref_counted(MainPid, FromPid, UserCreds),
                         Server2#server{current_dbs_open=DbsOpen}};
                 Error ->
                     {reply, Error, Server2}
@@ -229,13 +230,16 @@ handle_call({open, DbName, Options}, {FromPid,_}, Server) ->
             true = ets:insert(couch_dbs_by_name, {DbName, {MainPid, LruTime}}),
             true = ets:delete(couch_dbs_by_lru, PrevLruTime),
             true = ets:insert(couch_dbs_by_lru, {LruTime, DbName}),
-            {reply, couch_db:open_ref_counted(MainPid, FromPid), Server}
+            {reply,
+                couch_db:open_ref_counted(MainPid, FromPid, UserCreds),
+                Server}
         end;
     Error ->
         {reply, Error, Server}
     end;
 handle_call({create, DbName, Options}, {FromPid,_}, Server) ->
     DbNameList = binary_to_list(DbName),
+    UserCreds = proplists:get_value(creds, Options, nil),
     case check_dbname(Server, DbNameList) of
     ok ->
         Filepath = get_full_filename(Server, DbNameList),
@@ -251,7 +255,7 @@ handle_call({create, DbName, Options}, {FromPid,_}, Server) ->
                 DbsOpen = Server#server.current_dbs_open + 1,
                 couch_db_update_notifier:notify({created, DbName}),
                 {reply,
-                    couch_db:open_ref_counted(MainPid, FromPid), 
+                    couch_db:open_ref_counted(MainPid, FromPid, UserCreds), 
                     Server#server{current_dbs_open=DbsOpen}};
             Error ->
                 {reply, Error, Server}
@@ -262,8 +266,9 @@ handle_call({create, DbName, Options}, {FromPid,_}, Server) ->
     Error ->
         {reply, Error, Server}
     end;
-handle_call({delete, DbName}, _From, Server) ->
+handle_call({delete, DbName, Options}, _From, Server) ->
     DbNameList = binary_to_list(DbName),
+    _UserCreds = proplists:get_value(creds, Options, nil),
     case check_dbname(Server, DbNameList) of
     ok ->
         FullFilepath = get_full_filename(Server, DbNameList),
@@ -306,10 +311,10 @@ handle_cast(Msg, _Server) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-handle_info({'EXIT', Pid, _Reason}, Server) ->
+handle_info({'EXIT', Pid, _Reason}, #server{current_dbs_open=DbsOpen}=Server) ->
     [{Pid, DbName}] = ets:lookup(couch_dbs_by_pid, Pid),
     true = ets:delete(couch_dbs_by_pid, Pid),
     true = ets:delete(couch_dbs_by_name, DbName),
-    {noreply, Server};
+    {noreply, Server#server{current_dbs_open=DbsOpen-1}};
 handle_info(Info, _Server) ->
     exit({unknown_message, Info}).

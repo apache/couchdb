@@ -209,7 +209,7 @@ save_docs_loop(DbTarget, DocsWritten) ->
     receive
     {Src, docs, Docs} ->
         Src ! got_it,
-        ok = save_docs(DbTarget, Docs, []),
+        ok = update_docs(DbTarget, Docs, [], false),
         save_docs_loop(DbTarget, DocsWritten + length(Docs));
     {Src, shutdown} ->
         Src ! {done, self(), [{<<"docs_written">>, DocsWritten}]}
@@ -313,16 +313,16 @@ update_doc(DbUrl, #doc{id=DocId}=Doc, _Options) when is_list(DbUrl) ->
 update_doc(Db, Doc, Options) ->
     couch_db:update_doc(Db, Doc, Options).
 
-save_docs(_, [], _) ->
+update_docs(_, [], _, _) ->
     ok;
-save_docs(DbUrl, Docs, []) when is_list(DbUrl) ->
+update_docs(DbUrl, Docs, [], NewEdits) when is_list(DbUrl) ->
     JsonDocs = [couch_doc:to_json_obj(Doc, [revs,attachments]) || Doc <- Docs],
     {Returned} =
-        do_http_request(DbUrl ++ "_bulk_docs", post, {[{new_edits, false}, {docs, JsonDocs}]}),
+        do_http_request(DbUrl ++ "_bulk_docs", post, {[{new_edits, NewEdits}, {docs, JsonDocs}]}),
     true = proplists:get_value(<<"ok">>, Returned),
     ok;
-save_docs(Db, Docs, Options) ->
-    couch_db:save_docs(Db, Docs, Options).
+update_docs(Db, Docs, Options, NewEdits) ->
+    couch_db:update_docs(Db, Docs, Options, NewEdits).
 
 
 open_doc(DbUrl, DocId, []) when is_list(DbUrl) ->

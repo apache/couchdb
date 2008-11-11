@@ -12,8 +12,8 @@
 
 -module(couch_doc).
 
--export([get_view_functions/1, is_special_doc/1,to_doc_info/1]).
--export([bin_foldl/3,bin_size/1,bin_to_binary/1]).
+-export([to_doc_info/1,to_doc_info_path/1]).
+-export([bin_foldl/3,bin_size/1,bin_to_binary/1,get_validate_doc_fun/1]).
 -export([from_json_obj/1,to_json_obj/2,has_stubs/1, merge_stubs/2]).
 
 -include("couch_db.hrl").
@@ -130,8 +130,11 @@ from_json_obj({Props}) ->
         attachments = Bins
         }.
 
+to_doc_info(FullDocInfo) ->
+    {DocInfo, _Path} = to_doc_info_path(FullDocInfo),
+    DocInfo.
 
-to_doc_info(#full_doc_info{id=Id,update_seq=Seq,rev_tree=Tree}) ->
+to_doc_info_path(#full_doc_info{id=Id,update_seq=Seq,rev_tree=Tree}) ->
     LeafRevs = couch_key_tree:get_all_leafs(Tree),
     SortedLeafRevs =
     lists:sort(fun({RevIdA, {IsDeletedA, _}, PathA}, {RevIdB, {IsDeletedB, _}, PathB}) ->
@@ -142,7 +145,7 @@ to_doc_info(#full_doc_info{id=Id,update_seq=Seq,rev_tree=Tree}) ->
         end,
         LeafRevs),
 
-    [{RevId, {IsDeleted, SummaryPointer}, _Path} | Rest] = SortedLeafRevs,
+    [{RevId, {IsDeleted, SummaryPointer}, Path} | Rest] = SortedLeafRevs,
 
     {ConflictRevTuples, DeletedConflictRevTuples} =
         lists:splitwith(fun({_ConflictRevId, {IsDeleted1, _Sp}, _}) ->
@@ -151,22 +154,15 @@ to_doc_info(#full_doc_info{id=Id,update_seq=Seq,rev_tree=Tree}) ->
 
     ConflictRevs = [RevId1  || {RevId1, _, _} <- ConflictRevTuples],
     DeletedConflictRevs = [RevId2   || {RevId2, _, _} <- DeletedConflictRevTuples],
-    #doc_info{
+    DocInfo = #doc_info{
         id=Id,
         update_seq=Seq,
         rev = RevId,
         summary_pointer = SummaryPointer,
         conflict_revs = ConflictRevs,
         deleted_conflict_revs = DeletedConflictRevs,
-        deleted = IsDeleted
-        }.
-
-is_special_doc(?DESIGN_DOC_PREFIX ++ _ ) ->
-    true;
-is_special_doc(#doc{id=Id}) ->
-    is_special_doc(Id);
-is_special_doc(_) ->
-    false.
+        deleted = IsDeleted},
+    {DocInfo, Path}.
 
 bin_foldl(Bin, Fun, Acc) when is_binary(Bin) ->
     case Fun(Bin, Acc) of
@@ -188,12 +184,18 @@ bin_to_binary({Fd, Sp, Len}) ->
     {ok, Bin, _Sp2} = couch_stream:read(Fd, Sp, Len),
     Bin.
 
-get_view_functions(#doc{body={Fields}}) ->
-    Lang = proplists:get_value(<<"language">>, Fields, <<"javascript">>),
-    {Views} = proplists:get_value(<<"views">>, Fields, {[]}),
-    {Lang, [{ViewName, Value} || {ViewName, Value} <- Views, is_list(Value)]};
-get_view_functions(_Doc) ->
-    none.
+get_validate_doc_fun(#doc{body={Props}}) ->
+    Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
+    case proplists:get_value(<<"validate_doc_update">>, Props) of
+    undefined ->
+        nil;
+    FunSrc ->
+        fun(EditDoc, DiskDoc, Ctx) ->
+            couch_query_servers:validate_doc_update(
+                    Lang, FunSrc, EditDoc, DiskDoc, Ctx)
+        end
+    end.
+        
 
 has_stubs(#doc{attachments=Bins}) ->
     has_stubs(Bins);

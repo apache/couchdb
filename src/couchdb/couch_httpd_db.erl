@@ -43,7 +43,7 @@ handle_request(#httpd{path_parts=[DbName|RestParts],method=Method,
 
 create_db_req(Req, DbName) ->
     ok = couch_httpd:check_is_admin(Req),
-    case couch_server:create(DbName, []) of
+    case couch_server:create(DbName, [{creds, couch_httpd:creds(Req)}]) of
     {ok, Db} ->
         couch_db:close(Db),
         send_json(Req, 201, {[{ok, true}]});
@@ -53,7 +53,7 @@ create_db_req(Req, DbName) ->
 
 delete_db_req(Req, DbName) ->
     ok = couch_httpd:check_is_admin(Req),
-    case couch_server:delete(DbName) of
+    case couch_server:delete(DbName, [{creds, couch_httpd:creds(Req)}]) of
     ok ->
         send_json(Req, 200, {[{ok, true}]});
     Error ->
@@ -61,7 +61,7 @@ delete_db_req(Req, DbName) ->
     end.
 
 do_db_req(#httpd{path_parts=[DbName|_]}=Req, Fun) ->
-    case couch_db:open(DbName, []) of
+    case couch_db:open(DbName, [{creds, couch_httpd:creds(Req)}]) of
     {ok, Db} ->
         try
             Fun(Req, Db)
@@ -129,7 +129,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
             _ -> []
         end,
         Docs = [couch_doc:from_json_obj(JsonObj) || JsonObj <- DocsArray],
-        ok = couch_db:save_docs(Db, Docs, Options),
+        ok = couch_db:update_docs(Db, Docs, Options, false),
         send_json(Req, 201, {[
             {ok, true}
         ]})

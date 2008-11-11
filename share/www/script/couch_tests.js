@@ -1918,6 +1918,65 @@ var tests = {
     // you can get a single key
     xhr = CouchDB.request("GET", "/_config/test/foo");
     T(xhr.responseText == '"bar"');
+  },
+  
+  security : function(debug) {
+    var db = new CouchDB("test_suite_db");
+    db.deleteDb();
+    db.createDb();
+    if (debug) debugger;
+
+    var designDoc = {
+      _id:"_design/test",
+      language: "javascript",
+      validate_doc_update: "(" + (function (newDoc, oldDoc, userCtx) {
+        // docs should have an author field.
+        if (!newDoc.author) {
+          throw {error:"forbidden",
+                reason:"Documents must have an author field",
+                http_status:403};
+        }
+        if (oldDoc && oldDoc.author != userCtx.name) {
+            throw {error:"unauthorized",
+                reason:"You are not the author of this document. You jerk.",
+                headers:
+                  {"WWW-Authenticate": "Basic realm=\"" + userCtx.db + "\""},
+                http_status:401};
+        }
+      }).toString() + ")"
+    }
+    
+    db.save(designDoc);
+    
+    var userDb = new CouchDB("test_suite_db", {username:"test user", password:"foo"});
+    
+    try {
+      userDb.save({foo:1});
+      T(false && "Can't get here. Should have thrown an error");
+    } catch (e) {
+      T(e.error == "forbidden");
+      T(e.http_status == 403);
+    }
+    
+    userDb.save({_id:"testdoc", foo:1, author:"test user"});
+    
+    var doc = userDb.open("testdoc");
+    doc.foo=2;
+    userDb.save(doc);
+    
+    var user2Db = new CouchDB("test_suite_db", {username:"test user2"});
+    
+    var doc = user2Db.open("testdoc");
+    doc.foo=3;
+    try {
+      user2Db.save(doc);
+      T(false && "Can't get here. Should have thrown an error 2");
+    } catch (e) {
+      T(e.error == "unauthorized");
+      T(e.http_status == 401);
+    }
+    
+    
   }
 };
 

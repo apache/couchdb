@@ -17,7 +17,7 @@
 
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2,code_change/3,stop/0]).
 -export([start_doc_map/2, map_docs/2, stop_doc_map/1]).
--export([reduce/3, rereduce/3]).
+-export([reduce/3, rereduce/3,validate_doc_update/5]).
 % -export([test/0]).
 
 -include("couch_db.hrl").
@@ -46,10 +46,10 @@ readline(Port, Acc) ->
         lists:reverse(Acc, Data);
     {Port, Err} ->
         catch port_close(Port),
-        throw({map_process_error, Err})
+        throw({external_process_error, Err})
     after Timeout ->
         catch port_close(Port),
-        throw({map_process_error, "map function timed out"})
+        throw({external_process_error, "External process timed out"})
     end.
 
 read_json(Port) ->
@@ -174,6 +174,25 @@ reduce(Lang, RedSrcs, KVs) ->
     return_linked_port(Lang, Port),
     {ok, Results}.
 
+validate_doc_update(Lang, FunSrc, EditDoc, DiskDoc, Ctx) ->
+    Port = get_linked_port(Lang),
+    JsonEditDoc = couch_doc:to_json_obj(EditDoc, [revs]),
+    JsonDiskDoc =
+    if DiskDoc == nil ->
+        null;
+    true -> 
+        couch_doc:to_json_obj(EditDoc, [revs])
+    end,
+    try prompt(Port, 
+            [<<"validate">>, FunSrc, JsonEditDoc, JsonDiskDoc, Ctx]) of
+    1 ->
+        ok;
+    {ErrorObject} ->
+        {user_error,
+           {ErrorObject}}
+    after
+        return_linked_port(Lang, Port)
+    end.
 
 init([]) ->
     

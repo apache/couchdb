@@ -13,18 +13,18 @@
 // A simple class to represent a database. Uses XMLHttpRequest to interface with
 // the CouchDB server.
 
-function CouchDB(name) {
-  this.name = name
+function CouchDB(name, options) {
+  this.name = name;
   this.uri = "/" + encodeURIComponent(name) + "/";
-  request = CouchDB.request;
+  request = function(method, uri, requestOptions) {
+      return CouchDB.request(method, uri, combine(requestOptions, options));
+    }
 
   // Creates the database on the server
   this.createDb = function() {
     var req = request("PUT", this.uri);
-    var result = JSON.parse(req.responseText);
-    if (req.status != 201)
-      throw result;
-    return result;
+    maybeThrowError(req);
+    return JSON.parse(req.responseText);
   }
 
   // Deletes the database on the server
@@ -32,10 +32,8 @@ function CouchDB(name) {
     var req = request("DELETE", this.uri);
     if (req.status == 404)
       return false;
-    var result = JSON.parse(req.responseText);
-    if (req.status != 200)
-      throw result;
-    return result;
+    maybeThrowError(req);
+    return JSON.parse(req.responseText);
   }
 
   // Save a document to the database
@@ -47,9 +45,8 @@ function CouchDB(name) {
     req = request("PUT", this.uri  + encodeURIComponent(doc._id) + encodeOptions(options), {
       body: JSON.stringify(doc)
     });
+    maybeThrowError(req);
     var result = JSON.parse(req.responseText);
-    if (req.status != 201)
-      throw result;
     doc._rev = result.rev;
     return result;
   }
@@ -59,18 +56,15 @@ function CouchDB(name) {
     var req = request("GET", this.uri + encodeURIComponent(docId) + encodeOptions(options));
     if (req.status == 404)
       return null;
-    var result = JSON.parse(req.responseText);
-    if (req.status != 200)
-      throw result;
-    return result;
+    maybeThrowError(req);
+    return JSON.parse(req.responseText);
   }
 
   // Deletes a document from the database
   this.deleteDoc = function(doc) {
     var req = request("DELETE", this.uri + encodeURIComponent(doc._id) + "?rev=" + doc._rev);
+    maybeThrowError(req);
     var result = JSON.parse(req.responseText);
-    if (req.status != 200)
-      throw result;
     doc._rev = result.rev; //record rev in input document
     doc._deleted = true;
     return result;
@@ -79,9 +73,8 @@ function CouchDB(name) {
   // Deletes an attachment from a document
   this.deleteDocAttachment = function(doc, attachment_name) {
     var req = request("DELETE", this.uri + encodeURIComponent(doc._id) + "/" + attachment_name + "?rev=" + doc._rev);
+    maybeThrowError(req);
     var result = JSON.parse(req.responseText);
-    if (req.status != 200)
-      throw result;
     doc._rev = result.rev; //record rev in input document
     return result;
   }
@@ -102,9 +95,8 @@ function CouchDB(name) {
     var req = request("POST", this.uri + "_bulk_docs" + encodeOptions(options), {
       body: JSON.stringify({"docs": docs})
     });
+    maybeThrowError(req);
     var result = JSON.parse(req.responseText);
-    if (req.status != 201)
-      throw result;
     for (var i = 0; i < docs.length; i++) {
         docs[i]._rev = result.new_revs[i].rev;
     }
@@ -129,10 +121,8 @@ function CouchDB(name) {
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify(body)
     });
-    var result = JSON.parse(req.responseText);
-    if (req.status != 200)
-      throw result;
-    return result;
+    maybeThrowError(req);
+    return JSON.parse(req.responseText);
   }
 
   this.view = function(viewname, options, keys) {
@@ -147,19 +137,15 @@ function CouchDB(name) {
     }
     if (req.status == 404)
       return null;
-    var result = JSON.parse(req.responseText);
-    if (req.status != 200)
-      throw result;
-    return result;
+    maybeThrowError(req);
+    return JSON.parse(req.responseText);
   }
 
   // gets information about the database
   this.info = function() {
     var req = request("GET", this.uri);
-    var result = JSON.parse(req.responseText);
-    if (req.status != 200)
-      throw result;
-    return result;
+    maybeThrowError(req);
+    return JSON.parse(req.responseText);
   }
 
   this.allDocs = function(options,keys) {
@@ -172,18 +158,14 @@ function CouchDB(name) {
         body: JSON.stringify({keys:keys})
       });      
     }
-    var result = JSON.parse(req.responseText);
-    if (req.status != 200)
-      throw result;
-    return result;
+    maybeThrowError(req);
+    return JSON.parse(req.responseText);
   }
 
   this.compact = function() {
     var req = request("POST", this.uri + "_compact");
-    var result = JSON.parse(req.responseText);
-    if (req.status != 202)
-      throw result;
-    return result;
+    maybeThrowError(req);
+    return JSON.parse(req.responseText);
   }
 
   // Convert a options object to an url query string.
@@ -208,6 +190,35 @@ function CouchDB(name) {
 
   function toJSON(obj) {
     return obj !== null ? JSON.stringify(obj) : null;
+  }
+  
+  function combine(object1, object2) {
+    if (!object2) {
+      return object1;
+    }
+    if (!object1) {
+      return object2;
+    }
+    for (var name in object2) {
+      object1[name] = object2[name];
+    }
+    return object1;
+  }
+  
+  function maybeThrowError(req) {
+    if (req.status >= 400) {
+      if (req.responseText) {
+        try {
+          var result = JSON.parse(req.responseText);
+        } catch (ParseError) {
+          var result = {error:"unknown", reason:req.responseText};
+        }
+      } else {
+        var result = {};
+      }
+      result.http_status = req.status;
+      throw result;
+    }
   }
 }
 
@@ -247,7 +258,7 @@ CouchDB.request = function(method, uri, options) {
   } else {
     throw new Error("No XMLHTTPRequest support detected");
   }
-  req.open(method, uri, false);
+  req.open(method, uri, false, options.username, options.password);
   if (options.headers) {
     var headers = options.headers;
     for (var headerName in headers) {

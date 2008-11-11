@@ -153,7 +153,19 @@ while (cmd = eval(readline())) {
         print("[true," + toJSON(reductions) + "]");
         }
         break;
-
+      case "validate":
+        var funSrc = cmd[1];
+        var newDoc = cmd[2];
+        var oldDoc = cmd[3];
+        var userCtx = cmd[4];
+        var validateFun = compileFunction(funSrc);
+        try {
+          validateFun(newDoc, oldDoc, userCtx);
+          print("1");
+        } catch (error) {
+          print(toJSON(error));
+        }
+        break;
       default:
         print(toJSON({error: "query_server_error",
             reason: "unknown command '" + cmd[0] + "'"}));

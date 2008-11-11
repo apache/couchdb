@@ -13,7 +13,7 @@
 -module(couch_key_tree).
 
 -export([merge/2, find_missing/2, get_key_leafs/2, get_full_key_paths/2, get/2]).
--export([map/2, get_all_leafs/1, get_leaf_keys/1, count_leafs/1, remove_leafs/2]).
+-export([map/2, get_all_leafs/1, get_leaf_keys/1, count_leafs/1, remove_leafs/2,get_all_leafs_full/1]).
 
 % a key tree looks like this:
 % Tree -> [] or [{Key, Value, ChildTree} | SiblingTree]
@@ -136,6 +136,16 @@ get_full_key_paths([{KeyId, Value, SubTree} | RestTree], KeysToGet, KeyPathAcc) 
     {KeysGotten, KeysRemaining} = get_full_key_paths(SubTree, KeysToGet2, [{KeyId, Value} | KeyPathAcc]),
     {KeysGotten2, KeysRemaining2} = get_full_key_paths(RestTree, KeysRemaining, KeyPathAcc),
     {CurrentNodeResult ++ KeysGotten ++ KeysGotten2, KeysRemaining2}.
+
+get_all_leafs_full(Tree) ->
+    get_all_leafs_full(Tree, []).
+    
+get_all_leafs_full([], _KeyPathAcc) ->
+    [];
+get_all_leafs_full([{KeyId, Value, []} | RestTree], KeyPathAcc) ->
+    [[{KeyId, Value} | KeyPathAcc] | get_all_leafs_full(RestTree, KeyPathAcc)];
+get_all_leafs_full([{KeyId, Value, SubTree} | RestTree], KeyPathAcc) ->
+    get_all_leafs_full(SubTree, [{KeyId, Value} | KeyPathAcc]) ++ get_all_leafs_full(RestTree, KeyPathAcc).
 
 get_all_leafs(Tree) ->
     get_all_leafs(Tree, []).

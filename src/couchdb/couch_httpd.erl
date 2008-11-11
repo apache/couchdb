@@ -16,7 +16,7 @@
 -export([start_link/0, stop/0, handle_request/3]).
 
 -export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,path/1]).
--export([check_is_admin/1,unquote/1]).
+-export([check_is_admin/1,unquote/1,creds/1]).
 -export([parse_form/1,json_body/1,body/1,doc_etag/1]).
 -export([primary_header_value/2,partition/1,serve_file/3]).
 -export([start_chunked_response/3,send_chunk/2]).
@@ -197,14 +197,37 @@ json_body(#httpd{mochi_req=MochiReq}) ->
 doc_etag(#doc{revs=[DiskRev|_]}) ->
      "\"" ++ binary_to_list(DiskRev) ++ "\"".
 
-check_is_admin(Req) ->
-    IsNamedAdmin =
+
+% user credentials
+creds(Req) ->
+    case username_pw(Req) of
+    {User, _Pw} ->
+        {[{<<"name">>, ?l2b(User)}]};
+    nil ->
+        {[]}
+    end.
+
+username_pw(Req) ->
     case header_value(Req, "Authorization") of
     "Basic " ++ Base64Value ->
-        [User, Pass] =
-            string:tokens(?b2l(couch_util:decodeBase64(Base64Value)),":"),
-        couch_server:is_admin(User, Pass);
+        case string:tokens(?b2l(couch_util:decodeBase64(Base64Value)),":") of
+        [User, Pass] ->
+            {User, Pass};
+        [User] ->
+            {User, <<"">>};
+        _ ->
+            nil
+        end;
     _ ->
+        nil
+    end.
+
+check_is_admin(Req) ->
+    IsNamedAdmin =
+    case username_pw(Req) of
+    {User, Pass} ->
+        couch_server:is_admin(User, Pass);
+    nil ->
         false
     end,
     
@@ -214,7 +237,7 @@ check_is_admin(Req) ->
     false ->
         case couch_server:has_admins() of
         true ->
-            throw(admin_auth_error);
+            throw(admin_authorization_error);
         false ->
             % if no admins, then everyone is admin! Yay, admin party!
             ok
@@ -265,7 +288,6 @@ end_json_response(Resp) ->
     send_chunk(Resp, []).
 
 
-
 send_error(Req, bad_request) ->
     send_error(Req, 400, <<"bad_request">>, <<>>);
 send_error(Req, {bad_request, Reason}) ->
@@ -276,13 +298,18 @@ send_error(Req, {not_found, Reason}) ->
     send_error(Req, 404, <<"not_found">>, Reason);
 send_error(Req, conflict) ->
     send_error(Req, 412, <<"conflict">>, <<"Document update conflict.">>);
-send_error(Req, admin_auth_error) ->
+send_error(Req, admin_authorization_error) ->
     send_json(Req, 401,
-        [{"WWW-Authenticate", "Basic realm=\"admin\""}],
-        {[{<<"error">>,  <<"auth_error">>},
+        [{"WWW-Authenticate", "Basic realm=\"administrator\""}],
+        {[{<<"error">>,  <<"authorization">>},
          {<<"reason">>, <<"Admin user name and password required">>}]});
-send_error(Req, {doc_validation, Msg}) ->
-    send_error(Req, 406, <<"doc_validation">>, Msg);
+send_error(Req, {user_error, {Props}}) ->
+    {Headers} = proplists:get_value(<<"headers">>, Props, {[]}),
+    send_json(Req,
+        proplists:get_value(<<"http_status">>, Props, 500),
+        Headers,
+        {[{<<"error">>, proplists:get_value(<<"error">>, Props)},
+            {<<"reason">>, proplists:get_value(<<"reason">>, Props)}]});
 send_error(Req, file_exists) ->
     send_error(Req, 409, <<"file_exists">>, <<"The database could not be "
         "created, the file already exists.">>);
