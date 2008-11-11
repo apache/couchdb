@@ -14,8 +14,8 @@ specific language governing permissions and limitations under the License.
 */
 
 // This file is the C port driver for Erlang. It provides a low overhead
-// means of calling into C code, however unlike the Fabric engine, coding
-// errors in this module can crash the entire Erlang server.
+// means of calling into C code, however coding errors in this module can
+// crash the entire Erlang server.
 
 #ifdef DARWIN
 #define U_HIDE_DRAFT_API 1
@@ -56,10 +56,8 @@ static ErlDrvData couch_drv_start(ErlDrvPort port, char *buff)
         return ERL_DRV_ERROR_GENERAL;
 
     pData->port = port;
-    pData->coll = NULL;
-    pData->collNoCase = NULL;
+    
     pData->coll = ucol_open("", &status);
-
     if (U_FAILURE(status)) {
         couch_drv_stop((ErlDrvData)pData);
         return ERL_DRV_ERROR_GENERAL;

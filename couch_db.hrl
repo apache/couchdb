@@ -111,7 +111,9 @@
     local_docs_btree,
     update_seq,
     name,
-    filepath
+    filepath,
+    validate_doc_funs=[],
+    user_ctx={[]}
     }).
     
 

@@ -28,13 +28,13 @@ init({MainPid, DbName, Filepath, Fd, Options}) ->
         Header =  #db_header{},
         ok = couch_file:write_header(Fd, ?HEADER_SIG, Header),
         % delete any old compaction files that might be hanging around
-        file:delete(Filepath ++ ".compact"),
-        file:delete(Filepath ++ ".old");
+        file:delete(Filepath ++ ".compact");
     false ->
         {ok, Header} = couch_file:read_header(Fd, ?HEADER_SIG)
     end,
     
     Db = init_db(DbName, Filepath, Fd, Header),
+    Db2 = refresh_validate_doc_funs(Db),
     {ok, Db#db{main_pid=MainPid}}.
 
 terminate(_Reason, Db) ->
@@ -158,7 +158,6 @@ handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
         
         couch_stream:close(Db#db.summary_stream),
         couch_file:close_maybe(Db#db.fd),
-        file:delete(Filepath ++ ".old"),
             
         ok = gen_server:call(Db#db.main_pid, {db_updated, NewDb2}),
         ?LOG_INFO("Compaction for db \"~s\" completed.", [Db#db.name]),
@@ -254,21 +253,34 @@ init_db(DbName, Filepath, Fd, Header) ->
         local_docs_btree = LocalDocsBtree,
         update_seq = Header#db_header.update_seq,
         name = DbName,
-        filepath=Filepath }.
+        filepath=Filepath}.
+
 
 close_db(#db{fd=Fd,summary_stream=Ss}) ->
     couch_file:close(Fd),
     couch_stream:close(Ss).
 
+refresh_validate_doc_funs(Db) ->
+    {ok, DesignDocs} = get_design_docs(Db),
+    ProcessDocFuns = lists:flatmap(
+        fun(DesignDoc) ->
+            case couch_doc:get_validate_doc_fun(DesignDoc) of
+            nil -> [];
+            Fun -> [Fun]
+            end
+        end, DesignDocs),
+    Db#db{validate_doc_funs=ProcessDocFuns}.
+
+get_design_docs(#db{fulldocinfo_by_id_btree=Btree}=Db) ->
+    couch_btree:foldl(Btree, <<"_design/">>,
+        fun(#full_doc_info{id= <<"_design/",_/binary>>}=FullDocInfo, _Reds, AccDocs) ->
+            {ok, [couch_db:make_doc(Db, FullDocInfo) | AccDocs]};
+        (_, _Reds, AccDocs) ->
+            {stop, AccDocs}
+        end,
+        []).
+
 % rev tree functions
-
-doc_to_tree(Doc) ->
-    doc_to_tree(Doc, lists:reverse(Doc#doc.revs)).
-
-doc_to_tree(Doc, [RevId]) ->
-    [{RevId, Doc, []}];
-doc_to_tree(Doc, [RevId | Rest]) ->
-    [{RevId, ?REV_MISSING, doc_to_tree(Doc, Rest)}].
 
 flush_trees(_Db, [], AccFlushedTrees) ->
     {ok, lists:reverse(AccFlushedTrees)};
@@ -311,7 +323,7 @@ merge_rev_trees(NoConflicts, [NewDocs|RestDocsList],
     #full_doc_info{id=Id,rev_tree=OldTree}=OldDocInfo,
     UpdatesRevTree = lists:foldl(
         fun(NewDoc, AccTree) ->
-            couch_key_tree:merge(AccTree, doc_to_tree(NewDoc))
+            couch_key_tree:merge(AccTree, couch_db:doc_to_tree(NewDoc))
         end,
         [], NewDocs),
     NewRevTree = couch_key_tree:merge(OldTree, UpdatesRevTree),
@@ -323,7 +335,14 @@ merge_rev_trees(NoConflicts, [NewDocs|RestDocsList],
             OldConflicts = couch_key_tree:count_leafs(OldTree),
             NewConflicts = couch_key_tree:count_leafs(NewRevTree),
             if NewConflicts > OldConflicts ->
-                throw(conflict);
+                % if all the old docs are deletions, allow this new conflict
+                case [1 || {_Rev,{IsDel,_Sp}} <- 
+                    couch_key_tree:get_all_leafs(OldTree), IsDel==false] of
+                [] ->
+                    ok;
+                _ ->
+                    throw(conflict)
+                end;
             true -> ok
             end;
         true -> ok
@@ -397,12 +416,19 @@ update_docs_int(Db, DocsList, Options) ->
         fulldocinfo_by_id_btree = DocInfoByIdBTree2,
         docinfo_by_seq_btree = DocInfoBySeqBTree2,
         update_seq = NewSeq},
+    
+    case [1 || <<"_design/",_/binary>> <- Ids] of
+    [] ->
+        Db4 = Db3;
+    _ ->
+        Db4 = refresh_validate_doc_funs(Db3)
+    end,
 
     case lists:member(delay_commit, Options) of
     true ->
-        {ok, Db3};
+        {ok, Db4};
     false ->
-        {ok, commit_data(Db3)}
+        {ok, commit_data(Db4)}
     end.
 
 update_local_docs(#db{local_docs_btree=Btree}=Db, Docs) ->
