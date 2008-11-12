@@ -786,7 +786,7 @@ PostHttp(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval
   curl_easy_setopt(handle,CURLOPT_HEADERFUNCTION,curl_write);
   curl_easy_setopt(handle,CURLOPT_WRITEHEADER,b);
   curl_easy_setopt(handle,CURLOPT_URL,url);                     // url
-  curl_easy_setopt(handle,CURLOPT_HTTPPOST,1);                  // Set Op. to post
+  curl_easy_setopt(handle,CURLOPT_POST,1);                  // Set Op. to post
   curl_easy_setopt(handle,CURLOPT_NOPROGRESS,1);                // No Progress Meter
   curl_easy_setopt(handle,CURLOPT_IPRESOLVE,CURL_IPRESOLVE_V4); // only ipv4
 
@@ -797,8 +797,8 @@ PostHttp(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval
     return JS_FALSE;
   }
 
-  curl_easy_setopt(handle,CURLOPT_COPYPOSTFIELDS,body);         // Curl wants '\0' terminated, we oblige
-  free(body);
+  curl_easy_setopt(handle,CURLOPT_POSTFIELDSIZE,strlen(body));
+  curl_easy_setopt(handle,CURLOPT_POSTFIELDS,body);         // Curl wants '\0' terminated, we oblige
 
   struct curl_slist *slist = generateCurlHeaders(context,argv+2); // Initialize Headers
   if(slist != NULL) {
@@ -809,12 +809,14 @@ PostHttp(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval
 
   if((exitcode = curl_easy_perform(handle)) != 0) {             // Perform
     curl_slist_free_all(slist);
+    free(body);
     free(url);
     free_Buffer(b);
     curl_easy_cleanup(handle);
     return JS_FALSE;
   }
 
+  free(body);
   free(url);
   curl_slist_free_all(slist);
 
