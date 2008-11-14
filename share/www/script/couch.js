@@ -162,6 +162,20 @@ function CouchDB(name, options) {
     return JSON.parse(req.responseText);
   }
 
+  this.allDocsBySeq = function(options,keys) {
+    var req = null;
+    if(!keys) {
+      req = request("GET", this.uri + "_all_docs_by_seq" + encodeOptions(options));      
+    } else {
+      req = request("POST", this.uri + "_all_docs_by_seq" + encodeOptions(options), {
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({keys:keys})
+      });      
+    }
+    maybeThrowError(req);
+    return JSON.parse(req.responseText);
+  }
+
   this.compact = function() {
     var req = request("POST", this.uri + "_compact");
     maybeThrowError(req);
