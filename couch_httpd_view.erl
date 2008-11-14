@@ -426,12 +426,13 @@ view_row_obj(Db, {{Key, DocId}, Value}, IncludeDocs) ->
                 []
             end,
             ?LOG_DEBUG("Include Doc: ~p ~p", [DocId, Rev]),
-            case (catch couch_httpd_db:couch_doc_open(Db, DocId, 
-                Rev, [])) of
-            {{not_found, missing}, _} ->
+            case (catch couch_httpd_db:couch_doc_open(Db, DocId, Rev, [])) of
+              {{not_found, missing}, _} ->
                 {[{id, DocId}, {key, Key}, {value, Value}, {error, missing}]};
-            Doc ->
-                JsonDoc = couch_doc:to_json_obj(Doc, []),
+              {not_found, deleted} ->
+                {[{id, DocId}, {key, Key}, {value, Value}]};
+              Doc ->
+                JsonDoc = couch_doc:to_json_obj(Doc, []), 
                 {[{id, DocId}, {key, Key}, {value, Value}, {doc, JsonDoc}]}
             end;
         _ ->
