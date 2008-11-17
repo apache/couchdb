@@ -13,16 +13,17 @@
 -module(couch_httpd).
 -include("couch_db.hrl").
 
--export([start_link/0, stop/0, handle_request/3]).
+-export([start_link/0, stop/0, handle_request/4]).
 
 -export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,path/1]).
--export([check_is_admin/1,unquote/1,creds/1]).
+-export([check_is_admin/1,unquote/1]).
 -export([parse_form/1,json_body/1,body/1,doc_etag/1]).
 -export([primary_header_value/2,partition/1,serve_file/3]).
 -export([start_chunked_response/3,send_chunk/2]).
 -export([start_json_response/2, start_json_response/3, end_json_response/1]).
 -export([send_response/4,send_method_not_allowed/2,send_error/4]).
 -export([send_json/2,send_json/3,send_json/4]).
+-export([default_authenticate/1]).
 
 
 % Maximum size of document PUT request body (4GB)
@@ -36,32 +37,24 @@ start_link() ->
 
     BindAddress = couch_config:get("httpd", "bind_address", any),
     Port = couch_config:get("httpd", "port", "5984"),
-    
+    AuthenticationFun = make_arity_1_fun(
+            couch_config:get("httpd", "authentication", 
+            "{couch_httpd, default_authenticate}")),
+        
     UrlHandlersList = lists:map(
         fun({UrlKey, SpecStr}) ->
-            case couch_util:parse_term(SpecStr) of
-            {ok, {M, F, A}} ->
-                {list_to_binary(UrlKey), fun(Req) -> apply(M, F, [Req, A]) end};
-            {ok, {M, F}} ->
-                {list_to_binary(UrlKey), fun(Req) -> apply(M, F, [Req]) end}
-            end
+            {list_to_binary(UrlKey), make_arity_1_fun(SpecStr)}
         end, couch_config:get("httpd_global_handlers")),
         
     DbUrlHandlersList = lists:map(
         fun({UrlKey, SpecStr}) ->
-            case couch_util:parse_term(SpecStr) of
-            {ok, {M, F, A}} ->
-                {list_to_binary(UrlKey),
-                    fun(Req, Db) -> apply(M, F, [Req, Db, A]) end};
-            {ok, {M, F}} ->
-                {list_to_binary(UrlKey),
-                    fun(Req, Db) -> apply(M, F, [Req, Db]) end}
-            end
+            {list_to_binary(UrlKey), make_arity_2_fun(SpecStr)}
         end, couch_config:get("httpd_db_handlers")),
     UrlHandlers = dict:from_list(UrlHandlersList),
     DbUrlHandlers = dict:from_list(DbUrlHandlersList),
     Loop = fun(Req)->
-            apply(?MODULE, handle_request, [Req, UrlHandlers, DbUrlHandlers])
+            apply(?MODULE, handle_request,
+                    [Req, UrlHandlers, DbUrlHandlers, AuthenticationFun])
         end,
 
     % and off we go
@@ -76,6 +69,8 @@ start_link() ->
             ?MODULE:stop();
         ("httpd", "port") ->
             ?MODULE:stop();
+        ("httpd", "authentication") ->
+            ?MODULE:stop();
         ("httpd_global_handlers", _) ->
             ?MODULE:stop();
         ("httpd_db_handlers", _) ->
@@ -84,11 +79,29 @@ start_link() ->
 
     {ok, Pid}.
 
+% SpecStr is a string like "{my_module, my_fun}"  or "{my_module, my_fun, foo}"
+make_arity_1_fun(SpecStr) ->
+    case couch_util:parse_term(SpecStr) of
+    {ok, {Mod, Fun, SpecArg}} ->
+        fun(Arg) -> apply(Mod, Fun, [Arg, SpecArg]) end;
+    {ok, {Mod, Fun}} ->
+        fun(Arg) -> apply(Mod, Fun, [Arg]) end
+    end.
+
+make_arity_2_fun(SpecStr) ->
+    case couch_util:parse_term(SpecStr) of
+    {ok, {Mod, Fun, SpecArg}} ->
+        fun(Arg1, Arg2) -> apply(Mod, Fun, [Arg1, Arg2, SpecArg]) end;
+    {ok, {Mod, Fun}} ->
+        fun(Arg1, Arg2) -> apply(Mod, Fun, [Arg1, Arg2]) end
+    end.
+    
+
 stop() ->
     mochiweb_http:stop(?MODULE).
     
 
-handle_request(MochiReq, UrlHandlers, DbUrlHandlers) ->
+handle_request(MochiReq, UrlHandlers, DbUrlHandlers, AuthenticationFun) ->
 
     % for the path, use the raw path with the query string and fragment
     % removed, but URL quoting left intact
@@ -128,13 +141,16 @@ handle_request(MochiReq, UrlHandlers, DbUrlHandlers) ->
                 || Part <- string:tokens(Path, "/")],
         db_url_handlers = DbUrlHandlers
         },
-    
     DefaultFun = fun couch_httpd_db:handle_request/1,
     HandlerFun = couch_util:dict_find(HandlerKey, UrlHandlers, DefaultFun),
+    CouchHeaders = [{?l2b(K), ?l2b(V)}
+            || {"X-Couch-" ++ _= K,V}
+            <- mochiweb_headers:to_list(MochiReq:get(headers))],
     
     {ok, Resp} =
     try
-        HandlerFun(HttpReq)
+        {UserCtxProps} = AuthenticationFun(HttpReq),
+        HandlerFun(HttpReq#httpd{user_ctx={UserCtxProps ++ CouchHeaders}})
     catch
         Error ->
             send_error(HttpReq, Error)
@@ -148,6 +164,17 @@ handle_request(MochiReq, UrlHandlers, DbUrlHandlers) ->
     ]),
     {ok, Resp}.
 
+
+
+default_authenticate(Req) ->
+    % by default, we just assume the users credentials for basic authentication
+    % are correct.
+    case basic_username_pw(Req) of
+    {Username, _Pw} ->
+        {[{<<"name">>, ?l2b(Username)}]};
+    nil ->
+        {[]}
+    end.
 
 
 % Utilities
@@ -197,17 +224,7 @@ json_body(#httpd{mochi_req=MochiReq}) ->
 doc_etag(#doc{revs=[DiskRev|_]}) ->
      "\"" ++ binary_to_list(DiskRev) ++ "\"".
 
-
-% user credentials
-creds(Req) ->
-    case username_pw(Req) of
-    {User, _Pw} ->
-        {[{<<"name">>, ?l2b(User)}]};
-    nil ->
-        {[]}
-    end.
-
-username_pw(Req) ->
+basic_username_pw(Req) ->
     case header_value(Req, "Authorization") of
     "Basic " ++ Base64Value ->
         case string:tokens(?b2l(couch_util:decodeBase64(Base64Value)),":") of
@@ -224,7 +241,7 @@ username_pw(Req) ->
 
 check_is_admin(Req) ->
     IsNamedAdmin =
-    case username_pw(Req) of
+    case basic_username_pw(Req) of
     {User, Pass} ->
         couch_server:is_admin(User, Pass);
     nil ->

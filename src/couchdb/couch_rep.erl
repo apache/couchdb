@@ -14,6 +14,11 @@
 
 -include("couch_db.hrl").
 
+-record(http_db, {
+    uri,
+    headers
+}).
+
 -export([replicate/2, replicate/3]).
 
 url_encode(Bin) when is_binary(Bin) ->
@@ -44,9 +49,11 @@ replicate(DbNameA, DbNameB) ->
     replicate(DbNameA, DbNameB, []).
 
 replicate(Source, Target, Options) ->
-    {ok, DbSrc} = open_db(Source),
+    {ok, DbSrc} = open_db(Source,
+            proplists:get_value(source_options, Options, [])),
     try
-        {ok, DbTgt} = open_db(Target),
+        {ok, DbTgt} = open_db(Target,
+                proplists:get_value(target_options, Options, [])),
         try
             replicate2(Source, DbSrc, Target, DbTgt, Options)
         after
@@ -216,20 +223,19 @@ save_docs_loop(DbTarget, DocsWritten) ->
     end.
 
 
-do_http_request(Url, Action) ->
-    do_http_request(Url, Action, []).
+do_http_request(Url, Action, Headers) ->
+    do_http_request(Url, Action, Headers, []).
 
-do_http_request(Url, Action, JsonBody) ->
+do_http_request(Url, Action, Headers, JsonBody) ->
     ?LOG_DEBUG("couch_rep HTTP client request:", []),
     ?LOG_DEBUG("\tAction: ~p", [Action]),
     ?LOG_DEBUG("\tUrl: ~p", [Url]),
-
     Request =
     case JsonBody of
     [] ->
-        {Url, []};
+        {Url, Headers};
     _ ->
-        {Url, [], "application/json; charset=utf-8", iolist_to_binary(?JSON_ENCODE(JsonBody))}
+        {Url, Headers, "application/json; charset=utf-8", iolist_to_binary(?JSON_ENCODE(JsonBody))}
     end,
     {ok, {{_, ResponseCode,_},_Headers, ResponseBody}} = http:request(Action, Request, [], []),
     if
@@ -249,29 +255,32 @@ fix_url(UrlBin) ->
     Url = binary_to_list(UrlBin),
     case lists:last(Url) of
     $/ ->
-        {ok, Url};
+        Url;
     _ ->
-        {ok, Url ++ "/"}
+        Url ++ "/"
     end.
 
-open_db(<<"http://", _/binary>>=UrlBin)->
-    fix_url(UrlBin);
-open_db(<<"https://", _/binary>>=UrlBin)->
-    fix_url(UrlBin);
-open_db(DbName)->
-    couch_db:open(DbName, []).
+open_http_db(UrlBin, Options) ->
+    Headers = proplists:get_value(headers, Options, {[]}),
+    {ok, #http_db{uri=fix_url(UrlBin), headers=Headers}}.
+            
+open_db(<<"http://", _/binary>>=Url, Options)->
+    open_http_db(Url, Options);
+open_db(<<"https://", _/binary>>=Url, Options)->
+    open_http_db(Url, Options);
+open_db(DbName, Options)->
+    couch_db:open(DbName, Options).
 
-close_db("http://" ++ _)->
+close_db(#http_db{})->
     ok;
-close_db("https://" ++ _)->
-    ok;
-close_db(DbName)->
-    couch_db:close(DbName).
+close_db(Db)->
+    couch_db:close(Db).
 
 
-enum_docs_since(DbUrl, StartSeq, InFun, InAcc) when is_list(DbUrl) ->
-    Url = DbUrl ++ "_all_docs_by_seq?count=100&startkey=" ++ integer_to_list(StartSeq),
-    {Results} = do_http_request(Url, get),
+enum_docs_since(#http_db{uri=DbUrl, headers=Headers}=Db, Start, InFun, InAcc)->
+    Url = DbUrl ++ "_all_docs_by_seq?count=100&startkey="
+            ++ integer_to_list(Start),
+    {Results} = do_http_request(Url, get, Headers),
     DocInfoList=
     lists:map(fun({RowInfoList}) ->
         {RowValueProps} = proplists:get_value(<<"value">>, RowInfoList),
@@ -291,23 +300,25 @@ enum_docs_since(DbUrl, StartSeq, InFun, InAcc) when is_list(DbUrl) ->
     _ ->
         Acc2 = enum_docs0(InFun, DocInfoList, InAcc),
         #doc_info{update_seq=LastSeq} = lists:last(DocInfoList),
-        enum_docs_since(DbUrl, LastSeq, InFun, Acc2)
+        enum_docs_since(Db, LastSeq, InFun, Acc2)
     end;
 enum_docs_since(DbSource, StartSeq, Fun, Acc) ->
     couch_db:enum_docs_since(DbSource, StartSeq, Fun, Acc).
 
-get_missing_revs(DbUrl, DocIdRevsList) when is_list(DbUrl) ->
-    {ResponseMembers} = do_http_request(DbUrl ++ "_missing_revs", post, {DocIdRevsList}),
+get_missing_revs(#http_db{uri=DbUrl, headers=Headers}, DocIdRevsList) ->
+    {ResponseMembers} = do_http_request(DbUrl ++ "_missing_revs", post, Headers,
+            {DocIdRevsList}),
     {DocMissingRevsList} = proplists:get_value(<<"missing_revs">>, ResponseMembers),
     {ok, DocMissingRevsList};
 get_missing_revs(Db, DocId) ->
     couch_db:get_missing_revs(Db, DocId).
 
 
-update_doc(DbUrl, #doc{id=DocId}=Doc, _Options) when is_list(DbUrl) ->
+update_doc(#http_db{uri=DbUrl, headers=Headers}, #doc{id=DocId}=Doc, Options) ->
+    [] = Options,
     Url = DbUrl ++ url_encode(DocId),
-    {ResponseMembers} =
-        do_http_request(Url, put, couch_doc:to_json_obj(Doc, [revs,attachments])),
+    {ResponseMembers} = do_http_request(Url, put, Headers,
+            couch_doc:to_json_obj(Doc, [revs,attachments])),
     RevId = proplists:get_value(<<"_rev">>, ResponseMembers),
     {ok, RevId};
 update_doc(Db, Doc, Options) ->
@@ -315,28 +326,30 @@ update_doc(Db, Doc, Options) ->
 
 update_docs(_, [], _, _) ->
     ok;
-update_docs(DbUrl, Docs, [], NewEdits) when is_list(DbUrl) ->
+update_docs(#http_db{uri=DbUrl, headers=Headers}, Docs, [], NewEdits) ->
     JsonDocs = [couch_doc:to_json_obj(Doc, [revs,attachments]) || Doc <- Docs],
     {Returned} =
-        do_http_request(DbUrl ++ "_bulk_docs", post, {[{new_edits, NewEdits}, {docs, JsonDocs}]}),
+        do_http_request(DbUrl ++ "_bulk_docs", post, Headers,
+                {[{new_edits, NewEdits}, {docs, JsonDocs}]}),
     true = proplists:get_value(<<"ok">>, Returned),
     ok;
 update_docs(Db, Docs, Options, NewEdits) ->
     couch_db:update_docs(Db, Docs, Options, NewEdits).
 
 
-open_doc(DbUrl, DocId, []) when is_list(DbUrl) ->
-    case do_http_request(DbUrl ++ url_encode(DocId), get) of
+open_doc(#http_db{uri=DbUrl, headers=Headers}, DocId, Options) ->
+    [] = Options,
+    case do_http_request(DbUrl ++ url_encode(DocId), get, Headers) of
     {[{<<"error">>, ErrId}, {<<"reason">>, Reason}]} -> % binaries?
         {list_to_atom(binary_to_list(ErrId)), Reason};
     Doc  ->
         {ok, couch_doc:from_json_obj(Doc)}
     end;
-open_doc(Db, DocId, Options) when not is_list(Db) ->
+open_doc(Db, DocId, Options) ->
     couch_db:open_doc(Db, DocId, Options).
 
 
-open_doc_revs(DbUrl, DocId, Revs, Options) when is_list(DbUrl) ->
+open_doc_revs(#http_db{uri=DbUrl, headers=Headers}, DocId, Revs, Options) ->
     QueryOptionStrs =
     lists:map(fun(latest) ->
             % latest is only option right now
@@ -344,7 +357,7 @@ open_doc_revs(DbUrl, DocId, Revs, Options) when is_list(DbUrl) ->
         end, Options),
     RevsQueryStrs = lists:flatten(?JSON_ENCODE(Revs)),
     Url = DbUrl ++ url_encode(DocId) ++ "?" ++ couch_util:implode(["revs=true", "attachments=true", "open_revs=" ++ RevsQueryStrs ] ++ QueryOptionStrs, "&"),
-    JsonResults = do_http_request(Url, get, []),
+    JsonResults = do_http_request(Url, get, Headers),
     Results =
     lists:map(
         fun({[{<<"missing">>, Rev}]}) ->

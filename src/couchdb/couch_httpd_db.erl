@@ -41,9 +41,9 @@ handle_request(#httpd{path_parts=[DbName|RestParts],method=Method,
         do_db_req(Req, Handler)
     end.
 
-create_db_req(Req, DbName) ->
+create_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
     ok = couch_httpd:check_is_admin(Req),
-    case couch_server:create(DbName, [{creds, couch_httpd:creds(Req)}]) of
+    case couch_server:create(DbName, [{user_ctx, UserCtx}]) of
     {ok, Db} ->
         couch_db:close(Db),
         send_json(Req, 201, {[{ok, true}]});
@@ -51,17 +51,17 @@ create_db_req(Req, DbName) ->
         throw(Error)
     end.
 
-delete_db_req(Req, DbName) ->
+delete_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
     ok = couch_httpd:check_is_admin(Req),
-    case couch_server:delete(DbName, [{creds, couch_httpd:creds(Req)}]) of
+    case couch_server:delete(DbName, [{user_ctx, UserCtx}]) of
     ok ->
         send_json(Req, 200, {[{ok, true}]});
     Error ->
         throw(Error)
     end.
 
-do_db_req(#httpd{path_parts=[DbName|_]}=Req, Fun) ->
-    case couch_db:open(DbName, [{creds, couch_httpd:creds(Req)}]) of
+do_db_req(#httpd{user_ctx=UserCtx,path_parts=[DbName|_]}=Req, Fun) ->
+    case couch_db:open(DbName, [{user_ctx, UserCtx}]) of
     {ok, Db} ->
         try
             Fun(Req, Db)

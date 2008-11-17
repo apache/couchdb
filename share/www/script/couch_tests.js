@@ -1991,11 +1991,25 @@ var tests = {
                 reason:"Documents must have an author field",
                 http_status:403};
         }
-        if (oldDoc && oldDoc.author != userCtx.name) {
+        
+        // Note, the next line could be:
+        //
+        // if (oldDoc && oldDoc.author != userCtx.name) {
+        //  
+        // when name is the result of basic authentication, and added:
+        // 
+        // headers:
+        //    {"WWW-Authenticate": "Basic realm=\"" + userCtx.db + "\""},
+        //
+        // to the thrown exception. But when trying to authenticate in this
+        // manner, most browsers have  weird behaviors that make testing it
+        // in the browser difficult. So instead we use special header values
+        // a proof of concept.
+        if (oldDoc && oldDoc.author != userCtx["X-Couch-Username"]) {
             throw {error:"unauthorized",
                 reason:"You are not the author of this document. You jerk.",
                 headers:
-                  {"WWW-Authenticate": "Basic realm=\"" + userCtx.db + "\""},
+                  {"X-Couch-Foo": "bar"},
                 http_status:401};
         }
       }).toString() + ")"
@@ -2003,14 +2017,14 @@ var tests = {
     
     db.save(designDoc);
     
-    var userDb = new CouchDB("test_suite_db", {username:"test user", password:"foo"});
+    var userDb = new CouchDB("test_suite_db", {"X-Couch-Username":"test user"});
     
     try {
       userDb.save({foo:1});
       T(false && "Can't get here. Should have thrown an error");
     } catch (e) {
       T(e.error == "forbidden");
-      T(e.http_status == 403);
+      T(userDb.last_req.status == 403);
     }
     
     userDb.save({_id:"testdoc", foo:1, author:"test user"});
@@ -2019,7 +2033,7 @@ var tests = {
     doc.foo=2;
     userDb.save(doc);
     
-    var user2Db = new CouchDB("test_suite_db", {username:"test user2"});
+    var user2Db = new CouchDB("test_suite_db", {"X-Couch-Username":"test user2"});
     
     var doc = user2Db.open("testdoc");
     doc.foo=3;
@@ -2028,7 +2042,8 @@ var tests = {
       T(false && "Can't get here. Should have thrown an error 2");
     } catch (e) {
       T(e.error == "unauthorized");
-      T(e.http_status == 401);
+      T(user2Db.last_req.status == 401);
+      T(user2Db.last_req.getResponseHeader("X-Couch-Foo") == "bar");
     }
     
     
