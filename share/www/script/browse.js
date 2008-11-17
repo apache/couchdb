@@ -873,12 +873,18 @@ function CouchDocumentPage() {
   }
 
   function _renderAttachmentItem(name, attachment) {
+    var attachmentHref = db.uri + encodeURIComponent(docId) 
+      + "/" + encodeURIComponent(name);
     var li = $("<li></li>");
     $("<a href='' title='Download file' target='_top'></a>").text(name)
-      .attr("href", db.uri + encodeURIComponent(docId) + "/" + encodeURIComponent(name))
+      .attr("href", attachmentHref)
       .wrapInner("<tt></tt>").appendTo(li);
     $("<span>()</span>").text("" + prettyPrintSize(attachment.length) + 
       ", " + attachment.content_type).addClass("info").appendTo(li);
+    if (name == "tests.js") {
+      li.find('span.info').append(', <a href="/_utils/couch_tests.html?' 
+        + attachmentHref + '">open in test runner</a>');
+    }
     _initAttachmentItem(name, attachment, li);
     return li;
   }

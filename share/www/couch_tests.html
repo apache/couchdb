@@ -22,20 +22,18 @@ specific language governing permissions and limitations under the License.
     <script src="script/jquery.js?1.2.6"></script>
     <script src="script/couch.js?0.8.0"></script>
     <script src="script/pprint.js?0.8.0"></script>
+    <script src="script/couch_test_runner.js"></script>
     <script>
-      $(document).ready(function() {
+      $(function() {        
+        updateTestsListing();
+        $("#toolbar button.run").click(runAllTests);
+        if (window != parent) parent.updateNavigation();        
         $("#toolbar button.load").click(function() {
           location.reload(true);
         });
       });
-    </script>
-    <script src="script/couch_tests.js"></script>
-    <script>
-      $(document).ready(function() {
-        updateTestsListing();
-        $("#toolbar button.run").click(runAllTests);
-        if (window != parent) parent.updateNavigation();
-      });
+      var testsPath = document.location.toString().split('?')[1];
+      loadTests(testsPath||"script/couch_tests.js")
     </script>
   </head>
   <body>
