@@ -59,7 +59,8 @@
     {mochi_req,
     method,
     path_parts,
-    db_url_handlers
+    db_url_handlers,
+    user_ctx
     }).
     
 

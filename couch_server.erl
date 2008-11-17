@@ -202,7 +202,7 @@ handle_call(get_root, _From, #server{root_dir=Root}=Server) ->
     {reply, {ok, Root}, Server};
 handle_call({open, DbName, Options}, {FromPid,_}, Server) ->
     DbNameList = binary_to_list(DbName),
-    UserCreds = proplists:get_value(creds, Options, nil),
+    UserCtx = proplists:get_value(user_ctx, Options, nil),
     case check_dbname(Server, DbNameList) of
     ok ->
         Filepath = get_full_filename(Server, DbNameList),
@@ -218,7 +218,7 @@ handle_call({open, DbName, Options}, {FromPid,_}, Server) ->
                     true = ets:insert(couch_dbs_by_lru, {LruTime, DbName}),
                     DbsOpen = Server2#server.current_dbs_open + 1,
                     {reply,
-                        couch_db:open_ref_counted(MainPid, FromPid, UserCreds),
+                        couch_db:open_ref_counted(MainPid, FromPid, UserCtx),
                         Server2#server{current_dbs_open=DbsOpen}};
                 Error ->
                     {reply, Error, Server2}
@@ -231,7 +231,7 @@ handle_call({open, DbName, Options}, {FromPid,_}, Server) ->
             true = ets:delete(couch_dbs_by_lru, PrevLruTime),
             true = ets:insert(couch_dbs_by_lru, {LruTime, DbName}),
             {reply,
-                couch_db:open_ref_counted(MainPid, FromPid, UserCreds),
+                couch_db:open_ref_counted(MainPid, FromPid, UserCtx),
                 Server}
         end;
     Error ->
@@ -239,7 +239,7 @@ handle_call({open, DbName, Options}, {FromPid,_}, Server) ->
     end;
 handle_call({create, DbName, Options}, {FromPid,_}, Server) ->
     DbNameList = binary_to_list(DbName),
-    UserCreds = proplists:get_value(creds, Options, nil),
+    UserCtx = proplists:get_value(user_ctx, Options, nil),
     case check_dbname(Server, DbNameList) of
     ok ->
         Filepath = get_full_filename(Server, DbNameList),
@@ -255,7 +255,7 @@ handle_call({create, DbName, Options}, {FromPid,_}, Server) ->
                 DbsOpen = Server#server.current_dbs_open + 1,
                 couch_db_update_notifier:notify({created, DbName}),
                 {reply,
-                    couch_db:open_ref_counted(MainPid, FromPid, UserCreds), 
+                    couch_db:open_ref_counted(MainPid, FromPid, UserCtx), 
                     Server#server{current_dbs_open=DbsOpen}};
             Error ->
                 {reply, Error, Server}
@@ -268,7 +268,7 @@ handle_call({create, DbName, Options}, {FromPid,_}, Server) ->
     end;
 handle_call({delete, DbName, Options}, _From, Server) ->
     DbNameList = binary_to_list(DbName),
-    _UserCreds = proplists:get_value(creds, Options, nil),
+    _UserCtx = proplists:get_value(user_ctx, Options, nil),
     case check_dbname(Server, DbNameList) of
     ok ->
         FullFilepath = get_full_filename(Server, DbNameList),

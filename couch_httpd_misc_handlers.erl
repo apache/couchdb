@@ -62,12 +62,28 @@ handle_all_dbs_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 
-handle_replicate_req(#httpd{method='POST'}=Req) ->
+handle_replicate_req(#httpd{user_ctx=UserCtx,method='POST'}=Req) ->
     {Props} = couch_httpd:json_body(Req),
     Source = proplists:get_value(<<"source">>, Props),
     Target = proplists:get_value(<<"target">>, Props),
+    
+    {SrcOpts} = proplists:get_value(<<"source_options">>, Props, {[]}),
+    {SrcHeadersBinary} = proplists:get_value(<<"headers">>, SrcOpts, {[]}),
+    SrcHeaders = [{?b2l(K),(V)} || {K,V} <- SrcHeadersBinary],
+    
+    {TgtOpts} = proplists:get_value(<<"target_options">>, Props, {[]}),
+    {TgtHeadersBinary} = proplists:get_value(<<"headers">>, TgtOpts, {[]}),
+    TgtHeaders = [{?b2l(K),(V)} || {K,V} <- TgtHeadersBinary],
+    
     {Options} = proplists:get_value(<<"options">>, Props, {[]}),
-    {ok, {JsonResults}} = couch_rep:replicate(Source, Target, Options),
+    Options2 = [{source_options,
+                    [{headers, SrcHeaders},
+                    {user_ctx, UserCtx}]},
+                {target_options,
+                    [{headers, TgtHeaders},
+                    {user_ctx, UserCtx}]}
+                | Options],
+    {ok, {JsonResults}} = couch_rep:replicate(Source, Target, Options2),
     send_json(Req, {[{ok, true} | JsonResults]});
 handle_replicate_req(Req) ->
     send_method_not_allowed(Req, "POST").
