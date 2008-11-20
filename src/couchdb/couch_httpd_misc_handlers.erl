@@ -31,7 +31,8 @@
 handle_welcome_req(#httpd{method='GET'}=Req, WelcomeMessage) ->
     send_json(Req, {[
         {couchdb, WelcomeMessage},
-        {version, list_to_binary(couch_server:get_version())}
+        {version, list_to_binary(couch_server:get_version())},
+        {start_time, list_to_binary(couch_server:get_start_time())}
     ]});
 handle_welcome_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
@@ -90,10 +91,9 @@ handle_replicate_req(Req) ->
 
 
 handle_restart_req(#httpd{method='POST'}=Req) ->
-    ok = couch_httpd:check_is_admin(Req),
-    Response = send_json(Req, {[{ok, true}]}),
-    spawn(fun() -> couch_server:remote_restart() end),
-    Response;
+    ok = couch_httpd:verify_is_server_admin(Req),
+    couch_server_sup:restart_core_server(),
+    send_json(Req, 200, {[{ok, true}]});
 handle_restart_req(Req) ->
     send_method_not_allowed(Req, "POST").
 
@@ -114,7 +114,7 @@ handle_uuids_req(Req) ->
 % GET /_config/
 % GET /_config
 handle_config_req(#httpd{method='GET', path_parts=[_]}=Req) ->
-    ok = couch_httpd:check_is_admin(Req),
+    ok = couch_httpd:verify_is_server_admin(Req),
     Grouped = lists:foldl(fun({{Section, Key}, Value}, Acc) ->
         case dict:is_key(Section, Acc) of
         true ->
@@ -129,22 +129,22 @@ handle_config_req(#httpd{method='GET', path_parts=[_]}=Req) ->
     send_json(Req, 200, {KVs});
 % GET /_config/Section
 handle_config_req(#httpd{method='GET', path_parts=[_,Section]}=Req) ->
-    ok = couch_httpd:check_is_admin(Req),
+    ok = couch_httpd:verify_is_server_admin(Req),
     KVs = [{list_to_binary(Key), list_to_binary(Value)}
             || {Key, Value} <- couch_config:get(Section)],
     send_json(Req, 200, {KVs});
 % PUT /_config/Section/Key
 % "value"
 handle_config_req(#httpd{method='PUT', path_parts=[_, Section, Key]}=Req) ->
-    ok = couch_httpd:check_is_admin(Req),
-    Value = binary_to_list(couch_httpd:body(Req)),
-    ok = couch_config:set(Section, Key, Value),
-    send_json(Req, 200, {[
-        {ok, true}
-    ]});
+    ok = couch_httpd:verify_is_server_admin(Req),
+    Value = couch_httpd:json_body(Req),
+    Persist = couch_httpd:header_value(Req, "X-Couch-Persist") /= "false",
+    OldValue = couch_config:get(Section, Key, null),
+    ok = couch_config:set(Section, Key, ?b2l(Value), Persist),
+    send_json(Req, 200, list_to_binary(OldValue));
 % GET /_config/Section/Key
 handle_config_req(#httpd{method='GET', path_parts=[_, Section, Key]}=Req) ->
-    ok = couch_httpd:check_is_admin(Req),
+    ok = couch_httpd:verify_is_server_admin(Req),
     case couch_config:get(Section, Key, null) of
     null ->
         throw({not_found, unknown_config_value});
@@ -153,7 +153,7 @@ handle_config_req(#httpd{method='GET', path_parts=[_, Section, Key]}=Req) ->
     end;
 % DELETE /_config/Section/Key
 handle_config_req(#httpd{method='DELETE',path_parts=[_,Section,Key]}=Req) ->
-    ok = couch_httpd:check_is_admin(Req),
+    ok = couch_httpd:verify_is_server_admin(Req),
     case couch_config:get(Section, Key, null) of
     null ->
         throw({not_found, unknown_config_value});

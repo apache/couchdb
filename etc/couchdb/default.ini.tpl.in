@@ -11,6 +11,7 @@ view_timeout = 5000 ; 5 seconds
 [httpd]
 port = 5984
 bind_address = 127.0.0.1
+authentication_handler = {couch_httpd, default_authentication_handler}
 
 [log]
 file = %localstatelogdir%/couch.log

@@ -340,8 +340,8 @@ update_docs(Db, Docs, Options, NewEdits) ->
 open_doc(#http_db{uri=DbUrl, headers=Headers}, DocId, Options) ->
     [] = Options,
     case do_http_request(DbUrl ++ url_encode(DocId), get, Headers) of
-    {[{<<"error">>, ErrId}, {<<"reason">>, Reason}]} -> % binaries?
-        {list_to_atom(binary_to_list(ErrId)), Reason};
+    {[{<<"error">>, ErrId}, {<<"reason">>, Reason}]} ->
+        {couch_util:to_existing_atom(ErrId), Reason};
     Doc  ->
         {ok, couch_doc:from_json_obj(Doc)}
     end;

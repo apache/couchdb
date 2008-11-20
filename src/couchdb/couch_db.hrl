@@ -85,19 +85,35 @@
     meta = []
     }).
     
-    
 
 
+-record(user_ctx,
+    {name=nil,
+    roles=[]
+    }).
+
+% This should be updated anytime a header change happens that requires more
+% than filling in new defaults.
+%
+% As long the changes are limited to new header fields (with inline
+% defaults) added to the end of the file, then there is no need to increment
+% the disk revision number.
+%
+% if the disk revision is incremented, then new upgrade logic will need to be
+% added to couch_db_updater:init_db.
+
+-define(LATEST_DISK_VERSION, 0).
 
 -record(db_header,
-    {write_version = 0,
+    {disk_version = ?LATEST_DISK_VERSION,  
      update_seq = 0,
      summary_stream_state = nil,
      fulldocinfo_by_id_btree_state = nil,
      docinfo_by_seq_btree_state = nil,
      local_docs_btree_state = nil,
      purge_seq = 0,
-     purged_docs = nil
+     purged_docs = nil,
+     admins_ptr = nil 
     }).
 
 -record(db,
@@ -114,9 +130,11 @@
     name,
     filepath,
     validate_doc_funs=[],
-    user_ctx={[]}
+    admins=[],
+    admins_ptr=nil,
+    user_ctx=#user_ctx{}
     }).
-    
+
 
 -record(view_query_args, {
     start_key = nil,

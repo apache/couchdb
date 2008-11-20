@@ -13,17 +13,17 @@
 -module(couch_httpd).
 -include("couch_db.hrl").
 
--export([start_link/0, stop/0, handle_request/4]).
+-export([start_link/0, stop/0, handle_request/3]).
 
 -export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,path/1]).
--export([check_is_admin/1,unquote/1]).
+-export([verify_is_server_admin/1,unquote/1]).
 -export([parse_form/1,json_body/1,body/1,doc_etag/1]).
 -export([primary_header_value/2,partition/1,serve_file/3]).
 -export([start_chunked_response/3,send_chunk/2]).
 -export([start_json_response/2, start_json_response/3, end_json_response/1]).
 -export([send_response/4,send_method_not_allowed/2,send_error/4]).
 -export([send_json/2,send_json/3,send_json/4]).
--export([default_authenticate/1]).
+-export([default_authentication_handler/1,special_test_authentication_handler/1]).
 
 
 % Maximum size of document PUT request body (4GB)
@@ -37,24 +37,21 @@ start_link() ->
 
     BindAddress = couch_config:get("httpd", "bind_address", any),
     Port = couch_config:get("httpd", "port", "5984"),
-    AuthenticationFun = make_arity_1_fun(
-            couch_config:get("httpd", "authentication", 
-            "{couch_httpd, default_authenticate}")),
-        
+    
     UrlHandlersList = lists:map(
         fun({UrlKey, SpecStr}) ->
-            {list_to_binary(UrlKey), make_arity_1_fun(SpecStr)}
+            {?l2b(UrlKey), make_arity_1_fun(SpecStr)}
         end, couch_config:get("httpd_global_handlers")),
         
     DbUrlHandlersList = lists:map(
         fun({UrlKey, SpecStr}) ->
-            {list_to_binary(UrlKey), make_arity_2_fun(SpecStr)}
+            {?l2b(UrlKey), make_arity_2_fun(SpecStr)}
         end, couch_config:get("httpd_db_handlers")),
     UrlHandlers = dict:from_list(UrlHandlersList),
     DbUrlHandlers = dict:from_list(DbUrlHandlersList),
     Loop = fun(Req)->
             apply(?MODULE, handle_request,
-                    [Req, UrlHandlers, DbUrlHandlers, AuthenticationFun])
+                    [Req, UrlHandlers, DbUrlHandlers])
         end,
 
     % and off we go
@@ -69,8 +66,6 @@ start_link() ->
             ?MODULE:stop();
         ("httpd", "port") ->
             ?MODULE:stop();
-        ("httpd", "authentication") ->
-            ?MODULE:stop();
         ("httpd_global_handlers", _) ->
             ?MODULE:stop();
         ("httpd_db_handlers", _) ->
@@ -79,7 +74,8 @@ start_link() ->
 
     {ok, Pid}.
 
-% SpecStr is a string like "{my_module, my_fun}"  or "{my_module, my_fun, foo}"
+% SpecStr is a string like "{my_module, my_fun}" 
+%  or "{my_module, my_fun, <<"my_arg">>}"
 make_arity_1_fun(SpecStr) ->
     case couch_util:parse_term(SpecStr) of
     {ok, {Mod, Fun, SpecArg}} ->
@@ -101,8 +97,9 @@ stop() ->
     mochiweb_http:stop(?MODULE).
     
 
-handle_request(MochiReq, UrlHandlers, DbUrlHandlers, AuthenticationFun) ->
-
+handle_request(MochiReq, UrlHandlers, DbUrlHandlers) ->
+    AuthenticationFun = make_arity_1_fun(
+            couch_config:get("httpd", "authentication_handler")),
     % for the path, use the raw path with the query string and fragment
     % removed, but URL quoting left intact
     RawUri = MochiReq:get(raw_path),
@@ -132,7 +129,7 @@ handle_request(MochiReq, UrlHandlers, DbUrlHandlers, AuthenticationFun) ->
         
         % Non standard HTTP verbs aren't atoms (COPY, MOVE etc) so convert when
         % possible (if any module references the atom, then it's existing).
-        Meth -> try list_to_existing_atom(Meth) catch _ -> Meth end
+        Meth -> couch_util:to_existing_atom(Meth)
     end,
     HttpReq = #httpd{
         mochi_req = MochiReq,
@@ -143,14 +140,10 @@ handle_request(MochiReq, UrlHandlers, DbUrlHandlers, AuthenticationFun) ->
         },
     DefaultFun = fun couch_httpd_db:handle_request/1,
     HandlerFun = couch_util:dict_find(HandlerKey, UrlHandlers, DefaultFun),
-    CouchHeaders = [{?l2b(K), ?l2b(V)}
-            || {"X-Couch-" ++ _= K,V}
-            <- mochiweb_headers:to_list(MochiReq:get(headers))],
     
     {ok, Resp} =
     try
-        {UserCtxProps} = AuthenticationFun(HttpReq),
-        HandlerFun(HttpReq#httpd{user_ctx={UserCtxProps ++ CouchHeaders}})
+        HandlerFun(HttpReq#httpd{user_ctx=AuthenticationFun(HttpReq)})
     catch
         Error ->
             send_error(HttpReq, Error)
@@ -165,15 +158,44 @@ handle_request(MochiReq, UrlHandlers, DbUrlHandlers, AuthenticationFun) ->
     {ok, Resp}.
 
 
+special_test_authentication_handler(Req) ->
+    case header_value(Req, "WWW-Authenticate") of
+    "X-Couch-Test-Auth " ++ NamePass ->
+        % NamePass is a colon separated string: "joe schmoe:a password".
+        {ok, [Name, Pass]} = regexp:split(NamePass, ":"),
+        case {Name, Pass} of
+        {"Jan Lehnardt", "apple"} -> ok;
+        {"Christopher Lenz", "dog food"} -> ok;
+        {"Noah Slater", "biggiesmalls endian"} -> ok;
+        {"Chris Anderson", "mp3"} -> ok;
+        {"Damien Katz", "pecan pie"} -> ok;
+        {_, _} ->
+            throw({unauthorized, <<"Name or password is incorrect.">>})
+        end,
+        #user_ctx{name=?l2b(Name)};
+    _ ->
+        % No X-Couch-Test-Auth credentials sent, give admin access so the
+        % previous authentication can be restored after the test
+        #user_ctx{roles=[<<"_admin">>]}
+    end.
 
-default_authenticate(Req) ->
-    % by default, we just assume the users credentials for basic authentication
-    % are correct.
+default_authentication_handler(Req) ->
     case basic_username_pw(Req) of
-    {Username, _Pw} ->
-        {[{<<"name">>, ?l2b(Username)}]};
+    {User, Pass} ->
+        case couch_server:is_admin(User, Pass) of
+        true ->
+            #user_ctx{name=User, roles=[<<"_admin">>]};
+        false ->
+            throw({unauthorized, <<"Name or password is incorrect.">>})
+        end;
     nil ->
-        {[]}
+        case couch_server:has_admins() of
+        true ->
+            #user_ctx{};
+        false ->
+            % if no admins, then everyone is admin! Yay, admin party!
+            #user_ctx{roles=[<<"_admin">>]}
+        end
     end.
 
 
@@ -224,6 +246,14 @@ json_body(#httpd{mochi_req=MochiReq}) ->
 doc_etag(#doc{revs=[DiskRev|_]}) ->
      "\"" ++ binary_to_list(DiskRev) ++ "\"".
 
+verify_is_server_admin(#httpd{user_ctx=#user_ctx{roles=Roles}}) ->
+    case lists:member(<<"_admin">>, Roles) of
+    true -> ok;
+    false -> throw({unauthorized, <<"You are not a server admin.">>})
+    end.
+
+
+
 basic_username_pw(Req) ->
     case header_value(Req, "Authorization") of
     "Basic " ++ Base64Value ->
@@ -239,27 +269,6 @@ basic_username_pw(Req) ->
         nil
     end.
 
-check_is_admin(Req) ->
-    IsNamedAdmin =
-    case basic_username_pw(Req) of
-    {User, Pass} ->
-        couch_server:is_admin(User, Pass);
-    nil ->
-        false
-    end,
-    
-    case IsNamedAdmin of
-    true ->
-        ok;
-    false ->
-        case couch_server:has_admins() of
-        true ->
-            throw(admin_authorization_error);
-        false ->
-            % if no admins, then everyone is admin! Yay, admin party!
-            ok
-        end
-    end.
 
 start_chunked_response(#httpd{mochi_req=MochiReq}, Code, Headers) ->
     {ok, MochiReq:respond({Code, Headers ++ server_header(), chunked})}.
@@ -315,11 +324,23 @@ send_error(Req, {not_found, Reason}) ->
     send_error(Req, 404, <<"not_found">>, Reason);
 send_error(Req, conflict) ->
     send_error(Req, 412, <<"conflict">>, <<"Document update conflict.">>);
-send_error(Req, admin_authorization_error) ->
-    send_json(Req, 401,
-        [{"WWW-Authenticate", "Basic realm=\"administrator\""}],
-        {[{<<"error">>,  <<"authorization">>},
-         {<<"reason">>, <<"Admin user name and password required">>}]});
+send_error(Req, {forbidden, Msg}) ->
+    send_json(Req, 403,
+        {[{<<"error">>,  <<"forbidden">>},
+         {<<"reason">>, Msg}]});
+send_error(Req, {unauthorized, Msg}) ->
+    case couch_config:get("httpd", "WWW-Authenticate", nil) of
+    nil ->
+        Headers = [];
+    Type ->
+        Headers = [{"WWW-Authenticate", Type}]
+    end,
+    send_json(Req, 401, Headers,
+        {[{<<"error">>,  <<"unauthorized">>},
+         {<<"reason">>, Msg}]});
+send_error(Req, {http_error, Code, Headers, Error, Reason}) ->
+    send_json(Req, Code, Headers,
+        {[{<<"error">>, Error}, {<<"reason">>, Reason}]});
 send_error(Req, {user_error, {Props}}) ->
     {Headers} = proplists:get_value(<<"headers">>, Props, {[]}),
     send_json(Req,
@@ -351,9 +372,9 @@ send_error(Req, Code, Error, Msg) when not is_binary(Error) ->
 send_error(Req, Code, Error, Msg) when not is_binary(Msg) ->
     send_error(Req, Code, Error, list_to_binary(io_lib:format("~p", [Msg])));
 send_error(Req, Code, Error, <<>>) ->
-    send_json(Req, Code, {[{error, Error}]});
+    send_json(Req, Code, {[{<<"error">>, Error}]});
 send_error(Req, Code, Error, Msg) ->
-    send_json(Req, Code, {[{error, Error}, {reason, Msg}]}).
+    send_json(Req, Code, {[{<<"error">>, Error}, {<<"reason">>, Msg}]}).
     
 
 

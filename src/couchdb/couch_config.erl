@@ -20,12 +20,14 @@
 -include("couch_db.hrl").
 
 -behaviour(gen_server).
--export([start_link/1, init/1, handle_call/3, handle_cast/2, handle_info/2,terminate/2, code_change/3]).
--export([all/0, get/1, get/2, get/3, delete/2, set/3, register/1, register/2,load_ini_file/1]).
+-export([start_link/1, init/1, handle_call/3, handle_cast/2, handle_info/2,
+        terminate/2, code_change/3]).
+-export([all/0, get/1, get/2, get/3, delete/2, set/3, set/4, register/1,
+        register/2, load_ini_file/1]).
 
 -record(config,
     {notify_funs=[],
-    writeback_filename=""
+    write_filename=""
     }).
 
 %% Public API %%
@@ -36,29 +38,37 @@ start_link(IniFiles) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, IniFiles, []).
 
 all() ->
-    gen_server:call(?MODULE, all).
+    lists:sort(ets:tab2list(?MODULE)).
+
+
 get(Section) when is_binary(Section) ->
-    gen_server:call(?MODULE, {fetch, binary_to_list(Section)});
+    ?MODULE:get(?b2l(Section));
 get(Section) ->
-    gen_server:call(?MODULE, {fetch, Section}).
-get(Section, Key) when is_binary(Section) and is_binary(Key) ->
-    get(binary_to_list(Section), binary_to_list(Key), undefined);
+    Matches = ets:match(?MODULE, {{Section, '$1'}, '$2'}),
+    [{Key, Value} || [Key, Value] <- Matches].
+
+
 get(Section, Key) ->
-    get(Section, Key, undefined).
+    ?MODULE:get(Section, Key, undefined).
+    
 get(Section, Key, Default) when is_binary(Section) and is_binary(Key) ->
-    gen_server:call(?MODULE, {fetch, binary_to_list(Section), binary_to_list(Key), Default});
+    ?MODULE:get(?b2l(Section), ?b2l(Key), Default);
 get(Section, Key, Default) ->
-    gen_server:call(?MODULE, {fetch, Section, Key, Default}).
+    case ets:lookup(?MODULE, {Section, Key}) of
+    [] -> Default;
+    [{_,Result}] -> Result
+    end.
 
-set(Section, Key, Value) when is_binary(Section) and is_binary(Key)  ->
-    gen_server:call(?MODULE, {set, [{{binary_to_list(Section), binary_to_list(Key)}, Value}]});
 set(Section, Key, Value) ->
-    gen_server:call(?MODULE, {set, [{{Section, Key}, Value}]}).
+    set(Section, Key, Value, true).
 
-delete(Section, Key) when is_binary(Section) and is_binary(Key) ->
-    gen_server:call(?MODULE, {delete, {binary_to_list(Section), binary_to_list(Key)}});
+set(Section, Key, Value, Persist) when is_binary(Section) and is_binary(Key)  ->
+    set(?b2l(Section), ?b2l(Key), Value, Persist);
+set(Section, Key, Value, Persist) ->
+    gen_server:call(?MODULE, {set, [{{Section, Key}, Value}], Persist}).
+
 delete(Section, Key) ->
-    gen_server:call(?MODULE, {delete, {Section, Key}}).
+    set(Section, Key, "").
 
 register(Fun) ->
     ?MODULE:register(Fun, self()).
@@ -73,42 +83,36 @@ register(Fun, Pid) ->
 init(IniFiles) ->
     ets:new(?MODULE, [named_table, set, protected]),
     [ok = load_ini_file(IniFile) || IniFile <- IniFiles],
-    {ok, #config{writeback_filename=lists:last(IniFiles)}}.
+    {ok, #config{write_filename=lists:last(IniFiles)}}.
 
-handle_call(all, _From, Config) ->
-    {reply, lists:sort(ets:tab2list(?MODULE)), Config};
-
-handle_call({fetch, Section}, _From, Config) ->
-    Matches = ets:match(?MODULE, {{Section, '$1'}, '$2'}),
-    {reply, [{Key, Value} || [Key, Value] <- Matches], Config};
-
-handle_call({fetch, Section, Key, Default}, _From, Config) ->
-    Ret = case ets:lookup(?MODULE, {Section, Key}) of
-    [] -> Default;
-    [{_,Result}] -> Result
-    end,
-    {reply, Ret, Config};
-
-handle_call({set, KVs}, _From, Config) ->
-    [ok = insert_and_commit(Config, KV) || KV <- KVs],
-    {reply, ok, Config};
-
-handle_call({delete, Key}, _From, Config) ->
-    ets:delete(?MODULE, Key),
+handle_call({set, KVs, Persist}, _From, Config) ->
+    lists:map(
+        fun({{Section, Key}, Value}=KV) ->
+            true = ets:insert(?MODULE, KV),
+            if Persist ->
+                ok = couch_config_writer:save_to_file(KV,
+                        Config#config.write_filename);
+            true -> ok
+            end,
+            [catch F(Section, Key, Value)
+                    || {_Pid, F} <- Config#config.notify_funs]
+        end, KVs),
     {reply, ok, Config};
 
 handle_call({register, Fun, Pid}, _From, #config{notify_funs=PidFuns}=Config) ->
     erlang:monitor(process, Pid),
-    {reply, ok, Config#config{notify_funs=[{Pid, Fun}|PidFuns]}}.
-
-%% @spec insert_and_commit(Tab::etstable(), Config::any()) -> ok
-%% @doc Inserts a Key/Value pair into the ets table, writes it to the storage
-%%      ini file and calls all registered callback functions for Key.
-insert_and_commit(Config, KV) ->
-    true = ets:insert(?MODULE, KV),
-    % notify funs
-    [catch Fun(KV) || {_Pid, Fun} <- Config#config.notify_funs],
-    couch_config_writer:save_to_file(KV, Config#config.writeback_filename).
+    % convert 1 and 2 arity to 3 arity
+    Fun2 = 
+    if is_function(Fun, 1) ->
+        fun(Section, _Key, _Value) -> Fun(Section) end;
+    is_function(Fun, 2) ->
+        fun(Section, Key, _Value) -> Fun(Section, Key) end;
+    is_function(Fun, 3) ->
+        Fun
+    end,
+    {reply, ok, Config#config{notify_funs=[{Pid, Fun2}|PidFuns]}}.
+    
+    
 
 %% @spec load_ini_file(IniFile::filename()) -> ok
 %% @doc Parses an ini file and stores Key/Value Pairs into the ets table.
@@ -120,7 +124,7 @@ load_ini_file(IniFile) ->
            IniBin0;
         {error, enoent} ->
            Msg = io_lib:format("Couldn't find server configuration file ~s.", [IniFilename]),
-           io:format("~s~n", [Msg]),
+           ?LOG_ERROR("~s~n", [Msg]),
            throw({startup_error, Msg})
     end,
 

@@ -130,7 +130,7 @@ var tests = {
     T(db.open(existingDoc._id, {rev: existingDoc._rev}) != null);
     
     // make sure restart works
-    T(restartServer().ok);
+    restartServer();
   },
   all_docs: function(debug) {
     var db = new CouchDB("test_suite_db");
@@ -1845,6 +1845,7 @@ var tests = {
     for(var i in docs) {
         db.deleteDoc(docs[i]);
     }
+    db.setAdmins(["Foo bar"]);
     var deletesize = db.info().disk_size;
     T(deletesize > originalsize);
 
@@ -1859,6 +1860,7 @@ var tests = {
     T(xhr.getResponseHeader("Content-Type") == "text/plain")
     T(db.info().doc_count == 1);
     T(db.info().disk_size < deletesize);
+    
   },
   
   purge: function(debug) {
@@ -1963,7 +1965,7 @@ var tests = {
     
     // test that settings can be altered
     xhr = CouchDB.request("PUT", "/_config/test/foo",{
-      body : "bar"
+      body : JSON.stringify("bar")
     });
     T(xhr.status == 200);
     xhr = CouchDB.request("GET", "/_config/test");
@@ -1975,78 +1977,139 @@ var tests = {
     T(xhr.responseText == '"bar"');
   },
   
-  security : function(debug) {
+  security_validation : function(debug) {
+    // This tests couchdb's security and validation features. This does
+    // not test authentication, except to use test authentication code made
+    // specifically for this testing. It is a WWWW-Authenticate scheme named
+    // X-Couch-Test-Auth, and the user names and passwords are hard coded
+    // on the server-side.
+    // 
+    // We could have used Basic authentication, however the XMLHttpRequest
+    // implementation for Firefox and Safari, and probably other browsers are
+    // broken (Firefox always prompts the user on 401 failures, Safari gives
+    // odd security errors when using different name/passwords, perhaps due
+    // to cross site scripting prevention).  These problems essentially make Basic
+    // authentication testing in the browser impossible. But while hard to
+    // test automated in the browser, Basic auth may still useful for real
+    // world use where these bugs/behaviors don't matter.
+    //
+    // So for testing purposes we are using this custom X-Couch-Test-Auth.
+    // It's identical to Basic auth, except it doesn't even base64 encode
+    // the "username:password" string, it's sent completely plain text.
+    // Firefox and Safari both deal with this correctly (which is to say
+    // they correctly do nothing special).
+    
+    
     var db = new CouchDB("test_suite_db");
     db.deleteDb();
     db.createDb();
     if (debug) debugger;
-
-    var designDoc = {
-      _id:"_design/test",
-      language: "javascript",
-      validate_doc_update: "(" + (function (newDoc, oldDoc, userCtx) {
-        // docs should have an author field.
-        if (!newDoc.author) {
-          throw {error:"forbidden",
-                reason:"Documents must have an author field",
-                http_status:403};
+    
+    run_on_modified_server(
+      [{section: "httpd",
+        key: "authentication_handler",
+        value: "{couch_httpd, special_test_authentication_handler}"},
+      {section:"httpd",
+        key: "WWW-Authenticate",
+        value:  "X-Couch-Test-Auth"}],
+        
+      function () {
+    
+        // try saving document usin the wrong credentials
+        var wrongPasswordDb = new CouchDB("test_suite_db",
+          {"WWW-Authenticate": "X-Couch-Test-Auth Damien Katz:foo"}
+        );
+    
+        try {
+          wrongPasswordDb.save({foo:1,author:"Damien Katz"});
+          T(false && "Can't get here. Should have thrown an error 1");
+        } catch (e) {
+          T(e.error == "unauthorized");
+          T(wrongPasswordDb.last_req.status == 401);
         }
         
-        // Note, the next line could be:
-        //
-        // if (oldDoc && oldDoc.author != userCtx.name) {
-        //  
-        // when name is the result of basic authentication, and added:
-        // 
-        // headers:
-        //    {"WWW-Authenticate": "Basic realm=\"" + userCtx.db + "\""},
-        //
-        // to the thrown exception. But when trying to authenticate in this
-        // manner, most browsers have  weird behaviors that make testing it
-        // in the browser difficult. So instead we use special header values
-        // a proof of concept.
-        if (oldDoc && oldDoc.author != userCtx["X-Couch-Username"]) {
-            throw {error:"unauthorized",
-                reason:"You are not the author of this document. You jerk.",
-                headers:
-                  {"X-Couch-Foo": "bar"},
-                http_status:401};
+        
+        // Create the design doc that will run custom validation code
+        var designDoc = {
+          _id:"_design/test",
+          language: "javascript",
+          validate_doc_update: "(" + (function (newDoc, oldDoc, userCtx) {
+            log("newDoc: " + newDoc.toSource());
+            if (oldDoc) {
+              log("oldDoc: " + oldDoc.toSource());
+            }
+            // docs should have an author field.
+            if (!newDoc.author) {
+              throw {forbidden:
+                  "Documents must have an author field"};
+            }
+            if (oldDoc && oldDoc.author != userCtx.name) {
+                throw {unauthorized:
+                    "You are not the author of this document. You jerk."};
+            }
+          }).toString() + ")"
         }
-      }).toString() + ")"
-    }
+
+        // Save a document normally
+        var userDb = new CouchDB("test_suite_db",
+          {"WWW-Authenticate": "X-Couch-Test-Auth Damien Katz:pecan pie"}
+        );
+        
+        T(userDb.save({_id:"testdoc", foo:1, author:"Damien Katz"}).ok);
+        
+        // Attempt to save the design as a non-admin
+        try {
+          userDb.save(designDoc);
+          T(false && "Can't get here. Should have thrown an error on design doc");
+        } catch (e) {
+          T(e.error == "unauthorized");
+          T(userDb.last_req.status == 401);
+        }
+        
+        // add user as admin
+        db.setAdmins(["Damien Katz"]);
+        
+        T(userDb.save(designDoc).ok);
     
-    db.save(designDoc);
+        // update the document
+        var doc = userDb.open("testdoc");
+        doc.foo=2;
+        T(userDb.save(doc).ok);
+        
+        // Save a document that's missing an author field.
+        try {
+          userDb.save({foo:1});
+          T(false && "Can't get here. Should have thrown an error 2");
+        } catch (e) {
+          T(e.error == "forbidden");
+          T(userDb.last_req.status == 403);
+        }
     
-    var userDb = new CouchDB("test_suite_db", {"X-Couch-Username":"test user"});
+        // Now attempt to update the document as a different user, Jan 
+        var user2Db = new CouchDB("test_suite_db",
+          {"WWW-Authenticate": "X-Couch-Test-Auth Jan Lehnardt:apple"}
+        );
     
-    try {
-      userDb.save({foo:1});
-      T(false && "Can't get here. Should have thrown an error");
-    } catch (e) {
-      T(e.error == "forbidden");
-      T(userDb.last_req.status == 403);
-    }
-    
-    userDb.save({_id:"testdoc", foo:1, author:"test user"});
-    
-    var doc = userDb.open("testdoc");
-    doc.foo=2;
-    userDb.save(doc);
-    
-    var user2Db = new CouchDB("test_suite_db", {"X-Couch-Username":"test user2"});
-    
-    var doc = user2Db.open("testdoc");
-    doc.foo=3;
-    try {
-      user2Db.save(doc);
-      T(false && "Can't get here. Should have thrown an error 2");
-    } catch (e) {
-      T(e.error == "unauthorized");
-      T(user2Db.last_req.status == 401);
-      T(user2Db.last_req.getResponseHeader("X-Couch-Foo") == "bar");
-    }
-    
-    
+        var doc = user2Db.open("testdoc");
+        doc.foo=3;
+        try {
+          user2Db.save(doc);
+          T(false && "Can't get here. Should have thrown an error 3");
+        } catch (e) {
+          T(e.error == "unauthorized");
+          T(user2Db.last_req.status == 401);
+        }
+        
+        // Now have Damien change the author to Jan
+        doc = userDb.open("testdoc");
+        doc.author="Jan Lehnardt";
+        T(userDb.save(doc).ok);
+        
+        // Now update the document as Jan
+        doc = user2Db.open("testdoc");
+        doc.foo = 3;
+        T(user2Db.save(doc).ok);
+      });
   }
 };
 
@@ -2067,10 +2130,32 @@ function makeDocs(start, end, templateDoc) {
   return docs;
 }
 
+function run_on_modified_server(settings, fun) {
+  try {
+    // set the settings
+    for(var i=0; i < settings.length; i++) {
+      var s = settings[i];
+      var xhr = CouchDB.request("PUT", "/_config/" + s.section + "/" + s.key, {
+        body: JSON.stringify(s.value),
+        headers: {"X-Couch-Persist": "false"}
+      });
+      CouchDB.maybeThrowError(xhr);
+      s.oldValue = xhr.responseText;
+    }
+    // run the thing
+    fun();
+  } finally {
+    // unset the settings
+    for(var j=0; j < i; j++) {
+      var s = settings[j];
+      CouchDB.request("PUT", "/_config/" + s.section + "/" + s.key, {
+        body: s.oldValue,
+        headers: {"X-Couch-Persist": "false"}
+      });
+    }
+  }
+}
+
 function restartServer() {
-  var reply = CouchDB.request("POST", "/_restart");
-  do {
-    var xhr = CouchDB.request("GET", "/");
-  } while(xhr.status != 200);
-  return JSON.parse(reply.responseText);
+  CouchDB.request("POST", "/_restart");
 }

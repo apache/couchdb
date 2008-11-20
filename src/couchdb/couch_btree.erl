@@ -277,11 +277,11 @@ modify_node(Bt, RootPointerInfo, Actions, QueryOutput) ->
         {NodeType, NodeList} = get_node(Bt, Pointer)
     end,
     NodeTuple = list_to_tuple(NodeList),
+    
+    {ok, NewNodeList, QueryOutput2, Bt2} =
     case NodeType of
-    kp_node ->
-        {ok, NewNodeList, QueryOutput2, Bt2} = modify_kpnode(Bt, NodeTuple, 1, Actions, [], QueryOutput);
-    kv_node ->
-        {ok, NewNodeList, QueryOutput2, Bt2} = modify_kvnode(Bt, NodeTuple, 1, Actions, [], QueryOutput)
+    kp_node -> modify_kpnode(Bt, NodeTuple, 1, Actions, [], QueryOutput);
+    kv_node -> modify_kvnode(Bt, NodeTuple, 1, Actions, [], QueryOutput)
     end,
     case NewNodeList of
     [] ->  % no nodes remain
