@@ -21,7 +21,7 @@
 -export([enum_docs/4,enum_docs/5,enum_docs_since/4,enum_docs_since/5]).
 -export([enum_docs_since_reduce_to_count/1,enum_docs_reduce_to_count/1]).
 -export([increment_update_seq/1,get_purge_seq/1,purge_docs/2,get_last_purged/1]).
--export([start_link/3,make_doc/2]).
+-export([start_link/3,make_doc/2,set_admins/2,get_admins/1]).
 -export([init/1,terminate/2,handle_call/3,handle_cast/2,code_change/3,handle_info/2]).
 
 
@@ -67,9 +67,9 @@ open(DbName, Options) ->
 close(#db{fd=Fd}) ->
     couch_file:drop_ref(Fd).
 
-open_ref_counted(MainPid, OpeningPid, UserCred) ->
+open_ref_counted(MainPid, OpeningPid, UserCtx) ->
     {ok, Db} = gen_server:call(MainPid, {open_ref_counted_instance, OpeningPid}),
-    {ok, Db#db{user_ctx=UserCred}}.
+    {ok, Db#db{user_ctx=UserCtx}}.
 
 num_refs(MainPid) ->
     gen_server:call(MainPid, num_refs).
@@ -172,6 +172,16 @@ get_db_info(Db) ->
         ],
     {ok, InfoList}.
 
+get_admins(#db{admins=Admins}) ->
+    Admins.
+
+set_admins(#db{update_pid=UpdatePid,user_ctx=Ctx}, 
+        Admins) when is_list(Admins) ->
+    case gen_server:call(UpdatePid, {set_admins, Admins, Ctx}, infinity) of
+    ok -> ok;
+    Error -> throw(Error)
+    end.
+
 name(#db{name=Name}) ->
     Name.
     
@@ -203,15 +213,28 @@ group_alike_docs([Doc|Rest], [Bucket|RestBuckets]) ->
        group_alike_docs(Rest, [[Doc]|[Bucket|RestBuckets]])
     end.
 
+
+validate_doc_update(#db{user_ctx=UserCtx, admins=Admins},
+        #doc{id= <<"_design/",_/binary>>}=Doc, _GetDiskDocFun) ->
+    UserNames = [UserCtx#user_ctx.name | UserCtx#user_ctx.roles],
+    % if the user is a server admin or db admin, allow the save
+    case length(UserNames -- [<<"_admin">> | Admins]) == length(UserNames) of
+    true ->
+        % not an admin
+        throw({unauthorized, <<"You are not a server or database admin.">>});
+    false ->
+        Doc
+    end;
 validate_doc_update(#db{validate_doc_funs=[]}, Doc, _GetDiskDocFun) ->
-    Doc;
-validate_doc_update(_Db, #doc{id= <<"_design/",_/binary>>}=Doc, _GetDiskDocFun) ->
     Doc;
 validate_doc_update(_Db, #doc{id= <<"_local/",_/binary>>}=Doc, _GetDiskDocFun) ->
     Doc;
-validate_doc_update(#db{name=DbName,user_ctx={CtxProps}}=Db, Doc, GetDiskDocFun) ->
+validate_doc_update(#db{name=DbName,user_ctx=Ctx}=Db, Doc, GetDiskDocFun) ->
     DiskDoc = GetDiskDocFun(),
-    [case Fun(Doc, DiskDoc, {[{<<"db">>, DbName} | CtxProps]}) of
+    JsonCtx =  {[{<<"db">>, DbName},
+            {<<"name">>,Ctx#user_ctx.name},
+            {<<"roles">>,Ctx#user_ctx.roles}]},
+    [case Fun(Doc, DiskDoc, JsonCtx) of
         ok -> ok;
         Error -> throw(Error)
     end || Fun <- Db#db.validate_doc_funs],

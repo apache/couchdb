@@ -13,7 +13,7 @@
 -module(couch_util).
 
 -export([start_driver/1]).
--export([should_flush/0, should_flush/1]).
+-export([should_flush/0, should_flush/1, to_existing_atom/1]).
 -export([new_uuid/0, rand32/0, implode/2, collate/2, collate/3]).
 -export([abs_pathname/1,abs_pathname/2, trim/1, ascii_lower/1]).
 -export([encodeBase64/1, decodeBase64/1, to_hex/1,parse_term/1,dict_find/3]).
@@ -32,6 +32,16 @@ start_driver(LibDir) ->
     {error, Error} ->
         exit(erl_ddll:format_error(Error))
     end.
+
+% works like list_to_existing_atom, except can be list or binary and it
+% gives you the original value instead of an error if no existing atom.
+to_existing_atom(V) when is_list(V)->
+    try list_to_existing_atom(V) catch _ -> V end;
+to_existing_atom(V) when is_binary(V)->
+    try list_to_existing_atom(?b2l(V)) catch _ -> V end;
+to_existing_atom(V) when is_atom(V)->
+    V.
+
 
 new_uuid() ->
     list_to_binary(to_hex(crypto:rand_bytes(16))).
@@ -168,11 +178,7 @@ collate(A, B, Options) when is_binary(A), is_binary(B) ->
     [Result] = erlang:port_control(drv_port(), Operation, Bin),
     % Result is 0 for lt, 1 for eq and 2 for gt. Subtract 1 to return the
     % expected typical -1, 0, 1
-    Result - 1;
-
-collate(A, B, _Options) ->
-    io:format("-----A,B:~p,~p~n", [A,B]),
-    throw({error, badtypes}).
+    Result - 1.
 
 should_flush() ->
     should_flush(?FLUSH_MAX_MEM).

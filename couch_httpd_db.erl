@@ -42,7 +42,7 @@ handle_request(#httpd{path_parts=[DbName|RestParts],method=Method,
     end.
 
 create_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
-    ok = couch_httpd:check_is_admin(Req),
+    ok = couch_httpd:verify_is_server_admin(Req),
     case couch_server:create(DbName, [{user_ctx, UserCtx}]) of
     {ok, Db} ->
         couch_db:close(Db),
@@ -52,7 +52,7 @@ create_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
     end.
 
 delete_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
-    ok = couch_httpd:check_is_admin(Req),
+    ok = couch_httpd:verify_is_server_admin(Req),
     case couch_server:delete(DbName, [{user_ctx, UserCtx}]) of
     ok ->
         send_json(Req, 200, {[{ok, true}]});
@@ -229,6 +229,18 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_missing_revs">>]}=Req, Db) ->
 
 db_req(#httpd{path_parts=[_,<<"_missing_revs">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
+
+db_req(#httpd{method='PUT',path_parts=[_,<<"_admins">>]}=Req,
+        Db) ->
+    Admins = couch_httpd:json_body(Req),
+    ok = couch_db:set_admins(Db, Admins),
+    send_json(Req, {[{<<"ok">>, true}]});
+
+db_req(#httpd{method='GET',path_parts=[_,<<"_admins">>]}=Req, Db) ->
+    send_json(Req, couch_db:get_admins(Db));
+
+db_req(#httpd{path_parts=[_,<<"_admins">>]}=Req, _Db) ->
+    send_method_not_allowed(Req, "PUT,GET");
 
 db_req(#httpd{method='POST',path_parts=[DbName,<<"_design">>,Name|Rest]}=Req,
         Db) ->

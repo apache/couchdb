@@ -18,7 +18,7 @@
 -export([open/2,create/2,delete/2,all_databases/0,get_version/0]).
 -export([init/1, handle_call/3,sup_start_link/0]).
 -export([handle_cast/2,code_change/3,handle_info/2,terminate/2]).
--export([dev_start/0,remote_restart/0,is_admin/2,has_admins/0]).
+-export([dev_start/0,is_admin/2,has_admins/0,get_start_time/0]).
 
 -include("couch_db.hrl").
 
@@ -26,7 +26,8 @@
     root_dir = [],
     dbname_regexp,
     max_dbs_open=100,
-    current_dbs_open=0
+    current_dbs_open=0,
+    start_time=""
     }).
 
 start() ->
@@ -62,6 +63,10 @@ get_version() ->
         "0.0.0"
     end.
 
+get_start_time() ->
+    {ok, #server{start_time=Time}} = gen_server:call(couch_server, get_server),
+    Time.
+
 sup_start_link() ->
     gen_server:start_link({local, couch_server}, couch_server, [], []).
 
@@ -73,9 +78,6 @@ create(DbName, Options) ->
 
 delete(DbName, Options) ->
     gen_server:call(couch_server, {delete, DbName, Options}).
-
-remote_restart() ->
-    gen_server:call(couch_server, remote_restart).
 
 check_dbname(#server{dbname_regexp=RegExp}, DbName) ->
     case regexp:match(DbName, RegExp) of
@@ -137,13 +139,14 @@ init([]) ->
     process_flag(trap_exit, true),
     {ok, #server{root_dir=RootDir,
                 dbname_regexp=RegExp,
-                max_dbs_open=MaxDbsOpen}}.
+                max_dbs_open=MaxDbsOpen,
+                start_time=httpd_util:rfc1123_date()}}.
 
 terminate(_Reason, _Server) ->
     ok.
 
 all_databases() ->
-    {ok, Root} = gen_server:call(couch_server, get_root),
+    {ok, #server{root_dir=Root}} = gen_server:call(couch_server, get_server),
     Filenames =
     filelib:fold_files(Root, "^[a-z0-9\\_\\$()\\+\\-]*[\\.]couch$", true,
         fun(Filename, AccIn) ->
@@ -196,10 +199,7 @@ try_close_lru(StartTime) ->
     end.
 
 handle_call(get_server, _From, Server) ->
-    {reply, Server, Server};
-
-handle_call(get_root, _From, #server{root_dir=Root}=Server) ->
-    {reply, {ok, Root}, Server};
+    {reply, {ok, Server}, Server};
 handle_call({open, DbName, Options}, {FromPid,_}, Server) ->
     DbNameList = binary_to_list(DbName),
     UserCtx = proplists:get_value(user_ctx, Options, nil),
@@ -295,15 +295,7 @@ handle_call({delete, DbName, Options}, _From, Server) ->
         end;
     Error ->
         {reply, Error, Server}
-    end;
-handle_call(remote_restart, _From, Server) ->
-    case couch_config:get("couchdb", "allow_remote_restart", "false") of
-    "true" ->
-        exit(couch_server_sup, restart);
-    _ ->
-        ok
-    end,
-    {reply, ok, Server}.
+    end.
 
 handle_cast(Msg, _Server) ->
     exit({unknown_cast_message, Msg}).

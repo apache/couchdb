@@ -60,6 +60,19 @@ handle_call(increment_update_seq, _From, Db) ->
     couch_db_update_notifier:notify({updated, Db#db.name}),
     {reply, {ok, Db2#db.update_seq}, Db2};
 
+handle_call({set_admins, NewAdmins, #user_ctx{roles=Roles}}, _From, Db) ->
+    DbAdmins = [<<"_admin">> | Db#db.admins],
+    case length(DbAdmins -- Roles) == length(DbAdmins) of
+    true ->
+        {reply, {unauthorized, <<"You are not a db or server admin.">>}, Db};
+    false ->
+        {ok, Ptr} = couch_file:append_term(Db#db.fd, NewAdmins),
+        Db2 = commit_data(Db#db{admins=NewAdmins, admins_ptr=Ptr,
+                update_seq=Db#db.update_seq+1}),
+        ok = gen_server:call(Db2#db.main_pid, {db_updated, Db2}),
+        {reply, ok, Db2}
+    end;
+
 handle_call({purge_docs, _IdRevs}, _From,
         #db{compactor_pid=Pid}=Db) when Pid /= nil ->
     {reply, {error, purge_during_compaction}, Db};
@@ -128,7 +141,7 @@ handle_cast(start_compact, Db) ->
     case Db#db.compactor_pid of
     nil ->
         ?LOG_INFO("Starting compaction for db \"~s\"", [Db#db.name]),
-        Pid = spawn_link(fun() -> start_copy_compact_int(Db) end),
+        Pid = spawn_link(fun() -> start_copy_compact(Db) end),
         Db2 = Db#db{compactor_pid=Pid},
         ok = gen_server:call(Db#db.main_pid, {db_updated, Db2}),
         {noreply, Db2};
@@ -166,7 +179,7 @@ handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
         ?LOG_INFO("Compaction file still behind main file "
             "(update seq=~p. compact update seq=~p). Retrying.",
             [Db#db.update_seq, NewSeq]),
-        Pid = spawn_link(fun() -> start_copy_compact_int(Db) end),
+        Pid = spawn_link(fun() -> start_copy_compact(Db) end),
         Db2 = Db#db{compactor_pid=Pid},
         couch_file:close(NewFd),
         {noreply, Db2}
@@ -222,7 +235,19 @@ btree_by_seq_reduce(reduce, DocInfos) ->
 btree_by_seq_reduce(rereduce, Reds) ->
     lists:sum(Reds).
 
-init_db(DbName, Filepath, Fd, Header) ->
+simple_upgrade_record(Old, New) when size(Old) == size(New)->
+    Old;
+simple_upgrade_record(Old, New) ->
+    NewValuesTail =
+        lists:sublist(tuple_to_list(New), size(Old) + 1, size(New)-size(Old)),
+    list_to_tuple(tuple_to_list(Old) ++ NewValuesTail).
+
+init_db(DbName, Filepath, Fd, Header0) ->
+    case element(2, Header0) of
+    ?LATEST_DISK_VERSION -> ok;
+    _ -> throw({database_disk_version_error, "Incorrect disk header version"})
+    end,
+    Header = simple_upgrade_record(Header0, #db_header{}),
     {ok, SummaryStream} = couch_stream:open(Header#db_header.summary_stream_state, Fd),
     ok = couch_stream:set_min_buffer(SummaryStream, 10000),
     Less =
@@ -242,7 +267,13 @@ init_db(DbName, Filepath, Fd, Header) ->
             {join, fun(X,Y) -> btree_by_seq_join(X,Y) end},
             {reduce, fun(X,Y) -> btree_by_seq_reduce(X,Y) end}]),
     {ok, LocalDocsBtree} = couch_btree:open(Header#db_header.local_docs_btree_state, Fd),
-
+    case Header#db_header.admins_ptr of
+    nil ->
+        Admins = [],
+        AdminsPtr = nil;
+    AdminsPtr ->
+        {ok, Admins} = couch_file:pread_term(Fd, AdminsPtr)
+    end,
     #db{
         update_pid=self(),
         fd=Fd,
@@ -253,7 +284,9 @@ init_db(DbName, Filepath, Fd, Header) ->
         local_docs_btree = LocalDocsBtree,
         update_seq = Header#db_header.update_seq,
         name = DbName,
-        filepath=Filepath}.
+        filepath = Filepath,
+        admins = Admins,
+        admins_ptr = AdminsPtr}.
 
 
 close_db(#db{fd=Fd,summary_stream=Ss}) ->
@@ -474,7 +507,8 @@ commit_data(#db{fd=Fd, header=Header} = Db) ->
         summary_stream_state = couch_stream:get_state(Db#db.summary_stream),
         docinfo_by_seq_btree_state = couch_btree:get_state(Db#db.docinfo_by_seq_btree),
         fulldocinfo_by_id_btree_state = couch_btree:get_state(Db#db.fulldocinfo_by_id_btree),
-        local_docs_btree_state = couch_btree:get_state(Db#db.local_docs_btree)
+        local_docs_btree_state = couch_btree:get_state(Db#db.local_docs_btree),
+        admins_ptr = Db#db.admins_ptr
         },
     if Header == Header2 ->
         Db; % unchanged. nothing to do
@@ -532,7 +566,7 @@ copy_docs(#db{fd=SrcFd}=Db, #db{fd=DestFd,summary_stream=DestStream}=NewDb, Info
 
 
           
-copy_compact_docs(Db, NewDb, Retry) ->
+copy_compact(Db, NewDb, Retry) ->
     EnumBySeqFun =
     fun(#doc_info{update_seq=Seq}=DocInfo, _Offset, {AccNewDb, AccUncopied}) ->
         case couch_util:should_flush() of
@@ -546,15 +580,19 @@ copy_compact_docs(Db, NewDb, Retry) ->
     {ok, {NewDb2, Uncopied}} =
         couch_btree:foldl(Db#db.docinfo_by_seq_btree, NewDb#db.update_seq + 1, EnumBySeqFun, {NewDb, []}),
 
-    case Uncopied of
-    [#doc_info{update_seq=LastSeq} | _] ->
-        commit_data( copy_docs(Db, NewDb2#db{update_seq=LastSeq},
-            lists:reverse(Uncopied), Retry));
-    [] ->
-        NewDb2
-    end.
+    NewDb3 = copy_docs(Db, NewDb2, lists:reverse(Uncopied), Retry),
+    
+    % copy misc header values
+    if NewDb3#db.admins /= Db#db.admins ->
+        {ok, Ptr} = couch_file:append_term(NewDb3#db.fd, Db#db.admins),
+        NewDb4 = NewDb3#db{admins=Db#db.admins, admins_ptr=Ptr};
+    true ->
+        NewDb4 = NewDb3
+    end,
+    
+    commit_data(NewDb4#db{update_seq=Db#db.update_seq}).
 
-start_copy_compact_int(#db{name=Name,filepath=Filepath}=Db) ->
+start_copy_compact(#db{name=Name,filepath=Filepath}=Db) ->
     CompactFile = Filepath ++ ".compact",
     ?LOG_DEBUG("Compaction process spawned for db \"~s\"", [Name]),
     case couch_file:open(CompactFile) of
@@ -568,7 +606,7 @@ start_copy_compact_int(#db{name=Name,filepath=Filepath}=Db) ->
         ok = couch_file:write_header(Fd, ?HEADER_SIG, Header=#db_header{})
     end,
     NewDb = init_db(Name, CompactFile, Fd, Header),
-    NewDb2 = copy_compact_docs(Db, NewDb, Retry),
+    NewDb2 = copy_compact(Db, NewDb, Retry),
     close_db(NewDb2),
     
     gen_server:cast(Db#db.update_pid, {compact_done, CompactFile}).

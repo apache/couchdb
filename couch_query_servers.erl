@@ -69,9 +69,9 @@ prompt(Port, Json) ->
     true = port_command(Port, Bin),
     case read_json(Port) of
     {[{<<"error">>, Id}, {<<"reason">>, Reason}]} ->
-        throw({list_to_atom(binary_to_list(Id)),Reason});
+        throw({Id,Reason});
     {[{<<"reason">>, Reason}, {<<"error">>, Id}]} ->
-        throw({list_to_atom(binary_to_list(Id)),Reason});
+        throw({Id,Reason});
     Result ->
         Result
     end.
@@ -181,15 +181,16 @@ validate_doc_update(Lang, FunSrc, EditDoc, DiskDoc, Ctx) ->
     if DiskDoc == nil ->
         null;
     true -> 
-        couch_doc:to_json_obj(EditDoc, [revs])
+        couch_doc:to_json_obj(DiskDoc, [revs])
     end,
     try prompt(Port, 
             [<<"validate">>, FunSrc, JsonEditDoc, JsonDiskDoc, Ctx]) of
     1 ->
         ok;
-    {ErrorObject} ->
-        {user_error,
-           {ErrorObject}}
+    {[{<<"forbidden">>, Message}]} ->
+        throw({forbidden, Message});
+    {[{<<"unauthorized">>, Message}]} ->
+        throw({unauthorized, Message})
     after
         return_linked_port(Lang, Port)
     end.
