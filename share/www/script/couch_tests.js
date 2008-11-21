@@ -2034,12 +2034,8 @@ var tests = {
           _id:"_design/test",
           language: "javascript",
           validate_doc_update: "(" + (function (newDoc, oldDoc, userCtx) {
-            log("newDoc: " + newDoc.toSource());
-            if (oldDoc) {
-              log("oldDoc: " + oldDoc.toSource());
-            }
             // docs should have an author field.
-            if (!newDoc.author) {
+            if (!newDoc._deleted && !newDoc.author) {
               throw {forbidden:
                   "Documents must have an author field"};
             }
@@ -2109,6 +2105,9 @@ var tests = {
         doc = user2Db.open("testdoc");
         doc.foo = 3;
         T(user2Db.save(doc).ok);
+        
+        // Now delete document
+        T(user2Db.deleteDoc(doc).ok);
       });
   }
 };
