@@ -12,6 +12,7 @@ view_timeout = 5000 ; 5 seconds
 port = 5984
 bind_address = 127.0.0.1
 authentication_handler = {couch_httpd, default_authentication_handler}
+WWW-Authenticate = Basic realm="administrator"
 
 [log]
 file = %localstatelogdir%/couch.log
