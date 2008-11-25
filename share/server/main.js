@@ -105,7 +105,8 @@ while (cmd = eval(readline())) {
               throw {error: "map_runtime_error",
                   reason: "function raised fatal exception"};
             }
-            print(toJSON({log: "function raised exception (" + err + ")"}));
+            print(toJSON({log: "function raised exception (" + err 
+              + ") with doc._id " + doc._id}));
             buf.push("[]");
           }
         }
