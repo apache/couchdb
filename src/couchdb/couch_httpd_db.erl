@@ -186,6 +186,7 @@ db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs_by_seq">>]}=Req, Db) ->
     StartKey2 = case StartKey of
         nil -> 0;
         <<>> -> 100000000000;
+        {} -> 100000000000;
         StartKey when is_integer(StartKey) -> StartKey
     end,
     {ok, FoldResult} = couch_db:enum_docs_since(Db, StartKey2, Dir,

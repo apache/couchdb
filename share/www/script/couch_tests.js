@@ -171,6 +171,14 @@ var tests = {
       T(row.id == ids[i]);
     };
     
+    // it should work in reverse as well
+    all_seq = db.allDocsBySeq({descending:true});
+    ids = ["2","1","3","0"];
+    for (var i=0; i < all_seq.rows.length; i++) {
+      var row = all_seq.rows[i];
+      T(row.id == ids[i]);
+    };
+    
     // check that deletions also show up right
     var doc1 = db.open("1");
     var deleted = db.deleteDoc(doc1);
