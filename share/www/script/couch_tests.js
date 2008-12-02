@@ -2114,6 +2114,15 @@ var tests = {
         doc.foo = 3;
         T(user2Db.save(doc).ok);
         
+        // Damien can't delete it
+        try {
+          userDb.deleteDoc(doc);
+          T(false && "Can't get here. Should have thrown an error 4");
+        } catch (e) {
+          T(e.error == "unauthorized");
+          T(userDb.last_req.status == 401);
+        }
+        
         // Now delete document
         T(user2Db.deleteDoc(doc).ok);
       });
@@ -2130,7 +2139,7 @@ function makeDocs(start, end, templateDoc) {
   for (var i = start; i < end; i++) {
     var newDoc = eval("(" + templateDocSrc + ")");
     newDoc._id = (i).toString();
-    newDoc.integer = i
+    newDoc.integer = i;
     newDoc.string = (i).toString();
     docs.push(newDoc)
   }
