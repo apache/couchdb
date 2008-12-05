@@ -115,6 +115,7 @@ function CouchDatabasePage() {
   this.viewName = viewName;
   this.db = db;
   this.isDirty = false;
+  this.isTempView = viewName == "_temp_view";
   page = this;
 
   this.addDocument = function() {
@@ -393,7 +394,7 @@ function CouchDatabasePage() {
       $.cookies.remove(dbName + ".desc");
     }
     $("#paging a").unbind();
-    $("#documents tbody.content").empty();
+    $("#documents").find("tbody.content").empty().end().show();
     this.updateDesignDocLink();
 
     options.success = function(resp) {
