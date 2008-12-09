@@ -184,7 +184,7 @@ default_authentication_handler(Req) ->
     {User, Pass} ->
         case couch_server:is_admin(User, Pass) of
         true ->
-            #user_ctx{name=User, roles=[<<"_admin">>]};
+            #user_ctx{name=?l2b(User), roles=[<<"_admin">>]};
         false ->
             throw({unauthorized, <<"Name or password is incorrect.">>})
         end;
