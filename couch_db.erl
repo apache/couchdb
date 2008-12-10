@@ -17,7 +17,7 @@
 -export([open_ref_counted/3,num_refs/1,monitor/1]).
 -export([update_doc/3,update_docs/4,update_docs/2,update_docs/3,delete_doc/3]).
 -export([get_doc_info/2,open_doc/2,open_doc/3,open_doc_revs/4]).
--export([get_missing_revs/2,name/1,doc_to_tree/1]).
+-export([get_missing_revs/2,name/1,doc_to_tree/1,get_update_seq/1]).
 -export([enum_docs/4,enum_docs/5,enum_docs_since/4,enum_docs_since/5]).
 -export([enum_docs_since_reduce_to_count/1,enum_docs_reduce_to_count/1]).
 -export([increment_update_seq/1,get_purge_seq/1,purge_docs/2,get_last_purged/1]).
@@ -145,6 +145,9 @@ purge_docs(#db{update_pid=UpdatePid}, IdsRevs) ->
     gen_server:call(UpdatePid, {purge_docs, IdsRevs}).
     
 
+get_update_seq(#db{header=#db_header{update_seq=Seq}})->
+    Seq.
+    
 get_purge_seq(#db{header=#db_header{purge_seq=PurgeSeq}})->
     PurgeSeq.
 

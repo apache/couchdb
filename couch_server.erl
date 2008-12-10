@@ -22,14 +22,6 @@
 
 -include("couch_db.hrl").
 
--record(server,{
-    root_dir = [],
-    dbname_regexp,
-    max_dbs_open=100,
-    current_dbs_open=0,
-    start_time=""
-    }).
-
 start() ->
     start(["default.ini"]).
 

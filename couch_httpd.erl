@@ -261,7 +261,7 @@ basic_username_pw(Req) ->
         [User, Pass] ->
             {User, Pass};
         [User] ->
-            {User, <<"">>};
+            {User, ""};
         _ ->
             nil
         end;

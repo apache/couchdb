@@ -22,18 +22,19 @@
     start_json_response/2,send_chunk/2,end_json_response/1]).
 
 design_doc_view(Req, Db, Id, ViewName, Keys) ->
+    #view_query_args{
+        update = Update,
+        reduce = Reduce
+    } = QueryArgs = parse_view_query(Req, Keys),
     case couch_view:get_map_view({couch_db:name(Db), 
-            <<"_design/", Id/binary>>, ViewName}) of
+            <<"_design/", Id/binary>>, ViewName, Update}) of
     {ok, View} ->    
-        QueryArgs = parse_view_query(Req, Keys),
         output_map_view(Req, View, Db, QueryArgs, Keys);
     {not_found, Reason} ->
         case couch_view:get_reduce_view({couch_db:name(Db),
                 <<"_design/", Id/binary>>, ViewName}) of
         {ok, View} ->
-            #view_query_args{
-                reduce = Reduce
-            } = QueryArgs = parse_view_query(Req, Keys, true),
+            parse_view_query(Req, Keys, true), % just for validation
             case Reduce of
             false ->
                 {reduce, _N, _Lang, MapView} = View,
