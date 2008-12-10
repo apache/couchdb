@@ -88,7 +88,7 @@
 
 
 -record(user_ctx,
-    {name=nil,
+    {name=null,
     roles=[]
     }).
 
@@ -152,6 +152,41 @@
     include_docs = false
 }).
 
+-record(group,
+    {sig=nil,
+    db=nil,
+    fd=nil,
+    name,
+    def_lang,
+    views,
+    id_btree=nil,
+    current_seq=0,
+    purge_seq=0,
+    query_server=nil
+    }).
+
+-record(view,
+    {id_num,
+    map_names=[],
+    def,
+    btree=nil,
+    reduce_funs=[]
+    }).
+
+-record(server,{
+    root_dir = [],
+    dbname_regexp,
+    max_dbs_open=100,
+    current_dbs_open=0,
+    start_time=""
+    }).
+
+-record(index_header,
+    {seq=0,
+    purge_seq=0,
+    id_btree_state=nil,
+    view_states=nil
+    }).
 
 % small value used in revision trees to indicate the revision isn't stored
 -define(REV_MISSING, []).

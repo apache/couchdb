@@ -1905,6 +1905,7 @@ var tests = {
     }
     T(db.view("test/single_doc").total_rows == 1);
     
+    var info = db.info();
     var doc1 = db.open("1");
     var doc2 = db.open("2");
     
@@ -1913,7 +1914,13 @@ var tests = {
       body: JSON.stringify({"1":[doc1._rev], "2":[doc2._rev]}),
     });
     T(xhr.status == 200);
-    
+
+    var newInfo = db.info();
+    // purging increments the update sequence
+    T(info.update_seq+1 == newInfo.update_seq);
+    // and it increments the purge_seq
+    T(info.purge_seq+1 == newInfo.purge_seq);
+
     var result = JSON.parse(xhr.responseText);
     T(result.purged["1"][0] == doc1._rev);
     T(result.purged["2"][0] == doc2._rev);

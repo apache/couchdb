@@ -129,7 +129,7 @@ handle_call({purge_docs, IdRevs}, _From, Db) ->
         Db#db{
             fulldocinfo_by_id_btree = DocInfoByIdBTree2,
             docinfo_by_seq_btree = DocInfoBySeqBTree2,
-            update_seq = NewSeq,
+            update_seq = NewSeq + 1,
             header=Header#db_header{purge_seq=PurgeSeq+1, purged_docs=Pointer}}),
     
     ok = gen_server:call(Db2#db.main_pid, {db_updated, Db2}),
