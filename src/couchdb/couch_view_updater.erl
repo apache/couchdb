@@ -22,7 +22,6 @@ update(RootDir, DbName, GroupId, NotifyPid) ->
     {ok, #group{sig=Sig,fd=Fd}=Group} = prepare_group(RootDir, DbName, GroupId),
     {ok, Db} = couch_db:open(DbName, []),
     Result = update_group(Group#group{db=Db}),
-    ?LOG_DEBUG("update {Result} DONE ~p", [{Result}]),    
     couch_db:close(Db),
     case Result of
     {same, Group2} ->
