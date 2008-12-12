@@ -33,23 +33,14 @@ open(Filepath) ->
     open(Filepath, []).
     
 open(Filepath, Options) ->
-    case gen_server:start_link(couch_file, {Filepath, Options, self()}, []) of
-    {ok, FdPid} ->
-        % we got back an ok, but that doesn't really mean it was successful.
-        % Instead the true status has been sent back to us as a message.
-        % We do this because if the gen_server doesn't initialize properly,
-        % it generates a crash report that will get logged. This avoids
-        % that mess, because we don't want crash reports generated
-        % every time a file cannot be found.
+    case gen_server:start_link(couch_file,
+            {Filepath, Options, self(), Ref = make_ref()}, []) of
+    {ok, Fd} ->
+        {ok, Fd};
+    ignore ->
+        % get the error
         receive
-        {FdPid, ok} ->
-            {ok, FdPid};
-        {FdPid, Error} ->
-            case process_info(self(), trap_exit) of
-            {trap_exit, true} ->
-                receive {'EXIT', FdPid, _} -> ok end;
-            _ -> ok
-            end,
+        {Ref, Error} ->
             Error
         end;
     Error ->
@@ -235,12 +226,12 @@ read_header(Fd, Prefix) ->
                 ?LOG_INFO("Header version differences.~nPrimary Header: ~p~nSecondary Header: ~p", [Header1, Header2]),
                 {ok, Header1}
             end;
-        {error, Error} ->
+        Error ->
             % error reading second header. It's ok, but log it.
             ?LOG_INFO("Secondary header corruption (error: ~p). Using primary header.", [Error]),
             {ok, Header1}
         end;
-    {error, Error} ->
+    Error ->
         % error reading primary header
         case extract_header(Prefix, Bin2) of
         {ok, Header2} ->
@@ -250,7 +241,7 @@ read_header(Fd, Prefix) ->
         _ ->
             % error reading secondary header too
             % return the error, no need to log anything as the caller will be responsible for dealing with the error.
-            {error, Error}
+            Error
         end
     end,
     case Result of
@@ -277,26 +268,20 @@ extract_header(Prefix, Bin) ->
             Header = binary_to_term(TermBin),
             {ok, Header};
         false ->
-            {error, header_corrupt}
+            header_corrupt
         end;
     _ ->
-        {error, unknown_header_type}
+        unknown_header_type
     end.
 
 
-
-init_status_ok(ReturnPid, Fd) ->
-    ReturnPid ! {self(), ok}, % signal back ok
-    {ok, Fd}.
-
-init_status_error(ReturnPid, Error) ->
-    ReturnPid ! {self(), Error}, % signal back error status
-    gen_server:cast(self(), close), % tell ourself to close async
-    {ok, nil}.
+init_status_error(ReturnPid, Ref, Error) ->
+    ReturnPid ! {Ref, Error},
+    ignore.
 
 % server functions
 
-init({Filepath, Options, ReturnPid}) ->
+init({Filepath, Options, ReturnPid, Ref}) ->
     case lists:member(create, Options) of
     true ->
         filelib:ensure_dir(Filepath),
@@ -312,16 +297,16 @@ init({Filepath, Options, ReturnPid}) ->
                 true ->
                     {ok, 0} = file:position(Fd, 0),
                     ok = file:truncate(Fd),
-                    init_status_ok(ReturnPid, Fd);
+                    {ok, Fd};
                 false ->
                     ok = file:close(Fd),
-                    init_status_error(ReturnPid, file_exists)
+                    init_status_error(ReturnPid, Ref, file_exists)
                 end;
             false ->
-                init_status_ok(ReturnPid, Fd)
+                {ok, Fd}
             end;
         Error ->
-            init_status_error(ReturnPid, Error)
+            init_status_error(ReturnPid, Ref, Error)
         end;
     false ->
         % open in read mode first, so we don't create the file if it doesn't exist.
@@ -329,15 +314,13 @@ init({Filepath, Options, ReturnPid}) ->
         {ok, Fd_Read} ->
             {ok, Fd} = file:open(Filepath, [read, write, raw, binary]),
             ok = file:close(Fd_Read),
-            init_status_ok(ReturnPid, Fd);
+            {ok, Fd};
         Error ->
-            init_status_error(ReturnPid, Error)
+            init_status_error(ReturnPid, Ref, Error)
         end
     end.
 
 
-terminate(_Reason, nil) ->
-    ok;
 terminate(_Reason, Fd) ->
     file:close(Fd),
     ok.
@@ -403,9 +386,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 handle_info({'DOWN', MonitorRef, _Type, Pid, _Info}, Fd) ->
     {MonitorRef, _RefCount} = erase(Pid),
-    maybe_close_async(Fd);
-handle_info(Info, Fd) ->
-    exit({error, {Info, Fd}}).
+    maybe_close_async(Fd).
 
 
 

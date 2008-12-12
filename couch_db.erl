@@ -553,7 +553,7 @@ open_doc_int(Db, Id, Options) ->
     {ok, FullDocInfo} ->
         open_doc_int(Db, FullDocInfo, Options);
     not_found ->
-        throw({not_found, missing})
+        {not_found, missing}
     end.
 
 doc_meta_info(DocInfo, RevTree, Options) ->

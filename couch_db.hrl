@@ -35,7 +35,7 @@
     end).
 
 -define(LOG_ERROR(Format, Args),
-    error_logger:info_report(couch_error, {Format, Args})).
+    error_logger:error_report(couch_error, {Format, Args})).
 
 -record(doc_info,
     {
@@ -162,7 +162,8 @@
     id_btree=nil,
     current_seq=0,
     purge_seq=0,
-    query_server=nil
+    query_server=nil,
+    commit_fun
     }).
 
 -record(view,

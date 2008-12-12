@@ -27,8 +27,12 @@ get_temp_updater(DbName, Type, MapSrc, RedSrc) ->
     Pid.
 
 get_group_server(DbName, GroupId) ->
-    {ok, Pid} = gen_server:call(couch_view, {start_group_server, DbName, GroupId}),
-    Pid.
+    case gen_server:call(couch_view, {start_group_server, DbName, GroupId}) of
+    {ok, Pid} ->
+        Pid;
+    Error ->
+        throw(Error)
+    end.
     
 get_updated_group(DbName, GroupId, Update) ->
     couch_view_group:request_group(get_group_server(DbName, GroupId), seq_for_update(DbName, Update)).
@@ -45,10 +49,10 @@ get_reduce_view({temp, DbName, Type, MapSrc, RedSrc}) ->
     {ok, {temp_reduce, View}};
 get_reduce_view({DbName, GroupId, Name}) ->
     case get_updated_group(DbName, GroupId, true) of
-    {error, Reason} ->
-        Reason;
     {ok, #group{views=Views,def_lang=Lang}} ->
-        get_reduce_view0(Name, Lang, Views)
+        get_reduce_view0(Name, Lang, Views);
+    Error ->
+        Error
     end.
 
 get_reduce_view0(_Name, _Lang, []) ->
@@ -124,10 +128,10 @@ get_map_view({temp, DbName, Type, Src}) ->
     {ok, View};
 get_map_view({DbName, GroupId, Name, Update}) ->
     case get_updated_group(DbName, GroupId, Update) of
-    {error, Reason} ->
-        Reason;
     {ok, #group{views=Views}} ->
-        get_map_view0(Name, Views)
+        get_map_view0(Name, Views);
+    Error ->
+        Error
     end.
 
 get_map_view0(_Name, []) ->
@@ -217,7 +221,7 @@ handle_call({start_temp_updater, DbName, Lang, MapSrc, RedSrc}, _From, #server{r
             ok
         end,
         ?LOG_DEBUG("Spawning new temp update process for db ~s.", [DbName]),
-        {ok, NewPid} = couch_view_group:start_link({DbName, Fd, Lang, MapSrc, RedSrc}),
+        {ok, NewPid} = couch_view_group:start_link({temp_view, DbName, Fd, Lang, MapSrc, RedSrc}),
         true = ets:insert(couch_temp_group_fd_by_db, {DbName, Fd, Count + 1}),
         add_to_ets(NewPid, DbName, Name),
         NewPid;
@@ -226,17 +230,19 @@ handle_call({start_temp_updater, DbName, Lang, MapSrc, RedSrc}, _From, #server{r
     end,
     {reply, {ok, Pid}, Server};
 handle_call({start_group_server, DbName, GroupId}, _From, #server{root_dir=Root}=Server) ->
-    Pid = 
     case ets:lookup(group_servers_by_name, {DbName, GroupId}) of
     [] ->
         ?LOG_DEBUG("Spawning new group server for view group ~s in database ~s.", [GroupId, DbName]),
-        {ok, NewPid} = couch_view_group:start_link({Root, DbName, GroupId}),
-        add_to_ets(NewPid, DbName, GroupId),
-        NewPid;
-    [{_, ExistingPid0}] ->
-        ExistingPid0
-    end,
-    {reply, {ok, Pid}, Server}.
+        case couch_view_group:start_link({view, Root, DbName, GroupId}) of
+        {ok, NewPid} ->
+            add_to_ets(NewPid, DbName, GroupId),
+            {reply, {ok, NewPid}, Server};
+        Error ->
+            {reply, Error, Server}
+        end;
+    [{_, ExistingPid}] ->
+        {reply, {ok, ExistingPid}, Server}
+    end.
 
 handle_cast({reset_indexes, DbName}, #server{root_dir=Root}=Server) ->
     % shutdown all the updaters
@@ -254,14 +260,15 @@ handle_cast({reset_indexes, DbName}, #server{root_dir=Root}=Server) ->
     file:delete(Root ++ "/." ++ binary_to_list(DbName) ++ "_temp"),
     {noreply, Server}.
 
-handle_info({'EXIT', _FromPid, normal}, Server) ->
-   {noreply, Server};
 handle_info({'EXIT', FromPid, Reason}, #server{root_dir=RootDir}=Server) ->
-    ?LOG_DEBUG("Exit from process: ~p", [{FromPid, Reason}]),
     case ets:lookup(couch_groups_by_updater, FromPid) of
-    [] -> % non-updater linked process must have died, we propagate the error
-        ?LOG_ERROR("Exit on non-updater process: ~p", [Reason]),
-        exit(Reason);
+    [] ->
+        if Reason /= normal ->
+            % non-updater linked process died, we propagate the error
+            ?LOG_ERROR("Exit on non-updater process: ~p", [Reason]),
+            exit(Reason);
+        true -> ok
+        end;
     [{_, {DbName, "_temp_" ++ _ = GroupId}}] ->
         delete_from_ets(FromPid, DbName, GroupId),
         [{_, Fd, Count}] = ets:lookup(couch_temp_group_fd_by_db, DbName),
@@ -276,10 +283,7 @@ handle_info({'EXIT', FromPid, Reason}, #server{root_dir=RootDir}=Server) ->
     [{_, {DbName, GroupId}}] ->
         delete_from_ets(FromPid, DbName, GroupId)
     end,
-    {noreply, Server};
-handle_info(Msg, _Server) ->
-    ?LOG_ERROR("Bad message received for view module: ~p", [Msg]),
-    exit({error, Msg}).
+    {noreply, Server}.
     
 add_to_ets(Pid, DbName, GroupId) ->
     true = ets:insert(couch_groups_by_updater, {Pid, {DbName, GroupId}}),
