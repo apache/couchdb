@@ -379,9 +379,30 @@ open_doc_revs(#http_db{uri=DbUrl, headers=Headers}, DocId, Revs, Options) ->
             % latest is only option right now
             "latest=true"
         end, Options),
-    RevsQueryStrs = lists:flatten(?JSON_ENCODE(Revs)),
-    Url = DbUrl ++ url_encode(DocId) ++ "?" ++ couch_util:implode(["revs=true", "attachments=true", "open_revs=" ++ RevsQueryStrs ] ++ QueryOptionStrs, "&"),
-    JsonResults = do_http_request(Url, get, Headers),
+    
+    BaseUrl = DbUrl ++ url_encode(DocId) ++ "?" ++ couch_util:implode(
+        ["revs=true", "attachments=true"] ++ QueryOptionStrs, "&"),
+    
+    %% MochiWeb expects URLs < 8KB long, so maybe split into multiple requests
+    MaxN = trunc((8192 - length(BaseUrl))/14),
+    
+    JsonResults = case length(Revs) > MaxN of
+    false ->
+        Url = BaseUrl ++ "&open_revs=" ++ lists:flatten(?JSON_ENCODE(Revs)),
+        do_http_request(Url, get, Headers);
+    true ->
+        {_, Rest, Acc} = lists:foldl(
+        fun(Rev, {Count, RevsAcc, AccResults}) when Count =:= MaxN ->
+            QSRevs = lists:flatten(?JSON_ENCODE(lists:reverse(RevsAcc))),
+            Url = BaseUrl ++ "&open_revs=" ++ QSRevs,
+            {1, [Rev], AccResults++do_http_request(Url, get, Headers)};
+        (Rev, {Count, RevsAcc, AccResults}) ->
+            {Count+1, [Rev|RevsAcc], AccResults}
+        end, {0, [], []}, Revs),
+        Acc ++ do_http_request(BaseUrl ++ "&open_revs=" ++ 
+            lists:flatten(?JSON_ENCODE(lists:reverse(Rest))), get, Headers)
+    end,
+    
     Results =
     lists:map(
         fun({[{<<"missing">>, Rev}]}) ->
