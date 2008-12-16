@@ -1991,7 +1991,199 @@ var tests = {
     xhr = CouchDB.request("GET", "/_config/test/foo");
     T(xhr.responseText == '"bar"');
   },
-  
+
+  actions: function(debug) {
+    var db = new CouchDB("test_suite_db");
+    db.deleteDb();
+    db.createDb();
+    if (debug) debugger;
+
+    var xhr;
+    var numDocs = 10;
+
+    T(db.bulkSave(makeDocs(1, numDocs + 1)).ok);
+    
+    var designDoc = {
+      _id:"_design/no_actions",
+      language: "javascript",
+      views: {
+        single_doc: {map: "function(doc) { if (doc._id == \"1\") { emit(1, null) }}"}
+      }
+    }
+    T(db.save(designDoc).ok);
+   
+    designDoc = {
+      _id:"_design/errors",
+      language: "javascript",
+      actions: {
+        syntax: "function( bad syntax",
+        except: "function(req) { throw \"Failed to execute\" ; }"
+      }
+    }
+    T(db.save(designDoc).ok);
+   
+    // var testControllerDoc = {
+    //   _id: "_design/test",
+    //   language: "javascript",
+    //   actions: {
+    //     "execution": "function(req) { return {json : req.query.userdata}}",
+    //   }
+    // }
+   
+    designDoc = {
+      _id:"_design/an_action",
+      actions: {
+        "times_two": "function(req) {return {code:200, json: {val: req.query.q * 2}};}",
+        "html" : "function() {return {body:'<p>Lorem ipsum...</p>'}}",
+        "request_object": "function(req) {return {json:req} }",
+        "bad_return": "function(req) {return {foo:\"bar\"} }",
+        "requires_put": 'function(req) {if (req.verb != "PUT") { throw {code:405, body:"Method Not Allowed, Punk!"}} else { return {body:"thanks for the PUT"}}};'
+      }
+    }
+    T(db.save(designDoc).ok);
+   
+    // Make sure we don't succeed on something that shouldn't
+    xhr = CouchDB.request("GET", "/test_suite_db/_external");
+    T(xhr.status == 404);
+    T(JSON.parse(xhr.responseText).reason == "No server name specified.");
+    xhr = CouchDB.request("GET", "/test_suite_db/_external/bannana");
+    T(xhr.status == 404);
+    T(JSON.parse(xhr.responseText).reason == "No server configured for \"bannana\".");
+    xhr = CouchDB.request("GET", "/test_suite_db/_external/action");
+    T(xhr.status == 404);
+    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/no_actions");
+    T(xhr.status == 404)
+    T(JSON.parse(xhr.responseText).reason == "Invalid path: \"no_actions\".");;
+    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/no_actions/foo");
+    T(xhr.status == 500);
+    T(/^No actions found/.test(JSON.parse(xhr.responseText).reason));
+    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/an_action/invalid");
+    T(xhr.status == 500);
+    T(/^No action \'invalid\'/.test(JSON.parse(xhr.responseText).reason));
+    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/errors/syntax");
+    T(xhr.status == 500);
+    T(/^Failed to compile/.test(JSON.parse(xhr.responseText).reason));
+    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/errors/except");
+    T(/Failed to execute/.test(JSON.parse(xhr.responseText).reason));
+
+    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/an_action/times_two");
+    T(xhr.status == 200);
+    T(JSON.parse(xhr.responseText).val == null);
+
+    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/an_action/bad_return");
+    T(xhr.status == 500);
+    T(/^Invalid data from external server/.test(JSON.parse(xhr.responseText).reason));
+
+
+    // test that we invoke the action server
+    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/an_action/times_two?q=3");
+    T(xhr.status == 200);
+    T(JSON.parse(xhr.responseText).val == 6);
+    
+    // Test that we can return raw text
+    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/an_action/html");
+    T(xhr.status == 200);
+    T(xhr.responseText == '<p>Lorem ipsum...</p>');
+    
+    // Test environment
+    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/an_action/request_object?couchdb=relax");
+    T(xhr.status == 200);
+    var req = JSON.parse(xhr.responseText);
+
+    // Test that actions know their verbs
+    T(req.verb == "GET");
+    // Test that actions know their req
+    T(req.info.db_name == "test_suite_db");
+    T(req.path[0] == "an_action");
+    T(req.path[1] == "request_object");
+    T(req.query.couchdb == "relax");
+
+    xhr = CouchDB.request("POST", "/test_suite_db/_external/action/an_action/request_object?couchdb=relax",{
+      "body" : "some=text",
+      "headers" : {
+        "Content-Type" : "application/x-www-form-urlencoded"
+      }
+    });
+    T(xhr.status == 200);
+    var req = JSON.parse(xhr.responseText);
+    // Test that actions know their verbs
+    T(req.verb == "POST");
+    // Test that actions know their db
+    T(req.info.db_name == "test_suite_db");
+    T(req.path[0] == "an_action");
+    T(req.path[1] == "request_object");
+    // T(req.path[2] == "foo"); // this would be fun
+    T(req.query.couchdb == "relax");
+    
+    // we get raw access to the post body as well as access to the mochiweb-parsed form
+    T(req.body == "some=text");
+    T(req.form.some == "text");
+
+    // we can send error codes back
+    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/an_action/requires_put");
+    T(xhr.status == 405);
+    T(xhr.responseText == "Method Not Allowed, Punk!");
+    
+    xhr = CouchDB.request("PUT", "/test_suite_db/_external/action/an_action/requires_put");
+    T(xhr.status == 200);
+    T(xhr.responseText == "thanks for the PUT");
+  },
+
+  action_server_requests : function(debug) {
+    var db = new CouchDB("test_suite_db");
+    db.deleteDb();
+    db.createDb();
+    if (debug) debugger;
+
+    // create views for get, post, put and delete
+    var verbControllerDoc = {
+      _id: "_design/verbs",
+      language: "javascript",
+      actions: {
+        "get" : "function(req, db) { var doc = db.open(req.query.docid); return {json:doc} }",
+        "post" : "function(req, db) { var rs = db.save({'req' : req }); return {json:rs} }",
+        "put" : "function(req, db) { var rs = db.save({ '_id' : req.query.setid, 'req' : req.query }); return {json:rs} }",
+        "delete": "function(req, db) { var id = req.query.delid; var doc = db.open(id); var rd = db.deleteDoc(doc); return {json:rd} }"
+      }
+    }
+    T(db.save(verbControllerDoc).ok);
+
+    // test firing verbs
+
+    // test GET
+    var doc = {foo:"bar"};
+    var result = db.save(doc);
+    var xhr = CouchDB.request("GET", "/test_suite_db/_external/action/verbs/get?docid="+result.id);
+    var resp = JSON.parse(xhr.responseText);
+    T(resp.foo == "bar");   
+
+    // test POST
+    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/verbs/post?baz=boom");
+    resp = JSON.parse(xhr.responseText);
+    doc = db.open(resp.id);
+    T(doc.req.query.baz == "boom");
+
+    // test PUT
+    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/verbs/put?setid=mynewdocid&flim=flam");    
+    doc = db.open("mynewdocid");
+    T(doc.req.flim == "flam");
+
+    // test DELETE
+    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/verbs/delete?delid=mynewdocid");    
+    T(db.open("mynewdocid") == null);
+
+    // PUT through on top of an existing id and see the error at the client
+    var created = db.save({
+      _id : "takethisid",
+      key : "value"
+    });
+    T(created.ok);
+    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/verbs/put?setid=takethisid&flim=flam");    
+    resp = JSON.parse(xhr.responseText);
+    T(resp.error == "conflict");
+    T(resp.reason == "Document update conflict.");
+  },
+
   security_validation : function(debug) {
     // This tests couchdb's security and validation features. This does
     // not test authentication, except to use test authentication code made
