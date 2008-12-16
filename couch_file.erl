@@ -56,7 +56,7 @@ open(Filepath, Options) ->
 %%----------------------------------------------------------------------
 
 pread(Fd, Pos, Bytes) when Bytes > 0 ->
-    gen_server:call(Fd, {pread, Pos, Bytes}).
+    gen_server:call(Fd, {pread, Pos, Bytes}, infinity).
 
 
 %%----------------------------------------------------------------------
@@ -67,7 +67,7 @@ pread(Fd, Pos, Bytes) when Bytes > 0 ->
 %%----------------------------------------------------------------------
 
 pwrite(Fd, Pos, Bin) ->
-    gen_server:call(Fd, {pwrite, Pos, Bin}).
+    gen_server:call(Fd, {pwrite, Pos, Bin}, infinity).
 
 %%----------------------------------------------------------------------
 %% Purpose: To append a segment of zeros to the end of the file.
@@ -78,7 +78,7 @@ pwrite(Fd, Pos, Bin) ->
 %%----------------------------------------------------------------------
 
 expand(Fd, Bytes) when Bytes > 0 ->
-    gen_server:call(Fd, {expand, Bytes}).
+    gen_server:call(Fd, {expand, Bytes}, infinity).
 
 
 %%----------------------------------------------------------------------
@@ -135,7 +135,7 @@ pread_binary(Fd, Pos) ->
 
 % length in bytes
 bytes(Fd) ->
-    gen_server:call(Fd, bytes).
+    gen_server:call(Fd, bytes, infinity).
 
 %%----------------------------------------------------------------------
 %% Purpose: Truncate a file to the number of bytes.
@@ -144,7 +144,7 @@ bytes(Fd) ->
 %%----------------------------------------------------------------------
 
 truncate(Fd, Pos) ->
-    gen_server:call(Fd, {truncate, Pos}).
+    gen_server:call(Fd, {truncate, Pos}, infinity).
 
 %%----------------------------------------------------------------------
 %% Purpose: Ensure all bytes written to the file are flushed to disk.
