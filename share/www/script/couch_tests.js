@@ -1344,6 +1344,15 @@ var tests = {
     }
     T(db.save(designDoc).ok);
 
+    // Test that missing keys work too
+    var keys = [101,30,15,37,50]
+    var reduce = db.view("test/summate",{group:true},keys).rows;
+    T(reduce.length == keys.length-1); // 101 is missing
+    for(var i=0; i<reduce.length; i++) {
+      T(keys.indexOf(reduce[i].key) != -1);
+      T(reduce[i].key == reduce[i].value);
+    }
+
     // First, the goods:
     var keys = [10,15,30,37,50];
     var rows = db.view("test/all_docs",{},keys).rows;
@@ -1356,7 +1365,7 @@ var tests = {
     T(reduce.length == keys.length);
     for(var i=0; i<reduce.length; i++) {
       T(keys.indexOf(reduce[i].key) != -1);
-      T(rows[i].key == rows[i].value);
+      T(reduce[i].key == reduce[i].value);
     }
 
     // Test that invalid parameter combinations get rejected

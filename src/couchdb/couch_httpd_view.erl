@@ -153,10 +153,10 @@ output_reduce_view(Req, View, QueryArgs, Keys) ->
     send_chunk(Resp, "{\"rows\":["),
     lists:foldl(
         fun(Key, AccSeparator) ->
-            {ok, _} = couch_view:fold_reduce(View, Dir, {Key, StartDocId}, 
+            {ok, {NewAcc, _, _}} = couch_view:fold_reduce(View, Dir, {Key, StartDocId}, 
                 {Key, EndDocId}, GroupRowsFun, RespFun, 
                 {AccSeparator, Skip, Count}),
-            "," % Switch to comma
+            NewAcc % Switch to comma
         end,
     "", Keys), % Start with no comma
     send_chunk(Resp, "]}"),
