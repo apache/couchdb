@@ -37,12 +37,14 @@ stop(Pid) ->
     couch_event_sup:stop(Pid).
 
 init(Exec) when is_list(Exec) -> % an exe
-    Port = open_port({spawn, Exec}, [stream, exit_status, hide]),
-    {ok, Port};
+    {ok, couch_os_process:start_link(Exec, [], [stream, exit_status, hide])};
 init(Else) ->
     {ok, Else}.
 
-terminate(_Reason, _Port) ->
+terminate(_Reason, Pid) when is_pid(Pid) ->
+    couch_os_process:stop(Pid),
+    ok;
+terminate(_Reason, _State) ->
     ok.
 
 handle_event(Event, Fun) when is_function(Fun, 1) ->
@@ -51,16 +53,17 @@ handle_event(Event, Fun) when is_function(Fun, 1) ->
 handle_event(Event, {Fun, FunAcc}) ->
     FunAcc2 = Fun(Event, FunAcc),
     {ok, {Fun, FunAcc2}};
-handle_event({EventAtom, DbName}, Port) ->
+handle_event({EventAtom, DbName}, Pid) ->
     Obj = {[{type, list_to_binary(atom_to_list(EventAtom))}, {db, DbName}]},
-    true = port_command(Port, ?JSON_ENCODE(Obj) ++ "\n"),
-    {ok, Port}.
+    true = couch_os_process:write(Pid, Obj),
+    {ok, Pid}.
 
 handle_call(_Request, State) ->
-    {ok, ok, State}.
+    {reply, ok, State}.
 
-handle_info({'EXIT', _, _Reason}, _Port) ->
-    remove_handler.
+handle_info({'EXIT', Pid, Reason}, Pid) ->
+    ?LOG_ERROR("Update notification process ~p died: ~p", [Pid, Reason]),
+    {stop, nil}.
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
