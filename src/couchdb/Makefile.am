@@ -53,7 +53,6 @@ source_files = \
     couch_httpd_db.erl \
     couch_httpd_view.erl \
     couch_httpd_misc_handlers.erl \
-    couch_ft_query.erl \
     couch_key_tree.erl \
     couch_log.erl \
     couch_query_servers.erl \
@@ -80,7 +79,6 @@ compiled_files = \
     couch_doc.beam \
     couch_event_sup.beam \
     couch_file.beam \
-    couch_ft_query.beam \
     couch_httpd.beam \
     couch_httpd_db.beam \
     couch_httpd_view.beam \
@@ -116,7 +114,6 @@ compiled_files = \
 #     couch_doc.html \
 #     couch_event_sup.html \
 #     couch_file.html \
-#     couch_ft_query.html \
 #     couch_httpd.html \
 #     couch_key_tree.html \
 #     couch_log.html \
