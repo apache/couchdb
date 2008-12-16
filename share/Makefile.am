@@ -12,6 +12,7 @@
 
 nobase_dist_localdata_DATA = \
     server/main.js \
+    server/action.js \
     www/browse/_compact_database.html \
     www/browse/_create_database.html \
     www/browse/_create_document.html \
