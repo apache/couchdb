@@ -14,7 +14,7 @@
 -behaviour(gen_server).
 
 -export([open/2,close/1,create/2,start_compact/1,get_db_info/1]).
--export([open_ref_counted/3,num_refs/1,monitor/1]).
+-export([open_ref_counted/2,num_refs/1,monitor/1]).
 -export([update_doc/3,update_docs/4,update_docs/2,update_docs/3,delete_doc/3]).
 -export([get_doc_info/2,open_doc/2,open_doc/3,open_doc_revs/4]).
 -export([get_missing_revs/2,name/1,doc_to_tree/1,get_update_seq/1]).
@@ -67,8 +67,8 @@ open(DbName, Options) ->
 close(#db{fd=Fd}) ->
     couch_file:drop_ref(Fd).
 
-open_ref_counted(MainPid, OpeningPid, UserCtx) ->
-    {ok, Db} = gen_server:call(MainPid, {open_ref_counted_instance, OpeningPid}),
+open_ref_counted(MainPid, UserCtx) ->
+    {ok, Db} = gen_server:call(MainPid, {open_ref_counted_instance, self()}),
     {ok, Db#db{user_ctx=UserCtx}}.
 
 num_refs(MainPid) ->
@@ -357,8 +357,8 @@ make_first_doc_on_disk(Db, Id, [{_Rev, {IsDel, Sp}} |_]=DocPath) ->
     make_doc(Db, Id, IsDel, Sp, Revs).
 
 
-write_and_commit(#db{update_pid=UpdatePid}=Db, DocBuckets, Options) ->
-
+write_and_commit(#db{update_pid=UpdatePid, user_ctx=Ctx}=Db, DocBuckets,
+        Options) ->
     % flush unwritten binaries to disk.
     DocBuckets2 = [[doc_flush_binaries(Doc, Db#db.fd) || Doc <- Bucket] || Bucket <- DocBuckets],
     case gen_server:call(UpdatePid, {update_docs, DocBuckets2, Options}, infinity) of
@@ -366,7 +366,7 @@ write_and_commit(#db{update_pid=UpdatePid}=Db, DocBuckets, Options) ->
     retry ->
         % This can happen if the db file we wrote to was swapped out by
         % compaction. Retry writing to the current file
-        {ok, Db2} = open_ref_counted(Db#db.main_pid, self(), {[]}),
+        {ok, Db2} = open_ref_counted(Db#db.main_pid, Ctx),
         DocBuckets3 = [[doc_flush_binaries(Doc, Db2#db.fd) || Doc <- Bucket] || Bucket <- DocBuckets],
         % We only retry once
         close(Db2),
