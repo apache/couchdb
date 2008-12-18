@@ -63,10 +63,22 @@ sup_start_link() ->
     gen_server:start_link({local, couch_server}, couch_server, [], []).
 
 open(DbName, Options) ->
-    gen_server:call(couch_server, {open, DbName, Options}).
+    case gen_server:call(couch_server, {open, DbName, Options}) of
+    {ok, MainPid} ->
+        Ctx = proplists:get_value(user_ctx, Options, #user_ctx{}),
+        couch_db:open_ref_counted(MainPid, Ctx);
+    Error ->
+        Error
+    end.
 
 create(DbName, Options) ->
-    gen_server:call(couch_server, {create, DbName, Options}).
+    case gen_server:call(couch_server, {create, DbName, Options}) of
+    {ok, MainPid} ->
+        Ctx = proplists:get_value(user_ctx, Options, #user_ctx{}),
+        couch_db:open_ref_counted(MainPid, Ctx);
+    Error ->
+        Error
+    end.
 
 delete(DbName, Options) ->
     gen_server:call(couch_server, {delete, DbName, Options}).
@@ -192,15 +204,14 @@ try_close_lru(StartTime) ->
 
 handle_call(get_server, _From, Server) ->
     {reply, {ok, Server}, Server};
-handle_call({open, DbName, Options}, {FromPid,_}, Server) ->
+handle_call({open, DbName, Options}, _From, Server) ->
     DbNameList = binary_to_list(DbName),
-    UserCtx = proplists:get_value(user_ctx, Options, nil),
     case check_dbname(Server, DbNameList) of
     ok ->
         Filepath = get_full_filename(Server, DbNameList),
         LruTime = now(),
         case ets:lookup(couch_dbs_by_name, DbName) of
-        [] ->    
+        [] ->
             case maybe_close_lru_db(Server) of
             {ok, Server2} ->
                 case couch_db:start_link(DbName, Filepath, Options) of
@@ -209,9 +220,8 @@ handle_call({open, DbName, Options}, {FromPid,_}, Server) ->
                     true = ets:insert(couch_dbs_by_pid, {MainPid, DbName}),
                     true = ets:insert(couch_dbs_by_lru, {LruTime, DbName}),
                     DbsOpen = Server2#server.current_dbs_open + 1,
-                    {reply,
-                        couch_db:open_ref_counted(MainPid, FromPid, UserCtx),
-                        Server2#server{current_dbs_open=DbsOpen}};
+                    {reply, {ok, MainPid},
+                            Server2#server{current_dbs_open=DbsOpen}};
                 Error ->
                     {reply, Error, Server2}
                 end;
@@ -222,35 +232,37 @@ handle_call({open, DbName, Options}, {FromPid,_}, Server) ->
             true = ets:insert(couch_dbs_by_name, {DbName, {MainPid, LruTime}}),
             true = ets:delete(couch_dbs_by_lru, PrevLruTime),
             true = ets:insert(couch_dbs_by_lru, {LruTime, DbName}),
-            {reply,
-                couch_db:open_ref_counted(MainPid, FromPid, UserCtx),
-                Server}
+            {reply, {ok, MainPid}, Server}
         end;
     Error ->
         {reply, Error, Server}
     end;
-handle_call({create, DbName, Options}, {FromPid,_}, Server) ->
+handle_call({create, DbName, Options}, _From, Server) ->
     DbNameList = binary_to_list(DbName),
-    UserCtx = proplists:get_value(user_ctx, Options, nil),
     case check_dbname(Server, DbNameList) of
     ok ->
         Filepath = get_full_filename(Server, DbNameList),
 
         case ets:lookup(couch_dbs_by_name, DbName) of
         [] ->
-            case couch_db:start_link(DbName, Filepath, [create|Options]) of
-            {ok, MainPid} ->
-                LruTime = now(),
-                true = ets:insert(couch_dbs_by_name, {DbName, {MainPid, LruTime}}),
-                true = ets:insert(couch_dbs_by_pid, {MainPid, DbName}),
-                true = ets:insert(couch_dbs_by_lru, {LruTime, DbName}),
-                DbsOpen = Server#server.current_dbs_open + 1,
-                couch_db_update_notifier:notify({created, DbName}),
-                {reply,
-                    couch_db:open_ref_counted(MainPid, FromPid, UserCtx), 
-                    Server#server{current_dbs_open=DbsOpen}};
-            Error ->
-                {reply, Error, Server}
+            case maybe_close_lru_db(Server) of
+            {ok, Server2} ->
+                case couch_db:start_link(DbName, Filepath, [create|Options]) of
+                {ok, MainPid} ->
+                    LruTime = now(),
+                    true = ets:insert(couch_dbs_by_name,
+                            {DbName, {MainPid, LruTime}}),
+                    true = ets:insert(couch_dbs_by_pid, {MainPid, DbName}),
+                    true = ets:insert(couch_dbs_by_lru, {LruTime, DbName}),
+                    DbsOpen = Server2#server.current_dbs_open + 1,
+                    couch_db_update_notifier:notify({created, DbName}),
+                    {reply, {ok, MainPid},
+                            Server2#server{current_dbs_open=DbsOpen}};
+                Error ->
+                    {reply, Error, Server2}
+                end;
+            CloseError ->
+                {reply, CloseError, Server}
             end;
         [_AlreadyRunningDb] ->
             {reply, file_exists, Server}
