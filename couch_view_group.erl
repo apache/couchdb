@@ -47,9 +47,19 @@ request_group(Pid, Seq) ->
 start_link(InitArgs) ->
     case gen_server:start_link(couch_view_group,
             {InitArgs, self(), Ref = make_ref()}, []) of
-    {ok, Pid}   -> {ok, Pid};
-    ignore      -> receive {Ref, Error} -> Error end;
-    Error       -> Error
+    {ok, Pid} ->
+        {ok, Pid};
+    ignore -> 
+        receive
+        {Ref, Pid, Error} ->
+            case process_info(self(), trap_exit) of
+            {trap_exit, true} -> receive {'EXIT', Pid, _} -> ok end;
+            {trap_exit, false} -> ok
+            end,
+            Error
+        end;
+    Error ->
+        Error
     end.
 
 % init differentiates between temp and design_doc views. It creates a closure
@@ -67,7 +77,7 @@ init({InitArgs, ReturnPid, Ref}) ->
                 updater_pid = Pid,
                 group=Group}};
     Error ->
-        ReturnPid ! {Ref, Error},
+        ReturnPid ! {Ref, self(), Error},
         ignore
     end.
 
