@@ -309,8 +309,10 @@ code_change(_OldVsn, State, _Extra) ->
 
 handle_info({'EXIT', Pid, _Reason}, #server{current_dbs_open=DbsOpen}=Server) ->
     [{Pid, DbName}] = ets:lookup(couch_dbs_by_pid, Pid),
+    [{DbName, {Pid, LruTime}}] = ets:lookup(couch_dbs_by_name, DbName),
     true = ets:delete(couch_dbs_by_pid, Pid),
     true = ets:delete(couch_dbs_by_name, DbName),
+    true = ets:delete(couch_dbs_by_lru, LruTime),
     {noreply, Server#server{current_dbs_open=DbsOpen-1}};
 handle_info(Info, _Server) ->
     exit({unknown_message, Info}).

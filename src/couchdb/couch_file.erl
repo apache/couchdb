@@ -40,7 +40,11 @@ open(Filepath, Options) ->
     ignore ->
         % get the error
         receive
-        {Ref, Error} ->
+        {Ref, Pid, Error} ->
+            case process_info(self(), trap_exit) of
+            {trap_exit, true} -> receive {'EXIT', Pid, _} -> ok end;
+            {trap_exit, false} -> ok
+            end,
             Error
         end;
     Error ->
@@ -276,7 +280,7 @@ extract_header(Prefix, Bin) ->
 
 
 init_status_error(ReturnPid, Ref, Error) ->
-    ReturnPid ! {Ref, Error},
+    ReturnPid ! {Ref, self(), Error},
     ignore.
 
 % server functions
