@@ -612,18 +612,18 @@ parse_doc_query(Req) ->
 
 
 
-extract_header_rev(Req, ExplictRev) when is_list(ExplictRev)->
-    extract_header_rev(Req, list_to_binary(ExplictRev));
-extract_header_rev(Req, ExplictRev) ->
+extract_header_rev(Req, ExplicitRev) when is_list(ExplicitRev)->
+    extract_header_rev(Req, list_to_binary(ExplicitRev));
+extract_header_rev(Req, ExplicitRev) ->
     Etag = case couch_httpd:header_value(Req, "If-Match") of
         undefined -> undefined;
-        Tag -> string:strip(Tag, both, $")
+        Value -> list_to_binary(string:strip(Value, both, $"))
     end,
-    case {ExplictRev, Etag} of
+    case {ExplicitRev, Etag} of
     {undefined, undefined} -> missing_rev;
-    {_, undefined} -> ExplictRev;
-    {undefined, _} -> list_to_binary(Etag);
-    _ when ExplictRev == Etag -> list_to_binary(Etag);
+    {_, undefined} -> ExplicitRev;
+    {undefined, _} -> Etag;
+    _ when ExplicitRev == Etag -> Etag;
     _ ->
         throw({bad_request, "Document rev and etag have different values"})
     end.
