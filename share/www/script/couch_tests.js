@@ -2054,48 +2054,45 @@ var tests = {
     // Make sure we don't succeed on something that shouldn't
     xhr = CouchDB.request("GET", "/test_suite_db/_external");
     T(xhr.status == 404);
-    T(JSON.parse(xhr.responseText).reason == "No server name specified.");
-    xhr = CouchDB.request("GET", "/test_suite_db/_external/bannana");
+    T(JSON.parse(xhr.responseText).reason == "missing");
+    xhr = CouchDB.request("GET", "/test_suite_db/_action");
     T(xhr.status == 404);
-    T(JSON.parse(xhr.responseText).reason == "No server configured for \"bannana\".");
-    xhr = CouchDB.request("GET", "/test_suite_db/_external/action");
-    T(xhr.status == 404);
-    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/no_actions");
+    xhr = CouchDB.request("GET", "/test_suite_db/_action/no_actions");
     T(xhr.status == 404)
     T(JSON.parse(xhr.responseText).reason == "Invalid path: \"no_actions\".");;
-    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/no_actions/foo");
+    xhr = CouchDB.request("GET", "/test_suite_db/_action/no_actions/foo");
     T(xhr.status == 500);
     T(/^No actions found/.test(JSON.parse(xhr.responseText).reason));
-    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/an_action/invalid");
+    xhr = CouchDB.request("GET", "/test_suite_db/_action/an_action/invalid");
     T(xhr.status == 500);
     T(/^No action \'invalid\'/.test(JSON.parse(xhr.responseText).reason));
-    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/errors/syntax");
+    xhr = CouchDB.request("GET", "/test_suite_db/_action/errors/syntax");
     T(xhr.status == 500);
     T(/^Failed to compile/.test(JSON.parse(xhr.responseText).reason));
-    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/errors/except");
+    xhr = CouchDB.request("GET", "/test_suite_db/_action/errors/except");
     T(/Failed to execute/.test(JSON.parse(xhr.responseText).reason));
 
-    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/an_action/times_two");
+    xhr = CouchDB.request("GET", "/test_suite_db/_action/an_action/times_two");
     T(xhr.status == 200);
     T(JSON.parse(xhr.responseText).val == null);
 
-    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/an_action/bad_return");
+    xhr = CouchDB.request("GET", "/test_suite_db/_action/an_action/bad_return");
     T(xhr.status == 500);
     T(/^Invalid data from external server/.test(JSON.parse(xhr.responseText).reason));
 
 
     // test that we invoke the action server
-    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/an_action/times_two?q=3");
+    xhr = CouchDB.request("GET", "/test_suite_db/_action/an_action/times_two?q=3");
     T(xhr.status == 200);
     T(JSON.parse(xhr.responseText).val == 6);
     
     // Test that we can return raw text
-    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/an_action/html");
+    xhr = CouchDB.request("GET", "/test_suite_db/_action/an_action/html");
     T(xhr.status == 200);
     T(xhr.responseText == '<p>Lorem ipsum...</p>');
     
     // Test environment
-    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/an_action/request_object?couchdb=relax");
+    xhr = CouchDB.request("GET", "/test_suite_db/_action/an_action/request_object?couchdb=relax");
     T(xhr.status == 200);
     var req = JSON.parse(xhr.responseText);
 
@@ -2107,7 +2104,7 @@ var tests = {
     T(req.path[1] == "request_object");
     T(req.query.couchdb == "relax");
 
-    xhr = CouchDB.request("POST", "/test_suite_db/_external/action/an_action/request_object?couchdb=relax",{
+    xhr = CouchDB.request("POST", "/test_suite_db/_action/an_action/request_object?couchdb=relax",{
       "body" : "some=text",
       "headers" : {
         "Content-Type" : "application/x-www-form-urlencoded"
@@ -2129,11 +2126,11 @@ var tests = {
     T(req.form.some == "text");
 
     // we can send error codes back
-    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/an_action/requires_put");
+    xhr = CouchDB.request("GET", "/test_suite_db/_action/an_action/requires_put");
     T(xhr.status == 405);
     T(xhr.responseText == "Method Not Allowed, Punk!");
     
-    xhr = CouchDB.request("PUT", "/test_suite_db/_external/action/an_action/requires_put");
+    xhr = CouchDB.request("PUT", "/test_suite_db/_action/an_action/requires_put");
     T(xhr.status == 200);
     T(xhr.responseText == "thanks for the PUT");
   },
@@ -2162,23 +2159,23 @@ var tests = {
     // test GET
     var doc = {foo:"bar"};
     var result = db.save(doc);
-    var xhr = CouchDB.request("GET", "/test_suite_db/_external/action/verbs/get?docid="+result.id);
+    var xhr = CouchDB.request("GET", "/test_suite_db/_action/verbs/get?docid="+result.id);
     var resp = JSON.parse(xhr.responseText);
     T(resp.foo == "bar");   
 
     // test POST
-    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/verbs/post?baz=boom");
+    xhr = CouchDB.request("GET", "/test_suite_db/_action/verbs/post?baz=boom");
     resp = JSON.parse(xhr.responseText);
     doc = db.open(resp.id);
     T(doc.req.query.baz == "boom");
 
     // test PUT
-    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/verbs/put?setid=mynewdocid&flim=flam");    
+    xhr = CouchDB.request("GET", "/test_suite_db/_action/verbs/put?setid=mynewdocid&flim=flam");    
     doc = db.open("mynewdocid");
     T(doc.req.flim == "flam");
 
     // test DELETE
-    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/verbs/delete?delid=mynewdocid");    
+    xhr = CouchDB.request("GET", "/test_suite_db/_action/verbs/delete?delid=mynewdocid");    
     T(db.open("mynewdocid") == null);
 
     // PUT through on top of an existing id and see the error at the client
@@ -2187,7 +2184,7 @@ var tests = {
       key : "value"
     });
     T(created.ok);
-    xhr = CouchDB.request("GET", "/test_suite_db/_external/action/verbs/put?setid=takethisid&flim=flam");    
+    xhr = CouchDB.request("GET", "/test_suite_db/_action/verbs/put?setid=takethisid&flim=flam");    
     resp = JSON.parse(xhr.responseText);
     T(resp.error == "conflict");
     T(resp.reason == "Document update conflict.");
