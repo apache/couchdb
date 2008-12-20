@@ -111,86 +111,22 @@ generate_acinclude () {
 }
 
 process_file_collection () {
-    echo "Installing \`"$BUILD_AUX_DIRECTORY"'"
-    mkdir -p $BUILD_AUX_DIRECTORY
-    echo "Installing \`"$CONFIG_GUESS_FILE"'"
-    gzip --decompress --stdout \
-        $CONFIG_GUESS_COMPRESSED_FILE > $CONFIG_GUESS_FILE
-    echo "Installing \`"$CONFIG_SUB_FILE"'"
-    gzip --decompress --stdout \
-        $CONFIG_SUB_COMPRESSED_FILE > $CONFIG_SUB_FILE
-    echo "Installing \`"$M4_DIRECTORY"'"
-    mkdir -p $M4_DIRECTORY
-    echo "Installing \`"$M4_AC_CHECK_ICU_FILE"'"
-    gzip --decompress --stdout \
-        $AC_CHECK_ICU_COMPRESSED_FILE > $M4_AC_CHECK_ICU_FILE
-    echo "Installing \`"$M4_AC_CHECK_CURL_FILE"'"
-    gzip --decompress --stdout \
-        $AC_CHECK_CURL_COMPRESSED_FILE > $M4_AC_CHECK_CURL_FILE
-}
-
-run_aclocal () {
-    if test -x "`which aclocal || true`"; then
-        echo "Running aclocal"
-        aclocal -I m4
-    else
-        echo "Can't find aclocal"
-        exit $SCRIPT_ERROR
-    fi
-}
-
-run_libtoolize () {
-    if test -x "`which libtoolize || true`"; then
-        echo "Running libtoolize"
-        libtoolize -f -c
-    else
-        if test -x "`which glibtoolize || true`"; then
-            echo "Running glibtoolize"
-            glibtoolize -f -c
-        else
-            echo "Can't find libtoolize or glibtoolize"
-            exit $SCRIPT_ERROR
-        fi
-    fi
-}
-
-run_autoheader () {
-    if test -x "`which autoheader || true`"; then
-        echo "Running autoheader"
-        autoheader -f
-    else
-        echo "Can't find autoheader"
-        exit $SCRIPT_ERROR
-    fi
-}
-
-run_automake () {
-    AUTOMAKE_OPTION_COLLECTION=""
-    if test -x "`which automake || true`"; then
-        echo "Running automake"
-        automake -f -c -a --gnits
-    else
-        echo "Can't find automake"
-        exit $SCRIPT_ERROR
-    fi
-}
-
-run_autoconf () {
-    if test -x "`which autoconf || true`"; then
-        echo "Running autoconf"
-        autoconf -f
-    else
-        echo "Can't find autoconf"
-        exit $SCRIPT_ERROR
-    fi
+    gunzip -c $CONFIG_GUESS_COMPRESSED_FILE > $CONFIG_GUESS_FILE
+    gunzip -c $CONFIG_SUB_COMPRESSED_FILE > $CONFIG_SUB_FILE
+    gunzip -c $AC_CHECK_ICU_COMPRESSED_FILE > $M4_AC_CHECK_ICU_FILE
+    gunzip -c $AC_CHECK_CURL_COMPRESSED_FILE > $M4_AC_CHECK_CURL_FILE
 }
 
 run_command_collection () {
-    run_libtoolize
-    run_aclocal
-    run_autoheader
-    run_automake
-    run_autoconf
+    if test -x "`which glibtoolize || true`"; then
+        glibtoolize -f -c
+    else
+        libtoolize -f -c
+    fi
+    aclocal -I m4
+    autoheader -f
+    automake -f -c -a --gnits
+    autoconf -f
     cat << EOF
 
 You have bootstrapped Apache CouchDB, time to relax.
