@@ -12,149 +12,50 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-# Bootstrap the pristine source ready for distribution.
-
-SCRIPT_OK=0
-SCRIPT_ERROR=1
-
-ACINCLUDE_FILE="acinclude.m4"
-ACINCLUDE_IN_FILE="acinclude.m4.in"
-ACINCLUDE_TMP_FILE="acinclude.m4.tmp"
-AC_CHECK_ICU_COMPRESSED_FILE="build-contrib/ac_check_icu.m4_2008-06-07.gz"
-AC_CHECK_CURL_COMPRESSED_FILE="build-contrib/ac_check_curl.m4_2008-04-12.gz"
-AUTHORS_FILE="authors.xml"
-BUILD_AUX_DIRECTORY="build-aux"
-CONFIG_GUESS_COMPRESSED_FILE="build-contrib/config.guess_2008-06-07.gz"
-CONFIG_GUESS_FILE="build-aux/config.guess"
-CONFIG_SUB_COMPRESSED_FILE="build-contrib/config.sub_2008-06-07.gz"
-CONFIG_SUB_FILE="build-aux/config.sub"
-M4_DIRECTORY="m4"
-M4_AC_CHECK_ICU_FILE="m4/ac_check_icu.m4"
-M4_AC_CHECK_CURL_FILE="m4/ac_check_curl.m4"
-REPOSITORY_URI="http://svn.apache.org/repos/asf/incubator/couchdb/trunk"
-
-basename=`basename $0`
-
 get () {
     variable_name=$1
-    echo "changequote(\`[', \`]')" > $ACINCLUDE_TMP_FILE
-    sed -e "s/m4_//" < $ACINCLUDE_IN_FILE >> $ACINCLUDE_TMP_FILE
-    echo $variable_name >> $ACINCLUDE_TMP_FILE
-    if test -x "`which m4 || true`"; then
-        `which m4` $ACINCLUDE_TMP_FILE | grep -v "^$" || true
+    echo "changequote(\`[', \`]')" > acinclude.m4.tmp
+    sed -e "s/m4_//" < acinclude.m4.in >> acinclude.m4.tmp
+    echo $variable_name >> acinclude.m4.tmp
+    if test -x "`which gm4 || true`"; then
+        gm4 acinclude.m4.tmp | grep -v "^$" || true
     else
-        if test -x "`which gm4 || true`"; then
-            `which gm4` $ACINCLUDE_TMP_FILE | grep -v "^$" || true
+        if test -x "`which m4 || true`"; then
+            m4 acinclude.m4.tmp | grep -v "^$" || true
         else
             echo unknown
         fi
     fi
-    rm -f $ACINCLUDE_TMP_FILE
+    rm -f acinclude.m4.tmp
 }
 
-display_version () {
-    cat << EOF
-$basename - `get LOCAL_PACKAGE_NAME` `get LOCAL_VERSION_PRIMARY`
+if test -z "$REVISION"; then
+    REVISION=`\`which svn\` info . 2> /dev/null | awk "/Revision:/{print \\$2}"`
+fi
+if test -z "`get LOCAL_VERSION_STAGE`" -o -z "$REVISION"; then
+    sed "s/%release%//" < acinclude.m4.in > acinclude.m4
+else
+    sed "s/%release%/$REVISION/" < acinclude.m4.in > acinclude.m4
+fi
 
-Licensed under the Apache License, Version 2.0 (the "License"); you may not use
-this file except in compliance with the License.  You may obtain a copy of the
-License at
+gunzip -c build-aux/config.guess.gz > build-aux/config.guess
+gunzip -c build-aux/config.sub.gz   > build-aux/config.sub
+gunzip -c m4/ac_check_icu.m4.gz     > m4/ac_check_icu.m4
+gunzip -c m4/ac_check_curl.m4.gz    > m4/ac_check_curl.m4
 
-  http://www.apache.org/licenses/LICENSE-2.0
+if test -x "`which glibtoolize || true`"; then
+    glibtoolize -f -c
+else
+    libtoolize -f -c
+fi
+aclocal -I m4
+autoheader -f
+automake -f -c -a --gnits
+autoconf -f
 
-Unless required by applicable law or agreed to in writing, software distributed
-under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-CONDITIONS OF ANY KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations under the License.
-EOF
-}
-
-display_help () {
-    cat << EOF
-Usage: $basename [OPTION]...
-
-The $basename script bootstraps the pristeen source so that it can be built.
-
-The exit status is 0 for success or 1 for failure.
-
-Options:
-
-  -h  display a short help message and exit
-  -v  display version information and exit
-
-Environment variables:
-
-  REVISION  manual override for revision information
-
-Report bugs at <`get LOCAL_BUG_URI`>.
-EOF
-}
-
-display_error () {
-    if test -n "$1"; then
-        echo $1 >&2
-    fi
-    echo >&2
-    echo "Try \`"$basename" -h' for more information." >&2
-    exit $SCRIPT_ERROR
-}
-
-generate_acinclude () {
-    if test -z "$REVISION"; then
-        REVISION=`\`which svn\` info . 2> /dev/null | awk "/Revision:/{print \\$2}"`
-    fi
-    if test -z "`get LOCAL_VERSION_STAGE`" -o -z "$REVISION"; then
-        sed "s/%release%//" < $ACINCLUDE_IN_FILE > $ACINCLUDE_FILE
-    else
-        sed "s/%release%/$REVISION/" < $ACINCLUDE_IN_FILE > $ACINCLUDE_FILE
-    fi
-}
-
-process_file_collection () {
-    gunzip -c $CONFIG_GUESS_COMPRESSED_FILE > $CONFIG_GUESS_FILE
-    gunzip -c $CONFIG_SUB_COMPRESSED_FILE > $CONFIG_SUB_FILE
-    gunzip -c $AC_CHECK_ICU_COMPRESSED_FILE > $M4_AC_CHECK_ICU_FILE
-    gunzip -c $AC_CHECK_CURL_COMPRESSED_FILE > $M4_AC_CHECK_CURL_FILE
-}
-
-run_command_collection () {
-    if test -x "`which glibtoolize || true`"; then
-        glibtoolize -f -c
-    else
-        libtoolize -f -c
-    fi
-    aclocal -I m4
-    autoheader -f
-    automake -f -c -a --gnits
-    autoconf -f
-    cat << EOF
+cat << EOF
 
 You have bootstrapped Apache CouchDB, time to relax.
 
 Run \`./configure' to configure the source before you install.
 EOF
-}
-
-parse_script_option_list () {
-    set +e
-    options=`getopt hVC $@`
-    if test ! $? -eq 0; then
-        display_error
-    fi
-    set -e
-    eval set -- $options
-    while [ $# -gt 0 ]; do
-        case "$1" in
-            -h) shift; display_help; exit $SCRIPT_OK;;
-            -V) shift; display_version; exit $SCRIPT_OK;;
-            --) shift; break;;
-            *) display_error "Unknown option: $1" >&2;;
-        esac
-    done
-    cd `dirname $0`
-    process_file_collection
-    generate_acinclude
-    run_command_collection
-}
-
-parse_script_option_list $@
