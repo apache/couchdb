@@ -132,7 +132,7 @@ process_file_collection () {
 run_aclocal () {
     if test -x "`which aclocal || true`"; then
         echo "Running aclocal"
-        `which aclocal` -I m4
+        aclocal -I m4
     else
         echo "Can't find aclocal"
         exit $SCRIPT_ERROR
@@ -142,11 +142,11 @@ run_aclocal () {
 run_libtoolize () {
     if test -x "`which libtoolize || true`"; then
         echo "Running libtoolize"
-        `which libtoolize` -f -c
+        libtoolize -f -c
     else
         if test -x "`which glibtoolize || true`"; then
             echo "Running glibtoolize"
-            `which glibtoolize` -f -c
+            glibtoolize -f -c
         else
             echo "Can't find libtoolize or glibtoolize"
             exit $SCRIPT_ERROR
@@ -157,7 +157,7 @@ run_libtoolize () {
 run_autoheader () {
     if test -x "`which autoheader || true`"; then
         echo "Running autoheader"
-        `which autoheader` -f
+        autoheader -f
     else
         echo "Can't find autoheader"
         exit $SCRIPT_ERROR
@@ -168,7 +168,7 @@ run_automake () {
     AUTOMAKE_OPTION_COLLECTION=""
     if test -x "`which automake || true`"; then
         echo "Running automake"
-        `which automake` -f -c -a --gnits
+        automake -f -c -a --gnits
     else
         echo "Can't find automake"
         exit $SCRIPT_ERROR
@@ -178,7 +178,7 @@ run_automake () {
 run_autoconf () {
     if test -x "`which autoconf || true`"; then
         echo "Running autoconf"
-        `which autoconf` -f
+        autoconf -f
     else
         echo "Can't find autoconf"
         exit $SCRIPT_ERROR
