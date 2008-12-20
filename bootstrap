@@ -39,15 +39,16 @@ else
 fi
 
 gunzip -c build-aux/config.guess.gz > build-aux/config.guess
-gunzip -c build-aux/config.sub.gz   > build-aux/config.sub
-gunzip -c m4/ac_check_icu.m4.gz     > m4/ac_check_icu.m4
-gunzip -c m4/ac_check_curl.m4.gz    > m4/ac_check_curl.m4
+gunzip -c build-aux/config.sub.gz > build-aux/config.sub
+gunzip -c m4/ac_check_icu.m4.gz > m4/ac_check_icu.m4
+gunzip -c m4/ac_check_curl.m4.gz > m4/ac_check_curl.m4
 
 if test -x "`which glibtoolize || true`"; then
     glibtoolize -f -c
 else
     libtoolize -f -c
 fi
+
 aclocal -I m4
 autoheader -f
 automake -f -c -a --gnits
