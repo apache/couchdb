@@ -26,21 +26,20 @@ design_doc_view(Req, Db, Id, ViewName, Keys) ->
         update = Update,
         reduce = Reduce
     } = QueryArgs = parse_view_query(Req, Keys),
-    case couch_view:get_map_view({couch_db:name(Db), 
-            <<"_design/", Id/binary>>, ViewName, Update}) of
+    DesignId = <<"_design/", Id/binary>>,
+    case couch_view:get_map_view(Db, DesignId, ViewName, Update) of
     {ok, View} ->    
         output_map_view(Req, View, Db, QueryArgs, Keys);
     {not_found, Reason} ->
-        case couch_view:get_reduce_view({couch_db:name(Db),
-                <<"_design/", Id/binary>>, ViewName}) of
-        {ok, View} ->
+        case couch_view:get_reduce_view(Db, DesignId, ViewName, Update) of
+        {ok, ReduceView} ->
             parse_view_query(Req, Keys, true), % just for validation
             case Reduce of
             false ->
-                {reduce, _N, _Lang, MapView} = View,
+                MapView = couch_view:extract_map_view(ReduceView),
                 output_map_view(Req, MapView, Db, QueryArgs, Keys);
             _ ->
-                output_reduce_view(Req, View, QueryArgs, Keys)
+                output_reduce_view(Req, ReduceView, QueryArgs, Keys)
             end;
         _ ->
             throw({not_found, Reason})
@@ -72,11 +71,11 @@ handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
     Keys = proplists:get_value(<<"keys">>, Props, nil),
     case proplists:get_value(<<"reduce">>, Props, null) of
     null ->
-        {ok, View} = couch_view:get_map_view({temp, couch_db:name(Db), Language, MapSrc}),
+        {ok, View} = couch_view:get_temp_map_view(Db, Language, MapSrc),
         output_map_view(Req, View, Db, QueryArgs, Keys);
     RedSrc ->
-        {ok, View} = couch_view:get_reduce_view(
-                {temp,  couch_db:name(Db), Language, MapSrc, RedSrc}),
+        {ok, View} = couch_view:get_temp_reduce_view(Db, Language, MapSrc,
+                RedSrc),
         output_reduce_view(Req, View, QueryArgs, Keys)
     end;
 

@@ -270,9 +270,8 @@ handle_call({create, DbName, Options}, _From, Server) ->
     Error ->
         {reply, Error, Server}
     end;
-handle_call({delete, DbName, Options}, _From, Server) ->
+handle_call({delete, DbName, _Options}, _From, Server) ->
     DbNameList = binary_to_list(DbName),
-    _UserCtx = proplists:get_value(user_ctx, Options, nil),
     case check_dbname(Server, DbNameList) of
     ok ->
         FullFilepath = get_full_filename(Server, DbNameList),

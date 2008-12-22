@@ -36,6 +36,7 @@ open(Filepath, Options) ->
     case gen_server:start_link(couch_file,
             {Filepath, Options, self(), Ref = make_ref()}, []) of
     {ok, Fd} ->
+        couch_file_stats:track_file(Fd),
         {ok, Fd};
     ignore ->
         % get the error
@@ -164,7 +165,9 @@ sync(Fd) ->
 %% Returns: ok
 %%----------------------------------------------------------------------
 close(Fd) ->
-    gen_server:cast(Fd, close).
+    Result = gen_server:cast(Fd, close),
+    catch unlink(Fd),
+    Result.
     
 close_maybe(Fd) ->
     gen_server:cast(Fd, {close_maybe, self()}).
@@ -184,6 +187,7 @@ add_ref(Fd, Pid) ->
 
 num_refs(Fd) ->
     gen_server:call(Fd, num_refs).
+
 
 write_header(Fd, Prefix, Data) ->
     TermBin = term_to_binary(Data),
@@ -286,6 +290,7 @@ init_status_error(ReturnPid, Ref, Error) ->
 % server functions
 
 init({Filepath, Options, ReturnPid, Ref}) ->
+    process_flag(trap_exit, true),
     case lists:member(create, Options) of
     true ->
         filelib:ensure_dir(Filepath),
@@ -325,8 +330,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
     end.
 
 
-terminate(_Reason, Fd) ->
-    file:close(Fd),
+terminate(_Reason, _Fd) ->
     ok.
 
 
@@ -366,7 +370,6 @@ handle_call(num_refs, _From, Fd) ->
     {reply, length(Monitors), Fd}.
 
 
-
 handle_cast(close, Fd) ->
     {stop,normal,Fd};
 handle_cast({close_maybe, Pid}, Fd) ->
@@ -388,6 +391,8 @@ handle_cast({drop_ref, Pid}, Fd) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+handle_info({'EXIT', _Pid, Reason}, Fd) ->
+    {stop, Reason, Fd};
 handle_info({'DOWN', MonitorRef, _Type, Pid, _Info}, Fd) ->
     {MonitorRef, _RefCount} = erase(Pid),
     maybe_close_async(Fd).
