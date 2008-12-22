@@ -463,7 +463,7 @@ init({DbName, Filepath, Fd, Options}) ->
     gen_server:call(UpdaterPid, get_db).
 
 terminate(_Reason, Db) ->
-    exit(Db#db.update_pid, kill).
+    ok.
     
 handle_call({open_ref_counted_instance, OpenerPid}, _From, #db{fd=Fd}=Db) ->
     ok = couch_file:add_ref(Fd, OpenerPid),

@@ -13,9 +13,11 @@
 -module(couch_view).
 -behaviour(gen_server).
 
--export([start_link/0,fold/4,fold/5,less_json/2,less_json_keys/2,expand_dups/2,detuple_kvs/2]).
--export([init/1,terminate/2,handle_call/3,handle_cast/2,handle_info/2,code_change/3]).
--export([get_reduce_view/1, get_map_view/1,get_row_count/1,reduce_to_count/1, fold_reduce/7]).
+-export([start_link/0,fold/4,fold/5,less_json/2,less_json_keys/2,expand_dups/2,
+    detuple_kvs/2,init/1,terminate/2,handle_call/3,handle_cast/2,handle_info/2,
+    code_change/3,get_reduce_view/4,get_temp_reduce_view/4,get_temp_map_view/3,
+    get_map_view/4,get_row_count/1,reduce_to_count/1,fold_reduce/7,
+    extract_map_view/1]).
 
 -include("couch_db.hrl").
     
@@ -23,7 +25,8 @@ start_link() ->
     gen_server:start_link({local, couch_view}, couch_view, [], []).
 
 get_temp_updater(DbName, Type, MapSrc, RedSrc) ->
-    {ok, Pid} = gen_server:call(couch_view, {start_temp_updater, DbName, Type, MapSrc, RedSrc}),
+    {ok, Pid} = gen_server:call(couch_view,
+            {start_temp_updater, DbName, Type, MapSrc, RedSrc}),
     Pid.
 
 get_group_server(DbName, GroupId) ->
@@ -34,21 +37,28 @@ get_group_server(DbName, GroupId) ->
         throw(Error)
     end.
     
-get_updated_group(DbName, GroupId, Update) ->
-    couch_view_group:request_group(get_group_server(DbName, GroupId), seq_for_update(DbName, Update)).
+get_group(Db, GroupId, Update) ->
+    couch_view_group:request_group(
+            get_group_server(couch_db:name(Db), GroupId),
+            if Update -> couch_db:get_update_seq(Db); true -> 0 end).
 
-get_updated_group(temp, DbName, Type, MapSrc, RedSrc, Update) ->
-    couch_view_group:request_group(get_temp_updater(DbName, Type, MapSrc, RedSrc), seq_for_update(DbName, Update)).
+
+get_temp_group(Db, Type, MapSrc, RedSrc) ->
+    couch_view_group:request_group(
+            get_temp_updater(couch_db:name(Db), Type, MapSrc, RedSrc),
+            couch_db:get_update_seq(Db)).
 
 get_row_count(#view{btree=Bt}) ->
     {ok, {Count, _Reds}} = couch_btree:full_reduce(Bt),
     {ok, Count}.
 
-get_reduce_view({temp, DbName, Type, MapSrc, RedSrc}) ->
-    {ok, #group{views=[View]}} = get_updated_group(temp, DbName, Type, MapSrc, RedSrc, true),
-    {ok, {temp_reduce, View}};
-get_reduce_view({DbName, GroupId, Name}) ->
-    case get_updated_group(DbName, GroupId, true) of
+get_temp_reduce_view(Db, Type, MapSrc, RedSrc) ->
+    {ok, #group{views=[View]}} = get_temp_group(Db, Type, MapSrc, RedSrc),
+    {ok, {temp_reduce, View}}.
+
+
+get_reduce_view(Db, GroupId, Name, Update) ->
+    case get_group(Db, GroupId, Update) of
     {ok, #group{views=Views,def_lang=Lang}} ->
         get_reduce_view0(Name, Lang, Views);
     Error ->
@@ -62,6 +72,9 @@ get_reduce_view0(Name, Lang, [#view{reduce_funs=RedFuns}=View|Rest]) ->
         0 -> get_reduce_view0(Name, Lang, Rest);
         N -> {ok, {reduce, N, Lang, View}}
     end.
+
+extract_map_view({reduce, _N, _Lang, View}) ->
+    View.
 
 detuple_kvs([], Acc) ->
     lists:reverse(Acc);
@@ -113,21 +126,14 @@ get_key_pos(Key, [{Key1,_Value}|_], N) when Key == Key1 ->
     N + 1;
 get_key_pos(Key, [_|Rest], N) ->
     get_key_pos(Key, Rest, N+1).
-       
-seq_for_update(DbName, Update) ->
-    case Update of
-    true ->
-        {ok, #db{update_seq=CurrentSeq}} = couch_db:open(DbName, []),
-        CurrentSeq;
-    _Else ->
-        0
-    end.  
-        
-get_map_view({temp, DbName, Type, Src}) ->
-    {ok, #group{views=[View]}} = get_updated_group(temp, DbName, Type, Src, [], true),
-    {ok, View};
-get_map_view({DbName, GroupId, Name, Update}) ->
-    case get_updated_group(DbName, GroupId, Update) of
+
+
+get_temp_map_view(Db, Type, Src) ->
+    {ok, #group{views=[View]}} = get_temp_group(Db, Type, Src, []),
+    {ok, View}.
+
+get_map_view(Db, GroupId, Name, Update) ->
+    case get_group(Db, GroupId, Update) of
     {ok, #group{views=Views}} ->
         get_map_view0(Name, Views);
     Error ->
