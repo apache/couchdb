@@ -139,7 +139,7 @@ handle_config_req(#httpd{method='PUT', path_parts=[_, Section, Key]}=Req) ->
     ok = couch_httpd:verify_is_server_admin(Req),
     Value = couch_httpd:json_body(Req),
     Persist = couch_httpd:header_value(Req, "X-Couch-Persist") /= "false",
-    OldValue = couch_config:get(Section, Key, null),
+    OldValue = couch_config:get(Section, Key, ""),
     ok = couch_config:set(Section, Key, ?b2l(Value), Persist),
     send_json(Req, 200, list_to_binary(OldValue));
 % GET /_config/Section/Key
