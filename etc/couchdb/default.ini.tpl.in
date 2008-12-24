@@ -21,8 +21,10 @@ level = info
 [query_servers]
 javascript = %bindir%/%couchjs_command_name% %localdatadir%/server/main.js
 
-[external]
-action = %bindir%/%couchjs_command_name% %localdatadir%/server/action.js
+; enable external as an httpd handler, then link it with commands here.
+; note, this api is still under consideration.
+; [external]
+; mykey = /path/to/mycommand
 
 [daemons]
 view_manager={couch_view, start_link, []}
@@ -45,10 +47,9 @@ _restart = {couch_httpd_misc_handlers, handle_restart_req}
 [httpd_db_handlers]
 _view = {couch_httpd_view, handle_view_req}
 _temp_view = {couch_httpd_view, handle_temp_view_req}
-; The new location for action servers
-_action = {couch_httpd_external, handle_external_req, <<"action">>}
-; They'd been here for a while. If something you've been running breaks on you
-; try adding the next line to your local.ini. Or better yet replace
-; '_external/action' in your urls with '_action'.
-; This message will be removed before the next release.
+
+; The external module takes an optional argument allowing you to narrow it to a
+; single script. Otherwise the script name is inferred from the first path section 
+; after _external's own path.
+; _mypath = {couch_httpd_external, handle_external_req, <<"mykey">>}
 ; _external = {couch_httpd_external, handle_external_req}
