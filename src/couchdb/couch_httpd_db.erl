@@ -243,7 +243,7 @@ db_req(#httpd{method='GET',path_parts=[_,<<"_admins">>]}=Req, Db) ->
 db_req(#httpd{path_parts=[_,<<"_admins">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "PUT,GET");
 
-db_req(#httpd{method='POST',path_parts=[DbName,<<"_design">>,Name|Rest]}=Req,
+db_req(#httpd{path_parts=[DbName,<<"_design">>,Name|Rest]}=Req,
         Db) ->
     % Special case to enable using an unencoded in the URL of design docs, as
     % slashes in document IDs must otherwise be URL encoded
@@ -252,8 +252,8 @@ db_req(#httpd{method='POST',path_parts=[DbName,<<"_design">>,Name|Rest]}=Req,
 db_req(#httpd{path_parts=[_, DocId]}=Req, Db) ->
     db_doc_req(Req, Db, DocId);
 
-db_req(#httpd{path_parts=[_, DocId, FileName]}=Req, Db) ->
-    db_attachment_req(Req, Db, DocId, FileName).
+db_req(#httpd{path_parts=[_, DocId | FileNameParts]}=Req, Db) ->
+    db_attachment_req(Req, Db, DocId, FileNameParts).
 
 all_docs_view(Req, Db, Keys) -> 
     #view_query_args{
@@ -510,7 +510,8 @@ couch_doc_open(Db, DocId, Rev, Options) ->
 
 % Attachment request handlers
 
-db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileName) ->
+db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
+    FileName = list_to_binary(mochiweb_util:join(lists:map(fun binary_to_list/1, FileNameParts),"/")),
     case couch_db:open_doc(Db, DocId, []) of
     {ok, #doc{attachments=Attachments}} ->
         case proplists:get_value(FileName, Attachments) of
@@ -539,9 +540,10 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileName) ->
         throw(Error)
     end;
 
-db_attachment_req(#httpd{method=Method}=Req, Db, DocId, FileName)
-        when (Method == 'PUT') or (Method == 'DELETE') ->
 
+db_attachment_req(#httpd{method=Method}=Req, Db, DocId, FileNameParts)
+        when (Method == 'PUT') or (Method == 'DELETE') ->
+    FileName = list_to_binary(mochiweb_util:join(lists:map(fun binary_to_list/1, FileNameParts),"/")),
     NewAttachment = case Method of
         'DELETE' ->
             [];
@@ -573,7 +575,7 @@ db_attachment_req(#httpd{method=Method}=Req, Db, DocId, FileName)
         {rev, UpdatedRev}
     ]});
 
-db_attachment_req(Req, _Db, _DocId, _FileName) ->
+db_attachment_req(Req, _Db, _DocId, _FileNameParts) ->
     send_method_not_allowed(Req, "DELETE,GET,HEAD,PUT").
 
 
