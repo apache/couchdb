@@ -513,12 +513,13 @@ couch_doc_open(Db, DocId, Rev, Options) ->
 db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
     FileName = list_to_binary(mochiweb_util:join(lists:map(fun binary_to_list/1, FileNameParts),"/")),
     case couch_db:open_doc(Db, DocId, []) of
-    {ok, #doc{attachments=Attachments}} ->
+    {ok, #doc{attachments=Attachments, revs=[LastRev|_OldRevs]}} ->
         case proplists:get_value(FileName, Attachments) of
         undefined ->
             throw({not_found, "Document is missing attachment"});
         {Type, Bin} ->
             {ok, Resp} = start_chunked_response(Req, 200, [
+                {"ETag", binary_to_list(LastRev)},
                 {"Cache-Control", "must-revalidate"},
                 {"Content-Type", binary_to_list(Type)}%,
                 % My understanding of http://www.faqs.org/rfcs/rfc2616.html

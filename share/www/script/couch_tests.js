@@ -795,11 +795,13 @@ var tests = {
       }
     }
 
-    T(db.save(binAttDoc).ok);
+    var save_response = db.save(binAttDoc);
+    T(save_response.ok);
 
     var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt");
     T(xhr.responseText == "This is a base64 encoded text");
     T(xhr.getResponseHeader("Content-Type") == "text/plain");
+    T(xhr.getResponseHeader("Etag") == save_response.rev);
 
     // empty attachment
     var binAttDoc2 = {
