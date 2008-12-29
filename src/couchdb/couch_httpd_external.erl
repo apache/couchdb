@@ -13,6 +13,7 @@
 -module(couch_httpd_external).
 
 -export([handle_external_req/2, handle_external_req/3]).
+-export([send_external_response/2, json_req_obj/2]).
 
 -import(couch_httpd,[send_error/4]).
 
@@ -25,9 +26,44 @@
     headers = []
 }).
 
-process_external_req(#httpd{mochi_req=Req, 
-                        method=Verb
-                    }=HttpReq, Db, Name, Path) ->
+% handle_external_req/2
+% for the old type of config usage:
+% _external = {couch_httpd_external, handle_external_req}
+% with urls like
+% /db/_external/action/design/name
+handle_external_req(#httpd{
+                        path_parts=[_DbName, _External, UrlName | _Path]
+                    }=HttpReq, Db) ->
+    process_external_req(HttpReq, Db, UrlName);
+handle_external_req(#httpd{path_parts=[_, _]}=Req, _Db) ->
+    send_error(Req, 404, <<"external_server_error">>, <<"No server name specified.">>);
+handle_external_req(Req, _) ->
+    send_error(Req, 404, <<"external_server_error">>, <<"Broken assumption">>).
+
+% handle_external_req/3 
+% for this type of config usage:
+% _action = {couch_httpd_external, handle_external_req, <<"action">>}
+% with urls like
+% /db/_action/design/name
+handle_external_req(HttpReq, Db, Name) ->
+    process_external_req(HttpReq, Db, Name).
+
+process_external_req(HttpReq, Db, Name) ->
+
+    Response = couch_external_manager:execute(binary_to_list(Name), 
+        json_req_obj(HttpReq, Db)),
+
+    case Response of
+    {unknown_external_server, Msg} ->
+        send_error(HttpReq, 404, <<"external_server_error">>, Msg);
+    _ ->
+        send_external_response(HttpReq, Response)
+    end.
+
+json_req_obj(#httpd{mochi_req=Req, 
+               method=Verb,
+               path_parts=Path
+            }, Db) ->
     ReqBody = Req:recv_body(),
     ParsedForm = case Req:get_primary_header_value("content-type") of
         "application/x-www-form-urlencoded" ++ _ ->
@@ -35,40 +71,37 @@ process_external_req(#httpd{mochi_req=Req,
         _ ->
             []
     end,
-    Response = couch_external_manager:execute(binary_to_list(Name), 
-        Db, Verb, Path, Req:parse_qs(), ReqBody, ParsedForm,
-        Req:parse_cookie()),
-        
-    case Response of
-    {unknown_external_server, Msg} ->
-        send_error(HttpReq, 404, <<"external_server_error">>, Msg);
-    _ ->
-        send_external_response(Req, Response)
-    end.
+    Headers = Req:get(headers),
+    Hlist = mochiweb_headers:to_list(Headers),
+    {ok, Info} = couch_db:get_db_info(Db),
+    % add headers...
+    {[{<<"info">>, {Info}},
+        {<<"verb">>, Verb},
+        {<<"path">>, Path},
+        {<<"query">>, to_json_terms(Req:parse_qs())},
+        {<<"headers">>, to_json_terms(Hlist)},
+        {<<"body">>, ReqBody},
+        {<<"form">>, to_json_terms(ParsedForm)},
+        {<<"cookie">>, to_json_terms(Req:parse_cookie())}]}.
 
-handle_external_req(#httpd{
-                        path_parts=[_DbName, _External, UrlName | Path]
-                    }=HttpReq, Db) ->
-    process_external_req(HttpReq, Db, UrlName, Path);
-handle_external_req(#httpd{path_parts=[_, _]}=Req, _Db) ->
-    send_error(Req, 404, <<"external_server_error">>, <<"No server name specified.">>);
-handle_external_req(Req, _) ->
-    send_error(Req, 404, <<"external_server_error">>, <<"Broken assumption">>).
+to_json_terms(Data) ->
+    to_json_terms(Data, []).
+to_json_terms([], Acc) ->
+    {lists:reverse(Acc)};
+to_json_terms([{Key, Value} | Rest], Acc) when is_atom(Key) ->
+    to_json_terms(Rest, [{list_to_binary(atom_to_list(Key)), list_to_binary(Value)} | Acc]);
+to_json_terms([{Key, Value} | Rest], Acc) ->
+    to_json_terms(Rest, [{list_to_binary(Key), list_to_binary(Value)} | Acc]).
 
-handle_external_req(#httpd{
-                        path_parts=[_DbName, _External | Path]
-                    }=HttpReq, Db, Name) ->
-    process_external_req(HttpReq, Db, Name, Path).
 
-send_external_response(Req, Response) ->
+send_external_response(#httpd{mochi_req=MochiReq}, Response) ->
     #extern_resp_args{
         code = Code,
         data = Data,
         ctype = CType,
         headers = Headers
     } = parse_external_response(Response),
-    ?LOG_DEBUG("External Response ~p",[Response]),
-    Resp = Req:respond({Code, 
+    Resp = MochiReq:respond({Code, 
         default_or_content_type(CType, Headers), chunked}),
     Resp:write_chunk(Data),
     Resp:write_chunk(""),
@@ -87,13 +120,15 @@ parse_external_response({Response}) ->
                     ctype="application/json"};
             {<<"body">>, Value} ->
                 Args#extern_resp_args{data=Value, ctype="text/html"};
+            {<<"base64">>, Value} ->
+                Args#extern_resp_args{data=couch_util:decodeBase64(Value), ctype="application/binary"};
             {<<"headers">>, {Headers}} ->
                 NewHeaders = lists:map(fun({Header, HVal}) ->
                     {binary_to_list(Header), binary_to_list(HVal)}
                 end, Headers),
                 Args#extern_resp_args{headers=NewHeaders};
             _ -> % unknown key
-                Msg = lists:flatten(io_lib:format("Invalid data from external server: ~s = ~p", [Key, Value])),
+                Msg = lists:flatten(io_lib:format("Invalid data from external server: ~p", [{Key, Value}])),
                 throw({external_response_error, Msg})
             end
         end, #extern_resp_args{}, Response).

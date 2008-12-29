@@ -24,7 +24,7 @@
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
     start_json_response/2,send_chunk/2,end_json_response/1,
-    start_chunked_response/3]).
+    start_chunked_response/3, send_error/4]).
 
 % httpd global handlers
 
@@ -173,5 +173,5 @@ increment_update_seq_req(#httpd{method='POST'}=Req, Db) ->
         {update_seq, NewSeq}
     ]});
 increment_update_seq_req(Req, _Db) ->
-    send_method_not_allowed(Req, "GET,PUT,DELETE").
+    send_method_not_allowed(Req, "POST").
 

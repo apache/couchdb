@@ -13,7 +13,7 @@
 -module(couch_external_manager).
 -behaviour(gen_server).
 
--export([start_link/0, execute/8, config_change/2]).
+-export([start_link/0, execute/2, config_change/2]).
 -export([init/1, terminate/2, code_change/3, handle_call/3, handle_cast/2, handle_info/2]).
 
 -include("couch_db.hrl").
@@ -21,13 +21,13 @@
 start_link() ->
     gen_server:start_link({local, couch_external_manager}, couch_external_manager, [], []).
 
-execute(UrlName, Db, Verb, Path, Query, Body, Post, Cookie) ->
+execute(UrlName, JsonReq) ->
     Pid = gen_server:call(couch_external_manager, {get, UrlName}),
     case Pid of
     {error, Reason} ->
         Reason;
     _ ->
-        couch_external_server:execute(Pid, Db, Verb, Path, Query, Body, Post, Cookie)
+        couch_external_server:execute(Pid, JsonReq)
     end.
 
 config_change("external", UrlName) ->
