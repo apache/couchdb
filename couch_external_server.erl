@@ -13,7 +13,7 @@
 -module(couch_external_server).
 -behaviour(gen_server).
 
--export([start_link/2, stop/1, execute/8]).
+-export([start_link/2, stop/1, execute/2]).
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2, code_change/3]). 
 
 -define(TIMEOUT, 5000).
@@ -28,8 +28,8 @@ start_link(Name, Command) ->
 stop(Pid) ->
     gen_server:cast(Pid, stop).
 
-execute(Pid, Db, Verb, Path, Query, Body, Post, Cookie) ->
-    gen_server:call(Pid, {execute, Db, Verb, Path, Query, Body, Post, Cookie}).
+execute(Pid, JsonReq) ->
+    gen_server:call(Pid, {execute, JsonReq}).
 
 % Gen Server Handlers
 
@@ -43,18 +43,8 @@ terminate(_Reason, {Name, _Command, Pid}) ->
     couch_os_process:stop(Pid),
     ok.
 
-handle_call({execute, Db, Verb, Path, Query, Body, Post, Cookie}, _From, {Name, Command, Pid}) ->
-    ?LOG_DEBUG("Query Params ~p",[Query]),
-    {ok, Info} = couch_db:get_db_info(Db),
-    Json = {[
-        {<<"info">>, {Info}},
-        {<<"verb">>, Verb},
-        {<<"path">>, Path},
-        {<<"query">>, to_json_terms(Query)},
-        {<<"body">>, Body},
-        {<<"form">>, to_json_terms(Post)},
-        {<<"cookie">>, to_json_terms(Cookie)}]},
-    {reply, couch_os_process:prompt(Pid, Json), {Name, Command, Pid}}.
+handle_call({execute, JsonReq}, _From, {Name, Command, Pid}) ->
+    {reply, couch_os_process:prompt(Pid, JsonReq), {Name, Command, Pid}}.
 
 handle_info({'EXIT', Pid, Reason}, {Name, Command, Pid}) ->
     ?LOG_INFO("EXTERNAL: Restarting process for ~s (reason: ~w)", [Name, Reason]),
@@ -69,12 +59,4 @@ handle_cast(_Whatever, State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-% Internal API
-
-to_json_terms(Data) ->
-    to_json_terms(Data, []).
-to_json_terms([], Acc) ->
-    {lists:reverse(Acc)};
-to_json_terms([{Key, Value} | Rest], Acc) ->
-    to_json_terms(Rest, [{list_to_binary(Key), list_to_binary(Value)} | Acc]).
 
