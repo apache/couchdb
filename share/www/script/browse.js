@@ -127,7 +127,7 @@ function CouchDatabasePage() {
           },
           success: function(resp) {
             location.href = "document.html?" + encodeURIComponent(dbName) +
-                            "/" + encodeURIComponent(resp.id);
+                            "/" + encodeDocId(resp.id);
           }
         });
       }
@@ -325,7 +325,7 @@ function CouchDatabasePage() {
                 callback();
                 page.isDirty = false;
                 location.href = "database.html?" + encodeURIComponent(dbName) +
-                  "/" + encodeURIComponent(doc._id) +
+                  "/" + encodeDocId(doc._id) +
                   "/" + encodeURIComponent(data.name);
               }
             });
@@ -370,7 +370,7 @@ function CouchDatabasePage() {
     if (viewName && /^_design/.test(viewName)) {
       var docId = "_design/" + viewName.split("/")[1];
       $("#designdoc-link").attr("href", "document.html?" +
-        encodeURIComponent(dbName) + "/" + encodeURIComponent(docId)).text(docId);
+        encodeURIComponent(dbName) + "/" + encodeDocId(docId)).text(docId);
     } else {
       $("#designdoc-link").removeAttr("href").text("");
     }
@@ -446,7 +446,7 @@ function CouchDatabasePage() {
         var key = row.key;
         if (row.id) {
           $("<td class='key'><a href='document.html?" + encodeURIComponent(db.name) +
-            "/" + encodeURIComponent(row.id) + "'><strong></strong><br>" +
+            "/" + encodeDocId(row.id) + "'><strong></strong><br>" +
             "<span class='docid'>ID:&nbsp;" + row.id + "</span></a></td>")
             .find("strong").text(key !== null ? prettyPrintJSON(key, 0, "") : "null").end()
             .appendTo(tr);
@@ -604,12 +604,12 @@ function CouchDocumentPage() {
         if (currentIndex < revs.length - 1) {
           var prevRev = revs[currentIndex + 1].rev;
           $("#paging a.prev").attr("href", "?" + encodeURIComponent(dbName) +
-            "/" + encodeURIComponent(docId) + "@" + prevRev);
+            "/" + encodeDocId(docId) + "@" + prevRev);
         }
         if (currentIndex > 0) {
           var nextRev = revs[currentIndex - 1].rev;
           $("#paging a.next").attr("href", "?" + encodeURIComponent(dbName) +
-            "/" + encodeURIComponent(docId) + "@" + nextRev);
+            "/" + encodeDocId(docId) + "@" + nextRev);
         }
         $("#fields tbody.footer td span").text("Showing revision " +
           (revs.length - currentIndex) + " of " + revs.length);
@@ -627,7 +627,7 @@ function CouchDocumentPage() {
               alert("The requested revision was not found. " +
                     "You will be redirected back to the latest revision.");
               location.href = "?" + encodeURIComponent(dbName) +
-                "/" + encodeURIComponent(docId);
+                "/" + encodeDocId(docId);
             },
             success: function(doc) {
               handleResult(doc, revs);
@@ -659,7 +659,7 @@ function CouchDocumentPage() {
       success: function(resp) {
         page.isDirty = false;
         location.href = "?" + encodeURIComponent(dbName) +
-          "/" + encodeURIComponent(docId);
+          "/" + encodeDocId(docId);
       }
     });
   }
@@ -682,12 +682,12 @@ function CouchDocumentPage() {
         var form = $("#upload-form");
         form.find("#progress").css("visibility", "visible");
         form.ajaxSubmit({
-          url: db.uri + encodeURIComponent(page.docId),
+          url: db.uri + encodeDocId(page.docId),
           success: function(resp) {
             form.find("#progress").css("visibility", "hidden");
             page.isDirty = false;
             location.href = "?" + encodeURIComponent(dbName) +
-              "/" + encodeURIComponent(docId);
+              "/" + encodeDocId(docId);
           }
         });
       }
@@ -874,8 +874,8 @@ function CouchDocumentPage() {
   }
 
   function _renderAttachmentItem(name, attachment) {
-    var attachmentHref = db.uri + encodeURIComponent(docId) 
-      + "/" + encodeURIComponent(name);
+    var attachmentHref = db.uri + encodeDocId(docId) 
+      + "/" + encodeAttachment(name);
     var li = $("<li></li>");
     $("<a href='' title='Download file' target='_top'></a>").text(name)
       .attr("href", attachmentHref)
@@ -898,5 +898,25 @@ function CouchDocumentPage() {
       return false;
     }).prependTo($("a", li));
   }
+}
 
+// Ideally these would be module-private. Maybe there's a helper they can go on.
+
+function encodeDocId(docid) {
+  var encoded, parts = docid.split('/');
+  if (parts[0] == '_design') {
+    parts.shift();
+    encoded = encodeURIComponent(parts.join('/'));
+    return '_design/'+encoded;
+  } else {
+    return encodeURIComponent(docid);
+  }
+};
+
+function encodeAttachment(name) {
+  var encoded = [], parts = name.split('/');
+  for (var i=0; i < parts.length; i++) {
+    encoded.push(encodeURIComponent(parts[i]));
+  };
+  return encoded.join('/');
 }
