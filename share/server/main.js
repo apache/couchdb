@@ -345,6 +345,7 @@ while (cmd = eval(readline())) {
           var rendered = formFun(doc, req);
           print(toJSON(rendered));
         } catch (error) {
+          log("form function raised error: "+error.toString());
           log({error:(error||"undefined error")});
           print(toJSON(error));
         }
