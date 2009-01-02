@@ -37,7 +37,7 @@ stop(Pid) ->
     couch_event_sup:stop(Pid).
 
 init(Exec) when is_list(Exec) -> % an exe
-    {ok, couch_os_process:start_link(Exec, [], [stream, exit_status, hide])};
+    couch_os_process:start_link(Exec, [], [stream, exit_status, hide]);
 init(Else) ->
     {ok, Else}.
 
