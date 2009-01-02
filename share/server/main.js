@@ -133,7 +133,6 @@ var Mimeparse = (function() {
   return publicMethods;
 })();
 
-
 // this function provides a shortcut for managing responses by Accept header
 respondWith = function(req, responders) {
   var accept = req.headers["Accept"];
@@ -153,9 +152,9 @@ respondWith = function(req, responders) {
       resp["headers"]["Content-Type"] = bestMime;
       return resp;
     }
-  } 
-  if (responders.default) {
-    return responders[responders.default]();
+  }
+  if (responders.fallback) {
+    return responders[responders.fallback]();
   } 
   throw({code:406, body:"Not Acceptable: "+accept});
 }

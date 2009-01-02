@@ -67,8 +67,7 @@ var HTTP = (function() {
           var h = headers[i];
           if (keymatcher.test(h)) {
             var value = h.substr(key.length+2);
-            value = value.slice(0, value.length-1);
-            return value;
+            return value.replace(/^\s+|\s+$/g,"");
           }
         }
         return "";

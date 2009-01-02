@@ -2034,43 +2034,49 @@ var tests = {
      db.deleteDb();
      db.createDb();
      if (debug) debugger;
+     
+     function stringFun(fun) {
+       var string = fun.toSource ? fun.toSource() : "(" + fun.toString() + ")";
+       return string;
+     }
          
      var designDoc = {
        _id:"_design/template",
        language: "javascript",
        forms: {
-         "hello" : (function() { 
+         "hello" : stringFun(function() { 
            return {
              body : "Hello World"
            };
-         }).toString(),
-         "just-name" : (function(doc, req) {
+         }),
+         "just-name" : stringFun(function(doc, req) {
            return {
              body : "Just " + doc.name
            };
-         }).toString(),
-         "req-info" : (function(doc, req) {
+         }),
+         "req-info" : stringFun(function(doc, req) {
            return {
              json : req
            }
-         }).toString(),
-         "xml-type" : (function(doc, req) {
-           return {
-             headers : {
-               "Content-Type" : "application/xml"
-             },
-             "body" : <xml><node foo="bar"/></xml>
-           }
-         }).toString(),
-         "no-set-etag" : (function(doc, req) {
+         }),
+         "xml-type" : [
+           'function(doc, req) {                     ',
+           '  return {                               ',
+           '    "headers" : {                        ',
+           '      "Content-Type" : "application/xml" ',
+           '    },                                   ',
+           '    "body" : <xml><node foo="bar"/></xml>',
+           '  }                                      ',
+           '}'].join('\n'),
+         "no-set-etag" : stringFun(function(doc, req) {
            return {
              headers : {
                "Etag" : "skipped"
              },
              "body" : "something"
            }
-         }).toString(),
-         "accept-switch" : (function(doc, req) {
+         }),
+         "accept-switch" : stringFun(function(doc, req) {
            if (req.headers["Accept"].match(/image/)) {
              return {
                // a 16x16 px version of the CouchDB logo
@@ -2097,29 +2103,30 @@ var tests = {
                }
              };
            }
-         }).toString(),
-         "respondWith" : (function(doc, req) {
-           registerType("foo", "application/foo","application/x-foo");
-           return respondWith(req, {
-             html : function() {
-               return {
-                 body:"Ha ha, you said \"" + doc.word + "\"."
-               };
-             },
-             xml : function() {
-               return {
-                 body: <xml><node foo={doc.word}/></xml>
-               };
-             },
-             foo : function() {
-               return {
-                 body: "foofoo"
-               };
-             },
-             default : "html"
-           });
-         }).toString()
-       }
+         }),
+         "respondWith" : [
+           'function(doc, req) {                                         ',
+           '  registerType("foo", "application/foo","application/x-foo");',
+           '  return respondWith(req, {                                  ',
+           '    html : function() {                                      ',
+           '      return {                                               ',
+           '        body:"Ha ha, you said \\"" + doc.word + "\\"."         ',
+           '      };                                                     ',
+           '    },                                                       ',
+           '    xml : function() {                                       ',
+           '      return {                                               ',
+           '        body: <xml><node foo={doc.word}/></xml>              ',
+           '      };                                                     ',
+           '    },                                                       ',
+           '    foo : function() {                                       ',
+           '      return {                                               ',
+           '        body: "foofoo"                                       ',
+           '      };                                                     ',
+           '    },                                                       ',
+           '    fallback : "html"                                        ',
+           '  });                                                        ',
+           '}'].join('\n')
+         }
      };
      T(db.save(designDoc).ok);
      
