@@ -55,12 +55,19 @@ start_link() ->
         end,
 
     % and off we go
-    {ok, Pid} = mochiweb_http:start([
+    
+    {ok, Pid} = case mochiweb_http:start([
         {loop, Loop},
         {name, ?MODULE},
         {ip, BindAddress},
         {port, Port}
-    ]),
+    ]) of
+    {ok, MochiPid} -> {ok, MochiPid};
+    {error, Reason} ->
+        io:format("Failure to start Mochiweb: ~s~n",[Reason]),
+        throw({error, Reason})
+    end,
+
     ok = couch_config:register(
         fun("httpd", "bind_address") ->
             ?MODULE:stop();
