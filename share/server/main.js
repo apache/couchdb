@@ -344,9 +344,15 @@ while (cmd = eval(readline())) {
           var rendered = formFun(doc, req);
           print(toJSON(rendered));
         } catch (error) {
+          // Available error fields: 
+          // message, fileName, lineNumber, stack, name
           log("form function raised error: "+error.toString());
-          log({error:(error||"undefined error")});
-          print(toJSON(error));
+          log("stacktrace: "+error.stack);
+          try {
+            print(toJSON(error));            
+          } catch (e) {
+            print({"error":error.toString()});
+          }
         }
         break;
       default:
