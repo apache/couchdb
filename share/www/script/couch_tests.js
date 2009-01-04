@@ -492,7 +492,7 @@ var tests = {
     result = db.query(map, reduce, {startkey: 4, endkey: 6});
     T(result.rows[0].value == 30);
 
-    result = db.query(map, reduce, {group:true, count:3});
+    result = db.query(map, reduce, {group:true, limit:3});
     T(result.rows[0].value == 2);
     T(result.rows[1].value == 4);
     T(result.rows[2].value == 6);
@@ -536,8 +536,8 @@ var tests = {
       T(equals(results.rows[2], {key:["a", "b", "c"],value:10*i}));
       T(equals(results.rows[3], {key:["a", "b", "d"],value:10*i}));
 
-      // test to make sure group reduce and count params provide valid json
-      var results = db.query(map, reduce, {group: true, count: 2});
+      // test to make sure group reduce and limit params provide valid json
+      var results = db.query(map, reduce, {group: true, limit: 2});
       T(equals(results.rows[0], {key: ["a"], value: 20*i}));
       T(equals(results.rows.length, 2));
 
@@ -1394,7 +1394,7 @@ var tests = {
     }
     T(db.save(designDoc).ok);
 
-    var resp = db.view('test/all_docs', {include_docs: true, count: 2});
+    var resp = db.view('test/all_docs', {include_docs: true, limit: 2});
     T(resp.rows.length == 2);
     T(resp.rows[0].id == "0");
     T(resp.rows[0].doc._id == "0");
@@ -1406,7 +1406,7 @@ var tests = {
     T(resp.rows[0].doc._id == "29");
     T(resp.rows[1].doc.integer == 74);
 
-    resp = db.allDocs({count: 2, skip: 1, include_docs: true});
+    resp = db.allDocs({limit: 2, skip: 1, include_docs: true});
     T(resp.rows.length == 2);
     T(resp.rows[0].doc.integer == 1);
     T(resp.rows[1].doc.integer == 10);
@@ -1420,7 +1420,7 @@ var tests = {
     T(resp.rows[0].doc.integer == 1);
     T(!resp.rows[1].doc);
 
-    resp = db.allDocs({include_docs: true, count: 0});
+    resp = db.allDocs({include_docs: true, limit: 0});
     T(resp.rows.length == 0);
 
     // No reduce support
@@ -1482,7 +1482,7 @@ var tests = {
     for(var i=0; i<rows.length; i++)
       T(rows[i].id == keys[i]);
 
-    rows = db.allDocs({count: 1}, keys).rows;
+    rows = db.allDocs({limit: 1}, keys).rows;
     T(rows.length == 1);
     T(rows[0].id == keys[0]);
 
@@ -1496,7 +1496,7 @@ var tests = {
     for(var i=0; i<rows.length; i++)
         T(rows[i].id == keys[keys.length-i-1]);
 
-    rows = db.allDocs({descending: "true", skip: 3, count:1}, keys).rows;
+    rows = db.allDocs({descending: "true", skip: 3, limit:1}, keys).rows;
     T(rows.length == 1);
     T(rows[0].id == keys[1]);
 
@@ -1596,8 +1596,8 @@ var tests = {
         T(curr[i].value == exp_val[i]);
     }
 
-    // Check count works
-    curr = db.view("test/all_docs", {count: 1}, keys).rows;
+    // Check limit works
+    curr = db.view("test/all_docs", {limit: 1}, keys).rows;
     T(curr.length == 1);
     T(curr[0].key == 10);
 
@@ -1613,25 +1613,25 @@ var tests = {
     T(curr[99].value == 0);
 
     // Check a couple combinations
-    curr = db.view("test/multi_emit", {descending: "true", skip: 3, count: 2}, [2]).rows;
+    curr = db.view("test/multi_emit", {descending: "true", skip: 3, limit: 2}, [2]).rows;
     T(curr.length, 2);
     T(curr[0].value == 96);
     T(curr[1].value == 95);
 
-    curr = db.view("test/multi_emit", {skip: 2, count: 3, startkey_docid: "13"}, [0]).rows;
+    curr = db.view("test/multi_emit", {skip: 2, limit: 3, startkey_docid: "13"}, [0]).rows;
     T(curr.length == 3);
     T(curr[0].value == 15);
     T(curr[1].value == 16);
     T(curr[2].value == 17);
 
     curr = db.view("test/multi_emit",
-            {skip: 1, count: 5, startkey_docid: "25", endkey_docid: "27"}, [1]).rows;
+            {skip: 1, limit: 5, startkey_docid: "25", endkey_docid: "27"}, [1]).rows;
     T(curr.length == 2);
     T(curr[0].value == 26);
     T(curr[1].value == 27);
 
     curr = db.view("test/multi_emit",
-            {skip: 1, count: 5, startkey_docid: "28", endkey_docid: "26", descending: "true"}, [1]).rows;
+            {skip: 1, limit: 5, startkey_docid: "28", endkey_docid: "26", descending: "true"}, [1]).rows;
     T(curr.length == 2);
     T(curr[0].value == 27);
     T(curr[1].value == 26);
@@ -1680,7 +1680,7 @@ var tests = {
       var queryResults = db.query(queryFun, null, {
         startkey: i,
         startkey_docid: i,
-        count: 10
+        limit: 10
       });
       T(queryResults.rows.length == 10)
       T(queryResults.total_rows == docs.length)
@@ -1697,7 +1697,7 @@ var tests = {
         startkey: i,
         startkey_docid: i,
         descending: true,
-        count: 10
+        limit: 10
       });
       T(queryResults.rows.length == 10)
       T(queryResults.total_rows == docs.length)
@@ -1714,7 +1714,7 @@ var tests = {
         startkey: i,
         startkey_docid: i,
         descending: false,
-        count: 10
+        limit: 10
       });
       T(queryResults.rows.length == 10)
       T(queryResults.total_rows == docs.length)

@@ -276,7 +276,7 @@ function CouchDatabasePage() {
       load: function(elem) {
         $("#input_docid", elem).val(designDocId).suggest(function(text, callback) {
           db.allDocs({
-            count: 10, startkey: "_design/" + text,
+            limit: 10, startkey: "_design/" + text,
             endkey: "_design/" + text + "ZZZZ",
             success: function(docs) {
               var matches = [];
@@ -379,8 +379,8 @@ function CouchDatabasePage() {
   this.updateDocumentListing = function(options) {
     $(document.body).addClass("loading");
     if (options === undefined) options = {};
-    if (options.count === undefined) {
-      options.count = parseInt($("#perpage").val(), 10);
+    if (options.limit === undefined) {
+      options.limit = parseInt($("#perpage").val(), 10);
     }
     if (options.group === undefined) {
       options.group = true;
@@ -406,16 +406,16 @@ function CouchDatabasePage() {
         resp.rows = resp.rows.reverse();
       }
       if (resp.rows !== null && (decending_reverse ? 
-        (resp.total_rows - resp.offset > options.count) :
+        (resp.total_rows - resp.offset > options.limit) :
         (resp.offset > 0))) {
-        $("#paging a.prev").attr("href", "#" + (resp.offset - options.count)).click(function() {
+        $("#paging a.prev").attr("href", "#" + (resp.offset - options.limit)).click(function() {
           var firstDoc = resp.rows[0];
           page.updateDocumentListing({
             startkey: firstDoc.key !== undefined ? firstDoc.key : null,
             startkey_docid: firstDoc.id,
             skip: 1,
             descending: !descend,
-            count: options.count
+            limit: options.limit
           });
           return false;
         });
@@ -423,16 +423,16 @@ function CouchDatabasePage() {
         $("#paging a.prev").removeAttr("href");
       }
       if (resp.rows !== null && (decending_reverse ? 
-        (resp.offset - resp.total_rows < options.count) : 
-        (resp.total_rows - resp.offset > options.count))) {
-        $("#paging a.next").attr("href", "#" + (resp.offset + options.count)).click(function() {
+        (resp.offset - resp.total_rows < options.limit) : 
+        (resp.total_rows - resp.offset > options.limit))) {
+        $("#paging a.next").attr("href", "#" + (resp.offset + options.limit)).click(function() {
           var lastDoc = resp.rows[resp.rows.length - 1];
           page.updateDocumentListing({
             startkey: lastDoc.key !== undefined ? lastDoc.key : null,
             startkey_docid: lastDoc.id,
             skip: 1,
             descending: descend,
-            count: options.count
+            limit: options.limit
           });
           return false;
         });
