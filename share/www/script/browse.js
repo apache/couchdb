@@ -115,7 +115,7 @@ function CouchDatabasePage() {
   this.viewName = viewName;
   this.db = db;
   this.isDirty = false;
-  this.isTempView = viewName == "_temp_view";
+  this.isTempView = viewName == "_slow_view";
   page = this;
 
   this.addDocument = function() {
@@ -223,7 +223,7 @@ function CouchDatabasePage() {
       }
     });
     if (!viewName.match(/^_design\//)) {
-      $.each(["_all_docs", "_design_docs", "_temp_view"], function(idx, name) {
+      $.each(["_all_docs", "_design_docs", "_slow_view"], function(idx, name) {
         if (viewName == name) {
           select[0].options[idx].selected = true;
         }
@@ -493,7 +493,7 @@ function CouchDatabasePage() {
       $("#switch select").get(0).selectedIndex = 0;
       db.allDocs(options);
     } else {
-      if (viewName == "_temp_view") {
+      if (viewName == "_slow_view") {
         $("#viewcode").show().removeClass("collapsed");
         var mapFun = $("#viewcode_map").val();
         $.cookies.set(db.name + ".map", mapFun);
