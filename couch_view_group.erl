@@ -246,7 +246,7 @@ prepare_group({view, RootDir, DbName, GroupId}, ForceReset)->
         catch delete_index_file(RootDir, DbName, GroupId),
         Error
     end;
-prepare_group({temp_view, DbName, Fd, Lang, MapSrc, RedSrc}, _ForceReset) ->
+prepare_group({slow_view, DbName, Fd, Lang, MapSrc, RedSrc}, _ForceReset) ->
     case couch_db:open(DbName, []) of
     {ok, Db} ->
         View = #view{map_names=["_temp"],

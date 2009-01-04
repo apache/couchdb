@@ -227,7 +227,7 @@ handle_call({start_temp_updater, DbName, Lang, MapSrc, RedSrc}, _From, #server{r
             ok
         end,
         ?LOG_DEBUG("Spawning new temp update process for db ~s.", [DbName]),
-        {ok, NewPid} = couch_view_group:start_link({temp_view, DbName, Fd, Lang, MapSrc, RedSrc}),
+        {ok, NewPid} = couch_view_group:start_link({slow_view, DbName, Fd, Lang, MapSrc, RedSrc}),
         true = ets:insert(couch_temp_group_fd_by_db, {DbName, Fd, Count + 1}),
         add_to_ets(NewPid, DbName, Name),
         NewPid;
