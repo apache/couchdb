@@ -2117,9 +2117,6 @@ var tests = {
                // E4X outside of a string.
                this.eval('xml.node.@foo = doc.word');
                return {
-                 headers : {
-                   "Content-Type" : "application/xml",
-                 },
                  body: xml
                };
              },
