@@ -2059,15 +2059,14 @@ var tests = {
              json : req
            }
          }),
-         "xml-type" : [
-           'function(doc, req) {                     ',
-           '  return {                               ',
-           '    "headers" : {                        ',
-           '      "Content-Type" : "application/xml" ',
-           '    },                                   ',
-           '    "body" : <xml><node foo="bar"/></xml>',
-           '  }                                      ',
-           '}'].join('\n'),
+         "xml-type" : stringFun(function(doc, req) {
+            return {
+              "headers" : {
+                "Content-Type" : "application/xml"
+              },
+              "body" : new XML('<xml><node foo="bar"/></xml>')
+            }
+          }),
          "no-set-etag" : stringFun(function(doc, req) {
            return {
              headers : {
@@ -2104,29 +2103,35 @@ var tests = {
              };
            }
          }),
-         "respondWith" : [
-           'function(doc, req) {                                         ',
-           '  registerType("foo", "application/foo","application/x-foo");',
-           '  return respondWith(req, {                                  ',
-           '    html : function() {                                      ',
-           '      return {                                               ',
-           '        body:"Ha ha, you said \\"" + doc.word + "\\"."         ',
-           '      };                                                     ',
-           '    },                                                       ',
-           '    xml : function() {                                       ',
-           '      return {                                               ',
-           '        body: <xml><node foo={doc.word}/></xml>              ',
-           '      };                                                     ',
-           '    },                                                       ',
-           '    foo : function() {                                       ',
-           '      return {                                               ',
-           '        body: "foofoo"                                       ',
-           '      };                                                     ',
-           '    },                                                       ',
-           '    fallback : "html"                                        ',
-           '  });                                                        ',
-           '}'].join('\n')
-         }
+         "respondWith" : stringFun(function(doc, req) {
+           registerType("foo", "application/foo","application/x-foo");
+           return respondWith(req, {
+             html : function() {
+               return {
+                 body:"Ha ha, you said \"" + doc.word + "\"."
+               };
+             },
+             xml : function() {
+               var xml = new XML('<xml><node/></xml>');
+               // becase Safari can't stand to see that dastardly
+               // E4X outside of a string.
+               this.eval('xml.node.@foo = doc.word');
+               return {
+                 headers : {
+                   "Content-Type" : "application/xml",
+                 },
+                 body: xml
+               };
+             },
+             foo : function() {
+               return {
+                 body: "foofoo"
+               };
+             },
+             fallback : "html"
+           });
+         })
+       }
      };
      T(db.save(designDoc).ok);
      
@@ -2277,6 +2282,7 @@ var tests = {
        }
      });
      T(xhr.getResponseHeader("Content-Type") == "application/xml");
+     T(xhr.responseText.match(/node/));
      T(xhr.responseText.match(/plankton/));
      
      // registering types works
