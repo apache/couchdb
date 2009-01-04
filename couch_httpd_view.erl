@@ -84,7 +84,7 @@ handle_slow_view_req(Req, _Db) ->
 
 output_map_view(Req, View, Db, QueryArgs, nil) ->
     #view_query_args{
-        count = Count,
+        limit = Limit,
         direction = Dir,
         skip = SkipCount,
         start_key = StartKey,
@@ -94,19 +94,19 @@ output_map_view(Req, View, Db, QueryArgs, nil) ->
     Start = {StartKey, StartDocId},
     FoldlFun = make_view_fold_fun(Req, QueryArgs, Db, RowCount,
             fun couch_view:reduce_to_count/1),
-    FoldAccInit = {Count, SkipCount, undefined, []},
+    FoldAccInit = {Limit, SkipCount, undefined, []},
     FoldResult = couch_view:fold(View, Start, Dir, FoldlFun, FoldAccInit),
     finish_view_fold(Req, RowCount, FoldResult);
     
 output_map_view(Req, View, Db, QueryArgs, Keys) ->
     #view_query_args{
-        count = Count,
+        limit = Limit,
         direction = Dir,
         skip = SkipCount,
         start_docid = StartDocId
     } = QueryArgs,
     {ok, RowCount} = couch_view:get_row_count(View),
-    FoldAccInit = {Count, SkipCount, undefined, []},
+    FoldAccInit = {Limit, SkipCount, undefined, []},
     FoldResult = lists:foldl(
         fun(Key, {ok, FoldAcc}) ->
             Start = {Key, StartDocId},
@@ -123,7 +123,7 @@ output_reduce_view(Req, View, QueryArgs, nil) ->
     #view_query_args{
         start_key = StartKey,
         end_key = EndKey,
-        count = Count,
+        limit = Limit,
         skip = Skip,
         direction = Dir,
         start_docid = StartDocId,
@@ -134,13 +134,13 @@ output_reduce_view(Req, View, QueryArgs, nil) ->
     {ok, GroupRowsFun, RespFun} = make_reduce_fold_funs(Resp, GroupLevel),
     send_chunk(Resp, "{\"rows\":["),
     {ok, _} = couch_view:fold_reduce(View, Dir, {StartKey, StartDocId}, 
-        {EndKey, EndDocId}, GroupRowsFun, RespFun, {"", Skip, Count}),
+        {EndKey, EndDocId}, GroupRowsFun, RespFun, {"", Skip, Limit}),
     send_chunk(Resp, "]}"),
     end_json_response(Resp);
     
 output_reduce_view(Req, View, QueryArgs, Keys) ->
     #view_query_args{
-        count = Count,
+        limit = Limit,
         skip = Skip,
         direction = Dir,
         start_docid = StartDocId,
@@ -154,7 +154,7 @@ output_reduce_view(Req, View, QueryArgs, Keys) ->
         fun(Key, AccSeparator) ->
             {ok, {NewAcc, _, _}} = couch_view:fold_reduce(View, Dir, {Key, StartDocId}, 
                 {Key, EndDocId}, GroupRowsFun, RespFun, 
-                {AccSeparator, Skip, Count}),
+                {AccSeparator, Skip, Limit}),
             NewAcc % Switch to comma
         end,
     "", Keys), % Start with no comma
@@ -171,25 +171,25 @@ make_reduce_fold_funs(Resp, GroupLevel) ->
         ({Key1,_}, {Key2,_}) ->
             Key1 == Key2
         end,
-    RespFun = fun(_Key, _Red, {AccSeparator,AccSkip,AccCount}) when AccSkip > 0 ->
-        {ok, {AccSeparator,AccSkip-1,AccCount}};
-    (_Key, _Red, {AccSeparator,0,AccCount}) when AccCount == 0 ->
-        {stop, {AccSeparator,0,AccCount}};
-    (_Key, Red, {AccSeparator,0,AccCount}) when GroupLevel == 0 ->
+    RespFun = fun(_Key, _Red, {AccSeparator,AccSkip,AccLimit}) when AccSkip > 0 ->
+        {ok, {AccSeparator,AccSkip-1,AccLimit}};
+    (_Key, _Red, {AccSeparator,0,AccLimit}) when AccLimit == 0 ->
+        {stop, {AccSeparator,0,AccLimit}};
+    (_Key, Red, {AccSeparator,0,AccLimit}) when GroupLevel == 0 ->
         Json = ?JSON_ENCODE({[{key, null}, {value, Red}]}),
         send_chunk(Resp, AccSeparator ++ Json),
-        {ok, {",",0,AccCount-1}};
-    (Key, Red, {AccSeparator,0,AccCount})
+        {ok, {",",0,AccLimit-1}};
+    (Key, Red, {AccSeparator,0,AccLimit})
             when is_integer(GroupLevel) 
             andalso is_list(Key) ->
         Json = ?JSON_ENCODE(
             {[{key, lists:sublist(Key, GroupLevel)},{value, Red}]}),
         send_chunk(Resp, AccSeparator ++ Json),
-        {ok, {",",0,AccCount-1}};
-    (Key, Red, {AccSeparator,0,AccCount}) ->
+        {ok, {",",0,AccLimit-1}};
+    (Key, Red, {AccSeparator,0,AccLimit}) ->
         Json = ?JSON_ENCODE({[{key, Key}, {value, Red}]}),
         send_chunk(Resp, AccSeparator ++ Json),
-        {ok, {",",0,AccCount-1}}
+        {ok, {",",0,AccLimit-1}}
     end,
     {ok, GroupRowsFun, RespFun}.
     
@@ -241,17 +241,17 @@ parse_view_query(Req, Keys, IsReduce) ->
                 Msg = io_lib:format("Query parameter \"~s\" not compatible with multi key mode.", [Key]),
                 throw({query_parse_error, Msg})
             end;
-        {"count", Value} ->
+        {"limit", Value} ->
             case (catch list_to_integer(Value)) of
-            Count when is_integer(Count) ->
-                if Count < 0 ->
-                    Msg = io_lib:format("Count must be a positive integer: count=~s", [Value]),
+            Limit when is_integer(Limit) ->
+                if Limit < 0 ->
+                    Msg = io_lib:format("Limit must be a positive integer: limit=~s", [Value]),
                     throw({query_parse_error, Msg});
                 true ->
-                    Args#view_query_args{count=Count}
+                    Args#view_query_args{limit=Limit}
                 end;
             _Error ->
-                Msg = io_lib:format("Bad URL query value, number expected: count=~s", [Value]),
+                Msg = io_lib:format("Bad URL query value, number expected: limit=~s", [Value]),
                 throw({query_parse_error, Msg})
             end;
         {"update", "false"} ->
@@ -276,8 +276,8 @@ parse_view_query(Req, Keys, IsReduce) ->
           Args;
         {"skip", Value} ->
             case (catch list_to_integer(Value)) of
-            Count when is_integer(Count) ->
-                Args#view_query_args{skip=Count};
+            Limit when is_integer(Limit) ->
+                Args#view_query_args{skip=Limit};
             _Error ->
                 Msg = lists:flatten(io_lib:format(
                 "Bad URL query value, number expected: skip=~s", [Value])),
@@ -381,17 +381,17 @@ make_view_fold_fun(Req, QueryArgs, Db, TotalViewCount, ReduceCountFun) ->
     end,
 
     fun({{Key, DocId}, Value}, OffsetReds,
-                      {AccCount, AccSkip, Resp, AccRevRows}) ->
+                      {AccLimit, AccSkip, Resp, AccRevRows}) ->
         PassedEnd = PassedEndFun(Key, DocId),
-        case {PassedEnd, AccCount, AccSkip, Resp} of
+        case {PassedEnd, AccLimit, AccSkip, Resp} of
         {true, _, _, _} ->
             % The stop key has been passed, stop looping.
-            {stop, {AccCount, AccSkip, Resp, AccRevRows}};
+            {stop, {AccLimit, AccSkip, Resp, AccRevRows}};
         {_, 0, _, _} ->
-            % we've done "count" rows, stop foldling
+            % we've done "limit" rows, stop foldling
             {stop, {0, 0, Resp, AccRevRows}};
         {_, _, AccSkip, _} when AccSkip > 0 ->
-            {ok, {AccCount, AccSkip - 1, Resp, AccRevRows}};
+            {ok, {AccLimit, AccSkip - 1, Resp, AccRevRows}};
         {_, _, _, undefined} ->
             {ok, Resp2} = start_json_response(Req, 200),
             Offset = ReduceCountFun(OffsetReds),
@@ -399,11 +399,11 @@ make_view_fold_fun(Req, QueryArgs, Db, TotalViewCount, ReduceCountFun) ->
                     [TotalViewCount, Offset]),
             JsonObj = view_row_obj(Db, {{Key, DocId}, Value}, IncludeDocs),
             send_chunk(Resp2, JsonBegin ++ ?JSON_ENCODE(JsonObj)),
-            {ok, {AccCount - 1, 0, Resp2, AccRevRows}};
-        {_, AccCount, _, Resp} when (AccCount > 0) ->
+            {ok, {AccLimit - 1, 0, Resp2, AccRevRows}};
+        {_, AccLimit, _, Resp} when (AccLimit > 0) ->
             JsonObj = view_row_obj(Db, {{Key, DocId}, Value}, IncludeDocs),
             send_chunk(Resp, ",\r\n" ++  ?JSON_ENCODE(JsonObj)),
-            {ok, {AccCount - 1, 0, Resp, AccRevRows}}
+            {ok, {AccLimit - 1, 0, Resp, AccRevRows}}
         end
     end.
 

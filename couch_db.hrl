@@ -139,8 +139,8 @@
 -record(view_query_args, {
     start_key = nil,
     end_key = {},
-    count = 10000000000, % a huge huge default number. Picked so we don't have
-                         % to do different logic for when there is no count
+    limit = 10000000000, % a huge huge default number. Picked so we don't have
+                         % to do different logic for when there is no limit
                          % limit
     update = true,
     direction = fwd,

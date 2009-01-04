@@ -277,7 +277,7 @@ close_db(Db)->
     couch_db:close(Db).
 
 get_doc_info_list(#http_db{uri=DbUrl, headers=Headers}, StartSeq) ->
-    Url = DbUrl ++ "_all_docs_by_seq?count=100&startkey=" 
+    Url = DbUrl ++ "_all_docs_by_seq?limit=100&startkey=" 
         ++ integer_to_list(StartSeq),
     {Results} = do_http_request(Url, get, Headers),
     lists:map(fun({RowInfoList}) ->

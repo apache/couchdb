@@ -173,7 +173,7 @@ db_req(#httpd{path_parts=[_,<<"_all_docs">>]}=Req, _Db) ->
 db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs_by_seq">>]}=Req, Db) ->
     #view_query_args{
         start_key = StartKey,
-        count = Count,
+        limit = Limit,
         skip = SkipCount,
         direction = Dir
     } = QueryArgs = couch_httpd_view:parse_view_query(Req),
@@ -215,7 +215,7 @@ db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs_by_seq">>]}=Req, Db) ->
                 end
             },
             FoldlFun({{UpdateSeq, Id}, Json}, Offset, Acc)
-        end, {Count, SkipCount, undefined, []}),
+        end, {Limit, SkipCount, undefined, []}),
     couch_httpd_view:finish_view_fold(Req, TotalRowCount, {ok, FoldResult});
 
 db_req(#httpd{path_parts=[_,<<"_all_docs_by_seq">>]}=Req, _Db) ->
@@ -259,7 +259,7 @@ all_docs_view(Req, Db, Keys) ->
     #view_query_args{
         start_key = StartKey,
         start_docid = StartDocId,
-        count = Count,
+        limit = Limit,
         skip = SkipCount,
         direction = Dir
     } = QueryArgs = couch_httpd_view:parse_view_query(Req, Keys),    
@@ -268,7 +268,7 @@ all_docs_view(Req, Db, Keys) ->
     StartId = if is_binary(StartKey) -> StartKey;
     true -> StartDocId
     end,
-    FoldAccInit = {Count, SkipCount, undefined, []},
+    FoldAccInit = {Limit, SkipCount, undefined, []},
     
     case Keys of
     nil ->
