@@ -42,11 +42,15 @@ save_to_file({{Section, Option}, Value}, File) ->
 
     % produce the contents for the config file
     NewFileContents =
-    case NewFileContents2 = save_loop({{SectionName, OptionList}, Value}, Lines, "", "", []) of
+    case {NewFileContents2, DoneOptions} = save_loop({{SectionName, OptionList}, Value}, Lines, "", "", []) of
         % we didn't change anything, that means we couldn't find a matching
         % [ini section] in which case we just append a new one.
-        OldFileContents ->
-            append_new_ini_section({{SectionName, OptionList}, Value}, OldFileContents);
+        {OldFileContents, DoneOptions} ->
+            % but only if we haven't actually written anything.
+            case lists:member(OptionList, DoneOptions) of
+                true -> OldFileContents;
+                _ -> append_new_ini_section({{SectionName, OptionList}, Value}, OldFileContents)
+            end;
         _ ->
             NewFileContents2
     end,
@@ -110,9 +114,9 @@ save_loop({{Section, Option}, Value}, [], OldSection, NewFileContents, DoneOptio
     case lists:member(Option, DoneOptions) of
         % append Deferred Option
         false when Section == OldSection -> 
-            NewFileContents ++ "\n" ++ Option ++ " = " ++ Value ++ "\n";
+            {NewFileContents ++ "\n" ++ Option ++ " = " ++ Value ++ "\n", DoneOptions};
         % we're out of new lines, just return the new file's contents
-        _ -> NewFileContents
+        _ -> {NewFileContents, DoneOptions}
     end.
 
 append_new_ini_section({{SectionName, Option}, Value}, OldFileContents) ->

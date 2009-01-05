@@ -11,7 +11,8 @@ couch_config_writer_test() ->
         fun() -> replace_existing_variable3() end,
         fun() -> append_new_variable() end,
         fun() -> append_new_module() end,
-        fun() -> overwrite_variable_further_down() end
+        fun() -> overwrite_variable_further_down() end,
+        fun() -> double_append_new_section_bug() end
     ].
 
 
@@ -148,6 +149,33 @@ option = value
 option2 = value2
 ",
     run_operation_and_compare_results(Contents, Expect, [{{"erlang", "option"}, "value"}, {{"erlang", "option2"}, "value2"}]).
+
+double_append_new_section_bug() ->
+    % create file
+    Contents = "[section]
+variable = value
+
+[another_section]
+another_var = another_value
+
+[erlang]
+option = value
+
+option2 = value2
+",
+
+    Expect = "[section]
+variable = value
+
+[another_section]
+another_var = another_value
+
+[erlang]
+option = value
+
+option2 = value2
+",
+    run_operation_and_compare_results(Contents, Expect, [{{"another_section", "another_var"}, "another_value"}]).
 
 
 run_operation_and_compare_results(Contents, Expect, Config) when not is_list(Config) ->
