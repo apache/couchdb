@@ -54,6 +54,10 @@ handle_call({update_docs, DocActions, Options}, _From, Db) ->
         throw: conflict ->
             {reply, conflict, Db}
     end;
+handle_call(full_commit, _From, #db{waiting_delayed_commit=nil}=Db) ->
+    {reply, ok, Db}; % no data waiting, return ok immediately
+handle_call(full_commit, _From, Db) ->
+    {reply, ok, commit_data(Db)}; % commit the data and return ok
 handle_call(increment_update_seq, _From, Db) ->
     Db2 = commit_data(Db#db{update_seq=Db#db.update_seq+1}),
     ok = gen_server:call(Db2#db.main_pid, {db_updated, Db2}),
@@ -185,9 +189,8 @@ handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
         {noreply, Db2}
     end.
 
-handle_info(Msg, Db) ->
-    ?LOG_ERROR("Bad message received for db ~s: ~p", [Db#db.name, Msg]),
-    exit({error, Msg}).
+handle_info(delayed_commit, Db) ->
+    {noreply, commit_data(Db#db{waiting_delayed_commit=nil})}.
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
@@ -456,13 +459,8 @@ update_docs_int(Db, DocsList, Options) ->
     _ ->
         Db4 = refresh_validate_doc_funs(Db3)
     end,
-
-    case lists:member(delay_commit, Options) of
-    true ->
-        {ok, Db4};
-    false ->
-        {ok, commit_data(Db4)}
-    end.
+    
+    {ok, commit_data(Db4, not lists:member(full_commit, Options))}.
 
 update_local_docs(#db{local_docs_btree=Btree}=Db, Docs) ->
     Ids = [Id || #doc{id=Id} <- Docs],
@@ -500,21 +498,34 @@ update_local_docs(#db{local_docs_btree=Btree}=Db, Docs) ->
     {ok, Db#db{local_docs_btree = Btree2}}.
 
 
+commit_data(Db) ->
+    commit_data(Db, false).
 
-commit_data(#db{fd=Fd, header=Header} = Db) ->
-    Header2 = Header#db_header{
+
+commit_data(#db{fd=Fd, header=Header} = Db, Delay) ->
+    Db2 = Db#db{header = Header#db_header{
         update_seq = Db#db.update_seq,
         summary_stream_state = couch_stream:get_state(Db#db.summary_stream),
         docinfo_by_seq_btree_state = couch_btree:get_state(Db#db.docinfo_by_seq_btree),
         fulldocinfo_by_id_btree_state = couch_btree:get_state(Db#db.fulldocinfo_by_id_btree),
         local_docs_btree_state = couch_btree:get_state(Db#db.local_docs_btree),
         admins_ptr = Db#db.admins_ptr
-        },
-    if Header == Header2 ->
-        Db; % unchanged. nothing to do
+        }},
+    if Delay and (Db#db.waiting_delayed_commit == nil) ->
+        Db2#db{waiting_delayed_commit=
+                erlang:send_after(1000, self(), delayed_commit)};
+    Delay ->
+        Db2;
     true ->
-        ok = couch_file:write_header(Fd, ?HEADER_SIG, Header2),
-        Db#db{header = Header2}
+        if Db#db.waiting_delayed_commit /= nil ->
+            case erlang:cancel_timer(Db#db.waiting_delayed_commit) of
+            false -> receive delayed_commit -> ok after 0 -> ok end;
+            _ -> ok
+            end;
+        true -> ok
+        end,
+        ok = couch_file:write_header(Fd, ?HEADER_SIG, Db2#db.header),
+        Db2#db{waiting_delayed_commit=nil}
     end.
 
 copy_raw_doc(SrcFd, SrcSp, DestFd, DestStream) ->

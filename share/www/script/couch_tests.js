@@ -130,7 +130,11 @@ var tests = {
     T(db.open(existingDoc._id, {rev: existingDoc._rev}) != null);
     
     // make sure restart works
+    T(db.ensureFullCommit().ok);
     restartServer();
+    
+    // make sure we can still open
+    T(db.open(existingDoc._id, {rev: existingDoc._rev}) != null);
   },
   all_docs: function(debug) {
     var db = new CouchDB("test_suite_db");
@@ -1173,6 +1177,7 @@ var tests = {
       }
       T(db.view("test/no_docs").total_rows == 0)
       T(db.view("test/single_doc").total_rows == 1)
+      T(db.ensureFullCommit().ok);
       restartServer();
     };
     
@@ -1214,7 +1219,8 @@ var tests = {
     T(db.deleteDoc(designDoc).ok);
     T(db.open(designDoc._id) == null);
     T(db.view("test/no_docs") == null);
-
+    
+    T(db.ensureFullCommit().ok);
     restartServer();
     T(db.open(designDoc._id) == null);
     T(db.view("test/no_docs") == null);
@@ -2327,6 +2333,7 @@ var tests = {
     // compaction isn't instantaneous, loop until done
     while (db.info().compact_running) {};
     
+    T(db.ensureFullCommit().ok);
     restartServer();
     var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt");
     T(xhr.responseText == "This is a base64 encoded text")

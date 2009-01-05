@@ -21,7 +21,7 @@
 -export([enum_docs/4,enum_docs/5,enum_docs_since/4,enum_docs_since/5]).
 -export([enum_docs_since_reduce_to_count/1,enum_docs_reduce_to_count/1]).
 -export([increment_update_seq/1,get_purge_seq/1,purge_docs/2,get_last_purged/1]).
--export([start_link/3,make_doc/2,set_admins/2,get_admins/1]).
+-export([start_link/3,make_doc/2,set_admins/2,get_admins/1,ensure_full_commit/1]).
 -export([init/1,terminate/2,handle_call/3,handle_cast/2,code_change/3,handle_info/2]).
 
 
@@ -63,6 +63,9 @@ create(DbName, Options) ->
 
 open(DbName, Options) ->
     couch_server:open(DbName, Options).
+
+ensure_full_commit(#db{update_pid=UpdatePid}) ->
+    gen_server:call(UpdatePid, full_commit, infinity).
 
 close(#db{fd=Fd}) ->
     couch_file:drop_ref(Fd).
@@ -462,7 +465,7 @@ init({DbName, Filepath, Fd, Options}) ->
     ok = couch_file:add_ref(Fd),
     gen_server:call(UpdaterPid, get_db).
 
-terminate(_Reason, Db) ->
+terminate(_Reason, _Db) ->
     ok.
     
 handle_call({open_ref_counted_instance, OpenerPid}, _From, #db{fd=Fd}=Db) ->

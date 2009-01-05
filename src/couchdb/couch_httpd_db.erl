@@ -89,10 +89,24 @@ db_req(#httpd{method='POST',path_parts=[_DbName]}=Req, Db) ->
 db_req(#httpd{path_parts=[_DbName]}=Req, _Db) ->
     send_method_not_allowed(Req, "DELETE,GET,HEAD,POST");
 
+db_req(#httpd{method='POST',path_parts=[_,<<"_ensure_full_commit">>]}=Req, Db) ->
+    ok = couch_db:ensure_full_commit(Db),
+    send_json(Req, 201, {[
+            {ok, true}
+        ]});
+    
+db_req(#httpd{path_parts=[_,<<"_ensure_full_commit">>]}=Req, _Db) ->
+    send_method_not_allowed(Req, "POST");
+
 db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
     {JsonProps} = couch_httpd:json_body(Req),
     DocsArray = proplists:get_value(<<"docs">>, JsonProps),
-    % convert all the doc elements to native docs
+    case couch_httpd:header_value(Req, "X-Couch-Full-Commit", "false") of
+    "true" ->
+        Options = [full_commit];
+    _ ->
+        Options = []
+    end,
     case proplists:get_value(<<"new_edits">>, JsonProps, true) of
     true ->
         Docs = lists:map(
@@ -109,7 +123,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
                 Doc#doc{id=Id,revs=Revs}
             end,
             DocsArray),
-        {ok, ResultRevs} = couch_db:update_docs(Db, Docs, []),
+        {ok, ResultRevs} = couch_db:update_docs(Db, Docs, Options),
 
         % output the results
         DocResults = lists:zipwith(
@@ -123,11 +137,6 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
         ]});
 
     false ->
-        Options =
-        case proplists:get_value(<<"new_edits">>, JsonProps, true) of
-            true -> [new_edits];
-            _ -> []
-        end,
         Docs = [couch_doc:from_json_obj(JsonObj) || JsonObj <- DocsArray],
         ok = couch_db:update_docs(Db, Docs, Options, false),
         send_json(Req, 201, {[
@@ -418,13 +427,19 @@ db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
         [Rev0|_] -> Rev0;
         [] -> undefined
     end,
+    case couch_httpd:header_value(Req, "X-Couch-Full-Commit", "false") of
+    "true" ->
+        Options = [full_commit];
+    _ ->
+        Options = []
+    end,
     case extract_header_rev(Req, ExplicitRev) of
     missing_rev ->
         Revs = [];
     Rev ->
         Revs = [Rev]
     end,
-    {ok, NewRev} = couch_db:update_doc(Db, Doc#doc{id=DocId, revs=Revs}, []),
+    {ok, NewRev} = couch_db:update_doc(Db, Doc#doc{id=DocId, revs=Revs}, Options),
     send_json(Req, 201, [{"Etag", <<"\"", NewRev/binary, "\"">>}], {[
         {ok, true},
         {id, DocId},

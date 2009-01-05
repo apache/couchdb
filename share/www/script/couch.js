@@ -108,6 +108,12 @@ function CouchDB(name, httpHeaders) {
     }
     return result;
   }
+  
+  this.ensureFullCommit = function() {
+    this.last_req = this.request("POST", this.uri + "_ensure_full_commit");
+    CouchDB.maybeThrowError(this.last_req);
+    return JSON.parse(this.last_req.responseText);
+  }
 
   // Applies the map function to the contents of database and returns the results.
   this.query = function(mapFun, reduceFun, options, keys) {
