@@ -16,8 +16,7 @@
 
 -include("couch_db.hrl").
 
-update(#group{db=Db,current_seq=Seq,purge_seq=PurgeSeq,
-        commit_fun=CommitFun}=Group) ->
+update(#group{db=Db,current_seq=Seq,purge_seq=PurgeSeq}=Group) ->
     ?LOG_DEBUG("Starting index update.",[]),
     DbPurgeSeq = couch_db:get_purge_seq(Db),
     Group2 =
@@ -45,14 +44,9 @@ update(#group{db=Db,current_seq=Seq,purge_seq=PurgeSeq,
             UncomputedDocs, Results, ViewKVsToAdd, DocIdViewIdKeys),
     couch_query_servers:stop_doc_map(Group4#group.query_server),
     NewSeq = couch_db:get_update_seq(Db),
-    if Seq /= NewSeq ->
-        {ok, Group5} = write_changes(Group4, ViewKVsToAdd2, DocIdViewIdKeys2,
+    {ok, Group5} = write_changes(Group4, ViewKVsToAdd2, DocIdViewIdKeys2,
                 NewSeq),
-        ok = CommitFun(Group5),
-        exit({new_group, Group5#group{query_server=nil}});
-    true ->
-        exit({new_group, Group4#group{query_server=nil}})
-    end.
+    exit({new_group, Group5#group{query_server=nil}}).
 
 
 purge_index(#group{db=Db, views=Views, id_btree=IdBtree}=Group) ->

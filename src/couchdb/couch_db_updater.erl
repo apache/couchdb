@@ -503,19 +503,21 @@ commit_data(Db) ->
 
 
 commit_data(#db{fd=Fd, header=Header} = Db, Delay) ->
-    Db2 = Db#db{header = Header#db_header{
+    Header2 = Header#db_header{
         update_seq = Db#db.update_seq,
         summary_stream_state = couch_stream:get_state(Db#db.summary_stream),
         docinfo_by_seq_btree_state = couch_btree:get_state(Db#db.docinfo_by_seq_btree),
         fulldocinfo_by_id_btree_state = couch_btree:get_state(Db#db.fulldocinfo_by_id_btree),
         local_docs_btree_state = couch_btree:get_state(Db#db.local_docs_btree),
         admins_ptr = Db#db.admins_ptr
-        }},
-    if Delay and (Db#db.waiting_delayed_commit == nil) ->
-        Db2#db{waiting_delayed_commit=
+        },
+    if Header == Header2 ->
+        Db;
+    Delay and (Db#db.waiting_delayed_commit == nil) ->
+        Db#db{waiting_delayed_commit=
                 erlang:send_after(1000, self(), delayed_commit)};
     Delay ->
-        Db2;
+        Db;
     true ->
         if Db#db.waiting_delayed_commit /= nil ->
             case erlang:cancel_timer(Db#db.waiting_delayed_commit) of
@@ -524,8 +526,8 @@ commit_data(#db{fd=Fd, header=Header} = Db, Delay) ->
             end;
         true -> ok
         end,
-        ok = couch_file:write_header(Fd, ?HEADER_SIG, Db2#db.header),
-        Db2#db{waiting_delayed_commit=nil}
+        ok = couch_file:write_header(Fd, ?HEADER_SIG, Header2),
+        Db#db{waiting_delayed_commit=nil,header=Header2}
     end.
 
 copy_raw_doc(SrcFd, SrcSp, DestFd, DestStream) ->
