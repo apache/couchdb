@@ -132,7 +132,8 @@
     validate_doc_funs=[],
     admins=[],
     admins_ptr=nil,
-    user_ctx=#user_ctx{}
+    user_ctx=#user_ctx{},
+    waiting_delayed_commit=nil
     }).
 
 
@@ -161,6 +162,7 @@
     views,
     id_btree=nil,
     current_seq=0,
+    committed_seq=0,
     purge_seq=0,
     query_server=nil,
     commit_fun
