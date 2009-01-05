@@ -154,7 +154,8 @@
 }).
 
 -record(group,
-    {sig=nil,
+    {type=view, % can also be slow_view
+    sig=nil,
     db=nil,
     fd=nil,
     name,
@@ -162,10 +163,9 @@
     views,
     id_btree=nil,
     current_seq=0,
-    committed_seq=0,
     purge_seq=0,
     query_server=nil,
-    commit_fun
+    waiting_delayed_commit=nil
     }).
 
 -record(view,
