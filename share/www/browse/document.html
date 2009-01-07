@@ -64,6 +64,9 @@ specific language governing permissions and limitations under the License.
         $("#toolbar button.add").click(page.addField);
         $("#toolbar button.load").click(page.uploadAttachment);
         $("#toolbar button.delete").click(page.deleteDocument);
+
+        // Update the title
+        document.title = "View Document " + page.docId; 
       });
     </script>
   </head>

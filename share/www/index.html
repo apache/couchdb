@@ -30,7 +30,8 @@ specific language governing permissions and limitations under the License.
     <script src="script/jquery.js?1.2.6"></script>
     <script src="script/jquery.cookies.js?0.8.0"></script>
     <script src="script/jquery.couch.js?0.8.0"></script>
-    <script>
+    <script src="script/jquery.history.js?0.8.0"></script>
+    <script type="text/javascript">
       function updateRecentDatabasesList() {
         $("#dbs").empty();
         var recentDbs = $.cookies.get("recent", "").split(",");
@@ -40,6 +41,17 @@ specific language governing permissions and limitations under the License.
             encodeURIComponent(name) + "' target='content'>" + name +
             "</a></li>");
         });
+      }
+      var baseURL = location.pathname.match(/.*\//).toString();
+      function updateIFrame(hash) {
+        var l = frames['content'].location;
+        var title = frames['content'].document.title + " - Apache CouchDB: Futon Utility Client";        
+        document.title = title;	
+        var href = baseURL + hash;
+        // For some reason the onload event fires twice; the 2nd time with URL-decoded l.href
+        if (hash != '' && decodeURIComponent(l.pathname + l.search) != decodeURIComponent(href)) {
+          l.href = href;
+        }
       }
       function updateNavigation(path, queryString) {
         function fixupPath(path) { // hack for IE/Win
@@ -69,6 +81,11 @@ specific language governing permissions and limitations under the License.
         });
       }
       $(function() {
+        $.historyInit(updateIFrame);
+        $('#content').load(function() {
+          var l = frames["content"].location;
+          $.historyLoad(l.pathname.substring(baseURL.length) + l.search);
+        });
         $.couch.info({
           success: function(info, status) {
             $("#version").text(info.version);
@@ -95,7 +112,7 @@ specific language governing permissions and limitations under the License.
     </ul>
     <div id="footer">Futon on Apache CouchDB <span id="version">?</span></div>
     <div id="view">
-      <iframe name="content" src="browse/index.html" allowtransparency="true">
+      <iframe name="content" src="browse/index.html" allowtransparency="true" id="content">
     </div>
   </body>
 </html>

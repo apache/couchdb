@@ -103,6 +103,9 @@ specific language governing permissions and limitations under the License.
         $("#toolbar button.add").click(page.addDocument);
         $("#toolbar button.compact").click(page.compactDatabase);
         $("#toolbar button.delete").click(page.deleteDatabase);
+
+        // Update title
+        document.title = "Browse Database " + page.db.name;
       });
     </script>
   </head>
