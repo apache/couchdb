@@ -262,15 +262,9 @@ For the share/www/script/jquery.form.js component:
   OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
   WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-For the share/www/script/json2.js component:
+For the share/www/script/jquery.history.js component:
 
-  Public Domain
-
-  No warranty expressed or implied. Use at your own risk.
-
-For the src/couchdb/cjson.erl component:
-
-  Copyright (c) 2006 Mochi Media, Inc.
+  http://www.mikage.to/jquery/jquery_history.html
 
   Permission is hereby granted, free of charge, to any person obtaining
   a copy of this software and associated documentation files (the
@@ -290,6 +284,12 @@ For the src/couchdb/cjson.erl component:
   LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
   OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
   WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+For the share/www/script/json2.js component:
+
+  Public Domain
+
+  No warranty expressed or implied. Use at your own risk.
 
 For the src/mochiweb component:
 

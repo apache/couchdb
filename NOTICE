@@ -14,6 +14,10 @@ This product also includes the following third-party components:
 
    Copyright 2008, John Resig
 
+ * jQuery history plugin (http://www.mikage.to/jquery/jquery_history.html)
+
+   Copyright 2006, Taku Sano (Mikage Sawatari)
+
  * json2.js (http://www.json.org/)
 
    In the public domain
