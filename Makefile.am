@@ -147,7 +147,7 @@ couch.app: couch.app.tpl
 
 # $(ERL) -noshell -run edoc_run files [\"$<\"]
 
-%.beam: %.erl
+%.beam: %.erl couch_db.hrl
 	$(ERLC) $<
 
 install-data-hook:
