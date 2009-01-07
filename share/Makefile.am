@@ -63,7 +63,6 @@ nobase_dist_localdata_DATA = \
     www/script/jquery.couch.js \
     www/script/jquery.dialog.js \
     www/script/jquery.form.js \
-    www/script/jquery.history.js \
     www/script/jquery.resizer.js \
     www/script/jquery.suggest.js \
     www/script/json2.js \
