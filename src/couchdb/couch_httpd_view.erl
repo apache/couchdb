@@ -254,6 +254,8 @@ parse_view_query(Req, Keys, IsReduce) ->
                 Msg = io_lib:format("Bad URL query value, number expected: limit=~s", [Value]),
                 throw({query_parse_error, Msg})
             end;
+        {"count", Value} ->
+            throw({query_parse_error, "URL query parameter 'count' has been changed to 'limit'."});
         {"update", "false"} ->
             Args#view_query_args{update=false};
         {"descending", "true"} ->
