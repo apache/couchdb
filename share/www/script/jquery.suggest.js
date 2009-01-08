@@ -27,9 +27,13 @@
 
     input
       .blur(function() {
+        if (timer) clearTimeout(timer);
         setTimeout(function() { dropdown.hide() }, 200);
       })
       .keydown(function(e) {
+        if ($.inArray(e.keyCode, [16, 17, 18, 20, 144, 91, 93, 224]) != -1) {
+          return; // ignore modifier keys
+        }
         if (timer) clearTimeout(timer);
         if ($.inArray(e.keyCode, [38, 40]) != -1 ||
             (dropdown.is(":visible") && (e.keyCode == 27 ||
