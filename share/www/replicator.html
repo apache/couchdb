@@ -17,14 +17,17 @@ specific language governing permissions and limitations under the License.
   <head>
     <title>Replicator</title>
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
-    <link rel="stylesheet" href="style/layout.css?0.8.0" type="text/css">
+    <link rel="stylesheet" href="style/layout.css?0.9.0" type="text/css">
     <script src="script/json2.js"></script>
     <script src="script/jquery.js?1.2.6"></script>
-    <script src="script/jquery.couch.js?0.8.0"></script>
-    <script src="script/pprint.js?0.8.0"></script>
+    <script src="script/jquery.cookies.js?0.9.0"></script>
+    <script src="script/jquery.couch.js?0.9.0"></script>
+    <script src="script/pprint.js?0.9.0"></script>
     <script>
       $(document).ready(function() {
-        if (window !== parent) parent.updateNavigation();
+        $.get("_sidebar.html", function(resp) {
+          $(resp).insertAfter("#wrap");
+        });
 
         $("fieldset input[type=radio]").click(function() {
           var radio = this;
@@ -95,12 +98,12 @@ specific language governing permissions and limitations under the License.
       });
     </script>
   </head>
-  <body>
+  <body><div id="wrap">
     <h1>
-      <a href="browse/index.html">Overview</a>
+      <a href="index.html">Overview</a>
       <strong>Replicator</strong>
     </h1>
-    <div id="wrap">
+    <div id="content">
 
       <form id="replicator">
         <fieldset id="source">
@@ -129,7 +132,7 @@ specific language governing permissions and limitations under the License.
         </p>
       </form>
 
-      <table id="records" class="listing">
+      <table id="records" class="listing" cellspacing="0">
         <caption>Replication History</caption>
         <thead><tr>
           <th>Event</th>
@@ -141,5 +144,5 @@ specific language governing permissions and limitations under the License.
       </table>
 
     </div>
-  </body>
+  </div></body>
 </html>

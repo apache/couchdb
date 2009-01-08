@@ -1,0 +1,65 @@
+<div id="sidebar">
+  <a href="index.html">
+    <img id="logo" src="image/logo.png" width="175" height="150" alt="Apache CouchDB: Relax">
+  </a>
+  <ul id="nav">
+    <li><span>Tools</span><ul>
+      <li><a href="index.html">Overview</a></li>
+      <li><a href="replicator.html">Replicator</a></li>
+      <li><a href="config.html">Configuration</a></li>
+      <li><a href="couch_tests.html?script/couch_tests.js">Test Suite</a></li>
+    </ul></li>
+    <li><span>Recent Databases</span>
+      <ul id="dbs"></ul>
+    </li>
+  </ul>
+  <div id="footer">
+    Futon on <a href="http://couchdb.apache.org/">Apache CouchDB</a>
+    <span id="version">?</span>
+  </div>
+</div>
+<script type="text/javascript">
+  function updateNavigation(path, queryString) {
+    function fixupPath(path) { // hack for IE/Win
+      return (path.charAt(0) != "/") ? ("/" + path) : path;
+    }
+    if (!path) {
+      path = location.pathname;
+      if (!queryString) {
+        queryString = location.search;
+      }
+    } else if (!queryString) {
+      queryString = "";
+    }
+    var href = fixupPath(path + queryString);
+    $("#nav li").removeClass("selected");
+    $("#nav li a").each(function() {
+      if (fixupPath(this.pathname) + this.search != href) return;
+      $(this).parent("li").addClass("selected").parents("li").addClass("selected");
+    });
+  }
+
+  function updateRecentDatabasesList() {
+    $("#dbs").empty();
+    var recentDbs = $.cookies.get("recent", "").split(",");
+    recentDbs.sort();
+    $.each(recentDbs, function(idx, name) {
+      if (name) {
+        $("#dbs").append("<li><a href='database.html?" +
+          encodeURIComponent(name) + "'>" + name +
+          "</a></li>");
+      }
+    });
+  }
+
+  $(function() {
+    document.title = "Apache CouchDB - Futon: " + document.title;
+    $.couch.info({
+      success: function(info, status) {
+        $("#version").text(info.version);
+      }
+    });
+    updateRecentDatabasesList();
+    updateNavigation();
+  });
+</script>

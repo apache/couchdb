@@ -17,14 +17,17 @@ specific language governing permissions and limitations under the License.
   <head>
     <title>Configuration</title>
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
-    <link rel="stylesheet" href="style/layout.css?0.8.0" type="text/css">
+    <link rel="stylesheet" href="style/layout.css?0.9.0" type="text/css">
     <script src="script/json2.js"></script>
     <script src="script/jquery.js?1.2.6"></script>
-    <script src="script/jquery.couch.js?0.8.0"></script>
-    <script src="script/pprint.js?0.8.0"></script>
+    <script src="script/jquery.cookies.js?0.9.0"></script>
+    <script src="script/jquery.couch.js?0.9.0"></script>
+    <script src="script/pprint.js?0.9.0"></script>
     <script>
       $(document).ready(function() {
-        if (window !== parent) parent.updateNavigation();
+        $.get("_sidebar.html", function(resp) {
+          $(resp).insertAfter("#wrap");
+        });
 
         $(document.body).addClass("loading");
         $.couch.config({
@@ -61,14 +64,14 @@ specific language governing permissions and limitations under the License.
       });
     </script>
   </head>
-  <body>
+  <body><div id="wrap">
     <h1>
-      <a href="browse/index.html">Overview</a>
+      <a href="index.html">Overview</a>
       <strong>Configuration</strong>
     </h1>
-    <div id="wrap">
+    <div id="content">
 
-      <table id="config" class="listing">
+      <table id="config" class="listing" cellspacing="0">
         <caption>Configuration</caption>
         <thead><tr>
           <th>Section</th>
@@ -79,5 +82,5 @@ specific language governing permissions and limitations under the License.
       </table>
 
     </div>
-  </body>
+  </div></body>
 </html>

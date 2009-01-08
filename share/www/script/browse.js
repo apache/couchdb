@@ -17,7 +17,7 @@ function CouchIndexPage() {
   page = this;
 
   this.addDatabase = function() {
-    $.showDialog("_create_database.html", {
+    $.showDialog("dialog/_create_database.html", {
       submit: function(data, callback) {
         if (!data.name || data.name.length == 0) {
           callback({name: "Please enter a name."});
@@ -119,7 +119,7 @@ function CouchDatabasePage() {
   page = this;
 
   this.addDocument = function() {
-    $.showDialog("_create_document.html", {
+    $.showDialog("dialog/_create_document.html", {
       submit: function(data, callback) {
         db.saveDoc(data.docid ? {_id: data.docid} : {}, {
           error: function(status, error, reason) {
@@ -135,7 +135,7 @@ function CouchDatabasePage() {
   }
 
   this.compactDatabase = function() {
-    $.showDialog("_compact_database.html", {
+    $.showDialog("dialog/_compact_database.html", {
       submit: function(data, callback) {
         db.compact({
           success: function(resp) {
@@ -147,16 +147,25 @@ function CouchDatabasePage() {
   }
 
   this.deleteDatabase = function() {
-    $.showDialog("_delete_database.html", {
+    $.showDialog("dialog/_delete_database.html", {
       submit: function(data, callback) {
         db.drop({
           success: function(resp) {
             callback();
             location.href = "index.html";
             if (window !== null) {
-              parent.$("#dbs li").filter(function(index) {
+              $("#dbs li").filter(function(index) {
                 return $("a", this).text() == dbName;
               }).remove();
+
+              // remove database from recent databases list
+              var recentDbs = $.cookies.get("recent", "").split(",");
+              var recentIdx = $.inArray(db.name, recentDbs)
+              if (recentIdx >= 0) {
+                recentDbs.splice(recentIdx, 1);
+                $.cookies.set("recent", recentDbs.join(","));
+                updateRecentDatabasesList();
+              }
             }
           }
         });
@@ -173,7 +182,7 @@ function CouchDatabasePage() {
           dirtyTimeout = setTimeout(function() {
             var buttons = $("#viewcode button.save, #viewcode button.revert");
             page.isDirty = ($("#viewcode_map").val() != page.storedViewCode.map)
-              || ($("#viewcode_reduce").val() != page.storedViewCode.reduce);
+              || ($("#viewcode_reduce").val() != (page.storedViewCode.reduce || ""));
             if (page.isDirty) {
               buttons.removeAttr("disabled");
             } else {
@@ -182,9 +191,7 @@ function CouchDatabasePage() {
           }, 100);
         }
         $("#viewcode textarea").bind("input", updateDirtyState);
-        if ($.browser.msie) { // sorry, browser detection
-          $("#viewcode textarea").get(0).onpropertychange = updateDirtyState
-        } else if ($.browser.safari) {
+        if ($.browser.msie || $.browser.safari) {
           $("#viewcode textarea").bind("paste", updateDirtyState)
                                  .bind("change", updateDirtyState)
                                  .bind("keydown", updateDirtyState)
@@ -272,7 +279,7 @@ function CouchDatabasePage() {
     } else {
       var designDocId = "", localViewName = ""
     }
-    $.showDialog("_save_view_as.html", {
+    $.showDialog("dialog/_save_view_as.html", {
       load: function(elem) {
         $("#input_docid", elem).val(designDocId).suggest(function(text, callback) {
           db.allDocs({
@@ -490,7 +497,7 @@ function CouchDatabasePage() {
     }
 
     if (!viewName) {
-      $("#switch select").get(0).selectedIndex = 0;
+      $("#switch select")[0].selectedIndex = 0;
       db.allDocs(options);
     } else {
       if (viewName == "_slow_view") {
@@ -641,7 +648,7 @@ function CouchDocumentPage() {
   }
 
   this.deleteDocument = function() {
-    $.showDialog("_delete_document.html", {
+    $.showDialog("dialog/_delete_document.html", {
       submit: function(data, callback) {
         db.removeDoc(page.doc, {
           success: function(resp) {
@@ -670,7 +677,7 @@ function CouchDocumentPage() {
             "document before you can attach a new file.");
       return false;
     }
-    $.showDialog("_upload_attachment.html", {
+    $.showDialog("dialog/_upload_attachment.html", {
       load: function(elem) {
         $("input[name='_rev']", elem).val(page.doc._rev);
       },

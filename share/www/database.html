@@ -17,31 +17,34 @@ specific language governing permissions and limitations under the License.
   <head>
     <title>Browse Database</title>
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
-    <link rel="stylesheet" href="../style/layout.css?0.8.0" type="text/css">
-    <script src="../script/json2.js"></script>
-    <script src="../script/jquery.js?1.2.6"></script>
-    <script src="../script/jquery.cookies.js?0.8.0"></script>
-    <script src="../script/jquery.couch.js?0.8.0"></script>
-    <script src="../script/jquery.dialog.js?0.8.0"></script>
-    <script src="../script/jquery.resizer.js?0.8.0"></script>
-    <script src="../script/jquery.suggest.js?0.8.0"></script>
-    <script src="../script/browse.js?0.8.0"></script>
-    <script src="../script/pprint.js?0.8.0"></script>
+    <link rel="stylesheet" href="style/layout.css?0.9.0" type="text/css">
+    <script src="script/json2.js"></script>
+    <script src="script/jquery.js?1.2.6"></script>
+    <script src="script/jquery.cookies.js?0.9.0"></script>
+    <script src="script/jquery.couch.js?0.9.0"></script>
+    <script src="script/jquery.dialog.js?0.9.0"></script>
+    <script src="script/jquery.resizer.js?0.9.0"></script>
+    <script src="script/jquery.suggest.js?0.9.0"></script>
+    <script src="script/browse.js?0.9.0"></script>
+    <script src="script/pprint.js?0.9.0"></script>
     <script>
       var page = new CouchDatabasePage();
-      if (window != parent) {
-        parent.updateNavigation(location.pathname,
-          encodeURIComponent(location.search.split("/", 2)[0]));
+
+      $.get("_sidebar.html", function(resp) {
+        $(resp).insertAfter("#wrap");
+
         var recentDbs = $.cookies.get("recent", "").split(",");
         if ($.inArray(page.db.name, recentDbs) == -1) {
           recentDbs.unshift(page.db.name);
           if (recentDbs.length > 10) recentDbs.length = 10;
-          $.cookies.set("recent", recentDbs.join(","), parent.location.pathname);
-          parent.updateRecentDatabasesList();
+          $.cookies.set("recent", recentDbs.join(","));
+          updateRecentDatabasesList();
         }
-      }
 
-      $(document).ready(function() {
+        updateNavigation(location.pathname, "?" + page.db.name);
+      });
+
+      $(function() {
         $("h1 strong").text(page.db.name);
         $("#viewcode span").click(function() {
           $("#viewcode").toggleClass("collapsed");
@@ -107,12 +110,12 @@ specific language governing permissions and limitations under the License.
     </script>
   </head>
 
-  <body>
+  <body><div id="wrap">
     <h1>
       <a href="index.html">Overview</a>
       <strong>?</strong>
     </h1>
-    <div id="wrap">
+    <div id="content">
       <div id="switch">
         <label>Select view: <select autocomplete="false">
           <option value="">All documents</option>
@@ -182,5 +185,5 @@ specific language governing permissions and limitations under the License.
       </table>
 
     </div>
-  </body>
+  </div></body>
 </html>

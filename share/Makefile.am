@@ -12,16 +12,13 @@
 
 nobase_dist_localdata_DATA = \
     server/main.js \
-    www/browse/_compact_database.html \
-    www/browse/_create_database.html \
-    www/browse/_create_document.html \
-    www/browse/_delete_database.html \
-    www/browse/_delete_document.html \
-    www/browse/_save_view_as.html \
-    www/browse/_upload_attachment.html \
-    www/browse/database.html \
-    www/browse/document.html \
-    www/browse/index.html \
+    www/dialog/_compact_database.html \
+    www/dialog/_create_database.html \
+    www/dialog/_create_document.html \
+    www/dialog/_delete_database.html \
+    www/dialog/_delete_document.html \
+    www/dialog/_save_view_as.html \
+    www/dialog/_upload_attachment.html \
     www/couch_tests.html \
     www/favicon.ico \
     www/image/add.gif \
@@ -51,8 +48,11 @@ nobase_dist_localdata_DATA = \
     www/image/toggle-collapse.gif \
     www/image/toggle-expand.gif \
     www/image/twisty.gif \
+    www/_sidebar.html \
     www/index.html \
     www/config.html \
+    www/database.html \
+    www/document.html \
     www/replicator.html \
     www/script/browse.js \
     www/script/couch.js \

@@ -17,17 +17,22 @@ specific language governing permissions and limitations under the License.
   <head>
     <title>Test Suite</title>
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
-    <link rel="stylesheet" href="style/layout.css?0.8.0" type="text/css">
+    <link rel="stylesheet" href="style/layout.css?0.9.0" type="text/css">
     <script src="script/json2.js"></script>
     <script src="script/jquery.js?1.2.6"></script>
-    <script src="script/couch.js?0.8.0"></script>
-    <script src="script/pprint.js?0.8.0"></script>
+    <script src="script/jquery.cookies.js?0.9.0"></script>
+    <script src="script/jquery.couch.js?0.9.0"></script>
+    <script src="script/couch.js?0.9.0"></script>
+    <script src="script/pprint.js?0.9.0"></script>
     <script src="script/couch_test_runner.js"></script>
     <script>
       $(function() {        
+        $.get("_sidebar.html", function(resp) {
+          $(resp).insertAfter("#wrap");
+        });
+
         updateTestsListing();
         $("#toolbar button.run").click(runAllTests);
-        if (window != parent) parent.updateNavigation();        
         $("#toolbar button.load").click(function() {
           location.reload(true);
         });
@@ -36,12 +41,12 @@ specific language governing permissions and limitations under the License.
       loadTests(testsPath||"script/couch_tests.js")
     </script>
   </head>
-  <body>
+  <body><div id="wrap">
     <h1>
-      <a href="browse/index.html">Overview</a>
+      <a href="index.html">Overview</a>
       <strong>Test Suite</strong>
     </h1>
-    <div id="wrap">
+    <div id="content">
       <ul id="toolbar">
         <li><button class="run">Run All</button></li>
         <li><button class="load">Reload</button></li>
@@ -52,6 +57,7 @@ specific language governing permissions and limitations under the License.
         some time, and you'll not be able to do much with your browser while
         a test is being executed.
       </p>
+
       <table class="listing" id="tests" cellspacing="0">
         <caption>Tests</caption>
         <thead>
@@ -70,6 +76,7 @@ specific language governing permissions and limitations under the License.
           </tr>
         </tbody>
       </table>
+
     </div>
-  </body>
+  </div></body>
 </html>
