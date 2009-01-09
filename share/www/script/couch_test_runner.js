@@ -49,7 +49,7 @@ function runAllTests() {
       var row = rows.get(offset);
       runTest($("th button", row).get(0), function() {
         offset += 1;
-        setTimeout(runNext, 1000);
+        setTimeout(runNext, 100);
       });
     }
   }
