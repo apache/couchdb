@@ -107,7 +107,10 @@ function CouchDatabasePage() {
     viewName = decodeURIComponent(viewName);
     $.cookies.set(dbName + ".view", viewName);
   } else {
-    viewName = $.cookies.get(dbName + ".view") || "";
+    viewName = $.cookies.get(dbName + ".view", "");
+    if (viewName) {
+      location.href = "database.html?" + dbName + "/" + viewName;
+    }
   }
   var db = $.couch.db(dbName);
 
@@ -157,15 +160,7 @@ function CouchDatabasePage() {
               $("#dbs li").filter(function(index) {
                 return $("a", this).text() == dbName;
               }).remove();
-
-              // remove database from recent databases list
-              var recentDbs = $.cookies.get("recent", "").split(",");
-              var recentIdx = $.inArray(db.name, recentDbs)
-              if (recentIdx >= 0) {
-                recentDbs.splice(recentIdx, 1);
-                $.cookies.set("recent", recentDbs.join(","));
-                updateRecentDatabasesList();
-              }
+              $.futon.navigation.removeDatabase(dbName);
             }
           }
         });
@@ -200,6 +195,11 @@ function CouchDatabasePage() {
                                  .bind("textInput", updateDirtyState);
         }
       });
+    } else if (viewName == "_slow_view") {
+      page.updateViewEditor(
+        $.cookies.get(db.name + ".map"),
+        $.cookies.get(db.name + ".reduce", "")
+      );
     }
   }
 
@@ -252,11 +252,7 @@ function CouchDatabasePage() {
         },
         success: function(resp) {
           var viewCode = resp.views[localViewName];
-          $("#viewcode_map").val(viewCode.map);
-          $("#viewcode_reduce").val(viewCode.reduce || "");
-          var lines = Math.max(viewCode.map.split("\n").length,
-                               (viewCode.reduce ? viewCode.reduce.split("\n").length : 1));
-          $("#viewcode textarea").attr("rows", Math.min(15, Math.max(3, lines)));
+          page.updateViewEditor(viewCode.map, viewCode.reduce || "");
           $("#viewcode button.revert, #viewcode button.save").attr("disabled", "disabled");
           page.storedViewCode = viewCode;
           if (callback) callback();
@@ -271,13 +267,24 @@ function CouchDatabasePage() {
     }
   }
 
+  this.updateViewEditor = function(mapFun, reduceFun) {
+    if (!mapFun) return;
+    $("#viewcode_map").val(mapFun);
+    $("#viewcode_reduce").val(reduceFun);
+    var lines = Math.max(
+      mapFun.split("\n").length,
+      reduceFun.split("\n").length
+    );
+    $("#viewcode textarea").attr("rows", Math.min(15, Math.max(3, lines)));
+  }
+
   this.saveViewAs = function() {
     if (viewName && /^_design/.test(viewName)) {
       var viewNameParts = viewName.split("/");
       var designDocId = viewNameParts[1];
       var localViewName = viewNameParts[2];
     } else {
-      var designDocId = "", localViewName = ""
+      var designDocId = "", localViewName = "";
     }
     $.showDialog("dialog/_save_view_as.html", {
       load: function(elem) {
@@ -496,7 +503,7 @@ function CouchDatabasePage() {
       $(document.body).removeClass("loading");
     }
 
-    if (!viewName) {
+    if (!viewName || viewName == "_all_docs") {
       $("#switch select")[0].selectedIndex = 0;
       db.allDocs(options);
     } else {

@@ -21,25 +21,25 @@ nobase_dist_localdata_DATA = \
     www/dialog/_upload_attachment.html \
     www/couch_tests.html \
     www/favicon.ico \
-    www/image/add.gif \
+    www/image/add.png \
     www/image/apply.gif \
     www/image/bg.png \
     www/image/cancel.gif \
-    www/image/compact.gif \
-    www/image/delete-mini.gif \
-    www/image/delete.gif \
+    www/image/compact.png \
+    www/image/delete-mini.png \
+    www/image/delete.png \
     www/image/grippie.gif \
     www/image/hgrad.gif \
-    www/image/load.gif \
+    www/image/load.png \
     www/image/logo.png \
     www/image/order-asc.gif \
     www/image/order-desc.gif \
     www/image/path.gif \
     www/image/progress.gif \
-    www/image/run-mini.gif \
-    www/image/run.gif \
-    www/image/running.gif \
-    www/image/save.gif \
+    www/image/run-mini.png \
+    www/image/run.png \
+    www/image/running.png \
+    www/image/save.png \
     www/image/spinner.gif \
     www/image/test_failure.gif \
     www/image/test_success.gif \
@@ -58,6 +58,7 @@ nobase_dist_localdata_DATA = \
     www/script/couch.js \
     www/script/couch_tests.js \
     www/script/couch_test_runner.js \
+    www/script/futon.js \
     www/script/jquery.js \
     www/script/jquery.cookies.js \
     www/script/jquery.couch.js \

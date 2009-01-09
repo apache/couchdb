@@ -25,20 +25,21 @@ specific language governing permissions and limitations under the License.
     <script src="script/jquery.dialog.js?0.9.0"></script>
     <script src="script/jquery.form.js?0.9.0"></script>
     <script src="script/jquery.resizer.js?0.9.0"></script>
+    <script src="script/futon.js?0.9.0"></script>
     <script src="script/browse.js?0.9.0"></script>
     <script src="script/pprint.js?0.9.0"></script>
     <script>
       var page = new CouchDocumentPage();
 
+      $.futon.navigation.ready(function() {
+        this.addDatabase(page.db.name);
+        this.updateSelection(
+          location.pathname.replace(/document\.html/, "database.html"),
+          "?" + page.db.name
+        );
+      });
+
       $(function() {
-        $.get("_sidebar.html", function(resp) {
-          $(resp).insertAfter("#wrap");
-
-          updateNavigation(
-            location.pathname.replace(/document\.html/, "database.html"),
-            "?" + page.db.name);
-        });
-
         $("h1 a.dbname").text(page.dbName)
           .attr("href", "database.html?" + encodeURIComponent(page.db.name));
         $("h1 strong").text(page.docId);
