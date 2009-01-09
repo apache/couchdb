@@ -216,6 +216,13 @@ var tests = {
     // and on the deleted one, no doc
     T(all_seq.rows[2].value.deleted);
     T(!all_seq.rows[2].doc);
+    
+    // test the all docs collates sanely
+    db.save({_id: "Z", foo: "Z"});
+    db.save({_id: "a", foo: "a"});
+
+    var rows = db.allDocs({startkey: "Z", endkey: "Z"}).rows;
+    T(rows.length == 1);
   },
   
   // Do some edit conflict detection tests
@@ -1166,7 +1173,7 @@ var tests = {
     T(db.bulkSave(makeDocs(1, numDocs + 1)).ok);
 
     // test that the _all_docs view returns correctly with keys
-    var results = db.allDocs({startkey:"_design%2F", endkey:"_design%2FZZZ"});
+    var results = db.allDocs({startkey:"_design", endkey:"_design0"});
     T(results.rows.length == 1);
 
     for (var loop = 0; loop < 2; loop++) {

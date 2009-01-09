@@ -14,6 +14,7 @@
 -behaviour(gen_server).
 
 -export([btree_by_id_reduce/2,btree_by_seq_reduce/2]).
+-export([less_docid/2]).
 -export([init/1,terminate/2,handle_call/3,handle_cast/2,code_change/3,handle_info/2]).
 
 -include("couch_db.hrl").
@@ -245,6 +246,12 @@ simple_upgrade_record(Old, New) ->
         lists:sublist(tuple_to_list(New), size(Old) + 1, size(New)-size(Old)),
     list_to_tuple(tuple_to_list(Old) ++ NewValuesTail).
 
+% used for doc insertion, also for the PassedEndFun on all_docs view
+less_docid(A, B) when A==B -> false;
+less_docid(nil, _) -> true; % nil - special key sorts before all
+less_docid({}, _) -> false; % {} -> special key sorts after all
+less_docid(A, B) -> A < B.
+
 init_db(DbName, Filepath, Fd, Header0) ->
     case element(2, Header0) of
     ?LATEST_DISK_VERSION -> ok;
@@ -253,12 +260,7 @@ init_db(DbName, Filepath, Fd, Header0) ->
     Header = simple_upgrade_record(Header0, #db_header{}),
     {ok, SummaryStream} = couch_stream:open(Header#db_header.summary_stream_state, Fd),
     ok = couch_stream:set_min_buffer(SummaryStream, 10000),
-    Less =
-        fun(A,B) when A==B -> false;
-        (nil, _) -> true; % nil - special key sorts before all
-        ({}, _) -> false; % {} -> special key sorts after all
-        (A, B) -> A < B
-        end,
+    Less = fun less_docid/2,
             
     {ok, IdBtree} = couch_btree:open(Header#db_header.fulldocinfo_by_id_btree_state, Fd,
         [{split, fun(X) -> btree_by_id_split(X) end},
