@@ -136,6 +136,89 @@ var tests = {
     // make sure we can still open
     T(db.open(existingDoc._id, {rev: existingDoc._rev}) != null);
   },
+  
+  delayed_commits: function(debug) {
+    var db = new CouchDB("test_suite_db");
+    db.deleteDb();
+    db.createDb();
+    if (debug) debugger;
+    
+    // By default, couchdb doesn't fully commit documents to disk right away,
+    // it waits about a second to batch the full commit flush along with any 
+    // other updates. If it crashes or is restarted you may lose the most
+    // recent commits.
+    
+    T(db.save({_id:"1",a:2,b:4}).ok);
+    T(db.open("1") != null);
+    
+    restartServer();
+    
+    T(db.open("1") == null); // lost the update.
+    // note if we waited > 1 sec before the restart, the doc would likely
+    // commit.
+    
+    
+    // Retry the same thing but with full commits on.
+    
+    var db2 = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"true"});
+    
+    T(db2.save({_id:"1",a:2,b:4}).ok);
+    T(db2.open("1") != null);
+    
+    restartServer();
+    
+    T(db2.open("1") != null);
+    
+    // You can update but without committing immediately, and then ensure
+    // everything is commited in the last step.
+    
+    T(db.save({_id:"2",a:2,b:4}).ok);
+    T(db.open("2") != null);
+    T(db.ensureFullCommit().ok);
+    restartServer();
+    
+    T(db.open("2") != null);
+    
+    // However, it's possible even when flushed, that the server crashed between
+    // the update and the commit, and you don't want to check to make sure
+    // every doc you updated actually made it to disk. So record the instance
+    // start time of the database before the updates and then check it again
+    // after the flush (the instance start time is returned by the flush
+    // operation). if they are the same, we know everything was updated
+    // safely.
+    
+    // First try it with a crash.
+    
+    var instanceStartTime = db.info().instance_start_time;
+    
+    T(db.save({_id:"3",a:2,b:4}).ok);
+    T(db.open("3") != null);
+    
+    restartServer();
+    
+    var commitResult = db.ensureFullCommit();
+    T(commitResult.ok && commitResult.instance_start_time != instanceStartTime);
+    // start times don't match, meaning the server lost our change
+    
+    T(db.open("3") == null); // yup lost it
+    
+    // retry with no server restart
+    
+    var instanceStartTime = db.info().instance_start_time;
+    
+    T(db.save({_id:"4",a:2,b:4}).ok);
+    T(db.open("4") != null);
+    
+    var commitResult = db.ensureFullCommit();
+    T(commitResult.ok && commitResult.instance_start_time == instanceStartTime);
+    // Successful commit, start times match!
+    
+    restartServer();
+    
+    T(db.open("4") != null);
+    
+  },
+  
   all_docs: function(debug) {
     var db = new CouchDB("test_suite_db");
     db.deleteDb();
@@ -1881,97 +1964,153 @@ var tests = {
       dbA.createDb();
       dbB.deleteDb();
       dbB.createDb();
-
-      var docs = makeDocs(0, numDocs);
-      T(dbA.bulkSave(docs).ok);
-
-      T(CouchDB.replicate(A, B).ok);
-
-      for (var j = 0; j < numDocs; j++) {
-        docA = dbA.open("" + j);
-        docB = dbB.open("" + j);
-        T(docA._rev == docB._rev);
-      }
-
-      // check documents with a '/' in the ID
-      // need to re-encode the slash when replicating from a remote source
-      dbA.save({ _id:"abc/def", val:"one" });
       
-      T(CouchDB.replicate(A, B).ok);
-      T(CouchDB.replicate(B, A).ok);
-      
-      docA = dbA.open("abc/def");
-      docB = dbB.open("abc/def");
-      T(docA._rev == docB._rev);
-      
-      // now check binary attachments
-      var binDoc = {
-        _id:"bin_doc",
-        _attachments:{
-          "foo.txt": {
-            "type":"base64",
-            "data": "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+      var repTests = {
+        // copy and paste and put your code in. delete unused steps.
+        test_template: new function () {
+          this.init = function(dbA, dbB) {
+            // before anything has happened
           }
+          this.afterAB1 = function(dbA, dbB) {
+            // called after replicating src=A  tgt=B first time.
+          };
+          this.afterBA1 = function(dbA, dbB) {
+            // called after replicating src=B  tgt=A first time.
+          };
+          this.afterAB2 = function(dbA, dbB) {
+            // called after replicating src=A  tgt=B second time. 
+          };
+          this.afterBA2 = function(dbA, dbB) {
+            // etc...
+          };
+        },
+        
+        simple_test: new function () {
+          this.init = function(dbA, dbB) {
+            var docs = makeDocs(0, numDocs);
+            T(dbA.bulkSave(docs).ok);
+          };
+        
+          this.afterAB1 = function(dbA, dbB) {          
+            for (var j = 0; j < numDocs; j++) {
+              var docA = dbA.open("" + j);
+              var docB = dbB.open("" + j);
+              T(docA._rev == docB._rev);
+            }
+          };
+        },
+      
+       deletes_test: new function () {
+          this.init = function(dbA, dbB) {
+            T(dbA.save({_id:"foo1",value:"a"}).ok);
+          };
+          
+          this.afterAB1 = function(dbA, dbB) {
+            var docA = dbA.open("foo1");
+            var docB = dbB.open("foo1");
+            T(docA._rev == docB._rev);
+
+            dbA.deleteDoc(docA);
+          };
+          
+          this.afterAB2 = function(dbA, dbB) {
+            T(dbA.open("foo1") == null);
+            T(dbB.open("foo1") == null);
+          };
+        },
+        
+        slashes_in_ids_test: new function () {
+          // make sure docs with slashes in id replicate properly
+          this.init = function(dbA, dbB) {
+            dbA.save({ _id:"abc/def", val:"one" });
+          };
+          
+          this.afterAB1 = function(dbA, dbB) {
+            var docA = dbA.open("abc/def");
+            var docB = dbB.open("abc/def");
+            T(docA._rev == docB._rev);
+          };
+        },
+      
+        attachments_test: new function () {
+          // Test attachments
+          this.init = function(dbA, dbB) {
+            dbA.save({
+              _id:"bin_doc",
+              _attachments:{
+                "foo.txt": {
+                  "type":"base64",
+                  "data": "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+                }
+              }
+            });
+          };
+          
+          this.afterAB1 = function(dbA, dbB) {
+            var xhr = CouchDB.request("GET", "/test_suite_db_a/bin_doc/foo.txt");
+            T(xhr.responseText == "This is a base64 encoded text")
+
+            xhr = CouchDB.request("GET", "/test_suite_db_b/bin_doc/foo.txt");
+            T(xhr.responseText == "This is a base64 encoded text")
+          };
+        },
+        
+        conflicts_test: new function () {
+          // test conflicts
+          this.init = function(dbA, dbB) {
+            dbA.save({_id:"foo",value:"a"});
+            dbB.save({_id:"foo",value:"b"});
+          };
+          
+          this.afterBA1 = function(dbA, dbB) {            
+            var docA = dbA.open("foo", {conflicts: true});
+            var docB = dbB.open("foo", {conflicts: true});
+
+            // make sure the same rev is in each db
+            T(docA._rev === docB._rev);
+
+            // make sure the conflicts are the same in each db
+            T(docA._conflicts[0] === docB._conflicts[0]);
+
+            // delete a conflict.
+            dbA.deleteDoc({_id:"foo", _rev:docA._conflicts[0]});
+          };
+          
+          this.afterBA2 = function(dbA, dbB) {            
+            // open documents and include the conflict meta data
+            var docA = dbA.open("foo", {conflicts: true});
+            var docB = dbB.open("foo", {conflicts: true});
+
+            // We should have no conflicts this time
+            T(docA._conflicts === undefined)
+            T(docB._conflicts === undefined);
+          };
         }
-      }
-
-      dbA.save(binDoc);
-
+      };
+      var test;
+      for(test in repTests)
+        if(repTests[test].init) repTests[test].init(dbA, dbB);
+      
       T(CouchDB.replicate(A, B).ok);
+      
+      for(test in repTests)
+        if(repTests[test].afterAB1) repTests[test].afterAB1(dbA, dbB);
+        
       T(CouchDB.replicate(B, A).ok);
-
-      xhr = CouchDB.request("GET", "/test_suite_db_a/bin_doc/foo.txt");
-      T(xhr.responseText == "This is a base64 encoded text")
-
-      xhr = CouchDB.request("GET", "/test_suite_db_b/bin_doc/foo.txt");
-      T(xhr.responseText == "This is a base64 encoded text")
-
-      dbA.save({_id:"foo1",value:"a"});
-
+      
+      for(test in repTests)
+        if(repTests[test].afterBA1) repTests[test].afterBA1(dbA, dbB);
+      
       T(CouchDB.replicate(A, B).ok);
+      
+      for(test in repTests)
+        if(repTests[test].afterAB2) repTests[test].afterAB2(dbA, dbB);
+        
       T(CouchDB.replicate(B, A).ok);
-
-      docA = dbA.open("foo1");
-      docB = dbB.open("foo1");
-      T(docA._rev == docB._rev);
-
-      dbA.deleteDoc(docA);
-
-      T(CouchDB.replicate(A, B).ok);
-      T(CouchDB.replicate(B, A).ok);
-
-      T(dbA.open("foo1") == null);
-      T(dbB.open("foo1") == null);
-
-      dbA.save({_id:"foo",value:"a"});
-      dbB.save({_id:"foo",value:"b"});
-
-      T(CouchDB.replicate(A, B).ok);
-      T(CouchDB.replicate(B, A).ok);
-
-      // open documents and include the conflict meta data
-      docA = dbA.open("foo", {conflicts: true});
-      docB = dbB.open("foo", {conflicts: true});
-
-      // make sure the same rev is in each db
-      T(docA._rev === docB._rev);
-
-      // make sure the conflicts are the same in each db
-      T(docA._conflicts[0] === docB._conflicts[0]);
-
-      // delete a conflict.
-      dbA.deleteDoc({_id:"foo", _rev:docA._conflicts[0]});
-
-      // replicate the change
-      T(CouchDB.replicate(A, B).ok);
-
-      // open documents and include the conflict meta data
-      docA = dbA.open("foo", {conflicts: true});
-      docB = dbB.open("foo", {conflicts: true});
-
-      // We should have no conflicts this time
-      T(docA._conflicts === undefined)
-      T(docB._conflicts === undefined);
+      
+      for(test in repTests)
+        if(repTests[test].afterBA2) repTests[test].afterBA2(dbA, dbB);
+      
     }
   },
 
