@@ -149,7 +149,7 @@ handle_info(delayed_commit, #group_state{db_name=DbName,group=Group}=State) ->
         {noreply, State#group_state{waiting_commit=false}};
     true ->
         % We can't commit the header because the database seq that's fully
-        % committed to disk is still behind us. It we committed now and the
+        % committed to disk is still behind us. If we committed now and the
         % database lost those changes our view could be forever out of sync
         % with the database. But a crash before we commit these changes, no big
         % deal, we only lose incremental changes since last committal.

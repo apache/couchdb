@@ -170,7 +170,8 @@ close(Fd) ->
     Result.
     
 close_maybe(Fd) ->
-    gen_server:cast(Fd, {close_maybe, self()}).
+    catch unlink(Fd),
+    catch gen_server:cast(Fd, close_maybe).
 
 drop_ref(Fd) ->
     drop_ref(Fd, self()).
@@ -372,8 +373,7 @@ handle_call(num_refs, _From, Fd) ->
 
 handle_cast(close, Fd) ->
     {stop,normal,Fd};
-handle_cast({close_maybe, Pid}, Fd) ->
-    catch unlink(Pid),
+handle_cast(close_maybe, Fd) ->
     maybe_close_async(Fd);
 handle_cast({drop_ref, Pid}, Fd) ->
     case get(Pid) of

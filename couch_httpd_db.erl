@@ -90,9 +90,10 @@ db_req(#httpd{path_parts=[_DbName]}=Req, _Db) ->
     send_method_not_allowed(Req, "DELETE,GET,HEAD,POST");
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_ensure_full_commit">>]}=Req, Db) ->
-    ok = couch_db:ensure_full_commit(Db),
+    {ok, DbStartTime} = couch_db:ensure_full_commit(Db),
     send_json(Req, 201, {[
-            {ok, true}
+            {ok, true},
+            {instance_start_time, DbStartTime}
         ]});
     
 db_req(#httpd{path_parts=[_,<<"_ensure_full_commit">>]}=Req, _Db) ->

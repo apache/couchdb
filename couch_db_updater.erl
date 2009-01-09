@@ -279,6 +279,12 @@ init_db(DbName, Filepath, Fd, Header0) ->
     AdminsPtr ->
         {ok, Admins} = couch_file:pread_term(Fd, AdminsPtr)
     end,
+    
+    % convert start time tuple to microsecs and store as a binary string
+    {MegaSecs, Secs, MicroSecs} = now(),
+    StartTime = ?l2b(io_lib:format("~p",
+            [(MegaSecs*1000000*1000000) + (Secs*1000000) + MicroSecs])),
+    
     #db{
         update_pid=self(),
         fd=Fd,
@@ -291,7 +297,9 @@ init_db(DbName, Filepath, Fd, Header0) ->
         name = DbName,
         filepath = Filepath,
         admins = Admins,
-        admins_ptr = AdminsPtr}.
+        admins_ptr = AdminsPtr,
+        instance_start_time = StartTime
+        }.
 
 
 close_db(#db{fd=Fd,summary_stream=Ss}) ->

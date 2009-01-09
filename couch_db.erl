@@ -64,8 +64,9 @@ create(DbName, Options) ->
 open(DbName, Options) ->
     couch_server:open(DbName, Options).
 
-ensure_full_commit(#db{update_pid=UpdatePid}) ->
-    gen_server:call(UpdatePid, full_commit, infinity).
+ensure_full_commit(#db{update_pid=UpdatePid,instance_start_time=StartTime}) ->
+    ok = gen_server:call(UpdatePid, full_commit, infinity),
+    {ok, StartTime}.
 
 close(#db{fd=Fd}) ->
     couch_file:drop_ref(Fd).
@@ -166,7 +167,8 @@ get_db_info(Db) ->
         compactor_pid=Compactor,
         update_seq=SeqNum,
         name=Name,
-        fulldocinfo_by_id_btree=FullDocBtree} = Db,
+        fulldocinfo_by_id_btree=FullDocBtree,
+        instance_start_time=StartTime} = Db,
     {ok, Size} = couch_file:bytes(Fd),
     {ok, {Count, DelCount}} = couch_btree:full_reduce(FullDocBtree),
     InfoList = [
@@ -176,7 +178,8 @@ get_db_info(Db) ->
         {update_seq, SeqNum},
         {purge_seq, couch_db:get_purge_seq(Db)},
         {compact_running, Compactor/=nil},
-        {disk_size, Size}
+        {disk_size, Size},
+        {instance_start_time, StartTime}
         ],
     {ok, InfoList}.
 

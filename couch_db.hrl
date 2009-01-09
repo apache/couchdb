@@ -120,6 +120,7 @@
     {main_pid=nil,
     update_pid=nil,
     compactor_pid=nil,
+    instance_start_time, % number of microsecs since jan 1 1970 as a binary string
     fd,
     header = #db_header{},
     summary_stream,
