@@ -15,7 +15,7 @@
 
 -export([handle_view_req/2,handle_slow_view_req/2]).
 
--export([parse_view_query/1,parse_view_query/2,make_view_fold_fun/5,finish_view_fold/3]).
+-export([parse_view_query/1,parse_view_query/2,make_view_fold_fun/5, make_view_fold_fun/6,finish_view_fold/3]).
 
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
@@ -361,14 +361,13 @@ parse_view_query(Req, Keys, IsReduce) ->
     end.
 
 
-make_view_fold_fun(Req, QueryArgs, Db, TotalViewCount, ReduceCountFun) ->
+make_view_fold_fun(Req, QueryArgs, Db,
+    TotalViewCount, ReduceCountFun) ->
     #view_query_args{
         end_key = EndKey,
         end_docid = EndDocId,
-        include_docs = IncludeDocs,
         direction = Dir
     } = QueryArgs,
-
     PassedEndFun =
     case Dir of
     fwd ->
@@ -380,6 +379,12 @@ make_view_fold_fun(Req, QueryArgs, Db, TotalViewCount, ReduceCountFun) ->
             couch_view:less_json([ViewKey, ViewId], [EndKey, EndDocId])
         end
     end,
+    make_view_fold_fun(Req, QueryArgs, Db, TotalViewCount, ReduceCountFun, PassedEndFun).
+
+make_view_fold_fun(Req, QueryArgs, Db, TotalViewCount, ReduceCountFun, PassedEndFun) ->
+    #view_query_args{
+        include_docs = IncludeDocs
+    } = QueryArgs,
 
     fun({{Key, DocId}, Value}, OffsetReds,
                       {AccLimit, AccSkip, Resp, AccRevRows}) ->
