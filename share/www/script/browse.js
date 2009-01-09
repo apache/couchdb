@@ -205,7 +205,7 @@ function CouchDatabasePage() {
 
   this.populateViewsMenu = function() {
     var select = $("#switch select");
-    db.allDocs({startkey: "_design/", endkey: "_design/ZZZ",
+    db.allDocs({startkey: "_design/", endkey: "_design0",
       success: function(resp) {
         select[0].options.length = 3;
         for (var i = 0; i < resp.rows.length; i++) {
@@ -519,8 +519,8 @@ function CouchDatabasePage() {
         }
         db.query(mapFun, reduceFun, null, options);
       } else if (viewName == "_design_docs") {
-        options.startkey = options.descending ? "_design/ZZZZ" : "_design/";
-        options.endkey = options.descending ? "_design/" : "_design/ZZZZ";
+        options.startkey = options.descending ? "_design0" : "_design";
+        options.endkey = options.descending ? "_design" : "_design0";
         db.allDocs(options);
       } else {
         $("#viewcode").show();
