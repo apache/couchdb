@@ -83,7 +83,6 @@ specific language governing permissions and limitations under the License.
 
         $("#switch select").change(function() {
           var viewName = $(this).val();
-          console.log(viewName);
           if (!viewName) $.cookies.remove(page.db.name + ".view");
           location.href = "?" + encodeURIComponent(page.db.name) +
             (viewName ? "/" + encodeURIComponent(viewName)  : "");
