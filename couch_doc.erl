@@ -18,65 +18,82 @@
 
 -include("couch_db.hrl").
 
-to_json_obj(#doc{id=Id,deleted=Del,body=Body,revs=Revs,meta=Meta}=Doc,Options)->
-    {[{<<"_id">>, Id}] ++
-        case Revs of
+% helpers used by to_json_obj
+to_json_rev([]) ->
+    [];
+to_json_rev(Revs) ->
+    [{<<"_rev">>, lists:nth(1, Revs)}].
+
+to_json_body(true, _Body) ->
+    [{<<"_deleted">>, true}];
+to_json_body(false, {Body}) ->
+    Body.
+
+to_json_revs(Options, Revs) ->
+    case lists:member(revs, Options) of
+    false -> [];
+    true ->
+        [{<<"_revs">>, Revs}]
+    end.
+
+to_json_revs_info(Meta) ->
+    lists:map(
+        fun({revs_info, RevsInfo}) ->
+            JsonRevsInfo =
+            [{[{rev, Rev}, {status, list_to_binary(atom_to_list(Status))}]} ||
+                {Rev, Status} <- RevsInfo],
+            {<<"_revs_info">>, JsonRevsInfo};
+        ({conflicts, Conflicts}) ->
+            {<<"_conflicts">>, Conflicts};
+        ({deleted_conflicts, Conflicts}) ->
+            {<<"_deleted_conflicts">>, Conflicts}
+        end, Meta).
+
+to_json_attachment_stubs(Attachments) ->
+    BinProps = lists:map(
+        fun({Name, {Type, BinValue}}) ->
+            {Name, {[
+                {<<"stub">>, true},
+                {<<"content_type">>, Type},
+                {<<"length">>, bin_size(BinValue)}
+            ]}}
+        end,
+        Attachments),
+    case BinProps of
         [] -> [];
-        _ -> [{<<"_rev">>, lists:nth(1, Revs)}]
-        end ++
-        case Del of
-        false ->
-            {BodyProps} = Body,
-            BodyProps;
-        true ->
-            [{<<"_deleted">>, true}]
-        end ++
-        case lists:member(revs, Options) of
-        false -> [];
-        true ->
-            [{<<"_revs">>, Revs}]
-        end ++
-        lists:map(
-            fun({revs_info, RevsInfo}) ->
-                JsonRevsInfo =
-                [{[{rev, Rev}, {status, list_to_binary(atom_to_list(Status))}]} ||
-                    {Rev, Status} <- RevsInfo],
-                {<<"_revs_info">>, JsonRevsInfo};
-            ({conflicts, Conflicts}) ->
-                {<<"_conflicts">>, Conflicts};
-            ({deleted_conflicts, Conflicts}) ->
-                {<<"_deleted_conflicts">>, Conflicts}
-            end, Meta) ++
-        case lists:member(attachments, Options) of
-        true -> % return the full rev list and the binaries as strings.
-            BinProps = lists:map(
-                fun({Name, {Type, BinValue}}) ->
-                    {Name, {[
-                        {<<"content_type">>, Type},
-                        {<<"data">>, couch_util:encodeBase64(bin_to_binary(BinValue))}
-                    ]}}
-                end,
-                Doc#doc.attachments),
-            case BinProps of
-            [] -> [];
-            _ -> [{<<"_attachments">>, {BinProps}}]
-            end;
-        false ->
-            BinProps = lists:map(
-                fun({Name, {Type, BinValue}}) ->
-                    {Name, {[
-                        {<<"stub">>, true},
-                        {<<"content_type">>, Type},
-                        {<<"length">>, bin_size(BinValue)}
-                    ]}}
-                end,
-                Doc#doc.attachments),
-            case BinProps of
-                [] -> [];
-                _ -> [{<<"_attachments">>, {BinProps}}]
-            end
-        end
-        }.
+        _ -> [{<<"_attachments">>, {BinProps}}]
+    end.
+
+to_json_attachments(Attachments) ->
+    BinProps = lists:map(
+        fun({Name, {Type, BinValue}}) ->
+            {Name, {[
+                {<<"content_type">>, Type},
+                {<<"data">>, couch_util:encodeBase64(bin_to_binary(BinValue))}
+            ]}}
+        end,
+        Attachments),
+    case BinProps of
+    [] -> [];
+    _ -> [{<<"_attachments">>, {BinProps}}]
+    end.
+
+to_json_attachments(Attachments, Options) ->
+    case lists:member(attachments, Options) of
+    true -> % return the full rev list and the binaries as strings.
+        to_json_attachments(Attachments);
+    false ->
+        to_json_attachment_stubs(Attachments)
+    end.
+
+to_json_obj(#doc{id=Id,deleted=Del,body=Body,revs=Revs,meta=Meta}=Doc,Options)->
+    {[{<<"_id">>, Id}] 
+        ++ to_json_rev(Revs) 
+        ++ to_json_body(Del, Body)
+        ++ to_json_revs(Options, Revs) 
+        ++ to_json_revs_info(Meta)
+        ++ to_json_attachments(Doc#doc.attachments, Options)
+    }.
 
 from_json_obj({Props}) ->
     {JsonBins} = proplists:get_value(<<"_attachments">>, Props, {[]}),
