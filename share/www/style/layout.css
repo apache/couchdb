@@ -36,6 +36,7 @@ h1 :link, h1 :visited {
   text-shadow: #333 2px 2px 1px;
 }
 h1 strong { color: #fff; font-weight: normal; padding-right: 25px; }
+h1 strong a {color:#fff !important;background:none !important;}
 body.loading h1 strong {
   background: url(../image/spinner.gif) right center no-repeat;
 }
