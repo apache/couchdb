@@ -253,11 +253,20 @@ db_req(#httpd{method='GET',path_parts=[_,<<"_admins">>]}=Req, Db) ->
 db_req(#httpd{path_parts=[_,<<"_admins">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "PUT,GET");
 
-db_req(#httpd{path_parts=[DbName,<<"_design">>,Name|Rest]}=Req,
-        Db) ->
-    % Special case to enable using an unencoded in the URL of design docs, as
-    % slashes in document IDs must otherwise be URL encoded
-    db_req(Req#httpd{path_parts=[DbName,<<"_design/",Name/binary>>|Rest]}, Db);
+% Special case to enable using an unencoded slash in the URL of design docs, 
+% as slashes in document IDs must otherwise be URL encoded.
+db_req(#httpd{method='GET',mochi_req=MochiReq, path_parts=[DbName,<<"_design/",Name/binary>>|Rest]}=Req, Db) ->
+    PathFront = "/" ++ binary_to_list(DbName) ++ "/_design",
+    {ok, [PathFront|PathTail]} = regexp:split(MochiReq:get(raw_path),"%2F"),
+    RedirectTo = PathFront ++ "/" ++ mochiweb_util:join(PathTail, "%2F"),
+    couch_httpd:send_response(Req, 301, [{"Location", RedirectTo}], <<>>);
+
+db_req(#httpd{path_parts=[_DbName,<<"_design">>,Name]}=Req, Db) ->
+    db_doc_req(Req, Db, <<"_design/",Name/binary>>);
+    
+db_req(#httpd{path_parts=[_DbName,<<"_design">>,Name|FileNameParts]}=Req, Db) ->
+    db_attachment_req(Req, Db, <<"_design/",Name/binary>>, FileNameParts);
+
 
 db_req(#httpd{path_parts=[_, DocId]}=Req, Db) ->
     db_doc_req(Req, Db, DocId);
