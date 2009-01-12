@@ -43,7 +43,11 @@ body.loading h1 strong {
 
 hr { border: 1px solid #999; border-width: 1px 0 0; }
 dl dt { font-weight: bold; }
-code, tt { font-family: "DejaVu Sans Mono",Monaco,monospace; }
+code, tt, pre { font-family: "DejaVu Sans Mono",Monaco,monospace; }
+code.key { color: #333; font-weight: bold; }
+code.string { color: #393; }
+code.number, code.boolean { color: #339; }
+code.null { color: #666; }
 
 button { font-size: 100%; -webkit-appearance: square-button; }
 input, select, textarea { background: #fff; border: 1px solid;
@@ -321,7 +325,7 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
 /* Documents table */
 
 #documents thead th { width: 50%; }
-#documents tbody.content td { color: #666;
+#documents tbody.content td { color: #999;
   font: normal 11px "DejaVu Sans Mono",Monaco,monospace;
 }
 #documents tbody.content td.key { color: #333; }
@@ -355,19 +359,15 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
   background-image: url(../image/delete-mini.png);
 }
 #fields tbody.content th b { display: block; padding: 2px; }
-#fields tbody.content td { padding-left: 14px; padding-right: 48px; }
-#fields tbody.content td code { color: #999; display: block; font-size: 11px;
-  padding: 2px;
+#fields tbody.content td { color: #999; padding-left: 14px;
+  padding-right: 48px;
 }
-#fields tbody.content td code.string { color: #393; }
-#fields tbody.content td code.number, #fields tbody.content td code.boolean {
-  color: #339;
-}
+#fields tbody.content td code { display: block; font-size: 11px; padding: 2px; }
 #fields tbody.content td dl { margin: 0; padding: 0; }
 #fields tbody.content td dt {
   background: transparent url(../image/toggle-collapse.gif) 0 3px no-repeat;
-  clear: left; cursor: pointer; line-height: 1em; margin-left: -12px;
-  padding-left: 14px;
+  clear: left; color: #333; cursor: pointer; line-height: 1em;
+  margin-left: -12px; padding-left: 14px;
 }
 #fields tbody.content td dd { line-height: 1em; margin: 0;
   padding: 0 0 0 1em;
@@ -431,8 +431,8 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
 #fields tbody.content td ul.attachments li button.delete {
   background-image: url(../image/delete-mini.png);
 }
-#fields tbody.source td code { display: block; overflow: auto;
-  white-space: pre-wrap; width: 100%;
+#fields tbody.source td pre { color: #999; font-size: 11px; line-height: 1.6em;
+  margin: 0; overflow: auto; white-space: pre-wrap; width: 100%;
 }
 
 /* Test suite */

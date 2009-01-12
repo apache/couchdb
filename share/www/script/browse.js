@@ -59,7 +59,7 @@ function CouchIndexPage() {
           $.couch.db(dbName).info({
             success: function(info) {
               $("#databases tbody.content tr:eq(" + idx + ")")
-                .find("td.size").text(prettyPrintSize(info.disk_size)).end()
+                .find("td.size").text($.futon.formatSize(info.disk_size)).end()
                 .find("td.count").text(info.doc_count).end()
                 .find("td.seq").text(info.update_seq);
               if (idx == dbsOnPage.length - 1) {
@@ -457,22 +457,28 @@ function CouchDatabasePage() {
       for (var i = 0; i < resp.rows.length; i++) {
         var row = resp.rows[i];
         var tr = $("<tr></tr>");
-        var key = row.key;
+        var key = "null";
+        if (row.key !== null) {
+          key = $.futon.formatJSON(row.key, {indent: 0, linesep: ""});
+        }
         if (row.id) {
           $("<td class='key'><a href='document.html?" + encodeURIComponent(db.name) +
             "/" + encodeDocId(row.id) + "'><strong></strong><br>" +
             "<span class='docid'>ID:&nbsp;" + row.id + "</span></a></td>")
-            .find("strong").text(key !== null ? prettyPrintJSON(key, 0, "") : "null").end()
+            .find("strong").text(key).end()
             .appendTo(tr);
         } else {
           $("<td class='key'><strong></strong></td>")
-            .find("strong").text(key !== null ? prettyPrintJSON(key, 0, "") : "null").end()
+            .find("strong").text(key).end()
             .appendTo(tr);
         }
-        var value = row.value;
-        $("<td class='value'></td>").text(
-          value !== null ? prettyPrintJSON(value, 0, "") : "null"
-        ).appendTo(tr).dblclick(function() {
+        var value = "null";
+        if (row.value !== null) {
+          value = $.futon.formatJSON(row.value, {
+            html: true, indent: 0, linesep: "", quoteKeys: false
+          });
+        }
+        $("<td class='value'><div></div></td>").find("div").html(value).end().appendTo(tr).dblclick(function() {
           location.href = this.previousSibling.firstChild.href;
         });
         tr.appendTo("#documents tbody.content");
@@ -736,7 +742,7 @@ function CouchDocumentPage() {
         _initValue(value);
       }
     }
-    $("#fields tbody tr").removeClass("odd").filter(":odd").addClass("odd");
+    $("#fields tbody.content tr").removeClass("odd").filter(":odd").addClass("odd");
     return row;
   }
 
@@ -838,7 +844,7 @@ function CouchDocumentPage() {
       cancelChange();
     }).appendTo(tools);
     tools.appendTo(td);
-    input.val(prettyPrintJSON(value)).appendTo(td);
+    input.val($.futon.formatJSON(value)).appendTo(td);
     input.each(function() { this.focus(); this.select(); });
     if (needsTextarea) input.makeResizable({vertical: true});
   }
@@ -849,7 +855,7 @@ function CouchDocumentPage() {
         delete doc[fieldName];
         row.remove();
         page.isDirty = true;
-        $("#fields tbody tr").removeClass("odd").filter(":odd").addClass("odd");
+        $("#fields tbody.content tr").removeClass("odd").filter(":odd").addClass("odd");
       }).prependTo(row.find("th"));
     }
   }
@@ -894,7 +900,7 @@ function CouchDocumentPage() {
     $("<a href='' title='Download file' target='_top'></a>").text(name)
       .attr("href", attachmentHref)
       .wrapInner("<tt></tt>").appendTo(li);
-    $("<span>()</span>").text("" + prettyPrintSize(attachment.length) + 
+    $("<span>()</span>").text("" + $.futon.formatSize(attachment.length) + 
       ", " + attachment.content_type).addClass("info").appendTo(li);
     if (name == "tests.js") {
       li.find('span.info').append(', <a href="/_utils/couch_tests.html?' 

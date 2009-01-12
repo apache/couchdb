@@ -12,7 +12,7 @@
 
 (function($) {
   $.couch = $.couch || {};
-  $.fn.extend($.couch, {
+  $.extend($.couch, {
 
     allDbs: function(options) {
       options = options || {};

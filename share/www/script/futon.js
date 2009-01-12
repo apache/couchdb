@@ -103,7 +103,7 @@
   }
 
   $.futon = $.futon || {};
-  $.fn.extend($.futon, {
+  $.extend($.futon, {
     navigation: new Navigation()
   });
 

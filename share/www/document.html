@@ -27,7 +27,7 @@ specific language governing permissions and limitations under the License.
     <script src="script/jquery.resizer.js?0.9.0"></script>
     <script src="script/futon.js?0.9.0"></script>
     <script src="script/browse.js?0.9.0"></script>
-    <script src="script/pprint.js?0.9.0"></script>
+    <script src="script/futon.format.js?0.9.0"></script>
     <script>
       var page = new CouchDocumentPage();
 
@@ -59,7 +59,7 @@ specific language governing permissions and limitations under the License.
           $("#fields thead th:first").text("Source").attr("colspan", 2).next().hide();
           $("#fields tbody.content").hide();
           $("#fields tbody.source").find("td").each(function() {
-            $(this).html($("<code></code>").text(prettyPrintJSON(page.doc)));
+            $(this).html($("<pre></pre>").html($.futon.formatJSON(page.doc, {html: true})));
           }).end().show();
         });
 

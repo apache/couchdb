@@ -59,6 +59,7 @@ nobase_dist_localdata_DATA = \
     www/script/couch_tests.js \
     www/script/couch_test_runner.js \
     www/script/futon.js \
+    www/script/futon.format.js \
     www/script/jquery.js \
     www/script/jquery.cookies.js \
     www/script/jquery.couch.js \
@@ -67,5 +68,4 @@ nobase_dist_localdata_DATA = \
     www/script/jquery.resizer.js \
     www/script/jquery.suggest.js \
     www/script/json2.js \
-    www/script/pprint.js \
     www/style/layout.css

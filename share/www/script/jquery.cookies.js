@@ -12,7 +12,7 @@
 
 (function($) {
   $.cookies = $.cookies || {}
-  $.fn.extend($.cookies, {
+  $.extend($.cookies, {
 
     /* Return the value of a cookie. */
     get: function(name, defaultValue) {
