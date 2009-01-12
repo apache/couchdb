@@ -47,7 +47,7 @@ _restart = {couch_httpd_misc_handlers, handle_restart_req}
 [httpd_db_handlers]
 _view = {couch_httpd_view, handle_view_req}
 _slow_view = {couch_httpd_view, handle_slow_view_req}
-_form = {couch_httpd_form, handle_form_req}
+_show = {couch_httpd_show, handle_doc_show_req}
 
 ; The external module takes an optional argument allowing you to narrow it to a
 ; single script. Otherwise the script name is inferred from the first path section 

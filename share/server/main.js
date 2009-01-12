@@ -335,7 +335,7 @@ while (cmd = eval(readline())) {
           print(toJSON(error));
         }
         break;
-      case "form":
+      case "show_doc":
         var funSrc = cmd[1];
         var doc = cmd[2];
         var req = cmd[3];
@@ -346,7 +346,7 @@ while (cmd = eval(readline())) {
         } catch (error) {
           // Available error fields: 
           // message, fileName, lineNumber, stack, name
-          log("form function raised error: "+error.toString());
+          log("doc show function raised error: "+error.toString());
           log("stacktrace: "+error.stack);
           try {
             print(toJSON(error));            

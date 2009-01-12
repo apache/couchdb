@@ -17,7 +17,7 @@
 
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2,code_change/3,stop/0]).
 -export([start_doc_map/2, map_docs/2, stop_doc_map/1]).
--export([reduce/3, rereduce/3,validate_doc_update/5,render_doc_form/5]).
+-export([reduce/3, rereduce/3,validate_doc_update/5,render_doc_show/5]).
 % -export([test/0]).
 
 -include("couch_db.hrl").
@@ -122,11 +122,12 @@ validate_doc_update(Lang, FunSrc, EditDoc, DiskDoc, Ctx) ->
         ok = ret_os_process(Lang, Pid)
     end.
 
-render_doc_form(Lang, FormSrc, Doc, Req, Db) ->
+render_doc_show(Lang, ShowSrc, Doc, Req, Db) ->
     Pid = get_os_process(Lang),
     JsonDoc = couch_doc:to_json_obj(Doc, [revs]),
     JsonReq = couch_httpd_external:json_req_obj(Req, Db),
-    try couch_os_process:prompt(Pid, [<<"form">>, FormSrc, JsonDoc, JsonReq]) of
+    try couch_os_process:prompt(Pid, 
+        [<<"show_doc">>, ShowSrc, JsonDoc, JsonReq]) of
     FormResp ->
         FormResp
     after
