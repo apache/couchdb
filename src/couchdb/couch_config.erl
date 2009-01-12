@@ -40,7 +40,6 @@ start_link(IniFiles) ->
 all() ->
     lists:sort(ets:tab2list(?MODULE)).
 
-
 get(Section) when is_binary(Section) ->
     ?MODULE:get(?b2l(Section));
 get(Section) ->
@@ -111,8 +110,6 @@ handle_call({register, Fun, Pid}, _From, #config{notify_funs=PidFuns}=Config) ->
         Fun
     end,
     {reply, ok, Config#config{notify_funs=[{Pid, Fun2}|PidFuns]}}.
-    
-    
 
 %% @spec load_ini_file(IniFile::filename()) -> ok
 %% @doc Parses an ini file and stores Key/Value Pairs into the ets table.
@@ -162,7 +159,6 @@ load_ini_file(IniFile) ->
 
 %% @doc Unused
 handle_cast(foo, State) -> {noreply, State}.
-
 
 handle_info({'DOWN', _, _, DownPid, _}, #config{notify_funs=PidFuns}=Config) ->
     % remove any funs registered by the downed process
