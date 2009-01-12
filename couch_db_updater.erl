@@ -382,7 +382,7 @@ merge_rev_trees(NoConflicts, [NewDocs|RestDocsList],
             NewConflicts = couch_key_tree:count_leafs(NewRevTree),
             if NewConflicts > OldConflicts ->
                 % if all the old docs are deletions, allow this new conflict
-                case [1 || {_Rev,{IsDel,_Sp}} <- 
+                case [1 || {_Rev,{IsDel,_Sp},_Path} <- 
                     couch_key_tree:get_all_leafs(OldTree), IsDel==false] of
                 [] ->
                     ok;
