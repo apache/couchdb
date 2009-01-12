@@ -55,7 +55,7 @@ source_files = \
     couch_httpd.erl \
     couch_httpd_db.erl \
     couch_httpd_external.erl \
-    couch_httpd_form.erl \
+    couch_httpd_show.erl \
     couch_httpd_view.erl \
     couch_httpd_misc_handlers.erl \
     couch_key_tree.erl \
@@ -91,7 +91,7 @@ compiled_files = \
     couch_httpd.beam \
     couch_httpd_db.beam \
     couch_httpd_external.beam \
-    couch_httpd_form.beam \
+    couch_httpd_show.beam \
     couch_httpd_view.beam \
     couch_httpd_misc_handlers.beam \
     couch_key_tree.beam \
