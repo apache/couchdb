@@ -54,11 +54,11 @@ nobase_dist_localdata_DATA = \
     www/database.html \
     www/document.html \
     www/replicator.html \
-    www/script/browse.js \
     www/script/couch.js \
     www/script/couch_tests.js \
     www/script/couch_test_runner.js \
     www/script/futon.js \
+    www/script/futon.browse.js \
     www/script/futon.format.js \
     www/script/jquery.js \
     www/script/jquery.cookies.js \

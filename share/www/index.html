@@ -24,10 +24,10 @@ specific language governing permissions and limitations under the License.
     <script src="script/jquery.couch.js?0.9.0"></script>
     <script src="script/jquery.dialog.js?0.9.0"></script>
     <script src="script/futon.js?0.9.0"></script>
-    <script src="script/browse.js?0.9.0"></script>
+    <script src="script/futon.browse.js?0.9.0"></script>
     <script src="script/futon.format.js?0.9.0"></script>
     <script>
-      var page = new CouchIndexPage();
+      var page = new $.futon.CouchIndexPage();
       $(document).ready(function() {
         if (!/index\.html$/.test(location.pathname)) {
           $.futon.navigation.ready(function() {

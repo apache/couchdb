@@ -26,10 +26,10 @@ specific language governing permissions and limitations under the License.
     <script src="script/jquery.resizer.js?0.9.0"></script>
     <script src="script/jquery.suggest.js?0.9.0"></script>
     <script src="script/futon.js?0.9.0"></script>
-    <script src="script/browse.js?0.9.0"></script>
+    <script src="script/futon.browse.js?0.9.0"></script>
     <script src="script/futon.format.js?0.9.0"></script>
     <script>
-      var page = new CouchDatabasePage();
+      var page = new $.futon.CouchDatabasePage();
 
       $.futon.navigation.ready(function() {
         this.addDatabase(page.db.name);

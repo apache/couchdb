@@ -26,10 +26,10 @@ specific language governing permissions and limitations under the License.
     <script src="script/jquery.form.js?0.9.0"></script>
     <script src="script/jquery.resizer.js?0.9.0"></script>
     <script src="script/futon.js?0.9.0"></script>
-    <script src="script/browse.js?0.9.0"></script>
+    <script src="script/futon.browse.js?0.9.0"></script>
     <script src="script/futon.format.js?0.9.0"></script>
     <script>
-      var page = new CouchDocumentPage();
+      var page = new $.futon.CouchDocumentPage();
 
       $.futon.navigation.ready(function() {
         this.addDatabase(page.db.name);
@@ -46,22 +46,8 @@ specific language governing permissions and limitations under the License.
           +'/'+encodeURIComponent(page.docId)+'>'+page.docId+'</a>');
         page.updateFieldListing();
 
-        $("#tabs li.tabular a").click(function() {
-          $("#tabs li").removeClass("active");
-          $(this).parent().addClass("active");
-          $("#fields thead th:first").text("Field").attr("colspan", 1).next().show();
-          $("#fields tbody.content").show();
-          $("#fields tbody.source").hide();
-        });
-        $("#tabs li.source a").click(function() {
-          $("#tabs li").removeClass("active");
-          $(this).parent().addClass("active");
-          $("#fields thead th:first").text("Source").attr("colspan", 2).next().hide();
-          $("#fields tbody.content").hide();
-          $("#fields tbody.source").find("td").each(function() {
-            $(this).html($("<pre></pre>").html($.futon.formatJSON(page.doc, {html: true})));
-          }).end().show();
-        });
+        $("#tabs li.tabular a").click(page.activateTabularView);
+        $("#tabs li.source a").click(page.activateSourceView);
 
         $("#toolbar button.save").click(page.saveDocument);
         $("#toolbar button.add").click(page.addField);
