@@ -787,7 +787,7 @@
           delete doc[fieldName];
           th.children().remove();
           th.append($("<b></b>").text(newName));
-          _initKey(doc, th.parent("tr"), fieldName);
+          _initKey(doc, th.parent("tr"), newName);
           page.isDirty = true;
         }
         function cancelChange() {
