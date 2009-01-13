@@ -36,6 +36,7 @@ nobase_dist_localdata_DATA = \
     www/image/order-desc.gif \
     www/image/path.gif \
     www/image/progress.gif \
+    www/image/rarrow.png \
     www/image/run-mini.png \
     www/image/run.png \
     www/image/running.png \

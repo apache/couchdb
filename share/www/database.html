@@ -38,6 +38,12 @@ specific language governing permissions and limitations under the License.
 
       $(function() {
         $("h1 strong").text(page.db.name);
+        var viewPath = (page.viewName || "_all_docs").replace(/^_design\//, "_view/");
+        if (viewPath != "_slow_view" && viewPath != "_design_docs") {
+          $("h1 a.raw").attr("href", "/" + encodeURIComponent(page.db.name) +
+            "/" + viewPath);
+        }
+
         $("#viewcode span").click(function() {
           $("#viewcode").toggleClass("collapsed");
         });
@@ -106,6 +112,7 @@ specific language governing permissions and limitations under the License.
     <h1>
       <a href="index.html">Overview</a>
       <strong>?</strong>
+      <a class="raw" title="Raw view"></a>
     </h1>
     <div id="content">
       <div id="switch">

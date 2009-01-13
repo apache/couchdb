@@ -27,7 +27,7 @@ body { background: #fff url(../image/bg.png) 100% 0 repeat-y;
 h1 { background: #333; border-right: 2px solid #111;
   border-bottom: 1px solid #333; color: #999;
   font: 125% normal Arial,Helvetica,sans-serif;
-  line-height: 1.8em; margin: 0 0 1em; padding: 0 0 0 1em;
+  line-height: 1.8em; margin: 0 0 1em; padding: 0 0 0 1em; position: relative;
 }
 h1 :link, h1 :visited, h1 strong { padding: .4em .5em; }
 h1 :link, h1 :visited { 
@@ -37,6 +37,10 @@ h1 :link, h1 :visited {
 }
 h1 strong { color: #fff; font-weight: normal; padding-right: 25px; }
 h1 strong a {color:#fff !important;background:none !important;}
+h1 :link.raw, h1 :visited.raw {
+  background: url(../image/rarrow.png) 100% 50% no-repeat; position: absolute;
+  right: 20px; width: 35px; height: 100%; padding: 0;
+}
 body.loading h1 strong {
   background: url(../image/spinner.gif) right center no-repeat;
 }
