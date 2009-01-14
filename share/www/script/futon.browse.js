@@ -109,6 +109,7 @@
       } else {
         viewName = $.cookies.get(dbName + ".view", "");
         if (viewName) {
+          this.redirecting = true;
           location.href = "database.html?" + dbName + "/" + viewName;
         }
       }
@@ -596,7 +597,7 @@
         page.doc[fieldName] = null;
         var row = _addRowForField(page.doc, fieldName);
         page.isDirty = true;
-        _editKey(page.doc, row.find("th"), fieldName);
+        row.find("th b").dblclick();
       }
 
       var _sortFields = function(a, b) {
@@ -694,6 +695,10 @@
       this.saveDocument = function() {
         $(document.body).addClass("loading");
         db.saveDoc(page.doc, {
+          error: function(status, error, reason) {
+            alert("Error: " + error + "\n\n" + reason);
+            $(document.body).removeClass("loading");
+          },
           success: function(resp) {
             page.isDirty = false;
             location.href = "?" + encodeURIComponent(dbName) +
@@ -740,167 +745,123 @@
       }
 
       function _addRowForField(doc, fieldName) {
-        var row = $("<tr><th></th><td></td></tr>").find("th").append($("<b></b>")
-          .text(fieldName)).end().appendTo("#fields tbody.content");
+        var row = $("<tr><th></th><td></td></tr>")
+          .find("th").append($("<b></b>").text(fieldName)).end()
+          .appendTo("#fields tbody.content");
         if (fieldName == "_attachments") {
-          row
-            .find("td").append(_renderAttachmentList(doc[fieldName]));
+          row.find("td").append(_renderAttachmentList(doc[fieldName]));
         } else {
-          var value = _renderValue(doc[fieldName]);
-          row
-            .find("th b").dblclick(function() {
-              _editKey(doc, this, $(this).text());
-            }).end()
-            .find("td").append(value).dblclick(function() {
-              _editValue(doc, this, $(this).prev("th").text());
-            }).end();
-          if (fieldName != "_id" && fieldName != "_rev") {
-            row.find("th, td").attr("title", "Double click to edit");
-            _initKey(doc, row, fieldName);
-            _initValue(value);
-          }
+          row.find("td").append(_renderValue(doc[fieldName]));
+          _initKey(doc, row, fieldName);
+          _initValue(doc, row, fieldName);
         }
         $("#fields tbody.content tr").removeClass("odd").filter(":odd").addClass("odd");
+        row.data("name", fieldName);
         return row;
       }
 
-      function _editKey(doc, cell, fieldName) {
-        if (fieldName == "_id" || fieldName == "_rev") return;
-        var th = $(cell);
-        th.empty();
-        var input = $("<input type='text' spellcheck='false'>");
-        input.dblclick(function() { return false; }).keydown(function(evt) {
-          switch (evt.keyCode) {
-            case 13: applyChange(); break;
-            case 27: cancelChange(); break;
-          }
-        });
-        var tools = $("<div class='tools'></div>");
-        function applyChange() {
-          input.nextAll().remove();
-          var newName = input.val();
-          if (!newName.length || newName == fieldName) {
-            cancelChange();
-            return;
-          }
-          doc[newName] = doc[fieldName];
-          delete doc[fieldName];
-          th.children().remove();
-          th.append($("<b></b>").text(newName));
-          _initKey(doc, th.parent("tr"), newName);
-          page.isDirty = true;
-        }
-        function cancelChange() {
-          th.children().remove();
-          th.append($("<b></b>").text(fieldName));
-          _initKey(doc, th.parent("tr"), fieldName);
-        }
-
-        $("<button type='button' class='apply'></button>").click(function() {
-          applyChange();
-        }).appendTo(tools);
-        $("<button type='button' class='cancel'></button>").click(function() {
-          cancelChange();
-        }).appendTo(tools);
-        tools.appendTo(th);
-        input.val(fieldName).appendTo(th);
-        input.each(function() { this.focus(); this.select(); });
-      }
-
-      function _editValue(doc, cell, fieldName) {
-        if (!fieldName || fieldName == "_id" || fieldName == "_rev") return;
-        var td = $(cell);
-        var value = doc[fieldName];
-        var needsTextarea = $("dl", td).length > 0 || $("code", td).text().length > 60;
-        td.empty();
-        if (needsTextarea) {
-          var input = $("<textarea rows='8' cols='40' spellcheck='false'></textarea>");
-        } else {
-          var input = $("<input type='text' spellcheck='false'>");
-        }
-        input.dblclick(function() { return false; }).keydown(function(evt) {
-          switch (evt.keyCode) {
-            case 13: if (!needsTextarea) applyChange(); break;
-            case 27: cancelChange(); break;
-          }
-        });
-        var tools = $("<div class='tools'></div>");
-        function applyChange() {
-          input.nextAll().remove();
-          try {
-            var newValue = input.val() || "null";
-            if (newValue == doc[fieldName]) {
-              cancelChange();
-              return;
-            }
-            doc[fieldName] = JSON.parse(newValue);
-            td.children().remove();
-            page.isDirty = true;
-            var value = _renderValue(doc[fieldName]);
-            td.append(value);
-            _initValue(value);
-          } catch (err) {
-            input.addClass("invalid");
-            var msg = err.message;
-            if (msg == "parseJSON") {
-              msg = "Please enter a valid JSON value (for example, \"string\").";
-            }
-            $("<div class='error'></div>").text(msg).insertAfter(input);
-          }
-        }
-        function cancelChange() {
-          td.children().remove();
-          var value = _renderValue(doc[fieldName]);
-          td.append(value);
-          _initValue(value);
-        }
-
-        $("<button type='button' class='apply' title='Apply change'></button>").click(function() {
-          applyChange();
-        }).appendTo(tools);
-        $("<button type='button' class='cancel' title='Revert change'></button>").click(function() {
-          cancelChange();
-        }).appendTo(tools);
-        tools.appendTo(td);
-        input.val($.futon.formatJSON(value)).appendTo(td);
-        input.each(function() { this.focus(); this.select(); });
-        if (needsTextarea) input.makeResizable({vertical: true});
-      }
-
       function _initKey(doc, row, fieldName) {
-        if (fieldName != "_id" && fieldName != "_rev") {
-          $("<button type='button' class='delete' title='Delete field'></button>").click(function() {
-            delete doc[fieldName];
-            row.remove();
-            page.isDirty = true;
-            $("#fields tbody.content tr").removeClass("odd").filter(":odd").addClass("odd");
-          }).prependTo(row.find("th"));
+        if (fieldName == "_id" || fieldName == "_rev") {
+          return;
         }
+
+        var cell = row.find("th");
+
+        $("<button type='button' class='delete' title='Delete field'></button>").click(function() {
+          delete doc[fieldName];
+          row.remove();
+          page.isDirty = true;
+          $("#fields tbody.content tr").removeClass("odd").filter(":odd").addClass("odd");
+        }).prependTo(cell);
+
+        cell.find("b").makeEditable({allowEmpty: false,
+          accept: function(newName, oldName) {
+            doc[newName] = doc[oldName];
+            delete doc[oldName];
+            row.data("name", newName);
+            $(this).text(newName);
+            page.isDirty = true;
+          },
+          begin: function() {
+            row.find("th button.delete").hide();
+            return true;
+          },
+          end: function(keyCode) {
+            row.find("th button.delete").show();
+            if (keyCode == 9) { // tab, move to editing the value
+              row.find("td").dblclick();
+            }
+          }
+        });
       }
 
-      function _initValue(value) {
-        value.find("dd:has(dl)").hide().prev("dt").addClass("collapsed");
-        value.find("dd:not(:has(dl))").addClass("inline").prev().addClass("inline");
-        value.find("dt.collapsed").click(function() {
-          $(this).toggleClass("collapsed").next().toggle();
+      function _initValue(doc, row, fieldName) {
+        if (fieldName == "_id" || fieldName == "_rev") {
+          return;
+        }
+
+        row.find("td").makeEditable({allowEmpty: true,
+          createInput: function(value) {
+            if ($("dl", this).length > 0 || $("code", this).text().length > 60) {
+              return $("<textarea rows='8' cols='40' spellcheck='false'></textarea>");
+            }
+            return $("<input type='text' spellcheck='false'>");
+          },
+          prepareInput: function(input) {
+            if ($(input).is("textarea")) {
+              $(input).makeResizable({vertical: true});
+            }
+          },
+          accept: function(newValue) {
+            doc[row.data("name")] = JSON.parse(newValue);
+            $(this).children().remove();
+            page.isDirty = true;
+            var value = _renderValue(doc[row.data("name")]);
+            $(this).append(value);
+          },
+          populate: function(value) {
+            return $.futon.formatJSON(doc[row.data("name")]);
+          },
+          validate: function(value) {
+            try {
+              JSON.parse(value);
+              return true;
+            } catch (err) {
+              var msg = err.message;
+              if (msg == "parseJSON") {
+                msg = "Please enter a valid JSON value (for example, \"string\").";
+              }
+              $("<div class='error'></div>").text(msg).appendTo(this);
+              return false;
+            }
+          }
         });
       }
 
       function _renderValue(value) {
-        var type = typeof(value);
-        if (type == "object" && value !== null) {
-          var list = $("<dl></dl>");
-          for (var i in value) {
-            if (!value.hasOwnProperty(i)) continue;
-            $("<dt></dt>").text(i).appendTo(list);
-            $("<dd></dd>").append(_renderValue(value[i])).appendTo(list);
+        function render(val) {
+          var type = typeof(val);
+          if (type == "object" && val !== null) {
+            var list = $("<dl></dl>");
+            for (var i in val) {
+              if (!value.hasOwnProperty(i)) continue;
+              $("<dt></dt>").text(i).appendTo(list);
+              $("<dd></dd>").append(_renderValue(val[i])).appendTo(list);
+            }
+            return list;
+          } else {
+            return $($.futon.formatJSON(val, {html: true}));
           }
-          return list;
-        } else {
-          return $("<code></code>").addClass(type).text(
-            value !== null ? JSON.stringify(value) : "null"
-          );
         }
+        var elem = render(value);
+
+        elem.find("dd:has(dl)").hide().prev("dt").addClass("collapsed");
+        elem.find("dd:not(:has(dl))").addClass("inline").prev().addClass("inline");
+        elem.find("dt.collapsed").click(function() {
+          $(this).toggleClass("collapsed").next().toggle();
+        });
+
+        return elem;
       }
 
       function _renderAttachmentList(attachments) {

@@ -16,13 +16,11 @@
 
     // JSON pretty printing
     formatJSON: function(val, options) {
-      options = options || {};
-      if (options.indent === undefined) {
-        options.indent = 4;
-      }
-      options.indent = options.indent !== undefined ? options.indent : 4;
-      options.linesep = options.linesep !== undefined ? options.linesep : "\n";
-      options.quoteKeys = options.quoteKeys !== undefined ? options.quoteKeys : true;
+      options = $.extend({
+        indent: 4,
+        linesep: "\n",
+        quoteKeys: true
+      }, options || {});
       var itemsep = options.linesep.length ? "," + options.linesep : ", ";
 
       function escape(string) {

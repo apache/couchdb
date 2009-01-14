@@ -37,6 +37,7 @@ specific language governing permissions and limitations under the License.
       });
 
       $(function() {
+        if (page.redirecting) return;
         $("h1 strong").text(page.db.name);
         var viewPath = (page.viewName || "_all_docs").replace(/^_design\//, "_view/");
         if (viewPath != "_slow_view" && viewPath != "_design_docs") {

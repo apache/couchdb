@@ -65,6 +65,7 @@ nobase_dist_localdata_DATA = \
     www/script/jquery.cookies.js \
     www/script/jquery.couch.js \
     www/script/jquery.dialog.js \
+    www/script/jquery.editinline.js \
     www/script/jquery.form.js \
     www/script/jquery.resizer.js \
     www/script/jquery.suggest.js \

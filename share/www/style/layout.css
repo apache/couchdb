@@ -106,7 +106,7 @@ table.listing tbody th :link, table.listing tbody th :visited {
 }
 table.listing tbody.content th button {
   background: transparent no-repeat; border: none; cursor: pointer;
-  float: left; margin: 0 5px 0 -20px; padding: 0; width: 15px; height: 15px;
+  float: left; margin: .2em 5px 0 -20px; padding: 0; width: 15px; height: 15px;
 }
 table.listing tbody.content th button:hover { background-position: -15px 0; }
 table.listing tbody.footer tr td { background: #e9e9e9;
@@ -360,13 +360,16 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
 #fields col.field { width: 33%; }
 #fields tbody.content th { padding-left: 25px; padding-right: 48px; }
 #fields tbody.content th button {
-  background-image: url(../image/delete-mini.png);
+  background-image: url(../image/delete-mini.png);;
 }
-#fields tbody.content th b { display: block; padding: 2px; }
+#fields tbody.content th b { display: block; padding: 2px 2px 2px 3px; }
+#fields tbody.content th b.editinline-container { padding: 0; }
 #fields tbody.content td { color: #999; padding-left: 14px;
   padding-right: 48px;
 }
-#fields tbody.content td code { display: block; font-size: 11px; padding: 2px; }
+#fields tbody.content td code { display: block; font-size: 11px;
+  padding: 2px 2px 2px 3px;
+}
 #fields tbody.content td dl { margin: 0; padding: 0; }
 #fields tbody.content td dt {
   background: transparent url(../image/toggle-collapse.gif) 0 3px no-repeat;
@@ -391,25 +394,31 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
   font-weight: bold;
 }
 #fields tbody.content td input, #fields tbody.content td textarea {
-  font: 10px normal "DejaVu Sans Mono",Monaco,monospace;
+  font: 11px normal "DejaVu Sans Mono",Monaco,monospace;
 }
 #fields tbody.content input.invalid,
 #fields tbody.content textarea.invalid {
   background: #f9f4f4; border-color: #b66 #ebb #ebb #b66;
 }
-#fields tbody.content div.tools { margin: 2px 2px 0; float: right;
+#fields tbody.content div.grippie { padding: 0 1px; width: 100%; }
+
+#fields tbody.content span.editinline-tools { margin: 2px 2px 0; float: right;
   margin-right: -45px;
 }
-#fields tbody.content div.tools button { background: transparent 0 0 no-repeat;
-  border: none; cursor: pointer; display: block; float: left; margin: 0 .2em;
-  width: 11px; height: 11px;
+#fields tbody.content span.editinline-tools button {
+  background: transparent 0 0 no-repeat; border: none; cursor: pointer;
+  display: block; float: left; margin: 0 .2em; width: 11px; height: 11px;
 }
-#fields tbody.content div.tools button:hover { background-position: 0 -22px; }
-#fields tbody.content div.tools button:active { background-position: 0 -44px; }
-#fields tbody.content div.tools button.apply {
+#fields tbody.content span.editinline-tools button:hover {
+  background-position: 0 -22px;
+}
+#fields tbody.content span.editinline-tools button:active {
+  background-position: 0 -44px;
+}
+#fields tbody.content span.editinline-tools button.apply {
   background-image: url(../image/apply.gif);
 }
-#fields tbody.content div.tools button.cancel {
+#fields tbody.content span.editinline-tools button.cancel {
   background-image: url(../image/cancel.gif);
 }
 #fields tbody.content div.error { color: #d33; }
