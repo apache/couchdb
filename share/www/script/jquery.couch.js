@@ -33,8 +33,23 @@
     },
 
     config: function(options, section, option, value) {
+      options = options || {};
+      var url = "/_config/";
+      if (section) {
+        url += encodeURIComponent(section) + "/";
+        if (option) {
+          url += encodeURIComponent(option);
+        }
+      }
+      if (value === undefined) {
+        var method = "GET";
+      } else {
+        var method = "PUT";
+        var data = toJSON(value);
+      }
       $.ajax({
-        type: "GET", url: "/_config/",
+        type: method, url: url, contentType: "application/json",
+        dataType: "json", data: toJSON(value), processData: false,
         complete: function(req) {
           var resp = $.httpData(req, "json");
           if (req.status == 200) {
@@ -42,8 +57,8 @@
           } else if (options.error) {
             options.error(req.status, resp.error, resp.reason);
           } else {
-            alert("An error occurred retrieving the server configuration: " +
-              resp.reason);
+            alert("An error occurred retrieving/updating the server " +
+              "configuration: " + resp.reason);
           }
         }
       });
@@ -76,7 +91,7 @@
           options = options || {};
           $.ajax({
             type: "PUT", url: this.uri, contentType: "application/json",
-            dataType: "json", data: "", processData: false, 
+            dataType: "json", data: "", processData: false,
             complete: function(req) {
               var resp = $.httpData(req, "json");
               if (req.status == 201) {

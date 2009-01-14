@@ -104,11 +104,6 @@ table.listing tbody th { text-align: left; }
 table.listing tbody th :link, table.listing tbody th :visited {
   display: block;
 }
-table.listing tbody.content th button {
-  background: transparent no-repeat; border: none; cursor: pointer;
-  float: left; margin: .2em 5px 0 -20px; padding: 0; width: 15px; height: 15px;
-}
-table.listing tbody.content th button:hover { background-position: -15px 0; }
 table.listing tbody.footer tr td { background: #e9e9e9;
   border-top: 1px solid #a7a7a7; color: #999; font-size: 90%;
   line-height: 1.8em;
@@ -120,6 +115,22 @@ table.listing tbody.footer #paging label {
 }
 table.listing tbody.footer #paging label { color: #666; }
 table.listing tbody.footer #paging select { font-size: 90%; padding: 0; }
+
+/* Inline editing */
+
+span.editinline-tools { margin: 2px 2px 0; float: right; margin-right: -45px; }
+span.editinline-tools button { background: transparent 0 0 no-repeat;
+  border: none; cursor: pointer; display: block; float: left; margin: 0 .2em;
+  width: 11px; height: 11px;
+}
+span.editinline-tools button:hover { background-position: 0 -22px; }
+span.editinline-tools button:active { background-position: 0 -44px; }
+span.editinline-tools button.apply {
+  background-image: url(../image/apply.gif);
+}
+span.editinline-tools button.cancel {
+  background-image: url(../image/cancel.gif);
+}
 
 /* Resizer grippies */
 
@@ -359,9 +370,12 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
 #fields { clear: right; table-layout: fixed; }
 #fields col.field { width: 33%; }
 #fields tbody.content th { padding-left: 25px; padding-right: 48px; }
-#fields tbody.content th button {
-  background-image: url(../image/delete-mini.png);;
+#fields tbody.content th button.delete {
+  background: url(../image/delete-mini.png) no-repeat; border: none;
+  cursor: pointer; float: left; margin: .2em 5px 0 -20px; padding: 0;
+  width: 15px; height: 15px;
 }
+#fields tbody.content th button.delete:hover { background-position: -15px 0; }
 #fields tbody.content th b { display: block; padding: 2px 2px 2px 3px; }
 #fields tbody.content th b.editinline-container { padding: 0; }
 #fields tbody.content td { color: #999; padding-left: 14px;
@@ -401,26 +415,6 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
   background: #f9f4f4; border-color: #b66 #ebb #ebb #b66;
 }
 #fields tbody.content div.grippie { padding: 0 1px; width: 100%; }
-
-#fields tbody.content span.editinline-tools { margin: 2px 2px 0; float: right;
-  margin-right: -45px;
-}
-#fields tbody.content span.editinline-tools button {
-  background: transparent 0 0 no-repeat; border: none; cursor: pointer;
-  display: block; float: left; margin: 0 .2em; width: 11px; height: 11px;
-}
-#fields tbody.content span.editinline-tools button:hover {
-  background-position: 0 -22px;
-}
-#fields tbody.content span.editinline-tools button:active {
-  background-position: 0 -44px;
-}
-#fields tbody.content span.editinline-tools button.apply {
-  background-image: url(../image/apply.gif);
-}
-#fields tbody.content span.editinline-tools button.cancel {
-  background-image: url(../image/cancel.gif);
-}
 #fields tbody.content div.error { color: #d33; }
 
 #fields tbody.content td ul.attachments { list-style: none; margin: 0;
@@ -486,14 +480,21 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
 
 /* Configuration */
 
-table#config tbody th { background: #e6e6e6; border-right: none;
+#config tbody th { background: #e6e6e6; border-right: none;
   border-top: 1px solid #d9d9d9;
 }
-table#config tbody td.name { border-left: 1px solid #d9d9d9; color: #333;
+#config tbody td.name { border-left: 1px solid #d9d9d9; color: #333;
   font-weight: bold;
 }
-table#config tbody td.value {
-  font-family: "DejaVu Sans Mono",Monaco,monospace;
+#config tbody td.value { padding: 1px 48px 1px 1px; }
+#config tbody td.value code { display: block; font-size: 11px;
+  padding: 2px 2px 2px 3px;
+}
+#config tbody td.value code.editinline-container { padding: 0; }
+#config tbody td input {
+  background: #fff; border: 1px solid; border-color: #999 #ddd #ddd #999;
+  font: 11px normal "DejaVu Sans Mono",Monaco,monospace;
+  margin: 0; padding: 1px; width: 100%;
 }
 
 /* Replication */

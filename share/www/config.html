@@ -22,9 +22,10 @@ specific language governing permissions and limitations under the License.
     <script src="script/jquery.js?1.2.6"></script>
     <script src="script/jquery.cookies.js?0.9.0"></script>
     <script src="script/jquery.couch.js?0.9.0"></script>
+    <script src="script/jquery.editinline.js?0.9.0"></script>
     <script src="script/futon.js?0.9.0"></script>
     <script>
-      $(document).ready(function() {
+      $(function() {
         $(document.body).addClass("loading");
         $.couch.config({
           success: function(resp) {
@@ -46,8 +47,11 @@ specific language governing permissions and limitations under the License.
               var prev = null;
               $.each(options, function(idx, optionName) {
                 var cur = idx == 0 ? row : $("<tr></tr>");
-                $("<td class='name'></td>").text(optionName).appendTo(cur);
-                $("<td class='value'></td>").text(section[optionName]).appendTo(cur);
+                $("<td class='name'><b></b></td>")
+                  .find("b").text(optionName).end().appendTo(cur);
+                $("<td class='value'><code></code></td>")
+                  .find("code").text(section[optionName]).end().appendTo(cur);
+                cur.data("section", sectionName).data("option", optionName);
                 if (cur !== row) cur.insertAfter(prev);
                 prev = cur;
               });
@@ -55,8 +59,21 @@ specific language governing permissions and limitations under the License.
             });
             $("#config tbody tr").removeClass("odd").filter(":odd").addClass("odd");
             $(document.body).removeClass("loading");
+
+            $("#config tbody td.value code").makeEditable({
+              accept: function(newValue) {
+                $(document.body).addClass("loading");
+                var row = $(this).parents("tr").eq(0);
+                $.couch.config({
+                  success: function(resp) {
+                    row.find("td.value code").text(newValue);
+                    $(document.body).removeClass("loading");
+                }}, row.data("section"), row.data("option"), newValue);
+              }
+            });
           }
         });
+
       });
     </script>
   </head>
@@ -66,6 +83,10 @@ specific language governing permissions and limitations under the License.
       <strong>Configuration</strong>
     </h1>
     <div id="content">
+      <p class="help">
+        <strong>Note:</strong> Some configuration options may require
+        restarting the server to take effect after modification.
+      </p>
 
       <table id="config" class="listing" cellspacing="0">
         <caption>Configuration</caption>
