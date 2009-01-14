@@ -72,8 +72,6 @@ specific language governing permissions and limitations under the License.
         });
 
         // Restore preferences/state from cookies
-        var query = $.cookies.get(page.db.name + ".query");
-        if (query) $("#viewcode_map").val(query);
         var desc = $.cookies.get(page.db.name + ".desc");
         if (desc) $("#documents thead th.key").addClass("desc");
         var rowsPerPage = $.cookies.get(page.db.name + ".perpage");
@@ -137,9 +135,7 @@ specific language governing permissions and limitations under the License.
         <table summary="View functions" cellspacing="0"><tr>
           <td class="code map">
             <label for="viewcode_map">Map Function:</label>
-            <textarea id="viewcode_map" class="map" rows="5" cols="20" spellcheck="false" wrap="off">function(doc) {
-  emit(null, doc);
-}</textarea>
+            <textarea id="viewcode_map" class="map" rows="5" cols="20" spellcheck="false" wrap="off"></textarea>
           </td>
           <td class="splitter"></td>
           <td class="code reduce">
@@ -152,6 +148,7 @@ specific language governing permissions and limitations under the License.
           <button class="saveas" type="button">Save As…</button>
           <button class="revert" type="button" disabled>Revert</button>
           <button class="run" type="button">Run</button>
+          <label>Language: <select id="language"></select></label>
         </div>
       </div>
 

@@ -54,6 +54,7 @@ code.number, code.boolean { color: #339; }
 code.null { color: #666; }
 
 button { font-size: 100%; -webkit-appearance: square-button; }
+button[disabled] { color: #999; }
 input, select, textarea { background: #fff; border: 1px solid;
   border-color: #999 #ddd #ddd #999; margin: 0; padding: 1px;
 }
@@ -309,8 +310,8 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
   white-space: nowrap;
 }
 #viewcode .code textarea { border: none; border-top: 1px solid #ccc;
-  color: #333; margin: 0; min-height: 50px; padding: .4em 0 0; resize: none;
-  width: 100%; overflow: auto;
+  color: #333; font-size: 11px; margin: 0; min-height: 50px; padding: .4em 0 0;
+  resize: none; width: 100%; overflow: auto;
 }
 #viewcode .code textarea:focus { background: #e9f4ff; }
 #viewcode .bottom { border-bottom: none; clear: left; padding: 1px 3px; }
@@ -324,6 +325,7 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
   float: right; margin: 0 0 0 1em;
 }
 #viewcode .bottom button.save { font-weight: bold; }
+#viewcode .bottom label { color: #666; font-size: 90%; }
 #viewcode .grippie { background-position: 50% 50%; }
 #viewcode.collapsed { background: #e9e9e9; }
 #viewcode.collapsed .top { border-bottom: none; }

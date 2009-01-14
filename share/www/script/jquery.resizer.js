@@ -76,7 +76,7 @@
             $(document).unbind("mousemove");
             document.onselectstart = null; // for IE
           });
-        return false;
+        return true;
       });
     });
   }

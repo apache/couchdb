@@ -117,10 +117,17 @@
 
       this.dbName = dbName;
       this.viewName = viewName;
+      this.viewLanguage = "javascript";
       this.db = db;
       this.isDirty = false;
       this.isTempView = viewName == "_slow_view";
       page = this;
+
+      var templates = {
+        javascript: "function(doc) {\n  emit(null, doc);\n}",
+        python: "def fun(doc):\n  yield None, doc",
+        ruby: "{|doc|\n  emit(nil, doc);\n}",
+      }
 
       this.addDocument = function() {
         $.showDialog("dialog/_create_document.html", {
@@ -178,7 +185,8 @@
               dirtyTimeout = setTimeout(function() {
                 var buttons = $("#viewcode button.save, #viewcode button.revert");
                 page.isDirty = ($("#viewcode_map").val() != page.storedViewCode.map)
-                  || ($("#viewcode_reduce").val() != (page.storedViewCode.reduce || ""));
+                  || ($("#viewcode_reduce").val() != (page.storedViewCode.reduce || ""))
+                  || page.viewLanguage != page.storedViewLanguage;
                 if (page.isDirty) {
                   buttons.removeAttr("disabled");
                 } else {
@@ -195,13 +203,48 @@
                                      .bind("keyup", updateDirtyState)
                                      .bind("textInput", updateDirtyState);
             }
+            $("#language").change(updateDirtyState);
           });
         } else if (viewName == "_slow_view") {
+          page.viewLanguage = $.cookies.get(db.name + ".language", page.viewLanguage);
           page.updateViewEditor(
-            $.cookies.get(db.name + ".map"),
+            $.cookies.get(db.name + ".map", templates[page.viewLanguage]),
             $.cookies.get(db.name + ".reduce", "")
           );
         }
+        page.populateLanguagesMenu();
+      }
+
+      // Populate the languages dropdown, and listen to selection changes
+      this.populateLanguagesMenu = function() {
+        $.couch.config({
+          success: function(resp) {
+            var select = $("#language");
+            for (var language in resp) {
+              var option = $(document.createElement("option"))
+                .attr("value", language).text(language)
+                .appendTo(select);
+            }
+            if (select[0].options.length == 1) {
+              select[0].disabled = true;
+            } else {
+              select.val(page.viewLanguage);
+              select.change(function() {
+                var language = $("#language").val();
+                if (language != page.viewLanguage) {
+                  var mapFun = $("#viewcode_map").val();
+                  if (mapFun == "" || mapFun == templates[page.viewLanguage]) {
+                    // no edits made, so change to the new default
+                    $("#viewcode_map").val(templates[language]);
+                  }
+                  page.viewLanguage = language;
+                  $("#viewcode_map")[0].focus();
+                }
+                return false;
+              });
+            }
+          }
+        }, "query_servers");
       }
 
       this.populateViewsMenu = function() {
@@ -212,7 +255,6 @@
             for (var i = 0; i < resp.rows.length; i++) {
               db.openDoc(resp.rows[i].id, {
                 success: function(doc) {
-                  var optGroup = $("<optgroup></optgroup>").attr("label", doc._id.substr(8));
                   var optGroup = $(document.createElement("optgroup"))
                     .attr("label", doc._id.substr(8));
                   for (var name in doc.views) {
@@ -248,22 +290,27 @@
             error: function(status, error, reason) {
               if (status == 404) {
                 $.cookies.remove(dbName + ".view");
-                location.reload();
+                location.href = "database.html?" + encodeURIComponent(db.name);
               }
             },
             success: function(resp) {
               var viewCode = resp.views[localViewName];
+              page.viewLanguage = resp.language || "javascript";
+              $("#language").val(page.viewLanguage);
               page.updateViewEditor(viewCode.map, viewCode.reduce || "");
               $("#viewcode button.revert, #viewcode button.save").attr("disabled", "disabled");
               page.storedViewCode = viewCode;
+              page.storedViewLanguage = page.viewLanguage;
               if (callback) callback();
             }
           });
         } else {
-          $("#viewcode_map").val(page.storedViewCode.map);
-          $("#viewcode_reduce").val(page.storedViewCode.reduce || "");
-          page.isDirty = false;
+          page.updateViewEditor(page.storedViewCode.map,
+            page.storedViewCode.reduce || "");
+          page.viewLanguage = page.storedViewLanguage;
+          $("#language").val(page.viewLanguage);
           $("#viewcode button.revert, #viewcode button.save").attr("disabled", "disabled");
+          page.isDirty = false;
           if (callback) callback();
         }
       }
@@ -332,7 +379,23 @@
               };
               var docId = ["_design", data.docid].join("/");
               function save(doc) {
-                if (!doc) doc = {_id: docId, language: "javascript"};
+                if (!doc) {
+                  doc = {_id: docId, language: page.viewLanguage};
+                } else {
+                  var numViews = 0;
+                  for (var viewName in (doc.views || {})) {
+                    if (viewName != data.name) numViews++;
+                  }
+                  if (numViews > 0 && page.viewLanguage != doc.language) {
+                    callback({
+                      docid: "Cannot save to " + data.docid +
+                             " because its language is \"" + doc.language +
+                             "\", not \"" + page.viewLanguage + "\"."
+                    });
+                    return;
+                  }
+                  doc.language = page.viewLanguage;
+                }
                 if (doc.views === undefined) doc.views = {};
                 doc.views[data.name] = viewCode;
                 db.saveDoc(doc, {
@@ -366,6 +429,17 @@
         $(document.body).addClass("loading");
         db.openDoc(["_design", designDocId].join("/"), {
           success: function(doc) {
+            var numViews = 0;
+            for (var viewName in (doc.views || {})) {
+              if (viewName != localViewName) numViews++;
+            }
+            if (numViews > 0 && page.viewLanguage != doc.language) {
+              alert("Cannot save view because the design document language " +
+                    "is \"" + doc.language + "\", not \"" +
+                    page.viewLanguage + "\".");
+              return;
+            }
+            doc.language = page.viewLanguage;
             var viewDef = doc.views[localViewName];
             viewDef.map = $("#viewcode_map").val();
             viewDef.reduce = $("#viewcode_reduce").val() || undefined;
@@ -524,7 +598,8 @@
             } else {
               $.cookies.remove(db.name + ".reduce");
             }
-            db.query(mapFun, reduceFun, null, options);
+            $.cookies.set(db.name + ".language", page.viewLanguage);
+            db.query(mapFun, reduceFun, page.viewLanguage, options);
           } else if (viewName == "_design_docs") {
             options.startkey = options.descending ? "_design0" : "_design";
             options.endkey = options.descending ? "_design" : "_design0";
@@ -534,7 +609,7 @@
             var currentMapCode = $("#viewcode_map").val();
             var currentReduceCode = $("#viewcode_reduce").val() || null;
             if (page.isDirty) {
-              db.query(currentMapCode, currentReduceCode, null, options);
+              db.query(currentMapCode, currentReduceCode, page.viewLanguage, options);
             } else {
               db.view(viewName.substr(8), options);
             }
