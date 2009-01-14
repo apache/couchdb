@@ -76,7 +76,6 @@ specific language governing permissions and limitations under the License.
           $("#records tbody.content").empty();
           var source = $("#from_local")[0].checked ? $("#from_name").val() : $("#from_url").val();
           var target = $("#to_local")[0].checked ? $("#to_name").val() : $("#to_url").val();
-          $(document.body).addClass("loading");
           $.couch.replicate(source, target, {
             success: function(resp) {
               $.each(resp.history, function(idx, record) {
@@ -86,7 +85,6 @@ specific language governing permissions and limitations under the License.
               });
               $("#records tbody tr").removeClass("odd").filter(":odd").addClass("odd");
               $("#records tbody.footer td").text("Replication session " + resp.session_id);
-              $(document.body).removeClass("loading");
             }
           });
         });

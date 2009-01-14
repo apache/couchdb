@@ -39,7 +39,6 @@
 
       this.updateDatabaseListing = function(offset) {
         offset |= 0;
-        $(document.body).addClass("loading");
         var maxPerPage = parseInt($("#perpage").val(), 10);
 
         $.couch.allDbs({
@@ -47,9 +46,6 @@
             $("#paging a").unbind();
             $("#databases tbody.content").empty();
 
-            if (dbs.length == 0) {
-              $(document.body).removeClass("loading");
-            }
             var dbsOnPage = dbs.slice(offset, offset + maxPerPage);
 
             $.each(dbsOnPage, function(idx, dbName) {
@@ -64,9 +60,6 @@
                     .find("td.size").text($.futon.formatSize(info.disk_size)).end()
                     .find("td.count").text(info.doc_count).end()
                     .find("td.seq").text(info.update_seq);
-                  if (idx == dbsOnPage.length - 1) {
-                    $(document.body).removeClass("loading");
-                  }
                 }
               });
             });
@@ -426,7 +419,6 @@
         var viewNameParts = viewName.split("/");
         var designDocId = viewNameParts[1];
         var localViewName = viewNameParts[2];
-        $(document.body).addClass("loading");
         db.openDoc(["_design", designDocId].join("/"), {
           success: function(doc) {
             var numViews = 0;
@@ -448,7 +440,6 @@
                 page.isDirty = false;
                 $("#viewcode button.revert, #viewcode button.save")
                   .attr("disabled", "disabled");
-                $(document.body).removeClass("loading");
               }
             });
           }
@@ -466,7 +457,6 @@
       }
 
       this.updateDocumentListing = function(options) {
-        $(document.body).addClass("loading");
         if (options === undefined) options = {};
         if (options.limit === undefined) {
           options.limit = parseInt($("#perpage").val(), 10);
@@ -577,11 +567,9 @@
             "Showing " + firstNum + "-" + lastNum + " of " + totalNum +
             " row" + (firstNum != lastNum ? "s" : ""));
           $("#documents tbody tr:odd").addClass("odd");
-          $(document.body).removeClass("loading");
         }
         options.error = function(status, error, reason) {
           alert("Error: " + error + "\n\n" + reason);
-          $(document.body).removeClass("loading");
         }
 
         if (!viewName || viewName == "_all_docs") {
@@ -689,7 +677,6 @@
       }
 
       this.updateFieldListing = function() {
-        $(document.body).addClass("loading");
         $("#fields tbody.content").empty();
 
         function handleResult(doc, revs) {
@@ -728,7 +715,6 @@
           if (location.hash == "#source") {
             page.activateSourceView();
           }
-          $(document.body).removeClass("loading");
         }
 
         db.openDoc(docId, {revs_info: true,
@@ -768,11 +754,9 @@
       }
 
       this.saveDocument = function() {
-        $(document.body).addClass("loading");
         db.saveDoc(page.doc, {
           error: function(status, error, reason) {
             alert("Error: " + error + "\n\n" + reason);
-            $(document.body).removeClass("loading");
           },
           success: function(resp) {
             page.isDirty = false;

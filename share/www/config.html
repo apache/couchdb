@@ -26,7 +26,6 @@ specific language governing permissions and limitations under the License.
     <script src="script/futon.js?0.9.0"></script>
     <script>
       $(function() {
-        $(document.body).addClass("loading");
         $.couch.config({
           success: function(resp) {
             var sections = [];
@@ -58,16 +57,13 @@ specific language governing permissions and limitations under the License.
               row.find("th").attr("rowspan", options.length);
             });
             $("#config tbody tr").removeClass("odd").filter(":odd").addClass("odd");
-            $(document.body).removeClass("loading");
 
             $("#config tbody td.value code").makeEditable({
               accept: function(newValue) {
-                $(document.body).addClass("loading");
                 var row = $(this).parents("tr").eq(0);
                 $.couch.config({
                   success: function(resp) {
                     row.find("td.value code").text(newValue);
-                    $(document.body).removeClass("loading");
                 }}, row.data("section"), row.data("option"), newValue);
               }
             });

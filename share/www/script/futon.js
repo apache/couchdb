@@ -107,6 +107,10 @@
     navigation: new Navigation()
   });
 
+  $(document)
+    .ajaxStart(function() { $(this.body).addClass("loading"); })
+    .ajaxStop(function() { $(this.body).removeClass("loading"); });
+
   $(function() {
     document.title = "Apache CouchDB - Futon: " + document.title;
     $.get("_sidebar.html", function(resp) {
