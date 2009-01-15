@@ -400,7 +400,9 @@ doc_flush_binaries(Doc, Fd) ->
                 % written to a different file
                 SizeAcc + Len;
             {_Key, {_Type, Bin}} when is_binary(Bin) ->
-                SizeAcc + size(Bin)
+                SizeAcc + size(Bin);
+            {_Key, {_Type, {Fun, Len}}} when is_function(Fun) ->
+                SizeAcc + Len
             end
         end,
         0, Bins),
@@ -433,7 +435,11 @@ doc_flush_binaries(Doc, Fd) ->
                 {Fd, NewStreamPointer, Len};
             Bin when is_binary(Bin) ->
                 {ok, StreamPointer} = couch_stream:write(OutputStream, Bin),
-                {Fd, StreamPointer, size(Bin)}
+                {Fd, StreamPointer, size(Bin)};
+            {Fun, Len} when is_function(Fun) ->
+                {ok, StreamPointer} =
+                        write_streamed_attachment(OutputStream, Fun, Len, nil),
+                {Fd, StreamPointer, Len}
             end,
             {Key, {Type, NewBinValue}}
         end, Bins),
@@ -441,6 +447,17 @@ doc_flush_binaries(Doc, Fd) ->
     {ok, _FinalPos} = couch_stream:close(OutputStream),
 
     Doc#doc{attachments = NewBins}.
+    
+write_streamed_attachment(_Stream, _F, 0, SpAcc) ->
+    {ok, SpAcc};
+write_streamed_attachment(Stream, F, LenLeft, nil) ->
+    Bin = F(),
+    {ok, StreamPointer} = couch_stream:write(Stream, Bin),
+    write_streamed_attachment(Stream, F, LenLeft - size(Bin), StreamPointer);
+write_streamed_attachment(Stream, F, LenLeft, SpAcc) ->
+    Bin = F(),
+    {ok, _} = couch_stream:write(Stream, Bin),
+    write_streamed_attachment(Stream, F, LenLeft - size(Bin), SpAcc).
 
 enum_docs_since_reduce_to_count(Reds) ->
     couch_btree:final_reduce(
