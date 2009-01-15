@@ -137,7 +137,9 @@ function updateTestsListing() {
 
 function updateTestsFooter() {
   var tests = $("#tests tbody.content tr td.status");
-  var testsRun = tests.not(":contains('not run'))");
+  console.log(tests);
+  var testsRun = tests.filter(".success, .error, .failure");
+  console.log(testsRun)
   var testsFailed = testsRun.not(".success");
   $("#tests tbody.footer td").text(testsRun.length + " of " + tests.length +
     " test(s) run, " + testsFailed.length + " failures");
