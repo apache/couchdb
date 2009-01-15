@@ -205,16 +205,6 @@
             $.cookies.get(db.name + ".reduce", "")
           );
         }
-        $("#viewcode textarea").change(function() {
-          if (page.viewLanguage == "javascript") {
-            try {
-              var func = eval("(" + $(this).val() + ")");
-              $(this).removeClass("invalid").next(".error").remove();
-            } catch (err) {
-              $(this).addClass("invalid").data("error", err.message);
-            }
-          }
-        });
         page.populateLanguagesMenu();
       }
 

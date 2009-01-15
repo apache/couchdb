@@ -314,7 +314,6 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
   resize: none; width: 100%; overflow: auto;
 }
 #viewcode .code textarea:focus { background: #e9f4ff; }
-#viewcode .code textarea.invalid { background: #fee; color: #800; }
 #viewcode .bottom { border-bottom: none; clear: left; padding: 1px 3px; }
 #viewcode .bottom button { font-size: 90%; margin: 0 1em 0 0;
   padding-left: 2em; padding-right: 2em;
