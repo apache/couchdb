@@ -255,7 +255,7 @@ db_req(#httpd{path_parts=[_,<<"_admins">>]}=Req, _Db) ->
 
 % Special case to enable using an unencoded slash in the URL of design docs, 
 % as slashes in document IDs must otherwise be URL encoded.
-db_req(#httpd{method='GET',mochi_req=MochiReq, path_parts=[DbName,<<"_design/",Name/binary>>|Rest]}=Req, Db) ->
+db_req(#httpd{method='GET',mochi_req=MochiReq, path_parts=[DbName,<<"_design/",_/binary>>|_]}=Req, _Db) ->
     PathFront = "/" ++ binary_to_list(DbName) ++ "/_design",
     {ok, [PathFront|PathTail]} = regexp:split(MochiReq:get(raw_path),"%2F"),
     RedirectTo = PathFront ++ "/" ++ mochiweb_util:join(PathTail, "%2F"),
@@ -279,7 +279,6 @@ all_docs_view(Req, Db, Keys) ->
         start_key = StartKey,
         start_docid = StartDocId,
         end_key = EndKey,
-        end_docid = EndDocId,
         limit = Limit,
         skip = SkipCount,
         direction = Dir
@@ -590,7 +589,12 @@ db_attachment_req(#httpd{method=Method}=Req, Db, DocId, FileNameParts)
         _ ->
             [{FileName, {
                 list_to_binary(couch_httpd:header_value(Req,"Content-Type")),
-                couch_httpd:body(Req)
+                case couch_httpd:header_value(Req,"Content-Length") of
+                undefined -> 
+                    throw({bad_request, "Attachment uploads must be fixed length"});
+                Length -> 
+                    {fun() -> couch_httpd:recv(Req, 0) end, list_to_integer(Length)}
+                end
             }}]
     end,
 
