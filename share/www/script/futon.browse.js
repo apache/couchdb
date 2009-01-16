@@ -950,8 +950,14 @@
 
       function _initAttachmentItem(name, attachment, li) {
         $("<button type='button' class='delete' title='Delete attachment'></button>").click(function() {
-          delete page.doc._attachments[name];
-          li.remove();
+          if (!li.siblings("li").length) {
+            delete page.doc._attachments;
+            li.parents("tr").remove();
+            $("#fields tbody.content tr").removeClass("odd").filter(":odd").addClass("odd");
+          } else {
+            delete page.doc._attachments[name];
+            li.remove();
+          }
           page.isDirty = true;
           return false;
         }).prependTo($("a", li));
