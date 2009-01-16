@@ -38,7 +38,6 @@
         if ($.inArray(e.keyCode, [38, 40]) != -1 ||
             (dropdown.is(":visible") && (e.keyCode == 27 ||
              ($.inArray(e.keyCode, [9, 13]) != -1 && getSelection())))) {
-          e.preventDefault(); e.stopPropagation();
           switch(e.keyCode) {
             case 38: // up
               moveUp();
@@ -49,11 +48,13 @@
             case 9:  // tab
             case 13: // return
               commit();
+              if (e.keyCode == 9) return true;
               break;
             case 27: // escape
               dropdown.hide();
               break;
           }
+          e.preventDefault(); e.stopPropagation();
           return false;
         } else {
           timer = setTimeout(function() { suggest() }, options.delay);
@@ -120,11 +121,12 @@
   }
 
   $.fn.suggest = function(callback, options) {
-    options = options || {};
-    options.callback = callback;
-    options.delay = options.delay || 100;
-    options.dropdownClass = options.dropdownClass || "suggest-dropdown";
-    options.minChars = options.minChars || 1;
+    options = $.extend({
+      callback: callback,
+      delay: 100,
+      dropdownClass: "suggest-dropdown",
+      minChars: 1
+    }, options || {});
     return this.each(function() {
       suggest(this, options);
     });

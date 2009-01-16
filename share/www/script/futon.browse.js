@@ -331,12 +331,14 @@
           load: function(elem) {
             $("#input_docid", elem).val(designDocId).suggest(function(text, callback) {
               db.allDocs({
-                limit: 10, startkey: "_design/" + text,
-                endkey: "_design/" + text + "ZZZZ",
+                limit: 10, startkey: "_design/" + text, endkey: "_design0",
                 success: function(docs) {
                   var matches = [];
                   for (var i = 0; i < docs.rows.length; i++) {
-                    matches[i] = docs.rows[i].id.substr(8);
+                    var docName = docs.rows[i].id.substr(8);
+                    if (docName.substr(0, text.length) == text) {
+                      matches[i] = docName;
+                    }
                   }
                   callback(matches);
                 }
@@ -349,10 +351,9 @@
                   var matches = [];
                   if (!doc.views) return;
                   for (var viewName in doc.views) {
-                    if (!doc.views.hasOwnProperty(viewName) || !viewName.match("^" + text)) {
-                      continue;
+                    if (viewName.substr(0, text.length) == text) {
+                      matches.push(viewName);
                     }
-                    matches.push(viewName);
                   }
                   callback(matches);
                 }
