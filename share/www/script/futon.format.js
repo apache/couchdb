@@ -71,7 +71,6 @@
               buf.push("{");
               var index = 0;
               for (var key in val) {
-                if (!val.hasOwnProperty(key)) continue;
                 buf.push(index > 0 ? itemsep : options.linesep);
                 var keyDisplay = options.quoteKeys ? JSON.stringify(key) : key;
                 if (options.html) {

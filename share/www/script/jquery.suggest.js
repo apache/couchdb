@@ -65,9 +65,9 @@
       var newVal = $.trim(input.val());
       if (force || newVal != prevVal) {
         if (force || newVal.length >= options.minChars) {
-          options.callback($.trim(input.val()), function(items) {
-            show(items);
-          });
+          options.callback.apply(elem, [$.trim(input.val()), function(items, render) {
+            show(items, render);
+          }]);
         } else {
           dropdown.hide();
         }
@@ -75,14 +75,22 @@
       }
     }
 
-    function show(items) {
+    function show(items, render) {
       if (!items) return;
       if (!items.length) { dropdown.hide(); return; }
-      var html = [];
+      render = render || function(idx, value) { return value; }
+      dropdown.empty();
       for (var i = 0; i < items.length; i++) {
-        html.push('<li>' + items[i] + '</li>');
+        var item = $("<li></li>").data("value", items[i]);
+        var rendered = render(i, items[i]);
+        if (typeof(rendered) == "string") {
+          item.text(rendered);
+        } else {
+          item.append(rendered);
+        }
+        item.appendTo(dropdown);
       }
-      dropdown.html(html.join("")).slideDown("fast");
+      dropdown.slideDown("fast");
       dropdown.children('li').click(function(e) {
         $(this).addClass("selected");
         commit();
@@ -92,7 +100,7 @@
     function commit() {
       var sel = getSelection();
       if (sel) {
-        prevVal = sel.text();
+        prevVal = sel.data("value");
         input.val(prevVal);
         dropdown.hide();
       }

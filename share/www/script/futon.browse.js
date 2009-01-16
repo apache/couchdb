@@ -251,7 +251,6 @@
                   var optGroup = $(document.createElement("optgroup"))
                     .attr("label", doc._id.substr(8));
                   for (var name in doc.views) {
-                    if (!doc.views.hasOwnProperty(name)) continue;
                     var option = $(document.createElement("option"))
                       .attr("value", doc._id + "/" + name).text(name)
                       .appendTo(optGroup);
@@ -684,7 +683,6 @@
           page.doc = doc;
           var propNames = [];
           for (var prop in doc) {
-            if (!doc.hasOwnProperty(prop)) continue;
             propNames.push(prop);
           }
           // Order properties alphabetically, but put internal fields first
@@ -904,7 +902,6 @@
           if (type == "object" && val !== null) {
             var list = $("<dl></dl>");
             for (var i in val) {
-              if (!value.hasOwnProperty(i)) continue;
               $("<dt></dt>").text(i).appendTo(list);
               $("<dd></dd>").append(_renderValue(val[i])).appendTo(list);
             }
