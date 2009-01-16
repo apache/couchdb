@@ -41,7 +41,7 @@ function patchTest(fun) {
 
 function runAllTests() {
   var rows = $("#tests tbody.content tr");
-  $("td", rows).html("&nbsp;");
+  $("td", rows).text("");
   $("td.status", rows).removeClass("error").removeClass("failure").removeClass("success").text("not run");
   var offset = 0;
   function runNext() {
@@ -66,7 +66,7 @@ function runTest(button, callback, debug) {
   }
   var row = currentRow = $(button).parents("tr").get(0);
   $("td.status", row).removeClass("error").removeClass("failure").removeClass("success");
-  $("td", row).html("&nbsp;");
+  $("td", row).text("");
   var testFun = tests[row.id];
   function run() {
     numFailures = 0;
@@ -115,15 +115,14 @@ function showSource(cell) {
 
 function updateTestsListing() {
   for (var name in tests) {
-    if (!tests.hasOwnProperty(name)) continue;
     var testFunction = tests[name];
     var row = $("<tr><th></th><td></td><td></td><td></td></tr>")
       .find("th").text(name).attr("title", "Show source").click(function() {
         showSource(this);
       }).end()
       .find("td:nth(0)").addClass("status").text("not run").end()
-      .find("td:nth(1)").addClass("duration").html("&nbsp;").end()
-      .find("td:nth(2)").addClass("details").html("&nbsp;").end();
+      .find("td:nth(1)").addClass("duration").end()
+      .find("td:nth(2)").addClass("details").end();
     $("<button type='button' class='run' title='Run test'></button>").click(function() {
       this.blur();
       runTest(this);
@@ -139,8 +138,14 @@ function updateTestsFooter() {
   var tests = $("#tests tbody.content tr td.status");
   var testsRun = tests.filter(".success, .error, .failure");
   var testsFailed = testsRun.not(".success");
+  var totalDuration = 0;
+  $("#tests tbody.content tr td.duration:contains('ms')").each(function() {
+    var text = $(this).text();
+    totalDuration += parseInt(text.substr(0, text.length - 2), 10);
+  });
   $("#tests tbody.footer td").text(testsRun.length + " of " + tests.length +
-    " test(s) run, " + testsFailed.length + " failures");
+    " test(s) run, " + testsFailed.length + " failures (" +
+    totalDuration + " ms)");
 }
 
 // Use T to perform a test that returns false on failure and if the test fails,
