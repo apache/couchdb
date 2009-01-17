@@ -1010,7 +1010,7 @@ var tests = {
     var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc4/attachment.txt");
     T(xhr.status == 200);
     T(xhr.responseText == "This is a string");
-    
+
   },
 
   attachment_paths : function(debug) {
@@ -1144,6 +1144,93 @@ var tests = {
     T(binAttDoc._attachments["foo/bar2.txt"] !== undefined);
     T(binAttDoc._attachments["foo/bar2.txt"].content_type == "text/plain;charset=utf-8");
     T(binAttDoc._attachments["foo/bar2.txt"].length == 30);
+
+  },
+
+  attachment_views: function(debug) {
+
+    var db = new CouchDB("test_suite_db");
+    db.deleteDb();
+    db.createDb();
+    if (debug) debugger;
+
+    // count attachments in a view
+
+    db.bulkSave(makeDocs(0, 10));
+
+    db.bulkSave(makeDocs(10, 20, {
+      _attachments:{
+        "foo.txt": {
+          content_type:"text/plain",
+          data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+        }
+      }
+    }));
+
+    db.bulkSave(makeDocs(20, 30, {
+      _attachments:{
+        "foo.txt": {
+          content_type:"text/plain",
+          data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+        },
+        "bar.txt": {
+          content_type:"text/plain",
+          data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+        }
+      }
+    }));
+
+    db.bulkSave(makeDocs(30, 40, {
+      _attachments:{
+        "foo.txt": {
+          content_type:"text/plain",
+          data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+        },
+        "bar.txt": {
+          content_type:"text/plain",
+          data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+        },
+        "baz.txt": {
+          content_type:"text/plain",
+          data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+        }
+      }
+    }));
+
+    var mapFunction = function(doc) {
+      var count = 0;
+
+      for(var idx in doc._attachments) {
+        count = count + 1;
+      }
+
+      emit(parseInt(doc._id), count);
+    }
+
+    var reduceFunction = function(key, values) {
+      return sum(values);
+    }
+    
+    var result = db.query(mapFunction, reduceFunction);
+
+    T(result.rows.length == 1);
+    T(result.rows[0].value == 60);
+
+    var result = db.query(mapFunction, reduceFunction, {
+      startkey:10,
+      endkey:19
+    });
+
+    T(result.rows.length == 1);
+    T(result.rows[0].value == 10);
+
+    var result = db.query(mapFunction, reduceFunction, {
+      startkey:20,
+      endkey:29
+    });
+
+    T(result.rows.length == 1);
+    T(result.rows[0].value == 20);
 
   },
 
@@ -2096,7 +2183,14 @@ var tests = {
       for(test in repTests)
         if(repTests[test].init) repTests[test].init(dbA, dbB);
       
-      T(CouchDB.replicate(A, B).ok);
+      try {
+        T(CouchDB.replicate(A, B).ok);
+      } catch (e) {
+        if(window.location.host.match(/localhost/)) {
+          alert("Hi, the replication test failed. The most likely cause is that 'localhost' resolves to ::1 (IPv6) and CouchDB only listenes at 127.0.0.1 (IPv4). Try 127.0.0.1 to access Futon and run this test suite again.");
+        }
+        throw e;
+      }
       
       for(test in repTests)
         if(repTests[test].afterAB1) repTests[test].afterAB1(dbA, dbB);
