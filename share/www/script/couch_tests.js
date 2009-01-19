@@ -2862,7 +2862,7 @@ var tests = {
 };
 
 function makeDocs(start, end, templateDoc) {
-  var templateDocSrc = templateDoc ? templateDoc.toSource() : "{}"
+  var templateDocSrc = templateDoc ? JSON.stringify(templateDoc) : "{}"
   if (end === undefined) {
     end = start;
     start = 0;
