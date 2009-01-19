@@ -102,6 +102,9 @@
       if (sel) {
         prevVal = sel.data("value");
         input.val(prevVal);
+        if (options.select) {
+          options.select.apply(elem, [prevVal]);
+        }
         dropdown.hide();
       }
       if (timer) clearTimeout(timer)
@@ -133,7 +136,8 @@
       callback: callback,
       delay: 100,
       dropdownClass: "suggest-dropdown",
-      minChars: 1
+      minChars: 1,
+      select: null
     }, options || {});
     return this.each(function() {
       suggest(this, options);
