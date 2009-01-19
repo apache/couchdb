@@ -16,7 +16,7 @@
 -export([start_link/0, stop/0, handle_request/3]).
 
 -export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,path/1]).
--export([verify_is_server_admin/1,unquote/1,recv/2]).
+-export([verify_is_server_admin/1,unquote/1,quote/1,recv/2]).
 -export([parse_form/1,json_body/1,body/1,doc_etag/1]).
 -export([primary_header_value/2,partition/1,serve_file/3]).
 -export([start_chunked_response/3,send_chunk/2]).
@@ -152,7 +152,9 @@ handle_request(MochiReq, UrlHandlers, DbUrlHandlers) ->
     try
         HandlerFun(HttpReq#httpd{user_ctx=AuthenticationFun(HttpReq)})
     catch
-        _Tag:Error ->
+        Tag:Error ->
+            ?LOG_ERROR("Uncaught error in HTTP request: ~p",[{Tag, Error}]),
+            ?LOG_DEBUG("Stacktrace: ~p",[erlang:get_stacktrace()]),
             send_error(HttpReq, Error)
     end,
 
@@ -240,6 +242,9 @@ path(#httpd{mochi_req=MochiReq}) ->
 
 unquote(UrlEncodedString) ->
     mochiweb_util:unquote(UrlEncodedString).
+
+quote(UrlDecodedString) ->
+    mochiweb_util:quote_plus(UrlDecodedString).
 
 parse_form(#httpd{mochi_req=MochiReq}) ->
     mochiweb_multipart:parse_form(MochiReq).
