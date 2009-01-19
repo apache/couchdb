@@ -30,7 +30,7 @@ track_file(Fd) ->
 
 get_stats() ->
     #stats{opened=Opened,closed=Closed}=gen_server:call(couch_file_stats,get),
-    {ok, [{opened,Opened}, {closed,Closed}]}.
+    [{files_open,Opened-Closed}, {files_closed,Closed}].
 
 
 start_link() ->

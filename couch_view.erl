@@ -20,6 +20,10 @@
     extract_map_view/1]).
 
 -include("couch_db.hrl").
+
+
+-record(server,{
+    root_dir = []}).
     
 start_link() ->
     gen_server:start_link({local, couch_view}, couch_view, [], []).

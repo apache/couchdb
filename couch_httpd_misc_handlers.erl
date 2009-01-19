@@ -12,9 +12,9 @@
 
 -module(couch_httpd_misc_handlers).
 
--export([handle_welcome_req/2,handle_favicon_req/2,handle_utils_dir_req/2,handle_all_dbs_req/1,
-    handle_replicate_req/1,handle_restart_req/1,handle_uuids_req/1,
-    handle_config_req/1]).
+-export([handle_welcome_req/2,handle_favicon_req/2,handle_utils_dir_req/2,
+    handle_all_dbs_req/1,handle_replicate_req/1,handle_restart_req/1,
+    handle_uuids_req/1,handle_config_req/1,handle_stats_req/1]).
     
 -export([increment_update_seq_req/2]).
 
@@ -31,8 +31,7 @@
 handle_welcome_req(#httpd{method='GET'}=Req, WelcomeMessage) ->
     send_json(Req, {[
         {couchdb, WelcomeMessage},
-        {version, list_to_binary(couch_server:get_version())},
-        {start_time, list_to_binary(couch_server:get_start_time())}
+        {version, list_to_binary(couch_server:get_version())}
     ]});
 handle_welcome_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
@@ -62,6 +61,11 @@ handle_all_dbs_req(#httpd{method='GET'}=Req) ->
 handle_all_dbs_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
+handle_stats_req(#httpd{method='GET'}=Req) ->
+    ok = couch_httpd:verify_is_server_admin(Req),
+    send_json(Req, {couch_server:get_stats() ++ couch_file_stats:get_stats()});
+handle_stats_req(Req) ->
+    send_method_not_allowed(Req, "GET,HEAD").
 
 handle_replicate_req(#httpd{user_ctx=UserCtx,method='POST'}=Req) ->
     {Props} = couch_httpd:json_body(Req),
