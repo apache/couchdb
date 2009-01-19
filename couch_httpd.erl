@@ -152,7 +152,7 @@ handle_request(MochiReq, UrlHandlers, DbUrlHandlers) ->
     try
         HandlerFun(HttpReq#httpd{user_ctx=AuthenticationFun(HttpReq)})
     catch
-        Error ->
+        _Tag:Error ->
             send_error(HttpReq, Error)
     end,
 
