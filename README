@@ -59,7 +59,7 @@ Dependencies
 
 To build and install apache CouchDB you will need the following installed:
 
- * Erlang OTP (>=R11B)     (http://erlang.org/)
+ * Erlang OTP (>=R12B-4)     (http://erlang.org/)
  * ICU                     (http://icu.sourceforge.net/)
  * OpenSSL                 (http://www.openssl.org/)
  * Mozilla SpiderMonkey    (http://www.mozilla.org/js/spidermonkey/)
