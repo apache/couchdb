@@ -18,9 +18,17 @@
 -export([open/2,create/2,delete/2,all_databases/0,get_version/0]).
 -export([init/1, handle_call/3,sup_start_link/0]).
 -export([handle_cast/2,code_change/3,handle_info/2,terminate/2]).
--export([dev_start/0,is_admin/2,has_admins/0,get_start_time/0]).
+-export([dev_start/0,is_admin/2,has_admins/0,get_stats/0]).
 
 -include("couch_db.hrl").
+
+-record(server,{
+    root_dir = [],
+    dbname_regexp,
+    max_dbs_open=100,
+    dbs_open=0,
+    start_time=""
+    }).
 
 start() ->
     start(["default.ini"]).
@@ -55,9 +63,10 @@ get_version() ->
         "0.0.0"
     end.
 
-get_start_time() ->
-    {ok, #server{start_time=Time}} = gen_server:call(couch_server, get_server),
-    Time.
+get_stats() ->
+    {ok, #server{start_time=Time,dbs_open=Open}} =
+            gen_server:call(couch_server, get_server),
+    [{start_time, ?l2b(Time)}, {dbs_open, Open}].
 
 sup_start_link() ->
     gen_server:start_link({local, couch_server}, couch_server, [], []).
@@ -124,16 +133,19 @@ init([]) ->
 
     RootDir = couch_config:get("couchdb", "database_dir", "."),
     MaxDbsOpen = list_to_integer(
-            couch_config:get("couchdb", "max_open_databases", "100")),
+            couch_config:get("couchdb", "max_dbs_open")),
     Self = self(),
     ok = couch_config:register(
         fun("couchdb", "database_dir") ->
-            exit(Self, config_change);
-        ("couchdb", "server_options") ->
             exit(Self, config_change)
         end),
     ok = couch_config:register(
-        fun("admins", _) ->
+        fun("couchdb", "max_dbs_open", Max) ->
+            gen_server:call(couch_server,
+                    {set_max_dbs_open, list_to_integer(Max)})
+        end),
+    ok = couch_config:register(
+        fun("admins") ->
             hash_admin_passwords()
         end),
     hash_admin_passwords(),
@@ -164,13 +176,13 @@ all_databases() ->
     {ok, Filenames}.
 
 
-maybe_close_lru_db(#server{current_dbs_open=NumOpen, max_dbs_open=MaxOpen}=Server)
+maybe_close_lru_db(#server{dbs_open=NumOpen, max_dbs_open=MaxOpen}=Server)
         when NumOpen < MaxOpen ->
     {ok, Server};
-maybe_close_lru_db(#server{current_dbs_open=NumOpen}=Server) ->
+maybe_close_lru_db(#server{dbs_open=NumOpen}=Server) ->
     % must free up the lru db.
     case try_close_lru(now()) of
-    ok -> {ok, Server#server{current_dbs_open=NumOpen-1}};
+    ok -> {ok, Server#server{dbs_open=NumOpen-1}};
     Error -> Error
     end.
 
@@ -203,6 +215,8 @@ try_close_lru(StartTime) ->
         end
     end.
 
+handle_call({set_max_dbs_open, Max}, _From, Server) ->
+    {reply, ok, Server#server{max_dbs_open=Max}};
 handle_call(get_server, _From, Server) ->
     {reply, {ok, Server}, Server};
 handle_call({open, DbName, Options}, _From, Server) ->
@@ -220,9 +234,9 @@ handle_call({open, DbName, Options}, _From, Server) ->
                     true = ets:insert(couch_dbs_by_name, {DbName, {MainPid, LruTime}}),
                     true = ets:insert(couch_dbs_by_pid, {MainPid, DbName}),
                     true = ets:insert(couch_dbs_by_lru, {LruTime, DbName}),
-                    DbsOpen = Server2#server.current_dbs_open + 1,
+                    DbsOpen = Server2#server.dbs_open + 1,
                     {reply, {ok, MainPid},
-                            Server2#server{current_dbs_open=DbsOpen}};
+                            Server2#server{dbs_open=DbsOpen}};
                 Error ->
                     {reply, Error, Server2}
                 end;
@@ -255,10 +269,10 @@ handle_call({create, DbName, Options}, _From, Server) ->
                             {DbName, {MainPid, LruTime}}),
                     true = ets:insert(couch_dbs_by_pid, {MainPid, DbName}),
                     true = ets:insert(couch_dbs_by_lru, {LruTime, DbName}),
-                    DbsOpen = Server2#server.current_dbs_open + 1,
+                    DbsOpen = Server2#server.dbs_open + 1,
                     couch_db_update_notifier:notify({created, DbName}),
                     {reply, {ok, MainPid},
-                            Server2#server{current_dbs_open=DbsOpen}};
+                            Server2#server{dbs_open=DbsOpen}};
                 Error ->
                     {reply, Error, Server2}
                 end;
@@ -285,8 +299,7 @@ handle_call({delete, DbName, _Options}, _From, Server) ->
             true = ets:delete(couch_dbs_by_name, DbName),
             true = ets:delete(couch_dbs_by_pid, Pid),
             true = ets:delete(couch_dbs_by_lru, LruTime),
-            DbsOpen = Server#server.current_dbs_open - 1,
-            Server#server{current_dbs_open=DbsOpen}
+            Server#server{dbs_open=Server#server.dbs_open - 1}
         end,
         case file:delete(FullFilepath) of
         ok ->
@@ -306,13 +319,15 @@ handle_cast(Msg, _Server) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
-handle_info({'EXIT', Pid, _Reason}, #server{current_dbs_open=DbsOpen}=Server) ->
+    
+handle_info({'EXIT', _Pid, config_change}, _Server) ->
+    exit(kill);
+handle_info({'EXIT', Pid, _Reason}, #server{dbs_open=DbsOpen}=Server) ->
     [{Pid, DbName}] = ets:lookup(couch_dbs_by_pid, Pid),
     [{DbName, {Pid, LruTime}}] = ets:lookup(couch_dbs_by_name, DbName),
     true = ets:delete(couch_dbs_by_pid, Pid),
     true = ets:delete(couch_dbs_by_name, DbName),
     true = ets:delete(couch_dbs_by_lru, LruTime),
-    {noreply, Server#server{current_dbs_open=DbsOpen-1}};
+    {noreply, Server#server{dbs_open=DbsOpen-1}};
 handle_info(Info, _Server) ->
     exit({unknown_message, Info}).

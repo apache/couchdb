@@ -177,14 +177,6 @@
     reduce_funs=[]
     }).
 
--record(server,{
-    root_dir = [],
-    dbname_regexp,
-    max_dbs_open=100,
-    current_dbs_open=0,
-    start_time=""
-    }).
-
 -record(index_header,
     {seq=0,
     purge_seq=0,

@@ -2860,7 +2860,38 @@ var tests = {
         // Now delete document
         T(user2Db.deleteDoc(doc).ok);
       });
-  }
+  },
+  
+  
+  max_dbs_open : function(debug) {
+    if (debug) debugger;
+    restartServer();
+    var max = 5;
+    run_on_modified_server(
+      [{section: "couchdb",
+        key: "max_dbs_open",
+        value: max.toString()}],
+        
+      function () {
+        for(var i=0; i<max*2; i++) {
+          var db = new CouchDB("test_suite_db"+ i);
+          db.deleteDb();
+          db.createDb();
+        }
+        
+        var stats = JSON.parse(CouchDB.request("GET", "/_stats").responseText);
+        T(stats.dbs_open == max);
+        
+        
+        for(var i=0; i<max*2; i++) {
+          var db = new CouchDB("test_suite_db"+ i);
+          db.deleteDb();
+        }
+        
+        var stats = JSON.parse(CouchDB.request("GET", "/_stats").responseText);
+        T(stats.dbs_open == 0);
+      })
+  },
 };
 
 function makeDocs(start, end, templateDoc) {

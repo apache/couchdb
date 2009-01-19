@@ -7,6 +7,7 @@ database_dir = %localstatelibdir%
 util_driver_dir = %couchprivlibdir%
 max_document_size = 4294967296 ; 4 GB
 view_timeout = 5000 ; 5 seconds
+max_dbs_open = 100
 
 [httpd]
 port = 5984
@@ -39,6 +40,7 @@ favicon.ico = {couch_httpd_misc_handlers, handle_favicon_req, "%localdatadir%/ww
 
 _utils = {couch_httpd_misc_handlers, handle_utils_dir_req, "%localdatadir%/www"}
 _all_dbs = {couch_httpd_misc_handlers, handle_all_dbs_req}
+_stats = {couch_httpd_misc_handlers, handle_stats_req}
 _config = {couch_httpd_misc_handlers, handle_config_req}
 _replicate = {couch_httpd_misc_handlers, handle_replicate_req}
 _uuids = {couch_httpd_misc_handlers, handle_uuids_req}
