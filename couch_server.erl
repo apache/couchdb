@@ -123,7 +123,8 @@ init([]) ->
     % will restart us and then we will pick up the new settings.
 
     RootDir = couch_config:get("couchdb", "database_dir", "."),
-    MaxDbsOpen = couch_config:get("couchdb", "max_open_databases", "100"),
+    MaxDbsOpen = list_to_integer(
+            couch_config:get("couchdb", "max_open_databases", "100")),
     Self = self(),
     ok = couch_config:register(
         fun("couchdb", "database_dir") ->
