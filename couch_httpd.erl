@@ -152,6 +152,8 @@ handle_request(MochiReq, UrlHandlers, DbUrlHandlers) ->
     try
         HandlerFun(HttpReq#httpd{user_ctx=AuthenticationFun(HttpReq)})
     catch
+        throw:Error ->
+            send_error(HttpReq, Error);
         Tag:Error ->
             ?LOG_ERROR("Uncaught error in HTTP request: ~p",[{Tag, Error}]),
             ?LOG_DEBUG("Stacktrace: ~p",[erlang:get_stacktrace()]),
