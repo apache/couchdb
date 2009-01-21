@@ -103,7 +103,8 @@
         viewName = $.cookies.get(dbName + ".view", "");
         if (viewName) {
           this.redirecting = true;
-          location.href = "database.html?" + dbName + "/" + viewName;
+          location.href = "database.html?" + encodeURIComponent(dbName) +
+            "/" + encodeDocId(viewName);
         }
       }
       var db = $.couch.db(dbName);
@@ -969,7 +970,7 @@
     if (parts[0] == '_design') {
       parts.shift();
       encoded = encodeURIComponent(parts.join('/'));
-      return '_design/'+encoded;
+      return '_design/' + encoded;
     } else {
       return encodeURIComponent(docid);
     }
