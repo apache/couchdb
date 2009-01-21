@@ -19,13 +19,8 @@
     var cacheKeys = [];
 
     var input = $(elem).attr("autocomplete", "off");
-    var pos = input.position();
     var dropdown = $('<ul style="display: none; position: absolute; z-index: 10000"></ul>')
-      .addClass(options.dropdownClass).insertAfter(input).css({
-        top: (pos.top + input.outerHeight()) + "px",
-        left: pos.left + "px",
-        minWidth: input.css("width")
-      });
+      .addClass(options.dropdownClass).insertAfter(input);
 
     input
       .blur(function() {
@@ -91,8 +86,12 @@
     function show(items, render) {
       if (!items) return;
       if (!items.length) { dropdown.hide(); return; }
+      var pos = input.position();
+      dropdown.empty().css({
+        top: (pos.top + input.outerHeight()) + "px", left: pos.left + "px",
+        minWidth: input.css("width")
+      });
       render = render || function(idx, value) { return value; }
-      dropdown.empty();
       for (var i = 0; i < items.length; i++) {
         var item = $("<li></li>").data("value", items[i]);
         var rendered = render(i, items[i]);
