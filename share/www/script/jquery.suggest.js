@@ -15,13 +15,15 @@
   suggest = function(elem, options) {
     var timer = null;
     var prevVal = null;
+    var cache = {};
+    var cacheKeys = [];
 
     var input = $(elem).attr("autocomplete", "off");
-    var offset = input.offset();
-    var dropdown = $('<ul style="z-index: 10000"></ul>')
-      .addClass(options.dropdownClass).appendTo("body").css({
-        top: (offset.top + elem.offsetHeight) + "px",
-        left: offset.left + "px",
+    var pos = input.position();
+    var dropdown = $('<ul style="display: none; position: absolute; z-index: 10000"></ul>')
+      .addClass(options.dropdownClass).insertAfter(input).css({
+        top: (pos.top + input.outerHeight()) + "px",
+        left: pos.left + "px",
         minWidth: input.css("width")
       });
 
@@ -65,9 +67,20 @@
       var newVal = $.trim(input.val());
       if (force || newVal != prevVal) {
         if (force || newVal.length >= options.minChars) {
-          options.callback.apply(elem, [$.trim(input.val()), function(items, render) {
-            show(items, render);
-          }]);
+          if (options.cache && cache.hasOwnProperty(newVal)) {
+            show(cache[newVal].items, cache[newVal].render);
+          } else {
+            options.callback.apply(elem, [newVal, function(items, render) {
+              if (options.cache) {
+                if (cacheKeys.length >= options.cacheLimit) {
+                  delete cache[cacheKeys.shift()];
+                }
+                cache[newVal] = {items: items, render: render};
+                cacheKeys.push(newVal);
+              }
+              show(items, render);
+            }]);
+          }
         } else {
           dropdown.hide();
         }
@@ -91,7 +104,7 @@
         item.appendTo(dropdown);
       }
       dropdown.slideDown("fast");
-      dropdown.children('li').click(function(e) {
+      dropdown.children("li").click(function(e) {
         $(this).addClass("selected");
         commit();
       });
@@ -133,8 +146,10 @@
 
   $.fn.suggest = function(callback, options) {
     options = $.extend({
+      cache: true,
+      cacheLimit: 10,
       callback: callback,
-      delay: 100,
+      delay: 250,
       dropdownClass: "suggest-dropdown",
       minChars: 1,
       select: null

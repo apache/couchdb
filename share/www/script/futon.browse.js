@@ -335,7 +335,7 @@
                   var matches = [];
                   for (var i = 0; i < docs.rows.length; i++) {
                     var docName = docs.rows[i].id.substr(8);
-                    if (docName.substr(0, text.length) == text) {
+                    if (docName.indexOf(text) == 0) {
                       matches[i] = docName;
                     }
                   }
@@ -350,7 +350,7 @@
                   var matches = [];
                   if (!doc.views) return;
                   for (var viewName in doc.views) {
-                    if (viewName.substr(0, text.length) == text) {
+                    if (viewName.indexOf(text) == 0) {
                       matches.push(viewName);
                     }
                   }
