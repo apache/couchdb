@@ -1,3 +1,5 @@
+// http://svn.apache.org/repos/asf/couchdb/trunk/share/www/script/jquery.suggest.js
+//
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License.  You may obtain a copy
 // of the License at
@@ -12,7 +14,7 @@
 
 (function($) {
 
-  suggest = function(elem, options) {
+  function suggest(elem, options) {
     var timer = null;
     var prevVal = null;
     var cache = {};
@@ -20,7 +22,7 @@
 
     var input = $(elem).attr("autocomplete", "off");
     var dropdown = $('<ul style="display: none; position: absolute; z-index: 10000"></ul>')
-      .addClass(options.dropdownClass).insertAfter(input);
+      .addClass(options.dropdownClass).appendTo(document.body);
 
     input
       .blur(function() {
@@ -86,9 +88,9 @@
     function show(items, render) {
       if (!items) return;
       if (!items.length) { dropdown.hide(); return; }
-      var pos = input.position();
+      var offset = input.offset();
       dropdown.empty().css({
-        top: (pos.top + input.outerHeight()) + "px", left: pos.left + "px",
+        top: (offset.top + input.outerHeight()) + "px", left: offset.left + "px",
         minWidth: input.css("width")
       });
       render = render || function(idx, value) { return value; }
