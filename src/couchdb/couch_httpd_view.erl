@@ -23,15 +23,15 @@
 
 design_doc_view(Req, Db, Id, ViewName, Keys) ->
     #view_query_args{
-        update = Update,
+        stale = Stale,
         reduce = Reduce
     } = QueryArgs = parse_view_query(Req, Keys),
     DesignId = <<"_design/", Id/binary>>,
-    case couch_view:get_map_view(Db, DesignId, ViewName, Update) of
+    case couch_view:get_map_view(Db, DesignId, ViewName, Stale) of
     {ok, View} ->    
         output_map_view(Req, View, Db, QueryArgs, Keys);
     {not_found, Reason} ->
-        case couch_view:get_reduce_view(Db, DesignId, ViewName, Update) of
+        case couch_view:get_reduce_view(Db, DesignId, ViewName, Stale) of
         {ok, ReduceView} ->
             parse_view_query(Req, Keys, true), % just for validation
             case Reduce of
@@ -256,8 +256,10 @@ parse_view_query(Req, Keys, IsReduce) ->
             end;
         {"count", Value} ->
             throw({query_parse_error, "URL query parameter 'count' has been changed to 'limit'."});
+        {"stale", "ok"} ->
+            Args#view_query_args{stale=ok};
         {"update", "false"} ->
-            Args#view_query_args{update=false};
+            throw({query_parse_error, "URL query parameter 'update=false' has been changed to 'stale=ok'."});
         {"descending", "true"} ->
             case Args#view_query_args.direction of
             fwd ->

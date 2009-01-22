@@ -144,7 +144,7 @@
     limit = 10000000000, % a huge huge default number. Picked so we don't have
                          % to do different logic for when there is no limit
                          % limit
-    update = true,
+    stale = false,
     direction = fwd,
     start_docid = nil,
     end_docid = {},
