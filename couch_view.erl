@@ -41,10 +41,14 @@ get_group_server(DbName, GroupId) ->
         throw(Error)
     end.
     
-get_group(Db, GroupId, Update) ->
+get_group(Db, GroupId, Stale) ->
+    MinUpdateSeq = case Stale of
+    ok -> 0;
+    _Else -> couch_db:get_update_seq(Db)
+    end,
     couch_view_group:request_group(
             get_group_server(couch_db:name(Db), GroupId),
-            if Update -> couch_db:get_update_seq(Db); true -> 0 end).
+            MinUpdateSeq).
 
 
 get_temp_group(Db, Type, MapSrc, RedSrc) ->
@@ -136,8 +140,8 @@ get_temp_map_view(Db, Type, Src) ->
     {ok, #group{views=[View]}} = get_temp_group(Db, Type, Src, []),
     {ok, View}.
 
-get_map_view(Db, GroupId, Name, Update) ->
-    case get_group(Db, GroupId, Update) of
+get_map_view(Db, GroupId, Name, Stale) ->
+    case get_group(Db, GroupId, Stale) of
     {ok, #group{views=Views}} ->
         get_map_view0(Name, Views);
     Error ->
