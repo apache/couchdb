@@ -107,7 +107,7 @@ handle_uuids_req(#httpd{method='POST'}=Req) ->
     % generate the uuids
     UUIDs = [ couch_util:new_uuid() || _ <- lists:seq(1,Count)],
     % send a JSON response
-    send_json(Req, {[{"uuids", UUIDs}]});
+    send_json(Req, {[{<<"uuids">>, UUIDs}]});
 handle_uuids_req(Req) ->
     send_method_not_allowed(Req, "POST").
 
