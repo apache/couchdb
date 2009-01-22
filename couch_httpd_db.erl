@@ -129,7 +129,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
         % output the results
         DocResults = lists:zipwith(
             fun(Doc, NewRev) ->
-                {[{"id", Doc#doc.id}, {"rev", NewRev}]}
+                {[{<<"id">>, Doc#doc.id}, {<<"rev">>, NewRev}]}
             end,
             Docs, ResultRevs),
         send_json(Req, 201, {[
@@ -210,17 +210,17 @@ db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs_by_seq">>]}=Req, Db) ->
                 deleted_conflict_revs=DelConflictRevs
             } = DocInfo,
             Json = {
-                [{"rev", Rev}] ++
+                [{<<"rev">>, Rev}] ++
                 case ConflictRevs of
                     []  ->  [];
-                    _   ->  [{"conflicts", ConflictRevs}]
+                    _   ->  [{<<"conflicts">>, ConflictRevs}]
                 end ++
                 case DelConflictRevs of
                     []  ->  [];
-                    _   ->  [{"deleted_conflicts", DelConflictRevs}]
+                    _   ->  [{<<"deleted_conflicts">>, DelConflictRevs}]
                 end ++
                 case Deleted of
-                    true -> [{"deleted", true}];
+                    true -> [{<<"deleted">>, true}];
                     false -> []
                 end
             },
