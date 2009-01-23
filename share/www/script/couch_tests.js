@@ -2301,44 +2301,43 @@ var tests = {
      var designDoc = {
        _id:"_design/template",
        language: "javascript",
-       show: {
-         docs: {
-           "hello" : stringFun(function() { 
+       shows: {
+         "hello" : stringFun(function() { 
+           return {
+             body : "Hello World"
+           };
+         }),
+         "just-name" : stringFun(function(doc, req) {
+           return {
+             body : "Just " + doc.name
+           };
+         }),
+         "req-info" : stringFun(function(doc, req) {
+           return {
+             json : req
+           }
+         }),
+         "xml-type" : stringFun(function(doc, req) {
+            return {
+              "headers" : {
+                "Content-Type" : "application/xml"
+              },
+              "body" : new XML('<xml><node foo="bar"/></xml>')
+            }
+          }),
+         "no-set-etag" : stringFun(function(doc, req) {
+           return {
+             headers : {
+               "Etag" : "skipped"
+             },
+             "body" : "something"
+           }
+         }),
+         "accept-switch" : stringFun(function(doc, req) {
+           if (req.headers["Accept"].match(/image/)) {
              return {
-               body : "Hello World"
-             };
-           }),
-           "just-name" : stringFun(function(doc, req) {
-             return {
-               body : "Just " + doc.name
-             };
-           }),
-           "req-info" : stringFun(function(doc, req) {
-             return {
-               json : req
-             }
-           }),
-           "xml-type" : stringFun(function(doc, req) {
-              return {
-                "headers" : {
-                  "Content-Type" : "application/xml"
-                },
-                "body" : new XML('<xml><node foo="bar"/></xml>')
-              }
-            }),
-           "no-set-etag" : stringFun(function(doc, req) {
-             return {
-               headers : {
-                 "Etag" : "skipped"
-               },
-               "body" : "something"
-             }
-           }),
-           "accept-switch" : stringFun(function(doc, req) {
-             if (req.headers["Accept"].match(/image/)) {
-               return {
-                 // a 16x16 px version of the CouchDB logo
-                 "base64" : 
+               // a 16x16 px version of the CouchDB logo
+               "base64" : 
 ["iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAsV",
 "BMVEUAAAD////////////////////////5ur3rEBn////////////////wDBL/",
 "AADuBAe9EB3IEBz/7+//X1/qBQn2AgP/f3/ilpzsDxfpChDtDhXeCA76AQH/v7",
@@ -2348,47 +2347,47 @@ var tests = {
 "zMxw/4OleiJlHeUtv2X6RbNO1Uqj9g0RMCuQO0vBIg4vMFeOpCWIWmDOw82fZx",
 "vaND1c8OG4vrdOqD8YwgpDYDxRgkSm5rwu0nQVBJuMg++pLXZyr5jnc1BaH4GT",
 "LvEliY253nA3pVhQqdPt0f/erJkMGMB8xucAAAAASUVORK5CYII="].join(''),
-                 headers : {
-                   "Content-Type" : "image/png",
-                   "Vary" : "Accept" // we set this for proxy caches
-                 }
-               };
-             } else {
+               headers : {
+                 "Content-Type" : "image/png",
+                 "Vary" : "Accept" // we set this for proxy caches
+               }
+             };
+           } else {
+             return {
+               "body" : "accepting text requests",
+               headers : {
+                 "Content-Type" : "text/html",
+                 "Vary" : "Accept"
+               }
+             };
+           }
+         }),
+         "respondWith" : stringFun(function(doc, req) {
+           registerType("foo", "application/foo","application/x-foo");
+           return respondWith(req, {
+             html : function() {
                return {
-                 "body" : "accepting text requests",
-                 headers : {
-                   "Content-Type" : "text/html",
-                   "Vary" : "Accept"
-                 }
+                 body:"Ha ha, you said \"" + doc.word + "\"."
                };
-             }
-           }),
-           "respondWith" : stringFun(function(doc, req) {
-             registerType("foo", "application/foo","application/x-foo");
-             return respondWith(req, {
-               html : function() {
-                 return {
-                   body:"Ha ha, you said \"" + doc.word + "\"."
-                 };
-               },
-               xml : function() {
-                 var xml = new XML('<xml><node/></xml>');
-                 // becase Safari can't stand to see that dastardly
-                 // E4X outside of a string.
-                 this.eval('xml.node.@foo = doc.word');
-                 return {
-                   body: xml
-                 };
-               },
-               foo : function() {
-                 return {
-                   body: "foofoo"
-                 };
-               },
-               fallback : "html"
-             });
-           })
-         }
+             },
+             xml : function() {
+               var xml = new XML('<xml><node/></xml>');
+               // Becase Safari can't stand to see that dastardly
+               // E4X outside of a string. Outside of tests you
+               // can just use E4X literals.
+               this.eval('xml.node.@foo = doc.word');
+               return {
+                 body: xml
+               };
+             },
+             foo : function() {
+               return {
+                 body: "foofoo"
+               };
+             },
+             fallback : "html"
+           });
+         })
        }
      };
      T(db.save(designDoc).ok);
@@ -2418,12 +2417,15 @@ var tests = {
      T(resp.error == "not_found");
      T(resp.reason == "missing");
      
+     // show with missing func
+     xhr = CouchDB.request("GET", "/test_suite_db/_show/template/missing/"+docid);
+     T(xhr.status == 404);
+     
      // missing design doc
      xhr = CouchDB.request("GET", "/test_suite_db/_show/missingdoc/just-name/"+docid);
      T(xhr.status == 404);
      var resp = JSON.parse(xhr.responseText);
      T(resp.error == "not_found");
-     T(resp.reason == "missing_design_doc");
      
      // query parameters
      xhr = CouchDB.request("GET", "/test_suite_db/_show/template/req-info/"+docid+"?foo=bar", {
@@ -2504,7 +2506,7 @@ var tests = {
      T(xhr.status == 304);
      
      // update design doc function
-     designDoc.show.docs["just-name"] = (function(doc, req) {
+     designDoc.shows["just-name"] = (function(doc, req) {
        return {
          body : "Just old " + doc.name
        };
@@ -2552,6 +2554,146 @@ var tests = {
      T(xhr.getResponseHeader("Content-Type") == "application/x-foo");
      T(xhr.responseText.match(/foofoo/));
    },
+
+  list_views : function(debug) {
+    var db = new CouchDB("test_suite_db");
+    db.deleteDb();
+    db.createDb();
+    if (debug) debugger;
+    
+    function stringFun(fun) {
+      var string = fun.toSource ? fun.toSource() : "(" + fun.toString() + ")";
+      return string;
+    }
+        
+    var designDoc = {
+      _id:"_design/lists",
+      language: "javascript",
+      views : {
+        basicView : {
+          map : stringFun(function(doc) {
+            emit(doc.integer, doc.string);
+          })
+        },
+        withReduce : {
+          map : stringFun(function(doc) {
+            emit(doc.integer, doc.string);
+          }),
+          reduce : stringFun(function(keys, values, rereduce) {
+            if (rereduce) {
+              return sum(values);
+            } else {
+              return values.length;
+            }
+          })
+        }
+      },
+      lists: {
+        simpleForm: stringFun(function(head, row, req) {
+          if (row) {
+            // we ignore headers on rows and tail
+            return {body : '\n<li>Key: '+row.key+' Value: '+row.value+'</li>'};
+          } else if (head) {
+            // we return an object (like those used by external and show)
+            // so that we can specify headers
+            return {
+              body : '<h1>Total Rows: '
+                + head.total_rows
+                + ' Offset: ' + head.offset
+                + '</h1><ul>'
+            };
+          } else {
+            // tail
+            return {body : '</ul>'};
+          }
+        }),
+        acceptSwitch: stringFun(function(head, row, req) {
+          return respondWith(req, {
+            html : function() {
+              if (head) {
+                return {body : "HTML <ul>"};
+              } else if (row) {
+                return {body : '\n<li>Key: '
+                  +row.key+' Value: '+row.value+'</li>'};
+              } else { // tail
+                return {body : "</ul>"};
+              }
+            },
+            xml : function() {
+              if (head) {
+                return {body:'<feed xmlns="http://www.w3.org/2005/Atom">'
+                  +'<title>Test XML Feed</title>'};
+              } else if (row) {
+                // Becase Safari can't stand to see that dastardly
+                // E4X outside of a string. Outside of tests you
+                // can just use E4X literals.
+                var entry = new XML('<entry/>');
+                entry.id = row.id;
+                entry.title = row.key;
+                entry.content = row.value;
+                return {body:entry};
+              } else {
+                return {body : "</feed>"};
+              }
+            }
+          })
+        })
+      }
+    };
+
+    T(db.save(designDoc).ok);
+    
+    var docs = makeDocs(0, 10);
+    var saveResult = db.bulkSave(docs);
+    T(saveResult.ok);
+    
+    var view = db.view('lists/basicView');
+    T(view.total_rows == 10);
+    
+    // standard get
+    var xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/simpleForm/basicView");
+    T(xhr.status == 200);
+    T(/Total Rows/.test(xhr.responseText));
+    T(/Key: 1/.test(xhr.responseText));
+    
+    // get with query params
+    var xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/simpleForm/basicView?startkey=3");
+    T(xhr.status == 200);
+    T(/Total Rows/.test(xhr.responseText));
+    T(!(/Key: 1/.test(xhr.responseText)));
+    
+    // with 0 rows
+    var xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/simpleForm/basicView?startkey=30");
+    T(xhr.status == 200);
+    T(/Total Rows/.test(xhr.responseText));
+    T(/Offset: null/.test(xhr.responseText));
+    
+    // when there is a reduce present, but not used
+    var xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/simpleForm/withReduce?reduce=false");
+    T(xhr.status == 200);
+    T(/Total Rows/.test(xhr.responseText));
+    T(/Key: 1/.test(xhr.responseText));
+    
+    // with accept headers for HTML
+    xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/acceptSwitch/basicView", {
+      headers: {
+        "Accept": 'text/html'
+      }
+    });
+    T(xhr.getResponseHeader("Content-Type") == "text/html");
+    T(xhr.responseText.match(/HTML/));
+    T(xhr.responseText.match(/Value/));
+
+    // now with xml
+    xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/acceptSwitch/basicView", {
+      headers: {
+        "Accept": 'application/xml'
+      }
+    });
+    T(xhr.getResponseHeader("Content-Type") == "application/xml");
+    T(xhr.responseText.match(/XML/));
+    T(xhr.responseText.match(/entry/));
+  },
 
   compact: function(debug) {
     var db = new CouchDB("test_suite_db");

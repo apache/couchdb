@@ -192,7 +192,9 @@ db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs_by_seq">>]}=Req, Db) ->
     TotalRowCount = proplists:get_value(doc_count, Info),
 
     FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, Db,
-        TotalRowCount, fun couch_db:enum_docs_since_reduce_to_count/1),
+        TotalRowCount, #view_fold_helper_funs{
+            reduce_count = fun couch_db:enum_docs_since_reduce_to_count/1
+        }),
     StartKey2 = case StartKey of
         nil -> 0;
         <<>> -> 100000000000;
@@ -306,7 +308,10 @@ all_docs_view(Req, Db, Keys) ->
     case Keys of
     nil ->
         FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, Db,
-            TotalRowCount, fun couch_db:enum_docs_reduce_to_count/1, PassedEndFun),
+            TotalRowCount, #view_fold_helper_funs{
+                reduce_count = fun couch_db:enum_docs_reduce_to_count/1,
+                passed_end = PassedEndFun
+            }),
         AdapterFun = fun(#full_doc_info{id=Id}=FullDocInfo, Offset, Acc) ->
             case couch_doc:to_doc_info(FullDocInfo) of
             #doc_info{deleted=false, rev=Rev} ->
@@ -320,7 +325,9 @@ all_docs_view(Req, Db, Keys) ->
         couch_httpd_view:finish_view_fold(Req, TotalRowCount, {ok, FoldResult});
     _ ->
         FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, Db,
-            TotalRowCount, fun(Offset) -> Offset end),
+            TotalRowCount, #view_fold_helper_funs{
+                reduce_count = fun(Offset) -> Offset end
+            }),
         KeyFoldFun = case Dir of
         fwd ->
             fun lists:foldl/3;

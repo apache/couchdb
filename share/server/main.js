@@ -332,28 +332,32 @@ while (cmd = eval(readline())) {
           validateFun(newDoc, oldDoc, userCtx);
           print("1");
         } catch (error) {
-          print(toJSON(error));
+          respond(error);
         }
         break;
       case "show_doc":
         var funSrc = cmd[1];
         var doc = cmd[2];
         var req = cmd[3];
-        try {
-          var formFun = compileFunction(funSrc);
-          var rendered = formFun(doc, req);
-          print(toJSON(rendered));
-        } catch (error) {
-          // Available error fields: 
-          // message, fileName, lineNumber, stack, name
-          log("doc show function raised error: "+error.toString());
-          log("stacktrace: "+error.stack);
-          try {
-            print(toJSON(error));            
-          } catch (e) {
-            print({"error":error.toString()});
-          }
-        }
+        var formFun = compileFunction(funSrc);
+        runRenderFunction(formFun, [doc, req]);
+        break;
+      case "list_begin":
+        var listFun = funs[0];
+        var head = cmd[1];
+        var req = cmd[2];
+        runRenderFunction(listFun, [head, null, req]);
+        break;
+      case "list_row":
+        var listFun = funs[0];
+        var row = cmd[1];
+        var req = cmd[2];
+        runRenderFunction(listFun, [null, row, req]);
+        break;
+      case "list_tail":
+        var listFun = funs[0];
+        var req = cmd[1];
+        runRenderFunction(listFun, [null, null, req]);
         break;
       default:
         print(toJSON({error: "query_server_error",
@@ -365,6 +369,24 @@ while (cmd = eval(readline())) {
   }
 }
 
+function runRenderFunction(renderFun, args) {
+  try {
+    var result = renderFun.apply(null, args);
+    respond(result); 
+  } catch(e) {
+    log("function raised error: "+e.toString());
+    log("stacktrace: "+e.stack);
+  }
+};
+
+// prints the object as JSON, and rescues and logs any toJSON() related errors
+function respond(obj) {
+  try {
+    print(toJSON(obj));    
+  } catch(e) {
+    log("Error converting object to JSON: " + e.toString());
+  }
+}
 
 function compileFunction(source) {
   try {
