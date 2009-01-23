@@ -60,10 +60,10 @@ open(State, Fd) ->
     {ok, #stream{pid = Pid, fd = Fd}}.
 
 close(#stream{pid = Pid, fd = _Fd}) ->
-    gen_server:call(Pid, close).
+    gen_server:call(Pid, close, infinity).
 
 get_state(#stream{pid = Pid, fd = _Fd}) ->
-    gen_server:call(Pid, get_state).
+    gen_server:call(Pid, get_state, infinity).
 
 ensure_buffer(#stream{pid = Pid, fd = _Fd}, Bytes) ->
     gen_server:call(Pid, {ensure_buffer, Bytes}).
@@ -118,7 +118,7 @@ write_term(Stream, Term) ->
 write(#stream{}, <<>>) ->
     {ok, {0,0}};
 write(#stream{pid = Pid}, Bin) when is_binary(Bin) ->
-    gen_server:call(Pid, {write, Bin}).
+    gen_server:call(Pid, {write, Bin}, infinity).
 
 
 init({{Pos, BytesRemaining}, Fd}) ->

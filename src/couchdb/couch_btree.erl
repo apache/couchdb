@@ -14,7 +14,7 @@
 
 -export([open/2, open/3, query_modify/4, add/2, add_remove/3, foldl/3, foldl/4]).
 -export([foldr/3, foldr/4, fold/4, fold/5, full_reduce/1, final_reduce/2]).
--export([fold_reduce/7, lookup/2, get_state/1, set_options/2]).
+-export([fold_reduce/6, fold_reduce/7, lookup/2, get_state/1, set_options/2]).
 -export([test/1, test/0, test_remove/2, test_add/2]).
 
 -define(CHUNK_THRESHOLD, 16#4ff).

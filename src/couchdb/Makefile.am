@@ -66,6 +66,7 @@ source_files = \
     couch_server.erl \
     couch_server_sup.erl \
     couch_stream.erl \
+    couch_task_status.erl \
     couch_util.erl \
     couch_view.erl \
     couch_view_updater.erl \
@@ -102,6 +103,7 @@ compiled_files = \
     couch_server.beam \
     couch_server_sup.beam \
     couch_stream.beam \
+    couch_task_status.beam \
     couch_util.beam \
     couch_view.beam \
     couch_view_updater.beam \
