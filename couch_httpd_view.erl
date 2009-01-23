@@ -15,7 +15,8 @@
 
 -export([handle_view_req/2,handle_slow_view_req/2]).
 
--export([parse_view_query/1,parse_view_query/2,make_view_fold_fun/5, make_view_fold_fun/6,finish_view_fold/3]).
+-export([parse_view_query/1,parse_view_query/2,make_view_fold_fun/5,
+    finish_view_fold/3, view_row_obj/3]).
 
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
@@ -92,8 +93,7 @@ output_map_view(Req, View, Db, QueryArgs, nil) ->
     } = QueryArgs,
     {ok, RowCount} = couch_view:get_row_count(View),
     Start = {StartKey, StartDocId},
-    FoldlFun = make_view_fold_fun(Req, QueryArgs, Db, RowCount,
-            fun couch_view:reduce_to_count/1),
+    FoldlFun = make_view_fold_fun(Req, QueryArgs, Db, RowCount, #view_fold_helper_funs{reduce_count=fun couch_view:reduce_to_count/1}),
     FoldAccInit = {Limit, SkipCount, undefined, []},
     FoldResult = couch_view:fold(View, Start, Dir, FoldlFun, FoldAccInit),
     finish_view_fold(Req, RowCount, FoldResult);
@@ -114,7 +114,10 @@ output_map_view(Req, View, Db, QueryArgs, Keys) ->
                 QueryArgs#view_query_args{
                     start_key = Key,
                     end_key = Key
-                }, Db, RowCount, fun couch_view:reduce_to_count/1),
+                }, Db, RowCount, 
+                #view_fold_helper_funs{
+                    reduce_count = fun couch_view:reduce_to_count/1
+                }),
             couch_view:fold(View, Start, Dir, FoldlFun, FoldAcc)
         end, {ok, FoldAccInit}, Keys),
     finish_view_fold(Req, RowCount, FoldResult).
@@ -362,28 +365,21 @@ parse_view_query(Req, Keys, IsReduce) ->
         end
     end.
 
-
 make_view_fold_fun(Req, QueryArgs, Db,
-    TotalViewCount, ReduceCountFun) ->
+    TotalViewCount, HelperFuns) ->
     #view_query_args{
         end_key = EndKey,
         end_docid = EndDocId,
         direction = Dir
     } = QueryArgs,
-    PassedEndFun =
-    case Dir of
-    fwd ->
-        fun(ViewKey, ViewId) ->
-            couch_view:less_json([EndKey, EndDocId], [ViewKey, ViewId])
-        end;
-    rev->
-        fun(ViewKey, ViewId) ->
-            couch_view:less_json([ViewKey, ViewId], [EndKey, EndDocId])
-        end
-    end,
-    make_view_fold_fun(Req, QueryArgs, Db, TotalViewCount, ReduceCountFun, PassedEndFun).
+    
+    #view_fold_helper_funs{
+        passed_end = PassedEndFun,
+        start_response = StartRespFun,
+        send_row = SendRowFun,
+        reduce_count = ReduceCountFun
+    } = apply_default_helper_funs(HelperFuns, {Dir, EndKey, EndDocId}),
 
-make_view_fold_fun(Req, QueryArgs, Db, TotalViewCount, ReduceCountFun, PassedEndFun) ->
     #view_query_args{
         include_docs = IncludeDocs
     } = QueryArgs,
@@ -401,19 +397,71 @@ make_view_fold_fun(Req, QueryArgs, Db, TotalViewCount, ReduceCountFun, PassedEnd
         {_, _, AccSkip, _} when AccSkip > 0 ->
             {ok, {AccLimit, AccSkip - 1, Resp, AccRevRows}};
         {_, _, _, undefined} ->
-            {ok, Resp2} = start_json_response(Req, 200),
             Offset = ReduceCountFun(OffsetReds),
-            JsonBegin = io_lib:format("{\"total_rows\":~w,\"offset\":~w,\"rows\":[\r\n",
-                    [TotalViewCount, Offset]),
-            JsonObj = view_row_obj(Db, {{Key, DocId}, Value}, IncludeDocs),
-            send_chunk(Resp2, JsonBegin ++ ?JSON_ENCODE(JsonObj)),
+            {ok, Resp2, BeginBody} = StartRespFun(Req, 200, 
+                TotalViewCount, Offset),
+            SendRowFun(Resp2, Db, 
+                {{Key, DocId}, Value}, BeginBody, IncludeDocs),
             {ok, {AccLimit - 1, 0, Resp2, AccRevRows}};
         {_, AccLimit, _, Resp} when (AccLimit > 0) ->
-            JsonObj = view_row_obj(Db, {{Key, DocId}, Value}, IncludeDocs),
-            send_chunk(Resp, ",\r\n" ++  ?JSON_ENCODE(JsonObj)),
+            SendRowFun(Resp, Db, 
+                {{Key, DocId}, Value}, nil, IncludeDocs),
             {ok, {AccLimit - 1, 0, Resp, AccRevRows}}
         end
     end.
+
+apply_default_helper_funs(#view_fold_helper_funs{
+    passed_end = PassedEnd,
+    start_response = StartResp,
+    send_row = SendRow
+}=Helpers, {Dir, EndKey, EndDocId}) ->
+    PassedEnd2 = case PassedEnd of
+    undefined -> make_passed_end_fun(Dir, EndKey, EndDocId);
+    _ -> PassedEnd
+    end,
+
+    StartResp2 = case StartResp of
+    undefined -> fun json_view_start_resp/4;
+    _ -> StartResp
+    end,
+
+    SendRow2 = case SendRow of
+    undefined -> fun send_json_view_row/5;
+    _ -> SendRow
+    end,
+
+    Helpers#view_fold_helper_funs{
+        passed_end = PassedEnd2,
+        start_response = StartResp2,
+        send_row = SendRow2
+    }.
+
+make_passed_end_fun(Dir, EndKey, EndDocId) ->
+    case Dir of
+    fwd ->
+        fun(ViewKey, ViewId) ->
+            couch_view:less_json([EndKey, EndDocId], [ViewKey, ViewId])
+        end;
+    rev->
+        fun(ViewKey, ViewId) ->
+            couch_view:less_json([ViewKey, ViewId], [EndKey, EndDocId])
+        end
+    end.
+
+json_view_start_resp(Req, Code, TotalViewCount, Offset) ->
+    {ok, Resp} = couch_httpd:start_json_response(Req, Code),
+    BeginBody = io_lib:format("{\"total_rows\":~w,\"offset\":~w,\"rows\":[\r\n",
+            [TotalViewCount, Offset]),
+    {ok, Resp, BeginBody}.
+
+send_json_view_row(Resp, Db, {{Key, DocId}, Value}, RowFront, IncludeDocs) ->
+    JsonObj = view_row_obj(Db, {{Key, DocId}, Value}, IncludeDocs),
+    RowFront2 = case RowFront of
+    nil -> ",\r\n";
+    _ -> RowFront
+    end,
+    send_chunk(Resp, RowFront2 ++  ?JSON_ENCODE(JsonObj)).
+    
 
 view_row_obj(Db, {{Key, DocId}, Value}, IncludeDocs) ->
     case DocId of

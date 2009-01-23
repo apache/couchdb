@@ -14,17 +14,11 @@
 
 -export([handle_external_req/2, handle_external_req/3]).
 -export([send_external_response/2, json_req_obj/2]).
+-export([default_or_content_type/2, parse_external_response/1]).
 
 -import(couch_httpd,[send_error/4]).
 
 -include("couch_db.hrl").
-
--record(extern_resp_args, {
-    code = 200,
-    data = <<>>,
-    ctype = "application/json",
-    headers = []
-}).
 
 % handle_external_req/2
 % for the old type of config usage:
@@ -121,7 +115,10 @@ parse_external_response({Response}) ->
             {<<"body">>, Value} ->
                 Args#extern_resp_args{data=Value, ctype="text/html"};
             {<<"base64">>, Value} ->
-                Args#extern_resp_args{data=couch_util:decodeBase64(Value), ctype="application/binary"};
+                Args#extern_resp_args{
+                    data=couch_util:decodeBase64(Value),        
+                    ctype="application/binary"
+                };
             {<<"headers">>, {Headers}} ->
                 NewHeaders = lists:map(fun({Header, HVal}) ->
                     {binary_to_list(Header), binary_to_list(HVal)}
