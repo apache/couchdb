@@ -16,29 +16,39 @@
 
 -include("couch_db.hrl").
 
-update(#group{db=Db,current_seq=Seq,purge_seq=PurgeSeq}=Group) ->
-    ?LOG_DEBUG("Starting index update.",[]),
+update(#group{db=#db{name=DbName}=Db,name=GroupName,current_seq=Seq,purge_seq=PurgeSeq}=Group) ->
+    couch_task_status:add_task(<<"View Group Indexer">>, <<DbName/binary," ",GroupName/binary>>, <<"Starting index update">>),
+    
     DbPurgeSeq = couch_db:get_purge_seq(Db),
     Group2 =
     if DbPurgeSeq == PurgeSeq ->
         Group;
     DbPurgeSeq == PurgeSeq + 1 ->
-        ?LOG_DEBUG("Purging entries from view index.",[]),
+        couch_task_status:update(<<"Removing purged entries from view index.">>),
         purge_index(Group);
     true ->
-        ?LOG_DEBUG("Resetting view index due to lost purge entries.",[]),
+        couch_task_status:update(<<"Resetting view index due to lost purge entries.">>),
         exit(reset)
     end,
     
     ViewEmptyKVs = [{View, []} || View <- Group2#group.views],
     % compute on all docs modified since we last computed.
-    {ok, {UncomputedDocs, Group3, ViewKVsToAdd, DocIdViewIdKeys}}
+    TotalChanges = couch_db:count_changes_since(Db, Seq),
+    % update status every half second
+    couch_task_status:set_update_frequency(500),
+    {ok, {_,{UncomputedDocs, Group3, ViewKVsToAdd, DocIdViewIdKeys}}}
         = couch_db:enum_docs_since(
             Db,
             Seq,
-            fun(DocInfo, _, Acc) -> process_doc(Db, DocInfo, Acc) end,
-            {[], Group2, ViewEmptyKVs, []}
+            fun(DocInfo, _, {ChangesProcessed, Acc}) ->
+                couch_task_status:update("Processed ~p of ~p changes (~p%)",
+                        [ChangesProcessed, TotalChanges, (ChangesProcessed*100) div TotalChanges]),
+                {ok, {ChangesProcessed+1, process_doc(Db, DocInfo, Acc)}}
+            end,
+            {0, {[], Group2, ViewEmptyKVs, []}}
             ),
+    couch_task_status:set_update_frequency(0),
+    couch_task_status:update("Finishing."),
     {Group4, Results} = view_compute(Group3, UncomputedDocs),
     {ViewKVsToAdd2, DocIdViewIdKeys2} = view_insert_query_results(
             UncomputedDocs, Results, ViewKVsToAdd, DocIdViewIdKeys),
@@ -93,7 +103,7 @@ process_doc(Db, DocInfo, {Docs, #group{sig=Sig,name=GroupId}=Group, ViewKVs,
             case couch_view_group:design_doc_to_view_group(Doc) of
             #group{sig=Sig} ->
                 % The same md5 signature, keep on computing
-                {ok, {Docs, Group, ViewKVs, DocIdViewIdKeys}};
+                {Docs, Group, ViewKVs, DocIdViewIdKeys};
             _ ->
                 exit(reset)
             end;
@@ -101,7 +111,7 @@ process_doc(Db, DocInfo, {Docs, #group{sig=Sig,name=GroupId}=Group, ViewKVs,
             exit(reset)
         end;
     <<?DESIGN_DOC_PREFIX, _/binary>> -> % we skip design docs
-        {ok, {Docs, Group, ViewKVs, DocIdViewIdKeys}};
+        {Docs, Group, ViewKVs, DocIdViewIdKeys};
     _ ->
         {Docs2, DocIdViewIdKeys2} =
         if Deleted ->
@@ -119,9 +129,9 @@ process_doc(Db, DocInfo, {Docs, #group{sig=Sig,name=GroupId}=Group, ViewKVs,
                     DocInfo#doc_info.update_seq),
             garbage_collect(),
             ViewEmptyKeyValues = [{View, []} || View <- Group2#group.views],
-            {ok, {[], Group2, ViewEmptyKeyValues, []}};
+            {[], Group2, ViewEmptyKeyValues, []};
         false ->
-            {ok, {Docs2, Group, ViewKVs, DocIdViewIdKeys2}}
+            {Docs2, Group, ViewKVs, DocIdViewIdKeys2}
         end
     end.
 

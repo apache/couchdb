@@ -265,12 +265,12 @@ prepare_group({view, RootDir, DbName, GroupId}, ForceReset)->
 prepare_group({slow_view, DbName, Fd, Lang, MapSrc, RedSrc}, _ForceReset) ->
     case couch_db:open(DbName, []) of
     {ok, Db} ->
-        View = #view{map_names=["_temp"],
+        View = #view{map_names=[<<"_temp">>],
             id_num=0,
             btree=nil,
             def=MapSrc,
-            reduce_funs= if RedSrc==[] -> []; true -> [{"_temp", RedSrc}] end},
-        {ok, init_group(Db, Fd, #group{type=slow_view, name="_temp", db=Db,
+            reduce_funs= if RedSrc==[] -> []; true -> [{<<"_temp">>, RedSrc}] end},
+        {ok, init_group(Db, Fd, #group{type=slow_view, name= <<"_temp">>, db=Db,
                 views=[View], def_lang=Lang}, nil)};
     Error ->
         Error

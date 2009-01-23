@@ -590,19 +590,30 @@ copy_docs(#db{fd=SrcFd}=Db, #db{fd=DestFd,summary_stream=DestStream}=NewDb, Info
 
           
 copy_compact(Db, NewDb, Retry) ->
+    TotalChanges = couch_db:count_changes_since(Db, NewDb#db.update_seq),
     EnumBySeqFun =
-    fun(#doc_info{update_seq=Seq}=DocInfo, _Offset, {AccNewDb, AccUncopied}) ->
-        case couch_util:should_flush() of
-        true ->
+    fun(#doc_info{update_seq=Seq}=DocInfo, _Offset, {AccNewDb, AccUncopied, TotalCopied}) ->
+        couch_task_status:update("Copied ~p of ~p changes (~p%)", 
+                [TotalCopied, TotalChanges, (TotalCopied*100) div TotalChanges]),
+        if TotalCopied rem 1000 == 0 ->
             NewDb2 = copy_docs(Db, AccNewDb, lists:reverse([DocInfo | AccUncopied]), Retry),
-            {ok, {commit_data(NewDb2#db{update_seq=Seq}), []}};
-        false ->    
-            {ok, {AccNewDb, [DocInfo | AccUncopied]}}
+            if TotalCopied rem 10000 == 0 ->
+                {ok, {commit_data(NewDb2#db{update_seq=Seq}), [], TotalCopied + 1}};
+            true ->
+                {ok, {NewDb2#db{update_seq=Seq}, [], TotalCopied + 1}}
+            end;
+        true ->    
+            {ok, {AccNewDb, [DocInfo | AccUncopied], TotalCopied + 1}}
         end
     end,
-    {ok, {NewDb2, Uncopied}} =
-        couch_btree:foldl(Db#db.docinfo_by_seq_btree, NewDb#db.update_seq + 1, EnumBySeqFun, {NewDb, []}),
-
+    
+    couch_task_status:set_update_frequency(500),
+     
+    {ok, {NewDb2, Uncopied, TotalChanges}} =
+        couch_btree:foldl(Db#db.docinfo_by_seq_btree, NewDb#db.update_seq + 1, EnumBySeqFun, {NewDb, [], 0}),
+    
+    couch_task_status:update("Flushing"), 
+        
     NewDb3 = copy_docs(Db, NewDb2, lists:reverse(Uncopied), Retry),
     
     % copy misc header values
@@ -620,10 +631,11 @@ start_copy_compact(#db{name=Name,filepath=Filepath}=Db) ->
     ?LOG_DEBUG("Compaction process spawned for db \"~s\"", [Name]),
     case couch_file:open(CompactFile) of
     {ok, Fd} ->
-        ?LOG_DEBUG("Found existing compaction file for db \"~s\"", [Name]),
+        couch_task_status:add_task(<<"Database Compaction">>, <<Name/binary, " retry">>, <<"Starting">>),
         Retry = true,
         {ok, Header} = couch_file:read_header(Fd, ?HEADER_SIG);
     {error, enoent} ->
+        couch_task_status:add_task(<<"Database Compaction">>, Name, <<"Starting">>),
         {ok, Fd} = couch_file:open(CompactFile, [create]),
         Retry = false,
         ok = couch_file:write_header(Fd, ?HEADER_SIG, Header=#db_header{})

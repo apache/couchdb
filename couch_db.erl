@@ -14,7 +14,7 @@
 -behaviour(gen_server).
 
 -export([open/2,close/1,create/2,start_compact/1,get_db_info/1]).
--export([open_ref_counted/2,num_refs/1,monitor/1]).
+-export([open_ref_counted/2,num_refs/1,monitor/1,count_changes_since/2]).
 -export([update_doc/3,update_docs/4,update_docs/2,update_docs/3,delete_doc/3]).
 -export([get_doc_info/2,open_doc/2,open_doc/3,open_doc_revs/4]).
 -export([get_missing_revs/2,name/1,doc_to_tree/1,get_update_seq/1,get_committed_update_seq/1]).
@@ -468,6 +468,18 @@ enum_docs_reduce_to_count(Reds) ->
             fun couch_db_updater:btree_by_id_reduce/2, Reds),
     Count.
 
+count_changes_since(Db, SinceSeq) ->
+    {ok, Changes} = 
+    couch_btree:fold_reduce(Db#db.docinfo_by_seq_btree,
+        SinceSeq + 1, % startkey
+        ok, % endkey
+        fun(_,_) -> true end, % groupkeys
+        fun(_SeqStart, PartialReds, ok) ->
+            {ok, couch_btree:final_reduce(Db#db.docinfo_by_seq_btree, PartialReds)}
+        end,
+        ok),
+    Changes.
+    
 enum_docs_since(Db, SinceSeq, Direction, InFun, Ctx) ->
     couch_btree:fold(Db#db.docinfo_by_seq_btree, SinceSeq + 1, Direction, InFun, Ctx).
 
