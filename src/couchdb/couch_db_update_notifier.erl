@@ -63,7 +63,11 @@ handle_call(_Request, State) ->
 
 handle_info({'EXIT', Pid, Reason}, Pid) ->
     ?LOG_ERROR("Update notification process ~p died: ~p", [Pid, Reason]),
-    {stop, nil}.
+    remove_handler;
+handle_info({'EXIT', _, _}, Pid) ->
+    %% the db_update event manager traps exits and forwards this message to all
+    %% its handlers. Just ignore as it wasn't our os_process that exited.
+    {ok, Pid}.
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
