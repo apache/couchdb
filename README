@@ -33,7 +33,7 @@ dependencies using the `apt-get` command:
 
     apt-get install automake autoconf libtool help2man
 
-The OS X version of these dependencies may be out of date so it is recommended
+The Mac OS X version of these dependencies may be out of date so it is recommended
 that you use MacPorts (http://www.macports.org/) to install newer versions using
 the `port` command:
 
@@ -51,7 +51,7 @@ Bootstrap the pristine source by running the following command:
 Installation and First Run
 --------------------------
 
-UNIX-like Operating Systems (inc. OS X)
+UNIX-like Operating Systems (inc. Mac OS X)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Dependencies
@@ -84,10 +84,10 @@ install those packages instead. `libcurl4-openssl-dev` is the current version of
 `libcurl-dev` supplied by Ubuntu. You may need to specify an alternate package
 name for libcurl bindings.
 
-OS X
-++++
+Mac OS X
+++++++++
 
-To install GNU Make and the GNU Compiler Collection on OS X you should install
+To install GNU Make and the GNU Compiler Collection on Mac OS X you should install
 the Xcode Tools metapackage by running the following command:
 
     open /Applications/Installers/Xcode\ Tools/XcodeTools.mpkg
@@ -156,7 +156,7 @@ On many UNIX-like systems you can run the following command:
     adduser --system --home /usr/local/var/lib/couchdb --no-create-home \
             --shell /bin/bash --group --gecos "CouchDB Administrator" couchdb
 
-OS X provides the standard Accounts option from the System Preferences
+Mac OS X provides the standard Accounts option from the System Preferences
 application or you can optionally use the Workgroup Manager application which
 can be downloaded as part of the Server Admin Tools:
 
@@ -193,18 +193,30 @@ To check that everything has worked, point your web browser to:
 
 From here you should run the test suite.
 
-OS X
-++++
+Mac OS X
+++++++++
 
 If you get error when running Apache CouchDB that look like the following:
 
-    dyld: Library not loaded: libicuuc.38.dy
+    dyld: Library not loaded: libicuuc.38.dylib
 
-You should make sure that your `~/.profile` file contains the following line:
+It seems that your installation is messed up. The dynamically linked object
+file usually contains the path to the dynamic library it was linked against.
+Invoke the command:
 
-    export DYLD_LIBRARY_PATH=/opt/local/lib:$DYLD_LIBRARY_PATH
+    otool -L /usr/local/lib/couchdb/erlang/lib/couch-0.9.0a708993-incubating/priv/lib/couch_erl_driver.so
 
-This should have been added for you by MacPorts but may be missing.
+e.g. to see where CouchDB expects the ICU libraries. In that case you should
+invoke:
+
+    make distclean
+    ./configure
+    make
+    sudo make install
+
+It is not necessary to set dyld(1) environment variables like
+DYLD_LIBARY_PATH. These are necessary only for debugging or testing binary
+compatibility.
 
 Running as a Daemon
 ^^^^^^^^^^^^^^^^^^^
@@ -244,8 +256,8 @@ GNU/Linux) you can configure your system using the following command:
 
     sudo update-rc.d couchdb defaults
 
-OS X
-++++
+Mac OS X
+++++++++
 
 You can use the `launchctl` command to control the Apache CouchDB daemon.
 
@@ -253,22 +265,26 @@ To load the launchd configuration you must run the following command:
 
     sudo launchctl load /usr/local/Library/LaunchDaemons/org.apache.couchdb.plist
 
-Then you can start Apache CouchDB by running :
-
-    sudo launchctl start org.apache.couchdb
-
 You can stop the Apache CouchDB daemon by running the following command:
 
     sudo launchctl unload /usr/local/Library/LaunchDaemons/org.apache.couchdb.plist
 
-If you wish to change the launchd configuration, such as which user to run
-Apache CouchDB as, you must edit the
-`/usr/local/Library/LaunchDaemons/org.apache.couchdb.plist` file as
-appropriate.
+You can change the launchd configuration, such as which user to run
+Apache CouchDB as, by running the command 
+`open /usr/local/Library/LaunchDaemons/org.apache.couchdb.plist`. It will open
+Apple's `Property List Editor'. See launchd.plist(5) for available options in 
+launchd property lists. One is the `OnDemand' property, which makes it possible
+to start and stop the service using launchctl if set to `true'. By default, 
+launchd immediately restarts a stopped service and makes the `launchctl stop' 
+behave effectively like a restart. If set to `true', use these commands to start
+and stop Apache CouchDB:
 
-If you wish the Apache CouchDB daemon to run as a system service you need to
-copy the `/usr/local/Library/LaunchDaemons/org.apache.couchdb.plist` file into
-your system wide `/Library/LaunchDaemons` directory.
+    sudo launchctl start org.apache.couchdb
+    sudo launchctl stop org.apache.couchdb
+
+If you wish the Apache CouchDB daemon to run at startup, you need to copy or
+symlink the `/usr/local/Library/LaunchDaemons/org.apache.couchdb.plist` file
+into your system wide `/Library/LaunchDaemons` directory.
 
 Windows
 ~~~~~~~
