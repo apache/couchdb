@@ -96,9 +96,7 @@ send_external_response(#httpd{mochi_req=MochiReq}, Response) ->
         headers = Headers
     } = parse_external_response(Response),
     Resp = MochiReq:respond({Code, 
-        default_or_content_type(CType, Headers), chunked}),
-    Resp:write_chunk(Data),
-    Resp:write_chunk(""),
+        default_or_content_type(CType, Headers), Data}),
     {ok, Resp}.
 
 parse_external_response({Response}) ->
