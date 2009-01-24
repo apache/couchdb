@@ -151,7 +151,7 @@ handle_cast(Msg, OsProc) ->
 
 handle_info({Port, {exit_status, Status}}, #os_proc{port=Port}=OsProc) ->
     ?LOG_ERROR("OS Process died with status: ~p", [Status]),
-    {stop, error, OsProc};
+    {stop, {exit_status, Status}, OsProc};
 handle_info(Msg, OsProc) ->
     ?LOG_DEBUG("OS Proc: Unknown info: ~p", [Msg]),
     {noreply, OsProc}.
