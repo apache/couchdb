@@ -11,8 +11,13 @@
 // the License.
 
 // Used by replication test
-CouchDB.host = (typeof window == 'undefined' || !window) ? 
-                  "127.0.0.1:5984" : window.location.host;
+if (typeof window == 'undefined' || !window) {
+  CouchDB.host = "127.0.0.1:5984";
+  CouchDB.inBrowser = false;
+} else {
+  CouchDB.host = window.location.host;
+  CouchDB.inBrowser = true;
+}
 
 var tests = {
 
@@ -2843,9 +2848,32 @@ var tests = {
     // test that /_config returns all the settings
     var xhr = CouchDB.request("GET", "/_config");
     var config = JSON.parse(xhr.responseText);
-    var port = CouchDB.host.split(':').pop()
+
+    /*
+      if we run on standard ports, we can't extract
+      the number from the URL. Instead we try to guess
+      from the protocol what port we are running on.
+      If we can't guess, we don't test for the port.
+      Overengineering FTW.
+    */
+    var server_port = CouchDB.host.split(':');
+    if(server_port.length == 1 && CouchDB.inBrowser) {
+      var proto = window.location.protocol;
+      if(proto == "http:") {
+        port = 80;
+      }
+      if(proto == "https:") {
+        port = 443;
+      }
+    } else {
+      port = server_port.pop();
+    }
+
+    if(port) {
+      T(config.httpd.port == port);
+    }
+
     T(config.couchdb.database_dir);
-    T(config.httpd.port == port);
     T(config.daemons.httpd);
     T(config.httpd_global_handlers._config);
     T(config.log.level);
