@@ -147,7 +147,7 @@ respondWith = function(req, responders) {
     var bestKey = keysByMime[bestMime];
     var rFunc = responders[bestKey];
     if (rFunc) {
-      var resp = rFunc();
+      var resp = maybeWrapResponse(rFunc());
       resp["headers"] = resp["headers"] || {};
       resp["headers"]["Content-Type"] = bestMime;
       return resp;
@@ -369,10 +369,19 @@ while (cmd = eval(readline())) {
   }
 }
 
+function maybeWrapResponse(resp) {
+  var type = typeof resp;
+  if ((type == "string") || (type == "xml")) {
+    return {body:resp};
+  } else {
+    return resp;
+  }
+};
+
 function runRenderFunction(renderFun, args) {
   try {
-    var result = renderFun.apply(null, args);
-    respond(result); 
+    var resp = renderFun.apply(null, args);
+    respond(maybeWrapResponse(resp)); 
   } catch(e) {
     log("function raised error: "+e.toString());
     log("stacktrace: "+e.stack);

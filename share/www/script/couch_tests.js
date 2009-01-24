@@ -2610,19 +2610,21 @@ var tests = {
         acceptSwitch: stringFun(function(head, row, req) {
           return respondWith(req, {
             html : function() {
+              // If you're outputting text and you're not setting
+              // any headers, you can just return a string.
               if (head) {
-                return {body : "HTML <ul>"};
+                return "HTML <ul>";
               } else if (row) {
-                return {body : '\n<li>Key: '
-                  +row.key+' Value: '+row.value+'</li>'};
+                return '\n<li>Key: '
+                  +row.key+' Value: '+row.value+'</li>';
               } else { // tail
-                return {body : "</ul>"};
+                return "</ul>";
               }
             },
             xml : function() {
               if (head) {
-                return {body:'<feed xmlns="http://www.w3.org/2005/Atom">'
-                  +'<title>Test XML Feed</title>'};
+                return '<feed xmlns="http://www.w3.org/2005/Atom">'
+                  +'<title>Test XML Feed</title>';
               } else if (row) {
                 // Becase Safari can't stand to see that dastardly
                 // E4X outside of a string. Outside of tests you
@@ -2631,9 +2633,11 @@ var tests = {
                 entry.id = row.id;
                 entry.title = row.key;
                 entry.content = row.value;
-                return {body:entry};
+                // We'll also let you return just an E4X object
+                // if you aren't setting headers.
+                return entry;
               } else {
-                return {body : "</feed>"};
+                return "</feed>";
               }
             }
           })
