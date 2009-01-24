@@ -616,6 +616,7 @@ GetHttp(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
   curl_easy_setopt(handle,CURLOPT_WRITEHEADER,b);
   curl_easy_setopt(handle,CURLOPT_URL,url);
   curl_easy_setopt(handle,CURLOPT_HTTPGET,1);
+  curl_easy_setopt(handle,CURLOPT_FOLLOWLOCATION,1);  
   curl_easy_setopt(handle,CURLOPT_NOPROGRESS,1);
   curl_easy_setopt(handle,CURLOPT_IPRESOLVE,CURL_IPRESOLVE_V4);
 
@@ -864,8 +865,12 @@ PutHttp(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
   b_data->pos = 0;
   
   data = JSValToChar(context,(argv+1));
+  readlen = strlen(data);
+  
+
+  
   // TODO: remove strlen
-  append_Buffer(b_data->buffer,data,strlen(data));
+  append_Buffer(b_data->buffer,data,readlen);
 
   free(data);
 
@@ -887,6 +892,9 @@ PutHttp(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
   curl_easy_setopt(handle,CURLOPT_READDATA,b_data);
   curl_easy_setopt(handle,CURLOPT_URL,url);
   curl_easy_setopt(handle,CURLOPT_UPLOAD,1);
+  curl_easy_setopt(handle,CURLOPT_INFILESIZE,readlen);
+  
+
 
   // Curl structure
   struct curl_slist *slist = generateCurlHeaders(context,argv+2);
@@ -899,6 +907,8 @@ PutHttp(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
   curl_easy_setopt(handle,CURLOPT_NOPROGRESS,1);
   // Use only ipv4
   curl_easy_setopt(handle,CURLOPT_IPRESOLVE,CURL_IPRESOLVE_V4);
+
+  
 
   // Perform
   int exitcode;
