@@ -145,7 +145,10 @@ from_json_obj({Props}) ->
         deleted = proplists:get_value(<<"_deleted">>, Props, false),
         body = NewBody,
         attachments = Bins
-        }.
+        };
+
+from_json_obj(Other) ->
+    throw({invalid_json_object, "Document must be a JSON object"}).
 
 to_doc_info(FullDocInfo) ->
     {DocInfo, _Path} = to_doc_info_path(FullDocInfo),
