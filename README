@@ -28,14 +28,17 @@ To build Apache CouchDB from checkout you need some of the following installed:
  * GNU Libtool            (http://www.gnu.org/software/libtool/)
  * GNU help2man           (http://www.gnu.org/software/help2man/)
 
-If you are running a Debian GNU/Linux based system you can install these
-dependencies using the `apt-get` command:
+Debian-based (inc. Ubuntu) Systems
+++++++++++++++++++++++++++++++++++
+
+You can install the dependencies by running:
 
     apt-get install automake autoconf libtool help2man
 
-The Mac OS X version of these dependencies may be out of date so it is recommended
-that you use MacPorts (http://www.macports.org/) to install newer versions using
-the `port` command:
+Mac OS X
+++++++++
+
+You can install the dependencies using MacPorts by running:
 
     port install automake autoconf libtool help2man
 
@@ -44,7 +47,7 @@ Bootstrapping
 
 Note: You must repeat this step every time you update your checkout.
 
-Bootstrap the pristine source by running the following command:
+Bootstrap the pristine source by running:
 
     ./bootstrap
 
@@ -52,12 +55,12 @@ Installation and First Run
 --------------------------
 
 UNIX-like Operating Systems (inc. Mac OS X)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Dependencies
 ^^^^^^^^^^^^
 
-To build and install apache CouchDB you will need the following installed:
+To build and install Apache CouchDB you will need the following installed:
 
  * Erlang OTP (>=R12B)     (http://erlang.org/)
  * ICU                     (http://icu.sourceforge.net/)
@@ -72,8 +75,7 @@ It is recommended that you install Erlang OTP R12B-4 or above where possible.
 Debian-based (inc. Ubuntu) Systems
 ++++++++++++++++++++++++++++++++++
 
-If you are running a Debian GNU/Linux system (or a derivative such as Ubuntu
-GNU/Linux) you can install the dependencies using the `apt-get` command:
+You can install the dependencies by running:
 
     apt-get install build-essential erlang libicu38 libicu-dev libmozjs-dev \
                     libcurl4-openssl-dev
@@ -87,28 +89,19 @@ name for libcurl bindings.
 Mac OS X
 ++++++++
 
-To install GNU Make and the GNU Compiler Collection on Mac OS X you should install
-the Xcode Tools metapackage by running the following command:
+To install GNU Make and the GNU Compiler Collection on Mac OS X you should
+install the Xcode Tools metapackage by running:
 
     open /Applications/Installers/Xcode\ Tools/XcodeTools.mpkg
 
-We recommend that you satisfy the other dependancies by installing
-[MacPorts][07] and running the following command:
+You can install the dependencies using MacPorts by running:
 
     port install icu erlang spidermonkey curl
-
-Note: Don't forget to open a new terminal after you have installed MacPorts
-as it updates your PATH and you will not be able to run the `port` command
-without the effects of this change.
-
-To update your `locate` database you may want to run the following command:
-
-    sudo /usr/libexec/locate.updatedb
 
 Installing
 ^^^^^^^^^^
 
-Once you have satisfied the dependencies you should run the following command:
+Once you have satisfied the dependencies you should run:
 
     ./configure
 
@@ -128,11 +121,6 @@ To install Apache CouchDB you should then run the following command:
 
     make && sudo make install
 
-If you do not wish to be prompted to overwrite any existing Apache CouchDB
-configuration files you should run the following command:
-
-    sudo make && yes | sudo make install
-
 Note: The use of the `sudo` command is only required if you are installing into
 a system owned directory. You do not need to do this if you are installing
 elsewhere, such as your home directory.
@@ -151,7 +139,7 @@ data/log directories.
 
 You can use whatever tool your system provides to create a new `couchdb` user.
 
-On many UNIX-like systems you can run the following command:
+On many UNIX-like systems you can run:
 
     adduser --system --home /usr/local/var/lib/couchdb --no-create-home \
             --shell /bin/bash --group --gecos "CouchDB Administrator" couchdb
@@ -166,8 +154,7 @@ You should make sure that the `couchdb` user has a working POSIX shell and set
 the home directory to `/usr/local/var/lib/couchdb` which is the Apache CouchDB
 database directory.
 
-Make sure to change the ownership of the Apache CouchDB data directories by
-running the following commands:
+Change the ownership of the Apache CouchDB data directories by running:
 
     chown -R couchdb /usr/local/var/lib/couchdb
     chown -R couchdb /usr/local/var/log/couchdb
@@ -175,7 +162,7 @@ running the following commands:
 Running Manually
 ^^^^^^^^^^^^^^^^
 
-To start the Apache CouchDB server you should run the following command:
+You can start the Apache CouchDB server by running:
 
     sudo -i -u couchdb couchdb
 
@@ -193,30 +180,16 @@ To check that everything has worked, point your web browser to:
 
 From here you should run the test suite.
 
-Mac OS X
-++++++++
+Troubleshooting
+^^^^^^^^^^^^^^^
 
-If you get error when running Apache CouchDB that look like the following:
+If you're getting a cryptic error message, visit the wiki:
 
-    dyld: Library not loaded: libicuuc.38.dylib
+  http://wiki.apache.org/couchdb/Error_messages
 
-It seems that your installation is messed up. The dynamically linked object
-file usually contains the path to the dynamic library it was linked against.
-Invoke the command:
+For general troubleshooting, visit the wiki:
 
-    otool -L /usr/local/lib/couchdb/erlang/lib/couch-0.9.0a708993-incubating/priv/lib/couch_erl_driver.so
-
-e.g. to see where CouchDB expects the ICU libraries. In that case you should
-invoke:
-
-    make distclean
-    ./configure
-    make
-    sudo make install
-
-It is not necessary to set dyld(1) environment variables like
-DYLD_LIBARY_PATH. These are necessary only for debugging or testing binary
-compatibility.
+  http://wiki.apache.org/couchdb/Troubleshooting
 
 Running as a Daemon
 ^^^^^^^^^^^^^^^^^^^
@@ -224,8 +197,8 @@ Running as a Daemon
 Note: These instructions assume you have created the `couchdb` user. See the
 specific system information included below to learn how to reconfigure this.
 
-Note: If any of these methods report a failure you can run the `couchdb`
-command manually to see the error messages it is displaying.
+Note: If any of these methods report a failure you can run the `couchdb` command
+manually to see the error messages it is displaying.
 
 The `/usr/local/etc/logrotate.d/couchdb` file is provided as a logrotate
 configuration that you can use to rotate Apache CouchDB's logs.
@@ -237,7 +210,7 @@ Depending on your system the `couchdb` init script will be installed into a
 direcory called `init.d` (for SysV-style systems) or `rc.d` (for BSD-style
 systems). These examples use the `[init.d|rc.d]` notation to indicate this.
 
-You can control the Apache CouchDB daemon by running the following command:
+You can control the Apache CouchDB daemon by running:
 
     /usr/local/etc/[init.d|rc.d]/couchdb [start|stop|restart|force-reload|status]
 
@@ -248,43 +221,42 @@ remove the line with the `COUCHDB_USER` setting.
 
 If you wish the Apache CouchDB daemon to run as a system service you need to
 copy the `/usr/local/etc/[init.d|rc.d]/couchdb` script into your system wide
-`/etc/[init.d|rc.d]` directory and update your system configuration as
-appropriate. Consult your system documentation for more information.
+`/etc/[init.d|rc.d]` directory and update your system configuration.
 
-If you are running a Debian GNU/Linux system (or a derivative such as Ubuntu
-GNU/Linux) you can configure your system using the following command:
+You may be able to configure your system using the following command:
 
     sudo update-rc.d couchdb defaults
+
+Consult your system documentation for more information.
 
 Mac OS X
 ++++++++
 
 You can use the `launchctl` command to control the Apache CouchDB daemon.
 
-To load the launchd configuration you must run the following command:
+You can load the launchd configuration by running:
 
     sudo launchctl load /usr/local/Library/LaunchDaemons/org.apache.couchdb.plist
 
-You can stop the Apache CouchDB daemon by running the following command:
+You can stop the Apache CouchDB daemon by running:
 
     sudo launchctl unload /usr/local/Library/LaunchDaemons/org.apache.couchdb.plist
 
-You can change the launchd configuration, such as which user to run
-Apache CouchDB as, by running the command 
-`open /usr/local/Library/LaunchDaemons/org.apache.couchdb.plist`. It will open
-Apple's `Property List Editor'. See launchd.plist(5) for available options in 
-launchd property lists. One is the `OnDemand' property, which makes it possible
-to start and stop the service using launchctl if set to `true'. By default, 
-launchd immediately restarts a stopped service and makes the `launchctl stop' 
-behave effectively like a restart. If set to `true', use these commands to start
-and stop Apache CouchDB:
+You can start Apache CouchDB by running:
 
     sudo launchctl start org.apache.couchdb
+
+You can restart Apache CouchDB by running:
+
     sudo launchctl stop org.apache.couchdb
 
-If you wish the Apache CouchDB daemon to run at startup, you need to copy or
-symlink the `/usr/local/Library/LaunchDaemons/org.apache.couchdb.plist` file
-into your system wide `/Library/LaunchDaemons` directory.
+You can change the launchd configuration by running:
+
+    open /usr/local/Library/LaunchDaemons/org.apache.couchdb.plist
+
+If you want the Apache CouchDB daemon to run at startup, copy the
+`/usr/local/Library/LaunchDaemons/org.apache.couchdb.plist` file to your system
+`/Library/LaunchDaemons` directory.
 
 Windows
 ~~~~~~~
