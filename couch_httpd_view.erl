@@ -13,7 +13,7 @@
 -module(couch_httpd_view).
 -include("couch_db.hrl").
 
--export([handle_view_req/2,handle_slow_view_req/2]).
+-export([handle_view_req/2,handle_temp_view_req/2]).
 
 -export([parse_view_query/1,parse_view_query/2,make_view_fold_fun/5,
     finish_view_fold/3, view_row_obj/3]).
@@ -58,7 +58,7 @@ handle_view_req(#httpd{method='POST',path_parts=[_,_, Id, ViewName]}=Req, Db) ->
 handle_view_req(Req, _Db) ->
     send_method_not_allowed(Req, "GET,POST,HEAD").
 
-handle_slow_view_req(#httpd{method='POST'}=Req, Db) ->
+handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
     QueryArgs = parse_view_query(Req),
 
     case couch_httpd:primary_header_value(Req, "content-type") of
@@ -80,7 +80,7 @@ handle_slow_view_req(#httpd{method='POST'}=Req, Db) ->
         output_reduce_view(Req, View, QueryArgs, Keys)
     end;
 
-handle_slow_view_req(Req, _Db) ->
+handle_temp_view_req(Req, _Db) ->
     send_method_not_allowed(Req, "POST").
 
 output_map_view(Req, View, Db, QueryArgs, nil) ->
