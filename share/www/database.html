@@ -40,7 +40,7 @@ specific language governing permissions and limitations under the License.
         if (page.redirecting) return;
         $("h1 strong").text(page.db.name);
         var viewPath = (page.viewName || "_all_docs").replace(/^_design\//, "_view/");
-        if (viewPath != "_slow_view" && viewPath != "_design_docs") {
+        if (viewPath != "_temp_view" && viewPath != "_design_docs") {
           $("h1 a.raw").attr("href", "/" + encodeURIComponent(page.db.name) +
             "/" + viewPath);
         }
@@ -118,7 +118,7 @@ specific language governing permissions and limitations under the License.
         <label>Select view: <select autocomplete="false">
           <option value="_all_docs">All documents</option>
           <option value="_design_docs">Design documents</option>
-          <option value="_slow_view">Custom query…</option>
+          <option value="_temp_view">Custom query…</option>
         </select></label>
       </div>
       <ul id="toolbar">

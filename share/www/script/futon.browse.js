@@ -114,7 +114,7 @@
       this.viewLanguage = "javascript";
       this.db = db;
       this.isDirty = false;
-      this.isTempView = viewName == "_slow_view";
+      this.isTempView = viewName == "_temp_view";
       page = this;
 
       var templates = {
@@ -199,7 +199,7 @@
             }
             $("#language").change(updateDirtyState);
           });
-        } else if (viewName == "_slow_view") {
+        } else if (viewName == "_temp_view") {
           page.viewLanguage = $.cookies.get(db.name + ".language", page.viewLanguage);
           page.updateViewEditor(
             $.cookies.get(db.name + ".map", templates[page.viewLanguage]),
@@ -266,7 +266,7 @@
           }
         });
         if (!viewName.match(/^_design\//)) {
-          $.each(["_all_docs", "_design_docs", "_slow_view"], function(idx, name) {
+          $.each(["_all_docs", "_design_docs", "_temp_view"], function(idx, name) {
             if (viewName == name) {
               select[0].options[idx].selected = true;
             }
@@ -577,7 +577,7 @@
           $("#switch select")[0].selectedIndex = 0;
           db.allDocs(options);
         } else {
-          if (viewName == "_slow_view") {
+          if (viewName == "_temp_view") {
             $("#viewcode").show().removeClass("collapsed");
             var mapFun = $("#viewcode_map").val();
             $.cookies.set(db.name + ".map", mapFun);

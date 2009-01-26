@@ -249,7 +249,7 @@
             body.reduce = reduceFun;
           }
           $.ajax({
-            type: "POST", url: this.uri + "_slow_view" + encodeOptions(options),
+            type: "POST", url: this.uri + "_temp_view" + encodeOptions(options),
             contentType: "application/json",
             data: toJSON(body), dataType: "json",
             complete: function(req) {
