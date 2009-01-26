@@ -55,6 +55,7 @@ nobase_dist_localdata_DATA = \
     www/database.html \
     www/document.html \
     www/replicator.html \
+    www/status.html \
     www/script/couch.js \
     www/script/couch_tests.js \
     www/script/couch_test_runner.js \
