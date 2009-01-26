@@ -866,6 +866,10 @@
             }
             return $("<input type='text' spellcheck='false'>");
           },
+          end: function() {
+            $(this).children().remove();
+            $(this).append(_renderValue(doc[row.data("name")]));
+          },
           prepareInput: function(input) {
             if ($(input).is("textarea")) {
               $(input).makeResizable({vertical: true});
@@ -873,10 +877,7 @@
           },
           accept: function(newValue) {
             doc[row.data("name")] = JSON.parse(newValue);
-            $(this).children().remove();
             page.isDirty = true;
-            var value = _renderValue(doc[row.data("name")]);
-            $(this).append(value);
           },
           populate: function(value) {
             return $.futon.formatJSON(doc[row.data("name")]);
@@ -904,7 +905,7 @@
             var list = $("<dl></dl>");
             for (var i in val) {
               $("<dt></dt>").text(i).appendTo(list);
-              $("<dd></dd>").append(_renderValue(val[i])).appendTo(list);
+              $("<dd></dd>").append(render(val[i])).appendTo(list);
             }
             return list;
           } else {

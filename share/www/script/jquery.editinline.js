@@ -57,7 +57,7 @@
       input.remove();
       tools.remove();
       options.accept.apply(elem, [newText, origText]);
-      editable.removeClass("editinline-container")
+      editable.removeClass("editinline-container");
       options.end.apply(elem, [keyCode]);
       return true;
     }
