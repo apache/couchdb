@@ -207,6 +207,9 @@
           );
         }
         page.populateLanguagesMenu();
+        if (this.isTempView) {
+          $("#tempwarn").show();
+        }
       }
 
       // Populate the languages dropdown, and listen to selection changes
