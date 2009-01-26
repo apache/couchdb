@@ -517,3 +517,16 @@ form#replicator p.swap button:hover { color: #000; }
 form#replicator p.actions { padding: 1px; clear: left; margin: 0;
   text-align: right;
 }
+
+/* Active tasks */
+
+#interval { color: #666; float: right; font-size: 90%; font-weight: bold;
+  line-height: 16px; padding: 5px;
+}
+#interval input { vertical-align: top; }
+#interval .secs { display: inline-block; width: 2em; text-align: right; }
+
+#status tr.none th { color: #666; font-weight: normal; }
+#status td.object, #status td.pid {
+  font-family: "DejaVu Sans Mono",Monaco,monospace; font-size: 11px;
+}

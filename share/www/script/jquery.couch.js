@@ -14,6 +14,24 @@
   $.couch = $.couch || {};
   $.extend($.couch, {
 
+    activeTasks: function(options) {
+      options = options || {};
+      $.ajax({
+        type: "GET", url: "/_active_tasks", dataType: "json",
+        complete: function(req) {
+          var resp = $.httpData(req, "json");
+          if (req.status == 200) {
+            if (options.success) options.success(resp);
+          } else  if (options.error) {
+            options.error(req.status, resp.error, resp.reason);
+          } else {
+            alert("Active task status could not be retrieved: " +
+              resp.reason);
+          }
+        }
+      });
+    },
+
     allDbs: function(options) {
       options = options || {};
       $.ajax({
