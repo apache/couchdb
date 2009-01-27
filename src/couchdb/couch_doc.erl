@@ -147,7 +147,7 @@ from_json_obj({Props}) ->
         attachments = Bins
         };
 
-from_json_obj(Other) ->
+from_json_obj(_Other) ->
     throw({invalid_json_object, "Document must be a JSON object"}).
 
 to_doc_info(FullDocInfo) ->

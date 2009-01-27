@@ -2307,10 +2307,12 @@ var tests = {
        _id:"_design/template",
        language: "javascript",
        shows: {
-         "hello" : stringFun(function() { 
-           return {
-             body : "Hello World"
-           };
+         "hello" : stringFun(function(doc) { 
+           if (doc) {
+             return "Hello World";             
+           } else {
+             return "Empty World";
+           }
          }),
          "just-name" : stringFun(function(doc, req) {
            return {
@@ -2410,6 +2412,11 @@ var tests = {
      // hello template world
      xhr = CouchDB.request("GET", "/test_suite_db/_show/template/hello/"+docid);
      T(xhr.responseText == "Hello World");
+
+     // hello template world (no docid)
+     xhr = CouchDB.request("GET", "/test_suite_db/_show/template/hello");
+     T(xhr.responseText == "Empty World");
+
      
      // show with doc
      xhr = CouchDB.request("GET", "/test_suite_db/_show/template/just-name/"+docid);

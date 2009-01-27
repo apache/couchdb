@@ -29,7 +29,12 @@ sum = function(values) {
 }
 
 log = function(message) {
-  print(toJSON({log: toJSON(message)}));  
+  if (typeof message == "undefined") {
+    message = "Error: attempting to log message of 'undefined'.";
+  } else if (typeof message != "string") {
+    message = toJSON(message);
+  }
+  print(toJSON({log: message}));
 }
 
 // mimeparse.js
@@ -135,7 +140,7 @@ var Mimeparse = (function() {
 
 // this function provides a shortcut for managing responses by Accept header
 respondWith = function(req, responders) {
-  var accept = req.headers["Accept"];
+  var bestKey = null, accept = req.headers["Accept"];
   if (accept) {
     var provides = [];
     for (key in responders) {
@@ -144,19 +149,17 @@ respondWith = function(req, responders) {
       }
     }
     var bestMime = Mimeparse.bestMatch(provides, accept);
-    var bestKey = keysByMime[bestMime];
-    var rFunc = responders[bestKey];
-    if (rFunc) {
-      var resp = maybeWrapResponse(rFunc());
-      resp["headers"] = resp["headers"] || {};
-      resp["headers"]["Content-Type"] = bestMime;
-      return resp;
-    }
+    bestKey = keysByMime[bestMime];
   }
-  if (responders.fallback) {
-    return responders[responders.fallback]();
-  } 
-  throw({code:406, body:"Not Acceptable: "+accept});
+  var rFunc = responders[bestKey || responders.fallback || "html"];
+  if (rFunc) {      
+    var resp = maybeWrapResponse(rFunc());
+    resp["headers"] = resp["headers"] || {};
+    resp["headers"]["Content-Type"] = bestMime;
+    respond(resp);
+  } else {
+    throw({code:406, body:"Not Acceptable: "+accept});    
+  }
 }
 
 // whoever registers last wins.
@@ -378,20 +381,30 @@ function maybeWrapResponse(resp) {
   }
 };
 
+var responseSent;
 function runRenderFunction(renderFun, args) {
+  responseSent = false;
   try {
     var resp = renderFun.apply(null, args);
-    respond(maybeWrapResponse(resp)); 
+    if (!responseSent) {
+      if (resp) {
+        respond(maybeWrapResponse(resp));       
+      } else {
+        respond({error:"render_error",reason:"undefined response from render function"});
+      }      
+    }
   } catch(e) {
     log("function raised error: "+e.toString());
     log("stacktrace: "+e.stack);
+    respond({error:"render_error",reason:e});
   }
 };
 
 // prints the object as JSON, and rescues and logs any toJSON() related errors
 function respond(obj) {
+  responseSent = true;
   try {
-    print(toJSON(obj));    
+    print(toJSON(obj));  
   } catch(e) {
     log("Error converting object to JSON: " + e.toString());
   }
