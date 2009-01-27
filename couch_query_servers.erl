@@ -125,7 +125,10 @@ validate_doc_update(Lang, FunSrc, EditDoc, DiskDoc, Ctx) ->
 
 render_doc_show(Lang, ShowSrc, Doc, Req, Db) ->
     Pid = get_os_process(Lang),
-    JsonDoc = couch_doc:to_json_obj(Doc, [revs]),
+    JsonDoc = case Doc of
+        nil -> null;
+        _ -> couch_doc:to_json_obj(Doc, [revs])
+    end,
     JsonReq = couch_httpd_external:json_req_obj(Req, Db),
     try couch_os_process:prompt(Pid, 
         [<<"show_doc">>, ShowSrc, JsonDoc, JsonReq]) of

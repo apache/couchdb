@@ -17,7 +17,7 @@
 
 -export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,path/1]).
 -export([verify_is_server_admin/1,unquote/1,quote/1,recv/2]).
--export([parse_form/1,json_body/1,body/1,doc_etag/1]).
+-export([parse_form/1,json_body/1,body/1,doc_etag/1, make_etag/1, etag_respond/3]).
 -export([primary_header_value/2,partition/1,serve_file/3]).
 -export([start_chunked_response/3,send_chunk/2]).
 -export([start_json_response/2, start_json_response/3, end_json_response/1]).
@@ -261,7 +261,29 @@ json_body(#httpd{mochi_req=MochiReq}) ->
     ?JSON_DECODE(MochiReq:recv_body(?MAX_DOC_SIZE)).
 
 doc_etag(#doc{revs=[DiskRev|_]}) ->
-     "\"" ++ binary_to_list(DiskRev) ++ "\"".
+    "\"" ++ binary_to_list(DiskRev) ++ "\"".
+
+make_etag(Term) ->
+    <<SigInt:128/integer>> = erlang:md5(term_to_binary(Term)),
+    list_to_binary("\"" ++ lists:flatten(io_lib:format("~.36B",[SigInt])) ++ "\"").
+
+etag_match(Req, CurrentEtag) when is_binary(CurrentEtag) ->
+    etag_match(Req, binary_to_list(CurrentEtag));
+
+etag_match(Req, CurrentEtag) ->
+    EtagsToMatch = string:tokens(
+        couch_httpd:header_value(Req, "If-None-Match", ""), ", "),
+    lists:member(CurrentEtag, EtagsToMatch).
+
+etag_respond(Req, CurrentEtag, RespFun) ->
+    case etag_match(Req, CurrentEtag) of
+    true ->
+        % the client has this in their cache.
+        couch_httpd:send_response(Req, 304, [{"Etag", CurrentEtag}], <<>>);
+    false ->
+        % Run the function.
+        RespFun()
+    end.
 
 verify_is_server_admin(#httpd{user_ctx=#user_ctx{roles=Roles}}) ->
     case lists:member(<<"_admin">>, Roles) of

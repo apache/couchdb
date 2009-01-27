@@ -33,6 +33,16 @@ handle_doc_show_req(#httpd{
     Doc = couch_httpd_db:couch_doc_open(Db, Docid, [], []),
     send_doc_show_response(Lang, ShowSrc, Doc, Req, Db);
 
+handle_doc_show_req(#httpd{
+        method='GET',
+        path_parts=[_, _, DesignName, ShowName]
+    }=Req, Db) ->
+    DesignId = <<"_design/", DesignName/binary>>,
+    #doc{body={Props}} = couch_httpd_db:couch_doc_open(Db, DesignId, [], []),
+    Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
+    ShowSrc = get_nested_json_value({Props}, [<<"shows">>, ShowName]),
+    send_doc_show_response(Lang, ShowSrc, nil, Req, Db);
+
 handle_doc_show_req(#httpd{method='GET'}=Req, _Db) ->
     send_error(Req, 404, <<"show_error">>, <<"Invalid path.">>);
 
@@ -158,45 +168,32 @@ finish_view_list(Req, Db, QueryServer, TotalRows,
         throw(Error)
     end.
 
-
-send_doc_show_response(Lang, ShowSrc, #doc{revs=[DocRev|_]}=Doc, #httpd{mochi_req=MReq}=Req, Db) ->
-    % make a term with etag-effecting Req components, but not always changing ones.
+send_doc_show_response(Lang, ShowSrc, nil, #httpd{mochi_req=MReq}=Req, Db) ->
+    % compute etag with no doc
     Headers = MReq:get(headers),
     Hlist = mochiweb_headers:to_list(Headers),
     Accept = proplists:get_value('Accept', Hlist),
-    <<SigInt:128/integer>> = erlang:md5(term_to_binary({Lang, ShowSrc, DocRev, Accept})),
-    CurrentEtag = list_to_binary("\"" ++ lists:flatten(io_lib:format("form_~.36B",[SigInt])) ++ "\""),
-    EtagsToMatch = string:tokens(
-                couch_httpd:header_value(Req, "If-None-Match", ""), ", "),
-    % We know our etag now                
-    case lists:member(binary_to_list(CurrentEtag), EtagsToMatch) of
-    true ->
-        % the client has this in their cache.
-        couch_httpd:send_response(Req, 304, [{"Etag", CurrentEtag}], <<>>);
-    false ->
-        % Run the external form renderer.
-        {JsonResponse} = couch_query_servers:render_doc_show(Lang, ShowSrc, Doc, Req, Db),
-        % Here we embark on the delicate task of replacing or creating the  
-        % headers on the JsonResponse object. We need to control the Etag and 
-        % Vary headers. If the external function controls the Etag, we'd have to 
-        % run it to check for a match, which sort of defeats the purpose.
-        JsonResponse2 = case proplists:get_value(<<"headers">>, JsonResponse, nil) of
-        nil ->
-            % no JSON headers
-            % add our Etag and Vary headers to the response
-            [{<<"headers">>, {[{<<"Etag">>, CurrentEtag}, {<<"Vary">>, <<"Accept">>}]}} | JsonResponse];
-        {JsonHeaders} ->
-            [case Field of
-            {<<"headers">>, {JsonHeaders}} -> % add our headers
-                JsonHeadersEtagged = set_or_replace_header({<<"Etag">>, CurrentEtag}, JsonHeaders),
-                JsonHeadersVaried = set_or_replace_header({<<"Vary">>, <<"Accept">>}, JsonHeadersEtagged),
-                {<<"headers">>, {JsonHeadersVaried}};
-            _ -> % skip non-header fields
-                Field
-            end || Field <- JsonResponse]
-        end,
-        couch_httpd_external:send_external_response(Req, {JsonResponse2})    
-    end.
+    CurrentEtag = couch_httpd:make_etag({Lang, ShowSrc, nil, Accept}),
+    couch_httpd:etag_respond(Req, CurrentEtag, fun() -> 
+        ExternalResp = couch_query_servers:render_doc_show(Lang, ShowSrc, 
+            nil, Req, Db),
+        JsonResp = apply_etag(ExternalResp, CurrentEtag),
+        couch_httpd_external:send_external_response(Req, JsonResp)
+    end);
+
+send_doc_show_response(Lang, ShowSrc, #doc{revs=[DocRev|_]}=Doc, #httpd{mochi_req=MReq}=Req, Db) ->
+    % calculate the etag
+    Headers = MReq:get(headers),
+    Hlist = mochiweb_headers:to_list(Headers),
+    Accept = proplists:get_value('Accept', Hlist),
+    CurrentEtag = couch_httpd:make_etag({Lang, ShowSrc, DocRev, Accept}),
+    % We know our etag now    
+    couch_httpd:etag_respond(Req, CurrentEtag, fun() -> 
+        ExternalResp = couch_query_servers:render_doc_show(Lang, ShowSrc, 
+            Doc, Req, Db),
+        JsonResp = apply_etag(ExternalResp, CurrentEtag),
+        couch_httpd_external:send_external_response(Req, JsonResp)
+    end).
 
 set_or_replace_header(H, L) ->
     set_or_replace_header(H, L, []).
@@ -210,3 +207,24 @@ set_or_replace_header({Key, NewValue}, [{OtherKey, OtherVal} | Headers], Acc) ->
 set_or_replace_header({Key, NewValue}, [], Acc) ->
     % end of list, add ours
     [{Key, NewValue}|Acc].
+
+apply_etag({ExternalResponse}, CurrentEtag) ->
+    % Here we embark on the delicate task of replacing or creating the  
+    % headers on the JsonResponse object. We need to control the Etag and 
+    % Vary headers. If the external function controls the Etag, we'd have to 
+    % run it to check for a match, which sort of defeats the purpose.
+    case proplists:get_value(<<"headers">>, ExternalResponse, nil) of
+    nil ->
+        % no JSON headers
+        % add our Etag and Vary headers to the response
+        {[{<<"headers">>, {[{<<"Etag">>, CurrentEtag}, {<<"Vary">>, <<"Accept">>}]}} | ExternalResponse]};
+    {JsonHeaders} ->
+        {[case Field of
+        {<<"headers">>, {JsonHeaders}} -> % add our headers
+            JsonHeadersEtagged = set_or_replace_header({<<"Etag">>, CurrentEtag}, JsonHeaders),
+            JsonHeadersVaried = set_or_replace_header({<<"Vary">>, <<"Accept">>}, JsonHeadersEtagged),
+            {<<"headers">>, {JsonHeadersVaried}};
+        _ -> % skip non-header fields
+            Field
+        end || Field <- ExternalResponse]}
+    end.
