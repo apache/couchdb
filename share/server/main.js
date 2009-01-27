@@ -207,6 +207,7 @@ try {
   sandbox.emit = emit;
   sandbox.sum = sum;
   sandbox.log = log;
+  sandbox.toJSON = toJSON;
   sandbox.respondWith = respondWith;
   sandbox.registerType = registerType;
 } catch (e) {}
