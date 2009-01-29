@@ -21,3 +21,9 @@ This product also includes the following third-party components:
  * MochiWeb (http://code.google.com/p/mochiweb/)
 
    Copyright 2007, Mochi Media Coporation
+
+ * ibrowse
+ (http://jungerl.cvs.sourceforge.net/viewvc/jungerl/jungerl/lib/ibrowse/)
+
+   Copyright 2008, Chandrashekhar Mullaparthi
+   This ASF redistribution is consistent with the terms of the BSD License.

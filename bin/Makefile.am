@@ -28,8 +28,9 @@ couchdb: couchdb.tpl
 	    -e "s|%ICU_CONFIG%|$(ICU_CONFIG)|g" \
 	    -e "s|%bindir%|@bindir@|g" \
 	    -e "s|%localerlanglibdir%|@localerlanglibdir@|g" \
-	    -e "s|%mochiwebebindir%|couch-@version@/ebin|g" \
-	    -e "s|%couchdbebindir%|mochiweb-r82/ebin|g" \
+	    -e "s|%couchdbebindir%|couch-@version@/ebin|g" \
+	    -e "s|%mochiwebebindir%|mochiweb-r82/ebin|g" \
+	    -e "s|%ibrowseebindir%|ibrowse-1.4.1/ebin|g" \
 	    -e "s|%defaultini%|default.ini|g" \
 	    -e "s|%localini%|local.ini|g" \
 	    -e "s|%localconfdir%|@localconfdir@|g" \

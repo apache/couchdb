@@ -183,11 +183,12 @@ start_couchdb () {
         %ERL% $interactive_option -smp auto -sasl errlog_type error +K true \
         -pa %localerlanglibdir%/%couchdbebindir% \
             %localerlanglibdir%/%mochiwebebindir% \
-        -eval \"application:load(inets)\" \
+            %localerlanglibdir%/%ibrowseebindir% \
+        -eval \"application:load(ibrowse)\" \
         -eval \"application:load(crypto)\" \
         -eval \"application:load(couch)\" \
         -eval \"crypto:start()\" \
-        -eval \"inets:start()\" \
+        -eval \"ibrowse:start()\" \
         -eval \"couch_server:start([$start_arguments]), receive done -> done end.\" "
     if test "$BACKGROUND_BOOLEAN" = "true" \
         -a "$RECURSED_BOOLEAN" = "false"; then

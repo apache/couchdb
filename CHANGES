@@ -28,6 +28,8 @@ Database Core:
    dramatically. The fix keeps only one document in the write queue at a time.
  * Fix for databases sometimes incorrectly reporting that they contain 0
    documents after compaction.
+ * CouchDB now uses ibrowse instead of inets for its internal HTTP client
+   implementation. This means better replication stability.
 
 HTTP Interface:
 

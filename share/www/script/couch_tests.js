@@ -2134,6 +2134,19 @@ var tests = {
             T(docA._rev == docB._rev);
           };
         },
+
+        design_docs_test: new function() {
+          // make sure design docs replicate properly
+          this.init = function(dbA, dbB) {
+            dbA.save({ _id:"_design/test" });
+          };
+
+          this.afterAB1 = function() {
+            var docA = dbA.open("_design/test");
+            var docB = dbB.open("_design/test");
+            T(docA._rev == docB._rev);
+          };
+        },
       
         attachments_test: new function () {
           // Test attachments
