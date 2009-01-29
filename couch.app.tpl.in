@@ -24,4 +24,4 @@
                            couch_view,
                            couch_query_servers,
                            couch_db_update_notifier_sup]},
-              {applications,[kernel,stdlib,crypto,inets,mochiweb]}]}.
+              {applications,[kernel,stdlib,crypto,ibrowse,mochiweb]}]}.

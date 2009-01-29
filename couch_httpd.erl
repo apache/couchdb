@@ -15,7 +15,7 @@
 
 -export([start_link/0, stop/0, handle_request/3]).
 
--export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,path/1]).
+-export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,path/1,absolute_uri/2]).
 -export([verify_is_server_admin/1,unquote/1,quote/1,recv/2]).
 -export([parse_form/1,json_body/1,body/1,doc_etag/1, make_etag/1, etag_respond/3]).
 -export([primary_header_value/2,partition/1,serve_file/3]).
@@ -241,6 +241,15 @@ qs(#httpd{mochi_req=MochiReq}) ->
 
 path(#httpd{mochi_req=MochiReq}) ->
     MochiReq:get(path).
+
+absolute_uri(#httpd{mochi_req=MochiReq}, Path) ->
+    Host = case MochiReq:get_header_value("Host") of
+        undefined ->
+            {ok, {Address, Port}} = inet:sockname(MochiReq:get(socket)),
+            inet_parse:ntoa(Address) ++ ":" ++ integer_to_list(Port);
+        Value -> Value
+    end,
+    "http://" ++ Host ++ Path.
 
 unquote(UrlEncodedString) ->
     mochiweb_util:unquote(UrlEncodedString).
