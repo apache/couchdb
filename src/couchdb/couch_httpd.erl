@@ -26,9 +26,6 @@
 -export([default_authentication_handler/1,special_test_authentication_handler/1]).
 
 
-% Maximum size of document PUT request body (4GB)
--define(MAX_DOC_SIZE, (4*1024*1024*1024)).
-
 start_link() ->
     % read config and register for configuration changes
 
@@ -264,10 +261,13 @@ recv(#httpd{mochi_req=MochiReq}, Len) ->
     MochiReq:recv(Len).
 
 body(#httpd{mochi_req=MochiReq}) ->
-    MochiReq:recv_body(?MAX_DOC_SIZE).
+    % Maximum size of document PUT request body (4GB)
+    MaxSize = list_to_integer(
+        couch_config:get("couchdb", "max_document_size", "4294967296")),
+    MochiReq:recv_body(MaxSize).
 
-json_body(#httpd{mochi_req=MochiReq}) ->
-    ?JSON_DECODE(MochiReq:recv_body(?MAX_DOC_SIZE)).
+json_body(Httpd) ->
+    ?JSON_DECODE(body(Httpd)).
 
 doc_etag(#doc{revs=[DiskRev|_]}) ->
     "\"" ++ binary_to_list(DiskRev) ++ "\"".
