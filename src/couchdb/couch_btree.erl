@@ -558,6 +558,8 @@ adjust_dir(rev, List) ->
 
 stream_node(Bt, Reds, PointerInfo, nil, Dir, Fun, Acc) ->
     stream_node(Bt, Reds, PointerInfo, Dir, Fun, Acc);
+stream_node(Bt, Reds, PointerInfo, {}, rev, Fun, Acc) ->
+    stream_node(Bt, Reds, PointerInfo, rev, Fun, Acc);
 stream_node(_Bt, _Reds, nil, _StartKey, _Dir, _Fun, Acc) ->
     {ok, Acc};
 stream_node(Bt, Reds, {Pointer, _Reds}, StartKey, Dir, Fun, Acc) ->

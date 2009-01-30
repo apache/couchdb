@@ -577,9 +577,8 @@ var tests = {
     }
 
     // Check _all_docs with descending=true again (now that there are many docs)
-    // this fails, see COUCHDB-109
-    // var desc = db.allDocs({descending:true});
-    // T(desc.total_rows == desc.rows.length);
+    var desc = db.allDocs({descending:true});
+    T(desc.total_rows == desc.rows.length);
   },
 
   reduce: function(debug) {
