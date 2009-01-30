@@ -268,10 +268,14 @@ parse_view_query(Req, Keys, IsReduce) ->
             fwd ->
                 Args#view_query_args {
                     direction = rev,
-                    start_key = reverse_key_default(Args#view_query_args.start_key),
-                    start_docid = reverse_key_default(Args#view_query_args.start_docid),
-                    end_key = reverse_key_default(Args#view_query_args.end_key),
-                    end_docid =  reverse_key_default(Args#view_query_args.end_docid)};
+                    start_key =
+                        reverse_key_default(Args#view_query_args.start_key),
+                    start_docid =
+                        reverse_key_default(Args#view_query_args.start_docid),
+                    end_key =
+                        reverse_key_default(Args#view_query_args.end_key),
+                    end_docid =
+                        reverse_key_default(Args#view_query_args.end_docid)};
             _ ->
                 Args %already reversed
             end;
