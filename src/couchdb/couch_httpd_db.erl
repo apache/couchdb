@@ -369,7 +369,7 @@ all_docs_view(Req, Db, Keys) ->
 db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
     case extract_header_rev(Req, couch_httpd:qs_value(Req, "rev")) of
     missing_rev ->
-        couch_httpd:send_error(Req, 412, <<"missing_rev">>,
+        couch_httpd:send_error(Req, 409, <<"missing_rev">>,
             <<"Document rev/etag must be specified to delete">>);
     RevToDelete ->
         {ok, NewRev} = couch_db:delete_doc(Db, DocId, [RevToDelete]),
