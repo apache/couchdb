@@ -18,7 +18,7 @@
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
     start_json_response/2,send_chunk/2,end_json_response/1,
-    start_chunked_response/3]).
+    start_chunked_response/3, absolute_uri/2]).
 
 -record(doc_query_args, {
     options = [],
@@ -76,11 +76,13 @@ db_req(#httpd{method='GET',path_parts=[_DbName]}=Req, Db) ->
     {ok, DbInfo} = couch_db:get_db_info(Db),
     send_json(Req, {DbInfo});
 
-db_req(#httpd{method='POST',path_parts=[_DbName]}=Req, Db) ->
+db_req(#httpd{method='POST',path_parts=[DbName]}=Req, Db) ->
     Doc = couch_doc:from_json_obj(couch_httpd:json_body(Req)),
     DocId = couch_util:new_uuid(),
     {ok, NewRev} = couch_db:update_doc(Db, Doc#doc{id=DocId, revs=[]}, []),
-    send_json(Req, 201, {[
+    DocUrl = absolute_uri(Req, 
+        binary_to_list(<<"/",DbName/binary,"/",DocId/binary>>)),
+    send_json(Req, 201, [{"Location", DocUrl}], {[
         {ok, true},
         {id, DocId},
         {rev, NewRev}
