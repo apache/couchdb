@@ -140,6 +140,18 @@ var tests = {
     
     // make sure we can still open
     T(db.open(existingDoc._id, {rev: existingDoc._rev}) != null);
+    
+    // test that the POST response has a Location header
+    var xhr = CouchDB.request("POST", "/test_suite_db", {
+      body: JSON.stringify({"foo":"bar"})
+    });
+    var resp = JSON.parse(xhr.responseText);
+    T(resp.ok);
+    var loc = xhr.getResponseHeader("Location");
+    T(loc, "should have a Location header");
+    var locs = loc.split('/');
+    T(locs[4] == resp.id);
+    T(locs[3] == "test_suite_db");    
   },
   
   delayed_commits: function(debug) {
