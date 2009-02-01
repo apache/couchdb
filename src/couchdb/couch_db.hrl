@@ -174,6 +174,7 @@
     fd=nil,
     name,
     def_lang,
+    design_options=[],
     views,
     id_btree=nil,
     current_seq=0,

@@ -129,6 +129,10 @@ function CouchDB(name, httpHeaders) {
         reduceFun = reduceFun.toSource ? reduceFun.toSource() : "(" + reduceFun.toString() + ")";
       body.reduce = reduceFun;
     }
+    if (options && options.options != undefined) {
+        body.options = options.options;
+        delete options.options;
+    }
     this.last_req = this.request("POST", this.uri + "_temp_view" + encodeOptions(options), {
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify(body)

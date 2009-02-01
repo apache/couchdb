@@ -773,6 +773,58 @@ var tests = {
     }
   },
 
+  design_options: function(debug) {
+    var db = new CouchDB("test_suite_db");
+    db.deleteDb();
+    db.createDb();
+    if (debug) debugger;
+
+    //// test the includes_design option
+    var map = "function (doc) {emit(null, doc._id);}";
+
+    // we need a design doc even to test temp views with it
+    var designDoc = {
+      _id:"_design/fu",
+      language: "javascript",
+      options: {
+        include_design: true        
+      },
+      views: {
+        data: {"map": map}
+      }
+    };
+    T(db.save(designDoc).ok);
+
+    // should work for temp views
+    var rows = db.query(map, null, {options:{include_design: true}}).rows;
+    T(rows.length == 1);
+    T(rows[0].value == "_design/fu");
+
+    rows = db.query(map).rows;
+    T(rows.length == 0);
+
+    // when true, should include design docs in views
+    rows = db.view("fu/data").rows;
+    T(rows.length == 1);
+    T(rows[0].value == "_design/fu");
+
+    // when false, should not
+    designDoc.options.include_design = false;
+    delete designDoc._rev;
+    designDoc._id = "_design/bingo";
+    T(db.save(designDoc).ok);
+    rows = db.view("bingo/data").rows;
+    T(rows.length == 0);
+
+    // should default to false
+    delete designDoc.options;
+    delete designDoc._rev;
+    designDoc._id = "_design/bango";
+    T(db.save(designDoc).ok);
+    rows = db.view("bango/data").rows;
+    T(rows.length == 0);
+  },
+
   multiple_rows: function(debug) {
     var db = new CouchDB("test_suite_db");
     db.deleteDb();

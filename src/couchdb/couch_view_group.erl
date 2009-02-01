@@ -262,7 +262,7 @@ prepare_group({view, RootDir, DbName, GroupId}, ForceReset)->
         catch delete_index_file(RootDir, DbName, GroupId),
         Error
     end;
-prepare_group({slow_view, DbName, Fd, Lang, MapSrc, RedSrc}, _ForceReset) ->
+prepare_group({slow_view, DbName, Fd, Lang, DesignOptions, MapSrc, RedSrc}, _ForceReset) ->
     case couch_db:open(DbName, []) of
     {ok, Db} ->
         View = #view{map_names=[<<"_temp">>],
@@ -271,7 +271,7 @@ prepare_group({slow_view, DbName, Fd, Lang, MapSrc, RedSrc}, _ForceReset) ->
             def=MapSrc,
             reduce_funs= if RedSrc==[] -> []; true -> [{<<"_temp">>, RedSrc}] end},
         {ok, init_group(Db, Fd, #group{type=slow_view, name= <<"_temp">>, db=Db,
-                views=[View], def_lang=Lang}, nil)};
+            views=[View], def_lang=Lang, design_options=DesignOptions}, nil)};
     Error ->
         Error
     end.
@@ -311,6 +311,7 @@ open_db_group(DbName, GroupId) ->
 % maybe move to another module
 design_doc_to_view_group(#doc{id=Id,body={Fields}}) ->
     Language = proplists:get_value(<<"language">>, Fields, <<"javascript">>),
+    {DesignOptions} = proplists:get_value(<<"options">>, Fields, {[]}),
     {RawViews} = proplists:get_value(<<"views">>, Fields, {[]}),
 
     % add the views to a dictionary object, with the map source as the key
@@ -338,7 +339,7 @@ design_doc_to_view_group(#doc{id=Id,body={Fields}}) ->
             {View#view{id_num=N},N+1}
         end, 0, dict:to_list(DictBySrc)),
 
-    Group = #group{name=Id, views=Views, def_lang=Language},
+    Group = #group{name=Id, views=Views, def_lang=Language, design_options=DesignOptions},
     Group#group{sig=erlang:md5(term_to_binary(Group))}.
 
 reset_group(#group{views=Views}=Group) ->
