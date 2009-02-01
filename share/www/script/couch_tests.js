@@ -1491,71 +1491,71 @@ var tests = {
     // NOTE, the values are already in their correct sort order. Consider this
     // a specification of collation of json types.
 
-    var values = []
+    var values = [];
 
     // special values sort before all other types
-    values.push(null)
-    values.push(false)
-    values.push(true)
+    values.push(null);
+    values.push(false);
+    values.push(true);
 
     // then numbers
-    values.push(1)
-    values.push(2)
-    values.push(3.0)
-    values.push(4)
+    values.push(1);
+    values.push(2);
+    values.push(3.0);
+    values.push(4);
 
     // then text, case sensitive
-    values.push("a")
-    values.push("A")
-    values.push("aa")
-    values.push("b")
-    values.push("B")
-    values.push("ba")
-    values.push("bb")
+    values.push("a");
+    values.push("A");
+    values.push("aa");
+    values.push("b");
+    values.push("B");
+    values.push("ba");
+    values.push("bb");
 
     // then arrays. compared element by element until different.
     // Longer arrays sort after their prefixes
-    values.push(["a"])
-    values.push(["b"])
-    values.push(["b","c"])
-    values.push(["b","c", "a"])
-    values.push(["b","d"])
-    values.push(["b","d", "e"])
+    values.push(["a"]);
+    values.push(["b"]);
+    values.push(["b","c"]);
+    values.push(["b","c", "a"]);
+    values.push(["b","d"]);
+    values.push(["b","d", "e"]);
 
     // then object, compares each key value in the list until different.
     // larger objects sort after their subset objects.
-    values.push({a:1})
-    values.push({a:2})
-    values.push({b:1})
-    values.push({b:2})
-    values.push({b:2, a:1}) // Member order does matter for collation.
-                            // CouchDB preserves member order
-                            // but doesn't require that clients will.
-                            // (this test might fail if used with a js engine
-                            // that doesn't preserve order)
-    values.push({b:2, c:2})
+    values.push({a:1});
+    values.push({a:2});
+    values.push({b:1});
+    values.push({b:2});
+    values.push({b:2, a:1}); // Member order does matter for collation.
+                             // CouchDB preserves member order
+                             // but doesn't require that clients will.
+                             // (this test might fail if used with a js engine
+                             // that doesn't preserve order)
+    values.push({b:2, c:2});
 
     for (var i=0; i<values.length; i++) {
       db.save({_id:(i).toString(), foo:values[i]});
     }
 
-    var queryFun = function(doc) { emit(doc.foo, null); }
+    var queryFun = function(doc) { emit(doc.foo, null); };
     var rows = db.query(queryFun).rows;
     for (i=0; i<values.length; i++) {
-      T(equals(rows[i].key, values[i]))
+      T(equals(rows[i].key, values[i]));
     }
 
     // everything has collated correctly. Now to check the descending output
-    rows = db.query(queryFun, null, {descending: true}).rows
+    rows = db.query(queryFun, null, {descending: true}).rows;
     for (i=0; i<values.length; i++) {
-      T(equals(rows[i].key, values[values.length - 1 -i]))
+      T(equals(rows[i].key, values[values.length - 1 -i]));
     }
 
     // now check the key query args
     for (i=1; i<values.length; i++) {
-      var queryOptions = {key:values[i]}
+      var queryOptions = {key:values[i]};
       rows = db.query(queryFun, null, queryOptions).rows;
-      T(rows.length == 1 && equals(rows[0].key, values[i]))
+      T(rows.length == 1 && equals(rows[0].key, values[i]));
     }
   },
 
@@ -2316,7 +2316,7 @@ var tests = {
     T(xhr.status == 201);
 
     // extract the ETag header values
-    var etag = xhr.getResponseHeader("etag")
+    var etag = xhr.getResponseHeader("etag");
 
     // get the doc and verify the headers match
     xhr = CouchDB.request("GET", "/test_suite_db/1");
@@ -2337,13 +2337,13 @@ var tests = {
 
     // extract the new ETag value
     var etagOld= etag;
-    etag = xhr.getResponseHeader("etag")
+    etag = xhr.getResponseHeader("etag");
 
     // fail to replace a doc
     xhr = CouchDB.request("PUT", "/test_suite_db/1", {
       body: "{}"
     });
-    T(xhr.status == 409)
+    T(xhr.status == 409);
 
     // verify get w/Etag
     xhr = CouchDB.request("GET", "/test_suite_db/1", {
@@ -2365,7 +2365,7 @@ var tests = {
     xhr = CouchDB.request("DELETE", "/test_suite_db/1", {
       headers: {"if-match": etag}
     });
-    T(xhr.status == 200)
+    T(xhr.status == 200);
   },
 
    show_documents: function(debug) {
