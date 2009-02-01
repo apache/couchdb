@@ -56,8 +56,6 @@ local-clean: maintainer-clean
 	rm -f $(top_srcdir)/configure
 	rm -f $(top_srcdir)/*.tar.gz
 	rm -f $(top_srcdir)/*.tar.gz.*
-	rm -fr $(top_srcdir)/build-aux
-	rm -fr $(top_srcdir)/m4
 	rm -fr $(top_srcdir)/tmp
 	find $(top_srcdir) -name Makefile.in -exec rm {} \;
 
