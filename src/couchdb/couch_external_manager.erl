@@ -19,7 +19,8 @@
 -include("couch_db.hrl").
 
 start_link() ->
-    gen_server:start_link({local, couch_external_manager}, couch_external_manager, [], []).
+    gen_server:start_link({local, couch_external_manager}, 
+        couch_external_manager, [], []).
 
 execute(UrlName, JsonReq) ->
     Pid = gen_server:call(couch_external_manager, {get, UrlName}),
@@ -37,10 +38,6 @@ config_change("external", UrlName) ->
 
 init([]) ->
     Handlers = ets:new(couch_external_manager_handlers, [set, private]),
-    lists:foreach(fun({UrlName, Command}) ->
-        {ok, Pid} = couch_external_server:start_link(UrlName, Command),
-        true = ets:insert(Handlers, {UrlName, Pid})
-    end, couch_config:get("external")),
     couch_config:register(fun config_change/2),
     {ok, Handlers}.
 
@@ -52,14 +49,21 @@ terminate(_Reason, Handlers) ->
     ok.
 
 handle_call({get, UrlName}, _From, Handlers) ->
-    Resp = case ets:lookup(Handlers, UrlName) of
-    [{UrlName, Pid}] ->
-        Pid;
+    case ets:lookup(Handlers, UrlName) of
     [] ->
-        Mesg = lists:flatten(io_lib:format("No server configured for ~p.", [UrlName])),
-        {error, {unknown_external_server, Mesg}}
-    end,
-    {reply, Resp, Handlers};
+        case couch_config:get("external", UrlName, nil) of
+        nil ->
+            Mesg = lists:flatten(
+                io_lib:format("No server configured for ~p.", [UrlName])),
+            {reply, {error, {unknown_external_server, Mesg}}, Handlers};
+        Command ->
+            {ok, NewPid} = couch_external_server:start_link(UrlName, Command),
+            true = ets:insert(Handlers, {UrlName, NewPid}),
+            {reply, NewPid, Handlers}
+        end;
+    [{UrlName, Pid}] ->
+        {reply, Pid, Handlers}
+    end;
 handle_call({config, UrlName}, _From, Handlers) ->
     % A newly added handler and a handler that had it's command
     % changed are treated exactly the same.
@@ -68,25 +72,17 @@ handle_call({config, UrlName}, _From, Handlers) ->
     case ets:lookup(Handlers, UrlName) of
     [{UrlName, Pid}] ->
         couch_external_server:stop(Pid);
-    _ ->
+    [] ->
         ok
     end,
-    case couch_config:get("external", UrlName, nil) of
-    % Handler no longer exists
-    nil ->
-        ok;
-    % New handler start up.
-    Command ->
-        {ok, NewPid} = couch_external_server:start_link(UrlName, Command),
-        true = ets:insert(Handlers, {Command, NewPid})
-    end,
+    % Wait for next request to boot the handler.
     {reply, ok, Handlers}.
 
 handle_cast(_Whatever, State) ->
     {noreply, State}.
 
 handle_info({'EXIT', Reason, Pid}, Handlers) ->
-    ?LOG_DEBUG("External server ~p died. (reason: ~p)", [Pid, Reason]),
+    ?LOG_DEBUG("EXTERNAL: Server ~p died. (reason: ~p)", [Pid, Reason]),
     % Remove Pid from the handlers table so we don't try closing
     % it a second time in terminate/2.
     ets:match_delete(Handlers, {'_', Pid}),
