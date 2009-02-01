@@ -15,7 +15,7 @@
 
 -export([start_link/0,fold/4,fold/5,less_json/2,less_json_keys/2,expand_dups/2,
     detuple_kvs/2,init/1,terminate/2,handle_call/3,handle_cast/2,handle_info/2,
-    code_change/3,get_reduce_view/4,get_temp_reduce_view/4,get_temp_map_view/3,
+    code_change/3,get_reduce_view/4,get_temp_reduce_view/5,get_temp_map_view/4,
     get_map_view/4,get_row_count/1,reduce_to_count/1,fold_reduce/7,
     extract_map_view/1]).
 
@@ -28,9 +28,9 @@
 start_link() ->
     gen_server:start_link({local, couch_view}, couch_view, [], []).
 
-get_temp_updater(DbName, Type, MapSrc, RedSrc) ->
+get_temp_updater(DbName, Type, DesignOptions, MapSrc, RedSrc) ->
     {ok, Pid} = gen_server:call(couch_view,
-            {start_temp_updater, DbName, Type, MapSrc, RedSrc}),
+            {start_temp_updater, DbName, Type, DesignOptions, MapSrc, RedSrc}),
     Pid.
 
 get_group_server(DbName, GroupId) ->
@@ -51,17 +51,17 @@ get_group(Db, GroupId, Stale) ->
             MinUpdateSeq).
 
 
-get_temp_group(Db, Type, MapSrc, RedSrc) ->
+get_temp_group(Db, Type, DesignOptions, MapSrc, RedSrc) ->
     couch_view_group:request_group(
-            get_temp_updater(couch_db:name(Db), Type, MapSrc, RedSrc),
+            get_temp_updater(couch_db:name(Db), Type, DesignOptions, MapSrc, RedSrc),
             couch_db:get_update_seq(Db)).
 
 get_row_count(#view{btree=Bt}) ->
     {ok, {Count, _Reds}} = couch_btree:full_reduce(Bt),
     {ok, Count}.
 
-get_temp_reduce_view(Db, Type, MapSrc, RedSrc) ->
-    {ok, #group{views=[View]}} = get_temp_group(Db, Type, MapSrc, RedSrc),
+get_temp_reduce_view(Db, Type, DesignOptions, MapSrc, RedSrc) ->
+    {ok, #group{views=[View]}} = get_temp_group(Db, Type, DesignOptions, MapSrc, RedSrc),
     {ok, {temp_reduce, View}}.
 
 
@@ -136,8 +136,8 @@ get_key_pos(Key, [_|Rest], N) ->
     get_key_pos(Key, Rest, N+1).
 
 
-get_temp_map_view(Db, Type, Src) ->
-    {ok, #group{views=[View]}} = get_temp_group(Db, Type, Src, []),
+get_temp_map_view(Db, Type, DesignOptions, Src) ->
+    {ok, #group{views=[View]}} = get_temp_group(Db, Type, DesignOptions, Src, []),
     {ok, View}.
 
 get_map_view(Db, GroupId, Name, Stale) ->
@@ -220,8 +220,9 @@ terminate(_Reason,_State) ->
     ok.
 
 
-handle_call({start_temp_updater, DbName, Lang, MapSrc, RedSrc}, _From, #server{root_dir=Root}=Server) ->    
-    <<SigInt:128/integer>> = erlang:md5(term_to_binary({Lang, MapSrc, RedSrc})),
+handle_call({start_temp_updater, DbName, Lang, DesignOptions, MapSrc, RedSrc},
+                                                _From, #server{root_dir=Root}=Server) ->
+    <<SigInt:128/integer>> = erlang:md5(term_to_binary({Lang, DesignOptions, MapSrc, RedSrc})),
     Name = lists:flatten(io_lib:format("_temp_~.36B",[SigInt])),
     Pid = 
     case ets:lookup(group_servers_by_name, {DbName, Name}) of
@@ -235,7 +236,7 @@ handle_call({start_temp_updater, DbName, Lang, MapSrc, RedSrc}, _From, #server{r
             ok
         end,
         ?LOG_DEBUG("Spawning new temp update process for db ~s.", [DbName]),
-        {ok, NewPid} = couch_view_group:start_link({slow_view, DbName, Fd, Lang, MapSrc, RedSrc}),
+        {ok, NewPid} = couch_view_group:start_link({slow_view, DbName, Fd, Lang, DesignOptions, MapSrc, RedSrc}),
         true = ets:insert(couch_temp_group_fd_by_db, {DbName, Fd, Count + 1}),
         add_to_ets(NewPid, DbName, Name),
         NewPid;

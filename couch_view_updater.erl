@@ -90,43 +90,52 @@ purge_index(#group{db=Db, views=Views, id_btree=IdBtree}=Group) ->
             views=Views2,
             purge_seq=couch_db:get_purge_seq(Db)}.
 
-process_doc(Db, DocInfo, {Docs, #group{sig=Sig,name=GroupId}=Group, ViewKVs,
+process_doc(Db, DocInfo, {Docs, #group{sig=Sig,name=GroupId,design_options=DesignOptions}=Group, ViewKVs,
         DocIdViewIdKeys}) ->
     % This fun computes once for each document        
     #doc_info{id=DocId, deleted=Deleted} = DocInfo,
-    case DocId of
-    GroupId ->
+    IncludeDesign = proplists:get_value(<<"include_design">>, 
+        DesignOptions, false),
+    case {IncludeDesign, DocId} of
+    {_, GroupId} ->
         % uh oh. this is the design doc with our definitions. See if
         % anything in the definition changed.
-        case couch_db:open_doc(Db, DocInfo) of
+        case couch_db:open_doc(Db, DocInfo, [conflicts, deleted_conflicts]) of
         {ok, Doc} ->
             case couch_view_group:design_doc_to_view_group(Doc) of
             #group{sig=Sig} ->
                 % The same md5 signature, keep on computing
-                {Docs, Group, ViewKVs, DocIdViewIdKeys};
+                case IncludeDesign of
+                true ->
+                    {[Doc | Docs], Group, ViewKVs, DocIdViewIdKeys};
+                _ ->
+                    {Docs, Group, ViewKVs, DocIdViewIdKeys}
+                end;
             _ ->
                 exit(reset)
             end;
         {not_found, deleted} ->
             exit(reset)
         end;
-    <<?DESIGN_DOC_PREFIX, _/binary>> -> % we skip design docs
+    {false, <<?DESIGN_DOC_PREFIX, _/binary>>} -> % we skip design docs
         {Docs, Group, ViewKVs, DocIdViewIdKeys};
     _ ->
         {Docs2, DocIdViewIdKeys2} =
         if Deleted ->
             {Docs, [{DocId, []} | DocIdViewIdKeys]};
         true ->
-            {ok, Doc} = couch_db:open_doc(Db, DocInfo, [conflicts, deleted_conflicts]),
+            {ok, Doc} = couch_db:open_doc(Db, DocInfo, 
+                [conflicts, deleted_conflicts]),
             {[Doc | Docs], DocIdViewIdKeys}
         end,
         
         case couch_util:should_flush() of
         true ->
             {Group1, Results} = view_compute(Group, Docs2),
-            {ViewKVs3, DocIdViewIdKeys3} = view_insert_query_results(Docs2, Results, ViewKVs, DocIdViewIdKeys2),
+            {ViewKVs3, DocIdViewIdKeys3} = view_insert_query_results(Docs2, 
+                Results, ViewKVs, DocIdViewIdKeys2),
             {ok, Group2} = write_changes(Group1, ViewKVs3, DocIdViewIdKeys3,
-                    DocInfo#doc_info.update_seq),
+                DocInfo#doc_info.update_seq),
             garbage_collect(),
             ViewEmptyKeyValues = [{View, []} || View <- Group2#group.views],
             {[], Group2, ViewEmptyKeyValues, []};
