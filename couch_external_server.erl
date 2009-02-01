@@ -16,8 +16,6 @@
 -export([start_link/2, stop/1, execute/2]).
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2, code_change/3]). 
 
--define(TIMEOUT, 5000).
-
 -include("couch_db.hrl").
 
 % External API
@@ -34,12 +32,12 @@ execute(Pid, JsonReq) ->
 % Gen Server Handlers
 
 init([Name, Command]) ->
-    ?LOG_INFO("Starting process for: ~s", [Name]),
+    ?LOG_INFO("EXTERNAL: Starting process for: ~s", [Name]),
+    ?LOG_INFO("COMMAND: ~s", [Command]),
     {ok, Pid} = couch_os_process:start_link(Command),
     {ok, {Name, Command, Pid}}.
 
-terminate(_Reason, {Name, _Command, Pid}) ->
-    ?LOG_INFO("External Process Terminating: ~p: ~p", [Name, Pid]),
+terminate(_Reason, {_Name, _Command, Pid}) ->
     couch_os_process:stop(Pid),
     ok.
 
@@ -47,12 +45,13 @@ handle_call({execute, JsonReq}, _From, {Name, Command, Pid}) ->
     {reply, couch_os_process:prompt(Pid, JsonReq), {Name, Command, Pid}}.
 
 handle_info({'EXIT', Pid, Reason}, {Name, Command, Pid}) ->
-    ?LOG_INFO("EXTERNAL: Restarting process for ~s (reason: ~w)", [Name, Reason]),
-    {ok, Pid} = couch_os_process:start_link(Command),
-    {noreply, {Name, Command, Pid}}.
+    ?LOG_INFO("EXTERNAL: Process for ~s exiting. (reason: ~w)", [Name, Reason]),
+    {stop, normal, {Name, Command, Pid}}.
 
-handle_cast(stop, State) ->
-    {stop, normal, State};
+handle_cast(stop, {Name, Command, Pid}) ->
+    ?LOG_INFO("EXTERNAL: Shutting down ~s", [Name]),
+    exit(Pid, normal),
+    {stop, normal, {Name, Command, Pid}};
 handle_cast(_Whatever, State) ->
     {noreply, State}.
 
