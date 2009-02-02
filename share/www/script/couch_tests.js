@@ -2677,10 +2677,14 @@ var tests = {
         }
       },
       lists: {
-        simpleForm: stringFun(function(head, row, req) {
+        simpleForm: stringFun(function(head, row, req, row_number) {
           if (row) {
             // we ignore headers on rows and tail
-            return {body : '\n<li>Key: '+row.key+' Value: '+row.value+'</li>'};
+            return {
+                    body : '\n<li>Key: '+row.key
+                    +' Value: '+row.value
+                    +' LineNo: '+row_number+'</li>'
+            };
           } else if (head) {
             // we return an object (like those used by external and show)
             // so that we can specify headers
@@ -2695,7 +2699,7 @@ var tests = {
             return {body : '</ul>'};
           }
         }),
-        acceptSwitch: stringFun(function(head, row, req) {
+        acceptSwitch: stringFun(function(head, row, req, row_number) {
           return respondWith(req, {
             html : function() {
               // If you're outputting text and you're not setting
@@ -2704,7 +2708,8 @@ var tests = {
                 return "HTML <ul>";
               } else if (row) {
                 return '\n<li>Key: '
-                  +row.key+' Value: '+row.value+'</li>';
+                  +row.key+' Value: '+row.value
+                  +' LineNo: '+row_number+'</li>';
               } else { // tail
                 return "</ul>";
               }
@@ -2747,7 +2752,12 @@ var tests = {
     T(xhr.status == 200);
     T(/Total Rows/.test(xhr.responseText));
     T(/Key: 1/.test(xhr.responseText));
-    
+    T(/LineNo: 0/.test(xhr.responseText));
+    T(/LineNo: 5/.test(xhr.responseText));
+
+    var lines = xhr.responseText.split('\n');
+    T(/LineNo: 5/.test(lines[6]));
+
     // get with query params
     var xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/simpleForm/basicView?startkey=3");
     T(xhr.status == 200);

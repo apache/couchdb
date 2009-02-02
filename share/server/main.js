@@ -13,6 +13,7 @@
 var cmd;
 var funs = [];        // holds functions used for computation
 var map_results = []; // holds temporary emitted values during doc map
+var row_line = {}; // holds row number in list per func
 
 var sandbox = null;
 
@@ -350,18 +351,25 @@ while (cmd = eval(readline())) {
         var listFun = funs[0];
         var head = cmd[1];
         var req = cmd[2];
-        runRenderFunction(listFun, [head, null, req]);
+        row_line[listFun] = 0;
+        runRenderFunction(listFun, [head, null, req, null]);
         break;
       case "list_row":
         var listFun = funs[0];
         var row = cmd[1];
         var req = cmd[2];
-        runRenderFunction(listFun, [null, row, req]);
+        runRenderFunction(listFun, [null, row, req, row_line[listFun]]);
+        row_line[listFun]++;
         break;
       case "list_tail":
         var listFun = funs[0];
         var req = cmd[1];
-        runRenderFunction(listFun, [null, null, req]);
+        var row_number = null;
+        try {
+            row_number = row_line[listFun];
+            delete row_line[listFun];
+        } catch (e) {}
+        runRenderFunction(listFun, [null, null, req, row_number]);
         break;
       default:
         print(toJSON({error: "query_server_error",
