@@ -2974,7 +2974,8 @@ var tests = {
     
     // test that settings can be altered
     xhr = CouchDB.request("PUT", "/_config/test/foo",{
-      body : JSON.stringify("bar")
+      body : JSON.stringify("bar"),
+      headers: {"X-Couch-Persist": "false"}
     });
     T(xhr.status == 200);
     xhr = CouchDB.request("GET", "/_config/test");
