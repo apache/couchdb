@@ -185,7 +185,8 @@ registerType = function() {
 
 registerType("all", "*/*");
 registerType("text", "text/plain", "txt");
-registerType("html", "text/html", "application/xhtml+xml", "xhtml");
+registerType("html", "text/html");
+registerType("xhtml", "application/xhtml+xml", "xhtml");
 registerType("xml", "application/xml", "text/xml", "application/x-xml");
 // http://www.ietf.org/rfc/rfc4627.txt
 registerType("json", "application/json", "text/x-json");
