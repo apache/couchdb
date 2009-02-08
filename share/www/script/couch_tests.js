@@ -32,7 +32,7 @@ var tests = {
     // bug COUCHDB-100: DELETE on non-existent DB returns 500 instead of 404
     db.deleteDb();
     
-    db.createDb();
+db.createDb();
 
     // PUT on existing DB should return 412 instead of 500
     xhr = CouchDB.request("PUT", "/test_suite_db/");
