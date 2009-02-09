@@ -354,25 +354,32 @@ while (cmd = eval(readline())) {
         var listFun = funs[0];
         var head = cmd[1];
         var req = cmd[2];
-        row_line[listFun] = 0;
+        row_line[listFun] = { first_key: null, row_number: 0, prev_key: null };
         runRenderFunction(listFun, [head, null, req, null]);
         break;
       case "list_row":
         var listFun = funs[0];
         var row = cmd[1];
         var req = cmd[2];
-        runRenderFunction(listFun, [null, row, req, row_line[listFun]]);
-        row_line[listFun]++;
+        var row_info = row_line[listFun];
+        runRenderFunction(listFun, [null, row, req, row_info]);
+        if (row_info.first_key == null) {
+            row_info.first_key = row.key;
+        } else {
+            row_info.prev_key = row.key;
+        }
+        row_info.row_number++;
+        row_line[listFun] = row_info;
         break;
       case "list_tail":
         var listFun = funs[0];
         var req = cmd[1];
-        var row_number = null;
+        var row_info = null;
         try {
-            row_number = row_line[listFun];
+            row_info = row_line[listFun];
             delete row_line[listFun];
         } catch (e) {}
-        runRenderFunction(listFun, [null, null, req, row_number]);
+        runRenderFunction(listFun, [null, null, req, row_info]);
         break;
       default:
         print(toJSON({error: "query_server_error",

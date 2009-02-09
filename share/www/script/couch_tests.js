@@ -2677,13 +2677,13 @@ db.createDb();
         }
       },
       lists: {
-        simpleForm: stringFun(function(head, row, req, row_number) {
+        simpleForm: stringFun(function(head, row, req, row_info) {
           if (row) {
             // we ignore headers on rows and tail
             return {
                     body : '\n<li>Key: '+row.key
                     +' Value: '+row.value
-                    +' LineNo: '+row_number+'</li>'
+                    +' LineNo: '+row_info.row_number+'</li>'
             };
           } else if (head) {
             // we return an object (like those used by external and show)
@@ -2696,10 +2696,12 @@ db.createDb();
             };
           } else {
             // tail
-            return {body : '</ul>'};
+            return {body : '</ul>'+
+                '<p>FirstKey: '+row_info.first_key+ 
+                ' LastKey: '+row_info.prev_key+'</p>'};
           }
         }),
-        acceptSwitch: stringFun(function(head, row, req, row_number) {
+        acceptSwitch: stringFun(function(head, row, req, row_info) {
           return respondWith(req, {
             html : function() {
               // If you're outputting text and you're not setting
@@ -2709,9 +2711,10 @@ db.createDb();
               } else if (row) {
                 return '\n<li>Key: '
                   +row.key+' Value: '+row.value
-                  +' LineNo: '+row_number+'</li>';
+                  +' LineNo: '+row_info.row_number+'</li>';
               } else { // tail
-                return "</ul>";
+                return '</ul>';
+
               }
             },
             xml : function() {
@@ -2754,6 +2757,9 @@ db.createDb();
     T(/Key: 1/.test(xhr.responseText));
     T(/LineNo: 0/.test(xhr.responseText));
     T(/LineNo: 5/.test(xhr.responseText));
+    T(/FirstKey: 0/.test(xhr.responseText));
+    T(/LastKey: 9/.test(xhr.responseText));
+
 
     var lines = xhr.responseText.split('\n');
     T(/LineNo: 5/.test(lines[6]));
@@ -2763,6 +2769,9 @@ db.createDb();
     T(xhr.status == 200);
     T(/Total Rows/.test(xhr.responseText));
     T(!(/Key: 1/.test(xhr.responseText)));
+    T(/FirstKey: 3/.test(xhr.responseText));
+    T(/LastKey: 9/.test(xhr.responseText));
+
     
     // with 0 rows
     var xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/simpleForm/basicView?startkey=30");
