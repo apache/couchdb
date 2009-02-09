@@ -142,7 +142,7 @@ var Mimeparse = (function() {
 // this function provides a shortcut for managing responses by Accept header
 respondWith = function(req, responders) {
   var bestKey = null, accept = req.headers["Accept"];
-  if (accept) {
+  if (accept && !req.query.format) {
     var provides = [];
     for (key in responders) {
       if (mimesByKey[key]) {
@@ -151,6 +151,8 @@ respondWith = function(req, responders) {
     }
     var bestMime = Mimeparse.bestMatch(provides, accept);
     bestKey = keysByMime[bestMime];
+  } else {
+    bestKey = req.query.format;
   }
   var rFunc = responders[bestKey || responders.fallback || "html"];
   if (rFunc) {      
