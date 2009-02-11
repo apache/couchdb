@@ -112,12 +112,12 @@ from_json_obj({Props}) ->
         <<"conflicts">>, <<"deleted_conflicts">>, <<"deleted">>],
     % collect all the doc-members that start with "_"
     % if any aren't in the AllowedSpecialMembers list 
-    % then throw a doc_validation error
+    % then throw a invalid_doc error
     [case lists:member(Name, AllowedSpecialMembers) of
         true ->
             ok;
         false ->
-            throw({doc_validation, io_lib:format("Bad special document member: _~s", [Name])})
+            throw({invalid_doc, io_lib:format("Bad special document member: _~s", [Name])})
         end
          || {<<$_,Name/binary>>, _Value} <- Props],
     Revs =
@@ -131,10 +131,14 @@ from_json_obj({Props}) ->
         Revs0
     end,
     case proplists:get_value(<<"_id">>, Props, <<>>) of
+    <<"_design/", _/binary>> = Id -> ok;
+    <<"_local/", _/binary>> = Id -> ok;
+    <<"_", _/binary>> = Id ->
+        throw({invalid_doc, "Document Ids must not start with underscore."});
     Id when is_binary(Id) -> ok;
     Id ->
         ?LOG_DEBUG("Document id is not a string: ~p", [Id]),
-        throw({invalid_document_id, "Document id is not a string"})
+        throw({invalid_doc, "Document id is not a string"})
     end,
     
     % strip out the all props beginning with _
@@ -148,7 +152,7 @@ from_json_obj({Props}) ->
         };
 
 from_json_obj(_Other) ->
-    throw({invalid_json_object, "Document must be a JSON object"}).
+    throw({invalid_doc, "Document must be a JSON object"}).
 
 to_doc_info(FullDocInfo) ->
     {DocInfo, _Path} = to_doc_info_path(FullDocInfo),
