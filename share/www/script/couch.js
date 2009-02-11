@@ -312,7 +312,7 @@ CouchDB.newUuids = function(n) {
     }
     return uuids;
   } else {
-    CouchDB.last_req = CouchDB.request("POST", "/_uuids?count=" + (100 + n));
+    CouchDB.last_req = CouchDB.request("GET", "/_uuids?count=" + (100 + n));
     CouchDB.maybeThrowError(CouchDB.last_req);
     var result = JSON.parse(CouchDB.last_req.responseText);
     CouchDB.uuids_cache =
