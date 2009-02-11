@@ -1482,6 +1482,49 @@ db.createDb();
     T(db.view("test/no_docs") == null);
   },
 
+  invalid_docids: function(debug) {
+    var db = new CouchDB("test_suite_db");
+    db.deleteDb();
+    db.createDb();
+    if (debug) debugger;
+
+    // Test _local explicitly first.
+    T(db.save({"_id": "_local/foo"}).ok);
+    T(db.open("_local/foo")._id == "_local/foo");
+    
+    //Test non-string
+    try {
+      db.save({"_id": 1});
+      T(1 == 0);
+    } catch(e) {
+        T(db.last_req.status == 400);
+        T(e.error == "invalid_doc");
+    }
+
+    // Test invalid _prefix
+    try {
+      db.save({"_id": "_invalid"});
+      T(1 == 0);
+    } catch(e) {
+        T(db.last_req.status == 400);
+        T(e.error == "invalid_doc");
+    }
+
+    // Test _bulk_docs explicitly.
+    var docs = [{"_id": "_design/foo"}, {"_id": "_local/bar"}];
+    T(db.bulkSave(docs).ok);
+    docs.forEach(function(d) {T(db.open(d._id)._id == d._id);});
+
+    docs = [{"_id": "_invalid"}];
+    try {
+      db.bulkSave(docs);
+      T(1 == 0);
+    } catch(e) {
+        T(db.last_req.status == 400);
+        T(e.error == "invalid_doc");
+    }
+  },
+
   view_collation: function(debug) {
     var db = new CouchDB("test_suite_db");
     db.deleteDb();

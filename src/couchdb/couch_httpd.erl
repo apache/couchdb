@@ -372,6 +372,8 @@ send_error(Req, {not_found, Reason}) ->
     send_error(Req, 404, <<"not_found">>, Reason);
 send_error(Req, conflict) ->
     send_error(Req, 409, <<"conflict">>, <<"Document update conflict.">>);
+send_error(Req, {invalid_doc, Reason}) ->
+    send_error(Req, 400, <<"invalid_doc">>, Reason);
 send_error(Req, {forbidden, Msg}) ->
     send_json(Req, 403,
         {[{<<"error">>,  <<"forbidden">>},
