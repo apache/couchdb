@@ -194,10 +194,10 @@ fold(#view{btree=Btree}, StartKey, Dir, Fun, Acc) ->
 
 init([]) ->
     % read configuration settings and register for configuration changes
-    RootDir = couch_config:get("couchdb", "database_dir"),
+    RootDir = couch_config:get("couchdb", "view_index_dir"),
     Self = self(),
     ok = couch_config:register(
-        fun("couchdb", "database_dir")->
+        fun("couchdb", "view_index_dir")->
             exit(Self, config_change)
         end),
         
