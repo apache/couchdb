@@ -38,7 +38,8 @@ ibrowseebin_DATA = \
 
 EXTRA_DIST =  \
     $(ibrowse_file_collection) \
-    $(ibrowseebin_static_file)
+    $(ibrowseebin_static_file) \
+    ibrowse.hrl
 
 CLEANFILES = \
     $(ibrowseebin_make_generated_file_list)
