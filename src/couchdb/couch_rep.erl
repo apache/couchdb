@@ -71,8 +71,11 @@ replicate2(Source, DbSrc, Target, DbTgt, Options) ->
     
     ReplicationStartTime = httpd_util:rfc1123_date(),
     
-    {ok, SrcInstanceStartTime} = get_db_info(DbSrc),
-    {ok, TgtInstanceStartTime} = get_db_info(DbTgt),
+    {ok, InfoSrc} = get_db_info(DbSrc),
+    {ok, InfoTgt} = get_db_info(DbTgt),
+    
+    SrcInstanceStartTime = proplists:get_value(instance_start_time, InfoSrc),
+    TgtInstanceStartTime = proplists:get_value(instance_start_time, InfoTgt),
     
     case proplists:get_value(full, Options, false)
         orelse proplists:get_value("full", Options, false) of
