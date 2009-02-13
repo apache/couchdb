@@ -162,6 +162,7 @@
 
 -record(extern_resp_args, {
     code = 200,
+    stop = false,
     data = <<>>,
     ctype = "application/json",
     headers = []

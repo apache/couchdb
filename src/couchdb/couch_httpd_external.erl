@@ -106,6 +106,8 @@ parse_external_response({Response}) ->
                 Args;
             {<<"code">>, Value} ->
                 Args#extern_resp_args{code=Value};
+            {<<"stop">>, true} ->
+                Args#extern_resp_args{stop=true};
             {<<"json">>, Value} ->
                 Args#extern_resp_args{
                     data=?JSON_ENCODE(Value),

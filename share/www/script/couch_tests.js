@@ -2796,9 +2796,33 @@ db.createDb();
             }
           })
         }),
-        qsParams: stringFun(function(head, row, req, row_number) {
+        qsParams: stringFun(function(head, row, req, row_info) {
           if(head) return {body: req.query.foo};
           else return {body: "\n"};
+        }),
+        stopIter: stringFun(function(head, row, req, row_info) {
+          if(head) {
+            return {body: "head"};
+          } else if(row) {
+            if(row_info.row_number > 2) return {stop: true};
+            return {body: " " + row_info.row_number};
+          } else {
+            return {body: " tail"};
+          }
+        }),
+        stopIter2: stringFun(function(head, row, req, row_info) {
+          return respondWith(req, {
+            html: function() {
+              if(head) {
+                return "head";
+              } else if(row) {
+                if(row_info.row_number > 2) return {stop: true};
+                return " " + row_info.row_number;
+              } else {
+                return " tail";
+              }
+            }
+          });
         })
       }
     };
@@ -2870,6 +2894,15 @@ db.createDb();
     // now with extra qs params
     xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/qsParams/basicView?foo=blam");
     T(xhr.responseText.match(/blam/));
+    
+
+    // aborting iteration
+    xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/stopIter/basicView");
+    T(xhr.responseText.match(/^head 0 1 2 tail$/));
+    xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/stopIter2/basicView");
+    T(xhr.responseText.match(/^head 0 1 2 tail$/));
+
+
   },
 
   compact: function(debug) {

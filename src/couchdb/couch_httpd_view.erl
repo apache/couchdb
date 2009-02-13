@@ -416,13 +416,17 @@ make_view_fold_fun(Req, QueryArgs, Db,
             Offset = ReduceCountFun(OffsetReds),
             {ok, Resp2, BeginBody} = StartRespFun(Req, 200, 
                 TotalViewCount, Offset),
-            SendRowFun(Resp2, Db, 
-                {{Key, DocId}, Value}, BeginBody, IncludeDocs),
-            {ok, {AccLimit - 1, 0, Resp2, AccRevRows}};
+            case SendRowFun(Resp2, Db, 
+                {{Key, DocId}, Value}, BeginBody, IncludeDocs) of
+            stop ->  {stop, {AccLimit - 1, 0, Resp2, AccRevRows}};
+            _ -> {ok, {AccLimit - 1, 0, Resp2, AccRevRows}}
+            end;
         {_, AccLimit, _, Resp} when (AccLimit > 0) ->
-            SendRowFun(Resp, Db, 
-                {{Key, DocId}, Value}, nil, IncludeDocs),
-            {ok, {AccLimit - 1, 0, Resp, AccRevRows}}
+            case SendRowFun(Resp, Db, 
+                {{Key, DocId}, Value}, nil, IncludeDocs) of
+            stop ->  {stop, {AccLimit - 1, 0, Resp, AccRevRows}};
+            _ -> {ok, {AccLimit - 1, 0, Resp, AccRevRows}}
+            end
         end
     end.
 
