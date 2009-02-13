@@ -75,7 +75,7 @@ send_view_list_response(Lang, ListSrc, ViewName, DesignId, Req, Db) ->
     #view_query_args{
         stale = Stale,
         reduce = Reduce
-    } = QueryArgs = couch_httpd_view:parse_view_query(Req),
+    } = QueryArgs = couch_httpd_view:parse_view_query(Req, nil, nil, true),
     case couch_view:get_map_view(Db, DesignId, ViewName, Stale) of
     {ok, View} ->    
         output_map_list(Req, Lang, ListSrc, View, Db, QueryArgs);

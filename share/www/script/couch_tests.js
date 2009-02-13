@@ -2795,6 +2795,10 @@ db.createDb();
               }
             }
           })
+        }),
+        qsParams: stringFun(function(head, row, req, row_number) {
+          if(head) return {body: req.query.foo};
+          else return {body: "\n"};
         })
       }
     };
@@ -2862,6 +2866,10 @@ db.createDb();
     T(xhr.getResponseHeader("Content-Type") == "application/xml");
     T(xhr.responseText.match(/XML/));
     T(xhr.responseText.match(/entry/));
+
+    // now with extra qs params
+    xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/qsParams/basicView?foo=blam");
+    T(xhr.responseText.match(/blam/));
   },
 
   compact: function(debug) {
