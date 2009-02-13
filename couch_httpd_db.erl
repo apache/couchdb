@@ -585,18 +585,31 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
 
 db_attachment_req(#httpd{method=Method}=Req, Db, DocId, FileNameParts)
         when (Method == 'PUT') or (Method == 'DELETE') ->
-    FileName = list_to_binary(mochiweb_util:join(lists:map(fun binary_to_list/1, FileNameParts),"/")),
+    FileName = list_to_binary(mochiweb_util:join(lists:map(fun binary_to_list/1, 
+        FileNameParts),"/")),
     NewAttachment = case Method of
         'DELETE' ->
             [];
         _ ->
+            % see couch_db:doc_flush_binaries for usage of this structure
             [{FileName, {
-                list_to_binary(couch_httpd:header_value(Req,"Content-Type")),
+                case couch_httpd:header_value(Req,"Content-Type") of
+                undefined ->
+                    % We could throw an error here or guess by the FileName.
+                    % Currently, just giving it a default.
+                    <<"application/octet-stream">>;
+                CType ->
+                    list_to_binary(CType)
+                end,
                 case couch_httpd:header_value(Req,"Content-Length") of
                 undefined -> 
-                    throw({bad_request, "Attachment uploads must be fixed length"});
+                    {fun(MaxChunkSize, ChunkFun, InitState) -> 
+                        couch_httpd:recv_chunked(Req, MaxChunkSize, 
+                            ChunkFun, InitState) 
+                    end, undefined};
                 Length -> 
-                    {fun() -> couch_httpd:recv(Req, 0) end, list_to_integer(Length)}
+                    {fun() -> couch_httpd:recv(Req, 0) end,
+                        list_to_integer(Length)}
                 end
             }}]
     end,

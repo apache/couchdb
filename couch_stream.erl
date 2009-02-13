@@ -136,6 +136,7 @@ handle_call(get_state, _From, Stream) ->
     {reply, {Pos, BytesRemaining}, Stream};
 handle_call({set_min_buffer, MinBuffer}, _From, Stream) ->
     {reply, ok, Stream#write_stream{min_alloc = MinBuffer}};
+% set next_alloc if we need more room
 handle_call({ensure_buffer, BufferSizeRequested}, _From, Stream) ->
     #write_stream{bytes_remaining = BytesRemainingInCurrentBuffer} = Stream,
     case BytesRemainingInCurrentBuffer < BufferSizeRequested of
