@@ -15,7 +15,7 @@
 
 -export([handle_view_req/2,handle_temp_view_req/2]).
 
--export([parse_view_query/1,parse_view_query/2,make_view_fold_fun/5,
+-export([parse_view_query/1,parse_view_query/2,parse_view_query/4,make_view_fold_fun/5,
     finish_view_fold/3, view_row_obj/3]).
 
 -import(couch_httpd,
@@ -210,6 +210,8 @@ parse_view_query(Req) ->
 parse_view_query(Req, Keys) ->
     parse_view_query(Req, Keys, nil).
 parse_view_query(Req, Keys, IsReduce) ->
+    parse_view_query(Req, Keys, IsReduce, false).
+parse_view_query(Req, Keys, IsReduce, IgnoreExtra) ->
     QueryList = couch_httpd:qs(Req),
     #view_query_args{
         group_level = GroupLevel
@@ -332,9 +334,14 @@ parse_view_query(Req, Keys, IsReduce) ->
             % we just ignore format, so that JS can have it
             Args;
         _ -> % unknown key
-            Msg = lists:flatten(io_lib:format(
-                "Bad URL query key:~s", [Key])),
-            throw({query_parse_error, Msg})
+            case IgnoreExtra of
+            true ->
+                Args;
+            false ->
+                Msg = lists:flatten(io_lib:format(
+                    "Bad URL query key:~s", [Key])),
+                throw({query_parse_error, Msg})
+            end
         end
     end, #view_query_args{}, QueryList),
     case IsReduce of
