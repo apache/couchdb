@@ -7,6 +7,7 @@ database_dir = %localstatelibdir%
 view_index_dir = %localstatelibdir%
 util_driver_dir = %couchprivlibdir%
 max_document_size = 4294967296 ; 4 GB
+max_attachment_chunk_size = 4294967296 ; 4GB
 view_timeout = 5000 ; 5 seconds
 max_dbs_open = 100
 

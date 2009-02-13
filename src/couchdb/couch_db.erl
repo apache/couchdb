@@ -24,7 +24,6 @@
 -export([start_link/3,make_doc/2,set_admins/2,get_admins/1,ensure_full_commit/1]).
 -export([init/1,terminate/2,handle_call/3,handle_cast/2,code_change/3,handle_info/2]).
 
-
 -include("couch_db.hrl").
 
 
@@ -400,8 +399,14 @@ doc_flush_binaries(Doc, Fd) ->
                 % written to a different file
                 SizeAcc + Len;
             {_Key, {_Type, Bin}} when is_binary(Bin) ->
+                % we have a new binary to write
                 SizeAcc + size(Bin);
+            {_Key, {_Type, {Fun, undefined}}} when is_function(Fun) ->
+                % function without a known length
+                % we'll have to alloc as we go with this one, for now, nothing
+                SizeAcc;
             {_Key, {_Type, {Fun, Len}}} when is_function(Fun) ->
+                % function to yield binary data with known length
                 SizeAcc + Len
             end
         end,
@@ -409,7 +414,6 @@ doc_flush_binaries(Doc, Fd) ->
 
     {ok, OutputStream} = couch_stream:open(Fd),
     ok = couch_stream:ensure_buffer(OutputStream, PreAllocSize),
-
     NewBins = lists:map(
         fun({Key, {Type, BinValue}}) ->
             NewBinValue =
@@ -436,6 +440,18 @@ doc_flush_binaries(Doc, Fd) ->
             Bin when is_binary(Bin) ->
                 {ok, StreamPointer} = couch_stream:write(OutputStream, Bin),
                 {Fd, StreamPointer, size(Bin)};
+            {StreamFun, undefined} when is_function(StreamFun) ->
+                % we will throw an error if the client 
+                % sends a chunk larger than this size
+                MaxChunkSize = list_to_integer(couch_config:get("couchdb", 
+                    "max_attachment_chunk_size","4294967296")),
+                WriterFun = make_writer_fun(OutputStream),
+                % StreamFun(MaxChunkSize, WriterFun) 
+                % will call our WriterFun
+                % once for each chunk of the attachment.
+                {ok, {TotalLength, NewStreamPointer}} = 
+                    StreamFun(MaxChunkSize, WriterFun, {0, nil}),
+                {Fd, NewStreamPointer, TotalLength};                
             {Fun, Len} when is_function(Fun) ->
                 {ok, StreamPointer} =
                         write_streamed_attachment(OutputStream, Fun, Len, nil),
@@ -445,8 +461,27 @@ doc_flush_binaries(Doc, Fd) ->
         end, Bins),
 
     {ok, _FinalPos} = couch_stream:close(OutputStream),
-
     Doc#doc{attachments = NewBins}.
+
+
+make_writer_fun(Stream) ->
+    % WriterFun({Length, Binary}, State)
+    % WriterFun({0, _Footers}, State)
+    % Called with Length == 0 on the last time.
+    % WriterFun returns NewState.
+    fun
+        ({0, _Footers}, {FinalLen, SpFin}) ->
+            % last block, return the final tuple
+            {ok, {FinalLen, SpFin}};
+        ({Length, Bin}, {Total, nil}) ->
+            % save StreamPointer 
+            {ok, StreamPointer} = couch_stream:write(Stream, Bin),
+            {Total+Length, StreamPointer};
+        ({Length, Bin}, {Total, SpAcc}) ->
+            % write the Bin to disk 
+            {ok, _Sp} = couch_stream:write(Stream, Bin),
+            {Total+Length, SpAcc}
+    end.
     
 write_streamed_attachment(_Stream, _F, 0, SpAcc) ->
     {ok, SpAcc};
