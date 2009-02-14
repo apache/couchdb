@@ -441,8 +441,7 @@ doc_flush_binaries(Doc, Fd) ->
                 {ok, StreamPointer} = couch_stream:write(OutputStream, Bin),
                 {Fd, StreamPointer, size(Bin)};
             {StreamFun, undefined} when is_function(StreamFun) ->
-                % we will throw an error if the client 
-                % sends a chunk larger than this size
+                % max_attachment_chunk_size control the max we buffer in memory
                 MaxChunkSize = list_to_integer(couch_config:get("couchdb", 
                     "max_attachment_chunk_size","4294967296")),
                 WriterFun = make_writer_fun(OutputStream),
