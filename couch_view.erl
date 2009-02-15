@@ -61,14 +61,19 @@ get_row_count(#view{btree=Bt}) ->
     {ok, Count}.
 
 get_temp_reduce_view(Db, Type, DesignOptions, MapSrc, RedSrc) ->
-    {ok, #group{views=[View]}} = get_temp_group(Db, Type, DesignOptions, MapSrc, RedSrc),
-    {ok, {temp_reduce, View}}.
+    {ok, #group{views=[View]}=Group} = get_temp_group(Db, Type, DesignOptions, MapSrc, RedSrc),
+    {ok, {temp_reduce, View}, Group}.
 
 
 get_reduce_view(Db, GroupId, Name, Update) ->
     case get_group(Db, GroupId, Update) of
-    {ok, #group{views=Views,def_lang=Lang}} ->
-        get_reduce_view0(Name, Lang, Views);
+    {ok, #group{views=Views,def_lang=Lang}=Group} ->
+        case get_reduce_view0(Name, Lang, Views) of
+        {ok, View} ->
+            {ok, View, Group};
+        Else ->
+            Else
+        end;
     Error ->
         Error
     end.
@@ -137,13 +142,18 @@ get_key_pos(Key, [_|Rest], N) ->
 
 
 get_temp_map_view(Db, Type, DesignOptions, Src) ->
-    {ok, #group{views=[View]}} = get_temp_group(Db, Type, DesignOptions, Src, []),
-    {ok, View}.
+    {ok, #group{views=[View]}=Group} = get_temp_group(Db, Type, DesignOptions, Src, []),
+    {ok, View, Group}.
 
 get_map_view(Db, GroupId, Name, Stale) ->
     case get_group(Db, GroupId, Stale) of
-    {ok, #group{views=Views}} ->
-        get_map_view0(Name, Views);
+    {ok, #group{views=Views}=Group} ->
+        case get_map_view0(Name, Views) of
+        {ok, View} ->
+            {ok, View, Group};
+        Else ->
+            Else
+        end;
     Error ->
         Error
     end.

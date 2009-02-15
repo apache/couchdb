@@ -169,7 +169,7 @@
 }).
 
 -record(group,
-    {type=view, % can also be slow_view
+    {type=view, % can also be temp_view
     sig=nil,
     db=nil,
     fd=nil,
