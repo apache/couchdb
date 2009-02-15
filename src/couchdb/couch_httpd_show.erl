@@ -77,15 +77,15 @@ send_view_list_response(Lang, ListSrc, ViewName, DesignId, Req, Db) ->
         reduce = Reduce
     } = QueryArgs = couch_httpd_view:parse_view_query(Req, nil, nil, true),
     case couch_view:get_map_view(Db, DesignId, ViewName, Stale) of
-    {ok, View} ->    
-        output_map_list(Req, Lang, ListSrc, View, Db, QueryArgs);
+    {ok, View, Group} ->    
+        output_map_list(Req, Lang, ListSrc, View, Group, Db, QueryArgs);
     {not_found, _Reason} ->
         case couch_view:get_reduce_view(Db, DesignId, ViewName, Stale) of
-        {ok, ReduceView} ->
+        {ok, ReduceView, Group} ->
             case Reduce of
             false ->
                 MapView = couch_view:extract_map_view(ReduceView),
-                output_map_list(Req, Lang, ListSrc, MapView, Db, QueryArgs);
+                output_map_list(Req, Lang, ListSrc, MapView, Group, Db, QueryArgs);
             _ ->
                 throw({not_implemented, reduce_view_lists})
             end;
@@ -94,7 +94,7 @@ send_view_list_response(Lang, ListSrc, ViewName, DesignId, Req, Db) ->
         end
     end.
     
-output_map_list(Req, Lang, ListSrc, View, Db, QueryArgs) ->
+output_map_list(#httpd{mochi_req=MReq}=Req, Lang, ListSrc, View, Group, Db, QueryArgs) ->
     #view_query_args{
         limit = Limit,
         direction = Dir,
@@ -104,51 +104,59 @@ output_map_list(Req, Lang, ListSrc, View, Db, QueryArgs) ->
     } = QueryArgs,
     {ok, RowCount} = couch_view:get_row_count(View),
     Start = {StartKey, StartDocId},
-    % get the os process here
-    % pass it into the view fold with closures
-    {ok, QueryServer} = couch_query_servers:start_view_list(Lang, ListSrc),
+    Headers = MReq:get(headers),
+    Hlist = mochiweb_headers:to_list(Headers),
+    Accept = proplists:get_value('Accept', Hlist),
+    CurrentEtag = couch_httpd_view:view_group_etag(Group, {Lang, ListSrc, Accept}),
+    couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
+        % get the os process here
+        % pass it into the view fold with closures
+        {ok, QueryServer} = couch_query_servers:start_view_list(Lang, ListSrc),
 
-    StartListRespFun = fun(Req2, Code, TotalViewCount, Offset) ->
-        JsonResp = couch_query_servers:render_list_head(QueryServer, 
-            Req2, Db, TotalViewCount, Offset),
-        #extern_resp_args{
-            code = Code,
-            data = BeginBody,
-            ctype = CType,
-            headers = Headers
-        } = couch_httpd_external:parse_external_response(JsonResp),
-        JsonHeaders = couch_httpd_external:default_or_content_type(CType, Headers),
-        {ok, Resp} = start_chunked_response(Req, Code, JsonHeaders),
-        {ok, Resp, binary_to_list(BeginBody)}
-    end,
-    
-    SendListRowFun = fun(Resp, Db2, {{Key, DocId}, Value}, 
-        RowFront, _IncludeDocs) ->
-        JsonResp = couch_query_servers:render_list_row(QueryServer, 
-            Req, Db2, {{Key, DocId}, Value}),
-        #extern_resp_args{
-            stop = StopIter,
-            data = RowBody
-        } = couch_httpd_external:parse_external_response(JsonResp),
-        RowFront2 = case RowFront of
-        nil -> [];
-        _ -> RowFront
+        StartListRespFun = fun(Req2, Etag, TotalViewCount, Offset) ->
+            ExternalResp = couch_query_servers:render_list_head(QueryServer, 
+                Req2, Db, TotalViewCount, Offset),
+            JsonResp = apply_etag(ExternalResp, CurrentEtag),
+            #extern_resp_args{
+                code = Code,
+                data = BeginBody,
+                ctype = CType,
+                headers = ExtHeaders
+            } = couch_httpd_external:parse_external_response(JsonResp),
+            JsonHeaders = couch_httpd_external:default_or_content_type(CType, ExtHeaders),
+            % TODO use the Etag
+            {ok, Resp} = start_chunked_response(Req, Code, JsonHeaders),
+            {ok, Resp, binary_to_list(BeginBody)}
         end,
-        case StopIter of
-        true -> stop;
-        _ -> send_chunk(Resp, RowFront2 ++ binary_to_list(RowBody))
-        end
-    end,
     
-    FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, Db, RowCount,
-        #view_fold_helper_funs{
-            reduce_count = fun couch_view:reduce_to_count/1,
-            start_response = StartListRespFun,
-            send_row = SendListRowFun
-        }),
-    FoldAccInit = {Limit, SkipCount, undefined, []},
-    FoldResult = couch_view:fold(View, Start, Dir, FoldlFun, FoldAccInit),
-    finish_view_list(Req, Db, QueryServer, RowCount, FoldResult, StartListRespFun).
+        SendListRowFun = fun(Resp, Db2, {{Key, DocId}, Value}, 
+            RowFront, _IncludeDocs) ->
+            JsonResp = couch_query_servers:render_list_row(QueryServer, 
+                Req, Db2, {{Key, DocId}, Value}),
+            #extern_resp_args{
+                stop = StopIter,
+                data = RowBody
+            } = couch_httpd_external:parse_external_response(JsonResp),
+            RowFront2 = case RowFront of
+            nil -> [];
+            _ -> RowFront
+            end,
+            case StopIter of
+            true -> stop;
+            _ -> send_chunk(Resp, RowFront2 ++ binary_to_list(RowBody))
+            end
+        end,
+    
+        FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db, RowCount,
+            #view_fold_helper_funs{
+                reduce_count = fun couch_view:reduce_to_count/1,
+                start_response = StartListRespFun,
+                send_row = SendListRowFun
+            }),
+        FoldAccInit = {Limit, SkipCount, undefined, []},
+        FoldResult = couch_view:fold(View, Start, Dir, FoldlFun, FoldAccInit),
+        finish_view_list(Req, Db, QueryServer, RowCount, FoldResult, StartListRespFun)
+    end).
 
 finish_view_list(Req, Db, QueryServer, TotalRows, 
     FoldResult, StartListRespFun) ->

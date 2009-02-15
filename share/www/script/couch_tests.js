@@ -2425,17 +2425,87 @@ db.createDb();
     });
     T(xhr.status == 200);
   },
+  etags_views: function(debug) {
+    var db = new CouchDB("test_suite_db");
+    db.deleteDb();
+    db.createDb();
+    if (debug) debugger;
+    
+    var designDoc = {
+      _id:"_design/etags",
+      language: "javascript",
+      views : {
+        basicView : {
+          map : stringFun(function(doc) {
+            emit(doc.integer, doc.string);
+          })
+        },
+        withReduce : {
+          map : stringFun(function(doc) {
+            emit(doc.integer, doc.string);
+          }),
+          reduce : stringFun(function(keys, values, rereduce) {
+            if (rereduce) {
+              return sum(values);
+            } else {
+              return values.length;
+            }
+          })
+        }
+      }
+    }
+    T(db.save(designDoc).ok);
+    var xhr;
+    var docs = makeDocs(0, 10);
+    var saveResult = db.bulkSave(docs);
+    T(saveResult.ok);
+    
+    // verify get w/Etag on map view
+    xhr = CouchDB.request("GET", "/test_suite_db/_view/etags/basicView");
+    T(xhr.status == 200);
+    var etag = xhr.getResponseHeader("etag");
+    xhr = CouchDB.request("GET", "/test_suite_db/_view/etags/basicView", {
+      headers: {"if-none-match": etag}
+    });
+    T(xhr.status == 304);
+    // TODO GET with keys (when that is available)
+    
+    // reduce view
+    xhr = CouchDB.request("GET", "/test_suite_db/_view/etags/withReduce");
+    T(xhr.status == 200);
+    var etag = xhr.getResponseHeader("etag");
+    xhr = CouchDB.request("GET", "/test_suite_db/_view/etags/withReduce", {
+      headers: {"if-none-match": etag}
+    });
+    T(xhr.status == 304);
+    
+    // all docs
+    xhr = CouchDB.request("GET", "/test_suite_db/_all_docs");
+    T(xhr.status == 200);
+    var etag = xhr.getResponseHeader("etag");
+    xhr = CouchDB.request("GET", "/test_suite_db/_all_docs", {
+      headers: {"if-none-match": etag}
+    });
+    T(xhr.status == 304);
+
+    // by seq
+    xhr = CouchDB.request("GET", "/test_suite_db/_all_docs_by_seq");
+    T(xhr.status == 200);
+    var etag = xhr.getResponseHeader("etag");
+    xhr = CouchDB.request("GET", "/test_suite_db/_all_docs_by_seq", {
+      headers: {"if-none-match": etag}
+    });
+    T(xhr.status == 304);    
+
+    // list etag
+    // in the list test for now
+  },
 
    show_documents: function(debug) {
      var db = new CouchDB("test_suite_db");
      db.deleteDb();
      db.createDb();
      if (debug) debugger;
-     
-     function stringFun(fun) {
-       var string = fun.toSource ? fun.toSource() : "(" + fun.toString() + ")";
-       return string;
-     }
          
      var designDoc = {
        _id:"_design/template",
@@ -2706,11 +2776,6 @@ db.createDb();
     db.deleteDb();
     db.createDb();
     if (debug) debugger;
-    
-    function stringFun(fun) {
-      var string = fun.toSource ? fun.toSource() : "(" + fun.toString() + ")";
-      return string;
-    }
         
     var designDoc = {
       _id:"_design/lists",
@@ -2849,6 +2914,13 @@ db.createDb();
 
     var lines = xhr.responseText.split('\n');
     T(/LineNo: 5/.test(lines[6]));
+
+    // test that etags are available
+    var etag = xhr.getResponseHeader("etag");
+    xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/simpleForm/basicView", {
+      headers: {"if-none-match": etag}
+    });
+    T(xhr.status == 304);
 
     // get with query params
     var xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/simpleForm/basicView?startkey=3");
@@ -3311,6 +3383,11 @@ function run_on_modified_server(settings, fun) {
       });
     }
   }
+}
+
+function stringFun(fun) {
+  var string = fun.toSource ? fun.toSource() : "(" + fun.toString() + ")";
+  return string;
 }
 
 function restartServer() {
