@@ -194,14 +194,14 @@ var numFailures = 0;
 function runAllTestsConsole() {
   var numTests = 0;
   var debug = false;
-  for (var t in tests) {
+  for (var t in couchTests) {
     p(t);
     if (t == "utf8") {
       p("We skip the utf8 test because it fails due to problems in couch_js.c");
       p("Run the in-browser tests to verify utf8.\n");
     } else {
       numTests += 1;
-      var testFun = tests[t];
+      var testFun = couchTests[t];
       runTestConsole(testFun, debug);      
     }
   }

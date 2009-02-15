@@ -1,0 +1,144 @@
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License.  You may obtain a copy
+// of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+// License for the specific language governing permissions and limitations under
+// the License.
+
+// Do some basic tests.
+couchTests.basics = function(debug) {
+    var result = JSON.parse(CouchDB.request("GET", "/").responseText);
+    T(result.couchdb == "Welcome"); 
+    
+    var db = new CouchDB("test_suite_db");
+    db.deleteDb();
+
+    // bug COUCHDB-100: DELETE on non-existent DB returns 500 instead of 404
+    db.deleteDb();
+    
+db.createDb();
+
+    // PUT on existing DB should return 412 instead of 500
+    xhr = CouchDB.request("PUT", "/test_suite_db/");
+    T(xhr.status == 412);
+    if (debug) debugger;
+
+    // Get the database info, check the db_name
+    T(db.info().db_name == "test_suite_db");
+
+    // Get the database info, check the doc_count
+    T(db.info().doc_count == 0);
+
+    // create a document and save it to the database
+    var doc = {_id:"0",a:1,b:1};
+    var result = db.save(doc);
+
+    T(result.ok==true); // return object has an ok member with a value true
+    T(result.id); // the _id of the document is set.
+    T(result.rev); // the revision id of the document is set.
+
+    // Verify the input doc is now set with the doc id and rev
+    // (for caller convenience).
+    T(doc._id == result.id && doc._rev == result.rev);
+
+    var id = result.id; // save off the id for later
+
+    // make sure the revs_info status is good
+    var doc = db.open(id, {revs_info:true});
+    T(doc._revs_info[0].status == "available");
+
+    // Create some more documents.
+    // Notice the use of the ok member on the return result.
+    T(db.save({_id:"1",a:2,b:4}).ok);
+    T(db.save({_id:"2",a:3,b:9}).ok);
+    T(db.save({_id:"3",a:4,b:16}).ok);
+
+    // Check the database doc count
+    T(db.info().doc_count == 4);
+
+    // Test a simple map functions
+
+    // create a map function that selects all documents whose "a" member
+    // has a value of 4, and then returns the document's b value.
+    var mapFunction = function(doc){
+      if (doc.a==4)
+        emit(null, doc.b);
+    };
+
+    results = db.query(mapFunction);
+
+    // verify only one document found and the result value (doc.b).
+    T(results.total_rows == 1 && results.rows[0].value == 16);
+
+    // reopen document we saved earlier
+    existingDoc = db.open(id);
+
+    T(existingDoc.a==1);
+
+    //modify and save
+    existingDoc.a=4;
+    db.save(existingDoc);
+
+    // redo the map query
+    results = db.query(mapFunction);
+
+    // the modified document should now be in the results.
+    T(results.total_rows == 2);
+
+    // write 2 more documents
+    T(db.save({a:3,b:9}).ok);
+    T(db.save({a:4,b:16}).ok);
+
+    results = db.query(mapFunction);
+
+    // 1 more document should now be in the result.
+    T(results.total_rows == 3);
+    T(db.info().doc_count == 6);
+
+    var reduceFunction = function(keys, values){
+      return sum(values);
+    };
+
+    results = db.query(mapFunction, reduceFunction);
+
+    T(results.rows[0].value == 33);
+
+    // delete a document
+    T(db.deleteDoc(existingDoc).ok);
+
+    // make sure we can't open the doc
+    T(db.open(existingDoc._id) == null);
+
+    results = db.query(mapFunction);
+
+    // 1 less document should now be in the results.
+    T(results.total_rows == 2);
+    T(db.info().doc_count == 5);
+
+    // make sure we can still open the old rev of the deleted doc
+    T(db.open(existingDoc._id, {rev: existingDoc._rev}) != null);
+    
+    // make sure restart works
+    T(db.ensureFullCommit().ok);
+    restartServer();
+    
+    // make sure we can still open
+    T(db.open(existingDoc._id, {rev: existingDoc._rev}) != null);
+    
+    // test that the POST response has a Location header
+    var xhr = CouchDB.request("POST", "/test_suite_db", {
+      body: JSON.stringify({"foo":"bar"})
+    });
+    var resp = JSON.parse(xhr.responseText);
+    T(resp.ok);
+    var loc = xhr.getResponseHeader("Location");
+    T(loc, "should have a Location header");
+    var locs = loc.split('/');
+    T(locs[4] == resp.id);
+    T(locs[3] == "test_suite_db");    
+  };
