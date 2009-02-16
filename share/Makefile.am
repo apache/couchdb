@@ -71,4 +71,46 @@ nobase_dist_localdata_DATA = \
     www/script/jquery.resizer.js \
     www/script/jquery.suggest.js \
     www/script/json2.js \
+    www/script/test/basics.js \
+    www/script/test/delayed_commits.js \
+    www/script/test/all_docs.js \
+    www/script/test/conflicts.js \
+    www/script/test/recreate_doc.js \
+    www/script/test/copy_move_doc.js \
+    www/script/test/uuids.js \
+    www/script/test/bulk_docs.js \
+    www/script/test/lots_of_docs.js \
+    www/script/test/reduce.js \
+    www/script/test/reduce_false.js \
+    www/script/test/design_options.js \
+    www/script/test/multiple_rows.js \
+    www/script/test/large_docs.js \
+    www/script/test/utf8.js \
+    www/script/test/attachments.js \
+    www/script/test/attachment_paths.js \
+    www/script/test/attachment_views.js \
+    www/script/test/design_paths.js \
+    www/script/test/content_negotiation.js \
+    www/script/test/design_docs.js \
+    www/script/test/invalid_docids.js \
+    www/script/test/view_collation.js \
+    www/script/test/view_conflicts.js \
+    www/script/test/view_errors.js \
+    www/script/test/view_include_docs.js \
+    www/script/test/view_multi_key_all_docs.js \
+    www/script/test/view_multi_key_design.js \
+    www/script/test/view_multi_key_temp.js \
+    www/script/test/view_pagination.js \
+    www/script/test/view_sandboxing.js \
+    www/script/test/view_xml.js \
+    www/script/test/replication.js \
+    www/script/test/etags_head.js \
+    www/script/test/etags_views.js \
+    www/script/test/show_documents.js \
+    www/script/test/list_views.js \
+    www/script/test/compact.js \
+    www/script/test/purge.js \
+    www/script/test/config.js \
+    www/script/test/security_validation.js \
+    www/script/test/max_dbs_open.js \
     www/style/layout.css
