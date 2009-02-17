@@ -20,7 +20,6 @@
 -export([open/1, open/2, close/1, pread/3, pwrite/3, expand/2, bytes/1, sync/1]).
 -export([append_term/2, pread_term/2,write_header/3, read_header/2, truncate/2]).
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, code_change/3, handle_info/2]).
--export([close_maybe/1,drop_ref/1,drop_ref/2,add_ref/1,add_ref/2,num_refs/1]).
 
 %%----------------------------------------------------------------------
 %% Args:   Valid Options are [create] and [create,overwrite].
@@ -168,26 +167,6 @@ close(Fd) ->
     Result = gen_server:cast(Fd, close),
     catch unlink(Fd),
     Result.
-    
-close_maybe(Fd) ->
-    catch unlink(Fd),
-    catch gen_server:cast(Fd, close_maybe).
-
-drop_ref(Fd) ->
-    drop_ref(Fd, self()).
-    
-drop_ref(Fd, Pid) ->
-    gen_server:cast(Fd, {drop_ref, Pid}).
-
-
-add_ref(Fd) ->
-    add_ref(Fd, self()).
-
-add_ref(Fd, Pid) ->
-    gen_server:call(Fd, {add_ref, Pid}).
-
-num_refs(Fd) ->
-    gen_server:call(Fd, num_refs).
 
 
 write_header(Fd, Prefix, Data) ->
@@ -291,7 +270,6 @@ init_status_error(ReturnPid, Ref, Error) ->
 % server functions
 
 init({Filepath, Options, ReturnPid, Ref}) ->
-    process_flag(trap_exit, true),
     case lists:member(create, Options) of
     true ->
         filelib:ensure_dir(Filepath),
@@ -357,66 +335,15 @@ handle_call({append_bin, Bin}, _From, Fd) ->
 handle_call({pread_bin, Pos}, _From, Fd) ->
     {ok, <<TermLen:32>>} = file:pread(Fd, Pos, 4),
     {ok, Bin} = file:pread(Fd, Pos + 4, TermLen),
-    {reply, {ok, Bin}, Fd};
-handle_call({add_ref, Pid},_From, Fd) ->
-    case get(Pid) of
-    undefined ->
-        put(Pid, {erlang:monitor(process, Pid), 1});
-    {MonRef, RefCnt} ->
-        put(Pid, {MonRef, RefCnt + 1})
-    end,
-    {reply, ok, Fd};
-handle_call(num_refs, _From, Fd) ->
-    {monitors, Monitors} =  process_info(self(), monitors),
-    {reply, length(Monitors), Fd}.
+    {reply, {ok, Bin}, Fd}.
 
 
 handle_cast(close, Fd) ->
-    {stop,normal,Fd};
-handle_cast(close_maybe, Fd) ->
-    maybe_close_async(Fd);
-handle_cast({drop_ref, Pid}, Fd) ->
-    case get(Pid) of
-    {MonRef, 1} ->
-        erase(Pid),
-        % don't check return of demonitor. The process could haved crashed causing
-        % the {'DOWN', ...} message to be sent and the process unmonitored.
-        erlang:demonitor(MonRef, [flush]);
-    {MonRef, Num} ->
-        put(Pid, {MonRef, Num-1})
-    end,
-    maybe_close_async(Fd).
+    {stop,normal,Fd}.
 
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-handle_info({'EXIT', _Pid, Reason}, Fd) ->
-    {stop, Reason, Fd};
-handle_info({'DOWN', MonitorRef, _Type, Pid, _Info}, Fd) ->
-    {MonitorRef, _RefCount} = erase(Pid),
-    maybe_close_async(Fd).
-
-
-
-should_close(_Fd) ->
-    case process_info(self(), links) of
-    {links, [_]} ->
-        % no linkers left (except our fd port). What about monitors?
-        case process_info(self(), monitors) of
-        {monitors, []} ->
-            true;
-        _ ->
-            false
-        end;
-    {links,  [_|_]} ->
-        false
-    end.
-
-maybe_close_async(Fd) ->
-    case should_close(Fd) of
-    true ->
-        {stop,normal,Fd};
-    false ->
-        {noreply,Fd}
-    end.
+handle_info(foo, Fd) ->
+    {stop, foo, Fd}.

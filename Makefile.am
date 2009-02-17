@@ -62,6 +62,7 @@ source_files = \
     couch_log.erl \
     couch_os_process.erl \
     couch_query_servers.erl \
+    couch_ref_counter.erl \
     couch_rep.erl \
     couch_server.erl \
     couch_server_sup.erl \
@@ -99,6 +100,7 @@ compiled_files = \
     couch_log.beam \
     couch_os_process.beam \
     couch_query_servers.beam \
+    couch_ref_counter.beam \
     couch_rep.beam \
     couch_server.beam \
     couch_server_sup.beam \
