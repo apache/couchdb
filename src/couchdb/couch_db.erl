@@ -14,7 +14,7 @@
 -behaviour(gen_server).
 
 -export([open/2,close/1,create/2,start_compact/1,get_db_info/1]).
--export([open_ref_counted/2,num_refs/1,monitor/1,count_changes_since/2]).
+-export([open_ref_counted/2,is_idle/1,monitor/1,count_changes_since/2]).
 -export([update_doc/3,update_docs/4,update_docs/2,update_docs/3,delete_doc/3]).
 -export([get_doc_info/2,open_doc/2,open_doc/3,open_doc_revs/4]).
 -export([get_missing_revs/2,name/1,doc_to_tree/1,get_update_seq/1,get_committed_update_seq/1]).
@@ -67,15 +67,15 @@ ensure_full_commit(#db{update_pid=UpdatePid,instance_start_time=StartTime}) ->
     ok = gen_server:call(UpdatePid, full_commit, infinity),
     {ok, StartTime}.
 
-close(#db{fd=Fd}) ->
-    couch_file:drop_ref(Fd).
+close(#db{fd_ref_counter=RefCntr}) ->
+    couch_ref_counter:drop(RefCntr).
 
 open_ref_counted(MainPid, UserCtx) ->
-    {ok, Db} = gen_server:call(MainPid, {open_ref_counted_instance, self()}),
+    {ok, Db} = gen_server:call(MainPid, {open_ref_count, self()}),
     {ok, Db#db{user_ctx=UserCtx}}.
 
-num_refs(MainPid) ->
-    gen_server:call(MainPid, num_refs).
+is_idle(MainPid) ->
+    gen_server:call(MainPid, is_idle).
 
 monitor(#db{main_pid=MainPid}) ->
     erlang:monitor(process, MainPid).
@@ -530,23 +530,28 @@ enum_docs(Db, StartId, InFun, Ctx) ->
 
 init({DbName, Filepath, Fd, Options}) ->
     {ok, UpdaterPid} = gen_server:start_link(couch_db_updater, {self(), DbName, Filepath, Fd, Options}, []),
-    ok = couch_file:add_ref(Fd),
-    gen_server:call(UpdaterPid, get_db).
+    {ok, #db{fd_ref_counter=RefCntr}=Db} = gen_server:call(UpdaterPid, get_db),
+    couch_ref_counter:add(RefCntr),
+    {ok, Db}.
 
 terminate(_Reason, _Db) ->
     ok.
     
-handle_call({open_ref_counted_instance, OpenerPid}, _From, #db{fd=Fd}=Db) ->
-    ok = couch_file:add_ref(Fd, OpenerPid),
+handle_call({open_ref_count, OpenerPid}, _, #db{fd_ref_counter=RefCntr}=Db) ->
+    ok = couch_ref_counter:add(RefCntr, OpenerPid),
     {reply, {ok, Db}, Db};
-handle_call(num_refs, _From, #db{fd=Fd}=Db) ->
-    {reply, couch_file:num_refs(Fd) - 1, Db};
-handle_call({db_updated, #db{fd=NewFd}=NewDb}, _From, #db{fd=OldFd}) ->
-    case NewFd == OldFd of
+handle_call(is_idle, _From,
+        #db{fd_ref_counter=RefCntr, compactor_pid=Compact}=Db) ->
+    % Idle means no referrers. Unless in the middle of a compaction file switch, 
+    % there are always at least 2 referrers, couch_db_updater and us.
+    {reply, (Compact == nil) and (couch_ref_counter:count(RefCntr) == 2), Db};
+handle_call({db_updated, #db{fd_ref_counter=NewRefCntr}=NewDb}, _From,
+        #db{fd_ref_counter=OldRefCntr}) ->
+    case NewRefCntr == OldRefCntr of
     true -> ok;
     false ->
-        couch_file:add_ref(NewFd),
-        couch_file:drop_ref(OldFd)
+        couch_ref_counter:add(NewRefCntr),
+        couch_ref_counter:drop(OldRefCntr)
     end,
     {reply, ok, NewDb}.
 

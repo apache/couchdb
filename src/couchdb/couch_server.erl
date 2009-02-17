@@ -195,15 +195,15 @@ try_close_lru(StartTime) ->
     true ->
         [{_, DbName}] = ets:lookup(couch_dbs_by_lru, LruTime),
         [{_, {MainPid, LruTime}}] = ets:lookup(couch_dbs_by_name, DbName),
-        case couch_db:num_refs(MainPid) of
-        0 ->
+        case couch_db:is_idle(MainPid) of
+        true ->
             exit(MainPid, kill),
             receive {'EXIT', MainPid, _Reason} -> ok end,
             true = ets:delete(couch_dbs_by_lru, LruTime),
             true = ets:delete(couch_dbs_by_name, DbName),
             true = ets:delete(couch_dbs_by_pid, MainPid),
             ok;
-        _NumRefs ->
+        false ->
             % this still has referrers. Go ahead and give it a current lru time
             % and try the next one in the table.
             NewLruTime = now(),

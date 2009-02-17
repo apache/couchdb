@@ -22,7 +22,6 @@
 -define(HEADER_SIG, <<$g, $m, $k, 0>>).
 
 init({MainPid, DbName, Filepath, Fd, Options}) ->
-    link(Fd),
     case lists:member(create, Options) of
     true ->
         % create a new header and writes it to the file
@@ -38,8 +37,8 @@ init({MainPid, DbName, Filepath, Fd, Options}) ->
     Db2 = refresh_validate_doc_funs(Db),
     {ok, Db2#db{main_pid=MainPid}}.
 
-terminate(_Reason, Db) ->
-    close_db(Db).
+terminate(_Reason, _Db) ->
+    ok.
 
 handle_call(get_db, _From, Db) ->
     {reply, {ok, Db}, Db};
@@ -175,7 +174,7 @@ handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
         ok = file:rename(CompactFilepath, Filepath),
         
         couch_stream:close(Db#db.summary_stream),
-        couch_file:close_maybe(Db#db.fd),
+        couch_ref_counter:drop(Db#db.fd_ref_counter),
             
         ok = gen_server:call(Db#db.main_pid, {db_updated, NewDb2}),
         ?LOG_INFO("Compaction for db \"~s\" completed.", [Db#db.name]),
@@ -284,10 +283,11 @@ init_db(DbName, Filepath, Fd, Header0) ->
     {MegaSecs, Secs, MicroSecs} = now(),
     StartTime = ?l2b(io_lib:format("~p",
             [(MegaSecs*1000000*1000000) + (Secs*1000000) + MicroSecs])),
-    
+    {ok, RefCntr} = couch_ref_counter:start([Fd]),
     #db{
         update_pid=self(),
         fd=Fd,
+        fd_ref_counter = RefCntr,
         header=Header,
         summary_stream = SummaryStream,
         fulldocinfo_by_id_btree = IdBtree,
@@ -301,10 +301,6 @@ init_db(DbName, Filepath, Fd, Header0) ->
         instance_start_time = StartTime
         }.
 
-
-close_db(#db{fd=Fd,summary_stream=Ss}) ->
-    couch_file:close(Fd),
-    couch_stream:close(Ss).
 
 refresh_validate_doc_funs(Db) ->
     {ok, DesignDocs} = get_design_docs(Db),
@@ -641,8 +637,7 @@ start_copy_compact(#db{name=Name,filepath=Filepath}=Db) ->
         ok = couch_file:write_header(Fd, ?HEADER_SIG, Header=#db_header{})
     end,
     NewDb = init_db(Name, CompactFile, Fd, Header),
-    NewDb2 = copy_compact(Db, NewDb, Retry),
-    close_db(NewDb2),
+    _NewDb2 = copy_compact(Db, NewDb, Retry),
     
     gen_server:cast(Db#db.update_pid, {compact_done, CompactFile}).
     

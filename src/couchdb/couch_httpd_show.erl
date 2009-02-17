@@ -113,7 +113,7 @@ output_map_list(#httpd{mochi_req=MReq}=Req, Lang, ListSrc, View, Group, Db, Quer
         % pass it into the view fold with closures
         {ok, QueryServer} = couch_query_servers:start_view_list(Lang, ListSrc),
 
-        StartListRespFun = fun(Req2, Etag, TotalViewCount, Offset) ->
+        StartListRespFun = fun(Req2, _Etag, TotalViewCount, Offset) ->
             ExternalResp = couch_query_servers:render_list_head(QueryServer, 
                 Req2, Db, TotalViewCount, Offset),
             JsonResp = apply_etag(ExternalResp, CurrentEtag),

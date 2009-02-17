@@ -122,6 +122,7 @@
     compactor_pid=nil,
     instance_start_time, % number of microsecs since jan 1 1970 as a binary string
     fd,
+    fd_ref_counter,
     header = #db_header{},
     summary_stream,
     fulldocinfo_by_id_btree,
