@@ -70,7 +70,10 @@ decoder(Options) ->
 %% @spec decode(iolist()) -> json_term()
 %% @doc Decode the given iolist to Erlang terms.
 decode(S) ->
-    json_decode(S, #decoder{}).
+    try json_decode(S, #decoder{})
+    catch
+        _:_ -> throw({invalid_json, S})
+    end.
 
 test() ->
     test_all().

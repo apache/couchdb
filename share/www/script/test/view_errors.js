@@ -40,4 +40,13 @@ couchTests.view_errors = function(debug) {
     emit([doc._id, doc.undef], null);
   });
   T(results.total_rows == 0);
+  
+  // querying a view with invalid params should give a resonable error message
+  var xhr = CouchDB.request("POST", "/test_suite_db/_temp_view?startkey=foo", {
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({language: "javascript", 
+      map : "function(doc){emit(doc.integer)}"
+    })
+  });
+  T(JSON.parse(xhr.responseText).error == "invalid_json");
 };
