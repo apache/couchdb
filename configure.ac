@@ -76,7 +76,7 @@ AC_ARG_WITH([js-lib], [AC_HELP_STRING([--with-js-lib=PATH],
 
 AC_ARG_VAR([FLAGS], [general flags to prepend to LDFLAGS and CPPFLAGS])
 
-LIB_FLAGS="170$JS_LIB_FLAGS -L/usr/local/lib -L/opt/local/lib"
+LIB_FLAGS="$JS_LIB_FLAGS -L/usr/local/lib -L/opt/local/lib"
 LIBS="$LIB_FLAGS $LIBS"
 # XP_UNIX required for jsapi.h and has been tested to work on Linux and Darwin.
 FLAGS="$LIB_FLAGS $ERLANG_FLAGS $JS_FLAGS -DXP_UNIX $FLAGS"
