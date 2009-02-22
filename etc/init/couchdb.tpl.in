@@ -63,6 +63,9 @@ start_couchdb () {
     # Start Apache CouchDB as a background process.
 
     command="$COUCHDB -b"
+    if test -n "$COUCHDB_PID_FILE"; then 
+        command="$command -p $COUCHDB_PID_FILE" 
+    fi 
     if test -n "$COUCHDB_STDOUT_FILE"; then
         command="$command -o $COUCHDB_STDOUT_FILE"
     fi
