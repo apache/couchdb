@@ -77,7 +77,7 @@ source_files = \
     couch_view_group.erl \
     couch_db_updater.erl
 
-EXTRA_DIST = $(source_files) couch_db.hrl
+EXTRA_DIST = $(source_files) couch_db.hrl couch_stats.hrl
 
 compiled_files = \
     couch.app \
