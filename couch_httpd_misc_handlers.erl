@@ -14,7 +14,7 @@
 
 -export([handle_welcome_req/2,handle_favicon_req/2,handle_utils_dir_req/2,
     handle_all_dbs_req/1,handle_replicate_req/1,handle_restart_req/1,
-    handle_uuids_req/1,handle_config_req/1,handle_stats_req/1,
+    handle_uuids_req/1,handle_config_req/1,
     handle_task_status_req/1]).
     
 -export([increment_update_seq_req/2]).
@@ -60,13 +60,6 @@ handle_all_dbs_req(#httpd{method='GET'}=Req) ->
     {ok, DbNames} = couch_server:all_databases(),
     send_json(Req, DbNames);
 handle_all_dbs_req(Req) ->
-    send_method_not_allowed(Req, "GET,HEAD").
-
-
-handle_stats_req(#httpd{method='GET'}=Req) ->
-    ok = couch_httpd:verify_is_server_admin(Req),
-    send_json(Req, {couch_server:get_stats() ++ couch_file_stats:get_stats()});
-handle_stats_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 

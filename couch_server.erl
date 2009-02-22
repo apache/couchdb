@@ -182,7 +182,9 @@ maybe_close_lru_db(#server{dbs_open=NumOpen, max_dbs_open=MaxOpen}=Server)
 maybe_close_lru_db(#server{dbs_open=NumOpen}=Server) ->
     % must free up the lru db.
     case try_close_lru(now()) of
-    ok -> {ok, Server#server{dbs_open=NumOpen-1}};
+    ok -> 
+        couch_stats_collector:decrement({couchdb, open_databases}),   
+        {ok, Server#server{dbs_open=NumOpen - 1}};
     Error -> Error
     end.
 
@@ -235,6 +237,7 @@ handle_call({open, DbName, Options}, _From, Server) ->
                     true = ets:insert(couch_dbs_by_pid, {MainPid, DbName}),
                     true = ets:insert(couch_dbs_by_lru, {LruTime, DbName}),
                     DbsOpen = Server2#server.dbs_open + 1,
+                    couch_stats_collector:increment({couchdb, open_databases}),
                     {reply, {ok, MainPid},
                             Server2#server{dbs_open=DbsOpen}};
                 Error ->
@@ -270,6 +273,7 @@ handle_call({create, DbName, Options}, _From, Server) ->
                     true = ets:insert(couch_dbs_by_pid, {MainPid, DbName}),
                     true = ets:insert(couch_dbs_by_lru, {LruTime, DbName}),
                     DbsOpen = Server2#server.dbs_open + 1,
+                    couch_stats_collector:increment({couchdb, open_databases}),
                     couch_db_update_notifier:notify({created, DbName}),
                     {reply, {ok, MainPid},
                             Server2#server{dbs_open=DbsOpen}};
@@ -299,6 +303,7 @@ handle_call({delete, DbName, _Options}, _From, Server) ->
             true = ets:delete(couch_dbs_by_name, DbName),
             true = ets:delete(couch_dbs_by_pid, Pid),
             true = ets:delete(couch_dbs_by_lru, LruTime),
+            couch_stats_collector:decrement({couchdb, open_databases}),
             Server#server{dbs_open=Server#server.dbs_open - 1}
         end,
         case file:delete(FullFilepath) of
@@ -328,6 +333,7 @@ handle_info({'EXIT', Pid, _Reason}, #server{dbs_open=DbsOpen}=Server) ->
     true = ets:delete(couch_dbs_by_pid, Pid),
     true = ets:delete(couch_dbs_by_name, DbName),
     true = ets:delete(couch_dbs_by_lru, LruTime),
-    {noreply, Server#server{dbs_open=DbsOpen-1}};
+    couch_stats_collector:decrement({couchdb, open_databases}),
+    {noreply, Server#server{dbs_open=DbsOpen - 1}};
 handle_info(Info, _Server) ->
     exit({unknown_message, Info}).

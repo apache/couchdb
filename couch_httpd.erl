@@ -102,6 +102,7 @@ stop() ->
     
 
 handle_request(MochiReq, UrlHandlers, DbUrlHandlers) ->
+    statistics(runtime), % prepare request_time counter, see end of function
     AuthenticationFun = make_arity_1_fun(
             couch_config:get("httpd", "authentication_handler")),
     % for the path, use the raw path with the query string and fragment
@@ -123,11 +124,8 @@ handle_request(MochiReq, UrlHandlers, DbUrlHandlers) ->
         mochiweb_headers:to_list(MochiReq:get(headers))
     ]),
     
-    Method =
+    Method1 =
     case MochiReq:get(method) of
-        % alias HEAD to GET as mochiweb takes care of stripping the body
-        'HEAD' -> 'GET';
-        
         % already an atom
         Meth when is_atom(Meth) -> Meth;
         
@@ -135,6 +133,15 @@ handle_request(MochiReq, UrlHandlers, DbUrlHandlers) ->
         % possible (if any module references the atom, then it's existing).
         Meth -> couch_util:to_existing_atom(Meth)
     end,
+    
+    increment_method_stats(Method1),
+    
+    % alias HEAD to GET as mochiweb takes care of stripping the body
+    Method = case Method1 of
+        'HEAD' -> 'GET';
+        Other -> Other
+    end,
+
     HttpReq = #httpd{
         mochi_req = MochiReq,
         method = Method,
@@ -163,8 +170,14 @@ handle_request(MochiReq, UrlHandlers, DbUrlHandlers) ->
         RawUri,
         Resp:get(code)
     ]),
+    {_TotalRuntime, RequestTime} = statistics(runtime),
+    couch_stats_collector:record({couchdb, request_time}, RequestTime),
+    couch_stats_collector:increment({httpd, requests}),
     {ok, Resp}.
 
+increment_method_stats(Method) ->
+    CounterName = list_to_atom(string:to_lower(atom_to_list(Method)) ++ "_requests"),
+    couch_stats_collector:increment({httpd, CounterName}).
 
 special_test_authentication_handler(Req) ->
     case header_value(Req, "WWW-Authenticate") of
@@ -325,6 +338,7 @@ basic_username_pw(Req) ->
 
 
 start_chunked_response(#httpd{mochi_req=MochiReq}, Code, Headers) ->
+    couch_stats_collector:increment({http_status_codes, Code}),
     {ok, MochiReq:respond({Code, Headers ++ server_header(), chunked})}.
 
 send_chunk(Resp, Data) ->
@@ -332,6 +346,7 @@ send_chunk(Resp, Data) ->
     {ok, Resp}.
 
 send_response(#httpd{mochi_req=MochiReq}, Code, Headers, Body) ->
+    couch_stats_collector:increment({http_status_codes, Code}),
     if Code >= 400 ->
         ?LOG_DEBUG("HTTPd ~p error response:~n ~s", [Code, Body]);
     true -> ok
