@@ -192,7 +192,7 @@
                       index = ddoc.couchapp && ddoc.couchapp.index;
                       if (index) {
                         appPath = ['', name, index[0], appName, index[1]].join('/');
-                      } else if (ddoc._attachments["index.html"]) {
+                      } else if (ddoc._attachments && ddoc._attachments["index.html"]) {
                         appPath = ['', name, '_design', appName, "index.html"].join('/');
                       }
                       if (appPath) options.eachApp(appName, appPath, ddoc);
