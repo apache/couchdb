@@ -52,9 +52,16 @@
               $("#databases tbody.content").append("<tr>" + 
                 "<th><a href='database.html?" + encodeURIComponent(dbName) + "'>" +
                   dbName + "</a></th>" +
-                "<td class='size'></td><td class='count'></td>" +
+                "<td class='size'></td><td class='apps'></td><td class='count'></td>" +
                 "<td class='seq'></td></tr>");
-              $.couch.db(dbName).info({
+              var db = $.couch.db(dbName);
+              db.allApps({
+                eachApp : function(name, path) {
+                  $("#databases tbody.content tr:eq(" + idx + ")")
+                    .find("td.apps").append('<a href="'+path+'">'+name+'</a> ');
+                }
+              });
+              db.info({
                 success: function(info) {
                   $("#databases tbody.content tr:eq(" + idx + ")")
                     .find("td.size").text($.futon.formatSize(info.disk_size)).end()

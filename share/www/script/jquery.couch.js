@@ -173,6 +173,38 @@
             }
           });
         },
+        allDesignDocs: function(options) {
+          options = options || {};
+          this.allDocs($.extend({startkey:"_design", endkey:"_design0"}, options));
+        },
+        allApps: function(options) {
+          options = options || {};
+          var self = this;
+          if (options.eachApp) {
+            this.allDesignDocs({
+              success: function(resp) {
+                $.each(resp.rows, function() {
+                  self.openDoc(this.id, {
+                    success: function(ddoc) {
+                      var index, appPath, appName = ddoc._id.split('/');
+                      appName.shift();
+                      appName = appName.join('/');
+                      index = ddoc.couchapp && ddoc.couchapp.index;
+                      if (index) {
+                        appPath = ['', name, index[0], appName, index[1]].join('/');
+                      } else if (ddoc._attachments["index.html"]) {
+                        appPath = ['', name, '_design', appName, "index.html"].join('/');
+                      }
+                      if (appPath) options.eachApp(appName, appPath, ddoc);
+                    }
+                  });
+                });
+              }
+            });            
+          } else {
+            alert("please provide an eachApp function for allApps()");
+          }
+        },
         openDoc: function(docId, options) {
           options = options || {};
           $.ajax({

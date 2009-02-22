@@ -336,8 +336,8 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
 
 /* Database table */
 
-#databases thead th.size, #databases thead th.count, #databases thead th.seq,
-#databases tbody td.size, #databases tbody td.count, #databases tbody td.seq {
+#databases thead th.apps, #databases thead th.size, #databases thead th.count, #databases thead th.seq,
+#databases thead th.apps, #databases tbody td.size, #databases tbody td.count, #databases tbody td.seq {
   text-align: right;
 }
 

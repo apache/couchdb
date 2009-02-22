@@ -177,6 +177,10 @@ function CouchDB(name, httpHeaders) {
     CouchDB.maybeThrowError(this.last_req);
     return JSON.parse(this.last_req.responseText);
   }
+  
+  this.designDocs = function() {
+    return this.allDocs({startkey:"_design", endkey:"_design0"});
+  };
 
   this.allDocsBySeq = function(options,keys) {
     var req = null;
@@ -262,6 +266,15 @@ CouchDB.allDbs = function() {
     CouchDB.maybeThrowError(CouchDB.last_req);
   return JSON.parse(CouchDB.last_req.responseText);
 }
+
+CouchDB.allDesignDocs = function() {
+  var ddocs = {}, dbs = CouchDB.allDbs();
+  for (var i=0; i < dbs.length; i++) {
+    var db = new CouchDB(dbs[i]);
+    ddocs[dbs[i]] = db.designDocs();
+  };
+  return ddocs;
+};
 
 CouchDB.getVersion = function() {
   CouchDB.last_req = CouchDB.request("GET", "/");
