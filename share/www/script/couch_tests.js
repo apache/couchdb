@@ -66,7 +66,6 @@ loadTest("compact.js");
 loadTest("purge.js");
 loadTest("config.js");
 loadTest("security_validation.js");
-loadTest("max_dbs_open.js");
 
 function makeDocs(start, end, templateDoc) {
   var templateDocSrc = templateDoc ? JSON.stringify(templateDoc) : "{}"

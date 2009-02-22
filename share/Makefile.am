@@ -112,5 +112,4 @@ nobase_dist_localdata_DATA = \
     www/script/test/purge.js \
     www/script/test/config.js \
     www/script/test/security_validation.js \
-    www/script/test/max_dbs_open.js \
     www/style/layout.css

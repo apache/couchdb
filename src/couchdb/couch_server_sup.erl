@@ -158,7 +158,6 @@ start_primary_services() ->
                 supervisor,
                 dynamic}]}).
 
-
 start_secondary_services() ->
     DaemonChildSpecs = [
         begin
@@ -173,7 +172,7 @@ start_secondary_services() ->
         end
         || {Name, SpecStr}
         <- couch_config:get("daemons"), SpecStr /= ""],
-        
+    
     supervisor:start_link({local, couch_secondary_services}, couch_server_sup,
         {{one_for_one, 10, 3600}, DaemonChildSpecs}).
 

@@ -28,8 +28,8 @@ design_doc_view(Req, Db, Id, ViewName, Keys) ->
         reduce = Reduce
     } = QueryArgs = parse_view_query(Req, Keys),
     DesignId = <<"_design/", Id/binary>>,
-    case couch_view:get_map_view(Db, DesignId, ViewName, Stale) of
-    {ok, View, Group} ->    
+    Result = case couch_view:get_map_view(Db, DesignId, ViewName, Stale) of
+    {ok, View, Group} ->
         output_map_view(Req, View, Group, Db, QueryArgs, Keys);
     {not_found, Reason} ->
         case couch_view:get_reduce_view(Db, DesignId, ViewName, Stale) of
@@ -45,7 +45,9 @@ design_doc_view(Req, Db, Id, ViewName, Keys) ->
         _ ->
             throw({not_found, Reason})
         end
-    end.
+    end,
+    couch_stats_collector:increment({httpd, view_reads}),
+    Result.
 
 handle_view_req(#httpd{method='GET',path_parts=[_,_, Id, ViewName]}=Req, Db) ->
     design_doc_view(Req, Db, Id, ViewName, nil);
@@ -60,7 +62,7 @@ handle_view_req(Req, _Db) ->
 
 handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
     QueryArgs = parse_view_query(Req),
-
+    couch_stats_collector:increment({httpd, temporary_view_reads}),
     case couch_httpd:primary_header_value(Req, "content-type") of
         undefined -> ok;
         "application/json" -> ok;
