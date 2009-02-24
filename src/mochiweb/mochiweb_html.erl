@@ -129,7 +129,9 @@ escape_attr(F) when is_float(F) ->
 test() ->
     test_destack(),
     test_tokens(),
+    test_tokens2(),
     test_parse(),
+    test_parse2(),
     test_parse_tokens(),
     test_escape(),
     test_escape_attr(),
@@ -426,6 +428,34 @@ test_parse() ->
     Expect = parse(D0),
     ok.
 
+test_tokens2() ->
+    D0 = <<"<channel><title>from __future__ import *</title><link>http://bob.pythonmac.org</link><description>Bob's Rants</description></channel>">>,
+    Expect = [{start_tag,<<"channel">>,[],false},
+              {start_tag,<<"title">>,[],false},
+              {data,<<"from __future__ import *">>,false},
+              {end_tag,<<"title">>},
+              {start_tag,<<"link">>,[],true},
+              {data,<<"http://bob.pythonmac.org">>,false},
+              {end_tag,<<"link">>},
+              {start_tag,<<"description">>,[],false},
+              {data,<<"Bob's Rants">>,false},
+              {end_tag,<<"description">>},
+              {end_tag,<<"channel">>}],
+    Expect = tokens(D0),
+    ok.
+
+test_parse2() ->
+    D0 = <<"<channel><title>from __future__ import *</title><link>http://bob.pythonmac.org<br>foo</link><description>Bob's Rants</description></channel>">>,
+    Expect = {<<"channel">>,[],
+              [{<<"title">>,[],[<<"from __future__ import *">>]},
+               {<<"link">>,[],[
+                               <<"http://bob.pythonmac.org">>,
+                               {<<"br">>,[],[]},
+                               <<"foo">>]},
+               {<<"description">>,[],[<<"Bob's Rants">>]}]},
+    Expect = parse(D0),
+    ok.
+
 test_parse_tokens() ->
     D0 = [{doctype,[<<"HTML">>,<<"PUBLIC">>,<<"-//W3C//DTD HTML 4.01 Transitional//EN">>]},
           {data,<<"\n">>,true},
@@ -562,8 +592,23 @@ destack(TagName, Stack) when is_list(Stack) ->
         end,
     case lists:splitwith(F, Stack) of
         {_, []} ->
-            %% No match, no state change
-            Stack;
+            %% If we're parsing something like XML we might find
+            %% a <link>tag</link> that is normally a singleton
+            %% in HTML but isn't here
+            case {is_singleton(TagName), Stack} of
+                {true, [{T0, A0, Acc0} | Post0]} ->
+                    case lists:splitwith(F, Acc0) of
+                        {_, []} ->
+                            %% Actually was a singleton
+                            Stack;
+                        {Pre, [{T1, A1, []} | Post1]} ->
+                            [{T0, A0, [{T1, A1, lists:reverse(Pre)} | Post1]}
+                             | Post0]
+                    end;
+                _ ->
+                    %% No match, no state change
+                    Stack
+            end;
         {_Pre, [_T]} ->
             %% Unfurl the whole stack, we're done
             destack(Stack);

@@ -478,10 +478,6 @@ test_one([{E, J} | Rest], N) ->
     true = equiv(E, decode(encode(E))),
     test_one(Rest, 1+N).
 
-e2j_test_vec(unicode) -> 
-    [
-     {"foo" ++ [500] ++ "bar", [$", $f, $o, $o, 500, $b, $a, $r, $"]}
-    ];
 e2j_test_vec(utf8) ->
     [
     {1, "1"},

@@ -6,7 +6,7 @@
 -module(mochiweb_headers).
 -author('bob@mochimedia.com').
 -export([empty/0, from_list/1, insert/3, enter/3, get_value/2, lookup/2]).
--export([get_primary_value/2]).
+-export([delete_any/2, get_primary_value/2]).
 -export([default/3, enter_from_list/2, default_from_list/2]).
 -export([to_list/1, make/1]).
 -export([test/0]).
@@ -35,6 +35,8 @@ test() ->
                         H3),
     "application/x-www-form-urlencoded" = ?MODULE:get_primary_value(
                                              "content-type", H4),
+    H4 = ?MODULE:delete_any("nonexistent-header", H4),
+    H3 = ?MODULE:delete_any("content-type", H4),
     ok.
 
 %% @spec empty() -> headers()
@@ -144,6 +146,12 @@ insert(K, V, T) ->
             V2 = merge(K1, V1, V0),
             gb_trees:update(K1, {K0, V2}, T)
     end.
+
+%% @spec delete_any(key(), headers()) -> headers()
+%% @doc Delete the header corresponding to key if it is present.
+delete_any(K, T) ->
+    K1 = normalize(K),
+    gb_trees:delete_any(K1, T).
 
 %% Internal API
 

@@ -21,7 +21,10 @@
         mochiweb_socket_server,
         mochiweb_sup,
         mochiweb_util,
-        reloader
+        reloader,
+        mochifmt,
+        mochifmt_std,
+        mochifmt_records
 	    ]},
   {registered, []},
   {mod, {mochiweb_app, []}},

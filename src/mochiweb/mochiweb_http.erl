@@ -10,6 +10,7 @@
 
 -define(IDLE_TIMEOUT, 30000).
 
+-define(MAX_HEADERS, 1000).
 -define(DEFAULTS, [{name, ?MODULE},
                    {port, 8888}]).
 
@@ -37,7 +38,7 @@ stop() ->
 
 stop(Name) ->
     mochiweb_socket_server:stop(Name).
-    
+
 start() ->
     start([{ip, "127.0.0.1"},
            {loop, {?MODULE, default_body}}]).
@@ -80,12 +81,12 @@ default_body(Req, 'POST', "/multipart") ->
                                    {body, Req:recv_body()},
                                    Req:dump()]]),
     Req:ok({"text/html", [], frm(Body)});
-default_body(Req, 'POST', _Path) ->    
+default_body(Req, 'POST', _Path) ->
     Body = io_lib:format("~p~n", [[{parse_qs, Req:parse_qs()},
                                    {parse_cookie, Req:parse_cookie()},
                                    {parse_post, Req:parse_post()},
                                    Req:dump()]]),
-    Req:ok({"text/html", [], frm(Body)});           
+    Req:ok({"text/html", [], frm(Body)});
 default_body(Req, _Method, _Path) ->
     Req:respond({501, [], []}).
 
@@ -99,7 +100,7 @@ loop(Socket, Body) ->
 request(Socket, Body) ->
     case gen_tcp:recv(Socket, 0, ?IDLE_TIMEOUT) of
         {ok, {http_request, Method, Path, Version}} ->
-            headers(Socket, {Method, Path, Version}, [], Body);
+            headers(Socket, {Method, Path, Version}, [], Body, 0);
         {error, {http_error, "\r\n"}} ->
             request(Socket, Body);
         {error, {http_error, "\n"}} ->
@@ -109,7 +110,15 @@ request(Socket, Body) ->
             exit(normal)
     end.
 
-headers(Socket, Request, Headers, Body) ->
+headers(Socket, Request, Headers, _Body, ?MAX_HEADERS) ->
+    %% Too many headers sent, bad request.
+    inet:setopts(Socket, [{packet, raw}]),
+    Req = mochiweb:new_request({Socket, Request,
+                                lists:reverse(Headers)}),
+    Req:respond({400, [], []}),
+    gen_tcp:close(Socket),
+    exit(normal);
+headers(Socket, Request, Headers, Body, HeaderCount) ->
     case gen_tcp:recv(Socket, 0, ?IDLE_TIMEOUT) of
         {ok, http_eoh} ->
             inet:setopts(Socket, [{packet, raw}]),
@@ -125,7 +134,8 @@ headers(Socket, Request, Headers, Body) ->
                     ?MODULE:loop(Socket, Body)
             end;
         {ok, {http_header, _, Name, _, Value}} ->
-            headers(Socket, Request, [{Name, Value} | Headers], Body);
+            headers(Socket, Request, [{Name, Value} | Headers], Body,
+                    1 + HeaderCount);
         _Other ->
             gen_tcp:close(Socket),
             exit(normal)
