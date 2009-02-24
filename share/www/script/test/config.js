@@ -15,7 +15,7 @@ couchTests.config = function(debug) {
   db.deleteDb();
   db.createDb();
   if (debug) debugger;
-  
+
   // test that /_config returns all the settings
   var xhr = CouchDB.request("GET", "/_config");
   var config = JSON.parse(xhr.responseText);
@@ -49,7 +49,7 @@ couchTests.config = function(debug) {
   T(config.httpd_global_handlers._config);
   T(config.log.level);
   T(config.query_servers.javascript);
-  
+
   // test that settings can be altered
   xhr = CouchDB.request("PUT", "/_config/test/foo",{
     body : JSON.stringify("bar"),
@@ -62,5 +62,6 @@ couchTests.config = function(debug) {
 
   // you can get a single key
   xhr = CouchDB.request("GET", "/_config/test/foo");
-  T(xhr.responseText == '"bar"');
+  config = JSON.parse(xhr.responseText);
+  T(config == "bar");
 };

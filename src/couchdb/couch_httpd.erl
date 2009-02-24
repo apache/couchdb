@@ -367,7 +367,8 @@ send_json(Req, Code, Headers, Value) ->
         {"Content-Type", negotiate_content_type(Req)},
         {"Cache-Control", "must-revalidate"}
     ],
-    send_response(Req, Code, DefaultHeaders ++ Headers, ?JSON_ENCODE(Value)).
+    send_response(Req, Code, DefaultHeaders ++ Headers,
+                  list_to_binary([?JSON_ENCODE(Value), $\n])).
 
 start_json_response(Req, Code) ->
     start_json_response(Req, Code, []).
@@ -380,6 +381,7 @@ start_json_response(Req, Code, Headers) ->
     start_chunked_response(Req, Code, DefaultHeaders ++ Headers).
 
 end_json_response(Resp) ->
+    send_chunk(Resp, [$\n]),
     send_chunk(Resp, []).
 
 
