@@ -182,7 +182,7 @@ recv_body(MaxBody) ->
             true -> 
                 {NewLength, [Bin | BinAcc]}
             end
-        end, {0, []}, ?MAX_RECV_BODY),
+        end, {0, []}, MaxBody),
     put(?SAVE_BODY, Body),
     Body.
 
