@@ -183,7 +183,7 @@ maybe_close_lru_db(#server{dbs_open=NumOpen}=Server) ->
     % must free up the lru db.
     case try_close_lru(now()) of
     ok -> 
-        couch_stats_collector:decrement({couchdb, open_databases}),   
+        couch_stats_collector:decrement({couchdb, open_databases}),
         {ok, Server#server{dbs_open=NumOpen - 1}};
     Error -> Error
     end.

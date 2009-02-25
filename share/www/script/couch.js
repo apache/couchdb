@@ -312,20 +312,13 @@ CouchDB.request = function(method, uri, options) {
   return req;
 }
 
-CouchDB.requestStats = function(module, key, aggregate, options) {
-  var options, optionsOrLast = Array.prototype.pop.apply(arguments);
-  if (typeof optionsOrLast == "string") {
-    options = null;
-    Array.prototype.push.apply(arguments, [optionsOrLast]);
-  } else {
-    options = optionsOrLast;
+CouchDB.requestStats = function(module, key, test) {
+  var query_arg = "";
+  if(test !== null) {
+    query_arg = "?flush=true";
   }
 
-  var request_options = {};
-  request_options.headers = {"Content-Type": "application/json"};
-
-  var stat = CouchDB.request("GET", "/_stats/" + Array.prototype.join.apply(arguments,["/"]) + (options ?
-    ("?" + CouchDB.params(options)) : ""), request_options).responseText;
+  var stat = CouchDB.request("GET", "/_stats/" + module + "/" + key + query_arg).responseText;
   return JSON.parse(stat)[module][key];
 }
 

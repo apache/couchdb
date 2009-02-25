@@ -241,10 +241,10 @@ update_aggregates(Value, Stat, CounterType) ->
     end.
 
 
-aggregate_to_json_term(#aggregates{min=Min,max=Max,mean=Mean,stddev=Stddev,count=Count}) ->
+aggregate_to_json_term(#aggregates{min=Min,max=Max,mean=Mean,stddev=Stddev,count=Count,last=Last}) ->
     {[
         % current is redundant, but reads nicer in JSON
-        {current, Count},
+        {current, Last},
         {count, Count},
         {mean, Mean},
         {min, Min},

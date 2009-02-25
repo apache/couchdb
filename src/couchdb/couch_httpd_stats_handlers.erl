@@ -22,12 +22,27 @@
 
 -define(b2a(V), list_to_atom(binary_to_list(V))).
 
+-record(stats_query_args, {
+    range='0',
+    flush=false
+}).
+
 handle_stats_req(#httpd{method='GET', path_parts=[_]}=Req) ->
     send_json(Req, couch_stats_aggregator:all());
 
 handle_stats_req(#httpd{method='GET', path_parts=[_Stats, Module, Key]}=Req) ->
-    Time = parse_stats_query(Req),
-    Stats = couch_stats_aggregator:get_json({?b2a(Module), ?b2a(Key)}, Time),
+    #stats_query_args{
+        range=Range,
+        flush=Flush
+    } = parse_stats_query(Req),
+
+    case Flush of
+        true ->
+            couch_stats_aggregator:time_passed();
+        _ -> ok
+    end,
+
+    Stats = couch_stats_aggregator:get_json({?b2a(Module), ?b2a(Key)}, Range),
     Response = {[{Module, {[{Key, Stats}]}}]},
     send_json(Req, Response);
 
@@ -35,7 +50,13 @@ handle_stats_req(Req) ->
     send_method_not_allowed(Req, "GET").
 
 parse_stats_query(Req) ->
-    case couch_httpd:qs(Req) of
-        [{"range", Time}] -> list_to_atom(Time);
-        _ -> '0'
-    end.
+    lists:foldl(fun({Key,Value}, Args) ->
+        case {Key, Value} of
+        {"range", Range} ->
+            Args#stats_query_args{range=list_to_atom(Range)};
+        {"flush", "true"} ->
+            Args#stats_query_args{flush=true};
+        _Else -> % unknown key value pair, ignore.
+            Args
+        end
+    end, #stats_query_args{}, couch_httpd:qs(Req)).
