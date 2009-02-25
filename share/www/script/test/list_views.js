@@ -59,8 +59,8 @@ couchTests.list_views = function(debug) {
         } else {
           // tail
           return {body : '</ul>'+
-              '<p>FirstKey: '+row_info.first_key+ 
-              ' LastKey: '+row_info.prev_key+'</p>'};
+              '<p>FirstKey: '+(row_info ? row_info.first_key : '')+ 
+              ' LastKey: '+(row_info ? row_info.prev_key : '')+'</p>'};
         }
       }),
       acceptSwitch: stringFun(function(head, row, req, row_info) {
@@ -127,6 +127,9 @@ couchTests.list_views = function(debug) {
             }
           }
         });
+      }),
+      emptyList: stringFun(function(head, row, req, row_info) {
+        return { body: "" };
       })
     }
   };
@@ -175,11 +178,23 @@ couchTests.list_views = function(debug) {
   T(xhr.status == 200);
   T(/Total Rows/.test(xhr.responseText));
   T(/Offset: null/.test(xhr.responseText));
+
+  // reduce with 0 rows
+  var xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/simpleForm/withReduce?startkey=30");
+  T(xhr.status == 200);
+  T(/Total Rows/.test(xhr.responseText));
+  T(/Offset: undefined/.test(xhr.responseText));
+
   
   // when there is a reduce present, but not used
   var xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/simpleForm/withReduce?reduce=false");
   T(xhr.status == 200);
   T(/Total Rows/.test(xhr.responseText));
+  T(/Key: 1/.test(xhr.responseText));
+  
+  // when there is a reduce present, and used
+  var xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/simpleForm/withReduce?group=true");
+  T(xhr.status == 200);
   T(/Key: 1/.test(xhr.responseText));
   
   // with accept headers for HTML
@@ -203,14 +218,25 @@ couchTests.list_views = function(debug) {
   T(xhr.responseText.match(/entry/));
 
   // now with extra qs params
-  xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/qsParams/basicView?foo=blam");
+  var xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/qsParams/basicView?foo=blam");
   T(xhr.responseText.match(/blam/));
   
-
   // aborting iteration
-  xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/stopIter/basicView");
+  var xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/stopIter/basicView");
   T(xhr.responseText.match(/^head 0 1 2 tail$/));
   xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/stopIter2/basicView");
   T(xhr.responseText.match(/^head 0 1 2 tail$/));
+
+  // aborting iteration with reduce
+  var xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/stopIter/withReduce?group=true");
+  T(xhr.responseText.match(/^head 0 1 2 tail$/));
+  xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/stopIter2/withReduce?group=true");
+  T(xhr.responseText.match(/^head 0 1 2 tail$/));
+
+  // empty list
+  var xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/emptyList/basicView");
+  T(xhr.responseText.match(/^$/));
+  xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/emptyList/withReduce?group=true");
+  T(xhr.responseText.match(/^$/));
 
 };

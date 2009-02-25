@@ -18,7 +18,7 @@
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2,code_change/3,stop/0]).
 -export([start_doc_map/2, map_docs/2, stop_doc_map/1]).
 -export([reduce/3, rereduce/3,validate_doc_update/5]).
--export([render_doc_show/5,start_view_list/2,render_list_head/5, render_list_row/4, render_list_tail/3]).
+-export([render_doc_show/5,start_view_list/2,render_list_head/5, render_list_row/4, render_list_tail/3, render_reduce_head/3, render_reduce_row/4]).
 % -export([test/0]).
 
 -include("couch_db.hrl").
@@ -160,6 +160,16 @@ render_list_tail({Lang, Pid}, Req, Db) ->
     JsonResp.
     
     
+render_reduce_head({_Lang, Pid}, Req, Db) ->
+    Head = {[]},
+    JsonReq = couch_httpd_external:json_req_obj(Req, Db),
+    couch_os_process:prompt(Pid, [<<"list_begin">>, Head, JsonReq]).
+
+render_reduce_row({_Lang, Pid}, Req, Db, {Key, Value}) ->
+    JsonRow = {[{key, Key}, {value, Value}]},
+    JsonReq = couch_httpd_external:json_req_obj(Req, Db),
+    couch_os_process:prompt(Pid, [<<"list_row">>, JsonRow, JsonReq]).
+
 
 init([]) ->
     
