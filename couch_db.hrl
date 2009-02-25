@@ -161,6 +161,11 @@
     send_row
 }).
 
+-record(reduce_fold_helper_funs, {
+    start_response,
+    send_row
+}).
+
 -record(extern_resp_args, {
     code = 200,
     stop = false,

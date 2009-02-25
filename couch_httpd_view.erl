@@ -16,7 +16,7 @@
 -export([handle_view_req/2,handle_temp_view_req/2]).
 
 -export([parse_view_query/1,parse_view_query/2,parse_view_query/4,make_view_fold_fun/6,
-    finish_view_fold/3, view_row_obj/3, view_group_etag/1, view_group_etag/2]).
+    finish_view_fold/3, view_row_obj/3, view_group_etag/1, view_group_etag/2, make_reduce_fold_funs/5]).
 
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,send_chunk/2,
@@ -145,13 +145,11 @@ output_reduce_view(Req, View, Group, QueryArgs, nil) ->
     } = QueryArgs,
     CurrentEtag = view_group_etag(Group),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
-        {ok, Resp} = start_json_response(Req, 200, [{"Etag",CurrentEtag}]),
-        {ok, GroupRowsFun, RespFun} = make_reduce_fold_funs(Resp, GroupLevel),
-        send_chunk(Resp, "{\"rows\":["),
-        {ok, _} = couch_view:fold_reduce(View, Dir, {StartKey, StartDocId}, 
-            {EndKey, EndDocId}, GroupRowsFun, RespFun, {"", Skip, Limit}),
-        send_chunk(Resp, "]}"),
-        end_json_response(Resp)
+        {ok, GroupRowsFun, RespFun} = make_reduce_fold_funs(Req, GroupLevel, QueryArgs, CurrentEtag, #reduce_fold_helper_funs{}),
+        FoldAccInit = {Limit, Skip, undefined, []},
+        {ok, {_, _, Resp, _}} = couch_view:fold_reduce(View, Dir, {StartKey, StartDocId}, 
+            {EndKey, EndDocId}, GroupRowsFun, RespFun, FoldAccInit),
+        finish_reduce_fold(Req, Resp)
     end);
     
 output_reduce_view(Req, View, Group, QueryArgs, Keys) ->
@@ -165,22 +163,25 @@ output_reduce_view(Req, View, Group, QueryArgs, Keys) ->
     } = QueryArgs,
     CurrentEtag = view_group_etag(Group),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
-        {ok, Resp} = start_json_response(Req, 200, [{"Etag",CurrentEtag}]),
-        {ok, GroupRowsFun, RespFun} = make_reduce_fold_funs(Resp, GroupLevel),
-        send_chunk(Resp, "{\"rows\":["),
-        lists:foldl(
-            fun(Key, AccSeparator) ->
-                {ok, {NewAcc, _, _}} = couch_view:fold_reduce(View, Dir, {Key, StartDocId}, 
-                    {Key, EndDocId}, GroupRowsFun, RespFun, 
-                    {AccSeparator, Skip, Limit}),
-                NewAcc % Switch to comma
+        {ok, GroupRowsFun, RespFun} = make_reduce_fold_funs(Req, GroupLevel, QueryArgs, CurrentEtag, #reduce_fold_helper_funs{}),
+        {Resp, _} = lists:foldl(
+            fun(Key, {Resp, AccSeparator}) ->
+                FoldAccInit = {Limit, Skip, Resp, AccSeparator},
+                {_, {_, _, Resp2, NewAcc}} = couch_view:fold_reduce(View, Dir, {Key, StartDocId}, 
+                    {Key, EndDocId}, GroupRowsFun, RespFun, FoldAccInit),
+                % Switch to comma
+                {Resp2, NewAcc}
             end,
-        "", Keys), % Start with no comma
-        send_chunk(Resp, "]}"),
-        end_json_response(Resp)
+        {undefined, []}, Keys), % Start with no comma
+        finish_reduce_fold(Req, Resp)
     end).
     
-make_reduce_fold_funs(Resp, GroupLevel) ->
+make_reduce_fold_funs(Req, GroupLevel, _QueryArgs, Etag, HelperFuns) ->
+    #reduce_fold_helper_funs{
+        start_response = StartRespFun,
+        send_row = SendRowFun
+    } = apply_default_helper_funs(HelperFuns),
+
     GroupRowsFun =
         fun({_Key1,_}, {_Key2,_}) when GroupLevel == 0 ->
             true;
@@ -190,29 +191,45 @@ make_reduce_fold_funs(Resp, GroupLevel) ->
         ({Key1,_}, {Key2,_}) ->
             Key1 == Key2
         end,
-    RespFun = fun(_Key, _Red, {AccSeparator,AccSkip,AccLimit}) when AccSkip > 0 ->
-        {ok, {AccSeparator,AccSkip-1,AccLimit}};
-    (_Key, _Red, {AccSeparator,0,AccLimit}) when AccLimit == 0 ->
-        {stop, {AccSeparator,0,AccLimit}};
-    (_Key, Red, {AccSeparator,0,AccLimit}) when GroupLevel == 0 ->
-        Json = ?JSON_ENCODE({[{key, null}, {value, Red}]}),
-        send_chunk(Resp, AccSeparator ++ Json),
-        {ok, {",",0,AccLimit-1}};
-    (Key, Red, {AccSeparator,0,AccLimit})
+    RespFun = fun(_Key, _Red, {AccLimit, AccSkip, Resp, AccSeparator}) when AccSkip > 0 ->
+        {ok, {AccLimit, AccSkip - 1, Resp, AccSeparator}};
+    (_Key, _Red, {0, 0, Resp, AccSeparator}) ->
+        {stop, {0, 0, Resp, AccSeparator}};
+    (_Key, Red, {AccLimit, 0, Resp, AccSeparator}) when GroupLevel == 0 ->
+        {ok, Resp2, RowSep} = case Resp of
+        undefined -> StartRespFun(Req, Etag, null, null);
+        _ -> {ok, Resp, nil}
+        end,
+        RowResult = case SendRowFun(Resp2, {null, Red}, RowSep) of
+        stop -> stop;
+        _ -> ok
+        end,
+        {RowResult, {AccLimit - 1, 0, Resp2, AccSeparator}};
+    (Key, Red, {AccLimit, 0, Resp, AccSeparator})
             when is_integer(GroupLevel) 
             andalso is_list(Key) ->
-        Json = ?JSON_ENCODE(
-            {[{key, lists:sublist(Key, GroupLevel)},{value, Red}]}),
-        send_chunk(Resp, AccSeparator ++ Json),
-        {ok, {",",0,AccLimit-1}};
-    (Key, Red, {AccSeparator,0,AccLimit}) ->
-        Json = ?JSON_ENCODE({[{key, Key}, {value, Red}]}),
-        send_chunk(Resp, AccSeparator ++ Json),
-        {ok, {",",0,AccLimit-1}}
+        {ok, Resp2, RowSep} = case Resp of
+        undefined -> StartRespFun(Req, Etag, null, null);
+        _ -> {ok, Resp, nil}
+        end,
+        RowResult = case SendRowFun(Resp2, {lists:sublist(Key, GroupLevel), Red}, RowSep) of
+        stop -> stop;
+        _ -> ok
+        end,
+        {RowResult, {AccLimit - 1, 0, Resp2, AccSeparator}};
+    (Key, Red, {AccLimit, 0, Resp, AccSeparator}) ->
+        {ok, Resp2, RowSep} = case Resp of
+        undefined -> StartRespFun(Req, Etag, null, null);
+        _ -> {ok, Resp, nil}
+        end,
+        RowResult = case SendRowFun(Resp2, {Key, Red}, RowSep) of
+        stop -> stop;
+        _ -> ok
+        end,
+        {RowResult, {AccLimit - 1, 0, Resp2, AccSeparator}}
     end,
     {ok, GroupRowsFun, RespFun}.
     
-
 
 
 reverse_key_default(nil) -> {};
@@ -470,6 +487,25 @@ apply_default_helper_funs(#view_fold_helper_funs{
         send_row = SendRow2
     }.
 
+apply_default_helper_funs(#reduce_fold_helper_funs{
+    start_response = StartResp,
+    send_row = SendRow
+}=Helpers) ->
+    StartResp2 = case StartResp of
+    undefined -> fun json_reduce_start_resp/4;
+    _ -> StartResp
+    end,
+
+    SendRow2 = case SendRow of
+    undefined -> fun send_json_reduce_row/3;
+    _ -> SendRow
+    end,
+
+    Helpers#reduce_fold_helper_funs{
+        start_response = StartResp2,
+        send_row = SendRow2
+    }.
+
 make_passed_end_fun(Dir, EndKey, EndDocId) ->
     case Dir of
     fwd ->
@@ -495,6 +531,18 @@ send_json_view_row(Resp, Db, {{Key, DocId}, Value}, RowFront, IncludeDocs) ->
     _ -> RowFront
     end,
     send_chunk(Resp, RowFront2 ++  ?JSON_ENCODE(JsonObj)).
+
+json_reduce_start_resp(Req, Etag, _, _) ->
+    {ok, Resp} = start_json_response(Req, 200, [{"Etag", Etag}]),
+    BeginBody = "{\"rows\":[\r\n",
+    {ok, Resp, BeginBody}.
+
+send_json_reduce_row(Resp, {Key, Value}, RowFront) ->
+    RowFront2 = case RowFront of
+    nil -> ",\r\n";
+    _ -> RowFront
+    end,
+    send_chunk(Resp, RowFront2 ++ ?JSON_ENCODE({[{key, Key}, {value, Value}]})).
 
 view_group_etag(Group) ->
     view_group_etag(Group, nil).
@@ -556,4 +604,15 @@ finish_view_fold(Req, TotalRows, FoldResult) ->
         end_json_response(Resp);
     Error ->
         throw(Error)
+    end.
+
+finish_reduce_fold(Req, Resp) ->
+    case Resp of
+    undefined ->
+        send_json(Req, 200, {[
+            {rows, []}
+        ]});
+    Resp ->
+        send_chunk(Resp, "\r\n]}"),
+        end_json_response(Resp)
     end.
