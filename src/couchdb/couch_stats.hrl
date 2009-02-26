@@ -11,11 +11,12 @@
 % the License.
 
 -record(aggregates, {
-    min=0,
-    max=0,
-    mean=0.0,
+    min = 0,
+    max = 0,
+    mean = 0.0,
     variance = 0.0,
-    stddev=0.0,
-    count=0,
-    last=0
+    stddev = 0.0,
+    count = 0,
+    last = 0,
+    description
 }).

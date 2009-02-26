@@ -23,7 +23,8 @@
          time_passed/0, clear_aggregates/1]).
 
 -record(state, {
-    aggregates = []
+    aggregates = [],
+    descriptions = []
 }).
 
 -define(COLLECTOR, couch_stats_collector).
@@ -61,6 +62,7 @@ all() ->
 init(_) ->
     ets:new(?MODULE, [named_table, set, protected]),
     init_timers(),
+    init_descriptions(),
     {ok, #state{}}.
 
 handle_call({get, Key}, _, State) ->
@@ -141,8 +143,8 @@ do_clear_aggregates(Time, #state{aggregates=Stats}) ->
     end, Stats),
     #state{aggregates=NewStats}.
 
-%% default Time is 0, which is when CouchDB started
 get_aggregate(Key, State) ->
+    %% default Time is 0, which is when CouchDB started
     get_aggregate(Key, State, '0').
 get_aggregate(Key, #state{aggregates=StatsList}, Time) ->
     Aggregates = case proplists:lookup(Key, StatsList) of
@@ -151,10 +153,16 @@ get_aggregate(Key, #state{aggregates=StatsList}, Time) ->
         {Key, Stats} ->
             case proplists:lookup(Time, Stats) of
                 none -> #aggregates{}; % empty record again
-                {Time, Stat} -> Stat
+                {Time, Stat} -> Stat#aggregates{description=get_description(Key)}
             end
     end,
     Aggregates.
+
+get_description(Key) ->
+    case ets:lookup(?MODULE, Key) of
+        [] -> <<"No description yet.">>;
+        [{_Key, Description}] -> Description
+    end.
 
 %% updates all aggregates for Key
 update_aggregates_loop(Key, Values, State, CounterType) ->
@@ -193,7 +201,9 @@ update_aggregates_loop(Key, Values, State, CounterType) ->
 
     % put the newly calculated aggregates into State and delete the previous
     % entry
-    #state{aggregates=[{Key, NewStats} | proplists:delete(Key, AllStats)]}.
+    #state{
+        aggregates=[{Key, NewStats} | proplists:delete(Key, AllStats)]
+    }.
 
 % does the actual updating of the aggregate record
 update_aggregates(Value, Stat, CounterType) ->
@@ -241,7 +251,7 @@ update_aggregates(Value, Stat, CounterType) ->
     end.
 
 
-aggregate_to_json_term(#aggregates{min=Min,max=Max,mean=Mean,stddev=Stddev,count=Count,last=Last}) ->
+aggregate_to_json_term(#aggregates{min=Min,max=Max,mean=Mean,stddev=Stddev,count=Count,last=Last,description=Description}) ->
     {[
         % current is redundant, but reads nicer in JSON
         {current, Last},
@@ -250,7 +260,8 @@ aggregate_to_json_term(#aggregates{min=Min,max=Max,mean=Mean,stddev=Stddev,count
         {min, Min},
         {max, Max},
         {stddev, Stddev},
-        {resolution, 1}
+        {resolution, 1},
+        {description, Description}
     ]}.
 
 get_stats(Key, State) ->
@@ -274,6 +285,49 @@ do_get_all(#state{aggregates=Stats}=State) ->
           end, [], lists:sort(Stats)),
           {[{LastMod, {lists:sort(LastVals)}} | LastRestMods]}
     end.
+
+
+init_descriptions() ->
+
+    % ets is probably overkill here, but I didn't manage to keep the 
+    % descriptions in the gen_server state. Which means there is probably
+    % a bug in one of the handle_call() functions most likely the one that
+    % handles the time_passed message. But don't tell anyone, the math is
+    % correct :) -- Jan
+
+    % please keep this in alphabetical order
+    ets:insert(?MODULE, {{couchdb, database_changes}, <<"Number of times a database was changed">>}),
+    ets:insert(?MODULE, {{couchdb, database_reads}, <<"Number of times a document was read from a database">>}),
+    ets:insert(?MODULE, {{couchdb, open_databases}, <<"Number of open databases">>}),
+    ets:insert(?MODULE, {{couchdb, request_time}, <<"Length of a request inside CouchDB without Mochiweb">>}),
+
+    ets:insert(?MODULE, {{http_status_codes, '200'}, <<"Number of HTTP 200 OK responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '201'}, <<"Number of HTTP 201 Created responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '202'}, <<"Number of HTTP 202 Accepted responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '301'}, <<"Number of HTTP 301 Moved Permanently responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '304'}, <<"Number of HTTP 304 Not Modified responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '400'}, <<"Number of HTTP 400 Bad Request responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '401'}, <<"Number of HTTP 401 Unauthorized responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '403'}, <<"Number of HTTP 403 Forbidden responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '404'}, <<"Number of HTTP 404 Not Found responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '405'}, <<"Number of HTTP 405 Method Not Allowed responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '409'}, <<"Number of HTTP 409 Conflict responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '412'}, <<"Number of HTTP 412 Precondition Failed responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '500'}, <<"Number of HTTP 500 Internal Server Error responses">>}),
+
+    ets:insert(?MODULE, {{httpd, bulk_requests}, <<"Number of bulk requests">>}),
+    ets:insert(?MODULE, {{httpd, copy_requests}, <<"Number of HTTP COPY requests">>}),
+    ets:insert(?MODULE, {{httpd, delete_requests}, <<"Number of HTTP DELETE requests">>}),
+    ets:insert(?MODULE, {{httpd, get_requests}, <<"Number of HTTP GET requests">>}),
+    ets:insert(?MODULE, {{httpd, head_requests}, <<"Number of HTTP HEAD requests">>}),
+    ets:insert(?MODULE, {{httpd, move_requests}, <<"Number of HTTP MOVE requests">>}),
+    ets:insert(?MODULE, {{httpd, post_requests}, <<"Number of HTTP POST requests">>}),
+    ets:insert(?MODULE, {{httpd, requests}, <<"Number of HTTP requests">>}),
+    ets:insert(?MODULE, {{httpd, temporary_view_reads}, <<"Number of temporary view reads">>}),
+    ets:insert(?MODULE, {{httpd, view_reads}, <<"Number of view reads">>}),
+    ets:insert(?MODULE, {{httpd, put_requests}, <<"Number of HTTP PUT requests">>}).
+    % please keep this in alphabetical order
+
 
 % Timer
 

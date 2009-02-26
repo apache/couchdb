@@ -92,6 +92,7 @@ open_doc(Db, IdOrDocInfo) ->
     open_doc(Db, IdOrDocInfo, []).
 
 open_doc(Db, Id, Options) ->
+    couch_stats_collector:increment({couchdb, database_reads}),
     case open_doc_int(Db, Id, Options) of
     {ok, #doc{deleted=true}=Doc} ->
         case lists:member(deleted, Options) of
@@ -105,6 +106,7 @@ open_doc(Db, Id, Options) ->
     end.
 
 open_doc_revs(Db, Id, Revs, Options) ->
+    couch_stats_collector:increment({couchdb, database_reads}),
     [Result] = open_doc_revs_int(Db, [{Id, Revs}], Options),
     Result.
 
@@ -284,6 +286,7 @@ update_docs(#db{update_pid=UpdatePid}=Db, Docs, Options) ->
     update_docs(#db{update_pid=UpdatePid}=Db, Docs, Options, true).
 
 update_docs(Db, Docs, Options, false) ->
+    couch_stats_collector:increment({couchdb, database_changes}),
     DocBuckets = group_alike_docs(Docs),
     Ids = [Id || [#doc{id=Id}|_] <- DocBuckets],
     
@@ -320,7 +323,9 @@ update_docs(Db, Docs, Options, false) ->
     write_and_commit(Db, DocBuckets2, Options);
     
 update_docs(Db, Docs, Options, true) ->
-        % go ahead and generate the new revision ids for the documents.
+    couch_stats_collector:increment({couchdb, database_changes}),
+
+    % go ahead and generate the new revision ids for the documents.
     Docs2 = lists:map(
         fun(#doc{id=Id,revs=Revs}=Doc) ->
             case Id of

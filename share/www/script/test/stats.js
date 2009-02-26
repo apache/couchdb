@@ -86,40 +86,40 @@ couchTests.stats = function(debug) {
    }
  };
  
- var document_read_count_tests = {
-   'should increase read document counter when a document is read': function(name) {
+ var database_read_count_tests = {
+   'should increase database reads counter when a document is read': function(name) {
      var db = new CouchDB("test_suite_db");
      db.deleteDb();
      db.createDb();
      db.save({"_id":"test"});
 
-     var reads = requestStatsTest("httpd", "document_reads").current;
+     var reads = requestStatsTest("couchdb", "database_reads").current;
      db.open("test");
-     var new_reads = requestStatsTest("httpd", "document_reads").current;
+     var new_reads = requestStatsTest("couchdb", "database_reads").current;
 
      TEquals(reads + 1 , new_reads, name);
    },
-   'should not increase read document counter when a non-document is read': function(name) {
+   'should not increase database read counter when a non-document is read': function(name) {
      var db = new CouchDB("test_suite_db");
      db.deleteDb();
      db.createDb();
      db.save({"_id":"test"});
 
-     var reads = requestStatsTest("httpd", "document_reads").current;
+     var reads = requestStatsTest("couchdb", "database_reads").current;
      CouchDB.request("GET", "/");
-     var new_reads = requestStatsTest("httpd", "document_reads").current;
+     var new_reads = requestStatsTest("couchdb", "database_reads").current;
 
      TEquals(reads, new_reads, name);
    },
-   'should increase read document counter when a document\'s revisions are read': function(name) {
+   'should increase database read counter when a document\'s revisions are read': function(name) {
      var db = new CouchDB("test_suite_db");
      db.deleteDb();
      db.createDb();
      db.save({"_id":"test"});
 
-     var reads = requestStatsTest("httpd", "document_reads").current;
+     var reads = requestStatsTest("couchdb", "database_reads").current;
      db.open("test", {"open_revs":"all"});
-     var new_reads = requestStatsTest("httpd", "document_reads").current;
+     var new_reads = requestStatsTest("couchdb", "database_reads").current;
 
      TEquals(reads + 1 , new_reads, name);
    }
@@ -208,18 +208,18 @@ couchTests.stats = function(debug) {
  };
 
  var document_write_count_tests = {
-   'should increment counter for document creates': function(name) {
+   'should increment database changes counter for document creates': function(name) {
      var db = new CouchDB("test_suite_db");
      db.deleteDb();
      db.createDb();
 
-     var creates = requestStatsTest("httpd", "document_creates").current;
+     var creates = requestStatsTest("couchdb", "database_changes").current;
      db.save({"a":"1"});
-     var new_creates = requestStatsTest("httpd", "document_creates").current;
+     var new_creates = requestStatsTest("couchdb", "database_changes").current;
 
      TEquals(creates + 1, new_creates, name);
    },
-   'should not increment counter for document creates when updating a doc': function(name) {
+   'should increment database changes counter for document updates': function(name) {
      var db = new CouchDB("test_suite_db");
      db.deleteDb();
      db.createDb();
@@ -227,38 +227,13 @@ couchTests.stats = function(debug) {
      var doc = {"_id":"test"};
      db.save(doc);
      
-     var creates = requestStatsTest("httpd", "document_creates").current;
+     var updates = requestStatsTest("couchdb", "database_changes").current;
      db.save(doc);
-     var new_creates = requestStatsTest("httpd", "document_creates").current;
-
-     TEquals(creates, new_creates, name);
-   },
-   'should increment counter for document updates': function(name) {
-     var db = new CouchDB("test_suite_db");
-     db.deleteDb();
-     db.createDb();
-
-     var doc = {"_id":"test"};
-     db.save(doc);
-     
-     var updates = requestStatsTest("httpd", "document_updates").current;
-     db.save(doc);
-     var new_updates = requestStatsTest("httpd", "document_updates").current;
+     var new_updates = requestStatsTest("couchdb", "database_changes").current;
 
      TEquals(updates + 1, new_updates, name);
    },
-   'should not increment counter for document updates when creating a document': function(name) {
-     var db = new CouchDB("test_suite_db");
-     db.deleteDb();
-     db.createDb();
-
-     var updates = requestStatsTest("httpd", "document_updates").current;
-     db.save({"a":"1"});
-     var new_updates = requestStatsTest("httpd", "document_updates").current;
-
-     TEquals(updates, new_updates, name);
-   },
-   'should increment counter for document deletes': function(name) {
+   'should increment database changes counter for document deletes': function(name) {
      var db = new CouchDB("test_suite_db");
      db.deleteDb();
      db.createDb();
@@ -266,13 +241,13 @@ couchTests.stats = function(debug) {
      var doc = {"_id":"test"};
      db.save(doc);
      
-     var deletes = requestStatsTest("httpd", "document_deletes").current;
+     var deletes = requestStatsTest("couchdb", "database_changes").current;
      db.deleteDoc(doc);
-     var new_deletes = requestStatsTest("httpd", "document_deletes").current;
+     var new_deletes = requestStatsTest("couchdb", "database_changes").current;
 
      TEquals(deletes + 1, new_deletes, name);
    },
-   'should increment the copy counter': function(name) {
+   'should increment database changes counter for document copies': function(name) {
      var db = new CouchDB("test_suite_db");
      db.deleteDb();
      db.createDb();
@@ -280,15 +255,15 @@ couchTests.stats = function(debug) {
      var doc = {"_id":"test"};
      db.save(doc);
 
-     var copies = requestStatsTest("httpd", "document_copies").current;
+     var copies = requestStatsTest("couchdb", "database_changes").current;
      CouchDB.request("COPY", "/test_suite_db/test", {
        headers: {"Destination":"copy_of_test"}
      });
-     var new_copies = requestStatsTest("httpd", "document_copies").current;
+     var new_copies = requestStatsTest("couchdb", "database_changes").current;
 
      TEquals(copies + 1, new_copies, name);
    },
-   'should increment the move counter': function(name) {
+   'should increment database changes counter for document moves': function(name) {
      var db = new CouchDB("test_suite_db");
      db.deleteDb();
      db.createDb();
@@ -296,11 +271,11 @@ couchTests.stats = function(debug) {
      var doc = {"_id":"test"};
      db.save(doc);
 
-     var moves = requestStatsTest("httpd", "document_moves").current;
+     var moves = requestStatsTest("couchdb", "database_changes").current;
      CouchDB.request("MOVE", "/test_suite_db/test?rev=" + doc._rev, {
        headers: {"Destination":"move_of_test"}
      });
-     var new_moves = requestStatsTest("httpd", "document_moves").current;
+     var new_moves = requestStatsTest("couchdb", "database_changes").current;
 
      TEquals(moves + 1, new_moves, name);
    },
@@ -318,31 +293,31 @@ couchTests.stats = function(debug) {
 
      TEquals(bulks + 1, new_bulks, name);
    },
-   'should increment counter for document creates using POST': function(name) {
+   'should increment database changes counter for document creates using POST': function(name) {
      var db = new CouchDB("test_suite_db");
      db.deleteDb();
      db.createDb();
 
-     var creates = requestStatsTest("httpd", "document_creates").current;
+     var creates = requestStatsTest("couchdb", "database_changes").current;
      CouchDB.request("POST", "/test_suite_db", {body:'{"a":"1"}'});
-     var new_creates = requestStatsTest("httpd", "document_creates").current;
+     var new_creates = requestStatsTest("couchdb", "database_changes").current;
 
      TEquals(creates + 1, new_creates, name);
    },
-   'should increment document create counter when adding attachment': function(name) {
+   'should increment database changes counter when adding attachment': function(name) {
      var db = new CouchDB("test_suite_db");
      db.deleteDb();
      db.createDb();
 
-     var creates = requestStatsTest("httpd", "document_creates").current;
+     var creates = requestStatsTest("couchdb", "database_changes").current;
      CouchDB.request("PUT", "/test_suite_db/bin_doc2/foo2.txt", {
            body:"This is no base64 encoded text",
            headers:{"Content-Type": "text/plain;charset=utf-8"}
      });
-     var new_creates = requestStatsTest("httpd", "document_creates").current;
+     var new_creates = requestStatsTest("couchdb", "database_changes").current;
      TEquals(creates + 1, new_creates, name);
    },
-   'should increment document update counter when adding attachment to existing doc': function(name) {
+   'should increment database changes counter when adding attachment to existing doc': function(name) {
      var db = new CouchDB("test_suite_db");
      db.deleteDb();
      db.createDb();
@@ -350,12 +325,12 @@ couchTests.stats = function(debug) {
      var doc = {_id:"test"};
      db.save(doc);
 
-     var updates = requestStatsTest("httpd", "document_updates").current;
+     var updates = requestStatsTest("couchdb", "database_changes").current;
      CouchDB.request("PUT", "/test_suite_db/test/foo2.txt?rev=" + doc._rev, {
            body:"This is no base64 encoded text",
            headers:{"Content-Type": "text/plain;charset=utf-8"}
      });
-     var new_updates = requestStatsTest("httpd", "document_updates").current;
+     var new_updates = requestStatsTest("couchdb", "database_changes").current;
      TEquals(updates + 1, new_updates, name);
    }
 
@@ -428,7 +403,7 @@ couchTests.stats = function(debug) {
    var tests = [
      open_databases_tests,
      request_count_tests, 
-     document_read_count_tests, 
+     database_read_count_tests, 
      view_read_count_tests, 
      http_requests_by_method_tests,
      document_write_count_tests,
