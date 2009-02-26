@@ -35,7 +35,6 @@ open(Filepath, Options) ->
     case gen_server:start_link(couch_file,
             {Filepath, Options, self(), Ref = make_ref()}, []) of
     {ok, Fd} ->
-        couch_file_stats:track_file(Fd),
         {ok, Fd};
     ignore ->
         % get the error
@@ -270,6 +269,7 @@ init_status_error(ReturnPid, Ref, Error) ->
 % server functions
 
 init({Filepath, Options, ReturnPid, Ref}) ->
+    process_flag(trap_exit, true),
     case lists:member(create, Options) of
     true ->
         filelib:ensure_dir(Filepath),
@@ -285,12 +285,14 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                 true ->
                     {ok, 0} = file:position(Fd, 0),
                     ok = file:truncate(Fd),
+                    couch_stats_collector:increment({couchdb, os_files_open}),
                     {ok, Fd};
                 false ->
                     ok = file:close(Fd),
                     init_status_error(ReturnPid, Ref, file_exists)
                 end;
             false ->
+                couch_stats_collector:increment({couchdb, os_files_open}),
                 {ok, Fd}
             end;
         Error ->
@@ -302,6 +304,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
         {ok, Fd_Read} ->
             {ok, Fd} = file:open(Filepath, [read, write, raw, binary]),
             ok = file:close(Fd_Read),
+            couch_stats_collector:increment({couchdb, os_files_open}),
             {ok, Fd};
         Error ->
             init_status_error(ReturnPid, Ref, Error)
@@ -310,6 +313,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
 
 
 terminate(_Reason, _Fd) ->
+    couch_stats_collector:decrement({couchdb, os_files_open}),
     ok.
 
 
@@ -345,5 +349,5 @@ handle_cast(close, Fd) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-handle_info(foo, Fd) ->
-    {stop, foo, Fd}.
+handle_info({'EXIT', _, Reason}, Fd) ->
+    {stop, Reason, Fd}.
