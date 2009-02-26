@@ -56,6 +56,7 @@ couchTests.stats = function(debug) {
           value: max.toString()}],
 
         function () {
+          var files_open = requestStatsTest("couchdb", "os_files_open").current;
           for(var i=0; i<max+1; i++) {
             var db = new CouchDB("test_suite_db" + i);
             db.deleteDb();
@@ -65,11 +66,11 @@ couchTests.stats = function(debug) {
           var open_databases = requestStatsTest("couchdb", "open_databases").max;
           T(max >= open_databases, name);
 
-          // not needed for the test but cleanup is nice
           for(var i=0; i<max+1; i++) {
             var db = new CouchDB("test_suite_db" + i);
             db.deleteDb();
           }
+          T(files_open == requestStatsTest("couchdb", "os_files_open").current);
         })
     },
  };

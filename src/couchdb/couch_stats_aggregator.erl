@@ -299,6 +299,7 @@ init_descriptions() ->
     ets:insert(?MODULE, {{couchdb, database_changes}, <<"Number of times a database was changed">>}),
     ets:insert(?MODULE, {{couchdb, database_reads}, <<"Number of times a document was read from a database">>}),
     ets:insert(?MODULE, {{couchdb, open_databases}, <<"Number of open databases">>}),
+    ets:insert(?MODULE, {{couchdb, os_files_open}, <<"Number of file descriptors CouchDB has open.">>}),
     ets:insert(?MODULE, {{couchdb, request_time}, <<"Length of a request inside CouchDB without Mochiweb">>}),
 
     ets:insert(?MODULE, {{http_status_codes, '200'}, <<"Number of HTTP 200 OK responses">>}),
