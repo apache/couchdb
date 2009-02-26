@@ -295,38 +295,42 @@ init_descriptions() ->
     % handles the time_passed message. But don't tell anyone, the math is
     % correct :) -- Jan
 
+
+    % Style guide for descriptions: Start with a lowercase letter & do not add 
+    % a trailing full-stop / period.
+    
     % please keep this in alphabetical order
-    ets:insert(?MODULE, {{couchdb, database_changes}, <<"Number of times a database was changed">>}),
-    ets:insert(?MODULE, {{couchdb, database_reads}, <<"Number of times a document was read from a database">>}),
-    ets:insert(?MODULE, {{couchdb, open_databases}, <<"Number of open databases">>}),
-    ets:insert(?MODULE, {{couchdb, os_files_open}, <<"Number of file descriptors CouchDB has open.">>}),
-    ets:insert(?MODULE, {{couchdb, request_time}, <<"Length of a request inside CouchDB without Mochiweb">>}),
+    ets:insert(?MODULE, {{couchdb, database_changes}, <<"number of times a database was changed">>}),
+    ets:insert(?MODULE, {{couchdb, database_reads}, <<"number of times a document was read from a database">>}),
+    ets:insert(?MODULE, {{couchdb, open_databases}, <<"number of open databases">>}),
+    ets:insert(?MODULE, {{couchdb, os_files_open}, <<"number of file descriptors CouchDB has open">>}),
+    ets:insert(?MODULE, {{couchdb, request_time}, <<"length of a request inside CouchDB without Mochiweb">>}),
 
-    ets:insert(?MODULE, {{http_status_codes, '200'}, <<"Number of HTTP 200 OK responses">>}),
-    ets:insert(?MODULE, {{http_status_codes, '201'}, <<"Number of HTTP 201 Created responses">>}),
-    ets:insert(?MODULE, {{http_status_codes, '202'}, <<"Number of HTTP 202 Accepted responses">>}),
-    ets:insert(?MODULE, {{http_status_codes, '301'}, <<"Number of HTTP 301 Moved Permanently responses">>}),
-    ets:insert(?MODULE, {{http_status_codes, '304'}, <<"Number of HTTP 304 Not Modified responses">>}),
-    ets:insert(?MODULE, {{http_status_codes, '400'}, <<"Number of HTTP 400 Bad Request responses">>}),
-    ets:insert(?MODULE, {{http_status_codes, '401'}, <<"Number of HTTP 401 Unauthorized responses">>}),
-    ets:insert(?MODULE, {{http_status_codes, '403'}, <<"Number of HTTP 403 Forbidden responses">>}),
-    ets:insert(?MODULE, {{http_status_codes, '404'}, <<"Number of HTTP 404 Not Found responses">>}),
-    ets:insert(?MODULE, {{http_status_codes, '405'}, <<"Number of HTTP 405 Method Not Allowed responses">>}),
-    ets:insert(?MODULE, {{http_status_codes, '409'}, <<"Number of HTTP 409 Conflict responses">>}),
-    ets:insert(?MODULE, {{http_status_codes, '412'}, <<"Number of HTTP 412 Precondition Failed responses">>}),
-    ets:insert(?MODULE, {{http_status_codes, '500'}, <<"Number of HTTP 500 Internal Server Error responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '200'}, <<"number of HTTP 200 OK responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '201'}, <<"number of HTTP 201 Created responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '202'}, <<"number of HTTP 202 Accepted responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '301'}, <<"number of HTTP 301 Moved Permanently responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '304'}, <<"number of HTTP 304 Not Modified responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '400'}, <<"number of HTTP 400 Bad Request responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '401'}, <<"number of HTTP 401 Unauthorized responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '403'}, <<"number of HTTP 403 Forbidden responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '404'}, <<"number of HTTP 404 Not Found responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '405'}, <<"number of HTTP 405 Method Not Allowed responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '409'}, <<"number of HTTP 409 Conflict responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '412'}, <<"number of HTTP 412 Precondition Failed responses">>}),
+    ets:insert(?MODULE, {{http_status_codes, '500'}, <<"number of HTTP 500 Internal Server Error responses">>}),
 
-    ets:insert(?MODULE, {{httpd, bulk_requests}, <<"Number of bulk requests">>}),
-    ets:insert(?MODULE, {{httpd, copy_requests}, <<"Number of HTTP COPY requests">>}),
-    ets:insert(?MODULE, {{httpd, delete_requests}, <<"Number of HTTP DELETE requests">>}),
-    ets:insert(?MODULE, {{httpd, get_requests}, <<"Number of HTTP GET requests">>}),
-    ets:insert(?MODULE, {{httpd, head_requests}, <<"Number of HTTP HEAD requests">>}),
-    ets:insert(?MODULE, {{httpd, move_requests}, <<"Number of HTTP MOVE requests">>}),
-    ets:insert(?MODULE, {{httpd, post_requests}, <<"Number of HTTP POST requests">>}),
-    ets:insert(?MODULE, {{httpd, requests}, <<"Number of HTTP requests">>}),
-    ets:insert(?MODULE, {{httpd, temporary_view_reads}, <<"Number of temporary view reads">>}),
-    ets:insert(?MODULE, {{httpd, view_reads}, <<"Number of view reads">>}),
-    ets:insert(?MODULE, {{httpd, put_requests}, <<"Number of HTTP PUT requests">>}).
+    ets:insert(?MODULE, {{httpd, bulk_requests}, <<"number of bulk requests">>}),
+    ets:insert(?MODULE, {{httpd, copy_requests}, <<"number of HTTP COPY requests">>}),
+    ets:insert(?MODULE, {{httpd, delete_requests}, <<"number of HTTP DELETE requests">>}),
+    ets:insert(?MODULE, {{httpd, get_requests}, <<"number of HTTP GET requests">>}),
+    ets:insert(?MODULE, {{httpd, head_requests}, <<"number of HTTP HEAD requests">>}),
+    ets:insert(?MODULE, {{httpd, move_requests}, <<"number of HTTP MOVE requests">>}),
+    ets:insert(?MODULE, {{httpd, post_requests}, <<"number of HTTP POST requests">>}),
+    ets:insert(?MODULE, {{httpd, requests}, <<"number of HTTP requests">>}),
+    ets:insert(?MODULE, {{httpd, temporary_view_reads}, <<"number of temporary view reads">>}),
+    ets:insert(?MODULE, {{httpd, view_reads}, <<"number of view reads">>}),
+    ets:insert(?MODULE, {{httpd, put_requests}, <<"number of HTTP PUT requests">>}).
     % please keep this in alphabetical order
 
 
