@@ -17,6 +17,6 @@
     variance = 0.0,
     stddev = 0.0,
     count = 0,
-    last = 0,
+    current = 0,
     description
 }).
