@@ -187,22 +187,22 @@ couchTests.stats = function(debug) {
  
  var http_requests_by_method_tests = {
    'should count GET requests': function(name) {
-     var requests = requestStatsTest("httpd", "get_requests").current;
-     var new_requests = requestStatsTest("httpd", "get_requests").current;
+     var requests = requestStatsTest("httpd_request_methods", "GET").current;
+     var new_requests = requestStatsTest("httpd_request_methods", "GET").current;
 
      TEquals(requests + 1, new_requests, name);
    },
    'should not count GET requests for POST request': function(name) {
-     var requests = requestStatsTest("httpd", "get_requests").current;
+     var requests = requestStatsTest("httpd_request_methods", "GET").current;
      CouchDB.request("POST", "/");
-     var new_requests = requestStatsTest("httpd", "get_requests").current;
+     var new_requests = requestStatsTest("httpd_request_methods", "GET").current;
 
      TEquals(requests + 1, new_requests, name);        
    },
    'should count POST requests': function(name) {
-     var requests = requestStatsTest("httpd", "post_requests").current;
+     var requests = requestStatsTest("httpd_request_methods", "POST").current;
      CouchDB.request("POST", "/");
-     var new_requests = requestStatsTest("httpd", "post_requests").current;
+     var new_requests = requestStatsTest("httpd_request_methods", "POST").current;
 
      TEquals(requests + 1, new_requests, name);
    }
@@ -341,9 +341,9 @@ couchTests.stats = function(debug) {
      var db = new CouchDB("nonexistant_db");
      db.deleteDb();
 
-     var not_founds = requestStatsTest("http_status_codes", "404").current;
+     var not_founds = requestStatsTest("httpd_status_codes", "404").current;
      CouchDB.request("GET", "/nonexistant_db");
-     var new_not_founds = requestStatsTest("http_status_codes", "404").current;
+     var new_not_founds = requestStatsTest("httpd_status_codes", "404").current;
 
      TEquals(not_founds + 1, new_not_founds, name);
    },

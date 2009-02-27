@@ -176,8 +176,7 @@ handle_request(MochiReq, UrlHandlers, DbUrlHandlers) ->
     {ok, Resp}.
 
 increment_method_stats(Method) ->
-    CounterName = list_to_atom(string:to_lower(atom_to_list(Method)) ++ "_requests"),
-    couch_stats_collector:increment({httpd, CounterName}).
+    couch_stats_collector:increment({httpd_request_methods, Method}).
 
 special_test_authentication_handler(Req) ->
     case header_value(Req, "WWW-Authenticate") of
@@ -338,7 +337,7 @@ basic_username_pw(Req) ->
 
 
 start_chunked_response(#httpd{mochi_req=MochiReq}, Code, Headers) ->
-    couch_stats_collector:increment({http_status_codes, Code}),
+    couch_stats_collector:increment({httpd_status_codes, Code}),
     {ok, MochiReq:respond({Code, Headers ++ server_header(), chunked})}.
 
 send_chunk(Resp, Data) ->
@@ -346,7 +345,7 @@ send_chunk(Resp, Data) ->
     {ok, Resp}.
 
 send_response(#httpd{mochi_req=MochiReq}, Code, Headers, Body) ->
-    couch_stats_collector:increment({http_status_codes, Code}),
+    couch_stats_collector:increment({httpd_status_codes, Code}),
     if Code >= 400 ->
         ?LOG_DEBUG("HTTPd ~p error response:~n ~s", [Code, Body]);
     true -> ok

@@ -147,13 +147,14 @@ get_aggregate(Key, State) ->
     %% default Time is 0, which is when CouchDB started
     get_aggregate(Key, State, '0').
 get_aggregate(Key, #state{aggregates=StatsList}, Time) ->
+    Description = get_description(Key),
     Aggregates = case proplists:lookup(Key, StatsList) of
         % if we don't have any data here, return an empty record
-        none -> #aggregates{};
+        none -> #aggregates{description=Description};
         {Key, Stats} ->
             case proplists:lookup(Time, Stats) of
-                none -> #aggregates{}; % empty record again
-                {Time, Stat} -> Stat#aggregates{description=get_description(Key)}
+                none -> #aggregates{description=Description}; % empty record again
+                {Time, Stat} -> Stat#aggregates{description=Description}
             end
     end,
     Aggregates.
@@ -217,7 +218,7 @@ update_aggregates(Value, Stat, CounterType) ->
             variance=0,
             stddev=0,
             count=1,
-            last=Value
+            current=Value
         };
         % this sure could look nicer -- any ideas?
         StatsRecord ->
@@ -227,12 +228,12 @@ update_aggregates(Value, Stat, CounterType) ->
                 mean=Mean,
                 variance=Variance,
                 count=Count,
-                last=Last
+                current=Current
             } = StatsRecord,
 
             % incremental counters need to keep track of the last update's value
             NewValue = case CounterType of
-                incremental -> Value - Last;
+                incremental -> Value - Current;
                 absolute -> Value
             end,
                 % Knuth, The Art of Computer Programming, vol. 2, p. 232. 
@@ -246,15 +247,14 @@ update_aggregates(Value, Stat, CounterType) ->
                     variance=NewVariance,
                     stddev=math:sqrt(NewVariance / NewCount),
                     count=NewCount,
-                    last=Value
+                    current=Value
                 }
     end.
 
 
-aggregate_to_json_term(#aggregates{min=Min,max=Max,mean=Mean,stddev=Stddev,count=Count,last=Last,description=Description}) ->
+aggregate_to_json_term(#aggregates{min=Min,max=Max,mean=Mean,stddev=Stddev,count=Count,current=Current,description=Description}) ->
     {[
-        % current is redundant, but reads nicer in JSON
-        {current, Last},
+        {current, Current},
         {count, Count},
         {mean, Mean},
         {min, Min},
@@ -305,32 +305,33 @@ init_descriptions() ->
     ets:insert(?MODULE, {{couchdb, open_databases}, <<"number of open databases">>}),
     ets:insert(?MODULE, {{couchdb, os_files_open}, <<"number of file descriptors CouchDB has open">>}),
     ets:insert(?MODULE, {{couchdb, request_time}, <<"length of a request inside CouchDB without Mochiweb">>}),
-
-    ets:insert(?MODULE, {{http_status_codes, '200'}, <<"number of HTTP 200 OK responses">>}),
-    ets:insert(?MODULE, {{http_status_codes, '201'}, <<"number of HTTP 201 Created responses">>}),
-    ets:insert(?MODULE, {{http_status_codes, '202'}, <<"number of HTTP 202 Accepted responses">>}),
-    ets:insert(?MODULE, {{http_status_codes, '301'}, <<"number of HTTP 301 Moved Permanently responses">>}),
-    ets:insert(?MODULE, {{http_status_codes, '304'}, <<"number of HTTP 304 Not Modified responses">>}),
-    ets:insert(?MODULE, {{http_status_codes, '400'}, <<"number of HTTP 400 Bad Request responses">>}),
-    ets:insert(?MODULE, {{http_status_codes, '401'}, <<"number of HTTP 401 Unauthorized responses">>}),
-    ets:insert(?MODULE, {{http_status_codes, '403'}, <<"number of HTTP 403 Forbidden responses">>}),
-    ets:insert(?MODULE, {{http_status_codes, '404'}, <<"number of HTTP 404 Not Found responses">>}),
-    ets:insert(?MODULE, {{http_status_codes, '405'}, <<"number of HTTP 405 Method Not Allowed responses">>}),
-    ets:insert(?MODULE, {{http_status_codes, '409'}, <<"number of HTTP 409 Conflict responses">>}),
-    ets:insert(?MODULE, {{http_status_codes, '412'}, <<"number of HTTP 412 Precondition Failed responses">>}),
-    ets:insert(?MODULE, {{http_status_codes, '500'}, <<"number of HTTP 500 Internal Server Error responses">>}),
-
+    
     ets:insert(?MODULE, {{httpd, bulk_requests}, <<"number of bulk requests">>}),
-    ets:insert(?MODULE, {{httpd, copy_requests}, <<"number of HTTP COPY requests">>}),
-    ets:insert(?MODULE, {{httpd, delete_requests}, <<"number of HTTP DELETE requests">>}),
-    ets:insert(?MODULE, {{httpd, get_requests}, <<"number of HTTP GET requests">>}),
-    ets:insert(?MODULE, {{httpd, head_requests}, <<"number of HTTP HEAD requests">>}),
-    ets:insert(?MODULE, {{httpd, move_requests}, <<"number of HTTP MOVE requests">>}),
-    ets:insert(?MODULE, {{httpd, post_requests}, <<"number of HTTP POST requests">>}),
     ets:insert(?MODULE, {{httpd, requests}, <<"number of HTTP requests">>}),
     ets:insert(?MODULE, {{httpd, temporary_view_reads}, <<"number of temporary view reads">>}),
     ets:insert(?MODULE, {{httpd, view_reads}, <<"number of view reads">>}),
-    ets:insert(?MODULE, {{httpd, put_requests}, <<"number of HTTP PUT requests">>}).
+    
+    ets:insert(?MODULE, {{httpd_request_methods, 'COPY'}, <<"number of HTTP COPY requests">>}),
+    ets:insert(?MODULE, {{httpd_request_methods, 'DELETE'}, <<"number of HTTP DELETE requests">>}),
+    ets:insert(?MODULE, {{httpd_request_methods, 'GET'}, <<"number of HTTP GET requests">>}),
+    ets:insert(?MODULE, {{httpd_request_methods, 'HEAD'}, <<"number of HTTP HEAD requests">>}),
+    ets:insert(?MODULE, {{httpd_request_methods, 'MOVE'}, <<"number of HTTP MOVE requests">>}),
+    ets:insert(?MODULE, {{httpd_request_methods, 'POST'}, <<"number of HTTP POST requests">>}),
+    ets:insert(?MODULE, {{httpd_request_methods, 'PUT'}, <<"number of HTTP PUT requests">>}),
+    
+    ets:insert(?MODULE, {{httpd_status_codes, '200'}, <<"number of HTTP 200 OK responses">>}),
+    ets:insert(?MODULE, {{httpd_status_codes, '201'}, <<"number of HTTP 201 Created responses">>}),
+    ets:insert(?MODULE, {{httpd_status_codes, '202'}, <<"number of HTTP 202 Accepted responses">>}),
+    ets:insert(?MODULE, {{httpd_status_codes, '301'}, <<"number of HTTP 301 Moved Permanently responses">>}),
+    ets:insert(?MODULE, {{httpd_status_codes, '304'}, <<"number of HTTP 304 Not Modified responses">>}),
+    ets:insert(?MODULE, {{httpd_status_codes, '400'}, <<"number of HTTP 400 Bad Request responses">>}),
+    ets:insert(?MODULE, {{httpd_status_codes, '401'}, <<"number of HTTP 401 Unauthorized responses">>}),
+    ets:insert(?MODULE, {{httpd_status_codes, '403'}, <<"number of HTTP 403 Forbidden responses">>}),
+    ets:insert(?MODULE, {{httpd_status_codes, '404'}, <<"number of HTTP 404 Not Found responses">>}),
+    ets:insert(?MODULE, {{httpd_status_codes, '405'}, <<"number of HTTP 405 Method Not Allowed responses">>}),
+    ets:insert(?MODULE, {{httpd_status_codes, '409'}, <<"number of HTTP 409 Conflict responses">>}),
+    ets:insert(?MODULE, {{httpd_status_codes, '412'}, <<"number of HTTP 412 Precondition Failed responses">>}),
+    ets:insert(?MODULE, {{httpd_status_codes, '500'}, <<"number of HTTP 500 Internal Server Error responses">>}).
     % please keep this in alphabetical order
 
 
