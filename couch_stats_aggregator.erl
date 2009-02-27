@@ -260,7 +260,6 @@ aggregate_to_json_term(#aggregates{min=Min,max=Max,mean=Mean,stddev=Stddev,count
         {min, Min},
         {max, Max},
         {stddev, Stddev},
-        {resolution, 1},
         {description, Description}
     ]}.
 
@@ -271,7 +270,7 @@ get_stats(Key, State) ->
 % Thanks to Paul Davis
 do_get_all(#state{aggregates=Stats}=State) ->
     case Stats of
-        [] -> {[{ok, no_stats_yet}]};
+        [] -> {[{}]};
         _ ->
         [{LastMod, LastVals} | LastRestMods] = lists:foldl(fun({{Module, Key}, _Count}, AccIn) ->
               case AccIn of
