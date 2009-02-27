@@ -393,7 +393,7 @@ couchTests.stats = function(debug) {
      options.headers = {"Accept": "application/json"};
      var summary = JSON.parse(CouchDB.request("GET", "/_stats", options).responseText);
      var aggregates = ["mean", "min", "max", "stddev", 
-       "current", "resolution"];
+       "current"];
 
      for(var i in aggregates) {
        T(summary.httpd.requests[aggregates[i]] >= 0, aggregates[i] + " >= 0", name);
