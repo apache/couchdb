@@ -193,9 +193,27 @@ couchTests.list_views = function(debug) {
   T(/Key: 1/.test(xhr.responseText));
   
   // when there is a reduce present, and used
-  var xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/simpleForm/withReduce?group=true");
+  xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/simpleForm/withReduce?group=true");
   T(xhr.status == 200);
   T(/Key: 1/.test(xhr.responseText));
+  
+  // there should be etags on reduce as well
+  var etag = xhr.getResponseHeader("etag");
+  T(etag, "Etags should be served with reduce lists");
+  xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/simpleForm/withReduce?group=true", {
+    headers: {"if-none-match": etag}
+  });
+  T(xhr.status == 304);
+  
+  // verify the etags expire correctly
+  var docs = makeDocs(11, 12);
+  var saveResult = db.bulkSave(docs);
+  T(saveResult.ok);
+  
+  xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/simpleForm/withReduce?group=true", {
+    headers: {"if-none-match": etag}
+  });
+  T(xhr.status == 200);
   
   // with accept headers for HTML
   xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/acceptSwitch/basicView", {
