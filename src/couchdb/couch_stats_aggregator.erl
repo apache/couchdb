@@ -303,7 +303,7 @@ init_descriptions() ->
     ets:insert(?MODULE, {{couchdb, database_reads}, <<"number of times a document was read from a database">>}),
     ets:insert(?MODULE, {{couchdb, open_databases}, <<"number of open databases">>}),
     ets:insert(?MODULE, {{couchdb, os_files_open}, <<"number of file descriptors CouchDB has open">>}),
-    ets:insert(?MODULE, {{couchdb, request_time}, <<"length of a request inside CouchDB without Mochiweb">>}),
+    ets:insert(?MODULE, {{couchdb, request_time}, <<"length of a request inside CouchDB without MochiWeb">>}),
     
     ets:insert(?MODULE, {{httpd, bulk_requests}, <<"number of bulk requests">>}),
     ets:insert(?MODULE, {{httpd, requests}, <<"number of HTTP requests">>}),
