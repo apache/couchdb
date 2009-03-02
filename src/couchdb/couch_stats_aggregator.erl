@@ -270,7 +270,7 @@ get_stats(Key, State) ->
 % Thanks to Paul Davis
 do_get_all(#state{aggregates=Stats}=State) ->
     case Stats of
-        [] -> {[{}]};
+        [] -> {[]};
         _ ->
         [{LastMod, LastVals} | LastRestMods] = lists:foldl(fun({{Module, Key}, _Count}, AccIn) ->
               case AccIn of
