@@ -20,6 +20,7 @@ BACKGROUND_BOOLEAN=false
 KILL_BOOLEAN=false
 SHUTDOWN_BOOLEAN=false
 RECURSED_BOOLEAN=false
+RESET_CONFIG_BOOLEAN=true
 
 RESPAWN_TIMEOUT=0
 
@@ -70,6 +71,7 @@ Options:
   -h          display a short help message and exit
   -V          display version information and exit
   -c FILE     use configuration FILE (chainable, resets system default)
+  -C FILE     use configuration FILE (chainable, does not reset system default)
   -i          use the interactive Erlang shell
   -b          spawn as a background process
   -p FILE     set the background PID FILE (overrides system default)
@@ -168,7 +170,11 @@ start_couchdb () {
         interactive_option="+Bd -noinput"
     fi
     if test -n "$INI_FILES"; then
-        ini_files="$INI_FILES"
+        if test "$RESET_CONFIG_BOOLEAN" = "true"; then
+            ini_files="$INI_FILES"
+        else
+            ini_files="$DEFAULT_INI_FILE $INI_FILES"
+        fi
     else
         ini_files="$DEFAULT_INI_FILE $LOCAL_INI_FILE"
     fi
@@ -258,7 +264,7 @@ stop_couchdb () {
 
 parse_script_option_list () {
     set +e
-    options=`getopt hVc:ibp:r:Ro:e:skd $@`
+    options=`getopt hVc:C:ibp:r:Ro:e:skd $@`
     if test ! $? -eq 0; then
         display_error
     fi
@@ -269,6 +275,7 @@ parse_script_option_list () {
             -h) shift; display_help; exit $SCRIPT_OK;;
             -V) shift; display_version; exit $SCRIPT_OK;;
             -c) shift; INI_FILES="$INI_FILES $1"; shift;;
+            -C) shift; RESET_CONFIG_BOOLEAN=false; INI_FILES="$INI_FILES $1"; shift;;
             -i) shift; INTERACTIVE_BOOLEAN=true;;
             -b) shift; BACKGROUND_BOOLEAN=true;;
             -r) shift; RESPAWN_TIMEOUT=$1; shift;;
