@@ -286,7 +286,7 @@ update_docs(#db{update_pid=UpdatePid}=Db, Docs, Options) ->
     update_docs(#db{update_pid=UpdatePid}=Db, Docs, Options, true).
 
 update_docs(Db, Docs, Options, false) ->
-    couch_stats_collector:increment({couchdb, database_changes}),
+    couch_stats_collector:increment({couchdb, database_writes}),
     DocBuckets = group_alike_docs(Docs),
     Ids = [Id || [#doc{id=Id}|_] <- DocBuckets],
     
@@ -323,7 +323,7 @@ update_docs(Db, Docs, Options, false) ->
     write_and_commit(Db, DocBuckets2, Options);
     
 update_docs(Db, Docs, Options, true) ->
-    couch_stats_collector:increment({couchdb, database_changes}),
+    couch_stats_collector:increment({couchdb, database_writes}),
 
     % go ahead and generate the new revision ids for the documents.
     Docs2 = lists:map(
