@@ -29,7 +29,7 @@ couchdb: couchdb.tpl
 	    -e "s|%bindir%|@bindir@|g" \
 	    -e "s|%localerlanglibdir%|@localerlanglibdir@|g" \
 	    -e "s|%couchdbebindir%|couch-@version@/ebin|g" \
-	    -e "s|%mochiwebebindir%|mochiweb-r82/ebin|g" \
+	    -e "s|%mochiwebebindir%|mochiweb-r97/ebin|g" \
 	    -e "s|%ibrowseebindir%|ibrowse-1.4.1/ebin|g" \
 	    -e "s|%defaultini%|default.ini|g" \
 	    -e "s|%localini%|local.ini|g" \
