@@ -285,14 +285,14 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                 true ->
                     {ok, 0} = file:position(Fd, 0),
                     ok = file:truncate(Fd),
-                    couch_stats_collector:increment({couchdb, os_files_open}),
+                    couch_stats_collector:increment({couchdb, open_os_files}),
                     {ok, Fd};
                 false ->
                     ok = file:close(Fd),
                     init_status_error(ReturnPid, Ref, file_exists)
                 end;
             false ->
-                couch_stats_collector:increment({couchdb, os_files_open}),
+                couch_stats_collector:increment({couchdb, open_os_files}),
                 {ok, Fd}
             end;
         Error ->
@@ -304,7 +304,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
         {ok, Fd_Read} ->
             {ok, Fd} = file:open(Filepath, [read, write, raw, binary]),
             ok = file:close(Fd_Read),
-            couch_stats_collector:increment({couchdb, os_files_open}),
+            couch_stats_collector:increment({couchdb, open_os_files}),
             {ok, Fd};
         Error ->
             init_status_error(ReturnPid, Ref, Error)
@@ -313,7 +313,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
 
 
 terminate(_Reason, _Fd) ->
-    couch_stats_collector:decrement({couchdb, os_files_open}),
+    couch_stats_collector:decrement({couchdb, open_os_files}),
     ok.
 
 
