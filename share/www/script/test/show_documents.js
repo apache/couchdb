@@ -21,11 +21,15 @@ couchTests.show_documents = function(debug) {
     _id:"_design/template",
     language: "javascript",
     shows: {
-      "hello" : stringFun(function(doc) { 
+      "hello" : stringFun(function(doc, req) { 
         if (doc) {
-          return "Hello World";             
+          return "Hello World";
         } else {
-          return "Empty World";
+          if(req.docId) {
+            return "New World";
+          } else {
+            return "Empty World";
+          }
         }
       }),
       "just-name" : stringFun(function(doc, req) {
@@ -122,161 +126,167 @@ couchTests.show_documents = function(debug) {
   var xhr = CouchDB.request("GET", "/test_suite_db/_show/");
   T(xhr.status == 404);
   T(JSON.parse(xhr.responseText).reason == "Invalid path.");
-
+  
   // hello template world
   xhr = CouchDB.request("GET", "/test_suite_db/_show/template/hello/"+docid);
   T(xhr.responseText == "Hello World");
-
+ 
   // hello template world (no docid)
-  xhr = CouchDB.request("GET", "/test_suite_db/_show/template/hello");
+  xhr = CouchDB.request("GET", "/test_suite_db/_show/template/hello/");
   T(xhr.responseText == "Empty World");
 
+  // // hello template world (non-existing docid)
+  xhr = CouchDB.request("GET", "/test_suite_db/_show/template/hello/nonExistingDoc");
+  T(xhr.responseText == "New World");
   
   // show with doc
   xhr = CouchDB.request("GET", "/test_suite_db/_show/template/just-name/"+docid);
   T(xhr.responseText == "Just Rusty");
   
-  // show with missing doc
-  xhr = CouchDB.request("GET", "/test_suite_db/_show/template/just-name/missingdoc");
-  T(xhr.status == 404);
-  var resp = JSON.parse(xhr.responseText);
-  T(resp.error == "not_found");
-  T(resp.reason == "missing");
   
-  // show with missing func
-  xhr = CouchDB.request("GET", "/test_suite_db/_show/template/missing/"+docid);
-  T(xhr.status == 404);
-  
-  // missing design doc
-  xhr = CouchDB.request("GET", "/test_suite_db/_show/missingdoc/just-name/"+docid);
-  T(xhr.status == 404);
-  var resp = JSON.parse(xhr.responseText);
-  T(resp.error == "not_found");
-  
-  // query parameters
-  xhr = CouchDB.request("GET", "/test_suite_db/_show/template/req-info/"+docid+"?foo=bar", {
-    headers: {
-      "Accept": "text/html;text/plain;*/*",
-      "X-Foo" : "bar"
-    }
-  });
-  var resp = JSON.parse(xhr.responseText);
-  T(equals(resp.headers["X-Foo"], "bar"));
-  T(equals(resp.query, {foo:"bar"}));
-  T(equals(resp.verb, "GET"));
-  T(equals(resp.path[4], docid));
-  T(equals(resp.info.db_name, "test_suite_db"));
-  
-  // returning a content-type
-  xhr = CouchDB.request("GET", "/test_suite_db/_show/template/xml-type/"+docid);
-  T("application/xml" == xhr.getResponseHeader("Content-Type"));
-  T("Accept" == xhr.getResponseHeader("Vary"));
-
-  // accept header switching
-  // different mime has different etag
-  
-  xhr = CouchDB.request("GET", "/test_suite_db/_show/template/accept-switch/"+docid, {
-    headers: {"Accept": "text/html;text/plain;*/*"}
-  });
-  T("text/html" == xhr.getResponseHeader("Content-Type"));
-  T("Accept" == xhr.getResponseHeader("Vary"));
-  var etag = xhr.getResponseHeader("etag");
-
-  xhr = CouchDB.request("GET", "/test_suite_db/_show/template/accept-switch/"+docid, {
-    headers: {"Accept": "image/png;*/*"}
-  });
-  T(xhr.responseText.match(/PNG/))
-  T("image/png" == xhr.getResponseHeader("Content-Type"));
-  var etag2 = xhr.getResponseHeader("etag");
-  T(etag2 != etag);
-
-  // proper etags
-  // show with doc
-  xhr = CouchDB.request("GET", "/test_suite_db/_show/template/just-name/"+docid);
-  // extract the ETag header values
-  etag = xhr.getResponseHeader("etag");
-  // get again with etag in request
-  xhr = CouchDB.request("GET", "/test_suite_db/_show/template/just-name/"+docid, {
-    headers: {"if-none-match": etag}
-  });
-  // should be 304
-  T(xhr.status == 304);    
-
-  // update the doc
-  doc.name = "Crusty";
-  resp = db.save(doc);
-  T(resp.ok);
-  // req with same etag
-  xhr = CouchDB.request("GET", "/test_suite_db/_show/template/just-name/"+docid, {
-    headers: {"if-none-match": etag}
-  });
-  // status is 200    
-  T(xhr.status == 200);
-
-  // get new etag and request again
-  etag = xhr.getResponseHeader("etag");
-  xhr = CouchDB.request("GET", "/test_suite_db/_show/template/just-name/"+docid, {
-    headers: {"if-none-match": etag}
-  });
-  // should be 304
-  T(xhr.status == 304);
-
-  // update design doc (but not function)
-  designDoc.isChanged = true;
-  T(db.save(designDoc).ok);
-  
-  xhr = CouchDB.request("GET", "/test_suite_db/_show/template/just-name/"+docid, {
-    headers: {"if-none-match": etag}
-  });
-  // should be 304
-  T(xhr.status == 304);
-  
-  // update design doc function
-  designDoc.shows["just-name"] = (function(doc, req) {
-    return {
-      body : "Just old " + doc.name
-    };
-  }).toString();
-  T(db.save(designDoc).ok);
-
-  xhr = CouchDB.request("GET", "/test_suite_db/_show/template/just-name/"+docid, {
-    headers: {"if-none-match": etag}
-  });
-  // status is 200    
-  T(xhr.status == 200);
-  
-  
-  // JS can't set etag
-  xhr = CouchDB.request("GET", "/test_suite_db/_show/template/no-set-etag/"+docid);
-  // extract the ETag header values
-  etag = xhr.getResponseHeader("etag");
-  T(etag != "skipped")
-
-  // test the respondWith mime matcher
-  xhr = CouchDB.request("GET", "/test_suite_db/_show/template/respondWith/"+docid, {
-    headers: {
-      "Accept": 'text/html,application/atom+xml; q=0.9'
-    }
-  });
-  T(xhr.getResponseHeader("Content-Type") == "text/html");
-  T(xhr.responseText == "Ha ha, you said \"plankton\".");
-
-  // now with xml
-  xhr = CouchDB.request("GET", "/test_suite_db/_show/template/respondWith/"+docid, {
-    headers: {
-      "Accept": 'application/xml'
-    }
-  });
-  T(xhr.getResponseHeader("Content-Type") == "application/xml");
-  T(xhr.responseText.match(/node/));
-  T(xhr.responseText.match(/plankton/));
-  
-  // registering types works
-  xhr = CouchDB.request("GET", "/test_suite_db/_show/template/respondWith/"+docid, {
-    headers: {
-      "Accept": "application/x-foo"
-    }
-  });
-  T(xhr.getResponseHeader("Content-Type") == "application/x-foo");
-  T(xhr.responseText.match(/foofoo/));
+   // show with missing func
+   xhr = CouchDB.request("GET", "/test_suite_db/_show/template/missing/"+docid);
+   T(xhr.status == 404);
+   
+   // missing design doc
+   xhr = CouchDB.request("GET", "/test_suite_db/_show/missingdoc/just-name/"+docid);
+   T(xhr.status == 404);
+   var resp = JSON.parse(xhr.responseText);
+   T(resp.error == "not_found");
+   
+   // query parameters
+   xhr = CouchDB.request("GET", "/test_suite_db/_show/template/req-info/"+docid+"?foo=bar", {
+     headers: {
+       "Accept": "text/html;text/plain;*/*",
+       "X-Foo" : "bar"
+     }
+   });
+   var resp = JSON.parse(xhr.responseText);
+   T(equals(resp.headers["X-Foo"], "bar"));
+   T(equals(resp.query, {foo:"bar"}));
+   T(equals(resp.verb, "GET"));
+   T(equals(resp.path[4], docid));
+   T(equals(resp.info.db_name, "test_suite_db"));
+   
+   // returning a content-type
+   xhr = CouchDB.request("GET", "/test_suite_db/_show/template/xml-type/"+docid);
+   T("application/xml" == xhr.getResponseHeader("Content-Type"));
+   T("Accept" == xhr.getResponseHeader("Vary"));
+   
+   // accept header switching
+   // different mime has different etag
+   
+   xhr = CouchDB.request("GET", "/test_suite_db/_show/template/accept-switch/"+docid, {
+     headers: {"Accept": "text/html;text/plain;*/*"}
+   });
+   T("text/html" == xhr.getResponseHeader("Content-Type"));
+   T("Accept" == xhr.getResponseHeader("Vary"));
+   var etag = xhr.getResponseHeader("etag");
+   
+   xhr = CouchDB.request("GET", "/test_suite_db/_show/template/accept-switch/"+docid, {
+     headers: {"Accept": "image/png;*/*"}
+   });
+   T(xhr.responseText.match(/PNG/))
+   T("image/png" == xhr.getResponseHeader("Content-Type"));
+   var etag2 = xhr.getResponseHeader("etag");
+   T(etag2 != etag);
+   
+   // proper etags
+   // show with doc
+   xhr = CouchDB.request("GET", "/test_suite_db/_show/template/just-name/"+docid);
+   // extract the ETag header values
+   etag = xhr.getResponseHeader("etag");
+   // get again with etag in request
+   xhr = CouchDB.request("GET", "/test_suite_db/_show/template/just-name/"+docid, {
+     headers: {"if-none-match": etag}
+   });
+   // should be 304
+   T(xhr.status == 304);    
+   
+   // update the doc
+   doc.name = "Crusty";
+   resp = db.save(doc);
+   T(resp.ok);
+   // req with same etag
+   xhr = CouchDB.request("GET", "/test_suite_db/_show/template/just-name/"+docid, {
+     headers: {"if-none-match": etag}
+   });
+   // status is 200    
+   T(xhr.status == 200);
+   
+   // get new etag and request again
+   etag = xhr.getResponseHeader("etag");
+   xhr = CouchDB.request("GET", "/test_suite_db/_show/template/just-name/"+docid, {
+     headers: {"if-none-match": etag}
+   });
+   // should be 304
+   T(xhr.status == 304);
+   
+   // update design doc (but not function)
+   designDoc.isChanged = true;
+   T(db.save(designDoc).ok);
+   
+   xhr = CouchDB.request("GET", "/test_suite_db/_show/template/just-name/"+docid, {
+     headers: {"if-none-match": etag}
+   });
+   // should be 304
+   T(xhr.status == 304);
+   
+   // update design doc function
+   designDoc.shows["just-name"] = (function(doc, req) {
+     return {
+       body : "Just old " + doc.name
+     };
+   }).toString();
+   T(db.save(designDoc).ok);
+   
+   xhr = CouchDB.request("GET", "/test_suite_db/_show/template/just-name/"+docid, {
+     headers: {"if-none-match": etag}
+   });
+   // status is 200    
+   T(xhr.status == 200);
+   
+   
+   // JS can't set etag
+   xhr = CouchDB.request("GET", "/test_suite_db/_show/template/no-set-etag/"+docid);
+   // extract the ETag header values
+   etag = xhr.getResponseHeader("etag");
+   T(etag != "skipped")
+   
+   // test the respondWith mime matcher
+   xhr = CouchDB.request("GET", "/test_suite_db/_show/template/respondWith/"+docid, {
+     headers: {
+       "Accept": 'text/html,application/atom+xml; q=0.9'
+     }
+   });
+   T(xhr.getResponseHeader("Content-Type") == "text/html");
+   T(xhr.responseText == "Ha ha, you said \"plankton\".");
+   
+   // now with xml
+   xhr = CouchDB.request("GET", "/test_suite_db/_show/template/respondWith/"+docid, {
+     headers: {
+       "Accept": 'application/xml'
+     }
+   });
+   T(xhr.getResponseHeader("Content-Type") == "application/xml");
+   T(xhr.responseText.match(/node/));
+   T(xhr.responseText.match(/plankton/));
+   
+   // registering types works
+   xhr = CouchDB.request("GET", "/test_suite_db/_show/template/respondWith/"+docid, {
+     headers: {
+       "Accept": "application/x-foo"
+     }
+   });
+   T(xhr.getResponseHeader("Content-Type") == "application/x-foo");
+   T(xhr.responseText.match(/foofoo/));
+   
+   // test the respondWith mime matcher without
+   xhr = CouchDB.request("GET", "/test_suite_db/_show/template/respondWith/"+docid, {
+     headers: {
+       "Accept": 'text/html,application/atom+xml; q=0.9'
+     }
+   });
+   T(xhr.getResponseHeader("Content-Type") == "text/html");
+   T(xhr.responseText == "Ha ha, you said \"plankton\".");
 };
