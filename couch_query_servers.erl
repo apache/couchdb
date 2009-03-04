@@ -18,7 +18,9 @@
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2,code_change/3,stop/0]).
 -export([start_doc_map/2, map_docs/2, stop_doc_map/1]).
 -export([reduce/3, rereduce/3,validate_doc_update/5]).
--export([render_doc_show/5,start_view_list/2,render_list_head/5, render_list_row/4, render_list_tail/3, render_reduce_head/3, render_reduce_row/4]).
+-export([render_doc_show/6,start_view_list/2,render_list_head/5, 
+        render_list_row/4, render_list_tail/3, render_reduce_head/3, 
+        render_reduce_row/4]).
 % -export([test/0]).
 
 -include("couch_db.hrl").
@@ -122,14 +124,18 @@ validate_doc_update(Lang, FunSrc, EditDoc, DiskDoc, Ctx) ->
     after
         ok = ret_os_process(Lang, Pid)
     end.
+append_docid(DocId, JsonReqIn) ->
+    [{<<"docId">>, DocId} | JsonReqIn].
 
-render_doc_show(Lang, ShowSrc, Doc, Req, Db) ->
+render_doc_show(Lang, ShowSrc, DocId, Doc, Req, Db) ->
     Pid = get_os_process(Lang),
-    JsonDoc = case Doc of
-        nil -> null;
-        _ -> couch_doc:to_json_obj(Doc, [revs])
+    {JsonReqIn} = couch_httpd_external:json_req_obj(Req, Db),
+
+    {JsonReq, JsonDoc} = case {DocId, Doc} of
+        {nil, nil} -> {{JsonReqIn}, null};
+        {DocId, nil} -> {{append_docid(DocId, JsonReqIn)}, null};
+        _ -> {{append_docid(DocId, JsonReqIn)}, couch_doc:to_json_obj(Doc, [revs])}
     end,
-    JsonReq = couch_httpd_external:json_req_obj(Req, Db),
     try couch_os_process:prompt(Pid, 
         [<<"show_doc">>, ShowSrc, JsonDoc, JsonReq]) of
     FormResp ->

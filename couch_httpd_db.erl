@@ -13,7 +13,7 @@
 -module(couch_httpd_db).
 -include("couch_db.hrl").
 
--export([handle_request/1, db_req/2, couch_doc_open/4]).
+-export([handle_request/1, db_req/2, couch_doc_open/4, couch_doc_open/5]).
 
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
@@ -538,20 +538,27 @@ db_doc_req(Req, _Db, _DocId) ->
 %   couch_doc_open(Db, DocId, [], []).
 
 couch_doc_open(Db, DocId, Rev, Options) ->
+    couch_doc_open(Db, DocId, Rev, Options, true).
+
+couch_doc_open(Db, DocId, Rev, Options, Throw) ->
     case Rev of
     "" -> % open most recent rev
         case couch_db:open_doc(Db, DocId, Options) of
         {ok, Doc} ->
             Doc;
-         Error ->
-             throw(Error)
+         Error when Throw ->
+             throw(Error);
+         _ ->
+             nil
          end;
   _ -> % open a specific rev (deletions come back as stubs)
       case couch_db:open_doc_revs(Db, DocId, [Rev], Options) of
           {ok, [{ok, Doc}]} ->
               Doc;
-          {ok, [Else]} ->
-              throw(Else)
+          {ok, [Else]} when Throw ->
+              throw(Else);
+          {ok, _} ->
+              nil
       end
   end.
 
