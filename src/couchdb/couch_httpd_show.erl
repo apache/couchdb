@@ -30,7 +30,11 @@ handle_doc_show_req(#httpd{
     #doc{body={Props}} = couch_httpd_db:couch_doc_open(Db, DesignId, [], []),
     Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
     ShowSrc = get_nested_json_value({Props}, [<<"shows">>, ShowName]),
-    Doc = couch_httpd_db:couch_doc_open(Db, DocId, [], [], false),
+    Doc = try couch_httpd_db:couch_doc_open(Db, DocId, [], []) of
+        FoundDoc -> FoundDoc
+    catch
+        _ -> nil
+    end,
     send_doc_show_response(Lang, ShowSrc, DocId, Doc, Req, Db);
 
 handle_doc_show_req(#httpd{
