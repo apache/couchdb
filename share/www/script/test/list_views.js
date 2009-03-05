@@ -257,4 +257,23 @@ couchTests.list_views = function(debug) {
   xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/emptyList/withReduce?group=true");
   T(xhr.responseText.match(/^$/));
 
+  // multi-key fetch
+  var xhr = CouchDB.request("POST", "/test_suite_db/_list/lists/simpleForm/basicView", {
+    body: '{"keys":[2,4,5,7]}'
+  });
+  T(xhr.status == 200);
+  T(/Total Rows/.test(xhr.responseText));
+  T(!(/Key: 1/.test(xhr.responseText)));
+  T(/Key: 2/.test(xhr.responseText));
+  T(/FirstKey: 2/.test(xhr.responseText));
+  T(/LastKey: 7/.test(xhr.responseText));
+  xhr = CouchDB.request("POST", "/test_suite_db/_list/lists/simpleForm/withReduce?group=true", {
+    body: '{"keys":[2,4,5,7]}'
+  });
+  T(xhr.status == 200);
+  T(/Total Rows/.test(xhr.responseText));
+  T(!(/Key: 1/.test(xhr.responseText)));
+  T(/Key: 2/.test(xhr.responseText));
+  T(/FirstKey: 2/.test(xhr.responseText));
+  T(/LastKey: 7/.test(xhr.responseText));
 };

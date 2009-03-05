@@ -56,9 +56,13 @@ process_external_req(HttpReq, Db, Name) ->
 
 json_req_obj(#httpd{mochi_req=Req, 
                method=Verb,
-               path_parts=Path
+               path_parts=Path,
+               req_body=ReqBody
             }, Db) ->
-    ReqBody = Req:recv_body(),
+    Body = case ReqBody of
+        undefined -> Req:recv_body();
+        Else -> Else
+    end,
     ParsedForm = case Req:get_primary_header_value("content-type") of
         "application/x-www-form-urlencoded" ++ _ ->
             mochiweb_util:parse_qs(ReqBody);
@@ -74,7 +78,7 @@ json_req_obj(#httpd{mochi_req=Req,
         {<<"path">>, Path},
         {<<"query">>, to_json_terms(Req:parse_qs())},
         {<<"headers">>, to_json_terms(Hlist)},
-        {<<"body">>, ReqBody},
+        {<<"body">>, Body},
         {<<"form">>, to_json_terms(ParsedForm)},
         {<<"cookie">>, to_json_terms(Req:parse_cookie())}]}.
 

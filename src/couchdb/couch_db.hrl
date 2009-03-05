@@ -60,7 +60,8 @@
     method,
     path_parts,
     db_url_handlers,
-    user_ctx
+    user_ctx,
+    req_body = undefined
     }).
     
 
