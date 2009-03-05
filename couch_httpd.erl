@@ -347,7 +347,7 @@ send_chunk(Resp, Data) ->
 send_response(#httpd{mochi_req=MochiReq}, Code, Headers, Body) ->
     couch_stats_collector:increment({httpd_status_codes, Code}),
     if Code >= 400 ->
-        ?LOG_DEBUG("HTTPd ~p error response:~n ~s", [Code, Body]);
+        ?LOG_DEBUG("httpd ~p error response:~n ~s", [Code, Body]);
     true -> ok
     end,
     {ok, MochiReq:respond({Code, Headers ++ server_header(), Body})}.
