@@ -364,10 +364,9 @@ while (cmd = eval(readline())) {
         var row_info = row_line[listFun];
         runRenderFunction(listFun, [null, row, req, row_info]);
         if (row_info.first_key == null) {
-            row_info.first_key = row.key;
-        } else {
-            row_info.prev_key = row.key;
+          row_info.first_key = row.key;
         }
+        row_info.prev_key = row.key;
         row_info.row_number++;
         row_line[listFun] = row_info;
         break;
