@@ -207,7 +207,7 @@ start_couchdb () {
                 export HEART_COMMAND
                 export HEART_BEAT_TIMEOUT
                 `eval $command -pidfile $PID_FILE -heart \
-                    > $STDOUT_FILE 2> $STDERR_FILE` || true
+                    >> $STDOUT_FILE 2>> $STDERR_FILE` || true
                 PID=`_get_pid`
                 if test -n "$PID"; then
                     if kill -0 $PID 2> /dev/null; then
