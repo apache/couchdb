@@ -41,6 +41,7 @@ loadTest("multiple_rows.js");
 loadTest("large_docs.js");
 loadTest("utf8.js");
 loadTest("attachments.js");
+loadTest("attachment_names.js");
 loadTest("attachment_paths.js");
 loadTest("attachment_views.js");
 loadTest("design_paths.js");
