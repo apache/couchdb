@@ -99,12 +99,14 @@ readjson(OsProc) when is_record(OsProc, os_proc) ->
 
 % gen_server API
 init([Command, Options, PortOptions]) ->
+    BaseTimeOut = list_to_integer(couch_config:get(
+        "couchdb", "os_process_timeout", "5000")),
     BaseProc = #os_proc{
         command=Command,
         port=open_port({spawn, Command}, PortOptions),
         writer=fun writejson/2,
         reader=fun readjson/1,
-        timeout=5000
+        timeout=BaseTimeOut
     },
     OsProc =
     lists:foldl(fun(Opt, Proc) ->
