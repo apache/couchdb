@@ -386,6 +386,8 @@ end_json_response(Resp) ->
 
 send_error(Req, bad_request) ->
     send_error(Req, 400, <<"bad_request">>, <<>>);
+send_error(Req, {query_parse_error, Reason}) ->
+    send_error(Req, 400, <<"query_parse_error">>, Reason);
 send_error(Req, {bad_request, Reason}) ->
     send_error(Req, 400, <<"bad_request">>, Reason);
 send_error(Req, not_found) ->

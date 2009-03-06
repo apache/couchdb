@@ -98,6 +98,7 @@ send_view_list_response(Lang, ListSrc, ViewName, DesignId, Req, Db, Keys) ->
     {not_found, _Reason} ->
         case couch_view:get_reduce_view(Db, DesignId, ViewName, Stale) of
         {ok, ReduceView, Group} ->
+            couch_httpd_view:parse_view_query(Req, Keys, true, true), % just for validation
             case Reduce of
             false ->
                 MapView = couch_view:extract_map_view(ReduceView),
