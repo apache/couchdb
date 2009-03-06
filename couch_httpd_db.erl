@@ -720,13 +720,11 @@ validate_attachment_names(Doc) ->
 
 validate_attachment_name(Name) when is_list(Name) ->
     validate_attachment_name(list_to_binary(Name));
+validate_attachment_name(<<"_",_/binary>>) ->
+    throw({bad_request, <<"Attachment name can't start with '_'">>});
 validate_attachment_name(Name) ->
     case is_valid_utf8(Name) of
-        true -> 
-            case Name of
-                <<"_",_/binary>>=Name -> throw({bad_request, <<"Attachment name can't start with '_'">>});
-                _ -> Name
-            end;
+        true -> Name;
         false -> throw({bad_request, <<"Attachment name is not UTF-8 encoded">>})
     end.
 
