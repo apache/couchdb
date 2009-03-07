@@ -64,6 +64,7 @@ source_files = \
     couch_query_servers.erl \
     couch_ref_counter.erl \
     couch_rep.erl \
+    couch_rep_sup.erl \
     couch_server.erl \
     couch_server_sup.erl \
     couch_stats_aggregator.erl \
@@ -104,6 +105,7 @@ compiled_files = \
     couch_query_servers.beam \
     couch_ref_counter.beam \
     couch_rep.beam \
+    couch_rep_sup.beam \
     couch_server.beam \
     couch_server_sup.beam \
     couch_stats_aggregator.beam \
@@ -139,6 +141,7 @@ compiled_files = \
 #     couch_log.html \
 #     couch_query_servers.html \
 #     couch_rep.html \
+#     couch_rep_sup.html \
 #     couch_server.html \
 #     couch_server_sup.html \
 #     couch_stream.html \
