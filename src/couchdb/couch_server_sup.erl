@@ -133,6 +133,12 @@ start_primary_services() ->
                 brutal_kill,
                 worker,
                 [couch_log]},
+            {couch_replication_supervisor,
+                {couch_rep_sup, start_link, []},
+                permanent,
+                infinity,
+                supervisor,
+                [couch_rep_sup]},
             {couch_task_status,
                 {couch_task_status, start_link, []},
                 permanent,
@@ -150,7 +156,9 @@ start_primary_services() ->
                 permanent,
                 brutal_kill,
                 supervisor,
-                dynamic}]}).
+                dynamic}
+            ]
+        }).
 
 start_secondary_services() ->
     DaemonChildSpecs = [

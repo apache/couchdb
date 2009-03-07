@@ -192,6 +192,8 @@ send_req(Url, Headers, Method, Body) ->
 %% @spec send_req(Url::string(), Headers::headerList(), Method::method(), Body::body(), Options::optionList()) -> response()
 %% optionList() = [option()]
 %% option() = {max_sessions, integer()}        |
+%%          {response_format,response_format()}| 
+%%          {stream_chunk_size, integer()}     |
 %%          {max_pipeline_size, integer()}     |
 %%          {trace, boolean()}                 | 
 %%          {is_ssl, boolean()}                |
@@ -219,7 +221,7 @@ send_req(Url, Headers, Method, Body) ->
 %% ChunkSize = integer()
 %% srtf() = boolean() | filename()
 %% filename() = string()
-%% 
+%% response_format() = list | binary
 send_req(Url, Headers, Method, Body, Options) ->
     send_req(Url, Headers, Method, Body, Options, 30000).
 
@@ -230,7 +232,8 @@ send_req(Url, Headers, Method, Body, Options) ->
 send_req(Url, Headers, Method, Body, Options, Timeout) ->
     case catch parse_url(Url) of
 	#url{host = Host,
-	     port = Port} = Parsed_url ->
+	     port = Port,
+	     protocol = Protocol} = Parsed_url ->
 	    Lb_pid = case ets:lookup(ibrowse_lb, {Host, Port}) of
 			 [] ->
 			     get_lb_pid(Parsed_url);
@@ -241,9 +244,10 @@ send_req(Url, Headers, Method, Body, Options, Timeout) ->
 	    Max_pipeline_size = get_max_pipeline_size(Host, Port, Options),
 	    Options_1 = merge_options(Host, Port, Options),
 	    {SSLOptions, IsSSL} =
-		case get_value(is_ssl, Options_1, false) of
+		case (Protocol == https) orelse
+		     get_value(is_ssl, Options_1, false) of
 		    false -> {[], false};
-		    true -> {get_value(ssl_options, Options_1), true}
+		    true -> {get_value(ssl_options, Options_1, []), true}
 		end,
 	    case ibrowse_lb:spawn_connection(Lb_pid, Parsed_url,
 					     Max_sessions, 
@@ -316,6 +320,13 @@ do_send_req(Conn_Pid, Parsed_url, Headers, Method, Body, Options, Timeout) ->
 	    {error, req_timedout};
 	{'EXIT', Reason} ->
 	    {error, {'EXIT', Reason}};
+	{ok, St_code, Headers, Body} = Ret when is_binary(Body) ->
+	    case get_value(response_format, Options, list) of
+		list ->
+		    {ok, St_code, Headers, binary_to_list(Body)};
+		binary ->
+		    Ret
+	    end;
 	Ret ->
 	    Ret
     end.

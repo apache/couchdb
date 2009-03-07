@@ -14,7 +14,10 @@
 	 drv_ue_test/0,
 	 drv_ue_test/1,
 	 ue_test/0,
-	 ue_test/1
+	 ue_test/1,
+	 verify_chunked_streaming/0,
+	 verify_chunked_streaming/1,
+	 i_do_async_req_list/4
 	]).
 
 -import(ibrowse_lib, [printable_date/0]).
@@ -88,7 +91,7 @@ do_wait() ->
 		    do_wait()
 	    end
     end.
-		     
+
 do_send_req(Url, NumReqs) ->
     do_send_req_1(Url, NumReqs).
 
@@ -149,7 +152,7 @@ dump_errors(Key, Iod) ->
 -define(TEST_LIST, [{"http://intranet/messenger", get},
 		    {"http://www.google.co.uk", get},
 		    {"http://www.google.com", get},
-		    {"http://www.google.com", options}, 
+		    {"http://www.google.com", options},
 		    {"http://www.sun.com", get},
 		    {"http://www.oracle.com", get},
 		    {"http://www.bbc.co.uk", get},
@@ -172,7 +175,8 @@ dump_errors(Key, Iod) ->
 		    {"http://jigsaw.w3.org/HTTP/400/toolong/", get},
 		    {"http://jigsaw.w3.org/HTTP/300/", get},
 		    {"http://jigsaw.w3.org/HTTP/Basic/", get, [{basic_auth, {"guest", "guest"}}]},
-		    {"http://jigsaw.w3.org/HTTP/CL/", get}
+		    {"http://jigsaw.w3.org/HTTP/CL/", get},
+		    {"http://www.httpwatch.com/httpgallery/chunked/", get}
 		   ]).
 
 unit_tests() ->
@@ -185,13 +189,104 @@ unit_tests(Options) ->
 			  execute_req(Url, Method, X_Opts ++ Options)
 		  end, ?TEST_LIST).
 
-execute_req(Url, Method) ->
-    execute_req(Url, Method, []).
+verify_chunked_streaming() ->
+    verify_chunked_streaming([]).
+
+verify_chunked_streaming(Options) ->
+    Url = "http://www.httpwatch.com/httpgallery/chunked/",
+    io:format("URL: ~s~n", [Url]),
+    io:format("Fetching data without streaming...~n", []),
+    Result_without_streaming = ibrowse:send_req(
+				 Url, [], get, [],
+				 [{response_format, binary} | Options]),
+    io:format("Fetching data with streaming as list...~n", []),
+    Async_response_list = do_async_req_list(
+			    Url, get, [{response_format, list}]),
+    io:format("Fetching data with streaming as binary...~n", []),
+    Async_response_bin = do_async_req_list(
+			   Url, get, [{response_format, binary}]),
+    compare_responses(Result_without_streaming, Async_response_list, Async_response_bin).
+
+compare_responses({ok, St_code, _, Body}, {ok, St_code, _, Body}, {ok, St_code, _, Body}) ->
+    success;
+compare_responses({ok, St_code, _, Body_1}, {ok, St_code, _, Body_2}, {ok, St_code, _, Body_3}) ->
+    case Body_1 of
+	Body_2 ->
+	    io:format("Body_1 and Body_2 match~n", []);
+	Body_3 ->
+	    io:format("Body_1 and Body_3 match~n", []);
+	_ when Body_2 == Body_3 ->
+	    io:format("Body_2 and Body_3 match~n", []);
+	_ ->
+	    io:format("All three bodies are different!~n", [])
+    end,
+    fail_bodies_mismatch;
+compare_responses(R1, R2, R3) ->
+    io:format("R1 -> ~p~n", [R1]),
+    io:format("R2 -> ~p~n", [R2]),
+    io:format("R3 -> ~p~n", [R3]),
+    fail.
+
+do_async_req_list(Url) ->
+    do_async_req_list(Url, get).
+
+do_async_req_list(Url, Method) ->
+    do_async_req_list(Url, Method, [{stream_to, self()},
+				    {stream_chunk_size, 1000}]).
+
+do_async_req_list(Url, Method, Options) ->
+    {Pid,_} = erlang:spawn_monitor(?MODULE, i_do_async_req_list,
+				   [self(), Url, Method, 
+				    Options ++ [{stream_chunk_size, 1000}]]),
+    io:format("Spawned process ~p~n", [Pid]),
+    wait_for_resp(Pid).
+
+wait_for_resp(Pid) ->
+    receive
+	{async_result, Pid, Res} ->
+	    Res;
+	{'DOWN', _, _, Pid, Reason} ->
+	    {'EXIT', Reason};
+	{'DOWN', _, _, _, _} ->
+	    wait_for_resp(Pid);
+	Msg ->
+	    io:format("Recvd unknown message: ~p~n", [Msg]),
+	    wait_for_resp(Pid)
+    after 10000 ->
+	  {error, timeout}
+    end.
+
+i_do_async_req_list(Parent, Url, Method, Options) ->
+    Res = ibrowse:send_req(Url, [], Method, [], [{stream_to, self()} | Options]),
+    case Res of
+	{ibrowse_req_id, Req_id} ->
+	    Result = wait_for_async_resp(Req_id, undefined, undefined, []),
+	    Parent ! {async_result, self(), Result};
+	Err ->
+	    Parent ! {async_result, self(), Err}
+    end.
+
+wait_for_async_resp(Req_id, Acc_Stat_code, Acc_Headers, Body) ->
+    receive
+	{ibrowse_async_headers, Req_id, StatCode, Headers} ->
+	    wait_for_async_resp(Req_id, StatCode, Headers, Body);
+	{ibrowse_async_response, Req_id, {chunk_start, _}} ->
+	    wait_for_async_resp(Req_id, Acc_Stat_code, Acc_Headers, Body);
+	{ibrowse_async_response, Req_id, chunk_end} ->
+	    wait_for_async_resp(Req_id, Acc_Stat_code, Acc_Headers, Body);
+	{ibrowse_async_response_end, Req_id} ->
+	    Body_1 = list_to_binary(lists:reverse(Body)),
+	    {ok, Acc_Stat_code, Acc_Headers, Body_1};
+	{ibrowse_async_response, Req_id, Data} ->
+	    wait_for_async_resp(Req_id, Acc_Stat_code, Acc_Headers, [Data | Body]);
+	Err ->
+	    {ok, Acc_Stat_code, Acc_Headers, Err}
+    end.
 
 execute_req(Url, Method, Options) ->
     io:format("~s, ~p: ", [Url, Method]),
     Result = (catch ibrowse:send_req(Url, [], Method, [], Options)),
-    case Result of 
+    case Result of
 	{ok, SCode, _H, _B} ->
 	    io:format("Status code: ~p~n", [SCode]);
 	Err ->

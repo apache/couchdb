@@ -184,19 +184,18 @@ should_flush() ->
     should_flush(?FLUSH_MAX_MEM).
     
 should_flush(MemThreshHold) ->
-    case process_info(self(), memory) of
-    {memory, Mem} when Mem > 2*MemThreshHold ->
+    {memory, ProcMem} = process_info(self(), memory),
+    BinMem = lists:foldl(fun({_Id, Size, _NRefs}, Acc) -> Size+Acc end, 
+        0, element(2,process_info(self(), binary))),
+    if ProcMem+BinMem > 2*MemThreshHold ->
         garbage_collect(),
-        case process_info(self(), memory) of
-        {memory, Mem} when Mem > MemThreshHold ->
+        {memory, ProcMem2} = process_info(self(), memory),
+        BinMem2 = lists:foldl(fun({_Id, Size, _NRefs}, Acc) -> Size+Acc end, 
+            0, element(2,process_info(self(), binary))),
+        if ProcMem2+BinMem2 > MemThreshHold ->
             true;
-        _ ->
-            false
-        end;
-    _ ->
-        false
-    end.
-
+        true -> false end;
+    true -> false end.
 
 
 %%% Purpose : Base 64 encoding and decoding.
