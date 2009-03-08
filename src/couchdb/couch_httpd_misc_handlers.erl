@@ -92,8 +92,14 @@ handle_replicate_req(#httpd{user_ctx=UserCtx,method='POST'}=Req) ->
                     [{headers, TgtHeaders},
                     {user_ctx, UserCtx}]}
                 | Options],
-    {ok, {JsonResults}} = couch_rep:replicate(Source, Target, Options2),
-    send_json(Req, {[{ok, true} | JsonResults]});
+    case couch_rep:replicate(Source, Target, Options2) of
+        {ok, {JsonResults}} ->
+            send_json(Req, {[{ok, true} | JsonResults]});
+        {error, {Type, Details}} ->
+            send_json(Req, 500, {[{error, Type}, {reason, Details}]});
+        {error, Reason} ->
+            send_json(Req, 500, {[{error, Reason}]})
+    end;
 handle_replicate_req(Req) ->
     send_method_not_allowed(Req, "POST").
 
