@@ -13,7 +13,7 @@
 -module(couch_httpd).
 -include("couch_db.hrl").
 
--export([start_link/0, stop/0, handle_request/3]).
+-export([start_link/0, stop/0, handle_request/4]).
 
 -export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,path/1,absolute_uri/2]).
 -export([verify_is_server_admin/1,unquote/1,quote/1,recv/2,recv_chunked/4]).
@@ -44,11 +44,18 @@ start_link() ->
         fun({UrlKey, SpecStr}) ->
             {?l2b(UrlKey), make_arity_2_fun(SpecStr)}
         end, couch_config:get("httpd_db_handlers")),
+
+    DesignUrlHandlersList = lists:map(
+        fun({UrlKey, SpecStr}) ->
+            {?l2b(UrlKey), make_arity_2_fun(SpecStr)}
+        end, couch_config:get("httpd_design_handlers")),
+        
     UrlHandlers = dict:from_list(UrlHandlersList),
     DbUrlHandlers = dict:from_list(DbUrlHandlersList),
+    DesignUrlHandlers = dict:from_list(DesignUrlHandlersList),
     Loop = fun(Req)->
             apply(?MODULE, handle_request,
-                    [Req, UrlHandlers, DbUrlHandlers])
+                    [Req, UrlHandlers, DbUrlHandlers, DesignUrlHandlers])
         end,
 
     % and off we go
@@ -101,7 +108,7 @@ stop() ->
     mochiweb_http:stop(?MODULE).
     
 
-handle_request(MochiReq, UrlHandlers, DbUrlHandlers) ->
+handle_request(MochiReq, UrlHandlers, DbUrlHandlers, DesignUrlHandlers) ->
     statistics(runtime), % prepare request_time counter, see end of function
     AuthenticationFun = make_arity_1_fun(
             couch_config:get("httpd", "authentication_handler")),
@@ -147,7 +154,8 @@ handle_request(MochiReq, UrlHandlers, DbUrlHandlers) ->
         method = Method,
         path_parts = [list_to_binary(couch_httpd:unquote(Part))
                 || Part <- string:tokens(Path, "/")],
-        db_url_handlers = DbUrlHandlers
+        db_url_handlers = DbUrlHandlers,
+        design_url_handlers = DesignUrlHandlers
         },
     DefaultFun = fun couch_httpd_db:handle_request/1,
     HandlerFun = couch_util:dict_find(HandlerKey, UrlHandlers, DefaultFun),
