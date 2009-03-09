@@ -24,7 +24,7 @@
     
 handle_doc_show_req(#httpd{
         method='GET',
-        path_parts=[_, _, DesignName, ShowName, DocId]
+        path_parts=[_DbName, _Design, DesignName, _Show, ShowName, DocId]
     }=Req, Db) ->
     DesignId = <<"_design/", DesignName/binary>>,
     #doc{body={Props}} = couch_httpd_db:couch_doc_open(Db, DesignId, [], []),
@@ -39,7 +39,7 @@ handle_doc_show_req(#httpd{
 
 handle_doc_show_req(#httpd{
         method='GET',
-        path_parts=[_, _, DesignName, ShowName]
+        path_parts=[_DbName, _Design, DesignName, _Show, ShowName]
     }=Req, Db) ->
     DesignId = <<"_design/", DesignName/binary>>,
     #doc{body={Props}} = couch_httpd_db:couch_doc_open(Db, DesignId, [], []),
@@ -53,7 +53,8 @@ handle_doc_show_req(#httpd{method='GET'}=Req, _Db) ->
 handle_doc_show_req(Req, _Db) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
-handle_view_list_req(#httpd{method='GET',path_parts=[_, _, DesignName, ListName, ViewName]}=Req, Db) ->
+handle_view_list_req(#httpd{method='GET',
+        path_parts=[_DbName, _Design, DesignName, _List, ListName, ViewName]}=Req, Db) ->
     DesignId = <<"_design/", DesignName/binary>>,
     #doc{body={Props}} = couch_httpd_db:couch_doc_open(Db, DesignId, [], []),
     Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
@@ -63,7 +64,8 @@ handle_view_list_req(#httpd{method='GET',path_parts=[_, _, DesignName, ListName,
 handle_view_list_req(#httpd{method='GET'}=Req, _Db) ->
     send_error(Req, 404, <<"list_error">>, <<"Invalid path.">>);
 
-handle_view_list_req(#httpd{method='POST',path_parts=[_, _, DesignName, ListName, ViewName]}=Req, Db) ->
+handle_view_list_req(#httpd{method='POST',
+        path_parts=[_DbName, _Design, DesignName, _List, ListName, ViewName]}=Req, Db) ->
     DesignId = <<"_design/", DesignName/binary>>,
     #doc{body={Props}} = couch_httpd_db:couch_doc_open(Db, DesignId, [], []),
     Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),

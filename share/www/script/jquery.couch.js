@@ -191,9 +191,9 @@
                       appName = appName.join('/');
                       index = ddoc.couchapp && ddoc.couchapp.index;
                       if (index) {
-                        appPath = ['', name, index[0], appName, index[1]].join('/');
+                        appPath = ['', name, ddoc._id, index].join('/');
                       } else if (ddoc._attachments && ddoc._attachments["index.html"]) {
-                        appPath = ['', name, '_design', appName, "index.html"].join('/');
+                        appPath = ['', name, ddoc._id, "index.html"].join('/');
                       }
                       if (appPath) options.eachApp(appName, appPath, ddoc);
                     }
@@ -298,8 +298,9 @@
         },
         view: function(name, options) {
           options = options || {};
+          name = name.split('/');
           $.ajax({
-            type: "GET", url: this.uri + "_view/" + name + encodeOptions(options),
+            type: "GET", url: this.uri + "_design/" + name[0] + "/_view/" + name[1] + encodeOptions(options),
             dataType: "json",
             complete: function(req) {
               var resp = $.httpData(req, "json");

@@ -13,7 +13,7 @@
 -module(couch_httpd_db).
 -include("couch_db.hrl").
 
--export([handle_request/1, db_req/2, couch_doc_open/4]).
+-export([handle_request/1, handle_design_req/2, db_req/2, couch_doc_open/4]).
 
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
@@ -40,6 +40,16 @@ handle_request(#httpd{path_parts=[DbName|RestParts],method=Method,
         Handler = couch_util:dict_find(SecondPart, DbUrlHandlers, fun db_req/2),
         do_db_req(Req, Handler)
     end.
+
+handle_design_req(#httpd{
+        path_parts=[_DbName,_Design,_DesName, <<"_",_/binary>> = Action | _Rest],
+        design_url_handlers = DesignUrlHandlers
+    }=Req, Db) ->
+    Handler = couch_util:dict_find(Action, DesignUrlHandlers, fun db_req/2),
+    Handler(Req, Db);
+    
+handle_design_req(Req, Db) ->
+    db_req(Req, Db).
 
 create_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
     ok = couch_httpd:verify_is_server_admin(Req),

@@ -61,7 +61,8 @@
     path_parts,
     db_url_handlers,
     user_ctx,
-    req_body = undefined
+    req_body = undefined,
+    design_url_handlers
     }).
     
 

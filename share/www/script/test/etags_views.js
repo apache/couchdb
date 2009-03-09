@@ -46,20 +46,20 @@ couchTests.etags_views = function(debug) {
   T(saveResult.ok);
   
   // verify get w/Etag on map view
-  xhr = CouchDB.request("GET", "/test_suite_db/_view/etags/basicView");
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/basicView");
   T(xhr.status == 200);
   var etag = xhr.getResponseHeader("etag");
-  xhr = CouchDB.request("GET", "/test_suite_db/_view/etags/basicView", {
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/basicView", {
     headers: {"if-none-match": etag}
   });
   T(xhr.status == 304);
   // TODO GET with keys (when that is available)
   
   // reduce view
-  xhr = CouchDB.request("GET", "/test_suite_db/_view/etags/withReduce");
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/withReduce");
   T(xhr.status == 200);
   var etag = xhr.getResponseHeader("etag");
-  xhr = CouchDB.request("GET", "/test_suite_db/_view/etags/withReduce", {
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/withReduce", {
     headers: {"if-none-match": etag}
   });
   T(xhr.status == 304);

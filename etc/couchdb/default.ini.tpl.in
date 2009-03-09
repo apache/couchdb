@@ -52,13 +52,16 @@ _restart = {couch_httpd_misc_handlers, handle_restart_req}
 _stats = {couch_httpd_stats_handlers, handle_stats_req}
 
 [httpd_db_handlers]
-_view = {couch_httpd_view, handle_view_req}
+_design = {couch_httpd_db, handle_design_req}
 _temp_view = {couch_httpd_view, handle_temp_view_req}
-_show = {couch_httpd_show, handle_doc_show_req}
-_list = {couch_httpd_show, handle_view_list_req}
 
 ; The external module takes an optional argument allowing you to narrow it to a
 ; single script. Otherwise the script name is inferred from the first path section 
 ; after _external's own path.
 ; _mypath = {couch_httpd_external, handle_external_req, <<"mykey">>}
 ; _external = {couch_httpd_external, handle_external_req}
+
+[httpd_design_handlers]
+_view = {couch_httpd_view, handle_view_req}
+_show = {couch_httpd_show, handle_doc_show_req}
+_list = {couch_httpd_show, handle_view_list_req}

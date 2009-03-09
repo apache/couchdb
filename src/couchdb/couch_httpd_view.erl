@@ -49,13 +49,15 @@ design_doc_view(Req, Db, Id, ViewName, Keys) ->
     couch_stats_collector:increment({httpd, view_reads}),
     Result.
 
-handle_view_req(#httpd{method='GET',path_parts=[_,_, Id, ViewName]}=Req, Db) ->
-    design_doc_view(Req, Db, Id, ViewName, nil);
+handle_view_req(#httpd{method='GET',
+        path_parts=[_Db, _Design, DName, _View, ViewName]}=Req, Db) ->
+    design_doc_view(Req, Db, DName, ViewName, nil);
 
-handle_view_req(#httpd{method='POST',path_parts=[_,_, Id, ViewName]}=Req, Db) ->
+handle_view_req(#httpd{method='POST',
+        path_parts=[_Db, _Design, DName, _View, ViewName]}=Req, Db) ->
     {Props} = couch_httpd:json_body(Req),
     Keys = proplists:get_value(<<"keys">>, Props, nil),
-    design_doc_view(Req, Db, Id, ViewName, Keys);
+    design_doc_view(Req, Db, DName, ViewName, Keys);
 
 handle_view_req(Req, _Db) ->
     send_method_not_allowed(Req, "GET,POST,HEAD").

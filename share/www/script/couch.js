@@ -142,12 +142,13 @@ function CouchDB(name, httpHeaders) {
   }
 
   this.view = function(viewname, options, keys) {
+    var viewParts = viewname.split('/');
+    var viewPath = this.uri + "_design/" + viewParts[0] + "/_view/" 
+        + viewParts[1] + encodeOptions(options);
     if(!keys) {
-      this.last_req = this.request("GET", this.uri + "_view/" +
-          viewname + encodeOptions(options));      
+      this.last_req = this.request("GET", viewPath);      
     } else {
-      this.last_req = this.request("POST", this.uri + "_view/" + 
-        viewname + encodeOptions(options), {
+      this.last_req = this.request("POST", viewPath, {
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({keys:keys})
       });      

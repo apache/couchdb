@@ -17,6 +17,13 @@ Futon Utility Client:
  * Added pagination to the database listing page.
  * Implemented attachment uploading from the document page.
 
+Design Document Resource Paths:
+
+ * Added httpd_design_handlers config section.
+ * Moved _view to httpd_design_handlers.
+ * Added ability to render documents as non-JSON content-types with _show and 
+   _list functions, which are also httpd_design_handlers.
+
 Version 0.8.1-incubating
 ------------------------
 

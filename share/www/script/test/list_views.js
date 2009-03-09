@@ -144,8 +144,8 @@ couchTests.list_views = function(debug) {
   T(view.total_rows == 10);
   
   // standard get
-  var xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/simpleForm/basicView");
-  T(xhr.status == 200);
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/basicView");
+  T(xhr.status == 200, "standard get should be 200");
   T(/Total Rows/.test(xhr.responseText));
   T(/Key: 1/.test(xhr.responseText));
   T(/LineNo: 0/.test(xhr.responseText));
@@ -159,14 +159,14 @@ couchTests.list_views = function(debug) {
 
   // test that etags are available
   var etag = xhr.getResponseHeader("etag");
-  xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/simpleForm/basicView", {
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/basicView", {
     headers: {"if-none-match": etag}
   });
   T(xhr.status == 304);
 
   // get with query params
-  var xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/simpleForm/basicView?startkey=3");
-  T(xhr.status == 200);
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/basicView?startkey=3");
+  T(xhr.status == 200, "with query params");
   T(/Total Rows/.test(xhr.responseText));
   T(!(/Key: 1/.test(xhr.responseText)));
   T(/FirstKey: 3/.test(xhr.responseText));
@@ -174,33 +174,33 @@ couchTests.list_views = function(debug) {
 
   
   // with 0 rows
-  var xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/simpleForm/basicView?startkey=30");
-  T(xhr.status == 200);
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/basicView?startkey=30");
+  T(xhr.status == 200, "0 rows");
   T(/Total Rows/.test(xhr.responseText));
   T(/Offset: null/.test(xhr.responseText));
 
   // reduce with 0 rows
-  var xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/simpleForm/withReduce?startkey=30");
-  T(xhr.status == 200);
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/withReduce?startkey=30");
+  T(xhr.status == 200, "reduce 0 rows");
   T(/Total Rows/.test(xhr.responseText));
   T(/Offset: undefined/.test(xhr.responseText));
 
   
   // when there is a reduce present, but not used
-  var xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/simpleForm/withReduce?reduce=false");
-  T(xhr.status == 200);
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/withReduce?reduce=false");
+  T(xhr.status == 200, "reduce false");
   T(/Total Rows/.test(xhr.responseText));
   T(/Key: 1/.test(xhr.responseText));
   
   // when there is a reduce present, and used
-  xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/simpleForm/withReduce?group=true");
-  T(xhr.status == 200);
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/withReduce?group=true");
+  T(xhr.status == 200, "group reduce");
   T(/Key: 1/.test(xhr.responseText));
   
   // there should be etags on reduce as well
   var etag = xhr.getResponseHeader("etag");
   T(etag, "Etags should be served with reduce lists");
-  xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/simpleForm/withReduce?group=true", {
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/withReduce?group=true", {
     headers: {"if-none-match": etag}
   });
   T(xhr.status == 304);
@@ -210,13 +210,13 @@ couchTests.list_views = function(debug) {
   var saveResult = db.bulkSave(docs);
   T(saveResult.ok);
   
-  xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/simpleForm/withReduce?group=true", {
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/withReduce?group=true", {
     headers: {"if-none-match": etag}
   });
-  T(xhr.status == 200);
+  T(xhr.status == 200, "reduce etag");
   
   // with accept headers for HTML
-  xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/acceptSwitch/basicView", {
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/acceptSwitch/basicView", {
     headers: {
       "Accept": 'text/html'
     }
@@ -226,7 +226,7 @@ couchTests.list_views = function(debug) {
   T(xhr.responseText.match(/Value/));
 
   // now with xml
-  xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/acceptSwitch/basicView", {
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/acceptSwitch/basicView", {
     headers: {
       "Accept": 'application/xml'
     }
@@ -236,49 +236,40 @@ couchTests.list_views = function(debug) {
   T(xhr.responseText.match(/entry/));
 
   // now with extra qs params
-  var xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/qsParams/basicView?foo=blam");
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/qsParams/basicView?foo=blam");
   T(xhr.responseText.match(/blam/));
   
   // aborting iteration
-  var xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/stopIter/basicView");
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/stopIter/basicView");
   T(xhr.responseText.match(/^head 0 1 2 tail$/));
-  xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/stopIter2/basicView");
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/stopIter2/basicView");
   T(xhr.responseText.match(/^head 0 1 2 tail$/));
 
   // aborting iteration with reduce
-  var xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/stopIter/withReduce?group=true");
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/stopIter/withReduce?group=true");
   T(xhr.responseText.match(/^head 0 1 2 tail$/));
-  xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/stopIter2/withReduce?group=true");
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/stopIter2/withReduce?group=true");
   T(xhr.responseText.match(/^head 0 1 2 tail$/));
 
   // empty list
-  var xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/emptyList/basicView");
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/emptyList/basicView");
   T(xhr.responseText.match(/^$/));
-  xhr = CouchDB.request("GET", "/test_suite_db/_list/lists/emptyList/withReduce?group=true");
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/emptyList/withReduce?group=true");
   T(xhr.responseText.match(/^$/));
 
   // multi-key fetch
-  var xhr = CouchDB.request("POST", "/test_suite_db/_list/lists/simpleForm/basicView", {
+  var xhr = CouchDB.request("POST", "/test_suite_db/_design/lists/_list/simpleForm/basicView", {
     body: '{"keys":[2,4,5,7]}'
   });
-  T(xhr.status == 200);
+  T(xhr.status == 200, "multi key");
   T(/Total Rows/.test(xhr.responseText));
   T(!(/Key: 1/.test(xhr.responseText)));
   T(/Key: 2/.test(xhr.responseText));
   T(/FirstKey: 2/.test(xhr.responseText));
   T(/LastKey: 7/.test(xhr.responseText));
-  xhr = CouchDB.request("POST", "/test_suite_db/_list/lists/simpleForm/withReduce?group=true", {
-    body: '{"keys":[2,4,5,7]}'
-  });
-  T(xhr.status == 200);
-  T(/Total Rows/.test(xhr.responseText));
-  T(!(/Key: 1/.test(xhr.responseText)));
-  T(/Key: 2/.test(xhr.responseText));
-  T(/FirstKey: 2/.test(xhr.responseText));
-  T(/LastKey: 7/.test(xhr.responseText));
-  
+
   // no multi-key fetch allowed when group=false
-  xhr = CouchDB.request("POST", "/test_suite_db/_list/lists/simpleForm/withReduce?group=false", {
+  xhr = CouchDB.request("POST", "/test_suite_db/_design/lists/_list/simpleForm/withReduce?group=false", {
     body: '{"keys":[2,4,5,7]}'
   });
   T(xhr.status == 400);
