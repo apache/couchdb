@@ -51,7 +51,7 @@ read(Pid) ->
     gen_server:call(Pid, read).
 
 prompt(Pid, Data) ->
-    gen_server:call(Pid, {prompt, Data}).
+    gen_server:call(Pid, {prompt, Data}, infinity).
 
 async(Pid, Data, CallBack) ->
     gen_server:cast(Pid, {async, Data, CallBack}).

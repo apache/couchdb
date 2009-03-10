@@ -27,7 +27,7 @@ stop(Pid) ->
     gen_server:cast(Pid, stop).
 
 execute(Pid, JsonReq) ->
-    gen_server:call(Pid, {execute, JsonReq}).
+    gen_server:call(Pid, {execute, JsonReq}, infinity).
 
 % Gen Server Handlers
 
