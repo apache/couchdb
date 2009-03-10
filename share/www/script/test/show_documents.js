@@ -152,7 +152,7 @@ couchTests.show_documents = function(debug) {
   
   // show with missing doc
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/just-name/missingdoc");
-  console.log(xhr)
+
   T(xhr.status == 404, 'Doc should be missing');
   T(xhr.responseText == "No such doc");
   
