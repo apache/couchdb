@@ -12,41 +12,53 @@
 
 -module(couch_doc).
 
--export([to_doc_info/1,to_doc_info_path/1]).
+-export([to_doc_info/1,to_doc_info_path/1,parse_rev/1,parse_revs/1,rev_to_str/1,rev_to_strs/1]).
 -export([bin_foldl/3,bin_size/1,bin_to_binary/1,get_validate_doc_fun/1]).
 -export([from_json_obj/1,to_json_obj/2,has_stubs/1, merge_stubs/2]).
 
 -include("couch_db.hrl").
 
 % helpers used by to_json_obj
-to_json_rev([]) ->
+to_json_rev(0, []) ->
     [];
-to_json_rev(Revs) ->
-    [{<<"_rev">>, lists:nth(1, Revs)}].
+to_json_rev(Start, [FirstRevId|_]) ->
+    [{<<"_rev">>, ?l2b([integer_to_list(Start),"-",FirstRevId])}].
 
 to_json_body(true, _Body) ->
     [{<<"_deleted">>, true}];
 to_json_body(false, {Body}) ->
     Body.
 
-to_json_revs(Options, Revs) ->
+to_json_revisions(Options, Start, RevIds) ->
     case lists:member(revs, Options) of
     false -> [];
     true ->
-        [{<<"_revs">>, Revs}]
+        [{<<"_revisions">>, {[{<<"start">>, Start}, 
+                        {<<"ids">>, RevIds}]}}]
     end.
 
-to_json_revs_info(Meta) ->
+rev_to_str({Pos, RevId}) ->
+    ?l2b([integer_to_list(Pos),"-",RevId]).
+
+rev_to_strs([]) ->
+    [];
+rev_to_strs([{Pos, RevId}| Rest]) ->
+    [rev_to_str({Pos, RevId}) | rev_to_strs(Rest)].
+
+to_json_meta(Meta) ->
     lists:map(
-        fun({revs_info, RevsInfo}) ->
-            JsonRevsInfo =
-            [{[{rev, Rev}, {status, list_to_binary(atom_to_list(Status))}]} ||
-                {Rev, Status} <- RevsInfo],
+        fun({revs_info, Start, RevsInfo}) ->
+            {JsonRevsInfo, _Pos}  = lists:mapfoldl(
+                fun({RevId, Status}, PosAcc) ->
+                    JsonObj = {[{<<"rev">>, rev_to_str({PosAcc, RevId})},
+                        {<<"status">>, ?l2b(atom_to_list(Status))}]},
+                    {JsonObj, PosAcc - 1}
+                end, Start, RevsInfo),
             {<<"_revs_info">>, JsonRevsInfo};
         ({conflicts, Conflicts}) ->
-            {<<"_conflicts">>, Conflicts};
-        ({deleted_conflicts, Conflicts}) ->
-            {<<"_deleted_conflicts">>, Conflicts}
+            {<<"_conflicts">>, rev_to_strs(Conflicts)};
+        ({deleted_conflicts, DConflicts}) ->
+            {<<"_deleted_conflicts">>, rev_to_strs(DConflicts)}
         end, Meta).
 
 to_json_attachment_stubs(Attachments) ->
@@ -98,17 +110,62 @@ to_json_attachments(Attachments, Options) ->
         to_json_attachment_stubs(Attachments)
     end.
 
-to_json_obj(#doc{id=Id,deleted=Del,body=Body,revs=Revs,meta=Meta}=Doc,Options)->
+to_json_obj(#doc{id=Id,deleted=Del,body=Body,revs={Start, RevIds},
+            meta=Meta}=Doc,Options)->
     {[{<<"_id">>, Id}] 
-        ++ to_json_rev(Revs) 
+        ++ to_json_rev(Start, RevIds)
         ++ to_json_body(Del, Body)
-        ++ to_json_revs(Options, Revs) 
-        ++ to_json_revs_info(Meta)
+        ++ to_json_revisions(Options, Start, RevIds) 
+        ++ to_json_meta(Meta)
         ++ to_json_attachments(Doc#doc.attachments, Options)
     }.
 
 from_json_obj({Props}) ->
-    {JsonBins} = proplists:get_value(<<"_attachments">>, Props, {[]}),
+    transfer_fields(Props, #doc{body=[]});
+
+from_json_obj(_Other) ->
+    throw({bad_request, "Document must be a JSON object"}).
+
+parse_rev(Rev) when is_binary(Rev) ->
+    parse_rev(?b2l(Rev));
+parse_rev(Rev) ->
+    {Pos, [$- | RevId]} = lists:splitwith(fun($-) -> false; (_) -> true end, Rev),
+    {list_to_integer(Pos), ?l2b(RevId)}.
+
+parse_revs([]) ->
+    [];
+parse_revs([Rev | Rest]) ->
+    [parse_rev(Rev) | parse_revs(Rest)].
+
+
+transfer_fields([], #doc{body=Fields}=Doc) ->
+    % convert fields back to json object
+    Doc#doc{body={lists:reverse(Fields)}};
+    
+transfer_fields([{<<"_id">>, Id} | Rest], Doc) when is_binary(Id) ->
+    case Id of
+    <<"_design/", _/binary>> -> ok;
+    <<"_local/", _/binary>> -> ok;
+    <<"_", _/binary>> ->
+        throw({bad_request, <<"Only reserved document ids may start with underscore.">>});
+    _Else -> ok
+    end,
+    transfer_fields(Rest, Doc#doc{id=Id});
+    
+transfer_fields([{<<"_id">>, Id} | _Rest], _Doc) ->
+    ?LOG_DEBUG("Document id is not a string: ~p", [Id]),
+    throw({bad_request, <<"Document id must be a string">>});
+    
+transfer_fields([{<<"_rev">>, Rev} | Rest], #doc{revs={0, []}}=Doc) ->
+    {Pos, RevId} = parse_rev(Rev),
+    transfer_fields(Rest,
+            Doc#doc{revs={Pos, [RevId]}});
+            
+transfer_fields([{<<"_rev">>, _Rev} | Rest], Doc) ->
+    % we already got the rev from the _revisions
+    transfer_fields(Rest,Doc);
+    
+transfer_fields([{<<"_attachments">>, {JsonBins}} | Rest], Doc) ->
     Bins = lists:flatmap(fun({Name, {BinProps}}) ->
         case proplists:get_value(<<"stub">>, BinProps) of
         true ->
@@ -122,51 +179,40 @@ from_json_obj({Props}) ->
             [{Name, {Type, couch_util:decodeBase64(Value)}}]
         end
     end, JsonBins),
-    AllowedSpecialMembers = [<<"id">>, <<"revs">>, <<"rev">>, <<"attachments">>, <<"revs_info">>,
-        <<"conflicts">>, <<"deleted_conflicts">>, <<"deleted">>],
-    % collect all the doc-members that start with "_"
-    % if any aren't in the AllowedSpecialMembers list 
-    % then throw a invalid_doc error
-    [case lists:member(Name, AllowedSpecialMembers) of
-        true ->
-            ok;
-        false ->
-            throw({invalid_doc, io_lib:format("Bad special document member: _~s", [Name])})
-        end
-         || {<<$_,Name/binary>>, _Value} <- Props],
-    Revs =
-    case proplists:get_value(<<"_revs">>, Props, []) of
-    [] ->
-        case proplists:get_value(<<"_rev">>, Props) of
-        undefined -> [];
-        Rev -> [Rev]
-        end;
-    Revs0 ->
-        Revs0
-    end,
-    case proplists:get_value(<<"_id">>, Props, <<>>) of
-    <<"_design/", _/binary>> = Id -> ok;
-    <<"_local/", _/binary>> = Id -> ok;
-    <<"_", _/binary>> = Id ->
-        throw({invalid_doc, "Document Ids must not start with underscore."});
-    Id when is_binary(Id) -> ok;
-    Id ->
-        ?LOG_DEBUG("Document id is not a string: ~p", [Id]),
-        throw({invalid_doc, "Document id is not a string"})
-    end,
+    transfer_fields(Rest, Doc#doc{attachments=Bins});
     
-    % strip out the all props beginning with _
-    NewBody = {[{K, V} || {<<First,_/binary>>=K, V} <- Props, First /= $_]},
-    #doc{
-        id = Id,
-        revs = Revs,
-        deleted = proplists:get_value(<<"_deleted">>, Props, false),
-        body = NewBody,
-        attachments = Bins
-        };
+transfer_fields([{<<"_revisions">>, {Props}} | Rest], Doc) ->
+    RevIds = proplists:get_value(<<"ids">>, Props),
+    Start = proplists:get_value(<<"start">>, Props),
+    if not is_integer(Start) ->
+        throw({doc_validation, "_revisions.start isn't an integer."});
+    not is_list(RevIds) ->
+        throw({doc_validation, "_revisions.ids isn't a array."});
+    true ->
+        ok
+    end,
+    [throw({doc_validation, "RevId isn't a string"}) ||
+            RevId <- RevIds, not is_binary(RevId)],
+    transfer_fields(Rest, Doc#doc{revs={Start, RevIds}});
+    
+transfer_fields([{<<"_deleted">>, B} | Rest], Doc) when (B==true) or (B==false) ->
+    transfer_fields(Rest, Doc#doc{deleted=B});
 
-from_json_obj(_Other) ->
-    throw({invalid_doc, "Document must be a JSON object"}).
+% ignored fields
+transfer_fields([{<<"_revs_info">>, _} | Rest], Doc) ->
+    transfer_fields(Rest, Doc);
+transfer_fields([{<<"_conflicts">>, _} | Rest], Doc) ->
+    transfer_fields(Rest, Doc);
+transfer_fields([{<<"_deleted_conflicts">>, _} | Rest], Doc) ->
+    transfer_fields(Rest, Doc);
+
+% unknown special field
+transfer_fields([{<<"_",Name/binary>>, Start} | _], _) when is_integer(Start) ->
+    throw({doc_validation,
+            ?l2b(io_lib:format("Bad special document member: _~s", [Name]))});
+            
+transfer_fields([Field | Rest], #doc{body=Fields}=Doc) ->
+    transfer_fields(Rest, Doc#doc{body=[Field|Fields]}).
 
 to_doc_info(FullDocInfo) ->
     {DocInfo, _Path} = to_doc_info_path(FullDocInfo),
@@ -175,27 +221,26 @@ to_doc_info(FullDocInfo) ->
 to_doc_info_path(#full_doc_info{id=Id,update_seq=Seq,rev_tree=Tree}) ->
     LeafRevs = couch_key_tree:get_all_leafs(Tree),
     SortedLeafRevs =
-    lists:sort(fun({RevIdA, {IsDeletedA, _}, PathA}, {RevIdB, {IsDeletedB, _}, PathB}) ->
+    lists:sort(fun({{IsDeletedA, _}, {StartA, [RevIdA|_]}}, {{IsDeletedB, _}, {StartB, [RevIdB|_]}}) ->
             % sort descending by {not deleted, then Depth, then RevisionId}
-            A = {not IsDeletedA, length(PathA), RevIdA},
-            B = {not IsDeletedB, length(PathB), RevIdB},
+            A = {not IsDeletedA, StartA, RevIdA},
+            B = {not IsDeletedB, StartB, RevIdB},
             A > B
         end,
         LeafRevs),
 
-    [{RevId, {IsDeleted, SummaryPointer}, Path} | Rest] = SortedLeafRevs,
-
+    [{{IsDeleted, SummaryPointer}, {Start, [RevId|_]}=Path} | Rest] = SortedLeafRevs,
     {ConflictRevTuples, DeletedConflictRevTuples} =
-        lists:splitwith(fun({_ConflictRevId, {IsDeleted1, _Sp}, _}) ->
+        lists:splitwith(fun({{IsDeleted1, _Sp}, _}) ->
                 not IsDeleted1
             end, Rest),
 
-    ConflictRevs = [RevId1  || {RevId1, _, _} <- ConflictRevTuples],
-    DeletedConflictRevs = [RevId2   || {RevId2, _, _} <- DeletedConflictRevTuples],
+    ConflictRevs = [{Start1, RevId1}  || {_, {Start1, [RevId1|_]}} <- ConflictRevTuples],
+    DeletedConflictRevs = [{Start1, RevId1}  || {_, {Start1, [RevId1|_]}} <- DeletedConflictRevTuples],
     DocInfo = #doc_info{
         id=Id,
         update_seq=Seq,
-        rev = RevId,
+        rev = {Start, RevId},
         summary_pointer = SummaryPointer,
         conflict_revs = ConflictRevs,
         deleted_conflict_revs = DeletedConflictRevs,

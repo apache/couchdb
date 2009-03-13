@@ -17,7 +17,7 @@ couchTests.view_multi_key_all_docs = function(debug) {
   if (debug) debugger;
 
   var docs = makeDocs(0, 100);
-  T(db.bulkSave(docs).ok);
+  db.bulkSave(docs);
 
   var keys = ["10","15","30","37","50"];
   var rows = db.allDocs({},keys).rows;

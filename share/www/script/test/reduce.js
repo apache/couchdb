@@ -17,7 +17,7 @@ couchTests.reduce = function(debug) {
   if (debug) debugger;
   var numDocs = 500
   var docs = makeDocs(1,numDocs + 1);
-  T(db.bulkSave(docs).ok);
+  db.bulkSave(docs);
   var summate = function(N) {return (N+1)*N/2;};
 
   var map = function (doc) {
@@ -65,7 +65,7 @@ couchTests.reduce = function(debug) {
       docs.push({keys:["d", "a"]});
       docs.push({keys:["d", "b"]});
       docs.push({keys:["d", "c"]});
-      T(db.bulkSave(docs).ok);
+      db.bulkSave(docs);
       T(db.info().doc_count == ((i - 1) * 10 * 11) + ((j + 1) * 11));
     }
 
@@ -157,7 +157,7 @@ couchTests.reduce = function(debug) {
     docs.push({val:80});
     docs.push({val:90});
     docs.push({val:100});
-    T(db.bulkSave(docs).ok);
+    db.bulkSave(docs);
   }
   
   var results = db.query(map, reduceCombine);

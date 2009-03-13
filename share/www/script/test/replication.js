@@ -59,7 +59,7 @@ couchTests.replication = function(debug) {
       simple_test: new function () {
         this.init = function(dbA, dbB) {
           var docs = makeDocs(0, numDocs);
-          T(dbA.bulkSave(docs).ok);
+          dbA.bulkSave(docs);
         };
       
         this.afterAB1 = function(dbA, dbB) {          
@@ -160,7 +160,7 @@ couchTests.replication = function(debug) {
           dbA.deleteDoc({_id:"foo", _rev:docA._conflicts[0]});
         };
         
-        this.afterBA2 = function(dbA, dbB) {            
+        this.afterBA2 = function(dbA, dbB) {
           // open documents and include the conflict meta data
           var docA = dbA.open("foo", {conflicts: true});
           var docB = dbB.open("foo", {conflicts: true});
@@ -179,29 +179,56 @@ couchTests.replication = function(debug) {
       }
     }
 
-    T(CouchDB.replicate(A, B).ok);
+    var result = CouchDB.replicate(A, B);
+    
+    var seqA = result.source_last_seq;
+    T(0 == result.history[0].start_last_seq);
+    T(result.history[1] === undefined)
 
     for(test in repTests) {
       if(repTests[test].afterAB1) repTests[test].afterAB1(dbA, dbB);
     }
 
-    T(CouchDB.replicate(B, A).ok);
+    result = CouchDB.replicate(B, A);
+    
+    var seqB = result.source_last_seq;
+    T(0 == result.history[0].start_last_seq);
+    T(result.history[1] === undefined)
 
     for(test in repTests) {
       if(repTests[test].afterBA1) repTests[test].afterBA1(dbA, dbB);
     }
 
-    T(CouchDB.replicate(A, B).ok);
+    var result2 = CouchDB.replicate(A, B);
+    
+    // each successful replication produces a new session id
+    T(result2.session_id != result.session_id);
+    
+    T(seqA < result2.source_last_seq);
+    T(seqA == result2.history[0].start_last_seq);
+    T(result2.history[1].end_last_seq == seqA)
+    
+    seqA = result2.source_last_seq;
 
     for(test in repTests) {
       if(repTests[test].afterAB2) repTests[test].afterAB2(dbA, dbB);
     }
 
-    T(CouchDB.replicate(B, A).ok);
+    result = CouchDB.replicate(B, A)
+    
+    T(seqB < result.source_last_seq);
+    T(seqB == result.history[0].start_last_seq);
+    T(result.history[1].end_last_seq == seqB)
+    
+    seqB = result.source_last_seq;
 
     for(test in repTests) {
       if(repTests[test].afterBA2) repTests[test].afterBA2(dbA, dbB);
     }
-
+    
+    // do an replication where nothing has changed
+    result2 = CouchDB.replicate(B, A);
+    T(result2.no_changes == true);
+    T(result2.session_id == result.session_id);
   }
 };

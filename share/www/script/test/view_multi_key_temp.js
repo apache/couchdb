@@ -17,7 +17,7 @@ couchTests.view_multi_key_temp = function(debug) {
   if (debug) debugger;
 
   var docs = makeDocs(0, 100);
-  T(db.bulkSave(docs).ok);
+  db.bulkSave(docs);
 
   var queryFun = function(doc) { emit(doc.integer, doc.integer) };
   var reduceFun = function (keys, values) { return sum(values); };

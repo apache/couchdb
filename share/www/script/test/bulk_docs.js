@@ -19,38 +19,73 @@ couchTests.bulk_docs = function(debug) {
   var docs = makeDocs(5);
 
   // Create the docs
-  var result = db.bulkSave(docs);
-  T(result.ok);
-  T(result.new_revs.length == 5);
+  var results = db.bulkSave(docs);
+  
+  T(results.length == 5);
   for (var i = 0; i < 5; i++) {
-    T(result.new_revs[i].id == docs[i]._id);
-    T(result.new_revs[i].rev);
+    T(results[i].id == docs[i]._id);
+    T(results[i].rev);
+    // Update the doc
     docs[i].string = docs[i].string + ".00";
   }
 
-  // Update the docs
-  result = db.bulkSave(docs);
-  T(result.ok);
-  T(result.new_revs.length == 5);
+  // Save the docs
+  results = db.bulkSave(docs);
+  T(results.length == 5);
   for (i = 0; i < 5; i++) {
-    T(result.new_revs[i].id == i.toString());
+    T(results[i].id == i.toString());
+    
+    // set the delete flag to delete the docs in the next step
     docs[i]._deleted = true;
   }
+  
+  // now test a bulk update with a conflict
+  // open and save
+  var doc = db.open("0");
+  db.save(doc);
 
-  // Delete the docs
-  result = db.bulkSave(docs);
-  T(result.ok);
-  T(result.new_revs.length == 5);
-  for (i = 0; i < 5; i++) {
+  // Now bulk delete the docs
+  results = db.bulkSave(docs);
+
+	// doc "0" should be a conflict
+  T(results.length == 5);
+  T(results[0].id == "0");
+  T(results[0].error == "conflict");
+  T(results[0].rev === undefined); // no rev member when a conflict
+  
+	// but the rest are not
+  for (i = 1; i < 5; i++) {
+    T(results[i].id == i.toString());
+    T(results[i].rev)
     T(db.open(docs[i]._id) == null);
   }
+
+  // now force a conflict to to save
+  
+  // save doc 0, this will cause a conflict when we save docs[0]
+  var doc = db.open("0");
+	docs[0] = db.open("0")
+  db.save(doc);
+  
+  docs[0].shooby = "dooby";
+  
+  // Now save the bulk docs, When we use all_or_nothing, we don't get conflict
+  // checking, all docs are saved regardless of conflict status, or none are
+  // saved.
+  results = db.bulkSave(docs,{all_or_nothing:true});  
+  T(results.error === undefined);
+  
+  var doc = db.open("0", {conflicts:true});
+  var docConflict = db.open("0", {rev:doc._conflicts[0]});
+  
+  T(doc.shooby == "dooby" || docConflict.shooby == "dooby");
   
   // verify creating a document with no id returns a new id
   var req = CouchDB.request("POST", "/test_suite_db/_bulk_docs", {
     body: JSON.stringify({"docs": [{"foo":"bar"}]})
   });
-  result = JSON.parse(req.responseText);
+  results = JSON.parse(req.responseText);
   
-  T(result.new_revs[0].id != "");
-  T(result.new_revs[0].rev != "");
+  T(results[0].id != "");
+  T(results[0].rev != "");
 };

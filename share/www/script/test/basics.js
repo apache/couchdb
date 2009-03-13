@@ -14,14 +14,14 @@
 couchTests.basics = function(debug) {
     var result = JSON.parse(CouchDB.request("GET", "/").responseText);
     T(result.couchdb == "Welcome"); 
-    
+  
     var db = new CouchDB("test_suite_db");
     db.deleteDb();
 
     // bug COUCHDB-100: DELETE on non-existent DB returns 500 instead of 404
     db.deleteDb();
-    
-db.createDb();
+  
+    db.createDb();
 
     // PUT on existing DB should return 412 instead of 500
     xhr = CouchDB.request("PUT", "/test_suite_db/");
@@ -122,14 +122,14 @@ db.createDb();
 
     // make sure we can still open the old rev of the deleted doc
     T(db.open(existingDoc._id, {rev: existingDoc._rev}) != null);
-    
+  
     // make sure restart works
     T(db.ensureFullCommit().ok);
     restartServer();
-    
+  
     // make sure we can still open
     T(db.open(existingDoc._id, {rev: existingDoc._rev}) != null);
-    
+  
     // test that the POST response has a Location header
     var xhr = CouchDB.request("POST", "/test_suite_db", {
       body: JSON.stringify({"foo":"bar"})

@@ -10,7 +10,7 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-couchTests.attatchment_names = function(debug) { 
+couchTests.attachment_names = function(debug) { 
   var db = new CouchDB("test_suite_db"); 
   db.deleteDb(); 
   db.createDb(); 

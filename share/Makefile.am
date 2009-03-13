@@ -104,6 +104,7 @@ nobase_dist_localdata_DATA = \
     www/script/test/view_sandboxing.js \
     www/script/test/view_xml.js \
     www/script/test/replication.js \
+    www/script/test/rev_stemming.js \
     www/script/test/etags_head.js \
     www/script/test/etags_views.js \
     www/script/test/show_documents.js \

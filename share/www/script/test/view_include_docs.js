@@ -17,7 +17,7 @@ couchTests.view_include_docs = function(debug) {
   if (debug) debugger;
 
   var docs = makeDocs(0, 100);
-  T(db.bulkSave(docs).ok);
+  db.bulkSave(docs);
 
   var designDoc = {
     _id:"_design/test",

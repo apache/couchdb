@@ -16,8 +16,7 @@ couchTests.compact = function(debug) {
   db.createDb();
   if (debug) debugger;
   var docs = makeDocs(0, 10);
-  var saveResult = db.bulkSave(docs);
-  T(saveResult.ok);
+  db.bulkSave(docs);
 
   var binAttDoc = {
     _id: "bin_doc",
@@ -36,12 +35,11 @@ couchTests.compact = function(debug) {
   for(var i in docs) {
       db.deleteDoc(docs[i]);
   }
-  db.setAdmins(["Foo bar"]);
   var deletesize = db.info().disk_size;
   T(deletesize > originalsize);
 
-  var xhr = CouchDB.request("POST", "/test_suite_db/_compact");
-  T(xhr.status == 202);
+  T(db.compact().ok);
+  T(db.last_req.status == 202);
   // compaction isn't instantaneous, loop until done
   while (db.info().compact_running) {};
   

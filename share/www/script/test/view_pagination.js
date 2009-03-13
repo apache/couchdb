@@ -17,7 +17,7 @@ couchTests.view_pagination = function(debug) {
     if (debug) debugger;
 
     var docs = makeDocs(0, 100);
-    T(db.bulkSave(docs).ok);
+    db.bulkSave(docs);
 
     var queryFun = function(doc) { emit(doc.integer, null) };
     var i;

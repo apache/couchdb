@@ -34,7 +34,7 @@ couchTests.purge = function(debug) {
   
   T(db.save(designDoc).ok);
 
-  T(db.bulkSave(makeDocs(1, numDocs + 1)).ok);
+  db.bulkSave(makeDocs(1, numDocs + 1));
 
   // go ahead and validate the views before purging
   var rows = db.view("test/all_docs_twice").rows;

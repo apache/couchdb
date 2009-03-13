@@ -43,7 +43,7 @@ couchTests.design_docs = function(debug) {
   }
   T(db.save(designDoc).ok);
 
-  T(db.bulkSave(makeDocs(1, numDocs + 1)).ok);
+  db.bulkSave(makeDocs(1, numDocs + 1));
 
   // test that the _all_docs view returns correctly with keys
   var results = db.allDocs({startkey:"_design", endkey:"_design0"});

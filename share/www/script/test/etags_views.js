@@ -42,8 +42,7 @@ couchTests.etags_views = function(debug) {
   T(db.save(designDoc).ok);
   var xhr;
   var docs = makeDocs(0, 10);
-  var saveResult = db.bulkSave(docs);
-  T(saveResult.ok);
+  db.bulkSave(docs);
   
   // verify get w/Etag on map view
   xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/basicView");

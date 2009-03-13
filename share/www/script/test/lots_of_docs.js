@@ -25,7 +25,7 @@ couchTests.lots_of_docs = function(debug) {
   for(var i=0; i < numDocsToCreate; i += 100) {
       var createNow = Math.min(numDocsToCreate - i, 100);
       var docs = makeDocs(i, i + createNow);
-      T(db.bulkSave(docs).ok);
+      db.bulkSave(docs);
   }
 
   // query all documents, and return the doc.integer member as a key.

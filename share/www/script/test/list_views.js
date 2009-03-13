@@ -137,8 +137,7 @@ couchTests.list_views = function(debug) {
   T(db.save(designDoc).ok);
   
   var docs = makeDocs(0, 10);
-  var saveResult = db.bulkSave(docs);
-  T(saveResult.ok);
+  db.bulkSave(docs);
   
   var view = db.view('lists/basicView');
   T(view.total_rows == 10);
@@ -207,8 +206,7 @@ couchTests.list_views = function(debug) {
   
   // verify the etags expire correctly
   var docs = makeDocs(11, 12);
-  var saveResult = db.bulkSave(docs);
-  T(saveResult.ok);
+  db.bulkSave(docs);
   
   xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/withReduce?group=true", {
     headers: {"if-none-match": etag}

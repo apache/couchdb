@@ -23,32 +23,32 @@ couchTests.invalid_docids = function(debug) {
   //Test non-string
   try {
     db.save({"_id": 1});
-    T(1 == 0);
+    T(1 == 0, "doc id must be string");
   } catch(e) {
       T(db.last_req.status == 400);
-      T(e.error == "invalid_doc");
+      T(e.error == "bad_request");
   }
 
   // Test invalid _prefix
   try {
     db.save({"_id": "_invalid"});
-    T(1 == 0);
+    T(1 == 0, "doc id may not start with underscore");
   } catch(e) {
       T(db.last_req.status == 400);
-      T(e.error == "invalid_doc");
+      T(e.error == "bad_request");
   }
 
   // Test _bulk_docs explicitly.
   var docs = [{"_id": "_design/foo"}, {"_id": "_local/bar"}];
-  T(db.bulkSave(docs).ok);
+  db.bulkSave(docs);
   docs.forEach(function(d) {T(db.open(d._id)._id == d._id);});
 
   docs = [{"_id": "_invalid"}];
   try {
     db.bulkSave(docs);
-    T(1 == 0);
+    T(1 == 0, "doc id may not start with underscore, even in bulk docs");
   } catch(e) {
       T(db.last_req.status == 400);
-      T(e.error == "invalid_doc");
+      T(e.error == "bad_request");
   }
 };

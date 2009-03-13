@@ -18,7 +18,7 @@ couchTests.reduce_false = function(debug) {
 
   var numDocs = 5;
   var docs = makeDocs(1,numDocs + 1);
-  T(db.bulkSave(docs).ok);
+  db.bulkSave(docs);
   var summate = function(N) {return (N+1)*N/2;};
 
   var designDoc = {

@@ -98,15 +98,26 @@ function CouchDB(name, httpHeaders) {
       if (docs[i]._id == undefined)
         docs[i]._id = newUuids.pop();
     }
-    this.last_req = this.request("POST", this.uri + "_bulk_docs" + encodeOptions(options), {
-      body: JSON.stringify({"docs": docs})
-    });
-    CouchDB.maybeThrowError(this.last_req);
-    var result = JSON.parse(this.last_req.responseText);
-    for (var i = 0; i < docs.length; i++) {
-        docs[i]._rev = result.new_revs[i].rev;
+    var json = {"docs": docs};
+    // put any options in the json
+    for (var option in options) {
+      json[option] = options[option];
     }
-    return result;
+    this.last_req = this.request("POST", this.uri + "_bulk_docs", {
+      body: JSON.stringify(json)
+    });
+    if (this.last_req.status == 417) {
+      return {errors: JSON.parse(this.last_req.responseText)};
+    }
+    else {
+      CouchDB.maybeThrowError(this.last_req);
+      var results = JSON.parse(this.last_req.responseText);
+      for (var i = 0; i < docs.length; i++) {
+        if(results[i].rev)
+          docs[i]._rev = results[i].rev;
+      }
+      return results;
+    }
   }
   
   this.ensureFullCommit = function() {
@@ -203,6 +214,20 @@ function CouchDB(name, httpHeaders) {
     return JSON.parse(this.last_req.responseText);
   }
   
+  this.setDbProperty = function(propId, propValue) {
+    this.last_req = this.request("PUT", this.uri + propId,{
+      body:JSON.stringify(propValue)
+    });
+    CouchDB.maybeThrowError(this.last_req);
+    return JSON.parse(this.last_req.responseText);
+  }
+  
+  this.getDbProperty = function(propId) {
+    this.last_req = this.request("GET", this.uri + propId);
+    CouchDB.maybeThrowError(this.last_req);
+    return JSON.parse(this.last_req.responseText);
+  }
+  
   this.setAdmins = function(adminsArray) {
     this.last_req = this.request("PUT", this.uri + "_admins",{
       body:JSON.stringify(adminsArray)
@@ -283,8 +308,11 @@ CouchDB.getVersion = function() {
   return JSON.parse(CouchDB.last_req.responseText).version;
 }
 
-CouchDB.replicate = function(source, target) {
+CouchDB.replicate = function(source, target, rep_options) {
+  rep_options = rep_options || {};
+  var headers = rep_options.headers || {};
   CouchDB.last_req = CouchDB.request("POST", "/_replicate", {
+    headers: headers,
     body: JSON.stringify({source: source, target: target})
   });
   CouchDB.maybeThrowError(CouchDB.last_req);
