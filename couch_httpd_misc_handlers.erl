@@ -70,35 +70,36 @@ handle_task_status_req(#httpd{method='GET'}=Req) ->
 handle_task_status_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
+% add trailing slash if missing
+fix_db_url(UrlBin) ->
+    ?l2b(case lists:last(Url = ?b2l(UrlBin)) of
+    $/ -> Url;
+    _  -> Url ++ "/"
+    end).
+    
 
-handle_replicate_req(#httpd{user_ctx=UserCtx,method='POST'}=Req) ->
+get_rep_endpoint(_Req, {Props}) ->
+    Url = proplists:get_value(<<"url">>, Props),
+    {BinHeaders} = proplists:get_value(<<"headers">>, Props, {[]}),
+    {remote, fix_db_url(Url), [{?b2l(K),?b2l(V)} || {K,V} <- BinHeaders]};
+get_rep_endpoint(_Req, <<"http://",_/binary>>=Url) ->
+    {remote, fix_db_url(Url), []};
+get_rep_endpoint(_Req, <<"https://",_/binary>>=Url) ->
+    {remote, fix_db_url(Url), []};
+get_rep_endpoint(#httpd{user_ctx=UserCtx}, <<DbName/binary>>) ->
+    {local, DbName, UserCtx}.
+
+handle_replicate_req(#httpd{method='POST'}=Req) ->
     {Props} = couch_httpd:json_body(Req),
-    Source = proplists:get_value(<<"source">>, Props),
-    Target = proplists:get_value(<<"target">>, Props),
-    
-    {SrcOpts} = proplists:get_value(<<"source_options">>, Props, {[]}),
-    {SrcHeadersBinary} = proplists:get_value(<<"headers">>, SrcOpts, {[]}),
-    SrcHeaders = [{?b2l(K),(V)} || {K,V} <- SrcHeadersBinary],
-    
-    {TgtOpts} = proplists:get_value(<<"target_options">>, Props, {[]}),
-    {TgtHeadersBinary} = proplists:get_value(<<"headers">>, TgtOpts, {[]}),
-    TgtHeaders = [{?b2l(K),(V)} || {K,V} <- TgtHeadersBinary],
-    
-    {Options} = proplists:get_value(<<"options">>, Props, {[]}),
-    Options2 = [{source_options,
-                    [{headers, SrcHeaders},
-                    {user_ctx, UserCtx}]},
-                {target_options,
-                    [{headers, TgtHeaders},
-                    {user_ctx, UserCtx}]}
-                | Options],
-    case couch_rep:replicate(Source, Target, Options2) of
-        {ok, {JsonResults}} ->
-            send_json(Req, {[{ok, true} | JsonResults]});
-        {error, {Type, Details}} ->
-            send_json(Req, 500, {[{error, Type}, {reason, Details}]});
-        {error, Reason} ->
-            send_json(Req, 500, {[{error, Reason}]})
+    Source = get_rep_endpoint(Req, proplists:get_value(<<"source">>, Props)),
+    Target = get_rep_endpoint(Req, proplists:get_value(<<"target">>, Props)),
+    case couch_rep:replicate(Source, Target) of
+    {ok, {JsonResults}} ->
+        send_json(Req, {[{ok, true} | JsonResults]});
+    {error, {Type, Details}} ->
+        send_json(Req, 500, {[{error, Type}, {reason, Details}]});
+    {error, Reason} ->
+        send_json(Req, 500, {[{error, Reason}]})
     end;
 handle_replicate_req(Req) ->
     send_method_not_allowed(Req, "POST").

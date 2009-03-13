@@ -565,14 +565,14 @@ view_row_obj(Db, {{Key, DocId}, Value}, IncludeDocs) ->
         true ->
             Rev = case Value of
             {Props} ->
-                case is_list(Props) of
-                true ->
-                    proplists:get_value(<<"_rev">>, Props, []);
-                _ ->
-                    []
+                case proplists:get_value(<<"_rev">>, Props) of
+                undefined ->
+                    nil;
+                Rev0 ->
+                    couch_doc:parse_rev(Rev0)
                 end;
             _ ->
-                []
+                nil
             end,
             ?LOG_DEBUG("Include Doc: ~p ~p", [DocId, Rev]),
             case (catch couch_httpd_db:couch_doc_open(Db, DocId, Rev, [])) of

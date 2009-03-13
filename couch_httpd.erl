@@ -16,7 +16,7 @@
 -export([start_link/0, stop/0, handle_request/4]).
 
 -export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,path/1,absolute_uri/2]).
--export([verify_is_server_admin/1,unquote/1,quote/1,recv/2,recv_chunked/4]).
+-export([verify_is_server_admin/1,unquote/1,quote/1,recv/2,recv_chunked/4,error_info/1]).
 -export([parse_form/1,json_body/1,body/1,doc_etag/1, make_etag/1, etag_respond/3]).
 -export([primary_header_value/2,partition/1,serve_file/3]).
 -export([start_chunked_response/3,send_chunk/2]).
@@ -166,7 +166,7 @@ handle_request(MochiReq, UrlHandlers, DbUrlHandlers, DesignUrlHandlers) ->
     catch
         throw:Error ->
             send_error(HttpReq, Error);
-        Tag:Error ->
+        Tag:Error when Error ==foo ->
             ?LOG_ERROR("Uncaught error in HTTP request: ~p",[{Tag, Error}]),
             ?LOG_DEBUG("Stacktrace: ~p",[erlang:get_stacktrace()]),
             send_error(HttpReq, Error)
@@ -295,8 +295,8 @@ body(#httpd{mochi_req=MochiReq}) ->
 json_body(Httpd) ->
     ?JSON_DECODE(body(Httpd)).
 
-doc_etag(#doc{revs=[DiskRev|_]}) ->
-    "\"" ++ binary_to_list(DiskRev) ++ "\"".
+doc_etag(#doc{revs={Start, [DiskRev|_]}}) ->
+    "\"" ++ ?b2l(couch_doc:rev_to_str({Start, DiskRev})) ++ "\"".
 
 make_etag(Term) ->
     <<SigInt:128/integer>> = erlang:md5(term_to_binary(Term)),
@@ -392,75 +392,55 @@ end_json_response(Resp) ->
     send_chunk(Resp, []).
 
 
-send_error(Req, bad_request) ->
-    send_error(Req, 400, <<"bad_request">>, <<>>);
-send_error(Req, {query_parse_error, Reason}) ->
-    send_error(Req, 400, <<"query_parse_error">>, Reason);
-send_error(Req, {bad_request, Reason}) ->
-    send_error(Req, 400, <<"bad_request">>, Reason);
-send_error(Req, not_found) ->
-    send_error(Req, 404, <<"not_found">>, <<"Missing">>);
-send_error(Req, {not_found, Reason}) ->
-    send_error(Req, 404, <<"not_found">>, Reason);
-send_error(Req, conflict) ->
-    send_error(Req, 409, <<"conflict">>, <<"Document update conflict.">>);
-send_error(Req, {invalid_doc, Reason}) ->
-    send_error(Req, 400, <<"invalid_doc">>, Reason);
-send_error(Req, {forbidden, Msg}) ->
-    send_json(Req, 403,
-        {[{<<"error">>,  <<"forbidden">>},
-         {<<"reason">>, Msg}]});
-send_error(Req, {unauthorized, Msg}) ->
-    case couch_config:get("httpd", "WWW-Authenticate", nil) of
-    nil ->
-        Headers = [];
-    Type ->
-        Headers = [{"WWW-Authenticate", Type}]
-    end,
-    send_json(Req, 401, Headers,
-        {[{<<"error">>,  <<"unauthorized">>},
-         {<<"reason">>, Msg}]});
-send_error(Req, {http_error, Code, Headers, Error, Reason}) ->
-    send_json(Req, Code, Headers,
-        {[{<<"error">>, Error}, {<<"reason">>, Reason}]});
-send_error(Req, {user_error, {Props}}) ->
-    {Headers} = proplists:get_value(<<"headers">>, Props, {[]}),
-    send_json(Req,
-        proplists:get_value(<<"http_status">>, Props, 500),
-        Headers,
-        {[{<<"error">>, proplists:get_value(<<"error">>, Props)},
-            {<<"reason">>, proplists:get_value(<<"reason">>, Props)}]});
-send_error(Req, file_exists) ->
-    send_error(Req, 412, <<"file_exists">>, <<"The database could not be "
-        "created, the file already exists.">>);
-send_error(Req, {Error, Reason}) ->
-    send_error(Req, 500, Error, Reason);
+error_info(bad_request) ->
+    {400, <<"bad_request">>, <<>>};
+error_info({bad_request, Reason}) ->
+    {400, <<"bad_request">>, Reason};
+error_info({query_parse_error, Reason}) ->
+    {400, <<"query_parse_error">>, Reason};
+error_info(not_found) ->
+    {404, <<"not_found">>, <<"Missing">>};
+error_info({not_found, Reason}) ->
+    {404, <<"not_found">>, Reason};
+error_info(conflict) ->
+    {409, <<"conflict">>, <<"Document update conflict.">>};
+error_info({forbidden, Msg}) ->
+    {403, <<"forbidden">>, Msg};
+error_info({unauthorized, Msg}) ->
+    {401, <<"unauthorized">>, Msg};
+error_info(file_exists) ->
+    {412, <<"file_exists">>, <<"The database could not be "
+        "created, the file already exists.">>};
+error_info({Error, Reason}) ->
+    {500, couch_util:to_binary(Error), couch_util:to_binary(Reason)};
+error_info(Error) ->
+    {500, <<"unknown_error">>, couch_util:to_binary(Error)}.
+
 send_error(Req, Error) ->
-    send_error(Req, 500, <<"error">>, Error).
+    {Code, ErrorStr, ReasonStr} = error_info(Error),
+    if Code == 401 ->     
+        case couch_config:get("httpd", "WWW-Authenticate", nil) of
+        nil ->
+            Headers = [];
+        Type ->
+            Headers = [{"WWW-Authenticate", Type}]
+        end;
+    true ->
+        Headers = []
+    end,
+    send_error(Req, Code, Headers, ErrorStr, ReasonStr).
 
-
-
-send_error(Req, Code, Error, Msg) when is_atom(Error) ->
-    send_error(Req, Code, list_to_binary(atom_to_list(Error)), Msg);
-send_error(Req, Code, Error, Msg) when is_list(Msg) ->
-    case (catch list_to_binary(Msg)) of
-    Bin when is_binary(Bin) ->
-        send_error(Req, Code, Error, Bin);
-    _ ->
-        send_error(Req, Code, Error, io_lib:format("~p", [Msg]))
-    end;
-send_error(Req, Code, Error, Msg) when not is_binary(Error) ->
-    send_error(Req, Code, list_to_binary(io_lib:format("~p", [Error])), Msg);
-send_error(Req, Code, Error, Msg) when not is_binary(Msg) ->
-    send_error(Req, Code, Error, list_to_binary(io_lib:format("~p", [Msg])));
-send_error(Req, Code, Error, <<>>) ->
-    send_json(Req, Code, {[{<<"error">>, Error}]});
-send_error(Req, Code, Error, Msg) ->
-    send_json(Req, Code, {[{<<"error">>, Error}, {<<"reason">>, Msg}]}).
+send_error(Req, Code, ErrorStr, ReasonStr) ->
+    send_error(Req, Code, [], ErrorStr, ReasonStr).
     
-send_redirect(Req, Path) ->
-    Headers = [{"Location", couch_httpd:absolute_uri(Req, Path)}],
-    send_response(Req, 301, Headers, <<>>).
+send_error(Req, Code, Headers, ErrorStr, ReasonStr) ->
+    send_json(Req, Code, Headers,
+        {[{<<"error">>,  ErrorStr},
+         {<<"reason">>, ReasonStr}]}).
+
+ send_redirect(Req, Path) ->
+     Headers = [{"Location", couch_httpd:absolute_uri(Req, Path)}],
+     send_response(Req, 301, Headers, <<>>).
 
 negotiate_content_type(#httpd{mochi_req=MochiReq}) ->
     %% Determine the appropriate Content-Type header for a JSON response
