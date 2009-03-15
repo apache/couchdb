@@ -150,6 +150,16 @@ couchTests.replication = function(debug) {
               }
             }
           });
+          // make sure on design docs as well
+          dbA.save({
+            _id:"_design/with_bin",
+            _attachments:{
+              "foo.txt": {
+                "type":"base64",
+                "data": "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+              }
+            }
+          });
         };
         
         this.afterAB1 = function(dbA, dbB) {
@@ -157,6 +167,13 @@ couchTests.replication = function(debug) {
           T(xhr.responseText == "This is a base64 encoded text")
 
           xhr = CouchDB.request("GET", "/test_suite_db_b/bin_doc/foo.txt");
+          T(xhr.responseText == "This is a base64 encoded text")
+
+          // and the design-doc
+          xhr = CouchDB.request("GET", "/test_suite_db_a/_design/with_bin/foo.txt");
+          T(xhr.responseText == "This is a base64 encoded text")
+
+          xhr = CouchDB.request("GET", "/test_suite_db_b/_design/with_bin/foo.txt");
           T(xhr.responseText == "This is a base64 encoded text")
         };
       },
