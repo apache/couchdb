@@ -129,9 +129,12 @@ from_json_obj(_Other) ->
 parse_rev(Rev) when is_binary(Rev) ->
     parse_rev(?b2l(Rev));
 parse_rev(Rev) ->
-    {Pos, [$- | RevId]} = lists:splitwith(fun($-) -> false; (_) -> true end, Rev),
-    {list_to_integer(Pos), ?l2b(RevId)}.
-
+    SplitRev = lists:splitwith(fun($-) -> false; (_) -> true end, Rev),
+    case SplitRev of 
+        {Pos, [$- | RevId]} -> {list_to_integer(Pos), ?l2b(RevId)};
+        _Else -> throw({bad_request, <<"Invalid rev format">>})
+    end.
+    
 parse_revs([]) ->
     [];
 parse_revs([Rev | Rest]) ->
