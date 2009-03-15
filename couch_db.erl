@@ -342,8 +342,8 @@ prep_and_validate_updates(Db, [DocBucket|RestBuckets],
         fun(Doc, {Docs2Acc, AccErrors2}) ->
             case prep_and_validate_update(Db, Doc, OldFullDocInfo,
                     LeafRevsDict) of
-            {ok, Doc} ->
-                {[Doc | Docs2Acc], AccErrors2};
+            {ok, Doc2} ->
+                {[Doc2 | Docs2Acc], AccErrors2};
             {Error, #doc{id=Id,revs={Pos, [NewRev|_]}}} ->
                 % Record the error
                 {Docs2Acc, [{{Id, {Pos, NewRev}}, Error} |AccErrors2]}
