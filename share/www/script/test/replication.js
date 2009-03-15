@@ -72,6 +72,7 @@ couchTests.replication = function(debug) {
       },
     
      deletes_test: new function () {
+        // make sure deletes are replicated
         this.init = function(dbA, dbB) {
           T(dbA.save({_id:"foo1",value:"a"}).ok);
         };
@@ -87,6 +88,27 @@ couchTests.replication = function(debug) {
         this.afterAB2 = function(dbA, dbB) {
           T(dbA.open("foo1") == null);
           T(dbB.open("foo1") == null);
+        };
+      },
+      
+      deleted_test : new function() {
+        // docs created and deleted on a single node are also replicated
+        this.init = function(dbA, dbB) {
+          T(dbA.save({_id:"del1",value:"a"}).ok);
+          var docA = dbA.open("del1");
+          dbA.deleteDoc(docA);
+        };
+        
+        this.afterAB1 = function(dbA, dbB) {
+          var rows = dbB.allDocsBySeq().rows;
+          var rowCnt = 0;
+          for (var i=0; i < rows.length; i++) {
+            if (rows[i].id == "del1") {
+              rowCnt += 1;
+              T(rows[i].value.deleted == true);
+            }
+          };
+          T(rowCnt == 1);
         };
       },
       
