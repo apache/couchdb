@@ -597,7 +597,7 @@ drop_nodes(_Bt, Reds, _StartKey, []) ->
 drop_nodes(Bt, Reds, StartKey, [{NodeKey, {Pointer, Red}} | RestKPs]) ->
     case less(Bt, NodeKey, StartKey) of
     true -> drop_nodes(Bt, [Red | Reds], StartKey, RestKPs);
-    false -> {Reds, [{NodeKey, {Pointer, Reds}} | RestKPs]}
+    false -> {Reds, [{NodeKey, {Pointer, Red}} | RestKPs]}
     end.
 
 stream_kp_node(Bt, Reds, KPs, StartKey, Dir, Fun, Acc) ->
@@ -621,10 +621,10 @@ stream_kp_node(Bt, Reds, KPs, StartKey, Dir, Fun, Acc) ->
     case NodesToStream of
     [] ->
         {ok, Acc};
-    [{_Key, PointerInfo} | Rest] ->
-        case stream_node(Bt, NewReds, PointerInfo, StartKey, Dir, Fun, Acc) of
+    [{_Key, {Pointer, Red}} | Rest] ->
+        case stream_node(Bt, NewReds, {Pointer, Red}, StartKey, Dir, Fun, Acc) of
         {ok, Acc2} ->
-            stream_kp_node(Bt, NewReds, Rest, Dir, Fun, Acc2);
+            stream_kp_node(Bt, [Red | NewReds], Rest, Dir, Fun, Acc2);
         {stop, Acc2} ->
             {stop, Acc2}
         end
@@ -703,12 +703,13 @@ test_btree(KeyValues) ->
     % get the leading reduction as we foldl/r
     % and count of all from start to Val1
     Val1 = Len div 3,
-    {ok, true} = foldl(Btree10, Val1, fun(_X, LeadingReds, _Acc) ->
-            CountToStart = Val1 - 1,
+    {ok, _} = foldl(Btree10, Val1,
+        fun(_X, LeadingReds, Acc) ->
+            CountToStart = Val1 + Acc - 1,
             CountToStart = final_reduce(Btree10, LeadingReds),
-            {stop, true} % change Acc to 'true'
+            {ok, Acc + 1}
         end,
-        false),
+        0),
 
     {ok, true} = foldr(Btree10, Val1, fun(_X, LeadingReds, _Acc) ->
             CountToEnd = Len - Val1,
