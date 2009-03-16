@@ -223,7 +223,7 @@ handle_call({fin, {LastSeq, RevsCount}}, {Pid,_}, #state{enum_pid=Pid} = State) 
     case State#state.listeners of
     [] ->
         % still waiting for the first listener to sen a request
-        {noreply, State#state{current_seq=LastSeq}};
+        {noreply, State#state{current_seq=LastSeq,done=true}};
     _ ->
         {stop, normal, ok, State#state{current_seq=LastSeq}}
     end.
