@@ -86,8 +86,8 @@ merge_at([{Key, Value, SubTree}|Sibs], Place, Insert) ->
         {ok, [{Key, Value, Merged} | Sibs], Conflicts};
     no ->
         case merge_at(Sibs, Place, Insert) of
-        {ok, Merged} ->
-            [{Key, Value, SubTree} | Merged];
+        {ok, Merged, Conflicts} ->
+            {ok, [{Key, Value, SubTree} | Merged], Conflicts};
         no ->
             no
         end
@@ -316,8 +316,12 @@ test() ->
     TwoChild = [{0, {"1","foo", [{"1a", "bar", [{"1aa", "bar", []}]}]}}],
     TwoChildSibs = [{0, {"1","foo", [{"1a", "bar", []},
                                      {"1b", "bar", []}]}}],
+    TwoChildSibs2 = [{0, {"1","foo", [{"1a", "bar", []},
+                                     {"1b", "bar", [{"1bb", "boo", []}]}]}}],
+    Stemmed1b = [{1, {"1a", "bar", []}}],
     Stemmed1a = [{1, {"1a", "bar", [{"1aa", "bar", []}]}}],
     Stemmed1aa = [{2, {"1aa", "bar", []}}],
+    Stemmed1bb = [{2, {"1bb", "boo", []}}],
     
     {EmptyTree, no_conflicts} = merge(EmptyTree, EmptyTree),
     {One, no_conflicts} = merge(EmptyTree, One),
@@ -326,6 +330,10 @@ test() ->
     {One, no_conflicts} = merge(One, One),
     {TwoChild, no_conflicts} = merge(TwoChild, TwoChild),
     {TwoChildSibs, no_conflicts} = merge(TwoChildSibs, TwoChildSibs),
+    {TwoChildSibs, no_conflicts} = merge(TwoChildSibs, Stemmed1b),
+    {TwoChildSibs, no_conflicts} = merge(Stemmed1b, TwoChildSibs),
+    {TwoChildSibs2, no_conflicts} = merge(TwoChildSibs2, Stemmed1bb),
+    {TwoChildSibs2, no_conflicts} = merge(Stemmed1bb, TwoChildSibs2),
     {TwoChild, no_conflicts} = merge(TwoChild, Stemmed1aa),
     {TwoChild, no_conflicts} = merge(TwoChild, Stemmed1a),
     {Stemmed1a, no_conflicts} = merge(Stemmed1a, Stemmed1aa),
