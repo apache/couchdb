@@ -91,7 +91,8 @@ replicate(Source, Target) ->
     stats,
     enum_pid,
     docs_buffer = [],
-    listeners = []
+    listeners = [],
+    done = false
 }).
 
 
@@ -178,7 +179,8 @@ init([RepId, Source, Target]) ->
     },
     
     {ok, State}.
-
+handle_call(get_result, From, #state{listeners=L,done=true} = State) ->
+    {stop, normal, State#state{listeners=[From|L]}};
 handle_call(get_result, From, #state{listeners=L} = State) ->
     {noreply, State#state{listeners=[From|L]}};
 
@@ -218,7 +220,13 @@ handle_call({replicate_doc, {Id, Revs}}, {Pid,_}, #state{enum_pid=Pid} = State) 
 
 handle_call({fin, {LastSeq, RevsCount}}, {Pid,_}, #state{enum_pid=Pid} = State) ->
     ets:update_counter(State#state.stats, total_revs, RevsCount),
-    {stop, normal, ok, State#state{current_seq=LastSeq}}.
+    case State#state.listeners of
+    [] ->
+        % still waiting for the first listener to sen a request
+        {noreply, State#state{current_seq=LastSeq}};
+    _ ->
+        {stop, normal, ok, State#state{current_seq=LastSeq}}
+    end.
 
 handle_cast({increment_update_seq, Seq}, State) ->
     couch_task_status:update("Processed source update #~p", [Seq]),
@@ -270,12 +278,8 @@ terminate(normal, State) ->
     ets:delete(Stats),
     close_db(Target),
     
-    case Listeners of
-    [Original|Rest] ->
-        %% reply to original requester
-        gen_server:reply(Original, {ok, NewRepHistory});
-    Rest -> ok
-    end,
+    [Original|Rest] = Listeners,
+    gen_server:reply(Original, {ok, NewRepHistory}),
     
     %% maybe trigger another replication. If this replicator uses a local 
     %% source Db, changes to that Db since we started will not be included in 
