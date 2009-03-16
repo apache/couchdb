@@ -44,9 +44,9 @@ gunzip -c m4/ac_check_icu.m4.gz > m4/ac_check_icu.m4
 gunzip -c m4/ac_check_curl.m4.gz > m4/ac_check_curl.m4
 
 if test -x "`which glibtoolize || true`"; then
-    glibtoolize -f -c
+    glibtoolize -f -c --automake
 else
-    libtoolize -f -c
+    libtoolize -f -c --automake
 fi
 
 aclocal -I m4
