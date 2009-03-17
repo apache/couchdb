@@ -55,6 +55,7 @@ loadTest("view_include_docs.js");
 loadTest("view_multi_key_all_docs.js");
 loadTest("view_multi_key_design.js");
 loadTest("view_multi_key_temp.js");
+loadTest("view_offsets.js");
 loadTest("view_pagination.js");
 loadTest("view_sandboxing.js");
 loadTest("view_xml.js");
