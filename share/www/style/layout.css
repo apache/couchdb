@@ -333,6 +333,7 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
 #viewcode.collapsed table, #viewcode.collapsed .bottom { display: none; }
 
 #tempwarn { display: none; font-size: 90%; margin: 0 2em 1.5em; }
+#grouptruenotice { display: none; font-size: 90%; margin: 1ex 2em 1.5em; }
 
 /* Database table */
 

@@ -199,12 +199,14 @@
             }
             $("#language").change(updateDirtyState);
           });
+          $("#grouptruenotice").show();
         } else if (viewName == "_temp_view") {
           page.viewLanguage = $.cookies.get(db.name + ".language", page.viewLanguage);
           page.updateViewEditor(
             $.cookies.get(db.name + ".map", templates[page.viewLanguage]),
             $.cookies.get(db.name + ".reduce", "")
           );
+        $("#grouptruenotice").show();
         }
         page.populateLanguagesMenu();
         if (this.isTempView) {
