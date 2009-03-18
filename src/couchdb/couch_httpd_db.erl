@@ -494,33 +494,8 @@ db_doc_req(#httpd{method='COPY'}=Req, Db, SourceDocId) ->
         throw(Error)
     end;
 
-db_doc_req(#httpd{method='MOVE'}=Req, Db, SourceDocId) ->
-    SourceRev = {SourceRevPos, SourceRevId} =
-    case extract_header_rev(Req, couch_httpd:qs_value(Req, "rev")) of
-    missing_rev -> 
-        throw({bad_request, "MOVE requires a specified rev parameter"
-                "for the origin resource."});
-    Rev -> Rev
-    end,
-
-    {TargetDocId, TargetRevs} = parse_copy_destination_header(Req),
-    % open revision Rev or Current
-    Doc = couch_doc_open(Db, SourceDocId, SourceRev, []),
-
-    % save new doc & delete old doc in one operation
-    Docs = [
-        #doc{id=SourceDocId, revs={SourceRevPos, [SourceRevId]}, deleted=true},
-        Doc#doc{id=TargetDocId, revs=TargetRevs}
-        ],
-    {ok, [SourceResult, TargetResult]} = couch_db:update_docs(Db, Docs, []),
-    
-    send_json(Req, 201, {[
-        {SourceDocId, update_result_to_json(SourceResult)},
-        {TargetDocId, update_result_to_json(TargetResult)}
-    ]});
-
 db_doc_req(Req, _Db, _DocId) ->
-    send_method_not_allowed(Req, "DELETE,GET,HEAD,POST,PUT,COPY,MOVE").
+    send_method_not_allowed(Req, "DELETE,GET,HEAD,POST,PUT,COPY").
 
 update_result_to_json({ok, NewRev}) ->
     {[{rev, couch_doc:rev_to_str(NewRev)}]};
