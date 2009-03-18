@@ -76,7 +76,7 @@ nobase_dist_localdata_DATA = \
     www/script/test/all_docs.js \
     www/script/test/conflicts.js \
     www/script/test/recreate_doc.js \
-    www/script/test/copy_move_doc.js \
+    www/script/test/copy_doc.js \
     www/script/test/uuids.js \
     www/script/test/bulk_docs.js \
     www/script/test/lots_of_docs.js \
