@@ -30,7 +30,7 @@ loadTest("delayed_commits.js");
 loadTest("all_docs.js");
 loadTest("conflicts.js");
 loadTest("recreate_doc.js");
-loadTest("copy_move_doc.js");
+loadTest("copy_doc.js");
 loadTest("uuids.js");
 loadTest("bulk_docs.js");
 loadTest("lots_of_docs.js");
