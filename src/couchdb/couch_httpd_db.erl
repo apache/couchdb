@@ -471,6 +471,28 @@ db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
         end_json_response(Resp)
     end;
 
+db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
+    Form = couch_httpd:parse_form(Req),
+    Rev = couch_doc:parse_rev(list_to_binary(proplists:get_value("_rev", Form))),
+    {ok, [{ok, Doc}]} = couch_db:open_doc_revs(Db, DocId, [Rev], []),
+
+    NewAttachments = [
+        {validate_attachment_name(Name), {list_to_binary(ContentType), Content}} ||
+        {Name, {ContentType, _}, Content} <-
+        proplists:get_all_values("_attachments", Form)
+    ],
+    #doc{attachments=Attachments} = Doc,
+    NewDoc = Doc#doc{
+        attachments = Attachments ++ NewAttachments
+    },
+    {ok, NewRev} = couch_db:update_doc(Db, NewDoc, []),
+
+    send_json(Req, 201, [{"Etag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewRev)) ++ "\""}], {[
+        {ok, true},
+        {id, DocId},
+        {rev, couch_doc:rev_to_str(NewRev)}
+    ]});
+
 db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
     update_doc(Req, Db, DocId, couch_httpd:json_body(Req));
 
