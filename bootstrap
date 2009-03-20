@@ -51,11 +51,10 @@ fi
 
 aclocal -I m4
 autoheader -f
-automake -f -c -a --gnits
+automake -f -c -a --gnits 2>&1 | sed -e "/install/d"
 autoconf -f
 
 cat << EOF
-
 You have bootstrapped Apache CouchDB, time to relax.
 
 Run \`./configure' to configure the source before you install.
