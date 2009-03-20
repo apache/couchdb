@@ -264,22 +264,6 @@ couchTests.stats = function(debug) {
 
      TEquals(copies + 1, new_copies, name);
    },
-   'should increment database changes counter for document moves': function(name) {
-     var db = new CouchDB("test_suite_db");
-     db.deleteDb();
-     db.createDb();
-
-     var doc = {"_id":"test"};
-     db.save(doc);
-
-     var moves = requestStatsTest("couchdb", "database_writes").current;
-     CouchDB.request("MOVE", "/test_suite_db/test?rev=" + doc._rev, {
-       headers: {"Destination":"move_of_test"}
-     });
-     var new_moves = requestStatsTest("couchdb", "database_writes").current;
-
-     TEquals(moves + 1, new_moves, name);
-   },
    'should increase the bulk doc counter': function(name) {
      var db = new CouchDB("test_suite_db");
      db.deleteDb();
