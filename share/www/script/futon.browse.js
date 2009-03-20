@@ -465,7 +465,12 @@
       this.updateDocumentListing = function(options) {
         if (options === undefined) options = {};
         if (options.limit === undefined) {
-          options.limit = parseInt($("#perpage").val(), 10);
+          per_page = parseInt($("#perpage").val(), 10)
+          // Fetch an extra row so we know when we're on the last page for
+          // reduce views
+          options.limit = per_page + 1;
+        } else {
+          per_page = options.limit;
         }
         if ($("#documents thead th.key").is(".desc")) {
           if (typeof options.descending == 'undefined') options.descending = true;
@@ -483,46 +488,58 @@
           if (resp.offset === undefined) {
             resp.offset = 0;
           }
-          var decending_reverse = ((options.descending && !descend) || (descend && (options.descending === false)));
-          if (decending_reverse && resp.rows) {
+          var descending_reverse = ((options.descending && !descend) || (descend && (options.descending === false)));
+          if (descending_reverse && resp.rows) {
             resp.rows = resp.rows.reverse();
           }
-          if (resp.rows !== null && (decending_reverse ? 
-            (resp.total_rows - resp.offset > options.limit) :
-            (resp.offset > 0))) {
-            $("#paging a.prev").attr("href", "#" + (resp.offset - options.limit)).click(function() {
-              var firstDoc = resp.rows[0];
-              page.updateDocumentListing({
-                startkey: firstDoc.key !== undefined ? firstDoc.key : null,
-                startkey_docid: firstDoc.id,
-                skip: 1,
+          var has_reduce_prev = resp.total_rows === undefined && (descending_reverse ? resp.rows.length > per_page : options.startkey !== undefined);
+          if (resp.rows !== null && (has_reduce_prev || (descending_reverse ? 
+            (resp.total_rows - resp.offset > per_page) :
+            (resp.offset > 0)))) {
+            $("#paging a.prev").attr("href", "#" + (resp.offset - per_page)).click(function() {
+              var opt = {
                 descending: !descend,
                 limit: options.limit
-              });
+              };
+              if (resp.rows.length > 0) {
+                var firstDoc = resp.rows[0];
+                opt.startkey = firstDoc.key !== undefined ? firstDoc.key : null;
+                if (firstDoc.id !== undefined) {
+                  opt.startkey_docid = firstDoc.id;
+                }
+                opt.skip = 1;
+              }
+              page.updateDocumentListing(opt);
               return false;
             });
           } else {
             $("#paging a.prev").removeAttr("href");
           }
-          if (resp.rows !== null && (decending_reverse ? 
-            (resp.offset - resp.total_rows < options.limit) : 
-            (resp.total_rows - resp.offset > options.limit))) {
-            $("#paging a.next").attr("href", "#" + (resp.offset + options.limit)).click(function() {
-              var lastDoc = resp.rows[resp.rows.length - 1];
-              page.updateDocumentListing({
-                startkey: lastDoc.key !== undefined ? lastDoc.key : null,
-                startkey_docid: lastDoc.id,
-                skip: 1,
+          var has_reduce_next = resp.total_rows === undefined && (descending_reverse ? options.startkey !== undefined : resp.rows.length > per_page);
+          if (resp.rows !== null && (has_reduce_next || (descending_reverse ? 
+            (resp.offset - resp.total_rows < per_page) : 
+            (resp.total_rows - resp.offset > per_page)))) {
+            $("#paging a.next").attr("href", "#" + (resp.offset + per_page)).click(function() {
+              var opt = {
                 descending: descend,
                 limit: options.limit
-              });
+              };
+              if (resp.rows.length > 0) {
+                var lastDoc = resp.rows[Math.min(per_page, resp.rows.length) - 1];
+                opt.startkey = lastDoc.key !== undefined ? lastDoc.key : null;
+                if (lastDoc.id !== undefined) {
+                  opt.startkey_docid = lastDoc.id;
+                }
+                opt.skip = 1;
+              }
+              page.updateDocumentListing(opt);
               return false;
             });
           } else {
             $("#paging a.next").removeAttr("href");
           }
 
-          for (var i = 0; i < resp.rows.length; i++) {
+          for (var i = 0; i < Math.min(per_page, resp.rows.length); i++) {
             var row = resp.rows[i];
             var tr = $("<tr></tr>");
             var key = "null";
@@ -552,23 +569,24 @@
             tr.appendTo("#documents tbody.content");
           }
           var firstNum = 1;
-          var lastNum = totalNum = resp.rows.length;
+          var lastNum = totalNum = Math.min(per_page, resp.rows.length);
           if (resp.total_rows != null) {
-            if (decending_reverse) {
+            if (descending_reverse) {
               lastNum = Math.min(resp.total_rows, resp.total_rows - resp.offset);
-              firstNum = lastNum - resp.rows.length + 1;          
+              firstNum = lastNum - totalNum + 1;
             } else {
               firstNum = Math.min(resp.total_rows, resp.offset + 1);
-              lastNum = firstNum + resp.rows.length - 1;
+              lastNum = firstNum + totalNum - 1;
             }
             totalNum = resp.total_rows;
-            $("#paging").show();
           } else {
-            $("#paging").hide();
+            totalNum = "unknown";
           }
+          $("#paging").show();
+
           $("#documents tbody.footer td span").text(
             "Showing " + firstNum + "-" + lastNum + " of " + totalNum +
-            " row" + (firstNum != lastNum ? "s" : ""));
+            " row" + (firstNum != lastNum || totalNum == "unknown" ? "s" : ""));
           $("#documents tbody tr:odd").addClass("odd");
         }
         options.error = function(status, error, reason) {
