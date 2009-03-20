@@ -49,4 +49,41 @@ couchTests.view_errors = function(debug) {
     })
   });
   T(JSON.parse(xhr.responseText).error == "invalid_json");
+  
+  var map = function (doc) {emit(doc.integer, doc.integer);};
+  
+  try {
+      db.query(map, null, {group: true});
+      T(0 == 1);
+  } catch(e) {
+      T(e.error == "query_parse_error");
+  }
+  
+  // reduce=false on map views doesn't work, so group=true will
+  // never throw for temp reduce views.
+  
+  var designDoc = {
+    _id:"_design/test",
+    language: "javascript",
+    views: {
+      no_reduce: {map:"function(doc) {emit(doc._id, null);}"},
+      with_reduce: {map:"function (doc) {emit(doc.integer, doc.integer)};",
+                reduce:"function (keys, values) { return sum(values); };"},
+    }
+  };
+  T(db.save(designDoc).ok);
+  
+  try {
+      db.view("test/no_reduce", {group: true});
+      T(0 == 1);
+  } catch(e) {
+      T(e.error == "query_parse_error");
+  }
+  
+  try {
+      db.view("test/with_reduce", {group: true, reduce: false});
+      T(0 == 1);
+  } catch(e) {
+      T(e.error == "query_parse_error");
+  }
 };

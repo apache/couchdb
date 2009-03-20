@@ -301,7 +301,7 @@
               page.storedViewLanguage = page.viewLanguage;
               if (callback) callback();
             }
-          });
+          },{async:false});
         } else {
           page.updateViewEditor(page.storedViewCode.map,
             page.storedViewCode.reduce || "");
@@ -467,9 +467,6 @@
         if (options.limit === undefined) {
           options.limit = parseInt($("#perpage").val(), 10);
         }
-        if (options.group === undefined) {
-          options.group = true;
-        }
         if ($("#documents thead th.key").is(".desc")) {
           if (typeof options.descending == 'undefined') options.descending = true;
           var descend = true;
@@ -589,6 +586,7 @@
             var reduceFun = $("#viewcode_reduce").val() || null;
             if (reduceFun != null) {
               $.cookies.set(db.name + ".reduce", reduceFun);
+              options.group = true;
             } else {
               $.cookies.remove(db.name + ".reduce");
             }
@@ -602,6 +600,9 @@
             $("#viewcode").show();
             var currentMapCode = $("#viewcode_map").val();
             var currentReduceCode = $("#viewcode_reduce").val() || null;
+            if (currentReduceCode) {
+              options.group = true;
+            }
             if (page.isDirty) {
               db.query(currentMapCode, currentReduceCode, page.viewLanguage, options);
             } else {

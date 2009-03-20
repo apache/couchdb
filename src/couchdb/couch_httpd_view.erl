@@ -97,6 +97,7 @@ output_map_view(Req, View, Group, Db, QueryArgs, nil) ->
         start_key = StartKey,
         start_docid = StartDocId
     } = QueryArgs,
+    validate_map_query(QueryArgs),
     CurrentEtag = view_group_etag(Group),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() -> 
         {ok, RowCount} = couch_view:get_row_count(View),
@@ -114,6 +115,7 @@ output_map_view(Req, View, Group, Db, QueryArgs, Keys) ->
         skip = SkipCount,
         start_docid = StartDocId
     } = QueryArgs,
+    validate_map_query(QueryArgs),
     CurrentEtag = view_group_etag(Group, Keys),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->     
         {ok, RowCount} = couch_view:get_row_count(View),
@@ -133,6 +135,13 @@ output_map_view(Req, View, Group, Db, QueryArgs, Keys) ->
             end, {ok, FoldAccInit}, Keys),
         finish_view_fold(Req, RowCount, FoldResult)
     end).
+
+validate_map_query(QueryArgs) ->
+    case QueryArgs#view_query_args.group_level of
+    0 -> ok;
+    _ ->
+        throw({query_parse_error, <<"Query parameter \"group\" and/or \"group_level\" are invalid for map views.">>})
+    end.
 
 output_reduce_view(Req, View, Group, QueryArgs, nil) ->
     #view_query_args{

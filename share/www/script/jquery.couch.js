@@ -205,9 +205,10 @@
             alert("please provide an eachApp function for allApps()");
           }
         },
-        openDoc: function(docId, options) {
+        openDoc: function(docId, options, ajaxOptions) {
           options = options || {};
-          $.ajax({
+          ajaxOptions = ajaxOptions || {};
+          $.ajax($.extend({
             type: "GET",
             url: this.uri + encodeURIComponent(docId) + encodeOptions(options),
             dataType: "json",
@@ -221,7 +222,7 @@
                 alert("The document could not be retrieved: " + resp.reason);
               }
             }
-          });
+          }, ajaxOptions));
         },
         saveDoc: function(doc, options) {
           options = options || {};
