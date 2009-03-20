@@ -140,15 +140,15 @@ check_environment () {
         exit $SCRIPT_ERROR
     fi
     message_prefix="Apache CouchDB needs a regular"
-    if ! echo 2> /dev/null >> $PID_FILE; then
+    if `echo 2> /dev/null >> $PID_FILE; echo $?` -gt 0; then
         echo "$message_prefix PID file: $PID_FILE" >&2
         exit $SCRIPT_ERROR
     fi
-    if ! echo 2> /dev/null >> $STDOUT_FILE; then
+    if `echo 2> /dev/null >> $STDOUT_FILE; echo $?` -gt 0; then
         echo "$message_prefix STDOUT file: $STDOUT_FILE" >&2
         exit $SCRIPT_ERROR
     fi
-    if ! echo 2> /dev/null >> $STDERR_FILE; then
+    if `echo 2> /dev/null >> $STDERR_FILE; echo $?` -gt 0; then
         echo "$message_prefix STDERR file: $STDERR_FILE" >&2
         exit $SCRIPT_ERROR
     fi

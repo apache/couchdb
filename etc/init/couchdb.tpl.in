@@ -27,7 +27,7 @@ SCRIPT_ERROR=1
 
 DESCRIPTION="database server"
 NAME=couchdb
-SCRIPT_NAME=$(basename $0)
+SCRIPT_NAME=`basename $0`
 COUCHDB=%bindir%/%couchdb_command_name%
 CONFIGURATION_FILE=%sysconfdir%/default/couchdb
 LSB_LIBRARY=/lib/lsb/init-functions
@@ -63,9 +63,9 @@ start_couchdb () {
     # Start Apache CouchDB as a background process.
 
     command="$COUCHDB -b"
-    if test -n "$COUCHDB_PID_FILE"; then 
-        command="$command -p $COUCHDB_PID_FILE" 
-    fi 
+    if test -n "$COUCHDB_PID_FILE"; then
+        command="$command -p $COUCHDB_PID_FILE"
+    fi
     if test -n "$COUCHDB_STDOUT_FILE"; then
         command="$command -o $COUCHDB_STDOUT_FILE"
     fi
