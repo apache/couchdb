@@ -15,12 +15,12 @@
 SCRIPT_OK=0
 SCRIPT_ERROR=1
 
-INTERACTIVE_BOOLEAN=false
-BACKGROUND_BOOLEAN=false
-KILL_BOOLEAN=false
-SHUTDOWN_BOOLEAN=false
-RECURSED_BOOLEAN=false
-RESET_CONFIG_BOOLEAN=true
+INTERACTIVE=false
+BACKGROUND=false
+KILL=false
+SHUTDOWN=false
+RECURSED=false
+RESET_CONFIG=true
 
 RESPAWN_TIMEOUT=0
 
@@ -120,7 +120,7 @@ EOF
 }
 
 check_environment () {
-    if test "$BACKGROUND_BOOLEAN" != "true"; then
+    if test "$BACKGROUND" != "true"; then
         return
     fi
     touch $PID_FILE 2> /dev/null || true
@@ -155,22 +155,22 @@ check_environment () {
 }
 
 start_couchdb () {
-    if test ! "$RECURSED_BOOLEAN" = "true"; then
+    if test ! "$RECURSED" = "true"; then
         if check_status 2> /dev/null; then
             exit $SCRIPT_OK
         fi
         check_environment
     fi
     interactive_option="+Bd -noinput"
-    if test "$INTERACTIVE_BOOLEAN" = "true"; then
+    if test "$INTERACTIVE" = "true"; then
         interactive_option=""
     fi
-    if test "$BACKGROUND_BOOLEAN" = "true"; then
+    if test "$BACKGROUND" = "true"; then
         touch $PID_FILE
         interactive_option="+Bd -noinput"
     fi
     if test -n "$INI_FILES"; then
-        if test "$RESET_CONFIG_BOOLEAN" = "true"; then
+        if test "$RESET_CONFIG" = "true"; then
             ini_files="$INI_FILES"
         else
             ini_files="$DEFAULT_INI_FILE $INI_FILES"
@@ -196,13 +196,13 @@ start_couchdb () {
         -eval \"crypto:start()\" \
         -eval \"ibrowse:start()\" \
         -eval \"couch_server:start([$start_arguments]), receive done -> done end.\" "
-    if test "$BACKGROUND_BOOLEAN" = "true" \
-        -a "$RECURSED_BOOLEAN" = "false"; then
+    if test "$BACKGROUND" = "true" \
+        -a "$RECURSED" = "false"; then
         $0 $background_start_arguments -b -r $RESPAWN_TIMEOUT -p $PID_FILE \
             -o $STDOUT_FILE -e $STDERR_FILE -R &
         echo "Apache CouchDB has started, time to relax."
     else
-        if test "$RECURSED_BOOLEAN" = "true"; then
+        if test "$RECURSED" = "true"; then
             while true; do
                 export HEART_COMMAND
                 export HEART_BEAT_TIMEOUT
@@ -275,23 +275,23 @@ parse_script_option_list () {
             -h) shift; display_help; exit $SCRIPT_OK;;
             -V) shift; display_version; exit $SCRIPT_OK;;
             -c) shift; INI_FILES="$INI_FILES $1"; shift;;
-            -C) shift; RESET_CONFIG_BOOLEAN=false; INI_FILES="$INI_FILES $1"; shift;;
-            -i) shift; INTERACTIVE_BOOLEAN=true;;
-            -b) shift; BACKGROUND_BOOLEAN=true;;
+            -C) shift; RESET_CONFIG=false; INI_FILES="$INI_FILES $1"; shift;;
+            -i) shift; INTERACTIVE=true;;
+            -b) shift; BACKGROUND=true;;
             -r) shift; RESPAWN_TIMEOUT=$1; shift;;
-            -R) shift; RECURSED_BOOLEAN=true;;
+            -R) shift; RECURSED=true;;
             -p) shift; PID_FILE=$1; shift;;
             -o) shift; STDOUT_FILE=$1; shift;;
             -e) shift; STDERR_FILE=$1; shift;;
             -s) shift; check_status; exit $SCRIPT_OK;;
-            -k) shift; KILL_BOOLEAN=true;;
-            -d) shift; SHUTDOWN_BOOLEAN=true;;
+            -k) shift; KILL=true;;
+            -d) shift; SHUTDOWN=true;;
             --) shift; break;;
             *) display_error "Unknown option: $1" >&2;;
         esac
     done
-    if test "$KILL_BOOLEAN" = "true" -o "$SHUTDOWN_BOOLEAN" = "true"; then
-        stop_couchdb $KILL_BOOLEAN
+    if test "$KILL" = "true" -o "$SHUTDOWN" = "true"; then
+        stop_couchdb $KILL
     else
         start_couchdb
     fi
