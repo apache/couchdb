@@ -141,4 +141,8 @@ couchTests.basics = function(debug) {
     var locs = loc.split('/');
     T(locs[4] == resp.id);
     T(locs[3] == "test_suite_db");    
+    
+    // deleting a non-existent doc should be 404
+    xhr = CouchDB.request("DELETE", "/test_suite_db/doc-does-not-exist");
+    T(xhr.status == 404);    
   };

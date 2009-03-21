@@ -423,6 +423,8 @@ all_docs_view(Req, Db, Keys) ->
 
 
 db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
+    % check for the existence of the doc to handle the 404 case.
+    couch_doc_open(Db, DocId, nil, []),
     case couch_httpd:qs_value(Req, "rev") of
     undefined ->
         update_doc(Req, Db, DocId, {[{<<"_deleted">>,true}]});
