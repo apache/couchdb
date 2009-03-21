@@ -88,4 +88,13 @@ couchTests.bulk_docs = function(debug) {
 
   T(results[0].id != "");
   T(results[0].rev != "");
+  
+  
+  // Regression test for failure on update/delete
+  var newdoc = {"_id": "foobar", "body": "baz"};
+  T(db.save(newdoc).ok);
+  update = {"_id": newdoc._id, "_rev": newdoc._rev, "body": "blam"};
+  torem = {"_id": newdoc._id, "_rev": newdoc._rev, "_deleted": true};
+  results = db.bulkSave([update, torem]);
+  T(results[1].error == "conflict");
 };
