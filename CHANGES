@@ -18,6 +18,18 @@ Futon Utility Client:
 
  * Added pagination to the database listing page.
  * Implemented attachment uploading from the document page.
+ * Added page that shows the current configuration, and allows modification of
+   option values.
+ * Added a JSON "source view" for document display.
+ * JSON data in view rows is now syntax highlighted.
+ * Removed the use of an iframe for better integration with browser history and 
+   bookmarking.
+ * Full database listing in the sidebar has been replaced by a short list of 
+   recent databases.
+ * The view editor now allows selection of the view language if there is more
+   than one configured.
+ * Added links to go to the raw view or document URL.
+ * Added status page to display currently running tasks in CouchDB.
  * JavaScript test suite split into multiple files.
  * Pagination for reduce views.
 
