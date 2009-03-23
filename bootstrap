@@ -38,8 +38,6 @@ else
     sed "s/%release%/$REVISION/" < acinclude.m4.in > acinclude.m4
 fi
 
-gunzip -c build-aux/config.guess.gz > build-aux/config.guess
-gunzip -c build-aux/config.sub.gz > build-aux/config.sub
 gunzip -c m4/ac_check_icu.m4.gz > m4/ac_check_icu.m4
 gunzip -c m4/ac_check_curl.m4.gz > m4/ac_check_curl.m4
 
