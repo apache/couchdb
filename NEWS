@@ -1,25 +1,28 @@
 Apache CouchDB NEWS
 ===================
 
-For details on backwards incompatible changes between releases, please see:
+For details about backwards incompatible changes, please see:
 
   http://wiki.apache.org/couchdb/BreakingChanges
 
-Version 0.9.0
-------------------------
+Each release section below notes when backwards incompatible changes exist.
 
- * Modular configuration. 
+Version 0.9.0
+-------------
+
+This release contains backwards incompatible changes, please see above for help.
+
+ * Modular configuration.
  * Performance enhancements for document and view access.
  * More resilient replication process.
  * Replication streams binary attachments.
  * Administrator role and basic authentication.
  * Document validation functions in design documents.
- * Show and list functions for rendering documents and views as developer 
-   controlled content-types. 
+ * Show and list functions for rendering documents and views as developer
+   controlled content-types.
  * External process server module.
  * Attachment uploading from Futon.
  * Etags for views, lists, shows, document and attachment requests.
- 
 
 Version 0.8.1-incubating
 ------------------------
@@ -30,7 +33,7 @@ Version 0.8.1-incubating
 Version 0.8.0-incubating
 ------------------------
 
-Released under the patronage of the Apache Software Foundation Incubator.
+This release contains backwards incompatible changes, please see above for help.
 
  * Changed core licensing to the Apache Software License 2.0.
  * Refactoring of the core view and storage engines.
@@ -42,10 +45,6 @@ Released under the patronage of the Apache Software Foundation Incubator.
  * SpiderMonkey is no longer included with CouchDB, but rather treated as an
    external dependency.
  * Added bits of awesome.
-
-Please note that there have been many backwards incompatible changes in this
-release. See http://wiki.apache.org/couchdb/BreakingChanges for more information
-and some tips for upgrading.
 
 Version 0.7.2
 -------------
