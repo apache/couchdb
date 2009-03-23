@@ -5,7 +5,7 @@ For details about backwards incompatible changes, please see:
 
   http://wiki.apache.org/couchdb/BreakingChanges
 
-Each release section below notes when backwards incompatible changes exist.
+Each release section notes when backwards incompatible changes have been made.
 
 Version 0.9.0
 -------------
@@ -28,7 +28,7 @@ Version 0.8.1-incubating
 ------------------------
 
  * Various bug fixes for replication, compaction, the HTTP interface and the
-   Javascript View Server.
+   JavaScript View Server.
 
 Version 0.8.0-incubating
 ------------------------
@@ -83,13 +83,13 @@ Version 0.5.0
 Version 0.4.0
 -------------
 
- * Non-existant variables are now nil lists.
+ * Non-existent variables are now nil lists.
  * Couch error codes and messages are no longer sent in the HTTP fields,
    instead they are exclusively returned in the XML body. This is to avoid HTTP
    header parsing problems with oddly formed error messages.
  * Returned error messages are now logged at the server at the `info` level to
    make general debugging easier.
- * Fixed a problem where big table builds caused timesout errors.
+ * Fixed a problem where big table builds caused timeout errors.
  * Lots of changes in the low level machinery. Most formulas will continue to
    function the same.
  * Added full compiler support for extended characters in formula source.
