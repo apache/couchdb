@@ -17,10 +17,10 @@ get () {
     echo "changequote(\`[', \`]')" > acinclude.m4.tmp
     sed -e "s/m4_//" < acinclude.m4.in >> acinclude.m4.tmp
     echo $variable_name >> acinclude.m4.tmp
-    if test -x "`which gm4 || true`"; then
+    if test -x "`which gm4 2> /dev/null || true`"; then
         gm4 acinclude.m4.tmp | grep -v "^$" || true
     else
-        if test -x "`which m4 || true`"; then
+        if test -x "`which m4 2> /dev/null || true`"; then
             m4 acinclude.m4.tmp | grep -v "^$" || true
         else
             echo unknown
@@ -43,7 +43,7 @@ gunzip -c build-aux/config.sub.gz > build-aux/config.sub
 gunzip -c m4/ac_check_icu.m4.gz > m4/ac_check_icu.m4
 gunzip -c m4/ac_check_curl.m4.gz > m4/ac_check_curl.m4
 
-if test -x "`which glibtoolize || true`"; then
+if test -x "`which glibtoolize 2> /dev/null || true`"; then
     glibtoolize -f -c --automake
 else
     libtoolize -f -c --automake
