@@ -22,9 +22,9 @@ Futon Utility Client:
    option values.
  * Added a JSON "source view" for document display.
  * JSON data in view rows is now syntax highlighted.
- * Removed the use of an iframe for better integration with browser history and 
+ * Removed the use of an iframe for better integration with browser history and
    bookmarking.
- * Full database listing in the sidebar has been replaced by a short list of 
+ * Full database listing in the sidebar has been replaced by a short list of
    recent databases.
  * The view editor now allows selection of the view language if there is more
    than one configured.
@@ -37,7 +37,7 @@ Design Document Resource Paths:
 
  * Added httpd_design_handlers config section.
  * Moved _view to httpd_design_handlers.
- * Added ability to render documents as non-JSON content-types with _show and 
+ * Added ability to render documents as non-JSON content-types with _show and
    _list functions, which are also httpd_design_handlers.
 
 HTTP Interface:
@@ -52,7 +52,7 @@ HTTP Interface:
  * Use stale=ok to request potentially cached view index
  * External query handler module for full-text or other indexers.
  * Etags for attachments, views, shows and lists
- * Show and list functions for rendering documents and views as developer 
+ * Show and list functions for rendering documents and views as developer
    controlled content-types.
  * Attachment names may use slashes to allow uploading of nested directories
    (useful for static web hosting).
@@ -76,12 +76,18 @@ Database Core:
  * Document purge functionality.
  * Ref-counting for database file handles.
 
+Build and System Integration:
+
+ * The `couchdb` script now supports system chainable configuration files.
+ * The Mac OS X daemon script now redirects STDOUT and STDERR like SysV/BSD.
+ * The build and system integration have been improved for portability.
+
 Configuration and stats system:
 
  * Separate default and local configuration files.
  * HTTP interface for configuration changes.
  * Statistics framework with HTTP query API.
- 
+
 
 Version 0.8.1-incubating
 ------------------------
@@ -116,7 +122,7 @@ JavaScript View Server:
  * Improve error handling for undefined values emitted by map functions.
    (COUCHDB-83)
 
-Packaging and System Integration:
+Build and System Integration:
 
  * The `couchdb` script no longer uses `awk` for configuration checks as this
    was causing portability problems.
@@ -191,7 +197,7 @@ JavaScript View Server:
    renamed to `emit(key, value)`.
  * Fixed handling of exceptions raised by view functions.
 
-Packaging and System Integration:
+Build and System Integration:
 
  * CouchDB can automatically respawn following a server crash.
  * Database server no longer refuses to start with a stale PID file.
@@ -199,7 +205,7 @@ Packaging and System Integration:
  * Improved handling of ICU shared libraries.
  * The `couchdb` script now automatically enables SMP support in Erlang.
  * The `couchdb` and `couchjs` scripts have been improved for portability.
- * The build and install system has been improved for portability.
+ * The build and system integration have been improved for portability.
 
 Futon Utility Client:
 

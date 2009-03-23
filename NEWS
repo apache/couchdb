@@ -23,6 +23,7 @@ This release contains backwards incompatible changes, please see above for help.
  * External process server module.
  * Attachment uploading from Futon.
  * Etags for views, lists, shows, document and attachment requests.
+ * Miscellaneous improvements to build, system integration, and portability.
 
 Version 0.8.1-incubating
 ------------------------
@@ -40,7 +41,7 @@ This release contains backwards incompatible changes, please see above for help.
  * Added support for incremental map/reduce views.
  * Changed database file format.
  * Many improvements to Futon, the web administration interface.
- * Miscellaneous improvements to system integration and portability.
+ * Miscellaneous improvements to build, system integration, and portability.
  * Swapped out Erlang's inets HTTP server for the Mochiweb HTTP server.
  * SpiderMonkey is no longer included with CouchDB, but rather treated as an
    external dependency.
