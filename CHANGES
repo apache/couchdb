@@ -1,7 +1,7 @@
 Apache CouchDB CHANGES
 ======================
 
-Version 0.9.0-incubating
+Version 0.9.0
 ------------------------
 
 Packaging and System Integration:
@@ -11,11 +11,15 @@ Packaging and System Integration:
  * Updated `configure.ac` to manually link `libm` for portability.
  * Updated `configure.ac` to extended default library paths.
  * Removed inets configuration files.
+ * Added command line test runner.
+ * Created dev target for make.
 
 Futon Utility Client:
 
  * Added pagination to the database listing page.
  * Implemented attachment uploading from the document page.
+ * JavaScript test suite split into multiple files.
+ * Pagination for reduce views.
 
 Design Document Resource Paths:
 
@@ -23,6 +27,49 @@ Design Document Resource Paths:
  * Moved _view to httpd_design_handlers.
  * Added ability to render documents as non-JSON content-types with _show and 
    _list functions, which are also httpd_design_handlers.
+
+HTTP Interface:
+
+ * Added client side UUIDs for idempotent document creation
+ * HTTP COPY for documents
+ * Streaming of chunked attachment PUTs to disk
+ * Remove negative count feature
+ * Add include_docs option for view queries
+ * Add multi-key view post for views
+ * Query paramter validation
+ * Use stale=ok to request potentially cached view index
+ * External query handler module for full-text or other indexers.
+ * Etags for attachments, views, shows and lists
+ * Show and list functions for rendering documents and views as developer 
+   controlled content-types.
+ * Attachment names may use slashes to allow uploading of nested directories
+   (useful for static web hosting).
+ * Option for a view to run over design documents.
+ * Added newline to JSON responses. Closes bike-shed.
+
+Replicator:
+
+ * Using ibrowse.
+ * Checkpoint replications so failures are less expensive.
+ * Automatically retry of failed replications.
+ * Stream attachments in replication.
+
+Database Core:
+
+ * Faster Btree implementation.
+ * Changed internal JSON term format.
+ * Improvements to Erlang VM interactions under heavy load.
+ * User context and administrator role.
+ * Update validations with design document validation functions.
+ * Document purge functionality.
+ * Ref-counting for database file handles.
+
+Configuration and stats system:
+
+ * Separate default and local configuration files.
+ * HTTP interface for configuration changes.
+ * Statistics framework with HTTP query API.
+ 
 
 Version 0.8.1-incubating
 ------------------------

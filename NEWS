@@ -5,10 +5,21 @@ For details on backwards incompatible changes between releases, please see:
 
   http://wiki.apache.org/couchdb/BreakingChanges
 
-Version 0.9.0-incubating
+Version 0.9.0
 ------------------------
 
-This release is still under development.
+ * Modular configuration. 
+ * Performance enhancements for document and view access.
+ * More resilient replication process.
+ * Replication streams binary attachments.
+ * Administrator role and basic authentication.
+ * Document validation functions in design documents.
+ * Show and list functions for rendering documents and views as developer 
+   controlled content-types. 
+ * External process server module.
+ * Attachment uploading from Futon.
+ * Etags for views, lists, shows, document and attachment requests.
+ 
 
 Version 0.8.1-incubating
 ------------------------
@@ -32,7 +43,7 @@ Released under the patronage of the Apache Software Foundation Incubator.
    external dependency.
  * Added bits of awesome.
 
-Please note that there have been many backwards incomatible changes in this
+Please note that there have been many backwards incompatible changes in this
 release. See http://wiki.apache.org/couchdb/BreakingChanges for more information
 and some tips for upgrading.
 
