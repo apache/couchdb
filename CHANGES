@@ -28,7 +28,7 @@ Futon Utility Client:
    recent databases.
  * The view editor now allows selection of the view language if there is more
    than one configured.
- * Added links to go to the raw view or document URL.
+ * Added links to go to the raw view or document URI.
  * Added status page to display currently running tasks in CouchDB.
  * JavaScript test suite split into multiple files.
  * Pagination for reduce views.
@@ -48,7 +48,7 @@ HTTP Interface:
  * Remove negative count feature
  * Add include_docs option for view queries
  * Add multi-key view post for views
- * Query paramter validation
+ * Query parameter validation
  * Use stale=ok to request potentially cached view index
  * External query handler module for full-text or other indexers.
  * Etags for attachments, views, shows and lists
@@ -59,16 +59,16 @@ HTTP Interface:
  * Option for a view to run over design documents.
  * Added newline to JSON responses. Closes bike-shed.
 
-Replicator:
+Replication:
 
  * Using ibrowse.
  * Checkpoint replications so failures are less expensive.
  * Automatically retry of failed replications.
- * Stream attachments in replication.
+ * Stream attachments in pull-replication.
 
 Database Core:
 
- * Faster Btree implementation.
+ * Faster B-tree implementation.
  * Changed internal JSON term format.
  * Improvements to Erlang VM interactions under heavy load.
  * User context and administrator role.
