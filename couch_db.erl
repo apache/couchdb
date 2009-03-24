@@ -669,10 +669,10 @@ count_changes_since(Db, SinceSeq) ->
         SinceSeq + 1, % startkey
         ok, % endkey
         fun(_,_) -> true end, % groupkeys
-        fun(_SeqStart, PartialReds, ok) ->
+        fun(_SeqStart, PartialReds, 0) ->
             {ok, couch_btree:final_reduce(Db#db.docinfo_by_seq_btree, PartialReds)}
         end,
-        ok),
+        0),
     Changes.
 
 enum_docs_since(Db, SinceSeq, Direction, InFun, Ctx) ->
