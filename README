@@ -146,8 +146,9 @@ You should make sure that the `couchdb` user has a working POSIX shell and set
 the home directory to `/usr/local/var/lib/couchdb` which is the Apache CouchDB
 database directory.
 
-Change the ownership of the Apache CouchDB data directories by running:
+Change the ownership of the Apache CouchDB directories by running:
 
+    chown -R couchdb /usr/local/etc/couchdb
     chown -R couchdb /usr/local/var/lib/couchdb
     chown -R couchdb /usr/local/var/log/couchdb
 
