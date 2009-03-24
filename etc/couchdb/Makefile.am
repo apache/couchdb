@@ -14,8 +14,9 @@ couchprivlibdir = $(localerlanglibdir)/couch-$(version)/priv/lib
 devcouchprivlibdir = $(abs_top_srcdir)/src/couchdb/.libs
 
 localconf_DATA = default.ini
-dist_noinst_DATA = local.ini
 noinst_DATA = default_dev.ini
+
+EXTRA_DIST = local.ini local_dev.ini
 
 CLEANFILES = $(localconf_DATA) $(noinst_DATA)
 
