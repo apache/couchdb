@@ -56,21 +56,21 @@ couchTests.stats = function(debug) {
           value: max.toString()}],
 
         function () {
-          var files_open = requestStatsTest("couchdb", "open_os_files").current;
+          var files_open = requestStatsTest("couchdb", "open_databases").current;
           for(var i=0; i<max+1; i++) {
             var db = new CouchDB("test_suite_db" + i);
             db.deleteDb();
             db.createDb();
           }
 
-          var open_databases = requestStatsTest("couchdb", "open_os_files").max;
+          var open_databases = requestStatsTest("couchdb", "open_databases").max;
           T(open_databases > 0 && max >= open_databases, name);
 
           for(var i=0; i<max+1; i++) {
             var db = new CouchDB("test_suite_db" + i);
             db.deleteDb();
           }
-          T(files_open == requestStatsTest("couchdb", "open_os_files").current);
+          T(files_open == requestStatsTest("couchdb", "open_databases").current);
         })
     },
  };

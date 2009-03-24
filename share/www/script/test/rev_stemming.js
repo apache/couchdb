@@ -88,6 +88,12 @@ couchTests.rev_stemming = function(debug) {
   // compaction isn't instantaneous, loop until done
   while (db.info().compact_running) {};
   
-  T(db.open("bar", {revs:true})._revisions.ids.length == newLimit);
+  // force reload because ETags don't honour compaction
+  var req = db.request("GET", "/test_suite_db_a/bar?revs=true", {
+    headers:{"if-none-match":"pommes"}
+  });
   
+  var finalDoc = JSON.parse(req.responseText);
+  TEquals(newLimit, finalDoc._revisions.ids.length,
+    "should return a truncated revision list");
 };

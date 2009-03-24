@@ -394,6 +394,8 @@ end_json_response(Resp) ->
     send_chunk(Resp, []).
 
 
+error_info({Error, Reason}) when is_list(Reason) ->
+    error_info({Error, ?l2b(Reason)});
 error_info(bad_request) ->
     {400, <<"bad_request">>, <<>>};
 error_info({bad_request, Reason}) ->
@@ -440,7 +442,7 @@ send_error(Req, Code, Headers, ErrorStr, ReasonStr) ->
         {[{<<"error">>,  ErrorStr},
          {<<"reason">>, ReasonStr}]}).
 
- send_redirect(Req, Path) ->
+send_redirect(Req, Path) ->
      Headers = [{"Location", couch_httpd:absolute_uri(Req, Path)}],
      send_response(Req, 301, Headers, <<>>).
 
