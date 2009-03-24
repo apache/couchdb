@@ -156,13 +156,13 @@ Running Manually
 
 You can start the Apache CouchDB server by running:
 
-    sudo -i -u couchdb couchdb
+    sudo -i -u couchdb couchdb -b
 
 This uses the `sudo` command to run the `couchdb` command as the `couchdb` user.
 
 When Apache CouchDB starts it should eventually display the following message:
 
-    Apache CouchDB has started, time to relax. See http://127.0.0.1:5984/_utils/index.html
+    Apache CouchDB has started, time to relax.
 
 Relax.
 
