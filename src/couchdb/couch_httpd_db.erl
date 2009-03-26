@@ -496,7 +496,8 @@ db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
     ]});
 
 db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
-    update_doc(Req, Db, DocId, couch_httpd:json_body(Req));
+    update_doc(Req, Db, DocId, couch_httpd:json_body(Req),
+      [{"Location", "/" ++ ?b2l(Db#db.name) ++ "/" ++ ?b2l(DocId)}]);
 
 db_doc_req(#httpd{method='COPY'}=Req, Db, SourceDocId) ->
     SourceRev =
@@ -529,6 +530,9 @@ update_result_to_json(Error) ->
 
 
 update_doc(Req, Db, DocId, Json) ->
+    update_doc(Req, Db, DocId, Json, []).
+
+update_doc(Req, Db, DocId, Json, Headers) ->
     #doc{deleted=Deleted} = Doc = couch_doc:from_json_obj(Json),
     validate_attachment_names(Doc),
     ExplicitDocRev =
@@ -551,8 +555,9 @@ update_doc(Req, Db, DocId, Json) ->
     end,
     {ok, NewRev} = couch_db:update_doc(Db, Doc#doc{id=DocId, revs=Revs}, Options),
     NewRevStr = couch_doc:rev_to_str(NewRev),
+    ResponseHeaders = [{"Etag", <<"\"", NewRevStr/binary, "\"">>}] ++ Headers,
     send_json(Req, if Deleted -> 200; true -> 201 end,
-        [{"Etag", <<"\"", NewRevStr/binary, "\"">>}], {[
+        ResponseHeaders, {[
             {ok, true},
             {id, DocId},
             {rev, NewRevStr}]}).

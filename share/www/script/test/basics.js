@@ -148,6 +148,13 @@ couchTests.basics = function(debug) {
     T(locs[4] == resp.id);
     T(locs[3] == "test_suite_db");
 
+    // document put's should return a Location header
+    var xhr = CouchDB.request("PUT", "/test_suite_db/newdoc", {
+      body: JSON.stringify({"a":1})
+    });
+    TEquals("/test_suite_db/newdoc", xhr.getResponseHeader("Location"),
+      "should return Location header to newly created document");
+
     // deleting a non-existent doc should be 404
     xhr = CouchDB.request("DELETE", "/test_suite_db/doc-does-not-exist");
     T(xhr.status == 404);
