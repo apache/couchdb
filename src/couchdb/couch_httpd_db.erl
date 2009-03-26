@@ -56,7 +56,7 @@ create_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
     case couch_server:create(DbName, [{user_ctx, UserCtx}]) of
     {ok, Db} ->
         couch_db:close(Db),
-        send_json(Req, 201, {[{ok, true}]});
+        send_json(Req, 201, [{"Location", "/" ++ DbName}], {[{ok, true}]});
     Error ->
         throw(Error)
     end.

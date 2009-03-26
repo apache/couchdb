@@ -28,6 +28,12 @@ couchTests.basics = function(debug) {
     T(xhr.status == 412);
     if (debug) debugger;
 
+    // creating a new DB should return Location header
+    xhr = CouchDB.request("DELETE", "/new-db");
+    xhr = CouchDB.request("PUT", "/new-db");
+    TEquals("/new-db", xhr.getResponseHeader("Location"),
+      "should return newly created database name in location header");
+
     // Get the database info, check the db_name
     T(db.info().db_name == "test_suite_db");
 
