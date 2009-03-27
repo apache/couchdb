@@ -56,7 +56,8 @@ create_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
     case couch_server:create(DbName, [{user_ctx, UserCtx}]) of
     {ok, Db} ->
         couch_db:close(Db),
-        send_json(Req, 201, [{"Location", "/" ++ DbName}], {[{ok, true}]});
+        DocUrl = absolute_uri(Req, "/" ++ DbName),
+        send_json(Req, 201, [{"Location", DocUrl}], {[{ok, true}]});
     Error ->
         throw(Error)
     end.
@@ -496,8 +497,9 @@ db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
     ]});
 
 db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
+    Location = absolute_uri(Req, "/" ++ ?b2l(Db#db.name) ++ "/" ++ ?b2l(DocId)),
     update_doc(Req, Db, DocId, couch_httpd:json_body(Req),
-      [{"Location", "/" ++ ?b2l(Db#db.name) ++ "/" ++ ?b2l(DocId)}]);
+      [{"Location", Location}]);
 
 db_doc_req(#httpd{method='COPY'}=Req, Db, SourceDocId) ->
     SourceRev =

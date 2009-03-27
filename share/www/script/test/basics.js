@@ -31,8 +31,13 @@ couchTests.basics = function(debug) {
     // creating a new DB should return Location header
     xhr = CouchDB.request("DELETE", "/new-db");
     xhr = CouchDB.request("PUT", "/new-db");
-    TEquals("/new-db", xhr.getResponseHeader("Location"),
-      "should return newly created database name in location header");
+    TEquals("/new-db", 
+      xhr.getResponseHeader("Location").substr(-7),
+      "should return Location header to newly created document");
+
+    TEquals("http://", 
+      xhr.getResponseHeader("Location").substr(0, 7),
+      "should return absolute Location header to newly created document");
 
     // Get the database info, check the db_name
     T(db.info().db_name == "test_suite_db");
@@ -152,8 +157,13 @@ couchTests.basics = function(debug) {
     var xhr = CouchDB.request("PUT", "/test_suite_db/newdoc", {
       body: JSON.stringify({"a":1})
     });
-    TEquals("/test_suite_db/newdoc", xhr.getResponseHeader("Location"),
+    TEquals("/test_suite_db/newdoc", 
+      xhr.getResponseHeader("Location").substr(-21),
       "should return Location header to newly created document");
+
+    TEquals("http://", 
+      xhr.getResponseHeader("Location").substr(0, 7),
+      "should return absolute Location header to newly created document");
 
     // deleting a non-existent doc should be 404
     xhr = CouchDB.request("DELETE", "/test_suite_db/doc-does-not-exist");
