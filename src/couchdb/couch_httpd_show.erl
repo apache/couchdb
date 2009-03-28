@@ -30,7 +30,7 @@ handle_doc_show_req(#httpd{
     #doc{body={Props}} = couch_httpd_db:couch_doc_open(Db, DesignId, nil, []),
     Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
     ShowSrc = get_nested_json_value({Props}, [<<"shows">>, ShowName]),
-    Doc = try couch_httpd_db:couch_doc_open(Db, DocId, nil, []) of
+    Doc = try couch_httpd_db:couch_doc_open(Db, DocId, nil, [conflicts]) of
         FoundDoc -> FoundDoc
     catch
         _ -> nil

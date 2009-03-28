@@ -44,6 +44,11 @@ couchTests.show_documents = function(debug) {
           };
         }
       }),
+      "json" : stringFun(function(doc, req) {
+        return {
+          json : doc
+        }
+      }),
       "req-info" : stringFun(function(doc, req) {
         return {
           json : req
@@ -300,4 +305,17 @@ couchTests.show_documents = function(debug) {
   });
   T(xhr.getResponseHeader("Content-Type") == "text/html");
   T(xhr.responseText == "Ha ha, you said \"plankton\".");
+
+  // test inclusion of conflict state
+  var doc1 = {_id:"foo", a:1};
+  var doc2 = {_id:"foo", a:2};
+  db.save(doc1);
+
+  //create the conflict with a all_or_nothing bulk docs request
+  var docs = [doc2];
+  db.bulkSave(docs, {all_or_nothing:true});
+
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/json/foo");
+  TEquals(1, JSON.parse(xhr.responseText)._conflicts.length);
+
 };
