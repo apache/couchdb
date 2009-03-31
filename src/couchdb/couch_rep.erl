@@ -17,7 +17,7 @@
 
 -export([replicate/2]).
 
--include_lib("couch_db.hrl").
+-include("couch_db.hrl").
 
 %% @spec replicate(Source::binary(), Target::binary()) -> 
 %%      {ok, Stats} | {error, Reason}
