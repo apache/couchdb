@@ -29,6 +29,8 @@ get () {
     rm -f acinclude.m4.tmp
 }
 
+mkdir -p build-aux
+
 if test -z "$REVISION"; then
     REVISION=`\`which svn\` info . 2> /dev/null | awk "/Revision:/{print \\$2}"`
 fi
