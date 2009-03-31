@@ -8,7 +8,11 @@ This product also includes the following third-party components:
 
  * ac_check_icu.m4 (http://autoconf-archive.cryp.to/ac_check_icu.html)
 
-   Copyright 2005, Akos Maroy <darkeye@tyrell.hu>
+   Copyright 2008, Akos Maroy <darkeye@tyrell.hu>
+
+ * ac_check_curl.m4 (http://autoconf-archive.cryp.to/ac_check_curl.html)
+
+   Copyright 2008, Akos Maroy <darkeye@tyrell.hu>
 
  * jQuery (http://jquery.com/)
 
