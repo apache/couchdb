@@ -148,9 +148,9 @@ database directory.
 
 Change the ownership of the Apache CouchDB directories by running:
 
-    chown -R couchdb /usr/local/etc/couchdb
-    chown -R couchdb /usr/local/var/lib/couchdb
-    chown -R couchdb /usr/local/var/log/couchdb
+    chown -R couchdb:couchdb /usr/local/etc/couchdb
+    chown -R couchdb:couchdb /usr/local/var/lib/couchdb
+    chown -R root:couchdb /usr/local/var/log/couchdb
 
 Running Manually
 ^^^^^^^^^^^^^^^^
