@@ -4,16 +4,6 @@ Apache CouchDB CHANGES
 Version 0.9.0
 -------------
 
-Packaging and System Integration:
-
- * Added COUCHDB_OPTIONS to etc/default/couchdb file.
- * Remove COUCHDB_INI_FILE and COUCHDB_PID_FILE from etc/default/couchdb file.
- * Updated `configure.ac` to manually link `libm` for portability.
- * Updated `configure.ac` to extended default library paths.
- * Removed inets configuration files.
- * Added command line test runner.
- * Created dev target for make.
-
 Futon Utility Client:
 
  * Added pagination to the database listing page.
@@ -81,6 +71,13 @@ Build and System Integration:
  * The `couchdb` script now supports system chainable configuration files.
  * The Mac OS X daemon script now redirects STDOUT and STDERR like SysV/BSD.
  * The build and system integration have been improved for portability.
+ * Added COUCHDB_OPTIONS to etc/default/couchdb file.
+ * Remove COUCHDB_INI_FILE and COUCHDB_PID_FILE from etc/default/couchdb file.
+ * Updated `configure.ac` to manually link `libm` for portability.
+ * Updated `configure.ac` to extended default library paths.
+ * Removed inets configuration files.
+ * Added command line test runner.
+ * Created dev target for make.
 
 Configuration and stats system:
 
