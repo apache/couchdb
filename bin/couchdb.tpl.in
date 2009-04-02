@@ -27,7 +27,7 @@ RESPAWN_TIMEOUT=0
 DEFAULT_INI_FILE=%localconfdir%/%defaultini%
 LOCAL_INI_FILE=%localconfdir%/%localini%
 
-PID_FILE=%localstatedir%/run/couchdb.pid
+PID_FILE=%localstatedir%/run/couchdb/couchdb.pid
 
 STDOUT_FILE=couchdb.stdout
 STDERR_FILE=couchdb.stderr
