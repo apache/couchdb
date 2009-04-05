@@ -13,7 +13,8 @@
 -module(couch_httpd_db).
 -include("couch_db.hrl").
 
--export([handle_request/1, handle_design_req/2, db_req/2, couch_doc_open/4]).
+-export([handle_request/1, handle_compact_req/2, handle_design_req/2, 
+    db_req/2, couch_doc_open/4]).
 
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
@@ -40,6 +41,17 @@ handle_request(#httpd{path_parts=[DbName|RestParts],method=Method,
         Handler = couch_util:dict_find(SecondPart, DbUrlHandlers, fun db_req/2),
         do_db_req(Req, Handler)
     end.
+
+handle_compact_req(#httpd{method='POST',path_parts=[DbName,_,Id|_]}=Req, _Db) ->
+    ok = couch_view_compactor:start_compact(DbName, Id),
+    send_json(Req, 202, {[{ok, true}]});
+
+handle_compact_req(#httpd{method='POST'}=Req, Db) ->
+    ok = couch_db:start_compact(Db),
+    send_json(Req, 202, {[{ok, true}]});
+
+handle_compact_req(Req, _Db) ->
+    send_method_not_allowed(Req, "POST").
 
 handle_design_req(#httpd{
         path_parts=[_DbName,_Design,_DesName, <<"_",_/binary>> = Action | _Rest],
@@ -187,13 +199,6 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
         send_json(Req, 201, ErrorsJson)
     end;
 db_req(#httpd{path_parts=[_,<<"_bulk_docs">>]}=Req, _Db) ->
-    send_method_not_allowed(Req, "POST");
-
-db_req(#httpd{method='POST',path_parts=[_,<<"_compact">>]}=Req, Db) ->
-    ok = couch_db:start_compact(Db),
-    send_json(Req, 202, {[{ok, true}]});
-
-db_req(#httpd{path_parts=[_,<<"_compact">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_purge">>]}=Req, Db) ->

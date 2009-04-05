@@ -73,6 +73,7 @@ source_files = \
     couch_task_status.erl \
     couch_util.erl \
     couch_view.erl \
+    couch_view_compactor.erl \
     couch_view_updater.erl \
     couch_view_group.erl \
     couch_db_updater.erl
@@ -114,6 +115,7 @@ compiled_files = \
     couch_task_status.beam \
     couch_util.beam \
     couch_view.beam \
+    couch_view_compactor.beam \
     couch_view_updater.beam \
     couch_view_group.beam \
     couch_db_updater.beam
