@@ -24,7 +24,7 @@
 -export([send_response/4,send_method_not_allowed/2,send_error/4, send_redirect/2]).
 -export([send_json/2,send_json/3,send_json/4]).
 -export([default_authentication_handler/1,special_test_authentication_handler/1]).
-
+-export([null_authentication_handler/1]).
 
 start_link() ->
     % read config and register for configuration changes
@@ -228,6 +228,8 @@ default_authentication_handler(Req) ->
         end
     end.
 
+null_authentication_handler(_Req) ->
+    #user_ctx{roles=[<<"_admin">>]}.
 
 % Utilities
 
