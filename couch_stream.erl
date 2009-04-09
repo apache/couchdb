@@ -38,7 +38,6 @@
     current_pos = 0,
     bytes_remaining = 0,
     next_alloc = 0,
-    first_alloc = 0,
     min_alloc = 16#00010000
     }).
 
