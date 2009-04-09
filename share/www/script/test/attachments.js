@@ -142,5 +142,38 @@ couchTests.attachments= function(debug) {
   var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc4/attachment.txt");
   T(xhr.status == 200);
   T(xhr.responseText == "This is a string");
+  
+  
+  // Attachment sparseness COUCHDB-220
+
+  var docs = []
+  for (var i = 0; i < 5; i++) {
+      var doc = {
+	  _id: (i).toString(),
+	  _attachments:{
+	      "foo.txt": {
+		  content_type:"text/plain",
+		  data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+	      }
+	  }
+      }
+      docs.push(doc)
+  }
+
+  db.bulkSave(docs);
+  
+  var before = db.info().disk_size;
+
+  // Compact it.
+  T(db.compact().ok);
+  T(db.last_req.status == 202);
+  // compaction isn't instantaneous, loop until done
+  while (db.info().compact_running) {};
+  
+  var after = db.info().disk_size;
+  
+  // Compaction should reduce the database slightly, but not
+  // orders of magnitude (unless attachments introduce sparseness)
+  T(after > before * 0.1, "before: " + before + " after: " + after);
 
 };

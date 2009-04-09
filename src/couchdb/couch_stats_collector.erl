@@ -56,13 +56,17 @@ increment({Module, Key}) when is_integer(Key) ->
     increment({Module, list_to_atom(integer_to_list(Key))});
 increment(Key) ->
     case catch ets:update_counter(?HIT_COUNTER_TABLE, Key, 1) of
-        {'EXIT', {badarg, _}} -> ets:insert(?HIT_COUNTER_TABLE, {Key, 1});
+        {'EXIT', {badarg, _}} ->
+            true = ets:insert(?HIT_COUNTER_TABLE, {Key, 1}),
+            ok;
         _ -> ok
     end.
     
 decrement(Key) ->
     case catch ets:update_counter(?HIT_COUNTER_TABLE, Key, -1) of
-        {'EXIT', {badarg, _}} -> ets:insert(?HIT_COUNTER_TABLE, {Key, -1});
+        {'EXIT', {badarg, _}} ->
+            true = ets:insert(?HIT_COUNTER_TABLE, {Key, -1}),
+            ok;
         _ -> ok
     end.
     

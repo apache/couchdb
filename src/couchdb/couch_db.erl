@@ -548,34 +548,7 @@ write_and_commit(#db{update_pid=UpdatePid, user_ctx=Ctx}=Db, DocBuckets,
 
 
 doc_flush_binaries(Doc, Fd) ->
-    % calc size of binaries to write out
-    Bins = Doc#doc.attachments,
-    PreAllocSize = lists:foldl(
-        fun(BinValue, SizeAcc) ->
-            case BinValue of
-            {_Key, {_Type, {Fd0, _StreamPointer, _Len}}} when Fd0 == Fd ->
-                % already written to our file, nothing to write
-                SizeAcc;
-            {_Key, {_Type, {_OtherFd, _StreamPointer, Len}}} ->
-                % written to a different file
-                SizeAcc + Len;
-            {_Key, {_Type, Bin}} when is_binary(Bin) ->
-                % we have a new binary to write
-                SizeAcc + size(Bin);
-            {_Key, {_Type, {Fun, undefined}}} when is_function(Fun) ->
-                % function without a known length
-                % we'll have to alloc as we go with this one, for now, nothing
-                SizeAcc;
-            {_Key, {_Type, {Fun, Len}}} when is_function(Fun) ->
-                % function to yield binary data with known length
-                SizeAcc + Len
-            end
-        end,
-        0, Bins),
-
-    {ok, OutputStream} = couch_stream:open(Fd),
-    ok = couch_stream:ensure_buffer(OutputStream, PreAllocSize),
-    NewBins = lists:map(
+    NewAttachments = lists:map(
         fun({Key, {Type, BinValue}}) ->
             NewBinValue =
             case BinValue of
@@ -585,6 +558,8 @@ doc_flush_binaries(Doc, Fd) ->
             {OtherFd, StreamPointer, Len} ->
                 % written to a different file (or a closed file
                 % instance, which will cause an error)
+                {ok, OutputStream} = couch_stream:open(Fd),
+                ok = couch_stream:set_min_buffer(OutputStream, Len),
                 {ok, {NewStreamPointer, Len}, _EndSp} =
                 couch_stream:foldl(OtherFd, StreamPointer, Len,
                     fun(Bin, {BeginPointer, SizeAcc}) ->
@@ -597,31 +572,38 @@ doc_flush_binaries(Doc, Fd) ->
                         end
                     end,
                     {{0,0}, 0}),
+                couch_stream:close(OutputStream),
                 {Fd, NewStreamPointer, Len};
             Bin when is_binary(Bin) ->
+                {ok, OutputStream} = couch_stream:open(Fd),
+                ok = couch_stream:set_min_buffer(OutputStream, size(Bin)),
                 {ok, StreamPointer} = couch_stream:write(OutputStream, Bin),
+                couch_stream:close(OutputStream),
                 {Fd, StreamPointer, size(Bin)};
             {StreamFun, undefined} when is_function(StreamFun) ->
                 % max_attachment_chunk_size control the max we buffer in memory
                 MaxChunkSize = list_to_integer(couch_config:get("couchdb", 
                     "max_attachment_chunk_size","4294967296")),
+                {ok, OutputStream} = couch_stream:open(Fd),
                 WriterFun = make_writer_fun(OutputStream),
                 % StreamFun(MaxChunkSize, WriterFun) 
                 % will call our WriterFun
                 % once for each chunk of the attachment.
                 {ok, {TotalLength, NewStreamPointer}} = 
                     StreamFun(MaxChunkSize, WriterFun, {0, nil}),
+                couch_stream:close(OutputStream),
                 {Fd, NewStreamPointer, TotalLength};                
             {Fun, Len} when is_function(Fun) ->
+                {ok, OutputStream} = couch_stream:open(Fd),
+                ok = couch_stream:set_min_buffer(OutputStream, Len),
                 {ok, StreamPointer} =
                         write_streamed_attachment(OutputStream, Fun, Len, nil),
+                couch_stream:close(OutputStream),
                 {Fd, StreamPointer, Len}
             end,
             {Key, {Type, NewBinValue}}
-        end, Bins),
-
-    {ok, _FinalPos} = couch_stream:close(OutputStream),
-    Doc#doc{attachments = NewBins}.
+        end, Doc#doc.attachments),
+    Doc#doc{attachments = NewAttachments}.
 
 
 make_writer_fun(Stream) ->
