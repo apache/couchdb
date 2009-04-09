@@ -315,7 +315,7 @@ terminate(_Reason, _Fd) ->
     ok.
 
 track_stats() ->
-    try couch_stats_collector:increment({couchdb, open_os_files}) of
+    case (catch couch_stats_collector:increment({couchdb, open_os_files})) of
     ok ->
         Self = self(),
         spawn(
@@ -323,8 +323,8 @@ track_stats() ->
                 erlang:monitor(process, Self),
                 receive {'DOWN', _, _, _, _} -> ok end,
                 couch_stats_collector:decrement({couchdb, open_os_files})
-            end)
-    catch _ -> ok
+            end);
+     _ -> ok
     end.
 
 handle_call({pread, Pos, Bytes}, _From, Fd) ->
