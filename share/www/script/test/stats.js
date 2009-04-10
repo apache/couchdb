@@ -56,7 +56,8 @@ couchTests.stats = function(debug) {
           value: max.toString()}],
 
         function () {
-          var files_open = requestStatsTest("couchdb", "open_databases").current;
+          var dbs_open = requestStatsTest("couchdb", "open_databases").current;
+          var files_open = requestStatsTest("couchdb", "open_os_files").current;
           for(var i=0; i<max+1; i++) {
             var db = new CouchDB("test_suite_db" + i);
             db.deleteDb();
@@ -70,7 +71,8 @@ couchTests.stats = function(debug) {
             var db = new CouchDB("test_suite_db" + i);
             db.deleteDb();
           }
-          T(files_open == requestStatsTest("couchdb", "open_databases").current);
+          T(dbs_open == requestStatsTest("couchdb", "open_databases").current);
+          T(files_open == requestStatsTest("couchdb", "open_os_files").current);
         })
     },
  };

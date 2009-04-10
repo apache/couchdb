@@ -49,7 +49,8 @@ init({Pid, ChildProcs}) ->
     {ok, #srv{referrers=Referrers}}.
 
 
-terminate(_Reason, _Srv) ->
+terminate(Reason, _Srv) ->
+    couch_util:terminate_linked(Reason),
     ok.
 
 

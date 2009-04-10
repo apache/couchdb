@@ -12,7 +12,7 @@
 
 -module(couch_util).
 
--export([start_driver/1]).
+-export([start_driver/1,terminate_linked/1]).
 -export([should_flush/0, should_flush/1, to_existing_atom/1, to_binary/1]).
 -export([new_uuid/0, rand32/0, implode/2, collate/2, collate/3]).
 -export([abs_pathname/1,abs_pathname/2, trim/1, ascii_lower/1]).
@@ -41,6 +41,14 @@ to_existing_atom(V) when is_binary(V)->
     try list_to_existing_atom(?b2l(V)) catch _ -> V end;
 to_existing_atom(V) when is_atom(V)->
     V.
+
+
+terminate_linked(normal) ->
+    terminate_linked(shutdown);
+terminate_linked(Reason) ->
+    {links, Links} = process_info(self(), links),
+    [catch exit(Pid, Reason) || Pid <- Links],
+    ok.
 
 
 new_uuid() ->

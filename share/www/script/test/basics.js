@@ -29,10 +29,10 @@ couchTests.basics = function(debug) {
     if (debug) debugger;
 
     // creating a new DB should return Location header
-    xhr = CouchDB.request("DELETE", "/new-db");
-    xhr = CouchDB.request("PUT", "/new-db");
-    TEquals("/new-db", 
-      xhr.getResponseHeader("Location").substr(-7),
+    xhr = CouchDB.request("DELETE", "/test_suite_db");
+    xhr = CouchDB.request("PUT", "/test_suite_db");
+    TEquals("/test_suite_db", 
+      xhr.getResponseHeader("Location").substr(-14),
       "should return Location header to newly created document");
 
     TEquals("http://", 

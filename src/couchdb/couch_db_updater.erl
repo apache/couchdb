@@ -37,7 +37,9 @@ init({MainPid, DbName, Filepath, Fd, Options}) ->
     Db2 = refresh_validate_doc_funs(Db),
     {ok, Db2#db{main_pid=MainPid}}.
 
-terminate(_Reason, _Db) ->
+
+terminate(Reason, _Srv) ->
+    couch_util:terminate_linked(Reason),
     ok.
 
 handle_call(get_db, _From, Db) ->
