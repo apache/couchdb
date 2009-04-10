@@ -677,7 +677,8 @@ init({DbName, Filepath, Fd, Options}) ->
     couch_ref_counter:add(RefCntr),
     {ok, Db}.
 
-terminate(_Reason, _Db) ->
+terminate(Reason, _Db) ->
+    couch_util:terminate_linked(Reason),
     ok.
     
 handle_call({open_ref_count, OpenerPid}, _, #db{fd_ref_counter=RefCntr}=Db) ->

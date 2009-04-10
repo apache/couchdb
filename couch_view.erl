@@ -226,7 +226,9 @@ init([]) ->
     process_flag(trap_exit, true),
     {ok, #server{root_dir=RootDir}}.
 
-terminate(_Reason,_State) ->
+
+terminate(Reason, _Srv) ->
+    couch_util:terminate_linked(Reason),
     ok.
 
 

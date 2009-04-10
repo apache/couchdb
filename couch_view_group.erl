@@ -272,6 +272,7 @@ handle_info({'DOWN',_,_,_,_}, State) ->
 
 terminate(Reason, State) ->
     reply_all(State, Reason),
+    couch_util:terminate_linked(Reason),
     ok.
 
 code_change(_OldVsn, State, _Extra) ->

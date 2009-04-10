@@ -311,7 +311,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
     end.
 
 
-terminate(_Reason, _Fd) ->         
+terminate(_Reason, _Fd) ->
     ok.
 
 track_stats() ->
@@ -359,5 +359,5 @@ handle_cast(close, Fd) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-handle_info(foo, _Fd) ->
-    ok.
+handle_info({'EXIT', _, Reason}, Fd) ->
+    {stop, Reason, Fd}.

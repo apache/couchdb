@@ -159,7 +159,8 @@ init([]) ->
                 max_dbs_open=MaxDbsOpen,
                 start_time=httpd_util:rfc1123_date()}}.
 
-terminate(_Reason, _Server) ->
+terminate(Reason, _Srv) ->
+    couch_util:terminate_linked(Reason),
     ok.
 
 all_databases() ->
