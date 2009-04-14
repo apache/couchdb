@@ -100,7 +100,7 @@ nobase_dist_localdata_DATA = \
     www/script/test/view_multi_key_all_docs.js \
     www/script/test/view_multi_key_design.js \
     www/script/test/view_multi_key_temp.js \
-	www/script/test/view_offsets.js \
+    www/script/test/view_offsets.js \
     www/script/test/view_pagination.js \
     www/script/test/view_sandboxing.js \
     www/script/test/view_xml.js \
