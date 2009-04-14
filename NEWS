@@ -3,7 +3,7 @@ Apache CouchDB NEWS
 
 For details about backwards incompatible changes, please see:
 
-  http://wiki.apache.org/couchdb/BreakingChanges
+  http://wiki.apache.org/couchdb/Breaking_changes
 
 Each release section notes when backwards incompatible changes have been made.
 
