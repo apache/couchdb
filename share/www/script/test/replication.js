@@ -144,7 +144,7 @@ couchTests.replication = function(debug) {
           dbA.save({
             _id:"bin_doc",
             _attachments:{
-              "foo.txt": {
+              "foo+bar.txt": {
                 "type":"base64",
                 "data": "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
               }
@@ -154,7 +154,7 @@ couchTests.replication = function(debug) {
           dbA.save({
             _id:"_design/with_bin",
             _attachments:{
-              "foo.txt": {
+              "foo+bar.txt": {
                 "type":"base64",
                 "data": "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
               }
@@ -163,17 +163,21 @@ couchTests.replication = function(debug) {
         };
         
         this.afterAB1 = function(dbA, dbB) {
-          var xhr = CouchDB.request("GET", "/test_suite_db_a/bin_doc/foo.txt");
+          var xhr = CouchDB.request("GET", 
+            "/test_suite_db_a/bin_doc/foo%2Bbar.txt");
           T(xhr.responseText == "This is a base64 encoded text")
 
-          xhr = CouchDB.request("GET", "/test_suite_db_b/bin_doc/foo.txt");
+          xhr = CouchDB.request("GET", 
+            "/test_suite_db_b/bin_doc/foo%2Bbar.txt");
           T(xhr.responseText == "This is a base64 encoded text")
 
           // and the design-doc
-          xhr = CouchDB.request("GET", "/test_suite_db_a/_design/with_bin/foo.txt");
+          xhr = CouchDB.request("GET", 
+            "/test_suite_db_a/_design/with_bin/foo%2Bbar.txt");
           T(xhr.responseText == "This is a base64 encoded text")
 
-          xhr = CouchDB.request("GET", "/test_suite_db_b/_design/with_bin/foo.txt");
+          xhr = CouchDB.request("GET", 
+            "/test_suite_db_b/_design/with_bin/foo%2Bbar.txt");
           T(xhr.responseText == "This is a base64 encoded text")
         };
       },
