@@ -118,11 +118,11 @@ load_ini_file(IniFile) ->
     IniBin =
     case file:read_file(IniFilename) of
         {ok, IniBin0} ->
-           IniBin0;
+            IniBin0;
         {error, enoent} ->
-           Msg = io_lib:format("Couldn't find server configuration file ~s.", [IniFilename]),
-           ?LOG_ERROR("~s~n", [Msg]),
-           throw({startup_error, Msg})
+            Msg = ?l2b(io_lib:format("Couldn't find server configuration file ~s.", [IniFilename])),
+            ?LOG_ERROR("~s~n", [Msg]),
+            throw({startup_error, Msg})
     end,
 
     {ok, Lines} = regexp:split(binary_to_list(IniBin), "\r\n|\n|\r|\032"),
