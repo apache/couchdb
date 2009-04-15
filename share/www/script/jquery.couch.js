@@ -238,7 +238,7 @@
             contentType: "application/json",
             dataType: "json", data: toJSON(doc),
             complete: function(req) {
-              var resp = $.httpData(req, "json")
+              var resp = $.httpData(req, "json");
               doc._id = resp.id;
               doc._rev = resp.rev;
               if (req.status == 201) {
@@ -247,6 +247,24 @@
                 options.error(req.status, resp.error, resp.reason);
               } else {
                 alert("The document could not be saved: " + resp.reason);
+              }
+            }
+          });
+        },
+        bulkSave: function(docs, options) {
+          options = options || {};
+          $.ajax({
+            type: 'POST', url: this.uri + "_bulk_docs" + encodeOptions(options),
+            contentType: "application/json",
+            dataType: "json", data: toJSON({docs: docs}),
+            complete: function(req) {
+              var resp = $.httpData(req, "json");
+              if (req.status == 201) {
+                if (options.success) options.success(resp);
+              } else if (options.error) {
+                options.error(req.status, resp.error, resp.reason);
+              } else {
+                alert("The documents could not be saved: " + resp.reason);
               }
             }
           });
