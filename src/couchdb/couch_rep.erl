@@ -372,7 +372,7 @@ attachment_loop(ReqId) ->
 attachment_stub_converter(DbS, Id, {Name, {stub, Type, Length}}) ->
     #http_db{uri=DbUrl, headers=Headers} = DbS,
     % TODO worry about revisions
-    Url = DbUrl ++ url_encode(Id) ++ "/" ++ ?b2l(Name),
+    Url = DbUrl ++ url_encode(Id) ++ "/" ++ url_encode(?b2l(Name)),
     ?LOG_DEBUG("Attachment URL ~p", [Url]),
     {ok, RcvFun} = make_attachment_stub_receiver(Url, Headers, Name, 
         Type, Length),
