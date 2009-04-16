@@ -414,7 +414,8 @@ function runRenderFunction(renderFun, args) {
   } catch(e) {
     log("function raised error: "+e.toString());
     log("stacktrace: "+e.stack);
-    respond({error:"render_error",reason:e});
+    var errorMessage = "function raised error: "+e.toString()+"\nstacktrace: "+e.stack;
+    respond({error:"render_error",reason:errorMessage});
   }
 };
 

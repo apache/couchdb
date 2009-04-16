@@ -231,6 +231,7 @@ EvalInContext(JSContext *context, JSObject *obj, uintN argc, jsval *argv,
     } else {
         ok = JS_EvaluateUCScript(sub_context, sandbox, src, srclen, NULL, -1,
                                  rval);
+        ok = JS_TRUE;
     }
 
 out:
