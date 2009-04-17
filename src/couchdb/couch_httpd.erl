@@ -21,7 +21,7 @@
 -export([primary_header_value/2,partition/1,serve_file/3]).
 -export([start_chunked_response/3,send_chunk/2]).
 -export([start_json_response/2, start_json_response/3, end_json_response/1]).
--export([send_response/4,send_method_not_allowed/2,send_error/4, send_redirect/2]).
+-export([send_response/4,send_method_not_allowed/2,send_error/4, send_redirect/2,send_chunked_error/2]).
 -export([send_json/2,send_json/3,send_json/4]).
 -export([default_authentication_handler/1,special_test_authentication_handler/1]).
 -export([null_authentication_handler/1]).
@@ -422,6 +422,9 @@ error_info({Error, Reason}) ->
 error_info(Error) ->
     {500, <<"unknown_error">>, couch_util:to_binary(Error)}.
 
+send_error(_Req, {already_sent, _Error}) ->
+    ok;
+    
 send_error(Req, Error) ->
     {Code, ErrorStr, ReasonStr} = error_info(Error),
     if Code == 401 ->     
@@ -443,6 +446,23 @@ send_error(Req, Code, Headers, ErrorStr, ReasonStr) ->
     send_json(Req, Code, Headers,
         {[{<<"error">>,  ErrorStr},
          {<<"reason">>, ReasonStr}]}).
+
+send_chunked_error(Resp, Error) ->
+    {Code, ErrorStr, ReasonStr} = error_info(Error),
+    CType = Resp:get_header_value("Content-Type"),
+    case CType of
+        "text/html" ->
+            HtmlError = ?l2b([$\n,
+                "<html><body><h2>Error: ", ErrorStr, "</h2>",
+                "<pre>Reason: ", ReasonStr, "</pre>", $\n]),
+            send_chunk(Resp, HtmlError);
+        _Else ->
+            JsonError = {[{<<"code">>, Code},
+                {<<"error">>,  ErrorStr}, 
+                {<<"reason">>, ReasonStr}]},
+            send_chunk(Resp, ?l2b([$\n,?JSON_ENCODE(JsonError),$\n]))
+    end,
+    send_chunk(Resp, []).
 
 send_redirect(Req, Path) ->
      Headers = [{"Location", couch_httpd:absolute_uri(Req, Path)}],
