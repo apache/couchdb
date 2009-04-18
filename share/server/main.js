@@ -10,33 +10,6 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-var cmd;
-var funs = [];        // holds functions used for computation
-var map_results = []; // holds temporary emitted values during doc map
-var row_line = {}; // holds row number in list per func
-
-var sandbox = null;
-
-emit = function(key, value) {
-  map_results.push([key, value]);
-}
-
-sum = function(values) {
-  var rv = 0;
-  for (var i in values) {
-    rv += values[i];
-  }
-  return rv;
-}
-
-log = function(message) {
-  if (typeof message == "undefined") {
-    message = "Error: attempting to log message of 'undefined'.";
-  } else if (typeof message != "string") {
-    message = toJSON(message);
-  }
-  print(toJSON({log: message}));
-}
 
 // mimeparse.js
 // http://code.google.com/p/mimeparse/
@@ -46,12 +19,12 @@ log = function(message) {
 
 var Mimeparse = (function() {
   function strip(string) {
-    return string.replace(/^\s+/, '').replace(/\s+$/, '')
+    return string.replace(/^\s+/, '').replace(/\s+$/, '');
   };
   function parseRanges(ranges) {
     var parsedRanges = [], rangeParts = ranges.split(",");
     for (var i=0; i < rangeParts.length; i++) {
-      parsedRanges.push(publicMethods.parseMediaRange(rangeParts[i]))
+      parsedRanges.push(publicMethods.parseMediaRange(rangeParts[i]));
     };
     return parsedRanges;
   };
@@ -130,12 +103,12 @@ var Mimeparse = (function() {
       var parsedHeader = parseRanges(header);
       var weighted = [];
       for (var i=0; i < supported.length; i++) {
-        weighted.push([publicMethods.fitnessAndQualityParsed(supported[i], parsedHeader), supported[i]])
+        weighted.push([publicMethods.fitnessAndQualityParsed(supported[i], parsedHeader), supported[i]]);
       };
       weighted.sort();
       return weighted[weighted.length-1][0][1] ? weighted[weighted.length-1][1] : '';
     }
-  }
+  };
   return publicMethods;
 })();
 
@@ -163,7 +136,7 @@ respondWith = function(req, responders) {
   } else {
     throw({code:406, body:"Not Acceptable: "+accept});    
   }
-}
+};
 
 // whoever registers last wins.
 mimesByKey = {};
@@ -203,204 +176,33 @@ registerType("yaml", "application/x-yaml", "text/yaml");
 registerType("multipart_form", "multipart/form-data");
 registerType("url_encoded_form", "application/x-www-form-urlencoded");
 
-// ok back to business.
 
-try {
-  // if possible, use evalcx (not always available)
-  sandbox = evalcx('');
-  sandbox.emit = emit;
-  sandbox.sum = sum;
-  sandbox.log = log;
-  sandbox.toJSON = toJSON;
-  sandbox.respondWith = respondWith;
-  sandbox.registerType = registerType;
-} catch (e) {}
-
-// Commands are in the form of json arrays:
-// ["commandname",..optional args...]\n
-//
-// Responses are json values followed by a new line ("\n")
-
-while (cmd = eval(readline())) {
-  try {
-    switch (cmd[0]) {
-      case "reset":
-        // clear the globals and run gc
-        funs = [];
-        gc();
-        print("true"); // indicates success
-        break;
-      case "add_fun":
-        // The second arg is a string that will compile to a function.
-        // and then we add it to funs array
-        funs.push(compileFunction(cmd[1]));
-        print("true");
-        break;
-      case "map_doc":
-        // The second arg is a document. We compute all the map functions against
-        // it.
-        //
-        // Each function can output multiple keys value, pairs for each document
-        //
-        // Example output of map_doc after three functions set by add_fun cmds:
-        // [
-        //  [["Key","Value"]],                    <- fun 1 returned 1 key value
-        //  [],                                   <- fun 2 returned 0 key values
-        //  [["Key1","Value1"],["Key2","Value2"]] <- fun 3 returned 2 key values
-        // ]
-        //
-        var doc = cmd[1];
-        /*
-        Immutable document support temporarily removed.
-        
-        Removed because the seal function no longer works on JS 1.8 arrays,
-        instead returning an error. The sealing is meant to prevent map
-        functions from modifying the same document that is passed to other map
-        functions. However, only map functions in the same design document are
-        run together, so we have a reasonable expectation they can trust each
-        other. Any map fun that can't be trusted can be placed in its own
-        design document, and it cannot affect other map functions.
-        
-        recursivelySeal(doc); // seal to prevent map functions from changing doc
-        */
-        var buf = [];
-        for (var i = 0; i < funs.length; i++) {
-          map_results = [];
-          try {
-            funs[i](doc);
-            buf.push(toJSON(map_results));
-          } catch (err) {
-            if (err == "fatal_error") {
-              // Only if it's a "fatal_error" do we exit. What's a fatal error?
-              // That's for the query to decide.
-              //
-              // This will make it possible for queries to completely error out,
-              // by catching their own local exception and rethrowing a
-              // fatal_error. But by default if they don't do error handling we
-              // just eat the exception and carry on.
-              throw {error: "map_runtime_error",
-                  reason: "function raised fatal exception"};
-            }
-            print(toJSON({log: "function raised exception (" + err 
-              + ") with doc._id " + doc._id}));
-            buf.push("[]");
-          }
-        }
-        print("[" + buf.join(", ") + "]");
-        break;
-
-      case "rereduce":
-      case "reduce":
-        {
-        var keys = null;
-        var values = null;
-        var reduceFuns = cmd[1];
-        var rereduce = false;
-        
-        if (cmd[0] == "reduce") {
-          var kvs = cmd[2];
-          keys = new Array(kvs.length);
-          values = new Array(kvs.length);
-          for(var i = 0; i < kvs.length; i++) {
-              keys[i] = kvs[i][0];
-              values[i] = kvs[i][1];
-          }
-        } else {
-          values = cmd[2];
-          rereduce = true;
-        }
-
-        for (var i in reduceFuns) {
-          reduceFuns[i] = compileFunction(reduceFuns[i]);
-        }
-
-        var reductions = new Array(funs.length);
-        for(var i = 0; i < reduceFuns.length; i++) {
-          try {
-            reductions[i] = reduceFuns[i](keys, values, rereduce);
-          } catch (err) {
-            if (err == "fatal_error") {
-              throw {error: "reduce_runtime_error",
-                  reason: "function raised fatal exception"};
-            }
-            print(toJSON({log: "function raised exception (" + err + ")"}));
-            reductions[i] = null;
-          }
-        }
-        print("[true," + toJSON(reductions) + "]");
-        }
-        break;
-      case "validate":
-        var funSrc = cmd[1];
-        var newDoc = cmd[2];
-        var oldDoc = cmd[3];
-        var userCtx = cmd[4];
-        var validateFun = compileFunction(funSrc);
-        try {
-          validateFun(newDoc, oldDoc, userCtx);
-          print("1");
-        } catch (error) {
-          respond(error);
-        }
-        break;
-      case "show_doc":
-        var funSrc = cmd[1];
-        var doc = cmd[2];
-        var req = cmd[3];
-        var formFun = compileFunction(funSrc);
-        runRenderFunction(formFun, [doc, req]);
-        break;
-      case "list_begin":
-        var listFun = funs[0];
-        var head = cmd[1];
-        var req = cmd[2];
-        row_line[listFun] = { first_key: null, row_number: 0, prev_key: null };
-        runRenderFunction(listFun, [head, null, req, null]);
-        break;
-      case "list_row":
-        var listFun = funs[0];
-        var row = cmd[1];
-        var req = cmd[2];
-        var row_info = row_line[listFun];
-        runRenderFunction(listFun, [null, row, req, row_info]);
-        if (row_info.first_key == null) {
-          row_info.first_key = row.key;
-        }
-        row_info.prev_key = row.key;
-        row_info.row_number++;
-        row_line[listFun] = row_info;
-        break;
-      case "list_tail":
-        var listFun = funs[0];
-        var req = cmd[1];
-        var row_info = null;
-        try {
-            row_info = row_line[listFun];
-            delete row_line[listFun];
-        } catch (e) {}
-        runRenderFunction(listFun, [null, null, req, row_info]);
-        break;
-      default:
-        print(toJSON({error: "query_server_error",
-            reason: "unknown command '" + cmd[0] + "'"}));
-        quit();
+var Render = (function() {
+  var row_info;
+  return {
+    showDoc : function(funSrc, doc, req) {
+      var formFun = compileFunction(funSrc);
+      runRenderFunction(formFun, [doc, req], funSrc);
+    },
+    listBegin : function(head, req) {
+      row_info = { first_key: null, row_number: 0, prev_key: null };
+      runRenderFunction(funs[0], [head, null, req, null], funsrc[0]);
+    },
+    listRow : function(row, req) {
+      if (row_info.first_key == null) {
+        row_info.first_key = row.key;
+      }
+      runRenderFunction(funs[0], [null, row, req, row_info], funsrc[0], true);
+      row_info.prev_key = row.key;
+      row_info.row_number++;
+    },
+    listTail : function(req) {
+      runRenderFunction(funs[0], [null, null, req, row_info], funsrc[0]);
     }
-  } catch (exception) {
-    print(toJSON(exception));
   }
-}
+})();
 
-function maybeWrapResponse(resp) {
-  var type = typeof resp;
-  if ((type == "string") || (type == "xml")) {
-    return {body:resp};
-  } else {
-    return resp;
-  }
-};
-
-var responseSent;
-function runRenderFunction(renderFun, args) {
+function runRenderFunction(renderFun, args, funSrc, htmlErrors) {
   responseSent = false;
   try {
     var resp = renderFun.apply(null, args);
@@ -412,46 +214,85 @@ function runRenderFunction(renderFun, args) {
       }      
     }
   } catch(e) {
-    log("function raised error: "+e.toString());
-    log("stacktrace: "+e.stack);
-    var errorMessage = "JavaScript function raised error: "+e.toString()+"\nSee CouchDB logfile for stacktrace.";
-    respond({error:"render_error",reason:errorMessage});
+    var logMessage = "function raised error: "+e.toString();
+    log(logMessage);
+    // log("stacktrace: "+e.stack);
+    var errorMessage = htmlErrors ? htmlRenderError(e, funSrc) : logMessage;
+    respond({
+      error:"render_error",
+      reason:errorMessage});
   }
 };
 
-// prints the object as JSON, and rescues and logs any toJSON() related errors
-function respond(obj) {
-  responseSent = true;
-  try {
-    print(toJSON(obj));  
-  } catch(e) {
-    log("Error converting object to JSON: " + e.toString());
-  }
+function escapeHTML(string) {
+  return string.replace(/&/g, "&amp;")
+               .replace(/</g, "&lt;")
+               .replace(/>/g, "&gt;");
 }
 
-function compileFunction(source) {
-  try {
-    var functionObject = sandbox ? evalcx(source, sandbox) : eval(source);
-  } catch (err) {
-    throw {error: "compilation_error",
-      reason: err.toString() + " (" + source + ")"};
-  }
-  if (typeof(functionObject) == "function") {
-    return functionObject;
+function htmlRenderError(e, funSrc) {
+  var msg = ["<html><body><h1>Render Error</h1>",
+    "<p>JavaScript function raised error: ",
+    e.toString(),
+    "</p><h2>Stacktrace:</h2><code><pre>",
+    escapeHTML(e.stack),
+    "</pre></code><h2>Function source:</h2><code><pre>",
+    escapeHTML(funSrc),
+    "</pre></code></body></html>"].join('');
+  return {body:msg};
+};
+
+function maybeWrapResponse(resp) {
+  var type = typeof resp;
+  if ((type == "string") || (type == "xml")) {
+    return {body:resp};
   } else {
-    throw {error: "compilation_error",
-      reason: "expression does not eval to a function. (" + source + ")"};
+    return resp;
   }
-}
+};
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License.  You may obtain a copy
+// of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+// License for the specific language governing permissions and limitations under
+// the License.
 
-function recursivelySeal(obj) {
-  seal(obj);
-  for (var propname in obj) {
-    if (typeof doc[propname] == "object") {
-      recursivelySeal(doc[propname]);
+// globals used by other modules and functions
+var funs = [];        // holds functions used for computation
+var funsrc = [];      // holds function source for debug info
+var State = (function() {
+  return {
+    reset : function() {
+      // clear the globals and run gc
+      funs = [];
+      funsrc = [];
+      gc();
+      print("true"); // indicates success
+    },
+    addFun : function(newFun) {
+      // Compile to a function and add it to funs array
+      funsrc.push(newFun);
+      funs.push(compileFunction(newFun));
+      print("true");
     }
   }
-}
+})();
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License.  You may obtain a copy
+// of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+// License for the specific language governing permissions and limitations under
+// the License.
 
 function toJSON(val) {
   if (typeof(val) == "undefined") {
@@ -474,7 +315,7 @@ function toJSON(val) {
       return v.toString();
     },
     "Date": function(v) {
-      var f = function(n) { return n < 10 ? '0' + n : n }
+      var f = function(n) { return n < 10 ? '0' + n : n };
       return '"' + v.getUTCFullYear()   + '-' +
                  f(v.getUTCMonth() + 1) + '-' +
                  f(v.getUTCDate())      + 'T' +
@@ -509,3 +350,248 @@ function toJSON(val) {
     }
   }[val != null ? val.constructor.name : "Object"](val);
 }
+
+function compileFunction(source) {
+  try {
+    var functionObject = sandbox ? evalcx(source, sandbox) : eval(source);
+  } catch (err) {
+    throw {error: "compilation_error",
+      reason: err.toString() + " (" + source + ")"};
+  }
+  if (typeof(functionObject) == "function") {
+    return functionObject;
+  } else {
+    throw {error: "compilation_error",
+      reason: "expression does not eval to a function. (" + source + ")"};
+  }
+}
+
+function recursivelySeal(obj) {
+  seal(obj);
+  for (var propname in obj) {
+    if (typeof doc[propname] == "object") {
+      recursivelySeal(doc[propname]);
+    }
+  }
+}
+
+var responseSent;
+// prints the object as JSON, and rescues and logs any toJSON() related errors
+function respond(obj) {
+  responseSent = true;
+  try {
+    print(toJSON(obj));  
+  } catch(e) {
+    log("Error converting object to JSON: " + e.toString());
+  }
+};
+
+log = function(message) {
+  if (typeof message == "undefined") {
+    message = "Error: attempting to log message of 'undefined'.";
+  } else if (typeof message != "string") {
+    message = toJSON(message);
+  }
+  print(toJSON({log: message}));
+};
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License.  You may obtain a copy
+// of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+// License for the specific language governing permissions and limitations under
+// the License.
+
+var Validate = {
+  validate : function(funSrc, newDoc, oldDoc, userCtx) {
+    var validateFun = compileFunction(funSrc);
+    try {
+      validateFun(newDoc, oldDoc, userCtx);
+      print("1");
+    } catch (error) {
+      respond(error);
+    }
+  }
+};// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License.  You may obtain a copy
+// of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+// License for the specific language governing permissions and limitations under
+// the License.
+
+// globals used by views
+var map_results = []; // holds temporary emitted values during doc map
+
+// view helper functions
+emit = function(key, value) {
+  map_results.push([key, value]);
+}
+
+sum = function(values) {
+  var rv = 0;
+  for (var i in values) {
+    rv += values[i];
+  }
+  return rv;
+}
+
+var Views = (function() {
+    
+  function runReduce(reduceFuns, keys, values, rereduce) {
+    for (var i in reduceFuns) {
+      reduceFuns[i] = compileFunction(reduceFuns[i]);
+    }
+    var reductions = new Array(reduceFuns.length);
+    for(var i = 0; i < reduceFuns.length; i++) {
+      try {
+        reductions[i] = reduceFuns[i](keys, values, rereduce);
+      } catch (err) {
+        if (err == "fatal_error") {
+          throw {
+            error: "reduce_runtime_error",
+            reason: "function raised fatal exception"};
+        }
+        log("function raised exception (" + err + ")");
+        reductions[i] = null;
+      }
+    }
+    print("[true," + toJSON(reductions) + "]");
+  };
+  
+  return {
+    reduce : function(reduceFuns, kvs) {
+      var keys = new Array(kvs.length);
+      var values = new Array(kvs.length);
+      for(var i = 0; i < kvs.length; i++) {
+          keys[i] = kvs[i][0];
+          values[i] = kvs[i][1];
+      }
+      runReduce(reduceFuns, keys, values, false);
+    },
+    rereduce : function(reduceFuns, values) {
+      runReduce(reduceFuns, null, values, true);
+    },
+    mapDoc : function(doc) {
+      // Compute all the map functions against the document.
+      //
+      // Each function can output multiple key/value pairs for each document.
+      //
+      // Example output of map_doc after three functions set by add_fun cmds:
+      // [
+      //  [["Key","Value"]],                    <- fun 1 returned 1 key value
+      //  [],                                   <- fun 2 returned 0 key values
+      //  [["Key1","Value1"],["Key2","Value2"]] <- fun 3 returned 2 key values
+      // ]
+      //
+
+      /*
+      Immutable document support temporarily removed.
+
+      Removed because the seal function no longer works on JS 1.8 arrays,
+      instead returning an error. The sealing is meant to prevent map
+      functions from modifying the same document that is passed to other map
+      functions. However, only map functions in the same design document are
+      run together, so we have a reasonable expectation they can trust each
+      other. Any map fun that can't be trusted can be placed in its own
+      design document, and it cannot affect other map functions.
+
+      recursivelySeal(doc); // seal to prevent map functions from changing doc
+      */
+      var buf = [];
+      for (var i = 0; i < funs.length; i++) {
+        map_results = [];
+        try {
+          funs[i](doc);
+          buf.push(toJSON(map_results));
+        } catch (err) {
+          if (err == "fatal_error") {
+            // Only if it's a "fatal_error" do we exit. What's a fatal error?
+            // That's for the query to decide.
+            //
+            // This will make it possible for queries to completely error out,
+            // by catching their own local exception and rethrowing a
+            // fatal_error. But by default if they don't do error handling we
+            // just eat the exception and carry on.
+            throw {
+              error: "map_runtime_error",
+              reason: "function raised fatal exception"};
+          }
+          log("function raised exception (" + err + ") with doc._id " + doc._id);
+          buf.push("[]");
+        }
+      }
+      print("[" + buf.join(", ") + "]");
+    }
+  }
+})();
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License.  You may obtain a copy
+// of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+// License for the specific language governing permissions and limitations under
+// the License.
+
+var sandbox = null;
+
+try {
+  // if possible, use evalcx (not always available)
+  sandbox = evalcx('');
+  sandbox.emit = emit;
+  sandbox.sum = sum;
+  sandbox.log = log;
+  sandbox.toJSON = toJSON;
+  sandbox.respondWith = respondWith;
+  sandbox.registerType = registerType;
+} catch (e) {}
+
+// Commands are in the form of json arrays:
+// ["commandname",..optional args...]\n
+//
+// Responses are json values followed by a new line ("\n")
+
+var cmd, cmdkey;
+
+var dispatch = {
+  "reset"      : State.reset,
+  "add_fun"    : State.addFun,
+  "map_doc"    : Views.mapDoc,
+  "reduce"     : Views.reduce,
+  "rereduce"   : Views.rereduce,
+  "validate"   : Validate.validate,
+  "show_doc"   : Render.showDoc,
+  "list_begin" : Render.listBegin,
+  "list_row"   : Render.listRow,
+  "list_tail"  : Render.listTail 
+};
+
+while (cmd = eval(readline())) {
+  try {
+    cmdkey = cmd.shift();
+    if (dispatch[cmdkey]) {
+      // run the correct responder with the cmd body
+      dispatch[cmdkey].apply(this, cmd);
+    } else {
+      // unknown command, quit and hope the restarted version is better
+      respond({
+        error: "query_server_error",
+        reason: "unknown command '" + cmdkey + "'"});
+      quit();
+    }
+  } catch(e) {
+    respond(e);
+  }
+};

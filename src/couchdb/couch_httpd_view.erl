@@ -530,7 +530,7 @@ apply_default_helper_funs(#view_fold_helper_funs{
     Helpers#view_fold_helper_funs{
         passed_end = PassedEnd2,
         start_response = StartResp2,
-        send_row = wrap_for_chunked_errors(SendRow2)
+        send_row = SendRow2
     }.
 
 apply_default_helper_funs(#reduce_fold_helper_funs{
@@ -549,7 +549,7 @@ apply_default_helper_funs(#reduce_fold_helper_funs{
 
     Helpers#reduce_fold_helper_funs{
         start_response = StartResp2,
-        send_row = wrap_for_chunked_errors(SendRow2)
+        send_row = SendRow2
     }.
 
 make_passed_end_fun(fwd, EndKey, EndDocId, InclusiveEnd) ->
@@ -606,27 +606,7 @@ send_json_reduce_row(Resp, {Key, Value}, RowFront) ->
     nil -> ",\r\n";
     _ -> RowFront
     end,
-    send_chunk(Resp, RowFront2 ++ ?JSON_ENCODE({[{key, Key}, {value, Value}]})).
-
-wrap_for_chunked_errors(Fun) when is_function(Fun, 3)->
-    fun(Resp, B, C) ->
-        try Fun(Resp, B, C)
-        catch
-            throw:Error ->
-                send_chunked_error(Resp, Error),
-                throw({already_sent, Error})
-        end
-    end;
-
-wrap_for_chunked_errors(Fun) when is_function(Fun, 5)->
-    fun(Resp, B, C, D, E) ->
-        try Fun(Resp, B, C, D, E)
-        catch
-            throw:Error ->
-                send_chunked_error(Resp, Error),
-                throw({already_sent, Error})
-        end
-    end.    
+    send_chunk(Resp, RowFront2 ++ ?JSON_ENCODE({[{key, Key}, {value, Value}]})).    
 
 view_group_etag(Group) ->
     view_group_etag(Group, nil).

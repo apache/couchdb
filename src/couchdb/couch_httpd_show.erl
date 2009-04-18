@@ -19,7 +19,7 @@
 
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
-    start_json_response/2,send_chunk/2,
+    start_json_response/2,send_chunk/2,send_chunked_error/2,
     start_chunked_response/3, send_error/4]).
     
 handle_doc_show_req(#httpd{
@@ -132,24 +132,30 @@ make_map_start_resp_fun(QueryServer, Req, Db, CurrentEtag) ->
 make_map_send_row_fun(QueryServer, Req) ->
     fun(Resp, Db2, {{Key, DocId}, Value}, 
         RowFront, _IncludeDocs) ->
-        JsonResp = couch_query_servers:render_list_row(QueryServer, 
-            Req, Db2, {{Key, DocId}, Value}),
-        #extern_resp_args{
-            stop = StopIter,
-            data = RowBody
-        } = couch_httpd_external:parse_external_response(JsonResp),
-        case StopIter of
-        true -> stop;
-        _ ->
-            RowFront2 = case RowFront of
-            nil -> [];
-            _ -> RowFront
-            end,
-            Chunk = RowFront2 ++ binary_to_list(RowBody),
-            case Chunk of
-                [] -> {ok, Resp};
-                _ -> send_chunk(Resp, Chunk)
+        try
+            JsonResp = couch_query_servers:render_list_row(QueryServer, 
+                Req, Db2, {{Key, DocId}, Value}),
+            #extern_resp_args{
+                stop = StopIter,
+                data = RowBody
+            } = couch_httpd_external:parse_external_response(JsonResp),
+            case StopIter of
+            true -> stop;
+            _ ->
+                RowFront2 = case RowFront of
+                nil -> [];
+                _ -> RowFront
+                end,
+                Chunk = RowFront2 ++ binary_to_list(RowBody),
+                case Chunk of
+                    [] -> {ok, Resp};
+                    _ -> send_chunk(Resp, Chunk)
+                end
             end
+        catch
+            throw:Error ->
+                send_chunked_error(Resp, Error),
+                throw({already_sent, Resp, Error})
         end
     end.
 
@@ -241,24 +247,30 @@ make_reduce_start_resp_fun(QueryServer, Req, Db, CurrentEtag) ->
 
 make_reduce_send_row_fun(QueryServer, Req, Db) ->
     fun(Resp, {Key, Value}, RowFront) ->
-        JsonResp = couch_query_servers:render_reduce_row(QueryServer, 
-            Req, Db, {Key, Value}),
-        #extern_resp_args{
-            stop = StopIter,
-            data = RowBody
-        } = couch_httpd_external:parse_external_response(JsonResp),
-        RowFront2 = case RowFront of
-        nil -> [];
-        _ -> RowFront
-        end,
-        case StopIter of
-        true -> stop;
-        _ ->
-            Chunk = RowFront2 ++ binary_to_list(RowBody),
-            case Chunk of
-                [] -> {ok, Resp};
-                _ -> send_chunk(Resp, Chunk)
+        try
+            JsonResp = couch_query_servers:render_reduce_row(QueryServer, 
+                Req, Db, {Key, Value}),
+            #extern_resp_args{
+                stop = StopIter,
+                data = RowBody
+            } = couch_httpd_external:parse_external_response(JsonResp),
+            RowFront2 = case RowFront of
+            nil -> [];
+            _ -> RowFront
+            end,
+            case StopIter of
+            true -> stop;
+            _ ->
+                Chunk = RowFront2 ++ binary_to_list(RowBody),
+                case Chunk of
+                    [] -> {ok, Resp};
+                    _ -> send_chunk(Resp, Chunk)
+                end
             end
+        catch
+            throw:Error ->
+                send_chunked_error(Resp, Error),
+                throw({already_sent, Resp, Error})
         end
     end.
 
@@ -417,3 +429,4 @@ apply_etag({ExternalResponse}, CurrentEtag) ->
             Field
         end || Field <- ExternalResponse]}
     end.
+    

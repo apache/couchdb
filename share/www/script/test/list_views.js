@@ -130,6 +130,15 @@ couchTests.list_views = function(debug) {
       }),
       emptyList: stringFun(function(head, row, req, row_info) {
         return { body: "" };
+      }),
+      rowError : stringFun(function(head, row, req, row_info) {
+        if (head) {
+          return "head";
+        } else if(row) {
+          return missingValue;
+        } else {
+          return "tail"
+        }
       })
     }
   };
@@ -272,4 +281,7 @@ couchTests.list_views = function(debug) {
   });
   T(xhr.status == 400);
   T(/query_parse_error/.test(xhr.responseText));
+  
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/rowError/basicView");
+  T(/<h1>Render Error<\/h1>/.test(xhr.responseText));
 };
