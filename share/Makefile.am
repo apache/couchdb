@@ -10,7 +10,15 @@
 ## License for the specific language governing permissions and limitations
 ## under the License.
 
-server/main.js:
+MAKEJS_FILES = \
+    server/loop.js \
+    server/render.js \
+    server/state.js \
+    server/util.js \
+    server/validate.js \
+    server/views.js
+    
+server/main.js: $(MAKEJS_FILES)
 	server/mainjs.sh
 
 CLEANFILES = server/main.js
