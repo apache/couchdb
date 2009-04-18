@@ -155,6 +155,7 @@
     skip = 0,
     group_level = 0,
     reduce = true,
+    req_reduce = false,
     inclusive_end=true, % aka a closed-interval
     include_docs = false
 }).
