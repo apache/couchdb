@@ -150,14 +150,12 @@ Change the ownership of the Apache CouchDB directories by running:
     chown -R couchdb:couchdb /usr/local/etc/couchdb
     chown -R couchdb:couchdb /usr/local/var/lib/couchdb
     chown -R couchdb:couchdb /usr/local/var/log/couchdb
-    chown -R couchdb:couchdb /usr/local/var/run/couchdb
 
 Change the permission of the Apache CouchDB directories by running:
 
     chmod -R 0770 /usr/local/etc/couchdb
     chmod -R 0770 /usr/local/var/lib/couchdb
     chmod -R 0770 /usr/local/var/log/couchdb
-    chmod -R 0770 /usr/local/var/run/couchdb
 
 Running Manually
 ^^^^^^^^^^^^^^^^

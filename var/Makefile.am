@@ -14,10 +14,8 @@ install-data-hook:
 	if test ! "$(mkdir_p)" = ""; then \
 	    $(mkdir_p) "$(DESTDIR)$(localstatelibdir)"; \
 	    $(mkdir_p) "$(DESTDIR)$(localstatelogdir)"; \
-	    $(mkdir_p) "$(DESTDIR)$(localstaterundir)"; \
 	else \
 	    echo "WARNING: You may have to create these directories by hand."; \
 	    mkdir -p "$(DESTDIR)$(localstatelibdir)"; \
 	    mkdir -p "$(DESTDIR)$(localstatelogdir)"; \
-	    mkdir -p "$(DESTDIR)$(localstaterundir)"; \
 	fi

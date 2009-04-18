@@ -44,6 +44,7 @@ init/couchdb: init/couchdb.tpl
 	    -e "s|%bindir%|$(bindir)|" \
 	    -e "s|%sysconfdir%|$(sysconfdir)|" \
 	    -e "s|%localerlangbindir%|$(localerlangbindir)|" \
+	    -e "s|%localstaterundir%|$(localstaterundir)|" \
 	    -e "s|%couchdb_command_name%|$(couchdb_command_name)|" \
 	< $< > $@
 
