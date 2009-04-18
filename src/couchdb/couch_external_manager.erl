@@ -53,9 +53,9 @@ handle_call({get, UrlName}, _From, Handlers) ->
     [] ->
         case couch_config:get("external", UrlName, nil) of
         nil ->
-            Mesg = lists:flatten(
+            Msg = lists:flatten(
                 io_lib:format("No server configured for ~p.", [UrlName])),
-            {reply, {error, {unknown_external_server, Mesg}}, Handlers};
+            {reply, {error, {unknown_external_server, ?l2b(Msg)}}, Handlers};
         Command ->
             {ok, NewPid} = couch_external_server:start_link(UrlName, Command),
             true = ets:insert(Handlers, {UrlName, NewPid}),
