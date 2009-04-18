@@ -422,8 +422,8 @@ error_info({Error, Reason}) ->
 error_info(Error) ->
     {500, <<"unknown_error">>, couch_util:to_binary(Error)}.
 
-send_error(_Req, {already_sent, _Error}) ->
-    ok;
+send_error(_Req, {already_sent, Resp, _Error}) ->
+    {ok, Resp};
     
 send_error(Req, Error) ->
     {Code, ErrorStr, ReasonStr} = error_info(Error),
@@ -447,21 +447,17 @@ send_error(Req, Code, Headers, ErrorStr, ReasonStr) ->
         {[{<<"error">>,  ErrorStr},
          {<<"reason">>, ReasonStr}]}).
 
+% give the option for list functions to output html or other raw errors
+send_chunked_error(Resp, {_Error, {[{<<"body">>, Reason}]}}) ->
+    send_chunk(Resp, Reason),
+    send_chunk(Resp, []);
+
 send_chunked_error(Resp, Error) ->
     {Code, ErrorStr, ReasonStr} = error_info(Error),
-    CType = Resp:get_header_value("Content-Type"),
-    case CType of
-        "text/html" ->
-            HtmlError = ?l2b([$\n,
-                "<html><body><h2>Error: ", ErrorStr, "</h2>",
-                "<pre>Reason: ", ReasonStr, "</pre>", $\n]),
-            send_chunk(Resp, HtmlError);
-        _Else ->
-            JsonError = {[{<<"code">>, Code},
-                {<<"error">>,  ErrorStr}, 
-                {<<"reason">>, ReasonStr}]},
-            send_chunk(Resp, ?l2b([$\n,?JSON_ENCODE(JsonError),$\n]))
-    end,
+    JsonError = {[{<<"code">>, Code},
+        {<<"error">>,  ErrorStr}, 
+        {<<"reason">>, ReasonStr}]},
+    send_chunk(Resp, ?l2b([$\n,?JSON_ENCODE(JsonError),$\n])),
     send_chunk(Resp, []).
 
 send_redirect(Req, Path) ->
