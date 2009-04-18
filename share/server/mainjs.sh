@@ -12,7 +12,12 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
+TARGET="main.js"
+
 cd server
+echo "// Generated from *.js by makejs.sh on `date`" > $TARGET
+echo "// DO NOT EDIT BY HAND\n" >> $TARGET
+
 cat \
   render.js \
   state.js \
@@ -20,5 +25,5 @@ cat \
   validate.js \
   views.js \
   loop.js \
-  > main.js
+  >> $TARGET
 cd ..
