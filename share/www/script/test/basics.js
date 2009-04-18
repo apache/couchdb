@@ -168,4 +168,32 @@ couchTests.basics = function(debug) {
     // deleting a non-existent doc should be 404
     xhr = CouchDB.request("DELETE", "/test_suite_db/doc-does-not-exist");
     T(xhr.status == 404);
+
+    // Check some common error responses.
+    // PUT body not an object
+    xhr = CouchDB.request("PUT", "/test_suite_db/bar", {body: "[]"});
+    T(xhr.status == 400);
+    result = JSON.parse(xhr.responseText);
+    T(result.error == "bad_request");
+    T(result.reason == "Document must be a JSON object");
+
+    // Body of a _bulk_docs is not an object
+    xhr = CouchDB.request("POST", "/test_suite_db/_bulk_docs", {body: "[]"});
+    T(xhr.status == 400);
+    result = JSON.parse(xhr.responseText);
+    T(result.error == "bad_request");
+    T(result.reason == "Body must be a JSON object");
+
+    // Body of an _all_docs  multi-get is not a {"key": [...]} structure.
+    xhr = CouchDB.request("POST", "/test_suite_db/_all_docs", {body: "[]"});
+    T(xhr.status == 400);
+    result = JSON.parse(xhr.responseText);
+    T(result.error == "bad_request");
+    T(result.reason == "Body must be a JSON object");
+    var data = "{\"keys\": 1}";
+    xhr = CouchDB.request("POST", "/test_suite_db/_all_docs", {body:data});
+    T(xhr.status == 400);
+    result = JSON.parse(xhr.responseText);
+    T(result.error == "bad_request");
+    T(result.reason == "`keys` member must be a array.");
   };
