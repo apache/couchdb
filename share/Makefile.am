@@ -10,11 +10,16 @@
 ## License for the specific language governing permissions and limitations
 ## under the License.
 
+server/main.js:
+	server/mainjs.sh
+
+CLEANFILES = server/main.js
+
 nobase_dist_localdata_DATA = \
     server/main.js \
     www/dialog/_compact_database.html \
-    www/dialog/_create_database.html \
     www/dialog/_create_document.html \
+    www/dialog/_create_database.html \
     www/dialog/_delete_database.html \
     www/dialog/_delete_document.html \
     www/dialog/_save_view_as.html \

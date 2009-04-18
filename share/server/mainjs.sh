@@ -12,13 +12,13 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-dirname=`dirname $0`
-
+cd server
 cat \
-  $dirname/render.js \
-  $dirname/state.js \
-  $dirname/util.js \
-  $dirname/validate.js \
-  $dirname/views.js \
-  $dirname/loop.js \
-  > $dirname/main.js
+  render.js \
+  state.js \
+  util.js \
+  validate.js \
+  views.js \
+  loop.js \
+  > main.js
+cd ..
