@@ -51,7 +51,13 @@ read(Pid) ->
     gen_server:call(Pid, read).
 
 prompt(Pid, Data) ->
-    gen_server:call(Pid, {prompt, Data}, infinity).
+    case gen_server:call(Pid, {prompt, Data}, infinity) of
+        {ok, Result} ->
+            Result;
+        {error, Error} ->
+            ?LOG_DEBUG("OS Process Error ~p",[Error]),
+            throw(Error)
+    end.
 
 async(Pid, Data, CallBack) ->
     gen_server:cast(Pid, {async, Data, CallBack}).
@@ -138,7 +144,13 @@ handle_call(read, _From, OsProc) ->
 handle_call({prompt, Data}, _From, OsProc) ->
     #os_proc{writer=Writer, reader=Reader} = OsProc,
     Writer(OsProc, Data),
-    {reply, Reader(OsProc), OsProc}.
+    Result = try Reader(OsProc) of
+        Ok -> {ok, Ok}
+    catch
+        throw:OsError ->
+            {error, OsError}
+    end,
+    {reply, Result, OsProc}.
 
 handle_cast({async, Data, CallBack}, OsProc) ->
     #os_proc{writer=Writer, reader=Reader} = OsProc,
