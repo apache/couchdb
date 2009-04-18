@@ -10,16 +10,19 @@
 ## License for the specific language governing permissions and limitations
 ## under the License.
 
+# loop.js MUST be last!
 MAKEJS_FILES = \
-    server/loop.js \
     server/render.js \
     server/state.js \
     server/util.js \
     server/validate.js \
-    server/views.js
+    server/views.js \
+    server/loop.js
     
 server/main.js: $(MAKEJS_FILES)
-	server/mainjs.sh
+	@echo "// Generated from *.js by make on `date`" > server/main.js
+	@echo "// DO NOT EDIT BY HAND\n" >> server/main.js
+	@cat $(MAKEJS_FILES) >> server/main.js
 
 CLEANFILES = server/main.js
 
