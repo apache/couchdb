@@ -6,6 +6,12 @@ Version 0.10.0
 
 This version has not been released yet.
 
+Build and System Integration:
+
+ * Updated ownership and permission advice in `README` for better security.
+ * The SysV/BSD daemon script now creates the PID directory on each invokation
+   because PREFIX/var/run might be a temporary filesystem.
+
 Version 0.9.0
 -------------
 
@@ -127,7 +133,7 @@ Build and System Integration:
 
  * The `couchdb` script no longer uses `awk` for configuration checks as this
    was causing portability problems.
- * Updated `sudo` example in the `README` to use the `-i` option, this fixes
+ * Updated `sudo` example in `README` to use the `-i` option, this fixes
    problems when invoking from a directory the `couchdb` user cannot access.
 
 Futon Utility Client:
