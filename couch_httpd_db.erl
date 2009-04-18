@@ -126,7 +126,13 @@ db_req(#httpd{path_parts=[_,<<"_ensure_full_commit">>]}=Req, _Db) ->
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
     couch_stats_collector:increment({httpd, bulk_requests}),
-    {JsonProps} = couch_httpd:json_body(Req),
+    JsonProps =
+    case couch_httpd:json_body(Req) of
+    {Fields} ->
+        Fields;
+    _ ->
+        throw({bad_request, "Body must be a JSON object"})
+    end,
     DocsArray = proplists:get_value(<<"docs">>, JsonProps),
     case couch_httpd:header_value(Req, "X-Couch-Full-Commit", "false") of
     "true" ->
@@ -220,9 +226,20 @@ db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs">>]}=Req, Db) ->
     all_docs_view(Req, Db, nil);
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_all_docs">>]}=Req, Db) ->
-    {Props} = couch_httpd:json_body(Req),
-    Keys = proplists:get_value(<<"keys">>, Props, nil),
-    all_docs_view(Req, Db, Keys);
+    case couch_httpd:json_body(Req) of
+    {Fields} ->
+        case proplists:get_value(<<"keys">>, Fields, nil) of
+        nil ->
+            ?LOG_DEBUG("POST to _all_docs with no keys member.", []),
+            all_docs_view(Req, Db, nil);
+        Keys when is_list(Keys) ->
+            all_docs_view(Req, Db, Keys);
+        _ ->
+            throw({bad_request, "`keys` member must be a array."})
+        end;
+    _ ->
+        throw({bad_request, "Body must be a JSON object"})
+    end;
 
 db_req(#httpd{path_parts=[_,<<"_all_docs">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "GET,HEAD,POST");

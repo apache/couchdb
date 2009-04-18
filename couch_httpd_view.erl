@@ -56,9 +56,21 @@ handle_view_req(#httpd{method='GET',
 
 handle_view_req(#httpd{method='POST',
         path_parts=[_Db, _Design, DName, _View, ViewName]}=Req, Db) ->
-    {Props} = couch_httpd:json_body(Req),
-    Keys = proplists:get_value(<<"keys">>, Props, nil),
-    design_doc_view(Req, Db, DName, ViewName, Keys);
+    case couch_httpd:json_body(Req) of
+    {Fields} ->
+        case proplists:get_value(<<"keys">>, Fields, nil) of
+        nil ->
+            Fmt = "POST to view ~p/~p in database ~p with no keys member.",
+            ?LOG_DEBUG(Fmt, [DName, ViewName, Db]),
+            design_doc_view(Req, Db, DName, ViewName, nil);
+        Keys when is_list(Keys) ->
+            design_doc_view(Req, Db, DName, ViewName, Keys);
+        _ ->
+            throw({bad_request, "`keys` member must be a array."})
+        end;
+    _ ->
+        throw({bad_request, "Body must be a JSON object"})
+    end;
 
 handle_view_req(Req, _Db) ->
     send_method_not_allowed(Req, "GET,POST,HEAD").
