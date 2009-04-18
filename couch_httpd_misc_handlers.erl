@@ -50,7 +50,8 @@ handle_utils_dir_req(#httpd{method='GET'}=Req, DocumentRoot) ->
         couch_httpd:serve_file(Req, RelativePath, DocumentRoot);
     {_ActionKey, "", _RelativePath} ->
         % GET /_utils
-        couch_httpd:send_redirect(Req, "/_utils/")
+        RedirectPath = couch_httpd:path(Req) ++ "/",
+        couch_httpd:send_redirect(Req, RedirectPath)
     end;
 handle_utils_dir_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
