@@ -81,6 +81,14 @@ couchTests.view_errors = function(debug) {
   }
   
   try {
+    db.view("test/no_reduce", {reduce: true});
+    T(0 == 1);
+  } catch(e) {
+    T(db.last_req.status == 400);
+    T(e.error == "query_parse_error");
+  }
+
+  try {
       db.view("test/with_reduce", {group: true, reduce: false});
       T(0 == 1);
   } catch(e) {
