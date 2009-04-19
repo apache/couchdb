@@ -30,6 +30,7 @@ CLEANFILES = server/main.js
 
 nobase_dist_localdata_DATA = \
     $(MAKEJS_FILES) \
+    server/main.js \
     www/dialog/_compact_database.html \
     www/dialog/_create_document.html \
     www/dialog/_create_database.html \
