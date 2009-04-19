@@ -52,9 +52,9 @@ start_server(IniFiles) ->
         end;
     _ -> ok
     end,
-    
+
     {ok, ConfigPid} = couch_config:start_link(IniFiles),
-    
+
     LogLevel = couch_config:get("log", "level", "info"),
     % announce startup
     io:format("Apache CouchDB ~s (LogLevel=~s) is starting.~n", [
@@ -68,16 +68,16 @@ start_server(IniFiles) ->
             || {{Module, Variable}, Value} <- couch_config:all()];
     _ -> ok
     end,
-    
+
     LibDir =
     case couch_config:get("couchdb", "util_driver_dir", null) of
     null ->
         filename:join(code:priv_dir(couch), "lib");
     LibDir0 -> LibDir0
     end,
-    
+
     ok = couch_util:start_driver(LibDir),
-    
+
     BaseChildSpecs =
     {{one_for_all, 10, 3600}, 
         [{couch_config,
@@ -99,7 +99,6 @@ start_server(IniFiles) ->
             supervisor,
             [couch_server_sup]}
         ]},
-   
 
     % ensure these applications are running
     application:start(ibrowse),
@@ -117,11 +116,11 @@ start_server(IniFiles) ->
         ("daemons", _) ->
             ?MODULE:stop()
         end, Pid),
-    
+
     unlink(ConfigPid),
-    
+
     io:format("Apache CouchDB has started. Time to relax.~n"),
-    
+
     {ok, Pid}.
 
 start_primary_services() ->
@@ -170,11 +169,11 @@ start_secondary_services() ->
                 permanent,
                 brutal_kill,
                 worker,
-                [Module]}                
+                [Module]}
         end
         || {Name, SpecStr}
         <- couch_config:get("daemons"), SpecStr /= ""],
-    
+
     supervisor:start_link({local, couch_secondary_services}, couch_server_sup,
         {{one_for_one, 10, 3600}, DaemonChildSpecs}).
 
