@@ -120,6 +120,7 @@ start_server(IniFiles) ->
     unlink(ConfigPid),
 
     io:format("Apache CouchDB has started. Time to relax.~n"),
+    ?LOG_INFO("Apache CouchDB has started.", []),
 
     {ok, Pid}.
 
