@@ -497,6 +497,12 @@ db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
     end;
 
 db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
+    case couch_httpd:header_value(Req, "content-type") of
+    "multipart/form-data" ++  _Rest ->
+        ok;
+    _Else ->
+        throw({bad_ctype, <<"Invalid Content-Type header for form upload">>})
+    end,
     Form = couch_httpd:parse_form(Req),
     Rev = couch_doc:parse_rev(list_to_binary(proplists:get_value("_rev", Form))),
     {ok, [{ok, Doc}]} = couch_db:open_doc_revs(Db, DocId, [Rev], []),
