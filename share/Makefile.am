@@ -18,7 +18,9 @@ MAKEJS_FILES = \
     server/validate.js \
     server/views.js \
     server/loop.js
-    
+
+all: server/main.js
+
 server/main.js: $(MAKEJS_FILES)
 	@echo "// Generated from *.js by make on `date`" > server/main.js
 	@echo "// DO NOT EDIT BY HAND\n" >> server/main.js
