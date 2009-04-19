@@ -201,8 +201,8 @@ if test "$use_launchd" = "yes"; then
     fi
 fi
 
-AC_ARG_VAR([ERL_EXECUTABLE], [path to the `erl' executable])
-AC_ARG_VAR([ERLC_EXECUTABLE], [path to the `erlc' executable])
+AC_ARG_VAR([ERL], [path to the `erl' executable])
+AC_ARG_VAR([ERLC], [path to the `erlc' executable])
 AC_ARG_VAR([HELP2MAN_EXECUTABLE], [path to the `help2man' program])
 
 if test -n "$HELP2MAN_EXECUTABLE"; then
