@@ -22,9 +22,10 @@ MAKEJS_FILES = \
 all: server/main.js
 
 server/main.js: $(MAKEJS_FILES)
+	@echo "Generating main.js"
 	@echo "// Generated from *.js by make on `date`" > server/main.js
-	@echo "// DO NOT EDIT BY HAND\n" >> server/main.js
 	@cat $(MAKEJS_FILES) >> server/main.js
+	@echo "// DO NOT EDIT BY HAND\n" >> server/main.js
 
 CLEANFILES = server/main.js
 
