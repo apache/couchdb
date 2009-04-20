@@ -157,7 +157,8 @@ handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
     {ok, NewFd} = couch_file:open(CompactFilepath),
     {ok, NewHeader} = couch_file:read_header(NewFd, ?HEADER_SIG),
     #db{update_seq=NewSeq} = NewDb =
-            init_db(Db#db.name, CompactFilepath, NewFd, NewHeader),
+            init_db(Db#db.name, Filepath, NewFd, NewHeader),
+    unlink(NewFd),
     case Db#db.update_seq == NewSeq of
     true ->
         % suck up all the local docs into memory and write them to the new db
@@ -172,10 +173,7 @@ handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
                 [Filepath, CompactFilepath]),
         file:delete(Filepath),
         ok = file:rename(CompactFilepath, Filepath),
-        
-        couch_stream:close(Db#db.summary_stream),
-        couch_ref_counter:drop(Db#db.fd_ref_counter),
-            
+        close_db(Db),
         ok = gen_server:call(Db#db.main_pid, {db_updated, NewDb2}),
         ?LOG_INFO("Compaction for db \"~s\" completed.", [Db#db.name]),
         {noreply, NewDb2#db{compactor_pid=nil}};
@@ -183,7 +181,7 @@ handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
         ?LOG_INFO("Compaction file still behind main file "
             "(update seq=~p. compact update seq=~p). Retrying.",
             [Db#db.update_seq, NewSeq]),
-        couch_file:close(NewFd),
+        close_db(NewDb),
         Pid = spawn_link(fun() -> start_copy_compact(Db) end),
         Db2 = Db#db{compactor_pid=Pid},
         {noreply, Db2}
@@ -302,6 +300,11 @@ init_db(DbName, Filepath, Fd, Header0) ->
         revs_limit = Header#db_header.revs_limit
         }.
 
+
+close_db(#db{ fd_ref_counter = RefCntr, summary_stream = SummaryStream}) ->
+    couch_stream:close(SummaryStream),
+    couch_ref_counter:drop(RefCntr).
+    
 
 refresh_validate_doc_funs(Db) ->
     {ok, DesignDocs} = get_design_docs(Db),
@@ -644,7 +647,9 @@ start_copy_compact(#db{name=Name,filepath=Filepath}=Db) ->
         ok = couch_file:write_header(Fd, ?HEADER_SIG, Header=#db_header{})
     end,
     NewDb = init_db(Name, CompactFile, Fd, Header),
-    _NewDb2 = copy_compact(Db, NewDb, Retry),
+    unlink(Fd),
+    NewDb2 = copy_compact(Db, NewDb, Retry),
     
-    gen_server:cast(Db#db.update_pid, {compact_done, CompactFile}).
+    gen_server:cast(Db#db.update_pid, {compact_done, CompactFile}),
+    close_db(NewDb2).
     
