@@ -71,6 +71,7 @@ Options:
   -h          display a short help message and exit
   -V          display version information and exit
   -a FILE     add configuration FILE to chain
+  -A DIR      add configuration DIR to chain
   -n          reset configuration file chain (including system default)
   -c          print configuration file chain and exit
   -i          use the interactive Erlang shell
@@ -291,7 +292,7 @@ stop_couchdb () {
 parse_script_option_list () {
     _load_config
     set +e
-    options=`getopt hVa:ncibp:r:Ro:e:skd $@`
+    options=`getopt hVa:A:ncibp:r:Ro:e:skd $@`
     if test ! $? -eq 0; then
         display_error
     fi
@@ -302,6 +303,7 @@ parse_script_option_list () {
             -h) shift; display_help; exit;;
             -V) shift; display_version; exit;;
             -a) shift; _add_config_file "$1"; shift;;
+            -A) shift; _add_config_dir "$1"; shift;;
             -n) shift; _reset_config;;
             -c) shift; _print_config; exit;;
             -i) shift; INTERACTIVE=true;;
