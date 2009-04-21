@@ -12,28 +12,28 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-SCRIPT_OK=0
-SCRIPT_ERROR=1
-
-INTERACTIVE=false
 BACKGROUND=false
+DEFAULT_CONFIG_DIR=%localconfdir%/default.d
+DEFAULT_CONFIG_FILE=%localconfdir%/default.ini
+HEART_BEAT_TIMEOUT=11
+HEART_COMMAND="%bindir%/%couchdb_command_name% -k"
+INTERACTIVE=false
 KILL=false
-SHUTDOWN=false
+LOCAL_CONFIG_DIR=%localconfdir%/local.d
+LOCAL_CONFIG_FILE=%localconfdir%/local.ini
+PID_FILE=%localstatedir%/run/couchdb/couchdb.pid
 RECURSED=false
 RESET_CONFIG=true
-
 RESPAWN_TIMEOUT=0
-
-DEFAULT_INI_FILE=%localconfdir%/%defaultini%
-LOCAL_INI_FILE=%localconfdir%/%localini%
-
-PID_FILE=%localstatedir%/run/couchdb/couchdb.pid
-
-STDOUT_FILE=couchdb.stdout
+SCRIPT_ERROR=1
+SCRIPT_OK=0
+SHUTDOWN=false
 STDERR_FILE=couchdb.stderr
+STDOUT_FILE=couchdb.stdout
 
-HEART_COMMAND="%bindir%/%couchdb_command_name% -k"
-HEART_BEAT_TIMEOUT=11
+print_arguments=""
+start_arguments=""
+background_start_arguments=""
 
 basename=`basename $0`
 
@@ -70,8 +70,9 @@ Options:
 
   -h          display a short help message and exit
   -V          display version information and exit
-  -c FILE     use configuration FILE (chainable, resets system default)
-  -C FILE     use configuration FILE (chainable, does not reset system default)
+  -a FILE     add configuration FILE to chain
+  -n          reset configuration file chain (including system default)
+  -c          print configuration file chain and exit
   -i          use the interactive Erlang shell
   -b          spawn as a background process
   -p FILE     set the background PID FILE (overrides system default)
@@ -92,7 +93,7 @@ display_error () {
     fi
     echo >&2
     echo "Try \`"$basename" -h' for more information." >&2
-    exit $SCRIPT_ERROR
+    false
 }
 
 _get_pid () {
@@ -100,6 +101,48 @@ _get_pid () {
         PID=`cat $PID_FILE`
     fi
     echo $PID
+}
+
+_add_config_file () {
+    if test -n "$start_arguments"; then
+        start_arguments="$start_arguments, ";
+    fi
+    if test -z "$print_arguments"; then
+        print_arguments="$1"
+    else
+        print_arguments="`cat <<EOF
+$print_arguments
+$1
+EOF
+`"
+    fi
+    start_arguments="$start_arguments \\\"$1\\\""
+    background_start_arguments="$background_start_arguments -c \\\"$1\\\""
+}
+
+_add_config_dir () {
+    for file in `find "$1" -mindepth 1`; do
+        _add_config_file $file
+    done
+}
+
+_load_config () {
+    _add_config_file "$DEFAULT_CONFIG_FILE"
+    _add_config_dir "$DEFAULT_CONFIG_DIR"
+    _add_config_file "$LOCAL_CONFIG_FILE"
+    _add_config_dir "$LOCAL_CONFIG_DIR"
+}
+
+_reset_config () {
+    print_arguments=""
+    start_arguments=""
+    background_start_arguments=""
+}
+
+_print_config () {
+    cat <<EOF
+$print_arguments
+EOF
 }
 
 check_status () {
@@ -129,35 +172,35 @@ check_environment () {
     message_prefix="Apache CouchDB needs write permission on the"
     if test ! -w $PID_FILE; then
         echo "$message_prefix PID file: $PID_FILE" >&2
-        exit $SCRIPT_ERROR
+        false
     fi
     if test ! -w $STDOUT_FILE; then
         echo "$message_prefix STDOUT file: $STDOUT_FILE" >&2
-        exit $SCRIPT_ERROR
+        false
     fi
     if test ! -w $STDERR_FILE; then
         echo "$message_prefix STDERR file: $STDERR_FILE" >&2
-        exit $SCRIPT_ERROR
+        false
     fi
     message_prefix="Apache CouchDB needs a regular"
     if test `echo 2> /dev/null >> $PID_FILE; echo $?` -gt 0; then
         echo "$message_prefix PID file: $PID_FILE" >&2
-        exit $SCRIPT_ERROR
+        false
     fi
     if test `echo 2> /dev/null >> $STDOUT_FILE; echo $?` -gt 0; then
         echo "$message_prefix STDOUT file: $STDOUT_FILE" >&2
-        exit $SCRIPT_ERROR
+        false
     fi
     if test `echo 2> /dev/null >> $STDERR_FILE; echo $?` -gt 0; then
         echo "$message_prefix STDERR file: $STDERR_FILE" >&2
-        exit $SCRIPT_ERROR
+        false
     fi
 }
 
 start_couchdb () {
     if test ! "$RECURSED" = "true"; then
         if check_status 2> /dev/null; then
-            exit $SCRIPT_OK
+            exit
         fi
         check_environment
     fi
@@ -169,22 +212,6 @@ start_couchdb () {
         touch $PID_FILE
         interactive_option="+Bd -noinput"
     fi
-    if test -n "$INI_FILES"; then
-        if test "$RESET_CONFIG" = "true"; then
-            ini_files="$INI_FILES"
-        else
-            ini_files="$DEFAULT_INI_FILE $INI_FILES"
-        fi
-    else
-        ini_files="$DEFAULT_INI_FILE $LOCAL_INI_FILE"
-    fi
-    for file in $ini_files; do
-        if test -n "$start_arguments"; then
-            start_arguments="$start_arguments, ";
-        fi
-        start_arguments="$start_arguments \\\"$file\\\""
-        background_start_arguments="$background_start_arguments -c \\\"$file\\\""
-    done
     command="`%ICU_CONFIG% --invoke` \
         %ERL% $interactive_option -smp auto -sasl errlog_type error +K true \
         -pa %localerlanglibdir%/%couchdbebindir% \
@@ -196,8 +223,7 @@ start_couchdb () {
         -eval \"crypto:start()\" \
         -eval \"ibrowse:start()\" \
         -eval \"couch_server:start([$start_arguments]), receive done -> done end.\" "
-    if test "$BACKGROUND" = "true" \
-        -a "$RECURSED" = "false"; then
+    if test "$BACKGROUND" = "true" -a "$RECURSED" = "false"; then
         $0 $background_start_arguments -b -r $RESPAWN_TIMEOUT -p $PID_FILE \
             -o $STDOUT_FILE -e $STDERR_FILE -R &
         echo "Apache CouchDB has started, time to relax."
@@ -263,8 +289,9 @@ stop_couchdb () {
 }
 
 parse_script_option_list () {
+    _load_config
     set +e
-    options=`getopt hVc:C:ibp:r:Ro:e:skd $@`
+    options=`getopt hVa:ncibp:r:Ro:e:skd $@`
     if test ! $? -eq 0; then
         display_error
     fi
@@ -272,10 +299,11 @@ parse_script_option_list () {
     eval set -- $options
     while [ $# -gt 0 ]; do
         case "$1" in
-            -h) shift; display_help; exit $SCRIPT_OK;;
-            -V) shift; display_version; exit $SCRIPT_OK;;
-            -c) shift; INI_FILES="$INI_FILES $1"; shift;;
-            -C) shift; RESET_CONFIG=false; INI_FILES="$INI_FILES $1"; shift;;
+            -h) shift; display_help; exit;;
+            -V) shift; display_version; exit;;
+            -a) shift; _add_config_file "$1"; shift;;
+            -n) shift; _reset_config;;
+            -c) shift; _print_config; exit;;
             -i) shift; INTERACTIVE=true;;
             -b) shift; BACKGROUND=true;;
             -r) shift; RESPAWN_TIMEOUT=$1; shift;;
@@ -283,7 +311,7 @@ parse_script_option_list () {
             -p) shift; PID_FILE=$1; shift;;
             -o) shift; STDOUT_FILE=$1; shift;;
             -e) shift; STDERR_FILE=$1; shift;;
-            -s) shift; check_status; exit $SCRIPT_OK;;
+            -s) shift; check_status; exit;;
             -k) shift; KILL=true;;
             -d) shift; SHUTDOWN=true;;
             --) shift; break;;

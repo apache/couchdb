@@ -52,7 +52,6 @@ _restart = {couch_httpd_misc_handlers, handle_restart_req}
 _stats = {couch_httpd_stats_handlers, handle_stats_req}
 
 [httpd_db_handlers]
-_compact = {couch_httpd_db, handle_compact_req}
 _design = {couch_httpd_db, handle_design_req}
 _temp_view = {couch_httpd_view, handle_temp_view_req}
 
