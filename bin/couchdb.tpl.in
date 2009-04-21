@@ -14,13 +14,13 @@
 
 BACKGROUND=false
 DEFAULT_CONFIG_DIR=%localconfdir%/default.d
-DEFAULT_CONFIG_FILE=%localconfdir%/default.ini
+DEFAULT_CONFIG_FILE=%localconfdir%/%defaultini%
 HEART_BEAT_TIMEOUT=11
 HEART_COMMAND="%bindir%/%couchdb_command_name% -k"
 INTERACTIVE=false
 KILL=false
 LOCAL_CONFIG_DIR=%localconfdir%/local.d
-LOCAL_CONFIG_FILE=%localconfdir%/local.ini
+LOCAL_CONFIG_FILE=%localconfdir%/%localini%
 PID_FILE=%localstatedir%/run/couchdb/couchdb.pid
 RECURSED=false
 RESET_CONFIG=true
