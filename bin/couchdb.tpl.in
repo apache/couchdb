@@ -122,7 +122,7 @@ EOF
 }
 
 _add_config_dir () {
-    for file in `find "$1" -mindepth 1 -type f`; do
+    for file in `find "$1" -mindepth 1 -maxdepth 1 -type f`; do
         _add_config_file $file
     done
 }
