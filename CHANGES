@@ -8,6 +8,8 @@ This version has not been released yet.
 
 Build and System Integration:
 
+ * Changed `couchdb` script configuration options.
+ * Added default.d and local.d configuration directories to load sequence.
  * Updated ownership and permission advice in `README` for better security.
  * The SysV/BSD daemon script now creates the PID directory on each invokation
    because PREFIX/var/run might be a temporary filesystem.
