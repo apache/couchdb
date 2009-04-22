@@ -146,18 +146,22 @@
 -record(view_query_args, {
     start_key = nil,
     end_key = {},
-    limit = 10000000000, % a huge huge default number. Picked so we don't have
-                         % to do different logic for when there is no limit
-    stale = false,
-    direction = fwd,
     start_docid = nil,
     end_docid = {},
-    skip = 0,
-    group_level = 0,
-    reduce = true,
-    req_reduce = false,
+
+    direction = fwd,
     inclusive_end=true, % aka a closed-interval
-    include_docs = false
+
+    limit = 10000000000, % Huge number to simplify logic
+    skip = 0,
+
+    group_level = 0,
+
+    view_type = nil,
+    include_docs = false,
+    stale = false,
+    multi_get = false,
+    ignore = false
 }).
 
 -record(view_fold_helper_funs, {

@@ -42,7 +42,7 @@ couchTests.view_offsets = function(debug) {
   db.bulkSave(docs);
 
   var check = function(startkey, offset) {
-    var opts = {startkey: startkey, descending: true, reduce: false};
+    var opts = {startkey: startkey, descending: true};
     T(db.view("test/offset", opts).offset == offset);
   };
 
@@ -90,7 +90,7 @@ couchTests.view_offsets = function(debug) {
 
     var res = db.view("test/offset", { 
       startkey: ["b",4], startkey_docid: "b4", endkey: ["b"], 
-      limit: 2, descending: true, skip: 1, reduce: false
+      limit: 2, descending: true, skip: 1
     })
 
     return res.offset == 4;

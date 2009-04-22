@@ -15,8 +15,9 @@
 
 -export([handle_view_req/2,handle_temp_view_req/2]).
 
--export([parse_view_query/1,parse_view_query/2,parse_view_query/4,make_view_fold_fun/6,
-    finish_view_fold/3, view_row_obj/3, view_group_etag/1, view_group_etag/2, make_reduce_fold_funs/5]).
+-export([get_stale_type/1, get_reduce_type/1, parse_view_params/4]).
+-export([make_view_fold_fun/6, finish_view_fold/3, view_row_obj/3]).
+-export([view_group_etag/1, view_group_etag/2, make_reduce_fold_funs/5]).
 
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,send_chunk/2,
@@ -24,23 +25,23 @@
     send_chunked_error/2]).
 
 design_doc_view(Req, Db, Id, ViewName, Keys) ->
-    #view_query_args{
-        stale = Stale,
-        reduce = Reduce
-    } = QueryArgs = parse_view_query(Req, Keys),
     DesignId = <<"_design/", Id/binary>>,
+    Stale = get_stale_type(Req),
+    Reduce = get_reduce_type(Req),
     Result = case couch_view:get_map_view(Db, DesignId, ViewName, Stale) of
     {ok, View, Group} ->
+        QueryArgs = parse_view_params(Req, Keys, map, strict),
         output_map_view(Req, View, Group, Db, QueryArgs, Keys);
     {not_found, Reason} ->
         case couch_view:get_reduce_view(Db, DesignId, ViewName, Stale) of
         {ok, ReduceView, Group} ->
-            parse_view_query(Req, Keys, true), % just for validation
             case Reduce of
             false ->
+                QueryArgs = parse_view_params(Req, Keys, red_map, strict),
                 MapView = couch_view:extract_map_view(ReduceView),
                 output_map_view(Req, MapView, Group, Db, QueryArgs, Keys);
             _ ->
+                QueryArgs = parse_view_params(Req, Keys, reduce, strict),
                 output_reduce_view(Req, ReduceView, Group, QueryArgs, Keys)
             end;
         _ ->
@@ -76,7 +77,6 @@ handle_view_req(Req, _Db) ->
     send_method_not_allowed(Req, "GET,POST,HEAD").
 
 handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
-    QueryArgs = parse_view_query(Req),
     couch_stats_collector:increment({httpd, temporary_view_reads}),
     case couch_httpd:primary_header_value(Req, "content-type") of
         undefined -> ok;
@@ -90,10 +90,12 @@ handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
     Keys = proplists:get_value(<<"keys">>, Props, nil),
     case proplists:get_value(<<"reduce">>, Props, null) of
     null ->
+        QueryArgs = parse_view_params(Req, Keys, map, strict),
         {ok, View, Group} = couch_view:get_temp_map_view(Db, Language, 
             DesignOptions, MapSrc),
         output_map_view(Req, View, Group, Db, QueryArgs, Keys);
     RedSrc ->
+        QueryArgs = parse_view_params(Req, Keys, reduce, strict),
         {ok, View, Group} = couch_view:get_temp_reduce_view(Db, Language, 
             DesignOptions, MapSrc, RedSrc),
         output_reduce_view(Req, View, Group, QueryArgs, Keys)
@@ -110,7 +112,6 @@ output_map_view(Req, View, Group, Db, QueryArgs, nil) ->
         start_key = StartKey,
         start_docid = StartDocId
     } = QueryArgs,
-    validate_map_query(QueryArgs),
     CurrentEtag = view_group_etag(Group),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() -> 
         {ok, RowCount} = couch_view:get_row_count(View),
@@ -128,7 +129,6 @@ output_map_view(Req, View, Group, Db, QueryArgs, Keys) ->
         skip = SkipCount,
         start_docid = StartDocId
     } = QueryArgs,
-    validate_map_query(QueryArgs),
     CurrentEtag = view_group_etag(Group, Keys),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->     
         {ok, RowCount} = couch_view:get_row_count(View),
@@ -148,13 +148,6 @@ output_map_view(Req, View, Group, Db, QueryArgs, Keys) ->
             end, {ok, FoldAccInit}, Keys),
         finish_view_fold(Req, RowCount, FoldResult)
     end).
-
-validate_map_query(QueryArgs) ->
-    case QueryArgs#view_query_args.group_level of
-    0 -> ok;
-    _ ->
-        throw({query_parse_error, <<"Query parameter \"group\" and/or \"group_level\" are invalid for map views.">>})
-    end.
 
 output_reduce_view(Req, View, Group, QueryArgs, nil) ->
     #view_query_args{
@@ -260,200 +253,178 @@ reverse_key_default(nil) -> {};
 reverse_key_default({}) -> nil;
 reverse_key_default(Key) -> Key.
 
-parse_view_query(Req) ->
-    parse_view_query(Req, nil, nil).
-parse_view_query(Req, Keys) ->
-    parse_view_query(Req, Keys, nil).
-parse_view_query(Req, Keys, IsReduce) ->
-    parse_view_query(Req, Keys, IsReduce, false).
-parse_view_query(Req, Keys, IsReduce, IgnoreExtra) ->
+get_stale_type(Req) ->
     QueryList = couch_httpd:qs(Req),
-    #view_query_args{
-        group_level = GroupLevel
-    } = QueryArgs = lists:foldl(fun({Key,Value}, Args) ->
-        case {Key, Value} of
-        {"", _} ->
-            Args;
-        {"key", Value} ->
-            case Keys of
-            nil ->
-                JsonKey = ?JSON_DECODE(Value),
-                Args#view_query_args{start_key=JsonKey,end_key=JsonKey};
-            _ ->
-                Msg = io_lib:format("Query parameter \"~s\" not compatible with multi key mode.", [Key]),
-                throw({query_parse_error, ?l2b(Msg)})
-            end;
-        {"startkey_docid", DocId} ->
-            Args#view_query_args{start_docid=list_to_binary(DocId)};
-        {"endkey_docid", DocId} ->
-            Args#view_query_args{end_docid=list_to_binary(DocId)};
-        {"startkey", Value} ->
-            case Keys of
-            nil ->
-                Args#view_query_args{start_key=?JSON_DECODE(Value)};
-            _ ->
-                Msg = io_lib:format("Query parameter \"~s\" not compatible with multi key mode.", [Key]),
-                throw({query_parse_error, ?l2b(Msg)})
-            end;
-        {"endkey", Value} ->
-            case Keys of
-            nil ->
-                Args#view_query_args{end_key=?JSON_DECODE(Value)};
-            _ ->
-                Msg = io_lib:format("Query parameter \"~s\" not compatible with multi key mode.", [Key]),
-                throw({query_parse_error, ?l2b(Msg)})
-            end;
-        {"limit", Value} ->
-            case (catch list_to_integer(Value)) of
-            Limit when is_integer(Limit) ->
-                if Limit < 0 ->
-                    Msg = io_lib:format("Limit must be a positive integer: limit=~s", [Value]),
-                    throw({query_parse_error, ?l2b(Msg)});
-                true ->
-                    Args#view_query_args{limit=Limit}
-                end;
-            _Error ->
-                Msg = io_lib:format("Bad URL query value, number expected: limit=~s", [Value]),
-                throw({query_parse_error, ?l2b(Msg)})
-            end;
-        {"count", Value} ->
-            throw({query_parse_error, <<"URL query parameter 'count' has been changed to 'limit'.">>});
-        {"stale", "ok"} ->
-            Args#view_query_args{stale=ok};
-        {"update", "false"} ->
-            throw({query_parse_error, <<"URL query parameter 'update=false' has been changed to 'stale=ok'.">>});
-        {"descending", "true"} ->
-            case Args#view_query_args.direction of
-            fwd ->
-                Args#view_query_args {
-                    direction = rev,
-                    start_key =
-                        reverse_key_default(Args#view_query_args.start_key),
-                    start_docid =
-                        reverse_key_default(Args#view_query_args.start_docid),
-                    end_key =
-                        reverse_key_default(Args#view_query_args.end_key),
-                    end_docid =
-                        reverse_key_default(Args#view_query_args.end_docid)};
-            _ ->
-                Args %already reversed
-            end;
-        {"descending", "false"} ->
-          % The descending=false behaviour is the default behaviour, so we
-          % simpply ignore it. This is only for convenience when playing with
-          % the HTTP API, so that a user doesn't get served an error when
-          % flipping true to false in the descending option.
-          Args;
-        {"skip", Value} ->
-            case (catch list_to_integer(Value)) of
-            Limit when is_integer(Limit) ->
-                Args#view_query_args{skip=Limit};
-            _Error ->
-                Msg = lists:flatten(io_lib:format(
-                "Bad URL query value, number expected: skip=~s", [Value])),
-                throw({query_parse_error, ?l2b(Msg)})
-            end;
-        {"group", Value} ->
-            case Value of
-            "true" ->
-                Args#view_query_args{group_level=exact};
-            "false" ->
-                Args#view_query_args{group_level=0};
-            _ ->
-                Msg = "Bad URL query value for 'group' expected \"true\" or \"false\".",
-                throw({query_parse_error, ?l2b(Msg)})
-            end;
-        {"group_level", LevelStr} ->
-            case Keys of
-            nil ->
-                Args#view_query_args{group_level=list_to_integer(LevelStr)};
-            _ ->
-                Msg = lists:flatten(io_lib:format("Multi-key fetches for a reduce view must include group=true", [])),
-                throw({query_parse_error, ?l2b(Msg)})
-            end;
-        {"inclusive_end", "true"} ->
-            Args#view_query_args{inclusive_end=true};
-        {"inclusive_end", "false"} ->
-            Args#view_query_args{inclusive_end=false};
-        {"reduce", "true"} ->
-            Args#view_query_args{
-                reduce=true,
-                req_reduce=true
-            };
-        {"reduce", "false"} ->
-            Args#view_query_args{
-                reduce=false,
-                req_reduce=true
-            };
-        {"include_docs", Value} ->
-            case Value of
-            "true" ->
-                Args#view_query_args{include_docs=true};
-            "false" ->
-                Args#view_query_args{include_docs=false};
-            _ ->
-                Msg1 = "Bad URL query value for 'include_docs' expected \"true\" or \"false\".",
-                throw({query_parse_error, ?l2b(Msg1)})
-            end;
-        {"format", _} ->
-            % we just ignore format, so that JS can have it
-            Args;
-        _ -> % unknown key
-            case IgnoreExtra of
-            true ->
-                Args;
-            false ->
-                Msg = lists:flatten(io_lib:format(
-                    "Bad URL query key:~s", [Key])),
-                throw({query_parse_error, ?l2b(Msg)})
-            end
-        end
-    end, #view_query_args{}, QueryList),
-    case IsReduce of
-    true ->
-        case QueryArgs#view_query_args.include_docs and QueryArgs#view_query_args.reduce of
-        true ->
-            ErrMsg = <<"Bad URL query key for reduce operation: include_docs">>,
-            throw({query_parse_error, ErrMsg});
-        _ ->
-            ok
-        end;
-    _ ->
-        case QueryArgs#view_query_args.req_reduce of
-        true ->
-            case QueryArgs#view_query_args.reduce of
-            true ->
-                ErrMsg = <<"Bad URL parameter: reduce=true">>,
-                throw({query_parse_error, ErrMsg});
-            _ ->
-                ok
-            end;
-        _ ->
-            ok
-        end
+    case proplists:get_value("stale", QueryList, nil) of
+        "ok" -> ok;
+        Else -> Else
+    end.
+
+get_reduce_type(Req) ->
+    QueryList = couch_httpd:qs(Req),
+    case proplists:get_value("reduce", QueryList, true) of
+        "false" -> false;
+        _ -> true
+    end.
+
+parse_view_params(Req, Keys, ViewType, IgnoreType) ->
+    QueryList = couch_httpd:qs(Req),
+    QueryParams = 
+    lists:foldl(fun({K, V}, Acc) ->
+            parse_view_param(K, V) ++ Acc
+        end, [], QueryList),
+    IsMultiGet = case Keys of
+        nil -> false;
+        _ -> true
     end,
-    case Keys of
-    nil ->
-        QueryArgs;
-    _ ->
-        case IsReduce of
-        nil ->
+    Args = #view_query_args{
+        view_type=ViewType,
+        multi_get=IsMultiGet,
+        ignore=IgnoreType
+    },
+    QueryArgs = lists:foldl(fun({K, V}, Args2) ->
+        validate_view_query(K, V, Args2)
+    end, Args, lists:reverse(QueryParams)), % Reverse to match QS order.
+
+    GroupLevel = QueryArgs#view_query_args.group_level,
+    case {ViewType, GroupLevel, IsMultiGet} of
+        {reduce, exact, true} ->
             QueryArgs;
+        {reduce, _, false} ->
+            QueryArgs;
+        {reduce, _, _} ->
+            Msg = <<"Multi-key fetchs for reduce "
+                    "view must include `group=true`">>,
+            throw({query_parse_error, Msg});
         _ ->
-            case GroupLevel of
-            exact ->
-                QueryArgs;
-            _ ->
-                #view_query_args{reduce=OptReduce} = QueryArgs,
-                case OptReduce of
-                true ->
-                    Msg = <<"Multi-key fetches for a reduce view must include group=true">>,
-                    throw({query_parse_error, Msg});
-                _ -> 
-                    QueryArgs
-                end
-            end
-        end
+            QueryArgs
+    end,
+    QueryArgs.
+
+parse_view_param("", _) ->
+    [];
+parse_view_param("key", Value) ->
+    JsonKey = ?JSON_DECODE(Value),
+    [{start_key, JsonKey}, {end_key, JsonKey}];
+parse_view_param("startkey_docid", Value) ->
+    [{start_docid, ?l2b(Value)}];
+parse_view_param("endkey_docid", Value) ->
+    [{end_docid, ?l2b(Value)}];
+parse_view_param("startkey", Value) ->
+    [{start_key, ?JSON_DECODE(Value)}];
+parse_view_param("endkey", Value) ->
+    [{end_key, ?JSON_DECODE(Value)}];
+parse_view_param("limit", Value) ->
+    [{limit, parse_positive_int_param(Value)}];
+parse_view_param("count", _Value) ->
+    throw({query_parse_error, <<"Query parameter 'count' is now 'limit'.">>});
+parse_view_param("stale", "ok") ->
+    [{stale, ok}];
+parse_view_param("stale", _Value) ->
+    throw({query_parse_error, <<"stale only available as stale=ok">>});
+parse_view_param("update", _Value) ->
+    throw({query_parse_error, <<"update=false is now stale=ok">>});
+parse_view_param("descending", Value) ->
+    [{descending, parse_bool_param(Value)}];
+parse_view_param("skip", Value) ->
+    [{skip, parse_int_param(Value)}];
+parse_view_param("group", Value) ->
+    case parse_bool_param(Value) of
+        true -> [{group_level, exact}];
+        false -> [{group_level, 0}]
+    end;
+parse_view_param("group_level", Value) ->
+    [{group_level, parse_positive_int_param(Value)}];
+parse_view_param("inclusive_end", Value) ->
+    [{inclusive_end, parse_bool_param(Value)}];
+parse_view_param("reduce", Value) ->
+    [{reduce, parse_bool_param(Value)}];
+parse_view_param("include_docs", Value) ->
+    [{include_docs, parse_bool_param(Value)}];
+parse_view_param(Key, Value) ->
+    [{extra, {Key, Value}}].
+
+validate_view_query(start_key, Value, Args) ->
+    case Args#view_query_args.multi_get of
+        true ->
+            Msg = <<"Query parameter `start_key` is "
+                    "not compatiible with multi-get">>,
+            throw({query_parse_error, Msg});
+        _ ->
+            Args#view_query_args{start_key=Value}
+    end;
+validate_view_query(start_docid, Value, Args) ->
+    Args#view_query_args{start_docid=Value};
+validate_view_query(end_key, Value, Args) ->
+    case Args#view_query_args.multi_get of
+        true->
+            Msg = <<"Query paramter `end_key` is "
+                    "not compatibile with multi-get">>,
+            throw({query_parse_error, Msg});
+        _ ->
+            Args#view_query_args{end_key=Value}
+    end;
+validate_view_query(end_docid, Value, Args) ->
+    Args#view_query_args{end_docid=Value};
+validate_view_query(limit, Value, Args) ->
+    Args#view_query_args{limit=Value};
+validate_view_query(stale, _, Args) ->
+    Args;
+validate_view_query(descending, true, Args) ->
+    case Args#view_query_args.direction of
+        rev -> Args; % Already reversed
+        fwd ->
+            Args#view_query_args{
+                direction = rev,
+                start_key =
+                    reverse_key_default(Args#view_query_args.start_key),
+                start_docid =
+                    reverse_key_default(Args#view_query_args.start_docid),
+                end_key =
+                    reverse_key_default(Args#view_query_args.end_key),
+                end_docid =
+                    reverse_key_default(Args#view_query_args.end_docid)
+            }
+    end;
+validate_view_query(descending, false, Args) ->
+    Args; % Ignore default condition
+validate_view_query(skip, Value, Args) ->
+    Args#view_query_args{skip=Value};
+validate_view_query(group_level, Value, Args) ->
+    case Args#view_query_args.view_type of
+        reduce ->
+            Args#view_query_args{group_level=Value};
+        _ ->
+            Msg = <<"Invalid URL parameter 'group' or "
+                    " 'group_level' for non-reduce view.">>,
+            throw({query_parse_error, Msg})
+    end;
+validate_view_query(inclusive_end, Value, Args) ->
+    Args#view_query_args{inclusive_end=Value};
+validate_view_query(reduce, _, Args) ->
+    case Args#view_query_args.view_type of
+        map ->
+            Msg = <<"Invalid URL parameter `reduce` for map view.">>,
+            throw({query_parse_error, Msg});
+        _ ->
+            Args
+    end;
+validate_view_query(include_docs, _Value, Args) ->
+    case Args#view_query_args.view_type of
+        reduce ->
+            Msg = <<"Query paramter `include_docs` "
+                    "is invalid for reduce views.">>,
+            throw({query_parse_error, Msg});
+        _ ->
+            Args#view_query_args{include_docs=true}
+    end;
+validate_view_query(extra, {Key, _}, Args) ->
+    case Args#view_query_args.ignore of
+        strict ->
+            Msg = io_lib:format("Invalid URL parameter: ~p", [Key]),
+            throw({query_parse_error, ?l2b(Msg)});
+        _ ->
+            Args
     end.
 
 make_view_fold_fun(Req, QueryArgs, Etag, Db,
@@ -680,3 +651,29 @@ finish_reduce_fold(Req, Resp) ->
         send_chunk(Resp, "\r\n]}"),
         end_json_response(Resp)
     end.
+
+parse_bool_param("true") -> true;
+parse_bool_param("false") -> false;
+parse_bool_param(Val) ->
+    Msg = io_lib:format("Invalid value for boolean paramter: ~p", [Val]),
+    throw({query_parse_error, ?l2b(Msg)}).
+
+parse_int_param(Val) ->
+    case (catch list_to_integer(Val)) of
+    IntVal when is_integer(IntVal) ->
+        IntVal;
+    _ ->
+        Msg = io_lib:format("Invalid value for integer parameter: ~p", [Val]),
+        throw({query_parse_error, ?l2b(Msg)})
+    end.
+
+parse_positive_int_param(Val) ->
+    case parse_int_param(Val) of
+    IntVal when IntVal >= 0 ->
+        IntVal;
+    _ ->
+        Fmt = "Invalid value for positive integer parameter: ~p",
+        Msg = io_lib:format(Fmt, [Val]),
+        throw({query_parse_error, ?l2b(Msg)})
+    end.
+

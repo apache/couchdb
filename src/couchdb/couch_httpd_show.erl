@@ -90,22 +90,26 @@ get_nested_json_value(_NotJSONObj, _) ->
     throw({not_found, json_mismatch}).
 
 send_view_list_response(Lang, ListSrc, ViewName, DesignId, Req, Db, Keys) ->
-    #view_query_args{
-        stale = Stale,
-        reduce = Reduce
-    } = QueryArgs = couch_httpd_view:parse_view_query(Req, nil, nil, true),
+    Stale = couch_httpd_view:get_stale_type(Req),
+    Reduce = couch_httpd_view:get_reduce_type(Req),
     case couch_view:get_map_view(Db, DesignId, ViewName, Stale) of
     {ok, View, Group} ->    
+        QueryArgs = couch_httpd_view:parse_view_params(Req, Keys, map, ignore),
         output_map_list(Req, Lang, ListSrc, View, Group, Db, QueryArgs, Keys);
     {not_found, _Reason} ->
         case couch_view:get_reduce_view(Db, DesignId, ViewName, Stale) of
         {ok, ReduceView, Group} ->
-            couch_httpd_view:parse_view_query(Req, Keys, true, true), % just for validation
             case Reduce of
             false ->
+                QueryArgs = couch_httpd_view:parse_view_params(
+                    Req, Keys, map_red, ignore
+                ),
                 MapView = couch_view:extract_map_view(ReduceView),
                 output_map_list(Req, Lang, ListSrc, MapView, Group, Db, QueryArgs, Keys);
             _ ->
+                QueryArgs = couch_httpd_view:parse_view_params(
+                    Req, Keys, reduce, ignore
+                ),
                 output_reduce_list(Req, Lang, ListSrc, ReduceView, Group, Db, QueryArgs, Keys)
             end;
         {not_found, Reason} ->
