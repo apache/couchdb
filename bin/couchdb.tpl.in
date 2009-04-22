@@ -118,7 +118,7 @@ EOF
 `"
     fi
     start_arguments="$start_arguments \\\"$1\\\""
-    background_start_arguments="$background_start_arguments -c \\\"$1\\\""
+    background_start_arguments="$background_start_arguments -a \\\"$1\\\""
 }
 
 _add_config_dir () {
