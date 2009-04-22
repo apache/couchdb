@@ -250,7 +250,7 @@ db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs_by_seq">>]}=Req, Db) ->
         limit = Limit,
         skip = SkipCount,
         direction = Dir
-    } = QueryArgs = couch_httpd_view:parse_view_query(Req),
+    } = QueryArgs = couch_httpd_view:parse_view_params(Req, nil, map, strict),
 
     {ok, Info} = couch_db:get_db_info(Db),
     CurrentEtag = couch_httpd:make_etag(proplists:get_value(update_seq, Info)),
@@ -365,7 +365,7 @@ all_docs_view(Req, Db, Keys) ->
         limit = Limit,
         skip = SkipCount,
         direction = Dir
-    } = QueryArgs = couch_httpd_view:parse_view_query(Req, Keys),    
+    } = QueryArgs = couch_httpd_view:parse_view_params(Req, Keys, map, strict),
     {ok, Info} = couch_db:get_db_info(Db),
     CurrentEtag = couch_httpd:make_etag(proplists:get_value(update_seq, Info)),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() -> 
