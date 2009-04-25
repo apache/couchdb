@@ -409,7 +409,7 @@ validate_view_query(reduce, _, Args) ->
         _ ->
             Args
     end;
-validate_view_query(include_docs, _Value, Args) ->
+validate_view_query(include_docs, true, Args) ->
     case Args#view_query_args.view_type of
         reduce ->
             Msg = <<"Query paramter `include_docs` "
@@ -418,6 +418,8 @@ validate_view_query(include_docs, _Value, Args) ->
         _ ->
             Args#view_query_args{include_docs=true}
     end;
+validate_view_query(include_docs, _Value, Args) ->
+    Args;
 validate_view_query(extra, {Key, _}, Args) ->
     case Args#view_query_args.ignore of
         strict ->
