@@ -79,6 +79,11 @@ couchTests.view_include_docs = function(debug) {
   resp = db.view('test/summate', {reduce: false, include_docs: true});
   T(resp.rows.length == 100);
 
+  // Not an error with include_docs=false&reduce=true
+  resp = db.view('test/summate', {reduce: true, include_docs: false});
+  T(resp.rows.length == 1);
+  T(resp.rows[0].value == 4950);
+
   // Check emitted _rev controls things
   resp = db.allDocs({include_docs: true}, ["0"]);
   var before = resp.rows[0].doc;
