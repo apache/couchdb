@@ -691,11 +691,11 @@ terminate(Reason, _Db) ->
 handle_call({open_ref_count, OpenerPid}, _, #db{fd_ref_counter=RefCntr}=Db) ->
     ok = couch_ref_counter:add(RefCntr, OpenerPid),
     {reply, {ok, Db}, Db};
-handle_call(is_idle, _From,
-        #db{fd_ref_counter=RefCntr, compactor_pid=Compact}=Db) ->
+handle_call(is_idle, _From, #db{fd_ref_counter=RefCntr, compactor_pid=Compact, 
+            waiting_delayed_commit=Delay}=Db) ->
     % Idle means no referrers. Unless in the middle of a compaction file switch, 
     % there are always at least 2 referrers, couch_db_updater and us.
-    {reply, (Compact == nil) and (couch_ref_counter:count(RefCntr) == 2), Db};
+    {reply, (Delay == nil) and (Compact == nil) and (couch_ref_counter:count(RefCntr) == 2), Db};
 handle_call({db_updated, #db{fd_ref_counter=NewRefCntr}=NewDb}, _From,
         #db{fd_ref_counter=OldRefCntr}) ->
     case NewRefCntr == OldRefCntr of
