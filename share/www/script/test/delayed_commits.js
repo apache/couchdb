@@ -90,4 +90,26 @@ couchTests.delayed_commits = function(debug) {
   
   T(db.open("4") != null);
   
+  // Now test that when we exceed the max_dbs_open, pending commits are safely
+  // written.
+  T(db.save({_id:"5",foo:"bar"}).ok);
+  var max = 2;
+  run_on_modified_server(
+    [{section: "couchdb",
+      key: "max_dbs_open",
+      value: max.toString()}],
+
+    function () {
+      for(var i=0; i<max; i++) {
+        var dbi = new CouchDB("test_suite_db" + i);
+        dbi.deleteDb();
+        dbi.createDb();
+      }
+      T(db.open("5").foo=="bar");
+      for(var i=0; i<max+1; i++) {
+        var dbi = new CouchDB("test_suite_db" + i);
+        dbi.deleteDb();
+      }
+    });
+  
 };
