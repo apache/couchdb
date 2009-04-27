@@ -497,6 +497,7 @@ db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
     end;
 
 db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
+    couch_doc:validate_docid(DocId),
     case couch_httpd:header_value(Req, "content-type") of
     "multipart/form-data" ++  _Rest ->
         ok;
@@ -525,6 +526,7 @@ db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
     ]});
 
 db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
+    couch_doc:validate_docid(DocId),
     Location = absolute_uri(Req, "/" ++ ?b2l(Db#db.name) ++ "/" ++ ?b2l(DocId)),
     update_doc(Req, Db, DocId, couch_httpd:json_body(Req),
       [{"Location", Location}]);
