@@ -29,6 +29,16 @@ couchTests.invalid_docids = function(debug) {
       T(e.error == "bad_request");
   }
 
+  // Via PUT with _id not in body.
+  var res = res = db.request("PUT", "/test_suite_db/_other", {"body": "{}"});
+  T(res.status == 400);
+  T(JSON.parse(res.responseText).error == "bad_request");
+
+  // Accidental POST to form handling code.
+  res = db.request("POST", "/test_suite_db/_tmp_view", {"body": "{}"});
+  T(res.status == 400);
+  T(JSON.parse(res.responseText).error == "bad_request");
+
   // Test invalid _prefix
   try {
     db.save({"_id": "_invalid"});

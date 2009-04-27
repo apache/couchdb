@@ -15,6 +15,7 @@
 -export([to_doc_info/1,to_doc_info_path/1,parse_rev/1,parse_revs/1,rev_to_str/1,rev_to_strs/1]).
 -export([bin_foldl/3,bin_size/1,bin_to_binary/1,get_validate_doc_fun/1]).
 -export([from_json_obj/1,to_json_obj/2,has_stubs/1, merge_stubs/2]).
+-export([validate_docid/1]).
 
 -include("couch_db.hrl").
 
@@ -143,23 +144,26 @@ parse_revs([Rev | Rest]) ->
     [parse_rev(Rev) | parse_revs(Rest)].
 
 
-transfer_fields([], #doc{body=Fields}=Doc) ->
-    % convert fields back to json object
-    Doc#doc{body={lists:reverse(Fields)}};
-    
-transfer_fields([{<<"_id">>, Id} | Rest], Doc) when is_binary(Id) ->
+validate_docid(Id) when is_binary(Id) ->
     case Id of
     <<"_design/", _/binary>> -> ok;
     <<"_local/", _/binary>> -> ok;
     <<"_", _/binary>> ->
         throw({bad_request, <<"Only reserved document ids may start with underscore.">>});
     _Else -> ok
-    end,
-    transfer_fields(Rest, Doc#doc{id=Id});
-    
-transfer_fields([{<<"_id">>, Id} | _Rest], _Doc) ->
+    end;
+validate_docid(Id) ->
     ?LOG_DEBUG("Document id is not a string: ~p", [Id]),
-    throw({bad_request, <<"Document id must be a string">>});
+    throw({bad_request, <<"Document id must be a string">>}).
+
+transfer_fields([], #doc{body=Fields}=Doc) ->
+    % convert fields back to json object
+    Doc#doc{body={lists:reverse(Fields)}};
+    
+transfer_fields([{<<"_id">>, Id} | Rest], Doc) ->
+    io:format("Transfering docid! ~p~n", [Id]),
+    validate_docid(Id),
+    transfer_fields(Rest, Doc#doc{id=Id});
     
 transfer_fields([{<<"_rev">>, Rev} | Rest], #doc{revs={0, []}}=Doc) ->
     {Pos, RevId} = parse_rev(Rev),
