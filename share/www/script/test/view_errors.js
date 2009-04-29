@@ -50,6 +50,15 @@ couchTests.view_errors = function(debug) {
   });
   T(JSON.parse(xhr.responseText).error == "invalid_json");
   
+  // views should ignore Content-Type, like the rest of CouchDB
+  var xhr = CouchDB.request("POST", "/test_suite_db/_temp_view", {
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: JSON.stringify({language: "javascript", 
+      map : "function(doc){}"
+    })
+  });
+  T(xhr.status == 200);
+  
   var map = function (doc) {emit(doc.integer, doc.integer);};
   
   try {
