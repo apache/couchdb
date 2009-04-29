@@ -78,11 +78,6 @@ handle_view_req(Req, _Db) ->
 
 handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
     couch_stats_collector:increment({httpd, temporary_view_reads}),
-    case couch_httpd:primary_header_value(Req, "content-type") of
-        undefined -> ok;
-        "application/json" -> ok;
-        Else -> throw({incorrect_mime_type, Else})
-    end,
     {Props} = couch_httpd:json_body(Req),
     Language = proplists:get_value(<<"language">>, Props, <<"javascript">>),
     {DesignOptions} = proplists:get_value(<<"options">>, Props, {[]}),
