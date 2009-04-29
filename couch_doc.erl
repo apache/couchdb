@@ -161,7 +161,6 @@ transfer_fields([], #doc{body=Fields}=Doc) ->
     Doc#doc{body={lists:reverse(Fields)}};
     
 transfer_fields([{<<"_id">>, Id} | Rest], Doc) ->
-    io:format("Transfering docid! ~p~n", [Id]),
     validate_docid(Id),
     transfer_fields(Rest, Doc#doc{id=Id});
     
