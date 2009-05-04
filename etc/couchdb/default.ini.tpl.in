@@ -26,6 +26,9 @@ level = info
 [query_servers]
 javascript = %bindir%/%couchjs_command_name% %localdatadir%/server/main.js
 
+; Changing reduce_limit to false will disable reduce_limit.
+; If you think you're hitting reduce_limit with a "good" reduce function,
+; please let us know on the mailing list so we can fine tune the heuristic.
 [query_server_config]
 reduce_limit = true
 
