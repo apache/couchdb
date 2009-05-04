@@ -624,10 +624,12 @@ make_writer_fun(Stream) ->
             {ok, {FinalLen, SpFin}};
         ({Length, Bin}, {Total, nil}) ->
             % save StreamPointer 
+            ok = couch_stream:set_min_buffer(Stream, Length),
             {ok, StreamPointer} = couch_stream:write(Stream, Bin),
             {Total+Length, StreamPointer};
         ({Length, Bin}, {Total, SpAcc}) ->
             % write the Bin to disk 
+            ok = couch_stream:set_min_buffer(Stream, Length),
             {ok, _Sp} = couch_stream:write(Stream, Bin),
             {Total+Length, SpAcc}
     end.
