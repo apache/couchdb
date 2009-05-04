@@ -117,8 +117,14 @@ couchTests.attachments= function(debug) {
   var xhr = CouchDB.request("DELETE", "/test_suite_db/bin_doc3/attachment.txt?rev=" + rev);
   T(xhr.status == 200);
   
-  var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc3/attachment.txt?rev=" + rev);
+  var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc3/attachment.txt");
   T(xhr.status == 404);
+
+  // deleted attachment is still accessible with revision
+  var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc3/attachment.txt?rev=" + rev);
+  T(xhr.status == 200);
+  T(xhr.responseText == bin_data);
+  T(xhr.getResponseHeader("Content-Type") == "text/plain;charset=utf-8");
 
   // empty attachments
   var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc4/attachment.txt", {
