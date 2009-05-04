@@ -41,6 +41,8 @@ CLEANFILES = $(compiled_files) $(doc_base)
 
 source_files = \
     couch_btree.erl \
+    couch_batch_save.erl \
+    couch_batch_save_sup.erl \
     couch_config.erl \
     couch_config_writer.erl \
     couch_db.erl \
@@ -83,6 +85,8 @@ EXTRA_DIST = $(source_files) couch_db.hrl couch_stats.hrl
 compiled_files = \
     couch.app \
     couch_btree.beam \
+    couch_batch_save.beam \
+    couch_batch_save_sup.beam \
     couch_config.beam \
     couch_config_writer.beam \
     couch_db.beam \

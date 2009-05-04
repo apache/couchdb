@@ -10,6 +10,8 @@ max_document_size = 4294967296 ; 4 GB
 max_attachment_chunk_size = 4294967296 ; 4GB
 os_process_timeout = 5000 ; 5 seconds. for view and external servers.
 max_dbs_open = 100
+batch_save_size = 1000 ; number of docs at which to save a batch
+batch_save_interval = 1000 ; milliseconds after which to save batches
 
 [httpd]
 port = 5984
@@ -33,6 +35,7 @@ javascript = %bindir%/%couchjs_command_name% %localdatadir%/server/main.js
 view_manager={couch_view, start_link, []}
 external_manager={couch_external_manager, start_link, []}
 db_update_notifier={couch_db_update_notifier_sup, start_link, []}
+batch_save={couch_batch_save_sup, start_link, []}
 query_servers={couch_query_servers, start_link, []}
 httpd={couch_httpd, start_link, []}
 stats_aggregator={couch_stats_aggregator, start, []}
