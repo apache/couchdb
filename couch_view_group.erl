@@ -42,9 +42,9 @@ request_group(Pid, Seq) ->
     {ok, Group, RefCounter} ->
         couch_ref_counter:add(RefCounter),
         {ok, Group};
-    Else ->
-        ?LOG_DEBUG("get_updated_group replied with _Else ~p", [Else]),
-        Else
+    Error ->
+        ?LOG_DEBUG("request_group Error ~p", [Error]),
+        throw(Error)
     end.
 
 
@@ -261,6 +261,10 @@ handle_info({'EXIT', FromPid, reset},
 handle_info({'EXIT', _FromPid, normal}, State) ->
     {noreply, State};
     
+handle_info({'EXIT', FromPid, {{nocatch, Reason}, Trace}}, State) ->
+    ?LOG_DEBUG("Uncaught throw() in linked pid: ~p", [{FromPid, Reason}]),
+    {stop, Reason, State};
+
 handle_info({'EXIT', FromPid, Reason}, State) ->
     ?LOG_DEBUG("Exit from linked pid: ~p", [{FromPid, Reason}]),
     {stop, Reason, State};
