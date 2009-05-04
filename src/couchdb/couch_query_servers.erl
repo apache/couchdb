@@ -85,23 +85,27 @@ rereduce(_Lang, [], _ReducedValues) ->
 rereduce(Lang, RedSrcs, ReducedValues) ->
     Pid = get_os_process(Lang),
     Grouped = group_reductions_results(ReducedValues),
-    Results = lists:zipwith(
+    Results = try lists:zipwith(
         fun(FunSrc, Values) ->
             [true, [Result]] = 
                 couch_os_process:prompt(Pid, [<<"rereduce">>, [FunSrc], Values]),
             Result
-        end, RedSrcs, Grouped),
-        
-    ok = ret_os_process(Lang, Pid),
+        end, RedSrcs, Grouped)
+    after
+        ok = ret_os_process(Lang, Pid)
+    end,
     {ok, Results}.
 
 reduce(_Lang, [], _KVs) ->
     {ok, []};
 reduce(Lang, RedSrcs, KVs) ->
     Pid = get_os_process(Lang),
-    [true, Results] = couch_os_process:prompt(Pid, 
-            [<<"reduce">>, RedSrcs, KVs]),
-    ok = ret_os_process(Lang, Pid),
+    Results = try couch_os_process:prompt(Pid, 
+            [<<"reduce">>, RedSrcs, KVs]) of
+        [true, Reductions] -> Reductions
+    after
+        ok = ret_os_process(Lang, Pid)
+    end,
     {ok, Results}.
 
 validate_doc_update(Lang, FunSrc, EditDoc, DiskDoc, Ctx) ->
@@ -209,7 +213,8 @@ handle_call({get_proc, Lang}, _From, {Langs, PidLangs, Pids, InUse}=Server) ->
         add_value(PidLangs, Pid, Lang),
         rem_from_list(Pids, Lang, Pid),
         add_to_list(InUse, Lang, Pid),
-        true = couch_os_process:prompt(Pid, [<<"reset">>]),
+        QueryConfig = get_query_server_config(),
+        true = couch_os_process:prompt(Pid, [<<"reset">>, QueryConfig]),
         {reply, Pid, Server};
     _ ->
         {ok, Pid} = new_process(Langs, Lang),
@@ -248,6 +253,11 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 % Private API
+
+get_query_server_config() ->
+    ReduceLimit = list_to_atom(
+        couch_config:get("query_server_config","reduce_limit","true")),
+    {[{<<"reduce_limit">>, ReduceLimit}]}.
 
 new_process(Langs, Lang) ->
     Proc =

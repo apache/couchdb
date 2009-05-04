@@ -26,6 +26,9 @@ level = info
 [query_servers]
 javascript = %bindir%/%couchjs_command_name% %localdatadir%/server/main.js
 
+[query_server_config]
+reduce_limit = true
+
 ; enable external as an httpd handler, then link it with commands here.
 ; note, this api is still under consideration.
 ; [external]

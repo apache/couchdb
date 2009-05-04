@@ -16,6 +16,12 @@ couchTests.design_docs = function(debug) {
   db.createDb();
   if (debug) debugger;
 
+  run_on_modified_server(
+    [{section: "query_server_config",
+      key: "reduce_limit",
+      value: "false"}],
+function() {
+
   var numDocs = 500;
 
   function makebigstring(power) {
@@ -104,4 +110,5 @@ couchTests.design_docs = function(debug) {
   restartServer();
   T(db.open(designDoc._id) == null);
   T(db.view("test/no_docs") == null);
+});
 };

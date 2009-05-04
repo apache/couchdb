@@ -28,7 +28,7 @@ try {
 //
 // Responses are json values followed by a new line ("\n")
 
-var cmd, cmdkey;
+var line, cmd, cmdkey;
 
 var dispatch = {
   "reset"      : State.reset,
@@ -43,7 +43,9 @@ var dispatch = {
   "list_tail"  : Render.listTail 
 };
 
-while (cmd = eval(readline())) {
+while (line = eval(readline())) {
+  cmd = eval(line)
+  line_length = line.length
   try {
     cmdkey = cmd.shift();
     if (dispatch[cmdkey]) {

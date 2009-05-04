@@ -75,12 +75,25 @@ couchTests.view_errors = function(debug) {
     _id:"_design/test",
     language: "javascript",
     views: {
-      no_reduce: {map:"function(doc) {emit(doc._id, null);}"},
-      with_reduce: {map:"function (doc) {emit(doc.integer, doc.integer)};",
-                reduce:"function (keys, values) { return sum(values); };"},
+      "no_reduce": {map:"function(doc) {emit(doc._id, null);}"},
+      "with_reduce": {
+        map:"function (doc) {emit(doc.integer, doc.integer)};",
+        reduce:"function (keys, values) { return sum(values); };"}
     }
   };
   T(db.save(designDoc).ok);
+  
+  var designDoc2 = {
+    _id:"_design/testbig",
+    language: "javascript",
+    views: {
+      "reduce_too_big"  : {
+        map:"function (doc) {emit(doc.integer, doc.integer)};",
+        reduce:"function (keys, values) { var chars = []; for (var i=0; i < 1000; i++) {chars.push('wazzap');};return chars; };"}
+    }
+  };
+  T(db.save(designDoc2).ok);
+  
   
   try {
       db.view("test/no_reduce", {group: true});
@@ -117,4 +130,11 @@ couchTests.view_errors = function(debug) {
   result = JSON.parse(xhr.responseText);
   T(result.error == "bad_request");
   T(result.reason == "`keys` member must be a array.");
+
+  // if the reduce grows to fast, throw an overflow error
+  var path = "/test_suite_db/_design/testbig/_view/reduce_too_big";
+  xhr = CouchDB.request("GET", path);
+  T(xhr.status == 500);
+  result = JSON.parse(xhr.responseText);
+  T(result.error == "reduce_overflow_error");
 };

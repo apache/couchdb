@@ -13,12 +13,14 @@
 // globals used by other modules and functions
 var funs = [];        // holds functions used for computation
 var funsrc = [];      // holds function source for debug info
+var query_config = {};
 var State = (function() {
   return {
-    reset : function() {
+    reset : function(config) {
       // clear the globals and run gc
       funs = [];
       funsrc = [];
+      query_config = config;
       gc();
       print("true"); // indicates success
     },

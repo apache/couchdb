@@ -46,7 +46,17 @@ var Views = (function() {
         reductions[i] = null;
       }
     }
-    print("[true," + toJSON(reductions) + "]");
+    var reduce_line = toJSON(reductions);
+    var reduce_length = reduce_line.length;
+    if (query_config && query_config.reduce_limit &&
+          reduce_length > 200 && ((reduce_length * 2) > line.length)) {
+      throw {
+        error:"reduce_overflow_error",
+        reason: "Reduce output must shrink more rapidly. Current output: '"+reduce_line+"'"
+      };
+    } else {
+      print("[true," + reduce_line + "]");
+    }
   };
   
   return {
