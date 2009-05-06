@@ -375,15 +375,9 @@ parse_view_query(Req, Keys, IsReduce, IgnoreExtra) ->
         {"inclusive_end", "false"} ->
             Args#view_query_args{inclusive_end=false};
         {"reduce", "true"} ->
-            Args#view_query_args{
-                reduce=true,
-                req_reduce=true
-            };
+            Args#view_query_args{reduce=true};
         {"reduce", "false"} ->
-            Args#view_query_args{
-                reduce=false,
-                req_reduce=true
-            };
+            Args#view_query_args{reduce=false};
         {"include_docs", Value} ->
             case Value of
             "true" ->
@@ -418,18 +412,7 @@ parse_view_query(Req, Keys, IsReduce, IgnoreExtra) ->
             ok
         end;
     _ ->
-        case QueryArgs#view_query_args.req_reduce of
-        true ->
-            case QueryArgs#view_query_args.reduce of
-            true ->
-                ErrMsg = <<"Bad URL parameter: reduce=true">>,
-                throw({query_parse_error, ErrMsg});
-            _ ->
-                ok
-            end;
-        _ ->
-            ok
-        end
+        ok
     end,
     case Keys of
     nil ->
