@@ -226,34 +226,28 @@ to_doc_info(FullDocInfo) ->
     {DocInfo, _Path} = to_doc_info_path(FullDocInfo),
     DocInfo.
 
-to_doc_info_path(#full_doc_info{id=Id,update_seq=Seq,rev_tree=Tree}) ->
-    LeafRevs = couch_key_tree:get_all_leafs(Tree),
-    SortedLeafRevs =
-    lists:sort(fun({{IsDeletedA, _}, {StartA, [RevIdA|_]}}, {{IsDeletedB, _}, {StartB, [RevIdB|_]}}) ->
-            % sort descending by {not deleted, then Depth, then RevisionId}
-            A = {not IsDeletedA, StartA, RevIdA},
-            B = {not IsDeletedB, StartB, RevIdB},
-            A > B
-        end,
-        LeafRevs),
+max_seq([], Max) ->
+    Max;
+max_seq([#rev_info{seq=Seq}|Rest], Max) ->
+    max_seq(Rest, if Max > Seq -> Max; true -> Seq end).
 
-    [{{IsDeleted, SummaryPointer}, {Start, [RevId|_]}=Path} | Rest] = SortedLeafRevs,
-    {ConflictRevTuples, DeletedConflictRevTuples} =
-        lists:splitwith(fun({{IsDeleted1, _Sp}, _}) ->
-                not IsDeleted1
-            end, Rest),
+to_doc_info_path(#full_doc_info{id=Id,rev_tree=Tree}) ->
+    RevInfosAndPath =
+        [{#rev_info{deleted=Del,body_sp=Bp,seq=Seq,rev={Pos,RevId}}, Path} || 
+            {{Del, Bp, Seq},{Pos, [RevId|_]}=Path} <- 
+            couch_key_tree:get_all_leafs(Tree)],
+    SortedRevInfosAndPath = lists:sort(
+            fun({#rev_info{deleted=DeletedA,rev=RevA}, _PathA}, 
+                {#rev_info{deleted=DeletedB,rev=RevB}, _PathB}) ->
+            % sort descending by {not deleted, rev}
+            {not DeletedA, RevA} > {not DeletedB, RevB}
+        end, RevInfosAndPath),
+    [{_RevInfo, WinPath}|_] = SortedRevInfosAndPath,
+    RevInfos = [RevInfo || {RevInfo, _Path} <- SortedRevInfosAndPath],
+    {#doc_info{id=Id, high_seq=max_seq(RevInfos, 0), revs=RevInfos}, WinPath}.
 
-    ConflictRevs = [{Start1, RevId1}  || {_, {Start1, [RevId1|_]}} <- ConflictRevTuples],
-    DeletedConflictRevs = [{Start1, RevId1}  || {_, {Start1, [RevId1|_]}} <- DeletedConflictRevTuples],
-    DocInfo = #doc_info{
-        id=Id,
-        update_seq=Seq,
-        rev = {Start, RevId},
-        summary_pointer = SummaryPointer,
-        conflict_revs = ConflictRevs,
-        deleted_conflict_revs = DeletedConflictRevs,
-        deleted = IsDeleted},
-    {DocInfo, Path}.
+
+
 
 bin_foldl(Bin, Fun, Acc) when is_binary(Bin) ->
     case Fun(Bin, Acc) of

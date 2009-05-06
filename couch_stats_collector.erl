@@ -24,6 +24,7 @@
 
 -export([start/0, stop/0, get/1, 
         increment/1, decrement/1,
+        track_process_count/1,
         record/2, clear/1,
         all/0, all/1]).
 
@@ -84,6 +85,20 @@ all(Type) ->
     case Type of
         incremental -> ets:tab2list(?HIT_COUNTER_TABLE);
         absolute -> ets:tab2list(?ABSOLUTE_VALUE_COUNTER_TABLE)
+    end.
+
+
+track_process_count(Stat) ->
+    case (catch couch_stats_collector:increment(Stat)) of
+    ok ->
+        Self = self(),
+        spawn(
+            fun() ->
+                erlang:monitor(process, Self),
+                receive {'DOWN', _, _, _, _} -> ok end,
+                couch_stats_collector:decrement(Stat)
+            end);
+     _ -> ok
     end.
 
 

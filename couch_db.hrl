@@ -37,15 +37,20 @@
 -define(LOG_ERROR(Format, Args),
     error_logger:error_report(couch_error, {Format, Args})).
 
+
+-record(rev_info,
+    {
+    rev,
+    seq = 0,
+    deleted = false,
+    body_sp = nil % stream pointer
+    }).
+
 -record(doc_info,
     {
     id = <<"">>,
-    rev = <<"">>,
-    update_seq = 0,
-    summary_pointer = nil,
-    conflict_revs = [],
-    deleted_conflict_revs = [],
-    deleted = false
+    high_seq = 0,
+    revs = [] % rev_info
     }).
 
 -record(full_doc_info,
@@ -98,13 +103,14 @@
 % than filling in new defaults.
 %
 % As long the changes are limited to new header fields (with inline
-% defaults) added to the end of the file, then there is no need to increment
+% defaults) added to the end of the record, then there is no need to increment
 % the disk revision number.
 %
 % if the disk revision is incremented, then new upgrade logic will need to be
 % added to couch_db_updater:init_db.
 
--define(LATEST_DISK_VERSION, 1).
+-define(DISK_VERSION_0_9, 1).
+-define(LATEST_DISK_VERSION, 2).
 
 -record(db_header,
     {disk_version = ?LATEST_DISK_VERSION,  

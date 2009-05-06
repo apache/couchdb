@@ -92,15 +92,16 @@ purge_index(#group{db=Db, views=Views, id_btree=IdBtree}=Group) ->
 
 process_doc(Db, DocInfo, {Docs, #group{sig=Sig,name=GroupId,design_options=DesignOptions}=Group, ViewKVs,
         DocIdViewIdKeys}) ->
-    % This fun computes once for each document        
-    #doc_info{id=DocId, deleted=Deleted} = DocInfo,
+    % This fun computes once for each document
+
+    #doc_info{id=DocId, revs=[#rev_info{deleted=Deleted}|_]} = DocInfo,
     IncludeDesign = proplists:get_value(<<"include_design">>, 
         DesignOptions, false),
     case {IncludeDesign, DocId} of
     {_, GroupId} ->
         % uh oh. this is the design doc with our definitions. See if
         % anything in the definition changed.
-        case couch_db:open_doc(Db, DocInfo, [conflicts, deleted_conflicts]) of
+        case couch_db:open_doc_int(Db, DocInfo, [conflicts, deleted_conflicts]) of
         {ok, Doc} ->
             case couch_view_group:design_doc_to_view_group(Doc) of
             #group{sig=Sig} ->
@@ -124,7 +125,7 @@ process_doc(Db, DocInfo, {Docs, #group{sig=Sig,name=GroupId,design_options=Desig
         if Deleted ->
             {Docs, [{DocId, []} | DocIdViewIdKeys]};
         true ->
-            {ok, Doc} = couch_db:open_doc(Db, DocInfo, 
+            {ok, Doc} = couch_db:open_doc_int(Db, DocInfo, 
                 [conflicts, deleted_conflicts]),
             {[Doc | Docs], DocIdViewIdKeys}
         end,
@@ -135,7 +136,7 @@ process_doc(Db, DocInfo, {Docs, #group{sig=Sig,name=GroupId,design_options=Desig
             {ViewKVs3, DocIdViewIdKeys3} = view_insert_query_results(Docs2, 
                 Results, ViewKVs, DocIdViewIdKeys2),
             {ok, Group2} = write_changes(Group1, ViewKVs3, DocIdViewIdKeys3,
-                DocInfo#doc_info.update_seq),
+                DocInfo#doc_info.high_seq),
             garbage_collect(),
             ViewEmptyKeyValues = [{View, []} || View <- Group2#group.views],
             {[], Group2, ViewEmptyKeyValues, []};
