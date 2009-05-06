@@ -680,7 +680,6 @@ open_doc(Db, DocId, Options) ->
 
 open_doc_revs(#http_db{uri=DbUrl, headers=Headers} = DbS, DocId, Revs0, 
         [latest]) ->
-            io:format("Revs0:~p~n", [Revs0]),
     Revs = couch_doc:rev_to_strs(Revs0),
     BaseUrl = DbUrl ++ url_encode(DocId) ++ "?revs=true&latest=true",
     
