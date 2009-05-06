@@ -60,6 +60,7 @@ loadTest("view_offsets.js");
 loadTest("view_pagination.js");
 loadTest("view_sandboxing.js");
 loadTest("view_xml.js");
+loadTest("changes.js");
 loadTest("replication.js");
 loadTest("etags_head.js");
 loadTest("etags_views.js");

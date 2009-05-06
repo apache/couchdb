@@ -14,7 +14,7 @@
 -include("couch_db.hrl").
 
 -export([handle_request/1, handle_compact_req/2, handle_design_req/2, 
-    db_req/2, couch_doc_open/4]).
+    db_req/2, couch_doc_open/4,handle_changes_req/2]).
 
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
@@ -41,6 +41,72 @@ handle_request(#httpd{path_parts=[DbName|RestParts],method=Method,
         Handler = couch_util:dict_find(SecondPart, DbUrlHandlers, fun db_req/2),
         do_db_req(Req, Handler)
     end.
+
+handle_changes_req(#httpd{method='GET',path_parts=[DbName|_]}=Req, Db) ->
+    StartSeq = list_to_integer(couch_httpd:qs_value(Req, "since", "0")),
+
+    {ok, Resp} = start_json_response(Req, 200),
+    send_chunk(Resp, "{\"results\":[\n"),
+    case couch_httpd:qs_value(Req, "continuous", "false") of
+    "true" ->
+        Self = self(),
+        Notify = couch_db_update_notifier:start_link(
+            fun({_, DbName0}) when DbName0 == DbName ->
+                Self ! db_updated;
+            (_) ->
+                ok
+            end),
+        try
+            keep_sending_changes(Req, Resp, Db, StartSeq, <<"">>)
+        after
+            catch couch_db_update_notifier:stop(Notify),
+            wait_db_updated(0) % clean out any remaining update messages
+        end;
+    "false" ->
+        {ok, {LastSeq, _Prepend}} = 
+                send_changes(Req, Resp, Db, StartSeq, <<"">>),
+        send_chunk(Resp, io_lib:format("\n],\n\"last_seq\":~w}\n", [LastSeq])),
+        send_chunk(Resp, "")
+    end;
+
+handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
+    send_method_not_allowed(Req, "GET,HEAD").
+
+% waits for a db_updated msg, if there are multiple msgs, collects them.
+wait_db_updated(Timeout) ->
+    receive db_updated ->
+        wait_db_updated(0)
+    after Timeout -> ok
+    end.
+
+keep_sending_changes(#httpd{user_ctx=UserCtx,path_parts=[DbName|_]}=Req, Resp, Db, StartSeq, Prepend) ->
+    {ok, {EndSeq, Prepend2}} = send_changes(Req, Resp, Db, StartSeq, Prepend),
+    couch_db:close(Db),
+    wait_db_updated(infinity),
+    {ok, Db2} = couch_db:open(DbName, [{user_ctx, UserCtx}]),
+    keep_sending_changes(Req, Resp, Db2, EndSeq, Prepend2).
+
+send_changes(Req, Resp, Db, StartSeq, Prepend0) ->
+    Style = list_to_existing_atom(
+            couch_httpd:qs_value(Req, "style", "main_only")),
+    couch_db:changes_since(Db, Style, StartSeq, 
+        fun([#doc_info{id=Id, high_seq=Seq}|_]=DocInfos, {_, Prepend}) ->
+            FilterFun =
+            fun(#doc_info{revs=[#rev_info{rev=Rev}|_]}) ->
+                {[{rev, couch_doc:rev_to_str(Rev)}]}
+            end,
+            Results0 = [FilterFun(DocInfo) || DocInfo <- DocInfos],
+            Results = [Result || Result <- Results0, Result /= null],
+            case Results of
+            [] ->
+                {ok, {Seq, Prepend}};
+            _ ->
+                send_chunk(Resp, 
+                    [Prepend, ?JSON_ENCODE({[{seq,Seq}, {id, Id},
+                                              {changes,Results}]})]),
+                {ok, {Seq, <<",\n">>}}
+            end
+        end, {StartSeq, Prepend0}).
 
 handle_compact_req(#httpd{method='POST',path_parts=[DbName,_,Id|_]}=Req, _Db) ->
     ok = couch_view_compactor:start_compact(DbName, Id),
@@ -89,7 +155,7 @@ do_db_req(#httpd{user_ctx=UserCtx,path_parts=[DbName|_]}=Req, Fun) ->
         try
             Fun(Req, Db)
         after
-            couch_db:close(Db)
+            catch couch_db:close(Db)
         end;
     Error ->
         throw(Error)
@@ -258,7 +324,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_all_docs">>]}=Req, Db) ->
 
 db_req(#httpd{path_parts=[_,<<"_all_docs">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "GET,HEAD,POST");
-
+    
 db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs_by_seq">>]}=Req, Db) ->
     #view_query_args{
         start_key = StartKey,
@@ -285,28 +351,29 @@ db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs_by_seq">>]}=Req, Db) ->
             fun(DocInfo, Offset, Acc) ->
                 #doc_info{
                     id=Id,
-                    rev=Rev,
-                    update_seq=UpdateSeq,
-                    deleted=Deleted,
-                    conflict_revs=ConflictRevs,
-                    deleted_conflict_revs=DelConflictRevs
+                    high_seq=Seq,
+                    revs=[#rev_info{rev=Rev,deleted=Deleted} | RestInfo]
                 } = DocInfo,
+                ConflictRevs = couch_doc:rev_to_strs(
+                    [Rev1 || #rev_info{deleted=false, rev=Rev1} <- RestInfo]),
+                DelConflictRevs = couch_doc:rev_to_strs(
+                    [Rev1 || #rev_info{deleted=true, rev=Rev1} <- RestInfo]),
                 Json = {
                     [{<<"rev">>, couch_doc:rev_to_str(Rev)}] ++
                     case ConflictRevs of
-                        []  ->  [];
-                        _   ->  [{<<"conflicts">>, couch_doc:rev_to_strs(ConflictRevs)}]
+                    []  -> [];
+                    _   -> [{<<"conflicts">>, ConflictRevs}]
                     end ++
                     case DelConflictRevs of
-                        []  ->  [];
-                        _   ->  [{<<"deleted_conflicts">>, couch_doc:rev_to_strs(DelConflictRevs)}]
+                    []  ->  [];
+                    _   ->  [{<<"deleted_conflicts">>, DelConflictRevs}]
                     end ++
                     case Deleted of
-                        true -> [{<<"deleted">>, true}];
-                        false -> []
+                    true -> [{<<"deleted">>, true}];
+                    false -> []
                     end
                 },
-                FoldlFun({{UpdateSeq, Id}, Json}, Offset, Acc)
+                FoldlFun({{Seq, Id}, Json}, Offset, Acc)
             end, {Limit, SkipCount, undefined, []}),
         couch_httpd_view:finish_view_fold(Req, TotalRowCount, {ok, FoldResult})
     end);
@@ -412,9 +479,9 @@ all_docs_view(Req, Db, Keys) ->
                 }),
             AdapterFun = fun(#full_doc_info{id=Id}=FullDocInfo, Offset, Acc) ->
                 case couch_doc:to_doc_info(FullDocInfo) of
-                #doc_info{deleted=false, rev=Rev} ->
+                #doc_info{revs=[#rev_info{deleted=false, rev=Rev}|_]} ->
                     FoldlFun({{Id, Id}, {[{rev, couch_doc:rev_to_str(Rev)}]}}, Offset, Acc);
-                #doc_info{deleted=true} ->
+                #doc_info{revs=[#rev_info{deleted=true}|_]} ->
                     {ok, Acc}
                 end
             end,
@@ -436,9 +503,9 @@ all_docs_view(Req, Db, Keys) ->
                 fun(Key, {ok, FoldAcc}) ->
                     DocInfo = (catch couch_db:get_doc_info(Db, Key)),
                     Doc = case DocInfo of
-                    {ok, #doc_info{id=Id, rev=Rev, deleted=false}} = DocInfo ->
+                    {ok, #doc_info{id=Id, revs=[#rev_info{deleted=false, rev=Rev}|_]}} ->
                         {{Id, Id}, {[{rev, couch_doc:rev_to_str(Rev)}]}};
-                    {ok, #doc_info{id=Id, rev=Rev, deleted=true}} = DocInfo ->
+                    {ok, #doc_info{id=Id, revs=[#rev_info{deleted=true, rev=Rev}|_]}} ->
                         {{Id, Id}, {[{rev, couch_doc:rev_to_str(Rev)}, {deleted, true}]}};
                     not_found ->
                         {{Key, error}, not_found};

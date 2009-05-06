@@ -64,6 +64,7 @@ _stats = {couch_httpd_stats_handlers, handle_stats_req}
 _compact = {couch_httpd_db, handle_compact_req}
 _design = {couch_httpd_db, handle_design_req}
 _temp_view = {couch_httpd_view, handle_temp_view_req}
+_changes = {couch_httpd_db, handle_changes_req}
 
 ; The external module takes an optional argument allowing you to narrow it to a
 ; single script. Otherwise the script name is inferred from the first path section 

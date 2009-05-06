@@ -319,16 +319,19 @@ CouchDB.replicate = function(source, target, rep_options) {
   return JSON.parse(CouchDB.last_req.responseText);
 }
 
-CouchDB.request = function(method, uri, options) {
-  options = options || {};
-  var req = null;
+CouchDB.newXhr = function() {
   if (typeof(XMLHttpRequest) != "undefined") {
-    req = new XMLHttpRequest();
+    return new XMLHttpRequest();
   } else if (typeof(ActiveXObject) != "undefined") {
-    req = new ActiveXObject("Microsoft.XMLHTTP");
+    return new ActiveXObject("Microsoft.XMLHTTP");
   } else {
     throw new Error("No XMLHTTPRequest support detected");
   }
+}
+
+CouchDB.request = function(method, uri, options) {
+  options = options || {};
+  var req = CouchDB.newXhr();
   req.open(method, uri, false);
   if (options.headers) {
     var headers = options.headers;

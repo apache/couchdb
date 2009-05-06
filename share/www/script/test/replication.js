@@ -189,7 +189,7 @@ couchTests.replication = function(debug) {
           dbB.save({_id:"foo",value:"b"});
         };
         
-        this.afterBA1 = function(dbA, dbB) {            
+        this.afterBA1 = function(dbA, dbB) {
           var docA = dbA.open("foo", {conflicts: true});
           var docB = dbB.open("foo", {conflicts: true});
 

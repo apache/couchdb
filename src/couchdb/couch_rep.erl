@@ -605,22 +605,17 @@ enum_docs_since(Pid, DbSource, DbTarget, {StartSeq, RevsCount}) ->
     [] ->
         gen_server:call(Pid, {fin, {StartSeq, RevsCount}}, infinity);
     DocInfoList ->
-        SrcRevsList = lists:map(fun(SrcDocInfo) ->
-            #doc_info{id=Id,
-                rev=Rev,
-                conflict_revs=Conflicts,
-                deleted_conflict_revs=DelConflicts
-            } = SrcDocInfo,
-            SrcRevs = [Rev | Conflicts] ++ DelConflicts,
+        SrcRevsList = lists:map(fun(#doc_info{id=Id,revs=RevInfos}) ->
+            SrcRevs = [Rev || #rev_info{rev=Rev} <- RevInfos],
             {Id, SrcRevs}
         end, DocInfoList),        
         {ok, MissingRevs} = get_missing_revs(DbTarget, SrcRevsList),
         
         %% do we need to check for success here?
-        [ gen_server:call(Pid, {replicate_doc, Info}, infinity) 
+        [gen_server:call(Pid, {replicate_doc, Info}, infinity) 
             || Info <- MissingRevs ],
         
-        #doc_info{update_seq=LastSeq} = lists:last(DocInfoList),
+        #doc_info{high_seq=LastSeq} = lists:last(DocInfoList),
         RevsCount2 = RevsCount + length(SrcRevsList),
         gen_server:cast(Pid, {increment_update_seq, LastSeq}),
         
@@ -641,15 +636,15 @@ get_doc_info_list(#http_db{uri=DbUrl, headers=Headers}, StartSeq) ->
     {Results} = do_http_request(Url, get, Headers),
     lists:map(fun({RowInfoList}) ->
         {RowValueProps} = proplists:get_value(<<"value">>, RowInfoList),
+        Seq = proplists:get_value(<<"key">>, RowInfoList),
+        Revs = 
+            [#rev_info{rev=couch_doc:parse_rev(proplists:get_value(<<"rev">>, RowValueProps)), deleted = proplists:get_value(<<"deleted">>, RowValueProps, false)} | 
+                [#rev_info{rev=Rev,deleted=false} || Rev <- couch_doc:parse_revs(proplists:get_value(<<"conflicts">>, RowValueProps, []))] ++
+                [#rev_info{rev=Rev,deleted=true} || Rev <- couch_doc:parse_revs(proplists:get_value(<<"deleted_conflicts">>, RowValueProps, []))]],
         #doc_info{
             id=proplists:get_value(<<"id">>, RowInfoList),
-            rev=couch_doc:parse_rev(proplists:get_value(<<"rev">>, RowValueProps)),
-            update_seq = proplists:get_value(<<"key">>, RowInfoList),
-            conflict_revs =
-                couch_doc:parse_revs(proplists:get_value(<<"conflicts">>, RowValueProps, [])),
-            deleted_conflict_revs =
-                couch_doc:parse_revs(proplists:get_value(<<"deleted_conflicts">>, RowValueProps, [])),
-            deleted = proplists:get_value(<<"deleted">>, RowValueProps, false)
+            high_seq = Seq,
+            revs = Revs
         }
     end, proplists:get_value(<<"rows">>, Results));
 get_doc_info_list(DbSource, StartSeq) ->
@@ -685,6 +680,7 @@ open_doc(Db, DocId, Options) ->
 
 open_doc_revs(#http_db{uri=DbUrl, headers=Headers} = DbS, DocId, Revs0, 
         [latest]) ->
+            io:format("Revs0:~p~n", [Revs0]),
     Revs = couch_doc:rev_to_strs(Revs0),
     BaseUrl = DbUrl ++ url_encode(DocId) ++ "?revs=true&latest=true",
     
