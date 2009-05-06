@@ -67,7 +67,6 @@ loadTest("list_views.js");
 loadTest("compact.js");
 loadTest("purge.js");
 loadTest("config.js");
-loadTest("form_submit.js");
 loadTest("security_validation.js");
 loadTest("stats.js");
 loadTest("rev_stemming.js");
