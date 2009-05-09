@@ -215,7 +215,7 @@ transfer_fields([{<<"_deleted_conflicts">>, _} | Rest], Doc) ->
     transfer_fields(Rest, Doc);
 
 % unknown special field
-transfer_fields([{<<"_",Name/binary>>, Start} | _], _) when is_integer(Start) ->
+transfer_fields([{<<"_",Name/binary>>, _} | _], _) ->
     throw({doc_validation,
             ?l2b(io_lib:format("Bad special document member: _~s", [Name]))});
             
