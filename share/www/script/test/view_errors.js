@@ -123,7 +123,7 @@ couchTests.view_errors = function(debug) {
   T(xhr.status == 400);
   result = JSON.parse(xhr.responseText);
   T(result.error == "bad_request");
-  T(result.reason == "Body must be a JSON object");
+  T(result.reason == "Request body must be a JSON object");
   var data = "{\"keys\": 1}";
   xhr = CouchDB.request("POST", path, {body:data});
   T(xhr.status == 400);

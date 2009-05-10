@@ -91,7 +91,7 @@ get_rep_endpoint(#httpd{user_ctx=UserCtx}, <<DbName/binary>>) ->
     {local, DbName, UserCtx}.
 
 handle_replicate_req(#httpd{method='POST'}=Req) ->
-    {Props} = couch_httpd:json_body(Req),
+    {Props} = couch_httpd:json_body_obj(Req),
     Source = get_rep_endpoint(Req, proplists:get_value(<<"source">>, Props)),
     Target = get_rep_endpoint(Req, proplists:get_value(<<"target">>, Props)),
     case couch_rep:replicate(Source, Target) of

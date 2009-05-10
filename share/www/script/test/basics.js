@@ -204,14 +204,14 @@ couchTests.basics = function(debug) {
     T(xhr.status == 400);
     result = JSON.parse(xhr.responseText);
     T(result.error == "bad_request");
-    T(result.reason == "Body must be a JSON object");
+    T(result.reason == "Request body must be a JSON object");
 
     // Body of an _all_docs  multi-get is not a {"key": [...]} structure.
     xhr = CouchDB.request("POST", "/test_suite_db/_all_docs", {body: "[]"});
     T(xhr.status == 400);
     result = JSON.parse(xhr.responseText);
     T(result.error == "bad_request");
-    T(result.reason == "Body must be a JSON object");
+    T(result.reason == "Request body must be a JSON object");
     var data = "{\"keys\": 1}";
     xhr = CouchDB.request("POST", "/test_suite_db/_all_docs", {body:data});
     T(xhr.status == 400);
