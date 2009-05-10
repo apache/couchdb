@@ -248,15 +248,15 @@ couchTests.list_views = function(debug) {
   
   // aborting iteration
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/stopIter/basicView");
-  T(xhr.responseText.match(/^head 0 1 2 tail$/));
+  T(xhr.responseText.match(/^head 0 1 2 tail$/) && "basic stop");
   xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/stopIter2/basicView");
-  T(xhr.responseText.match(/^head 0 1 2 tail$/));
+  T(xhr.responseText.match(/^head 0 1 2 tail$/) && "stop 2");
 
   // aborting iteration with reduce
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/stopIter/withReduce?group=true");
-  T(xhr.responseText.match(/^head 0 1 2 tail$/));
+  T(xhr.responseText.match(/^head 0 1 2 tail$/) && "reduce stop");
   xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/stopIter2/withReduce?group=true");
-  T(xhr.responseText.match(/^head 0 1 2 tail$/));
+  T(xhr.responseText.match(/^head 0 1 2 tail$/) && "reduce stop 2");
 
   // empty list
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/emptyList/basicView");

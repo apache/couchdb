@@ -457,21 +457,21 @@ all_docs_view(Req, Db, Keys) ->
         true -> StartDocId
         end,
         FoldAccInit = {Limit, SkipCount, undefined, []},
-    
-        PassedEndFun = 
-        case Dir of
-        fwd ->
-            fun(ViewKey, _ViewId) ->
-                couch_db_updater:less_docid(EndKey, ViewKey)
-            end;
-        rev->
-            fun(ViewKey, _ViewId) ->
-                couch_db_updater:less_docid(ViewKey, EndKey)
-            end
-        end,
-    
+        
         case Keys of
         nil ->
+            PassedEndFun = 
+            case Dir of
+            fwd ->
+                fun(ViewKey, _ViewId) ->
+                    couch_db_updater:less_docid(EndKey, ViewKey)
+                end;
+            rev->
+                fun(ViewKey, _ViewId) ->
+                    couch_db_updater:less_docid(ViewKey, EndKey)
+                end
+            end,
+            
             FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db,
                 TotalRowCount, #view_fold_helper_funs{
                     reduce_count = fun couch_db:enum_docs_reduce_to_count/1,

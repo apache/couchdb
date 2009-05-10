@@ -177,91 +177,28 @@ output_reduce_view(Req, View, Group, QueryArgs, Keys) ->
     CurrentEtag = view_group_etag(Group),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         {ok, GroupRowsFun, RespFun} = make_reduce_fold_funs(Req, GroupLevel, QueryArgs, CurrentEtag, #reduce_fold_helper_funs{}),
-        {Resp, _} = lists:foldl(
-            fun(Key, {Resp, AccSeparator}) ->
-                FoldAccInit = {Limit, Skip, Resp, AccSeparator},
-                {_, {_, _, Resp2, NewAcc}} = couch_view:fold_reduce(View, Dir, {Key, StartDocId}, 
+        {Resp, _RedAcc3} = lists:foldl(
+            fun(Key, {Resp, RedAcc}) ->
+                % run the reduce once for each key in keys, with limit etc reapplied for each key
+                FoldAccInit = {Limit, Skip, Resp, RedAcc},
+                {_, {_, _, Resp2, RedAcc2}} = couch_view:fold_reduce(View, Dir, {Key, StartDocId}, 
                     {Key, EndDocId}, GroupRowsFun, RespFun, FoldAccInit),
                 % Switch to comma
-                {Resp2, NewAcc}
+                {Resp2, RedAcc2}
             end,
         {undefined, []}, Keys), % Start with no comma
         finish_reduce_fold(Req, Resp)
     end).
-    
-make_reduce_fold_funs(Req, GroupLevel, _QueryArgs, Etag, HelperFuns) ->
-    #reduce_fold_helper_funs{
-        start_response = StartRespFun,
-        send_row = SendRowFun
-    } = apply_default_helper_funs(HelperFuns),
-
-    GroupRowsFun =
-        fun({_Key1,_}, {_Key2,_}) when GroupLevel == 0 ->
-            true;
-        ({Key1,_}, {Key2,_})
-                when is_integer(GroupLevel) and is_list(Key1) and is_list(Key2) ->
-            lists:sublist(Key1, GroupLevel) == lists:sublist(Key2, GroupLevel);
-        ({Key1,_}, {Key2,_}) ->
-            Key1 == Key2
-        end,
-    RespFun = fun(_Key, _Red, {AccLimit, AccSkip, Resp, AccSeparator}) when AccSkip > 0 ->
-        {ok, {AccLimit, AccSkip - 1, Resp, AccSeparator}};
-    (_Key, _Red, {0, 0, Resp, AccSeparator}) ->
-        {stop, {0, 0, Resp, AccSeparator}};
-    (_Key, Red, {AccLimit, 0, Resp, AccSeparator}) when GroupLevel == 0 ->
-        {ok, Resp2, RowSep} = case Resp of
-        undefined -> StartRespFun(Req, Etag, null, null);
-        _ -> {ok, Resp, nil}
-        end,
-        RowResult = case SendRowFun(Resp2, {null, Red}, RowSep) of
-        stop -> stop;
-        _ -> ok
-        end,
-        {RowResult, {AccLimit - 1, 0, Resp2, AccSeparator}};
-    (Key, Red, {AccLimit, 0, Resp, AccSeparator})
-            when is_integer(GroupLevel) 
-            andalso is_list(Key) ->
-        {ok, Resp2, RowSep} = case Resp of
-        undefined -> StartRespFun(Req, Etag, null, null);
-        _ -> {ok, Resp, nil}
-        end,
-        RowResult = case SendRowFun(Resp2, {lists:sublist(Key, GroupLevel), Red}, RowSep) of
-        stop -> stop;
-        _ -> ok
-        end,
-        {RowResult, {AccLimit - 1, 0, Resp2, AccSeparator}};
-    (Key, Red, {AccLimit, 0, Resp, AccSeparator}) ->
-        {ok, Resp2, RowSep} = case Resp of
-        undefined -> StartRespFun(Req, Etag, null, null);
-        _ -> {ok, Resp, nil}
-        end,
-        RowResult = case SendRowFun(Resp2, {Key, Red}, RowSep) of
-        stop -> stop;
-        _ -> ok
-        end,
-        {RowResult, {AccLimit - 1, 0, Resp2, AccSeparator}}
-    end,
-    {ok, GroupRowsFun, RespFun}.
-    
-
 
 reverse_key_default(nil) -> {};
 reverse_key_default({}) -> nil;
 reverse_key_default(Key) -> Key.
 
 get_stale_type(Req) ->
-    QueryList = couch_httpd:qs(Req),
-    case proplists:get_value("stale", QueryList, nil) of
-        "ok" -> ok;
-        Else -> Else
-    end.
+    list_to_atom(couch_httpd:qs_value(Req, "stale", "nil")).
 
 get_reduce_type(Req) ->
-    QueryList = couch_httpd:qs(Req),
-    case proplists:get_value("reduce", QueryList, true) of
-        "false" -> false;
-        _ -> true
-    end.
+    list_to_atom(couch_httpd:qs_value(Req, "reduce", "true")).
 
 parse_view_params(Req, Keys, ViewType, IgnoreType) ->
     QueryList = couch_httpd:qs(Req),
@@ -425,8 +362,7 @@ validate_view_query(extra, {Key, _}, Args) ->
             Args
     end.
 
-make_view_fold_fun(Req, QueryArgs, Etag, Db,
-    TotalViewCount, HelperFuns) ->
+make_view_fold_fun(Req, QueryArgs, Etag, Db, TotalViewCount, HelperFuns) ->
     #view_query_args{
         end_key = EndKey,
         end_docid = EndDocId,
@@ -446,35 +382,91 @@ make_view_fold_fun(Req, QueryArgs, Etag, Db,
         include_docs = IncludeDocs
     } = QueryArgs,
 
-    fun({{Key, DocId}, Value}, OffsetReds,
-                      {AccLimit, AccSkip, Resp, AccRevRows}) ->
+    fun({{Key, DocId}, Value}, OffsetReds, {AccLimit, AccSkip, Resp, RowFunAcc}) ->
         PassedEnd = PassedEndFun(Key, DocId),
         case {PassedEnd, AccLimit, AccSkip, Resp} of
         {true, _, _, _} ->
             % The stop key has been passed, stop looping.
-            {stop, {AccLimit, AccSkip, Resp, AccRevRows}};
+            {stop, {AccLimit, AccSkip, Resp, RowFunAcc}};
         {_, 0, _, _} ->
             % we've done "limit" rows, stop foldling
-            {stop, {0, 0, Resp, AccRevRows}};
+            {stop, {0, 0, Resp, RowFunAcc}};
         {_, _, AccSkip, _} when AccSkip > 0 ->
-            {ok, {AccLimit, AccSkip - 1, Resp, AccRevRows}};
+            % just keep skipping
+            {ok, {AccLimit, AccSkip - 1, Resp, RowFunAcc}};
         {_, _, _, undefined} ->
+            % rendering the first row, first we start the response
             Offset = ReduceCountFun(OffsetReds),
-            {ok, Resp2, BeginBody} = StartRespFun(Req, Etag,
-                TotalViewCount, Offset),
-            case SendRowFun(Resp2, Db, 
-                {{Key, DocId}, Value}, BeginBody, IncludeDocs) of
-            stop ->  {stop, {AccLimit - 1, 0, Resp2, AccRevRows}};
-            _ -> {ok, {AccLimit - 1, 0, Resp2, AccRevRows}}
-            end;
+            {ok, Resp2, RowFunAcc0} = StartRespFun(Req, Etag,
+                TotalViewCount, Offset, RowFunAcc),
+            {Go, RowFunAcc2} = SendRowFun(Resp2, Db, {{Key, DocId}, Value}, 
+                IncludeDocs, RowFunAcc0),
+            {Go, {AccLimit - 1, 0, Resp2, RowFunAcc2}};
         {_, AccLimit, _, Resp} when (AccLimit > 0) ->
-            case SendRowFun(Resp, Db, 
-                {{Key, DocId}, Value}, nil, IncludeDocs) of
-            stop ->  {stop, {AccLimit - 1, 0, Resp, AccRevRows}};
-            _ -> {ok, {AccLimit - 1, 0, Resp, AccRevRows}}
-            end
+            % rendering all other rows
+            {Go, RowFunAcc2} = SendRowFun(Resp, Db, {{Key, DocId}, Value}, 
+                IncludeDocs, RowFunAcc),
+            {Go, {AccLimit - 1, 0, Resp, RowFunAcc2}}
         end
     end.
+
+make_reduce_fold_funs(Req, GroupLevel, _QueryArgs, Etag, HelperFuns) ->
+    #reduce_fold_helper_funs{
+        start_response = StartRespFun,
+        send_row = SendRowFun
+    } = apply_default_helper_funs(HelperFuns),
+
+    GroupRowsFun =
+        fun({_Key1,_}, {_Key2,_}) when GroupLevel == 0 ->
+            true;
+        ({Key1,_}, {Key2,_})
+                when is_integer(GroupLevel) and is_list(Key1) and is_list(Key2) ->
+            lists:sublist(Key1, GroupLevel) == lists:sublist(Key2, GroupLevel);
+        ({Key1,_}, {Key2,_}) ->
+            Key1 == Key2
+        end,
+
+    RespFun = fun
+    (_Key, _Red, {AccLimit, AccSkip, Resp, RowAcc}) when AccSkip > 0 ->
+        % keep skipping
+        {ok, {AccLimit, AccSkip - 1, Resp, RowAcc}};
+    (_Key, _Red, {0, _AccSkip, Resp, RowAcc}) ->
+        % we've exhausted limit rows, stop
+        {stop, {0, _AccSkip, Resp, RowAcc}};
+
+    (_Key, Red, {AccLimit, 0, undefined, RowAcc0}) when GroupLevel == 0 ->
+        % we haven't started responding yet and group=false
+        {ok, Resp2, RowAcc} = StartRespFun(Req, Etag, RowAcc0),
+        {Go, RowAcc2} = SendRowFun(Resp2, {null, Red}, RowAcc),
+        {Go, {AccLimit - 1, 0, Resp2, RowAcc2}};
+    (_Key, Red, {AccLimit, 0, Resp, RowAcc}) when GroupLevel == 0 ->
+        % group=false but we've already started the response
+        {Go, RowAcc2} = SendRowFun(Resp, {null, Red}, RowAcc),
+        {Go, {AccLimit - 1, 0, Resp, RowAcc2}};
+
+    (Key, Red, {AccLimit, 0, undefined, RowAcc0})
+            when is_integer(GroupLevel), is_list(Key) ->
+        % group_level and we haven't responded yet
+        {ok, Resp2, RowAcc} = StartRespFun(Req, Etag, RowAcc0),
+        {Go, RowAcc2} = SendRowFun(Resp2, {lists:sublist(Key, GroupLevel), Red}, RowAcc),    
+        {Go, {AccLimit - 1, 0, Resp2, RowAcc2}};
+    (Key, Red, {AccLimit, 0, Resp, RowAcc})
+            when is_integer(GroupLevel), is_list(Key) ->
+        % group_level and we've already started the response
+        {Go, RowAcc2} = SendRowFun(Resp, {lists:sublist(Key, GroupLevel), Red}, RowAcc),
+        {Go, {AccLimit - 1, 0, Resp, RowAcc2}};
+
+    (Key, Red, {AccLimit, 0, undefined, RowAcc0}) ->
+        % group=true and we haven't responded yet
+        {ok, Resp2, RowAcc} = StartRespFun(Req, Etag, RowAcc0),
+        {Go, RowAcc2} = SendRowFun(Resp2, {Key, Red}, RowAcc),
+        {Go, {AccLimit - 1, 0, Resp2, RowAcc2}};
+    (Key, Red, {AccLimit, 0, Resp, RowAcc}) ->
+        % group=true and we've already started the response
+        {Go, RowAcc2} = SendRowFun(Resp, {Key, Red}, RowAcc),
+        {Go, {AccLimit - 1, 0, Resp, RowAcc2}}
+    end,
+    {ok, GroupRowsFun, RespFun}.
 
 apply_default_helper_funs(#view_fold_helper_funs{
     passed_end = PassedEnd,
@@ -487,7 +479,7 @@ apply_default_helper_funs(#view_fold_helper_funs{
     end,
 
     StartResp2 = case StartResp of
-    undefined -> fun json_view_start_resp/4;
+    undefined -> fun json_view_start_resp/5;
     _ -> StartResp
     end,
 
@@ -507,7 +499,7 @@ apply_default_helper_funs(#reduce_fold_helper_funs{
     send_row = SendRow
 }=Helpers) ->
     StartResp2 = case StartResp of
-    undefined -> fun json_reduce_start_resp/4;
+    undefined -> fun json_reduce_start_resp/3;
     _ -> StartResp
     end,
 
@@ -551,31 +543,24 @@ make_passed_end_fun(rev, EndKey, EndDocId, InclusiveEnd) ->
         end
     end.
 
-json_view_start_resp(Req, Etag, TotalViewCount, Offset) ->
+json_view_start_resp(Req, Etag, TotalViewCount, Offset, _Acc) ->
     {ok, Resp} = start_json_response(Req, 200, [{"Etag", Etag}]),
     BeginBody = io_lib:format("{\"total_rows\":~w,\"offset\":~w,\"rows\":[\r\n",
             [TotalViewCount, Offset]),
     {ok, Resp, BeginBody}.
 
-send_json_view_row(Resp, Db, {{Key, DocId}, Value}, RowFront, IncludeDocs) ->
+send_json_view_row(Resp, Db, {{Key, DocId}, Value}, IncludeDocs, RowFront) ->
     JsonObj = view_row_obj(Db, {{Key, DocId}, Value}, IncludeDocs),
-    RowFront2 = case RowFront of
-    nil -> ",\r\n";
-    _ -> RowFront
-    end,
-    send_chunk(Resp, RowFront2 ++  ?JSON_ENCODE(JsonObj)).
+    send_chunk(Resp, RowFront ++  ?JSON_ENCODE(JsonObj)),
+    {ok, ",\r\n"}.
 
-json_reduce_start_resp(Req, Etag, _, _) ->
+json_reduce_start_resp(Req, Etag, _Acc0) ->
     {ok, Resp} = start_json_response(Req, 200, [{"Etag", Etag}]),
-    BeginBody = "{\"rows\":[\r\n",
-    {ok, Resp, BeginBody}.
+    {ok, Resp, "{\"rows\":[\r\n"}.
 
 send_json_reduce_row(Resp, {Key, Value}, RowFront) ->
-    RowFront2 = case RowFront of
-    nil -> ",\r\n";
-    _ -> RowFront
-    end,
-    send_chunk(Resp, RowFront2 ++ ?JSON_ENCODE({[{key, Key}, {value, Value}]})).    
+    send_chunk(Resp, RowFront ++ ?JSON_ENCODE({[{key, Key}, {value, Value}]})),
+    {ok, ",\r\n"}.    
 
 view_group_etag(Group) ->
     view_group_etag(Group, nil).
@@ -587,41 +572,38 @@ view_group_etag(#group{sig=Sig,current_seq=CurrentSeq}, Extra) ->
     % track of the last Db seq that caused an index change.
     couch_httpd:make_etag({Sig, CurrentSeq, Extra}).
 
-view_row_obj(Db, {{Key, DocId}, Value}, IncludeDocs) ->
-    case DocId of
-    error ->
-        {[{key, Key}, {error, Value}]};
-    _ ->
-        case IncludeDocs of
-        true ->
-            Rev = case Value of
-            {Props} ->
-                case proplists:get_value(<<"_rev">>, Props) of
-                undefined ->
-                    nil;
-                Rev0 ->
-                    couch_doc:parse_rev(Rev0)
-                end;
-            _ ->
-                nil
-            end,
-            ?LOG_DEBUG("Include Doc: ~p ~p", [DocId, Rev]),
-            case (catch couch_httpd_db:couch_doc_open(Db, DocId, Rev, [])) of
-              {{not_found, missing}, _RevId} ->
-                  {[{id, DocId}, {key, Key}, {value, Value}, {error, missing}]};
-              {not_found, missing} ->
-                  {[{id, DocId}, {key, Key}, {value, Value}, {error, missing}]};
-              {not_found, deleted} ->
-                  {[{id, DocId}, {key, Key}, {value, Value}]};
-              Doc ->
-                JsonDoc = couch_doc:to_json_obj(Doc, []), 
-                {[{id, DocId}, {key, Key}, {value, Value}, {doc, JsonDoc}]}
-            end;
-        _ ->
-            {[{id, DocId}, {key, Key}, {value, Value}]}
-        end
-    end.
+% the view row has an error
+view_row_obj(_Db, {{Key, error}, Value}, _IncludeDocs) ->
+    {[{key, Key}, {error, Value}]};
+% include docs in the view output
+view_row_obj(Db, {{Key, DocId}, {Props}}, true) ->
+    Rev = case proplists:get_value(<<"_rev">>, Props) of
+    undefined ->
+        nil;
+    Rev0 ->
+        couch_doc:parse_rev(Rev0)
+    end,
+    view_row_with_doc(Db, {{Key, DocId}, {Props}}, Rev);
+view_row_obj(Db, {{Key, DocId}, Value}, true) ->
+    view_row_with_doc(Db, {{Key, DocId}, Value}, nil);
+% the normal case for rendering a view row
+view_row_obj(_Db, {{Key, DocId}, Value}, _IncludeDocs) ->
+    {[{id, DocId}, {key, Key}, {value, Value}]}.
 
+view_row_with_doc(Db, {{Key, DocId}, Value}, Rev) ->
+    ?LOG_DEBUG("Include Doc: ~p ~p", [DocId, Rev]),
+    case (catch couch_httpd_db:couch_doc_open(Db, DocId, Rev, [])) of
+      {{not_found, missing}, _RevId} ->
+          {[{id, DocId}, {key, Key}, {value, Value}, {error, missing}]};
+      {not_found, missing} ->
+          {[{id, DocId}, {key, Key}, {value, Value}, {error, missing}]};
+      {not_found, deleted} ->
+          {[{id, DocId}, {key, Key}, {value, Value}]};
+      Doc ->
+        JsonDoc = couch_doc:to_json_obj(Doc, []), 
+        {[{id, DocId}, {key, Key}, {value, Value}, {doc, JsonDoc}]}
+    end.
+    
 finish_view_fold(Req, TotalRows, FoldResult) ->
     case FoldResult of
     {ok, {_, _, undefined, _}} ->
@@ -631,9 +613,9 @@ finish_view_fold(Req, TotalRows, FoldResult) ->
             {total_rows, TotalRows},
             {rows, []}
         ]});
-    {ok, {_, _, Resp, AccRevRows}} ->
+    {ok, {_, _, Resp, _}} ->
         % end the view
-        send_chunk(Resp, AccRevRows ++ "\r\n]}"),
+        send_chunk(Resp, "\r\n]}"),
         end_json_response(Resp);
     Error ->
         throw(Error)
