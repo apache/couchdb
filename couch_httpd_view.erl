@@ -58,20 +58,16 @@ handle_view_req(#httpd{method='GET',
 
 handle_view_req(#httpd{method='POST',
         path_parts=[_Db, _Design, DName, _View, ViewName]}=Req, Db) ->
-    case couch_httpd:json_body(Req) of
-    {Fields} ->
-        case proplists:get_value(<<"keys">>, Fields, nil) of
-        nil ->
-            Fmt = "POST to view ~p/~p in database ~p with no keys member.",
-            ?LOG_DEBUG(Fmt, [DName, ViewName, Db]),
-            design_doc_view(Req, Db, DName, ViewName, nil);
-        Keys when is_list(Keys) ->
-            design_doc_view(Req, Db, DName, ViewName, Keys);
-        _ ->
-            throw({bad_request, "`keys` member must be a array."})
-        end;
+    {Fields} = couch_httpd:json_body_obj(Req),
+    case proplists:get_value(<<"keys">>, Fields, nil) of
+    nil ->
+        Fmt = "POST to view ~p/~p in database ~p with no keys member.",
+        ?LOG_DEBUG(Fmt, [DName, ViewName, Db]),
+        design_doc_view(Req, Db, DName, ViewName, nil);
+    Keys when is_list(Keys) ->
+        design_doc_view(Req, Db, DName, ViewName, Keys);
     _ ->
-        throw({bad_request, "Body must be a JSON object"})
+        throw({bad_request, "`keys` member must be a array."})
     end;
 
 handle_view_req(Req, _Db) ->
@@ -79,7 +75,7 @@ handle_view_req(Req, _Db) ->
 
 handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
     couch_stats_collector:increment({httpd, temporary_view_reads}),
-    {Props} = couch_httpd:json_body(Req),
+    {Props} = couch_httpd:json_body_obj(Req),
     Language = proplists:get_value(<<"language">>, Props, <<"javascript">>),
     {DesignOptions} = proplists:get_value(<<"options">>, Props, {[]}),
     MapSrc = proplists:get_value(<<"map">>, Props),

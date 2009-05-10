@@ -17,7 +17,7 @@
 
 -export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,path/1,absolute_uri/2]).
 -export([verify_is_server_admin/1,unquote/1,quote/1,recv/2,recv_chunked/4,error_info/1]).
--export([parse_form/1,json_body/1,body/1,doc_etag/1, make_etag/1, etag_respond/3]).
+-export([parse_form/1,json_body/1,json_body_obj/1,body/1,doc_etag/1, make_etag/1, etag_respond/3]).
 -export([primary_header_value/2,partition/1,serve_file/3]).
 -export([start_chunked_response/3,send_chunk/2]).
 -export([start_json_response/2, start_json_response/3, end_json_response/1]).
@@ -298,6 +298,14 @@ body(#httpd{mochi_req=MochiReq}) ->
 
 json_body(Httpd) ->
     ?JSON_DECODE(body(Httpd)).
+
+json_body_obj(Httpd) ->
+    case json_body(Httpd) of
+        {Props} -> {Props};
+        _Else -> 
+            throw({bad_request, "Request body must be a JSON object"})
+    end.
+
 
 doc_etag(#doc{revs={Start, [DiskRev|_]}}) ->
     "\"" ++ ?b2l(couch_doc:rev_to_str({Start, DiskRev})) ++ "\"".
