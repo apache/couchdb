@@ -198,12 +198,15 @@ increment_update_seq_req(Req, _Db) ->
 % httpd log handlers
 
 handle_log_req(#httpd{method='GET'}=Req) ->
-    LastBytes = list_to_integer(couch_httpd:qs_value(Req, "bytes", "1000")),
+    Bytes = list_to_integer(couch_httpd:qs_value(Req, "bytes", "1000")),
+    Offset = list_to_integer(couch_httpd:qs_value(Req, "offset", "0")),
+    Chunk = couch_log:read(Bytes, Offset),
     {ok, Resp} = start_chunked_response(Req, 200, [
         % send a plaintext response
-        {"Content-Type", "text/plain; charset=utf-8"}
+        {"Content-Type", "text/plain; charset=utf-8"},
+        {"Content-Length", integer_to_list(length(Chunk))}
     ]),
-    send_chunk(Resp, couch_log:read(LastBytes)),
+    send_chunk(Resp, Chunk),
     send_chunk(Resp, "");
 handle_log_req(Req) ->
     send_method_not_allowed(Req, "GET").
