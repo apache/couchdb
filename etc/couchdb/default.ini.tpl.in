@@ -59,6 +59,7 @@ _replicate = {couch_httpd_misc_handlers, handle_replicate_req}
 _uuids = {couch_httpd_misc_handlers, handle_uuids_req}
 _restart = {couch_httpd_misc_handlers, handle_restart_req}
 _stats = {couch_httpd_stats_handlers, handle_stats_req}
+_log = {couch_httpd_misc_handlers, handle_log_req}
 
 [httpd_db_handlers]
 _compact = {couch_httpd_db, handle_compact_req}
