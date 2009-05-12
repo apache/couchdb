@@ -37,6 +37,7 @@ loadTest("bulk_docs.js");
 loadTest("lots_of_docs.js");
 loadTest("reduce.js");
 loadTest("reduce_false.js");
+loadTest("reduce_builtin.js");
 loadTest("design_options.js");
 loadTest("multiple_rows.js");
 loadTest("large_docs.js");

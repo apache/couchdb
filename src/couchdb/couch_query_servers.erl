@@ -86,7 +86,11 @@ rereduce(Lang, RedSrcs, ReducedValues) ->
     Pid = get_os_process(Lang),
     Grouped = group_reductions_results(ReducedValues),
     Results = try lists:zipwith(
-        fun(FunSrc, Values) ->
+        fun
+        (<<"_", _/binary>> = FunSrc, Values) ->
+            {ok, [Result]} = builtin_reduce(rereduce, [FunSrc], [[[], V] || V <- Values], []),
+            Result;
+        (FunSrc, Values) ->
             [true, [Result]] = 
                 couch_os_process:prompt(Pid, [<<"rereduce">>, [FunSrc], Values]),
             Result
@@ -99,15 +103,53 @@ rereduce(Lang, RedSrcs, ReducedValues) ->
 reduce(_Lang, [], _KVs) ->
     {ok, []};
 reduce(Lang, RedSrcs, KVs) ->
+    {OsRedSrcs, BuiltinReds} = lists:partition(fun
+        (<<"_", _/binary>>) -> false;
+        (_OsFun) -> true
+    end, RedSrcs),
+    {ok, OsResults} = os_reduce(Lang, OsRedSrcs, KVs),
+    {ok, BuiltinResults} = builtin_reduce(reduce, BuiltinReds, KVs, []),
+    recombine_reduce_results(RedSrcs, OsResults, BuiltinResults, []).
+
+recombine_reduce_results([], [], [], Acc) ->
+    {ok, lists:reverse(Acc)};
+recombine_reduce_results([<<"_", _/binary>>|RedSrcs], OsResults, [BRes|BuiltinResults], Acc) ->
+    recombine_reduce_results(RedSrcs, OsResults, BuiltinResults, [BRes|Acc]);
+recombine_reduce_results([_OsFun|RedSrcs], [OsR|OsResults], BuiltinResults, Acc) ->
+    recombine_reduce_results(RedSrcs, OsResults, BuiltinResults, [OsR|Acc]).
+
+os_reduce(Lang, [], KVs) ->
+    {ok, []};
+os_reduce(Lang, OsRedSrcs, KVs) ->
     Pid = get_os_process(Lang),
-    Results = try couch_os_process:prompt(Pid, 
-            [<<"reduce">>, RedSrcs, KVs]) of
+    OsResults = try couch_os_process:prompt(Pid, 
+            [<<"reduce">>, OsRedSrcs, KVs]) of
         [true, Reductions] -> Reductions
     after
         ok = ret_os_process(Lang, Pid)
     end,
-    {ok, Results}.
+    {ok, OsResults}.
 
+builtin_reduce(_Re, [], KVs, Acc) ->
+    {ok, lists:reverse(Acc)};
+builtin_reduce(Re, [<<"_sum">>|BuiltinReds], KVs, Acc) ->
+    Sum = builtin_sum_rows(KVs),
+    builtin_reduce(Re, BuiltinReds, KVs, [Sum|Acc]);
+builtin_reduce(reduce, [<<"_count">>|BuiltinReds], KVs, Acc) ->
+    Count = length(KVs),
+    builtin_reduce(reduce, BuiltinReds, KVs, [Count|Acc]);
+builtin_reduce(rereduce, [<<"_count">>|BuiltinReds], KVs, Acc) ->
+    Count = builtin_sum_rows(KVs),
+    builtin_reduce(rereduce, BuiltinReds, KVs, [Count|Acc]).
+
+builtin_sum_rows(KVs) ->
+    lists:foldl(fun
+        ([_Key, Value], Acc) when is_number(Value) -> 
+            Acc + Value;
+        (_Else, _Acc) -> 
+            throw({invalid_value, <<"builtin _sum function requires map values to be numbers">>})
+    end, 0, KVs).
+    
 validate_doc_update(Lang, FunSrc, EditDoc, DiskDoc, Ctx) ->
     Pid = get_os_process(Lang),
     JsonEditDoc = couch_doc:to_json_obj(EditDoc, [revs]),
