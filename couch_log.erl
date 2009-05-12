@@ -16,6 +16,7 @@
 -export([start_link/0,stop/0]).
 -export([debug_on/0,info_on/0,get_level/0,get_level_integer/0, set_level/1]).
 -export([init/1, handle_event/2, terminate/2, code_change/3, handle_info/2, handle_call/2]).
+-export([read/1]).
 
 -define(LEVEL_ERROR, 3).
 -define(LEVEL_INFO, 2).
@@ -120,3 +121,16 @@ log(Fd, Pid, Level, Format, Args) ->
     ok = io:format("[~s] [~p] ~s~n", [Level, Pid, Msg]), % dump to console too
     {ok, Msg2, _} = regexp:gsub(lists:flatten(Msg),"\\r\\n|\\r|\\n", "\r\n"),
     ok = io:format(Fd, "[~s] [~s] [~p] ~s\r~n\r~n", [httpd_util:rfc1123_date(), Level, Pid, Msg2]).
+
+read(LastBytes) ->
+    LogFileName = couch_config:get("log", "file"),
+    LogFileSize = couch_util:file_read_size(LogFileName),
+
+    {ok, Fd} = file:open(LogFileName, [binary]),
+    Start = lists:max([LogFileSize - LastBytes, 0]),
+
+    % TODO: truncate chopped first line
+    % TODO: make streaming
+
+    {ok, Chunk} = file:pread(Fd, Start, LogFileSize),
+    Chunk.

@@ -14,7 +14,7 @@
 
 -export([handle_welcome_req/2,handle_favicon_req/2,handle_utils_dir_req/2,
     handle_all_dbs_req/1,handle_replicate_req/1,handle_restart_req/1,
-    handle_uuids_req/1,handle_config_req/1,
+    handle_uuids_req/1,handle_config_req/1,handle_log_req/1,
     handle_task_status_req/1]).
     
 -export([increment_update_seq_req/2]).
@@ -195,3 +195,15 @@ increment_update_seq_req(#httpd{method='POST'}=Req, Db) ->
 increment_update_seq_req(Req, _Db) ->
     send_method_not_allowed(Req, "POST").
 
+% httpd log handlers
+
+handle_log_req(#httpd{method='GET'}=Req) ->
+    LastBytes = list_to_integer(couch_httpd:qs_value(Req, "bytes", "1000")),
+    {ok, Resp} = start_chunked_response(Req, 200, [
+        % send a plaintext response
+        {"Content-Type", "text/plain; charset=utf-8"}
+    ]),
+    send_chunk(Resp, couch_log:read(LastBytes)),
+    send_chunk(Resp, "");
+handle_log_req(Req) ->
+    send_method_not_allowed(Req, "GET").
