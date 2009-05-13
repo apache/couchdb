@@ -167,7 +167,8 @@
     include_docs = false,
     stale = false,
     multi_get = false,
-    ignore = false
+    ignore = false,
+    callback = nil
 }).
 
 -record(view_fold_helper_funs, {

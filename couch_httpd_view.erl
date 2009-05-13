@@ -270,6 +270,8 @@ parse_view_param("reduce", Value) ->
     [{reduce, parse_bool_param(Value)}];
 parse_view_param("include_docs", Value) ->
     [{include_docs, parse_bool_param(Value)}];
+parse_view_param("callback", _) ->
+    []; % Verified in the JSON response functions
 parse_view_param(Key, Value) ->
     [{extra, {Key, Value}}].
 

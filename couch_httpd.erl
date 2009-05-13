@@ -386,8 +386,10 @@ send_json(Req, Code, Headers, Value) ->
         {"Content-Type", negotiate_content_type(Req)},
         {"Cache-Control", "must-revalidate"}
     ],
-    send_response(Req, Code, DefaultHeaders ++ Headers,
-                  list_to_binary([?JSON_ENCODE(Value), $\n])).
+    Body = list_to_binary(
+        [start_jsonp(Req), ?JSON_ENCODE(Value), end_jsonp(), $\n]
+    ),
+    send_response(Req, Code, DefaultHeaders ++ Headers, Body).
 
 start_json_response(Req, Code) ->
     start_json_response(Req, Code, []).
@@ -397,11 +399,65 @@ start_json_response(Req, Code, Headers) ->
         {"Content-Type", negotiate_content_type(Req)},
         {"Cache-Control", "must-revalidate"}
     ],
-    start_chunked_response(Req, Code, DefaultHeaders ++ Headers).
+    start_jsonp(Req), % Validate before starting chunked.
+    %start_chunked_response(Req, Code, DefaultHeaders ++ Headers).
+    {ok, Resp} = start_chunked_response(Req, Code, DefaultHeaders ++ Headers),
+    case start_jsonp(Req) of
+        [] -> ok;
+        Start -> send_chunk(Resp, Start)
+    end,
+    {ok, Resp}.
 
 end_json_response(Resp) ->
-    send_chunk(Resp, [$\n]),
+    send_chunk(Resp, end_jsonp() ++ [$\n]),
+    %send_chunk(Resp, [$\n]),
     send_chunk(Resp, []).
+
+start_jsonp(Req) ->
+    case get(jsonp) of
+        undefined -> put(jsonp, qs_value(Req, "callback", no_jsonp));
+        _ -> ok
+    end,
+    case get(jsonp) of
+        no_jsonp -> [];
+        [] -> [];
+        CallBack ->
+            try
+                validate_callback(CallBack),
+                CallBack ++ "("
+            catch
+                Error ->
+                    put(jsonp, no_jsonp),
+                    throw(Error)
+            end
+    end.
+
+end_jsonp() ->
+    Resp = case get(jsonp) of
+        no_jsonp -> [];
+        [] -> [];
+        _ -> ");"
+    end,
+    put(jsonp, undefined),
+    Resp.
+        
+validate_callback(CallBack) when is_binary(CallBack) ->
+    validate_callback(binary_to_list(CallBack));
+validate_callback([]) ->
+    ok;
+validate_callback([Char | Rest]) ->
+    case Char of
+        _ when Char >= $a andalso Char =< $z -> ok;
+        _ when Char >= $A andalso Char =< $Z -> ok;
+        _ when Char >= $0 andalso Char =< $9 -> ok;
+        _ when Char == $. -> ok;
+        _ when Char == $_ -> ok;
+        _ when Char == $[ -> ok;
+        _ when Char == $] -> ok;
+        _ ->
+            throw({bad_request, invalid_callback})
+    end,
+    validate_callback(Rest).
 
 
 error_info({Error, Reason}) when is_list(Reason) ->
