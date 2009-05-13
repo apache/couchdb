@@ -278,7 +278,7 @@ handle_info({'EXIT', Pid, Status}, {Langs, PidLangs, Pids, InUse}) ->
     [{Pid, Lang}] ->
         case Status of
         normal -> ok;
-        _ -> ?LOG_DEBUG("Linked process died abnromally: ~p (reason: ~p)", [Pid, Status])
+        _ -> ?LOG_DEBUG("Linked process died abnormally: ~p (reason: ~p)", [Pid, Status])
         end,
         {ok, {
             Langs,
