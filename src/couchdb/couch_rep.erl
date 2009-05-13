@@ -369,10 +369,11 @@ attachment_loop(ReqId) ->
         {ibrowse_async_response_end, ReqId} -> ok
     end.
 
-attachment_stub_converter(DbS, Id, {Name, {stub, Type, Length}}) ->
+attachment_stub_converter(DbS, Id, Rev, {Name, {stub, Type, Length}}) ->
     #http_db{uri=DbUrl, headers=Headers} = DbS,
-    % TODO worry about revisions
-    Url = DbUrl ++ url_encode(Id) ++ "/" ++ url_encode(?b2l(Name)),
+    {Pos, [RevId|_]} = Rev,
+    Url = lists:flatten([DbUrl, url_encode(Id), "/", url_encode(?b2l(Name)),
+        "?rev=", couch_doc:rev_to_str({Pos,RevId})]),
     ?LOG_DEBUG("Attachment URL ~p", [Url]),
     {ok, RcvFun} = make_attachment_stub_receiver(Url, Headers, Name, 
         Type, Length),
@@ -712,8 +713,9 @@ open_doc_revs(#http_db{uri=DbUrl, headers=Headers} = DbS, DocId, Revs0,
         fun({[{<<"missing">>, Rev}]}) ->
             {{not_found, missing}, couch_doc:parse_rev(Rev)};
         ({[{<<"ok">>, JsonDoc}]}) ->
-        #doc{id=Id, attachments=Attach} = Doc = couch_doc:from_json_obj(JsonDoc),
-        Attach2 = [attachment_stub_converter(DbS,Id,A) || A <- Attach],
+        #doc{id=Id, revs=Rev, attachments=Attach} = Doc =
+            couch_doc:from_json_obj(JsonDoc),
+        Attach2 = [attachment_stub_converter(DbS,Id,Rev,A) || A <- Attach],
         {ok, Doc#doc{attachments=Attach2}}
         end, JsonResults),
     {ok, Results};
