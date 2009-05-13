@@ -292,6 +292,10 @@
               }
             },
             success: function(resp) {
+              if(!resp.views || !resp.views[localViewName]) {
+                $.cookies.remove(dbName + ".view");
+                location.href = "database.html?" + encodeURIComponent(db.name);
+              }
               var viewCode = resp.views[localViewName];
               page.viewLanguage = resp.language || "javascript";
               $("#language").val(page.viewLanguage);
