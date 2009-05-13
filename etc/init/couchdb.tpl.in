@@ -30,6 +30,7 @@ NAME=couchdb
 SCRIPT_NAME=`basename $0`
 COUCHDB=%bindir%/%couchdb_command_name%
 CONFIGURATION_FILE=%sysconfdir%/default/couchdb
+RUN_DIR=%localstaterundir%
 LSB_LIBRARY=/lib/lsb/init-functions
 
 if test ! -x $COUCHDB; then
@@ -75,7 +76,9 @@ start_couchdb () {
     if test -n "$COUCHDB_OPTIONS"; then
         command="$command $COUCHDB_OPTIONS"
     fi
+    mkdir -p "$RUN_DIR"
     if test -n "$COUCHDB_USER"; then
+        chown $COUCHDB_USER "$RUN_DIR"
         if su $COUCHDB_USER -c "$command" > /dev/null; then
             return $SCRIPT_OK
         else
