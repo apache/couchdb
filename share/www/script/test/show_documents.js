@@ -33,7 +33,8 @@ couchTests.show_documents = function(debug) {
         }
       }),
       "just-name" : stringFun(function(doc, req) {
-        if (doc) {
+        if (docm
+          
           return {
             body : "Just " + doc.name
           };
