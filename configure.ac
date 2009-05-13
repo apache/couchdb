@@ -279,4 +279,4 @@ AC_OUTPUT
 echo
 echo "You have configured Apache CouchDB, time to relax."
 echo
-echo "Run \`make && make install' to install."
+echo "Run \`make && sudo make install' to install."
