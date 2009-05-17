@@ -644,12 +644,24 @@ write_streamed_attachment(_Stream, _F, 0, SpAcc) ->
     {ok, SpAcc};
 write_streamed_attachment(Stream, F, LenLeft, nil) ->
     Bin = F(),
-    {ok, StreamPointer} = couch_stream:write(Stream, Bin),
-    write_streamed_attachment(Stream, F, LenLeft - size(Bin), StreamPointer);
+    TruncatedBin = check_bin_length(LenLeft, Bin),
+    {ok, SpAcc} = couch_stream:write(Stream, TruncatedBin),
+    write_streamed_attachment(Stream, F, LenLeft - size(TruncatedBin), SpAcc);
 write_streamed_attachment(Stream, F, LenLeft, SpAcc) ->
     Bin = F(),
-    {ok, _} = couch_stream:write(Stream, Bin),
-    write_streamed_attachment(Stream, F, LenLeft - size(Bin), SpAcc).
+    TruncatedBin = check_bin_length(LenLeft, Bin),
+    {ok, _} = couch_stream:write(Stream, TruncatedBin),
+    write_streamed_attachment(Stream, F, LenLeft - size(TruncatedBin), SpAcc).
+
+%% on rare occasions ibrowse seems to process a chunked response incorrectly
+%% and include an extra "\r" in the last chunk.  This code ensures that we 
+%% truncate the downloaed attachment at the length specified in the metadata.
+check_bin_length(LenLeft, Bin) when size(Bin) > LenLeft ->
+    <<ValidData:LenLeft/binary, Crap/binary>> = Bin,
+    ?LOG_ERROR("write_streamed_attachment has written too much expected: ~p" ++
+        " got: ~p tail: ~p", [LenLeft, size(Bin), Crap]),
+    ValidData;
+check_bin_length(_, Bin) -> Bin.
 
 enum_docs_since_reduce_to_count(Reds) ->
     couch_btree:final_reduce(
