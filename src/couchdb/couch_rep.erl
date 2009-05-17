@@ -769,7 +769,8 @@ open_doc_revs(Db, DocId, Revs, Options) ->
 should_flush(DocCount) when DocCount > ?BUFFER_NDOCS ->
     true;
 should_flush(_DocCount) ->
-    MeAndMyLinks = [self()|element(2,process_info(self(),links))],
+    MeAndMyLinks = [self()|
+        [P || P <- element(2,process_info(self(),links)), is_pid(P)]],
     
     case length(MeAndMyLinks)/2 > ?BUFFER_NATTACHMENTS of
     true -> true;
