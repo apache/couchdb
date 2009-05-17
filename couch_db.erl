@@ -52,7 +52,7 @@ open_db_file(Filepath, Options) ->
             ok = file:rename(Filepath ++ ".compact", Filepath),
             {ok, Fd};
         {error, enoent} ->
-            not_found
+            {not_found, no_db_file}
         end;
     Error ->
         Error

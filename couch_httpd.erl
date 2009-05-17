@@ -469,7 +469,7 @@ error_info({bad_request, Reason}) ->
 error_info({query_parse_error, Reason}) ->
     {400, <<"query_parse_error">>, Reason};
 error_info(not_found) ->
-    {404, <<"not_found">>, <<"Missing">>};
+    {404, <<"not_found">>, <<"missing">>};
 error_info({not_found, Reason}) ->
     {404, <<"not_found">>, Reason};
 error_info(conflict) ->
