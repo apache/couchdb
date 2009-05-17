@@ -527,7 +527,13 @@ do_checkpoint(Source, Target, Context, NewSeqNum, Stats) ->
         % commit tgt sync
         {ok, TgtInstanceStartTime2} = ensure_full_commit(Target),
         
-        receive {SrcCommitPid, {ok, SrcInstanceStartTime2}} -> ok end,
+        SrcInstanceStartTime2 =
+        receive
+        {SrcCommitPid, {ok, Timestamp}} ->
+            Timestamp;
+        {'EXIT', SrcCommitPid, {http_request_failed, _}} ->
+            exit(replication_link_failure)
+        end,
         
         RecordSeqNum =
         if SrcInstanceStartTime2 == SrcInstanceStartTime andalso
