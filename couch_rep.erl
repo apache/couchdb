@@ -385,7 +385,7 @@ attachment_stub_converter(DbS, Id, Rev, {Name, {stub, Type, Length}}) ->
     {Pos, [RevId|_]} = Rev,
     Url = lists:flatten([DbUrl, url_encode(Id), "/", url_encode(?b2l(Name)),
         "?rev=", ?b2l(couch_doc:rev_to_str({Pos,RevId}))]),
-    ?LOG_DEBUG("Attachment URL ~p", [Url]),
+    ?LOG_DEBUG("Attachment URL ~s", [Url]),
     {ok, RcvFun} = make_attachment_stub_receiver(Url, Headers, Name, 
         Type, Length),
     {Name, {Type, {RcvFun, Length}}}.
@@ -396,7 +396,7 @@ make_attachment_stub_receiver(Url, Headers, Name, Type, Length) ->
 make_attachment_stub_receiver(Url, _Headers, _Name, _Type, _Length, 0) ->
     ?LOG_ERROR("streaming attachment request failed after 10 retries: ~s", 
         [Url]),
-    exit(attachment_request_failed);
+    exit({attachment_request_failed, ?l2b(["failed to replicate ", Url])});
     
 make_attachment_stub_receiver(Url, Headers, Name, Type, Length, Retries) ->
     %% start the process that receives attachment data from ibrowse
@@ -409,7 +409,9 @@ make_attachment_stub_receiver(Url, Headers, Name, Type, Length, Retries) ->
     ReqId = 
     case ibrowse:send_req_direct(Conn, Url, Headers, get, [], Opts, infinity) of
         {ibrowse_req_id, X} -> X;
-        {error, _Reason} -> exit(attachment_request_failed)
+        {error, Reason} ->
+            exit({attachment_request_failed,
+                ?l2b(["ibrowse error on ", Url, " : ", atom_to_list(Reason)])})
     end,
     
     %% tell our receiver about the ReqId it needs to look for
@@ -562,10 +564,12 @@ do_http_request(Url, Action, Headers) ->
 do_http_request(Url, Action, Headers, JsonBody) ->
     do_http_request(Url, Action, Headers, JsonBody, 10).
 
+do_http_request(Url, Action, Headers, Body, Retries) when is_binary(Url) ->
+    do_http_request(?b2l(Url), Action, Headers, Body, Retries);
 do_http_request(Url, Action, _Headers, _JsonBody, 0) ->
     ?LOG_ERROR("couch_rep HTTP ~p request failed after 10 retries: ~s", 
         [Action, Url]),
-    exit({http_request_failed, Url});
+    exit({http_request_failed, ?l2b(["failed to replicate ", Url])});
 do_http_request(Url, Action, Headers, JsonBody, Retries) ->
     ?LOG_DEBUG("couch_rep HTTP ~p request: ~s", [Action, Url]),
     Body =
@@ -702,19 +706,19 @@ open_doc_revs(#http_db{uri=DbUrl, headers=Headers} = DbS, DocId, Revs0,
     
     JsonResults = case length(Revs) > MaxN of
     false ->
-        Url = BaseUrl ++ "&open_revs=" ++ lists:flatten(?JSON_ENCODE(Revs)),
+        Url = ?l2b(BaseUrl ++ "&open_revs=" ++ ?JSON_ENCODE(Revs)),
         do_http_request(Url, get, Headers);
     true ->
         {_, Rest, Acc} = lists:foldl(
         fun(Rev, {Count, RevsAcc, AccResults}) when Count =:= MaxN ->
-            QSRevs = lists:flatten(?JSON_ENCODE(lists:reverse(RevsAcc))),
-            Url = BaseUrl ++ "&open_revs=" ++ QSRevs,
+            QSRevs = ?JSON_ENCODE(lists:reverse(RevsAcc)),
+            Url = ?l2b(BaseUrl ++ "&open_revs=" ++ QSRevs),
             {1, [Rev], AccResults++do_http_request(Url, get, Headers)};
         (Rev, {Count, RevsAcc, AccResults}) ->
             {Count+1, [Rev|RevsAcc], AccResults}
         end, {0, [], []}, Revs),
-        Acc ++ do_http_request(BaseUrl ++ "&open_revs=" ++ 
-            lists:flatten(?JSON_ENCODE(lists:reverse(Rest))), get, Headers)
+        Acc ++ do_http_request(?l2b(BaseUrl ++ "&open_revs=" ++
+            ?JSON_ENCODE(lists:reverse(Rest))), get, Headers)
     end,
     
     Results =
