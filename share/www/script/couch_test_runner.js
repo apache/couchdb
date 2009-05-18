@@ -109,8 +109,7 @@ function runTest(button, callback, debug) {
 function showSource(cell) {
   var name = $(cell).text();
   var win = window.open("", name, "width=700,height=500,resizable=yes,scrollbars=yes");
-  win.document.title = name;
-  $("<pre></pre>").text(couchTests[name].toString()).appendTo(win.document.body).fadeIn();
+  win.document.location = "script/test/" + name + ".js";
 }
 
 function updateTestsListing() {
