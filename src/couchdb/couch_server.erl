@@ -303,6 +303,11 @@ handle_call({delete, DbName, _Options}, _From, Server) ->
             true = ets:delete(couch_dbs_by_lru, LruTime),
             Server#server{dbs_open=Server#server.dbs_open - 1}
         end,
+        
+        %% Delete any leftover .compact files.  If we don't do this a subsequent
+        %% request for this DB will try to open the .compact file and use it.
+        file:delete(FullFilepath ++ ".compact"),
+        
         case file:delete(FullFilepath) of
         ok ->
             couch_db_update_notifier:notify({deleted, DbName}),
