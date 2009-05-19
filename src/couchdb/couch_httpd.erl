@@ -156,10 +156,19 @@ handle_request(MochiReq, UrlHandlers, DbUrlHandlers, DesignUrlHandlers) ->
                 || Part <- string:tokens(Path, "/")],
         db_url_handlers = DbUrlHandlers,
         design_url_handlers = DesignUrlHandlers
-        },
-    DefaultFun = fun couch_httpd_db:handle_request/1,
+    },
+
+    DefaultSpec = "{couch_httpd_db, handle_request}",
+    DefaultFun = make_arity_1_fun(
+        couch_config:get("httpd", "default_handler", DefaultSpec)
+    ),
     HandlerFun = couch_util:dict_find(HandlerKey, UrlHandlers, DefaultFun),
     
+    Self = self(),
+    ok = couch_config:register(
+        fun("httpd", "default_handler") -> exit(Self, config_change) end
+    ),
+
     {ok, Resp} =
     try
         HandlerFun(HttpReq#httpd{user_ctx=AuthenticationFun(HttpReq)})
