@@ -31,12 +31,11 @@ start_link() ->
 init([]) ->
     Self = self(),
     ok = couch_config:register(
-        fun("update_notification", _) ->
-            exit(Self, reload_config)
-        end),
+        fun("update_notification", Key, Value) -> reload_config(Key, Value) end
+    ),
     
     UpdateNotifierExes = couch_config:get("update_notification"),
-
+    
     {ok,
         {{one_for_one, 10, 3600}, 
             lists:map(fun({Name, UpdateNotifierExe}) ->
@@ -47,3 +46,19 @@ init([]) ->
                     supervisor,
                     [couch_db_update_notifier]}
                 end, UpdateNotifierExes)}}.
+
+%% @doc when update_notification configuration changes, terminate the process 
+%%      for that notifier and start a new one with the updated config
+reload_config(Id, Exe) ->
+    ChildSpec = {
+        Id,
+        {couch_db_update_notifier, start_link, [Exe]},
+        permanent,
+        1000,
+        supervisor,
+        [couch_db_update_notifier]
+    },
+    supervisor:terminate_child(couch_db_update_notifier_sup, Id),
+    supervisor:delete_child(couch_db_update_notifier_sup, Id),
+    supervisor:start_child(couch_db_update_notifier_sup, ChildSpec).
+
