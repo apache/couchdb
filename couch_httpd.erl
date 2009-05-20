@@ -13,7 +13,7 @@
 -module(couch_httpd).
 -include("couch_db.hrl").
 
--export([start_link/0, stop/0, handle_request/4]).
+-export([start_link/0, stop/0, handle_request/5]).
 
 -export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,path/1,absolute_uri/2]).
 -export([verify_is_server_admin/1,unquote/1,quote/1,recv/2,recv_chunked/4,error_info/1]).
@@ -35,6 +35,11 @@ start_link() ->
     BindAddress = couch_config:get("httpd", "bind_address", any),
     Port = couch_config:get("httpd", "port", "5984"),
     
+    DefaultSpec = "{couch_httpd_db, handle_request}",
+    DefaultFun = make_arity_1_fun(
+        couch_config:get("httpd", "default_handler", DefaultSpec)
+    ),
+    
     UrlHandlersList = lists:map(
         fun({UrlKey, SpecStr}) ->
             {?l2b(UrlKey), make_arity_1_fun(SpecStr)}
@@ -49,14 +54,15 @@ start_link() ->
         fun({UrlKey, SpecStr}) ->
             {?l2b(UrlKey), make_arity_2_fun(SpecStr)}
         end, couch_config:get("httpd_design_handlers")),
-        
+
     UrlHandlers = dict:from_list(UrlHandlersList),
     DbUrlHandlers = dict:from_list(DbUrlHandlersList),
     DesignUrlHandlers = dict:from_list(DesignUrlHandlersList),
     Loop = fun(Req)->
-            apply(?MODULE, handle_request,
-                    [Req, UrlHandlers, DbUrlHandlers, DesignUrlHandlers])
-        end,
+        apply(?MODULE, handle_request, [
+            Req, DefaultFun, UrlHandlers, DbUrlHandlers, DesignUrlHandlers
+        ])
+    end,
 
     % and off we go
     
@@ -76,6 +82,8 @@ start_link() ->
         fun("httpd", "bind_address") ->
             ?MODULE:stop();
         ("httpd", "port") ->
+            ?MODULE:stop();
+        ("httpd", "default_handler") ->
             ?MODULE:stop();
         ("httpd_global_handlers", _) ->
             ?MODULE:stop();
@@ -108,7 +116,8 @@ stop() ->
     mochiweb_http:stop(?MODULE).
     
 
-handle_request(MochiReq, UrlHandlers, DbUrlHandlers, DesignUrlHandlers) ->
+handle_request(MochiReq, DefaultFun,
+        UrlHandlers, DbUrlHandlers, DesignUrlHandlers) ->
     Begin = now(),
     AuthenticationFun = make_arity_1_fun(
             couch_config:get("httpd", "authentication_handler")),
@@ -158,16 +167,7 @@ handle_request(MochiReq, UrlHandlers, DbUrlHandlers, DesignUrlHandlers) ->
         design_url_handlers = DesignUrlHandlers
     },
 
-    DefaultSpec = "{couch_httpd_db, handle_request}",
-    DefaultFun = make_arity_1_fun(
-        couch_config:get("httpd", "default_handler", DefaultSpec)
-    ),
     HandlerFun = couch_util:dict_find(HandlerKey, UrlHandlers, DefaultFun),
-    
-    Self = self(),
-    ok = couch_config:register(
-        fun("httpd", "default_handler") -> exit(Self, config_change) end
-    ),
 
     {ok, Resp} =
     try
