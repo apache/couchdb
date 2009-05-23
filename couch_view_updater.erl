@@ -97,11 +97,20 @@ process_doc(Db, DocInfo, {Docs, #group{sig=Sig,name=GroupId,design_options=Desig
     #doc_info{id=DocId, revs=[#rev_info{deleted=Deleted}|_]} = DocInfo,
     IncludeDesign = proplists:get_value(<<"include_design">>, 
         DesignOptions, false),
+    LocalSeq = proplists:get_value(<<"local_seq">>, 
+        DesignOptions, false),
+    DocOpts = case LocalSeq of
+        true ->
+            [conflicts, deleted_conflicts, local_seq];
+        _ ->
+            [conflicts, deleted_conflicts]
+    end,
+    ?LOG_ERROR("DocOpts ~p LocalSeq ~p",[DocOpts, LocalSeq]),
     case {IncludeDesign, DocId} of
     {_, GroupId} ->
         % uh oh. this is the design doc with our definitions. See if
         % anything in the definition changed.
-        case couch_db:open_doc_int(Db, DocInfo, [conflicts, deleted_conflicts]) of
+        case couch_db:open_doc_int(Db, DocInfo, DocOpts) of
         {ok, Doc} ->
             case couch_view_group:design_doc_to_view_group(Doc) of
             #group{sig=Sig} ->
@@ -126,7 +135,7 @@ process_doc(Db, DocInfo, {Docs, #group{sig=Sig,name=GroupId,design_options=Desig
             {Docs, [{DocId, []} | DocIdViewIdKeys]};
         true ->
             {ok, Doc} = couch_db:open_doc_int(Db, DocInfo, 
-                [conflicts, deleted_conflicts]),
+                DocOpts),
             {[Doc | Docs], DocIdViewIdKeys}
         end,
         

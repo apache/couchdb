@@ -56,6 +56,8 @@ to_json_meta(Meta) ->
                     {JsonObj, PosAcc - 1}
                 end, Start, RevsInfo),
             {<<"_revs_info">>, JsonRevsInfo};
+        ({local_seq, Seq}) ->
+            {<<"_local_seq">>, Seq};
         ({conflicts, Conflicts}) ->
             {<<"_conflicts">>, rev_to_strs(Conflicts)};
         ({deleted_conflicts, DConflicts}) ->

@@ -801,6 +801,9 @@ parse_doc_query(Req) ->
         {"revs", "true"} ->
             Options = [revs | Args#doc_query_args.options],
             Args#doc_query_args{options=Options};
+        {"local_seq", "true"} ->
+            Options = [local_seq | Args#doc_query_args.options],
+            Args#doc_query_args{options=Options};
         {"revs_info", "true"} ->
             Options = [revs_info | Args#doc_query_args.options],
             Args#doc_query_args{options=Options};
