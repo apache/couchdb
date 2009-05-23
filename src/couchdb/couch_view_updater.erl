@@ -105,7 +105,6 @@ process_doc(Db, DocInfo, {Docs, #group{sig=Sig,name=GroupId,design_options=Desig
         _ ->
             [conflicts, deleted_conflicts]
     end,
-    ?LOG_ERROR("DocOpts ~p LocalSeq ~p",[DocOpts, LocalSeq]),
     case {IncludeDesign, DocId} of
     {_, GroupId} ->
         % uh oh. this is the design doc with our definitions. See if
