@@ -18,16 +18,19 @@ couchTests.design_options = function(debug) {
 
   //// test the includes_design option
   var map = "function (doc) {emit(null, doc._id);}";
+  var withseq = "function(doc) {emit(doc._local_seq, null)}"
 
   // we need a design doc even to test temp views with it
   var designDoc = {
     _id:"_design/fu",
     language: "javascript",
     options: {
-      include_design: true        
+      include_design: true,
+      local_seq: true        
     },
     views: {
-      data: {"map": map}
+      data: {"map": map},
+      with_seq : {"map" : withseq}
     }
   };
   T(db.save(designDoc).ok);
@@ -60,4 +63,13 @@ couchTests.design_options = function(debug) {
   T(db.save(designDoc).ok);
   rows = db.view("bango/data").rows;
   T(rows.length == 0);
+  
+  // should also have local_seq in the view
+  var resp = db.save({});
+  rows = db.view("fu/with_seq").rows;
+  T(rows[0].key == 1)
+  T(rows[1].key == 2)
+  var doc = db.open(resp.id);
+  db.deleteDoc(doc);
+  console.log(resp)
 };

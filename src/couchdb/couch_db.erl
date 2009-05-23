@@ -820,7 +820,7 @@ open_doc_int(Db, Id, Options) ->
         {not_found, missing}
     end.
 
-doc_meta_info(#doc_info{revs=[#rev_info{rev=Rev}|RestInfo]}, RevTree, Options) ->
+doc_meta_info(#doc_info{high_seq=Seq,revs=[#rev_info{rev=Rev}|RestInfo]}, RevTree, Options) ->
     case lists:member(revs_info, Options) of
     false -> [];
     true ->
@@ -851,6 +851,10 @@ doc_meta_info(#doc_info{revs=[#rev_info{rev=Rev}|RestInfo]}, RevTree, Options) -
         [] -> [];
         DelConflictRevs -> [{deleted_conflicts, DelConflictRevs}]
         end
+    end ++
+    case lists:member(local_seq, Options) of
+    false -> [];
+    true -> [{local_seq, Seq}]
     end.
 
 
