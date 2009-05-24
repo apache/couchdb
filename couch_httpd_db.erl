@@ -51,18 +51,21 @@ handle_changes_req(#httpd{method='GET',path_parts=[DbName|_]}=Req, Db) ->
     case couch_httpd:qs_value(Req, "continuous", "false") of
     "true" ->
         Self = self(),
-        Notify = couch_db_update_notifier:start_link(
+        {ok, Notify} = couch_db_update_notifier:start_link(
             fun({_, DbName0}) when DbName0 == DbName ->
                 Self ! db_updated;
             (_) ->
                 ok
             end),
+        couch_stats_collector:track_process_count(Self,
+                            {httpd, clients_requesting_changes}),
         try
             keep_sending_changes(Req, Resp, Db, StartSeq, <<"">>)
         after
-            catch couch_db_update_notifier:stop(Notify),
+            couch_db_update_notifier:stop(Notify),
             wait_db_updated(0) % clean out any remaining update messages
         end;
+        
     "false" ->
         {ok, {LastSeq, _Prepend}} = 
                 send_changes(Req, Resp, Db, StartSeq, <<"">>),

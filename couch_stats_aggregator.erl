@@ -309,6 +309,7 @@ init_descriptions() ->
     ets:insert(?MODULE, {{httpd, requests}, <<"number of HTTP requests">>}),
     ets:insert(?MODULE, {{httpd, temporary_view_reads}, <<"number of temporary view reads">>}),
     ets:insert(?MODULE, {{httpd, view_reads}, <<"number of view reads">>}),
+    ets:insert(?MODULE, {{httpd, clients_requesting_changes}, <<"Number of clients currently requesting continuous _changes">>}),
     
     ets:insert(?MODULE, {{httpd_request_methods, 'COPY'}, <<"number of HTTP COPY requests">>}),
     ets:insert(?MODULE, {{httpd_request_methods, 'DELETE'}, <<"number of HTTP DELETE requests">>}),
