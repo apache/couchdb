@@ -123,10 +123,10 @@ handle_call(close, _From, Stream) ->
     
     case Buffer of
     [] ->
-        Result = {Written, WrittenLen};
+        Result = {lists:reverse(Written), WrittenLen};
     _ ->
         {ok, Pos} = couch_file:append_binary(Fd, lists:reverse(Buffer)),
-        Result = {[Pos|Written], WrittenLen + BufferLen}
+        Result = {lists:reverse(Written, [Pos]), WrittenLen + BufferLen}
     end,
     {stop, normal, Result, Stream}.
 
