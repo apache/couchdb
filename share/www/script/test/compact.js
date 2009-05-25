@@ -15,7 +15,7 @@ couchTests.compact = function(debug) {
   db.deleteDb();
   db.createDb();
   if (debug) debugger;
-  var docs = makeDocs(0, 10);
+  var docs = makeDocs(0, 20);
   db.bulkSave(docs);
 
   var binAttDoc = {
@@ -35,6 +35,7 @@ couchTests.compact = function(debug) {
   for(var i in docs) {
       db.deleteDoc(docs[i]);
   }
+  T(db.ensureFullCommit().ok);
   var deletesize = db.info().disk_size;
   T(deletesize > originalsize);
 

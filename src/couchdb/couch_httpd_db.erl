@@ -723,12 +723,7 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
             % {"Content-Length", integer_to_list(couch_doc:bin_size(Bin))}
             ]),
         couch_doc:bin_foldl(Bin,
-            fun(BinSegment, []) ->
-                send_chunk(Resp, BinSegment),
-                {ok, []}
-            end,
-            []
-        ),
+                fun(BinSegment, _) -> send_chunk(Resp, BinSegment) end,[]),
         send_chunk(Resp, "")
     end;
 

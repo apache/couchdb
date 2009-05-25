@@ -139,7 +139,7 @@ couchTests.basics = function(debug) {
 
     // make sure we can still open the old rev of the deleted doc
     T(db.open(existingDoc._id, {rev: existingDoc._rev}) != null);
-
+    console.log("db.info: " + db.info.update_seq),
     // make sure restart works
     T(db.ensureFullCommit().ok);
     restartServer();
