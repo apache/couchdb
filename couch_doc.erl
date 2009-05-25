@@ -252,13 +252,12 @@ to_doc_info_path(#full_doc_info{id=Id,rev_tree=Tree}) ->
 
 
 bin_foldl(Bin, Fun, Acc) when is_binary(Bin) ->
-    case Fun(Bin, Acc) of
-        {ok, Acc2} -> {ok, Acc2};
-        {done, Acc2} -> {ok, Acc2}
-    end;
-bin_foldl({Fd, Sp, Len}, Fun, Acc) ->
-    {ok, Acc2, _Sp2} = couch_stream:foldl(Fd, Sp, Len, Fun, Acc),
-    {ok, Acc2}.
+    Fun(Bin, Acc);
+bin_foldl({Fd, Sp, Len}, Fun, Acc) when is_tuple(Sp) orelse Sp == null ->
+    % 09 UPGRADE CODE
+    couch_stream:old_foldl(Fd, Sp, Len, Fun, Acc);
+bin_foldl({Fd, Sp, _Len}, Fun, Acc) ->
+    couch_stream:foldl(Fd, Sp, Fun, Acc).
 
 bin_size(Bin) when is_binary(Bin) ->
     size(Bin);
@@ -267,9 +266,8 @@ bin_size({_Fd, _Sp, Len}) ->
 
 bin_to_binary(Bin) when is_binary(Bin) ->
     Bin;
-bin_to_binary({Fd, Sp, Len}) ->
-    {ok, Bin, _Sp2} = couch_stream:read(Fd, Sp, Len),
-    Bin.
+bin_to_binary({Fd, Sp, _Len}) ->
+    couch_stream:foldl(Fd, Sp, fun(Bin, Acc) -> [Bin|Acc] end, []).
 
 get_validate_doc_fun(#doc{body={Props}}) ->
     Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),

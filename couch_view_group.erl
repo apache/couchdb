@@ -205,7 +205,7 @@ handle_info(delayed_commit, #group_state{db_name=DbName,group=Group}=State) ->
     if CommittedSeq >= Group#group.current_seq ->
         % save the header
         Header = {Group#group.sig, get_index_header_data(Group)},
-        ok = couch_file:write_header(Group#group.fd, <<$r, $c, $k, 0>>, Header),
+        ok = couch_file:write_header(Group#group.fd, Header),
         {noreply, State#group_state{waiting_commit=false}};
     true ->
         % We can't commit the header because the database seq that's fully
@@ -261,7 +261,7 @@ handle_info({'EXIT', FromPid, reset},
 handle_info({'EXIT', _FromPid, normal}, State) ->
     {noreply, State};
     
-handle_info({'EXIT', FromPid, {{nocatch, Reason}, Trace}}, State) ->
+handle_info({'EXIT', FromPid, {{nocatch, Reason}, _Trace}}, State) ->
     ?LOG_DEBUG("Uncaught throw() in linked pid: ~p", [{FromPid, Reason}]),
     {stop, Reason, State};
 
@@ -313,7 +313,9 @@ prepare_group({view, RootDir, DbName, GroupId}, ForceReset)->
             if ForceReset ->
                 {ok, reset_file(Db, Fd, DbName, Group)};
             true ->
-                case (catch couch_file:read_header(Fd, <<$r, $c, $k, 0>>)) of
+                % 09 UPGRADE CODE
+                ok = couch_file:upgrade_old_header(Fd, <<$r, $c, $k, 0>>),
+                case (catch couch_file:read_header(Fd)) of
                 {ok, {Sig, HeaderInfo}} ->
                     % sigs match!
                     {ok, init_group(Db, Fd, Group, HeaderInfo)};
@@ -417,7 +419,7 @@ reset_group(#group{views=Views}=Group) ->
 reset_file(Db, Fd, DbName, #group{sig=Sig,name=Name} = Group) ->
     ?LOG_DEBUG("Reseting group index \"~s\" in db ~s", [Name, DbName]),
     ok = couch_file:truncate(Fd, 0),
-    ok = couch_file:write_header(Fd, <<$r, $c, $k, 0>>, {Sig, nil}),
+    ok = couch_file:write_header(Fd, {Sig, nil}),
     init_group(Db, Fd, reset_group(Group), nil).
 
 delete_index_file(RootDir, DbName, GroupId) ->
