@@ -211,6 +211,8 @@ transfer_fields([{<<"_deleted">>, B} | Rest], Doc) when (B==true) or (B==false) 
 % ignored fields
 transfer_fields([{<<"_revs_info">>, _} | Rest], Doc) ->
     transfer_fields(Rest, Doc);
+transfer_fields([{<<"_local_seq">>, _} | Rest], Doc) ->
+    transfer_fields(Rest, Doc);
 transfer_fields([{<<"_conflicts">>, _} | Rest], Doc) ->
     transfer_fields(Rest, Doc);
 transfer_fields([{<<"_deleted_conflicts">>, _} | Rest], Doc) ->
