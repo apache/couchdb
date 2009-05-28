@@ -81,7 +81,10 @@ register(Fun, Pid) ->
 %% @doc Creates a new ets table of the type "set".
 init(IniFiles) ->
     ets:new(?MODULE, [named_table, set, protected]),
-    [ok = load_ini_file(IniFile) || IniFile <- IniFiles],
+    lists:map(fun(IniFile) ->
+        {ok, ParsedIniValues} = parse_ini_file(IniFile),
+        ets:insert(?MODULE, ParsedIniValues)
+    end, IniFiles),
     {ok, #config{write_filename=lists:last(IniFiles)}}.
 
 handle_call({set, KVs, Persist}, _From, Config) ->
@@ -114,6 +117,13 @@ handle_call({register, Fun, Pid}, _From, #config{notify_funs=PidFuns}=Config) ->
 %% @spec load_ini_file(IniFile::filename()) -> ok
 %% @doc Parses an ini file and stores Key/Value Pairs into the ets table.
 load_ini_file(IniFile) ->
+    {ok, KVs} = parse_ini_file(IniFile),
+    gen_server:call(?MODULE, {set, KVs, false}).
+
+%% @spec load_ini_file(IniFile::filename()) -> {ok, [KV]}
+%%       KV = {{Section::string(), Key::string()}, Value::String()}
+%% @throws {startup_error, Msg::string()}
+parse_ini_file(IniFile) ->
     IniFilename = couch_util:abs_pathname(IniFile),
     IniBin =
     case file:read_file(IniFilename) of
@@ -151,9 +161,7 @@ load_ini_file(IniFile) ->
                 end
             end
         end, {"", []}, Lines),
-
-        [ets:insert(?MODULE, {Key, Value}) || {Key, Value} <- ParsedIniValues],
-    ok.
+    {ok, ParsedIniValues}.
 
 % Unused gen_server behaviour API functions that we need to declare.
 
