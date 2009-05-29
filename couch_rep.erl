@@ -808,16 +808,20 @@ should_flush(_DocCount) ->
 %% @spec memory_footprint([pid()]) -> integer()
 %% @doc Sum of process and binary memory utilization for all processes in list
 memory_footprint(PidList) ->
-    ProcessMemory = lists:foldl(fun(Pid, Acc) ->
-        Acc + element(2,process_info(Pid, memory))
-    end, 0, PidList),
-    
-    BinaryMemory = lists:foldl(fun(Pid, Acc) ->
-        Acc + binary_memory(Pid)
-    end, 0, PidList),
-    
+    memory_footprint(PidList, {0,0}).
+
+memory_footprint([], {ProcessMemory, BinaryMemory}) ->
     ?LOG_DEBUG("ProcessMem ~p BinaryMem ~p", [ProcessMemory, BinaryMemory]),
-    ProcessMemory + BinaryMemory.
+    ProcessMemory + BinaryMemory;
+memory_footprint([Pid|Rest], {ProcAcc, BinAcc}) ->
+    case is_process_alive(Pid) of
+    true ->
+        ProcMem = element(2,process_info(Pid, memory)),
+        BinMem = binary_memory(Pid),
+        memory_footprint(Rest, {ProcMem + ProcAcc, BinMem + BinAcc});
+    false ->
+        memory_footprint(Rest, {ProcAcc, BinAcc})
+    end.
 
 %% @spec binary_memory(pid()) -> integer()
 %% @doc Memory utilization of all binaries referenced by this process.
