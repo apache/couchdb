@@ -613,8 +613,9 @@ write_streamed_attachment(_Stream, _F, 0) ->
     ok;
 write_streamed_attachment(Stream, F, LenLeft) ->
     Bin = F(),
-    ok = couch_stream:write(Stream, check_bin_length(LenLeft, Bin)),
-    write_streamed_attachment(Stream, F, LenLeft - size(Bin)).
+    TruncatedBin = check_bin_length(LenLeft, Bin),
+    ok = couch_stream:write(Stream, TruncatedBin),
+    write_streamed_attachment(Stream, F, LenLeft - size(TruncatedBin)).
 
 %% on rare occasions ibrowse seems to process a chunked response incorrectly
 %% and include an extra "\r" in the last chunk.  This code ensures that we 
