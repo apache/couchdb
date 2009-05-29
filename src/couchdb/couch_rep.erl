@@ -692,7 +692,7 @@ enum_docs_since(Pid, DbSource, DbTarget, {StartSeq, RevsCount}) ->
             
 get_db_info(#http_db{uri=DbUrl, headers=Headers}) ->
     {DbProps} = do_http_request(DbUrl, get, Headers),
-    {ok, [{list_to_existing_atom(?b2l(K)), V} || {K,V} <- DbProps]};
+    {ok, [{list_to_atom(?b2l(K)), V} || {K,V} <- DbProps]};
 get_db_info(Db) ->
     couch_db:get_db_info(Db).
 
