@@ -102,7 +102,7 @@ handle_call({write, Bin}, _From, Stream) ->
         buffer_list = Buffer,
         max_buffer = Max} = Stream,
     if BinSize + BufferLen > Max ->
-        {ok, Pos} = couch_file:append_binary(Fd, lists:reverse(Buffer, Bin)),
+        {ok, Pos} = couch_file:append_binary(Fd, lists:reverse(Buffer, [Bin])),
         {reply, ok, Stream#stream{
                         written_len=WrittenLen + BufferLen + BinSize,
                         written_pointers=[Pos|Written],
