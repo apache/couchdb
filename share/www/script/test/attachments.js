@@ -181,5 +181,20 @@ couchTests.attachments= function(debug) {
   // Compaction should reduce the database slightly, but not
   // orders of magnitude (unless attachments introduce sparseness)
   T(after > before * 0.1, "before: " + before + " after: " + after);
+  
+  
+  // test large attachments - COUCHDB-366
+  var lorem = CouchDB.request("GET", "/_utils/script/test/lorem.txt").responseText;
+
+  var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc5/lorem.txt", {
+    headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body:lorem
+  });
+  T(xhr.status == 201);
+  var rev = JSON.parse(xhr.responseText).rev;
+
+  var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc5/lorem.txt");
+  T(xhr.responseText == lorem);
+  T(xhr.getResponseHeader("Content-Type") == "text/plain;charset=utf-8");
 
 };
