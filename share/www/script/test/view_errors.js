@@ -94,15 +94,6 @@ couchTests.view_errors = function(debug) {
   };
   T(db.save(designDoc2).ok);
   
-  var designDoc3 = {
-    _id:"_design/infinite",
-    language: "javascript",
-    views: {
-      "infinite_loop" :{map:"function(doc) {while(true){emit(doc,doc);}};"}
-    }
-  };
-  T(db.save(designDoc3).ok);
-  db.view("infinite/infinite_loop");
   try {
       db.view("test/no_reduce", {group: true});
       T(0 == 1);
@@ -124,13 +115,7 @@ couchTests.view_errors = function(debug) {
   } catch(e) {
       T(e.error == "query_parse_error");
   }
-  db.view("infinite/infinite_loop");
-  try {
-      db.view("infinite/infinite_loop");
-      T(0 == 1);
-  } catch(e) {
-      T(e.error == "query_parse_error");
-  }
+    
   // Check error responses for invalid multi-get bodies.
   var path = "/test_suite_db/_design/test/_view/no_reduce";
   var xhr = CouchDB.request("POST", path, {body: "[]"});
