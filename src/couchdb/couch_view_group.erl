@@ -274,9 +274,10 @@ handle_info({'DOWN',_,_,_,_}, State) ->
     {stop, normal, reply_all(State, shutdown)}.
 
 
-terminate(Reason, State) ->
-    reply_all(State, Reason),
-    couch_util:terminate_linked(Reason),
+terminate(Reason, #group_state{updater_pid=Update, compactor_pid=Compact}=S) ->
+    reply_all(S, Reason),
+    catch exit(Update, Reason),
+    catch exit(Compact, Reason),
     ok.
 
 code_change(_OldVsn, State, _Extra) ->

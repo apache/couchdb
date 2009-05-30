@@ -14,7 +14,7 @@
 -behaviour(gen_server).
 
 -export([start_link/1, start_link/2, start_link/3, stop/1]).
--export([set_timeout/2, write/2, read/1, prompt/2, async/3]).
+-export([set_timeout/2, prompt/2]).
 -export([writeline/2, readline/1, writejson/2, readjson/1]).
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2, code_change/3]).
 
@@ -27,7 +27,7 @@
      port,
      writer,
      reader,
-     timeout
+     timeout=5000
     }).
 
 start_link(Command) ->
@@ -44,23 +44,14 @@ stop(Pid) ->
 set_timeout(Pid, TimeOut) when is_integer(TimeOut) ->
     ok = gen_server:call(Pid, {set_timeout, TimeOut}).
 
-write(Pid, Data) ->
-    gen_server:call(Pid, {write, Data}).
-
-read(Pid) ->
-    gen_server:call(Pid, read).
-
 prompt(Pid, Data) ->
     case gen_server:call(Pid, {prompt, Data}, infinity) of
         {ok, Result} ->
             Result;
-        {error, Error} ->
+        Error ->
             ?LOG_DEBUG("OS Process Error ~p",[Error]),
             throw(Error)
     end.
-
-async(Pid, Data, CallBack) ->
-    gen_server:cast(Pid, {async, Data, CallBack}).
 
 % Utility functions for reading and writing
 % in custom functions
@@ -103,17 +94,31 @@ readjson(OsProc) when is_record(OsProc, os_proc) ->
         Result
     end.
 
+
 % gen_server API
 init([Command, Options, PortOptions]) ->
-    BaseTimeOut = list_to_integer(couch_config:get(
-        "couchdb", "os_process_timeout", "5000")),
+    case code:priv_dir(couch) of
+    {error, bad_name} ->
+        % small hack, in dev mode "app" is couchdb. Fixing requires renaming
+        % src/couch to src/couch. Not really worth the hassle.-Damien
+        PrivDir = code:priv_dir(couchdb);
+    PrivDir -> ok
+    end,
+    Spawnkiller = filename:join(PrivDir, "couchspawnkillable"),
     BaseProc = #os_proc{
         command=Command,
-        port=open_port({spawn, Command}, PortOptions),
+        port=open_port({spawn, Spawnkiller ++ " " ++ Command}, PortOptions),
         writer=fun writejson/2,
-        reader=fun readjson/1,
-        timeout=BaseTimeOut
+        reader=fun readjson/1
     },
+    KillCmd = readline(BaseProc),
+    Pid = self(),
+    spawn(fun() ->
+            % this ensure the real os process is killed when this process dies.
+            erlang:monitor(process, Pid),
+            receive _ -> ok end,
+            os:cmd(?b2l(KillCmd))
+        end),
     OsProc =
     lists:foldl(fun(Opt, Proc) ->
         case Opt of
@@ -127,36 +132,22 @@ init([Command, Options, PortOptions]) ->
     end, BaseProc, Options),
     {ok, OsProc}.
 
-terminate(_Reason, #os_proc{port=nil}) ->
-    ok;
 terminate(_Reason, #os_proc{port=Port}) ->
     catch port_close(Port),
     ok.
 
 handle_call({set_timeout, TimeOut}, _From, OsProc) ->
     {reply, ok, OsProc#os_proc{timeout=TimeOut}};
-handle_call({write, Data}, _From, OsProc) ->
-    Writer = OsProc#os_proc.writer,
-    {reply, Writer(OsProc, Data), OsProc};
-handle_call(read, _From, OsProc) ->
-    Reader = OsProc#os_proc.reader,
-    {reply, Reader(OsProc), OsProc};
 handle_call({prompt, Data}, _From, OsProc) ->
     #os_proc{writer=Writer, reader=Reader} = OsProc,
-    Writer(OsProc, Data),
-    Result = try Reader(OsProc) of
-        Ok -> {ok, Ok}
+    try
+        Writer(OsProc, Data),
+        {reply, {ok, Reader(OsProc)}, OsProc}
     catch
         throw:OsError ->
-            {error, OsError}
-    end,
-    {reply, Result, OsProc}.
+            {stop, normal, OsError, OsProc}
+    end.
 
-handle_cast({async, Data, CallBack}, OsProc) ->
-    #os_proc{writer=Writer, reader=Reader} = OsProc,
-    Writer(OsProc, Data),
-    CallBack(Reader(OsProc)),
-    {noreply, OsProc};
 handle_cast(stop, OsProc) ->
     {stop, normal, OsProc};
 handle_cast(Msg, OsProc) ->
