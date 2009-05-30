@@ -2,7 +2,7 @@
 %% -*- erlang -*-
 %%! -pa ./src/couchdb -sasl errlog_type error -boot start_sasl -noshell
 
--define(FILE_NAME, "./t/temp.021").
+-define(FILE_NAME, "./test/etap/temp.021").
 -define(ROWS, 1000).
 
 main(_) ->

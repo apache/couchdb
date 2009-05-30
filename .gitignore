@@ -62,3 +62,11 @@ etc/couchdb/default_dev.ini
 etc/couchdb/local_dev.ini
 utils/run
 tmp
+
+# for make check
+
+test/etap/temp.*
+
+# for make cover
+
+cover/*

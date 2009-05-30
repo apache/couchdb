@@ -2,7 +2,8 @@
 %% -*- erlang -*-
 %%! -pa ./src/couchdb -sasl errlog_type error -boot start_sasl -noshell
 
--define(FILE_NAME, "./t/temp.020").
+-define(FILE_NAME, "./test/etap/temp.020").
+-define(ROWS, 250).
 
 -record(btree, {fd, root, extract_kv, assemble_kv, less, reduce}).
 
@@ -21,7 +22,7 @@ main(_) ->
 %% broken into multiple nodes. AKA "How do we appropiately detect if multiple
 %% nodes were created."
 test()->
-    Sorted = [{Seq, random:uniform()} || Seq <- lists:seq(1, 1000)],
+    Sorted = [{Seq, random:uniform()} || Seq <- lists:seq(1, ?ROWS)],
     etap:ok(test_kvs(Sorted), "Testing sorted keys"),
     etap:ok(test_kvs(lists:reverse(Sorted)), "Testing reversed sorted keys"),
     etap:ok(test_kvs(shuffle(Sorted)), "Testing shuffled keys."),

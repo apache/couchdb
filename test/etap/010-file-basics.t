@@ -2,7 +2,7 @@
 %% -*- erlang -*-
 %%! -pa ./src/couchdb -sasl errlog_type error -boot start_sasl -noshell
 
--define(FILE_NAME, "./t/temp.010").
+-define(FILE_NAME, "./test/etap/temp.010").
 
 main(_) ->
     etap:plan(16),

@@ -2,7 +2,7 @@
 %% -*- erlang -*-
 %%! -pa ./src/couchdb -sasl errlog_type error -boot start_sasl -noshell
 
--define(FILE_NAME, "./t/temp.011").
+-define(FILE_NAME, "./test/etap/temp.011").
 -define(SIZE_BLOCK, 4096). % Need to keep this in sync with couch_file.erl
 
 main(_) ->
