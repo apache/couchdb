@@ -260,7 +260,7 @@ handle_call({start_group_server, DbName, GroupId}, _From, #server{root_dir=Root}
     case ets:lookup(group_servers_by_name, {DbName, GroupId}) of
     [] ->
         ?LOG_DEBUG("Spawning new group server for view group ~s in database ~s.", [GroupId, DbName]),
-        case couch_view_group:start_link({view, Root, DbName, GroupId}) of
+        case (catch couch_view_group:start_link({view, Root, DbName, GroupId})) of
         {ok, NewPid} ->
             add_to_ets(NewPid, DbName, GroupId),
             {reply, {ok, NewPid}, Server};

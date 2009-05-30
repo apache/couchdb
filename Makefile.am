@@ -13,9 +13,11 @@
 ICU_LOCAL_FLAGS = $(ICU_LOCAL_CFLAGS) $(ICU_LOCAL_LDFLAGS)
 
 # devdocdir = $(localdocdir)/developer/couchdb
-couchprivlibdir = $(localerlanglibdir)/couch-$(version)/priv/lib
-couchincludedir = $(localerlanglibdir)/couch-$(version)/include
-couchebindir = $(localerlanglibdir)/couch-$(version)/ebin
+couchlibdir = $(localerlanglibdir)/couch-$(version)
+couchprivdir = $(couchlibdir)/priv
+couchprivlibdir = $(couchlibdir)/priv/lib
+couchincludedir = $(couchlibdir)/include
+couchebindir = $(couchlibdir)/ebin
 
 couchprivlib_LTLIBRARIES = couch_erl_driver.la
 couch_erl_driver_la_SOURCES = couch_erl_driver.c
@@ -32,6 +34,8 @@ couchjs_LDADD = -lcurl
 couchinclude_DATA = couch_db.hrl
 
 couchebin_DATA = $(compiled_files)
+
+couchpriv_SCRIPTS = priv/couchspawnkillable
 
 # dist_devdoc_DATA = $(doc_base) $(doc_modules)
 
