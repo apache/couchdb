@@ -1,0 +1,191 @@
+#!/usr/bin/env escript
+%% -*- erlang -*-
+%%! -pa ./src/couchdb -sasl errlog_type error -boot start_sasl -noshell
+
+-define(FILE_NAME, "./t/temp.020").
+
+-record(btree, {fd, root, extract_kv, assemble_kv, less, reduce}).
+
+main(_) ->
+    etap:plan(48),
+    case (catch test()) of
+        ok ->
+            etap:end_tests();
+        Other ->
+            etap:diag(io_lib:format("Test died abnormally: ~p", [Other])),
+            etap:bail()
+    end,
+    ok.
+
+%% @todo Determine if this number should be greater to see if the btree was
+%% broken into multiple nodes. AKA "How do we appropiately detect if multiple
+%% nodes were created."
+test()->
+    Sorted = [{Seq, random:uniform()} || Seq <- lists:seq(1, 1000)],
+    etap:ok(test_kvs(Sorted), "Testing sorted keys"),
+    etap:ok(test_kvs(lists:reverse(Sorted)), "Testing reversed sorted keys"),
+    etap:ok(test_kvs(shuffle(Sorted)), "Testing shuffled keys."),
+    ok.
+
+test_kvs(KeyValues) ->    
+    ReduceFun = fun
+        (reduce, KVs) ->
+            length(KVs);
+        (rereduce, Reds) ->
+            lists:sum(Reds)
+    end,
+
+    Keys = [K || {K, _} <- KeyValues],
+
+    {ok, Fd} = couch_file:open(?FILE_NAME, [create,overwrite]),
+    {ok, Btree} = couch_btree:open(nil, Fd),
+    etap:ok(is_record(Btree, btree), "Created btree is really a btree record"),
+    etap:is(Btree#btree.fd, Fd, "Btree#btree.fd is set correctly."),
+    etap:is(Btree#btree.root, nil, "Btree#btree.root is set correctly."),
+
+    Btree1 = couch_btree:set_options(Btree, [{reduce, ReduceFun}]),
+    etap:is(Btree1#btree.reduce, ReduceFun, "Reduce function was set"),
+    EmptyRes = couch_btree:foldl(Btree1, fun(_, X) -> {ok, X+1} end, 0),
+    etap:is(EmptyRes, {ok, 0}, "Folding over an empty btree"),
+
+    {ok, Btree2} = couch_btree:add_remove(Btree1, KeyValues, []),
+    etap:ok(test_btree(Btree2, KeyValues),
+        "Adding all keys at once returns a complete btree."),
+    
+    etap:fun_is(
+        fun
+            ({ok, {kp_node, _}}) -> true;
+            (_) -> false
+        end,
+        couch_file:pread_term(Fd, element(1, Btree2#btree.root)),
+        "Btree root pointer is a kp_node."
+    ),
+
+    {ok, Btree3} = couch_btree:add_remove(Btree2, [], Keys),
+    etap:ok(test_btree(Btree3, []),
+        "Removing all keys at once returns an empty btree."),
+
+    Btree4 = lists:foldl(fun(KV, BtAcc) ->
+        {ok, BtAcc2} = couch_btree:add_remove(BtAcc, [KV], []),
+        BtAcc2
+    end, Btree3, KeyValues),
+    etap:ok(test_btree(Btree4, KeyValues),
+        "Adding all keys one at a time returns a complete btree."),
+
+    Btree5 = lists:foldl(fun({K, _}, BtAcc) ->
+        {ok, BtAcc2} = couch_btree:add_remove(BtAcc, [], [K]),
+        BtAcc2
+    end, Btree4, KeyValues),
+    etap:ok(test_btree(Btree5, []),
+        "Removing all keys one at a time returns an empty btree."),
+
+    KeyValuesRev = lists:reverse(KeyValues),
+    Btree6 = lists:foldl(fun(KV, BtAcc) ->
+        {ok, BtAcc2} = couch_btree:add_remove(BtAcc, [KV], []),
+        BtAcc2
+    end, Btree5, KeyValuesRev),
+    etap:ok(test_btree(Btree6, KeyValues),
+        "Adding all keys in reverse order returns a complete btree."),
+
+    {_, Rem2Keys0, Rem2Keys1} = lists:foldl(fun(X, {Count, Left, Right}) ->
+        case Count rem 2 == 0 of
+            true-> {Count+1, [X | Left], Right};
+            false -> {Count+1, Left, [X | Right]}
+        end
+    end, {0, [], []}, KeyValues),
+
+    etap:ok(test_add_remove(Btree6, Rem2Keys0, Rem2Keys1),
+        "Add/Remove every other key."),
+    
+    etap:ok(test_add_remove(Btree6, Rem2Keys1, Rem2Keys0),
+        "Add/Remove opposite every other key."),
+
+    {ok, Btree7} = couch_btree:add_remove(Btree6, [], [K||{K,_}<-Rem2Keys1]),
+    {ok, Btree8} = couch_btree:add_remove(Btree7, [], [K||{K,_}<-Rem2Keys0]),
+    etap:ok(test_btree(Btree8, []),
+        "Removing both halves of every other key returns an empty btree."),
+
+    %% Third chunk (close out)
+    etap:is(couch_file:close(Fd), ok, "closing out"),
+    true.
+
+test_btree(Btree, KeyValues) ->
+    ok = test_key_access(Btree, KeyValues),
+    ok = test_lookup_access(Btree, KeyValues),
+    ok = test_final_reductions(Btree, KeyValues),
+    true.
+
+test_add_remove(Btree, OutKeyValues, RemainingKeyValues) ->
+    Btree2 = lists:foldl(fun({K, _}, BtAcc) ->
+        {ok, BtAcc2} = couch_btree:add_remove(BtAcc, [], [K]),
+        BtAcc2
+    end, Btree, OutKeyValues),
+    true = test_btree(Btree2, RemainingKeyValues),
+
+    Btree3 = lists:foldl(fun(KV, BtAcc) ->
+        {ok, BtAcc2} = couch_btree:add_remove(BtAcc, [KV], []),
+        BtAcc2
+    end, Btree2, OutKeyValues),
+    true = test_btree(Btree3, OutKeyValues ++ RemainingKeyValues).
+
+test_key_access(Btree, List) ->
+    FoldFun = fun(Element, {[HAcc|TAcc], Count}) ->
+        case Element == HAcc of
+            true -> {ok, {TAcc, Count + 1}};
+            _ -> {ok, {TAcc, Count + 1}}
+        end
+    end,
+    Length = length(List),
+    Sorted = lists:sort(List),
+    {ok, {[], Length}} = couch_btree:foldl(Btree, FoldFun, {Sorted, 0}),
+    {ok, {[], Length}} = couch_btree:foldr(Btree, FoldFun, {Sorted, 0}),
+    ok.
+
+test_lookup_access(Btree, KeyValues) ->
+    FoldFun = fun({Key, Value}, {Key, Value}) -> {stop, true} end,
+    lists:foreach(fun({Key, Value}) ->
+        [{ok, {Key, Value}}] = couch_btree:lookup(Btree, [Key]),
+        {ok, true} = couch_btree:foldl(Btree, Key, FoldFun, {Key, Value})
+    end, KeyValues).
+
+test_final_reductions(Btree, KeyValues) ->
+    KVLen = length(KeyValues),
+    FoldLFun = fun(_X, LeadingReds, Acc) ->
+        CountToStart = KVLen div 3 + Acc,
+        CountToStart = couch_btree:final_reduce(Btree, LeadingReds),
+        {ok, Acc+1}
+    end,
+    FoldRFun = fun(_X, LeadingReds, Acc) ->
+        CountToEnd = KVLen - KVLen div 3 + Acc,
+        CountToEnd = couch_btree:final_reduce(Btree, LeadingReds),
+        {ok, Acc+1}
+    end,
+    {LStartKey, _} = case KVLen of
+        0 -> {nil, nil};
+        _ -> lists:nth(KVLen div 3 + 1, lists:sort(KeyValues))
+    end,
+    {RStartKey, _} = case KVLen of
+        0 -> {nil, nil};
+        _ -> lists:nth(KVLen div 3, lists:sort(KeyValues))
+    end,
+    {ok, FoldLRed} = couch_btree:foldl(Btree, LStartKey, FoldLFun, 0),
+    {ok, FoldRRed} = couch_btree:foldr(Btree, RStartKey, FoldRFun, 0),
+    KVLen = FoldLRed + FoldRRed,
+    ok.
+
+shuffle(List) ->
+   randomize(round(math:log(length(List)) + 0.5), List).
+
+randomize(1, List) ->
+   randomize(List);
+randomize(T, List) ->
+    lists:foldl(fun(_E, Acc) ->
+        randomize(Acc)
+    end, randomize(List), lists:seq(1, (T - 1))).
+
+randomize(List) ->
+    D = lists:map(fun(A) ->
+        {random:uniform(), A}
+    end, List),
+    {_, D1} = lists:unzip(lists:keysort(1, D)), 
+    D1.

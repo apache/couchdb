@@ -36,6 +36,9 @@ README.gz: $(top_srcdir)/README
 THANKS.gz: $(top_srcdir)/THANKS
 	-gzip -9 < $< > $@
 
+check: all
+	prove t/*.t
+
 dev: all
 	@echo "This command is intended for developers to use;"
 	@echo "it creates development ini files as well as a"
