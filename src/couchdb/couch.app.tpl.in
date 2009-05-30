@@ -1,4 +1,4 @@
-{application,couchdb,
+{application,couch,
              [{description,"@package_name@"},
               {vsn,"@version@"},
               {modules,[couch_btree,
