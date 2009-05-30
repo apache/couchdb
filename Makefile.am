@@ -39,6 +39,13 @@ THANKS.gz: $(top_srcdir)/THANKS
 check: all
 	prove test/etap/*.t
 
+cover: all
+	rm -f cover/*.coverdata
+	COVER=1 COVER_BIN=./src/couchdb/ prove test/etap/*.t
+	SRC=./src/couchdb/ \
+	    $(ERL) -noshell -eval 'etap_report:create()' \
+	    -s init stop -noshell > /dev/null 2>&1
+
 dev: all
 	@echo "This command is intended for developers to use;"
 	@echo "it creates development ini files as well as a"

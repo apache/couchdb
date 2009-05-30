@@ -87,11 +87,11 @@ test_from_json_success() ->
         },
         {
             {[
-                {<<"_rev">>, <<"6-something">>},
                 {<<"_revisions">>, {[
                     {<<"start">>, 4},
                     {<<"ids">>, [<<"foo1">>, <<"phi3">>, <<"omega">>]}
-                ]}}
+                ]}},
+                {<<"_rev">>, <<"6-something">>}
             ]},
             #doc{revs={4, [<<"foo1">>, <<"phi3">>, <<"omega">>]}},
             "_revisions attribute are preferred to _rev."

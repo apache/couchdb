@@ -76,4 +76,4 @@ CLEANFILES = \
     $(mochiwebebin_make_generated_file_list)
 
 %.beam: %.erl
-	$(ERLC) $<
+	$(ERLC) $(ERLC_FLAGS) $<
