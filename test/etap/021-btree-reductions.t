@@ -6,6 +6,7 @@
 -define(ROWS, 1000).
 
 main(_) ->
+    code:add_pathz("src/couchdb"),
     etap:plan(8),
     case (catch test()) of
         ok ->

@@ -8,6 +8,7 @@
             attachments=[], deleted=false, meta=[]}).
 
 main(_) ->
+    code:add_pathz("src/couchdb"),
     etap:plan(26),
     case (catch test()) of
         ok ->

@@ -5,6 +5,7 @@
 -define(FILE_NAME, "./test/etap/temp.010").
 
 main(_) ->
+    code:add_pathz("src/couchdb"),
     etap:plan(16),
     case (catch test()) of
         ok ->
