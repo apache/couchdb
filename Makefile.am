@@ -37,7 +37,7 @@ THANKS.gz: $(top_srcdir)/THANKS
 	-gzip -9 < $< > $@
 
 check: all
-	prove t/*.t
+	prove test/etap/*.t
 
 dev: all
 	@echo "This command is intended for developers to use;"
