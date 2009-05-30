@@ -468,7 +468,7 @@ make_blocks(BlockOffset, IoList) ->
     case split_iolist(IoList, (?SIZE_BLOCK - BlockOffset), []) of
     {Begin, End} ->
         [Begin | make_blocks(0, End)];
-    _Size ->
+    _SplitRemaining ->
         IoList
     end.
 
@@ -485,8 +485,8 @@ split_iolist([Sublist| Rest], SplitAt, BeginAcc) when is_list(Sublist) ->
     case split_iolist(Sublist, SplitAt, BeginAcc) of
     {Begin, End} ->
         {Begin, [End | Rest]};
-    Len ->
-        split_iolist(Rest, SplitAt - Len, [Sublist | BeginAcc])
+    SplitRemaining ->
+        split_iolist(Rest, SplitAt - (SplitAt - SplitRemaining), [Sublist | BeginAcc])
     end;
 split_iolist([Byte | Rest], SplitAt, BeginAcc) when is_integer(Byte) ->
     split_iolist(Rest, SplitAt - 1, [Byte | BeginAcc]).
