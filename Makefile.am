@@ -169,7 +169,7 @@ couch.app: couch.app.tpl
 # $(ERL) -noshell -run edoc_run files [\"$<\"]
 
 %.beam: %.erl couch_db.hrl
-	$(ERLC) ${TEST} $<;
+	$(ERLC) $(ERLC_FLAGS) ${TEST} $<;
 
 install-data-hook:
 	if test -f "$(DESTDIR)/$(couchprivlibdir)/couch_erl_driver"; then \
