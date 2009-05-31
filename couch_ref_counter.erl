@@ -75,7 +75,9 @@ handle_cast({drop, Pid}, #srv{referrers=Referrers}=Srv) ->
         erlang:demonitor(MonRef, [flush]),
         dict:erase(Pid, Referrers);
     {ok, {MonRef, Num}} ->
-        dict:store(Pid, {MonRef, Num-1}, Referrers)
+        dict:store(Pid, {MonRef, Num-1}, Referrers);
+    error ->
+        Referrers
     end,
     maybe_close_async(Srv#srv{referrers=Referrers2}).
 
