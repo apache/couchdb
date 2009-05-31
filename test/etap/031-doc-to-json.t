@@ -150,3 +150,4 @@ test_to_json_success() ->
             etap:is(couch_doc:to_json_obj(Doc, Options), EJson, Mesg)
     end, Cases),
     ok.
+

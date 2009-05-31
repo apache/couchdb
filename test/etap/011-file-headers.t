@@ -2,8 +2,8 @@
 %% -*- erlang -*-
 %%! -pa ./src/couchdb -sasl errlog_type error -boot start_sasl -noshell
 
--define(FILE_NAME, "./test/etap/temp.011").
--define(SIZE_BLOCK, 4096). % Need to keep this in sync with couch_file.erl
+filename() -> "./test/etap/temp.011".
+sizeblock() -> 4096. % Need to keep this in sync with couch_file.erl
 
 main(_) ->
     code:add_pathz("src/couchdb"),
@@ -21,7 +21,7 @@ main(_) ->
     ok.
     
 test() ->
-    {ok, Fd} = couch_file:open(?FILE_NAME, [create,overwrite]),
+    {ok, Fd} = couch_file:open(filename(), [create,overwrite]),
     
     etap:is({ok, 0}, couch_file:bytes(Fd),
         "File should be initialized to contain zero bytes."),
@@ -103,8 +103,8 @@ test() ->
     ok.
 
 check_header_recovery(CheckFun) ->
-    {ok, Fd} = couch_file:open(?FILE_NAME, [create,overwrite]),
-    {ok, RawFd} = file:open(?FILE_NAME, [read, write, raw, binary]),
+    {ok, Fd} = couch_file:open(filename(), [create,overwrite]),
+    {ok, RawFd} = file:open(filename(), [read, write, raw, binary]),
 
     {ok, _} = write_random_data(Fd),
     ExpectHeader = {some_atom, <<"a binary">>, 756},
@@ -124,7 +124,7 @@ write_random_data(Fd) ->
 
 write_random_data(Fd, 0) ->
     {ok, Bytes} = couch_file:bytes(Fd),
-    {ok, (1 + Bytes div ?SIZE_BLOCK) * ?SIZE_BLOCK};
+    {ok, (1 + Bytes div sizeblock()) * sizeblock()};
 write_random_data(Fd, N) ->
     Choices = [foo, bar, <<"bizzingle">>, "bank", ["rough", stuff]],
     Term = lists:nth(random:uniform(4) + 1, Choices),

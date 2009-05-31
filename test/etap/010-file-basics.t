@@ -2,7 +2,7 @@
 %% -*- erlang -*-
 %%! -pa ./src/couchdb -sasl errlog_type error -boot start_sasl -noshell
 
--define(FILE_NAME, "./test/etap/temp.010").
+filename() -> "./test/etap/temp.010".
 
 main(_) ->
     code:add_pathz("src/couchdb"),
@@ -22,11 +22,11 @@ test() ->
 
     etap:fun_is(
         fun({ok, _}) -> true; (_) -> false end,
-        couch_file:open(?FILE_NAME ++ ".1", [create, invalid_option]),
+        couch_file:open(filename() ++ ".1", [create, invalid_option]),
         "Invalid flags to open are ignored."
     ),
 
-    {ok, Fd} = couch_file:open(?FILE_NAME ++ ".0", [create, overwrite]),
+    {ok, Fd} = couch_file:open(filename() ++ ".0", [create, overwrite]),
     etap:ok(is_pid(Fd),
         "Returned file descriptor is a Pid"),
     
