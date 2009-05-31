@@ -59,7 +59,7 @@ get_changes_timeout(Req, Resp) ->
         {DefaultTimeout, fun() -> send_chunk(Resp, "\n"), ok end};
     TimeoutList ->
         {lists:min([DefaultTimeout, list_to_integer(TimeoutList)]),
-            fun() -> send_chunk(Resp, " \n"), ok end}
+            fun() -> send_chunk(Resp, "\n"), ok end}
     end.
 
 handle_changes_req(#httpd{method='GET',path_parts=[DbName|_]}=Req, Db) ->
