@@ -119,7 +119,8 @@ keep_sending_changes(#httpd{user_ctx=UserCtx,path_parts=[DbName|_]}=Req, Resp, D
         {ok, Db2} = couch_db:open(DbName, [{user_ctx, UserCtx}]),
         keep_sending_changes(Req, Resp, Db2, EndSeq, Prepend2, Timeout, TimeoutFun);
     stop ->
-        send_chunk(Resp, io_lib:format("\n],\n\"last_seq\":~w}\n", [EndSeq]))
+        send_chunk(Resp, io_lib:format("\n],\n\"last_seq\":~w}\n", [EndSeq])),
+        send_chunk(Resp, "")
     end.
 
 send_changes(Req, Resp, Db, StartSeq, Prepend0) ->
