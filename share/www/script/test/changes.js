@@ -30,6 +30,12 @@ couchTests.changes = function(debug) {
   
   T(resp.results.length == 1 && resp.last_seq==1)
   T(resp.results[0].changes[0].rev == docFoo._rev)
+
+  
+  req = CouchDB.request("GET", "/test_suite_db/_changes?continuous=true&timeout=10");
+  var resp = JSON.parse(req.responseText);
+  T(resp.results.length == 1 && resp.last_seq==1)
+  T(resp.results[0].changes[0].rev == docFoo._rev)
   
   var xhr;
   
@@ -43,7 +49,7 @@ couchTests.changes = function(debug) {
     // with real async support.
     
     var sleep = function(msecs) {
-      // by making a slow sync request, weallows the waiting XHR request data
+      // by making a slow sync request, we allow the waiting XHR request data
       // to be received.
       var req = CouchDB.request("GET", "/_sleep?time=" + msecs);
       T(JSON.parse(req.responseText).ok == true);
@@ -55,6 +61,7 @@ couchTests.changes = function(debug) {
       }
       return JSON.parse(line);
     }
+    
   
     xhr.open("GET", "/test_suite_db/_changes?continuous=true", true);
     xhr.send("");
@@ -89,6 +96,19 @@ couchTests.changes = function(debug) {
     T(change.seq == 3);
     T(change.id == "baz");
     T(change.changes[0].rev == docBaz._rev);
+    
+    
+    xhr = CouchDB.newXhr();
   
+    //verify the hearbeat newlines are sent
+    xhr.open("GET", "/test_suite_db/_changes?continuous=true&heartbeat=10", true);
+    xhr.send("");
+    
+    sleep(100);
+    
+    var str = xhr.responseText;
+    
+    T(str.charAt(str.length - 1) == "\n")
+    T(str.charAt(str.length - 2) == "\n")
   }
 };
