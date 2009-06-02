@@ -33,8 +33,7 @@ couchTests.show_documents = function(debug) {
         }
       }),
       "just-name" : stringFun(function(doc, req) {
-        if (docm
-          
+        if (doc) {
           return {
             body : "Just " + doc.name
           };
@@ -49,6 +48,9 @@ couchTests.show_documents = function(debug) {
         return {
           json : req
         }
+      }),
+      "render-error" : stringFun(function(doc, req) {
+        return noSuchVariable;
       }),
       "xml-type" : stringFun(function(doc, req) {
          return {
@@ -138,6 +140,10 @@ couchTests.show_documents = function(debug) {
   // hello template world
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/hello/"+docid);
   T(xhr.responseText == "Hello World");
+
+  // error stacktraces
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/render-error/"+docid);
+  T(JSON.parse(xhr.responseText).error == "render_error");
  
   // hello template world (no docid)
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/hello");
@@ -301,4 +307,5 @@ couchTests.show_documents = function(debug) {
   });
   T(xhr.getResponseHeader("Content-Type") == "text/html");
   T(xhr.responseText == "Ha ha, you said \"plankton\".");
+
 };
