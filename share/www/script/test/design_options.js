@@ -71,5 +71,4 @@ couchTests.design_options = function(debug) {
   T(rows[1].key == 2)
   var doc = db.open(resp.id);
   db.deleteDoc(doc);
-  console.log(resp)
 };
