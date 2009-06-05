@@ -322,8 +322,6 @@ terminate(Reason, State) ->
     
     [gen_server:reply(L, {error, Reason}) || L <- Listeners],
     
-    {ok, _, _} = do_checkpoint(Source, Target, Context, Seq, Stats),
-    
     ets:delete(Stats),
     close_db(Target),
     close_db(Source).
