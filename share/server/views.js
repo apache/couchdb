@@ -50,9 +50,11 @@ var Views = (function() {
     var reduce_length = reduce_line.length;
     if (query_config && query_config.reduce_limit &&
           reduce_length > 200 && ((reduce_length * 2) > line.length)) {
+      var reduce_preview = "Current output: '"+(reduce_line.substring(0,100) + "'... (first 100 of "+reduce_length+' bytes)');
+      
       throw {
         error:"reduce_overflow_error",
-        reason: "Reduce output must shrink more rapidly. Current output: '"+reduce_line+"'"
+        reason: "Reduce output must shrink more rapidly: "+reduce_preview+""
       };
     } else {
       print("[true," + reduce_line + "]");
