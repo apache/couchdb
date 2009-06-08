@@ -371,11 +371,20 @@ tokenize_string(B, S=#decoder{offset=O}, Acc) ->
             tokenize_string(B, ?ADV_COL(S, 2), [$\r | Acc]);
         <<_:O/binary, "\\t", _/binary>> ->
             tokenize_string(B, ?ADV_COL(S, 2), [$\t | Acc]);
-        <<_:O/binary, "\\u", C3, C2, C1, C0, _/binary>> ->
-            %% coalesce UTF-16 surrogate pair?
+        <<_:O/binary, "\\u", C3, C2, C1, C0, Rest/binary>> ->
             C = erlang:list_to_integer([C3, C2, C1, C0], 16),
-            Acc1 = lists:reverse(xmerl_ucs:to_utf8(C), Acc),
-            tokenize_string(B, ?ADV_COL(S, 6), Acc1);
+            if C > 16#D7FF, C < 16#DC00 ->
+                %% coalesce UTF-16 surrogate pair
+                <<"\\u", D3, D2, D1, D0, _/binary>> = Rest,
+                D = erlang:list_to_integer([D3,D2,D1,D0], 16),
+                [CodePoint] = xmerl_ucs:from_utf16be(<<C:16/big-unsigned-integer,
+                    D:16/big-unsigned-integer>>),
+                Acc1 = lists:reverse(xmerl_ucs:to_utf8(CodePoint), Acc),
+                tokenize_string(B, ?ADV_COL(S, 12), Acc1);
+            true ->
+                Acc1 = lists:reverse(xmerl_ucs:to_utf8(C), Acc),
+                tokenize_string(B, ?ADV_COL(S, 6), Acc1)
+            end;
         <<_:O/binary, C, _/binary>> ->
             tokenize_string(B, ?INC_CHAR(S, C), [C | Acc])
     end.
@@ -541,6 +550,7 @@ equiv_list([V1 | L1], [V2 | L2]) ->
 
 test_all() ->
     [1199344435545.0, 1] = decode(<<"[1199344435545.0,1]">>),
+    <<16#F0,16#9D,16#9C,16#95>> = decode([34,"\\ud835","\\udf15",34]),
     test_one(e2j_test_vec(utf8), 1).
 
 test_one([], _N) ->
