@@ -32,7 +32,6 @@ EXTRA_DIST = $(JS_FILE_COMPONENTS) $(JS_FILE_COMPONENTS_LAST)
 
 nobase_dist_localdata_DATA = \
     $(JS_FILE) \
-    server/main.js \
     www/dialog/_compact_database.html \
     www/dialog/_create_document.html \
     www/dialog/_create_database.html \
