@@ -37,7 +37,7 @@ stop(Pid) ->
     couch_event_sup:stop(Pid).
 
 init(Exec) when is_list(Exec) -> % an exe
-    couch_os_process:start_link(Exec, [], [stream, exit_status, hide]);
+    couch_os_process:start_link(Exec, []);
 init(Else) ->
     {ok, Else}.
 
@@ -55,7 +55,7 @@ handle_event(Event, {Fun, FunAcc}) ->
     {ok, {Fun, FunAcc2}};
 handle_event({EventAtom, DbName}, Pid) ->
     Obj = {[{type, list_to_binary(atom_to_list(EventAtom))}, {db, DbName}]},
-    true = couch_os_process:write(Pid, Obj),
+    ok = couch_os_process:send(Pid, Obj),
     {ok, Pid}.
 
 handle_call(_Request, State) ->

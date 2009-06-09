@@ -15,7 +15,7 @@
 
 -export([start_link/1, start_link/2, start_link/3, stop/1]).
 -export([set_timeout/2, prompt/2]).
--export([writeline/2, readline/1, writejson/2, readjson/1]).
+-export([send/2, writeline/2, readline/1, writejson/2, readjson/1]).
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2, code_change/3]).
 
 -include("couch_db.hrl").
@@ -43,6 +43,10 @@ stop(Pid) ->
 % Read/Write API
 set_timeout(Pid, TimeOut) when is_integer(TimeOut) ->
     ok = gen_server:call(Pid, {set_timeout, TimeOut}).
+
+% Used by couch_db_update_notifier.erl
+send(Pid, Data) ->
+    gen_server:cast(Pid, {send, Data}).
 
 prompt(Pid, Data) ->
     case gen_server:call(Pid, {prompt, Data}, infinity) of
@@ -148,6 +152,15 @@ handle_call({prompt, Data}, _From, OsProc) ->
             {stop, normal, OsError, OsProc}
     end.
 
+handle_cast({send, Data}, #os_proc{writer=Writer}=OsProc) ->
+    try
+        Writer(OsProc, Data),
+        {noreply, OsProc}
+    catch
+        throw:OsError ->
+            ?LOG_ERROR("Failed sending data: ~p -> ~p", [Data, OsError]),
+            {stop, normal, OsProc}
+    end;
 handle_cast(stop, OsProc) ->
     {stop, normal, OsProc};
 handle_cast(Msg, OsProc) ->
