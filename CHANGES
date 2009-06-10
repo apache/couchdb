@@ -6,22 +6,10 @@ Version 0.9.1
 
 r782645, kocolosk
 r781151, jchris
-r780351, davisp
-r780349, davisp
-r780339, davisp
-r780329, davisp
-r780319, davisp
-r780198, davisp
-r778951, davisp
-r776686, davisp
-r776144, davisp
-r775798, davisp
 r775725, kocolosk
 r775637, kocolosk
 r775634, kocolosk
-r775578, davisp
 r775509, kocolosk
-r774588, davisp
 r774409, kocolosk
 r774385, jan
 r774384, kocolosk
@@ -72,22 +60,9 @@ r774304, jan
 r774302, jan
 r774301, jan
 r774296, jan
-r774188, davisp
-r773261, davisp
-r772340, davisp
-r772329, davisp
-r772325, davisp
-r772321, davisp
 r771476, jchris
 r769180, damien
-r768575, davisp
-r768574, davisp
-r766509, davisp
 r766388, jchris
-r766374, davisp
-r766359, davisp
-r766354, davisp
-r766348, davisp
 r765422, jchris
 r765387, kocolosk
 
@@ -95,6 +70,12 @@ Build and System Integration:
 
  * Updated top-level documentation.
  * PID file directory is created by the SysV/BSD daemon scripts.
+
+Bug Fixes
+
+ * Futon redirects when a view gets deleted.
+ * Document validation for underscore prefixed variables
+ * POST'ing to _external handlers.
 
 Version 0.9.0
 -------------
