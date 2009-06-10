@@ -7,6 +7,98 @@ For details about backwards incompatible changes, please see:
 
 Each release section notes when backwards incompatible changes have been made.
 
+Version 0.9.1
+-------------
+
+r782645, kocolosk
+r781151, jchris
+r780351, davisp
+r780349, davisp
+r780339, davisp
+r780329, davisp
+r780319, davisp
+r780198, davisp
+r778951, davisp
+r776686, davisp
+r776144, davisp
+r775798, davisp
+r775725, kocolosk
+r775637, kocolosk
+r775634, kocolosk
+r775578, davisp
+r775509, kocolosk
+r774588, davisp
+r774409, kocolosk
+r774385, jan
+r774384, kocolosk
+r774382, kocolosk
+r774358, jan
+r774357, jan
+r774356, jan
+r774355, jan
+r774353, jan
+r774352, jan
+r774351, jan
+r774350, jan
+r774349, jan
+r774347, jan
+r774346, jan
+r774345, jan
+r774343, jan
+r774342, jan
+r774340, jan
+r774339, jan
+r774338, jan
+r774337, jan
+r774336, jan
+r774333, jan
+r774332, jan
+r774331, jan
+r774330, jan
+r774329, jan
+r774328, jan
+r774326, jan
+r774325, jan
+r774324, jan
+r774323, jan
+r774322, jan
+r774321, jan
+r774320, jan
+r774317, jan
+r774315, jan
+r774314, jan
+r774313, jan
+r774312, jan
+r774311, jan
+r774310, jan
+r774308, jan
+r774307, jan
+r774306, jan
+r774304, jan
+r774302, jan
+r774301, jan
+r774296, jan
+r774188, davisp
+r773261, davisp
+r772340, davisp
+r772329, davisp
+r772325, davisp
+r772321, davisp
+r771476, jchris
+r769180, damien
+r768575, davisp
+r768574, davisp
+r766509, davisp
+r766388, jchris
+r766374, davisp
+r766359, davisp
+r766354, davisp
+r766348, davisp
+r765422, jchris
+r765387, kocolosk
+
+ * Miscellaneous improvements to build, system integration, and portability.
+
 Version 0.9.0
 -------------
 
