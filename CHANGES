@@ -4,16 +4,8 @@ Apache CouchDB CHANGES
 Version 0.9.1
 -------------
 
-r782645, kocolosk
 r781151, jchris
-r775725, kocolosk
-r775637, kocolosk
-r775634, kocolosk
-r775509, kocolosk
-r774409, kocolosk
 r774385, jan
-r774384, kocolosk
-r774382, kocolosk
 r774358, jan
 r774357, jan
 r774356, jan
@@ -64,7 +56,6 @@ r771476, jchris
 r769180, damien
 r766388, jchris
 r765422, jchris
-r765387, kocolosk
 
 Build and System Integration:
 
@@ -76,6 +67,14 @@ Bug Fixes
  * Futon redirects when a view gets deleted.
  * Document validation for underscore prefixed variables
  * POST'ing to _external handlers.
+ * Attachment requests respect the "rev" query-string parameter.
+ * Added support for unicode characters transmitted as UTF-16 surrogate pairs.
+ * Replicator URL-encodes attachment names when necessary.
+ * Replicator pulls specific revisions of an attachment, instead of just the
+   latest one.
+ * Replicator works around a rare chunk-merging problem in ibrowse.
+ * Replicator works with documents containing Unicode characters outside the
+   Basic Multilingual Plane.
 
 Version 0.9.0
 -------------

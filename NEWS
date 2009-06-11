@@ -10,7 +10,6 @@ Each release section notes when backwards incompatible changes have been made.
 Version 0.9.1
 -------------
 
-r782645, kocolosk
 r781151, jchris
 r780351, davisp
 r780349, davisp
@@ -22,16 +21,9 @@ r778951, davisp
 r776686, davisp
 r776144, davisp
 r775798, davisp
-r775725, kocolosk
-r775637, kocolosk
-r775634, kocolosk
 r775578, davisp
-r775509, kocolosk
 r774588, davisp
-r774409, kocolosk
 r774385, jan
-r774384, kocolosk
-r774382, kocolosk
 r774358, jan
 r774357, jan
 r774356, jan
@@ -95,9 +87,9 @@ r766359, davisp
 r766354, davisp
 r766348, davisp
 r765422, jchris
-r765387, kocolosk
 
  * Miscellaneous improvements to build, system integration, and portability.
+ * Better support for Unicode and document attachments in the replicator.
 
 Version 0.9.0
 -------------
