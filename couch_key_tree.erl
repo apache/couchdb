@@ -14,7 +14,7 @@
 
 -export([merge/2, find_missing/2, get_key_leafs/2, get_full_key_paths/2, get/2]).
 -export([map/2, get_all_leafs/1, count_leafs/1, remove_leafs/2,
-    get_all_leafs_full/1,stem/2,map_leafs/2,test/0]).
+    get_all_leafs_full/1,stem/2,map_leafs/2]).
 
 % a key tree looks like this:
 % Tree -> [] or [{Key, Value, ChildTree} | SiblingTree]

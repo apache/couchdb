@@ -24,7 +24,6 @@
 
 -define(DEFAULT_STREAM_CHUNK, 16#00100000). % 1 meg chunks when streaming data
 
--export([test/0]).
 -export([open/1, close/1, write/2, foldl/4, old_foldl/5,old_copy_to_new_stream/4]).
 -export([copy_to_new_stream/3,old_read_term/2]).
 -export([init/1, terminate/2, handle_call/3]).
