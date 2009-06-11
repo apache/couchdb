@@ -5,7 +5,7 @@ main(_) ->
     code:add_pathz("src/couchdb"),
     code:add_pathz("src/mochiweb"),
     
-    etap:plan(unknown),
+    etap:plan(4),
     case (catch test()) of
         ok ->
             etap:end_tests();
