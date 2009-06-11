@@ -174,39 +174,5 @@ old_stream_data(Fd, {Pos, Offset}, Num, MaxChunk, Fun, Acc) ->
     old_stream_data(Fd, Sp, Num - ReadAmount, MaxChunk, Fun, Fun(Bin, Acc)).
 
 
-
-%%% Tests %%%
-
-read_all(Fd, PosList) ->
-    iolist_to_binary(foldl(Fd, PosList,
-        fun(Bin, Acc) ->
-            [Bin, Acc]
-        end, [])).
-
-
-test() ->
-    {ok, Fd} = couch_file:open("foo", [create,overwrite]),
-    ok = couch_file:write_header(Fd, {howdy, howdy}),
-    Bin = <<"damienkatz">>,
-    {ok, Pos} = couch_file:append_binary(Fd, Bin),
-    {ok, Bin} = couch_file:pread_binary(Fd, Pos),
-    {ok, {howdy, howdy}} = couch_file:read_header(Fd),
-    ok = couch_file:write_header(Fd, {foo, foo}),
-    {ok, {foo, foo}} = couch_file:read_header(Fd),
-    
-    {ok, Stream} = open(Fd),
-    ok = write(Stream, <<"food">>),
-    ok = write(Stream, <<"foob">>),
-    {PosList, 8} = close(Stream),
-    <<"foodfoob">> = read_all(Fd, PosList),
-    {ok, Stream2} = open(Fd),
-    OneBits = <<1:(8*10)>>,
-    ZeroBits = <<0:(8*10)>>,
-    ok = write(Stream2, OneBits),
-    ok = write(Stream2, ZeroBits),
-    {PosList2, 20} = close(Stream2),
-    AllBits = iolist_to_binary([OneBits,ZeroBits]),
-    AllBits = read_all(Fd, PosList2),
-    couch_file:close(Fd),
-    PosList2.
+% Tests moved to tests/etap/050-stream.t
 

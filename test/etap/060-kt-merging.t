@@ -1,0 +1,128 @@
+#!/usr/bin/env escript
+%% -*- erlang -*-
+
+main(_) ->
+    code:add_pathz("src/couchdb"),
+    etap:plan(unknown),
+    case (catch test()) of
+        ok ->
+            etap:end_tests();
+        Other ->
+            etap:diag(io_lib:format("Test died abnormally: ~p", [Other])),
+            etap:bail(Other)
+    end,
+    ok.
+
+test() ->
+    EmptyTree = [],
+    One = [{0, {"1","foo",[]}}],
+    TwoSibs = [{0, {"1","foo",[]}},
+               {0, {"2","foo",[]}}],
+    OneChild = [{0, {"1","foo",[{"1a", "bar", []}]}}],
+    TwoChild = [{0, {"1","foo", [{"1a", "bar", [{"1aa", "bar", []}]}]}}],
+    TwoChildSibs = [{0, {"1","foo", [{"1a", "bar", []},
+                                     {"1b", "bar", []}]}}],
+    TwoChildSibs2 = [{0, {"1","foo", [{"1a", "bar", []},
+                                     {"1b", "bar", [{"1bb", "boo", []}]}]}}],
+    Stemmed1b = [{1, {"1a", "bar", []}}],
+    Stemmed1a = [{1, {"1a", "bar", [{"1aa", "bar", []}]}}],
+    Stemmed1aa = [{2, {"1aa", "bar", []}}],
+    Stemmed1bb = [{2, {"1bb", "boo", []}}],
+    
+    etap:is(
+        {EmptyTree, no_conflicts},
+        couch_key_tree:merge(EmptyTree, EmptyTree),
+        "Merging two empty trees yields an empty tree."
+    ),
+
+    etap:is(
+        {One, no_conflicts},
+        couch_key_tree:merge(EmptyTree, One),
+        "The empty tree is the identity for merge."
+    ),
+
+    etap:is(
+        {One, no_conflicts},
+        couch_key_tree:merge(One, EmptyTree),
+        "Merging is commutative."
+    ),
+
+    etap:is(
+        {TwoSibs, no_conflicts},
+        couch_key_tree:merge(One, TwoSibs),
+        "Merging a prefix of a tree with the tree yields the tree."
+    ),
+
+    etap:is(
+        {One, no_conflicts},
+        couch_key_tree:merge(One, One),
+        "Merging is reflexive."
+    ),
+
+    etap:is(
+        {TwoChild, no_conflicts},
+        couch_key_tree:merge(TwoChild, TwoChild),
+        "Merging two children is still reflexive."
+    ),
+
+    etap:is(
+        {TwoChildSibs, no_conflicts},
+        couch_key_tree:merge(TwoChildSibs, TwoChildSibs),
+        "Merging a tree to itself is itself."),
+    
+    etap:is(
+        {TwoChildSibs, no_conflicts},
+        couch_key_tree:merge(TwoChildSibs, Stemmed1b),
+        "Merging a tree with a stem."
+    ),
+
+    etap:is(
+        {TwoChildSibs, no_conflicts},
+        couch_key_tree:merge(Stemmed1b, TwoChildSibs),
+        "Merging in the opposite direction."
+    ),
+
+    etap:is(
+        {TwoChildSibs2, no_conflicts},
+        couch_key_tree:merge(TwoChildSibs2, Stemmed1bb),
+        "Merging a stem at a deeper level."
+    ),
+    
+    etap:is(
+        {TwoChildSibs2, no_conflicts},
+        couch_key_tree:merge(Stemmed1bb, TwoChildSibs2),
+        "Merging a deeper level in opposite order."
+    ),
+
+    etap:is(
+        {TwoChild, no_conflicts},
+        couch_key_tree:merge(TwoChild, Stemmed1aa),
+        "Merging a single tree with a deeper stem."
+    ),
+
+    etap:is(
+        {TwoChild, no_conflicts},
+        couch_key_tree:merge(TwoChild, Stemmed1a),
+        "Merging a larger stem."
+    ),
+
+    etap:is(
+        {Stemmed1a, no_conflicts},
+        couch_key_tree:merge(Stemmed1a, Stemmed1aa),
+        "More merging."
+    ),
+
+    Expect1 = OneChild ++ Stemmed1aa,
+    etap:is(
+        {Expect1, conflicts},
+        couch_key_tree:merge(OneChild, Stemmed1aa),
+        "Merging should create conflicts."
+    ),
+    
+    etap:is(
+        {TwoChild, no_conflicts},
+        couch_key_tree:merge(Expect1, TwoChild),
+        "Merge should have no conflicts."
+    ),
+  
+    ok.
