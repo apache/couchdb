@@ -44,7 +44,7 @@ cover: all
 	COVER=1 COVER_BIN=./src/couchdb/ prove test/etap/*.t
 	SRC=./src/couchdb/ \
 	    $(ERL) -noshell -eval 'etap_report:create()' \
-	    -s init stop -noshell > /dev/null 2>&1
+	    -s init stop > /dev/null 2>&1
 
 dev: all
 	@echo "This command is intended for developers to use;"
