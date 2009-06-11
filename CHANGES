@@ -4,59 +4,6 @@ Apache CouchDB CHANGES
 Version 0.9.1
 -------------
 
-r781151, jchris
-r774385, jan
-r774358, jan
-r774357, jan
-r774356, jan
-r774355, jan
-r774353, jan
-r774352, jan
-r774351, jan
-r774350, jan
-r774349, jan
-r774347, jan
-r774346, jan
-r774345, jan
-r774343, jan
-r774342, jan
-r774340, jan
-r774339, jan
-r774338, jan
-r774337, jan
-r774336, jan
-r774333, jan
-r774332, jan
-r774331, jan
-r774330, jan
-r774329, jan
-r774328, jan
-r774326, jan
-r774325, jan
-r774324, jan
-r774323, jan
-r774322, jan
-r774321, jan
-r774320, jan
-r774317, jan
-r774315, jan
-r774314, jan
-r774313, jan
-r774312, jan
-r774311, jan
-r774310, jan
-r774308, jan
-r774307, jan
-r774306, jan
-r774304, jan
-r774302, jan
-r774301, jan
-r774296, jan
-r771476, jchris
-r769180, damien
-r766388, jchris
-r765422, jchris
-
 Build and System Integration:
 
  * Updated top-level documentation.
@@ -75,6 +22,14 @@ Bug Fixes
  * Replicator works around a rare chunk-merging problem in ibrowse.
  * Replicator works with documents containing Unicode characters outside the
    Basic Multilingual Plane.
+ * Fix build instructions shown by ./configure.
+ * Show corerct environment variables in ./configure --help.
+ * Fix incorrect recording of request time.
+ * Attachment storage less sparse.
+ * Fix for COUCHDB-334 where a database with delayed commits pending is 
+   considered idle, and subject to losing changes when shutdown.
+ * Useful JavaScript Error messages.
+ * Correct missing-.ini file error message.
 
 Version 0.9.0
 -------------
