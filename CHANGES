@@ -23,7 +23,7 @@ Bug Fixes
  * Replicator works with documents containing Unicode characters outside the
    Basic Multilingual Plane.
  * Fix build instructions shown by ./configure.
- * Show corerct environment variables in ./configure --help.
+ * Show correct environment variables in ./configure --help.
  * Fix incorrect recording of request time.
  * Attachment storage less sparse.
  * Fix for COUCHDB-334 where a database with delayed commits pending is 
