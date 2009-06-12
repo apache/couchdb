@@ -12,8 +12,7 @@ Version 0.9.1
 
  * Miscellaneous improvements to build, system integration, and portability.
  * Better support for Unicode and document attachments in the replicator.
- * Fix incorrect recording of request time.
- * Attachment storage less sparse.
+ * Various bug fixes
 
 Version 0.9.0
 -------------
