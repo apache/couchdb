@@ -31,8 +31,6 @@ This release contains backwards incompatible changes, please see above for help.
  * Attachment uploading from Futon.
  * Etags for views, lists, shows, document and attachment requests.
  * Miscellaneous improvements to build, system integration, and portability.
- * Fix for COUCHDB-334 where a database with delayed commits pending is 
-   considered idle, and subject to losing changes when shutdown.
 
 Version 0.8.1-incubating
 ------------------------
