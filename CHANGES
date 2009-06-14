@@ -25,7 +25,7 @@ Bug Fixes
  * Fix build instructions shown by ./configure.
  * Show correct environment variables in ./configure --help.
  * Fix incorrect recording of request time.
- * Made attachment storage sparseness.
+ * Made attachment storage less sparse.
  * Fix for COUCHDB-334 where a database with delayed commits pending is 
    considered idle, and subject to losing changes when shutdown.
  * Useful JavaScript Error messages.
