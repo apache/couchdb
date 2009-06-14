@@ -53,7 +53,7 @@ prompt(Pid, Data) ->
         {ok, Result} ->
             Result;
         Error ->
-            ?LOG_DEBUG("OS Process Error ~p",[Error]),
+            ?LOG_ERROR("OS Process Error :: ~p",[Error]),
             throw(Error)
     end.
 
@@ -81,20 +81,22 @@ readline(OsProc, Acc) when is_record(OsProc, os_proc) ->
 
 % Standard JSON functions
 writejson(OsProc, Data) when is_record(OsProc, os_proc) ->
+    % ?LOG_DEBUG("OS Process Input :: ~p", [Data]),
     true = writeline(OsProc, ?JSON_ENCODE(Data)).
 
 readjson(OsProc) when is_record(OsProc, os_proc) ->
     Line = readline(OsProc),
     case ?JSON_DECODE(Line) of
-    {[{<<"log">>,Msg}]} when is_binary(Msg) ->
+    [<<"log">>, Msg] when is_binary(Msg) ->
         % we got a message to log. Log it and continue
-        ?LOG_INFO("OS Process Log Message: ~s", [Msg]),
+        ?LOG_INFO("OS Process :: ~s", [Msg]),
         readjson(OsProc);
     {[{<<"error">>, Id}, {<<"reason">>, Reason}]} ->
         throw({list_to_atom(binary_to_list(Id)),Reason});
     {[{<<"reason">>, Reason}, {<<"error">>, Id}]} ->
         throw({list_to_atom(binary_to_list(Id)),Reason});
     Result ->
+        % ?LOG_DEBUG("OS Process Output :: ~p", [Result]),
         Result
     end.
 

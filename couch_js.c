@@ -247,13 +247,13 @@ GC(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
 
 static JSBool
 Print(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-    uintN i, n;
+    uintN i;
     size_t cl, bl;
     JSString *str;
     jschar *chars;
     char *bytes;
 
-    for (i = n = 0; i < argc; i++) {
+    for (i = 0; i < argc; i++) {
         str = JS_ValueToString(context, argv[i]);
         if (!str)
             return JS_FALSE;
@@ -270,9 +270,8 @@ Print(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
         fprintf(stdout, "%s%s", i ? " " : "", bytes);
         JS_free(context, bytes);
     }
-    n++;
-    if (n)
-        fputc('\n', stdout);
+
+    fputc('\n', stdout);
     fflush(stdout);
     return JS_TRUE;
 }
