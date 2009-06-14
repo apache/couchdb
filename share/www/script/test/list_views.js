@@ -39,106 +39,127 @@ couchTests.list_views = function(debug) {
       }
     },
     lists: {
-      simpleForm: stringFun(function(head, row, req, row_info) {
-        if (row) {
-          // we ignore headers on rows and tail
-          return {
-                  body : '\n<li>Key: '+row.key
-                  +' Value: '+row.value
-                  +' LineNo: '+row_info.row_number+'</li>'
-          };
-        } else if (head) {
-          // we return an object (like those used by external and show)
-          // so that we can specify headers
-          return {
-            body : '<h1>Total Rows: '
-              + head.total_rows
-              + ' Offset: ' + head.offset
-              + '</h1><ul>'
-          };
-        } else {
-          // tail
-          return {body : '</ul>'+
-              '<p>FirstKey: '+(row_info ? row_info.first_key : '')+ 
-              ' LastKey: '+(row_info ? row_info.prev_key : '')+'</p>'};
-        }
+      basicBasic : stringFun(function(head, req) {
+        send("head");
+        var row;
+        while(row = getRow()) {
+          log("row: "+toJSON(row));
+          send(row.key);        
+        };
+        return "tail";
       }),
-      acceptSwitch: stringFun(function(head, row, req, row_info) {
-        return respondWith(req, {
-          html : function() {
-            // If you're outputting text and you're not setting
-            // any headers, you can just return a string.
-            if (head) {
-              return "HTML <ul>";
-            } else if (row) {
-              return '\n<li>Key: '
-                +row.key+' Value: '+row.value
-                +' LineNo: '+row_info.row_number+'</li>';
-            } else { // tail
-              return '</ul>';
+      basicJSON : stringFun(function(head, req) {
+        start({"headers":{"Content-Type" : "application/json"}}); 
+        send('{"head":'+toJSON(head)+', ');
+        send('"req":'+toJSON(req)+', ');
+        send('"rows":[');
+        var row, sep = '';
+        while (row = getRow()) {
+          send(sep + toJSON(row));
+          sep = ', ';
+        }
+        return "]}";
+      }),
+      simpleForm: stringFun(function(head, req) {
+        log("simpleForm");
+        send('<h1>Total Rows: '
+              // + head.total_rows
+              // + ' Offset: ' + head.offset
+              + '</h1><ul>');
 
+        // rows
+        var row, row_number = 0, prevKey, firstKey = null;
+        while (row = getRow()) {
+          row_number += 1;
+          if (!firstKey) firstKey = row.key;
+          prevKey = row.key;
+          send('\n<li>Key: '+row.key
+          +' Value: '+row.value
+          +' LineNo: '+row_number+'</li>');
+        }
+
+        // tail
+        return '</ul><p>FirstKey: '+ firstKey + ' LastKey: '+ prevKey+'</p>';
+      }),
+      acceptSwitch: stringFun(function(head, req) {
+        // respondWith takes care of setting the proper headers
+        respondWith(req, {
+          html : function() {
+            send("HTML <ul>");
+
+            var row, num = 0;
+            while (row = getRow()) {
+              num ++;
+              send('\n<li>Key: '
+                +row.key+' Value: '+row.value
+                +' LineNo: '+num+'</li>');
             }
+
+            // tail
+            return '</ul>';
           },
           xml : function() {
-            if (head) {
-              return '<feed xmlns="http://www.w3.org/2005/Atom">'
-                +'<title>Test XML Feed</title>';
-            } else if (row) {
-              // Becase Safari can't stand to see that dastardly
-              // E4X outside of a string. Outside of tests you
-              // can just use E4X literals.
+            send('<feed xmlns="http://www.w3.org/2005/Atom">'
+              +'<title>Test XML Feed</title>');
+
+            while (row = getRow()) {
               var entry = new XML('<entry/>');
               entry.id = row.id;
               entry.title = row.key;
               entry.content = row.value;
-              // We'll also let you return just an E4X object
-              // if you aren't setting headers.
-              return entry;
-            } else {
-              return "</feed>";
+              send(entry);
             }
-          }
-        })
-      }),
-      qsParams: stringFun(function(head, row, req, row_info) {
-        if(head) return {body: req.query.foo};
-        else return {body: "\n"};
-      }),
-      stopIter: stringFun(function(head, row, req, row_info) {
-        if(head) {
-          return {body: "head"};
-        } else if(row) {
-          if(row_info.row_number > 2) return {stop: true};
-          return {body: " " + row_info.row_number};
-        } else {
-          return {body: " tail"};
-        }
-      }),
-      stopIter2: stringFun(function(head, row, req, row_info) {
-        return respondWith(req, {
-          html: function() {
-            if(head) {
-              return "head";
-            } else if(row) {
-              if(row_info.row_number > 2) return {stop: true};
-              return " " + row_info.row_number;
-            } else {
-              return " tail";
-            }
+            return "</feed>";
           }
         });
       }),
-      emptyList: stringFun(function(head, row, req, row_info) {
-        return { body: "" };
+      qsParams: stringFun(function(head, req) {
+        return toJSON(req.query) + "\n";
       }),
-      rowError : stringFun(function(head, row, req, row_info) {
-        if (head) {
-          return "head";
-        } else if(row) {
-          return missingValue;
-        } else {
-          return "tail"
-        }
+      stopIter: stringFun(function(req) {
+        send("head");
+        var row, row_number = 0;
+        while(row = getRow()) {
+          if(row_number > 2) break;
+          send(" " + row_number);
+          row_number += 1;
+        };
+        return " tail";
+      }),
+      stopIter2: stringFun(function(head, req) {
+        respondWith(req, {
+          html: function() {
+            send("head");
+            var row, row_number = 0;
+            while(row = getRow()) {
+              if(row_number > 2) break;
+              send(" " + row_number);
+              row_number += 1;
+            };
+            return " tail";
+          }
+        });
+      }),
+      tooManyGetRows : stringFun(function() {
+        send("head");
+        var row;
+        while(row = getRow()) {
+          send(row.key);        
+        };
+        getRow();
+        getRow();
+        getRow();
+        row = getRow();
+        return "after row: "+toJSON(row);
+      }),
+      emptyList: stringFun(function() {
+        return " ";
+      }),
+      rowError : stringFun(function(head, req) {
+        send("head");
+        var row = getRow();
+        send(fooBarBam); // intentional error
+        return "tail";
       })
     }
   };
@@ -152,25 +173,39 @@ couchTests.list_views = function(debug) {
   T(view.total_rows == 10);
   
   // standard get
-  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/basicView");
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/basicBasic/basicView");
   T(xhr.status == 200, "standard get should be 200");
-  T(/Total Rows/.test(xhr.responseText));
-  T(/Key: 1/.test(xhr.responseText));
-  T(/LineNo: 0/.test(xhr.responseText));
-  T(/LineNo: 5/.test(xhr.responseText));
-  T(/FirstKey: 0/.test(xhr.responseText));
-  T(/LastKey: 9/.test(xhr.responseText));
-
-
-  var lines = xhr.responseText.split('\n');
-  T(/LineNo: 5/.test(lines[6]));
+  T(/head0123456789tail/.test(xhr.responseText));
 
   // test that etags are available
   var etag = xhr.getResponseHeader("etag");
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/basicView", {
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/basicBasic/basicView", {
     headers: {"if-none-match": etag}
   });
   T(xhr.status == 304);
+
+  // test the richness of the arguments
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/basicJSON/basicView");
+  T(xhr.status == 200, "standard get should be 200");
+  var resp = JSON.parse(xhr.responseText);
+  TEquals(resp.head, {total_rows:10, offset:0});
+  T(resp.rows.length == 10);
+  TEquals(resp.rows[0], {"id": "0","key": 0,"value": "0"});
+
+  TEquals(resp.req.info.db_name, "test_suite_db");
+  TEquals(resp.req.verb, "GET");
+  TEquals(resp.req.path, [
+      "test_suite_db",
+      "_design",
+      "lists",
+      "_list",
+      "basicJSON",
+      "basicView"
+  ]);
+  T(resp.req.headers.Accept);
+  T(resp.req.headers.Host);
+  T(resp.req.headers["User-Agent"]);
+  T(resp.req.cookie);
 
   // get with query params
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/basicView?startkey=3");
@@ -179,26 +214,30 @@ couchTests.list_views = function(debug) {
   T(!(/Key: 1/.test(xhr.responseText)));
   T(/FirstKey: 3/.test(xhr.responseText));
   T(/LastKey: 9/.test(xhr.responseText));
-
   
   // with 0 rows
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/basicView?startkey=30");
   T(xhr.status == 200, "0 rows");
   T(/Total Rows/.test(xhr.responseText));
-  T(/Offset: null/.test(xhr.responseText));
+
+  //too many Get Rows
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/tooManyGetRows/basicView");
+  T(xhr.status == 200, "tooManyGetRows");
+  T(/9after row: null/.test(xhr.responseText));
+
 
   // reduce with 0 rows
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/withReduce?startkey=30");
   T(xhr.status == 200, "reduce 0 rows");
   T(/Total Rows/.test(xhr.responseText));
-  T(/Offset: undefined/.test(xhr.responseText));
-
+  T(/LastKey: undefined/.test(xhr.responseText));
   
   // when there is a reduce present, but not used
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/withReduce?reduce=false");
   T(xhr.status == 200, "reduce false");
   T(/Total Rows/.test(xhr.responseText));
   T(/Key: 1/.test(xhr.responseText));
+
   
   // when there is a reduce present, and used
   xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/withReduce?group=true");
@@ -221,6 +260,51 @@ couchTests.list_views = function(debug) {
     headers: {"if-none-match": etag}
   });
   T(xhr.status == 200, "reduce etag");
+
+  // empty list
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/emptyList/basicView");
+  T(xhr.responseText.match(/^ $/));
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/emptyList/withReduce?group=true");
+  T(xhr.responseText.match(/^ $/));
+
+  // multi-key fetch
+  var xhr = CouchDB.request("POST", "/test_suite_db/_design/lists/_list/simpleForm/basicView", {
+    body: '{"keys":[2,4,5,7]}'
+  });
+  T(xhr.status == 200, "multi key");
+  T(/Total Rows/.test(xhr.responseText));
+  T(!(/Key: 1/.test(xhr.responseText)));
+  T(/Key: 2/.test(xhr.responseText));
+  T(/FirstKey: 2/.test(xhr.responseText));
+  T(/LastKey: 7/.test(xhr.responseText));
+
+  // no multi-key fetch allowed when group=false
+  xhr = CouchDB.request("POST", "/test_suite_db/_design/lists/_list/simpleForm/withReduce?group=false", {
+    body: '{"keys":[2,4,5,7]}'
+  });
+  T(xhr.status == 400);
+  T(/query_parse_error/.test(xhr.responseText));
+    
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/rowError/basicView");
+  T(/ReferenceError/.test(xhr.responseText));
+
+
+  // now with extra qs params
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/qsParams/basicView?foo=blam");
+  T(xhr.responseText.match(/blam/));
+  
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/stopIter/basicView");
+  // T(xhr.getResponseHeader("Content-Type") == "text/plain");
+  T(xhr.responseText.match(/^head 0 1 2 tail$/) && "basic stop");
+
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/stopIter2/basicView");
+  T(xhr.responseText.match(/^head 0 1 2 tail$/) && "stop 2");
+
+  // aborting iteration with reduce
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/stopIter/withReduce?group=true");
+  T(xhr.responseText.match(/^head 0 1 2 tail$/) && "reduce stop");
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/stopIter2/withReduce?group=true");
+  T(xhr.responseText.match(/^head 0 1 2 tail$/) && "reduce stop 2");
   
   // with accept headers for HTML
   xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/acceptSwitch/basicView", {
@@ -241,47 +325,4 @@ couchTests.list_views = function(debug) {
   T(xhr.getResponseHeader("Content-Type") == "application/xml");
   T(xhr.responseText.match(/XML/));
   T(xhr.responseText.match(/entry/));
-
-  // now with extra qs params
-  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/qsParams/basicView?foo=blam");
-  T(xhr.responseText.match(/blam/));
-  
-  // aborting iteration
-  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/stopIter/basicView");
-  T(xhr.responseText.match(/^head 0 1 2 tail$/) && "basic stop");
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/stopIter2/basicView");
-  T(xhr.responseText.match(/^head 0 1 2 tail$/) && "stop 2");
-
-  // aborting iteration with reduce
-  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/stopIter/withReduce?group=true");
-  T(xhr.responseText.match(/^head 0 1 2 tail$/) && "reduce stop");
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/stopIter2/withReduce?group=true");
-  T(xhr.responseText.match(/^head 0 1 2 tail$/) && "reduce stop 2");
-
-  // empty list
-  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/emptyList/basicView");
-  T(xhr.responseText.match(/^$/));
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/emptyList/withReduce?group=true");
-  T(xhr.responseText.match(/^$/));
-
-  // multi-key fetch
-  var xhr = CouchDB.request("POST", "/test_suite_db/_design/lists/_list/simpleForm/basicView", {
-    body: '{"keys":[2,4,5,7]}'
-  });
-  T(xhr.status == 200, "multi key");
-  T(/Total Rows/.test(xhr.responseText));
-  T(!(/Key: 1/.test(xhr.responseText)));
-  T(/Key: 2/.test(xhr.responseText));
-  T(/FirstKey: 2/.test(xhr.responseText));
-  T(/LastKey: 7/.test(xhr.responseText));
-
-  // no multi-key fetch allowed when group=false
-  xhr = CouchDB.request("POST", "/test_suite_db/_design/lists/_list/simpleForm/withReduce?group=false", {
-    body: '{"keys":[2,4,5,7]}'
-  });
-  T(xhr.status == 400);
-  T(/query_parse_error/.test(xhr.responseText));
-  
-  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/rowError/basicView");
-  T(/<h1>Render Error<\/h1>/.test(xhr.responseText));
 };

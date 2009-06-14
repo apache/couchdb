@@ -21,6 +21,9 @@ try {
   sandbox.toJSON = toJSON;
   sandbox.respondWith = respondWith;
   sandbox.registerType = registerType;
+  sandbox.start = start;
+  sandbox.send = send;
+  sandbox.getRow = getRow;
 } catch (e) {}
 
 // Commands are in the form of json arrays:
@@ -31,21 +34,19 @@ try {
 var line, cmd, cmdkey;
 
 var dispatch = {
-  "reset"      : State.reset,
-  "add_fun"    : State.addFun,
-  "map_doc"    : Views.mapDoc,
-  "reduce"     : Views.reduce,
-  "rereduce"   : Views.rereduce,
-  "validate"   : Validate.validate,
-  "show_doc"   : Render.showDoc,
-  "list_begin" : Render.listBegin,
-  "list_row"   : Render.listRow,
-  "list_tail"  : Render.listTail 
+  "reset"    : State.reset,
+  "add_fun"  : State.addFun,
+  "map_doc"  : Views.mapDoc,
+  "reduce"   : Views.reduce,
+  "rereduce" : Views.rereduce,
+  "validate" : Validate.validate,
+  "show"     : Render.show,
+  "list"     : Render.list
 };
 
 while (line = eval(readline())) {
-  cmd = eval(line)
-  line_length = line.length
+  cmd = eval(line);
+  line_length = line.length;
   try {
     cmdkey = cmd.shift();
     if (dispatch[cmdkey]) {

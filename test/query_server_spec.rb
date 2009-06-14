@@ -22,31 +22,6 @@ require 'spec'
 require 'json'
 
 
-JSON_REQ = {
-  "body"=>"undefined", 
-  "verb"=>"GET", 
-  "info"=>{
-    "disk_format_version"=>2, 
-    "purge_seq"=>0, 
-    "doc_count"=>9082, 
-    "instance_start_time"=>"1243713611467271", 
-    "update_seq"=>9512, 
-    "disk_size"=>27541604, 
-    "compact_running"=>false, 
-    "db_name"=>"toast", 
-    "doc_del_count"=>1
-  }, 
-  "cookie"=>{}, 
-  "form"=>{}, 
-  "query"=>{"q"=>"stuff"}, 
-  "path"=>["toast", "_ext"], 
-  "headers"=>{
-    "User-Agent"=>"curl/7.18.1 (i386-apple-darwin9.2.2) libcurl/7.18.1 zlib/1.2.3", 
-    "Host"=>"localhost:5984", 
-    "Accept"=>"*/*"
-  }
-}
-
 class OSProcessRunner
   def self.run
     trace = false
@@ -78,9 +53,9 @@ class OSProcessRunner
   def add_fun(fun)
     run(["add_fun", fun])
   end
-  def get_chunk
+  def get_chunks
     resp = jsgets
-    raise "not a chunk" unless resp.first == "chunk"
+    raise "not a chunk" unless resp.first == "chunks"
     return resp[1]
   end
   def run json
@@ -103,10 +78,10 @@ class OSProcessRunner
     # puts "err: #{err}" if err
     if resp
       rj = JSON.parse("[#{resp.chomp}]")[0]
-      if rj.respond_to?(:[]) && !rj.is_a?(Array) && 
-        if rj["log"]
-          log = rj["log"]
-          puts "log: #{log}" #if @trace
+      if rj.respond_to?(:[]) && rj.is_a?(Array)
+        if rj[0] == "log"
+          log = rj[1]
+          puts "log: #{log}" if @trace
           rj = jsgets
         end
       end
@@ -177,131 +152,300 @@ describe "query server normal case" do
       @qs.run(["rereduce", [@fun], vs]).should == [true, [45]]
     end
   end
+  
   # it "should validate"
+  describe "validation" do
+    before(:all) do
+      @fun = <<-JS
+        function(newDoc, oldDoc, userCtx) {
+          if (newDoc.bad) throw({forbidden:"bad doc"});
+          "foo bar";
+        }
+        JS
+      @qs.reset!
+    end
+    it "should allow good updates" do
+      @qs.run(["validate", @fun, {"good" => true}, {}, {}]).should == 1
+    end
+    it "should reject invalid updates" do
+      @qs.run(["validate", @fun, {"bad" => true}, {}, {}]).should == {"forbidden"=>"bad doc"}
+    end
+  end
   
   describe "show" do
-     before(:all) do
-       @fun = <<-JS
-         function(doc, req) {
-           return [doc.title, doc.body].join(' - ')
-         }
-         JS
-       @qs.reset!
-     end
-     it "should show" do
-       @qs.rrun(["show_doc", @fun, 
-         {:title => "Best ever", :body => "Doc body"}, JSON_REQ])
-       @qs.jsgets.should == {"body"=>"Best ever - Doc body"}
-     end
-   end
-   
-   describe "show with headers" do
-     before(:all) do
-       @fun = <<-JS
-         function(doc, req) {
-           return {
-             headers : {"X-Plankton":"Rusty"},
-             body : [doc.title, doc.body].join(' - ')
-           }
-           
-         }
-         JS
-       @qs.reset!
-     end
-     it "should show" do
-       @qs.rrun(["show_doc", @fun, 
-         {:title => "Best ever", :body => "Doc body"}])
-       @qs.jsgets.should == {"headers"=>{"X-Plankton"=>"Rusty"}, "body"=>"Best ever - Doc body"}
-     end
-   end
-     
-   describe "list with headers" do
-     before(:each) do
-       @fun = <<-JS
-         function(head, row, req) {
-           if (head) return {headers : {"Content-Type" : "text/plain"}, code : 200, "body" : "foo"};
-           if (row) return 'some "text" here';
-           return "tail";
-         };
-         JS
-       @qs.reset!
-       @qs.add_fun(@fun).should == true
-     end
-     it "should send head, row, and tail" do
-       @qs.rrun(["list_begin", {"total_rows"=>1000}, {"q" => "ok"}])
-       @qs.jsgets.should == {"headers"=>{"Content-Type"=>"text/plain"}, "code"=>200, "body"=>"foo"}
-       @qs.run(["list_row", {"foo"=>"bar"}, {"q" => "ok"}]).should == {"body"=>"some \"text\" here"}
-       @qs.run(["list_tail", {"foo"=>"bar"}, {"q" => "ok"}]).should == {"body"=>"tail"}
-     end
-   end
-   
-   describe "list with headers and rows" do
-     before(:each) do
-       @fun = <<-JS
-         function(head, row, req) {
-           if (head) return {headers : {"Content-Type" : "text/plain"}, code : 200, "body" : "foo"};
-           if (row) return 'row value '+row.value;
-           return "tail "+req.q;
-         };
-         JS
-       @qs.reset!
-       @qs.add_fun(@fun).should == true
-     end
-     it "should render rows" do
-       @qs.rrun(["list_begin", {"total_rows"=>1000}, {"q" => "ok"}])
-       @qs.jsgets.should == {"headers"=>{"Content-Type"=>"text/plain"}, "code"=>200, "body"=>"foo"}
-       @qs.run(["list_row", {"value"=>"bar"}, {"q" => "ok"}]).should == {"body"=>"row value bar"}
-       @qs.run(["list_row", {"value"=>"baz"}, {"q" => "ok"}]).should == {"body"=>"row value baz"}
-       @qs.run(["list_row", {"value"=>"bam"}, {"q" => "ok"}]).should == {"body"=>"row value bam"}
-       @qs.run(["list_tail", {"q" => "ok"}]).should == {"body"=>"tail ok"}
-     end
-   end
- end # query server normal case
-
- describe "query server errors" do
-   before(:each) do
-     @qs = QueryServerRunner.run
-   end
-   after(:each) do
-     @qs.close
-   end
-   
-   describe "list" do
-     before(:each) do
-       @fun = <<-JS
-         function(head, row, req) {
-           if (head) return {headers : {"Content-Type" : "text/plain"}, code : 200, "body" : "foo"};
-           if (row) return 'row value '+row.value;
-           return "tail "+req.q;
-         };
-         JS
-       @qs.run(["reset"]).should == true    
-       @qs.add_fun(@fun).should == true
-     end
-     it "should reset in the middle" do
-       @qs.rrun(["list_begin", {"total_rows"=>1000}, {"q" => "ok"}])
-       @qs.jsgets.should == {"headers"=>{"Content-Type"=>"text/plain"}, "code"=>200, "body"=>"foo"}
-       @qs.run(["list_row", {"value"=>"bar"}, {"q" => "ok"}]).should == {"body"=>"row value bar"}
-       @qs.run(["reset"]).should == true
-     end
-   end  
- end #query server that errors
-
-## tests for the generic "echo" external
- 
-# describe "running an external" do
-#   before(:all) do
-#     @ext = ExternalRunner.run
-#     
-#   end
-#   it "should respond to 'info'" do
-#     @ext.rrun(['info'])
-#     @ext.jsgets.should == ["info", "echo", "external server that prints its arguments as JSON"]
-#   end
-#   it "should echo the request" do
-
-#     @ext.rrun(['req', req_obj])
-#     @ext.jsgets.should == ["x"]
-#   end
+    before(:all) do
+      @fun = <<-JS
+        function(doc, req) {
+          log("ok");
+          return [doc.title, doc.body].join(' - ');
+        }
+        JS
+      @qs.reset!
+    end
+    it "should show" do
+      @qs.rrun(["show", @fun, 
+        {:title => "Best ever", :body => "Doc body"}])
+      @qs.jsgets.should == ["resp", {"body" => "Best ever - Doc body"}]
+    end
+  end
+  
+  describe "show with headers" do
+    before(:all) do
+      @fun = <<-JS
+        function(doc, req) {
+          var resp = {"code":200, "headers":{"X-Plankton":"Rusty"}};
+          resp.body = [doc.title, doc.body].join(' - ');
+          return resp;
+        }
+        JS
+      @qs.reset!
+    end
+    it "should show headers" do
+      @qs.rrun(["show", @fun, 
+        {:title => "Best ever", :body => "Doc body"}])
+      @qs.jsgets.should == ["resp", {"code"=>200,"headers" => {"X-Plankton"=>"Rusty"}, "body" => "Best ever - Doc body"}]
+    end
+  end
+    
 # end
-# 
+#                    LIST TESTS
+# __END__
+    
+  describe "raw list with headers" do
+    before(:each) do
+      @fun = <<-JS
+        function(head, req) {
+          start({headers:{"Content-Type" : "text/plain"}});
+          send("first chunk");
+          send('second "chunk"');
+          return "tail";
+        };
+        JS
+      @qs.reset!
+      @qs.add_fun(@fun).should == true
+    end
+    it "should do headers proper" do
+      @qs.rrun(["list", {"total_rows"=>1000}, {"q" => "ok"}])
+      @qs.jsgets.should == ["start", ["first chunk", 'second "chunk"'], {"headers"=>{"Content-Type"=>"text/plain"}}]
+      @qs.rrun(["list_end"])
+      @qs.jsgets.should == ["end", ["tail"]]
+    end
+  end
+  
+  describe "list with rows" do
+    before(:each) do
+      @fun = <<-JS
+        function(head, req) {
+          send("first chunk");
+          send(req.q);
+          var row;
+          log("about to getRow " + typeof(getRow));
+          while(row = getRow()) {
+            send(row.key);        
+          };
+          return "tail";
+        };
+        JS
+      @qs.run(["reset"]).should == true    
+      @qs.add_fun(@fun).should == true
+    end
+    it "should should list em" do
+      @qs.rrun(["list", {"foo"=>"bar"}, {"q" => "ok"}])
+      @qs.jsgets.should == ["start", ["first chunk", "ok"], {"headers"=>{}}]
+      @qs.rrun(["list_row", {"key"=>"baz"}])
+      @qs.get_chunks.should == ["baz"]
+      @qs.rrun(["list_row", {"key"=>"bam"}])
+      @qs.get_chunks.should == ["bam"]
+      @qs.rrun(["list_end"])
+      @qs.jsgets.should == ["end", ["tail"]]
+    end
+    it "should work with zero rows" do
+      @qs.rrun(["list", {"foo"=>"bar"}, {"q" => "ok"}])
+      @qs.jsgets.should == ["start", ["first chunk", "ok"], {"headers"=>{}}]
+      @qs.rrun(["list_end"])
+      @qs.jsgets.should == ["end", ["tail"]]
+    end
+  end
+  
+  describe "should buffer multiple chunks sent for a single row." do
+    before(:all) do
+      @fun = <<-JS
+        function(head, req) {
+          send("bacon");
+          var row;
+          log("about to getRow " + typeof(getRow));
+          while(row = getRow()) {
+            send(row.key);        
+            send("eggs");        
+          };
+          return "tail";
+        };
+        JS
+      @qs.reset!
+      @qs.add_fun(@fun).should == true
+    end
+    it "should should buffer em" do
+      @qs.rrun(["list", {"foo"=>"bar"}, {"q" => "ok"}])
+      @qs.jsgets.should == ["start", ["bacon"], {"headers"=>{}}]
+      @qs.rrun(["list_row", {"key"=>"baz"}])
+      @qs.get_chunks.should == ["baz", "eggs"]
+      @qs.rrun(["list_row", {"key"=>"bam"}])
+      @qs.get_chunks.should == ["bam", "eggs"]
+      @qs.rrun(["list_end"])
+      @qs.jsgets.should == ["end", ["tail"]]
+    end
+  end
+
+  describe "example list" do
+    before(:all) do
+      @fun = <<-JS
+        function(head, req) {
+          send("first chunk");
+          send(req.q);
+          var row;
+          while(row = getRow()) {
+            send(row.key);    
+          };
+          return "early";
+        };
+        JS
+      @qs.reset!
+      @qs.add_fun(@fun).should == true
+    end
+    it "should run normal" do
+      @qs.run(["list", {"foo"=>"bar"}, {"q" => "ok"}]).should == ["start", ["first chunk", "ok"], {"headers"=>{}}]
+      @qs.run(["list_row", {"key"=>"baz"}]).should ==  ["chunks", ["baz"]]
+      @qs.run(["list_row", {"key"=>"bam"}]).should ==  ["chunks", ["bam"]]
+      @qs.run(["list_row", {"key"=>"foom"}]).should == ["chunks", ["foom"]]
+      @qs.run(["list_row", {"key"=>"fooz"}]).should == ["chunks", ["fooz"]]
+      @qs.run(["list_row", {"key"=>"foox"}]).should == ["chunks", ["foox"]]
+      @qs.run(["list_end"]).should == ["end" , ["early"]]
+    end
+  end
+  
+  describe "only goes to 2 list" do
+    before(:all) do
+      @fun = <<-JS
+        function(head, req) {
+          send("first chunk");
+          send(req.q);
+          var row, i=0;
+          while(row = getRow()) {
+            send(row.key);  
+            i += 1;
+            if (i > 2) {
+              return('early tail');
+            }  
+          };
+        };
+        JS
+      @qs.reset!
+      @qs.add_fun(@fun).should == true
+    end
+    it "should end early" do
+      @qs.run(["list", {"foo"=>"bar"}, {"q" => "ok"}]).
+        should == ["start", ["first chunk", "ok"], {"headers"=>{}}]
+      @qs.run(["list_row", {"key"=>"baz"}]).
+        should ==  ["chunks", ["baz"]]
+
+      @qs.run(["list_row", {"key"=>"bam"}]).
+        should ==  ["chunks", ["bam"]]
+
+      @qs.run(["list_row", {"key"=>"foom"}]).
+        should == ["end", ["foom", "early tail"]]
+      # here's where js has to discard quit properly
+      @qs.run(["reset"]).
+        should == true
+    end
+  end
+end
+
+def should_have_exited qs
+  begin
+    qs.run(["reset"])
+    "raise before this".should == true
+  rescue RuntimeError => e
+    e.message.should == "no response"
+  rescue Errno::EPIPE
+    true.should == true
+  end
+end
+
+describe "query server that exits" do
+  before(:each) do
+    @qs = QueryServerRunner.run
+  end
+  after(:each) do
+    @qs.close
+  end
+  
+  describe "old style list" do
+    before(:each) do
+      @fun = <<-JS
+        function(head, req, foo, bar) {
+          return "stuff";
+        }
+        JS
+      @qs.reset!
+      @qs.add_fun(@fun).should == true
+    end
+    it "should get a warning" do
+      resp = @qs.run(["list", {"foo"=>"bar"}, {"q" => "ok"}])
+      resp["error"].should == "render_error"
+      resp["reason"].should include("the list API has changed")
+    end
+  end
+  
+  describe "only goes to 2 list" do
+    before(:each) do
+      @fun = <<-JS
+        function(head, req) {
+          send("bacon")
+          var row, i = 0;
+          while(row = getRow()) {
+            send(row.key);        
+            i += 1;
+            if (i > 2) {
+              return('early');
+            }
+          };
+        }
+        JS
+      @qs.reset!
+      @qs.add_fun(@fun).should == true
+    end
+    it "should exit if erlang sends too many rows" do
+      @qs.run(["list", {"foo"=>"bar"}, {"q" => "ok"}]).should == ["start", ["bacon"], {"headers"=>{}}]
+      @qs.run(["list_row", {"key"=>"baz"}]).should ==  ["chunks", ["baz"]]
+      @qs.run(["list_row", {"key"=>"foom"}]).should == ["chunks", ["foom"]]
+      @qs.run(["list_row", {"key"=>"fooz"}]).should == ["end", ["fooz", "early"]]
+      @qs.rrun(["list_row", {"key"=>"foox"}])
+      @qs.jsgets["error"].should == "query_server_error"
+      should_have_exited @qs
+    end
+  end
+  
+  describe "raw list" do
+    before(:each) do
+      @fun = <<-JS
+        function(head, req) {
+          send("first chunk");
+          send(req.q);
+          var row;
+          while(row = getRow()) {
+            send(row.key);        
+          };
+          return "tail";
+        };
+        JS
+      @qs.run(["reset"]).should == true    
+      @qs.add_fun(@fun).should == true
+    end
+    it "should exit if it gets a non-row in the middle" do
+      @qs.rrun(["list", {"foo"=>"bar"}, {"q" => "ok"}])
+      @qs.jsgets.should == ["start", ["first chunk", "ok"], {"headers"=>{}}]
+      @qs.run(["reset"])["error"].should == "query_server_error"
+      should_have_exited @qs
+    end
+  end  
+end
