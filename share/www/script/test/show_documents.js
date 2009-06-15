@@ -148,6 +148,9 @@ couchTests.show_documents = function(debug) {
 // 
 // function foo() {
 
+  // Fix for COUCHDB-379
+  T(equals(xhr.getResponseHeader("Server").substr(0,7), "CouchDB"));
+
   // // error stacktraces
   // xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/render-error/"+docid);
   // T(JSON.parse(xhr.responseText).error == "render_error");
