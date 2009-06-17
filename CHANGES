@@ -7,21 +7,21 @@ Version 0.9.1
 Build and System Integration:
 
  * Updated top-level documentation.
- * PID file directory is created by the SysV/BSD daemon scripts.
- * Show correct environment variables in ./configure --help.
- * Fix build instructions shown by ./configure.
+ * PID file directory is now created by the SysV/BSD daemon scripts.
+ * Fixed the environment variables shown by the configure script.
+ * Fixed the build instructions shown by the configure script.
 
 Configuration and stats system:
 
- * Correct missing-.ini file error message.
- * Fix incorrect recording of request time.
+ * Corrected missing configuration file error message.
+ * Fixed incorrect recording of request time.
 
 Database Core:
 
- * Document validation for underscore prefixed variables
+ * Document validation for underscore prefixed variables.
  * Made attachment storage less sparse.
- * Fix for COUCHDB-334 where a database with delayed commits pending is 
-   considered idle, and subject to losing changes when shutdown.
+ * Fixed problems when a database with delayed commits pending is considered
+   idle, and subject to losing changes when shutdown. (COUCHDB-334)
 
 External Handlers:
 
@@ -29,7 +29,7 @@ External Handlers:
 
 Futon Utility Client:
 
- * Redirect when loading a deleted view URL from the cookie.
+ * Redirect when loading a deleted view URI from the cookie.
 
 HTTP Interface:
 
@@ -41,7 +41,7 @@ JavaScript View Server:
 
 Replication:
 
- * Added support for unicode characters transmitted as UTF-16 surrogate pairs.
+ * Added support for Unicode characters transmitted as UTF-16 surrogate pairs.
  * URL-encode attachment names when necessary.
  * Pull specific revisions of an attachment, instead of just the latest one.
  * Work around a rare chunk-merging problem in ibrowse.
