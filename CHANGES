@@ -8,28 +8,45 @@ Build and System Integration:
 
  * Updated top-level documentation.
  * PID file directory is created by the SysV/BSD daemon scripts.
-
-Bug Fixes
-
- * Futon redirects when a view gets deleted.
- * Document validation for underscore prefixed variables
- * POST'ing to _external handlers.
- * Attachment requests respect the "rev" query-string parameter.
- * Added support for unicode characters transmitted as UTF-16 surrogate pairs.
- * Replicator URL-encodes attachment names when necessary.
- * Replicator pulls specific revisions of an attachment, instead of just the
-   latest one.
- * Replicator works around a rare chunk-merging problem in ibrowse.
- * Replicator works with documents containing Unicode characters outside the
-   Basic Multilingual Plane.
- * Fix build instructions shown by ./configure.
  * Show correct environment variables in ./configure --help.
+ * Fix build instructions shown by ./configure.
+
+Configuration and stats system:
+
+ * Correct missing-.ini file error message.
  * Fix incorrect recording of request time.
+
+Database Core:
+
+ * Document validation for underscore prefixed variables
  * Made attachment storage less sparse.
  * Fix for COUCHDB-334 where a database with delayed commits pending is 
    considered idle, and subject to losing changes when shutdown.
+
+External Handlers:
+
+ * Fix POST requests.
+
+Futon Utility Client:
+
+ * Redirect when loading a deleted view URL from the cookie.
+
+HTTP Interface:
+
+ * Attachment requests respect the "rev" query-string parameter.
+
+JavaScript View Server:
+
  * Useful JavaScript Error messages.
- * Correct missing-.ini file error message.
+
+Replication:
+
+ * Added support for unicode characters transmitted as UTF-16 surrogate pairs.
+ * URL-encode attachment names when necessary.
+ * Pull specific revisions of an attachment, instead of just the latest one.
+ * Work around a rare chunk-merging problem in ibrowse.
+ * Work with documents containing Unicode characters outside the Basic
+   Multilingual Plane.
 
 Version 0.9.0
 -------------
