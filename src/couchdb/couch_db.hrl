@@ -167,7 +167,6 @@
     include_docs = false,
     stale = false,
     multi_get = false,
-    ignore = false,
     callback = nil
 }).
 
