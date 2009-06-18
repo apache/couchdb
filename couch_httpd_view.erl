@@ -15,7 +15,7 @@
 
 -export([handle_view_req/2,handle_temp_view_req/2]).
 
--export([get_stale_type/1, get_reduce_type/1, parse_view_params/4]).
+-export([get_stale_type/1, get_reduce_type/1, parse_view_params/3]).
 -export([make_view_fold_fun/6, finish_view_fold/3, view_row_obj/3]).
 -export([view_group_etag/1, view_group_etag/2, make_reduce_fold_funs/5]).
 -export([design_doc_view/5]).
@@ -31,18 +31,18 @@ design_doc_view(Req, Db, Id, ViewName, Keys) ->
     Reduce = get_reduce_type(Req),
     Result = case couch_view:get_map_view(Db, DesignId, ViewName, Stale) of
     {ok, View, Group} ->
-        QueryArgs = parse_view_params(Req, Keys, map, strict),
+        QueryArgs = parse_view_params(Req, Keys, map),
         output_map_view(Req, View, Group, Db, QueryArgs, Keys);
     {not_found, Reason} ->
         case couch_view:get_reduce_view(Db, DesignId, ViewName, Stale) of
         {ok, ReduceView, Group} ->
             case Reduce of
             false ->
-                QueryArgs = parse_view_params(Req, Keys, red_map, strict),
+                QueryArgs = parse_view_params(Req, Keys, red_map),
                 MapView = couch_view:extract_map_view(ReduceView),
                 output_map_view(Req, MapView, Group, Db, QueryArgs, Keys);
             _ ->
-                QueryArgs = parse_view_params(Req, Keys, reduce, strict),
+                QueryArgs = parse_view_params(Req, Keys, reduce),
                 output_reduce_view(Req, ReduceView, Group, QueryArgs, Keys)
             end;
         _ ->
@@ -82,12 +82,12 @@ handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
     Keys = proplists:get_value(<<"keys">>, Props, nil),
     case proplists:get_value(<<"reduce">>, Props, null) of
     null ->
-        QueryArgs = parse_view_params(Req, Keys, map, strict),
+        QueryArgs = parse_view_params(Req, Keys, map),
         {ok, View, Group} = couch_view:get_temp_map_view(Db, Language, 
             DesignOptions, MapSrc),
         output_map_view(Req, View, Group, Db, QueryArgs, Keys);
     RedSrc ->
-        QueryArgs = parse_view_params(Req, Keys, reduce, strict),
+        QueryArgs = parse_view_params(Req, Keys, reduce),
         {ok, View, Group} = couch_view:get_temp_reduce_view(Db, Language, 
             DesignOptions, MapSrc, RedSrc),
         output_reduce_view(Req, View, Group, QueryArgs, Keys)
@@ -196,7 +196,7 @@ get_stale_type(Req) ->
 get_reduce_type(Req) ->
     list_to_atom(couch_httpd:qs_value(Req, "reduce", "true")).
 
-parse_view_params(Req, Keys, ViewType, IgnoreType) ->
+parse_view_params(Req, Keys, ViewType) ->
     QueryList = couch_httpd:qs(Req),
     QueryParams = 
     lists:foldl(fun({K, V}, Acc) ->
@@ -208,8 +208,7 @@ parse_view_params(Req, Keys, ViewType, IgnoreType) ->
     end,
     Args = #view_query_args{
         view_type=ViewType,
-        multi_get=IsMultiGet,
-        ignore=IgnoreType
+        multi_get=IsMultiGet
     },
     QueryArgs = lists:foldl(fun({K, V}, Args2) ->
         validate_view_query(K, V, Args2)
@@ -351,14 +350,8 @@ validate_view_query(include_docs, true, Args) ->
     end;
 validate_view_query(include_docs, _Value, Args) ->
     Args;
-validate_view_query(extra, {Key, _}, Args) ->
-    case Args#view_query_args.ignore of
-        strict ->
-            Msg = io_lib:format("Invalid URL parameter: ~p", [Key]),
-            throw({query_parse_error, ?l2b(Msg)});
-        _ ->
-            Args
-    end.
+validate_view_query(extra, _Value, Args) ->
+    Args.
 
 make_view_fold_fun(Req, QueryArgs, Etag, Db, TotalViewCount, HelperFuns) ->
     #view_query_args{
