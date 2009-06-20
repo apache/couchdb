@@ -6,10 +6,10 @@ Version 0.9.1
 
 Build and System Integration:
 
- * Updated top-level documentation.
  * PID file directory is now created by the SysV/BSD daemon scripts.
  * Fixed the environment variables shown by the configure script.
  * Fixed the build instructions shown by the configure script.
+ * Updated ownership and permission advice in `README` for better security.
 
 Configuration and stats system:
 
