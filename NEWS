@@ -17,6 +17,13 @@ This release contains backwards incompatible changes, please see above for help.
  * Added modular configuration file directories.
  * Miscellaneous improvements to build, system integration, and portability.
 
+Version 0.9.1
+-------------
+
+ * Various bug fixes for the build system, configuration, statistics reporting,
+   database core, external handlers, Futon interface, HTTP interface,
+   JavaScript View Server and replicator.
+
 Version 0.9.0
 -------------
 

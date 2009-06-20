@@ -14,6 +14,53 @@ Build and System Integration:
  * The SysV/BSD daemon script now creates the PID directory on each invokation
    because PREFIX/var/run might be a temporary filesystem.
 
+Version 0.9.1
+-------------
+
+Build and System Integration:
+
+ * Updated top-level documentation.
+ * PID file directory is now created by the SysV/BSD daemon scripts.
+ * Fixed the environment variables shown by the configure script.
+ * Fixed the build instructions shown by the configure script.
+
+Configuration and stats system:
+
+ * Corrected missing configuration file error message.
+ * Fixed incorrect recording of request time.
+
+Database Core:
+
+ * Document validation for underscore prefixed variables.
+ * Made attachment storage less sparse.
+ * Fixed problems when a database with delayed commits pending is considered
+   idle, and subject to losing changes when shutdown. (COUCHDB-334)
+
+External Handlers:
+
+ * Fix POST requests.
+
+Futon Utility Client:
+
+ * Redirect when loading a deleted view URI from the cookie.
+
+HTTP Interface:
+
+ * Attachment requests respect the "rev" query-string parameter.
+
+JavaScript View Server:
+
+ * Useful JavaScript Error messages.
+
+Replication:
+
+ * Added support for Unicode characters transmitted as UTF-16 surrogate pairs.
+ * URL-encode attachment names when necessary.
+ * Pull specific revisions of an attachment, instead of just the latest one.
+ * Work around a rare chunk-merging problem in ibrowse.
+ * Work with documents containing Unicode characters outside the Basic
+   Multilingual Plane.
+
 Version 0.9.0
 -------------
 
