@@ -466,6 +466,13 @@
         }
       }
 
+      this.jumpToDocument = function(e) {
+        if (e.which == 13) {
+          var docid = $('#jumpto input').val();
+          location.href = 'document.html?' + encodeURIComponent(db.name) + '/' + encodeDocId(docid);
+        }
+      }
+
       this.updateDocumentListing = function(options) {
         if (options === undefined) options = {};
         if (options.limit === undefined) {

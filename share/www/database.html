@@ -108,7 +108,26 @@ specific language governing permissions and limitations under the License.
         $("#toolbar button.add").click(page.addDocument);
         $("#toolbar button.compact").click(page.compactDatabase);
         $("#toolbar button.delete").click(page.deleteDatabase);
+
+        $('#jumpto input').suggest(function(text, callback) {
+          page.db.allDocs({
+            limit: 10, startkey: text, endkey: text + 'zzz',
+            success: function(docs) {
+              var matches = [];
+              for (var i = 0; i < docs.rows.length; i++) {
+                if (docs.rows[i].id.indexOf(text) == 0) {
+                  matches[i] = docs.rows[i].id;
+                }
+              }
+              callback(matches);
+            }
+          });
+        });
+
+        $("#jumpto input").keypress(page.jumpToDocument);
+
       });
+
     </script>
   </head>
 
@@ -125,6 +144,11 @@ specific language governing permissions and limitations under the License.
           <option value="_design_docs">Design documents</option>
           <option value="_temp_view">Temporary view…</option>
         </select></label>
+      </div>
+      <div id="jumpto">
+        <label>Jump to document:
+          <input type="text" name="docid" />
+        </label>
       </div>
       <ul id="toolbar">
         <li><button class="add">Create Document …</button></li>

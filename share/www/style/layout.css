@@ -274,6 +274,13 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
   visibility: hidden;
 }
 
+/* Document quick jump */
+
+#jumpto { float: right; padding: 5px 10px 5px 5px; line-height: 16px;
+  font-weight: bold; color: #666; font-size: 90%; }
+
+#jumpto input { font-size: 90%; }
+
 /* View selector */
 
 #switch { color: #666; float: right; font-size: 90%; font-weight: bold;
