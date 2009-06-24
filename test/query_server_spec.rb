@@ -15,6 +15,7 @@
 # spec test/query_server_spec.rb -f specdoc --color
 
 COUCH_ROOT = "#{File.dirname(__FILE__)}/.." unless defined?(COUCH_ROOT)
+LANGUAGE = "js"
 
 
 require 'open3'
@@ -93,8 +94,11 @@ class OSProcessRunner
 end
 
 class QueryServerRunner < OSProcessRunner
+  
+  COMMANDS = {"js" => "#{COUCH_ROOT}/src/couchdb/couchjs #{COUCH_ROOT}/share/server/main.js" }
+
   def self.run_command
-    "#{COUCH_ROOT}/src/couchdb/couchjs #{COUCH_ROOT}/share/server/main.js"
+    COMMANDS[LANGUAGE]
   end
 end
 
@@ -103,6 +107,143 @@ class ExternalRunner < OSProcessRunner
     "#{COUCH_ROOT}/src/couchdb/couchjs #{COUCH_ROOT}/share/server/echo.js"
   end
 end
+
+functions = {
+  "emit-twice" => {
+    "js" => %{function(doc){emit("foo",doc.a); emit("bar",doc.a)}}
+  },
+  "emit-once" => {
+    "js" => %{function(doc){emit("baz",doc.a)}}
+  },
+  "reduce-values-length" => {
+    "js" => %{function(keys, values, rereduce) { return values.length; }}
+  },
+  "reduce-values-sum" => {
+    "js" => %{function(keys, values, rereduce) { return sum(values); }}
+  },
+  "validate-forbidden" => {
+    "js" => %{function(newDoc, oldDoc, userCtx) { if (newDoc.bad) throw({forbidden:"bad doc"}); "foo bar";}}
+  },
+  "show-simple" => {
+    "js" => <<-JS
+        function(doc, req) {
+          log("ok");
+          return [doc.title, doc.body].join(' - ');
+        }
+    JS
+  },
+  "show-headers" => {
+    "js" => <<-JS
+        function(doc, req) {
+          var resp = {"code":200, "headers":{"X-Plankton":"Rusty"}};
+          resp.body = [doc.title, doc.body].join(' - ');
+          return resp;
+        }
+     JS
+  },
+  "show-sends" => {
+    "js" =>  <<-JS
+        function(head, req) {
+          start({headers:{"Content-Type" : "text/plain"}});
+          send("first chunk");
+          send('second "chunk"');
+          return "tail";
+        };
+    JS
+  },
+  "show-while-get-rows" => {
+    "js" =>  <<-JS
+        function(head, req) {
+          send("first chunk");
+          send(req.q);
+          var row;
+          log("about to getRow " + typeof(getRow));
+          while(row = getRow()) {
+            send(row.key);        
+          };
+          return "tail";
+        };
+    JS
+  },
+  "show-while-get-rows-multi-send" => {
+    "js" => <<-JS
+        function(head, req) {
+          send("bacon");
+          var row;
+          log("about to getRow " + typeof(getRow));
+          while(row = getRow()) {
+            send(row.key);        
+            send("eggs");        
+          };
+          return "tail";
+        };
+    JS
+  },
+  "list-simple" => {
+    "js" => <<-JS
+        function(head, req) {
+          send("first chunk");
+          send(req.q);
+          var row;
+          while(row = getRow()) {
+            send(row.key);    
+          };
+          return "early";
+        };
+    JS
+  },
+  "list-chunky" => {
+    "js" => <<-JS
+        function(head, req) {
+          send("first chunk");
+          send(req.q);
+          var row, i=0;
+          while(row = getRow()) {
+            send(row.key);  
+            i += 1;
+            if (i > 2) {
+              return('early tail');
+            }  
+          };
+        };
+    JS
+  },
+  "list-old-style" => {
+    "js" => <<-JS
+        function(head, req, foo, bar) {
+          return "stuff";
+        }
+    JS
+  },
+  "list-capped" => {
+    "js" => <<-JS
+        function(head, req) {
+          send("bacon")
+          var row, i = 0;
+          while(row = getRow()) {
+            send(row.key);        
+            i += 1;
+            if (i > 2) {
+              return('early');
+            }
+          };
+        }
+    JS
+  },
+  "list-raw" => {
+    "js" => <<-JS
+        function(head, req) {
+          send("first chunk");
+          send(req.q);
+          var row;
+          while(row = getRow()) {
+            send(row.key);        
+          };
+          return "tail";
+        };
+    JS
+  }
+}
 
 describe "query server normal case" do
   before(:all) do
@@ -117,8 +258,8 @@ describe "query server normal case" do
   end
   it "should run map funs" do
     @qs.reset!
-    @qs.run(["add_fun", %{function(doc){emit("foo",doc.a); emit("bar",doc.a)}}]).should == true
-    @qs.run(["add_fun", %{function(doc){emit("baz",doc.a)}}]).should == true
+    @qs.run(["add_fun", functions["emit-twice"][LANGUAGE]]).should == true
+    @qs.run(["add_fun", functions["emit-once"][LANGUAGE]]).should == true
     rows = @qs.run(["map_doc", {:a => "b"}])
     rows[0][0].should == ["foo", "b"]
     rows[0][1].should == ["bar", "b"]
@@ -126,11 +267,7 @@ describe "query server normal case" do
   end
   describe "reduce" do
     before(:all) do
-      @fun = <<-JS
-        function(keys, values, rereduce) {
-          return values.length;
-        }
-        JS
+      @fun = functions["reduce-values-length"][LANGUAGE]
       @qs.reset!
     end
     it "should reduce" do
@@ -140,11 +277,7 @@ describe "query server normal case" do
   end
   describe "rereduce" do
     before(:all) do
-      @fun = <<-JS
-        function(keys, values, rereduce) {
-          return sum(values);
-        }
-        JS
+      @fun = functions["reduce-values-sum"][LANGUAGE]
       @qs.reset!
     end
     it "should rereduce" do
@@ -156,12 +289,7 @@ describe "query server normal case" do
   # it "should validate"
   describe "validation" do
     before(:all) do
-      @fun = <<-JS
-        function(newDoc, oldDoc, userCtx) {
-          if (newDoc.bad) throw({forbidden:"bad doc"});
-          "foo bar";
-        }
-        JS
+      @fun = functions["validate-forbidden"][LANGUAGE]
       @qs.reset!
     end
     it "should allow good updates" do
@@ -174,12 +302,7 @@ describe "query server normal case" do
   
   describe "show" do
     before(:all) do
-      @fun = <<-JS
-        function(doc, req) {
-          log("ok");
-          return [doc.title, doc.body].join(' - ');
-        }
-        JS
+      @fun = functions["show-simple"][LANGUAGE]
       @qs.reset!
     end
     it "should show" do
@@ -191,13 +314,7 @@ describe "query server normal case" do
   
   describe "show with headers" do
     before(:all) do
-      @fun = <<-JS
-        function(doc, req) {
-          var resp = {"code":200, "headers":{"X-Plankton":"Rusty"}};
-          resp.body = [doc.title, doc.body].join(' - ');
-          return resp;
-        }
-        JS
+      @fun = functions["show-headers"][LANGUAGE]
       @qs.reset!
     end
     it "should show headers" do
@@ -213,14 +330,7 @@ describe "query server normal case" do
     
   describe "raw list with headers" do
     before(:each) do
-      @fun = <<-JS
-        function(head, req) {
-          start({headers:{"Content-Type" : "text/plain"}});
-          send("first chunk");
-          send('second "chunk"');
-          return "tail";
-        };
-        JS
+      @fun = functions["show-sends"][LANGUAGE]
       @qs.reset!
       @qs.add_fun(@fun).should == true
     end
@@ -234,22 +344,11 @@ describe "query server normal case" do
   
   describe "list with rows" do
     before(:each) do
-      @fun = <<-JS
-        function(head, req) {
-          send("first chunk");
-          send(req.q);
-          var row;
-          log("about to getRow " + typeof(getRow));
-          while(row = getRow()) {
-            send(row.key);        
-          };
-          return "tail";
-        };
-        JS
+      @fun = functions["show-while-get-rows"][LANGUAGE]
       @qs.run(["reset"]).should == true    
       @qs.add_fun(@fun).should == true
     end
-    it "should should list em" do
+    it "should list em" do
       @qs.rrun(["list", {"foo"=>"bar"}, {"q" => "ok"}])
       @qs.jsgets.should == ["start", ["first chunk", "ok"], {"headers"=>{}}]
       @qs.rrun(["list_row", {"key"=>"baz"}])
@@ -269,18 +368,7 @@ describe "query server normal case" do
   
   describe "should buffer multiple chunks sent for a single row." do
     before(:all) do
-      @fun = <<-JS
-        function(head, req) {
-          send("bacon");
-          var row;
-          log("about to getRow " + typeof(getRow));
-          while(row = getRow()) {
-            send(row.key);        
-            send("eggs");        
-          };
-          return "tail";
-        };
-        JS
+      @fun = functions["show-while-get-rows-multi-send"][LANGUAGE]
       @qs.reset!
       @qs.add_fun(@fun).should == true
     end
@@ -298,17 +386,7 @@ describe "query server normal case" do
 
   describe "example list" do
     before(:all) do
-      @fun = <<-JS
-        function(head, req) {
-          send("first chunk");
-          send(req.q);
-          var row;
-          while(row = getRow()) {
-            send(row.key);    
-          };
-          return "early";
-        };
-        JS
+      @fun = functions["list-simple"][LANGUAGE]
       @qs.reset!
       @qs.add_fun(@fun).should == true
     end
@@ -325,20 +403,7 @@ describe "query server normal case" do
   
   describe "only goes to 2 list" do
     before(:all) do
-      @fun = <<-JS
-        function(head, req) {
-          send("first chunk");
-          send(req.q);
-          var row, i=0;
-          while(row = getRow()) {
-            send(row.key);  
-            i += 1;
-            if (i > 2) {
-              return('early tail');
-            }  
-          };
-        };
-        JS
+      @fun = functions["list-chunky"][LANGUAGE]
       @qs.reset!
       @qs.add_fun(@fun).should == true
     end
@@ -381,11 +446,7 @@ describe "query server that exits" do
   
   describe "old style list" do
     before(:each) do
-      @fun = <<-JS
-        function(head, req, foo, bar) {
-          return "stuff";
-        }
-        JS
+      @fun = functions["list-old-style"][LANGUAGE]
       @qs.reset!
       @qs.add_fun(@fun).should == true
     end
@@ -398,19 +459,7 @@ describe "query server that exits" do
   
   describe "only goes to 2 list" do
     before(:each) do
-      @fun = <<-JS
-        function(head, req) {
-          send("bacon")
-          var row, i = 0;
-          while(row = getRow()) {
-            send(row.key);        
-            i += 1;
-            if (i > 2) {
-              return('early');
-            }
-          };
-        }
-        JS
+      @fun = functions["list-capped"][LANGUAGE]
       @qs.reset!
       @qs.add_fun(@fun).should == true
     end
@@ -427,18 +476,8 @@ describe "query server that exits" do
   
   describe "raw list" do
     before(:each) do
-      @fun = <<-JS
-        function(head, req) {
-          send("first chunk");
-          send(req.q);
-          var row;
-          while(row = getRow()) {
-            send(row.key);        
-          };
-          return "tail";
-        };
-        JS
-      @qs.run(["reset"]).should == true    
+      @fun = functions["list-raw"][LANGUAGE]
+      @qs.run(["reset"]).should == true
       @qs.add_fun(@fun).should == true
     end
     it "should exit if it gets a non-row in the middle" do
