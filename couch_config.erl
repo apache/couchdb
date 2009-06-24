@@ -10,42 +10,47 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-%% @doc Reads CouchDB's ini file and gets queried for configuration parameters.
-%%      This module is initialized with a list of ini files that it
-%%      consecutively reads Key/Value pairs from and saves them in an ets
-%%      table. If more an one ini file is specified, the last one is used to
-%%      write changes that are made with store/2 back to that ini file.
+% Reads CouchDB's ini file and gets queried for configuration parameters.
+% This module is initialized with a list of ini files that it consecutively
+% reads Key/Value pairs from and saves them in an ets table. If more an one
+% ini file is specified, the last one is used to write changes that are made
+% with store/2 back to that ini file.
 
 -module(couch_config).
+-behaviour(gen_server).
+
 -include("couch_db.hrl").
 
--behaviour(gen_server).
--export([start_link/1, init/1, handle_call/3, handle_cast/2, handle_info/2,
-        terminate/2, code_change/3]).
--export([all/0, get/1, get/2, get/3, delete/2, set/3, set/4, register/1,
-        register/2, load_ini_file/1]).
 
--record(config,
-    {notify_funs=[],
-    write_filename=""
-    }).
+-export([start_link/1, stop/0]).
+-export([all/0, get/1, get/2, get/3, set/3, set/4, delete/2, delete/3]).
+-export([register/1, register/2]).
+-export([parse_ini_file/1]).
 
-%% Public API %%
+-export([init/1, terminate/2, code_change/3]).
+-export([handle_call/3, handle_cast/2, handle_info/2]).
 
-%% @type etstable() = integer().
+-record(config, {
+    notify_funs=[],
+    write_filename=undefined
+}).
+
 
 start_link(IniFiles) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, IniFiles, []).
 
+stop() ->
+    gen_server:cast(?MODULE, stop).
+
+
 all() ->
-    lists:sort(ets:tab2list(?MODULE)).
+    lists:sort(gen_server:call(?MODULE, all)).
+
 
 get(Section) when is_binary(Section) ->
     ?MODULE:get(?b2l(Section));
 get(Section) ->
-    Matches = ets:match(?MODULE, {{Section, '$1'}, '$2'}),
-    [{Key, Value} || [Key, Value] <- Matches].
-
+    gen_server:call(?MODULE, {get, Section}).
 
 get(Section, Key) ->
     ?MODULE:get(Section, Key, undefined).
@@ -53,21 +58,28 @@ get(Section, Key) ->
 get(Section, Key, Default) when is_binary(Section) and is_binary(Key) ->
     ?MODULE:get(?b2l(Section), ?b2l(Key), Default);
 get(Section, Key, Default) ->
-    case ets:lookup(?MODULE, {Section, Key}) of
-    [] -> Default;
-    [{_,Result}] -> Result
-    end.
+    gen_server:call(?MODULE, {get, Section, Key, Default}).
+
 
 set(Section, Key, Value) ->
-    set(Section, Key, Value, true).
+    ?MODULE:set(Section, Key, Value, true).
 
 set(Section, Key, Value, Persist) when is_binary(Section) and is_binary(Key)  ->
-    set(?b2l(Section), ?b2l(Key), Value, Persist);
+    ?MODULE:set(?b2l(Section), ?b2l(Key), Value, Persist);
 set(Section, Key, Value, Persist) ->
-    gen_server:call(?MODULE, {set, [{{Section, Key}, Value}], Persist}).
+    gen_server:call(?MODULE, {set, Section, Key, Value, Persist}).
 
+
+delete(Section, Key) when is_binary(Section) and is_binary(Key) ->
+    delete(?b2l(Section), ?b2l(Key));
 delete(Section, Key) ->
-    set(Section, Key, "").
+    delete(Section, Key, true).
+
+delete(Section, Key, Persist) when is_binary(Section) and is_binary(Key) ->
+    delete(?b2l(Section), ?b2l(Key), Persist);
+delete(Section, Key, Persist) ->
+    ?MODULE:set(Section, Key, "", Persist).
+
 
 register(Fun) ->
     ?MODULE:register(Fun, self()).
@@ -75,54 +87,78 @@ register(Fun) ->
 register(Fun, Pid) ->
     gen_server:call(?MODULE, {register, Fun, Pid}).
 
-%% Private API %%
 
-%% @spec init(List::list([])) -> {ok, Tab::etsatable()}
-%% @doc Creates a new ets table of the type "set".
 init(IniFiles) ->
-    ets:new(?MODULE, [named_table, set, protected]),
+    ets:new(?MODULE, [named_table, set, private]),
     lists:map(fun(IniFile) ->
         {ok, ParsedIniValues} = parse_ini_file(IniFile),
         ets:insert(?MODULE, ParsedIniValues)
     end, IniFiles),
-    {ok, #config{write_filename=lists:last(IniFiles)}}.
+    WriteFile = case length(IniFiles) > 0 of
+        true -> lists:last(IniFiles);
+        _ -> undefined
+    end,
+    {ok, #config{write_filename=WriteFile}}.
 
-handle_call({set, KVs, Persist}, _From, Config) ->
-    lists:map(
-        fun({{Section, Key}, Value}=KV) ->
-            true = ets:insert(?MODULE, KV),
-            if Persist ->
-                ok = couch_config_writer:save_to_file(KV,
-                        Config#config.write_filename);
-            true -> ok
-            end,
-            [catch F(Section, Key, Value)
-                    || {_Pid, F} <- Config#config.notify_funs]
-        end, KVs),
+
+terminate(_Reason, _State) ->
+    ok.
+
+
+handle_call(all, _From, Config) ->
+    Resp = lists:sort((ets:tab2list(?MODULE))),
+    {reply, Resp, Config};
+handle_call({get, Section}, _From, Config) ->
+    Matches = ets:match(?MODULE, {{Section, '$1'}, '$2'}),
+    Resp = [{Key, Value} || [Key, Value] <- Matches],
+    {reply, Resp, Config};
+handle_call({get, Section, Key, Default}, _From, Config) ->
+    Resp = case ets:lookup(?MODULE, {Section, Key}) of
+        [] -> Default;
+        [{_, Match}] -> Match
+    end,
+    {reply, Resp, Config};
+handle_call({set, Sec, Key, Val, Persist}, _From, Config) ->
+    true = ets:insert(?MODULE, {{Sec, Key}, Val}),
+    case {Persist, Config#config.write_filename} of
+        {true, undefined} ->
+            ok;
+        {true, FileName} ->
+            couch_config_writer:save_to_file({{Sec, Key}, Val}, FileName);
+        _ ->
+            ok
+    end,
+    [catch F(Sec, Key, Val) || {_Pid, F} <- Config#config.notify_funs],
     {reply, ok, Config};
-
 handle_call({register, Fun, Pid}, _From, #config{notify_funs=PidFuns}=Config) ->
     erlang:monitor(process, Pid),
     % convert 1 and 2 arity to 3 arity
-    Fun2 = 
-    if is_function(Fun, 1) ->
-        fun(Section, _Key, _Value) -> Fun(Section) end;
-    is_function(Fun, 2) ->
-        fun(Section, Key, _Value) -> Fun(Section, Key) end;
-    is_function(Fun, 3) ->
-        Fun
+    Fun2 =
+    case Fun of
+        _ when is_function(Fun, 1) ->
+            fun(Section, _Key, _Value) -> Fun(Section) end;
+        _ when is_function(Fun, 2) ->
+            fun(Section, Key, _Value) -> Fun(Section, Key) end;
+        _ when is_function(Fun, 3) ->
+            Fun
     end,
-    {reply, ok, Config#config{notify_funs=[{Pid, Fun2}|PidFuns]}}.
+    {reply, ok, Config#config{notify_funs=[{Pid, Fun2} | PidFuns]}}.
 
-%% @spec load_ini_file(IniFile::filename()) -> ok
-%% @doc Parses an ini file and stores Key/Value Pairs into the ets table.
-load_ini_file(IniFile) ->
-    {ok, KVs} = parse_ini_file(IniFile),
-    gen_server:call(?MODULE, {set, KVs, false}).
 
-%% @spec load_ini_file(IniFile::filename()) -> {ok, [KV]}
-%%       KV = {{Section::string(), Key::string()}, Value::String()}
-%% @throws {startup_error, Msg::string()}
+handle_cast(stop, State) ->
+    {stop, normal, State};
+handle_cast(_Msg, State) ->
+    {noreply, State}.
+
+handle_info({'DOWN', _, _, DownPid, _}, #config{notify_funs=PidFuns}=Config) ->
+    % remove any funs registered by the downed process
+    FilteredPidFuns = [{Pid,Fun} || {Pid,Fun} <- PidFuns, Pid /= DownPid],
+    {noreply, Config#config{notify_funs=FilteredPidFuns}}.
+
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+
 parse_ini_file(IniFile) ->
     IniFilename = couch_util:abs_pathname(IniFile),
     IniBin =
@@ -130,7 +166,8 @@ parse_ini_file(IniFile) ->
         {ok, IniBin0} ->
             IniBin0;
         {error, enoent} ->
-            Msg = ?l2b(io_lib:format("Couldn't find server configuration file ~s.", [IniFilename])),
+            Fmt = "Couldn't find server configuration file ~s.",
+            Msg = ?l2b(io_lib:format(Fmt, [IniFilename])),
             ?LOG_ERROR("~s~n", [Msg]),
             throw({startup_error, Msg})
     end,
@@ -156,25 +193,12 @@ parse_ini_file(IniFile) ->
                     {AccSectionName, AccValues};
                 {ok, [ValueName|LineValues]} -> % yeehaw, got a line!
                     RemainingLine = couch_util:implode(LineValues, "="),
-                    {ok, [LineValue | _Rest]} = regexp:split(RemainingLine, " ;|\t;"), % removes comments
-                    {AccSectionName, [{{AccSectionName, ValueName}, LineValue} | AccValues]}
+                    {ok, [LineValue | _Rest]} = 
+			    regexp:split(RemainingLine, " ;|\t;"), % removes comments
+                    {AccSectionName, 
+		     [{{AccSectionName, ValueName}, LineValue} | AccValues]}
                 end
             end
         end, {"", []}, Lines),
     {ok, ParsedIniValues}.
 
-% Unused gen_server behaviour API functions that we need to declare.
-
-%% @doc Unused
-handle_cast(foo, State) -> {noreply, State}.
-
-handle_info({'DOWN', _, _, DownPid, _}, #config{notify_funs=PidFuns}=Config) ->
-    % remove any funs registered by the downed process
-    FilteredPidFuns = [{Pid,Fun} || {Pid,Fun} <- PidFuns, Pid /= DownPid],
-    {noreply, Config#config{notify_funs=FilteredPidFuns}}.
-
-%% @doc Unused
-terminate(_Reason, _State) -> ok.
-
-%% @doc Unused
-code_change(_OldVersion, State, _Extra) -> {ok, State}.
