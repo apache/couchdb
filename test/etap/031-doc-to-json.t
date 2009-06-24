@@ -9,7 +9,7 @@
 
 main(_) ->
     code:add_pathz("src/couchdb"),
-    etap:plan(unknown),
+    etap:plan(12),
     case (catch test()) of
         ok ->
             etap:end_tests();

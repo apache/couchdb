@@ -36,10 +36,10 @@ README.gz: $(top_srcdir)/README
 THANKS.gz: $(top_srcdir)/THANKS
 	-gzip -9 < $< > $@
 
-check: all
+check: dev
 	prove test/etap/*.t
 
-cover: all
+cover: dev
 	rm -f cover/*.coverdata
 	COVER=1 COVER_BIN=./src/couchdb/ prove test/etap/*.t
 	SRC=./src/couchdb/ \
