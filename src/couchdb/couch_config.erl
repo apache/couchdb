@@ -194,9 +194,9 @@ parse_ini_file(IniFile) ->
                 {ok, [ValueName|LineValues]} -> % yeehaw, got a line!
                     RemainingLine = couch_util:implode(LineValues, "="),
                     {ok, [LineValue | _Rest]} = 
-			    regexp:split(RemainingLine, " ;|\t;"), % removes comments
+                regexp:split(RemainingLine, " ;|\t;"), % removes comments
                     {AccSectionName, 
-		     [{{AccSectionName, ValueName}, LineValue} | AccValues]}
+             [{{AccSectionName, ValueName}, LineValue} | AccValues]}
                 end
             end
         end, {"", []}, Lines),

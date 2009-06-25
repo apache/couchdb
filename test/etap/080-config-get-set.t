@@ -27,38 +27,38 @@ test() ->
     etap:fun_is(
         fun(List) -> length(List) > 0 end,
         couch_config:all(),
-		"Data was loaded from the INI file."
-	),
+        "Data was loaded from the INI file."
+    ),
     
     etap:fun_is(
         fun(List) -> length(List) > 0 end,
         couch_config:get("daemons"),
-		"There are settings in the [daemons] section of the INI file."
-	),
-	
+        "There are settings in the [daemons] section of the INI file."
+    ),
+    
     etap:is(
         couch_config:get("httpd_design_handlers", "_view"),
-	    "{couch_httpd_view, handle_view_req}",
-	    "The {httpd_design_handlers, view} is the expected default."
-	),
+        "{couch_httpd_view, handle_view_req}",
+        "The {httpd_design_handlers, view} is the expected default."
+    ),
 
     etap:is(
         couch_config:get("httpd", "foo", "bar"),
         "bar",
-	    "Returns the default when key doesn't exist in config."
-	),
-	
-	etap:is(
-	    couch_config:get("httpd", "foo"),
-	    undefined,
-	    "The default default is the atom 'undefined'."
-	),
+        "Returns the default when key doesn't exist in config."
+    ),
+    
+    etap:is(
+        couch_config:get("httpd", "foo"),
+        undefined,
+        "The default default is the atom 'undefined'."
+    ),
     
     etap:is(
         couch_config:get("httpd", "port", "bar"),
         "5984",
-	    "Only returns the default when the config setting does not exist."
-	),
+        "Only returns the default when the config setting does not exist."
+    ),
 
 
     % Check that setting values works.
@@ -69,8 +69,8 @@ test() ->
     etap:is(
         couch_config:get("log", "level"),
         "severe",
-	    "Non persisted changes take effect."
-	),
+        "Non persisted changes take effect."
+    ),
     
     etap:is(
         couch_config:get("new_section", "bizzle"),

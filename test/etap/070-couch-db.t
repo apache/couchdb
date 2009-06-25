@@ -38,8 +38,8 @@ test() ->
             true -> couch_server:delete(MkDbName(Int), []);
             _ -> ok
         end,
-		{ok, Db} = couch_db:create(MkDbName(Int), []),
-		ok = couch_db:close(Db)
+        {ok, Db} = couch_db:create(MkDbName(Int), []),
+        ok = couch_db:close(Db)
     end, lists:seq(1, 200)),
 
     {ok, AllDbs3} = couch_server:all_databases(),

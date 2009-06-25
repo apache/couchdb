@@ -17,33 +17,33 @@ check_status(Pid,ListPropLists) ->
     From = list_to_binary(pid_to_list(Pid)),
     Element = lists:foldl(
         fun(PropList,Acc) ->
-	        case proplists:get_value(pid,PropList) of
-			    From ->
+            case proplists:get_value(pid,PropList) of
+                From ->
                     [PropList | Acc];
-				_ ->
+                _ ->
                     []
-			end
-		end,
+            end
+        end,
         [], ListPropLists
     ),
     proplists:get_value(status,hd(Element)).
 
 loop() ->
     receive
-	{add, From} ->
-	    Resp = couch_task_status:add_task("type", "task", "init"),
-	    From ! {ok, self(), Resp},
-	    loop();
-	{update, Status, From} ->
-	    Resp = couch_task_status:update(Status),
-	    From ! {ok, self(), Resp},
-	    loop();
-	{update_frequency, Msecs, From} ->
-	    Resp = couch_task_status:set_update_frequency(Msecs),
-	    From ! {ok, self(), Resp},
-	    loop();
-	{done, From} ->
-	    From ! {ok, self(), ok}
+    {add, From} ->
+        Resp = couch_task_status:add_task("type", "task", "init"),
+        From ! {ok, self(), Resp},
+        loop();
+    {update, Status, From} ->
+        Resp = couch_task_status:update(Status),
+        From ! {ok, self(), Resp},
+        loop();
+    {update_frequency, Msecs, From} ->
+        Resp = couch_task_status:set_update_frequency(Msecs),
+        From ! {ok, self(), Resp},
+        loop();
+    {done, From} ->
+        From ! {ok, self(), ok}
     end.
 
 call(Pid, Command) ->
@@ -86,15 +86,15 @@ test() ->
     etap:is(
         check_status(Pid1, couch_task_status:all()),
         <<"init">>,
-		"Task status was set to 'init'."
+        "Task status was set to 'init'."
     ),
 
     call(Pid1,update,"running"),
     etap:is(
         check_status(Pid1,couch_task_status:all()),
         <<"running">>,
-		"Status updated to 'running'."
-	),
+        "Status updated to 'running'."
+    ),
 
 
     call(Pid2,add),
@@ -107,15 +107,15 @@ test() ->
     etap:is(
         check_status(Pid2, couch_task_status:all()),
         <<"init">>,
-		"Second tasks's status was set to 'init'."
-	),
-	
+        "Second tasks's status was set to 'init'."
+    ),
+    
     call(Pid2, update, "running"),
     etap:is(
         check_status(Pid2, couch_task_status:all()),
         <<"running">>,
-		"Second task's status updated to 'running'."
-	),
+        "Second task's status updated to 'running'."
+    ),
 
 
     call(Pid3, add),
@@ -128,15 +128,15 @@ test() ->
     etap:is(
         check_status(Pid3, couch_task_status:all()),
         <<"init">>,
-		"Third tasks's status was set to 'init'."
-	),
-	
+        "Third tasks's status was set to 'init'."
+    ),
+    
     call(Pid3, update, "running"),
     etap:is(
         check_status(Pid3, couch_task_status:all()),
         <<"running">>,
-		"Third task's status updated to 'running'."
-	),
+        "Third task's status updated to 'running'."
+    ),
 
 
     call(Pid3, update_frequency, 500),
@@ -144,23 +144,23 @@ test() ->
     etap:is(
         check_status(Pid3, couch_task_status:all()),
         <<"still running">>,
-		"Third task's status updated to 'still running'."
-	),
+        "Third task's status updated to 'still running'."
+    ),
 
     call(Pid3, update, "skip this update"),
     etap:is(
         check_status(Pid3, couch_task_status:all()),
         <<"still running">>,
-		"Status update dropped because of frequency limit."
-	),
+        "Status update dropped because of frequency limit."
+    ),
 
     call(Pid3, update_frequency, 0),
     call(Pid3, update, "don't skip"),
     etap:is(
         check_status(Pid3, couch_task_status:all()),
         <<"don't skip">>,
-		"Status updated after reseting frequency limit."
-	),
+        "Status updated after reseting frequency limit."
+    ),
 
 
     call(Pid1, done),

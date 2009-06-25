@@ -95,12 +95,12 @@ handle_call(all, _, Server) ->
     All = [
         [
             {type, Type},
-	        {task, Task},
-	        {status, Status},
-	        {pid, ?l2b(pid_to_list(Pid))}
+            {task, Task},
+            {status, Status},
+            {pid, ?l2b(pid_to_list(Pid))}
         ]
         ||
-	    {Pid, {Type, Task, Status}} <- ets:tab2list(?MODULE)
+        {Pid, {Type, Task, Status}} <- ets:tab2list(?MODULE)
     ],
     {reply, All, Server}.
 

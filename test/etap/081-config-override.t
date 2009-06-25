@@ -48,9 +48,9 @@ test() ->
         etap:is(
             couch_config:get("couchdb", "max_dbs_open"),
             "100",
-    	    "{couchdb, max_dbs_open} is 100 by defualt."
-    	),
-	
+            "{couchdb, max_dbs_open} is 100 by defualt."
+        ),
+    
         etap:is(
             couch_config:get("httpd","port"),
             "5984",
