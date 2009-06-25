@@ -13,11 +13,12 @@
 -module(couch_util).
 
 -export([start_driver/1,terminate_linked/1]).
--export([should_flush/0, should_flush/1, to_existing_atom/1, to_binary/1]).
+-export([should_flush/0, should_flush/1, to_existing_atom/1]).
 -export([new_uuid/0, rand32/0, implode/2, collate/2, collate/3]).
 -export([abs_pathname/1,abs_pathname/2, trim/1, ascii_lower/1]).
 -export([encodeBase64/1, decodeBase64/1, to_hex/1,parse_term/1,dict_find/3]).
 -export([file_read_size/1]).
+-export([to_binary/1, to_list/1]).
 
 -include("couch_db.hrl").
 -include_lib("kernel/include/file.hrl").
@@ -65,19 +66,6 @@ to_hex([H|T]) ->
 
 to_digit(N) when N < 10 -> $0 + N;
 to_digit(N)             -> $a + N-10.
-
-
-to_binary(V) when is_binary(V) ->
-    V;
-to_binary(V) when is_list(V) -> 
-    try list_to_binary(V)
-    catch
-        _ -> list_to_binary(io_lib:format("~p", [V]))
-    end;
-to_binary(V) when is_atom(V) ->
-    list_to_binary(atom_to_list(V));
-to_binary(V) ->
-    list_to_binary(io_lib:format("~p", [V])).
 
 
 parse_term(Bin) when is_binary(Bin)->
@@ -301,3 +289,26 @@ file_read_size(FileName) ->
             FileInfo#file_info.size;
         Error -> Error
     end.
+
+to_binary(V) when is_binary(V) ->
+    V;
+to_binary(V) when is_list(V) ->
+    try
+        list_to_binary(V)
+    catch
+        _ ->
+            list_to_binary(io_lib:format("~p", [V]))
+    end;
+to_binary(V) when is_atom(V) ->
+    list_to_binary(atom_to_list(V));
+to_binary(V) ->
+    list_to_binary(io_lib:format("~p", [V])).
+
+to_list(V) when is_list(V) ->
+    V;
+to_list(V) when is_binary(V) ->
+    binary_to_list(V);
+to_list(V) when is_atom(V) ->
+    atom_to_list(V);
+to_list(V) ->
+    lists:flatten(io_lib:format("~p", [V])).
