@@ -60,6 +60,11 @@ couchTests.security_validation = function(debug) {
         T(wrongPasswordDb.last_req.status == 401);
       }
 
+      // test force_login=true. 
+      var resp = wrongPasswordDb.request("GET", "/_whoami?force_login=true");    
+      var err = JSON.parse(resp.responseText);
+      T(err.error == "unauthorized");
+      T(resp.status == 401);
 
       // Create the design doc that will run custom validation code
       var designDoc = {
@@ -98,6 +103,14 @@ couchTests.security_validation = function(debug) {
       T(db.setDbProperty("_admins", ["Damien Katz"]).ok);
 
       T(userDb.save(designDoc).ok);
+
+      // test the _whoami endpoint
+      var resp = userDb.request("GET", "/_whoami");
+      var user = JSON.parse(resp.responseText)
+      T(user.name == "Damien Katz");
+      // test that the roles are listed properly
+      TEquals(user.roles, []);
+      
 
       // update the document
       var doc = userDb.open("testdoc");
