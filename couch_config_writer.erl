@@ -54,11 +54,8 @@ save_to_file({{Section, Option}, Value}, File) ->
         _ ->
             NewFileContents2
     end,
-
-    % do the save, close the config file and get out
-    save_file(File, NewFileContents),
-    file:close(Stream),
-
+    
+    ok = file:write_file(File, list_to_binary(NewFileContents)),
     ok.
 
 %% @doc Iterates over the lines of an ini file and replaces or adds a new
@@ -164,9 +161,3 @@ parse_variable(Line, Option, Value) ->
         {match, _Start, _Length} ->
             Option ++ " = " ++ Value
     end.
-
-%% @spec save_file(File::filename(), Contents::string()) ->
-%%           ok | {error, Reason::string()}
-%% @doc Writes Contents to File
-save_file(File, Contents) ->
-    file:write_file(File, list_to_binary(Contents)).

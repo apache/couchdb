@@ -29,12 +29,8 @@ merge(A, B) ->
     {Merged, HasConflicts} = 
     lists:foldl(
         fun(InsertTree, {AccTrees, AccConflicts}) ->
-            case merge_one(AccTrees, InsertTree, [], false) of
-            {ok, Merged, Conflicts} ->
-                {Merged, Conflicts or AccConflicts};
-            no ->
-                {[InsertTree | AccTrees], true} 
-            end
+            {ok, Merged, Conflicts} = merge_one(AccTrees, InsertTree, [], false),
+            {Merged, Conflicts or AccConflicts}
         end,
         {A, false}, B),
     if HasConflicts or 

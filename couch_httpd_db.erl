@@ -637,19 +637,16 @@ db_doc_req(#httpd{method='COPY'}=Req, Db, SourceDocId) ->
         missing_rev -> nil;
         Rev -> Rev
     end,
-
     {TargetDocId, TargetRevs} = parse_copy_destination_header(Req),
-
-    % open revision Rev or Current  
+    % open old doc
     Doc = couch_doc_open(Db, SourceDocId, SourceRev, []),
     % save new doc
-    case couch_db:update_doc(Db, Doc#doc{id=TargetDocId, revs=TargetRevs}, []) of
-    {ok, NewTargetRev} ->
-        send_json(Req, 201, [{"Etag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewTargetRev)) ++ "\""}],
-            update_doc_result_to_json(TargetDocId, {ok, NewTargetRev}));
-    Error ->
-        throw(Error)
-    end;
+    {ok, NewTargetRev} = couch_db:update_doc(Db, 
+        Doc#doc{id=TargetDocId, revs=TargetRevs}, []), 
+    % respond
+    send_json(Req, 201, 
+        [{"Etag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewTargetRev)) ++ "\""}],
+        update_doc_result_to_json(TargetDocId, {ok, NewTargetRev}));
 
 db_doc_req(Req, _Db, _DocId) ->
     send_method_not_allowed(Req, "DELETE,GET,HEAD,POST,PUT,COPY").
