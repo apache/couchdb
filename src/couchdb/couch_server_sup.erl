@@ -32,10 +32,12 @@ start_link(IniFiles) ->
     end.
 
 restart_core_server() ->
-    supervisor:terminate_child(couch_secondary_services, couch_server),
     supervisor:terminate_child(couch_primary_services, couch_server),
+    supervisor:terminate_child(couch_secondary_services, stats_aggregator),
+    supervisor:terminate_child(couch_secondary_services, stats_collector),
     supervisor:restart_child(couch_primary_services, couch_server),
-    supervisor:restart_child(couch_secondary_services, couch_server).
+    supervisor:restart_child(couch_secondary_services, stats_collector),
+    supervisor:restart_child(couch_secondary_services, stats_aggregator).
 
 couch_config_start_link_wrapper(IniFiles, FirstConfigPid) ->
     case is_process_alive(FirstConfigPid) of

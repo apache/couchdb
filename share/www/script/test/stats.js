@@ -64,7 +64,7 @@ couchTests.stats = function(debug) {
             db.createDb();
           }
 
-          var open_databases = requestStatsTest("couchdb", "open_databases").max;
+          var open_databases = requestStatsTest("couchdb", "open_databases").current;
           T(open_databases > 0 && max >= open_databases, name);
 
           for(var i=0; i<max+1; i++) {
