@@ -355,9 +355,9 @@ init_timers() ->
     % fifteen minutes) are gone.
 
     {ok, _} = timer:apply_interval(1000, ?MODULE, time_passed, []),
-    {ok, _} = timer:apply_interval(6000, ?MODULE, clear_aggregates, ['60']),
-    {ok, _} = timer:apply_interval(30000, ?MODULE, clear_aggregates, ['300']),
-    {ok, _} = timer:apply_interval(90000, ?MODULE, clear_aggregates, ['900']).
+    {ok, _} = timer:apply_interval(60000, ?MODULE, clear_aggregates, ['60']),
+    {ok, _} = timer:apply_interval(300000, ?MODULE, clear_aggregates, ['300']),
+    {ok, _} = timer:apply_interval(900000, ?MODULE, clear_aggregates, ['900']).
 
 
 % Unused gen_server behaviour API functions that we need to declare.
