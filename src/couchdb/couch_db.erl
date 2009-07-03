@@ -617,14 +617,15 @@ write_streamed_attachment(Stream, F, LenLeft) ->
     ok = couch_stream:write(Stream, TruncatedBin),
     write_streamed_attachment(Stream, F, LenLeft - size(TruncatedBin)).
 
-%% on rare occasions ibrowse seems to process a chunked response incorrectly
-%% and include an extra "\r" in the last chunk.  This code ensures that we 
-%% truncate the downloaed attachment at the length specified in the metadata.
+%% There was a bug in ibrowse 1.4.1 that would cause it to append a CR to a
+%% chunked response when the CR and LF terminating the last data chunk were
+%% split across packets.  The bug was fixed in version 1.5.0, but we still
+%% check for it just in case.
 check_bin_length(LenLeft, Bin) when size(Bin) > LenLeft ->
-    <<ValidData:LenLeft/binary, Crap/binary>> = Bin,
+    <<_ValidData:LenLeft/binary, Crap/binary>> = Bin,
     ?LOG_ERROR("write_streamed_attachment has written too much expected: ~p" ++
         " got: ~p tail: ~p", [LenLeft, size(Bin), Crap]),
-    ValidData;
+    exit(replicated_attachment_too_large);
 check_bin_length(_, Bin) -> Bin.
 
 enum_docs_since_reduce_to_count(Reds) ->
