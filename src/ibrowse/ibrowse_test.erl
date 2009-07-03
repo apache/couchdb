@@ -4,13 +4,14 @@
 %%% Created : 14 Oct 2003 by Chandrashekhar Mullaparthi <chandrashekhar.mullaparthi@t-mobile.co.uk>
 
 -module(ibrowse_test).
--vsn('$Id: ibrowse_test.erl,v 1.3 2008/05/21 15:28:11 chandrusf Exp $ ').
+-vsn('$Id: ibrowse_test.erl,v 1.4 2009/07/01 22:43:19 chandrusf Exp $ ').
 -export([
 	 load_test/3,
 	 send_reqs_1/3,
 	 do_send_req/2,
 	 unit_tests/0,
 	 unit_tests/1,
+	 unit_tests_1/2,
 	 drv_ue_test/0,
 	 drv_ue_test/1,
 	 ue_test/0,
@@ -19,8 +20,6 @@
 	 verify_chunked_streaming/1,
 	 i_do_async_req_list/4
 	]).
-
--import(ibrowse_lib, [printable_date/0]).
 
 %% Use ibrowse:set_max_sessions/3 and ibrowse:set_max_pipeline_size/3 to
 %% tweak settings before running the load test. The defaults are 10 and 10.
@@ -49,7 +48,7 @@ send_reqs_1(Url, NumWorkers, NumReqsPerWorker) ->
     log_msg("End time  : ~1000.p~n", [calendar:now_to_local_time(End_time)]),
     Elapsed_time_secs = trunc(timer:now_diff(End_time, Start_time) / 1000000),
     log_msg("Elapsed   : ~p~n", [Elapsed_time_secs]),
-    log_msg("Reqs/sec  : ~p~n", [(NumWorkers*NumReqsPerWorker) / Elapsed_time_secs]),
+    log_msg("Reqs/sec  : ~p~n", [round(trunc((NumWorkers*NumReqsPerWorker) / Elapsed_time_secs))]),
     dump_errors().
 
 init_results() ->
@@ -183,11 +182,23 @@ unit_tests() ->
     unit_tests([]).
 
 unit_tests(Options) ->
+    {Pid, Ref} = erlang:spawn_monitor(?MODULE, unit_tests_1, [self(), Options]),
+    receive 
+	{done, Pid} ->
+	    ok;
+	{'DOWN', Ref, _, _, Info} ->
+	    io:format("Test process crashed: ~p~n", [Info])
+    after 60000 ->
+	    io:format("Timed out waiting for tests to complete~n", [])
+    end.
+
+unit_tests_1(Parent, Options) ->
     lists:foreach(fun({Url, Method}) ->
 			  execute_req(Url, Method, Options);
 		     ({Url, Method, X_Opts}) ->
 			  execute_req(Url, Method, X_Opts ++ Options)
-		  end, ?TEST_LIST).
+		  end, ?TEST_LIST),
+    Parent ! {done, self()}.
 
 verify_chunked_streaming() ->
     verify_chunked_streaming([]).
@@ -201,10 +212,10 @@ verify_chunked_streaming(Options) ->
 				 [{response_format, binary} | Options]),
     io:format("Fetching data with streaming as list...~n", []),
     Async_response_list = do_async_req_list(
-			    Url, get, [{response_format, list}]),
+			    Url, get, [{response_format, list} | Options]),
     io:format("Fetching data with streaming as binary...~n", []),
     Async_response_bin = do_async_req_list(
-			   Url, get, [{response_format, binary}]),
+			   Url, get, [{response_format, binary} | Options]),
     compare_responses(Result_without_streaming, Async_response_list, Async_response_bin).
 
 compare_responses({ok, St_code, _, Body}, {ok, St_code, _, Body}, {ok, St_code, _, Body}) ->
@@ -220,6 +231,9 @@ compare_responses({ok, St_code, _, Body_1}, {ok, St_code, _, Body_2}, {ok, St_co
 	_ ->
 	    io:format("All three bodies are different!~n", [])
     end,
+    io:format("Body_1 -> ~p~n", [Body_1]),
+    io:format("Body_2 -> ~p~n", [Body_2]),
+    io:format("Body_3 -> ~p~n", [Body_3]),
     fail_bodies_mismatch;
 compare_responses(R1, R2, R3) ->
     io:format("R1 -> ~p~n", [R1]),
@@ -227,12 +241,12 @@ compare_responses(R1, R2, R3) ->
     io:format("R3 -> ~p~n", [R3]),
     fail.
 
-do_async_req_list(Url) ->
-    do_async_req_list(Url, get).
+%% do_async_req_list(Url) ->
+%%     do_async_req_list(Url, get).
 
-do_async_req_list(Url, Method) ->
-    do_async_req_list(Url, Method, [{stream_to, self()},
-				    {stream_chunk_size, 1000}]).
+%% do_async_req_list(Url, Method) ->
+%%     do_async_req_list(Url, Method, [{stream_to, self()},
+%% 				    {stream_chunk_size, 1000}]).
 
 do_async_req_list(Url, Method, Options) ->
     {Pid,_} = erlang:spawn_monitor(?MODULE, i_do_async_req_list,
@@ -270,10 +284,6 @@ wait_for_async_resp(Req_id, Acc_Stat_code, Acc_Headers, Body) ->
     receive
 	{ibrowse_async_headers, Req_id, StatCode, Headers} ->
 	    wait_for_async_resp(Req_id, StatCode, Headers, Body);
-	{ibrowse_async_response, Req_id, {chunk_start, _}} ->
-	    wait_for_async_resp(Req_id, Acc_Stat_code, Acc_Headers, Body);
-	{ibrowse_async_response, Req_id, chunk_end} ->
-	    wait_for_async_resp(Req_id, Acc_Stat_code, Acc_Headers, Body);
 	{ibrowse_async_response_end, Req_id} ->
 	    Body_1 = list_to_binary(lists:reverse(Body)),
 	    {ok, Acc_Stat_code, Acc_Headers, Body_1};
@@ -284,7 +294,7 @@ wait_for_async_resp(Req_id, Acc_Stat_code, Acc_Headers, Body) ->
     end.
 
 execute_req(Url, Method, Options) ->
-    io:format("~s, ~p: ", [Url, Method]),
+    io:format("~7.7w, ~50.50s: ", [Method, Url]),
     Result = (catch ibrowse:send_req(Url, [], Method, [], Options)),
     case Result of
 	{ok, SCode, _H, _B} ->

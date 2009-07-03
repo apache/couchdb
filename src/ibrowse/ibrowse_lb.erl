@@ -7,7 +7,7 @@
 %%%-------------------------------------------------------------------
 -module(ibrowse_lb).
 
--vsn('$Id: ibrowse_lb.erl,v 1.1 2008/03/27 01:36:21 chandrusf Exp $ ').
+-vsn('$Id: ibrowse_lb.erl,v 1.2 2009/07/01 22:43:19 chandrusf Exp $ ').
 -author(chandru).
 -behaviour(gen_server).
 %%--------------------------------------------------------------------
@@ -38,13 +38,6 @@
 		max_sessions,
 		max_pipeline_size,
 		num_cur_sessions = 0}).
-
--import(ibrowse_lib, [
-		      parse_url/1,
-		      printable_date/0,
-		      get_value/3
-		     ]).
-		      
 
 -include("ibrowse.hrl").
 

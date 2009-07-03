@@ -6,8 +6,8 @@
 %%% Created : 11 Oct 2003 by Chandrashekhar Mullaparthi <chandrashekhar.mullaparthi@t-mobile.co.uk>
 %%%-------------------------------------------------------------------
 %% @author Chandrashekhar Mullaparthi <chandrashekhar dot mullaparthi at gmail dot com>
-%% @copyright 2005-2008 Chandrashekhar Mullaparthi
-%% @version 1.4
+%% @copyright 2005-2009 Chandrashekhar Mullaparthi
+%% @version 1.5.0
 %% @doc The ibrowse application implements an HTTP 1.1 client. This
 %% module implements the API of the HTTP client. There is one named
 %% process called 'ibrowse' which assists in load balancing and maintaining configuration. There is one load balancing process per unique webserver. There is
@@ -57,7 +57,7 @@
 %% driver isn't actually used.</p>
 
 -module(ibrowse).
--vsn('$Id: ibrowse.erl,v 1.7 2008/05/21 15:28:11 chandrusf Exp $ ').
+-vsn('$Id: ibrowse.erl,v 1.8 2009/07/01 22:43:19 chandrusf Exp $ ').
 
 -behaviour(gen_server).
 %%--------------------------------------------------------------------
@@ -96,6 +96,7 @@
 	 trace_off/0,
 	 trace_on/2,
 	 trace_off/2,
+	 all_trace_off/0,
 	 show_dest_status/2
 	]).
 
@@ -105,8 +106,6 @@
 
 -import(ibrowse_lib, [
 		      parse_url/1,
-		      printable_date/0,
-		      get_value/2,
 		      get_value/3,
 		      do_trace/2
 		     ]).
@@ -114,6 +113,7 @@
 -record(state, {trace = false}).
 
 -include("ibrowse.hrl").
+-include_lib("stdlib/include/ms_transform.hrl").
 
 -define(DEF_MAX_SESSIONS,10).
 -define(DEF_MAX_PIPELINE_SIZE,10).
@@ -170,7 +170,7 @@ send_req(Url, Headers, Method, Body) ->
 %% For a description of SSL Options, look in the ssl manpage. If the
 %% HTTP Version to use is not specified, the default is 1.1.
 %% <br/>
-%% <p>The <code>host_header</code> is useful in the case where ibrowse is
+%% <p>The <code>host_header</code> option is useful in the case where ibrowse is
 %% connecting to a component such as <a
 %% href="http://www.stunnel.org">stunnel</a> which then sets up a
 %% secure connection to a webserver. In this case, the URL supplied to
@@ -188,11 +188,39 @@ send_req(Url, Headers, Method, Body) ->
 %% <li>Whenever an error occurs in the processing of a request, ibrowse will return as much
 %% information as it has, such as HTTP Status Code and HTTP Headers. When this happens, the response
 %% is of the form <code>{error, {Reason, {stat_code, StatusCode}, HTTP_headers}}</code></li>
+%%
+%% <li>The <code>inactivity_timeout</code> option is useful when
+%% dealing with large response bodies and/or slow links. In these
+%% cases, it might be hard to estimate how long a request will take to
+%% complete. In such cases, the client might want to timeout if no
+%% data has been received on the link for a certain time interval.</li>
+%%
+%% <li>
+%% The <code>connect_timeout</code> option is to specify how long the
+%% client process should wait for connection establishment. This is
+%% useful in scenarios where connections to servers are usually setup
+%% very fast, but responses might take much longer compared to
+%% connection setup. In such cases, it is better for the calling
+%% process to timeout faster if there is a problem (DNS lookup
+%% delays/failures, network routing issues, etc). The total timeout
+%% value specified for the request will enforced. To illustrate using
+%% an example:
+%% <code>
+%% ibrowse:send_req("http://www.example.com/cgi-bin/request", [], get, [], [{connect_timeout, 100}], 1000).
+%% </code>
+%% In the above invocation, if the connection isn't established within
+%% 100 milliseconds, the request will fail with 
+%% <code>{error, conn_failed}</code>.<br/>
+%% If connection setup succeeds, the total time allowed for the
+%% request to complete will be 1000 milliseconds minus the time taken
+%% for connection setup.
+%% </li>
 %% </ul>
+%% 
 %% @spec send_req(Url::string(), Headers::headerList(), Method::method(), Body::body(), Options::optionList()) -> response()
 %% optionList() = [option()]
 %% option() = {max_sessions, integer()}        |
-%%          {response_format,response_format()}| 
+%%          {response_format,response_format()}|
 %%          {stream_chunk_size, integer()}     |
 %%          {max_pipeline_size, integer()}     |
 %%          {trace, boolean()}                 | 
@@ -212,8 +240,10 @@ send_req(Url, Headers, Method, Body) ->
 %%          {stream_to, process()}             |
 %%          {http_vsn, {MajorVsn, MinorVsn}}   |
 %%          {host_header, string()}            |
+%%          {inactivity_timeout, integer()}    |
+%%          {connect_timeout, integer()}       |
 %%          {transfer_encoding, {chunked, ChunkSize}}
-%% 
+%%
 %% process() = pid() | atom()
 %% username() = string()
 %% password() = string()
@@ -314,7 +344,7 @@ set_max_pipeline_size(Host, Port, Max) when is_integer(Max), Max > 0 ->
 
 do_send_req(Conn_Pid, Parsed_url, Headers, Method, Body, Options, Timeout) ->
     case catch ibrowse_http_client:send_req(Conn_Pid, Parsed_url,
-					    Headers, Method, Body,
+					    Headers, Method, ensure_bin(Body),
 					    Options, Timeout) of
 	{'EXIT', {timeout, _}} ->
 	    {error, req_timedout};
@@ -330,6 +360,11 @@ do_send_req(Conn_Pid, Parsed_url, Headers, Method, Body, Options, Timeout) ->
 	Ret ->
 	    Ret
     end.
+
+ensure_bin(L) when is_list(L) ->
+    list_to_binary(L);
+ensure_bin(B) when is_binary(B) ->
+    B.
 
 %% @doc Creates a HTTP client process to the specified Host:Port which
 %% is not part of the load balancing pool. This is useful in cases
@@ -400,17 +435,25 @@ trace_off() ->
 
 %% @doc Turn tracing on for all connections to the specified HTTP
 %% server. Host is whatever is specified as the domain name in the URL
-%% @spec trace_on(Host, Port) -> term() 
+%% @spec trace_on(Host, Port) -> ok
 %% Host = string() 
 %% Port = integer()
 trace_on(Host, Port) ->
-    ibrowse ! {trace, true, Host, Port}.
+    ibrowse ! {trace, true, Host, Port},
+    ok.
 
 %% @doc Turn tracing OFF for all connections to the specified HTTP
 %% server.
-%% @spec trace_off(Host, Port) -> term()
+%% @spec trace_off(Host, Port) -> ok
 trace_off(Host, Port) ->
-    ibrowse ! {trace, false, Host, Port}.
+    ibrowse ! {trace, false, Host, Port},
+    ok.
+
+%% @doc Turn Off ALL tracing
+%% @spec all_trace_off() -> ok
+all_trace_off() ->
+    ibrowse ! all_trace_off,
+    ok.
 
 %% @doc Shows some internal information about load balancing to a
 %% specified Host:Port. Info about workers spawned using
@@ -588,6 +631,30 @@ handle_cast(_Msg, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
+handle_info(all_trace_off, State) ->
+    Mspec = [{{ibrowse_conf,{trace,'$1','$2'},true},[],[{{'$1','$2'}}]}],
+    Trace_on_dests = ets:select(ibrowse_conf, Mspec),
+    Fun = fun(#lb_pid{host_port = {H, P}, pid = Pid}, _) ->
+		  case lists:member({H, P}, Trace_on_dests) of
+		      false ->
+			  ok;
+		      true ->
+			  catch Pid ! {trace, false}
+		  end;
+	     (#client_conn{key = {H, P, Pid}}, _) ->
+		  case lists:member({H, P}, Trace_on_dests) of
+		      false ->
+			  ok;
+		      true ->
+			  catch Pid ! {trace, false}
+		  end;
+	     (_, Acc) ->
+		  Acc
+	  end,
+    ets:foldl(Fun, undefined, ibrowse_lb),
+    ets:select_delete(ibrowse_conf, [{{ibrowse_conf,{trace,'$1','$2'},true},[],['true']}]),
+    {noreply, State};
+				  
 handle_info({trace, Bool}, State) ->
     put(my_trace_flag, Bool),
     {noreply, State};
