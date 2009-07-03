@@ -18,9 +18,50 @@
 	 ue_test/1,
 	 verify_chunked_streaming/0,
 	 verify_chunked_streaming/1,
-	 i_do_async_req_list/4
+	 i_do_async_req_list/4,
+	 test_stream_once/3,
+	 test_stream_once/4
 	]).
 
+test_stream_once(Url, Method, Options) ->
+    test_stream_once(Url, Method, Options, 5000).
+
+test_stream_once(Url, Method, Options, Timeout) ->
+    case ibrowse:send_req(Url, [], Method, [], [{stream_to, {self(), once}} | Options], Timeout) of
+	{ibrowse_req_id, Req_id} ->
+	    case ibrowse:stream_next(Req_id) of
+		ok ->
+		    test_stream_once(Req_id);
+		Err ->
+		    Err
+	    end;
+	Err ->
+	    Err
+    end.
+
+test_stream_once(Req_id) ->
+    receive
+	{ibrowse_async_headers, Req_id, StatCode, Headers} ->
+	    io:format("Recvd headers~n~p~n", [{ibrowse_async_headers, Req_id, StatCode, Headers}]),
+	    case ibrowse:stream_next(Req_id) of
+		ok ->
+		    test_stream_once(Req_id);
+		Err ->
+		    Err
+	    end;
+	{ibrowse_async_response, Req_id, {error, Err}} ->
+	    io:format("Recvd error: ~p~n", [Err]);
+	{ibrowse_async_response, Req_id, Body_1} ->
+	    io:format("Recvd body part: ~n~p~n", [{ibrowse_async_response, Req_id, Body_1}]),
+	    case ibrowse:stream_next(Req_id) of
+		ok ->
+		    test_stream_once(Req_id);
+		Err ->
+		    Err
+	    end;
+	{ibrowse_async_response_end, Req_id} ->
+	    ok
+    end.
 %% Use ibrowse:set_max_sessions/3 and ibrowse:set_max_pipeline_size/3 to
 %% tweak settings before running the load test. The defaults are 10 and 10.
 load_test(Url, NumWorkers, NumReqsPerWorker) when is_list(Url),
@@ -182,7 +223,8 @@ unit_tests() ->
     unit_tests([]).
 
 unit_tests(Options) ->
-    {Pid, Ref} = erlang:spawn_monitor(?MODULE, unit_tests_1, [self(), Options]),
+    Options_1 = Options ++ [{connect_timeout, 5000}],
+    {Pid, Ref} = erlang:spawn_monitor(?MODULE, unit_tests_1, [self(), Options_1]),
     receive 
 	{done, Pid} ->
 	    ok;
