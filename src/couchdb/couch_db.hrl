@@ -190,8 +190,7 @@
     headers = []
 }).
 
--record(group,
-    {type=view, % can also be temp_view
+-record(group, {
     sig=nil,
     db=nil,
     fd=nil,

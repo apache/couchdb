@@ -106,26 +106,6 @@ process_doc(Db, DocInfo, {Docs, #group{sig=Sig,name=GroupId,design_options=Desig
             [conflicts, deleted_conflicts]
     end,
     case {IncludeDesign, DocId} of
-    {_, GroupId} ->
-        % uh oh. this is the design doc with our definitions. See if
-        % anything in the definition changed.
-        case couch_db:open_doc_int(Db, DocInfo, DocOpts) of
-        {ok, Doc} ->
-            case couch_view_group:design_doc_to_view_group(Doc) of
-            #group{sig=Sig} ->
-                % The same md5 signature, keep on computing
-                case IncludeDesign of
-                true ->
-                    {[Doc | Docs], Group, ViewKVs, DocIdViewIdKeys};
-                _ ->
-                    {Docs, Group, ViewKVs, DocIdViewIdKeys}
-                end;
-            _ ->
-                exit(reset)
-            end;
-        {not_found, missing} ->
-            exit(reset)
-        end;
     {false, <<?DESIGN_DOC_PREFIX, _/binary>>} -> % we skip design docs
         {Docs, Group, ViewKVs, DocIdViewIdKeys};
     _ ->
