@@ -117,7 +117,7 @@ parse_external_response({Response}) ->
                     data=?JSON_ENCODE(Value),
                     ctype="application/json"};
             {<<"body">>, Value} ->
-                Args#extern_resp_args{data=Value, ctype="text/html"};
+                Args#extern_resp_args{data=Value, ctype="text/html; charset=utf-8"};
             {<<"base64">>, Value} ->
                 Args#extern_resp_args{
                     data=couch_util:decodeBase64(Value),        
