@@ -166,8 +166,8 @@ registerType = function() {
 // http://dev.rubyonrails.org/svn/rails/trunk/actionpack/lib/action_controller/mime_types.rb
 
 registerType("all", "*/*");
-registerType("text", "text/plain", "txt");
-registerType("html", "text/html");
+registerType("text", "text/plain; charset=utf-8", "txt");
+registerType("html", "text/html; charset=utf-8");
 registerType("xhtml", "application/xhtml+xml", "xhtml");
 registerType("xml", "application/xml", "text/xml", "application/x-xml");
 registerType("js", "text/javascript", "application/javascript", "application/x-javascript");

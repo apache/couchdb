@@ -143,10 +143,7 @@ couchTests.show_documents = function(debug) {
   // hello template world
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/hello/"+docid);
   T(xhr.responseText == "Hello World");
-// 
-// };
-// 
-// function foo() {
+  T(/charset=utf-8/.test(xhr.getResponseHeader("Content-Type")))
 
   // Fix for COUCHDB-379
   T(equals(xhr.getResponseHeader("Server").substr(0,7), "CouchDB"));
@@ -207,7 +204,8 @@ couchTests.show_documents = function(debug) {
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/accept-switch/"+docid, {
     headers: {"Accept": "text/html;text/plain;*/*"}
   });
-  T("text/html" == xhr.getResponseHeader("Content-Type"));
+  var ct = xhr.getResponseHeader("Content-Type");
+  T(/text\/html/.test(ct))
   T("Accept" == xhr.getResponseHeader("Vary"));
   var etag = xhr.getResponseHeader("etag");
 
@@ -287,7 +285,9 @@ couchTests.show_documents = function(debug) {
       "Accept": 'text/html,application/atom+xml; q=0.9'
     }
   });
-  T(xhr.getResponseHeader("Content-Type") == "text/html");
+  var ct = xhr.getResponseHeader("Content-Type");
+  T(/charset=utf-8/.test(ct))
+  T(/text\/html/.test(ct))  
   T(xhr.responseText == "Ha ha, you said \"plankton\".");
 
   // now with xml
@@ -315,7 +315,9 @@ couchTests.show_documents = function(debug) {
      "Accept": 'text/html,application/atom+xml; q=0.9'
    }
   });
-  T(xhr.getResponseHeader("Content-Type") == "text/html");
+  var ct = xhr.getResponseHeader("Content-Type");
+  T(/charset=utf-8/.test(ct))
+  T(/text\/html/.test(ct))
   T(xhr.responseText == "Ha ha, you said \"plankton\".");
 
   // test inclusion of conflict state

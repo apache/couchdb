@@ -312,7 +312,7 @@ couchTests.list_views = function(debug) {
       "Accept": 'text/html'
     }
   });
-  T(xhr.getResponseHeader("Content-Type") == "text/html");
+  T(xhr.getResponseHeader("Content-Type") == "text/html; charset=utf-8");
   T(xhr.responseText.match(/HTML/));
   T(xhr.responseText.match(/Value/));
 
