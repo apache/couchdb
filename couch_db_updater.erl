@@ -350,7 +350,7 @@ close_db(#db{fd_ref_counter = RefCntr}) ->
     
 
 refresh_validate_doc_funs(Db) ->
-    {ok, DesignDocs} = get_design_docs(Db),
+    {ok, DesignDocs} = couch_db:get_design_docs(Db),
     ProcessDocFuns = lists:flatmap(
         fun(DesignDoc) ->
             case couch_doc:get_validate_doc_fun(DesignDoc) of
@@ -359,16 +359,6 @@ refresh_validate_doc_funs(Db) ->
             end
         end, DesignDocs),
     Db#db{validate_doc_funs=ProcessDocFuns}.
-
-get_design_docs(#db{fulldocinfo_by_id_btree=Btree}=Db) ->
-    couch_btree:foldl(Btree, <<"_design/">>,
-        fun(#full_doc_info{id= <<"_design/",_/binary>>}=FullDocInfo, _Reds, AccDocs) ->
-            {ok, Doc} = couch_db:open_doc_int(Db, FullDocInfo, []),
-            {ok, [Doc | AccDocs]};
-        (_, _Reds, AccDocs) ->
-            {stop, AccDocs}
-        end,
-        []).
 
 % rev tree functions
 
