@@ -243,8 +243,9 @@ complete_root(Bt, KPs) ->
 % written. Plus with the "case size(term_to_binary(InList)) of" code it's
 % probably really inefficient.
 
-chunkify(_Bt, []) ->
-    [];
+% dialyzer says this pattern is never matched
+% chunkify(_Bt, []) ->
+%     [];
 chunkify(Bt, InList) ->
     case size(term_to_binary(InList)) of
     Size when Size > ?CHUNK_THRESHOLD ->

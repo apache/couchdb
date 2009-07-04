@@ -123,7 +123,7 @@ process_doc(Db, DocInfo, {Docs, #group{sig=Sig,name=GroupId,design_options=Desig
             _ ->
                 exit(reset)
             end;
-        {not_found, deleted} ->
+        {not_found, missing} ->
             exit(reset)
         end;
     {false, <<?DESIGN_DOC_PREFIX, _/binary>>} -> % we skip design docs
