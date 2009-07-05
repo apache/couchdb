@@ -43,7 +43,6 @@ init/couchdb: init/couchdb.tpl
 	sed -e "s|%configure_input%|$@. Generated from $< by configure.|" \
 	    -e "s|%bindir%|$(bindir)|" \
 	    -e "s|%sysconfdir%|$(sysconfdir)|" \
-	    -e "s|%localerlangbindir%|$(localerlangbindir)|" \
 	    -e "s|%localstaterundir%|$(localstaterundir)|" \
 	    -e "s|%couchdb_command_name%|$(couchdb_command_name)|" \
 	< $< > $@
