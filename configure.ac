@@ -243,7 +243,6 @@ AC_SUBST([localstatelibdir], [${localstatedir}/lib/${package_identifier}])
 AC_SUBST([localstatelogdir], [${localstatedir}/log/${package_identifier}])
 AC_SUBST([localstaterundir], [${localstatedir}/run/${package_identifier}])
 AC_SUBST([locallibbindir], [${locallibdir}/bin])
-AC_SUBST([localerlangbindir], [${locallibdir}/erlang/bin])
 AC_SUBST([localerlanglibdir], [${locallibdir}/erlang/lib])
 
 # fix for older autotools that don't define "abs_top_YYY" by default
