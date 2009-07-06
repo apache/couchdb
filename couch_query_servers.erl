@@ -18,7 +18,7 @@
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2,code_change/3,stop/0]).
 -export([start_doc_map/2, map_docs/2, stop_doc_map/1]).
 -export([reduce/3, rereduce/3,validate_doc_update/5]).
--export([render_doc_show/6, start_view_list/2, 
+-export([render_doc_show/6, start_view_list/2,
         render_list_head/4, render_list_row/3, render_list_tail/1]).
 % -export([test/0]).
 
@@ -42,7 +42,7 @@ map_docs({_Lang, Pid}, Docs) ->
     Results = lists:map(
         fun(Doc) ->
             Json = couch_doc:to_json_obj(Doc, []),
-            
+
             FunsResults = couch_os_process:prompt(Pid, [<<"map_doc">>, Json]),
             % the results are a json array of function map yields like this:
             % [FunResults1, FunResults2 ...]
@@ -90,7 +90,7 @@ rereduce(Lang, RedSrcs, ReducedValues) ->
             {ok, [Result]} = builtin_reduce(rereduce, [FunSrc], [[[], V] || V <- Values], []),
             Result;
         (FunSrc, Values) ->
-            [true, [Result]] = 
+            [true, [Result]] =
                 couch_os_process:prompt(Pid, [<<"rereduce">>, [FunSrc], Values]),
             Result
         end, RedSrcs, Grouped)
@@ -121,7 +121,7 @@ os_reduce(_Lang, [], _KVs) ->
     {ok, []};
 os_reduce(Lang, OsRedSrcs, KVs) ->
     Pid = get_os_process(Lang),
-    OsResults = try couch_os_process:prompt(Pid, 
+    OsResults = try couch_os_process:prompt(Pid,
             [<<"reduce">>, OsRedSrcs, KVs]) of
         [true, Reductions] -> Reductions
     after
@@ -143,22 +143,22 @@ builtin_reduce(rereduce, [<<"_count">>|BuiltinReds], KVs, Acc) ->
 
 builtin_sum_rows(KVs) ->
     lists:foldl(fun
-        ([_Key, Value], Acc) when is_number(Value) -> 
+        ([_Key, Value], Acc) when is_number(Value) ->
             Acc + Value;
-        (_Else, _Acc) -> 
+        (_Else, _Acc) ->
             throw({invalid_value, <<"builtin _sum function requires map values to be numbers">>})
     end, 0, KVs).
-    
+
 validate_doc_update(Lang, FunSrc, EditDoc, DiskDoc, Ctx) ->
     Pid = get_os_process(Lang),
     JsonEditDoc = couch_doc:to_json_obj(EditDoc, [revs]),
     JsonDiskDoc =
     if DiskDoc == nil ->
         null;
-    true -> 
+    true ->
         couch_doc:to_json_obj(DiskDoc, [revs])
     end,
-    try couch_os_process:prompt(Pid, 
+    try couch_os_process:prompt(Pid,
             [<<"validate">>, FunSrc, JsonEditDoc, JsonDiskDoc, Ctx]) of
     1 ->
         ok;
@@ -181,7 +181,7 @@ render_doc_show(Lang, ShowSrc, DocId, Doc, Req, Db) ->
         {DocId, nil} -> {{append_docid(DocId, JsonReqIn)}, null};
         _ -> {{append_docid(DocId, JsonReqIn)}, couch_doc:to_json_obj(Doc, [revs])}
     end,
-    try couch_os_process:prompt(Pid, 
+    try couch_os_process:prompt(Pid,
         [<<"show">>, ShowSrc, JsonDoc, JsonReq]) of
     FormResp ->
         FormResp
@@ -209,18 +209,18 @@ render_list_row({_Lang, Pid}, _, {Key, Value}) ->
 render_list_tail({Lang, Pid}) ->
     JsonResp = couch_os_process:prompt(Pid, [<<"list_end">>]),
     ok = ret_os_process(Lang, Pid),
-    JsonResp.    
-    
+    JsonResp.
+
 
 
 
 init([]) ->
-    
+
     % read config and register for configuration changes
-    
+
     % just stop if one of the config settings change. couch_server_sup
     % will restart us and then we will pick up the new settings.
-    
+
     ok = couch_config:register(
         fun("query_servers" ++ _, _) ->
             ?MODULE:stop()

@@ -39,7 +39,7 @@ less(#btree{less=Less}, A, B) ->
 % pass in 'nil' for State if a new Btree.
 open(State, Fd) ->
     {ok, #btree{root=State, fd=Fd}}.
-    
+
 set_options(Bt, []) ->
     Bt;
 set_options(Bt, [{split, Extract}|Rest]) ->
@@ -68,7 +68,7 @@ final_reduce(Reduce, {[], Reductions}) ->
 final_reduce(Reduce, {KVs, Reductions}) ->
     Red = Reduce(reduce, KVs),
     final_reduce(Reduce, {[], [Red | Reductions]}).
-    
+
 fold_reduce(Bt, StartKey, EndKey, KeyGroupFun, Fun, Acc) ->
     fold_reduce(Bt, fwd, StartKey, EndKey, KeyGroupFun, Fun, Acc).
 
@@ -189,7 +189,7 @@ lookup(Bt, {Pointer, _Reds}, Keys) ->
 
 lookup_kpnode(_Bt, _NodeTuple, _LowerBound, [], Output) ->
     {ok, lists:reverse(Output)};
-    
+
 lookup_kpnode(_Bt, NodeTuple, LowerBound, Keys, Output) when size(NodeTuple) < LowerBound ->
     {ok, lists:reverse(Output, [{Key, not_found} || Key <- Keys])};
 
@@ -238,7 +238,7 @@ complete_root(Bt, KPs) ->
     {ok, ResultKeyPointers, Bt2} = write_node(Bt, kp_node, KPs),
     complete_root(Bt2, ResultKeyPointers).
 
-%%%%%%%%%%%%% The chunkify function sucks! %%%%%%%%%%%%% 
+%%%%%%%%%%%%% The chunkify function sucks! %%%%%%%%%%%%%
 % It is inaccurate as it does not account for compression when blocks are
 % written. Plus with the "case size(term_to_binary(InList)) of" code it's
 % probably really inefficient.
@@ -277,7 +277,7 @@ modify_node(Bt, RootPointerInfo, Actions, QueryOutput) ->
         {NodeType, NodeList} = get_node(Bt, Pointer)
     end,
     NodeTuple = list_to_tuple(NodeList),
-    
+
     {ok, NewNodeList, QueryOutput2, Bt2} =
     case NodeType of
     kp_node -> modify_kpnode(Bt, NodeTuple, 1, Actions, [], QueryOutput);
@@ -320,7 +320,7 @@ write_node(Bt, NodeType, NodeList) ->
         ANodeList <- NodeListList
     ],
     {ok, ResultList, Bt}.
-    
+
 modify_kpnode(Bt, {}, _LowerBound, Actions, [], QueryOutput) ->
     modify_node(Bt, nil, Actions, QueryOutput);
 modify_kpnode(Bt, NodeTuple, LowerBound, [], ResultNode, QueryOutput) ->
@@ -350,15 +350,15 @@ modify_kpnode(Bt, NodeTuple, LowerBound,
                 LowerBound, N - 1, ResultNode)),
         modify_kpnode(Bt2, NodeTuple, N+1, GreaterQueries, ResultNode2, QueryOutput2)
     end.
-    
+
 bounded_tuple_to_revlist(_Tuple, Start, End, Tail) when Start > End ->
     Tail;
 bounded_tuple_to_revlist(Tuple, Start, End, Tail) ->
     bounded_tuple_to_revlist(Tuple, Start+1, End, [element(Start, Tuple)|Tail]).
-        
+
 bounded_tuple_to_list(Tuple, Start, End, Tail) ->
     bounded_tuple_to_list2(Tuple, Start, End, [], Tail).
-    
+
 bounded_tuple_to_list2(_Tuple, Start, End, Acc, Tail) when Start > End ->
     lists:reverse(Acc, Tail);
 bounded_tuple_to_list2(Tuple, Start, End, Acc, Tail) ->
@@ -426,10 +426,10 @@ modify_kvnode(Bt, NodeTuple, LowerBound, [{ActionType, ActionKey, ActionValue} |
     end.
 
 
-reduce_stream_node(_Bt, _Dir, nil, _KeyStart, _KeyEnd, GroupedKey, GroupedKVsAcc, 
+reduce_stream_node(_Bt, _Dir, nil, _KeyStart, _KeyEnd, GroupedKey, GroupedKVsAcc,
         GroupedRedsAcc, _KeyGroupFun, _Fun, Acc) ->
-    {ok, Acc, GroupedRedsAcc, GroupedKVsAcc, GroupedKey}; 
-reduce_stream_node(Bt, Dir, {P, _R}, KeyStart, KeyEnd, GroupedKey, GroupedKVsAcc, 
+    {ok, Acc, GroupedRedsAcc, GroupedKVsAcc, GroupedKey};
+reduce_stream_node(Bt, Dir, {P, _R}, KeyStart, KeyEnd, GroupedKey, GroupedKVsAcc,
         GroupedRedsAcc, KeyGroupFun, Fun, Acc) ->
     case get_node(Bt, P) of
     {kp_node, NodeList} ->
@@ -475,7 +475,7 @@ reduce_stream_kv_node2(Bt, [{Key, Value}| RestKVs], GroupedKey, GroupedKVsAcc,
         reduce_stream_kv_node2(Bt, RestKVs, Key,
                 [assemble(Bt,Key,Value)], [], KeyGroupFun, Fun, Acc);
     _ ->
-    
+
         case KeyGroupFun(GroupedKey, Key) of
         true ->
             reduce_stream_kv_node2(Bt, RestKVs, GroupedKey,
@@ -531,7 +531,7 @@ reduce_stream_kp_node2(Bt, Dir, NodeList, KeyStart, KeyEnd,
         GroupedKey, GroupedKVsAcc, GroupedRedsAcc, KeyGroupFun, Fun, Acc) ->
     {Grouped0, Ungrouped0} = lists:splitwith(fun({Key,_}) ->
         KeyGroupFun(GroupedKey, Key) end, NodeList),
-    {GroupedNodes, UngroupedNodes} = 
+    {GroupedNodes, UngroupedNodes} =
     case Grouped0 of
     [] ->
         {Grouped0, Ungrouped0};
@@ -542,7 +542,7 @@ reduce_stream_kp_node2(Bt, Dir, NodeList, KeyStart, KeyEnd,
     GroupedReds = [R || {_, {_,R}} <- GroupedNodes],
     case UngroupedNodes of
     [{_Key, NodeInfo}|RestNodes] ->
-        {ok, Acc2, GroupedRedsAcc2, GroupedKVsAcc2, GroupedKey2} = 
+        {ok, Acc2, GroupedRedsAcc2, GroupedKVsAcc2, GroupedKey2} =
             reduce_stream_node(Bt, Dir, NodeInfo, KeyStart, KeyEnd, GroupedKey,
                 GroupedKVsAcc, GroupedReds ++ GroupedRedsAcc, KeyGroupFun, Fun, Acc),
         reduce_stream_kp_node2(Bt, Dir, RestNodes, KeyStart, KeyEnd, GroupedKey2,

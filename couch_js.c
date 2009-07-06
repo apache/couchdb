@@ -489,12 +489,12 @@ char* JSValToChar(JSContext* context, jsval* arg) {
   jsmsg = JS_ValueToString(context,*arg);
   len = JS_GetStringLength(jsmsg);
   tmp = JS_GetStringBytes(jsmsg);
-      
+
   c = (char*)malloc(len+1);
   c[len] = '\0';
 
   int i;
- 
+
   for(i = 0;i < len;i++) {
     c[i] = tmp[i];
   }
@@ -541,11 +541,11 @@ struct curl_slist* generateCurlHeaders(JSContext* context,jsval* arg) {
     }
 
     JSObject* iterator = JS_NewPropertyIterator(context,header_obj);
-    
+
     jsval *jsProperty = JS_malloc(context,sizeof(jsval));
     jsval *jsValue = JS_malloc(context,sizeof(jsval));
     jsid *jsId = JS_malloc(context,sizeof(jsid));
-    
+
     while(JS_NextProperty(context,iterator,jsId) == JS_TRUE) {
 
       if(*jsId == JSVAL_VOID) {
@@ -569,7 +569,7 @@ struct curl_slist* generateCurlHeaders(JSContext* context,jsval* arg) {
       append_Buffer(bTmp,"",1);
 
       slist = curl_slist_append(slist,bTmp->data);
-      
+
       free_Buffer(bTmp);
       free(jsPropertyValue);
       free(jsPropertyName);
@@ -595,7 +595,7 @@ GetHttp(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 
   // Run GC
   JS_MaybeGC(context);
-  
+
   // Init Curl
   if((handle = curl_easy_init()) == NULL) {
     return JS_FALSE;
@@ -616,7 +616,7 @@ GetHttp(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
   curl_easy_setopt(handle,CURLOPT_WRITEHEADER,b);
   curl_easy_setopt(handle,CURLOPT_URL,url);
   curl_easy_setopt(handle,CURLOPT_HTTPGET,1);
-  curl_easy_setopt(handle,CURLOPT_FOLLOWLOCATION,1);  
+  curl_easy_setopt(handle,CURLOPT_FOLLOWLOCATION,1);
   curl_easy_setopt(handle,CURLOPT_NOPROGRESS,1);
   curl_easy_setopt(handle,CURLOPT_IPRESOLVE,CURL_IPRESOLVE_V4);
 
@@ -654,7 +654,7 @@ GetHttp(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
   /* Shrink the buffer to the real size  and store its value in rval */
   shrink_Buffer(b);
   BufferToJSVal(context,b,rval);
-  
+
   // Free Buffer
   free_Buffer(b);
 
@@ -679,7 +679,7 @@ HeadHttp(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval
 
   // Run GC
   JS_MaybeGC(context);
-  
+
   // Init Curl
   if((handle = curl_easy_init()) == NULL) {
     return JS_FALSE;
@@ -741,7 +741,7 @@ HeadHttp(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval
   /* Shrink the buffer to the real size  and store its value in rval */
   shrink_Buffer(b);
   BufferToJSVal(context,b,rval);
-  
+
   // Free Buffer
   free_Buffer(b);
 
@@ -803,7 +803,7 @@ PostHttp(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval
 
   struct curl_slist *slist = generateCurlHeaders(context,argv+2); // Initialize Headers
   if(slist != NULL) {
-    curl_easy_setopt(handle,CURLOPT_HTTPHEADER,slist);            
+    curl_easy_setopt(handle,CURLOPT_HTTPHEADER,slist);
   }
 
   int exitcode;
@@ -858,17 +858,17 @@ PutHttp(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 
   // Allocate buffer that will store the get resultant
   b = init_Buffer();
-  
+
   // Allocate data buffer and move data into them
   b_data = (BufferCount)malloc(sizeof(Buffer) + sizeof(int));
   b_data->buffer = init_Buffer();
   b_data->pos = 0;
-  
+
   data = JSValToChar(context,(argv+1));
   readlen = strlen(data);
-  
 
-  
+
+
   // TODO: remove strlen
   append_Buffer(b_data->buffer,data,readlen);
 
@@ -893,7 +893,7 @@ PutHttp(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
   curl_easy_setopt(handle,CURLOPT_URL,url);
   curl_easy_setopt(handle,CURLOPT_UPLOAD,1);
   curl_easy_setopt(handle,CURLOPT_INFILESIZE,readlen);
-  
+
 
 
   // Curl structure
@@ -908,11 +908,11 @@ PutHttp(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
   // Use only ipv4
   curl_easy_setopt(handle,CURLOPT_IPRESOLVE,CURL_IPRESOLVE_V4);
 
-  
+
 
   // Perform
   int exitcode;
-  
+
   if((exitcode = curl_easy_perform(handle)) != 0) {
     if(slist != NULL)
       curl_slist_free_all(slist);
@@ -939,7 +939,7 @@ PutHttp(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
   shrink_Buffer(b);
 
   BufferToJSVal(context,b,rval);
-  
+
   free_Buffer(b);
 
   if(rval == NULL) {
@@ -1023,7 +1023,7 @@ DelHttp(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
   shrink_Buffer(b);
 
   BufferToJSVal(context,b,rval);
-  
+
   if(rval == NULL) {
     curl_easy_cleanup(handle);
     return JS_FALSE;
@@ -1105,7 +1105,7 @@ CopyHttp(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval
   shrink_Buffer(b);
 
   BufferToJSVal(context,b,rval);
-  
+
   if(rval == NULL) {
     curl_easy_cleanup(handle);
     return JS_FALSE;
@@ -1187,7 +1187,7 @@ MoveHttp(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval
   shrink_Buffer(b);
 
   BufferToJSVal(context,b,rval);
-  
+
   if(rval == NULL) {
     curl_easy_cleanup(handle);
     return JS_FALSE;

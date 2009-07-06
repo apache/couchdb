@@ -21,7 +21,7 @@
 -define(l2b(V), list_to_binary(V)).
 
 -define(DEFAULT_ATTACHMENT_CONTENT_TYPE, <<"application/octet-stream">>).
-        
+
 -define(LOG_DEBUG(Format, Args),
     case couch_log:debug_on() of
         true -> error_logger:info_report(couch_debug, {Format, Args});
@@ -69,7 +69,7 @@
     req_body = undefined,
     design_url_handlers
     }).
-    
+
 
 -record(doc,
     {
@@ -91,7 +91,7 @@
     % couch_db:open_doc(Db, Id, Options).
     meta = []
     }).
-    
+
 
 
 -record(user_ctx,
@@ -112,7 +112,7 @@
 -define(LATEST_DISK_VERSION, 3).
 
 -record(db_header,
-    {disk_version = ?LATEST_DISK_VERSION,  
+    {disk_version = ?LATEST_DISK_VERSION,
      update_seq = 0,
      unused = 0,
      fulldocinfo_by_id_btree_state = nil,

@@ -24,14 +24,14 @@
 
 -record(server,{
     root_dir = []}).
-    
+
 start_link() ->
     gen_server:start_link({local, couch_view}, couch_view, [], []).
 
 get_temp_updater(DbName, Language, DesignOptions, MapSrc, RedSrc) ->
     % make temp group
     % do we need to close this db?
-    {ok, _Db, Group} = 
+    {ok, _Db, Group} =
         couch_view_group:open_temp_group(DbName, Language, DesignOptions, MapSrc, RedSrc),
     case gen_server:call(couch_view, {get_group_server, DbName, Group}) of
     {ok, Pid} ->
@@ -44,7 +44,7 @@ get_group_server(DbName, GroupId) ->
     % get signature for group
     case couch_view_group:open_db_group(DbName, GroupId) of
     % do we need to close this db?
-    {ok, _Db, Group} ->        
+    {ok, _Db, Group} ->
         case gen_server:call(couch_view, {get_group_server, DbName, Group}) of
         {ok, Pid} ->
             Pid;
@@ -54,7 +54,7 @@ get_group_server(DbName, GroupId) ->
     Error ->
         throw(Error)
     end.
-    
+
 get_group(Db, GroupId, Stale) ->
     MinUpdateSeq = case Stale of
     ok -> 0;
@@ -73,23 +73,23 @@ get_group_info(Db, GroupId) ->
     couch_view_group:request_group_info(
         get_group_server(couch_db:name(Db), GroupId)).
 
-cleanup_index_files(Db) -> 
+cleanup_index_files(Db) ->
     % load all ddocs
     {ok, DesignDocs} = couch_db:get_design_docs(Db),
-    
+
     % make unique list of group sigs
     Sigs = lists:map(fun(#doc{id = GroupId} = DDoc) ->
         {ok, Info} = get_group_info(Db, GroupId),
         ?b2l(proplists:get_value(signature, Info))
     end, [DD||DD <- DesignDocs, DD#doc.deleted == false]),
-    
+
     FileList = list_index_files(Db),
-    
+
     % regex that matches all ddocs
     RegExp = "("++ string:join(Sigs, "|") ++")",
 
     % filter out the ones in use
-    DeleteFiles = lists:filter(fun(FilePath) -> 
+    DeleteFiles = lists:filter(fun(FilePath) ->
             regexp:first_match(FilePath, RegExp)==nomatch
         end, FileList),
     % delete unused files
@@ -108,7 +108,7 @@ get_row_count(#view{btree=Bt}) ->
     {ok, Count}.
 
 get_temp_reduce_view(Db, Language, DesignOptions, MapSrc, RedSrc) ->
-    {ok, #group{views=[View]}=Group} = 
+    {ok, #group{views=[View]}=Group} =
         get_temp_group(Db, Language, DesignOptions, MapSrc, RedSrc),
     {ok, {temp_reduce, View}, Group}.
 
@@ -161,7 +161,7 @@ fold_reduce({temp_reduce, #view{btree=Bt}}, Dir, StartKey, EndKey, GroupFun, Fun
     couch_btree:fold_reduce(Bt, Dir, StartKey, EndKey, GroupFun,
             WrapperFun, Acc);
 
-fold_reduce({reduce, NthRed, Lang, #view{btree=Bt, reduce_funs=RedFuns}}, Dir, StartKey, EndKey, GroupFun, Fun, Acc) ->    
+fold_reduce({reduce, NthRed, Lang, #view{btree=Bt, reduce_funs=RedFuns}}, Dir, StartKey, EndKey, GroupFun, Fun, Acc) ->
     PreResultPadding = lists:duplicate(NthRed - 1, []),
     PostResultPadding = lists:duplicate(length(RedFuns) - NthRed, []),
     {_Name, FunSrc} = lists:nth(NthRed,RedFuns),
@@ -180,7 +180,7 @@ fold_reduce({reduce, NthRed, Lang, #view{btree=Bt, reduce_funs=RedFuns}}, Dir, S
         end,
     couch_btree:fold_reduce(Bt, Dir, StartKey, EndKey, GroupFun,
             WrapperFun, Acc).
-        
+
 get_key_pos(_Key, [], _N) ->
     0;
 get_key_pos(Key, [{Key1,_Value}|_], N) when Key == Key1 ->
@@ -215,7 +215,7 @@ get_map_view0(Name, [#view{map_names=MapNames}=View|Rest]) ->
     end.
 
 reduce_to_count(Reductions) ->
-    {Count, _} = 
+    {Count, _} =
     couch_btree:final_reduce(
         fun(reduce, KVs) ->
             Count = lists:sum(
@@ -226,9 +226,9 @@ reduce_to_count(Reductions) ->
             {lists:sum([Count0 || {Count0, _} <- Reds]), []}
         end, Reductions),
     Count.
-                
 
-    
+
+
 fold_fun(_Fun, [], _, Acc) ->
     {ok, Acc};
 fold_fun(Fun, [KV|Rest], {KVReds, Reds}, Acc) ->
@@ -258,7 +258,7 @@ init([]) ->
         fun("couchdb", "view_index_dir")->
             exit(Self, config_change)
         end),
-        
+
     couch_db_update_notifier:start_link(
         fun({deleted, DbName}) ->
             gen_server:cast(couch_view, {reset_indexes, DbName});
@@ -279,11 +279,11 @@ terminate(Reason, _Srv) ->
     ok.
 
 
-handle_call({get_group_server, DbName, 
+handle_call({get_group_server, DbName,
     #group{name=GroupId,sig=Sig}=Group}, _From, #server{root_dir=Root}=Server) ->
     case ets:lookup(group_servers_by_sig, {DbName, Sig}) of
     [] ->
-        ?LOG_DEBUG("Spawning new group server for view group ~s in database ~s.", 
+        ?LOG_DEBUG("Spawning new group server for view group ~s in database ~s.",
             [GroupId, DbName]),
         case (catch couch_view_group:start_link({Root, DbName, Group})) of
         {ok, NewPid} ->
@@ -325,12 +325,12 @@ handle_info({'EXIT', FromPid, Reason}, Server) ->
         delete_from_ets(FromPid, DbName, GroupId)
     end,
     {noreply, Server}.
-    
+
 add_to_ets(Pid, DbName, Sig) ->
     true = ets:insert(couch_groups_by_updater, {Pid, {DbName, Sig}}),
     true = ets:insert(group_servers_by_sig, {{DbName, Sig}, Pid}),
     true = ets:insert(couch_groups_by_db, {DbName, Sig}).
-    
+
 delete_from_ets(Pid, DbName, Sig) ->
     true = ets:delete(couch_groups_by_updater, Pid),
     true = ets:delete(group_servers_by_sig, {DbName, Sig}),
@@ -356,7 +356,7 @@ nuke_dir(Dir) ->
                     ok = nuke_dir(Full)
                 end
             end,
-            Files),    
+            Files),
         ok = file:del_dir(Dir)
     end.
 
@@ -400,7 +400,7 @@ less_same_type(A, B) when is_list(A) ->
   less_list(A, B);
 less_same_type(A, B) ->
     A < B.
-	
+
 less_props([], [_|_]) ->
     true;
 less_props(_, []) ->

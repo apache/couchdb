@@ -34,20 +34,20 @@ compact_group(Group, EmptyGroup) ->
         name = GroupId,
         views = Views
     } = Group,
-    
+
     #group{
         db = Db,
         id_btree = EmptyIdBtree,
         views = EmptyViews
     } = EmptyGroup,
-    
+
     {ok, {Count, _}} = couch_btree:full_reduce(Db#db.fulldocinfo_by_id_btree),
-    
+
     <<"_design", ShortName/binary>> = GroupId,
     DbName = couch_db:name(Db),
     TaskName = <<DbName/binary, ShortName/binary>>,
     couch_task_status:add_task(<<"View Group Compaction">>, TaskName, <<"">>),
-    
+
     Fun = fun(KV, {Bt, Acc, TotalCopied}) ->
         if TotalCopied rem 10000 == 0 ->
             couch_task_status:update("Copied ~p of ~p Ids (~p%)",
@@ -58,27 +58,27 @@ compact_group(Group, EmptyGroup) ->
             {ok, {Bt, [KV|Acc], TotalCopied+1}}
         end
     end,
-    {ok, {Bt3, Uncopied, _Total}} = couch_btree:foldl(IdBtree, Fun, 
+    {ok, {Bt3, Uncopied, _Total}} = couch_btree:foldl(IdBtree, Fun,
         {EmptyIdBtree, [], 0}),
     {ok, NewIdBtree} = couch_btree:add(Bt3, lists:reverse(Uncopied)),
-    
+
     NewViews = lists:map(fun({View, EmptyView}) ->
         compact_view(View, EmptyView)
     end, lists:zip(Views, EmptyViews)),
-    
+
     NewGroup = EmptyGroup#group{
-        id_btree=NewIdBtree, 
-        views=NewViews, 
+        id_btree=NewIdBtree,
+        views=NewViews,
         current_seq=Seq
     },
-    
+
     Pid = couch_view:get_group_server(DbName, GroupId),
     gen_server:cast(Pid, {compact_done, NewGroup}).
 
 %% @spec compact_view(View, EmptyView, Retry) -> CompactView
 compact_view(View, EmptyView) ->
     {ok, Count} = couch_view:get_row_count(View),
-    
+
     %% Key is {Key,DocId}
     Fun = fun(KV, {Bt, Acc, TotalCopied}) ->
         if TotalCopied rem 10000 == 0 ->
@@ -86,12 +86,12 @@ compact_view(View, EmptyView) ->
                 [View#view.id_num, TotalCopied, Count, (TotalCopied*100) div Count]),
             {ok, Bt2} = couch_btree:add(Bt, lists:reverse([KV|Acc])),
             {ok, {Bt2, [], TotalCopied + 1}};
-        true ->    
+        true ->
             {ok, {Bt, [KV|Acc], TotalCopied + 1}}
         end
     end,
-    
-    {ok, {Bt3, Uncopied, _Total}} = couch_btree:foldl(View#view.btree, Fun, 
+
+    {ok, {Bt3, Uncopied, _Total}} = couch_btree:foldl(View#view.btree, Fun,
         {EmptyView#view.btree, [], 0}),
     {ok, NewBt} = couch_btree:add(Bt3, lists:reverse(Uncopied)),
     EmptyView#view{btree = NewBt}.

@@ -46,10 +46,10 @@ start_link(BatchSize, BatchInterval) ->
 eventually_save_doc(DbName, Doc, UserCtx) ->
     % find or create a process for the {DbName, UserCtx} pair
     {ok, Pid} = batch_pid_for_db_and_user(DbName, UserCtx),
-    % hand it the document 
+    % hand it the document
     ?LOG_DEBUG("sending doc to batch ~p",[Pid]),
     ok = send_doc_to_batch(Pid, Doc).
-    
+
 %%--------------------------------------------------------------------
 %% Function: commit_now(DbName) -> committed
 %% Description: Commits all docs for the DB. Does not reply until
@@ -72,8 +72,8 @@ commit_now(DbName, UserCtx) ->
 %%--------------------------------------------------------------------
 % commit_all() ->
 %     committed = gen_server:call(couch_batch_save, commit_now, infinity).
-%  
-    
+%
+
 %%====================================================================
 %% gen_server callbacks
 %%====================================================================
@@ -102,9 +102,9 @@ handle_call({make_pid, DbName, UserCtx}, _From, #batch_state{
         batch_size=BatchSize,
         batch_interval=BatchInterval
     }=State) ->
-    % Create the pid in a serialized process. 
+    % Create the pid in a serialized process.
     % We checked before to see that we need the Pid, but the check is outside
-    % the gen_server for parellelism. We check again here to ensure we don't 
+    % the gen_server for parellelism. We check again here to ensure we don't
     % make a duplicate.
     Resp = case ets:lookup(couch_batch_save_by_db, {DbName,UserCtx}) of
         [{_, Pid}] ->
@@ -114,8 +114,8 @@ handle_call({make_pid, DbName, UserCtx}, _From, #batch_state{
             % no match
             % start and record the doc collector process
             ?LOG_DEBUG("making a batch pid ~p",[{DbName, UserCtx}]),
-            Pid = spawn_link(fun() -> 
-                doc_collector(DbName, UserCtx, {BatchSize, BatchInterval}, new) 
+            Pid = spawn_link(fun() ->
+                doc_collector(DbName, UserCtx, {BatchSize, BatchInterval}, new)
             end),
             true = ets:insert_new(couch_batch_save_by_db, {{DbName, UserCtx}, Pid}),
             {ok, Pid}
@@ -168,7 +168,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 commit_user_docs(_DbName, _UserCtx, []) ->
     {ok, []};
-    
+
 commit_user_docs(DbName, UserCtx, Docs) ->
     ?LOG_INFO("Committing ~p batch docs to ~p",[length(Docs), DbName]),
     case couch_db:open(DbName, [{user_ctx, UserCtx}]) of
@@ -194,7 +194,7 @@ commit_every_ms(Pid, BatchInterval) ->
 
 send_commit(Pid) ->
     Pid ! {self(), commit},
-    receive 
+    receive
         {Pid, committed} ->
            ok
     end.
@@ -225,7 +225,7 @@ send_doc_to_batch(Pid, Doc) ->
     end.
 
 % the loop that holds documents between commits
-doc_collector(DbName, UserCtx, {BatchSize, BatchInterval}, new) -> 
+doc_collector(DbName, UserCtx, {BatchSize, BatchInterval}, new) ->
     % start a process that triggers commit every BatchInterval milliseconds
     _IntervalPid = spawn_link(fun() -> commit_every_ms(self(), BatchInterval) end),
     doc_collector(DbName, UserCtx, {BatchSize, BatchInterval}, []);
@@ -233,7 +233,7 @@ doc_collector(DbName, UserCtx, {BatchSize, BatchInterval}, new) ->
 doc_collector(DbName, UserCtx, {BatchSize, BatchInterval}, Docs) when length(Docs) >= BatchSize->
     collector_commit(DbName, UserCtx, BatchInterval, Docs),
     exit(normal);
-    
+
 doc_collector(DbName, UserCtx, {BatchSize, BatchInterval}, Docs) ->
     receive
         {From, add_doc, Doc} ->

@@ -67,7 +67,7 @@ old_copy_to_new_stream(Fd, Pos, Len, DestFd) ->
         end, ok),
     close(Dest).
 
-% 09 UPGRADE CODE    
+% 09 UPGRADE CODE
 old_foldl(_Fd, null, 0, _Fun, Acc) ->
     Acc;
 old_foldl(Fd, OldPointer, Len, Fun, Acc) when is_tuple(OldPointer)->
@@ -119,7 +119,7 @@ handle_call(close, _From, Stream) ->
         written_pointers = Written,
         buffer_len = BufferLen,
         buffer_list = Buffer} = Stream,
-    
+
     case Buffer of
     [] ->
         Result = {lists:reverse(Written), WrittenLen};
@@ -137,7 +137,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 handle_info(_Info, State) ->
     {noreply, State}.
-    
+
 
 
 % 09 UPGRADE CODE

@@ -34,7 +34,7 @@ handle_external_req(#httpd{path_parts=[_, _]}=Req, _Db) ->
 handle_external_req(Req, _) ->
     send_error(Req, 404, <<"external_server_error">>, <<"Broken assumption">>).
 
-% handle_external_req/3 
+% handle_external_req/3
 % for this type of config usage:
 % _action = {couch_httpd_external, handle_external_req, <<"action">>}
 % with urls like
@@ -44,7 +44,7 @@ handle_external_req(HttpReq, Db, Name) ->
 
 process_external_req(HttpReq, Db, Name) ->
 
-    Response = couch_external_manager:execute(binary_to_list(Name), 
+    Response = couch_external_manager:execute(binary_to_list(Name),
         json_req_obj(HttpReq, Db)),
 
     case Response of
@@ -54,7 +54,7 @@ process_external_req(HttpReq, Db, Name) ->
         send_external_response(HttpReq, Response)
     end.
 
-json_req_obj(#httpd{mochi_req=Req, 
+json_req_obj(#httpd{mochi_req=Req,
                method=Verb,
                path_parts=Path,
                req_body=ReqBody
@@ -99,7 +99,7 @@ send_external_response(#httpd{mochi_req=MochiReq}, Response) ->
         ctype = CType,
         headers = Headers
     } = parse_external_response(Response),
-    Resp = MochiReq:respond({Code, 
+    Resp = MochiReq:respond({Code,
         default_or_content_type(CType, Headers ++ couch_httpd:server_header()), Data}),
     {ok, Resp}.
 
@@ -120,7 +120,7 @@ parse_external_response({Response}) ->
                 Args#extern_resp_args{data=Value, ctype="text/html; charset=utf-8"};
             {<<"base64">>, Value} ->
                 Args#extern_resp_args{
-                    data=couch_util:decodeBase64(Value),        
+                    data=couch_util:decodeBase64(Value),
                     ctype="application/binary"
                 };
             {<<"headers">>, {Headers}} ->

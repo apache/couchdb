@@ -34,17 +34,17 @@ start_link() ->
 
     BindAddress = couch_config:get("httpd", "bind_address", any),
     Port = couch_config:get("httpd", "port", "5984"),
-    
+
     DefaultSpec = "{couch_httpd_db, handle_request}",
     DefaultFun = make_arity_1_fun(
         couch_config:get("httpd", "default_handler", DefaultSpec)
     ),
-    
+
     UrlHandlersList = lists:map(
         fun({UrlKey, SpecStr}) ->
             {?l2b(UrlKey), make_arity_1_fun(SpecStr)}
         end, couch_config:get("httpd_global_handlers")),
-        
+
     DbUrlHandlersList = lists:map(
         fun({UrlKey, SpecStr}) ->
             {?l2b(UrlKey), make_arity_2_fun(SpecStr)}
@@ -65,7 +65,7 @@ start_link() ->
     end,
 
     % and off we go
-    
+
     {ok, Pid} = case mochiweb_http:start([
         {loop, Loop},
         {name, ?MODULE},
@@ -93,7 +93,7 @@ start_link() ->
 
     {ok, Pid}.
 
-% SpecStr is a string like "{my_module, my_fun}" 
+% SpecStr is a string like "{my_module, my_fun}"
 %  or "{my_module, my_fun, <<"my_arg">>}"
 make_arity_1_fun(SpecStr) ->
     case couch_util:parse_term(SpecStr) of
@@ -110,11 +110,11 @@ make_arity_2_fun(SpecStr) ->
     {ok, {Mod, Fun}} ->
         fun(Arg1, Arg2) -> apply(Mod, Fun, [Arg1, Arg2]) end
     end.
-    
+
 
 stop() ->
     mochiweb_http:stop(?MODULE).
-    
+
 
 handle_request(MochiReq, DefaultFun,
         UrlHandlers, DbUrlHandlers, DesignUrlHandlers) ->
@@ -125,7 +125,7 @@ handle_request(MochiReq, DefaultFun,
     % removed, but URL quoting left intact
     RawUri = MochiReq:get(raw_path),
     {"/" ++ Path, _, _} = mochiweb_util:urlsplit_path(RawUri),
-    
+
     HandlerKey =
     case mochiweb_util:partition(Path, "/") of
     {"", "", ""} ->
@@ -139,19 +139,19 @@ handle_request(MochiReq, DefaultFun,
         MochiReq:get(version),
         mochiweb_headers:to_list(MochiReq:get(headers))
     ]),
-    
+
     Method1 =
     case MochiReq:get(method) of
         % already an atom
         Meth when is_atom(Meth) -> Meth;
-        
+
         % Non standard HTTP verbs aren't atoms (COPY, MOVE etc) so convert when
         % possible (if any module references the atom, then it's existing).
         Meth -> couch_util:to_existing_atom(Meth)
     end,
-    
+
     increment_method_stats(Method1),
-    
+
     % alias HEAD to GET as mochiweb takes care of stripping the body
     Method = case Method1 of
         'HEAD' -> 'GET';
@@ -264,13 +264,13 @@ header_value(#httpd{mochi_req=MochiReq}, Key, Default) ->
 
 primary_header_value(#httpd{mochi_req=MochiReq}, Key) ->
     MochiReq:get_primary_header_value(Key).
-    
+
 serve_file(#httpd{mochi_req=MochiReq}, RelativePath, DocumentRoot) ->
     {ok, MochiReq:serve_file(RelativePath, DocumentRoot, server_header())}.
 
 qs_value(Req, Key) ->
     qs_value(Req, Key, undefined).
-    
+
 qs_value(Req, Key, Default) ->
     proplists:get_value(Key, qs(Req), Default).
 
@@ -319,7 +319,7 @@ json_body(Httpd) ->
 json_body_obj(Httpd) ->
     case json_body(Httpd) of
         {Props} -> {Props};
-        _Else -> 
+        _Else ->
             throw({bad_request, "Request body must be a JSON object"})
     end.
 
@@ -457,7 +457,7 @@ end_jsonp() ->
     end,
     put(jsonp, undefined),
     Resp.
-        
+
 validate_callback(CallBack) when is_binary(CallBack) ->
     validate_callback(binary_to_list(CallBack));
 validate_callback([]) ->
@@ -507,10 +507,10 @@ error_info(Error) ->
 
 send_error(_Req, {already_sent, Resp, _Error}) ->
     {ok, Resp};
-    
+
 send_error(Req, Error) ->
     {Code, ErrorStr, ReasonStr} = error_info(Error),
-    if Code == 401 ->     
+    if Code == 401 ->
         case couch_config:get("httpd", "WWW-Authenticate", nil) of
         nil ->
             Headers = [];
@@ -524,7 +524,7 @@ send_error(Req, Error) ->
 
 send_error(Req, Code, ErrorStr, ReasonStr) ->
     send_error(Req, Code, [], ErrorStr, ReasonStr).
-    
+
 send_error(Req, Code, Headers, ErrorStr, ReasonStr) ->
     send_json(Req, Code, Headers,
         {[{<<"error">>,  ErrorStr},
@@ -538,7 +538,7 @@ send_chunked_error(Resp, {_Error, {[{<<"body">>, Reason}]}}) ->
 send_chunked_error(Resp, Error) ->
     {Code, ErrorStr, ReasonStr} = error_info(Error),
     JsonError = {[{<<"code">>, Code},
-        {<<"error">>,  ErrorStr}, 
+        {<<"error">>,  ErrorStr},
         {<<"reason">>, ReasonStr}]},
     send_chunk(Resp, ?l2b([$\n,?JSON_ENCODE(JsonError),$\n])),
     send_chunk(Resp, []).

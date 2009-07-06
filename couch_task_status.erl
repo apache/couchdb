@@ -59,7 +59,7 @@ set_update_frequency(Msecs) ->
 
 update(StatusText) ->
     update("~s", [StatusText]).
-    
+
 update(Format, Data) ->
     {LastUpdateTime, Frequency} = get(task_status_update),
     case timer:now_diff(Now = now(), LastUpdateTime) >= Frequency of

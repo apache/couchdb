@@ -38,7 +38,7 @@ Buffer init_Buffer() {
 }
 
 void free_Buffer(Buffer b) {
-  if(b == NULL) 
+  if(b == NULL)
     return;
   if(b->data != NULL)
     free(b->data);
@@ -186,7 +186,7 @@ int set_List(List l, int pos, void* ptr) {
   }
 
   *(l->elements + pos) = ptr;
-   
+
   return TRUE;
 }
 

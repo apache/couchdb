@@ -16,7 +16,7 @@
     handle_all_dbs_req/1,handle_replicate_req/1,handle_restart_req/1,
     handle_uuids_req/1,handle_config_req/1,handle_log_req/1,
     handle_task_status_req/1,handle_sleep_req/1,handle_whoami_req/1]).
-    
+
 -export([increment_update_seq_req/2]).
 
 
@@ -41,7 +41,7 @@ handle_favicon_req(#httpd{method='GET'}=Req, DocumentRoot) ->
     couch_httpd:serve_file(Req, "favicon.ico", DocumentRoot);
 handle_favicon_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
-    
+
 handle_utils_dir_req(#httpd{method='GET'}=Req, DocumentRoot) ->
     "/" ++ UrlPath = couch_httpd:path(Req),
     case couch_httpd:partition(UrlPath) of
@@ -83,7 +83,7 @@ fix_db_url(UrlBin) ->
     $/ -> Url;
     _  -> Url ++ "/"
     end).
-    
+
 
 get_rep_endpoint(_Req, {Props}) ->
     Url = proplists:get_value(<<"url">>, Props),
@@ -136,7 +136,7 @@ handle_uuids_req(Req) ->
 
 % Config request handler
 
-    
+
 % GET /_config/
 % GET /_config
 handle_config_req(#httpd{method='GET', path_parts=[_]}=Req) ->

@@ -56,7 +56,7 @@ terminate_linked(Reason) ->
 
 new_uuid() ->
     list_to_binary(to_hex(crypto:rand_bytes(16))).
-    
+
 to_hex([]) ->
     [];
 to_hex(Bin) when is_binary(Bin) ->
@@ -73,7 +73,7 @@ parse_term(Bin) when is_binary(Bin)->
 parse_term(List) ->
     {ok, Tokens, _} = erl_scan:string(List ++ "."),
     erl_parse:parse_term(Tokens).
-    
+
 
 % returns a random integer
 rand32() ->
@@ -193,15 +193,15 @@ collate(A, B, Options) when is_binary(A), is_binary(B) ->
 
 should_flush() ->
     should_flush(?FLUSH_MAX_MEM).
-    
+
 should_flush(MemThreshHold) ->
     {memory, ProcMem} = process_info(self(), memory),
-    BinMem = lists:foldl(fun({_Id, Size, _NRefs}, Acc) -> Size+Acc end, 
+    BinMem = lists:foldl(fun({_Id, Size, _NRefs}, Acc) -> Size+Acc end,
         0, element(2,process_info(self(), binary))),
     if ProcMem+BinMem > 2*MemThreshHold ->
         garbage_collect(),
         {memory, ProcMem2} = process_info(self(), memory),
-        BinMem2 = lists:foldl(fun({_Id, Size, _NRefs}, Acc) -> Size+Acc end, 
+        BinMem2 = lists:foldl(fun({_Id, Size, _NRefs}, Acc) -> Size+Acc end,
             0, element(2,process_info(self(), binary))),
         if ProcMem2+BinMem2 > MemThreshHold ->
             true;
@@ -230,7 +230,7 @@ encodeBase64(Bs) when list(Bs) ->
     encodeBase64(list_to_binary(Bs), <<>>);
 encodeBase64(Bs) ->
     encodeBase64(Bs, <<>>).
-    
+
 encodeBase64(<<B:3/binary, Bs/binary>>, Acc) ->
     <<C1:6, C2:6, C3:6, C4:6>> = B,
     encodeBase64(Bs, <<Acc/binary, (enc(C1)), (enc(C2)), (enc(C3)), (enc(C4))>>);

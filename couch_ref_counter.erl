@@ -18,11 +18,11 @@
 
 start(ChildProcs) ->
     gen_server:start(couch_ref_counter, {self(), ChildProcs}, []).
-    
-    
+
+
 drop(RefCounterPid) ->
     drop(RefCounterPid, self()).
-    
+
 drop(RefCounterPid, Pid) ->
     gen_server:cast(RefCounterPid, {drop, Pid}).
 
@@ -42,7 +42,7 @@ count(RefCounterPid) ->
     {
     referrers=dict:new() % a dict of each ref counting proc.
     }).
-    
+
 init({Pid, ChildProcs}) ->
     [link(ChildProc) || ChildProc <- ChildProcs],
     Referrers = dict:from_list([{Pid, {erlang:monitor(process, Pid), 1}}]),

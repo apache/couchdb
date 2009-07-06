@@ -22,7 +22,7 @@
 	 terminate/2, code_change/3]).
 
 -include("couch_db.hrl").
-	 
+
 -record(group_state, {
     type,
     db_name,
@@ -70,7 +70,7 @@ start_link(InitArgs) ->
             {InitArgs, self(), Ref = make_ref()}, []) of
     {ok, Pid} ->
         {ok, Pid};
-    ignore -> 
+    ignore ->
         receive
         {Ref, Pid, Error} ->
             case process_info(self(), trap_exit) of
@@ -83,7 +83,7 @@ start_link(InitArgs) ->
         Error
     end.
 
-% init creates a closure which spawns the appropriate view_updater. 
+% init creates a closure which spawns the appropriate view_updater.
 init({InitArgs, ReturnPid, Ref}) ->
     process_flag(trap_exit, true),
     case prepare_group(InitArgs, false) of
@@ -118,7 +118,7 @@ init({InitArgs, ReturnPid, Ref}) ->
 % If the request sequence is higher than our current high_target seq, we set
 % that as the highest seqence. If the updater is not running, we launch it.
 
-handle_call({request_group, RequestSeq}, From, 
+handle_call({request_group, RequestSeq}, From,
         #group_state{
             db_name=DbName,
             group=#group{current_seq=Seq}=Group,
@@ -128,13 +128,13 @@ handle_call({request_group, RequestSeq}, From,
     {ok, Db} = couch_db:open(DbName, []),
     Group2 = Group#group{db=Db},
     Pid = spawn_link(fun()-> couch_view_updater:update(Group2) end),
-    
+
     {noreply, State#group_state{
         updater_pid=Pid,
         group=Group2,
         waiting_list=[{From,RequestSeq}|WaitList]
         }, infinity};
-        
+
 
 % If the request seqence is less than or equal to the seq_id of a known Group,
 % we respond with that Group.
@@ -159,7 +159,7 @@ handle_call(request_group_info, _From, #group_state{
     GroupInfo = get_group_info(Group, CompactorPid),
     {reply, {ok, GroupInfo}, State}.
 
-handle_cast({start_compact, CompactFun}, #group_state{ compactor_pid=nil, 
+handle_cast({start_compact, CompactFun}, #group_state{ compactor_pid=nil,
         group=Group, init_args={view, RootDir, DbName, GroupId} } = State) ->
     ?LOG_INFO("Starting view group compaction", []),
     {ok, Db} = couch_db:open(DbName, []),
@@ -171,10 +171,10 @@ handle_cast({start_compact, _}, State) ->
     %% compact already running, this is a no-op
     {noreply, State};
 
-handle_cast({compact_done, #group{fd=NewFd, current_seq=NewSeq} = NewGroup}, 
-        #group_state{ 
+handle_cast({compact_done, #group{fd=NewFd, current_seq=NewSeq} = NewGroup},
+        #group_state{
             group = #group{current_seq=OldSeq, sig=GroupSig} = Group,
-            init_args = {view, RootDir, DbName, _GroupId}, 
+            init_args = {view, RootDir, DbName, _GroupId},
             updater_pid = nil,
             ref_counter = RefCounter
         } = State) when NewSeq >= OldSeq ->
@@ -183,7 +183,7 @@ handle_cast({compact_done, #group{fd=NewFd, current_seq=NewSeq} = NewGroup},
     CompactName = index_file_name(compact, RootDir, DbName, GroupSig),
     file:delete(FileName),
     ok = file:rename(CompactName, FileName),
-    
+
     %% cleanup old group
     couch_ref_counter:drop(RefCounter),
     {ok, NewRefCounter} = couch_ref_counter:start([NewFd]),
@@ -191,20 +191,20 @@ handle_cast({compact_done, #group{fd=NewFd, current_seq=NewSeq} = NewGroup},
         nil -> ok;
         Else -> couch_db:close(Else)
     end,
-    
+
     erlang:send_after(1000, self(), delayed_commit),
     {noreply, State#group_state{
-        group=NewGroup, 
+        group=NewGroup,
         ref_counter=NewRefCounter,
         compactor_pid=nil
     }};
-handle_cast({compact_done, NewGroup}, #group_state{ 
+handle_cast({compact_done, NewGroup}, #group_state{
         init_args={view, _RootDir, DbName, GroupId} } = State) ->
     ?LOG_INFO("View index compaction still behind main file", []),
     couch_db:close(NewGroup#group.db),
     {ok, Db} = couch_db:open(DbName, []),
-    Pid = spawn_link(fun() -> 
-        {_,Ref} = erlang:spawn_monitor(fun() -> 
+    Pid = spawn_link(fun() ->
+        {_,Ref} = erlang:spawn_monitor(fun() ->
             couch_view_updater:update(NewGroup#group{db = Db})
         end),
         receive
@@ -258,8 +258,8 @@ handle_info({'EXIT', FromPid, {new_group, #group{db=Db}=Group}},
         {noreply, State#group_state{waiting_commit=true,
                 waiting_list=StillWaiting, group=Group2, updater_pid=Pid}}
     end;
-    
-handle_info({'EXIT', FromPid, reset}, 
+
+handle_info({'EXIT', FromPid, reset},
         #group_state{
             init_args=InitArgs,
             updater_pid=UpPid,
@@ -274,10 +274,10 @@ handle_info({'EXIT', FromPid, reset},
     Error ->
         {stop, normal, reply_all(State, Error)}
     end;
-    
+
 handle_info({'EXIT', _FromPid, normal}, State) ->
     {noreply, State};
-    
+
 handle_info({'EXIT', FromPid, {{nocatch, Reason}, _Trace}}, State) ->
     ?LOG_DEBUG("Uncaught throw() in linked pid: ~p", [{FromPid, Reason}]),
     {stop, Reason, State};
@@ -285,7 +285,7 @@ handle_info({'EXIT', FromPid, {{nocatch, Reason}, _Trace}}, State) ->
 handle_info({'EXIT', FromPid, Reason}, State) ->
     ?LOG_DEBUG("Exit from linked pid: ~p", [{FromPid, Reason}]),
     {stop, Reason, State};
-    
+
 handle_info({'DOWN',_,_,_,_}, State) ->
     ?LOG_INFO("Shutting down view group server, monitored db is closing.", []),
     {stop, normal, reply_all(State, shutdown)}.
@@ -305,13 +305,13 @@ code_change(_OldVsn, State, _Extra) ->
 % reply_with_group/3
 % for each item in the WaitingList {Pid, Seq}
 % if the Seq is =< GroupSeq, reply
-reply_with_group(Group=#group{current_seq=GroupSeq}, [{Pid, Seq}|WaitList], 
+reply_with_group(Group=#group{current_seq=GroupSeq}, [{Pid, Seq}|WaitList],
         StillWaiting, RefCounter) when Seq =< GroupSeq ->
     gen_server:reply(Pid, {ok, Group, RefCounter}),
     reply_with_group(Group, WaitList, StillWaiting, RefCounter);
 
 % else
-% put it in the continuing waiting list    
+% put it in the continuing waiting list
 reply_with_group(Group, [{Pid, Seq}|WaitList], StillWaiting, RefCounter) ->
     reply_with_group(Group, WaitList, [{Pid, Seq}|StillWaiting], RefCounter);
 
@@ -351,7 +351,7 @@ prepare_group({RootDir, DbName, #group{sig=Sig}=Group}, ForceReset)->
         Else
     end.
 
-get_index_header_data(#group{current_seq=Seq, purge_seq=PurgeSeq, 
+get_index_header_data(#group{current_seq=Seq, purge_seq=PurgeSeq,
             id_btree=IdBtree,views=Views}) ->
     ViewStates = [couch_btree:get_state(Btree) || #view{btree=Btree} <- Views],
     #index_header{seq=Seq,
@@ -364,7 +364,7 @@ hex_sig(GroupSig) ->
 
 design_root(RootDir, DbName) ->
     RootDir ++ "/." ++ ?b2l(DbName) ++ "_design/".
-    
+
 index_file_name(RootDir, DbName, GroupSig) ->
     design_root(RootDir, DbName) ++ hex_sig(GroupSig) ++".view".
 
@@ -390,17 +390,17 @@ open_temp_group(DbName, Language, DesignOptions, MapSrc, RedSrc) ->
             reduce_funs= if RedSrc==[] -> []; true -> [{<<"_temp">>, RedSrc}] end},
 
         {ok, Db, #group{
-            name = <<"_temp">>, 
+            name = <<"_temp">>,
             db=Db,
-            views=[View], 
-            def_lang=Language, 
+            views=[View],
+            def_lang=Language,
             design_options=DesignOptions,
             sig = erlang:md5(term_to_binary({[View], Language, DesignOptions}))
         }};
     Error ->
         Error
     end.
-    
+
 open_db_group(DbName, GroupId) ->
     case couch_db:open(DbName, []) of
     {ok, Db} ->
@@ -425,7 +425,7 @@ get_group_info(#group{
         {signature, ?l2b(hex_sig(GroupSig))},
         {language, Lang},
         {disk_size, Size},
-        {compact_running, CompactorPid /= nil}   
+        {compact_running, CompactorPid /= nil}
     ].
 
 % maybe move to another module
@@ -490,11 +490,11 @@ init_group(Db, Fd, #group{def_lang=Lang,views=Views}=Group, IndexHeader) ->
     Views2 = lists:zipwith(
         fun(BtreeState, #view{reduce_funs=RedFuns}=View) ->
             FunSrcs = [FunSrc || {_Name, FunSrc} <- RedFuns],
-            ReduceFun = 
+            ReduceFun =
                 fun(reduce, KVs) ->
                     KVs2 = couch_view:expand_dups(KVs,[]),
                     KVs3 = couch_view:detuple_kvs(KVs2,[]),
-                    {ok, Reduced} = couch_query_servers:reduce(Lang, FunSrcs, 
+                    {ok, Reduced} = couch_query_servers:reduce(Lang, FunSrcs,
                         KVs3),
                     {length(KVs3), Reduced};
                 (rereduce, Reds) ->

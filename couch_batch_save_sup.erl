@@ -27,9 +27,9 @@ init([]) ->
             exit(Self, reload_config)
         end),
 
-    BatchSize = list_to_integer(couch_config:get("couchdb", 
+    BatchSize = list_to_integer(couch_config:get("couchdb",
         "batch_save_size","1000")),
-    BatchInterval = list_to_integer(couch_config:get("couchdb", 
+    BatchInterval = list_to_integer(couch_config:get("couchdb",
         "batch_save_interval","1000")),
 
     Batch = {batch, {couch_batch_save, start_link, [BatchSize, BatchInterval]},
