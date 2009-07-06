@@ -12,7 +12,7 @@
 
 // *********************** Test Framework of Sorts ************************* //
 
-function loadScript(url) {  
+function loadScript(url) {
   if (typeof document != "undefined") document.write('<script src="'+url+'"></script>');
 };
 

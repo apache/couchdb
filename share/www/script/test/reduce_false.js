@@ -34,7 +34,7 @@ couchTests.reduce_false = function(debug) {
   // Test that the reduce works
   var res = db.view('test/summate');
   T(res.rows.length == 1 && res.rows[0].value == summate(5));
-  
+
   //Test that we get our docs back
   res = db.view('test/summate', {reduce: false});
   T(res.rows.length == 5);

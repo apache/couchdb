@@ -1,7 +1,7 @@
 % couch_config module test suote
 
 % Set up test suite
-% ?MODULE_test() returns a list of functions 
+% ?MODULE_test() returns a list of functions
 % that run the actual tests.
 couch_config_test() ->
     [
@@ -10,7 +10,7 @@ couch_config_test() ->
 
 
 % test functions
-  
+
 store_strings() ->
     Filename = "test.ini",
     file:write_file(Filename, ""),
@@ -26,7 +26,7 @@ store_strings() ->
 
     exit(Proc, kill),
     receive {'EXIT', Proc, _} -> ok end,
-    
+
     % clean up
     file:delete(Filename),
 

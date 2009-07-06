@@ -83,12 +83,12 @@ handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
     case proplists:get_value(<<"reduce">>, Props, null) of
     null ->
         QueryArgs = parse_view_params(Req, Keys, map),
-        {ok, View, Group} = couch_view:get_temp_map_view(Db, Language, 
+        {ok, View, Group} = couch_view:get_temp_map_view(Db, Language,
             DesignOptions, MapSrc),
         output_map_view(Req, View, Group, Db, QueryArgs, Keys);
     RedSrc ->
         QueryArgs = parse_view_params(Req, Keys, reduce),
-        {ok, View, Group} = couch_view:get_temp_reduce_view(Db, Language, 
+        {ok, View, Group} = couch_view:get_temp_reduce_view(Db, Language,
             DesignOptions, MapSrc, RedSrc),
         output_reduce_view(Req, View, Group, QueryArgs, Keys)
     end;
@@ -105,7 +105,7 @@ output_map_view(Req, View, Group, Db, QueryArgs, nil) ->
         start_docid = StartDocId
     } = QueryArgs,
     CurrentEtag = view_group_etag(Group),
-    couch_httpd:etag_respond(Req, CurrentEtag, fun() -> 
+    couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         {ok, RowCount} = couch_view:get_row_count(View),
         Start = {StartKey, StartDocId},
         FoldlFun = make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db, RowCount, #view_fold_helper_funs{reduce_count=fun couch_view:reduce_to_count/1}),
@@ -113,7 +113,7 @@ output_map_view(Req, View, Group, Db, QueryArgs, nil) ->
         FoldResult = couch_view:fold(View, Start, Dir, FoldlFun, FoldAccInit),
         finish_view_fold(Req, RowCount, FoldResult)
     end);
-    
+
 output_map_view(Req, View, Group, Db, QueryArgs, Keys) ->
     #view_query_args{
         limit = Limit,
@@ -122,7 +122,7 @@ output_map_view(Req, View, Group, Db, QueryArgs, Keys) ->
         start_docid = StartDocId
     } = QueryArgs,
     CurrentEtag = view_group_etag(Group, Keys),
-    couch_httpd:etag_respond(Req, CurrentEtag, fun() ->     
+    couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         {ok, RowCount} = couch_view:get_row_count(View),
         FoldAccInit = {Limit, SkipCount, undefined, []},
         FoldResult = lists:foldl(
@@ -132,7 +132,7 @@ output_map_view(Req, View, Group, Db, QueryArgs, Keys) ->
                     QueryArgs#view_query_args{
                         start_key = Key,
                         end_key = Key
-                    }, CurrentEtag, Db, RowCount, 
+                    }, CurrentEtag, Db, RowCount,
                     #view_fold_helper_funs{
                         reduce_count = fun couch_view:reduce_to_count/1
                     }),
@@ -156,11 +156,11 @@ output_reduce_view(Req, View, Group, QueryArgs, nil) ->
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         {ok, GroupRowsFun, RespFun} = make_reduce_fold_funs(Req, GroupLevel, QueryArgs, CurrentEtag, #reduce_fold_helper_funs{}),
         FoldAccInit = {Limit, Skip, undefined, []},
-        {ok, {_, _, Resp, _}} = couch_view:fold_reduce(View, Dir, {StartKey, StartDocId}, 
+        {ok, {_, _, Resp, _}} = couch_view:fold_reduce(View, Dir, {StartKey, StartDocId},
             {EndKey, EndDocId}, GroupRowsFun, RespFun, FoldAccInit),
         finish_reduce_fold(Req, Resp)
     end);
-    
+
 output_reduce_view(Req, View, Group, QueryArgs, Keys) ->
     #view_query_args{
         limit = Limit,
@@ -177,7 +177,7 @@ output_reduce_view(Req, View, Group, QueryArgs, Keys) ->
             fun(Key, {Resp, RedAcc}) ->
                 % run the reduce once for each key in keys, with limit etc reapplied for each key
                 FoldAccInit = {Limit, Skip, Resp, RedAcc},
-                {_, {_, _, Resp2, RedAcc2}} = couch_view:fold_reduce(View, Dir, {Key, StartDocId}, 
+                {_, {_, _, Resp2, RedAcc2}} = couch_view:fold_reduce(View, Dir, {Key, StartDocId},
                     {Key, EndDocId}, GroupRowsFun, RespFun, FoldAccInit),
                 % Switch to comma
                 {Resp2, RedAcc2}
@@ -198,7 +198,7 @@ get_reduce_type(Req) ->
 
 parse_view_params(Req, Keys, ViewType) ->
     QueryList = couch_httpd:qs(Req),
-    QueryParams = 
+    QueryParams =
     lists:foldl(fun({K, V}, Acc) ->
             parse_view_param(K, V) ++ Acc
         end, [], QueryList),
@@ -360,13 +360,13 @@ make_view_fold_fun(Req, QueryArgs, Etag, Db, TotalViewCount, HelperFuns) ->
         inclusive_end = InclusiveEnd,
         direction = Dir
     } = QueryArgs,
-    
+
     #view_fold_helper_funs{
         passed_end = PassedEndFun,
         start_response = StartRespFun,
         send_row = SendRowFun,
         reduce_count = ReduceCountFun
-    } = apply_default_helper_funs(HelperFuns, 
+    } = apply_default_helper_funs(HelperFuns,
         {Dir, EndKey, EndDocId, InclusiveEnd}),
 
     #view_query_args{
@@ -390,12 +390,12 @@ make_view_fold_fun(Req, QueryArgs, Etag, Db, TotalViewCount, HelperFuns) ->
             Offset = ReduceCountFun(OffsetReds),
             {ok, Resp2, RowFunAcc0} = StartRespFun(Req, Etag,
                 TotalViewCount, Offset, RowFunAcc),
-            {Go, RowFunAcc2} = SendRowFun(Resp2, Db, {{Key, DocId}, Value}, 
+            {Go, RowFunAcc2} = SendRowFun(Resp2, Db, {{Key, DocId}, Value},
                 IncludeDocs, RowFunAcc0),
             {Go, {AccLimit - 1, 0, Resp2, RowFunAcc2}};
         {_, AccLimit, _, Resp} when (AccLimit > 0) ->
             % rendering all other rows
-            {Go, RowFunAcc2} = SendRowFun(Resp, Db, {{Key, DocId}, Value}, 
+            {Go, RowFunAcc2} = SendRowFun(Resp, Db, {{Key, DocId}, Value},
                 IncludeDocs, RowFunAcc),
             {Go, {AccLimit - 1, 0, Resp, RowFunAcc2}}
         end
@@ -439,7 +439,7 @@ make_reduce_fold_funs(Req, GroupLevel, _QueryArgs, Etag, HelperFuns) ->
             when is_integer(GroupLevel), is_list(Key) ->
         % group_level and we haven't responded yet
         {ok, Resp2, RowAcc} = StartRespFun(Req, Etag, RowAcc0),
-        {Go, RowAcc2} = SendRowFun(Resp2, {lists:sublist(Key, GroupLevel), Red}, RowAcc),    
+        {Go, RowAcc2} = SendRowFun(Resp2, {lists:sublist(Key, GroupLevel), Red}, RowAcc),
         {Go, {AccLimit - 1, 0, Resp2, RowAcc2}};
     (Key, Red, {AccLimit, 0, Resp, RowAcc})
             when is_integer(GroupLevel), is_list(Key) ->
@@ -551,15 +551,15 @@ json_reduce_start_resp(Req, Etag, _Acc0) ->
 
 send_json_reduce_row(Resp, {Key, Value}, RowFront) ->
     send_chunk(Resp, RowFront ++ ?JSON_ENCODE({[{key, Key}, {value, Value}]})),
-    {ok, ",\r\n"}.    
+    {ok, ",\r\n"}.
 
 view_group_etag(Group) ->
     view_group_etag(Group, nil).
-    
+
 view_group_etag(#group{sig=Sig,current_seq=CurrentSeq}, Extra) ->
     % This is not as granular as it could be.
     % If there are updates to the db that do not effect the view index,
-    % they will change the Etag. For more granular Etags we'd need to keep 
+    % they will change the Etag. For more granular Etags we'd need to keep
     % track of the last Db seq that caused an index change.
     couch_httpd:make_etag({Sig, CurrentSeq, Extra}).
 
@@ -591,10 +591,10 @@ view_row_with_doc(Db, {{Key, DocId}, Value}, Rev) ->
       {not_found, deleted} ->
           {[{id, DocId}, {key, Key}, {value, Value}]};
       Doc ->
-        JsonDoc = couch_doc:to_json_obj(Doc, []), 
+        JsonDoc = couch_doc:to_json_obj(Doc, []),
         {[{id, DocId}, {key, Key}, {value, Value}, {doc, JsonDoc}]}
     end.
-    
+
 finish_view_fold(Req, TotalRows, FoldResult) ->
     case FoldResult of
     {ok, {_, _, undefined, _}} ->

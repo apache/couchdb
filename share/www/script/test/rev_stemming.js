@@ -18,11 +18,11 @@ couchTests.rev_stemming = function(debug) {
   dbB.deleteDb();
   dbB.createDb();
   if (debug) debugger;
-  
+
   var newLimit = 5;
-  
+
   T(db.getDbProperty("_revs_limit") == 1000);
-  
+
   var doc = {_id:"foo",foo:0}
   for( var i=0; i < newLimit + 1; i++) {
     doc.foo++;
@@ -30,30 +30,30 @@ couchTests.rev_stemming = function(debug) {
   }
   var doc0 = db.open("foo", {revs:true});
   T(doc0._revisions.ids.length == newLimit + 1);
-  
+
   var docBar = {_id:"bar",foo:0}
   for( var i=0; i < newLimit + 1; i++) {
     docBar.foo++;
     T(db.save(docBar).ok);
   }
   T(db.open("bar", {revs:true})._revisions.ids.length == newLimit + 1);
-  
+
   T(db.setDbProperty("_revs_limit", newLimit).ok);
-  
+
   for( var i=0; i < newLimit + 1; i++) {
     doc.foo++;
     T(db.save(doc).ok);
   }
   doc0 = db.open("foo", {revs:true});
   T(doc0._revisions.ids.length == newLimit);
-  
-  
+
+
   // If you replicate after you make more edits than the limit, you'll
   // cause a spurious edit conflict.
   CouchDB.replicate("test_suite_db_a", "test_suite_db_b");
   var docB1 = dbB.open("foo",{conflicts:true})
   T(docB1._conflicts == null);
-  
+
   for( var i=0; i < newLimit - 1; i++) {
     doc.foo++;
     T(db.save(doc).ok);
@@ -69,30 +69,30 @@ couchTests.rev_stemming = function(debug) {
     doc.foo++;
     T(db.save(doc).ok);
   }
-  
+
   CouchDB.replicate("test_suite_db_a", "test_suite_db_b");
-  
+
   var docB2 = dbB.open("foo",{conflicts:true});
-  
+
   // we have a conflict, but the previous replicated rev is always the losing
   // conflict
   T(docB2._conflicts[0] == docB1._rev)
-  
+
   // We having already updated bar before setting the limit, so it's still got
   // a long rev history. compact to stem the revs.
-  
+
   T(db.open("bar", {revs:true})._revisions.ids.length == newLimit + 1);
-  
+
   T(db.compact().ok);
-  
+
   // compaction isn't instantaneous, loop until done
   while (db.info().compact_running) {};
-  
+
   // force reload because ETags don't honour compaction
   var req = db.request("GET", "/test_suite_db_a/bar?revs=true", {
     headers:{"if-none-match":"pommes"}
   });
-  
+
   var finalDoc = JSON.parse(req.responseText);
   TEquals(newLimit, finalDoc._revisions.ids.length,
     "should return a truncated revision list");

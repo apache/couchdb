@@ -540,7 +540,7 @@ tree([T={comment, _Comment} | Rest], S) ->
     tree(Rest, append_stack_child(T, S));
 tree(L=[{data, _Data, _Whitespace} | _], S) ->
     case tree_data(L, true, []) of
-        {_, true, Rest} -> 
+        {_, true, Rest} ->
             tree(Rest, S);
         {Data, false, Rest} ->
             tree(Rest, append_stack_child(Data, S))

@@ -43,7 +43,7 @@ stop() ->
 
 init([]) ->
     % read config and register for configuration changes
-    
+
     % just stop if one of the config settings change. couch_server_sup
     % will restart us and then we will pick up the new settings.
     ok = couch_config:register(
@@ -52,7 +52,7 @@ init([]) ->
         ("log", "level") ->
             ?MODULE:stop()
         end),
-    
+
     Filename = couch_config:get("log", "file", "couchdb.log"),
     Level = couch_config:get("log", "level", "info"),
 

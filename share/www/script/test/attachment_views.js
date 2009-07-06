@@ -73,7 +73,7 @@ couchTests.attachment_views= function(debug) {
   var reduceFunction = function(key, values) {
     return sum(values);
   }
-  
+
   var result = db.query(mapFunction, reduceFunction);
 
   T(result.rows.length == 1);

@@ -9,7 +9,7 @@
 
 stop() ->
     mochiweb_socket_server:stop(?MODULE).
-    
+
 start() ->
     mochiweb_socket_server:start([{name, ?MODULE},
                                   {port, 6789},

@@ -30,7 +30,7 @@ h1 { background: #333; border-right: 2px solid #111;
   line-height: 1.8em; margin: 0 0 1em; padding: 0 0 0 1em; position: relative;
 }
 h1 :link, h1 :visited, h1 strong { padding: .4em .5em; }
-h1 :link, h1 :visited { 
+h1 :link, h1 :visited {
   background: url(../image/path.gif) 100% 50% no-repeat;
   color: #bbb; cursor: pointer; padding-right: 2.2em;
   text-shadow: #333 2px 2px 1px;

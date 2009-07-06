@@ -22,10 +22,10 @@ test()->
         (reduce, KVs) -> length(KVs);
         (rereduce, Reds) -> lists:sum(Reds)
     end,
-    
+
     {ok, Fd} = couch_file:open(filename(), [create,overwrite]),
     {ok, Btree} = couch_btree:open(nil, Fd, [{reduce, ReduceFun}]),
-    
+
     % Create a list, of {"even", Value} or {"odd", Value} pairs.
     {_, EvenOddKVs} = lists:foldl(fun(Idx, {Key, Acc}) ->
         case Key of
@@ -50,7 +50,7 @@ test()->
                 true;
             (_) ->
                 false
-        end,    
+        end,
         couch_btree:fold_reduce(Btree2, nil, nil, GroupFun, FoldFun, []),
         "Reduction works with no specified direction, startkey, or endkey."
     ),
@@ -76,7 +76,7 @@ test()->
         couch_btree:fold_reduce(Btree2, rev, nil, nil, GroupFun, FoldFun, []),
         "Reducing backwards works with no startkey or endkey."
     ),
-    
+
     etap:fun_is(
         fun
             ({ok, [{{"odd", _}, 500}, {{"even", _}, 500}]}) ->
@@ -87,7 +87,7 @@ test()->
         couch_btree:fold_reduce(Btree2, fwd, SK1, EK2, GroupFun, FoldFun, []),
         "Reducing works over the entire range with startkey and endkey set."
     ),
-    
+
     etap:fun_is(
         fun
             ({ok, [{{"even", _}, 500}]}) -> true;
@@ -114,7 +114,7 @@ test()->
         couch_btree:fold_reduce(Btree2, rev, EK2, SK2, GroupFun, FoldFun, []),
         "Reducing in reverse works after swapping the startkey and endkey."
     ),
-    
+
     etap:fun_is(
         fun
             ({ok, [{{"even", _}, 500}, {{"odd", _}, 500}]}) ->

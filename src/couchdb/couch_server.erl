@@ -42,7 +42,7 @@ start(_Type, _Args) ->
 restart() ->
     stop(),
     start().
-    
+
 stop() ->
     couch_server_sup:stop().
 
@@ -127,7 +127,7 @@ hash_admin_passwords() ->
 
 init([]) ->
     % read config and register for configuration changes
-    
+
     % just stop if one of the config settings change. couch_server_sup
     % will restart us and then we will pick up the new settings.
 
@@ -292,7 +292,7 @@ handle_call({delete, DbName, _Options}, _From, Server) ->
     case check_dbname(Server, DbNameList) of
     ok ->
         FullFilepath = get_full_filename(Server, DbNameList),
-        Server2 = 
+        Server2 =
         case ets:lookup(couch_dbs_by_name, DbName) of
         [] -> Server;
         [{_, {Pid, LruTime}}] ->
@@ -303,11 +303,11 @@ handle_call({delete, DbName, _Options}, _From, Server) ->
             true = ets:delete(couch_dbs_by_lru, LruTime),
             Server#server{dbs_open=Server#server.dbs_open - 1}
         end,
-        
+
         %% Delete any leftover .compact files.  If we don't do this a subsequent
         %% request for this DB will try to open the .compact file and use it.
         file:delete(FullFilepath ++ ".compact"),
-        
+
         case file:delete(FullFilepath) of
         ok ->
             couch_db_update_notifier:notify({deleted, DbName}),
@@ -326,7 +326,7 @@ handle_cast(Msg, _Server) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-    
+
 handle_info({'EXIT', _Pid, config_change}, _Server) ->
     exit(kill);
 handle_info({'EXIT', Pid, _Reason}, #server{dbs_open=DbsOpen}=Server) ->

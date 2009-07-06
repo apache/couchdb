@@ -56,7 +56,7 @@ static ErlDrvData couch_drv_start(ErlDrvPort port, char *buff)
         return ERL_DRV_ERROR_GENERAL;
 
     pData->port = port;
-    
+
     pData->coll = ucol_open("", &status);
     if (U_FAILURE(status)) {
         couch_drv_stop((ErlDrvData)pData);
@@ -140,7 +140,7 @@ static int couch_drv_control(ErlDrvData drv_data, unsigned int command, char *pB
 
         return return_control_result(&response, sizeof(response), rbuf, rlen);
         }
-      
+
     default:
         return -1;
     }

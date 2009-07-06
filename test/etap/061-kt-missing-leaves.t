@@ -17,7 +17,7 @@ test() ->
     TwoChildSibs = [{0, {"1","foo", [{"1a", "bar", []}, {"1b", "bar", []}]}}],
     Stemmed1 = [{1, {"1a", "bar", [{"1aa", "bar", []}]}}],
     Stemmed2 = [{2, {"1aa", "bar", []}}],
-    
+
     etap:is(
         [],
         couch_key_tree:find_missing(TwoChildSibs, [{0,"1"}, {1,"1a"}]),

@@ -94,7 +94,7 @@ class OSProcessRunner
 end
 
 class QueryServerRunner < OSProcessRunner
-  
+
   COMMANDS = {"js" => "#{COUCH_ROOT}/src/couchdb/couchjs #{COUCH_ROOT}/share/server/main.js" }
 
   def self.run_command
@@ -159,7 +159,7 @@ functions = {
           var row;
           log("about to getRow " + typeof(getRow));
           while(row = getRow()) {
-            send(row.key);        
+            send(row.key);
           };
           return "tail";
         };
@@ -172,8 +172,8 @@ functions = {
           var row;
           log("about to getRow " + typeof(getRow));
           while(row = getRow()) {
-            send(row.key);        
-            send("eggs");        
+            send(row.key);
+            send("eggs");
           };
           return "tail";
         };
@@ -186,7 +186,7 @@ functions = {
           send(req.q);
           var row;
           while(row = getRow()) {
-            send(row.key);    
+            send(row.key);
           };
           return "early";
         };
@@ -199,11 +199,11 @@ functions = {
           send(req.q);
           var row, i=0;
           while(row = getRow()) {
-            send(row.key);  
+            send(row.key);
             i += 1;
             if (i > 2) {
               return('early tail');
-            }  
+            }
           };
         };
     JS
@@ -221,7 +221,7 @@ functions = {
           send("bacon")
           var row, i = 0;
           while(row = getRow()) {
-            send(row.key);        
+            send(row.key);
             i += 1;
             if (i > 2) {
               return('early');
@@ -237,7 +237,7 @@ functions = {
           send(req.q);
           var row;
           while(row = getRow()) {
-            send(row.key);        
+            send(row.key);
           };
           return "tail";
         };
@@ -254,7 +254,7 @@ describe "query server normal case" do
     @qs.close
   end
   it "should reset" do
-    @qs.run(["reset"]).should == true    
+    @qs.run(["reset"]).should == true
   end
   it "should run map funs" do
     @qs.reset!
@@ -285,7 +285,7 @@ describe "query server normal case" do
       @qs.run(["rereduce", [@fun], vs]).should == [true, [45]]
     end
   end
-  
+
   # it "should validate"
   describe "validation" do
     before(:all) do
@@ -299,35 +299,35 @@ describe "query server normal case" do
       @qs.run(["validate", @fun, {"bad" => true}, {}, {}]).should == {"forbidden"=>"bad doc"}
     end
   end
-  
+
   describe "show" do
     before(:all) do
       @fun = functions["show-simple"][LANGUAGE]
       @qs.reset!
     end
     it "should show" do
-      @qs.rrun(["show", @fun, 
+      @qs.rrun(["show", @fun,
         {:title => "Best ever", :body => "Doc body"}])
       @qs.jsgets.should == ["resp", {"body" => "Best ever - Doc body"}]
     end
   end
-  
+
   describe "show with headers" do
     before(:all) do
       @fun = functions["show-headers"][LANGUAGE]
       @qs.reset!
     end
     it "should show headers" do
-      @qs.rrun(["show", @fun, 
+      @qs.rrun(["show", @fun,
         {:title => "Best ever", :body => "Doc body"}])
       @qs.jsgets.should == ["resp", {"code"=>200,"headers" => {"X-Plankton"=>"Rusty"}, "body" => "Best ever - Doc body"}]
     end
   end
-    
+
 # end
 #                    LIST TESTS
 # __END__
-    
+
   describe "raw list with headers" do
     before(:each) do
       @fun = functions["show-sends"][LANGUAGE]
@@ -341,11 +341,11 @@ describe "query server normal case" do
       @qs.jsgets.should == ["end", ["tail"]]
     end
   end
-  
+
   describe "list with rows" do
     before(:each) do
       @fun = functions["show-while-get-rows"][LANGUAGE]
-      @qs.run(["reset"]).should == true    
+      @qs.run(["reset"]).should == true
       @qs.add_fun(@fun).should == true
     end
     it "should list em" do
@@ -365,7 +365,7 @@ describe "query server normal case" do
       @qs.jsgets.should == ["end", ["tail"]]
     end
   end
-  
+
   describe "should buffer multiple chunks sent for a single row." do
     before(:all) do
       @fun = functions["show-while-get-rows-multi-send"][LANGUAGE]
@@ -400,7 +400,7 @@ describe "query server normal case" do
       @qs.run(["list_end"]).should == ["end" , ["early"]]
     end
   end
-  
+
   describe "only goes to 2 list" do
     before(:all) do
       @fun = functions["list-chunky"][LANGUAGE]
@@ -443,7 +443,7 @@ describe "query server that exits" do
   after(:each) do
     @qs.close
   end
-  
+
   describe "old style list" do
     before(:each) do
       @fun = functions["list-old-style"][LANGUAGE]
@@ -456,7 +456,7 @@ describe "query server that exits" do
       resp["reason"].should include("the list API has changed")
     end
   end
-  
+
   describe "only goes to 2 list" do
     before(:each) do
       @fun = functions["list-capped"][LANGUAGE]
@@ -473,7 +473,7 @@ describe "query server that exits" do
       should_have_exited @qs
     end
   end
-  
+
   describe "raw list" do
     before(:each) do
       @fun = functions["list-raw"][LANGUAGE]
@@ -486,5 +486,5 @@ describe "query server that exits" do
       @qs.run(["reset"])["error"].should == "query_server_error"
       should_have_exited @qs
     end
-  end  
+  end
 end

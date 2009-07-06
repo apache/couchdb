@@ -29,7 +29,7 @@ test()->
     etap:ok(test_kvs(shuffle(Sorted)), "Testing shuffled keys."),
     ok.
 
-test_kvs(KeyValues) ->    
+test_kvs(KeyValues) ->
     ReduceFun = fun
         (reduce, KVs) ->
             length(KVs);
@@ -53,7 +53,7 @@ test_kvs(KeyValues) ->
     {ok, Btree2} = couch_btree:add_remove(Btree1, KeyValues, []),
     etap:ok(test_btree(Btree2, KeyValues),
         "Adding all keys at once returns a complete btree."),
-    
+
     etap:fun_is(
         fun
             ({ok, {kp_node, _}}) -> true;
@@ -98,7 +98,7 @@ test_kvs(KeyValues) ->
 
     etap:ok(test_add_remove(Btree6, Rem2Keys0, Rem2Keys1),
         "Add/Remove every other key."),
-    
+
     etap:ok(test_add_remove(Btree6, Rem2Keys1, Rem2Keys0),
         "Add/Remove opposite every other key."),
 
@@ -189,5 +189,5 @@ randomize(List) ->
     D = lists:map(fun(A) ->
         {random:uniform(), A}
     end, List),
-    {_, D1} = lists:unzip(lists:keysort(1, D)), 
+    {_, D1} = lists:unzip(lists:keysort(1, D)),
     D1.

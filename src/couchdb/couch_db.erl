@@ -140,7 +140,7 @@ get_doc_info(Db, Id) ->
     Else ->
         Else
     end.
-    
+
 %   returns {ok, DocInfo} or not_found
 get_full_doc_info(Db, Id) ->
     [Result] = get_full_doc_infos(Db, [Id]),
@@ -154,13 +154,13 @@ increment_update_seq(#db{update_pid=UpdatePid}) ->
 
 purge_docs(#db{update_pid=UpdatePid}, IdsRevs) ->
     gen_server:call(UpdatePid, {purge_docs, IdsRevs}).
-    
+
 get_committed_update_seq(#db{committed_update_seq=Seq}) ->
     Seq.
 
 get_update_seq(#db{update_seq=Seq})->
     Seq.
-    
+
 get_purge_seq(#db{header=#db_header{purge_seq=PurgeSeq}})->
     PurgeSeq.
 
@@ -230,7 +230,7 @@ set_revs_limit(_Db, _Limit) ->
 
 name(#db{name=Name}) ->
     Name.
-    
+
 update_doc(Db, Doc, Options) ->
     case update_docs(Db, [Doc], Options) of
     {ok, [{ok, NewRev}]} ->
@@ -241,7 +241,7 @@ update_doc(Db, Doc, Options) ->
 
 update_docs(Db, Docs) ->
     update_docs(Db, Docs, []).
-    
+
 % group_alike_docs groups the sorted documents into sublist buckets, by id.
 % ([DocA, DocA, DocB, DocC], []) -> [[DocA, DocA], [DocB], [DocC]]
 group_alike_docs(Docs) ->
@@ -375,7 +375,7 @@ update_docs(#db{update_pid=UpdatePid}=Db, Docs, Options) ->
 
 
 prep_and_validate_replicated_updates(_Db, [], [], AccPrepped, AccErrors) ->
-    Errors2 = [{{Id, {Pos, Rev}}, Error} || 
+    Errors2 = [{{Id, {Pos, Rev}}, Error} ||
             {#doc{id=Id,revs={Pos,[Rev|_]}}, Error} <- AccErrors],
     {lists:reverse(AccPrepped), lists:reverse(Errors2)};
 prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldInfo], AccPrepped, AccErrors) ->
@@ -406,9 +406,9 @@ prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldI
             fun(#doc{id=Id,revs={Pos, [RevId|_]}}=Doc, {AccValidated, AccErrors2}) ->
                 case dict:find({Pos, RevId}, LeafRevsFullDict) of
                 {ok, {Start, Path}} ->
-                    % our unflushed doc is a leaf node. Go back on the path 
+                    % our unflushed doc is a leaf node. Go back on the path
                     % to find the previous rev that's on disk.
-                    PrevRevResult = 
+                    PrevRevResult =
                     case couch_doc:has_stubs(Doc) of
                     true ->
                         [_PrevRevFull | [PrevRevFull | _]=PrevPath]  = Path,
@@ -420,14 +420,14 @@ prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldI
                             Doc2 = couch_doc:merge_stubs(Doc, DiskDoc),
                             {ok, Doc2, fun() -> DiskDoc end}
                         end;
-                    false ->    
+                    false ->
                         {ok, Doc,
                             fun() ->
                                 make_first_doc_on_disk(Db,Id,Start-1, tl(Path))
                             end}
                     end,
                     case PrevRevResult of
-                    {ok, NewDoc, LoadPrevRevFun} ->                        
+                    {ok, NewDoc, LoadPrevRevFun} ->
                         case validate_doc_update(Db, NewDoc, LoadPrevRevFun) of
                         ok ->
                             {[NewDoc | AccValidated], AccErrors2};
@@ -450,7 +450,7 @@ prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldI
 update_docs(Db, Docs, Options, replicated_changes) ->
     couch_stats_collector:increment({couchdb, database_writes}),
     DocBuckets = group_alike_docs(Docs),
-    
+
     case (Db#db.validate_doc_funs /= []) orelse
         lists:any(
             fun(#doc{id= <<?DESIGN_DOC_PREFIX, _/binary>>}) -> true;
@@ -459,7 +459,7 @@ update_docs(Db, Docs, Options, replicated_changes) ->
     true ->
         Ids = [Id || [#doc{id=Id}|_] <- DocBuckets],
         ExistingDocs = get_full_doc_infos(Db, Ids),
-    
+
         {DocBuckets2, DocErrors} =
                 prep_and_validate_replicated_updates(Db, DocBuckets, ExistingDocs, [], []),
         DocBuckets3 = [Bucket || [_|_]=Bucket <- DocBuckets2]; % remove empty buckets
@@ -469,7 +469,7 @@ update_docs(Db, Docs, Options, replicated_changes) ->
     end,
     {ok, []} = write_and_commit(Db, DocBuckets3, [merge_conflicts | Options]),
     {ok, DocErrors};
-    
+
 update_docs(Db, Docs, Options, interactive_edit) ->
     couch_stats_collector:increment({couchdb, database_writes}),
     AllOrNothing = lists:member(all_or_nothing, Options),
@@ -485,7 +485,7 @@ update_docs(Db, Docs, Options, interactive_edit) ->
             end
         end, Docs),
     DocBuckets = group_alike_docs(Docs2),
-    
+
     case (Db#db.validate_doc_funs /= []) orelse
         lists:any(
             fun(#doc{id= <<?DESIGN_DOC_PREFIX, _/binary>>}) ->
@@ -497,16 +497,16 @@ update_docs(Db, Docs, Options, interactive_edit) ->
         % lookup the doc by id and get the most recent
         Ids = [Id || [#doc{id=Id}|_] <- DocBuckets],
         ExistingDocInfos = get_full_doc_infos(Db, Ids),
-        
+
         {DocBucketsPrepped, Failures} =
         case AllOrNothing of
         true ->
-            prep_and_validate_replicated_updates(Db, DocBuckets, 
+            prep_and_validate_replicated_updates(Db, DocBuckets,
                     ExistingDocInfos, [], []);
         false ->
             prep_and_validate_updates(Db, DocBuckets, ExistingDocInfos, [], [])
         end,
-        
+
         % strip out any empty buckets
         DocBuckets2 = [Bucket || [_|_] = Bucket <- DocBucketsPrepped];
     false ->
@@ -517,7 +517,7 @@ update_docs(Db, Docs, Options, interactive_edit) ->
     if (AllOrNothing) and (Failures /= []) ->
          {aborted, Failures};
     true ->
-        Options2 = if AllOrNothing -> [merge_conflicts]; 
+        Options2 = if AllOrNothing -> [merge_conflicts];
                 true -> [] end ++ Options,
         {ok, CommitFailures} = write_and_commit(Db, DocBuckets2, Options2),
         FailDict = dict:from_list(CommitFailures ++ Failures),
@@ -575,24 +575,24 @@ doc_flush_binaries(Doc, Fd) ->
 flush_binary(Fd, {Fd0, StreamPointer, Len}) when Fd0 == Fd ->
     % already written to our file, nothing to write
     {Fd, StreamPointer, Len};
-  
+
 flush_binary(Fd, {OtherFd, StreamPointer, Len}) when is_tuple(StreamPointer) ->
-    {NewStreamData, Len} = 
+    {NewStreamData, Len} =
             couch_stream:old_copy_to_new_stream(OtherFd, StreamPointer, Len, Fd),
     {Fd, NewStreamData, Len};
 
 flush_binary(Fd, {OtherFd, StreamPointer, Len}) ->
-    {NewStreamData, Len} = 
+    {NewStreamData, Len} =
             couch_stream:copy_to_new_stream(OtherFd, StreamPointer, Fd),
     {Fd, NewStreamData, Len};
-                         
+
 flush_binary(Fd, Bin) when is_binary(Bin) ->
     with_stream(Fd, fun(OutputStream) ->
         couch_stream:write(OutputStream, Bin)
     end);
-                 
+
 flush_binary(Fd, {StreamFun, undefined}) when is_function(StreamFun) ->
-    with_stream(Fd, fun(OutputStream) -> 
+    with_stream(Fd, fun(OutputStream) ->
         % StreamFun(MaxChunkSize, WriterFun) must call WriterFun
         % once for each chunk of the attachment,
         StreamFun(4096,
@@ -606,19 +606,19 @@ flush_binary(Fd, {StreamFun, undefined}) when is_function(StreamFun) ->
                 couch_stream:write(OutputStream, Bin)
             end, ok)
     end);
-             
+
 flush_binary(Fd, {Fun, Len}) when is_function(Fun) ->
-    with_stream(Fd, fun(OutputStream) -> 
+    with_stream(Fd, fun(OutputStream) ->
         write_streamed_attachment(OutputStream, Fun, Len)
     end).
-            
+
 with_stream(Fd, Fun) ->
     {ok, OutputStream} = couch_stream:open(Fd),
     Fun(OutputStream),
     {StreamInfo, Len} = couch_stream:close(OutputStream),
     {Fd, StreamInfo, Len}.
 
-    
+
 write_streamed_attachment(_Stream, _F, 0) ->
     ok;
 write_streamed_attachment(Stream, F, LenLeft) ->
@@ -656,14 +656,14 @@ changes_since(Db, Style, StartSeq, Fun, Acc) ->
                 Infos = [DocInfo];
             all_docs ->
                 % make each rev it's own doc info
-                Infos = [DocInfo#doc_info{revs=[RevInfo]} || 
+                Infos = [DocInfo#doc_info{revs=[RevInfo]} ||
                     #rev_info{seq=RevSeq}=RevInfo <- Revs, StartSeq < RevSeq]
             end,
             Fun(Infos, Acc2)
         end, Acc).
 
 count_changes_since(Db, SinceSeq) ->
-    {ok, Changes} = 
+    {ok, Changes} =
     couch_btree:fold_reduce(Db#db.docinfo_by_seq_btree,
         SinceSeq + 1, % startkey
         ok, % endkey
@@ -673,7 +673,7 @@ count_changes_since(Db, SinceSeq) ->
         end,
         0),
     Changes.
-    
+
 enum_docs_since(Db, SinceSeq, Direction, InFun, Acc) ->
     couch_btree:fold(Db#db.docinfo_by_seq_btree, SinceSeq + 1, Direction, InFun, Acc).
 
@@ -698,13 +698,13 @@ init({DbName, Filepath, Fd, Options}) ->
 terminate(Reason, _Db) ->
     couch_util:terminate_linked(Reason),
     ok.
-    
+
 handle_call({open_ref_count, OpenerPid}, _, #db{fd_ref_counter=RefCntr}=Db) ->
     ok = couch_ref_counter:add(RefCntr, OpenerPid),
     {reply, {ok, Db}, Db};
-handle_call(is_idle, _From, #db{fd_ref_counter=RefCntr, compactor_pid=Compact, 
+handle_call(is_idle, _From, #db{fd_ref_counter=RefCntr, compactor_pid=Compact,
             waiting_delayed_commit=Delay}=Db) ->
-    % Idle means no referrers. Unless in the middle of a compaction file switch, 
+    % Idle means no referrers. Unless in the middle of a compaction file switch,
     % there are always at least 2 referrers, couch_db_updater and us.
     {reply, (Delay == nil) and (Compact == nil) and (couch_ref_counter:count(RefCntr) == 2), Db};
 handle_call({db_updated, NewDb}, _From, #db{fd_ref_counter=OldRefCntr}) ->
@@ -782,7 +782,7 @@ open_doc_int(Db, #doc_info{id=Id,revs=[RevInfo|_]}=DocInfo, Options) ->
     Doc = make_doc(Db, Id, IsDeleted, Bp, {Pos,[RevId]}),
     {ok, Doc#doc{meta=doc_meta_info(DocInfo, [], Options)}};
 open_doc_int(Db, #full_doc_info{id=Id,rev_tree=RevTree}=FullDocInfo, Options) ->
-    #doc_info{revs=[#rev_info{deleted=IsDeleted,rev=Rev,body_sp=Bp}|_]} = 
+    #doc_info{revs=[#rev_info{deleted=IsDeleted,rev=Rev,body_sp=Bp}|_]} =
         DocInfo = couch_doc:to_doc_info(FullDocInfo),
     {[{_, RevPath}], []} = couch_key_tree:get(RevTree, [Rev]),
     Doc = make_doc(Db, Id, IsDeleted, Bp, RevPath),
@@ -799,11 +799,11 @@ doc_meta_info(#doc_info{high_seq=Seq,revs=[#rev_info{rev=Rev}|RestInfo]}, RevTre
     case lists:member(revs_info, Options) of
     false -> [];
     true ->
-        {[{Pos, RevPath}],[]} = 
+        {[{Pos, RevPath}],[]} =
             couch_key_tree:get_full_key_paths(RevTree, [Rev]),
-        
+
         [{revs_info, Pos, lists:map(
-            fun({Rev1, {true, _Sp, _UpdateSeq}}) -> 
+            fun({Rev1, {true, _Sp, _UpdateSeq}}) ->
                 {Rev1, deleted};
             ({Rev1, {false, _Sp, _UpdateSeq}}) ->
                 {Rev1, available};
@@ -849,7 +849,7 @@ doc_to_tree_simple(Doc, [RevId]) ->
 doc_to_tree_simple(Doc, [RevId | Rest]) ->
     [{RevId, ?REV_MISSING, doc_to_tree_simple(Doc, Rest)}].
 
-    
+
 make_doc(#db{fd=Fd}, Id, Deleted, Bp, RevisionPath) ->
     {BodyData, BinValues} =
     case Bp of
@@ -867,6 +867,6 @@ make_doc(#db{fd=Fd}, Id, Deleted, Bp, RevisionPath) ->
         attachments = BinValues,
         deleted = Deleted
         }.
-    
-    
-    
+
+
+

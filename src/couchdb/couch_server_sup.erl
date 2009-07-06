@@ -83,7 +83,7 @@ start_server(IniFiles) ->
     ok = couch_util:start_driver(LibDir),
 
     BaseChildSpecs =
-    {{one_for_all, 10, 3600}, 
+    {{one_for_all, 10, 3600},
         [{couch_config,
             {couch_server_sup, couch_config_start_link_wrapper, [IniFiles, ConfigPid]},
             permanent,
@@ -130,7 +130,7 @@ start_server(IniFiles) ->
 
 start_primary_services() ->
     supervisor:start_link({local, couch_primary_services}, couch_server_sup,
-        {{one_for_one, 10, 3600}, 
+        {{one_for_one, 10, 3600},
             [{couch_log,
                 {couch_log, start_link, []},
                 permanent,
@@ -168,7 +168,7 @@ start_secondary_services() ->
     DaemonChildSpecs = [
         begin
             {ok, {Module, Fun, Args}} = couch_util:parse_term(SpecStr),
-            
+
             {list_to_atom(Name),
                 {Module, Fun, Args},
                 permanent,

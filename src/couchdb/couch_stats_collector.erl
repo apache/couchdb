@@ -22,7 +22,7 @@
         terminate/2, code_change/3]).
 
 
--export([start/0, stop/0, get/1, 
+-export([start/0, stop/0, get/1,
         increment/1, decrement/1,
         track_process_count/1, track_process_count/2,
         record/2, clear/1,
@@ -38,15 +38,15 @@
 
 start() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-    
+
 stop() ->
     gen_server:call(?MODULE, stop).
 
 get(Key) ->
     case ets:lookup(?HIT_COUNTER_TABLE, Key) of
-        [] -> 
+        [] ->
             case ets:lookup(?ABSOLUTE_VALUE_COUNTER_TABLE, Key) of
-                [] -> 
+                [] ->
                     0;
                 Result2 -> extract_value_from_ets_result(Key, Result2)
             end;
@@ -62,7 +62,7 @@ increment(Key) ->
             ok;
         _ -> ok
     end.
-    
+
 decrement(Key) ->
     case catch ets:update_counter(?HIT_COUNTER_TABLE, Key, -1) of
         {'EXIT', {badarg, _}} ->
@@ -70,7 +70,7 @@ decrement(Key) ->
             ok;
         _ -> ok
     end.
-    
+
 record(Key, Value) ->
     ets:insert(?ABSOLUTE_VALUE_COUNTER_TABLE, {Key, Value}).
 
@@ -78,7 +78,7 @@ clear(Key) ->
     true = ets:delete(?ABSOLUTE_VALUE_COUNTER_TABLE, Key).
 
 all() ->
-    lists:append(ets:tab2list(?HIT_COUNTER_TABLE), 
+    lists:append(ets:tab2list(?HIT_COUNTER_TABLE),
         ets:tab2list(?ABSOLUTE_VALUE_COUNTER_TABLE)).
 
 all(Type) ->
@@ -123,7 +123,7 @@ extract_value_from_ets_result(_Key, Result) ->
 
 
 % Unused gen_server behaviour API functions that we need to declare.
-  
+
 %% @doc Unused
 handle_cast(foo, State) ->
     {noreply, State}.

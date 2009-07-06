@@ -26,9 +26,9 @@ wait() ->
     after
         1000 ->
             throw(timeout_error)
-    end.    
+    end.
 
-test() ->   
+test() ->
     {ok, RefCtr} = couch_ref_counter:start([]),
 
     etap:is(
@@ -67,7 +67,7 @@ test() ->
         2,
         "Droping the doubly added Pid only removes a ref, not a referer."
     ),
-    
+
     couch_ref_counter:drop(RefCtr, ChildPid1),
     etap:is(
         couch_ref_counter:count(RefCtr),
@@ -81,7 +81,7 @@ test() ->
         2,
         "Sanity checking that the Pid was re-added."
     ),
-    
+
     ChildPid1 ! {ping, self()},
     wait(),
     etap:is(

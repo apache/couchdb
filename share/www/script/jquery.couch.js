@@ -92,7 +92,7 @@
           $.ajax({
             type: "POST", url: this.uri + "_compact",
             contentType: "application/json",
-            dataType: "json", data: "", processData: false, 
+            dataType: "json", data: "", processData: false,
             complete: function(req) {
               var resp = $.httpData(req, "json");
               if (req.status == 202) {
@@ -200,7 +200,7 @@
                   });
                 });
               }
-            });            
+            });
           } else {
             alert("please provide an eachApp function for allApps()");
           }

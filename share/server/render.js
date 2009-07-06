@@ -121,7 +121,7 @@ respondWith = function(req, responders) {
     var provides = [];
     for (key in responders) {
       if (mimesByKey[key]) {
-        provides = provides.concat(mimesByKey[key]);        
+        provides = provides.concat(mimesByKey[key]);
       }
     }
     var bestMime = Mimeparse.bestMatch(provides, accept);
@@ -130,7 +130,7 @@ respondWith = function(req, responders) {
     bestKey = req.query.format;
   }
   var rFunc = responders[bestKey || responders.fallback || "html"];
-  if (rFunc) {    
+  if (rFunc) {
     if (isShow) {
       var resp = maybeWrapResponse(rFunc());
       resp["headers"] = resp["headers"] || {};
@@ -141,7 +141,7 @@ respondWith = function(req, responders) {
       respTail = rFunc();
     }
   } else {
-    throw({code:406, body:"Not Acceptable: "+accept});    
+    throw({code:406, body:"Not Acceptable: "+accept});
   }
 };
 
@@ -198,7 +198,7 @@ function sendStart(label) {
   startResp = startResp || {};
   startResp["headers"] = startResp["headers"] || {};
   startResp["headers"]["Content-Type"] = startResp["headers"]["Content-Type"] || respCT;
-  
+
   respond(["start", chunks, startResp]);
   chunks = [];
   startResp = {};
@@ -221,7 +221,7 @@ function getRow() {
     gotRow = true;
     sendStart();
   } else {
-    blowChunks()  
+    blowChunks()
   }
   var line = readline();
   var json = eval(line);
@@ -247,7 +247,7 @@ function getRow() {
 var isShow = false;
 var Render = (function() {
   var row_info;
-  
+
   return {
     show : function(funSrc, doc, req) {
       isShow = true;
@@ -295,11 +295,11 @@ function runListRenderFunction(renderFun, args, funSrc, htmlErrors) {
       getRow();
     }
     if (typeof resp != "undefined") {
-      chunks.push(resp);      
+      chunks.push(resp);
     } else if (respTail) {
-      chunks.push(respTail);      
+      chunks.push(respTail);
     }
-    blowChunks("end");      
+    blowChunks("end");
   } catch(e) {
     respondError(e, funSrc, htmlErrors);
   }

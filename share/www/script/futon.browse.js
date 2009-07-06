@@ -49,7 +49,7 @@
             var dbsOnPage = dbs.slice(offset, offset + maxPerPage);
 
             $.each(dbsOnPage, function(idx, dbName) {
-              $("#databases tbody.content").append("<tr>" + 
+              $("#databases tbody.content").append("<tr>" +
                 "<th><a href='database.html?" + encodeURIComponent(dbName) + "'>" +
                   dbName + "</a></th>" +
                 "<td class='size'></td><td class='count'></td>" +
@@ -504,7 +504,7 @@
             resp.rows = resp.rows.reverse();
           }
           var has_reduce_prev = resp.total_rows === undefined && (descending_reverse ? resp.rows.length > per_page : options.startkey !== undefined);
-          if (resp.rows !== null && (has_reduce_prev || (descending_reverse ? 
+          if (resp.rows !== null && (has_reduce_prev || (descending_reverse ?
             (resp.total_rows - resp.offset > per_page) :
             (resp.offset > 0)))) {
             $("#paging a.prev").attr("href", "#" + (resp.offset - per_page)).click(function() {
@@ -527,8 +527,8 @@
             $("#paging a.prev").removeAttr("href");
           }
           var has_reduce_next = resp.total_rows === undefined && (descending_reverse ? options.startkey !== undefined : resp.rows.length > per_page);
-          if (resp.rows !== null && (has_reduce_next || (descending_reverse ? 
-            (resp.offset - resp.total_rows < per_page) : 
+          if (resp.rows !== null && (has_reduce_next || (descending_reverse ?
+            (resp.offset - resp.total_rows < per_page) :
             (resp.total_rows - resp.offset > per_page)))) {
             $("#paging a.next").attr("href", "#" + (resp.offset + per_page)).click(function() {
               var opt = {
@@ -967,16 +967,16 @@
       }
 
       function _renderAttachmentItem(name, attachment) {
-        var attachmentHref = db.uri + encodeDocId(docId) 
+        var attachmentHref = db.uri + encodeDocId(docId)
           + "/" + encodeAttachment(name);
         var li = $("<li></li>");
         $("<a href='' title='Download file' target='_top'></a>").text(name)
           .attr("href", attachmentHref)
           .wrapInner("<tt></tt>").appendTo(li);
-        $("<span>()</span>").text("" + $.futon.formatSize(attachment.length) + 
+        $("<span>()</span>").text("" + $.futon.formatSize(attachment.length) +
           ", " + attachment.content_type).addClass("info").appendTo(li);
         if (name == "tests.js") {
-          li.find('span.info').append(', <a href="/_utils/couch_tests.html?' 
+          li.find('span.info').append(', <a href="/_utils/couch_tests.html?'
             + attachmentHref + '">open in test runner</a>');
         }
         _initAttachmentItem(name, attachment, li);

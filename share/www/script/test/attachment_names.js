@@ -10,21 +10,21 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-couchTests.attachment_names = function(debug) { 
-  var db = new CouchDB("test_suite_db"); 
-  db.deleteDb(); 
-  db.createDb(); 
-  if (debug) debugger; 
+couchTests.attachment_names = function(debug) {
+  var db = new CouchDB("test_suite_db");
+  db.deleteDb();
+  db.createDb();
+  if (debug) debugger;
 
-  var binAttDoc = { 
-    _id: "bin_doc", 
-    _attachments:{ 
-      "foo\x80txt": { 
-        content_type:"text/plain", 
-        data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ=" 
-      } 
-    } 
-  } 
+  var binAttDoc = {
+    _id: "bin_doc",
+    _attachments:{
+      "foo\x80txt": {
+        content_type:"text/plain",
+        data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+      }
+    }
+  }
 
   // inline attachments
   try {
@@ -38,7 +38,7 @@ couchTests.attachment_names = function(debug) {
 
   // standalone docs
   var bin_data = "JHAPDO*AU£PN ){(3u[d 93DQ9¡€])}    ææøo'∂ƒæ≤çæππ•¥∫¶®#†π¶®¥π€ª®˙π8np";
-  
+
   var xhr = (CouchDB.request("PUT", "/test_suite_db/bin_doc3/attachment\x80txt", {
     headers:{"Content-Type":"text/plain;charset=utf-8"},
     body:bin_data
@@ -64,15 +64,15 @@ couchTests.attachment_names = function(debug) {
 
 
   // leading underscores
-  var binAttDoc = { 
-    _id: "bin_doc2", 
-    _attachments:{ 
-      "_foo.txt": { 
-        content_type:"text/plain", 
-        data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ=" 
-      } 
-    } 
-  } 
+  var binAttDoc = {
+    _id: "bin_doc2",
+    _attachments:{
+      "_foo.txt": {
+        content_type:"text/plain",
+        data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+      }
+    }
+  }
 
   try {
     db.save(binAttDoc);
@@ -80,8 +80,8 @@ couchTests.attachment_names = function(debug) {
   } catch (e) {
     TEquals("bad_request", e.error, "attachment_name: leading underscore");
     TEquals("Attachment name can't start with '_'", e.reason, "attachment_name: leading underscore");
-  }  
-  
+  }
+
   // todo: form uploads, waiting for cmlenz' test case for form uploads
 
 };

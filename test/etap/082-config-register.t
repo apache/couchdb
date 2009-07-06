@@ -24,9 +24,9 @@ test() ->
         "5984",
         "{httpd, port} is 5984 by default."
     ),
-    
+
     ok = couch_config:set("httpd", "port", "4895", false),
-    
+
     etap:is(
         couch_config:get("httpd", "port"),
         "4895",
@@ -46,9 +46,9 @@ test() ->
         end,
         SentinelPid
     ),
-    
+
     ok = couch_config:set("httpd", "port", "8080", false),
-    
+
     % Implicitly checking that we *don't* call the function
     etap:is(
         couch_config:get("httpd", "bind_address"),
@@ -56,7 +56,7 @@ test() ->
         "{httpd, bind_address} is not '0.0.0.0'"
     ),
     ok = couch_config:set("httpd", "bind_address", "0.0.0.0", false),
-    
+
     % Ping-Pong kill process
     SentinelPid ! {ping, self()},
     receive
@@ -71,5 +71,5 @@ test() ->
         "80",
         "Implicitly test that the function got de-registered"
     ),
-   
+
     ok.

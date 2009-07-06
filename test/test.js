@@ -56,7 +56,7 @@ var HTTP = (function() {
     var body = parts.pop();
     var header = parts.pop();
     var headers = header.split(/\n/);
-    
+
     var status = /HTTP\/1.\d (\d*)/.exec(header)[1];
     return {
       responseText: body,
@@ -83,7 +83,7 @@ var HTTP = (function() {
     HEAD : function(url, body, headers) {
       var st, urx = url, hx = (headers || null);
       st = headhttp(urx, hx);
-      return parseCurl(st);      
+      return parseCurl(st);
     },
     DELETE : function(url, body, headers) {
       var st, urx = url, hx = (headers || null);
@@ -202,7 +202,7 @@ function runAllTestsConsole() {
     } else {
       numTests += 1;
       var testFun = couchTests[t];
-      runTestConsole(testFun, debug);      
+      runTestConsole(testFun, debug);
     }
   }
   p("Results: "+numFailures.toString() + " failures in "+numTests+" tests.")

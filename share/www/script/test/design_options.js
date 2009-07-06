@@ -26,7 +26,7 @@ couchTests.design_options = function(debug) {
     language: "javascript",
     options: {
       include_design: true,
-      local_seq: true        
+      local_seq: true
     },
     views: {
       data: {"map": map},
@@ -63,7 +63,7 @@ couchTests.design_options = function(debug) {
   T(db.save(designDoc).ok);
   rows = db.view("bango/data").rows;
   T(rows.length == 0);
-  
+
   // should also have local_seq in the view
   var resp = db.save({});
   rows = db.view("fu/with_seq").rows;

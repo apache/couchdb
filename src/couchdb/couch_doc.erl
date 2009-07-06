@@ -34,7 +34,7 @@ to_json_revisions(Options, Start, RevIds) ->
     case lists:member(revs, Options) of
     false -> [];
     true ->
-        [{<<"_revisions">>, {[{<<"start">>, Start}, 
+        [{<<"_revisions">>, {[{<<"start">>, Start},
                         {<<"ids">>, RevIds}]}}]
     end.
 
@@ -115,10 +115,10 @@ to_json_attachments(Attachments, Options) ->
 
 to_json_obj(#doc{id=Id,deleted=Del,body=Body,revs={Start, RevIds},
             meta=Meta}=Doc,Options)->
-    {[{<<"_id">>, Id}] 
+    {[{<<"_id">>, Id}]
         ++ to_json_rev(Start, RevIds)
         ++ to_json_body(Del, Body)
-        ++ to_json_revisions(Options, Start, RevIds) 
+        ++ to_json_revisions(Options, Start, RevIds)
         ++ to_json_meta(Meta)
         ++ to_json_attachments(Doc#doc.attachments, Options)
     }.
@@ -133,13 +133,13 @@ parse_rev(Rev) when is_binary(Rev) ->
     parse_rev(?b2l(Rev));
 parse_rev(Rev) when is_list(Rev) ->
     SplitRev = lists:splitwith(fun($-) -> false; (_) -> true end, Rev),
-    case SplitRev of 
+    case SplitRev of
         {Pos, [$- | RevId]} -> {list_to_integer(Pos), ?l2b(RevId)};
         _Else -> throw({bad_request, <<"Invalid rev format">>})
     end;
 parse_rev(_BadRev) ->
     throw({bad_request, <<"Invalid rev format">>}).
-    
+
 parse_revs([]) ->
     [];
 parse_revs([Rev | Rest]) ->
@@ -161,20 +161,20 @@ validate_docid(Id) ->
 transfer_fields([], #doc{body=Fields}=Doc) ->
     % convert fields back to json object
     Doc#doc{body={lists:reverse(Fields)}};
-    
+
 transfer_fields([{<<"_id">>, Id} | Rest], Doc) ->
     validate_docid(Id),
     transfer_fields(Rest, Doc#doc{id=Id});
-    
+
 transfer_fields([{<<"_rev">>, Rev} | Rest], #doc{revs={0, []}}=Doc) ->
     {Pos, RevId} = parse_rev(Rev),
     transfer_fields(Rest,
             Doc#doc{revs={Pos, [RevId]}});
-            
+
 transfer_fields([{<<"_rev">>, _Rev} | Rest], Doc) ->
     % we already got the rev from the _revisions
     transfer_fields(Rest,Doc);
-    
+
 transfer_fields([{<<"_attachments">>, {JsonBins}} | Rest], Doc) ->
     Bins = lists:flatmap(fun({Name, {BinProps}}) ->
         case proplists:get_value(<<"stub">>, BinProps) of
@@ -190,7 +190,7 @@ transfer_fields([{<<"_attachments">>, {JsonBins}} | Rest], Doc) ->
         end
     end, JsonBins),
     transfer_fields(Rest, Doc#doc{attachments=Bins});
-    
+
 transfer_fields([{<<"_revisions">>, {Props}} | Rest], Doc) ->
     RevIds = proplists:get_value(<<"ids">>, Props),
     Start = proplists:get_value(<<"start">>, Props),
@@ -204,7 +204,7 @@ transfer_fields([{<<"_revisions">>, {Props}} | Rest], Doc) ->
     [throw({doc_validation, "RevId isn't a string"}) ||
             RevId <- RevIds, not is_binary(RevId)],
     transfer_fields(Rest, Doc#doc{revs={Start, RevIds}});
-    
+
 transfer_fields([{<<"_deleted">>, B} | Rest], Doc) when (B==true) or (B==false) ->
     transfer_fields(Rest, Doc#doc{deleted=B});
 
@@ -222,7 +222,7 @@ transfer_fields([{<<"_deleted_conflicts">>, _} | Rest], Doc) ->
 transfer_fields([{<<"_",Name/binary>>, _} | _], _) ->
     throw({doc_validation,
             ?l2b(io_lib:format("Bad special document member: _~s", [Name]))});
-            
+
 transfer_fields([Field | Rest], #doc{body=Fields}=Doc) ->
     transfer_fields(Rest, Doc#doc{body=[Field|Fields]}).
 
@@ -237,11 +237,11 @@ max_seq([#rev_info{seq=Seq}|Rest], Max) ->
 
 to_doc_info_path(#full_doc_info{id=Id,rev_tree=Tree}) ->
     RevInfosAndPath =
-        [{#rev_info{deleted=Del,body_sp=Bp,seq=Seq,rev={Pos,RevId}}, Path} || 
-            {{Del, Bp, Seq},{Pos, [RevId|_]}=Path} <- 
+        [{#rev_info{deleted=Del,body_sp=Bp,seq=Seq,rev={Pos,RevId}}, Path} ||
+            {{Del, Bp, Seq},{Pos, [RevId|_]}=Path} <-
             couch_key_tree:get_all_leafs(Tree)],
     SortedRevInfosAndPath = lists:sort(
-            fun({#rev_info{deleted=DeletedA,rev=RevA}, _PathA}, 
+            fun({#rev_info{deleted=DeletedA,rev=RevA}, _PathA},
                 {#rev_info{deleted=DeletedB,rev=RevB}, _PathB}) ->
             % sort descending by {not deleted, rev}
             {not DeletedA, RevA} > {not DeletedB, RevB}
@@ -282,7 +282,7 @@ get_validate_doc_fun(#doc{body={Props}}) ->
                     Lang, FunSrc, EditDoc, DiskDoc, Ctx)
         end
     end.
-        
+
 
 has_stubs(#doc{attachments=Bins}) ->
     has_stubs(Bins);

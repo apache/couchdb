@@ -44,14 +44,14 @@ couchTests.attachment_paths = function(debug) {
     // lets try it with an escaped attachment id...
     // weird that it's at two urls
     var xhr = CouchDB.request("GET", "/"+dbName+"/bin_doc/foo%2Fbar.txt");
-    T(xhr.status == 200); 
+    T(xhr.status == 200);
     // xhr.responseText == "This is a base64 encoded text"
 
     var xhr = CouchDB.request("GET", "/"+dbName+"/bin_doc/foo/baz.txt");
     T(xhr.status == 404);
 
     var xhr = CouchDB.request("GET", "/"+dbName+"/bin_doc/foo%252Fbaz.txt");
-    T(xhr.status == 200); 
+    T(xhr.status == 200);
     T(xhr.responseText == "We like percent two F.");
 
     // require a _rev to PUT
@@ -59,7 +59,7 @@ couchTests.attachment_paths = function(debug) {
       headers:{"Content-Type":"text/plain;charset=utf-8"},
       body:"Just some text"
     });
-    T(xhr.status == 409);    
+    T(xhr.status == 409);
 
     var xhr = CouchDB.request("PUT", "/"+dbName+"/bin_doc/foo/bar2.txt?rev=" + binAttDoc._rev, {
       body:"This is no base64 encoded text",
@@ -77,7 +77,7 @@ couchTests.attachment_paths = function(debug) {
     T(binAttDoc._attachments["foo/bar2.txt"].length == 30);
 
     //// now repeat the while thing with a design doc
-  
+
     // first just save a regular doc with an attachment that has a slash in the url.
     // (also gonna run an encoding check case)
     var binAttDoc = {
@@ -120,7 +120,7 @@ couchTests.attachment_paths = function(debug) {
     T(xhr.status == 404);
 
     var xhr = CouchDB.request("GET", "/"+dbName+"/_design%2Fbin_doc/foo%252Fbaz.txt");
-    T(xhr.status == 200); 
+    T(xhr.status == 200);
     T(xhr.responseText == "We like percent two F.");
 
     // require a _rev to PUT
@@ -128,7 +128,7 @@ couchTests.attachment_paths = function(debug) {
       headers:{"Content-Type":"text/plain;charset=utf-8"},
       body:"Just some text"
     });
-    T(xhr.status == 409);    
+    T(xhr.status == 409);
 
     var xhr = CouchDB.request("PUT", "/"+dbName+"/_design%2Fbin_doc/foo/bar2.txt?rev=" + binAttDoc._rev, {
       body:"This is no base64 encoded text",

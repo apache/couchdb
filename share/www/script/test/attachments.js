@@ -33,7 +33,7 @@ couchTests.attachments= function(debug) {
   T(xhr.responseText == "This is a base64 encoded text");
   T(xhr.getResponseHeader("Content-Type") == "text/plain");
   T(xhr.getResponseHeader("Etag") == '"' + save_response.rev + '"');
-  
+
   // empty attachment
   var binAttDoc2 = {
     _id: "bin_doc2",
@@ -70,7 +70,7 @@ couchTests.attachments= function(debug) {
   var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc2/foo2.txt");
   T(xhr.responseText == "This is no base64 encoded text");
   T(xhr.getResponseHeader("Content-Type") == "text/plain;charset=utf-8");
-  
+
   // test without rev, should fail
   var xhr = CouchDB.request("DELETE", "/test_suite_db/bin_doc2/foo2.txt");
   T(xhr.status == 409);
@@ -78,8 +78,8 @@ couchTests.attachments= function(debug) {
   // test with rev, should not fail
   var xhr = CouchDB.request("DELETE", "/test_suite_db/bin_doc2/foo2.txt?rev=" + rev);
   T(xhr.status == 200);
-  
-  
+
+
   // test binary data
   var bin_data = "JHAPDO*AU£PN ){(3u[d 93DQ9¡€])}    ææøo'∂ƒæ≤çæππ•¥∫¶®#†π¶®¥π€ª®˙π8np";
   var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc3/attachment.txt", {
@@ -88,11 +88,11 @@ couchTests.attachments= function(debug) {
   });
   T(xhr.status == 201);
   var rev = JSON.parse(xhr.responseText).rev;
-  
+
   var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc3/attachment.txt");
   T(xhr.responseText == bin_data);
   T(xhr.getResponseHeader("Content-Type") == "text/plain;charset=utf-8");
-  
+
   var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc3/attachment.txt", {
     headers:{"Content-Type":"text/plain;charset=utf-8"},
     body:bin_data
@@ -116,7 +116,7 @@ couchTests.attachments= function(debug) {
 
   var xhr = CouchDB.request("DELETE", "/test_suite_db/bin_doc3/attachment.txt?rev=" + rev);
   T(xhr.status == 200);
-  
+
   var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc3/attachment.txt");
   T(xhr.status == 404);
 
@@ -137,7 +137,7 @@ couchTests.attachments= function(debug) {
   var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc4/attachment.txt");
   T(xhr.status == 200);
   T(xhr.responseText.length == 0);
-  
+
   // overwrite previsously empty attachment
   var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc4/attachment.txt?rev=" + rev, {
     headers:{"Content-Type":"text/plain;charset=utf-8"},
@@ -148,8 +148,8 @@ couchTests.attachments= function(debug) {
   var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc4/attachment.txt");
   T(xhr.status == 200);
   T(xhr.responseText == "This is a string");
-  
-  
+
+
   // Attachment sparseness COUCHDB-220
 
   var docs = []
@@ -167,7 +167,7 @@ couchTests.attachments= function(debug) {
   }
 
   db.bulkSave(docs);
-  
+
   var before = db.info().disk_size;
 
   // Compact it.
@@ -175,14 +175,14 @@ couchTests.attachments= function(debug) {
   T(db.last_req.status == 202);
   // compaction isn't instantaneous, loop until done
   while (db.info().compact_running) {};
-  
+
   var after = db.info().disk_size;
-  
+
   // Compaction should reduce the database slightly, but not
   // orders of magnitude (unless attachments introduce sparseness)
   T(after > before * 0.1, "before: " + before + " after: " + after);
-  
-  
+
+
   // test large attachments - COUCHDB-366
   var lorem = CouchDB.request("GET", "/_utils/script/test/lorem.txt").responseText;
 

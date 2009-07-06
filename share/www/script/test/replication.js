@@ -35,7 +35,7 @@ couchTests.replication = function(debug) {
     dbA.createDb();
     dbB.deleteDb();
     dbB.createDb();
-    
+
     var repTests = {
       // copy and paste and put your code in. delete unused steps.
       test_template: new function () {
@@ -49,20 +49,20 @@ couchTests.replication = function(debug) {
           // called after replicating src=B  tgt=A first time.
         };
         this.afterAB2 = function(dbA, dbB) {
-          // called after replicating src=A  tgt=B second time. 
+          // called after replicating src=A  tgt=B second time.
         };
         this.afterBA2 = function(dbA, dbB) {
           // etc...
         };
       },
-      
+
       simple_test: new function () {
         this.init = function(dbA, dbB) {
           var docs = makeDocs(0, numDocs);
           dbA.bulkSave(docs);
         };
-      
-        this.afterAB1 = function(dbA, dbB) {          
+
+        this.afterAB1 = function(dbA, dbB) {
           for (var j = 0; j < numDocs; j++) {
             var docA = dbA.open("" + j);
             var docB = dbB.open("" + j);
@@ -70,13 +70,13 @@ couchTests.replication = function(debug) {
           }
         };
       },
-    
+
      deletes_test: new function () {
         // make sure deletes are replicated
         this.init = function(dbA, dbB) {
           T(dbA.save({_id:"foo1",value:"a"}).ok);
         };
-        
+
         this.afterAB1 = function(dbA, dbB) {
           var docA = dbA.open("foo1");
           var docB = dbB.open("foo1");
@@ -84,13 +84,13 @@ couchTests.replication = function(debug) {
 
           dbA.deleteDoc(docA);
         };
-        
+
         this.afterAB2 = function(dbA, dbB) {
           T(dbA.open("foo1") == null);
           T(dbB.open("foo1") == null);
         };
       },
-      
+
       deleted_test : new function() {
         // docs created and deleted on a single node are also replicated
         this.init = function(dbA, dbB) {
@@ -98,7 +98,7 @@ couchTests.replication = function(debug) {
           var docA = dbA.open("del1");
           dbA.deleteDoc(docA);
         };
-        
+
         this.afterAB1 = function(dbA, dbB) {
           var rows = dbB.allDocsBySeq().rows;
           var rowCnt = 0;
@@ -111,13 +111,13 @@ couchTests.replication = function(debug) {
           T(rowCnt == 1);
         };
       },
-      
+
       slashes_in_ids_test: new function () {
         // make sure docs with slashes in id replicate properly
         this.init = function(dbA, dbB) {
           dbA.save({ _id:"abc/def", val:"one" });
         };
-        
+
         this.afterAB1 = function(dbA, dbB) {
           var docA = dbA.open("abc/def");
           var docB = dbB.open("abc/def");
@@ -137,7 +137,7 @@ couchTests.replication = function(debug) {
           T(docA._rev == docB._rev);
         };
       },
-    
+
       attachments_test: new function () {
         // Test attachments
         this.init = function(dbA, dbB) {
@@ -161,34 +161,34 @@ couchTests.replication = function(debug) {
             }
           });
         };
-        
+
         this.afterAB1 = function(dbA, dbB) {
-          var xhr = CouchDB.request("GET", 
+          var xhr = CouchDB.request("GET",
             "/test_suite_db_a/bin_doc/foo%2Bbar.txt");
           T(xhr.responseText == "This is a base64 encoded text")
 
-          xhr = CouchDB.request("GET", 
+          xhr = CouchDB.request("GET",
             "/test_suite_db_b/bin_doc/foo%2Bbar.txt");
           T(xhr.responseText == "This is a base64 encoded text")
 
           // and the design-doc
-          xhr = CouchDB.request("GET", 
+          xhr = CouchDB.request("GET",
             "/test_suite_db_a/_design/with_bin/foo%2Bbar.txt");
           T(xhr.responseText == "This is a base64 encoded text")
 
-          xhr = CouchDB.request("GET", 
+          xhr = CouchDB.request("GET",
             "/test_suite_db_b/_design/with_bin/foo%2Bbar.txt");
           T(xhr.responseText == "This is a base64 encoded text")
         };
       },
-      
+
       conflicts_test: new function () {
         // test conflicts
         this.init = function(dbA, dbB) {
           dbA.save({_id:"foo",value:"a"});
           dbB.save({_id:"foo",value:"b"});
         };
-        
+
         this.afterBA1 = function(dbA, dbB) {
           var docA = dbA.open("foo", {conflicts: true});
           var docB = dbB.open("foo", {conflicts: true});
@@ -202,7 +202,7 @@ couchTests.replication = function(debug) {
           // delete a conflict.
           dbA.deleteDoc({_id:"foo", _rev:docA._conflicts[0]});
         };
-        
+
         this.afterBA2 = function(dbA, dbB) {
           // open documents and include the conflict meta data
           var docA = dbA.open("foo", {conflicts: true});
@@ -223,7 +223,7 @@ couchTests.replication = function(debug) {
     }
 
     var result = CouchDB.replicate(A, B);
-    
+
     var seqA = result.source_last_seq;
     T(0 == result.history[0].start_last_seq);
     T(result.history[1] === undefined)
@@ -233,7 +233,7 @@ couchTests.replication = function(debug) {
     }
 
     result = CouchDB.replicate(B, A);
-    
+
     var seqB = result.source_last_seq;
     T(0 == result.history[0].start_last_seq);
     T(result.history[1] === undefined)
@@ -243,14 +243,14 @@ couchTests.replication = function(debug) {
     }
 
     var result2 = CouchDB.replicate(A, B);
-    
+
     // each successful replication produces a new session id
     T(result2.session_id != result.session_id);
-    
+
     T(seqA < result2.source_last_seq);
     T(seqA == result2.history[0].start_last_seq);
     T(result2.history[1].end_last_seq == seqA)
-    
+
     seqA = result2.source_last_seq;
 
     for(test in repTests) {
@@ -258,17 +258,17 @@ couchTests.replication = function(debug) {
     }
 
     result = CouchDB.replicate(B, A)
-    
+
     T(seqB < result.source_last_seq);
     T(seqB == result.history[0].start_last_seq);
     T(result.history[1].end_last_seq == seqB)
-    
+
     seqB = result.source_last_seq;
 
     for(test in repTests) {
       if(repTests[test].afterBA2) repTests[test].afterBA2(dbA, dbB);
     }
-    
+
     // do an replication where nothing has changed
     result2 = CouchDB.replicate(B, A);
     T(result2.no_changes == true);

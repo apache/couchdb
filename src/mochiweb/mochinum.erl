@@ -40,7 +40,7 @@ digits(Float) ->
         _ ->
             R
     end.
-    
+
 %% @spec frexp(F::float()) -> {Frac::float(), Exp::float()}
 %% @doc  Return the fractional and exponent part of an IEEE 754 double,
 %%       equivalent to the libc function of the same name.
@@ -205,7 +205,7 @@ generate(R0, S, MPlus, MMinus, LowOk, HighOk) ->
             end
     end.
 
-unpack(Float) ->    
+unpack(Float) ->
     <<Sign:1, Exp:11, Frac:52>> = <<Float:64/float>>,
     {Sign, Exp, Frac}.
 
@@ -243,7 +243,7 @@ test_int_ceil() ->
     -1 = int_ceil(-1.5),
     -2 = int_ceil(-2.0),
     ok.
-    
+
 test_int_pow() ->
     1 = int_pow(1, 1),
     1 = int_pow(1, 0),
@@ -252,7 +252,7 @@ test_int_pow() ->
     100 = int_pow(10, 2),
     1000 = int_pow(10, 3),
     ok.
-    
+
 test_digits() ->
     "0" = digits(0),
     "0.0" = digits(0.0),

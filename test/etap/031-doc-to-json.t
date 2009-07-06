@@ -22,7 +22,7 @@ main(_) ->
 test() ->
     ok = test_to_json_success(),
     ok.
-    
+
 test_to_json_success() ->
     Cases = [
         {
@@ -92,7 +92,7 @@ test_to_json_success() ->
         {
             #doc{meta=[{deleted_conflicts, [{10923, <<"big_cowboy_hat">>}]}]},
             {[
-                {<<"_id">>, <<>>}, 
+                {<<"_id">>, <<>>},
                 {<<"_deleted_conflicts">>, [<<"10923-big_cowboy_hat">>]}
             ]},
             "_deleted_conflicsts is added as an array of strings."

@@ -19,7 +19,7 @@
 %% @doc Run tests for this module.
 test() ->
     H = ?MODULE:make([{hdr, foo}, {"Hdr", "bar"}, {'Hdr', 2}]),
-    [{hdr, "foo, bar, 2"}] = ?MODULE:to_list(H), 
+    [{hdr, "foo, bar, 2"}] = ?MODULE:to_list(H),
     H1 = ?MODULE:insert(taco, grande, H),
     [{hdr, "foo, bar, 2"}, {taco, "grande"}] = ?MODULE:to_list(H1),
     H2 = ?MODULE:make([{"Set-Cookie", "foo"}]),
@@ -69,7 +69,7 @@ default_from_list(List, T) ->
 
 %% @spec to_list(headers()) -> [{key(), string()}]
 %% @doc Return the contents of the headers. The keys will be the exact key
-%%      that was first inserted (e.g. may be an atom or binary, case is 
+%%      that was first inserted (e.g. may be an atom or binary, case is
 %%      preserved).
 to_list(T) ->
     F = fun ({K, {array, L}}, Acc) ->

@@ -1,7 +1,7 @@
 % couch_config_writer module test suote
 
 % Set up test suite
-% ?MODULE_test() returns a list of functions 
+% ?MODULE_test() returns a list of functions
 % that run the actual tests.
 % todo, fix replace_existing_variable2 (i.e. reordering)
 couch_config_writer_test() ->
@@ -186,12 +186,12 @@ run_operation_and_compare_results(Contents, Expect, Config) ->
 
     % call replace function
     [couch_config_writer:save_to_file(ConfigVar, Filename) || ConfigVar <- Config],
-    
+
     % compare new file with expected file
     {ok, Result_} = file:read_file(Filename),
     Result = binary_to_list(Result_),
 
     % clean up
     % file:delete(Filename),
-    
+
     Result = Expect.

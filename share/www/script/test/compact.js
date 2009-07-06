@@ -43,7 +43,7 @@ couchTests.compact = function(debug) {
   T(db.last_req.status == 202);
   // compaction isn't instantaneous, loop until done
   while (db.info().compact_running) {};
-  
+
   T(db.ensureFullCommit().ok);
   restartServer();
   var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt");
@@ -51,5 +51,5 @@ couchTests.compact = function(debug) {
   T(xhr.getResponseHeader("Content-Type") == "text/plain")
   T(db.info().doc_count == 1);
   T(db.info().disk_size < deletesize);
-  
+
 };

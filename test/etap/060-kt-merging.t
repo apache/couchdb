@@ -28,7 +28,7 @@ test() ->
     Stemmed1a = [{1, {"1a", "bar", [{"1aa", "bar", []}]}}],
     Stemmed1aa = [{2, {"1aa", "bar", []}}],
     Stemmed1bb = [{2, {"1bb", "boo", []}}],
-    
+
     etap:is(
         {EmptyTree, no_conflicts},
         couch_key_tree:merge(EmptyTree, EmptyTree),
@@ -69,7 +69,7 @@ test() ->
         {TwoChildSibs, no_conflicts},
         couch_key_tree:merge(TwoChildSibs, TwoChildSibs),
         "Merging a tree to itself is itself."),
-    
+
     etap:is(
         {TwoChildSibs, no_conflicts},
         couch_key_tree:merge(TwoChildSibs, Stemmed1b),
@@ -87,7 +87,7 @@ test() ->
         couch_key_tree:merge(TwoChildSibs2, Stemmed1bb),
         "Merging a stem at a deeper level."
     ),
-    
+
     etap:is(
         {TwoChildSibs2, no_conflicts},
         couch_key_tree:merge(Stemmed1bb, TwoChildSibs2),
@@ -118,11 +118,11 @@ test() ->
         couch_key_tree:merge(OneChild, Stemmed1aa),
         "Merging should create conflicts."
     ),
-    
+
     etap:is(
         {TwoChild, no_conflicts},
         couch_key_tree:merge(Expect1, TwoChild),
         "Merge should have no conflicts."
     ),
-  
+
     ok.

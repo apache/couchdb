@@ -106,7 +106,7 @@ ipv6_supported() ->
 
 init(State=#mochiweb_socket_server{ip=Ip, port=Port, backlog=Backlog}) ->
     process_flag(trap_exit, true),
-    BaseOpts = [binary, 
+    BaseOpts = [binary,
                 {reuseaddr, true},
                 {packet, 0},
                 {backlog, Backlog},
@@ -126,7 +126,7 @@ init(State=#mochiweb_socket_server{ip=Ip, port=Port, backlog=Backlog}) ->
     end,
     case gen_tcp_listen(Port, Opts, State) of
         {stop, eacces} ->
-            case Port < 1024 of 
+            case Port < 1024 of
                 true ->
                     case fdsrv:start() of
                         {ok, _} ->
@@ -150,7 +150,7 @@ gen_tcp_listen(Port, Opts, State) ->
     case gen_tcp:listen(Port, Opts) of
         {ok, Listen} ->
             {ok, ListenPort} = inet:port(Listen),
-            {ok, new_acceptor(State#mochiweb_socket_server{listen=Listen, 
+            {ok, new_acceptor(State#mochiweb_socket_server{listen=Listen,
                                                            port=ListenPort})};
         {error, Reason} ->
             {stop, Reason}
@@ -183,11 +183,11 @@ acceptor_loop({Server, Listen, Loop}) ->
                lists:flatten(io_lib:format("~p", [Other]))]),
             exit({error, accept_failed})
     end.
-            
+
 
 do_get(port, #mochiweb_socket_server{port=Port}) ->
     Port.
-    
+
 handle_call({get, Property}, _From, State) ->
     Res = do_get(Property, State),
     {reply, Res, State};
@@ -205,7 +205,7 @@ handle_cast(stop, State) ->
 
 terminate(_Reason, #mochiweb_socket_server{listen=Listen, port=Port}) ->
     gen_tcp:close(Listen),
-    case Port < 1024 of 
+    case Port < 1024 of
         true ->
             catch fdsrv:stop(),
             ok;
@@ -228,7 +228,7 @@ handle_info({'EXIT', Pid, Reason},
     {noreply, new_acceptor(State)};
 handle_info({'EXIT', _LoopPid, Reason},
             State=#mochiweb_socket_server{acceptor=Pid, max=Max}) ->
-    case Reason of 
+    case Reason of
         normal ->
             ok;
         _ ->

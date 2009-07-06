@@ -51,10 +51,10 @@
 	       }).
 
 -record(request, {url, method, options, from,
-		  stream_to, caller_controls_socket = false, 
+		  stream_to, caller_controls_socket = false,
 		  req_id,
 		  stream_chunk_size,
-		  save_response_to_file = false, 
+		  save_response_to_file = false,
 		  tmp_file_name, tmp_file_fd,
 		  response_format}).
 
@@ -338,7 +338,7 @@ accumulate_response(Data, #state{reply_buffer = RepBuf,
 	    State#state{reply_buffer = RepBuf_1};
 	_ when Caller_controls_socket == true ->
 	    do_interim_reply(StreamTo, Response_format, ReqId, RepBuf_1),
-	    State#state{reply_buffer = <<>>, 
+	    State#state{reply_buffer = <<>>,
 			streamed_size = Streamed_size + size(RepBuf_1)};
 	_ when New_data_size >= Stream_chunk_size ->
 	    {Stream_chunk, Rem_data} = split_binary(RepBuf_1, Stream_chunk_size),
@@ -514,7 +514,7 @@ send_req_1(From,
 	    {Caller, once} when is_pid(Caller) or
 				is_atom(Caller) ->
 		Async_pid_rec = {{req_id_pid, ReqId}, self()},
-		true = ets:insert(ibrowse_stream, Async_pid_rec), 
+		true = ets:insert(ibrowse_stream, Async_pid_rec),
 		{Caller, true};
 	    undefined ->
 		{undefined, false};
@@ -869,7 +869,7 @@ is_connection_closing(_, _)                -> false.
 
 %% This clause determines the chunk size when given data from the beginning of the chunk
 parse_11_response(DataRecvd,
-		  #state{transfer_encoding=chunked, 
+		  #state{transfer_encoding=chunked,
 			 chunk_size=chunk_start,
 			 chunk_size_buffer = Chunk_sz_buf
 			} = State) ->
@@ -899,7 +899,7 @@ parse_11_response(DataRecvd,
 %% This clause is to remove the CRLF between two chunks
 %%
 parse_11_response(DataRecvd,
-		  #state{transfer_encoding = chunked, 
+		  #state{transfer_encoding = chunked,
 			 chunk_size = tbd,
 			 chunk_size_buffer = Buf}=State) ->
     case scan_crlf(Buf, DataRecvd) of
@@ -916,7 +916,7 @@ parse_11_response(DataRecvd,
 
 %% This clause deals with the end of a chunked transfer
 parse_11_response(DataRecvd,
-		  #state{transfer_encoding = chunked, chunk_size = 0, 
+		  #state{transfer_encoding = chunked, chunk_size = 0,
 			 cur_req = CurReq,
 			 deleted_crlf = DelCrlf,
 			 reply_buffer = Trailer, reqs = Reqs}=State) ->
@@ -1449,7 +1449,7 @@ get_stream_chunk_size(Options) ->
 	    ?DEFAULT_STREAM_CHUNK_SIZE
     end.
 
-get_inac_timeout(#state{cur_req = #request{options = Opts}}) ->	
+get_inac_timeout(#state{cur_req = #request{options = Opts}}) ->
     get_value(inactivity_timeout, Opts, infinity);
 get_inac_timeout(#state{cur_req = undefined}) ->
     infinity.

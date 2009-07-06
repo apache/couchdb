@@ -1,7 +1,7 @@
 %%%-------------------------------------------------------------------
 %%% File    : ibrowse_sup.erl
 %%% Author  : Chandrashekhar Mullaparthi <chandrashekhar.mullaparthi@t-mobile.co.uk>
-%%% Description : 
+%%% Description :
 %%%
 %%% Created : 15 Oct 2003 by Chandrashekhar Mullaparthi <chandrashekhar.mullaparthi@t-mobile.co.uk>
 %%%-------------------------------------------------------------------
@@ -53,7 +53,7 @@ start_link() ->
 %% Func: init/1
 %% Returns: {ok,  {SupFlags,  [ChildSpec]}} |
 %%          ignore                          |
-%%          {error, Reason}   
+%%          {error, Reason}
 %%--------------------------------------------------------------------
 init([]) ->
     AChild = {ibrowse,{ibrowse,start_link,[]},

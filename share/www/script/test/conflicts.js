@@ -41,7 +41,7 @@ couchTests.conflicts = function(debug) {
   } catch (e) {
     T(e.error == "conflict");
   }
-   
+
   var bySeq = db.allDocsBySeq();
 
   T( bySeq.rows.length == 1)

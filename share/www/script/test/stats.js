@@ -76,7 +76,7 @@ couchTests.stats = function(debug) {
         })
     },
  };
-  
+
   var request_count_tests = {
    'should increase the request count for every request': function(name) {
      var requests = requestStatsTest("httpd", "requests").current + 1;
@@ -88,7 +88,7 @@ couchTests.stats = function(debug) {
      TEquals(requests + 1, new_requests, name);
    }
  };
- 
+
  var database_read_count_tests = {
    'should increase database reads counter when a document is read': function(name) {
      var db = new CouchDB("test_suite_db");
@@ -186,7 +186,7 @@ couchTests.stats = function(debug) {
      TEquals(reads + 1 , new_reads, name);
    }
  };
- 
+
  var http_requests_by_method_tests = {
    'should count GET requests': function(name) {
      var requests = requestStatsTest("httpd_request_methods", "GET").current;
@@ -199,7 +199,7 @@ couchTests.stats = function(debug) {
      CouchDB.request("POST", "/");
      var new_requests = requestStatsTest("httpd_request_methods", "GET").current;
 
-     TEquals(requests + 1, new_requests, name);        
+     TEquals(requests + 1, new_requests, name);
    },
    'should count POST requests': function(name) {
      var requests = requestStatsTest("httpd_request_methods", "POST").current;
@@ -229,7 +229,7 @@ couchTests.stats = function(debug) {
 
      var doc = {"_id":"test"};
      db.save(doc);
-     
+
      var updates = requestStatsTest("couchdb", "database_writes").current;
      db.save(doc);
      var new_updates = requestStatsTest("couchdb", "database_writes").current;
@@ -243,7 +243,7 @@ couchTests.stats = function(debug) {
 
      var doc = {"_id":"test"};
      db.save(doc);
-     
+
      var deletes = requestStatsTest("couchdb", "database_writes").current;
      db.deleteDoc(doc);
      var new_deletes = requestStatsTest("couchdb", "database_writes").current;
@@ -275,7 +275,7 @@ couchTests.stats = function(debug) {
 
      var docs = makeDocs(5);
      db.bulkSave(docs);
-     
+
      var new_bulks = requestStatsTest("httpd", "bulk_requests").current;
 
      TEquals(bulks + 1, new_bulks, name);
@@ -378,7 +378,7 @@ couchTests.stats = function(debug) {
      var options = {};
      options.headers = {"Accept": "application/json"};
      var summary = JSON.parse(CouchDB.request("GET", "/_stats", options).responseText);
-     var aggregates = ["mean", "min", "max", "stddev", 
+     var aggregates = ["mean", "min", "max", "stddev",
        "current"];
 
      for(var i in aggregates) {
@@ -386,12 +386,12 @@ couchTests.stats = function(debug) {
      }
    }
  };
- 
+
    var tests = [
      open_databases_tests,
-     request_count_tests, 
-     database_read_count_tests, 
-     view_read_count_tests, 
+     request_count_tests,
+     database_read_count_tests,
+     view_read_count_tests,
      http_requests_by_method_tests,
      document_write_count_tests,
      response_codes_tests,
@@ -404,7 +404,7 @@ couchTests.stats = function(debug) {
        tests[testGroup][test](test);
      }
    };
- 
+
    function createAndRequestView(db) {
      var designDoc = {
        _id:"_design/test", // turn off couch.js id escaping?
@@ -414,7 +414,7 @@ couchTests.stats = function(debug) {
        }
      };
      db.save(designDoc);
- 
+
      db.view("test/all_docs_twice");
    }
 
@@ -422,4 +422,3 @@ couchTests.stats = function(debug) {
      return CouchDB.requestStats(module, key, true);
    }
 }
- 

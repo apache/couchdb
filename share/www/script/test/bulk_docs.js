@@ -34,7 +34,7 @@ couchTests.bulk_docs = function(debug) {
   T(results.length == 5);
   for (i = 0; i < 5; i++) {
     T(results[i].id == i.toString());
-    
+
     // set the delete flag to delete the docs in the next step
     docs[i]._deleted = true;
   }
@@ -72,7 +72,7 @@ couchTests.bulk_docs = function(debug) {
   // Now save the bulk docs, When we use all_or_nothing, we don't get conflict
   // checking, all docs are saved regardless of conflict status, or none are
   // saved.
-  results = db.bulkSave(docs,{all_or_nothing:true});  
+  results = db.bulkSave(docs,{all_or_nothing:true});
   T(results.error === undefined);
 
   var doc = db.open("0", {conflicts:true});
@@ -88,8 +88,8 @@ couchTests.bulk_docs = function(debug) {
 
   T(results[0].id != "");
   T(results[0].rev != "");
-  
-  
+
+
   // Regression test for failure on update/delete
   var newdoc = {"_id": "foobar", "body": "baz"};
   T(db.save(newdoc).ok);

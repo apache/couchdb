@@ -15,11 +15,11 @@ couchTests.reduce_builtin = function(debug) {
   db.deleteDb();
   db.createDb();
   if (debug) debugger;
-  
+
   var numDocs = 500
   var docs = makeDocs(1,numDocs + 1);
   db.bulkSave(docs);
-  
+
   var summate = function(N) {return (N+1)*N/2;};
 
   // this is the same test as the reduce.js test
@@ -42,7 +42,7 @@ couchTests.reduce_builtin = function(debug) {
   T(result.rows[0].value == 18);
   result = db.query(map, "_count", {startkey: 4, endkey: 5});
   T(result.rows[0].value == 4);
-  
+
   result = db.query(map, "_sum", {startkey: 4, endkey: 6});
   T(result.rows[0].value == 30);
   result = db.query(map, "_count", {startkey: 4, endkey: 6});
@@ -57,7 +57,7 @@ couchTests.reduce_builtin = function(debug) {
     result = db.query(map, "_sum", {startkey: i, endkey: numDocs - i});
     T(result.rows[0].value == 2*(summate(numDocs-i) - summate(i-1)));
   }
-  
+
   db.deleteDb();
   db.createDb();
 
@@ -88,7 +88,7 @@ couchTests.reduce_builtin = function(debug) {
     for (var b=0; b < builtins.length; b++) {
       var fun = builtins[b];
       var results = db.query(map, fun, {group:true});
-      
+
       //group by exact key match
       T(equals(results.rows[0], {key:["a"],value:20*i}));
       T(equals(results.rows[1], {key:["a","b"],value:20*i}));
@@ -114,6 +114,6 @@ couchTests.reduce_builtin = function(debug) {
       T(equals(results.rows[4], {key:["d","a"],value:10*i}));
       T(equals(results.rows[5], {key:["d","b"],value:10*i}));
       T(equals(results.rows[6], {key:["d","c"],value:10*i}));
-    };    
+    };
   }
 }

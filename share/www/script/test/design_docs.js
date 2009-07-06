@@ -74,16 +74,16 @@ function() {
     T(db.ensureFullCommit().ok);
     restartServer();
   };
-    
+
   // test when language not specified, Javascript is implied
   var designDoc2 = {
     _id:"_design/test2",
-    // language: "javascript", 
+    // language: "javascript",
     views: {
       single_doc: {map: "function(doc) { if (doc._id == \"1\") { emit(1, null) }}"}
     }
   };
-  
+
   T(db.save(designDoc2).ok);
   T(db.view("test2/single_doc").total_rows == 1);
 
@@ -113,14 +113,14 @@ function() {
   T(db.deleteDoc(designDoc).ok);
   T(db.open(designDoc._id) == null);
   T(db.view("test/no_docs") == null);
-  
+
   T(db.ensureFullCommit().ok);
   restartServer();
   T(db.open(designDoc._id) == null);
   T(db.view("test/no_docs") == null);
-  
+
   // trigger ddoc cleanup
   T(db.viewCleanup().ok);
-  
+
 });
 };

@@ -1,6 +1,6 @@
 %%% File    : ibrowse_lib.erl
 %%% Author  : Chandrashekhar Mullaparthi <chandrashekhar.mullaparthi@t-mobile.co.uk>
-%%% Description : 
+%%% Description :
 %%% Created : 27 Feb 2004 by Chandrashekhar Mullaparthi <chandrashekhar.mullaparthi@t-mobile.co.uk>
 %% @doc Module with a few useful functions
 
@@ -110,7 +110,7 @@ month_int("Oct") -> 10;
 month_int("Nov") -> 11;
 month_int("Dec") -> 12.
 
-%% @doc Given a status code, returns an atom describing the status code. 
+%% @doc Given a status code, returns an atom describing the status code.
 %% @spec status_code(StatusCode::status_code()) -> StatusDescription
 %% status_code() = string() | integer()
 %% StatusDescription = atom()
@@ -271,7 +271,7 @@ parse_url([$:, $/, $/ | _], get_protocol, Url, []) ->
     {invalid_uri_1, Url};
 parse_url([$:, $/, $/ | T], get_protocol, Url, TmpAcc) ->
     Prot = list_to_atom(lists:reverse(TmpAcc)),
-    parse_url(T, get_username, 
+    parse_url(T, get_username,
 	      Url#url{protocol = Prot},
 	      []);
 parse_url([$/ | T], get_username, Url, TmpAcc) ->
@@ -285,16 +285,16 @@ parse_url([$: | T], get_username, Url, TmpAcc) ->
     %% a username/password. If we encounter a '@' later on, there is a
     %% username/password indeed. If we encounter a '/', it was
     %% actually the hostname
-    parse_url(T, get_password, 
+    parse_url(T, get_password,
 	      Url#url{username = lists:reverse(TmpAcc)},
 	      []);
 parse_url([$@ | T], get_username, Url, TmpAcc) ->
-    parse_url(T, get_host, 
+    parse_url(T, get_host,
 	      Url#url{username = lists:reverse(TmpAcc),
 		      password = ""},
 	      []);
 parse_url([$@ | T], get_password, Url, TmpAcc) ->
-    parse_url(T, get_host, 
+    parse_url(T, get_host,
 	      Url#url{password = lists:reverse(TmpAcc)},
 	      []);
 parse_url([$/ | T], get_password, Url, TmpAcc) ->
@@ -308,7 +308,7 @@ parse_url([$/ | T], get_password, Url, TmpAcc) ->
 	    password = undefined,
 	    path = [$/ | T]};
 parse_url([$: | T], get_host, #url{} = Url, TmpAcc) ->
-    parse_url(T, get_port, 
+    parse_url(T, get_port,
 	      Url#url{host = lists:reverse(TmpAcc)},
 	      []);
 parse_url([$/ | T], get_host, #url{protocol=Prot} = Url, TmpAcc) ->
@@ -340,7 +340,7 @@ parse_url([], get_port, #url{protocol=Prot} = Url, TmpAcc) ->
 	       _ ->
 		   list_to_integer(lists:reverse(TmpAcc))
 	   end,
-    Url#url{port = Port, 
+    Url#url{port = Port,
 	    path = "/"};
 parse_url([], get_password, Url, TmpAcc) ->
     %% Ok, what we thought was the username/password was the hostname
@@ -387,12 +387,12 @@ do_trace(Fmt, Args) ->
 -ifdef(DEBUG).
 do_trace(_, Fmt, Args) ->
     io:format("~s -- (~s) - "++Fmt,
-	      [printable_date(), 
+	      [printable_date(),
 	       get(ibrowse_trace_token) | Args]).
 -else.
 do_trace(true, Fmt, Args) ->
     io:format("~s -- (~s) - "++Fmt,
-	      [printable_date(), 
+	      [printable_date(),
 	       get(ibrowse_trace_token) | Args]);
 do_trace(_, _, _) ->
     ok.

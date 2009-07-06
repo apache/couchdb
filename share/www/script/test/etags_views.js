@@ -15,7 +15,7 @@ couchTests.etags_views = function(debug) {
   db.deleteDb();
   db.createDb();
   if (debug) debugger;
-  
+
   var designDoc = {
     _id:"_design/etags",
     language: "javascript",
@@ -43,7 +43,7 @@ couchTests.etags_views = function(debug) {
   var xhr;
   var docs = makeDocs(0, 10);
   db.bulkSave(docs);
-  
+
   // verify get w/Etag on map view
   xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/basicView");
   T(xhr.status == 200);
@@ -53,7 +53,7 @@ couchTests.etags_views = function(debug) {
   });
   T(xhr.status == 304);
   // TODO GET with keys (when that is available)
-  
+
   // reduce view
   xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/withReduce");
   T(xhr.status == 200);
@@ -62,7 +62,7 @@ couchTests.etags_views = function(debug) {
     headers: {"if-none-match": etag}
   });
   T(xhr.status == 304);
-  
+
   // all docs
   xhr = CouchDB.request("GET", "/test_suite_db/_all_docs");
   T(xhr.status == 200);
@@ -79,7 +79,7 @@ couchTests.etags_views = function(debug) {
   xhr = CouchDB.request("GET", "/test_suite_db/_all_docs_by_seq", {
     headers: {"if-none-match": etag}
   });
-  T(xhr.status == 304);    
+  T(xhr.status == 304);
 
   // list etag
   // in the list test for now

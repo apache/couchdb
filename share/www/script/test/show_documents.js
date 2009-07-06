@@ -16,12 +16,12 @@ couchTests.show_documents = function(debug) {
   db.deleteDb();
   db.createDb();
   if (debug) debugger;
-      
+
   var designDoc = {
     _id:"_design/template",
     language: "javascript",
     shows: {
-      "hello" : stringFun(function(doc, req) { 
+      "hello" : stringFun(function(doc, req) {
         if (doc) {
           return "Hello World";
         } else {
@@ -77,7 +77,7 @@ couchTests.show_documents = function(debug) {
         if (req.headers["Accept"].match(/image/)) {
           return {
             // a 16x16 px version of the CouchDB logo
-            "base64" : 
+            "base64" :
 ["iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAsV",
 "BMVEUAAAD////////////////////////5ur3rEBn////////////////wDBL/",
 "AADuBAe9EB3IEBz/7+//X1/qBQn2AgP/f3/ilpzsDxfpChDtDhXeCA76AQH/v7",
@@ -129,7 +129,7 @@ couchTests.show_documents = function(debug) {
     }
   };
   T(db.save(designDoc).ok);
-  
+
   var doc = {"word":"plankton", "name":"Rusty"}
   var resp = db.save(doc);
   T(resp.ok);
@@ -139,7 +139,7 @@ couchTests.show_documents = function(debug) {
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/");
   T(xhr.status == 404, 'Should be missing');
   T(JSON.parse(xhr.responseText).reason == "Invalid path.");
-  
+
   // hello template world
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/hello/"+docid);
   T(xhr.responseText == "Hello World");
@@ -151,7 +151,7 @@ couchTests.show_documents = function(debug) {
   // // error stacktraces
   // xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/render-error/"+docid);
   // T(JSON.parse(xhr.responseText).error == "render_error");
- 
+
   // hello template world (no docid)
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/hello");
   T(xhr.responseText == "Empty World");
@@ -159,21 +159,21 @@ couchTests.show_documents = function(debug) {
   // // hello template world (non-existing docid)
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/hello/nonExistingDoc");
   T(xhr.responseText == "New World");
-  
+
   // show with doc
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/just-name/"+docid);
   T(xhr.responseText == "Just Rusty");
-  
+
   // show with missing doc
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/just-name/missingdoc");
 
   T(xhr.status == 404, 'Doc should be missing');
   T(xhr.responseText == "No such doc");
-  
+
   // show with missing func
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/missing/"+docid);
   T(xhr.status == 404, "function is missing");
-  
+
   // missing design doc
   xhr = CouchDB.request("GET", "/test_suite_db/_design/missingddoc/_show/just-name/"+docid);
   T(xhr.status == 404);
@@ -200,7 +200,7 @@ couchTests.show_documents = function(debug) {
   T("Accept" == xhr.getResponseHeader("Vary"));
 
   // accept header switching
-  // different mime has different etag  
+  // different mime has different etag
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/accept-switch/"+docid, {
     headers: {"Accept": "text/html;text/plain;*/*"}
   });
@@ -227,7 +227,7 @@ couchTests.show_documents = function(debug) {
     headers: {"if-none-match": etag}
   });
   // should be 304
-  T(xhr.status == 304);    
+  T(xhr.status == 304);
 
   // update the doc
   doc.name = "Crusty";
@@ -237,7 +237,7 @@ couchTests.show_documents = function(debug) {
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/just-name/"+docid, {
     headers: {"if-none-match": etag}
   });
-  // status is 200    
+  // status is 200
   T(xhr.status == 200);
 
   // get new etag and request again
@@ -251,7 +251,7 @@ couchTests.show_documents = function(debug) {
   // update design doc (but not function)
   designDoc.isChanged = true;
   T(db.save(designDoc).ok);
-  
+
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/just-name/"+docid, {
     headers: {"if-none-match": etag}
   });
@@ -269,7 +269,7 @@ couchTests.show_documents = function(debug) {
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/just-name/"+docid, {
     headers: {"if-none-match": etag}
   });
-  // status is 200    
+  // status is 200
   T(xhr.status == 200);
 
 
@@ -287,7 +287,7 @@ couchTests.show_documents = function(debug) {
   });
   var ct = xhr.getResponseHeader("Content-Type");
   T(/charset=utf-8/.test(ct))
-  T(/text\/html/.test(ct))  
+  T(/text\/html/.test(ct))
   T(xhr.responseText == "Ha ha, you said \"plankton\".");
 
   // now with xml

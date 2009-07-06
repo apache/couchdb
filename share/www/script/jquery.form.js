@@ -13,7 +13,7 @@
 ;(function($) {
 
 /*
-    Usage Note:  
+    Usage Note:
     -----------
     Do not use both ajaxSubmit and ajaxForm on the same form.  These
     functions are intended to be exclusive.  Use ajaxSubmit if you want
@@ -36,13 +36,13 @@
             target: '#output'
         });
     });
-        
+
     When using ajaxForm, the ajaxSubmit function will be invoked for you
-    at the appropriate time.  
+    at the appropriate time.
 */
 
 /**
- * ajaxSubmit() provides a mechanism for immediately submitting 
+ * ajaxSubmit() provides a mechanism for immediately submitting
  * an HTML form using AJAX.
  */
 $.fn.ajaxSubmit = function(options) {
@@ -73,8 +73,8 @@ $.fn.ajaxSubmit = function(options) {
     if (options.beforeSerialize && options.beforeSerialize(this, options) === false) {
         log('ajaxSubmit: submit aborted via beforeSerialize callback');
         return this;
-    }    
-   
+    }
+
     var a = this.formToArray(options.semantic);
     if (options.data) {
         options.extraData = options.data;
@@ -82,7 +82,7 @@ $.fn.ajaxSubmit = function(options) {
           if(options.data[n] instanceof Array) {
             for (var k in options.data[n])
               a.push( { name: n, value: options.data[n][k] } )
-          }  
+          }
           else
              a.push( { name: n, value: options.data[n] } );
         }
@@ -92,14 +92,14 @@ $.fn.ajaxSubmit = function(options) {
     if (options.beforeSubmit && options.beforeSubmit(a, this, options) === false) {
         log('ajaxSubmit: submit aborted via beforeSubmit callback');
         return this;
-    }    
+    }
 
     // fire vetoable 'validate' event
     this.trigger('form-submit-validate', [a, this, options, veto]);
     if (veto.veto) {
         log('ajaxSubmit: submit vetoed via form-submit-validate trigger');
         return this;
-    }    
+    }
 
     var q = $.param(a);
 
@@ -137,7 +137,7 @@ $.fn.ajaxSubmit = function(options) {
             found = true;
 
     // options.iframe allows user to force iframe mode
-   if (options.iframe || found) { 
+   if (options.iframe || found) {
        // hack to fix Safari hang (thanks to Tim Molendijk for this)
        // see:  http://groups.google.com/group/jquery-dev/browse_thread/thread/36395b7ab510dd5d
        if ($.browser.safari && options.closeKeepAlive)
@@ -156,12 +156,12 @@ $.fn.ajaxSubmit = function(options) {
     // private function for handling file uploads (hat tip to YAHOO!)
     function fileUpload() {
         var form = $form[0];
-        
+
         if ($(':input[name=submit]', form).length) {
             alert('Error: Form elements must not be named "submit".');
             return;
         }
-        
+
         var opts = $.extend({}, $.ajaxSettings, options);
 		var s = jQuery.extend(true, {}, $.extend(true, {}, $.ajaxSettings), opts);
 
@@ -169,7 +169,7 @@ $.fn.ajaxSubmit = function(options) {
         var $io = $('<iframe id="' + id + '" name="' + id + '" />');
         var io = $io[0];
 
-        if ($.browser.msie || $.browser.opera) 
+        if ($.browser.msie || $.browser.opera)
             io.src = 'javascript:false;document.write("");';
         $io.css({ position: 'absolute', top: '-1000px', left: '-1000px' });
 
@@ -182,8 +182,8 @@ $.fn.ajaxSubmit = function(options) {
             getAllResponseHeaders: function() {},
             getResponseHeader: function() {},
             setRequestHeader: function() {},
-            abort: function() { 
-                this.aborted = 1; 
+            abort: function() {
+                this.aborted = 1;
                 $io.attr('src','about:blank'); // abort op in progress
             }
         };
@@ -199,7 +199,7 @@ $.fn.ajaxSubmit = function(options) {
         }
         if (xhr.aborted)
             return;
-        
+
         var cbInvoked = 0;
         var timedOut = 0;
 
@@ -226,7 +226,7 @@ $.fn.ajaxSubmit = function(options) {
                 method:   'POST',
                 action:   opts.url
             });
-            
+
             // ie borks in some cases when setting encoding
             if (! options.skipEncodingOverride) {
                 $form.attr({
@@ -247,7 +247,7 @@ $.fn.ajaxSubmit = function(options) {
                         extraInputs.push(
                             $('<input type="hidden" name="'+n+'" value="'+options.extraData[n]+'" />')
                                 .appendTo(form)[0]);
-            
+
                 // add iframe to doc and submit the form
                 $io.appendTo('body');
                 io.attachEvent ? io.attachEvent('onload', cb) : io.addEventListener('load', cb, false);
@@ -263,7 +263,7 @@ $.fn.ajaxSubmit = function(options) {
 
         function cb() {
             if (cbInvoked++) return;
-            
+
             io.detachEvent ? io.detachEvent('onload', cb) : io.removeEventListener('load', cb, false);
 
             var operaHack = 0;
@@ -274,7 +274,7 @@ $.fn.ajaxSubmit = function(options) {
                 var data, doc;
 
                 doc = io.contentWindow ? io.contentWindow.document : io.contentDocument ? io.contentDocument : io.document;
-                
+
                 if (doc.body == null && !operaHack && $.browser.opera) {
                     // In Opera 9.2.x the iframe DOM is not always traversable when
                     // the onload callback fires so we give Opera 100ms to right itself
@@ -283,7 +283,7 @@ $.fn.ajaxSubmit = function(options) {
                     setTimeout(cb, 100);
                     return;
                 }
-                
+
                 xhr.responseText = doc.body ? doc.body.innerHTML : null;
                 xhr.responseXML = doc.XMLDocument ? doc.XMLDocument : doc;
                 xhr.getResponseHeader = function(header){
@@ -348,7 +348,7 @@ $.fn.ajaxSubmit = function(options) {
  * The options argument for ajaxForm works exactly as it does for ajaxSubmit.  ajaxForm merely
  * passes the options argument along after properly binding events for submit elements and
  * the form itself.
- */ 
+ */
 $.fn.ajaxForm = function(options) {
     return this.ajaxFormUnbind().bind('submit.form-plugin',function() {
         $(this).ajaxSubmit(options);
@@ -594,10 +594,10 @@ $.fn.resetForm = function() {
 /**
  * Enables or disables any matching elements.
  */
-$.fn.enable = function(b) { 
+$.fn.enable = function(b) {
     if (b == undefined) b = true;
-    return this.each(function() { 
-        this.disabled = !b 
+    return this.each(function() {
+        this.disabled = !b
     });
 };
 
@@ -607,7 +607,7 @@ $.fn.enable = function(b) {
  */
 $.fn.selected = function(select) {
     if (select == undefined) select = true;
-    return this.each(function() { 
+    return this.each(function() {
         var t = this.type;
         if (t == 'checkbox' || t == 'radio')
             this.checked = select;

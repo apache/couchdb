@@ -16,11 +16,11 @@
 function CouchDB(name, httpHeaders) {
   this.name = name;
   this.uri = "/" + encodeURIComponent(name) + "/";
-  
+
   // The XMLHttpRequest object from the most recent request. Callers can
   // use this to check result http status and headers.
   this.last_req = null;
-  
+
   this.request = function(method, uri, requestOptions) {
       requestOptions = requestOptions || {}
       requestOptions.headers = combine(requestOptions.headers, httpHeaders)
@@ -48,7 +48,7 @@ function CouchDB(name, httpHeaders) {
     if (doc._id == undefined)
       doc._id = CouchDB.newUuids(1)[0];
 
-    this.last_req = this.request("PUT", this.uri  + 
+    this.last_req = this.request("PUT", this.uri  +
         encodeURIComponent(doc._id) + encodeOptions(options),
         {body: JSON.stringify(doc)});
     CouchDB.maybeThrowError(this.last_req);
@@ -84,7 +84,7 @@ function CouchDB(name, httpHeaders) {
     doc._rev = result.rev; //record rev in input document
     return result;
   }
-  
+
   this.bulkSave = function(docs, options) {
     // first prepoulate the UUIDs for new documents
     var newCount = 0
@@ -119,7 +119,7 @@ function CouchDB(name, httpHeaders) {
       return results;
     }
   }
-  
+
   this.ensureFullCommit = function() {
     this.last_req = this.request("POST", this.uri + "_ensure_full_commit");
     CouchDB.maybeThrowError(this.last_req);
@@ -130,7 +130,7 @@ function CouchDB(name, httpHeaders) {
   this.query = function(mapFun, reduceFun, options, keys) {
     var body = {language: "javascript"};
     if(keys) {
-      body.keys = keys ;      
+      body.keys = keys ;
     }
     if (typeof(mapFun) != "string")
       mapFun = mapFun.toSource ? mapFun.toSource() : "(" + mapFun.toString() + ")";
@@ -154,15 +154,15 @@ function CouchDB(name, httpHeaders) {
 
   this.view = function(viewname, options, keys) {
     var viewParts = viewname.split('/');
-    var viewPath = this.uri + "_design/" + viewParts[0] + "/_view/" 
+    var viewPath = this.uri + "_design/" + viewParts[0] + "/_view/"
         + viewParts[1] + encodeOptions(options);
     if(!keys) {
-      this.last_req = this.request("GET", viewPath);      
+      this.last_req = this.request("GET", viewPath);
     } else {
       this.last_req = this.request("POST", viewPath, {
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({keys:keys})
-      });      
+      });
     }
     if (this.last_req.status == 404)
       return null;
@@ -183,7 +183,7 @@ function CouchDB(name, httpHeaders) {
     CouchDB.maybeThrowError(this.last_req);
     return JSON.parse(this.last_req.responseText);
   }
-  
+
   this.viewCleanup = function() {
     this.last_req = this.request("POST", this.uri + "_view_cleanup");
     CouchDB.maybeThrowError(this.last_req);
@@ -192,17 +192,17 @@ function CouchDB(name, httpHeaders) {
 
   this.allDocs = function(options,keys) {
     if(!keys) {
-      this.last_req = this.request("GET", this.uri + "_all_docs" + encodeOptions(options));      
+      this.last_req = this.request("GET", this.uri + "_all_docs" + encodeOptions(options));
     } else {
       this.last_req = this.request("POST", this.uri + "_all_docs" + encodeOptions(options), {
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({keys:keys})
-      });      
+      });
     }
     CouchDB.maybeThrowError(this.last_req);
     return JSON.parse(this.last_req.responseText);
   }
-  
+
   this.designDocs = function() {
     return this.allDocs({startkey:"_design", endkey:"_design0"});
   };
@@ -210,12 +210,12 @@ function CouchDB(name, httpHeaders) {
   this.allDocsBySeq = function(options,keys) {
     var req = null;
     if(!keys) {
-      req = this.request("GET", this.uri + "_all_docs_by_seq" + encodeOptions(options));      
+      req = this.request("GET", this.uri + "_all_docs_by_seq" + encodeOptions(options));
     } else {
       req = this.request("POST", this.uri + "_all_docs_by_seq" + encodeOptions(options), {
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({keys:keys})
-      });      
+      });
     }
     CouchDB.maybeThrowError(req);
     return JSON.parse(req.responseText);
@@ -226,7 +226,7 @@ function CouchDB(name, httpHeaders) {
     CouchDB.maybeThrowError(this.last_req);
     return JSON.parse(this.last_req.responseText);
   }
-  
+
   this.setDbProperty = function(propId, propValue) {
     this.last_req = this.request("PUT", this.uri + propId,{
       body:JSON.stringify(propValue)
@@ -234,13 +234,13 @@ function CouchDB(name, httpHeaders) {
     CouchDB.maybeThrowError(this.last_req);
     return JSON.parse(this.last_req.responseText);
   }
-  
+
   this.getDbProperty = function(propId) {
     this.last_req = this.request("GET", this.uri + propId);
     CouchDB.maybeThrowError(this.last_req);
     return JSON.parse(this.last_req.responseText);
   }
-  
+
   this.setAdmins = function(adminsArray) {
     this.last_req = this.request("PUT", this.uri + "_admins",{
       body:JSON.stringify(adminsArray)
@@ -248,13 +248,13 @@ function CouchDB(name, httpHeaders) {
     CouchDB.maybeThrowError(this.last_req);
     return JSON.parse(this.last_req.responseText);
   }
-  
+
   this.getAdmins = function() {
     this.last_req = this.request("GET", this.uri + "_admins");
     CouchDB.maybeThrowError(this.last_req);
     return JSON.parse(this.last_req.responseText);
   }
-  
+
   // Convert a options object to an url query string.
   // ex: {key:'value',key2:'value2'} becomes '?key="value"&key2="value2"'
   function encodeOptions(options) {
@@ -278,26 +278,26 @@ function CouchDB(name, httpHeaders) {
   function toJSON(obj) {
     return obj !== null ? JSON.stringify(obj) : null;
   }
-  
+
   function combine(object1, object2) {
     if (!object2)
       return object1;
     if (!object1)
       return object2;
-      
+
     for (var name in object2)
       object1[name] = object2[name];
-      
+
     return object1;
   }
-  
-  
+
+
 }
 
 // this is the XMLHttpRequest object from last request made by the following
 // CouchDB.* functions (except for calls to request itself).
 // Use this from callers to check HTTP status or header values of requests.
-CouchDB.last_req = null; 
+CouchDB.last_req = null;
 
 
 CouchDB.allDbs = function() {

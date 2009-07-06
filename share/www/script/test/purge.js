@@ -15,7 +15,7 @@ couchTests.purge = function(debug) {
   db.deleteDb();
   db.createDb();
   if (debug) debugger;
-  
+
   /*
    purge is not to be confused with a document deletion.  It removes the
    document and all edit history from the local instance of the database.
@@ -31,7 +31,7 @@ couchTests.purge = function(debug) {
       single_doc: {map: "function(doc) { if (doc._id == \"1\") { emit(1, null) }}"}
     }
   }
-  
+
   T(db.save(designDoc).ok);
 
   db.bulkSave(makeDocs(1, numDocs + 1));
@@ -43,11 +43,11 @@ couchTests.purge = function(debug) {
     T(rows[(2*i)+1].key == i+1);
   }
   T(db.view("test/single_doc").total_rows == 1);
-  
+
   var info = db.info();
   var doc1 = db.open("1");
   var doc2 = db.open("2");
-  
+
   // purge the documents
   var xhr = CouchDB.request("POST", "/test_suite_db/_purge", {
     body: JSON.stringify({"1":[doc1._rev], "2":[doc2._rev]}),
@@ -63,35 +63,35 @@ couchTests.purge = function(debug) {
   var result = JSON.parse(xhr.responseText);
   T(result.purged["1"][0] == doc1._rev);
   T(result.purged["2"][0] == doc2._rev);
-  
+
   T(db.open("1") == null);
   T(db.open("2") == null);
-  
+
   var rows = db.view("test/all_docs_twice").rows;
   for (var i = 2; i < numDocs; i++) {
     T(rows[2*(i-2)].key == i+1);
     T(rows[(2*(i-2))+1].key == i+1);
   }
   T(db.view("test/single_doc").total_rows == 0);
-  
+
   // purge documents twice in a row without loading views
   // (causes full view rebuilds)
-  
+
   var doc3 = db.open("3");
   var doc4 = db.open("4");
-  
+
   xhr = CouchDB.request("POST", "/test_suite_db/_purge", {
     body: JSON.stringify({"3":[doc3._rev]}),
   });
-  
+
   T(xhr.status == 200);
-  
+
   xhr = CouchDB.request("POST", "/test_suite_db/_purge", {
     body: JSON.stringify({"4":[doc4._rev]}),
   });
-  
+
   T(xhr.status == 200);
-  
+
   var rows = db.view("test/all_docs_twice").rows;
   for (var i = 4; i < numDocs; i++) {
     T(rows[2*(i-4)].key == i+1);

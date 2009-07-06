@@ -71,7 +71,7 @@ couchTests.view_pagination = function(debug) {
         T(queryResults.rows[j].key == i + j);
       }
     }
-    
+
     // test endkey_docid
     var queryResults = db.query(function(doc) { emit(null, null);}, null, {
       startkey: null,
@@ -79,7 +79,7 @@ couchTests.view_pagination = function(debug) {
       endkey: null,
       endkey_docid: 40
     });
-    
+
     T(queryResults.rows.length == 35)
     T(queryResults.total_rows == docs.length)
     T(queryResults.offset == 1)

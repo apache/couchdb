@@ -36,7 +36,7 @@
 
 open(Filepath) ->
     open(Filepath, []).
-    
+
 open(Filepath, Options) ->
     case gen_server:start_link(couch_file,
             {Filepath, Options, self(), Ref = make_ref()}, []) of
@@ -76,7 +76,7 @@ append_term(Fd, Term) ->
 %%  serialized  term. Use pread_term to read the term back.
 %%  or {error, Reason}.
 %%----------------------------------------------------------------------
-    
+
 append_binary(Fd, Bin) ->
     Size = iolist_size(Bin),
     gen_server:call(Fd, {append_bin, [<<Size:32/integer>>, Bin]}, infinity).
@@ -89,7 +89,7 @@ append_binary(Fd, Bin) ->
 %%  or {error, Reason}.
 %%----------------------------------------------------------------------
 
-    
+
 pread_term(Fd, Pos) ->
     {ok, Bin} = pread_binary(Fd, Pos),
     {ok, binary_to_term(Bin)}.
@@ -178,14 +178,14 @@ read_header(Fd) ->
     Else ->
         Else
     end.
-    
+
 write_header(Fd, Data) ->
     Bin = term_to_binary(Data),
     Md5 = erlang:md5(Bin),
     % now we assemble the final header binary and write to disk
     FinalBin = <<Md5/binary, Bin/binary>>,
     gen_server:call(Fd, {write_header, FinalBin}, infinity).
-    
+
 
 
 
@@ -301,7 +301,7 @@ handle_call({upgrade_old_header, Prefix}, _From, #file{fd=Fd}=File) ->
 handle_call(find_header, _From, #file{fd=Fd}=File) ->
     {ok, Pos} = file:position(Fd, eof),
     {reply, find_header(Fd, Pos div ?SIZE_BLOCK), File}.
-        
+
 % 09 UPGRADE CODE
 -define(HEADER_SIZE, 2048). % size of each segment of the doubly written header
 
@@ -349,7 +349,7 @@ read_old_header(Fd, Prefix) ->
     _ ->
         Result
     end.
-    
+
 % 09 UPGRADE CODE
 extract_header(Prefix, Bin) ->
     SizeOfPrefix = size(Prefix),
@@ -373,7 +373,7 @@ extract_header(Prefix, Bin) ->
     _ ->
         unknown_header_type
     end.
-    
+
 
 % 09 UPGRADE CODE
 write_old_header(Fd, Prefix, Data) ->
@@ -401,7 +401,7 @@ write_old_header(Fd, Prefix, Data) ->
     ok = file:pwrite(Fd, 0, DblWriteBin),
     ok = file:sync(Fd).
 
-    
+
 handle_cast(close, Fd) ->
     {stop,normal,Fd}.
 
@@ -422,14 +422,14 @@ find_header(Fd, Block) ->
     _Error ->
         find_header(Fd, Block -1)
     end.
-    
+
 load_header(Fd, Block) ->
     {ok, <<1>>} = file:pread(Fd, Block*?SIZE_BLOCK, 1),
     {ok, <<HeaderLen:32/integer>>} = file:pread(Fd, (Block*?SIZE_BLOCK) + 1, 4),
     TotalBytes = calculate_total_read_len(1, HeaderLen),
-    {ok, <<RawBin:TotalBytes/binary>>} = 
+    {ok, <<RawBin:TotalBytes/binary>>} =
             file:pread(Fd, (Block*?SIZE_BLOCK) + 5, TotalBytes),
-    <<Md5Sig:16/binary, HeaderBin/binary>> = 
+    <<Md5Sig:16/binary, HeaderBin/binary>> =
         iolist_to_binary(remove_block_prefixes(1, RawBin)),
     Md5Sig = erlang:md5(HeaderBin),
     {ok, HeaderBin}.

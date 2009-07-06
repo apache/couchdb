@@ -13,7 +13,7 @@
 // Do some basic tests.
 couchTests.basics = function(debug) {
     var result = JSON.parse(CouchDB.request("GET", "/").responseText);
-    T(result.couchdb == "Welcome"); 
+    T(result.couchdb == "Welcome");
 
     var db = new CouchDB("test_suite_db");
     db.deleteDb();
@@ -31,11 +31,11 @@ couchTests.basics = function(debug) {
     // creating a new DB should return Location header
     xhr = CouchDB.request("DELETE", "/test_suite_db");
     xhr = CouchDB.request("PUT", "/test_suite_db");
-    TEquals("/test_suite_db", 
+    TEquals("/test_suite_db",
       xhr.getResponseHeader("Location").substr(-14),
       "should return Location header to newly created document");
 
-    TEquals("http://", 
+    TEquals("http://",
       xhr.getResponseHeader("Location").substr(0, 7),
       "should return absolute Location header to newly created document");
 
@@ -66,7 +66,7 @@ couchTests.basics = function(debug) {
     // make sure you can do a seq=true option
     var doc = db.open(id, {local_seq:true});
     T(doc._local_seq == 1);
-    
+
 
     // Create some more documents.
     // Notice the use of the ok member on the return result.
@@ -161,11 +161,11 @@ couchTests.basics = function(debug) {
     var xhr = CouchDB.request("PUT", "/test_suite_db/newdoc", {
       body: JSON.stringify({"a":1})
     });
-    TEquals("/test_suite_db/newdoc", 
+    TEquals("/test_suite_db/newdoc",
       xhr.getResponseHeader("Location").substr(-21),
       "should return Location header to newly created document");
 
-    TEquals("http://", 
+    TEquals("http://",
       xhr.getResponseHeader("Location").substr(0, 7),
       "should return absolute Location header to newly created document");
 
@@ -182,12 +182,12 @@ couchTests.basics = function(debug) {
   ]
   var test_doc = function(info) {
     var data = JSON.stringify(info[1]);
-    
+
     xhr = CouchDB.request("PUT", "/test_suite_db/" + info[0], {body: data});
     T(xhr.status == 500);
     result = JSON.parse(xhr.responseText);
     T(result.error == "doc_validation");
-    
+
     xhr = CouchDB.request("POST", "/test_suite_db/", {body: data});
     T(xhr.status == 500);
     result = JSON.parse(xhr.responseText);

@@ -15,14 +15,14 @@ couchTests.view_errors = function(debug) {
   db.deleteDb();
   db.createDb();
   if (debug) debugger;
-  
-  
+
+
 
   run_on_modified_server(
     [{section: "couchdb",
       key: "os_process_timeout",
       value: "500"}],
-    function() {    
+    function() {
       var doc = {integer: 1, string: "1", array: [1, 2, 3]};
       T(db.save(doc).ok);
 
@@ -47,37 +47,37 @@ couchTests.view_errors = function(debug) {
         emit([doc._id, doc.undef], null);
       });
       T(results.total_rows == 0);
-  
+
       // querying a view with invalid params should give a resonable error message
       var xhr = CouchDB.request("POST", "/test_suite_db/_temp_view?startkey=foo", {
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({language: "javascript", 
+        body: JSON.stringify({language: "javascript",
           map : "function(doc){emit(doc.integer)}"
         })
       });
       T(JSON.parse(xhr.responseText).error == "invalid_json");
-  
+
       // views should ignore Content-Type, like the rest of CouchDB
       var xhr = CouchDB.request("POST", "/test_suite_db/_temp_view", {
         headers: {"Content-Type": "application/x-www-form-urlencoded"},
-        body: JSON.stringify({language: "javascript", 
+        body: JSON.stringify({language: "javascript",
           map : "function(doc){}"
         })
       });
       T(xhr.status == 200);
-  
+
       var map = function (doc) {emit(doc.integer, doc.integer);};
-  
+
       try {
           db.query(map, null, {group: true});
           T(0 == 1);
       } catch(e) {
           T(e.error == "query_parse_error");
       }
-  
+
       // reduce=false on map views doesn't work, so group=true will
       // never throw for temp reduce views.
-  
+
       var designDoc = {
         _id:"_design/test",
         language: "javascript",
@@ -89,7 +89,7 @@ couchTests.view_errors = function(debug) {
         }
       };
       T(db.save(designDoc).ok);
-  
+
       var designDoc2 = {
         _id:"_design/testbig",
         language: "javascript",
@@ -100,14 +100,14 @@ couchTests.view_errors = function(debug) {
         }
       };
       T(db.save(designDoc2).ok);
-  
+
       try {
           db.view("test/no_reduce", {group: true});
           T(0 == 1);
       } catch(e) {
           T(e.error == "query_parse_error");
       }
-  
+
       try {
         db.view("test/no_reduce", {reduce: true});
         T(0 == 1);
@@ -122,7 +122,7 @@ couchTests.view_errors = function(debug) {
       } catch(e) {
           T(e.error == "query_parse_error");
       }
-  
+
       var designDoc3 = {
         _id:"_design/infinite",
         language: "javascript",
@@ -138,7 +138,7 @@ couchTests.view_errors = function(debug) {
       } catch(e) {
           T(e.error == "os_process_error");
       }
-    
+
       // Check error responses for invalid multi-get bodies.
       var path = "/test_suite_db/_design/test/_view/no_reduce";
       var xhr = CouchDB.request("POST", path, {body: "[]"});

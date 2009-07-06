@@ -18,7 +18,7 @@ main(_) ->
             etap:bail()
     end,
     ok.
-    
+
 test() ->
     ok = test_from_json_success(),
     ok = test_from_json_errors(),
@@ -49,7 +49,7 @@ test_from_json_success() ->
         {
             {[{<<"_rev">>, <<"4-230234">>}]},
             #doc{revs={4, [<<"230234">>]}},
-            "_rev stored in revs."        
+            "_rev stored in revs."
         },
         {
             {[{<<"soap">>, 35}]},
@@ -105,7 +105,7 @@ test_from_json_success() ->
         {
             {[{<<"_local_seq">>, dropping}]},
             #doc{},
-            "Drops _local_seq."        
+            "Drops _local_seq."
         },
         {
             {[{<<"_conflicts">>, dropping}]},
@@ -118,7 +118,7 @@ test_from_json_success() ->
             "Drops _deleted_conflicts."
         }
     ],
-    
+
     lists:foreach(fun({EJson, Expect, Mesg}) ->
         etap:is(couch_doc:from_json_obj(EJson), Expect, Mesg)
     end, Cases),
@@ -193,7 +193,7 @@ test_from_json_errors() ->
             "Underscore prefix fields are reserved."
         }
     ],
-    
+
     lists:foreach(fun
         ({EJson, Expect, Mesg}) ->
             Error = (catch couch_doc:from_json_obj(EJson)),

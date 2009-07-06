@@ -54,7 +54,7 @@ get(Section) ->
 
 get(Section, Key) ->
     ?MODULE:get(Section, Key, undefined).
-    
+
 get(Section, Key, Default) when is_binary(Section) and is_binary(Key) ->
     ?MODULE:get(?b2l(Section), ?b2l(Key), Default);
 get(Section, Key, Default) ->
@@ -194,9 +194,9 @@ parse_ini_file(IniFile) ->
                 {ok, [ValueName|LineValues]} -> % yeehaw, got a line!
                     RemainingLine = couch_util:implode(LineValues, "="),
                     % removes comments
-                    {ok, [LineValue | _Rest]} = 
+                    {ok, [LineValue | _Rest]} =
                         regexp:split(RemainingLine, " ;|\t;"),
-                    {AccSectionName, 
+                    {AccSectionName,
                 [{{AccSectionName, ValueName}, LineValue} | AccValues]}
                 end
             end

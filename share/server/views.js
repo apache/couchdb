@@ -27,7 +27,7 @@ sum = function(values) {
 }
 
 var Views = (function() {
-    
+
   function runReduce(reduceFuns, keys, values, rereduce) {
     for (var i in reduceFuns) {
       reduceFuns[i] = compileFunction(reduceFuns[i]);
@@ -51,7 +51,7 @@ var Views = (function() {
     if (query_config && query_config.reduce_limit &&
           reduce_length > 200 && ((reduce_length * 2) > line.length)) {
       var reduce_preview = "Current output: '"+(reduce_line.substring(0,100) + "'... (first 100 of "+reduce_length+' bytes)');
-      
+
       throw {
         error:"reduce_overflow_error",
         reason: "Reduce output must shrink more rapidly: "+reduce_preview+""
@@ -60,7 +60,7 @@ var Views = (function() {
       print("[true," + reduce_line + "]");
     }
   };
-  
+
   return {
     reduce : function(reduceFuns, kvs) {
       var keys = new Array(kvs.length);

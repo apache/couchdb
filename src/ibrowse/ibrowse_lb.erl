@@ -1,7 +1,7 @@
 %%%-------------------------------------------------------------------
 %%% File    : ibrowse_lb.erl
 %%% Author  : chandru <chandrashekhar.mullaparthi@t-mobile.co.uk>
-%%% Description : 
+%%% Description :
 %%%
 %%% Created :  6 Mar 2008 by chandru <chandrashekhar.mullaparthi@t-mobile.co.uk>
 %%%-------------------------------------------------------------------
@@ -101,7 +101,7 @@ spawn_connection(Lb_pid, Url,
 % 	    #state{max_sessions = Max_sess,
 % 		   ets_tid = Tid,
 % 		   max_pipeline_size = Max_pipe_sz,
-% 		   num_cur_sessions = Num} = State) 
+% 		   num_cur_sessions = Num} = State)
 %     when Num >= Max ->
 %     Reply = find_best_connection(Tid),
 %     {reply, sorry_dude_reuse, State};
@@ -109,7 +109,7 @@ spawn_connection(Lb_pid, Url,
 %% Update max_sessions in #state with supplied value
 handle_call({spawn_connection, _Url, Max_sess, Max_pipe, _}, _From,
 	    #state{ets_tid = Tid,
-		   num_cur_sessions = Num} = State) 
+		   num_cur_sessions = Num} = State)
     when Num >= Max_sess ->
     Reply = find_best_connection(Tid, Max_pipe),
     {reply, Reply, State#state{max_sessions = Max_sess}};

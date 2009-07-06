@@ -11,12 +11,12 @@
 // the License.
 
 couchTests.view_offsets = function(debug) {
-  if (debug) debugger;      
+  if (debug) debugger;
 
   var db = new CouchDB("test_suite_db");
   db.deleteDb();
   db.createDb();
-  
+
   var designDoc = {
     _id : "_design/test",
     views : {
@@ -26,7 +26,7 @@ couchTests.view_offsets = function(debug) {
     }
   };
   T(db.save(designDoc).ok);
-  
+
   var docs = [
     {_id : "a1", letter : "a", number : 1, foo: "bar"},
     {_id : "a2", letter : "a", number : 2, foo: "bar"},
@@ -88,8 +88,8 @@ couchTests.view_offsets = function(debug) {
     ];
     db.bulkSave(docs);
 
-    var res = db.view("test/offset", { 
-      startkey: ["b",4], startkey_docid: "b4", endkey: ["b"], 
+    var res = db.view("test/offset", {
+      startkey: ["b",4], startkey_docid: "b4", endkey: ["b"],
       limit: 2, descending: true, skip: 1
     })
 

@@ -19,32 +19,32 @@ couchTests.batch_save = function(debug) {
 
   // commit should work fine with no batches
   T(db.ensureFullCommit().ok);
-  
+
   // PUT a doc with ?batch=ok
   T(db.save({_id:"0",a:1,b:1},  {batch : "ok"}).ok);
 
   // test that response is 200 Accepted
   T(db.last_req.status == 202);
   T(db.last_req.statusText == "Accepted");
-  
+
   T(db.allDocs().total_rows == 0);
 
   restartServer();
-  
+
   // lost the updates
   T(db.allDocs().total_rows == 0);
-  
+
   T(db.save({_id:"0",a:1,b:1},  {batch : "ok"}).ok);
   T(db.save({_id:"1",a:1,b:1},  {batch : "ok"}).ok);
   T(db.save({_id:"2",a:1,b:1},  {batch : "ok"}).ok);
 
   T(db.ensureFullCommit().ok);
   T(db.allDocs().total_rows == 3);
-  
+
   // repeat the tests for POST
   var resp = db.request("POST", db.uri + "?batch=ok", {body: JSON.stringify({a:1})});
   T(JSON.parse(resp.responseText).ok);
-  
+
   // test that response is 200 Accepted
   T(resp.status == 202);
   T(resp.statusText == "Accepted");
@@ -59,5 +59,5 @@ couchTests.batch_save = function(debug) {
 
   T(db.ensureFullCommit().ok);
   T(db.allDocs().total_rows == 5);
-  
+
 };

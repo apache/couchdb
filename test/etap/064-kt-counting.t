@@ -18,7 +18,7 @@ test() ->
     One = [{0, {"1","foo",[]}}],
     TwoChildSibs = [{0, {"1","foo", [{"1a", "bar", []}, {"1b", "bar", []}]}}],
     Stemmed = [{2, {"1bb", "boo", []}}],
-    
+
     etap:is(0, couch_key_tree:count_leafs(EmptyTree),
         "Empty trees have no leaves."),
 
@@ -27,8 +27,8 @@ test() ->
 
     etap:is(2, couch_key_tree:count_leafs(TwoChildSibs),
         "Two children siblings counted as two leaves."),
-    
+
     etap:is(1, couch_key_tree:count_leafs(Stemmed),
         "Stemming does not affect leaf counting."),
-    
+
     ok.

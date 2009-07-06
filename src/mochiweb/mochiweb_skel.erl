@@ -7,7 +7,7 @@
 
 skelcopy(DestDir, Name) ->
     ok = ensuredir(DestDir),
-    LDst = case length(filename:dirname(DestDir)) of 
+    LDst = case length(filename:dirname(DestDir)) of
                1 -> %% handle case when dirname returns "/"
                    0;
                N ->
@@ -17,7 +17,7 @@ skelcopy(DestDir, Name) ->
     ok = file:make_symlink(
         filename:join(filename:dirname(code:which(?MODULE)), ".."),
         filename:join([DestDir, Name, "deps", "mochiweb-src"])).
-    
+
 
 %% Internal API
 
@@ -40,7 +40,7 @@ skelcopy(Src, DestDir, Name, LDst) ->
             io:format("~s/~n", [EDst]),
             lists:foreach(fun ("." ++ _) -> ok;
                               (F) ->
-                                  skelcopy(filename:join(Src, F), 
+                                  skelcopy(filename:join(Src, F),
                                            Dir,
                                            Name,
                                            LDst)

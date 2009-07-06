@@ -19,7 +19,7 @@
 -include("couch_db.hrl").
 
 start_link() ->
-    gen_server:start_link({local, couch_external_manager}, 
+    gen_server:start_link({local, couch_external_manager},
         couch_external_manager, [], []).
 
 execute(UrlName, JsonReq) ->

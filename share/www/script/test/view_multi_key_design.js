@@ -53,7 +53,7 @@ couchTests.view_multi_key_design = function(debug) {
     T(keys.indexOf(rows[i].key) != -1);
     T(rows[i].key == rows[i].value);
   }
-  
+
   var reduce = db.view("test/summate",{group:true},keys).rows;
   T(reduce.length == keys.length);
   for(var i=0; i<reduce.length; i++) {

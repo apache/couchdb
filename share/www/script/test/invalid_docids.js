@@ -19,7 +19,7 @@ couchTests.invalid_docids = function(debug) {
   // Test _local explicitly first.
   T(db.save({"_id": "_local/foo"}).ok);
   T(db.open("_local/foo")._id == "_local/foo");
-  
+
   //Test non-string
   try {
     db.save({"_id": 1});

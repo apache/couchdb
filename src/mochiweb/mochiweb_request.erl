@@ -173,13 +173,13 @@ recv_body() ->
 recv_body(MaxBody) ->
     % we could use a sane constant for max chunk size
     Body = stream_body(?MAX_RECV_BODY, fun
-        ({0, _ChunkedFooter}, {_LengthAcc, BinAcc}) -> 
+        ({0, _ChunkedFooter}, {_LengthAcc, BinAcc}) ->
             iolist_to_binary(lists:reverse(BinAcc));
         ({Length, Bin}, {LengthAcc, BinAcc}) ->
             NewLength = Length + LengthAcc,
             if NewLength > MaxBody ->
                 exit({body_too_large, chunked});
-            true -> 
+            true ->
                 {NewLength, [Bin | BinAcc]}
             end
         end, {0, []}, MaxBody),
@@ -188,7 +188,7 @@ recv_body(MaxBody) ->
 
 stream_body(MaxChunkSize, ChunkFun, FunState) ->
     stream_body(MaxChunkSize, ChunkFun, FunState, undefined).
-    
+
 stream_body(MaxChunkSize, ChunkFun, FunState, MaxBodyLength) ->
 
     case get_header_value("expect") of
@@ -215,7 +215,7 @@ stream_body(MaxChunkSize, ChunkFun, FunState, MaxBodyLength) ->
                 exit({body_too_large, content_length});
             _ ->
                 stream_unchunked_body(Length, MaxChunkSize, ChunkFun, FunState)
-            end;     
+            end;
         Length ->
             exit({length_not_integer, Length})
     end.
@@ -510,7 +510,7 @@ read_sub_chunks(Length, MaxChunkSize, Fun, FunState) when Length > MaxChunkSize 
 
 read_sub_chunks(Length, _MaxChunkSize, Fun, FunState) ->
     Fun({Length, read_chunk(Length)}, FunState).
-    
+
 %% @spec serve_file(Path, DocRoot) -> Response
 %% @doc Serve a file relative to DocRoot.
 serve_file(Path, DocRoot) ->
@@ -723,19 +723,19 @@ test_range() ->
     %% valid, multiple range
     io:format("Testing parse_range_request with valid multiple ranges~n"),
     io:format("1"),
-    [{20, 30}, {50, 100}, {110, 200}] = 
+    [{20, 30}, {50, 100}, {110, 200}] =
         parse_range_request("bytes=20-30,50-100,110-200"),
     io:format("2"),
-    [{20, none}, {50, 100}, {none, 200}] = 
+    [{20, none}, {50, 100}, {none, 200}] =
         parse_range_request("bytes=20-,50-100,-200"),
     io:format(".. ok~n"),
-    
+
     %% no ranges
     io:format("Testing out parse_range_request with no ranges~n"),
     io:format("1"),
     [] = parse_range_request("bytes="),
     io:format(".. ok~n"),
-    
+
     Body = <<"012345678901234567890123456789012345678901234567890123456789">>,
     BodySize = size(Body), %% 60
     BodySize = 60,
@@ -751,7 +751,7 @@ test_range() ->
     io:format("4"),
     {30, 30} = range_skip_length({30, none}, BodySize), %% 30-
     io:format(".. ok ~n"),
-    
+
     %% valid edge cases for range_skip_length
     io:format("Testing out range_skip_length on valid edge case ranges~n"),
     io:format("1"),
@@ -787,4 +787,4 @@ test_range() ->
     invalid_range = range_skip_length({BodySize, none}, BodySize),
     io:format(".. ok ~n"),
     ok.
-    
+

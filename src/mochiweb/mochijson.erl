@@ -145,7 +145,7 @@ json_encode_proplist([], _State) ->
     "{}";
 json_encode_proplist(Props, State) ->
     F = fun ({K, V}, Acc) ->
-                KS = case K of 
+                KS = case K of
                          K when is_atom(K) ->
                              json_encode_string_utf8(atom_to_list(K));
                          K when is_integer(K) ->
@@ -320,12 +320,12 @@ tokenize_string([$\\, $u, C3, C2, C1, C0 | Rest], S, Acc) ->
     % coalesce UTF-16 surrogate pair?
     C = dehex(C0) bor
         (dehex(C1) bsl 4) bor
-        (dehex(C2) bsl 8) bor 
+        (dehex(C2) bsl 8) bor
         (dehex(C3) bsl 12),
     tokenize_string(Rest, ?ADV_COL(S, 6), [C | Acc]);
 tokenize_string([C | Rest], S, Acc) when C >= $\s; C < 16#10FFFF ->
     tokenize_string(Rest, ?ADV_COL(S, 1), [C | Acc]).
-    
+
 tokenize_number(IoList=[C | _], Mode, S=#decoder{input_encoding=utf8}, Acc)
   when is_list(C); is_binary(C); C >= 16#7f ->
     List = xmerl_ucs:from_utf8(iolist_to_binary(IoList)),
@@ -418,7 +418,7 @@ is_obj({struct, Props}) ->
                 true;
             (_) ->
                 false
-        end,    
+        end,
     lists:all(F, Props).
 
 obj_from_list(Props) ->

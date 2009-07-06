@@ -4,7 +4,7 @@
 main(_) ->
     code:add_pathz("src/couchdb"),
     code:add_pathz("src/mochiweb"),
-    
+
     etap:plan(4),
     case (catch test()) of
         ok ->
@@ -16,7 +16,7 @@ main(_) ->
     ok.
 
 test() ->
-    
+
     couch_server:start(
         ["etc/couchdb/default_dev.ini", "etc/couchdb/local_dev.ini"]
     ),
@@ -48,7 +48,7 @@ test() ->
         Acc+1
     end, 0, lists:seq(1, 200)),
     etap:is(200, NumCreated, "Created all databases."),
-    
+
     lists:foreach(fun(Int) ->
         ok = couch_server:delete(MkDbName(Int), [])
     end, lists:seq(1, 200)),
@@ -59,5 +59,5 @@ test() ->
         Acc+1
     end, 0, lists:seq(1, 200)),
     etap:is(200, NumDeleted, "Deleted all databases."),
-    
+
     ok.

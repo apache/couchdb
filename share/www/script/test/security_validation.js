@@ -16,7 +16,7 @@ couchTests.security_validation = function(debug) {
   // specifically for this testing. It is a WWWW-Authenticate scheme named
   // X-Couch-Test-Auth, and the user names and passwords are hard coded
   // on the server-side.
-  // 
+  //
   // We could have used Basic authentication, however the XMLHttpRequest
   // implementation for Firefox and Safari, and probably other browsers are
   // broken (Firefox always prompts the user on 401 failures, Safari gives
@@ -45,7 +45,7 @@ couchTests.security_validation = function(debug) {
      {section:"httpd",
       key: "WWW-Authenticate",
       value:  "X-Couch-Test-Auth"}],
-  
+
     function () {
       // try saving document usin the wrong credentials
       var wrongPasswordDb = new CouchDB("test_suite_db",
@@ -60,8 +60,8 @@ couchTests.security_validation = function(debug) {
         T(wrongPasswordDb.last_req.status == 401);
       }
 
-      // test force_login=true. 
-      var resp = wrongPasswordDb.request("GET", "/_whoami?force_login=true");    
+      // test force_login=true.
+      var resp = wrongPasswordDb.request("GET", "/_whoami?force_login=true");
       var err = JSON.parse(resp.responseText);
       T(err.error == "unauthorized");
       T(resp.status == 401);
@@ -110,7 +110,7 @@ couchTests.security_validation = function(debug) {
       T(user.name == "Damien Katz");
       // test that the roles are listed properly
       TEquals(user.roles, []);
-      
+
 
       // update the document
       var doc = userDb.open("testdoc");
@@ -126,7 +126,7 @@ couchTests.security_validation = function(debug) {
         T(userDb.last_req.status == 403);
       }
 
-      // Now attempt to update the document as a different user, Jan 
+      // Now attempt to update the document as a different user, Jan
       var user2Db = new CouchDB("test_suite_db",
         {"WWW-Authenticate": "X-Couch-Test-Auth Jan Lehnardt:apple"}
       );
@@ -161,7 +161,7 @@ couchTests.security_validation = function(debug) {
       }
 
       // Now delete document
-      T(user2Db.deleteDoc(doc).ok);      
+      T(user2Db.deleteDoc(doc).ok);
 
       // now test bulk docs
       var docs = [{_id:"bahbah",author:"Damien Katz",foo:"bar"},{_id:"fahfah",foo:"baz"}];
@@ -173,11 +173,11 @@ couchTests.security_validation = function(debug) {
       T(results[0].error == undefined)
       T(results[1].rev === undefined)
       T(results[1].error == "forbidden")
-      
+
       T(db.open("bahbah"));
       T(db.open("fahfah") == null);
-      
-      
+
+
       // now all or nothing with a failure
       var docs = [{_id:"booboo",author:"Damien Katz",foo:"bar"},{_id:"foofoo",foo:"baz"}];
 
@@ -188,23 +188,23 @@ couchTests.security_validation = function(debug) {
       T(results.errors[0].error == "forbidden");
       T(db.open("booboo") == null);
       T(db.open("foofoo") == null);
-      
-      
+
+
       // Now test replication
       var AuthHeaders = {"WWW-Authenticate": "X-Couch-Test-Auth Christopher Lenz:dog food"};
       var host = CouchDB.host;
       var dbPairs = [
         {source:"test_suite_db_a",
           target:"test_suite_db_b"},
-    
+
         {source:"test_suite_db_a",
           target:{url: "http://" + host + "/test_suite_db_b",
                   headers: AuthHeaders}},
-        
+
         {source:{url:"http://" + host + "/test_suite_db_a",
                  headers: AuthHeaders},
           target:"test_suite_db_b"},
-        
+
         {source:{url:"http://" + host + "/test_suite_db_a",
                  headers: AuthHeaders},
          target:{url:"http://" + host + "/test_suite_db_b",
@@ -225,7 +225,7 @@ couchTests.security_validation = function(debug) {
         adminDbA.createDb();
         adminDbB.deleteDb();
         adminDbB.createDb();
-  
+
         // save and replicate a documents that will and will not pass our design
         // doc validation function.
         dbA.save({_id:"foo1",value:"a",author:"Noah Slater"});
@@ -239,44 +239,44 @@ couchTests.security_validation = function(debug) {
         T(dbB.open("foo1"));
         T(dbA.open("foo2"));
         T(dbB.open("foo2"));
-  
+
         // save the design doc to dbA
         delete designDoc._rev; // clear rev from previous saves
         adminDbA.save(designDoc);
 
         // no affect on already saved docs
         T(dbA.open("bad1"));
-  
+
         // Update some docs on dbB. Since the design hasn't replicated, anything
         // is allowed.
-  
+
         // this edit will fail validation on replication to dbA (no author)
         T(dbB.save({_id:"bad2",value:"a"}).ok);
-  
+
         // this edit will fail security on replication to dbA (wrong author
         //  replicating the change)
         var foo1 = dbB.open("foo1");
         foo1.value = "b";
         dbB.save(foo1);
-  
+
         // this is a legal edit
         var foo2 = dbB.open("foo2");
         foo2.value = "b";
         dbB.save(foo2);
-  
+
         var results = CouchDB.replicate(B, A, {headers:AuthHeaders});
-  
+
         T(results.ok);
-  
+
         T(results.history[0].docs_written == 1);
         T(results.history[0].doc_write_failures == 2);
-  
+
         // bad2 should not be on dbA
         T(dbA.open("bad2") == null);
-  
+
         // The edit to foo1 should not have replicated.
         T(dbA.open("foo1").value == "a");
-  
+
         // The edit to foo2 should have replicated.
         T(dbA.open("foo2").value == "b");
       }

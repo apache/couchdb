@@ -19,39 +19,39 @@ main(_) ->
             etap:bail()
     end,
     ok.
-    
+
 test() ->
     {ok, Fd} = couch_file:open(filename(), [create,overwrite]),
-    
+
     etap:is({ok, 0}, couch_file:bytes(Fd),
         "File should be initialized to contain zero bytes."),
-    
+
     etap:is(ok, couch_file:write_header(Fd, {<<"some_data">>, 32}),
         "Writing a header succeeds."),
-    
+
     {ok, Size1} = couch_file:bytes(Fd),
     etap:is_greater(Size1, 0,
         "Writing a header allocates space in the file."),
-    
+
     etap:is({ok, {<<"some_data">>, 32}}, couch_file:read_header(Fd),
         "Reading the header returns what we wrote."),
-    
+
     etap:is(ok, couch_file:write_header(Fd, [foo, <<"more">>]),
         "Writing a second header succeeds."),
-    
+
     {ok, Size2} = couch_file:bytes(Fd),
     etap:is_greater(Size2, Size1,
         "Writing a second header allocates more space."),
-    
+
     etap:is({ok, [foo, <<"more">>]}, couch_file:read_header(Fd),
         "Reading the second header does not return the first header."),
-    
+
     % Delete the second header.
     ok = couch_file:truncate(Fd, Size1),
-    
+
     etap:is({ok, {<<"some_data">>, 32}}, couch_file:read_header(Fd),
         "Reading the header after a truncation returns a previous header."),
-    
+
     couch_file:write_header(Fd, [foo, <<"more">>]),
     etap:is({ok, Size2}, couch_file:bytes(Fd),
         "Rewriting the same second header returns the same second size."),
@@ -60,16 +60,16 @@ test() ->
 
     % Now for the fun stuff. Try corrupting the second header and see
     % if we recover properly.
-    
+
     % Destroy the 0x1 byte that marks a header
     check_header_recovery(fun(CouchFd, RawFd, Expect, HeaderPos) ->
         etap:isnt(Expect, couch_file:read_header(CouchFd),
             "Should return a different header before corruption."),
         file:pwrite(RawFd, HeaderPos, <<0>>),
         etap:is(Expect, couch_file:read_header(CouchFd),
-            "Corrupting the byte marker should read the previous header.")     
+            "Corrupting the byte marker should read the previous header.")
     end),
-    
+
     % Corrupt the size.
     check_header_recovery(fun(CouchFd, RawFd, Expect, HeaderPos) ->
         etap:isnt(Expect, couch_file:read_header(CouchFd),
@@ -79,7 +79,7 @@ test() ->
         etap:is(Expect, couch_file:read_header(CouchFd),
             "Corrupting the size should read the previous header.")
     end),
-    
+
     % Corrupt the MD5 signature
     check_header_recovery(fun(CouchFd, RawFd, Expect, HeaderPos) ->
         etap:isnt(Expect, couch_file:read_header(CouchFd),
@@ -89,7 +89,7 @@ test() ->
         etap:is(Expect, couch_file:read_header(CouchFd),
             "Corrupting the MD5 signature should read the previous header.")
     end),
-    
+
     % Corrupt the data
     check_header_recovery(fun(CouchFd, RawFd, Expect, HeaderPos) ->
         etap:isnt(Expect, couch_file:read_header(CouchFd),
@@ -99,7 +99,7 @@ test() ->
         etap:is(Expect, couch_file:read_header(CouchFd),
             "Corrupting the header data should read the previous header.")
     end),
-    
+
     ok.
 
 check_header_recovery(CheckFun) ->
@@ -112,9 +112,9 @@ check_header_recovery(CheckFun) ->
 
     {ok, HeaderPos} = write_random_data(Fd),
     ok = couch_file:write_header(Fd, {2342, <<"corruption! greed!">>}),
-    
+
     CheckFun(Fd, RawFd, {ok, ExpectHeader}, HeaderPos),
-    
+
     ok = file:close(RawFd),
     ok = couch_file:close(Fd),
     ok.
@@ -131,4 +131,3 @@ write_random_data(Fd, N) ->
     {ok, _} = couch_file:append_term(Fd, Term),
     write_random_data(Fd, N-1).
 
-    

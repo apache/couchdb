@@ -15,7 +15,7 @@ couchTests.list_views = function(debug) {
   db.deleteDb();
   db.createDb();
   if (debug) debugger;
-      
+
   var designDoc = {
     _id:"_design/lists",
     language: "javascript",
@@ -44,12 +44,12 @@ couchTests.list_views = function(debug) {
         var row;
         while(row = getRow()) {
           log("row: "+toJSON(row));
-          send(row.key);        
+          send(row.key);
         };
         return "tail";
       }),
       basicJSON : stringFun(function(head, req) {
-        start({"headers":{"Content-Type" : "application/json"}}); 
+        start({"headers":{"Content-Type" : "application/json"}});
         send('{"head":'+toJSON(head)+', ');
         send('"req":'+toJSON(req)+', ');
         send('"rows":[');
@@ -144,7 +144,7 @@ couchTests.list_views = function(debug) {
         send("head");
         var row;
         while(row = getRow()) {
-          send(row.key);        
+          send(row.key);
         };
         getRow();
         getRow();
@@ -165,13 +165,13 @@ couchTests.list_views = function(debug) {
   };
 
   T(db.save(designDoc).ok);
-  
+
   var docs = makeDocs(0, 10);
   db.bulkSave(docs);
-  
+
   var view = db.view('lists/basicView');
   T(view.total_rows == 10);
-  
+
   // standard get
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/basicBasic/basicView");
   T(xhr.status == 200, "standard get should be 200");
@@ -214,7 +214,7 @@ couchTests.list_views = function(debug) {
   T(!(/Key: 1/.test(xhr.responseText)));
   T(/FirstKey: 3/.test(xhr.responseText));
   T(/LastKey: 9/.test(xhr.responseText));
-  
+
   // with 0 rows
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/basicView?startkey=30");
   T(xhr.status == 200, "0 rows");
@@ -231,19 +231,19 @@ couchTests.list_views = function(debug) {
   T(xhr.status == 200, "reduce 0 rows");
   T(/Total Rows/.test(xhr.responseText));
   T(/LastKey: undefined/.test(xhr.responseText));
-  
+
   // when there is a reduce present, but not used
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/withReduce?reduce=false");
   T(xhr.status == 200, "reduce false");
   T(/Total Rows/.test(xhr.responseText));
   T(/Key: 1/.test(xhr.responseText));
 
-  
+
   // when there is a reduce present, and used
   xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/withReduce?group=true");
   T(xhr.status == 200, "group reduce");
   T(/Key: 1/.test(xhr.responseText));
-  
+
   // there should be etags on reduce as well
   var etag = xhr.getResponseHeader("etag");
   T(etag, "Etags should be served with reduce lists");
@@ -251,11 +251,11 @@ couchTests.list_views = function(debug) {
     headers: {"if-none-match": etag}
   });
   T(xhr.status == 304);
-  
+
   // verify the etags expire correctly
   var docs = makeDocs(11, 12);
   db.bulkSave(docs);
-  
+
   xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/withReduce?group=true", {
     headers: {"if-none-match": etag}
   });
@@ -284,7 +284,7 @@ couchTests.list_views = function(debug) {
   });
   T(xhr.status == 400);
   T(/query_parse_error/.test(xhr.responseText));
-    
+
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/rowError/basicView");
   T(/ReferenceError/.test(xhr.responseText));
 
@@ -292,7 +292,7 @@ couchTests.list_views = function(debug) {
   // now with extra qs params
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/qsParams/basicView?foo=blam");
   T(xhr.responseText.match(/blam/));
-  
+
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/stopIter/basicView");
   // T(xhr.getResponseHeader("Content-Type") == "text/plain");
   T(xhr.responseText.match(/^head 0 1 2 tail$/) && "basic stop");
@@ -305,7 +305,7 @@ couchTests.list_views = function(debug) {
   T(xhr.responseText.match(/^head 0 1 2 tail$/) && "reduce stop");
   xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/stopIter2/withReduce?group=true");
   T(xhr.responseText.match(/^head 0 1 2 tail$/) && "reduce stop 2");
-  
+
   // with accept headers for HTML
   xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/acceptSwitch/basicView", {
     headers: {

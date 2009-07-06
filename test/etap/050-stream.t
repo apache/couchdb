@@ -20,7 +20,7 @@ read_all(Fd, PosList) ->
 test() ->
     {ok, Fd} = couch_file:open("test/etap/temp.050", [create,overwrite]),
     {ok, Stream} = couch_stream:open(Fd),
-    
+
     etap:is(ok, couch_stream:write(Stream, <<"food">>),
         "Writing to streams works."),
 
@@ -43,16 +43,16 @@ test() ->
         "Successfully wrote 80 1 bits."),
 
     ZeroBits = <<0:(8*10)>>,
-    etap:is(ok, couch_stream:write(Stream2, ZeroBits), 
+    etap:is(ok, couch_stream:write(Stream2, ZeroBits),
         "Successfully wrote 80 0 bits."),
-    
+
     {Ptrs2, Length2} = couch_stream:close(Stream2),
     etap:is(Ptrs2, [ExpPtr], "Closing stream returns the file pointers."),
     etap:is(Length2, 20, "Length written is 160 bytes."),
 
     AllBits = iolist_to_binary([OneBits,ZeroBits]),
     etap:is(AllBits, read_all(Fd, Ptrs2), "Returned pointers are valid."),
-    
+
     % Stream more the 4K chunk size.
     {ok, ExpPtr2} = couch_file:bytes(Fd),
     {ok, Stream3} = couch_stream:open(Fd),

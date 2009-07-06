@@ -59,11 +59,11 @@ wait(Pid) ->
         {ok, Pid, Msg} -> Msg
     after 1000 ->
         throw(timeout_error)
-    end.    
+    end.
 
-test() ->   
+test() ->
     {ok, TaskStatusPid} = couch_task_status:start_link(),
-    
+
     TaskUpdater = fun() -> loop() end,
     % create three updaters
     Pid1 = spawn(TaskUpdater),
@@ -103,13 +103,13 @@ test() ->
         2,
         "Started a second task."
     ),
-    
+
     etap:is(
         check_status(Pid2, couch_task_status:all()),
         <<"init">>,
         "Second tasks's status was set to 'init'."
     ),
-    
+
     call(Pid2, update, "running"),
     etap:is(
         check_status(Pid2, couch_task_status:all()),
@@ -124,13 +124,13 @@ test() ->
         3,
         "Registered a third task."
     ),
-    
+
     etap:is(
         check_status(Pid3, couch_task_status:all()),
         <<"init">>,
         "Third tasks's status was set to 'init'."
     ),
-    
+
     call(Pid3, update, "running"),
     etap:is(
         check_status(Pid3, couch_task_status:all()),
@@ -169,14 +169,14 @@ test() ->
         2,
         "First task finished."
     ),
-    
+
     call(Pid2, done),
     etap:is(
         length(couch_task_status:all()),
         1,
         "Second task finished."
     ),
-    
+
     call(Pid3, done),
     etap:is(
         length(couch_task_status:all()),

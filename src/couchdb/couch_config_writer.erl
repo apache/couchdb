@@ -54,7 +54,7 @@ save_to_file({{Section, Option}, Value}, File) ->
         _ ->
             NewFileContents2
     end,
-    
+
     ok = file:write_file(File, list_to_binary(NewFileContents)),
     ok.
 
@@ -66,7 +66,7 @@ save_loop({{Section, Option}, Value}, [Line|Rest], OldCurrentSection, Contents, 
     NewCurrentSection = parse_module(Line, OldCurrentSection),
     % if the current Section is the one we want to change, try to match
     % each line with the Option
-    NewContents = 
+    NewContents =
     case NewCurrentSection of
     Section ->
         case OldCurrentSection of
@@ -87,21 +87,21 @@ save_loop({{Section, Option}, Value}, [Line|Rest], OldCurrentSection, Contents, 
             end;
         _ -> % we got into a new [section]
             {NewLine, DoneOptions2} = append_var_to_section(
-                {{Section, Option}, Value}, 
-                Line, 
-                OldCurrentSection, 
+                {{Section, Option}, Value},
+                Line,
+                OldCurrentSection,
                 DoneOptions),
             NewLine
         end;
     _ -> % we are reading [NewCurrentSection]
         {NewLine, DoneOptions2} = append_var_to_section(
-            {{Section, Option}, Value}, 
-            Line, 
-            OldCurrentSection, 
+            {{Section, Option}, Value},
+            Line,
+            OldCurrentSection,
             DoneOptions),
         NewLine
     end,
-    % clumsy way to only append a newline character if the line is not empty. We need this to 
+    % clumsy way to only append a newline character if the line is not empty. We need this to
     % avoid having a newline inserted at the top of the target file each time we save it.
     Contents2 = case Contents of "" -> ""; _ -> Contents ++ "\n" end,
     % go to next line
@@ -110,7 +110,7 @@ save_loop({{Section, Option}, Value}, [Line|Rest], OldCurrentSection, Contents, 
 save_loop({{Section, Option}, Value}, [], OldSection, NewFileContents, DoneOptions) ->
     case lists:member(Option, DoneOptions) of
         % append Deferred Option
-        false when Section == OldSection -> 
+        false when Section == OldSection ->
             {NewFileContents ++ "\n" ++ Option ++ " = " ++ Value ++ "\n", DoneOptions};
         % we're out of new lines, just return the new file's contents
         _ -> {NewFileContents, DoneOptions}
@@ -131,7 +131,7 @@ append_var_to_section({{Section, Option}, Value}, Line, OldCurrentSection, DoneO
         _ ->
             {Line, DoneOptions}
         end.
-    
+
 %% @spec parse_module(Line::string(), OldSection::string()) -> string()
 %% @doc Tries to match a line against a pattern specifying a ini module or
 %%      section ("[Section]"). Returns OldSection if no match is found.

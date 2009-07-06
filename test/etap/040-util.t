@@ -19,13 +19,13 @@ test() ->
     % to_existing_atom
     etap:is(true, couch_util:to_existing_atom(true), "An atom is an atom."),
     etap:is(foo, couch_util:to_existing_atom(<<"foo">>),
-        "A binary foo is the atom foo."),    
+        "A binary foo is the atom foo."),
     etap:is(foobarbaz, couch_util:to_existing_atom("foobarbaz"),
         "A list of atoms is one munged atom."),
 
     % terminate_linked
     Self = self(),
-    spawn(fun() -> 
+    spawn(fun() ->
 		  ChildPid = spawn_link(fun() -> receive shutdown -> ok end end),
 		  couch_util:terminate_linked(normal),
 		  Self ! {pid, ChildPid}
@@ -33,7 +33,7 @@ test() ->
     receive
         {pid, Pid} ->
 	    etap:ok(not is_process_alive(Pid), "why wont this work?")
-    end,    
+    end,
 
     % new_uuid
     etap:isnt(couch_util:new_uuid(), couch_util:new_uuid(),
@@ -68,5 +68,5 @@ test() ->
 
     etap:ok(not couch_util:should_flush(),
         "Checking to flush invokes GC."),
-    
+
     ok.

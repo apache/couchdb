@@ -24,9 +24,9 @@ test() ->
         couch_config:all(),
         "No INI files specified returns 0 key/value pairs."
     ),
-    
+
     ok = couch_config:set("httpd", "port", "80", false),
-    
+
     etap:is(
         couch_config:get("httpd", "port"),
         "80",

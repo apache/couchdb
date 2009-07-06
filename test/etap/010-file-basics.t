@@ -15,7 +15,7 @@ main(_) ->
             etap:bail()
     end,
     ok.
-    
+
 test() ->
     etap:is({error, enoent}, couch_file:open("not a real file"),
         "Opening a non-existant file should return an enoent error."),
@@ -29,7 +29,7 @@ test() ->
     {ok, Fd} = couch_file:open(filename() ++ ".0", [create, overwrite]),
     etap:ok(is_pid(Fd),
         "Returned file descriptor is a Pid"),
-    
+
     etap:is({ok, 0}, couch_file:bytes(Fd),
         "Newly created files have 0 bytes."),
 
@@ -39,16 +39,16 @@ test() ->
     {ok, Size} = couch_file:bytes(Fd),
     etap:is_greater(Size, 0,
         "Writing a term increased the file size."),
-    
+
     etap:is({ok, Size}, couch_file:append_binary(Fd, <<"fancy!">>),
         "Appending a binary returns the current file size."),
-    
+
     etap:is({ok, foo}, couch_file:pread_term(Fd, 0),
         "Reading the first term returns what we wrote: foo"),
-    
+
     etap:is({ok, <<"fancy!">>}, couch_file:pread_binary(Fd, Size),
         "Reading back the binary returns what we wrote: <<\"fancy\">>."),
-        
+
     etap:is({ok, <<131, 100, 0, 3, 102, 111, 111>>},
         couch_file:pread_binary(Fd, 0),
         "Reading a binary at a term position returns the term as binary."
@@ -75,7 +75,7 @@ test() ->
     %    "Reading data that was truncated fails.")
     etap:skip(fun() -> ok end,
         "No idea how to test reading beyond EOF"),
-    
+
     etap:is({ok, foo}, couch_file:pread_term(Fd, 0),
         "Truncating does not affect data located before the truncation mark."),
 

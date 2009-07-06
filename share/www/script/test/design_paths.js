@@ -18,7 +18,7 @@ couchTests.design_paths = function(debug) {
     var dbName = encodeURIComponent(dbNames[i]);
     db.deleteDb();
     db.createDb();
-    
+
     // create a ddoc w bulk_docs
     db.bulkSave([{
       _id : "_design/test",

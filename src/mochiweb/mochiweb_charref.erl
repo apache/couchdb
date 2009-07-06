@@ -26,7 +26,7 @@ charref([$# | L]) ->
     end;
 charref(L) ->
     entity(L).
-    
+
 %% @spec test() -> ok
 %% @doc Run tests for mochiweb_charref.
 test() ->
