@@ -205,12 +205,15 @@ couchTests.replication = function(debug) {
 
         this.afterBA2 = function(dbA, dbB) {
           // open documents and include the conflict meta data
-          var docA = dbA.open("foo", {conflicts: true});
-          var docB = dbB.open("foo", {conflicts: true});
+          var docA = dbA.open("foo", {conflicts: true, deleted_conflicts: true});
+          var docB = dbB.open("foo", {conflicts: true, deleted_conflicts: true});
 
           // We should have no conflicts this time
           T(docA._conflicts === undefined)
           T(docB._conflicts === undefined);
+
+          // They show up as deleted conflicts instead
+          T(docA._deleted_conflicts[0] == docB._deleted_conflicts[0]);
         };
       }
     };
