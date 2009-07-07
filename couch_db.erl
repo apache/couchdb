@@ -822,7 +822,7 @@ doc_meta_info(#doc_info{high_seq=Seq,revs=[#rev_info{rev=Rev}|RestInfo]}, RevTre
     case lists:member(deleted_conflicts, Options) of
     false -> [];
     true ->
-        case [Rev1 || #rev_info{rev=Rev1,deleted=false} <- RestInfo] of
+        case [Rev1 || #rev_info{rev=Rev1,deleted=true} <- RestInfo] of
         [] -> [];
         DelConflictRevs -> [{deleted_conflicts, DelConflictRevs}]
         end
