@@ -109,7 +109,7 @@ output_map_view(Req, View, Group, Db, QueryArgs, nil) ->
         {ok, RowCount} = couch_view:get_row_count(View),
         Start = {StartKey, StartDocId},
         FoldlFun = make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db, RowCount, #view_fold_helper_funs{reduce_count=fun couch_view:reduce_to_count/1}),
-        FoldAccInit = {Limit, SkipCount, undefined, []},
+        FoldAccInit = {Limit, SkipCount, undefined, [], nil},
         FoldResult = couch_view:fold(View, Start, Dir, FoldlFun, FoldAccInit),
         finish_view_fold(Req, RowCount, FoldResult)
     end);
@@ -124,7 +124,7 @@ output_map_view(Req, View, Group, Db, QueryArgs, Keys) ->
     CurrentEtag = view_group_etag(Group, Keys),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         {ok, RowCount} = couch_view:get_row_count(View),
-        FoldAccInit = {Limit, SkipCount, undefined, []},
+        FoldAccInit = {Limit, SkipCount, undefined, [], nil},
         FoldResult = lists:foldl(
             fun(Key, {ok, FoldAcc}) ->
                 Start = {Key, StartDocId},
@@ -373,18 +373,26 @@ make_view_fold_fun(Req, QueryArgs, Etag, Db, TotalViewCount, HelperFuns) ->
         include_docs = IncludeDocs
     } = QueryArgs,
 
-    fun({{Key, DocId}, Value}, OffsetReds, {AccLimit, AccSkip, Resp, RowFunAcc}) ->
+    fun({{Key, DocId}, Value}, OffsetReds, {AccLimit, AccSkip, Resp, RowFunAcc,
+                                            OffsetAcc}) ->
         PassedEnd = PassedEndFun(Key, DocId),
         case {PassedEnd, AccLimit, AccSkip, Resp} of
         {true, _, _, _} ->
             % The stop key has been passed, stop looping.
-            {stop, {AccLimit, AccSkip, Resp, RowFunAcc}};
+            % We may need offset so calcluate it here.
+            % Checking Resp is an optimization that tells
+            % us its already been calculated (and sent).
+            NewOffset = case Resp of
+                undefined -> ReduceCountFun(OffsetReds);
+                _ -> nil
+            end,
+            {stop, {AccLimit, AccSkip, Resp, RowFunAcc, NewOffset}};
         {_, 0, _, _} ->
             % we've done "limit" rows, stop foldling
-            {stop, {0, 0, Resp, RowFunAcc}};
+            {stop, {0, 0, Resp, RowFunAcc, OffsetAcc}};
         {_, _, AccSkip, _} when AccSkip > 0 ->
             % just keep skipping
-            {ok, {AccLimit, AccSkip - 1, Resp, RowFunAcc}};
+            {ok, {AccLimit, AccSkip - 1, Resp, RowFunAcc, OffsetAcc}};
         {_, _, _, undefined} ->
             % rendering the first row, first we start the response
             Offset = ReduceCountFun(OffsetReds),
@@ -392,12 +400,12 @@ make_view_fold_fun(Req, QueryArgs, Etag, Db, TotalViewCount, HelperFuns) ->
                 TotalViewCount, Offset, RowFunAcc),
             {Go, RowFunAcc2} = SendRowFun(Resp2, Db, {{Key, DocId}, Value},
                 IncludeDocs, RowFunAcc0),
-            {Go, {AccLimit - 1, 0, Resp2, RowFunAcc2}};
+            {Go, {AccLimit - 1, 0, Resp2, RowFunAcc2, Offset}};
         {_, AccLimit, _, Resp} when (AccLimit > 0) ->
             % rendering all other rows
             {Go, RowFunAcc2} = SendRowFun(Resp, Db, {{Key, DocId}, Value},
                 IncludeDocs, RowFunAcc),
-            {Go, {AccLimit - 1, 0, Resp, RowFunAcc2}}
+            {Go, {AccLimit - 1, 0, Resp, RowFunAcc2, OffsetAcc}}
         end
     end.
 
@@ -597,14 +605,19 @@ view_row_with_doc(Db, {{Key, DocId}, Value}, Rev) ->
 
 finish_view_fold(Req, TotalRows, FoldResult) ->
     case FoldResult of
-    {ok, {_, _, undefined, _}} ->
+    {ok, {_, _, undefined, _, Offset}} ->
         % nothing found in the view, nothing has been returned
         % send empty view
+        NewOffset = case Offset of
+            nil -> TotalRows;
+            _ -> Offset
+        end,
         send_json(Req, 200, {[
             {total_rows, TotalRows},
+            {offset, NewOffset},
             {rows, []}
         ]});
-    {ok, {_, _, Resp, _}} ->
+    {ok, {_, _, Resp, _, _}} ->
         % end the view
         send_chunk(Resp, "\r\n]}"),
         end_json_response(Resp);

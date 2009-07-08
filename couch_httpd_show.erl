@@ -146,7 +146,7 @@ output_map_list(#httpd{mochi_req=MReq}=Req, Lang, ListSrc, View, Group, Db, Quer
                 start_response = StartListRespFun,
                 send_row = SendListRowFun
             }),
-        FoldAccInit = {Limit, SkipCount, undefined, []},
+        FoldAccInit = {Limit, SkipCount, undefined, [], nil},
         {ok, FoldResult} = couch_view:fold(View, Start, Dir, FoldlFun, FoldAccInit),
         finish_list(Req, QueryServer, CurrentEtag, FoldResult, StartListRespFun, RowCount)
     end);
@@ -171,7 +171,7 @@ output_map_list(#httpd{mochi_req=MReq}=Req, Lang, ListSrc, View, Group, Db, Quer
         StartListRespFun = make_map_start_resp_fun(QueryServer, Db),
         SendListRowFun = make_map_send_row_fun(QueryServer),
 
-        FoldAccInit = {Limit, SkipCount, undefined, []},
+        FoldAccInit = {Limit, SkipCount, undefined, [], nil},
         {ok, FoldResult} = lists:foldl(
             fun(Key, {ok, FoldAcc}) ->
                 FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs#view_query_args{
@@ -317,16 +317,22 @@ output_reduce_list(#httpd{mochi_req=MReq}=Req, Lang, ListSrc, View, Group, Db, Q
     end).
 
 finish_list(Req, QueryServer, Etag, FoldResult, StartFun, TotalRows) ->
-    case FoldResult of
-        {_, _, undefined, _} ->
+    FoldResult2 = case FoldResult of
+        {Limit, SkipCount, Response, RowAcc} ->
+            {Limit, SkipCount, Response, RowAcc, nil};
+        Else ->
+            Else
+    end,
+    case FoldResult2 of
+        {_, _, undefined, _, _} ->
             {ok, Resp, BeginBody} =
                 render_head_for_empty_list(StartFun, Req, Etag, TotalRows),
             [<<"end">>, Chunks] = couch_query_servers:render_list_tail(QueryServer),
             Chunk = BeginBody ++ ?b2l(?l2b(Chunks)),
             send_non_empty_chunk(Resp, Chunk);
-        {_, _, Resp, stop} ->
+        {_, _, Resp, stop, _} ->
             ok;
-        {_, _, Resp, _} ->
+        {_, _, Resp, _, _} ->
             [<<"end">>, Chunks] = couch_query_servers:render_list_tail(QueryServer),
             send_non_empty_chunk(Resp, ?b2l(?l2b(Chunks)))
     end,
