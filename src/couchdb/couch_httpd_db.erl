@@ -407,7 +407,7 @@ db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs_by_seq">>]}=Req, Db) ->
                     end
                 },
                 FoldlFun({{Seq, Id}, Json}, Offset, Acc)
-            end, {Limit, SkipCount, undefined, []}),
+            end, {Limit, SkipCount, undefined, [], nil}),
         couch_httpd_view:finish_view_fold(Req, TotalRowCount, {ok, FoldResult})
     end);
 
@@ -489,7 +489,7 @@ all_docs_view(Req, Db, Keys) ->
         StartId = if is_binary(StartKey) -> StartKey;
         true -> StartDocId
         end,
-        FoldAccInit = {Limit, SkipCount, undefined, []},
+        FoldAccInit = {Limit, SkipCount, undefined, [], nil},
 
         case Keys of
         nil ->

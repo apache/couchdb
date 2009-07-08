@@ -88,12 +88,19 @@ couchTests.view_offsets = function(debug) {
     ];
     db.bulkSave(docs);
 
-    var res = db.view("test/offset", {
+    var res1 = db.view("test/offset", {
       startkey: ["b",4], startkey_docid: "b4", endkey: ["b"],
       limit: 2, descending: true, skip: 1
     })
 
-    return res.offset == 4;
+    var res2 = db.view("test/offset", {startkey: ["c", 3]});
+    var res3 = db.view("test/offset", {
+        startkey: ["b", 6],
+        endkey: ["b", 7]
+    });
+
+    return res1.offset == 4 && res2.offset == docs.length && res3.offset == 8;
+
   };
 
   for(var i = 0; i < 15; i++) T(runTest());
