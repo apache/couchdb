@@ -48,6 +48,7 @@ void free_Buffer(Buffer b) {
 int append_Buffer(Buffer b, char* c, int length) {
   int capacity_changed;
   int new_count;
+  int i;
 
   capacity_changed = FALSE;
   new_count = b->count + length;
@@ -67,8 +68,6 @@ int append_Buffer(Buffer b, char* c, int length) {
     }
   }
 
-  int i;
-
   for(i = 0;i < length;i++) {
     *(b->data + b->count + i) = *(c + i);
   }
@@ -80,14 +79,13 @@ int append_Buffer(Buffer b, char* c, int length) {
 
 char* toString_Buffer(Buffer b) {
   char* result;
+  int i;
 
   if((result = (char*)malloc(sizeof(char)*(b->count+1))) == NULL) {
     return NULL;
   }
 
   result[b->count] = '\0';
-
-  int i;
 
   for(i = 0;i < b->count;i++) {
     result[i] = b->data[i];
@@ -122,10 +120,9 @@ int shrink_Buffer(Buffer b) {
 }
 
 void copy_Buffer(Buffer b, char* c, int pos, int length) {
+  int i;
   if((pos + length) > b->count)
     return;
-
-  int i;
 
   for(i = 0; i < length;i++) {
     *(c + i) = *(b->data + pos + i);
@@ -134,10 +131,9 @@ void copy_Buffer(Buffer b, char* c, int pos, int length) {
 
 
 List init_List(int capacity) {
+  List l;
   if(capacity < 5)
     capacity = 5;
-
-  List l;
 
   if((l = (List)malloc(sizeof(void**)+sizeof(int)*2)) == NULL) {
     return NULL;
@@ -193,6 +189,7 @@ int set_List(List l, int pos, void* ptr) {
 int append_List(List l, void* ptr, int length) {
   int capacity_changed;
   int new_count;
+  int i;
 
   capacity_changed = FALSE;
   new_count = l->count + length;
@@ -212,10 +209,8 @@ int append_List(List l, void* ptr, int length) {
     }
   }
 
-  int i;
-
   for(i = 0;i < length;i++) {
-    *(l->elements + l->count + i) = ptr + i;
+    *(l->elements + l->count + i) = (void *)((char *)ptr + i);
   }
 
   l->count = new_count;
@@ -226,6 +221,7 @@ int append_List(List l, void* ptr, int length) {
 int push_List(List l, void* ptr, int length) {
   int capacity_changed;
   int new_count;
+  int i;
 
   capacity_changed = FALSE;
   new_count = l->count + length;
@@ -245,14 +241,12 @@ int push_List(List l, void* ptr, int length) {
     }
   }
 
-  int i;
-
   for(i = 0;i < length;i++) {
     *(l->elements + l->count + i) = *(l->elements + i);
   }
 
   for(i = 0;i < length;i++) {
-    *(l->elements + i) = ptr+i;
+    *(l->elements + i) = (void *)((char *)ptr+i);
   }
 
   l->count = new_count;
