@@ -197,4 +197,9 @@ couchTests.attachments= function(debug) {
   T(xhr.responseText == lorem);
   T(xhr.getResponseHeader("Content-Type") == "text/plain;charset=utf-8");
 
+  // test large inline attachment too
+  var lorem_b64 = CouchDB.request("GET", "/_utils/script/test/lorem_b64.txt").responseText;
+  var doc = db.open("bin_doc5", {attachments:true});
+  T(doc._attachments["lorem.txt"].data == lorem_b64);
+
 };
