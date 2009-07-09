@@ -269,7 +269,7 @@ bin_size({_Fd, _Sp, Len}) ->
 bin_to_binary(Bin) when is_binary(Bin) ->
     Bin;
 bin_to_binary({Fd, Sp, _Len}) ->
-    couch_stream:foldl(Fd, Sp, fun(Bin, Acc) -> [Bin|Acc] end, []).
+    lists:reverse(couch_stream:foldl(Fd, Sp, fun(Bin,Acc) -> [Bin|Acc] end, [])).
 
 get_validate_doc_fun(#doc{body={Props}}) ->
     Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
