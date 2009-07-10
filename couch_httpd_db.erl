@@ -26,7 +26,8 @@
 -record(doc_query_args, {
     options = [],
     rev = nil,
-    open_revs = []
+    open_revs = [],
+    show = nil
 }).
 
 % Database request handlers
@@ -191,7 +192,6 @@ handle_design_info_req(#httpd{
 
 handle_design_info_req(Req, _Db) ->
     send_method_not_allowed(Req, "GET").
-
 
 create_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
     ok = couch_httpd:verify_is_server_admin(Req),
@@ -558,8 +558,6 @@ all_docs_view(Req, Db, Keys) ->
         end
     end).
 
-
-
 db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
     % check for the existence of the doc to handle the 404 case.
     couch_doc_open(Db, DocId, nil, []),
@@ -572,43 +570,50 @@ db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
 
 db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
     #doc_query_args{
+        show = Format,
         rev = Rev,
         open_revs = Revs,
         options = Options
     } = parse_doc_query(Req),
-    case Revs of
-    [] ->
-        Doc = couch_doc_open(Db, DocId, Rev, Options),
-        DiskEtag = couch_httpd:doc_etag(Doc),
-        couch_httpd:etag_respond(Req, DiskEtag, fun() ->
-            Headers = case Doc#doc.meta of
-            [] -> [{"Etag", DiskEtag}]; % output etag only when we have no meta
-            _ -> []
-            end,
-            send_json(Req, 200, Headers, couch_doc:to_json_obj(Doc, Options))
-        end);
-    _ ->
-        {ok, Results} = couch_db:open_doc_revs(Db, DocId, Revs, Options),
-        {ok, Resp} = start_json_response(Req, 200),
-        send_chunk(Resp, "["),
-        % We loop through the docs. The first time through the separator
-        % is whitespace, then a comma on subsequent iterations.
-        lists:foldl(
-            fun(Result, AccSeparator) ->
-                case Result of
-                {ok, Doc} ->
-                    JsonDoc = couch_doc:to_json_obj(Doc, Options),
-                    Json = ?JSON_ENCODE({[{ok, JsonDoc}]}),
-                    send_chunk(Resp, AccSeparator ++ Json);
-                {{not_found, missing}, RevId} ->
-                    Json = ?JSON_ENCODE({[{"missing", RevId}]}),
-                    send_chunk(Resp, AccSeparator ++ Json)
+    case Format of
+    nil ->
+        case Revs of
+        [] ->
+            Doc = couch_doc_open(Db, DocId, Rev, Options),
+            DiskEtag = couch_httpd:doc_etag(Doc),
+            couch_httpd:etag_respond(Req, DiskEtag, fun() ->
+                Headers = case Doc#doc.meta of
+                [] -> [{"Etag", DiskEtag}]; % output etag only when we have no meta
+                _ -> []
                 end,
-                "," % AccSeparator now has a comma
-            end,
-            "", Results),
-        send_chunk(Resp, "]"),
-        end_json_response(Resp)
+                send_json(Req, 200, Headers, couch_doc:to_json_obj(Doc, Options))
+            end);
+        _ ->
+            {ok, Results} = couch_db:open_doc_revs(Db, DocId, Revs, Options),
+            {ok, Resp} = start_json_response(Req, 200),
+            send_chunk(Resp, "["),
+            % We loop through the docs. The first time through the separator
+            % is whitespace, then a comma on subsequent iterations.
+            lists:foldl(
+                fun(Result, AccSeparator) ->
+                    case Result of
+                    {ok, Doc} ->
+                        JsonDoc = couch_doc:to_json_obj(Doc, Options),
+                        Json = ?JSON_ENCODE({[{ok, JsonDoc}]}),
+                        send_chunk(Resp, AccSeparator ++ Json);
+                    {{not_found, missing}, RevId} ->
+                        Json = ?JSON_ENCODE({[{"missing", RevId}]}),
+                        send_chunk(Resp, AccSeparator ++ Json)
+                    end,
+                    "," % AccSeparator now has a comma
+                end,
+                "", Results),
+            send_chunk(Resp, "]"),
+            end_json_response(Resp)
+        end;
+    _ ->
+        {DesignName, ShowName} = Format,
+        couch_httpd_show:handle_doc_show(Req, DesignName, ShowName, DocId, Db)
     end;
 
 db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
@@ -843,6 +848,16 @@ db_attachment_req(#httpd{method=Method}=Req, Db, DocId, FileNameParts)
 db_attachment_req(Req, _Db, _DocId, _FileNameParts) ->
     send_method_not_allowed(Req, "DELETE,GET,HEAD,PUT").
 
+parse_doc_format(FormatStr) when is_binary(FormatStr) ->
+    parse_doc_format(?b2l(FormatStr));
+parse_doc_format(FormatStr) when is_list(FormatStr) ->
+    SplitFormat = lists:splitwith(fun($/) -> false; (_) -> true end, FormatStr),
+    case SplitFormat of
+        {DesignName, [$/ | ShowName]} -> {?l2b(DesignName), ?l2b(ShowName)};
+        _Else -> throw({bad_request, <<"Invalid doc format">>})
+    end;
+parse_doc_format(_BadFormatStr) ->
+    throw({bad_request, <<"Invalid doc format">>}).   
 
 parse_doc_query(Req) ->
     lists:foldl(fun({Key,Value}, Args) ->
@@ -875,6 +890,8 @@ parse_doc_query(Req) ->
         {"open_revs", RevsJsonStr} ->
             JsonArray = ?JSON_DECODE(RevsJsonStr),
             Args#doc_query_args{open_revs=[couch_doc:parse_rev(Rev) || Rev <- JsonArray]};
+        {"show", FormatStr} ->
+            Args#doc_query_args{show=parse_doc_format(FormatStr)};
         _Else -> % unknown key value pair, ignore.
             Args
         end
