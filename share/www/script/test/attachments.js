@@ -202,4 +202,13 @@ couchTests.attachments= function(debug) {
   var doc = db.open("bin_doc5", {attachments:true});
   T(doc._attachments["lorem.txt"].data == lorem_b64);
 
+  // test etags for attachments.
+  var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc5/lorem.txt");
+  T(xhr.status == 200);
+  var etag = xhr.getResponseHeader("etag");
+  console.log(etag)
+  xhr = CouchDB.request("GET", "/test_suite_db/bin_doc5/lorem.txt", {
+    headers: {"if-none-match": etag}
+  });
+  T(xhr.status == 304);
 };
