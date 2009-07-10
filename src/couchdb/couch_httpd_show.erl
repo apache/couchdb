@@ -12,7 +12,8 @@
 
 -module(couch_httpd_show).
 
--export([handle_doc_show_req/2, handle_view_list_req/2]).
+-export([handle_doc_show_req/2, handle_view_list_req/2,
+        handle_doc_show/5, handle_view_list/6]).
 
 
 -include("couch_db.hrl").
@@ -26,58 +27,59 @@ handle_doc_show_req(#httpd{
         method='GET',
         path_parts=[_DbName, _Design, DesignName, _Show, ShowName, DocId]
     }=Req, Db) ->
-    DesignId = <<"_design/", DesignName/binary>>,
-    #doc{body={Props}} = couch_httpd_db:couch_doc_open(Db, DesignId, nil, []),
-    Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
-    ShowSrc = get_nested_json_value({Props}, [<<"shows">>, ShowName]),
-    Doc = try couch_httpd_db:couch_doc_open(Db, DocId, nil, [conflicts]) of
-        FoundDoc -> FoundDoc
-    catch
-        _ -> nil
-    end,
-    send_doc_show_response(Lang, ShowSrc, DocId, Doc, Req, Db);
-
+    handle_doc_show(Req, DesignName, ShowName, DocId, Db);
+        
 handle_doc_show_req(#httpd{
         method='GET',
         path_parts=[_DbName, _Design, DesignName, _Show, ShowName]
     }=Req, Db) ->
-    DesignId = <<"_design/", DesignName/binary>>,
-    #doc{body={Props}} = couch_httpd_db:couch_doc_open(Db, DesignId, nil, []),
-    Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
-    ShowSrc = get_nested_json_value({Props}, [<<"shows">>, ShowName]),
-    send_doc_show_response(Lang, ShowSrc, nil, nil, Req, Db);
+    handle_doc_show(Req, DesignName, ShowName, nil, Db);
 
 handle_doc_show_req(#httpd{method='GET'}=Req, _Db) ->
     send_error(Req, 404, <<"show_error">>, <<"Invalid path.">>);
 
 handle_doc_show_req(Req, _Db) ->
     send_method_not_allowed(Req, "GET,HEAD").
-
-handle_view_list_req(#httpd{method='GET',
-        path_parts=[_DbName, _Design, DesignName, _List, ListName, ViewName]}=Req, Db) ->
+    
+handle_doc_show(Req, DesignName, ShowName, DocId, Db) ->
     DesignId = <<"_design/", DesignName/binary>>,
     #doc{body={Props}} = couch_httpd_db:couch_doc_open(Db, DesignId, nil, []),
     Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
-    ListSrc = get_nested_json_value({Props}, [<<"lists">>, ListName]),
-    send_view_list_response(Lang, ListSrc, ViewName, DesignId, Req, Db, nil);
+    ShowSrc = get_nested_json_value({Props}, [<<"shows">>, ShowName]),
+    Doc = case DocId of
+        nil -> nil;
+        _ ->
+        try couch_httpd_db:couch_doc_open(Db, DocId, nil, [conflicts]) of
+            FoundDoc -> FoundDoc
+        catch
+            _ -> nil
+        end
+    end,
+    send_doc_show_response(Lang, ShowSrc, DocId, Doc, Req, Db).
+    
+handle_view_list_req(#httpd{method='GET',
+        path_parts=[_DbName, _Design, DesignName, _List, ListName, ViewName]}=Req, Db) ->
+    handle_view_list(Req, DesignName, ListName, ViewName, Db, nil);
 
 handle_view_list_req(#httpd{method='GET'}=Req, _Db) ->
     send_error(Req, 404, <<"list_error">>, <<"Invalid path.">>);
 
 handle_view_list_req(#httpd{method='POST',
         path_parts=[_DbName, _Design, DesignName, _List, ListName, ViewName]}=Req, Db) ->
-    DesignId = <<"_design/", DesignName/binary>>,
-    #doc{body={Props}} = couch_httpd_db:couch_doc_open(Db, DesignId, nil, []),
-    Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
-    ListSrc = get_nested_json_value({Props}, [<<"lists">>, ListName]),
     ReqBody = couch_httpd:body(Req),
     {Props2} = ?JSON_DECODE(ReqBody),
     Keys = proplists:get_value(<<"keys">>, Props2, nil),
-    send_view_list_response(Lang, ListSrc, ViewName, DesignId, Req#httpd{req_body=ReqBody}, Db, Keys);
+    handle_view_list(Req#httpd{req_body=ReqBody}, DesignName, ListName, ViewName, Db, Keys);
 
 handle_view_list_req(Req, _Db) ->
     send_method_not_allowed(Req, "GET,POST,HEAD").
 
+handle_view_list(Req, DesignName, ListName, ViewName, Db, Keys) ->
+    DesignId = <<"_design/", DesignName/binary>>,
+    #doc{body={Props}} = couch_httpd_db:couch_doc_open(Db, DesignId, nil, []),
+    Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
+    ListSrc = get_nested_json_value({Props}, [<<"lists">>, ListName]),
+    send_view_list_response(Lang, ListSrc, ViewName, DesignId, Req, Db, Keys).
 
 get_nested_json_value({Props}, [Key|Keys]) ->
     case proplists:get_value(Key, Props, nil) of

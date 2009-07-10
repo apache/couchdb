@@ -13,7 +13,7 @@
 -module(couch_httpd_view).
 -include("couch_db.hrl").
 
--export([handle_view_req/2,handle_temp_view_req/2]).
+-export([handle_view_req/2,handle_temp_view_req/2,handle_db_view_req/2]).
 
 -export([get_stale_type/1, get_reduce_type/1, parse_view_params/3]).
 -export([make_view_fold_fun/6, finish_view_fold/3, view_row_obj/3]).
@@ -71,6 +71,49 @@ handle_view_req(#httpd{method='POST',
     end;
 
 handle_view_req(Req, _Db) ->
+    send_method_not_allowed(Req, "GET,POST,HEAD").
+
+handle_db_view_req(#httpd{method='GET',
+        path_parts=[_Db, _View, DName, ViewName]}=Req, Db) ->
+    QueryArgs = couch_httpd_view:parse_view_params(Req, nil, nil),
+    #view_query_args{
+        list = ListName
+    } = QueryArgs,
+    ?LOG_DEBUG("ici ~p", [ListName]),
+    case ListName of
+        nil -> couch_httpd_view:design_doc_view(Req, Db, DName, ViewName, nil);
+        _ ->
+            couch_httpd_show:handle_view_list(Req, DName, ListName, ViewName, Db, nil)
+    end;    
+
+handle_db_view_req(#httpd{method='POST',
+        path_parts=[_Db, _View, DName, ViewName]}=Req, Db) ->
+    QueryArgs = couch_httpd_view:parse_view_params(Req, nil, nil),
+    #view_query_args{
+        list = ListName
+    } = QueryArgs,     
+    case ListName of 
+    nil ->     
+        {Fields} = couch_httpd:json_body_obj(Req),
+        case proplists:get_value(<<"keys">>, Fields, nil) of
+        nil ->
+            Fmt = "POST to view ~p/~p in database ~p with no keys member.",
+            ?LOG_DEBUG(Fmt, [DName, ViewName, Db]),
+            couch_httpd_view:design_doc_view(Req, Db, DName, ViewName, nil);
+        Keys when is_list(Keys) ->
+            couch_httpd_view:design_doc_view(Req, Db, DName, ViewName, Keys);
+        _ ->
+            throw({bad_request, "`keys` member must be a array."})
+        end;
+    _ ->
+        ReqBody = couch_httpd:body(Req),
+        {Props2} = ?JSON_DECODE(ReqBody),
+        Keys = proplists:get_value(<<"keys">>, Props2, nil),
+        couch_httpd_show:handle_view_list(Req#httpd{req_body=ReqBody}, 
+            DName, ListName, ViewName, Db, Keys)
+    end;
+
+handle_db_view_req(Req, _Db) ->
     send_method_not_allowed(Req, "GET,POST,HEAD").
 
 handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
@@ -269,6 +312,8 @@ parse_view_param("reduce", Value) ->
     [{reduce, parse_bool_param(Value)}];
 parse_view_param("include_docs", Value) ->
     [{include_docs, parse_bool_param(Value)}];
+parse_view_param("list", Value) ->
+    [{list, ?l2b(Value)}];
 parse_view_param("callback", _) ->
     []; % Verified in the JSON response functions
 parse_view_param(Key, Value) ->
@@ -298,6 +343,8 @@ validate_view_query(end_docid, Value, Args) ->
     Args#view_query_args{end_docid=Value};
 validate_view_query(limit, Value, Args) ->
     Args#view_query_args{limit=Value};
+validate_view_query(list, Value, Args) ->
+    Args#view_query_args{list=Value};
 validate_view_query(stale, _, Args) ->
     Args;
 validate_view_query(descending, true, Args) ->

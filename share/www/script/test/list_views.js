@@ -176,10 +176,20 @@ couchTests.list_views = function(debug) {
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/basicBasic/basicView");
   T(xhr.status == 200, "standard get should be 200");
   T(/head0123456789tail/.test(xhr.responseText));
+  
+  var xhr = CouchDB.request("GET", "/test_suite_db/_view/lists/basicView?list=basicBasic");
+  T(xhr.status == 200, "standard get should be 200");
+  T(/head0123456789tail/.test(xhr.responseText));
 
   // test that etags are available
   var etag = xhr.getResponseHeader("etag");
   xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/basicBasic/basicView", {
+    headers: {"if-none-match": etag}
+  });
+  T(xhr.status == 304);
+  
+  var etag = xhr.getResponseHeader("etag");
+  xhr = CouchDB.request("GET", "/test_suite_db/_view/lists/basicView?list=basicBasic", {
     headers: {"if-none-match": etag}
   });
   T(xhr.status == 304);
@@ -208,15 +218,26 @@ couchTests.list_views = function(debug) {
   T(resp.req.cookie);
 
   // get with query params
-  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/basicView?startkey=3");
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/basicView?startkey=3");
   T(xhr.status == 200, "with query params");
   T(/Total Rows/.test(xhr.responseText));
   T(!(/Key: 1/.test(xhr.responseText)));
   T(/FirstKey: 3/.test(xhr.responseText));
   T(/LastKey: 9/.test(xhr.responseText));
-
+  
+  var xhr = CouchDB.request("GET", "/test_suite_db/_view/lists/basicView?list=simpleForm&startkey=3");
+  T(xhr.status == 200, "with query params");
+  T(/Total Rows/.test(xhr.responseText));
+  T(!(/Key: 1/.test(xhr.responseText)));
+  T(/FirstKey: 3/.test(xhr.responseText));
+  T(/LastKey: 9/.test(xhr.responseText));
+  
   // with 0 rows
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/basicView?startkey=30");
+  T(xhr.status == 200, "0 rows");
+  T(/Total Rows/.test(xhr.responseText));
+  
+   var xhr = CouchDB.request("GET", "/test_suite_db/_view/lists/basicView?list=simpleForm&startkey=30");
   T(xhr.status == 200, "0 rows");
   T(/Total Rows/.test(xhr.responseText));
 
@@ -231,6 +252,12 @@ couchTests.list_views = function(debug) {
   T(xhr.status == 200, "reduce 0 rows");
   T(/Total Rows/.test(xhr.responseText));
   T(/LastKey: undefined/.test(xhr.responseText));
+  
+  // reduce with 0 rows
+   var xhr = CouchDB.request("GET", "/test_suite_db/_view/lists/withReduce?list=simpleForm&startkey=30");
+   T(xhr.status == 200, "reduce 0 rows");
+   T(/Total Rows/.test(xhr.responseText));
+   T(/LastKey: undefined/.test(xhr.responseText));
 
   // when there is a reduce present, but not used
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/withReduce?reduce=false");
