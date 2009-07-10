@@ -206,7 +206,6 @@ couchTests.attachments= function(debug) {
   var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc5/lorem.txt");
   T(xhr.status == 200);
   var etag = xhr.getResponseHeader("etag");
-  console.log(etag)
   xhr = CouchDB.request("GET", "/test_suite_db/bin_doc5/lorem.txt", {
     headers: {"if-none-match": etag}
   });
