@@ -149,21 +149,20 @@ couchTests.attachments= function(debug) {
   T(xhr.status == 200);
   T(xhr.responseText == "This is a string");
 
-
   // Attachment sparseness COUCHDB-220
 
   var docs = []
   for (var i = 0; i < 5; i++) {
-      var doc = {
-	  _id: (i).toString(),
-	  _attachments:{
-	      "foo.txt": {
-		  content_type:"text/plain",
-		  data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
-	      }
-	  }
+    var doc = {
+      _id: (i).toString(),
+      _attachments:{
+        "foo.txt": {
+          content_type:"text/plain",
+          data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+        }
       }
-      docs.push(doc)
+    }
+    docs.push(doc)
   }
 
   db.bulkSave(docs);
