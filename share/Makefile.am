@@ -72,6 +72,7 @@ nobase_dist_localdata_DATA = \
     www/_sidebar.html \
     www/index.html \
     www/config.html \
+	www/custom_test.html \
     www/database.html \
     www/document.html \
     www/replicator.html \
