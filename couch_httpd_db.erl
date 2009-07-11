@@ -842,7 +842,19 @@ db_attachment_req(#httpd{method=Method}=Req, Db, DocId, FileNameParts)
         attachments = NewAttachment ++ proplists:delete(FileName, Attachments)
     },
     {ok, UpdatedRev} = couch_db:update_doc(Db, DocEdited, []),
-    send_json(Req, case Method of 'DELETE' -> 200; _ -> 201 end, {[
+    #db{name=DbName} = Db,
+    
+    {Status, Headers} = case Method of
+        'DELETE' ->
+            {200, []};
+        _ ->
+            {201, [{"Location", absolute_uri(Req, "/" ++ 
+                binary_to_list(DbName) ++ "/" ++ 
+                binary_to_list(DocId) ++ "/" ++ 
+                binary_to_list(FileName)
+            )}]}
+        end,
+    send_json(Req,Status, Headers, {[
         {ok, true},
         {id, DocId},
         {rev, couch_doc:rev_to_str(UpdatedRev)}
