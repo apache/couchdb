@@ -239,9 +239,9 @@
             dataType: "json", data: toJSON(doc),
             complete: function(req) {
               var resp = $.httpData(req, "json");
-              doc._id = resp.id;
-              doc._rev = resp.rev;
               if (req.status == 201) {
+                doc._id = resp.id;
+                doc._rev = resp.rev;
                 if (options.success) options.success(resp);
               } else if (options.error) {
                 options.error(req.status, resp.error, resp.reason);
