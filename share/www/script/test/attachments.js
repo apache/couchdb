@@ -58,6 +58,10 @@ couchTests.attachments= function(debug) {
     headers:{"Content-Type": "text/plain;charset=utf-8"}
   });
   T(xhr.status == 201);
+  TEquals("/bin_doc2/foo2.txt",
+    xhr.getResponseHeader("Location").substr(-18),
+    "should return Location header to newly created or updated attachment");
+  
   var rev = JSON.parse(xhr.responseText).rev;
 
   binAttDoc2 = db.open("bin_doc2");
@@ -78,7 +82,8 @@ couchTests.attachments= function(debug) {
   // test with rev, should not fail
   var xhr = CouchDB.request("DELETE", "/test_suite_db/bin_doc2/foo2.txt?rev=" + rev);
   T(xhr.status == 200);
-
+  TEquals(null, xhr.getResponseHeader("Location"),
+    "should not return Location header on DELETE request");
 
   // test binary data
   var bin_data = "JHAPDO*AU£PN ){(3u[d 93DQ9¡€])}    ææøo'∂ƒæ≤çæππ•¥∫¶®#†π¶®¥π€ª®˙π8np";
