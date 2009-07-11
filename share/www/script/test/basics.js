@@ -181,8 +181,7 @@ couchTests.basics = function(debug) {
     ["tastyfish", {"_bing": {"wha?": "soda can"}}]
   ]
   var test_doc = function(info) {
-    var data = JSON.stringify(info[1]);
-
+  var data = JSON.stringify(info[1]);
     xhr = CouchDB.request("PUT", "/test_suite_db/" + info[0], {body: data});
     T(xhr.status == 500);
     result = JSON.parse(xhr.responseText);

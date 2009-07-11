@@ -32,6 +32,9 @@ specific language governing permissions and limitations under the License.
         $("#toolbar button.load").click(function() {
           location.reload(true);
         });
+        $("#toolbar button.add").click(function() {
+          location = "custom_test.html";
+        });
       });
       var testsPath = document.location.toString().split('?')[1];
       loadScript(testsPath||"script/couch_tests.js")
@@ -46,6 +49,7 @@ specific language governing permissions and limitations under the License.
       <ul id="toolbar">
         <li><button class="run">Run All</button></li>
         <li><button class="load">Reload</button></li>
+        <li><button class="add">Custom Test</button></li>
       </ul>
       <p class="help">
         <strong>Note:</strong> Each of the tests will block the browser. If the

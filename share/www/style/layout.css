@@ -486,11 +486,11 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
 #tests tbody.content td.running {
   background-image: url(../image/running.png); color: #333;
 }
-#tests tbody.content td.success {
-  background-image: url(../image/test_success.gif); color: #060;
+#tests tbody.content td.success, span.success {
+  background-image: url(../image/test_success.gif) no-repeat; color: #060;
 }
-#tests tbody.content td.error, #tests tbody.content td.failure {
-  background-image: url(../image/test_failure.gif); color: #c00;
+#tests tbody.content td.error, #tests tbody.content td.failure, span.failure {
+  background-image: url(../image/test_failure.gif) no-repeat; color: #c00;
 }
 
 /* Configuration */
