@@ -182,9 +182,7 @@ handle_design_info_req(#httpd{
             path_parts=[_DbName, _Design, DesignName, _]
         }=Req, Db) ->
     DesignId = <<"_design/", DesignName/binary>>,
-    ?LOG_ERROR("DesignId ~p",[DesignId]),
     {ok, GroupInfoList} = couch_view:get_group_info(Db, DesignId),
-    ?LOG_ERROR("GroupInfoList ~p",[GroupInfoList]),
     send_json(Req, 200, {[
         {name, DesignName},
         {view_index, {GroupInfoList}}
