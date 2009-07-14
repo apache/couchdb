@@ -6,7 +6,6 @@ bin/couchjs.1
 BUGS
 build-aux/*
 CHANGES
-check.except
 config.*
 configure
 etc/couchdb/default*
@@ -15,6 +14,7 @@ etc/default/couchdb
 etc/launchd/org.apache.couchdb.plist.*
 etc/logrotate.d/couchdb*
 libtool
+licence.skip
 m4/ac_check_curl.m4*
 m4/ac_check_icu.m4*
 Makefile
@@ -28,7 +28,7 @@ share/www/favicon.ico
 share/www/image/*
 share/www/script/jquery.*
 share/www/script/json2.js
-share/www/script/test/lorem.txt
+share/www/script/test/lorem*
 src/couchdb/*.beam
 src/couchdb/couch.app.tpl.in
 src/couchdb/.deps/*
