@@ -1,15 +1,14 @@
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
-// use this file except in compliance with the License.  You may obtain a copy
-// of the License at
+// use this file except in compliance with the License. You may obtain a copy of
+// the License at
 //
 //   http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 // License for the specific language governing permissions and limitations under
 // the License.
-
 
 couchTests.show_documents = function(debug) {
   var db = new CouchDB("test_suite_db");
@@ -147,8 +146,8 @@ couchTests.show_documents = function(debug) {
 
   // Fix for COUCHDB-379
   T(equals(xhr.getResponseHeader("Server").substr(0,7), "CouchDB"));
-  
-  
+
+
   xhr = CouchDB.request("GET", "/test_suite_db/"+docid+"?show=template/hello");
   T(xhr.responseText == "Hello World");
   T(/charset=utf-8/.test(xhr.getResponseHeader("Content-Type")))
@@ -171,10 +170,10 @@ couchTests.show_documents = function(debug) {
   // show with doc
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/just-name/"+docid);
   T(xhr.responseText == "Just Rusty");
-  
+
   xhr = CouchDB.request("GET", "/test_suite_db/"+docid+"?show=template/just-name");
   T(xhr.responseText == "Just Rusty");
-  
+
   // show with missing doc
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/just-name/missingdoc");
 
