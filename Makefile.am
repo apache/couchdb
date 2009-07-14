@@ -69,6 +69,11 @@ local-clean: maintainer-clean
 	rm -fr $(top_srcdir)/tmp
 	find $(top_srcdir) -name Makefile.in -exec rm {} \;
 
+distcheck-hook:
+	grep -rL 'http://www.apache.org/licenses/LICENSE-2.0' * \
+            | grep -vf licence.skip; \
+        test "$$?" -eq 1
+
 .PHONY: distsign
 distsign: distcheck
 	gpg --armor --detach-sig \
