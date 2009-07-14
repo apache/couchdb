@@ -71,7 +71,7 @@ local-clean: maintainer-clean
 
 distcheck-hook:
 	grep -rL 'http://www.apache.org/licenses/LICENSE-2.0' * \
-            | grep -vf licence.skip; \
+            | grep -vf license.skip; \
         test "$$?" -eq 1
 
 .PHONY: distsign

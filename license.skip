@@ -14,7 +14,7 @@ etc/default/couchdb
 etc/launchd/org.apache.couchdb.plist.*
 etc/logrotate.d/couchdb*
 libtool
-licence.skip
+license.skip
 m4/ac_check_curl.m4*
 m4/ac_check_icu.m4*
 Makefile
