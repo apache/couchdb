@@ -1,12 +1,12 @@
 % Licensed under the Apache License, Version 2.0 (the "License"); you may not
-% use this file except in compliance with the License.  You may obtain a copy of
+% use this file except in compliance with the License. You may obtain a copy of
 % the License at
 %
 %   http://www.apache.org/licenses/LICENSE-2.0
 %
 % Unless required by applicable law or agreed to in writing, software
 % distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-% WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+% WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 % License for the specific language governing permissions and limitations under
 % the License.
 
@@ -84,16 +84,16 @@ handle_db_view_req(#httpd{method='GET',
         nil -> couch_httpd_view:design_doc_view(Req, Db, DName, ViewName, nil);
         _ ->
             couch_httpd_show:handle_view_list(Req, DName, ListName, ViewName, Db, nil)
-    end;    
+    end;
 
 handle_db_view_req(#httpd{method='POST',
         path_parts=[_Db, _View, DName, ViewName]}=Req, Db) ->
     QueryArgs = couch_httpd_view:parse_view_params(Req, nil, nil),
     #view_query_args{
         list = ListName
-    } = QueryArgs,     
-    case ListName of 
-    nil ->     
+    } = QueryArgs,
+    case ListName of
+    nil ->
         {Fields} = couch_httpd:json_body_obj(Req),
         case proplists:get_value(<<"keys">>, Fields, nil) of
         nil ->
@@ -109,7 +109,7 @@ handle_db_view_req(#httpd{method='POST',
         ReqBody = couch_httpd:body(Req),
         {Props2} = ?JSON_DECODE(ReqBody),
         Keys = proplists:get_value(<<"keys">>, Props2, nil),
-        couch_httpd_show:handle_view_list(Req#httpd{req_body=ReqBody}, 
+        couch_httpd_show:handle_view_list(Req#httpd{req_body=ReqBody},
             DName, ListName, ViewName, Db, Keys)
     end;
 

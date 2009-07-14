@@ -1,12 +1,12 @@
 % Licensed under the Apache License, Version 2.0 (the "License"); you may not
-% use this file except in compliance with the License.  You may obtain a copy of
+% use this file except in compliance with the License. You may obtain a copy of
 % the License at
 %
 %   http://www.apache.org/licenses/LICENSE-2.0
 %
 % Unless required by applicable law or agreed to in writing, software
 % distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-% WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+% WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 % License for the specific language governing permissions and limitations under
 % the License.
 
@@ -28,7 +28,7 @@ handle_doc_show_req(#httpd{
         path_parts=[_DbName, _Design, DesignName, _Show, ShowName, DocId]
     }=Req, Db) ->
     handle_doc_show(Req, DesignName, ShowName, DocId, Db);
-        
+
 handle_doc_show_req(#httpd{
         method='GET',
         path_parts=[_DbName, _Design, DesignName, _Show, ShowName]
@@ -40,7 +40,7 @@ handle_doc_show_req(#httpd{method='GET'}=Req, _Db) ->
 
 handle_doc_show_req(Req, _Db) ->
     send_method_not_allowed(Req, "GET,HEAD").
-    
+
 handle_doc_show(Req, DesignName, ShowName, DocId, Db) ->
     DesignId = <<"_design/", DesignName/binary>>,
     #doc{body={Props}} = couch_httpd_db:couch_doc_open(Db, DesignId, nil, []),
@@ -56,7 +56,7 @@ handle_doc_show(Req, DesignName, ShowName, DocId, Db) ->
         end
     end,
     send_doc_show_response(Lang, ShowSrc, DocId, Doc, Req, Db).
-    
+
 handle_view_list_req(#httpd{method='GET',
         path_parts=[_DbName, _Design, DesignName, _List, ListName, ViewName]}=Req, Db) ->
     handle_view_list(Req, DesignName, ListName, ViewName, Db, nil);
