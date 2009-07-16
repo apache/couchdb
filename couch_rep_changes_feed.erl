@@ -22,13 +22,22 @@
 -include("couch_db.hrl").
 -include("../ibrowse/ibrowse.hrl").
 
--record (state, {
+-record (remote, {
     conn = nil,
     reqid = nil,
+    complete = false,
     count = 0,
     reply_to = nil,
-    rows = queue:new(),
-    complete = false
+    rows = queue:new()
+}).
+
+-record (local, {
+    changes_from = nil,
+    changes_pid = nil,
+    complete = false,
+    count = 0,
+    reply_to = nil,
+    rows = queue:new()
 }).
 
 start(Url, Options) ->
@@ -38,7 +47,6 @@ start_link(Url, Options) ->
     gen_server:start_link(?MODULE, [Url, Options], []).
 
 next(Server) ->
-    ?LOG_DEBUG("~p at ~p received next_change call", [?MODULE, Server]),
     gen_server:call(Server, next_change, infinity).
 
 stop(Server) ->
@@ -49,64 +57,110 @@ init([{remote, Url}, Options]) ->
     Continuous = proplists:get_value(continuous, Options, false),
     {Pid, ReqId} = start_http_request(lists:concat([Url, "/_changes",
         "?style=all_docs", "&since=", Since, "&continuous=", Continuous])),
-    {ok, #state{conn=Pid, reqid=ReqId}};
+    {ok, #remote{conn=Pid, reqid=ReqId}};
 
+init([{local, DbName}, Options]) when is_list(DbName) ->
+    init([{local, ?l2b(DbName)}, Options]);
 init([{local, DbName}, Options]) ->
-    init([{remote, "http://" ++ couch_config:get("httpd", "bind_address") ++ ":"
-        ++ couch_config:get("httpd", "port") ++ "/" ++ DbName}, Options]).
+    ?LOG_DEBUG("initializing local changes feed for ~s with ~p", [DbName, Options]),
+    process_flag(trap_exit, true),
+    Server = self(),
+    Since = proplists:get_value(since, Options, 0),
+    ChangesPid =
+    case proplists:get_value(continuous, Options, false) of
+    false ->
+        spawn_link(fun() -> send_local_changes_once(Server, DbName, Since) end);
+    true ->
+        spawn_link(fun() -> send_local_changes_forever(Server, DbName, Since) end)
+    end,
+    {ok, #local{changes_pid=ChangesPid}}.
 
-handle_call(next_change, From, State) ->
-    #state{
+handle_call({add, Row}, _From, #local{count=Count, rows=Rows}=State) 
+        when Count < ?MIN_BUFFER_SIZE->
+    case State of
+    #local{reply_to=nil} ->
+        {reply, ok, State#local{count=Count+1, rows = queue:in(Row, Rows)}};
+    #local{count=0, reply_to=Requestor}->
+        gen_server:reply(Requestor, Row),
+        {reply, ok, State#local{reply_to=nil}}
+    end;
+handle_call({add, Row}, From, #local{}=State) ->
+    #local{
+        count = Count,
+        rows = Rows
+    } = State,
+    {noreply, State#local{count=Count+1, changes_from=From, rows=queue:in(Row,Rows)}};
+
+handle_call(next_change, From, #local{count=0}=State) ->
+    if State#local.complete ->
+        {stop, normal, complete, State};
+    true ->
+        {noreply, State#local{reply_to=From}}
+    end;
+handle_call(next_change, _From, #local{}=State) ->
+    #local{
+        count = Count,
+        changes_from = ChangesFrom,
+        rows = Rows
+    } = State,
+    {{value, Row}, NewRows} = queue:out(Rows),
+    if Count =:= ?MIN_BUFFER_SIZE, ChangesFrom =/= nil ->
+        gen_server:reply(ChangesFrom, ok),
+        {reply, Row, State#local{count=Count-1, changes_from=nil, rows=NewRows}};
+    true ->
+        {reply, Row, State#local{count=Count-1, rows=NewRows}}
+    end;
+
+handle_call(next_change, From, #remote{count=0}=State) ->
+    if State#remote.complete ->
+        {stop, normal, complete, State};
+    true ->
+        {noreply, State#remote{reply_to=From}}
+    end;
+handle_call(next_change, _From, #remote{}=State) ->
+    #remote{
         reqid = Id,
         complete = Complete,
         count = Count,
         rows = Rows
     } = State,
-    
     ok = maybe_stream_next(Complete, Count, Id),
-    
-    case queue:out(Rows) of
-    {{value, Row}, NewRows} ->
-        {reply, Row, State#state{count=Count-1, rows=NewRows}};
-    {empty, Rows} ->
-        if State#state.complete ->
-            {stop, normal, complete, State};
-        % State#state.waiting_on_headers ->
-        %     {noreply, State#state{reply_to=From}};
-        true ->
-            {noreply, State#state{reply_to=From}}
-        end
-    end;
+    {{value, Row}, NewRows} = queue:out(Rows),
+    {reply, Row, State#remote{count=Count-1, rows=NewRows}};
 
-handle_call(stop, _From, State) ->
-    catch ibrowse:stop_worker_process(State#state.conn),
+handle_call(stop, _From, #local{changes_pid=ChangesPid} = State) ->
+    exit(ChangesPid, stop),
+    {stop, normal, ok, State};
+
+handle_call(stop, _From, #remote{conn=Conn} = State) ->
+    catch ibrowse:stop_worker_process(Conn),
     {stop, normal, ok, State}.
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({ibrowse_async_headers, Id, "200", _}, #state{reqid=Id}=State) ->
-    #state{
+handle_info({ibrowse_async_headers, Id, "200", _}, #remote{reqid=Id}=State) ->
+    #remote{
         complete = Complete,
         count = Count
     } = State,
     ?LOG_DEBUG("~p reqid ~p ibrowse_async_headers 200", [?MODULE, Id]),
     ok = maybe_stream_next(Complete, Count, Id),
     {noreply, State};
-handle_info({ibrowse_async_headers, Id, "301", Hdrs}, #state{reqid=Id}=State) ->
+handle_info({ibrowse_async_headers, Id, "301", Hdrs}, #remote{reqid=Id}=State) ->
     ?LOG_DEBUG("~p reqid ~p ibrowse_async_headers 301", [?MODULE, Id]),
-    catch ibrowse:stop_worker_process(State#state.conn),
+    catch ibrowse:stop_worker_process(State#remote.conn),
     Url = mochiweb_headers:get_value("Location", mochiweb_headers:make(Hdrs)),
     {Pid, ReqId} = start_http_request(Url),
-    {noreply, State#state{conn=Pid, reqid=ReqId}};
-handle_info({ibrowse_async_headers, Id, Code, Hdrs}, #state{reqid=Id}=State) ->
+    {noreply, State#remote{conn=Pid, reqid=ReqId}};
+handle_info({ibrowse_async_headers, Id, Code, Hdrs}, #remote{reqid=Id}=State) ->
     ?LOG_ERROR("replicator changes feed failed with code ~s and Headers ~n~p",
         [Code,Hdrs]),
     {stop, {error, list_to_integer(Code)}, State};
 
-handle_info({ibrowse_async_response, Id, Msg}, #state{reqid=Id} = State) ->
+handle_info({ibrowse_async_response, Id, Msg}, #remote{reqid=Id} = State) ->
     ?LOG_DEBUG("~p reqid ~p ibrowse_async_response ~p", [?MODULE, Id, Msg]),
-    #state{
+    #remote{
         complete = Complete,
         count = Count,
         rows = Rows
@@ -114,11 +168,11 @@ handle_info({ibrowse_async_response, Id, Msg}, #state{reqid=Id} = State) ->
     try
         Row = decode_row(Msg),
         case State of
-        #state{reply_to=nil} ->
-            {noreply, State#state{count=Count+1, rows = queue:in(Row, Rows)}};
-        #state{count=0, reply_to=From}->
+        #remote{reply_to=nil} ->
+            {noreply, State#remote{count=Count+1, rows = queue:in(Row, Rows)}};
+        #remote{count=0, reply_to=From}->
             gen_server:reply(From, Row),
-            {noreply, State#state{reply_to=nil}}
+            {noreply, State#remote{reply_to=nil}}
         end
     catch
     throw:{invalid_json, Msg} ->
@@ -127,21 +181,32 @@ handle_info({ibrowse_async_response, Id, Msg}, #state{reqid=Id} = State) ->
         {noreply, State}
     end;
 
-handle_info({ibrowse_async_response_end, Id}, #state{reqid=Id} = State) ->
-    ?LOG_DEBUG("got ibrowse_async_response_end ~p", [State#state.reply_to]),
+handle_info({ibrowse_async_response_end, Id}, #remote{reqid=Id} = State) ->
+    ?LOG_DEBUG("got ibrowse_async_response_end ~p", [State#remote.reply_to]),
     case State of
-    #state{reply_to=nil} ->
-        {noreply, State#state{complete=true}};
-    #state{count=0, reply_to=From}->
+    #remote{reply_to=nil} ->
+        {noreply, State#remote{complete=true}};
+    #remote{count=0, reply_to=From}->
         gen_server:reply(From, complete),
         {stop, normal, State}
     end;
+
+handle_info({'EXIT', From, normal}, #local{changes_pid=From} = State) ->
+    if State#local.reply_to =/= nil ->
+        gen_server:reply(State#local.reply_to, complete),
+        {stop, normal, State};
+    true ->
+        {noreply, State#local{complete=true}}
+    end;
+handle_info({'EXIT', From, Reason}, #local{changes_pid=From} = State) ->
+    ?LOG_ERROR("changes_pid died with reason ~p", [Reason]),
+    {stop, changes_pid_died, State};
 
 handle_info(Msg, State) ->
     ?LOG_INFO("unexpected message ~p", [Msg]),
     {noreply, State}.
 
-terminate(_Reason, #state{conn=Pid}) when is_pid(Pid) ->
+terminate(_Reason, #remote{conn=Pid}) when is_pid(Pid) ->
     catch ibrowse:stop_worker_process(Pid),
     ok;
 terminate(_Reason, _State) ->
@@ -149,6 +214,8 @@ terminate(_Reason, _State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+%internal funs
 
 decode_row([$,, $\n | Rest]) ->
     decode_row(Rest);
@@ -161,6 +228,35 @@ maybe_stream_next(false, Count, Id) when Count < ?MIN_BUFFER_SIZE ->
 maybe_stream_next(_Complete, _Count, Id) ->
     ?LOG_DEBUG("~p reqid ~p not streaming", [?MODULE, Id]),
     ok.
+
+send_local_changes_forever(Server, DbName, Since) ->
+    {ok, NewSeq} = send_local_changes_once(Server, DbName, Since),
+    timer:sleep(5000),
+    send_local_changes_forever(Server, DbName, NewSeq).
+
+send_local_changes_once(Server, DbName, Since) ->
+    {ok, Db} = couch_db:open(DbName, []),
+
+    FilterFun =
+    fun(#doc_info{revs=[#rev_info{rev=Rev}|_]}) ->
+        {[{<<"rev">>, couch_doc:rev_to_str(Rev)}]}
+    end,
+
+    ChangesFun =
+    fun([#doc_info{id=Id, high_seq=Seq}|_]=DocInfos, _) ->
+        Results0 = [FilterFun(DocInfo) || DocInfo <- DocInfos],
+        Results = [Result || Result <- Results0, Result /= null],
+        if Results /= [] ->
+            Change = {[{<<"seq">>,Seq}, {<<"id">>,Id}, {<<"changes">>,Results}]},
+            gen_server:call(Server, {add, Change}, infinity);
+        true ->
+            ?LOG_DEBUG("Results was empty ~p", [Results0]),
+            ok
+        end,
+        {ok, Seq}
+    end,
+
+    couch_db:changes_since(Db, all_docs, Since, ChangesFun, Since).
 
 start_http_request(RawUrl) ->
     Url = ibrowse_lib:parse_url(RawUrl),
