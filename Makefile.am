@@ -71,11 +71,14 @@ local-clean: maintainer-clean
 
 distcheck-hook:
 	grep -rL 'http://www.apache.org/licenses/LICENSE-2.0' * \
-            | grep -vf license.skip; \
+            | grep -vEf license.skip; \
         test "$$?" -eq 1
 
 .PHONY: distsign
 distsign: distcheck
+	@# @@ unpack archive and run diff -r to double check missing files
+	@# @@ does automake have anything that does this?
+	false
 	gpg --armor --detach-sig \
 	    < $(top_srcdir)/$(distdir).tar.gz \
 	    > $(top_srcdir)/$(distdir).tar.gz.asc
