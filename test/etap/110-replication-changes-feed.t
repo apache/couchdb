@@ -22,7 +22,7 @@ main(_) ->
     code:add_pathz("src/ibrowse"),
     code:add_pathz("src/mochiweb"),
     
-    etap:plan(6),
+    etap:plan(12),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -40,47 +40,59 @@ test() ->
     crypto:start(),
 
     couch_server:delete(<<"etap-test-db">>, []),
-    {ok, Db} = couch_db:create(<<"etap-test-db">>, []),
-
-    test_unchanged_db(),
-    test_simple_change(),
-    test_since_parameter(),
-    test_continuous_parameter(),
-    test_conflicts(),
-    test_deleted_conflicts(),
-
-    couch_db:close(Db),
+    {ok, Db1} = couch_db:create(<<"etap-test-db">>, []),
+    test_all(local),
+    couch_db:close(Db1),
     couch_server:delete(<<"etap-test-db">>, []),
+
+    couch_server:delete(<<"etap-test-db">>, []),
+    {ok, Db2} = couch_db:create(<<"etap-test-db">>, []),
+    test_all(remote),
+    couch_db:close(Db2),
+    couch_server:delete(<<"etap-test-db">>, []),
+
     ok.
 
-test_unchanged_db() ->
-    {ok, Pid} = couch_rep_changes_feed:start({local, "etap-test-db"}, []),
+test_all(Type) ->
+    test_unchanged_db(Type),
+    test_simple_change(Type),
+    test_since_parameter(Type),
+    test_continuous_parameter(Type),
+    test_conflicts(Type),
+    test_deleted_conflicts(Type).
+
+test_unchanged_db(Type) ->
+    {ok, Pid} = couch_rep_changes_feed:start({Type, get_dbname(Type)}, []),
     etap:is(
         couch_rep_changes_feed:next(Pid),
         complete,
-        "changes feed for unchanged DB is automatically complete"
+        io_lib:format(
+            "(~p) changes feed for unchanged DB is automatically complete",
+            [Type])
     ).
 
-test_simple_change() ->
+test_simple_change(Type) ->
     Expect = generate_change(),
-    {ok, Pid} = couch_rep_changes_feed:start({local, "etap-test-db"}, []),
+    {ok, Pid} = couch_rep_changes_feed:start({Type, get_dbname(Type)}, []),
     etap:is(
         {couch_rep_changes_feed:next(Pid), couch_rep_changes_feed:next(Pid)},
         {Expect, complete},
-        "change one document, get one row"
+        io_lib:format("(~p) change one document, get one row", [Type])
     ).
 
-test_since_parameter() ->
-    {ok, Pid} = couch_rep_changes_feed:start({local, "etap-test-db"}, 
+test_since_parameter(Type) ->
+    {ok, Pid} = couch_rep_changes_feed:start({Type, get_dbname(Type)}, 
         [{since, get_update_seq()}]),
     etap:is(
         couch_rep_changes_feed:next(Pid),
         complete,
-        "since query-string parameter allows us to skip changes"
+        io_lib:format(
+            "(~p) since query-string parameter allows us to skip changes",
+            [Type])
     ).
 
-test_continuous_parameter() ->
-    {ok, Pid} = couch_rep_changes_feed:start({local, "etap-test-db"},
+test_continuous_parameter(Type) ->
+    {ok, Pid} = couch_rep_changes_feed:start({Type, get_dbname(Type)},
         [{since, get_update_seq()}, {continuous, true}]),
 
     % make the changes_feed request before the next update
@@ -94,23 +106,25 @@ test_continuous_parameter() ->
     etap:is(
         receive {actual, Actual} -> Actual end,
         Expect,
-        "continuous query-string parameter picks up new changes"
+        io_lib:format(
+            "(~p) continuous query-string parameter picks up new changes",
+            [Type])
     ),
 
     ok = couch_rep_changes_feed:stop(Pid).
 
-test_conflicts() ->
+test_conflicts(Type) ->
     Since = get_update_seq(),
     Expect = generate_conflict(),
-    {ok, Pid} = couch_rep_changes_feed:start({local, "etap-test-db"}, 
+    {ok, Pid} = couch_rep_changes_feed:start({Type, get_dbname(Type)}, 
         [{since, Since}]),
     etap:is(
         {couch_rep_changes_feed:next(Pid), couch_rep_changes_feed:next(Pid)},
         {Expect, complete},
-        "conflict revisions show up in feed"
+        io_lib:format("(~p) conflict revisions show up in feed", [Type])
     ).
 
-test_deleted_conflicts() ->
+test_deleted_conflicts(Type) ->
     Since = get_update_seq(),
     {ExpectProps} = generate_conflict(),
 
@@ -132,12 +146,12 @@ test_deleted_conflicts() ->
         {<<"changes">>, [Win, {[{<<"rev">>, couch_doc:rev_to_str(Rev)}]}]}
     ]},
     
-    {ok, Pid} = couch_rep_changes_feed:start({local, "etap-test-db"}, 
+    {ok, Pid} = couch_rep_changes_feed:start({Type, get_dbname(Type)}, 
         [{since, Since}]),
     etap:is(
         {couch_rep_changes_feed:next(Pid), couch_rep_changes_feed:next(Pid)},
         {Expect, complete},
-        "deleted conflict revisions show up in feed"
+        io_lib:format("(~p) deleted conflict revisions show up in feed", [Type])
     ).
 
 generate_change() ->
@@ -177,6 +191,11 @@ generate_conflict() ->
 get_db() ->
     {ok, Db} = couch_db:open(<<"etap-test-db">>, []),
     Db.
+
+get_dbname(local) ->
+    "etap-test-db";
+get_dbname(remote) ->
+    "http://127.0.0.1:5984/etap-test-db".
 
 get_update_seq() ->
     Db = get_db(),
