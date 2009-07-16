@@ -1,7 +1,19 @@
+% Licensed under the Apache License, Version 2.0 (the "License"); you may not
+% use this file except in compliance with the License.  You may obtain a copy of
+% the License at
+%
+%   http://www.apache.org/licenses/LICENSE-2.0
+%
+% Unless required by applicable law or agreed to in writing, software
+% distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+% WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+% License for the specific language governing permissions and limitations under
+% the License.
+
 % couch_config_writer module test suote
 
 % Set up test suite
-% ?MODULE_test() returns a list of functions 
+% ?MODULE_test() returns a list of functions
 % that run the actual tests.
 % todo, fix replace_existing_variable2 (i.e. reordering)
 couch_config_writer_test() ->
@@ -186,12 +198,12 @@ run_operation_and_compare_results(Contents, Expect, Config) ->
 
     % call replace function
     [couch_config_writer:save_to_file(ConfigVar, Filename) || ConfigVar <- Config],
-    
+
     % compare new file with expected file
     {ok, Result_} = file:read_file(Filename),
     Result = binary_to_list(Result_),
 
     % clean up
     % file:delete(Filename),
-    
+
     Result = Expect.
