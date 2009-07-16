@@ -1,4 +1,5 @@
 aclocal.m4
+apache-couchdb-*
 AUTHORS
 autom4te.cache/*
 bin/couchdb.1

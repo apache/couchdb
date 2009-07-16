@@ -10,6 +10,8 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
+SUBDIRS = priv
+
 ICU_LOCAL_FLAGS = $(ICU_LOCAL_CFLAGS) $(ICU_LOCAL_LDFLAGS)
 
 # devdocdir = $(localdocdir)/developer/couchdb
@@ -35,7 +37,7 @@ couchinclude_DATA = couch_db.hrl
 
 couchebin_DATA = $(compiled_files)
 
-couchpriv_SCRIPTS = priv/couchspawnkillable
+nobase_couchpriv_SCRIPTS = priv/couchspawnkillable
 
 # dist_devdoc_DATA = $(doc_base) $(doc_modules)
 

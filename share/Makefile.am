@@ -72,7 +72,7 @@ nobase_dist_localdata_DATA = \
     www/_sidebar.html \
     www/index.html \
     www/config.html \
-	www/custom_test.html \
+    www/custom_test.html \
     www/database.html \
     www/document.html \
     www/replicator.html \
@@ -109,6 +109,7 @@ nobase_dist_localdata_DATA = \
     www/script/test/utf8.js \
     www/script/test/jsonp.js \
     www/script/test/attachments.js \
+    www/script/test/attachment_names.js \
     www/script/test/attachment_paths.js \
     www/script/test/attachment_views.js \
     www/script/test/design_paths.js \
