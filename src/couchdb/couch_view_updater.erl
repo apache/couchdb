@@ -12,11 +12,17 @@
 
 -module(couch_view_updater).
 
--export([update/1]).
+-export([update/2]).
 
 -include("couch_db.hrl").
 
-update(#group{db=#db{name=DbName}=Db,name=GroupName,current_seq=Seq,purge_seq=PurgeSeq}=Group) ->
+update(Owner, Group) ->
+    #group{
+        db = #db{name=DbName} = Db,
+        name = GroupName,
+        current_seq = Seq,
+        purge_seq = PurgeSeq
+    } = Group,
     couch_task_status:add_task(<<"View Group Indexer">>, <<DbName/binary," ",GroupName/binary>>, <<"Starting index update">>),
 
     DbPurgeSeq = couch_db:get_purge_seq(Db),
@@ -43,7 +49,7 @@ update(#group{db=#db{name=DbName}=Db,name=GroupName,current_seq=Seq,purge_seq=Pu
             fun(DocInfo, _, {ChangesProcessed, Acc}) ->
                 couch_task_status:update("Processed ~p of ~p changes (~p%)",
                         [ChangesProcessed, TotalChanges, (ChangesProcessed*100) div TotalChanges]),
-                {ok, {ChangesProcessed+1, process_doc(Db, DocInfo, Acc)}}
+                {ok, {ChangesProcessed+1, process_doc(Db, Owner, DocInfo, Acc)}}
             end,
             {0, {[], Group2, ViewEmptyKVs, []}}
             ),
@@ -90,9 +96,9 @@ purge_index(#group{db=Db, views=Views, id_btree=IdBtree}=Group) ->
             views=Views2,
             purge_seq=couch_db:get_purge_seq(Db)}.
 
-process_doc(Db, DocInfo, {Docs, #group{sig=Sig,name=GroupId,design_options=DesignOptions}=Group, ViewKVs,
-        DocIdViewIdKeys}) ->
-    % This fun computes once for each document
+% This fun computes once for each document
+process_doc(Db, Owner, DocInfo, {Docs, Group, ViewKVs, DocIdViewIdKeys}) ->
+    #group{ design_options = DesignOptions } = Group,
 
     #doc_info{id=DocId, revs=[#rev_info{deleted=Deleted}|_]} = DocInfo,
     IncludeDesign = proplists:get_value(<<"include_design">>,
@@ -125,6 +131,9 @@ process_doc(Db, DocInfo, {Docs, #group{sig=Sig,name=GroupId,design_options=Desig
                 Results, ViewKVs, DocIdViewIdKeys2),
             {ok, Group2} = write_changes(Group1, ViewKVs3, DocIdViewIdKeys3,
                 DocInfo#doc_info.high_seq),
+            if is_pid(Owner) ->
+                ok = gen_server:cast(Owner, {partial_update, Group2});
+            true -> ok end,
             garbage_collect(),
             ViewEmptyKeyValues = [{View, []} || View <- Group2#group.views],
             {[], Group2, ViewEmptyKeyValues, []};
