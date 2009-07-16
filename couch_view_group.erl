@@ -89,7 +89,8 @@ init({InitArgs, ReturnPid, Ref}) ->
     case prepare_group(InitArgs, false) of
     {ok, #group{db=Db, fd=Fd}=Group} ->
         couch_db:monitor(Db),
-        Pid = spawn_link(fun()-> couch_view_updater:update(Group) end),
+        Owner = self(),
+        Pid = spawn_link(fun()-> couch_view_updater:update(Owner, Group) end),
         {ok, RefCounter} = couch_ref_counter:start([Fd]),
         {ok, #group_state{
                 db_name=couch_db:name(Db),
@@ -127,7 +128,8 @@ handle_call({request_group, RequestSeq}, From,
             }=State) when RequestSeq > Seq ->
     {ok, Db} = couch_db:open(DbName, []),
     Group2 = Group#group{db=Db},
-    Pid = spawn_link(fun()-> couch_view_updater:update(Group2) end),
+    Owner = self(),
+    Pid = spawn_link(fun()-> couch_view_updater:update(Owner, Group2) end),
 
     {noreply, State#group_state{
         updater_pid=Pid,
@@ -205,7 +207,7 @@ handle_cast({compact_done, NewGroup}, #group_state{
     {ok, Db} = couch_db:open(DbName, []),
     Pid = spawn_link(fun() ->
         {_,Ref} = erlang:spawn_monitor(fun() ->
-            couch_view_updater:update(NewGroup#group{db = Db})
+            couch_view_updater:update(nil, NewGroup#group{db = Db})
         end),
         receive
             {'DOWN', Ref, _, _, {new_group, NewGroup2}} ->
@@ -214,7 +216,21 @@ handle_cast({compact_done, NewGroup}, #group_state{
                 gen_server:cast(Pid2, {compact_done, NewGroup2})
         end
     end),
-    {noreply, State#group_state{compactor_pid = Pid}}.
+    {noreply, State#group_state{compactor_pid = Pid}};
+
+handle_cast({partial_update, NewGroup}, State) ->
+    #group_state{
+        db_name = DbName,
+        waiting_commit = WaitingCommit
+    } = State,
+    NewSeq = NewGroup#group.current_seq,
+    ?LOG_INFO("checkpointing view update at seq ~p for ~s ~s", [NewSeq,
+        DbName, NewGroup#group.name]),
+    if not WaitingCommit ->
+        erlang:send_after(1000, self(), delayed_commit);
+    true -> ok
+    end,
+    {noreply, State#group_state{group=NewGroup, waiting_commit=true}}.
 
 handle_info(delayed_commit, #group_state{db_name=DbName,group=Group}=State) ->
     {ok, Db} = couch_db:open(DbName, []),
@@ -254,7 +270,8 @@ handle_info({'EXIT', FromPid, {new_group, #group{db=Db}=Group}},
         % we still have some waiters, reopen the database and reupdate the index
         {ok, Db2} = couch_db:open(DbName, []),
         Group2 = Group#group{db=Db2},
-        Pid = spawn_link(fun() -> couch_view_updater:update(Group2) end),
+        Owner = self(),
+        Pid = spawn_link(fun() -> couch_view_updater:update(Owner, Group2) end),
         {noreply, State#group_state{waiting_commit=true,
                 waiting_list=StillWaiting, group=Group2, updater_pid=Pid}}
     end;
@@ -267,7 +284,8 @@ handle_info({'EXIT', FromPid, reset},
     ok = couch_db:close(Group#group.db),
     case prepare_group(InitArgs, true) of
     {ok, ResetGroup} ->
-        Pid = spawn_link(fun()-> couch_view_updater:update(ResetGroup) end),
+        Owner = self(),
+        Pid = spawn_link(fun()-> couch_view_updater:update(Owner, ResetGroup) end),
         {noreply, State#group_state{
                 updater_pid=Pid,
                 group=ResetGroup}};
