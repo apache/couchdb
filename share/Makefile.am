@@ -87,6 +87,7 @@ nobase_dist_localdata_DATA = \
     www/script/test/large_docs.js \
     www/script/test/utf8.js \
     www/script/test/attachments.js \
+    www/script/test/attachment_names.js \
     www/script/test/attachment_paths.js \
     www/script/test/attachment_views.js \
     www/script/test/design_paths.js \
