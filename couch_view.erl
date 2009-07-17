@@ -78,7 +78,7 @@ cleanup_index_files(Db) ->
     {ok, DesignDocs} = couch_db:get_design_docs(Db),
 
     % make unique list of group sigs
-    Sigs = lists:map(fun(#doc{id = GroupId} = DDoc) ->
+    Sigs = lists:map(fun(#doc{id = GroupId}) ->
         {ok, Info} = get_group_info(Db, GroupId),
         ?b2l(proplists:get_value(signature, Info))
     end, [DD||DD <- DesignDocs, DD#doc.deleted == false]),
@@ -100,7 +100,7 @@ cleanup_index_files(Db) ->
 list_index_files(Db) ->
     % call server to fetch the index files
     RootDir = couch_config:get("couchdb", "view_index_dir"),
-    Files = filelib:wildcard(RootDir ++ "/." ++ ?b2l(couch_db:name(Db)) ++ "_design"++"/*").
+    filelib:wildcard(RootDir ++ "/." ++ ?b2l(couch_db:name(Db)) ++ "_design"++"/*").
 
 
 get_row_count(#view{btree=Bt}) ->

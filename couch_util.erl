@@ -226,8 +226,8 @@ should_flush(MemThreshHold) ->
 %% Take 3 bytes a time (3 x 8 = 24 bits), and make 4 characters out of
 %% them (4 x 6 = 24 bits).
 %%
-encodeBase64(Bs) when list(Bs) ->
-    encodeBase64(list_to_binary(Bs), <<>>);
+encodeBase64(Bs) when is_list(Bs) ->
+    encodeBase64(iolist_to_binary(Bs), <<>>);
 encodeBase64(Bs) ->
     encodeBase64(Bs, <<>>).
 

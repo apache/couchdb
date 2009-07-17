@@ -29,7 +29,6 @@ start_link() ->
         couch_db_update_notifier_sup, []).
 
 init([]) ->
-    Self = self(),
     ok = couch_config:register(
         fun("update_notification", Key, Value) -> reload_config(Key, Value) end
     ),
