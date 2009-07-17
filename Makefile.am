@@ -37,7 +37,7 @@ couchinclude_DATA = couch_db.hrl
 
 couchebin_DATA = $(compiled_files)
 
-nobase_couchpriv_SCRIPTS = priv/couchspawnkillable
+couchpriv_SCRIPTS = priv/couchspawnkillable
 
 # dist_devdoc_DATA = $(doc_base) $(doc_modules)
 
