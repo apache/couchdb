@@ -7,7 +7,7 @@
 %%%-------------------------------------------------------------------
 %% @author Chandrashekhar Mullaparthi <chandrashekhar dot mullaparthi at gmail dot com>
 %% @copyright 2005-2009 Chandrashekhar Mullaparthi
-%% @version 1.5.0
+%% @version 1.5.1
 %% @doc The ibrowse application implements an HTTP 1.1 client. This
 %% module implements the API of the HTTP client. There is one named
 %% process called 'ibrowse' which assists in load balancing and maintaining configuration. There is one load balancing process per unique webserver. There is
@@ -152,7 +152,7 @@ stop() ->
 %% headerName() = string()
 %% headerValue() = string()
 %% response() = {ok, Status, ResponseHeaders, ResponseBody} | {ibrowse_req_id, req_id() } | {error, Reason}
-%% req_id = term()
+%% req_id() = term()
 %% ResponseBody = string() | {file, Filename}
 %% Reason = term()
 send_req(Url, Headers, Method) ->
@@ -169,7 +169,7 @@ send_req(Url, Headers, Method, Body) ->
     send_req(Url, Headers, Method, Body, []).
 
 %% @doc Same as send_req/4.
-%% For a description of SSL Options, look in the ssl manpage. If the
+%% For a description of SSL Options, look in the <a href="http://www.erlang.org/doc/apps/ssl/index.html">ssl</a> manpage. If the
 %% HTTP Version to use is not specified, the default is 1.1.
 %% <br/>
 %% <p>The <code>host_header</code> option is useful in the case where ibrowse is
@@ -181,7 +181,15 @@ send_req(Url, Headers, Method, Body) ->
 %% used to specify what should go in the <code>Host</code> header in
 %% the request.</p>
 %% <ul>
-%% <li>When both the options <code>save_response_to_file</code> and <code>stream_to</code>
+%% <li>The <code>stream_to</code> option can be used to have the HTTP
+%% response streamed to a process as messages as data arrives on the
+%% socket. If the calling process wishes to control the rate at which
+%% data is received from the server, the option <code>{stream_to,
+%% {process(), once}}</code> can be specified. The calling process
+%% will have to invoke <code>ibrowse:stream_next(Request_id)</code> to
+%% receive the next packet.</li>
+%%
+%% <li>When both the options <code>save_response_to_file</code> and <code>stream_to</code> 
 %% are specified, the former takes precedence.</li>
 %%
 %% <li>For the <code>save_response_to_file</code> option, the response body is saved to
@@ -239,13 +247,14 @@ send_req(Url, Headers, Method, Body) ->
 %%          {content_length, integer()}        |
 %%          {content_type, string()}           |
 %%          {save_response_to_file, srtf()}    |
-%%          {stream_to, process()}             |
+%%          {stream_to, stream_to()}           |
 %%          {http_vsn, {MajorVsn, MinorVsn}}   |
 %%          {host_header, string()}            |
 %%          {inactivity_timeout, integer()}    |
 %%          {connect_timeout, integer()}       |
 %%          {transfer_encoding, {chunked, ChunkSize}}
 %%
+%% stream_to() = process() | {process(), once}
 %% process() = pid() | atom()
 %% username() = string()
 %% password() = string()
@@ -363,10 +372,11 @@ do_send_req(Conn_Pid, Parsed_url, Headers, Method, Body, Options, Timeout) ->
 	    Ret
     end.
 
-ensure_bin(L) when is_list(L) ->
-    list_to_binary(L);
-ensure_bin(B) when is_binary(B) ->
-    B.
+ensure_bin(L) when is_list(L)                     -> list_to_binary(L);
+ensure_bin(B) when is_binary(B)                   -> B;
+ensure_bin(Fun) when is_function(Fun)             -> Fun;
+ensure_bin({Fun}) when is_function(Fun)           -> Fun;
+ensure_bin({Fun, _} = Body) when is_function(Fun) -> Body.
 
 %% @doc Creates a HTTP client process to the specified Host:Port which
 %% is not part of the load balancing pool. This is useful in cases

@@ -388,7 +388,7 @@ handle_sock_closed(#state{reply_buffer = Buf, reqs = Reqs, http_status_code = SC
 	    case TmpFilename of
 		undefined ->
 		    do_reply(State, From, StreamTo, ReqId, Resp_format,
-			     {ok, SC, Headers, lists:reverse(Buf)});
+			     {ok, SC, Headers, Buf});
 		_ ->
 		    file:close(Fd),
 		    do_reply(State, From, StreamTo, ReqId, Resp_format,

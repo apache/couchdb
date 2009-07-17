@@ -151,7 +151,13 @@ handle_info({'EXIT', Pid, _Reason},
     ets:match_delete(Tid, {{'_', Pid}, '_'}),
     {noreply, State#state{num_cur_sessions = Cur - 1}};
 
-handle_info({trace, Bool}, State) ->
+handle_info({trace, Bool}, #state{ets_tid = Tid} = State) ->
+    ets:foldl(fun({{_, Pid}, _}, Acc) when is_pid(Pid) ->
+		      catch Pid ! {trace, Bool},
+		      Acc;
+		 (_, Acc) ->
+		      Acc
+	      end, undefined, Tid),
     put(my_trace_flag, Bool),
     {noreply, State};
 

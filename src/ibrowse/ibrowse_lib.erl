@@ -49,7 +49,7 @@ drv_ue(Str, Port) ->
 %% @spec url_encode(Str) -> UrlEncodedStr
 %% Str = string()
 %% UrlEncodedStr = string()
-url_encode(Str) when list(Str) ->
+url_encode(Str) when is_list(Str) ->
     url_encode_char(lists:reverse(Str), []).
 
 url_encode_char([X | T], Acc) when X >= $0, X =< $9 ->
@@ -70,7 +70,7 @@ url_encode_char([], Acc) ->
 d2h(N) when N<10 -> N+$0;
 d2h(N) -> N+$a-10.
 
-decode_rfc822_date(String) when list(String) ->
+decode_rfc822_date(String) when is_list(String) ->
     case catch decode_rfc822_date_1(string:tokens(String, ", \t\r\n")) of
 	{'EXIT', _} ->
 	    {error, invalid_date};
@@ -177,9 +177,9 @@ dec2hex(M,N,Ack) -> dec2hex(M-1,N bsr 4,[d2h(N band 15)|Ack]).
 %% @spec encode_base64(In) -> Out
 %% In = string() | binary()
 %% Out = string() | binary()
-encode_base64(List) when list(List) ->
+encode_base64(List) when is_list(List) ->
     encode_base64_1(list_to_binary(List));
-encode_base64(Bin) when binary(Bin) ->
+encode_base64(Bin) when is_binary(Bin) ->
     List = encode_base64_1(Bin),
     list_to_binary(List).
 
@@ -197,9 +197,9 @@ encode_base64_1(<<>>) ->
 %% @spec decode_base64(In) -> Out | exit({error, invalid_input})
 %% In = string() | binary()
 %% Out = string() | binary()
-decode_base64(List) when list(List) ->
+decode_base64(List) when is_list(List) ->
     decode_base64_1(List, []);
-decode_base64(Bin) when binary(Bin) ->
+decode_base64(Bin) when is_binary(Bin) ->
     List = decode_base64_1(binary_to_list(Bin), []),
     list_to_binary(List).
 
