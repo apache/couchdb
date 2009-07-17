@@ -16,7 +16,8 @@
 
 %% XXX: Figure out how to -include("couch_db.hrl")
 -record(doc, {id= <<"">>, revs={0, []}, body={[]},
-            attachments=[], deleted=false, meta=[]}).
+            atts=[], deleted=false, meta=[]}).
+-record(att, {name, type, len, md5= <<>>, revpos=0, data}).
 
 main(_) ->
     code:add_pathz("src/couchdb"),
@@ -79,11 +80,19 @@ test_from_json_success() ->
                     {<<"content_type">>, <<"application/pgp-signature">>}
                 ]}}
             ]}}]},
-            #doc{attachments=[
-                {<<"my_attachment.fu">>,
-                    {stub, <<"application/awesome">>, 45}},
-                {<<"noahs_private_key.gpg">>,
-                    {<<"application/pgp-signature">>, <<"I have a pet fish!">>}}
+            #doc{atts=[
+                #att{
+                    name = <<"my_attachment.fu">>,
+                    data = stub,
+                    type = <<"application/awesome">>,
+                    len = 45
+                },
+                #att{
+                    name = <<"noahs_private_key.gpg">>,
+                    data = <<"I have a pet fish!">>,
+                    type = <<"application/pgp-signature">>,
+                    len = 18
+                }
             ]},
             "Attachments are parsed correctly."
         },

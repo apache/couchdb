@@ -16,7 +16,8 @@
 
 %% XXX: Figure out how to -include("couch_db.hrl")
 -record(doc, {id= <<"">>, revs={0, []}, body={[]},
-            attachments=[], deleted=false, meta=[]}).
+            atts=[], deleted=false, meta=[]}).
+-record(att, {name, type, len, md5= <<>>, revpos=0, data}).
 
 main(_) ->
     code:add_pathz("src/couchdb"),
@@ -109,9 +110,18 @@ test_to_json_success() ->
             "_deleted_conflicsts is added as an array of strings."
         },
         {
-            #doc{attachments=[
-                {<<"big.xml">>, {<<"xml/sucks">>, {fun() -> ok end, 400}}},
-                {<<"fast.json">>, {<<"json/ftw">>, <<"{\"so\": \"there!\"}">>}}
+            #doc{atts=[
+                #att{
+                    name = <<"big.xml">>, 
+                    type = <<"xml/sucks">>, 
+                    data = fun() -> ok end, 
+                    len = 400
+                },
+                #att{
+                    name = <<"fast.json">>, 
+                    type = <<"json/ftw">>, 
+                    data = <<"{\"so\": \"there!\"}">>
+                }
             ]},
             {[
                 {<<"_id">>, <<>>},
@@ -119,12 +129,14 @@ test_to_json_success() ->
                     {<<"big.xml">>, {[
                         {<<"stub">>, true},
                         {<<"content_type">>, <<"xml/sucks">>},
-                        {<<"length">>, 400}
+                        {<<"length">>, 400},
+                        {<<"revpos">>, 0}
                     ]}},
                     {<<"fast.json">>, {[
                         {<<"stub">>, true},
                         {<<"content_type">>, <<"json/ftw">>},
-                        {<<"length">>, 16}
+                        {<<"length">>, 16},
+                        {<<"revpos">>, 0}
                     ]}}
                 ]}}
             ]},
@@ -132,20 +144,30 @@ test_to_json_success() ->
         },
         {
             [attachments],
-            #doc{attachments=[
-                {<<"stuff.txt">>,
-                    {<<"text/plain">>, {fun() -> <<"diet pepsi">> end, 10}}},
-                {<<"food.now">>, {<<"application/food">>, <<"sammich">>}}
+            #doc{atts=[
+                #att{
+                    name = <<"stuff.txt">>,
+                    type = <<"text/plain">>,
+                    data = fun() -> <<"diet pepsi">> end,
+                    len = 10
+                },
+                #att{
+                    name = <<"food.now">>,
+                    type = <<"application/food">>,
+                    data = <<"sammich">>
+                }
             ]},
             {[
                 {<<"_id">>, <<>>},
                 {<<"_attachments">>, {[
                     {<<"stuff.txt">>, {[
                         {<<"content_type">>, <<"text/plain">>},
+                        {<<"revpos">>, 0},
                         {<<"data">>, <<"ZGlldCBwZXBzaQ==">>}
                     ]}},
                     {<<"food.now">>, {[
                         {<<"content_type">>, <<"application/food">>},
+                        {<<"revpos">>, 0},
                         {<<"data">>, <<"c2FtbWljaA==">>}
                     ]}}
                 ]}}
