@@ -25,8 +25,7 @@
 -export([open/1, open/2, close/1, bytes/1, sync/1, append_binary/2,old_pread/3]).
 -export([append_term/2, pread_term/2, pread_iolist/2, write_header/2]).
 -export([pread_binary/2, read_header/1, truncate/2, upgrade_old_header/2]).
--export([append_term_md5/2, pread_iolist_md5/2, pread_binary_md5/2]).
--export([pread_term_md5/2]).
+-export([append_term_md5/2,append_binary_md5/2]).
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, code_change/3, handle_info/2]).
 
 %%----------------------------------------------------------------------
@@ -84,12 +83,13 @@ append_term_md5(Fd, Term) ->
 
 append_binary(Fd, Bin) ->
     Size = iolist_size(Bin),
-    gen_server:call(Fd, {append_bin, [<<Size:32/integer>>, Bin]}, infinity).
+    gen_server:call(Fd, {append_bin,
+            [<<0:1/integer,Size:31/integer>>, Bin]}, infinity).
     
 append_binary_md5(Fd, Bin) ->
     Size = iolist_size(Bin),
     gen_server:call(Fd, {append_bin, 
-            [<<Size:32/integer>>, erlang:md5(Bin), Bin]}, infinity).
+            [<<1:1/integer,Size:31/integer>>, erlang:md5(Bin), Bin]}, infinity).
 
 
 %%----------------------------------------------------------------------
@@ -102,10 +102,6 @@ append_binary_md5(Fd, Bin) ->
 
 pread_term(Fd, Pos) ->
     {ok, Bin} = pread_binary(Fd, Pos),
-    {ok, binary_to_term(Bin)}.
-
-pread_term_md5(Fd, Pos) ->
-    {ok, Bin} = pread_binary_md5(Fd, Pos),
     {ok, binary_to_term(Bin)}.
 
 
@@ -121,21 +117,26 @@ pread_binary(Fd, Pos) ->
     {ok, iolist_to_binary(L)}.
 
 pread_iolist(Fd, Pos) ->
-    {ok, LenIolist, NextPos} =read_raw_iolist(Fd, Pos, 4),
-    <<Len:32/integer>> = iolist_to_binary(LenIolist),
-    {ok, Iolist, _} = read_raw_iolist(Fd, NextPos, Len),
-    {ok, Iolist}.
-    
-pread_binary_md5(Fd, Pos) ->
-    {ok, L} = pread_iolist_md5(Fd, Pos),
-    {ok, iolist_to_binary(L)}.
-
-pread_iolist_md5(Fd, Pos) ->
     {ok, LenIolist, NextPos} =read_raw_iolist(Fd, Pos, 20),
-    <<Len:32/integer, Md5/binary>> = iolist_to_binary(LenIolist),
-    {ok, Iolist, _} = read_raw_iolist(Fd, NextPos, Len),
-    Md5 = erlang:md5(Iolist),
-    {ok, Iolist}.
+    case iolist_to_binary(LenIolist) of
+    <<1:1/integer,Len:31/integer,Md5/binary>> ->
+        {ok, Iolist, _} = read_raw_iolist(Fd, NextPos, Len),
+        case erlang:md5(Iolist) of
+        Md5 -> ok;
+        _ ->  throw(file_corruption)
+        end, 
+        {ok, Iolist};
+    <<0:1/integer,Len:31/integer,First16Bytes/binary>> ->
+        if Len =< 16 ->
+            <<Final:Len/binary,_/binary>> = First16Bytes,
+            {ok, Final};
+        true ->
+            {ok, Iolist, _} = read_raw_iolist(Fd, NextPos, Len - 16),
+            {ok, [First16Bytes, Iolist]}
+        end
+    end.
+            
+       
 
 read_raw_iolist(Fd, Pos, Len) ->
     BlockOffset = Pos rem ?SIZE_BLOCK,
