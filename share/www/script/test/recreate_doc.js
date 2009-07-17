@@ -29,11 +29,7 @@ couchTests.recreate_doc = function(debug) {
     T(db.save(doc).ok);
     doc = db.open("foo");
     doc.a = "baz";
-    try {
-      T(db.save(doc).ok);
-    } finally {
-      // And now, we can't even delete the document anymore :/
-      T(db.deleteDoc(doc).rev != undefined);
-    }
+    T(db.save(doc).ok);
+    T(db.deleteDoc(doc).rev != undefined);
   }
 };

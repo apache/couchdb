@@ -79,11 +79,7 @@
     % the json body object.
     body = {[]},
 
-    % each attachment contains:
-    %    {data, Type, <<binary>>}
-    % or:
-    %    {pointer, Type, {FileHandle, StreamPointer, Length}}
-    attachments = [],
+    atts = [], % attachments
 
     deleted = false,
 
@@ -92,6 +88,16 @@
     meta = []
     }).
 
+
+-record(att,
+    {
+    name,
+    type,
+    len,
+    md5= <<>>,
+    revpos=0,
+    data
+    }).
 
 
 -record(user_ctx,
@@ -109,7 +115,7 @@
 % if the disk revision is incremented, then new upgrade logic will need to be
 % added to couch_db_updater:init_db.
 
--define(LATEST_DISK_VERSION, 3).
+-define(LATEST_DISK_VERSION, 4).
 
 -record(db_header,
     {disk_version = ?LATEST_DISK_VERSION,

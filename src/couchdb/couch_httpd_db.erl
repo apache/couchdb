@@ -579,13 +579,15 @@ db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
         [] ->
             Doc = couch_doc_open(Db, DocId, Rev, Options),
             DiskEtag = couch_httpd:doc_etag(Doc),
-            couch_httpd:etag_respond(Req, DiskEtag, fun() ->
-                Headers = case Doc#doc.meta of
-                [] -> [{"Etag", DiskEtag}]; % output etag only when we have no meta
-                _ -> []
-                end,
-                send_json(Req, 200, Headers, couch_doc:to_json_obj(Doc, Options))
-            end);
+            case Doc#doc.meta of
+            [] ->
+                % output etag only when we have no meta
+                couch_httpd:etag_respond(Req, DiskEtag, fun() -> 
+                    send_json(Req, 200, [{"Etag", DiskEtag}], couch_doc:to_json_obj(Doc, Options))
+                end);
+            _ ->
+                send_json(Req, 200, [], couch_doc:to_json_obj(Doc, Options))
+            end;
         _ ->
             {ok, Results} = couch_db:open_doc_revs(Db, DocId, Revs, Options),
             {ok, Resp} = start_json_response(Req, 200),
@@ -626,14 +628,23 @@ db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
     Rev = couch_doc:parse_rev(list_to_binary(proplists:get_value("_rev", Form))),
     {ok, [{ok, Doc}]} = couch_db:open_doc_revs(Db, DocId, [Rev], []),
 
-    NewAttachments = [
-        {validate_attachment_name(Name), {list_to_binary(ContentType), Content}} ||
+    UpdatedAtts = [
+        #att{name=validate_attachment_name(Name),
+            type=list_to_binary(ContentType),
+            data=Content} ||
         {Name, {ContentType, _}, Content} <-
         proplists:get_all_values("_attachments", Form)
     ],
-    #doc{attachments=Attachments} = Doc,
+    #doc{atts=OldAtts} = Doc,
+    OldAtts2 = lists:flatmap(
+        fun(#att{name=OldName}=Att) ->
+            case [1 || A <- UpdatedAtts, A#att.name == OldName] of
+            [] -> [Att]; % the attachment wasn't in the UpdatedAtts, return it
+            _ -> [] % the attachment was in the UpdatedAtts, drop it
+            end
+        end, OldAtts),
     NewDoc = Doc#doc{
-        attachments = Attachments ++ NewAttachments
+        atts = UpdatedAtts ++ OldAtts2
     },
     {ok, NewRev} = couch_db:update_doc(Db, NewDoc, []),
 
@@ -765,13 +776,12 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
         options=Options
     } = parse_doc_query(Req),
     #doc{
-        attachments=Attachments
+        atts=Atts
     } = Doc = couch_doc_open(Db, DocId, Rev, Options),
-
-    case proplists:get_value(FileName, Attachments) of
-    undefined ->
+    case [A || A <- Atts, A#att.name == FileName] of
+    [] ->
         throw({not_found, "Document is missing attachment"});
-    {Type, Bin} ->
+    [#att{type=Type}=Att] ->
         Etag = couch_httpd:doc_etag(Doc),
         couch_httpd:etag_respond(Req, Etag, fun() ->
             {ok, Resp} = start_chunked_response(Req, 200, [
@@ -784,7 +794,7 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
                 % open to discussion.
                 % {"Content-Length", integer_to_list(couch_doc:bin_size(Bin))}
                 ]),
-            couch_doc:bin_foldl(Bin,
+            couch_doc:att_foldl(Att,
                     fun(BinSegment, _) -> send_chunk(Resp, BinSegment) end,[]),
             send_chunk(Resp, "")
         end)
@@ -798,31 +808,36 @@ db_attachment_req(#httpd{method=Method}=Req, Db, DocId, FileNameParts)
                         lists:map(fun binary_to_list/1,
                             FileNameParts),"/")),
 
-    NewAttachment = case Method of
+    NewAtt = case Method of
         'DELETE' ->
             [];
         _ ->
-            % see couch_db:doc_flush_binaries for usage of this structure
-            [{FileName, {
-                case couch_httpd:header_value(Req,"Content-Type") of
-                undefined ->
-                    % We could throw an error here or guess by the FileName.
-                    % Currently, just giving it a default.
-                    <<"application/octet-stream">>;
-                CType ->
-                    list_to_binary(CType)
-                end,
-                case couch_httpd:header_value(Req,"Content-Length") of
-                undefined ->
-                    {fun(MaxChunkSize, ChunkFun, InitState) ->
-                        couch_httpd:recv_chunked(Req, MaxChunkSize,
-                            ChunkFun, InitState)
-                    end, undefined};
-                Length ->
-                    {fun() -> couch_httpd:recv(Req, 0) end,
-                        list_to_integer(Length)}
-                end
-            }}]
+            [#att{
+                name=FileName,
+                type = case couch_httpd:header_value(Req,"Content-Type") of
+                    undefined ->
+                        % We could throw an error here or guess by the FileName.
+                        % Currently, just giving it a default.
+                        <<"application/octet-stream">>;
+                    CType ->
+                        list_to_binary(CType)
+                    end,
+                data = case couch_httpd:header_value(Req,"Content-Length") of
+                    undefined ->
+                        fun(MaxChunkSize, ChunkFun, InitState) ->
+                            couch_httpd:recv_chunked(Req, MaxChunkSize,
+                                ChunkFun, InitState)
+                        end;
+                    Length ->
+                        fun() -> couch_httpd:recv(Req, 0) end
+                    end,
+                len = case couch_httpd:header_value(Req,"Content-Length") of
+                    undefined ->
+                        undefined;
+                    Length ->
+                        list_to_integer(Length)
+                    end
+                    }]
     end,
 
     Doc = case extract_header_rev(Req, couch_httpd:qs_value(Req, "rev")) of
@@ -835,9 +850,9 @@ db_attachment_req(#httpd{method=Method}=Req, Db, DocId, FileNameParts)
             end
     end,
 
-    #doc{attachments=Attachments} = Doc,
+    #doc{atts=Atts} = Doc,
     DocEdited = Doc#doc{
-        attachments = NewAttachment ++ proplists:delete(FileName, Attachments)
+        atts = NewAtt ++ [A || A <- Atts, A#att.name /= FileName]
     },
     {ok, UpdatedRev} = couch_db:update_doc(Db, DocEdited, []),
     #db{name=DbName} = Db,
@@ -941,9 +956,9 @@ parse_copy_destination_header(Req) ->
     end.
 
 validate_attachment_names(Doc) ->
-    lists:foreach(fun({Name, _}) ->
+    lists:foreach(fun(#att{name=Name}) ->
         validate_attachment_name(Name)
-    end, Doc#doc.attachments).
+    end, Doc#doc.atts).
 
 validate_attachment_name(Name) when is_list(Name) ->
     validate_attachment_name(list_to_binary(Name));

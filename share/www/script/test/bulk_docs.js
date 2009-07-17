@@ -96,5 +96,5 @@ couchTests.bulk_docs = function(debug) {
   update = {"_id": newdoc._id, "_rev": newdoc._rev, "body": "blam"};
   torem = {"_id": newdoc._id, "_rev": newdoc._rev, "_deleted": true};
   results = db.bulkSave([update, torem]);
-  T(results[1].error == "conflict");
+  T(results[0].error == "conflict" || results[1].error == "conflict");
 };

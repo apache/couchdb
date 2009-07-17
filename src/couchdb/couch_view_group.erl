@@ -55,15 +55,6 @@ request_group_info(Pid) ->
         throw(Error)
     end.
 
-request_index_files(Pid) ->
-    case gen_server:call(Pid, request_index_files) of
-    {ok, Filelist} ->
-        {ok, Filelist};
-    Error ->
-        throw(Error)
-    end.
-
-
 % from template
 start_link(InitArgs) ->
     case gen_server:start_link(couch_view_group,

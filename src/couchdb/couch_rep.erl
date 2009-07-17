@@ -312,8 +312,6 @@ terminate(normal, State) ->
 terminate(Reason, State) ->
     ?LOG_ERROR("replicator terminating with reason ~p", [Reason]),
     #state{
-        context = Context,
-        current_seq = Seq,
         listeners = Listeners,
         source = Source,
         target = Target,
@@ -390,25 +388,26 @@ attachment_loop(ReqId, Conn) ->
             exit(normal)
     end.
 
-attachment_stub_converter(DbS, Id, Rev, {Name, {stub, Type, Length}}) ->
+att_stub_converter(DbS, Id, Rev,
+        #att{name=Name,data=stub,type=Type,len=Length}=Att) ->
     #http_db{uri=DbUrl, headers=Headers} = DbS,
     {Pos, [RevId|_]} = Rev,
     Url = lists:flatten([DbUrl, url_encode(Id), "/", url_encode(?b2l(Name)),
         "?rev=", ?b2l(couch_doc:rev_to_str({Pos,RevId}))]),
     ?LOG_DEBUG("Attachment URL ~s", [Url]),
-    {ok, RcvFun} = make_attachment_stub_receiver(Url, Headers, Name,
+    {ok, RcvFun} = make_att_stub_receiver(Url, Headers, Name,
         Type, Length),
-    {Name, {Type, {RcvFun, Length}}}.
+    Att#att{name=Name,type=Type,data=RcvFun,len=Length}.
 
-make_attachment_stub_receiver(Url, Headers, Name, Type, Length) ->
-    make_attachment_stub_receiver(Url, Headers, Name, Type, Length, 10, 1000).
+make_att_stub_receiver(Url, Headers, Name, Type, Length) ->
+    make_att_stub_receiver(Url, Headers, Name, Type, Length, 10, 1000).
 
-make_attachment_stub_receiver(Url, _Headers, _Name, _Type, _Length, 0, _Pause) ->
+make_att_stub_receiver(Url, _Headers, _Name, _Type, _Length, 0, _Pause) ->
     ?LOG_ERROR("streaming attachment request failed after 10 retries: ~s",
         [Url]),
     exit({attachment_request_failed, ?l2b(["failed to replicate ", Url])});
 
-make_attachment_stub_receiver(Url, Headers, Name, Type, Length, Retries, Pause) ->
+make_att_stub_receiver(Url, Headers, Name, Type, Length, Retries, Pause) ->
     %% start the process that receives attachment data from ibrowse
     #url{host=Host, port=Port} = ibrowse_lib:parse_url(Url),
     {ok, Conn} = ibrowse:spawn_link_worker_process(Host, Port),
@@ -425,7 +424,7 @@ make_attachment_stub_receiver(Url, Headers, Name, Type, Length, Retries, Pause) 
             "seconds due to {error, ~p}: ~s", [Pause/1000, Reason, Url]),
         catch ibrowse:stop_worker_process(Conn),
         timer:sleep(Pause),
-        make_attachment_stub_receiver(Url, Headers, Name, Type, Length,
+        make_att_stub_receiver(Url, Headers, Name, Type, Length,
             Retries-1, 2*Pause)
     end,
 
@@ -437,7 +436,7 @@ make_attachment_stub_receiver(Url, Headers, Name, Type, Length, Retries, Pause) 
     {'EXIT', Pid, _Reason} ->
         catch ibrowse:stop_worker_process(Conn),
         timer:sleep(Pause),
-        make_attachment_stub_receiver(Url, Headers, Name, Type, Length,
+        make_att_stub_receiver(Url, Headers, Name, Type, Length,
             Retries-1, 2*Pause)
     end,
 
@@ -447,7 +446,7 @@ make_attachment_stub_receiver(Url, Headers, Name, Type, Length, Retries, Pause) 
     receive
     {'EXIT', Pid, attachment_request_failed} ->
         catch ibrowse:stop_worker_process(Conn),
-        make_attachment_stub_receiver(Url, Headers, Name, Type, Length,
+        make_att_stub_receiver(Url, Headers, Name, Type, Length,
             Retries-1, Pause);
     {Pid, {status, StreamStatus, StreamHeaders}} ->
         ?LOG_DEBUG("streaming attachment Status ~p Headers ~p",
@@ -476,7 +475,7 @@ make_attachment_stub_receiver(Url, Headers, Name, Type, Length, Retries, Pause) 
             RedirectUrl = mochiweb_headers:get_value("Location",
                 mochiweb_headers:make(StreamHeaders)),
             catch ibrowse:stop_worker_process(Conn),
-            make_attachment_stub_receiver(RedirectUrl, Headers, Name, Type,
+            make_att_stub_receiver(RedirectUrl, Headers, Name, Type,
                 Length, Retries - 1, Pause);
         ResponseCode >= 400, ResponseCode < 500 ->
             % an error... log and fail
@@ -491,7 +490,7 @@ make_attachment_stub_receiver(Url, Headers, Name, Type, Length, Retries, Pause) 
             Pid ! {self(), fail},
             catch ibrowse:stop_worker_process(Conn),
             timer:sleep(Pause),
-            make_attachment_stub_receiver(Url, Headers, Name, Type, Length,
+            make_att_stub_receiver(Url, Headers, Name, Type, Length,
                 Retries - 1, 2*Pause)
         end
     end.
@@ -772,10 +771,9 @@ open_doc_revs(#http_db{uri=DbUrl, headers=Headers} = DbS, DocId, Revs0,
         fun({[{<<"missing">>, Rev}]}) ->
             {{not_found, missing}, couch_doc:parse_rev(Rev)};
         ({[{<<"ok">>, JsonDoc}]}) ->
-        #doc{id=Id, revs=Rev, attachments=Attach} = Doc =
+        #doc{id=Id, revs=Rev, atts=Atts} = Doc =
             couch_doc:from_json_obj(JsonDoc),
-        Attach2 = [attachment_stub_converter(DbS,Id,Rev,A) || A <- Attach],
-        {ok, Doc#doc{attachments=Attach2}}
+        {ok, Doc#doc{atts=[att_stub_converter(DbS,Id,Rev,A) || A <- Atts]}}
         end, JsonResults),
     {ok, Results};
 open_doc_revs(Db, DocId, Revs, Options) ->

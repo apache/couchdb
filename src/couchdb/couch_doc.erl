@@ -13,7 +13,7 @@
 -module(couch_doc).
 
 -export([to_doc_info/1,to_doc_info_path/1,parse_rev/1,parse_revs/1,rev_to_str/1,rev_to_strs/1]).
--export([bin_foldl/3,bin_size/1,bin_to_binary/1,get_validate_doc_fun/1]).
+-export([att_foldl/3,get_validate_doc_fun/1]).
 -export([from_json_obj/1,to_json_obj/2,has_stubs/1, merge_stubs/2]).
 -export([validate_docid/1]).
 
@@ -23,7 +23,7 @@
 to_json_rev(0, []) ->
     [];
 to_json_rev(Start, [FirstRevId|_]) ->
-    [{<<"_rev">>, ?l2b([integer_to_list(Start),"-",FirstRevId])}].
+    [{<<"_rev">>, ?l2b([integer_to_list(Start),"-",revid_to_str(FirstRevId)])}].
 
 to_json_body(true, _Body) ->
     [{<<"_deleted">>, true}];
@@ -35,12 +35,18 @@ to_json_revisions(Options, Start, RevIds) ->
     false -> [];
     true ->
         [{<<"_revisions">>, {[{<<"start">>, Start},
-                        {<<"ids">>, RevIds}]}}]
+                {<<"ids">>, [revid_to_str(R) ||R <- RevIds]}]}}]
     end.
 
-rev_to_str({Pos, RevId}) ->
-    ?l2b([integer_to_list(Pos),"-",RevId]).
+revid_to_str(RevId) when size(RevId) == 16 ->
+    ?l2b(couch_util:to_hex(RevId));
+revid_to_str(RevId) ->
+    RevId.
 
+rev_to_str({Pos, RevId}) ->
+    ?l2b([integer_to_list(Pos),"-",revid_to_str(RevId)]).
+                    
+                    
 rev_to_strs([]) ->
     [];
 rev_to_strs([{Pos, RevId}| Rest]) ->
@@ -66,17 +72,12 @@ to_json_meta(Meta) ->
 
 to_json_attachment_stubs(Attachments) ->
     BinProps = lists:map(
-        fun({Name, {Type, {_RcvFun, Length}}}) ->
+        fun(#att{name=Name,type=Type,len=Length,revpos=Pos}) ->
             {Name, {[
                 {<<"stub">>, true},
                 {<<"content_type">>, Type},
-                {<<"length">>, Length}
-            ]}};
-        ({Name, {Type, BinValue}}) ->
-            {Name, {[
-                {<<"stub">>, true},
-                {<<"content_type">>, Type},
-                {<<"length">>, bin_size(BinValue)}
+                {<<"length">>, Length},
+                {<<"revpos">>, Pos}
             ]}}
         end,
         Attachments),
@@ -85,24 +86,26 @@ to_json_attachment_stubs(Attachments) ->
         _ -> [{<<"_attachments">>, {BinProps}}]
     end.
 
-to_json_attachments(Attachments) ->
-    BinProps = lists:map(
-        fun({Name, {Type, {RcvFun, Length}}}) ->
-            Data = read_streamed_attachment(RcvFun, Length, _Acc = []),
-            {Name, {[
-                {<<"content_type">>, Type},
+to_json_attachments(Atts) ->
+    AttProps = lists:map(
+        fun(#att{data=Fun,len=Len}=Att) when is_function(Fun) ->
+            Data = read_streamed_attachment(Fun, Len, _Acc = []),
+            {Att#att.name, {[
+                {<<"content_type">>, Att#att.type},
+                {<<"revpos">>, Att#att.revpos},
                 {<<"data">>, couch_util:encodeBase64(Data)}
             ]}};
-        ({Name, {Type, BinValue}}) ->
-            {Name, {[
-                {<<"content_type">>, Type},
-                {<<"data">>, couch_util:encodeBase64(bin_to_binary(BinValue))}
+        (Att) ->
+            {Att#att.name, {[
+                {<<"content_type">>, Att#att.type},
+                {<<"revpos">>, Att#att.revpos},
+                {<<"data">>, couch_util:encodeBase64(att_to_iolist(Att))}
             ]}}
         end,
-        Attachments),
-    case BinProps of
+        Atts),
+    case AttProps of
     [] -> [];
-    _ -> [{<<"_attachments">>, {BinProps}}]
+    _ -> [{<<"_attachments">>, {AttProps}}]
     end.
 
 to_json_attachments(Attachments, Options) ->
@@ -120,7 +123,7 @@ to_json_obj(#doc{id=Id,deleted=Del,body=Body,revs={Start, RevIds},
         ++ to_json_body(Del, Body)
         ++ to_json_revisions(Options, Start, RevIds)
         ++ to_json_meta(Meta)
-        ++ to_json_attachments(Doc#doc.attachments, Options)
+        ++ to_json_attachments(Doc#doc.atts, Options)
     }.
 
 from_json_obj({Props}) ->
@@ -129,12 +132,24 @@ from_json_obj({Props}) ->
 from_json_obj(_Other) ->
     throw({bad_request, "Document must be a JSON object"}).
 
+parse_revid(RevId) when size(RevId) == 32 ->
+    RevInt = erlang:list_to_integer(?b2l(RevId), 16),
+     <<RevInt:128>>;
+parse_revid(RevId) when length(RevId) == 32 ->
+    RevInt = erlang:list_to_integer(RevId, 16),
+     <<RevInt:128>>;
+parse_revid(RevId) when is_binary(RevId) ->
+    RevId;
+parse_revid(RevId) when is_list(RevId) ->
+    ?l2b(RevId).
+
+
 parse_rev(Rev) when is_binary(Rev) ->
     parse_rev(?b2l(Rev));
 parse_rev(Rev) when is_list(Rev) ->
     SplitRev = lists:splitwith(fun($-) -> false; (_) -> true end, Rev),
     case SplitRev of
-        {Pos, [$- | RevId]} -> {list_to_integer(Pos), ?l2b(RevId)};
+        {Pos, [$- | RevId]} -> {list_to_integer(Pos), parse_revid(RevId)};
         _Else -> throw({bad_request, <<"Invalid rev format">>})
     end;
 parse_rev(_BadRev) ->
@@ -176,20 +191,23 @@ transfer_fields([{<<"_rev">>, _Rev} | Rest], Doc) ->
     transfer_fields(Rest,Doc);
 
 transfer_fields([{<<"_attachments">>, {JsonBins}} | Rest], Doc) ->
-    Bins = lists:flatmap(fun({Name, {BinProps}}) ->
+    Atts = lists:map(fun({Name, {BinProps}}) ->
         case proplists:get_value(<<"stub">>, BinProps) of
         true ->
             Type = proplists:get_value(<<"content_type">>, BinProps),
             Length = proplists:get_value(<<"length">>, BinProps),
-            [{Name, {stub, Type, Length}}];
+            RevPos = proplists:get_value(<<"revpos">>, BinProps, 0),
+            #att{name=Name, data=stub, type=Type, len=Length, revpos=RevPos};
         _ ->
             Value = proplists:get_value(<<"data">>, BinProps),
             Type = proplists:get_value(<<"content_type">>, BinProps,
                     ?DEFAULT_ATTACHMENT_CONTENT_TYPE),
-            [{Name, {Type, couch_util:decodeBase64(Value)}}]
+            RevPos = proplists:get_value(<<"revpos">>, BinProps, 0),
+            Bin = couch_util:decodeBase64(Value),
+            #att{name=Name, data=Bin, type=Type, len=size(Bin), revpos=RevPos}
         end
     end, JsonBins),
-    transfer_fields(Rest, Doc#doc{attachments=Bins});
+    transfer_fields(Rest, Doc#doc{atts=Atts});
 
 transfer_fields([{<<"_revisions">>, {Props}} | Rest], Doc) ->
     RevIds = proplists:get_value(<<"ids">>, Props),
@@ -203,7 +221,8 @@ transfer_fields([{<<"_revisions">>, {Props}} | Rest], Doc) ->
     end,
     [throw({doc_validation, "RevId isn't a string"}) ||
             RevId <- RevIds, not is_binary(RevId)],
-    transfer_fields(Rest, Doc#doc{revs={Start, RevIds}});
+    RevIds2 = [parse_revid(RevId) || RevId <- RevIds],
+    transfer_fields(Rest, Doc#doc{revs={Start, RevIds2}});
 
 transfer_fields([{<<"_deleted">>, B} | Rest], Doc) when (B==true) or (B==false) ->
     transfer_fields(Rest, Doc#doc{deleted=B});
@@ -253,23 +272,20 @@ to_doc_info_path(#full_doc_info{id=Id,rev_tree=Tree}) ->
 
 
 
-bin_foldl(Bin, Fun, Acc) when is_binary(Bin) ->
+att_foldl(#att{data=Bin}, Fun, Acc) when is_binary(Bin) ->
     Fun(Bin, Acc);
-bin_foldl({Fd, Sp, Len}, Fun, Acc) when is_tuple(Sp) orelse Sp == null ->
+att_foldl(#att{data={Fd,Sp},len=Len}, Fun, Acc) when is_tuple(Sp) orelse Sp == null ->
     % 09 UPGRADE CODE
     couch_stream:old_foldl(Fd, Sp, Len, Fun, Acc);
-bin_foldl({Fd, Sp, _Len}, Fun, Acc) ->
-    couch_stream:foldl(Fd, Sp, Fun, Acc).
+att_foldl(#att{data={Fd,Sp},md5=Md5}, Fun, Acc) ->
+    couch_stream:foldl(Fd, Sp, Md5, Fun, Acc).
 
-bin_size(Bin) when is_binary(Bin) ->
-    size(Bin);
-bin_size({_Fd, _Sp, Len}) ->
-    Len.
-
-bin_to_binary(Bin) when is_binary(Bin) ->
+att_to_iolist(#att{data=Bin}) when is_binary(Bin) ->
     Bin;
-bin_to_binary({Fd, Sp, _Len}) ->
-    lists:reverse(couch_stream:foldl(Fd, Sp, fun(Bin,Acc) -> [Bin|Acc] end, [])).
+att_to_iolist(#att{data=Iolist}) when is_list(Iolist) ->
+    Iolist;
+att_to_iolist(#att{data={Fd,Sp},md5=Md5}) ->
+    lists:reverse(couch_stream:foldl(Fd, Sp, Md5, fun(Bin,Acc) -> [Bin|Acc] end, [])).
 
 get_validate_doc_fun(#doc{body={Props}}) ->
     Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
@@ -284,24 +300,24 @@ get_validate_doc_fun(#doc{body={Props}}) ->
     end.
 
 
-has_stubs(#doc{attachments=Bins}) ->
-    has_stubs(Bins);
+has_stubs(#doc{atts=Atts}) ->
+    has_stubs(Atts);
 has_stubs([]) ->
     false;
-has_stubs([{_Name, {stub, _, _}}|_]) ->
+has_stubs([#att{data=stub}|_]) ->
     true;
-has_stubs([_Bin|Rest]) ->
+has_stubs([_Att|Rest]) ->
     has_stubs(Rest).
 
-merge_stubs(#doc{attachments=MemBins}=StubsDoc, #doc{attachments=DiskBins}) ->
-    BinDict = dict:from_list(DiskBins),
+merge_stubs(#doc{atts=MemBins}=StubsDoc, #doc{atts=DiskBins}) ->
+    BinDict = dict:from_list([{Name, Att} || #att{name=Name}=Att <- DiskBins]),
     MergedBins = lists:map(
-        fun({Name, {stub, _, _}}) ->
-            {Name, dict:fetch(Name, BinDict)};
-        ({Name, Value}) ->
-            {Name, Value}
+        fun(#att{name=Name, data=stub}) ->
+            dict:fetch(Name, BinDict);
+        (Att) ->
+            Att
         end, MemBins),
-    StubsDoc#doc{attachments= MergedBins}.
+    StubsDoc#doc{atts= MergedBins}.
 
 read_streamed_attachment(_RcvFun, 0, Acc) ->
     list_to_binary(lists:reverse(Acc));
