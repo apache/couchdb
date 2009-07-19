@@ -229,7 +229,7 @@ flush_updated_messages() ->
 
 local_update_notification(Self, DbName, {updated, DbName}) ->
     Self ! updated;
-local_update_notification(Self, DbName, {updated, DbName}) ->
+local_update_notification(Self, DbName, {deleted, DbName}) ->
     Self ! deleted;
 local_update_notification(_, _, _) ->
     ok.
