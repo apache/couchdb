@@ -279,11 +279,9 @@ validate_doc_update(#db{validate_doc_funs=[]}, _Doc, _GetDiskDocFun) ->
     ok;
 validate_doc_update(_Db, #doc{id= <<"_local/",_/binary>>}, _GetDiskDocFun) ->
     ok;
-validate_doc_update(#db{name=DbName,user_ctx=Ctx}=Db, Doc, GetDiskDocFun) ->
+validate_doc_update(Db, Doc, GetDiskDocFun) ->
     DiskDoc = GetDiskDocFun(),
-    JsonCtx =  {[{<<"db">>, DbName},
-            {<<"name">>,Ctx#user_ctx.name},
-            {<<"roles">>,Ctx#user_ctx.roles}]},
+    JsonCtx = couch_util:json_user_ctx(Db),
     try [case Fun(Doc, DiskDoc, JsonCtx) of
             ok -> ok;
             Error -> throw(Error)
