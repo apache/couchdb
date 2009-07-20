@@ -40,11 +40,6 @@ specific language governing permissions and limitations under the License.
         if (page.redirecting) return;
         $("h1 strong").text(page.db.name);
         var viewPath = page.viewName || "_all_docs";
-        if (/^_design\//.test(viewPath)) {
-          var parts = viewPath.split("/");
-          parts.splice(2, 0, "_view");
-          viewPath = parts.join("/");
-        }
         if (viewPath != "_temp_view" && viewPath != "_design_docs") {
           $("h1 a.raw").attr("href", "/" + encodeURIComponent(page.db.name) +
             "/" + viewPath);
@@ -95,7 +90,7 @@ specific language governing permissions and limitations under the License.
           var viewName = $(this).val();
           if (!viewName) $.cookies.remove(page.db.name + ".view");
           location.href = "?" + encodeURIComponent(page.db.name) +
-            (viewName ? "/" + encodeURIComponent(viewName)  : "");
+            (viewName ? "/" + viewName  : "");
         });
         $("#documents thead th.key").click(function() {
           $(this).toggleClass("desc");
