@@ -41,7 +41,8 @@ var dispatch = {
   "rereduce" : Views.rereduce,
   "validate" : Validate.validate,
   "show"     : Render.show,
-  "list"     : Render.list
+  "list"     : Render.list,
+  "filter"   : Filter.filter
 };
 
 while (line = eval(readline())) {

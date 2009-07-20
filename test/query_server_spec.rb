@@ -239,6 +239,15 @@ functions = {
           return "tail";
         };
     JS
+  },
+  "filter-basic" => {
+    "js" => <<-JS
+      function(doc, req, userCtx) {
+        if (doc.good) {
+          return true;
+        }
+      }
+    JS
   }
 }
 
@@ -418,6 +427,18 @@ describe "query server normal case" do
       # here's where js has to discard quit properly
       @qs.run(["reset"]).
         should == true
+    end
+  end
+  
+  describe "changes filter" do
+    before(:all) do
+      @fun = functions["filter-basic"][LANGUAGE]
+      @qs.reset!
+      @qs.add_fun(@fun).should == true
+    end
+    it "should only return true for good docs" do
+      @qs.run(["filter", [{"key"=>"bam", "good" => true}, {"foo" => "bar"}, {"good" => true}]]).
+        should ==  [true, [true, false, true]]
     end
   end
 end

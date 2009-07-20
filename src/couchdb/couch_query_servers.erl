@@ -20,6 +20,7 @@
 -export([reduce/3, rereduce/3,validate_doc_update/5]).
 -export([render_doc_show/6, start_view_list/2,
         render_list_head/4, render_list_row/3, render_list_tail/1]).
+-export([start_filter/2, filter_doc/4, end_filter/1]).
 % -export([test/0]).
 
 -include("couch_db.hrl").
@@ -211,8 +212,22 @@ render_list_tail({Lang, Pid}) ->
     ok = ret_os_process(Lang, Pid),
     JsonResp.
 
+start_filter(Lang, FilterSrc) ->
+    Pid = get_os_process(Lang),
+    true = couch_os_process:prompt(Pid, [<<"add_fun">>, FilterSrc]),
+    {ok, {Lang, Pid}}.
 
+filter_doc({_Lang, Pid}, Doc, Req, Db) ->
+    JsonReq = couch_httpd_external:json_req_obj(Req, Db),
+    JsonDoc = couch_doc:to_json_obj(Doc, [revs]),
+    JsonCtx = couch_util:json_user_ctx(Db),
+    [true, [Pass]] = couch_os_process:prompt(Pid,
+        [<<"filter">>, [JsonDoc], JsonReq, JsonCtx]),
+    {ok, Pass}.
 
+end_filter({Lang, Pid}) ->
+    ok = ret_os_process(Lang, Pid).
+    
 
 init([]) ->
 

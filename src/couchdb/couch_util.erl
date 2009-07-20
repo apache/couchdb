@@ -17,7 +17,7 @@
 -export([new_uuid/0, rand32/0, implode/2, collate/2, collate/3]).
 -export([abs_pathname/1,abs_pathname/2, trim/1, ascii_lower/1]).
 -export([encodeBase64/1, decodeBase64/1, to_hex/1,parse_term/1,dict_find/3]).
--export([file_read_size/1]).
+-export([file_read_size/1, get_nested_json_value/2, json_user_ctx/1]).
 -export([to_binary/1, to_list/1]).
 
 -include("couch_db.hrl").
@@ -74,6 +74,22 @@ parse_term(List) ->
     {ok, Tokens, _} = erl_scan:string(List ++ "."),
     erl_parse:parse_term(Tokens).
 
+
+get_nested_json_value({Props}, [Key|Keys]) ->
+    case proplists:get_value(Key, Props, nil) of
+    nil -> throw({not_found, <<"missing json key: ", Key/binary>>});
+    Value -> get_nested_json_value(Value, Keys)
+    end;
+get_nested_json_value(Value, []) ->
+    Value;
+get_nested_json_value(_NotJSONObj, _) ->
+    throw({not_found, json_mismatch}).
+
+json_user_ctx(#db{name=DbName, user_ctx=Ctx}) ->
+    {[{<<"db">>, DbName},
+            {<<"name">>,Ctx#user_ctx.name},
+            {<<"roles">>,Ctx#user_ctx.roles}]}.
+    
 
 % returns a random integer
 rand32() ->

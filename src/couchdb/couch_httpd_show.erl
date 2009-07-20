@@ -45,7 +45,7 @@ handle_doc_show(Req, DesignName, ShowName, DocId, Db) ->
     DesignId = <<"_design/", DesignName/binary>>,
     #doc{body={Props}} = couch_httpd_db:couch_doc_open(Db, DesignId, nil, []),
     Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
-    ShowSrc = get_nested_json_value({Props}, [<<"shows">>, ShowName]),
+    ShowSrc = couch_util:get_nested_json_value({Props}, [<<"shows">>, ShowName]),
     Doc = case DocId of
         nil -> nil;
         _ ->
@@ -78,18 +78,10 @@ handle_view_list(Req, DesignName, ListName, ViewName, Db, Keys) ->
     DesignId = <<"_design/", DesignName/binary>>,
     #doc{body={Props}} = couch_httpd_db:couch_doc_open(Db, DesignId, nil, []),
     Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
-    ListSrc = get_nested_json_value({Props}, [<<"lists">>, ListName]),
+    ListSrc = couch_util:get_nested_json_value({Props}, [<<"lists">>, ListName]),
     send_view_list_response(Lang, ListSrc, ViewName, DesignId, Req, Db, Keys).
 
-get_nested_json_value({Props}, [Key|Keys]) ->
-    case proplists:get_value(Key, Props, nil) of
-    nil -> throw({not_found, <<"missing json key: ", Key/binary>>});
-    Value -> get_nested_json_value(Value, Keys)
-    end;
-get_nested_json_value(Value, []) ->
-    Value;
-get_nested_json_value(_NotJSONObj, _) ->
-    throw({not_found, json_mismatch}).
+
 
 send_view_list_response(Lang, ListSrc, ViewName, DesignId, Req, Db, Keys) ->
     Stale = couch_httpd_view:get_stale_type(Req),
