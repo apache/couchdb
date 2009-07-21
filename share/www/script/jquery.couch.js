@@ -13,73 +13,40 @@
 (function($) {
   $.couch = $.couch || {};
   $.extend($.couch, {
-
     activeTasks: function(options) {
-      options = options || {};
-      $.ajax({
-        type: "GET", url: "/_active_tasks", dataType: "json",
-        complete: function(req) {
-          var resp = $.httpData(req, "json");
-          if (req.status == 200) {
-            if (options.success) options.success(resp);
-          } else  if (options.error) {
-            options.error(req.status, resp.error, resp.reason);
-          } else {
-            alert("Active task status could not be retrieved: " +
-              resp.reason);
-          }
-        }
-      });
+      ajax(
+        {url: "/_active_tasks"},
+        options,
+        "Active task status could not be retrieved"
+      );
     },
 
     allDbs: function(options) {
-      options = options || {};
-      $.ajax({
-        type: "GET", url: "/_all_dbs",
-        complete: function(req) {
-          var resp = $.httpData(req, "json");
-          if (req.status == 200) {
-            if (options.success) options.success(resp);
-          } else if (options.error) {
-            options.error(req.status, resp.error, resp.reason);
-          } else {
-            alert("An error occurred retrieving the list of all databases: " +
-              resp.reason);
-          }
-        }
-      });
+      ajax(
+        {url: "/_all_dbs"},
+        options,
+        "An error occurred retrieving the list of all databases"
+      );
     },
 
     config: function(options, section, option, value) {
-      options = options || {};
-      var url = "/_config/";
+      var req = {url: "/_config/"};
       if (section) {
-        url += encodeURIComponent(section) + "/";
+        req.url += encodeURIComponent(section) + "/";
         if (option) {
-          url += encodeURIComponent(option);
+          req.url += encodeURIComponent(option);
         }
       }
-      if (value === undefined) {
-        var method = "GET";
-      } else {
-        var method = "PUT";
-        var data = toJSON(value);
+      if (value !== undefined) {
+        req.method = "PUT";
+        req.data = toJSON(value);
+        req.contentType = "application/json";
+        req.processData = false
       }
-      $.ajax({
-        type: method, url: url, contentType: "application/json",
-        dataType: "json", data: toJSON(value), processData: false,
-        complete: function(req) {
-          var resp = $.httpData(req, "json");
-          if (req.status == 200) {
-            if (options.success) options.success(resp);
-          } else if (options.error) {
-            options.error(req.status, resp.error, resp.reason);
-          } else {
-            alert("An error occurred retrieving/updating the server " +
-              "configuration: " + resp.reason);
-          }
-        }
-      });
+
+      ajax(req, options,
+        "An error occurred retrieving/updating the server configuration"
+      );
     },
 
     db: function(name) {
@@ -88,93 +55,47 @@
         uri: "/" + encodeURIComponent(name) + "/",
 
         compact: function(options) {
-          options = options || {};
-          $.ajax({
-            type: "POST", url: this.uri + "_compact",
-            contentType: "application/json",
-            dataType: "json", data: "", processData: false,
-            complete: function(req) {
-              var resp = $.httpData(req, "json");
-              if (req.status == 202) {
-                if (options.success) options.success(resp);
-              } else if (options.error) {
-                options.error(req.status, resp.error, resp.reason);
-              } else {
-                alert("The database could not be compacted: " + resp.reason);
-              }
-            }
-          });
+          $.extend(options, {successStatus: 202});
+          ajax({
+              type: "POST", url: this.uri + "_compact",
+              data: "", processData: false
+            },
+            options,
+            "The database could not be compacted"
+          );
         },
         create: function(options) {
-          options = options || {};
-          $.ajax({
-            type: "PUT", url: this.uri, contentType: "application/json",
-            dataType: "json", data: "", processData: false,
-            complete: function(req) {
-              var resp = $.httpData(req, "json");
-              if (req.status == 201) {
-                if (options.success) options.success(resp);
-              } else if (options.error) {
-                options.error(req.status, resp.error, resp.reason);
-              } else {
-                alert("The database could not be created: " + resp.reason);
-              }
-            }
-          });
+          $.extend(options, {successStatus: 201});
+          ajax({
+              type: "PUT", url: this.uri, contentType: "application/json",
+              data: "", processData: false
+            },
+            options,
+            "The database could not be created"
+          );
         },
         drop: function(options) {
-          options = options || {};
-          $.ajax({
-            type: "DELETE", url: this.uri, dataType: "json",
-            complete: function(req) {
-              var resp = $.httpData(req, "json");
-              if (req.status == 200) {
-                if (options.success) options.success(resp);
-              } else if (options.error) {
-                options.error(req.status, resp.error, resp.reason);
-              } else {
-                alert("The database could not be deleted: " + resp.reason);
-              }
-            }
-          });
+          ajax(
+            {type: "DELETE", url: this.uri},
+            options,
+            "The database could not be deleted"
+          );
         },
         info: function(options) {
-          options = options || {};
-          $.ajax({
-            type: "GET", url: this.uri, dataType: "json",
-            complete: function(req) {
-              var resp = $.httpData(req, "json");
-              if (req.status == 200) {
-                if (options.success) options.success(resp);
-              } else  if (options.error) {
-                options.error(req.status, resp.error, resp.reason);
-              } else {
-                alert("Database information could not be retrieved: " +
-                  resp.reason);
-              }
-            }
-          });
+          ajax(
+            {url: this.uri},
+            options,
+            "Database information could not be retrieved"
+          );
         },
         allDocs: function(options) {
-          options = options || {};
-          $.ajax({
-            type: "GET", url: this.uri + "_all_docs" + encodeOptions(options),
-            dataType: "json",
-            complete: function(req) {
-              var resp = $.httpData(req, "json");
-              if (req.status == 200) {
-                if (options.success) options.success(resp);
-              } else if (options.error) {
-                options.error(req.status, resp.error, resp.reason);
-              } else {
-                alert("An error occurred retrieving a list of all documents: " +
-                  resp.reason);
-              }
-            }
-          });
+          ajax(
+            {url: this.uri + "_all_docs" + encodeOptions(options)},
+            options,
+            "An error occurred retrieving a list of all documents"
+          );
         },
         allDesignDocs: function(options) {
-          options = options || {};
           this.allDocs($.extend({startkey:"_design", endkey:"_design0"}, options));
         },
         allApps: function(options) {
@@ -206,23 +127,11 @@
           }
         },
         openDoc: function(docId, options, ajaxOptions) {
-          options = options || {};
-          ajaxOptions = ajaxOptions || {};
-          $.ajax($.extend({
-            type: "GET",
-            url: this.uri + encodeURIComponent(docId) + encodeOptions(options),
-            dataType: "json",
-            complete: function(req) {
-              var resp = $.httpData(req, "json");
-              if (req.status == 200) {
-                if (options.success) options.success(resp);
-              } else if (options.error) {
-                options.error(req.status, resp.error, resp.reason);
-              } else {
-                alert("The document could not be retrieved: " + resp.reason);
-              }
-            }
-          }, ajaxOptions));
+          ajax({url: this.uri + encodeURIComponent(docId) + encodeOptions(options)},
+            options,
+            "The document could not be retrieved",
+            ajaxOptions
+          );
         },
         saveDoc: function(doc, options) {
           options = options || {};
@@ -252,137 +161,108 @@
           });
         },
         bulkSave: function(docs, options) {
-          options = options || {};
-          $.ajax({
-            type: 'POST', url: this.uri + "_bulk_docs" + encodeOptions(options),
-            contentType: "application/json",
-            dataType: "json", data: toJSON({docs: docs}),
-            complete: function(req) {
-              var resp = $.httpData(req, "json");
-              if (req.status == 201) {
-                if (options.success) options.success(resp);
-              } else if (options.error) {
-                options.error(req.status, resp.error, resp.reason);
-              } else {
-                alert("The documents could not be saved: " + resp.reason);
-              }
-            }
-          });
+          $.extend(options, {successStatus: 201});
+          ajax({
+              type: "POST",
+              url: this.uri + "_bulk_docs" + encodeOptions(options)
+            },
+            options,
+            "The documents could not be saved"
+          );
         },
         removeDoc: function(doc, options) {
-          options = options || {};
-          $.ajax({
-            type: "DELETE",
-            url: this.uri + encodeURIComponent(doc._id) + encodeOptions({rev: doc._rev}),
-            dataType: "json",
-            complete: function(req) {
-              var resp = $.httpData(req, "json");
-              if (req.status == 200) {
-                if (options.success) options.success(resp);
-              } else if (options.error) {
-                options.error(req.status, resp.error, resp.reason);
-              } else {
-                alert("The document could not be deleted: " + resp.reason);
-              }
-            }
-          });
+          ajax({
+              type: "DELETE",
+              url: this.uri +
+                   encodeURIComponent(doc._id) +
+                   encodeOptions({rev: doc._rev})
+            },
+            options,
+            "The document could not be deleted"
+          );
         },
         query: function(mapFun, reduceFun, language, options) {
-          options = options || {};
-          language = language || "javascript"
-          if (typeof(mapFun) != "string") {
+          language = language || "javascript";
+          if (typeof(mapFun) !== "string") {
             mapFun = mapFun.toSource ? mapFun.toSource() : "(" + mapFun.toString() + ")";
           }
           var body = {language: language, map: mapFun};
           if (reduceFun != null) {
-            if (typeof(reduceFun) != "string")
+            if (typeof(reduceFun) !== "string")
               reduceFun = reduceFun.toSource ? reduceFun.toSource() : "(" + reduceFun.toString() + ")";
             body.reduce = reduceFun;
           }
-          $.ajax({
-            type: "POST", url: this.uri + "_temp_view" + encodeOptions(options),
-            contentType: "application/json",
-            data: toJSON(body), dataType: "json",
-            complete: function(req) {
-              var resp = $.httpData(req, "json");
-              if (req.status == 200) {
-                if (options.success) options.success(resp);
-              } else if (options.error) {
-                options.error(req.status, resp.error, resp.reason);
-              } else {
-                alert("An error occurred querying the database: " + resp.reason);
-              }
-            }
-          });
+          ajax({
+              type: "POST",
+              url: this.uri + "_temp_view" + encodeOptions(options),
+              contentType: "application/json", data: toJSON(body)
+            },
+            options,
+            "An error occurred querying the database"
+          );
         },
         view: function(name, options) {
-          options = options || {};
           name = name.split('/');
-          $.ajax({
-            type: "GET", url: this.uri + "_design/" + name[0] + "/_view/" + name[1] + encodeOptions(options),
-            dataType: "json",
-            complete: function(req) {
-              var resp = $.httpData(req, "json");
-              if (req.status == 200) {
-                if (options.success) options.success(resp);
-              } else if (options.error) {
-                options.error(req.status, resp.error, resp.reason);
-              } else {
-                alert("An error occurred accessing the view: " + resp.reason);
-              }
-            }
-          });
+          ajax({
+              url: this.uri + "_design/" + name[0] +
+                   "/_view/" + name[1] + encodeOptions(options)
+            },
+            options, "An error occurred accessing the view"
+          );
         }
       };
     },
 
     info: function(options) {
-      options = options || {};
-      $.ajax({
-        type: "GET", url: "/", dataType: "json",
-        complete: function(req) {
-          var resp = $.httpData(req, "json");
-          if (req.status == 200) {
-            if (options.success) options.success(resp);
-          } else if (options.error) {
-            options.error(req.status, resp.error, resp.reason);
-          } else {
-            alert("Server information could not be retrieved: " + resp.reason);
-          }
-        }
-      });
+      ajax(
+        {url: "/"},
+        options,
+        "Server information could not be retrieved"
+      );
     },
 
     replicate: function(source, target, options) {
-      options = options || {};
-      $.ajax({
-        type: "POST", url: "/_replicate", dataType: "json",
-        data: JSON.stringify({source: source, target: target}),
-        contentType: "application/json",
-        complete: function(req) {
-          var resp = $.httpData(req, "json");
-          if (req.status == 200) {
-            if (options.success) options.success(resp);
-          } else if (options.error) {
-            options.error(req.status, resp.error, resp.reason);
-          } else {
-            alert("Replication failed: " + resp.reason);
-          }
-        }
-      });
+      ajax({
+          type: "POST", url: "/_replicate",
+          data: JSON.stringify({source: source, target: target}),
+          contentType: "application/json"
+        },
+        options,
+        "Replication failed"
+      );
     }
 
   });
 
+  function ajax(obj, options, errorMessage, ajaxOptions) {
+    options = $.extend({successStatus: 200}, options);
+    errorMessage = errorMessage || "Unknown error";
+
+    $.ajax($.extend({
+      type: "GET", dataType: "json",
+      complete: function(req) {
+        var resp = $.httpData(req, "json");
+        if (req.status == options.successStatus) {
+          if (options.success) options.success(resp);
+        } else if (options.error) {
+          options.error(req.status, resp.error, resp.reason);
+        } else {
+          alert(errorMessage + ": " + resp.reason);
+        }
+      }
+    }, obj), ajaxOptions);
+  }
+
   // Convert a options object to an url query string.
   // ex: {key:'value',key2:'value2'} becomes '?key="value"&key2="value2"'
   function encodeOptions(options) {
-    var buf = []
-    if (typeof(options) == "object" && options !== null) {
+    var buf = [];
+    if (typeof(options) === "object" && options !== null) {
       for (var name in options) {
-        if (name == "error" || name == "success") continue;
+        if (~["error", "success"].indexOf(name))
+          continue;
         var value = options[name];
-        if (name == "key" || name == "startkey" || name == "endkey") {
+        if (~["key", "startkey", "endkey"].indexOf(name)) {
           value = toJSON(value);
         }
         buf.push(encodeURIComponent(name) + "=" + encodeURIComponent(value));
