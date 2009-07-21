@@ -86,12 +86,11 @@ handle_changes_req(#httpd{method='GET',path_parts=[DbName|_]}=Req, Db) ->
             couch_db_update_notifier:stop(Notify),
             get_rest_db_updated() % clean out any remaining update messages
         end;
-
     "false" ->
         {ok, {LastSeq, _Prepend}} =
                 send_changes(Req, Resp, Db, StartSeq, <<"">>),
         send_chunk(Resp, io_lib:format("\n],\n\"last_seq\":~w}\n", [LastSeq])),
-        send_chunk(Resp, "")
+        end_json_response(Resp)
     end;
 
 handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
@@ -121,7 +120,7 @@ keep_sending_changes(#httpd{user_ctx=UserCtx,path_parts=[DbName|_]}=Req, Resp, D
         keep_sending_changes(Req, Resp, Db2, EndSeq, Prepend2, Timeout, TimeoutFun);
     stop ->
         send_chunk(Resp, io_lib:format("\n],\n\"last_seq\":~w}\n", [EndSeq])),
-        send_chunk(Resp, "")
+        end_json_response(Resp)
     end.
 
 send_changes(Req, Resp, Db, StartSeq, Prepend0) ->

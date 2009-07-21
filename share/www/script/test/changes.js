@@ -10,6 +10,12 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+function jsonp(obj) {
+  T(jsonp_flag == 0);
+  T(obj.results.length == 1 && obj.last_seq==1)
+  jsonp_flag = 1;
+}
+
 couchTests.changes = function(debug) {
   var db = new CouchDB("test_suite_db");
   db.deleteDb();
@@ -29,6 +35,13 @@ couchTests.changes = function(debug) {
 
   T(resp.results.length == 1 && resp.last_seq==1)
   T(resp.results[0].changes[0].rev == docFoo._rev)
+
+  // test with callback
+  var xhr = CouchDB.request("GET", "/test_suite_db/_changes?callback=jsonp");
+  T(xhr.status == 200);
+  jsonp_flag = 0;
+  eval(xhr.responseText);
+  T(jsonp_flag == 1);
 
 
   req = CouchDB.request("GET", "/test_suite_db/_changes?continuous=true&timeout=10");
