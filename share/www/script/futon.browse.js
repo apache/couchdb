@@ -755,7 +755,7 @@
 
         db.openDoc(docId, {revs_info: true,
           success: function(doc) {
-            var revs = doc._revs_info;
+            var revs = doc._revs_info || [];
             delete doc._revs_info;
             if (docRev != null) {
               db.openDoc(docId, {rev: docRev,
