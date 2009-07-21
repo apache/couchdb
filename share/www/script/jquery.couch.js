@@ -12,6 +12,16 @@
 
 (function($) {
   $.couch = $.couch || {};
+
+  function encodeDocId(docID) {
+    var parts = docID.split("/");
+    if (parts[0] == "_design") {
+      parts.shift();
+      return "_design/" + encodeURIComponent(parts.join('/'));
+    }
+    return encodeURIComponent(docID);
+  }
+
   $.extend($.couch, {
     activeTasks: function(options) {
       ajax(
@@ -127,7 +137,7 @@
           }
         },
         openDoc: function(docId, options, ajaxOptions) {
-          ajax({url: this.uri + encodeURIComponent(docId) + encodeOptions(options)},
+          ajax({url: this.uri + encodeDocId(docId) + encodeOptions(options)},
             options,
             "The document could not be retrieved",
             ajaxOptions
@@ -140,7 +150,7 @@
             var uri = this.uri;
           } else {
             var method = "PUT";
-            var uri = this.uri  + encodeURIComponent(doc._id);
+            var uri = this.uri  + encodeDocId(doc._id);
           }
           $.ajax({
             type: method, url: uri + encodeOptions(options),
@@ -174,7 +184,7 @@
           ajax({
               type: "DELETE",
               url: this.uri +
-                   encodeURIComponent(doc._id) +
+                   encodeDocId(doc._id) +
                    encodeOptions({rev: doc._rev})
             },
             options,
@@ -212,6 +222,8 @@
         }
       };
     },
+
+    encodeDocId: encodeDocId, 
 
     info: function(options) {
       ajax(
