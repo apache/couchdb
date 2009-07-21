@@ -160,8 +160,8 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
 #logo { padding: 20px 18px; }
 
 #nav { color: #333; font-size: 110%; font-weight: bold; list-style: none;
-  margin: 0; overflow: auto; padding: 0; position: absolute; top: 185px;
-  bottom: 20px; right: 0; width: 210px;
+  margin: 0; overflow: auto; overflow-x: hidden; padding: 0;
+  position: absolute; top: 185px; bottom: 20px; right: 0; width: 210px;
 }
 #nav ul { list-style: none; margin: 0; padding: 0; }
 #nav li { color: #999; margin: 5px 0 0; padding: 3px 0; }
@@ -173,7 +173,7 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
 #nav li li:hover { background: #e4e4e4; }
 #nav li.selected li:hover { background: #d7d7d7; }
 #nav li li :link, #nav li li :visited { color: #333; display: block;
-  text-decoration: none;
+  overflow: hidden; text-decoration: none; text-overflow: ellipsis;
 }
 #nav li li :link:hover, #nav li li :visited:hover { color: #000; }
 #nav li li :link:focus, #nav li li :visited:focus { outline: none; }
@@ -185,8 +185,8 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
   color: #fff;
 }
 #nav li button { background: transparent 0 0 no-repeat; border: none;
-  cursor: pointer; width: 15px; height: 15px; margin-left: .5em;
-  vertical-align: top;
+  cursor: pointer; width: 15px; height: 15px; margin-left: -20px;
+  position: absolute; vertical-align: top;
 }
 #nav li li:hover button.remove {
   background-image: url(../image/delete-mini.png);

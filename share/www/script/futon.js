@@ -65,9 +65,9 @@
       recentDbs.sort();
       $.each(recentDbs, function(idx, name) {
         if (name) {
-          $("#dbs").append("<li><a href='database.html?" +
-            encodeURIComponent(name) + "'>" + name +
+          $("#dbs").append("<li>" +
             "<button class='remove' title='Remove from list' value='" + name + "'></button>" +
+            "<a href='database.html?" + encodeURIComponent(name) + "'>" + name +
             "</a></li>");
         }
       });
