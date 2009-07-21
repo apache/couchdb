@@ -255,7 +255,7 @@
               db.openDoc(resp.rows[i].id, {
                 success: function(doc) {
                   var optGroup = $(document.createElement("optgroup"))
-                    .attr("label", doc._id.substr(8));
+                    .attr("label", doc._id.substr(8)).appendTo(select);
                   for (var name in doc.views) {
                     var option = $(document.createElement("option"))
                       .attr("value", encodeURIComponent(doc._id) + "/_view/" +
@@ -265,7 +265,6 @@
                       option[0].selected = true;
                     }
                   }
-                  optGroup.appendTo(select);
                 }
               });
             }
