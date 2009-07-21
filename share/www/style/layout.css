@@ -299,9 +299,11 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
   padding: 0 .5em 2px;
 }
 #viewcode .top { border-bottom: 1px solid #ddd; color: #aaa; font-size: 95%; }
-#viewcode .top span { background: url(../image/twisty.gif) 0 -96px no-repeat;
-  border: none; color: #666; cursor: pointer; display: block; font-size: 90%;
-  margin: 0; padding: 2px 0 0 15px;
+#viewcode .top span { border: none; color: #666; cursor: pointer;
+  display: block; font-size: 90%; margin: 0; padding: 2px 0 0;
+}
+#viewcode .top span#view-toggle {
+  background: url(../image/twisty.gif) 0 -96px no-repeat; padding-left: 15px;
 }
 #viewcode .top a { float: right; font-size: 90%; line-height: 1.4em;
   padding: 2px 2px 0 0;
