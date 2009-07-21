@@ -466,10 +466,10 @@
         }
       }
 
-      this.jumpToDocument = function(e) {
-        if (e.which == 13) {
-          var docid = $('#jumpto input').val();
-          location.href = 'document.html?' + encodeURIComponent(db.name) + '/' + encodeDocId(docid);
+      this.jumpToDocument = function(docId) {
+        if (docId != "") {
+          location.href = 'document.html?' + encodeURIComponent(db.name)
+            + "/" + encodeDocId(docId);
         }
       }
 

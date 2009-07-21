@@ -58,6 +58,7 @@ button[disabled] { color: #999; }
 input, select, textarea { background: #fff; border: 1px solid;
   border-color: #999 #ddd #ddd #999; margin: 0; padding: 1px;
 }
+input.placeholder { color: #999; }
 textarea { font-family: "DejaVu Sans Mono",Monaco,monospace; font-size: 100%; }
 fieldset { border: none; font-size: 95%; margin: 0; padding: .2em 0 0; }
 fieldset legend { color: #666; font-weight: bold; padding: 0; }

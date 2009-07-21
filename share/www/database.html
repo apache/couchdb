@@ -30,7 +30,6 @@ specific language governing permissions and limitations under the License.
     <script src="script/futon.format.js?0.9.0"></script>
     <script>
       var page = new $.futon.CouchDatabasePage();
-
       $.futon.navigation.ready(function() {
         this.addDatabase(page.db.name);
         this.updateSelection(location.pathname, "?" + page.db.name);
@@ -104,7 +103,7 @@ specific language governing permissions and limitations under the License.
         $("#toolbar button.compact").click(page.compactDatabase);
         $("#toolbar button.delete").click(page.deleteDatabase);
 
-        $('#jumpto input').suggest(function(text, callback) {
+        $('#jumpto input').addPlaceholder("Document ID").suggest(function(text, callback) {
           page.db.allDocs({
             limit: 10, startkey: text, endkey: text + 'zzz',
             success: function(docs) {
@@ -117,12 +116,12 @@ specific language governing permissions and limitations under the License.
               callback(matches);
             }
           });
+        }).keypress(function(e) {
+          if (e.keyCode == 13) {
+            page.jumpToDocument($(this).val());
+          }
         });
-
-        $("#jumpto input").keypress(page.jumpToDocument);
-
       });
-
     </script>
   </head>
 
@@ -134,15 +133,15 @@ specific language governing permissions and limitations under the License.
     </h1>
     <div id="content">
       <div id="switch">
-        <label>Select view: <select autocomplete="false">
+        <label>View: <select autocomplete="false">
           <option value="_all_docs">All documents</option>
           <option value="_design_docs">Design documents</option>
           <option value="_temp_view">Temporary view…</option>
         </select></label>
       </div>
       <div id="jumpto">
-        <label>Jump to document:
-          <input type="text" name="docid" />
+        <label>Jump to:
+          <input type="text" name="docid" autocomplete="off" />
         </label>
       </div>
       <ul id="toolbar">

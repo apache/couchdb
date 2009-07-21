@@ -107,6 +107,33 @@
     navigation: new Navigation()
   });
 
+  $.fn.addPlaceholder = function(text) {
+    return this.each(function() {
+      var input = $(this);
+      if ($.browser.safari) {
+        input.attr("placeholder", text);
+        return;
+      }
+      input.blur(function() {
+        if ($.trim(input.val()) == "") {
+          input.addClass("placeholder").val(text);
+        } else {
+          input.removeClass("placeholder");
+        }
+      }).triggerHandler("blur")
+      input.focus(function() {
+        if (input.is(".placeholder")) {
+          input.val("").removeClass("placeholder");
+        }
+      });
+      $(this.form).submit(function() {
+        if (input.is(".placeholder")) {
+          input.val("");
+        }
+      });
+    });
+  }
+
   $(document)
     .ajaxStart(function() { $(this.body).addClass("loading"); })
     .ajaxStop(function() { $(this.body).removeClass("loading"); });
