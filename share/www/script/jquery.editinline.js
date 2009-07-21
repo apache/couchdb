@@ -50,7 +50,7 @@
         return true;
       }
       if ((!options.allowEmpty && !newText.length) ||
-          !options.validate.apply(elem, [newText])) {
+          !options.validate.apply(elem, [newText, origText])) {
         input.addClass("invalid");
         return false;
       }

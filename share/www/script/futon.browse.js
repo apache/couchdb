@@ -885,6 +885,15 @@
             if (keyCode == 9) { // tab, move to editing the value
               row.find("td").dblclick();
             }
+          },
+          validate: function(newName, oldName) {
+            $("div.error", this).remove();
+            if (newName != oldName && doc[newName] !== undefined) {
+              $("<div class='error'>Already have field with that name.</div>")
+                .appendTo(this);
+              return false;
+            }
+            return true;
           }
         });
       }
@@ -918,12 +927,13 @@
             return $.futon.formatJSON(doc[row.data("name")]);
           },
           validate: function(value) {
+            $("div.error", this).remove();
             try {
               JSON.parse(value);
               return true;
             } catch (err) {
               var msg = err.message;
-              if (msg == "parseJSON") {
+              if (msg == "parseJSON" || msg == "JSON.parse") {
                 msg = "Please enter a valid JSON value (for example, \"string\").";
               }
               $("<div class='error'></div>").text(msg).appendTo(this);
