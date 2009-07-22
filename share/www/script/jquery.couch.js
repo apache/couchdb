@@ -289,10 +289,10 @@
     var buf = [];
     if (typeof(options) === "object" && options !== null) {
       for (var name in options) {
-        if (~["error", "success"].indexOf(name))
+        if ($.inArray(name, ["error", "success"]) >= 0)
           continue;
         var value = options[name];
-        if (~["key", "startkey", "endkey"].indexOf(name)) {
+        if ($.inArray(name, ["key", "startkey", "endkey"]) >= 0) {
           value = toJSON(value);
         }
         buf.push(encodeURIComponent(name) + "=" + encodeURIComponent(value));
