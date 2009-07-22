@@ -602,8 +602,8 @@
             $("#viewcode").show().removeClass("collapsed");
             var mapFun = $("#viewcode_map").val();
             $.cookies.set(db.name + ".map", mapFun);
-            var reduceFun = $("#viewcode_reduce").val() || null;
-            if (reduceFun != null) {
+            var reduceFun = $.trim($("#viewcode_reduce").val()) || null;
+            if (reduceFun) {
               $.cookies.set(db.name + ".reduce", reduceFun);
               options.group = true;
             } else {
@@ -618,7 +618,7 @@
           } else {
             $("#viewcode").show();
             var currentMapCode = $("#viewcode_map").val();
-            var currentReduceCode = $("#viewcode_reduce").val() || null;
+            var currentReduceCode = $.trim($("#viewcode_reduce").val()) || null;
             if (currentReduceCode) {
               options.group = true;
             }
