@@ -122,20 +122,8 @@
         ruby: "{|doc|\n  emit(nil, doc);\n}"
       }
 
-      this.addDocument = function() {
-        $.showDialog("dialog/_create_document.html", {
-          submit: function(data, callback) {
-            db.saveDoc(data.docid ? {_id: data.docid} : {}, {
-              error: function(status, error, reason) {
-                callback({docid: reason});
-              },
-              success: function(resp) {
-                location.href = "document.html?" + encodeURIComponent(dbName) +
-                                "/" + $.couch.encodeDocId(resp.id);
-              }
-            });
-          }
-        });
+      this.newDocument = function() {
+        location.href = "document.html?" + encodeURIComponent(db.name);
       }
 
       this.compactDatabase = function() {
@@ -655,16 +643,23 @@
     CouchDocumentPage: function() {
       var urlParts = location.search.substr(1).split("/");
       var dbName = decodeURIComponent(urlParts.shift());
-      var idParts = urlParts.join("/").split("@", 2);
-      var docId = decodeURIComponent(idParts[0]);
-      var docRev = (idParts.length > 1) ? idParts[1] : null;
+      if (urlParts.length) {
+        var idParts = urlParts.join("/").split("@", 2);
+        var docId = decodeURIComponent(idParts[0]);
+        var docRev = (idParts.length > 1) ? idParts[1] : null;
+        this.isNew = false;
+      } else {
+        var docId = $.couch.newUUID();
+        var docRev = null;
+        this.isNew = true;
+      }
       var db = $.couch.db(dbName);
 
       this.dbName = dbName;
       this.db = db;
       this.docId = docId;
       this.doc = null;
-      this.isDirty = false;
+      this.isDirty = this.isNew;
       page = this;
 
       this.activateTabularView = function() {
@@ -752,27 +747,32 @@
           }
         }
 
-        db.openDoc(docId, {revs_info: true,
-          success: function(doc) {
-            var revs = doc._revs_info || [];
-            delete doc._revs_info;
-            if (docRev != null) {
-              db.openDoc(docId, {rev: docRev,
-                error: function(status, error, reason) {
-                  alert("The requested revision was not found. " +
-                        "You will be redirected back to the latest revision.");
-                  location.href = "?" + encodeURIComponent(dbName) +
-                    "/" + $.couch.encodeDocId(docId);
-                },
-                success: function(doc) {
-                  handleResult(doc, revs);
-                }
-              });
-            } else {
-              handleResult(doc, revs);
+        if (!page.isNew) {
+          db.openDoc(docId, {revs_info: true,
+            success: function(doc) {
+              var revs = doc._revs_info || [];
+              delete doc._revs_info;
+              if (docRev != null) {
+                db.openDoc(docId, {rev: docRev,
+                  error: function(status, error, reason) {
+                    alert("The requested revision was not found. You will " +
+                          "be redirected back to the latest revision.");
+                    location.href = "?" + encodeURIComponent(dbName) +
+                      "/" + $.couch.encodeDocId(docId);
+                  },
+                  success: function(doc) {
+                    handleResult(doc, revs);
+                  }
+                });
+              } else {
+                handleResult(doc, revs);
+              }
             }
-          }
-        });
+          });
+        } else {
+          handleResult({_id: docId}, []);
+          $("#fields tbody td").dblclick();
+        }
       }
 
       this.deleteDocument = function() {
@@ -796,7 +796,7 @@
           success: function(resp) {
             page.isDirty = false;
             location.href = "?" + encodeURIComponent(dbName) +
-              "/" + $.couch.encodeDocId(docId);
+              "/" + $.couch.encodeDocId(page.docId);
           }
         });
       }
@@ -824,7 +824,7 @@
                 form.find("#progress").css("visibility", "hidden");
                 page.isDirty = false;
                 location.href = "?" + encodeURIComponent(dbName) +
-                  "/" + $.couch.encodeDocId(docId);
+                  "/" + $.couch.encodeDocId(page.docId);
               }
             });
           }
@@ -899,7 +899,7 @@
       }
 
       function _initValue(doc, row, fieldName) {
-        if (fieldName == "_id" || fieldName == "_rev") {
+        if ((fieldName == "_id" && !page.isNew) || fieldName == "_rev") {
           return;
         }
 
@@ -920,8 +920,13 @@
             }
           },
           accept: function(newValue) {
-            doc[row.data("name")] = JSON.parse(newValue);
+            var fieldName = row.data("name");
+            doc[fieldName] = JSON.parse(newValue);
             page.isDirty = true;
+            if (fieldName == "_id") {
+              page.docId = page.doc._id = doc[fieldName];
+              $("h1 strong").text(page.docId);
+            }
           },
           populate: function(value) {
             return $.futon.formatJSON(doc[row.data("name")]);
@@ -929,7 +934,12 @@
           validate: function(value) {
             $("div.error", this).remove();
             try {
-              JSON.parse(value);
+              var parsed = JSON.parse(value);
+              if (row.data("name") == "_id" && typeof(parsed) != "string") {
+                $("<div class='error'>The document ID must be a string.</div>")
+                  .appendTo(this);
+                return false;
+              }
               return true;
             } catch (err) {
               var msg = err.message;
@@ -977,7 +987,7 @@
       }
 
       function _renderAttachmentItem(name, attachment) {
-        var attachmentHref = db.uri + $.couch.encodeDocId(docId)
+        var attachmentHref = db.uri + $.couch.encodeDocId(page.docId)
           + "/" + encodeAttachment(name);
         var li = $("<li></li>");
         $("<a href='' title='Download file' target='_top'></a>").text(name)

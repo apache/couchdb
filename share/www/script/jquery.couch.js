@@ -22,6 +22,8 @@
     return encodeURIComponent(docID);
   }
 
+  uuidCache = [];
+
   $.extend($.couch, {
     activeTasks: function(options) {
       ajax(
@@ -242,6 +244,22 @@
         options,
         "Replication failed"
       );
+    },
+
+    newUUID: function(cacheNum) {
+      if (cacheNum === undefined) {
+        cacheNum = 1;
+      }
+      if (!uuidCache.length) {
+        ajax({url: "/_uuids", data: {count: cacheNum}, async: false}, {
+            success: function(resp) {
+              uuidCache = resp.uuids
+            }
+          },
+          "Failed to retrieve UUID batch."
+        );
+      }
+      return uuidCache.shift();
     }
 
   });

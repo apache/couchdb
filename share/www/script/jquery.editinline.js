@@ -42,6 +42,11 @@
           }
         }
       });
+    if (options.acceptOnBlur) {
+      input.blur(function() {
+        return applyChange();
+      });
+    }
 
     function applyChange(keyCode) {
       var newText = input.val();
@@ -86,6 +91,7 @@
       acceptLabel: "",
       cancelLabel: "",
       toolTip: "Double click to edit",
+      acceptOnBlur: true,
 
       // callbacks
       begin: function() { return true },

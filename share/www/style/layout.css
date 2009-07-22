@@ -211,7 +211,7 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
 #toolbar li { display: inline; }
 #toolbar button { background: transparent 2px 2px no-repeat; border: none;
   color: #666; margin: 0; padding: 2px 1em 2px 22px; cursor: pointer;
-  font-size: 95%; font-weight: bold; line-height: 16px;
+  font-size: 95%; line-height: 16px;
 }
 #toolbar button:hover { background-position: 2px -30px; color: #000; }
 #toolbar button:active { background-position: 2px -62px; color: #000; }
