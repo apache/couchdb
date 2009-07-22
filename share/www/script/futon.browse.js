@@ -471,7 +471,7 @@
           // reduce views
           options.limit = per_page + 1;
         } else {
-          per_page = options.limit;
+          per_page = options.limit - 1;
         }
         if ($("#documents thead th.key").is(".desc")) {
           if (typeof options.descending == 'undefined') options.descending = true;
