@@ -132,7 +132,7 @@ process_doc(Db, Owner, DocInfo, {Docs, Group, ViewKVs, DocIdViewIdKeys}) ->
             {ok, Group2} = write_changes(Group1, ViewKVs3, DocIdViewIdKeys3,
                 DocInfo#doc_info.high_seq),
             if is_pid(Owner) ->
-                ok = gen_server:cast(Owner, {partial_update, Group2});
+                ok = gen_server:cast(Owner, {partial_update, self(), Group2});
             true -> ok end,
             garbage_collect(),
             ViewEmptyKeyValues = [{View, []} || View <- Group2#group.views],
