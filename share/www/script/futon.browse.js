@@ -236,24 +236,27 @@
       this.populateViewsMenu = function() {
         var select = $("#switch select");
         db.allDocs({startkey: "_design/", endkey: "_design0",
+          include_docs: true,
           success: function(resp) {
             select[0].options.length = 3;
             for (var i = 0; i < resp.rows.length; i++) {
-              db.openDoc(resp.rows[i].id, {
-                success: function(doc) {
-                  var optGroup = $(document.createElement("optgroup"))
-                    .attr("label", doc._id.substr(8)).appendTo(select);
-                  for (var name in doc.views) {
-                    var path = $.couch.encodeDocId(doc._id) + "/_view/" +
-                      encodeURIComponent(name);
-                    var option = $(document.createElement("option"))
-                      .attr("value", path).text(name).appendTo(optGroup);
-                    if (path == viewName) {
-                      option[0].selected = true;
-                    }
-                  }
+              var doc = resp.rows[i].doc;
+              var optGroup = $(document.createElement("optgroup"))
+                .attr("label", doc._id.substr(8)).appendTo(select);
+              var viewNames = [];
+              for (var name in doc.views) {
+                viewNames.push(name);
+              }
+              viewNames.sort();
+              for (var j = 0; j < viewNames.length; j++) {
+                var path = $.couch.encodeDocId(doc._id) + "/_view/" +
+                  encodeURIComponent(viewNames[j]);
+                var option = $(document.createElement("option"))
+                  .attr("value", path).text(viewNames[j]).appendTo(optGroup);
+                if (path == viewName) {
+                  option[0].selected = true;
                 }
-              });
+              }
             }
           }
         });
