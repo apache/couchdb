@@ -78,9 +78,7 @@ specific language governing permissions and limitations under the License.
 
         page.populateViewsMenu();
         page.populateViewEditor();
-        if (!page.isTempView) {
-          page.updateDocumentListing();
-        } else {
+        if (page.isTempView) {
           $("#viewcode").show().removeClass("collapsed").find("textarea")[0].focus();
           $("#documents").hide();
         }

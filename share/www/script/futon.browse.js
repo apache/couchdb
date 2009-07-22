@@ -185,6 +185,7 @@
                                      .bind("textInput", updateDirtyState);
             }
             $("#language").change(updateDirtyState);
+            page.updateDocumentListing();
           });
           $("#grouptruenotice").show();
         } else if (viewName == "_temp_view") {
@@ -194,6 +195,8 @@
             $.cookies.get(db.name + ".reduce", "")
           );
           $("#grouptruenotice").show();
+        } else {
+          page.updateDocumentListing();
         }
         page.populateLanguagesMenu();
         if (this.isTempView) {
