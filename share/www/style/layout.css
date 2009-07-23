@@ -215,7 +215,6 @@ body.fullwidth #wrap { margin-right: 0; }
 #content { padding: 1em 16px 3em 10px; overflow: auto; position: absolute;
   top: 33px; bottom: 0; left: 0; right: 0;
 }
-body.fullwidth #content { padding-right: 26px; }
 
 /* Toolbar */
 

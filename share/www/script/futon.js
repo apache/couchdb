@@ -107,17 +107,19 @@
       var sidebar = $("#sidebar").stop(true, true);
       var hidden = !$(sidebar).is(".hidden");
 
-      sidebar.toggleClass("hidden").animate({
-        width: hidden ? 26 : 210,
-        height: hidden ? $("h1").outerHeight() - 1 : "100%",
-        right: hidden ? 0 : -210
-      }, speed).children(":not(#sidebar-toggle)").toggle(speed * 1.2);
-      $("h1").animate({marginRight: hidden ? 26 : 0}, speed);
       $("#wrap").animate({
         marginRight: hidden ? 0 : 210
       }, speed, function() {
         $(document.body).toggleClass("fullwidth", hidden);
       });
+      sidebar.toggleClass("hidden").animate({
+        width: hidden ? 26 : 210,
+        height: hidden ? $("h1").outerHeight() - 1 : "100%",
+        right: hidden ? 0 : -210
+      }, speed).children(":not(#sidebar-toggle)").animate({
+        opacity: "toggle"
+      }, speed);
+      $("h1").animate({marginRight: hidden ? 26 : 0}, speed);
 
       $("#sidebar-toggle")
         .attr("title", hidden ? "Show Sidebar" : "Hide Sidebar");
