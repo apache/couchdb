@@ -144,11 +144,11 @@ init([]) ->
             gen_server:call(couch_server,
                     {set_max_dbs_open, list_to_integer(Max)})
         end),
+    hash_admin_passwords(),
     ok = couch_config:register(
         fun("admins") ->
             hash_admin_passwords()
         end),
-    hash_admin_passwords(),
     {ok, RegExp} = regexp:parse("^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*$"),
     ets:new(couch_dbs_by_name, [set, private, named_table]),
     ets:new(couch_dbs_by_pid, [set, private, named_table]),
