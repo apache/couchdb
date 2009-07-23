@@ -44,10 +44,8 @@ default_dev.ini: default.ini.tpl
 	    -e "s|%couchjs_command_name%|$(couchjs_dev_command_name)|g" \
 	< $< > $@
 
-local_dev.ini: local.ini
-	if test ! -f "$@"; then \
-	    cp $< $@; \
-	fi
+local_dev.ini:
+	cp local.ini $@
 
 install-data-hook:
 	if test ! -f "$(DESTDIR)/$(localconfdir)/local.ini"; then \
