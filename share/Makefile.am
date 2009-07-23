@@ -61,6 +61,7 @@ nobase_dist_localdata_DATA = \
     www/image/run.png \
     www/image/running.png \
     www/image/save.png \
+    www/image/sidebar-toggle.png \
     www/image/spinner.gif \
     www/image/test_failure.gif \
     www/image/test_success.gif \

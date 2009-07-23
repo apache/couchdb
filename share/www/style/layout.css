@@ -18,16 +18,13 @@ specific language governing permissions and limitations under the License.
 html, body { color: #000; font: normal 90% Arial,Helvetica,sans-serif;
   height: 100%; margin: 0; padding: 0; overflow: hidden;
 }
-body { background: #fff url(../image/bg.png) 100% 0 repeat-y;
-  padding-right: 210px;
-}
 :link, :visited { color: #ba1e16; text-decoration: none; }
 :link img, :visited img { border: none; }
 
 h1 { background: #333; border-right: 2px solid #111;
   border-bottom: 1px solid #333; color: #999;
-  font: 125% normal Arial,Helvetica,sans-serif;
-  line-height: 1.8em; margin: 0 0 1em; padding: 0 0 0 1em; position: relative;
+  font: 125% normal Arial,Helvetica,sans-serif; height: 32px;
+  line-height: 32px; margin: 0; padding: 0 0 0 .5em; position: relative;
 }
 h1 :link, h1 :visited, h1 strong { padding: .4em .5em; }
 h1 :link, h1 :visited {
@@ -39,7 +36,7 @@ h1 strong { color: #fff; font-weight: normal; padding-right: 25px; }
 h1 strong a {color:#fff !important;background:none !important;}
 h1 :link.raw, h1 :visited.raw {
   background: url(../image/rarrow.png) 100% 50% no-repeat; position: absolute;
-  right: 20px; width: 35px; height: 100%; padding: 0;
+  right: 20px; width: 35px; height: 100%; padding: 0; margin: 0;
 }
 body.loading h1 strong {
   background: url(../image/spinner.gif) right center no-repeat;
@@ -155,14 +152,25 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
 
 /* Logo & Navigation */
 
-#sidebar { background: #fff; position: absolute; top: 0; right: 0;
+#sidebar { background: #fff; position: absolute; top: 0; right: -210px;
   width: 210px; height: 100%;
 }
-#logo { padding: 20px 18px; }
+body.fullwidth #sidebar { border-bottom: 1px solid #333; right: 0;
+  width: 26px;
+}
+#sidebar-toggle { background: url(../image/sidebar-toggle.png) 0 0 no-repeat;
+  color: #999; cursor: pointer; display: block; position: absolute; right: 0;
+  top: 0; font-size: 110%; width: 26px; height: 32px; text-indent: -9999px;
+}
+#sidebar-toggle:hover { background-position: -26px 0; }
+#sidebar-toggle:focus { outline: none; }
+#sidebar.hidden #sidebar-toggle { background-position: 0 -32px; }
+#sidebar.hidden #sidebar-toggle:hover { background-position: -26px -32px; }
+
+#logo { margin: 30px 0 0; padding: 0 18px 10px; }
 
 #nav { color: #333; font-size: 110%; font-weight: bold; list-style: none;
-  margin: 0; overflow: auto; overflow-x: hidden; padding: 0;
-  position: absolute; top: 185px; bottom: 20px; right: 0; width: 210px;
+  margin: 0; overflow: auto; overflow-x: hidden; padding: 0; width: 210px;
 }
 #nav ul { list-style: none; margin: 0; padding: 0; }
 #nav li { color: #999; margin: 5px 0 0; padding: 3px 0; }
@@ -200,8 +208,14 @@ ul.suggest-dropdown li.selected { cursor: pointer; background: Highlight;
 }
 #footer :link, #footer :visited { color: #000; }
 
-#wrap { height: 100%; overflow: auto; }
-#content { padding: 0 20px 3em; }
+#wrap { background: #fff url(../image/bg.png) 100% 0 repeat-y;
+  height: 100%; margin-right: 210px; position: relative;
+}
+body.fullwidth #wrap { margin-right: 0; }
+#content { padding: 1em 16px 3em 10px; overflow: auto; position: absolute;
+  top: 33px; bottom: 0; left: 0; right: 0;
+}
+body.fullwidth #content { padding-right: 26px; }
 
 /* Toolbar */
 

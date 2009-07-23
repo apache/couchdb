@@ -100,6 +100,29 @@
       });
     }
 
+    this.toggle = function(speed) {
+      if (speed === undefined) {
+        speed = 500;
+      }
+      var sidebar = $("#sidebar").stop(true, true);
+      var hidden = !$(sidebar).is(".hidden");
+
+      sidebar.toggleClass("hidden").animate({
+        width: hidden ? 26 : 210,
+        height: hidden ? $("h1").outerHeight() - 1 : "100%",
+        right: hidden ? 0 : -210
+      }, speed).children(":not(#sidebar-toggle)").toggle(speed * 1.2);
+      $("h1").animate({marginRight: hidden ? 26 : 0}, speed);
+      $("#wrap").animate({
+        marginRight: hidden ? 0 : 210
+      }, speed, function() {
+        $(document.body).toggleClass("fullwidth", hidden);
+      });
+
+      $("#sidebar-toggle")
+        .attr("title", hidden ? "Show Sidebar" : "Hide Sidebar");
+      $.cookies.set("sidebar", hidden ? "hidden" : "show");
+    };
   }
 
   $.futon = $.futon || {};
@@ -140,8 +163,19 @@
 
   $(function() {
     document.title = "Apache CouchDB - Futon: " + document.title;
+    if ($.cookies.get("sidebar") == "hidden") {
+      // doing this as early as possible prevents flickering
+      $(document.body).addClass("fullwidth");
+    }
     $.get("_sidebar.html", function(resp) {
-      $(resp).insertAfter("#wrap");
+      $("#wrap").append(resp)
+        .find("#sidebar-toggle").click(function(e) {
+            $.futon.navigation.toggle(e.shiftKey ? 2500 : 500);
+            return false;
+          });
+      if ($.cookies.get("sidebar") == "hidden") {
+        $.futon.navigation.toggle(0);
+      }
 
       $.futon.navigation.updateDatabases();
       $.futon.navigation.updateSelection();
