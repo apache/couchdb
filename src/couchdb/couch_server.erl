@@ -147,7 +147,8 @@ init([]) ->
     hash_admin_passwords(),
     ok = couch_config:register(
         fun("admins") ->
-            hash_admin_passwords()
+            % spawn here so couch_config doesn't try to call itself
+            spawn(fun() -> hash_admin_passwords() end)
         end),
     {ok, RegExp} = regexp:parse("^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*$"),
     ets:new(couch_dbs_by_name, [set, private, named_table]),
