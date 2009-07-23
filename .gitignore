@@ -29,6 +29,7 @@ libtool
 share/Makefile
 src/couchdb/.deps/*
 src/couchdb/Makefile
+src/couchdb/priv/Makefile
 src/mochiweb/Makefile
 stamp-h1
 test/.deps/
