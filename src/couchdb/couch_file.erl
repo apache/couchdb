@@ -116,26 +116,23 @@ pread_binary(Fd, Pos) ->
     {ok, L} = pread_iolist(Fd, Pos),
     {ok, iolist_to_binary(L)}.
 
+
 pread_iolist(Fd, Pos) ->
-    {ok, LenIolist, NextPos} =read_raw_iolist(Fd, Pos, 20),
+    {ok, LenIolist, NextPos} = read_raw_iolist(Fd, Pos, 4),
     case iolist_to_binary(LenIolist) of
-    <<1:1/integer,Len:31/integer,Md5/binary>> ->
-        {ok, Iolist, _} = read_raw_iolist(Fd, NextPos, Len),
-        case erlang:md5(Iolist) of
+    <<1:1/integer,Len:31/integer>> ->
+        {ok, Md5List, ValPos} = read_raw_iolist(Fd, NextPos, 16),
+        Md5 = iolist_to_binary(Md5List),
+        {ok, IoList, _} = read_raw_iolist(Fd,ValPos,Len),
+        case erlang:md5(IoList) of
         Md5 -> ok;
         _ ->  throw(file_corruption)
         end, 
-        {ok, Iolist};
-    <<0:1/integer,Len:31/integer,First16Bytes/binary>> ->
-        if Len =< 16 ->
-            <<Final:Len/binary,_/binary>> = First16Bytes,
-            {ok, Final};
-        true ->
-            {ok, Iolist, _} = read_raw_iolist(Fd, NextPos, Len - 16),
-            {ok, [First16Bytes, Iolist]}
-        end
+        {ok, IoList};
+    <<0:1/integer,Len:31/integer>> ->
+        {ok, Iolist, _} = read_raw_iolist(Fd, NextPos, Len),
+        {ok, Iolist} 
     end.
-            
        
 
 read_raw_iolist(Fd, Pos, Len) ->

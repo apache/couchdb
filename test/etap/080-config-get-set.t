@@ -105,7 +105,7 @@ test() ->
     ok = couch_config:delete("new_section", "bizzle", false),
     etap:is(
         couch_config:get("new_section", "bizzle"),
-        "",
+        undefined,
         "Deleting sets the value to \"\""
     ),
 
@@ -121,7 +121,7 @@ test() ->
     ok = couch_config:delete(<<"foo">>, <<"bar">>, false),
     etap:is(
         couch_config:get(<<"foo">>, <<"bar">>),
-        "",
+        undefined,
         "Deleting with binary section/key pairs sets the value to \"\""
     ),
 

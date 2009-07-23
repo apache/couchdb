@@ -167,7 +167,7 @@ test() ->
 
         etap:is(
             couch_config:get("httpd", "bind_address"),
-            "",
+            undefined,
             "{httpd, bind_address} was actually deleted."
         )
     end,
@@ -202,7 +202,7 @@ test() ->
 
         etap:is(
             couch_config:get("httpd", "bind_address"),
-            "",
+            undefined,
             "{httpd, bind_address} is still \"\" after reopening."
         )
     end,

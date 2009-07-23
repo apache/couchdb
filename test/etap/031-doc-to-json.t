@@ -120,7 +120,8 @@ test_to_json_success() ->
                 #att{
                     name = <<"fast.json">>, 
                     type = <<"json/ftw">>, 
-                    data = <<"{\"so\": \"there!\"}">>
+                    data = <<"{\"so\": \"there!\"}">>,
+                    len = 16
                 }
             ]},
             {[
