@@ -14,9 +14,9 @@ couchprivlibdir = $(localerlanglibdir)/couch-$(version)/priv/lib
 devcouchprivlibdir = $(abs_top_srcdir)/src/couchdb/.libs
 
 localconf_DATA = default.ini
-noinst_DATA = default_dev.ini
+noinst_DATA = default_dev.ini local_dev.ini
 
-EXTRA_DIST = local.ini local_dev.ini
+EXTRA_DIST = local.ini
 
 CLEANFILES = $(localconf_DATA) $(noinst_DATA)
 
@@ -43,6 +43,11 @@ default_dev.ini: default.ini.tpl
 	    -e "s|%couchprivlibdir%|$(devcouchprivlibdir)|g" \
 	    -e "s|%couchjs_command_name%|$(couchjs_dev_command_name)|g" \
 	< $< > $@
+
+local_dev.ini: local.ini
+	if test ! -f "$@"; then \
+	    cp $< $@; \
+	fi
 
 install-data-hook:
 	if test ! -f "$(DESTDIR)/$(localconfdir)/local.ini"; then \
