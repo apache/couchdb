@@ -824,7 +824,9 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
                 % My understanding of http://www.faqs.org/rfcs/rfc2616.html
                 % says that we should not use Content-Length with a chunked
                 % encoding. Turning this off makes libcurl happy, but I am
-                % open to discussion.
+                % open to discussion. (jchris)
+                %
+                % Can you point to the section that makes you think that? (jan)
                 % {"Content-Length", integer_to_list(couch_doc:bin_size(Bin))}
                 ]),
             couch_doc:att_foldl(Att,
