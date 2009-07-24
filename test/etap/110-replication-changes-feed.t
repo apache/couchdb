@@ -22,7 +22,7 @@ main(_) ->
     code:add_pathz("src/ibrowse"),
     code:add_pathz("src/mochiweb"),
     
-    etap:plan(12),
+    etap:plan(17),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -48,6 +48,7 @@ test() ->
     couch_server:delete(<<"etap-test-db">>, []),
     {ok, Db2} = couch_db:create(<<"etap-test-db">>, []),
     test_all(remote),
+    test_remote_only(),
     couch_db:close(Db2),
     couch_server:delete(<<"etap-test-db">>, []),
 
@@ -59,7 +60,11 @@ test_all(Type) ->
     test_since_parameter(Type),
     test_continuous_parameter(Type),
     test_conflicts(Type),
-    test_deleted_conflicts(Type).
+    test_deleted_conflicts(Type),
+    test_non_blocking_call(Type).
+
+test_remote_only() ->
+    test_chunk_reassembly(remote).
 
 test_unchanged_db(Type) ->
     {ok, Pid} = couch_rep_changes_feed:start({Type, get_dbname(Type)}, []),
@@ -152,6 +157,40 @@ test_deleted_conflicts(Type) ->
         {couch_rep_changes_feed:next(Pid), couch_rep_changes_feed:next(Pid)},
         {Expect, complete},
         io_lib:format("(~p) deleted conflict revisions show up in feed", [Type])
+    ).
+
+test_non_blocking_call(Type) ->
+    Since = get_update_seq(),
+    {ok, Pid} = couch_rep_changes_feed:start({Type, get_dbname(Type)},
+        [{since, Since}, {continuous, true}]),
+    etap:is(
+        couch_rep_changes_feed:all(Pid),
+        [],
+        io_lib:format("(~p) all() returns empty list if no changes available",
+            [Type])
+    ),
+    Expect1 = generate_change(),
+    Expect2 = generate_change(),
+    timer:sleep(100),
+    etap:is(
+        couch_rep_changes_feed:all(Pid),
+        [Expect1, Expect2],
+        io_lib:format("(~p) all() returns full list of outstanding changes",
+            [Type])
+    ),
+    ok = couch_rep_changes_feed:stop(Pid).
+
+test_chunk_reassembly(Type) ->
+    Since = get_update_seq(),
+    Expect = [generate_change() || _I <- lists:seq(1,30)],
+    {ok, Pid} = couch_rep_changes_feed:start({Type, get_dbname(Type)},
+        [{since, Since}]),
+    timer:sleep(100),
+    etap:is(
+        couch_rep_changes_feed:all(Pid),
+        Expect,
+        io_lib:format("(~p) reassembles chunks split across TCP frames",
+            [Type])
     ).
 
 generate_change() ->
