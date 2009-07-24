@@ -10,16 +10,9 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-function toJSON(val) {
-  if (typeof(val) == "undefined") {
-    throw "Cannot encode 'undefined' value as JSON";
-  }
-  var subs = {'\b': '\\b', '\t': '\\t', '\n': '\\n', '\f': '\\f',
+toJSON.subs = {'\b': '\\b', '\t': '\\t', '\n': '\\n', '\f': '\\f',
               '\r': '\\r', '"' : '\\"', '\\': '\\\\'};
-  if (typeof(val) == "xml") { // E4X support
-    val = val.toXMLString();
-  }
-  return {
+toJSON.dispatcher = {
     "Array": function(v) {
       var buf = [];
       for (var i = 0; i < v.length; i++) {
@@ -43,20 +36,20 @@ function toJSON(val) {
       return isFinite(v) ? v.toString() : "null";
     },
     "Object": function(v) {
-      if (v === null) return "null";
+      //if (v === null) return "null";
       var buf = [];
       for (var k in v) {
         if (!v.hasOwnProperty(k) || typeof(k) !== "string" || v[k] === undefined) {
           continue;
         }
-        buf.push(toJSON(k, val) + ": " + toJSON(v[k]));
+        buf.push(toJSON(k) + ": " + toJSON(v[k]));
       }
       return "{" + buf.join(",") + "}";
     },
     "String": function(v) {
       if (/["\\\x00-\x1f]/.test(v)) {
         v = v.replace(/([\x00-\x1f\\"])/g, function(a, b) {
-          var c = subs[b];
+          var c = toJSON.subs[b];
           if (c) return c;
           c = b.charCodeAt();
           return '\\u00' + Math.floor(c / 16).toString(16) + (c % 16).toString(16);
@@ -64,7 +57,17 @@ function toJSON(val) {
       }
       return '"' + v + '"';
     }
-  }[val != null ? val.constructor.name : "Object"](val);
+};
+
+function toJSON(val) {
+  if (typeof(val) == "undefined") {
+    throw "Cannot encode 'undefined' value as JSON";
+  }
+  if (typeof(val) == "xml") { // E4X support
+    val = val.toXMLString();
+  }
+  if (val === null) { return "null"; }
+  return (toJSON.dispatcher[val.constructor.name])(val);
 }
 
 function compileFunction(source) {
