@@ -316,13 +316,7 @@ prep_and_validate_update(Db, #doc{id=Id,revs={RevStart, Revs}}=Doc,
     [] ->
         % new doc, and we have existing revs.
         % reuse existing deleted doc
-        if OldFullDocInfo#full_doc_info.deleted ->
-            % existing docs are deletions
-             #doc_info{revs=[#rev_info{rev={Pos, DelRevId}}|_]} =
-                couch_doc:to_doc_info(OldFullDocInfo),
-            Doc2 = Doc#doc{revs={Pos, [DelRevId]}},
-            {validate_doc_update(Db, Doc2, fun() -> nil end), Doc2};
-        AllowConflict ->
+        if OldFullDocInfo#full_doc_info.deleted orelse AllowConflict ->
             {validate_doc_update(Db, Doc, fun() -> nil end), Doc};
         true ->
             {conflict, Doc}
