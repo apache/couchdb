@@ -170,7 +170,18 @@ couchTests.attachments= function(debug) {
     docs.push(doc)
   }
 
-  db.bulkSave(docs);
+  var saved = db.bulkSave(docs);
+  // now delete the docs, and while we are looping over them, remove the
+  // '_rev' field so we can re-create after deletion.
+  var to_up = [];
+  for (i=0;i<saved.length;i++) {
+    to_up.push({'_id': saved[i]['id'], '_rev': saved[i]['rev'], '_deleted': true});
+    delete docs[i]._rev;
+  }
+  // delete them.
+  var saved2 = db.bulkSave(to_up);
+  // re-create them
+  var saved3 = db.bulkSave(docs);
 
   var before = db.info().disk_size;
 
