@@ -160,6 +160,12 @@ couchTests.list_views = function(debug) {
         var row = getRow();
         send(fooBarBam); // intentional error
         return "tail";
+      }),
+      docReference : stringFun(function(head, req) {
+        send("head");
+        var row = getRow();
+        send(row.doc.integer);
+        return "tail";
       })
     }
   };
@@ -315,6 +321,10 @@ couchTests.list_views = function(debug) {
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/rowError/basicView");
   T(/ReferenceError/.test(xhr.responseText));
 
+
+  // with include_docs and a reference to the doc.
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/docReference/basicView?include_docs=true");
+  T(xhr.responseText.match(/head0tail/));
 
   // now with extra qs params
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/qsParams/basicView?foo=blam");
