@@ -207,18 +207,18 @@ start_list_resp(QueryServer, Req, Db, Head, Etag) ->
     {ok, Resp, ?b2l(?l2b(Chunks))}.
 
 make_map_send_row_fun(QueryServer) ->
-    fun(Resp, Db, Row, _IncludeDocs, RowFront) ->
-        send_list_row(Resp, QueryServer, Db, Row, RowFront)
+    fun(Resp, Db, Row, IncludeDocs, RowFront) ->
+        send_list_row(Resp, QueryServer, Db, Row, RowFront, IncludeDocs)
     end.
 
 make_reduce_send_row_fun(QueryServer, Db) ->
     fun(Resp, Row, RowFront) ->
-        send_list_row(Resp, QueryServer, Db, Row, RowFront)
+        send_list_row(Resp, QueryServer, Db, Row, RowFront, false)
     end.
 
-send_list_row(Resp, QueryServer, Db, Row, RowFront) ->
+send_list_row(Resp, QueryServer, Db, Row, RowFront, IncludeDoc) ->
     try
-        [Go,Chunks] = couch_query_servers:render_list_row(QueryServer, Db, Row),
+        [Go,Chunks] = couch_query_servers:render_list_row(QueryServer, Db, Row, IncludeDoc),
         Chunk = RowFront ++ ?b2l(?l2b(Chunks)),
         send_non_empty_chunk(Resp, Chunk),
         case Go of
