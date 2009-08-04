@@ -103,6 +103,16 @@ AC_CHECK_HEADER([jsapi.h], [], [
 Are the Mozilla SpiderMonkey headers installed?])
         ])])
 
+AC_LANG_PUSH(C)
+AC_LINK_IFELSE(
+    [AC_LANG_PROGRAM(
+        [[]],
+        [[JS_SetOperationCallback(0, 0);]]
+    )],
+    AC_DEFINE([USE_JS_SETOPCB], [], [Use new JS_SetOperationCallback])
+)
+AC_LANG_POP(C)
+
 AC_CHECK_ICU([3])
 
 ICU_LOCAL_CFLAGS=`$ICU_CONFIG --cppflags-searchpath`

@@ -19,6 +19,7 @@ specific language governing permissions and limitations under the License.
 #include "curlhelper.h"
 #include <jsapi.h>
 #include <curl/curl.h>
+#include "config.h"
 
 #ifndef CURLOPT_COPYPOSTFIELDS
    #define CURLOPT_COPYPOSTFIELDS 10165
@@ -214,7 +215,7 @@ EvalInContext(JSContext *context, JSObject *obj, uintN argc, jsval *argv,
         return JS_FALSE;
     }
 
-#if JS_VERSION > 170
+#ifdef USE_JS_SETOPCB
     JS_SetContextThread(sub_context);
     JS_BeginRequest(sub_context);
 #endif
@@ -240,7 +241,7 @@ EvalInContext(JSContext *context, JSObject *obj, uintN argc, jsval *argv,
     }
 
 out:
-#if JS_VERSION > 170
+#ifdef USE_JS_SETOPCB
     JS_EndRequest(sub_context);
     JS_ClearContextThread(sub_context);
 #endif
@@ -405,9 +406,10 @@ ExecuteScript(JSContext *context, JSObject *obj, const char *filename) {
 
 static uint32 gBranchCount = 0;
 
-#if JS_VERSION <= 170
+#ifdef USE_JS_SETOPCB
 static JSBool
-BranchCallback(JSContext *context, JSScript *script) {
+OperationCallback(JSContext *context)
+{
     if ((++gBranchCount & 0x3fff) == 1) {
         JS_MaybeGC(context);
     }
@@ -415,8 +417,7 @@ BranchCallback(JSContext *context, JSScript *script) {
 }
 #else
 static JSBool
-OperationCallback(JSContext *context)
-{
+BranchCallback(JSContext *context, JSScript *script) {
     if ((++gBranchCount & 0x3fff) == 1) {
         JS_MaybeGC(context);
     }
@@ -1234,13 +1235,13 @@ main(int argc, const char * argv[]) {
         return 1;
     /* FIXME: https://bugzilla.mozilla.org/show_bug.cgi?id=477187 */
     JS_SetErrorReporter(context, PrintError);
-#if JS_VERSION <= 170
-    JS_SetBranchCallback(context, BranchCallback);
-    JS_ToggleOptions(context, JSOPTION_NATIVE_BRANCH_CALLBACK);
-#else
+#ifdef USE_JS_SETOPCB
     JS_SetContextThread(context);
     JS_BeginRequest(context);
     JS_SetOperationCallback(context, OperationCallback);
+#else
+    JS_SetBranchCallback(context, BranchCallback);
+    JS_ToggleOptions(context, JSOPTION_NATIVE_BRANCH_CALLBACK);
 #endif
     JS_ToggleOptions(context, JSOPTION_XML);
 
@@ -1272,7 +1273,7 @@ main(int argc, const char * argv[]) {
 
     ExecuteScript(context, global, argv[1]);
 
-#if JS_VERSION > 170
+#ifdef USE_JS_SETOPCB
     JS_EndRequest(context);
     JS_ClearContextThread(context);
 #endif
