@@ -85,8 +85,8 @@ CPPFLAGS="$FLAGS $CPPFLAGS"
 # manually linking libm is requred for FreeBSD 7.0
 LDFLAGS="$FLAGS -lm $LDFLAGS"
 
-AC_CHECK_LIB([js], [JS_NewContext], [], [
-    AC_CHECK_LIB([mozjs], [JS_NewContext], [], [
+AC_CHECK_LIB([mozjs], [JS_NewContext], [], [
+    AC_CHECK_LIB([js], [JS_NewContext], [], [
         AC_MSG_ERROR([Could not find the js library.
 
 Is the Mozilla SpiderMonkey library installed?])])])

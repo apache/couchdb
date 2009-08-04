@@ -112,7 +112,7 @@ couchTests.show_documents = function(debug) {
             // Becase Safari can't stand to see that dastardly
             // E4X outside of a string. Outside of tests you
             // can just use E4X literals.
-            this.eval('xml.node.@foo = doc.word');
+            eval('xml.node.@foo = doc.word');
             return {
               body: xml
             };
