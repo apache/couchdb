@@ -59,7 +59,8 @@ AC_ARG_WITH([erlang], [AC_HELP_STRING([--with-erlang=PATH],
 
 AC_ARG_WITH([js-include], [AC_HELP_STRING([--with-js-include=PATH],
     [set PATH to the SpiderMonkey include directory])], [
-    JS_FLAGS="-I$withval"
+    JS_INCLUDE="$withval"
+    JS_FLAGS="-I$JS_INCLUDE"
 ], [
     JS_FLAGS="-I/usr/include"
     JS_FLAGS="$JS_FLAGS -I/usr/include/js"
@@ -92,9 +93,15 @@ AC_CHECK_LIB([mozjs], [JS_NewContext], [], [
 Is the Mozilla SpiderMonkey library installed?])])])
 
 AC_CHECK_HEADER([jsapi.h], [], [
-    AC_MSG_ERROR([Could not find the jsapi header.
+    AC_CHECK_HEADER([js/jsapi.h],
+        [
+        CPPFLAGS="$CPPFLAGS -I$JS_INCLUDE/js"
+        ],
+        [
+            AC_MSG_ERROR([Could not find the jsapi header.
 
-Are the Mozilla SpiderMonkey headers installed?])])
+Are the Mozilla SpiderMonkey headers installed?])
+        ])])
 
 AC_CHECK_ICU([3])
 
