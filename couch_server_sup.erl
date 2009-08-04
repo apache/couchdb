@@ -123,8 +123,10 @@ start_server(IniFiles) ->
 
     unlink(ConfigPid),
 
+    Ip = couch_config:get("httpd", "bind_address"),
+    Port = mochiweb_socket_server:get(couch_httpd, port),
     io:format("Apache CouchDB has started. Time to relax.~n"),
-    ?LOG_INFO("Apache CouchDB has started.", []),
+    ?LOG_INFO("Apache CouchDB has started on http://~s:~w/", [Ip, Port]),
 
     {ok, Pid}.
 
