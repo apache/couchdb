@@ -15,7 +15,7 @@
 -export([handle_welcome_req/2,handle_favicon_req/2,handle_utils_dir_req/2,
     handle_all_dbs_req/1,handle_replicate_req/1,handle_restart_req/1,
     handle_uuids_req/1,handle_config_req/1,handle_log_req/1,
-    handle_task_status_req/1,handle_sleep_req/1,handle_whoami_req/1]).
+    handle_task_status_req/1,handle_sleep_req/1]).
 
 -export([increment_update_seq_req/2]).
 
@@ -88,11 +88,13 @@ fix_db_url(UrlBin) ->
 get_rep_endpoint(_Req, {Props}) ->
     Url = proplists:get_value(<<"url">>, Props),
     {BinHeaders} = proplists:get_value(<<"headers">>, Props, {[]}),
-    {remote, fix_db_url(Url), [{?b2l(K),?b2l(V)} || {K,V} <- BinHeaders]};
+    Auth = proplists:get_value(<<"auth">>, Props, undefined),
+    ?LOG_DEBUG("AUTH ~p", [Auth]),
+    {remote, fix_db_url(Url), [{?b2l(K),?b2l(V)} || {K,V} <- BinHeaders], Auth};
 get_rep_endpoint(_Req, <<"http://",_/binary>>=Url) ->
-    {remote, fix_db_url(Url), []};
+    {remote, fix_db_url(Url), [], []};
 get_rep_endpoint(_Req, <<"https://",_/binary>>=Url) ->
-    {remote, fix_db_url(Url), []};
+    {remote, fix_db_url(Url), [], []};
 get_rep_endpoint(#httpd{user_ctx=UserCtx}, <<DbName/binary>>) ->
     {local, DbName, UserCtx}.
 
@@ -218,20 +220,3 @@ handle_log_req(Req) ->
     send_method_not_allowed(Req, "GET").
 
 
-% whoami handler
-handle_whoami_req(#httpd{method='GET', user_ctx=UserCtx}=Req) ->
-    Name = UserCtx#user_ctx.name,
-    Roles = UserCtx#user_ctx.roles,
-    ForceLogin = couch_httpd:qs_value(Req, "force_login", "false"),
-    case {Name, ForceLogin} of
-        {null, "true"} ->
-            throw({unauthorized, <<"Please login.">>});
-        _False -> ok
-    end,
-    send_json(Req, {[
-        {ok, true},
-        {name, Name},
-        {roles, Roles}
-    ]});
-handle_whoami_req(Req) ->
-    send_method_not_allowed(Req, "GET").
