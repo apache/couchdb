@@ -237,7 +237,7 @@ create_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
     case couch_server:create(DbName, [{user_ctx, UserCtx}]) of
     {ok, Db} ->
         couch_db:close(Db),
-        DocUrl = absolute_uri(Req, "/" ++ DbName),
+        DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
         send_json(Req, 201, [{"Location", DocUrl}], {[{ok, true}]});
     Error ->
         throw(Error)

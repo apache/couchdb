@@ -18,7 +18,7 @@
 -export([abs_pathname/1,abs_pathname/2, trim/1, ascii_lower/1]).
 -export([encodeBase64/1, decodeBase64/1, to_hex/1,parse_term/1,dict_find/3]).
 -export([file_read_size/1, get_nested_json_value/2, json_user_ctx/1]).
--export([to_binary/1, to_list/1]).
+-export([to_binary/1, to_list/1, url_encode/1]).
 
 -include("couch_db.hrl").
 -include_lib("kernel/include/file.hrl").
@@ -328,3 +328,26 @@ to_list(V) when is_atom(V) ->
     atom_to_list(V);
 to_list(V) ->
     lists:flatten(io_lib:format("~p", [V])).
+
+url_encode(Bin) when is_binary(Bin) ->
+    url_encode(binary_to_list(Bin));
+url_encode([H|T]) ->
+    if
+    H >= $a, $z >= H ->
+        [H|url_encode(T)];
+    H >= $A, $Z >= H ->
+        [H|url_encode(T)];
+    H >= $0, $9 >= H ->
+        [H|url_encode(T)];
+    H == $_; H == $.; H == $-; H == $: ->
+        [H|url_encode(T)];
+    true ->
+        case lists:flatten(io_lib:format("~.16.0B", [H])) of
+        [X, Y] ->
+            [$%, X, Y | url_encode(T)];
+        [X] ->
+            [$%, $0, X | url_encode(T)]
+        end
+    end;
+url_encode([]) ->
+    [].
