@@ -919,7 +919,7 @@ parse_11_response(DataRecvd,
 		  #state{transfer_encoding = chunked, chunk_size = 0,
 			 cur_req = CurReq,
 			 deleted_crlf = DelCrlf,
-			 reply_buffer = Trailer, reqs = Reqs}=State) ->
+			 chunk_size_buffer = Trailer, reqs = Reqs}=State) ->
     do_trace("Detected end of chunked transfer...~n", []),
     DataRecvd_1 = case DelCrlf of
 		      false ->
@@ -933,7 +933,7 @@ parse_11_response(DataRecvd,
 	    State_1 = handle_response(CurReq, State#state{reqs = Reqs_1}),
 	    parse_response(Rem, reset_state(State_1));
 	{no, Rem} ->
-	    State#state{reply_buffer = Rem, rep_buf_size = size(Rem), deleted_crlf = false}
+	    State#state{chunk_size_buffer = Rem, deleted_crlf = false}
     end;
 
 %% This clause extracts a chunk, given the size.
