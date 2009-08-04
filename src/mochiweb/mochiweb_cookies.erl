@@ -32,7 +32,7 @@ cookie(Key, Value) ->
 %% @spec cookie(Key::string(), Value::string(), Options::[Option]) -> header()
 %% where Option = {max_age, integer()} | {local_time, {date(), time()}}
 %%                | {domain, string()} | {path, string()}
-%%                | {secure, true | false}
+%%                | {secure, true | false} | {http_only, true | false}
 %%
 %% @doc Generate a Set-Cookie header field tuple.
 cookie(Key, Value, Options) ->
@@ -83,7 +83,14 @@ cookie(Key, Value, Options) ->
             Path ->
                 ["; Path=", quote(Path)]
         end,
-    CookieParts = [Cookie, ExpiresPart, SecurePart, DomainPart, PathPart],
+    HttpOnlyPart =
+        case proplists:get_value(http_only, Options) of
+            true ->
+                "; HttpOnly";
+            _ ->
+                ""
+        end,
+    CookieParts = [Cookie, ExpiresPart, SecurePart, DomainPart, PathPart, HttpOnlyPart],
     {"Set-Cookie", lists:flatten(CookieParts)}.
 
 

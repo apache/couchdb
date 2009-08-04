@@ -219,7 +219,9 @@ start_couchdb () {
         -pa %localerlanglibdir%/%couchdbebindir% \
             %localerlanglibdir%/%mochiwebebindir% \
             %localerlanglibdir%/%ibrowseebindir% \
+            %localerlanglibdir%/%oauthebindir% \
         -eval \"application:load(ibrowse)\" \
+        -eval \"application:load(oauth)\" \
         -eval \"application:load(crypto)\" \
         -eval \"application:load(couch)\" \
         -eval \"crypto:start()\" \

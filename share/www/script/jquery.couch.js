@@ -61,6 +61,41 @@
       );
     },
 
+    // TODO make login/logout and db.login/db.logout DRY
+    login: function(options) {
+      options = options || {};
+      $.ajax({
+        type: "POST", url: "/_login", dataType: "json",
+        data: {username: options.username, password: options.password},
+        complete: function(req) {
+          var resp = $.httpData(req, "json");
+          if (req.status == 200) {
+            if (options.success) options.success(resp);
+          } else if (options.error) {
+            options.error(req.status, resp.error, resp.reason);
+          } else {
+            alert("An error occurred logging in: " + resp.reason);
+          }
+        }
+      });
+    },
+    logout: function(options) {
+      options = options || {};
+      $.ajax({
+        type: "POST", url: "/_logout", dataType: "json",
+        complete: function(req) {
+          var resp = $.httpData(req, "json");
+          if (req.status == 200) {
+            if (options.success) options.success(resp);
+          } else if (options.error) {
+            options.error(req.status, resp.error, resp.reason);
+          } else {
+            alert("An error occurred logging out: " + resp.reason);
+          }
+        }
+      });
+    },
+
     db: function(name) {
       return {
         name: name,

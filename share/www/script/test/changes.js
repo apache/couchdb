@@ -195,8 +195,8 @@ couchTests.changes = function(debug) {
   // test for userCtx
   run_on_modified_server(
     [{section: "httpd",
-      key: "authentication_handler",
-      value: "{couch_httpd, special_test_authentication_handler}"},
+      key: "authentication_handlers",
+      value: "{couch_httpd_auth, special_test_authentication_handler}"},
      {section:"httpd",
       key: "WWW-Authenticate",
       value:  "X-Couch-Test-Auth"}],

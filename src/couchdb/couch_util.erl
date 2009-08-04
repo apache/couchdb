@@ -16,7 +16,8 @@
 -export([should_flush/0, should_flush/1, to_existing_atom/1]).
 -export([new_uuid/0, rand32/0, implode/2, collate/2, collate/3]).
 -export([abs_pathname/1,abs_pathname/2, trim/1, ascii_lower/1]).
--export([encodeBase64/1, decodeBase64/1, to_hex/1,parse_term/1,dict_find/3]).
+-export([encodeBase64/1, decodeBase64/1, encodeBase64Url/1, decodeBase64Url/1,
+    to_hex/1,parse_term/1, dict_find/3]).
 -export([file_read_size/1, get_nested_json_value/2, json_user_ctx/1]).
 -export([to_binary/1, to_list/1, url_encode/1]).
 
@@ -259,6 +260,23 @@ encodeBase64(<<B:1/binary>>, Acc) ->
 encodeBase64(<<>>, Acc) ->
     Acc.
 
+encodeBase64Url(Bs) when list(Bs) ->
+    encodeBase64Url(list_to_binary(Bs), <<>>);
+encodeBase64Url(Bs) ->
+    encodeBase64Url(Bs, <<>>).
+    
+encodeBase64Url(<<B:3/binary, Bs/binary>>, Acc) ->
+    <<C1:6, C2:6, C3:6, C4:6>> = B,
+    encodeBase64Url(Bs, <<Acc/binary, (encUrl(C1)), (encUrl(C2)), (encUrl(C3)), (encUrl(C4))>>);
+encodeBase64Url(<<B:2/binary>>, Acc) ->
+    <<C1:6, C2:6, C3:6, _:6>> = <<B/binary, 0>>,
+    <<Acc/binary, (encUrl(C1)), (encUrl(C2)), (encUrl(C3))>>;
+encodeBase64Url(<<B:1/binary>>, Acc) ->
+    <<C1:6, C2:6, _:12>> = <<B/binary, 0, 0>>,
+    <<Acc/binary, (encUrl(C1)), (encUrl(C2))>>;
+encodeBase64Url(<<>>, Acc) ->
+    Acc.
+
 %%
 %% decodeBase64(BinaryChars) -> Binary
 %%
@@ -279,6 +297,23 @@ decode1(<<C1, C2, C3, C4, Cs/binary>>, Acc) ->
 decode1(<<>>, Acc) ->
     Acc.
 
+decodeBase64Url(Cs) when is_list(Cs)->
+    decodeBase64Url(list_to_binary(Cs));
+decodeBase64Url(Cs) ->
+    decode1Url(Cs, <<>>).
+
+decode1Url(<<C1, C2>>, Acc) ->
+    <<B1, _:16>> = <<(decUrl(C1)):6, (decUrl(C2)):6, 0:12>>,
+    <<Acc/binary, B1>>;
+decode1Url(<<C1, C2, C3>>, Acc) ->
+    <<B1, B2, _:8>> = <<(decUrl(C1)):6, (decUrl(C2)):6, (decUrl(C3)):6, (decUrl(0)):6>>,
+    <<Acc/binary, B1, B2>>;
+decode1Url(<<C1, C2, C3, C4, Cs/binary>>, Acc) ->
+    Bin = <<Acc/binary, (decUrl(C1)):6, (decUrl(C2)):6, (decUrl(C3)):6, (decUrl(C4)):6>>,
+    decode1Url(Cs, Bin);
+decode1Url(<<>>, Acc) ->
+    Acc.
+
 %% enc/1 and dec/1
 %%
 %% Mapping: 0-25 -> A-Z, 26-51 -> a-z, 52-61 -> 0-9, 62 -> +, 63 -> /
@@ -289,6 +324,15 @@ enc(C) ->
 dec(C) ->
     62*?st(C,43) + ?st(C,47) + (C-59)*?st(C,48) - 69*?st(C,65) - 6*?st(C,97).
 
+%% encUrl/1 and decUrl/1
+%%
+%% Mapping: 0-25 -> A-Z, 26-51 -> a-z, 52-61 -> 0-9, 62 -> -, 63 -> _
+%%
+encUrl(C) ->
+    65 + C + 6*?st(C,26) - 75*?st(C,52) -13*?st(C,62) + 49*?st(C,63).
+
+decUrl(C) ->
+    62*?st(C,45) + (C-58)*?st(C,48) - 69*?st(C,65) + 33*?st(C,95) - 39*?st(C,97).
 
 dict_find(Key, Dict, DefaultValue) ->
     case dict:find(Key, Dict) of

@@ -25,6 +25,7 @@ run: ../bin/couchdb.tpl
 	    -e "s|%mochiwebebindir%|mochiweb|g" \
 	    -e "s|%couchdbebindir%|couchdb|g" \
 	    -e "s|%ibrowseebindir%|ibrowse|g" \
+	    -e "s|%oauthebindir%|erlang-oauth|g" \
 	    -e "s|%defaultini%|default_dev.ini|g" \
 	    -e "s|%localini%|local_dev.ini|g" \
 	    -e "s|%localerlanglibdir%|$(abs_top_srcdir)/src|g" \

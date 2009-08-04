@@ -18,7 +18,7 @@
 -export([get_stale_type/1, get_reduce_type/1, parse_view_params/3]).
 -export([make_view_fold_fun/6, finish_view_fold/3, view_row_obj/3]).
 -export([view_group_etag/1, view_group_etag/2, make_reduce_fold_funs/5]).
--export([design_doc_view/5]).
+-export([design_doc_view/5, parse_bool_param/1]).
 
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,send_chunk/2,

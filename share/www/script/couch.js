@@ -299,6 +299,67 @@ function CouchDB(name, httpHeaders) {
 // Use this from callers to check HTTP status or header values of requests.
 CouchDB.last_req = null;
 
+CouchDB.login = function(username, password) {
+  CouchDB.last_req = CouchDB.request("POST", "/_session", {
+    headers: {"Content-Type": "application/x-www-form-urlencoded",
+      "X-CouchDB-WWW-Authenticate": "Cookie"},
+    body: "username=" + encodeURIComponent(username) + "&password=" + encodeURIComponent(password)
+  });
+  return JSON.parse(CouchDB.last_req.responseText);
+}
+
+CouchDB.logout = function() {
+  CouchDB.last_req = CouchDB.request("DELETE", "/_session", {
+    headers: {"Content-Type": "application/x-www-form-urlencoded",
+      "X-CouchDB-WWW-Authenticate": "Cookie"}
+  });
+  return JSON.parse(CouchDB.last_req.responseText);
+}
+
+CouchDB.createUser = function(username, password, email, roles, basicAuth) {
+  var roles_str = ""
+  if (roles) {
+    for (var i=0; i< roles.length; i++) {
+      roles_str += "&roles=" + encodeURIComponent(roles[i]);
+    }
+  }
+  var headers = {"Content-Type": "application/x-www-form-urlencoded"};
+  if (!basicAuth) {
+    headers['X-CouchDB-WWW-Authenticate'] = 'Cookie';
+  }
+  
+  CouchDB.last_req = CouchDB.request("POST", "/_user/", {
+    headers: headers,
+    body: "username=" + encodeURIComponent(username) + "&password=" + encodeURIComponent(password) 
+          + "&email="+ encodeURIComponent(email)+ roles_str
+    
+  });
+  return JSON.parse(CouchDB.last_req.responseText);
+}
+
+CouchDB.updateUser = function(username, email, roles, password, old_password) {
+  var roles_str = ""
+  if (roles) {
+    for (var i=0; i< roles.length; i++) {
+      roles_str += "&roles=" + encodeURIComponent(roles[i]);
+    }
+  }
+
+  var body = "email="+ encodeURIComponent(email)+ roles_str;
+
+  if (typeof(password) != "undefined" && password)
+    body += "&password=" + password;
+
+  if (typeof(old_password) != "undefined" && old_password)
+    body += "&old_password=" + old_password;
+
+  CouchDB.last_req = CouchDB.request("PUT", "/_user/"+encodeURIComponent(username), {
+    headers: {"Content-Type": "application/x-www-form-urlencoded",
+      "X-CouchDB-WWW-Authenticate": "Cookie"},
+    body: body
+  });
+  return JSON.parse(CouchDB.last_req.responseText);
+}
 
 CouchDB.allDbs = function() {
   CouchDB.last_req = CouchDB.request("GET", "/_all_dbs");

@@ -335,7 +335,7 @@ couchTests.show_documents = function(debug) {
   var doc2 = {_id:"foo", a:2};
   db.save(doc1);
 
-  //create the conflict with a all_or_nothing bulk docs request
+  // create the conflict with an all_or_nothing bulk docs request
   var docs = [doc2];
   db.bulkSave(docs, {all_or_nothing:true});
 

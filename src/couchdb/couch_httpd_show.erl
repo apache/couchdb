@@ -30,7 +30,6 @@ handle_doc_show_req(#httpd{
     handle_doc_show(Req, DesignName, ShowName, DocId, Db);
 
 handle_doc_show_req(#httpd{
-        method='GET',
         path_parts=[_DbName, _Design, DesignName, _Show, ShowName]
     }=Req, Db) ->
     handle_doc_show(Req, DesignName, ShowName, nil, Db);
@@ -39,7 +38,7 @@ handle_doc_show_req(#httpd{method='GET'}=Req, _Db) ->
     send_error(Req, 404, <<"show_error">>, <<"Invalid path.">>);
 
 handle_doc_show_req(Req, _Db) ->
-    send_method_not_allowed(Req, "GET,HEAD").
+    send_method_not_allowed(Req, "GET,POST,HEAD").
 
 handle_doc_show(Req, DesignName, ShowName, DocId, Db) ->
     DesignId = <<"_design/", DesignName/binary>>,
@@ -112,7 +111,7 @@ send_view_list_response(Lang, ListSrc, ViewName, DesignId, Req, Db, Keys) ->
     end.
 
 
-output_map_list(#httpd{mochi_req=MReq}=Req, Lang, ListSrc, View, Group, Db, QueryArgs, nil) ->
+output_map_list(#httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Lang, ListSrc, View, Group, Db, QueryArgs, nil) ->
     #view_query_args{
         limit = Limit,
         direction = Dir,
@@ -125,7 +124,7 @@ output_map_list(#httpd{mochi_req=MReq}=Req, Lang, ListSrc, View, Group, Db, Quer
     Headers = MReq:get(headers),
     Hlist = mochiweb_headers:to_list(Headers),
     Accept = proplists:get_value('Accept', Hlist),
-    CurrentEtag = couch_httpd_view:view_group_etag(Group, {Lang, ListSrc, Accept}),
+    CurrentEtag = couch_httpd_view:view_group_etag(Group, {Lang, ListSrc, Accept, UserCtx}),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         % get the os process here
         % pass it into the view fold with closures
@@ -145,7 +144,7 @@ output_map_list(#httpd{mochi_req=MReq}=Req, Lang, ListSrc, View, Group, Db, Quer
         finish_list(Req, QueryServer, CurrentEtag, FoldResult, StartListRespFun, RowCount)
     end);
 
-output_map_list(#httpd{mochi_req=MReq}=Req, Lang, ListSrc, View, Group, Db, QueryArgs, Keys) ->
+output_map_list(#httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Lang, ListSrc, View, Group, Db, QueryArgs, Keys) ->
     #view_query_args{
         limit = Limit,
         direction = Dir,
@@ -156,7 +155,7 @@ output_map_list(#httpd{mochi_req=MReq}=Req, Lang, ListSrc, View, Group, Db, Quer
     Headers = MReq:get(headers),
     Hlist = mochiweb_headers:to_list(Headers),
     Accept = proplists:get_value('Accept', Hlist),
-    CurrentEtag = couch_httpd_view:view_group_etag(Group, {Lang, ListSrc, Accept}),
+    CurrentEtag = couch_httpd_view:view_group_etag(Group, {Lang, ListSrc, Accept, UserCtx}),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         % get the os process here
         % pass it into the view fold with closures
@@ -239,7 +238,7 @@ send_non_empty_chunk(Resp, Chunk) ->
         _ -> send_chunk(Resp, Chunk)
     end.
 
-output_reduce_list(#httpd{mochi_req=MReq}=Req, Lang, ListSrc, View, Group, Db, QueryArgs, nil) ->
+output_reduce_list(#httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Lang, ListSrc, View, Group, Db, QueryArgs, nil) ->
     #view_query_args{
         limit = Limit,
         direction = Dir,
@@ -256,7 +255,7 @@ output_reduce_list(#httpd{mochi_req=MReq}=Req, Lang, ListSrc, View, Group, Db, Q
     Headers = MReq:get(headers),
     Hlist = mochiweb_headers:to_list(Headers),
     Accept = proplists:get_value('Accept', Hlist),
-    CurrentEtag = couch_httpd_view:view_group_etag(Group, {Lang, ListSrc, Accept}),
+    CurrentEtag = couch_httpd_view:view_group_etag(Group, {Lang, ListSrc, Accept, UserCtx}),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         StartListRespFun = make_reduce_start_resp_fun(QueryServer, Req, Db, CurrentEtag),
         SendListRowFun = make_reduce_send_row_fun(QueryServer, Db),
@@ -274,7 +273,7 @@ output_reduce_list(#httpd{mochi_req=MReq}=Req, Lang, ListSrc, View, Group, Db, Q
         finish_list(Req, QueryServer, CurrentEtag, FoldResult, StartListRespFun, null)
     end);
 
-output_reduce_list(#httpd{mochi_req=MReq}=Req, Lang, ListSrc, View, Group, Db, QueryArgs, Keys) ->
+output_reduce_list(#httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Lang, ListSrc, View, Group, Db, QueryArgs, Keys) ->
     #view_query_args{
         limit = Limit,
         direction = Dir,
@@ -289,7 +288,7 @@ output_reduce_list(#httpd{mochi_req=MReq}=Req, Lang, ListSrc, View, Group, Db, Q
     Headers = MReq:get(headers),
     Hlist = mochiweb_headers:to_list(Headers),
     Accept = proplists:get_value('Accept', Hlist),
-    CurrentEtag = couch_httpd_view:view_group_etag(Group, {Lang, ListSrc, Accept, Keys}),
+    CurrentEtag = couch_httpd_view:view_group_etag(Group, {Lang, ListSrc, Accept, UserCtx, Keys}),
 
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         StartListRespFun = make_reduce_start_resp_fun(QueryServer, Req, Db, CurrentEtag),
@@ -332,17 +331,18 @@ finish_list(Req, QueryServer, Etag, FoldResult, StartFun, TotalRows) ->
     end,
     send_chunk(Resp, []).
 
+
 render_head_for_empty_list(StartListRespFun, Req, Etag, null) ->
     StartListRespFun(Req, Etag, []); % for reduce
 render_head_for_empty_list(StartListRespFun, Req, Etag, TotalRows) ->
     StartListRespFun(Req, Etag, TotalRows, null, []).
 
-send_doc_show_response(Lang, ShowSrc, DocId, nil, #httpd{mochi_req=MReq}=Req, Db) ->
+send_doc_show_response(Lang, ShowSrc, DocId, nil, #httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Db) ->
     % compute etag with no doc
     Headers = MReq:get(headers),
     Hlist = mochiweb_headers:to_list(Headers),
     Accept = proplists:get_value('Accept', Hlist),
-    CurrentEtag = couch_httpd:make_etag({Lang, ShowSrc, nil, Accept}),
+    CurrentEtag = couch_httpd:make_etag({Lang, ShowSrc, nil, Accept, UserCtx}),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         [<<"resp">>, ExternalResp] = couch_query_servers:render_doc_show(Lang, ShowSrc,
             DocId, nil, Req, Db),
@@ -350,12 +350,12 @@ send_doc_show_response(Lang, ShowSrc, DocId, nil, #httpd{mochi_req=MReq}=Req, Db
         couch_httpd_external:send_external_response(Req, JsonResp)
     end);
 
-send_doc_show_response(Lang, ShowSrc, DocId, #doc{revs=Revs}=Doc, #httpd{mochi_req=MReq}=Req, Db) ->
+send_doc_show_response(Lang, ShowSrc, DocId, #doc{revs=Revs}=Doc, #httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Db) ->
     % calculate the etag
     Headers = MReq:get(headers),
     Hlist = mochiweb_headers:to_list(Headers),
     Accept = proplists:get_value('Accept', Hlist),
-    CurrentEtag = couch_httpd:make_etag({Lang, ShowSrc, Revs, Accept}),
+    CurrentEtag = couch_httpd:make_etag({Lang, ShowSrc, Revs, Accept, UserCtx}),
     % We know our etag now
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         [<<"resp">>, ExternalResp] = couch_query_servers:render_doc_show(Lang, ShowSrc,

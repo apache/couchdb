@@ -11,6 +11,12 @@ Build and System Integration:
  * Changed `couchdb` script configuration options.
  * Added default.d and local.d configuration directories to load sequence.
 
+HTTP Interface:
+
+ * Added optional cookie-based authentication handler.
+ * Added optional two-legged OAuth authentication handler.
+
+
 Version 0.9.1
 -------------
 

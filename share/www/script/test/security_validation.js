@@ -39,14 +39,14 @@ couchTests.security_validation = function(debug) {
 
   run_on_modified_server(
     [{section: "httpd",
-      key: "authentication_handler",
-      value: "{couch_httpd, special_test_authentication_handler}"},
+      key: "authentication_handlers",
+      value: "{couch_httpd_auth, special_test_authentication_handler}"},
      {section:"httpd",
       key: "WWW-Authenticate",
       value:  "X-Couch-Test-Auth"}],
 
     function () {
-      // try saving document usin the wrong credentials
+      // try saving document using the wrong credentials
       var wrongPasswordDb = new CouchDB("test_suite_db",
         {"WWW-Authenticate": "X-Couch-Test-Auth Damien Katz:foo"}
       );
@@ -59,8 +59,8 @@ couchTests.security_validation = function(debug) {
         T(wrongPasswordDb.last_req.status == 401);
       }
 
-      // test force_login=true.
-      var resp = wrongPasswordDb.request("GET", "/_whoami?force_login=true");
+      // test force basic login
+      var resp = wrongPasswordDb.request("GET", "/_session?basic=true");
       var err = JSON.parse(resp.responseText);
       T(err.error == "unauthorized");
       T(resp.status == 401);
@@ -104,7 +104,7 @@ couchTests.security_validation = function(debug) {
       T(userDb.save(designDoc).ok);
 
       // test the _whoami endpoint
-      var resp = userDb.request("GET", "/_whoami");
+      var resp = userDb.request("GET", "/_session");
       var user = JSON.parse(resp.responseText)
       T(user.name == "Damien Katz");
       // test that the roles are listed properly

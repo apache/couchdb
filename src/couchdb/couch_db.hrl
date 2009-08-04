@@ -67,7 +67,8 @@
     db_url_handlers,
     user_ctx,
     req_body = undefined,
-    design_url_handlers
+    design_url_handlers,
+    auth
     }).
 
 
