@@ -213,8 +213,12 @@ EvalInContext(JSContext *context, JSObject *obj, uintN argc, jsval *argv,
         JS_ReportOutOfMemory(context);
         return JS_FALSE;
     }
+
+#if JS_VERSION > 170
     JS_SetContextThread(sub_context);
     JS_BeginRequest(sub_context);
+#endif
+
     src = JS_GetStringChars(str);
     srclen = JS_GetStringLength(str);
 
@@ -236,9 +240,12 @@ EvalInContext(JSContext *context, JSObject *obj, uintN argc, jsval *argv,
     }
 
 out:
+#if JS_VERSION > 170
     JS_EndRequest(sub_context);
-    JS_DestroyContext(sub_context);
     JS_ClearContextThread(sub_context);
+#endif
+
+    JS_DestroyContext(sub_context);
     return ok;
 }
 
@@ -1225,14 +1232,14 @@ main(int argc, const char * argv[]) {
     context = JS_NewContext(runtime, gStackChunkSize);
     if (!context)
         return 1;
-    JS_SetContextThread(context);
-    JS_BeginRequest(context);
     /* FIXME: https://bugzilla.mozilla.org/show_bug.cgi?id=477187 */
     JS_SetErrorReporter(context, PrintError);
 #if JS_VERSION <= 170
     JS_SetBranchCallback(context, BranchCallback);
     JS_ToggleOptions(context, JSOPTION_NATIVE_BRANCH_CALLBACK);
 #else
+    JS_SetContextThread(context);
+    JS_BeginRequest(context);
     JS_SetOperationCallback(context, OperationCallback);
 #endif
     JS_ToggleOptions(context, JSOPTION_XML);
@@ -1264,9 +1271,13 @@ main(int argc, const char * argv[]) {
     }
 
     ExecuteScript(context, global, argv[1]);
+
+#if JS_VERSION > 170
     JS_EndRequest(context);
-    JS_DestroyContext(context);
     JS_ClearContextThread(context);
+#endif
+
+    JS_DestroyContext(context);
     JS_DestroyRuntime(runtime);
     JS_ShutDown();
 
