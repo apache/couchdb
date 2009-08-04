@@ -392,7 +392,7 @@ att_stub_converter(DbS, Id, Rev,
         #att{name=Name,data=stub,type=Type,len=Length}=Att) ->
     #http_db{uri=DbUrl, headers=Headers} = DbS,
     {Pos, [RevId|_]} = Rev,
-    Url = lists:flatten([DbUrl, url_encode(Id), "/", url_encode(?b2l(Name)),
+    Url = lists:flatten([DbUrl, couch_util:url_encode(Id), "/", couch_util:url_encode(?b2l(Name)),
         "?rev=", ?b2l(couch_doc:rev_to_str({Pos,RevId}))]),
     ?LOG_DEBUG("Attachment URL ~s", [Url]),
     {ok, RcvFun} = make_att_stub_receiver(Url, Headers, Name,
@@ -732,7 +732,7 @@ get_missing_revs(Db, DocId) ->
 
 open_doc(#http_db{uri=DbUrl, headers=Headers}, DocId, Options) ->
     [] = Options,
-    case do_http_request(DbUrl ++ url_encode(DocId), get, Headers) of
+    case do_http_request(DbUrl ++ couch_util:url_encode(DocId), get, Headers) of
     {[{<<"error">>, ErrId}, {<<"reason">>, Reason}]} ->
         {couch_util:to_existing_atom(ErrId), Reason};
     Doc  ->
@@ -744,7 +744,7 @@ open_doc(Db, DocId, Options) ->
 open_doc_revs(#http_db{uri=DbUrl, headers=Headers} = DbS, DocId, Revs0,
         [latest]) ->
     Revs = couch_doc:rev_to_strs(Revs0),
-    BaseUrl = DbUrl ++ url_encode(DocId) ++ "?revs=true&latest=true",
+    BaseUrl = DbUrl ++ couch_util:url_encode(DocId) ++ "?revs=true&latest=true",
 
     %% MochiWeb expects URLs < 8KB long, so maybe split into multiple requests
     MaxN = trunc((8192 - length(BaseUrl))/14),
@@ -827,7 +827,7 @@ binary_memory(Pid) ->
 
 update_doc(#http_db{uri=DbUrl, headers=Headers}, #doc{id=DocId}=Doc, Options) ->
     [] = Options,
-    Url = DbUrl ++ url_encode(DocId),
+    Url = DbUrl ++ couch_util:url_encode(DocId),
     {ResponseMembers} = do_http_request(Url, put, Headers,
             couch_doc:to_json_obj(Doc, [attachments])),
     Rev = proplists:get_value(<<"rev">>, ResponseMembers),
@@ -865,25 +865,3 @@ up_to_date(Source, Seq) ->
     couch_db:close(NewDb),
     T.
 
-url_encode(Bin) when is_binary(Bin) ->
-    url_encode(binary_to_list(Bin));
-url_encode([H|T]) ->
-    if
-    H >= $a, $z >= H ->
-        [H|url_encode(T)];
-    H >= $A, $Z >= H ->
-        [H|url_encode(T)];
-    H >= $0, $9 >= H ->
-        [H|url_encode(T)];
-    H == $_; H == $.; H == $-; H == $: ->
-        [H|url_encode(T)];
-    true ->
-        case lists:flatten(io_lib:format("~.16.0B", [H])) of
-        [X, Y] ->
-            [$%, X, Y | url_encode(T)];
-        [X] ->
-            [$%, $0, X | url_encode(T)]
-        end
-    end;
-url_encode([]) ->
-    [].
