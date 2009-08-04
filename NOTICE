@@ -29,3 +29,7 @@ This product also includes the following third-party components:
  * ibrowse (http://github.com/cmullaparthi/ibrowse/tree/master)
 
    Copyright 2009, Chandrashekhar Mullaparthi
+
+ * mimeparse.js (http://code.google.com/p/mimeparse/)
+
+   Copyright 2009, Chris Anderson <jchris@apache.org>
