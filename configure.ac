@@ -104,13 +104,16 @@ Are the Mozilla SpiderMonkey headers installed?])
         ])])
 
 AC_LANG_PUSH(C)
-AC_LINK_IFELSE(
+OLD_CFLAGS="$CFLAGS"
+CFLAGS="-Werror-implicit-function-declaration"
+AC_COMPILE_IFELSE(
     [AC_LANG_PROGRAM(
-        [[]],
+        [[#include <jsapi.h>]],
         [[JS_SetOperationCallback(0, 0);]]
     )],
     AC_DEFINE([USE_JS_SETOPCB], [], [Use new JS_SetOperationCallback])
 )
+CFLAGS="$OLD_CFLAGS"
 AC_LANG_POP(C)
 
 AC_CHECK_ICU([3])
