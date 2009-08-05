@@ -452,6 +452,8 @@ error_info(not_found) ->
     {404, <<"not_found">>, <<"missing">>};
 error_info({not_found, Reason}) ->
     {404, <<"not_found">>, Reason};
+error_info({not_acceptable, Reason}) ->
+    {406, <<"not_acceptable">>, Reason};
 error_info(conflict) ->
     {409, <<"conflict">>, <<"Document update conflict.">>};
 error_info({forbidden, Msg}) ->
