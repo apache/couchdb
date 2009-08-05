@@ -37,6 +37,7 @@
 ^src/couchdb/Makefile
 ^src/couchdb/Makefile.in
 ^src/couchdb/*.o
+^src/erlang-oauth/*
 ^src/ibrowse/*
 ^src/mochiweb/*
 ^stamp-h1
