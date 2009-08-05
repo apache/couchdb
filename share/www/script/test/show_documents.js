@@ -318,13 +318,12 @@ couchTests.show_documents = function(debug) {
   // test the provides mime matcher without a match
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/provides/"+docid, {
    headers: {
-     "Accept": 'text/html,application/atom+xml; q=0.9'
+     "Accept": 'text/monkeys'
    }
   });
-  var ct = xhr.getResponseHeader("Content-Type");
-  T(/charset=utf-8/.test(ct))
-  T(/text\/html/.test(ct))
-  T(xhr.responseText == "Ha ha, you said \"plankton\".");
+  var rs = JSON.parse(xhr.responseText);
+  T(rs.error == "not_acceptable")
+
 
   // should fallback on the first one
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/provides/"+docid, {

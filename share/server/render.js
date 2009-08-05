@@ -140,18 +140,21 @@ function runProvides(req) {
     responseContentType = mimesByKey[bestKey][0];
   }
   
-  for (var i=0; i < mimeFuns.length; i++) {
-    if (mimeFuns[i][0] == bestKey) {
-      bestFun = mimeFuns[i][1];
-      break;
-    }
+  if (bestKey) {
+    for (var i=0; i < mimeFuns.length; i++) {
+      if (mimeFuns[i][0] == bestKey) {
+        bestFun = mimeFuns[i][1];
+        break;
+      }
+    };
   };
-
+  
   if (bestFun) {
     // log("responding with: "+bestKey);
     return bestFun();
   } else {
-    throw({code:406, body:"Not Acceptable: "+accept||bestKey});
+    var supportedTypes = mimeFuns.map(function(mf) {return mimesByKey[mf[0]].join(', ') || mf[0]});
+    throw({error:"not_acceptable", reason:"Content-Type "+(accept||bestKey)+" not supported, try one of: "+supportedTypes.join(', ')});
   }
 };
 
@@ -248,13 +251,15 @@ function renderError(m) {
 }
 
 function respondError(e, funSrc, htmlErrors) {
-  var logMessage = "function raised error: "+e.toString();
-  log(logMessage);
-  log("stacktrace: "+e.stack);
-  var errorMessage = htmlErrors ? htmlRenderError(e, funSrc) : logMessage;
-  respond({
-    error:"render_error",
-    reason:errorMessage});
+  if (e.error && e.reason) {
+    respond(e);
+  } else {
+    var logMessage = "function raised error: "+e.toString();
+    log(logMessage);
+    log("stacktrace: "+e.stack);
+    var errorMessage = htmlErrors ? htmlRenderError(e, funSrc) : logMessage;
+    renderError(errorMessage);
+  }
 }
 
 function escapeHTML(string) {
