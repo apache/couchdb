@@ -19,7 +19,7 @@ try {
   sandbox.sum = sum;
   sandbox.log = log;
   sandbox.toJSON = toJSON;
-  sandbox.respondWith = respondWith;
+  sandbox.provides = provides;
   sandbox.registerType = registerType;
   sandbox.start = start;
   sandbox.send = send;

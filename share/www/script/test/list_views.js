@@ -83,34 +83,33 @@ couchTests.list_views = function(debug) {
       }),
       acceptSwitch: stringFun(function(head, req) {
         // respondWith takes care of setting the proper headers
-        respondWith(req, {
-          html : function() {
-            send("HTML <ul>");
+        provides("html", function() {
+          send("HTML <ul>");
 
-            var row, num = 0;
-            while (row = getRow()) {
-              num ++;
-              send('\n<li>Key: '
-                +row.key+' Value: '+row.value
-                +' LineNo: '+num+'</li>');
-            }
-
-            // tail
-            return '</ul>';
-          },
-          xml : function() {
-            send('<feed xmlns="http://www.w3.org/2005/Atom">'
-              +'<title>Test XML Feed</title>');
-
-            while (row = getRow()) {
-              var entry = new XML('<entry/>');
-              entry.id = row.id;
-              entry.title = row.key;
-              entry.content = row.value;
-              send(entry);
-            }
-            return "</feed>";
+          var row, num = 0;
+          while (row = getRow()) {
+            num ++;
+            send('\n<li>Key: '
+              +row.key+' Value: '+row.value
+              +' LineNo: '+num+'</li>');
           }
+
+          // tail
+          return '</ul>';
+        });
+
+        provides("xml", function() {
+          send('<feed xmlns="http://www.w3.org/2005/Atom">'
+            +'<title>Test XML Feed</title>');
+
+          while (row = getRow()) {
+            var entry = new XML('<entry/>');
+            entry.id = row.id;
+            entry.title = row.key;
+            entry.content = row.value;
+            send(entry);
+          }
+          return "</feed>";
         });
       }),
       qsParams: stringFun(function(head, req) {
@@ -127,17 +126,15 @@ couchTests.list_views = function(debug) {
         return " tail";
       }),
       stopIter2: stringFun(function(head, req) {
-        respondWith(req, {
-          html: function() {
-            send("head");
-            var row, row_number = 0;
-            while(row = getRow()) {
-              if(row_number > 2) break;
-              send(" " + row_number);
-              row_number += 1;
-            };
-            return " tail";
-          }
+        provides("html", function() {
+          send("head");
+          var row, row_number = 0;
+          while(row = getRow()) {
+            if(row_number > 2) break;
+            send(" " + row_number);
+            row_number += 1;
+          };
+          return " tail";
         });
       }),
       tooManyGetRows : stringFun(function() {

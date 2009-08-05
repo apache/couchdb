@@ -101,28 +101,24 @@ couchTests.show_documents = function(debug) {
           };
         }
       }),
-      "respondWith" : stringFun(function(doc, req) {
+      "provides" : stringFun(function(doc, req) {
         registerType("foo", "application/foo","application/x-foo");
-        return respondWith(req, {
-          html : function() {
-            return "Ha ha, you said \"" + doc.word + "\".";
-          },
-          xml : function() {
-            var xml = new XML('<xml><node/></xml>');
-            // Becase Safari can't stand to see that dastardly
-            // E4X outside of a string. Outside of tests you
-            // can just use E4X literals.
-            eval('xml.node.@foo = doc.word');
-            return {
-              body: xml
-            };
-          },
-          foo : function() {
-            return {
-              body: "foofoo"
-            };
-          },
-          fallback : "html"
+
+        provides("html", function() {
+          return "Ha ha, you said \"" + doc.word + "\".";
+        });
+
+        provides("xml", function() {
+          var xml = new XML('<xml><node/></xml>');
+          // Becase Safari can't stand to see that dastardly
+          // E4X outside of a string. Outside of tests you
+          // can just use E4X literals.
+          eval('xml.node.@foo = doc.word');
+          return xml;
+        });
+        
+        provides("foo", function() {
+          return "foofoo";
         });
       })
     }
@@ -289,8 +285,8 @@ couchTests.show_documents = function(debug) {
   etag = xhr.getResponseHeader("etag");
   T(etag != "skipped")
 
-  // test the respondWith mime matcher
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/respondWith/"+docid, {
+  // test the provides mime matcher
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/provides/"+docid, {
     headers: {
       "Accept": 'text/html,application/atom+xml; q=0.9'
     }
@@ -301,7 +297,7 @@ couchTests.show_documents = function(debug) {
   T(xhr.responseText == "Ha ha, you said \"plankton\".");
 
   // now with xml
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/respondWith/"+docid, {
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/provides/"+docid, {
     headers: {
       "Accept": 'application/xml'
     }
@@ -311,7 +307,7 @@ couchTests.show_documents = function(debug) {
   T(xhr.responseText.match(/plankton/));
 
   // registering types works
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/respondWith/"+docid, {
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/provides/"+docid, {
     headers: {
       "Accept": "application/x-foo"
     }
@@ -319,8 +315,8 @@ couchTests.show_documents = function(debug) {
   T(xhr.getResponseHeader("Content-Type") == "application/x-foo");
   T(xhr.responseText.match(/foofoo/));
 
-  // test the respondWith mime matcher without
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/respondWith/"+docid, {
+  // test the provides mime matcher without a match
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/provides/"+docid, {
    headers: {
      "Accept": 'text/html,application/atom+xml; q=0.9'
    }
@@ -329,6 +325,15 @@ couchTests.show_documents = function(debug) {
   T(/charset=utf-8/.test(ct))
   T(/text\/html/.test(ct))
   T(xhr.responseText == "Ha ha, you said \"plankton\".");
+
+  // should fallback on the first one
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/provides/"+docid, {
+   headers: {
+     "Accept": 'application/x-foo, application/xml'
+   }
+  });
+  var ct = xhr.getResponseHeader("Content-Type");
+  T(/application\/xml/.test(ct));  
 
   // test inclusion of conflict state
   var doc1 = {_id:"foo", a:1};

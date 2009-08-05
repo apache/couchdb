@@ -10,40 +10,16 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-var respCT;
-var respTail;
-// this function provides a shortcut for managing responses by Accept header
-respondWith = function(req, responders) {
-  var bestKey = null, accept = req.headers["Accept"];
-  if (accept && !req.query.format) {
-    var provides = [];
-    for (key in responders) {
-      if (mimesByKey[key]) {
-        provides = provides.concat(mimesByKey[key]);
-      }
-    }
-    var bestMime = Mimeparse.bestMatch(provides, accept);
-    bestKey = keysByMime[bestMime];
-  } else {
-    bestKey = req.query.format;
-  }
-  var rFunc = responders[bestKey || responders.fallback || "html"];
-  if (rFunc) {
-    if (isShow) {
-      var resp = maybeWrapResponse(rFunc());
-      resp["headers"] = resp["headers"] || {};
-      resp["headers"]["Content-Type"] = bestMime;
-      respond(["resp", resp]);
-    } else {
-      respCT = bestMime;
-      respTail = rFunc();
-    }
-  } else {
-    throw({code:406, body:"Not Acceptable: "+accept});
-  }
-};
 
-// whoever registers last wins.
+// registerType(name, mime-type, mime-type, ...)
+// 
+// Available in query server sandbox. TODO: The list is cleared on reset.
+// This registers a particular name with the set of mimetypes it can handle.
+// Whoever registers last wins.
+// 
+// Example: 
+// registerType("html", "text/html; charset=utf-8");
+
 mimesByKey = {};
 keysByMime = {};
 registerType = function() {
@@ -75,16 +51,11 @@ registerType("csv", "text/csv");
 registerType("rss", "application/rss+xml");
 registerType("atom", "application/atom+xml");
 registerType("yaml", "application/x-yaml", "text/yaml");
-
 // just like Rails
 registerType("multipart_form", "multipart/form-data");
 registerType("url_encoded_form", "application/x-www-form-urlencoded");
-
 // http://www.ietf.org/rfc/rfc4627.txt
 registerType("json", "application/json", "text/x-json");
-
-
-
 
 //  Start chunks
 var startResp = {};
@@ -92,15 +63,21 @@ function start(resp) {
   startResp = resp || {};
 };
 
-function sendStart(label) {
-  startResp = startResp || {};
-  startResp["headers"] = startResp["headers"] || {};
-  startResp["headers"]["Content-Type"] = startResp["headers"]["Content-Type"] || respCT;
-
+function sendStart() {
+  startResp = applyContentType((startResp || {}), responseContentType);
   respond(["start", chunks, startResp]);
   chunks = [];
   startResp = {};
 }
+
+function applyContentType(resp, responseContentType) {
+  resp["headers"] = resp["headers"] || {};
+  if (responseContentType) {
+    resp["headers"]["Content-Type"] = resp["headers"]["Content-Type"] || responseContentType;    
+  }
+  return resp;
+}
+
 //  Send chunk
 var chunks = [];
 function send(chunk) {
@@ -119,12 +96,12 @@ function getRow() {
     gotRow = true;
     sendStart();
   } else {
-    blowChunks()
+    blowChunks();
   }
   var line = readline();
   var json = eval(line);
   if (json[0] == "list_end") {
-    lastRow = true
+    lastRow = true;
     return null;
   }
   if (json[0] != "list_row") {
@@ -136,28 +113,65 @@ function getRow() {
   return json[1];
 };
 
+var mimeFuns = [], providesUsed, responseContentType;
+function provides(type, fun) {
+  providesUsed = true;
+  mimeFuns.push([type, fun]);
+};
+
+function runProvides(req) {
+  var supportedMimes = [], bestFun, bestKey = null, accept = req.headers["Accept"];
+  if (req.query && req.query.format) {
+    bestKey = req.query.format;
+    responseContentType = mimesByKey[bestKey][0];
+  } else if (accept) {
+    // log("using accept header: "+accept);
+    mimeFuns.reverse().forEach(function(mimeFun) {
+      var mimeKey = mimeFun[0];
+      if (mimesByKey[mimeKey]) {
+        supportedMimes = supportedMimes.concat(mimesByKey[mimeKey]);
+      }
+    });
+    responseContentType = Mimeparse.bestMatch(supportedMimes, accept);
+    bestKey = keysByMime[responseContentType];
+  } else {
+    // just do the first one
+    bestKey = mimeFuns[0][0];
+    responseContentType = mimesByKey[bestKey][0];
+  }
+  
+  for (var i=0; i < mimeFuns.length; i++) {
+    if (mimeFuns[i][0] == bestKey) {
+      bestFun = mimeFuns[i][1];
+      break;
+    }
+  };
+
+  if (bestFun) {
+    // log("responding with: "+bestKey);
+    return bestFun();
+  } else {
+    throw({code:406, body:"Not Acceptable: "+accept||bestKey});
+  }
+};
+
+
+
 ////
 ////  Render dispatcher
 ////
 ////
 ////
 ////
-var isShow = false;
-var Render = (function() {
-  var row_info;
-
-  return {
-    show : function(funSrc, doc, req) {
-      isShow = true;
-      var formFun = compileFunction(funSrc);
-      runShowRenderFunction(formFun, [doc, req], funSrc, true);
-    },
-    list : function(head, req) {
-      isShow = false;
-      runListRenderFunction(funs[0], [head, req], funsrc[0], false);
-    }
+var Render = {
+  show : function(funSrc, doc, req) {
+    var showFun = compileFunction(funSrc);
+    runShow(showFun, doc, req, funSrc);
+  },
+  list : function(head, req) {
+    runList(funs[0], head, req, funsrc[0]);
   }
-})();
+};
 
 function maybeWrapResponse(resp) {
   var type = typeof resp;
@@ -168,45 +182,70 @@ function maybeWrapResponse(resp) {
   }
 };
 
-function runShowRenderFunction(renderFun, args, funSrc, htmlErrors) {
+function resetProvides() {
+  // set globals
+  providesUsed = false;
+  mimeFuns = [];
+  responseContentType = null;  
+};
+
+function runShow(showFun, doc, req, funSrc) {
   try {
-    var resp = renderFun.apply(null, args);
+    resetProvides();
+    var resp = showFun.apply(null, [doc, req]);
+    
+    if (providesUsed) {
+      resp = runProvides(req);
+      resp = applyContentType(maybeWrapResponse(resp), responseContentType);
+    }
+    
     if (resp) {
       respond(["resp", maybeWrapResponse(resp)]);
     } else {
-      renderError("undefined response from render function");
+      renderError("undefined response from show function");
     }
   } catch(e) {
-    respondError(e, funSrc, htmlErrors);
+    respondError(e, funSrc, true);
   }
 };
-function runListRenderFunction(renderFun, args, funSrc, htmlErrors) {
+
+function resetList() {
+  gotRow = false;
+  lastRow = false;
+  chunks = [];
+  startResp = {};
+};
+
+function runList(listFun, head, req, funSrc) {
   try {
-    gotRow = false;
-    lastRow = false;
-    respTail = "";
-    if (renderFun.arity > 2) {
+    if (listFun.arity > 2) {
       throw("the list API has changed for CouchDB 0.10, please upgrade your code");
     }
-    var resp = renderFun.apply(null, args);
+    
+    resetProvides();
+    resetList();
+    
+    var tail = listFun.apply(null, [head, req]);
+    
+    if (providesUsed) {
+      tail = runProvides(req);
+    }
+    
     if (!gotRow) {
       getRow();
     }
-    if (typeof resp != "undefined") {
-      chunks.push(resp);
-    } else if (respTail) {
-      chunks.push(respTail);
+    if (typeof tail != "undefined") {
+      chunks.push(tail);
     }
     blowChunks("end");
   } catch(e) {
-    respondError(e, funSrc, htmlErrors);
+    respondError(e, funSrc, false);
   }
 };
 
 function renderError(m) {
   respond({error : "render_error", reason : m});
 }
-
 
 function respondError(e, funSrc, htmlErrors) {
   var logMessage = "function raised error: "+e.toString();
@@ -235,4 +274,3 @@ function htmlRenderError(e, funSrc) {
     "</pre></code></body></html>"].join('');
   return {body:msg};
 };
-
