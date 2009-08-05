@@ -30,6 +30,10 @@ This product also includes the following third-party components:
 
    Copyright 2009, Chandrashekhar Mullaparthi
 
+ * Erlang OAuth (http://github.com/tim/erlang-oauth/tree/master)
+
+   Copyright 2009, Tim Fletcher <http://tfletcher.com/>
+
  * mimeparse.js (http://code.google.com/p/mimeparse/)
 
    Copyright 2009, Chris Anderson <jchris@apache.org>
