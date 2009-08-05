@@ -25,6 +25,7 @@
 ^README
 ^share/Makefile
 ^share/Makefile.in
+^share/server/mimeparse.js
 ^share/www/favicon.ico
 ^share/www/image/*
 ^share/www/script/jquery.*
