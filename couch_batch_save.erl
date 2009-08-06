@@ -196,7 +196,9 @@ send_commit(Pid) ->
     Pid ! {self(), commit},
     receive
         {Pid, committed} ->
-           ok
+           ok;
+        {'DOWN', _, _, Pid, _} ->
+           exit(normal)
     end.
 
 batch_pid_for_db_and_user(DbName, UserCtx) ->
@@ -227,7 +229,11 @@ send_doc_to_batch(Pid, Doc) ->
 % the loop that holds documents between commits
 doc_collector(DbName, UserCtx, {BatchSize, BatchInterval}, new) ->
     % start a process that triggers commit every BatchInterval milliseconds
-    _IntervalPid = spawn_link(fun() -> commit_every_ms(self(), BatchInterval) end),
+    Me = self(),
+    spawn_link(fun() ->
+        erlang:monitor(process, Me),
+        commit_every_ms(Me, BatchInterval) 
+    end),
     doc_collector(DbName, UserCtx, {BatchSize, BatchInterval}, []);
 
 doc_collector(DbName, UserCtx, {BatchSize, BatchInterval}, Docs) when length(Docs) >= BatchSize->
