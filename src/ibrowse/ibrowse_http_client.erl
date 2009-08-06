@@ -137,7 +137,7 @@ handle_call({send_req, {Url, Headers, Method, Body, Options, Timeout}},
 handle_call(stop, _From, State) ->
     do_close(State),
     do_error_reply(State, closing_on_request),
-    {stop, normal, State};
+    {stop, normal, ok, State};
 
 handle_call(Request, _From, State) ->
     Reply = {unknown_request, Request},
@@ -184,6 +184,15 @@ handle_info({ssl_closed, _Sock}, State) ->
     handle_sock_closed(State),
     {stop, normal, State};
 
+handle_info({tcp_error, _Sock}, State) ->
+    io:format("Error on connection to ~1000.p:~1000.p~n", [State#state.host, State#state.port]),
+    handle_sock_closed(State),
+    {stop, normal, State};
+handle_info({ssl_error, _Sock}, State) ->
+    io:format("Error on SSL connection to ~1000.p:~1000.p~n", [State#state.host, State#state.port]),
+    handle_sock_closed(State),
+    {stop, normal, State};
+
 handle_info({req_timedout, From}, State) ->
     case lists:keysearch(From, #request.from, queue:to_list(State#state.reqs)) of
 	false ->
@@ -204,6 +213,8 @@ handle_info({trace, Bool}, State) ->
     {noreply, State};
 
 handle_info(Info, State) ->
+    io:format("Unknown message recvd for ~1000.p:~1000.p -> ~p~n",
+	      [State#state.host, State#state.port, Info]),
     io:format("Recvd unknown message ~p when in state: ~p~n", [Info, State]),
     {noreply, State}.
 
@@ -869,8 +880,8 @@ is_connection_closing(_, _)                -> false.
 
 %% This clause determines the chunk size when given data from the beginning of the chunk
 parse_11_response(DataRecvd,
-		  #state{transfer_encoding=chunked,
-			 chunk_size=chunk_start,
+		  #state{transfer_encoding = chunked,
+			 chunk_size = chunk_start,
 			 chunk_size_buffer = Chunk_sz_buf
 			} = State) ->
     case scan_crlf(Chunk_sz_buf, DataRecvd) of
@@ -906,15 +917,15 @@ parse_11_response(DataRecvd,
 	{yes, _, NextChunk} ->
 	    State_1 = State#state{chunk_size = chunk_start,
 				  chunk_size_buffer = <<>>,
-%%				  reply_buffer = Buf_1,
 				  deleted_crlf = true},
 	    parse_11_response(NextChunk, State_1);
 	{no, Data_1} ->
-%%	    State#state{reply_buffer = Data_1, rep_buf_size = size(Data_1)}
 	    State#state{chunk_size_buffer = Data_1}
     end;
 
-%% This clause deals with the end of a chunked transfer
+%% This clause deals with the end of a chunked transfer. ibrowse does
+%% not support Trailers in the Chunked Transfer encoding. Any trailer
+%% received is silently discarded.
 parse_11_response(DataRecvd,
 		  #state{transfer_encoding = chunked, chunk_size = 0,
 			 cur_req = CurReq,

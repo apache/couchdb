@@ -7,7 +7,7 @@
 %%%-------------------------------------------------------------------
 %% @author Chandrashekhar Mullaparthi <chandrashekhar dot mullaparthi at gmail dot com>
 %% @copyright 2005-2009 Chandrashekhar Mullaparthi
-%% @version 1.5.1
+%% @version 1.5.2
 %% @doc The ibrowse application implements an HTTP 1.1 client. This
 %% module implements the API of the HTTP client. There is one named
 %% process called 'ibrowse' which assists in load balancing and maintaining configuration. There is one load balancing process per unique webserver. There is
@@ -98,6 +98,7 @@
 	 trace_on/2,
 	 trace_off/2,
 	 all_trace_off/0,
+	 show_dest_status/0,
 	 show_dest_status/2
 	]).
 
@@ -479,6 +480,44 @@ trace_off(Host, Port) ->
 all_trace_off() ->
     ibrowse ! all_trace_off,
     ok.
+
+show_dest_status() ->
+    Dests = lists:filter(fun({lb_pid, {Host, Port}, _}) when is_list(Host),
+							     is_integer(Port) ->
+				 true;
+			    (_) ->
+				 false
+			 end, ets:tab2list(ibrowse_lb)),
+    All_ets = ets:all(),
+    io:format("~-40.40s | ~-5.5s | ~-10.10s | ~s~n",
+	      ["Server:port", "ETS", "Num conns", "LB Pid"]),
+    io:format("~80.80.=s~n", [""]),
+    lists:foreach(fun({lb_pid, {Host, Port}, Lb_pid}) ->
+			  case lists:dropwhile(
+				 fun(Tid) ->
+					 ets:info(Tid, owner) /= Lb_pid
+				 end, All_ets) of
+			      [] ->
+				  io:format("~40.40s | ~-5.5s | ~-5.5s | ~s~n",
+					    [Host ++ ":" ++ integer_to_list(Port),
+					     "",
+					     "",
+					     io_lib:format("~p", [Lb_pid])]
+					   );
+			      [Tid | _] ->
+				  catch (
+				    begin
+					Size = ets:info(Tid, size),
+					io:format("~40.40s | ~-5.5s | ~-5.5s | ~s~n",
+						  [Host ++ ":" ++ integer_to_list(Port),
+						   integer_to_list(Tid),
+						   integer_to_list(Size),
+						   io_lib:format("~p", [Lb_pid])]
+						 )
+				    end
+				   )
+				  end
+		  end, Dests).
 
 %% @doc Shows some internal information about load balancing to a
 %% specified Host:Port. Info about workers spawned using

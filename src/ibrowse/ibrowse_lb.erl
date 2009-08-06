@@ -108,18 +108,19 @@ spawn_connection(Lb_pid, Url,
 
 %% Update max_sessions in #state with supplied value
 handle_call({spawn_connection, _Url, Max_sess, Max_pipe, _}, _From,
-	    #state{ets_tid = Tid,
-		   num_cur_sessions = Num} = State)
+	    #state{num_cur_sessions = Num} = State)
     when Num >= Max_sess ->
-    Reply = find_best_connection(Tid, Max_pipe),
-    {reply, Reply, State#state{max_sessions = Max_sess}};
+    State_1 = maybe_create_ets(State),
+    Reply = find_best_connection(State_1#state.ets_tid, Max_pipe),
+    {reply, Reply, State_1#state{max_sessions = Max_sess}};
 
 handle_call({spawn_connection, Url, _Max_sess, _Max_pipe, SSL_options}, _From,
-	    #state{num_cur_sessions = Cur,
-		   ets_tid = Tid} = State) ->
+	    #state{num_cur_sessions = Cur} = State) ->
+    State_1 = maybe_create_ets(State),
+    Tid = State_1#state.ets_tid,
     {ok, Pid} = ibrowse_http_client:start_link({Tid, Url, SSL_options}),
     ets:insert(Tid, {{1, Pid}, []}),
-    {reply, {ok, Pid}, State#state{num_cur_sessions = Cur + 1}};
+    {reply, {ok, Pid}, State_1#state{num_cur_sessions = Cur + 1}};
 
 handle_call(Request, _From, State) ->
     Reply = {unknown_request, Request},
@@ -145,11 +146,26 @@ handle_cast(_Msg, State) ->
 handle_info({'EXIT', Parent, _Reason}, #state{parent_pid = Parent} = State) ->
     {stop, normal, State};
 
+handle_info({'EXIT', _Pid, _Reason}, #state{ets_tid = undefined} = State) ->
+    {noreply, State};
+
 handle_info({'EXIT', Pid, _Reason},
 	    #state{num_cur_sessions = Cur,
 		   ets_tid = Tid} = State) ->
     ets:match_delete(Tid, {{'_', Pid}, '_'}),
-    {noreply, State#state{num_cur_sessions = Cur - 1}};
+    Cur_1 = Cur - 1,
+    State_1 = case Cur_1 of
+		  0 ->
+		      ets:delete(Tid),
+		      State#state{ets_tid = undefined};
+		  _ ->
+		      State
+	      end,
+    {noreply, State_1#state{num_cur_sessions = Cur_1}};
+
+handle_info({trace, Bool}, #state{ets_tid = undefined} = State) ->
+    put(my_trace_flag, Bool),
+    {noreply, State};
 
 handle_info({trace, Bool}, #state{ets_tid = Tid} = State) ->
     ets:foldl(fun({{_, Pid}, _}, Acc) when is_pid(Pid) ->
@@ -192,3 +208,9 @@ find_best_connection(Tid, Max_pipe) ->
 	_ ->
 	    {error, retry_later}
     end.
+
+maybe_create_ets(#state{ets_tid = undefined} = State) ->
+    Tid = ets:new(ibrowse_lb, [public, ordered_set]),
+    State#state{ets_tid = Tid};
+maybe_create_ets(State) ->
+    State.

@@ -231,6 +231,7 @@ unit_tests(Options) ->
 	{'DOWN', Ref, _, _, Info} ->
 	    io:format("Test process crashed: ~p~n", [Info])
     after 60000 ->
+	    exit(Pid, kill),
 	    io:format("Timed out waiting for tests to complete~n", [])
     end.
 
@@ -301,6 +302,9 @@ wait_for_resp(Pid) ->
     receive
 	{async_result, Pid, Res} ->
 	    Res;
+	{async_result, Other_pid, _} ->
+	    io:format("~p: Waiting for result from ~p: got from ~p~n", [self(), Pid, Other_pid]),
+	    wait_for_resp(Pid);
 	{'DOWN', _, _, Pid, Reason} ->
 	    {'EXIT', Reason};
 	{'DOWN', _, _, _, _} ->
