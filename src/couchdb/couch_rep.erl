@@ -82,7 +82,7 @@ replicate(Source, Target) ->
 %% gen_server callbacks
 %%=============================================================================
 
--record(http_db, {
+-record(old_http_db, {
     uri,
     headers,
     oauth
@@ -391,7 +391,7 @@ attachment_loop(ReqId, Conn) ->
 
 att_stub_converter(DbS, Id, Rev,
         #att{name=Name,data=stub,type=Type,len=Length}=Att) ->
-    #http_db{uri=DbUrl, headers=Headers} = DbS,
+    #old_http_db{uri=DbUrl, headers=Headers} = DbS,
     {Pos, [RevId|_]} = Rev,
     Url = lists:flatten([DbUrl, couch_util:url_encode(Id), "/", couch_util:url_encode(?b2l(Name)),
         "?rev=", ?b2l(couch_doc:rev_to_str({Pos,RevId}))]),
@@ -498,7 +498,7 @@ make_att_stub_receiver(Url, Headers, Name, Type, Length, Retries, Pause) ->
 
 
 open_db({remote, Url, Headers, Auth})->
-    {ok, #http_db{uri=?b2l(Url), headers=Headers, oauth=Auth}, Url};
+    {ok, #old_http_db{uri=?b2l(Url), headers=Headers, oauth=Auth}, Url};
 open_db({local, DbName, UserCtx})->
     case couch_db:open(DbName, [{user_ctx, UserCtx}]) of
     {ok, Db} -> {ok, Db, DbName};
@@ -506,7 +506,7 @@ open_db({local, DbName, UserCtx})->
     end.
 
 
-close_db(#http_db{})->
+close_db(#old_http_db{})->
     ok;
 close_db(Db)->
     couch_db:close(Db).
@@ -675,7 +675,7 @@ do_http_request0(Url, Action, Headers, JsonBody, Retries, Pause) ->
         do_http_request0(Url, Action, Headers, JsonBody, Retries - 1, 2*Pause)
     end.
 
-ensure_full_commit(#http_db{uri=DbUrl, headers=Headers, oauth=OAuth}) ->
+ensure_full_commit(#old_http_db{uri=DbUrl, headers=Headers, oauth=OAuth}) ->
     {ResultProps} = do_http_request(DbUrl ++ "_ensure_full_commit", post,
         Headers, OAuth, true),
     true = proplists:get_value(<<"ok">>, ResultProps),
@@ -707,13 +707,13 @@ enum_docs_since(Pid, DbSource, DbTarget, {StartSeq, RevsCount}) ->
 
 
 
-get_db_info(#http_db{uri=DbUrl, headers=Headers, oauth=OAuth}) ->
+get_db_info(#old_http_db{uri=DbUrl, headers=Headers, oauth=OAuth}) ->
     {DbProps} = do_http_request(DbUrl, get, Headers, OAuth),
     {ok, [{list_to_atom(?b2l(K)), V} || {K,V} <- DbProps]};
 get_db_info(Db) ->
     couch_db:get_db_info(Db).
 
-get_doc_info_list(#http_db{uri=DbUrl, headers=Headers, oauth=OAuth}, StartSeq) ->
+get_doc_info_list(#old_http_db{uri=DbUrl, headers=Headers, oauth=OAuth}, StartSeq) ->
     Url = DbUrl ++ "_all_docs_by_seq?limit=100&startkey="
         ++ integer_to_list(StartSeq),
     {Results} = do_http_request(Url, get, Headers, OAuth),
@@ -739,7 +739,7 @@ get_doc_info_list(DbSource, StartSeq) ->
     end, {0, []}),
     lists:reverse(DocInfoList).
 
-get_missing_revs(#http_db{uri=DbUrl, headers=Headers, oauth=OAuth}, DocIdRevsList) ->
+get_missing_revs(#old_http_db{uri=DbUrl, headers=Headers, oauth=OAuth}, DocIdRevsList) ->
     DocIdRevsList2 = [{Id, couch_doc:rev_to_strs(Revs)} || {Id, Revs} <- DocIdRevsList],
     {ResponseMembers} = do_http_request(DbUrl ++ "_missing_revs", post, Headers, OAuth,
             {DocIdRevsList2}),
@@ -750,7 +750,7 @@ get_missing_revs(Db, DocId) ->
     couch_db:get_missing_revs(Db, DocId).
 
 
-open_doc(#http_db{uri=DbUrl, headers=Headers, oauth=OAuth}, DocId, Options) ->
+open_doc(#old_http_db{uri=DbUrl, headers=Headers, oauth=OAuth}, DocId, Options) ->
     [] = Options,
     case do_http_request(DbUrl ++ couch_util:url_encode(DocId), get, Headers, OAuth) of
     {[{<<"error">>, ErrId}, {<<"reason">>, Reason}]} ->
@@ -761,7 +761,7 @@ open_doc(#http_db{uri=DbUrl, headers=Headers, oauth=OAuth}, DocId, Options) ->
 open_doc(Db, DocId, Options) ->
     couch_db:open_doc(Db, DocId, Options).
 
-open_doc_revs(#http_db{uri=DbUrl, headers=Headers, oauth=OAuth} = DbS, DocId, Revs0,
+open_doc_revs(#old_http_db{uri=DbUrl, headers=Headers, oauth=OAuth} = DbS, DocId, Revs0,
         [latest]) ->
     Revs = couch_doc:rev_to_strs(Revs0),
     BaseUrl = DbUrl ++ couch_util:url_encode(DocId) ++ "?revs=true&latest=true",
@@ -845,7 +845,7 @@ binary_memory(Pid) ->
     lists:foldl(fun({_Id, Size, _NRefs}, Acc) -> Size+Acc end,
         0, element(2,process_info(Pid, binary))).
 
-update_doc(#http_db{uri=DbUrl, headers=Headers, oauth=OAuth}, #doc{id=DocId}=Doc, Options) ->
+update_doc(#old_http_db{uri=DbUrl, headers=Headers, oauth=OAuth}, #doc{id=DocId}=Doc, Options) ->
     [] = Options,
     Url = DbUrl ++ couch_util:url_encode(DocId),
     {ResponseMembers} = do_http_request(Url, put, Headers, OAuth,
@@ -857,7 +857,7 @@ update_doc(Db, Doc, Options) ->
 
 update_docs(_, [], _, _) ->
     {ok, []};
-update_docs(#http_db{uri=DbUrl, headers=Headers, oauth=OAuth}, Docs, [], replicated_changes) ->
+update_docs(#old_http_db{uri=DbUrl, headers=Headers, oauth=OAuth}, Docs, [], replicated_changes) ->
     JsonDocs = [couch_doc:to_json_obj(Doc, [revs,attachments]) || Doc <- Docs],
     ErrorsJson =
         do_http_request(DbUrl ++ "_bulk_docs", post, Headers, OAuth,
@@ -877,7 +877,7 @@ update_docs(#http_db{uri=DbUrl, headers=Headers, oauth=OAuth}, Docs, [], replica
 update_docs(Db, Docs, Options, UpdateType) ->
     couch_db:update_docs(Db, Docs, Options, UpdateType).
 
-up_to_date(#http_db{}, _Seq) ->
+up_to_date(#old_http_db{}, _Seq) ->
     true;
 up_to_date(Source, Seq) ->
     {ok, NewDb} = couch_db:open(Source#db.name, []),

@@ -228,5 +228,26 @@
     view_states=nil
     }).
 
+-record(http_db, {
+    url,
+    auth = [],
+    resource = "",
+    headers = [
+        {"User-Agent", "CouchDb/"++couch_server:get_version()},
+        {"Accept", "application/json"},
+        {"Accept-Encoding", "gzip"}
+    ],
+    qs = [],
+    method = get,
+    body = nil,
+    options = [
+        {response_format,binary},
+        {inactivity_timeout, 30000}
+    ],
+    retries = 10,
+    pause = 1,
+    conn = nil
+}).
+
 % small value used in revision trees to indicate the revision isn't stored
 -define(REV_MISSING, []).

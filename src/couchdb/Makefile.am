@@ -75,6 +75,7 @@ source_files = \
     couch_ref_counter.erl \
     couch_rep.erl \
     couch_rep_changes_feed.erl \
+    couch_rep_httpc.erl \
     couch_rep_sup.erl \
     couch_server.erl \
     couch_server_sup.erl \
@@ -122,6 +123,7 @@ compiled_files = \
     couch_ref_counter.beam \
     couch_rep.beam \
     couch_rep_changes_feed.beam \
+    couch_rep_httpc.beam \
     couch_rep_sup.beam \
     couch_server.beam \
     couch_server_sup.beam \
