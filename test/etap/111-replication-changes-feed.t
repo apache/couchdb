@@ -17,12 +17,33 @@
 -record(doc, {id= <<"">>, revs={0, []}, body={[]},
             attachments=[], deleted=false, meta=[]}).
 
+-record(http_db, {
+    url,
+    auth = [],
+    resource = "",
+    headers = [
+        {"User-Agent", "CouchDb/"++couch_server:get_version()},
+        {"Accept", "application/json"},
+        {"Accept-Encoding", "gzip"}
+    ],
+    qs = [],
+    method = get,
+    body = nil,
+    options = [
+        {response_format,binary},
+        {inactivity_timeout, 30000}
+    ],
+    retries = 10,
+    pause = 1,
+    conn = nil
+}).
 main(_) ->
     code:add_pathz("src/couchdb"),
     code:add_pathz("src/ibrowse"),
     code:add_pathz("src/mochiweb"),
+    code:add_pathz("src/erlang-oauth"),
     
-    etap:plan(17),
+    etap:plan(13),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -60,14 +81,13 @@ test_all(Type) ->
     test_since_parameter(Type),
     test_continuous_parameter(Type),
     test_conflicts(Type),
-    test_deleted_conflicts(Type),
-    test_non_blocking_call(Type).
+    test_deleted_conflicts(Type).
 
 test_remote_only() ->
     test_chunk_reassembly(remote).
 
 test_unchanged_db(Type) ->
-    {ok, Pid} = couch_rep_changes_feed:start({Type, get_dbname(Type)}, []),
+    {ok, Pid} = start_changes_feed(Type, 0, false),
     etap:is(
         couch_rep_changes_feed:next(Pid),
         complete,
@@ -78,16 +98,15 @@ test_unchanged_db(Type) ->
 
 test_simple_change(Type) ->
     Expect = generate_change(),
-    {ok, Pid} = couch_rep_changes_feed:start({Type, get_dbname(Type)}, []),
+    {ok, Pid} = start_changes_feed(Type, 0, false),
     etap:is(
         {couch_rep_changes_feed:next(Pid), couch_rep_changes_feed:next(Pid)},
-        {Expect, complete},
+        {[Expect], complete},
         io_lib:format("(~p) change one document, get one row", [Type])
     ).
 
 test_since_parameter(Type) ->
-    {ok, Pid} = couch_rep_changes_feed:start({Type, get_dbname(Type)}, 
-        [{since, get_update_seq()}]),
+    {ok, Pid} = start_changes_feed(Type, get_update_seq(), false), 
     etap:is(
         couch_rep_changes_feed:next(Pid),
         complete,
@@ -97,8 +116,7 @@ test_since_parameter(Type) ->
     ).
 
 test_continuous_parameter(Type) ->
-    {ok, Pid} = couch_rep_changes_feed:start({Type, get_dbname(Type)},
-        [{since, get_update_seq()}, {continuous, true}]),
+    {ok, Pid} = start_changes_feed(Type, get_update_seq(), true),
 
     % make the changes_feed request before the next update
     Self = self(),
@@ -110,9 +128,9 @@ test_continuous_parameter(Type) ->
     Expect = generate_change(),
     etap:is(
         receive {actual, Actual} -> Actual end,
-        Expect,
+        [Expect],
         io_lib:format(
-            "(~p) continuous query-string parameter picks up new changes",
+            "(~p) feed=continuous query-string parameter picks up new changes",
             [Type])
     ),
 
@@ -121,11 +139,10 @@ test_continuous_parameter(Type) ->
 test_conflicts(Type) ->
     Since = get_update_seq(),
     Expect = generate_conflict(),
-    {ok, Pid} = couch_rep_changes_feed:start({Type, get_dbname(Type)}, 
-        [{since, Since}]),
+    {ok, Pid} = start_changes_feed(Type, Since, false),
     etap:is(
         {couch_rep_changes_feed:next(Pid), couch_rep_changes_feed:next(Pid)},
-        {Expect, complete},
+        {[Expect], complete},
         io_lib:format("(~p) conflict revisions show up in feed", [Type])
     ).
 
@@ -138,7 +155,7 @@ test_deleted_conflicts(Type) ->
     [Win, {[{<<"rev">>, Lose}]}] = proplists:get_value(<<"changes">>, ExpectProps),
     Doc = couch_doc:from_json_obj({[
         {<<"_id">>, Id},
-        {<<"_rev">>, Lose},
+        {<<"_rev">>, couch_doc:rev_to_str(Lose)},
         {<<"_deleted">>, true}
     ]}),
     Db = get_db(),
@@ -148,50 +165,34 @@ test_deleted_conflicts(Type) ->
     Expect = {[
         {<<"seq">>, get_update_seq()},
         {<<"id">>, Id},
-        {<<"changes">>, [Win, {[{<<"rev">>, couch_doc:rev_to_str(Rev)}]}]}
+        {<<"changes">>, [Win, {[{<<"rev">>, Rev}]}]}
     ]},
     
-    {ok, Pid} = couch_rep_changes_feed:start({Type, get_dbname(Type)}, 
-        [{since, Since}]),
+    {ok, Pid} = start_changes_feed(Type, Since, false),
     etap:is(
         {couch_rep_changes_feed:next(Pid), couch_rep_changes_feed:next(Pid)},
-        {Expect, complete},
+        {[Expect], complete},
         io_lib:format("(~p) deleted conflict revisions show up in feed", [Type])
     ).
-
-test_non_blocking_call(Type) ->
-    Since = get_update_seq(),
-    {ok, Pid} = couch_rep_changes_feed:start({Type, get_dbname(Type)},
-        [{since, Since}, {continuous, true}]),
-    etap:is(
-        couch_rep_changes_feed:all(Pid),
-        [],
-        io_lib:format("(~p) all() returns empty list if no changes available",
-            [Type])
-    ),
-    Expect1 = generate_change(),
-    Expect2 = generate_change(),
-    timer:sleep(100),
-    etap:is(
-        couch_rep_changes_feed:all(Pid),
-        [Expect1, Expect2],
-        io_lib:format("(~p) all() returns full list of outstanding changes",
-            [Type])
-    ),
-    ok = couch_rep_changes_feed:stop(Pid).
 
 test_chunk_reassembly(Type) ->
     Since = get_update_seq(),
     Expect = [generate_change() || _I <- lists:seq(1,30)],
-    {ok, Pid} = couch_rep_changes_feed:start({Type, get_dbname(Type)},
-        [{since, Since}]),
-    timer:sleep(100),
+    {ok, Pid} = start_changes_feed(Type, Since, false),
     etap:is(
-        couch_rep_changes_feed:all(Pid),
+        get_all_changes(Pid, []),
         Expect,
         io_lib:format("(~p) reassembles chunks split across TCP frames",
             [Type])
     ).
+
+get_all_changes(Pid, Acc) ->
+    case couch_rep_changes_feed:next(Pid) of
+    complete ->
+        lists:flatten(lists:reverse(Acc));
+    Else ->
+        get_all_changes(Pid, [Else|Acc])
+    end.
 
 generate_change() ->
     generate_change(couch_util:new_uuid()).
@@ -207,7 +208,7 @@ generate_change(Id, EJson) ->
     {[
         {<<"seq">>, get_update_seq()},
         {<<"id">>, Id},
-        {<<"changes">>, [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]}]}
+        {<<"changes">>, [{[{<<"rev">>, Rev}]}]}
     ]}.
 
 generate_conflict() ->
@@ -219,7 +220,7 @@ generate_conflict() ->
     {ok, Rev2} = couch_db:update_doc(Db, Doc2, [full_commit, all_or_nothing]),
     
     %% relies on undocumented CouchDB conflict winner algo and revision sorting!
-    RevList = [{[{<<"rev">>, couch_doc:rev_to_str(R)}]} || R
+    RevList = [{[{<<"rev">>, R}]} || R
         <- lists:sort(fun(A,B) -> B<A end, [Rev1,Rev2])],
     {[
         {<<"seq">>, get_update_seq()},
@@ -234,10 +235,18 @@ get_db() ->
 get_dbname(local) ->
     "etap-test-db";
 get_dbname(remote) ->
-    "http://127.0.0.1:5984/etap-test-db".
+    "http://127.0.0.1:5984/etap-test-db/".
 
 get_update_seq() ->
     Db = get_db(),
     Seq = couch_db:get_update_seq(Db),
     couch_db:close(Db),
     Seq.
+
+start_changes_feed(local, Since, Continuous) ->
+    Props = [{<<"continuous">>, Continuous}],
+    couch_rep_changes_feed:start_link(self(), get_db(), Since, Props);
+start_changes_feed(remote, Since, Continuous) ->
+    Props = [{<<"continuous">>, Continuous}],
+    Db = #http_db{url = get_dbname(remote)},
+    couch_rep_changes_feed:start_link(self(), Db, Since, Props).
