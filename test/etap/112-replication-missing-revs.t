@@ -185,4 +185,3 @@ start_missing_revs(local, Changes) ->
 start_missing_revs(remote, Changes) ->
     Db = #http_db{url = "http://127.0.0.1:5984/etap-test-target/"},
     couch_rep_missing_revs:start_link(self(), Db, Changes, []).
-    
