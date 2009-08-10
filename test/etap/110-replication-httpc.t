@@ -92,7 +92,6 @@ test_binary_url() ->
         {<<"couchdb">>, <<"Welcome">>},
         {<<"version">>, list_to_binary(couch_server:get_version())}
     ]},
-    Fun = fun(Expect) -> true; (_) -> false end,
     etap:is(
         couch_rep_httpc:request(Req),
         Expect,
