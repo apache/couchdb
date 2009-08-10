@@ -47,6 +47,7 @@ stop(Server) ->
     gen_server:call(Server, stop).
 
 init([_Parent, #http_db{}=Source, Since, PostProps]) ->
+    process_flag(trap_exit, true),
     Feed = case proplists:get_value(<<"continuous">>, PostProps, false) of
     false ->
         normal;
