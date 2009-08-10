@@ -260,7 +260,7 @@ encodeBase64(<<B:1/binary>>, Acc) ->
 encodeBase64(<<>>, Acc) ->
     Acc.
 
-encodeBase64Url(Bs) when list(Bs) ->
+encodeBase64Url(Bs) when is_list(Bs) ->
     encodeBase64Url(list_to_binary(Bs), <<>>);
 encodeBase64Url(Bs) ->
     encodeBase64Url(Bs, <<>>).
