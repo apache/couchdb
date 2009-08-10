@@ -95,9 +95,9 @@ process_response({ok, Status, Headers, Body}, Req) ->
         #http_db{pause = Pause, retries = Retries} = Req,
         ?LOG_INFO("retrying couch_rep_httpc request in ~p seconds " ++
             % "due to remote server error: ~s~s", [Pause/1000, Req#http_db.url,
-            "due to remote server error: ~p Body ~s", [Pause, Code,
+            "due to remote server error: ~p Body ~s", [Pause/1000, Code,
             Body]),
-        timer:sleep(1000*Pause),
+        timer:sleep(Pause),
         do_request(Req#http_db{retries = Retries-1, pause = 2*Pause})
     end;
 
@@ -124,9 +124,9 @@ process_response({error, Reason}, Req) ->
         Else
     end,
     ?LOG_DEBUG("retrying couch_rep_httpc ~p request in ~p seconds due to " ++
-        "{error, ~p}", [Method, Pause, ShortReason]),
+        "{error, ~p}", [Method, Pause/1000, ShortReason]),
         % "{error}", [Method, Pause]),
-    timer:sleep(1000*Pause),
+    timer:sleep(Pause),
     do_request(Req#http_db{retries = Retries-1, pause = 2*Pause}).
 
 spawn_worker_process(Req) ->

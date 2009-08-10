@@ -245,7 +245,7 @@
         {inactivity_timeout, 30000}
     ],
     retries = 10,
-    pause = 1,
+    pause = 500,
     conn = nil
 }).
 
