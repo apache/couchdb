@@ -522,7 +522,7 @@ reset_group(#group{views=Views}=Group) ->
             id_btree=nil,views=Views2}.
 
 reset_file(Db, Fd, DbName, #group{sig=Sig,name=Name} = Group) ->
-    ?LOG_DEBUG("Reseting group index \"~s\" in db ~s", [Name, DbName]),
+    ?LOG_DEBUG("Resetting group index \"~s\" in db ~s", [Name, DbName]),
     ok = couch_file:truncate(Fd, 0),
     ok = couch_file:write_header(Fd, {Sig, nil}),
     init_group(Db, Fd, reset_group(Group), nil).
