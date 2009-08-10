@@ -51,19 +51,17 @@ init([Parent, Target, ChangesFeed, _PostProps]) ->
     {ok, #state{changes_loop=Pid, target=Target, parent=Parent}}.
 
 handle_call({add_missing_revs, {HighSeq, Revs}}, From, State) ->
+    State#state.parent ! {update_stats, missing_revs, length(Revs)},
     handle_add_missing_revs(HighSeq, Revs, From, State);
 
 handle_call(next_missing_revs, From, State) ->
-    handle_next_missing_revs(From, State);
+    handle_next_missing_revs(From, State).
 
-handle_call({update_committed_seq, N}, _From, State) ->
+handle_cast({update_committed_seq, N}, State) ->
     if State#state.high_committed_seq < N ->
         ?LOG_DEBUG("missing_revs updating committed seq to ~p", [N]);
     true -> ok end,
-    {reply, ok, State#state{high_committed_seq=N}}.
-
-handle_cast(_Msg, State) ->
-    {noreply, State}.
+    {noreply, State#state{high_committed_seq=N}}.
 
 handle_info({'EXIT', Pid, Reason}, #state{changes_loop=Pid} = State) ->
     handle_changes_loop_exit(Reason, State);
@@ -84,8 +82,9 @@ code_change(_OldVsn, State, _Extra) ->
 %internal funs
 
 handle_add_missing_revs(HighSeq, [], _From, State) ->
-    maybe_checkpoint(State),
-    {reply, ok, State#state{high_source_seq=HighSeq}};
+    NewState = State#state{high_source_seq=HighSeq},
+    maybe_checkpoint(NewState),
+    {reply, ok, NewState};
 handle_add_missing_revs(HighSeq, Revs, From, #state{reply_to=nil} = State) ->
     #state{rows=Rows, count=Count} = State,
     NewState = State#state{

@@ -77,32 +77,9 @@ handle_task_status_req(#httpd{method='GET'}=Req) ->
 handle_task_status_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
-% add trailing slash if missing
-fix_db_url(UrlBin) ->
-    ?l2b(case lists:last(Url = ?b2l(UrlBin)) of
-    $/ -> Url;
-    _  -> Url ++ "/"
-    end).
-
-
-get_rep_endpoint(_Req, {Props}) ->
-    Url = proplists:get_value(<<"url">>, Props),
-    {BinHeaders} = proplists:get_value(<<"headers">>, Props, {[]}),
-    Auth = proplists:get_value(<<"auth">>, Props, undefined),
-    ?LOG_DEBUG("AUTH ~p", [Auth]),
-    {remote, fix_db_url(Url), [{?b2l(K),?b2l(V)} || {K,V} <- BinHeaders], Auth};
-get_rep_endpoint(_Req, <<"http://",_/binary>>=Url) ->
-    {remote, fix_db_url(Url), [], []};
-get_rep_endpoint(_Req, <<"https://",_/binary>>=Url) ->
-    {remote, fix_db_url(Url), [], []};
-get_rep_endpoint(#httpd{user_ctx=UserCtx}, <<DbName/binary>>) ->
-    {local, DbName, UserCtx}.
-
 handle_replicate_req(#httpd{method='POST'}=Req) ->
-    {Props} = couch_httpd:json_body_obj(Req),
-    Source = get_rep_endpoint(Req, proplists:get_value(<<"source">>, Props)),
-    Target = get_rep_endpoint(Req, proplists:get_value(<<"target">>, Props)),
-    case couch_rep:replicate(Source, Target) of
+    PostBody = couch_httpd:json_body_obj(Req),
+    case couch_rep:replicate(PostBody, Req#httpd.user_ctx) of
     {ok, {JsonResults}} ->
         send_json(Req, {[{ok, true} | JsonResults]});
     {error, {Type, Details}} ->
