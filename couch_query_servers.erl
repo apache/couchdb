@@ -18,7 +18,7 @@
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2,code_change/3,stop/0]).
 -export([start_doc_map/2, map_docs/2, stop_doc_map/1]).
 -export([reduce/3, rereduce/3,validate_doc_update/5]).
--export([render_doc_show/6, start_view_list/2,
+-export([render_doc_show/6, render_doc_update/6, start_view_list/2,
         render_list_head/4, render_list_row/4, render_list_tail/1]).
 -export([start_filter/2, filter_doc/4, end_filter/1]).
 % -export([test/0]).
@@ -170,6 +170,7 @@ validate_doc_update(Lang, FunSrc, EditDoc, DiskDoc, Ctx) ->
     after
         ok = ret_os_process(Lang, Pid)
     end.
+% todo use json_apply_field
 append_docid(DocId, JsonReqIn) ->
     [{<<"docId">>, DocId} | JsonReqIn].
 
@@ -184,6 +185,23 @@ render_doc_show(Lang, ShowSrc, DocId, Doc, Req, Db) ->
     end,
     try couch_os_process:prompt(Pid,
         [<<"show">>, ShowSrc, JsonDoc, JsonReq]) of
+    FormResp ->
+        FormResp
+    after
+        ok = ret_os_process(Lang, Pid)
+    end.
+
+render_doc_update(Lang, UpdateSrc, DocId, Doc, Req, Db) ->
+    Pid = get_os_process(Lang),
+    {JsonReqIn} = couch_httpd_external:json_req_obj(Req, Db),
+
+    {JsonReq, JsonDoc} = case {DocId, Doc} of
+        {nil, nil} -> {{JsonReqIn}, null};
+        {DocId, nil} -> {{append_docid(DocId, JsonReqIn)}, null};
+        _ -> {{append_docid(DocId, JsonReqIn)}, couch_doc:to_json_obj(Doc, [revs])}
+    end,
+    try couch_os_process:prompt(Pid, 
+        [<<"update">>, UpdateSrc, JsonDoc, JsonReq]) of
     FormResp ->
         FormResp
     after
