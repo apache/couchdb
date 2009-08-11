@@ -242,11 +242,20 @@ functions = {
   },
   "filter-basic" => {
     "js" => <<-JS
-      function(doc, req, userCtx) {
+      function(doc, req) {
         if (doc.good) {
           return true;
         }
       }
+    JS
+  },
+  "update-basic" => {
+    "js" => <<-JS
+    function(doc, req) {
+      doc.world = "hello";
+      var resp = [doc, "hello doc"];
+      return resp;
+    }
     JS
   }
 }
@@ -439,6 +448,19 @@ describe "query server normal case" do
     it "should only return true for good docs" do
       @qs.run(["filter", [{"key"=>"bam", "good" => true}, {"foo" => "bar"}, {"good" => true}]]).
         should ==  [true, [true, false, true]]
+    end
+  end
+  
+  describe "update" do
+    before(:all) do
+      @fun = functions["update-basic"][LANGUAGE]
+      @qs.reset!
+    end
+    it "should return a doc and a resp body" do
+      up, doc, resp = @qs.run(["update", @fun, {"foo" => "gnarly"}, {"verb" => "POST"}])
+      up.should == "up"
+      doc.should == {"foo" => "gnarly", "world" => "hello"}
+      resp["body"].should == "hello doc"
     end
   end
 end

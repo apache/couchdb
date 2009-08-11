@@ -41,6 +41,7 @@ var dispatch = {
   "rereduce" : Views.rereduce,
   "validate" : Validate.validate,
   "show"     : Render.show,
+  "update"   : Render.update,
   "list"     : Render.list,
   "filter"   : Filter.filter
 };

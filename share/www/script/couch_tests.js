@@ -67,6 +67,7 @@ loadTest("replication.js");
 loadTest("etags_head.js");
 loadTest("etags_views.js");
 loadTest("show_documents.js");
+loadTest("update_documents.js");
 loadTest("list_views.js");
 loadTest("compact.js");
 loadTest("purge.js");

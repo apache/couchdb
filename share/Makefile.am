@@ -137,6 +137,7 @@ nobase_dist_localdata_DATA = \
     www/script/test/etags_head.js \
     www/script/test/etags_views.js \
     www/script/test/show_documents.js \
+    www/script/test/update_documents.js \
     www/script/test/list_views.js \
     www/script/test/compact.js \
     www/script/test/purge.js \

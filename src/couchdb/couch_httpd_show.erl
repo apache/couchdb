@@ -12,9 +12,8 @@
 
 -module(couch_httpd_show).
 
--export([handle_doc_show_req/2, handle_view_list_req/2,
+-export([handle_doc_show_req/2, handle_doc_update_req/2, handle_view_list_req/2,
         handle_doc_show/5, handle_view_list/6]).
-
 
 -include("couch_db.hrl").
 
@@ -39,6 +38,47 @@ handle_doc_show_req(#httpd{method='GET'}=Req, _Db) ->
 
 handle_doc_show_req(Req, _Db) ->
     send_method_not_allowed(Req, "GET,POST,HEAD").
+
+handle_doc_update_req(#httpd{
+        method = 'PUT',
+        path_parts=[_DbName, _Design, DesignName, _Update, UpdateName, DocId]
+    }=Req, Db) ->
+    DesignId = <<"_design/", DesignName/binary>>,
+    #doc{body={Props}} = couch_httpd_db:couch_doc_open(Db, DesignId, nil, []),
+    Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
+    UpdateSrc = couch_util:get_nested_json_value({Props}, [<<"updates">>, UpdateName]),
+    Doc = try couch_httpd_db:couch_doc_open(Db, DocId, nil, [conflicts]) of
+        FoundDoc -> FoundDoc
+    catch
+        _ -> nil
+    end,
+    send_doc_update_response(Lang, UpdateSrc, DocId, Doc, Req, Db);
+
+handle_doc_update_req(#httpd{
+        method = 'POST',
+        path_parts=[_DbName, _Design, DesignName, _Update, UpdateName]
+    }=Req, Db) ->
+    DesignId = <<"_design/", DesignName/binary>>,
+    #doc{body={Props}} = couch_httpd_db:couch_doc_open(Db, DesignId, nil, []),
+    Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
+    UpdateSrc = couch_util:get_nested_json_value({Props}, [<<"updates">>, UpdateName]),
+    send_doc_update_response(Lang, UpdateSrc, nil, nil, Req, Db);
+
+handle_doc_update_req(#httpd{
+        path_parts=[_DbName, _Design, DesignName, _Update, UpdateName, DocId]
+    }=Req, Db) ->
+    send_method_not_allowed(Req, "PUT");
+
+handle_doc_update_req(#httpd{
+        path_parts=[_DbName, _Design, DesignName, _Update, UpdateName]
+    }=Req, Db) ->
+    send_method_not_allowed(Req, "POST");
+
+handle_doc_update_req(Req, _Db) ->
+    send_error(Req, 404, <<"update_error">>, <<"Invalid path.">>).
+
+
+
 
 handle_doc_show(Req, DesignName, ShowName, DocId, Db) ->
     DesignId = <<"_design/", DesignName/binary>>,
@@ -364,18 +404,39 @@ send_doc_show_response(Lang, ShowSrc, DocId, #doc{revs=Revs}=Doc, #httpd{mochi_r
         couch_httpd_external:send_external_response(Req, JsonResp)
     end).
 
-set_or_replace_header(H, L) ->
-    set_or_replace_header(H, L, []).
+send_doc_update_response(Lang, UpdateSrc, DocId, Doc, #httpd{mochi_req=MReq}=Req, Db) ->
+    case couch_query_servers:render_doc_update(Lang, UpdateSrc, 
+        DocId, Doc, Req, Db) of
+    [<<"up">>, {NewJsonDoc}, JsonResp] ->
+        Options = case couch_httpd:header_value(Req, "X-Couch-Full-Commit", "false") of
+        "true" ->
+            [full_commit];
+        _ ->
+            []
+        end,
+        NewDoc = couch_doc:from_json_obj({NewJsonDoc}),
+        Code = 201,
+        {ok, NewRev} = couch_db:update_doc(Db, NewDoc, Options);
+    [<<"up">>, _Other, JsonResp] ->
+        Code = 200,
+        ok
+    end,
+    JsonResp2 = json_apply_field({<<"code">>, Code}, JsonResp),
+    couch_httpd_external:send_external_response(Req, JsonResp2).
 
-set_or_replace_header({Key, NewValue}, [{Key, _OldVal} | Headers], Acc) ->
+% Maybe this is in the proplists API
+% todo move to couch_util
+json_apply_field(H, {L}) ->
+    json_apply_field(H, L, []).
+json_apply_field({Key, NewValue}, [{Key, _OldVal} | Headers], Acc) ->
     % drop matching keys
-    set_or_replace_header({Key, NewValue}, Headers, Acc);
-set_or_replace_header({Key, NewValue}, [{OtherKey, OtherVal} | Headers], Acc) ->
+    json_apply_field({Key, NewValue}, Headers, Acc);
+json_apply_field({Key, NewValue}, [{OtherKey, OtherVal} | Headers], Acc) ->
     % something else is next, leave it alone.
-    set_or_replace_header({Key, NewValue}, Headers, [{OtherKey, OtherVal} | Acc]);
-set_or_replace_header({Key, NewValue}, [], Acc) ->
+    json_apply_field({Key, NewValue}, Headers, [{OtherKey, OtherVal} | Acc]);
+json_apply_field({Key, NewValue}, [], Acc) ->
     % end of list, add ours
-    [{Key, NewValue}|Acc].
+    {[{Key, NewValue}|Acc]}.
 
 apply_etag({ExternalResponse}, CurrentEtag) ->
     % Here we embark on the delicate task of replacing or creating the
@@ -387,12 +448,12 @@ apply_etag({ExternalResponse}, CurrentEtag) ->
         % no JSON headers
         % add our Etag and Vary headers to the response
         {[{<<"headers">>, {[{<<"Etag">>, CurrentEtag}, {<<"Vary">>, <<"Accept">>}]}} | ExternalResponse]};
-    {JsonHeaders} ->
+    JsonHeaders ->
         {[case Field of
-        {<<"headers">>, {JsonHeaders}} -> % add our headers
-            JsonHeadersEtagged = set_or_replace_header({<<"Etag">>, CurrentEtag}, JsonHeaders),
-            JsonHeadersVaried = set_or_replace_header({<<"Vary">>, <<"Accept">>}, JsonHeadersEtagged),
-            {<<"headers">>, {JsonHeadersVaried}};
+        {<<"headers">>, JsonHeaders} -> % add our headers
+            JsonHeadersEtagged = json_apply_field({<<"Etag">>, CurrentEtag}, JsonHeaders),
+            JsonHeadersVaried = json_apply_field({<<"Vary">>, <<"Accept">>}, JsonHeadersEtagged),
+            {<<"headers">>, JsonHeadersVaried};
         _ -> % skip non-header fields
             Field
         end || Field <- ExternalResponse]}

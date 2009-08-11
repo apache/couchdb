@@ -166,10 +166,15 @@ function runProvides(req) {
 ////
 ////
 ////
+
 var Render = {
   show : function(funSrc, doc, req) {
     var showFun = compileFunction(funSrc);
     runShow(showFun, doc, req, funSrc);
+  },
+  update : function(funSrc, doc, req) {
+    var upFun = compileFunction(funSrc);
+    runUpdate(upFun, doc, req, funSrc);
   },
   list : function(head, req) {
     runList(funs[0], head, req, funsrc[0]);
@@ -206,6 +211,21 @@ function runShow(showFun, doc, req, funSrc) {
       respond(["resp", maybeWrapResponse(resp)]);
     } else {
       renderError("undefined response from show function");
+    }
+  } catch(e) {
+    respondError(e, funSrc, true);
+  }
+};
+
+function runUpdate(renderFun, doc, req, funSrc) {
+  try {
+    var result = renderFun.apply(null, [doc, req]);
+    var doc = result[0];
+    var resp = result[1];
+    if (resp) {
+      respond(["up", doc, maybeWrapResponse(resp)]);
+    } else {
+      renderError("undefined response from update function");
     }
   } catch(e) {
     respondError(e, funSrc, true);
