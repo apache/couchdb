@@ -28,8 +28,6 @@
     last_seq,
     conn = nil,
     reqid = nil,
-    by_seq_from = nil,
-    by_seq_loop = nil,
     complete = false,
     count = 0,
     partial_chunk = nil,
@@ -84,7 +82,7 @@ init([_Parent, #http_db{}=Source, Since, PostProps]) ->
         ?LOG_INFO("source doesn't have _changes, trying _all_docs_by_seq", []),
         Self = self(),
         BySeqPid = spawn_link(fun() -> by_seq_loop(Self, Source, Since) end),
-        {ok, #state{last_seq=Since, by_seq_loop=BySeqPid}};
+        {ok, #state{last_seq=Since, changes_loop=BySeqPid}};
     {ibrowse_async_headers, ReqId, Code, _} ->
         {stop, {changes_error_code, list_to_integer(Code)}}
     after 10000 ->
@@ -138,7 +136,7 @@ handle_info({'EXIT', From, Reason}, #state{changes_loop=From} = State) ->
     {stop, changes_loop_died, State};
 
 handle_info(Msg, State) ->
-    ?LOG_INFO("unexpected message ~p", [Msg]),
+    ?LOG_DEBUG("unexpected message at changes_feed ~p", [Msg]),
     {noreply, State}.
 
 terminate(_Reason, #state{conn=Pid}) when is_pid(Pid) ->
@@ -260,7 +258,8 @@ by_seq_loop(Server, Source, StartSeq) ->
         qs = [{limit, 1000}, {startkey, StartSeq}]
     },
     {Results} = couch_rep_httpc:request(Req),
-    if Results =:= [] -> exit(normal); true -> ok end,
+    Rows = proplists:get_value(<<"rows">>, Results),
+    if Rows =:= [] -> exit(normal); true -> ok end,
     EndSeq = lists:foldl(fun({RowInfoList}, _) ->
         Id = proplists:get_value(<<"id">>, RowInfoList),
         Seq = proplists:get_value(<<"key">>, RowInfoList),
@@ -273,12 +272,12 @@ by_seq_loop(Server, Source, StartSeq) ->
         ParsedRevs = couch_doc:parse_revs(lists:flatten(RawRevs)),
         Change = {[
             {<<"seq">>, Seq},
-            {<<"Id">>, Id},
+            {<<"id">>, Id},
             {<<"changes">>, [{[{<<"rev">>,R}]} || R <- ParsedRevs]}
         ]},
         gen_server:call(Server, {add_change, Change}),
         Seq
-    end, 0, proplists:get_value(<<"rows">>, Results)),
+    end, 0, Rows),
     by_seq_loop(Server, Source, EndSeq+1).
 
 decode_row(<<",\n", Rest/binary>>) ->
