@@ -65,13 +65,13 @@ handle_doc_update_req(#httpd{
     send_doc_update_response(Lang, UpdateSrc, nil, nil, Req, Db);
 
 handle_doc_update_req(#httpd{
-        path_parts=[_DbName, _Design, DesignName, _Update, UpdateName, DocId]
-    }=Req, Db) ->
+        path_parts=[_DbName, _Design, _DesignName, _Update, _UpdateName, _DocId]
+    }=Req, _Db) ->
     send_method_not_allowed(Req, "PUT");
 
 handle_doc_update_req(#httpd{
-        path_parts=[_DbName, _Design, DesignName, _Update, UpdateName]
-    }=Req, Db) ->
+        path_parts=[_DbName, _Design, _DesignName, _Update, _UpdateName]
+    }=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 
 handle_doc_update_req(Req, _Db) ->
@@ -404,7 +404,7 @@ send_doc_show_response(Lang, ShowSrc, DocId, #doc{revs=Revs}=Doc, #httpd{mochi_r
         couch_httpd_external:send_external_response(Req, JsonResp)
     end).
 
-send_doc_update_response(Lang, UpdateSrc, DocId, Doc, #httpd{mochi_req=MReq}=Req, Db) ->
+send_doc_update_response(Lang, UpdateSrc, DocId, Doc, Req, Db) ->
     case couch_query_servers:render_doc_update(Lang, UpdateSrc, 
         DocId, Doc, Req, Db) of
     [<<"up">>, {NewJsonDoc}, JsonResp] ->
@@ -416,7 +416,7 @@ send_doc_update_response(Lang, UpdateSrc, DocId, Doc, #httpd{mochi_req=MReq}=Req
         end,
         NewDoc = couch_doc:from_json_obj({NewJsonDoc}),
         Code = 201,
-        {ok, NewRev} = couch_db:update_doc(Db, NewDoc, Options);
+        {ok, _NewRev} = couch_db:update_doc(Db, NewDoc, Options);
     [<<"up">>, _Other, JsonResp] ->
         Code = 200,
         ok
