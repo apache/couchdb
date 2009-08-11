@@ -22,7 +22,7 @@ start_link(Parent, Target, Reader, _PostProps) ->
 make_chunk(Data) when is_list(Data) ->
     make_chunk(list_to_binary(Data));
 make_chunk(Data) ->
-    [ibrowse_lib:dec2hex(4, size(Data)), "\r\n", Data, "\r\n"].
+    [ibrowse_lib:dec2hex(8, size(Data)), "\r\n", Data, "\r\n"].
 
 upload_docs({start, Docs}) ->
     Data = make_chunk(<<"{\"new_edits\":false, \"docs\":[">>),
