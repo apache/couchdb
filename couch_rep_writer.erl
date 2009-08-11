@@ -19,15 +19,30 @@
 start_link(Parent, Target, Reader, _PostProps) ->
     {ok, spawn_link(fun() -> writer_loop(Parent, Reader, Target) end)}.
 
+make_chunk(Data) when is_list(Data) ->
+    make_chunk(list_to_binary(Data));
+make_chunk(Data) ->
+    [ibrowse_lib:dec2hex(4, size(Data)), "\r\n", Data, "\r\n"].
+
+upload_docs({start, Docs}) ->
+    Data = make_chunk(<<"{\"new_edits\":false, \"docs\":[">>),
+    {ok, Data, {continue, Docs, ""}};
+upload_docs({continue, [Doc|Rest], Prepend}) ->
+    JsonDoc = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, [revs,attachments])),
+    {ok, make_chunk([Prepend, JsonDoc]), {continue, Rest, ","}};
+upload_docs({continue, [], _}) ->
+    {ok, make_chunk(<<"]}\n">>), last_chunk};
+upload_docs(last_chunk) ->
+    {ok, "0\r\n\r\n", finish};
+upload_docs(finish) ->
+    eof.
+    
 writer_loop(Parent, Reader, Target) ->
-    % ?LOG_DEBUG("writer loop begin", []),
     case couch_rep_reader:next(Reader) of
     {complete, FinalSeq} ->
-        % ?LOG_INFO("writer terminating normally", []),
         Parent ! {writer_checkpoint, FinalSeq},
         ok;
     {HighSeq, Docs} ->
-        % ?LOG_DEBUG("writer loop trying to write ~p", [Docs]),
         DocCount = length(Docs),
         try write_docs(Target, Docs) of
         {ok, []} ->
@@ -47,11 +62,11 @@ writer_loop(Parent, Reader, Target) ->
     end.
 
 write_docs(#http_db{} = Db, Docs) ->
-    JsonDocs = [couch_doc:to_json_obj(Doc, [revs,attachments]) || Doc <- Docs],
     ErrorsJson = couch_rep_httpc:request(Db#http_db{
         resource = "_bulk_docs",
         method = post,
-        body = {[{new_edits, false}, {docs, JsonDocs}]}
+        body = {fun upload_docs/1, {start, Docs}},
+        headers = [{"transfer-encoding", "chunked"} | Db#http_db.headers]
     }),
     ErrorsList =
     lists:map(
