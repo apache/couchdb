@@ -39,7 +39,14 @@ do_request(Req) ->
     {OAuthProps} ->
         [oauth_header(Url, Method, OAuthProps) | Headers0]
     end,
-    Body = if B =:= nil -> []; true -> iolist_to_binary(?JSON_ENCODE(B)) end,
+    Body = case B of
+    {Fun, InitialState} when is_function(Fun) ->
+        {Fun, InitialState};
+    nil ->
+        [];
+    _Else ->
+        iolist_to_binary(?JSON_ENCODE(B)) 
+    end,
     Resp = case Conn of
     nil ->
         ibrowse:send_req(Url, Headers, Method, Body, Opts, infinity);
