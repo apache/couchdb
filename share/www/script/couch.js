@@ -127,8 +127,8 @@ function CouchDB(name, httpHeaders) {
   }
 
   // Applies the map function to the contents of database and returns the results.
-  this.query = function(mapFun, reduceFun, options, keys) {
-    var body = {language: "javascript"};
+  this.query = function(mapFun, reduceFun, options, keys, language) {
+    var body = {language: language || "javascript"};
     if(keys) {
       body.keys = keys ;
     }

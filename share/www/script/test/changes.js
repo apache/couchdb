@@ -161,13 +161,13 @@ couchTests.changes = function(debug) {
   var ddoc = {
     _id : "_design/changes_filter",
     "filters" : {
-      "bop" : "function(doc, req, userCtx) { return (doc.bop);}",
-      "dynamic" : stringFun(function(doc, req, userCtx) { 
+      "bop" : "function(doc, req) { return (doc.bop);}",
+      "dynamic" : stringFun(function(doc, req) { 
         var field = req.query.field;
         return doc[field];
       }),
-      "userCtx" : stringFun(function(doc, req, userCtx) {
-        return doc.user && (doc.user == userCtx.name);
+      "userCtx" : stringFun(function(doc, req) {
+        return doc.user && (doc.user == req.userCtx.name);
       })
     }
   }

@@ -206,32 +206,48 @@
 
       // Populate the languages dropdown, and listen to selection changes
       this.populateLanguagesMenu = function() {
+        var all_langs = {};
+        fill_language = function() {
+          var select = $("#language");
+          for (var language in all_langs) {
+            var option = $(document.createElement("option"))
+              .attr("value", language).text(language)
+              .appendTo(select);
+          }
+          if (select[0].options.length == 1) {
+            select[0].disabled = true;
+          } else {
+            select[0].disabled = false;
+            select.val(page.viewLanguage);
+            select.change(function() {
+              var language = $("#language").val();
+              if (language != page.viewLanguage) {
+                var mapFun = $("#viewcode_map").val();
+                if (mapFun == "" || mapFun == templates[page.viewLanguage]) {
+                  // no edits made, so change to the new default
+                  $("#viewcode_map").val(templates[language]);
+                }
+                page.viewLanguage = language;
+                $("#viewcode_map")[0].focus();
+              }
+              return false;
+            });
+          }
+        }
         $.couch.config({
           success: function(resp) {
-            var select = $("#language");
             for (var language in resp) {
-              var option = $(document.createElement("option"))
-                .attr("value", language).text(language)
-                .appendTo(select);
+              all_langs[language] = resp[language];
             }
-            if (select[0].options.length == 1) {
-              select[0].disabled = true;
-            } else {
-              select.val(page.viewLanguage);
-              select.change(function() {
-                var language = $("#language").val();
-                if (language != page.viewLanguage) {
-                  var mapFun = $("#viewcode_map").val();
-                  if (mapFun == "" || mapFun == templates[page.viewLanguage]) {
-                    // no edits made, so change to the new default
-                    $("#viewcode_map").val(templates[language]);
-                  }
-                  page.viewLanguage = language;
-                  $("#viewcode_map")[0].focus();
+
+            $.couch.config({
+              success: function(resp) {
+                for (var language in resp) {
+                  all_langs[language] = resp[language];
                 }
-                return false;
-              });
-            }
+                fill_language();
+              }
+            }, "native_query_servers");
           }
         }, "query_servers");
       }
