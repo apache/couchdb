@@ -164,7 +164,7 @@ output_map_list(#httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Lang, ListSrc, Vie
     Headers = MReq:get(headers),
     Hlist = mochiweb_headers:to_list(Headers),
     Accept = proplists:get_value('Accept', Hlist),
-    CurrentEtag = couch_httpd_view:view_group_etag(Group, {Lang, ListSrc, Accept, UserCtx}),
+    CurrentEtag = couch_httpd_view:view_group_etag(Group, Db, {Lang, ListSrc, Accept, UserCtx}),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         % get the os process here
         % pass it into the view fold with closures
@@ -195,7 +195,7 @@ output_map_list(#httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Lang, ListSrc, Vie
     Headers = MReq:get(headers),
     Hlist = mochiweb_headers:to_list(Headers),
     Accept = proplists:get_value('Accept', Hlist),
-    CurrentEtag = couch_httpd_view:view_group_etag(Group, {Lang, ListSrc, Accept, UserCtx}),
+    CurrentEtag = couch_httpd_view:view_group_etag(Group, Db, {Lang, ListSrc, Accept, UserCtx}),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         % get the os process here
         % pass it into the view fold with closures
@@ -295,7 +295,7 @@ output_reduce_list(#httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Lang, ListSrc, 
     Headers = MReq:get(headers),
     Hlist = mochiweb_headers:to_list(Headers),
     Accept = proplists:get_value('Accept', Hlist),
-    CurrentEtag = couch_httpd_view:view_group_etag(Group, {Lang, ListSrc, Accept, UserCtx}),
+    CurrentEtag = couch_httpd_view:view_group_etag(Group, Db, {Lang, ListSrc, Accept, UserCtx}),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         StartListRespFun = make_reduce_start_resp_fun(QueryServer, Req, Db, CurrentEtag),
         SendListRowFun = make_reduce_send_row_fun(QueryServer, Db),
@@ -328,7 +328,7 @@ output_reduce_list(#httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Lang, ListSrc, 
     Headers = MReq:get(headers),
     Hlist = mochiweb_headers:to_list(Headers),
     Accept = proplists:get_value('Accept', Hlist),
-    CurrentEtag = couch_httpd_view:view_group_etag(Group, {Lang, ListSrc, Accept, UserCtx, Keys}),
+    CurrentEtag = couch_httpd_view:view_group_etag(Group, Db, {Lang, ListSrc, Accept, UserCtx, Keys}),
 
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         StartListRespFun = make_reduce_start_resp_fun(QueryServer, Req, Db, CurrentEtag),
