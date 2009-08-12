@@ -314,6 +314,8 @@ parse_view_param("include_docs", Value) ->
     [{include_docs, parse_bool_param(Value)}];
 parse_view_param("list", Value) ->
     [{list, ?l2b(Value)}];
+parse_view_param("deleted", Value) ->
+    [{deleted, parse_bool_param(Value)}];
 parse_view_param("callback", _) ->
     []; % Verified in the JSON response functions
 parse_view_param(Key, Value) ->
@@ -398,7 +400,9 @@ validate_view_query(include_docs, true, Args) ->
 validate_view_query(include_docs, _Value, Args) ->
     Args;
 validate_view_query(extra, _Value, Args) ->
-    Args.
+    Args;
+validate_view_query(deleted, Value, Args) ->
+    Args#view_query_args{deleted = Value}.
 
 make_view_fold_fun(Req, QueryArgs, Etag, Db, TotalViewCount, HelperFuns) ->
     #view_query_args{
