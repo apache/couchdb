@@ -406,7 +406,7 @@ db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs_by_seq">>]}=Req, Db) ->
     } = QueryArgs = couch_httpd_view:parse_view_params(Req, nil, map),
 
     {ok, Info} = couch_db:get_db_info(Db),
-    CurrentEtag = couch_httpd:make_etag(proplists:get_value(update_seq, Info)),
+    CurrentEtag = couch_httpd:make_etag(Info),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         TotalRowCount = proplists:get_value(doc_count, Info),
         FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db,
@@ -521,7 +521,7 @@ all_docs_view(Req, Db, Keys) ->
         direction = Dir
     } = QueryArgs = couch_httpd_view:parse_view_params(Req, Keys, map),
     {ok, Info} = couch_db:get_db_info(Db),
-    CurrentEtag = couch_httpd:make_etag(proplists:get_value(update_seq, Info)),
+    CurrentEtag = couch_httpd:make_etag(Info),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
 
         TotalRowCount = proplists:get_value(doc_count, Info),

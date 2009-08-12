@@ -17,7 +17,7 @@
 
 -export([get_stale_type/1, get_reduce_type/1, parse_view_params/3]).
 -export([make_view_fold_fun/6, finish_view_fold/3, view_row_obj/3]).
--export([view_group_etag/1, view_group_etag/2, make_reduce_fold_funs/5]).
+-export([view_group_etag/2, view_group_etag/3, make_reduce_fold_funs/5]).
 -export([design_doc_view/5, parse_bool_param/1]).
 
 -import(couch_httpd,
@@ -43,7 +43,7 @@ design_doc_view(Req, Db, Id, ViewName, Keys) ->
                 output_map_view(Req, MapView, Group, Db, QueryArgs, Keys);
             _ ->
                 QueryArgs = parse_view_params(Req, Keys, reduce),
-                output_reduce_view(Req, ReduceView, Group, QueryArgs, Keys)
+                output_reduce_view(Req, Db, ReduceView, Group, QueryArgs, Keys)
             end;
         _ ->
             throw({not_found, Reason})
@@ -133,7 +133,7 @@ handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
         QueryArgs = parse_view_params(Req, Keys, reduce),
         {ok, View, Group} = couch_view:get_temp_reduce_view(Db, Language,
             DesignOptions, MapSrc, RedSrc),
-        output_reduce_view(Req, View, Group, QueryArgs, Keys)
+        output_reduce_view(Req, Db, View, Group, QueryArgs, Keys)
     end;
 
 handle_temp_view_req(Req, _Db) ->
@@ -147,7 +147,7 @@ output_map_view(Req, View, Group, Db, QueryArgs, nil) ->
         start_key = StartKey,
         start_docid = StartDocId
     } = QueryArgs,
-    CurrentEtag = view_group_etag(Group),
+    CurrentEtag = view_group_etag(Group, Db),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         {ok, RowCount} = couch_view:get_row_count(View),
         Start = {StartKey, StartDocId},
@@ -164,7 +164,7 @@ output_map_view(Req, View, Group, Db, QueryArgs, Keys) ->
         skip = SkipCount,
         start_docid = StartDocId
     } = QueryArgs,
-    CurrentEtag = view_group_etag(Group, Keys),
+    CurrentEtag = view_group_etag(Group, Db, Keys),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         {ok, RowCount} = couch_view:get_row_count(View),
         FoldAccInit = {Limit, SkipCount, undefined, [], nil},
@@ -184,7 +184,7 @@ output_map_view(Req, View, Group, Db, QueryArgs, Keys) ->
         finish_view_fold(Req, RowCount, FoldResult)
     end).
 
-output_reduce_view(Req, View, Group, QueryArgs, nil) ->
+output_reduce_view(Req, Db, View, Group, QueryArgs, nil) ->
     #view_query_args{
         start_key = StartKey,
         end_key = EndKey,
@@ -195,7 +195,7 @@ output_reduce_view(Req, View, Group, QueryArgs, nil) ->
         end_docid = EndDocId,
         group_level = GroupLevel
     } = QueryArgs,
-    CurrentEtag = view_group_etag(Group),
+    CurrentEtag = view_group_etag(Group, Db),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         {ok, GroupRowsFun, RespFun} = make_reduce_fold_funs(Req, GroupLevel, QueryArgs, CurrentEtag, #reduce_fold_helper_funs{}),
         FoldAccInit = {Limit, Skip, undefined, []},
@@ -204,7 +204,7 @@ output_reduce_view(Req, View, Group, QueryArgs, nil) ->
         finish_reduce_fold(Req, Resp)
     end);
 
-output_reduce_view(Req, View, Group, QueryArgs, Keys) ->
+output_reduce_view(Req, Db, View, Group, QueryArgs, Keys) ->
     #view_query_args{
         limit = Limit,
         skip = Skip,
@@ -213,7 +213,7 @@ output_reduce_view(Req, View, Group, QueryArgs, Keys) ->
         end_docid = EndDocId,
         group_level = GroupLevel
     } = QueryArgs,
-    CurrentEtag = view_group_etag(Group),
+    CurrentEtag = view_group_etag(Group, Db),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         {ok, GroupRowsFun, RespFun} = make_reduce_fold_funs(Req, GroupLevel, QueryArgs, CurrentEtag, #reduce_fold_helper_funs{}),
         {Resp, _RedAcc3} = lists:foldl(
@@ -608,10 +608,11 @@ send_json_reduce_row(Resp, {Key, Value}, RowFront) ->
     send_chunk(Resp, RowFront ++ ?JSON_ENCODE({[{key, Key}, {value, Value}]})),
     {ok, ",\r\n"}.
 
-view_group_etag(Group) ->
-    view_group_etag(Group, nil).
+view_group_etag(Group, Db) ->
+    view_group_etag(Group, Db, nil).
 
-view_group_etag(#group{sig=Sig,current_seq=CurrentSeq}, Extra) ->
+view_group_etag(#group{sig=Sig,current_seq=CurrentSeq}, Db, Extra) ->
+    % ?LOG_ERROR("Group ~p",[Group]),
     % This is not as granular as it could be.
     % If there are updates to the db that do not effect the view index,
     % they will change the Etag. For more granular Etags we'd need to keep

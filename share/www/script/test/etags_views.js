@@ -83,4 +83,21 @@ couchTests.etags_views = function(debug) {
 
   // list etag
   // in the list test for now
+  
+  // A new database should have unique _all_docs etags. 
+  db.deleteDb(); 
+  db.createDb(); 
+  db.save({a: 1}); 
+  xhr = CouchDB.request("GET", "/test_suite_db/_all_docs"); 
+  var etag = xhr.getResponseHeader("etag"); 
+  db.deleteDb(); 
+  db.createDb(); 
+  db.save({a: 2}); 
+  xhr = CouchDB.request("GET", "/test_suite_db/_all_docs"); 
+  var new_etag = xhr.getResponseHeader("etag");
+  T(etag != new_etag);
+  // but still be cacheable
+  xhr = CouchDB.request("GET", "/test_suite_db/_all_docs"); 
+  T(new_etag == xhr.getResponseHeader("etag"));
+  
 };
