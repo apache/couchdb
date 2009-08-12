@@ -191,10 +191,18 @@ function CouchDB(name, httpHeaders) {
   }
 
   this.allDocs = function(options,keys) {
+    return this.builtinView("_all_docs", options, keys)
+  }
+
+  this.conflicts = function(options,keys) {
+    return this.builtinView("_conflicts", options, keys)
+  }
+
+  this.builtinView = function(name, options, keys) {
     if(!keys) {
-      this.last_req = this.request("GET", this.uri + "_all_docs" + encodeOptions(options));
+      this.last_req = this.request("GET", this.uri + name + encodeOptions(options));
     } else {
-      this.last_req = this.request("POST", this.uri + "_all_docs" + encodeOptions(options), {
+      this.last_req = this.request("POST", this.uri + name + encodeOptions(options), {
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({keys:keys})
       });

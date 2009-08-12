@@ -51,6 +51,7 @@ loadTest("design_paths.js");
 loadTest("content_negotiation.js");
 loadTest("design_docs.js");
 loadTest("invalid_docids.js");
+loadTest("view_builtin.js");
 loadTest("view_collation.js");
 loadTest("view_conflicts.js");
 loadTest("view_errors.js");
