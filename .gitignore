@@ -5,7 +5,9 @@
 *.lo
 *.m4
 *.in
-*.in~
+*~
+*.orig
+*.rej
 erl_crash.dump
 configure
 autom4te.cache
