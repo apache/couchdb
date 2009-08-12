@@ -383,21 +383,74 @@ db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs">>]}=Req, Db) ->
     all_docs_view(Req, Db, nil);
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_all_docs">>]}=Req, Db) ->
-    post_keys_to_view(Req, Db, fun all_docs_view/3);
+    {Fields} = couch_httpd:json_body_obj(Req),
+    case proplists:get_value(<<"keys">>, Fields, nil) of
+    nil ->
+        ?LOG_DEBUG("POST to _all_docs with no keys member.", []),
+        all_docs_view(Req, Db, nil);
+    Keys when is_list(Keys) ->
+        all_docs_view(Req, Db, Keys);
+    _ ->
+        throw({bad_request, "`keys` member must be a array."})
+    end;
 
 db_req(#httpd{path_parts=[_,<<"_all_docs">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "GET,HEAD,POST");
 
 db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs_by_seq">>]}=Req, Db) ->
-    all_docs_by_seq_view(Req, Db);
+    #view_query_args{
+        start_key = StartKey,
+        limit = Limit,
+        skip = SkipCount,
+        direction = Dir
+    } = QueryArgs = couch_httpd_view:parse_view_params(Req, nil, map),
+
+    {ok, Info} = couch_db:get_db_info(Db),
+    CurrentEtag = couch_httpd:make_etag(Info),
+    couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
+        TotalRowCount = proplists:get_value(doc_count, Info),
+        FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db,
+            TotalRowCount, #view_fold_helper_funs{
+                reduce_count = fun couch_db:enum_docs_since_reduce_to_count/1
+            }),
+        StartKey2 = case StartKey of
+            nil -> 0;
+            <<>> -> 100000000000;
+            {} -> 100000000000;
+            StartKey when is_integer(StartKey) -> StartKey
+        end,
+        {ok, FoldResult} = couch_db:enum_docs_since(Db, StartKey2, Dir,
+            fun(DocInfo, Offset, Acc) ->
+                #doc_info{
+                    id=Id,
+                    high_seq=Seq,
+                    revs=[#rev_info{rev=Rev,deleted=Deleted} | RestInfo]
+                } = DocInfo,
+                ConflictRevs = couch_doc:rev_to_strs(
+                    [Rev1 || #rev_info{deleted=false, rev=Rev1} <- RestInfo]),
+                DelConflictRevs = couch_doc:rev_to_strs(
+                    [Rev1 || #rev_info{deleted=true, rev=Rev1} <- RestInfo]),
+                Json = {
+                    [{<<"rev">>, couch_doc:rev_to_str(Rev)}] ++
+                    case ConflictRevs of
+                    []  -> [];
+                    _   -> [{<<"conflicts">>, ConflictRevs}]
+                    end ++
+                    case DelConflictRevs of
+                    []  ->  [];
+                    _   ->  [{<<"deleted_conflicts">>, DelConflictRevs}]
+                    end ++
+                    case Deleted of
+                    true -> [{<<"deleted">>, true}];
+                    false -> []
+                    end
+                },
+                FoldlFun({{Seq, Id}, Json}, Offset, Acc)
+            end, {Limit, SkipCount, undefined, [], nil}),
+        couch_httpd_view:finish_view_fold(Req, TotalRowCount, {ok, FoldResult})
+    end);
 
 db_req(#httpd{path_parts=[_,<<"_all_docs_by_seq">>]}=Req, _Db) ->
-    send_method_not_allowed(Req, "GET,HEAD");
-
-db_req(#httpd{method='GET',path_parts=[_,<<"_conflicts">>]}=Req, Db) ->
-    conflicts_view(Req, Db, nil);
-
-db_req(#httpd{path_parts=[_,<<"_conflicts">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "GET,HEAD");
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_missing_revs">>]}=Req, Db) ->
@@ -457,18 +510,6 @@ db_req(#httpd{path_parts=[_, DocId]}=Req, Db) ->
 
 db_req(#httpd{path_parts=[_, DocId | FileNameParts]}=Req, Db) ->
     db_attachment_req(Req, Db, DocId, FileNameParts).
-
-post_keys_to_view(Req, Db, ViewFun) ->
-    {Fields} = couch_httpd:json_body_obj(Req),
-    case proplists:get_value(<<"keys">>, Fields, nil) of
-    nil ->
-        ?LOG_DEBUG("POST to view with no keys member.", []),
-        ViewFun(Req, Db, nil);
-    Keys when is_list(Keys) ->
-        ViewFun(Req, Db, Keys);
-    _ ->
-        throw({bad_request, "`keys` member must be a array."})
-    end.
 
 all_docs_view(Req, Db, Keys) ->
     #view_query_args{
@@ -553,136 +594,6 @@ all_docs_view(Req, Db, Keys) ->
                     end
                 end, {ok, FoldAccInit}, Keys),
             couch_httpd_view:finish_view_fold(Req, TotalRowCount, {ok, FoldResult})
-        end
-    end).
-
-all_docs_by_seq_view(Req, Db) ->
-    #view_query_args{
-        start_key = StartKey,
-        limit = Limit,
-        skip = SkipCount,
-        direction = Dir
-    } = QueryArgs = couch_httpd_view:parse_view_params(Req, nil, map),
-
-    {ok, Info} = couch_db:get_db_info(Db),
-    CurrentEtag = couch_httpd:make_etag(Info),
-    couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
-        TotalRowCount = proplists:get_value(doc_count, Info),
-        FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db,
-            TotalRowCount, #view_fold_helper_funs{
-                reduce_count = fun couch_db:enum_docs_since_reduce_to_count/1
-            }),
-        StartKey2 = case StartKey of
-            nil -> 0;
-            <<>> -> 100000000000;
-            {} -> 100000000000;
-            StartKey when is_integer(StartKey) -> StartKey
-        end,
-        {ok, FoldResult} = couch_db:enum_docs_since(Db, StartKey2, Dir,
-            fun(DocInfo, Offset, Acc) ->
-                #doc_info{
-                    id=Id,
-                    high_seq=Seq,
-                    revs=[#rev_info{rev=Rev,deleted=Deleted} | RestInfo]
-                } = DocInfo,
-                ConflictRevs = couch_doc:rev_to_strs(
-                    [Rev1 || #rev_info{deleted=false, rev=Rev1} <- RestInfo]),
-                DelConflictRevs = couch_doc:rev_to_strs(
-                    [Rev1 || #rev_info{deleted=true, rev=Rev1} <- RestInfo]),
-                Json = {
-                    [{<<"rev">>, couch_doc:rev_to_str(Rev)}] ++
-                    case ConflictRevs of
-                    []  -> [];
-                    _   -> [{<<"conflicts">>, ConflictRevs}]
-                    end ++
-                    case DelConflictRevs of
-                    []  ->  [];
-                    _   ->  [{<<"deleted_conflicts">>, DelConflictRevs}]
-                    end ++
-                    case Deleted of
-                    true -> [{<<"deleted">>, true}];
-                    false -> []
-                    end
-                },
-                FoldlFun({{Seq, Id}, Json}, Offset, Acc)
-            end, {Limit, SkipCount, undefined, [], nil}),
-        couch_httpd_view:finish_view_fold(Req, TotalRowCount, {ok, FoldResult})
-    end).
-
-conflicts_view(Req, Db, nil) ->
-    #view_query_args{
-        start_key = StartKey,
-        limit = Limit,
-        skip = SkipCount,
-        direction = Dir,
-        deleted = ShowDeletedConflicts
-    } = QueryArgs = couch_httpd_view:parse_view_params(Req, nil, map),
-
-    StartResp = fun(Req2, Etag, _TotalViewCount, _Offset, _Acc) ->
-        {ok, Resp} = couch_httpd:start_json_response(Req2, 200, [{"Etag",Etag}]),
-        {ok, Resp, "{\"rows\":[\r\n"}
-    end,
-
-    SendRow = fun(Resp, _Db, {{Id,Rev}, Value}, _IncludeDocs, RowFront) ->
-        {IsDeleted, Conflicts, DelConflicts} = Value,
-        JsonProps = lists:flatten([{key, Id},{id, Id}, {rev, Rev},
-            case IsDeleted of true -> {deleted, true}; _ -> [] end,
-            case Conflicts of [] -> []; _ -> {conflicts, Conflicts} end,
-            case DelConflicts of
-                [] -> [];
-                _ -> {deleted_conflicts, DelConflicts}
-            end
-        ]),
-        send_chunk(Resp, RowFront ++  ?JSON_ENCODE({JsonProps})),
-        {ok, ",\r\n"}
-    end,
-
-    CurrentEtag = couch_httpd:make_etag(couch_db:get_update_seq(Db)),
-    couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
-        HelperFuns = #view_fold_helper_funs{
-            start_response = StartResp,
-            send_row = SendRow,
-            reduce_count = fun couch_db:enum_docs_reduce_to_count/1
-        },
-        FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs,
-            CurrentEtag, Db, 0, HelperFuns),
-
-        EnumFun = fun(FullDocInfo, Offset, Acc) ->
-            IsDeleted = FullDocInfo#full_doc_info.deleted,
-            #doc_info{
-                id = Id,
-                revs = [RevInfo | ConflictInfo]
-            } = couch_doc:to_doc_info(FullDocInfo),
-            RevStr = couch_doc:rev_to_str(RevInfo#rev_info.rev),
-            Conflicts = couch_doc:rev_to_strs(
-                [Rev || #rev_info{deleted=false, rev=Rev} <- ConflictInfo]),
-            DelConflicts = couch_doc:rev_to_strs(
-                [Rev || #rev_info{deleted=true, rev=Rev} <- ConflictInfo]),
-            case {ShowDeletedConflicts, Conflicts, DelConflicts} of
-            {_, [], []} ->
-                {ok, Acc};
-            {false, [], _} ->
-                {ok, Acc};
-            {true, _, _} ->
-                Value = {IsDeleted, Conflicts, DelConflicts},
-                FoldlFun({{Id,RevStr}, Value}, Offset, Acc);
-            {false, _, _} ->
-                Value = {IsDeleted, Conflicts, []},
-                FoldlFun({{Id,RevStr}, Value}, Offset, Acc)
-            end
-        end,
-
-        Acc0 = {Limit, SkipCount, undefined, [], nil},
-        case couch_db:enum_docs(Db, StartKey, Dir, EnumFun, Acc0) of
-        {ok, {_, _, undefined, _, _}} ->
-            % nothing found in the view, send empty view
-            send_json(Req, 200, {[{rows, []}]});
-        {ok, {_, _, Resp, _, _}} ->
-            % end the view
-            send_chunk(Resp, "\r\n]}"),
-            end_json_response(Resp);
-        Error ->
-            throw(Error)
         end
     end).
 
