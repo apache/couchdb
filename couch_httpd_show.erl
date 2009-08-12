@@ -416,6 +416,7 @@ send_doc_update_response(Lang, UpdateSrc, DocId, Doc, Req, Db) ->
         end,
         NewDoc = couch_doc:from_json_obj({NewJsonDoc}),
         Code = 201,
+        % todo set location field
         {ok, _NewRev} = couch_db:update_doc(Db, NewDoc, Options);
     [<<"up">>, _Other, JsonResp] ->
         Code = 200,
