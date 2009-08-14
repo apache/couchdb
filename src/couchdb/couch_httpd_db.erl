@@ -858,14 +858,22 @@ db_attachment_req(#httpd{method=Method}=Req, Db, DocId, FileNameParts)
                     CType ->
                         list_to_binary(CType)
                     end,
-                data = case couch_httpd:header_value(Req,"Content-Length") of
+                data = case couch_httpd:body_length(Req) of
                     undefined ->
+                        undefined;
+                    {unknown_transfer_encoding, Unknown} ->
+                        exit({unknown_transfer_encoding, Unknown});
+                    chunked ->
                         fun(MaxChunkSize, ChunkFun, InitState) ->
                             couch_httpd:recv_chunked(Req, MaxChunkSize,
                                 ChunkFun, InitState)
                         end;
+                    0 ->
+                        <<>>;
+                    Length when is_integer(Length) ->
+                        fun() -> couch_httpd:recv(Req, 0) end;
                     Length ->
-                        fun() -> couch_httpd:recv(Req, 0) end
+                        exit({length_not_integer, Length})
                     end,
                 len = case couch_httpd:header_value(Req,"Content-Length") of
                     undefined ->
