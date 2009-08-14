@@ -506,6 +506,21 @@ db_req(#httpd{path_parts=[_DbName,<<"_design">>,Name|FileNameParts]}=Req, Db) ->
     db_attachment_req(Req, Db, <<"_design/",Name/binary>>, FileNameParts);
 
 
+% Special case to allow for accessing local documents without %2F
+% encoding the docid. Throws out requests that don't have the second
+% path part or that specify an attachment name.
+db_req(#httpd{path_parts=[_DbName, <<"_local">>]}, _Db) ->
+    throw({bad_request, <<"Invalid _local document id.">>});
+
+db_req(#httpd{path_parts=[_DbName, <<"_local/">>]}, _Db) ->
+    throw({bad_request, <<"Invalid _local document id.">>});
+
+db_req(#httpd{path_parts=[_DbName, <<"_local">>, Name]}=Req, Db) ->
+    db_doc_req(Req, Db, <<"_local/", Name/binary>>);
+
+db_req(#httpd{path_parts=[_DbName, <<"_local">> | _Rest]}, _Db) ->
+    throw({bad_request, <<"_local documents do not accept attachments.">>});
+
 db_req(#httpd{path_parts=[_, DocId]}=Req, Db) ->
     db_doc_req(Req, Db, DocId);
 
