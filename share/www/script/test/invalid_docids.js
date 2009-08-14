@@ -20,6 +20,19 @@ couchTests.invalid_docids = function(debug) {
   T(db.save({"_id": "_local/foo"}).ok);
   T(db.open("_local/foo")._id == "_local/foo");
 
+  var urls = [
+      "/test_suite_db/_local",
+      "/test_suite_db/_local/",
+      "/test_suite_db/_local%2F",
+      "/test_suite_db/_local/foo/bar",
+  ];
+
+  urls.forEach(function(u) {
+    var res = db.request("PUT", u, {"body": "{}"});
+    T(res.status == 400);
+    T(JSON.parse(res.responseText).error == "bad_request");
+  });
+
   //Test non-string
   try {
     db.save({"_id": 1});
