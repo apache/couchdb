@@ -21,7 +21,8 @@
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
     start_json_response/2,send_chunk/2,end_json_response/1,
-    start_chunked_response/3, absolute_uri/2]).
+    start_chunked_response/3, absolute_uri/2, send/2,
+    start_response_length/4]).
 
 -record(doc_query_args, {
     options = [],
@@ -822,24 +823,16 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
     case [A || A <- Atts, A#att.name == FileName] of
     [] ->
         throw({not_found, "Document is missing attachment"});
-    [#att{type=Type}=Att] ->
+    [#att{type=Type, len=Len}=Att] ->
         Etag = couch_httpd:doc_etag(Doc),
         couch_httpd:etag_respond(Req, Etag, fun() ->
-            {ok, Resp} = start_chunked_response(Req, 200, [
+            {ok, Resp} = start_response_length(Req, 200, [
                 {"ETag", Etag},
                 {"Cache-Control", "must-revalidate"},
-                {"Content-Type", binary_to_list(Type)}%,
-                % My understanding of http://www.faqs.org/rfcs/rfc2616.html
-                % says that we should not use Content-Length with a chunked
-                % encoding. Turning this off makes libcurl happy, but I am
-                % open to discussion. (jchris)
-                %
-                % Can you point to the section that makes you think that? (jan)
-                % {"Content-Length", integer_to_list(couch_doc:bin_size(Bin))}
-                ]),
+                {"Content-Type", binary_to_list(Type)}
+                ], integer_to_list(Len)),
             couch_doc:att_foldl(Att,
-                    fun(BinSegment, _) -> send_chunk(Resp, BinSegment) end,[]),
-            send_chunk(Resp, "")
+                    fun(BinSegment, _) -> send(Resp, BinSegment) end,[])
         end)
     end;
 
