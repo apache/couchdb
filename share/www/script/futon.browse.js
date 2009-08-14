@@ -509,10 +509,13 @@
             resp.offset = 0;
           }
           var descending_reverse = ((options.descending && !descend) || (descend && (options.descending === false)));
+          var has_reduce_prev = resp.total_rows === undefined && (descending_reverse ? resp.rows.length > per_page : options.startkey !== undefined);
           if (descending_reverse && resp.rows) {
             resp.rows = resp.rows.reverse();
+            if (resp.rows.length > per_page) {
+              resp.rows.push(resp.rows.shift());
+            }
           }
-          var has_reduce_prev = resp.total_rows === undefined && (descending_reverse ? resp.rows.length > per_page : options.startkey !== undefined);
           if (resp.rows !== null && (has_reduce_prev || (descending_reverse ?
             (resp.total_rows - resp.offset > per_page) :
             (resp.offset > 0)))) {
