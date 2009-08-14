@@ -475,7 +475,7 @@ handle_user_req(#httpd{method='PUT', path_parts=[_, UserName]}=Req) ->
         {ok, Db} -> update_user_req(Req, Db, UserName)
     end;
 handle_user_req(Req) ->
-     send_method_not_allowed(Req, "GET,HEAD,POST,PUT,DELETE").
+     send_method_not_allowed(Req, "POST,PUT").
 
 to_int(Value) when is_binary(Value) ->
     to_int(?b2l(Value)); 
