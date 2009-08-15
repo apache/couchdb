@@ -93,10 +93,10 @@ delete(DbName, Options) ->
     gen_server:call(couch_server, {delete, DbName, Options}).
 
 check_dbname(#server{dbname_regexp=RegExp}, DbName) ->
-    case regexp:match(DbName, RegExp) of
+    case re:run(DbName, RegExp, [{capture, none}]) of
     nomatch ->
         {error, illegal_database_name};
-    _Match ->
+    match ->
         ok
     end.
 
@@ -150,7 +150,7 @@ init([]) ->
             % spawn here so couch_config doesn't try to call itself
             spawn(fun() -> hash_admin_passwords() end)
         end),
-    {ok, RegExp} = regexp:parse("^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*$"),
+    {ok, RegExp} = re:compile("^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*$"),
     ets:new(couch_dbs_by_name, [set, private, named_table]),
     ets:new(couch_dbs_by_pid, [set, private, named_table]),
     ets:new(couch_dbs_by_lru, [ordered_set, private, named_table]),

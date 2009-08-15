@@ -90,7 +90,7 @@ cleanup_index_files(Db) ->
 
     % filter out the ones in use
     DeleteFiles = lists:filter(fun(FilePath) ->
-            regexp:first_match(FilePath, RegExp)==nomatch
+            re:run(FilePath, RegExp, [{capture, none}]) == nomatch
         end, FileList),
     % delete unused files
     ?LOG_DEBUG("deleting unused view index files: ~p",[DeleteFiles]),
