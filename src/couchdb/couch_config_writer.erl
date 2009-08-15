@@ -34,7 +34,7 @@ save_to_file({{Section, Option}, Value}, File) ->
     % open file and create a list of lines
     {ok, Stream} = file:read_file(File),
     OldFileContents = binary_to_list(Stream),
-    {ok, Lines} = regexp:split(OldFileContents, "\r\n|\n|\r|\032"),
+    Lines = re:split(OldFileContents, "\r\n|\n|\r|\032", [{return, list}]),
 
     % prepare input variables
     SectionName = "[" ++ Section ++ "]",
@@ -136,13 +136,10 @@ append_var_to_section({{Section, Option}, Value}, Line, OldCurrentSection, DoneO
 %% @doc Tries to match a line against a pattern specifying a ini module or
 %%      section ("[Section]"). Returns OldSection if no match is found.
 parse_module(Line, OldSection) ->
-    case regexp:match(Line, "^\\[([a-zA-Z0-9\_-]*)\\]$") of
+    case re:run(Line, "^\\[([a-zA-Z0-9\_-]*)\\]$", [{capture, global}]) of
         nomatch ->
             OldSection;
-        {error, Error} ->
-            io:format("ini file regex error module: '~s'~n", [Error]),
-            OldSection;
-        {match, Start, Length} ->
+        {match, [_, {Start, Length}]} ->
             string:substr(Line, Start, Length)
     end.
 
@@ -152,12 +149,9 @@ parse_module(Line, OldSection) ->
 %%      Option is not found. Returns a new line composed of the Option and
 %%      Value otherwise.
 parse_variable(Line, Option, Value) ->
-    case regexp:match(Line, "^" ++ Option ++ "\s?=") of
+    case re:run(Line, "^" ++ Option ++ "\s?=", [{capture, none}]) of
         nomatch ->
             nomatch;
-        {error, Error}->
-            io:format("ini file regex error variable: '~s'~n", [Error]),
-            nomatch;
-        {match, _Start, _Length} ->
+        match ->
             Option ++ " = " ++ Value
     end.

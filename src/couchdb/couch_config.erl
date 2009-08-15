@@ -184,13 +184,13 @@ parse_ini_file(IniFile) ->
             throw({startup_error, Msg})
     end,
 
-    {ok, Lines} = regexp:split(binary_to_list(IniBin), "\r\n|\n|\r|\032"),
+    Lines = re:split(IniBin, "\r\n|\n|\r|\032", [{return, list}]),
     {_, ParsedIniValues} =
     lists:foldl(fun(Line, {AccSectionName, AccValues}) ->
             case string:strip(Line) of
             "[" ++ Rest ->
-                case regexp:split(Rest, "\\]") of
-                {ok, [NewSectionName, ""]} ->
+                case re:split(Rest, "\\]", [{return, list}]) of
+                [NewSectionName, ""] ->
                     {NewSectionName, AccValues};
                 _Else -> % end bracket not at end, ignore this line
                     {AccSectionName, AccValues}
@@ -198,20 +198,20 @@ parse_ini_file(IniFile) ->
             ";" ++ _Comment ->
                 {AccSectionName, AccValues};
             Line2 ->
-                case regexp:split(Line2, "\s?=\s?") of
-                {ok, [_SingleElement]} -> % no "=" found, ignore this line
+                case re:split(Line2, "\s?=\s?", [{return, list}]) of
+                [_SingleElement] -> % no "=" found, ignore this line
                     {AccSectionName, AccValues};
-                {ok, [""|_LineValues]} -> % line begins with "=", ignore
+                [""|_LineValues] -> % line begins with "=", ignore
                     {AccSectionName, AccValues};
-                {ok, [ValueName|LineValues]} -> % yeehaw, got a line!
+                [ValueName|LineValues] -> % yeehaw, got a line!
                     RemainingLine = couch_util:implode(LineValues, "="),
                     % removes comments
-                    case regexp:split(RemainingLine, " ;|\t;") of
-                    {ok, [[]]} ->
+                    case re:split(RemainingLine, " ;|\t;", [{return, list}]) of
+                    [[]] ->
                         % empty line means delete this key
                         ets:delete(?MODULE, {AccSectionName, ValueName}),
                         {AccSectionName, AccValues};                        
-                    {ok, [LineValue | _Rest]} ->
+                    [LineValue | _Rest] ->
                         {AccSectionName,
                             [{{AccSectionName, ValueName}, LineValue} | AccValues]}
                     end
