@@ -313,9 +313,11 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
     couch_stats_collector:increment({httpd, bulk_requests}),
     {JsonProps} = couch_httpd:json_body_obj(Req),
     DocsArray = proplists:get_value(<<"docs">>, JsonProps),
-    case couch_httpd:header_value(Req, "X-Couch-Full-Commit", "false") of
+    case couch_httpd:header_value(Req, "X-Couch-Full-Commit") of
     "true" ->
         Options = [full_commit];
+    "false" ->
+        Options = [delay_commit];
     _ ->
         Options = []
     end,
@@ -770,9 +772,11 @@ update_doc(Req, Db, DocId, Json) ->
 update_doc(Req, Db, DocId, Json, Headers) ->
     #doc{deleted=Deleted} = Doc = couch_doc_from_req(Req, DocId, Json),
 
-    case couch_httpd:header_value(Req, "X-Couch-Full-Commit", "false") of
+    case couch_httpd:header_value(Req, "X-Couch-Full-Commit") of
     "true" ->
         Options = [full_commit];
+    "false" ->
+        Options = [delay_commit];
     _ ->
         Options = []
     end,
