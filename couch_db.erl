@@ -567,9 +567,27 @@ make_first_doc_on_disk(Db, Id, Pos, [{_Rev, {IsDel, Sp, _Seq}} |_]=DocPath) ->
     Revs = [Rev || {Rev, _} <- DocPath],
     make_doc(Db, Id, IsDel, Sp, {Pos, Revs}).
 
+set_commit_option(Options) ->
+    CommitSettings = {
+        [true || O <- Options, O==full_commit orelse O==delay_commit],
+        couch_config:get("couchdb", "delayed_commits", "false")
+    },
+    case CommitSettings of
+    {[true], _} ->
+        Options; % user requested explicit commit setting, do not change it
+    {_, "true"} ->
+        Options; % delayed commits are enabled, do nothing
+    {_, "false"} ->
+        [full_commit|Options];
+    {_, Else} ->
+        ?LOG_ERROR("[couchdb] delayed_commits setting must be true/false, not ~p",
+            [Else]),
+        [full_commit|Options]
+    end.
 
 write_and_commit(#db{update_pid=UpdatePid, user_ctx=Ctx}=Db, DocBuckets,
-        NonRepDocs, Options) ->
+        NonRepDocs, Options0) ->
+    Options = set_commit_option(Options0),
     case gen_server:call(UpdatePid, 
             {update_docs, DocBuckets, NonRepDocs, Options}, infinity) of
     {ok, Results} -> {ok, Results};
