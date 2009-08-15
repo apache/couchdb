@@ -78,7 +78,11 @@ replicate(PostBody, UserCtx) ->
         replicate(PostBody, UserCtx)
     end.
 
-init([RepId, {PostProps}, UserCtx] = InitArgs) ->
+init(InitArgs) ->
+    try do_init(InitArgs)
+    catch throw:{db_not_found, DbUrl} -> {stop, {db_not_found, DbUrl}} end.
+
+do_init([RepId, {PostProps}, UserCtx] = InitArgs) ->
     process_flag(trap_exit, true),
 
     SourceProps = proplists:get_value(<<"source">>, PostProps),
@@ -177,7 +181,6 @@ handle_info({'EXIT', Pid, Reason}, State) ->
     {stop, Reason, State}.
 
 terminate(normal, State) ->
-    % ?LOG_DEBUG("replication terminating normally", []),
     #state{
         checkpoint_history = CheckpointHistory,
         committed_seq = NewSeq,
@@ -252,7 +255,9 @@ start_replication_server(Replicator) ->
         end;
     {error, {already_started, Pid}} ->
         ?LOG_DEBUG("replication ~p already running at ~p", [RepId, Pid]),
-        Pid
+        Pid;
+    {error, {{db_not_found, DbUrl}, _}} ->
+        throw({db_not_found, <<"could not open ", DbUrl/binary>>})
     end.
 
 compare_replication_logs(SrcDoc, TgtDoc) ->
@@ -389,7 +394,7 @@ open_db({Props}, _UserCtx) ->
     },
     case couch_rep_httpc:db_exists(Db) of
     true -> Db;
-    false -> throw({db_not_found, Url})
+    false -> throw({db_not_found, ?l2b(Url)})
     end;
 open_db(<<"http://",_/binary>>=Url, _) ->
     open_db({[{<<"url">>,Url}]}, []);
@@ -446,17 +451,22 @@ do_checkpoint(State) ->
         {<<"source_last_seq">>, RecordSeqNum},
         {<<"history">>, lists:sublist([NewHistoryEntry | OldHistory], 50)}
     ]},
-    % ?LOG_DEBUG("updating src doc ~p", [SourceLog]),
+
+    try
     {SrcRevPos,SrcRevId} =
         update_doc(Source, SourceLog#doc{body=NewRepHistory}, []),
-    % ?LOG_DEBUG("updating tgt doc ~p", [TargetLog]),
     {TgtRevPos,TgtRevId} =
         update_doc(Target, TargetLog#doc{body=NewRepHistory}, []),
     State#state{
         checkpoint_history = NewRepHistory,
         source_log = SourceLog#doc{revs={SrcRevPos, [SrcRevId]}},
         target_log = TargetLog#doc{revs={TgtRevPos, [TgtRevId]}}
-    }.
+    }
+    catch throw:conflict ->
+    ?LOG_ERROR("checkpoint failure: conflict (are you replicating to yourself?)",
+        []),
+    State
+    end.
 
 commit_to_both(Source, Target) ->
     % commit the src async

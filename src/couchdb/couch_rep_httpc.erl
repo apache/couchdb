@@ -96,6 +96,8 @@ process_response({ok, Status, Headers, Body}, Req) ->
         MochiHeaders = mochiweb_headers:make(Headers),
         RedirectUrl = mochiweb_headers:get_value("Location", MochiHeaders),
         do_request(Req#http_db{url = RedirectUrl});
+    Code =:= 409 ->
+        throw(conflict);
     Code >= 400, Code < 500 ->
         ?JSON_DECODE(maybe_decompress(Headers, Body));
     Code =:= 500; Code =:= 502 ->
