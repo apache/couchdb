@@ -271,21 +271,27 @@ db_req(#httpd{method='GET',path_parts=[_DbName]}=Req, Db) ->
 
 db_req(#httpd{method='POST',path_parts=[DbName]}=Req, Db) ->
     Doc = couch_doc:from_json_obj(couch_httpd:json_body(Req)),
-    DocId = couch_util:new_uuid(),
+    Doc2 = case Doc#doc.id of
+        <<"">> ->
+            Doc#doc{id=couch_util:new_uuid(), revs={0, []}};
+        _ ->
+            Doc
+    end,
+    DocId = Doc2#doc.id,
     case couch_httpd:qs_value(Req, "batch") of
     "ok" ->
         % batch
-        ok = couch_batch_save:eventually_save_doc(Db#db.name,
-                Doc#doc{id=DocId}, Db#db.user_ctx),
+        ok = couch_batch_save:eventually_save_doc(
+            Db#db.name, Doc2, Db#db.user_ctx),
         send_json(Req, 202, [], {[
             {ok, true},
             {id, DocId}
         ]});
     _Normal ->
         % normal
-        {ok, NewRev} = couch_db:update_doc(Db, Doc#doc{id=DocId}, []),
-        DocUrl = absolute_uri(Req,
-            binary_to_list(<<"/",DbName/binary,"/",DocId/binary>>)),
+        {ok, NewRev} = couch_db:update_doc(Db, Doc2, []),
+        DocUrl = absolute_uri(
+            Req, binary_to_list(<<"/",DbName/binary,"/", DocId/binary>>)),
         send_json(Req, 201, [{"Location", DocUrl}], {[
             {ok, true},
             {id, DocId},
