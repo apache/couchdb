@@ -93,8 +93,8 @@ handle_info({'DOWN', Ref, _, _, Reason}, State) ->
 handle_info({'EXIT', Loop, complete}, #state{reader_loop=Loop} = State) ->
     handle_reader_loop_complete(State).
 
-terminate(Reason, _State) ->
-    % ?LOG_INFO("rep reader terminating with reason ~p", [Reason]),
+terminate(_Reason, _State) ->
+    % ?LOG_INFO("rep reader terminating with reason ~p", [_Reason]),
     ok.
 
 code_change(_OldVsn, State, _Extra) ->
