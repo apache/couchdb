@@ -161,6 +161,16 @@ couchTests.basics = function(debug) {
   T(locs[4] == resp.id);
   T(locs[3] == "test_suite_db");
 
+  // test that that POST's with an _id aren't overriden with a UUID.
+  var xhr = CouchDB.request("POST", "/test_suite_db", {
+    body: JSON.stringify({"_id": "oppossum", "yar": "matey"})
+  });
+  var resp = JSON.parse(xhr.responseText);
+  T(resp.ok);
+  T(resp.id == "oppossum");
+  var doc = db.open("oppossum");
+  T(doc.yar == "matey");
+
   // document put's should return a Location header
   var xhr = CouchDB.request("PUT", "/test_suite_db/newdoc", {
     body: JSON.stringify({"a":1})
