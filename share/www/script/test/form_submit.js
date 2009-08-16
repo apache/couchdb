@@ -12,7 +12,7 @@
 
 // Do some basic tests.
 couchTests.form_upload = function(debug) {
-    var db = new CouchDB("test_suite_db");
+    var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
     db.deleteDb();
     db.createDb();
 

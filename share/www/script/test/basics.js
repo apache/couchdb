@@ -15,7 +15,7 @@ couchTests.basics = function(debug) {
   var result = JSON.parse(CouchDB.request("GET", "/").responseText);
   T(result.couchdb == "Welcome");
 
-  var db = new CouchDB("test_suite_db");
+  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
   db.deleteDb();
 
   // bug COUCHDB-100: DELETE on non-existent DB returns 500 instead of 404

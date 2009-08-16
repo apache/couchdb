@@ -15,13 +15,13 @@ couchTests.oauth = function(debug) {
 
   var authorization_url = "/_oauth/authorize";
 
-  var db = new CouchDB("test_suite_db");
+  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
   db.deleteDb();
   db.createDb();
   if (debug) debugger;
 
-  var dbA = new CouchDB("test_suite_db_a");
-  var dbB = new CouchDB("test_suite_db_b");
+  var dbA = new CouchDB("test_suite_db_a", {"X-Couch-Full-Commit":"false"});
+  var dbB = new CouchDB("test_suite_db_b", {"X-Couch-Full-Commit":"false"});
   dbA.deleteDb();
   dbA.createDb();
   dbB.deleteDb();
@@ -79,7 +79,7 @@ couchTests.oauth = function(debug) {
   // this function will be called on the modified server
   var testFun = function () {
     try {
-      var usersDb = new CouchDB("test_suite_users");
+      var usersDb = new CouchDB("test_suite_users", {"X-Couch-Full-Commit":"false"});
       usersDb.deleteDb();
       usersDb.createDb();
       

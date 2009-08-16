@@ -88,7 +88,7 @@ specific language governing permissions and limitations under the License.
           <td class="code">
             <textarea name="code" id="code" rows="18" cols="120">
 couchTests.custom_test = function(debug) {
-  var db = new CouchDB("test_suite_db");
+  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
   db.deleteDb();
   db.createDb();
 

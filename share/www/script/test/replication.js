@@ -23,8 +23,8 @@ couchTests.replication = function(debug) {
     {source:"http://" + host + "/test_suite_db_a",
       target:"http://" + host + "/test_suite_db_b"}
   ]
-  var dbA = new CouchDB("test_suite_db_a");
-  var dbB = new CouchDB("test_suite_db_b");
+  var dbA = new CouchDB("test_suite_db_a", {"X-Couch-Full-Commit":"false"});
+  var dbB = new CouchDB("test_suite_db_b", {"X-Couch-Full-Commit":"false"});
   var numDocs = 10;
   var xhr;
   for (var testPair = 0; testPair < dbPairs.length; testPair++) {

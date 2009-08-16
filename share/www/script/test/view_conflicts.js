@@ -11,10 +11,10 @@
 // the License.
 
 couchTests.view_conflicts = function(debug) {
-  var dbA = new CouchDB("test_suite_db_a");
+  var dbA = new CouchDB("test_suite_db_a", {"X-Couch-Full-Commit":"false"});
   dbA.deleteDb();
   dbA.createDb();
-  var dbB = new CouchDB("test_suite_db_b");
+  var dbB = new CouchDB("test_suite_db_b", {"X-Couch-Full-Commit":"false"});
   dbB.deleteDb();
   dbB.createDb();
   if (debug) debugger;

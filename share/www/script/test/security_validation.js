@@ -32,7 +32,7 @@ couchTests.security_validation = function(debug) {
   // Firefox and Safari both deal with this correctly (which is to say
   // they correctly do nothing special).
 
-  var db = new CouchDB("test_suite_db");
+  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
   db.deleteDb();
   db.createDb();
   if (debug) debugger;
@@ -209,8 +209,8 @@ couchTests.security_validation = function(debug) {
          target:{url:"http://" + host + "/test_suite_db_b",
                  headers: AuthHeaders}},
       ]
-      var adminDbA = new CouchDB("test_suite_db_a");
-      var adminDbB = new CouchDB("test_suite_db_b");
+      var adminDbA = new CouchDB("test_suite_db_a", {"X-Couch-Full-Commit":"false"});
+      var adminDbB = new CouchDB("test_suite_db_b", {"X-Couch-Full-Commit":"false"});
       var dbA = new CouchDB("test_suite_db_a",
           {"WWW-Authenticate": "X-Couch-Test-Auth Christopher Lenz:dog food"});
       var dbB = new CouchDB("test_suite_db_b",

@@ -13,7 +13,7 @@
 couchTests.view_offsets = function(debug) {
   if (debug) debugger;
 
-  var db = new CouchDB("test_suite_db");
+  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
   db.deleteDb();
   db.createDb();
 
@@ -60,7 +60,7 @@ couchTests.view_offsets = function(debug) {
   ].forEach(function(row){ check(row[0], row[1]);});
 
   var runTest = function () {
-    var db = new CouchDB("test_suite_db");
+    var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
     db.deleteDb();
     db.createDb();
 

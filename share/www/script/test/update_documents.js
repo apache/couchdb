@@ -12,7 +12,7 @@
 
 
 couchTests.update_documents = function(debug) {
-  var db = new CouchDB("test_suite_db");
+  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
   db.deleteDb();
   db.createDb();
   if (debug) debugger;
@@ -114,7 +114,7 @@ couchTests.update_documents = function(debug) {
   
   // bump counter
   xhr = CouchDB.request("PUT", "/test_suite_db/_design/update/_update/bump-counter/"+docid, {
-    headers : {"X-Couch-Full-Commit":"true"}
+    headers : {"X-Couch-Full-Commit":"false"}
   });
   T(xhr.status == 201);
   T(xhr.responseText == "<h1>bumped it!</h1>");
@@ -123,7 +123,7 @@ couchTests.update_documents = function(debug) {
   
   // _update honors full commit if you need it to
   xhr = CouchDB.request("PUT", "/test_suite_db/_design/update/_update/bump-counter/"+docid, {
-    headers : {"X-Couch-Full-Commit":"true"}
+    headers : {"X-Couch-Full-Commit":"false"}
   });
   
   doc = db.open(docid);
@@ -131,7 +131,7 @@ couchTests.update_documents = function(debug) {
 
   // parse xml
   xhr = CouchDB.request("PUT", "/test_suite_db/_design/update/_update/xml/"+docid, {
-    headers : {"X-Couch-Full-Commit":"true"},
+    headers : {"X-Couch-Full-Commit":"false"},
     "body" : '<xml><foo>bar</foo></xml>'
   });
   T(xhr.status == 201);

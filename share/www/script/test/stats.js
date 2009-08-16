@@ -15,7 +15,7 @@ couchTests.stats = function(debug) {
 
   var open_databases_tests = {
     'should increment the number of open databases when creating a db': function(name) {
-       var db = new CouchDB("test_suite_db");
+       var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
        db.deleteDb();
        var open_databases = requestStatsTest("couchdb", "open_databases").current;
        db.createDb();
@@ -24,7 +24,7 @@ couchTests.stats = function(debug) {
        TEquals(open_databases + 1, new_open_databases, name);
      },
     'should increment the number of open databases when opening a db': function(name) {
-       var db = new CouchDB("test_suite_db");
+       var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
        db.deleteDb();
        db.createDb();
 
@@ -38,7 +38,7 @@ couchTests.stats = function(debug) {
        TEquals(open_databases + 1, new_open_databases, name);
      },
        'should decrement the number of open databases when deleting': function(name) {
-       var db = new CouchDB("test_suite_db");
+       var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
        db.deleteDb();
        db.createDb();
        var open_databases = requestStatsTest("couchdb", "open_databases").current;
@@ -91,7 +91,7 @@ couchTests.stats = function(debug) {
 
  var database_read_count_tests = {
    'should increase database reads counter when a document is read': function(name) {
-     var db = new CouchDB("test_suite_db");
+     var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
      db.deleteDb();
      db.createDb();
      db.save({"_id":"test"});
@@ -103,7 +103,7 @@ couchTests.stats = function(debug) {
      TEquals(reads + 1 , new_reads, name);
    },
    'should not increase database read counter when a non-document is read': function(name) {
-     var db = new CouchDB("test_suite_db");
+     var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
      db.deleteDb();
      db.createDb();
      db.save({"_id":"test"});
@@ -115,7 +115,7 @@ couchTests.stats = function(debug) {
      TEquals(reads, new_reads, name);
    },
    'should increase database read counter when a document\'s revisions are read': function(name) {
-     var db = new CouchDB("test_suite_db");
+     var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
      db.deleteDb();
      db.createDb();
      db.save({"_id":"test"});
@@ -130,7 +130,7 @@ couchTests.stats = function(debug) {
 
  var view_read_count_tests = {
    'should increase the permanent view read counter': function(name) {
-     var db = new CouchDB("test_suite_db");
+     var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
      db.deleteDb();
      db.createDb();
 
@@ -141,7 +141,7 @@ couchTests.stats = function(debug) {
      TEquals(reads + 1 , new_reads, name);
    },
    'should not increase the permanent view read counter when a document is read': function(name) {
-     var db = new CouchDB("test_suite_db");
+     var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
      db.deleteDb();
      db.createDb();
      db.save({"_id":"test"});
@@ -153,7 +153,7 @@ couchTests.stats = function(debug) {
      TEquals(reads, new_reads, name);
    },
    'should not increase the permanent view read counter when a temporary view is read': function(name) {
-     var db = new CouchDB("test_suite_db");
+     var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
      db.deleteDb();
      db.createDb();
 
@@ -164,7 +164,7 @@ couchTests.stats = function(debug) {
      TEquals(reads, new_reads, name);
    },
    'should increase the temporary view read counter': function(name) {
-     var db = new CouchDB("test_suite_db");
+     var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
      db.deleteDb();
      db.createDb();
 
@@ -175,7 +175,7 @@ couchTests.stats = function(debug) {
      TEquals(reads + 1, new_reads, name);
    },
    'should increase the temporary view read counter when querying a permanent view': function(name) {
-     var db = new CouchDB("test_suite_db");
+     var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
      db.deleteDb();
      db.createDb();
 
@@ -212,7 +212,7 @@ couchTests.stats = function(debug) {
 
  var document_write_count_tests = {
    'should increment database changes counter for document creates': function(name) {
-     var db = new CouchDB("test_suite_db");
+     var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
      db.deleteDb();
      db.createDb();
 
@@ -223,7 +223,7 @@ couchTests.stats = function(debug) {
      TEquals(creates + 1, new_creates, name);
    },
    'should increment database changes counter for document updates': function(name) {
-     var db = new CouchDB("test_suite_db");
+     var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
      db.deleteDb();
      db.createDb();
 
@@ -237,7 +237,7 @@ couchTests.stats = function(debug) {
      TEquals(updates + 1, new_updates, name);
    },
    'should increment database changes counter for document deletes': function(name) {
-     var db = new CouchDB("test_suite_db");
+     var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
      db.deleteDb();
      db.createDb();
 
@@ -251,7 +251,7 @@ couchTests.stats = function(debug) {
      TEquals(deletes + 1, new_deletes, name);
    },
    'should increment database changes counter for document copies': function(name) {
-     var db = new CouchDB("test_suite_db");
+     var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
      db.deleteDb();
      db.createDb();
 
@@ -267,7 +267,7 @@ couchTests.stats = function(debug) {
      TEquals(copies + 1, new_copies, name);
    },
    'should increase the bulk doc counter': function(name) {
-     var db = new CouchDB("test_suite_db");
+     var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
      db.deleteDb();
      db.createDb();
 
@@ -281,7 +281,7 @@ couchTests.stats = function(debug) {
      TEquals(bulks + 1, new_bulks, name);
    },
    'should increment database changes counter for document creates using POST': function(name) {
-     var db = new CouchDB("test_suite_db");
+     var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
      db.deleteDb();
      db.createDb();
 
@@ -292,7 +292,7 @@ couchTests.stats = function(debug) {
      TEquals(creates + 1, new_creates, name);
    },
    'should increment database changes counter when adding attachment': function(name) {
-     var db = new CouchDB("test_suite_db");
+     var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
      db.deleteDb();
      db.createDb();
 
@@ -305,7 +305,7 @@ couchTests.stats = function(debug) {
      TEquals(creates + 1, new_creates, name);
    },
    'should increment database changes counter when adding attachment to existing doc': function(name) {
-     var db = new CouchDB("test_suite_db");
+     var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
      db.deleteDb();
      db.createDb();
 
@@ -324,7 +324,7 @@ couchTests.stats = function(debug) {
  };
  var response_codes_tests = {
    'should increment the response code counter': function(name) {
-     var db = new CouchDB("nonexistant_db");
+     var db = new CouchDB("nonexistant_db", {"X-Couch-Full-Commit":"false"});
      db.deleteDb();
 
      var not_founds = requestStatsTest("httpd_status_codes", "404").current;

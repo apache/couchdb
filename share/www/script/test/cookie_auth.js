@@ -13,7 +13,7 @@
 couchTests.cookie_auth = function(debug) {
   // This tests cookie-based authentication.
   
-  var db = new CouchDB("test_suite_db");
+  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
   db.deleteDb();
   db.createDb();
   if (debug) debugger;
@@ -30,7 +30,7 @@ couchTests.cookie_auth = function(debug) {
   var testFun = function () {
     try {
       // try using an invalid cookie
-      var usersDb = new CouchDB("test_suite_users");
+      var usersDb = new CouchDB("test_suite_users", {"X-Couch-Full-Commit":"false"});
       usersDb.deleteDb();
       usersDb.createDb();
       

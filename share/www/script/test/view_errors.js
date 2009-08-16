@@ -11,7 +11,7 @@
 // the License.
 
 couchTests.view_errors = function(debug) {
-  var db = new CouchDB("test_suite_db");
+  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"true"});
   db.deleteDb();
   db.createDb();
   if (debug) debugger;
