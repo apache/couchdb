@@ -13,7 +13,7 @@
 -module(couch_httpd_show).
 
 -export([handle_doc_show_req/2, handle_doc_update_req/2, handle_view_list_req/2,
-        handle_doc_show/5, handle_view_list/6]).
+        handle_doc_show/5, handle_view_list/7]).
 
 -include("couch_db.hrl").
 
@@ -96,9 +96,15 @@ handle_doc_show(Req, DesignName, ShowName, DocId, Db) ->
     end,
     send_doc_show_response(Lang, ShowSrc, DocId, Doc, Req, Db).
 
+% view-list request with view and list from same design doc.
 handle_view_list_req(#httpd{method='GET',
         path_parts=[_DbName, _Design, DesignName, _List, ListName, ViewName]}=Req, Db) ->
-    handle_view_list(Req, DesignName, ListName, ViewName, Db, nil);
+    handle_view_list(Req, DesignName, ListName, DesignName, ViewName, Db, nil);
+
+% view-list request with view and list from different design docs.
+handle_view_list_req(#httpd{method='GET',
+        path_parts=[_DbName, _Design, DesignName, _List, ListName, ViewDesignName, ViewName]}=Req, Db) ->
+    handle_view_list(Req, DesignName, ListName, ViewDesignName, ViewName, Db, nil);
 
 handle_view_list_req(#httpd{method='GET'}=Req, _Db) ->
     send_error(Req, 404, <<"list_error">>, <<"Invalid path.">>);
@@ -108,18 +114,26 @@ handle_view_list_req(#httpd{method='POST',
     ReqBody = couch_httpd:body(Req),
     {Props2} = ?JSON_DECODE(ReqBody),
     Keys = proplists:get_value(<<"keys">>, Props2, nil),
-    handle_view_list(Req#httpd{req_body=ReqBody}, DesignName, ListName, ViewName, Db, Keys);
+    handle_view_list(Req#httpd{req_body=ReqBody}, DesignName, ListName, DesignName, ViewName, Db, Keys);
 
 handle_view_list_req(Req, _Db) ->
     send_method_not_allowed(Req, "GET,POST,HEAD").
 
-handle_view_list(Req, DesignName, ListName, ViewName, Db, Keys) ->
-    DesignId = <<"_design/", DesignName/binary>>,
-    #doc{body={Props}} = couch_httpd_db:couch_doc_open(Db, DesignId, nil, []),
-    Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
-    ListSrc = couch_util:get_nested_json_value({Props}, [<<"lists">>, ListName]),
-    send_view_list_response(Lang, ListSrc, ViewName, DesignId, Req, Db, Keys).
+handle_view_list(Req, ListDesignName, ListName, ViewDesignName, ViewName, Db, Keys) ->
+    ListDesignId = <<"_design/", ListDesignName/binary>>,
+    #doc{body={ListProps}} = couch_httpd_db:couch_doc_open(Db, ListDesignId, nil, []),
+    if
+    ViewDesignName == ListDesignName ->
+        ViewProps = ListProps,
+        ViewDesignId = ListDesignId;
+    true ->
+        ViewDesignId = <<"_design/", ViewDesignName/binary>>,
+        #doc{body={ViewProps}} = couch_httpd_db:couch_doc_open(Db, ViewDesignId, nil, [])
+    end,
 
+    ViewLang = proplists:get_value(<<"language">>, ViewProps, <<"javascript">>),
+    ListSrc = couch_util:get_nested_json_value({ListProps}, [<<"lists">>, ListName]),
+    send_view_list_response(ViewLang, ListSrc, ViewName, ViewDesignId, Req, Db, Keys).
 
 
 send_view_list_response(Lang, ListSrc, ViewName, DesignId, Req, Db, Keys) ->
