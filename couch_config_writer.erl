@@ -136,11 +136,11 @@ append_var_to_section({{Section, Option}, Value}, Line, OldCurrentSection, DoneO
 %% @doc Tries to match a line against a pattern specifying a ini module or
 %%      section ("[Section]"). Returns OldSection if no match is found.
 parse_module(Line, OldSection) ->
-    case re:run(Line, "^\\[([a-zA-Z0-9\_-]*)\\]$", [{capture, global}]) of
+    case re:run(Line, "^\\[([a-zA-Z0-9\_-]*)\\]$", [{capture, first}]) of
         nomatch ->
             OldSection;
-        {match, [_, {Start, Length}]} ->
-            string:substr(Line, Start, Length)
+        {match, [{Start, Length}]} ->
+            string:substr(Line, Start+1, Length-1)
     end.
 
 %% @spec parse_variable(Line::string(), Option::string(), Value::string()) ->
