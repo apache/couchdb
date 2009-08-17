@@ -257,10 +257,10 @@ couchTests.list_views = function(debug) {
   T(/LastKey: undefined/.test(xhr.responseText));
 
   // reduce with 0 rows
-   var xhr = CouchDB.request("GET", "/test_suite_db/_view/lists/withReduce?list=simpleForm&startkey=30");
-   T(xhr.status == 200, "reduce 0 rows");
-   T(/Total Rows/.test(xhr.responseText));
-   T(/LastKey: undefined/.test(xhr.responseText));
+  var xhr = CouchDB.request("GET", "/test_suite_db/_view/lists/withReduce?list=simpleForm&startkey=30");
+  T(xhr.status == 200, "reduce 0 rows");
+  T(/Total Rows/.test(xhr.responseText));
+  T(/LastKey: undefined/.test(xhr.responseText));
 
   // when there is a reduce present, but not used
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/withReduce?reduce=false");
