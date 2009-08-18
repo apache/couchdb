@@ -206,6 +206,9 @@ handle_response(<<"{\"results\":[\n">>, State) ->
 handle_response(<<"\n],\n\"last_seq\":", LastSeqStr/binary>>, State) ->
     LastSeq = list_to_integer(?b2l(hd(re:split(LastSeqStr, "}")))),
     {noreply, State#state{last_seq = LastSeq}};
+handle_response(<<"{\"last_seq\":", LastSeqStr/binary>>, State) ->
+    LastSeq = list_to_integer(?b2l(hd(re:split(LastSeqStr, "}")))),
+    {noreply, State#state{last_seq = LastSeq}};
 handle_response(Chunk, #state{partial_chunk=nil} = State) ->
     #state{
         count = Count,
