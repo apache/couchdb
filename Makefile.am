@@ -224,7 +224,7 @@ if WINDOWS
 # what gets installed for 'couchspawnkillable' - but the correct one for
 # couchjs.exe *does* get copied.  *shrug*  So just clobber it with the 
 # correct one here... See bug COUCHDB-439
-	$(INSTALL) priv/.libs/couchspawnkillable_win.exe "$(DESTDIR)$(couchprivdir)/couchspawnkillable.exe"
+	$(INSTALL) priv/.libs/couchspawnkillable.exe "$(DESTDIR)$(couchprivdir)/couchspawnkillable.exe"
 endif
 
 uninstall-local:
