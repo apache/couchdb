@@ -1,0 +1,14 @@
+@echo off
+setlocal
+rem First change to the erlang bin directory
+cd %~dp0
+
+rem Allow a different erlang executable (eg, werl) to be used.
+if "%ERL%x" == "x" set ERL=erl.exe
+
+echo CouchDB %version% - prepare to relax...
+%ERL% -smp auto -sasl errlog_type error ^
+      -eval "application:load(crypto)" ^
+      -eval "application:load(couch)" ^
+      -eval "crypto:start()" ^
+      -eval "couch_server:start([""../etc/couchdb/default.ini"", ""../etc/couchdb/local.ini""]), receive done -> done end."

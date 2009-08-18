@@ -10,7 +10,12 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
+if WINDOWS
+bin_SCRIPTS = couchdb.bat
+else
 bin_SCRIPTS = couchdb couchjs
+endif
+
 noinst_SCRIPTS = couchjs_dev
 
 if HELP2MAN
@@ -68,6 +73,11 @@ couchjs_dev: couchjs.tpl
 	    -e "s|%couchjs_command_name%|$(couchjs_command_name)|g" > \
 	$@ < $<
 	chmod +x $@
+
+couchdb.bat: couchdb.bat.tpl
+	sed -e "s|%ICU_CONFIG%|$(ICU_CONFIG)|g" \
+	    -e "s|%version%|@version@|g" \
+	$< > $@
 
 HELP2MAN_OPTION=--no-info --help-option="-h" --version-option="-V"
 

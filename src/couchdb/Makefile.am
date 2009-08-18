@@ -13,6 +13,11 @@
 SUBDIRS = priv
 
 ICU_LOCAL_FLAGS = $(ICU_LOCAL_CFLAGS) $(ICU_LOCAL_LDFLAGS)
+if WINDOWS
+ICU_LOCAL_LIBS=-licuuc -licudt -licuin
+else
+ICU_LOCAL_LIBS=-licuuc -licudata -licui18n
+endif
 
 # devdocdir = $(localdocdir)/developer/couchdb
 couchlibdir = $(localerlanglibdir)/couch-$(version)
@@ -25,19 +30,28 @@ couchprivlib_LTLIBRARIES = couch_erl_driver.la
 couch_erl_driver_la_SOURCES = couch_erl_driver.c
 couch_erl_driver_la_LDFLAGS = -module -avoid-version $(ICU_LOCAL_FLAGS)
 couch_erl_driver_la_CFLAGS = $(ICU_LOCAL_FLAGS)
-couch_erl_driver_la_LIBADD = -licuuc -licudata -licui18n
+couch_erl_driver_la_LIBADD = $(ICU_LOCAL_LIBS)
 
 locallibbin_PROGRAMS = couchjs
 couchjs_SOURCES = couch_js.c curlhelper.c curlhelper.h
-couchjs_LDLAGS = $(CURL_LDLAGS)
+couchjs_LDFLAGS = $(CURL_LDFLAGS)
 couchjs_CFLAGS = $(CURL_CFLAGS)
-couchjs_LDADD = -lcurl
+couchjs_LDADD = $(CURL_LDFLAGS)
+
+if WINDOWS
+priv_couchspawnkillable_win_SOURCES = priv/couchspawnkillable_win.c
+couchpriv_PROGRAMS = priv/couchspawnkillable_win
+couch_erl_driver_la_LDFLAGS += -no-undefined
+
+# copy ICU dlls for the erlang driver
+dist_couch_erl_driver_la_DATA=$(ICU_LOCAL_BIN)/icuuc42.dll $(ICU_LOCAL_BIN)/icudt42.dll $(ICU_LOCAL_BIN)/icuin42.dll
+couch_erl_driver_ladir=$(bindir)
+endif
 
 couchinclude_DATA = couch_db.hrl
 
 couchebin_DATA = $(compiled_files)
 
-couchpriv_SCRIPTS = priv/couchspawnkillable
 
 # dist_devdoc_DATA = $(doc_base) $(doc_modules)
 
@@ -98,6 +112,7 @@ source_files = \
 EXTRA_DIST = $(source_files) couch_db.hrl couch_stats.hrl
 
 compiled_files = \
+	priv/couchspawnkillable \
     couch.app \
     couch_btree.beam \
     couch_batch_save.beam \
@@ -191,14 +206,31 @@ couch.app: couch.app.tpl
 %.beam: %.erl couch_db.hrl
 	$(ERLC) $(ERLC_FLAGS) ${TEST} $<;
 
+if WINDOWS
+priv/couchspawnkillable: priv/couchspawnkillable_win
+	cp $< $@
+else
+priv/couchspawnkillable: priv/couchspawnkillable.sh
+	cp $< $@
+endif
+
 install-data-hook:
-	if test -f "$(DESTDIR)/$(couchprivlibdir)/couch_erl_driver"; then \
-	    rm -f "$(DESTDIR)/$(couchprivlibdir)/couch_erl_driver.so"; \
-	    cd "$(DESTDIR)/$(couchprivlibdir)" && \
+	if test -f "$(DESTDIR)$(couchprivlibdir)/couch_erl_driver"; then \
+	    rm -f "$(DESTDIR)$(couchprivlibdir)/couch_erl_driver.so"; \
+	    cd "$(DESTDIR)$(couchprivlibdir)" && \
 	        $(LN_S) couch_erl_driver couch_erl_driver.so; \
 	fi
+if WINDOWS
+# libtool and automake have defeated markh.  For each of our executables
+# we end up with 2 copies - one directly in the 'target' folder (eg, 'priv')
+# and another - the correct one - in .libs.  The former doesn't work but is 
+# what gets installed for 'couchspawnkillable' - but the correct one for
+# couchjs.exe *does* get copied.  *shrug*  So just clobber it with the 
+# correct one here... See bug COUCHDB-439
+	$(INSTALL) priv/.libs/couchspawnkillable_win.exe "$(DESTDIR)$(couchprivdir)/couchspawnkillable.exe"
+endif
 
 uninstall-local:
-	if test -f "$(DESTDIR)/$(couchprivlibdir)/couch_erl_driver"; then \
-	    rm -f "$(DESTDIR)/$(couchprivlibdir)/couch_erl_driver.so"; \
+	if test -f "$(DESTDIR)$(couchprivlibdir)/couch_erl_driver"; then \
+	    rm -f "$(DESTDIR)$(couchprivlibdir)/couch_erl_driver.so"; \
 	fi

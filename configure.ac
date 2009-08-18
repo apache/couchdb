@@ -80,17 +80,36 @@ AC_ARG_VAR([FLAGS], [general flags to prepend to LDFLAGS and CPPFLAGS])
 
 LIB_FLAGS="$JS_LIB_FLAGS -L/usr/local/lib -L/opt/local/lib"
 LIBS="$LIB_FLAGS $LIBS"
-# XP_UNIX required for jsapi.h and has been tested to work on Linux and Darwin.
-FLAGS="$LIB_FLAGS $ERLANG_FLAGS $JS_FLAGS -DXP_UNIX $FLAGS"
-CPPFLAGS="$FLAGS $CPPFLAGS"
-# manually linking libm is requred for FreeBSD 7.0
-LDFLAGS="$FLAGS -lm $LDFLAGS"
+
+case "$(uname -s)" in
+  CYGWIN*)
+    FLAGS="$LIB_FLAGS $ERLANG_FLAGS $JS_FLAGS -DXP_WIN $FLAGS"
+    CPPFLAGS="$FLAGS $CPPFLAGS"
+    LDFLAGS="$FLAGS $LDFLAGS"
+    IS_WINDOWS="TRUE"
+    # The erlang cc.sh/ld.sh scripts will convert a -O option
+    # into the same optimization flags erlang itself uses.
+    CFLAGS="-O2"
+    LTCFLAGS="$CFLAGS"
+    ;;
+  *)
+    # XP_UNIX required for jsapi.h and has been tested to work on Linux and Darwin.
+    FLAGS="$LIB_FLAGS $ERLANG_FLAGS $JS_FLAGS -DXP_UNIX $FLAGS"
+    CPPFLAGS="$FLAGS $CPPFLAGS"
+    # manually linking libm is requred for FreeBSD 7.0
+    LDFLAGS="$FLAGS -lm $LDFLAGS"
+    ;;
+esac
+
+AM_CONDITIONAL([WINDOWS], [test x$IS_WINDOWS = xTRUE])
 
 AC_CHECK_LIB([mozjs], [JS_NewContext], [], [
     AC_CHECK_LIB([js], [JS_NewContext], [], [
-        AC_MSG_ERROR([Could not find the js library.
+        AC_CHECK_LIB([js3250], [JS_NewContext], [], [
+            AC_CHECK_LIB([js32], [JS_NewContext], [], [
+                AC_MSG_ERROR([Could not find the js library.
 
-Is the Mozilla SpiderMonkey library installed?])])])
+Is the Mozilla SpiderMonkey library installed?])])])])])
 
 AC_CHECK_HEADER([jsapi.h], [], [
     AC_CHECK_HEADER([js/jsapi.h],
@@ -116,18 +135,39 @@ AC_COMPILE_IFELSE(
 CFLAGS="$OLD_CFLAGS"
 AC_LANG_POP(C)
 
-AC_CHECK_ICU([3])
+AC_ARG_WITH([win32-icu-binaries], [AC_HELP_STRING([--with-win32-icu-binaries=PATH],
+    [set PATH to the Win32 native ICU binaries directory])], [
+    ICU_CONFIG="" # supposed to be a command to query options...
+    ICU_LOCAL_CFLAGS="-I$withval/include"
+    ICU_LOCAL_LDFLAGS="-L$withval/lib"
+    ICU_LOCAL_BIN=$withval/bin
+], [
+    AC_CHECK_ICU([3])
+    ICU_LOCAL_CFLAGS=`$ICU_CONFIG --cppflags-searchpath`
+    ICU_LOCAL_LDFLAGS=`$ICU_CONFIG --ldflags-searchpath`
+    ICU_LOCAL_BIN=
+])
 
-ICU_LOCAL_CFLAGS=`$ICU_CONFIG --cppflags-searchpath`
-ICU_LOCAL_LDFLAGS=`$ICU_CONFIG --ldflags-searchpath`
 
 AC_SUBST(ICU_CONFIG)
 AC_SUBST(ICU_LOCAL_CFLAGS)
 AC_SUBST(ICU_LOCAL_LDFLAGS)
+AC_SUBST(ICU_LOCAL_BIN)
 
-AC_CHECK_CURL([7.15.5])
+AC_ARG_WITH([win32-curl], [AC_HELP_STRING([--with-win32-curl=PATH],
+    [set PATH to the Win32 native curl directory])], [
+    # default build on windows is a static lib, and that's what we want too
+    CURL_CFLAGS="-I$withval/include -DCURL_STATICLIB"
+    CURL_LIBS="$withval/lib/libcurl"
+    CURL_LDFLAGS="-l$CURL_LIBS -lWs2_32 -lkernel32 -luser32 -ladvapi32 -lWldap32"
+], [
+    AC_CHECK_CURL([7.15.5])
+    CURL_LDFLAGS=-lcurl
+])
+
 AC_SUBST(CURL_CFLAGS)
 AC_SUBST(CURL_LIBS)
+AC_SUBST(CURL_LDFLAGS)
 
 case "$(uname -s)" in
   Linux)
@@ -268,8 +308,15 @@ AC_SUBST([locallibdir], [${libdir}/${package_identifier}])
 AC_SUBST([localstatelibdir], [${localstatedir}/lib/${package_identifier}])
 AC_SUBST([localstatelogdir], [${localstatedir}/log/${package_identifier}])
 AC_SUBST([localstaterundir], [${localstatedir}/run/${package_identifier}])
-AC_SUBST([locallibbindir], [${locallibdir}/bin])
-AC_SUBST([localerlanglibdir], [${locallibdir}/erlang/lib])
+
+# On Windows we install directly into our erlang distribution.
+if test x${IS_WINDOWS} = xTRUE; then
+    AC_SUBST([locallibbindir], [${prefix}/bin])
+    AC_SUBST([localerlanglibdir], [${libdir}])
+else
+    AC_SUBST([locallibbindir], [${locallibdir}/bin])
+    AC_SUBST([localerlanglibdir], [${locallibdir}/erlang/lib])
+fi
 
 # fix for older autotools that don't define "abs_top_YYY" by default
 AC_SUBST(abs_top_srcdir)
@@ -280,6 +327,7 @@ AC_REVISION([LOCAL_VERSION])
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([bin/couchjs.tpl])
 AC_CONFIG_FILES([bin/couchdb.tpl])
+AC_CONFIG_FILES([bin/couchdb.bat.tpl])
 AC_CONFIG_FILES([bin/Makefile])
 AC_CONFIG_FILES([etc/couchdb/Makefile])
 AC_CONFIG_FILES([etc/couchdb/default.ini.tpl])
@@ -303,6 +351,21 @@ AC_CONFIG_FILES([utils/Makefile])
 AC_CONFIG_FILES([var/Makefile])
 
 AC_OUTPUT
+
+# *sob* - on Windows libtool fails as 'libname_spec' isn't correct (it
+# expects GNU style lib names).  I can't work out how to configure this
+# option sanely, so we pass the script through sed to modify it.
+# Also, the erlang cc.sh script doesn't cope well with the '-link' command
+# line option libtool provides.
+# PLEASE, someone help put this out of its misery!!
+# This hackery is being tracked via COUCHDB-440.
+if test x${IS_WINDOWS} = xTRUE; then
+    sed -e 's,libname_spec="lib\\$name",libname_spec="\\\$name",' \
+        -e 's,-link,,' \
+        < libtool > libtool.tmp
+    mv libtool.tmp libtool
+    # probably would chmod +x if we weren't on windows...
+fi
 
 echo
 echo "You have configured Apache CouchDB, time to relax."

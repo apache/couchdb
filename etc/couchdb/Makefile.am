@@ -24,6 +24,17 @@ transform = @program_transform_name@
 couchjs_command_name = `echo couchjs | sed '$(transform)'`
 couchjs_dev_command_name = `echo couchjs_dev | sed '$(transform)'`
 
+if WINDOWS
+default.ini: default.ini.tpl
+	sed -e "s|%bindir%|.|g" \
+	    -e "s|%localconfdir%|$(localconfdir)|g" \
+	    -e "s|%localdatadir%|../share/couchdb|g" \
+	    -e "s|%localstatelibdir%|../var/lib/couchdb|g" \
+	    -e "s|%localstatelogdir%|../var/log/couchdb|g" \
+	    -e "s|%couchprivlibdir%|../lib/couch-$(version)/priv/lib|g" \
+	    -e "s|%couchjs_command_name%|couchjs.exe|g" \
+	< $< > $@
+else
 default.ini: default.ini.tpl
 	sed -e "s|%bindir%|$(bindir)|g" \
 	    -e "s|%localconfdir%|$(localconfdir)|g" \
@@ -33,6 +44,7 @@ default.ini: default.ini.tpl
 	    -e "s|%couchprivlibdir%|$(couchprivlibdir)|g" \
 	    -e "s|%couchjs_command_name%|$(couchjs_command_name)|g" \
 	< $< > $@
+endif
 
 default_dev.ini: default.ini.tpl
 	sed -e "s|%bindir%|$(abs_top_srcdir)/bin|g" \
@@ -48,16 +60,16 @@ local_dev.ini:
 	cp local.ini $@
 
 install-data-hook:
-	if test ! -f "$(DESTDIR)/$(localconfdir)/local.ini"; then \
-	    cp $(srcdir)/local.ini "$(DESTDIR)/$(localconfdir)/local.ini"; \
+	if test ! -f "$(DESTDIR)$(localconfdir)/local.ini"; then \
+	    cp $(srcdir)/local.ini "$(DESTDIR)$(localconfdir)/local.ini"; \
 	fi
 	if test ! "$(mkdir_p)" = ""; then \
-	    $(mkdir_p) "$(DESTDIR)/$(localconfdir)/default.d"; \
-	    $(mkdir_p) "$(DESTDIR)/$(localconfdir)/local.d"; \
+	    $(mkdir_p) "$(DESTDIR)$(localconfdir)/default.d"; \
+	    $(mkdir_p) "$(DESTDIR)$(localconfdir)/local.d"; \
 	else \
 	    echo "WARNING: You may have to create these directories by hand."; \
-	    mkdir -p "$(DESTDIR)/$(localconfdir)/default.d"; \
-	    mkdir -p "$(DESTDIR)/$(localconfdir)/local.d"; \
+	    mkdir -p "$(DESTDIR)$(localconfdir)/default.d"; \
+	    mkdir -p "$(DESTDIR)$(localconfdir)/local.d"; \
 	fi
 
 uninstall-local:
