@@ -51,7 +51,7 @@ endif
 couchinclude_DATA = couch_db.hrl
 
 couchebin_DATA = $(compiled_files)
-
+couchpriv_DATA = priv/couchspawnkillable
 
 # dist_devdoc_DATA = $(doc_base) $(doc_modules)
 
@@ -112,7 +112,6 @@ source_files = \
 EXTRA_DIST = $(source_files) couch_db.hrl couch_stats.hrl
 
 compiled_files = \
-	priv/couchspawnkillable \
     couch.app \
     couch_btree.beam \
     couch_batch_save.beam \
