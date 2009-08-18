@@ -45,9 +45,9 @@ couchTests.changes = function(debug) {
 
 
   req = CouchDB.request("GET", "/test_suite_db/_changes?feed=continuous&timeout=10");
-  var resp = JSON.parse(req.responseText);
-  T(resp.results.length == 1 && resp.last_seq==1)
-  T(resp.results[0].changes[0].rev == docFoo._rev)
+  var lines = req.responseText.split("\n");
+  T(JSON.parse(lines[0]).changes[0].rev == docFoo._rev);
+  T(JSON.parse(lines[1]).last_seq == 1);
 
   var xhr;
 
@@ -67,14 +67,6 @@ couchTests.changes = function(debug) {
       T(JSON.parse(req.responseText).ok == true);
     }
 
-    var parse_changes_line = function(line) {
-      if (line.charAt(line.length-1) == ",") {
-        line = line.substring(0, line.length-1);
-      }
-      return JSON.parse(line);
-    }
-
-
     xhr.open("GET", "/test_suite_db/_changes?feed=continuous", true);
     xhr.send("");
 
@@ -83,15 +75,13 @@ couchTests.changes = function(debug) {
 
     sleep(100);
     var lines = xhr.responseText.split("\n");
-
-    T(lines[0]='{"results":[');
-
-    var change = parse_changes_line(lines[1]);
+  
+    var change = JSON.parse(lines[0]);
 
     T(change.seq == 1)
     T(change.id == "foo")
 
-    change = parse_changes_line(lines[2]);
+    change = JSON.parse(lines[1]);
 
     T(change.seq == 2)
     T(change.id == "bar")
@@ -103,7 +93,7 @@ couchTests.changes = function(debug) {
     sleep(100);
     var lines = xhr.responseText.split("\n");
 
-    change = parse_changes_line(lines[3]);
+    change = JSON.parse(lines[2]);
 
     T(change.seq == 3);
     T(change.id == "baz");
@@ -147,6 +137,13 @@ couchTests.changes = function(debug) {
     sleep(100);
 
     var lines = xhr.responseText.split("\n");
+
+    var parse_changes_line = function(line) {
+      if (line.charAt(line.length-1) == ",") {
+        line = line.substring(0, line.length-1);
+      }
+      return JSON.parse(line);
+    }
 
     change = parse_changes_line(lines[1]);
 
