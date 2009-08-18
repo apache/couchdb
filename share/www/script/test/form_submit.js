@@ -11,7 +11,7 @@
 // the License.
 
 // Do some basic tests.
-couchTests.form_upload = function(debug) {
+couchTests.form_submit = function(debug) {
     var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
     db.deleteDb();
     db.createDb();
