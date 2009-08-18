@@ -34,13 +34,17 @@ EXTRA_DIST = $(JS_FILE_COMPONENTS) $(JS_FILE_COMPONENTS_LAST)
 
 nobase_dist_localdata_DATA = \
     $(JS_FILE) \
+    www/config.html \
+    www/couch_tests.html \
+    www/custom_test.html \
+    www/database.html \
     www/dialog/_compact_database.html \
     www/dialog/_create_database.html \
     www/dialog/_delete_database.html \
     www/dialog/_delete_document.html \
     www/dialog/_save_view_as.html \
     www/dialog/_upload_attachment.html \
-    www/couch_tests.html \
+    www/document.html \
     www/favicon.ico \
     www/image/add.png \
     www/image/apply.gif \
@@ -66,61 +70,75 @@ nobase_dist_localdata_DATA = \
     www/image/spinner.gif \
     www/image/test_failure.gif \
     www/image/test_success.gif \
-    www/image/thead.gif \
     www/image/thead-key.gif \
+    www/image/thead.gif \
     www/image/toggle-collapse.gif \
     www/image/toggle-expand.gif \
     www/image/twisty.gif \
-    www/_sidebar.html \
     www/index.html \
-    www/config.html \
-    www/custom_test.html \
-    www/database.html \
-    www/document.html \
     www/replicator.html \
-    www/status.html \
     www/script/couch.js \
     www/script/couch_tests.js \
     www/script/couch_test_runner.js \
-    www/script/futon.js \
     www/script/futon.browse.js \
     www/script/futon.format.js \
-    www/script/jquery.js \
+    www/script/futon.js \
     www/script/jquery.cookies.js \
     www/script/jquery.couch.js \
     www/script/jquery.dialog.js \
     www/script/jquery.editinline.js \
     www/script/jquery.form.js \
+    www/script/jquery.js \
     www/script/jquery.resizer.js \
     www/script/jquery.suggest.js \
     www/script/json2.js \
     www/script/oauth.js \
     www/script/sha1.js \
-    www/script/test/basics.js \
-    www/script/test/batch_save.js \
-    www/script/test/delayed_commits.js \
     www/script/test/all_docs.js \
-    www/script/test/conflicts.js \
-    www/script/test/recreate_doc.js \
-    www/script/test/copy_doc.js \
-    www/script/test/uuids.js \
-    www/script/test/bulk_docs.js \
-    www/script/test/lots_of_docs.js \
-    www/script/test/reduce.js \
-    www/script/test/reduce_false.js \
-    www/script/test/design_options.js \
-    www/script/test/multiple_rows.js \
-    www/script/test/large_docs.js \
-    www/script/test/utf8.js \
-    www/script/test/jsonp.js \
     www/script/test/attachments.js \
     www/script/test/attachment_names.js \
     www/script/test/attachment_paths.js \
     www/script/test/attachment_views.js \
-    www/script/test/design_paths.js \
+    www/script/test/basics.js \
+    www/script/test/batch_save.js \
+    www/script/test/bulk_docs.js \
+    www/script/test/changes.js \
+    www/script/test/compact.js \
+    www/script/test/config.js \
+    www/script/test/conflicts.js \
     www/script/test/content_negotiation.js \
+    www/script/test/cookie_auth.js \
+    www/script/test/copy_doc.js \
+    www/script/test/delayed_commits.js \
     www/script/test/design_docs.js \
+    www/script/test/design_options.js \
+    www/script/test/design_paths.js \
+    www/script/test/erlang_views.js \
+    www/script/test/etags_head.js \
+    www/script/test/etags_views.js \
+    www/script/test/form_submit.js \
     www/script/test/invalid_docids.js \
+    www/script/test/jsonp.js \
+    www/script/test/large_docs.js \
+    www/script/test/list_views.js \
+    www/script/test/lorem.txt \
+    www/script/test/lorem_b64.txt \
+    www/script/test/lots_of_docs.js \
+    www/script/test/multiple_rows.js \
+    www/script/test/oauth.js \
+    www/script/test/purge.js \
+    www/script/test/recreate_doc.js \
+    www/script/test/reduce.js \
+    www/script/test/reduce_builtin.js \
+    www/script/test/reduce_false.js \
+    www/script/test/replication.js \
+    www/script/test/rev_stemming.js \
+    www/script/test/security_validation.js \
+    www/script/test/show_documents.js \
+    www/script/test/stats.js \
+    www/script/test/update_documents.js \
+    www/script/test/utf8.js \
+    www/script/test/uuids.js \
     www/script/test/view_collation.js \
     www/script/test/view_conflicts.js \
     www/script/test/view_errors.js \
@@ -132,24 +150,6 @@ nobase_dist_localdata_DATA = \
     www/script/test/view_pagination.js \
     www/script/test/view_sandboxing.js \
     www/script/test/view_xml.js \
-    www/script/test/replication.js \
-    www/script/test/rev_stemming.js \
-    www/script/test/erlang_views.js \
-    www/script/test/etags_head.js \
-    www/script/test/etags_views.js \
-    www/script/test/show_documents.js \
-    www/script/test/update_documents.js \
-    www/script/test/list_views.js \
-    www/script/test/compact.js \
-    www/script/test/purge.js \
-    www/script/test/config.js \
-    www/script/test/security_validation.js \
-    www/script/test/cookie_auth.js \
-    www/script/test/oauth.js \
-    www/script/test/stats.js \
-    www/script/test/changes.js \
-    www/script/test/form_submit.js \
-    www/script/test/reduce_builtin.js \
-    www/script/test/lorem.txt \
-    www/script/test/lorem_b64.txt \
-    www/style/layout.css
+    www/status.html \
+    www/style/layout.css \
+    www/_sidebar.html
