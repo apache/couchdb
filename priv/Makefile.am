@@ -10,11 +10,13 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
+couchlibdir = $(localerlanglibdir)/couch-$(version)
 couchprivdir = $(couchlibdir)/priv
 
 EXTRA_DIST = couchspawnkillable.sh
 
 couchpriv_PROGRAMS = couchspawnkillable
+
 if WINDOWS
 couchspawnkillable_SOURCES = couchspawnkillable_win.c
 endif
