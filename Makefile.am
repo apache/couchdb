@@ -49,11 +49,11 @@ cover: dev
 dev: all
 	@echo "This command is intended for developers to use;"
 	@echo "it creates development ini files as well as a"
-	@echo "./tmp structure for development runtime files."
+	@echo "$(top_builddir)/tmp structure for development runtime files."
 	@echo "Use ./utils/run to launch CouchDB from the source tree."
-	mkdir -p ./tmp/lib
-	mkdir -p ./tmp/log
-	mkdir -p ./tmp/run
+	mkdir -p $(top_builddir)/tmp/lib
+	mkdir -p $(top_builddir)/tmp/log
+	mkdir -p $(top_builddir)/tmp/run
 
 .PHONY: local-clean
 local-clean: maintainer-clean
