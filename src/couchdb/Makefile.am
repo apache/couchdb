@@ -39,19 +39,20 @@ couchjs_CFLAGS = $(CURL_CFLAGS)
 couchjs_LDADD = $(CURL_LDFLAGS)
 
 if WINDOWS
-priv_couchspawnkillable_win_SOURCES = priv/couchspawnkillable_win.c
-couchpriv_PROGRAMS = priv/couchspawnkillable_win
+priv_couchspawnkillable_SOURCES = priv/couchspawnkillable_win.c
+couchpriv_PROGRAMS = priv/couchspawnkillable
 couch_erl_driver_la_LDFLAGS += -no-undefined
 
 # copy ICU dlls for the erlang driver
 dist_couch_erl_driver_la_DATA=$(ICU_LOCAL_BIN)/icuuc42.dll $(ICU_LOCAL_BIN)/icudt42.dll $(ICU_LOCAL_BIN)/icuin42.dll
 couch_erl_driver_ladir=$(bindir)
+else
+couchpriv_PROGRAMS=priv/couchspawnkillable
 endif
 
 couchinclude_DATA = couch_db.hrl
 
 couchebin_DATA = $(compiled_files)
-couchpriv_DATA = priv/couchspawnkillable
 
 # dist_devdoc_DATA = $(doc_base) $(doc_modules)
 
@@ -205,10 +206,7 @@ couch.app: couch.app.tpl
 %.beam: %.erl couch_db.hrl
 	$(ERLC) $(ERLC_FLAGS) ${TEST} $<;
 
-if WINDOWS
-priv/couchspawnkillable: priv/couchspawnkillable_win
-	cp $< $@
-else
+if !WINDOWS
 priv/couchspawnkillable: priv/couchspawnkillable.sh
 	cp $< $@
 endif
