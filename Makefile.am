@@ -39,15 +39,10 @@ couchjs_CFLAGS = $(CURL_CFLAGS)
 couchjs_LDADD = $(CURL_LDFLAGS)
 
 if WINDOWS
-priv_couchspawnkillable_SOURCES = priv/couchspawnkillable_win.c
-couchpriv_PROGRAMS = priv/couchspawnkillable
 couch_erl_driver_la_LDFLAGS += -no-undefined
-
 # copy ICU dlls for the erlang driver
-dist_couch_erl_driver_la_DATA=$(ICU_LOCAL_BIN)/icuuc42.dll $(ICU_LOCAL_BIN)/icudt42.dll $(ICU_LOCAL_BIN)/icuin42.dll
+#dist_couch_erl_driver_la_DATA=$(ICU_LOCAL_BIN)/icuuc42.dll $(ICU_LOCAL_BIN)/icudt42.dll $(ICU_LOCAL_BIN)/icuin42.dll
 couch_erl_driver_ladir=$(bindir)
-else
-couchpriv_PROGRAMS=priv/couchspawnkillable
 endif
 
 couchinclude_DATA = couch_db.hrl
@@ -206,26 +201,12 @@ couch.app: couch.app.tpl
 %.beam: %.erl couch_db.hrl
 	$(ERLC) $(ERLC_FLAGS) ${TEST} $<;
 
-if !WINDOWS
-priv/couchspawnkillable: priv/couchspawnkillable.sh
-	cp $< $@
-endif
-
 install-data-hook:
 	if test -f "$(DESTDIR)$(couchprivlibdir)/couch_erl_driver"; then \
 	    rm -f "$(DESTDIR)$(couchprivlibdir)/couch_erl_driver.so"; \
 	    cd "$(DESTDIR)$(couchprivlibdir)" && \
 	        $(LN_S) couch_erl_driver couch_erl_driver.so; \
 	fi
-if WINDOWS
-# libtool and automake have defeated markh.  For each of our executables
-# we end up with 2 copies - one directly in the 'target' folder (eg, 'priv')
-# and another - the correct one - in .libs.  The former doesn't work but is 
-# what gets installed for 'couchspawnkillable' - but the correct one for
-# couchjs.exe *does* get copied.  *shrug*  So just clobber it with the 
-# correct one here... See bug COUCHDB-439
-	$(INSTALL) priv/.libs/couchspawnkillable.exe "$(DESTDIR)$(couchprivdir)/couchspawnkillable.exe"
-endif
 
 uninstall-local:
 	if test -f "$(DESTDIR)$(couchprivlibdir)/couch_erl_driver"; then \

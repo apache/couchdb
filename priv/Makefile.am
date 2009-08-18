@@ -10,4 +10,27 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
-## This file intentionally left blank.
+couchprivdir = $(couchlibdir)/priv
+
+EXTRA_DIST = couchspawnkillable.sh
+
+couchpriv_PROGRAMS = couchspawnkillable
+if WINDOWS
+couchspawnkillable_SOURCES = couchspawnkillable_win.c
+endif
+
+if !WINDOWS
+couchspawnkillable: couchspawnkillable.sh
+	cp $< $@
+endif
+
+if WINDOWS
+install-data-hook:
+# libtool and automake have defeated markh.  For each of our executables
+# we end up with 2 copies - one directly in the 'target' folder (eg, 'priv')
+# and another - the correct one - in .libs.  The former doesn't work but is 
+# what gets installed for 'couchspawnkillable' - but the correct one for
+# couchjs.exe *does* get copied.  *shrug*  So just clobber it with the 
+# correct one here... See bug COUCHDB-439
+	$(INSTALL) .libs/couchspawnkillable.exe "$(DESTDIR)$(couchprivdir)/couchspawnkillable.exe"
+endif
