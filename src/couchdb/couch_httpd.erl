@@ -256,10 +256,16 @@ path(#httpd{mochi_req=MochiReq}) ->
     MochiReq:get(path).
 
 absolute_uri(#httpd{mochi_req=MochiReq}, Path) ->
-    Host = case MochiReq:get_header_value("Host") of
+    XHost = couch_config:get("httpd", "x_forwarded_host", "X-Forwarded-Host"),
+    Host = case MochiReq:get_header_value(XHost) of
         undefined ->
-            {ok, {Address, Port}} = inet:sockname(MochiReq:get(socket)),
-            inet_parse:ntoa(Address) ++ ":" ++ integer_to_list(Port);
+            case MochiReq:get_header_value("Host") of
+                undefined ->    
+                    {ok, {Address, Port}} = inet:sockname(MochiReq:get(socket)),
+                    inet_parse:ntoa(Address) ++ ":" ++ integer_to_list(Port);
+                Value1 ->
+                    Value1
+            end;
         Value -> Value
     end,
     "http://" ++ Host ++ Path.

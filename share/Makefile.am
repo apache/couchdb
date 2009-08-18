@@ -117,6 +117,7 @@ nobase_dist_localdata_DATA = \
     www/script/test/etags_head.js \
     www/script/test/etags_views.js \
     www/script/test/form_submit.js \
+    www/script/test/http.js \
     www/script/test/invalid_docids.js \
     www/script/test/jsonp.js \
     www/script/test/large_docs.js \

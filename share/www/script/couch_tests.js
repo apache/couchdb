@@ -81,6 +81,7 @@ loadTest("oauth.js");
 loadTest("stats.js");
 loadTest("rev_stemming.js");
 loadTest("erlang_views.js");
+loadTest("http.js");
 
 function makeDocs(start, end, templateDoc) {
   var templateDocSrc = templateDoc ? JSON.stringify(templateDoc) : "{}"
