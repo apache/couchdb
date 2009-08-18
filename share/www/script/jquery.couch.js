@@ -50,7 +50,7 @@
         }
       }
       if (value !== undefined) {
-        req.method = "PUT";
+        req.type = "PUT";
         req.data = toJSON(value);
         req.contentType = "application/json";
         req.processData = false
