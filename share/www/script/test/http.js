@@ -21,10 +21,11 @@ couchTests.http = function(debug) {
 
   // PUT on existing DB should return 412 instead of 500
   if (debug) debugger;
-  
+
   var xhr = CouchDB.request("PUT", "/test_suite_db/test", {body: "{}"});
-  
-  TEquals("http://127.0.0.1:5984/test_suite_db/test", 
+  var host = CouchDB.host;
+
+  TEquals("http://" + host + "/test_suite_db/test", 
     xhr.getResponseHeader("Location"),
     "should include ip address");
 
