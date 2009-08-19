@@ -80,6 +80,8 @@ handle_task_status_req(Req) ->
 handle_replicate_req(#httpd{method='POST'}=Req) ->
     PostBody = couch_httpd:json_body_obj(Req),
     try couch_rep:replicate(PostBody, Req#httpd.user_ctx) of
+    {ok, {continuous, RepId}} ->
+        send_json(Req, 202, {[{ok, true}, {<<"_local_id">>, RepId}]});
     {ok, {JsonResults}} ->
         send_json(Req, {[{ok, true} | JsonResults]});
     {error, {Type, Details}} ->

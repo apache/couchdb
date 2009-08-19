@@ -54,7 +54,7 @@ replicate(Source, Target) when is_binary(Source), is_binary(Target) ->
     replicate({[{<<"source">>, Source}, {<<"target">>, Target}]}, #user_ctx{});
 
 %% function handling POST to _replicate
-replicate(PostBody, UserCtx) ->
+replicate({Props}=PostBody, UserCtx) ->
     RepId = make_replication_id(PostBody, UserCtx),
     Replicator = {RepId,
         {gen_server, start_link, [?MODULE, [RepId, PostBody, UserCtx], []]},
@@ -66,6 +66,14 @@ replicate(PostBody, UserCtx) ->
 
     Server = start_replication_server(Replicator),
 
+    case proplists:get_value(<<"continuous">>, Props, false) of
+    true ->
+        {ok, {continuous, ?l2b(RepId)}};
+    false ->
+        get_result(Server, PostBody, UserCtx)
+    end.
+
+get_result(Server, PostBody, UserCtx) ->
     try gen_server:call(Server, get_result, infinity) of
     retry -> replicate(PostBody, UserCtx);
     Else -> Else
