@@ -35,8 +35,8 @@
     conn = nil
 }).
 
--define(SERVER, "http://127.0.0.1:5984/").
--define(DBNAME, "etap-test-db").
+server() -> "http://127.0.0.1:5984/".
+dbname() -> "etap-test-db".
 
 main(_) ->
     code:add_pathz("src/couchdb"),
@@ -61,8 +61,8 @@ test() ->
     ibrowse:start(),
     crypto:start(),
 
-    couch_server:delete(list_to_binary(?DBNAME), []),
-    {ok, Db} = couch_db:create(list_to_binary(?DBNAME), []),
+    couch_server:delete(list_to_binary(dbname()), []),
+    {ok, Db} = couch_db:create(list_to_binary(dbname()), []),
 
     test_welcome(),
     test_binary_url(),
@@ -71,11 +71,11 @@ test() ->
     test_db_exists(),
 
     couch_db:close(Db),
-    couch_server:delete(list_to_binary(?DBNAME), []),
+    couch_server:delete(list_to_binary(dbname()), []),
     ok.
 
 test_welcome() ->
-    WelcomeReq = #http_db{url=?SERVER},
+    WelcomeReq = #http_db{url=server()},
     Expect = {[
         {<<"couchdb">>, <<"Welcome">>},
         {<<"version">>, list_to_binary(couch_server:get_version())}
@@ -87,7 +87,7 @@ test_welcome() ->
     ).
 
 test_binary_url() ->
-    Req = #http_db{url=list_to_binary(?SERVER)},
+    Req = #http_db{url=list_to_binary(server())},
     Expect = {[
         {<<"couchdb">>, <<"Welcome">>},
         {<<"version">>, list_to_binary(couch_server:get_version())}
@@ -100,7 +100,7 @@ test_binary_url() ->
 
 test_put() ->
     Req = #http_db{
-        url = ?SERVER ++ ?DBNAME ++ "/",
+        url = server() ++ dbname() ++ "/",
         resource = "test_put",
         body = {[{<<"foo">>, <<"bar">>}]},
         method = put
@@ -111,7 +111,7 @@ test_put() ->
 
 test_qs() ->
     Req = #http_db{
-        url = ?SERVER ++ ?DBNAME ++ "/",
+        url = server() ++ dbname() ++ "/",
         resource = "foo",
         qs = [
             {bar, true},
@@ -119,7 +119,7 @@ test_qs() ->
             {bif, mochijson2:encode(<<"1-23456">>)}
         ]
     },
-    Expect = ?SERVER ++ ?DBNAME ++ "/foo?bar=true&baz=1.03&bif=\"1-23456\"",
+    Expect = server() ++ dbname() ++ "/foo?bar=true&baz=1.03&bif=\"1-23456\"",
     etap:is(
         couch_rep_httpc:full_url(Req),
         Expect,
@@ -127,7 +127,7 @@ test_qs() ->
     ).
 
 test_db_exists() ->
-    Req1 = #http_db{url=?SERVER ++ ?DBNAME ++ "/"},
-    Req2 = #http_db{url=?SERVER ++ ?DBNAME ++ "_foo/"},
+    Req1 = #http_db{url=server() ++ dbname() ++ "/"},
+    Req2 = #http_db{url=server() ++ dbname() ++ "_foo/"},
     etap:ok(couch_rep_httpc:db_exists(Req1), "db_exists true check"),
     etap:is(couch_rep_httpc:db_exists(Req2), false, "db_exists false check").
