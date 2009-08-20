@@ -123,7 +123,7 @@ couchTests.update_documents = function(debug) {
   
   // _update honors full commit if you need it to
   xhr = CouchDB.request("PUT", "/test_suite_db/_design/update/_update/bump-counter/"+docid, {
-    headers : {"X-Couch-Full-Commit":"false"}
+    headers : {"X-Couch-Full-Commit":"true"}
   });
   
   doc = db.open(docid);
