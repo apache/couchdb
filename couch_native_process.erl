@@ -81,7 +81,7 @@ prompt(Pid, Data) when is_pid(Pid), is_list(Data) ->
         _ ->
             ok % Not listing
     end,
-    {NewState, Resp} = run(State, Data),
+    {NewState, Resp} = run(State, to_binary(Data)),
     put(?STATE, NewState),
     case Resp of
         {error, Reason} ->
@@ -345,3 +345,21 @@ start_list_resp(Self, Sig) ->
         _ ->
             ok
     end.
+
+to_binary({Data}) ->
+    Pred = fun({Key, Value}) ->
+        {to_binary(Key), to_binary(Value)}
+    end,
+    {lists:map(Pred, Data)};
+to_binary(Data) when is_list(Data) ->
+    lists:map(fun to_binary/1, Data);
+to_binary(null) ->
+    null;
+to_binary(true) ->
+    true;
+to_binary(false) ->
+    false;
+to_binary(Data) when is_atom(Data) ->
+    list_to_binary(atom_to_list(Data));
+to_binary(Data) ->
+    Data.
