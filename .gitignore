@@ -54,6 +54,8 @@ src/couchdb/couchjs
 src/couchdb/edoc-info
 src/couchdb/erlang.png
 src/couchdb/stylesheet.css
+src/couchdb/priv/.deps/
+src/couchdb/priv/couchspawnkillable
 test/local.ini
 share/server/main.js
 
