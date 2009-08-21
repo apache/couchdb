@@ -168,7 +168,7 @@ merge(_, V1, V0) ->
     V0 ++ ", " ++ V1.
 
 normalize(K) when is_list(K) ->
-    mochiweb_util:to_lower(K);
+    string:to_lower(K);
 normalize(K) when is_atom(K) ->
     normalize(atom_to_list(K));
 normalize(K) when is_binary(K) ->
