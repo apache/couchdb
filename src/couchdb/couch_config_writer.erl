@@ -140,7 +140,7 @@ parse_module(Line, OldSection) ->
         nomatch ->
             OldSection;
         {match, [{Start, Length}]} ->
-            string:substr(Line, Start+1, Length-1)
+            string:substr(Line, Start+1, Length)
     end.
 
 %% @spec parse_variable(Line::string(), Option::string(), Value::string()) ->
