@@ -199,6 +199,7 @@ handle_response({error, Reason}, State) ->
     {stop, {error, Reason}, State};
 handle_response(<<"\n">>, State) ->
     ?LOG_DEBUG("got a heartbeat from the remote server", []),
+    ok = maybe_stream_next(State),
     {noreply, State};
 handle_response(<<"{\"results\":[\n">>, State) ->
     ok = maybe_stream_next(State),
