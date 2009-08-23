@@ -16,11 +16,11 @@
 -export([oauth_authentication_handler/1, handle_oauth_req/1, consumer_lookup/2]).
 
 % OAuth auth handler using per-node user db
-oauth_authentication_handler(#httpd{method=Method}=Req) ->
+oauth_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
     serve_oauth(Req, fun(URL, Params, Consumer, Signature) ->
         AccessToken = proplists:get_value("oauth_token", Params),
         TokenSecret = couch_config:get("oauth_token_secrets", AccessToken),
-        case oauth:verify(Signature, atom_to_list(Method), URL, Params, Consumer, TokenSecret) of
+        case oauth:verify(Signature, atom_to_list(MochiReq:get(method)), URL, Params, Consumer, TokenSecret) of
             true ->
                 set_user_ctx(Req, AccessToken);
             false ->
