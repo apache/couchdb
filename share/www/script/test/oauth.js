@@ -133,6 +133,10 @@ couchTests.oauth = function(debug) {
           xhr = oauthRequest("http://" + host + "/_session?foo=bar", message, accessor);
           T(xhr.status == expectedCode);
 
+          // Test HEAD method
+          xhr = oauthRequest("http://" + host + "/_session?foo=bar", message, accessor, "HEAD");
+          T(xhr.status == expectedCode);
+
           // Replication
           var result = CouchDB.replicate(dbPair.source, dbPair.target);
           T(result.ok);
