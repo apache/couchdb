@@ -174,6 +174,8 @@ calculate_new_high_seq(#state{requested_seqs=[], opened_seqs=[Open|_]}) ->
 calculate_new_high_seq(#state{requested_seqs=[Req|_], opened_seqs=[Open|_]})
         when Req < Open ->
     0;
+calculate_new_high_seq(#state{opened_seqs=[]}) ->
+    0;
 calculate_new_high_seq(State) ->
     hd(State#state.opened_seqs).
 
