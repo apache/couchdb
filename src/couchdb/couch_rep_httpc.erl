@@ -92,7 +92,7 @@ process_response({ok, Status, Headers, Body}, Req) ->
     Code = list_to_integer(Status),
     if Code =:= 200; Code =:= 201 ->
         ?JSON_DECODE(maybe_decompress(Headers, Body));
-    Code =:= 301 ->
+    Code =:= 301; Code =:= 302 ->
         MochiHeaders = mochiweb_headers:make(Headers),
         RedirectUrl = mochiweb_headers:get_value("Location", MochiHeaders),
         do_request(Req#http_db{url = RedirectUrl});
