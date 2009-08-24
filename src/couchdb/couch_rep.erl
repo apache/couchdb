@@ -15,7 +15,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, 
     code_change/3]).
 
--export([replicate/2]).
+-export([replicate/2, checkpoint/1]).
 
 -include("couch_db.hrl").
 
@@ -28,6 +28,7 @@
     source,
     target,
     init_args,
+    checkpoint_scheduled = nil,
 
     start_seq,
     history,
@@ -72,6 +73,9 @@ replicate({Props}=PostBody, UserCtx) ->
     false ->
         get_result(Server, PostBody, UserCtx)
     end.
+
+checkpoint(Server) ->
+    gen_server:cast(Server, do_checkpoint).
 
 get_result(Server, PostBody, UserCtx) ->
     try gen_server:call(Server, get_result, infinity) of
@@ -137,6 +141,7 @@ do_init([RepId, {PostProps}, UserCtx] = InitArgs) ->
         target = Target,
         init_args = InitArgs,
         stats = Stats,
+        checkpoint_scheduled = nil,
 
         start_seq = StartSeq,
         history = History,
@@ -154,19 +159,22 @@ handle_call(get_result, From, State) ->
     Listeners = State#state.listeners,
     {noreply, State#state{listeners=[From|Listeners]}}.
 
+handle_cast(do_checkpoint, State) ->
+    {noreply, do_checkpoint(State)};
+
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info({missing_revs_checkpoint, SourceSeq}, State) ->
     couch_task_status:update("MR Processed source update #~p", [SourceSeq]),
-    {noreply, do_checkpoint(State#state{committed_seq = SourceSeq})};
+    {noreply, schedule_checkpoint(State#state{committed_seq = SourceSeq})};
 
 handle_info({writer_checkpoint, SourceSeq}, #state{committed_seq=N} = State)
         when SourceSeq > N ->
     MissingRevs = State#state.missing_revs,
     ok = gen_server:cast(MissingRevs, {update_committed_seq, SourceSeq}),
     couch_task_status:update("W Processed source update #~p", [SourceSeq]),
-    {noreply, do_checkpoint(State#state{committed_seq = SourceSeq})};
+    {noreply, schedule_checkpoint(State#state{committed_seq = SourceSeq})};
 handle_info({writer_checkpoint, _}, State) ->
     {noreply, State};
 
@@ -190,6 +198,7 @@ handle_info({'EXIT', Pid, Reason}, State) ->
 
 terminate(normal, State) ->
     #state{
+        checkpoint_scheduled = TRef,
         checkpoint_history = CheckpointHistory,
         committed_seq = NewSeq,
         listeners = Listeners,
@@ -197,7 +206,8 @@ terminate(normal, State) ->
         target = Target,
         stats = Stats,
         source_log = #doc{body={OldHistory}}
-    } = State,
+    } = do_checkpoint(State),
+    timer:cancel(TRef),
     couch_task_status:update("Finishing"),
     ets:delete(Stats),
     close_db(Target),
@@ -414,6 +424,18 @@ open_db(<<DbName/binary>>, UserCtx) ->
     {not_found, no_db_file} -> throw({db_not_found, DbName})
     end.
 
+schedule_checkpoint(#state{checkpoint_scheduled = nil} = State) ->
+    Server = self(),
+    case timer:apply_after(5000, couch_rep, checkpoint, [Server]) of
+    {ok, TRef} ->
+        State#state{checkpoint_scheduled = TRef};
+    Error ->
+        ?LOG_ERROR("tried to schedule a checkpoint but got ~p", [Error]),
+        State
+    end;
+schedule_checkpoint(State) ->
+    State.
+
 do_checkpoint(State) ->
     #state{
         source = Source,
@@ -466,6 +488,7 @@ do_checkpoint(State) ->
     {TgtRevPos,TgtRevId} =
         update_local_doc(Target, TargetLog#doc{body=NewRepHistory}),
     State#state{
+        checkpoint_scheduled = nil,
         checkpoint_history = NewRepHistory,
         source_log = SourceLog#doc{revs={SrcRevPos, [SrcRevId]}},
         target_log = TargetLog#doc{revs={TgtRevPos, [TgtRevId]}}
