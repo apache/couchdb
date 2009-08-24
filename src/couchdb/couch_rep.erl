@@ -462,9 +462,9 @@ do_checkpoint(State) ->
 
     try
     {SrcRevPos,SrcRevId} =
-        update_doc(Source, SourceLog#doc{body=NewRepHistory}, []),
+        update_local_doc(Source, SourceLog#doc{body=NewRepHistory}),
     {TgtRevPos,TgtRevId} =
-        update_doc(Target, TargetLog#doc{body=NewRepHistory}, []),
+        update_local_doc(Target, TargetLog#doc{body=NewRepHistory}),
     State#state{
         checkpoint_history = NewRepHistory,
         source_log = SourceLog#doc{revs={SrcRevPos, [SrcRevId]}},
@@ -504,20 +504,33 @@ ensure_full_commit(#http_db{} = Db) ->
     true = proplists:get_value(<<"ok">>, ResultProps),
     proplists:get_value(<<"instance_start_time">>, ResultProps);
 ensure_full_commit(Db) ->
-    {ok, StartTime} = couch_db:ensure_full_commit(Db),
-    StartTime.
+    {ok, NewDb} = couch_db:open(Db#db.name, []),
+    UpdateSeq = couch_db:get_update_seq(Db),
+    CommitSeq = couch_db:get_committed_update_seq(NewDb),
+    InstanceStartTime = NewDb#db.instance_start_time,
+    couch_db:close(NewDb),
+    if UpdateSeq > CommitSeq ->
+        ?LOG_DEBUG("replication needs a full commit: update ~p commit ~p",
+            [UpdateSeq, CommitSeq]),
+        {ok, NewTime} = couch_db:ensure_full_commit(Db),
+        NewTime;
+    true ->
+        ?LOG_DEBUG("replication doesn't need a full commit", []),
+        InstanceStartTime
+    end.
 
-update_doc(#http_db{} = Db, #doc{id=DocId} = Doc, []) ->
+update_local_doc(#http_db{} = Db, #doc{id=DocId} = Doc) ->
     Req = Db#http_db{
         resource = couch_util:url_encode(DocId),
         method = put,
-        body = couch_doc:to_json_obj(Doc, [attachments])
+        body = couch_doc:to_json_obj(Doc, [attachments]),
+        headers = [{"x-couch-full-commit", "false"} | Db#http_db.headers]
     },
     {ResponseMembers} = couch_rep_httpc:request(Req),
     Rev = proplists:get_value(<<"rev">>, ResponseMembers),
     couch_doc:parse_rev(Rev);
-update_doc(Db, Doc, Options) ->
-    {ok, Result} = couch_db:update_doc(Db, Doc, Options),
+update_local_doc(Db, Doc) ->
+    {ok, Result} = couch_db:update_doc(Db, Doc, [delay_commit]),
     Result.
 
 up_to_date(#http_db{}, _Seq) ->
