@@ -130,7 +130,6 @@ handle_next_docs(_From, State) ->
         gen_server:reply(ReaderFrom, ok);
     true -> ok end,
     NewState = State#state{count=0, reader_from=nil, docs=queue:new()},
-    ?LOG_INFO("replying to next_docs with HighSeq ~p", [calculate_new_high_seq(State)]),
     {reply, {calculate_new_high_seq(State), queue:to_list(Docs)}, NewState}.
 
 handle_open_remote_doc(Id, Seq, Revs, From, #state{monitor_count=N} = State)
