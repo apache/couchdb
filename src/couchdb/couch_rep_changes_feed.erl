@@ -67,7 +67,7 @@ init([_Parent, #http_db{}=Source, Since, PostProps]) ->
     {ibrowse_async_headers, ReqId, "200", _} ->
         ibrowse:stream_next(ReqId),
         {ok, #state{conn=Pid, last_seq=Since, reqid=ReqId}};
-    {ibrowse_async_headers, ReqId, "301", Hdrs} ->
+    {ibrowse_async_headers, ReqId, Code, Hdrs} when Code=="301"; Code=="302" ->
         catch ibrowse:stop_worker_process(Pid),
         Url2 = mochiweb_headers:get_value("Location", mochiweb_headers:make(Hdrs)),
         %% TODO use couch_httpc:request instead of start_http_request
