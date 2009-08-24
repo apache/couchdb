@@ -148,6 +148,7 @@ get_missing_revs(#http_db{}=Target, Changes) ->
     Transform = fun({[{<<"seq">>,_}, {<<"id">>,Id}, {<<"changes">>,C}]}) ->
         {Id, [couch_doc:rev_to_str(R) || {[{<<"rev">>, R}]} <- C]} end,
     IdRevsList = [Transform(Change) || Change <- Changes],
+    SeqDict = changes_dictionary(Changes),
     {[{<<"seq">>, HighSeq}, _, _]} = lists:last(Changes),
     Request = Target#http_db{
         resource = "_missing_revs",
@@ -156,16 +157,23 @@ get_missing_revs(#http_db{}=Target, Changes) ->
     },
     {Resp} = couch_rep_httpc:request(Request),
     {MissingRevs} = proplists:get_value(<<"missing_revs">>, Resp),
-    X = [{Id, couch_doc:parse_revs(RevStrs)} || {Id,RevStrs} <- MissingRevs],
+    X = [{Id, dict:fetch(Id, SeqDict), couch_doc:parse_revs(RevStrs)} ||
+        {Id,RevStrs} <- MissingRevs],
     {HighSeq, X};
         
 get_missing_revs(Target, Changes) ->
     Transform = fun({[{<<"seq">>,_}, {<<"id">>,Id}, {<<"changes">>,C}]}) ->
         {Id, [R || {[{<<"rev">>, R}]} <- C]} end,
     IdRevsList = [Transform(Change) || Change <- Changes],
+    SeqDict = changes_dictionary(Changes),
     {[{<<"seq">>, HighSeq}, _, _]} = lists:last(Changes),
     {ok, Results} = couch_db:get_missing_revs(Target, IdRevsList),
-    {HighSeq, Results}.
+    {HighSeq, [{Id, dict:fetch(Id, SeqDict), Revs} || {Id, Revs} <- Results]}.
+
+changes_dictionary(ChangeList) ->
+    KVs = [{proplists:get_value(<<"id">>,C), proplists:get_value(<<"seq">>,C)}
+        || {C} <- ChangeList],
+    dict:from_list(KVs).
 
 %% save a checkpoint if no revs are missing on target so we don't
 %% rescan metadata unnecessarily
