@@ -279,7 +279,7 @@ by_seq_loop(Server, Source, StartSeq) ->
             {<<"id">>, Id},
             {<<"changes">>, [{[{<<"rev">>,R}]} || R <- ParsedRevs]}
         ]},
-        gen_server:call(Server, {add_change, Change}),
+        gen_server:call(Server, {add_change, Change}, infinity),
         Seq
     end, 0, Rows),
     by_seq_loop(Server, Source, EndSeq+1).
