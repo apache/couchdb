@@ -244,18 +244,19 @@ reader_loop(ReaderServer, Source, MissingRevsServer) ->
         % to be safe, make sure Results are sorted by source_seq
         SortedIdsRevs = lists:keysort(2, IdsRevs),
         RequestSeqs = [S || {_,S,_} <- SortedIdsRevs],
-        gen_server:call(ReaderServer, {add_request_seqs, RequestSeqs}),
+        gen_server:call(ReaderServer, {add_request_seqs, RequestSeqs}, infinity),
         case Source of
         #http_db{} ->
-            [gen_server:call(ReaderServer, {open_remote_doc, Id, Seq, Revs})
-                || {Id,Seq,Revs} <- SortedIdsRevs],
+            [gen_server:call(ReaderServer, {open_remote_doc, Id, Seq, Revs},
+                infinity) || {Id,Seq,Revs} <- SortedIdsRevs],
             reader_loop(ReaderServer, Source, MissingRevsServer);
         _Local ->
             Source2 = maybe_reopen_db(Source, HighSeq),
             lists:foreach(fun({Id,Seq,Revs}) ->
                 {ok, Docs} = couch_db:open_doc_revs(Source2, Id, Revs, [latest]),
                 JustTheDocs = [Doc || {ok, Doc} <- Docs],
-                gen_server:call(ReaderServer, {add_docs, Seq, JustTheDocs})
+                gen_server:call(ReaderServer, {add_docs, Seq, JustTheDocs},
+                    infinity)
             end, SortedIdsRevs),
             reader_loop(ReaderServer, Source2, MissingRevsServer)
         end
@@ -271,6 +272,6 @@ spawn_document_request(Source, Id, Seq, Revs) ->
     Server = self(),
     SpawnFun = fun() ->
         Results = open_doc_revs(Source, Id, Revs),
-        gen_server:call(Server, {add_docs, Seq, Results})
+        gen_server:call(Server, {add_docs, Seq, Results}, infinity)
     end,
     spawn_monitor(SpawnFun).
