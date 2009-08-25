@@ -97,7 +97,12 @@ init([_Parent, Source, Since, PostProps]) ->
     false ->
         spawn_link(fun() -> send_local_changes_once(Server, Source, Since) end);
     true ->
-        spawn_link(fun() -> send_local_changes_forever(Server, Source, Since) end)
+        spawn_link(fun() ->
+            Self = self(),
+            {ok, _} = couch_db_update_notifier:start_link(fun(Msg) ->
+                local_update_notification(Self, Source#db.name, Msg) end),
+            send_local_changes_forever(Server, Source, Since)
+        end)
     end,
     {ok, #state{changes_loop=ChangesPid}}.
 
@@ -312,9 +317,6 @@ maybe_stream_next(_) ->
 
 send_local_changes_forever(Server, Db, Since) ->
     #db{name = DbName, user_ctx = UserCtx} = Db,
-    Self = self(),
-    {ok, _} = couch_db_update_notifier:start_link(
-        fun(Msg) -> local_update_notification(Self, DbName, Msg) end),
     {ok, NewSeq} = send_local_changes_once(Server, Db, Since),
     couch_db:close(Db),
     ok = wait_db_updated(),
