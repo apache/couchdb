@@ -48,7 +48,8 @@ write_docs(#http_db{} = Db, Docs) ->
     ErrorsJson = couch_rep_httpc:request(Db#http_db{
         resource = "_bulk_docs",
         method = post,
-        body = {[{new_edits, false}, {docs, JsonDocs}]}
+        body = {[{new_edits, false}, {docs, JsonDocs}]},
+        headers = [{"x-couch-full-commit", "false"} | Db#http_db.headers]
     }),
     ErrorsList =
     lists:map(
@@ -62,4 +63,4 @@ write_docs(#http_db{} = Db, Docs) ->
         end, ErrorsJson),
     {ok, ErrorsList};
 write_docs(Db, Docs) ->
-    couch_db:update_docs(Db, Docs, [], replicated_changes).
+    couch_db:update_docs(Db, Docs, [delay_commit], replicated_changes).

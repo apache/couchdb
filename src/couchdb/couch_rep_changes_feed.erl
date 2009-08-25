@@ -67,7 +67,7 @@ init([_Parent, #http_db{}=Source, Since, PostProps]) ->
     {ibrowse_async_headers, ReqId, "200", _} ->
         ibrowse:stream_next(ReqId),
         {ok, #state{conn=Pid, last_seq=Since, reqid=ReqId}};
-    {ibrowse_async_headers, ReqId, "301", Hdrs} ->
+    {ibrowse_async_headers, ReqId, Code, Hdrs} when Code=="301"; Code=="302" ->
         catch ibrowse:stop_worker_process(Pid),
         Url2 = mochiweb_headers:get_value("Location", mochiweb_headers:make(Hdrs)),
         %% TODO use couch_httpc:request instead of start_http_request
@@ -97,7 +97,12 @@ init([_Parent, Source, Since, PostProps]) ->
     false ->
         spawn_link(fun() -> send_local_changes_once(Server, Source, Since) end);
     true ->
-        spawn_link(fun() -> send_local_changes_forever(Server, Source, Since) end)
+        spawn_link(fun() ->
+            Self = self(),
+            {ok, _} = couch_db_update_notifier:start_link(fun(Msg) ->
+                local_update_notification(Self, Source#db.name, Msg) end),
+            send_local_changes_forever(Server, Source, Since)
+        end)
     end,
     {ok, #state{changes_loop=ChangesPid}}.
 
@@ -279,7 +284,7 @@ by_seq_loop(Server, Source, StartSeq) ->
             {<<"id">>, Id},
             {<<"changes">>, [{[{<<"rev">>,R}]} || R <- ParsedRevs]}
         ]},
-        gen_server:call(Server, {add_change, Change}),
+        gen_server:call(Server, {add_change, Change}, infinity),
         Seq
     end, 0, Rows),
     by_seq_loop(Server, Source, EndSeq+1).
@@ -312,9 +317,6 @@ maybe_stream_next(_) ->
 
 send_local_changes_forever(Server, Db, Since) ->
     #db{name = DbName, user_ctx = UserCtx} = Db,
-    Self = self(),
-    {ok, _} = couch_db_update_notifier:start_link(
-        fun(Msg) -> local_update_notification(Self, DbName, Msg) end),
     {ok, NewSeq} = send_local_changes_once(Server, Db, Since),
     couch_db:close(Db),
     ok = wait_db_updated(),

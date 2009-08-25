@@ -15,7 +15,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, 
     code_change/3]).
 
--export([replicate/2]).
+-export([replicate/2, checkpoint/1]).
 
 -include("couch_db.hrl").
 
@@ -28,6 +28,7 @@
     source,
     target,
     init_args,
+    checkpoint_scheduled = nil,
 
     start_seq,
     history,
@@ -72,6 +73,9 @@ replicate({Props}=PostBody, UserCtx) ->
     false ->
         get_result(Server, PostBody, UserCtx)
     end.
+
+checkpoint(Server) ->
+    gen_server:cast(Server, do_checkpoint).
 
 get_result(Server, PostBody, UserCtx) ->
     try gen_server:call(Server, get_result, infinity) of
@@ -137,6 +141,7 @@ do_init([RepId, {PostProps}, UserCtx] = InitArgs) ->
         target = Target,
         init_args = InitArgs,
         stats = Stats,
+        checkpoint_scheduled = nil,
 
         start_seq = StartSeq,
         history = History,
@@ -154,19 +159,22 @@ handle_call(get_result, From, State) ->
     Listeners = State#state.listeners,
     {noreply, State#state{listeners=[From|Listeners]}}.
 
+handle_cast(do_checkpoint, State) ->
+    {noreply, do_checkpoint(State)};
+
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info({missing_revs_checkpoint, SourceSeq}, State) ->
     couch_task_status:update("MR Processed source update #~p", [SourceSeq]),
-    {noreply, do_checkpoint(State#state{committed_seq = SourceSeq})};
+    {noreply, schedule_checkpoint(State#state{committed_seq = SourceSeq})};
 
 handle_info({writer_checkpoint, SourceSeq}, #state{committed_seq=N} = State)
         when SourceSeq > N ->
     MissingRevs = State#state.missing_revs,
     ok = gen_server:cast(MissingRevs, {update_committed_seq, SourceSeq}),
     couch_task_status:update("W Processed source update #~p", [SourceSeq]),
-    {noreply, do_checkpoint(State#state{committed_seq = SourceSeq})};
+    {noreply, schedule_checkpoint(State#state{committed_seq = SourceSeq})};
 handle_info({writer_checkpoint, _}, State) ->
     {noreply, State};
 
@@ -188,41 +196,12 @@ handle_info({'EXIT', Pid, Reason}, State) ->
     ?LOG_ERROR("exit of linked Pid ~p with reason ~p", [Pid, Reason]),
     {stop, Reason, State}.
 
-terminate(normal, State) ->
-    #state{
-        checkpoint_history = CheckpointHistory,
-        committed_seq = NewSeq,
-        listeners = Listeners,
-        source = Source,
-        target = Target,
-        stats = Stats,
-        source_log = #doc{body={OldHistory}}
-    } = State,
-    couch_task_status:update("Finishing"),
-    ets:delete(Stats),
-    close_db(Target),
+terminate(normal, #state{checkpoint_scheduled=nil} = State) ->
+    do_terminate(State);
     
-    NewRepHistory = case CheckpointHistory of
-    nil ->
-        {[{<<"no_changes">>, true} | OldHistory]};
-    _Else ->
-        CheckpointHistory
-    end,
-
-    %% reply to original requester
-    [Original|OtherListeners] = lists:reverse(Listeners),
-    gen_server:reply(Original, {ok, NewRepHistory}),
-
-    %% maybe trigger another replication. If this replicator uses a local
-    %% source Db, changes to that Db since we started will not be included in
-    %% this pass.
-    case up_to_date(Source, NewSeq) of
-        true ->
-            [gen_server:reply(R, {ok, NewRepHistory}) || R <- OtherListeners];
-        false ->
-            [gen_server:reply(R, retry) || R <- OtherListeners]
-    end,
-    close_db(Source);
+terminate(normal, State) ->
+    timer:cancel(State#state.checkpoint_scheduled),
+    do_terminate(do_checkpoint(State));
 
 terminate(Reason, State) ->
     #state{
@@ -330,6 +309,42 @@ dbinfo(Db) ->
     {ok, Info} = couch_db:get_db_info(Db),
     Info.
 
+do_terminate(State) ->
+    #state{
+        checkpoint_history = CheckpointHistory,
+        committed_seq = NewSeq,
+        listeners = Listeners,
+        source = Source,
+        target = Target,
+        stats = Stats,
+        source_log = #doc{body={OldHistory}}
+    } = State,
+    couch_task_status:update("Finishing"),
+    ets:delete(Stats),
+    close_db(Target),
+    
+    NewRepHistory = case CheckpointHistory of
+    nil ->
+        {[{<<"no_changes">>, true} | OldHistory]};
+    _Else ->
+        CheckpointHistory
+    end,
+
+    %% reply to original requester
+    [Original|OtherListeners] = lists:reverse(Listeners),
+    gen_server:reply(Original, {ok, NewRepHistory}),
+
+    %% maybe trigger another replication. If this replicator uses a local
+    %% source Db, changes to that Db since we started will not be included in
+    %% this pass.
+    case up_to_date(Source, NewSeq) of
+        true ->
+            [gen_server:reply(R, {ok, NewRepHistory}) || R <- OtherListeners];
+        false ->
+            [gen_server:reply(R, retry) || R <- OtherListeners]
+    end,
+    close_db(Source).
+
 has_session_id(_SessionId, []) ->
     false;
 has_session_id(SessionId, [{Props} | Rest]) ->
@@ -343,6 +358,7 @@ has_session_id(SessionId, [{Props} | Rest]) ->
 make_replication_id({Props}, UserCtx) ->
     %% funky algorithm to preserve backwards compatibility
     {ok, HostName} = inet:gethostname(),
+    % Port = mochiweb_socket_server:get(couch_httpd, port),
     Src = get_rep_endpoint(UserCtx, proplists:get_value(<<"source">>, Props)),
     Tgt = get_rep_endpoint(UserCtx, proplists:get_value(<<"target">>, Props)),    
     couch_util:to_hex(erlang:md5(term_to_binary([HostName, Src, Tgt]))).
@@ -414,6 +430,18 @@ open_db(<<DbName/binary>>, UserCtx) ->
     {not_found, no_db_file} -> throw({db_not_found, DbName})
     end.
 
+schedule_checkpoint(#state{checkpoint_scheduled = nil} = State) ->
+    Server = self(),
+    case timer:apply_after(5000, couch_rep, checkpoint, [Server]) of
+    {ok, TRef} ->
+        State#state{checkpoint_scheduled = TRef};
+    Error ->
+        ?LOG_ERROR("tried to schedule a checkpoint but got ~p", [Error]),
+        State
+    end;
+schedule_checkpoint(State) ->
+    State.
+
 do_checkpoint(State) ->
     #state{
         source = Source,
@@ -429,7 +457,7 @@ do_checkpoint(State) ->
         stats = Stats
     } = State,
     ?LOG_INFO("recording a checkpoint at source update_seq ~p", [NewSeqNum]),
-    RecordSeqNum = case commit_to_both(Source, Target) of
+    RecordSeqNum = case commit_to_both(Source, Target, NewSeqNum) of
     {SrcInstanceStartTime, TgtInstanceStartTime} ->
         NewSeqNum;
     _Else ->
@@ -462,10 +490,11 @@ do_checkpoint(State) ->
 
     try
     {SrcRevPos,SrcRevId} =
-        update_doc(Source, SourceLog#doc{body=NewRepHistory}, []),
+        update_local_doc(Source, SourceLog#doc{body=NewRepHistory}),
     {TgtRevPos,TgtRevId} =
-        update_doc(Target, TargetLog#doc{body=NewRepHistory}, []),
+        update_local_doc(Target, TargetLog#doc{body=NewRepHistory}),
     State#state{
+        checkpoint_scheduled = nil,
         checkpoint_history = NewRepHistory,
         source_log = SourceLog#doc{revs={SrcRevPos, [SrcRevId]}},
         target_log = TargetLog#doc{revs={TgtRevPos, [TgtRevId]}}
@@ -476,11 +505,11 @@ do_checkpoint(State) ->
     State
     end.
 
-commit_to_both(Source, Target) ->
+commit_to_both(Source, Target, RequiredSeq) ->
     % commit the src async
     ParentPid = self(),
     SrcCommitPid = spawn_link(fun() ->
-            ParentPid ! {self(), ensure_full_commit(Source)} end),
+            ParentPid ! {self(), ensure_full_commit(Source, RequiredSeq)} end),
 
     % commit tgt sync
     TargetStartTime = ensure_full_commit(Target),
@@ -494,8 +523,8 @@ commit_to_both(Source, Target) ->
     end,
     {SourceStartTime, TargetStartTime}.
     
-ensure_full_commit(#http_db{} = Db) ->
-    Req = Db#http_db{
+ensure_full_commit(#http_db{} = Target) ->
+    Req = Target#http_db{
         resource = "_ensure_full_commit",
         method = post,
         body = true
@@ -503,21 +532,58 @@ ensure_full_commit(#http_db{} = Db) ->
     {ResultProps} = couch_rep_httpc:request(Req),
     true = proplists:get_value(<<"ok">>, ResultProps),
     proplists:get_value(<<"instance_start_time">>, ResultProps);
-ensure_full_commit(Db) ->
-    {ok, StartTime} = couch_db:ensure_full_commit(Db),
-    StartTime.
+ensure_full_commit(Target) ->
+    {ok, NewDb} = couch_db:open(Target#db.name, []),
+    UpdateSeq = couch_db:get_update_seq(Target),
+    CommitSeq = couch_db:get_committed_update_seq(NewDb),
+    InstanceStartTime = NewDb#db.instance_start_time,
+    couch_db:close(NewDb),
+    if UpdateSeq > CommitSeq ->
+        ?LOG_DEBUG("replication needs a full commit: update ~p commit ~p",
+            [UpdateSeq, CommitSeq]),
+        {ok, DbStartTime} = couch_db:ensure_full_commit(Target),
+        DbStartTime;
+    true ->
+        ?LOG_DEBUG("replication doesn't need a full commit", []),
+        InstanceStartTime
+    end.
 
-update_doc(#http_db{} = Db, #doc{id=DocId} = Doc, []) ->
+ensure_full_commit(#http_db{} = Source, RequiredSeq) ->
+    Req = Source#http_db{
+        resource = "_ensure_full_commit",
+        method = post,
+        body = true,
+        qs = [{seq, RequiredSeq}]
+    },
+    {ResultProps} = couch_rep_httpc:request(Req),
+    case proplists:get_value(<<"ok">>, ResultProps) of
+    true ->
+        proplists:get_value(<<"instance_start_time">>, ResultProps);
+    undefined -> nil end;
+ensure_full_commit(Source, RequiredSeq) ->
+    {ok, NewDb} = couch_db:open(Source#db.name, []),
+    CommitSeq = couch_db:get_committed_update_seq(NewDb),
+    InstanceStartTime = NewDb#db.instance_start_time,
+    couch_db:close(NewDb),
+    if RequiredSeq > CommitSeq ->
+        {ok, DbStartTime} = couch_db:ensure_full_commit(Source),
+        DbStartTime;
+    true ->
+        InstanceStartTime
+    end.
+
+update_local_doc(#http_db{} = Db, #doc{id=DocId} = Doc) ->
     Req = Db#http_db{
         resource = couch_util:url_encode(DocId),
         method = put,
-        body = couch_doc:to_json_obj(Doc, [attachments])
+        body = couch_doc:to_json_obj(Doc, [attachments]),
+        headers = [{"x-couch-full-commit", "false"} | Db#http_db.headers]
     },
     {ResponseMembers} = couch_rep_httpc:request(Req),
     Rev = proplists:get_value(<<"rev">>, ResponseMembers),
     couch_doc:parse_rev(Rev);
-update_doc(Db, Doc, Options) ->
-    {ok, Result} = couch_db:update_doc(Db, Doc, Options),
+update_local_doc(Db, Doc) ->
+    {ok, Result} = couch_db:update_doc(Db, Doc, [delay_commit]),
     Result.
 
 up_to_date(#http_db{}, _Seq) ->
