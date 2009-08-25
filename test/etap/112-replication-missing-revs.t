@@ -113,8 +113,8 @@ test_multiple_changes(SrcType, TgtType) ->
 test_changes_not_missing(SrcType, TgtType) ->
     %% put identical changes on source and target
     Id = couch_util:new_uuid(),
-    {Id, [Rev]} = Expect = generate_change(Id, {[]}, get_db(source)),
-    {Id, [Rev]} = generate_change(Id, {[]}, get_db(target)),
+    {Id, _Seq, [Rev]} = Expect = generate_change(Id, {[]}, get_db(source)),
+    {Id, _, [Rev]} = generate_change(Id, {[]}, get_db(target)),
 
     %% confirm that this change is not in missing revs feed
     {ok, Pid1} = start_changes_feed(SrcType, 0, false),
@@ -141,9 +141,10 @@ generate_change(Id, EJson) ->
 
 generate_change(Id, EJson, Db) ->
     Doc = couch_doc:from_json_obj(EJson),
+    Seq = get_update_seq(),
     {ok, Rev} = couch_db:update_doc(Db, Doc#doc{id = Id}, [full_commit]),
     couch_db:close(Db),
-    {Id, [Rev]}.
+    {Id, Seq+1, [Rev]}.
 
 get_all_missing_revs(Pid, {HighSeq, Revs}) ->
     case couch_rep_missing_revs:next(Pid) of
@@ -159,6 +160,12 @@ get_db(source) ->
 get_db(target) ->
     {ok, Db} = couch_db:open(<<"etap-test-target">>, []),
     Db.
+
+get_update_seq() ->
+    Db = get_db(source),
+    Seq = couch_db:get_update_seq(Db),
+    couch_db:close(Db),
+    Seq.
 
 setup() ->
     {ok, DbA} = couch_db:create(<<"etap-test-source">>, []),
