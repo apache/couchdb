@@ -327,13 +327,29 @@ db_req(#httpd{path_parts=[_DbName]}=Req, _Db) ->
     send_method_not_allowed(Req, "DELETE,GET,HEAD,POST");
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_ensure_full_commit">>]}=Req, Db) ->
-    % make the batch save
-    committed = couch_batch_save:commit_now(Db#db.name, Db#db.user_ctx),
-    {ok, DbStartTime} = couch_db:ensure_full_commit(Db),
+    UpdateSeq = couch_db:get_update_seq(Db),
+    CommittedSeq = couch_db:get_committed_update_seq(Db),
+    {ok, StartTime} =
+    case couch_httpd:qs_value(Req, "seq") of
+    undefined ->
+        committed = couch_batch_save:commit_now(Db#db.name, Db#db.user_ctx),
+        couch_db:ensure_full_commit(Db);
+    RequiredStr ->
+        RequiredSeq = list_to_integer(RequiredStr),
+        if RequiredSeq > UpdateSeq ->
+            throw({bad_request,
+                "can't do a full commit ahead of current update_seq"});
+        RequiredSeq > CommittedSeq ->
+            % user asked for an explicit sequence, don't commit any batches
+            couch_db:ensure_full_commit(Db);
+        true ->
+            {ok, Db#db.instance_start_time}
+        end
+    end,
     send_json(Req, 201, {[
-            {ok, true},
-            {instance_start_time, DbStartTime}
-        ]});
+        {ok, true},
+        {instance_start_time, StartTime}
+    ]});
 
 db_req(#httpd{path_parts=[_,<<"_ensure_full_commit">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
