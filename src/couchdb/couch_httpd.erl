@@ -153,7 +153,6 @@ handle_request(MochiReq, DefaultFun,
     end,
 
     increment_method_stats(Method1),
-
     % alias HEAD to GET as mochiweb takes care of stripping the body
     Method = case Method1 of
         'HEAD' -> 'GET';
@@ -180,6 +179,8 @@ handle_request(MochiReq, DefaultFun,
             Response
         end
     catch
+        throw:{http_head_abort, Resp0} ->
+            {ok, Resp0};
         throw:Error ->
             ?LOG_DEBUG("Minor error in HTTP request: ~p",[Error]),
             ?LOG_DEBUG("Stacktrace: ~p",[erlang:get_stacktrace()]),
@@ -360,7 +361,12 @@ verify_is_server_admin(#httpd{user_ctx=#user_ctx{roles=Roles}}) ->
 
 start_response_length(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Length) ->
     couch_stats_collector:increment({httpd_status_codes, Code}),
-    {ok, MochiReq:start_response_length({Code, Headers ++ server_header() ++ couch_httpd_auth:cookie_auth_header(Req, Headers), Length})}.
+    Resp = MochiReq:start_response_length({Code, Headers ++ server_header() ++ couch_httpd_auth:cookie_auth_header(Req, Headers), Length}),
+    case MochiReq:get(method) of
+    'HEAD' -> throw({http_head_abort, Resp});
+    _ -> ok
+    end,
+    {ok, Resp}.
 
 send(Resp, Data) ->
     Resp:send(Data),
@@ -368,7 +374,12 @@ send(Resp, Data) ->
 
 start_chunked_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers) ->
     couch_stats_collector:increment({httpd_status_codes, Code}),
-    {ok, MochiReq:respond({Code, Headers ++ server_header() ++ couch_httpd_auth:cookie_auth_header(Req, Headers), chunked})}.
+    Resp = MochiReq:respond({Code, Headers ++ server_header() ++ couch_httpd_auth:cookie_auth_header(Req, Headers), chunked}),
+    case MochiReq:get(method) of
+    'HEAD' -> throw({http_head_abort, Resp});
+    _ -> ok
+    end,
+    {ok, Resp}.
 
 send_chunk(Resp, Data) ->
     Resp:write_chunk(Data),
