@@ -189,6 +189,15 @@ couchTests.changes = function(debug) {
   resp = JSON.parse(req.responseText);
   T(resp.results.length == 1);
   
+  // changes get all_docs style with deleted docs
+  var doc = {a:1};
+  db.save(doc);
+  db.deleteDoc(doc);
+  var req = CouchDB.request("GET", 
+    "/test_suite_db/_changes?filter=changes_filter/bop&style=all_docs");
+  var resp = JSON.parse(req.responseText);
+  TEquals(1, resp.results.length, "should return one result row");
+  
   // test for userCtx
   run_on_modified_server(
     [{section: "httpd",

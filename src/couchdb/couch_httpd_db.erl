@@ -194,7 +194,7 @@ make_filter_funs(Req, Db) ->
         FilterSrc = couch_util:get_nested_json_value({Props}, [<<"filters">>, FName]),
         {ok, Pid} = couch_query_servers:start_filter(Lang, FilterSrc),
         FilterFun = fun(DInfo = #doc_info{revs=[#rev_info{rev=Rev}|_]}) ->
-            {ok, Doc} = couch_db:open_doc(Db, DInfo),
+            {ok, Doc} = couch_db:open_doc(Db, DInfo, [deleted]),
             {ok, Pass} = couch_query_servers:filter_doc(Pid, Doc, Req, Db),
             case Pass of
             true ->
