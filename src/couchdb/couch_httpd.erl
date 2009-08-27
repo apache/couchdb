@@ -135,9 +135,12 @@ handle_request(MochiReq, DefaultFun,
     {FirstPart, _, _} ->
         list_to_binary(FirstPart)
     end,
-    ?LOG_DEBUG("~p ~s ~p~nHeaders: ~p", [
+    ?LOG_INFO("~s - ~p ~s", [
+        MochiReq:get(peer),
         MochiReq:get(method),
-        RawUri,
+        RawUri
+    ]),
+    ?LOG_DEBUG("HTTP ~p~nHeaders: ~p", [
         MochiReq:get(version),
         mochiweb_headers:to_list(MochiReq:get(headers))
     ]),
@@ -151,7 +154,6 @@ handle_request(MochiReq, DefaultFun,
         % possible (if any module references the atom, then it's existing).
         Meth -> couch_util:to_existing_atom(Meth)
     end,
-
     increment_method_stats(Method1),
     % alias HEAD to GET as mochiweb takes care of stripping the body
     Method = case Method1 of
@@ -173,7 +175,7 @@ handle_request(MochiReq, DefaultFun,
     {ok, Resp} =
     try
         case authenticate_request(HttpReq, AuthenticationFuns) of
-        Req when is_record(Req, httpd) ->
+        #httpd{} = Req ->
             HandlerFun(Req);
         Response ->
             Response
@@ -181,6 +183,8 @@ handle_request(MochiReq, DefaultFun,
     catch
         throw:{http_head_abort, Resp0} ->
             {ok, Resp0};
+        exit:normal ->
+            exit(normal);
         throw:Error ->
             ?LOG_DEBUG("Minor error in HTTP request: ~p",[Error]),
             ?LOG_DEBUG("Stacktrace: ~p",[erlang:get_stacktrace()]),
@@ -198,13 +202,7 @@ handle_request(MochiReq, DefaultFun,
             ?LOG_INFO("Stacktrace: ~p",[erlang:get_stacktrace()]),
             send_error(HttpReq, Error)
     end,
-
-    ?LOG_INFO("~s - - ~p ~s ~B", [
-        MochiReq:get(peer),
-        MochiReq:get(method),
-        RawUri,
-        Resp:get(code)
-    ]),
+    ?LOG_INFO("Response code: ~B", [Resp:get(code)]),
     RequestTime = round(timer:now_diff(now(), Begin)/1000),
     couch_stats_collector:record({couchdb, request_time}, RequestTime),
     couch_stats_collector:increment({httpd, requests}),
