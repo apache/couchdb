@@ -100,14 +100,16 @@ process_response({ok, Status, Headers, Body}, Req) ->
         throw(conflict);
     Code >= 400, Code < 500 ->
         ?JSON_DECODE(maybe_decompress(Headers, Body));
-    Code =:= 500; Code =:= 502 ->
+    Code =:= 500; Code =:= 502; Code =:= 503 ->
         #http_db{pause = Pause, retries = Retries} = Req,
         ?LOG_INFO("retrying couch_rep_httpc request in ~p seconds " ++
             % "due to remote server error: ~s~s", [Pause/1000, Req#http_db.url,
             "due to remote server error: ~p Body ~s", [Pause/1000, Code,
             Body]),
         timer:sleep(Pause),
-        do_request(Req#http_db{retries = Retries-1, pause = 2*Pause})
+        do_request(Req#http_db{retries = Retries-1, pause = 2*Pause});
+    true ->
+        exit({http_request_failed, ?l2b(["unhandled response code ", Status])})
     end;
 
 process_response({ibrowse_req_id, Id}, _Req) ->
