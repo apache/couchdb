@@ -188,7 +188,25 @@ couchTests.changes = function(debug) {
   req = CouchDB.request("GET", "/test_suite_db/_changes?filter=changes_filter/dynamic&field=bop");
   resp = JSON.parse(req.responseText);
   T(resp.results.length == 1);
-  
+
+  // error conditions
+
+  // non-existing design doc
+  var req = CouchDB.request("GET", 
+    "/test_suite_db/_changes?filter=nothingtosee/bop");
+  TEquals(400, req.status, "should return 400 for non existant design doc");
+
+  // non-existing filter 
+  var req = CouchDB.request("GET", 
+    "/test_suite_db/_changes?filter=changes_filter/movealong");
+  TEquals(400, req.status, "should return 400 for non existant filter fun");
+
+  // both
+  var req = CouchDB.request("GET", 
+    "/test_suite_db/_changes?filter=nothingtosee/movealong");
+  TEquals(400, req.status, 
+    "should return 400 for non existant design doc and filter fun");
+
   // changes get all_docs style with deleted docs
   var doc = {a:1};
   db.save(doc);
