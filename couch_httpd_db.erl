@@ -72,6 +72,7 @@ start_sending_changes(Resp, _Else) ->
     send_chunk(Resp, "{\"results\":[\n").
 
 handle_changes_req(#httpd{method='GET',path_parts=[DbName|_]}=Req, Db) ->
+    {FilterFun, EndFilterFun} = make_filter_funs(Req, Db),
     StartSeq = list_to_integer(couch_httpd:qs_value(Req, "since", "0")),
     {ok, Resp} = start_json_response(Req, 200),
     ResponseType = couch_httpd:qs_value(Req, "feed", "normal"),
@@ -88,14 +89,16 @@ handle_changes_req(#httpd{method='GET',path_parts=[DbName|_]}=Req, Db) ->
         couch_stats_collector:track_process_count(Self,
                             {httpd, clients_requesting_changes}),
         try
-            keep_sending_changes(Req, Resp, Db, StartSeq, <<"">>, Timeout, TimeoutFun, ResponseType)
+            keep_sending_changes(Req, Resp, Db, StartSeq, <<"">>, Timeout,
+                TimeoutFun, ResponseType, FilterFun, EndFilterFun)
         after
             couch_db_update_notifier:stop(Notify),
             get_rest_db_updated() % clean out any remaining update messages
         end;
     true ->
         {ok, {LastSeq, _Prepend, _, _, _}} =
-                send_changes(Req, Resp, Db, StartSeq, <<"">>, "normal"),
+                send_changes(Req, Resp, Db, StartSeq, <<"">>, "normal",
+                    FilterFun, EndFilterFun),
         end_sending_changes(Resp, LastSeq, ResponseType)
     end;
 
@@ -125,9 +128,9 @@ end_sending_changes(Resp, EndSeq, _Else) ->
     end_json_response(Resp).
 
 keep_sending_changes(#httpd{user_ctx=UserCtx,path_parts=[DbName|_]}=Req, Resp,
-        Db, StartSeq, Prepend, Timeout, TimeoutFun, ResponseType) ->
+        Db, StartSeq, Prepend, Timeout, TimeoutFun, ResponseType, Filter, End) ->
     {ok, {EndSeq, Prepend2, _, _, _}} = send_changes(Req, Resp, Db, StartSeq,
-        Prepend, ResponseType),
+        Prepend, ResponseType, Filter, End),
     couch_db:close(Db),
     if
     EndSeq > StartSeq, ResponseType == "longpoll" ->
@@ -136,7 +139,8 @@ keep_sending_changes(#httpd{user_ctx=UserCtx,path_parts=[DbName|_]}=Req, Resp,
         case wait_db_updated(Timeout, TimeoutFun) of
         updated ->
             {ok, Db2} = couch_db:open(DbName, [{user_ctx, UserCtx}]),
-            keep_sending_changes(Req, Resp, Db2, EndSeq, Prepend2, Timeout, TimeoutFun, ResponseType);
+            keep_sending_changes(Req, Resp, Db2, EndSeq, Prepend2, Timeout,
+                TimeoutFun, ResponseType, Filter, End);
         stop ->
             end_sending_changes(Resp, EndSeq, ResponseType)
         end
@@ -167,15 +171,14 @@ changes_enumerator(DocInfos, {_, Prepend, FilterFun, Resp, _}) ->
         {ok, {Seq, <<",\n">>, FilterFun, Resp, nil}}
     end.
 
-send_changes(Req, Resp, Db, StartSeq, Prepend, ResponseType) ->
+send_changes(Req, Resp, Db, StartSeq, Prepend, ResponseType, FilterFun, End) ->
     Style = list_to_existing_atom(
             couch_httpd:qs_value(Req, "style", "main_only")),
-    {FilterFun, EndFilterFun} = make_filter_funs(Req, Db),
     try
         couch_db:changes_since(Db, Style, StartSeq, fun changes_enumerator/2,
             {StartSeq, Prepend, FilterFun, Resp, ResponseType})
     after
-        EndFilterFun()
+        End()
     end.
 
 make_filter_funs(Req, Db) ->
@@ -189,24 +192,33 @@ make_filter_funs(Req, Db) ->
         fun() -> ok end};
     [DName, FName] ->
         DesignId = <<"_design/", DName/binary>>,
-        #doc{body={Props}} = couch_httpd_db:couch_doc_open(Db, DesignId, nil, []),
-        Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
-        FilterSrc = couch_util:get_nested_json_value({Props}, [<<"filters">>, FName]),
-        {ok, Pid} = couch_query_servers:start_filter(Lang, FilterSrc),
-        FilterFun = fun(DInfo = #doc_info{revs=[#rev_info{rev=Rev}|_]}) ->
-            {ok, Doc} = couch_db:open_doc(Db, DInfo, [deleted]),
-            {ok, Pass} = couch_query_servers:filter_doc(Pid, Doc, Req, Db),
-            case Pass of
-            true ->
-                {[{rev, couch_doc:rev_to_str(Rev)}]};
-            false ->
-                null
-            end
-        end,
-        EndFilterFun = fun() ->
-            couch_query_servers:end_filter(Pid)
-        end,
-        {FilterFun, EndFilterFun};
+        case couch_db:open_doc(Db, DesignId) of
+        {ok, #doc{body={Props}}} ->
+            FilterSrc = try couch_util:get_nested_json_value({Props},
+                [<<"filters">>, FName])
+            catch
+            throw:{not_found, _} ->
+                throw({bad_request, "invalid filter function"})
+            end,
+            Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
+            {ok, Pid} = couch_query_servers:start_filter(Lang, FilterSrc),
+            FilterFun = fun(DInfo = #doc_info{revs=[#rev_info{rev=Rev}|_]}) ->
+                {ok, Doc} = couch_db:open_doc(Db, DInfo, [deleted]),
+                {ok, Pass} = couch_query_servers:filter_doc(Pid, Doc, Req, Db),
+                case Pass of
+                true ->
+                    {[{rev, couch_doc:rev_to_str(Rev)}]};
+                false ->
+                    null
+                end
+            end,
+            EndFilterFun = fun() ->
+                couch_query_servers:end_filter(Pid)
+            end,
+            {FilterFun, EndFilterFun};
+        _Error ->
+            throw({bad_request, "invalid design doc"})
+        end;
     _Else ->
         throw({bad_request, 
             "filter parameter must be of the form `designname/filtername`"})
