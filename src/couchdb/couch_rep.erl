@@ -416,10 +416,7 @@ open_db({Props}, _UserCtx) ->
         auth = AuthProps,
         headers = lists:ukeymerge(1, Headers, DefaultHeaders)
     },
-    case couch_rep_httpc:db_exists(Db) of
-    true -> Db;
-    false -> throw({db_not_found, ?l2b(Url)})
-    end;
+    couch_rep_httpc:db_exists(Db);
 open_db(<<"http://",_/binary>>=Url, _) ->
     open_db({[{<<"url">>,Url}]}, []);
 open_db(<<"https://",_/binary>>=Url, _) ->
