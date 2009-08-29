@@ -324,7 +324,9 @@ CouchDB.createUser = function(username, password, email, roles, basicAuth) {
     }
   }
   var headers = {"Content-Type": "application/x-www-form-urlencoded"};
-  if (!basicAuth) {
+  if (basicAuth) {
+    headers['Authorization'] = basicAuth
+  } else {
     headers['X-CouchDB-WWW-Authenticate'] = 'Cookie';
   }
   
