@@ -45,8 +45,10 @@ special_test_authentication_handler(Req) ->
     end.
 
 basic_username_pw(Req) ->
-    case header_value(Req, "Authorization") of
+    AuthorizationHeader = header_value(Req, "Authorization"),
+    case AuthorizationHeader of
     "Basic " ++ Base64Value ->
+        io:format("~n~nBase64Value: '~p'~n~n", [Base64Value]),
         case string:tokens(?b2l(couch_util:decodeBase64(Base64Value)),":") of
         [User, Pass] ->
             {User, Pass};
@@ -109,29 +111,41 @@ cookie_authentication_handler(Req) ->
 
 % maybe we can use hovercraft to simplify running this view query
 get_user(Db, UserName) ->
-    DesignId = <<"_design/_auth">>,
-    ViewName = <<"users">>,
-    % if the design doc or the view doesn't exist, then make it
-    ensure_users_view_exists(Db, DesignId, ViewName),
-    
-    case (catch couch_view:get_map_view(Db, DesignId, ViewName, nil)) of
-    {ok, View, _Group} ->
-        FoldlFun = fun
-        ({{Key, _DocId}, Value}, _, nil) when Key == UserName -> {ok, Value};
-        (_, _, Acc) -> {stop, Acc}
-        end,
-        case couch_view:fold(View, {UserName, nil}, fwd, FoldlFun, nil) of
-        {ok, {Result}} -> Result;
-        _Else -> nil
-        end;
-    {not_found, _Reason} ->
-        nil
-        % case (catch couch_view:get_reduce_view(Db, DesignId, ViewName, nil)) of
-        % {ok, _ReduceView, _Group} ->
-        %     not_implemented;
-        % {not_found, _Reason} ->
-        %     nil
-        % end
+    % In the future this will be pluggable. For now we check the .ini first,
+    % then fall back to querying the db.
+    io:format("~n~nget-user: '~p'~n", [get_user]),
+    case couch_config:get("admins", ?b2l(UserName)) of
+    "-hashed-" ++ HashedPwdAndSalt ->
+        io:format("hashed: '~p'~n", [hashed]),
+        [HashedPwd, Salt] = string:tokens(HashedPwdAndSalt, ","),
+        [{<<"roles">>, [<<"_admin">>]},
+          {<<"salt">>, ?l2b(Salt)},
+          {<<"password_sha">>, ?l2b(HashedPwd)}];
+    _ ->
+        DesignId = <<"_design/_auth">>,
+        ViewName = <<"users">>,
+        % if the design doc or the view doesn't exist, then make it
+        ensure_users_view_exists(Db, DesignId, ViewName),
+
+        case (catch couch_view:get_map_view(Db, DesignId, ViewName, nil)) of
+        {ok, View, _Group} ->
+            FoldlFun = fun
+            ({{Key, _DocId}, Value}, _, nil) when Key == UserName -> {ok, Value};
+            (_, _, Acc) -> {stop, Acc}
+            end,
+            case couch_view:fold(View, {UserName, nil}, fwd, FoldlFun, nil) of
+            {ok, {Result}} -> Result;
+            _Else -> nil
+            end;
+        {not_found, _Reason} ->
+            nil
+            % case (catch couch_view:get_reduce_view(Db, DesignId, ViewName, nil)) of
+            % {ok, _ReduceView, _Group} ->
+            %     not_implemented;
+            % {not_found, _Reason} ->
+            %     nil
+            % end
+        end
     end.
     
 ensure_users_db_exists(DbName) ->

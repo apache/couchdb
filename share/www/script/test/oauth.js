@@ -36,7 +36,7 @@ couchTests.oauth = function(debug) {
     return secret;
   }
 
-  function oauthRequest(path, message, accessor, method) {
+  function oauthRequest(method, path, message, accessor) {
     message.action = path;
     message.method = method || 'GET';
     OAuth.SignatureMethod.sign(message, accessor);
@@ -59,6 +59,8 @@ couchTests.oauth = function(debug) {
 
   var consumerSecret = generateSecret(64);
   var tokenSecret = generateSecret(64);
+  var admintokenSecret = generateSecret(64);
+  var testadminPassword = "ohsosecret";
 
   var host = CouchDB.host;
   var dbPair = {
@@ -76,24 +78,40 @@ couchTests.oauth = function(debug) {
     target: "http://" + host + "/test_suite_db_b"
   };
 
+  var adminBasicAuthHeaderValue = function() {
+    var retval = 'Basic ' + binb2b64(str2binb("testadmin:" + testadminPassword));
+    return retval;
+  }
+
   // this function will be called on the modified server
   var testFun = function () {
     try {
-      var usersDb = new CouchDB("test_suite_users", {"X-Couch-Full-Commit":"false"});
+      CouchDB.request("PUT", "http://" + host + "/_config/admins/testadmin", {
+        headers: {"X-Couch-Persist": "false"},
+        body: JSON.stringify(testadminPassword)
+      });
+
+      var usersDb = new CouchDB("test_suite_users", {
+        "X-Couch-Full-Commit":"false",
+        "Authorization": adminBasicAuthHeaderValue()
+      });
       usersDb.deleteDb();
       usersDb.createDb();
-      
+        
       // Create a user
-      T(CouchDB.createUser("jason", "testpassword", "test@somemail.com", ['test'], true).ok);
+      T(CouchDB.createUser("jason", "testpassword", "test@somemail.com", ['test'], adminBasicAuthHeaderValue()).ok);
 
       var accessor = {
         consumerSecret: consumerSecret,
         tokenSecret: tokenSecret
       };
+      var adminAccessor = {
+        consumerSecret: consumerSecret,
+        tokenSecret: admintokenSecret
+      };
 
       var signatureMethods = ["PLAINTEXT", "HMAC-SHA1"];
       var consumerKeys = {key: 200, nonexistent_key: 400};
-
       for (var i=0; i<signatureMethods.length; i++) {
         for (var consumerKey in consumerKeys) {
           var expectedCode = consumerKeys[consumerKey];
@@ -108,11 +126,11 @@ couchTests.oauth = function(debug) {
           };
 
           // Get request token via Authorization header
-          xhr = oauthRequest("http://" + host + "/_oauth/request_token", message, accessor);
+          xhr = oauthRequest("GET", "http://" + host + "/_oauth/request_token", message, accessor);
           T(xhr.status == expectedCode);
 
           // GET request token via query parameters
-          xhr = oauthRequest("http://" + host + "/_oauth/request_token", message, accessor, "GET");
+          xhr = oauthRequest("GET", "http://" + host + "/_oauth/request_token", message, accessor);
           T(xhr.status == expectedCode);
 
           responseMessage = OAuth.decodeForm(xhr.responseText);
@@ -122,7 +140,7 @@ couchTests.oauth = function(debug) {
           //xhr = CouchDB.request("GET", authorization_url + '?oauth_token=' + responseMessage.oauth_token);
           //T(xhr.status == expectedCode);
 
-          xhr = oauthRequest("http://" + host + "/_session", message, accessor);
+          xhr = oauthRequest("GET", "http://" + host + "/_session", message, accessor);
           T(xhr.status == expectedCode);
           if (xhr.status == expectedCode == 200) {
             data = JSON.parse(xhr.responseText);
@@ -130,25 +148,49 @@ couchTests.oauth = function(debug) {
             T(data.roles[0] == "test");
           }
 
-          xhr = oauthRequest("http://" + host + "/_session?foo=bar", message, accessor);
+          xhr = oauthRequest("GET", "http://" + host + "/_session?foo=bar", message, accessor);
           T(xhr.status == expectedCode);
 
           // Test HEAD method
-          xhr = oauthRequest("http://" + host + "/_session?foo=bar", message, accessor, "HEAD");
+          xhr = oauthRequest("HEAD", "http://" + host + "/_session?foo=bar", message, accessor);
           T(xhr.status == expectedCode);
 
           // Replication
           var result = CouchDB.replicate(dbPair.source, dbPair.target);
           T(result.ok);
+
+          // Test auth via admin user defined in .ini
+          var message = {
+            parameters: {
+              oauth_signature_method: signatureMethods[i],
+              oauth_consumer_key: consumerKey,
+              oauth_token: "bar",
+              oauth_token_secret: admintokenSecret,
+              oauth_version: "1.0"
+            }
+          };
+          xhr = oauthRequest("GET", "http://" + host + "/_session?foo=bar", message, adminAccessor);
+          if (xhr.status == expectedCode == 200) {
+            data = JSON.parse(xhr.responseText);
+            T(data.name == "testadmin");
+            T(data.roles[0] == "_admin");
+          }
         }
       }
-
     } finally {
+      var xhr = CouchDB.request("DELETE", "http://" + host + "/_config/admins/testadmin", {
+        headers: {
+          "Authorization": adminBasicAuthHeaderValue(),
+          "X-Couch-Persist": "false"
+        }
+      });
+      T(xhr.status == 200);
     }
   };
 
   run_on_modified_server(
-    [{section: "httpd",
+    [
+     {section: "httpd",
       key: "WWW-Authenticate", value: 'Basic realm="administrator",OAuth'},
      {section: "couch_httpd_auth",
       key: "secret", value: generateSecret(64)},
@@ -158,13 +200,15 @@ couchTests.oauth = function(debug) {
       key: "key", value: consumerSecret},
      {section: "oauth_token_users",
       key: "foo", value: "jason"},
+     {section: "oauth_token_users",
+      key: "bar", value: "testadmin"},
      {section: "oauth_token_secrets",
       key: "foo", value: tokenSecret},
+     {section: "oauth_token_secrets",
+      key: "bar", value: admintokenSecret},
      {section: "couch_httpd_oauth",
-      key: "authorization_url", value: authorization_url},
-     {section: "httpd",
-      key: "authentication_handlers",
-      value: "{couch_httpd_oauth, oauth_authentication_handler}, {couch_httpd_auth, default_authentication_handler}"}],
+      key: "authorization_url", value: authorization_url}
+    ],
     testFun
   );
 };
