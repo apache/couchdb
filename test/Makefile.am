@@ -12,11 +12,6 @@
 
 dist_TESTS = runner.sh
 
-CLEANFILES = runner.beam test.ini
-
 EXTRA_DIST = \
-    couch_config_test.erl \
-    couch_config_writer_test.erl \
-    runner.erl \
     runner.sh \
     test.js
