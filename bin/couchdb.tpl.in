@@ -106,9 +106,6 @@ _get_pid () {
 }
 
 _add_config_file () {
-    if test -n "$start_arguments"; then
-        start_arguments="$start_arguments, ";
-    fi
     if test -z "$print_arguments"; then
         print_arguments="$1"
     else
@@ -118,12 +115,12 @@ $1
 EOF
 `"
     fi
-    start_arguments="$start_arguments \\\"$1\\\""
+    start_arguments="$start_arguments $1"
     background_start_arguments="$background_start_arguments -a \\\"$1\\\""
 }
 
 _add_config_dir () {
-    for file in `find "$1" -mindepth 1 -maxdepth 1 -type f`; do
+    for file in `find "$1" -mindepth 1 -maxdepth 1 -type f -name *.ini`; do
         _add_config_file $file
     done
 }
@@ -214,19 +211,8 @@ start_couchdb () {
         touch $PID_FILE
         interactive_option="+Bd -noinput"
     fi
-    command="`%ICU_CONFIG% --invoke` \
-        %ERL% $interactive_option -smp auto -sasl errlog_type error +K true \
-        -pa %localerlanglibdir%/%couchdbebindir% \
-            %localerlanglibdir%/%mochiwebebindir% \
-            %localerlanglibdir%/%ibrowseebindir% \
-            %localerlanglibdir%/%oauthebindir% \
-        -eval \"application:load(ibrowse)\" \
-        -eval \"application:load(oauth)\" \
-        -eval \"application:load(crypto)\" \
-        -eval \"application:load(couch)\" \
-        -eval \"crypto:start()\" \
-        -eval \"ibrowse:start()\" \
-        -eval \"couch_server:start([$start_arguments]), receive done -> done end.\" "
+    command="%ERL% $interactive_option -sasl errlog_type error +K true \
+        -env ERL_LIBS %localerlanglibdir% -couch_ini $start_arguments -s couch"
     if test "$BACKGROUND" = "true" -a "$RECURSED" = "false"; then
         $0 $background_start_arguments -b -r $RESPAWN_TIMEOUT -p $PID_FILE \
             -o $STDOUT_FILE -e $STDERR_FILE -R &
