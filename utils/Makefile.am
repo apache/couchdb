@@ -21,14 +21,12 @@ run: ../bin/couchdb.tpl
 	sed -e "s|%ERL%|$(ERL)|g" \
 	    -e "s|%ICU_CONFIG%|$(ICU_CONFIG)|g" \
 	    -e "s|%bindir%|$(abs_top_srcdir)/bin|g" \
-	    -e "s|%localerlanglibdir%|$(abs_top_srcdir)/src|g" \
-	    -e "s|%mochiwebebindir%|mochiweb|g" \
-	    -e "s|%couchdbebindir%|couchdb|g" \
-	    -e "s|%ibrowseebindir%|ibrowse|g" \
-	    -e "s|%oauthebindir%|erlang-oauth|g" \
 	    -e "s|%defaultini%|default_dev.ini|g" \
 	    -e "s|%localini%|local_dev.ini|g" \
-	    -e "s|%localerlanglibdir%|$(abs_top_srcdir)/src|g" \
+	    -e "s|%localerlanglibdir%|foo -pa $(abs_top_srcdir)\/src\/couchdb \
+									  -pa $(abs_top_srcdir)\/src\/erlang-oauth \
+									  -pa $(abs_top_srcdir)\/src\/ibrowse \
+									  -pa $(abs_top_srcdir)\/src\/mochiweb|g" \
 	    -e "s|%localconfdir%|$(abs_top_srcdir)/etc/couchdb|g" \
 	    -e "s|%localstatelogdir%|$(abs_top_srcdir)/tmp/log|g" \
 	    -e "s|%localstatelibdir%|$(abs_top_srcdir)/tmp/lib|g" \
