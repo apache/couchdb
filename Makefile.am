@@ -56,6 +56,8 @@ CLEANFILES = $(compiled_files) $(doc_base)
 # CLEANFILES = $(doc_modules) edoc-info
 
 source_files = \
+    couch.erl \
+    couch_app.erl \
     couch_btree.erl \
     couch_batch_save.erl \
     couch_batch_save_sup.erl \
@@ -109,6 +111,8 @@ EXTRA_DIST = $(source_files) couch_db.hrl couch_stats.hrl
 
 compiled_files = \
     couch.app \
+    couch.beam \
+    couch_app.beam \
     couch_btree.beam \
     couch_batch_save.beam \
     couch_batch_save_sup.beam \
@@ -189,8 +193,13 @@ compiled_files = \
 #     couch_view.html
 
 couch.app: couch.app.tpl
+	modules=`find . -name "*.erl" -exec basename -s .erl {} \; | tr '\n' ',' | sed "s/,$$//"`; \
 	sed -e "s|%package_name%|@package_name@|g" \
-	    -e "s|%version%|@version@|g" > \
+	    -e "s|%version%|@version@|g" \
+	    -e "s|@modules@|$$modules|g" \
+	    -e "s|%localconfdir%|@localconfdir@|g" \
+	    -e "s|@defaultini@|default.ini|g" \
+	    -e "s|@localini@|local.ini|g" > \
 	$@ < $<
 	chmod +x $@
 

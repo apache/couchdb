@@ -12,9 +12,7 @@
 
 -module(couch_server).
 -behaviour(gen_server).
--behaviour(application).
 
--export([start/0,start/1,start/2,stop/0,stop/1,restart/0]).
 -export([open/2,create/2,delete/2,all_databases/0,get_version/0]).
 -export([init/1, handle_call/3,sup_start_link/0]).
 -export([handle_cast/2,code_change/3,handle_info/2,terminate/2]).
@@ -30,29 +28,10 @@
     start_time=""
     }).
 
-start() ->
-    start(["default.ini"]).
-
-start(IniFiles) ->
-    couch_server_sup:start_link(IniFiles).
-
-start(_Type, _Args) ->
-    start().
-
-restart() ->
-    stop(),
-    start().
-
-stop() ->
-    couch_server_sup:stop().
-
-stop(_Reason) ->
-    stop().
-
 dev_start() ->
-    stop(),
+    couch:stop(),
     up_to_date = make:all([load, debug_info]),
-    start().
+    couch:start().
 
 get_version() ->
     Apps = application:loaded_applications(),
