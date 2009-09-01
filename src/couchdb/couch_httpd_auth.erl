@@ -113,7 +113,6 @@ cookie_authentication_handler(Req) ->
 get_user(Db, UserName) ->
     % In the future this will be pluggable. For now we check the .ini first,
     % then fall back to querying the db.
-    io:format("~n~nget-user: '~p'~n", [get_user]),
     case couch_config:get("admins", ?b2l(UserName)) of
     "-hashed-" ++ HashedPwdAndSalt ->
         io:format("hashed: '~p'~n", [hashed]),
