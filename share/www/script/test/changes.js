@@ -56,9 +56,14 @@ couchTests.changes = function(debug) {
   } catch (err) {
   }
 
-  if (xhr) {
+  // poor man's browser detection
+  var is_safari = navigator.userAgent.match(/AppleWebKit/);
+  if (!is_safari && xhr) {
     // Only test the continuous stuff if we have a real XHR object
     // with real async support.
+
+    // WebKit (last checked on nightly #47686) does fail on processing
+    // the async-request properly while javascript is executed.
 
     var sleep = function(msecs) {
       // by making a slow sync request, we allow the waiting XHR request data
