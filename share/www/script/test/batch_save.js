@@ -22,9 +22,8 @@ couchTests.batch_save = function(debug) {
   // PUT a doc with ?batch=ok
   T(db.save({_id:"0",a:1,b:1},  {batch : "ok"}).ok);
 
-  // test that response is 200 Accepted
+  // test that response is 202 Accepted
   T(db.last_req.status == 202);
-  T(db.last_req.statusText == "Accepted");
 
   T(db.allDocs().total_rows == 0);
 
@@ -44,9 +43,8 @@ couchTests.batch_save = function(debug) {
   var resp = db.request("POST", db.uri + "?batch=ok", {body: JSON.stringify({a:1})});
   T(JSON.parse(resp.responseText).ok);
 
-  // test that response is 200 Accepted
+  // test that response is 202 Accepted
   T(resp.status == 202);
-  T(resp.statusText == "Accepted");
 
   T(db.allDocs().total_rows == 3);
   // restartServer();
