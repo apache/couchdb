@@ -54,7 +54,7 @@ main(_) ->
     ok.
 
 test() ->
-    couch_server:start(
+    couch_server_sup:start_link(
         ["etc/couchdb/default_dev.ini", "etc/couchdb/local_dev.ini"]
     ),
     ibrowse:start(),
