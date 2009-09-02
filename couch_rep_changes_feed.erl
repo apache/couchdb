@@ -30,7 +30,7 @@
     reqid = nil,
     complete = false,
     count = 0,
-    partial_chunk = nil,
+    partial_chunk = <<>>,
     reply_to = nil,
     rows = queue:new()
 }).
@@ -60,7 +60,7 @@ init([_Parent, #http_db{}=Source, Since, PostProps]) ->
         conn = Pid,
         options = [{stream_to, {self(), once}}, {response_format, binary}],
         headers = Source#http_db.headers -- [{"Accept-Encoding", "gzip"}]
-    },    
+    },
     {ibrowse_req_id, ReqId} = couch_rep_httpc:request(Req),
 
     receive
@@ -127,8 +127,12 @@ handle_cast(_Msg, State) ->
 handle_info({ibrowse_async_headers, Id, Code, Hdrs}, #state{reqid=Id}=State) ->
     handle_headers(list_to_integer(Code), Hdrs, State);
 
-handle_info({ibrowse_async_response, Id, Msg}, #state{reqid=Id} = State) ->
-    handle_response(Msg, State);
+handle_info({ibrowse_async_response, Id, {error,E}}, #state{reqid=Id}=State) ->
+    {stop, {error, E}, State};
+
+handle_info({ibrowse_async_response, Id, Chunk}, #state{reqid=Id}=State) ->
+    Messages = [M || M <- re:split(Chunk, ",?\n", [trim]), M =/= <<>>],
+    handle_messages(Messages, State);
 
 handle_info({ibrowse_async_response_end, Id}, #state{reqid=Id} = State) ->
     handle_feed_completion(State);
@@ -200,60 +204,41 @@ handle_headers(Code, Hdrs, State) ->
         [Code,Hdrs]),
     {stop, {error, Code}, State}.
 
-handle_response({error, Reason}, State) ->
-    {stop, {error, Reason}, State};
-handle_response(<<"\n">>, State) ->
-    ?LOG_DEBUG("got a heartbeat from the remote server", []),
+handle_messages([], State) ->
     ok = maybe_stream_next(State),
     {noreply, State};
-handle_response(<<"{\"results\":[\n">>, State) ->
-    ok = maybe_stream_next(State),
-    {noreply, State};
-handle_response(<<"\n],\n\"last_seq\":", LastSeqStr/binary>>, State) ->
+handle_messages([<<"{\"results\":[">>|Rest], State) ->
+    handle_messages(Rest, State);
+handle_messages([<<"]">>, <<"\"last_seq\":", LastSeqStr/binary>>], State) ->
     LastSeq = list_to_integer(?b2l(hd(re:split(LastSeqStr, "}")))),
-    {noreply, State#state{last_seq = LastSeq}};
-handle_response(<<"{\"last_seq\":", LastSeqStr/binary>>, State) ->
+    handle_feed_completion(State#state{last_seq = LastSeq});
+handle_messages([<<"{\"last_seq\":", LastSeqStr/binary>>], State) ->
     LastSeq = list_to_integer(?b2l(hd(re:split(LastSeqStr, "}")))),
-    {noreply, State#state{last_seq = LastSeq}};
-handle_response(Chunk, #state{partial_chunk=nil} = State) ->
-    #state{
-        count = Count,
-        rows = Rows
-    } = State,
-    ok = maybe_stream_next(State),
-    try
-        Row = decode_row(Chunk),
-        case State of
-        #state{reply_to=nil} ->
-            {noreply, State#state{count=Count+1, rows = queue:in(Row, Rows)}};
-        #state{count=0, reply_to=From}->
-            gen_server:reply(From, [Row]),
-            {noreply, State#state{reply_to=nil}}
-        end
-    catch
-    throw:{invalid_json, Bad} ->
-        {noreply, State#state{partial_chunk = Bad}}
-    end;
-handle_response(Chunk, State) ->
+    handle_feed_completion(State#state{last_seq = LastSeq});
+handle_messages([Chunk|Rest], State) ->
     #state{
         count = Count,
         partial_chunk = Partial,
         rows = Rows
     } = State,
-    ok = maybe_stream_next(State),
-    try
+    NewState = try
         Row = decode_row(<<Partial/binary, Chunk/binary>>),
-        {noreply, case State of
+        case State of
         #state{reply_to=nil} ->
-            State#state{count=Count+1, partial_chunk=nil, rows=queue:in(Row,Rows)};
+            State#state{
+                count = Count+1,
+                partial_chunk = <<>>,
+                rows=queue:in(Row,Rows)
+            };
         #state{count=0, reply_to=From}->
             gen_server:reply(From, [Row]),
-            State#state{reply_to=nil, partial_chunk=nil}
-        end}
+            State#state{reply_to = nil, partial_chunk = <<>>}
+        end
     catch
     throw:{invalid_json, Bad} ->
-        {noreply, State#state{partial_chunk = Bad}}
-    end.
+        State#state{partial_chunk = Bad}
+    end,
+    handle_messages(Rest, NewState).
 
 handle_feed_completion(#state{reply_to=nil} = State)->
     {noreply, State#state{complete=true}};
