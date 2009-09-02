@@ -56,9 +56,9 @@ replicate(Source, Target) when is_binary(Source), is_binary(Target) ->
 
 %% function handling POST to _replicate
 replicate({Props}=PostBody, UserCtx) ->
-    RepId = make_replication_id(PostBody, UserCtx),
-    Replicator = {RepId,
-        {gen_server, start_link, [?MODULE, [RepId, PostBody, UserCtx], []]},
+    {BaseId, Extension} = make_replication_id(PostBody, UserCtx),
+    Replicator = {BaseId ++ Extension,
+        {gen_server, start_link, [?MODULE, [BaseId, PostBody, UserCtx], []]},
         transient,
         1,
         worker,
@@ -69,7 +69,7 @@ replicate({Props}=PostBody, UserCtx) ->
 
     case proplists:get_value(<<"continuous">>, Props, false) of
     true ->
-        {ok, {continuous, ?l2b(RepId)}};
+        {ok, {continuous, ?l2b(BaseId)}};
     false ->
         get_result(Server, PostBody, UserCtx)
     end.
@@ -361,7 +361,14 @@ make_replication_id({Props}, UserCtx) ->
     % Port = mochiweb_socket_server:get(couch_httpd, port),
     Src = get_rep_endpoint(UserCtx, proplists:get_value(<<"source">>, Props)),
     Tgt = get_rep_endpoint(UserCtx, proplists:get_value(<<"target">>, Props)),    
-    couch_util:to_hex(erlang:md5(term_to_binary([HostName, Src, Tgt]))).
+    Base = couch_util:to_hex(erlang:md5(term_to_binary([HostName, Src, Tgt]))),
+    Extension = case proplists:get_value(<<"continuous">>, Props, false) of
+    true ->
+        "+continuous";
+    false ->
+        ""
+    end,
+    {Base, Extension}.
 
 maybe_add_trailing_slash(Url) ->
     re:replace(Url, "[^/]$", "&/", [{return, list}]).
