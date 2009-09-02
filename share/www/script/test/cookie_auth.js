@@ -40,7 +40,7 @@ couchTests.cookie_auth = function(debug) {
       T(usersDb.save({
         _id: "a1",
         salt: "123",
-        password_sha: "8da1CtkFvb58LWrnup5chgdZVUs=",
+        password_sha: hex_sha1(password + "123"),
         username: "Jason Davies",
         author: "Jason Davies",
         type: "user",
