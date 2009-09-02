@@ -149,12 +149,12 @@ process_response({error, Reason}, Req) ->
 
 spawn_worker_process(Req) ->
     Url = ibrowse_lib:parse_url(Req#http_db.url),
-    {ok, Pid} = ibrowse:spawn_worker_process(Url#url.host, Url#url.port),
+    {ok, Pid} = ibrowse_http_client:start(Url),
     Pid.
 
 spawn_link_worker_process(Req) ->
     Url = ibrowse_lib:parse_url(Req#http_db.url),
-    {ok, Pid} = ibrowse:spawn_link_worker_process(Url#url.host, Url#url.port),
+    {ok, Pid} = ibrowse_http_client:start_link(Url),
     Pid.
 
 maybe_decompress(Headers, Body) ->
