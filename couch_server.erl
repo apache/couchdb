@@ -202,15 +202,15 @@ handle_call({set_max_dbs_open, Max}, _From, Server) ->
 handle_call(get_server, _From, Server) ->
     {reply, {ok, Server}, Server};
 handle_call({open, DbName, Options}, _From, Server) ->
-    DbNameList = binary_to_list(DbName),
-    case check_dbname(Server, DbNameList) of
-    ok ->
-        Filepath = get_full_filename(Server, DbNameList),
-        LruTime = now(),
-        case ets:lookup(couch_dbs_by_name, DbName) of
-        [] ->
+    LruTime = now(),
+    case ets:lookup(couch_dbs_by_name, DbName) of
+    [] ->
+        DbNameList = binary_to_list(DbName),
+        case check_dbname(Server, DbNameList) of
+        ok ->
             case maybe_close_lru_db(Server) of
             {ok, Server2} ->
+                Filepath = get_full_filename(Server, DbNameList),
                 case couch_db:start_link(DbName, Filepath, Options) of
                 {ok, MainPid} ->
                     true = ets:insert(couch_dbs_by_name, {DbName, {MainPid, LruTime}}),
@@ -225,14 +225,14 @@ handle_call({open, DbName, Options}, _From, Server) ->
             CloseError ->
                 {reply, CloseError, Server}
             end;
-        [{_, {MainPid, PrevLruTime}}] ->
-            true = ets:insert(couch_dbs_by_name, {DbName, {MainPid, LruTime}}),
-            true = ets:delete(couch_dbs_by_lru, PrevLruTime),
-            true = ets:insert(couch_dbs_by_lru, {LruTime, DbName}),
-            {reply, {ok, MainPid}, Server}
+        Error ->
+            {reply, Error, Server}
         end;
-    Error ->
-        {reply, Error, Server}
+    [{_, {MainPid, PrevLruTime}}] ->
+        true = ets:insert(couch_dbs_by_name, {DbName, {MainPid, LruTime}}),
+        true = ets:delete(couch_dbs_by_lru, PrevLruTime),
+        true = ets:insert(couch_dbs_by_lru, {LruTime, DbName}),
+        {reply, {ok, MainPid}, Server}
     end;
 handle_call({create, DbName, Options}, _From, Server) ->
     DbNameList = binary_to_list(DbName),
