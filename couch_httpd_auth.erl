@@ -48,7 +48,6 @@ basic_username_pw(Req) ->
     AuthorizationHeader = header_value(Req, "Authorization"),
     case AuthorizationHeader of
     "Basic " ++ Base64Value ->
-        io:format("~n~nBase64Value: '~p'~n~n", [Base64Value]),
         case string:tokens(?b2l(couch_util:decodeBase64(Base64Value)),":") of
         [User, Pass] ->
             {User, Pass};
@@ -285,6 +284,9 @@ cookie_auth_cookie(User, Secret, TimeStamp) ->
         couch_util:encodeBase64Url(SessionData ++ ":" ++ ?b2l(Hash)),
         [{path, "/"}, {http_only, true}]). % TODO add {secure, true} when SSL is detected
 
+hash_password(Password, Salt) ->
+    ?l2b(couch_util:to_hex(crypto:sha(<<Password/binary, Salt/binary>>))).
+
 % Login handler with user db
 handle_login_req(#httpd{method='POST', mochi_req=MochiReq}=Req, #db{}=Db) ->
     ReqBody = MochiReq:recv_body(),
@@ -301,7 +303,7 @@ handle_login_req(#httpd{method='POST', mochi_req=MochiReq}=Req, #db{}=Db) ->
         Result -> Result
     end,
     UserSalt = proplists:get_value(<<"salt">>, User, <<>>),
-    PasswordHash = couch_util:encodeBase64(crypto:sha(<<UserSalt/binary, Password/binary>>)),
+    PasswordHash = hash_password(Password, UserSalt),
     case proplists:get_value(<<"password_sha">>, User, nil) of
         ExpectedHash when ExpectedHash == PasswordHash ->
             Secret = ?l2b(couch_config:get("couch_httpd_auth", "secret", nil)),
@@ -380,7 +382,7 @@ create_user_req(#httpd{method='POST', mochi_req=MochiReq}=Req, Db) ->
         end,
             
         UserSalt = couch_util:new_uuid(),
-        PasswordHash = couch_util:encodeBase64(crypto:sha(<<UserSalt/binary, Password/binary>>)),
+        PasswordHash = hash_password(Password, UserSalt),
         DocId = couch_util:new_uuid(),
         {ok, UserDoc} = user_doc(DocId, UserName, UserSalt, PasswordHash, Email, Active, Roles1),
         {ok, _Rev} = couch_db:update_doc(Db, UserDoc, []),
@@ -435,7 +437,7 @@ update_user_req(#httpd{method='PUT', mochi_req=MochiReq, user_ctx=UserCtx}=Req, 
             Hash = case Password of
                 <<>> -> CurrentPasswordHash;
                 _Else ->
-                    H = couch_util:encodeBase64(crypto:sha(<<UserSalt/binary, Password/binary>>)),
+                    H = hash_password(Password, UserSalt),
                     H
                 end,
             Hash;
@@ -447,11 +449,11 @@ update_user_req(#httpd{method='PUT', mochi_req=MochiReq, user_ctx=UserCtx}=Req, 
                 _P when length(OldPassword) == 0 ->
                     throw({forbidden, <<"Old password is incorrect.">>});
                 _Else ->
-                    OldPasswordHash = couch_util:encodeBase64(crypto:sha(<<UserSalt/binary, OldPassword1/binary>>)),
+                    OldPasswordHash = hash_password(OldPassword1, UserSalt),
                     ?LOG_DEBUG("~p == ~p", [CurrentPasswordHash, OldPasswordHash]),
                     Hash1 = case CurrentPasswordHash of
                         ExpectedHash when ExpectedHash == OldPasswordHash ->
-                            H = couch_util:encodeBase64(crypto:sha(<<UserSalt/binary, Password/binary>>)),
+                            H = hash_password(Password, UserSalt),
                             H;
                         _ ->
                             throw({forbidden, <<"Old password is incorrect.">>})
