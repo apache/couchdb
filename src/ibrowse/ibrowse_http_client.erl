@@ -113,6 +113,16 @@ init({Host, Port}) ->
 		   port = Port},
     put(ibrowse_trace_token, [Host, $:, integer_to_list(Port)]),
     put(my_trace_flag, ibrowse_lib:get_trace_status(Host, Port)),
+    {ok, State};
+init(#url{host=Host, port=Port, protocol=Protocol}) ->
+    State = #state{
+        host = Host,
+        port = Port,
+        is_ssl = (Protocol == https),
+        ssl_options = [{ssl_imp, new}]
+    },
+    put(ibrowse_trace_token, [Host, $:, integer_to_list(Port)]),
+    put(my_trace_flag, ibrowse_lib:get_trace_status(Host, Port)),
     {ok, State}.
 
 %%--------------------------------------------------------------------
@@ -137,7 +147,7 @@ handle_call({send_req, {Url, Headers, Method, Body, Options, Timeout}},
 handle_call(stop, _From, State) ->
     do_close(State),
     do_error_reply(State, closing_on_request),
-    {stop, normal, ok, State};
+    {stop, normal, ok, State#state{socket=undefined}};
 
 handle_call(Request, _From, State) ->
     Reply = {unknown_request, Request},

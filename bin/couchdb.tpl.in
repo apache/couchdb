@@ -225,6 +225,7 @@ start_couchdb () {
         -eval \"application:load(crypto)\" \
         -eval \"application:load(couch)\" \
         -eval \"crypto:start()\" \
+        -eval \"ssl:start()\" \
         -eval \"ibrowse:start()\" \
         -eval \"couch_server:start([$start_arguments]), receive done -> done end.\" "
     if test "$BACKGROUND" = "true" -a "$RECURSED" = "false"; then
