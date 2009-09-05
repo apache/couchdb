@@ -446,7 +446,7 @@ update_user_req(#httpd{method='PUT', mochi_req=MochiReq, user_ctx=UserCtx}=Req, 
             Hash = case Password of
                 <<>> -> 
                     CurrentPasswordHash;
-                _P when length(OldPassword) == 0 ->
+                _P when OldPassword = [] ->
                     throw({forbidden, <<"Old password is incorrect.">>});
                 _Else ->
                     OldPasswordHash = hash_password(OldPassword1, UserSalt),

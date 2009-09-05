@@ -94,8 +94,8 @@ init(IniFiles) ->
         {ok, ParsedIniValues} = parse_ini_file(IniFile),
         ets:insert(?MODULE, ParsedIniValues)
     end, IniFiles),
-    WriteFile = case length(IniFiles) > 0 of
-        true -> lists:last(IniFiles);
+    WriteFile = case IniFiles of
+        [_|_] -> lists:last(IniFiles);
         _ -> undefined
     end,
     {ok, #config{write_filename=WriteFile}}.
