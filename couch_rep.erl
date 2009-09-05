@@ -268,7 +268,7 @@ compare_replication_logs(SrcDoc, TgtDoc) ->
         compare_rep_history(SourceHistory, TargetHistory)
     end.
 
-compare_rep_history(S, T) when length(S) =:= 0 orelse length(T) =:= 0 ->
+compare_rep_history([], []) ->
     ?LOG_INFO("no common ancestry -- performing full replication", []),
     {0, []};
 compare_rep_history([{S}|SourceRest], [{T}|TargetRest]=Target) ->
