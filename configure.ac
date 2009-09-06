@@ -103,10 +103,10 @@ esac
 
 AM_CONDITIONAL([WINDOWS], [test x$IS_WINDOWS = xTRUE])
 
-AC_CHECK_LIB([mozjs], [JS_NewContext], [], [
-    AC_CHECK_LIB([js], [JS_NewContext], [], [
-        AC_CHECK_LIB([js3250], [JS_NewContext], [], [
-            AC_CHECK_LIB([js32], [JS_NewContext], [], [
+AC_CHECK_LIB([mozjs], [JS_NewContext], [JSLIB=-lmozjs], [
+    AC_CHECK_LIB([js], [JS_NewContext], [JSLIB=-ljs], [
+        AC_CHECK_LIB([js3250], [JS_NewContext], [JSLIB=-ljs3250], [
+            AC_CHECK_LIB([js32], [JS_NewContext], [JSLIB=-ljs32], [
                 AC_MSG_ERROR([Could not find the js library.
 
 Is the Mozilla SpiderMonkey library installed?])])])])])
@@ -121,6 +121,8 @@ AC_CHECK_HEADER([jsapi.h], [], [
 
 Are the Mozilla SpiderMonkey headers installed?])
         ])])
+
+AC_SUBST(JSLIB)
 
 AC_LANG_PUSH(C)
 OLD_CFLAGS="$CFLAGS"
