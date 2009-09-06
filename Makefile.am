@@ -36,7 +36,7 @@ locallibbin_PROGRAMS = couchjs
 couchjs_SOURCES = couch_js.c curlhelper.c curlhelper.h
 couchjs_LDFLAGS = $(CURL_LDFLAGS)
 couchjs_CFLAGS = $(CURL_CFLAGS)
-couchjs_LDADD = $(CURL_LDFLAGS)
+couchjs_LDADD = $(CURL_LDFLAGS) @JSLIB@
 
 if WINDOWS
 couch_erl_driver_la_LDFLAGS += -no-undefined
