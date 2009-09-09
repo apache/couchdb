@@ -381,9 +381,9 @@ create_user_req(#httpd{method='POST', mochi_req=MochiReq}=Req, Db) ->
             [?l2b(R) || R <- Roles]
         end,
             
-        UserSalt = couch_util:new_uuid(),
+        UserSalt = couch_uuids:random(),
         PasswordHash = hash_password(Password, UserSalt),
-        DocId = couch_util:new_uuid(),
+        DocId = couch_uuids:random(),
         {ok, UserDoc} = user_doc(DocId, UserName, UserSalt, PasswordHash, Email, Active, Roles1),
         {ok, _Rev} = couch_db:update_doc(Db, UserDoc, []),
         ?LOG_DEBUG("User ~s (~s) with password, ~s created.", [?b2l(UserName), ?b2l(DocId), ?b2l(Password)]),

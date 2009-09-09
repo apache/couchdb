@@ -470,7 +470,7 @@ do_checkpoint(State) ->
             "replication is redone and documents reexamined.", []),
         StartSeqNum
     end,
-    SessionId = couch_util:new_uuid(),
+    SessionId = couch_uuids:random(),
     NewHistoryEntry = {[
         {<<"session_id">>, SessionId},
         {<<"start_time">>, list_to_binary(ReplicationStartTime)},

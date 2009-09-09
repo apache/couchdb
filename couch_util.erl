@@ -14,7 +14,7 @@
 
 -export([start_driver/1,terminate_linked/1]).
 -export([should_flush/0, should_flush/1, to_existing_atom/1]).
--export([new_uuid/0, rand32/0, implode/2, collate/2, collate/3]).
+-export([rand32/0, implode/2, collate/2, collate/3]).
 -export([abs_pathname/1,abs_pathname/2, trim/1, ascii_lower/1]).
 -export([encodeBase64/1, decodeBase64/1, encodeBase64Url/1, decodeBase64Url/1,
     to_hex/1,parse_term/1, dict_find/3]).
@@ -54,9 +54,6 @@ terminate_linked(Reason) ->
     [catch exit(Pid, Reason) || Pid <- Links],
     ok.
 
-
-new_uuid() ->
-    list_to_binary(to_hex(crypto:rand_bytes(16))).
 
 to_hex([]) ->
     [];
