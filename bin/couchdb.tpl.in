@@ -138,7 +138,7 @@ _load_config () {
 _reset_config () {
     print_arguments=""
     start_arguments=""
-    background_start_arguments=""
+    background_start_arguments="-n"
 }
 
 _print_config () {
