@@ -53,6 +53,7 @@ query_servers={couch_query_servers, start_link, []}
 httpd={couch_httpd, start_link, []}
 stats_aggregator={couch_stats_aggregator, start, []}
 stats_collector={couch_stats_collector, start, []}
+uuids={couch_uuids, start, []}
 
 [httpd_global_handlers]
 / = {couch_httpd_misc_handlers, handle_welcome_req, <<"Welcome">>}
@@ -92,3 +93,15 @@ _show = {couch_httpd_show, handle_doc_show_req}
 _list = {couch_httpd_show, handle_view_list_req}
 _info = {couch_httpd_db,   handle_design_info_req}
 _update = {couch_httpd_show, handle_doc_update_req}
+
+[uuids]
+; Known algorithms:
+;   random - 128 bits of random awesome
+;     All awesome, all the time.
+;   sequential - monotonically increasing ids with random increments
+;     First 26 hex characters are random. Last 6 increment in
+;     random amounts until an overflow occurs. On overflow, the
+;     random prefix is regenerated and the process starts over.
+;   utc_random - Time since Jan 1, 1970 UTC with microseconds
+;     First 14 characters are the time in hex. Last 18 are random.
+algorithm = random

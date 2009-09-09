@@ -17,7 +17,7 @@ main(_) ->
     code:add_pathz("src/couchdb"),
     application:start(crypto),
 
-    etap:plan(11),
+    etap:plan(10),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -46,10 +46,6 @@ test() ->
         {pid, Pid} ->
             etap:ok(not is_process_alive(Pid), "why wont this work?")
     end,
-
-    % new_uuid
-    etap:isnt(couch_util:new_uuid(), couch_util:new_uuid(),
-        "A guid ought to be unique."),
 
     % implode
     etap:is([1, 38, 2, 38, 3], couch_util:implode([1,2,3],"&"),

@@ -195,7 +195,7 @@ get_all_changes(Pid, Acc) ->
     end.
 
 generate_change() ->
-    generate_change(couch_util:new_uuid()).
+    generate_change(couch_uuids:random()).
 
 generate_change(Id) ->
     generate_change(Id, {[]}).
@@ -212,7 +212,7 @@ generate_change(Id, EJson) ->
     ]}.
 
 generate_conflict() ->
-    Id = couch_util:new_uuid(),
+    Id = couch_uuids:random(),
     Db = get_db(),
     Doc1 = (couch_doc:from_json_obj({[<<"foo">>, <<"bar">>]}))#doc{id = Id},
     Doc2 = (couch_doc:from_json_obj({[<<"foo">>, <<"baz">>]}))#doc{id = Id},

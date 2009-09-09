@@ -108,11 +108,10 @@ handle_uuids_req(#httpd{method='GET'}=Req) ->
     Count = list_to_integer(couch_httpd:qs_value(Req, "count", "1")),
     CacheBustingHeaders = [{"Date", httpd_util:rfc1123_date()},
                            {"Cache-Control", "no-cache"},
-                           {"Expires", "Fri, 01 Jan 1990 00:00:00 GMT"},  % Past date, ON PURPOSE!
+                           % Past date, ON PURPOSE!
+                           {"Expires", "Fri, 01 Jan 1990 00:00:00 GMT"},
                            {"Pragma", "no-cache"}],
-    % generate the uuids
-    UUIDs = [ couch_util:new_uuid() || _ <- lists:seq(1,Count)],
-    % send a JSON response
+    UUIDs = [couch_uuids:new() || _ <- lists:seq(1, Count)],
     send_json(Req, 200, CacheBustingHeaders, {[{<<"uuids">>, UUIDs}]});
 handle_uuids_req(Req) ->
     send_method_not_allowed(Req, "GET").

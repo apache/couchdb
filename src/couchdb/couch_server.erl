@@ -99,7 +99,7 @@ hash_admin_passwords() ->
         fun({_User, "-hashed-" ++ _}) ->
             ok; % already hashed
         ({User, ClearPassword}) ->
-            Salt = ?b2l(couch_util:new_uuid()),
+            Salt = ?b2l(couch_uuids:random()),
             Hashed = couch_util:to_hex(crypto:sha(ClearPassword ++ Salt)),
             couch_config:set("admins", User, "-hashed-" ++ Hashed ++ "," ++ Salt)
         end, couch_config:get("admins")).

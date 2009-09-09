@@ -308,7 +308,7 @@ db_req(#httpd{method='POST',path_parts=[DbName]}=Req, Db) ->
     Doc = couch_doc:from_json_obj(couch_httpd:json_body(Req)),
     Doc2 = case Doc#doc.id of
         <<"">> ->
-            Doc#doc{id=couch_util:new_uuid(), revs={0, []}};
+            Doc#doc{id=couch_uuids:new(), revs={0, []}};
         _ ->
             Doc
     end,
@@ -385,7 +385,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
                 Doc = couch_doc:from_json_obj(JsonObj),
                 validate_attachment_names(Doc),
                 Id = case Doc#doc.id of
-                    <<>> -> couch_util:new_uuid();
+                    <<>> -> couch_uuids:new();
                     Id0 -> Id0
                 end,
                 case proplists:get_value(<<"_rev">>, ObjProps) of

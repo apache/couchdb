@@ -59,4 +59,45 @@ couchTests.uuids = function(debug) {
   // ensure we return a 405 on POST
   xhr = CouchDB.request("POST", "/_uuids?count=1000");
   T(xhr.status == 405);
+
+  // Test sequential uuids
+  var seq_testfun = function() {
+    xhr = CouchDB.request("GET", "/_uuids?count=1000");
+    T(xhr.status == 200);
+    result = JSON.parse(xhr.responseText);
+    for(var i = 1; i < result.uuids.length; i++) {
+      T(result.uuids[i].length == 32);
+      T(result.uuids[i-1] < result.uuids[i], "Sequential uuids are ordered.");
+    }
+  };
+
+  run_on_modified_server([{
+      "section": "uuids",
+      "key": "algorithm",
+      "value": "sequential",
+    }],
+    seq_testfun
+  );
+
+  // Test utc_random uuids
+  var utc_testfun = function() {
+    xhr = CouchDB.request("GET", "/_uuids?count=1000");
+    T(xhr.status == 200);
+    result = JSON.parse(xhr.responseText);
+    for(var i = 1; i < result.uuids.length; i++) {
+      T(result.uuids[i].length == 32);
+      var u1 = result.uuids[i-1].substr(0, 13);
+      var u2 = result.uuids[i].substr(0, 13);
+      T(u1 < u2, "UTC uuids are roughly ordered.");
+    }
+  };
+
+  run_on_modified_server([{
+      "section": "uuids",
+      "key": "algorithm",
+      "value": "utc_random"
+    }],
+    utc_testfun
+  );
+
 };

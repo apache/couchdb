@@ -112,7 +112,7 @@ test_multiple_changes(SrcType, TgtType) ->
 
 test_changes_not_missing(SrcType, TgtType) ->
     %% put identical changes on source and target
-    Id = couch_util:new_uuid(),
+    Id = couch_uuids:random(),
     {Id, _Seq, [Rev]} = Expect = generate_change(Id, {[]}, get_db(source)),
     {Id, _, [Rev]} = generate_change(Id, {[]}, get_db(target)),
 
@@ -131,7 +131,7 @@ test_changes_not_missing(SrcType, TgtType) ->
     ).
 
 generate_change() ->
-    generate_change(couch_util:new_uuid()).
+    generate_change(couch_uuids:random()).
 
 generate_change(Id) ->
     generate_change(Id, {[]}).
