@@ -144,7 +144,7 @@ serve_oauth(#httpd{mochi_req=MochiReq}=Req, Fun, FailSilently) ->
                             couch_httpd:send_error(Req, 400, <<"invalid_consumer">>, <<"Invalid consumer (key or signature method).">>);
                         Consumer ->
                             Signature = proplists:get_value("oauth_signature", Params),
-                            URL = couch_httpd:absolute_uri(Req, MochiReq:get(path)),
+                            URL = couch_httpd:absolute_uri(Req, MochiReq:get(raw_path)),
                             Fun(URL, proplists:delete("oauth_signature", Params),
                                 Consumer, Signature)
                     end
