@@ -114,7 +114,6 @@ get_user(Db, UserName) ->
     % then fall back to querying the db.
     case couch_config:get("admins", ?b2l(UserName)) of
     "-hashed-" ++ HashedPwdAndSalt ->
-        io:format("hashed: '~p'~n", [hashed]),
         [HashedPwd, Salt] = string:tokens(HashedPwdAndSalt, ","),
         [{<<"roles">>, [<<"_admin">>]},
           {<<"salt">>, ?l2b(Salt)},
@@ -127,14 +126,10 @@ get_user(Db, UserName) ->
 
         case (catch couch_view:get_map_view(Db, DesignId, ViewName, nil)) of
         {ok, View, _Group} ->
-            FoldlFun = fun
-            ({{Key, _DocId}, Value}, _, nil) when Key == UserName -> {ok, Value};
-            (_, _, Acc) -> {stop, Acc}
-            end,
-            case couch_view:fold(View, {UserName, nil}, fwd, FoldlFun, nil) of
-            {ok, {Result}} -> Result;
-            _Else -> nil
-            end;
+            FoldFun = fun({_, Value}, _, {_}) -> {stop, Value} end,
+            {ok, _, {Result}} = couch_view:fold(View, FoldFun, {nil},
+                    [{start_key, {UserName, nil}},{end_key, {UserName, {}}}]),
+            Result;
         {not_found, _Reason} ->
             nil
             % case (catch couch_view:get_reduce_view(Db, DesignId, ViewName, nil)) of

@@ -58,7 +58,7 @@ compact_group(Group, EmptyGroup) ->
             {ok, {Bt, [KV|Acc], TotalCopied+1}}
         end
     end,
-    {ok, {Bt3, Uncopied, _Total}} = couch_btree:foldl(IdBtree, Fun,
+    {ok, _, {Bt3, Uncopied, _Total}} = couch_btree:foldl(IdBtree, Fun,
         {EmptyIdBtree, [], 0}),
     {ok, NewIdBtree} = couch_btree:add(Bt3, lists:reverse(Uncopied)),
 
@@ -91,7 +91,7 @@ compact_view(View, EmptyView) ->
         end
     end,
 
-    {ok, {Bt3, Uncopied, _Total}} = couch_btree:foldl(View#view.btree, Fun,
+    {ok, _, {Bt3, Uncopied, _Total}} = couch_btree:foldl(View#view.btree, Fun,
         {EmptyView#view.btree, [], 0}),
     {ok, NewBt} = couch_btree:add(Bt3, lists:reverse(Uncopied)),
     EmptyView#view{btree = NewBt}.

@@ -168,7 +168,7 @@ handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
     case Db#db.update_seq == NewSeq of
     true ->
         % suck up all the local docs into memory and write them to the new db
-        {ok, LocalDocs} = couch_btree:foldl(Db#db.local_docs_btree,
+        {ok, _, LocalDocs} = couch_btree:foldl(Db#db.local_docs_btree,
                 fun(Value, _Offset, Acc) -> {ok, [Value | Acc]} end, []),
         {ok, NewLocalBtree} = couch_btree:add(NewDb#db.local_docs_btree, LocalDocs),
 
@@ -279,10 +279,11 @@ simple_upgrade_record(Old, New) ->
         lists:sublist(tuple_to_list(New), size(Old) + 1, size(New)-size(Old)),
     list_to_tuple(tuple_to_list(Old) ++ NewValuesTail).
 
-% used for doc insertion, also for the PassedEndFun on all_docs view
-less_docid(A, B) when A==B -> false;
+less_docid(A, B) when A == B -> false;
 less_docid(nil, _) -> true; % nil - special key sorts before all
 less_docid({}, _) -> false; % {} -> special key sorts after all
+less_docid(_, nil) -> false;
+less_docid(_, {}) -> true; 
 less_docid(A, B) -> A < B.
 
 
@@ -722,8 +723,10 @@ copy_compact(Db, NewDb0, Retry) ->
 
     couch_task_status:set_update_frequency(500),
 
-    {ok, {NewDb2, Uncopied, TotalChanges}} =
-        couch_btree:foldl(Db#db.docinfo_by_seq_btree, NewDb#db.update_seq + 1, EnumBySeqFun, {NewDb, [], 0}),
+    {ok, _, {NewDb2, Uncopied, TotalChanges}} =
+        couch_btree:foldl(Db#db.docinfo_by_seq_btree, EnumBySeqFun, 
+            {NewDb, [], 0},
+            [{start_key, NewDb#db.update_seq + 1}]),
 
     couch_task_status:update("Flushing"),
 

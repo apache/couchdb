@@ -460,6 +460,7 @@ db_req(#httpd{path_parts=[_,<<"_all_docs">>]}=Req, _Db) ->
 db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs_by_seq">>]}=Req, Db) ->
     #view_query_args{
         start_key = StartKey,
+        end_key = EndKey,
         limit = Limit,
         skip = SkipCount,
         direction = Dir
@@ -479,7 +480,7 @@ db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs_by_seq">>]}=Req, Db) ->
             {} -> 100000000000;
             StartKey when is_integer(StartKey) -> StartKey
         end,
-        {ok, FoldResult} = couch_db:enum_docs_since(Db, StartKey2, Dir,
+        {ok, LastOffset, FoldResult} = couch_db:enum_docs_since(Db, StartKey2,
             fun(DocInfo, Offset, Acc) ->
                 #doc_info{
                     id=Id,
@@ -505,9 +506,13 @@ db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs_by_seq">>]}=Req, Db) ->
                     false -> []
                     end
                 },
-                FoldlFun({{Seq, Id}, Json}, Offset, Acc)
-            end, {Limit, SkipCount, undefined, [], nil}),
-        couch_httpd_view:finish_view_fold(Req, TotalRowCount, {ok, FoldResult})
+                if (Seq > EndKey) ->
+                    {stop, Acc};
+                true ->
+                    FoldlFun({{Seq, Id}, Json}, Offset, Acc)
+                end
+            end, {Limit, SkipCount, undefined, []}, [{dir, Dir}]),
+        couch_httpd_view:finish_view_fold(Req, TotalRowCount, LastOffset, FoldResult)
     end);
 
 db_req(#httpd{path_parts=[_,<<"_all_docs_by_seq">>]}=Req, _Db) ->
@@ -591,9 +596,11 @@ all_docs_view(Req, Db, Keys) ->
         start_key = StartKey,
         start_docid = StartDocId,
         end_key = EndKey,
+        end_docid = EndDocId,
         limit = Limit,
         skip = SkipCount,
-        direction = Dir
+        direction = Dir,
+        inclusive_end = Inclusive
     } = QueryArgs = couch_httpd_view:parse_view_params(Req, Keys, map),
     {ok, Info} = couch_db:get_db_info(Db),
     CurrentEtag = couch_httpd:make_etag(Info),
@@ -603,26 +610,16 @@ all_docs_view(Req, Db, Keys) ->
         StartId = if is_binary(StartKey) -> StartKey;
         true -> StartDocId
         end,
-        FoldAccInit = {Limit, SkipCount, undefined, [], nil},
+        EndId = if is_binary(EndKey) -> EndKey;
+        true -> EndDocId
+        end,
+        FoldAccInit = {Limit, SkipCount, undefined, []},
 
         case Keys of
         nil ->
-            PassedEndFun =
-            case Dir of
-            fwd ->
-                fun(ViewKey, _ViewId) ->
-                    couch_db_updater:less_docid(EndKey, ViewKey)
-                end;
-            rev->
-                fun(ViewKey, _ViewId) ->
-                    couch_db_updater:less_docid(ViewKey, EndKey)
-                end
-            end,
-
             FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db,
                 TotalRowCount, #view_fold_helper_funs{
-                    reduce_count = fun couch_db:enum_docs_reduce_to_count/1,
-                    passed_end = PassedEndFun
+                    reduce_count = fun couch_db:enum_docs_reduce_to_count/1
                 }),
             AdapterFun = fun(#full_doc_info{id=Id}=FullDocInfo, Offset, Acc) ->
                 case couch_doc:to_doc_info(FullDocInfo) of
@@ -632,9 +629,10 @@ all_docs_view(Req, Db, Keys) ->
                     {ok, Acc}
                 end
             end,
-            {ok, FoldResult} = couch_db:enum_docs(Db, StartId, Dir,
-                AdapterFun, FoldAccInit),
-            couch_httpd_view:finish_view_fold(Req, TotalRowCount, {ok, FoldResult});
+            {ok, LastOffset, FoldResult} = couch_db:enum_docs(Db,
+                AdapterFun, FoldAccInit, [{start_key, StartId}, {dir, Dir},
+                    {if Inclusive -> end_key_inclusive; true -> end_key end, EndId}]),
+            couch_httpd_view:finish_view_fold(Req, TotalRowCount, LastOffset, FoldResult);
         _ ->
             FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db,
                 TotalRowCount, #view_fold_helper_funs{
@@ -646,8 +644,8 @@ all_docs_view(Req, Db, Keys) ->
             rev ->
                 fun lists:foldr/3
             end,
-            {ok, FoldResult} = KeyFoldFun(
-                fun(Key, {ok, FoldAcc}) ->
+            FoldResult = KeyFoldFun(
+                fun(Key, FoldAcc) ->
                     DocInfo = (catch couch_db:get_doc_info(Db, Key)),
                     Doc = case DocInfo of
                     {ok, #doc_info{id=Id, revs=[#rev_info{deleted=false, rev=Rev}|_]}} ->
@@ -660,15 +658,10 @@ all_docs_view(Req, Db, Keys) ->
                         ?LOG_ERROR("Invalid DocInfo: ~p", [DocInfo]),
                         throw({error, invalid_doc_info})
                     end,
-                    Acc = (catch FoldlFun(Doc, 0, FoldAcc)),
-                    case Acc of
-                    {stop, Acc2} ->
-                        {ok, Acc2};
-                    _ ->
-                        Acc
-                    end
-                end, {ok, FoldAccInit}, Keys),
-            couch_httpd_view:finish_view_fold(Req, TotalRowCount, {ok, FoldResult})
+                    {_, FoldAcc2} = FoldlFun(Doc, 0, FoldAcc),
+                    FoldAcc2
+                end, FoldAccInit, Keys),
+            couch_httpd_view:finish_view_fold(Req, TotalRowCount, 0, FoldResult)
         end
     end).
 

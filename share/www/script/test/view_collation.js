@@ -103,10 +103,14 @@ couchTests.view_collation = function(debug) {
   var rows = db.query(queryFun, null, {endkey : "b",
     descending:true, inclusive_end:false}).rows;
   T(rows[rows.length-1].key == "B")
-
-  // inclusive_end=false overrides endkey_docid
+  
   var rows = db.query(queryFun, null, {
-    endkey : "b", endkey_docid: "b",
+    endkey : "b", endkey_docid: "10",
     inclusive_end:false}).rows;
   T(rows[rows.length-1].key == "aa")
+  
+  var rows = db.query(queryFun, null, {
+    endkey : "b", endkey_docid: "11",
+    inclusive_end:false}).rows;
+  T(rows[rows.length-1].key == "b")
 };

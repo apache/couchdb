@@ -59,8 +59,8 @@ test_kvs(KeyValues) ->
 
     Btree1 = couch_btree:set_options(Btree, [{reduce, ReduceFun}]),
     etap:is(Btree1#btree.reduce, ReduceFun, "Reduce function was set"),
-    EmptyRes = couch_btree:foldl(Btree1, fun(_, X) -> {ok, X+1} end, 0),
-    etap:is(EmptyRes, {ok, 0}, "Folding over an empty btree"),
+    {ok, _, EmptyRes} = couch_btree:foldl(Btree1, fun(_, X) -> {ok, X+1} end, 0),
+    etap:is(EmptyRes, 0, "Folding over an empty btree"),
 
     {ok, Btree2} = couch_btree:add_remove(Btree1, KeyValues, []),
     etap:ok(test_btree(Btree2, KeyValues),
@@ -151,15 +151,15 @@ test_key_access(Btree, List) ->
     end,
     Length = length(List),
     Sorted = lists:sort(List),
-    {ok, {[], Length}} = couch_btree:foldl(Btree, FoldFun, {Sorted, 0}),
-    {ok, {[], Length}} = couch_btree:foldr(Btree, FoldFun, {Sorted, 0}),
+    {ok, _, {[], Length}} = couch_btree:foldl(Btree, FoldFun, {Sorted, 0}),
+    {ok, _, {[], Length}} = couch_btree:fold(Btree, FoldFun, {Sorted, 0}, [{dir, rev}]),
     ok.
 
 test_lookup_access(Btree, KeyValues) ->
     FoldFun = fun({Key, Value}, {Key, Value}) -> {stop, true} end,
     lists:foreach(fun({Key, Value}) ->
         [{ok, {Key, Value}}] = couch_btree:lookup(Btree, [Key]),
-        {ok, true} = couch_btree:foldl(Btree, Key, FoldFun, {Key, Value})
+        {ok, _, true} = couch_btree:foldl(Btree, FoldFun, {Key, Value}, [{start_key, Key}])
     end, KeyValues).
 
 test_final_reductions(Btree, KeyValues) ->
@@ -182,8 +182,8 @@ test_final_reductions(Btree, KeyValues) ->
         0 -> {nil, nil};
         _ -> lists:nth(KVLen div 3, lists:sort(KeyValues))
     end,
-    {ok, FoldLRed} = couch_btree:foldl(Btree, LStartKey, FoldLFun, 0),
-    {ok, FoldRRed} = couch_btree:foldr(Btree, RStartKey, FoldRFun, 0),
+    {ok, _, FoldLRed} = couch_btree:foldl(Btree, FoldLFun, 0, [{start_key, LStartKey}]),
+    {ok, _, FoldRRed} = couch_btree:fold(Btree, FoldRFun, 0, [{dir, rev}, {start_key, RStartKey}]),
     KVLen = FoldLRed + FoldRRed,
     ok.
 

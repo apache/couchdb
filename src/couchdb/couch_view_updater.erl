@@ -41,7 +41,7 @@ update(Owner, Group) ->
     Self = self(),
     ViewEmptyKVs = [{View, []} || View <- Group2#group.views],
     spawn_link(fun() -> do_maps(Group, MapQueue, WriteQueue, ViewEmptyKVs) end),
-    spawn_link(fun() -> do_writes(Self, Owner, Group2, WriteQueue) end),
+    spawn_link(fun() -> do_writes(Self, Owner, Group2, WriteQueue, Seq == 0) end),
     % compute on all docs modified since we last computed.
     TotalChanges = couch_db:count_changes_since(Db, Seq),
     % update status every half second
@@ -55,7 +55,7 @@ update(Owner, Group) ->
     true -> [conflicts, deleted_conflicts, local_seq];
     _ -> [conflicts, deleted_conflicts]
     end,
-    {ok, _}
+    {ok, _, _}
         = couch_db:enum_docs_since(
             Db,
             Seq,
@@ -65,7 +65,7 @@ update(Owner, Group) ->
                 load_doc(Db, DocInfo, MapQueue, DocOpts, IncludeDesign),
                 {ok, ChangesProcessed+1}
             end,
-            0),
+            0, []),
     couch_task_status:set_update_frequency(0),
     couch_task_status:update("Finishing."),
     couch_work_queue:close(MapQueue),
@@ -137,7 +137,7 @@ do_maps(Group, MapQueue, WriteQueue, ViewEmptyKVs) ->
         do_maps(Group1, MapQueue, WriteQueue, ViewEmptyKVs)
     end.
 
-do_writes(Parent, Owner, Group, WriteQueue) ->
+do_writes(Parent, Owner, Group, WriteQueue, IntitalBuild) ->
     case couch_work_queue:dequeue(WriteQueue) of
     closed ->
         Parent ! {new_group, Group};
@@ -154,12 +154,13 @@ do_writes(Parent, Owner, Group, WriteQueue) ->
                 {lists:max([Seq, Seq2]),
                         AccViewKVs2, DocIdViewIdKeys ++ AccDocIdViewIdKeys}
             end, nil, Queue),
-        Group2 = write_changes(Group, ViewKeyValues, DocIdViewIdKeys, NewSeq),
+        Group2 = write_changes(Group, ViewKeyValues, DocIdViewIdKeys, NewSeq,
+                IntitalBuild),
         case Owner of
         nil -> ok;
         _ -> ok = gen_server:cast(Owner, {partial_update, self(), Group2})
         end,
-        do_writes(Parent, nil, Group2, WriteQueue)
+        do_writes(Parent, nil, Group2, WriteQueue, IntitalBuild)
     end.
 
 view_insert_query_results([], [], ViewKVs, DocIdViewIdKeysAcc) ->
@@ -212,12 +213,17 @@ view_compute(#group{def_lang=DefLang, query_server=QueryServerIn}=Group, Docs) -
 
 
 
-write_changes(Group, ViewKeyValuesToAdd, DocIdViewIdKeys, NewSeq) ->
+write_changes(Group, ViewKeyValuesToAdd, DocIdViewIdKeys, NewSeq, InitialBuild) ->
     #group{id_btree=IdBtree} = Group,
 
     AddDocIdViewIdKeys = [{DocId, ViewIdKeys} || {DocId, ViewIdKeys} <- DocIdViewIdKeys, ViewIdKeys /= []],
-    RemoveDocIds = [DocId || {DocId, ViewIdKeys} <- DocIdViewIdKeys, ViewIdKeys == []],
-    LookupDocIds = [DocId || {DocId, _ViewIdKeys} <- DocIdViewIdKeys],
+    if InitialBuild ->
+        RemoveDocIds = [],
+        LookupDocIds = [];
+    true ->
+        RemoveDocIds = [DocId || {DocId, ViewIdKeys} <- DocIdViewIdKeys, ViewIdKeys == []],
+        LookupDocIds = [DocId || {DocId, _ViewIdKeys} <- DocIdViewIdKeys]
+    end,
     {ok, LookupResults, IdBtree2}
         = couch_btree:query_modify(IdBtree, LookupDocIds, AddDocIdViewIdKeys, RemoveDocIds),
     KeysToRemoveByView = lists:foldl(
