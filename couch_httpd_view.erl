@@ -16,7 +16,7 @@
 -export([handle_view_req/2,handle_temp_view_req/2,handle_db_view_req/2]).
 
 -export([get_stale_type/1, get_reduce_type/1, parse_view_params/3]).
--export([make_view_fold_fun/6, finish_view_fold/3, view_row_obj/3]).
+-export([make_view_fold_fun/6, finish_view_fold/4, view_row_obj/3]).
 -export([view_group_etag/2, view_group_etag/3, make_reduce_fold_funs/5]).
 -export([design_doc_view/5, parse_bool_param/1]).
 
@@ -150,11 +150,11 @@ output_map_view(Req, View, Group, Db, QueryArgs, nil) ->
     CurrentEtag = view_group_etag(Group, Db),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         {ok, RowCount} = couch_view:get_row_count(View),
-        Start = {StartKey, StartDocId},
         FoldlFun = make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db, RowCount, #view_fold_helper_funs{reduce_count=fun couch_view:reduce_to_count/1}),
-        FoldAccInit = {Limit, SkipCount, undefined, [], nil},
-        FoldResult = couch_view:fold(View, Start, Dir, FoldlFun, FoldAccInit),
-        finish_view_fold(Req, RowCount, FoldResult)
+        FoldAccInit = {Limit, SkipCount, undefined, []},
+        {ok, LastReduce, FoldResult} = couch_view:fold(View, FoldlFun, FoldAccInit,
+                [{dir, Dir}, {start_key, {StartKey, StartDocId}} |  make_end_key_option(QueryArgs)]),
+        finish_view_fold(Req, RowCount, couch_view:reduce_to_count(LastReduce), FoldResult)
     end);
 
 output_map_view(Req, View, Group, Db, QueryArgs, Keys) ->
@@ -167,21 +167,21 @@ output_map_view(Req, View, Group, Db, QueryArgs, Keys) ->
     CurrentEtag = view_group_etag(Group, Db, Keys),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         {ok, RowCount} = couch_view:get_row_count(View),
-        FoldAccInit = {Limit, SkipCount, undefined, [], nil},
-        FoldResult = lists:foldl(
-            fun(Key, {ok, FoldAcc}) ->
-                Start = {Key, StartDocId},
+        FoldAccInit = {Limit, SkipCount, undefined, []},
+        {LastReduce, FoldResult} = lists:foldl(
+            fun(Key, {_, FoldAcc}) ->
                 FoldlFun = make_view_fold_fun(Req,
                     QueryArgs#view_query_args{
-                        start_key = Key,
-                        end_key = Key
                     }, CurrentEtag, Db, RowCount,
                     #view_fold_helper_funs{
                         reduce_count = fun couch_view:reduce_to_count/1
                     }),
-                couch_view:fold(View, Start, Dir, FoldlFun, FoldAcc)
-            end, {ok, FoldAccInit}, Keys),
-        finish_view_fold(Req, RowCount, FoldResult)
+                {ok, LastReduce, FoldResult} = couch_view:fold(View, FoldlFun, FoldAcc, 
+                    [{dir, Dir},{start_key, {Key, StartDocId}} |  make_end_key_option(
+                            QueryArgs#view_query_args{end_key=Key})]),
+                {LastReduce, FoldResult}
+            end, {{[],[]}, FoldAccInit}, Keys),
+        finish_view_fold(Req, RowCount, couch_view:reduce_to_count(LastReduce), FoldResult)
     end).
 
 output_reduce_view(Req, Db, View, Group, QueryArgs, nil) ->
@@ -401,58 +401,37 @@ validate_view_query(extra, _Value, Args) ->
     Args.
 
 make_view_fold_fun(Req, QueryArgs, Etag, Db, TotalViewCount, HelperFuns) ->
-    #view_query_args{
-        end_key = EndKey,
-        end_docid = EndDocId,
-        inclusive_end = InclusiveEnd,
-        direction = Dir
-    } = QueryArgs,
-
     #view_fold_helper_funs{
-        passed_end = PassedEndFun,
         start_response = StartRespFun,
         send_row = SendRowFun,
         reduce_count = ReduceCountFun
-    } = apply_default_helper_funs(HelperFuns,
-        {Dir, EndKey, EndDocId, InclusiveEnd}),
+    } = apply_default_helper_funs(HelperFuns),
 
     #view_query_args{
         include_docs = IncludeDocs
     } = QueryArgs,
-
-    fun({{Key, DocId}, Value}, OffsetReds, {AccLimit, AccSkip, Resp, RowFunAcc,
-                                            OffsetAcc}) ->
-        PassedEnd = PassedEndFun(Key, DocId),
-        case {PassedEnd, AccLimit, AccSkip, Resp} of
-        {true, _, _, _} ->
-            % The stop key has been passed, stop looping.
-            % We may need offset so calcluate it here.
-            % Checking Resp is an optimization that tells
-            % us its already been calculated (and sent).
-            NewOffset = case Resp of
-                undefined -> ReduceCountFun(OffsetReds);
-                _ -> nil
-            end,
-            {stop, {AccLimit, AccSkip, Resp, RowFunAcc, NewOffset}};
-        {_, 0, _, _} ->
+    
+    fun({{Key, DocId}, Value}, OffsetReds, {AccLimit, AccSkip, Resp, RowFunAcc}) ->
+        case {AccLimit, AccSkip, Resp} of
+        {0, _, _} ->
             % we've done "limit" rows, stop foldling
-            {stop, {0, 0, Resp, RowFunAcc, OffsetAcc}};
-        {_, _, AccSkip, _} when AccSkip > 0 ->
+            {stop, {0, 0, Resp, RowFunAcc}};
+        {_, AccSkip, _} when AccSkip > 0 ->
             % just keep skipping
-            {ok, {AccLimit, AccSkip - 1, Resp, RowFunAcc, OffsetAcc}};
-        {_, _, _, undefined} ->
+            {ok, {AccLimit, AccSkip - 1, Resp, RowFunAcc}};
+        {_, _, undefined} ->
             % rendering the first row, first we start the response
             Offset = ReduceCountFun(OffsetReds),
             {ok, Resp2, RowFunAcc0} = StartRespFun(Req, Etag,
                 TotalViewCount, Offset, RowFunAcc),
             {Go, RowFunAcc2} = SendRowFun(Resp2, Db, {{Key, DocId}, Value},
                 IncludeDocs, RowFunAcc0),
-            {Go, {AccLimit - 1, 0, Resp2, RowFunAcc2, Offset}};
-        {_, AccLimit, _, Resp} when (AccLimit > 0) ->
+            {Go, {AccLimit - 1, 0, Resp2, RowFunAcc2}};
+        {AccLimit, _, Resp} when (AccLimit > 0) ->
             % rendering all other rows
             {Go, RowFunAcc2} = SendRowFun(Resp, Db, {{Key, DocId}, Value},
                 IncludeDocs, RowFunAcc),
-            {Go, {AccLimit - 1, 0, Resp, RowFunAcc2, OffsetAcc}}
+            {Go, {AccLimit - 1, 0, Resp, RowFunAcc2}}
         end
     end.
 
@@ -515,14 +494,9 @@ make_reduce_fold_funs(Req, GroupLevel, _QueryArgs, Etag, HelperFuns) ->
     {ok, GroupRowsFun, RespFun}.
 
 apply_default_helper_funs(#view_fold_helper_funs{
-    passed_end = PassedEnd,
     start_response = StartResp,
     send_row = SendRow
-}=Helpers, {Dir, EndKey, EndDocId, InclusiveEnd}) ->
-    PassedEnd2 = case PassedEnd of
-    undefined -> make_passed_end_fun(Dir, EndKey, EndDocId, InclusiveEnd);
-    _ -> PassedEnd
-    end,
+}=Helpers) ->
 
     StartResp2 = case StartResp of
     undefined -> fun json_view_start_resp/5;
@@ -535,10 +509,10 @@ apply_default_helper_funs(#view_fold_helper_funs{
     end,
 
     Helpers#view_fold_helper_funs{
-        passed_end = PassedEnd2,
         start_response = StartResp2,
         send_row = SendRow2
-    }.
+    };
+
 
 apply_default_helper_funs(#reduce_fold_helper_funs{
     start_response = StartResp,
@@ -559,35 +533,17 @@ apply_default_helper_funs(#reduce_fold_helper_funs{
         send_row = SendRow2
     }.
 
-make_passed_end_fun(fwd, EndKey, EndDocId, InclusiveEnd) ->
-    case InclusiveEnd of
-    true ->
-        fun(ViewKey, ViewId) ->
-            couch_view:less_json([EndKey, EndDocId], [ViewKey, ViewId])
-        end;
-    false ->
-        fun
-            (ViewKey, _ViewId) when ViewKey == EndKey ->
-                true;
-            (ViewKey, ViewId) ->
-                couch_view:less_json([EndKey, EndDocId], [ViewKey, ViewId])
-        end
-    end;
-
-make_passed_end_fun(rev, EndKey, EndDocId, InclusiveEnd) ->
-    case InclusiveEnd of
-    true ->
-        fun(ViewKey, ViewId) ->
-            couch_view:less_json([ViewKey, ViewId], [EndKey, EndDocId])
-        end;
-    false->
-        fun
-            (ViewKey, _ViewId) when ViewKey == EndKey ->
-                true;
-            (ViewKey, ViewId) ->
-                couch_view:less_json([ViewKey, ViewId], [EndKey, EndDocId])
-        end
-    end.
+make_end_key_option(
+        #view_query_args{end_key = EndKey,
+            end_docid = EndDocId,
+            inclusive_end = true}) ->
+    [{end_key_inclusive, {EndKey, EndDocId}}];
+make_end_key_option(
+        #view_query_args{
+            end_key = EndKey,
+            end_docid = EndDocId,
+            inclusive_end = false}) ->
+    [{end_key, {EndKey,reverse_key_default(EndDocId)}}].
 
 json_view_start_resp(Req, Etag, TotalViewCount, Offset, _Acc) ->
     {ok, Resp} = start_json_response(Req, 200, [{"Etag", Etag}]),
@@ -651,26 +607,20 @@ view_row_with_doc(Db, {{Key, DocId}, Value}, Rev) ->
         {[{id, DocId}, {key, Key}, {value, Value}, {doc, JsonDoc}]}
     end.
 
-finish_view_fold(Req, TotalRows, FoldResult) ->
+finish_view_fold(Req, TotalRows, Offset, FoldResult) ->
     case FoldResult of
-    {ok, {_, _, undefined, _, Offset}} ->
-        % nothing found in the view, nothing has been returned
+    {_, _, undefined, _} ->
+        % nothing found in the view or keys, nothing has been returned
         % send empty view
-        NewOffset = case Offset of
-            nil -> TotalRows;
-            _ -> Offset
-        end,
         send_json(Req, 200, {[
             {total_rows, TotalRows},
-            {offset, NewOffset},
+            {offset, Offset},
             {rows, []}
         ]});
-    {ok, {_, _, Resp, _, _}} ->
+    {_, _, Resp, _} ->
         % end the view
         send_chunk(Resp, "\r\n]}"),
-        end_json_response(Resp);
-    Error ->
-        throw(Error)
+        end_json_response(Resp)
     end.
 
 finish_reduce_fold(Req, Resp) ->

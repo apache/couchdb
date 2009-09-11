@@ -193,8 +193,8 @@ output_map_list(#httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Lang, ListSrc, Vie
                 start_response = StartListRespFun,
                 send_row = SendListRowFun
             }),
-        FoldAccInit = {Limit, SkipCount, undefined, [], nil},
-        {ok, FoldResult} = couch_view:fold(View, Start, Dir, FoldlFun, FoldAccInit),
+        FoldAccInit = {Limit, SkipCount, undefined, []},
+        {ok, _, FoldResult} = couch_view:fold(View, FoldlFun, FoldAccInit, [{start_key, Start},{dir, Dir}]),
         finish_list(Req, QueryServer, CurrentEtag, FoldResult, StartListRespFun, RowCount)
     end);
 
@@ -218,9 +218,9 @@ output_map_list(#httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Lang, ListSrc, Vie
         StartListRespFun = make_map_start_resp_fun(QueryServer, Db),
         SendListRowFun = make_map_send_row_fun(QueryServer),
 
-        FoldAccInit = {Limit, SkipCount, undefined, [], nil},
-        {ok, FoldResult} = lists:foldl(
-            fun(Key, {ok, FoldAcc}) ->
+        FoldAccInit = {Limit, SkipCount, undefined, []},
+        {ok, _, FoldResult} = lists:foldl(
+            fun(Key, {ok, _, FoldAcc}) ->
                 FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs#view_query_args{
                         start_key = Key,
                         end_key = Key
@@ -230,8 +230,8 @@ output_map_list(#httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Lang, ListSrc, Vie
                         start_response = StartListRespFun,
                         send_row = SendListRowFun
                     }),
-                couch_view:fold(View, {Key, StartDocId}, Dir, FoldlFun, FoldAcc)
-            end, {ok, FoldAccInit}, Keys),
+                couch_view:fold(View, FoldlFun, FoldAcc, [{start_key, {Key, StartDocId}}, {dir, Dir}])
+            end, {ok, nil, FoldAccInit}, Keys),
         finish_list(Req, QueryServer, CurrentEtag, FoldResult, StartListRespFun, RowCount)
     end).
 

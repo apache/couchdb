@@ -13,7 +13,7 @@
 -module(couch_view).
 -behaviour(gen_server).
 
--export([start_link/0,fold/4,fold/5,less_json/2,less_json_keys/2,expand_dups/2,
+-export([start_link/0,fold/4,less_json/2,less_json_keys/2,expand_dups/2,
     detuple_kvs/2,init/1,terminate/2,handle_call/3,handle_cast/2,handle_info/2,
     code_change/3,get_reduce_view/4,get_temp_reduce_view/5,get_temp_map_view/4,
     get_map_view/4,get_row_count/1,reduce_to_count/1,fold_reduce/7,
@@ -239,15 +239,13 @@ fold_fun(Fun, [KV|Rest], {KVReds, Reds}, Acc) ->
         {stop, Acc2}
     end.
 
-fold(#view{btree=Btree}, Dir, Fun, Acc) ->
-    fold(Btree, nil, Dir, Fun, Acc).
 
-fold(#view{btree=Btree}, StartKey, Dir, Fun, Acc) ->
+fold(#view{btree=Btree}, Fun, Acc, Options) ->
     WrapperFun =
         fun(KV, Reds, Acc2) ->
             fold_fun(Fun, expand_dups([KV],[]), Reds, Acc2)
         end,
-    {ok, _AccResult} = couch_btree:fold(Btree, StartKey, Dir, WrapperFun, Acc).
+    {ok, _LastReduce, _AccResult} = couch_btree:fold(Btree, WrapperFun, Acc, Options).
 
 
 init([]) ->

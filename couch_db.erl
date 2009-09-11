@@ -19,7 +19,7 @@
 -export([get_doc_info/2,open_doc/2,open_doc/3,open_doc_revs/4]).
 -export([set_revs_limit/2,get_revs_limit/1,register_update_notifier/3]).
 -export([get_missing_revs/2,name/1,doc_to_tree/1,get_update_seq/1,get_committed_update_seq/1]).
--export([enum_docs/4,enum_docs/5,enum_docs_since/4,enum_docs_since/5]).
+-export([enum_docs/4,enum_docs_since/5]).
 -export([enum_docs_since_reduce_to_count/1,enum_docs_reduce_to_count/1]).
 -export([increment_update_seq/1,get_purge_seq/1,purge_docs/2,get_last_purged/1]).
 -export([start_link/3,open_doc_int/3,set_admins/2,get_admins/1,ensure_full_commit/1]).
@@ -193,14 +193,15 @@ get_db_info(Db) ->
     {ok, InfoList}.
 
 get_design_docs(#db{fulldocinfo_by_id_btree=Btree}=Db) ->
-    couch_btree:foldl(Btree, <<"_design/">>,
+    {ok,_, Docs} = couch_btree:fold(Btree,
         fun(#full_doc_info{id= <<"_design/",_/binary>>}=FullDocInfo, _Reds, AccDocs) ->
             {ok, Doc} = couch_db:open_doc_int(Db, FullDocInfo, []),
             {ok, [Doc | AccDocs]};
         (_, _Reds, AccDocs) ->
             {stop, AccDocs}
         end,
-        []).
+        [], [{start_key, <<"_design/">>}, {end_key, <<"_design0">>}]),
+    {ok, Docs}.
 
 check_is_admin(#db{admins=Admins, user_ctx=#user_ctx{name=Name,roles=Roles}}) ->
     DbAdmins = [<<"_admin">> | Admins],
@@ -693,8 +694,7 @@ enum_docs_reduce_to_count(Reds) ->
     Count.
 
 changes_since(Db, Style, StartSeq, Fun, Acc) ->
-    enum_docs_since(Db, StartSeq, fwd,
-        fun(DocInfo, _Offset, Acc2) ->
+    Wrapper = fun(DocInfo, _Offset, Acc2) ->
             #doc_info{revs=Revs} = DocInfo,
             case Style of
             main_only ->
@@ -705,7 +705,9 @@ changes_since(Db, Style, StartSeq, Fun, Acc) ->
                     #rev_info{seq=RevSeq}=RevInfo <- Revs, StartSeq < RevSeq]
             end,
             Fun(Infos, Acc2)
-        end, Acc).
+        end,
+    {ok, _LastReduction, AccOut} = couch_btree:fold(Db#db.docinfo_by_seq_btree, Wrapper, Acc, [{start_key, StartSeq + 1}]),
+    {ok, AccOut}.
 
 count_changes_since(Db, SinceSeq) ->
     {ok, Changes} =
@@ -719,17 +721,13 @@ count_changes_since(Db, SinceSeq) ->
         0),
     Changes.
 
-enum_docs_since(Db, SinceSeq, Direction, InFun, Acc) ->
-    couch_btree:fold(Db#db.docinfo_by_seq_btree, SinceSeq + 1, Direction, InFun, Acc).
+enum_docs_since(Db, SinceSeq, InFun, Acc, Options) ->
+    {ok, LastReduction, AccOut} = couch_btree:fold(Db#db.docinfo_by_seq_btree, InFun, Acc, [{start_key, SinceSeq + 1} | Options]),
+    {ok, enum_docs_since_reduce_to_count(LastReduction), AccOut}.
 
-enum_docs_since(Db, SinceSeq, InFun, Acc) ->
-    enum_docs_since(Db, SinceSeq, fwd, InFun, Acc).
-
-enum_docs(Db, StartId, Direction, InFun, InAcc) ->
-    couch_btree:fold(Db#db.fulldocinfo_by_id_btree, StartId, Direction, InFun, InAcc).
-
-enum_docs(Db, StartId, InFun, Ctx) ->
-    enum_docs(Db, StartId, fwd, InFun, Ctx).
+enum_docs(Db, InFun, InAcc, Options) ->
+    {ok, LastReduce, OutAcc} = couch_btree:fold(Db#db.fulldocinfo_by_id_btree, InFun, InAcc, Options),
+    {ok, enum_docs_reduce_to_count(LastReduce), OutAcc}.
 
 % server functions
 

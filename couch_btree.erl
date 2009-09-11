@@ -12,8 +12,8 @@
 
 -module(couch_btree).
 
--export([open/2, open/3, query_modify/4, add/2, add_remove/3, foldl/3, foldl/4]).
--export([foldr/3, foldr/4, fold/4, fold/5, full_reduce/1, final_reduce/2]).
+-export([open/2, open/3, query_modify/4, add/2, add_remove/3]).
+-export([fold/4, full_reduce/1, final_reduce/2,foldl/3,foldl/4]).
 -export([fold_reduce/6, fold_reduce/7, lookup/2, get_state/1, set_options/2]).
 
 -define(CHUNK_THRESHOLD, 16#4ff).
@@ -99,31 +99,67 @@ full_reduce(#btree{root=nil,reduce=Reduce}) ->
 full_reduce(#btree{root={_P, Red}}) ->
     {ok, Red}.
 
-foldl(Bt, Fun, Acc) ->
-    fold(Bt, fwd, Fun, Acc).
-
-foldl(Bt, Key, Fun, Acc) ->
-    fold(Bt, Key, fwd, Fun, Acc).
-
-foldr(Bt, Fun, Acc) ->
-    fold(Bt, rev, Fun, Acc).
-
-foldr(Bt, Key, Fun, Acc) ->
-    fold(Bt, Key, rev, Fun, Acc).
-
 % wraps a 2 arity function with the proper 3 arity function
 convert_fun_arity(Fun) when is_function(Fun, 2) ->
     fun(KV, _Reds, AccIn) -> Fun(KV, AccIn) end;
 convert_fun_arity(Fun) when is_function(Fun, 3) ->
     Fun.    % Already arity 3
 
-fold(Bt, Dir, Fun, Acc) ->
-    {_ContinueFlag, Acc2} = stream_node(Bt, [], Bt#btree.root, nil, Dir, convert_fun_arity(Fun), Acc),
-    {ok, Acc2}.
 
-fold(Bt, Key, Dir, Fun, Acc) ->
-    {_ContinueFlag, Acc2} = stream_node(Bt, [], Bt#btree.root, Key, Dir, convert_fun_arity(Fun), Acc),
-    {ok, Acc2}.
+make_key_in_end_range_function(#btree{less=Less}, fwd, Options) ->
+    case proplists:get_value(end_key, Options) of
+    undefined ->
+        case proplists:get_value(end_key_inclusive, Options) of
+        undefined ->
+            fun(_Key) -> true end;
+        LastKey ->
+            fun(Key) -> not Less(LastKey, Key) end
+        end;
+    EndKey ->
+        fun(Key) -> Less(Key, EndKey) end
+    end;
+make_key_in_end_range_function(#btree{less=Less}, rev, Options) ->
+    case proplists:get_value(end_key, Options) of
+    undefined ->
+        case proplists:get_value(end_key_inclusive, Options) of
+        undefined ->
+            fun(_Key) -> true end;
+        LastKey ->
+            fun(Key) -> not Less(Key, LastKey) end
+        end;
+    EndKey ->
+        fun(Key) -> Less(EndKey, Key) end
+    end.
+
+
+foldl(Bt, Fun, Acc) ->
+    fold(Bt, Fun, Acc, []).
+
+foldl(Bt, Fun, Acc, Options) ->
+    fold(Bt, Fun, Acc, Options).
+
+
+fold(#btree{root=nil}, _Fun, Acc, _Options) ->
+    {ok, {[], []}, Acc};
+fold(#btree{root=Root}=Bt, Fun, Acc, Options) ->
+    Dir = proplists:get_value(dir, Options, fwd),
+    InRange = make_key_in_end_range_function(Bt, Dir, Options),
+    Result =
+    case proplists:get_value(start_key, Options) of
+    undefined ->
+        stream_node(Bt, [], Bt#btree.root, InRange, Dir, 
+                convert_fun_arity(Fun), Acc);
+    StartKey ->
+        stream_node(Bt, [], Bt#btree.root, StartKey, InRange, Dir, 
+                convert_fun_arity(Fun), Acc)
+    end,
+    case Result of
+    {ok, Acc2}->
+        {_P, FullReduction} = Root,
+        {ok, {[], [FullReduction]}, Acc2};
+    {stop, LastReduction, Acc2} ->
+        {ok, LastReduction, Acc2}
+    end.
 
 add(Bt, InsertKeyValues) ->
     add_remove(Bt, InsertKeyValues, []).
@@ -556,40 +592,32 @@ adjust_dir(fwd, List) ->
 adjust_dir(rev, List) ->
     lists:reverse(List).
 
-stream_node(Bt, Reds, PointerInfo, nil, Dir, Fun, Acc) ->
-    stream_node(Bt, Reds, PointerInfo, Dir, Fun, Acc);
-stream_node(Bt, Reds, PointerInfo, {}, rev, Fun, Acc) ->
-    stream_node(Bt, Reds, PointerInfo, rev, Fun, Acc);
-stream_node(_Bt, _Reds, nil, _StartKey, _Dir, _Fun, Acc) ->
-    {ok, Acc};
-stream_node(Bt, Reds, {Pointer, _Reds}, StartKey, Dir, Fun, Acc) ->
+stream_node(Bt, Reds, {Pointer, _Reds}, StartKey, InRange, Dir, Fun, Acc) ->
     {NodeType, NodeList} = get_node(Bt, Pointer),
     case NodeType of
     kp_node ->
-        stream_kp_node(Bt, Reds, adjust_dir(Dir, NodeList), StartKey, Dir, Fun, Acc);
+        stream_kp_node(Bt, Reds, adjust_dir(Dir, NodeList), StartKey, InRange, Dir, Fun, Acc);
     kv_node ->
-        stream_kv_node(Bt, Reds, adjust_dir(Dir, NodeList), StartKey, Dir, Fun, Acc)
+        stream_kv_node(Bt, Reds, adjust_dir(Dir, NodeList), StartKey, InRange, Dir, Fun, Acc)
     end.
 
-stream_node(_Bt, _Reds, nil, _Dir, _Fun, Acc) ->
-    {ok, Acc};
-stream_node(Bt, Reds, {Pointer, _Reds}, Dir, Fun, Acc) ->
+stream_node(Bt, Reds, {Pointer, _Reds}, InRange, Dir, Fun, Acc) ->
     {NodeType, NodeList} = get_node(Bt, Pointer),
     case NodeType of
     kp_node ->
-        stream_kp_node(Bt, Reds, adjust_dir(Dir, NodeList), Dir, Fun, Acc);
+        stream_kp_node(Bt, Reds, adjust_dir(Dir, NodeList), InRange, Dir, Fun, Acc);
     kv_node ->
-        stream_kv_node2(Bt, Reds, [], adjust_dir(Dir, NodeList), Dir, Fun, Acc)
+        stream_kv_node2(Bt, Reds, [], adjust_dir(Dir, NodeList), InRange, Dir, Fun, Acc)
     end.
 
-stream_kp_node(_Bt, _Reds, [], _Dir, _Fun, Acc) ->
+stream_kp_node(_Bt, _Reds, [], _InRange, _Dir, _Fun, Acc) ->
     {ok, Acc};
-stream_kp_node(Bt, Reds, [{_Key, {Pointer, Red}} | Rest], Dir, Fun, Acc) ->
-    case stream_node(Bt, Reds, {Pointer, Red}, Dir, Fun, Acc) of
+stream_kp_node(Bt, Reds, [{_Key, {Pointer, Red}} | Rest], InRange, Dir, Fun, Acc) ->
+    case stream_node(Bt, Reds, {Pointer, Red}, InRange, Dir, Fun, Acc) of
     {ok, Acc2} ->
-        stream_kp_node(Bt, [Red | Reds], Rest, Dir, Fun, Acc2);
-    {stop, Acc2} ->
-        {stop, Acc2}
+        stream_kp_node(Bt, [Red | Reds], Rest, InRange, Dir, Fun, Acc2);
+    {stop, LastReds, Acc2} ->
+        {stop, LastReds, Acc2}
     end.
 
 drop_nodes(_Bt, Reds, _StartKey, []) ->
@@ -600,7 +628,7 @@ drop_nodes(Bt, Reds, StartKey, [{NodeKey, {Pointer, Red}} | RestKPs]) ->
     false -> {Reds, [{NodeKey, {Pointer, Red}} | RestKPs]}
     end.
 
-stream_kp_node(Bt, Reds, KPs, StartKey, Dir, Fun, Acc) ->
+stream_kp_node(Bt, Reds, KPs, StartKey, InRange, Dir, Fun, Acc) ->
     {NewReds, NodesToStream} =
     case Dir of
     fwd ->
@@ -609,28 +637,28 @@ stream_kp_node(Bt, Reds, KPs, StartKey, Dir, Fun, Acc) ->
     rev ->
         % keep all nodes sorting before the key, AND the first node to sort after
         RevKPs = lists:reverse(KPs),
-        case lists:splitwith(fun({Key, _Pointer}) -> less(Bt, Key, StartKey) end, RevKPs) of
-        {_RevBefore, []} ->
+         case lists:splitwith(fun({Key, _Pointer}) -> less(Bt, Key, StartKey) end, RevKPs) of
+        {_RevsBefore, []} ->
             % everything sorts before it
             {Reds, KPs};
         {RevBefore, [FirstAfter | Drop]} ->
             {[Red || {_K,{_P,Red}} <- Drop] ++ Reds,
-                [FirstAfter | lists:reverse(RevBefore)]}
+                 [FirstAfter | lists:reverse(RevBefore)]}
         end
     end,
     case NodesToStream of
     [] ->
         {ok, Acc};
     [{_Key, {Pointer, Red}} | Rest] ->
-        case stream_node(Bt, NewReds, {Pointer, Red}, StartKey, Dir, Fun, Acc) of
+        case stream_node(Bt, NewReds, {Pointer, Red}, StartKey, InRange, Dir, Fun, Acc) of
         {ok, Acc2} ->
-            stream_kp_node(Bt, [Red | NewReds], Rest, Dir, Fun, Acc2);
-        {stop, Acc2} ->
-            {stop, Acc2}
+            stream_kp_node(Bt, [Red | NewReds], Rest, InRange, Dir, Fun, Acc2);
+        {stop, LastReds, Acc2} ->
+            {stop, LastReds, Acc2}
         end
     end.
 
-stream_kv_node(Bt, Reds, KVs, StartKey, Dir, Fun, Acc) ->
+stream_kv_node(Bt, Reds, KVs, StartKey, InRange, Dir, Fun, Acc) ->
     DropFun =
     case Dir of
     fwd ->
@@ -640,15 +668,20 @@ stream_kv_node(Bt, Reds, KVs, StartKey, Dir, Fun, Acc) ->
     end,
     {LTKVs, GTEKVs} = lists:splitwith(DropFun, KVs),
     AssembleLTKVs = [assemble(Bt,K,V) || {K,V} <- LTKVs],
-    stream_kv_node2(Bt, Reds, AssembleLTKVs, GTEKVs, Dir, Fun, Acc).
+    stream_kv_node2(Bt, Reds, AssembleLTKVs, GTEKVs, InRange, Dir, Fun, Acc).
 
-stream_kv_node2(_Bt, _Reds, _PrevKVs, [], _Dir, _Fun, Acc) ->
+stream_kv_node2(_Bt, _Reds, _PrevKVs, [], _InRange, _Dir, _Fun, Acc) ->
     {ok, Acc};
-stream_kv_node2(Bt, Reds, PrevKVs, [{K,V} | RestKVs], Dir, Fun, Acc) ->
-    AssembledKV = assemble(Bt, K, V),
-    case Fun(AssembledKV, {PrevKVs, Reds}, Acc) of
-    {ok, Acc2} ->
-        stream_kv_node2(Bt, Reds, [AssembledKV | PrevKVs], RestKVs, Dir, Fun, Acc2);
-    {stop, Acc2} ->
-        {stop, Acc2}
+stream_kv_node2(Bt, Reds, PrevKVs, [{K,V} | RestKVs], InRange, Dir, Fun, Acc) ->
+    case InRange(K) of
+    false ->
+        {stop, {PrevKVs, Reds}, Acc};
+    true ->
+        AssembledKV = assemble(Bt, K, V),
+        case Fun(AssembledKV, {PrevKVs, Reds}, Acc) of
+        {ok, Acc2} ->
+            stream_kv_node2(Bt, Reds, [AssembledKV | PrevKVs], RestKVs, InRange, Dir, Fun, Acc2);
+        {stop, Acc2} ->
+            {stop, {PrevKVs, Reds}, Acc2}
+        end
     end.
