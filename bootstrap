@@ -32,7 +32,12 @@ get () {
 mkdir -p build-aux
 
 if test -z "$REVISION"; then
-    REVISION=`\`which svn\` info . 2> /dev/null | awk "/Revision:/{print \\$2}"`
+    if test -d .git; then
+        REVISION=`git log | head -1 | awk '{print $2}' | cut -b 1-8`-git
+    else
+        # default to svn
+        REVISION=`\`which svn\` info . 2> /dev/null | awk "/Revision:/{print \\$2}"`
+    fi
 fi
 if test -z "`get LOCAL_VERSION_STAGE`" -o -z "$REVISION"; then
     sed "s/%release%//" < acinclude.m4.in > acinclude.m4
