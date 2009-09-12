@@ -89,7 +89,7 @@ start_server(IniFiles) ->
             permanent,
             brutal_kill,
             worker,
-            dynamic},
+            [couch_config]},
         {couch_primary_services,
             {couch_server_sup, start_primary_services, []},
             permanent,
@@ -155,13 +155,13 @@ start_primary_services() ->
                 {couch_server, sup_start_link, []},
                 permanent,
                 brutal_kill,
-                supervisor,
+                worker,
                 [couch_server]},
             {couch_db_update_event,
                 {gen_event, start_link, [{local, couch_db_update}]},
                 permanent,
                 brutal_kill,
-                supervisor,
+                worker,
                 dynamic}
             ]
         }).
