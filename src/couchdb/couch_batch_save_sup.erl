@@ -33,5 +33,5 @@ init([]) ->
         "batch_save_interval","1000")),
 
     Batch = {batch, {couch_batch_save, start_link, [BatchSize, BatchInterval]},
-            permanent, 1000, worker, [batch_save]},
+            permanent, 1000, worker, [couch_batch_save]},
     {ok, {{one_for_one, 10, 3600}, [Batch]}}.
