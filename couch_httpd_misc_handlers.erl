@@ -163,11 +163,12 @@ handle_config_req(#httpd{method='GET', path_parts=[_, Section, Key]}=Req) ->
 % DELETE /_config/Section/Key
 handle_config_req(#httpd{method='DELETE',path_parts=[_,Section,Key]}=Req) ->
     ok = couch_httpd:verify_is_server_admin(Req),
+    Persist = couch_httpd:header_value(Req, "X-Couch-Persist") /= "false",
     case couch_config:get(Section, Key, null) of
     null ->
         throw({not_found, unknown_config_value});
     OldValue ->
-        couch_config:delete(Section, Key),
+        couch_config:delete(Section, Key, Persist),
         send_json(Req, 200, list_to_binary(OldValue))
     end;
 handle_config_req(Req) ->
