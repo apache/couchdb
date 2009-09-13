@@ -84,4 +84,11 @@ test() ->
         "Implicitly test that the function got de-registered"
     ),
 
+    % test passing of Persist flag
+    couch_config:register(
+        fun("httpd", _, _, Persist) ->
+            etap:is(Persist, false)
+        end),
+    ok = couch_config:set("httpd", "port", "80", false),
+
     ok.

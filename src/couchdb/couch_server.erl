@@ -95,13 +95,17 @@ get_full_filename(Server, DbName) ->
     filename:join([Server#server.root_dir, "./" ++ DbName ++ ".couch"]).
 
 hash_admin_passwords() ->
+    hash_admin_passwords(true).
+
+hash_admin_passwords(Persist) ->
     lists:foreach(
         fun({_User, "-hashed-" ++ _}) ->
             ok; % already hashed
         ({User, ClearPassword}) ->
             Salt = ?b2l(couch_uuids:random()),
             Hashed = couch_util:to_hex(crypto:sha(ClearPassword ++ Salt)),
-            couch_config:set("admins", User, "-hashed-" ++ Hashed ++ "," ++ Salt)
+            couch_config:set("admins", 
+                User, "-hashed-" ++ Hashed ++ "," ++ Salt, Persist)
         end, couch_config:get("admins")).
 
 init([]) ->
@@ -125,10 +129,10 @@ init([]) ->
         end),
     hash_admin_passwords(),
     ok = couch_config:register(
-        fun("admins") ->
+        fun("admins", _Key, _Value, Persist) ->
             % spawn here so couch_config doesn't try to call itself
-            spawn(fun() -> hash_admin_passwords() end)
-        end),
+            spawn(fun() -> hash_admin_passwords(Persist) end)
+        end, false),
     {ok, RegExp} = re:compile("^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*$"),
     ets:new(couch_dbs_by_name, [set, private, named_table]),
     ets:new(couch_dbs_by_pid, [set, private, named_table]),
