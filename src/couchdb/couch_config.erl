@@ -128,7 +128,7 @@ handle_call({set, Sec, Key, Val, Persist}, _From, Config) ->
         _ ->
             ok
     end,
-    [catch F(Sec, Key, Val) || {_Pid, F} <- Config#config.notify_funs],
+    [catch F(Sec, Key, Val, Persist) || {_Pid, F} <- Config#config.notify_funs],
     {reply, ok, Config};
 handle_call({delete, Sec, Key, Persist}, _From, Config) ->
     true = ets:delete(?MODULE, {Sec,Key}),
@@ -140,7 +140,7 @@ handle_call({delete, Sec, Key, Persist}, _From, Config) ->
         _ ->
             ok
     end,
-    [catch F(Sec, Key, deleted) || {_Pid, F} <- Config#config.notify_funs],
+    [catch F(Sec, Key, deleted, Persist) || {_Pid, F} <- Config#config.notify_funs],
     {reply, ok, Config};
 handle_call({register, Fun, Pid}, _From, #config{notify_funs=PidFuns}=Config) ->
     erlang:monitor(process, Pid),
@@ -148,10 +148,12 @@ handle_call({register, Fun, Pid}, _From, #config{notify_funs=PidFuns}=Config) ->
     Fun2 =
     case Fun of
         _ when is_function(Fun, 1) ->
-            fun(Section, _Key, _Value) -> Fun(Section) end;
+            fun(Section, _Key, _Value, _Persist) -> Fun(Section) end;
         _ when is_function(Fun, 2) ->
-            fun(Section, Key, _Value) -> Fun(Section, Key) end;
+            fun(Section, Key, _Value, _Persist) -> Fun(Section, Key) end;
         _ when is_function(Fun, 3) ->
+            fun(Section, Key, Value, _Persist) -> Fun(Section, Key, Value) end;
+        _ when is_function(Fun, 4) ->
             Fun
     end,
     {reply, ok, Config#config{notify_funs=[{Pid, Fun2} | PidFuns]}}.
