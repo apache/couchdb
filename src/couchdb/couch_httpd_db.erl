@@ -147,29 +147,33 @@ keep_sending_changes(#httpd{user_ctx=UserCtx,path_parts=[DbName|_]}=Req, Resp,
     end.
 
 changes_enumerator(DocInfos, {_, _, FilterFun, Resp, "continuous"}) ->
-    [#doc_info{id=Id, high_seq=Seq}|_] = DocInfos,
+    [#doc_info{id=Id, high_seq=Seq, revs=[#rev_info{deleted=Del}|_]}|_] = DocInfos,
     Results0 = [FilterFun(DocInfo) || DocInfo <- DocInfos],
     Results = [Result || Result <- Results0, Result /= null],
     case Results of
     [] ->
         {ok, {Seq, nil, FilterFun, Resp, "continuous"}};
     _ ->
-        send_chunk(Resp, [?JSON_ENCODE({[{seq,Seq},{id,Id},{changes,Results}]})
-            |"\n"]),
+        send_chunk(Resp, [?JSON_ENCODE(changes_row(Seq, Id, Del, Results)) |"\n"]),
         {ok, {Seq, nil, FilterFun, Resp, "continuous"}}
     end;
 changes_enumerator(DocInfos, {_, Prepend, FilterFun, Resp, _}) ->
-    [#doc_info{id=Id, high_seq=Seq}|_] = DocInfos,
+    [#doc_info{id=Id, high_seq=Seq, revs=[#rev_info{deleted=Del}|_]}|_] = DocInfos,
     Results0 = [FilterFun(DocInfo) || DocInfo <- DocInfos],
     Results = [Result || Result <- Results0, Result /= null],
     case Results of
     [] ->
         {ok, {Seq, Prepend, FilterFun, Resp, nil}};
     _ ->
-        send_chunk(Resp, [Prepend, ?JSON_ENCODE({[{seq,Seq},{id,Id},
-            {changes,Results}]})]),
+        send_chunk(Resp, [Prepend, ?JSON_ENCODE(changes_row(Seq, Id, Del, Results))]),
         {ok, {Seq, <<",\n">>, FilterFun, Resp, nil}}
     end.
+
+changes_row(Seq, Id, Del, Results) ->
+    {[{seq,Seq},{id,Id},{changes,Results}] ++ deleted_item(Del)}.
+
+deleted_item(true) -> [{deleted,true}];
+deleted_item(_) -> [].
 
 send_changes(Req, Resp, Db, StartSeq, Prepend, ResponseType, FilterFun, End) ->
     Style = list_to_existing_atom(
