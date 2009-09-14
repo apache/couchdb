@@ -20,7 +20,8 @@
 
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
-    start_json_response/2,send_chunk/2,end_json_response/1,
+    start_json_response/2,start_json_response/3,
+    send_chunk/2,end_json_response/1,
     start_chunked_response/3, absolute_uri/2, send/2,
     start_response_length/4]).
 
@@ -73,11 +74,18 @@ start_sending_changes(Resp, _Else) ->
 
 handle_changes_req(#httpd{method='GET',path_parts=[DbName|_]}=Req, Db) ->
     {FilterFun, EndFilterFun} = make_filter_funs(Req, Db),
-    StartSeq = list_to_integer(couch_httpd:qs_value(Req, "since", "0")),
-    {ok, Resp} = start_json_response(Req, 200),
+    {Dir, StartSeq} = case couch_httpd:qs_value(Req, "descending", "false") of 
+        "false" -> 
+            {fwd, list_to_integer(couch_httpd:qs_value(Req, "since", "0"))}; 
+        "true" -> 
+            {rev, 1000000000000000}; % super big value, should use current db seq
+        _Bad -> throw({bad_request, "descending must be true or false"})
+    end,
     ResponseType = couch_httpd:qs_value(Req, "feed", "normal"),
-    start_sending_changes(Resp, ResponseType),
     if ResponseType == "continuous" orelse ResponseType == "longpoll" ->
+        {ok, Resp} = start_json_response(Req, 200),
+        start_sending_changes(Resp, ResponseType),
+
         Self = self(),
         {ok, Notify} = couch_db_update_notifier:start_link(
             fun({_, DbName0}) when DbName0 == DbName ->
@@ -96,10 +104,17 @@ handle_changes_req(#httpd{method='GET',path_parts=[DbName|_]}=Req, Db) ->
             get_rest_db_updated() % clean out any remaining update messages
         end;
     true ->
-        {ok, {LastSeq, _Prepend, _, _, _}} =
-                send_changes(Req, Resp, Db, StartSeq, <<"">>, "normal",
-                    FilterFun, EndFilterFun),
-        end_sending_changes(Resp, LastSeq, ResponseType)
+        {ok, Info} = couch_db:get_db_info(Db),
+        CurrentEtag = couch_httpd:make_etag(Info),
+        couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
+            % send the etag
+            {ok, Resp} = start_json_response(Req, 200, [{"Etag", CurrentEtag}]),
+            start_sending_changes(Resp, ResponseType),
+            {ok, {_, LastSeq, _Prepend, _, _, _, _}} =
+                    send_changes(Req, Resp, Db, Dir, StartSeq, <<"">>, "normal",
+                        FilterFun, EndFilterFun),
+            end_sending_changes(Resp, LastSeq, ResponseType)
+        end)
     end;
 
 handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
@@ -129,7 +144,7 @@ end_sending_changes(Resp, EndSeq, _Else) ->
 
 keep_sending_changes(#httpd{user_ctx=UserCtx,path_parts=[DbName|_]}=Req, Resp,
         Db, StartSeq, Prepend, Timeout, TimeoutFun, ResponseType, Filter, End) ->
-    {ok, {EndSeq, Prepend2, _, _, _}} = send_changes(Req, Resp, Db, StartSeq,
+    {ok, {_, EndSeq, Prepend2, _, _, _, _}} = send_changes(Req, Resp, Db, fwd, StartSeq,
         Prepend, ResponseType, Filter, End),
     couch_db:close(Db),
     if
@@ -146,37 +161,47 @@ keep_sending_changes(#httpd{user_ctx=UserCtx,path_parts=[DbName|_]}=Req, Resp,
         end
     end.
 
-changes_enumerator(DocInfos, {_, _, FilterFun, Resp, "continuous"}) ->
-    [#doc_info{id=Id, high_seq=Seq}|_] = DocInfos,
+changes_enumerator(DocInfos, {Db, _, _, FilterFun, Resp, "continuous", IncludeDocs}) ->
+    [#doc_info{id=Id, high_seq=Seq, revs=[#rev_info{rev=Rev}|_]}|_] = DocInfos,
     Results0 = [FilterFun(DocInfo) || DocInfo <- DocInfos],
     Results = [Result || Result <- Results0, Result /= null],
     case Results of
     [] ->
-        {ok, {Seq, nil, FilterFun, Resp, "continuous"}};
+        {ok, {Db, Seq, nil, FilterFun, Resp, "continuous", IncludeDocs}};
     _ ->
-        send_chunk(Resp, [?JSON_ENCODE({[{seq,Seq},{id,Id},{changes,Results}]})
+        send_chunk(Resp, [?JSON_ENCODE(changes_row(Db, Seq, Id, Results, Rev, IncludeDocs))
             |"\n"]),
-        {ok, {Seq, nil, FilterFun, Resp, "continuous"}}
+        {ok, {Db, Seq, nil, FilterFun, Resp, "continuous", IncludeDocs}}
     end;
-changes_enumerator(DocInfos, {_, Prepend, FilterFun, Resp, _}) ->
-    [#doc_info{id=Id, high_seq=Seq}|_] = DocInfos,
+changes_enumerator(DocInfos, {Db, _, Prepend, FilterFun, Resp, _, IncludeDocs}) ->
+    [#doc_info{id=Id, high_seq=Seq, revs=[#rev_info{rev=Rev}|_]}|_] = DocInfos,
     Results0 = [FilterFun(DocInfo) || DocInfo <- DocInfos],
     Results = [Result || Result <- Results0, Result /= null],
     case Results of
     [] ->
-        {ok, {Seq, Prepend, FilterFun, Resp, nil}};
+        {ok, {Db, Seq, Prepend, FilterFun, Resp, nil, IncludeDocs}};
     _ ->
-        send_chunk(Resp, [Prepend, ?JSON_ENCODE({[{seq,Seq},{id,Id},
-            {changes,Results}]})]),
-        {ok, {Seq, <<",\n">>, FilterFun, Resp, nil}}
+        send_chunk(Resp, [Prepend, ?JSON_ENCODE(
+            changes_row(Db, Seq, Id, Results, Rev, IncludeDocs))]),
+        {ok, {Db, Seq, <<",\n">>, FilterFun, Resp, nil, IncludeDocs}}
     end.
 
-send_changes(Req, Resp, Db, StartSeq, Prepend, ResponseType, FilterFun, End) ->
+changes_row(Db, Seq, Id, Results, Rev, true) ->
+    {[{seq,Seq},{id,Id},
+        {changes,Results}] ++
+        couch_httpd_view:doc_member(Db, Id, Rev)};
+changes_row(_, Seq, Id, Results, _, false) ->
+    {[{seq,Seq},{id,Id},
+        {changes,Results}]}.
+
+send_changes(Req, Resp, Db, Dir, StartSeq, Prepend, ResponseType, FilterFun, End) ->
     Style = list_to_existing_atom(
             couch_httpd:qs_value(Req, "style", "main_only")),
+    IncludeDocs = list_to_existing_atom(
+            couch_httpd:qs_value(Req, "include_docs", "false")),
     try
-        couch_db:changes_since(Db, Style, StartSeq, fun changes_enumerator/2,
-            {StartSeq, Prepend, FilterFun, Resp, ResponseType})
+        couch_db:changes_since(Db, Style, StartSeq, fun changes_enumerator/2, 
+            [{dir, Dir}], {Db, StartSeq, Prepend, FilterFun, Resp, ResponseType, IncludeDocs})
     after
         End()
     end.
@@ -456,67 +481,6 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_all_docs">>]}=Req, Db) ->
 
 db_req(#httpd{path_parts=[_,<<"_all_docs">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "GET,HEAD,POST");
-
-db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs_by_seq">>]}=Req, Db) ->
-    #view_query_args{
-        start_key = StartKey,
-        end_key = EndKey,
-        limit = Limit,
-        skip = SkipCount,
-        direction = Dir
-    } = QueryArgs = couch_httpd_view:parse_view_params(Req, nil, map),
-
-    {ok, Info} = couch_db:get_db_info(Db),
-    CurrentEtag = couch_httpd:make_etag(Info),
-    couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
-        TotalRowCount = proplists:get_value(doc_count, Info),
-        FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db,
-            TotalRowCount, #view_fold_helper_funs{
-                reduce_count = fun couch_db:enum_docs_since_reduce_to_count/1
-            }),
-        StartKey2 = case StartKey of
-            nil -> 0;
-            <<>> -> 100000000000;
-            {} -> 100000000000;
-            StartKey when is_integer(StartKey) -> StartKey
-        end,
-        {ok, LastOffset, FoldResult} = couch_db:enum_docs_since(Db, StartKey2,
-            fun(DocInfo, Offset, Acc) ->
-                #doc_info{
-                    id=Id,
-                    high_seq=Seq,
-                    revs=[#rev_info{rev=Rev,deleted=Deleted} | RestInfo]
-                } = DocInfo,
-                ConflictRevs = couch_doc:rev_to_strs(
-                    [Rev1 || #rev_info{deleted=false, rev=Rev1} <- RestInfo]),
-                DelConflictRevs = couch_doc:rev_to_strs(
-                    [Rev1 || #rev_info{deleted=true, rev=Rev1} <- RestInfo]),
-                Json = {
-                    [{<<"rev">>, couch_doc:rev_to_str(Rev)}] ++
-                    case ConflictRevs of
-                    []  -> [];
-                    _   -> [{<<"conflicts">>, ConflictRevs}]
-                    end ++
-                    case DelConflictRevs of
-                    []  ->  [];
-                    _   ->  [{<<"deleted_conflicts">>, DelConflictRevs}]
-                    end ++
-                    case Deleted of
-                    true -> [{<<"deleted">>, true}];
-                    false -> []
-                    end
-                },
-                if (Seq > EndKey) ->
-                    {stop, Acc};
-                true ->
-                    FoldlFun({{Seq, Id}, Json}, Offset, Acc)
-                end
-            end, {Limit, SkipCount, undefined, []}, [{dir, Dir}]),
-        couch_httpd_view:finish_view_fold(Req, TotalRowCount, LastOffset, FoldResult)
-    end);
-
-db_req(#httpd{path_parts=[_,<<"_all_docs_by_seq">>]}=Req, _Db) ->
-    send_method_not_allowed(Req, "GET,HEAD");
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_missing_revs">>]}=Req, Db) ->
     {JsonDocIdRevs} = couch_httpd:json_body_obj(Req),

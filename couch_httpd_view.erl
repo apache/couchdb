@@ -18,7 +18,7 @@
 -export([get_stale_type/1, get_reduce_type/1, parse_view_params/3]).
 -export([make_view_fold_fun/6, finish_view_fold/4, view_row_obj/3]).
 -export([view_group_etag/2, view_group_etag/3, make_reduce_fold_funs/5]).
--export([design_doc_view/5, parse_bool_param/1]).
+-export([design_doc_view/5, parse_bool_param/1, doc_member/3]).
 
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,send_chunk/2,
@@ -594,18 +594,18 @@ view_row_obj(_Db, {{Key, DocId}, Value}, _IncludeDocs) ->
     {[{id, DocId}, {key, Key}, {value, Value}]}.
 
 view_row_with_doc(Db, {{Key, DocId}, Value}, Rev) ->
+    {[{id, DocId}, {key, Key}, {value, Value}] ++ doc_member(Db, DocId, Rev)}.
+
+doc_member(Db, DocId, Rev) ->
     ?LOG_DEBUG("Include Doc: ~p ~p", [DocId, Rev]),
     case (catch couch_httpd_db:couch_doc_open(Db, DocId, Rev, [])) of
-      {{not_found, missing}, _RevId} ->
-          {[{id, DocId}, {key, Key}, {value, Value}, {error, missing}]};
-      {not_found, missing} ->
-          {[{id, DocId}, {key, Key}, {value, Value}, {error, missing}]};
-      {not_found, deleted} ->
-          {[{id, DocId}, {key, Key}, {value, Value}]};
-      Doc ->
-        JsonDoc = couch_doc:to_json_obj(Doc, []),
-        {[{id, DocId}, {key, Key}, {value, Value}, {doc, JsonDoc}]}
+        #doc{} = Doc ->
+            JsonDoc = couch_doc:to_json_obj(Doc, []),
+            [{doc, JsonDoc}];
+        _Else ->
+            [{error, missing}]
     end.
+    
 
 finish_view_fold(Req, TotalRows, Offset, FoldResult) ->
     case FoldResult of

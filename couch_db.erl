@@ -24,7 +24,7 @@
 -export([increment_update_seq/1,get_purge_seq/1,purge_docs/2,get_last_purged/1]).
 -export([start_link/3,open_doc_int/3,set_admins/2,get_admins/1,ensure_full_commit/1]).
 -export([init/1,terminate/2,handle_call/3,handle_cast/2,code_change/3,handle_info/2]).
--export([changes_since/5,read_doc/2,new_revid/1]).
+-export([changes_since/5,changes_since/6,read_doc/2,new_revid/1]).
 
 -include("couch_db.hrl").
 
@@ -694,6 +694,9 @@ enum_docs_reduce_to_count(Reds) ->
     Count.
 
 changes_since(Db, Style, StartSeq, Fun, Acc) ->
+    changes_since(Db, Style, StartSeq, Fun, [], Acc).
+    
+changes_since(Db, Style, StartSeq, Fun, Options, Acc) ->
     Wrapper = fun(DocInfo, _Offset, Acc2) ->
             #doc_info{revs=Revs} = DocInfo,
             case Style of
@@ -706,7 +709,8 @@ changes_since(Db, Style, StartSeq, Fun, Acc) ->
             end,
             Fun(Infos, Acc2)
         end,
-    {ok, _LastReduction, AccOut} = couch_btree:fold(Db#db.docinfo_by_seq_btree, Wrapper, Acc, [{start_key, StartSeq + 1}]),
+    {ok, _LastReduction, AccOut} = couch_btree:fold(Db#db.docinfo_by_seq_btree, 
+        Wrapper, Acc, [{start_key, StartSeq + 1}] ++ Options),
     {ok, AccOut}.
 
 count_changes_since(Db, SinceSeq) ->
