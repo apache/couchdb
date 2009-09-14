@@ -249,8 +249,20 @@
           );
         },
         view: function(name, options) {
-          name = name.split('/');
+          var name = name.split('/');
+          var options = options || {};
+          var type = "GET";
+          var data= null;
+          if (options["keys"]) {
+            type = "POST";
+            var keys = options["keys"];
+            delete options["keys"];
+            data = toJSON({ "keys": keys });
+            console.log(data);
+          }
           ajax({
+              type: type,
+              data: data,
               url: this.uri + "_design/" + name[0] +
                    "/_view/" + name[1] + encodeOptions(options)
             },
