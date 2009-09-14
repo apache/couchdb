@@ -65,7 +65,8 @@ couchTests.all_docs = function(debug) {
   // the deletion should make doc id 1 have the last seq num
   T(changes.results.length == 4);
   T(changes.results[3].id == "1");
-  T(changes.results[3].deleted);
+  // we've removed deletions from the changes feed as they are on the doc record not the doc_info
+  T(!changes.results[3].deleted);
 
   // do an update
   var doc2 = db.open("3");
