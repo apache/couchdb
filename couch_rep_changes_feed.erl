@@ -277,9 +277,13 @@ by_seq_loop(Server, Source, StartSeq) ->
 decode_row(<<",\n", Rest/binary>>) ->
     decode_row(Rest);
 decode_row(Row) ->
-    {[Seq, Id, {<<"changes">>,C}]} = ?JSON_DECODE(Row),
+    {Props} = ?JSON_DECODE(Row),
+    % [Seq, Id, {<<"changes">>,C}]
+    Seq = proplists:get_value(<<"seq">>, Props),
+    Id = proplists:get_value(<<"id">>, Props),
+    C = proplists:get_value(<<"changes">>, Props),
     C2 = [{[{<<"rev">>,couch_doc:parse_rev(R)}]} || {[{<<"rev">>,R}]} <- C],
-    {[Seq, Id, {<<"changes">>,C2}]}.
+    {[{<<"seq">>, Seq}, {<<"id">>,Id}, {<<"changes">>,C2}]}.
 
 flush_updated_messages() ->
     receive updated -> flush_updated_messages()
