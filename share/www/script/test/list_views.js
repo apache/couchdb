@@ -317,7 +317,7 @@ couchTests.list_views = function(debug) {
   T(!(/Key: 1 /.test(xhr.responseText)));
   T(/Key: 2/.test(xhr.responseText));
   T(/FirstKey: 2/.test(xhr.responseText));
-  T(/LastKey: 11/.test(xhr.responseText));
+  T(/LastKey: 7/.test(xhr.responseText));
 
   // no multi-key fetch allowed when group=false
   xhr = CouchDB.request("POST", "/test_suite_db/_design/lists/_list/simpleForm/withReduce?group=false", {

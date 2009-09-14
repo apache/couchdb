@@ -14,7 +14,7 @@
 
 -export([open/2, open/3, query_modify/4, add/2, add_remove/3]).
 -export([fold/4, full_reduce/1, final_reduce/2,foldl/3,foldl/4]).
--export([fold_reduce/6, fold_reduce/7, lookup/2, get_state/1, set_options/2]).
+-export([fold_reduce/4, lookup/2, get_state/1, set_options/2]).
 
 -define(CHUNK_THRESHOLD, 16#4ff).
 
@@ -69,10 +69,11 @@ final_reduce(Reduce, {KVs, Reductions}) ->
     Red = Reduce(reduce, KVs),
     final_reduce(Reduce, {[], [Red | Reductions]}).
 
-fold_reduce(Bt, StartKey, EndKey, KeyGroupFun, Fun, Acc) ->
-    fold_reduce(Bt, fwd, StartKey, EndKey, KeyGroupFun, Fun, Acc).
-
-fold_reduce(#btree{root=Root}=Bt, Dir, StartKey, EndKey, KeyGroupFun, Fun, Acc) ->
+fold_reduce(#btree{root=Root}=Bt, Fun, Acc, Options) ->
+    Dir = proplists:get_value(dir, Options, fwd),
+    StartKey = proplists:get_value(start_key, Options),
+    EndKey = proplists:get_value(end_key, Options),
+    KeyGroupFun = proplists:get_value(key_group_fun, Options, fun(_,_) -> true end),
     {StartKey2, EndKey2} =
     case Dir of
         rev -> {EndKey, StartKey};
@@ -80,9 +81,9 @@ fold_reduce(#btree{root=Root}=Bt, Dir, StartKey, EndKey, KeyGroupFun, Fun, Acc) 
     end,
     try
         {ok, Acc2, GroupedRedsAcc2, GroupedKVsAcc2, GroupedKey2} =
-            reduce_stream_node(Bt, Dir, Root, StartKey2, EndKey2, nil, [], [],
+            reduce_stream_node(Bt, Dir, Root, StartKey2, EndKey2, undefined, [], [],
             KeyGroupFun, Fun, Acc),
-        if GroupedKey2 == nil ->
+        if GroupedKey2 == undefined ->
             {ok, Acc2};
         true ->
             case Fun(GroupedKey2, {GroupedKVsAcc2, GroupedRedsAcc2}, Acc2) of
@@ -105,11 +106,10 @@ convert_fun_arity(Fun) when is_function(Fun, 2) ->
 convert_fun_arity(Fun) when is_function(Fun, 3) ->
     Fun.    % Already arity 3
 
-
 make_key_in_end_range_function(#btree{less=Less}, fwd, Options) ->
-    case proplists:get_value(end_key, Options) of
+    case proplists:get_value(end_key_gt, Options) of
     undefined ->
-        case proplists:get_value(end_key_inclusive, Options) of
+        case proplists:get_value(end_key, Options) of
         undefined ->
             fun(_Key) -> true end;
         LastKey ->
@@ -119,9 +119,9 @@ make_key_in_end_range_function(#btree{less=Less}, fwd, Options) ->
         fun(Key) -> Less(Key, EndKey) end
     end;
 make_key_in_end_range_function(#btree{less=Less}, rev, Options) ->
-    case proplists:get_value(end_key, Options) of
+    case proplists:get_value(end_key_gt, Options) of
     undefined ->
-        case proplists:get_value(end_key_inclusive, Options) of
+        case proplists:get_value(end_key, Options) of
         undefined ->
             fun(_Key) -> true end;
         LastKey ->
@@ -179,15 +179,11 @@ query_modify(Bt, LookupKeys, InsertValues, RemoveKeys) ->
     FetchActions = [{fetch, Key, nil} || Key <- LookupKeys],
     SortFun =
         fun({OpA, A, _}, {OpB, B, _}) ->
-            case less(Bt, A, B) of
-            true -> true;
+            case A == B of
+            % A and B are equal, sort by op.
+            true -> op_order(OpA) < op_order(OpB);
             false ->
-                case less(Bt, B, A) of
-                true -> false;
-                false ->
-                    % A and B are equal, sort by op.
-                    op_order(OpA) < op_order(OpB)
-                end
+                less(Bt, A, B)
             end
         end,
     Actions = lists:sort(SortFun, lists:append([InsertActions, RemoveActions, FetchActions])),
@@ -482,14 +478,14 @@ reduce_stream_kv_node(Bt, Dir, KVs, KeyStart, KeyEnd,
 
     GTEKeyStartKVs =
     case KeyStart of
-    nil ->
+    undefined ->
         KVs;
     _ ->
         lists:dropwhile(fun({Key,_}) -> less(Bt, Key, KeyStart) end, KVs)
     end,
     KVs2 =
     case KeyEnd of
-    nil ->
+    undefined ->
         GTEKeyStartKVs;
     _ ->
         lists:takewhile(
@@ -507,7 +503,7 @@ reduce_stream_kv_node2(_Bt, [], GroupedKey, GroupedKVsAcc, GroupedRedsAcc,
 reduce_stream_kv_node2(Bt, [{Key, Value}| RestKVs], GroupedKey, GroupedKVsAcc,
         GroupedRedsAcc, KeyGroupFun, Fun, Acc) ->
     case GroupedKey of
-    nil ->
+    undefined ->
         reduce_stream_kv_node2(Bt, RestKVs, Key,
                 [assemble(Bt,Key,Value)], [], KeyGroupFun, Fun, Acc);
     _ ->
@@ -533,7 +529,7 @@ reduce_stream_kp_node(Bt, Dir, NodeList, KeyStart, KeyEnd,
                         KeyGroupFun, Fun, Acc) ->
     Nodes =
     case KeyStart of
-    nil ->
+    undefined ->
         NodeList;
     _ ->
         lists:dropwhile(
@@ -543,7 +539,7 @@ reduce_stream_kp_node(Bt, Dir, NodeList, KeyStart, KeyEnd,
     end,
     NodesInRange =
     case KeyEnd of
-    nil ->
+    undefined ->
         Nodes;
     _ ->
         {InRange, MaybeInRange} = lists:splitwith(
@@ -557,9 +553,9 @@ reduce_stream_kp_node(Bt, Dir, NodeList, KeyStart, KeyEnd,
 
 
 reduce_stream_kp_node2(Bt, Dir, [{_Key, NodeInfo} | RestNodeList], KeyStart, KeyEnd,
-                        nil, [], [], KeyGroupFun, Fun, Acc) ->
+                        undefined, [], [], KeyGroupFun, Fun, Acc) ->
     {ok, Acc2, GroupedRedsAcc2, GroupedKVsAcc2, GroupedKey2} =
-            reduce_stream_node(Bt, Dir, NodeInfo, KeyStart, KeyEnd, nil,
+            reduce_stream_node(Bt, Dir, NodeInfo, KeyStart, KeyEnd, undefined,
                 [], [], KeyGroupFun, Fun, Acc),
     reduce_stream_kp_node2(Bt, Dir, RestNodeList, KeyStart, KeyEnd, GroupedKey2,
             GroupedKVsAcc2, GroupedRedsAcc2, KeyGroupFun, Fun, Acc2);

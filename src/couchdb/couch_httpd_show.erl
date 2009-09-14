@@ -168,13 +168,9 @@ send_view_list_response(Lang, ListSrc, ViewName, DesignId, Req, Db, Keys) ->
 output_map_list(#httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Lang, ListSrc, View, Group, Db, QueryArgs, nil) ->
     #view_query_args{
         limit = Limit,
-        direction = Dir,
-        skip = SkipCount,
-        start_key = StartKey,
-        start_docid = StartDocId
+        skip = SkipCount
     } = QueryArgs,
     {ok, RowCount} = couch_view:get_row_count(View),
-    Start = {StartKey, StartDocId},
     Headers = MReq:get(headers),
     Hlist = mochiweb_headers:to_list(Headers),
     Accept = proplists:get_value('Accept', Hlist),
@@ -194,16 +190,15 @@ output_map_list(#httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Lang, ListSrc, Vie
                 send_row = SendListRowFun
             }),
         FoldAccInit = {Limit, SkipCount, undefined, []},
-        {ok, _, FoldResult} = couch_view:fold(View, FoldlFun, FoldAccInit, [{start_key, Start},{dir, Dir}]),
+        {ok, _, FoldResult} = couch_view:fold(View, FoldlFun, FoldAccInit,
+                couch_httpd_view:make_key_options(QueryArgs)),
         finish_list(Req, QueryServer, CurrentEtag, FoldResult, StartListRespFun, RowCount)
     end);
 
 output_map_list(#httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Lang, ListSrc, View, Group, Db, QueryArgs, Keys) ->
     #view_query_args{
         limit = Limit,
-        direction = Dir,
-        skip = SkipCount,
-        start_docid = StartDocId
+        skip = SkipCount
     } = QueryArgs,
     {ok, RowCount} = couch_view:get_row_count(View),
     Headers = MReq:get(headers),
@@ -221,16 +216,18 @@ output_map_list(#httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Lang, ListSrc, Vie
         FoldAccInit = {Limit, SkipCount, undefined, []},
         {ok, _, FoldResult} = lists:foldl(
             fun(Key, {ok, _, FoldAcc}) ->
-                FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs#view_query_args{
+                QueryArgs2 = QueryArgs#view_query_args{
                         start_key = Key,
                         end_key = Key
-                    }, CurrentEtag, Db, RowCount,
+                    },
+                FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs2, CurrentEtag, Db, RowCount,
                     #view_fold_helper_funs{
                         reduce_count = fun couch_view:reduce_to_count/1,
                         start_response = StartListRespFun,
                         send_row = SendListRowFun
                     }),
-                couch_view:fold(View, FoldlFun, FoldAcc, [{start_key, {Key, StartDocId}}, {dir, Dir}])
+                couch_view:fold(View, FoldlFun, FoldAcc,
+                    couch_httpd_view:make_key_options(QueryArgs2))
             end, {ok, nil, FoldAccInit}, Keys),
         finish_list(Req, QueryServer, CurrentEtag, FoldResult, StartListRespFun, RowCount)
     end).
@@ -295,12 +292,7 @@ send_non_empty_chunk(Resp, Chunk) ->
 output_reduce_list(#httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Lang, ListSrc, View, Group, Db, QueryArgs, nil) ->
     #view_query_args{
         limit = Limit,
-        direction = Dir,
         skip = SkipCount,
-        start_key = StartKey,
-        start_docid = StartDocId,
-        end_key = EndKey,
-        end_docid = EndDocId,
         group_level = GroupLevel
     } = QueryArgs,
     % get the os process here
@@ -321,19 +313,16 @@ output_reduce_list(#httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Lang, ListSrc, 
                 send_row = SendListRowFun
             }),
         FoldAccInit = {Limit, SkipCount, undefined, []},
-        {ok, FoldResult} = couch_view:fold_reduce(View, Dir, {StartKey, StartDocId},
-            {EndKey, EndDocId}, GroupRowsFun, RespFun,
-            FoldAccInit),
+        {ok, FoldResult} = couch_view:fold_reduce(View, RespFun, FoldAccInit, 
+            [{key_group_fun, GroupRowsFun} | 
+                couch_httpd_view:make_key_options(QueryArgs)]),
         finish_list(Req, QueryServer, CurrentEtag, FoldResult, StartListRespFun, null)
     end);
 
 output_reduce_list(#httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Lang, ListSrc, View, Group, Db, QueryArgs, Keys) ->
     #view_query_args{
         limit = Limit,
-        direction = Dir,
         skip = SkipCount,
-        start_docid = StartDocId,
-        end_docid = EndDocId,
         group_level = GroupLevel
     } = QueryArgs,
     % get the os process here
@@ -343,7 +332,6 @@ output_reduce_list(#httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Lang, ListSrc, 
     Hlist = mochiweb_headers:to_list(Headers),
     Accept = proplists:get_value('Accept', Hlist),
     CurrentEtag = couch_httpd_view:view_group_etag(Group, Db, {Lang, ListSrc, Accept, UserCtx, Keys}),
-
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         StartListRespFun = make_reduce_start_resp_fun(QueryServer, Req, Db, CurrentEtag),
         SendListRowFun = make_reduce_send_row_fun(QueryServer, Db),
@@ -357,8 +345,11 @@ output_reduce_list(#httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Lang, ListSrc, 
         FoldAccInit = {Limit, SkipCount, undefined, []},
         {ok, FoldResult} = lists:foldl(
             fun(Key, {ok, FoldAcc}) ->
-                couch_view:fold_reduce(View, Dir, {Key, StartDocId},
-                    {Key, EndDocId}, GroupRowsFun, RespFun, FoldAcc)
+                couch_view:fold_reduce(View, RespFun, FoldAcc,
+                    [{key_group_fun, GroupRowsFun} | 
+                        couch_httpd_view:make_key_options(
+                        QueryArgs#view_query_args{start_key=Key, end_key=Key})]
+                    )    
             end, {ok, FoldAccInit}, Keys),
         finish_list(Req, QueryServer, CurrentEtag, FoldResult, StartListRespFun, null)
     end).

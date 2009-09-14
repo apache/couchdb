@@ -597,7 +597,7 @@ all_docs_view(Req, Db, Keys) ->
             end,
             {ok, LastOffset, FoldResult} = couch_db:enum_docs(Db,
                 AdapterFun, FoldAccInit, [{start_key, StartId}, {dir, Dir},
-                    {if Inclusive -> end_key_inclusive; true -> end_key end, EndId}]),
+                    {if Inclusive -> end_key; true -> end_key_gt end, EndId}]),
             couch_httpd_view:finish_view_fold(Req, TotalRowCount, LastOffset, FoldResult);
         _ ->
             FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db,

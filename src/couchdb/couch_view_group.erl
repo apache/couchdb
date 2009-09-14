@@ -438,19 +438,20 @@ open_temp_group(DbName, Language, DesignOptions, MapSrc, RedSrc) ->
             id_num=0,
             btree=nil,
             def=MapSrc,
-            reduce_funs= if RedSrc==[] -> []; true -> [{<<"_temp">>, RedSrc}] end},
+            reduce_funs= if RedSrc==[] -> []; true -> [{<<"_temp">>, RedSrc}] end,
+            options=DesignOptions},
 
-        {ok, Db, #group{
-            name = <<"_temp">>,
-            db=Db,
-            views=[View],
-            def_lang=Language,
-            design_options=DesignOptions,
-            sig = erlang:md5(term_to_binary({[View], Language, DesignOptions}))
-        }};
+        {ok, Db, set_view_sig(#group{name = <<"_temp">>, db=Db, views=[View],
+            def_lang=Language, design_options=DesignOptions})};
     Error ->
         Error
     end.
+
+set_view_sig(#group{
+            views=Views,
+            def_lang=Language,
+            design_options=DesignOptions}=G) ->
+    G#group{sig=erlang:md5(term_to_binary({Views, Language, DesignOptions}))}.
 
 open_db_group(DbName, GroupId) ->
     case couch_db:open(DbName, []) of
@@ -484,20 +485,17 @@ design_doc_to_view_group(#doc{id=Id,body={Fields}}) ->
     Language = proplists:get_value(<<"language">>, Fields, <<"javascript">>),
     {DesignOptions} = proplists:get_value(<<"options">>, Fields, {[]}),
     {RawViews} = proplists:get_value(<<"views">>, Fields, {[]}),
-    % sort the views by name to avoid spurious signature changes
-    SortedRawViews = lists:sort(fun({Name1, _}, {Name2, _}) ->
-            Name1 >= Name2
-        end, RawViews),
     % add the views to a dictionary object, with the map source as the key
     DictBySrc =
     lists:foldl(
         fun({Name, {MRFuns}}, DictBySrcAcc) ->
             MapSrc = proplists:get_value(<<"map">>, MRFuns),
             RedSrc = proplists:get_value(<<"reduce">>, MRFuns, null),
+            {ViewOptions} = proplists:get_value(<<"options">>, MRFuns, {[]}),
             View =
-            case dict:find(MapSrc, DictBySrcAcc) of
+            case dict:find({MapSrc, ViewOptions}, DictBySrcAcc) of
                 {ok, View0} -> View0;
-                error -> #view{def=MapSrc} % create new view object
+                error -> #view{def=MapSrc, options=ViewOptions} % create new view object
             end,
             View2 =
             if RedSrc == null ->
@@ -505,16 +503,15 @@ design_doc_to_view_group(#doc{id=Id,body={Fields}}) ->
             true ->
                 View#view{reduce_funs=[{Name,RedSrc}|View#view.reduce_funs]}
             end,
-            dict:store(MapSrc, View2, DictBySrcAcc)
-        end, dict:new(), SortedRawViews),
+            dict:store({MapSrc, ViewOptions}, View2, DictBySrcAcc)
+        end, dict:new(), RawViews),
     % number the views
     {Views, _N} = lists:mapfoldl(
         fun({_Src, View}, N) ->
             {View#view{id_num=N},N+1}
-        end, 0, dict:to_list(DictBySrc)),
+        end, 0, lists:sort(dict:to_list(DictBySrc))),
 
-    Group = #group{name=Id, views=Views, def_lang=Language, design_options=DesignOptions},
-    Group#group{sig=erlang:md5(term_to_binary({Views, Language, DesignOptions}))}.
+    set_view_sig(#group{name=Id, views=Views, def_lang=Language, design_options=DesignOptions}).
 
 reset_group(#group{views=Views}=Group) ->
     Views2 = [View#view{btree=nil} || View <- Views],
@@ -534,12 +531,13 @@ init_group(Db, Fd, #group{views=Views}=Group, nil) ->
     init_group(Db, Fd, Group,
         #index_header{seq=0, purge_seq=couch_db:get_purge_seq(Db),
             id_btree_state=nil, view_states=[nil || _ <- Views]});
-init_group(Db, Fd, #group{def_lang=Lang,views=Views}=Group, IndexHeader) ->
+init_group(Db, Fd, #group{def_lang=Lang,views=Views}=
+            Group, IndexHeader) ->
      #index_header{seq=Seq, purge_seq=PurgeSeq,
             id_btree_state=IdBtreeState, view_states=ViewStates} = IndexHeader,
     {ok, IdBtree} = couch_btree:open(IdBtreeState, Fd),
     Views2 = lists:zipwith(
-        fun(BtreeState, #view{reduce_funs=RedFuns}=View) ->
+        fun(BtreeState, #view{reduce_funs=RedFuns,options=Options}=View) ->
             FunSrcs = [FunSrc || {_Name, FunSrc} <- RedFuns],
             ReduceFun =
                 fun(reduce, KVs) ->
@@ -555,8 +553,15 @@ init_group(Db, Fd, #group{def_lang=Lang,views=Views}=Group, IndexHeader) ->
                         UserReds),
                     {Count, Reduced}
                 end,
+            
+            case proplists:get_value(<<"collation">>, Options, <<"default">>) of
+            <<"default">> ->
+                Less = fun couch_view:less_json_ids/2;
+            <<"raw">> ->
+                Less = fun(A,B) -> A < B end
+            end,
             {ok, Btree} = couch_btree:open(BtreeState, Fd,
-                        [{less, fun couch_view:less_json_keys/2},
+                        [{less, Less},
                             {reduce, ReduceFun}]),
             View#view{btree=Btree}
         end,

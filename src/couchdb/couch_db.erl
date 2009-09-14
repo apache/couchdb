@@ -200,7 +200,7 @@ get_design_docs(#db{fulldocinfo_by_id_btree=Btree}=Db) ->
         (_, _Reds, AccDocs) ->
             {stop, AccDocs}
         end,
-        [], [{start_key, <<"_design/">>}, {end_key, <<"_design0">>}]),
+        [], [{start_key, <<"_design/">>}, {end_key_gt, <<"_design0">>}]),
     {ok, Docs}.
 
 check_is_admin(#db{admins=Admins, user_ctx=#user_ctx{name=Name,roles=Roles}}) ->
@@ -716,13 +716,10 @@ changes_since(Db, Style, StartSeq, Fun, Options, Acc) ->
 count_changes_since(Db, SinceSeq) ->
     {ok, Changes} =
     couch_btree:fold_reduce(Db#db.docinfo_by_seq_btree,
-        SinceSeq + 1, % startkey
-        ok, % endkey
-        fun(_,_) -> true end, % groupkeys
         fun(_SeqStart, PartialReds, 0) ->
             {ok, couch_btree:final_reduce(Db#db.docinfo_by_seq_btree, PartialReds)}
         end,
-        0),
+        0, [{start_key, SinceSeq + 1}]),
     Changes.
 
 enum_docs_since(Db, SinceSeq, InFun, Acc, Options) ->

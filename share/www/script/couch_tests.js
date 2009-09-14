@@ -74,6 +74,7 @@ loadTest("update_documents.js");
 loadTest("utf8.js");
 loadTest("uuids.js");
 loadTest("view_collation.js");
+loadTest("view_collation_raw.js");
 loadTest("view_conflicts.js");
 loadTest("view_errors.js");
 loadTest("view_include_docs.js");

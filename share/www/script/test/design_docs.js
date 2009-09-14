@@ -55,7 +55,7 @@ function() {
   var vinfo = dinfo.view_index;
   TEquals(51, vinfo.disk_size);
   TEquals(false, vinfo.compact_running);
-  TEquals("64625dce94960fd5ca116e42aa9d011a", vinfo.signature);
+  TEquals("3f88e53b303e2342e49a66c538c30679", vinfo.signature);
 
   db.bulkSave(makeDocs(1, numDocs + 1));
 

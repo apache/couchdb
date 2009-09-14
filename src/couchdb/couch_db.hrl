@@ -14,6 +14,9 @@
 -define(DESIGN_DOC_PREFIX0, "_design").
 -define(DESIGN_DOC_PREFIX, "_design/").
 
+-define(MIN_STR, <<"">>).
+-define(MAX_STR, <<255>>). % illegal utf string
+
 -define(JSON_ENCODE(V), mochijson2:encode(V)).
 -define(JSON_DECODE(V), mochijson2:decode(V)).
 
@@ -157,10 +160,10 @@
 
 
 -record(view_query_args, {
-    start_key = nil,
-    end_key = {},
-    start_docid = nil,
-    end_docid = {},
+    start_key,
+    end_key,
+    start_docid = ?MIN_STR,
+    end_docid = ?MAX_STR,
 
     direction = fwd,
     inclusive_end=true, % aka a closed-interval
@@ -218,7 +221,8 @@
     map_names=[],
     def,
     btree=nil,
-    reduce_funs=[]
+    reduce_funs=[],
+    options=[]
     }).
 
 -record(index_header,
