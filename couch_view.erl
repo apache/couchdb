@@ -13,10 +13,10 @@
 -module(couch_view).
 -behaviour(gen_server).
 
--export([start_link/0,fold/4,less_json/2,less_json_keys/2,expand_dups/2,
+-export([start_link/0,fold/4,less_json/2,less_json_ids/2,expand_dups/2,
     detuple_kvs/2,init/1,terminate/2,handle_call/3,handle_cast/2,handle_info/2,
     code_change/3,get_reduce_view/4,get_temp_reduce_view/5,get_temp_map_view/4,
-    get_map_view/4,get_row_count/1,reduce_to_count/1,fold_reduce/7,
+    get_map_view/4,get_row_count/1,reduce_to_count/1,fold_reduce/4,
     extract_map_view/1,get_group_server/2,get_group_info/2,cleanup_index_files/1]).
 
 -include("couch_db.hrl").
@@ -152,16 +152,14 @@ expand_dups([{Key, {dups, Vals}} | Rest], Acc) ->
 expand_dups([KV | Rest], Acc) ->
     expand_dups(Rest, [KV | Acc]).
 
-fold_reduce({temp_reduce, #view{btree=Bt}}, Dir, StartKey, EndKey, GroupFun, Fun, Acc) ->
-
+fold_reduce({temp_reduce, #view{btree=Bt}}, Fun, Acc, Options) ->
     WrapperFun = fun({GroupedKey, _}, PartialReds, Acc0) ->
             {_, [Red]} = couch_btree:final_reduce(Bt, PartialReds),
             Fun(GroupedKey, Red, Acc0)
         end,
-    couch_btree:fold_reduce(Bt, Dir, StartKey, EndKey, GroupFun,
-            WrapperFun, Acc);
+    couch_btree:fold_reduce(Bt, WrapperFun, Acc, Options);
 
-fold_reduce({reduce, NthRed, Lang, #view{btree=Bt, reduce_funs=RedFuns}}, Dir, StartKey, EndKey, GroupFun, Fun, Acc) ->
+fold_reduce({reduce, NthRed, Lang, #view{btree=Bt, reduce_funs=RedFuns}}, Fun, Acc, Options) ->
     PreResultPadding = lists:duplicate(NthRed - 1, []),
     PostResultPadding = lists:duplicate(length(RedFuns) - NthRed, []),
     {_Name, FunSrc} = lists:nth(NthRed,RedFuns),
@@ -178,8 +176,7 @@ fold_reduce({reduce, NthRed, Lang, #view{btree=Bt, reduce_funs=RedFuns}}, Dir, S
             {_, Reds} = couch_btree:final_reduce(ReduceFun, PartialReds),
             Fun(GroupedKey, lists:nth(NthRed, Reds), Acc0)
         end,
-    couch_btree:fold_reduce(Bt, Dir, StartKey, EndKey, GroupFun,
-            WrapperFun, Acc).
+    couch_btree:fold_reduce(Bt, WrapperFun, Acc, Options).
 
 get_key_pos(_Key, [], _N) ->
     0;
@@ -358,9 +355,16 @@ nuke_dir(Dir) ->
         ok = file:del_dir(Dir)
     end.
 
+
 % keys come back in the language of btree - tuples.
-less_json_keys(A, B) ->
-    less_json(tuple_to_list(A), tuple_to_list(B)).
+less_json_ids({JsonA, IdA}, {JsonB, IdB}) ->
+    case JsonA == JsonB of
+    false ->
+        less_json(JsonA, JsonB);
+    true ->
+        IdA < IdB
+    end.
+        
 
 less_json(A, B) ->
     TypeA = type_sort(A),
@@ -382,7 +386,6 @@ type_sort({V}) when is_list(V) -> 4;
 type_sort(V) when is_tuple(V) -> 5.
 
 
-atom_sort(nil) -> 0;
 atom_sort(null) -> 1;
 atom_sort(false) -> 2;
 atom_sort(true) -> 3.

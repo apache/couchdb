@@ -19,6 +19,7 @@
 -export([make_view_fold_fun/6, finish_view_fold/4, view_row_obj/3]).
 -export([view_group_etag/2, view_group_etag/3, make_reduce_fold_funs/5]).
 -export([design_doc_view/5, parse_bool_param/1, doc_member/3]).
+-export([make_key_options/1]).
 
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,send_chunk/2,
@@ -142,27 +143,23 @@ handle_temp_view_req(Req, _Db) ->
 output_map_view(Req, View, Group, Db, QueryArgs, nil) ->
     #view_query_args{
         limit = Limit,
-        direction = Dir,
-        skip = SkipCount,
-        start_key = StartKey,
-        start_docid = StartDocId
+        skip = SkipCount
     } = QueryArgs,
     CurrentEtag = view_group_etag(Group, Db),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         {ok, RowCount} = couch_view:get_row_count(View),
         FoldlFun = make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db, RowCount, #view_fold_helper_funs{reduce_count=fun couch_view:reduce_to_count/1}),
         FoldAccInit = {Limit, SkipCount, undefined, []},
-        {ok, LastReduce, FoldResult} = couch_view:fold(View, FoldlFun, FoldAccInit,
-                [{dir, Dir}, {start_key, {StartKey, StartDocId}} |  make_end_key_option(QueryArgs)]),
-        finish_view_fold(Req, RowCount, couch_view:reduce_to_count(LastReduce), FoldResult)
+        {ok, LastReduce, FoldResult} = couch_view:fold(View, 
+                FoldlFun, FoldAccInit, make_key_options(QueryArgs)),
+        finish_view_fold(Req, RowCount, 
+                couch_view:reduce_to_count(LastReduce), FoldResult)
     end);
 
 output_map_view(Req, View, Group, Db, QueryArgs, Keys) ->
     #view_query_args{
         limit = Limit,
-        direction = Dir,
-        skip = SkipCount,
-        start_docid = StartDocId
+        skip = SkipCount
     } = QueryArgs,
     CurrentEtag = view_group_etag(Group, Db, Keys),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
@@ -177,8 +174,7 @@ output_map_view(Req, View, Group, Db, QueryArgs, Keys) ->
                         reduce_count = fun couch_view:reduce_to_count/1
                     }),
                 {ok, LastReduce, FoldResult} = couch_view:fold(View, FoldlFun, FoldAcc, 
-                    [{dir, Dir},{start_key, {Key, StartDocId}} |  make_end_key_option(
-                            QueryArgs#view_query_args{end_key=Key})]),
+                    make_key_options(QueryArgs#view_query_args{start_key=Key, end_key=Key})),
                 {LastReduce, FoldResult}
             end, {{[],[]}, FoldAccInit}, Keys),
         finish_view_fold(Req, RowCount, couch_view:reduce_to_count(LastReduce), FoldResult)
@@ -186,21 +182,17 @@ output_map_view(Req, View, Group, Db, QueryArgs, Keys) ->
 
 output_reduce_view(Req, Db, View, Group, QueryArgs, nil) ->
     #view_query_args{
-        start_key = StartKey,
-        end_key = EndKey,
         limit = Limit,
         skip = Skip,
-        direction = Dir,
-        start_docid = StartDocId,
-        end_docid = EndDocId,
         group_level = GroupLevel
     } = QueryArgs,
     CurrentEtag = view_group_etag(Group, Db),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         {ok, GroupRowsFun, RespFun} = make_reduce_fold_funs(Req, GroupLevel, QueryArgs, CurrentEtag, #reduce_fold_helper_funs{}),
         FoldAccInit = {Limit, Skip, undefined, []},
-        {ok, {_, _, Resp, _}} = couch_view:fold_reduce(View, Dir, {StartKey, StartDocId},
-            {EndKey, EndDocId}, GroupRowsFun, RespFun, FoldAccInit),
+        {ok, {_, _, Resp, _}} = couch_view:fold_reduce(View,
+                RespFun, FoldAccInit, [{key_group_fun, GroupRowsFun} |
+                make_key_options(QueryArgs)]),
         finish_reduce_fold(Req, Resp)
     end);
 
@@ -208,9 +200,6 @@ output_reduce_view(Req, Db, View, Group, QueryArgs, Keys) ->
     #view_query_args{
         limit = Limit,
         skip = Skip,
-        direction = Dir,
-        start_docid = StartDocId,
-        end_docid = EndDocId,
         group_level = GroupLevel
     } = QueryArgs,
     CurrentEtag = view_group_etag(Group, Db),
@@ -220,8 +209,10 @@ output_reduce_view(Req, Db, View, Group, QueryArgs, Keys) ->
             fun(Key, {Resp, RedAcc}) ->
                 % run the reduce once for each key in keys, with limit etc reapplied for each key
                 FoldAccInit = {Limit, Skip, Resp, RedAcc},
-                {_, {_, _, Resp2, RedAcc2}} = couch_view:fold_reduce(View, Dir, {Key, StartDocId},
-                    {Key, EndDocId}, GroupRowsFun, RespFun, FoldAccInit),
+                {_, {_, _, Resp2, RedAcc2}} = couch_view:fold_reduce(View,
+                        RespFun, FoldAccInit, [{key_group_fun, GroupRowsFun} |
+                        make_key_options(QueryArgs#view_query_args{
+                            start_key=Key, end_key=Key})]),
                 % Switch to comma
                 {Resp2, RedAcc2}
             end,
@@ -229,8 +220,8 @@ output_reduce_view(Req, Db, View, Group, QueryArgs, Keys) ->
         finish_reduce_fold(Req, Resp)
     end).
 
-reverse_key_default(nil) -> {};
-reverse_key_default({}) -> nil;
+reverse_key_default(?MIN_STR) -> ?MAX_STR;
+reverse_key_default(?MAX_STR) -> ?MIN_STR;
 reverse_key_default(Key) -> Key.
 
 get_stale_type(Req) ->
@@ -353,12 +344,8 @@ validate_view_query(descending, true, Args) ->
         fwd ->
             Args#view_query_args{
                 direction = rev,
-                start_key =
-                    reverse_key_default(Args#view_query_args.start_key),
                 start_docid =
                     reverse_key_default(Args#view_query_args.start_docid),
-                end_key =
-                    reverse_key_default(Args#view_query_args.end_key),
                 end_docid =
                     reverse_key_default(Args#view_query_args.end_docid)
             }
@@ -533,17 +520,33 @@ apply_default_helper_funs(#reduce_fold_helper_funs{
         send_row = SendRow2
     }.
 
+make_key_options(#view_query_args{direction = Dir}=QueryArgs) ->
+     [{dir,Dir} | make_start_key_option(QueryArgs) ++ 
+            make_end_key_option(QueryArgs)].
+
+make_start_key_option(
+        #view_query_args{
+            start_key = StartKey,
+            start_docid = StartDocId}) ->
+    if StartKey == undefined ->
+        [];
+    true ->
+        [{start_key, {StartKey, StartDocId}}]
+    end.
+
+make_end_key_option(#view_query_args{end_key = undefined}) ->
+    [];
 make_end_key_option(
         #view_query_args{end_key = EndKey,
             end_docid = EndDocId,
             inclusive_end = true}) ->
-    [{end_key_inclusive, {EndKey, EndDocId}}];
+    [{end_key, {EndKey, EndDocId}}];
 make_end_key_option(
         #view_query_args{
             end_key = EndKey,
             end_docid = EndDocId,
             inclusive_end = false}) ->
-    [{end_key, {EndKey,reverse_key_default(EndDocId)}}].
+    [{end_key_gt, {EndKey,reverse_key_default(EndDocId)}}].
 
 json_view_start_resp(Req, Etag, TotalViewCount, Offset, _Acc) ->
     {ok, Resp} = start_json_response(Req, 200, [{"Etag", Etag}]),

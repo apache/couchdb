@@ -14,7 +14,6 @@
 -behaviour(gen_server).
 
 -export([btree_by_id_reduce/2,btree_by_seq_reduce/2]).
--export([less_docid/2]).
 -export([init/1,terminate/2,handle_call/3,handle_cast/2,code_change/3,handle_info/2]).
 
 -include("couch_db.hrl").
@@ -279,13 +278,6 @@ simple_upgrade_record(Old, New) ->
         lists:sublist(tuple_to_list(New), size(Old) + 1, size(New)-size(Old)),
     list_to_tuple(tuple_to_list(Old) ++ NewValuesTail).
 
-less_docid(A, B) when A == B -> false;
-less_docid(nil, _) -> true; % nil - special key sorts before all
-less_docid({}, _) -> false; % {} -> special key sorts after all
-less_docid(_, nil) -> false;
-less_docid(_, {}) -> true; 
-less_docid(A, B) -> A < B.
-
 
 init_db(DbName, Filepath, Fd, Header0) ->
     Header1 = simple_upgrade_record(Header0, #db_header{}),
@@ -297,7 +289,6 @@ init_db(DbName, Filepath, Fd, Header0) ->
     ?LATEST_DISK_VERSION -> Header1;
     _ -> throw({database_disk_version_error, "Incorrect disk header version"})
     end,
-    Less = fun less_docid/2,
 
     {ok, FsyncOptions} = couch_util:parse_term(
             couch_config:get("couchdb", "fsync_options",
@@ -311,8 +302,7 @@ init_db(DbName, Filepath, Fd, Header0) ->
     {ok, IdBtree} = couch_btree:open(Header#db_header.fulldocinfo_by_id_btree_state, Fd,
         [{split, fun(X) -> btree_by_id_split(X) end},
         {join, fun(X,Y) -> btree_by_id_join(X,Y) end},
-        {reduce, fun(X,Y) -> btree_by_id_reduce(X,Y) end},
-        {less, Less}]),
+        {reduce, fun(X,Y) -> btree_by_id_reduce(X,Y) end}]),
     {ok, SeqBtree} = couch_btree:open(Header#db_header.docinfo_by_seq_btree_state, Fd,
             [{split, fun(X) -> btree_by_seq_split(X) end},
             {join, fun(X,Y) -> btree_by_seq_join(X,Y) end},

@@ -128,7 +128,7 @@ get_user(Db, UserName) ->
         {ok, View, _Group} ->
             FoldFun = fun({_, Value}, _, {_}) -> {stop, Value} end,
             {ok, _, {Result}} = couch_view:fold(View, FoldFun, {nil},
-                    [{start_key, {UserName, nil}},{end_key, {UserName, {}}}]),
+                    [{start_key, {UserName, ?MIN_STR}},{end_key, {UserName, ?MAX_STR}}]),
             Result;
         {not_found, _Reason} ->
             nil
