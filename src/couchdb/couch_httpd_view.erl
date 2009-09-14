@@ -314,7 +314,7 @@ validate_view_query(start_key, Value, Args) ->
     case Args#view_query_args.multi_get of
         true ->
             Msg = <<"Query parameter `start_key` is "
-                    "not compatiible with multi-get">>,
+                    "not compatible with multi-get">>,
             throw({query_parse_error, Msg});
         _ ->
             Args#view_query_args{start_key=Value}
@@ -324,8 +324,8 @@ validate_view_query(start_docid, Value, Args) ->
 validate_view_query(end_key, Value, Args) ->
     case Args#view_query_args.multi_get of
         true->
-            Msg = <<"Query paramter `end_key` is "
-                    "not compatibile with multi-get">>,
+            Msg = <<"Query parameter `end_key` is "
+                    "not compatible with multi-get">>,
             throw({query_parse_error, Msg});
         _ ->
             Args#view_query_args{end_key=Value}
