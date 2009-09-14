@@ -141,6 +141,7 @@ nobase_dist_localdata_DATA = \
     www/script/test/utf8.js \
     www/script/test/uuids.js \
     www/script/test/view_collation.js \
+    www/script/test/view_collation_raw.js \
     www/script/test/view_conflicts.js \
     www/script/test/view_errors.js \
     www/script/test/view_include_docs.js \
