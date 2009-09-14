@@ -26,7 +26,5 @@
     <true/>
     <key>KeepAlive</key>
     <true/>
-    <key>OnDemand</key>
-    <true/>
   </dict>
 </plist>
