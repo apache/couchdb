@@ -603,7 +603,7 @@ doc_member(Db, DocId, Rev) ->
             JsonDoc = couch_doc:to_json_obj(Doc, []),
             [{doc, JsonDoc}];
         _Else ->
-            [{error, missing}]
+            [{doc, null}]
     end.
     
 

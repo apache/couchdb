@@ -74,11 +74,13 @@ start_sending_changes(Resp, _Else) ->
 
 handle_changes_req(#httpd{method='GET',path_parts=[DbName|_]}=Req, Db) ->
     {FilterFun, EndFilterFun} = make_filter_funs(Req, Db),
+    {ok, Info} = couch_db:get_db_info(Db),
+    Seq = proplists:get_value(update_seq, Info),
     {Dir, StartSeq} = case couch_httpd:qs_value(Req, "descending", "false") of 
         "false" -> 
             {fwd, list_to_integer(couch_httpd:qs_value(Req, "since", "0"))}; 
         "true" -> 
-            {rev, 1000000000000000}; % super big value, should use current db seq
+            {rev, Seq};
         _Bad -> throw({bad_request, "descending must be true or false"})
     end,
     ResponseType = couch_httpd:qs_value(Req, "feed", "normal"),
@@ -104,7 +106,6 @@ handle_changes_req(#httpd{method='GET',path_parts=[DbName|_]}=Req, Db) ->
             get_rest_db_updated() % clean out any remaining update messages
         end;
     true ->
-        {ok, Info} = couch_db:get_db_info(Db),
         CurrentEtag = couch_httpd:make_etag(Info),
         couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
             % send the etag
@@ -162,19 +163,19 @@ keep_sending_changes(#httpd{user_ctx=UserCtx,path_parts=[DbName|_]}=Req, Resp,
     end.
 
 changes_enumerator(DocInfos, {Db, _, _, FilterFun, Resp, "continuous", IncludeDocs}) ->
-    [#doc_info{id=Id, high_seq=Seq, revs=[#rev_info{rev=Rev}|_]}|_] = DocInfos,
+    [#doc_info{id=Id, high_seq=Seq, revs=[#rev_info{deleted=Del,rev=Rev}|_]}|_] = DocInfos,
     Results0 = [FilterFun(DocInfo) || DocInfo <- DocInfos],
     Results = [Result || Result <- Results0, Result /= null],
     case Results of
     [] ->
         {ok, {Db, Seq, nil, FilterFun, Resp, "continuous", IncludeDocs}};
     _ ->
-        send_chunk(Resp, [?JSON_ENCODE(changes_row(Db, Seq, Id, Results, Rev, IncludeDocs))
+        send_chunk(Resp, [?JSON_ENCODE(changes_row(Db, Seq, Id, Del, Results, Rev, IncludeDocs))
             |"\n"]),
         {ok, {Db, Seq, nil, FilterFun, Resp, "continuous", IncludeDocs}}
     end;
 changes_enumerator(DocInfos, {Db, _, Prepend, FilterFun, Resp, _, IncludeDocs}) ->
-    [#doc_info{id=Id, high_seq=Seq, revs=[#rev_info{rev=Rev}|_]}|_] = DocInfos,
+    [#doc_info{id=Id, high_seq=Seq, revs=[#rev_info{deleted=Del,rev=Rev}|_]}|_] = DocInfos,
     Results0 = [FilterFun(DocInfo) || DocInfo <- DocInfos],
     Results = [Result || Result <- Results0, Result /= null],
     case Results of
@@ -182,17 +183,18 @@ changes_enumerator(DocInfos, {Db, _, Prepend, FilterFun, Resp, _, IncludeDocs}) 
         {ok, {Db, Seq, Prepend, FilterFun, Resp, nil, IncludeDocs}};
     _ ->
         send_chunk(Resp, [Prepend, ?JSON_ENCODE(
-            changes_row(Db, Seq, Id, Results, Rev, IncludeDocs))]),
+            changes_row(Db, Seq, Id, Del, Results, Rev, IncludeDocs))]),
         {ok, {Db, Seq, <<",\n">>, FilterFun, Resp, nil, IncludeDocs}}
     end.
 
-changes_row(Db, Seq, Id, Results, Rev, true) ->
-    {[{seq,Seq},{id,Id},
-        {changes,Results}] ++
+changes_row(Db, Seq, Id, Del, Results, Rev, true) ->
+    {[{seq,Seq},{id,Id},{changes,Results}] ++ deleted_item(Del) ++
         couch_httpd_view:doc_member(Db, Id, Rev)};
-changes_row(_, Seq, Id, Results, _, false) ->
-    {[{seq,Seq},{id,Id},
-        {changes,Results}]}.
+changes_row(_, Seq, Id, Del, Results, _, false) ->
+    {[{seq,Seq},{id,Id},{changes,Results}] ++ deleted_item(Del)}.
+
+deleted_item(true) -> [{deleted,true}];
+deleted_item(_) -> [].
 
 send_changes(Req, Resp, Db, Dir, StartSeq, Prepend, ResponseType, FilterFun, End) ->
     Style = list_to_existing_atom(

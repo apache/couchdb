@@ -87,11 +87,13 @@ couchTests.view_include_docs = function(debug) {
   // Check emitted _rev controls things
   resp = db.allDocs({include_docs: true}, ["0"]);
   var before = resp.rows[0].doc;
+
   var after = db.open("0");
-  after.integer = 100
+  after.integer = 100;
   after.prev = after._rev;
-  db.save(after);
-  after = db.open("0");
+  T(db.save(after).ok);
+  
+  var after = db.open("0");
   T(after._rev != after.prev);
   T(after.integer == 100);
 
@@ -111,6 +113,6 @@ couchTests.view_include_docs = function(debug) {
   T(resp.rows[0].key == "0");
   T(resp.rows[0].id == "0");
   T(!resp.rows[0].doc);
-  T(resp.rows[0].error == "missing");
+  T(resp.rows[0].doc == null);
   T(resp.rows[1].doc.integer == 23);
 };
