@@ -232,19 +232,19 @@ couchTests.list_views = function(debug) {
   T(resp.req.cookie);
 
   // get with query params
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/basicView?startkey=3");
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/basicView?startkey=3&endkey=8");
   T(xhr.status == 200, "with query params");
   T(/Total Rows/.test(xhr.responseText));
   T(!(/Key: 1/.test(xhr.responseText)));
   T(/FirstKey: 3/.test(xhr.responseText));
-  T(/LastKey: 9/.test(xhr.responseText));
+  T(/LastKey: 8/.test(xhr.responseText));
 
-  var xhr = CouchDB.request("GET", "/test_suite_db/_view/lists/basicView?list=simpleForm&startkey=3");
+  var xhr = CouchDB.request("GET", "/test_suite_db/_view/lists/basicView?list=simpleForm&startkey=3&endkey=8");
   T(xhr.status == 200, "with query params");
   T(/Total Rows/.test(xhr.responseText));
   T(!(/Key: 1/.test(xhr.responseText)));
   T(/FirstKey: 3/.test(xhr.responseText));
-  T(/LastKey: 9/.test(xhr.responseText));
+  T(/LastKey: 8/.test(xhr.responseText));
 
   // with 0 rows
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/basicView?startkey=30");
