@@ -207,12 +207,12 @@ function CouchDB(name, httpHeaders) {
     return this.allDocs({startkey:"_design", endkey:"_design0"});
   };
 
-  this.allDocsBySeq = function(options,keys) {
+  this.changes = function(options,keys) {
     var req = null;
     if(!keys) {
-      req = this.request("GET", this.uri + "_all_docs_by_seq" + encodeOptions(options));
+      req = this.request("GET", this.uri + "_changes" + encodeOptions(options));
     } else {
-      req = this.request("POST", this.uri + "_all_docs_by_seq" + encodeOptions(options), {
+      req = this.request("POST", this.uri + "_changes" + encodeOptions(options), {
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({keys:keys})
       });

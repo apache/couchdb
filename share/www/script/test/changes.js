@@ -12,7 +12,7 @@
 
 function jsonp(obj) {
   T(jsonp_flag == 0);
-  T(obj.results.length == 1 && obj.last_seq==1)
+  T(obj.results.length == 1 && obj.last_seq==1, "jsonp")
   jsonp_flag = 1;
 }
 
@@ -25,15 +25,15 @@ couchTests.changes = function(debug) {
   var req = CouchDB.request("GET", "/test_suite_db/_changes");
   var resp = JSON.parse(req.responseText);
 
-  T(resp.results.length == 0 && resp.last_seq==0)
+  T(resp.results.length == 0 && resp.last_seq==0, "empty db")
 
   var docFoo = {_id:"foo", bar:1};
-  db.save(docFoo);
+  T(db.save(docFoo).ok);
 
   req = CouchDB.request("GET", "/test_suite_db/_changes");
   var resp = JSON.parse(req.responseText);
 
-  T(resp.results.length == 1 && resp.last_seq==1)
+  T(resp.results.length == 1 && resp.last_seq==1, "one doc db")
   T(resp.results[0].changes[0].rev == docFoo._rev)
 
   // test with callback
@@ -232,6 +232,9 @@ couchTests.changes = function(debug) {
 
     function() {
       var authOpts = {"headers":{"WWW-Authenticate": "X-Couch-Test-Auth Chris Anderson:mp3"}};
+
+      var req = CouchDB.request("GET", "/_session", authOpts);
+      var resp = JSON.parse(req.responseText);
       
       T(db.save({"user" : "Noah Slater"}).ok);
       var req = CouchDB.request("GET", "/test_suite_db/_changes?filter=changes_filter/userCtx", authOpts);
@@ -242,7 +245,7 @@ couchTests.changes = function(debug) {
       T(docResp.ok);
       req = CouchDB.request("GET", "/test_suite_db/_changes?filter=changes_filter/userCtx", authOpts);
       resp = JSON.parse(req.responseText);
-      T(resp.results.length == 1);
+      T(resp.results.length == 1, "userCtx");
       T(resp.results[0].id == docResp.id);
     });
   

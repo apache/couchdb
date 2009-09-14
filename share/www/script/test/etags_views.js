@@ -72,11 +72,11 @@ couchTests.etags_views = function(debug) {
   });
   T(xhr.status == 304);
 
-  // by seq
-  xhr = CouchDB.request("GET", "/test_suite_db/_all_docs_by_seq");
+  // _changes
+  xhr = CouchDB.request("GET", "/test_suite_db/_changes");
   T(xhr.status == 200);
   var etag = xhr.getResponseHeader("etag");
-  xhr = CouchDB.request("GET", "/test_suite_db/_all_docs_by_seq", {
+  xhr = CouchDB.request("GET", "/test_suite_db/_changes", {
     headers: {"if-none-match": etag}
   });
   T(xhr.status == 304);

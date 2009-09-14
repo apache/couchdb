@@ -100,12 +100,12 @@ couchTests.replication = function(debug) {
         };
 
         this.afterAB1 = function(dbA, dbB) {
-          var rows = dbB.allDocsBySeq().rows;
+          var rows = dbB.changes({include_docs:true}).results;
           var rowCnt = 0;
           for (var i=0; i < rows.length; i++) {
             if (rows[i].id == "del1") {
               rowCnt += 1;
-              T(rows[i].value.deleted == true);
+              T(rows[i].doc._deleted == true);
             }
           };
           T(rowCnt == 1);
