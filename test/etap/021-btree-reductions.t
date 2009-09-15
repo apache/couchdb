@@ -63,7 +63,7 @@ test()->
             (_) ->
                 false
         end,
-        couch_btree:fold_reduce(Btree2, nil, nil, GroupFun, FoldFun, []),
+        couch_btree:fold_reduce(Btree2, FoldFun, [], [{key_group_fun, GroupFun}]),
         "Reduction works with no specified direction, startkey, or endkey."
     ),
 
@@ -74,7 +74,7 @@ test()->
             (_) ->
                 false
         end,
-        couch_btree:fold_reduce(Btree2, fwd, nil, nil, GroupFun, FoldFun, []),
+        couch_btree:fold_reduce(Btree2, FoldFun, [], [{key_group_fun, GroupFun}, {dir, fwd}]),
         "Reducing forward works with no startkey or endkey."
     ),
 
@@ -85,7 +85,7 @@ test()->
             (_) ->
                 false
         end,
-        couch_btree:fold_reduce(Btree2, rev, nil, nil, GroupFun, FoldFun, []),
+        couch_btree:fold_reduce(Btree2, FoldFun, [], [{key_group_fun, GroupFun}, {dir, rev}]),
         "Reducing backwards works with no startkey or endkey."
     ),
 
@@ -96,7 +96,7 @@ test()->
             (_) ->
                 false
         end,
-        couch_btree:fold_reduce(Btree2, fwd, SK1, EK2, GroupFun, FoldFun, []),
+        couch_btree:fold_reduce(Btree2, FoldFun, [], [{dir, fwd}, {key_group_fun, GroupFun}, {start_key, SK1}, {end_key, EK2}]),
         "Reducing works over the entire range with startkey and endkey set."
     ),
 
@@ -105,7 +105,7 @@ test()->
             ({ok, [{{"even", _}, 500}]}) -> true;
             (_) -> false
         end,
-        couch_btree:fold_reduce(Btree2, fwd, SK1, EK1, GroupFun, FoldFun, []),
+        couch_btree:fold_reduce(Btree2, FoldFun, [], [{dir, fwd}, {key_group_fun, GroupFun}, {start_key, SK1}, {end_key, EK1}]),
         "Reducing foward over first half works with a startkey and endkey."
     ),
 
@@ -114,7 +114,7 @@ test()->
             ({ok, [{{"odd", _}, 500}]}) -> true;
             (_) -> false
         end,
-        couch_btree:fold_reduce(Btree2, fwd, SK2, EK2, GroupFun, FoldFun, []),
+        couch_btree:fold_reduce(Btree2, FoldFun, [], [{dir, fwd}, {key_group_fun, GroupFun}, {start_key, SK2}, {end_key, EK2}]),
         "Reducing foward over second half works with second startkey and endkey"
     ),
 
@@ -123,7 +123,7 @@ test()->
             ({ok, [{{"odd", _}, 500}]}) -> true;
             (_) -> false
         end,
-        couch_btree:fold_reduce(Btree2, rev, EK2, SK2, GroupFun, FoldFun, []),
+        couch_btree:fold_reduce(Btree2, FoldFun, [], [{dir, rev}, {key_group_fun, GroupFun}, {start_key, EK2}, {end_key, SK2}]),
         "Reducing in reverse works after swapping the startkey and endkey."
     ),
 
@@ -134,7 +134,7 @@ test()->
             (_) ->
                 false
         end,
-        couch_btree:fold_reduce(Btree2, rev, EK2, SK1, GroupFun, FoldFun, []),
+        couch_btree:fold_reduce(Btree2, FoldFun, [], [{dir, rev}, {key_group_fun, GroupFun}, {start_key, EK2}, {end_key, SK1}]),
         "Reducing in reverse results in reversed accumulator."
     ),
 
