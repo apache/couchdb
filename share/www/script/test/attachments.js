@@ -225,4 +225,16 @@ couchTests.attachments= function(debug) {
     headers: {"if-none-match": etag}
   });
   T(xhr.status == 304);
+
+  // test COUCHDB-497 - empty attachments
+  var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc5/empty.txt?rev="+rev, {
+    headers:{"Content-Type":"text/plain;charset=utf-8", "Content-Length": "0"},
+    body:""
+  });
+  TEquals(201, xhr.status, "should send 201 Accepted");
+  var rev = JSON.parse(xhr.responseText).rev;
+  var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc5/empty.txt?rev="+rev, {
+    headers:{"Content-Type":"text/plain;charset=utf-8"}
+  });
+  TEquals(201, xhr.status, "should send 201 Accepted");
 };
