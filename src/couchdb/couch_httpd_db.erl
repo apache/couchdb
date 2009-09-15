@@ -895,7 +895,7 @@ db_attachment_req(#httpd{method=Method}=Req, Db, DocId, FileNameParts)
                     end,
                 data = case couch_httpd:body_length(Req) of
                     undefined ->
-                        undefined;
+                        <<"">>;
                     {unknown_transfer_encoding, Unknown} ->
                         exit({unknown_transfer_encoding, Unknown});
                     chunked ->
@@ -904,7 +904,7 @@ db_attachment_req(#httpd{method=Method}=Req, Db, DocId, FileNameParts)
                                 ChunkFun, InitState)
                         end;
                     0 ->
-                        <<>>;
+                        <<"">>;
                     Length when is_integer(Length) ->
                         fun() -> couch_httpd:recv(Req, 0) end;
                     Length ->
