@@ -135,16 +135,13 @@ handle_request(MochiReq, DefaultFun,
     {FirstPart, _, _} ->
         list_to_binary(FirstPart)
     end,
-    ?LOG_INFO("~s - ~p ~s", [
-        MochiReq:get(peer),
+    ?LOG_DEBUG("~p ~s ~p~nHeaders: ~p", [
         MochiReq:get(method),
-        RawUri
-    ]),
-    ?LOG_DEBUG("HTTP ~p~nHeaders: ~p", [
+        RawUri,
         MochiReq:get(version),
         mochiweb_headers:to_list(MochiReq:get(headers))
     ]),
-
+    
     Method1 =
     case MochiReq:get(method) of
         % already an atom
@@ -163,6 +160,7 @@ handle_request(MochiReq, DefaultFun,
 
     HttpReq = #httpd{
         mochi_req = MochiReq,
+        peer = MochiReq:get(peer),
         method = Method,
         path_parts = [list_to_binary(couch_httpd:unquote(Part))
                 || Part <- string:tokens(Path, "/")],
@@ -202,7 +200,6 @@ handle_request(MochiReq, DefaultFun,
             ?LOG_INFO("Stacktrace: ~p",[erlang:get_stacktrace()]),
             send_error(HttpReq, Error)
     end,
-    ?LOG_INFO("Response code: ~B", [Resp:get(code)]),
     RequestTime = round(timer:now_diff(now(), Begin)/1000),
     couch_stats_collector:record({couchdb, request_time}, RequestTime),
     couch_stats_collector:increment({httpd, requests}),
@@ -357,7 +354,17 @@ verify_is_server_admin(#httpd{user_ctx=#user_ctx{roles=Roles}}) ->
     false -> throw({unauthorized, <<"You are not a server admin.">>})
     end.
 
+log_request(#httpd{mochi_req=MochiReq,peer=Peer,method=Method}, Code) ->
+    ?LOG_INFO("~s - - ~p ~s ~B", [
+        Peer,
+        Method,
+        MochiReq:get(raw_path),
+        Code
+    ]).
+
+
 start_response_length(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Length) ->
+    log_request(Req, Code),
     couch_stats_collector:increment({httpd_status_codes, Code}),
     Resp = MochiReq:start_response_length({Code, Headers ++ server_header() ++ couch_httpd_auth:cookie_auth_header(Req, Headers), Length}),
     case MochiReq:get(method) of
@@ -371,6 +378,7 @@ send(Resp, Data) ->
     {ok, Resp}.
 
 start_chunked_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers) ->
+    log_request(Req, Code),
     couch_stats_collector:increment({httpd_status_codes, Code}),
     Resp = MochiReq:respond({Code, Headers ++ server_header() ++ couch_httpd_auth:cookie_auth_header(Req, Headers), chunked}),
     case MochiReq:get(method) of
@@ -384,6 +392,7 @@ send_chunk(Resp, Data) ->
     {ok, Resp}.
 
 send_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Body) ->
+    log_request(Req, Code),
     couch_stats_collector:increment({httpd_status_codes, Code}),
     if Code >= 400 ->
         ?LOG_DEBUG("httpd ~p error response:~n ~s", [Code, Body]);

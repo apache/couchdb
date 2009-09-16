@@ -65,6 +65,7 @@
 
 -record(httpd,
     {mochi_req,
+    peer,
     method,
     path_parts,
     db_url_handlers,
