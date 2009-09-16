@@ -192,7 +192,7 @@ changes_enumerator(DocInfos, {Db, _, Prepend, FilterFun, Resp, _, Limit, Include
 
 changes_row(Db, Seq, Id, Del, Results, Rev, true) ->
     {[{seq,Seq},{id,Id},{changes,Results}] ++ deleted_item(Del) ++
-        couch_httpd_view:doc_member(Db, Id, Rev)};
+        couch_httpd_view:doc_member(Db, {Id, Rev})};
 changes_row(_, Seq, Id, Del, Results, _, false) ->
     {[{seq,Seq},{id,Id},{changes,Results}] ++ deleted_item(Del)}.
 

@@ -29,6 +29,9 @@ couchTests.view_include_docs = function(debug) {
       with_prev: {
         map: "function(doc){if(doc.prev) emit(doc._id,{'_rev':doc.prev}); else emit(doc._id,{'_rev':doc._rev});}"
       },
+      with_id: {
+        map: "function(doc) {if(doc.link_id) { var value = {'_id':doc.link_id}; if (doc.link_rev) {value._rev = doc.link_rev}; emit(doc._id, value);}};"
+      },
       summate: {
         map:"function (doc) {emit(doc.integer, doc.integer)};",
         reduce:"function (keys, values) { return sum(values); };"
@@ -84,6 +87,21 @@ couchTests.view_include_docs = function(debug) {
   T(resp.rows.length == 1);
   T(resp.rows[0].value == 4950);
 
+  T(db.save({
+    "_id": "link-to-10",
+    "link_id" : "10"
+  }).ok);
+  
+  // you can link to another doc from a value.
+  resp = db.view("test/with_id", {key:"link-to-10"});
+  T(resp.rows[0].key == "link-to-10");
+  T(resp.rows[0].value["_id"] == "10");
+  
+  resp = db.view("test/with_id", {key:"link-to-10",include_docs: true});
+  T(resp.rows[0].key == "link-to-10");
+  T(resp.rows[0].value["_id"] == "10");
+  T(resp.rows[0].doc._id == "10");
+
   // Check emitted _rev controls things
   resp = db.allDocs({include_docs: true}, ["0"]);
   var before = resp.rows[0].doc;
@@ -91,11 +109,13 @@ couchTests.view_include_docs = function(debug) {
   var after = db.open("0");
   after.integer = 100;
   after.prev = after._rev;
-  T(db.save(after).ok);
+  resp = db.save(after)
+  T(resp.ok);
   
   var after = db.open("0");
-  T(after._rev != after.prev);
-  T(after.integer == 100);
+  TEquals(resp.rev, after._rev, "fails with firebug running");
+  T(after._rev != after.prev, "passes");
+  TEquals(100, after.integer, "fails with firebug running");
 
   // should emit the previous revision
   resp = db.view("test/with_prev", {include_docs: true}, ["0"]);
