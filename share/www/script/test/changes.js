@@ -249,5 +249,7 @@ couchTests.changes = function(debug) {
       T(resp.results[0].id == docResp.id);
     });
   
-  // todo implement adhoc filters...
+    req = CouchDB.request("GET", "/test_suite_db/_changes?limit=1");
+    resp = JSON.parse(req.responseText);
+    TEquals(1, resp.results.length)
 };
