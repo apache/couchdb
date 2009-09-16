@@ -40,6 +40,7 @@ writer_loop(Parent, Reader, Target) ->
         end,
         Parent ! {writer_checkpoint, HighSeq},
         couch_rep_att:cleanup(),
+        couch_util:should_flush(),
         writer_loop(Parent, Reader, Target)
     end.
 
