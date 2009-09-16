@@ -83,6 +83,7 @@ handle_changes_req(#httpd{method='GET',path_parts=[DbName|_]}=Req, Db) ->
             {rev, Seq};
         _Bad -> throw({bad_request, "descending must be true or false"})
     end,
+    Limit = list_to_integer(couch_httpd:qs_value(Req, "limit", "1000000000000000")),
     ResponseType = couch_httpd:qs_value(Req, "feed", "normal"),
     if ResponseType == "continuous" orelse ResponseType == "longpoll" ->
         {ok, Resp} = start_json_response(Req, 200),
@@ -100,7 +101,7 @@ handle_changes_req(#httpd{method='GET',path_parts=[DbName|_]}=Req, Db) ->
                             {httpd, clients_requesting_changes}),
         try
             keep_sending_changes(Req, Resp, Db, StartSeq, <<"">>, Timeout,
-                TimeoutFun, ResponseType, FilterFun, EndFilterFun)
+                TimeoutFun, ResponseType, Limit, FilterFun, EndFilterFun)
         after
             couch_db_update_notifier:stop(Notify),
             get_rest_db_updated() % clean out any remaining update messages
@@ -111,9 +112,9 @@ handle_changes_req(#httpd{method='GET',path_parts=[DbName|_]}=Req, Db) ->
             % send the etag
             {ok, Resp} = start_json_response(Req, 200, [{"Etag", CurrentEtag}]),
             start_sending_changes(Resp, ResponseType),
-            {ok, {_, LastSeq, _Prepend, _, _, _, _}} =
+            {ok, {_, LastSeq, _Prepend, _, _, _, _, _}} =
                     send_changes(Req, Resp, Db, Dir, StartSeq, <<"">>, "normal",
-                        FilterFun, EndFilterFun),
+                        Limit, FilterFun, EndFilterFun),
             end_sending_changes(Resp, LastSeq, ResponseType)
         end)
     end;
@@ -144,9 +145,9 @@ end_sending_changes(Resp, EndSeq, _Else) ->
     end_json_response(Resp).
 
 keep_sending_changes(#httpd{user_ctx=UserCtx,path_parts=[DbName|_]}=Req, Resp,
-        Db, StartSeq, Prepend, Timeout, TimeoutFun, ResponseType, Filter, End) ->
-    {ok, {_, EndSeq, Prepend2, _, _, _, _}} = send_changes(Req, Resp, Db, fwd, StartSeq,
-        Prepend, ResponseType, Filter, End),
+        Db, StartSeq, Prepend, Timeout, TimeoutFun, ResponseType, Limit, Filter, End) ->
+    {ok, {_, EndSeq, Prepend2, _, _, _, NewLimit, _}} = send_changes(Req, Resp, Db, fwd, StartSeq,
+        Prepend, ResponseType, Limit, Filter, End),
     couch_db:close(Db),
     if
     EndSeq > StartSeq, ResponseType == "longpoll" ->
@@ -156,35 +157,37 @@ keep_sending_changes(#httpd{user_ctx=UserCtx,path_parts=[DbName|_]}=Req, Resp,
         updated ->
             {ok, Db2} = couch_db:open(DbName, [{user_ctx, UserCtx}]),
             keep_sending_changes(Req, Resp, Db2, EndSeq, Prepend2, Timeout,
-                TimeoutFun, ResponseType, Filter, End);
+                TimeoutFun, ResponseType, NewLimit, Filter, End);
         stop ->
             end_sending_changes(Resp, EndSeq, ResponseType)
         end
     end.
 
-changes_enumerator(DocInfos, {Db, _, _, FilterFun, Resp, "continuous", IncludeDocs}) ->
+changes_enumerator(DocInfos, {Db, _, _, FilterFun, Resp, "continuous", Limit, IncludeDocs}) ->
     [#doc_info{id=Id, high_seq=Seq, revs=[#rev_info{deleted=Del,rev=Rev}|_]}|_] = DocInfos,
     Results0 = [FilterFun(DocInfo) || DocInfo <- DocInfos],
     Results = [Result || Result <- Results0, Result /= null],
+    Go = if Limit =< 1 -> stop; true -> ok end,
     case Results of
     [] ->
-        {ok, {Db, Seq, nil, FilterFun, Resp, "continuous", IncludeDocs}};
+        {Go, {Db, Seq, nil, FilterFun, Resp, "continuous", Limit, IncludeDocs}};
     _ ->
         send_chunk(Resp, [?JSON_ENCODE(changes_row(Db, Seq, Id, Del, Results, Rev, IncludeDocs))
             |"\n"]),
-        {ok, {Db, Seq, nil, FilterFun, Resp, "continuous", IncludeDocs}}
+        {Go, {Db, Seq, nil, FilterFun, Resp, "continuous",  Limit-1, IncludeDocs}}
     end;
-changes_enumerator(DocInfos, {Db, _, Prepend, FilterFun, Resp, _, IncludeDocs}) ->
+changes_enumerator(DocInfos, {Db, _, Prepend, FilterFun, Resp, _, Limit, IncludeDocs}) ->
     [#doc_info{id=Id, high_seq=Seq, revs=[#rev_info{deleted=Del,rev=Rev}|_]}|_] = DocInfos,
     Results0 = [FilterFun(DocInfo) || DocInfo <- DocInfos],
     Results = [Result || Result <- Results0, Result /= null],
+    Go = if Limit =< 1 -> stop; true -> ok end,
     case Results of
     [] ->
-        {ok, {Db, Seq, Prepend, FilterFun, Resp, nil, IncludeDocs}};
+        {Go, {Db, Seq, Prepend, FilterFun, Resp, nil, Limit, IncludeDocs}};
     _ ->
         send_chunk(Resp, [Prepend, ?JSON_ENCODE(
             changes_row(Db, Seq, Id, Del, Results, Rev, IncludeDocs))]),
-        {ok, {Db, Seq, <<",\n">>, FilterFun, Resp, nil, IncludeDocs}}
+        {Go, {Db, Seq, <<",\n">>, FilterFun, Resp, nil, Limit-1, IncludeDocs}}
     end.
 
 changes_row(Db, Seq, Id, Del, Results, Rev, true) ->
@@ -196,14 +199,14 @@ changes_row(_, Seq, Id, Del, Results, _, false) ->
 deleted_item(true) -> [{deleted,true}];
 deleted_item(_) -> [].
 
-send_changes(Req, Resp, Db, Dir, StartSeq, Prepend, ResponseType, FilterFun, End) ->
+send_changes(Req, Resp, Db, Dir, StartSeq, Prepend, ResponseType, Limit, FilterFun, End) ->
     Style = list_to_existing_atom(
             couch_httpd:qs_value(Req, "style", "main_only")),
     IncludeDocs = list_to_existing_atom(
             couch_httpd:qs_value(Req, "include_docs", "false")),
     try
         couch_db:changes_since(Db, Style, StartSeq, fun changes_enumerator/2, 
-            [{dir, Dir}], {Db, StartSeq, Prepend, FilterFun, Resp, ResponseType, IncludeDocs})
+            [{dir, Dir}], {Db, StartSeq, Prepend, FilterFun, Resp, ResponseType, Limit, IncludeDocs})
     after
         End()
     end.
