@@ -18,7 +18,7 @@
 -export([get_stale_type/1, get_reduce_type/1, parse_view_params/3]).
 -export([make_view_fold_fun/6, finish_view_fold/4, view_row_obj/3]).
 -export([view_group_etag/2, view_group_etag/3, make_reduce_fold_funs/5]).
--export([design_doc_view/5, parse_bool_param/1, doc_member/3]).
+-export([design_doc_view/5, parse_bool_param/1, doc_member/2]).
 -export([make_key_options/1]).
 
 -import(couch_httpd,
@@ -589,17 +589,18 @@ view_row_obj(Db, {{Key, DocId}, {Props}}, true) ->
     Rev0 ->
         couch_doc:parse_rev(Rev0)
     end,
-    view_row_with_doc(Db, {{Key, DocId}, {Props}}, Rev);
+    IncludeId = proplists:get_value(<<"_id">>, Props, DocId),
+    view_row_with_doc(Db, {{Key, DocId}, {Props}}, {IncludeId, Rev});
 view_row_obj(Db, {{Key, DocId}, Value}, true) ->
-    view_row_with_doc(Db, {{Key, DocId}, Value}, nil);
+    view_row_with_doc(Db, {{Key, DocId}, Value}, {DocId, nil});
 % the normal case for rendering a view row
 view_row_obj(_Db, {{Key, DocId}, Value}, _IncludeDocs) ->
     {[{id, DocId}, {key, Key}, {value, Value}]}.
 
-view_row_with_doc(Db, {{Key, DocId}, Value}, Rev) ->
-    {[{id, DocId}, {key, Key}, {value, Value}] ++ doc_member(Db, DocId, Rev)}.
+view_row_with_doc(Db, {{Key, DocId}, Value}, IdRev) ->
+    {[{id, DocId}, {key, Key}, {value, Value}] ++ doc_member(Db, IdRev)}.
 
-doc_member(Db, DocId, Rev) ->
+doc_member(Db, {DocId, Rev}) ->
     ?LOG_DEBUG("Include Doc: ~p ~p", [DocId, Rev]),
     case (catch couch_httpd_db:couch_doc_open(Db, DocId, Rev, [])) of
         #doc{} = Doc ->
