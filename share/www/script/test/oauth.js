@@ -29,9 +29,10 @@ couchTests.oauth = function(debug) {
 
   // Simple secret key generator
   function generateSecret(length) {
+    var tab = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     var secret = '';
     for (var i=0; i<length; i++) {
-      secret += String.fromCharCode(Math.floor(Math.random() * 256));
+      secret += tab.charAt(Math.floor(Math.random() * 64));
     }
     return secret;
   }
