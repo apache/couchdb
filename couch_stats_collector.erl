@@ -18,23 +18,15 @@
 
 -behaviour(gen_server).
 
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-        terminate/2, code_change/3]).
+-export([start/0, stop/0]).
+-export([all/0, all/1, get/1, increment/1, decrement/1, record/2, clear/1]).
+-export([track_process_count/1, track_process_count/2]).
 
+-export([init/1, terminate/2, code_change/3]).
+-export([handle_call/3, handle_cast/2, handle_info/2]).
 
--export([start/0, stop/0, get/1,
-        increment/1, decrement/1,
-        track_process_count/1, track_process_count/2,
-        record/2, clear/1,
-        all/0, all/1]).
-
--record(state, {}).
-
--define(ABSOLUTE_VALUE_COUNTER_TABLE, abs_table).
--define(HIT_COUNTER_TABLE, hit_table).
-
-
-% PUBLIC API
+-define(HIT_TABLE, stats_hit_table).
+-define(ABS_TABLE, stats_abs_table).
 
 start() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -42,106 +34,103 @@ start() ->
 stop() ->
     gen_server:call(?MODULE, stop).
 
-get(Key) ->
-    case ets:lookup(?HIT_COUNTER_TABLE, Key) of
-        [] ->
-            case ets:lookup(?ABSOLUTE_VALUE_COUNTER_TABLE, Key) of
-                [] ->
-                    0;
-                Result2 -> extract_value_from_ets_result(Key, Result2)
-            end;
-        [{_,Result1}] -> Result1
+all() ->
+    ets:tab2list(?HIT_TABLE) ++ abs_to_list().
+
+all(Type) ->
+    case Type of
+        incremental -> ets:tab2list(?HIT_TABLE);
+        absolute -> abs_to_list()
     end.
 
-increment({Module, Key}) when is_integer(Key) ->
-    increment({Module, list_to_atom(integer_to_list(Key))});
+get(Key) ->
+    case ets:lookup(?HIT_TABLE, Key) of
+        [] ->
+            case ets:lookup(?ABS_TABLE, Key) of
+                [] ->
+                    nil;
+                AbsVals ->
+                    lists:map(fun({_, Value}) -> Value end, AbsVals)
+            end;
+        [{_, Counter}] ->
+            Counter
+    end.
+
 increment(Key) ->
-    case catch ets:update_counter(?HIT_COUNTER_TABLE, Key, 1) of
+    Key2 = make_key(Key),
+    case catch ets:update_counter(?HIT_TABLE, Key2, 1) of
         {'EXIT', {badarg, _}} ->
-            true = ets:insert(?HIT_COUNTER_TABLE, {Key, 1}),
+            true = ets:insert(?HIT_TABLE, {Key2, 1}),
             ok;
-        _ -> ok
+        _ ->
+            ok
     end.
 
 decrement(Key) ->
-    case catch ets:update_counter(?HIT_COUNTER_TABLE, Key, -1) of
+    Key2 = make_key(Key),
+    case catch ets:update_counter(?HIT_TABLE, Key2, -1) of
         {'EXIT', {badarg, _}} ->
-            true = ets:insert(?HIT_COUNTER_TABLE, {Key, -1}),
+            true = ets:insert(?HIT_TABLE, {Key2, -1}),
             ok;
         _ -> ok
     end.
 
 record(Key, Value) ->
-    ets:insert(?ABSOLUTE_VALUE_COUNTER_TABLE, {Key, Value}).
+    true = ets:insert(?ABS_TABLE, {make_key(Key), Value}).
 
 clear(Key) ->
-    true = ets:delete(?ABSOLUTE_VALUE_COUNTER_TABLE, Key).
-
-all() ->
-    lists:append(ets:tab2list(?HIT_COUNTER_TABLE),
-        ets:tab2list(?ABSOLUTE_VALUE_COUNTER_TABLE)).
-
-all(Type) ->
-    case Type of
-        incremental -> ets:tab2list(?HIT_COUNTER_TABLE);
-        absolute -> ets:tab2list(?ABSOLUTE_VALUE_COUNTER_TABLE)
-    end.
+    true = ets:delete(?ABS_TABLE, make_key(Key)).
 
 track_process_count(Stat) ->
     track_process_count(self(), Stat).
 
 track_process_count(Pid, Stat) ->
+    MonitorFun = fun() ->
+        Ref = erlang:monitor(process, Pid),
+        receive {'DOWN', Ref, _, _, _} -> ok end,
+        couch_stats_collector:decrement(Stat)
+    end,
     case (catch couch_stats_collector:increment(Stat)) of
-    ok ->
-        spawn(
-            fun() ->
-                erlang:monitor(process, Pid),
-                receive {'DOWN', _, _, _, _} -> ok end,
-                couch_stats_collector:decrement(Stat)
-            end);
-     _ -> ok
+        ok -> spawn(MonitorFun);
+        _ -> ok
     end.
 
 
-% GEN_SERVER
-
-
 init(_) ->
-    ets:new(?HIT_COUNTER_TABLE, [named_table, set, public]),
-    ets:new(?ABSOLUTE_VALUE_COUNTER_TABLE, [named_table, duplicate_bag, public]),
-    {ok, #state{}}.
+    ets:new(?HIT_TABLE, [named_table, set, public]),
+    ets:new(?ABS_TABLE, [named_table, duplicate_bag, public]),
+    {ok, nil}.
 
+terminate(_Reason, _State) ->
+    ok.
 
 handle_call(stop, _, State) ->
     {stop, normal, stopped, State}.
 
-
-% PRIVATE API
-
-extract_value_from_ets_result(_Key, Result) ->
-    lists:map(fun({_, Value}) -> Value end, Result).
-
-
-% Unused gen_server behaviour API functions that we need to declare.
-
-%% @doc Unused
 handle_cast(foo, State) ->
     {noreply, State}.
 
 handle_info(_Info, State) ->
     {noreply, State}.
 
-%% @doc Unused
-terminate(_Reason, _State) -> ok.
-
-%% @doc Unused
-code_change(_OldVersion, State, _Extra) -> {ok, State}.
+code_change(_OldVersion, State, _Extra) ->
+    {ok, State}.
 
 
-%% Tests
+make_key({Module, Key}) when is_integer(Key) ->
+    {Module, list_to_atom(integer_to_list(Key))};
+make_key(Key) ->
+    Key.
 
--ifdef(TEST).
-% Internal API unit tests go here
-
-
--endif.
+abs_to_list() ->
+    SortedKVs = lists:sort(ets:tab2list(?ABS_TABLE)),
+    lists:foldl(fun({Key, Val}, Acc) ->
+        case Acc of
+            [] ->
+                [{Key, [Val]}];
+            [{Key, Prev} | Rest] ->
+                [{Key, [Val | Prev]} | Rest];
+            Others ->
+                [{Key, [Val]} | Others]
+        end
+    end, [], SortedKVs).
