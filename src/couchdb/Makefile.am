@@ -109,7 +109,7 @@ source_files = \
     couch_db_updater.erl \
     couch_work_queue.erl
 
-EXTRA_DIST = $(source_files) couch_db.hrl couch_stats.hrl
+EXTRA_DIST = $(source_files) couch_db.hrl
 
 compiled_files = \
     couch.app \
