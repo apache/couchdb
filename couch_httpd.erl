@@ -377,10 +377,28 @@ send(Resp, Data) ->
     Resp:send(Data),
     {ok, Resp}.
 
+no_resp_conn_header([]) ->
+    true;
+no_resp_conn_header([{Hdr, _}|Rest]) ->
+    case string:to_lower(Hdr) of
+        "connection" -> false;
+        _ -> no_resp_conn_header(Rest)
+    end.
+
+http_1_0_keep_alive(Req, Headers) ->
+    KeepOpen = Req:should_close() == false,
+    IsHttp10 = Req:get(version) == {1, 0},
+    NoRespHeader = no_resp_conn_header(Headers),
+    case KeepOpen andalso IsHttp10 andalso NoRespHeader of
+        true -> [{"Connection", "Keep-Alive"} | Headers];
+        false -> Headers
+    end.
+
 start_chunked_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers) ->
     log_request(Req, Code),
     couch_stats_collector:increment({httpd_status_codes, Code}),
-    Resp = MochiReq:respond({Code, Headers ++ server_header() ++ couch_httpd_auth:cookie_auth_header(Req, Headers), chunked}),
+    Headers2 = http_1_0_keep_alive(MochiReq, Headers),
+    Resp = MochiReq:respond({Code, Headers2 ++ server_header() ++ couch_httpd_auth:cookie_auth_header(Req, Headers2), chunked}),
     case MochiReq:get(method) of
     'HEAD' -> throw({http_head_abort, Resp});
     _ -> ok
@@ -394,11 +412,12 @@ send_chunk(Resp, Data) ->
 send_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Body) ->
     log_request(Req, Code),
     couch_stats_collector:increment({httpd_status_codes, Code}),
+    Headers2 = http_1_0_keep_alive(MochiReq, Headers),
     if Code >= 400 ->
         ?LOG_DEBUG("httpd ~p error response:~n ~s", [Code, Body]);
     true -> ok
     end,
-    {ok, MochiReq:respond({Code, Headers ++ server_header() ++ couch_httpd_auth:cookie_auth_header(Req, Headers), Body})}.
+    {ok, MochiReq:respond({Code, Headers2 ++ server_header() ++ couch_httpd_auth:cookie_auth_header(Req, Headers2), Body})}.
 
 send_method_not_allowed(Req, Methods) ->
     send_error(Req, 405, [{"Allow", Methods}], <<"method_not_allowed">>, ?l2b("Only " ++ Methods ++ " allowed")).
