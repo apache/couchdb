@@ -19,7 +19,7 @@
 -export([cookie_auth_header/2]).
 -export([handle_session_req/1]).
 -export([handle_user_req/1]).
--export([ensure_users_db_exists/1, get_user/2]).
+-export([ensure_users_db_exists/1, get_user/1]).
 
 -import(couch_httpd, [header_value/2, send_json/2,send_json/4, send_method_not_allowed/2]).
 
@@ -109,7 +109,7 @@ cookie_authentication_handler(Req) ->
 %     end.
 
 % maybe we can use hovercraft to simplify running this view query
-get_user(Db, UserName) ->
+get_user(UserName) ->
     % In the future this will be pluggable. For now we check the .ini first,
     % then fall back to querying the db.
     case couch_config:get("admins", ?b2l(UserName)) of
@@ -122,6 +122,9 @@ get_user(Db, UserName) ->
         DesignId = <<"_design/_auth">>,
         ViewName = <<"users">>,
         % if the design doc or the view doesn't exist, then make it
+        DbName = couch_config:get("couch_httpd_auth", "authentication_db"),
+        {ok, Db} = ensure_users_db_exists(?l2b(DbName)),
+
         ensure_users_view_exists(Db, DesignId, ViewName),
 
         case (catch couch_view:get_map_view(Db, DesignId, ViewName, nil)) of
@@ -144,14 +147,12 @@ get_user(Db, UserName) ->
 ensure_users_db_exists(DbName) ->
     case couch_db:open(DbName, [{user_ctx, #user_ctx{roles=[<<"_admin">>]}}]) of
     {ok, Db} ->
-        couch_db:close(Db),
-        ok;
+        {ok, Db};
     _Error -> 
         ?LOG_ERROR("Create the db ~p", [DbName]),
         {ok, Db} = couch_db:create(DbName, [{user_ctx, #user_ctx{roles=[<<"_admin">>]}}]),
         ?LOG_ERROR("Created the db ~p", [DbName]),
-        couch_db:close(Db),
-        ok
+        {ok, Db}
     end.
     
 ensure_users_view_exists(Db, DDocId, VName) -> 
@@ -218,7 +219,7 @@ cookie_auth_user(#httpd{mochi_req=MochiReq}=Req, DbName) ->
                 nil -> nil;
                 SecretStr ->
                     Secret = ?l2b(SecretStr),
-                    case get_user(Db, ?l2b(User)) of
+                    case get_user(?l2b(User)) of
                     nil -> nil;
                     Result ->
                         UserSalt = proplists:get_value(<<"salt">>, Result, <<"">>),
@@ -283,7 +284,7 @@ hash_password(Password, Salt) ->
     ?l2b(couch_util:to_hex(crypto:sha(<<Password/binary, Salt/binary>>))).
 
 % Login handler with user db
-handle_login_req(#httpd{method='POST', mochi_req=MochiReq}=Req, #db{}=Db) ->
+handle_login_req(#httpd{method='POST', mochi_req=MochiReq}=Req) ->
     ReqBody = MochiReq:recv_body(),
     Form = case MochiReq:get_primary_header_value("content-type") of
         "application/x-www-form-urlencoded" ++ _ ->
@@ -293,7 +294,7 @@ handle_login_req(#httpd{method='POST', mochi_req=MochiReq}=Req, #db{}=Db) ->
     end,
     UserName = ?l2b(proplists:get_value("username", Form, "")),
     Password = ?l2b(proplists:get_value("password", Form, "")),
-    User = case get_user(Db, UserName) of
+    User = case get_user(UserName) of
         nil -> [];
         Result -> Result
     end,
@@ -320,11 +321,7 @@ handle_login_req(#httpd{method='POST', mochi_req=MochiReq}=Req, #db{}=Db) ->
 % Session Handler
 
 handle_session_req(#httpd{method='POST'}=Req) ->
-    % login
-    DbName = couch_config:get("couch_httpd_auth", "authentication_db"),
-    case couch_db:open(?l2b(DbName), [{user_ctx, #user_ctx{roles=[<<"_admin">>]}}]) of
-        {ok, Db} -> handle_login_req(Req, Db)
-    end;
+    handle_login_req(Req);
 handle_session_req(#httpd{method='GET', user_ctx=UserCtx}=Req) ->
     % whoami
     Name = UserCtx#user_ctx.name,
@@ -367,7 +364,7 @@ create_user_req(#httpd{method='POST', mochi_req=MochiReq}=Req, Db) ->
     Password = ?l2b(proplists:get_value("password", Form, "")),
     Email = ?l2b(proplists:get_value("email", Form, "")),
     Active = couch_httpd_view:parse_bool_param(proplists:get_value("active", Form, "true")),
-    case get_user(Db, UserName) of
+    case get_user(UserName) of
     nil -> 
         Roles1 = case Roles of
         [] -> Roles;
@@ -397,7 +394,7 @@ create_user_req(#httpd{method='POST', mochi_req=MochiReq}=Req, Db) ->
 update_user_req(#httpd{method='PUT', mochi_req=MochiReq, user_ctx=UserCtx}=Req, Db, UserName) ->
     Name = UserCtx#user_ctx.name,
     UserRoles = UserCtx#user_ctx.roles,
-    case User = get_user(Db, UserName) of
+    case User = get_user(UserName) of
     nil ->
         throw({not_found, <<"User don't exist">>});
     _Result ->
