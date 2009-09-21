@@ -143,9 +143,13 @@ process_response({error, Reason}, Req) ->
     end,
     ?LOG_DEBUG("retrying couch_rep_httpc ~p request in ~p seconds due to " ++
         "{error, ~p}", [Method, Pause/1000, ShortReason]),
-        % "{error}", [Method, Pause]),
     timer:sleep(Pause),
-    do_request(Req#http_db{retries = Retries-1, pause = 2*Pause}).
+    if Reason == worker_is_dead ->
+        C = spawn_link_worker_process(Req),
+        do_request(Req#http_db{retries = Retries-1, pause = 2*Pause, conn=C});
+    true ->
+        do_request(Req#http_db{retries = Retries-1, pause = 2*Pause})
+    end.
 
 spawn_worker_process(Req) ->
     Url = ibrowse_lib:parse_url(Req#http_db.url),
