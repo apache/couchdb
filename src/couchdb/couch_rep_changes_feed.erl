@@ -25,6 +25,7 @@
 -record (state, {
     changes_from = nil,
     changes_loop = nil,
+    init_args,
     last_seq,
     conn = nil,
     reqid = nil,
@@ -44,7 +45,7 @@ next(Server) ->
 stop(Server) ->
     gen_server:call(Server, stop).
 
-init([_Parent, #http_db{}=Source, Since, PostProps]) ->
+init([_Parent, #http_db{}=Source, Since, PostProps] = Args) ->
     process_flag(trap_exit, true),
     Feed = case proplists:get_value(<<"continuous">>, PostProps, false) of
     false ->
@@ -66,14 +67,14 @@ init([_Parent, #http_db{}=Source, Since, PostProps]) ->
     receive
     {ibrowse_async_headers, ReqId, "200", _} ->
         ibrowse:stream_next(ReqId),
-        {ok, #state{conn=Pid, last_seq=Since, reqid=ReqId}};
+        {ok, #state{conn=Pid, last_seq=Since, reqid=ReqId, init_args=Args}};
     {ibrowse_async_headers, ReqId, Code, Hdrs} when Code=="301"; Code=="302" ->
         catch ibrowse:stop_worker_process(Pid),
         Url2 = mochiweb_headers:get_value("Location", mochiweb_headers:make(Hdrs)),
         %% TODO use couch_httpc:request instead of start_http_request
         {Pid2, ReqId2} = start_http_request(Url2),
         receive {ibrowse_async_headers, ReqId2, "200", _} ->
-            {ok, #state{conn=Pid2, last_seq=Since, reqid=ReqId2}}
+            {ok, #state{conn=Pid2, last_seq=Since, reqid=ReqId2, init_args=Args}}
         after 30000 ->
             {stop, changes_timeout}
         end;
@@ -82,14 +83,14 @@ init([_Parent, #http_db{}=Source, Since, PostProps]) ->
         ?LOG_INFO("source doesn't have _changes, trying _all_docs_by_seq", []),
         Self = self(),
         BySeqPid = spawn_link(fun() -> by_seq_loop(Self, Source, Since) end),
-        {ok, #state{last_seq=Since, changes_loop=BySeqPid}};
+        {ok, #state{last_seq=Since, changes_loop=BySeqPid, init_args=Args}};
     {ibrowse_async_headers, ReqId, Code, _} ->
         {stop, {changes_error_code, list_to_integer(Code)}}
     after 10000 ->
         {stop, changes_timeout}
     end;
 
-init([_Parent, Source, Since, PostProps]) ->
+init([_Parent, Source, Since, PostProps] = InitArgs) ->
     process_flag(trap_exit, true),
     Server = self(),
     ChangesPid =
@@ -104,7 +105,7 @@ init([_Parent, Source, Since, PostProps]) ->
             send_local_changes_forever(Server, Source, Since)
         end)
     end,
-    {ok, #state{changes_loop=ChangesPid}}.
+    {ok, #state{changes_loop=ChangesPid, init_args=InitArgs}}.
 
 handle_call({add_change, Row}, From, State) ->
     handle_add_change(Row, From, State);
@@ -113,12 +114,6 @@ handle_call(next_changes, From, State) ->
     handle_next_changes(From, State);
     
 handle_call(stop, _From, State) ->
-    #state{
-        changes_loop = ChangesPid,
-        conn = Conn
-    } = State,
-    if is_pid(ChangesPid) -> exit(ChangesPid, stop); true -> ok end,
-    if is_pid(Conn) -> catch ibrowse:stop_worker_process(Conn); true -> ok end,
     {stop, normal, ok, State}.
 
 handle_cast(_Msg, State) ->
@@ -126,6 +121,10 @@ handle_cast(_Msg, State) ->
 
 handle_info({ibrowse_async_headers, Id, Code, Hdrs}, #state{reqid=Id}=State) ->
     handle_headers(list_to_integer(Code), Hdrs, State);
+
+handle_info({ibrowse_async_response, Id, {error,connection_closed}},
+        #state{reqid=Id}=State) ->
+    handle_retry(State);
 
 handle_info({ibrowse_async_response, Id, {error,E}}, #state{reqid=Id}=State) ->
     {stop, {error, E}, State};
@@ -148,10 +147,13 @@ handle_info(Msg, State) ->
     ?LOG_DEBUG("unexpected message at changes_feed ~p", [Msg]),
     {noreply, State}.
 
-terminate(_Reason, #state{conn=Pid}) when is_pid(Pid) ->
-    catch ibrowse:stop_worker_process(Pid),
-    ok;
-terminate(_Reason, _State) ->
+terminate(_Reason, State) ->
+    #state{
+        changes_loop = ChangesPid,
+        conn = Conn
+    } = State,
+    if is_pid(ChangesPid) -> exit(ChangesPid, stop); true -> ok end,
+    if is_pid(Conn) -> catch ibrowse:stop_worker_process(Conn); true -> ok end,
     ok.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -222,11 +224,12 @@ handle_messages([Chunk|Rest], State) ->
         rows = Rows
     } = State,
     NewState = try
-        Row = decode_row(<<Partial/binary, Chunk/binary>>),
+        Row = {Props} = decode_row(<<Partial/binary, Chunk/binary>>),
         case State of
         #state{reply_to=nil} ->
             State#state{
                 count = Count+1,
+                last_seq = proplists:get_value(<<"seq">>, Props),
                 partial_chunk = <<>>,
                 rows=queue:in(Row,Rows)
             };
@@ -245,6 +248,27 @@ handle_feed_completion(#state{reply_to=nil} = State)->
 handle_feed_completion(#state{count=0} = State) ->
     gen_server:reply(State#state.reply_to, complete),
     {stop, normal, State}.
+
+handle_retry(State) ->
+    ?LOG_DEBUG("retrying changes feed because our connection closed", []),
+    #state{
+        count = Count,
+        init_args = [_, Source, _, PostProps],
+        last_seq = Since,
+        reply_to = ReplyTo,
+        rows = Rows
+    } = State,
+    case init([nil, Source, Since, PostProps]) of
+    {ok, State1} ->
+        MergedState = State1#state{
+            count = Count,
+            reply_to = ReplyTo,
+            rows = Rows
+        },
+        {noreply, MergedState};
+    _ ->
+        {stop, {error, connection_closed}, State}
+    end.
 
 by_seq_loop(Server, Source, StartSeq) ->
     Req = Source#http_db{
@@ -292,8 +316,6 @@ flush_updated_messages() ->
 
 local_update_notification(Self, DbName, {updated, DbName}) ->
     Self ! updated;
-local_update_notification(Self, DbName, {deleted, DbName}) ->
-    Self ! deleted;
 local_update_notification(_, _, _) ->
     ok.
 
@@ -346,10 +368,6 @@ start_http_request(RawUrl) ->
     {Pid, Id}.
 
 wait_db_updated() ->
-    receive deleted ->
-        exit(deleted)
-    after 0 ->
-        receive updated ->
-            flush_updated_messages()
-        end
+    receive updated ->
+        flush_updated_messages()
     end.
