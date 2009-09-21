@@ -131,8 +131,7 @@ handle_changes_loop_exit(normal, State) ->
         {noreply, State#state{complete=true, changes_loop=nil}}
     end;
 handle_changes_loop_exit(Reason, State) ->
-    ?LOG_ERROR("changes_loop died with reason ~p", [Reason]),
-    {stop, changes_loop_died, State#state{changes_loop=nil}}.
+    {stop, Reason, State#state{changes_loop=nil}}.
 
 changes_loop(OurServer, SourceChangesServer, Target) ->
     case couch_rep_changes_feed:next(SourceChangesServer) of
@@ -156,11 +155,15 @@ get_missing_revs(#http_db{}=Target, Changes) ->
         body = {IdRevsList}
     },
     {Resp} = couch_rep_httpc:request(Request),
-    {MissingRevs} = proplists:get_value(<<"missing_revs">>, Resp),
-    X = [{Id, dict:fetch(Id, SeqDict), couch_doc:parse_revs(RevStrs)} ||
-        {Id,RevStrs} <- MissingRevs],
-    {HighSeq, X};
-        
+    case proplists:get_value(<<"missing_revs">>, Resp) of
+    {MissingRevs} ->
+        X = [{Id, dict:fetch(Id, SeqDict), couch_doc:parse_revs(RevStrs)} ||
+            {Id,RevStrs} <- MissingRevs],
+        {HighSeq, X};
+    _ ->
+        exit({target_error, proplists:get_value(<<"error">>, Resp)})
+    end;
+
 get_missing_revs(Target, Changes) ->
     Transform = fun({[{<<"seq">>,_}, {<<"id">>,Id}, {<<"changes">>,C}]}) ->
         {Id, [R || {[{<<"rev">>, R}]} <- C]} end,
