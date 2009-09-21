@@ -141,7 +141,7 @@ keep_sending_changes(#httpd{user_ctx=UserCtx,path_parts=[DbName|_]}=Req, Resp,
             case couch_db:open(DbName, [{user_ctx, UserCtx}]) of
             {ok, Db2} ->
                 keep_sending_changes(Req, Resp, Db2, EndSeq, Prepend2, Timeout,
-                    TimeoutFun, ResponseType, NewLimit, Filter, End);
+                    TimeoutFun, ResponseType, Filter, End);
             _Else ->
                 end_sending_changes(Resp, EndSeq, ResponseType)
             end;
