@@ -63,8 +63,6 @@
 ^src/ibrowse/*
 ^src/mochiweb/*
 ^stamp-h1
-^test/etap/081-config-override.1.ini
-^test/etap/081-config-override.2.ini
 ^test/etap/temp.*
 ^test/local.ini
 ^test/Makefile
