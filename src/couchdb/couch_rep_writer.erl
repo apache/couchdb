@@ -46,12 +46,18 @@ writer_loop(Parent, Reader, Target) ->
 
 write_docs(#http_db{} = Db, Docs) ->
     JsonDocs = [couch_doc:to_json_obj(Doc, [revs,attachments]) || Doc <- Docs],
-    ErrorsJson = couch_rep_httpc:request(Db#http_db{
+    Request = Db#http_db{
         resource = "_bulk_docs",
         method = post,
         body = {[{new_edits, false}, {docs, JsonDocs}]},
         headers = [{"x-couch-full-commit", "false"} | Db#http_db.headers]
-    }),
+    },
+    ErrorsJson = case couch_rep_httpc:request(Request) of
+    {FailProps} ->
+        exit({target_error, proplists:get_value(<<"error">>, FailProps)});
+    List when is_list(List) ->
+        List
+    end,
     ErrorsList =
     lists:map(
         fun({Props}) ->
