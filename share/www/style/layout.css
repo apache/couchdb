@@ -428,22 +428,23 @@ body.fullwidth #wrap { margin-right: 0; }
   float: left; margin-left: 0; padding-left: 2px; padding-right: .5em;
   padding-top: 2px;
 }
-#fields tbody.content input, #fields tbody.content textarea {
+#fields tbody.content input, #fields tbody.content textarea, #fields tbody.source textarea {
   background: #fff; border: 1px solid; border-color: #999 #ddd #ddd #999;
   margin: 0; padding: 1px; width: 100%;
 }
 #fields tbody.content th input { font-family: inherit; font-size: inherit;
   font-weight: bold;
 }
-#fields tbody.content td input, #fields tbody.content td textarea {
+#fields tbody.content td input, #fields tbody.content td textarea, #fields tbody.source textarea {
   font: 11px normal "DejaVu Sans Mono",Monaco,monospace;
 }
 #fields tbody.content input.invalid,
-#fields tbody.content textarea.invalid {
+#fields tbody.content textarea.invalid,
+#fields tbody.source textarea.invalid {
   background: #f9f4f4; border-color: #b66 #ebb #ebb #b66;
 }
-#fields tbody.content div.grippie { padding: 0 1px; width: 100%; }
-#fields tbody.content div.error { color: #d33; }
+#fields tbody.content div.grippie, #fields tbody.source div.gripple { padding: 0 1px; width: 100%; }
+#fields tbody.content div.error, #fields tbody.source div.error { color: #d33; }
 
 #fields tbody.content td ul.attachments { list-style: none; margin: 0;
   padding: 0;
@@ -469,6 +470,7 @@ body.fullwidth #wrap { margin-right: 0; }
 #fields tbody.source td pre { color: #999; font-size: 11px; line-height: 1.6em;
   margin: 0; overflow: auto; white-space: pre-wrap; width: 100%;
 }
+#fields tbody.source td.editinline-container { padding-left: 14px; padding-right: 48px; }
 
 /* Test suite */
 
