@@ -55,7 +55,7 @@ couchTests.view_errors = function(debug) {
           map : "function(doc){emit(doc.integer)}"
         })
       });
-      T(JSON.parse(xhr.responseText).error == "invalid_json");
+      T(JSON.parse(xhr.responseText).error == "bad_request");
 
       // views should ignore Content-Type, like the rest of CouchDB
       var xhr = CouchDB.request("POST", "/test_suite_db/_temp_view", {
