@@ -79,6 +79,7 @@ json_req_obj(#httpd{mochi_req=Req,
         {<<"query">>, to_json_terms(Req:parse_qs())},
         {<<"headers">>, to_json_terms(Hlist)},
         {<<"body">>, Body},
+        {<<"peer">>, ?l2b(Req:get(peer))},
         {<<"form">>, to_json_terms(ParsedForm)},
         {<<"cookie">>, to_json_terms(Req:parse_cookie())},
         {<<"userCtx">>, couch_util:json_user_ctx(Db)}]}.
