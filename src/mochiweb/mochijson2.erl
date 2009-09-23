@@ -345,10 +345,24 @@ tokenize_string_fast(B, O) ->
     case B of
         <<_:O/binary, ?Q, _/binary>> ->
             O;
-        <<_:O/binary, C, _/binary>> when C =/= $\\ ->
+        <<_:O/binary, $\\, _/binary>> ->
+            {escape, O};
+        <<_:O/binary, C1, _/binary>> when C1 < 128 ->
             tokenize_string_fast(B, 1 + O);
+        <<_:O/binary, C1, C2, _/binary>> when C1 >= 194, C1 =< 223,
+                C2 >= 128, C2 =< 191 ->
+            tokenize_string_fast(B, 2 + O);
+        <<_:O/binary, C1, C2, C3, _/binary>> when C1 >= 224, C1 =< 239,
+                C2 >= 128, C2 =< 191,
+                C3 >= 128, C3 =< 191 ->
+            tokenize_string_fast(B, 3 + O);
+        <<_:O/binary, C1, C2, C3, C4, _/binary>> when C1 >= 240, C1 =< 244,
+                C2 >= 128, C2 =< 191,
+                C3 >= 128, C3 =< 191,
+                C4 >= 128, C4 =< 191 ->
+            tokenize_string_fast(B, 4 + O);
         _ ->
-            {escape, O}
+            throw(invalid_utf8)
     end.
 
 tokenize_string(B, S=#decoder{offset=O}, Acc) ->

@@ -181,6 +181,9 @@ handle_request(MochiReq, DefaultFun,
     catch
         throw:{http_head_abort, Resp0} ->
             {ok, Resp0};
+        throw:{invalid_json, S} ->
+            ?LOG_ERROR("attempted upload of invalid JSON ~s", [S]),
+            send_error(HttpReq, {bad_request, "invalid UTF-8 JSON"});
         exit:normal ->
             exit(normal);
         throw:Error ->
