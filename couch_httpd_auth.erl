@@ -259,17 +259,15 @@ cookie_auth_header(#httpd{user_ctx=#user_ctx{name=User}, auth={Secret, true}}, H
     %    or logout handler.
     % The login and logout handlers need to set the AuthSession cookie
     % themselves.
-    case proplists:get_value("Set-Cookie", Headers) of
-    undefined -> [];
-    Cookie -> 
-        case proplists:get_value("AuthSession",
-            mochiweb_cookies:parse_cookie(Cookie), undefined) of
-        undefined ->
-            {NowMS, NowS, _} = erlang:now(),
-            TimeStamp = NowMS * 1000000 + NowS,
-            [cookie_auth_cookie(?b2l(User), Secret, TimeStamp)];
-        _Else -> []
-        end
+    CookieHeader = proplists:get_value("Set-Cookie", Headers, ""),
+    Cookies = mochiweb_cookies:parse_cookie(CookieHeader),
+    AuthSession = proplists:get_value("AuthSession", Cookies),
+    if AuthSession == undefined ->
+        {NowMS, NowS, _} = erlang:now(),
+        TimeStamp = NowMS * 1000000 + NowS,
+        [cookie_auth_cookie(?b2l(User), Secret, TimeStamp)];
+    true ->
+        []
     end;
 cookie_auth_header(_Req, _Headers) -> [].
 
