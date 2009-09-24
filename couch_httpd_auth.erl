@@ -88,8 +88,7 @@ null_authentication_handler(Req) ->
 
 % Cookie auth handler using per-node user db
 cookie_authentication_handler(Req) ->
-    DbName = couch_config:get("couch_httpd_auth", "authentication_db"),
-    case cookie_auth_user(Req, ?l2b(DbName)) of
+    case cookie_auth_user(Req) of
     % Fall back to default authentication handler
     nil -> default_authentication_handler(Req);
     Req2 -> Req2
@@ -201,52 +200,42 @@ user_doc(DocId, Username, UserSalt, PasswordHash, Email, Active, Roles, Rev) ->
     end,
     {ok, couch_doc:from_json_obj({DocProps1})}.
 
-cookie_auth_user(_Req, undefined) -> nil;
-cookie_auth_user(#httpd{mochi_req=MochiReq}=Req, DbName) ->
+cookie_auth_user(#httpd{mochi_req=MochiReq}=Req) ->
     case MochiReq:get_cookie_value("AuthSession") of
     undefined -> nil;
     [] -> nil;
     Cookie -> 
-        case couch_db:open(DbName, [{user_ctx, #user_ctx{roles=[<<"_admin">>]}}]) of
-        {ok, Db} ->
-            try
-                AuthSession = couch_util:decodeBase64Url(Cookie),
-                [User, TimeStr | HashParts] = string:tokens(?b2l(AuthSession), ":"),
-                % Verify expiry and hash
-                {NowMS, NowS, _} = erlang:now(),
-                CurrentTime = NowMS * 1000000 + NowS,
-                case couch_config:get("couch_httpd_auth", "secret", nil) of
-                nil -> nil;
-                SecretStr ->
-                    Secret = ?l2b(SecretStr),
-                    case get_user(?l2b(User)) of
-                    nil -> nil;
-                    Result ->
-                        UserSalt = proplists:get_value(<<"salt">>, Result, <<"">>),
-                        FullSecret = <<Secret/binary, UserSalt/binary>>,
-                        ExpectedHash = crypto:sha_mac(FullSecret, User ++ ":" ++ TimeStr),
-                        Hash = ?l2b(string:join(HashParts, ":")),
-                        Timeout = to_int(couch_config:get("couch_httpd_auth", "timeout", 600)),
-                        ?LOG_DEBUG("timeout ~p", [Timeout]),
-                        case (catch erlang:list_to_integer(TimeStr, 16)) of
-                            TimeStamp when CurrentTime < TimeStamp + Timeout 
-                            andalso ExpectedHash == Hash ->
-                                TimeLeft = TimeStamp + Timeout - CurrentTime,
-                                ?LOG_DEBUG("Successful cookie auth as: ~p", [User]),
-                                Req#httpd{user_ctx=#user_ctx{
-                                    name=?l2b(User),
-                                    roles=proplists:get_value(<<"roles">>, Result, [])
-                                }, auth={FullSecret, TimeLeft < Timeout*0.9}};
-                            _Else ->
-                                nil
-                        end
-                    end
+        AuthSession = couch_util:decodeBase64Url(Cookie),
+        [User, TimeStr | HashParts] = string:tokens(?b2l(AuthSession), ":"),
+        % Verify expiry and hash
+        {NowMS, NowS, _} = erlang:now(),
+        CurrentTime = NowMS * 1000000 + NowS,
+        case couch_config:get("couch_httpd_auth", "secret", nil) of
+        nil -> nil;
+        SecretStr ->
+            Secret = ?l2b(SecretStr),
+            case get_user(?l2b(User)) of
+            nil -> nil;
+            Result ->
+                UserSalt = proplists:get_value(<<"salt">>, Result, <<"">>),
+                FullSecret = <<Secret/binary, UserSalt/binary>>,
+                ExpectedHash = crypto:sha_mac(FullSecret, User ++ ":" ++ TimeStr),
+                Hash = ?l2b(string:join(HashParts, ":")),
+                Timeout = to_int(couch_config:get("couch_httpd_auth", "timeout", 600)),
+                ?LOG_DEBUG("timeout ~p", [Timeout]),
+                case (catch erlang:list_to_integer(TimeStr, 16)) of
+                    TimeStamp when CurrentTime < TimeStamp + Timeout
+                    andalso ExpectedHash == Hash ->
+                        TimeLeft = TimeStamp + Timeout - CurrentTime,
+                        ?LOG_DEBUG("Successful cookie auth as: ~p", [User]),
+                        Req#httpd{user_ctx=#user_ctx{
+                            name=?l2b(User),
+                            roles=proplists:get_value(<<"roles">>, Result, [])
+                        }, auth={FullSecret, TimeLeft < Timeout*0.9}};
+                    _Else ->
+                        nil
                 end
-            after
-                couch_db:close(Db)
-            end;
-        _Else ->
-            nil
+            end
         end
     end.
 
