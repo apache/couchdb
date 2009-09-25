@@ -383,7 +383,7 @@ update_user_req(#httpd{method='PUT', mochi_req=MochiReq, user_ctx=UserCtx}=Req, 
     UserRoles = UserCtx#user_ctx.roles,
     case User = get_user(UserName) of
     nil ->
-        throw({not_found, <<"User don't exist">>});
+        throw({not_found, <<"User doesn't exist">>});
     _Result ->
         ReqBody = MochiReq:recv_body(),
         Form = case MochiReq:get_primary_header_value("content-type") of
