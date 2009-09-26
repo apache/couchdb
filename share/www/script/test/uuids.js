@@ -11,16 +11,25 @@
 // the License.
 
 couchTests.uuids = function(debug) {
+  var etags = [];
   var testHashBustingHeaders = function(xhr) {
     T(xhr.getResponseHeader("Cache-Control").match(/no-cache/));
     T(xhr.getResponseHeader("Pragma") == "no-cache");
 
-    var currentTime = new Date();
-    var expiresHeader = Date.parse(xhr.getResponseHeader("Expires"));
-    var dateHeader = Date.parse(xhr.getResponseHeader("Date"));
+    var newetag = xhr.getResponseHeader("ETag");
+    T(etags.indexOf(newetag) < 0);
+    etags[etags.length] = newetag;
+    
+    // Removing the time based tests as they break easily when
+    // running CouchDB on a remote server in regards to the browser
+    // running the Futon test suite.
+    //
+    //var currentTime = new Date();
+    //var expiresHeader = Date.parse(xhr.getResponseHeader("Expires"));
+    //var dateHeader = Date.parse(xhr.getResponseHeader("Date"));
 
-    T(expiresHeader < currentTime);
-    T(currentTime - dateHeader < 3000);
+    //T(expiresHeader < currentTime);
+    //T(currentTime - dateHeader < 3000);
   };
 
   var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
