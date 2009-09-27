@@ -17,7 +17,7 @@ main(_) ->
     code:add_pathz("src/couchdb"),
     application:start(crypto),
 
-    etap:plan(10),
+    etap:plan(11),
     case (catch test()) of
         ok ->
             etap:end_tests();
