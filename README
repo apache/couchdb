@@ -402,6 +402,35 @@ Building erlang:
 * After executing './otp_build release -a', be sure to execute Install.exe in
   the release/win32 directory to setup the release/win32/bin dir correctly.
 
+Testing with Erlang
+^^^^^^^^^^^^^^^^^^^
+
+First, we need to get a copy of etap to run the tests.
+
+    $ git clone git://github.com/ngerakines/etap.git
+    $ cd etap
+    $ make && sudo make install
+
+Now we should be able to run the etap test suite:
+
+    $ cd /path/to/couchdb/
+    $ make check
+    ...
+    prove test/etap/*.t
+    test/etap/001-load........................ok
+    test/etap/010-file-basics.................ok
+    ...
+    All tests successful.
+    Files=28, Tests=363, 41 wallclock secs (...)
+
+Tests are also available to be run individually like such:
+
+    $ ./test/etap/001-load.t
+    # Current time local 2009-09-26 23:47:44
+    # Using etap version "0.3.4"
+    1..39
+    ok 1  - Loaded: couch_batch_save
+    ...
 
 Cryptographic Software Notice
 -----------------------------
