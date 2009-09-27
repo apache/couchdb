@@ -12,6 +12,8 @@
 ^CHANGES
 ^config.*
 ^configure
+^cover/.*\.coverdata
+^cover/.*\.html
 ^erl_crash.dump
 ^etc/Makefile
 ^etc/Makefile.in
