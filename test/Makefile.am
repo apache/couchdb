@@ -17,6 +17,9 @@ CLEANFILES = runner.beam test.ini
 EXTRA_DIST = \
     couch_config_test.erl \
     couch_config_writer_test.erl \
+    etap \
+    query_server_spec.rb \
+    run_native_process.es \
     runner.erl \
     runner.sh \
     test.js
