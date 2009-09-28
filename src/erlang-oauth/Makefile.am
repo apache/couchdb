@@ -18,6 +18,7 @@ oauthebindir = $(localerlanglibdir)/erlang-oauth/ebin
 oauth_file_collection = \
     oauth.erl \
     oauth_hmac_sha1.erl \
+    oauth_rsa_sha1.erl \
     oauth_http.erl \
     oauth_plaintext.erl \
     oauth_unix.erl \
@@ -28,6 +29,7 @@ oauthebin_static_file = oauth.app
 oauthebin_make_generated_file_list = \
     oauth.beam \
     oauth_hmac_sha1.beam \
+    oauth_rsa_sha1.beam \
     oauth_http.beam \
     oauth_plaintext.beam \
     oauth_unix.beam \
