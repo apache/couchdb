@@ -78,7 +78,6 @@ distcheck-hook:
 distsign: distcheck
 	@# @@ unpack archive and run diff -r to double check missing files
 	@# @@ does automake have anything that does this?
-	false
 	gpg --armor --detach-sig \
 	    < $(top_srcdir)/$(distdir).tar.gz \
 	    > $(top_srcdir)/$(distdir).tar.gz.asc
