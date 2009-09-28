@@ -296,7 +296,7 @@ by_seq_loop(Server, Source, StartSeq) ->
         gen_server:call(Server, {add_change, Change}, infinity),
         Seq
     end, 0, Rows),
-    by_seq_loop(Server, Source, EndSeq+1).
+    by_seq_loop(Server, Source, EndSeq).
 
 decode_row(<<",\n", Rest/binary>>) ->
     decode_row(Rest);
