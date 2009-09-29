@@ -17,6 +17,7 @@ default_config() ->
     "etc/couchdb/default_dev.ini".
 
 main(_) ->
+    code:add_patha("src/etap"),
     code:add_pathz("src/couchdb"),
     etap:plan(3),
     case (catch test()) of

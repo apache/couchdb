@@ -38,6 +38,7 @@ run_test(IniFiles, Test) ->
     end.
 
 main(_) ->
+    code:add_patha("src/etap"),
     code:add_pathz("src/couchdb"),
     application:start(crypto),
     etap:plan(unknown),

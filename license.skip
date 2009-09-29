@@ -62,6 +62,7 @@
 ^src/couchdb/priv/Makefile.in
 ^src/couchdb/priv/couchspawnkillable
 ^src/erlang-oauth/*
+^src/etap/*
 ^src/ibrowse/*
 ^src/mochiweb/*
 ^stamp-h1

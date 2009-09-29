@@ -17,6 +17,7 @@
 % Test that we can load each module.
 
 main(_) ->
+    code:add_patha("src/etap"),
     code:add_pathz("src/couchdb"),
     etap:plan(39),
     Modules = [

@@ -13,6 +13,7 @@
 
 
 main(_) ->
+    code:add_patha("src/etap"),
     code:add_pathz("src/couchdb"),
     etap:plan(3),
     etap:is(

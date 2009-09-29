@@ -20,6 +20,7 @@ rows() -> 250.
 -record(btree, {fd, root, extract_kv, assemble_kv, less, reduce}).
 
 main(_) ->
+    code:add_patha("src/etap"),
     code:add_pathz("src/couchdb"),
     etap:plan(48),
     case (catch test()) of

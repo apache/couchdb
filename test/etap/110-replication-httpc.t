@@ -39,6 +39,7 @@ server() -> "http://127.0.0.1:5984/".
 dbname() -> "etap-test-db".
 
 main(_) ->
+    code:add_patha("src/etap"),
     code:add_pathz("src/couchdb"),
     code:add_pathz("src/ibrowse"),
     code:add_pathz("src/mochiweb"),

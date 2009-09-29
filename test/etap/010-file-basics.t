@@ -15,6 +15,7 @@
 filename() -> "./test/etap/temp.010".
 
 main(_) ->
+    code:add_patha("src/etap"),
     code:add_pathz("src/couchdb"),
     etap:plan(16),
     case (catch test()) of

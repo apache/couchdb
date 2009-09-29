@@ -39,6 +39,7 @@ run_tests(IniFiles, Tests) ->
     end.
 
 main(_) ->
+    code:add_patha("src/etap"),
     code:add_pathz("src/couchdb"),
     etap:plan(17),
 
