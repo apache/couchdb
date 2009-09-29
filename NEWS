@@ -10,8 +10,6 @@ Each release section notes when backwards incompatible changes have been made.
 Version 0.10.0
 --------------
 
-This version has not been released yet.
-
 This release contains backwards incompatible changes, please see above for help.
 
  * Added modular configuration file directories.
