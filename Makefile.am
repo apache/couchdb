@@ -77,7 +77,7 @@ distcheck-hook:
         test "$$?" -eq 1
 
 .PHONY: distsign
-distsign: distcheck
+distsign: distcheck check
 	@# @@ unpack archive and run diff -r to double check missing files
 	@# @@ does automake have anything that does this?
 	gpg --armor --detach-sig \
