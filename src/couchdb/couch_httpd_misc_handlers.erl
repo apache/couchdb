@@ -109,14 +109,15 @@ handle_uuids_req(#httpd{method='GET'}=Req) ->
     % generate the uuids
     UUIDs = [ couch_util:new_uuid() || _ <- lists:seq(1,Count)],
     % send a JSON response
-    couch_httpd:etag_respond(Req, erlang:md5(UUIDs), fun() ->
+    Etag = couch_httpd:make_etag(UUIDs),
+    couch_httpd:etag_respond(Req, Etag, fun() ->
         CacheBustingHeaders = [
             {"Date", httpd_util:rfc1123_date()},
             {"Cache-Control", "no-cache"},
             % Past date, ON PURPOSE!
             {"Expires", "Fri, 01 Jan 1990 00:00:00 GMT"},
             {"Pragma", "no-cache"},
-            {"ETag", erlang:md5(UUIDs)}
+            {"ETag", Etag}
         ],
         send_json(Req, 200, CacheBustingHeaders, {[{<<"uuids">>, UUIDs}]})
     end);
