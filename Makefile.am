@@ -10,7 +10,7 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
-SUBDIRS = bin etc src/couchdb src/erlang-oauth src/ibrowse src/mochiweb share test var utils
+SUBDIRS = bin etc src/couchdb src/erlang-oauth src/etap src/ibrowse src/mochiweb share test var utils
 
 localdoc_DATA = AUTHORS.gz BUGS.gz CHANGES.gz NEWS.gz README.gz THANKS.gz
 
@@ -43,7 +43,9 @@ cover: dev
 	rm -f cover/*.coverdata
 	COVER=1 COVER_BIN=./src/couchdb/ prove test/etap/*.t
 	SRC=./src/couchdb/ \
-	    $(ERL) -noshell -eval 'etap_report:create()' \
+	    $(ERL) -noshell \
+		-pa src/etap \
+		-eval 'etap_report:create()' \
 	    -s init stop > /dev/null 2>&1
 
 dev: all

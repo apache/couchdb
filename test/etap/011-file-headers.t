@@ -18,6 +18,7 @@ filename() -> "./test/etap/temp.011".
 sizeblock() -> 4096. % Need to keep this in sync with couch_file.erl
 
 main(_) ->
+    code:add_patha("src/etap"),
     code:add_pathz("src/couchdb"),
     {S1, S2, S3} = now(),
     random:seed(S1, S2, S3),

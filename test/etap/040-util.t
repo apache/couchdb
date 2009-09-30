@@ -14,6 +14,7 @@
 % the License.
 
 main(_) ->
+    code:add_patha("src/etap"),
     code:add_pathz("src/couchdb"),
     application:start(crypto),
 
@@ -72,7 +73,7 @@ test() ->
         IntsToAGazillion = lists:seq(1, 200000),
         LotsOfData = lists:map(
             fun(Int) -> {Int, <<"foobar">>} end,
-        lists:seq(1, 200000)),
+        lists:seq(1, 500000)),
         etap:ok(couch_util:should_flush(),
             "Allocation 200K tuples puts us above the memory threshold.")
     end,

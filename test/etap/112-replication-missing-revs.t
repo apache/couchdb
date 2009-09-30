@@ -40,6 +40,7 @@
 }).
 
 main(_) ->
+    code:add_patha("src/etap"),
     code:add_pathz("src/couchdb"),
     code:add_pathz("src/ibrowse"),
     code:add_pathz("src/mochiweb"),
