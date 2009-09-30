@@ -150,7 +150,6 @@ AC_ARG_WITH([win32-icu-binaries], [AC_HELP_STRING([--with-win32-icu-binaries=PAT
     ICU_LOCAL_BIN=
 ])
 
-
 AC_SUBST(ICU_CONFIG)
 AC_SUBST(ICU_LOCAL_CFLAGS)
 AC_SUBST(ICU_LOCAL_LDFLAGS)
@@ -342,6 +341,7 @@ AC_CONFIG_FILES([etc/logrotate.d/couchdb.tpl])
 AC_CONFIG_FILES([etc/logrotate.d/Makefile])
 AC_CONFIG_FILES([etc/Makefile])
 AC_CONFIG_FILES([share/Makefile])
+AC_CONFIG_FILES([src/Makefile])
 AC_CONFIG_FILES([src/couchdb/couch.app.tpl])
 AC_CONFIG_FILES([src/couchdb/Makefile])
 AC_CONFIG_FILES([src/couchdb/priv/Makefile])

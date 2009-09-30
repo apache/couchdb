@@ -10,7 +10,7 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
-SUBDIRS = bin etc src/couchdb src/erlang-oauth src/etap src/ibrowse src/mochiweb share test var utils
+SUBDIRS = bin etc src share test var utils
 
 localdoc_DATA = AUTHORS.gz BUGS.gz CHANGES.gz NEWS.gz README.gz THANKS.gz
 
@@ -66,6 +66,7 @@ local-clean: maintainer-clean
 	rm -f $(top_srcdir)/aclocal.m4
 	rm -f $(top_srcdir)/config.h.in
 	rm -f $(top_srcdir)/configure
+	rm -f $(top_srcdir)/test/etap/temp.*
 	rm -f $(top_srcdir)/*.tar.gz
 	rm -f $(top_srcdir)/*.tar.gz.*
 	rm -fr $(top_srcdir)/tmp

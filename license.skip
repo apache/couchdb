@@ -50,6 +50,8 @@
 ^share/www/script/json2.js
 ^share/www/script/sha1.js
 ^share/www/script/test/lorem*
+^src/Makefile
+^src/Makefile.in
 ^src/couchdb/*.beam
 ^src/couchdb/couch.app.tpl.in
 ^src/couchdb/.deps/*
