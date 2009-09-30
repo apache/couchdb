@@ -39,13 +39,23 @@ test() ->
     % terminate_linked
     Self = self(),
     spawn(fun() ->
-                  ChildPid = spawn_link(fun() -> receive shutdown -> ok end end),
-                  couch_util:terminate_linked(normal),
-                  Self ! {pid, ChildPid}
-          end),
+        SecondSelf = self(),
+        ChildPid = spawn_link(fun() ->
+            SecondSelf ! {child, started},
+            receive shutdown -> ok end
+        end),
+        PidUp = receive
+            {child, started} -> ok
+        after 1000 ->
+            {error, timeout}
+        end,
+        etap:is(ok, PidUp, "Started a linked process."),
+        couch_util:terminate_linked(normal),
+        Self ! {pid, ChildPid}
+    end),
     receive
         {pid, Pid} ->
-            etap:ok(not is_process_alive(Pid), "why wont this work?")
+            etap:ok(not is_process_alive(Pid), "Linked process was killed.")
     end,
 
     % new_uuid
