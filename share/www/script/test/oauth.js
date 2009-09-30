@@ -52,7 +52,7 @@ couchTests.oauth = function(debug) {
         });
       }
     } else {
-      return CouchDB.request("GET", path, {
+      return CouchDB.request(method, path, {
         headers: {Authorization: OAuth.getAuthorizationHeader('', parameters)}
       });
     }
@@ -62,6 +62,11 @@ couchTests.oauth = function(debug) {
   var tokenSecret = generateSecret(64);
   var admintokenSecret = generateSecret(64);
   var testadminPassword = "ohsosecret";
+
+  var adminBasicAuthHeaderValue = function() {
+    var retval = 'Basic ' + binb2b64(str2binb("testadmin:" + testadminPassword));
+    return retval;
+  }
 
   var host = CouchDB.host;
   var dbPair = {
@@ -76,13 +81,11 @@ couchTests.oauth = function(debug) {
         }
       }
     },
-    target: "http://" + host + "/test_suite_db_b"
+    target: {
+      url: "http://" + host + "/test_suite_db_b",
+      headers: {"Authorization": adminBasicAuthHeaderValue()}
+    }
   };
-
-  var adminBasicAuthHeaderValue = function() {
-    var retval = 'Basic ' + binb2b64(str2binb("testadmin:" + testadminPassword));
-    return retval;
-  }
 
   // this function will be called on the modified server
   var testFun = function () {
@@ -90,6 +93,16 @@ couchTests.oauth = function(debug) {
       CouchDB.request("PUT", "http://" + host + "/_config/admins/testadmin", {
         headers: {"X-Couch-Persist": "false"},
         body: JSON.stringify(testadminPassword)
+      });
+
+      CouchDB.request("GET", "/_sleep?time=50");
+
+      CouchDB.request("PUT", "http://" + host + "/_config/couch_httpd_auth/require_valid_user", {
+        headers: {
+          "X-Couch-Persist": "false",
+          "Authorization": adminBasicAuthHeaderValue()
+        },
+        body: JSON.stringify("true")
       });
 
       var usersDb = new CouchDB("test_suite_users", {
@@ -157,7 +170,9 @@ couchTests.oauth = function(debug) {
           T(xhr.status == expectedCode);
 
           // Replication
-          var result = CouchDB.replicate(dbPair.source, dbPair.target);
+          var result = CouchDB.replicate(dbPair.source, dbPair.target, {
+            headers: {"Authorization": adminBasicAuthHeaderValue()}
+          });
           T(result.ok);
 
           // Test auth via admin user defined in .ini
@@ -179,6 +194,15 @@ couchTests.oauth = function(debug) {
         }
       }
     } finally {
+      var xhr = CouchDB.request("PUT", "http://" + host + "/_config/couch_httpd_auth/require_valid_user", {
+        headers: {
+          "Authorization": adminBasicAuthHeaderValue(),
+          "X-Couch-Persist": "false"
+        },
+        body: JSON.stringify("false")
+      });
+      T(xhr.status == 200);
+
       var xhr = CouchDB.request("DELETE", "http://" + host + "/_config/admins/testadmin", {
         headers: {
           "Authorization": adminBasicAuthHeaderValue(),
