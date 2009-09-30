@@ -107,14 +107,15 @@ handle_restart_req(Req) ->
 handle_uuids_req(#httpd{method='GET'}=Req) ->
     Count = list_to_integer(couch_httpd:qs_value(Req, "count", "1")),
     UUIDs = [couch_uuids:new() || _ <- lists:seq(1, Count)],
-    couch_httpd:etag_respond(Req, erlang:md5(UUIDs), fun() ->
+    Etag = couch_httpd:make_etag(UUIDs),
+    couch_httpd:etag_respond(Req, Etag, fun() ->
         CacheBustingHeaders = [
             {"Date", httpd_util:rfc1123_date()},
             {"Cache-Control", "no-cache"},
             % Past date, ON PURPOSE!
             {"Expires", "Fri, 01 Jan 1990 00:00:00 GMT"},
             {"Pragma", "no-cache"},
-            {"ETag", erlang:md5(UUIDs)}
+            {"ETag", Etag}
         ],
         send_json(Req, 200, CacheBustingHeaders, {[{<<"uuids">>, UUIDs}]})
     end);
