@@ -60,9 +60,16 @@ db_exists(Req) ->
 
 db_exists(Req, CanonicalUrl) ->
     #http_db{
-        url = Url,
-        headers = Headers
+        auth = Auth,
+        headers = Headers0,
+        url = Url
     } = Req,
+    Headers = case proplists:get_value(<<"oauth">>, Auth) of
+    undefined ->
+        Headers0;
+    {OAuthProps} ->
+        [oauth_header(Url, get, OAuthProps) | Headers0]
+    end,
     case catch ibrowse:send_req(Url, Headers, head) of
     {ok, "200", _, _} ->
         Req#http_db{url = CanonicalUrl};
