@@ -187,7 +187,7 @@
             var uri = this.uri;
           } else {
             var method = "PUT";
-            var uri = this.uri  + encodeDocId(doc._id);
+            var uri = this.uri + encodeDocId(doc._id);
           }
           $.ajax({
             type: method, url: uri + encodeOptions(options),
@@ -226,6 +226,32 @@
             },
             options,
             "The document could not be deleted"
+          );
+        },
+        copyDoc: function(doc, options, ajaxOptions) {
+          ajaxOptions = $.extend(ajaxOptions, {
+            complete: function(req) {
+              var resp = $.httpData(req, "json");
+              if (req.status == 201) {
+                doc._id = resp.id;
+                doc._rev = resp.rev;
+                if (options.success) options.success(resp);
+              } else if (options.error) {
+                options.error(req.status, resp.error, resp.reason);
+              } else {
+                alert("The document could not be copied: " + resp.reason);
+              }
+            }
+          });
+          ajax({
+              type: "COPY",
+              url: this.uri +
+                   encodeDocId(doc._id) +
+                   encodeOptions({rev: doc._rev})
+            },
+            options,
+            "The document could not be copied",
+            ajaxOptions
           );
         },
         query: function(mapFun, reduceFun, language, options) {
@@ -315,7 +341,7 @@
     options = $.extend({successStatus: 200}, options);
     errorMessage = errorMessage || "Unknown error";
 
-    $.ajax($.extend({
+    $.ajax($.extend($.extend({
       type: "GET", dataType: "json",
       complete: function(req) {
         var resp = $.httpData(req, "json");
@@ -327,7 +353,7 @@
           alert(errorMessage + ": " + resp.reason);
         }
       }
-    }, obj), ajaxOptions);
+    }, obj), ajaxOptions));
   }
 
   // Convert a options object to an url query string.
