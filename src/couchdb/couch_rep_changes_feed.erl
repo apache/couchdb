@@ -298,7 +298,7 @@ by_seq_loop(Server, Source, StartSeq) ->
     end, 0, Rows),
     by_seq_loop(Server, Source, EndSeq).
 
-decode_row(<<",\n", Rest/binary>>) ->
+decode_row(<<",", Rest/binary>>) ->
     decode_row(Rest);
 decode_row(Row) ->
     {Props} = ?JSON_DECODE(Row),
