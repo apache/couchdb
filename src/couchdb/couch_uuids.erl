@@ -41,18 +41,10 @@ utc_random() ->
     list_to_binary(Prefix ++ couch_util:to_hex(crypto:rand_bytes(9))).
 
 init([]) ->
-    ok = couch_config:register(fun("uuids", _) -> ?MODULE:stop() end),
-    AlgoStr = couch_config:get("uuids", "algorithm", "random"),
-    case couch_util:to_existing_atom(AlgoStr) of
-        random ->
-            {ok, random};
-        utc_random ->
-            {ok, utc_random};
-        sequential ->
-            {ok, {sequential, new_prefix(), inc()}};
-        Unknown ->
-            throw({unknown_uuid_algorithm, Unknown})
-    end.
+    ok = couch_config:register(
+        fun("uuids", _) -> gen_server:cast(?MODULE, change) end
+    ),
+    {ok, state()}.
 
 terminate(_Reason, _State) ->
     ok.
@@ -70,6 +62,8 @@ handle_call(create, _From, {sequential, Pref, Seq}) ->
             {reply, Result, {sequential, Pref, Seq + inc()}}
     end.
 
+handle_cast(change, _State) ->
+    {noreply, state()};
 handle_cast(stop, State) ->
     {stop, normal, State};
 handle_cast(_Msg, State) ->
@@ -86,3 +80,16 @@ new_prefix() ->
 
 inc() ->
     crypto:rand_uniform(1, 16#ffe).
+
+state() ->
+    AlgoStr = couch_config:get("uuids", "algorithm", "random"),
+    case couch_util:to_existing_atom(AlgoStr) of
+        random ->
+            random;
+        utc_random ->
+            utc_random;
+        sequential ->
+            {sequential, new_prefix(), inc()};
+        Unknown ->
+            throw({unknown_uuid_algorithm, Unknown})
+    end.
