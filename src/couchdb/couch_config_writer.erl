@@ -55,7 +55,10 @@ save_to_file({{Section, Option}, Value}, File) ->
             NewFileContents2
     end,
 
-    ok = file:write_file(File, list_to_binary(NewFileContents)),
+    case file:write_file(File, list_to_binary(NewFileContents)) of
+        ok -> ok;
+        _Else -> throw({permissions_error, <<"Config file is not writeable.">>})
+    end,
     ok.
 
 %% @doc Iterates over the lines of an ini file and replaces or adds a new
