@@ -13,8 +13,6 @@
 dist_TESTS = runner.sh
 
 EXTRA_DIST = \
-    couch_config_test.erl \
-    couch_config_writer_test.erl \
     etap/030-doc-from-json.t \
     etap/080-config-get-set.t \
     etap/064-kt-counting.t \
@@ -44,6 +42,5 @@ EXTRA_DIST = \
     etap/031-doc-to-json.t \
     query_server_spec.rb \
     run_native_process.es \
-    runner.erl \
     runner.sh \
     test.js
