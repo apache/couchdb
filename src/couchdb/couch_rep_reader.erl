@@ -32,7 +32,7 @@
     source,
     missing_revs,
     reader_loop,
-    reader_from = nil,
+    reader_from = [],
     count = 0,
     docs = queue:new(),
     reply_to = nil,
@@ -107,7 +107,7 @@ handle_add_docs(Seq, DocsToAdd, From, #state{reply_to=nil} = State) ->
     if NewState#state.count < ?BUFFER_SIZE ->
         {reply, ok, NewState};
     true ->
-        {noreply, NewState#state{reader_from=From}}
+        {noreply, NewState#state{reader_from=[From|State#state.reader_from]}}
     end;
 handle_add_docs(Seq, DocsToAdd, _From, #state{count=0} = State) ->
     NewState = update_sequence_lists(Seq, State),
@@ -126,10 +126,8 @@ handle_next_docs(_From, State) ->
         reader_from = ReaderFrom,
         docs = Docs
     } = State,
-    if ReaderFrom =/= nil ->
-        gen_server:reply(ReaderFrom, ok);
-    true -> ok end,
-    NewState = State#state{count=0, reader_from=nil, docs=queue:new()},
+    [gen_server:reply(F, ok) || F <- ReaderFrom],
+    NewState = State#state{count=0, reader_from=[], docs=queue:new()},
     {reply, {calculate_new_high_seq(State), queue:to_list(Docs)}, NewState}.
 
 handle_open_remote_doc(Id, Seq, Revs, From, #state{monitor_count=N} = State)

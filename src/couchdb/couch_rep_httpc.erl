@@ -26,18 +26,19 @@ do_request(#http_db{url=Url} = Req) when is_binary(Url) ->
 do_request(Req) ->
     #http_db{
         auth = Auth,
+        body = B,
+        conn = Conn,
         headers = Headers0,
         method = Method,
-        body = B,
         options = Opts,
-        conn = Conn
+        qs = QS
     } = Req,
     Url = full_url(Req),
     Headers = case proplists:get_value(<<"oauth">>, Auth) of
     undefined ->
         Headers0;
     {OAuthProps} ->
-        [oauth_header(Url, Method, OAuthProps) | Headers0]
+        [oauth_header(Url, QS, Method, OAuthProps) | Headers0]
     end,
     Body = case B of
     {Fun, InitialState} when is_function(Fun) ->
@@ -60,9 +61,16 @@ db_exists(Req) ->
 
 db_exists(Req, CanonicalUrl) ->
     #http_db{
-        url = Url,
-        headers = Headers
+        auth = Auth,
+        headers = Headers0,
+        url = Url
     } = Req,
+    Headers = case proplists:get_value(<<"oauth">>, Auth) of
+    undefined ->
+        Headers0;
+    {OAuthProps} ->
+        [oauth_header(Url, [], head, OAuthProps) | Headers0]
+    end,
     case catch ibrowse:send_req(Url, Headers, head) of
     {ok, "200", _, _} ->
         Req#http_db{url = CanonicalUrl};
@@ -168,7 +176,8 @@ maybe_decompress(Headers, Body) ->
         Body
     end.
 
-oauth_header(Url, Action, Props) ->
+oauth_header(Url, QS, Action, Props) ->
+    QSL = [{couch_util:to_list(K), couch_util:to_list(V)} || {K,V} <- QS],
     ConsumerKey = ?b2l(proplists:get_value(<<"consumer_key">>, Props)),
     Token = ?b2l(proplists:get_value(<<"token">>, Props)),
     TokenSecret = ?b2l(proplists:get_value(<<"token_secret">>, Props)),
@@ -177,7 +186,9 @@ oauth_header(Url, Action, Props) ->
     Method = case Action of
         get -> "GET";
         post -> "POST";
-        put -> "PUT"
+        put -> "PUT";
+        head -> "HEAD"
     end,
-    Params = oauth:signed_params(Method, Url, [], Consumer, Token, TokenSecret),
+    Params = oauth:signed_params(Method, Url, QSL, Consumer, Token, TokenSecret)
+        -- QSL,
     {"Authorization", "OAuth " ++ oauth_uri:params_to_header_string(Params)}.
