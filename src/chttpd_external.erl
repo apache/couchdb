@@ -160,18 +160,10 @@ parse_external_response({Response}) ->
         end, #extern_resp_args{}, Response).
 
 default_or_content_type(DefaultContentType, Headers) ->
-    {ContentType, OtherHeaders} = lists:partition(
-        fun({HeaderName, _}) ->
-            HeaderName == "Content-Type"
-        end, Headers),
-
-    % XXX: What happens if we were passed multiple content types? We add another?
-    case ContentType of
-        [{"Content-Type", SetContentType}] ->
-            TrueContentType = SetContentType;
-        _Else ->
-            TrueContentType = DefaultContentType
-    end,
-
-    HeadersWithContentType = lists:append(OtherHeaders, [{"Content-Type", TrueContentType}]),
-    HeadersWithContentType.
+    IsContentType = fun({X, _}) -> string:to_lower(X) == "content-type" end,
+    case lists:any(IsContentType, Headers) of
+    false ->
+        [{"Content-Type", DefaultContentType} | Headers];
+    true ->
+        Headers
+    end.
