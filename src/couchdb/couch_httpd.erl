@@ -362,7 +362,9 @@ etag_respond(Req, CurrentEtag, RespFun) ->
         RespFun()
     end.
 
-verify_is_server_admin(#httpd{user_ctx=#user_ctx{roles=Roles}}) ->
+verify_is_server_admin(#httpd{user_ctx=UserCtx}) ->
+    verify_is_server_admin(UserCtx);
+verify_is_server_admin(#user_ctx{roles=Roles}) ->
     case lists:member(<<"_admin">>, Roles) of
     true -> ok;
     false -> throw({unauthorized, <<"You are not a server admin.">>})

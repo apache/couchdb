@@ -277,4 +277,28 @@ couchTests.replication = function(debug) {
     T(result2.no_changes == true);
     T(result2.session_id == result.session_id);
   }
+
+  // test optional automatic creation of the target db
+
+  var dbA = new CouchDB("test_suite_db_a", {"X-Couch-Full-Commit":"false"});
+  var dbB = new CouchDB("test_suite_db_b", {"X-Couch-Full-Commit":"false"});
+  
+  dbA.deleteDb();
+  dbA.createDb();
+  dbB.deleteDb();
+  
+  // local
+  CouchDB.replicate(dbA.name, "test_suite_db_b", {
+    body: {"create_target": true}
+  });
+  TEquals("test_suite_db_b", dbB.info().db_name,
+    "Target database should exist");
+
+  // remote
+  dbB.deleteDb();
+  CouchDB.replicate(dbA.name, "http://" + CouchDB.host + "/test_suite_db_b", {
+    body: {"create_target": true}
+  });
+  TEquals("test_suite_db_b", dbB.info().db_name,
+    "Target database should exist");
 };
