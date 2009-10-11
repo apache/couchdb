@@ -28,6 +28,7 @@
     source,
     target,
     continuous,
+    create_target,
     init_args,
     checkpoint_scheduled = nil,
 
@@ -102,9 +103,10 @@ do_init([RepId, {PostProps}, UserCtx] = InitArgs) ->
     TargetProps = proplists:get_value(<<"target">>, PostProps),
 
     Continuous = proplists:get_value(<<"continuous">>, PostProps, false),
+    CreateTarget = proplists:get_value(<<"create_target">>, PostProps, false),
 
     Source = open_db(SourceProps, UserCtx),
-    Target = open_db(TargetProps, UserCtx),
+    Target = open_db(TargetProps, UserCtx, CreateTarget),
 
     SourceLog = open_replication_log(Source, RepId),
     TargetLog = open_replication_log(Target, RepId),
@@ -143,6 +145,7 @@ do_init([RepId, {PostProps}, UserCtx] = InitArgs) ->
         source = Source,
         target = Target,
         continuous = Continuous,
+        create_target = CreateTarget,
         init_args = InitArgs,
         stats = Stats,
         checkpoint_scheduled = nil,
@@ -375,6 +378,17 @@ has_session_id(SessionId, [{Props} | Rest]) ->
         has_session_id(SessionId, Rest)
     end.
 
+maybe_append_options(Options, Props) ->
+    lists:foldl(fun(Option, Acc) ->
+        Acc ++ 
+        case proplists:get_value(Option, Props, false) of
+        true ->
+            "+" ++ ?b2l(Option);
+        false ->
+            ""
+        end
+    end, [], Options).
+
 make_replication_id({Props}, UserCtx) ->
     %% funky algorithm to preserve backwards compatibility
     {ok, HostName} = inet:gethostname(),
@@ -382,12 +396,8 @@ make_replication_id({Props}, UserCtx) ->
     Src = get_rep_endpoint(UserCtx, proplists:get_value(<<"source">>, Props)),
     Tgt = get_rep_endpoint(UserCtx, proplists:get_value(<<"target">>, Props)),    
     Base = couch_util:to_hex(erlang:md5(term_to_binary([HostName, Src, Tgt]))),
-    Extension = case proplists:get_value(<<"continuous">>, Props, false) of
-    true ->
-        "+continuous";
-    false ->
-        ""
-    end,
+    Extension = maybe_append_options(
+        [<<"continuous">>, <<"create_target">>], Props),
     {Base, Extension}.
 
 maybe_add_trailing_slash(Url) ->
@@ -432,7 +442,10 @@ open_replication_log(Db, RepId) ->
         #doc{id=DocId}
     end.
 
-open_db({Props}, _UserCtx) ->
+open_db(Props, UserCtx) ->
+    open_db(Props, UserCtx, false).
+
+open_db({Props}, _UserCtx, CreateTarget) ->
     Url = maybe_add_trailing_slash(proplists:get_value(<<"url">>, Props)),
     {AuthProps} = proplists:get_value(<<"auth">>, Props, {[]}),
     {BinHeaders} = proplists:get_value(<<"headers">>, Props, {[]}),
@@ -443,12 +456,18 @@ open_db({Props}, _UserCtx) ->
         auth = AuthProps,
         headers = lists:ukeymerge(1, Headers, DefaultHeaders)
     },
-    couch_rep_httpc:db_exists(Db);
-open_db(<<"http://",_/binary>>=Url, _) ->
-    open_db({[{<<"url">>,Url}]}, []);
-open_db(<<"https://",_/binary>>=Url, _) ->
-    open_db({[{<<"url">>,Url}]}, []);
-open_db(<<DbName/binary>>, UserCtx) ->
+    couch_rep_httpc:db_exists(Db, CreateTarget);
+open_db(<<"http://",_/binary>>=Url, _, CreateTarget) ->
+    open_db({[{<<"url">>,Url}]}, [], CreateTarget);
+open_db(<<"https://",_/binary>>=Url, _, CreateTarget) ->
+    open_db({[{<<"url">>,Url}]}, [], CreateTarget);
+open_db(<<DbName/binary>>, UserCtx, CreateTarget) ->
+    ok = couch_httpd:verify_is_server_admin(UserCtx),
+    case CreateTarget of
+    true -> couch_server:create(DbName, [{user_ctx, UserCtx}]);
+    false -> ok
+    end,
+
     case couch_db:open(DbName, [{user_ctx, UserCtx}]) of
     {ok, Db} ->
         couch_db:monitor(Db),

@@ -14,7 +14,7 @@
 -include("couch_db.hrl").
 -include("../ibrowse/ibrowse.hrl").
 
--export([db_exists/1, full_url/1, request/1, spawn_worker_process/1,
+-export([db_exists/1, db_exists/2, full_url/1, request/1, spawn_worker_process/1,
     spawn_link_worker_process/1]).
 
 request(Req) when is_record(Req, http_db) ->
@@ -59,7 +59,16 @@ do_request(Req) ->
 db_exists(Req) ->
     db_exists(Req, Req#http_db.url).
 
+db_exists(Req, true) ->
+    db_exists(Req, Req#http_db.url, true);
+
+db_exists(Req, false) ->
+    db_exists(Req, Req#http_db.url, false);
+
 db_exists(Req, CanonicalUrl) ->
+    db_exists(Req, CanonicalUrl, false).
+
+db_exists(Req, CanonicalUrl, CreateDB) ->
     #http_db{
         auth = Auth,
         headers = Headers0,
@@ -70,6 +79,11 @@ db_exists(Req, CanonicalUrl) ->
         Headers0;
     {OAuthProps} ->
         [oauth_header(Url, [], head, OAuthProps) | Headers0]
+    end,
+    case CreateDB of
+        true ->
+            catch ibrowse:send_req(Url, Headers, put);
+        _Else -> ok
     end,
     case catch ibrowse:send_req(Url, Headers, head) of
     {ok, "200", _, _} ->
