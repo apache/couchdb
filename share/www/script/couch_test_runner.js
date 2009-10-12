@@ -142,9 +142,63 @@ function updateTestsFooter() {
     var text = $(this).text();
     totalDuration += parseInt(text.substr(0, text.length - 2), 10);
   });
-  $("#tests tbody.footer td").text(testsRun.length + " of " + tests.length +
+  $("#tests tbody.footer td").html("<span>"+testsRun.length + " of " + tests.length +
     " test(s) run, " + testsFailed.length + " failures (" +
-    totalDuration + " ms)");
+    totalDuration + " ms)</span> ");
+  if (testsFailed.length > 0) {
+    $("#tests tbody.footer td").append($('<a href="#">Click to Report Test Failures</a>').click(function(e) {
+      e.preventDefault();
+      reportTests();
+    }));
+  }
+}
+
+
+function testReport() {
+  var report = [];
+  report.push(testPlatform()+"\n");
+  $("#tests tbody.content tr").each(function() {
+    var status = $("td.status", this).text();
+    if (status != "not run") {
+      var dur = $("td.duration", this).text();
+      report.push(this.id+"\n  "+status+" "+dur);
+      var details = [];
+      $("td.details li", this).each(function() {
+        report.push("    "+$(this).text());
+      });
+    }
+  });
+  return report.join("\n");
+};
+
+function testPlatform() {
+  var b = $.browser;
+  var bs = ["mozilla", "msie", "opera", "safari"];
+  for (var i=0; i < bs.length; i++) {
+    if (b[bs[i]]) {
+      return "Platform: "+ bs[i] + " " + b.version;
+    }
+  };
+}
+
+
+function reportTests() {
+  var summary = $("#tests tbody.footer td span").text();
+  var report = testReport();
+  var uri = "http://groups.google.com/group/couchdb-test-report/post"
+    + "?subject=" + escape(summary);  
+
+  var d=document;
+  var f=d.createElement("form");
+  // f.style.display='none';
+  f.action=uri;
+  f.method="POST";f.target="_blank";
+  var t=d.createElement("textarea");
+  t.name="body";
+  t.value=report;
+  f.appendChild(t);
+  d.body.appendChild(f);
+  f.submit();
 }
 
 // Use T to perform a test that returns false on failure and if the test fails,
@@ -157,8 +211,9 @@ function T(arg1, arg2, testName) {
       if ($("td.details ol", currentRow).length == 0) {
         $("<ol></ol>").appendTo($("td.details", currentRow));
       }
+      var message = (arg2 != null ? arg2 : arg1).toString();
       $("<li><b>Assertion " + (testName ? "'" + testName + "'" : "") + " failed:</b> <code class='failure'></code></li>")
-        .find("code").text((arg2 != null ? arg2 : arg1).toString()).end()
+        .find("code").text(message).end()
         .appendTo($("td.details ol", currentRow));
     }
     numFailures += 1
