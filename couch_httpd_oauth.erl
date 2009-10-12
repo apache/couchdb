@@ -19,13 +19,18 @@
 oauth_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
     serve_oauth(Req, fun(URL, Params, Consumer, Signature) ->
         AccessToken = proplists:get_value("oauth_token", Params),
-        TokenSecret = couch_config:get("oauth_token_secrets", AccessToken),
-        ?LOG_DEBUG("OAuth URL is: ~p", [URL]),
-        case oauth:verify(Signature, atom_to_list(MochiReq:get(method)), URL, Params, Consumer, TokenSecret) of
-            true ->
-                set_user_ctx(Req, AccessToken);
-            false ->
-                Req
+        case couch_config:get("oauth_token_secrets", AccessToken) of
+            undefined -> 
+                couch_httpd:send_error(Req, 400, <<"invalid_token">>,
+                    <<"Invalid OAuth token.">>);
+            TokenSecret ->
+                ?LOG_DEBUG("OAuth URL is: ~p", [URL]),
+                case oauth:verify(Signature, atom_to_list(MochiReq:get(method)), URL, Params, Consumer, TokenSecret) of
+                    true ->
+                        set_user_ctx(Req, AccessToken);
+                    false ->
+                        Req
+                end
         end
     end, true).
 
