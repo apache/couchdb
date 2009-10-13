@@ -74,18 +74,20 @@ db_exists(Req, CanonicalUrl, CreateDB) ->
         headers = Headers0,
         url = Url
     } = Req,
-    Headers = case proplists:get_value(<<"oauth">>, Auth) of
-    undefined ->
-        Headers0;
-    {OAuthProps} ->
-        [oauth_header(Url, [], head, OAuthProps) | Headers0]
+    HeadersFun = fun(Method) ->
+        case proplists:get_value(<<"oauth">>, Auth) of
+        undefined ->
+            Headers0;
+        {OAuthProps} ->
+            [oauth_header(Url, [], Method, OAuthProps) | Headers0]
+        end
     end,
     case CreateDB of
         true ->
-            catch ibrowse:send_req(Url, Headers, put);
+            catch ibrowse:send_req(Url, HeadersFun(put), put);
         _Else -> ok
     end,
-    case catch ibrowse:send_req(Url, Headers, head) of
+    case catch ibrowse:send_req(Url, HeadersFun(head), head) of
     {ok, "200", _, _} ->
         Req#http_db{url = CanonicalUrl};
     {ok, "301", RespHeaders, _} ->
