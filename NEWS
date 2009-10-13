@@ -12,6 +12,9 @@ Version 0.11.0
 
 This version has not been released yet.
 
+ * Improved view information objects.
+ * Bug fix for partial updates durring view builds.
+
 Version 0.10.0
 --------------
 
