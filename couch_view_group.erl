@@ -145,11 +145,8 @@ handle_call({request_group, RequestSeq}, From,
         waiting_list=[{From, RequestSeq}|WaitList]
         }, infinity};
 
-handle_call(request_group_info, _From, #group_state{
-            group = Group,
-            compactor_pid = CompactorPid
-        } = State) ->
-    GroupInfo = get_group_info(Group, CompactorPid),
+handle_call(request_group_info, _From, State) ->
+    GroupInfo = get_group_info(State),
     {reply, {ok, GroupInfo}, State}.
 
 handle_cast({start_compact, CompactFun}, #group_state{compactor_pid=nil}
@@ -467,17 +464,32 @@ open_db_group(DbName, GroupId) ->
         Else
     end.
 
-get_group_info(#group{
+get_group_info(State) ->
+    #group_state{
+        group=Group,
+        updater_pid=UpdaterPid,
+        compactor_pid=CompactorPid,
+        waiting_commit=WaitingCommit,
+        waiting_list=WaitersList
+    } = State,
+    #group{
         fd = Fd,
         sig = GroupSig,
-        def_lang = Lang
-    }, CompactorPid) ->
+        def_lang = Lang,
+        current_seq=CurrentSeq,
+        purge_seq=PurgeSeq
+    } = Group,
     {ok, Size} = couch_file:bytes(Fd),
     [
         {signature, ?l2b(hex_sig(GroupSig))},
         {language, Lang},
         {disk_size, Size},
-        {compact_running, CompactorPid /= nil}
+        {updater_running, UpdaterPid /= nil},
+        {compact_running, CompactorPid /= nil},
+        {waiting_commit, WaitingCommit},
+        {waiting_clients, length(WaitersList)},
+        {update_seq, CurrentSeq},
+        {purge_seq, PurgeSeq}
     ].
 
 % maybe move to another module
