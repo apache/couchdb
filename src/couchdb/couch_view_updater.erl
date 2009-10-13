@@ -158,9 +158,9 @@ do_writes(Parent, Owner, Group, WriteQueue, IntitalBuild) ->
                 IntitalBuild),
         case Owner of
         nil -> ok;
-        _ -> ok = gen_server:cast(Owner, {partial_update, self(), Group2})
+        _ -> ok = gen_server:cast(Owner, {partial_update, Parent, Group2})
         end,
-        do_writes(Parent, nil, Group2, WriteQueue, IntitalBuild)
+        do_writes(Parent, Owner, Group2, WriteQueue, IntitalBuild)
     end.
 
 view_insert_query_results([], [], ViewKVs, DocIdViewIdKeysAcc) ->
