@@ -15,6 +15,7 @@ This version has not been released yet.
  * Added option to implicitly create replication target databases.
  * Improved view information objects.
  * Bug fix for partial updates during view builds.
+ * Bug fix for building couch.app's module list.
 
 Version 0.10.0
 --------------
