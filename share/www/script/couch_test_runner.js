@@ -158,11 +158,17 @@ function saveTestReport() {
   var report = makeTestReport();
   if (report) {
     var db = $.couch.db("test_suite_reports");
-    var saveReport = function() {
-      db.saveDoc(report);        
+    var saveReport = function(db_info) {
+      report.db = db_info;
+      $.couch.info({success : function(node_info) {
+        report.node = node_info;
+        db.saveDoc(report);        
+      }})
     };
     var createDb = function() {
-      db.create({error: saveReport, success: saveReport});    
+      db.create({success: function() {
+        db.info({success:saveReport});        
+      }});    
     }
     db.info({error: createDb, success:saveReport});
   }
