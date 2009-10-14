@@ -12,9 +12,9 @@ Version 0.11.0
 
 This version has not been released yet.
 
- * Added option to implicitly create replication target databases
+ * Added option to implicitly create replication target databases.
  * Improved view information objects.
- * Bug fix for partial updates durring view builds.
+ * Bug fix for partial updates during view builds.
 
 Version 0.10.0
 --------------
