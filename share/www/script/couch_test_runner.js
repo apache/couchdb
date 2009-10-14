@@ -51,7 +51,9 @@ function runAllTests() {
       runTest($("th button", row).get(0), function() {
         offset += 1;
         setTimeout(runNext, 100);
-      });
+      }, false, true);
+    } else {
+      saveTestReport();
     }
   }
   runNext();
@@ -60,7 +62,7 @@ function runAllTests() {
 var numFailures = 0;
 var currentRow = null;
 
-function runTest(button, callback, debug) {
+function runTest(button, callback, debug, noSave) {
   if (currentRow != null) {
     alert("Can not run multiple tests simultaneously.");
     return;
@@ -102,6 +104,7 @@ function runTest(button, callback, debug) {
     updateTestsFooter();
     currentRow = null;
     if (callback) callback();
+    if (!noSave) saveTestReport();
   }
   $("td.status", row).addClass("running").text("running…");
   setTimeout(run, 100);
@@ -146,15 +149,13 @@ function updateTestsFooter() {
   $("#tests tbody.footer td").html("<span>"+testsRun.length + " of " + tests.length +
     " test(s) run, " + testsFailed.length + " failures (" +
     totalDuration + " ms)</span> ");
-  saveTestReport();
 }
 
 // make report and save to local db
 // display how many reports need replicating to the mothership
 // have button to replicate them
 
-function saveTestReport() {
-  var subject = $("#tests tbody.footer td").text();
+function saveTestReport(report) {
   var report = makeTestReport();
   if (report) {
     var db = $.couch.db("test_suite_reports");
@@ -176,6 +177,7 @@ function saveTestReport() {
 
 function makeTestReport() {
   var report = {};
+  report.summary = $("#tests tbody.footer td").text();
   report.platform = testPlatform();
   var date = new Date();
   report.timestamp = date.getTime();
@@ -209,6 +211,7 @@ function testPlatform() {
       return {"browser" : bs[i], "version" : b.version};
     }
   };
+  return {"browser" : "undetected"};
 }
 
 
