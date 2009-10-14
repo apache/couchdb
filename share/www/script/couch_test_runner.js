@@ -153,6 +153,21 @@ function updateTestsFooter() {
   }
 }
 
+// make report and save to local db
+// display how many reports need replicating to the mothership
+// have button to replicate them
+
+function saveTestReport() {
+  var subject = $("#tests tbody.footer td").text();
+  var report = {
+    "failures" : failureList
+  }
+  var db = $.couch.db("test_suite_reports");
+  var saveReport = function() {
+    db.saveDoc(report);        
+  };
+  db.create({error: saveReport, success: saveReport});
+};
 
 function testReport() {
   var report = [];
