@@ -12,6 +12,7 @@
 
 // *********************** Test Framework of Sorts ************************* //
 
+
 function loadScript(url) {
   if (typeof document != "undefined") document.write('<script src="'+url+'"></script>');
 };
@@ -145,12 +146,6 @@ function updateTestsFooter() {
   $("#tests tbody.footer td").html("<span>"+testsRun.length + " of " + tests.length +
     " test(s) run, " + testsFailed.length + " failures (" +
     totalDuration + " ms)</span> ");
-  if (testsFailed.length > 0) {
-    $("#tests tbody.footer td").append($('<a href="#">Click to Report Test Failures</a>').click(function(e) {
-      e.preventDefault();
-      reportTests();
-    }));
-  }
 }
 
 // make report and save to local db
@@ -159,9 +154,7 @@ function updateTestsFooter() {
 
 function saveTestReport() {
   var subject = $("#tests tbody.footer td").text();
-  var report = {
-    "failures" : failureList
-  }
+  var report = makeTestReport();
   var db = $.couch.db("test_suite_reports");
   var saveReport = function() {
     db.saveDoc(report);        
@@ -169,9 +162,9 @@ function saveTestReport() {
   db.create({error: saveReport, success: saveReport});
 };
 
-function testReport() {
-  var report = [];
-  report.push(testPlatform()+"\n");
+function makeTestReport() {
+  var report = {};
+  report.platform = testPlatform());
   $("#tests tbody.content tr").each(function() {
     var status = $("td.status", this).text();
     if (status != "not run") {
@@ -198,22 +191,22 @@ function testPlatform() {
 
 
 function reportTests() {
-  var summary = $("#tests tbody.footer td span").text();
-  var report = testReport();
-  var uri = "http://groups.google.com/group/couchdb-test-report/post"
-    + "?subject=" + escape(summary);  
-
-  var d=document;
-  var f=d.createElement("form");
-  // f.style.display='none';
-  f.action=uri;
-  f.method="POST";f.target="_blank";
-  var t=d.createElement("textarea");
-  t.name="body";
-  t.value=report;
-  f.appendChild(t);
-  d.body.appendChild(f);
-  f.submit();
+  // var summary = $("#tests tbody.footer td span").text();
+  // var report = makeTestReport();
+  // var uri = "http://groups.google.com/group/couchdb-test-report/post"
+  //   + "?subject=" + escape(summary);  
+  // 
+  // var d=document;
+  // var f=d.createElement("form");
+  // // f.style.display='none';
+  // f.action=uri;
+  // f.method="POST";f.target="_blank";
+  // var t=d.createElement("textarea");
+  // t.name="body";
+  // t.value=report;
+  // f.appendChild(t);
+  // d.body.appendChild(f);
+  // f.submit();
 }
 
 // Use T to perform a test that returns false on failure and if the test fails,
@@ -257,3 +250,4 @@ function repr(val) {
     return JSON.stringify(val);
   }
 }
+
