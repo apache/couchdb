@@ -146,6 +146,7 @@ function updateTestsFooter() {
   $("#tests tbody.footer td").html("<span>"+testsRun.length + " of " + tests.length +
     " test(s) run, " + testsFailed.length + " failures (" +
     totalDuration + " ms)</span> ");
+  saveTestReport();
 }
 
 // make report and save to local db
@@ -155,28 +156,43 @@ function updateTestsFooter() {
 function saveTestReport() {
   var subject = $("#tests tbody.footer td").text();
   var report = makeTestReport();
-  var db = $.couch.db("test_suite_reports");
-  var saveReport = function() {
-    db.saveDoc(report);        
-  };
-  db.create({error: saveReport, success: saveReport});
+  if (report) {
+    var db = $.couch.db("test_suite_reports");
+    var saveReport = function() {
+      db.saveDoc(report);        
+    };
+    var createDb = function() {
+      db.create({error: saveReport, success: saveReport});    
+    }
+    db.info({error: createDb, success:saveReport});
+  }
 };
 
 function makeTestReport() {
   var report = {};
-  report.platform = testPlatform());
+  report.platform = testPlatform();
+  var date = new Date();
+  report.timestamp = date.getTime();
+  report.timezone = date.getTimezoneOffset();
+  report.tests = [];
   $("#tests tbody.content tr").each(function() {
     var status = $("td.status", this).text();
     if (status != "not run") {
-      var dur = $("td.duration", this).text();
-      report.push(this.id+"\n  "+status+" "+dur);
-      var details = [];
+      var test = {};
+      test.name = this.id;
+      test.status = status;
+      test.duration = parseInt($("td.duration", this).text());
+      test.details = [];
       $("td.details li", this).each(function() {
-        report.push("    "+$(this).text());
+        test.details.push($(this).text());
       });
+      if (test.details.length == 0) {
+        delete test.details;
+      }
+      report.tests.push(test);
     }
   });
-  return report.join("\n");
+  if (report.tests.length > 0) return report;
 };
 
 function testPlatform() {
@@ -184,29 +200,14 @@ function testPlatform() {
   var bs = ["mozilla", "msie", "opera", "safari"];
   for (var i=0; i < bs.length; i++) {
     if (b[bs[i]]) {
-      return "Platform: "+ bs[i] + " " + b.version;
+      return {"browser" : bs[i], "version" : b.version};
     }
   };
 }
 
 
 function reportTests() {
-  // var summary = $("#tests tbody.footer td span").text();
-  // var report = makeTestReport();
-  // var uri = "http://groups.google.com/group/couchdb-test-report/post"
-  //   + "?subject=" + escape(summary);  
-  // 
-  // var d=document;
-  // var f=d.createElement("form");
-  // // f.style.display='none';
-  // f.action=uri;
-  // f.method="POST";f.target="_blank";
-  // var t=d.createElement("textarea");
-  // t.name="body";
-  // t.value=report;
-  // f.appendChild(t);
-  // d.body.appendChild(f);
-  // f.submit();
+  // replicate the database to couchdb.couchdb.org
 }
 
 // Use T to perform a test that returns false on failure and if the test fails,
