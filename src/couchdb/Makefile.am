@@ -197,7 +197,7 @@ compiled_files = \
 #     couch_view.html
 
 couch.app: couch.app.tpl
-	modules=`find . -name "*.erl" -exec basename {} .erl \; | tr '\n' ',' | sed "s/,$$//"`; \
+	modules=`find . -name "couch*.erl" -exec basename {} .erl \; | tr '\n' ',' | sed "s/,$$//"`; \
 	sed -e "s|%package_name%|@package_name@|g" \
 	    -e "s|%version%|@version@|g" \
 	    -e "s|@modules@|$$modules|g" \
