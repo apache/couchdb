@@ -12,6 +12,9 @@ Version 0.11.0
 
 This version has not been released yet.
 
+ * Added optional 'raw' binary collation for faster view builds where Unicode
+   collation is not important.
+ * Improved view index build time by reducing ICU collation callouts.
  * Added option to implicitly create replication target databases.
  * Improved view information objects.
  * Bug fix for partial updates during view builds.
