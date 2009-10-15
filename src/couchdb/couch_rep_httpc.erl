@@ -213,7 +213,16 @@ oauth_header(Url, QS, Action, Props) ->
     Token = ?b2l(proplists:get_value(<<"token">>, Props)),
     TokenSecret = ?b2l(proplists:get_value(<<"token_secret">>, Props)),
     ConsumerSecret = ?b2l(proplists:get_value(<<"consumer_secret">>, Props)),
-    Consumer = {ConsumerKey, ConsumerSecret, hmac_sha1},
+    SignatureMethodStr = ?b2l(proplists:get_value(<<"signature_method">>, Props, <<"HMAC-SHA1">>)),
+    SignatureMethodAtom = case SignatureMethodStr of
+        "PLAINTEXT" ->
+            plaintext;
+        "HMAC-SHA1" ->
+            hmac_sha1;
+        "RSA-SHA1" ->
+            rsa_sha1
+    end,
+    Consumer = {ConsumerKey, ConsumerSecret, SignatureMethodAtom},
     Method = case Action of
         get -> "GET";
         post -> "POST";
