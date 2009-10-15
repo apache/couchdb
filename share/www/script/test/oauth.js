@@ -170,6 +170,11 @@ couchTests.oauth = function(debug) {
           T(xhr.status == expectedCode);
 
           // Replication
+          var dbA = new CouchDB("test_suite_db_a", {
+            "X-Couch-Full-Commit":"false",
+            "Authorization": adminBasicAuthHeaderValue()
+          });
+          T(dbA.save({_id:"_design/"+i+consumerKey}).ok);
           var result = CouchDB.replicate(dbPair.source, dbPair.target, {
             headers: {"Authorization": adminBasicAuthHeaderValue()}
           });

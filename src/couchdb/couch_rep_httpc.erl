@@ -126,7 +126,7 @@ process_response({ok, Status, Headers, Body}, Req) ->
     Code =:= 301; Code =:= 302 ->
         MochiHeaders = mochiweb_headers:make(Headers),
         RedirectUrl = mochiweb_headers:get_value("Location", MochiHeaders),
-        do_request(Req#http_db{url = RedirectUrl});
+        do_request(redirected_request(Req, RedirectUrl));
     Code =:= 409 ->
         throw(conflict);
     Code >= 400, Code < 500 ->
@@ -175,6 +175,17 @@ process_response({error, Reason}, Req) ->
         do_request(Req#http_db{retries = Retries-1, pause = 2*Pause})
     end.
 
+redirected_request(Req, RedirectUrl) ->
+    {Base, QStr, _} = mochiweb_util:urlsplit_path(RedirectUrl),
+    QS = mochiweb_util:parse_qs(QStr),
+    Hdrs = case proplists:get_value(<<"oauth">>, Req#http_db.auth) of
+    undefined ->
+        Req#http_db.headers;
+    _Else ->
+        lists:keydelete("Authorization", 1, Req#http_db.headers)
+    end,
+    Req#http_db{url=Base, resource="", qs=QS, headers=Hdrs}.
+
 spawn_worker_process(Req) ->
     Url = ibrowse_lib:parse_url(Req#http_db.url),
     {ok, Pid} = ibrowse_http_client:start(Url),
@@ -195,7 +206,9 @@ maybe_decompress(Headers, Body) ->
     end.
 
 oauth_header(Url, QS, Action, Props) ->
-    QSL = [{couch_util:to_list(K), couch_util:to_list(V)} || {K,V} <- QS],
+    % erlang-oauth doesn't like iolists
+    QSL = [{couch_util:to_list(K), ?b2l(?l2b(couch_util:to_list(V)))} ||
+        {K,V} <- QS],
     ConsumerKey = ?b2l(proplists:get_value(<<"consumer_key">>, Props)),
     Token = ?b2l(proplists:get_value(<<"token">>, Props)),
     TokenSecret = ?b2l(proplists:get_value(<<"token_secret">>, Props)),
