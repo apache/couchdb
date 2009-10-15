@@ -462,9 +462,10 @@ open_db(<<"http://",_/binary>>=Url, _, CreateTarget) ->
 open_db(<<"https://",_/binary>>=Url, _, CreateTarget) ->
     open_db({[{<<"url">>,Url}]}, [], CreateTarget);
 open_db(<<DbName/binary>>, UserCtx, CreateTarget) ->
-    ok = couch_httpd:verify_is_server_admin(UserCtx),
     case CreateTarget of
-    true -> couch_server:create(DbName, [{user_ctx, UserCtx}]);
+    true -> 
+        ok = couch_httpd:verify_is_server_admin(UserCtx),
+        couch_server:create(DbName, [{user_ctx, UserCtx}]);
     false -> ok
     end,
 
