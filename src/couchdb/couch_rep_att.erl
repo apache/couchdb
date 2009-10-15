@@ -85,10 +85,8 @@ start_http_request(Req) ->
 validate_headers(_Req, 200, _Headers) ->
     ok;
 validate_headers(Req, Code, Headers) when Code > 299, Code < 400 ->
-    %% TODO check that the qs is actually included in the Location header
-    %% TODO this only supports one level of redirection
     Url = mochiweb_headers:get_value("Location",mochiweb_headers:make(Headers)),
-    NewReq = Req#http_db{url=Url, resource="", qs=[]},
+    NewReq = couch_rep_httpc:redirected_request(Req, Url),
     {ibrowse_req_id, ReqId} = couch_rep_httpc:request(NewReq),
     receive {ibrowse_async_headers, ReqId, NewCode, NewHeaders} ->
         ok = validate_headers(NewReq, list_to_integer(NewCode), NewHeaders)
