@@ -14,8 +14,8 @@
 -include("couch_db.hrl").
 -include("../ibrowse/ibrowse.hrl").
 
--export([db_exists/1, db_exists/2, full_url/1, request/1, spawn_worker_process/1,
-    spawn_link_worker_process/1]).
+-export([db_exists/1, db_exists/2, full_url/1, request/1, redirected_request/2,
+    spawn_worker_process/1, spawn_link_worker_process/1]).
 
 request(Req) when is_record(Req, http_db) ->
     do_request(Req).
