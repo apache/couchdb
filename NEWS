@@ -32,7 +32,7 @@ This release contains backwards incompatible changes, please see above for help.
  * More robust push and pull replication.
  * Two-legged OAuth Support for applications and replication (three legged in
    preparation).
- * Cookie Authentication
+ * Cookie Authentication.
  * API detail improvements.
  * Better RFC 2616 (HTTP 1.1) compliance.
  * Added modular configuration file directories.
