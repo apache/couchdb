@@ -436,7 +436,8 @@ CouchDB.requestStats = function(module, key, test) {
 
 CouchDB.uuids_cache = [];
 
-CouchDB.newUuids = function(n) {
+CouchDB.newUuids = function(n, buf) {
+  buf = buf || 100;
   if (CouchDB.uuids_cache.length >= n) {
     var uuids = CouchDB.uuids_cache.slice(CouchDB.uuids_cache.length - n);
     if(CouchDB.uuids_cache.length - n == 0) {
@@ -447,12 +448,12 @@ CouchDB.newUuids = function(n) {
     }
     return uuids;
   } else {
-    CouchDB.last_req = CouchDB.request("GET", "/_uuids?count=" + (100 + n));
+    CouchDB.last_req = CouchDB.request("GET", "/_uuids?count=" + (buf + n));
     CouchDB.maybeThrowError(CouchDB.last_req);
     var result = JSON.parse(CouchDB.last_req.responseText);
     CouchDB.uuids_cache =
-        CouchDB.uuids_cache.concat(result.uuids.slice(0, 100));
-    return result.uuids.slice(100);
+        CouchDB.uuids_cache.concat(result.uuids.slice(0, buf));
+    return result.uuids.slice(buf);
   }
 }
 
