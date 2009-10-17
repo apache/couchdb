@@ -40,9 +40,6 @@ couchjs_LDADD = $(CURL_LDFLAGS) @JSLIB@
 
 if WINDOWS
 couch_erl_driver_la_LDFLAGS += -no-undefined
-# copy ICU dlls for the erlang driver
-#dist_couch_erl_driver_la_DATA=$(ICU_LOCAL_BIN)/icuuc42.dll $(ICU_LOCAL_BIN)/icudt42.dll $(ICU_LOCAL_BIN)/icuin42.dll
-couch_erl_driver_ladir=$(bindir)
 endif
 
 couchinclude_DATA = couch_db.hrl
@@ -196,8 +193,19 @@ compiled_files = \
 #     couch_util.html \
 #     couch_view.html
 
+if WINDOWS
 couch.app: couch.app.tpl
 	modules=`find . -name "couch*.erl" -exec basename {} .erl \; | tr '\n' ',' | sed "s/,$$//"`; \
+	sed -e "s|%package_name%|@package_name@|g" \
+	    -e "s|%version%|@version@|g" \
+	    -e "s|@modules@|$$modules|g" \
+	    -e "s|%localconfdir%|../etc/couchdb|g" \
+	    -e "s|@defaultini@|default.ini|g" \
+	    -e "s|@localini@|local.ini|g" > \
+	$@ < $<
+else
+couch.app: couch.app.tpl
+	modules=`find . -name "*.erl" -exec basename {} .erl \; | tr '\n' ',' | sed "s/,$$//"`; \
 	sed -e "s|%package_name%|@package_name@|g" \
 	    -e "s|%version%|@version@|g" \
 	    -e "s|@modules@|$$modules|g" \
@@ -206,6 +214,7 @@ couch.app: couch.app.tpl
 	    -e "s|@localini@|local.ini|g" > \
 	$@ < $<
 	chmod +x $@
+endif
 
 # $(dist_devdoc_DATA): edoc-info
 
@@ -220,6 +229,12 @@ install-data-hook:
 	    cd "$(DESTDIR)$(couchprivlibdir)" && \
 	        $(LN_S) couch_erl_driver couch_erl_driver.so; \
 	fi
+if WINDOWS
+	$(INSTALL) $(ICU_LOCAL_BIN)/icuuc42.dll $(bindir)
+	$(INSTALL) $(ICU_LOCAL_BIN)/icudt42.dll $(bindir)
+	$(INSTALL) $(ICU_LOCAL_BIN)/icuin42.dll $(bindir)
+	$(INSTALL) $(JS_LIB_BINARY) $(bindir)
+endif
 
 uninstall-local:
 	if test -f "$(DESTDIR)$(couchprivlibdir)/couch_erl_driver"; then \
