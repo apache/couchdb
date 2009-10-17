@@ -57,7 +57,7 @@ while [ $RUN -lt $ROUNDS ]; do
     echo "startkey $STARTKEY bulksize $BULKSIZE"
     DOCS=$(make_bulk_docs $BULKSIZE $STARTKEY $DOCSIZE)
     # echo $DOCS
-    echo $DOCS | curl -T - -X POST $POSTURL -w%{http_code}\ %{time_total}\ sec\\n -o out.file 2> /dev/null &
+    echo $DOCS | curl -T - -X POST $POSTURL -w%{http_code}\ %{time_total}\ sec\\n >/dev/null 2>&1 &
     let POSTS=POSTS+1
   done
 

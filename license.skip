@@ -32,6 +32,7 @@
 ^etc/logrotate.d/couchdb*
 ^etc/logrotate.d/Makefile
 ^etc/logrotate.d/Makefile.in
+^etc/windows/README.txt.tpl
 ^libtool
 ^license.skip
 ^m4/ac_check_curl.m4*
