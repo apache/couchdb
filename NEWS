@@ -12,6 +12,7 @@ Version 0.11.0
 
 This version has not been released yet.
 
+ * Added support for building a Windows installer as part of 'make dist'.
  * Added optional 'raw' binary collation for faster view builds where Unicode
    collation is not important.
  * Improved view index build time by reducing ICU collation callouts.

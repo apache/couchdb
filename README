@@ -370,20 +370,43 @@ Now we need to run a complicated configure command-line.
       --with-js-lib=/cygdrive/c/path_to_seamonkey_lib \
       --with-win32-icu-binaries=/cygdrive/c/path_to_icu_binaries_root \
       --with-erlang=$ERL_TOP/release/win32/usr/include \
-      --with-win32-curl=/cygdrive/c/path/to/curl/root/directory
+      --with-win32-curl=/cygdrive/c/path/to/curl/root/directory \
+      --with-openssl-bin-dir=c:/openssl/bin \
+      --with-msvc-redist-dir=c:/dir/with/vcredist_platform_executable \
       --prefix=$ERL_TOP/release/win32
+
+Relax, then relax some more, then get a beer and relax some more; the
+above command may take many many minutes to complete...
 
 Note that all paths must be in cygwin format.  Those starting with $ERL_TOP
 can be entered literally, assuming ERL_TOP is set as described above.
 
+Notes:
+  When building the installer, the necessary openssl binaries are pulled from
+  the directory pointed to --with-openssl-bin-dir.
+
+Now we can build it and "install" it into the $ERL_TOP/release/win32 (or
+wherever you set --prefix to above) directory:
+
+ $ make install
+ 
 Relax on your new couch:
 
-  The $ERL_TOP/win32/release directory is now ready to .zip up, be packaged
+  The $ERL_TOP/release/win32 directory is now ready to .zip up, be packaged
   by an installer, etc.  To test it in-place, execute:
 
-  $ $ERL_TOP/win32/release/bin/couchdb.bat
+  $ $ERL_TOP/release/win32/bin/couchdb.bat
 
   and everything should work fine.
+
+To create an installer, execute:
+
+  $ make dist
+
+and look for etc/windows/setup-couch*.exe.  Note - only do this after
+a clean build, not after testing in-place - otherwise your test database and
+log files will be shipped!
+  
 
 Additional Notes:
 

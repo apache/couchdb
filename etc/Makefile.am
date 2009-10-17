@@ -27,6 +27,10 @@ nobase_sysconf_DATA = $(default_sysconf_data) $(init_sysconf_data)
 
 EXTRA_DIST = $(init_sysconf_data)
 
+if WINDOWS
+EXTRA_DIST += windows/setup-couchdb-@version@.exe
+endif
+
 CLEANFILES = $(init_DATA) $(default_sysconf_data) $(launchd_DATA)
 
 transform = @program_transform_name@
@@ -62,6 +66,38 @@ launchd/org.apache.couchdb.plist: launchd/org.apache.couchdb.plist.tpl
 	    -e "s|%bindir%|$(bindir)|" \
 	    -e "s|%couchdb_command_name%|$(couchdb_command_name)|" \
 	< $< > $@
+
+if WINDOWS
+
+# README.txt has \n line endings in the repo and must have \r\n
+# when installed as notepad is used to view it.
+# Also: the targets below don't seem to update after an svn-up (which
+# changes the version string in the generated files) so we trick make 
+# into always building it with the FORCE pattern...
+windows/README.txt: windows/README.txt.tpl FORCE
+	sed -e "s|%package_name%|@package_name@|g" \
+	    -e "s|%version%|@version@|g" \
+	< $< | unix2dos > $@
+
+windows/couchdb.iss: windows/couchdb.iss.tpl FORCE
+	sed -e "s|%configure_input%|$@. Generated from $< by configure.|" \
+	    -e "s|%package_name%|@package_name@|g" \
+	    -e "s|%locallibbindir%|`cygpath -m @locallibbindir@`|g" \
+	    -e "s|%version%|@version@|g" \
+	    -e "s|%openssl_bin_dir%|@openssl_bin_dir@|g" \
+	    -e "s|%msvc_redist_dir%|@msvc_redist_dir@|g" \
+	    -e "s|%msvc_redist_name%|@msvc_redist_name@|g" \
+	< $< > $@
+
+# The installer depends on all files, not just the source .iss file,
+# so we trick make into always building it with the FORCE pattern...
+windows/setup-couchdb-@version@.exe: windows/couchdb.iss windows/README.txt FORCE
+	$(INNO_COMPILER_EXECUTABLE) /q $<
+	@echo Windows Installer is at: `cygpath -a -w windows/setup-couchdb-@version@.exe`
+
+FORCE:
+
+endif
 
 install-data-hook:
 	if test -n "$(init_DATA)"; then \
