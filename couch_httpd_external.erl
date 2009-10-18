@@ -94,13 +94,14 @@ to_json_terms([{Key, Value} | Rest], Acc) ->
     to_json_terms(Rest, [{list_to_binary(Key), list_to_binary(Value)} | Acc]).
 
 
-send_external_response(#httpd{mochi_req=MochiReq}, Response) ->
+send_external_response(#httpd{mochi_req=MochiReq}=Req, Response) ->
     #extern_resp_args{
         code = Code,
         data = Data,
         ctype = CType,
         headers = Headers
     } = parse_external_response(Response),
+    couch_httpd:log_request(Req, Code),
     Resp = MochiReq:respond({Code,
         default_or_content_type(CType, Headers ++ couch_httpd:server_header()), Data}),
     {ok, Resp}.
