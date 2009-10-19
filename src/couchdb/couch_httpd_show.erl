@@ -124,16 +124,14 @@ handle_view_list(Req, ListDesignName, ListName, ViewDesignName, ViewName, Db, Ke
     #doc{body={ListProps}} = couch_httpd_db:couch_doc_open(Db, ListDesignId, nil, []),
     if
     ViewDesignName == ListDesignName ->
-        ViewProps = ListProps,
         ViewDesignId = ListDesignId;
     true ->
-        ViewDesignId = <<"_design/", ViewDesignName/binary>>,
-        #doc{body={ViewProps}} = couch_httpd_db:couch_doc_open(Db, ViewDesignId, nil, [])
+        ViewDesignId = <<"_design/", ViewDesignName/binary>>
     end,
 
-    ViewLang = proplists:get_value(<<"language">>, ViewProps, <<"javascript">>),
+    ListLang = proplists:get_value(<<"language">>, ListProps, <<"javascript">>),
     ListSrc = couch_util:get_nested_json_value({ListProps}, [<<"lists">>, ListName]),
-    send_view_list_response(ViewLang, ListSrc, ViewName, ViewDesignId, Req, Db, Keys).
+    send_view_list_response(ListLang, ListSrc, ViewName, ViewDesignId, Req, Db, Keys).
 
 
 send_view_list_response(Lang, ListSrc, ViewName, DesignId, Req, Db, Keys) ->
