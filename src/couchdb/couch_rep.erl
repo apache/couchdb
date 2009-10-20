@@ -507,7 +507,7 @@ do_checkpoint(State) ->
     {SrcInstanceStartTime, TgtInstanceStartTime} ->
         NewSeqNum;
     _Else ->
-        ?LOG_INFO("A server has restarted sinced replication start. "
+        ?LOG_INFO("A server has restarted since replication start. "
             "Not recording the new sequence number to ensure the "
             "replication is redone and documents reexamined.", []),
         StartSeqNum
