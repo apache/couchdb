@@ -196,6 +196,12 @@ couchTests.oauth = function(debug) {
             T(data.name == "testadmin");
             T(data.roles[0] == "_admin");
           }
+
+          // Test when the user's token doesn't exist.
+          message.parameters.oauth_token = "not a token!";
+          xhr = oauthRequest("GET", "http://" + host + "/_session?foo=bar",
+                  message, adminAccessor);
+          T(xhr.status == 400, "Request should be invalid.");
         }
       }
     } finally {
