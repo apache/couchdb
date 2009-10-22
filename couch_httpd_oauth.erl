@@ -38,7 +38,10 @@ oauth_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
 set_user_ctx(Req, AccessToken) ->
     DbName = couch_config:get("couch_httpd_auth", "authentication_db"),
     {ok, _Db} = couch_httpd_auth:ensure_users_db_exists(?l2b(DbName)),
-    Name = ?l2b(couch_config:get("oauth_token_users", AccessToken)),
+    Name = case couch_config:get("oauth_token_users", AccessToken) of
+        undefined -> throw({bad_request, unknown_oauth_token});
+        Value -> ?l2b(Value)
+    end,
     case couch_httpd_auth:get_user(Name) of
         nil -> Req;
         User ->
