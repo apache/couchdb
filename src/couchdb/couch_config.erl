@@ -50,7 +50,8 @@ all() ->
 get(Section) when is_binary(Section) ->
     ?MODULE:get(?b2l(Section));
 get(Section) ->
-    gen_server:call(?MODULE, {get, Section}).
+    Matches = ets:match(?MODULE, {{Section, '$1'}, '$2'}),
+    [{Key, Value} || [Key, Value] <- Matches].
 
 get(Section, Key) ->
     ?MODULE:get(Section, Key, undefined).
@@ -58,8 +59,10 @@ get(Section, Key) ->
 get(Section, Key, Default) when is_binary(Section) and is_binary(Key) ->
     ?MODULE:get(?b2l(Section), ?b2l(Key), Default);
 get(Section, Key, Default) ->
-    gen_server:call(?MODULE, {get, Section, Key, Default}).
-
+    case ets:lookup(?MODULE, {Section, Key}) of
+        [] -> Default;
+        [{_, Match}] -> Match
+    end.
 
 set(Section, Key, Value) ->
     ?MODULE:set(Section, Key, Value, true).
@@ -89,7 +92,7 @@ register(Fun, Pid) ->
 
 
 init(IniFiles) ->
-    ets:new(?MODULE, [named_table, set, private]),
+    ets:new(?MODULE, [named_table, set, protected]),
     lists:map(fun(IniFile) ->
         {ok, ParsedIniValues} = parse_ini_file(IniFile),
         ets:insert(?MODULE, ParsedIniValues)
@@ -107,16 +110,6 @@ terminate(_Reason, _State) ->
 
 handle_call(all, _From, Config) ->
     Resp = lists:sort((ets:tab2list(?MODULE))),
-    {reply, Resp, Config};
-handle_call({get, Section}, _From, Config) ->
-    Matches = ets:match(?MODULE, {{Section, '$1'}, '$2'}),
-    Resp = [{Key, Value} || [Key, Value] <- Matches],
-    {reply, Resp, Config};
-handle_call({get, Section, Key, Default}, _From, Config) ->
-    Resp = case ets:lookup(?MODULE, {Section, Key}) of
-        [] -> Default;
-        [{_, Match}] -> Match
-    end,
     {reply, Resp, Config};
 handle_call({set, Sec, Key, Val, Persist}, _From, Config) ->
     true = ets:insert(?MODULE, {{Sec, Key}, Val}),
