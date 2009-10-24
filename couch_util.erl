@@ -12,7 +12,7 @@
 
 -module(couch_util).
 
--export([start_driver/1,terminate_linked/1]).
+-export([priv_dir/0, start_driver/1,terminate_linked/1]).
 -export([should_flush/0, should_flush/1, to_existing_atom/1]).
 -export([rand32/0, implode/2, collate/2, collate/3]).
 -export([abs_pathname/1,abs_pathname/2, trim/1, ascii_lower/1]).
@@ -26,6 +26,16 @@
 
 % arbitrarily chosen amount of memory to use before flushing to disk
 -define(FLUSH_MAX_MEM, 10000000).
+
+priv_dir() ->
+    case code:priv_dir(couch) of
+        {error, bad_name} ->
+            % small hack, in dev mode "app" is couchdb. Fixing requires
+            % renaming src/couch to src/couch. Not really worth the hassle.
+            % -Damien
+            code:priv_dir(couchdb);
+        Dir -> Dir
+    end.
 
 start_driver(LibDir) ->
     case erl_ddll:load_driver(LibDir, "couch_erl_driver") of

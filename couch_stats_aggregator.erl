@@ -90,16 +90,17 @@ init(_) ->
     ets:new(?MODULE, [named_table, set, protected]),
     SampleStr = couch_config:get("stats", "samples", "[0]"),
     {ok, Samples} = couch_util:parse_term(SampleStr),
-    lists:foreach(fun({KeyStr, Value}) ->
-        {ok, Key} = couch_util:parse_term(KeyStr),
+    PrivDir = couch_util:priv_dir(),
+    {ok, Descs} = file:consult(filename:join(PrivDir, "stat_descriptions.cfg")),
+    lists:foreach(fun({Sect, Key, Value}) ->
         lists:foreach(fun(Secs) ->
             Agg = #aggregate{
                 description=list_to_binary(Value),
                 seconds=Secs
             },
-            ets:insert(?MODULE, {{Key, Secs}, Agg})
+            ets:insert(?MODULE, {{{Sect, Key}, Secs}, Agg})
         end, Samples)
-    end, couch_config:get("stats_descriptions")),
+    end, Descs),
     
     Self = self(),
     ok = couch_config:register(
