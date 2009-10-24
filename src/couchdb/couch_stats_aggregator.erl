@@ -13,7 +13,7 @@
 -module(couch_stats_aggregator).
 -behaviour(gen_server).
 
--export([start/0, stop/0]).
+-export([start/0, start/1, stop/0]).
 -export([all/0, all/1, get/1, get/2, get_json/1, get_json/2, collect_sample/0]).
 
 -export([init/1, terminate/2, code_change/3]).
@@ -35,7 +35,11 @@
 
 
 start() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+    PrivDir = couch_util:priv_dir(),
+    start(filename:join(PrivDir, "stat_descriptions.cfg")).
+    
+start(FileName) ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [FileName], []).
 
 stop() ->
     gen_server:cast(?MODULE, stop).
@@ -85,13 +89,12 @@ collect_sample() ->
     gen_server:call(?MODULE, collect_sample).
 
 
-init(_) ->
+init(StatDescsFileName) ->
     % Create an aggregate entry for each {description, rate} pair.
     ets:new(?MODULE, [named_table, set, protected]),
     SampleStr = couch_config:get("stats", "samples", "[0]"),
     {ok, Samples} = couch_util:parse_term(SampleStr),
-    PrivDir = couch_util:priv_dir(),
-    {ok, Descs} = file:consult(filename:join(PrivDir, "stat_descriptions.cfg")),
+    {ok, Descs} = file:consult(StatDescsFileName),
     lists:foreach(fun({Sect, Key, Value}) ->
         lists:foreach(fun(Secs) ->
             Agg = #aggregate{

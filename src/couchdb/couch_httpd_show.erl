@@ -40,7 +40,7 @@ handle_doc_show_req(Req, _Db) ->
     send_method_not_allowed(Req, "GET,POST,HEAD").
 
 
-handle_doc_update_req(#httpd{method = 'GET'}=Req, Db) ->
+handle_doc_update_req(#httpd{method = 'GET'}=Req, _Db) ->
     send_method_not_allowed(Req, "POST,PUT,DELETE,ETC");
     
 handle_doc_update_req(#httpd{

@@ -29,7 +29,7 @@ main(_) ->
 test() ->
     couch_config:start_link(["test/etap/121-stats-aggregates.ini"]),
     couch_stats_collector:start(),
-    couch_stats_aggregator:start(),
+    couch_stats_aggregator:start("test/etap/121-stats-aggregates.cfg"),
     ok = test_all_empty(),
     ok = test_get_empty(),
     ok = test_count_stats(),
