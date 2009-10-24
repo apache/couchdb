@@ -103,13 +103,7 @@ readjson(OsProc) when is_record(OsProc, os_proc) ->
 
 % gen_server API
 init([Command, Options, PortOptions]) ->
-    case code:priv_dir(couch) of
-    {error, bad_name} ->
-        % small hack, in dev mode "app" is couchdb. Fixing requires renaming
-        % src/couch to src/couch. Not really worth the hassle.-Damien
-        PrivDir = code:priv_dir(couchdb);
-    PrivDir -> ok
-    end,
+    PrivDir = couch_util:priv_dir(),
     Spawnkiller = filename:join(PrivDir, "couchspawnkillable"),
     BaseProc = #os_proc{
         command=Command,

@@ -76,7 +76,7 @@ start_server(IniFiles) ->
     LibDir =
     case couch_config:get("couchdb", "util_driver_dir", null) of
     null ->
-        filename:join(code:priv_dir(couch), "lib");
+        filename:join(couch_util:priv_dir(), "lib");
     LibDir0 -> LibDir0
     end,
 
