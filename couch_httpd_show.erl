@@ -39,8 +39,11 @@ handle_doc_show_req(#httpd{method='GET'}=Req, _Db) ->
 handle_doc_show_req(Req, _Db) ->
     send_method_not_allowed(Req, "GET,POST,HEAD").
 
+
+handle_doc_update_req(#httpd{method = 'GET'}=Req, Db) ->
+    send_method_not_allowed(Req, "POST,PUT,DELETE,ETC");
+    
 handle_doc_update_req(#httpd{
-        method = 'PUT',
         path_parts=[_DbName, _Design, DesignName, _Update, UpdateName, DocId]
     }=Req, Db) ->
     DesignId = <<"_design/", DesignName/binary>>,
@@ -55,7 +58,6 @@ handle_doc_update_req(#httpd{
     send_doc_update_response(Lang, UpdateSrc, DocId, Doc, Req, Db);
 
 handle_doc_update_req(#httpd{
-        method = 'POST',
         path_parts=[_DbName, _Design, DesignName, _Update, UpdateName]
     }=Req, Db) ->
     DesignId = <<"_design/", DesignName/binary>>,
@@ -64,15 +66,6 @@ handle_doc_update_req(#httpd{
     UpdateSrc = couch_util:get_nested_json_value({Props}, [<<"updates">>, UpdateName]),
     send_doc_update_response(Lang, UpdateSrc, nil, nil, Req, Db);
 
-handle_doc_update_req(#httpd{
-        path_parts=[_DbName, _Design, _DesignName, _Update, _UpdateName, _DocId]
-    }=Req, _Db) ->
-    send_method_not_allowed(Req, "PUT");
-
-handle_doc_update_req(#httpd{
-        path_parts=[_DbName, _Design, _DesignName, _Update, _UpdateName]
-    }=Req, _Db) ->
-    send_method_not_allowed(Req, "POST");
 
 handle_doc_update_req(Req, _Db) ->
     send_error(Req, 404, <<"update_error">>, <<"Invalid path.">>).
