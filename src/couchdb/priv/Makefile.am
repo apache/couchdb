@@ -13,8 +13,9 @@
 couchlibdir = $(localerlanglibdir)/couch-$(version)
 couchprivdir = $(couchlibdir)/priv
 
-EXTRA_DIST = couchspawnkillable.sh
+EXTRA_DIST = couchspawnkillable.sh stat_descriptions.cfg
 
+couchpriv_DATA = stat_descriptions.cfg
 couchpriv_PROGRAMS = couchspawnkillable
 
 if WINDOWS

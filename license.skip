@@ -64,6 +64,7 @@
 ^src/couchdb/priv/Makefile
 ^src/couchdb/priv/Makefile.in
 ^src/couchdb/priv/couchspawnkillable
+^src/couchdb/priv/stat_descriptions.cfg
 ^src/erlang-oauth/*
 ^src/etap/*
 ^src/ibrowse/*
