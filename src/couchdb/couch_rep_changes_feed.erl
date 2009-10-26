@@ -189,12 +189,12 @@ handle_next_changes(_From, State) ->
         rows = Rows
     } = State,
     NewState = State#state{count=0, changes_from=nil, rows=queue:new()},
-    ok = maybe_stream_next(NewState),
+    maybe_stream_next(NewState),
     if ChangesFrom =/= nil -> gen_server:reply(ChangesFrom, ok); true -> ok end,
     {reply, queue:to_list(Rows), NewState}.
 
 handle_headers(200, _, State) ->
-    ok = maybe_stream_next(State),
+    maybe_stream_next(State),
     {noreply, State};
 handle_headers(301, Hdrs, State) ->
     catch ibrowse:stop_worker_process(State#state.conn),
@@ -208,7 +208,7 @@ handle_headers(Code, Hdrs, State) ->
     {stop, {error, Code}, State}.
 
 handle_messages([], State) ->
-    ok = maybe_stream_next(State),
+    maybe_stream_next(State),
     {noreply, State};
 handle_messages([<<"{\"results\":[">>|Rest], State) ->
     handle_messages(Rest, State);
