@@ -56,10 +56,11 @@ init([_Parent, #http_db{}=Source, Since, PostProps] = Args) ->
     Pid = couch_rep_httpc:spawn_link_worker_process(Source),
     Req = Source#http_db{
         resource = "_changes",
-        qs = [{style, all_docs}, {heartbeat, true}, {since, Since},
+        qs = [{style, all_docs}, {heartbeat, 10000}, {since, Since},
             {feed, Feed}],
         conn = Pid,
-        options = [{stream_to, {self(), once}}, {response_format, binary}],
+        options = [{stream_to, {self(), once}}, {response_format, binary},
+            {inactivity_timeout, 31000}], % miss 3 heartbeats, assume death
         headers = Source#http_db.headers -- [{"Accept-Encoding", "gzip"}]
     },
     {ibrowse_req_id, ReqId} = couch_rep_httpc:request(Req),
@@ -360,7 +361,7 @@ start_http_request(RawUrl) ->
     {ok, Pid} = ibrowse:spawn_link_worker_process(Url#url.host, Url#url.port),
     Opts = [
         {stream_to, {self(), once}},
-        {inactivity_timeout, 30000},
+        {inactivity_timeout, 31000},
         {response_format, binary}
     ],
     {ibrowse_req_id, Id} = 
