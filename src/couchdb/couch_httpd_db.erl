@@ -684,7 +684,8 @@ db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
                         Json = ?JSON_ENCODE({[{ok, JsonDoc}]}),
                         send_chunk(Resp, AccSeparator ++ Json);
                     {{not_found, missing}, RevId} ->
-                        Json = ?JSON_ENCODE({[{"missing", RevId}]}),
+                        RevStr = couch_doc:rev_to_str(RevId),
+                        Json = ?JSON_ENCODE({[{"missing", RevStr}]}),
                         send_chunk(Resp, AccSeparator ++ Json)
                     end,
                     "," % AccSeparator now has a comma
@@ -846,6 +847,8 @@ couch_doc_open(Db, DocId, Rev, Options) ->
       case couch_db:open_doc_revs(Db, DocId, [Rev], Options) of
           {ok, [{ok, Doc}]} ->
               Doc;
+          {ok, [{{not_found, missing}, Rev}]} ->
+              throw(not_found);
           {ok, [Else]} ->
               throw(Else)
       end
