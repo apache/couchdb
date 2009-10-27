@@ -19,7 +19,7 @@
 
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
-    start_json_response/2,send_chunk/2,send_chunked_error/2,
+    start_json_response/2,send_chunk/2,last_chunk/1,send_chunked_error/2,
     start_chunked_response/3, send_error/4]).
 
 handle_doc_show_req(#httpd{
@@ -365,7 +365,7 @@ finish_list(Req, QueryServer, Etag, FoldResult, StartFun, TotalRows) ->
             [<<"end">>, Chunks] = couch_query_servers:render_list_tail(QueryServer),
             send_non_empty_chunk(Resp, ?b2l(?l2b(Chunks)))
     end,
-    send_chunk(Resp, []).
+    last_chunk(Resp).
 
 
 render_head_for_empty_list(StartListRespFun, Req, Etag, null) ->

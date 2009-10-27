@@ -23,7 +23,7 @@
 -export([start_response_length/4, send/2]).
 -export([start_json_response/2, start_json_response/3, end_json_response/1]).
 -export([send_response/4,send_method_not_allowed/2,send_error/4, send_redirect/2,send_chunked_error/2]).
--export([send_json/2,send_json/3,send_json/4]).
+-export([send_json/2,send_json/3,send_json/4,last_chunk/1]).
 
 start_link() ->
     % read config and register for configuration changes
@@ -422,7 +422,14 @@ start_chunked_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers) ->
     {ok, Resp}.
 
 send_chunk(Resp, Data) ->
-    Resp:write_chunk(Data),
+    case iolist_size(Data) of
+    0 -> ok; % do nothing
+    _ -> Resp:write_chunk(Data)
+    end,
+    {ok, Resp}.
+
+last_chunk(Resp) ->
+    Resp:write_chunk([]),
     {ok, Resp}.
 
 send_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Body) ->
@@ -473,8 +480,7 @@ start_json_response(Req, Code, Headers) ->
 
 end_json_response(Resp) ->
     send_chunk(Resp, end_jsonp() ++ [$\n]),
-    %send_chunk(Resp, [$\n]),
-    send_chunk(Resp, []).
+    last_chunk(Resp).
 
 start_jsonp(Req) ->
     case get(jsonp) of
@@ -586,7 +592,7 @@ send_error(Req, Code, Headers, ErrorStr, ReasonStr) ->
 % give the option for list functions to output html or other raw errors
 send_chunked_error(Resp, {_Error, {[{<<"body">>, Reason}]}}) ->
     send_chunk(Resp, Reason),
-    send_chunk(Resp, []);
+    last_chunk(Resp);
 
 send_chunked_error(Resp, Error) ->
     {Code, ErrorStr, ReasonStr} = error_info(Error),
@@ -594,7 +600,7 @@ send_chunked_error(Resp, Error) ->
         {<<"error">>,  ErrorStr},
         {<<"reason">>, ReasonStr}]},
     send_chunk(Resp, ?l2b([$\n,?JSON_ENCODE(JsonError),$\n])),
-    send_chunk(Resp, []).
+    last_chunk(Resp).
 
 send_redirect(Req, Path) ->
      Headers = [{"Location", couch_httpd:absolute_uri(Req, Path)}],
