@@ -876,8 +876,11 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
                 {"Cache-Control", "must-revalidate"},
                 {"Content-Type", binary_to_list(Type)}
                 ], integer_to_list(Len)),
-            couch_doc:att_foldl(Att,
-                    fun(BinSegment, _) -> send(Resp, BinSegment) end,[])
+            couch_doc:att_foldl(
+                Att,
+                fun(BinSegment, _) -> send(Resp, BinSegment) end,
+                {ok, Resp} % Seed in case of 0 byte attachment.
+            )
         end)
     end;
 
