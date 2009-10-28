@@ -262,6 +262,7 @@ reader_loop(ReaderServer, Source, MissingRevsServer) ->
 
 maybe_reopen_db(#db{update_seq=OldSeq} = Db, HighSeq) when HighSeq > OldSeq ->
     {ok, NewDb} = couch_db:open(Db#db.name, [{user_ctx, Db#db.user_ctx}]),
+    couch_db:close(Db),
     NewDb;
 maybe_reopen_db(Db, _HighSeq) ->
     Db.
