@@ -890,7 +890,7 @@ couch_doc_open(Db, DocId, Rev, Options) ->
           {ok, [{ok, Doc}]} ->
               Doc;
           {ok, [{{not_found, missing}, Rev}]} ->
-              throw(not_found);
+              throw({not_found, missing});
           {ok, [Else]} ->
               throw(Else)
       end
