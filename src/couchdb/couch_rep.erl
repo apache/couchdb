@@ -486,7 +486,7 @@ do_checkpoint(State) ->
     {SrcInstanceStartTime, TgtInstanceStartTime} ->
         ?LOG_INFO("recording a checkpoint for ~s -> ~s at source update_seq ~p",
             [dbname(Source), dbname(Target), NewSeqNum]),
-        SessionId = couch_uuids:random(),
+        SessionId = couch_util:new_uuid(),
         NewHistoryEntry = {[
             {<<"session_id">>, SessionId},
             {<<"start_time">>, list_to_binary(ReplicationStartTime)},
