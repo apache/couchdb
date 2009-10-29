@@ -19,7 +19,6 @@
 %% @see couch_config
 
 -module(couch_config_writer).
--include("couch_db.hrl").
 
 -export([save_to_file/2]).
 
@@ -27,134 +26,54 @@
 %%           Config::{{Section::string(), Option::string()}, Value::string()},
 %%           File::filename()) -> ok
 %% @doc Saves a Section/Key/Value triple to the ini file File::filename()
-save_to_file({{Section, Option}, Value}, File) ->
-
-    ?LOG_DEBUG("saving to file '~s', Config: '~p'", [File, {{Section, Option}, Value}]),
-
-    % open file and create a list of lines
-    {ok, Stream} = file:read_file(File),
-    OldFileContents = binary_to_list(Stream),
+save_to_file({{Section, Key}, Value}, File) ->
+    {ok, OldFileContents} = file:read_file(File),
     Lines = re:split(OldFileContents, "\r\n|\n|\r|\032", [{return, list}]),
 
-    % prepare input variables
-    SectionName = "[" ++ Section ++ "]",
-    OptionList = Option,
+    SectionLine = "[" ++ Section ++ "]",
+    {ok, Pattern} = re:compile(["^(", Key, "\\s*=)|\\[[a-zA-Z0-9\_-]*\\]"]),
 
-    % produce the contents for the config file
-    NewFileContents =
-    case {NewFileContents2, DoneOptions} = save_loop({{SectionName, OptionList}, Value}, Lines, "", "", []) of
-        % we didn't change anything, that means we couldn't find a matching
-        % [ini section] in which case we just append a new one.
-        {OldFileContents, DoneOptions} ->
-            % but only if we haven't actually written anything.
-            case lists:member(OptionList, DoneOptions) of
-                true -> OldFileContents;
-                _ -> append_new_ini_section({{SectionName, OptionList}, Value}, OldFileContents)
-            end;
-        _ ->
-            NewFileContents2
-    end,
+    NewLines = process_file_lines(Lines, [], SectionLine, Pattern, Key, Value),
+    NewFileContents = reverse_and_add_newline(strip_empty_lines(NewLines), []),
+    ok = file:write_file(File, NewFileContents).
 
-    case file:write_file(File, list_to_binary(NewFileContents)) of
-        ok -> ok;
-        _Else -> throw({permissions_error, <<"Config file is not writeable.">>})
-    end,
-    ok.
 
-%% @doc Iterates over the lines of an ini file and replaces or adds a new
-%%      configuration directive.
-save_loop({{Section, Option}, Value}, [Line|Rest], OldCurrentSection, Contents, DoneOptions) ->
+process_file_lines([Section|Rest], SeenLines, Section, Pattern, Key, Value) ->
+    process_section_lines(Rest, [Section|SeenLines], Pattern, Key, Value);
 
-    % if we find a new [ini section] (Section), save that for reference
-    NewCurrentSection = parse_module(Line, OldCurrentSection),
-    % if the current Section is the one we want to change, try to match
-    % each line with the Option
-    NewContents =
-    case NewCurrentSection of
-    Section ->
-        case OldCurrentSection of
-        NewCurrentSection -> % we already were in [Section]
-            case lists:member(Option, DoneOptions) of
-            true -> % we already replaced Option, do nothing
-                DoneOptions2 = DoneOptions,
-                Line;
-            _ -> % we haven't written our Option yet
-                case parse_variable(Line, Option, Value) of
-                nomatch ->
-                    DoneOptions2 = DoneOptions,
-                    Line;
-                NewLine ->
-                    DoneOptions2 = [Option|DoneOptions],
-                    NewLine
-                end
-            end;
-        _ -> % we got into a new [section]
-            {NewLine, DoneOptions2} = append_var_to_section(
-                {{Section, Option}, Value},
-                Line,
-                OldCurrentSection,
-                DoneOptions),
-            NewLine
-        end;
-    _ -> % we are reading [NewCurrentSection]
-        {NewLine, DoneOptions2} = append_var_to_section(
-            {{Section, Option}, Value},
-            Line,
-            OldCurrentSection,
-            DoneOptions),
-        NewLine
-    end,
-    % clumsy way to only append a newline character if the line is not empty. We need this to
-    % avoid having a newline inserted at the top of the target file each time we save it.
-    Contents2 = case Contents of "" -> ""; _ -> Contents ++ "\n" end,
-    % go to next line
-    save_loop({{Section, Option}, Value}, Rest, NewCurrentSection, Contents2 ++ NewContents, DoneOptions2);
+process_file_lines([Line|Rest], SeenLines, Section, Pattern, Key, Value) ->
+    process_file_lines(Rest, [Line|SeenLines], Section, Pattern, Key, Value);
 
-save_loop({{Section, Option}, Value}, [], OldSection, NewFileContents, DoneOptions) ->
-    case lists:member(Option, DoneOptions) of
-        % append Deferred Option
-        false when Section == OldSection ->
-            {NewFileContents ++ "\n" ++ Option ++ " = " ++ Value ++ "\n", DoneOptions};
-        % we're out of new lines, just return the new file's contents
-        _ -> {NewFileContents, DoneOptions}
-    end.
+process_file_lines([], SeenLines, Section, _Pattern, Key, Value) ->
+    % Section wasn't found.  Append it with the option here.
+    [Key ++ " = " ++ Value, Section, "" | strip_empty_lines(SeenLines)].
 
-append_new_ini_section({{SectionName, Option}, Value}, OldFileContents) ->
-    OldFileContents ++ "\n" ++ SectionName ++ "\n" ++  Option ++ " = " ++ Value ++ "\n".
 
-append_var_to_section({{Section, Option}, Value}, Line, OldCurrentSection, DoneOptions) ->
-    case OldCurrentSection of
-        Section -> % append Option to Section
-            case lists:member(Option, DoneOptions) of
-            false ->
-                {Option ++ " = " ++ Value ++ "\n\n" ++ Line, [Option|DoneOptions]};
-            _ ->
-                {Line, DoneOptions}
-            end;
-        _ ->
-            {Line, DoneOptions}
-        end.
+process_section_lines([Line|Rest], SeenLines, Pattern, Key, Value) ->
+    case re:run(Line, Pattern, [{capture, all_but_first}]) of
+    nomatch -> % Found nothing interesting. Move on.
+        process_section_lines(Rest, [Line|SeenLines], Pattern, Key, Value);
+    {match, []} -> % Found another section. Append the option here.
+        lists:reverse(Rest) ++
+        [Line, "", Key ++ " = " ++ Value | strip_empty_lines(SeenLines)];
+    {match, _} -> % Found the option itself. Replace it.
+        lists:reverse(Rest) ++ [Key ++ " = " ++ Value | SeenLines]
+    end;
 
-%% @spec parse_module(Line::string(), OldSection::string()) -> string()
-%% @doc Tries to match a line against a pattern specifying a ini module or
-%%      section ("[Section]"). Returns OldSection if no match is found.
-parse_module(Line, OldSection) ->
-    case re:run(Line, "^\\[([a-zA-Z0-9\_-]*)\\]$", [{capture, first}]) of
-        nomatch ->
-            OldSection;
-        {match, [{Start, Length}]} ->
-            string:substr(Line, Start+1, Length)
-    end.
+process_section_lines([], SeenLines, _Pattern, Key, Value) ->
+    % Found end of file within the section. Append the option here.
+    [Key ++ " = " ++ Value | strip_empty_lines(SeenLines)].
 
-%% @spec parse_variable(Line::string(), Option::string(), Value::string()) ->
-%%         string() | nomatch
-%% @doc Tries to match a variable assignment in Line. Returns nomatch if the
-%%      Option is not found. Returns a new line composed of the Option and
-%%      Value otherwise.
-parse_variable(Line, Option, Value) ->
-    case re:run(Line, "^" ++ Option ++ "\s?=", [{capture, none}]) of
-        nomatch ->
-            nomatch;
-        match ->
-            Option ++ " = " ++ Value
-    end.
+
+reverse_and_add_newline([Line|Rest], Content) ->
+    reverse_and_add_newline(Rest, [Line, "\n", Content]);
+
+reverse_and_add_newline([], Content) ->
+    Content.
+
+
+strip_empty_lines(["" | Rest]) ->
+    strip_empty_lines(Rest);
+
+strip_empty_lines(All) ->
+    All.
