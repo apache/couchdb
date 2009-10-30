@@ -111,6 +111,16 @@
             "The database could not be compacted"
           );
         },
+        compactView: function(groupname, options) {
+          $.extend(options, {successStatus: 202});
+          ajax({
+              type: "POST", url: this.uri + "_compact/" + groupname,
+              data: "", processData: false
+            },
+            options,
+            "The view could not be compacted"
+          );
+        },
         create: function(options) {
           $.extend(options, {successStatus: 201});
           ajax({

@@ -37,7 +37,7 @@ specific language governing permissions and limitations under the License.
 
       $(function() {
         if (page.redirecting) return;
-        $("h1 strong").text(page.db.name);
+        $("h1 strong").html('<a href="?' + page.db.name + '">' + page.db.name + '</a>');
         var viewPath = page.viewName || "_all_docs";
         if (viewPath != "_temp_view" && viewPath != "_design_docs") {
           $("h1 a.raw").attr("href", "/" + encodeURIComponent(page.db.name) +
@@ -100,6 +100,7 @@ specific language governing permissions and limitations under the License.
         $("#toolbar button.add").click(page.newDocument);
         $("#toolbar button.compact").click(page.compactDatabase);
         $("#toolbar button.delete").click(page.deleteDatabase);
+        $("#toolbar button.compactview").click(page.compactView);
 
         $('#jumpto input').addPlaceholder("Document ID").suggest(function(text, callback) {
           page.db.allDocs({
@@ -146,6 +147,7 @@ specific language governing permissions and limitations under the License.
         <li><button class="add">New Document</button></li>
         <li><button class="compact">Compact Database…</button></li>
         <li><button class="delete">Delete Database…</button></li>
+        <li><button class="compactview" style="display: none">Compact View…</button></li>
       </ul>
 
       <div id="viewcode" class="collapsed" style="display: none">

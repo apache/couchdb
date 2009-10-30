@@ -138,6 +138,20 @@
         });
       }
 
+      this.compactView = function() {
+        var groupname = page.viewName.substring(8,
+            page.viewName.indexOf('/_view'));
+        $.showDialog("dialog/_compact_view.html", {
+          submit: function(data, callback) {
+            db.compactView(groupname, {
+              success: function(resp) {
+                callback();
+              }
+            });
+          }
+        });
+      }
+
       this.deleteDatabase = function() {
         $.showDialog("dialog/_delete_database.html", {
           submit: function(data, callback) {
@@ -638,6 +652,7 @@
             options.endkey = options.descending ? "_design" : "_design0";
             db.allDocs(options);
           } else {
+            $("button.compactview").show();
             $("#viewcode").show();
             var currentMapCode = $("#viewcode_map").val();
             var currentReduceCode = $.trim($("#viewcode_reduce").val()) || null;
