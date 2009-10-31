@@ -286,14 +286,14 @@ output_reduce_list(#httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Lang, ListSrc, 
         skip = SkipCount,
         group_level = GroupLevel
     } = QueryArgs,
-    % get the os process here
-    % pass it into the view fold with closures
-    {ok, QueryServer} = couch_query_servers:start_view_list(Lang, ListSrc),
     Headers = MReq:get(headers),
     Hlist = mochiweb_headers:to_list(Headers),
     Accept = proplists:get_value('Accept', Hlist),
     CurrentEtag = couch_httpd_view:view_group_etag(Group, Db, {Lang, ListSrc, Accept, UserCtx}),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
+        % get the os process here
+        % pass it into the view fold with closures
+        {ok, QueryServer} = couch_query_servers:start_view_list(Lang, ListSrc),
         StartListRespFun = make_reduce_start_resp_fun(QueryServer, Req, Db, CurrentEtag),
         SendListRowFun = make_reduce_send_row_fun(QueryServer, Db),
 
@@ -316,14 +316,14 @@ output_reduce_list(#httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Lang, ListSrc, 
         skip = SkipCount,
         group_level = GroupLevel
     } = QueryArgs,
-    % get the os process here
-    % pass it into the view fold with closures
-    {ok, QueryServer} = couch_query_servers:start_view_list(Lang, ListSrc),
     Headers = MReq:get(headers),
     Hlist = mochiweb_headers:to_list(Headers),
     Accept = proplists:get_value('Accept', Hlist),
     CurrentEtag = couch_httpd_view:view_group_etag(Group, Db, {Lang, ListSrc, Accept, UserCtx, Keys}),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
+        % get the os process here
+        % pass it into the view fold with closures
+        {ok, QueryServer} = couch_query_servers:start_view_list(Lang, ListSrc),
         StartListRespFun = make_reduce_start_resp_fun(QueryServer, Req, Db, CurrentEtag),
         SendListRowFun = make_reduce_send_row_fun(QueryServer, Db),
 
@@ -365,6 +365,7 @@ finish_list(Req, QueryServer, Etag, FoldResult, StartFun, TotalRows) ->
             [<<"end">>, Chunks] = couch_query_servers:render_list_tail(QueryServer),
             send_non_empty_chunk(Resp, ?b2l(?l2b(Chunks)))
     end,
+    couch_query_servers:stop_doc_map(QueryServer),
     last_chunk(Resp).
 
 
