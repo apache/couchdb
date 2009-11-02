@@ -375,7 +375,7 @@ log_request(#httpd{mochi_req=MochiReq,peer=Peer,method=Method}, Code) ->
         Peer,
         Method,
         MochiReq:get(raw_path),
-        Code
+        couch_util:to_integer(Code)
     ]).
 
 
