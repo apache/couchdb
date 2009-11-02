@@ -647,16 +647,18 @@ describe "query server that exits" do
     @qs.close
   end
 
-  describe "old style list" do
-    before(:each) do
-      @fun = functions["list-old-style"][LANGUAGE]
-      @qs.reset!
-      @qs.add_fun(@fun).should == true
-    end
-    it "should get a warning" do
-      resp = @qs.run(["list", {"foo"=>"bar"}, {"q" => "ok"}])
-      resp["error"].should == "render_error"
-      #resp["reason"].should include("the list API has changed")
+  if LANGUAGE == "js"
+    describe "old style list" do
+      before(:each) do
+        @fun = functions["list-old-style"][LANGUAGE]
+        @qs.reset!
+        @qs.add_fun(@fun).should == true
+      end
+      it "should get a warning" do
+        resp = @qs.run(["list", {"foo"=>"bar"}, {"q" => "ok"}])
+        resp["error"].should == "render_error"
+        resp["reason"].should include("the list API has changed")
+      end
     end
   end
 
