@@ -452,7 +452,7 @@ Tests are also available to be run individually like such:
     # Current time local 2009-09-26 23:47:44
     # Using etap version "0.3.4"
     1..39
-    ok 1  - Loaded: couch_batch_save
+    ok 1  - Loaded: couch_btree
     ...
 
 Cryptographic Software Notice

@@ -16,45 +16,30 @@ couchTests.batch_save = function(debug) {
   db.createDb();
   if (debug) debugger;
 
-  // commit should work fine with no batches
-  T(db.ensureFullCommit().ok);
-
-  // PUT a doc with ?batch=ok
-  T(db.save({_id:"0",a:1,b:1},  {batch : "ok"}).ok);
-
-  // test that response is 202 Accepted
-  T(db.last_req.status == 202);
-
-  T(db.allDocs().total_rows == 0);
-
-  restartServer();
-
-  // lost the updates
-  T(db.allDocs().total_rows == 0);
-
-  T(db.save({_id:"0",a:1,b:1},  {batch : "ok"}).ok);
-  T(db.save({_id:"1",a:1,b:1},  {batch : "ok"}).ok);
-  T(db.save({_id:"2",a:1,b:1},  {batch : "ok"}).ok);
-
-  T(db.ensureFullCommit().ok);
-  T(db.allDocs().total_rows == 3);
+  var i
+  for(i=0; i < 100; i++) {
+    T(db.save({_id:i.toString(),a:i,b:i},  {batch : "ok"}).ok);
+    
+    // test that response is 202 Accepted
+    T(db.last_req.status == 202);
+  }
+  
+  for(i=0; i < 100; i++) {
+    // attempt to save the same document a bunch of times
+    T(db.save({_id:"foo",a:i,b:i},  {batch : "ok"}).ok);
+    
+    // test that response is 202 Accepted
+    T(db.last_req.status == 202);
+  }
+  
+  while(db.allDocs().total_rows != 101){};
 
   // repeat the tests for POST
-  var resp = db.request("POST", db.uri + "?batch=ok", {body: JSON.stringify({a:1})});
-  T(JSON.parse(resp.responseText).ok);
-
-  // test that response is 202 Accepted
-  T(resp.status == 202);
-
-  T(db.allDocs().total_rows == 3);
-  // restartServer();
-  // // lost the POSTed doc
-  // T(db.allDocs().total_rows == 3);
-
-  var resp = db.request("POST", db.uri + "?batch=ok", {body: JSON.stringify({a:1})});
-  T(JSON.parse(resp.responseText).ok);
-
-  T(db.ensureFullCommit().ok);
-  T(db.allDocs().total_rows == 5);
+  for(i=0; i < 100; i++) {
+    var resp = db.request("POST", db.uri + "?batch=ok", {body: JSON.stringify({a:1})});
+    T(JSON.parse(resp.responseText).ok);
+  }
+  
+  while(db.allDocs().total_rows != 201){};
 
 };

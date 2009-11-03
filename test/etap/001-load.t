@@ -21,8 +21,6 @@ main(_) ->
     code:add_pathz("src/couchdb"),
     etap:plan(39),
     Modules = [
-        couch_batch_save,
-        couch_batch_save_sup,
         couch_btree,
         couch_config,
         couch_config_writer,
