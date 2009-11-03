@@ -86,7 +86,7 @@ get_json(Key, Time) ->
     to_json_term(?MODULE:get(Key, Time)).
 
 collect_sample() ->
-    gen_server:call(?MODULE, collect_sample).
+    gen_server:call(?MODULE, collect_sample, infinity).
 
 
 init(StatDescsFileName) ->
@@ -115,13 +115,15 @@ init(StatDescsFileName) ->
     
     Rate = list_to_integer(couch_config:get("stats", "rate", "1000")),
     % TODO: Add timer_start to kernel start options.
-    timer:apply_interval(Rate, ?MODULE, collect_sample, []).
+    {ok, TRef} = timer:apply_after(Rate, ?MODULE, collect_sample, []),
+    {ok, {TRef, Rate}}.
     
-terminate(_Reason, TRef) ->
+terminate(_Reason, {TRef, _Rate}) ->
     timer:cancel(TRef),
     ok.
 
-handle_call(collect_sample, _, State) ->
+handle_call(collect_sample, _, {_TRef, SampleInterval}) ->
+    {ok, TRef} = timer:apply_after(SampleInterval, ?MODULE, collect_sample, []),
     % Gather new stats values to add.
     Incs = lists:map(fun({Key, Value}) ->
         {Key, {incremental, Value}}
@@ -151,7 +153,7 @@ handle_call(collect_sample, _, State) ->
         end,
         ets:insert(?MODULE, {{Key, Rate}, NewAgg})
     end, ets:tab2list(?MODULE)),
-    {reply, ok, State}.
+    {reply, ok, {TRef, SampleInterval}}.
 
 handle_cast(stop, State) ->
     {stop, normal, State}.
