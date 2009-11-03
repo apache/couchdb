@@ -122,7 +122,8 @@ terminate(_Reason, {TRef, _Rate}) ->
     timer:cancel(TRef),
     ok.
 
-handle_call(collect_sample, _, {_TRef, SampleInterval}) ->
+handle_call(collect_sample, _, {OldTRef, SampleInterval}) ->
+    timer:cancel(OldTRef),
     {ok, TRef} = timer:apply_after(SampleInterval, ?MODULE, collect_sample, []),
     % Gather new stats values to add.
     Incs = lists:map(fun({Key, Value}) ->
