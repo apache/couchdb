@@ -3,8 +3,6 @@
     {vsn, "@version@"},
     {modules, [@modules@]},
     {registered, [
-        couch_batch_save,
-        couch_batch_save_sup,
         couch_config,
         couch_db_update,
         couch_db_update_notifier_sup,

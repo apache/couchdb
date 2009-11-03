@@ -586,24 +586,45 @@ set_commit_option(Options) ->
         [full_commit|Options]
     end.
 
+collect_results(UpdatePid, MRef, ResultsAcc) ->
+    receive
+    {result, UpdatePid, Result} ->
+        collect_results(UpdatePid, MRef, [Result | ResultsAcc]);
+    {done, UpdatePid} ->
+        {ok, ResultsAcc};
+    {retry, UpdatePid} ->
+        retry;
+    {'DOWN', MRef, _, _, Reason} ->
+        exit(Reason)
+    end.
+
 write_and_commit(#db{update_pid=UpdatePid, user_ctx=Ctx}=Db, DocBuckets,
         NonRepDocs, Options0) ->
     Options = set_commit_option(Options0),
-    case gen_server:call(UpdatePid, 
-            {update_docs, DocBuckets, NonRepDocs, Options}, infinity) of
-    {ok, Results} -> {ok, Results};
-    retry ->
-        % This can happen if the db file we wrote to was swapped out by
-        % compaction. Retry by reopening the db and writing to the current file
-        {ok, Db2} = open_ref_counted(Db#db.main_pid, Ctx),
-        DocBuckets2 = [[doc_flush_atts(Doc, Db2#db.fd) || Doc <- Bucket] || Bucket <- DocBuckets],
-        % We only retry once
-        close(Db2),
-        case gen_server:call(UpdatePid, {update_docs, DocBuckets2, NonRepDocs, Options}, infinity) of
+    MergeConflicts = lists:member(merge_conflicts, Options),
+    FullCommit = lists:member(full_commit, Options),
+    MRef = erlang:monitor(process, UpdatePid),
+    try
+        UpdatePid ! {update_docs, self(), DocBuckets, NonRepDocs, MergeConflicts, FullCommit},
+        case collect_results(UpdatePid, MRef, []) of
         {ok, Results} -> {ok, Results};
-        retry -> throw({update_error, compaction_retry})
+        retry ->
+            % This can happen if the db file we wrote to was swapped out by
+            % compaction. Retry by reopening the db and writing to the current file
+            {ok, Db2} = open_ref_counted(Db#db.main_pid, Ctx),
+            DocBuckets2 = [[doc_flush_atts(Doc, Db2#db.fd) || Doc <- Bucket] || Bucket <- DocBuckets],
+            % We only retry once
+            close(Db2),
+            UpdatePid ! {update_docs, self(), DocBuckets2, NonRepDocs, MergeConflicts, FullCommit},
+            case collect_results(UpdatePid, MRef, []) of
+            {ok, Results} -> {ok, Results};
+            retry -> throw({update_error, compaction_retry})
+            end
         end
+    after
+        erlang:demonitor(MRef, [flush])
     end.
+
 
 set_new_att_revpos(#doc{revs={RevPos,_Revs},atts=Atts}=Doc) ->
     Doc#doc{atts= lists:map(fun(#att{data={_Fd,_Sp}}=Att) ->

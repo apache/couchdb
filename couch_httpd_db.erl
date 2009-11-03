@@ -349,9 +349,15 @@ db_req(#httpd{method='POST',path_parts=[DbName]}=Req, Db) ->
     DocId = Doc2#doc.id,
     case couch_httpd:qs_value(Req, "batch") of
     "ok" ->
-        % batch
-        ok = couch_batch_save:eventually_save_doc(
-            Db#db.name, Doc2, Db#db.user_ctx),
+        % async_batching
+        spawn(fun() ->
+                case catch(couch_db:update_doc(Db, Doc2, [])) of
+                {ok, _} -> ok;
+                Error ->
+                    ?LOG_INFO("Batch doc error (~s): ~p",[DocId, Error])
+                end
+            end),
+            
         send_json(Req, 202, [], {[
             {ok, true},
             {id, DocId}
@@ -378,7 +384,6 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_ensure_full_commit">>]}=Req, Db) -
     {ok, StartTime} =
     case couch_httpd:qs_value(Req, "seq") of
     undefined ->
-        committed = couch_batch_save:commit_now(Db#db.name, Db#db.user_ctx),
         couch_db:ensure_full_commit(Db);
     RequiredStr ->
         RequiredSeq = list_to_integer(RequiredStr),
@@ -749,7 +754,14 @@ db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
     "ok" ->
         % batch
         Doc = couch_doc_from_req(Req, DocId, Json),
-        ok = couch_batch_save:eventually_save_doc(Db#db.name, Doc, Db#db.user_ctx),
+        
+        spawn(fun() ->
+                case catch(couch_db:update_doc(Db, Doc, [])) of
+                {ok, _} -> ok;
+                Error ->
+                    ?LOG_INFO("Batch doc error (~s): ~p",[DocId, Error])
+                end
+            end),
         send_json(Req, 202, [], {[
             {ok, true},
             {id, DocId}
