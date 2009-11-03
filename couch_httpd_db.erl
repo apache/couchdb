@@ -708,9 +708,14 @@ db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
         throw({bad_ctype, <<"Invalid Content-Type header for form upload">>})
     end,
     Form = couch_httpd:parse_form(Req),
-    Rev = couch_doc:parse_rev(list_to_binary(proplists:get_value("_rev", Form))),
-    {ok, [{ok, Doc}]} = couch_db:open_doc_revs(Db, DocId, [Rev], []),
-
+    case proplists:is_defined("_doc", Form) of
+    true ->
+        Json = ?JSON_DECODE(proplists:get_value("_doc", Form)),
+        Doc = couch_doc_from_req(Req, DocId, Json);
+    false ->
+        Rev = couch_doc:parse_rev(list_to_binary(proplists:get_value("_rev", Form))),
+        {ok, [{ok, Doc}]} = couch_db:open_doc_revs(Db, DocId, [Rev], [])
+    end,
     UpdatedAtts = [
         #att{name=validate_attachment_name(Name),
             type=list_to_binary(ContentType),
