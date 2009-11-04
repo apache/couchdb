@@ -7,6 +7,11 @@ For details about backwards incompatible changes, please see:
 
 Each release section notes when backwards incompatible changes have been made.
 
+Version 0.9.2
+-------------
+
+ * Fix replication with 0.10+ servers initiated by an 0.9 server.
+
 Version 0.9.1
 -------------
 

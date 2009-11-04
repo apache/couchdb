@@ -552,7 +552,7 @@ do_http_request(Url, Action, _Headers, _JsonBody, 0) ->
     ?LOG_ERROR("couch_rep HTTP ~p request failed after 10 retries: ~s", 
         [Action, Url]),
     exit({http_request_failed, Url});
-do_http_request(Url, Action, Headers, JsonBody, Retries) ->
+do_http_request(Url, Action, Headers0, JsonBody, Retries) ->
     ?LOG_DEBUG("couch_rep HTTP ~p request: ~s", [Action, Url]),
     Body =
     case JsonBody of
@@ -560,6 +560,12 @@ do_http_request(Url, Action, Headers, JsonBody, Retries) ->
         <<>>;
     _ ->
         iolist_to_binary(?JSON_ENCODE(JsonBody))
+    end,
+    Headers = case proplists:get_value("User-Agent", Headers0) of
+    undefined ->
+        [{"User-Agent","CouchDB/"++couch_server:get_version()} | Headers0];
+    _ ->
+        Headers0
     end,
     Options = case Action of
         get -> [];
@@ -631,7 +637,7 @@ enum_docs_since(Pid, DbSource, DbTarget, {StartSeq, RevsCount}) ->
             
 get_db_info(#http_db{uri=DbUrl, headers=Headers}) ->
     {DbProps} = do_http_request(DbUrl, get, Headers),
-    {ok, [{list_to_existing_atom(?b2l(K)), V} || {K,V} <- DbProps]};
+    {ok, [{list_to_atom(?b2l(K)), V} || {K,V} <- DbProps]};
 get_db_info(Db) ->
     couch_db:get_db_info(Db).
 
