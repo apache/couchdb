@@ -24,7 +24,8 @@
 
 -record(state, {
     aggregates = [],
-    descriptions = []
+    descriptions = [],
+    timer_refs = []
 }).
 
 -define(COLLECTOR, couch_stats_collector).
@@ -49,10 +50,10 @@ get_json(Key, Time) ->
     gen_server:call(?MODULE, {get_json, Key, Time}).
 
 time_passed() ->
-    gen_server:call(?MODULE, time_passed).
+    gen_server:call(?MODULE, time_passed, infinity).
 
 clear_aggregates(Time) ->
-    gen_server:call(?MODULE, {clear_aggregates, Time}).
+    gen_server:call(?MODULE, {clear_aggregates, Time}, infinity).
 
 all() ->
     gen_server:call(?MODULE, all).
@@ -61,9 +62,9 @@ all() ->
 
 init(_) ->
     ets:new(?MODULE, [named_table, set, protected]),
-    init_timers(),
+    TimerRefs = init_timers(),
     init_descriptions(),
-    {ok, #state{}}.
+    {ok, #state{timer_refs = TimerRefs}}.
 
 handle_call({get, Key}, _, State) ->
     Value = get_aggregate(Key, State),
@@ -82,7 +83,7 @@ handle_call({get_json, Key, Time}, _, State) ->
     {reply, Value, State};
 
 handle_call(time_passed, _, OldState) ->
-
+    NewTimerRefs = update_timer(time_passed, OldState#state.timer_refs),
     % the foldls below could probably be refactored into a less code-duping form
 
     % update aggregates on incremental counters
@@ -99,7 +100,7 @@ handle_call(time_passed, _, OldState) ->
         update_aggregates_loop(Key, Value, State, absolute)
     end, NextState, ?COLLECTOR:all(absolute)),
 
-    {reply, ok, NewState};
+    {reply, ok, NewState#state{timer_refs = NewTimerRefs}};
 
 handle_call({clear_aggregates, Time}, _, State) ->
     {reply, ok, do_clear_aggregates(Time, State)};
@@ -130,7 +131,8 @@ handle_call(stop, _, State) ->
 % ]
 
 %% clear the aggregats record for a specific Time = 60 | 300 | 900
-do_clear_aggregates(Time, #state{aggregates=Stats}) ->
+do_clear_aggregates(Time, #state{aggregates=Stats, timer_refs=Refs}) ->
+    NewTimerRefs = update_timer(Time, Refs),
     NewStats = lists:map(fun({Key, TimesProplist}) ->
         {Key, case proplists:lookup(Time, TimesProplist) of
             % do have stats for this key, if we don't, return Stat unmodified
@@ -141,7 +143,7 @@ do_clear_aggregates(Time, #state{aggregates=Stats}) ->
                 [{Time, #aggregates{}} | proplists:delete(Time, TimesProplist)]
         end}
     end, Stats),
-    #state{aggregates=NewStats}.
+    #state{aggregates=NewStats, timer_refs=NewTimerRefs}.
 
 get_aggregate(Key, State) ->
     %% default Time is 0, which is when CouchDB started
@@ -354,11 +356,22 @@ init_timers() ->
     % too and restarted by the supervision tree, all stats (for the last
     % fifteen minutes) are gone.
 
-    {ok, _} = timer:apply_interval(1000, ?MODULE, time_passed, []),
-    {ok, _} = timer:apply_interval(60000, ?MODULE, clear_aggregates, ['60']),
-    {ok, _} = timer:apply_interval(300000, ?MODULE, clear_aggregates, ['300']),
-    {ok, _} = timer:apply_interval(900000, ?MODULE, clear_aggregates, ['900']).
+    {ok, A} = timer:apply_after(1000, ?MODULE, time_passed, []),
+    {ok, B} = timer:apply_after(60000, ?MODULE, clear_aggregates, ['60']),
+    {ok, C} = timer:apply_after(300000, ?MODULE, clear_aggregates, ['300']),
+    {ok, D} = timer:apply_after(900000, ?MODULE, clear_aggregates, ['900']),
+    [{time_passed,A}, {'60',B}, {'300',C}, {'900',D}].
 
+update_timer(Type, Refs) ->
+    timer:cancel(proplists:get_value(Type, Refs)),
+    {ok,NewRef} =
+    if Type == time_passed ->
+        timer:apply_after(1000, ?MODULE, time_passed, []);
+    true ->
+        IntType = list_to_integer(atom_to_list(Type)),
+        timer:apply_after(1000*IntType, ?MODULE, clear_aggregates, [Type])
+    end,
+    [{Type,NewRef} | proplists:delete(Type, Refs)].
 
 % Unused gen_server behaviour API functions that we need to declare.
 
