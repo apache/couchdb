@@ -6,6 +6,36 @@ Version 0.11.0
 
 This version has not been released yet.
 
+Build and System Integration
+
+ * Added support for building a Windows installer as part of 'make dist'.
+ * Bug fix for building couch.app's module list.
+
+View Server
+
+ * Added optional 'raw' binary collation for faster view builds where Unicode
+   collation is not important.
+ * Improved view index build time by reducing ICU collation callouts.
+ * Improved view information objects.
+ * Bug fix for partial updates during view builds.
+
+Replication
+
+ * Added option to implicitly create replication target databases.
+
+Storage System
+
+ * Adds batching of multiple updating requests, to improve throughput with many 
+   writers. Removed the now redundant couch_batch_save module.
+
+Runtime Statistics
+
+ * Fixed a problem with statistics timers and system sleep.
+
+Futon
+
+ * Added a button for view compaction.
+
 Version 0.10.0
 --------------
 
