@@ -9,6 +9,15 @@ This version has not been released yet.
 Version 0.10.0
 --------------
 
+Storage Format
+
+ * Add move headers with checksums to the end of database files for extra robust
+   storage and faster storage.
+
+View Server
+
+ * Added native Erlang views for high-performance applications.
+
 Build and System Integration:
 
  * Changed `couchdb` script configuration options.
