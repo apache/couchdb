@@ -241,5 +241,5 @@ couchTests.basics = function(debug) {
   TEquals(400, xhr.status, "should return a bad request");
   result = JSON.parse(xhr.responseText);
   TEquals("bad_request", result.error);
-  TEquals("You tried to DELETE a database with a ?=rev parameter. Did mean to DELETE a document instead?", result.reason);
+  TEquals("You tried to DELETE a database with a ?=rev parameter. Did you mean to DELETE a document instead?", result.reason);
 };

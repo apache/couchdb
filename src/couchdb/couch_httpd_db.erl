@@ -45,7 +45,7 @@ handle_request(#httpd{path_parts=[DbName|RestParts],method=Method,
             false -> delete_db_req(Req, DbName);
             _Rev -> throw({bad_request,
                 "You tried to DELETE a database with a ?=rev parameter. "
-                ++ "Did mean to DELETE a document instead?"})
+                ++ "Did you mean to DELETE a document instead?"})
         end;
     {_, []} ->
         do_db_req(Req, fun db_req/2);
