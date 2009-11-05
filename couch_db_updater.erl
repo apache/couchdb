@@ -180,35 +180,6 @@ handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
     end.
 
 
-merge_updates([], RestB, AccOutGroups) ->
-    lists:reverse(AccOutGroups, RestB);
-merge_updates(RestA, [], AccOutGroups) ->
-    lists:reverse(AccOutGroups, RestA);
-merge_updates([[{_, #doc{id=IdA}}|_]=GroupA | RestA],
-        [[{_, #doc{id=IdB}}|_]=GroupB | RestB], AccOutGroups) ->
-    if IdA == IdB ->
-        merge_updates(RestA, RestB, [GroupA ++ GroupB | AccOutGroups]);
-    IdA < IdB ->
-        merge_updates(RestA, [GroupB | RestB], [GroupA | AccOutGroups]);
-    true ->
-        merge_updates([GroupA | RestA], RestB, [GroupB | AccOutGroups])
-    end.
-
-collect_updates(GroupedDocsAcc, ClientsAcc, MergeConflicts, FullCommit) ->
-    receive
-        % only collect updates with the same MergeConflicts flag and without
-        % local docs. Makes it easier to avoid multiple local doc updaters.
-        {update_docs, Client, GroupedDocs, [], MergeConflicts, FullCommit2} ->
-            GroupedDocs2 = [[{Client, Doc} || Doc <- DocGroup]
-                    || DocGroup <- GroupedDocs],
-            GroupedDocsAcc2 = 
-                merge_updates(GroupedDocsAcc, GroupedDocs2, []),
-            collect_updates(GroupedDocsAcc2, [Client | ClientsAcc],
-                    MergeConflicts, (FullCommit or FullCommit2))
-    after 0 ->
-        {GroupedDocsAcc, ClientsAcc, FullCommit}
-    end.
-
 handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts, 
         FullCommit}, Db) ->
     GroupedDocs2 = [[{Client, D} || D <- DocGroup] || DocGroup <- GroupedDocs],
@@ -241,6 +212,38 @@ handle_info(delayed_commit, Db) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+
+merge_updates([], RestB, AccOutGroups) ->
+    lists:reverse(AccOutGroups, RestB);
+merge_updates(RestA, [], AccOutGroups) ->
+    lists:reverse(AccOutGroups, RestA);
+merge_updates([[{_, #doc{id=IdA}}|_]=GroupA | RestA],
+        [[{_, #doc{id=IdB}}|_]=GroupB | RestB], AccOutGroups) ->
+    if IdA == IdB ->
+        merge_updates(RestA, RestB, [GroupA ++ GroupB | AccOutGroups]);
+    IdA < IdB ->
+        merge_updates(RestA, [GroupB | RestB], [GroupA | AccOutGroups]);
+    true ->
+        merge_updates([GroupA | RestA], RestB, [GroupB | AccOutGroups])
+    end.
+
+collect_updates(GroupedDocsAcc, ClientsAcc, MergeConflicts, FullCommit) ->
+    receive
+        % Only collect updates with the same MergeConflicts flag and without
+        % local docs. It's easier to just avoid multiple _local doc
+        % updaters than deal with their possible conflicts, and local docs
+        % writes are relatively rare. Can be optmized later if really needed.
+        {update_docs, Client, GroupedDocs, [], MergeConflicts, FullCommit2} ->
+            GroupedDocs2 = [[{Client, Doc} || Doc <- DocGroup]
+                    || DocGroup <- GroupedDocs],
+            GroupedDocsAcc2 = 
+                merge_updates(GroupedDocsAcc, GroupedDocs2, []),
+            collect_updates(GroupedDocsAcc2, [Client | ClientsAcc],
+                    MergeConflicts, (FullCommit or FullCommit2))
+    after 0 ->
+        {GroupedDocsAcc, ClientsAcc, FullCommit}
+    end.
 
 
 btree_by_seq_split(#doc_info{id=Id, high_seq=KeySeq, revs=Revs}) ->
