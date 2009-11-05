@@ -235,4 +235,11 @@ couchTests.basics = function(debug) {
   result = JSON.parse(xhr.responseText);
   T(result.error == "bad_request");
   T(result.reason == "`keys` member must be a array.");
+
+  // oops, the doc id got lost in code nirwana
+  xhr = CouchDB.request("DELETE", "/test_suite_db/?rev=foobarbaz");
+  TEquals(400, xhr.status, "should return a bad request");
+  result = JSON.parse(xhr.responseText);
+  TEquals("bad_request", result.error);
+  TEquals("You tried to DELETE a database with a ?=rev parameter. Did mean to DELETE a document instead?", result.reason);
 };
