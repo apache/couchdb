@@ -1,6 +1,21 @@
 Apache CouchDB CHANGES
 ======================
 
+Version 0.10.1
+--------------
+
+Replicator
+
+ * Stability enhancements regarding redirects, timeouts, OAuth.
+
+Query Server
+
+ * Avoid process leaks
+ * Allow list and view to span languages
+
+Stats
+ * Eliminate new process flood on system wake
+
 Version 0.10.0
 --------------
 
