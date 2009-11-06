@@ -10,9 +10,6 @@ Each release section notes when backwards incompatible changes have been made.
 Version 0.10.1
 --------------
 
-This release is a maintenance release including bugfixes and other miscellaneous
-improvements.
-
  * Fixed a problem with statistics timers and system sleep.
  * Fixed an edge case for HTTP redirects during replication.
  * Fixed HTTP timeout handling for replication.
