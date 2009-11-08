@@ -19,7 +19,7 @@
 main(_) ->
     code:add_patha("src/etap"),
     code:add_pathz("src/couchdb"),
-    etap:plan(39),
+    etap:plan(37),
     Modules = [
         couch_btree,
         couch_config,

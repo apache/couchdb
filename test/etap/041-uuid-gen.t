@@ -41,7 +41,7 @@ main(_) ->
     code:add_patha("src/etap"),
     code:add_pathz("src/couchdb"),
     application:start(crypto),
-    etap:plan(unknown),
+    etap:plan(6),
 
     case (catch test()) of
         ok ->

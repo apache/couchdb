@@ -16,7 +16,7 @@
 main(_) ->
     code:add_patha("src/etap"),
     code:add_pathz("src/couchdb"),
-    etap:plan(unknown),
+    etap:plan(17),
     case (catch test()) of
         ok ->
             etap:end_tests();
