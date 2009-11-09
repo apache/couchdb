@@ -14,16 +14,16 @@
 % the License.
 
 default_config() ->
-    "etc/couchdb/default_dev.ini".
+    test_util:build_file("etc/couchdb/default_dev.ini").
 
 local_config_1() ->
-    "test/etap/081-config-override.1.ini".
+    test_util:source_file("test/etap/081-config-override.1.ini").
 
 local_config_2() ->
-    "test/etap/081-config-override.2.ini".
+    test_util:source_file("test/etap/081-config-override.2.ini").
 
 local_config_write() ->
-    "test/etap/temp.081".
+    test_util:build_file("test/etap/temp.081").
 
 % Run tests and wait for the config gen_server to shutdown.
 run_tests(IniFiles, Tests) ->
@@ -39,8 +39,7 @@ run_tests(IniFiles, Tests) ->
     end.
 
 main(_) ->
-    code:add_patha("src/etap"),
-    code:add_pathz("src/couchdb"),
+    test_util:init_code_path(),
     etap:plan(17),
 
     case (catch test()) of

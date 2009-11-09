@@ -18,8 +18,7 @@ filename() -> "./test/etap/temp.021".
 rows() -> 1000.
 
 main(_) ->
-    code:add_patha("src/etap"),
-    code:add_pathz("src/couchdb"),
+    test_util:init_code_path(),
     etap:plan(8),
     case (catch test()) of
         ok ->

@@ -14,13 +14,13 @@
 % the License.
 
 default_config() ->
-    "etc/couchdb/default_dev.ini".
+    test_util:build_file("etc/couchdb/default_dev.ini").
 
 seq_alg_config() ->
-    "test/etap/041-uuid-gen-seq.ini".
+    test_util:source_file("test/etap/041-uuid-gen-seq.ini").
 
 utc_alg_config() ->
-    "test/etap/041-uuid-gen-utc.ini".
+    test_util:source_file("test/etap/041-uuid-gen-utc.ini").
 
 % Run tests and wait for the gen_servers to shutdown
 run_test(IniFiles, Test) ->
@@ -38,8 +38,7 @@ run_test(IniFiles, Test) ->
     end.
 
 main(_) ->
-    code:add_patha("src/etap"),
-    code:add_pathz("src/couchdb"),
+    test_util:init_code_path(),
     application:start(crypto),
     etap:plan(6),
 

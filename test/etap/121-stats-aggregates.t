@@ -13,9 +13,14 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
+ini_file() ->
+    test_util:source_file("test/etap/121-stats-aggregates.ini").
+
+cfg_file() ->
+    test_util:source_file("test/etap/121-stats-aggregates.cfg").
+
 main(_) ->
-    code:add_patha("src/etap"),
-    code:add_pathz("src/couchdb"),
+    test_util:init_code_path(),
     etap:plan(17),
     case (catch test()) of
         ok ->
@@ -27,9 +32,9 @@ main(_) ->
     ok.
 
 test() ->
-    couch_config:start_link(["test/etap/121-stats-aggregates.ini"]),
+    couch_config:start_link([ini_file()]),
     couch_stats_collector:start(),
-    couch_stats_aggregator:start("test/etap/121-stats-aggregates.cfg"),
+    couch_stats_aggregator:start(cfg_file()),
     ok = test_all_empty(),
     ok = test_get_empty(),
     ok = test_count_stats(),

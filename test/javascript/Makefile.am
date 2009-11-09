@@ -10,5 +10,6 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
-SUBDIRS = etap javascript view_server
-
+EXTRA_DIST = \
+	runner.sh \
+	test.js
