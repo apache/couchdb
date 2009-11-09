@@ -10,7 +10,7 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
-check_SCRIPTS = run
+noinst_SCRIPTS = run
 noinst_DATA = test_util.beam
 
 %.beam: %.erl

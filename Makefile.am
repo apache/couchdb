@@ -41,7 +41,7 @@ check: dev
 
 cover: dev
 	rm -f cover/*.coverdata
-	COVER=1 COVER_BIN=./src/couchdb/ prove test/etap/*.t
+	COVER=1 COVER_BIN=./src/couchdb/ $(top_builddir)/test/etap/run
 	SRC=./src/couchdb/ \
 	    $(ERL) -noshell \
 		-pa src/etap \
