@@ -13,10 +13,17 @@
 couchlibdir = $(localerlanglibdir)/couch-$(version)
 couchprivdir = $(couchlibdir)/priv
 
-EXTRA_DIST = couchspawnkillable.sh stat_descriptions.cfg
+EXTRA_DIST = \
+	couchspawnkillable.sh \
+	stat_descriptions.cfg.in
+
+CLEANFILES = stat_descriptions.cfg
 
 couchpriv_DATA = stat_descriptions.cfg
 couchpriv_PROGRAMS = couchspawnkillable
+
+%.cfg: %.cfg.in
+	cp $< $@
 
 if WINDOWS
 couchspawnkillable_SOURCES = couchspawnkillable_win.c
