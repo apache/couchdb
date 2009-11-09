@@ -39,8 +39,8 @@
 %% @type response(). A mochiweb_response parameterized module instance.
 %% @type ioheaders() = headers() | [{key(), value()}].
 
-% 10 second default idle timeout
--define(IDLE_TIMEOUT, 10000).
+% 5 minute default idle timeout
+-define(IDLE_TIMEOUT, 300000).
 
 % Maximum recv_body() length of 1MB
 -define(MAX_RECV_BODY, (1024*1024)).
@@ -451,14 +451,11 @@ stream_chunked_body(MaxChunkSize, Fun, FunState) ->
 
 stream_unchunked_body(0, _MaxChunkSize, Fun, FunState) ->
     Fun({0, <<>>}, FunState);
-stream_unchunked_body(Length, MaxChunkSize, Fun, FunState) when Length > MaxChunkSize ->
-    Bin = recv(MaxChunkSize),
-    NewState = Fun({MaxChunkSize, Bin}, FunState),
-    stream_unchunked_body(Length - MaxChunkSize, MaxChunkSize, Fun, NewState);
-stream_unchunked_body(Length, MaxChunkSize, Fun, FunState) ->
-    Bin = recv(Length),
-    NewState = Fun({Length, Bin}, FunState),
-    stream_unchunked_body(0, MaxChunkSize, Fun, NewState).
+stream_unchunked_body(Length, _, Fun, FunState) when Length > 0 ->
+    Bin = recv(0),
+    BinSize = size(Bin),
+    NewState = Fun({BinSize, Bin}, FunState),
+    stream_unchunked_body(Length - BinSize, 0, Fun, NewState).
 
 
 %% @spec read_chunk_length() -> integer()
