@@ -23,5 +23,5 @@ if test $# -gt 0; then
         shift
     done
 else
-    prove -v $SRCDIR/test/etap/*.t
+    prove $SRCDIR/test/etap/*.t
 fi
