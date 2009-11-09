@@ -57,6 +57,7 @@ src/couchdb/stylesheet.css
 src/couchdb/priv/.deps/
 src/couchdb/priv/couchspawnkillable
 test/local.ini
+test/etap/test_util.erl
 share/server/main.js
 
 # for make dev
