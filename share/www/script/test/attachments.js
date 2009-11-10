@@ -237,4 +237,11 @@ couchTests.attachments= function(debug) {
     headers:{"Content-Type":"text/plain;charset=utf-8"}
   });
   TEquals(201, xhr.status, "should send 201 Accepted");
+
+  // implicit doc creation allows creating docs with a reserved id. COUCHDB-565
+  var xhr = CouchDB.request("PUT", "/test_suite_db/_nonexistant/attachment.txt", {
+    headers: {"Content-Type":"text/plain;charset=utf-8"},
+    body: "THIS IS AN ATTACHMENT. BOOYA!"
+  });
+  TEquals(400, xhr.status, "should return error code 400 Bad Request");
 };
