@@ -39,12 +39,14 @@
     conn = nil
 }).
 
+config_files() ->
+    lists:map(fun test_util:build_file/1, [
+        "etc/couchdb/default_dev.ini",
+        "etc/couchdb/local_dev.ini"
+    ]).
+
 main(_) ->
-    code:add_patha("src/etap"),
-    code:add_pathz("src/couchdb"),
-    code:add_pathz("src/ibrowse"),
-    code:add_pathz("src/mochiweb"),
-    code:add_pathz("src/erlang-oauth"),
+    test_util:init_code_path(),
     
     etap:plan(12),
     case (catch test()) of
@@ -57,9 +59,7 @@ main(_) ->
     ok.
 
 test() ->
-    couch_server:start(
-        ["etc/couchdb/default_dev.ini", "etc/couchdb/local_dev.ini"]
-    ),
+    couch_server:start(config_files()),
     ibrowse:start(),
     crypto:start(),
 

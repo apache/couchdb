@@ -14,11 +14,10 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-filename() -> "./test/etap/temp.010".
+filename() -> test_util:build_file("test/etap/temp.010").
 
 main(_) ->
-    code:add_patha("src/etap"),
-    code:add_pathz("src/couchdb"),
+    test_util:init_code_path(),
     etap:plan(16),
     case (catch test()) of
         ok ->

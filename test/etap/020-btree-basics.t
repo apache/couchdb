@@ -14,14 +14,13 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-filename() -> "./test/etap/temp.020".
+filename() -> test_util:build_file("test/etap/temp.020").
 rows() -> 250.
 
 -record(btree, {fd, root, extract_kv, assemble_kv, less, reduce}).
 
 main(_) ->
-    code:add_patha("src/etap"),
-    code:add_pathz("src/couchdb"),
+    test_util:init_code_path(),
     etap:plan(48),
     case (catch test()) of
         ok ->
