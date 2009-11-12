@@ -127,6 +127,7 @@ couchTests.erlang_views = function(debug) {
       
       var rfun = 'fun(Keys, Values, RR) -> length(Values) end.';
       var results = db.query(mfun, rfun, null, null, "erlang");
-      alert(JSON.stringify(results));
+      T(results.rows[0].key === null, "Returned a reduced value.");
+      T(results.rows[0].value > 0, "Reduce value exists.");
     });
 };
