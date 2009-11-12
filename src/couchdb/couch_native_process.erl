@@ -41,6 +41,7 @@
 
 -export([start_link/0]).
 -export([set_timeout/2, prompt/2, stop/1]).
+-export([loop/0]).
 
 -define(STATE, native_proc_state).
 -record(evstate, {funs=[], query_config=[], list_pid=nil, timeout=5000}).
@@ -48,22 +49,56 @@
 -include("couch_db.hrl").
 
 start_link() ->
-    {ok, self()}.
+    {ok, spawn_link(?MODULE, loop, [])}.
 
-stop(_Pid) ->
-    ok.
+stop(Pid) ->
+    Pid ! {stop, self()},
+    receive
+        {ok, Pid} -> ok
+    after 1000 ->
+        throw({error, timeout})
+    end.
 
-set_timeout(_Pid, TimeOut) ->
-    NewState = case get(?STATE) of
-    undefined ->
-        #evstate{timeout=TimeOut};
-    State ->
-        State#evstate{timeout=TimeOut}
-    end,
-    put(?STATE, NewState),
-    ok.
+prompt(Pid, Data) ->
+    Pid ! {prompt, self(), Data},
+    receive
+        {ok, Pid, Resp} -> Resp
+    after 1000 ->
+        throw({error, timeout})
+    end.
 
-prompt(Pid, Data) when is_pid(Pid), is_list(Data) ->
+set_timeout(Pid, TimeOut) ->
+    Pid ! {set_timeout, self(), TimeOut},
+    receive
+        {ok, Pid} -> ok
+    after 1000 ->
+        throw({error, timeout})
+    end.
+
+loop() ->
+    receive
+        {prompt, From, Data} ->
+            case (catch prompt(Data)) of
+                {error, Reason} ->
+                    From ! {ok, self(), {[{error, Reason}]}};
+                {NewState, Resp} ->
+                    put(?STATE, NewState),
+                    From ! {ok, self(), Resp},
+                    loop()
+            end;
+        {set_timeout, From, TimeOut} ->
+            NewState = case get(?STATE) of
+                undefined -> #evstate{timeout=TimeOut};
+                State -> State#evstate{timeout=TimeOut}
+            end,
+            put(?STATE, NewState),
+            From ! {ok, self()},
+            loop();
+        {stop, From} ->
+            From ! {ok, self()}
+    end.
+
+prompt(Data) when is_list(Data) ->
     case get(?STATE) of
     undefined ->
         State = #evstate{},
@@ -81,15 +116,7 @@ prompt(Pid, Data) when is_pid(Pid), is_list(Data) ->
         _ ->
             ok % Not listing
     end,
-    {NewState, Resp} = run(State, to_binary(Data)),
-    put(?STATE, NewState),
-    case Resp of
-        {error, Reason} ->
-            Msg = io_lib:format("couch native server error: ~p", [Reason]),
-            {[{<<"error">>, list_to_binary(Msg)}]};
-        _ ->
-            Resp
-    end.
+    run(State, to_binary(Data)).
 
 run(_, [<<"reset">>]) ->
     {#evstate{}, true};

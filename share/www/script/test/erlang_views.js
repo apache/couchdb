@@ -93,5 +93,41 @@ couchTests.erlang_views = function(debug) {
       var xhr = CouchDB.request("GET", url);
       T(xhr.status == 200, "standard get should be 200");
       T(xhr.responseText == "head2tail");
+
+      // Larger dataset
+
+      db.deleteDb();
+      db.createDb();
+      var words = "foo bar abc def baz xxyz".split(/\s+/);
+      
+      var docs = [];
+      for(var i = 0; i < 10000; i++) {
+        var body = [];
+        for(var j = 0; j < 10; j++) {
+          body.push({
+            word: words[j%words.length],
+            count: j
+          });
+        }
+        docs.push({
+          "_id": "test-" + i,
+          "words": body
+        });
+      }
+      T(db.bulkSave(docs).length, 250, "Saved big doc set.");
+      
+      var mfun = 'fun({Doc}) -> ' +
+        'Words = proplists:get_value(<<"words">>, Doc), ' +
+        'lists:foreach(fun({Word}) -> ' +
+            'WordString = proplists:get_value(<<"word">>, Word), ' + 
+            'Count = proplists:get_value(<<"count">>, Word), ' + 
+            'Emit(WordString , Count) ' +
+          'end, Words) ' +
+        'end.';
+      
+      var rfun = 'fun(Keys, Values, RR) -> length(Values) end.';
+      var results = db.query(mfun, rfun, null, null, "erlang");
+      T(results.rows[0].key === null, "Returned a reduced value.");
+      T(results.rows[0].value > 0, "Reduce value exists.");
     });
 };
