@@ -218,7 +218,7 @@ open_doc_revs(#http_db{} = DbS, DocId, Revs) ->
     BaseLength = length(couch_rep_httpc:full_url(BaseReq)) + 11, % &open_revs=
 
     {RevLists, _, _} = lists:foldl(fun split_revlist/2,
-        {[[]], BaseLength, BaseLength}, couch_doc:rev_to_strs(Revs)),
+        {[[]], BaseLength, BaseLength}, couch_doc:revs_to_strs(Revs)),
 
     Requests = [BaseReq#http_db{
         qs = [{open_revs, ?JSON_ENCODE(RevList)} | BaseQS]

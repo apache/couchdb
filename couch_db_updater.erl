@@ -299,7 +299,7 @@ btree_by_id_join(Id, {HighSeq, Deleted, DiskTree}) ->
             % nums, which means couchdb will sometimes reexamine unchanged
             % documents with the _changes API.
             % This is fixed by compacting the database.
-            {IsDeleted, BodyPointer, HighSeq}
+            {IsDeleted == 1, BodyPointer, HighSeq}
         end, DiskTree),
 
     #full_doc_info{id=Id, update_seq=HighSeq, deleted=Deleted==1, rev_tree=Tree}.

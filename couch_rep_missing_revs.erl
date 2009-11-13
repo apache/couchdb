@@ -171,7 +171,7 @@ get_missing_revs(Target, Changes) ->
     SeqDict = changes_dictionary(Changes),
     {[{<<"seq">>, HighSeq}, _, _]} = lists:last(Changes),
     {ok, Results} = couch_db:get_missing_revs(Target, IdRevsList),
-    {HighSeq, [{Id, dict:fetch(Id, SeqDict), Revs} || {Id, Revs} <- Results]}.
+    {HighSeq, [{Id, dict:fetch(Id, SeqDict), Revs} || {Id, Revs, _} <- Results]}.
 
 changes_dictionary(ChangeList) ->
     KVs = [{proplists:get_value(<<"id">>,C), proplists:get_value(<<"seq">>,C)}
