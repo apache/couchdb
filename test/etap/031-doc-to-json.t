@@ -115,7 +115,7 @@ test_to_json_success() ->
                     name = <<"big.xml">>, 
                     type = <<"xml/sucks">>, 
                     data = fun() -> ok end,
-                    revpov = 1,
+                    revpos = 1,
                     len = 400
                 },
                 #att{
@@ -152,12 +152,13 @@ test_to_json_success() ->
                     name = <<"stuff.txt">>,
                     type = <<"text/plain">>,
                     data = fun() -> <<"diet pepsi">> end,
-                    revpos = 1
+                    revpos = 1,
                     len = 10
                 },
                 #att{
                     name = <<"food.now">>,
                     type = <<"application/food">>,
+                    revpos = 1,
                     data = <<"sammich">>
                 }
             ]},
