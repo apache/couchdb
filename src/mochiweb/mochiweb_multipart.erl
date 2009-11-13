@@ -158,7 +158,7 @@ feed_mp(body, State=#mp{boundary=Prefix, buffer=Buffer, callback=Callback}) ->
     end.
 
 get_boundary(ContentType) ->
-    {"multipart/form-data", Opts} = mochiweb_util:parse_header(ContentType),
+    {"multipart/" ++ _, Opts} = mochiweb_util:parse_header(ContentType),
     case proplists:get_value("boundary", Opts) of
         S when is_list(S) ->
             S

@@ -23,7 +23,7 @@
 -export([start_response_length/4, send/2]).
 -export([start_json_response/2, start_json_response/3, end_json_response/1]).
 -export([send_response/4,send_method_not_allowed/2,send_error/4, send_redirect/2,send_chunked_error/2]).
--export([send_json/2,send_json/3,send_json/4,last_chunk/1]).
+-export([send_json/2,send_json/3,send_json/4,last_chunk/1,parse_multipart_request/3]).
 
 start_link() ->
     % read config and register for configuration changes
@@ -337,6 +337,7 @@ json_body_obj(Httpd) ->
     end.
 
 
+
 doc_etag(#doc{revs={Start, [DiskRev|_]}}) ->
     "\"" ++ ?b2l(couch_doc:rev_to_str({Start, DiskRev})) ++ "\"".
 
@@ -628,3 +629,140 @@ server_header() ->
     OTPVersion = "R" ++ integer_to_list(erlang:system_info(compat_rel)) ++ "B",
     [{"Server", "CouchDB/" ++ couch_server:get_version() ++
                 " (Erlang OTP/" ++ OTPVersion ++ ")"}].
+
+
+-record(mp, {boundary, buffer, data_fun, callback}).
+
+
+parse_multipart_request(ContentType, DataFun, Callback) ->
+    Boundary0 = iolist_to_binary(get_boundary(ContentType)),
+    Boundary = <<"\r\n--", Boundary0/binary>>,
+    Mp = #mp{boundary= Boundary,
+            buffer= <<>>,
+            data_fun=DataFun,
+            callback=Callback},
+    {Mp2, _NilCallback} = read_until(Mp, <<"--", Boundary0/binary>>, 
+        fun(Next)-> nil_callback(Next) end),
+    #mp{buffer=Buffer, data_fun=DataFun2, callback=Callback2} = 
+            parse_part_header(Mp2),
+    {Buffer, DataFun2, Callback2}.
+
+nil_callback(_Data)->
+    fun(Next) -> nil_callback(Next) end.
+
+get_boundary(ContentType) ->
+    {"multipart/" ++ _, Opts} = mochiweb_util:parse_header(ContentType),
+    case proplists:get_value("boundary", Opts) of
+        S when is_list(S) ->
+            S
+    end.
+
+
+
+split_header(<<>>) ->
+    [];
+split_header(Line) ->
+    {Name, [$: | Value]} = lists:splitwith(fun (C) -> C =/= $: end,
+                                           binary_to_list(Line)),
+    [{string:to_lower(string:strip(Name)),
+     mochiweb_util:parse_header(Value)}].
+
+read_until(#mp{data_fun=DataFun, buffer=Buffer}=Mp, Pattern, Callback) ->
+    case find_in_binary(Pattern, Buffer) of
+    not_found ->
+        Callback2 = Callback(Buffer),
+        {Buffer2, DataFun2} = DataFun(),
+        Buffer3 = iolist_to_binary(Buffer2),
+        read_until(Mp#mp{data_fun=DataFun2,buffer=Buffer3}, Pattern, Callback2);
+    {partial, Skip} ->
+        <<DataChunk:Skip/binary, Rest/binary>> = Buffer,
+        Callback2 = Callback(DataChunk),
+        {Buffer2, DataFun2} = DataFun(),
+        Buffer3 = iolist_to_binary(Buffer2),
+        read_until(Mp#mp{data_fun=DataFun2,
+                buffer= <<Buffer3/binary, Rest/binary>>}, 
+                Pattern, Callback2);
+    {exact, Skip} ->
+        PatternLen = size(Pattern),
+        <<DataChunk:Skip/binary, _:PatternLen/binary, Rest/binary>> = Buffer,
+        Callback2 = Callback(DataChunk),
+        {Mp#mp{buffer= Rest}, Callback2}
+    end.
+
+
+parse_part_header(#mp{callback=UserCallBack}=Mp) ->
+    {Mp2, AccCallback} = read_until(Mp, <<"\r\n\r\n">>,
+            fun(Next) -> acc_callback(Next, []) end),
+    HeaderData = AccCallback(get_data),
+    
+    Headers =
+    lists:foldl(fun(Line, Acc) ->
+            split_header(Line) ++ Acc
+        end, [], re:split(HeaderData,<<"\r\n">>, [])),
+    NextCallback = UserCallBack({headers, Headers}),
+    parse_part_body(Mp2#mp{callback=NextCallback}).
+
+parse_part_body(#mp{boundary=Prefix, callback=Callback}=Mp) ->
+    {Mp2, WrappedCallback} = read_until(Mp, Prefix,
+            fun(Data) -> body_callback_wrapper(Data, Callback) end),
+    Callback2 = WrappedCallback(get_callback),
+    Callback3 = Callback2(body_end),
+    case check_for_last(Mp2#mp{callback=Callback3}) of
+    {last, #mp{callback=Callback3}=Mp3} ->
+        Mp3#mp{callback=Callback3(eof)};
+    {more, Mp3} ->
+        parse_part_header(Mp3)
+    end.
+
+acc_callback(get_data, Acc)->
+    iolist_to_binary(lists:reverse(Acc));
+acc_callback(Data, Acc)->
+    fun(Next) -> acc_callback(Next, [Data | Acc]) end.
+
+body_callback_wrapper(get_callback, Callback) ->
+    Callback;
+body_callback_wrapper(Data, Callback) ->
+    Callback2 = Callback({body, Data}),
+    fun(Next) -> body_callback_wrapper(Next, Callback2) end.
+
+
+check_for_last(#mp{buffer=Buffer, data_fun=DataFun}=Mp) ->
+    case Buffer of
+    <<"--",_/binary>> -> {last, Mp};
+    <<_, _, _/binary>> -> {more, Mp};
+    _ -> % not long enough
+        {Data, DataFun2} = DataFun(),
+        check_for_last(Mp#mp{buffer= <<Buffer/binary, Data/binary>>,
+                data_fun = DataFun2})
+    end.
+
+find_in_binary(B, Data) when size(B) > 0 ->
+    case size(Data) - size(B) of
+        Last when Last < 0 ->
+            partial_find(B, Data, 0, size(Data));
+        Last ->
+            find_in_binary(B, size(B), Data, 0, Last)
+    end.
+
+find_in_binary(B, BS, D, N, Last) when N =< Last->
+    case D of
+        <<_:N/binary, B:BS/binary, _/binary>> ->
+            {exact, N};
+        _ ->
+            find_in_binary(B, BS, D, 1 + N, Last)
+    end;
+find_in_binary(B, BS, D, N, Last) when N =:= 1 + Last ->
+    partial_find(B, D, N, BS - 1).
+
+partial_find(_B, _D, _N, 0) ->
+    not_found;
+partial_find(B, D, N, K) ->
+    <<B1:K/binary, _/binary>> = B,
+    case D of
+        <<_Skip:N/binary, B1:K/binary>> ->
+            {partial, N, K};
+        _ ->
+            partial_find(B, D, 1 + N, K - 1)
+    end.
+
+

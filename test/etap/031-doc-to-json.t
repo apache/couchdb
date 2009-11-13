@@ -114,13 +114,15 @@ test_to_json_success() ->
                 #att{
                     name = <<"big.xml">>, 
                     type = <<"xml/sucks">>, 
-                    data = fun() -> ok end, 
+                    data = fun() -> ok end,
+                    revpov = 1,
                     len = 400
                 },
                 #att{
                     name = <<"fast.json">>, 
                     type = <<"json/ftw">>, 
                     data = <<"{\"so\": \"there!\"}">>,
+                    revpos = 1,
                     len = 16
                 }
             ]},
@@ -128,16 +130,16 @@ test_to_json_success() ->
                 {<<"_id">>, <<>>},
                 {<<"_attachments">>, {[
                     {<<"big.xml">>, {[
-                        {<<"stub">>, true},
                         {<<"content_type">>, <<"xml/sucks">>},
+                        {<<"revpos">>, 1},
                         {<<"length">>, 400},
-                        {<<"revpos">>, 0}
+                        {<<"stub">>, true}
                     ]}},
                     {<<"fast.json">>, {[
-                        {<<"stub">>, true},
                         {<<"content_type">>, <<"json/ftw">>},
+                        {<<"revpos">>, 1},
                         {<<"length">>, 16},
-                        {<<"revpos">>, 0}
+                        {<<"stub">>, true}
                     ]}}
                 ]}}
             ]},
@@ -150,6 +152,7 @@ test_to_json_success() ->
                     name = <<"stuff.txt">>,
                     type = <<"text/plain">>,
                     data = fun() -> <<"diet pepsi">> end,
+                    revpos = 1
                     len = 10
                 },
                 #att{
@@ -163,12 +166,12 @@ test_to_json_success() ->
                 {<<"_attachments">>, {[
                     {<<"stuff.txt">>, {[
                         {<<"content_type">>, <<"text/plain">>},
-                        {<<"revpos">>, 0},
+                        {<<"revpos">>, 1},
                         {<<"data">>, <<"ZGlldCBwZXBzaQ==">>}
                     ]}},
                     {<<"food.now">>, {[
                         {<<"content_type">>, <<"application/food">>},
-                        {<<"revpos">>, 0},
+                        {<<"revpos">>, 1},
                         {<<"data">>, <<"c2FtbWljaA==">>}
                     ]}}
                 ]}}
