@@ -784,7 +784,7 @@ db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
     
     Loc = absolute_uri(Req, "/" ++ ?b2l(Db#db.name) ++ "/" ++ ?b2l(DocId)),
     RespHeaders = [{"Location", Loc}],
-    case couch_httpd:header_value(Req, "content-type") of
+    case couch_httpd:header_value(Req, "Content-Type") of
     ("multipart/related" ++  _Rest) = ContentType->
         Doc0 = couch_doc:doc_from_multi_part_stream(ContentType,
                 fun() -> receive_request_data(Req) end),
@@ -869,18 +869,18 @@ send_doc_efficiently(Req, #doc{atts=Atts}=Doc, Headers, Options) ->
             undefined       -> [];
             AcceptHeader    -> string:tokens(AcceptHeader, ", ")
         end,
-        case lists:member(AcceptedTypes, "multipart/related") of
+        case lists:member("multipart/related", AcceptedTypes) of
         false ->
             send_json(Req, 200, [], couch_doc:to_json_obj(Doc, Options));
         true ->
             Boundary = couch_uuids:random(),
-            JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, Options)),
+            JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, [follows|Options])),
             AttsSinceRevPos = proplists:get_value(atts_after_revpos, Options, 0),
             Len = couch_doc:len_doc_to_multi_part_stream(Boundary,JsonBytes,Atts,
                     AttsSinceRevPos),
-            CType = {<<"content-type">>, 
-                    <<"multipart/related; boundary=", Boundary/binary>>},
-            Resp = start_response_length(Req, 200, [CType | Headers], Len),
+            CType = {<<"Content-Type">>, 
+                    <<"multipart/related; boundary=\"", Boundary/binary, "\"">>},
+            {ok, Resp} = start_response_length(Req, 200, [CType|Headers], Len),
             couch_doc:doc_to_multi_part_stream(Boundary,JsonBytes,Atts,
                     AttsSinceRevPos,
                     fun(Data) -> couch_httpd:send(Resp, Data) end)
