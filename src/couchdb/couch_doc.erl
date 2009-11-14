@@ -340,14 +340,14 @@ fold_streamed_data(RcvFun, LenLeft, Fun, Acc) when LenLeft > 0->
 len_doc_to_multi_part_stream(Boundary,JsonBytes,Atts,AttsSinceRevPos) ->
     2 + % "--"
     size(Boundary) +
-    34 + % "\r\ncontent-type: application/json\r\n"
+    36 + % "\r\ncontent-type: application/json\r\n\r\n"
     iolist_size(JsonBytes) +
     4 + % "\r\n--"
     size(Boundary) +
     + lists:foldl(fun(#att{revpos=RevPos,len=Len}, AccAttsSize) ->
             if RevPos > AttsSinceRevPos ->
                 AccAttsSize +  
-                2 + % "\r\n"
+                4 + % "\r\n\r\n"
                 Len +
                 4 + % "\r\n--"
                 size(Boundary);
@@ -358,17 +358,18 @@ len_doc_to_multi_part_stream(Boundary,JsonBytes,Atts,AttsSinceRevPos) ->
     2. % "--"
     
 doc_to_multi_part_stream(Boundary,JsonBytes,Atts,AttsSinceRevPos,WriteFun) ->
-    WriteFun([<<"--", Boundary, "\r\ncontent-type: application/json\r\n">>,
-            JsonBytes, <<"\r\n--", Boundary>>]),
+    WriteFun([<<"--", Boundary/binary,
+            "\r\ncontent-type: application/json\r\n\r\n">>,
+            JsonBytes, <<"\r\n--", Boundary/binary>>]),
     atts_to_mp(Atts, Boundary, WriteFun, AttsSinceRevPos).
 
 atts_to_mp([], _Boundary, WriteFun, _AttsSinceRevPos) ->
     WriteFun(<<"--">>);
 atts_to_mp([#att{revpos=RevPos} = Att | RestAtts], Boundary, WriteFun, 
         AttsSinceRevPos) when RevPos > AttsSinceRevPos ->
-    WriteFun(<<"\r\n">>),
+    WriteFun(<<"\r\n\r\n">>),
     att_foldl(Att, fun(Data, ok) -> WriteFun(Data) end, ok),
-    WriteFun(<<"\r\n--", Boundary>>),
+    WriteFun(<<"\r\n--", Boundary/binary>>),
     atts_to_mp(RestAtts, Boundary, WriteFun, AttsSinceRevPos);
 atts_to_mp([_ | RestAtts], Boundary, WriteFun, AttsSinceRevPos) ->
     atts_to_mp(RestAtts, Boundary, WriteFun, AttsSinceRevPos).

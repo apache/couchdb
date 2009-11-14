@@ -97,6 +97,7 @@ nobase_dist_localdata_DATA = \
     www/script/sha1.js \
     www/script/test/all_docs.js \
     www/script/test/attachments.js \
+    www/script/test/attachments_multipart.js \
     www/script/test/attachment_names.js \
     www/script/test/attachment_paths.js \
     www/script/test/attachment_views.js \
