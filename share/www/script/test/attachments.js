@@ -237,60 +237,6 @@ couchTests.attachments= function(debug) {
     headers:{"Content-Type":"text/plain;charset=utf-8"}
   });
   TEquals(201, xhr.status, "should send 201 Accepted");
-  
-  // try mime multipart
-            
-  xhr = CouchDB.request("PUT", "/test_suite_db/multipart", {
-    headers: {"Content-Type": "multipart/related;boundary=\"abc123\""},
-    body:
-      "--abc123\r\n" +
-      "content-type: application/json\r\n" +
-      "\r\n" +
-      JSON.stringify({
-        "body":"This is a body.",
-        "_attachments":{
-          "foo.txt": {
-            "follows":true,
-            "content_type":"text/plain",
-            "length":21
-            },
-          "bar.txt": {
-            "follows":true,
-            "content_type":"text/plain",
-            "length":20
-            },
-          "baz.txt": {
-            "follows":true,
-            "content_type":"text/plain",
-            "length":19
-            }
-          }
-        }) +
-      "\r\n--abc123\r\n" +
-      "\r\n" +
-      "this is 21 chars long" +
-      "\r\n--abc123\r\n" +
-      "\r\n" +
-      "this is 20 chars lon" +
-      "\r\n--abc123\r\n" +
-      "\r\n" +
-      "this is 19 chars lo" +
-      "\r\n--abc123--"
-    });
-    
-  TEquals(201, xhr.status, "should send 201 Accepted");
-  
-  xhr = CouchDB.request("GET", "/test_suite_db/multipart/foo.txt");
-  
-  T(xhr.responseText == "this is 21 chars long");
-  
-  xhr = CouchDB.request("GET", "/test_suite_db/multipart/bar.txt");
-  
-  T(xhr.responseText == "this is 20 chars lon");
-  
-  xhr = CouchDB.request("GET", "/test_suite_db/multipart/baz.txt");
-  
-  T(xhr.responseText == "this is 19 chars lo");
 
   // implicit doc creation allows creating docs with a reserved id. COUCHDB-565
   var xhr = CouchDB.request("PUT", "/test_suite_db/_nonexistant/attachment.txt", {
