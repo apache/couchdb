@@ -79,6 +79,7 @@ couchTests.attachments_multipart= function(debug) {
   // now edit an attachment
   
   var doc = db.open("multipart");
+  var firstrev = doc._rev;
   
   T(doc._attachments["foo.txt"].stub == true);
   T(doc._attachments["bar.txt"].stub == true);
@@ -111,29 +112,29 @@ couchTests.attachments_multipart= function(debug) {
   xhr = CouchDB.request("GET", "/test_suite_db/multipart/baz.txt");
   T(xhr.status == 404);
   
-  xhr = CouchDB.request("GET", "/test_suite_db/multipart?attachments=true",
-    {headers:{"accept": "multipart/related,*/*;"}});
-
-  var headers = xhr.getAllResponseHeaders();
+  // now test receiving multipart docs
   
-  var ctype = xhr.getResponseHeader("Content-Type");
+  function getBoundary(xhr) {
+    var ctype = xhr.getResponseHeader("Content-Type");
   
-  var ctypeArgs = ctype.split("; ").slice(1);
-  var boundary = null;
-  for(var i=0; i<ctypeArgs.length; i++) {
-    if (ctypeArgs[i].indexOf("boundary=") == 0) {
-      boundary = ctypeArgs[i].split("=")[1];
-      if (boundary.charAt(0) == '"') {
-        // stringified boundary, parse as json 
-        // (will maybe not if there are escape quotes)
-        boundary = JSON.parse(boundary);
+    var ctypeArgs = ctype.split("; ").slice(1);
+    var boundary = null;
+    for(var i=0; i<ctypeArgs.length; i++) {
+      if (ctypeArgs[i].indexOf("boundary=") == 0) {
+        boundary = ctypeArgs[i].split("=")[1];
+        if (boundary.charAt(0) == '"') {
+          // stringified boundary, parse as json 
+          // (will maybe not if there are escape quotes)
+          boundary = JSON.parse(boundary);
+        }
       }
     }
+    return boundary;
   }
   
-  T(boundary != null);
-  
-  function parseMime(boundary, mimetext) {
+  function parseMultipart(xhr) {
+    var boundary = getBoundary(xhr);
+    var mimetext = xhr.responseText;
     // strip off leading boundary
     var leading = "--" + boundary + "\r\n";
     var last = "\r\n--" + boundary + "--";
@@ -163,11 +164,17 @@ couchTests.attachments_multipart= function(debug) {
     return sections;
   }
   
-  // parse out the multipart
+  
+  xhr = CouchDB.request("GET", "/test_suite_db/multipart?attachments=true",
+    {headers:{"accept": "multipart/related,*/*;"}});
   
   T(xhr.status == 200);
   
-  var sections = parseMime(boundary, xhr.responseText);
+  // parse out the multipart
+  
+  var sections = parseMultipart(xhr);
+  
+  T(sections.length == 3);
   
   // The first section is the json doc. Check it's content-type. It contains
   // the metadata for all the following attachments
@@ -176,10 +183,66 @@ couchTests.attachments_multipart= function(debug) {
   
   var doc = JSON.parse(sections[0].body);
   
-  T(doc._attachments['foo.txt'].follows = true);
-  T(doc._attachments['bar.txt'].follows = true);
+  T(doc._attachments['foo.txt'].follows == true);
+  T(doc._attachments['bar.txt'].follows == true);
   
   T(sections[1].body == "this is 21 chars long");
   T(sections[2].body == "this is 18 chars l");
+  
+  // now get attachments incrementally (only the attachments changes since
+  // a certain rev).
+  
+  xhr = CouchDB.request("GET", "/test_suite_db/multipart?atts_since=[\"" + firstrev + "\"]",
+    {headers:{"accept": "multipart/related,*/*;"}});
+  
+  T(xhr.status == 200);
+  
+  var sections = parseMultipart(xhr);
+  
+  T(sections.length == 2);
+  
+  var doc = JSON.parse(sections[0].body);
+  
+  T(doc._attachments['foo.txt'].stub == true);
+  T(doc._attachments['bar.txt'].follows == true);
+  
+  T(sections[1].body == "this is 18 chars l");
+  
+  // try it with a rev that doesn't exist (should get all attachments)
+  
+  xhr = CouchDB.request("GET", "/test_suite_db/multipart?atts_since=[\"1-2897589\"]",
+    {headers:{"accept": "multipart/related,*/*;"}});
+  
+  T(xhr.status == 200);
+  
+  var sections = parseMultipart(xhr);
+  
+  T(sections.length == 3);
+  
+  var doc = JSON.parse(sections[0].body);
+  
+  T(doc._attachments['foo.txt'].follows == true);
+  T(doc._attachments['bar.txt'].follows == true);
+  
+  T(sections[1].body == "this is 21 chars long");
+  T(sections[2].body == "this is 18 chars l");
+  
+  // try it with a rev that doesn't exist, and one that does
+  
+  xhr = CouchDB.request("GET", "/test_suite_db/multipart?atts_since=[\"1-2897589\",\"" + firstrev + "\"]",
+    {headers:{"accept": "multipart/related,*/*;"}});
+  
+  T(xhr.status == 200);
+  
+  var sections = parseMultipart(xhr);
+  
+  T(sections.length == 2);
+  
+  var doc = JSON.parse(sections[0].body);
+  
+  T(doc._attachments['foo.txt'].stub == true);
+  T(doc._attachments['bar.txt'].follows == true);
+  
+  T(sections[1].body == "this is 18 chars l");
   
 };

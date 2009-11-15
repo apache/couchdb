@@ -322,7 +322,7 @@ merge_stubs(#doc{id=Id,atts=MemBins}=StubsDoc, #doc{atts=DiskBins}) ->
             {ok, #att{revpos=RevPos}=DiskAtt} ->
                 DiskAtt;
             _ ->
-                throw({missing_stub_on_target,
+                throw({missing_stub,
                         <<"id:", Id/binary, ", name:", Name/binary>>})
             end;
         (Att) ->

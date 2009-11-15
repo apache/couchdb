@@ -559,6 +559,8 @@ error_info({error, illegal_database_name}) ->
     {400, <<"illegal_database_name">>, <<"Only lowercase characters (a-z), "
         "digits (0-9), and any of the characters _, $, (, ), +, -, and / "
         "are allowed">>};
+error_info({missing_stub, Reason}) ->
+    {412, <<"missing_stub">>, Reason};
 error_info({Error, Reason}) ->
     {500, couch_util:to_binary(Error), couch_util:to_binary(Reason)};
 error_info(Error) ->

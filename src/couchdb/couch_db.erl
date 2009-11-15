@@ -15,7 +15,7 @@
 
 -export([open/2,close/1,create/2,start_compact/1,get_db_info/1,get_design_docs/1]).
 -export([open_ref_counted/2,is_idle/1,monitor/1,count_changes_since/2]).
--export([update_doc/3,update_docs/4,update_docs/2,update_docs/3,delete_doc/3]).
+-export([update_doc/3,update_doc/4,update_docs/4,update_docs/2,update_docs/3,delete_doc/3]).
 -export([get_doc_info/2,open_doc/2,open_doc/3,open_doc_revs/4]).
 -export([set_revs_limit/2,get_revs_limit/1,register_update_notifier/3]).
 -export([get_missing_revs/2,name/1,doc_to_tree/1,get_update_seq/1,get_committed_update_seq/1]).
@@ -251,7 +251,10 @@ name(#db{name=Name}) ->
     Name.
 
 update_doc(Db, Doc, Options) ->
-    case update_docs(Db, [Doc], Options) of
+    update_doc(Db, Doc, Options, interactive_edit).
+
+update_doc(Db, Doc, Options, UpdateType) ->
+    case update_docs(Db, [Doc], Options, UpdateType) of
     {ok, [{ok, NewRev}]} ->
         {ok, NewRev};
     {ok, [Error]} ->
