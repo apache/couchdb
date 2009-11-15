@@ -30,7 +30,7 @@ Source: "%locallibbindir%\..\*.*"; DestDir: "{app}"; Flags: ignoreversion uninsr
 ; bin dir
 Source: "%locallibbindir%\*.*"; DestDir: "{app}\bin"; Flags: ignoreversion uninsrestartdelete restartreplace recursesubdirs
 ; other dirs copied '*.*'
-Source: "%locallibbindir%\..\erts-5.7.2\*.*"; DestDir: "{app}\erts-5.7.2"; Flags: ignoreversion uninsrestartdelete restartreplace recursesubdirs
+Source: "%locallibbindir%\..\erts-%erts_version%\*.*"; DestDir: "{app}\erts-%erts_version%"; Flags: ignoreversion uninsrestartdelete restartreplace recursesubdirs
 Source: "%locallibbindir%\..\lib\*.*"; DestDir: "{app}\lib"; Flags: ignoreversion uninsrestartdelete restartreplace recursesubdirs
 Source: "%locallibbindir%\..\share\*.*"; DestDir: "{app}\share"; Flags: ignoreversion uninsrestartdelete restartreplace recursesubdirs
 Source: "%locallibbindir%\..\releases\*.*"; DestDir: "{app}\releases"; Flags: ignoreversion uninsrestartdelete restartreplace recursesubdirs
@@ -62,7 +62,23 @@ Name: "{group}\Start CouchDB"; Filename: "{app}\bin\couchdb.bat"
 Name: "{group}\Futon (CouchDB web interface)"; Filename: "http://127.0.0.1:5984/_utils"
 Name: "{group}\CouchDB Web Site"; Filename: "http://couchdb.apache.org/"
 
+[Tasks]
+Name: service; Description: "Install couchdb as a Windows service"
+Name: service\start; Description: "Start the service after installation"
+
 [Run]
 Filename: "{tmp}\%msvc_redist_name%"; Parameters: "/q"
 ; This is erlang's Install.exe which updates erl.ini correctly.
 Filename: "{app}\Install.exe"; Parameters: "-s"; Flags: runhidden
+
+; Commands for a service
+; First attempt to nuke an existing service of this name, incase they are
+; reinstalling without uninstalling
+Filename: "{app}\erts-%erts_version%\bin\erlsrv.exe"; Parameters: "remove ""%package_name%"""; Tasks: service
+; add a new one
+Filename: "{app}\erts-%erts_version%\bin\erlsrv.exe"; Parameters: "add ""%package_name%"" -w ""{app}\bin"" -ar ""-sasl errlog_type error -s couch"" -c ""%package_name% %version%"""; Tasks: service
+; and start it if requested
+Filename: "{app}\erts-%erts_version%\bin\erlsrv.exe"; Parameters: "start ""%package_name%"""; Tasks: service\start
+
+[UninstallRun]
+Filename: "{app}\erts-%erts_version%\bin\erlsrv.exe"; Parameters: "remove ""%package_name%"""; Tasks: service

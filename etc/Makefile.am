@@ -28,7 +28,7 @@ nobase_sysconf_DATA = $(default_sysconf_data) $(init_sysconf_data)
 EXTRA_DIST = $(init_sysconf_data)
 
 if WINDOWS
-EXTRA_DIST += windows/setup-couchdb-@version@.exe
+EXTRA_DIST += windows/setup-couchdb-@version@.exe.md5
 endif
 
 CLEANFILES = $(init_DATA) $(default_sysconf_data) $(launchd_DATA)
@@ -84,6 +84,7 @@ windows/couchdb.iss: windows/couchdb.iss.tpl FORCE
 	    -e "s|%package_name%|@package_name@|g" \
 	    -e "s|%locallibbindir%|`cygpath -m @locallibbindir@`|g" \
 	    -e "s|%version%|@version@|g" \
+	    -e "s|%erts_version%|`$(ERL) -version 2>&1 | $(SED) 's/[^0-9\.]//g'`|g" \
 	    -e "s|%openssl_bin_dir%|@openssl_bin_dir@|g" \
 	    -e "s|%msvc_redist_dir%|@msvc_redist_dir@|g" \
 	    -e "s|%msvc_redist_name%|@msvc_redist_name@|g" \
@@ -93,6 +94,10 @@ windows/couchdb.iss: windows/couchdb.iss.tpl FORCE
 # so we trick make into always building it with the FORCE pattern...
 windows/setup-couchdb-@version@.exe: windows/couchdb.iss windows/README.txt FORCE
 	$(INNO_COMPILER_EXECUTABLE) /q $<
+	@echo Windows Installer is at: `cygpath -a -w windows/setup-couchdb-@version@.exe`
+
+windows/setup-couchdb-@version@.exe.md5: windows/setup-couchdb-@version@.exe
+	md5sum $< > $@
 	@echo Windows Installer is at: `cygpath -a -w windows/setup-couchdb-@version@.exe`
 
 FORCE:
