@@ -30,6 +30,7 @@
     rev = nil,
     open_revs = [],
     show = nil,
+    update_type = interactive_edit,
     atts_since = nil
 }).
 
@@ -780,6 +781,9 @@ db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
     ]});
 
 db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
+    #doc_query_args{
+        update_type = UpdateType
+    } = parse_doc_query(Req),
     couch_doc:validate_docid(DocId),
     
     Loc = absolute_uri(Req, "/" ++ ?b2l(Db#db.name) ++ "/" ++ ?b2l(DocId)),
@@ -789,7 +793,7 @@ db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
         Doc0 = couch_doc:doc_from_multi_part_stream(ContentType,
                 fun() -> receive_request_data(Req) end),
         Doc = couch_doc_from_req(Req, DocId, Doc0),
-        update_doc(Req, Db, DocId, Doc, RespHeaders);
+        update_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType);
     _ ->
         case couch_httpd:qs_value(Req, "batch") of
         "ok" ->
@@ -810,7 +814,7 @@ db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
         _Normal ->
             % normal
             Doc = couch_doc_from_req(Req, DocId, couch_httpd:json_body(Req)),
-            update_doc(Req, Db, DocId, Doc, RespHeaders)
+            update_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType)
         end
     end;
 
@@ -911,7 +915,10 @@ update_doc_result_to_json(DocId, Error) ->
 update_doc(Req, Db, DocId, Doc) ->
     update_doc(Req, Db, DocId, Doc, []).
 
-update_doc(Req, Db, DocId, #doc{deleted=Deleted}=Doc, Headers) ->
+update_doc(Req, Db, DocId, Doc, Headers) ->
+    update_doc(Req, Db, DocId, Doc, Headers, interactive_edit).
+
+update_doc(Req, Db, DocId, #doc{deleted=Deleted}=Doc, Headers, UpdateType) ->
     case couch_httpd:header_value(Req, "X-Couch-Full-Commit") of
     "true" ->
         Options = [full_commit];
@@ -920,7 +927,7 @@ update_doc(Req, Db, DocId, #doc{deleted=Deleted}=Doc, Headers) ->
     _ ->
         Options = []
     end,
-    {ok, NewRev} = couch_db:update_doc(Db, Doc, Options),
+    {ok, NewRev} = couch_db:update_doc(Db, Doc, Options, UpdateType),
     NewRevStr = couch_doc:rev_to_str(NewRev),
     ResponseHeaders = [{"Etag", <<"\"", NewRevStr/binary, "\"">>}] ++ Headers,
     send_json(Req, if Deleted -> 200; true -> 201 end,
@@ -1133,6 +1140,10 @@ parse_doc_query(Req) ->
             Args#doc_query_args{atts_since = couch_doc:parse_revs(JsonArray)};
         {"show", FormatStr} ->
             Args#doc_query_args{show=parse_doc_format(FormatStr)};
+        {"new_edits", "false"} ->
+            Args#doc_query_args{update_type=replicated_changes};
+        {"new_edits", "true"} ->
+            Args#doc_query_args{update_type=interactive_edit};
         _Else -> % unknown key value pair, ignore.
             Args
         end
