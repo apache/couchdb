@@ -31,6 +31,17 @@ This version has not been released yet.
  * Fixed a bug preventing mixing languages with lists and views.
  * Avoid OS process leaks in lists.
 
+Version 0.10.1
+--------------
+
+ * Fixed test suite to work with build system.
+ * Fixed a problem with statistics timers and system sleep.
+ * Fixed an edge case for HTTP redirects during replication.
+ * Fixed HTTP timeout handling for replication.
+ * Fixed query parameter handling in OAuth'd replication.
+ * Fixed a bug preventing mixing languages with lists and views.
+ * Avoid OS process leaks in lists.
+
 Version 0.10.0
 --------------
 

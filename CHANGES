@@ -36,6 +36,26 @@ Futon
 
  * Added a button for view compaction.
 
+Version 0.10.1
+--------------
+
+Replicator
+
+ * Stability enhancements regarding redirects, timeouts, OAuth.
+
+Query Server
+
+ * Avoid process leaks
+ * Allow list and view to span languages
+
+Stats
+
+ * Eliminate new process flood on system wake
+
+Build and System Integration:
+
+ * Test	suite now works	with the distcheck target.
+
 Version 0.10.0
 --------------
 
