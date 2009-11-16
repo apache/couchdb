@@ -630,8 +630,12 @@ end
 
 def should_have_exited qs
   begin
-    qs.run(["reset"])
-    "raise before this".should == true
+    resp = qs.run(["reset"])
+    #"raise before this".should == true
+    # Erlang can't very well kill the process, test
+    # for an error condition. Also, we should seriously
+    # rethink this test setup.
+    resp["error"].should == "timeout"
   rescue RuntimeError => e
     e.message.should == "no response"
   rescue Errno::EPIPE

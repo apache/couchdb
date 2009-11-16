@@ -14,8 +14,7 @@
 % the License.
 
 main(_) ->
-    code:add_patha("src/etap"),
-    code:add_pathz("src/couchdb"),
+    test_util:init_code_path(),
     application:start(crypto),
 
     etap:plan(12),

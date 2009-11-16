@@ -31,7 +31,7 @@ secret = replace this with a real secret in your local.ini file
 require_valid_user = false
 
 [query_servers]
-javascript = %bindir%/%couchjs_command_name% %localdatadir%/server/main.js
+javascript = %bindir%/%couchjs_command_name% %localbuilddatadir%/server/main.js
 
 ; Changing reduce_limit to false will disable reduce_limit.
 ; If you think you're hitting reduce_limit with a "good" reduce function,

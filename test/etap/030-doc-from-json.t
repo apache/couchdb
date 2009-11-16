@@ -20,8 +20,7 @@
 -record(att, {name, type, len, md5= <<>>, revpos=0, data}).
 
 main(_) ->
-    code:add_patha("src/etap"),
-    code:add_pathz("src/couchdb"),
+    test_util:init_code_path(),
     etap:plan(26),
     case (catch test()) of
         ok ->

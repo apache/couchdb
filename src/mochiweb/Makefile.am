@@ -20,6 +20,7 @@ mochiweb_file_collection = \
     mochijson.erl \
     mochijson2.erl \
     mochinum.erl \
+	mochiweb.app.in \
     mochiweb.erl \
     mochiweb_app.erl \
     mochiweb_charref.erl \
@@ -37,8 +38,6 @@ mochiweb_file_collection = \
     mochiweb_util.erl \
     reloader.erl
 
-mochiwebebin_static_file = mochiweb.app
-
 mochiwebebin_make_generated_file_list = \
     mochifmt.beam \
     mochifmt_records.beam \
@@ -47,6 +46,7 @@ mochiwebebin_make_generated_file_list = \
     mochijson.beam \
     mochijson2.beam \
     mochinum.beam \
+	mochiweb.app \
     mochiweb.beam \
     mochiweb_app.beam \
     mochiweb_charref.beam \
@@ -65,15 +65,16 @@ mochiwebebin_make_generated_file_list = \
     reloader.beam
 
 mochiwebebin_DATA = \
-    $(mochiwebebin_static_file) \
     $(mochiwebebin_make_generated_file_list)
 
 EXTRA_DIST =  \
-    $(mochiweb_file_collection) \
-    $(mochiwebebin_static_file)
+    $(mochiweb_file_collection)
 
 CLEANFILES = \
     $(mochiwebebin_make_generated_file_list)
+
+%.app: %.app.in
+	cp $< $@
 
 %.beam: %.erl
 	$(ERLC) $(ERLC_FLAGS) $<

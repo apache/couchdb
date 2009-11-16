@@ -10,6 +10,7 @@ Each release section notes when backwards incompatible changes have been made.
 Version 0.10.1
 --------------
 
+ * Fixed test suite to work with build system.
  * Fixed a problem with statistics timers and system sleep.
  * Fixed an edge case for HTTP redirects during replication.
  * Fixed HTTP timeout handling for replication.

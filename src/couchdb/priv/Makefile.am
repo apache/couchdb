@@ -17,6 +17,9 @@ EXTRA_DIST = couchspawnkillable.sh
 
 couchpriv_PROGRAMS = couchspawnkillable
 
+%.cfg: %.cfg.in
+	cp $< $@
+
 if WINDOWS
 couchspawnkillable_SOURCES = couchspawnkillable_win.c
 endif

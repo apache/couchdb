@@ -14,11 +14,10 @@
 % the License.
 
 default_config() ->
-    "etc/couchdb/default_dev.ini".
+    test_util:build_file("etc/couchdb/default_dev.ini").
 
 main(_) ->
-    code:add_patha("src/etap"),
-    code:add_pathz("src/couchdb"),
+    test_util:init_code_path(),
     etap:plan(3),
     case (catch test()) of
         ok ->

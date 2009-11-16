@@ -973,6 +973,7 @@ db_attachment_req(#httpd{method=Method}=Req, Db, DocId, FileNameParts)
 
     Doc = case extract_header_rev(Req, couch_httpd:qs_value(Req, "rev")) of
         missing_rev -> % make the new doc
+            couch_doc:validate_docid(DocId),
             #doc{id=DocId};
         Rev ->
             case couch_db:open_doc_revs(Db, DocId, [Rev], []) of

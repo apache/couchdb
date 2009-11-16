@@ -14,12 +14,11 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-filename() -> "./test/etap/temp.011".
+filename() -> test_util:build_file("test/etap/temp.011").
 sizeblock() -> 4096. % Need to keep this in sync with couch_file.erl
 
 main(_) ->
-    code:add_patha("src/etap"),
-    code:add_pathz("src/couchdb"),
+    test_util:init_code_path(),
     {S1, S2, S3} = now(),
     random:seed(S1, S2, S3),
 

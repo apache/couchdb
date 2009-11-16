@@ -11,7 +11,7 @@
 ## the License.
 
 couchprivlibdir = $(localerlanglibdir)/couch-$(version)/priv/lib
-devcouchprivlibdir = $(abs_top_srcdir)/src/couchdb/.libs
+devcouchprivlibdir = $(abs_top_builddir)/src/couchdb/.libs
 
 localconf_DATA = default.ini
 noinst_DATA = default_dev.ini local_dev.ini
@@ -29,6 +29,7 @@ default.ini: default.ini.tpl
 	sed -e "s|%bindir%|.|g" \
 	    -e "s|%localconfdir%|$(localconfdir)|g" \
 	    -e "s|%localdatadir%|../share/couchdb|g" \
+		-e "s|%localbuilddatadir%|../share/couchdb|g" \
 	    -e "s|%localstatelibdir%|../var/lib/couchdb|g" \
 	    -e "s|%localstatelogdir%|../var/log/couchdb|g" \
 	    -e "s|%couchprivlibdir%|../lib/couch-$(version)/priv/lib|g" \
@@ -39,6 +40,7 @@ default.ini: default.ini.tpl
 	sed -e "s|%bindir%|$(bindir)|g" \
 	    -e "s|%localconfdir%|$(localconfdir)|g" \
 	    -e "s|%localdatadir%|$(localdatadir)|g" \
+		-e "s|%localbuilddatadir%|$(localdatadir)|g" \
 	    -e "s|%localstatelibdir%|$(localstatelibdir)|g" \
 	    -e "s|%localstatelogdir%|$(localstatelogdir)|g" \
 	    -e "s|%couchprivlibdir%|$(couchprivlibdir)|g" \
@@ -47,11 +49,12 @@ default.ini: default.ini.tpl
 endif
 
 default_dev.ini: default.ini.tpl
-	sed -e "s|%bindir%|$(abs_top_srcdir)/bin|g" \
-	    -e "s|%localconfdir%|$(abs_top_srcdir)/etc/couchdb|g" \
+	sed -e "s|%bindir%|$(abs_top_builddir)/bin|g" \
+	    -e "s|%localconfdir%|$(abs_top_builddir)/etc/couchdb|g" \
 	    -e "s|%localdatadir%|$(abs_top_srcdir)/share|g" \
-	    -e "s|%localstatelibdir%|$(abs_top_srcdir)/tmp/lib|g" \
-	    -e "s|%localstatelogdir%|$(abs_top_srcdir)/tmp/log|g" \
+		-e "s|%localbuilddatadir%|$(abs_top_builddir)/share|g" \
+	    -e "s|%localstatelibdir%|$(abs_top_builddir)/tmp/lib|g" \
+	    -e "s|%localstatelogdir%|$(abs_top_builddir)/tmp/log|g" \
 	    -e "s|%couchprivlibdir%|$(devcouchprivlibdir)|g" \
 	    -e "s|%couchjs_command_name%|$(couchjs_dev_command_name)|g" \
 	< $< > $@

@@ -350,6 +350,8 @@ AC_CONFIG_FILES([src/etap/Makefile])
 AC_CONFIG_FILES([src/ibrowse/Makefile])
 AC_CONFIG_FILES([src/mochiweb/Makefile])
 AC_CONFIG_FILES([test/Makefile])
+AC_CONFIG_FILES([test/etap/Makefile])
+AC_CONFIG_FILES([test/etap/test_util.erl])
 AC_CONFIG_FILES([utils/Makefile])
 AC_CONFIG_FILES([var/Makefile])
 

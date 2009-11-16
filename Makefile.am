@@ -37,11 +37,11 @@ THANKS.gz: $(top_srcdir)/THANKS
 	-gzip -9 < $< > $@
 
 check: dev
-	prove test/etap/*.t
+	$(top_builddir)/test/etap/run
 
 cover: dev
 	rm -f cover/*.coverdata
-	COVER=1 COVER_BIN=./src/couchdb/ prove test/etap/*.t
+	COVER=1 COVER_BIN=./src/couchdb/ $(top_builddir)/test/etap/run
 	SRC=./src/couchdb/ \
 	    $(ERL) -noshell \
 		-pa src/etap \
@@ -57,6 +57,9 @@ dev: all
 	mkdir -p $(top_builddir)/tmp/log
 	mkdir -p $(top_builddir)/tmp/run
 
+distclean-local:
+	rm -fr $(top_builddir)/tmp
+
 .PHONY: local-clean
 local-clean: maintainer-clean
 	@echo "This command is intended for maintainers to use;"
@@ -69,7 +72,6 @@ local-clean: maintainer-clean
 	rm -f $(top_srcdir)/test/etap/temp.*
 	rm -f $(top_srcdir)/*.tar.gz
 	rm -f $(top_srcdir)/*.tar.gz.*
-	rm -fr $(top_srcdir)/tmp
 	find $(top_srcdir) -name Makefile.in -exec rm {} \;
 
 distcheck-hook:

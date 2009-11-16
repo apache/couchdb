@@ -64,7 +64,7 @@ couchjs: couchjs.tpl
 	chmod +x $@
 
 couchjs_dev: couchjs.tpl
-	sed -e "s|%locallibbindir%|$(abs_top_srcdir)/src/couchdb|g" \
+	sed -e "s|%locallibbindir%|$(abs_top_builddir)/src/couchdb|g" \
 	    -e "s|%bug_uri%|@bug_uri@|g" \
 	    -e "s|%package_author_address%|@package_author_address@|g" \
 	    -e "s|%package_author_name%|@package_author_name@|g" \
