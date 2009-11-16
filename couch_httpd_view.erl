@@ -376,7 +376,7 @@ validate_view_query(reduce, _, Args) ->
 validate_view_query(include_docs, true, Args) ->
     case Args#view_query_args.view_type of
         reduce ->
-            Msg = <<"Query paramter `include_docs` "
+            Msg = <<"Query parameter `include_docs` "
                     "is invalid for reduce views.">>,
             throw({query_parse_error, Msg});
         _ ->
@@ -638,11 +638,14 @@ finish_reduce_fold(Req, Resp) ->
         end_json_response(Resp)
     end.
 
-parse_bool_param("true") -> true;
-parse_bool_param("false") -> false;
 parse_bool_param(Val) ->
-    Msg = io_lib:format("Invalid value for boolean paramter: ~p", [Val]),
-    throw({query_parse_error, ?l2b(Msg)}).
+    case string:to_lower(Val) of
+        "true" -> true;
+        "false" -> false;
+        _ ->
+            Msg = io_lib:format("Invalid boolean parameter: ~p", [Val]),
+            throw({query_parse_error, ?l2b(Msg)})
+    end.
 
 parse_int_param(Val) ->
     case (catch list_to_integer(Val)) of

@@ -137,7 +137,7 @@ do_maps(Group, MapQueue, WriteQueue, ViewEmptyKVs) ->
         do_maps(Group1, MapQueue, WriteQueue, ViewEmptyKVs)
     end.
 
-do_writes(Parent, Owner, Group, WriteQueue, IntitalBuild) ->
+do_writes(Parent, Owner, Group, WriteQueue, InitialBuild) ->
     case couch_work_queue:dequeue(WriteQueue) of
     closed ->
         Parent ! {new_group, Group};
@@ -155,12 +155,12 @@ do_writes(Parent, Owner, Group, WriteQueue, IntitalBuild) ->
                         AccViewKVs2, DocIdViewIdKeys ++ AccDocIdViewIdKeys}
             end, nil, Queue),
         Group2 = write_changes(Group, ViewKeyValues, DocIdViewIdKeys, NewSeq,
-                IntitalBuild),
+                InitialBuild),
         case Owner of
         nil -> ok;
         _ -> ok = gen_server:cast(Owner, {partial_update, Parent, Group2})
         end,
-        do_writes(Parent, Owner, Group2, WriteQueue, IntitalBuild)
+        do_writes(Parent, Owner, Group2, WriteQueue, InitialBuild)
     end.
 
 view_insert_query_results([], [], ViewKVs, DocIdViewIdKeysAcc) ->
