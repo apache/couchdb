@@ -54,7 +54,7 @@ Stats
 
 Build and System Integration:
 
- * Test	suite now works	with the distcheck target.
+ * Test suite now works with the distcheck target.
 
 Version 0.10.0
 --------------
