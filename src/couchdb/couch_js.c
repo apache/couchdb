@@ -396,14 +396,6 @@ ExecuteScript(JSContext *context, JSObject *obj, const char *filename) {
 
 static uint32 gBranchCount = 0;
 
-static JSBool
-BranchCallback(JSContext *context, JSScript *script) {
-    if ((++gBranchCount & 0x3fff) == 1) {
-        JS_MaybeGC(context);
-    }
-    return JS_TRUE;
-}
-
 static void
 PrintError(JSContext *context, const char *message, JSErrorReport *report) {
     if (!report || !JSREPORT_IS_WARNING(report->flags))
@@ -1214,8 +1206,6 @@ main(int argc, const char * argv[]) {
     if (!context)
         return 1;
     JS_SetErrorReporter(context, PrintError);
-    JS_SetBranchCallback(context, BranchCallback);
-    JS_ToggleOptions(context, JSOPTION_NATIVE_BRANCH_CALLBACK);
     JS_ToggleOptions(context, JSOPTION_XML);
 
     global = JS_NewObject(context, NULL, NULL, NULL);
