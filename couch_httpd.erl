@@ -679,10 +679,9 @@ read_until(#mp{data_fun=DataFun, buffer=Buffer}=Mp, Pattern, Callback) ->
     {partial, Skip} ->
         <<DataChunk:Skip/binary, Rest/binary>> = Buffer,
         Callback2 = Callback(DataChunk),
-        {Buffer2, DataFun2} = DataFun(),
-        Buffer3 = iolist_to_binary(Buffer2),
+        {NewData, DataFun2} = DataFun(),
         read_until(Mp#mp{data_fun=DataFun2,
-                buffer= <<Buffer3/binary, Rest/binary>>}, 
+                buffer= iolist_to_binary([Rest | NewData])},
                 Pattern, Callback2);
     {exact, Skip} ->
         PatternLen = size(Pattern),
@@ -761,8 +760,8 @@ partial_find(_B, _D, _N, 0) ->
 partial_find(B, D, N, K) ->
     <<B1:K/binary, _/binary>> = B,
     case D of
-        <<_Skip:N/binary, B1:K/binary>> ->
-            {partial, N, K};
+        <<_Skip:N/binary, B1/binary>> ->
+            {partial, N};
         _ ->
             partial_find(B, D, 1 + N, K - 1)
     end.
