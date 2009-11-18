@@ -33,8 +33,9 @@ CLEANFILES = $(JS_FILE)
 
 EXTRA_DIST = $(JS_FILE_COMPONENTS) $(JS_FILE_COMPONENTS_LAST)
 
+nobase_localdata_DATA = $(JS_FILE)
+
 nobase_dist_localdata_DATA = \
-    $(JS_FILE) \
     www/config.html \
     www/couch_tests.html \
     www/custom_test.html \
