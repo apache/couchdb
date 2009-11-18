@@ -16,7 +16,7 @@ oauthebindir = $(localerlanglibdir)/erlang-oauth/ebin
 # we add a ./configure option to enable it.
 
 oauth_file_collection = \
-	oauth.app.in \
+    oauth.app.in \
     oauth.erl \
     oauth_hmac_sha1.erl \
     oauth_http.erl \
@@ -25,7 +25,7 @@ oauth_file_collection = \
     oauth_uri.erl
 
 oauthebin_make_generated_file_list = \
-	oauth.app \
+    oauth.app \
     oauth.beam \
     oauth_hmac_sha1.beam \
     oauth_http.beam \
@@ -34,10 +34,11 @@ oauthebin_make_generated_file_list = \
     oauth_uri.beam
 
 oauthebin_DATA = \
-	$(oauthebin_make_generated_file_list)
+    $(oauthebin_make_generated_file_list)
 
 EXTRA_DIST = \
-	$(oauth_file_collection)
+    $(oauth_file_collection) \
+    oauth_rsa_sha1.erl
 
 CLEANFILES = \
     $(oauthebin_make_generated_file_list)

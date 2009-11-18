@@ -12,3 +12,11 @@
 
 SUBDIRS = etap
 
+EXTRA_DIST = \
+    couch_config_test.erl \
+    couch_config_writer_test.erl \
+    query_server_spec.rb \
+    run_native_process.es \
+    runner.erl \
+    runner.sh \
+    test.js
