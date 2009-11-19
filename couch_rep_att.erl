@@ -45,25 +45,29 @@ cleanup() ->
 attachment_receiver(Ref, Request) ->
     case get(Ref) of
     undefined ->
-        ReqId = start_http_request(Request),
-        put(Ref, ReqId),
-        receive_data(Ref, ReqId);
-    ReqId ->
-        receive_data(Ref, ReqId)
+        {ReqId, ContentEncoding} = start_http_request(Request),
+        put(Ref, {ReqId, ContentEncoding}),
+        receive_data(Ref, ReqId, ContentEncoding);
+    {ReqId, ContentEncoding} ->
+        receive_data(Ref, ReqId, ContentEncoding)
     end.
 
-receive_data(Ref, ReqId) ->
+receive_data(Ref, ReqId, ContentEncoding) ->
     receive
     {ibrowse_async_response, ReqId, {chunk_start,_}} ->
-        receive_data(Ref, ReqId);
+        receive_data(Ref, ReqId, ContentEncoding);
     {ibrowse_async_response, ReqId, chunk_end} ->
-        receive_data(Ref, ReqId);
+        receive_data(Ref, ReqId, ContentEncoding);
     {ibrowse_async_response, ReqId, {error, Err}} ->
         ?LOG_ERROR("streaming attachment ~p failed with ~p", [ReqId, Err]),
         throw({attachment_request_failed, Err});
     {ibrowse_async_response, ReqId, Data} ->
         % ?LOG_DEBUG("got ~p bytes for ~p", [size(Data), ReqId]),
-        Data;
+        if ContentEncoding =:= "gzip" ->
+            zlib:gunzip(Data);
+        true ->
+            Data
+        end;
     {ibrowse_async_response_end, ReqId} ->
         ?LOG_ERROR("streaming att. ended but more data requested ~p", [ReqId]),
         throw({attachment_request_failed, premature_end})
@@ -75,23 +79,25 @@ start_http_request(Req) ->
     {ibrowse_req_id, ReqId} = couch_rep_httpc:request(Req2),
     receive {ibrowse_async_headers, ReqId, Code, Headers} ->
         case validate_headers(Req2, list_to_integer(Code), Headers) of
-        ok ->
-            ReqId;
-        {ok, NewReqId} ->
-            NewReqId
+        {ok, ContentEncoding} ->
+            {ReqId, ContentEncoding};
+        {ok, ContentEncoding, NewReqId} ->
+            {NewReqId, ContentEncoding}
         end
     end.
 
-validate_headers(_Req, 200, _Headers) ->
-    ok;
+validate_headers(_Req, 200, Headers) ->
+    MochiHeaders = mochiweb_headers:make(Headers),
+    {ok, mochiweb_headers:get_value("Content-Encoding", MochiHeaders)};
 validate_headers(Req, Code, Headers) when Code > 299, Code < 400 ->
     Url = mochiweb_headers:get_value("Location",mochiweb_headers:make(Headers)),
     NewReq = couch_rep_httpc:redirected_request(Req, Url),
     {ibrowse_req_id, ReqId} = couch_rep_httpc:request(NewReq),
     receive {ibrowse_async_headers, ReqId, NewCode, NewHeaders} ->
-        ok = validate_headers(NewReq, list_to_integer(NewCode), NewHeaders)
+        {ok, Encoding} = validate_headers(NewReq, list_to_integer(NewCode),
+            NewHeaders)
     end,
-    {ok, ReqId};
+    {ok, Encoding, ReqId};
 validate_headers(Req, Code, _Headers) ->
     #http_db{url=Url, resource=Resource} = Req,
     ?LOG_ERROR("got ~p for ~s~s", [Code, Url, Resource]),
