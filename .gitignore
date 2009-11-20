@@ -69,6 +69,11 @@ etc/couchdb/default_dev.ini
 etc/couchdb/local_dev.ini
 utils/run
 tmp
+src/couchdb/priv/stat_descriptions.cfg
+src/erlang-oauth/oauth.app
+src/ibrowse/ibrowse.app
+src/mochiweb/mochiweb.app
+test/etap/run
 
 # for make check
 
