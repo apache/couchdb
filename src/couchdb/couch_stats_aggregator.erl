@@ -173,8 +173,8 @@ new_value(incremental, Value, Current) ->
 new_value(absolute, Value, _Current) ->
     Value.
 
-add_value(Time, Value, #aggregate{count=Count}=Agg) when Count < 1 ->
-    Samples = case Agg#aggregate.seconds of
+add_value(Time, Value, #aggregate{count=Count, seconds=Secs}=Agg) when Count < 1 ->
+    Samples = case Secs of
         0 -> [];
         _ -> [{Time, Value}]
     end,
@@ -233,8 +233,8 @@ rem_values(Time, Agg) ->
     end, Agg, Remove),
     Agg2#aggregate{samples=Keep}.
 
-rem_value(_Value, #aggregate{count=Count}=Agg) when Count =< 1 ->
-    #aggregate{seconds=Agg#aggregate.seconds};
+rem_value(_Value, #aggregate{count=Count, seconds=Secs}) when Count =< 1 ->
+    #aggregate{seconds=Secs};
 rem_value(Value, Agg) ->
     #aggregate{
         count=Count,

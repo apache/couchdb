@@ -49,7 +49,7 @@ compact_group(Group, EmptyGroup) ->
     couch_task_status:add_task(<<"View Group Compaction">>, TaskName, <<"">>),
 
     Fun = fun(KV, {Bt, Acc, TotalCopied}) ->
-        if TotalCopied rem 10000 == 0 ->
+        if TotalCopied rem 10000 =:= 0 ->
             couch_task_status:update("Copied ~p of ~p Ids (~p%)",
                 [TotalCopied, Count, (TotalCopied*100) div Count]),
             {ok, Bt2} = couch_btree:add(Bt, lists:reverse([KV|Acc])),
@@ -81,7 +81,7 @@ compact_view(View, EmptyView) ->
 
     %% Key is {Key,DocId}
     Fun = fun(KV, {Bt, Acc, TotalCopied}) ->
-        if TotalCopied rem 10000 == 0 ->
+        if TotalCopied rem 10000 =:= 0 ->
             couch_task_status:update("View #~p: copied ~p of ~p KVs (~p%)",
                 [View#view.id_num, TotalCopied, Count, (TotalCopied*100) div Count]),
             {ok, Bt2} = couch_btree:add(Bt, lists:reverse([KV|Acc])),

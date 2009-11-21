@@ -16,6 +16,8 @@
 
 -include("couch_db.hrl").
 
+-spec update(_, #group{}) -> no_return().
+
 update(Owner, Group) ->
     #group{
         db = #db{name=DbName} = Db,

@@ -120,19 +120,14 @@ run(State, [<<"validate">>, BFun, NDoc, ODoc, Ctx]) ->
     {State, catch Fun(NDoc, ODoc, Ctx)};
 run(State, [<<"filter">>, Docs, Req]) ->
     {_Sig, Fun} = hd(State#evstate.funs),
-    Resp = lists:map(fun(Doc) ->
-        case (catch Fun(Doc, Req)) of
-            true -> true;
-            _ -> false
-        end
-    end, Docs),
+    Resp = lists:map(fun(Doc) -> (catch Fun(Doc, Req)) =:= true end, Docs),
     {State, [true, Resp]};
 run(State, [<<"show">>, BFun, Doc, Req]) ->
     {_Sig, Fun} = makefun(State, BFun),
     Resp = case (catch Fun(Doc, Req)) of
         FunResp when is_list(FunResp) ->
             FunResp;
-        FunResp when is_tuple(FunResp), size(FunResp) == 1 ->
+        FunResp when tuple_size(FunResp) =:= 1 ->
             [<<"resp">>, FunResp];
         FunResp ->
             FunResp
@@ -352,7 +347,7 @@ to_binary({Data}) ->
     end,
     {lists:map(Pred, Data)};
 to_binary(Data) when is_list(Data) ->
-    lists:map(fun to_binary/1, Data);
+    [to_binary(D) || D <- Data];
 to_binary(null) ->
     null;
 to_binary(true) ->

@@ -190,10 +190,7 @@ render_doc_show(Lang, ShowSrc, DocId, Doc, Req, Db) ->
         {DocId, nil} -> {{append_docid(DocId, JsonReqIn)}, null};
         _ -> {{append_docid(DocId, JsonReqIn)}, couch_doc:to_json_obj(Doc, [revs])}
     end,
-    try proc_prompt(Proc,
-        [<<"show">>, ShowSrc, JsonDoc, JsonReq]) of
-    FormResp ->
-        FormResp
+    try proc_prompt(Proc, [<<"show">>, ShowSrc, JsonDoc, JsonReq])
     after
         ok = ret_os_process(Proc)
     end.
@@ -207,10 +204,7 @@ render_doc_update(Lang, UpdateSrc, DocId, Doc, Req, Db) ->
         {DocId, nil} -> {{append_docid(DocId, JsonReqIn)}, null};
         _ -> {{append_docid(DocId, JsonReqIn)}, couch_doc:to_json_obj(Doc, [revs])}
     end,
-    try proc_prompt(Proc, 
-        [<<"update">>, UpdateSrc, JsonDoc, JsonReq]) of
-    FormResp ->
-        FormResp
+    try proc_prompt(Proc, [<<"update">>, UpdateSrc, JsonDoc, JsonReq])
     after
         ok = ret_os_process(Proc)
     end.

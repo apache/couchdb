@@ -290,7 +290,7 @@ validate_doc_update(#db{user_ctx=UserCtx, admins=Admins},
         #doc{id= <<"_design/",_/binary>>}, _GetDiskDocFun) ->
     UserNames = [UserCtx#user_ctx.name | UserCtx#user_ctx.roles],
     % if the user is a server admin or db admin, allow the save
-    case length(UserNames -- [<<"_admin">> | Admins]) == length(UserNames) of
+    case length(UserNames -- [<<"_admin">> | Admins]) =:= length(UserNames) of
     true ->
         % not an admin
         {unauthorized, <<"You are not a server or database admin.">>};
@@ -478,8 +478,8 @@ prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldI
 
 new_revid(#doc{body=Body,revs={OldStart,OldRevs},
         atts=Atts,deleted=Deleted}) ->
-    case [{N, T, M} || #att{name=N,type=T,md5=M} <- Atts, M /= <<>>] of
-    Atts2 when length(Atts) /= length(Atts2) ->
+    case [{N, T, M} || #att{name=N,type=T,md5=M} <- Atts, M =/= <<>>] of
+    Atts2 when length(Atts) =/= length(Atts2) ->
         % We must have old style non-md5 attachments
         ?l2b(integer_to_list(couch_util:rand32()));
     Atts2 ->
@@ -503,7 +503,7 @@ check_dup_atts(#doc{atts=Atts}=Doc) ->
     check_dup_atts2(Atts2),
     Doc.
 
-check_dup_atts2([#att{name=N1}, #att{name=N2} | _]) when N1 == N2 ->
+check_dup_atts2([#att{name=N}, #att{name=N} | _]) ->
     throw({bad_request, <<"Duplicate attachments">>});
 check_dup_atts2([_ | Rest]) ->
     check_dup_atts2(Rest);
@@ -803,10 +803,10 @@ handle_call(is_idle, _From, #db{fd_ref_counter=RefCntr, compactor_pid=Compact,
             waiting_delayed_commit=Delay}=Db) ->
     % Idle means no referrers. Unless in the middle of a compaction file switch,
     % there are always at least 2 referrers, couch_db_updater and us.
-    {reply, (Delay == nil) and (Compact == nil) and (couch_ref_counter:count(RefCntr) == 2), Db};
+    {reply, (Delay == nil) andalso (Compact == nil) andalso (couch_ref_counter:count(RefCntr) == 2), Db};
 handle_call({db_updated, NewDb}, _From, #db{fd_ref_counter=OldRefCntr}) ->
     #db{fd_ref_counter=NewRefCntr}=NewDb,
-    case NewRefCntr == OldRefCntr of
+    case NewRefCntr =:= OldRefCntr of
     true -> ok;
     false ->
         couch_ref_counter:add(NewRefCntr),

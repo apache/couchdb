@@ -40,7 +40,7 @@ to_json_revisions(Options, Start, RevIds) ->
                 {<<"ids">>, [revid_to_str(R) ||R <- RevIds]}]}}]
     end.
 
-revid_to_str(RevId) when size(RevId) == 16 ->
+revid_to_str(RevId) when size(RevId) =:= 16 ->
     ?l2b(couch_util:to_hex(RevId));
 revid_to_str(RevId) ->
     RevId.
@@ -122,10 +122,10 @@ from_json_obj({Props}) ->
 from_json_obj(_Other) ->
     throw({bad_request, "Document must be a JSON object"}).
 
-parse_revid(RevId) when size(RevId) == 32 ->
+parse_revid(RevId) when size(RevId) =:= 32 ->
     RevInt = erlang:list_to_integer(?b2l(RevId), 16),
      <<RevInt:128>>;
-parse_revid(RevId) when length(RevId) == 32 ->
+parse_revid(RevId) when length(RevId) =:= 32 ->
     RevInt = erlang:list_to_integer(RevId, 16),
      <<RevInt:128>>;
 parse_revid(RevId) when is_binary(RevId) ->
@@ -222,7 +222,7 @@ transfer_fields([{<<"_revisions">>, {Props}} | Rest], Doc) ->
     RevIds2 = [parse_revid(RevId) || RevId <- RevIds],
     transfer_fields(Rest, Doc#doc{revs={Start, RevIds2}});
 
-transfer_fields([{<<"_deleted">>, B} | Rest], Doc) when (B==true) or (B==false) ->
+transfer_fields([{<<"_deleted">>, B} | Rest], Doc) when is_boolean(B) ->
     transfer_fields(Rest, Doc#doc{deleted=B});
 
 % ignored fields

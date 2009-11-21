@@ -34,7 +34,7 @@ merge(A, B) ->
         end,
         {A, false}, B),
     if HasConflicts or
-            ((length(Merged) /= length(A)) and (length(Merged) /= length(B))) ->
+            ((length(Merged) =/= length(A)) and (length(Merged) =/= length(B))) ->
         Conflicts = conflicts;
     true ->
         Conflicts = no_conflicts
@@ -221,7 +221,7 @@ get_full_key_paths(_Pos, [], KeysToGet, _KeyPathAcc) ->
 get_full_key_paths(Pos, [{KeyId, Value, SubTree} | RestTree], KeysToGet, KeyPathAcc) ->
     KeysToGet2 = KeysToGet -- [{Pos, KeyId}],
     CurrentNodeResult =
-    case length(KeysToGet2) == length(KeysToGet) of
+    case length(KeysToGet2) =:= length(KeysToGet) of
     true -> % not in the key list.
         [];
     false -> % this node is the key list. return it
