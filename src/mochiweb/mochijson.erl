@@ -186,7 +186,8 @@ json_encode_string_utf8_1([C | Cs]) when C >= 0, C =< 16#7f ->
            end,
     [NewC | json_encode_string_utf8_1(Cs)];
 json_encode_string_utf8_1(All=[C | _]) when C >= 16#80, C =< 16#10FFFF ->
-    json_encode_string_unicode(xmerl_ucs:from_utf8(All));
+    [?Q | Rest] = json_encode_string_unicode(xmerl_ucs:from_utf8(All)),
+    Rest;
 json_encode_string_utf8_1([]) ->
     "\"".
 
@@ -459,15 +460,17 @@ equiv_object(Props1, Props2) ->
 equiv_list([], []) ->
     true;
 equiv_list([V1 | L1], [V2 | L2]) ->
-    case equiv(V1, V2) of
-        true ->
-            equiv_list(L1, L2);
-        false ->
-            false
-    end.
+    equiv(V1, V2) andalso equiv_list(L1, L2).
 
 test_all() ->
+    test_issue33(),
     test_one(e2j_test_vec(utf8), 1).
+
+test_issue33() ->
+    %% http://code.google.com/p/mochiweb/issues/detail?id=33
+    Js = {struct, [{"key", [194, 163]}]},
+    Encoder = encoder([{input_encoding, utf8}]),
+    "{\"key\":\"\\u00a3\"}" = lists:flatten(Encoder(Js)).
 
 test_one([], _N) ->
     %% io:format("~p tests passed~n", [N-1]),

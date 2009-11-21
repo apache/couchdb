@@ -78,8 +78,7 @@ code_change(_Vsn, State, _Extra) ->
 
 doit(From, To) ->
     [case file:read_file_info(Filename) of
-         {ok, FileInfo} when FileInfo#file_info.mtime >= From,
-                             FileInfo#file_info.mtime < To ->
+         {ok, #file_info{mtime = Mtime}} when Mtime >= From, Mtime < To ->
              reload(Module);
          {ok, _} ->
              unmodified;

@@ -22,7 +22,7 @@
          ip=any,
          listen=null,
          acceptor=null,
-         backlog=30}).
+         backlog=128}).
 
 start(State=#mochiweb_socket_server{}) ->
     start_server(State);

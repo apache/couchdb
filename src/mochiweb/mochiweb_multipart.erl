@@ -76,15 +76,15 @@ parse_multipart_request(Req, Callback) ->
     Boundary = iolist_to_binary(
                  get_boundary(Req:get_header_value("content-type"))),
     Prefix = <<"\r\n--", Boundary/binary>>,
-    BS = size(Boundary),
+    BS = byte_size(Boundary),
     Chunk = read_chunk(Req, Length),
-    Length1 = Length - size(Chunk),
+    Length1 = Length - byte_size(Chunk),
     <<"--", Boundary:BS/binary, "\r\n", Rest/binary>> = Chunk,
-    feed_mp(headers, #mp{boundary=Prefix,
-                         length=Length1,
-                         buffer=Rest,
-                         callback=Callback,
-                         req=Req}).
+    feed_mp(headers, flash_multipart_hack(#mp{boundary=Prefix,
+                                              length=Length1,
+                                              buffer=Rest,
+                                              callback=Callback,
+                                              req=Req})).
 
 parse_headers(<<>>) ->
     [];
@@ -117,8 +117,27 @@ read_chunk(Req, Length) when Length > 0 ->
 read_more(State=#mp{length=Length, buffer=Buffer, req=Req}) ->
     Data = read_chunk(Req, Length),
     Buffer1 = <<Buffer/binary, Data/binary>>,
-    State#mp{length=Length - size(Data),
-             buffer=Buffer1}.
+    flash_multipart_hack(State#mp{length=Length - byte_size(Data),
+                                  buffer=Buffer1}).
+
+flash_multipart_hack(State=#mp{length=0, buffer=Buffer, boundary=Prefix}) ->
+    %% http://code.google.com/p/mochiweb/issues/detail?id=22
+    %% Flash doesn't terminate multipart with \r\n properly so we fix it up here
+    PrefixSize = size(Prefix),
+    case size(Buffer) - (2 + PrefixSize) of
+        Seek when Seek >= 0 ->
+            case Buffer of
+                <<_:Seek/binary, Prefix:PrefixSize/binary, "--">> ->
+                    Buffer1 = <<Buffer/binary, "\r\n">>,
+                    State#mp{buffer=Buffer1};
+                _ ->
+                    State
+            end;
+        _ ->
+            State
+    end;
+flash_multipart_hack(State) ->
+    State.
 
 feed_mp(headers, State=#mp{buffer=Buffer, callback=Callback}) ->
     {State1, P} = case find_in_binary(<<"\r\n\r\n">>, Buffer) of
@@ -136,7 +155,8 @@ feed_mp(headers, State=#mp{buffer=Buffer, callback=Callback}) ->
     feed_mp(body, State1#mp{buffer=Rest,
                             callback=NextCallback});
 feed_mp(body, State=#mp{boundary=Prefix, buffer=Buffer, callback=Callback}) ->
-    case find_boundary(Prefix, Buffer) of
+    Boundary = find_boundary(Prefix, Buffer),
+    case Boundary of
         {end_boundary, Start, Skip} ->
             <<Data:Start/binary, _:Skip/binary, Rest/binary>> = Buffer,
             C1 = Callback({body, Data}),
@@ -158,7 +178,7 @@ feed_mp(body, State=#mp{boundary=Prefix, buffer=Buffer, callback=Callback}) ->
     end.
 
 get_boundary(ContentType) ->
-    {"multipart/" ++ _, Opts} = mochiweb_util:parse_header(ContentType),
+    {"multipart/form-data", Opts} = mochiweb_util:parse_header(ContentType),
     case proplists:get_value("boundary", Opts) of
         S when is_list(S) ->
             S
@@ -242,7 +262,11 @@ test_callback(Expect, [Expect | Rest]) ->
             ok;
         _ ->
             fun (Next) -> test_callback(Next, Rest) end
-    end.
+    end;
+test_callback({body, Got}, [{body, Expect} | Rest]) ->
+    GotSize = size(Got),
+    <<Got:GotSize/binary, Expect1/binary>> = Expect,
+    fun (Next) -> test_callback(Next, [{body, Expect1} | Rest]) end.
 
 test_parse3() ->
     ContentType = "multipart/form-data; boundary=---------------------------7386909285754635891697677882",
@@ -261,14 +285,12 @@ test_parse3() ->
               eof],
     TestCallback = fun (Next) -> test_callback(Next, Expect) end,
     ServerFun = fun (Socket) ->
-                        case gen_tcp:send(Socket, BinContent) of
-                            ok ->
-                                exit(normal)
-                        end
+                        ok = gen_tcp:send(Socket, BinContent),
+                        exit(normal)
                 end,
     ClientFun = fun (Socket) ->
                         Req = fake_request(Socket, ContentType,
-                                           size(BinContent)),
+                                           byte_size(BinContent)),
                         Res = parse_multipart_request(Req, TestCallback),
                         {0, <<>>, ok} = Res,
                         ok
@@ -294,14 +316,12 @@ test_parse2() ->
               eof],
     TestCallback = fun (Next) -> test_callback(Next, Expect) end,
     ServerFun = fun (Socket) ->
-                        case gen_tcp:send(Socket, BinContent) of
-                            ok ->
-                                exit(normal)
-                        end
+                        ok = gen_tcp:send(Socket, BinContent),
+                        exit(normal)
                 end,
     ClientFun = fun (Socket) ->
                         Req = fake_request(Socket, ContentType,
-                                           size(BinContent)),
+                                           byte_size(BinContent)),
                         Res = parse_multipart_request(Req, TestCallback),
                         {0, <<>>, ok} = Res,
                         ok
@@ -327,14 +347,12 @@ test_parse_form() ->
                  ""], "\r\n"),
     BinContent = iolist_to_binary(Content),
     ServerFun = fun (Socket) ->
-                        case gen_tcp:send(Socket, BinContent) of
-                            ok ->
-                                exit(normal)
-                        end
+                        ok = gen_tcp:send(Socket, BinContent),
+                        exit(normal)
                 end,
     ClientFun = fun (Socket) ->
                         Req = fake_request(Socket, ContentType,
-                                           size(BinContent)),
+                                           byte_size(BinContent)),
                         Res = parse_form(Req),
                         [{"submit-name", "Larry"},
                          {"files", {"file1.txt", {"text/plain",[]},
@@ -376,14 +394,12 @@ test_parse() ->
               eof],
     TestCallback = fun (Next) -> test_callback(Next, Expect) end,
     ServerFun = fun (Socket) ->
-                        case gen_tcp:send(Socket, BinContent) of
-                            ok ->
-                                exit(normal)
-                        end
+                        ok = gen_tcp:send(Socket, BinContent),
+                        exit(normal)
                 end,
     ClientFun = fun (Socket) ->
                         Req = fake_request(Socket, ContentType,
-                                           size(BinContent)),
+                                           byte_size(BinContent)),
                         Res = parse_multipart_request(Req, TestCallback),
                         {0, <<>>, ok} = Res,
                         ok
@@ -419,6 +435,89 @@ test_find_in_binary() ->
     {partial, 1, 3} = find_in_binary(<<"foobar">>, <<"afoo">>),
     ok.
 
+test_flash_parse() ->
+    ContentType = "multipart/form-data; boundary=----------ei4GI3GI3Ij5Ef1ae0KM7Ij5ei4Ij5",
+    "----------ei4GI3GI3Ij5Ef1ae0KM7Ij5ei4Ij5" = get_boundary(ContentType),
+    BinContent = <<"------------ei4GI3GI3Ij5Ef1ae0KM7Ij5ei4Ij5\r\nContent-Disposition: form-data; name=\"Filename\"\r\n\r\nhello.txt\r\n------------ei4GI3GI3Ij5Ef1ae0KM7Ij5ei4Ij5\r\nContent-Disposition: form-data; name=\"success_action_status\"\r\n\r\n201\r\n------------ei4GI3GI3Ij5Ef1ae0KM7Ij5ei4Ij5\r\nContent-Disposition: form-data; name=\"file\"; filename=\"hello.txt\"\r\nContent-Type: application/octet-stream\r\n\r\nhello\n\r\n------------ei4GI3GI3Ij5Ef1ae0KM7Ij5ei4Ij5\r\nContent-Disposition: form-data; name=\"Upload\"\r\n\r\nSubmit Query\r\n------------ei4GI3GI3Ij5Ef1ae0KM7Ij5ei4Ij5--">>,
+    Expect = [{headers,
+               [{"content-disposition",
+                 {"form-data", [{"name", "Filename"}]}}]},
+              {body, <<"hello.txt">>},
+              body_end,
+              {headers,
+               [{"content-disposition",
+                 {"form-data", [{"name", "success_action_status"}]}}]},
+              {body, <<"201">>},
+              body_end,
+              {headers,
+               [{"content-disposition",
+                 {"form-data", [{"name", "file"}, {"filename", "hello.txt"}]}},
+                {"content-type", {"application/octet-stream", []}}]},
+              {body, <<"hello\n">>},
+              body_end,
+              {headers,
+               [{"content-disposition",
+                 {"form-data", [{"name", "Upload"}]}}]},
+              {body, <<"Submit Query">>},
+              body_end,
+              eof],
+    TestCallback = fun (Next) -> test_callback(Next, Expect) end,
+    ServerFun = fun (Socket) ->
+                        ok = gen_tcp:send(Socket, BinContent),
+                        exit(normal)
+                end,
+    ClientFun = fun (Socket) ->
+                        Req = fake_request(Socket, ContentType,
+                                           byte_size(BinContent)),
+                        Res = parse_multipart_request(Req, TestCallback),
+                        {0, <<>>, ok} = Res,
+                        ok
+                end,
+    ok = with_socket_server(ServerFun, ClientFun),
+    ok.
+
+test_flash_parse2() ->
+    ContentType = "multipart/form-data; boundary=----------ei4GI3GI3Ij5Ef1ae0KM7Ij5ei4Ij5",
+    "----------ei4GI3GI3Ij5Ef1ae0KM7Ij5ei4Ij5" = get_boundary(ContentType),
+    Chunk = iolist_to_binary(string:copies("%", 4096)),
+    BinContent = <<"------------ei4GI3GI3Ij5Ef1ae0KM7Ij5ei4Ij5\r\nContent-Disposition: form-data; name=\"Filename\"\r\n\r\nhello.txt\r\n------------ei4GI3GI3Ij5Ef1ae0KM7Ij5ei4Ij5\r\nContent-Disposition: form-data; name=\"success_action_status\"\r\n\r\n201\r\n------------ei4GI3GI3Ij5Ef1ae0KM7Ij5ei4Ij5\r\nContent-Disposition: form-data; name=\"file\"; filename=\"hello.txt\"\r\nContent-Type: application/octet-stream\r\n\r\n", Chunk/binary, "\r\n------------ei4GI3GI3Ij5Ef1ae0KM7Ij5ei4Ij5\r\nContent-Disposition: form-data; name=\"Upload\"\r\n\r\nSubmit Query\r\n------------ei4GI3GI3Ij5Ef1ae0KM7Ij5ei4Ij5--">>,
+    Expect = [{headers,
+               [{"content-disposition",
+                 {"form-data", [{"name", "Filename"}]}}]},
+              {body, <<"hello.txt">>},
+              body_end,
+              {headers,
+               [{"content-disposition",
+                 {"form-data", [{"name", "success_action_status"}]}}]},
+              {body, <<"201">>},
+              body_end,
+              {headers,
+               [{"content-disposition",
+                 {"form-data", [{"name", "file"}, {"filename", "hello.txt"}]}},
+                {"content-type", {"application/octet-stream", []}}]},
+              {body, Chunk},
+              body_end,
+              {headers,
+               [{"content-disposition",
+                 {"form-data", [{"name", "Upload"}]}}]},
+              {body, <<"Submit Query">>},
+              body_end,
+              eof],
+    TestCallback = fun (Next) -> test_callback(Next, Expect) end,
+    ServerFun = fun (Socket) ->
+                        ok = gen_tcp:send(Socket, BinContent),
+                        exit(normal)
+                end,
+    ClientFun = fun (Socket) ->
+                        Req = fake_request(Socket, ContentType,
+                                           byte_size(BinContent)),
+                        Res = parse_multipart_request(Req, TestCallback),
+                        {0, <<>>, ok} = Res,
+                        ok
+                end,
+    ok = with_socket_server(ServerFun, ClientFun),
+    ok.
+
 test() ->
     test_find_in_binary(),
     test_find_boundary(),
@@ -426,4 +525,6 @@ test() ->
     test_parse2(),
     test_parse3(),
     test_parse_form(),
+    test_flash_parse(),
+    test_flash_parse2(),
     ok.

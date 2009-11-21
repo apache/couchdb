@@ -29,7 +29,8 @@ skel() ->
     "skel".
 
 skelcopy(Src, DestDir, Name, LDst) ->
-    {ok, Dest, _} = regexp:gsub(filename:basename(Src), skel(), Name),
+    Dest = re:replace(filename:basename(Src), skel(), Name,
+                      [global, {return, list}]),
     case file:read_file_info(Src) of
         {ok, #file_info{type=directory, mode=Mode}} ->
             Dir = DestDir ++ "/" ++ Dest,
@@ -50,7 +51,8 @@ skelcopy(Src, DestDir, Name, LDst) ->
         {ok, #file_info{type=regular, mode=Mode}} ->
             OutFile = filename:join(DestDir, Dest),
             {ok, B} = file:read_file(Src),
-            {ok, S, _} = regexp:gsub(binary_to_list(B), skel(), Name),
+            S = re:replace(binary_to_list(B), skel(), Name,
+                           [{return, list}, global]),
             ok = file:write_file(OutFile, list_to_binary(S)),
             ok = file:write_file_info(OutFile, #file_info{mode=Mode}),
             io:format("    ~s~n", [filename:basename(Src)]),

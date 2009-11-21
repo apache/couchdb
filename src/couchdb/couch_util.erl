@@ -20,6 +20,7 @@
     to_hex/1,parse_term/1, dict_find/3]).
 -export([file_read_size/1, get_nested_json_value/2, json_user_ctx/1]).
 -export([to_binary/1, to_integer/1, to_list/1, url_encode/1]).
+-export([json_encode/1, json_decode/1]).
 
 -include("couch_db.hrl").
 -include_lib("kernel/include/file.hrl").
@@ -406,3 +407,16 @@ url_encode([H|T]) ->
     end;
 url_encode([]) ->
     [].
+
+json_encode(V) ->
+    Handler =
+    fun({L}) when is_list(L) ->
+        {struct,L};
+    (Bad) ->
+        exit({json_encode, {bad_term, Bad}})
+    end,
+    (mochijson2:encoder([{handler, Handler}]))(V).
+
+json_decode(V) ->
+    try (mochijson2:decoder([{object_hook, fun({struct,L}) -> {L} end}]))(V)
+    catch _:_ -> throw({invalid_json,V}) end.

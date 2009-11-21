@@ -7,6 +7,7 @@
 -author('bob@mochimedia.com').
 -export([start/0, start/1, stop/0, stop/1]).
 -export([loop/2, default_body/1]).
+-export([after_response/2, reentry/1]).
 
 -define(IDLE_TIMEOUT, 30000).
 
@@ -110,6 +111,11 @@ request(Socket, Body) ->
             exit(normal)
     end.
 
+reentry(Body) ->
+    fun (Req) ->
+            ?MODULE:after_response(Body, Req)
+    end.
+
 headers(Socket, Request, Headers, _Body, ?MAX_HEADERS) ->
     %% Too many headers sent, bad request.
     inet:setopts(Socket, [{packet, raw}]),
@@ -125,18 +131,22 @@ headers(Socket, Request, Headers, Body, HeaderCount) ->
             Req = mochiweb:new_request({Socket, Request,
                                         lists:reverse(Headers)}),
             Body(Req),
-            case Req:should_close() of
-                true ->
-                    gen_tcp:close(Socket),
-                    exit(normal);
-                false ->
-                    Req:cleanup(),
-                    ?MODULE:loop(Socket, Body)
-            end;
+            ?MODULE:after_response(Body, Req);
         {ok, {http_header, _, Name, _, Value}} ->
             headers(Socket, Request, [{Name, Value} | Headers], Body,
                     1 + HeaderCount);
         _Other ->
             gen_tcp:close(Socket),
             exit(normal)
+    end.
+
+after_response(Body, Req) ->
+    Socket = Req:get(socket),
+    case Req:should_close() of
+        true ->
+            gen_tcp:close(Socket),
+            exit(normal);
+        false ->
+            Req:cleanup(),
+            ?MODULE:loop(Socket, Body)
     end.

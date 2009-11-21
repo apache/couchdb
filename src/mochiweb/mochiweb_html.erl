@@ -305,6 +305,18 @@ test_tokens() ->
      {data, <<" A= B <= C ">>, false},
      {end_tag, <<"script">>}] =
         tokens(<<"<script type=\"text/javascript\"> A= B <= C </script>">>),
+    [{start_tag, <<"script">>, [{<<"type">>, <<"text/javascript">>}], false},
+     {data, <<" A= B <= C ">>, false},
+     {end_tag, <<"script">>}] =
+        tokens(<<"<script type =\"text/javascript\"> A= B <= C </script>">>),
+    [{start_tag, <<"script">>, [{<<"type">>, <<"text/javascript">>}], false},
+     {data, <<" A= B <= C ">>, false},
+     {end_tag, <<"script">>}] =
+        tokens(<<"<script type = \"text/javascript\"> A= B <= C </script>">>),
+    [{start_tag, <<"script">>, [{<<"type">>, <<"text/javascript">>}], false},
+     {data, <<" A= B <= C ">>, false},
+     {end_tag, <<"script">>}] =
+        tokens(<<"<script type= \"text/javascript\"> A= B <= C </script>">>),
     [{start_tag, <<"textarea">>, [], false},
      {data, <<"<html></body>">>, false},
      {end_tag, <<"textarea">>}] =
@@ -672,7 +684,8 @@ tokenize_attr_value(Attr, B, S) ->
     O = S1#decoder.offset,
     case B of
         <<_:O/binary, "=", _/binary>> ->
-            tokenize_word_or_literal(B, ?INC_COL(S1));
+            S2 = skip_whitespace(B, ?INC_COL(S1)),
+            tokenize_word_or_literal(B, S2);
         _ ->
             {Attr, S1}
     end.
