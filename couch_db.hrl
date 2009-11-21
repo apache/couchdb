@@ -17,8 +17,8 @@
 -define(MIN_STR, <<"">>).
 -define(MAX_STR, <<255>>). % illegal utf string
 
--define(JSON_ENCODE(V), mochijson2:encode(V)).
--define(JSON_DECODE(V), mochijson2:decode(V)).
+-define(JSON_ENCODE(V), couch_util:json_encode(V)).
+-define(JSON_DECODE(V), couch_util:json_decode(V)).
 
 -define(b2a(V), list_to_atom(binary_to_list(V))).
 -define(b2l(V), binary_to_list(V)).
