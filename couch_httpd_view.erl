@@ -236,10 +236,7 @@ parse_view_params(Req, Keys, ViewType) ->
     lists:foldl(fun({K, V}, Acc) ->
             parse_view_param(K, V) ++ Acc
         end, [], QueryList),
-    IsMultiGet = case Keys of
-        nil -> false;
-        _ -> true
-    end,
+    IsMultiGet = (Keys =/= nil),
     Args = #view_query_args{
         view_type=ViewType,
         multi_get=IsMultiGet

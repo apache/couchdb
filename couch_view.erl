@@ -89,9 +89,9 @@ cleanup_index_files(Db) ->
     RegExp = "("++ string:join(Sigs, "|") ++")",
 
     % filter out the ones in use
-    DeleteFiles = lists:filter(fun(FilePath) ->
-            re:run(FilePath, RegExp, [{capture, none}]) == nomatch
-        end, FileList),
+    DeleteFiles = [FilePath
+		   || FilePath <- FileList,
+		      re:run(FilePath, RegExp, [{capture, none}]) =:= nomatch],
     % delete unused files
     ?LOG_DEBUG("deleting unused view index files: ~p",[DeleteFiles]),
     [file:delete(File)||File <- DeleteFiles],
@@ -369,12 +369,10 @@ less_json_ids({JsonA, IdA}, {JsonB, IdB}) ->
 less_json(A, B) ->
     TypeA = type_sort(A),
     TypeB = type_sort(B),
-    if
-    TypeA == TypeB ->
-        Less = less_same_type(A,B),
-        Less;
-    true ->
-        TypeA < TypeB
+    if TypeA == TypeB ->
+	    less_same_type(A, B);
+       true ->
+	    TypeA < TypeB
     end.
 
 type_sort(V) when is_atom(V) -> 0;

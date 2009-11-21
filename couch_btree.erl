@@ -217,16 +217,12 @@ lookup(Bt, {Pointer, _Reds}, Keys) ->
         lookup_kvnode(Bt, list_to_tuple(NodeList), 1, Keys, [])
     end.
 
-
-
 lookup_kpnode(_Bt, _NodeTuple, _LowerBound, [], Output) ->
     {ok, lists:reverse(Output)};
-
-lookup_kpnode(_Bt, NodeTuple, LowerBound, Keys, Output) when size(NodeTuple) < LowerBound ->
+lookup_kpnode(_Bt, NodeTuple, LowerBound, Keys, Output) when tuple_size(NodeTuple) < LowerBound ->
     {ok, lists:reverse(Output, [{Key, not_found} || Key <- Keys])};
-
 lookup_kpnode(Bt, NodeTuple, LowerBound, [FirstLookupKey | _] = LookupKeys, Output) ->
-    N = find_first_gteq(Bt, NodeTuple, LowerBound, size(NodeTuple), FirstLookupKey),
+    N = find_first_gteq(Bt, NodeTuple, LowerBound, tuple_size(NodeTuple), FirstLookupKey),
     {Key, PointerInfo} = element(N, NodeTuple),
     SplitFun = fun(LookupKey) -> not less(Bt, Key, LookupKey) end,
     case lists:splitwith(SplitFun, LookupKeys) of
@@ -240,11 +236,11 @@ lookup_kpnode(Bt, NodeTuple, LowerBound, [FirstLookupKey | _] = LookupKeys, Outp
 
 lookup_kvnode(_Bt, _NodeTuple, _LowerBound, [], Output) ->
     {ok, lists:reverse(Output)};
-lookup_kvnode(_Bt, NodeTuple, LowerBound, Keys, Output) when size(NodeTuple) < LowerBound ->
+lookup_kvnode(_Bt, NodeTuple, LowerBound, Keys, Output) when tuple_size(NodeTuple) < LowerBound ->
     % keys not found
     {ok, lists:reverse(Output, [{Key, not_found} || Key <- Keys])};
 lookup_kvnode(Bt, NodeTuple, LowerBound, [LookupKey | RestLookupKeys], Output) ->
-    N = find_first_gteq(Bt, NodeTuple, LowerBound, size(NodeTuple), LookupKey),
+    N = find_first_gteq(Bt, NodeTuple, LowerBound, tuple_size(NodeTuple), LookupKey),
     {Key, Value} = element(N, NodeTuple),
     case less(Bt, LookupKey, Key) of
     true ->
@@ -272,14 +268,14 @@ complete_root(Bt, KPs) ->
 
 %%%%%%%%%%%%% The chunkify function sucks! %%%%%%%%%%%%%
 % It is inaccurate as it does not account for compression when blocks are
-% written. Plus with the "case size(term_to_binary(InList)) of" code it's
-% probably really inefficient.
+% written. Plus with the "case byte_size(term_to_binary(InList)) of" code
+% it's probably really inefficient.
 
 % dialyzer says this pattern is never matched
 % chunkify(_Bt, []) ->
 %     [];
 chunkify(Bt, InList) ->
-    case size(term_to_binary(InList)) of
+    case byte_size(term_to_binary(InList)) of
     Size when Size > ?CHUNK_THRESHOLD ->
         NumberOfChunksLikely = ((Size div ?CHUNK_THRESHOLD) + 1),
         ChunkThreshold = Size div NumberOfChunksLikely,
@@ -293,7 +289,7 @@ chunkify(_Bt, [], _ChunkThreshold, [], 0, OutputChunks) ->
 chunkify(_Bt, [], _ChunkThreshold, OutList, _OutListSize, OutputChunks) ->
     lists:reverse([lists:reverse(OutList) | OutputChunks]);
 chunkify(Bt, [InElement | RestInList], ChunkThreshold, OutList, OutListSize, OutputChunks) ->
-    case size(term_to_binary(InElement)) of
+    case byte_size(term_to_binary(InElement)) of
     Size when (Size + OutListSize) > ChunkThreshold andalso OutList /= [] ->
         chunkify(Bt, RestInList, ChunkThreshold, [], 0, [lists:reverse([InElement | OutList]) | OutputChunks]);
     Size ->
@@ -319,7 +315,7 @@ modify_node(Bt, RootPointerInfo, Actions, QueryOutput) ->
     [] ->  % no nodes remain
         {ok, [], QueryOutput2, Bt2};
     NodeList ->  % nothing changed
-        {LastKey, _LastValue} = element(size(NodeTuple), NodeTuple),
+        {LastKey, _LastValue} = element(tuple_size(NodeTuple), NodeTuple),
         {ok, [{LastKey, RootPointerInfo}], QueryOutput2, Bt2};
     _Else2 ->
         {ok, ResultList, Bt3} = write_node(Bt2, NodeType, NewNodeList),
@@ -357,18 +353,19 @@ modify_kpnode(Bt, {}, _LowerBound, Actions, [], QueryOutput) ->
     modify_node(Bt, nil, Actions, QueryOutput);
 modify_kpnode(Bt, NodeTuple, LowerBound, [], ResultNode, QueryOutput) ->
     {ok, lists:reverse(ResultNode, bounded_tuple_to_list(NodeTuple, LowerBound,
-            size(NodeTuple),  [])), QueryOutput, Bt};
+            tuple_size(NodeTuple), [])), QueryOutput, Bt};
 modify_kpnode(Bt, NodeTuple, LowerBound,
         [{_, FirstActionKey, _}|_]=Actions, ResultNode, QueryOutput) ->
-    N = find_first_gteq(Bt, NodeTuple, LowerBound, size(NodeTuple), FirstActionKey),
-    case N == size(NodeTuple) of
+    Sz = tuple_size(NodeTuple),
+    N = find_first_gteq(Bt, NodeTuple, LowerBound, Sz, FirstActionKey),
+    case N =:= Sz of
     true  ->
         % perform remaining actions on last node
-        {_, PointerInfo} = element(size(NodeTuple), NodeTuple),
+        {_, PointerInfo} = element(Sz, NodeTuple),
         {ok, ChildKPs, QueryOutput2, Bt2} =
             modify_node(Bt, PointerInfo, Actions, QueryOutput),
         NodeList = lists:reverse(ResultNode, bounded_tuple_to_list(NodeTuple, LowerBound,
-            size(NodeTuple) - 1, ChildKPs)),
+            Sz - 1, ChildKPs)),
         {ok, NodeList, QueryOutput2, Bt2};
     false ->
         {NodeKey, PointerInfo} = element(N, NodeTuple),
@@ -409,8 +406,8 @@ find_first_gteq(Bt, Tuple, Start, End, Key) ->
     end.
 
 modify_kvnode(Bt, NodeTuple, LowerBound, [], ResultNode, QueryOutput) ->
-    {ok, lists:reverse(ResultNode, bounded_tuple_to_list(NodeTuple, LowerBound, size(NodeTuple), [])), QueryOutput, Bt};
-modify_kvnode(Bt, NodeTuple, LowerBound, [{ActionType, ActionKey, ActionValue} | RestActions], ResultNode, QueryOutput) when LowerBound > size(NodeTuple) ->
+    {ok, lists:reverse(ResultNode, bounded_tuple_to_list(NodeTuple, LowerBound, tuple_size(NodeTuple), [])), QueryOutput, Bt};
+modify_kvnode(Bt, NodeTuple, LowerBound, [{ActionType, ActionKey, ActionValue} | RestActions], ResultNode, QueryOutput) when LowerBound > tuple_size(NodeTuple) ->
     case ActionType of
     insert ->
         modify_kvnode(Bt, NodeTuple, LowerBound, RestActions, [{ActionKey, ActionValue} | ResultNode], QueryOutput);
@@ -422,7 +419,7 @@ modify_kvnode(Bt, NodeTuple, LowerBound, [{ActionType, ActionKey, ActionValue} |
         modify_kvnode(Bt, NodeTuple, LowerBound, RestActions, ResultNode, [{not_found, {ActionKey, nil}} | QueryOutput])
     end;
 modify_kvnode(Bt, NodeTuple, LowerBound, [{ActionType, ActionKey, ActionValue} | RestActions], AccNode, QueryOutput) ->
-    N = find_first_gteq(Bt, NodeTuple, LowerBound, size(NodeTuple), ActionKey),
+    N = find_first_gteq(Bt, NodeTuple, LowerBound, tuple_size(NodeTuple), ActionKey),
     {Key, Value} = element(N, NodeTuple),
     ResultNode =  bounded_tuple_to_revlist(NodeTuple, LowerBound, N - 1, AccNode),
     case less(Bt, ActionKey, Key) of

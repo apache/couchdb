@@ -377,7 +377,7 @@ create_user_req(#httpd{method='POST', mochi_req=MochiReq}=Req, Db) ->
         ?LOG_DEBUG("Can't create ~s: already exists", [?b2l(UserName)]),
          throw({forbidden, <<"User already exists.">>})
     end.
-    
+
 update_user_req(#httpd{method='PUT', mochi_req=MochiReq, user_ctx=UserCtx}=Req, Db, UserName) ->
     Name = UserCtx#user_ctx.name,
     UserRoles = UserCtx#user_ctx.roles,
@@ -413,16 +413,14 @@ update_user_req(#httpd{method='PUT', mochi_req=MochiReq, user_ctx=UserCtx}=Req, 
         
         PasswordHash = case lists:member(<<"_admin">>, UserRoles) of
         true ->
-            Hash = case Password of
+            case Password of
                 <<>> -> CurrentPasswordHash;
                 _Else ->
-                    H = hash_password(Password, UserSalt),
-                    H
-                end,
-            Hash;
-        false when Name == UserName ->
+                    hash_password(Password, UserSalt)
+	    end;
+        false when Name =:= UserName ->
             %% for user we test old password before allowing change
-            Hash = case Password of
+            case Password of
                 <<>> -> 
                     CurrentPasswordHash;
                 _P when OldPassword =:= [] ->
@@ -430,16 +428,13 @@ update_user_req(#httpd{method='PUT', mochi_req=MochiReq, user_ctx=UserCtx}=Req, 
                 _Else ->
                     OldPasswordHash = hash_password(OldPassword1, UserSalt),
                     ?LOG_DEBUG("~p == ~p", [CurrentPasswordHash, OldPasswordHash]),
-                    Hash1 = case CurrentPasswordHash of
-                        ExpectedHash when ExpectedHash == OldPasswordHash ->
-                            H = hash_password(Password, UserSalt),
-                            H;
+                    case CurrentPasswordHash of
+                        ExpectedHash when ExpectedHash =:= OldPasswordHash ->
+                            hash_password(Password, UserSalt);
                         _ ->
                             throw({forbidden, <<"Old password is incorrect.">>})
-                        end,
-                    Hash1
-                end,
-            Hash;
+		    end
+                end;
         _ ->
             throw({forbidden, <<"You aren't allowed to change this password.">>})
         end, 
@@ -457,24 +452,24 @@ update_user_req(#httpd{method='PUT', mochi_req=MochiReq, user_ctx=UserCtx}=Req, 
 handle_user_req(#httpd{method='POST'}=Req) ->
     DbName = couch_config:get("couch_httpd_auth", "authentication_db"),
     ensure_users_db_exists(?l2b(DbName)),
-    case couch_db:open(?l2b(DbName), [{user_ctx, #user_ctx{roles=[<<"_admin">>]}}]) of
-        {ok, Db} -> create_user_req(Req, Db)
-    end;
+    {ok, Db} = couch_db:open(?l2b(DbName),
+			     [{user_ctx, #user_ctx{roles=[<<"_admin">>]}}]),
+    create_user_req(Req, Db);
 handle_user_req(#httpd{method='PUT', path_parts=[_]}=_Req) ->
     throw({bad_request, <<"Username is missing">>});
 handle_user_req(#httpd{method='PUT', path_parts=[_, UserName]}=Req) ->
     DbName = couch_config:get("couch_httpd_auth", "authentication_db"),
     ensure_users_db_exists(?l2b(DbName)),
-    case couch_db:open(?l2b(DbName), [{user_ctx, #user_ctx{roles=[<<"_admin">>]}}]) of
-        {ok, Db} -> update_user_req(Req, Db, UserName)
-    end;
+    {ok, Db} = couch_db:open(?l2b(DbName),
+			     [{user_ctx, #user_ctx{roles=[<<"_admin">>]}}]),
+    update_user_req(Req, Db, UserName);
 handle_user_req(Req) ->
-     send_method_not_allowed(Req, "POST,PUT").
+    couch_httpd:send_method_not_allowed(Req, "POST,PUT").
 
 to_int(Value) when is_binary(Value) ->
     to_int(?b2l(Value)); 
 to_int(Value) when is_list(Value) ->
-    erlang:list_to_integer(Value);
+    list_to_integer(Value);
 to_int(Value) when is_integer(Value) ->
     Value.
 

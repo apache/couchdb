@@ -44,13 +44,13 @@ writer_loop(Parent, Reader, Target) ->
         writer_loop(Parent, Reader, Target)
     end.
 
-write_docs(#http_db{} = Db, Docs) ->
+write_docs(#http_db{headers = Headers} = Db, Docs) ->
     JsonDocs = [couch_doc:to_json_obj(Doc, [revs,attachments]) || Doc <- Docs],
     Request = Db#http_db{
         resource = "_bulk_docs",
         method = post,
         body = {[{new_edits, false}, {docs, JsonDocs}]},
-        headers = [{"x-couch-full-commit", "false"} | Db#http_db.headers]
+        headers = [{"x-couch-full-commit", "false"} | Headers]
     },
     ErrorsJson = case couch_rep_httpc:request(Request) of
     {FailProps} ->
@@ -58,16 +58,14 @@ write_docs(#http_db{} = Db, Docs) ->
     List when is_list(List) ->
         List
     end,
-    ErrorsList =
-    lists:map(
-        fun({Props}) ->
-            Id = proplists:get_value(<<"id">>, Props),
-            Rev = couch_doc:parse_rev(proplists:get_value(<<"rev">>, Props)),
-            ErrId = couch_util:to_existing_atom(
-                    proplists:get_value(<<"error">>, Props)),
-            Reason = proplists:get_value(<<"reason">>, Props),
-            {{Id, Rev}, {ErrId, Reason}}
-        end, ErrorsJson),
+    ErrorsList = [write_docs_1(V) || V <- ErrorsJson],
     {ok, ErrorsList};
 write_docs(Db, Docs) ->
     couch_db:update_docs(Db, Docs, [delay_commit], replicated_changes).
+
+write_docs_1({Props}) ->
+    Id = proplists:get_value(<<"id">>, Props),
+    Rev = couch_doc:parse_rev(proplists:get_value(<<"rev">>, Props)),
+    ErrId = couch_util:to_existing_atom(proplists:get_value(<<"error">>, Props)),
+    Reason = proplists:get_value(<<"reason">>, Props),
+    {{Id, Rev}, {ErrId, Reason}}.

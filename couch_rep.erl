@@ -308,15 +308,15 @@ compare_rep_history([{S}|SourceRest], [{T}|TargetRest]=Target) ->
         end
     end.
 
-close_db(#http_db{})->
+close_db(#http_db{}) ->
     ok;
-close_db(Db)->
+close_db(Db) ->
     couch_db:close(Db).
 
-dbname(#http_db{} = Db) ->
-    Db#http_db.url;
-dbname(Db) ->
-    Db#db.name.
+dbname(#http_db{url = Url}) ->
+    Url;
+dbname(#db{name = Name}) ->
+    Name.
 
 dbinfo(#http_db{} = Db) ->
     {DbProps} = couch_rep_httpc:request(Db),

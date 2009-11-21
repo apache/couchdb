@@ -52,7 +52,7 @@ terminate(_Reason, #q{work_waiter=WW}) ->
     gen_server:reply(WW, closed).
     
 handle_call({queue, Item}, From, #q{work_waiter=nil}=Q0) ->
-    Q = Q0#q{size=Q0#q.size + size(term_to_binary(Item)),
+    Q = Q0#q{size=Q0#q.size + byte_size(term_to_binary(Item)),
                 items=Q0#q.items + 1,
                 buffer=[Item | Q0#q.buffer]},
     case (Q#q.size >= Q#q.max_size) orelse

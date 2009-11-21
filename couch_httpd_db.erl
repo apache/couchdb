@@ -1021,7 +1021,7 @@ db_attachment_req(#httpd{method=Method}=Req, Db, DocId, FileNameParts)
             [];
         _ ->
             [#att{
-                name=FileName,
+                name = FileName,
                 type = case couch_httpd:header_value(Req,"Content-Type") of
                     undefined ->
                         % We could throw an error here or guess by the FileName.

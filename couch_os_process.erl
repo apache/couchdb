@@ -62,10 +62,9 @@ prompt(Pid, Data) ->
 writeline(OsProc, Data) when is_record(OsProc, os_proc) ->
     port_command(OsProc#os_proc.port, Data ++ "\n").
 
-readline(OsProc) when is_record(OsProc, os_proc) ->
+readline(#os_proc{} = OsProc) ->
     readline(OsProc, []).
-readline(OsProc, Acc) when is_record(OsProc, os_proc) ->
-    #os_proc{port=Port} = OsProc,
+readline(#os_proc{port = Port} = OsProc, Acc) ->
     receive
     {Port, {data, {noeol, Data}}} ->
         readline(OsProc, [Data|Acc]);

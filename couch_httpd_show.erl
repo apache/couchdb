@@ -50,11 +50,10 @@ handle_doc_update_req(#httpd{
     #doc{body={Props}} = couch_httpd_db:couch_doc_open(Db, DesignId, nil, []),
     Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
     UpdateSrc = couch_util:get_nested_json_value({Props}, [<<"updates">>, UpdateName]),
-    Doc = try couch_httpd_db:couch_doc_open(Db, DocId, nil, [conflicts]) of
-        FoundDoc -> FoundDoc
-    catch
-        _ -> nil
-    end,
+    Doc = try couch_httpd_db:couch_doc_open(Db, DocId, nil, [conflicts])
+	  catch
+	      _ -> nil
+	  end,
     send_doc_update_response(Lang, UpdateSrc, DocId, Doc, Req, Db);
 
 handle_doc_update_req(#httpd{
@@ -66,10 +65,8 @@ handle_doc_update_req(#httpd{
     UpdateSrc = couch_util:get_nested_json_value({Props}, [<<"updates">>, UpdateName]),
     send_doc_update_response(Lang, UpdateSrc, nil, nil, Req, Db);
 
-
 handle_doc_update_req(Req, _Db) ->
     send_error(Req, 404, <<"update_error">>, <<"Invalid path.">>).
-
 
 
 
@@ -81,8 +78,7 @@ handle_doc_show(Req, DesignName, ShowName, DocId, Db) ->
     Doc = case DocId of
         nil -> nil;
         _ ->
-        try couch_httpd_db:couch_doc_open(Db, DocId, nil, [conflicts]) of
-            FoundDoc -> FoundDoc
+        try couch_httpd_db:couch_doc_open(Db, DocId, nil, [conflicts])
         catch
             _ -> nil
         end

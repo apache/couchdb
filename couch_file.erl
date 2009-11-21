@@ -402,14 +402,14 @@ extract_header(Prefix, Bin) ->
 write_old_header(Fd, Prefix, Data) ->
     TermBin = term_to_binary(Data),
     % the size of all the bytes written to the header, including the md5 signature (16 bytes)
-    FilledSize = size(Prefix) + size(TermBin) + 16,
+    FilledSize = byte_size(Prefix) + byte_size(TermBin) + 16,
     {TermBin2, FilledSize2} =
     case FilledSize > ?HEADER_SIZE of
     true ->
         % too big!
         {ok, Pos} = append_binary(Fd, TermBin),
         PtrBin = term_to_binary({pointer_to_header_data, Pos}),
-        {PtrBin, size(Prefix) + size(PtrBin) + 16};
+        {PtrBin, byte_size(Prefix) + byte_size(PtrBin) + 16};
     false ->
         {TermBin, FilledSize}
     end,
@@ -465,7 +465,7 @@ calculate_total_read_len(BlockOffset, FinalLen) ->
         FinalLen;
     BlockLeft ->
         FinalLen + ((FinalLen - BlockLeft) div (?SIZE_BLOCK -1)) +
-            if ((FinalLen - BlockLeft) rem (?SIZE_BLOCK -1)) == 0 -> 0;
+            if ((FinalLen - BlockLeft) rem (?SIZE_BLOCK -1)) =:= 0 -> 0;
                 true -> 1 end
     end.
 
@@ -499,8 +499,8 @@ split_iolist(List, 0, BeginAcc) ->
     {lists:reverse(BeginAcc), List};
 split_iolist([], SplitAt, _BeginAcc) ->
     SplitAt;
-split_iolist([<<Bin/binary>> | Rest], SplitAt, BeginAcc)  when SplitAt > size(Bin) ->
-    split_iolist(Rest, SplitAt - size(Bin), [Bin | BeginAcc]);
+split_iolist([<<Bin/binary>> | Rest], SplitAt, BeginAcc) when SplitAt > byte_size(Bin) ->
+    split_iolist(Rest, SplitAt - byte_size(Bin), [Bin | BeginAcc]);
 split_iolist([<<Bin/binary>> | Rest], SplitAt, BeginAcc) ->
     <<Begin:SplitAt/binary,End/binary>> = Bin,
     split_iolist([End | Rest], 0, [Begin | BeginAcc]);

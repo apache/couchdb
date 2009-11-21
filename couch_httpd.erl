@@ -97,17 +97,17 @@ start_link() ->
 make_arity_1_fun(SpecStr) ->
     case couch_util:parse_term(SpecStr) of
     {ok, {Mod, Fun, SpecArg}} ->
-        fun(Arg) -> apply(Mod, Fun, [Arg, SpecArg]) end;
+        fun(Arg) -> Mod:Fun(Arg, SpecArg) end;
     {ok, {Mod, Fun}} ->
-        fun(Arg) -> apply(Mod, Fun, [Arg]) end
+        fun(Arg) -> Mod:Fun(Arg) end
     end.
 
 make_arity_2_fun(SpecStr) ->
     case couch_util:parse_term(SpecStr) of
     {ok, {Mod, Fun, SpecArg}} ->
-        fun(Arg1, Arg2) -> apply(Mod, Fun, [Arg1, Arg2, SpecArg]) end;
+        fun(Arg1, Arg2) -> Mod:Fun(Arg1, Arg2, SpecArg) end;
     {ok, {Mod, Fun}} ->
-        fun(Arg1, Arg2) -> apply(Mod, Fun, [Arg1, Arg2]) end
+        fun(Arg1, Arg2) -> Mod:Fun(Arg1, Arg2) end
     end.
 
 % SpecStr is "{my_module, my_fun}, {my_module2, my_fun2}"
