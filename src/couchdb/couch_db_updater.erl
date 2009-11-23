@@ -465,6 +465,19 @@ merge_rev_trees(MergeConflicts, [NewDocs|RestDocsList],
                 {_NewTree, conflicts} when (not OldDeleted) ->
                     send_result(Client, Id, {Pos-1,PrevRevs}, conflict),
                     AccTree;
+                {NewTree, conflicts} when PrevRevs /= [] ->
+                    % Check to be sure if prev revision was specified, it's
+                    % a leaf node in the tree
+                    Leafs = couch_key_tree:get_all_leafs(AccTree),
+                    IsPrevLeaf = lists:any(fun({_, {LeafPos, [LeafRevId|_]}}) ->
+                            {LeafPos, LeafRevId} == {Pos-1, hd(PrevRevs)}
+                        end, Leafs),
+                    if IsPrevLeaf ->
+                        NewTree;
+                    true ->
+                        send_result(Client, Id, {Pos-1,PrevRevs}, conflict),
+                        AccTree
+                    end;
                 {NewTree, no_conflicts} when  AccTree == NewTree ->
                     % the tree didn't change at all
                     % meaning we are saving a rev that's already
