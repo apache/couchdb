@@ -331,6 +331,8 @@ prep_and_validate_update(Db, #doc{id=Id,revs={RevStart, Revs}}=Doc,
                 {validate_doc_update(Db, Doc, LoadDiskDoc), Doc}
             end;
         error when AllowConflict ->
+            couch_doc:merge_stubs(Doc, #doc{}), % will generate error if
+                                                        % there are stubs
             {validate_doc_update(Db, Doc, fun() -> nil end), Doc};
         error ->
             {conflict, Doc}
@@ -396,7 +398,8 @@ prep_and_validate_updates(Db, [DocBucket|RestBuckets],
             end
         end,
         {[], AccErrors}, DocBucket),
-    prep_and_validate_updates(Db, RestBuckets, RestLookups, AllowConflict, [PreppedBucket | AccPrepped], AccErrors3).
+    prep_and_validate_updates(Db, RestBuckets, RestLookups, AllowConflict, 
+            [PreppedBucket | AccPrepped], AccErrors3).
 
 
 update_docs(#db{update_pid=UpdatePid}=Db, Docs, Options) ->
