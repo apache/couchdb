@@ -109,9 +109,6 @@ init(StatDescsFileName) ->
     ok = couch_config:register(
         fun("stats", _) -> exit(Self, config_change) end
     ),
-    ok = couch_config:register(
-        fun("stats_descriptions", _) -> exit(Self, config_change) end
-    ),
     
     Rate = list_to_integer(couch_config:get("stats", "rate", "1000")),
     % TODO: Add timer_start to kernel start options.
