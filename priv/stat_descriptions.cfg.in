@@ -2,36 +2,36 @@
 % a trailing full-stop / period
 % Please keep this in alphabetical order
 
-{couchdb, database_writes, "number of times a database was change"}.
-{couchdb, database_reads, "number of times a document was read from a databas"}.
-{couchdb, open_databases, "number of open database"}.
-{couchdb, open_os_files, "number of file descriptors CouchDB has ope"}.
-{couchdb, request_time, "length of a request inside CouchDB without MochiWe"}.
+{couchdb, database_writes, "number of times a database was changed"}.
+{couchdb, database_reads, "number of times a document was read from a database"}.
+{couchdb, open_databases, "number of open databases"}.
+{couchdb, open_os_files, "number of file descriptors CouchDB has open"}.
+{couchdb, request_time, "length of a request inside CouchDB without MochiWeb"}.
 
-{httpd, bulk_requests, "number of bulk request"}.
-{httpd, requests, "number of HTTP request"}.
-{httpd, temporary_view_reads, "number of temporary view read"}.
-{httpd, view_reads, "number of view read"}.
-{httpd, clients_requesting_changes, "number of clients for continuous _change"}.
+{httpd, bulk_requests, "number of bulk requests"}.
+{httpd, requests, "number of HTTP requests"}.
+{httpd, temporary_view_reads, "number of temporary view reads"}.
+{httpd, view_reads, "number of view reads"}.
+{httpd, clients_requesting_changes, "number of clients for continuous _changes"}.
 
-{httpd_request_methods, 'COPY', "number of HTTP COPY request"}.
-{httpd_request_methods, 'DELETE', "number of HTTP DELETE request"}.
-{httpd_request_methods, 'GET', "number of HTTP GET request"}.
-{httpd_request_methods, 'HEAD', "number of HTTP HEAD request"}.
-{httpd_request_methods, 'MOVE', "number of HTTP MOVE request"}.
-{httpd_request_methods, 'POST', "number of HTTP POST request"}.
-{httpd_request_methods, 'PUT', "number of HTTP PUT request"}.
+{httpd_request_methods, 'COPY', "number of HTTP COPY requests"}.
+{httpd_request_methods, 'DELETE', "number of HTTP DELETE requests"}.
+{httpd_request_methods, 'GET', "number of HTTP GET requests"}.
+{httpd_request_methods, 'HEAD', "number of HTTP HEAD requests"}.
+{httpd_request_methods, 'MOVE', "number of HTTP MOVE requests"}.
+{httpd_request_methods, 'POST', "number of HTTP POST requests"}.
+{httpd_request_methods, 'PUT', "number of HTTP PUT requests"}.
 
-{httpd_status_codes, '200', "number of HTTP 200 OK response"}.
-{httpd_status_codes, '201', "number of HTTP 201 Created response"}.
-{httpd_status_codes, '202', "number of HTTP 202 Accepted response"}.
-{httpd_status_codes, '301', "number of HTTP 301 Moved Permanently response"}.
-{httpd_status_codes, '304', "number of HTTP 304 Not Modified response"}.
-{httpd_status_codes, '400', "number of HTTP 400 Bad Request response"}.
-{httpd_status_codes, '401', "number of HTTP 401 Unauthorized response"}.
-{httpd_status_codes, '403', "number of HTTP 403 Forbidden response"}.
-{httpd_status_codes, '404', "number of HTTP 404 Not Found response"}.
-{httpd_status_codes, '405', "number of HTTP 405 Method Not Allowed response"}.
-{httpd_status_codes, '409', "number of HTTP 409 Conflict response"}.
-{httpd_status_codes, '412', "number of HTTP 412 Precondition Failed response"}.
-{httpd_status_codes, '500', "number of HTTP 500 Internal Server Error response"}.
+{httpd_status_codes, '200', "number of HTTP 200 OK responses"}.
+{httpd_status_codes, '201', "number of HTTP 201 Created responses"}.
+{httpd_status_codes, '202', "number of HTTP 202 Accepted responses"}.
+{httpd_status_codes, '301', "number of HTTP 301 Moved Permanently responses"}.
+{httpd_status_codes, '304', "number of HTTP 304 Not Modified responses"}.
+{httpd_status_codes, '400', "number of HTTP 400 Bad Request responses"}.
+{httpd_status_codes, '401', "number of HTTP 401 Unauthorized responses"}.
+{httpd_status_codes, '403', "number of HTTP 403 Forbidden responses"}.
+{httpd_status_codes, '404', "number of HTTP 404 Not Found responses"}.
+{httpd_status_codes, '405', "number of HTTP 405 Method Not Allowed responses"}.
+{httpd_status_codes, '409', "number of HTTP 409 Conflict responses"}.
+{httpd_status_codes, '412', "number of HTTP 412 Precondition Failed responses"}.
+{httpd_status_codes, '500', "number of HTTP 500 Internal Server Error responses"}.
