@@ -12,7 +12,9 @@ rem License for the specific language governing permissions and limitations
 rem under the License.
 
 setlocal
-rem First change to the erlang bin directory
+rem First change to the drive with the erlang bin directory
+%~d0
+rem then change to the erlang bin directory
 cd %~dp0
 
 rem Allow a different erlang executable (eg, werl) to be used.
