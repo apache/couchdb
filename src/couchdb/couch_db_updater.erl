@@ -656,8 +656,10 @@ commit_data(#db{fd=Fd,header=OldHeader,fsync_options=FsyncOptions}=Db, Delay) ->
     if OldHeader == Header ->
         Db;
     Delay and (Db#db.waiting_delayed_commit == nil) ->
-        Db#db{waiting_delayed_commit=
-                erlang:send_after(1000, self(), delayed_commit)};
+        Db2 = Db#db{waiting_delayed_commit=
+                erlang:send_after(1000, self(), delayed_commit)},
+        ok = gen_server:call(Db2#db.main_pid, {db_updated, Db2}),
+        Db2;
     Delay ->
         Db;
     true ->
@@ -680,9 +682,11 @@ commit_data(#db{fd=Fd,header=OldHeader,fsync_options=FsyncOptions}=Db, Delay) ->
         _    -> ok
         end,
 
-        Db#db{waiting_delayed_commit=nil,
+        Db2 = Db#db{waiting_delayed_commit=nil,
             header=Header,
-            committed_update_seq=Db#db.update_seq}
+            committed_update_seq=Db#db.update_seq},
+        %ok = gen_server:call(Db2#db.main_pid, {db_updated, Db2}),
+        Db2
     end.
 
 
