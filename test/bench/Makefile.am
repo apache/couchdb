@@ -10,7 +10,13 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
-EXTRA_DIST = \
-    bench_lib.js \
-    runner.sh \
-    benches.js
+EXTRA_DIST = benchbulk.sh benches.js
+
+noinst_SCRIPTS = run
+CLEANFILES = run
+
+run: run.tpl
+	sed -e "s|%abs_top_srcdir%|$(abs_top_srcdir)|" \
+		-e "s|%abs_top_builddir%|$(abs_top_builddir)|" \
+	< $< > $@
+	chmod +x $@
