@@ -12,8 +12,19 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-cat ../share/www/script/couch.js \
-    ../share/www/script/couch_test_runner.js \
-    ../share/www/script/couch_tests.js \
-    ../share/www/script/test/*.js test.js \
-    | ../src/couchdb/couchjs -
+SRC_DIR=%abs_top_srcdir%
+SCRIPT_DIR=$SRC_DIR/share/www/script
+JS_TEST_DIR=$SRC_DIR/test/javascript
+
+COUCHJS=%abs_top_builddir%/src/couchdb/priv/couchjs
+
+cat $SCRIPT_DIR/json2.js \
+	$SCRIPT_DIR/sha1.js \
+	$SCRIPT_DIR/oauth.js \
+	$SCRIPT_DIR/couch.js \
+	$SCRIPT_DIR/couch_test_runner.js \
+	$SCRIPT_DIR/couch_tests.js \
+	$SCRIPT_DIR/test/*.js \
+	$JS_TEST_DIR/couch_http.js \
+	$JS_TEST_DIR/cli_runner.js \
+    | $COUCHJS -

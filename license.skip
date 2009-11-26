@@ -12,6 +12,8 @@
 ^CHANGES
 ^config.*
 ^configure
+^couchdb.stderr
+^couchdb.stdout
 ^cover/.*\.coverdata
 ^cover/.*\.html
 ^erl_crash.dump

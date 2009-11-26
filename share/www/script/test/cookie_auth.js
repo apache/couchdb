@@ -94,7 +94,11 @@ couchTests.cookie_auth = function(debug) {
         body: "username=Jason%20Davies&password="+encodeURIComponent(password)
       });
       // should this be a redirect code instead of 200?
-      T(xhr.status == 200);
+      // The cURL adapter is returning the expected 302 here.
+      // I imagine this has to do with whether the client is willing
+      // to follow the redirect, ie, the browser follows and does a
+      // GET on the returned Location
+      T(xhr.status == 200 || xhr.status == 302);
       
       usersDb.deleteDb();
       // test user creation

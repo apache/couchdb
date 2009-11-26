@@ -53,9 +53,11 @@ dev: all
 	@echo "it creates development ini files as well as a"
 	@echo "$(top_builddir)/tmp structure for development runtime files."
 	@echo "Use ./utils/run to launch CouchDB from the source tree."
+	mkdir -p $(top_builddir)/etc/couchdb/default.d
+	mkdir -p $(top_builddir)/etc/couchdb/local.d
 	mkdir -p $(top_builddir)/tmp/lib
 	mkdir -p $(top_builddir)/tmp/log
-	mkdir -p $(top_builddir)/tmp/run
+	mkdir -p $(top_builddir)/tmp/run/couchdb
 
 distclean-local:
 	rm -fr $(top_builddir)/tmp

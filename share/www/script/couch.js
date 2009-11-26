@@ -496,4 +496,4 @@ CouchDB.params = function(options) {
     returnArray.push(key + "=" + value);
   }
   return returnArray.join("&");
-}
+};

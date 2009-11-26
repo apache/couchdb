@@ -57,7 +57,12 @@ couchTests.changes = function(debug) {
   }
 
   // poor man's browser detection
-  var is_safari = navigator.userAgent.match(/AppleWebKit/);
+  var is_safari = false;
+  if(typeof(navigator) == "undefined") {
+    is_safari = true; // For CouchHTTP based runners
+  } else if(navigator.userAgent.match(/AppleWebKit/)) {
+    is_safari = true;
+  };
   if (!is_safari && xhr) {
     // Only test the continuous stuff if we have a real XHR object
     // with real async support.

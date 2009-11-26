@@ -36,6 +36,7 @@ src/mochiweb/Makefile
 stamp-h1
 test/.deps/
 test/Makefile
+test/javascript/run_js_tests.sh
 var/Makefile
 
 # for make
@@ -65,6 +66,7 @@ src/mochiweb/mochiweb.app
 test/local.ini
 test/etap/run
 test/etap/test_util.erl
+test/javascript/run
 share/server/main.js
 
 # for make dev
@@ -85,6 +87,8 @@ test/etap/run
 # for make check
 
 test/etap/temp.*
+couchdb.stderr
+couchdb.stdout
 
 # for make cover
 

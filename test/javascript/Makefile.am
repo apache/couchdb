@@ -11,5 +11,12 @@
 ## the License.
 
 EXTRA_DIST = \
-	runner.sh \
-	test.js
+	cli_runner.js \
+	couch_http.js \
+	run.tpl
+
+run: run.tpl
+	sed -e "s|%abs_top_srcdir%|$(abs_top_srcdir)|" \
+		-e "s|%abs_top_builddir%|$(abs_top_builddir)|" \
+	< $< > $@
+	chmod +x $@
