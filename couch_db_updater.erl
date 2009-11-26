@@ -208,7 +208,13 @@ handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts,
             {noreply, Db}
     end;
 handle_info(delayed_commit, Db) ->
-    {noreply, commit_data(Db)}.
+    case commit_data(Db) of
+        Db ->
+            {noreply, Db};
+        Db2 ->
+            ok = gen_server:call(Db2#db.main_pid, {db_updated, Db2}),
+            {noreply, Db2}
+    end.
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
@@ -656,10 +662,8 @@ commit_data(#db{fd=Fd,header=OldHeader,fsync_options=FsyncOptions}=Db, Delay) ->
     if OldHeader == Header ->
         Db;
     Delay and (Db#db.waiting_delayed_commit == nil) ->
-        Db2 = Db#db{waiting_delayed_commit=
-                erlang:send_after(1000, self(), delayed_commit)},
-        ok = gen_server:call(Db2#db.main_pid, {db_updated, Db2}),
-        Db2;
+        Db#db{waiting_delayed_commit=
+                erlang:send_after(1000, self(), delayed_commit)};
     Delay ->
         Db;
     true ->
@@ -682,11 +686,9 @@ commit_data(#db{fd=Fd,header=OldHeader,fsync_options=FsyncOptions}=Db, Delay) ->
         _    -> ok
         end,
 
-        Db2 = Db#db{waiting_delayed_commit=nil,
+        Db#db{waiting_delayed_commit=nil,
             header=Header,
-            committed_update_seq=Db#db.update_seq},
-        ok = gen_server:call(Db2#db.main_pid, {db_updated, Db2}),
-        Db2
+            committed_update_seq=Db#db.update_seq}
     end.
 
 
