@@ -39,11 +39,11 @@ priv_dir() ->
     end.
 
 start_driver(LibDir) ->
-    case erl_ddll:load_driver(LibDir, "couch_erl_driver") of
+    case erl_ddll:load_driver(LibDir, "couch_icu_driver") of
     ok ->
         ok;
     {error, already_loaded} ->
-        ok = erl_ddll:reload_driver(LibDir, "couch_erl_driver");
+        ok = erl_ddll:reload_driver(LibDir, "couch_icu_driver");
     {error, Error} ->
         exit(erl_ddll:format_error(Error))
     end.
@@ -191,7 +191,7 @@ implode([H|T], Sep, Acc) ->
 drv_port() ->
     case get(couch_drv_port) of
     undefined ->
-        Port = open_port({spawn, "couch_erl_driver"}, []),
+        Port = open_port({spawn, "couch_icu_driver"}, []),
         put(couch_drv_port, Port),
         Port;
     Port ->

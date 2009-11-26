@@ -16,9 +16,9 @@ main(_) ->
     test_util:init_code_path(),
     etap:plan(3),
     etap:is(
-        couch_util:start_driver("src/couchdb/.libs"),
+        couch_util:start_driver("src/couchdb/priv/.libs"),
         ok,
-        "Started couch_erl_driver."
+        "Started couch_icu_driver."
     ),
     etap:is(
         couch_util:collate(<<"foo">>, <<"bar">>),

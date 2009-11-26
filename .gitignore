@@ -49,12 +49,14 @@ etc/launchd/org.apache.couchdb.plist
 etc/logrotate.d/couchdb
 src/couchdb/.libs/*
 src/couchdb/couch.app
-src/couchdb/couch_erl_driver.la
 src/couchdb/couchjs
 src/couchdb/edoc-info
 src/couchdb/erlang.png
 src/couchdb/stylesheet.css
 src/couchdb/priv/.deps/
+src/couchdb/priv/.libs/
+src/couchdb/priv/couch_icu_driver.la
+src/couchdb/priv/couchjs
 src/couchdb/priv/couchspawnkillable
 test/local.ini
 test/etap/test_util.erl
