@@ -15,6 +15,8 @@ EXTRA_DIST = \
 	couch_http.js \
 	run.tpl
 
+noinst_SCRIPTS = run
+
 run: run.tpl
 	sed -e "s|%abs_top_srcdir%|$(abs_top_srcdir)|" \
 		-e "s|%abs_top_builddir%|$(abs_top_builddir)|" \
