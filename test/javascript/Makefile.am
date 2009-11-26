@@ -16,6 +16,7 @@ EXTRA_DIST = \
 	run.tpl
 
 noinst_SCRIPTS = run
+CLEANFILES = run
 
 run: run.tpl
 	sed -e "s|%abs_top_srcdir%|$(abs_top_srcdir)|" \
