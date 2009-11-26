@@ -18,19 +18,19 @@ couchTests.content_negotiation = function(debug) {
   var xhr;
 
   xhr = CouchDB.request("GET", "/test_suite_db/");
-  T(xhr.getResponseHeader("Content-Type") == "text/plain;charset=utf-8");
+  TEquals("text/plain;charset=utf-8", xhr.getResponseHeader("Content-Type"));
 
   // make sure JSON responses end in a newline
   var text = xhr.responseText;
-  T(text[text.length-1] == "\n");
+  TEquals("\n", text[text.length-1]);
 
   xhr = CouchDB.request("GET", "/test_suite_db/", {
     headers: {"Accept": "text/html;text/plain;*/*"}
   });
-  T(xhr.getResponseHeader("Content-Type") == "text/plain;charset=utf-8");
+  TEquals("text/plain;charset=utf-8", xhr.getResponseHeader("Content-Type"));
 
   xhr = CouchDB.request("GET", "/test_suite_db/", {
     headers: {"Accept": "application/json"}
   });
-  T(xhr.getResponseHeader("Content-Type") == "application/json");
+  TEquals("application/json", xhr.getResponseHeader("Content-Type"));
 };
