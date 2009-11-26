@@ -28,7 +28,7 @@ DISTCLEANFILES = temp.*
 EXTRA_DIST = \
 	run.tpl \
     001-load.t \
-    002-erl-driver.t \
+    002-icu-driver.t \
     010-file-basics.t \
     011-file-headers.t \
     020-btree-basics.t \

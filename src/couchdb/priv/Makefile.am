@@ -15,10 +15,40 @@ couchprivdir = $(couchlibdir)/priv
 couchprivlibdir = $(couchlibdir)/priv/lib
 
 EXTRA_DIST = \
-	couchspawnkillable.sh \
+	spawnkillable/couchspawnkillable.sh \
 	stat_descriptions.cfg.in
 
 CLEANFILES = stat_descriptions.cfg
+
+ICU_LOCAL_FLAGS = $(ICU_LOCAL_CFLAGS) $(ICU_LOCAL_LDFLAGS)
+if WINDOWS
+ICU_LOCAL_LIBS=-licuuc -licudt -licuin
+else
+ICU_LOCAL_LIBS=-licuuc -licudata -licui18n
+endif
+
+couchprivlib_LTLIBRARIES = couch_icu_driver.la
+couch_icu_driver_la_SOURCES = icu_driver/couch_icu_driver.c
+couch_icu_driver_la_LDFLAGS = -module -avoid-version $(ICU_LOCAL_FLAGS)
+couch_icu_driver_la_CFLAGS = $(ICU_LOCAL_FLAGS)
+couch_icu_driver_la_LIBADD = $(ICU_LOCAL_LIBS)
+
+if WINDOWS
+couch_icu_driver_la_LDFLAGS += -no-undefined
+endif
+
+COUCHJS_SRCS = \
+	couch_js/http.c \
+	couch_js/http.h \
+	couch_js/main.c \
+	couch_js/utf8.c \
+	couch_js/utf8.h
+
+locallibbin_PROGRAMS = couchjs
+couchjs_SOURCES = $(COUCHJS_SRCS)
+couchjs_LDFLAGS = $(CURL_LDFLAGS)
+couchjs_CFLAGS = $(CURL_CFLAGS)
+couchjs_LDADD = $(CURL_LDFLAGS) @JSLIB@
 
 couchpriv_DATA = stat_descriptions.cfg
 couchpriv_PROGRAMS = couchspawnkillable

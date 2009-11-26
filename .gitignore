@@ -58,7 +58,12 @@ src/couchdb/priv/.libs/
 src/couchdb/priv/couch_icu_driver.la
 src/couchdb/priv/couchjs
 src/couchdb/priv/couchspawnkillable
+src/couchdb/priv/stat_descriptions.cfg
+src/erlang-oauth/oauth.app
+src/ibrowse/ibrowse.app
+src/mochiweb/mochiweb.app
 test/local.ini
+test/etap/run
 test/etap/test_util.erl
 share/server/main.js
 
