@@ -85,28 +85,21 @@ couchTests.stats = function(debug) {
       // that we've waited for more than 1 second since opening
       // the first database so that any delayed commits will be
       // flushed.
-      var times = [];
+      var triggered = false;
+      var db = null;
       for(var i = 0; i < max*2; i++) {
-        if(i >= max) {
-          if(i == max) {
-            try {
-              newDb("test_suite_db_" + i, true);
-              T(0 === 1, "Should have failed to create max+1 db's quickly.");
-            } catch(e) {
-              T(e.reason == "all_dbs_active", "All db's should be active.");
-            }
-          }
-          var msecs = (new Date()).getTime() - times[i-max];
-          if(msecs < 1000) {
-            CouchDB.request("GET", "/_sleep?time=" + (msecs+250));
-          }
+        try {
+          db = newDb("test_suite_db_" + i, true);
+        } catch(e) {
+          triggered = true;
+          CouchDB.request("GET", "/_sleep?time=1500");
+          db = newDb("test_suite_db_" + i, true);
         }
-        db = newDb("test_suite_db_" + i, true);
-        times.push((new Date()).getTime());
-        
+
         // Trigger a delayed commit
         db.save({_id: "" + i, "lang": "Awesome!"});
       }
+      T(triggered, "We managed to force a all_dbs_active error.");
       
       var open_dbs = getStat("couchdb", "open_databases").current;
       TEquals(open_dbs > 0, true, "We actually opened some dbs.");
