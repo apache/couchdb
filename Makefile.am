@@ -12,38 +12,12 @@
 
 SUBDIRS = priv
 
-ICU_LOCAL_FLAGS = $(ICU_LOCAL_CFLAGS) $(ICU_LOCAL_LDFLAGS)
-if WINDOWS
-ICU_LOCAL_LIBS=-licuuc -licudt -licuin
-else
-ICU_LOCAL_LIBS=-licuuc -licudata -licui18n
-endif
-
 # devdocdir = $(localdocdir)/developer/couchdb
 couchlibdir = $(localerlanglibdir)/couch-$(version)
-couchprivdir = $(couchlibdir)/priv
-couchprivlibdir = $(couchlibdir)/priv/lib
 couchincludedir = $(couchlibdir)/include
 couchebindir = $(couchlibdir)/ebin
 
-couchprivlib_LTLIBRARIES = couch_erl_driver.la
-couch_erl_driver_la_SOURCES = couch_erl_driver.c
-couch_erl_driver_la_LDFLAGS = -module -avoid-version $(ICU_LOCAL_FLAGS)
-couch_erl_driver_la_CFLAGS = $(ICU_LOCAL_FLAGS)
-couch_erl_driver_la_LIBADD = $(ICU_LOCAL_LIBS)
-
-locallibbin_PROGRAMS = couchjs
-couchjs_SOURCES = couch_js.c curlhelper.c curlhelper.h
-couchjs_LDFLAGS = $(CURL_LDFLAGS)
-couchjs_CFLAGS = $(CURL_CFLAGS)
-couchjs_LDADD = $(CURL_LDFLAGS) @JSLIB@
-
-if WINDOWS
-couch_erl_driver_la_LDFLAGS += -no-undefined
-endif
-
 couchinclude_DATA = couch_db.hrl
-
 couchebin_DATA = $(compiled_files)
 
 # dist_devdoc_DATA = $(doc_base) $(doc_modules)
@@ -219,20 +193,3 @@ endif
 %.beam: %.erl couch_db.hrl
 	$(ERLC) $(ERLC_FLAGS) ${TEST} $<;
 
-install-data-hook:
-	if test -f "$(DESTDIR)$(couchprivlibdir)/couch_erl_driver"; then \
-	    rm -f "$(DESTDIR)$(couchprivlibdir)/couch_erl_driver.so"; \
-	    cd "$(DESTDIR)$(couchprivlibdir)" && \
-	        $(LN_S) couch_erl_driver couch_erl_driver.so; \
-	fi
-if WINDOWS
-	$(INSTALL) $(ICU_LOCAL_BIN)/icuuc42.dll $(bindir)
-	$(INSTALL) $(ICU_LOCAL_BIN)/icudt42.dll $(bindir)
-	$(INSTALL) $(ICU_LOCAL_BIN)/icuin42.dll $(bindir)
-	$(INSTALL) $(JS_LIB_BINARY) $(bindir)
-endif
-
-uninstall-local:
-	if test -f "$(DESTDIR)$(couchprivlibdir)/couch_erl_driver"; then \
-	    rm -f "$(DESTDIR)$(couchprivlibdir)/couch_erl_driver.so"; \
-	fi

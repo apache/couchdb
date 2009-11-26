@@ -153,7 +153,7 @@ ErlDrvEntry couch_driver_entry = {
         NULL,               /* F_PTR output, called when erlang has sent */
         NULL,               /* F_PTR ready_input, called when input descriptor ready */
         NULL,               /* F_PTR ready_output, called when output descriptor ready */
-        "couch_erl_driver", /* char *driver_name, the argument to open_port */
+        "couch_icu_driver", /* char *driver_name, the argument to open_port */
         NULL,               /* F_PTR finish, called when unloaded */
         NULL,               /* Not used */
         couch_drv_control,  /* F_PTR control, port_command callback */
@@ -171,7 +171,7 @@ ErlDrvEntry couch_driver_entry = {
         NULL,               /* F_PTR process_exit */
 };
 
-DRIVER_INIT(couch_erl_driver) /* must match name in driver_entry */
+DRIVER_INIT(couch_icu_driver) /* must match name in driver_entry */
 {
         return &couch_driver_entry;
 }

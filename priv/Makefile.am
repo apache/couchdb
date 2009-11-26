@@ -12,6 +12,7 @@
 
 couchlibdir = $(localerlanglibdir)/couch-$(version)
 couchprivdir = $(couchlibdir)/priv
+couchprivlibdir = $(couchlibdir)/priv/lib
 
 EXTRA_DIST = \
 	couchspawnkillable.sh \
@@ -26,21 +27,36 @@ couchpriv_PROGRAMS = couchspawnkillable
 	cp $< $@
 
 if WINDOWS
-couchspawnkillable_SOURCES = couchspawnkillable_win.c
+couchspawnkillable_SOURCES = spawnkillable/couchspawnkillable_win.c
 endif
 
 if !WINDOWS
-couchspawnkillable: couchspawnkillable.sh
+couchspawnkillable: spawnkillable/couchspawnkillable.sh
 	cp $< $@
 endif
 
-if WINDOWS
-install-data-hook:
 # libtool and automake have defeated markh.  For each of our executables
 # we end up with 2 copies - one directly in the 'target' folder (eg, 'priv')
 # and another - the correct one - in .libs.  The former doesn't work but is 
 # what gets installed for 'couchspawnkillable' - but the correct one for
 # couchjs.exe *does* get copied.  *shrug*  So just clobber it with the 
-# correct one here... See bug COUCHDB-439
-	$(INSTALL) .libs/couchspawnkillable.exe "$(DESTDIR)$(couchprivdir)/couchspawnkillable.exe"
+# correct one as the last step. See bug COUCHDB-439
+install-data-hook:
+	if test -f "$(DESTDIR)$(couchprivlibdir)/couch_icu_driver"; then \
+	    rm -f "$(DESTDIR)$(couchprivlibdir)/couch_icu_driver.so"; \
+	    cd "$(DESTDIR)$(couchprivlibdir)" && \
+	        $(LN_S) couch_icu_driver couch_icu_driver.so; \
+	fi
+if WINDOWS
+	$(INSTALL) $(ICU_LOCAL_BIN)/icuuc42.dll $(bindir)
+	$(INSTALL) $(ICU_LOCAL_BIN)/icudt42.dll $(bindir)
+	$(INSTALL) $(ICU_LOCAL_BIN)/icuin42.dll $(bindir)
+	$(INSTALL) $(JS_LIB_BINARY) $(bindir)
+	$(INSTALL) .libs/couchspawnkillable.exe \
+		"$(DESTDIR)$(couchprivdir)/couchspawnkillable.exe"
 endif
+
+uninstall-local:
+	if test -f "$(DESTDIR)$(couchprivlibdir)/couch_erl_driver"; then \
+	    rm -f "$(DESTDIR)$(couchprivlibdir)/couch_erl_driver.so"; \
+	fi
