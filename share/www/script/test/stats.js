@@ -88,6 +88,14 @@ couchTests.stats = function(debug) {
       var times = [];
       for(var i = 0; i < max*2; i++) {
         if(i >= max) {
+          if(i == max) {
+            try {
+              newDb("test_suite_db_" + i, true);
+              T(0 === 1, "Should have failed to create max+1 db's quickly.");
+            } catch(e) {
+              T(e.reason == "all_dbs_active", "All db's should be active.");
+            }
+          }
           var msecs = (new Date()).getTime() - times[i-max];
           if(msecs < 1000) {
             CouchDB.request("GET", "/_sleep?time=" + (msecs+250));

@@ -685,7 +685,7 @@ commit_data(#db{fd=Fd,header=OldHeader,fsync_options=FsyncOptions}=Db, Delay) ->
         Db2 = Db#db{waiting_delayed_commit=nil,
             header=Header,
             committed_update_seq=Db#db.update_seq},
-        %ok = gen_server:call(Db2#db.main_pid, {db_updated, Db2}),
+        ok = gen_server:call(Db2#db.main_pid, {db_updated, Db2}),
         Db2
     end.
 
