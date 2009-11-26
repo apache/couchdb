@@ -306,13 +306,21 @@ main(int argc, const char * argv[])
     
     JS_SetGlobalObject(cx, global);
 
-    if(argc != 2) {
+    if(argc > 2)
+    {
         fprintf(stderr, "incorrect number of arguments\n\n");
         fprintf(stderr, "usage: %s <scriptfile>\n", argv[0]);
         return 2;
     }
 
-    execute_script(cx, global, argv[1]);
+    if(argc == 0)
+    {
+        execute_script(cx, global, NULL);
+    }
+    else
+    {
+        execute_script(cx, global, argv[1]);
+    }
 
     FINISH_REQUEST(cx);
 

@@ -38,6 +38,9 @@ char* METHODS[] = {"GET", "HEAD", "POST", "PUT", "DELETE", "COPY", NULL};
 static JSBool
 go(JSContext* cx, JSObject* obj, HTTPData* http, char* body, size_t blen);
 
+static JSString*
+str_from_binary(JSContext* cx, char* data, size_t length);
+
 static JSBool
 constructor(JSContext* cx, JSObject* obj, uintN argc, jsval* argv, jsval* rval)
 {
@@ -406,13 +409,13 @@ go(JSContext* cx, JSObject* obj, HTTPData* http, char* body, size_t bodylen)
     if(!HANDLE)
     {
         JS_ReportError(cx, "Failed to initialize cURL handle.");
-        goto error;
+        goto done;
     }
 
     if(http->method < 0 || http->method > COPY)
     {
         JS_ReportError(cx, "INTERNAL: Unknown method.");
-        goto error;
+        goto done;
     }
 
     curl_easy_setopt(HANDLE, CURLOPT_CUSTOMREQUEST, METHODS[http->method]);
@@ -452,13 +455,13 @@ go(JSContext* cx, JSObject* obj, HTTPData* http, char* body, size_t bodylen)
     if(curl_easy_perform(HANDLE) != 0)
     {
         JS_ReportError(cx, "Failed to execute HTTP request: %s", ERRBUF);
-        goto error;
+        goto done;
     }
     
     if(!state.resp_headers)
     {
         JS_ReportError(cx, "Failed to recieve HTTP headers.");
-        goto error;
+        goto done;
     }
 
     tmp = OBJECT_TO_JSVAL(state.resp_headers);
@@ -473,7 +476,7 @@ go(JSContext* cx, JSObject* obj, HTTPData* http, char* body, size_t bodylen)
     ))
     {
         JS_ReportError(cx, "INTERNAL: Failed to set response headers.");
-        goto error;
+        goto done;
     }
     
     if(state.recvbuf) // Is good enough?
@@ -482,16 +485,15 @@ go(JSContext* cx, JSObject* obj, HTTPData* http, char* body, size_t bodylen)
         jsbody = dec_string(cx, state.recvbuf, state.read+1);
         if(!jsbody)
         {
-            // This is so dirty its not even almost funny. I'm ignoring
-            // all sorts of content-types and character sets and just falling
-            // back to doing a chop job when something doesn't decode as UTF-8
-            // which is pretty sad. But, if you hate me for it, then feel free
-            // to write a patch that does the proper content-type parsing and
-            // actually respects charsets as returned in headers.
-            jsbody = JS_NewString(cx, state.recvbuf, state.read);
+            // If we can't decode the body as UTF-8 we forcefully
+            // convert it to a string by just forcing each byte
+            // to a jschar.
+            jsbody = str_from_binary(cx, state.recvbuf, state.read);
             if(!jsbody) {
-                JS_ReportError(cx, "INTERNAL: Failed to decode body.");
-                goto error;
+                if(!JS_IsExceptionPending(cx)) {
+                    JS_ReportError(cx, "INTERNAL: Failed to decode body.");
+                }
+                goto done;
             }
         }
         tmp = STRING_TO_JSVAL(jsbody);
@@ -512,16 +514,13 @@ go(JSContext* cx, JSObject* obj, HTTPData* http, char* body, size_t bodylen)
     ))
     {
         JS_ReportError(cx, "INTERNAL: Failed to set responseText.");
-        goto error;
+        goto done;
     }
     
     ret = JS_TRUE;
-    goto success;
 
-error:
+done:
     if(state.recvbuf) JS_free(cx, state.recvbuf);
-
-success:    
     return ret;
 }
 
@@ -644,4 +643,23 @@ recv_body(void *ptr, size_t size, size_t nmem, void *data)
     state->read += length;
     return length;
 }
- 
+
+JSString*
+str_from_binary(JSContext* cx, char* data, size_t length)
+{
+    jschar* conv = (jschar*) JS_malloc(cx, length * sizeof(jschar));
+    JSString* ret = NULL;
+    size_t i;
+
+    if(!conv) return NULL;
+
+    for(i = 0; i < length; i++)
+    {
+        conv[i] = (jschar) data[i];
+    }
+
+    ret = JS_NewUCString(cx, conv, length);
+    if(!ret) JS_free(cx, conv);
+
+    return ret;
+}
