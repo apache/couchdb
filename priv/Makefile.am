@@ -63,6 +63,7 @@ endif
 if !WINDOWS
 couchspawnkillable: spawnkillable/couchspawnkillable.sh
 	cp $< $@
+	chmod +x $@
 endif
 
 # libtool and automake have defeated markh.  For each of our executables
