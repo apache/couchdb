@@ -215,7 +215,7 @@ AC_ARG_WITH([win32-curl], [AC_HELP_STRING([--with-win32-curl=PATH],
     CURL_LIBS="$withval/lib/libcurl"
     CURL_LDFLAGS="-l$CURL_LIBS -lWs2_32 -lkernel32 -luser32 -ladvapi32 -lWldap32"
 ], [
-    AC_CHECK_CURL([7.15.5])
+    AC_CHECK_CURL([7.18.0])
     CURL_LDFLAGS=-lcurl
 ])
 
