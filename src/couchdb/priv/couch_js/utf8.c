@@ -12,7 +12,7 @@
 
 #include <jsapi.h>
 
-static inline int
+static int
 enc_char(uint8 *utf8Buffer, uint32 ucs4Char)
 {
     int utf8Length = 1;
@@ -150,7 +150,7 @@ success:
     return bytes;
 }
 
-static inline uint32
+static uint32
 dec_char(const uint8 *utf8Buffer, int utf8Length)
 {
     uint32 ucs4Char;
