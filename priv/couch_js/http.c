@@ -17,6 +17,13 @@
 
 #include "utf8.h"
 
+#ifdef XP_WIN
+// Map some of the string function names to things which exist on Windows
+#define strcasecmp _strcmpi
+#define strncasecmp _strnicmp
+#define snprintf _snprintf
+#endif
+
 typedef struct curl_slist CurlHeaders;
 
 typedef struct {
@@ -365,7 +372,7 @@ typedef struct {
  * I really hate doing this but this doesn't have to be
  * uber awesome, it just has to work.
  */
-CURL*       HANDLE = NULL;
+CURL*       HTTP_HANDLE = NULL;
 char        ERRBUF[CURL_ERROR_SIZE];
 
 static size_t send_body(void *ptr, size_t size, size_t nmem, void *data);
@@ -392,21 +399,21 @@ go(JSContext* cx, JSObject* obj, HTTPData* http, char* body, size_t bodylen)
     state.recvlen = 0;
     state.read = 0;
 
-    if(HANDLE == NULL)
+    if(HTTP_HANDLE == NULL)
     {
-        HANDLE = curl_easy_init();
-        curl_easy_setopt(HANDLE, CURLOPT_READFUNCTION, send_body);
-        curl_easy_setopt(HANDLE, CURLOPT_SEEKFUNCTION, seek_body);
-        curl_easy_setopt(HANDLE, CURLOPT_HEADERFUNCTION, recv_header);
-        curl_easy_setopt(HANDLE, CURLOPT_WRITEFUNCTION, recv_body);
-        curl_easy_setopt(HANDLE, CURLOPT_NOPROGRESS, 1);
-        curl_easy_setopt(HANDLE, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
-        curl_easy_setopt(HANDLE, CURLOPT_ERRORBUFFER, ERRBUF);
-        curl_easy_setopt(HANDLE, CURLOPT_COOKIEFILE, "");
-        curl_easy_setopt(HANDLE, CURLOPT_USERAGENT, "CouchHTTP Client - Relax");
+        HTTP_HANDLE = curl_easy_init();
+        curl_easy_setopt(HTTP_HANDLE, CURLOPT_READFUNCTION, send_body);
+        curl_easy_setopt(HTTP_HANDLE, CURLOPT_SEEKFUNCTION, seek_body);
+        curl_easy_setopt(HTTP_HANDLE, CURLOPT_HEADERFUNCTION, recv_header);
+        curl_easy_setopt(HTTP_HANDLE, CURLOPT_WRITEFUNCTION, recv_body);
+        curl_easy_setopt(HTTP_HANDLE, CURLOPT_NOPROGRESS, 1);
+        curl_easy_setopt(HTTP_HANDLE, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+        curl_easy_setopt(HTTP_HANDLE, CURLOPT_ERRORBUFFER, ERRBUF);
+        curl_easy_setopt(HTTP_HANDLE, CURLOPT_COOKIEFILE, "");
+        curl_easy_setopt(HTTP_HANDLE, CURLOPT_USERAGENT, "CouchHTTP Client - Relax");
     }
     
-    if(!HANDLE)
+    if(!HTTP_HANDLE)
     {
         JS_ReportError(cx, "Failed to initialize cURL handle.");
         goto done;
@@ -418,41 +425,41 @@ go(JSContext* cx, JSObject* obj, HTTPData* http, char* body, size_t bodylen)
         goto done;
     }
 
-    curl_easy_setopt(HANDLE, CURLOPT_CUSTOMREQUEST, METHODS[http->method]);
-    curl_easy_setopt(HANDLE, CURLOPT_NOBODY, 0);
-    curl_easy_setopt(HANDLE, CURLOPT_FOLLOWLOCATION, 1);
-    curl_easy_setopt(HANDLE, CURLOPT_UPLOAD, 0);
+    curl_easy_setopt(HTTP_HANDLE, CURLOPT_CUSTOMREQUEST, METHODS[http->method]);
+    curl_easy_setopt(HTTP_HANDLE, CURLOPT_NOBODY, 0);
+    curl_easy_setopt(HTTP_HANDLE, CURLOPT_FOLLOWLOCATION, 1);
+    curl_easy_setopt(HTTP_HANDLE, CURLOPT_UPLOAD, 0);
     
     if(http->method == HEAD)
     {
-        curl_easy_setopt(HANDLE, CURLOPT_NOBODY, 1);
-        curl_easy_setopt(HANDLE, CURLOPT_FOLLOWLOCATION, 0);
+        curl_easy_setopt(HTTP_HANDLE, CURLOPT_NOBODY, 1);
+        curl_easy_setopt(HTTP_HANDLE, CURLOPT_FOLLOWLOCATION, 0);
     }
     else if(http->method == POST || http->method == PUT)
     {
-        curl_easy_setopt(HANDLE, CURLOPT_UPLOAD, 1);
-        curl_easy_setopt(HANDLE, CURLOPT_FOLLOWLOCATION, 0);
+        curl_easy_setopt(HTTP_HANDLE, CURLOPT_UPLOAD, 1);
+        curl_easy_setopt(HTTP_HANDLE, CURLOPT_FOLLOWLOCATION, 0);
     }
     
     if(body && bodylen)
     {
-        curl_easy_setopt(HANDLE, CURLOPT_INFILESIZE, bodylen);        
+        curl_easy_setopt(HTTP_HANDLE, CURLOPT_INFILESIZE, bodylen);        
     }
     else
     {
-        curl_easy_setopt(HANDLE, CURLOPT_INFILESIZE, 0);
+        curl_easy_setopt(HTTP_HANDLE, CURLOPT_INFILESIZE, 0);
     }
 
-    //curl_easy_setopt(HANDLE, CURLOPT_VERBOSE, 1);
+    //curl_easy_setopt(HTTP_HANDLE, CURLOPT_VERBOSE, 1);
 
-    curl_easy_setopt(HANDLE, CURLOPT_URL, http->url);
-    curl_easy_setopt(HANDLE, CURLOPT_HTTPHEADER, http->req_headers);
-    curl_easy_setopt(HANDLE, CURLOPT_READDATA, &state);
-    curl_easy_setopt(HANDLE, CURLOPT_SEEKDATA, &state);
-    curl_easy_setopt(HANDLE, CURLOPT_WRITEHEADER, &state);
-    curl_easy_setopt(HANDLE, CURLOPT_WRITEDATA, &state);
+    curl_easy_setopt(HTTP_HANDLE, CURLOPT_URL, http->url);
+    curl_easy_setopt(HTTP_HANDLE, CURLOPT_HTTPHEADER, http->req_headers);
+    curl_easy_setopt(HTTP_HANDLE, CURLOPT_READDATA, &state);
+    curl_easy_setopt(HTTP_HANDLE, CURLOPT_SEEKDATA, &state);
+    curl_easy_setopt(HTTP_HANDLE, CURLOPT_WRITEHEADER, &state);
+    curl_easy_setopt(HTTP_HANDLE, CURLOPT_WRITEDATA, &state);
 
-    if(curl_easy_perform(HANDLE) != 0)
+    if(curl_easy_perform(HTTP_HANDLE) != 0)
     {
         JS_ReportError(cx, "Failed to execute HTTP request: %s", ERRBUF);
         goto done;
