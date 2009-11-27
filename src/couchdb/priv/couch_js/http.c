@@ -410,7 +410,8 @@ go(JSContext* cx, JSObject* obj, HTTPData* http, char* body, size_t bodylen)
         curl_easy_setopt(HTTP_HANDLE, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
         curl_easy_setopt(HTTP_HANDLE, CURLOPT_ERRORBUFFER, ERRBUF);
         curl_easy_setopt(HTTP_HANDLE, CURLOPT_COOKIEFILE, "");
-        curl_easy_setopt(HTTP_HANDLE, CURLOPT_USERAGENT, "CouchHTTP Client - Relax");
+        curl_easy_setopt(HTTP_HANDLE, CURLOPT_USERAGENT,
+                                            "CouchHTTP Client - Relax");
     }
     
     if(!HTTP_HANDLE)
