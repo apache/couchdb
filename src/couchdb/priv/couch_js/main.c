@@ -276,7 +276,8 @@ main(int argc, const char * argv[])
 {
     JSRuntime* rt = NULL;
     JSContext* cx = NULL;
-    JSObject *global = NULL;
+    JSObject* global = NULL;
+    JSFunctionSpec* sp = NULL;
     int i = 0;
     
     rt = JS_NewRuntime(64L * 1024L * 1024L);
@@ -293,10 +294,15 @@ main(int argc, const char * argv[])
     global = JS_NewObject(cx, &global_class, NULL, NULL);
     if (!global) return 1;
     if (!JS_InitStandardClasses(cx, global)) return 1;
-
-    if(!JS_DefineFunctions(cx, global, global_functions))
+    
+    for(sp = global_functions; sp->name != NULL; sp++)
     {
-        return 1;
+        if(!JS_DefineFunction(cx, global,
+               sp->name, sp->call, sp->nargs, sp->flags))
+        {
+            fprintf(stderr, "Failed to create function: %s\n", sp->name);
+            return 1;
+        }
     }
 
     if(!install_http(cx, global))
