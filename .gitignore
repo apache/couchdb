@@ -3,6 +3,7 @@
 *.tpl
 *.o
 *.lo
+*.la
 *.m4
 *.in
 *~
@@ -87,6 +88,7 @@ test/etap/run
 # for make check
 
 test/etap/temp.*
+test/bench/run
 couchdb.stderr
 couchdb.stdout
 
