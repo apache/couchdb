@@ -45,6 +45,7 @@ couchTests.basics = function(debug) {
 
   // Get the database info, check the db_name
   T(db.info().db_name == "test_suite_db");
+  T(CouchDB.allDbs().indexOf("test_suite_db") != -1)
 
   // Get the database info, check the doc_count
   T(db.info().doc_count == 0);
