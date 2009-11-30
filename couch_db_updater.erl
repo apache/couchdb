@@ -704,6 +704,10 @@ copy_doc_attachments(#db{fd=SrcFd}=SrcDb, {Pos,_RevId}, SrcSp, DestFd) ->
             % 09 UPGRADE CODE
             {NewBinSp, Len, Md5} = couch_stream:copy_to_new_stream(SrcFd, BinSp, DestFd),
             {Name, Type, NewBinSp, Len, Pos, Md5};
+        ({Name, Type, BinSp, Len, RevPos, <<>>}) when is_tuple(BinSp) orelse BinSp == null ->
+            % 09 UPGRADE CODE
+            {NewBinSp, Len, Md5} = couch_stream:old_copy_to_new_stream(SrcFd, BinSp, Len, DestFd),
+            {Name, Type, NewBinSp, Len, Len, Md5};
         ({Name, Type, BinSp, Len, RevPos, Md5}) ->
             {NewBinSp, Len, Md5} = couch_stream:copy_to_new_stream(SrcFd, BinSp, DestFd),
             {Name, Type, NewBinSp, Len, RevPos, Md5}

@@ -73,7 +73,8 @@ old_copy_to_new_stream(Fd, Pos, Len, DestFd) ->
 old_foldl(_Fd, null, 0, _Fun, Acc) ->
     Acc;
 old_foldl(Fd, OldPointer, Len, Fun, Acc) when is_tuple(OldPointer)->
-    old_stream_data(Fd, OldPointer, Len, ?DEFAULT_STREAM_CHUNK, Fun, Acc).
+    {ok, Acc2, _} = old_stream_data(Fd, OldPointer, Len, ?DEFAULT_STREAM_CHUNK, Fun, Acc),
+    Acc2.
 
 foldl(_Fd, [], _Fun, Acc) ->
     Acc;
