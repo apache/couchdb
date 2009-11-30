@@ -114,7 +114,6 @@ get_user(Db, UserName) ->
     % then fall back to querying the db.
     case couch_config:get("admins", ?b2l(UserName)) of
     "-hashed-" ++ HashedPwdAndSalt ->
-        io:format("hashed: '~p'~n", [hashed]),
         [HashedPwd, Salt] = string:tokens(HashedPwdAndSalt, ","),
         [{<<"roles">>, [<<"_admin">>]},
           {<<"salt">>, ?l2b(Salt)},
