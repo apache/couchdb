@@ -63,6 +63,29 @@ couchTests.etags_views = function(debug) {
   });
   T(xhr.status == 304);
 
+  // confirm ETag changes with different POST bodies
+  xhr = CouchDB.request("POST", "/test_suite_db/_design/etags/_view/basicView",
+    {body: JSON.stringify({keys:[1]})}
+  );
+  var etag1 = xhr.getResponseHeader("etag");
+  xhr = CouchDB.request("POST", "/test_suite_db/_design/etags/_view/basicView",
+    {body: JSON.stringify({keys:[2]})}
+  );
+  var etag2 = xhr.getResponseHeader("etag");
+  T(etag1 != etag2, "POST to map view generates key-depdendent ETags");
+
+  xhr = CouchDB.request("POST",
+    "/test_suite_db/_design/etags/_view/withReduce?group=true",
+    {body: JSON.stringify({keys:[1]})}
+  );
+  etag1 = xhr.getResponseHeader("etag");
+  xhr = CouchDB.request("POST",
+    "/test_suite_db/_design/etags/_view/withReduce?group=true",
+    {body: JSON.stringify({keys:[2]})}
+  );
+  etag2 = xhr.getResponseHeader("etag");
+  T(etag1 != etag2, "POST to reduce view generates key-depdendent ETags");
+  
   // all docs
   xhr = CouchDB.request("GET", "/test_suite_db/_all_docs");
   T(xhr.status == 200);

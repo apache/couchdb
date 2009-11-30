@@ -224,6 +224,17 @@ couchTests.list_views = function(debug) {
     headers: {"if-none-match": etag}
   });
   T(xhr.status == 304);
+  
+  // confirm ETag changes with different POST bodies
+  xhr = CouchDB.request("POST", "/test_suite_db/_design/lists/_list/basicBasic/basicView",
+    {body: JSON.stringify({keys:[1]})}
+  );
+  var etag1 = xhr.getResponseHeader("etag");
+  xhr = CouchDB.request("POST", "/test_suite_db/_design/lists/_list/basicBasic/basicView",
+    {body: JSON.stringify({keys:[2]})}
+  );
+  var etag2 = xhr.getResponseHeader("etag");
+  T(etag1 != etag2, "POST to map _list generates key-depdendent ETags");
 
   // test the richness of the arguments
   xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/basicJSON/basicView");
@@ -309,6 +320,17 @@ couchTests.list_views = function(debug) {
     headers: {"if-none-match": etag}
   });
   T(xhr.status == 304);
+
+  // confirm ETag changes with different POST bodies
+  xhr = CouchDB.request("POST", "/test_suite_db/_design/lists/_list/simpleForm/withReduce?group=true",
+    {body: JSON.stringify({keys:[1]})}
+  );
+  var etag1 = xhr.getResponseHeader("etag");
+  xhr = CouchDB.request("POST", "/test_suite_db/_design/lists/_list/simpleForm/withReduce?group=true",
+    {body: JSON.stringify({keys:[2]})}
+  );
+  var etag2 = xhr.getResponseHeader("etag");
+  T(etag1 != etag2, "POST to reduce _list generates key-depdendent ETags");
 
   // verify the etags expire correctly
   var docs = makeDocs(11, 12);

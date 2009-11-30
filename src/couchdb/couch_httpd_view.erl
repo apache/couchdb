@@ -202,7 +202,7 @@ output_reduce_view(Req, Db, View, Group, QueryArgs, Keys) ->
         skip = Skip,
         group_level = GroupLevel
     } = QueryArgs,
-    CurrentEtag = view_group_etag(Group, Db),
+    CurrentEtag = view_group_etag(Group, Db, Keys),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         {ok, GroupRowsFun, RespFun} = make_reduce_fold_funs(Req, GroupLevel, QueryArgs, CurrentEtag, #reduce_fold_helper_funs{}),
         {Resp, _RedAcc3} = lists:foldl(
