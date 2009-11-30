@@ -219,6 +219,17 @@ couchTests.changes = function(debug) {
     var resp = JSON.parse(xhr.responseText);
     T(resp.last_seq == 9);
     T(resp.results && resp.results.length > 0 && resp.results[0]["id"] == id, "filter the correct update");
+
+    // filter with continuous
+    xhr = CouchDB.newXhr();
+    xhr.open("GET", "/test_suite_db/_changes?feed=continuous&filter=changes_filter/bop&timeout=100", true);
+    xhr.send("");
+    db.save({"_id":"rusty", "bop" : "plankton"});
+    sleep(200);
+    var lines = xhr.responseText.split("\n");
+    T(JSON.parse(lines[1]).id == id);
+    T(JSON.parse(lines[2]).id == "rusty");
+    T(JSON.parse(lines[3]).last_seq == 10);
   }
 
   // error conditions
@@ -246,7 +257,7 @@ couchTests.changes = function(debug) {
   var req = CouchDB.request("GET", 
     "/test_suite_db/_changes?filter=changes_filter/bop&style=all_docs");
   var resp = JSON.parse(req.responseText);
-  TEquals(2, resp.results.length, "should return two rows");
+  TEquals(3, resp.results.length, "should return matching rows");
   
   // test for userCtx
   run_on_modified_server(
