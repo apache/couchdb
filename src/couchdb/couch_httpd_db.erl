@@ -159,7 +159,7 @@ keep_sending_changes(#httpd{user_ctx=UserCtx,path_parts=[DbName|_]}=Req, Resp,
         Prepend, ResponseType, Limit, Filter, End),
     couch_db:close(Db),
     if
-    EndSeq > StartSeq, ResponseType == "longpoll" ->
+    Limit > NewLimit, ResponseType == "longpoll" ->
         end_sending_changes(Resp, EndSeq, ResponseType);
     true ->
         case wait_db_updated(Timeout, TimeoutFun) of

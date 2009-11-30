@@ -26,10 +26,10 @@ couchTests.changes = function(debug) {
   var resp = JSON.parse(req.responseText);
 
   T(resp.results.length == 0 && resp.last_seq==0, "empty db")
-
   var docFoo = {_id:"foo", bar:1};
   T(db.save(docFoo).ok);
-
+  T(db.ensureFullCommit().ok);
+  
   req = CouchDB.request("GET", "/test_suite_db/_changes");
   var resp = JSON.parse(req.responseText);
 
@@ -186,6 +186,7 @@ couchTests.changes = function(debug) {
   T(resp.results.length == 0); 
 
   db.save({"bop" : "foom"});
+  db.save({"bop" : false});
   
   var req = CouchDB.request("GET", "/test_suite_db/_changes?filter=changes_filter/bop");
   var resp = JSON.parse(req.responseText);
@@ -198,6 +199,27 @@ couchTests.changes = function(debug) {
   req = CouchDB.request("GET", "/test_suite_db/_changes?filter=changes_filter/dynamic&field=bop");
   resp = JSON.parse(req.responseText);
   T(resp.results.length == 1);
+
+  if (!is_safari && xhr) { // full test requires parallel connections
+    // filter with longpoll
+    // longpoll filters full history when run without a since seq
+    xhr = CouchDB.newXhr();
+    xhr.open("GET", "/test_suite_db/_changes?feed=longpoll&filter=changes_filter/bop", true);
+    xhr.send("");
+    sleep(100);
+    var resp = JSON.parse(xhr.responseText);
+    T(resp.last_seq == 7);
+    // longpoll waits until a matching change before returning
+    xhr = CouchDB.newXhr();
+    xhr.open("GET", "/test_suite_db/_changes?feed=longpoll&since=7&filter=changes_filter/bop", true);
+    xhr.send("");
+    db.save({"bop" : ""}); // empty string is falsy
+    var id = db.save({"bop" : "bingo"}).id;
+    sleep(100);
+    var resp = JSON.parse(xhr.responseText);
+    T(resp.last_seq == 9);
+    T(resp.results && resp.results.length > 0 && resp.results[0]["id"] == id, "filter the correct update");
+  }
 
   // error conditions
 
@@ -224,7 +246,7 @@ couchTests.changes = function(debug) {
   var req = CouchDB.request("GET", 
     "/test_suite_db/_changes?filter=changes_filter/bop&style=all_docs");
   var resp = JSON.parse(req.responseText);
-  TEquals(1, resp.results.length, "should return one result row");
+  TEquals(2, resp.results.length, "should return two rows");
   
   // test for userCtx
   run_on_modified_server(
@@ -248,6 +270,7 @@ couchTests.changes = function(debug) {
 
       var docResp = db.save({"user" : "Chris Anderson"});
       T(docResp.ok);
+      T(db.ensureFullCommit().ok);
       req = CouchDB.request("GET", "/test_suite_db/_changes?filter=changes_filter/userCtx", authOpts);
       resp = JSON.parse(req.responseText);
       T(resp.results.length == 1, "userCtx");
