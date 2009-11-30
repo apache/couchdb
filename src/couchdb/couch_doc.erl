@@ -285,9 +285,9 @@ att_to_iolist(#att{data=Bin}) when is_binary(Bin) ->
     Bin;
 att_to_iolist(#att{data=Iolist}) when is_list(Iolist) ->
     Iolist;
-att_to_iolist(#att{data={Fd,Sp},md5=Md5}) ->
-    lists:reverse(couch_stream:foldl(Fd, Sp, Md5, 
-            fun(Bin,Acc) -> [Bin|Acc] end, []));
+att_to_iolist(#att{data={Fd,Sp}}=Att) ->
+    lists:reverse(att_foldl(Att,
+        fun(Bin,Acc) -> [Bin|Acc] end, []));
 att_to_iolist(#att{data=DataFun, len=Len}) when is_function(DataFun)->
     lists:reverse(fold_streamed_data(DataFun, Len,
             fun(Data, Acc) -> [Data | Acc] end, [])).
