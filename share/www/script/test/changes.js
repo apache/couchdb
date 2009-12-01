@@ -222,9 +222,10 @@ couchTests.changes = function(debug) {
 
     // filter with continuous
     xhr = CouchDB.newXhr();
-    xhr.open("GET", "/test_suite_db/_changes?feed=continuous&filter=changes_filter/bop&timeout=100", true);
+    xhr.open("GET", "/test_suite_db/_changes?feed=continuous&filter=changes_filter/bop&timeout=200", true);
     xhr.send("");
     db.save({"_id":"rusty", "bop" : "plankton"});
+    T(db.ensureFullCommit().ok);
     sleep(200);
     var lines = xhr.responseText.split("\n");
     T(JSON.parse(lines[1]).id == id);
