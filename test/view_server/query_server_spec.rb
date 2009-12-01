@@ -11,9 +11,9 @@
 # the License.
 
 # to run (requires ruby and rspec):
-# spec test/query_server_spec.rb -f specdoc --color
+# spec test/view_server/query_server_spec.rb -f specdoc --color
 
-COUCH_ROOT = "#{File.dirname(__FILE__)}/.." unless defined?(COUCH_ROOT)
+COUCH_ROOT = "#{File.dirname(__FILE__)}/../.." unless defined?(COUCH_ROOT)
 LANGUAGE = ENV["QS_LANG"] || "js"
 
 puts "Running query server specs for #{LANGUAGE} query server"
