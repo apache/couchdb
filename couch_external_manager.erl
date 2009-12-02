@@ -37,6 +37,7 @@ config_change("external", UrlName) ->
 % gen_server API
 
 init([]) ->
+    process_flag(trap_exit, true),
     Handlers = ets:new(couch_external_manager_handlers, [set, private]),
     couch_config:register(fun config_change/2),
     {ok, Handlers}.
@@ -81,12 +82,19 @@ handle_call({config, UrlName}, _From, Handlers) ->
 handle_cast(_Whatever, State) ->
     {noreply, State}.
 
-handle_info({'EXIT', Reason, Pid}, Handlers) ->
-    ?LOG_DEBUG("EXTERNAL: Server ~p died. (reason: ~p)", [Pid, Reason]),
+handle_info({'EXIT', Pid, normal}, Handlers) ->
+    ?LOG_INFO("EXTERNAL: Server ~p terminated normally", [Pid]),
+    % The process terminated normally without us asking - Remove Pid from the
+    % handlers table so we don't attempt to reuse it
+    ets:match_delete(Handlers, {'_', Pid}),
+    {noreply, Handlers};
+
+handle_info({'EXIT', Pid, Reason}, Handlers) ->
+    ?LOG_INFO("EXTERNAL: Server ~p died. (reason: ~p)", [Pid, Reason]),
     % Remove Pid from the handlers table so we don't try closing
     % it a second time in terminate/2.
     ets:match_delete(Handlers, {'_', Pid}),
-    {stop, Handlers}.
+    {stop, normal, Handlers}.
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
