@@ -11,11 +11,13 @@
 // the License.
 
 var Filter = {
-  filter : function(docs, req, userCtx) {
+  filter : function(funSrc, docs, req, userCtx) {
+    var filterFun = compileFunction(funSrc);
+    
     var results = [];
     try {
       for (var i=0; i < docs.length; i++) {
-        results.push((funs[0](docs[i], req, userCtx) && true) || false);
+        results.push((filterFun(docs[i], req, userCtx) && true) || false);
       };
       respond([true, results]);
     } catch (error) {

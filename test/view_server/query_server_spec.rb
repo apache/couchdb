@@ -606,10 +606,9 @@ describe "query server normal case" do
     before(:all) do
       @fun = functions["filter-basic"][LANGUAGE]
       @qs.reset!
-      @qs.add_fun(@fun).should == true
     end
     it "should only return true for good docs" do
-      @qs.run(["filter", [{"key"=>"bam", "good" => true}, {"foo" => "bar"}, {"good" => true}], {"req" => "foo"}]).
+      @qs.run(["filter", @fun, [{"key"=>"bam", "good" => true}, {"foo" => "bar"}, {"good" => true}], {"req" => "foo"}]).
         should ==  [true, [true, false, true]]
     end
   end
