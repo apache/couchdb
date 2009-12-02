@@ -21,7 +21,7 @@ This version has not been released yet.
  * Bug fix for partial updates during view builds.
  * Bug fix for building couch.app's module list.
  * Fixed a problem with statistics timers and system sleep.
- * Adds batching of multiple updating requests, to improve throughput with many 
+ * Adds batching of multiple updating requests, to improve throughput with many
    writers. Removed the now redundant couch_batch_save module.
  * Bug fix for premature termination of chunked responses.
  * Improved speed and concurrency of config lookups.
@@ -59,6 +59,13 @@ This release contains backwards incompatible changes, please see above for help.
  * Better RFC 2616 (HTTP 1.1) compliance.
  * Added modular configuration file directories.
  * Miscellaneous improvements to build, system integration, and portability.
+
+Version 0.9.2
+-------------
+
+ * Remove branch callbacks to allow building couchjs against newer versions of
+   Spidermonkey.
+ * Fix replication with 0.10+ servers initiated by an 0.9 server.
 
 Version 0.9.1
 -------------
