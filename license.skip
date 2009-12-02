@@ -74,6 +74,8 @@
 ^src/ibrowse/*
 ^src/mochiweb/*
 ^stamp-h1
+^test/bench/Makefile
+^test/bench/Makefile.in
 ^test/etap/temp.*
 ^test/etap/.*beam
 ^test/local.ini

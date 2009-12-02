@@ -10,7 +10,7 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
-EXTRA_DIST = benchbulk.sh benches.js
+EXTRA_DIST = benchbulk.sh bench_marks.js run.tpl
 
 noinst_SCRIPTS = run
 CLEANFILES = run
