@@ -82,7 +82,7 @@ start_sending_changes(Resp, _Else) ->
     send_chunk(Resp, "{\"results\":[\n").
 
 handle_changes_req(#httpd{method='GET',path_parts=[DbName|_]}=Req, Db) ->
-    {FilterFun, EndFilterFun} = make_filter_funs(Req, Db),
+    FilterFun = make_filter_fun(Req, Db),
     {ok, Info} = couch_db:get_db_info(Db),
     Seq = proplists:get_value(update_seq, Info),
     {Dir, StartSeq} = case couch_httpd:qs_value(Req, "descending", "false") of 
@@ -110,7 +110,7 @@ handle_changes_req(#httpd{method='GET',path_parts=[DbName|_]}=Req, Db) ->
                             {httpd, clients_requesting_changes}),
         try
             keep_sending_changes(Req, Resp, Db, StartSeq, <<"">>, Timeout,
-                TimeoutFun, ResponseType, Limit, FilterFun, EndFilterFun)
+                TimeoutFun, ResponseType, Limit, FilterFun)
         after
             couch_db_update_notifier:stop(Notify),
             get_rest_db_updated() % clean out any remaining update messages
@@ -123,7 +123,7 @@ handle_changes_req(#httpd{method='GET',path_parts=[DbName|_]}=Req, Db) ->
             start_sending_changes(Resp, ResponseType),
             {ok, {_, LastSeq, _Prepend, _, _, _, _, _}} =
                     send_changes(Req, Resp, Db, Dir, StartSeq, <<"">>, "normal",
-                        Limit, FilterFun, EndFilterFun),
+                        Limit, FilterFun),
             end_sending_changes(Resp, LastSeq, ResponseType)
         end)
     end;
@@ -154,9 +154,9 @@ end_sending_changes(Resp, EndSeq, _Else) ->
     end_json_response(Resp).
 
 keep_sending_changes(#httpd{user_ctx=UserCtx,path_parts=[DbName|_]}=Req, Resp,
-        Db, StartSeq, Prepend, Timeout, TimeoutFun, ResponseType, Limit, Filter, End) ->
+        Db, StartSeq, Prepend, Timeout, TimeoutFun, ResponseType, Limit, Filter) ->
     {ok, {_, EndSeq, Prepend2, _, _, _, NewLimit, _}} = send_changes(Req, Resp, Db, fwd, StartSeq,
-        Prepend, ResponseType, Limit, Filter, End),
+        Prepend, ResponseType, Limit, Filter),
     couch_db:close(Db),
     if
     Limit > NewLimit, ResponseType == "longpoll" ->
@@ -167,7 +167,7 @@ keep_sending_changes(#httpd{user_ctx=UserCtx,path_parts=[DbName|_]}=Req, Resp,
             case couch_db:open(DbName, [{user_ctx, UserCtx}]) of
             {ok, Db2} ->
                 keep_sending_changes(Req, Resp, Db2, EndSeq, Prepend2, Timeout,
-                    TimeoutFun, ResponseType, NewLimit, Filter, End);
+                    TimeoutFun, ResponseType, NewLimit, Filter);
             _Else ->
                 end_sending_changes(Resp, EndSeq, ResponseType)
             end;
@@ -178,7 +178,7 @@ keep_sending_changes(#httpd{user_ctx=UserCtx,path_parts=[DbName|_]}=Req, Resp,
 
 changes_enumerator(DocInfos, {Db, _, _, FilterFun, Resp, "continuous", Limit, IncludeDocs}) ->
     [#doc_info{id=Id, high_seq=Seq, revs=[#rev_info{deleted=Del,rev=Rev}|_]}|_] = DocInfos,
-    Results0 = [FilterFun(DocInfo) || DocInfo <- DocInfos],
+    Results0 = FilterFun(DocInfos),
     Results = [Result || Result <- Results0, Result /= null],
     Go = if Limit =< 1 -> stop; true -> ok end,
     case Results of
@@ -191,7 +191,7 @@ changes_enumerator(DocInfos, {Db, _, _, FilterFun, Resp, "continuous", Limit, In
     end;
 changes_enumerator(DocInfos, {Db, _, Prepend, FilterFun, Resp, _, Limit, IncludeDocs}) ->
     [#doc_info{id=Id, high_seq=Seq, revs=[#rev_info{deleted=Del,rev=Rev}|_]}|_] = DocInfos,
-    Results0 = [FilterFun(DocInfo) || DocInfo <- DocInfos],
+    Results0 = FilterFun(DocInfos),
     Results = [Result || Result <- Results0, Result /= null],
     Go = if Limit =< 1 -> stop; true -> ok end,
     case Results of
@@ -212,27 +212,24 @@ changes_row(_, Seq, Id, Del, Results, _, false) ->
 deleted_item(true) -> [{deleted,true}];
 deleted_item(_) -> [].
 
-send_changes(Req, Resp, Db, Dir, StartSeq, Prepend, ResponseType, Limit, FilterFun, End) ->
+send_changes(Req, Resp, Db, Dir, StartSeq, Prepend, ResponseType, Limit, FilterFun) ->
     Style = list_to_existing_atom(
             couch_httpd:qs_value(Req, "style", "main_only")),
     IncludeDocs = list_to_existing_atom(
             couch_httpd:qs_value(Req, "include_docs", "false")),
-    try
-        couch_db:changes_since(Db, Style, StartSeq, fun changes_enumerator/2, 
-            [{dir, Dir}], {Db, StartSeq, Prepend, FilterFun, Resp, ResponseType, Limit, IncludeDocs})
-    after
-        End()
-    end.
+    couch_db:changes_since(Db, Style, StartSeq, fun changes_enumerator/2, 
+            [{dir, Dir}], {Db, StartSeq, Prepend, FilterFun, Resp, ResponseType, Limit, IncludeDocs}).
 
-make_filter_funs(Req, Db) ->
+make_filter_fun(Req, Db) ->
     Filter = couch_httpd:qs_value(Req, "filter", ""),
     case [list_to_binary(couch_httpd:unquote(Part))
             || Part <- string:tokens(Filter, "/")] of
     [] ->
-    {fun(#doc_info{revs=[#rev_info{rev=Rev}|_]}) ->
-            {[{rev, couch_doc:rev_to_str(Rev)}]}
-        end,
-        fun() -> ok end};
+        fun(DocInfos) ->
+        % doing this as a batch is more efficient for external filters
+            [{[{rev, couch_doc:rev_to_str(Rev)}]} ||
+                #doc_info{revs=[#rev_info{rev=Rev}|_]} <- DocInfos]
+        end;
     [DName, FName] ->
         DesignId = <<"_design/", DName/binary>>,
         case couch_db:open_doc(Db, DesignId) of
@@ -244,21 +241,15 @@ make_filter_funs(Req, Db) ->
                 throw({bad_request, "invalid filter function"})
             end,
             Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
-            {ok, Pid} = couch_query_servers:start_filter(Lang, FilterSrc),
-            FilterFun = fun(DInfo = #doc_info{revs=[#rev_info{rev=Rev}|_]}) ->
-                {ok, Doc} = couch_db:open_doc(Db, DInfo, [deleted]),
-                {ok, Pass} = couch_query_servers:filter_doc(Pid, Doc, Req, Db),
-                case Pass of
-                true ->
-                    {[{rev, couch_doc:rev_to_str(Rev)}]};
-                false ->
-                    null
-                end
-            end,
-            EndFilterFun = fun() ->
-                couch_query_servers:end_filter(Pid)
-            end,
-            {FilterFun, EndFilterFun};
+            fun(DocInfos) ->
+                Docs = [Doc || {ok, Doc} <- [
+                    {ok, Doc} = couch_db:open_doc(Db, DInfo, [deleted])
+                    || DInfo <- DocInfos]],
+                {ok, Passes} = couch_query_servers:filter_docs(Lang, FilterSrc, Docs, Req, Db),
+                [{[{rev, couch_doc:rev_to_str(Rev)}]}
+                    || #doc_info{revs=[#rev_info{rev=Rev}|_]} <- DocInfos, 
+                    Pass <- Passes, Pass == true]
+            end;
         _Error ->
             throw({bad_request, "invalid design doc"})
         end;

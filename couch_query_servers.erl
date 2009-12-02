@@ -20,7 +20,7 @@
 -export([reduce/3, rereduce/3,validate_doc_update/5]).
 -export([render_doc_show/6, render_doc_update/6, start_view_list/2,
         render_list_head/4, render_list_row/4, render_list_tail/1]).
--export([start_filter/2, filter_doc/4, end_filter/1]).
+-export([filter_docs/5]).
 % -export([test/0]).
 
 -include("couch_db.hrl").
@@ -231,22 +231,15 @@ render_list_tail(Proc) ->
     ok = ret_os_process(Proc),
     JsonResp.
 
-start_filter(Lang, FilterSrc) ->
-    Proc = get_os_process(Lang),
-    true = proc_prompt(Proc, [<<"add_fun">>, FilterSrc]),
-    {ok, Proc}.
-
-filter_doc(Proc, Doc, Req, Db) ->
+filter_docs(Lang, Src, Docs, Req, Db) ->
     JsonReq = couch_httpd_external:json_req_obj(Req, Db),
-    JsonDoc = couch_doc:to_json_obj(Doc, [revs]),
+    JsonDocs = [couch_doc:to_json_obj(Doc, [revs]) || Doc <- Docs],
     JsonCtx = couch_util:json_user_ctx(Db),
-    [true, [Pass]] = proc_prompt(Proc,
-        [<<"filter">>, [JsonDoc], JsonReq, JsonCtx]),
-    {ok, Pass}.
-
-end_filter(Proc) ->
-    ok = ret_os_process(Proc).
-    
+    Proc = get_os_process(Lang),
+    [true, Passes] = proc_prompt(Proc,
+        [<<"filter">>, Src, JsonDocs, JsonReq, JsonCtx]),
+    ret_os_process(Proc),
+    {ok, Passes}.    
 
 init([]) ->
 
