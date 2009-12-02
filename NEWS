@@ -65,7 +65,7 @@ Version 0.9.2
 
  * Remove branch callbacks to allow building couchjs against newer versions of
    Spidermonkey.
- * Fix replication with 0.10+ servers initiated by an 0.9 server.
+ * Fix replication with 0.10 servers initiated by an 0.9 server.
 
 Version 0.9.1
 -------------
