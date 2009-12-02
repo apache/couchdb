@@ -16,7 +16,8 @@
 // * Write a line to stdout, consisting of the path to ourselves, plus
 //   '--kill {pid}' where {pid} is the PID of the newly created process.
 // * Un-suspend the new process.
-// * Terminate
+// * Wait for the process to terminate.
+// * Terminate with the child's exit-code.
 
 // Later, couch will call us with --kill and the PID, so we dutifully
 // terminate the specified PID.
@@ -112,6 +113,7 @@ int main(int argc, char **argv)
     char out_buf[1024];
     int rc;
     DWORD cbwritten;
+    DWORD exitcode;
     PROCESS_INFORMATION pi;
     if (argc==3 && strcmp(argv[1], "--kill")==0) {
         HANDLE h = OpenProcess(PROCESS_TERMINATE, 0, atoi(argv[2]));
@@ -134,6 +136,10 @@ int main(int argc, char **argv)
               &cbwritten, NULL);
     // Let the child process go...
     ResumeThread(pi.hThread);
-    // and that is all - we can die...
-    return 0;
+    // Wait for the process to terminate so we can reflect the exit code
+    // back to couch.
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    if (!GetExitCodeProcess(pi.hProcess, &exitcode))
+        return 6;
+    return exitcode;
 }
