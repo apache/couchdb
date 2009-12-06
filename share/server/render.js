@@ -197,6 +197,21 @@ function resetProvides() {
   responseContentType = null;  
 };
 
+// from http://javascript.crockford.com/remedial.html
+function typeOf(value) {
+    var s = typeof value;
+    if (s === 'object') {
+        if (value) {
+            if (value instanceof Array) {
+                s = 'array';
+            }
+        } else {
+            s = 'null';
+        }
+    }
+    return s;
+};
+
 function runShow(showFun, doc, req, funSrc) {
   try {
     resetProvides();
@@ -206,8 +221,9 @@ function runShow(showFun, doc, req, funSrc) {
       resp = runProvides(req);
       resp = applyContentType(maybeWrapResponse(resp), responseContentType);
     }
-    
-    if (resp) {
+
+    var type = typeOf(resp);
+    if (type == 'object' || type == 'string') {
       respond(["resp", maybeWrapResponse(resp)]);
     } else {
       renderError("undefined response from show function");

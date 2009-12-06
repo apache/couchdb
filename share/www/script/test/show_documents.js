@@ -56,6 +56,9 @@ couchTests.show_documents = function(debug) {
       "render-error" : stringFun(function(doc, req) {
         return noSuchVariable;
       }),
+      "empty" : stringFun(function(doc, req) {
+          return "";
+        }),
       "xml-type" : stringFun(function(doc, req) {
          return {
            "headers" : {
@@ -158,6 +161,10 @@ couchTests.show_documents = function(debug) {
   // hello template world (no docid)
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/hello");
   T(xhr.responseText == "Empty World");
+
+  // hello template world (no docid)
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/empty");
+  T(xhr.responseText == "");
 
   // // hello template world (non-existing docid)
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/hello/nonExistingDoc");
