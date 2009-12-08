@@ -553,9 +553,11 @@ do_checkpoint(State) ->
             reader = Reader,
             writer = Writer
         } = State,
-        Pids = [CF, MR, Reader, Writer],
+        Pids = [Writer, Reader, MR, CF],
         [unlink(Pid) || Pid <- Pids],
         [exit(Pid, shutdown) || Pid <- Pids],
+        close_db(Target),
+        close_db(Source),
         {ok, NewState} = init(State#state.init_args),
         NewState
     end.
