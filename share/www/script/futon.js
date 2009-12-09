@@ -159,6 +159,26 @@
     });
   }
 
+  $.fn.enableTabInsertion = function(chars) {
+    chars = chars || "\t";
+    var width = chars.length;
+    return this.keydown(function(evt) {
+      if (evt.keyCode == 9) {
+        var v = this.value;
+        var start = this.selectionStart;
+        var scrollTop = this.scrollTop;
+        if (start !== undefined) {
+          this.value = v.slice(0, start) + chars + v.slice(start);
+          this.selectionStart = this.selectionEnd = start + width;
+        } else {
+          document.selection.createRange().text = chars;
+          this.caretPos += width;
+        }
+        return false;
+      }
+    });
+  }
+
   $(document)
     .ajaxStart(function() { $(this.body).addClass("loading"); })
     .ajaxStop(function() { $(this.body).removeClass("loading"); });

@@ -23,7 +23,7 @@ html, body { color: #000; font: normal 90% Arial,Helvetica,sans-serif;
 
 h1 { background: #333; border-right: 2px solid #111;
   border-bottom: 1px solid #333; color: #999;
-  font: 125% normal Arial,Helvetica,sans-serif; height: 32px;
+  font: normal 125% Arial,Helvetica,sans-serif; height: 32px;
   line-height: 32px; margin: 0; padding: 0 0 0 .5em; position: relative;
 }
 h1 :link, h1 :visited, h1 strong { padding: .4em .5em; }
@@ -44,7 +44,9 @@ body.loading h1 strong {
 
 hr { border: 1px solid #999; border-width: 1px 0 0; }
 dl dt { font-weight: bold; }
-code, tt, pre { font-family: "DejaVu Sans Mono",Monaco,monospace; }
+code, tt, pre {
+  font-family: "DejaVu Sans Mono",Menlo,Courier,monospace;
+}
 code.key { color: #333; font-weight: bold; }
 code.string { color: #393; }
 code.number, code.boolean { color: #339; }
@@ -56,7 +58,10 @@ input, select, textarea { background: #fff; border: 1px solid;
   border-color: #999 #ddd #ddd #999; margin: 0; padding: 1px;
 }
 input.placeholder { color: #999; }
-textarea { font-family: "DejaVu Sans Mono",Monaco,monospace; font-size: 100%; }
+textarea {
+  font-family: "DejaVu Sans Mono",Menlo,Courier,monospace;
+  font-size: 100%;
+}
 fieldset { border: none; font-size: 95%; margin: 0; padding: .2em 0 0; }
 fieldset legend { color: #666; font-weight: bold; padding: 0; }
 fieldset input, fieldset select { font-size: 95%; }
@@ -370,7 +375,7 @@ body.fullwidth #wrap { margin-right: 0; }
 
 #documents thead th { width: 50%; }
 #documents tbody.content td { color: #999;
-  font: normal 11px "DejaVu Sans Mono",Monaco,monospace;
+  font: normal 11px "DejaVu Sans Mono",Menlo,Courier,monospace;
 }
 #documents tbody.content td.key { color: #333; }
 #documents tbody.content td.key a { display: block; }
@@ -411,8 +416,13 @@ body.fullwidth #wrap { margin-right: 0; }
   padding-right: 48px;
 }
 #fields tbody.content td code { display: block; font-size: 11px;
-  padding: 2px 2px 2px 3px;
+  padding: 2px 2px 2px 3px; position: relative;
 }
+#fields tbody.content td code.string:before { color: #ccc; content: "“";
+  position: absolute; left: -4px;
+}
+#fields tbody.content td code.string:after { color: #ccc; content: "”"; }
+
 #fields tbody.content td dl { margin: 0; padding: 0; }
 #fields tbody.content td dt {
   background: transparent url(../image/toggle-collapse.gif) 0 3px no-repeat;
@@ -429,23 +439,33 @@ body.fullwidth #wrap { margin-right: 0; }
   float: left; margin-left: 0; padding-left: 2px; padding-right: .5em;
   padding-top: 2px;
 }
-#fields tbody.content input, #fields tbody.content textarea, #fields tbody.source textarea {
+#fields tbody.content td dd code.string { left: 4px; text-indent: -6px;
+  white-space: pre-wrap;
+}
+#fields tbody.content td dd code.string:before { position: static; }
+#fields tbody.content input, #fields tbody.content textarea,
+#fields tbody.source textarea {
   background: #fff; border: 1px solid; border-color: #999 #ddd #ddd #999;
   margin: 0; padding: 1px; width: 100%;
 }
 #fields tbody.content th input { font-family: inherit; font-size: inherit;
   font-weight: bold;
 }
-#fields tbody.content td input, #fields tbody.content td textarea, #fields tbody.source textarea {
-  font: 11px normal "DejaVu Sans Mono",Monaco,monospace;
+#fields tbody.content td input, #fields tbody.content td textarea,
+#fields tbody.source textarea {
+  font: normal 11px "DejaVu Sans Mono",Menlo,Courier,monospace;
 }
 #fields tbody.content input.invalid,
 #fields tbody.content textarea.invalid,
 #fields tbody.source textarea.invalid {
   background: #f9f4f4; border-color: #b66 #ebb #ebb #b66;
 }
-#fields tbody.content div.grippie, #fields tbody.source div.gripple { padding: 0 1px; width: 100%; }
-#fields tbody.content div.error, #fields tbody.source div.error { color: #d33; }
+#fields tbody.content div.grippie, #fields tbody.source div.grippie {
+  padding: 0 1px; width: 100%;
+}
+#fields tbody.content div.error, #fields tbody.source div.error {
+  color: #d33;
+}
 
 #fields tbody.content td ul.attachments { list-style: none; margin: 0;
   padding: 0;
@@ -527,7 +547,7 @@ body.fullwidth #wrap { margin-right: 0; }
 #config tbody td.value code.editinline-container { padding: 0; }
 #config tbody td input {
   background: #fff; border: 1px solid; border-color: #999 #ddd #ddd #999;
-  font: 11px normal "DejaVu Sans Mono",Monaco,monospace;
+  font: normal 11px "DejaVu Sans Mono",Menlo,Courier,monospace;
   margin: 0; padding: 1px; width: 100%;
 }
 
@@ -557,5 +577,6 @@ form#replicator p.actions { padding: 1px; clear: left; margin: 0;
 
 #status tr.none th { color: #666; font-weight: normal; }
 #status td.object, #status td.pid {
-  font-family: "DejaVu Sans Mono",Monaco,monospace; font-size: 11px;
+  font-family: "DejaVu Sans Mono",Menlo,Courier,monospace;
+  font-size: 11px;
 }

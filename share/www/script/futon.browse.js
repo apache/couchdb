@@ -189,7 +189,8 @@
                 }
               }, 100);
             }
-            $("#viewcode textarea").bind("input", updateDirtyState);
+            $("#viewcode textarea").enableTabInsertion()
+              .bind("input", updateDirtyState);
             if ($.browser.msie || $.browser.safari) {
               $("#viewcode textarea").bind("paste", updateDirtyState)
                                      .bind("change", updateDirtyState)
@@ -720,7 +721,7 @@
           $(this).html($("<pre></pre>").html($.futon.formatJSON(page.doc, {html: true})))
             .makeEditable({allowEmpty: false,
               createInput: function(value) {
-                return $("<textarea rows='8' cols='80' spellcheck='false'></textarea>");
+                return $("<textarea rows='8' cols='80' spellcheck='false'></textarea>").enableTabInsertion();
               },
               prepareInput: function(input) {
                 $(input).makeResizable({vertical: true});
@@ -985,10 +986,10 @@
           return;
         }
 
-        row.find("td").makeEditable({allowEmpty: true,
+        row.find("td").makeEditable({acceptOnBlur: false, allowEmpty: true,
           createInput: function(value) {
             if ($("dl", this).length > 0 || $("code", this).text().length > 60) {
-              return $("<textarea rows='8' cols='40' spellcheck='false'></textarea>");
+              return $("<textarea rows='1' cols='40' spellcheck='false'></textarea>");
             }
             return $("<input type='text' spellcheck='false'>");
           },
@@ -998,12 +999,17 @@
           },
           prepareInput: function(input) {
             if ($(input).is("textarea")) {
-              $(input).makeResizable({vertical: true});
+              var height = Math.min(input.scrollHeight, document.body.clientHeight - 100);
+              $(input).height(height).makeResizable({vertical: true}).enableTabInsertion();
             }
           },
           accept: function(newValue) {
             var fieldName = row.data("name");
-            doc[fieldName] = JSON.parse(newValue);
+            try {
+              doc[fieldName] = JSON.parse(newValue);
+            } catch (err) {
+              doc[fieldName] = newValue;
+            }
             page.isDirty = true;
             if (fieldName == "_id") {
               page.docId = page.doc._id = doc[fieldName];
@@ -1011,7 +1017,11 @@
             }
           },
           populate: function(value) {
-            return $.futon.formatJSON(doc[row.data("name")]);
+            value = doc[row.data("name")];
+            if (typeof(value) == "string") {
+              return value;
+            }
+            return $.futon.formatJSON(value);
           },
           validate: function(value) {
             $("div.error", this).remove();
@@ -1024,12 +1034,7 @@
               }
               return true;
             } catch (err) {
-              var msg = err.message;
-              if (msg == "parseJSON" || msg == "JSON.parse") {
-                msg = "Please enter a valid JSON value (for example, \"string\").";
-              }
-              $("<div class='error'></div>").text(msg).appendTo(this);
-              return false;
+              return true;
             }
           }
         });
@@ -1046,7 +1051,11 @@
             }
             return list;
           } else {
-            return $($.futon.formatJSON(val, {html: true}));
+            var html = $.futon.formatJSON(val, {
+              html: true,
+              escapeStrings: false
+            });
+            return $(html);
           }
         }
         var elem = render(value);

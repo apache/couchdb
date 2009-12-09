@@ -17,6 +17,7 @@
     // JSON pretty printing
     formatJSON: function(val, options) {
       options = $.extend({
+        escapeStrings: true,
         indent: 4,
         linesep: "\n",
         quoteKeys: true
@@ -39,9 +40,14 @@
           case "boolean":
           case "number":
           case "string":
-            var retval = JSON.stringify(val);
+            var retval = val;
+            if (type == "string" && !options.escapeStrings) {
+              retval = indentLines(retval, tab);
+            } else {
+              retval = escape(JSON.stringify(val));
+            }
             if (options.html) {
-              retval = "<code class='" + type + "'>" + escape(retval) + "</code>";
+              retval = "<code class='" + type + "'>" + retval + "</code>";
             }
             return retval;
 
@@ -95,6 +101,14 @@
         }
       }
 
+      function indentLines(text, tab) {
+        var lines = text.split("\n");
+        for (var i in lines) {
+          lines[i] = (i > 0 ? tab : "") + escape(lines[i]);
+        }
+        return lines.join("<br>");
+      }
+
       return format(val, 1);
     },
 
@@ -112,4 +126,5 @@
     }
 
   });
+
 })(jQuery);
