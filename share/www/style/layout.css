@@ -324,6 +324,7 @@ body.fullwidth #wrap { margin-right: 0; }
 #viewcode .top span#view-toggle {
   background: url(../image/twisty.gif) 0 -96px no-repeat; padding-left: 15px;
 }
+#viewcode.collapsed .top span#view-toggle { background-position: 0 4px; }
 #viewcode .top a { float: right; font-size: 90%; line-height: 1.4em;
   padding: 2px 2px 0 0;
 }
