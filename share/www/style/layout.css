@@ -376,6 +376,9 @@ body.fullwidth #wrap { margin-right: 0; }
 /* Documents table */
 
 #documents thead th { width: 50%; }
+#documents thead th.value label { float: right; font-size: 90%;
+  text-shadow: none;
+}
 #documents tbody.content td { color: #999;
   font: normal 11px "DejaVu Sans Mono",Menlo,Courier,monospace;
 }

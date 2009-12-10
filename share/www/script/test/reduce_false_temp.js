@@ -10,7 +10,7 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-couchTests.reduce_false = function(debug) {
+couchTests.reduce_false_temp = function(debug) {
   var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
   db.deleteDb();
   db.createDb();
@@ -21,22 +21,15 @@ couchTests.reduce_false = function(debug) {
   db.bulkSave(docs);
   var summate = function(N) {return (N+1)*N/2;};
 
-  var designDoc = {
-    _id:"_design/test",
-    language: "javascript",
-    views: {
-      summate: {map:"function (doc) { emit(doc.integer, doc.integer); }",
-                reduce:"function (keys, values) { return sum(values); }"},
-    }
-  };
-  T(db.save(designDoc).ok);
+  var mapFun = "function (doc) { emit(doc.integer, doc.integer); }";
+  var reduceFun = "function (keys, values) { return sum(values); }";
 
   // Test that the reduce works
-  var res = db.view('test/summate');
+  var res = db.query(mapFun, reduceFun);
   T(res.rows.length == 1 && res.rows[0].value == summate(5));
 
   //Test that we get our docs back
-  res = db.view('test/summate', {reduce: false});
+  res = db.query(mapFun, reduceFun, {reduce: false});
   T(res.rows.length == 5);
   for(var i=0; i<5; i++) {
     T(res.rows[i].value == i+1);

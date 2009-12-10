@@ -211,6 +211,7 @@
           );
           $("#grouptruenotice").show();
         } else {
+          $("#reduce").hide();
           page.updateDocumentListing();
         }
         page.populateLanguagesMenu();
@@ -329,7 +330,7 @@
               page.storedViewLanguage = page.viewLanguage;
               if (callback) callback();
             }
-          },{async:false});
+          }, {async: false});
         } else {
           page.updateViewEditor(page.storedViewCode.map,
             page.storedViewCode.reduce || "");
@@ -349,6 +350,7 @@
           mapFun.split("\n").length,
           reduceFun.split("\n").length
         );
+        $("#reduce").toggle(reduceFun != null);
         $("#viewcode textarea").attr("rows", Math.min(15, Math.max(3, lines)));
       }
 
@@ -500,12 +502,12 @@
       this.updateDocumentListing = function(options) {
         if (options === undefined) options = {};
         if (options.limit === undefined) {
-          per_page = parseInt($("#perpage").val(), 10)
+          var perPage = parseInt($("#perpage").val(), 10)
           // Fetch an extra row so we know when we're on the last page for
           // reduce views
-          options.limit = per_page + 1;
+          options.limit = perPage + 1;
         } else {
-          per_page = options.limit - 1;
+          perPage = options.limit - 1;
         }
         if ($("#documents thead th.key").is(".desc")) {
           if (typeof options.descending == 'undefined') options.descending = true;
@@ -524,17 +526,17 @@
             resp.offset = 0;
           }
           var descending_reverse = ((options.descending && !descend) || (descend && (options.descending === false)));
-          var has_reduce_prev = resp.total_rows === undefined && (descending_reverse ? resp.rows.length > per_page : options.startkey !== undefined);
+          var has_reduce_prev = resp.total_rows === undefined && (descending_reverse ? resp.rows.length > perPage : options.startkey !== undefined);
           if (descending_reverse && resp.rows) {
             resp.rows = resp.rows.reverse();
-            if (resp.rows.length > per_page) {
+            if (resp.rows.length > perPage) {
               resp.rows.push(resp.rows.shift());
             }
           }
           if (resp.rows !== null && (has_reduce_prev || (descending_reverse ?
-            (resp.total_rows - resp.offset > per_page) :
+            (resp.total_rows - resp.offset > perPage) :
             (resp.offset > 0)))) {
-            $("#paging a.prev").attr("href", "#" + (resp.offset - per_page)).click(function() {
+            $("#paging a.prev").attr("href", "#" + (resp.offset - perPage)).click(function() {
               var opt = {
                 descending: !descend,
                 limit: options.limit
@@ -553,17 +555,17 @@
           } else {
             $("#paging a.prev").removeAttr("href");
           }
-          var has_reduce_next = resp.total_rows === undefined && (descending_reverse ? options.startkey !== undefined : resp.rows.length > per_page);
+          var has_reduce_next = resp.total_rows === undefined && (descending_reverse ? options.startkey !== undefined : resp.rows.length > perPage);
           if (resp.rows !== null && (has_reduce_next || (descending_reverse ?
-            (resp.offset - resp.total_rows < per_page) :
-            (resp.total_rows - resp.offset > per_page)))) {
-            $("#paging a.next").attr("href", "#" + (resp.offset + per_page)).click(function() {
+            (resp.offset - resp.total_rows < perPage) :
+            (resp.total_rows - resp.offset > perPage)))) {
+            $("#paging a.next").attr("href", "#" + (resp.offset + perPage)).click(function() {
               var opt = {
                 descending: descend,
                 limit: options.limit
               };
               if (resp.rows.length > 0) {
-                var lastDoc = resp.rows[Math.min(per_page, resp.rows.length) - 1];
+                var lastDoc = resp.rows[Math.min(perPage, resp.rows.length) - 1];
                 opt.startkey = lastDoc.key !== undefined ? lastDoc.key : null;
                 if (lastDoc.id !== undefined) {
                   opt.startkey_docid = lastDoc.id;
@@ -577,7 +579,7 @@
             $("#paging a.next").removeAttr("href");
           }
 
-          for (var i = 0; i < Math.min(per_page, resp.rows.length); i++) {
+          for (var i = 0; i < Math.min(perPage, resp.rows.length); i++) {
             var row = resp.rows[i];
             var tr = $("<tr></tr>");
             var key = "null";
@@ -601,13 +603,14 @@
                 html: true, indent: 0, linesep: "", quoteKeys: false
               });
             }
-            $("<td class='value'><div></div></td>").find("div").html(value).end().appendTo(tr).dblclick(function() {
-              location.href = this.previousSibling.firstChild.href;
-            });
+            $("<td class='value'><div></div></td>").find("div").html(value).end()
+              .appendTo(tr).dblclick(function() {
+                location.href = this.previousSibling.firstChild.href;
+              });
             tr.appendTo("#documents tbody.content");
           }
           var firstNum = 1;
-          var lastNum = totalNum = Math.min(per_page, resp.rows.length);
+          var lastNum = totalNum = Math.min(perPage, resp.rows.length);
           if (resp.total_rows != null) {
             if (descending_reverse) {
               lastNum = Math.min(resp.total_rows, resp.total_rows - resp.offset);
@@ -642,7 +645,11 @@
             var reduceFun = $.trim($("#viewcode_reduce").val()) || null;
             if (reduceFun) {
               $.cookies.set(db.name + ".reduce", reduceFun);
-              options.group = true;
+              if ($("#reduce :checked").length) {
+                options.group = true;
+              } else {
+                options.reduce = false;
+              }
             } else {
               $.cookies.remove(db.name + ".reduce");
             }
@@ -658,7 +665,11 @@
             var currentMapCode = $("#viewcode_map").val();
             var currentReduceCode = $.trim($("#viewcode_reduce").val()) || null;
             if (currentReduceCode) {
-              options.group = true;
+              if ($("#reduce :checked").length) {
+                options.group = true;
+              } else {
+                options.reduce = false;
+              }
             }
             if (page.isDirty) {
               db.query(currentMapCode, currentReduceCode, page.viewLanguage, options);

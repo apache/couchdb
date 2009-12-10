@@ -66,6 +66,7 @@ loadTest("recreate_doc.js");
 loadTest("reduce.js");
 loadTest("reduce_builtin.js");
 loadTest("reduce_false.js");
+loadTest("reduce_false_temp.js");
 loadTest("replication.js");
 loadTest("rev_stemming.js");
 loadTest("security_validation.js");

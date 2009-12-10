@@ -73,6 +73,8 @@ specific language governing permissions and limitations under the License.
         // Restore preferences/state from cookies
         var desc = $.cookies.get(page.db.name + ".desc");
         if (desc) $("#documents thead th.key").addClass("desc");
+        var reduce = $.cookies.get(page.db.name + ".doreduce");
+        $("#reduce :checkbox")[0].checked = reduce;
         var rowsPerPage = $.cookies.get(page.db.name + ".perpage");
         if (rowsPerPage) $("#perpage").val(rowsPerPage);
 
@@ -92,6 +94,14 @@ specific language governing permissions and limitations under the License.
         $("#documents thead th.key").click(function() {
           $(this).toggleClass("desc");
           page.updateDocumentListing();
+        });
+        $("#documents thead th.value #reduce :checkbox").click(function() {
+          page.updateDocumentListing();
+          if (this.checked) {
+            $.cookies.set(page.db.name + ".doreduce", "1");
+          } else {
+            $.cookies.remove(page.db.name + ".doreduce");
+          }
         });
         $("#perpage").change(function() {
           page.updateDocumentListing();
@@ -187,7 +197,10 @@ specific language governing permissions and limitations under the License.
         <thead>
           <tr>
             <th class="key"><div>Key</div></th>
-            <th class="value">Value</th>
+            <th class="value">
+              <label id="reduce"><input type="checkbox" autocomplete="off" checked> Reduce</label>
+              Value
+            </th>
           </tr>
         </thead>
         <tbody class="content">
