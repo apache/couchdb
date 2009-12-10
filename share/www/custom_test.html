@@ -46,7 +46,7 @@ specific language governing permissions and limitations under the License.
 
       $(function() {
         $("#status").removeClass("failure").removeClass("success");
-        $("#viewcode textarea").makeResizable({
+        $("#viewcode textarea").enableTabInsertion().makeResizable({
           always: true,
           grippie: $("#viewcode .bottom"),
           vertical: true
