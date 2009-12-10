@@ -124,9 +124,15 @@ handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
     {DesignOptions} = proplists:get_value(<<"options">>, Props, {[]}),
     MapSrc = proplists:get_value(<<"map">>, Props),
     Keys = proplists:get_value(<<"keys">>, Props, nil),
+    Reduce = get_reduce_type(Req),
     case proplists:get_value(<<"reduce">>, Props, null) of
     null ->
         QueryArgs = parse_view_params(Req, Keys, map),
+        {ok, View, Group} = couch_view:get_temp_map_view(Db, Language,
+            DesignOptions, MapSrc),
+        output_map_view(Req, View, Group, Db, QueryArgs, Keys);
+    _ when Reduce =:= false ->
+        QueryArgs = parse_view_params(Req, Keys, red_map),
         {ok, View, Group} = couch_view:get_temp_map_view(Db, Language,
             DesignOptions, MapSrc),
         output_map_view(Req, View, Group, Db, QueryArgs, Keys);
