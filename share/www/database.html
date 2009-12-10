@@ -95,7 +95,7 @@ specific language governing permissions and limitations under the License.
           $(this).toggleClass("desc");
           page.updateDocumentListing();
         });
-        $("#documents thead th.value #reduce :checkbox").click(function() {
+        $("#reduce :checkbox").click(function() {
           page.updateDocumentListing();
           if (this.checked) {
             $.cookies.set(page.db.name + ".doreduce", "1");

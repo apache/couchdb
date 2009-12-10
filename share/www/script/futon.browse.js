@@ -350,7 +350,7 @@
           mapFun.split("\n").length,
           reduceFun.split("\n").length
         );
-        $("#reduce").toggle(reduceFun != null);
+        $("#reduce").toggle(!!reduceFun);
         $("#viewcode textarea").attr("rows", Math.min(15, Math.max(3, lines)));
       }
 
