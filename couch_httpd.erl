@@ -18,7 +18,7 @@
 -export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,path/1,absolute_uri/2,body_length/1]).
 -export([verify_is_server_admin/1,unquote/1,quote/1,recv/2,recv_chunked/4,error_info/1]).
 -export([parse_form/1,json_body/1,json_body_obj/1,body/1,doc_etag/1, make_etag/1, etag_respond/3]).
--export([primary_header_value/2,partition/1,serve_file/3, server_header/0]).
+-export([primary_header_value/2,partition/1,serve_file/3,serve_file/4, server_header/0]).
 -export([start_chunked_response/3,send_chunk/2,log_request/2]).
 -export([start_response_length/4, send/2]).
 -export([start_json_response/2, start_json_response/3, end_json_response/1]).
@@ -245,8 +245,11 @@ primary_header_value(#httpd{mochi_req=MochiReq}, Key) ->
     MochiReq:get_primary_header_value(Key).
 
 serve_file(#httpd{mochi_req=MochiReq}=Req, RelativePath, DocumentRoot) ->
+    serve_file(Req, RelativePath, DocumentRoot, []).
+
+serve_file(#httpd{mochi_req=MochiReq}=Req, RelativePath, DocumentRoot, ExtraHeaders) ->
     {ok, MochiReq:serve_file(RelativePath, DocumentRoot,
-        server_header() ++ couch_httpd_auth:cookie_auth_header(Req, []))}.
+        server_header() ++ couch_httpd_auth:cookie_auth_header(Req, []) ++ ExtraHeaders)}.
 
 qs_value(Req, Key) ->
     qs_value(Req, Key, undefined).
