@@ -168,7 +168,11 @@
 
     this.set = function(name, value) {
       lookup(name, function(decl) {
-        handlers[decl.scope].set(decl.prefix + name, value);
+        if (value == decl.defaultValue) {
+          handlers[decl.scope].del(decl.prefix + name);
+        } else {
+          handlers[decl.scope].set(decl.prefix + name, value);
+        }
       });
     }
 

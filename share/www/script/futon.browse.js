@@ -101,8 +101,8 @@
       $.futon.storage.declareWithPrefix(dbName + ".", {
         desc: {},
         language: {defaultValue: "javascript"},
-        map_fun: {},
-        reduce_fun: {},
+        map_fun: {defaultValue: ""},
+        reduce_fun: {defaultValue: ""},
         reduce: {},
         group_level: {defaultValue: 100},
         per_page: {defaultValue: 10},
@@ -197,6 +197,7 @@
                   map: $("#viewcode_map").val(),
                   reduce: $("#viewcode_reduce").val()
                 };
+                $("#reduce, #grouplevel").toggle(!!viewCode.reduce);
                 page.isDirty = (viewCode.map != page.storedViewCode.map)
                   || (viewCode.reduce != (page.storedViewCode.reduce || ""))
                   || page.viewLanguage != page.storedViewLanguage;
@@ -205,7 +206,6 @@
                 } else {
                   buttons.attr("disabled", "disabled");
                 }
-                $("#reduce, #grouplevel").toggle(!!viewCode.reduce);
               }, 100);
             }
             $("#viewcode textarea").enableTabInsertion()
@@ -222,10 +222,11 @@
             page.updateDocumentListing();
           });
         } else if (viewName == "_temp_view") {
+          $("#viewcode textarea").enableTabInsertion();
           page.viewLanguage = $.futon.storage.get("language");
           page.updateViewEditor(
-            $.futon.storage.get("map", templates[page.viewLanguage]),
-            $.futon.storage.get("reduce")
+            $.futon.storage.get("map_fun", templates[page.viewLanguage]),
+            $.futon.storage.get("reduce_fun")
           );
         } else {
           $("#grouplevel, #reduce").hide();
@@ -671,8 +672,6 @@
               } else {
                 options.reduce = false;
               }
-            } else {
-              $.futon.storage.del("reduce");
             }
             $.futon.storage.set("language", page.viewLanguage);
             db.query(mapFun, reduceFun, page.viewLanguage, options);
