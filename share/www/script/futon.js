@@ -35,22 +35,22 @@
     }
 
     this.addDatabase = function(name) {
-      var recentDbs = $.cookies.get("recent", "").split(",");
+      var recentDbs = $.futon.storage.get("recent", "").split(",");
       if ($.inArray(name, recentDbs) == -1) {
         recentDbs.unshift(name);
         if (recentDbs.length > 10) recentDbs.length = 10;
-        $.cookies.set("recent", recentDbs.join(","));
+        $.futon.storage.set("recent", recentDbs.join(","));
         this.updateDatabases();
       }
     }
 
     this.removeDatabase = function(name) {
       // remove database from recent databases list
-      var recentDbs = $.cookies.get("recent", "").split(",");
+      var recentDbs = $.futon.storage.get("recent").split(",");
       var recentIdx = $.inArray(name, recentDbs);
       if (recentIdx >= 0) {
         recentDbs.splice(recentIdx, 1);
-        $.cookies.set("recent", recentDbs.join(","));
+        $.futon.storage.set("recent", recentDbs.join(","));
         this.updateDatabases();
       }
     }
@@ -61,7 +61,7 @@
         selection = [this.pathname, this.search];
       });
       $("#dbs").empty();
-      var recentDbs = $.cookies.get("recent", "").split(",");
+      var recentDbs = $.futon.storage.get("recent").split(",");
       recentDbs.sort();
       $.each(recentDbs, function(idx, name) {
         if (name) {
@@ -123,13 +123,113 @@
 
       $("#sidebar-toggle")
         .attr("title", hidden ? "Show Sidebar" : "Hide Sidebar");
-      $.cookies.set("sidebar", hidden ? "hidden" : "show");
+      $.futon.storage.set("sidebar", hidden ? "hidden" : "show");
     };
+  }
+
+  function Storage() {
+    var storage = this;
+    this.decls = {};
+
+    this.declare = function(name, options) {
+      this.decls[name] = $.extend({}, {
+        scope: "window",
+        defaultValue: null,
+        prefix: ""
+      }, options || {});
+    }
+
+    this.declareWithPrefix = function(prefix, decls) {
+      for (var name in decls) {
+        var options = decls[name];
+        options.prefix = prefix;
+        storage.declare(name, options);
+      }
+    }
+
+    this.del = function(name) {
+      lookup(name, function(decl) {
+        handlers[decl.scope].del(decl.prefix + name);
+      });
+    }
+
+    this.get = function(name, defaultValue) {
+      return lookup(name, function(decl) {
+        var value = handlers[decl.scope].get(decl.prefix + name);
+        if (value !== undefined) {
+          return value;
+        }
+        if (defaultValue !== undefined) {
+          return defaultValue;
+        }
+        return decl.defaultValue;
+      });
+    }
+
+    this.set = function(name, value) {
+      lookup(name, function(decl) {
+        handlers[decl.scope].set(decl.prefix + name, value);
+      });
+    }
+
+    function lookup(name, callback) {
+      var decl = storage.decls[name];
+      if (decl === undefined) {
+        return decl;
+      }
+      return callback(decl);
+    }
+
+    var handlers = {
+
+      "cookie": {
+        get: function(name) {
+          var nameEq = name + "=";
+          var parts = document.cookie.split(';');
+          for (var i = 0; i < parts.length; i++) {
+            var part = parts[i].replace(/^\s+/, "");
+            if (part.indexOf(nameEq) == 0) {
+              return unescape(part.substring(nameEq.length, part.length));
+            }
+          }
+        },
+        set: function(name, value) {
+          var date = new Date();
+          date.setTime(date.getTime() + 14*24*60*60*1000); // two weeks
+          document.cookie = name + "=" + escape(value) + "; expires=" +
+            date.toGMTString();
+        },
+        del: function(name) {
+          var date = new Date();
+          date.setTime(date.getTime() - 24*60*60*1000); // yesterday
+          document.cookie = name + "=; expires=" + date.toGMTString();
+        }
+      },
+
+      "window": {
+        get: function(name) {
+          return JSON.parse(window.name || "{}")[name];
+        },
+        set: function(name, value) {
+          var obj = JSON.parse(window.name || "{}");
+          obj[name] = value || null;
+          window.name = JSON.stringify(obj);
+        },
+        del: function(name) {
+          var obj = JSON.parse(window.name || "{}");
+          delete obj[name];
+          window.name = JSON.stringify(obj);
+        }
+      }
+
+    };
+
   }
 
   $.futon = $.futon || {};
   $.extend($.futon, {
-    navigation: new Navigation()
+    navigation: new Navigation(),
+    storage: new Storage()
   });
 
   $.fn.addPlaceholder = function(text) {
@@ -183,9 +283,12 @@
     .ajaxStart(function() { $(this.body).addClass("loading"); })
     .ajaxStop(function() { $(this.body).removeClass("loading"); });
 
+  $.futon.storage.declare("sidebar", {scope: "cookie", defaultValue: "show"});
+  $.futon.storage.declare("recent", {scope: "cookie", defaultValue: ""});
+
   $(function() {
     document.title = "Apache CouchDB - Futon: " + document.title;
-    if ($.cookies.get("sidebar") == "hidden") {
+    if ($.futon.storage.get("sidebar") == "hidden") {
       // doing this as early as possible prevents flickering
       $(document.body).addClass("fullwidth");
     }
@@ -195,7 +298,7 @@
             $.futon.navigation.toggle(e.shiftKey ? 2500 : 500);
             return false;
           });
-      if ($.cookies.get("sidebar") == "hidden") {
+      if ($.futon.storage.get("sidebar") == "hidden") {
         $.futon.navigation.toggle(0);
       }
 

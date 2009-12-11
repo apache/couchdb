@@ -84,7 +84,6 @@ nobase_dist_localdata_DATA = \
     www/script/futon.browse.js \
     www/script/futon.format.js \
     www/script/futon.js \
-    www/script/jquery.cookies.js \
     www/script/jquery.couch.js \
     www/script/jquery.dialog.js \
     www/script/jquery.editinline.js \

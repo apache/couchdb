@@ -18,6 +18,8 @@
     CouchIndexPage: function() {
       page = this;
 
+      $.futon.storage.declare("per_page", {defaultValue: 10});
+
       this.addDatabase = function() {
         $.showDialog("dialog/_create_database.html", {
           submit: function(data, callback) {
@@ -95,11 +97,22 @@
     CouchDatabasePage: function() {
       var urlParts = location.search.substr(1).split("/");
       var dbName = decodeURIComponent(urlParts.shift());
+
+      $.futon.storage.declareWithPrefix(dbName + ".", {
+        desc: {},
+        language: {defaultValue: "javascript"},
+        map_fun: {},
+        reduce_fun: {},
+        reduce: {},
+        per_page: {defaultValue: 10},
+        view: {defaultValue: ""}
+      });
+
       var viewName = (urlParts.length > 0) ? urlParts.join("/") : null;
       if (viewName) {
-        $.cookies.set(dbName + ".view", viewName);
+        $.futon.storage.set("view", viewName);
       } else {
-        viewName = $.cookies.get(dbName + ".view", "");
+        viewName = $.futon.storage.get("view");
         if (viewName) {
           this.redirecting = true;
           location.href = "database.html?" + encodeURIComponent(dbName) +
@@ -204,10 +217,10 @@
           });
           $("#grouptruenotice").show();
         } else if (viewName == "_temp_view") {
-          page.viewLanguage = $.cookies.get(db.name + ".language", page.viewLanguage);
+          page.viewLanguage = $.futon.storage.get("language");
           page.updateViewEditor(
-            $.cookies.get(db.name + ".map", templates[page.viewLanguage]),
-            $.cookies.get(db.name + ".reduce", "")
+            $.futon.storage.get("map", templates[page.viewLanguage]),
+            $.futon.storage.get("reduce")
           );
           $("#grouptruenotice").show();
         } else {
@@ -312,13 +325,13 @@
           db.openDoc("_design/" + designDocId, {
             error: function(status, error, reason) {
               if (status == 404) {
-                $.cookies.remove(dbName + ".view");
+                $.futon.storage.del("view");
                 location.href = "database.html?" + encodeURIComponent(db.name);
               }
             },
             success: function(resp) {
               if(!resp.views || !resp.views[localViewName]) {
-                $.cookies.remove(dbName + ".view");
+                $.futon.storage.del("view");
                 location.href = "database.html?" + encodeURIComponent(db.name);
               }
               var viewCode = resp.views[localViewName];
@@ -512,10 +525,10 @@
         if ($("#documents thead th.key").is(".desc")) {
           if (typeof options.descending == 'undefined') options.descending = true;
           var descend = true;
-          $.cookies.set(dbName + ".desc", "1");
+          $.futon.storage.set("desc", "1");
         } else {
           var descend = false;
-          $.cookies.remove(dbName + ".desc");
+          $.futon.storage.del("desc");
         }
         $("#paging a").unbind();
         $("#documents").find("tbody.content").empty().end().show();
@@ -641,19 +654,19 @@
           if (viewName == "_temp_view") {
             $("#viewcode").show().removeClass("collapsed");
             var mapFun = $("#viewcode_map").val();
-            $.cookies.set(db.name + ".map", mapFun);
+            $.futon.storage.set("map_fun", mapFun);
             var reduceFun = $.trim($("#viewcode_reduce").val()) || null;
             if (reduceFun) {
-              $.cookies.set(db.name + ".reduce", reduceFun);
+              $.futon.storage.set("reduce_fun", reduceFun);
               if ($("#reduce :checked").length) {
                 options.group = true;
               } else {
                 options.reduce = false;
               }
             } else {
-              $.cookies.remove(db.name + ".reduce");
+              $.futon.storage.del("reduce");
             }
-            $.cookies.set(db.name + ".language", page.viewLanguage);
+            $.futon.storage.set("language", page.viewLanguage);
             db.query(mapFun, reduceFun, page.viewLanguage, options);
           } else if (viewName == "_design_docs") {
             options.startkey = options.descending ? "_design0" : "_design";
