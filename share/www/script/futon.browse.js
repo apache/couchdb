@@ -731,6 +731,8 @@
       }
       var db = $.couch.db(dbName);
 
+      $.futon.storage.declare("tab", {defaultValue: "tabular", scope: "cookie"});
+
       this.dbName = dbName;
       this.db = db;
       this.docId = docId;
@@ -742,13 +744,16 @@
         if ($("#fields tbody.source textarea").length > 0)
           return;
 
+        $.futon.storage.set("tab", "tabular");
         $("#tabs li").removeClass("active").filter(".tabular").addClass("active");
         $("#fields thead th:first").text("Field").attr("colspan", 1).next().show();
         $("#fields tbody.content").show();
         $("#fields tbody.source").hide();
+        return false;
       }
 
       this.activateSourceView = function() {
+        $.futon.storage.set("tab", "source");
         $("#tabs li").removeClass("active").filter(".source").addClass("active");
         $("#fields thead th:first").text("Source").attr("colspan", 2).next().hide();
         $("#fields tbody.content").hide();
@@ -789,6 +794,7 @@
               }
             });
         }).end().show();
+        return false;
       }
 
       this.addField = function() {
@@ -855,7 +861,7 @@
             $("#fields tbody.footer td span").text("Showing revision " +
               (revs.length - currentIndex) + " of " + revs.length);
           }
-          if (location.hash == "#source" && !noReload) {
+          if ($.futon.storage.get("tab") == "source") {
             page.activateSourceView();
           }
         }
