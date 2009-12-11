@@ -71,6 +71,7 @@ specific language governing permissions and limitations under the License.
 
         // Restore preferences/state
         $("#documents thead th.key").toggleClass("desc", $.futon.storage.get("desc"));
+        $("#grouplevel select").val($.futon.storage.get("group_level"));
         $("#reduce :checkbox")[0].checked = $.futon.storage.get("reduce");
         $("#perpage").val($.futon.storage.get("per_page"));
 
@@ -87,12 +88,20 @@ specific language governing permissions and limitations under the License.
           location.href = "?" + encodeURIComponent(page.db.name) +
             (viewName ? "/" + viewName  : "");
         });
-        $("#documents thead th.key").click(function() {
-          $(this).toggleClass("desc");
+        $("#documents thead th.key span").click(function() {
+          $(this).closest("th").toggleClass("desc");
           page.updateDocumentListing();
+        });
+        $("#grouplevel select").change(function() {
+          page.updateDocumentListing();
+          $.futon.storage.set("group_level", this.value);
         });
         $("#reduce :checkbox").click(function() {
           page.updateDocumentListing();
+          var cb = this;
+          $("#grouplevel").toggleClass("disabled", !cb.checked).find("select").each(function() {
+            this.disabled = !cb.checked;
+          });
           $.futon.storage.set("reduce", this.checked);
         });
         $("#perpage").change(function() {
@@ -188,7 +197,24 @@ specific language governing permissions and limitations under the License.
         <caption>Documents</caption>
         <thead>
           <tr>
-            <th class="key"><div>Key</div></th>
+            <th class="key">
+              <label id="grouplevel">
+                Grouping: <select>
+                  <option value="0">none</option>
+                  <option value="1">level 1</option>
+                  <option value="2">level 2</option>
+                  <option value="3">level 3</option>
+                  <option value="4">level 4</option>
+                  <option value="5">level 5</option>
+                  <option value="6">level 6</option>
+                  <option value="7">level 7</option>
+                  <option value="8">level 8</option>
+                  <option value="9">level 9</option>
+                  <option value="100" selected>exact</option>
+                </select>
+              </label>
+              <span>Key</span>
+            </th>
             <th class="value">
               <label id="reduce"><input type="checkbox" autocomplete="off" checked> Reduce</label>
               Value
@@ -215,12 +241,6 @@ specific language governing permissions and limitations under the License.
           </tr>
         </tbody>
       </table>
-      <p id="grouptruenotice">
-        <strong>Note</strong>: Views with a reduce function will return a single row of reduced values.
-        If you are looking for the same results that you can see here in Futon,
-        add a <code>?group=true</code> parameter to your view query. Futon does
-        this automatically.
-      </p>
     </div>
   </div></body>
 </html>

@@ -104,6 +104,7 @@
         map_fun: {},
         reduce_fun: {},
         reduce: {},
+        group_level: {defaultValue: 100},
         per_page: {defaultValue: 10},
         view: {defaultValue: ""}
       });
@@ -192,14 +193,19 @@
               clearTimeout(dirtyTimeout);
               dirtyTimeout = setTimeout(function() {
                 var buttons = $("#viewcode button.save, #viewcode button.revert");
-                page.isDirty = ($("#viewcode_map").val() != page.storedViewCode.map)
-                  || ($("#viewcode_reduce").val() != (page.storedViewCode.reduce || ""))
+                var viewCode = {
+                  map: $("#viewcode_map").val(),
+                  reduce: $("#viewcode_reduce").val()
+                };
+                page.isDirty = (viewCode.map != page.storedViewCode.map)
+                  || (viewCode.reduce != (page.storedViewCode.reduce || ""))
                   || page.viewLanguage != page.storedViewLanguage;
                 if (page.isDirty) {
                   buttons.removeAttr("disabled");
                 } else {
                   buttons.attr("disabled", "disabled");
                 }
+                $("#reduce, #grouplevel").toggle(!!viewCode.reduce);
               }, 100);
             }
             $("#viewcode textarea").enableTabInsertion()
@@ -215,16 +221,14 @@
             $("#language").change(updateDirtyState);
             page.updateDocumentListing();
           });
-          $("#grouptruenotice").show();
         } else if (viewName == "_temp_view") {
           page.viewLanguage = $.futon.storage.get("language");
           page.updateViewEditor(
             $.futon.storage.get("map", templates[page.viewLanguage]),
             $.futon.storage.get("reduce")
           );
-          $("#grouptruenotice").show();
         } else {
-          $("#reduce").hide();
+          $("#grouplevel, #reduce").hide();
           page.updateDocumentListing();
         }
         page.populateLanguagesMenu();
@@ -363,7 +367,7 @@
           mapFun.split("\n").length,
           reduceFun.split("\n").length
         );
-        $("#reduce").toggle(!!reduceFun);
+        $("#reduce, #grouplevel").toggle(!!reduceFun);
         $("#viewcode textarea").attr("rows", Math.min(15, Math.max(3, lines)));
       }
 
@@ -532,7 +536,7 @@
         }
         $("#paging a").unbind();
         $("#documents").find("tbody.content").empty().end().show();
-        this.updateDesignDocLink();
+        page.updateDesignDocLink();
 
         options.success = function(resp) {
           if (resp.offset === undefined) {
@@ -659,7 +663,11 @@
             if (reduceFun) {
               $.futon.storage.set("reduce_fun", reduceFun);
               if ($("#reduce :checked").length) {
-                options.group = true;
+                var level = parseInt($("#grouplevel select").val(), 10);
+                options.group = level > 0;
+                if (options.group && level < 100) {
+                  options.group_level = level;
+                }
               } else {
                 options.reduce = false;
               }
@@ -679,7 +687,11 @@
             var currentReduceCode = $.trim($("#viewcode_reduce").val()) || null;
             if (currentReduceCode) {
               if ($("#reduce :checked").length) {
-                options.group = true;
+                var level = parseInt($("#grouplevel select").val(), 10);
+                options.group = level > 0;
+                if (options.group && level < 100) {
+                  options.group_level = level;
+                }
               } else {
                 options.reduce = false;
               }

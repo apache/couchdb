@@ -79,18 +79,18 @@ table.listing th, table.listing td { padding: .2em .5em; }
 table.listing thead th { background: #dadada url(../image/thead.gif) repeat-x;
   border: 1px solid #a7a7a7; border-width: 0 0 1px 1px; color: #333;
   font-size: 95%; font-weight: normal; text-align: left;
-  text-shadow: #999 2px 1px 2px; text-transform: capitalize;
-  white-space: nowrap;
+  text-shadow: #999 2px 1px 2px; white-space: nowrap;
 }
 table.listing thead th:first-child { border-left: none; }
 table.listing thead th.key {
   background: #a7afb6 url(../image/thead-key.gif) 0 0 repeat-x;
   padding-top: 2px;
 }
-table.listing thead th.key div {
+table.listing thead th.key span {
   background: url(../image/order-asc.gif) 100% 3px no-repeat; cursor: pointer;
+  padding-right: 20px;
 }
-table.listing thead th.desc div {
+table.listing thead th.desc span {
   background-image: url(../image/order-desc.gif);
 }
 table.listing tbody tr th, table.listing tbody tr td { background: #feffea; }
@@ -375,10 +375,14 @@ body.fullwidth #wrap { margin-right: 0; }
 
 /* Documents table */
 
-#documents thead th { width: 50%; }
-#documents thead th.value label { float: right; font-size: 90%;
+#documents thead th { line-height: 150%; width: 50%; }
+#documents thead th label { color: #333; float: right; font-size: 90%;
   text-shadow: none;
 }
+#documents thead th label.disabled { color: #777; }
+#documents thead th label input { vertical-align: middle; }
+#documents thead th label input[type=range] { width: 7em; }
+#documents thead th label output { width: 4em; display: inline-block; }
 #documents tbody.content td { color: #999;
   font: normal 11px "DejaVu Sans Mono",Menlo,Courier,monospace;
 }
