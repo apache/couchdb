@@ -1029,7 +1029,10 @@
 
         row.find("td").makeEditable({acceptOnBlur: false, allowEmpty: true,
           createInput: function(value) {
-            if ($("dl", this).length > 0 || $("code", this).text().length > 60) {
+            var elem = $(this);
+            if (elem.find("dl").length > 0 ||
+                elem.find("code").is(".array, .object") ||
+                elem.find("code.string").text().length > 60) {
               return $("<textarea rows='1' cols='40' spellcheck='false'></textarea>");
             }
             return $("<input type='text' spellcheck='false'>");
@@ -1082,9 +1085,14 @@
       }
 
       function _renderValue(value) {
+        function isNullOrEmpty(val) {
+          if (val == null) return true;
+          for (var i in val) return false;
+          return true;
+        }
         function render(val) {
           var type = typeof(val);
-          if (type == "object" && val !== null) {
+          if (type == "object" && !isNullOrEmpty(val)) {
             var list = $("<dl></dl>");
             for (var i in val) {
               $("<dt></dt>").text(i).appendTo(list);

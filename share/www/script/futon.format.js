@@ -72,6 +72,9 @@
               }
               if (index >= 0) buf.push(options.linesep, tab.substr(options.indent));
               buf.push("]");
+              if (options.html) {
+                return "<code class='array'>" + buf.join("") + "</code>";
+              }
 
             } else {
               buf.push("{");
@@ -94,6 +97,9 @@
               }
               if (index >= 0) buf.push(options.linesep, tab.substr(options.indent));
               buf.push("}");
+              if (options.html) {
+                return "<code class='object'>" + buf.join("") + "</code>";
+              }
             }
 
             return buf.join("");
