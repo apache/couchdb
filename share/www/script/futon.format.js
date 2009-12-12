@@ -42,7 +42,7 @@
           case "string":
             var retval = val;
             if (type == "string" && !options.escapeStrings) {
-              retval = indentLines(retval, tab);
+              retval = indentLines(retval.replace(/\r\n/g, "\n"), tab.substr(options.indent));
             } else {
               retval = escape(JSON.stringify(val));
             }
@@ -70,7 +70,9 @@
                 buf.push(index > 0 ? itemsep : options.linesep);
                 buf.push(tab, format(val[index], depth + 1));
               }
-              if (index >= 0) buf.push(options.linesep, tab.substr(options.indent));
+              if (index >= 0) {
+                buf.push(options.linesep, tab.substr(options.indent));
+              }
               buf.push("]");
               if (options.html) {
                 return "<code class='array'>" + buf.join("") + "</code>";
@@ -95,7 +97,9 @@
                   ": ", format(val[key], depth + 1));
                 index++;
               }
-              if (index >= 0) buf.push(options.linesep, tab.substr(options.indent));
+              if (index >= 0) {
+                buf.push(options.linesep, tab.substr(options.indent));
+              }
               buf.push("}");
               if (options.html) {
                 return "<code class='object'>" + buf.join("") + "</code>";

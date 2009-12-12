@@ -427,6 +427,7 @@ body.fullwidth #wrap { margin-right: 0; }
 #fields tbody.content td code { display: block; font-size: 11px;
   padding: 2px 2px 2px 3px; position: relative;
 }
+#fields tbody.content td code.string { white-space: pre-wrap; }
 #fields tbody.content td code.string:before { color: #ccc; content: "“";
   position: absolute; left: -4px;
 }
@@ -448,9 +449,7 @@ body.fullwidth #wrap { margin-right: 0; }
   float: left; margin-left: 0; padding-left: 2px; padding-right: .5em;
   padding-top: 2px;
 }
-#fields tbody.content td dd code.string { left: 4px; text-indent: -6px;
-  white-space: pre-wrap;
-}
+#fields tbody.content td dd code.string { left: 4px; text-indent: -6px; }
 #fields tbody.content td dd code.string:before { position: static; }
 #fields tbody.content input, #fields tbody.content textarea,
 #fields tbody.source textarea {
