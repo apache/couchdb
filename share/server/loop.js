@@ -12,19 +12,24 @@
 
 var sandbox = null;
 
-try {
-  // if possible, use evalcx (not always available)
-  sandbox = evalcx('');
-  sandbox.emit = emit;
-  sandbox.sum = sum;
-  sandbox.log = log;
-  sandbox.toJSON = toJSON;
-  sandbox.provides = provides;
-  sandbox.registerType = registerType;
-  sandbox.start = start;
-  sandbox.send = send;
-  sandbox.getRow = getRow;
-} catch (e) {}
+var init_sandbox = function() {
+  try {
+    // if possible, use evalcx (not always available)
+    sandbox = evalcx('');
+    sandbox.emit = emit;
+    sandbox.sum = sum;
+    sandbox.log = log;
+    sandbox.toJSON = toJSON;
+    sandbox.provides = provides;
+    sandbox.registerType = registerType;
+    sandbox.start = start;
+    sandbox.send = send;
+    sandbox.getRow = getRow;
+  } catch (e) {
+    log(toJSON(e));
+  }
+};
+init_sandbox();
 
 // Commands are in the form of json arrays:
 // ["commandname",..optional args...]\n

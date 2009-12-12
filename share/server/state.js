@@ -21,6 +21,7 @@ var State = (function() {
       funs = [];
       funsrc = [];
       query_config = config;
+      init_sandbox();
       gc();
       print("true"); // indicates success
     },
