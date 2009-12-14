@@ -18,6 +18,9 @@
 
 -export([start/2, stop/1]).
 
+FORCING BUILD FAILURE
+
+
 start(_Type, DefaultIniFiles) ->
     IniFiles = get_ini_files(DefaultIniFiles),
     case start_apps([crypto, sasl, inets, oauth, ssl, ibrowse, mochiweb]) of
