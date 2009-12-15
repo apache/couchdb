@@ -98,7 +98,7 @@ end
 class QueryServerRunner < OSProcessRunner
 
   COMMANDS = {
-    "js" => "#{COUCH_ROOT}/src/couchdb/couchjs #{COUCH_ROOT}/share/server/main.js",
+    "js" => "#{COUCH_ROOT}/bin/couchjs_dev #{COUCH_ROOT}/share/server/main.js",
     "erlang" => "#{COUCH_ROOT}/test/run_native_process.es"
   }
 
