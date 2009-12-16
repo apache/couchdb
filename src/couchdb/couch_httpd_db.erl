@@ -1043,8 +1043,9 @@ db_attachment_req(#httpd{method=Method}=Req, Db, DocId, FileNameParts)
                         undefined;
                     Length ->
                         list_to_integer(Length)
-                    end
-                    }]
+                    end,
+                md5 = get_md5_header(Req)
+            }]
     end,
 
     Doc = case extract_header_rev(Req, couch_httpd:qs_value(Req, "rev")) of
@@ -1083,6 +1084,27 @@ db_attachment_req(#httpd{method=Method}=Req, Db, DocId, FileNameParts)
 
 db_attachment_req(Req, _Db, _DocId, _FileNameParts) ->
     send_method_not_allowed(Req, "DELETE,GET,HEAD,PUT").
+
+
+get_md5_header(Req) ->
+    ContentMD5 = couch_httpd:header_value(Req, "Content-MD5"),
+    Length = couch_httpd:body_length(Req),
+    Trailer = couch_httpd:header_value(Req, "Trailer"),
+    case {ContentMD5, Length, Trailer} of
+        _ when is_list(ContentMD5) orelse is_binary(ContentMD5) ->
+            base64:decode(ContentMD5);
+        {_, chunked, undefined} ->
+            <<>>;
+        {_, chunked, _} ->
+            case re:run(Trailer, "\\bContent-MD5\\b", [caseless]) of
+                {match, _} ->
+                    md5_in_footer;
+                _ ->
+                    <<>>
+            end;
+        _ ->
+            <<>>
+    end.
 
 parse_doc_format(FormatStr) when is_binary(FormatStr) ->
     parse_doc_format(?b2l(FormatStr));

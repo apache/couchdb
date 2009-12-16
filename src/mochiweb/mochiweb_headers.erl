@@ -9,6 +9,7 @@
 -export([delete_any/2, get_primary_value/2]).
 -export([default/3, enter_from_list/2, default_from_list/2]).
 -export([to_list/1, make/1]).
+-export([from_binary/1]).
 -export([test/0]).
 
 %% @type headers().
@@ -37,6 +38,36 @@ test() ->
                                              "content-type", H4),
     H4 = ?MODULE:delete_any("nonexistent-header", H4),
     H3 = ?MODULE:delete_any("content-type", H4),
+    HB = <<"Content-Length: 47\r\nContent-Type: text/plain\r\n\r\n">>,
+    H_HB = ?MODULE:from_binary(HB),
+    H_HB = ?MODULE:from_binary(binary_to_list(HB)),
+    "47" = ?MODULE:get_value("Content-Length", H_HB),
+    "text/plain" = ?MODULE:get_value("Content-Type", H_HB),
+    L_H_HB = ?MODULE:to_list(H_HB),
+    2 = length(L_H_HB),
+    true = lists:member({'Content-Length', "47"}, L_H_HB),
+    true = lists:member({'Content-Type', "text/plain"}, L_H_HB),
+    HL = [ <<"Content-Length: 47\r\n">>, <<"Content-Type: text/plain\r\n">> ],
+    HL2 = [ "Content-Length: 47\r\n", <<"Content-Type: text/plain\r\n">> ],
+    HL3 = [ <<"Content-Length: 47\r\n">>, "Content-Type: text/plain\r\n" ],
+    H_HL = ?MODULE:from_binary(HL),
+    H_HL = ?MODULE:from_binary(HL2),
+    H_HL = ?MODULE:from_binary(HL3),
+    "47" = ?MODULE:get_value("Content-Length", H_HL),
+    "text/plain" = ?MODULE:get_value("Content-Type", H_HL),
+    L_H_HL = ?MODULE:to_list(H_HL),
+    2 = length(L_H_HL),
+    true = lists:member({'Content-Length', "47"}, L_H_HL),
+    true = lists:member({'Content-Type', "text/plain"}, L_H_HL),
+    [] = ?MODULE:to_list(?MODULE:from_binary(<<>>)),
+    [] = ?MODULE:to_list(?MODULE:from_binary(<<"">>)),
+    [] = ?MODULE:to_list(?MODULE:from_binary(<<"\r\n">>)),
+    [] = ?MODULE:to_list(?MODULE:from_binary(<<"\r\n\r\n">>)),
+    [] = ?MODULE:to_list(?MODULE:from_binary("")),
+    [] = ?MODULE:to_list(?MODULE:from_binary([<<>>])),
+    [] = ?MODULE:to_list(?MODULE:from_binary([<<"">>])),
+    [] = ?MODULE:to_list(?MODULE:from_binary([<<"\r\n">>])),
+    [] = ?MODULE:to_list(?MODULE:from_binary([<<"\r\n\r\n">>])),
     ok.
 
 %% @spec empty() -> headers()
@@ -51,6 +82,40 @@ make(L) when is_list(L) ->
 %% assume a tuple is already mochiweb_headers.
 make(T) when is_tuple(T) ->
     T.
+
+%% @spec from_binary(RawHttpHeader()) -> headers() 
+%% @type RawHttpHeader() -> string() | binary() | [ string() | binary() ]
+%%
+%% @doc Transforms a raw HTTP header into a mochiweb headers structure.
+%%
+%%      The given raw HTTP header can be one of the following:
+%%
+%%      1) A string or a binary representing a full HTTP header ending with 
+%%         double CRLF.
+%%         Examples:
+%%         "Content-Length: 47\r\nContent-Type: text/plain\r\n\r\n"
+%%         <<"Content-Length: 47\r\nContent-Type: text/plain\r\n\r\n">>
+%%
+%%      2) A list of binaries or strings where each element represents a raw 
+%%         HTTP header line ending with a single CRLF.
+%%         Examples:
+%%         [ <<"Content-Length: 47\r\n">>, <<"Content-Type: text/plain\r\n">> ]
+%%         [ "Content-Length: 47\r\n", "Content-Type: text/plain\r\n" ]
+%%         [ "Content-Length: 47\r\n", <<"Content-Type: text/plain\r\n">> ]
+%%
+from_binary(RawHttpHeader) when is_binary(RawHttpHeader) ->
+    from_binary(RawHttpHeader, []);
+
+from_binary(RawHttpHeaderList) ->
+    from_binary(list_to_binary([RawHttpHeaderList, "\r\n"])).
+
+from_binary(RawHttpHeader, Acc) ->
+    case erlang:decode_packet(httph, RawHttpHeader, []) of
+        { ok, {http_header, _, H, _, V}, Rest } ->
+            from_binary(Rest, [{H, V} | Acc]);
+        _ ->
+            make(Acc)
+    end.
 
 %% @spec from_list([{key(), value()}]) -> headers()
 %% @doc Construct a headers() from the given list.

@@ -687,7 +687,7 @@ doc_flush_atts(Doc, Fd) ->
 
 check_md5(_NewSig, <<>>) -> ok;
 check_md5(Sig1, Sig2) when Sig1 == Sig2 -> ok;
-check_md5(_, _) -> throw(data_corruption).
+check_md5(_, _) -> throw(md5_mismatch).
 
 flush_att(Fd, #att{data={Fd0, _}}=Att) when Fd0 == Fd ->
     % already written to our file, nothing to write
@@ -713,8 +713,14 @@ flush_att(Fd, #att{data=Fun,len=undefined}=Att) when is_function(Fun) ->
             % WriterFun({0, _Footers}, State)
             % Called with Length == 0 on the last time.
             % WriterFun returns NewState.
-            fun({0, _Footers}, _) ->
-                ok;
+            fun({0, Footers}, _) ->
+                F = mochiweb_headers:from_binary(Footers),
+                case mochiweb_headers:get_value("Content-MD5", F) of
+                undefined ->
+                    ok;
+                Md5 ->
+                    {md5, base64:decode(Md5)}
+                end;
             ({_Length, Chunk}, _) ->
                 couch_stream:write(OutputStream, Chunk)
             end, ok)
@@ -725,11 +731,29 @@ flush_att(Fd, #att{data=Fun,len=Len}=Att) when is_function(Fun) ->
         write_streamed_attachment(OutputStream, Fun, Len)
     end).
 
+% From RFC 2616 3.6.1 - Chunked Transfer Coding
+%
+%   In other words, the origin server is willing to accept
+%   the possibility that the trailer fields might be silently
+%   discarded along the path to the client.
+%
+% I take this to mean that if "Trailers: Content-MD5\r\n"
+% is present in the request, but there is no Content-MD5
+% trailer, we're free to ignore this inconsistency and
+% pretend that no Content-MD5 exists.
 with_stream(Fd, #att{md5=InMd5}=Att, Fun) ->
     {ok, OutputStream} = couch_stream:open(Fd),
-    Fun(OutputStream),
+    ReqMd5 = case Fun(OutputStream) of
+        {md5, FooterMd5} ->
+            case InMd5 of
+                md5_in_footer -> FooterMd5;
+                _ -> InMd5
+            end;
+        _ ->
+            InMd5
+    end,
     {StreamInfo, Len, Md5} = couch_stream:close(OutputStream),
-    check_md5(Md5, InMd5),
+    check_md5(Md5, ReqMd5),
     Att#att{data={Fd,StreamInfo},len=Len,md5=Md5}.
 
 
