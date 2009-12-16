@@ -419,4 +419,7 @@ json_encode(V) ->
 
 json_decode(V) ->
     try (mochijson2:decoder([{object_hook, fun({struct,L}) -> {L} end}]))(V)
-    catch _:_ -> throw({invalid_json,V}) end.
+    catch
+        _Type:_Error ->
+            throw({invalid_json,V})
+    end.
