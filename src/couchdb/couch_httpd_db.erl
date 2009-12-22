@@ -29,7 +29,6 @@
     options = [],
     rev = nil,
     open_revs = [],
-    show = nil,
     update_type = interactive_edit,
     atts_since = nil
 }).
@@ -676,56 +675,44 @@ db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
 
 db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
     #doc_query_args{
-        show = Format,
         rev = Rev,
         open_revs = Revs,
         options = Options,
         atts_since = AttsSince
     } = parse_doc_query(Req),
-    case Format of
-    nil ->
-        case Revs of
-        [] ->
-            Doc = couch_doc_open(Db, DocId, Rev, Options),
-            Options2 =
-            if AttsSince /= nil ->
-                RevPos = find_ancestor_rev_pos(Doc#doc.revs, AttsSince),
-                [{atts_after_revpos, RevPos} | Options];
-            true -> Options
-            end,
-            send_doc(Req, Doc, Options2);
-        _ ->
-            {ok, Results} = couch_db:open_doc_revs(Db, DocId, Revs, Options),
-            {ok, Resp} = start_json_response(Req, 200),
-            send_chunk(Resp, "["),
-            % We loop through the docs. The first time through the separator
-            % is whitespace, then a comma on subsequent iterations.
-            lists:foldl(
-                fun(Result, AccSeparator) ->
-                    case Result of
-                    {ok, Doc} ->
-                        JsonDoc = couch_doc:to_json_obj(Doc, Options),
-                        Json = ?JSON_ENCODE({[{ok, JsonDoc}]}),
-                        send_chunk(Resp, AccSeparator ++ Json);
-                    {{not_found, missing}, RevId} ->
-                        RevStr = couch_doc:rev_to_str(RevId),
-                        Json = ?JSON_ENCODE({[{"missing", RevStr}]}),
-                        send_chunk(Resp, AccSeparator ++ Json)
-                    end,
-                    "," % AccSeparator now has a comma
-                end,
-                "", Results),
-            send_chunk(Resp, "]"),
-            end_json_response(Resp)
-        end;
-    _ ->
-        {DesignName, ShowName} = Format,
-        % load ddoc
-        DesignId = <<"_design/", DesignName/binary>>,
-        DDoc = couch_httpd_db:couch_doc_open(Db, DesignId, nil, []),
-        % open doc
+    case Revs of
+    [] ->
         Doc = couch_doc_open(Db, DocId, Rev, Options),
-        couch_httpd_show:handle_doc_show(Req, Db, DDoc, ShowName, Doc)
+        Options2 =
+        if AttsSince /= nil ->
+            RevPos = find_ancestor_rev_pos(Doc#doc.revs, AttsSince),
+            [{atts_after_revpos, RevPos} | Options];
+        true -> Options
+        end,
+        send_doc(Req, Doc, Options2);
+    _ ->
+        {ok, Results} = couch_db:open_doc_revs(Db, DocId, Revs, Options),
+        {ok, Resp} = start_json_response(Req, 200),
+        send_chunk(Resp, "["),
+        % We loop through the docs. The first time through the separator
+        % is whitespace, then a comma on subsequent iterations.
+        lists:foldl(
+            fun(Result, AccSeparator) ->
+                case Result of
+                {ok, Doc} ->
+                    JsonDoc = couch_doc:to_json_obj(Doc, Options),
+                    Json = ?JSON_ENCODE({[{ok, JsonDoc}]}),
+                    send_chunk(Resp, AccSeparator ++ Json);
+                {{not_found, missing}, RevId} ->
+                    RevStr = couch_doc:rev_to_str(RevId),
+                    Json = ?JSON_ENCODE({[{"missing", RevStr}]}),
+                    send_chunk(Resp, AccSeparator ++ Json)
+                end,
+                "," % AccSeparator now has a comma
+            end,
+            "", Results),
+        send_chunk(Resp, "]"),
+        end_json_response(Resp)
     end;
 
 db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
@@ -1151,8 +1138,6 @@ parse_doc_query(Req) ->
         {"atts_since", RevsJsonStr} ->
             JsonArray = ?JSON_DECODE(RevsJsonStr),
             Args#doc_query_args{atts_since = couch_doc:parse_revs(JsonArray)};
-        {"show", FormatStr} ->
-            Args#doc_query_args{show=parse_doc_format(FormatStr)};
         {"new_edits", "false"} ->
             Args#doc_query_args{update_type=replicated_changes};
         {"new_edits", "true"} ->
