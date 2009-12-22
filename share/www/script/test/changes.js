@@ -213,12 +213,12 @@ couchTests.changes = function(debug) {
     xhr = CouchDB.newXhr();
     xhr.open("GET", "/test_suite_db/_changes?feed=longpoll&since=7&filter=changes_filter/bop", true);
     xhr.send("");
-    db.save({"bop" : ""}); // empty string is falsy
-    var id = db.save({"bop" : "bingo"}).id;
+    db.save({"_id":"falsy", "bop" : ""}); // empty string is falsy
+    db.save({"_id":"bingo","bop" : "bingo"});
     sleep(100);
     var resp = JSON.parse(xhr.responseText);
     T(resp.last_seq == 9);
-    T(resp.results && resp.results.length > 0 && resp.results[0]["id"] == id, "filter the correct update");
+    T(resp.results && resp.results.length > 0 && resp.results[0]["id"] == "bingo", "filter the correct update");
 
     // filter with continuous
     xhr = CouchDB.newXhr();
@@ -226,30 +226,29 @@ couchTests.changes = function(debug) {
     xhr.send("");
     db.save({"_id":"rusty", "bop" : "plankton"});
     T(db.ensureFullCommit().ok);
-    sleep(200);
+    sleep(300);
     var lines = xhr.responseText.split("\n");
-    T(JSON.parse(lines[1]).id == id);
-    T(JSON.parse(lines[2]).id == "rusty");
-    T(JSON.parse(lines[3]).last_seq == 10);
+    T(JSON.parse(lines[1]).id == "bingo", lines[1]);
+    T(JSON.parse(lines[2]).id == "rusty", lines[2]);
+    T(JSON.parse(lines[3]).last_seq == 10, lines[3]);
   }
-
   // error conditions
 
   // non-existing design doc
   var req = CouchDB.request("GET", 
     "/test_suite_db/_changes?filter=nothingtosee/bop");
-  TEquals(400, req.status, "should return 400 for non existant design doc");
+  TEquals(404, req.status, "should return 404 for non existant design doc");
 
   // non-existing filter 
   var req = CouchDB.request("GET", 
     "/test_suite_db/_changes?filter=changes_filter/movealong");
-  TEquals(400, req.status, "should return 400 for non existant filter fun");
+  TEquals(404, req.status, "should return 404 for non existant filter fun");
 
   // both
   var req = CouchDB.request("GET", 
     "/test_suite_db/_changes?filter=nothingtosee/movealong");
-  TEquals(400, req.status, 
-    "should return 400 for non existant design doc and filter fun");
+  TEquals(404, req.status, 
+    "should return 404 for non existant design doc and filter fun");
 
   // changes get all_docs style with deleted docs
   var doc = {a:1};

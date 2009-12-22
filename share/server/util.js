@@ -10,13 +10,50 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-toJSON.subs = {'\b': '\\b', '\t': '\\t', '\n': '\\n', '\f': '\\f',
+var Couch = {
+  // moving this away from global so we can move to json2.js later
+  toJSON : function (val) {
+    if (typeof(val) == "undefined") {
+      throw "Cannot encode 'undefined' value as JSON";
+    }
+    if (typeof(val) == "xml") { // E4X support
+      val = val.toXMLString();
+    }
+    if (val === null) { return "null"; }
+    return (Couch.toJSON.dispatcher[val.constructor.name])(val);
+  },
+  compileFunction : function(source) {
+    if (!source) throw(["error","not_found","missing function"]);
+    try {
+      var functionObject = sandbox ? evalcx(source, sandbox) : eval(source);
+    } catch (err) {
+      throw(["error", "compilation_error", err.toSource() + " (" + source + ")"]);
+    };
+    if (typeof(functionObject) == "function") {
+      return functionObject;
+    } else {
+      throw(["error","compilation_error",
+        "Expression does not eval to a function. (" + source.toSource() + ")"]);
+    };
+  },
+  recursivelySeal : function(obj) {
+    // seal() is broken in current Spidermonkey
+    seal(obj);
+    for (var propname in obj) {
+      if (typeof doc[propname] == "object") {
+        recursivelySeal(doc[propname]);
+      }
+    }
+  }
+}
+
+Couch.toJSON.subs = {'\b': '\\b', '\t': '\\t', '\n': '\\n', '\f': '\\f',
               '\r': '\\r', '"' : '\\"', '\\': '\\\\'};
-toJSON.dispatcher = {
+Couch.toJSON.dispatcher = {
     "Array": function(v) {
       var buf = [];
       for (var i = 0; i < v.length; i++) {
-        buf.push(toJSON(v[i]));
+        buf.push(Couch.toJSON(v[i]));
       }
       return "[" + buf.join(",") + "]";
     },
@@ -42,14 +79,14 @@ toJSON.dispatcher = {
         if (!v.hasOwnProperty(k) || typeof(k) !== "string" || v[k] === undefined) {
           continue;
         }
-        buf.push(toJSON(k) + ": " + toJSON(v[k]));
+        buf.push(Couch.toJSON(k) + ": " + Couch.toJSON(v[k]));
       }
       return "{" + buf.join(",") + "}";
     },
     "String": function(v) {
       if (/["\\\x00-\x1f]/.test(v)) {
         v = v.replace(/([\x00-\x1f\\"])/g, function(a, b) {
-          var c = toJSON.subs[b];
+          var c = Couch.toJSON.subs[b];
           if (c) return c;
           c = b.charCodeAt();
           return '\\u00' + Math.floor(c / 16).toString(16) + (c % 16).toString(16);
@@ -59,56 +96,22 @@ toJSON.dispatcher = {
     }
 };
 
-function toJSON(val) {
-  if (typeof(val) == "undefined") {
-    throw "Cannot encode 'undefined' value as JSON";
-  }
-  if (typeof(val) == "xml") { // E4X support
-    val = val.toXMLString();
-  }
-  if (val === null) { return "null"; }
-  return (toJSON.dispatcher[val.constructor.name])(val);
-}
-
-function compileFunction(source) {
-  try {
-    var functionObject = sandbox ? evalcx(source, sandbox) : eval(source);
-  } catch (err) {
-    throw {error: "compilation_error",
-      reason: err.toString() + " (" + source + ")"};
-  }
-  if (typeof(functionObject) == "function") {
-    return functionObject;
-  } else {
-    throw {error: "compilation_error",
-      reason: "expression does not eval to a function. (" + source + ")"};
-  }
-}
-
-function recursivelySeal(obj) {
-  seal(obj);
-  for (var propname in obj) {
-    if (typeof doc[propname] == "object") {
-      recursivelySeal(doc[propname]);
-    }
-  }
-}
-
 // prints the object as JSON, and rescues and logs any toJSON() related errors
 function respond(obj) {
   try {
-    print(toJSON(obj));
+    print(Couch.toJSON(obj));
   } catch(e) {
     log("Error converting object to JSON: " + e.toString());
+    log("error on obj: "+ obj.toSource());
   }
 };
 
-log = function(message) {
-  // return;
+function log(message) {
+  // return; // idea: query_server_config option for log level
   if (typeof message == "undefined") {
     message = "Error: attempting to log message of 'undefined'.";
   } else if (typeof message != "string") {
-    message = toJSON(message);
+    message = Couch.toJSON(message);
   }
   respond(["log", message]);
 };

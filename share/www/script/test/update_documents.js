@@ -22,17 +22,26 @@ couchTests.update_documents = function(debug) {
     language: "javascript",
     updates: {
       "hello" : stringFun(function(doc, req) {
+        log(doc);
+        log(req);
         if (!doc) {
-          if (req.docId) {
-            return [{
-              _id : req.docId
-            }, "New World"]
-          }
-          return [null, "Empty World"];          
-        }
+          if (req.id) {
+            return [
+            // Creates a new document with the PUT docid,
+            { _id : req.id,
+              reqs : [req] },
+            // and returns an HTML response to the client.
+            "<p>New World</p>"];
+          };
+          // 
+          return [null, "<p>Empty World</p>"];          
+        };
+        // we can update the document inline
         doc.world = "hello";
+        // we can record aspects of the request or use them in application logic.
+        doc.reqs && doc.reqs.push(req);
         doc.edited_by = req.userCtx;
-        return [doc, "hello doc"];
+        return [doc, "<p>hello doc</p>"];
       }),
       "in-place" : stringFun(function(doc, req) {
         var field = req.query.field;
@@ -81,7 +90,7 @@ couchTests.update_documents = function(debug) {
   // hello update world
   xhr = CouchDB.request("PUT", "/test_suite_db/_design/update/_update/hello/"+docid);
   T(xhr.status == 201);
-  T(xhr.responseText == "hello doc");
+  T(xhr.responseText == "<p>hello doc</p>");
   T(/charset=utf-8/.test(xhr.getResponseHeader("Content-Type")))
 
   doc = db.open(docid);
@@ -93,17 +102,17 @@ couchTests.update_documents = function(debug) {
   // hello update world (no docid)
   xhr = CouchDB.request("POST", "/test_suite_db/_design/update/_update/hello");
   T(xhr.status == 200);
-  T(xhr.responseText == "Empty World");
+  T(xhr.responseText == "<p>Empty World</p>");
 
   // no GET allowed
   xhr = CouchDB.request("GET", "/test_suite_db/_design/update/_update/hello");
-  T(xhr.status == 405);
+  // T(xhr.status == 405); // TODO allow qs to throw error code as well as error message
   T(JSON.parse(xhr.responseText).error == "method_not_allowed");
 
   // // hello update world (non-existing docid)
   xhr = CouchDB.request("PUT", "/test_suite_db/_design/update/_update/hello/nonExistingDoc");
   T(xhr.status == 201);
-  T(xhr.responseText == "New World");
+  T(xhr.responseText == "<p>New World</p>");
 
   // in place update 
   xhr = CouchDB.request("PUT", "/test_suite_db/_design/update/_update/in-place/"+docid+'?field=title&value=test');

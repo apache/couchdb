@@ -15,7 +15,7 @@
 read() ->
     case io:get_line('') of
         eof -> stop;
-        Data -> mochijson2:decode(Data)
+        Data -> couch_util:json_decode(Data)
     end.
 
 send(Data) when is_binary(Data) ->
@@ -24,15 +24,19 @@ send(Data) when is_list(Data) ->
     io:format(Data ++ "\n", []).
 
 write(Data) ->
-    case (catch mochijson2:encode(Data)) of
+    % log("~p", [Data]),
+    case (catch couch_util:json_encode(Data)) of
+        % when testing, this is what prints your errors
         {json_encode, Error} -> write({[{<<"error">>, Error}]});
         Json -> send(Json)
     end.
 
-%log(Mesg) ->
+% log(Mesg) ->
 %    log(Mesg, []).
-%log(Mesg, Params) ->
+% log(Mesg, Params) ->
 %    io:format(standard_error, Mesg, Params).
+% jlog(Mesg) ->
+%     write([<<"log">>, list_to_binary(io_lib:format("~p",[Mesg]))]).
 
 loop(Pid) ->
     case read() of
@@ -40,7 +44,7 @@ loop(Pid) ->
         Json ->
             case (catch couch_native_process:prompt(Pid, Json)) of
                 {error, Reason} ->
-                    ok = write({[{error, Reason}]});
+                    ok = write([error, Reason, Reason]);
                 Resp ->
                     ok = write(Resp),
                     loop(Pid)

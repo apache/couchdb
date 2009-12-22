@@ -76,7 +76,6 @@ _user = {couch_httpd_auth, handle_user_req}
 _view_cleanup = {couch_httpd_db, handle_view_cleanup_req}
 _compact = {couch_httpd_db, handle_compact_req}
 _design = {couch_httpd_db, handle_design_req}
-_view = {couch_httpd_view, handle_db_view_req}
 _temp_view = {couch_httpd_view, handle_temp_view_req}
 _changes = {couch_httpd_db, handle_changes_req}
 

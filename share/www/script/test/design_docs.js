@@ -12,8 +12,11 @@
 
 couchTests.design_docs = function(debug) {
   var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
+  var db2 = new CouchDB("test_suite_db_a", {"X-Couch-Full-Commit":"false"});
   db.deleteDb();
   db.createDb();
+  db2.deleteDb();
+  db2.createDb();
   if (debug) debugger;
 
   run_on_modified_server(
@@ -45,9 +48,31 @@ function() {
                 reduce:"function (keys, values) { return sum(values); };"},
       huge_src_and_results: {map: "function(doc) { if (doc._id == \"1\") { emit(\"" + makebigstring(16) + "\", null) }}",
                 reduce:"function (keys, values) { return \"" + makebigstring(16) + "\"; };"}
+    },
+    shows: {
+      simple: "function() {return 'ok'};"
     }
   }
+  var xhr = CouchDB.request("PUT", "/test_suite_db_a/_design/test", {body: JSON.stringify(designDoc)});
+  var resp = JSON.parse(xhr.responseText);
+  
+  TEquals(resp.rev, db.save(designDoc).rev);
+
+  // test that editing a show fun on the ddoc results in a change in output
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/simple");
+  T(xhr.status == 200);
+  TEquals(xhr.responseText, "ok");
+
+  designDoc.shows.simple = "function() {return 'ko'};"
   T(db.save(designDoc).ok);
+
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/simple");
+  T(xhr.status == 200);
+  TEquals(xhr.responseText, "ko");
+
+  var xhr = CouchDB.request("GET", "/test_suite_db_a/_design/test/_show/simple?cache=buster");
+  T(xhr.status == 200);
+  TEquals("ok", xhr.responseText, 'query server used wrong ddoc');
 
   // test that we get design doc info back
   var dinfo = db.designInfo("_design/test");

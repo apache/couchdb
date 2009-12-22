@@ -12,6 +12,13 @@
 
 # to run (requires ruby and rspec):
 # spec test/view_server/query_server_spec.rb -f specdoc --color
+# 
+# environment options:
+#   QS_TRACE=true
+#     shows full output from the query server
+#   QS_LANG=lang
+#     run tests on the query server (for now, one of: js, erlang)
+# 
 
 COUCH_ROOT = "#{File.dirname(__FILE__)}/../.." unless defined?(COUCH_ROOT)
 LANGUAGE = ENV["QS_LANG"] || "js"
@@ -47,6 +54,17 @@ class OSProcessRunner
   end
   def add_fun(fun)
     run(["add_fun", fun])
+  end
+  def teach_ddoc(ddoc)
+    run(["ddoc", "new", ddoc_id(ddoc), ddoc])
+  end
+  def ddoc_run(ddoc, fun_path, args)
+    run(["ddoc", ddoc_id(ddoc), fun_path, args])
+  end
+  def ddoc_id(ddoc)
+    d_id = ddoc["_id"]
+    raise 'ddoc must have _id' unless d_id
+    d_id
   end
   def get_chunks
     resp = jsgets
@@ -99,7 +117,7 @@ class QueryServerRunner < OSProcessRunner
 
   COMMANDS = {
     "js" => "#{COUCH_ROOT}/bin/couchjs_dev #{COUCH_ROOT}/share/server/main.js",
-    "erlang" => "#{COUCH_ROOT}/test/run_native_process.es"
+    "erlang" => "#{COUCH_ROOT}/test/view_server/run_native_process.es"
   }
 
   def self.run_command
@@ -113,6 +131,8 @@ class ExternalRunner < OSProcessRunner
   end
 end
 
+# we could organize this into a design document per language.
+# that would make testing future languages really easy.
 
 functions = {
   "emit-twice" => {
@@ -126,7 +146,11 @@ functions = {
     ERLANG
   },
   "emit-once" => {
-    "js" => %{function(doc){emit("baz",doc.a)}},
+    "js" => <<-JS,
+      function(doc){
+        emit("baz",doc.a)
+      }
+      JS
     "erlang" => <<-ERLANG
         fun({Doc}) ->
             A = proplists:get_value(<<"a">>, Doc, null),
@@ -370,6 +394,8 @@ functions = {
   "list-raw" => {
     "js" => <<-JS,
         function(head, req) {
+          // log(this.toSource());
+          // log(typeof send);
           send("first chunk");
           send(req.q);
           var row;
@@ -420,8 +446,46 @@ functions = {
             [{Doc2}, {[{<<"body">>, <<"hello doc">>}]}]
         end.
     ERLANG
+  },
+  "error" => {
+    "js" => <<-JS,
+    function() {
+      throw(["error","error_key","testing"]);
+    }
+    JS
+    "erlang" => <<-ERLANG
+    fun(A, B) ->
+      throw([<<"error">>,<<"error_key">>,<<"testing">>])
+    end.
+    ERLANG
+  },
+  "fatal" => {
+    "js" => <<-JS,
+    function() {
+      throw(["fatal","error_key","testing"]);
+    }
+    JS
+    "erlang" => <<-ERLANG
+    fun(A, B) ->
+      throw([<<"fatal">>,<<"error_key">>,<<"testing">>])
+    end.
+    ERLANG
   }
 }
+
+def make_ddoc(fun_path, fun_str)
+  doc = {"_id"=>"foo"}
+  d = doc
+  while p = fun_path.shift
+    l = p
+    if !fun_path.empty?
+      d[p] = {}
+      d = d[p]
+    end
+  end
+  d[l] = fun_str
+  doc
+end
 
 describe "query server normal case" do
   before(:all) do
@@ -434,6 +498,17 @@ describe "query server normal case" do
   it "should reset" do
     @qs.run(["reset"]).should == true
   end
+  it "should not erase ddocs on reset" do
+    @fun = functions["show-simple"][LANGUAGE]
+    @ddoc = make_ddoc(["shows","simple"], @fun)
+    @qs.teach_ddoc(@ddoc)
+    @qs.run(["reset"]).should == true   
+    @qs.ddoc_run(@ddoc, 
+      ["shows","simple"], 
+      [{:title => "Best ever", :body => "Doc body"}, {}]).should ==
+    ["resp", {"body" => "Best ever - Doc body"}] 
+  end
+  
   it "should run map funs" do
     @qs.reset!
     @qs.run(["add_fun", functions["emit-twice"][LANGUAGE]]).should == true
@@ -464,41 +539,114 @@ describe "query server normal case" do
     end
   end
 
+  describe "design docs" do
+    before(:all) do
+      @ddoc = {
+        "_id" => "foo"
+      }
+      @qs.reset!
+    end
+    it "should learn design docs" do
+      @qs.teach_ddoc(@ddoc).should == true
+    end
+  end
+
   # it "should validate"
   describe "validation" do
     before(:all) do
       @fun = functions["validate-forbidden"][LANGUAGE]
-      @qs.reset!
+      @ddoc = make_ddoc(["validate_doc_update"], @fun)
+      @qs.teach_ddoc(@ddoc)
     end
     it "should allow good updates" do
-      @qs.run(["validate", @fun, {"good" => true}, {}, {}]).should == 1
+      @qs.ddoc_run(@ddoc, 
+        ["validate_doc_update"], 
+        [{"good" => true}, {}, {}]).should == 1
     end
     it "should reject invalid updates" do
-      @qs.run(["validate", @fun, {"bad" => true}, {}, {}]).should == {"forbidden"=>"bad doc"}
+      @qs.ddoc_run(@ddoc, 
+        ["validate_doc_update"], 
+        [{"bad" => true}, {}, {}]).should == {"forbidden"=>"bad doc"}
     end
   end
 
   describe "show" do
     before(:all) do
       @fun = functions["show-simple"][LANGUAGE]
-      @qs.reset!
+      @ddoc = make_ddoc(["shows","simple"], @fun)
+      @qs.teach_ddoc(@ddoc)
     end
     it "should show" do
-      @qs.rrun(["show", @fun,
-        {:title => "Best ever", :body => "Doc body"}, {}])
-      @qs.jsgets.should == ["resp", {"body" => "Best ever - Doc body"}]
+      @qs.ddoc_run(@ddoc, 
+        ["shows","simple"], 
+        [{:title => "Best ever", :body => "Doc body"}, {}]).should ==
+      ["resp", {"body" => "Best ever - Doc body"}]
     end
   end
 
   describe "show with headers" do
     before(:all) do
+      # TODO we can make real ddocs up there. 
       @fun = functions["show-headers"][LANGUAGE]
-      @qs.reset!
+      @ddoc = make_ddoc(["shows","headers"], @fun)
+      @qs.teach_ddoc(@ddoc)
     end
     it "should show headers" do
-      @qs.rrun(["show", @fun,
-        {:title => "Best ever", :body => "Doc body"}, {}])
-      @qs.jsgets.should == ["resp", {"code"=>200,"headers" => {"X-Plankton"=>"Rusty"}, "body" => "Best ever - Doc body"}]
+      @qs.ddoc_run(
+        @ddoc, 
+        ["shows","headers"], 
+        [{:title => "Best ever", :body => "Doc body"}, {}]
+      ).
+      should == ["resp", {"code"=>200,"headers" => {"X-Plankton"=>"Rusty"}, "body" => "Best ever - Doc body"}]
+    end
+  end
+  
+  describe "recoverable error" do
+    before(:all) do
+      @fun = functions["error"][LANGUAGE]
+      @ddoc = make_ddoc(["shows","error"], @fun)
+      @qs.teach_ddoc(@ddoc)
+    end
+    it "should not exit" do
+      @qs.ddoc_run(@ddoc, ["shows","error"],
+        [{"foo"=>"bar"}, {"q" => "ok"}]).
+        should == ["error", "error_key", "testing"]
+      # still running
+      @qs.run(["reset"]).should == true
+    end
+  end
+  
+  describe "changes filter" do
+    before(:all) do
+      @fun = functions["filter-basic"][LANGUAGE]
+      @ddoc = make_ddoc(["filters","basic"], @fun)
+      @qs.teach_ddoc(@ddoc)
+    end
+    it "should only return true for good docs" do
+      @qs.ddoc_run(@ddoc, 
+        ["filters","basic"], 
+        [[{"key"=>"bam", "good" => true}, {"foo" => "bar"}, {"good" => true}], {"req" => "foo"}]
+      ).
+      should == [true, [true, false, true]]
+    end
+  end
+  
+  describe "update" do
+    before(:all) do
+      # in another patch we can remove this duplication
+      # by setting up the design doc for each language ahead of time.
+      @fun = functions["update-basic"][LANGUAGE]
+      @ddoc = make_ddoc(["updates","basic"], @fun)
+      @qs.teach_ddoc(@ddoc)
+    end
+    it "should return a doc and a resp body" do
+      up, doc, resp = @qs.ddoc_run(@ddoc, 
+        ["updates","basic"], 
+        [{"foo" => "gnarly"}, {"verb" => "POST"}]
+      )
+      up.should == "up"
+      doc.should == {"foo" => "gnarly", "world" => "hello"}
+      resp["body"].should == "hello doc"
     end
   end
 
@@ -506,131 +654,107 @@ describe "query server normal case" do
 #                    LIST TESTS
 # __END__
 
-  describe "raw list with headers" do
-    before(:each) do
-      @fun = functions["show-sends"][LANGUAGE]
-      @qs.reset!
-      @qs.add_fun(@fun).should == true
-    end
-    it "should do headers proper" do
-      @qs.rrun(["list", {"total_rows"=>1000}, {"q" => "ok"}])
-      @qs.jsgets.should == ["start", ["first chunk", 'second "chunk"'], {"headers"=>{"Content-Type"=>"text/plain"}}]
-      @qs.rrun(["list_end"])
-      @qs.jsgets.should == ["end", ["tail"]]
+  describe "ddoc list" do
+      before(:all) do
+        @ddoc = {
+          "_id" => "foo",
+          "lists" => {
+            "simple" => functions["list-simple"][LANGUAGE],
+            "headers" => functions["show-sends"][LANGUAGE],
+            "rows" => functions["show-while-get-rows"][LANGUAGE],
+            "buffer-chunks" => functions["show-while-get-rows-multi-send"][LANGUAGE],
+            "chunky" => functions["list-chunky"][LANGUAGE]
+          }
+        }
+        @qs.teach_ddoc(@ddoc)
+      end
+      
+      describe "example list" do
+        it "should run normal" do
+          @qs.ddoc_run(@ddoc,
+            ["lists","simple"],
+            [{"foo"=>"bar"}, {"q" => "ok"}]
+          ).should == ["start", ["first chunk", "ok"], {"headers"=>{}}]
+          @qs.run(["list_row", {"key"=>"baz"}]).should ==  ["chunks", ["baz"]]
+          @qs.run(["list_row", {"key"=>"bam"}]).should ==  ["chunks", ["bam"]]
+          @qs.run(["list_row", {"key"=>"foom"}]).should == ["chunks", ["foom"]]
+          @qs.run(["list_row", {"key"=>"fooz"}]).should == ["chunks", ["fooz"]]
+          @qs.run(["list_row", {"key"=>"foox"}]).should == ["chunks", ["foox"]]
+          @qs.run(["list_end"]).should == ["end" , ["early"]]
+        end
+      end
+      
+      describe "headers" do
+        it "should do headers proper" do
+          @qs.ddoc_run(@ddoc, ["lists","headers"], 
+            [{"total_rows"=>1000}, {"q" => "ok"}]
+          ).should == ["start", ["first chunk", 'second "chunk"'], 
+            {"headers"=>{"Content-Type"=>"text/plain"}}]
+          @qs.rrun(["list_end"])
+          @qs.jsgets.should == ["end", ["tail"]]
+        end
+      end
+
+      describe "with rows" do
+        it "should list em" do
+          @qs.ddoc_run(@ddoc, ["lists","rows"], 
+            [{"foo"=>"bar"}, {"q" => "ok"}]).
+            should == ["start", ["first chunk", "ok"], {"headers"=>{}}]
+          @qs.rrun(["list_row", {"key"=>"baz"}])
+          @qs.get_chunks.should == ["baz"]
+          @qs.rrun(["list_row", {"key"=>"bam"}])
+          @qs.get_chunks.should == ["bam"]
+          @qs.rrun(["list_end"])
+          @qs.jsgets.should == ["end", ["tail"]]
+        end
+        it "should work with zero rows" do
+          @qs.ddoc_run(@ddoc, ["lists","rows"],
+            [{"foo"=>"bar"}, {"q" => "ok"}]).
+            should == ["start", ["first chunk", "ok"], {"headers"=>{}}]
+          @qs.rrun(["list_end"])
+          @qs.jsgets.should == ["end", ["tail"]]
+        end
+      end
+      
+      describe "should buffer multiple chunks sent for a single row." do
+        it "should should buffer em" do
+          @qs.ddoc_run(@ddoc, ["lists","buffer-chunks"],
+            [{"foo"=>"bar"}, {"q" => "ok"}]).
+            should == ["start", ["bacon"], {"headers"=>{}}]
+          @qs.rrun(["list_row", {"key"=>"baz"}])
+          @qs.get_chunks.should == ["baz", "eggs"]
+          @qs.rrun(["list_row", {"key"=>"bam"}])
+          @qs.get_chunks.should == ["bam", "eggs"]
+          @qs.rrun(["list_end"])
+          @qs.jsgets.should == ["end", ["tail"]]
+        end
+      end
+      it "should end after 2" do
+        @qs.ddoc_run(@ddoc, ["lists","chunky"],
+          [{"foo"=>"bar"}, {"q" => "ok"}]).
+          should == ["start", ["first chunk", "ok"], {"headers"=>{}}]
+          
+        @qs.run(["list_row", {"key"=>"baz"}]).
+          should ==  ["chunks", ["baz"]]
+
+        @qs.run(["list_row", {"key"=>"bam"}]).
+          should ==  ["chunks", ["bam"]]
+
+        @qs.run(["list_row", {"key"=>"foom"}]).
+          should == ["end", ["foom", "early tail"]]
+        # here's where js has to discard quit properly
+        @qs.run(["reset"]).
+          should == true
+      end
     end
   end
 
-  describe "list with rows" do
-    before(:each) do
-      @fun = functions["show-while-get-rows"][LANGUAGE]
-      @qs.run(["reset"]).should == true
-      @qs.add_fun(@fun).should == true
-    end
-    it "should list em" do
-      @qs.rrun(["list", {"foo"=>"bar"}, {"q" => "ok"}])
-      @qs.jsgets.should == ["start", ["first chunk", "ok"], {"headers"=>{}}]
-      @qs.rrun(["list_row", {"key"=>"baz"}])
-      @qs.get_chunks.should == ["baz"]
-      @qs.rrun(["list_row", {"key"=>"bam"}])
-      @qs.get_chunks.should == ["bam"]
-      @qs.rrun(["list_end"])
-      @qs.jsgets.should == ["end", ["tail"]]
-    end
-    it "should work with zero rows" do
-      @qs.rrun(["list", {"foo"=>"bar"}, {"q" => "ok"}])
-      @qs.jsgets.should == ["start", ["first chunk", "ok"], {"headers"=>{}}]
-      @qs.rrun(["list_end"])
-      @qs.jsgets.should == ["end", ["tail"]]
-    end
-  end
 
-  describe "should buffer multiple chunks sent for a single row." do
-    before(:all) do
-      @fun = functions["show-while-get-rows-multi-send"][LANGUAGE]
-      @qs.reset!
-      @qs.add_fun(@fun).should == true
-    end
-    it "should should buffer em" do
-      @qs.rrun(["list", {"foo"=>"bar"}, {"q" => "ok"}])
-      @qs.jsgets.should == ["start", ["bacon"], {"headers"=>{}}]
-      @qs.rrun(["list_row", {"key"=>"baz"}])
-      @qs.get_chunks.should == ["baz", "eggs"]
-      @qs.rrun(["list_row", {"key"=>"bam"}])
-      @qs.get_chunks.should == ["bam", "eggs"]
-      @qs.rrun(["list_end"])
-      @qs.jsgets.should == ["end", ["tail"]]
-    end
-  end
-
-  describe "example list" do
-    before(:all) do
-      @fun = functions["list-simple"][LANGUAGE]
-      @qs.reset!
-      @qs.add_fun(@fun).should == true
-    end
-    it "should run normal" do
-      @qs.run(["list", {"foo"=>"bar"}, {"q" => "ok"}]).should == ["start", ["first chunk", "ok"], {"headers"=>{}}]
-      @qs.run(["list_row", {"key"=>"baz"}]).should ==  ["chunks", ["baz"]]
-      @qs.run(["list_row", {"key"=>"bam"}]).should ==  ["chunks", ["bam"]]
-      @qs.run(["list_row", {"key"=>"foom"}]).should == ["chunks", ["foom"]]
-      @qs.run(["list_row", {"key"=>"fooz"}]).should == ["chunks", ["fooz"]]
-      @qs.run(["list_row", {"key"=>"foox"}]).should == ["chunks", ["foox"]]
-      @qs.run(["list_end"]).should == ["end" , ["early"]]
-    end
-  end
-
-  describe "only goes to 2 list" do
-    before(:all) do
-      @fun = functions["list-chunky"][LANGUAGE]
-      @qs.reset!
-      @qs.add_fun(@fun).should == true
-    end
-    it "should end early" do
-      @qs.run(["list", {"foo"=>"bar"}, {"q" => "ok"}]).
-        should == ["start", ["first chunk", "ok"], {"headers"=>{}}]
-      @qs.run(["list_row", {"key"=>"baz"}]).
-        should ==  ["chunks", ["baz"]]
-
-      @qs.run(["list_row", {"key"=>"bam"}]).
-        should ==  ["chunks", ["bam"]]
-
-      @qs.run(["list_row", {"key"=>"foom"}]).
-        should == ["end", ["foom", "early tail"]]
-      # here's where js has to discard quit properly
-      @qs.run(["reset"]).
-        should == true
-    end
-  end
-  
-  describe "changes filter" do
-    before(:all) do
-      @fun = functions["filter-basic"][LANGUAGE]
-      @qs.reset!
-    end
-    it "should only return true for good docs" do
-      @qs.run(["filter", @fun, [{"key"=>"bam", "good" => true}, {"foo" => "bar"}, {"good" => true}], {"req" => "foo"}]).
-        should ==  [true, [true, false, true]]
-    end
-  end
-  
-  describe "update" do
-    before(:all) do
-      @fun = functions["update-basic"][LANGUAGE]
-      @qs.reset!
-    end
-    it "should return a doc and a resp body" do
-      up, doc, resp = @qs.run(["update", @fun, {"foo" => "gnarly"}, {"verb" => "POST"}])
-      up.should == "up"
-      doc.should == {"foo" => "gnarly", "world" => "hello"}
-      resp["body"].should == "hello doc"
-    end
-  end
-end
 
 def should_have_exited qs
   begin
     qs.run(["reset"])
-    "raise before this".should == true
+    "raise before this (except Erlang)".should == true
   rescue RuntimeError => e
     e.message.should == "no response"
   rescue Errno::EPIPE
@@ -641,54 +765,60 @@ end
 describe "query server that exits" do
   before(:each) do
     @qs = QueryServerRunner.run
+    @ddoc = {
+      "_id" => "foo",
+      "lists" => {
+        "capped" => functions["list-capped"][LANGUAGE],
+        "raw" => functions["list-raw"][LANGUAGE]
+      },
+      "shows" => {
+        "fatal" => functions["fatal"][LANGUAGE]
+      }
+    }
+    @qs.teach_ddoc(@ddoc)
   end
   after(:each) do
     @qs.close
   end
 
-  if LANGUAGE == "js"
-    describe "old style list" do
-      before(:each) do
-        @fun = functions["list-old-style"][LANGUAGE]
-        @qs.reset!
-        @qs.add_fun(@fun).should == true
-      end
-      it "should get a warning" do
-        resp = @qs.run(["list", {"foo"=>"bar"}, {"q" => "ok"}])
-        resp["error"].should == "render_error"
-        resp["reason"].should include("the list API has changed")
-      end
-    end
-  end
-
   describe "only goes to 2 list" do
-    before(:each) do
-      @fun = functions["list-capped"][LANGUAGE]
-      @qs.reset!
-      @qs.add_fun(@fun).should == true
-    end
     it "should exit if erlang sends too many rows" do
-      @qs.run(["list", {"foo"=>"bar"}, {"q" => "ok"}]).should == ["start", ["bacon"], {"headers"=>{}}]
+      @qs.ddoc_run(@ddoc, ["lists","capped"],
+        [{"foo"=>"bar"}, {"q" => "ok"}]).
+        should == ["start", ["bacon"], {"headers"=>{}}]
       @qs.run(["list_row", {"key"=>"baz"}]).should ==  ["chunks", ["baz"]]
       @qs.run(["list_row", {"key"=>"foom"}]).should == ["chunks", ["foom"]]
       @qs.run(["list_row", {"key"=>"fooz"}]).should == ["end", ["fooz", "early"]]
-      @qs.rrun(["list_row", {"key"=>"foox"}])
-      @qs.jsgets["error"].should == "query_server_error"
+      e = @qs.run(["list_row", {"key"=>"foox"}])
+      e[0].should == "error"
+      e[1].should == "unknown_command"
       should_have_exited @qs
     end
   end
 
   describe "raw list" do
-    before(:each) do
-      @fun = functions["list-raw"][LANGUAGE]
-      @qs.run(["reset"]).should == true
-      @qs.add_fun(@fun).should == true
-    end
     it "should exit if it gets a non-row in the middle" do
-      @qs.rrun(["list", {"foo"=>"bar"}, {"q" => "ok"}])
-      @qs.jsgets.should == ["start", ["first chunk", "ok"], {"headers"=>{}}]
-      @qs.run(["reset"])["error"].should == "query_server_error"
+      @qs.ddoc_run(@ddoc, ["lists","raw"],
+        [{"foo"=>"bar"}, {"q" => "ok"}]).
+        should == ["start", ["first chunk", "ok"], {"headers"=>{}}]
+      e = @qs.run(["reset"])
+      e[0].should == "error"
+      e[1].should == "list_error"
       should_have_exited @qs
     end
+  end
+  
+  describe "fatal error" do
+    it "should exit" do
+      @qs.ddoc_run(@ddoc, ["shows","fatal"],
+        [{"foo"=>"bar"}, {"q" => "ok"}]).
+        should == ["error", "error_key", "testing"]
+      should_have_exited @qs
+    end
+  end
+end
+
+describe "thank you for using the tests" do
+  it "for more info run with QS_TRACE=true or see query_server_spec.rb file header" do
   end
 end

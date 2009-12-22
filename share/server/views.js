@@ -10,58 +10,76 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-// globals used by views
-var map_results = []; // holds temporary emitted values during doc map
 
-// view helper functions
-emit = function(key, value) {
-  map_results.push([key, value]);
-}
-
-sum = function(values) {
-  var rv = 0;
-  for (var i in values) {
-    rv += values[i];
-  }
-  return rv;
-}
 
 var Views = (function() {
 
+  var map_results = []; // holds temporary emitted values during doc map
+
   function runReduce(reduceFuns, keys, values, rereduce) {
     for (var i in reduceFuns) {
-      reduceFuns[i] = compileFunction(reduceFuns[i]);
-    }
+      reduceFuns[i] = Couch.compileFunction(reduceFuns[i]);
+    };
     var reductions = new Array(reduceFuns.length);
     for(var i = 0; i < reduceFuns.length; i++) {
       try {
         reductions[i] = reduceFuns[i](keys, values, rereduce);
       } catch (err) {
-        if (err == "fatal_error") {
-          throw {
-            error: "reduce_runtime_error",
-            reason: "function raised fatal exception"};
-        }
-        log("function raised exception (" + err + ")");
+        handleViewError(err);
+        // if the error is not fatal, ignore the results and continue
         reductions[i] = null;
       }
-    }
-    var reduce_line = toJSON(reductions);
+    };
+    var reduce_line = Couch.toJSON(reductions);
     var reduce_length = reduce_line.length;
-    if (query_config && query_config.reduce_limit &&
-          reduce_length > 200 && ((reduce_length * 2) > line.length)) {
-      var reduce_preview = "Current output: '"+(reduce_line.substring(0,100) + "'... (first 100 of "+reduce_length+' bytes)');
-
-      throw {
-        error:"reduce_overflow_error",
-        reason: "Reduce output must shrink more rapidly: "+reduce_preview+""
-      };
+    // TODO make reduce_limit config into a number
+    if (State.query_config && State.query_config.reduce_limit &&
+          reduce_length > 200 && ((reduce_length * 2) > State.line_length)) {
+      var reduce_preview = "Current output: '"+(reduce_line.substring(0,100) + "'... (first 100 of "+reduce_length+" bytes)");
+      throw(["error", 
+        "reduce_overflow_error", 
+        "Reduce output must shrink more rapidly: "+reduce_preview]);
     } else {
       print("[true," + reduce_line + "]");
     }
   };
 
+  function handleViewError(err, doc) {
+    if (err == "fatal_error") {
+      // Only if it's a "fatal_error" do we exit. What's a fatal error?
+      // That's for the query to decide.
+      //
+      // This will make it possible for queries to completely error out,
+      // by catching their own local exception and rethrowing a
+      // fatal_error. But by default if they don't do error handling we
+      // just eat the exception and carry on.
+      //
+      // In this case we abort map processing but don't destroy the 
+      // JavaScript process. If you need to destroy the JavaScript 
+      // process, throw the error form matched by the block below.
+      throw(["error", "map_runtime_error", "function raised 'fatal_error'"]);
+    } else if (err[0] == "fatal") {
+      // Throwing errors of the form ["fatal","error_key","reason"]
+      // will kill the OS process. This is not normally what you want.
+      throw(err);
+    }
+    var message = "function raised exception " + err.toSource();
+    if (doc) message += " with doc._id " + doc._id;
+    log(message);
+  };
+
   return {
+    // view helper functions
+    emit : function(key, value) {
+      map_results.push([key, value]);
+    },
+    sum : function(values) {
+      var rv = 0;
+      for (var i in values) {
+        rv += values[i];
+      }
+      return rv;
+    },
     reduce : function(reduceFuns, kvs) {
       var keys = new Array(kvs.length);
       var values = new Array(kvs.length);
@@ -101,25 +119,15 @@ var Views = (function() {
       recursivelySeal(doc); // seal to prevent map functions from changing doc
       */
       var buf = [];
-      for (var i = 0; i < funs.length; i++) {
+      for (var i = 0; i < State.funs.length; i++) {
         map_results = [];
         try {
-          funs[i](doc);
-          buf.push(toJSON(map_results));
+          State.funs[i](doc);
+          buf.push(Couch.toJSON(map_results));
         } catch (err) {
-          if (err == "fatal_error") {
-            // Only if it's a "fatal_error" do we exit. What's a fatal error?
-            // That's for the query to decide.
-            //
-            // This will make it possible for queries to completely error out,
-            // by catching their own local exception and rethrowing a
-            // fatal_error. But by default if they don't do error handling we
-            // just eat the exception and carry on.
-            throw {
-              error: "map_runtime_error",
-              reason: "function raised fatal exception"};
-          }
-          log("function raised exception (" + err + ") with doc._id " + doc._id);
+          handleViewError(err, doc);
+          // If the error is not fatal, we treat the doc as if it
+          // did not emit anything, by buffering an empty array.
           buf.push("[]");
         }
       }

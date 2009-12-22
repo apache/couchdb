@@ -11,10 +11,9 @@
 // the License.
 
 var Validate = {
-  validate : function(funSrc, newDoc, oldDoc, userCtx) {
-    var validateFun = compileFunction(funSrc);
+  validate : function(fun, ddoc, args) {
     try {
-      validateFun(newDoc, oldDoc, userCtx);
+      fun.apply(ddoc, args);
       print("1");
     } catch (error) {
       respond(error);

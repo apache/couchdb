@@ -12,21 +12,21 @@
 
 var sandbox = null;
 
-var init_sandbox = function() {
+function init_sandbox() {
   try {
     // if possible, use evalcx (not always available)
     sandbox = evalcx('');
-    sandbox.emit = emit;
-    sandbox.sum = sum;
+    sandbox.emit = Views.emit;
+    sandbox.sum = Views.sum;
     sandbox.log = log;
-    sandbox.toJSON = toJSON;
-    sandbox.provides = provides;
-    sandbox.registerType = registerType;
-    sandbox.start = start;
-    sandbox.send = send;
-    sandbox.getRow = getRow;
+    sandbox.toJSON = Couch.toJSON;
+    sandbox.provides = Mime.provides;
+    sandbox.registerType = Mime.registerType;
+    sandbox.start = Render.start;
+    sandbox.send = Render.send;
+    sandbox.getRow = Render.getRow;
   } catch (e) {
-    log(toJSON(e));
+    log(e.toSource());
   }
 };
 init_sandbox();
@@ -36,37 +36,104 @@ init_sandbox();
 //
 // Responses are json values followed by a new line ("\n")
 
-var line, cmd, cmdkey;
+var DDoc = (function() {
+  var ddoc_dispatch = {
+    "lists"     : Render.list,
+    "shows"    : Render.show,
+    "filters"   : Filter.filter,
+    "updates"  : Render.update,
+    "validate_doc_update" : Validate.validate
+  };
+  var ddocs = {};
+  return {
+    ddoc : function() {
+      var args = [];
+      for (var i=0; i < arguments.length; i++) {
+        args.push(arguments[i]);
+      };
+      var ddocId = args.shift();
+      if (ddocId == "new") {
+        // get the real ddocId.
+        ddocId = args.shift();
+        // store the ddoc, functions are lazily compiled.
+        ddocs[ddocId] = args.shift();
+        print("true");
+      } else {
+        // Couch makes sure we know this ddoc already.
+        var ddoc = ddocs[ddocId];
+        if (!ddoc) throw(["fatal", "query_protocol_error", "uncached design doc: "+ddocId]);
+        var funPath = args.shift();
+        var cmd = funPath[0];
+        // the first member of the fun path determines the type of operation
+        var funArgs = args.shift();
+        if (ddoc_dispatch[cmd]) {
+          // get the function, call the command with it
+          var point = ddoc;
+          for (var i=0; i < funPath.length; i++) {
+            if (i+1 == funPath.length) {
+              fun = point[funPath[i]]
+              if (typeof fun != "function") {
+                fun = Couch.compileFunction(fun);
+                // cache the compiled fun on the ddoc
+                point[funPath[i]] = fun
+              };
+            } else {
+              point = point[funPath[i]]              
+            }
+          };
 
-var dispatch = {
-  "reset"    : State.reset,
-  "add_fun"  : State.addFun,
-  "map_doc"  : Views.mapDoc,
-  "reduce"   : Views.reduce,
-  "rereduce" : Views.rereduce,
-  "validate" : Validate.validate,
-  "show"     : Render.show,
-  "update"   : Render.update,
-  "list"     : Render.list,
-  "filter"   : Filter.filter
-};
-
-while (line = eval(readline())) {
-  cmd = eval(line);
-  line_length = line.length;
-  try {
-    cmdkey = cmd.shift();
-    if (dispatch[cmdkey]) {
-      // run the correct responder with the cmd body
-      dispatch[cmdkey].apply(this, cmd);
-    } else {
-      // unknown command, quit and hope the restarted version is better
-      respond({
-        error: "query_server_error",
-        reason: "unknown command '" + cmdkey + "'"});
-      quit();
+          // run the correct responder with the cmd body
+          ddoc_dispatch[cmd].apply(null, [fun, ddoc, funArgs]);
+        } else {
+          // unknown command, quit and hope the restarted version is better
+          throw(["fatal", "unknown_command", "unknown ddoc command '" + cmd + "'"]);
+        }
+      }
     }
-  } catch(e) {
-    respond(e);
-  }
+  };
+})();
+
+var Loop = function() {
+  var line, cmd, cmdkey, dispatch = {
+    "ddoc"     : DDoc.ddoc,
+    // "view"    : Views.handler,
+    "reset"    : State.reset,
+    "add_fun"  : State.addFun,
+    "map_doc"  : Views.mapDoc,
+    "reduce"   : Views.reduce,
+    "rereduce" : Views.rereduce
+  };
+  function handleError(e) {
+    var type = e[0];
+    if (type == "fatal") {
+      e[0] = "error"; // we tell the client it was a fatal error by dying
+      respond(e);
+      quit(-1);
+    } else if (type == "error") {
+      respond(e);
+    } else if (e.error && e.reason) {
+      // compatibility with old error format
+      respond(["error", e.error, e.reason]);
+    } else {
+      respond(["error","unnamed_error",e.toSource()]);
+    }
+  };
+  while (line = readline()) {
+    cmd = eval('('+line+')');
+    State.line_length = line.length;
+    try {
+      cmdkey = cmd.shift();
+      if (dispatch[cmdkey]) {
+        // run the correct responder with the cmd body
+        dispatch[cmdkey].apply(null, cmd);
+      } else {
+        // unknown command, quit and hope the restarted version is better
+        throw(["fatal", "unknown_command", "unknown command '" + cmdkey + "'"]);
+      }
+    } catch(e) {
+      handleError(e);
+    }
+  };
 };
+
+Loop();

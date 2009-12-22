@@ -10,26 +10,18 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-// globals used by other modules and functions
-var funs = [];        // holds functions used for computation
-var funsrc = [];      // holds function source for debug info
-var query_config = {};
-var State = (function() {
-  return {
-    reset : function(config) {
-      // clear the globals and run gc
-      funs = [];
-      funsrc = [];
-      query_config = config;
-      init_sandbox();
-      gc();
-      print("true"); // indicates success
-    },
-    addFun : function(newFun) {
-      // Compile to a function and add it to funs array
-      funsrc.push(newFun);
-      funs.push(compileFunction(newFun));
-      print("true");
-    }
+var State = {
+  reset : function(config) {
+    // clear the globals and run gc
+    State.funs = [];
+    State.query_config = config || {};
+    init_sandbox();
+    gc();
+    print("true"); // indicates success
+  },
+  addFun : function(newFun) {
+    // Compile to a function and add it to funs array
+    State.funs.push(Couch.compileFunction(newFun));
+    print("true");
   }
-})();
+}

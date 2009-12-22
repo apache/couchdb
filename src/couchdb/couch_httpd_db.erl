@@ -16,7 +16,7 @@
 -export([handle_request/1, handle_compact_req/2, handle_design_req/2,
     db_req/2, couch_doc_open/4,handle_changes_req/2,
     update_doc_result_to_json/1, update_doc_result_to_json/2,
-    handle_design_info_req/2, handle_view_cleanup_req/2]).
+    handle_design_info_req/3, handle_view_cleanup_req/2]).
 
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
@@ -232,26 +232,18 @@ make_filter_fun(Req, Db) ->
         end;
     [DName, FName] ->
         DesignId = <<"_design/", DName/binary>>,
-        case couch_db:open_doc(Db, DesignId) of
-        {ok, #doc{body={Props}}} ->
-            FilterSrc = try couch_util:get_nested_json_value({Props},
-                [<<"filters">>, FName])
-            catch
-            throw:{not_found, _} ->
-                throw({bad_request, "invalid filter function"})
-            end,
-            Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
-            fun(DocInfos) ->
-                Docs = [Doc || {ok, Doc} <- [
-                    {ok, Doc} = couch_db:open_doc(Db, DInfo, [deleted])
-                    || DInfo <- DocInfos]],
-                {ok, Passes} = couch_query_servers:filter_docs(Lang, FilterSrc, Docs, Req, Db),
-                [{[{rev, couch_doc:rev_to_str(Rev)}]}
-                    || #doc_info{revs=[#rev_info{rev=Rev}|_]} <- DocInfos, 
-                    Pass <- Passes, Pass == true]
-            end;
-        _Error ->
-            throw({bad_request, "invalid design doc"})
+        DDoc = couch_httpd_db:couch_doc_open(Db, DesignId, nil, []),
+        % validate that the ddoc has the filter fun
+        #doc{body={Props}} = DDoc,
+        couch_util:get_nested_json_value({Props}, [<<"filters">>, FName]),
+        fun(DocInfos) ->
+            Docs = [Doc || {ok, Doc} <- [
+                {ok, Doc} = couch_db:open_doc(Db, DInfo, [deleted])
+                || DInfo <- DocInfos]],
+            {ok, Passes} = couch_query_servers:filter_docs(Req, Db, DDoc, FName, Docs),
+            [{[{rev, couch_doc:rev_to_str(Rev)}]}
+                || #doc_info{revs=[#rev_info{rev=Rev}|_]} <- DocInfos, 
+                Pass <- Passes, Pass == true]
         end;
     _Else ->
         throw({bad_request, 
@@ -279,11 +271,14 @@ handle_view_cleanup_req(Req, _Db) ->
 
 
 handle_design_req(#httpd{
-        path_parts=[_DbName,_Design,_DesName, <<"_",_/binary>> = Action | _Rest],
+        path_parts=[_DbName, _Design, DesignName, <<"_",_/binary>> = Action | _Rest],
         design_url_handlers = DesignUrlHandlers
     }=Req, Db) ->
+    % load ddoc
+    DesignId = <<"_design/", DesignName/binary>>,
+    DDoc = couch_httpd_db:couch_doc_open(Db, DesignId, nil, []),
     Handler = couch_util:dict_find(Action, DesignUrlHandlers, fun db_req/2),
-    Handler(Req, Db);
+    Handler(Req, Db, DDoc);
 
 handle_design_req(Req, Db) ->
     db_req(Req, Db).
@@ -291,7 +286,7 @@ handle_design_req(Req, Db) ->
 handle_design_info_req(#httpd{
             method='GET',
             path_parts=[_DbName, _Design, DesignName, _]
-        }=Req, Db) ->
+        }=Req, Db, _DDoc) ->
     DesignId = <<"_design/", DesignName/binary>>,
     {ok, GroupInfoList} = couch_view:get_group_info(Db, DesignId),
     send_json(Req, 200, {[
@@ -299,7 +294,7 @@ handle_design_info_req(#httpd{
         {view_index, {GroupInfoList}}
     ]});
 
-handle_design_info_req(Req, _Db) ->
+handle_design_info_req(Req, _Db, _DDoc) ->
     send_method_not_allowed(Req, "GET").
 
 create_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
@@ -725,7 +720,12 @@ db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
         end;
     _ ->
         {DesignName, ShowName} = Format,
-        couch_httpd_show:handle_doc_show(Req, DesignName, ShowName, DocId, Db)
+        % load ddoc
+        DesignId = <<"_design/", DesignName/binary>>,
+        DDoc = couch_httpd_db:couch_doc_open(Db, DesignId, nil, []),
+        % open doc
+        Doc = couch_doc_open(Db, DocId, Rev, Options),
+        couch_httpd_show:handle_doc_show(Req, Db, DDoc, ShowName, Doc)
     end;
 
 db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->

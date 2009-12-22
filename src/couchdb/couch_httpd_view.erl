@@ -13,21 +13,21 @@
 -module(couch_httpd_view).
 -include("couch_db.hrl").
 
--export([handle_view_req/2,handle_temp_view_req/2,handle_db_view_req/2]).
+-export([handle_view_req/3,handle_temp_view_req/2]).
 
 -export([get_stale_type/1, get_reduce_type/1, parse_view_params/3]).
 -export([make_view_fold_fun/6, finish_view_fold/4, view_row_obj/3]).
 -export([view_group_etag/2, view_group_etag/3, make_reduce_fold_funs/5]).
 -export([design_doc_view/5, parse_bool_param/1, doc_member/2]).
--export([make_key_options/1]).
+-export([make_key_options/1, load_view/4]).
 
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,send_chunk/2,
     start_json_response/2, start_json_response/3, end_json_response/1,
     send_chunked_error/2]).
 
-design_doc_view(Req, Db, Id, ViewName, Keys) ->
-    DesignId = <<"_design/", Id/binary>>,
+design_doc_view(Req, Db, DName, ViewName, Keys) ->
+    DesignId = <<"_design/", DName/binary>>,
     Stale = get_stale_type(Req),
     Reduce = get_reduce_type(Req),
     Result = case couch_view:get_map_view(Db, DesignId, ViewName, Stale) of
@@ -54,11 +54,11 @@ design_doc_view(Req, Db, Id, ViewName, Keys) ->
     Result.
 
 handle_view_req(#httpd{method='GET',
-        path_parts=[_Db, _Design, DName, _View, ViewName]}=Req, Db) ->
+        path_parts=[_, _, DName, _, ViewName]}=Req, Db, _DDoc) ->
     design_doc_view(Req, Db, DName, ViewName, nil);
 
 handle_view_req(#httpd{method='POST',
-        path_parts=[_Db, _Design, DName, _View, ViewName]}=Req, Db) ->
+        path_parts=[_, _, DName, _, ViewName]}=Req, Db, _DDoc) ->
     {Fields} = couch_httpd:json_body_obj(Req),
     case proplists:get_value(<<"keys">>, Fields, nil) of
     nil ->
@@ -71,50 +71,7 @@ handle_view_req(#httpd{method='POST',
         throw({bad_request, "`keys` member must be a array."})
     end;
 
-handle_view_req(Req, _Db) ->
-    send_method_not_allowed(Req, "GET,POST,HEAD").
-
-handle_db_view_req(#httpd{method='GET',
-        path_parts=[_Db, _View, DName, ViewName]}=Req, Db) ->
-    QueryArgs = couch_httpd_view:parse_view_params(Req, nil, nil),
-    #view_query_args{
-        list = ListName
-    } = QueryArgs,
-    ?LOG_DEBUG("ici ~p", [ListName]),
-    case ListName of
-        nil -> couch_httpd_view:design_doc_view(Req, Db, DName, ViewName, nil);
-        _ ->
-            couch_httpd_show:handle_view_list(Req, DName, ListName, DName, ViewName, Db, nil)
-    end;
-
-handle_db_view_req(#httpd{method='POST',
-        path_parts=[_Db, _View, DName, ViewName]}=Req, Db) ->
-    QueryArgs = couch_httpd_view:parse_view_params(Req, nil, nil),
-    #view_query_args{
-        list = ListName
-    } = QueryArgs,
-    case ListName of
-    nil ->
-        {Fields} = couch_httpd:json_body_obj(Req),
-        case proplists:get_value(<<"keys">>, Fields, nil) of
-        nil ->
-            Fmt = "POST to view ~p/~p in database ~p with no keys member.",
-            ?LOG_DEBUG(Fmt, [DName, ViewName, Db]),
-            couch_httpd_view:design_doc_view(Req, Db, DName, ViewName, nil);
-        Keys when is_list(Keys) ->
-            couch_httpd_view:design_doc_view(Req, Db, DName, ViewName, Keys);
-        _ ->
-            throw({bad_request, "`keys` member must be a array."})
-        end;
-    _ ->
-        ReqBody = couch_httpd:body(Req),
-        {Props2} = ?JSON_DECODE(ReqBody),
-        Keys = proplists:get_value(<<"keys">>, Props2, nil),
-        couch_httpd_show:handle_view_list(Req#httpd{req_body=ReqBody},
-            DName, ListName, DName, ViewName, Db, Keys)
-    end;
-
-handle_db_view_req(Req, _Db) ->
+handle_view_req(Req, _Db, _DDoc) ->
     send_method_not_allowed(Req, "GET,POST,HEAD").
 
 handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
@@ -236,6 +193,35 @@ get_stale_type(Req) ->
 get_reduce_type(Req) ->
     list_to_atom(couch_httpd:qs_value(Req, "reduce", "true")).
 
+load_view(Req, Db, {ViewDesignId, ViewName}, Keys) ->
+    Stale = couch_httpd_view:get_stale_type(Req),
+    Reduce = couch_httpd_view:get_reduce_type(Req),
+    case couch_view:get_map_view(Db, ViewDesignId, ViewName, Stale) of
+    {ok, View, Group} ->
+        QueryArgs = couch_httpd_view:parse_view_params(Req, Keys, map),
+        {map, View, Group, QueryArgs};
+    {not_found, _Reason} ->
+        case couch_view:get_reduce_view(Db, ViewDesignId, ViewName, Stale) of
+        {ok, ReduceView, Group} ->
+            case Reduce of
+            false ->
+                QueryArgs = couch_httpd_view:parse_view_params(Req, Keys, map_red),
+                MapView = couch_view:extract_map_view(ReduceView),
+                {map, MapView, Group, QueryArgs};
+            _ ->
+                QueryArgs = couch_httpd_view:parse_view_params(Req, Keys, reduce),                
+                {reduce, ReduceView, Group, QueryArgs}
+            end;
+        {not_found, Reason} ->
+            throw({not_found, Reason})
+        end
+    end.
+
+% query_parse_error could be removed
+% we wouldn't need to pass the view type, it'd just parse params.
+% I'm not sure what to do about the error handling, but
+% it might simplify things to have a parse_view_params function
+% that doesn't throw().
 parse_view_params(Req, Keys, ViewType) ->
     QueryList = couch_httpd:qs(Req),
     QueryParams =
@@ -258,6 +244,7 @@ parse_view_params(Req, Keys, ViewType) ->
         {reduce, _, false} ->
             QueryArgs;
         {reduce, _, _} ->
+            % we can simplify code if we just drop this error message.
             Msg = <<"Multi-key fetchs for reduce "
                     "view must include `group=true`">>,
             throw({query_parse_error, Msg});
