@@ -13,7 +13,7 @@
 -module(couch_httpd_external).
 
 -export([handle_external_req/2, handle_external_req/3]).
--export([send_external_response/2, json_req_obj/2]).
+-export([send_external_response/2, json_req_obj/2, json_req_obj/3]).
 -export([default_or_content_type/2, parse_external_response/1]).
 
 -import(couch_httpd,[send_error/4]).
@@ -53,12 +53,12 @@ process_external_req(HttpReq, Db, Name) ->
     _ ->
         send_external_response(HttpReq, Response)
     end.
-
+json_req_obj(Req, Db) -> json_req_obj(Req, Db, null).
 json_req_obj(#httpd{mochi_req=Req,
                method=Verb,
                path_parts=Path,
                req_body=ReqBody
-            }, Db) ->
+            }, Db, DocId) ->
     Body = case ReqBody of
         undefined -> Req:recv_body();
         Else -> Else
@@ -74,6 +74,7 @@ json_req_obj(#httpd{mochi_req=Req,
     {ok, Info} = couch_db:get_db_info(Db),
     % add headers...
     {[{<<"info">>, {Info}},
+        {<<"id">>, DocId},
         {<<"verb">>, Verb},
         {<<"path">>, Path},
         {<<"query">>, to_json_terms(Req:parse_qs())},

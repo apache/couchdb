@@ -292,15 +292,13 @@ att_to_iolist(#att{data=DataFun, len=Len}) when is_function(DataFun)->
     lists:reverse(fold_streamed_data(DataFun, Len,
             fun(Data, Acc) -> [Data | Acc] end, [])).
 
-get_validate_doc_fun(#doc{body={Props}}) ->
-    Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
+get_validate_doc_fun(#doc{body={Props}}=DDoc) ->
     case proplists:get_value(<<"validate_doc_update">>, Props) of
     undefined ->
         nil;
-    FunSrc ->
+    _Else ->
         fun(EditDoc, DiskDoc, Ctx) ->
-            couch_query_servers:validate_doc_update(
-                    Lang, FunSrc, EditDoc, DiskDoc, Ctx)
+            couch_query_servers:validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx)
         end
     end.
 

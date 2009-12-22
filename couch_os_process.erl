@@ -53,7 +53,7 @@ prompt(Pid, Data) ->
         {ok, Result} ->
             Result;
         Error ->
-            ?LOG_ERROR("OS Process Error :: ~p",[Error]),
+            ?LOG_ERROR("OS Process Error ~p :: ~p",[Pid,Error]),
             throw(Error)
     end.
 
@@ -80,22 +80,24 @@ readline(#os_proc{port = Port} = OsProc, Acc) ->
 
 % Standard JSON functions
 writejson(OsProc, Data) when is_record(OsProc, os_proc) ->
-    % ?LOG_DEBUG("OS Process Input :: ~p", [Data]),
-    true = writeline(OsProc, ?JSON_ENCODE(Data)).
+    JsonData = ?JSON_ENCODE(Data),
+    ?LOG_DEBUG("OS Process ~p Input  :: ~s", [OsProc#os_proc.port, JsonData]),
+    true = writeline(OsProc, JsonData).
 
 readjson(OsProc) when is_record(OsProc, os_proc) ->
     Line = readline(OsProc),
+    ?LOG_DEBUG("OS Process ~p Output :: ~s", [OsProc#os_proc.port, Line]),
     case ?JSON_DECODE(Line) of
     [<<"log">>, Msg] when is_binary(Msg) ->
         % we got a message to log. Log it and continue
-        ?LOG_INFO("OS Process :: ~s", [Msg]),
+        ?LOG_INFO("OS Process ~p Log :: ~s", [OsProc#os_proc.port, Msg]),
         readjson(OsProc);
-    {[{<<"error">>, Id}, {<<"reason">>, Reason}]} ->
+    [<<"error">>, Id, Reason] ->
         throw({list_to_atom(binary_to_list(Id)),Reason});
-    {[{<<"reason">>, Reason}, {<<"error">>, Id}]} ->
+    [<<"fatal">>, Id, Reason] ->
+        ?LOG_INFO("OS Process ~p Fatal Error :: ~s ~p",[OsProc#os_proc.port, Id, Reason]),
         throw({list_to_atom(binary_to_list(Id)),Reason});
     Result ->
-        % ?LOG_DEBUG("OS Process Output :: ~p", [Result]),
         Result
     end.
 
@@ -112,6 +114,7 @@ init([Command, Options, PortOptions]) ->
     },
     KillCmd = readline(BaseProc),
     Pid = self(),
+    ?LOG_DEBUG("OS Process Start :: ~p", [BaseProc#os_proc.port]),
     spawn(fun() ->
             % this ensure the real os process is killed when this process dies.
             erlang:monitor(process, Pid),
@@ -143,8 +146,12 @@ handle_call({prompt, Data}, _From, OsProc) ->
         Writer(OsProc, Data),
         {reply, {ok, Reader(OsProc)}, OsProc}
     catch
-        throw:OsError ->
-            {stop, normal, OsError, OsProc}
+        throw:{error, OsError} ->
+            {reply, OsError, OsProc};
+        throw:{fatal, OsError} ->
+            {stop, normal, OsError, OsProc};
+        throw:OtherError ->
+            {stop, normal, OtherError, OsProc}
     end.
 
 handle_cast({send, Data}, #os_proc{writer=Writer}=OsProc) ->

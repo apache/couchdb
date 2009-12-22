@@ -51,7 +51,7 @@ start_link() ->
 
     DesignUrlHandlersList = lists:map(
         fun({UrlKey, SpecStr}) ->
-            {?l2b(UrlKey), make_arity_2_fun(SpecStr)}
+            {?l2b(UrlKey), make_arity_3_fun(SpecStr)}
         end, couch_config:get("httpd_design_handlers")),
 
     UrlHandlers = dict:from_list(UrlHandlersList),
@@ -108,6 +108,14 @@ make_arity_2_fun(SpecStr) ->
         fun(Arg1, Arg2) -> Mod:Fun(Arg1, Arg2, SpecArg) end;
     {ok, {Mod, Fun}} ->
         fun(Arg1, Arg2) -> Mod:Fun(Arg1, Arg2) end
+    end.
+
+make_arity_3_fun(SpecStr) ->
+    case couch_util:parse_term(SpecStr) of
+    {ok, {Mod, Fun, SpecArg}} ->
+        fun(Arg1, Arg2, Arg3) -> Mod:Fun(Arg1, Arg2, Arg3, SpecArg) end;
+    {ok, {Mod, Fun}} ->
+        fun(Arg1, Arg2, Arg3) -> Mod:Fun(Arg1, Arg2, Arg3) end
     end.
 
 % SpecStr is "{my_module, my_fun}, {my_module2, my_fun2}"
