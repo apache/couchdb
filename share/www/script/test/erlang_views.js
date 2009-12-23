@@ -57,7 +57,7 @@ couchTests.erlang_views = function(debug) {
             'fun(Doc, {Req}) -> ' +
             '  {Info} = proplists:get_value(<<"info">>, Req, {[]}), ' +
             '  Purged = proplists:get_value(<<"purge_seq">>, Info, -1), ' +
-            '  Verb = proplists:get_value(<<"verb">>, Req, <<"not_get">>), ' +
+            '  Verb = proplists:get_value(<<"method">>, Req, <<"not_get">>), ' +
             '  R = list_to_binary(io_lib:format("~b - ~s", [Purged, Verb])), ' +
             '  {[{<<"code">>, 200}, {<<"headers">>, {[]}}, {<<"body">>, R}]} ' +
             'end.'

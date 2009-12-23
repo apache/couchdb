@@ -642,7 +642,7 @@ describe "query server normal case" do
     it "should return a doc and a resp body" do
       up, doc, resp = @qs.ddoc_run(@ddoc, 
         ["updates","basic"], 
-        [{"foo" => "gnarly"}, {"verb" => "POST"}]
+        [{"foo" => "gnarly"}, {"method" => "POST"}]
       )
       up.should == "up"
       doc.should == {"foo" => "gnarly", "world" => "hello"}

@@ -192,7 +192,7 @@ couchTests.show_documents = function(debug) {
   var resp = JSON.parse(xhr.responseText);
   T(equals(resp.headers["X-Foo"], "bar"));
   T(equals(resp.query, {foo:"bar"}));
-  T(equals(resp.verb, "GET"));
+  T(equals(resp.method, "GET"));
   T(equals(resp.path[5], docid));
   T(equals(resp.info.db_name, "test_suite_db"));
 

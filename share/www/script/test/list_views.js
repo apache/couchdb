@@ -228,7 +228,7 @@ couchTests.list_views = function(debug) {
   TEquals(resp.rows[0], {"id": "0","key": 0,"value": "0"});
 
   TEquals(resp.req.info.db_name, "test_suite_db");
-  TEquals(resp.req.verb, "GET");
+  TEquals(resp.req.method, "GET");
   TEquals(resp.req.path, [
       "test_suite_db",
       "_design",

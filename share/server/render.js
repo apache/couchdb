@@ -233,9 +233,9 @@ var Render = (function() {
 
   function runUpdate(fun, ddoc, args) {
     try {
-      var verb = args[1].verb;
+      var method = args[1].method;
       // for analytics logging applications you might want to remove the next line
-      if (verb == "GET") throw(["error","method_not_allowed","Update functions do not allow GET"]);
+      if (method == "GET") throw(["error","method_not_allowed","Update functions do not allow GET"]);
       var result = fun.apply(ddoc, args);
       var doc = result[0];
       var resp = result[1];
