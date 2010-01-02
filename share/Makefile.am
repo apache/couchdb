@@ -40,6 +40,7 @@ nobase_dist_localdata_DATA = \
     www/custom_test.html \
     www/database.html \
     www/dialog/_compact_database.html \
+    www/dialog/_view_cleanup.html \
     www/dialog/_create_database.html \
     www/dialog/_delete_database.html \
     www/dialog/_delete_document.html \
