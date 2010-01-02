@@ -152,6 +152,18 @@
         });
       }
 
+      this.viewCleanup = function() {
+        $.showDialog("dialog/_view_cleanup.html", {
+          submit: function(data, callback) {
+            db.viewCleanup({
+              success: function(resp) {
+                callback();
+              }
+            });
+          }
+        });
+      }
+
       this.compactView = function() {
         var groupname = page.viewName.substring(8,
             page.viewName.indexOf('/_view'));

@@ -111,6 +111,16 @@
             "The database could not be compacted"
           );
         },
+        viewCleanup: function(options) {
+          $.extend(options, {successStatus: 202});
+          ajax({
+              type: "POST", url: this.uri + "_view_cleanup",
+              data: "", processData: false
+            },
+            options,
+            "The views could not be cleaned up"
+          );
+        },
         compactView: function(groupname, options) {
           $.extend(options, {successStatus: 202});
           ajax({

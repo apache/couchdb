@@ -243,6 +243,12 @@ function CouchDB(name, httpHeaders) {
     return JSON.parse(this.last_req.responseText);
   }
 
+  this.viewCleanup = function() {
+    this.last_req = this.request("POST", this.uri + "_view_cleanup");
+    CouchDB.maybeThrowError(this.last_req);
+    return JSON.parse(this.last_req.responseText);
+  }
+
   this.setDbProperty = function(propId, propValue) {
     this.last_req = this.request("PUT", this.uri + propId,{
       body:JSON.stringify(propValue)
