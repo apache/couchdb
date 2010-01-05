@@ -73,6 +73,7 @@ loadTest("security_validation.js");
 loadTest("show_documents.js");
 loadTest("stats.js");
 loadTest("update_documents.js");
+loadTest("users_db.js");
 loadTest("utf8.js");
 loadTest("uuids.js");
 loadTest("view_collation.js");

@@ -340,60 +340,34 @@ CouchDB.logout = function() {
   return JSON.parse(CouchDB.last_req.responseText);
 }
 
-CouchDB.createUser = function(username, password, email, roles, basicAuth) {
-  var roles_str = ""
-  if (roles) {
-    for (var i=0; i< roles.length; i++) {
-      roles_str += "&roles=" + encodeURIComponent(roles[i]);
-    }
-  }
-  var headers = {"Content-Type": "application/x-www-form-urlencoded"};
-  if (basicAuth) {
-    headers['Authorization'] = basicAuth
-  } else {
-    headers['X-CouchDB-WWW-Authenticate'] = 'Cookie';
-  }
-
-  CouchDB.last_req = CouchDB.request("POST", "/_user/", {
-    headers: headers,
-    body: "username=" + encodeURIComponent(username) + "&password="
-    + encodeURIComponent(password) + "&email="
-    + encodeURIComponent(email) + roles_str
-  });
+CouchDB.session = function(options) {
+  options = options || {};
+  CouchDB.last_req = CouchDB.request("GET", "/_session", options);
+  CouchDB.maybeThrowError(CouchDB.last_req);
   return JSON.parse(CouchDB.last_req.responseText);
-}
+};
 
-CouchDB.updateUser = function(username, email, roles, password, old_password) {
-  var roles_str = ""
-  if (roles) {
-    for (var i=0; i< roles.length; i++) {
-      roles_str += "&roles=" + encodeURIComponent(roles[i]);
-    }
+CouchDB.user_prefix = "org.couchdb.user:";
+
+CouchDB.prepareUserDoc = function(user_doc, new_password) {
+  user_doc._id = user_doc._id || CouchDB.user_prefix + user_doc.username;
+  if (new_password) {
+    // handle the password crypto
+    user_doc.salt = CouchDB.newUuids(1)[0];
+    user_doc.password_sha = hex_sha1(new_password + user_doc.salt);
   }
-
-  var body = "email="+ encodeURIComponent(email)+ roles_str;
-
-  if (typeof(password) != "undefined" && password) {
-    body += "&password=" + password;
+  user_doc.type = "user";
+  if (!user_doc.roles) {
+    user_doc.roles = []
   }
-
-  if (typeof(old_password) != "undefined" && old_password) {
-    body += "&old_password=" + old_password;
-  }
-
-  CouchDB.last_req = CouchDB.request("PUT", "/_user/"+encodeURIComponent(username), {
-    headers: {"Content-Type": "application/x-www-form-urlencoded",
-      "X-CouchDB-WWW-Authenticate": "Cookie"},
-    body: body
-  });
-  return JSON.parse(CouchDB.last_req.responseText);
-}
+  return user_doc;
+};
 
 CouchDB.allDbs = function() {
   CouchDB.last_req = CouchDB.request("GET", "/_all_dbs");
   CouchDB.maybeThrowError(CouchDB.last_req);
   return JSON.parse(CouchDB.last_req.responseText);
-}
+};
 
 CouchDB.allDesignDocs = function() {
   var ddocs = {}, dbs = CouchDB.allDbs();

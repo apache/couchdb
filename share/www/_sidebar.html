@@ -30,7 +30,31 @@ specific language governing permissions and limitations under the License.
     </li>
   </ul>
   <div id="footer">
-    Futon on <a href="http://couchdb.apache.org/">Apache CouchDB</a>
-    <span id="version">?</span>
+    <span id="userCtx">
+      <span class="loggedout">
+        <a href="#" class="signup">Signup</a> or <a href="#" class="login">Login</a>
+      </span>
+      <span class="loggedin">
+        Welcome <a class="username">?</a>! 
+        <br/>
+        <a href="#" class="logout">Logout</a>
+      </span>
+      <span class="loggedinadmin">
+        Welcome <a class="username">?</a>! 
+        <br/>
+        <a href="#" class="createadmin">Setup more admins</a> or
+        <a href="#" class="logout">Logout</a> 
+      </span>
+      <span class="adminparty">
+        Welcome to Admin Party! 
+        <br/>
+        Everyone is admin. <a href="#" class="createadmin">Fix this</a>
+      </span>
+    </span>
+    <hr/>
+    <span class="couch">
+      Futon on <a href="http://couchdb.apache.org/">Apache CouchDB</a>
+      <span id="version">?</span>
+    </span>
   </div>
 </div>

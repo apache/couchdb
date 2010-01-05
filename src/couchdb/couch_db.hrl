@@ -107,8 +107,10 @@
 
 
 -record(user_ctx,
-    {name=null,
-    roles=[]
+    {
+    name=null,
+    roles=[],
+    handler
     }).
 
 % This should be updated anytime a header change happens that requires more

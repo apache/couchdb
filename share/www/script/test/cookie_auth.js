@@ -36,117 +36,192 @@ couchTests.cookie_auth = function(debug) {
       usersDb.deleteDb();
       usersDb.createDb();
       
+      // test that the users db is born with the auth ddoc
+      var ddoc = usersDb.open("_design/_auth");
+      T(ddoc.validate_doc_update);
+      
+      // TODO test that changing the config so an existing db becomes the users db installs the ddoc also
+      
       var password = "3.141592653589";
 
       // Create a user
-      T(usersDb.save({
-        _id: "a1",
-        salt: "123",
-        password_sha: hex_sha1(password + "123"),
+      var jasonUserDoc = CouchDB.prepareUserDoc({
         username: "Jason Davies",
-        author: "Jason Davies",
-        type: "user",
-        roles: ["_admin"]
-      }).ok);
-
-      var validationDoc = {
-        _id : "_design/validate",
-        validate_doc_update: "(" + (function (newDoc, oldDoc, userCtx) {
-          // docs should have an author field.
-          if (!newDoc._deleted && !newDoc.author) {
-            throw {forbidden:
-                "Documents must have an author field"};
-          }
-          if (oldDoc && oldDoc.author != userCtx.name) {
-              throw {unauthorized:
-                  "You are not the author of this document. You jerk."+userCtx.name};
-          }
-        }).toString() + ")"
-      };
-
-      T(db.save(validationDoc).ok);
-
+        roles: ["dev"]
+      }, password);
+      T(usersDb.save(jasonUserDoc).ok);      
       
+      var checkDoc = usersDb.open(jasonUserDoc._id);
+      T(checkDoc.username == "Jason Davies");
+      
+      var jchrisUserDoc = CouchDB.prepareUserDoc({
+        username: "jchris@apache.org"
+      }, "funnybone");
+      T(usersDb.save(jchrisUserDoc).ok);
 
-      T(CouchDB.login('Jason Davies', password).ok);
-      // update the credentials document
-      var doc = usersDb.open("a1");
-      doc.foo=2;
-      T(usersDb.save(doc).ok);
+      // make sure we cant create duplicate users
+      var duplicateJchrisDoc = CouchDB.prepareUserDoc({
+        username: "jchris@apache.org"
+      }, "eh, Boo-Boo?");
 
-      // Save a document that's missing an author field.
       try {
-        // db has a validation function
-        db.save({foo:1});
-        T(false && "Can't get here. Should have thrown an error 2");
+        usersDb.save(duplicateJchrisDoc)
+        T(false && "Can't create duplicate user names. Should have thrown an error.");
+      } catch (e) {
+        T(e.error == "conflict");
+        T(usersDb.last_req.status == 409);
+      }
+      
+      // we can't create _usernames
+      var underscoreUserDoc = CouchDB.prepareUserDoc({
+        username: "_why"
+      }, "copperfield");
+
+      try {
+        usersDb.save(underscoreUserDoc)
+        T(false && "Can't create underscore user names. Should have thrown an error.");
       } catch (e) {
         T(e.error == "forbidden");
-        T(db.last_req.status == 403);
+        T(usersDb.last_req.status == 403);
+      }
+      
+      // we can't create docs with malformed ids
+      var badIdDoc = CouchDB.prepareUserDoc({
+        username: "foo"
+      }, "bar");
+      
+      badIdDoc._id = "org.apache.couchdb:w00x";
+
+      try {
+        usersDb.save(badIdDoc)
+        T(false && "Can't create malformed docids. Should have thrown an error.");
+      } catch (e) {
+        T(e.error == "forbidden");
+        T(usersDb.last_req.status == 403);
       }
 
-      // TODO should login() throw an exception here?
-      T(!CouchDB.login('Jason Davies', "2.71828").ok);
-      T(!CouchDB.login('Robert Allen Zimmerman', 'd00d').ok);
+      try {
+        usersDb.save(underscoreUserDoc)
+        T(false && "Can't create underscore user names. Should have thrown an error.");
+      } catch (e) {
+        T(e.error == "forbidden");
+        T(usersDb.last_req.status == 403);
+      }
+      
+      // login works
+      T(CouchDB.login('Jason Davies', password).ok);
+      T(CouchDB.session().name == 'Jason Davies');
+      
+      // update one's own credentials document
+      jasonUserDoc.foo=2;
+      T(usersDb.save(jasonUserDoc).ok);
 
-      // test redirect
-      xhr = CouchDB.request("POST", "/_session?next=/", {
-        headers: {"Content-Type": "application/x-www-form-urlencoded"},
-        body: "username=Jason%20Davies&password="+encodeURIComponent(password)
-      });
-      // should this be a redirect code instead of 200?
-      // The cURL adapter is returning the expected 302 here.
-      // I imagine this has to do with whether the client is willing
-      // to follow the redirect, ie, the browser follows and does a
-      // GET on the returned Location
-      T(xhr.status == 200 || xhr.status == 302);
+      // TODO should login() throw an exception here?
+       T(!CouchDB.login('Jason Davies', "2.71828").ok);
+       T(!CouchDB.login('Robert Allen Zimmerman', 'd00d').ok);
+
+       // a failed login attempt should log you out
+       T(CouchDB.session().name != 'Jason Davies');
+
+       // test redirect
+       xhr = CouchDB.request("POST", "/_session?next=/", {
+         headers: {"Content-Type": "application/x-www-form-urlencoded"},
+         body: "username=Jason%20Davies&password="+encodeURIComponent(password)
+       });
+       // should this be a redirect code instead of 200?
+       // The cURL adapter is returning the expected 302 here.
+       // I imagine this has to do with whether the client is willing
+       // to follow the redirect, ie, the browser follows and does a
+       // GET on the returned Location
+       if (xhr.status == 200) {
+         T(/Welcome/.test(xhr.responseText))
+       } else {
+         T(xhr.status == 302)
+         T(xhr.getResponseHeader("Location"))
+       }
+
+      // test users db validations
+      // 
+      // test that you can't update docs unless you are logged in as the user (or are admin)
+      T(CouchDB.login("jchris@apache.org", "funnybone").ok);
+      T(CouchDB.session().name == "jchris@apache.org");
+      T(CouchDB.session().roles.length == 0);
       
-      usersDb.deleteDb();
-      // test user creation
-      T(CouchDB.createUser("test", "testpassword", "test@somemail.com", ['read', 'write']).ok);
+      jasonUserDoc.foo=3;
+
+      try {
+        usersDb.save(jasonUserDoc)
+        T(false && "Can't update someone else's user doc. Should have thrown an error.");
+      } catch (e) {
+        T(e.error == "forbidden");
+        T(usersDb.last_req.status == 403);
+      }
+
+      // test that you can't edit roles unless you are admin
+      jchrisUserDoc.roles = ["foo"];
       
-      // make sure we create a unique user
-      T(!CouchDB.createUser("test", "testpassword2", "test2@somemail.com", ['read', 'write']).ok);
-      
-      // test login
-      T(CouchDB.login("test", "testpassword").ok);
-      T(!CouchDB.login('test', "testpassword2").ok);
-      
-      // test update user without changing password
-      T(CouchDB.updateUser("test", "test2@somemail.com").ok);
-      result = usersDb.view("_auth/users", {key: "test"});
-      T(result.rows[0].value['email'] == "test2@somemail.com");
-       
-       
-      // test changing password
-      result = usersDb.view("_auth/users", {key: "test"});
-      T(CouchDB.updateUser("test", "test2@somemail.com", [], "testpassword2", "testpassword").ok);
-      result1 = usersDb.view("_auth/users", {key: "test"});
-      T(result.rows[0].value['password_sha'] != result1.rows[0].value['password_sha']);
-      
-      
-      // test changing password with passing old password
-      T(!CouchDB.updateUser("test", "test2@somemail.com", [], "testpassword2").ok);
-      
-      // test changing password whith bad old password
-      T(!CouchDB.updateUser("test", "test2@somemail.com", [], "testpassword2", "badpasswword").ok);
-      
-      // Only admins can change roles
-      T(!CouchDB.updateUser("test", "test2@somemail.com", ['read', 'write']).ok);
+      try {
+        usersDb.save(jchrisUserDoc)
+        T(false && "Can't set roles unless you are admin. Should have thrown an error.");
+      } catch (e) {
+        T(e.error == "forbidden");
+        T(usersDb.last_req.status == 403);
+      }
       
       T(CouchDB.logout().ok);
+      T(CouchDB.session().roles[0] == "_admin");      
+
+      jchrisUserDoc.foo = ["foo"];
+      T(usersDb.save(jchrisUserDoc).ok);
+
+      // test that you can't save system (underscore) roles even if you are admin
+      jchrisUserDoc.roles = ["_bar"];
       
-      T(CouchDB.updateUser("test", "test2@somemail.com").ok);
-      result = usersDb.view("_auth/users", {key: "test"});
-      T(result.rows[0].value['email'] == "test2@somemail.com");
+      try {
+        usersDb.save(jchrisUserDoc)
+        T(false && "Can't add system roles to user's db. Should have thrown an error.");
+      } catch (e) {
+        T(e.error == "forbidden");
+        T(usersDb.last_req.status == 403);
+      }
+      
+      // make sure the foo role has been applied
+      T(CouchDB.login("jchris@apache.org", "funnybone").ok);
+      T(CouchDB.session().name == "jchris@apache.org");
+      T(CouchDB.session().roles.indexOf("_admin") == -1);
+      T(CouchDB.session().roles.indexOf("foo") != -1);
+      
+      // now let's make jchris a server admin
+      T(CouchDB.logout().ok);
+      T(CouchDB.session().roles[0] == "_admin");
+      T(CouchDB.session().name == null);
+      
+      // set the -hashed- password so the salt matches
+      // todo ask on the ML about this
+      run_on_modified_server([{section: "admins",
+        key: "jchris@apache.org", value: "funnybone"}], function() {
+          T(CouchDB.login("jchris@apache.org", "funnybone").ok);
+          T(CouchDB.session().name == "jchris@apache.org");
+          T(CouchDB.session().roles.indexOf("_admin") != -1);
+          // test that jchris still has the foo role
+          T(CouchDB.session().roles.indexOf("foo") != -1);
 
-      // test changing password, we don't need to set old password when we are admin
-      result = usersDb.view("_auth/users", {key: "test"});
-      T(CouchDB.updateUser("test", "test2@somemail.com", [], "testpassword3").ok);
-      result1 = usersDb.view("_auth/users", {key: "test"});
-      T(result.rows[0].value['password_sha'] != result1.rows[0].value['password_sha']);
-
-      // Only admins can change roles
-      T(CouchDB.updateUser("test", "test2@somemail.com", ['read']).ok);
+          // should work even when user doc has no password
+          jchrisUserDoc = usersDb.open(jchrisUserDoc._id);
+          delete jchrisUserDoc.salt;
+          delete jchrisUserDoc.password_sha;
+          T(usersDb.save(jchrisUserDoc).ok);
+          T(CouchDB.logout().ok);
+          T(CouchDB.login("jchris@apache.org", "funnybone").ok);
+          var s = CouchDB.session();
+          T(s.name == "jchris@apache.org");
+          T(s.roles.indexOf("_admin") != -1);
+          // test session info
+          T(s.info.authenticated == "{couch_httpd_auth, cookie_authentication_handler}");
+          T(s.info.user_db == "test_suite_users");
+          // test that jchris still has the foo role
+          T(CouchDB.session().roles.indexOf("foo") != -1);
+        });      
 
     } finally {
       // Make sure we erase any auth cookies so we don't affect other tests
@@ -157,7 +232,7 @@ couchTests.cookie_auth = function(debug) {
   run_on_modified_server(
     [{section: "httpd",
       key: "authentication_handlers",
-      value: "{couch_httpd_auth, cookie_authentication_handler}"},
+      value: "{couch_httpd_auth, cookie_authentication_handler}, {couch_httpd_auth, default_authentication_handler}"},
      {section: "couch_httpd_auth",
       key: "secret", value: generateSecret(64)},
      {section: "couch_httpd_auth",

@@ -79,6 +79,7 @@ check_dbname(#server{dbname_regexp=RegExp}, DbName) ->
         ok
     end.
 
+% move to auth?
 is_admin(User, ClearPwd) ->
     case couch_config:get("admins", User) of
     "-hashed-" ++ HashedPwdAndSalt ->
