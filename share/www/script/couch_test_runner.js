@@ -63,6 +63,8 @@ var numFailures = 0;
 var currentRow = null;
 
 function runTest(button, callback, debug, noSave) {
+
+  // offer to save admins
   if (currentRow != null) {
     alert("Can not run multiple tests simultaneously.");
     return;
@@ -116,6 +118,65 @@ function showSource(cell) {
   win.document.location = "script/test/" + name + ".js";
 }
 
+var readyToRun;
+function setupAdminParty(fun) {
+  if (readyToRun) {
+    fun();
+  } else {
+    function removeAdmins(confs, doneFun) {
+      // iterate through the config and remove current user last
+      // current user is at front of list
+      var remove = confs.pop();
+      if (remove) {
+        $.couch.config({
+          success : function() {
+            removeAdmins(confs, doneFun);
+          }
+        }, "admins", remove[0], null);        
+      } else {
+        doneFun();
+      }
+    };
+    $.couch.session({
+      success : function(userCtx) {
+        if (userCtx.name && userCtx.roles.indexOf("_admin") != -1) {
+          // admin but not admin party. dialog offering to make admin party
+          $.showDialog("dialog/_admin_party.html", {
+            submit: function(data, callback) {
+              $.couch.config({
+                success : function(conf) {
+                  var meAdmin, adminConfs = [];
+                  for (var name in conf) {
+                    if (name == userCtx.name) {
+                      meAdmin = [name, conf[name]];
+                    } else {
+                      adminConfs.push([name, conf[name]]);
+                    }
+                  }
+                  adminConfs.unshift(meAdmin);
+                  removeAdmins(adminConfs, function() {
+                    callback();
+                    $.futon.session.sidebar();
+                    readyToRun = true;
+                    setTimeout(fun, 500);
+                  });
+                }
+              }, "admins");
+            }
+          });
+        } else if (userCtx.roles.indexOf("_admin") != -1) {
+          // admin party!
+          readyToRun = true;
+          fun();
+        } else {
+          // not an admin
+          alert("Error: You need to be an admin to run the tests.");
+        };
+      }
+    });
+  }
+};
+
 function updateTestsListing() {
   for (var name in couchTests) {
     var testFunction = couchTests[name];
@@ -128,7 +189,11 @@ function updateTestsListing() {
       .find("td:nth(2)").addClass("details").end();
     $("<button type='button' class='run' title='Run test'></button>").click(function() {
       this.blur();
-      runTest(this);
+      var self = this;
+      // check for admin party
+      setupAdminParty(function() {
+        runTest(self);
+      });
       return false;
     }).prependTo(row.find("th"));
     row.attr("id", name).appendTo("#tests tbody.content");

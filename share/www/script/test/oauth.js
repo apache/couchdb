@@ -97,6 +97,8 @@ couchTests.oauth = function(debug) {
 
       CouchDB.request("GET", "/_sleep?time=50");
 
+      CouchDB.newUuids(2); // so we have one to make the salt
+
       CouchDB.request("PUT", "http://" + host + "/_config/couch_httpd_auth/require_valid_user", {
         headers: {
           "X-Couch-Persist": "false",
@@ -113,7 +115,12 @@ couchTests.oauth = function(debug) {
       usersDb.createDb();
         
       // Create a user
-      T(CouchDB.createUser("jason", "testpassword", "test@somemail.com", ['test'], adminBasicAuthHeaderValue()).ok);
+      var jasonUserDoc = CouchDB.prepareUserDoc({
+        username: "jason",
+        roles: ["test"]
+      }, "testpassword");
+      T(usersDb.save(jasonUserDoc).ok);
+
 
       var accessor = {
         consumerSecret: consumerSecret,
@@ -227,7 +234,7 @@ couchTests.oauth = function(debug) {
   run_on_modified_server(
     [
      {section: "httpd",
-      key: "WWW-Authenticate", value: 'Basic realm="administrator",OAuth'},
+      key: "WWW-Authenticate", value: 'OAuth'},
      {section: "couch_httpd_auth",
       key: "secret", value: generateSecret(64)},
      {section: "couch_httpd_auth",

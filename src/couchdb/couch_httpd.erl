@@ -17,6 +17,7 @@
 
 -export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,path/1,absolute_uri/2,body_length/1]).
 -export([verify_is_server_admin/1,unquote/1,quote/1,recv/2,recv_chunked/4,error_info/1]).
+-export([make_fun_spec_strs/1]).
 -export([parse_form/1,json_body/1,json_body_obj/1,body/1,doc_etag/1, make_etag/1, etag_respond/3]).
 -export([primary_header_value/2,partition/1,serve_file/3,serve_file/4, server_header/0]).
 -export([start_chunked_response/3,send_chunk/2,log_request/2]).
@@ -119,8 +120,8 @@ make_arity_3_fun(SpecStr) ->
     end.
 
 % SpecStr is "{my_module, my_fun}, {my_module2, my_fun2}"
-make_arity_1_fun_list(SpecStr) ->
-    [make_arity_1_fun(FunSpecStr) || FunSpecStr <- re:split(SpecStr, "(?<=})\\s*,\\s*(?={)", [{return, list}])].
+make_fun_spec_strs(SpecStr) ->
+    [FunSpecStr || FunSpecStr <- re:split(SpecStr, "(?<=})\\s*,\\s*(?={)", [{return, list}])].
 
 stop() ->
     mochiweb_http:stop(?MODULE).
@@ -129,7 +130,7 @@ stop() ->
 handle_request(MochiReq, DefaultFun,
         UrlHandlers, DbUrlHandlers, DesignUrlHandlers) ->
     Begin = now(),
-    AuthenticationFuns = make_arity_1_fun_list(
+    AuthenticationSrcs = make_fun_spec_strs(
             couch_config:get("httpd", "authentication_handlers")),
     % for the path, use the raw path with the query string and fragment
     % removed, but URL quoting left intact
@@ -180,7 +181,7 @@ handle_request(MochiReq, DefaultFun,
 
     {ok, Resp} =
     try
-        case authenticate_request(HttpReq, AuthenticationFuns) of
+        case authenticate_request(HttpReq, AuthenticationSrcs) of
         #httpd{} = Req ->
             HandlerFun(Req);
         Response ->
@@ -216,8 +217,10 @@ handle_request(MochiReq, DefaultFun,
     couch_stats_collector:increment({httpd, requests}),
     {ok, Resp}.
 
-% Try authentication handlers in order until one returns a result
-authenticate_request(#httpd{user_ctx=#user_ctx{}} = Req, _AuthFuns) ->
+% Try authentication handlers in order until one sets a user_ctx
+% the auth funs also have the option of returning a response
+% move this to couch_httpd_auth?
+authenticate_request(#httpd{user_ctx=#user_ctx{}} = Req, _AuthSrcs) ->
     Req;
 authenticate_request(#httpd{} = Req, []) ->
     case couch_config:get("couch_httpd_auth", "require_valid_user", "false") of
@@ -226,9 +229,15 @@ authenticate_request(#httpd{} = Req, []) ->
     "false" ->
         Req#httpd{user_ctx=#user_ctx{}}
     end;
-authenticate_request(#httpd{} = Req, [AuthFun|Rest]) ->
-    authenticate_request(AuthFun(Req), Rest);
-authenticate_request(Response, _AuthFuns) ->
+authenticate_request(#httpd{} = Req, [AuthSrc|Rest]) ->
+    AuthFun = make_arity_1_fun(AuthSrc),
+    R = case AuthFun(Req) of
+        #httpd{user_ctx=#user_ctx{}=UserCtx}=Req2 ->
+            Req2#httpd{user_ctx=UserCtx#user_ctx{handler=?l2b(AuthSrc)}};
+        Else -> Else
+    end,
+    authenticate_request(R, Rest);
+authenticate_request(Response, _AuthSrcs) ->
     Response.
 
 increment_method_stats(Method) ->
@@ -586,6 +595,7 @@ send_error(_Req, {already_sent, Resp, _Error}) ->
 send_error(#httpd{mochi_req=MochiReq}=Req, Error) ->
     {Code, ErrorStr, ReasonStr} = error_info(Error),
     Headers = if Code == 401 ->
+        % this is where the basic auth popup is triggered
         case MochiReq:get_header_value("X-CouchDB-WWW-Authenticate") of
         undefined ->
             case couch_config:get("httpd", "WWW-Authenticate", nil) of

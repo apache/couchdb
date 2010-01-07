@@ -19,15 +19,19 @@ specific language governing permissions and limitations under the License.
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
     <link rel="stylesheet" href="style/layout.css?0.11.0" type="text/css">
     <script src="script/json2.js"></script>
+    <script src="script/sha1.js"></script>
     <script src="script/jquery.js?1.3.2"></script>
     <script src="script/jquery.couch.js?0.11.0"></script>
-    <script src="script/couch.js?0.11.0"></script>
+    <script src="script/jquery.dialog.js?0.11.0"></script>
     <script src="script/futon.js?0.11.0"></script>
+    <script src="script/couch.js?0.11.0"></script>
     <script src="script/couch_test_runner.js?0.11.0"></script>
     <script>
       $(function() {
         updateTestsListing();
-        $("#toolbar button.run").click(runAllTests);
+        $("#toolbar button.run").click(function() {
+          setupAdminParty(runAllTests) ;
+        });
         $("#toolbar button.load").click(function() {
           location.reload(true);
         });

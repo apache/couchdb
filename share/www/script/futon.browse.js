@@ -294,7 +294,8 @@
                 fill_language();
               }
             }, "native_query_servers");
-          }
+          },
+          error : function() {}
         }, "query_servers");
       }
 
@@ -727,7 +728,7 @@
 
     },
 
-    // Page class for browse/database.html
+    // Page class for browse/document.html
     CouchDocumentPage: function() {
       var urlParts = location.search.substr(1).split("/");
       var dbName = decodeURIComponent(urlParts.shift());
@@ -1169,7 +1170,7 @@
           return false;
         }).prependTo($("a", li));
       }
-    }
+    },
 
   });
 

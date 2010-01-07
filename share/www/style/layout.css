@@ -211,7 +211,9 @@ body.fullwidth #sidebar { border-bottom: 1px solid #333; right: 0;
   font-size: 80%; opacity: .7; padding: 5px 10px; position: absolute; right: 0;
   bottom: 0; min-height: 1.3em; width: 190px; text-align: right;
 }
-#footer :link, #footer :visited { color: #000; }
+#footer .couch :link, #footer .couch :visited { color: #000; }
+
+#userCtx span { display:none; }
 
 #wrap { background: #fff url(../image/bg.png) 100% 0 repeat-y;
   height: 100%; margin-right: 210px; position: relative;
@@ -258,11 +260,18 @@ body.fullwidth #wrap { margin-right: 0; }
   -webkit-box-shadow: 4px 4px 6px #333;
 }
 *html #dialog { width: 33em; }
+body.loading #dialog h2 {
+  background: url(../image/spinner.gif) center no-repeat;
+}
 #dialog.loading { width: 220px; height: 80px; }
 #dialog.loaded { background-image: none; }
 #dialog h2 { background: #666; border-top: 1px solid #555;
   border-bottom: 1px solid #777; color: #ccc; font-size: 110%;
   font-weight: bold; margin: 0 -2em; padding: .35em 2em;
+}
+#dialog h3 {
+      color: #ccc; font-size: 110%;
+      font-weight: bold; margin: 0 -2em; padding: .35em 2em;
 }
 #dialog fieldset { background: #222; border-top: 1px solid #111;
   margin: 0 0 1em; padding: .5em 1em 1em;

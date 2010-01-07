@@ -20,7 +20,26 @@
       return "_design/" + encodeURIComponent(parts.join('/'));
     }
     return encodeURIComponent(docID);
-  }
+  };
+
+  function prepareUserDoc(user_doc, new_password) {    
+    if (typeof hex_sha1 == "undefined") {
+      alert("creating a user doc requires sha1.js to be loaded in the page");
+      return;
+    }
+    var user_prefix = "org.couchdb.user:";
+    user_doc._id = user_doc._id || user_prefix + user_doc.username;
+    if (new_password) {
+      // handle the password crypto
+      user_doc.salt = $.couch.newUUID();
+      user_doc.password_sha = hex_sha1(new_password + user_doc.salt);
+    }
+    user_doc.type = "user";
+    if (!user_doc.roles) {
+      user_doc.roles = []
+    }
+    return user_doc;
+  };
 
   uuidCache = [];
 
@@ -49,7 +68,9 @@
           req.url += encodeURIComponent(option);
         }
       }
-      if (value !== undefined) {
+      if (value === null) {
+        req.type = "DELETE";        
+      } else if (value !== undefined) {
         req.type = "PUT";
         req.data = toJSON(value);
         req.contentType = "application/json";
@@ -60,12 +81,46 @@
         "An error occurred retrieving/updating the server configuration"
       );
     },
+    
+    session: function(options) {
+      options = options || {};
+      $.ajax({
+        type: "GET", url: "/_session",
+        complete: function(req) {
+          var resp = $.httpData(req, "json");
+          if (req.status == 200) {
+            if (options.success) options.success(resp);
+          } else if (options.error) {
+            options.error(req.status, resp.error, resp.reason);
+          } else {
+            alert("An error occurred getting session info: " + resp.reason);
+          }
+        }
+      });
+    },
 
-    // TODO make login/logout and db.login/db.logout DRY
+    userDb : function(callback) {
+      $.couch.session({
+        success : function(resp) {
+          var userDb = $.couch.db(resp.info.user_db);
+          callback(userDb);
+        }
+      });
+    },
+
+    signup: function(user_doc, password, options) {      
+      options = options || {};
+      // prepare user doc based on name and password
+      user_doc = prepareUserDoc(user_doc, password);
+      $.couch.userDb(function(db) {
+        db.saveDoc(user_doc, options);
+      })
+    },
+    
     login: function(options) {
       options = options || {};
       $.ajax({
-        type: "POST", url: "/_login", dataType: "json",
+        type: "POST", url: "/_session", dataType: "json",
         data: {username: options.username, password: options.password},
         complete: function(req) {
           var resp = $.httpData(req, "json");
@@ -82,7 +137,8 @@
     logout: function(options) {
       options = options || {};
       $.ajax({
-        type: "POST", url: "/_logout", dataType: "json",
+        type: "DELETE", url: "/_session", dataType: "json",
+        username : "_", password : "_",
         complete: function(req) {
           var resp = $.httpData(req, "json");
           if (req.status == 200) {
@@ -304,7 +360,6 @@
             var keys = options["keys"];
             delete options["keys"];
             data = toJSON({ "keys": keys });
-            console.log(data);
           }
           ajax({
               type: type,
