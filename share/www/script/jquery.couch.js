@@ -136,7 +136,6 @@
     },
     logout: function(options) {
       options = options || {};
-      // TODO this should also login as the logged-out guy using basic auth
       $.ajax({
         type: "DELETE", url: "/_session", dataType: "json",
         username : "_", password : "_",

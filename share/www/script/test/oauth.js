@@ -115,8 +115,6 @@ couchTests.oauth = function(debug) {
       usersDb.createDb();
         
       // Create a user
-      // T(CouchDB.createUser("jason", "testpassword", "test@somemail.com", ['test'], adminBasicAuthHeaderValue()).ok);
-      // Create a user
       var jasonUserDoc = CouchDB.prepareUserDoc({
         username: "jason",
         roles: ["test"]

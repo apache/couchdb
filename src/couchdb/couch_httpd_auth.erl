@@ -75,7 +75,8 @@ default_authentication_handler(Req) ->
                     ExpectedHash when ExpectedHash == PasswordHash ->                        
                         Req#httpd{user_ctx=#user_ctx{
                             name=?l2b(User),
-                            roles=proplists:get_value(<<"roles">>, UserProps, [])
+                            roles=proplists:get_value(<<"roles">>, UserProps, []),
+                            user_doc={UserProps}
                         }};
                     _Else ->
                         throw({unauthorized, <<"Name or password is incorrect.">>})
@@ -114,8 +115,9 @@ get_user(UserName) ->
             UserProps when is_list(UserProps) ->
                 DocRoles = proplists:get_value(<<"roles">>, UserProps),
                 [{<<"roles">>, [<<"_admin">> | DocRoles]},
-                    {<<"salt">>, ?l2b(Salt)},
-                    {<<"password_sha">>, ?l2b(HashedPwd)}]
+                  {<<"salt">>, ?l2b(Salt)},
+                  {<<"password_sha">>, ?l2b(HashedPwd)},
+                  {<<"user_doc">>, {UserProps}}]
         end;
     Else ->
         get_user_props_from_db(UserName)
@@ -250,8 +252,8 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
             Secret = ?l2b(SecretStr),
             case get_user(?l2b(User)) of
             nil -> Req;
-            Result ->
-                UserSalt = proplists:get_value(<<"salt">>, Result, <<"">>),
+            UserProps ->
+                UserSalt = proplists:get_value(<<"salt">>, UserProps, <<"">>),
                 FullSecret = <<Secret/binary, UserSalt/binary>>,
                 ExpectedHash = crypto:sha_mac(FullSecret, User ++ ":" ++ TimeStr),
                 Hash = ?l2b(string:join(HashParts, ":")),
@@ -264,7 +266,8 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
                         ?LOG_DEBUG("Successful cookie auth as: ~p", [User]),
                         Req#httpd{user_ctx=#user_ctx{
                             name=?l2b(User),
-                            roles=proplists:get_value(<<"roles">>, Result, [])
+                            roles=proplists:get_value(<<"roles">>, UserProps, []),
+                            user_doc=proplists:get_value(<<"user_doc">>, UserProps, null)
                         }, auth={FullSecret, TimeLeft < Timeout*0.9}};
                     _Else ->
                         Req
@@ -351,7 +354,8 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req) ->
                 {[
                     {ok, true},
                     {name, proplists:get_value(<<"username">>, User, null)},
-                    {roles, proplists:get_value(<<"roles">>, User, [])}
+                    {roles, proplists:get_value(<<"roles">>, User, [])},
+                    {user_doc, proplists:get_value(<<"user_doc">>, User, null)}
                 ]});
         _Else ->
             % clear the session
@@ -375,7 +379,7 @@ handle_session_req(#httpd{method='GET', user_ctx=UserCtx}=Req) ->
                     {handlers, [?l2b(H) || H <- couch_httpd:make_fun_spec_strs(
                             couch_config:get("httpd", "authentication_handlers"))]}
                 ] ++ maybe_value(authenticated, UserCtx#user_ctx.handler)}}
-            ]})
+            ] ++ maybe_value(user_doc, UserCtx#user_ctx.user_doc)})
     end;
 % logout by deleting the session
 handle_session_req(#httpd{method='DELETE'}=Req) ->
@@ -391,7 +395,7 @@ handle_session_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD,POST,DELETE").
 
 maybe_value(Key, undefined) -> [];
-maybe_value(Key, Else) -> [{Key, ?l2b(Else)}].
+maybe_value(Key, Else) -> [{Key, Else}].
 
 to_int(Value) when is_binary(Value) ->
     to_int(?b2l(Value)); 

@@ -43,6 +43,7 @@ couchTests.users_db = function(debug) {
       }
     });
     T(s.name == "jchris@apache.org");
+    T(s.user_doc._id == "org.couchdb.user:jchris@apache.org")
     T(s.info.authenticated == "{couch_httpd_auth, default_authentication_handler}");
     T(s.info.user_db == "test_suite_users");
     TEquals(["{couch_httpd_oauth, oauth_authentication_handler}", 

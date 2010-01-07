@@ -328,6 +328,7 @@ delete_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
 
 do_db_req(#httpd{user_ctx=UserCtx,path_parts=[DbName|_]}=Req, Fun) ->
     LDbName = ?b2l(DbName),
+    % I hope this lookup is cheap.
     case couch_config:get("couch_httpd_auth", "authentication_db") of
         LDbName -> 
             % make sure user's db always has the auth ddoc

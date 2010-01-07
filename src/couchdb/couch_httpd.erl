@@ -233,7 +233,7 @@ authenticate_request(#httpd{} = Req, [AuthSrc|Rest]) ->
     AuthFun = make_arity_1_fun(AuthSrc),
     R = case AuthFun(Req) of
         #httpd{user_ctx=#user_ctx{}=UserCtx}=Req2 ->
-            Req2#httpd{user_ctx=UserCtx#user_ctx{handler=AuthSrc}};
+            Req2#httpd{user_ctx=UserCtx#user_ctx{handler=?l2b(AuthSrc)}};
         Else -> Else
     end,
     authenticate_request(R, Rest);

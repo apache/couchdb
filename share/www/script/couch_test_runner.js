@@ -164,10 +164,13 @@ function setupAdminParty(fun) {
               }, "admins");
             }
           });
-        } else {
-          // not a logged in admin.
+        } else if (userCtx.roles.indexOf("_admin") != -1) {
+          // admin party!
           readyToRun = true;
           fun();
+        } else {
+          // not an admin
+          alert("Error: You need to be an admin to run the tests.");
         };
       }
     });
