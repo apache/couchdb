@@ -298,13 +298,23 @@ handle_design_info_req(Req, _Db, _DDoc) ->
 
 create_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
     ok = couch_httpd:verify_is_server_admin(Req),
-    case couch_server:create(DbName, [{user_ctx, UserCtx}]) of
-    {ok, Db} ->
-        couch_db:close(Db),
-        DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
-        send_json(Req, 201, [{"Location", DocUrl}], {[{ok, true}]});
-    Error ->
-        throw(Error)
+    LDbName = ?b2l(DbName),
+    case couch_config:get("couch_httpd_auth", "authentication_db") of
+        LDbName -> 
+            % make sure user's db always has the auth ddoc
+            {ok, Db} = couch_httpd_auth:ensure_users_db_exists(DbName),
+            couch_db:close(Db),
+            DbUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
+            send_json(Req, 201, [{"Location", DbUrl}], {[{ok, true}]});
+        _Else ->
+            case couch_server:create(DbName, [{user_ctx, UserCtx}]) of
+            {ok, Db} ->
+                couch_db:close(Db),
+                DbUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
+                send_json(Req, 201, [{"Location", DbUrl}], {[{ok, true}]});
+            Error ->
+                throw(Error)
+            end
     end.
 
 delete_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
@@ -317,6 +327,15 @@ delete_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
     end.
 
 do_db_req(#httpd{user_ctx=UserCtx,path_parts=[DbName|_]}=Req, Fun) ->
+    LDbName = ?b2l(DbName),
+    % I hope this lookup is cheap.
+    case couch_config:get("couch_httpd_auth", "authentication_db") of
+        LDbName -> 
+            % make sure user's db always has the auth ddoc
+            {ok, ADb} = couch_httpd_auth:ensure_users_db_exists(DbName),
+            couch_db:close(ADb);
+        _Else -> ok
+    end,
     case couch_db:open(DbName, [{user_ctx, UserCtx}]) of
     {ok, Db} ->
         try
@@ -553,7 +572,7 @@ db_req(#httpd{path_parts=[_,<<"_revs_limit">>]}=Req, _Db) ->
 % as slashes in document IDs must otherwise be URL encoded.
 db_req(#httpd{method='GET',mochi_req=MochiReq, path_parts=[DbName,<<"_design/",_/binary>>|_]}=Req, _Db) ->
     PathFront = "/" ++ couch_httpd:quote(binary_to_list(DbName)) ++ "/",
-    [PathFront|PathTail] = re:split(MochiReq:get(raw_path), "_design%2F",
+    [_|PathTail] = re:split(MochiReq:get(raw_path), "_design%2F",
         [{return, list}]),
     couch_httpd:send_redirect(Req, PathFront ++ "_design/" ++
         mochiweb_util:join(PathTail, "_design%2F"));

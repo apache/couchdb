@@ -36,8 +36,7 @@ oauth_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
 
 % Look up the consumer key and get the roles to give the consumer
 set_user_ctx(Req, AccessToken) ->
-    DbName = couch_config:get("couch_httpd_auth", "authentication_db"),
-    {ok, _Db} = couch_httpd_auth:ensure_users_db_exists(?l2b(DbName)),
+    % TODO move to db storage
     Name = case couch_config:get("oauth_token_users", AccessToken) of
         undefined -> throw({bad_request, unknown_oauth_token});
         Value -> ?l2b(Value)
