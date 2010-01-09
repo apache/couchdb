@@ -99,7 +99,7 @@ _update = {couch_httpd_show, handle_doc_update_req}
 ;     random prefix is regenerated and the process starts over.
 ;   utc_random - Time since Jan 1, 1970 UTC with microseconds
 ;     First 14 characters are the time in hex. Last 18 are random.
-algorithm = random
+algorithm = sequential
 
 [stats]
 ; rate is in milliseconds
