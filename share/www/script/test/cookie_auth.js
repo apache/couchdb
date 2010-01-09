@@ -99,14 +99,6 @@ couchTests.cookie_auth = function(debug) {
         T(e.error == "forbidden");
         T(usersDb.last_req.status == 403);
       }
-
-      try {
-        usersDb.save(underscoreUserDoc)
-        T(false && "Can't create underscore user names. Should have thrown an error.");
-      } catch (e) {
-        T(e.error == "forbidden");
-        T(usersDb.last_req.status == 403);
-      }
       
       // login works
       T(CouchDB.login('Jason Davies', password).ok);
@@ -115,6 +107,15 @@ couchTests.cookie_auth = function(debug) {
       // update one's own credentials document
       jasonUserDoc.foo=2;
       T(usersDb.save(jasonUserDoc).ok);
+      T(CouchDB.session().roles.indexOf("_admin") == -1);
+      // can't delete another users doc unless you are admin
+      try {
+        usersDb.deleteDoc(jchrisUserDoc);
+        T(false && "Can't delete other users docs. Should have thrown an error.");
+      } catch (e) {
+        T(e.error == "forbidden");
+        T(usersDb.last_req.status == 403);
+      }
 
       // TODO should login() throw an exception here?
        T(!CouchDB.login('Jason Davies', "2.71828").ok);
