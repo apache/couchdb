@@ -130,7 +130,13 @@ get_user_props_from_db(UserName) ->
     try couch_httpd_db:couch_doc_open(Db, DocId, nil, []) of
         #doc{}=Doc ->
             {DocProps} = couch_query_servers:json_doc(Doc),
-            DocProps
+            case proplists:get_value(<<"type">>, DocProps) of
+                <<"user">> -> 
+                    DocProps;
+                _Else -> 
+                    ?LOG_ERROR("Invalid user doc. Id: ~p",[DocId]),
+                    nil
+            end
     catch
         throw:Throw ->
             nil        
@@ -164,19 +170,21 @@ auth_design_doc(DocId) ->
     DocProps = [
         {<<"_id">>, DocId},
         {<<"language">>,<<"javascript">>},
-        {<<"views">>,
-            {[{<<"users">>,
-                {[{<<"map">>,
-                    <<"function (doc) {\n if (doc.type == \"user\") {\n        emit(doc.username, doc);\n}\n}">>
-                }]}
-            }]}
-        },
         {
             <<"validate_doc_update">>,
             <<"function(newDoc, oldDoc, userCtx) {
-                if (newDoc.type != 'user') {
+                if ((oldDoc || newDoc).type != 'user') {
                     return;
                 } // we only validate user docs for now
+                if (newDoc._deleted === true) {
+                    // allow deletes by admins and matching users 
+                    // without checking the other fields
+                    if ((userCtx.roles.indexOf('_admin') != -1) || (userCtx.name == oldDoc.username)) {
+                        return;
+                    } else {
+                        throw({forbidden : 'Only admins may delete other user docs.'});
+                    }
+                }
                 if (!newDoc.username) {
                     throw({forbidden : 'doc.username is required'});
                 }
