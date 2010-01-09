@@ -74,7 +74,11 @@ delete(DbName, Options) ->
 check_dbname(#server{dbname_regexp=RegExp}, DbName) ->
     case re:run(DbName, RegExp, [{capture, none}]) of
     nomatch ->
-        {error, illegal_database_name};
+        case DbName of
+            "_users" -> ok;
+            _Else ->
+                {error, illegal_database_name}
+            end;
     match ->
         ok
     end.
