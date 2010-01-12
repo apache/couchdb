@@ -71,8 +71,9 @@ default_authentication_handler(Req) ->
             UserProps ->
                 UserSalt = proplists:get_value(<<"salt">>, UserProps, <<>>),
                 PasswordHash = hash_password(?l2b(Pass), UserSalt),
-                case proplists:get_value(<<"password_sha">>, UserProps, nil) of
-                    ExpectedHash when ExpectedHash == PasswordHash ->                        
+                ExpectedHash = proplists:get_value(<<"password_sha">>, UserProps, nil),
+                case couch_util:verify(ExpectedHash, PasswordHash) of
+                    true ->
                         Req#httpd{user_ctx=#user_ctx{
                             name=?l2b(User),
                             roles=proplists:get_value(<<"roles">>, UserProps, []),
@@ -268,15 +269,19 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
                 Timeout = to_int(couch_config:get("couch_httpd_auth", "timeout", 600)),
                 ?LOG_DEBUG("timeout ~p", [Timeout]),
                 case (catch erlang:list_to_integer(TimeStr, 16)) of
-                    TimeStamp when CurrentTime < TimeStamp + Timeout
-                    andalso ExpectedHash == Hash ->
-                        TimeLeft = TimeStamp + Timeout - CurrentTime,
-                        ?LOG_DEBUG("Successful cookie auth as: ~p", [User]),
-                        Req#httpd{user_ctx=#user_ctx{
-                            name=?l2b(User),
-                            roles=proplists:get_value(<<"roles">>, UserProps, []),
-                            user_doc=proplists:get_value(<<"user_doc">>, UserProps, null)
-                        }, auth={FullSecret, TimeLeft < Timeout*0.9}};
+                    TimeStamp when CurrentTime < TimeStamp + Timeout ->
+                        case couch_util:verify(ExpectedHash, Hash) of
+                            true ->
+                                TimeLeft = TimeStamp + Timeout - CurrentTime,
+                                ?LOG_DEBUG("Successful cookie auth as: ~p", [User]),
+                                Req#httpd{user_ctx=#user_ctx{
+                                    name=?l2b(User),
+                                    roles=proplists:get_value(<<"roles">>, UserProps, []),
+                                    user_doc=proplists:get_value(<<"user_doc">>, UserProps, null)
+                                }, auth={FullSecret, TimeLeft < Timeout*0.9}};
+                            _Else ->
+                                Req
+                        end;
                     _Else ->
                         Req
                 end
@@ -344,8 +349,9 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req) ->
     end,
     UserSalt = proplists:get_value(<<"salt">>, User, <<>>),
     PasswordHash = hash_password(Password, UserSalt),
-    case proplists:get_value(<<"password_sha">>, User, nil) of
-        ExpectedHash when ExpectedHash == PasswordHash ->
+    ExpectedHash = proplists:get_value(<<"password_sha">>, User, nil),
+    case couch_util:verify(ExpectedHash, PasswordHash) of
+        true ->
             % setup the session cookie
             Secret = ?l2b(ensure_cookie_auth_secret()),
             {NowMS, NowS, _} = erlang:now(),
