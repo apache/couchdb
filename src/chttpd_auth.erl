@@ -56,8 +56,9 @@ default_authentication_handler(Req) ->
         Props ->
             ExpectedHash = couch_util:get_value(<<"password_sha">>, Props),
             Salt = couch_util:get_value(<<"salt">>, Props),
-            case hash_password(?l2b(Password), Salt) of
-            ExpectedHash ->
+            PasswordHash = hash_password(?l2b(Password), Salt),
+            case couch_util:verify(ExpectedHash, PasswordHash) of
+            true ->
                 Ctx = #user_ctx{
                     name = couch_util:get_value(<<"username">>, Props),
                     roles = couch_util:get_value(<<"roles">>, Props)
@@ -132,8 +133,9 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq, user_ctx=Ctx}=Req) 
         false ->
             Password = extract_password(Form),
             ExpectedHash = couch_util:get_value(<<"password_sha">>, User),
-            case hash_password(Password, UserSalt) of
-            ExpectedHash ->
+            PasswordHash = hash_password(Password, UserSalt),
+            case couch_util:verify(ExpectedHash, PasswordHash) of
+            true ->
                 ok;
             _Else ->
                 throw({forbidden, <<"Name or password is incorrect.">>})
@@ -270,8 +272,9 @@ cookie_auth_user(#httpd{mochi_req=MochiReq}=Req) ->
                 UserSalt = couch_util:get_value(<<"salt">>, Result),
                 FullSecret = <<Secret/binary, UserSalt/binary>>,
                 ExpectedHash = crypto:sha_mac(FullSecret, [User, ":", TimeStr]),
-                case ?l2b(string:join(HashParts, ":")) of
-                ExpectedHash ->
+                PasswordHash = ?l2b(string:join(HashParts, ":")),
+                case couch_util:verify(ExpectedHash, PasswordHash) of
+                true ->
                     TimeStamp = erlang:list_to_integer(TimeStr, 16),
                     Timeout = erlang:list_to_integer(couch_config:get(
                         "chttpd_auth", "timeout", "600")),
