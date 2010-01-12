@@ -17,7 +17,7 @@ main(_) ->
     test_util:init_code_path(),
     application:start(crypto),
 
-    etap:plan(11),
+    etap:plan(16),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -87,5 +87,17 @@ test() ->
 
     etap:ok(not couch_util:should_flush(),
         "Checking to flush invokes GC."),
+
+    % verify
+    etap:is(true, couch_util:verify("It4Vooya", "It4Vooya"),
+         "String comparison."),
+    etap:is(false, couch_util:verify("It4VooyaX", "It4Vooya"),
+         "String comparison (unequal lengths)."),
+    etap:is(true, couch_util:verify(<<"ahBase3r">>, <<"ahBase3r">>),
+        "Binary comparison."),
+    etap:is(false, couch_util:verify(<<"ahBase3rX">>, <<"ahBase3r">>),
+        "Binary comparison (unequal lengths)."),
+    etap:is(false, couch_util:verify(nil, <<"ahBase3r">>),
+        "Binary comparison with atom."),
 
     ok.
