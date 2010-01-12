@@ -232,14 +232,18 @@ cookie_auth_user(#httpd{mochi_req=MochiReq}=Req, DbName) ->
                         Timeout = to_int(couch_config:get("couch_httpd_auth", "timeout", 600)),
                         ?LOG_DEBUG("timeout ~p", [Timeout]),
                         case (catch erlang:list_to_integer(TimeStr, 16)) of
-                            TimeStamp when CurrentTime < TimeStamp + Timeout 
-                            andalso ExpectedHash == Hash ->
-                                TimeLeft = TimeStamp + Timeout - CurrentTime,
-                                ?LOG_DEBUG("Successful cookie auth as: ~p", [User]),
-                                Req#httpd{user_ctx=#user_ctx{
-                                    name=?l2b(User),
-                                    roles=proplists:get_value(<<"roles">>, Result, [])
-                                }, auth={FullSecret, TimeLeft < Timeout*0.9}};
+                            TimeStamp when CurrentTime < TimeStamp + Timeout ->
+                                case couch_util:verify(ExpectedHash, Hash) of
+                                    true ->
+                                        TimeLeft = TimeStamp + Timeout - CurrentTime,
+                                        ?LOG_DEBUG("Successful cookie auth as: ~p", [User]),
+                                        Req#httpd{user_ctx=#user_ctx{
+                                            name=?l2b(User),
+                                            roles=proplists:get_value(<<"roles">>, Result, [])
+                                        }, auth={FullSecret, TimeLeft < Timeout*0.9}};
+                                    _Else ->
+                                        nil
+                                end;
                             _Else ->
                                 nil
                         end
@@ -301,8 +305,9 @@ handle_login_req(#httpd{method='POST', mochi_req=MochiReq}=Req, #db{}=Db) ->
     end,
     UserSalt = proplists:get_value(<<"salt">>, User, <<>>),
     PasswordHash = hash_password(Password, UserSalt),
-    case proplists:get_value(<<"password_sha">>, User, nil) of
-        ExpectedHash when ExpectedHash == PasswordHash ->
+    ExpectedHash = proplists:get_value(<<"password_sha">>, User, nil),
+    case couch_util:verify(ExpectedHash, PasswordHash) of
+        true ->
             Secret = ?l2b(couch_config:get("couch_httpd_auth", "secret", nil)),
             {NowMS, NowS, _} = erlang:now(),
             CurrentTime = NowMS * 1000000 + NowS,
@@ -448,10 +453,9 @@ update_user_req(#httpd{method='PUT', mochi_req=MochiReq, user_ctx=UserCtx}=Req, 
                 _Else ->
                     OldPasswordHash = hash_password(OldPassword1, UserSalt),
                     ?LOG_DEBUG("~p == ~p", [CurrentPasswordHash, OldPasswordHash]),
-                    Hash1 = case CurrentPasswordHash of
-                        ExpectedHash when ExpectedHash == OldPasswordHash ->
-                            H = hash_password(Password, UserSalt),
-                            H;
+                    Hash1 = case couch_util:verify(CurrentPasswordHash, OldPasswordHash) of
+                        true ->
+                            hash_password(Password, UserSalt);
                         _ ->
                             throw({forbidden, <<"Old password is incorrect.">>})
                         end,

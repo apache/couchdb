@@ -20,6 +20,7 @@
     to_hex/1,parse_term/1, dict_find/3]).
 -export([file_read_size/1, get_nested_json_value/2, json_user_ctx/1]).
 -export([to_binary/1, to_list/1, url_encode/1]).
+-export([verify/2]).
 
 -include("couch_db.hrl").
 -include_lib("kernel/include/file.hrl").
@@ -395,3 +396,19 @@ url_encode([H|T]) ->
     end;
 url_encode([]) ->
     [].
+
+verify([X|RestX], [Y|RestY], Result) ->
+    verify(RestX, RestY, (X bxor Y) bor Result);
+verify([], [], Result) ->
+    Result == 0.
+
+verify(<<X/binary>>, <<Y/binary>>) ->
+    verify(?b2l(X), ?b2l(Y));
+verify(X, Y) when is_list(X) and is_list(Y) ->
+    case length(X) == length(Y) of
+        true ->
+            verify(X, Y, 0);
+        false ->
+            false
+    end;
+verify(_X, _Y) -> false.
