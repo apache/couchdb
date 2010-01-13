@@ -175,7 +175,7 @@ auth_design_doc(DocId) ->
             <<"validate_doc_update">>,
             <<"function(newDoc, oldDoc, userCtx) {
                 if ((oldDoc || newDoc).type != 'user') {
-                    return;
+                    throw({forbidden : 'doc.type must be user'});
                 } // we only validate user docs for now
                 if (newDoc._deleted === true) {
                     // allow deletes by admins and matching users 
