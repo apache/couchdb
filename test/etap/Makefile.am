@@ -14,7 +14,7 @@ noinst_SCRIPTS = run
 noinst_DATA = test_util.beam
 
 %.beam: %.erl
-	erlc $<
+	$(ERLC) $<
 
 run: run.tpl
 	sed -e "s|%abs_top_srcdir%|@abs_top_srcdir@|g" \
