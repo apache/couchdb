@@ -105,7 +105,7 @@ couchTests.security_validation = function(debug) {
 
       // test the _whoami endpoint
       var resp = userDb.request("GET", "/_session");
-      var user = JSON.parse(resp.responseText)
+      var user = JSON.parse(resp.responseText).userCtx;
       T(user.name == "Damien Katz");
       // test that the roles are listed properly
       TEquals(user.roles, []);

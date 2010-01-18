@@ -28,7 +28,7 @@
       return;
     }
     var user_prefix = "org.couchdb.user:";
-    user_doc._id = user_doc._id || user_prefix + user_doc.username;
+    user_doc._id = user_doc._id || user_prefix + user_doc.name;
     if (new_password) {
       // handle the password crypto
       user_doc.salt = $.couch.newUUID();
@@ -102,7 +102,7 @@
     userDb : function(callback) {
       $.couch.session({
         success : function(resp) {
-          var userDb = $.couch.db(resp.info.user_db);
+          var userDb = $.couch.db(resp.info.authentication_db);
           callback(userDb);
         }
       });
@@ -121,7 +121,7 @@
       options = options || {};
       $.ajax({
         type: "POST", url: "/_session", dataType: "json",
-        data: {username: options.username, password: options.password},
+        data: {name: options.name, password: options.password},
         complete: function(req) {
           var resp = $.httpData(req, "json");
           if (req.status == 200) {

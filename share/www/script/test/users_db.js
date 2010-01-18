@@ -32,11 +32,11 @@ couchTests.users_db = function(debug) {
     
     // test that you can login as a user using basic auth
     var jchrisUserDoc = CouchDB.prepareUserDoc({
-      username: "jchris@apache.org"
+      name: "jchris@apache.org"
     }, "funnybone");
     T(usersDb.save(jchrisUserDoc).ok);
     
-    T(CouchDB.session().name == null);
+    T(CouchDB.session().userCtx.name == null);
 
     // test that you can use basic auth aginst the users db
     var s = CouchDB.session({
@@ -44,20 +44,48 @@ couchTests.users_db = function(debug) {
         "Authorization" : "Basic amNocmlzQGFwYWNoZS5vcmc6ZnVubnlib25l"
       }
     });
-    T(s.name == "jchris@apache.org");
-    T(s.user_doc._id == "org.couchdb.user:jchris@apache.org");
-    T(s.info.authenticated == "{couch_httpd_auth, default_authentication_handler}");
-    T(s.info.user_db == "test_suite_users");
-    TEquals(["{couch_httpd_oauth, oauth_authentication_handler}", 
-      "{couch_httpd_auth, cookie_authentication_handler}", 
-      "{couch_httpd_auth, default_authentication_handler}"], s.info.handlers);
+    T(s.userCtx.name == "jchris@apache.org");
+    T(s.info.authenticated == "default");
+    T(s.info.authentication_db == "test_suite_users");
+    TEquals(["oauth", "cookie", "default"], s.info.authentication_handlers);
     var s = CouchDB.session({
       headers : {
-        "Authorization" : "Basic Xzpf" // username and pass of _:_
+        "Authorization" : "Basic Xzpf" // name and pass of _:_
       }
     });
     T(s.name == null);
-    T(s.info.authenticated == "{couch_httpd_auth, default_authentication_handler}");
+    T(s.info.authenticated == "default");
+    
+    
+    // ok, now create a conflicting edit on the jchris doc, and make sure there's no login.
+    var jchrisUser2 = JSON.parse(JSON.stringify(jchrisUserDoc));
+    jchrisUser2.foo = "bar";
+    T(usersDb.save(jchrisUser2).ok);
+    try {
+      usersDb.save(jchrisUserDoc);
+      T(false && "should be an update conflict")
+    } catch(e) {
+      T(true);
+    }
+    // save as bulk with new_edits=false to force conflict save
+    var resp = usersDb.bulkSave([jchrisUserDoc],{all_or_nothing : true});
+    
+    var jchrisWithConflict = usersDb.open(jchrisUserDoc._id, {conflicts : true});
+    T(jchrisWithConflict._conflicts.length == 1)
+    
+    // no login with conflicted user doc
+    try {
+      var s = CouchDB.session({
+        headers : {
+          "Authorization" : "Basic amNocmlzQGFwYWNoZS5vcmc6ZnVubnlib25l"
+        }
+      });
+      T(false && "this will throw")
+    } catch(e) {
+      T(e.error == "unauthorized")
+      T(/conflict/.test(e.reason))
+    }
+
   };
   
   run_on_modified_server(

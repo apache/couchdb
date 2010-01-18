@@ -121,7 +121,7 @@ function CouchDB(name, httpHeaders) {
       CouchDB.maybeThrowError(this.last_req);
       var results = JSON.parse(this.last_req.responseText);
       for (var i = 0; i < docs.length; i++) {
-        if(results[i].rev) {
+        if(results[i] && results[i].rev) {
           docs[i]._rev = results[i].rev;
         }
       }
@@ -322,11 +322,11 @@ function CouchDB(name, httpHeaders) {
 // Use this from callers to check HTTP status or header values of requests.
 CouchDB.last_req = null;
 
-CouchDB.login = function(username, password) {
+CouchDB.login = function(name, password) {
   CouchDB.last_req = CouchDB.request("POST", "/_session", {
     headers: {"Content-Type": "application/x-www-form-urlencoded",
       "X-CouchDB-WWW-Authenticate": "Cookie"},
-    body: "username=" + encodeURIComponent(username) + "&password="
+    body: "name=" + encodeURIComponent(name) + "&password="
       + encodeURIComponent(password)
   });
   return JSON.parse(CouchDB.last_req.responseText);
@@ -350,7 +350,7 @@ CouchDB.session = function(options) {
 CouchDB.user_prefix = "org.couchdb.user:";
 
 CouchDB.prepareUserDoc = function(user_doc, new_password) {
-  user_doc._id = user_doc._id || CouchDB.user_prefix + user_doc.username;
+  user_doc._id = user_doc._id || CouchDB.user_prefix + user_doc.name;
   if (new_password) {
     // handle the password crypto
     user_doc.salt = CouchDB.newUuids(1)[0];

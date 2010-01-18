@@ -46,22 +46,22 @@ couchTests.cookie_auth = function(debug) {
 
       // Create a user
       var jasonUserDoc = CouchDB.prepareUserDoc({
-        username: "Jason Davies",
+        name: "Jason Davies",
         roles: ["dev"]
       }, password);
       T(usersDb.save(jasonUserDoc).ok);      
       
       var checkDoc = usersDb.open(jasonUserDoc._id);
-      T(checkDoc.username == "Jason Davies");
+      T(checkDoc.name == "Jason Davies");
       
       var jchrisUserDoc = CouchDB.prepareUserDoc({
-        username: "jchris@apache.org"
+        name: "jchris@apache.org"
       }, "funnybone");
       T(usersDb.save(jchrisUserDoc).ok);
 
       // make sure we cant create duplicate users
       var duplicateJchrisDoc = CouchDB.prepareUserDoc({
-        username: "jchris@apache.org"
+        name: "jchris@apache.org"
       }, "eh, Boo-Boo?");
 
       try {
@@ -72,9 +72,9 @@ couchTests.cookie_auth = function(debug) {
         T(usersDb.last_req.status == 409);
       }
       
-      // we can't create _usernames
+      // we can't create _names
       var underscoreUserDoc = CouchDB.prepareUserDoc({
-        username: "_why"
+        name: "_why"
       }, "copperfield");
 
       try {
@@ -87,7 +87,7 @@ couchTests.cookie_auth = function(debug) {
       
       // we can't create docs with malformed ids
       var badIdDoc = CouchDB.prepareUserDoc({
-        username: "foo"
+        name: "foo"
       }, "bar");
       
       badIdDoc._id = "org.apache.couchdb:w00x";
@@ -102,12 +102,12 @@ couchTests.cookie_auth = function(debug) {
       
       // login works
       T(CouchDB.login('Jason Davies', password).ok);
-      T(CouchDB.session().name == 'Jason Davies');
+      T(CouchDB.session().userCtx.name == 'Jason Davies');
       
       // update one's own credentials document
       jasonUserDoc.foo=2;
       T(usersDb.save(jasonUserDoc).ok);
-      T(CouchDB.session().roles.indexOf("_admin") == -1);
+      T(CouchDB.session().userCtx.roles.indexOf("_admin") == -1);
       // can't delete another users doc unless you are admin
       try {
         usersDb.deleteDoc(jchrisUserDoc);
@@ -122,12 +122,12 @@ couchTests.cookie_auth = function(debug) {
        T(!CouchDB.login('Robert Allen Zimmerman', 'd00d').ok);
 
        // a failed login attempt should log you out
-       T(CouchDB.session().name != 'Jason Davies');
+       T(CouchDB.session().userCtx.name != 'Jason Davies');
 
        // test redirect
        xhr = CouchDB.request("POST", "/_session?next=/", {
          headers: {"Content-Type": "application/x-www-form-urlencoded"},
-         body: "username=Jason%20Davies&password="+encodeURIComponent(password)
+         body: "name=Jason%20Davies&password="+encodeURIComponent(password)
        });
        // should this be a redirect code instead of 200?
        // The cURL adapter is returning the expected 302 here.
@@ -145,8 +145,8 @@ couchTests.cookie_auth = function(debug) {
       // 
       // test that you can't update docs unless you are logged in as the user (or are admin)
       T(CouchDB.login("jchris@apache.org", "funnybone").ok);
-      T(CouchDB.session().name == "jchris@apache.org");
-      T(CouchDB.session().roles.length == 0);
+      T(CouchDB.session().userCtx.name == "jchris@apache.org");
+      T(CouchDB.session().userCtx.roles.length == 0);
       
       jasonUserDoc.foo=3;
 
@@ -170,7 +170,7 @@ couchTests.cookie_auth = function(debug) {
       }
       
       T(CouchDB.logout().ok);
-      T(CouchDB.session().roles[0] == "_admin");      
+      T(CouchDB.session().userCtx.roles[0] == "_admin");      
 
       jchrisUserDoc.foo = ["foo"];
       T(usersDb.save(jchrisUserDoc).ok);
@@ -188,24 +188,24 @@ couchTests.cookie_auth = function(debug) {
       
       // make sure the foo role has been applied
       T(CouchDB.login("jchris@apache.org", "funnybone").ok);
-      T(CouchDB.session().name == "jchris@apache.org");
-      T(CouchDB.session().roles.indexOf("_admin") == -1);
-      T(CouchDB.session().roles.indexOf("foo") != -1);
+      T(CouchDB.session().userCtx.name == "jchris@apache.org");
+      T(CouchDB.session().userCtx.roles.indexOf("_admin") == -1);
+      T(CouchDB.session().userCtx.roles.indexOf("foo") != -1);
       
       // now let's make jchris a server admin
       T(CouchDB.logout().ok);
-      T(CouchDB.session().roles[0] == "_admin");
-      T(CouchDB.session().name == null);
+      T(CouchDB.session().userCtx.roles[0] == "_admin");
+      T(CouchDB.session().userCtx.name == null);
       
       // set the -hashed- password so the salt matches
       // todo ask on the ML about this
       run_on_modified_server([{section: "admins",
         key: "jchris@apache.org", value: "funnybone"}], function() {
           T(CouchDB.login("jchris@apache.org", "funnybone").ok);
-          T(CouchDB.session().name == "jchris@apache.org");
-          T(CouchDB.session().roles.indexOf("_admin") != -1);
+          T(CouchDB.session().userCtx.name == "jchris@apache.org");
+          T(CouchDB.session().userCtx.roles.indexOf("_admin") != -1);
           // test that jchris still has the foo role
-          T(CouchDB.session().roles.indexOf("foo") != -1);
+          T(CouchDB.session().userCtx.roles.indexOf("foo") != -1);
 
           // should work even when user doc has no password
           jchrisUserDoc = usersDb.open(jchrisUserDoc._id);
@@ -215,13 +215,13 @@ couchTests.cookie_auth = function(debug) {
           T(CouchDB.logout().ok);
           T(CouchDB.login("jchris@apache.org", "funnybone").ok);
           var s = CouchDB.session();
-          T(s.name == "jchris@apache.org");
-          T(s.roles.indexOf("_admin") != -1);
+          T(s.userCtx.name == "jchris@apache.org");
+          T(s.userCtx.roles.indexOf("_admin") != -1);
           // test session info
-          T(s.info.authenticated == "{couch_httpd_auth, cookie_authentication_handler}");
-          T(s.info.user_db == "test_suite_users");
+          T(s.info.authenticated == "cookie");
+          T(s.info.authentication_db == "test_suite_users");
           // test that jchris still has the foo role
-          T(CouchDB.session().roles.indexOf("foo") != -1);
+          T(CouchDB.session().userCtx.roles.indexOf("foo") != -1);
         });      
 
     } finally {

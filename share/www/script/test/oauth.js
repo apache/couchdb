@@ -116,7 +116,7 @@ couchTests.oauth = function(debug) {
         
       // Create a user
       var jasonUserDoc = CouchDB.prepareUserDoc({
-        username: "jason",
+        name: "jason",
         roles: ["test"]
       }, "testpassword");
       T(usersDb.save(jasonUserDoc).ok);

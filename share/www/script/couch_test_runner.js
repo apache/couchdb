@@ -138,7 +138,8 @@ function setupAdminParty(fun) {
       }
     };
     $.couch.session({
-      success : function(userCtx) {
+      success : function(resp) {
+        var userCtx = resp.userCtx;
         if (userCtx.name && userCtx.roles.indexOf("_admin") != -1) {
           // admin but not admin party. dialog offering to make admin party
           $.showDialog("dialog/_admin_party.html", {

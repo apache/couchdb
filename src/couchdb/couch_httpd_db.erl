@@ -467,7 +467,11 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
             send_json(Req, 417, ErrorsJson)
         end;
     false ->
-        Docs = [couch_doc:from_json_obj(JsonObj) || JsonObj <- DocsArray],
+        Docs = lists:map(fun(JsonObj) -> 
+                Doc = couch_doc:from_json_obj(JsonObj),
+                validate_attachment_names(Doc),
+                Doc
+            end, DocsArray),
         {ok, Errors} = couch_db:update_docs(Db, Docs, Options, replicated_changes),
         ErrorsJson =
             lists:map(fun update_doc_result_to_json/1, Errors),

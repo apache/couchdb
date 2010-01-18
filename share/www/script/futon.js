@@ -14,9 +14,9 @@
 
   function Session() {
     
-    function doLogin(username, password, callback) {
+    function doLogin(name, password, callback) {
       $.couch.login({
-        username : username,
+        name : name,
         password : password,
         success : function() {
           $.futon.session.sidebar();
@@ -24,36 +24,36 @@
         },
         error : function(code, error, reason) {
           $.futon.session.sidebar();
-          callback({username : "Error logging in: "+reason});
+          callback({name : "Error logging in: "+reason});
         }
       });
     };
     
-    function doSignup(username, password, callback, runLogin) {
+    function doSignup(name, password, callback, runLogin) {
       $.couch.signup({
-        username : username
+        name : name
       }, password, {
         success : function() {
           if (runLogin) {
-            doLogin(username, password, callback);            
+            doLogin(name, password, callback);            
           } else {
             callback();
           }
         },
         error : function(status, error, reason) {
           $.futon.session.sidebar();
-          if (error = "conflict") {
-            callback({username : "Name '"+username+"' is taken"});
+          if (error == "conflict") {
+            callback({name : "Name '"+name+"' is taken"});
           } else {
-            callback({username : "Signup error:  "+reason});
+            callback({name : "Signup error:  "+reason});
           }
         }
       });
     };
     
     function validateUsernameAndPassword(data, callback) {
-      if (!data.username || data.username.length == 0) {
-        callback({username: "Please enter a username."});
+      if (!data.name || data.name.length == 0) {
+        callback({name: "Please enter a name."});
         return false;
       };
       if (!data.password || data.password.length == 0) {
@@ -70,10 +70,10 @@
           $.couch.config({
             success : function() {
               callback();
-              doLogin(data.username, data.password, callback);            
-              doSignup(data.username, null, callback, false);
+              doLogin(data.name, data.password, callback);            
+              doSignup(data.name, null, callback, false);
             }
-          }, "admins", data.username, data.password);
+          }, "admins", data.name, data.password);
         }
       });
       return false;
@@ -83,7 +83,7 @@
       $.showDialog("dialog/_login.html", {
         submit: function(data, callback) {
           if (!validateUsernameAndPassword(data, callback)) return;
-          doLogin(data.username, data.password, callback);
+          doLogin(data.name, data.password, callback);
         }
       });
       return false;
@@ -101,7 +101,7 @@
       $.showDialog("dialog/_signup.html", {
         submit: function(data, callback) {
           if (!validateUsernameAndPassword(data, callback)) return;
-          doSignup(data.username, data.password, callback, true);
+          doSignup(data.name, data.password, callback, true);
         }
       });
       return false;
@@ -118,9 +118,10 @@
       // get users db info?
       $("#userCtx span").hide();
       $.couch.session({
-        success : function(userCtx) {
+        success : function(r) {
+          var userCtx = r.userCtx;
           if (userCtx.name) {
-            $("#userCtx .username").text(userCtx.name).attr({href : "/_utils/document.html?"+encodeURIComponent(userCtx.info.user_db)+"/org.couchdb.user%3A"+userCtx.name});
+            $("#userCtx .name").text(userCtx.name).attr({href : "/_utils/document.html?"+encodeURIComponent(r.info.authentication_db)+"/org.couchdb.user%3A"+userCtx.name});
             if (userCtx.roles.indexOf("_admin") != -1) {
               $("#userCtx .loggedinadmin").show();
             } else {
