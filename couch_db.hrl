@@ -110,8 +110,7 @@
     {
     name=null,
     roles=[],
-    handler,
-    user_doc
+    handler
     }).
 
 % This should be updated anytime a header change happens that requires more

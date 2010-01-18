@@ -43,7 +43,7 @@ special_test_authentication_handler(Req) ->
         Req#httpd{user_ctx=#user_ctx{roles=[<<"_admin">>]}}
     end.
 
-basic_username_pw(Req) ->
+basic_name_pw(Req) ->
     AuthorizationHeader = header_value(Req, "Authorization"),
     case AuthorizationHeader of
     "Basic " ++ Base64Value ->
@@ -63,7 +63,7 @@ basic_username_pw(Req) ->
     end.
 
 default_authentication_handler(Req) ->
-    case basic_username_pw(Req) of
+    case basic_name_pw(Req) of
     {User, Pass} ->
         case get_user(?l2b(User)) of
             nil ->
@@ -76,8 +76,7 @@ default_authentication_handler(Req) ->
                     true ->
                         Req#httpd{user_ctx=#user_ctx{
                             name=?l2b(User),
-                            roles=proplists:get_value(<<"roles">>, UserProps, []),
-                            user_doc={UserProps}
+                            roles=proplists:get_value(<<"roles">>, UserProps, [])
                         }};
                     _Else ->
                         throw({unauthorized, <<"Name or password is incorrect.">>})
@@ -105,8 +104,8 @@ null_authentication_handler(Req) ->
 get_user(UserName) ->
     case couch_config:get("admins", ?b2l(UserName)) of
     "-hashed-" ++ HashedPwdAndSalt ->
-        % the username is an admin, now check to see if there is a user doc
-        % which has a matching username, salt, and password_sha
+        % the name is an admin, now check to see if there is a user doc
+        % which has a matching name, salt, and password_sha
         [HashedPwd, Salt] = string:tokens(HashedPwdAndSalt, ","),
         case get_user_props_from_db(UserName) of
             nil ->        
@@ -117,8 +116,7 @@ get_user(UserName) ->
                 DocRoles = proplists:get_value(<<"roles">>, UserProps),
                 [{<<"roles">>, [<<"_admin">> | DocRoles]},
                   {<<"salt">>, ?l2b(Salt)},
-                  {<<"password_sha">>, ?l2b(HashedPwd)},
-                  {<<"user_doc">>, {UserProps}}]
+                  {<<"password_sha">>, ?l2b(HashedPwd)}]
         end;
     Else ->
         get_user_props_from_db(UserName)
@@ -128,15 +126,21 @@ get_user_props_from_db(UserName) ->
     DbName = couch_config:get("couch_httpd_auth", "authentication_db"),
     {ok, Db} = ensure_users_db_exists(?l2b(DbName)),
     DocId = <<"org.couchdb.user:", UserName/binary>>,
-    try couch_httpd_db:couch_doc_open(Db, DocId, nil, []) of
-        #doc{}=Doc ->
-            {DocProps} = couch_query_servers:json_doc(Doc),
-            case proplists:get_value(<<"type">>, DocProps) of
-                <<"user">> -> 
-                    DocProps;
-                _Else -> 
-                    ?LOG_ERROR("Invalid user doc. Id: ~p",[DocId]),
-                    nil
+    try couch_httpd_db:couch_doc_open(Db, DocId, nil, [conflicts]) of
+        #doc{meta=Meta}=Doc ->
+            %  check here for conflict state and throw error if conflicted
+            case proplists:get_value(conflicts,Meta,[]) of
+                [] -> 
+                    {DocProps} = couch_query_servers:json_doc(Doc),
+                    case proplists:get_value(<<"type">>, DocProps) of
+                        <<"user">> ->
+                            DocProps;
+                        _Else -> 
+                            ?LOG_ERROR("Invalid user doc. Id: ~p",[DocId]),
+                            nil
+                    end;
+                Else ->
+                    throw({unauthorized, <<"User document conflict must be resolved before login.">>})
             end
     catch
         throw:Throw ->
@@ -180,23 +184,23 @@ auth_design_doc(DocId) ->
                 if (newDoc._deleted === true) {
                     // allow deletes by admins and matching users 
                     // without checking the other fields
-                    if ((userCtx.roles.indexOf('_admin') != -1) || (userCtx.name == oldDoc.username)) {
+                    if ((userCtx.roles.indexOf('_admin') != -1) || (userCtx.name == oldDoc.name)) {
                         return;
                     } else {
                         throw({forbidden : 'Only admins may delete other user docs.'});
                     }
                 }
-                if (!newDoc.username) {
-                    throw({forbidden : 'doc.username is required'});
+                if (!newDoc.name) {
+                    throw({forbidden : 'doc.name is required'});
                 }
                 if (!(newDoc.roles && (typeof newDoc.roles.length != 'undefined') )) {
                     throw({forbidden : 'doc.roles must be an array'});
                 }
-                if (newDoc._id != 'org.couchdb.user:'+newDoc.username) {
-                    throw({forbidden : 'Docid must be of the form org.couchdb.user:username'});
+                if (newDoc._id != 'org.couchdb.user:'+newDoc.name) {
+                    throw({forbidden : 'Docid must be of the form org.couchdb.user:name'});
                 }
                 if (oldDoc) { // validate all updates
-                    if (oldDoc.username != newDoc.username) {
+                    if (oldDoc.name != newDoc.name) {
                       throw({forbidden : 'Usernames may not be changed.'});
                     }
                 }
@@ -205,7 +209,7 @@ auth_design_doc(DocId) ->
                 }
                 if (userCtx.roles.indexOf('_admin') == -1) { // not an admin
                     if (oldDoc) { // validate non-admin updates
-                        if (userCtx.name != newDoc.username) {
+                        if (userCtx.name != newDoc.name) {
                           throw({forbidden : 'You may only update your own user document.'});
                         }
                         // validate role updates
@@ -229,8 +233,8 @@ auth_design_doc(DocId) ->
                         throw({forbidden : 'No system roles (starting with underscore) in users db.'});
                     }
                 };
-                // no system names as usernames
-                if (newDoc.username[0] == '_') {
+                // no system names as names
+                if (newDoc.name[0] == '_') {
                     throw({forbidden : 'Username may not start with underscore.'});
                 }
             }">>
@@ -276,8 +280,7 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
                                 ?LOG_DEBUG("Successful cookie auth as: ~p", [User]),
                                 Req#httpd{user_ctx=#user_ctx{
                                     name=?l2b(User),
-                                    roles=proplists:get_value(<<"roles">>, UserProps, []),
-                                    user_doc=proplists:get_value(<<"user_doc">>, UserProps, null)
+                                    roles=proplists:get_value(<<"roles">>, UserProps, [])
                                 }, auth={FullSecret, TimeLeft < Timeout*0.9}};
                             _Else ->
                                 Req
@@ -340,7 +343,7 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req) ->
         _ ->
             []
     end,
-    UserName = ?l2b(proplists:get_value("username", Form, "")),
+    UserName = ?l2b(proplists:get_value("name", Form, "")),
     Password = ?l2b(proplists:get_value("password", Form, "")),
     ?LOG_DEBUG("Attempt Login: ~s",[UserName]),
     User = case get_user(UserName) of
@@ -367,9 +370,8 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req) ->
             send_json(Req#httpd{req_body=ReqBody}, Code, Headers,
                 {[
                     {ok, true},
-                    {name, proplists:get_value(<<"username">>, User, null)},
-                    {roles, proplists:get_value(<<"roles">>, User, [])},
-                    {user_doc, proplists:get_value(<<"user_doc">>, User, null)}
+                    {name, proplists:get_value(<<"name">>, User, null)},
+                    {roles, proplists:get_value(<<"roles">>, User, [])}
                 ]});
         _Else ->
             % clear the session
@@ -377,6 +379,7 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req) ->
             send_json(Req, 401, [Cookie], {[{error, <<"unauthorized">>},{reason, <<"Name or password is incorrect.">>}]})
     end;
 % get user info
+% GET /_session
 handle_session_req(#httpd{method='GET', user_ctx=UserCtx}=Req) ->
     Name = UserCtx#user_ctx.name,
     ForceLogin = couch_httpd:qs_value(Req, "basic", "false"),
@@ -385,15 +388,20 @@ handle_session_req(#httpd{method='GET', user_ctx=UserCtx}=Req) ->
             throw({unauthorized, <<"Please login.">>});
         {Name, _} ->
             send_json(Req, {[
+                % remove this ok
                 {ok, true},
-                {name, Name},
-                {roles, UserCtx#user_ctx.roles},
+                {<<"userCtx">>, {[
+                    {name, Name},
+                    {roles, UserCtx#user_ctx.roles}
+                ]}},
                 {info, {[
-                    {user_db, ?l2b(couch_config:get("couch_httpd_auth", "authentication_db"))},
-                    {handlers, [?l2b(H) || H <- couch_httpd:make_fun_spec_strs(
+                    {authentication_db, ?l2b(couch_config:get("couch_httpd_auth", "authentication_db"))},
+                    {authentication_handlers, [auth_name(H) || H <- couch_httpd:make_fun_spec_strs(
                             couch_config:get("httpd", "authentication_handlers"))]}
-                ] ++ maybe_value(authenticated, UserCtx#user_ctx.handler)}}
-            ] ++ maybe_value(user_doc, UserCtx#user_ctx.user_doc)})
+                ] ++ maybe_value(authenticated, UserCtx#user_ctx.handler, fun(Handler) -> 
+                        auth_name(?b2l(Handler))
+                    end)}}
+            ]})
     end;
 % logout by deleting the session
 handle_session_req(#httpd{method='DELETE'}=Req) ->
@@ -408,8 +416,15 @@ handle_session_req(#httpd{method='DELETE'}=Req) ->
 handle_session_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD,POST,DELETE").
 
+maybe_value(Key, undefined, Fun) -> [];
+maybe_value(Key, Else, Fun) -> 
+    [{Key, Fun(Else)}].
 maybe_value(Key, undefined) -> [];
 maybe_value(Key, Else) -> [{Key, Else}].
+
+auth_name(String) when is_list(String) ->
+    [_,_,_,_,_,Name|_] = re:split(String, "[\\W_]", [{return, list}]),
+    ?l2b(Name).
 
 to_int(Value) when is_binary(Value) ->
     to_int(?b2l(Value)); 

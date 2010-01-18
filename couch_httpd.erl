@@ -121,7 +121,7 @@ make_arity_3_fun(SpecStr) ->
 
 % SpecStr is "{my_module, my_fun}, {my_module2, my_fun2}"
 make_fun_spec_strs(SpecStr) ->
-    [FunSpecStr || FunSpecStr <- re:split(SpecStr, "(?<=})\\s*,\\s*(?={)", [{return, list}])].
+    re:split(SpecStr, "(?<=})\\s*,\\s*(?={)", [{return, list}]).
 
 stop() ->
     mochiweb_http:stop(?MODULE).
