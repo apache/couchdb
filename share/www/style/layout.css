@@ -237,8 +237,6 @@ body.fullwidth #wrap { margin-right: 0; }
 #toolbar button:active { background-position: 2px -62px; color: #000; }
 #toolbar button.add { background-image: url(../image/add.png); }
 #toolbar button.compact { background-image: url(../image/compact.png); }
-#toolbar button.viewcleanup { background-image: url(../image/compact.png); }
-#toolbar button.compactview { background-image: url(../image/compact.png); }
 #toolbar button.delete { background-image: url(../image/delete.png); }
 #toolbar button.load { background-image: url(../image/load.png); }
 #toolbar button.run { background-image: url(../image/run.png); }
@@ -290,6 +288,11 @@ body.loading #dialog h2 {
 #dialog fieldset input { background-color: #e9e9e9; vertical-align: middle; }
 #dialog fieldset input.error { background-color: #f9e4e4; }
 #dialog fieldset div.error { padding-top: .3em; color: #b33; }
+#dialog fieldset.radiogroup { padding-top: 1em; }
+#dialog fieldset.radiogroup label { position: relative; padding-left: 25px; }
+#dialog fieldset.radiogroup input { position: absolute; left: 5px; top: 2px; }
+#dialog fieldset.radiogroup p.help { margin-top: .5em; margin-left: 25px; }
+#dialog fieldset.radiogroup hr { border-color: #333; margin-left: 25px; }
 #dialog .buttons { padding: 0 .5em .5em; text-align: right; }
 #dialog .buttons button { background: #444; border: 1px solid #aaa;
   color: #ddd; cursor: pointer; font-size: 90%; font-weight: normal;

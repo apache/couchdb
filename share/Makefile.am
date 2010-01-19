@@ -40,9 +40,7 @@ nobase_dist_localdata_DATA = \
     www/custom_test.html \
     www/database.html \
     www/dialog/_admin_party.html \
-    www/dialog/_compact_database.html \
-    www/dialog/_compact_view.html \
-    www/dialog/_view_cleanup.html \
+    www/dialog/_compact_cleanup.html \
     www/dialog/_create_admin.html \
     www/dialog/_login.html \
     www/dialog/_signup.html \

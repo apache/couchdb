@@ -140,40 +140,22 @@
         location.href = "document.html?" + encodeURIComponent(db.name);
       }
 
-      this.compactDatabase = function() {
-        $.showDialog("dialog/_compact_database.html", {
+      this.compactAndCleanup = function() {
+        $.showDialog("dialog/_compact_cleanup.html", {
           submit: function(data, callback) {
-            db.compact({
-              success: function(resp) {
-                callback();
-              }
-            });
-          }
-        });
-      }
-
-      this.viewCleanup = function() {
-        $.showDialog("dialog/_view_cleanup.html", {
-          submit: function(data, callback) {
-            db.viewCleanup({
-              success: function(resp) {
-                callback();
-              }
-            });
-          }
-        });
-      }
-
-      this.compactView = function() {
-        var groupname = page.viewName.substring(8,
-            page.viewName.indexOf('/_view'));
-        $.showDialog("dialog/_compact_view.html", {
-          submit: function(data, callback) {
-            db.compactView(groupname, {
-              success: function(resp) {
-                callback();
-              }
-            });
+            switch (data.action) {
+              case "compact_database":
+                db.compact({success: function(resp) { callback() }});
+                break;
+              case "compact_views":
+                var groupname = page.viewName.substring(8,
+                    page.viewName.indexOf("/_view"));
+                db.compactView(groupname, {success: function(resp) { callback() }});
+                break;
+              case "view_cleanup": 
+                db.viewCleanup({success: function(resp) { callback() }});
+                break;
+            }
           }
         });
       }

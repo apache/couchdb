@@ -115,10 +115,8 @@ specific language governing permissions and limitations under the License.
           $.futon.storage.set("per_page", this.value);
         });
         $("#toolbar button.add").click(page.newDocument);
-        $("#toolbar button.compact").click(page.compactDatabase);
-        $("#toolbar button.viewcleanup").click(page.viewCleanup);
+        $("#toolbar button.compact").click(page.compactAndCleanup);
         $("#toolbar button.delete").click(page.deleteDatabase);
-        $("#toolbar button.compactview").click(page.compactView);
 
         $('#jumpto input').suggest(function(text, callback) {
           page.db.allDocs({
@@ -163,10 +161,8 @@ specific language governing permissions and limitations under the License.
       </div>
       <ul id="toolbar">
         <li><button class="add">New Document</button></li>
-        <li><button class="compact">Compact Database…</button></li>
-        <li><button class="viewcleanup">View Cleanup…</button></li>
+        <li><button class="compact">Compact &amp; Cleanup…</button></li>
         <li><button class="delete">Delete Database…</button></li>
-        <li><button class="compactview" style="display: none">Compact View…</button></li>
       </ul>
 
       <div id="viewcode" class="collapsed" style="display: none">
