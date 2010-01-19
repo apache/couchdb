@@ -362,31 +362,21 @@
     storage: new Storage()
   });
 
-  $.fn.addPlaceholder = function(text) {
-    return this.each(function() {
+  $.fn.addPlaceholder = function() {
+    if (this[0] && "placeholder" in document.createElement("input")) {
+      return; // found native placeholder support
+    }
+    return this.live('focusin', function() {
       var input = $(this);
-      if ($.browser.safari) {
-        input.attr("placeholder", text);
-        return;
+      if (input.val() === input.attr("placeholder")) {
+        input.removeClass("placeholder").val("");
       }
-      input.blur(function() {
-        if ($.trim(input.val()) == "") {
-          input.addClass("placeholder").val(text);
-        } else {
-          input.removeClass("placeholder");
-        }
-      }).triggerHandler("blur")
-      input.focus(function() {
-        if (input.is(".placeholder")) {
-          input.val("").removeClass("placeholder");
-        }
-      });
-      $(this.form).submit(function() {
-        if (input.is(".placeholder")) {
-          input.val("");
-        }
-      });
-    });
+    }).live("focusout", function() {
+      var input = $(this);
+      if (input.val() === "") {
+        input.val(input.attr("placeholder")).addClass("placeholder");
+      }
+    }).trigger("focusout");
   }
 
   $.fn.enableTabInsertion = function(chars) {
@@ -422,6 +412,8 @@
       // doing this as early as possible prevents flickering
       $(document.body).addClass("fullwidth");
     }
+    $("input[placeholder]").addPlaceholder();
+
     $.get("_sidebar.html", function(resp) {
       $("#wrap").append(resp)
         .find("#sidebar-toggle").click(function(e) {
@@ -443,7 +435,6 @@
           $("#version").text(info.version);
         }
       });
-      
     });
   });
 

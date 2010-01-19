@@ -219,8 +219,8 @@ body.fullwidth #sidebar { border-bottom: 1px solid #333; right: 0;
   height: 100%; margin-right: 210px; position: relative;
 }
 body.fullwidth #wrap { margin-right: 0; }
-#content { padding: 1em 16px 3em 10px; overflow: auto; position: absolute;
-  top: 33px; bottom: 0; left: 0; right: 0;
+#content { padding: 1em 16px 3em 10px; overflow: auto; overflow-y: scroll;
+  position: absolute; top: 33px; bottom: 0; left: 0; right: 0;
 }
 
 /* Toolbar */
@@ -260,18 +260,18 @@ body.fullwidth #wrap { margin-right: 0; }
   -webkit-box-shadow: 4px 4px 6px #333;
 }
 *html #dialog { width: 33em; }
-body.loading #dialog h2 {
-  background: url(../image/spinner.gif) center no-repeat;
-}
 #dialog.loading { width: 220px; height: 80px; }
 #dialog.loaded { background-image: none; }
-#dialog h2 { background: #666; border-top: 1px solid #555;
-  border-bottom: 1px solid #777; color: #ccc; font-size: 110%;
-  font-weight: bold; margin: 0 -2em; padding: .35em 2em;
+#dialog h2 { background: #666 right center no-repeat;
+  border-top: 1px solid #555; border-bottom: 1px solid #777; color: #ccc;
+  font-size: 110%; font-weight: bold; margin: 0 -2em; padding: .35em 2em;
+}
+body.loading #dialog h2 {
+  background-image: url(../image/spinner.gif);
 }
 #dialog h3 {
-      color: #ccc; font-size: 110%;
-      font-weight: bold; margin: 0 -2em; padding: .35em 2em;
+  color: #ccc; font-size: 110%; font-weight: bold; margin: 0 -2em;
+  padding: .35em 2em;
 }
 #dialog fieldset { background: #222; border-top: 1px solid #111;
   margin: 0 0 1em; padding: .5em 1em 1em;
@@ -351,8 +351,8 @@ body.loading #dialog h2 {
   white-space: nowrap;
 }
 #viewcode .code textarea { border: none; border-top: 1px solid #ccc;
-  color: #333; font-size: 11px; margin: 0; min-height: 50px; padding: .4em 0 0;
-  resize: none; width: 100%; overflow: auto;
+  color: #333; font-size: 11px; margin: 0; min-height: 50px; overflow: auto;
+  padding: .4em 0 0; resize: none; width: 100%;
 }
 #viewcode .code textarea:focus { background: #e9f4ff; }
 #viewcode .bottom { border-bottom: none; clear: left; padding: 1px 3px; }

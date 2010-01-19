@@ -120,7 +120,7 @@ specific language governing permissions and limitations under the License.
         $("#toolbar button.delete").click(page.deleteDatabase);
         $("#toolbar button.compactview").click(page.compactView);
 
-        $('#jumpto input').addPlaceholder("Document ID").suggest(function(text, callback) {
+        $('#jumpto input').suggest(function(text, callback) {
           page.db.allDocs({
             limit: 10, startkey: text, endkey: text + 'zzz',
             success: function(docs) {
@@ -158,7 +158,7 @@ specific language governing permissions and limitations under the License.
       </div>
       <div id="jumpto">
         <label>Jump to:
-          <input type="text" name="docid" autocomplete="off" />
+          <input type="text" name="docid" placeholder="Document ID" autocomplete="off" />
         </label>
       </div>
       <ul id="toolbar">
