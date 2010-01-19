@@ -262,9 +262,9 @@ body.fullwidth #wrap { margin-right: 0; }
 *html #dialog { width: 33em; }
 #dialog.loading { width: 220px; height: 80px; }
 #dialog.loaded { background-image: none; }
-#dialog h2 { background: #666 right center no-repeat;
+#dialog h2 { background: #666 98% 50% no-repeat;
   border-top: 1px solid #555; border-bottom: 1px solid #777; color: #ccc;
-  font-size: 110%; font-weight: bold; margin: 0 -2em; padding: .35em 2em;
+  font-size: 110%; font-weight: bold; margin: 0 -1em; padding: .35em 1em;
 }
 body.loading #dialog h2 {
   background-image: url(../image/spinner.gif);
@@ -491,7 +491,7 @@ body.loading #dialog h2 {
 #fields tbody.content td ul.attachments li {
   margin-bottom: .3em; min-height: 20px; padding-left: 20px;
 }
-#fields tbody.content td ul.attachments tt { font-size: 95%; }
+#fields tbody.content td ul.attachments tt { font-size: 11px; }
 #fields tbody.content td ul.attachments li span.info { color: #666;
   display: block; font-size: 95%;
 }
