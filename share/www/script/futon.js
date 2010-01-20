@@ -160,7 +160,8 @@
     }
 
     this.addDatabase = function(name) {
-      var recentDbs = $.futon.storage.get("recent", "").split(",");
+      var current = $.futon.storage.get("recent", "");
+      var recentDbs = current ? current.split(",") : [];
       if ($.inArray(name, recentDbs) == -1) {
         recentDbs.unshift(name);
         if (recentDbs.length > 10) recentDbs.length = 10;
@@ -171,7 +172,8 @@
 
     this.removeDatabase = function(name) {
       // remove database from recent databases list
-      var recentDbs = $.futon.storage.get("recent").split(",");
+      var current = $.futon.storage.get("recent", "");
+      var recentDbs = current ? current.split(",") : [];
       var recentIdx = $.inArray(name, recentDbs);
       if (recentIdx >= 0) {
         recentDbs.splice(recentIdx, 1);
@@ -309,11 +311,14 @@
       return callback(decl);
     }
 
+    // add suffix to cookie names to be able to separate between ports
+    var cookiePrefix = location.port + "_";
+
     var handlers = {
 
       "cookie": {
         get: function(name) {
-          var nameEq = name + "=";
+          var nameEq = cookiePrefix + name + "=";
           var parts = document.cookie.split(';');
           for (var i = 0; i < parts.length; i++) {
             var part = parts[i].replace(/^\s+/, "");
@@ -325,13 +330,14 @@
         set: function(name, value) {
           var date = new Date();
           date.setTime(date.getTime() + 14*24*60*60*1000); // two weeks
-          document.cookie = name + "=" + escape(value) + "; expires=" +
-            date.toGMTString();
+          document.cookie = cookiePrefix + name + "=" + escape(value) +
+            "; domain=" + location.hostname + "; expires=" + date.toGMTString();
         },
         del: function(name) {
           var date = new Date();
           date.setTime(date.getTime() - 24*60*60*1000); // yesterday
-          document.cookie = name + "=; expires=" + date.toGMTString();
+          document.cookie = cookiePrefix + name + "=; domain=" +
+            location.hostname + "; expires=" + date.toGMTString();
         }
       },
 
