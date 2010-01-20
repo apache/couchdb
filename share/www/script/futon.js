@@ -121,7 +121,7 @@
         success : function(r) {
           var userCtx = r.userCtx;
           if (userCtx.name) {
-            $("#userCtx .name").text(userCtx.name).attr({href : "/_utils/document.html?"+encodeURIComponent(r.info.authentication_db)+"/org.couchdb.user%3A"+userCtx.name});
+            $("#userCtx .name").text(userCtx.name).attr({href : "/_utils/document.html?"+encodeURIComponent(r.info.authentication_db)+"/org.couchdb.user%3A"+encodeURIComponent(userCtx.name)});
             if (userCtx.roles.indexOf("_admin") != -1) {
               $("#userCtx .loggedinadmin").show();
             } else {
