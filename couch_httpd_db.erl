@@ -237,7 +237,7 @@ make_filter_fun(Req, Db) ->
         couch_util:get_nested_json_value({Props}, [<<"filters">>, FName]),
         fun(DocInfos) ->
             Docs = [Doc || {ok, Doc} <- [
-                {ok, Doc} = couch_db:open_doc(Db, DInfo, [deleted])
+                {ok, Doc} = couch_db:open_doc(Db, DInfo, [deleted, conflicts])
                 || DInfo <- DocInfos]],
             {ok, Passes} = couch_query_servers:filter_docs(Req, Db, DDoc, FName, Docs),
             [{[{rev, couch_doc:rev_to_str(Rev)}]}
