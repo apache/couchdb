@@ -175,7 +175,8 @@ couchTests.changes = function(debug) {
       }),
       "userCtx" : stringFun(function(doc, req) {
         return doc.user && (doc.user == req.userCtx.name);
-      })
+      }),
+      "conflicted" : "function(doc, req) { return (doc._conflicts);}",
     }
   }
 
@@ -286,11 +287,19 @@ couchTests.changes = function(debug) {
       resp = JSON.parse(req.responseText);
       T(resp.results.length == 1, "userCtx");
       T(resp.results[0].id == docResp.id);
-    });
+    }
+  );
 
   req = CouchDB.request("GET", "/test_suite_db/_changes?limit=1");
   resp = JSON.parse(req.responseText);
-  TEquals(1, resp.results.length);
+  TEquals(1, resp.results.length)
 
+  //filter includes _conflicts
+  var id = db.save({'food' : 'pizza'}).id;
+  db.bulkSave([{_id: id, 'food' : 'pasta'}], {all_or_nothing:true});
 
+  req = CouchDB.request("GET", "/test_suite_db/_changes?filter=changes_filter/conflicted");
+  resp = JSON.parse(req.responseText);
+  T(resp.results.length == 1);
 };
+
