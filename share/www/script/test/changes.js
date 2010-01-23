@@ -287,8 +287,10 @@ couchTests.changes = function(debug) {
       T(resp.results.length == 1, "userCtx");
       T(resp.results[0].id == docResp.id);
     });
-  
-    req = CouchDB.request("GET", "/test_suite_db/_changes?limit=1");
-    resp = JSON.parse(req.responseText);
-    TEquals(1, resp.results.length)
+
+  req = CouchDB.request("GET", "/test_suite_db/_changes?limit=1");
+  resp = JSON.parse(req.responseText);
+  TEquals(1, resp.results.length);
+
+
 };
