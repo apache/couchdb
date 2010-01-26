@@ -16,8 +16,6 @@ couchTests.view_errors = function(debug) {
   db.createDb();
   if (debug) debugger;
 
-
-
   run_on_modified_server(
     [{section: "couchdb",
       key: "os_process_timeout",
@@ -26,12 +24,13 @@ couchTests.view_errors = function(debug) {
       var doc = {integer: 1, string: "1", array: [1, 2, 3]};
       T(db.save(doc).ok);
 
-      // emitting a key value that is undefined should result in that row not
-      // being included in the view results
+      // emitting a key value that is undefined should result in that row
+      // being included in the view results as null
       var results = db.query(function(doc) {
         emit(doc.undef, null);
       });
-      T(results.total_rows == 0);
+      T(results.total_rows == 1);
+      T(results.rows[0].key == null);
 
       // if a view function throws an exception, its results are not included in
       // the view index, but the view does not itself raise an error
@@ -41,13 +40,13 @@ couchTests.view_errors = function(debug) {
       T(results.total_rows == 0);
 
       // if a view function includes an undefined value in the emitted key or
-      // value, an error is logged and the result is not included in the view
-      // index, and the view itself does not raise an error
+      // value, it is treated as null
       var results = db.query(function(doc) {
         emit([doc._id, doc.undef], null);
       });
-      T(results.total_rows == 0);
-
+      T(results.total_rows == 1);
+      T(results.rows[0].key[1] == null);
+      
       // querying a view with invalid params should give a resonable error message
       var xhr = CouchDB.request("POST", "/test_suite_db/_temp_view?startkey=foo", {
         headers: {"Content-Type": "application/json"},

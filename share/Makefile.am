@@ -13,6 +13,7 @@
 JS_FILE = server/main.js
 
 JS_FILE_COMPONENTS = \
+    server/json2.js \
     server/filter.js \
     server/mimeparse.js \
     server/render.js \

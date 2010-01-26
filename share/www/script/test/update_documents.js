@@ -68,7 +68,7 @@ couchTests.update_documents = function(debug) {
           "headers" : {
             "Content-Type" : "application/xml"
           },
-          "body" : xml
+          "body" : xml.toXMLString()
         };
          
          return [doc, resp];

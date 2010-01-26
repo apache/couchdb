@@ -61,7 +61,7 @@ couchTests.show_documents = function(debug) {
            "headers" : {
              "Content-Type" : "application/xml"
            },
-           "body" : new XML('<xml><node foo="bar"/></xml>')
+           "body" : new XML('<xml><node foo="bar"/></xml>').toXMLString()
          }
        }),
       "no-set-etag" : stringFun(function(doc, req) {
@@ -114,7 +114,8 @@ couchTests.show_documents = function(debug) {
           // E4X outside of a string. Outside of tests you
           // can just use E4X literals.
           eval('xml.node.@foo = doc.word');
-          return xml;
+          log('xml: '+xml.toSource());
+          return xml.toXMLString();
         });
         
         provides("foo", function() {
