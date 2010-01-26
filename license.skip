@@ -47,6 +47,7 @@
 ^share/Makefile
 ^share/Makefile.in
 ^share/server/mimeparse.js
+^share/server/json2.js
 ^share/www/favicon.ico
 ^share/www/image/*
 ^share/www/script/jquery.*
