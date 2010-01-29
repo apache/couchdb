@@ -301,4 +301,61 @@ couchTests.replication = function(debug) {
   });
   TEquals("test_suite_db_b", dbB.info().db_name,
     "Target database should exist");
+
+
+  // test replication object option doc_ids
+
+  var dbA = new CouchDB("test_suite_rep_docs_db_a", {"X-Couch-Full-Commit":"false"});
+  var dbB = new CouchDB("test_suite_rep_docs_db_b", {"X-Couch-Full-Commit":"false"});
+
+  dbA.deleteDb();
+  dbA.createDb();
+  dbB.deleteDb();
+  dbB.createDb();
+
+  T(dbA.save({_id:"foo1",value:"a"}).ok);
+  T(dbA.save({_id:"foo2",value:"b"}).ok);
+  T(dbA.save({_id:"foo3",value:"c"}).ok);
+
+  var dbPairs = [
+    {source:"test_suite_rep_docs_db_a",
+      target:"test_suite_rep_docs_db_b"},
+    {source:"test_suite_rep_docs_db_a",
+      target:"http://" + host + "/test_suite_rep_docs_db_b"},
+    {source:"http://" + host + "/test_suite_rep_docs_db_a",
+      target:"test_suite_rep_docs_db_b"},
+    {source:"http://" + host + "/test_suite_rep_docs_db_a",
+      target:"http://" + host + "/test_suite_rep_docs_db_b"}
+  ];
+
+  for (var i = 0; i < dbPairs.length; i++) {
+    var dbA = dbPairs[i].source;
+    var dbB = dbPairs[i].target;
+
+    var repResult = CouchDB.replicate(dbA, dbB, {
+      body: {"doc_ids": ["foo1", "foo3", "foo666"]}
+    });
+
+    T(repResult.ok);
+    T(repResult.docs_written === 2);
+    T(repResult.docs_read === 2);
+    T(repResult.doc_write_failures === 0);
+
+    dbB = new CouchDB("test_suite_rep_docs_db_b");
+
+    var docFoo1 = dbB.open("foo1");
+    T(docFoo1 !== null);
+    T(docFoo1.value === "a");
+
+    var docFoo2 = dbB.open("foo2");
+    T(docFoo2 === null);
+
+    var docFoo3 = dbB.open("foo3");
+    T(docFoo3 !== null);
+    T(docFoo3.value === "c");
+
+    var docFoo666 = dbB.open("foo666");
+    T(docFoo666 === null);
+  }
+
 };
