@@ -694,17 +694,17 @@ flush_att(Fd, #att{data={Fd0, _}}=Att) when Fd0 == Fd ->
     Att;
 
 flush_att(Fd, #att{data={OtherFd,StreamPointer}, md5=InMd5}=Att) ->
-    {NewStreamData, Len, Md5} = 
+    {NewStreamData, Len, _IdentityLen, Md5, IdentityMd5} =
             couch_stream:copy_to_new_stream(OtherFd, StreamPointer, Fd),
-    check_md5(Md5, InMd5),
-    Att#att{data={Fd, NewStreamData}, md5=Md5, len=Len};
+    check_md5(IdentityMd5, InMd5),
+    Att#att{data={Fd, NewStreamData}, md5=Md5, att_len=Len, disk_len=Len};
 
 flush_att(Fd, #att{data=Data}=Att) when is_binary(Data) ->
     with_stream(Fd, Att, fun(OutputStream) ->
         couch_stream:write(OutputStream, Data)
     end);
 
-flush_att(Fd, #att{data=Fun,len=undefined}=Att) when is_function(Fun) ->
+flush_att(Fd, #att{data=Fun,att_len=undefined}=Att) when is_function(Fun) ->
     with_stream(Fd, Att, fun(OutputStream) ->
         % Fun(MaxChunkSize, WriterFun) must call WriterFun
         % once for each chunk of the attachment,
@@ -726,9 +726,9 @@ flush_att(Fd, #att{data=Fun,len=undefined}=Att) when is_function(Fun) ->
             end, ok)
     end);
 
-flush_att(Fd, #att{data=Fun,len=Len}=Att) when is_function(Fun) ->
+flush_att(Fd, #att{data=Fun,att_len=AttLen}=Att) when is_function(Fun) ->
     with_stream(Fd, Att, fun(OutputStream) ->
-        write_streamed_attachment(OutputStream, Fun, Len)
+        write_streamed_attachment(OutputStream, Fun, AttLen)
     end).
 
 % From RFC 2616 3.6.1 - Chunked Transfer Coding
@@ -741,8 +741,16 @@ flush_att(Fd, #att{data=Fun,len=Len}=Att) when is_function(Fun) ->
 % is present in the request, but there is no Content-MD5
 % trailer, we're free to ignore this inconsistency and
 % pretend that no Content-MD5 exists.
-with_stream(Fd, #att{md5=InMd5}=Att, Fun) ->
-    {ok, OutputStream} = couch_stream:open(Fd),
+with_stream(Fd, #att{md5=InMd5,type=Type}=Att, Fun) ->
+    {ok, OutputStream} = case couch_util:compressible_att_type(Type) of
+    true ->
+        CompLevel = list_to_integer(
+            couch_config:get("attachments", "compression_level", "0")
+        ),
+        couch_stream:open(Fd, CompLevel);
+    _ ->
+        couch_stream:open(Fd)
+    end,
     ReqMd5 = case Fun(OutputStream) of
         {md5, FooterMd5} ->
             case InMd5 of
@@ -752,9 +760,16 @@ with_stream(Fd, #att{md5=InMd5}=Att, Fun) ->
         _ ->
             InMd5
     end,
-    {StreamInfo, Len, Md5} = couch_stream:close(OutputStream),
-    check_md5(Md5, ReqMd5),
-    Att#att{data={Fd,StreamInfo},len=Len,md5=Md5}.
+    {StreamInfo, Len, IdentityLen, Md5, IdentityMd5} =
+        couch_stream:close(OutputStream),
+    check_md5(IdentityMd5, ReqMd5),
+    Att#att{
+        data={Fd,StreamInfo},
+        att_len=Len,
+        disk_len=IdentityLen,
+        md5=Md5,
+        comp=(IdentityMd5 =/= Md5)
+    }.
 
 
 write_streamed_attachment(_Stream, _F, 0) ->
@@ -983,17 +998,28 @@ make_doc(#db{fd=Fd}=Db, Id, Deleted, Bp, RevisionPath) ->
         {ok, {BodyData0, Atts0}} = read_doc(Db, Bp),
         {BodyData0,
             lists:map(
-                fun({Name,Type,Sp,Len,RevPos,Md5}) ->
+                fun({Name,Type,Sp,AttLen,DiskLen,RevPos,Md5,Comp}) ->
                     #att{name=Name,
                         type=Type,
-                        len=Len,
+                        att_len=AttLen,
+                        disk_len=DiskLen,
+                        md5=Md5,
+                        revpos=RevPos,
+                        data={Fd,Sp},
+                        comp=Comp};
+                ({Name,Type,Sp,AttLen,RevPos,Md5}) ->
+                    #att{name=Name,
+                        type=Type,
+                        att_len=AttLen,
+                        disk_len=AttLen,
                         md5=Md5,
                         revpos=RevPos,
                         data={Fd,Sp}};
-                ({Name,{Type,Sp,Len}}) ->
+                ({Name,{Type,Sp,AttLen}}) ->
                     #att{name=Name,
                         type=Type,
-                        len=Len,
+                        att_len=AttLen,
+                        disk_len=AttLen,
                         md5= <<>>,
                         revpos=0,
                         data={Fd,Sp}}

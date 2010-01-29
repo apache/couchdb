@@ -21,7 +21,7 @@
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
     start_json_response/2,start_json_response/3,
-    send_chunk/2,end_json_response/1,
+    send_chunk/2,last_chunk/1,end_json_response/1,
     start_chunked_response/3, absolute_uri/2, send/2,
     start_response_length/4]).
 
@@ -993,20 +993,37 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
     case [A || A <- Atts, A#att.name == FileName] of
     [] ->
         throw({not_found, "Document is missing attachment"});
-    [#att{type=Type, len=Len}=Att] ->
+    [#att{type=Type, comp=Comp}=Att] ->
         Etag = couch_httpd:doc_etag(Doc),
-        couch_httpd:etag_respond(Req, Etag, fun() ->
-            {ok, Resp} = start_response_length(Req, 200, [
-                {"ETag", Etag},
-                {"Cache-Control", "must-revalidate"},
-                {"Content-Type", binary_to_list(Type)}
-                ], integer_to_list(Len)),
-            couch_doc:att_foldl(
-                Att,
-                fun(BinSegment, _) -> send(Resp, BinSegment) end,
-                {ok, Resp} % Seed in case of 0 byte attachment.
-            )
-        end)
+        ReqAcceptsGzip = lists:member(
+           "gzip",
+           couch_httpd:accepted_encodings(Req)
+        ),
+        Headers = [
+            {"ETag", Etag},
+            {"Cache-Control", "must-revalidate"},
+            {"Content-Type", binary_to_list(Type)}
+        ] ++ case {Comp, ReqAcceptsGzip} of
+        {true, true} ->
+            [{"Content-Encoding", "gzip"}];
+        _ ->
+            []
+        end,
+        AttFun = case {Comp, ReqAcceptsGzip} of
+        {true, false} ->
+            fun couch_doc:att_foldl_unzip/3;
+        _ ->
+            fun couch_doc:att_foldl/3
+        end,
+        couch_httpd:etag_respond(
+            Req,
+            Etag,
+            fun() ->
+                {ok, Resp} = start_chunked_response(Req, 200, Headers),
+                AttFun(Att, fun(Seg, _) -> send_chunk(Resp, Seg) end, ok),
+                last_chunk(Resp)
+            end
+        )
     end;
 
 
@@ -1048,7 +1065,7 @@ db_attachment_req(#httpd{method=Method}=Req, Db, DocId, FileNameParts)
                     Length ->
                         exit({length_not_integer, Length})
                     end,
-                len = case couch_httpd:header_value(Req,"Content-Length") of
+                att_len = case couch_httpd:header_value(Req,"Content-Length") of
                     undefined ->
                         undefined;
                     Length ->
