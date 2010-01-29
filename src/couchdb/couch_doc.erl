@@ -13,7 +13,7 @@
 -module(couch_doc).
 
 -export([to_doc_info/1,to_doc_info_path/1,parse_rev/1,parse_revs/1,rev_to_str/1,revs_to_strs/1]).
--export([att_foldl/3,get_validate_doc_fun/1]).
+-export([att_foldl/3,att_foldl_unzip/3,get_validate_doc_fun/1]).
 -export([from_json_obj/1,to_json_obj/2,has_stubs/1, merge_stubs/2]).
 -export([validate_docid/1]).
 -export([doc_from_multi_part_stream/2]).
@@ -87,20 +87,26 @@ to_json_attachments([], _RevPosIncludeAfter, _DataToFollow) ->
     [];
 to_json_attachments(Atts, RevPosIncludeAfter, DataToFollow) ->
     AttProps = lists:map(
-        fun(#att{len=Len}=Att) ->
+        fun(#att{disk_len=DiskLen}=Att) ->
             {Att#att.name, {[
                 {<<"content_type">>, Att#att.type},
                 {<<"revpos">>, Att#att.revpos}
                 ] ++
                 if Att#att.revpos > RevPosIncludeAfter ->    
                     if DataToFollow ->
-                        [{<<"length">>, Len}, {<<"follows">>, true}];
+                        [{<<"length">>, DiskLen}, {<<"follows">>, true}];
                     true ->
+                        AttData = case Att#att.comp of
+                        true ->
+                            zlib:gunzip(att_to_iolist(Att));
+                        _ ->
+                            att_to_iolist(Att)
+                        end,
                         [{<<"data">>, 
-                            couch_util:encodeBase64(att_to_iolist(Att))}]
+                            couch_util:encodeBase64(AttData)}]
                     end;
                 true ->
-                    [{<<"length">>, Len}, {<<"stub">>, true}]
+                    [{<<"length">>, DiskLen}, {<<"stub">>, true}]
                 end
             }}
         end, Atts),
@@ -187,21 +193,23 @@ transfer_fields([{<<"_attachments">>, {JsonBins}} | Rest], Doc) ->
             Type = proplists:get_value(<<"content_type">>, BinProps),
             Length = proplists:get_value(<<"length">>, BinProps),
             RevPos = proplists:get_value(<<"revpos">>, BinProps, 0),
-            #att{name=Name, data=stub, type=Type, len=Length, revpos=RevPos};
+            #att{name=Name, data=stub, type=Type, att_len=Length,
+                disk_len=Length, revpos=RevPos};
         _ ->
             Type = proplists:get_value(<<"content_type">>, BinProps,
                     ?DEFAULT_ATTACHMENT_CONTENT_TYPE),
             RevPos = proplists:get_value(<<"revpos">>, BinProps, 0),
             case proplists:get_value(<<"follows">>, BinProps) of
             true ->
+                Len = proplists:get_value(<<"length">>, BinProps),
                 #att{name=Name, data=follows, type=Type, 
-                    len=proplists:get_value(<<"length">>, BinProps),
-                        revpos=RevPos};
+                    att_len=Len, disk_len=Len, revpos=RevPos};
             _ ->
                 Value = proplists:get_value(<<"data">>, BinProps),
                 Bin = couch_util:decodeBase64(Value),
-                #att{name=Name, data=Bin, type=Type, len=size(Bin),
-                        revpos=RevPos}
+                LenBin = size(Bin),
+                #att{name=Name, data=Bin, type=Type, att_len=LenBin,
+                        disk_len=LenBin, revpos=RevPos}
             end
         end
     end, JsonBins),
@@ -272,14 +280,16 @@ to_doc_info_path(#full_doc_info{id=Id,rev_tree=Tree}) ->
 
 att_foldl(#att{data=Bin}, Fun, Acc) when is_binary(Bin) ->
     Fun(Bin, Acc);
-att_foldl(#att{data={Fd,Sp},len=Len}, Fun, Acc) when is_tuple(Sp) orelse Sp == null ->
+att_foldl(#att{data={Fd,Sp},att_len=Len}, Fun, Acc) when is_tuple(Sp) orelse Sp == null ->
     % 09 UPGRADE CODE
     couch_stream:old_foldl(Fd, Sp, Len, Fun, Acc);
 att_foldl(#att{data={Fd,Sp},md5=Md5}, Fun, Acc) ->
     couch_stream:foldl(Fd, Sp, Md5, Fun, Acc);
-att_foldl(#att{data=DataFun,len=Len}, Fun, Acc) when is_function(DataFun) ->
+att_foldl(#att{data=DataFun,att_len=Len}, Fun, Acc) when is_function(DataFun) ->
    fold_streamed_data(DataFun, Len, Fun, Acc).
 
+att_foldl_unzip(#att{data={Fd,Sp},md5=Md5}, Fun, Acc) ->
+    couch_stream:foldl_unzip(Fd, Sp, Md5, Fun, Acc).
 
 att_to_iolist(#att{data=Bin}) when is_binary(Bin) ->
     Bin;
@@ -288,7 +298,7 @@ att_to_iolist(#att{data=Iolist}) when is_list(Iolist) ->
 att_to_iolist(#att{data={Fd,Sp}}=Att) ->
     lists:reverse(att_foldl(Att,
         fun(Bin,Acc) -> [Bin|Acc] end, []));
-att_to_iolist(#att{data=DataFun, len=Len}) when is_function(DataFun)->
+att_to_iolist(#att{data=DataFun, att_len=Len}) when is_function(DataFun)->
     lists:reverse(fold_streamed_data(DataFun, Len,
             fun(Data, Acc) -> [Data | Acc] end, [])).
 
@@ -342,11 +352,11 @@ len_doc_to_multi_part_stream(Boundary,JsonBytes,Atts,AttsSinceRevPos) ->
     iolist_size(JsonBytes) +
     4 + % "\r\n--"
     size(Boundary) +
-    + lists:foldl(fun(#att{revpos=RevPos,len=Len}, AccAttsSize) ->
+    + lists:foldl(fun(#att{revpos=RevPos,disk_len=DiskLen}, AccAttsSize) ->
             if RevPos > AttsSinceRevPos ->
                 AccAttsSize +  
                 4 + % "\r\n\r\n"
-                Len +
+                DiskLen +
                 4 + % "\r\n--"
                 size(Boundary);
             true ->
@@ -366,7 +376,13 @@ atts_to_mp([], _Boundary, WriteFun, _AttsSinceRevPos) ->
 atts_to_mp([#att{revpos=RevPos} = Att | RestAtts], Boundary, WriteFun, 
         AttsSinceRevPos) when RevPos > AttsSinceRevPos ->
     WriteFun(<<"\r\n\r\n">>),
-    att_foldl(Att, fun(Data, ok) -> WriteFun(Data) end, ok),
+    AttFun = case Att#att.comp of
+    true ->
+        fun att_foldl_unzip/3;
+    _ ->
+        fun att_foldl/3
+    end,
+    AttFun(Att, fun(Data, ok) -> WriteFun(Data) end, ok),
     WriteFun(<<"\r\n--", Boundary/binary>>),
     atts_to_mp(RestAtts, Boundary, WriteFun, AttsSinceRevPos);
 atts_to_mp([_ | RestAtts], Boundary, WriteFun, AttsSinceRevPos) ->

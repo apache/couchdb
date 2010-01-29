@@ -42,7 +42,7 @@ test() ->
     etap:is(ok, couch_stream:write(Stream, <<>>),
         "Writing an empty binary does nothing."),
 
-    {Ptrs, Length, _} = couch_stream:close(Stream),
+    {Ptrs, Length, _, _, _} = couch_stream:close(Stream),
     etap:is(Ptrs, [0], "Close returns the file pointers."),
     etap:is(Length, 8, "Close also returns the number of bytes written."),
     etap:is(<<"foodfoob">>, read_all(Fd, Ptrs), "Returned pointers are valid."),
@@ -58,7 +58,7 @@ test() ->
     etap:is(ok, couch_stream:write(Stream2, ZeroBits),
         "Successfully wrote 80 0 bits."),
 
-    {Ptrs2, Length2, _} = couch_stream:close(Stream2),
+    {Ptrs2, Length2, _, _, _} = couch_stream:close(Stream2),
     etap:is(Ptrs2, [ExpPtr], "Closing stream returns the file pointers."),
     etap:is(Length2, 20, "Length written is 160 bytes."),
 
@@ -73,7 +73,7 @@ test() ->
         couch_stream:write(Stream3, Data),
         [Data | Acc]
     end, [], lists:seq(1, 1024)),
-    {Ptrs3, Length3, _} = couch_stream:close(Stream3),
+    {Ptrs3, Length3, _, _, _} = couch_stream:close(Stream3),
 
     % 4095 because of 5 * 4096 rem 5 (last write before exceeding threshold)
     % + 5 puts us over the threshold

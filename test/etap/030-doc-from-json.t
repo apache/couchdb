@@ -17,7 +17,11 @@
 %% XXX: Figure out how to -include("couch_db.hrl")
 -record(doc, {id= <<"">>, revs={0, []}, body={[]},
             atts=[], deleted=false, meta=[]}).
--record(att, {name, type, len, md5= <<>>, revpos=0, data}).
+-record(att, {name, type, att_len, disk_len, md5= <<>>, revpos=0, data,
+            comp=false}).
+
+default_config() ->
+    test_util:build_file("etc/couchdb/default_dev.ini").
 
 main(_) ->
     test_util:init_code_path(),
@@ -32,6 +36,8 @@ main(_) ->
     ok.
 
 test() ->
+    couch_config:start_link([default_config()]),
+    couch_config:set("attachments", "compression_level", "0"),
     ok = test_from_json_success(),
     ok = test_from_json_errors(),
     ok.
@@ -85,13 +91,15 @@ test_from_json_success() ->
                     name = <<"my_attachment.fu">>,
                     data = stub,
                     type = <<"application/awesome">>,
-                    len = 45
+                    att_len = 45,
+                    disk_len = 45
                 },
                 #att{
                     name = <<"noahs_private_key.gpg">>,
                     data = <<"I have a pet fish!">>,
                     type = <<"application/pgp-signature">>,
-                    len = 18
+                    att_len = 18,
+                    disk_len = 18
                 }
             ]},
             "Attachments are parsed correctly."

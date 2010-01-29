@@ -25,6 +25,7 @@
 -export([start_json_response/2, start_json_response/3, end_json_response/1]).
 -export([send_response/4,send_method_not_allowed/2,send_error/4, send_redirect/2,send_chunked_error/2]).
 -export([send_json/2,send_json/3,send_json/4,last_chunk/1,parse_multipart_request/3]).
+-export([accepted_encodings/1]).
 
 start_link() ->
     % read config and register for configuration changes
@@ -193,6 +194,12 @@ handle_request(MochiReq, DefaultFun,
         throw:{invalid_json, S} ->
             ?LOG_ERROR("attempted upload of invalid JSON ~s", [S]),
             send_error(HttpReq, {bad_request, "invalid UTF-8 JSON"});
+        throw:unacceptable_encoding ->
+            ?LOG_ERROR("unsupported encoding method for the response", []),
+            send_error(HttpReq, {not_acceptable, "unsupported encoding"});
+        throw:bad_accept_encoding_value ->
+            ?LOG_ERROR("received invalid Accept-Encoding header", []),
+            send_error(HttpReq, bad_request);
         exit:normal ->
             exit(normal);
         throw:Error ->
@@ -260,6 +267,16 @@ header_value(#httpd{mochi_req=MochiReq}, Key, Default) ->
 
 primary_header_value(#httpd{mochi_req=MochiReq}, Key) ->
     MochiReq:get_primary_header_value(Key).
+
+accepted_encodings(#httpd{mochi_req=MochiReq}) ->
+    case MochiReq:accepted_encodings(["gzip", "identity"]) of
+    bad_accept_encoding_value ->
+        throw(bad_accept_encoding_value);
+    [] ->
+        throw(unacceptable_encoding);
+    EncList ->
+        EncList
+    end.
 
 serve_file(#httpd{mochi_req=MochiReq}=Req, RelativePath, DocumentRoot) ->
     serve_file(Req, RelativePath, DocumentRoot, []).

@@ -99,10 +99,13 @@
     {
     name,
     type,
-    len,
+    att_len,
+    disk_len, % length of the attachment in uncompressed form
+              % differs from at_len when comp =:= true
     md5= <<>>,
     revpos=0,
-    data
+    data,
+    comp=false  % gzip compression Y/N
     }).
 
 

@@ -17,7 +17,11 @@
 %% XXX: Figure out how to -include("couch_db.hrl")
 -record(doc, {id= <<"">>, revs={0, []}, body={[]},
             atts=[], deleted=false, meta=[]}).
--record(att, {name, type, len, md5= <<>>, revpos=0, data}).
+-record(att, {name, type, att_len, disk_len, md5= <<>>, revpos=0, data,
+            comp=false}).
+
+default_config() ->
+    test_util:build_file("etc/couchdb/default_dev.ini").
 
 main(_) ->
     test_util:init_code_path(),
@@ -32,6 +36,8 @@ main(_) ->
     ok.
 
 test() ->
+    couch_config:start_link([default_config()]),
+    couch_config:set("attachments", "compression_level", "0"),
     ok = test_to_json_success(),
     ok.
 
@@ -116,14 +122,16 @@ test_to_json_success() ->
                     type = <<"xml/sucks">>, 
                     data = fun() -> ok end,
                     revpos = 1,
-                    len = 400
+                    att_len = 400,
+                    disk_len = 400
                 },
                 #att{
                     name = <<"fast.json">>, 
                     type = <<"json/ftw">>, 
                     data = <<"{\"so\": \"there!\"}">>,
                     revpos = 1,
-                    len = 16
+                    att_len = 16,
+                    disk_len = 16
                 }
             ]},
             {[
@@ -153,7 +161,8 @@ test_to_json_success() ->
                     type = <<"text/plain">>,
                     data = fun() -> <<"diet pepsi">> end,
                     revpos = 1,
-                    len = 10
+                    att_len = 10,
+                    disk_len = 10
                 },
                 #att{
                     name = <<"food.now">>,

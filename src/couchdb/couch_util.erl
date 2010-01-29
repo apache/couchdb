@@ -22,6 +22,7 @@
 -export([to_binary/1, to_integer/1, to_list/1, url_encode/1]).
 -export([json_encode/1, json_decode/1]).
 -export([verify/2]).
+-export([compressible_att_type/1]).
 
 -include("couch_db.hrl").
 -include_lib("kernel/include/file.hrl").
@@ -440,3 +441,25 @@ verify(X, Y) when is_list(X) and is_list(Y) ->
             false
     end;
 verify(_X, _Y) -> false.
+
+compressible_att_type(MimeType) when is_binary(MimeType) ->
+    compressible_att_type(?b2l(MimeType));
+compressible_att_type(MimeType) ->
+    TypeExpList = re:split(
+        couch_config:get("attachments", "compressible_types", ""),
+        "\\s+",
+        [{return, list}]
+    ),
+    lists:any(
+        fun(TypeExp) ->
+            Regexp = "^\\s*" ++
+                re:replace(TypeExp, "\\*", ".*", [{return, list}]) ++ "\\s*$",
+            case re:run(MimeType, Regexp, [caseless]) of
+            {match, _} ->
+                true;
+            _ ->
+                false
+            end
+        end,
+        [T || T <- TypeExpList, T /= []]
+    ).

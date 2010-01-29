@@ -194,8 +194,28 @@ parse_ini_file(IniFile) ->
                 {AccSectionName, AccValues};
             Line2 ->
                 case re:split(Line2, "\s?=\s?", [{return, list}]) of
-                [_SingleElement] -> % no "=" found, ignore this line
-                    {AccSectionName, AccValues};
+                [Value] ->
+                    MultiLineValuePart = case re:run(Line, "^ \\S", []) of
+                    {match, _} ->
+                        true;
+                    _ ->
+                        false
+                    end,
+                    case {MultiLineValuePart, AccValues} of
+                    {true, [{{_, ValueName}, PrevValue} | AccValuesRest]} ->
+                        % remove comment
+                        case re:split(Value, " ;|\t;", [{return, list}]) of
+                        [[]] ->
+                            % empty line
+                            {AccSectionName, AccValues};
+                        [LineValue | _Rest] ->
+                            E = {{AccSectionName, ValueName},
+                                PrevValue ++ " " ++ LineValue},
+                            {AccSectionName, [E | AccValuesRest]}
+                        end;
+                    _ ->
+                        {AccSectionName, AccValues}
+                    end;
                 [""|_LineValues] -> % line begins with "=", ignore
                     {AccSectionName, AccValues};
                 [ValueName|LineValues] -> % yeehaw, got a line!

@@ -12,6 +12,7 @@
 -export([shell_quote/1, cmd/1, cmd_string/1, cmd_port/2]).
 -export([record_to_proplist/2, record_to_proplist/3]).
 -export([safe_relative_path/1, partition/2]).
+-export([parse_qvalues/1, pick_accepted_encodings/3]).
 -export([test/0]).
 
 -define(PERCENT, 37).  % $\%
@@ -435,6 +436,136 @@ shell_quote([C | Rest], Acc) when C =:= $\" orelse C =:= $\` orelse
 shell_quote([C | Rest], Acc) ->
     shell_quote(Rest, [C | Acc]).
 
+%% @spec parse_qvalues(string()) -> [qvalue()] | error()
+%% @type qvalue() -> {element(), q()}
+%% @type element() -> string()
+%% @type q() -> 0.0 .. 1.0
+%% @type error() -> invalid_qvalue_string
+%%
+%% @doc Parses a list (given as a string) of elements with Q values associated
+%%      to them. Elements are separated by commas and each element is separated
+%%      from its Q value by a semicolon. Q values are optional but when missing
+%%      the value of an element is considered as 1.0. A Q value is always in the
+%%      range [0.0, 1.0]. A Q value list is used for example as the value of the
+%%      HTTP "Accept-Encoding" header.
+%%
+%%      Q values are described in section 2.9 of the RFC 2616 (HTTP 1.1).
+%%
+%%      Example:
+%%
+%%      parse_qvalues("gzip; q=0.5, deflate, identity;q=0.0") ->
+%%          [{"gzip", 0.5}, {"deflate", 1.0}, {"identity", 0.0}]
+%%
+parse_qvalues(QValuesStr) ->
+    try
+        {ok, Re} = re:compile("^\\s*q\\s*=\\s*((?:0|1)(?:\\.\\d{1,3})?)\\s*$"),
+        lists:map(
+            fun(Pair) ->
+                case string:tokens(Pair, ";") of
+                    [Enc] ->
+                        {string:strip(Enc), 1.0};
+                    [Enc, QStr] ->
+                        case re:run(QStr, Re, [{capture, [1], list}]) of
+                            {match, [Q]} ->
+                                QVal = case Q of
+                                    "0" ->
+                                        0.0;
+                                    "1" ->
+                                        1.0;
+                                    Else ->
+                                        list_to_float(Else)
+                                end,
+                                case QVal < 0.0 orelse QVal > 1.0 of
+                                    false ->
+                                        {string:strip(Enc), QVal}
+                                end
+                        end
+                end
+            end,
+            string:tokens(string:to_lower(QValuesStr), ",")
+        )
+    catch
+        _Type:_Error ->
+            invalid_qvalue_string
+    end.
+
+%% @spec pick_accepted_encodings(qvalues(), [encoding()], encoding()) ->
+%%    [encoding()]
+%% @type qvalues() -> [ {encoding(), q()} ]
+%% @type encoding() -> string()
+%% @type q() -> 0.0 .. 1.0
+%%
+%% @doc Determines which encodings specified in the given Q values list are
+%%      valid according to a list of supported encodings and a default encoding.
+%%
+%%      The returned list of encodings is sorted, descendingly, according to the
+%%      Q values of the given list. The last element of this list is the given
+%%      default encoding unless this encoding is explicitily or implicitily
+%%      marked with a Q value of 0.0 in the given Q values list.
+%%      Note: encodings with the same Q value are kept in the same order as
+%%            found in the input Q values list.
+%%
+%%      This encoding picking process is described in section 14.3 of the
+%%      RFC 2616 (HTTP 1.1).
+%%
+%%      Example:
+%%
+%%      pick_accepted_encodings(
+%%          [{"gzip", 0.5}, {"deflate", 1.0}],
+%%          ["gzip", "identity"],
+%%          "identity"
+%%      ) ->
+%%          ["gzip", "identity"]
+%%
+pick_accepted_encodings(AcceptedEncs, SupportedEncs, DefaultEnc) ->
+    SortedQList = lists:reverse(
+        lists:sort(fun({_, Q1}, {_, Q2}) -> Q1 < Q2 end, AcceptedEncs)
+    ),
+    {Accepted, Refused} = lists:foldr(
+        fun({E, Q}, {A, R}) ->
+            case Q > 0.0 of
+                true ->
+                    {[E | A], R};
+                false ->
+                    {A, [E | R]}
+            end
+        end,
+        {[], []},
+        SortedQList
+    ),
+    Refused1 = lists:foldr(
+        fun(Enc, Acc) ->
+            case Enc of
+                "*" ->
+                    lists:subtract(SupportedEncs, Accepted) ++ Acc;
+                _ ->
+                    [Enc | Acc]
+            end
+        end,
+        [],
+        Refused
+    ),
+    Accepted1 = lists:foldr(
+        fun(Enc, Acc) ->
+            case Enc of
+                "*" ->
+                    lists:subtract(SupportedEncs, Accepted ++ Refused1) ++ Acc;
+                _ ->
+                    [Enc | Acc]
+            end
+        end,
+        [],
+        Accepted
+    ),
+    Accepted2 = case lists:member(DefaultEnc, Accepted1) of
+        true ->
+            Accepted1;
+        false ->
+            Accepted1 ++ [DefaultEnc]
+    end,
+    [E || E <- Accepted2, lists:member(E, SupportedEncs),
+        not lists:member(E, Refused1)].
+
 test() ->
     test_join(),
     test_quote_plus(),
@@ -453,6 +584,8 @@ test() ->
     test_cmd_string(),
     test_partition(),
     test_safe_relative_path(),
+    test_parse_qvalues(),
+    test_pick_accepted_encodings(),
     ok.
 
 test_shell_quote() ->
@@ -574,4 +707,153 @@ test_safe_relative_path() ->
     undefined = safe_relative_path("../foo"),
     undefined = safe_relative_path("foo/../.."),
     undefined = safe_relative_path("foo//"),
+    ok.
+
+test_parse_qvalues() ->
+    [] = parse_qvalues(""),
+    [{"identity", 0.0}] = parse_qvalues("identity;q=0"),
+    [{"identity", 0.0}] = parse_qvalues("identity ;q=0"),
+    [{"identity", 0.0}] = parse_qvalues(" identity; q =0 "),
+    [{"identity", 0.0}] = parse_qvalues("identity ; q = 0"),
+    [{"identity", 0.0}] = parse_qvalues("identity ; q= 0.0"),
+    [{"gzip", 1.0}, {"deflate", 1.0}, {"identity", 0.0}] = parse_qvalues(
+        "gzip,deflate,identity;q=0.0"
+    ),
+    [{"deflate", 1.0}, {"gzip", 1.0}, {"identity", 0.0}] = parse_qvalues(
+        "deflate,gzip,identity;q=0.0"
+    ),
+    [{"gzip", 1.0}, {"deflate", 1.0}, {"gzip", 1.0}, {"identity", 0.0}] =
+        parse_qvalues("gzip,deflate,gzip,identity;q=0"),
+    [{"gzip", 1.0}, {"deflate", 1.0}, {"identity", 0.0}] = parse_qvalues(
+        "gzip, deflate , identity; q=0.0"
+    ),
+    [{"gzip", 1.0}, {"deflate", 1.0}, {"identity", 0.0}] = parse_qvalues(
+        "gzip; q=1, deflate;q=1.0, identity;q=0.0"
+    ),
+    [{"gzip", 0.5}, {"deflate", 1.0}, {"identity", 0.0}] = parse_qvalues(
+        "gzip; q=0.5, deflate;q=1.0, identity;q=0"
+    ),
+    [{"gzip", 0.5}, {"deflate", 1.0}, {"identity", 0.0}] = parse_qvalues(
+        "gzip; q=0.5, deflate , identity;q=0.0"
+    ),
+    [{"gzip", 0.5}, {"deflate", 0.8}, {"identity", 0.0}] = parse_qvalues(
+        "gzip; q=0.5, deflate;q=0.8, identity;q=0.0"
+    ),
+    [{"gzip", 0.5}, {"deflate", 1.0}, {"identity", 1.0}] = parse_qvalues(
+        "gzip; q=0.5,deflate,identity"
+    ),
+    [{"gzip", 0.5}, {"deflate", 1.0}, {"identity", 1.0}, {"identity", 1.0}] =
+        parse_qvalues("gzip; q=0.5,deflate,identity, identity "),
+    invalid_qvalue_string = parse_qvalues("gzip; q=1.1, deflate"),
+    invalid_qvalue_string = parse_qvalues("gzip; q=0.5, deflate;q=2"),
+    invalid_qvalue_string = parse_qvalues("gzip, deflate;q=AB"),
+    invalid_qvalue_string = parse_qvalues("gzip; q=2.1, deflate"),
+    ok.
+
+test_pick_accepted_encodings() ->
+    ["identity"] = pick_accepted_encodings(
+        [],
+        ["gzip", "identity"],
+        "identity"
+    ),
+    ["gzip", "identity"] = pick_accepted_encodings(
+        [{"gzip", 1.0}],
+        ["gzip", "identity"],
+        "identity"
+    ),
+    ["identity"] = pick_accepted_encodings(
+        [{"gzip", 0.0}],
+        ["gzip", "identity"],
+        "identity"
+    ),
+    ["gzip", "identity"] = pick_accepted_encodings(
+        [{"gzip", 1.0}, {"deflate", 1.0}],
+        ["gzip", "identity"],
+        "identity"
+    ),
+    ["gzip", "identity"] = pick_accepted_encodings(
+        [{"gzip", 0.5}, {"deflate", 1.0}],
+        ["gzip", "identity"],
+        "identity"
+    ),
+    ["identity"] = pick_accepted_encodings(
+        [{"gzip", 0.0}, {"deflate", 0.0}],
+        ["gzip", "identity"],
+        "identity"
+    ),
+    ["gzip"] = pick_accepted_encodings(
+        [{"gzip", 1.0}, {"deflate", 1.0}, {"identity", 0.0}],
+        ["gzip", "identity"],
+        "identity"
+    ),
+    ["gzip", "deflate", "identity"] = pick_accepted_encodings(
+        [{"gzip", 1.0}, {"deflate", 1.0}],
+        ["gzip", "deflate", "identity"],
+        "identity"
+    ),
+    ["gzip", "deflate"] = pick_accepted_encodings(
+        [{"gzip", 1.0}, {"deflate", 1.0}, {"identity", 0.0}],
+        ["gzip", "deflate", "identity"],
+        "identity"
+    ),
+    ["deflate", "gzip", "identity"] = pick_accepted_encodings(
+        [{"gzip", 0.2}, {"deflate", 1.0}],
+        ["gzip", "deflate", "identity"],
+        "identity"
+    ),
+    ["deflate", "deflate", "gzip", "identity"] = pick_accepted_encodings(
+        [{"gzip", 0.2}, {"deflate", 1.0}, {"deflate", 1.0}],
+        ["gzip", "deflate", "identity"],
+        "identity"
+    ),
+    ["deflate", "gzip", "gzip", "identity"] = pick_accepted_encodings(
+        [{"gzip", 0.2}, {"deflate", 1.0}, {"gzip", 1.0}],
+        ["gzip", "deflate", "identity"],
+        "identity"
+    ),
+    ["gzip", "deflate", "gzip", "identity"] = pick_accepted_encodings(
+        [{"gzip", 0.2}, {"deflate", 0.9}, {"gzip", 1.0}],
+        ["gzip", "deflate", "identity"],
+        "identity"
+    ),
+    [] = pick_accepted_encodings(
+        [{"*", 0.0}],
+        ["gzip", "deflate", "identity"],
+        "identity"
+    ),
+    ["gzip", "deflate", "identity"] = pick_accepted_encodings(
+        [{"*", 1.0}],
+        ["gzip", "deflate", "identity"],
+        "identity"
+    ),
+    ["gzip", "deflate", "identity"] = pick_accepted_encodings(
+        [{"*", 0.6}],
+        ["gzip", "deflate", "identity"],
+        "identity"
+    ),
+    ["gzip"] = pick_accepted_encodings(
+        [{"gzip", 1.0}, {"*", 0.0}],
+        ["gzip", "deflate", "identity"],
+        "identity"
+    ),
+    ["gzip", "deflate"] = pick_accepted_encodings(
+        [{"gzip", 1.0}, {"deflate", 0.6}, {"*", 0.0}],
+        ["gzip", "deflate", "identity"],
+        "identity"
+    ),
+    ["deflate", "gzip"] = pick_accepted_encodings(
+        [{"gzip", 0.5}, {"deflate", 1.0}, {"*", 0.0}],
+        ["gzip", "deflate", "identity"],
+        "identity"
+    ),
+    ["gzip", "identity"] = pick_accepted_encodings(
+        [{"deflate", 0.0}, {"*", 1.0}],
+        ["gzip", "deflate", "identity"],
+        "identity"
+    ),
+    ["gzip", "identity"] = pick_accepted_encodings(
+        [{"*", 1.0}, {"deflate", 0.0}],
+        ["gzip", "deflate", "identity"],
+        "identity"
+    ),
     ok.

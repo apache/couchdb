@@ -20,6 +20,7 @@
 -export([should_close/0, cleanup/0]).
 -export([parse_cookie/0, get_cookie_value/1]).
 -export([serve_file/2, serve_file/3]).
+-export([accepted_encodings/1]).
 -export([test/0]).
 
 -define(SAVE_QS, mochiweb_request_qs).
@@ -730,6 +731,46 @@ parse_range_request(RawRange) when is_list(RawRange) ->
             fail
     end.
 
+%% @spec accepted_encodings([encoding()]) -> [encoding()] | error()
+%% @type encoding() -> string()
+%% @type error() -> bad_accept_encoding_value
+%%
+%% @doc Returns a list of encodings accepted by a request. Encodings that are
+%%      not supported by the server will not be included in the return list.
+%%      This list is computed from the "Accept-Encoding" header and
+%%      its elements are ordered, descendingly, according to their Q values.
+%%
+%%      Section 14.3 of the RFC 2616 (HTTP 1.1) describes the "Accept-Encoding"
+%%      header and the process of determining which server supported encodings
+%%      can be used for encoding the body for the request's response.
+%%
+%%      Examples
+%%
+%%      1) For a missing "Accept-Encoding" header:
+%%         accepted_encodings(["gzip", "identity"]) -> ["identity"]
+%%
+%%      2) For an "Accept-Encoding" header with value "gzip, deflate":
+%%         accepted_encodings(["gzip", "identity"]) -> ["gzip", "identity"]
+%%
+%%      3) For an "Accept-Encoding" header with value "gzip;q=0.5, deflate":
+%%         accepted_encodings(["gzip", "deflate", "identity"]) ->
+%%            ["deflate", "gzip", "identity"]
+%%
+accepted_encodings(SupportedEncodings) ->
+    AcceptEncodingHeader = case get_header_value("Accept-Encoding") of
+        undefined ->
+            "";
+        Value ->
+            Value
+    end,
+    case mochiweb_util:parse_qvalues(AcceptEncodingHeader) of
+        invalid_qvalue_string ->
+            bad_accept_encoding_value;
+        QList ->
+            mochiweb_util:pick_accepted_encodings(
+                QList, SupportedEncodings, "identity"
+            )
+    end.
 
 test() ->
     ok = test_range(),
