@@ -21,6 +21,8 @@ start_link(Parent, Target, Reader, _PostProps) ->
 
 writer_loop(Parent, Reader, Target) ->
     case couch_rep_reader:next(Reader) of
+    {complete, nil} ->
+        ok;
     {complete, FinalSeq} ->
         Parent ! {writer_checkpoint, FinalSeq},
         ok;
@@ -38,7 +40,12 @@ writer_loop(Parent, Reader, Target) ->
             ?LOG_DEBUG("writer failed to write an attachment ~p", [Err]),
             exit({attachment_request_failed, Err, Docs})
         end,
-        Parent ! {writer_checkpoint, HighSeq},
+        case HighSeq of
+        nil ->
+            ok;
+        _SeqNumber ->
+            Parent ! {writer_checkpoint, HighSeq}
+        end,
         couch_rep_att:cleanup(),
         couch_util:should_flush(),
         writer_loop(Parent, Reader, Target)
