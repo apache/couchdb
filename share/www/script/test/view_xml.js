@@ -22,7 +22,7 @@ couchTests.view_xml = function(debug) {
   var results = db.query(
     "function(doc) {\n" +
     "  var xml = new XML(doc.content);\n" +
-    "  emit(xml.title.text(), null);\n" +
+    "  emit(xml.title.text().toXMLString(), null);\n" +
     "}");
   T(results.total_rows == 2);
   T(results.rows[0].key == "Testing E4X");
@@ -31,7 +31,7 @@ couchTests.view_xml = function(debug) {
   var results = db.query(
     "function(doc) {\n" +
     "  var xml = new XML(doc.content);\n" +
-    "  emit(xml.title.@id, null);\n" +
+    "  emit(xml.title.@id.toXMLString(), null);\n" +
     "}");
   T(results.total_rows == 2);
   T(results.rows[0].key == "e4x");
