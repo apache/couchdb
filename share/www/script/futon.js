@@ -361,6 +361,7 @@
 
   }
 
+  $.couch.urlPrefix = "..";
   $.futon = $.futon || {};
   $.extend($.futon, {
     navigation: new Navigation(),

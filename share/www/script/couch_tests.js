@@ -19,6 +19,7 @@ if (typeof window == 'undefined' || !window) {
   CouchDB.inBrowser = true;
 }
 
+CouchDB.urlPrefix = "..";
 var couchTests = {};
 
 function loadTest(file) {

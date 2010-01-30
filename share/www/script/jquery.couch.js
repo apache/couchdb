@@ -44,9 +44,10 @@
   uuidCache = [];
 
   $.extend($.couch, {
+    urlPrefix: '',
     activeTasks: function(options) {
       ajax(
-        {url: "/_active_tasks"},
+        {url: this.urlPrefix + "/_active_tasks"},
         options,
         "Active task status could not be retrieved"
       );
@@ -54,14 +55,14 @@
 
     allDbs: function(options) {
       ajax(
-        {url: "/_all_dbs"},
+        {url: this.urlPrefix + "/_all_dbs"},
         options,
         "An error occurred retrieving the list of all databases"
       );
     },
 
     config: function(options, section, option, value) {
-      var req = {url: "/_config/"};
+      var req = {url: this.urlPrefix + "/_config/"};
       if (section) {
         req.url += encodeURIComponent(section) + "/";
         if (option) {
@@ -85,7 +86,7 @@
     session: function(options) {
       options = options || {};
       $.ajax({
-        type: "GET", url: "/_session",
+        type: "GET", url: this.urlPrefix + "/_session",
         complete: function(req) {
           var resp = $.httpData(req, "json");
           if (req.status == 200) {
@@ -120,7 +121,7 @@
     login: function(options) {
       options = options || {};
       $.ajax({
-        type: "POST", url: "/_session", dataType: "json",
+        type: "POST", url: this.urlPrefix + "/_session", dataType: "json",
         data: {name: options.name, password: options.password},
         complete: function(req) {
           var resp = $.httpData(req, "json");
@@ -137,7 +138,7 @@
     logout: function(options) {
       options = options || {};
       $.ajax({
-        type: "DELETE", url: "/_session", dataType: "json",
+        type: "DELETE", url: this.urlPrefix + "/_session", dataType: "json",
         username : "_", password : "_",
         complete: function(req) {
           var resp = $.httpData(req, "json");
@@ -155,7 +156,7 @@
     db: function(name) {
       return {
         name: name,
-        uri: "/" + encodeURIComponent(name) + "/",
+        uri: this.urlPrefix + "/" + encodeURIComponent(name) + "/",
 
         compact: function(options) {
           $.extend(options, {successStatus: 202});
@@ -377,7 +378,7 @@
 
     info: function(options) {
       ajax(
-        {url: "/"},
+        {url: this.urlPrefix + "/"},
         options,
         "Server information could not be retrieved"
       );
@@ -385,7 +386,7 @@
 
     replicate: function(source, target, options) {
       ajax({
-          type: "POST", url: "/_replicate",
+          type: "POST", url: this.urlPrefix + "/_replicate",
           data: JSON.stringify({source: source, target: target}),
           contentType: "application/json"
         },
@@ -399,7 +400,7 @@
         cacheNum = 1;
       }
       if (!uuidCache.length) {
-        ajax({url: "/_uuids", data: {count: cacheNum}, async: false}, {
+        ajax({url: this.urlPrefix + "/_uuids", data: {count: cacheNum}, async: false}, {
             success: function(resp) {
               uuidCache = resp.uuids
             }

@@ -321,6 +321,7 @@ function CouchDB(name, httpHeaders) {
 // CouchDB.* functions (except for calls to request itself).
 // Use this from callers to check HTTP status or header values of requests.
 CouchDB.last_req = null;
+CouchDB.urlPrefix = '';
 
 CouchDB.login = function(name, password) {
   CouchDB.last_req = CouchDB.request("POST", "/_session", {
@@ -411,7 +412,7 @@ CouchDB.newXhr = function() {
 CouchDB.request = function(method, uri, options) {
   options = options || {};
   var req = CouchDB.newXhr();
-  req.open(method, uri, false);
+  req.open(method, CouchDB.urlPrefix + uri, false);
   if (options.headers) {
     var headers = options.headers;
     for (var headerName in headers) {
