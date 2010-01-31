@@ -87,6 +87,7 @@ _view = {couch_httpd_view, handle_view_req}
 _show = {couch_httpd_show, handle_doc_show_req}
 _list = {couch_httpd_show, handle_view_list_req}
 _info = {couch_httpd_db,   handle_design_info_req}
+_rewrite = {couch_httpd_rewrite, handle_rewrite_req}
 _update = {couch_httpd_show, handle_doc_update_req}
 
 [uuids]
