@@ -288,7 +288,8 @@
           $.extend(options, {successStatus: 201});
           ajax({
               type: "POST",
-              url: this.uri + "_bulk_docs" + encodeOptions(options)
+              url: this.uri + "_bulk_docs" + encodeOptions(options),
+              data: toJSON(docs)
             },
             options,
             "The documents could not be saved"
