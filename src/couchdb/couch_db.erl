@@ -17,7 +17,7 @@
 -export([open_ref_counted/2,is_idle/1,monitor/1,count_changes_since/2]).
 -export([update_doc/3,update_doc/4,update_docs/4,update_docs/2,update_docs/3,delete_doc/3]).
 -export([get_doc_info/2,open_doc/2,open_doc/3,open_doc_revs/4]).
--export([set_revs_limit/2,get_revs_limit/1,register_update_notifier/3]).
+-export([set_revs_limit/2,get_revs_limit/1]).
 -export([get_missing_revs/2,name/1,doc_to_tree/1,get_update_seq/1,get_committed_update_seq/1]).
 -export([enum_docs/4,enum_docs_since/5]).
 -export([enum_docs_since_reduce_to_count/1,enum_docs_reduce_to_count/1]).
@@ -82,9 +82,6 @@ is_idle(MainPid) ->
 
 monitor(#db{main_pid=MainPid}) ->
     erlang:monitor(process, MainPid).
-
-register_update_notifier(#db{main_pid=Pid}, Seq, Fun) ->
-    gen_server:call(Pid, {register_update_notifier, Seq, Fun}).
 
 start_compact(#db{update_pid=Pid}) ->
     gen_server:cast(Pid, start_compact).
