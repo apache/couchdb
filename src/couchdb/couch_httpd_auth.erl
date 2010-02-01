@@ -118,7 +118,7 @@ get_user(UserName) ->
                   {<<"salt">>, ?l2b(Salt)},
                   {<<"password_sha">>, ?l2b(HashedPwd)}]
         end;
-    Else ->
+    _Else ->
         get_user_props_from_db(UserName)
     end.
 
@@ -139,12 +139,12 @@ get_user_props_from_db(UserName) ->
                             ?LOG_ERROR("Invalid user doc. Id: ~p",[DocId]),
                             nil
                     end;
-                Else ->
+                _Else ->
                     throw({unauthorized, <<"User document conflict must be resolved before login.">>})
             end
     catch
-        throw:Throw ->
-            nil        
+        throw:_Throw ->
+            nil
     end.
 
 % this should handle creating the ddoc
@@ -163,7 +163,7 @@ ensure_auth_ddoc_exists(Db, DDocId) ->
     try couch_httpd_db:couch_doc_open(Db, DDocId, nil, []) of
         _Foo -> ok
     catch 
-        _:Error -> 
+        _:_Error -> 
             % create the design document
             {ok, AuthDesign} = auth_design_doc(DDocId),
             {ok, _Rev} = couch_db:update_doc(Db, AuthDesign, []),
@@ -248,9 +248,9 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
     Cookie -> 
         [User, TimeStr | HashParts] = try
             AuthSession = couch_util:decodeBase64Url(Cookie),
-            [A, B | Cs] = string:tokens(?b2l(AuthSession), ":")
+            [_A, _B | _Cs] = string:tokens(?b2l(AuthSession), ":")
         catch
-            _:Error ->
+            _:_Error ->
                 Reason = <<"Malformed AuthSession cookie. Please clear your cookies.">>,
                 throw({bad_request, Reason})
         end,
@@ -416,11 +416,9 @@ handle_session_req(#httpd{method='DELETE'}=Req) ->
 handle_session_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD,POST,DELETE").
 
-maybe_value(Key, undefined, Fun) -> [];
+maybe_value(_Key, undefined, _Fun) -> [];
 maybe_value(Key, Else, Fun) -> 
     [{Key, Fun(Else)}].
-maybe_value(Key, undefined) -> [];
-maybe_value(Key, Else) -> [{Key, Else}].
 
 auth_name(String) when is_list(String) ->
     [_,_,_,_,_,Name|_] = re:split(String, "[\\W_]", [{return, list}]),

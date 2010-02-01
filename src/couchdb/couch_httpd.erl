@@ -278,7 +278,7 @@ accepted_encodings(#httpd{mochi_req=MochiReq}) ->
         EncList
     end.
 
-serve_file(#httpd{mochi_req=MochiReq}=Req, RelativePath, DocumentRoot) ->
+serve_file(Req, RelativePath, DocumentRoot) ->
     serve_file(Req, RelativePath, DocumentRoot, []).
 
 serve_file(#httpd{mochi_req=MochiReq}=Req, RelativePath, DocumentRoot, ExtraHeaders) ->
