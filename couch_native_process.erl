@@ -40,7 +40,8 @@
 -module(couch_native_process).
 -behaviour(gen_server).
 
--export([start_link/0,init/1,terminate/2,handle_call/3,handle_cast/2]).
+-export([start_link/0,init/1,terminate/2,handle_call/3,handle_cast/2,code_change/3,
+         handle_info/2]).
 -export([set_timeout/2, prompt/2]).
 
 -define(STATE, native_proc_state).
@@ -76,16 +77,18 @@ handle_call({prompt, Data}, _From, State) ->
             throw:{error, Why} ->
                 {State, [<<"error">>, Why, Why]}
         end,
-    
+
     case Resp of
         {error, Reason} ->
             Msg = io_lib:format("couch native server error: ~p", [Reason]),
             {reply, [<<"error">>, <<"native_query_server">>, list_to_binary(Msg)], NewState};
         [<<"error">> | Rest] ->
-            Msg = io_lib:format("couch native server error: ~p", [Rest]),
+            % Msg = io_lib:format("couch native server error: ~p", [Rest]),
+            % TODO: markh? (jan)
             {reply, [<<"error">> | Rest], NewState};
         [<<"fatal">> | Rest] ->
-            Msg = io_lib:format("couch native server error: ~p", [Rest]),
+            % Msg = io_lib:format("couch native server error: ~p", [Rest]),
+            % TODO: markh? (jan)
             {stop, fatal, [<<"error">> | Rest], NewState};
         Resp ->
             {reply, Resp, NewState}
@@ -169,11 +172,11 @@ ddoc(State, {DDoc}, [FunPath, Args]) ->
     BFun = lists:foldl(fun
         (Key, {Props}) when is_list(Props) ->
             proplists:get_value(Key, Props, nil);
-        (Key, Fun) when is_binary(Fun) ->
+        (_Key, Fun) when is_binary(Fun) ->
             Fun;
-        (Key, nil) ->
+        (_Key, nil) ->
             throw({error, not_found});
-        (Key, Fun) -> 
+        (_Key, _Fun) ->
             throw({error, malformed_ddoc})
         end, {DDoc}, FunPath),
     ddoc(State, makefun(State, BFun, {DDoc}), FunPath, Args).
@@ -238,7 +241,7 @@ load_ddoc(DDocs, DDocId) ->
     try dict:fetch(DDocId, DDocs) of
         {DDoc} -> {DDoc}
     catch
-        _:Else -> throw({error, ?l2b(io_lib:format("Native Query Server missing DDoc with Id: ~s",[DDocId]))})
+        _:_Else -> throw({error, ?l2b(io_lib:format("Native Query Server missing DDoc with Id: ~s",[DDocId]))})
     end.
 
 bindings(State, Sig) ->
@@ -300,7 +303,7 @@ bindings(State, Sig, DDoc) ->
         {'FoldRows', FoldRows}
     ],
     case DDoc of
-        {Props} ->
+        {_Props} ->
             Bindings ++ [{'DDoc', DDoc}];
         _Else -> Bindings
     end.

@@ -51,7 +51,7 @@ start_link(Parent, Source, MissingRevs_or_DocIds, PostProps) ->
 next(Pid) ->
     gen_server:call(Pid, next_docs, infinity).
 
-init([Parent, Source, MissingRevs_or_DocIds, PostProps]) ->
+init([Parent, Source, MissingRevs_or_DocIds, _PostProps]) ->
     process_flag(trap_exit, true),
     if is_record(Source, http_db) ->
         #url{host=Host, port=Port} = ibrowse_lib:parse_url(Source#http_db.url),

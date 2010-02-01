@@ -237,7 +237,7 @@ make_filter_fun(Req, Db) ->
         couch_util:get_nested_json_value({Props}, [<<"filters">>, FName]),
         fun(DocInfos) ->
             Docs = [Doc || {ok, Doc} <- [
-                {ok, Doc} = couch_db:open_doc(Db, DInfo, [deleted, conflicts])
+                {ok, _Doc} = couch_db:open_doc(Db, DInfo, [deleted, conflicts])
                 || DInfo <- DocInfos]],
             {ok, Passes} = couch_query_servers:filter_docs(Req, Db, DDoc, FName, Docs),
             [{[{rev, couch_doc:rev_to_str(Rev)}]}
@@ -1153,17 +1153,6 @@ get_md5_header(Req) ->
         _ ->
             <<>>
     end.
-
-parse_doc_format(FormatStr) when is_binary(FormatStr) ->
-    parse_doc_format(?b2l(FormatStr));
-parse_doc_format(FormatStr) when is_list(FormatStr) ->
-    SplitFormat = lists:splitwith(fun($/) -> false; (_) -> true end, FormatStr),
-    case SplitFormat of
-        {DesignName, [$/ | ShowName]} -> {?l2b(DesignName), ?l2b(ShowName)};
-        _Else -> throw({bad_request, <<"Invalid doc format">>})
-    end;
-parse_doc_format(_BadFormatStr) ->
-    throw({bad_request, <<"Invalid doc format">>}).
 
 parse_doc_query(Req) ->
     lists:foldl(fun({Key,Value}, Args) ->

@@ -406,11 +406,6 @@ get_ddoc_process(#doc{} = DDoc, DDocKey) ->
         throw(Error)
     end.
 
-ret_ddoc_process(Proc) ->
-    true = gen_server:call(couch_query_servers, {ret_proc, Proc}),
-    catch unlink(Proc#proc.pid),
-    ok.
-
 get_os_process(Lang) ->
     case gen_server:call(couch_query_servers, {get_proc, Lang}) of
     {ok, Proc, QueryConfig} ->

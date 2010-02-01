@@ -295,7 +295,7 @@ att_to_iolist(#att{data=Bin}) when is_binary(Bin) ->
     Bin;
 att_to_iolist(#att{data=Iolist}) when is_list(Iolist) ->
     Iolist;
-att_to_iolist(#att{data={Fd,Sp}}=Att) ->
+att_to_iolist(#att{data={_Fd,_Sp}}=Att) ->
     lists:reverse(att_foldl(Att,
         fun(Bin,Acc) -> [Bin|Acc] end, []));
 att_to_iolist(#att{data=DataFun, att_len=Len}) when is_function(DataFun)->
