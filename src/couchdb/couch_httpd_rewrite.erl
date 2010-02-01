@@ -31,7 +31,7 @@
 %%
 %%  { 
 %%      .... 
-%%      "rewrite": [ 
+%%      "rewrites": [ 
 %%      { 
 %%          "from": "", 
 %%          "to": "index.html", 
@@ -57,7 +57,7 @@
 %% "*". ex:
 %% /somepath/:var/*
 %%
-%% This path are converted in erlang list by splitting "/". Each var are 
+%% This path is converted in erlang list by splitting "/". Each var are 
 %% converted in atom. "*" is converted to '*' atom. The pattern matching is done
 %% by splitting "/" in request url in a list of token. A string pattern will 
 %% match equal token. The star atom ('*' in single quotes) will match any number 
