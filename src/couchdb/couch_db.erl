@@ -22,7 +22,8 @@
 -export([enum_docs/4,enum_docs_since/5]).
 -export([enum_docs_since_reduce_to_count/1,enum_docs_reduce_to_count/1]).
 -export([increment_update_seq/1,get_purge_seq/1,purge_docs/2,get_last_purged/1]).
--export([start_link/3,open_doc_int/3,set_admins/2,get_admins/1,ensure_full_commit/1]).
+-export([start_link/3,open_doc_int/3,ensure_full_commit/1]).
+-export([set_readers/2,get_readers/1,set_admins/2,get_admins/1,set_security/2,get_security/1]).
 -export([init/1,terminate/2,handle_call/3,handle_cast/2,code_change/3,handle_info/2]).
 -export([changes_since/5,changes_since/6,read_doc/2,new_revid/1]).
 
@@ -64,7 +65,18 @@ create(DbName, Options) ->
     couch_server:create(DbName, Options).
 
 open(DbName, Options) ->
-    couch_server:open(DbName, Options).
+    case couch_server:open(DbName, Options) of
+        {ok, Db} ->
+            try
+                check_is_reader(Db),
+                {ok, Db}
+            catch
+                throw:Error ->
+                    close(Db),
+                    throw(Error)
+            end;
+        Else -> Else
+    end.
 
 ensure_full_commit(#db{update_pid=UpdatePid,instance_start_time=StartTime}) ->
     ok = gen_server:call(UpdatePid, full_commit, infinity),
@@ -218,22 +230,103 @@ get_design_docs(#db{fulldocinfo_by_id_btree=Btree}=Db) ->
         [], [{start_key, <<"_design/">>}, {end_key_gt, <<"_design0">>}]),
     {ok, Docs}.
 
-check_is_admin(#db{admins=Admins, user_ctx=#user_ctx{name=Name,roles=Roles}}) ->
-    DbAdmins = [<<"_admin">> | Admins],
-    case DbAdmins -- [Name | Roles] of
-    DbAdmins -> % same list, not an admin
-        throw({unauthorized, <<"You are not a db or server admin.">>});
+check_is_admin(#db{user_ctx=#user_ctx{name=Name,roles=Roles}}=Db) ->
+    {Admins} = get_admins(Db),
+    AdminRoles = [<<"_admin">> | proplists:get_value(roles, Admins, [])],
+    AdminNames = proplists:get_value(names, Admins,[]),
+    case AdminRoles -- Roles of
+    AdminRoles -> % same list, not an admin role
+        case AdminNames -- [Name] of
+        AdminNames -> % same names, not an admin
+            throw({unauthorized, <<"You are not a db or server admin.">>});
+        _ ->
+            ok
+        end;
     _ ->
         ok
     end.
 
-get_admins(#db{admins=Admins}) ->
-    Admins.
+check_is_reader(#db{user_ctx=#user_ctx{name=Name,roles=Roles}=UserCtx}=Db) ->
+    % admins are not readers. this is for good reason. 
+    % we don't want to confuse setting admins with making private dbs
+    {Readers} = get_readers(Db),
+    ReaderRoles = proplists:get_value(roles, Readers,[]),
+    WithAdminRoles = [<<"_admin">> | ReaderRoles],
+    ReaderNames = proplists:get_value(names, Readers,[]),
+    case ReaderRoles ++ ReaderNames of 
+    [] -> ok; % no readers == public access
+    _Else ->
+        case WithAdminRoles -- Roles of
+        WithAdminRoles -> % same list, not an reader role
+            case ReaderNames -- [Name] of
+            ReaderNames -> % same names, not a reader
+                ?LOG_DEBUG("Not a reader: UserCtx ~p vs Names ~p Roles ~p",[UserCtx, ReaderNames, WithAdminRoles]),
+                throw({unauthorized, <<"You are not authorized to access this db.">>});
+            _ ->
+                ok
+            end;
+        _ ->
+            ok
+        end
+    end.
 
-set_admins(#db{update_pid=Pid}=Db, Admins) when is_list(Admins) ->
+get_admins(#db{security=SecProps}) ->
+    proplists:get_value(admins, SecProps, {[]}).
+
+set_admins(#db{security=SecProps,update_pid=Pid}=Db, Admins) ->
     check_is_admin(Db),
-    gen_server:call(Pid, {set_admins, Admins}, infinity).
+    SecProps2 = update_sec_field(admins, SecProps, just_names_and_roles(Admins)),
+    gen_server:call(Pid, {set_security, SecProps2}, infinity).
 
+get_readers(#db{security=SecProps}) ->
+    proplists:get_value(readers, SecProps, {[]}).
+
+set_readers(#db{security=SecProps,update_pid=Pid}=Db, Readers) ->
+    check_is_admin(Db),
+    SecProps2 = update_sec_field(readers, SecProps, just_names_and_roles(Readers)),
+    gen_server:call(Pid, {set_security, SecProps2}, infinity).
+
+get_security(#db{security=SecProps}) ->
+    proplists:get_value(sec_obj, SecProps, {[]}).
+
+set_security(#db{security=SecProps, update_pid=Pid}=Db, {SecObjProps}) when is_list(SecObjProps) ->
+    check_is_admin(Db),
+    SecProps2 = update_sec_field(sec_obj, SecProps, {SecObjProps}),
+    gen_server:call(Pid, {set_security, SecProps2}, infinity).
+
+update_sec_field(Field, SecProps, Value) ->
+    Admins = proplists:get_value(admins, SecProps, {[]}),
+    Readers = proplists:get_value(readers, SecProps, {[]}),
+    SecObj = proplists:get_value(sec_obj, SecProps, {[]}),
+    if Field == admins ->
+        [{admins, Value}];
+    true -> [{admins, Admins}] 
+    end ++ if Field == readers ->
+        [{readers, Value}];
+    true -> [{readers, Readers}] 
+    end ++ if Field == sec_obj ->
+        [{sec_obj, Value}];
+    true -> [{sec_obj, SecObj}]
+    end.
+
+% validate user input and convert proplist to atom keys
+just_names_and_roles({Props}) when is_list(Props) ->
+    Names = case proplists:get_value(<<"names">>,Props) of
+    Ns when is_list(Ns) ->
+            [throw("names must be a JSON list of strings") ||N <- Ns, not is_binary(N)],
+            Ns;
+    _ -> []
+    end,
+    Roles = case proplists:get_value(<<"roles">>,Props) of
+    Rs when is_list(Rs) ->
+        [throw("roles must be a JSON list of strings") ||R <- Rs, not is_binary(R)],
+        Rs;
+    _ -> []
+    end,
+    {[
+        {names, Names},
+        {roles, Roles}
+    ]}.
 
 get_revs_limit(#db{revs_limit=Limit}) ->
     Limit.
@@ -282,18 +375,8 @@ group_alike_docs([Doc|Rest], [Bucket|RestBuckets]) ->
        group_alike_docs(Rest, [[Doc]|[Bucket|RestBuckets]])
     end.
 
-
-validate_doc_update(#db{user_ctx=UserCtx, admins=Admins},
-        #doc{id= <<"_design/",_/binary>>}, _GetDiskDocFun) ->
-    UserNames = [UserCtx#user_ctx.name | UserCtx#user_ctx.roles],
-    % if the user is a server admin or db admin, allow the save
-    case length(UserNames -- [<<"_admin">> | Admins]) =:= length(UserNames) of
-    true ->
-        % not an admin
-        {unauthorized, <<"You are not a server or database admin.">>};
-    false ->
-        ok
-    end;
+validate_doc_update(#db{}=Db, #doc{id= <<"_design/",_/binary>>}, _GetDiskDocFun) ->
+    catch check_is_admin(Db);
 validate_doc_update(#db{validate_doc_funs=[]}, _Doc, _GetDiskDocFun) ->
     ok;
 validate_doc_update(_Db, #doc{id= <<"_local/",_/binary>>}, _GetDiskDocFun) ->
@@ -301,7 +384,8 @@ validate_doc_update(_Db, #doc{id= <<"_local/",_/binary>>}, _GetDiskDocFun) ->
 validate_doc_update(Db, Doc, GetDiskDocFun) ->
     DiskDoc = GetDiskDocFun(),
     JsonCtx = couch_util:json_user_ctx(Db),
-    try [case Fun(Doc, DiskDoc, JsonCtx) of
+    SecObj = get_security(Db),
+    try [case Fun(Doc, DiskDoc, JsonCtx, SecObj) of
             ok -> ok;
             Error -> throw(Error)
         end || Fun <- Db#db.validate_doc_funs],

@@ -63,6 +63,7 @@ loadScript("script/oauth.js");
 loadScript("script/sha1.js");
 loadTest("oauth.js");
 loadTest("purge.js");
+loadTest("reader_acl.js");
 loadTest("recreate_doc.js");
 loadTest("reduce.js");
 loadTest("reduce_builtin.js");

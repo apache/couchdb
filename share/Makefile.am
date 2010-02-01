@@ -48,6 +48,7 @@ nobase_dist_localdata_DATA = \
     www/dialog/_create_database.html \
     www/dialog/_delete_database.html \
     www/dialog/_delete_document.html \
+    www/dialog/_database_security.html \
     www/dialog/_save_view_as.html \
     www/dialog/_upload_attachment.html \
     www/document.html \
@@ -134,6 +135,7 @@ nobase_dist_localdata_DATA = \
     www/script/test/multiple_rows.js \
     www/script/test/oauth.js \
     www/script/test/purge.js \
+    www/script/test/reader_acl.js \
     www/script/test/recreate_doc.js \
     www/script/test/reduce.js \
     www/script/test/reduce_builtin.js \

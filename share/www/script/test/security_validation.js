@@ -69,7 +69,13 @@ couchTests.security_validation = function(debug) {
       var designDoc = {
         _id:"_design/test",
         language: "javascript",
-        validate_doc_update: "(" + (function (newDoc, oldDoc, userCtx) {
+        validate_doc_update: "(" + (function (newDoc, oldDoc, userCtx, secObj) {
+          if (secObj.admin_override) {
+            if (userCtx.roles.indexOf('_admin') != -1) {
+              // user is admin, they can do anything
+              return true;
+            }
+          }
           // docs should have an author field.
           if (!newDoc._deleted && !newDoc.author) {
             throw {forbidden:
@@ -99,11 +105,11 @@ couchTests.security_validation = function(debug) {
       }
 
       // set user as the admin
-      T(db.setDbProperty("_admins", ["Damien Katz"]).ok);
+      T(db.setDbProperty("_admins", {names : ["Damien Katz"]}).ok);
 
       T(userDb.save(designDoc).ok);
 
-      // test the _whoami endpoint
+      // test the _session API
       var resp = userDb.request("GET", "/_session");
       var user = JSON.parse(resp.responseText).userCtx;
       T(user.name == "Damien Katz");
@@ -158,6 +164,31 @@ couchTests.security_validation = function(debug) {
         T(e.error == "unauthorized");
         T(userDb.last_req.status == 401);
       }
+      
+      // admin must save with author field unless admin override
+      var resp = db.request("GET", "/_session");
+      var user = JSON.parse(resp.responseText).userCtx;
+      T(user.name == null);
+      // test that we are admin
+      TEquals(user.roles, ["_admin"]);
+      
+      // can't save the doc even though we are admin
+      var doc = db.open("testdoc");
+      doc.foo=3;
+      try {
+        db.save(doc);
+        T(false && "Can't get here. Should have thrown an error 3");
+      } catch (e) {
+        T(e.error == "unauthorized");
+        T(db.last_req.status == 401);
+      }
+
+      // now turn on admin override
+      T(db.setDbProperty("_security", {admin_override : true}).ok);
+      T(db.save(doc).ok);
+
+      // go back to normal
+      T(db.setDbProperty("_security", {admin_override : false}).ok);
 
       // Now delete document
       T(user2Db.deleteDoc(doc).ok);
@@ -187,7 +218,6 @@ couchTests.security_validation = function(debug) {
       T(results.errors[0].error == "forbidden");
       T(db.open("booboo") == null);
       T(db.open("foofoo") == null);
-
 
       // Now test replication
       var AuthHeaders = {"WWW-Authenticate": "X-Couch-Test-Auth Christopher Lenz:dog food"};

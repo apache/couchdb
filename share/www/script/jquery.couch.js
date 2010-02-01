@@ -371,6 +371,25 @@
             },
             options, "An error occurred accessing the view"
           );
+        },
+        getDbProperty: function(propName, options, ajaxOptions) {
+          ajax({url: this.uri + propName + encodeOptions(options)},
+            options,
+            "The property could not be retrieved",
+            ajaxOptions
+          );
+        },
+
+        setDbProperty: function(propName, propValue, options, ajaxOptions) {
+          ajax({
+            type: "PUT", 
+            url: this.uri + propName + encodeOptions(options),
+            data : JSON.stringify(propValue)
+          },
+            options,
+            "The property could not be updated",
+            ajaxOptions
+          );
         }
       };
     },

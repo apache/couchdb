@@ -17,7 +17,7 @@
 
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2,code_change/3,stop/0]).
 -export([start_doc_map/2, map_docs/2, stop_doc_map/1]).
--export([reduce/3, rereduce/3,validate_doc_update/4]).
+-export([reduce/3, rereduce/3,validate_doc_update/5]).
 -export([filter_docs/5]).
 
 -export([with_ddoc_proc/2, proc_prompt/2, ddoc_prompt/3, ddoc_proc_prompt/3, json_doc/1]).
@@ -166,10 +166,10 @@ builtin_sum_rows(KVs) ->
 
 
 % use the function stored in ddoc.validate_doc_update to test an update.
-validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx) ->
+validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj) ->
     JsonEditDoc = couch_doc:to_json_obj(EditDoc, [revs]),
     JsonDiskDoc = json_doc(DiskDoc),  
-    case ddoc_prompt(DDoc, [<<"validate_doc_update">>], [JsonEditDoc, JsonDiskDoc, Ctx]) of
+    case ddoc_prompt(DDoc, [<<"validate_doc_update">>], [JsonEditDoc, JsonDiskDoc, Ctx, SecObj]) of
         1 ->
             ok;
         {[{<<"forbidden">>, Message}]} ->

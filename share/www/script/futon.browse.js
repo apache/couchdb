@@ -178,6 +178,32 @@
           }
         });
       }
+      
+      this.databaseSecurity = function() {
+        $.showDialog("dialog/_database_security.html", {
+          load : function(d) {
+            ["admin", "reader"].forEach(function(key) {
+              db.getDbProperty("_"+key+"s", {
+                success : function(r) {
+                  $("input[name="+key+"_names]",d).val(JSON.stringify(r.names||[]));
+                  $("input[name="+key+"_roles]",d).val(JSON.stringify(r.roles||[]));
+                }
+              });
+            });
+          },
+          // maybe this should be 2 forms
+          submit: function(data, callback) {
+            ["admin", "reader"].forEach(function(key) {
+              var new_value = {
+                names : JSON.parse(data[key+"_names"]),
+                roles : JSON.parse(data[key+"_roles"])
+              };
+              db.setDbProperty("_"+key+"s", new_value);
+            });
+            callback();
+          }
+        });
+      }
 
       this.populateViewEditor = function() {
         if (viewName.match(/^_design\//)) {

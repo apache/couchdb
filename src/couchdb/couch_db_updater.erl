@@ -53,9 +53,9 @@ handle_call(increment_update_seq, _From, Db) ->
     couch_db_update_notifier:notify({updated, Db#db.name}),
     {reply, {ok, Db2#db.update_seq}, Db2};
 
-handle_call({set_admins, NewAdmins}, _From, Db) ->
-    {ok, Ptr} = couch_file:append_term(Db#db.fd, NewAdmins),
-    Db2 = commit_data(Db#db{admins=NewAdmins, admins_ptr=Ptr,
+handle_call({set_security, NewSec}, _From, Db) ->
+    {ok, Ptr} = couch_file:append_term(Db#db.fd, NewSec),
+    Db2 = commit_data(Db#db{security=NewSec, security_ptr=Ptr,
             update_seq=Db#db.update_seq+1}),
     ok = gen_server:call(Db2#db.main_pid, {db_updated, Db2}),
     {reply, ok, Db2};
@@ -326,7 +326,7 @@ btree_by_seq_reduce(rereduce, Reds) ->
 
 simple_upgrade_record(Old, New) when tuple_size(Old) =:= tuple_size(New) ->
     Old;
-simple_upgrade_record(Old, New) ->
+simple_upgrade_record(Old, New) when tuple_size(Old) < tuple_size(New) ->
     OldSz = tuple_size(Old),
     NewValuesTail =
         lists:sublist(tuple_to_list(New), OldSz + 1, tuple_size(New) - OldSz),
@@ -337,9 +337,10 @@ init_db(DbName, Filepath, Fd, Header0) ->
     Header1 = simple_upgrade_record(Header0, #db_header{}),
     Header =
     case element(2, Header1) of
-    1 -> Header1#db_header{unused = 0}; % 0.9
-    2 -> Header1#db_header{unused = 0}; % post 0.9 and pre 0.10
-    3 -> Header1; % post 0.9 and pre 0.10
+    1 -> Header1#db_header{unused = 0, security_ptr = nil}; % 0.9
+    2 -> Header1#db_header{unused = 0, security_ptr = nil}; % post 0.9 and pre 0.10
+    3 -> Header1#db_header{security_ptr = nil}; % post 0.9 and pre 0.10
+    4 -> Header1#db_header{security_ptr = nil}; % 0.10 and pre 0.11
     ?LATEST_DISK_VERSION -> Header1;
     _ -> throw({database_disk_version_error, "Incorrect disk header version"})
     end,
@@ -362,12 +363,12 @@ init_db(DbName, Filepath, Fd, Header0) ->
             {join, fun(X,Y) -> btree_by_seq_join(X,Y) end},
             {reduce, fun(X,Y) -> btree_by_seq_reduce(X,Y) end}]),
     {ok, LocalDocsBtree} = couch_btree:open(Header#db_header.local_docs_btree_state, Fd),
-    case Header#db_header.admins_ptr of
+    case Header#db_header.security_ptr of
     nil ->
-        Admins = [],
-        AdminsPtr = nil;
-    AdminsPtr ->
-        {ok, Admins} = couch_file:pread_term(Fd, AdminsPtr)
+        Security = [],
+        SecurityPtr = nil;
+    SecurityPtr ->
+        {ok, Security} = couch_file:pread_term(Fd, SecurityPtr)
     end,
     % convert start time tuple to microsecs and store as a binary string
     {MegaSecs, Secs, MicroSecs} = now(),
@@ -386,8 +387,8 @@ init_db(DbName, Filepath, Fd, Header0) ->
         update_seq = Header#db_header.update_seq,
         name = DbName,
         filepath = Filepath,
-        admins = Admins,
-        admins_ptr = AdminsPtr,
+        security = Security,
+        security_ptr = SecurityPtr,
         instance_start_time = StartTime,
         revs_limit = Header#db_header.revs_limit,
         fsync_options = FsyncOptions
@@ -655,7 +656,7 @@ db_to_header(Db, Header) ->
         docinfo_by_seq_btree_state = couch_btree:get_state(Db#db.docinfo_by_seq_btree),
         fulldocinfo_by_id_btree_state = couch_btree:get_state(Db#db.fulldocinfo_by_id_btree),
         local_docs_btree_state = couch_btree:get_state(Db#db.local_docs_btree),
-        admins_ptr = Db#db.admins_ptr,
+        security_ptr = Db#db.security_ptr,
         revs_limit = Db#db.revs_limit}.
 
 commit_data(#db{fd=Fd,header=OldHeader,fsync_options=FsyncOptions}=Db, Delay) ->
@@ -810,9 +811,9 @@ copy_compact(Db, NewDb0, Retry) ->
     NewDb3 = copy_docs(Db, NewDb2, lists:reverse(Uncopied), Retry),
 
     % copy misc header values
-    if NewDb3#db.admins /= Db#db.admins ->
-        {ok, Ptr} = couch_file:append_term(NewDb3#db.fd, Db#db.admins),
-        NewDb4 = NewDb3#db{admins=Db#db.admins, admins_ptr=Ptr};
+    if NewDb3#db.security /= Db#db.security ->
+        {ok, Ptr} = couch_file:append_term(NewDb3#db.fd, Db#db.security),
+        NewDb4 = NewDb3#db{security=Db#db.security, security_ptr=Ptr};
     true ->
         NewDb4 = NewDb3
     end,
