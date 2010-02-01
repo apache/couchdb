@@ -229,30 +229,32 @@ try_bind_path([Dispatch|Rest], Method, PathParts, QueryList) ->
 make_query_list([], _Bindings, Acc) ->
     Acc;
 make_query_list([{Key, {Value}}|Rest], Bindings, Acc) ->
-    Value1 = make_query_list(Value, Bindings, []),
+    Value1 = to_json({Value}),
     make_query_list(Rest, Bindings, [{to_atom(Key), Value1}|Acc]);
 make_query_list([{Key, Value}|Rest], Bindings, Acc) when is_binary(Value) ->
-    Value1 = replace_var(Value, Bindings),
+    Value1 = replace_var(Key, Value, Bindings),
     make_query_list(Rest, Bindings, [{to_atom(Key), Value1}|Acc]);
 make_query_list([{Key, Value}|Rest], Bindings, Acc) when is_list(Value) ->
-
-    Value1 = replace_vars(Value, Bindings, []),
+    Value1 = replace_var(Key, Value, Bindings),
     make_query_list(Rest, Bindings, [{to_atom(Key), Value1}|Acc]);
 make_query_list([{Key, Value}|Rest], Bindings, Acc) ->
     make_query_list(Rest, Bindings, [{to_atom(Key), Value}|Acc]).
     
-replace_vars([], _Bindings, Acc) ->
-    lists:reverse(Acc);
-replace_vars([V|R], Bindings, Acc) ->
-    V1 = replace_var(V, Bindings),
-    replace_vars(R, Bindings, [V1|Acc]).
-    
-replace_var(Value, Bindings) ->
+replace_var(Key, Value, Bindings) ->
     case Value of
         <<":", Var/binary>> ->
             Var1 = list_to_atom(binary_to_list(Var)),
             proplists:get_value(Var1, Bindings, Value);
-        _ -> Value
+        _ when is_binary(Value) ->
+            Value;
+        _ ->
+            case Key of
+                <<"key">> -> to_json(Value);
+                <<"startkey">> -> to_json(Value);
+                <<"endkey">> -> to_json(Value);
+                _ ->
+                    lists:flatten(?JSON_ENCODE(Value))
+            end
     end.
 
 
@@ -371,15 +373,17 @@ path_to_list([P|R], Acc) ->
     path_to_list(R, [P1|Acc]).
 
 encode_query(Props) ->
-    RevPairs = lists:foldl(fun ({K, V}, Acc) ->
+    Props1 = lists:foldl(fun ({K, V}, Acc) ->
         V1 = case is_list(V) of
             true -> V;
+            false when is_binary(V) ->
+                V;
             false ->
                 mochiweb_util:quote_plus(V)
         end,              
         [{K, V1} | Acc]
     end, [], Props),
-    lists:flatten(mochiweb_util:urlencode(RevPairs)).
+    lists:flatten(mochiweb_util:urlencode(Props1)).
 
 to_atom(V) when is_atom(V) ->
     V; 
@@ -387,3 +391,6 @@ to_atom(V) when is_binary(V) ->
     to_atom(?b2l(V));
 to_atom(V) ->
     list_to_atom(V).
+    
+to_json(V) ->
+    iolist_to_binary(?JSON_ENCODE(V)).
