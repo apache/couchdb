@@ -33,7 +33,10 @@ This version has not been released yet.
  * Avoid leaking file descriptors on automatic replication restarts.
  * Various improvements to the Futon UI.
  * Provide Content-MD5 header support for attachments.
-
+ * Added default cookie-authentication and users db.
+ * Added per-db reader access control lists.
+ * Added per-db security object for configuration data in validation functions.
+ 
 Version 0.10.1
 --------------
 
