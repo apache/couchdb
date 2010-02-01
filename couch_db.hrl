@@ -126,7 +126,7 @@
 % if the disk revision is incremented, then new upgrade logic will need to be
 % added to couch_db_updater:init_db.
 
--define(LATEST_DISK_VERSION, 4).
+-define(LATEST_DISK_VERSION, 5).
 
 -record(db_header,
     {disk_version = ?LATEST_DISK_VERSION,
@@ -137,7 +137,7 @@
      local_docs_btree_state = nil,
      purge_seq = 0,
      purged_docs = nil,
-     admins_ptr = nil,
+     security_ptr = nil,
      revs_limit = 1000
     }).
 
@@ -157,8 +157,8 @@
     name,
     filepath,
     validate_doc_funs = [],
-    admins = [],
-    admins_ptr = nil,
+    security = [],
+    security_ptr = nil,
     user_ctx = #user_ctx{},
     waiting_delayed_commit = nil,
     revs_limit = 1000,
