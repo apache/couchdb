@@ -67,12 +67,19 @@ couchTests.rewrite = function(debug) {
               }
             },
             {
-              "from": "/welcome2/:name",
+              "from": "/welcome2",
+              "to": "_show/welcome",
+              "query": {
+                "name": "user"
+              }
+            },
+            {
+              "from": "/welcome3/:name",
               "to": "_update/welcome2/:name",
               "method": "PUT"
             },
             {
-              "from": "/welcome2/:name",
+              "from": "/welcome3/:name",
               "to": "_show/welcome2/:name",
               "method": "GET"
             },
@@ -95,7 +102,36 @@ couchTests.rewrite = function(debug) {
                 "startkey": ":start",
                 "endkey": ":end"
               }
+            },
+            {
+              "from": "simpleForm/complexView",
+              "to": "_list/simpleForm/complexView",
+              "query": {
+                "key": [1, 2]
+              }
+            },
+            {
+              "from": "simpleForm/complexView2",
+              "to": "_list/simpleForm/complexView",
+              "query": {
+                "key": ["test", {}]
+              }
+            },
+            {
+              "from": "simpleForm/complexView3",
+              "to": "_list/simpleForm/complexView",
+              "query": {
+                "key": ["test", ["test", "essai"]]
+              }
+            },
+            {
+              "from": "simpleForm/complexView4",
+              "to": "_list/simpleForm/complexView2",
+              "query": {
+                "key": {"c": 1}
+              }
             }
+            
             
           ],
           lists: {
@@ -112,7 +148,7 @@ couchTests.rewrite = function(debug) {
                 +' LineNo: '+row_number+'</li>');
               }
               return '</ul><p>FirstKey: '+ firstKey + ' LastKey: '+ prevKey+'</p>';
-            })
+            }),
           },
           shows: {
             "welcome": stringFun(function(doc,req) {
@@ -152,7 +188,24 @@ couchTests.rewrite = function(debug) {
           views : {
             basicView : {
               map : stringFun(function(doc) {
-                emit(doc.integer, doc.string);
+                if (doc.integer) {
+                  emit(doc.integer, doc.string);
+                }
+                
+              })
+            },
+            complexView: {
+              map: stringFun(function(doc) {
+                if (doc.type == "complex") {
+                  emit([doc.a, doc.b], doc.string);
+                }
+              })
+            },
+            complexView2: {
+              map: stringFun(function(doc) {
+                if (doc.type == "complex") {
+                  emit(doc.a, doc.string);
+                }
               })
             }
           }
@@ -162,7 +215,17 @@ couchTests.rewrite = function(debug) {
         
         var docs = makeDocs(0, 10);
         db.bulkSave(docs);
- 
+
+        var docs2 = [
+          {"a": 1, "b": 1, "string": "doc 1", "type": "complex"},
+          {"a": 1, "b": 2, "string": "doc 2", "type": "complex"},
+          {"a": "test", "b": {}, "string": "doc 3", "type": "complex"},
+          {"a": "test", "b": ["test", "essai"], "string": "doc 4", "type": "complex"},
+          {"a": {"c": 1}, "b": "", "string": "doc 5", "type": "complex"}
+        ];
+
+        db.bulkSave(docs2);
+
         // test simple rewriting
  
         req = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/foo");
@@ -190,21 +253,22 @@ couchTests.rewrite = function(debug) {
         doc = db.open(docid);
         T(doc.world == "hello");
         
-        xhr = CouchDB.request("PUT", "/test_suite_db/_design/test/_rewrite/welcome2/test");
-        T(xhr.status == 201);
-        T(xhr.responseText == "New World");
-        T(/charset=utf-8/.test(xhr.getResponseHeader("Content-Type")));
-        
-        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/welcome2/test");
-        T(xhr.responseText == "Welcome test");
-        
         req = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/welcome?name=user");
         T(req.responseText == "Welcome user");
         
         req = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/welcome/user");
         T(req.responseText == "Welcome user");
         
+        req = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/welcome2");
+        T(req.responseText == "Welcome user");
         
+        xhr = CouchDB.request("PUT", "/test_suite_db/_design/test/_rewrite/welcome3/test");
+        T(xhr.status == 201);
+        T(xhr.responseText == "New World");
+        T(/charset=utf-8/.test(xhr.getResponseHeader("Content-Type")));
+        
+        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/welcome3/test");
+        T(xhr.responseText == "Welcome test");
         
         
         // get with query params
@@ -234,8 +298,22 @@ couchTests.rewrite = function(debug) {
         T(/FirstKey: 3/.test(xhr.responseText));
         T(/LastKey: 8/.test(xhr.responseText));
         
+        // get with query params        
+        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/simpleForm/complexView");
+        T(xhr.status == 200, "with query params");
+        T(/FirstKey: [1, 2]/.test(xhr.responseText));
         
+        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/simpleForm/complexView2");
+        T(xhr.status == 200, "with query params");
+        T(/Value: doc 3/.test(xhr.responseText));
         
+        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/simpleForm/complexView3");
+        T(xhr.status == 200, "with query params");
+        T(/Value: doc 4/.test(xhr.responseText));
+        
+        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/simpleForm/complexView4");
+        T(xhr.status == 200, "with query params");
+        T(/Value: doc 5/.test(xhr.responseText));
   });
   
 }
