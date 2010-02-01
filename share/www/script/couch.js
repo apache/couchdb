@@ -412,7 +412,10 @@ CouchDB.newXhr = function() {
 CouchDB.request = function(method, uri, options) {
   options = options || {};
   var req = CouchDB.newXhr();
-  req.open(method, CouchDB.urlPrefix + uri, false);
+  if(uri.substr(0, "http://".length) != "http://") {
+    uri = CouchDB.urlPrefix + uri
+  }
+  req.open(method, uri, false);
   if (options.headers) {
     var headers = options.headers;
     for (var headerName in headers) {
