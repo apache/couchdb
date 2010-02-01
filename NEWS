@@ -30,6 +30,9 @@ This version has not been released yet.
  * Fixed query parameter handling in OAuth'd replication.
  * Fixed a bug preventing mixing languages with lists and views.
  * Avoid OS process leaks in lists.
+ * Avoid leaking file descriptors on automatic replication restarts.
+ * Various improvements to the Futon UI.
+ * Provide Content-MD5 header support for attachments.
 
 Version 0.10.1
 --------------

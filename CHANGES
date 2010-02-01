@@ -6,6 +6,10 @@ Version 0.11.0
 
 This version has not been released yet.
 
+HTTP Interface
+
+ * Provide Content-MD5 header support for attachments.
+
 Build and System Integration
 
  * Added support for building a Windows installer as part of 'make dist'.
@@ -18,10 +22,12 @@ View Server
  * Improved view index build time by reducing ICU collation callouts.
  * Improved view information objects.
  * Bug fix for partial updates during view builds.
+ * Move query server to a design-doc based protocol.
 
 Replication
 
  * Added option to implicitly create replication target databases.
+ * Avoid leaking file descriptors on automatic replication restarts.
 
 Storage System
 
@@ -35,6 +41,15 @@ Runtime Statistics
 Futon
 
  * Added a button for view compaction.
+ * JSON strings are now displayed as-is in the document view, without the escaping of
+   new-lines and quotes. That dramatically improves readability of multi-line
+   strings.
+ * Same goes for editing of JSON string values. When a change to a field value is
+   submitted, and the value is not valid JSON it is assumed to be a string. This
+   improves editing of multi-line strings a lot.
+ * Hitting tab in textareas no longer moves focus to the next form field, but simply
+   inserts a tab character at the current caret position.
+ * Fixed some font declarations.
 
 Version 0.10.1
 --------------
