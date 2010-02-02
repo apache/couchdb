@@ -130,6 +130,10 @@ couchTests.rewrite = function(debug) {
               "query": {
                 "key": {"c": 1}
               }
+            },
+            {
+              "from": "uuids",
+              "to": "../../../_uuids"
             }
             
             
@@ -314,6 +318,15 @@ couchTests.rewrite = function(debug) {
         xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/simpleForm/complexView4");
         T(xhr.status == 200, "with query params");
         T(/Value: doc 5/.test(xhr.responseText));
+        
+        
+        // test path relative to server
+        
+        var xhr = CouchDB.request("GET", "/_uuids");
+        T(xhr.status == 200);
+        var result = JSON.parse(xhr.responseText);
+        T(result.uuids.length == 1);
+        var first = result.uuids[0];
   });
   
 }

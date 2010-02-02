@@ -159,11 +159,6 @@ handle_rewrite_req(#httpd{
 
             % normalize final path (fix levels "." and "..")
             RawPath1 = ?b2l(iolist_to_binary(normalize_path(RawPath))),
-            
-            %% get path parts, needed for CouchDB dispatching
-            {"/" ++ NewPath2, _, _} = mochiweb_util:urlsplit_path(RawPath1),
-            NewPathParts1 = [?l2b(couch_httpd:unquote(Part))
-                            || Part <- string:tokens(NewPath2, "/")],
                             
             ?LOG_DEBUG("rewrite to ~p ~n", [RawPath1]),
 
@@ -176,11 +171,21 @@ handle_rewrite_req(#httpd{
                                              
             % cleanup, It force mochiweb to reparse raw uri.
             MochiReq1:cleanup(),
-                        
-            % send to couchdb the rewritten request
-            couch_httpd_db:handle_request(Req#httpd{
-                        path_parts=NewPathParts1,
-                        mochi_req=MochiReq1})
+            
+            DefaultSpec = "{couch_httpd_db, handle_request}",
+            DefaultFun = couch_httpd:make_arity_1_fun(
+                couch_config:get("httpd", "default_handler", DefaultSpec)
+            ),
+
+            UrlHandlersList = lists:map(
+                fun({UrlKey, SpecStr}) ->
+                    {?l2b(UrlKey), couch_httpd:make_arity_1_fun(SpecStr)}
+                end, couch_config:get("httpd_global_handlers")),
+            UrlHandlers = dict:from_list(UrlHandlersList),
+            
+            couch_httpd:handle_request(MochiReq1, DefaultFun, 
+                    UrlHandlers, Req#httpd.db_url_handlers, 
+                    Req#httpd.design_url_handlers)
         end.
             
 
