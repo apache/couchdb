@@ -16,6 +16,7 @@
 -export([default_authentication_handler/1,special_test_authentication_handler/1]).
 -export([cookie_authentication_handler/1]).
 -export([null_authentication_handler/1]).
+-export([proxy_authentification_handler/1]).
 -export([cookie_auth_header/2]).
 -export([handle_session_req/1]).
 -export([ensure_users_db_exists/1, get_user/1]).
@@ -98,6 +99,62 @@ default_authentication_handler(Req) ->
 
 null_authentication_handler(Req) ->
     Req#httpd{user_ctx=#user_ctx{roles=[<<"_admin">>]}}.
+
+%% @doc proxy auth handler. 
+%
+% This handler allows creation of a userCtx object from a user authenticated remotly. 
+% The client just pass specific headers to CouchDB and the handler create the userCtx. 
+% Headers  name can be defined in local.ini. By thefault they are :
+%
+%   * X-Auth-CouchDB-UserName : contain the username, (x_auth_username in 
+%   couch_httpd_auth section)
+%   * X-Auth-CouchDB-Roles : contain the user roles, list of roles separated by a 
+%   comma (x_auth_roles in couch_httpd_auth section)
+%   * X-Auth-CouchDB-Token : token to authenticate the authorization (x_auth_token 
+%   in couch_httpd_auth section). This token is an hmac-sha1 created from secret key 
+%   and username. The secret key should be the same in the client and couchdb node. s
+%   ecret key is the secret key in couch_httpd_auth section of ini. This token is optional
+%   if value of proxy_use_secret key in couch_httpd_auth section of ini isn't true.
+%
+proxy_authentification_handler(Req) ->
+    case proxy_auth_user(Req) of
+        nil -> Req;
+        Req2 -> Req2
+    end.
+    
+proxy_auth_user(Req) ->
+    XHeaderUserName = couch_config:get("couch_httpd_auth", "x_auth_username",
+                                "X-Auth-CouchDB-UserName"),
+    XHeaderRoles = couch_config:get("couch_httpd_auth", "x_auth_roles",
+                                "X-Auth-CouchDB-Roles"),
+    XHeaderToken = couch_config:get("couch_httpd_auth", "x_auth_token", 
+                                "X-Auth-CouchDB-Token"),
+    case header_value(Req, XHeaderUserName) of
+        undefined -> nil;
+        UserName ->
+            Roles = case header_value(Req, XHeaderRoles) of
+                undefined -> [];
+                Else ->  
+                    [?l2b(R) || R <- string:tokens(Else, ",")]
+            end,
+            case couch_config:get("couch_httpd_auth", "proxy_use_secret", "false") of
+                "true" ->
+                    case couch_config:get("couch_httpd_auth", "secret", nil) of
+                        nil ->
+                            Req#httpd{user_ctx=#user_ctx{name=?l2b(UserName), roles=Roles}};
+                        Secret ->
+                            ExpectedToken = couch_util:to_hex(crypto:sha_mac(Secret, UserName)),
+                            case header_value(Req, XHeaderToken) of
+                                Token when Token == ExpectedToken ->
+                                    Req#httpd{user_ctx=#user_ctx{name=?l2b(UserName),
+                                                            roles=Roles}};
+                                _ -> nil
+                            end
+                    end;
+                _ ->
+                    Req#httpd{user_ctx=#user_ctx{name=?l2b(UserName), roles=Roles}}
+            end           
+    end.
 
 % maybe we can use hovercraft to simplify running this view query
 % rename to get_user_from_users_db
