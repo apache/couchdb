@@ -41,7 +41,7 @@
     return user_doc;
   };
 
-  uuidCache = [];
+  var uuidCache = [];
 
   $.extend($.couch, {
     urlPrefix: '',
