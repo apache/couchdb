@@ -322,7 +322,7 @@ couchTests.rewrite = function(debug) {
         
         // test path relative to server
         
-        var xhr = CouchDB.request("GET", "/_uuids");
+        var xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/uuids");
         T(xhr.status == 200);
         var result = JSON.parse(xhr.responseText);
         T(result.uuids.length == 1);
