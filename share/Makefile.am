@@ -134,6 +134,7 @@ nobase_dist_localdata_DATA = \
     www/script/test/lots_of_docs.js \
     www/script/test/multiple_rows.js \
     www/script/test/oauth.js \
+	www/script/test/proxyauth.js \
     www/script/test/purge.js \
     www/script/test/reader_acl.js \
     www/script/test/recreate_doc.js \
