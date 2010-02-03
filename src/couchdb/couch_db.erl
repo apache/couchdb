@@ -294,7 +294,9 @@ get_security(#db{security=SecProps}) ->
 set_security(#db{security=SecProps, update_pid=Pid}=Db, {SecObjProps}) when is_list(SecObjProps) ->
     check_is_admin(Db),
     SecProps2 = update_sec_field(sec_obj, SecProps, {SecObjProps}),
-    gen_server:call(Pid, {set_security, SecProps2}, infinity).
+    gen_server:call(Pid, {set_security, SecProps2}, infinity);
+set_security(_, _) ->
+    throw(bad_request).
 
 update_sec_field(Field, SecProps, Value) ->
     Admins = proplists:get_value(admins, SecProps, {[]}),

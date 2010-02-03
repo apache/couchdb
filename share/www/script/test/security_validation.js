@@ -187,6 +187,12 @@ couchTests.security_validation = function(debug) {
       T(db.setDbProperty("_security", {admin_override : true}).ok);
       T(db.save(doc).ok);
 
+      // try to do something lame
+      try {
+        db.setDbProperty("_security", ["foo"]);
+        T(false && "can't do this");
+      } catch(e) {}
+
       // go back to normal
       T(db.setDbProperty("_security", {admin_override : false}).ok);
 
