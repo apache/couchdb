@@ -247,26 +247,28 @@ check_is_admin(#db{user_ctx=#user_ctx{name=Name,roles=Roles}}=Db) ->
     end.
 
 check_is_reader(#db{user_ctx=#user_ctx{name=Name,roles=Roles}=UserCtx}=Db) ->
-    % admins are not readers. this is for good reason. 
-    % we don't want to confuse setting admins with making private dbs
-    {Readers} = get_readers(Db),
-    ReaderRoles = proplists:get_value(roles, Readers,[]),
-    WithAdminRoles = [<<"_admin">> | ReaderRoles],
-    ReaderNames = proplists:get_value(names, Readers,[]),
-    case ReaderRoles ++ ReaderNames of 
-    [] -> ok; % no readers == public access
-    _Else ->
-        case WithAdminRoles -- Roles of
-        WithAdminRoles -> % same list, not an reader role
-            case ReaderNames -- [Name] of
-            ReaderNames -> % same names, not a reader
-                ?LOG_DEBUG("Not a reader: UserCtx ~p vs Names ~p Roles ~p",[UserCtx, ReaderNames, WithAdminRoles]),
-                throw({unauthorized, <<"You are not authorized to access this db.">>});
+    case (catch check_is_admin(Db)) of
+    ok -> ok;
+    _ ->
+        {Readers} = get_readers(Db),
+        ReaderRoles = proplists:get_value(roles, Readers,[]),
+        WithAdminRoles = [<<"_admin">> | ReaderRoles],
+        ReaderNames = proplists:get_value(names, Readers,[]),
+        case ReaderRoles ++ ReaderNames of 
+        [] -> ok; % no readers == public access
+        _Else ->
+            case WithAdminRoles -- Roles of
+            WithAdminRoles -> % same list, not an reader role
+                case ReaderNames -- [Name] of
+                ReaderNames -> % same names, not a reader
+                    ?LOG_DEBUG("Not a reader: UserCtx ~p vs Names ~p Roles ~p",[UserCtx, ReaderNames, WithAdminRoles]),
+                    throw({unauthorized, <<"You are not authorized to access this db.">>});
+                _ ->
+                    ok
+                end;
             _ ->
                 ok
-            end;
-        _ ->
-            ok
+            end
         end
     end.
 
@@ -311,17 +313,17 @@ update_sec_field(Field, SecProps, Value) ->
 
 % validate user input and convert proplist to atom keys
 just_names_and_roles({Props}) when is_list(Props) ->
-    Names = case proplists:get_value(<<"names">>,Props) of
+    Names = case proplists:get_value(<<"names">>,Props,[]) of
     Ns when is_list(Ns) ->
             [throw("names must be a JSON list of strings") ||N <- Ns, not is_binary(N)],
             Ns;
-    _ -> []
+    _ -> throw("names must be a JSON list of strings")
     end,
-    Roles = case proplists:get_value(<<"roles">>,Props) of
+    Roles = case proplists:get_value(<<"roles">>,Props,[]) of
     Rs when is_list(Rs) ->
         [throw("roles must be a JSON list of strings") ||R <- Rs, not is_binary(R)],
         Rs;
-    _ -> []
+    _ -> throw("roles must be a JSON list of strings")
     end,
     {[
         {names, Names},

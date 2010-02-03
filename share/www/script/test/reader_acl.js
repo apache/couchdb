@@ -50,6 +50,21 @@ couchTests.reader_acl = function(debug) {
       }
 
       CouchDB.logout();
+      
+      // make top-secret an admin
+      T(secretDb.setDbProperty("_admins", {
+        roles : ["top-secret"],
+        names : []}).ok);
+
+      T(CouchDB.login("jchris@apache.org", "funnybone").ok);
+
+      T(secretDb.open("baz").foo == "bar");
+
+      CouchDB.logout();
+
+      T(secretDb.setDbProperty("_admins", {
+        roles : [],
+        names : []}).ok);
 
       // admin now adds the top-secret role to the db's readers
       T(CouchDB.session().userCtx.roles.indexOf("_admin") != -1);
@@ -67,18 +82,26 @@ couchTests.reader_acl = function(debug) {
 
       // can't set non string reader names or roles
       try {
-        T(!secretDb.setDbProperty("_readers", {
+        secretDb.setDbProperty("_readers", {
           roles : ["super-secret-club", {"top-secret":"awesome"}],
-          names : ["joe","barb"]}).ok);      
+          names : ["joe","barb"]});
         T(false && "only string roles");
       } catch (e) {}
 
       try {
-      T(!secretDb.setDbProperty("_readers", {
-        roles : ["super-secret-club", "top-secret"],
-        names : ["joe",22]}).ok);
+        secretDb.setDbProperty("_readers", {
+          roles : ["super-secret-club", "top-secret"],
+          names : ["joe",22]});
         T(false && "only string names");
-        } catch (e) {}
+      } catch (e) {}
+      
+      try {
+        secretDb.setDbProperty("_readers", {
+          roles : ["super-secret-club", "top-secret"],
+          names : "joe"
+        });
+        T(false && "only lists of names");
+      } catch (e) {}
     } finally {
       CouchDB.logout();
     }
