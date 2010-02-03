@@ -1048,7 +1048,7 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
     end;
 
 
-db_attachment_req(#httpd{method=Method}=Req, Db, DocId, FileNameParts)
+db_attachment_req(#httpd{method=Method,mochi_req=MochiReq}=Req, Db, DocId, FileNameParts)
         when (Method == 'PUT') or (Method == 'DELETE') ->
     FileName = validate_attachment_name(
                     mochiweb_util:join(
@@ -1082,6 +1082,20 @@ db_attachment_req(#httpd{method=Method}=Req, Db, DocId, FileNameParts)
                     0 ->
                         <<"">>;
                     Length when is_integer(Length) ->
+                        Expect = case couch_httpd:header_value(Req, "expect") of
+                                     undefined ->
+                                         undefined;
+                                     Value when is_list(Value) ->
+                                         string:to_lower(Value)
+                                 end,
+                        case Expect of
+                            "100-continue" ->
+                                MochiReq:start_raw_response({100, gb_trees:empty()});
+                            _Else ->
+                                ok
+                        end,
+                        
+                        
                         fun() -> couch_httpd:recv(Req, 0) end;
                     Length ->
                         exit({length_not_integer, Length})
