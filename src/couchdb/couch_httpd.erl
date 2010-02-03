@@ -175,7 +175,9 @@ handle_request(MochiReq, DefaultFun,
         path_parts = [list_to_binary(couch_httpd:unquote(Part))
                 || Part <- string:tokens(Path, "/")],
         db_url_handlers = DbUrlHandlers,
-        design_url_handlers = DesignUrlHandlers
+        design_url_handlers = DesignUrlHandlers,
+        default_fun = DefaultFun,
+        url_handlers = UrlHandlers
     },
 
     HandlerFun = couch_util:dict_find(HandlerKey, UrlHandlers, DefaultFun),
