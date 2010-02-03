@@ -172,20 +172,15 @@ handle_rewrite_req(#httpd{
             % cleanup, It force mochiweb to reparse raw uri.
             MochiReq1:cleanup(),
             
-            DefaultSpec = "{couch_httpd_db, handle_request}",
-            DefaultFun = couch_httpd:make_arity_1_fun(
-                couch_config:get("httpd", "default_handler", DefaultSpec)
-            ),
-
-            UrlHandlersList = lists:map(
-                fun({UrlKey, SpecStr}) ->
-                    {?l2b(UrlKey), couch_httpd:make_arity_1_fun(SpecStr)}
-                end, couch_config:get("httpd_global_handlers")),
-            UrlHandlers = dict:from_list(UrlHandlersList),
+            #httpd{
+                db_url_handlers = DbUrlHandlers,
+                design_url_handlers = DesignUrlHandlers,
+                default_fun = DefaultFun,
+                url_handlers = UrlHandlers
+            } = Req,
             
             couch_httpd:handle_request(MochiReq1, DefaultFun, 
-                    UrlHandlers, Req#httpd.db_url_handlers, 
-                    Req#httpd.design_url_handlers)
+                    UrlHandlers, DbUrlHandlers, DesignUrlHandlers)
         end.
             
 

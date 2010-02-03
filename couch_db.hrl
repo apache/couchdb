@@ -73,7 +73,9 @@
     user_ctx,
     req_body = undefined,
     design_url_handlers,
-    auth
+    auth,
+    default_fun,
+    url_handlers
     }).
 
 
