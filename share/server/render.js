@@ -227,7 +227,11 @@ var Render = (function() {
         throw(["error", "render_error", "undefined response from show function"]);      
       }
     } catch(e) {
-      renderError(e, fun.toSource());
+      if(args[0] === null) {
+        throw(["error", "not_found", "document not found"]);
+      } else {
+        renderError(e, fun.toSource());
+      }
     }
   };
 

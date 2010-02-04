@@ -22,10 +22,15 @@ couchTests.show_documents = function(debug) {
     shows: {
       "hello" : stringFun(function(doc, req) {
         log("hello fun");
+        log(req);
         if (doc) {
           return "Hello World";
         } else {
-          return "Empty World";
+          if(req.id) {
+            return "New World";
+          } else {
+            return "Empty World";
+          }
         }
       }),
       "just-name" : stringFun(function(doc, req) {
@@ -56,6 +61,9 @@ couchTests.show_documents = function(debug) {
       "empty" : stringFun(function(doc, req) {
           return "";
         }),
+      "fail" : stringFun(function(doc, req) {
+        return doc._id;
+      }),
       "xml-type" : stringFun(function(doc, req) {
          return {
            "headers" : {
@@ -161,7 +169,7 @@ couchTests.show_documents = function(debug) {
   T(xhr.responseText == "");
 
   // // hello template world (non-existing docid)
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/hello/nonExistingDoc");
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/fail/nonExistingDoc");
   T(xhr.status == 404);
   var resp = JSON.parse(xhr.responseText);
   T(resp.error == "not_found");
@@ -173,8 +181,7 @@ couchTests.show_documents = function(debug) {
   // show with missing doc
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/just-name/missingdoc");
   T(xhr.status == 404);
-  var resp = JSON.parse(xhr.responseText);
-  T(resp.error == "not_found");
+  TEquals("No such doc", xhr.responseText);
 
   // show with missing func
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/missing/"+docid);
@@ -350,5 +357,10 @@ couchTests.show_documents = function(debug) {
   db.save(doc3);
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/withSlash/a/b/c");
   T(xhr.status == 200);
+
+  // hello template world (non-existing docid)
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/hello/nonExistingDoc");
+  T(xhr.responseText == "New World");
+
   
 };
