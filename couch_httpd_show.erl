@@ -13,7 +13,7 @@
 -module(couch_httpd_show).
 
 -export([handle_doc_show_req/3, handle_doc_update_req/3, handle_view_list_req/3,
-        handle_doc_show/5, handle_view_list/6, get_fun_key/3]).
+        handle_view_list/6, get_fun_key/3]).
 
 -include("couch_db.hrl").
 
@@ -23,31 +23,40 @@
     start_chunked_response/3, send_error/4]).
 
 
-% /db/_design/foo/show/bar/docid
+% /db/_design/foo/_show/bar/docid
 % show converts a json doc to a response of any content-type. 
 % it looks up the doc an then passes it to the query server.
 % then it sends the response from the query server to the http client.
+
+maybe_open_doc(Db, DocId) ->
+    case catch couch_httpd_db:couch_doc_open(Db, DocId, nil, [conflicts]) of
+        {not_found, missing} -> nil;
+        Doc -> Doc
+    end.
 handle_doc_show_req(#httpd{
         path_parts=[_, _, _, _, ShowName, DocId]
     }=Req, Db, DDoc) ->
+
     % open the doc
-    Doc = couch_httpd_db:couch_doc_open(Db, DocId, nil, [conflicts]),
+    Doc = maybe_open_doc(Db, DocId),
+
     % we don't handle revs here b/c they are an internal api
     % returns 404 if there is no doc with DocId
-    handle_doc_show(Req, Db, DDoc, ShowName, Doc);
+    handle_doc_show(Req, Db, DDoc, ShowName, Doc, DocId);
 
 handle_doc_show_req(#httpd{
         path_parts=[_, _, _, _, ShowName, DocId|Rest]
     }=Req, Db, DDoc) ->
     
     DocParts = [DocId|Rest],
-    DocId1 = string:join([?b2l(P)|| P <- DocParts], "/"),
-        
+    DocId1 = ?l2b(string:join([?b2l(P)|| P <- DocParts], "/")),
+
     % open the doc
-    Doc = couch_httpd_db:couch_doc_open(Db, ?l2b(DocId1), nil, [conflicts]),
+    Doc = maybe_open_doc(Db, DocId1),
+
     % we don't handle revs here b/c they are an internal api
-    % returns 404 if there is no doc with DocId
-    handle_doc_show(Req, Db, DDoc, ShowName, Doc);
+    % pass 404 docs to the show function
+    handle_doc_show(Req, Db, DDoc, ShowName, Doc, DocId1);
 
 handle_doc_show_req(#httpd{
         path_parts=[_, _, _, _, ShowName]
@@ -59,10 +68,13 @@ handle_doc_show_req(Req, _Db, _DDoc) ->
     send_error(Req, 404, <<"show_error">>, <<"Invalid path.">>).
 
 handle_doc_show(Req, Db, DDoc, ShowName, Doc) ->
+    handle_doc_show(Req, Db, DDoc, ShowName, Doc, null).
+
+handle_doc_show(Req, Db, DDoc, ShowName, Doc, DocId) ->
     % get responder for ddoc/showname
     CurrentEtag = show_etag(Req, Doc, DDoc, []),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
-        JsonReq = couch_httpd_external:json_req_obj(Req, Db),
+        JsonReq = couch_httpd_external:json_req_obj(Req, Db, DocId),
         JsonDoc = couch_query_servers:json_doc(Doc),
         [<<"resp">>, ExternalResp] = 
             couch_query_servers:ddoc_prompt(DDoc, [<<"shows">>, ShowName], [JsonDoc, JsonReq]),
