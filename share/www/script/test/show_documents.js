@@ -121,6 +121,9 @@ couchTests.show_documents = function(debug) {
         provides("foo", function() {
           return "foofoo";
         });
+      }),
+      "withSlash": stringFun(function(doc, req) {
+        return { json: doc }
       })
     }
   };
@@ -343,4 +346,9 @@ couchTests.show_documents = function(debug) {
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/json/foo");
   TEquals(1, JSON.parse(xhr.responseText)._conflicts.length);
 
+  var doc3 = {_id:"a/b/c", a:1};
+  db.save(doc3);
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/withSlash/a/b/c");
+  T(xhr.status == 200);
+  
 };

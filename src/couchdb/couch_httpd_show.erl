@@ -21,11 +21,15 @@
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
     start_json_response/2,send_chunk/2,last_chunk/1,send_chunked_error/2,
     start_chunked_response/3, send_error/4]).
+    
+
 
 % /db/_design/foo/show/bar/docid
 % show converts a json doc to a response of any content-type. 
 % it looks up the doc an then passes it to the query server.
 % then it sends the response from the query server to the http client.
+
+
 handle_doc_show_req(#httpd{
         path_parts=[_, _, _, _, ShowName, DocId]
     }=Req, Db, DDoc) ->
@@ -34,6 +38,20 @@ handle_doc_show_req(#httpd{
     % we don't handle revs here b/c they are an internal api
     % returns 404 if there is no doc with DocId
     handle_doc_show(Req, Db, DDoc, ShowName, Doc);
+
+handle_doc_show_req(#httpd{
+        path_parts=[_, _, _, _, ShowName, DocId|Rest]
+    }=Req, Db, DDoc) ->
+    
+    DocParts = [DocId|Rest],
+    DocId1 = string:join([?b2l(P)|| P <- DocParts], "/"),
+        
+    % open the doc
+    Doc = couch_httpd_db:couch_doc_open(Db, ?l2b(DocId1), nil, [conflicts]),
+    % we don't handle revs here b/c they are an internal api
+    % returns 404 if there is no doc with DocId
+    handle_doc_show(Req, Db, DDoc, ShowName, Doc);
+
 
 handle_doc_show_req(#httpd{
         path_parts=[_, _, _, _, ShowName]
