@@ -212,8 +212,20 @@ var Render = (function() {
 
   function runShow(fun, ddoc, args) {
     try {
+      resetList();
       Mime.resetProvides();
-      var resp = fun.apply(ddoc, args);
+      var resp = fun.apply(ddoc, args) || {};
+
+      // handle list() style API
+      if (chunks.length && chunks.length > 0) {
+        resp = maybeWrapResponse(resp);
+        resp.headers = resp.headers || {};
+        for(var header in startResp) {
+          resp.headers[header] = startResp[header]
+        }
+        resp.body = chunks.join("") + (resp.body || "");
+        resetList();
+      }
 
       if (Mime.providesUsed) {
         resp = Mime.runProvides(args[1]);

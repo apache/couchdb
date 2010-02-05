@@ -22,7 +22,6 @@ couchTests.show_documents = function(debug) {
     shows: {
       "hello" : stringFun(function(doc, req) {
         log("hello fun");
-        log(req);
         if (doc) {
           return "Hello World";
         } else {
@@ -79,6 +78,25 @@ couchTests.show_documents = function(debug) {
           },
           "body" : "something"
         }
+      }),
+      "list-api" : stringFun(function(doc, req) {
+        start({"X-Couch-Test-Header": "Yeah"});
+        send("Hey");
+      }),
+      "list-api-mix" : stringFun(function(doc, req) {
+        start({"X-Couch-Test-Header": "Yeah"});
+        send("Hey ");
+        return "Dude";
+      }),
+      "list-api-mix-with-header" : stringFun(function(doc, req) {
+        start({"X-Couch-Test-Header": "Yeah"});
+        send("Hey ");
+        return {
+          headers: {
+            "X-Couch-Test-Header-Awesome": "Oh Yeah!"
+          },
+          body: "Dude"
+        };
       }),
       "accept-switch" : stringFun(function(doc, req) {
         if (req.headers["Accept"].match(/image/)) {
@@ -362,5 +380,18 @@ couchTests.show_documents = function(debug) {
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/hello/nonExistingDoc");
   T(xhr.responseText == "New World");
 
+  // test list() compatible API
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/list-api/foo");
+  T(xhr.responseText == "Hey");
+  TEquals("Yeah", xhr.getResponseHeader("X-Couch-Test-Header"), "header should be cool");
+
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/list-api-mix/foo");
+  T(xhr.responseText == "Hey Dude");
+  TEquals("Yeah", xhr.getResponseHeader("X-Couch-Test-Header"), "header should be cool");
+
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/list-api-mix-with-header/foo");
+  T(xhr.responseText == "Hey Dude");
+  TEquals("Yeah", xhr.getResponseHeader("X-Couch-Test-Header"), "header should be cool");
+  TEquals("Oh Yeah!", xhr.getResponseHeader("X-Couch-Test-Header-Awesome"), "header should be cool");
   
 };
