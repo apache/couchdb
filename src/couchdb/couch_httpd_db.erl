@@ -547,29 +547,6 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_revs_diff">>]}=Req, Db) ->
 db_req(#httpd{path_parts=[_,<<"_revs_diff">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 
-
-db_req(#httpd{method='PUT',path_parts=[_,<<"_admins">>]}=Req, Db) ->
-    Admins = couch_httpd:json_body(Req),
-    ok = couch_db:set_admins(Db, Admins),
-    send_json(Req, {[{<<"ok">>, true}]});
-
-db_req(#httpd{method='GET',path_parts=[_,<<"_admins">>]}=Req, Db) ->
-    send_json(Req, couch_db:get_admins(Db));
-
-db_req(#httpd{path_parts=[_,<<"_admins">>]}=Req, _Db) ->
-    send_method_not_allowed(Req, "PUT,GET");
-
-db_req(#httpd{method='PUT',path_parts=[_,<<"_readers">>]}=Req, Db) ->
-    Readers = couch_httpd:json_body(Req),
-    ok = couch_db:set_readers(Db, Readers),
-    send_json(Req, {[{<<"ok">>, true}]});
-
-db_req(#httpd{method='GET',path_parts=[_,<<"_readers">>]}=Req, Db) ->
-    send_json(Req, couch_db:get_readers(Db));
-
-db_req(#httpd{path_parts=[_,<<"_readers">>]}=Req, _Db) ->
-    send_method_not_allowed(Req, "PUT,GET");
-
 db_req(#httpd{method='PUT',path_parts=[_,<<"_security">>]}=Req, Db) ->
     SecObj = couch_httpd:json_body(Req),
     ok = couch_db:set_security(Db, SecObj),
