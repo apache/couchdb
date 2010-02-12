@@ -23,7 +23,7 @@
 -export([enum_docs_since_reduce_to_count/1,enum_docs_reduce_to_count/1]).
 -export([increment_update_seq/1,get_purge_seq/1,purge_docs/2,get_last_purged/1]).
 -export([start_link/3,open_doc_int/3,ensure_full_commit/1]).
--export([set_readers/2,get_readers/1,set_admins/2,get_admins/1,set_security/2,get_security/1]).
+-export([set_security/2,get_security/1]).
 -export([init/1,terminate/2,handle_call/3,handle_cast/2,code_change/3,handle_info/2]).
 -export([changes_since/5,changes_since/6,read_doc/2,new_revid/1]).
 
@@ -232,8 +232,8 @@ get_design_docs(#db{fulldocinfo_by_id_btree=Btree}=Db) ->
 
 check_is_admin(#db{user_ctx=#user_ctx{name=Name,roles=Roles}}=Db) ->
     {Admins} = get_admins(Db),
-    AdminRoles = [<<"_admin">> | proplists:get_value(roles, Admins, [])],
-    AdminNames = proplists:get_value(names, Admins,[]),
+    AdminRoles = [<<"_admin">> | proplists:get_value(<<"roles">>, Admins, [])],
+    AdminNames = proplists:get_value(<<"names">>, Admins,[]),
     case AdminRoles -- Roles of
     AdminRoles -> % same list, not an admin role
         case AdminNames -- [Name] of
@@ -251,9 +251,9 @@ check_is_reader(#db{user_ctx=#user_ctx{name=Name,roles=Roles}=UserCtx}=Db) ->
     ok -> ok;
     _ ->
         {Readers} = get_readers(Db),
-        ReaderRoles = proplists:get_value(roles, Readers,[]),
+        ReaderRoles = proplists:get_value(<<"roles">>, Readers,[]),
         WithAdminRoles = [<<"_admin">> | ReaderRoles],
-        ReaderNames = proplists:get_value(names, Readers,[]),
+        ReaderNames = proplists:get_value(<<"names">>, Readers,[]),
         case ReaderRoles ++ ReaderNames of 
         [] -> ok; % no readers == public access
         _Else ->
@@ -273,64 +273,43 @@ check_is_reader(#db{user_ctx=#user_ctx{name=Name,roles=Roles}=UserCtx}=Db) ->
     end.
 
 get_admins(#db{security=SecProps}) ->
-    proplists:get_value(admins, SecProps, {[]}).
-
-set_admins(#db{security=SecProps,update_pid=Pid}=Db, Admins) ->
-    check_is_admin(Db),
-    SecProps2 = update_sec_field(admins, SecProps, just_names_and_roles(Admins)),
-    gen_server:call(Pid, {set_security, SecProps2}, infinity).
+    proplists:get_value(<<"admins">>, SecProps, {[]}).
 
 get_readers(#db{security=SecProps}) ->
-    proplists:get_value(readers, SecProps, {[]}).
-
-set_readers(#db{security=SecProps,update_pid=Pid}=Db, Readers) ->
-    check_is_admin(Db),
-    SecProps2 = update_sec_field(readers, SecProps, just_names_and_roles(Readers)),
-    gen_server:call(Pid, {set_security, SecProps2}, infinity).
+    proplists:get_value(<<"readers">>, SecProps, {[]}).
 
 get_security(#db{security=SecProps}) ->
-    proplists:get_value(sec_obj, SecProps, {[]}).
+    {SecProps}.
 
-set_security(#db{security=SecProps, update_pid=Pid}=Db, {SecObjProps}) when is_list(SecObjProps) ->
+set_security(#db{update_pid=Pid}=Db, {NewSecProps}) when is_list(NewSecProps) ->
     check_is_admin(Db),
-    SecProps2 = update_sec_field(sec_obj, SecProps, {SecObjProps}),
-    gen_server:call(Pid, {set_security, SecProps2}, infinity);
+    ok = validate_security_object(NewSecProps),
+    gen_server:call(Pid, {set_security, NewSecProps}, infinity);
 set_security(_, _) ->
     throw(bad_request).
 
-update_sec_field(Field, SecProps, Value) ->
-    Admins = proplists:get_value(admins, SecProps, {[]}),
-    Readers = proplists:get_value(readers, SecProps, {[]}),
-    SecObj = proplists:get_value(sec_obj, SecProps, {[]}),
-    if Field == admins ->
-        [{admins, Value}];
-    true -> [{admins, Admins}] 
-    end ++ if Field == readers ->
-        [{readers, Value}];
-    true -> [{readers, Readers}] 
-    end ++ if Field == sec_obj ->
-        [{sec_obj, Value}];
-    true -> [{sec_obj, SecObj}]
-    end.
+validate_security_object(SecProps) ->
+    Admins = proplists:get_value(<<"admins">>, SecProps, {[]}),
+    Readers = proplists:get_value(<<"readers">>, SecProps, {[]}),
+    ok = validate_names_and_roles(Admins),
+    ok = validate_names_and_roles(Readers),
+    ok.
 
-% validate user input and convert proplist to atom keys
-just_names_and_roles({Props}) when is_list(Props) ->
-    Names = case proplists:get_value(<<"names">>,Props,[]) of
+% validate user input
+validate_names_and_roles({Props}) when is_list(Props) ->
+    case proplists:get_value(<<"names">>,Props,[]) of
     Ns when is_list(Ns) ->
             [throw("names must be a JSON list of strings") ||N <- Ns, not is_binary(N)],
             Ns;
     _ -> throw("names must be a JSON list of strings")
     end,
-    Roles = case proplists:get_value(<<"roles">>,Props,[]) of
+    case proplists:get_value(<<"roles">>,Props,[]) of
     Rs when is_list(Rs) ->
         [throw("roles must be a JSON list of strings") ||R <- Rs, not is_binary(R)],
         Rs;
     _ -> throw("roles must be a JSON list of strings")
     end,
-    {[
-        {names, Names},
-        {roles, Roles}
-    ]}.
+    ok.
 
 get_revs_limit(#db{revs_limit=Limit}) ->
     Limit.

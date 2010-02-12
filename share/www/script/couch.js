@@ -263,16 +263,16 @@ function CouchDB(name, httpHeaders) {
     return JSON.parse(this.last_req.responseText);
   }
 
-  this.setAdmins = function(adminsArray) {
-    this.last_req = this.request("PUT", this.uri + "_admins",{
-      body:JSON.stringify(adminsArray)
+  this.setSecObj = function(secObj) {
+    this.last_req = this.request("PUT", this.uri + "_security",{
+      body:JSON.stringify(secObj)
     });
     CouchDB.maybeThrowError(this.last_req);
     return JSON.parse(this.last_req.responseText);
   }
 
-  this.getAdmins = function() {
-    this.last_req = this.request("GET", this.uri + "_admins");
+  this.getSecObj = function() {
+    this.last_req = this.request("GET", this.uri + "_security");
     CouchDB.maybeThrowError(this.last_req);
     return JSON.parse(this.last_req.responseText);
   }

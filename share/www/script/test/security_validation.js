@@ -105,7 +105,9 @@ couchTests.security_validation = function(debug) {
       }
 
       // set user as the admin
-      T(db.setDbProperty("_admins", {names : ["Damien Katz"]}).ok);
+      T(db.setSecObj({
+        admins : {names : ["Damien Katz"]}
+      }).ok);
 
       T(userDb.save(designDoc).ok);
 
