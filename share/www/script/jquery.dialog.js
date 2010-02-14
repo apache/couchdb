@@ -79,7 +79,7 @@
             data[this.name] = this.value; // file inputs need special handling
           });
           options.submit(data, function callback(errors) {
-            if (errors == null || errors == {}) {
+            if ($.isEmptyObject(errors)) {
               dismiss();
             } else {
               for (var name in errors) {

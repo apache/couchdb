@@ -182,25 +182,69 @@
       this.databaseSecurity = function() {
         $.showDialog("dialog/_database_security.html", {
           load : function(d) {
-            ["admin", "reader"].forEach(function(key) {
-              db.getDbProperty("_"+key+"s", {
-                success : function(r) {
-                  $("input[name="+key+"_names]",d).val(JSON.stringify(r.names||[]));
-                  $("input[name="+key+"_roles]",d).val(JSON.stringify(r.roles||[]));
-                }
-              });
+            db.getDbProperty("_security", {
+              success: function(r) {
+                ["admin", "reader"].forEach(function(key) {
+                  var names = [];
+                  var roles = [];
+
+                  if (r && typeof r[key + "s"] === "object") {
+                    if ($.isArray(r[key + "s"]["names"])) {
+                      names = r[key + "s"]["names"];
+                    }
+                    if ($.isArray(r[key + "s"]["roles"])) {
+                      roles = r[key + "s"]["roles"];
+                    }
+                  }
+
+                  $("input[name=" + key + "_names]", d).val(JSON.stringify(names));
+                  $("input[name=" + key + "_roles]", d).val(JSON.stringify(roles));
+                });
+              }
             });
           },
           // maybe this should be 2 forms
           submit: function(data, callback) {
+            var errors = {};
+            var secObj = {
+              admins: {
+                names: [],
+                roles: []
+              },
+              readers: {
+                names: [],
+                roles: []
+              }
+            };
+
             ["admin", "reader"].forEach(function(key) {
-              var new_value = {
-                names : JSON.parse(data[key+"_names"]),
-                roles : JSON.parse(data[key+"_roles"])
-              };
-              db.setDbProperty("_"+key+"s", new_value);
+              var names, roles;
+
+              try {
+                names = JSON.parse(data[key + "_names"]);
+              } catch(e) { }
+              try {
+                roles = JSON.parse(data[key + "_roles"]);
+              } catch(e) { }
+
+              if ($.isArray(names)) {
+                secObj[key + "s"]["names"] = names;
+              } else {
+                errors[key + "_names"] = "The " + key +
+                  " names must be an array of strings";
+              }
+              if ($.isArray(roles)) {
+                secObj[key + "s"]["roles"] = roles;
+              } else {
+                errors[key + "_roles"] = "The " + key +
+                  " roles must be an array of strings";
+              }
             });
-            callback();
+
+            if ($.isEmptyObject(errors)) {
+              db.setDbProperty("_security", secObj);
+            }
+            callback(errors);
           }
         });
       }
