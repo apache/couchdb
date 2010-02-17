@@ -21,7 +21,8 @@ This version has not been released yet.
  * Bug fix for partial updates during view builds.
  * Bug fix for building couch.app's module list.
  * Fixed a problem with statistics timers and system sleep.
- * Improved the satistics calculations to use an online moving window algorithms.
+ * Improved the statistics calculations to use an online moving window
+   algorithm.
  * Adds batching of multiple updating requests, to improve throughput with many
    writers. Removed the now redundant couch_batch_save module.
  * Bug fix for premature termination of chunked responses.
