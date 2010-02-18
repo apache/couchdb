@@ -23,7 +23,7 @@
     auth = [],
     resource = "",
     headers = [
-        {"User-Agent", "CouchDb/"++couch_server:get_version()},
+        {"User-Agent", "CouchDB/"++couch_server:get_version()},
         {"Accept", "application/json"},
         {"Accept-Encoding", "gzip"}
     ],
