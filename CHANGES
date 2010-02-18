@@ -13,10 +13,12 @@ Security
  * Added per-database reader access control lists.
  * Added per-database security object for configuration data in validation
    functions.
+ * Added proxy authentication handler
 
 HTTP Interface
 
  * Provide Content-MD5 header support for attachments.
+ * Added URL Rewriter handler
 
 Build and System Integration
 

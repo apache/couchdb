@@ -38,6 +38,8 @@ This version has not been released yet.
  * Added default cookie-authentication and users db.
  * Added per-db reader access control lists.
  * Added per-db security object for configuration data in validation functions.
+ * Added URL Rewriter handler
+ * Added proxy authentication handler
  
 Version 0.10.1
 --------------
