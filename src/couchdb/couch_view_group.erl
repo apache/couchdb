@@ -78,17 +78,25 @@ start_link(InitArgs) ->
 init({InitArgs, ReturnPid, Ref}) ->
     process_flag(trap_exit, true),
     case prepare_group(InitArgs, false) of
-    {ok, #group{db=Db, fd=Fd}=Group} ->
-        couch_db:monitor(Db),
-        Owner = self(),
-        Pid = spawn_link(fun()-> couch_view_updater:update(Owner, Group) end),
-        {ok, RefCounter} = couch_ref_counter:start([Fd]),
-        {ok, #group_state{
-                db_name=couch_db:name(Db),
-                init_args=InitArgs,
-                updater_pid = Pid,
-                group=Group,
-                ref_counter=RefCounter}};
+    {ok, #group{db=Db, fd=Fd, current_seq=Seq}=Group} ->
+        case Seq > couch_db:get_update_seq(Db) of
+        true ->
+            ReturnPid ! {Ref, self(), {error, invalid_view_seq}},
+            ignore;
+        _ ->
+            couch_db:monitor(Db),
+            Owner = self(),
+            Pid = spawn_link(
+                fun()-> couch_view_updater:update(Owner, Group) end
+            ),
+            {ok, RefCounter} = couch_ref_counter:start([Fd]),
+            {ok, #group_state{
+                    db_name=couch_db:name(Db),
+                    init_args=InitArgs,
+                    updater_pid = Pid,
+                    group=Group,
+                    ref_counter=RefCounter}}
+        end;
     Error ->
         ReturnPid ! {Ref, self(), Error},
         ignore

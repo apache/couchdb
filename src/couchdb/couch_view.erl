@@ -284,6 +284,15 @@ handle_call({get_group_server, DbName,
         {ok, NewPid} ->
             add_to_ets(NewPid, DbName, Sig),
             {reply, {ok, NewPid}, Server};
+        {error, invalid_view_seq} ->
+            do_reset_indexes(DbName, Root),
+            case (catch couch_view_group:start_link({Root, DbName, Group})) of
+            {ok, NewPid} ->
+                add_to_ets(NewPid, DbName, Sig),
+                {reply, {ok, NewPid}, Server};
+            Error ->
+                {reply, Error, Server}
+            end;
         Error ->
             {reply, Error, Server}
         end;
@@ -292,6 +301,10 @@ handle_call({get_group_server, DbName,
     end.
 
 handle_cast({reset_indexes, DbName}, #server{root_dir=Root}=Server) ->
+    do_reset_indexes(DbName, Root),
+    {noreply, Server}.
+
+do_reset_indexes(DbName, Root) ->
     % shutdown all the updaters and clear the files, the db got changed
     Names = ets:lookup(couch_groups_by_db, DbName),
     lists:foreach(
@@ -304,8 +317,7 @@ handle_cast({reset_indexes, DbName}, #server{root_dir=Root}=Server) ->
             end
         end, Names),
     delete_index_dir(Root, DbName),
-    file:delete(Root ++ "/." ++ binary_to_list(DbName) ++ "_temp"),
-    {noreply, Server}.
+    file:delete(Root ++ "/." ++ ?b2l(DbName) ++ "_temp").
 
 handle_info({'EXIT', FromPid, Reason}, Server) ->
     case ets:lookup(couch_groups_by_updater, FromPid) of
