@@ -20,6 +20,7 @@ function init_sandbox() {
     sandbox.sum = Views.sum;
     sandbox.log = log;
     sandbox.toJSON = Couch.toJSON;
+    sandbox.JSON = JSON;
     sandbox.provides = Mime.provides;
     sandbox.registerType = Mime.registerType;
     sandbox.start = Render.start;
