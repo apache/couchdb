@@ -178,8 +178,7 @@ handle_rewrite_req(#httpd{
                 default_fun = DefaultFun,
                 url_handlers = UrlHandlers
             } = Req,
-
-            couch_httpd:handle_request(MochiReq1, DefaultFun,
+            couch_httpd:handle_request_int(MochiReq1, DefaultFun,
                     UrlHandlers, DbUrlHandlers, DesignUrlHandlers)
         end.
 

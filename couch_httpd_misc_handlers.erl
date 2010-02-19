@@ -46,6 +46,7 @@ handle_favicon_req(#httpd{method='GET'}=Req, DocumentRoot) ->
         {"Expires", httpd_util:rfc1123_date(OneYearFromNow)}
     ],
     couch_httpd:serve_file(Req, "favicon.ico", DocumentRoot, CachingHeaders);
+
 handle_favicon_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
 

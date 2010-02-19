@@ -25,7 +25,7 @@
 -export([start_json_response/2, start_json_response/3, end_json_response/1]).
 -export([send_response/4,send_method_not_allowed/2,send_error/4, send_redirect/2,send_chunked_error/2]).
 -export([send_json/2,send_json/3,send_json/4,last_chunk/1,parse_multipart_request/3]).
--export([accepted_encodings/1]).
+-export([accepted_encodings/1,handle_request_int/5]).
 
 start_link() ->
     % read config and register for configuration changes
@@ -127,9 +127,46 @@ make_fun_spec_strs(SpecStr) ->
 stop() ->
     mochiweb_http:stop(?MODULE).
 
+%%
+
+% if there's a vhost definition that matches the request, redirect internally
+redirect_to_vhost(MochiReq, DefaultFun,
+    UrlHandlers, DbUrlHandlers, DesignUrlHandlers, VhostTarget) ->
+
+    Path = MochiReq:get(path),
+    Target = VhostTarget ++ Path,
+    ?LOG_DEBUG("Vhost Target: '~p'~n", [Target]),
+    % build a new mochiweb request
+    MochiReq1 = mochiweb_request:new(MochiReq:get(socket),
+                                      MochiReq:get(method),
+                                      Target,
+                                      MochiReq:get(version),
+                                      MochiReq:get(headers)),
+    % cleanup, It force mochiweb to reparse raw uri.
+    MochiReq1:cleanup(),
+
+    handle_request1(MochiReq1, DefaultFun,
+        UrlHandlers, DbUrlHandlers, DesignUrlHandlers).
 
 handle_request(MochiReq, DefaultFun,
-        UrlHandlers, DbUrlHandlers, DesignUrlHandlers) ->
+    UrlHandlers, DbUrlHandlers, DesignUrlHandlers) ->
+
+    % grab Host from Req
+    Vhost = MochiReq:get_header_value("Host"),
+
+    % find Vhost in config
+    case couch_config:get("vhosts", Vhost, false) of
+        false -> % business as usual
+            handle_request_int(MochiReq, DefaultFun,
+                    UrlHandlers, DbUrlHandlers, DesignUrlHandlers);
+        VhostTarget ->
+            redirect_to_vhost(MochiReq, DefaultFun,
+                UrlHandlers, DbUrlHandlers, DesignUrlHandlers, VhostTarget)
+    end.
+
+
+handle_request_int(MochiReq, DefaultFun,
+            UrlHandlers, DbUrlHandlers, DesignUrlHandlers) ->
     Begin = now(),
     AuthenticationSrcs = make_fun_spec_strs(
             couch_config:get("httpd", "authentication_handlers")),
