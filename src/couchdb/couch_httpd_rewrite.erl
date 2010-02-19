@@ -23,25 +23,25 @@
 -define(MATCH_ALL, '*').
 
 
-%% doc The http rewrite handler. All rewriting is done from 
+%% doc The http rewrite handler. All rewriting is done from
 %% /dbname/_design/ddocname/_rewrite by default.
 %%
 %% each rules should be in rewrites member of the design doc.
 %% Ex of a complete rule :
 %%
-%%  { 
-%%      .... 
-%%      "rewrites": [ 
-%%      { 
-%%          "from": "", 
-%%          "to": "index.html", 
-%%          "method": "GET", 
-%%          "query": {} 
-%%      } 
-%%      ] 
-%%  } 
+%%  {
+%%      ....
+%%      "rewrites": [
+%%      {
+%%          "from": "",
+%%          "to": "index.html",
+%%          "method": "GET",
+%%          "query": {}
+%%      }
+%%      ]
+%%  }
 %%
-%%  from: is the path rule used to bind current uri to the rule. It 
+%%  from: is the path rule used to bind current uri to the rule. It
 %% use pattern matching for that.
 %%
 %%  to: rule to rewrite an url. It can contain variables depending on binding
@@ -51,27 +51,27 @@
 %%  method: method to bind the request method to the rule. by default "*"
 %%  query: query args you want to define they can contain dynamic variable
 %% by binding the key to the bindings
-%% 
+%%
 %%
 %% to and from are path with  patterns. pattern can be string starting with ":" or
 %% "*". ex:
 %% /somepath/:var/*
 %%
-%% This path is converted in erlang list by splitting "/". Each var are 
+%% This path is converted in erlang list by splitting "/". Each var are
 %% converted in atom. "*" is converted to '*' atom. The pattern matching is done
-%% by splitting "/" in request url in a list of token. A string pattern will 
-%% match equal token. The star atom ('*' in single quotes) will match any number 
-%% of tokens, but may only be present as the last pathtern in a pathspec. If all 
+%% by splitting "/" in request url in a list of token. A string pattern will
+%% match equal token. The star atom ('*' in single quotes) will match any number
+%% of tokens, but may only be present as the last pathtern in a pathspec. If all
 %% tokens are matched and all pathterms are used, then the pathspec matches. It works
 %% like webmachine. Each identified token will be reused in to rule and in query
 %%
-%% The pattern matching is done by first matching the request method to a rule. by 
+%% The pattern matching is done by first matching the request method to a rule. by
 %% default all methods match a rule. (method is equal to "*" by default). Then
-%% It will try to match the path to one rule. If no rule match, then a 404 error 
+%% It will try to match the path to one rule. If no rule match, then a 404 error
 %% is displayed.
-%% 
+%%
 %% Once a rule is found we rewrite the request url using the "to" and
-%% "query" members. The identified token are matched to the rule and 
+%% "query" members. The identified token are matched to the rule and
 %% will replace var. if '*' is found in the rule it will contain the remaining
 %% part if it exists.
 %%
@@ -83,15 +83,15 @@
 %% "to": "/some/"}                                              k = v
 %%
 %% {"from": "/a/b",         /a/b            /some/b?var=b       var =:= b
-%% "to": "/some/:var"}          
+%% "to": "/some/:var"}
 %%
-%% {"from": "/a",           /a              /some  
+%% {"from": "/a",           /a              /some
 %% "to": "/some/*"}
 %%
-%% {"from": "/a/*",         /a/b/c          /some/b/c  
+%% {"from": "/a/*",         /a/b/c          /some/b/c
 %% "to": "/some/*"}
 %%
-%% {"from": "/a",           /a              /some  
+%% {"from": "/a",           /a              /some
 %% "to": "/some/*"}
 %%
 %% {"from": "/a/:foo/*",    /a/b/c          /some/b/c?foo=b     foo =:= b
@@ -99,7 +99,7 @@
 %%
 %% {"from": "/a/:foo",     /a/b             /some/?k=b&foo=b    foo =:= b
 %% "to": "/some",
-%%  "query": { 
+%%  "query": {
 %%      "k": ":foo"
 %%  }}
 %%
@@ -113,32 +113,32 @@ handle_rewrite_req(#httpd{
         path_parts=[DbName, <<"_design">>, DesignName, _Rewrite|PathParts],
         method=Method,
         mochi_req=MochiReq}=Req, _Db, DDoc) ->
-    
+
     % we are in a design handler
     DesignId = <<"_design/", DesignName/binary>>,
     Prefix = <<"/", DbName/binary, "/", DesignId/binary>>,
     QueryList = couch_httpd:qs(Req),
-    
+
     #doc{body={Props}} = DDoc,
-    
+
     % get rules from ddoc
     case proplists:get_value(<<"rewrites">>, Props) of
         undefined ->
-            couch_httpd:send_error(Req, 404, <<"rewrite_error">>, 
+            couch_httpd:send_error(Req, 404, <<"rewrite_error">>,
                             <<"Invalid path.">>);
         Rules ->
             % create dispatch list from rules
             DispatchList =  [make_rule(Rule) || {Rule} <- Rules],
-            
+
             %% get raw path by matching url to a rule.
-            RawPath = case try_bind_path(DispatchList, Method, PathParts, 
+            RawPath = case try_bind_path(DispatchList, Method, PathParts,
                                     QueryList) of
                 no_dispatch_path ->
                     throw(not_found);
-                {NewPathParts, Bindings} -> 
+                {NewPathParts, Bindings} ->
                     Parts = [mochiweb_util:quote_plus(X) || X <- NewPathParts],
-                    
-                    % build new path, reencode query args, eventually convert 
+
+                    % build new path, reencode query args, eventually convert
                     % them to json
                     Path = lists:append(
                         string:join(Parts, [?SEPARATOR]),
@@ -146,20 +146,20 @@ handle_rewrite_req(#httpd{
                             [] -> [];
                             _ -> [$?, encode_query(Bindings)]
                         end),
-                    
+
                     % if path is relative detect it and rewrite path
                     case mochiweb_util:safe_relative_path(Path) of
-                        undefined -> 
+                        undefined ->
                             ?b2l(Prefix) ++ "/" ++ Path;
-                        P1 -> 
+                        P1 ->
                             ?b2l(Prefix) ++ "/" ++ P1
                     end
-                   
+
                 end,
 
             % normalize final path (fix levels "." and "..")
             RawPath1 = ?b2l(iolist_to_binary(normalize_path(RawPath))),
-                            
+
             ?LOG_DEBUG("rewrite to ~p ~n", [RawPath1]),
 
             % build a new mochiweb request
@@ -168,27 +168,26 @@ handle_rewrite_req(#httpd{
                                              RawPath1,
                                              MochiReq:get(version),
                                              MochiReq:get(headers)),
-                                             
+
             % cleanup, It force mochiweb to reparse raw uri.
             MochiReq1:cleanup(),
-            
+
             #httpd{
                 db_url_handlers = DbUrlHandlers,
                 design_url_handlers = DesignUrlHandlers,
                 default_fun = DefaultFun,
                 url_handlers = UrlHandlers
             } = Req,
-            
-            couch_httpd:handle_request(MochiReq1, DefaultFun, 
+            couch_httpd:handle_request_int(MochiReq1, DefaultFun,
                     UrlHandlers, DbUrlHandlers, DesignUrlHandlers)
         end.
-            
+
 
 
 %% @doc Try to find a rule matching current url. If none is found
 %% 404 error not_found is raised
 try_bind_path([], _Method, _PathParts, _QueryList) ->
-    no_dispatch_path;        
+    no_dispatch_path;
 try_bind_path([Dispatch|Rest], Method, PathParts, QueryList) ->
     [{PathParts1, Method1}, RedirectPath, QueryArgs] = Dispatch,
     case bind_method(Method1, Method) of
@@ -196,12 +195,12 @@ try_bind_path([Dispatch|Rest], Method, PathParts, QueryList) ->
             case bind_path(PathParts1, PathParts, []) of
                 {ok, Remaining, Bindings} ->
                     Bindings1 = Bindings ++ QueryList,
-                    
-                    % we parse query args from the rule and fill 
-                    % it eventually with bindings vars                    
+
+                    % we parse query args from the rule and fill
+                    % it eventually with bindings vars
                     QueryArgs1 = make_query_list(QueryArgs, Bindings1, []),
 
-                    % remove params in QueryLists1 that are already in 
+                    % remove params in QueryLists1 that are already in
                     % QueryArgs1
                     Bindings2 = lists:foldl(fun({K, V}, Acc) ->
                         K1 = to_atom(K),
@@ -213,17 +212,17 @@ try_bind_path([Dispatch|Rest], Method, PathParts, QueryList) ->
                     end, [], Bindings1),
 
                     FinalBindings = Bindings2 ++ QueryArgs1,
-                    NewPathParts = make_new_path(RedirectPath, FinalBindings, 
-                                    Remaining, []),                                    
-                    {NewPathParts, FinalBindings};         
+                    NewPathParts = make_new_path(RedirectPath, FinalBindings,
+                                    Remaining, []),
+                    {NewPathParts, FinalBindings};
                 fail ->
                     try_bind_path(Rest, Method, PathParts, QueryList)
-            end;    
+            end;
         false ->
             try_bind_path(Rest, Method, PathParts, QueryList)
     end.
-    
-%% rewriting dynamically the quey list given as query member in 
+
+%% rewriting dynamically the quey list given as query member in
 %% rewrites. Each value is replaced by one binding or an argument
 %% passed in url.
 make_query_list([], _Bindings, Acc) ->
@@ -239,7 +238,7 @@ make_query_list([{Key, Value}|Rest], Bindings, Acc) when is_list(Value) ->
     make_query_list(Rest, Bindings, [{to_atom(Key), Value1}|Acc]);
 make_query_list([{Key, Value}|Rest], Bindings, Acc) ->
     make_query_list(Rest, Bindings, [{to_atom(Key), Value}|Acc]).
-    
+
 replace_var(Key, Value, Bindings) ->
     case Value of
         <<":", Var/binary>> ->
@@ -270,16 +269,16 @@ make_new_path([?MATCH_ALL|_Rest], _Bindings, Remaining, Acc) ->
     Acc1 = lists:reverse(Acc) ++ Remaining,
     Acc1;
 make_new_path([P|Rest], Bindings, Remaining, Acc) when is_atom(P) ->
-    P2 = case proplists:get_value(P, Bindings) of 
+    P2 = case proplists:get_value(P, Bindings) of
         undefined -> << "undefined">>;
         P1 -> P1
     end,
     make_new_path(Rest, Bindings, Remaining, [P2|Acc]);
 make_new_path([P|Rest], Bindings, Remaining, Acc) ->
     make_new_path(Rest, Bindings, Remaining, [P|Acc]).
-            
 
-%% @doc If method of the query fith the rule method. If the 
+
+%% @doc If method of the query fith the rule method. If the
 %% method rule is '*', which is the default, all
 %% request method will bind. It allows us to make rules
 %% depending on HTTP method.
@@ -288,7 +287,7 @@ bind_method(?MATCH_ALL, _Method) ->
 bind_method(Method, Method) ->
     true;
 bind_method(_, _) ->
-    false. 
+    false.
 
 
 %% @doc bind path. Using the rule from we try to bind variables given
@@ -305,14 +304,14 @@ bind_path([Token|RestToken], [Token|RestMatch], Bindings) ->
     bind_path(RestToken, RestMatch, Bindings);
 bind_path(_, _, _) ->
     fail.
-    
+
 
 %% normalize path.
 normalize_path(Path)  ->
-    "/" ++ string:join(normalize_path1(string:tokens(Path, 
+    "/" ++ string:join(normalize_path1(string:tokens(Path,
                 "/"), []), [?SEPARATOR]).
-    
-    
+
+
 normalize_path1([], Acc) ->
     lists:reverse(Acc);
 normalize_path1([".."|Rest], Acc) ->
@@ -327,8 +326,8 @@ normalize_path1(["."|Rest], Acc) ->
 normalize_path1([Path|Rest], Acc) ->
     normalize_path1(Rest, [Path|Acc]).
 
- 
-%% @doc transform json rule in erlang for pattern matching   
+
+%% @doc transform json rule in erlang for pattern matching
 make_rule(Rule) ->
     Method = case proplists:get_value(<<"method">>, Rule) of
         undefined -> '*';
@@ -344,17 +343,17 @@ make_rule(Rule) ->
             parse_path(From)
         end,
     ToParts  = case proplists:get_value(<<"to">>, Rule) of
-        undefined ->  
+        undefined ->
             throw({error, invalid_rewrite_target});
         To ->
             parse_path(To)
         end,
     [{FromParts, Method}, ToParts, QueryArgs].
-    
+
 parse_path(Path) ->
     {ok, SlashRE} = re:compile(<<"\\/">>),
     path_to_list(re:split(Path, SlashRE), []).
-    
+
 %% @doc convert a path rule (from or to) to an erlang list
 %% * and path variable starting by ":" are converted
 %% in erlang atom.
@@ -380,17 +379,17 @@ encode_query(Props) ->
                 V;
             false ->
                 mochiweb_util:quote_plus(V)
-        end,              
+        end,
         [{K, V1} | Acc]
     end, [], Props),
     lists:flatten(mochiweb_util:urlencode(Props1)).
 
 to_atom(V) when is_atom(V) ->
-    V; 
+    V;
 to_atom(V) when is_binary(V) ->
     to_atom(?b2l(V));
 to_atom(V) ->
     list_to_atom(V).
-    
+
 to_json(V) ->
     iolist_to_binary(?JSON_ENCODE(V)).
