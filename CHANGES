@@ -18,7 +18,8 @@ Security
 HTTP Interface
 
  * Provide Content-MD5 header support for attachments.
- * Added URL Rewriter handler
+ * Added URL Rewriter handler.
+ * Added virtual host handling.
 
 Build and System Integration
 
