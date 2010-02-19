@@ -145,7 +145,7 @@ redirect_to_vhost(MochiReq, DefaultFun,
     % cleanup, It force mochiweb to reparse raw uri.
     MochiReq1:cleanup(),
 
-    handle_request1(MochiReq1, DefaultFun,
+    handle_request_int(MochiReq1, DefaultFun,
         UrlHandlers, DbUrlHandlers, DesignUrlHandlers).
 
 handle_request(MochiReq, DefaultFun,
