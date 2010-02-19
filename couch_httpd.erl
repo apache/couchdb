@@ -13,7 +13,7 @@
 -module(couch_httpd).
 -include("couch_db.hrl").
 
--export([start_link/0, stop/0, handle_request/5]).
+-export([start_link/0, stop/0, handle_request/6]).
 
 -export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,path/1,absolute_uri/2,body_length/1]).
 -export([verify_is_server_admin/1,unquote/1,quote/1,recv/2,recv_chunked/4,error_info/1]).
@@ -35,6 +35,7 @@ start_link() ->
 
     BindAddress = couch_config:get("httpd", "bind_address", any),
     Port = couch_config:get("httpd", "port", "5984"),
+    VirtualHosts = couch_config:get("vhosts"),
 
     DefaultSpec = "{couch_httpd_db, handle_request}",
     DefaultFun = make_arity_1_fun(
@@ -61,7 +62,8 @@ start_link() ->
     DesignUrlHandlers = dict:from_list(DesignUrlHandlersList),
     Loop = fun(Req)->
         apply(?MODULE, handle_request, [
-            Req, DefaultFun, UrlHandlers, DbUrlHandlers, DesignUrlHandlers
+            Req, DefaultFun, UrlHandlers, DbUrlHandlers, DesignUrlHandlers,
+                VirtualHosts
         ])
     end,
 
@@ -89,6 +91,8 @@ start_link() ->
         ("httpd_global_handlers", _) ->
             ?MODULE:stop();
         ("httpd_db_handlers", _) ->
+            ?MODULE:stop();
+        ("vhosts", _) ->
             ?MODULE:stop()
         end, Pid),
 
@@ -149,14 +153,14 @@ redirect_to_vhost(MochiReq, DefaultFun,
         UrlHandlers, DbUrlHandlers, DesignUrlHandlers).
 
 handle_request(MochiReq, DefaultFun,
-    UrlHandlers, DbUrlHandlers, DesignUrlHandlers) ->
+    UrlHandlers, DbUrlHandlers, DesignUrlHandlers, VirtualHosts) ->
 
     % grab Host from Req
     Vhost = MochiReq:get_header_value("Host"),
 
     % find Vhost in config
-    case couch_config:get("vhosts", Vhost, false) of
-        false -> % business as usual
+    case proplists:get_value(Vhost, VirtualHosts) of
+        undefined -> % business as usual
             handle_request_int(MochiReq, DefaultFun,
                     UrlHandlers, DbUrlHandlers, DesignUrlHandlers);
         VhostTarget ->
