@@ -604,7 +604,7 @@ do_checkpoint(State) ->
         close_db(Target),
         close_db(Source),
         {ok, NewState} = init(State#state.init_args),
-        NewState
+        NewState#state{listeners=State#state.listeners}
     end.
 
 commit_to_both(Source, Target, RequiredSeq) ->
