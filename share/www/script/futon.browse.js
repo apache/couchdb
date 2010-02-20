@@ -826,7 +826,8 @@
           $(this).html($("<pre></pre>").html($.futon.formatJSON(page.doc, {html: true})))
             .makeEditable({allowEmpty: false,
               createInput: function(value) {
-                return $("<textarea rows='8' cols='80' spellcheck='false'></textarea>").enableTabInsertion();
+                var rows = value.split("\n").length;
+                return $("<textarea rows='" + rows + "' cols='80' spellcheck='false'></textarea>").enableTabInsertion();
               },
               prepareInput: function(input) {
                 $(input).makeResizable({vertical: true});
