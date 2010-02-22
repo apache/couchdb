@@ -236,7 +236,7 @@ body.fullwidth #wrap { margin-right: 0; }
 #toolbar button:hover { background-position: 2px -30px; color: #000; }
 #toolbar button:active { background-position: 2px -62px; color: #000; }
 #toolbar button.add { background-image: url(../image/add.png); }
-#toolbar button.security { background-image: url(../image/compact.png); }
+#toolbar button.security { background-image: url(../image/key.png); }
 #toolbar button.compact { background-image: url(../image/compact.png); }
 #toolbar button.delete { background-image: url(../image/delete.png); }
 #toolbar button.load { background-image: url(../image/load.png); }
