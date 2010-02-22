@@ -130,7 +130,7 @@ handle_call({purge_docs, IdRevs}, _From, Db) ->
 
     ok = gen_server:call(Db2#db.main_pid, {db_updated, Db2}),
     couch_db_update_notifier:notify({updated, Db#db.name}),
-    {reply, {ok, Db2#db.update_seq, IdRevsPurged}, Db2}.
+    {reply, {ok, (Db2#db.header)#db_header.purge_seq, IdRevsPurged}, Db2}.
 
 
 handle_cast(start_compact, Db) ->
