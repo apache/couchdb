@@ -1,0 +1,4 @@
+{"*", [warn_obsolete_guard, warn_unused_import,
+       warn_shadow_vars, warn_export_vars, debug_info,
+       {i, "../include"},
+       {outdir, "../tests_ebin"}]}.

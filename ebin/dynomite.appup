@@ -1,0 +1,6 @@
+{"0.9.0-cloudant", [{"0.9.0-cloudant", [
+    {apply, {supervisor, terminate_child, [showroom_sup, dynomite_sup]}},
+    {restart_application, dynomite},
+    {apply, {supervisor, delete_child, [showroom_sup, dynomite_sup]}},
+    {update, showroom_sup, supervisor}
+]}],[{"0.9.0-cloudant",[]}]}.
