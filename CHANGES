@@ -38,6 +38,7 @@ View Server
  * Improved view information objects.
  * Bug fix for partial updates during view builds.
  * Move query server to a design-doc based protocol.
+ * Use json2.js for JSON serialization for compatiblity with native JSON.
  * Major refactoring of couchjs to lay the groundwork for disabling cURL
    support. The new HTTP interaction acts like a synchronous XHR. Example usage
    of the new system is in the JavaScript CLI test runner.
