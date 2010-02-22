@@ -69,9 +69,15 @@
           if (!validateUsernameAndPassword(data, callback)) return;
           $.couch.config({
             success : function() {
-              callback();
-              doLogin(data.name, data.password, callback);            
-              doSignup(data.name, null, callback, false);
+              doLogin(data.name, data.password, function(errors) {
+                if(!$.isEmptyObject(errors)) {
+                  callback(errors);
+                  return;
+                }
+                doSignup(data.name, null, function(errors) {
+                  callback(errors);
+                  }, false);
+                });            
             }
           }, "admins", data.name, data.password);
         }
