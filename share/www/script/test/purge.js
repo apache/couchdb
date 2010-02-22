@@ -54,13 +54,15 @@ couchTests.purge = function(debug) {
   });
   T(xhr.status == 200);
 
+  var result = JSON.parse(xhr.responseText);
   var newInfo = db.info();
+  
   // purging increments the update sequence
   T(info.update_seq+1 == newInfo.update_seq);
   // and it increments the purge_seq
   T(info.purge_seq+1 == newInfo.purge_seq);
+  T(result.purge_seq == newInfo.purge_seq);
 
-  var result = JSON.parse(xhr.responseText);
   T(result.purged["1"][0] == doc1._rev);
   T(result.purged["2"][0] == doc2._rev);
 
@@ -91,6 +93,8 @@ couchTests.purge = function(debug) {
   });
 
   T(xhr.status == 200);
+  result = JSON.parse(xhr.responseText);
+  T(result.purge_seq == db.info().purge_seq);
 
   var rows = db.view("test/all_docs_twice").rows;
   for (var i = 4; i < numDocs; i++) {
