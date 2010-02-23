@@ -15,11 +15,15 @@
 
   if(typeof(CouchHTTP) != "undefined") {
     CouchHTTP.prototype.open = function(method, url, async) {
-      if(/^\s*http:\/\//.test(url)) {
-        return this._open(method, url, async);
-      } else {
-        return this._open(method, this.base_url + url, async);
+      if(!/^\s*http:\/\//.test(url)) {
+        if(/^[^\/]/.test(url)) {
+          url = this.base_url + "/" + url;
+        } else {
+         url = this.base_url + url;
+        }
       }
+      
+      return this._open(method, url, async);
     };
     
     CouchHTTP.prototype.setRequestHeader = function(name, value) {
@@ -52,6 +56,7 @@
   }
 })();
 
+CouchDB.urlPrefix = "";
 CouchDB.newXhr = function() {
   return new CouchHTTP();
 };
