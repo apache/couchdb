@@ -312,8 +312,7 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
                 throw({bad_request, Reason})
         end,
         % Verify expiry and hash
-        {NowMS, NowS, _} = erlang:now(),
-        CurrentTime = NowMS * 1000000 + NowS,
+        CurrentTime = make_cookie_time(),
         case couch_config:get("couch_httpd_auth", "secret", nil) of
         nil -> 
             ?LOG_ERROR("cookie auth secret is not set",[]),
@@ -362,8 +361,7 @@ cookie_auth_header(#httpd{user_ctx=#user_ctx{name=User}, auth={Secret, true}}, H
     Cookies = mochiweb_cookies:parse_cookie(CookieHeader),
     AuthSession = proplists:get_value("AuthSession", Cookies),
     if AuthSession == undefined ->
-        {NowMS, NowS, _} = erlang:now(),
-        TimeStamp = NowMS * 1000000 + NowS,
+        TimeStamp = make_cookie_time(),
         [cookie_auth_cookie(?b2l(User), Secret, TimeStamp)];
     true ->
         []
@@ -414,8 +412,7 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req) ->
         true ->
             % setup the session cookie
             Secret = ?l2b(ensure_cookie_auth_secret()),
-            {NowMS, NowS, _} = erlang:now(),
-            CurrentTime = NowMS * 1000000 + NowS,
+            CurrentTime = make_cookie_time(),
             Cookie = cookie_auth_cookie(?b2l(UserName), <<Secret/binary, UserSalt/binary>>, CurrentTime),
             % TODO document the "next" feature in Futon
             {Code, Headers} = case couch_httpd:qs_value(Req, "next", nil) of
@@ -487,3 +484,7 @@ to_int(Value) when is_list(Value) ->
     list_to_integer(Value);
 to_int(Value) when is_integer(Value) ->
     Value.
+
+make_cookie_time() ->
+    {NowMS, NowS, _} = erlang:now(),
+    NowMS * 1000000 + NowS.
