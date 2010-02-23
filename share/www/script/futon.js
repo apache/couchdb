@@ -337,13 +337,13 @@
           var date = new Date();
           date.setTime(date.getTime() + 14*24*60*60*1000); // two weeks
           document.cookie = cookiePrefix + name + "=" + escape(value) +
-            "; domain=" + location.hostname + "; expires=" + date.toGMTString();
+            "; expires=" + date.toGMTString();
         },
         del: function(name) {
           var date = new Date();
           date.setTime(date.getTime() - 24*60*60*1000); // yesterday
-          document.cookie = cookiePrefix + name + "=; domain=" +
-            location.hostname + "; expires=" + date.toGMTString();
+          document.cookie = cookiePrefix + name + "=" +
+            "; expires=" + date.toGMTString();
         }
       },
 
