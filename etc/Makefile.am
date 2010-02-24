@@ -93,7 +93,7 @@ windows/couchdb.iss: windows/couchdb.iss.tpl FORCE
 # The installer depends on all files, not just the source .iss file,
 # so we trick make into always building it with the FORCE pattern...
 windows/setup-couchdb-@version@.exe: windows/couchdb.iss windows/README.txt FORCE
-	$(INNO_COMPILER_EXECUTABLE) /q $<
+	"$(INNO_COMPILER_EXECUTABLE)" /q $<
 	@echo Windows Installer is at: `cygpath -a -w windows/setup-couchdb-@version@.exe`
 
 windows/setup-couchdb-@version@.exe.md5: windows/setup-couchdb-@version@.exe
