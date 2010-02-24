@@ -68,13 +68,24 @@ replicate({Props}=PostBody, UserCtx) ->
         [?MODULE]
     },
 
-    Server = start_replication_server(Replicator),
-
-    case proplists:get_value(<<"continuous">>, Props, false) of
+    case proplists:get_value(<<"cancel">>, Props, false) of
     true ->
-        {ok, {continuous, ?l2b(BaseId)}};
+ case supervisor:terminate_child(couch_rep_sup, BaseId ++ Extension) of
+        {error, not_found} ->
+     {error, not_found};
+        ok ->
+     ok = supervisor:delete_child(couch_rep_sup, BaseId ++ Extension),
+            {ok, {cancelled, ?l2b(BaseId)}}
+ end;
     false ->
-        get_result(Server, PostBody, UserCtx)
+        Server = start_replication_server(Replicator),
+
+        case proplists:get_value(<<"continuous">>, Props, false) of
+        true ->
+            {ok, {continuous, ?l2b(BaseId)}};
+        false ->
+            get_result(Server, PostBody, UserCtx)
+        end
     end.
 
 checkpoint(Server) ->
