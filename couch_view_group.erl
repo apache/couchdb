@@ -125,7 +125,7 @@ handle_call({request_group, RequestSeq}, From,
             updater_pid=nil,
             waiting_list=WaitList
             }=State) when RequestSeq > Seq ->
-    {ok, Db} = couch_db:open(DbName, []),
+    {ok, Db} = couch_db:open_int(DbName, []),
     Group2 = Group#group{db=Db},
     Owner = self(),
     Pid = spawn_link(fun()-> couch_view_updater:update(Owner, Group2) end),
@@ -164,7 +164,7 @@ handle_cast({start_compact, CompactFun}, #group_state{compactor_pid=nil}
         init_args = {RootDir, DbName, _}
     } = State,
     ?LOG_INFO("View index compaction starting for ~s ~s", [DbName, GroupId]),
-    {ok, Db} = couch_db:open(DbName, []),
+    {ok, Db} = couch_db:open_int(DbName, []),
     {ok, Fd} = open_index_file(compact, RootDir, DbName, GroupSig),
     NewGroup = reset_file(Db, Fd, DbName, Group),
     Pid = spawn_link(fun() -> CompactFun(Group, NewGroup) end),
@@ -224,7 +224,7 @@ handle_cast({compact_done, NewGroup}, State) ->
     ?LOG_INFO("View index compaction still behind for ~s ~s -- current: ~p " ++
         "compact: ~p", [DbName, GroupId, CurrentSeq, NewGroup#group.current_seq]),
     couch_db:close(NewGroup#group.db),
-    {ok, Db} = couch_db:open(DbName, []),
+    {ok, Db} = couch_db:open_int(DbName, []),
     Pid = spawn_link(fun() ->
         {_,Ref} = erlang:spawn_monitor(fun() ->
             couch_view_updater:update(nil, NewGroup#group{db = Db})
@@ -257,7 +257,7 @@ handle_cast({partial_update, _, _}, State) ->
     {noreply, State}.
 
 handle_info(delayed_commit, #group_state{db_name=DbName,group=Group}=State) ->
-    {ok, Db} = couch_db:open(DbName, []),
+    {ok, Db} = couch_db:open_int(DbName, []),
     CommittedSeq = couch_db:get_committed_update_seq(Db),
     couch_db:close(Db),
     if CommittedSeq >= Group#group.current_seq ->
@@ -292,7 +292,7 @@ handle_info({'EXIT', FromPid, {new_group, #group{db=Db}=Group}},
                 group=Group#group{db=nil}, updater_pid=nil}};
     StillWaiting ->
         % we still have some waiters, reopen the database and reupdate the index
-        {ok, Db2} = couch_db:open(DbName, []),
+        {ok, Db2} = couch_db:open_int(DbName, []),
         Group2 = Group#group{db=Db2},
         Owner = self(),
         Pid = spawn_link(fun() -> couch_view_updater:update(Owner, Group2) end),
@@ -372,7 +372,7 @@ reply_all(#group_state{waiting_list=WaitList}=State, Reply) ->
     State#group_state{waiting_list=[]}.
 
 prepare_group({RootDir, DbName, #group{sig=Sig}=Group}, ForceReset)->
-    case couch_db:open(DbName, []) of
+    case couch_db:open_int(DbName, []) of
     {ok, Db} ->
         case open_index_file(RootDir, DbName, Sig) of
         {ok, Fd} ->
@@ -437,7 +437,7 @@ open_index_file(compact, RootDir, DbName, GroupSig) ->
     end.
 
 open_temp_group(DbName, Language, DesignOptions, MapSrc, RedSrc) ->
-    case couch_db:open(DbName, []) of
+    case couch_db:open_int(DbName, []) of
     {ok, Db} ->
         View = #view{map_names=[<<"_temp">>],
             id_num=0,
@@ -459,7 +459,7 @@ set_view_sig(#group{
     G#group{sig=erlang:md5(term_to_binary({Views, Language, DesignOptions}))}.
 
 open_db_group(DbName, GroupId) ->
-    case couch_db:open(DbName, []) of
+    case couch_db:open_int(DbName, []) of
     {ok, Db} ->
         case couch_db:open_doc(Db, GroupId) of
         {ok, Doc} ->
