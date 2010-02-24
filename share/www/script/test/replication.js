@@ -302,7 +302,26 @@ couchTests.replication = function(debug) {
   TEquals("test_suite_db_b", dbB.info().db_name,
     "Target database should exist");
 
+  // continuous
+  var continuousResult = CouchDB.replicate(dbA.name, "test_suite_db_b", {
+    body: {"continuous": true}
+  });
+  T(continuousResult.ok)
+  T(continuousResult._local_id)
 
+  var cancelResult = CouchDB.replicate(dbA.name, "test_suite_db_b", {
+    body: {"cancel": true}
+  });
+  T(cancelResult.ok)
+  T(continuousResult._local_id == cancelResult._local_id)
+
+  try {
+   var cancelResult2 = CouchDB.replicate(dbA.name, "test_suite_db_b", {
+     body: {"cancel": true}
+   });
+  } catch (e) {
+    T(e.error == "not_found")
+  }
   // test replication object option doc_ids
 
   var dbA = new CouchDB("test_suite_rep_docs_db_a", {"X-Couch-Full-Commit":"false"});
