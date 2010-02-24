@@ -47,7 +47,8 @@ Replication
 
  * Added option to implicitly create replication target databases.
  * Avoid leaking file descriptors on automatic replication restarts.
- * Added option to replicate a list of documents by id
+ * Added option to replicate a list of documents by id.
+ * Allow continuous replication to be cancelled.
 
 Storage System
 
