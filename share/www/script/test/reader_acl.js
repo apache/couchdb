@@ -90,10 +90,26 @@ couchTests.reader_acl = function(debug) {
       // server _admin can always read
       T(secretDb.open("baz").foo == "bar");
 
+      // and run temp views
+      TEquals(secretDb.query(function(doc) {
+        emit(null, null)
+      }).total_rows, 1);
+
+      T(secretDb.save({
+        "_id" : "_design/foo",
+        views : {
+          bar : {
+            map : "function(doc){emit(null, null)}"
+          }
+        }
+      }).ok)
+
       // now top-secret users can read too
       T(CouchDB.login("jchris@apache.org", "funnybone").ok);
       T(CouchDB.session().userCtx.roles.indexOf("_admin") == -1);
       T(secretDb.open("baz").foo == "bar");
+      // readers can query stored views
+      T(secretDb.view("foo/bar").total_rows == 1);
       
       CouchDB.logout();
 

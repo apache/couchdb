@@ -13,7 +13,7 @@
 -module(couch_db).
 -behaviour(gen_server).
 
--export([open/2,close/1,create/2,start_compact/1,get_db_info/1,get_design_docs/1]).
+-export([open/2,open_int/2,close/1,create/2,start_compact/1,get_db_info/1,get_design_docs/1]).
 -export([open_ref_counted/2,is_idle/1,monitor/1,count_changes_since/2]).
 -export([update_doc/3,update_doc/4,update_docs/4,update_docs/2,update_docs/3,delete_doc/3]).
 -export([get_doc_info/2,open_doc/2,open_doc/3,open_doc_revs/4]).
@@ -64,6 +64,13 @@ open_db_file(Filepath, Options) ->
 create(DbName, Options) ->
     couch_server:create(DbName, Options).
 
+% this is for opening a database for internal purposes like the replicator
+% or the view indexer. it never throws a reader error.
+open_int(DbName, Options) ->
+    couch_server:open(DbName, Options).
+
+% this should be called anytime an http request opens the database.
+% it ensures that the http userCtx is a valid reader
 open(DbName, Options) ->
     case couch_server:open(DbName, Options) of
         {ok, Db} ->
