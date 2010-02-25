@@ -33,7 +33,7 @@ mkdir -p build-aux
 
 if test -z "$REVISION"; then
     if test -d .git; then
-        REVISION=`git log | head -1 | awk '{print $2}' | cut -b 1-8`-git
+        REVISION=`git log --pretty="format:%h" | head -1`-git
     else
         # default to svn
         REVISION=`\`which svn\` info . 2> /dev/null | awk "/Revision:/{print \\$2}"`
