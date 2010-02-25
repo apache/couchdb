@@ -13,12 +13,13 @@ specific language governing permissions and limitations under the License.
 
 -->
 <form action="" method="post">
-  <h2>Admins and Readers</h2>
-  <p class="help">
-    Each database contains lists of admins and readers. 
-    Admins and readers are each defined by <tt>names</tt> and <tt>roles</tt>, which are lists of strings. For example, if the readers is defined by <tt>names ["jane", "mike"]</tt> and roles <tt>["bbq"]</tt> then anyone with a <tt>"bbq"</tt> role can read the database. Yummy!
-  </p>
+  <h2>Security</h2>
   <fieldset>
+    <p class="help">
+      Each database contains lists of admins and readers. 
+      Admins and readers are each defined by <tt>names</tt> and <tt>roles</tt>, which are lists of strings.
+    </p>
+
     <h3>Admins</h3>
     <p class="help">Database admins can update design documents and edit the readers list.</p>
     <table summary=""><tbody><tr>
@@ -29,10 +30,9 @@ specific language governing permissions and limitations under the License.
       <td><input type="text" name="admin_roles" size="40"></td>
     </tr>
     </tbody></table>
-  </fieldset>
-  <fieldset>
+
     <h3>Readers</h3>
-    <p class="help">Database readers can access the database. If no readers are defined, the database is public. When readers are defined, only they may read or write to the database.</p>
+    <p class="help">Database readers can access the database. If no readers are defined, the database is public.</p>
     <table summary=""><tbody><tr>
       <th><label>Names:</label></th>
       <td><input type="text" name="reader_names" size="40"></td>
