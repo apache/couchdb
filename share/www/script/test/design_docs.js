@@ -38,6 +38,13 @@ function() {
   var designDoc = {
     _id:"_design/test", // turn off couch.js id escaping?
     language: "javascript",
+    whatever : {
+      stringzone : "exports.string = 'plankton';",
+      commonjs : {
+        whynot : "exports.test = require('../stringzone')",
+        upper : "exports.testing = require('./whynot').test.string.toUpperCase()"
+      }
+    },
     views: {
       all_docs_twice: {map: "function(doc) { emit(doc.integer, null); emit(doc.integer, null) }"},
       no_docs: {map: "function(doc) {}"},
@@ -50,9 +57,11 @@ function() {
                 reduce:"function (keys, values) { return \"" + makebigstring(16) + "\"; };"}
     },
     shows: {
-      simple: "function() {return 'ok'};"
+      simple: "function() {return 'ok'};",
+      requirey : "function() { var lib = require('whatever/commonjs/upper'); return lib.testing; };"
     }
-  }
+  }; 
+
   var xhr = CouchDB.request("PUT", "/test_suite_db_a/_design/test", {body: JSON.stringify(designDoc)});
   var resp = JSON.parse(xhr.responseText);
   
@@ -73,6 +82,11 @@ function() {
   var xhr = CouchDB.request("GET", "/test_suite_db_a/_design/test/_show/simple?cache=buster");
   T(xhr.status == 200);
   TEquals("ok", xhr.responseText, 'query server used wrong ddoc');
+
+  // test commonjs require
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/requirey");
+  T(xhr.status == 200);
+  TEquals("PLANKTON", xhr.responseText);
 
   // test that we get design doc info back
   var dinfo = db.designInfo("_design/test");

@@ -10,15 +10,66 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+var resolveModule = function(names, parent, current) {
+  if (names.length == 0) {
+    if (typeof current != "string") {
+      throw ["error","invalid_require_path",
+        'Must require a JavaScript string, not: '+(typeof current)];
+    }
+    return [current, parent];
+  }
+  // we need to traverse the path
+  var n = names.shift();
+  if (n == '..') {
+    if (!(parent && parent.parent)) {
+      throw ["error", "invalid_require_path", 'Object has no parent '+JSON.stringify(current)];
+    }
+    return resolveModule(names, parent.parent.parent, parent.parent);
+  } else if (n == '.') {
+    if (!parent) {
+      throw ["error", "invalid_require_path", 'Object has no parent '+JSON.stringify(current)];
+    }
+    return resolveModule(names, parent.parent, parent);
+  }
+  if (!current[n]) {
+    throw ["error", "invalid_require_path", 'Object has no property "'+n+'". '+JSON.stringify(current)];
+  }
+  var p = current
+  current = current[n];
+  current.parent = p;
+  return resolveModule(names, p, current)
+}
+
 var Couch = {
   // moving this away from global so we can move to json2.js later
   toJSON : function (val) {
     return JSON.stringify(val);
   },
-  compileFunction : function(source) {
+  compileFunction : function(source, ddoc) {    
     if (!source) throw(["error","not_found","missing function"]);
     try {
-      var functionObject = sandbox ? evalcx(source, sandbox) : eval(source);
+      if (sandbox) {
+        if (ddoc) {
+          var require = function(name, parent) {
+            var exports = {};
+            var resolved = resolveModule(name.split('/'), parent, ddoc);
+            var source = resolved[0]; 
+            parent = resolved[1];
+            var s = "function (exports, require) { " + source + " }";
+            try {
+              var func = sandbox ? evalcx(s, sandbox) : eval(s);
+              func.apply(sandbox, [exports, function(name) {return require(name, parent, source)}]);
+            } catch(e) { 
+              throw ["error","compilation_error","Module require('"+name+"') raised error "+e.toSource()]; 
+            }
+            return exports;
+          }
+          sandbox.require = require;
+        }
+        var functionObject = evalcx(source, sandbox);
+      } else {
+        var functionObject = eval(source);
+      }
     } catch (err) {
       throw(["error", "compilation_error", err.toSource() + " (" + source + ")"]);
     };

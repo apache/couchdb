@@ -74,7 +74,7 @@ var DDoc = (function() {
             if (i+1 == funPath.length) {
               fun = point[funPath[i]]
               if (typeof fun != "function") {
-                fun = Couch.compileFunction(fun);
+                fun = Couch.compileFunction(fun, ddoc);
                 // cache the compiled fun on the ddoc
                 point[funPath[i]] = fun
               };
