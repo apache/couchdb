@@ -210,6 +210,11 @@ var Render = (function() {
     return s;
   };
 
+  function isDocRequestPath(info) {
+    var path = info.path;
+    return path.length > 5;
+  };
+
   function runShow(fun, ddoc, args) {
     try {
       resetList();
@@ -239,7 +244,7 @@ var Render = (function() {
         throw(["error", "render_error", "undefined response from show function"]);      
       }
     } catch(e) {
-      if(args[0] === null) {
+      if (args[0] === null && isDocRequestPath(args[1])) {
         throw(["error", "not_found", "document not found"]);
       } else {
         renderError(e, fun.toSource());
