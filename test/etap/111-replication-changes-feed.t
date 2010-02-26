@@ -157,7 +157,7 @@ test_deleted_conflicts(Type) ->
     [Win, {[{<<"rev">>, Lose}]}] = proplists:get_value(<<"changes">>, ExpectProps),
     Doc = couch_doc:from_json_obj({[
         {<<"_id">>, Id},
-        {<<"_rev">>, couch_doc:rev_to_str(Lose)},
+        {<<"_rev">>, Lose},
         {<<"_deleted">>, true}
     ]}),
     Db = get_db(),
@@ -167,7 +167,7 @@ test_deleted_conflicts(Type) ->
     Expect = {[
         {<<"seq">>, get_update_seq()},
         {<<"id">>, Id},
-        {<<"changes">>, [Win, {[{<<"rev">>, Rev}]}]}
+        {<<"changes">>, [Win, {[{<<"rev">>, couch_doc:rev_to_str(Rev)}]}]}
     ]},
     
     {ok, Pid} = start_changes_feed(Type, Since, false),
@@ -210,7 +210,7 @@ generate_change(Id, EJson) ->
     {[
         {<<"seq">>, get_update_seq()},
         {<<"id">>, Id},
-        {<<"changes">>, [{[{<<"rev">>, Rev}]}]}
+        {<<"changes">>, [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]}]}
     ]}.
 
 generate_conflict() ->
@@ -220,9 +220,9 @@ generate_conflict() ->
     Doc2 = (couch_doc:from_json_obj({[<<"foo">>, <<"baz">>]}))#doc{id = Id},
     {ok, Rev1} = couch_db:update_doc(Db, Doc1, [full_commit]),
     {ok, Rev2} = couch_db:update_doc(Db, Doc2, [full_commit, all_or_nothing]),
-    
+
     %% relies on undocumented CouchDB conflict winner algo and revision sorting!
-    RevList = [{[{<<"rev">>, R}]} || R
+    RevList = [{[{<<"rev">>, couch_doc:rev_to_str(R)}]} || R
         <- lists:sort(fun(A,B) -> B<A end, [Rev1,Rev2])],
     {[
         {<<"seq">>, get_update_seq()},

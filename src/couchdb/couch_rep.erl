@@ -451,7 +451,11 @@ make_replication_id({Props}, UserCtx) ->
     % Port = mochiweb_socket_server:get(couch_httpd, port),
     Src = get_rep_endpoint(UserCtx, proplists:get_value(<<"source">>, Props)),
     Tgt = get_rep_endpoint(UserCtx, proplists:get_value(<<"target">>, Props)),    
-    Base = couch_util:to_hex(erlang:md5(term_to_binary([HostName, Src, Tgt]))),
+    Filter = proplists:get_value(<<"filter">>, Props),
+    QueryParams = proplists:get_value(<<"query_params">>, Props),
+    Base = couch_util:to_hex(erlang:md5(
+        term_to_binary([HostName, Src, Tgt, Filter, QueryParams])
+    )),
     Extension = maybe_append_options(
         [<<"continuous">>, <<"create_target">>], Props),
     {Base, Extension}.

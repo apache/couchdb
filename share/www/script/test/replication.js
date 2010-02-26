@@ -377,4 +377,81 @@ couchTests.replication = function(debug) {
     T(docFoo666 === null);
   }
 
+  // test filtered replication
+
+  var sourceDb = new CouchDB(
+    "test_suite_filtered_rep_db_a", {"X-Couch-Full-Commit":"false"}
+  );
+
+  sourceDb.deleteDb();
+  sourceDb.createDb();
+
+  T(sourceDb.save({_id:"foo1",value:1}).ok);
+  T(sourceDb.save({_id:"foo2",value:2}).ok);
+  T(sourceDb.save({_id:"foo3",value:3}).ok);
+  T(sourceDb.save({_id:"foo4",value:4}).ok);
+  T(sourceDb.save({
+    "_id": "_design/mydesign",
+    "language" : "javascript",
+    "filters" : {
+      "myfilter" : (function(doc, req) {
+        if (doc.value < Number(req.query.maxvalue)) {
+          return true;
+        } else {
+          return false;
+        }
+      }).toString()
+    }
+  }).ok);
+
+  var dbPairs = [
+    {source:"test_suite_filtered_rep_db_a",
+      target:"test_suite_filtered_rep_db_b"},
+    {source:"test_suite_filtered_rep_db_a",
+      target:"http://" + host + "/test_suite_filtered_rep_db_b"},
+    {source:"http://" + host + "/test_suite_filtered_rep_db_a",
+      target:"test_suite_filtered_rep_db_b"},
+    {source:"http://" + host + "/test_suite_filtered_rep_db_a",
+      target:"http://" + host + "/test_suite_filtered_rep_db_b"}
+  ];
+
+  for (var i = 0; i < dbPairs.length; i++) {
+    var targetDb = new CouchDB("test_suite_filtered_rep_db_b");
+    targetDb.deleteDb();
+    targetDb.createDb();
+
+    var dbA = dbPairs[i].source;
+    var dbB = dbPairs[i].target;
+
+    var repResult = CouchDB.replicate(dbA, dbB, {
+      body: {
+        "filter" : "mydesign/myfilter",
+        "query_params" : {
+          "maxvalue": "3"
+        }
+      }
+    });
+
+    T(repResult.ok);
+    T($.isArray(repResult.history));
+    T(repResult.history.length === 1);
+    T(repResult.history[0].docs_written === 2);
+    T(repResult.history[0].docs_read === 2);
+    T(repResult.history[0].doc_write_failures === 0);
+
+    var docFoo1 = targetDb.open("foo1");
+    T(docFoo1 !== null);
+    T(docFoo1.value === 1);
+
+    var docFoo2 = targetDb.open("foo2");
+    T(docFoo2 !== null);
+    T(docFoo2.value === 2);
+
+    var docFoo3 = targetDb.open("foo3");
+    T(docFoo3 === null);
+
+    var docFoo4 = targetDb.open("foo4");
+    T(docFoo4 === null);
+  }
+
 };
