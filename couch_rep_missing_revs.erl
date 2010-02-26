@@ -144,11 +144,15 @@ changes_loop(OurServer, SourceChangesServer, Target) ->
     changes_loop(OurServer, SourceChangesServer, Target).
 
 get_missing_revs(#http_db{}=Target, Changes) ->
-    Transform = fun({[{<<"seq">>,_}, {<<"id">>,Id}, {<<"changes">>,C}]}) ->
-        {Id, [couch_doc:rev_to_str(R) || {[{<<"rev">>, R}]} <- C]} end,
+    Transform = fun({Props}) ->
+        C = proplists:get_value(<<"changes">>, Props),
+        Id = proplists:get_value(<<"id">>, Props),
+        {Id, [R || {[{<<"rev">>, R}]} <- C]}
+    end,
     IdRevsList = [Transform(Change) || Change <- Changes],
     SeqDict = changes_dictionary(Changes),
-    {[{<<"seq">>, HighSeq}, _, _]} = lists:last(Changes),
+    {LastProps} = lists:last(Changes),
+    HighSeq = proplists:get_value(<<"seq">>, LastProps),
     Request = Target#http_db{
         resource = "_missing_revs",
         method = post,
@@ -165,11 +169,15 @@ get_missing_revs(#http_db{}=Target, Changes) ->
     end;
 
 get_missing_revs(Target, Changes) ->
-    Transform = fun({[{<<"seq">>,_}, {<<"id">>,Id}, {<<"changes">>,C}]}) ->
-        {Id, [R || {[{<<"rev">>, R}]} <- C]} end,
+    Transform = fun({Props}) ->
+        C = proplists:get_value(<<"changes">>, Props),
+        Id = proplists:get_value(<<"id">>, Props),
+        {Id, [couch_doc:parse_rev(R) || {[{<<"rev">>, R}]} <- C]}
+    end,
     IdRevsList = [Transform(Change) || Change <- Changes],
     SeqDict = changes_dictionary(Changes),
-    {[{<<"seq">>, HighSeq}, _, _]} = lists:last(Changes),
+    {LastProps} = lists:last(Changes),
+    HighSeq = proplists:get_value(<<"seq">>, LastProps),
     {ok, Results} = couch_db:get_missing_revs(Target, IdRevsList),
     {HighSeq, [{Id, dict:fetch(Id, SeqDict), Revs} || {Id, Revs, _} <- Results]}.
 

@@ -264,3 +264,15 @@
 
 % small value used in revision trees to indicate the revision isn't stored
 -define(REV_MISSING, []).
+
+-record(changes_args, {
+    feed = "normal",
+    dir = fwd,
+    since = 0,
+    limit = 1000000000000000,
+    style = main_only,
+    heartbeat,
+    timeout,
+    filter = "",
+    include_docs = false
+}).
