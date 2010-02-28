@@ -31,7 +31,6 @@
 maybe_open_doc(Db, DocId) ->
     case catch couch_httpd_db:couch_doc_open(Db, DocId, nil, [conflicts]) of
         {not_found, missing} -> nil;
-        {not_found,deleted} -> nil;
         Doc -> Doc
     end.
 handle_doc_show_req(#httpd{
