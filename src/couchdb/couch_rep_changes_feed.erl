@@ -83,7 +83,8 @@ init([_Parent, #http_db{}=Source, Since, PostProps] = Args) ->
         resource = "_changes",
         qs = QS,
         conn = Pid,
-        options = [{stream_to, {self(), once}}, {response_format, binary}],
+        options = [{stream_to, {self(), once}}, {response_format, binary},
+            {inactivity_timeout, 31000}], % miss 3 heartbeats, assume death
         headers = Source#http_db.headers -- [{"Accept-Encoding", "gzip"}]
     },
     {ibrowse_req_id, ReqId} = couch_rep_httpc:request(Req),
@@ -201,9 +202,6 @@ handle_info({'EXIT', From, normal}, #state{changes_loop=From} = State) ->
 handle_info({'EXIT', From, Reason}, #state{changes_loop=From} = State) ->
     ?LOG_ERROR("changes_loop died with reason ~p", [Reason]),
     {stop, changes_loop_died, State};
-
-handle_info({'EXIT', _From, normal}, State) ->
-    {noreply, State};
 
 handle_info(Msg, State) ->
     ?LOG_DEBUG("unexpected message at changes_feed ~p", [Msg]),
