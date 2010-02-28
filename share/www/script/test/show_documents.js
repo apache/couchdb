@@ -54,6 +54,13 @@ couchTests.show_documents = function(debug) {
           json : req
         }
       }),
+      "show-deleted" : stringFun(function(doc, req) {
+        if(doc) {
+          return doc._id;
+        } else {
+          return "No doc " + req.id;
+        }
+      }),
       "render-error" : stringFun(function(doc, req) {
         return noSuchVariable;
       }),
@@ -393,5 +400,15 @@ couchTests.show_documents = function(debug) {
   T(xhr.responseText == "Hey Dude");
   TEquals("Yeah", xhr.getResponseHeader("X-Couch-Test-Header"), "header should be cool");
   TEquals("Oh Yeah!", xhr.getResponseHeader("X-Couch-Test-Header-Awesome"), "header should be cool");
+
+  // test deleted docs
+  var doc = {_id:"testdoc",foo:1};
+  db.save(doc);
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/show-deleted/testdoc");
+  TEquals("testdoc", xhr.responseText, "should return 'testdoc'");
+
+  db.deleteDoc(doc);
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/show-deleted/testdoc");
+  TEquals("No doc testdoc", xhr.responseText, "should return 'no doc testdoc'");
   
 };
