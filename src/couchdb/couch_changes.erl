@@ -117,6 +117,8 @@ get_changes_timeout(Args, Callback) ->
         case Timeout of
         undefined ->
             {DefaultTimeout, fun() -> stop end};
+        infinity ->
+            {infinity, fun() -> stop end};
         _ ->
             {lists:min([DefaultTimeout, Timeout]), fun() -> stop end}
         end;
