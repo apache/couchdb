@@ -40,9 +40,7 @@ start_link(Parent, Source, StartSeq, PostProps) ->
     gen_server:start_link(?MODULE, [Parent, Source, StartSeq, PostProps], []).
 
 next(Server) ->
-    try gen_server:call(Server, next_changes, 31000)
-    catch exit:{timeout, _Reason} -> throw(changes_timeout)
-    end.
+    gen_server:call(Server, next_changes, infinity).
 
 stop(Server) ->
     gen_server:call(Server, stop).
@@ -128,7 +126,8 @@ init([_Parent, Source, Since, PostProps] = InitArgs) ->
                 "continuous";
             false ->
                 "normal"
-        end
+        end,
+        timeout = infinity
     },
     ChangesPid = spawn_link(fun() ->
         ChangesFeedFun = couch_changes:handle_changes(
@@ -369,9 +368,12 @@ decode_row(Row) ->
 maybe_stream_next(#state{reqid=nil}) ->
     ok;
 maybe_stream_next(#state{complete=false, count=N} = S) when N < ?BUFFER_SIZE ->
+    timer:cancel(get(timeout)),
+    {ok, Timeout} = timer:exit_after(31000, changes_timeout),
+    put(timeout, Timeout),
     ibrowse:stream_next(S#state.reqid);
 maybe_stream_next(_) ->
-    ok.
+    timer:cancel(get(timeout)).
 
 start_http_request(RawUrl) ->
     Url = ibrowse_lib:parse_url(RawUrl),
