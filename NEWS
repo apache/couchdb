@@ -10,6 +10,8 @@ Each release section notes when backwards incompatible changes have been made.
 Version 0.11.0
 --------------
 
+This version is a feature-freeze release candidate for Apache CouchDB 1.0.
+
 This version has not been released yet.
 
  * Added support for building a Windows installer as part of 'make dist'.
