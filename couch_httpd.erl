@@ -137,7 +137,7 @@ stop() ->
 redirect_to_vhost(MochiReq, DefaultFun,
     UrlHandlers, DbUrlHandlers, DesignUrlHandlers, VhostTarget) ->
 
-    Path = MochiReq:get(path),
+    Path = MochiReq:get(raw_path),
     Target = VhostTarget ++ Path,
     ?LOG_DEBUG("Vhost Target: '~p'~n", [Target]),
     % build a new mochiweb request
