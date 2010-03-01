@@ -35,8 +35,15 @@
     conn = nil
 }).
 
+-record(user_ctx, {
+    name = null,
+    roles = [],
+    handler
+}).
+
 server() -> "http://127.0.0.1:5984/".
 dbname() -> "etap-test-db".
+admin_user_ctx() -> {user_ctx, #user_ctx{roles=[<<"_admin">>]}}.
 
 config_files() ->
     lists:map(fun test_util:build_file/1, [
@@ -47,7 +54,7 @@ config_files() ->
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(2),
+    etap:plan(3),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -62,14 +69,22 @@ test() ->
     ibrowse:start(),
     crypto:start(),
 
-    couch_server:delete(list_to_binary(dbname()), []),
-    {ok, Db} = couch_db:create(list_to_binary(dbname()), []),
+    couch_server:delete(list_to_binary(dbname()), [admin_user_ctx()]),
+    {ok, Db} = couch_db:create(list_to_binary(dbname()), [admin_user_ctx()]),
+
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"doc1">>},
+        {<<"value">>, 666}
+    ]}),
+    {ok, _} = couch_db:update_docs(Db, [Doc]),
+    couch_db:ensure_full_commit(Db),
 
     %% end boilerplate, start test
 
     couch_config:set("vhosts", "example.com", "/etap-test-db", false),
     test_regular_request(),
     test_vhost_request(),
+    test_vhost_request_with_qs(),
 
     %% restart boilerplate
     couch_db:close(Db),
@@ -92,5 +107,15 @@ test_vhost_request() ->
             {[{<<"db_name">>, <<"etap-test-db">>},_,_,_,_,_,_,_,_]}
                 = couch_util:json_decode(Body),
             etap:is(true, true, "should return database info");
+        _Else -> false
+    end.
+
+test_vhost_request_with_qs() ->
+    Url = server() ++ "doc1?revs_info=true",
+    case ibrowse:send_req(Url, [], get, [], [{host_header, "example.com"}]) of
+        {ok, _, _, Body} ->
+            {JsonProps} = couch_util:json_decode(Body),
+            HasRevsInfo = proplists:is_defined(<<"_revs_info">>, JsonProps),
+            etap:is(HasRevsInfo, true, "should return _revs_info");
         _Else -> false
     end.
