@@ -1,0 +1,6 @@
+{"{{dynomite_vsn}}", [{"{{dynomite_prev_vsn}}", [
+    {apply, {supervisor, terminate_child, [showroom_sup, dynomite_sup]}},
+    {restart_application, dynomite},
+    {apply, {supervisor, delete_child, [showroom_sup, dynomite_sup]}},
+    {update, showroom_sup, supervisor}
+]}],[{"{{dynomite_prev_vsn}}",[]}]}.
