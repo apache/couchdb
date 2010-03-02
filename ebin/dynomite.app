@@ -3,7 +3,7 @@
 {application, dynomite,
   [{description, "Dynomite Clustering System"},
    {mod, {dynomite_app, []}},
-   {vsn, "{{dynomite_vsn}}"},
+   {vsn, "0.9.5-cloudant"},
    {modules,
    [
       bootstrap_manager,
