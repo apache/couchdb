@@ -291,15 +291,15 @@ Please note:
 Setting Up
 ^^^^^^^^^^
 
-Once you have satisfied the dependencies you should run:
+Before starting any Cygwin terminals, run the following command:
 
     set CYGWIN=nontsec
 
-Close and restart all Cygwin terminals for this to take effect globally.
-
 To set up your environment, run the following command:
 
-    vcvars32.bat
+    [VS_BIN]/vcvars32.bat
+
+Replace [VS_BIN] with the path to your Visual Studio `bin` directory.
 
 After you have done this, `link.exe` and `cl.exe` should be on your path and
 correspond to the Microsoft linker and compiler, respectively.
@@ -315,7 +315,7 @@ To set up your path, run the following command:
 
     export PATH=$ERL_TOP/release/win32/erts-5.7.2/bin:$PATH
 
-Everything should be set up to build CouchDB.
+Everything should be set up properly now.
 
 Building
 ^^^^^^^^
