@@ -283,9 +283,7 @@ To build on Windows, you will need the following installed:
 Please note:
 
  * When installing Erlang, you must build it from source. The CouchDB build
-   makes use of a number of the Erlang build scripts. While using an Erlang
-   binary should work, if these Erlang build scripts cannot be found, the
-   CouchDB build itself will break.
+   makes use of a number of the Erlang build scripts.
 
  * When installing ICU, select the binaries built with Visual Studio 2008.
 
@@ -294,8 +292,8 @@ Please note:
  * When installing libcurl, be sure to install by hand as the Cygwin binaries
    are built with an incompatible compiler and will not work with Erlang.
 
-Build Environment
-^^^^^^^^^^^^^^^^^
+Setting Up
+^^^^^^^^^^
 
 Once you have satisfied the dependencies you should run:
 
@@ -303,50 +301,25 @@ Once you have satisfied the dependencies you should run:
 
 Close and restart all Cygwin terminals for this to take effect globally.
 
-***
+To set up your environment, run the following command:
 
-Execute the VC .bat files to setup your environment such that cl.exe etc are
-on your path.  Start a cygwin shell.
+    vcvars32.bat
 
-Check your environment:
+After you have done this, `link.exe` and `cl.exe` should be on your path and
+correspond to the Microsoft linker and compiler, respectively.
 
-  * which link -> should point at the MS linker.
-  * which cl -> should point at the MS compiler.
+To set up your environment, run the following command:
 
-If you are building from a source version of erlang:
+    eval `./otp_build env_win32`
 
-  Executing  "eval `./otp_build env_win32`" as per the Erlang build
-  instructions, will have set everything up, including the CC, LD etc
-  variables.  Do this even if erlang is already built and you are just
-  building couch.  This will have set the variables ERL_TOP, CC, LD, AD
-  and a number of others.
+Do this even if you have already built Erlang because the CouchDB build system
+needs the environment variables set up by this script.
 
-  Then, PATH must be adjusted such what 'which erl' lists the erl.exe
-  you built rather than the 'erl' script in the erts/etc/win32/cygwin_tools
-  directory - eg:
+To set up your path, run the following command:
 
-  $ export PATH=$ERL_TOP/release/win32/erts-5.7.2/bin:$PATH
+    export PATH=$ERL_TOP/release/win32/erts-5.7.2/bin:$PATH
 
-If you are building from a binary version of erlang:
-
-  * set ERL_TOP to the top of the erlang directory
-
-  Add to the PATH such that 'which erl' points at your erl.exe - eg:
-
-  $ export PATH=$ERL_TOP/erts-5.6.5/bin
-
-  You must also ensure the cc.sh etc scripts from the Erlang source tree is
-  on your PATH.  Use "which cc.sh" to ensure the path is set correctly.
-
-  Then set more variables:
-    $ export CC=cc.sh
-    $ export LD=ld.sh
-    $ export AR=ar.sh
-    $ export RC=rc.sh
-
-Set COUCHDB_TOP to the source directory.
-
-And we should be ready to bootstrap and build.
+Everything should be set up to build CouchDB.
 
 Building
 ^^^^^^^^
