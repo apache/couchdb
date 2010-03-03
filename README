@@ -261,11 +261,7 @@ If you want the Apache CouchDB daemon to run at startup, copy the
 Windows
 ~~~~~~~
 
-The Windows build process is very similar to the Erlang build process. It is
-therefore recommended you build erlang itself from sources, as this will ensure
-that you have all of the tools necessary to build CouchDB itself. A binary build
-of Erlang should work for those in a hurry, but it may cause problems. See the
-end of these notes for more information on building Erlang.
+The Windows build process is very similar to the Erlang build process.
 
 Build Tools
 ^^^^^^^^^^^
