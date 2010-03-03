@@ -25,11 +25,7 @@ convert_stub(#att{data=stub, name=Name} = Attachment,
         qs = [{rev, couch_doc:rev_to_str({Pos,RevId})}]
     },
     Ref = make_ref(),
-    RcvFun = fun() ->
-                 Bin = attachment_receiver(Ref, Request),
-                 cleanup(),
-                 Bin
-             end,
+    RcvFun = fun() -> attachment_receiver(Ref, Request) end,
     Attachment#att{data=RcvFun}.
 
 cleanup() ->
