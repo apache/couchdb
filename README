@@ -339,15 +339,16 @@ Now we need to run a complicated configure command-line.
       --with-win32-icu-binaries=/cygdrive/c/path_to_icu_binaries_root \
       --with-erlang=$ERL_TOP/release/win32/usr/include \
       --with-win32-curl=/cygdrive/c/path/to/curl/root/directory \
-      --with-openssl-bin-dir=c:/openssl/bin \
-      --with-msvc-redist-dir=c:/dir/with/vcredist_platform_executable \
+      --with-openssl-bin-dir=/cygdrive/c/openssl/bin \
+      --with-msvc-redist-dir=/cygdrive/c/dir/with/vcredist_platform_executable \
       --prefix=$ERL_TOP/release/win32
 
 Relax, then relax some more, then get a beer and relax some more; the
 above command may take many many minutes to complete...
 
-Note that all paths must be in cygwin format.  Those starting with $ERL_TOP
-can be entered literally, assuming ERL_TOP is set as described above.
+Note that all paths must be in cygwin format (ie, using '/cygdrive/c/dir/...'
+rather than 'c:/dir'.)  Those starting with $ERL_TOP can be entered 
+literally, assuming ERL_TOP is set as described above.
 
 Notes:
   When building the installer, the necessary openssl binaries are pulled from
