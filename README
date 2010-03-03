@@ -13,7 +13,7 @@ You can skip this section if you are installing from a release tarball.
 Dependencies
 ~~~~~~~~~~~~
 
-To build Apache CouchDB from checkout you need some of the following installed:
+To build Apache CouchDB from checkout, you need some of the following installed:
 
  * GNU Automake (>=1.6.3) (http://www.gnu.org/software/automake/)
  * GNU Autoconf (>=2.59)  (http://www.gnu.org/software/autoconf/)
@@ -52,15 +52,15 @@ Unix-like Operating Systems (inc. Mac OS X)
 Dependencies
 ^^^^^^^^^^^^
 
-To build and install Apache CouchDB you will need the following installed:
+To build and install Apache CouchDB, you will need the following installed:
 
- * Erlang OTP (>=R12B5)    (http://erlang.org/)
- * ICU                     (http://icu.sourceforge.net/)
- * OpenSSL                 (http://www.openssl.org/)
- * Mozilla SpiderMonkey    (http://www.mozilla.org/js/spidermonkey/)
- * libcurl                 (http://curl.haxx.se/libcurl/)
- * GNU Make                (http://www.gnu.org/software/make/)
- * GNU Compiler Collection (http://gcc.gnu.org/)
+ * Erlang OTP (>=R12B5)        (http://erlang.org/)
+ * ICU                         (http://icu.sourceforge.net/)
+ * OpenSSL                     (http://www.openssl.org/)
+ * Mozilla SpiderMonkey (=1.8) (http://www.mozilla.org/js/spidermonkey/)
+ * libcurl                     (http://curl.haxx.se/libcurl/)
+ * GNU Make                    (http://www.gnu.org/software/make/)
+ * GNU Compiler Collection     (http://gcc.gnu.org/)
 
 It is recommended that you install Erlang OTP R12B-5 or above where possible.
 
@@ -261,56 +261,55 @@ If you want the Apache CouchDB daemon to run at startup, copy the
 Windows
 ~~~~~~~
 
-The Windows build process is very similar to the erlang build process;
-indeed, we re-use some of their shell-scripts.  Therefore, it is recommended
-you build erlang itself from sources - this will ensure that you have all the
-tools and environment necessary to build couch itself.  A binary build of
-erlang should work for those in a hurry (see below), but it isn't really
-supported.  See the end of these notes or information on building erlang
-which is relevant to couch.
+The Windows build process is very similar to the Erlang build process. It is
+therefore recommended you build erlang itself from sources, as this will ensure
+that you have all of the tools necessary to build CouchDB itself. A binary build
+of Erlang should work for those in a hurry, but it may cause problems. See the
+end of these notes for more information on building Erlang.
 
 Build Tools
------------
+^^^^^^^^^^^
 
-To build on Windows, you need the following tools:
+To build on Windows, you will need the following installed:
 
-* cygwin - it isn't clear exactly which tools you need - select all
-  'development' tools.  As mentioned above, if you can build erlang itself
-  you have everything you need.
+ * Erlang OTP (>=R12B5)        (http://erlang.org/)
+ * ICU                         (http://icu.sourceforge.net/)
+ * OpenSSL                     (http://www.openssl.org/)
+ * Mozilla SpiderMonkey (=1.8) (http://www.mozilla.org/js/spidermonkey/)
+ * libcurl                     (http://curl.haxx.se/libcurl/)
+ * Cygwin                      (http://www.cygwin.com/)
+ * Visual Studio 2008          (http://msdn.microsoft.com/en-gb/vstudio/default.aspx)
 
-* VS2008
+Please note:
 
-* Erlang - a built source distro of erlang is preferred.  A binary
-  distribution of Erlang is OK, but you will also need a source distribution
-  for the cc.sh/link.sh etc wrapper shell scripts used by erlang - couch
-  reuses these scripts in its build process and the license isn't compatible
-  enough for us to clone them.
+ * When installing Erlang, you must build it from source. The CouchDB build
+   makes use of a number of the Erlang build scripts. While using an Erlang
+   binary should work, if these Erlang build scripts cannot be found, the
+   CouchDB build itself will break.
 
-Other tools:
+ * When installing ICU, select the binaries built with Visual Studio 2008.
 
-* Fetch the 'curl' sources and build them as per the instructions.  The cygwin
-  curl binaries are built with a different compiler so are no good.
+ * When installing Cygwin, be sure to select all the `development` tools.
 
-* Download the ICU binaries built with VS2008.
-
-* Download and build the same version of spidermonkey the version of couch
-  requires - at time of writing this is 1.8.  Different versions will not
-  work (ie, at time of writing, 1.8.1 does not work with couch).
+ * When installing libcurl, be sure to install by hand as the Cygwin binaries
+   are built with an incompatible compiler and will not work with Erlang.
 
 Build Environment
------------------
+^^^^^^^^^^^^^^^^^
 
-Setup your environment:
+Once you have satisfied the dependencies you should run:
 
-For the sake of everything you find sacred:
-  set CYGWIN=nontsec
-BEFORE starting any cygwin environments.  Set this variable globally.  Without
-it you can expect all kinds of permissions-related problems.
+    set CYGWIN=nontsec
+
+Close and restart all Cygwin terminals for this to take effect globally.
+
+***
 
 Execute the VC .bat files to setup your environment such that cl.exe etc are
 on your path.  Start a cygwin shell.
 
 Check your environment:
+
   * which link -> should point at the MS linker.
   * which cl -> should point at the MS compiler.
 
@@ -350,7 +349,7 @@ Set COUCHDB_TOP to the source directory.
 And we should be ready to bootstrap and build.
 
 Building
---------
+^^^^^^^^
 
 We start by bootstrapping:
 
@@ -389,7 +388,7 @@ Now we can build it and "install" it into the $ERL_TOP/release/win32 (or
 wherever you set --prefix to above) directory:
 
  $ make install
- 
+
 Relax on your new couch:
 
   The $ERL_TOP/release/win32 directory is now ready to .zip up, be packaged
@@ -406,78 +405,45 @@ To create an installer, execute:
 and look for etc/windows/setup-couch*.exe.  Note - only do this after
 a clean build, not after testing in-place - otherwise your test database and
 log files will be shipped!
-  
 
-Additional Notes:
+Notes
+^^^^^
 
-Building erlang:
-* Follow the instructions as described.  You do need openssl, but don't need
-  the GUI tools.  You may like to execute:
+Building Erlang
++++++++++++++++
+
+ * Follow the instructions as described. You do need openssl, but don't need
+   the GUI tools. You can skip them with the following command:
 
     echo "skipping gs" > lib/gs/SKIP
     echo "skipping ic" > lib/ic/SKIP
 
-  To skip them.
+ * Ensure `which link` points at the Microsoft linker. If you do not do this,
+   the one in /usr/bin may be found instead.
 
-* Ensure 'which link' points at the ms linker; one in /usr/bin may be found
-  instead.
-
-* After executing './otp_build release -a', be sure to execute Install.exe in
-  the release/win32 directory to setup the release/win32/bin dir correctly.
-
-Testing with Erlang
-^^^^^^^^^^^^^^^^^^^
-
-First, we need to get a copy of etap to run the tests.
-
-    $ git clone git://github.com/ngerakines/etap.git
-    $ cd etap
-    $ make && sudo make install
-
-Now we should be able to run the etap test suite:
-
-    $ cd /path/to/couchdb/
-    $ make check
-    ...
-    prove test/etap/*.t
-    test/etap/001-load........................ok
-    test/etap/010-file-basics.................ok
-    ...
-    All tests successful.
-    Files=28, Tests=363, 41 wallclock secs (...)
-
-Tests are also available to be run individually like such:
-
-    $ ./test/etap/001-load.t
-    # Current time local 2009-09-26 23:47:44
-    # Using etap version "0.3.4"
-    1..39
-    ok 1  - Loaded: couch_btree
-    ...
+ * After executing `./otp_build release -a`, be sure to execute Install.exe in
+   the release/win32 directory to setup the release/win32/bin dir correctly.
 
 Cryptographic Software Notice
 -----------------------------
 
-   This distribution includes cryptographic software.  The country in
-   which you currently reside may have restrictions on the import,
-   possession, use, and/or re-export to another country, of
-   encryption software.  BEFORE using any encryption software, please
-   check your country's laws, regulations and policies concerning the
-   import, possession, or use, and re-export of encryption software, to
-   see if this is permitted.  See <http://www.wassenaar.org/> for more
-   information.
+This distribution includes cryptographic software.  The country in which you
+currently reside may have restrictions on the import, possession, use, and/or
+re-export to another country, of encryption software.  BEFORE using any
+encryption software, please check your country's laws, regulations and policies
+concerning the import, possession, or use, and re-export of encryption software,
+to see if this is permitted.  See <http://www.wassenaar.org/> for more
+information.
 
-   The U.S. Government Department of Commerce, Bureau of Industry and
-   Security (BIS), has classified this software as Export Commodity
-   Control Number (ECCN) 5D002.C.1, which includes information security
-   software using or performing cryptographic functions with asymmetric
-   algorithms.  The form and manner of this Apache Software Foundation
-   distribution makes it eligible for export under the License Exception
-   ENC Technology Software Unrestricted (TSU) exception (see the BIS
-   Export Administration Regulations, Section 740.13) for both object
-   code and source code.
+The U.S. Government Department of Commerce, Bureau of Industry and Security
+(BIS), has classified this software as Export Commodity Control Number (ECCN)
+5D002.C.1, which includes information security software using or performing
+cryptographic functions with asymmetric algorithms.  The form and manner of this
+Apache Software Foundation distribution makes it eligible for export under the
+License Exception ENC Technology Software Unrestricted (TSU) exception (see the
+BIS Export Administration Regulations, Section 740.13) for both object code and
+source code.
 
-   The following provides more details on the included cryptographic
-   software:
+The following provides more details on the included cryptographic software:
 
-   CouchDB includes a HTTP client (ibrowse) with SSL functionality.
+CouchDB includes a HTTP client (ibrowse) with SSL functionality.
