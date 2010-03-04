@@ -903,11 +903,10 @@ init({DbName, Filepath, Fd, Options}) ->
     {ok, #db{fd_ref_counter=RefCntr}=Db} = gen_server:call(UpdaterPid, get_db),
     couch_ref_counter:add(RefCntr),
     couch_stats_collector:track_process_count({couchdb, open_databases}),
-    process_flag(trap_exit, true),
     {ok, Db}.
 
-terminate(_Reason, Db) ->
-    couch_util:shutdown_sync(Db#db.update_pid),
+terminate(Reason, _Db) ->
+    couch_util:terminate_linked(Reason),
     ok.
 
 handle_call({open_ref_count, OpenerPid}, _, #db{fd_ref_counter=RefCntr}=Db) ->
@@ -935,11 +934,7 @@ handle_cast(Msg, Db) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-    
-handle_info({'EXIT', _Pid, normal}, Db) ->
-    {noreply, Db};
-handle_info({'EXIT', _Pid, Reason}, Server) ->
-    {stop, Reason, Server};
+
 handle_info(Msg, Db) ->
     ?LOG_ERROR("Bad message received for db ~s: ~p", [Db#db.name, Msg]),
     exit({error, Msg}).
