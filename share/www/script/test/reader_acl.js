@@ -41,6 +41,11 @@ couchTests.reader_acl = function(debug) {
           names : ["joe","barb"]
         }
       }).ok);
+      
+      usersDb.ensureFullCommit();
+      // security changes will always commit synchronously
+      restartServer();
+      
       // can't read it as jchris
       T(CouchDB.login("jchris@apache.org", "funnybone").ok);
       T(CouchDB.session().userCtx.name == "jchris@apache.org");
