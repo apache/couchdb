@@ -1095,10 +1095,11 @@
 
         row.find("td").makeEditable({acceptOnBlur: false, allowEmpty: true,
           createInput: function(value) {
+            value = doc[row.data("name")];
             var elem = $(this);
             if (elem.find("dl").length > 0 ||
                 elem.find("code").is(".array, .object") ||
-                elem.find("code.string").text().length > 60) {
+                typeof(value) == "string" && (value.length > 60 || value.match(/\n/))) {
               return $("<textarea rows='1' cols='40' spellcheck='false'></textarea>");
             }
             return $("<input type='text' spellcheck='false'>");
