@@ -104,6 +104,7 @@ readjson(OsProc) when is_record(OsProc, os_proc) ->
 
 % gen_server API
 init([Command, Options, PortOptions]) ->
+    process_flag(trap_exit, true),
     PrivDir = couch_util:priv_dir(),
     Spawnkiller = filename:join(PrivDir, "couchspawnkillable"),
     BaseProc = #os_proc{

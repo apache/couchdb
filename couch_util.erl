@@ -12,7 +12,7 @@
 
 -module(couch_util).
 
--export([priv_dir/0, start_driver/1,terminate_linked/1]).
+-export([priv_dir/0, start_driver/1]).
 -export([should_flush/0, should_flush/1, to_existing_atom/1]).
 -export([rand32/0, implode/2, collate/2, collate/3]).
 -export([abs_pathname/1,abs_pathname/2, trim/1, ascii_lower/1]).
@@ -21,7 +21,7 @@
 -export([file_read_size/1, get_nested_json_value/2, json_user_ctx/1]).
 -export([to_binary/1, to_integer/1, to_list/1, url_encode/1]).
 -export([json_encode/1, json_decode/1]).
--export([verify/2]).
+-export([verify/2,simple_call/2,shutdown_sync/1]).
 -export([compressible_att_type/1]).
 
 -include("couch_db.hrl").
@@ -59,14 +59,35 @@ to_existing_atom(V) when is_binary(V) ->
 to_existing_atom(V) when is_atom(V) ->
     V.
 
+shutdown_sync(Pid) when not is_pid(Pid)->
+    ok;
+shutdown_sync(Pid) ->
+    MRef = erlang:monitor(process, Pid),
+    try
+        catch unlink(Pid),
+        catch exit(Pid, shutdown),
+        receive
+        {'DOWN', MRef, _, _, _} ->
+            ok
+        end
+    after
+        erlang:demonitor(MRef, [flush])
+    end.
+    
 
-terminate_linked(normal) ->
-    terminate_linked(shutdown);
-terminate_linked(Reason) ->
-    {links, Links} = process_info(self(), links),
-    [catch exit(Pid, Reason) || Pid <- Links],
-    ok.
-
+simple_call(Pid, Message) ->
+    MRef = erlang:monitor(process, Pid),
+    try
+        Pid ! {self(), Message},
+        receive
+        {Pid, Result} ->
+            Result;
+        {'DOWN', MRef, _, _, Reason} ->
+            exit(Reason)
+        end
+    after
+        erlang:demonitor(MRef, [flush])
+    end.
 
 to_hex([]) ->
     [];
