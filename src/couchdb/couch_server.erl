@@ -147,8 +147,9 @@ init([]) ->
                 max_dbs_open=MaxDbsOpen,
                 start_time=httpd_util:rfc1123_date()}}.
 
-terminate(Reason, _Srv) ->
-    couch_util:terminate_linked(Reason),
+terminate(_Reason, _Srv) ->
+    [couch_util:shutdown_sync(Pid) || {_, {Pid, _LruTime}} <- 
+            ets:tab2list(couch_dbs_by_name)],
     ok.
 
 all_databases() ->
@@ -187,8 +188,7 @@ try_close_lru(StartTime) ->
         [{_, {MainPid, LruTime}}] = ets:lookup(couch_dbs_by_name, DbName),
         case couch_db:is_idle(MainPid) of
         true ->
-            exit(MainPid, kill),
-            receive {'EXIT', MainPid, _Reason} -> ok end,
+            couch_util:shutdown_sync(MainPid),
             true = ets:delete(couch_dbs_by_lru, LruTime),
             true = ets:delete(couch_dbs_by_name, DbName),
             true = ets:delete(couch_dbs_by_pid, MainPid),
@@ -284,8 +284,7 @@ handle_call({delete, DbName, _Options}, _From, Server) ->
         case ets:lookup(couch_dbs_by_name, DbName) of
         [] -> Server;
         [{_, {Pid, LruTime}}] ->
-            exit(Pid, kill),
-            receive {'EXIT', Pid, _Reason} -> ok end,
+            couch_util:shutdown_sync(Pid),
             true = ets:delete(couch_dbs_by_name, DbName),
             true = ets:delete(couch_dbs_by_pid, Pid),
             true = ets:delete(couch_dbs_by_lru, LruTime),
@@ -315,14 +314,18 @@ handle_cast(Msg, _Server) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-handle_info({'EXIT', _Pid, config_change}, _Server) ->
-    exit(kill);
-handle_info({'EXIT', Pid, _Reason}, #server{dbs_open=DbsOpen}=Server) ->
-    [{Pid, DbName}] = ets:lookup(couch_dbs_by_pid, Pid),
-    [{DbName, {Pid, LruTime}}] = ets:lookup(couch_dbs_by_name, DbName),
-    true = ets:delete(couch_dbs_by_pid, Pid),
-    true = ets:delete(couch_dbs_by_name, DbName),
-    true = ets:delete(couch_dbs_by_lru, LruTime),
-    {noreply, Server#server{dbs_open=DbsOpen - 1}};
+handle_info({'EXIT', _Pid, config_change}, Server) ->
+    {stop, shutdown, Server};
+handle_info({'EXIT', Pid, Reason}, #server{dbs_open=DbsOpen}=Server) ->
+    case ets:lookup(couch_dbs_by_pid, Pid) of
+    [{Pid, DbName}] ->
+        [{DbName, {Pid, LruTime}}] = ets:lookup(couch_dbs_by_name, DbName),
+        true = ets:delete(couch_dbs_by_pid, Pid),
+        true = ets:delete(couch_dbs_by_name, DbName),
+        true = ets:delete(couch_dbs_by_lru, LruTime),
+        {noreply, Server#server{dbs_open=DbsOpen - 1}};
+    _ ->
+        {stop,Reason,Server}
+    end;
 handle_info(Info, _Server) ->
     exit({unknown_message, Info}).

@@ -341,8 +341,8 @@ handle_info({'DOWN',_,_,_,_}, State) ->
 
 terminate(Reason, #group_state{updater_pid=Update, compactor_pid=Compact}=S) ->
     reply_all(S, Reason),
-    catch exit(Update, Reason),
-    catch exit(Compact, Reason),
+    couch_util:shutdown_sync(Update),
+    couch_util:shutdown_sync(Compact),
     ok.
 
 code_change(_OldVsn, State, _Extra) ->
