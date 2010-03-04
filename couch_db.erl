@@ -291,7 +291,9 @@ get_security(#db{security=SecProps}) ->
 set_security(#db{update_pid=Pid}=Db, {NewSecProps}) when is_list(NewSecProps) ->
     check_is_admin(Db),
     ok = validate_security_object(NewSecProps),
-    gen_server:call(Pid, {set_security, NewSecProps}, infinity);
+    ok = gen_server:call(Pid, {set_security, NewSecProps}, infinity),
+    {ok, _} = ensure_full_commit(Db),
+    ok;
 set_security(_, _) ->
     throw(bad_request).
 
