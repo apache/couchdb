@@ -20,7 +20,6 @@
 
 
 init({MainPid, DbName, Filepath, Fd, Options}) ->
-    process_flag(trap_exit, true),
     case lists:member(create, Options) of
     true ->
         % create a new header and writes it to the file
@@ -38,10 +37,8 @@ init({MainPid, DbName, Filepath, Fd, Options}) ->
     {ok, Db2#db{main_pid=MainPid}}.
 
 
-terminate(_Reason, Db) ->
-    couch_file:close(Db#db.fd),
-    couch_util:shutdown_sync(Db#db.compactor_pid),
-    couch_util:shutdown_sync(Db#db.fd_ref_counter),
+terminate(Reason, _Srv) ->
+    couch_util:terminate_linked(Reason),
     ok.
 
 handle_call(get_db, _From, Db) ->
@@ -217,11 +214,7 @@ handle_info(delayed_commit, Db) ->
         Db2 ->
             ok = gen_server:call(Db2#db.main_pid, {db_updated, Db2}),
             {noreply, Db2}
-    end;
-handle_info({'EXIT', _Pid, normal}, Db) ->
-    {noreply, Db};
-handle_info({'EXIT', _Pid, Reason}, Db) ->
-    {stop, Reason, Db}.
+    end.
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
