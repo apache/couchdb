@@ -98,12 +98,11 @@ to_json_attachments(Atts, RevPosIncludeAfter, DataToFollow) ->
                     true ->
                         AttData = case Att#att.comp of
                         true ->
-                            zlib:gunzip(att_to_iolist(Att));
+                            zlib:gunzip(att_to_bin(Att));
                         _ ->
-                            att_to_iolist(Att)
+                            att_to_bin(Att)
                         end,
-                        [{<<"data">>, 
-                            couch_util:encodeBase64(AttData)}]
+                        [{<<"data">>, base64:encode(AttData)}]
                     end;
                 true ->
                     [{<<"length">>, DiskLen}, {<<"stub">>, true}]
@@ -206,7 +205,7 @@ transfer_fields([{<<"_attachments">>, {JsonBins}} | Rest], Doc) ->
                     att_len=Len, disk_len=Len, revpos=RevPos};
             _ ->
                 Value = proplists:get_value(<<"data">>, BinProps),
-                Bin = couch_util:decodeBase64(Value),
+                Bin = base64:decode(Value),
                 LenBin = size(Bin),
                 #att{name=Name, data=Bin, type=Type, att_len=LenBin,
                         disk_len=LenBin, revpos=RevPos}
@@ -291,16 +290,27 @@ att_foldl(#att{data=DataFun,att_len=Len}, Fun, Acc) when is_function(DataFun) ->
 att_foldl_unzip(#att{data={Fd,Sp},md5=Md5}, Fun, Acc) ->
     couch_stream:foldl_unzip(Fd, Sp, Md5, Fun, Acc).
 
-att_to_iolist(#att{data=Bin}) when is_binary(Bin) ->
+att_to_bin(#att{data=Bin}) when is_binary(Bin) ->
     Bin;
-att_to_iolist(#att{data=Iolist}) when is_list(Iolist) ->
-    Iolist;
-att_to_iolist(#att{data={_Fd,_Sp}}=Att) ->
-    lists:reverse(att_foldl(Att,
-        fun(Bin,Acc) -> [Bin|Acc] end, []));
-att_to_iolist(#att{data=DataFun, att_len=Len}) when is_function(DataFun)->
-    lists:reverse(fold_streamed_data(DataFun, Len,
-            fun(Data, Acc) -> [Data | Acc] end, [])).
+att_to_bin(#att{data=Iolist}) when is_list(Iolist) ->
+    iolist_to_binary(Iolist);
+att_to_bin(#att{data={_Fd,_Sp}}=Att) ->
+    iolist_to_binary(
+        lists:reverse(att_foldl(
+                Att,
+                fun(Bin,Acc) -> [Bin|Acc] end,
+                []
+        ))
+    );
+att_to_bin(#att{data=DataFun, att_len=Len}) when is_function(DataFun)->
+    iolist_to_binary(
+        lists:reverse(fold_streamed_data(
+            DataFun,
+            Len,
+            fun(Data, Acc) -> [Data | Acc] end,
+            []
+        ))
+    ).
 
 get_validate_doc_fun(#doc{body={Props}}=DDoc) ->
     case proplists:get_value(<<"validate_doc_update">>, Props) of
