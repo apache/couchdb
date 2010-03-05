@@ -742,13 +742,13 @@ send_doc_efficiently(Req, #doc{atts=Atts}=Doc, Headers, Options) ->
             JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, [follows|Options])),
             AttsSinceRevPos = proplists:get_value(atts_after_revpos, Options, 0),
             Len = couch_doc:len_doc_to_multi_part_stream(Boundary,JsonBytes,Atts,
-                    AttsSinceRevPos),
+                    AttsSinceRevPos,false),
             CType = {<<"Content-Type">>, 
                     <<"multipart/related; boundary=\"", Boundary/binary, "\"">>},
             {ok, Resp} = start_response_length(Req, 200, [CType|Headers], Len),
             couch_doc:doc_to_multi_part_stream(Boundary,JsonBytes,Atts,
                     AttsSinceRevPos,
-                    fun(Data) -> couch_httpd:send(Resp, Data) end)
+                    fun(Data) -> couch_httpd:send(Resp, Data) end, false)
         end;
     false ->
         send_json(Req, 200, [], couch_doc:to_json_obj(Doc, Options))
@@ -1045,6 +1045,9 @@ parse_doc_query(Req) ->
             Args#doc_query_args{update_type=replicated_changes};
         {"new_edits", "true"} ->
             Args#doc_query_args{update_type=interactive_edit};
+        {"att_gzip_length", "true"} ->
+            Options = [att_gzip_length | Args#doc_query_args.options],
+            Args#doc_query_args{options=Options};
         _Else -> % unknown key value pair, ignore.
             Args
         end
