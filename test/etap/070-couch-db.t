@@ -41,6 +41,7 @@ test() ->
     etap:ok(not lists:member(<<"etap-test-db">>, AllDbs2),
         "Database was deleted."),
 
+    gen_server:call(couch_server, {set_max_dbs_open, 3}),
     MkDbName = fun(Int) -> list_to_binary("lru-" ++ integer_to_list(Int)) end,
 
     lists:foreach(fun(Int) ->
@@ -51,24 +52,24 @@ test() ->
         end,
         {ok, Db} = couch_db:create(MkDbName(Int), []),
         ok = couch_db:close(Db)
-    end, lists:seq(1, 200)),
+    end, lists:seq(1, 6)),
 
     {ok, AllDbs3} = couch_server:all_databases(),
     NumCreated = lists:foldl(fun(Int, Acc) ->
         true = lists:member(MkDbName(Int), AllDbs3),
         Acc+1
-    end, 0, lists:seq(1, 200)),
-    etap:is(200, NumCreated, "Created all databases."),
+    end, 0, lists:seq(1, 6)),
+    etap:is(6, NumCreated, "Created all databases."),
 
     lists:foreach(fun(Int) ->
         ok = couch_server:delete(MkDbName(Int), [])
-    end, lists:seq(1, 200)),
+    end, lists:seq(1, 6)),
 
     {ok, AllDbs4} = couch_server:all_databases(),
     NumDeleted = lists:foldl(fun(Int, Acc) ->
         false = lists:member(MkDbName(Int), AllDbs4),
         Acc+1
-    end, 0, lists:seq(1, 200)),
-    etap:is(200, NumDeleted, "Deleted all databases."),
+    end, 0, lists:seq(1, 6)),
+    etap:is(6, NumDeleted, "Deleted all databases."),
 
     ok.
