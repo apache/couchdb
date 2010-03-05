@@ -16,8 +16,8 @@
 -export([should_flush/0, should_flush/1, to_existing_atom/1]).
 -export([rand32/0, implode/2, collate/2, collate/3]).
 -export([abs_pathname/1,abs_pathname/2, trim/1, ascii_lower/1]).
--export([encodeBase64/1, decodeBase64/1, encodeBase64Url/1, decodeBase64Url/1,
-    to_hex/1,parse_term/1, dict_find/3]).
+-export([encodeBase64Url/1, decodeBase64Url/1]).
+-export([to_hex/1, parse_term/1, dict_find/3]).
 -export([file_read_size/1, get_nested_json_value/2, json_user_ctx/1]).
 -export([to_binary/1, to_integer/1, to_list/1, url_encode/1]).
 -export([json_encode/1, json_decode/1]).
@@ -232,114 +232,18 @@ should_flush(MemThreshHold) ->
         ProcMem2+BinMem2 > MemThreshHold;
     true -> false end.
 
+encodeBase64Url(Url) ->
+    Url1 = iolist_to_binary(re:replace(base64:encode(Url), "=+$", "")),
+    Url2 = iolist_to_binary(re:replace(Url1, "/", "_", [global])),
+    iolist_to_binary(re:replace(Url2, "\\+", "-", [global])).
 
-%%% Purpose : Base 64 encoding and decoding.
-%%% Copied from ssl_base_64 to avoid using the
-%%% erlang ssl library
-
--define(st(X,A), ((X-A+256) div 256)).
-
-%% A PEM encoding consists of characters A-Z, a-z, 0-9, +, / and
-%% =. Each character encodes a 6 bits value from 0 to 63 (A = 0, / =
-%% 63); = is a padding character.
-%%
-
-%%
-%% encode64(Bytes|Binary) -> binary
-%%
-%% Take 3 bytes a time (3 x 8 = 24 bits), and make 4 characters out of
-%% them (4 x 6 = 24 bits).
-%%
-encodeBase64(Bs) when is_list(Bs) ->
-    encodeBase64(iolist_to_binary(Bs), <<>>);
-encodeBase64(Bs) ->
-    encodeBase64(Bs, <<>>).
-
-encodeBase64(<<B:3/binary, Bs/binary>>, Acc) ->
-    <<C1:6, C2:6, C3:6, C4:6>> = B,
-    encodeBase64(Bs, <<Acc/binary, (enc(C1)), (enc(C2)), (enc(C3)), (enc(C4))>>);
-encodeBase64(<<B:2/binary>>, Acc) ->
-    <<C1:6, C2:6, C3:6, _:6>> = <<B/binary, 0>>,
-    <<Acc/binary, (enc(C1)), (enc(C2)), (enc(C3)), $=>>;
-encodeBase64(<<B:1/binary>>, Acc) ->
-    <<C1:6, C2:6, _:12>> = <<B/binary, 0, 0>>,
-    <<Acc/binary, (enc(C1)), (enc(C2)), $=, $=>>;
-encodeBase64(<<>>, Acc) ->
-    Acc.
-
-encodeBase64Url(Bs) when is_list(Bs) ->
-    encodeBase64Url(list_to_binary(Bs), <<>>);
-encodeBase64Url(Bs) ->
-    encodeBase64Url(Bs, <<>>).
-    
-encodeBase64Url(<<B:3/binary, Bs/binary>>, Acc) ->
-    <<C1:6, C2:6, C3:6, C4:6>> = B,
-    encodeBase64Url(Bs, <<Acc/binary, (encUrl(C1)), (encUrl(C2)), (encUrl(C3)), (encUrl(C4))>>);
-encodeBase64Url(<<B:2/binary>>, Acc) ->
-    <<C1:6, C2:6, C3:6, _:6>> = <<B/binary, 0>>,
-    <<Acc/binary, (encUrl(C1)), (encUrl(C2)), (encUrl(C3))>>;
-encodeBase64Url(<<B:1/binary>>, Acc) ->
-    <<C1:6, C2:6, _:12>> = <<B/binary, 0, 0>>,
-    <<Acc/binary, (encUrl(C1)), (encUrl(C2))>>;
-encodeBase64Url(<<>>, Acc) ->
-    Acc.
-
-%%
-%% decodeBase64(BinaryChars) -> Binary
-%%
-decodeBase64(Cs) when is_list(Cs) ->
-    decodeBase64(list_to_binary(Cs));
-decodeBase64(Cs) ->
-    decode1(Cs, <<>>).
-
-decode1(<<C1, C2, $=, $=>>, Acc) ->
-    <<B1, _:16>> = <<(dec(C1)):6, (dec(C2)):6, 0:12>>,
-    <<Acc/binary, B1>>;
-decode1(<<C1, C2, C3, $=>>, Acc) ->
-    <<B1, B2, _:8>> = <<(dec(C1)):6, (dec(C2)):6, (dec(C3)):6, (dec(0)):6>>,
-    <<Acc/binary, B1, B2>>;
-decode1(<<C1, C2, C3, C4, Cs/binary>>, Acc) ->
-    Bin = <<Acc/binary, (dec(C1)):6, (dec(C2)):6, (dec(C3)):6, (dec(C4)):6>>,
-    decode1(Cs, Bin);
-decode1(<<>>, Acc) ->
-    Acc.
-
-decodeBase64Url(Cs) when is_list(Cs) ->
-    decodeBase64Url(list_to_binary(Cs));
-decodeBase64Url(Cs) ->
-    decode1Url(Cs, <<>>).
-
-decode1Url(<<C1, C2>>, Acc) ->
-    <<B1, _:16>> = <<(decUrl(C1)):6, (decUrl(C2)):6, 0:12>>,
-    <<Acc/binary, B1>>;
-decode1Url(<<C1, C2, C3>>, Acc) ->
-    <<B1, B2, _:8>> = <<(decUrl(C1)):6, (decUrl(C2)):6, (decUrl(C3)):6, (decUrl(0)):6>>,
-    <<Acc/binary, B1, B2>>;
-decode1Url(<<C1, C2, C3, C4, Cs/binary>>, Acc) ->
-    Bin = <<Acc/binary, (decUrl(C1)):6, (decUrl(C2)):6, (decUrl(C3)):6, (decUrl(C4)):6>>,
-    decode1Url(Cs, Bin);
-decode1Url(<<>>, Acc) ->
-    Acc.
-
-%% enc/1 and dec/1
-%%
-%% Mapping: 0-25 -> A-Z, 26-51 -> a-z, 52-61 -> 0-9, 62 -> +, 63 -> /
-%%
-enc(C) ->
-    65 + C + 6*?st(C,26) - 75*?st(C,52) -15*?st(C,62) + 3*?st(C,63).
-
-dec(C) ->
-    62*?st(C,43) + ?st(C,47) + (C-59)*?st(C,48) - 69*?st(C,65) - 6*?st(C,97).
-
-%% encUrl/1 and decUrl/1
-%%
-%% Mapping: 0-25 -> A-Z, 26-51 -> a-z, 52-61 -> 0-9, 62 -> -, 63 -> _
-%%
-encUrl(C) ->
-    65 + C + 6*?st(C,26) - 75*?st(C,52) -13*?st(C,62) + 49*?st(C,63).
-
-decUrl(C) ->
-    62*?st(C,45) + (C-58)*?st(C,48) - 69*?st(C,65) + 33*?st(C,95) - 39*?st(C,97).
+decodeBase64Url(Url64) ->
+    Url1 = re:replace(iolist_to_binary(Url64), "-", "+", [global]),
+    Url2 = iolist_to_binary(
+        re:replace(iolist_to_binary(Url1), "_", "/", [global])
+    ),
+    Padding = ?l2b(lists:duplicate((4 - size(Url2) rem 4) rem 4, $=)),
+    base64:decode(<<Url2/binary, Padding/binary>>).
 
 dict_find(Key, Dict, DefaultValue) ->
     case dict:find(Key, Dict) of
