@@ -52,7 +52,7 @@ start(_Type, _StartArgs) ->
     ok = start_node(),
     case dynomite_sup:start_link(PdStartArgs) of
     {ok, Supervisor} ->
-        {ok, Supervisor, State};
+        {ok, Supervisor};
     Error ->
         Error
     end.
