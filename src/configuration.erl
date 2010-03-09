@@ -36,6 +36,7 @@
 
 %% @doc starts couch_config gen_server if it's not already started
 start_link(DynomiteConfig) ->
+  couch_config_event:start_link(),
   couch_config:start_link([]),
   set_config(DynomiteConfig).
 
