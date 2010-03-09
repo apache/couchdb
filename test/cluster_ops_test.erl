@@ -1,6 +1,6 @@
 -module(cluster_ops_test).
 
--include("../../couchdb/couch_db.hrl").
+-include("../../couch/src/couch_db.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 
