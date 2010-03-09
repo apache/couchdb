@@ -18,19 +18,16 @@
 
 -export([start/2, stop/1]).
 
-start(_Type, DefaultIniFiles) ->
-    IniFiles = get_ini_files(DefaultIniFiles),
-    case start_apps([crypto, public_key, sasl, inets, oauth, ssl, ibrowse, mochiweb]) of
-    ok ->
-        couch_server_sup:start_link(IniFiles);
-    {error, Reason} ->
-        {error, Reason}
-    end.
+start(_Type, _Args) ->
+    IniFiles = get_ini_files(),
+    couch_server_sup:start_link(IniFiles).
 
 stop(_) ->
     ok.
 
-get_ini_files(Default) ->
+get_ini_files() ->
+    Etc = filename:join(code:root_dir(), "etc"),
+    Default = [filename:join(Etc,"default.ini"), filename:join(Etc,"local.ini")],
     case init:get_argument(couch_ini) of
     error ->
         Default;
@@ -38,19 +35,4 @@ get_ini_files(Default) ->
         Default;
     {ok, [Values]} ->
         Values
-    end.
-
-start_apps([]) ->
-    ok;
-start_apps([App|Rest]) ->
-    case application:start(App) of
-    ok ->
-       start_apps(Rest);
-    {error, {already_started, App}} ->
-       start_apps(Rest);
-    {error, _Reason} when App =:= public_key ->
-       % ignore on R12B5
-       start_apps(Rest);
-    {error, _Reason} ->
-       {error, {app_would_not_start, App}}
     end.
