@@ -12,8 +12,8 @@
 -author('cliff@powerset.com').
 
 %% API
--export([partition_range/1, create_partitions/3, map_partitions/2,
-         diff/2, pp_diff/1, int_to_partition/2,
+-export([partition_range/1, create_partitions/2, create_partitions/3,
+         diff/2, pp_diff/1, int_to_partition/2, map_partitions/2,
          join/3, leave/3, hash/1, hash_to_partition/2, item_to_nodepart/1,
          shard_name/2, hash_to_hex/2]).
 
@@ -32,6 +32,11 @@
 
 partition_range(Q) ->
   trunc( ?RINGTOP / math:pow(2,Q) ).  % SHA-1 space / 2^Q
+
+
+create_partitions(Q, Node) ->
+    create_partitions(Q, Node, []).
+
 
 create_partitions(Q, Node, _Nodes) ->
   fresh(trunc(math:pow(2,Q)), Node).
