@@ -20,7 +20,6 @@
 %% Application callbacks
 -export([start/2, stop/1]).
 
--define(APPS, [crypto,sasl,mochiweb]).
 -define(DEFAULT_CLUSTER_URL, "http://localhost:5984/_cluster").
 
 %%====================================================================
@@ -49,9 +48,6 @@ start(_Type, _StartArgs) ->
         Args
     end,
 
-    % start required apps
-    State = start_apps(),
-
     % start dynomite supervisor
     ok = start_node(),
     case dynomite_sup:start_link(PdStartArgs) of
@@ -78,24 +74,6 @@ stop({_, Sup}) ->
 %%====================================================================
 %% Internal functions
 %%====================================================================
-
-start_apps() ->
-    Fun = fun(App, AccIn) ->
-        Result = case application:start(App) of
-        ok ->
-            App;
-        {error, {already_started, App}} ->
-            nil;
-        _Error ->
-            exit(app_start_fail)
-        end,
-        if
-        Result =/= nil -> [App|AccIn];
-        true -> AccIn
-        end
-    end,
-    lists:foldl(Fun, [], ?APPS).
-
 
 %% @spec start_node() -> ok | {error, Reason}
 %% @doc start this node (join to dist. erlang cluster)
