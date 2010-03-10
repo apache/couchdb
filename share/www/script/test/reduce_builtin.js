@@ -22,6 +22,14 @@ couchTests.reduce_builtin = function(debug) {
 
   var summate = function(N) {return (N+1)*N/2;};
 
+  var sumsqr = function(N) { 
+    var acc = 0;
+    for (var i=1; i<=N; ++i) {
+      acc += i*i;
+    }
+    return acc;
+  }
+
   // this is the same test as the reduce.js test
   // only we'll let CouchDB run reduce in Erlang
   var map = function (doc) {
@@ -32,6 +40,12 @@ couchTests.reduce_builtin = function(debug) {
   T(result.rows[0].value == 2*summate(numDocs));
   result = db.query(map, "_count");
   T(result.rows[0].value == 1000);
+  result = db.query(map, "_stats");
+  T(result.rows[0].value.sum == 2*summate(numDocs));
+  T(result.rows[0].value.count == 1000);
+  T(result.rows[0].value.min == 1);
+  T(result.rows[0].value.max == 500);
+  T(result.rows[0].value.sumsqr == 2*sumsqr(numDocs));
 
   result = db.query(map, "_sum", {startkey: 4, endkey: 4});
   T(result.rows[0].value == 8);
