@@ -736,7 +736,7 @@ send_doc_efficiently(Req, #doc{atts=Atts}=Doc, Headers, Options) ->
         end,
         case lists:member("multipart/related", AcceptedTypes) of
         false ->
-            send_json(Req, 200, [], couch_doc:to_json_obj(Doc, Options));
+            send_json(Req, 200, Headers, couch_doc:to_json_obj(Doc, Options));
         true ->
             Boundary = couch_uuids:random(),
             JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, [follows|Options])),
@@ -751,7 +751,7 @@ send_doc_efficiently(Req, #doc{atts=Atts}=Doc, Headers, Options) ->
                     fun(Data) -> couch_httpd:send(Resp, Data) end, false)
         end;
     false ->
-        send_json(Req, 200, [], couch_doc:to_json_obj(Doc, Options))
+        send_json(Req, 200, Headers, couch_doc:to_json_obj(Doc, Options))
     end.
 
 
