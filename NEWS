@@ -45,8 +45,7 @@ This version has not been released yet.
  * Added ability to replicate documents by id.
  * Added virtual host handling.
  * Query server uses json2.js for JSON serialization compatiblity with native JSON.
- 
- 
+
 Version 0.10.1
 --------------
 

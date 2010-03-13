@@ -1,0 +1,42 @@
+Building From Checkout
+======================
+
+You only need to follow these instructions if you are building from a direct
+repository checkout. If you are installing CouchDB from a tarball you can skip
+to the installation section in the `README` file.
+
+You will need the following installed:
+
+ * GNU Automake (>=1.6.3) (http://www.gnu.org/software/automake/)
+ * GNU Autoconf (>=2.59)  (http://www.gnu.org/software/autoconf/)
+ * GNU Libtool            (http://www.gnu.org/software/libtool/)
+ * GNU help2man           (http://www.gnu.org/software/help2man/)
+
+The `help2man` tool is optional, but will generate `man` pages for you.
+
+Debian-based (inc. Ubuntu) Systems
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can install the dependencies by running:
+
+    apt-get install automake autoconf libtool help2man
+
+Be sure to update the version numbers to match your system's available packages.
+
+Mac OS X
+~~~~~~~~
+
+You can install the dependencies by running:
+
+    port install automake autoconf libtool help2man
+
+You will need MacPorts installed to use the `port` command.
+
+Bootstrapping
+~~~~~~~~~~~~~
+
+Bootstrap the pristine source by running:
+
+    ./bootstrap
+
+You must repeat this step every time you update your checkout.
