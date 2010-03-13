@@ -1,0 +1,95 @@
+Apache CouchDB DEVELOPERS
+=========================
+
+Only follow these instructions if you are building from a source checkout.
+
+If you're unsure what this means, ignore this document.
+
+Dependencies
+------------
+
+You will need the following installed:
+
+ * GNU Automake (>=1.6.3) (http://www.gnu.org/software/automake/)
+ * GNU Autoconf (>=2.59)  (http://www.gnu.org/software/autoconf/)
+ * GNU Libtool            (http://www.gnu.org/software/libtool/)
+ * GNU help2man           (http://www.gnu.org/software/help2man/)
+
+The `help2man` tool is optional, but will generate `man` pages for you.
+
+Debian-based (inc. Ubuntu) Systems
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can install the dependencies by running:
+
+    apt-get install automake autoconf libtool help2man
+
+Be sure to update the version numbers to match your system's available packages.
+
+Mac OS X
+~~~~~~~~
+
+You can install the dependencies by running:
+
+    port install automake autoconf libtool help2man
+
+You will need MacPorts installed to use the `port` command.
+
+Bootstrapping
+-------------
+
+Bootstrap the pristine source by running:
+
+    ./bootstrap
+
+You must repeat this step every time you update your source checkout.
+
+Testing
+-------
+
+Check the test suite by running:
+
+    make check
+
+Generate a coverage report by running:
+
+    make cover
+
+Please report any problems to the developer's mailing list.
+
+Releasing
+---------
+
+Unix-like Systems
+~~~~~~~~~~~~~~~~~
+
+Configure the source by running:
+
+    ./configure
+
+Prepare the release artefacts by running:
+
+    make distcheck
+
+You can prepare signed release artefacts by running:
+
+    make distsign
+
+The release artefacts can be found in the root source directory.
+
+Microsoft Windows
+~~~~~~~~~~~~~~~~~
+
+Configure the source by running:
+
+    ./configure
+
+Prepare the release artefacts by running:
+
+    make dist
+
+The release artefacts can be found in the `etc/windows` directory.
+
+Until the build system has been improved, you must make sure that you run this
+command from a clean source checkout. If you do not, your test database and log
+files will be bundled up in the release artefact.

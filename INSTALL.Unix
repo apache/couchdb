@@ -1,18 +1,20 @@
-Installing on Unix-like Systems
-===============================
+Apache CouchDB README.Unix
+==========================
+
+A high-level guide to Unix-like systems, inc. Mac OS X and Ubuntu.
 
 Dependencies
 ------------
 
 You will need the following installed:
 
- * Erlang OTP (>=R12B5)         (http://erlang.org/)
- * ICU                          (http://icu.sourceforge.net/)
- * OpenSSL                      (http://www.openssl.org/)
- * Mozilla SpiderMonkey (>=1.7) (http://www.mozilla.org/js/spidermonkey/)
- * libcurl                      (http://curl.haxx.se/libcurl/)
- * GNU Make                     (http://www.gnu.org/software/make/)
- * GNU Compiler Collection      (http://gcc.gnu.org/)
+ * Erlang OTP (>=R12B5)       (http://erlang.org/)
+ * ICU                        (http://icu.sourceforge.net/)
+ * OpenSSL                    (http://www.openssl.org/)
+ * Mozilla SpiderMonkey (1.8) (http://www.mozilla.org/js/spidermonkey/)
+ * libcurl                    (http://curl.haxx.se/libcurl/)
+ * GNU Make                   (http://www.gnu.org/software/make/)
+ * GNU Compiler Collection    (http://gcc.gnu.org/)
 
 It is recommended that you install Erlang OTP R12B-5 or above where possible.
 
@@ -45,8 +47,6 @@ You will need MacPorts installed to use the `port` command.
 Installing
 ----------
 
-Skip to the
-
 Once you have satisfied the dependencies you should run:
 
     ./configure
@@ -74,6 +74,27 @@ If everything was successful you should see the following message:
     You have installed Apache CouchDB, time to relax.
 
 Relax.
+
+First Run
+---------
+
+You can start the CouchDB server by running:
+
+    sudo -i -u couchdb couchdb
+
+This uses the `sudo` command to run the `couchdb` command as the `couchdb` user.
+
+When CouchDB starts it should eventually display the following message:
+
+    Apache CouchDB has started, time to relax.
+
+Relax.
+
+To check that everything has worked, point your web browser to:
+
+    http://127.0.0.1:5984/_utils/index.html
+
+From here you should run the test suite.
 
 Security Considerations
 -----------------------
