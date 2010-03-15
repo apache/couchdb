@@ -40,17 +40,9 @@
 
 %% @doc start required apps, join cluster, start dynomite supervisor
 start(_Type, _StartArgs) ->
-    % get process_dict hack for startargs (i.e. not from .app file)
-    PdStartArgs = case erase(startargs) of
-    undefined ->
-        [];
-    Args ->
-        Args
-    end,
-
     % start dynomite supervisor
     ok = start_node(),
-    case dynomite_sup:start_link(PdStartArgs) of
+    case dynomite_sup:start_link() of
     {ok, Supervisor} ->
         {ok, Supervisor};
     Error ->

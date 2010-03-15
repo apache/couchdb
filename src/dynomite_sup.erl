@@ -1,20 +1,10 @@
-%%%-------------------------------------------------------------------
-%%% File:      dynomite_sup.erl
-%%% @author    Cliff Moon <cliff@powerset.com> []
-%%% @copyright 2008 Cliff Moon
-%%% @doc
-%%%
-%%% @end
-%%%
-%%% @since 2008-06-27 by Cliff Moon
-%%%-------------------------------------------------------------------
 -module(dynomite_sup).
--author('cliff@powerset.com').
+-author('brad@cloudant.com').
 
 -behaviour(supervisor).
 
 %% API
--export([start_link/1]).
+-export([start_link/0]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -31,8 +21,8 @@
 %% @doc Starts the supervisor
 %% @end
 %%--------------------------------------------------------------------
-start_link(Hints) ->
-    supervisor:start_link(?MODULE, [Hints]).
+start_link() ->
+    supervisor:start_link(?MODULE, []).
 
 %%====================================================================
 %% Supervisor callbacks
@@ -47,11 +37,9 @@ start_link(Hints) ->
 %% specifications.
 %% @end
 %%--------------------------------------------------------------------
-init(Args) ->
-    Node = node(),
-    Nodes = running_nodes() ++ [node()],
+init(_Args) ->
     Membership = {membership,
-                  {mem3, start_link, [Node, Nodes, Args]},
+                  {mem3, start_link, []},
                   permanent,
                   1000,
                   worker,
@@ -68,18 +56,3 @@ init(Args) ->
 %%====================================================================
 %% Internal functions
 %%====================================================================
-
-%% @doc get a list of running nodes visible to this local node
-running_nodes() ->
-    [Node || Node <- nodes([this,visible]), running(Node)].
-
-%% @doc monitor the membership server on Node from here
-running(Node) ->
-    Ref = erlang:monitor(process, {membership, Node}),
-    R = receive
-            {'DOWN', Ref, _, _, _} -> false
-        after 1 ->
-                true
-        end,
-    erlang:demonitor(Ref),
-    R.

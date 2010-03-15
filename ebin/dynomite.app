@@ -18,6 +18,7 @@
       dynomite_prof,
       dynomite_sup,
       lib_misc,
+      mem3,
       mem_utils,
       membership2,
       node,

@@ -44,4 +44,7 @@
 -record(mem, {header=3,
               node,
               nodes,
-              clock}).
+              clock,
+              ets,
+              test=false
+             }).
