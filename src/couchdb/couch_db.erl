@@ -92,9 +92,8 @@ ensure_full_commit(#db{update_pid=UpdatePid,instance_start_time=StartTime}) ->
 close(#db{fd_ref_counter=RefCntr}) ->
     couch_ref_counter:drop(RefCntr).
 
-open_ref_counted(MainPid, UserCtx) ->
-    {ok, Db} = gen_server:call(MainPid, {open_ref_count, self()}),
-    {ok, Db#db{user_ctx=UserCtx}}.
+open_ref_counted(MainPid, OpenedPid) ->
+    gen_server:call(MainPid, {open_ref_count, OpenedPid}).
 
 is_idle(MainPid) ->
     gen_server:call(MainPid, is_idle).
