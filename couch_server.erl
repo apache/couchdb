@@ -52,18 +52,18 @@ sup_start_link() ->
 
 open(DbName, Options) ->
     case gen_server:call(couch_server, {open, DbName, Options}) of
-    {ok, MainPid} ->
+    {ok, Db} ->
         Ctx = proplists:get_value(user_ctx, Options, #user_ctx{}),
-        couch_db:open_ref_counted(MainPid, Ctx);
+        {ok, Db#db{user_ctx=Ctx}};
     Error ->
         Error
     end.
 
 create(DbName, Options) ->
     case gen_server:call(couch_server, {create, DbName, Options}) of
-    {ok, MainPid} ->
+    {ok, Db} ->
         Ctx = proplists:get_value(user_ctx, Options, #user_ctx{}),
-        couch_db:open_ref_counted(MainPid, Ctx);
+        {ok, Db#db{user_ctx=Ctx}};
     Error ->
         Error
     end.
@@ -184,7 +184,7 @@ try_close_lru(StartTime) ->
         {error, all_dbs_active};
     true ->
         [{_, DbName}] = ets:lookup(couch_dbs_by_lru, LruTime),
-        [{_, {MainPid, LruTime}}] = ets:lookup(couch_dbs_by_name, DbName),
+        [{_, {opened, MainPid, LruTime}}] = ets:lookup(couch_dbs_by_name, DbName),
         case couch_db:is_idle(MainPid) of
         true ->
             exit(MainPid, kill),
@@ -197,7 +197,7 @@ try_close_lru(StartTime) ->
             % this still has referrers. Go ahead and give it a current lru time
             % and try the next one in the table.
             NewLruTime = now(),
-            true = ets:insert(couch_dbs_by_name, {DbName, {MainPid, NewLruTime}}),
+            true = ets:insert(couch_dbs_by_name, {DbName, {opened, MainPid, NewLruTime}}),
             true = ets:insert(couch_dbs_by_pid, {MainPid, DbName}),
             true = ets:delete(couch_dbs_by_lru, LruTime),
             true = ets:insert(couch_dbs_by_lru, {NewLruTime, DbName}),
@@ -205,11 +205,44 @@ try_close_lru(StartTime) ->
         end
     end.
 
+open_async(Server, From, DbName, Filepath, Options) ->
+    Parent = self(),
+    Opener = spawn_link(fun() ->
+            Res = couch_db:start_link(DbName, Filepath, Options),
+            gen_server:call(Parent, {open_result, DbName, Res}, infinity),
+            unlink(Parent)
+        end),
+    true = ets:insert(couch_dbs_by_name, {DbName, {opening, Opener, [From]}}),
+    true = ets:insert(couch_dbs_by_pid, {Opener, DbName}),
+    Server#server{dbs_open=Server#server.dbs_open + 1}.
+
 handle_call({set_max_dbs_open, Max}, _From, Server) ->
     {reply, ok, Server#server{max_dbs_open=Max}};
 handle_call(get_server, _From, Server) ->
     {reply, {ok, Server}, Server};
-handle_call({open, DbName, Options}, _From, Server) ->
+handle_call({open_result, DbName, {ok, OpenedDbPid}}, _From, Server) ->
+    link(OpenedDbPid),
+    [{DbName, {opening,Opener,Froms}}] = ets:lookup(couch_dbs_by_name, DbName),
+    lists:foreach(fun({FromPid,_}=From) ->
+        gen_server:reply(From, 
+                catch couch_db:open_ref_counted(OpenedDbPid, FromPid))
+    end, Froms),
+    LruTime = now(),
+    true = ets:insert(couch_dbs_by_name,
+            {DbName, {opened, OpenedDbPid, LruTime}}),
+    true = ets:delete(couch_dbs_by_pid, Opener),
+    true = ets:insert(couch_dbs_by_pid, {OpenedDbPid, DbName}),
+    true = ets:insert(couch_dbs_by_lru, {LruTime, DbName}),
+    {reply, ok, Server};
+handle_call({open_result, DbName, Error}, _From, Server) ->    
+    [{DbName, {opening,Opener,Froms}}] = ets:lookup(couch_dbs_by_name, DbName),
+    lists:foreach(fun(From) ->
+        gen_server:reply(From, Error)
+    end, Froms),    
+    true = ets:delete(couch_dbs_by_name, DbName),
+    true = ets:delete(couch_dbs_by_pid, Opener),
+    {reply, ok, Server#server{dbs_open=Server#server.dbs_open - 1}};
+handle_call({open, DbName, Options}, {FromPid,_}=From, Server) ->
     LruTime = now(),
     case ets:lookup(couch_dbs_by_name, DbName) of
     [] ->
@@ -219,53 +252,33 @@ handle_call({open, DbName, Options}, _From, Server) ->
             case maybe_close_lru_db(Server) of
             {ok, Server2} ->
                 Filepath = get_full_filename(Server, DbNameList),
-                case couch_db:start_link(DbName, Filepath, Options) of
-                {ok, MainPid} ->
-                    true = ets:insert(couch_dbs_by_name, {DbName, {MainPid, LruTime}}),
-                    true = ets:insert(couch_dbs_by_pid, {MainPid, DbName}),
-                    true = ets:insert(couch_dbs_by_lru, {LruTime, DbName}),
-                    DbsOpen = Server2#server.dbs_open + 1,
-                    {reply, {ok, MainPid},
-                            Server2#server{dbs_open=DbsOpen}};
-                Error ->
-                    {reply, Error, Server2}
-                end;
+                {noreply, open_async(Server2, From, DbName, Filepath, Options)};
             CloseError ->
                 {reply, CloseError, Server}
             end;
         Error ->
             {reply, Error, Server}
         end;
-    [{_, {MainPid, PrevLruTime}}] ->
-        true = ets:insert(couch_dbs_by_name, {DbName, {MainPid, LruTime}}),
+    [{_, {opening, Opener, Froms}}] ->
+        true = ets:insert(couch_dbs_by_name, {DbName, {opening, Opener, [From|Froms]}}),
+        {noreply, Server};
+    [{_, {opened, MainPid, PrevLruTime}}] ->
+        true = ets:insert(couch_dbs_by_name, {DbName, {opened, MainPid, LruTime}}),
         true = ets:delete(couch_dbs_by_lru, PrevLruTime),
         true = ets:insert(couch_dbs_by_lru, {LruTime, DbName}),
-        {reply, {ok, MainPid}, Server}
+        {reply, couch_db:open_ref_counted(MainPid, FromPid), Server}
     end;
-handle_call({create, DbName, Options}, _From, Server) ->
+handle_call({create, DbName, Options}, From, Server) ->
     DbNameList = binary_to_list(DbName),
     case check_dbname(Server, DbNameList) of
     ok ->
-        Filepath = get_full_filename(Server, DbNameList),
-
         case ets:lookup(couch_dbs_by_name, DbName) of
         [] ->
             case maybe_close_lru_db(Server) of
             {ok, Server2} ->
-                case couch_db:start_link(DbName, Filepath, [create|Options]) of
-                {ok, MainPid} ->
-                    LruTime = now(),
-                    true = ets:insert(couch_dbs_by_name,
-                            {DbName, {MainPid, LruTime}}),
-                    true = ets:insert(couch_dbs_by_pid, {MainPid, DbName}),
-                    true = ets:insert(couch_dbs_by_lru, {LruTime, DbName}),
-                    DbsOpen = Server2#server.dbs_open + 1,
-                    couch_db_update_notifier:notify({created, DbName}),
-                    {reply, {ok, MainPid},
-                            Server2#server{dbs_open=DbsOpen}};
-                Error ->
-                    {reply, Error, Server2}
-                end;
+                Filepath = get_full_filename(Server, DbNameList),
+                {noreply, open_async(Server2, From, DbName, Filepath,
+                        [create | Options])};
             CloseError ->
                 {reply, CloseError, Server}
             end;
@@ -283,7 +296,14 @@ handle_call({delete, DbName, _Options}, _From, Server) ->
         Server2 =
         case ets:lookup(couch_dbs_by_name, DbName) of
         [] -> Server;
-        [{_, {Pid, LruTime}}] ->
+        [{_, {opening, Pid, Froms}}] ->
+            exit(Pid, kill),
+            receive {'EXIT', Pid, _Reason} -> ok end,
+            true = ets:delete(couch_dbs_by_name, DbName),
+            true = ets:delete(couch_dbs_by_pid, Pid),
+            [gen_server:send_result(F, not_found) || F <- Froms],
+            Server#server{dbs_open=Server#server.dbs_open - 1};
+        [{_, {opened, Pid, LruTime}}] ->
             exit(Pid, kill),
             receive {'EXIT', Pid, _Reason} -> ok end,
             true = ets:delete(couch_dbs_by_name, DbName),
@@ -317,12 +337,17 @@ code_change(_OldVsn, State, _Extra) ->
 
 handle_info({'EXIT', _Pid, config_change}, _Server) ->
     exit(kill);
-handle_info({'EXIT', Pid, _Reason}, #server{dbs_open=DbsOpen}=Server) ->
+handle_info({'EXIT', Pid, Reason}, #server{dbs_open=DbsOpen}=Server) ->
     [{Pid, DbName}] = ets:lookup(couch_dbs_by_pid, Pid),
-    [{DbName, {Pid, LruTime}}] = ets:lookup(couch_dbs_by_name, DbName),
+    case ets:lookup(couch_dbs_by_name, DbName) of
+    [{DbName, {opened, Pid, LruTime}}] ->
+        true = ets:delete(couch_dbs_by_lru, LruTime);
+    [{DbName, {opening, Pid, Froms}}] ->
+        [gen_server:reply(From, Reason) || From <- Froms]
+    end,
     true = ets:delete(couch_dbs_by_pid, Pid),
     true = ets:delete(couch_dbs_by_name, DbName),
-    true = ets:delete(couch_dbs_by_lru, LruTime),
     {noreply, Server#server{dbs_open=DbsOpen - 1}};
 handle_info(Info, _Server) ->
     exit({unknown_message, Info}).
+
