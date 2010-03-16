@@ -153,10 +153,12 @@ terminate(Reason, _Srv) ->
 
 all_databases() ->
     {ok, #server{root_dir=Root}} = gen_server:call(couch_server, get_server),
+    NormRoot = couch_util:normpath(Root),
     Filenames =
     filelib:fold_files(Root, "^[a-z0-9\\_\\$()\\+\\-]*[\\.]couch$", true,
         fun(Filename, AccIn) ->
-            case Filename -- Root of
+            NormFilename = couch_util:normpath(Filename),
+            case NormFilename -- NormRoot of
             [$/ | RelativeFilename] -> ok;
             RelativeFilename -> ok
             end,
