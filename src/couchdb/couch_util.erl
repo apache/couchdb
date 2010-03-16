@@ -12,7 +12,7 @@
 
 -module(couch_util).
 
--export([priv_dir/0, start_driver/1,terminate_linked/1]).
+-export([priv_dir/0, start_driver/1, normpath/1, terminate_linked/1]).
 -export([should_flush/0, should_flush/1, to_existing_atom/1]).
 -export([rand32/0, implode/2, collate/2, collate/3]).
 -export([abs_pathname/1,abs_pathname/2, trim/1, ascii_lower/1]).
@@ -49,6 +49,19 @@ start_driver(LibDir) ->
     {error, Error} ->
         exit(erl_ddll:format_error(Error))
     end.
+
+% Normalize a pathname by removing .. and . components.
+normpath(Path) ->
+    normparts(filename:split(Path), []).
+
+normparts([], Acc) ->
+    filename:join(lists:reverse(Acc));
+normparts([".." | RestParts], [_Drop | RestAcc]) ->
+    normparts(RestParts, RestAcc);
+normparts(["." | RestParts], Acc) ->
+    normparts(RestParts, Acc);
+normparts([Part | RestParts], Acc) ->
+    normparts(RestParts, [Part | Acc]).
 
 % works like list_to_existing_atom, except can be list or binary and it
 % gives you the original value instead of an error if no existing atom.
