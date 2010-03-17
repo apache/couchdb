@@ -1,0 +1,138 @@
+Installing on Microsoft Windows
+===============================
+
+Windows
+~~~~~~~
+
+The Windows build process is very similar to the Erlang build process.
+
+Build Tools
+^^^^^^^^^^^
+
+To build on Windows, you will need the following installed:
+
+ * Erlang OTP (>=R12B5)        (http://erlang.org/)
+ * ICU                         (http://icu.sourceforge.net/)
+ * OpenSSL                     (http://www.openssl.org/)
+ * Mozilla SpiderMonkey (=1.8) (http://www.mozilla.org/js/spidermonkey/)
+ * libcurl                     (http://curl.haxx.se/libcurl/)
+ * Cygwin                      (http://www.cygwin.com/)
+ * Visual Studio 2008          (http://msdn.microsoft.com/en-gb/vstudio/default.aspx)
+
+Please note:
+
+ * When installing Erlang, you must build it from source. The CouchDB build
+   makes use of a number of the Erlang build scripts.
+
+ * When installing ICU, select the binaries built with Visual Studio 2008.
+
+ * When installing Cygwin, be sure to select all the `development` tools.
+
+ * When installing libcurl, be sure to install by hand as the Cygwin binaries
+   are built with an incompatible compiler and will not work with Erlang.
+
+Setting Up
+^^^^^^^^^^
+
+Before starting any Cygwin terminals, run the following command:
+
+    set CYGWIN=nontsec
+
+To set up your environment, run the following command:
+
+    [VS_BIN]/vcvars32.bat
+
+Replace [VS_BIN] with the path to your Visual Studio `bin` directory.
+
+After you have done this, `link.exe` and `cl.exe` should be on your path and
+correspond to the Microsoft linker and compiler, respectively.
+
+To set up your environment, run the following command:
+
+    eval `./otp_build env_win32`
+
+Do this even if you have already built Erlang because the CouchDB build system
+needs the environment variables set up by this script.
+
+To set up your path, run the following command:
+
+    export PATH=$ERL_TOP/release/win32/erts-5.7.2/bin:$PATH
+
+Everything should be set up properly now.
+
+Building
+^^^^^^^^
+
+We start by bootstrapping:
+
+  $ cd $COUCHDB_TOP
+  $ ./bootstrap
+  You have bootstrapped Apache CouchDB, time to relax.
+
+  Run `./configure' to configure the source before you install.
+  $
+
+Relax.
+
+Now we need to run a complicated configure command-line.
+
+  $ ./configure \
+      --with-js-include=/cygdrive/c/path_to_seamonkey_include \
+      --with-js-lib=/cygdrive/c/path_to_seamonkey_lib \
+      --with-win32-icu-binaries=/cygdrive/c/path_to_icu_binaries_root \
+      --with-erlang=$ERL_TOP/release/win32/usr/include \
+      --with-win32-curl=/cygdrive/c/path/to/curl/root/directory \
+      --with-openssl-bin-dir=/cygdrive/c/openssl/bin \
+      --with-msvc-redist-dir=/cygdrive/c/dir/with/vcredist_platform_executable \
+      --prefix=$ERL_TOP/release/win32
+
+Relax, then relax some more, then get a beer and relax some more; the
+above command may take many many minutes to complete...
+
+Note that all paths must be in cygwin format (ie, using '/cygdrive/c/dir/...'
+rather than 'c:/dir'.)  Those starting with $ERL_TOP can be entered
+literally, assuming ERL_TOP is set as described above.
+
+Notes:
+  When building the installer, the necessary openssl binaries are pulled from
+  the directory pointed to --with-openssl-bin-dir.
+
+Now we can build it and "install" it into the $ERL_TOP/release/win32 (or
+wherever you set --prefix to above) directory:
+
+ $ make install
+
+Relax on your new couch:
+
+  The $ERL_TOP/release/win32 directory is now ready to .zip up, be packaged
+  by an installer, etc.  To test it in-place, execute:
+
+  $ $ERL_TOP/release/win32/bin/couchdb.bat
+
+  and everything should work fine.
+
+To create an installer, execute:
+
+  $ make dist
+
+and look for etc/windows/setup-couch*.exe.  Note - only do this after
+a clean build, not after testing in-place - otherwise your test database and
+log files will be shipped!
+
+Notes
+^^^^^
+
+Building Erlang
++++++++++++++++
+
+ * Follow the instructions as described. You do need openssl, but don't need
+   the GUI tools. You can skip them with the following command:
+
+    echo "skipping gs" > lib/gs/SKIP
+    echo "skipping ic" > lib/ic/SKIP
+
+ * Ensure `which link` points at the Microsoft linker. If you do not do this,
+   the one in /usr/bin may be found instead.
+
+ * After executing `./otp_build release -a`, be sure to execute Install.exe in
+   the release/win32 directory to setup the release/win32/bin dir correctly.
