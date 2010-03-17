@@ -1,10 +1,13 @@
 Apache CouchDB CHANGES
 ======================
 
-Version 0.11.0
+Version 0.12.0
 --------------
 
 This version has not been released yet.
+
+Version 0.11.0
+--------------
 
 Security:
 
@@ -69,6 +72,7 @@ Futon:
 
 Build and System Integration:
 
+ * Updated and improved source documentation.
  * Added support for building a Windows installer as part of 'make dist'.
  * Bug fix for building couch.app's module list.
  * ETap tests are now run during make distcheck. This included a number of

@@ -1,18 +1,19 @@
 Apache CouchDB NEWS
 ===================
 
-For details about backwards incompatible changes, please see:
+For details about backwards incompatible changes, see:
 
   http://wiki.apache.org/couchdb/Breaking_changes
 
 Each release section notes when backwards incompatible changes have been made.
 
-Version 0.11.0
+Version 0.12.0
 --------------
 
-This version is a feature-freeze release candidate for Apache CouchDB 1.0.
-
 This version has not been released yet.
+
+Version 0.11.0
+--------------
 
  * Added support for building a Windows installer as part of 'make dist'.
  * Added optional 'raw' binary collation for faster view builds where Unicode
@@ -44,7 +45,7 @@ This version has not been released yet.
  * Added proxy authentication handler.
  * Added ability to replicate documents by id.
  * Added virtual host handling.
- * Query server uses json2.js for JSON serialization compatiblity with native JSON.
+ * Uses json2.js for JSON serialization compatiblity with native JSON.
 
 Version 0.10.1
 --------------
@@ -185,8 +186,8 @@ Version 0.3.0
  * CouchDB now fully supports Unicode and locale specific collation via the ICU
    library, both in the Fabric engine and computed tables.
  * The `in` operator has been added to Fabric.
- * The `startdoc` query string variable specifies the starting document to use if
-   there are multiple rows with identical startkeys.
+ * The `startdoc` query string variable specifies the starting document to use
+   if there are multiple rows with identical startkeys.
  * The `skip` query string variable specifies the number of rows to skip before
    returning results. The `skip` value must be a positive integer. If used with
    a `count` variable the skipped rows aren't counted as output.
