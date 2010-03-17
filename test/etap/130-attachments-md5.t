@@ -227,7 +227,7 @@ get_socket() ->
 do_request(Request) ->
     Sock = get_socket(),
     gen_tcp:send(Sock, list_to_binary(lists:flatten(Request))),
-    timer:sleep(100),
+    timer:sleep(200),
     {ok, R} = gen_tcp:recv(Sock, 0),
     gen_tcp:close(Sock),
     [Header, Body] = re:split(R, "\r\n\r\n", [{return, binary}]),
