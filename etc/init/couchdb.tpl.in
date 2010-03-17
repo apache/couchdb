@@ -141,7 +141,7 @@ parse_script_option_list () {
                 log_end_msg $SCRIPT_ERROR
             fi
             ;;
-        restart|force-reload)
+        restart)
             log_daemon_msg "Restarting $DESCRIPTION" $NAME
             if stop_couchdb; then
                 if start_couchdb; then
@@ -158,7 +158,7 @@ parse_script_option_list () {
             ;;
         *)
             cat << EOF >&2
-Usage: $SCRIPT_NAME {start|stop|restart|force-reload|status}
+Usage: $SCRIPT_NAME {start|stop|restart|status}
 EOF
             exit $SCRIPT_ERROR
             ;;
