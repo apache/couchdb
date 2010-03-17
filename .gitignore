@@ -95,3 +95,4 @@ couchdb.stdout
 # for make cover
 
 cover/*
+INSTALL
