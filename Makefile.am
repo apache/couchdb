@@ -33,6 +33,7 @@ EXTRA_DIST = \
     BUGS \
     BUILDING \
     CHANGES \
+    INSTALL \
     INSTALL.Unix \
     INSTALL.Windows \
     LICENSE \
