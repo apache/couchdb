@@ -15,8 +15,8 @@ SUBDIRS = bin etc src share test var utils
 localdoc_DATA = \
     AUTHORS.gz \
     BUGS.gz \
-    BUILDING.gz \
     CHANGES.gz \
+    DEVELOPERS.gz \
     INSTALL.gz \
     INSTALL.Unix.gz \
     INSTALL.Windows.gz \
@@ -31,8 +31,8 @@ DISTCLEANFILES = $(localdoc_DATA)
 EXTRA_DIST = \
     AUTHORS \
     BUGS \
-    BUILDING \
     CHANGES \
+    DEVELOPERS \
     INSTALL \
     INSTALL.Unix \
     INSTALL.Windows \
@@ -49,10 +49,10 @@ AUTHORS.gz: $(top_srcdir)/AUTHORS
 BUGS.gz: $(top_srcdir)/BUGS
 	-gzip -9 < $< > $@
 
-BUILDING.gz: $(top_srcdir)/BUILDING
+CHANGES.gz: $(top_srcdir)/CHANGES
 	-gzip -9 < $< > $@
 
-CHANGES.gz: $(top_srcdir)/CHANGES
+DEVELOPERS.gz: $(top_srcdir)/DEVELOPERS
 	-gzip -9 < $< > $@
 
 INSTALL.gz: $(top_srcdir)/INSTALL
