@@ -56,8 +56,10 @@ fi
 
 aclocal -I m4
 autoheader -f
-automake -f -c -a --gnits 2>&1 | sed -e "/install/d"
+automake -f -a 2>&1 | sed -e "/install/d"
 autoconf -f
+
+ln -f -s "`dirname \`readlink build-aux/missing\``/INSTALL"
 
 cat << EOF
 You have bootstrapped Apache CouchDB, time to relax.

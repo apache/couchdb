@@ -12,11 +12,36 @@
 
 SUBDIRS = bin etc src share test var utils
 
-localdoc_DATA = AUTHORS.gz BUGS.gz CHANGES.gz NEWS.gz README.gz THANKS.gz
+localdoc_DATA = \
+    AUTHORS.gz \
+    BUGS.gz \
+    CHANGES.gz \
+    DEVELOPERS.gz \
+    INSTALL.gz \
+    INSTALL.Unix.gz \
+    INSTALL.Windows.gz \
+    LICENSE.gz \
+    NEWS.gz \
+    NOTICE.gz \
+    README.gz \
+    THANKS.gz
 
 DISTCLEANFILES = $(localdoc_DATA)
 
-EXTRA_DIST = AUTHORS BUGS CHANGES LICENSE NEWS NOTICE README THANKS license.skip
+EXTRA_DIST = \
+    AUTHORS \
+    BUGS \
+    CHANGES \
+    DEVELOPERS \
+    INSTALL \
+    INSTALL.Unix \
+    INSTALL.Windows \
+    LICENSE \
+    NEWS \
+    NOTICE \
+    README \
+    THANKS \
+    license.skip
 
 AUTHORS.gz: $(top_srcdir)/AUTHORS
 	-gzip -9 < $< > $@
@@ -27,7 +52,25 @@ BUGS.gz: $(top_srcdir)/BUGS
 CHANGES.gz: $(top_srcdir)/CHANGES
 	-gzip -9 < $< > $@
 
+DEVELOPERS.gz: $(top_srcdir)/DEVELOPERS
+	-gzip -9 < $< > $@
+
+INSTALL.gz: $(top_srcdir)/INSTALL
+	-gzip -9 < $< > $@
+
+INSTALL.Unix.gz: $(top_srcdir)/INSTALL.Unix
+	-gzip -9 < $< > $@
+
+INSTALL.Windows.gz: $(top_srcdir)/INSTALL.Windows
+	-gzip -9 < $< > $@
+
+LICENSE.gz: $(top_srcdir)/LICENSE
+	-gzip -9 < $< > $@
+
 NEWS.gz: $(top_srcdir)/NEWS
+	-gzip -9 < $< > $@
+
+NOTICE.gz: $(top_srcdir)/NOTICE
 	-gzip -9 < $< > $@
 
 README.gz: $(top_srcdir)/README
@@ -58,6 +101,10 @@ dev: all
 	mkdir -p $(top_builddir)/tmp/lib
 	mkdir -p $(top_builddir)/tmp/log
 	mkdir -p $(top_builddir)/tmp/run/couchdb
+
+install-data-hook:
+	@echo
+	@echo "You have installed Apache CouchDB, time to relax."
 
 distclean-local:
 	rm -fr $(top_builddir)/tmp
