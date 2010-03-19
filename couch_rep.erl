@@ -453,8 +453,9 @@ make_replication_id({Props}, UserCtx) ->
     Tgt = get_rep_endpoint(UserCtx, proplists:get_value(<<"target">>, Props)),    
     Filter = proplists:get_value(<<"filter">>, Props),
     QueryParams = proplists:get_value(<<"query_params">>, Props),
+    DocIds = proplists:get_value(<<"doc_ids">>, Props),
     Base = couch_util:to_hex(erlang:md5(
-        term_to_binary([HostName, Src, Tgt, Filter, QueryParams])
+        term_to_binary([HostName, Src, Tgt, Filter, QueryParams, DocIds])
     )),
     Extension = maybe_append_options(
         [<<"continuous">>, <<"create_target">>], Props),
