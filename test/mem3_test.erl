@@ -14,7 +14,8 @@ all_tests_test_() ->
        fun(Pid) ->
            {with, Pid,
             [
-             fun init/1
+             fun init/1,
+             fun join_first/1
             ]}
        end}
      ]
@@ -33,6 +34,11 @@ test_teardown(Pid) ->
 %% TESTS
 
 init(_Pid) ->
-    State = #mem{test=Test} = mem3:state(),
-    ?debugFmt("~nState: ~p~n", [State]),
+    #mem{test=Test} = mem3:state(),
     ?assertEqual(true, Test).
+
+
+join_first(_Pid) ->
+    mem3:join(first, [{1, a, []}, {2, b, []}]),
+    ?debugFmt("~nState: ~p~n", [mem3:state()]),
+    ok.

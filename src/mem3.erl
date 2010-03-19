@@ -1,4 +1,18 @@
-
+%%% membership module
+%%%
+%%% State of the gen_server is a #mem record
+%%%
+%%% Nodes and Gossip are the same thing, and are a list of three-tuples like:
+%%%
+%%%  [ {Pos,NodeName,Options} | _ ]
+%%%
+%%%  Position is 1-based incrementing in order of node joining
+%%%
+%%%  Options is a proplist, with [{hints, [Part1|_]}] denoting that the node
+%%%   is responsible for the extra partitions too.
+%%%
+%%% TODO: dialyzer type specs
+%%%
 -module(mem3).
 -author('brad@cloudant.com').
 
@@ -57,10 +71,7 @@ state() ->
 init(Args) ->
     process_flag(trap_exit,true),
     Config = configuration:get_config(),
-    OldState = case Args of
-    test -> nil;
-    _ -> read_latest_state_file(Config)
-    end,
+    OldState = read_latest_state_file(Args, Config),
     State = handle_init(OldState),
     {ok, State#mem{test=(Args == test)}}.
 
@@ -69,8 +80,8 @@ init(Args) ->
 %% new node joining to this node
 handle_call({join, JoinType, ExtNodes}, _From, State) ->
     Config = configuration:get_config(),
-    Reply = handle_join(JoinType, ExtNodes, State, Config),
-    {reply, Reply, State};
+    NewState = handle_join(JoinType, ExtNodes, State, Config),
+    {reply, ok, NewState};
 
 %% clock
 handle_call(clock, _From, State = #mem{clock=Clock}) ->
@@ -142,23 +153,26 @@ handle_init(nil) ->
     net_kernel:monitor_nodes(true),
     Table = init_ets_table(),
     Node = node(),
-    Nodes = [{Node, []}],
+    Nodes = [{0, Node, []}],
     Clock = vector_clock:create(Node),
     #mem{node=Node, nodes=Nodes, clock=Clock, ets=Table};
 
 handle_init(_OldState) ->
     ?debugHere,
     % there's an old state, let's try to rejoin automatically
+    %  but only if we can compare our old state to all other
+    %  available nodes and get a match... otherwise get a human involved
     % TODO implement me
     Table = init_ets_table(),
     #mem{ets=Table}.
 
 
-%% handle join activities
-handle_join(first, ExtNodes, State, Config) ->
+%% handle join activities, return NewState
+handle_join(first, ExtNodes, #mem{node=Node, clock=Clock} = State, Config) ->
     Map = create_map(Config, ExtNodes),
     ?debugFmt("~nmap: ~p~n", [Map]),
-    State#mem{};
+    NewClock = vector_clock:increment(Node, Clock),
+    State#mem{nodes=ExtNodes, clock=NewClock};
 
 handle_join(new, _ExtNodes, _State, _Config) ->
     ok;
@@ -190,7 +204,9 @@ find_latest_state_filename(Config) ->
     end.
 
 
-read_latest_state_file(Config) ->
+read_latest_state_file(test, _) ->
+    nil;
+read_latest_state_file(_, Config) ->
     try
         {ok, File} = find_latest_state_filename(Config),
         case file:consult(File) of
@@ -206,10 +222,14 @@ read_latest_state_file(Config) ->
 
 %% @doc given Config and a list of Nodes, construct a Fullmap
 create_map(#config{q=Q}, Nodes) ->
-    [{FirstNode,_}|_] = Nodes,
-    Pmap = lists:foldl(fun({Node, Hints}, Map) ->
-        partitions:join(Node, Map, Hints)
-    end, partitions:create(Q, FirstNode), Nodes),
+    [{_,FirstNode,_}|_] = Nodes,
+    Fun = fun({_Pos, Node, Options}, Map) ->
+        Hints = proplists:get_value(hints, Options),
+        {ok, NewMap} = partitions:join(Node, Map, Hints),
+        NewMap
+    end,
+    Acc0 = partitions:create_partitions(Q, FirstNode),
+    Pmap = lists:foldl(Fun, Acc0, lists:keysort(1, Nodes)),
     make_fullmap(Pmap).
 
 
