@@ -27,17 +27,14 @@ main(_) ->
 
 loop() ->
     receive
-    {ping, From} ->
-        From ! pong
+        close -> ok
     end.
 
 wait() ->
     receive
-        _ ->
-            ok
-    after
-        1000 ->
-            throw(timeout_error)
+        {'DOWN', _, _, _, _} -> ok
+    after 1000 ->
+        throw(timeout_error)
     end.
 
 test() ->
@@ -94,11 +91,23 @@ test() ->
         "Sanity checking that the Pid was re-added."
     ),
 
-    ChildPid1 ! {ping, self()},
+    erlang:monitor(process, ChildPid1),
+    ChildPid1 ! close,
     wait(),
-    etap:is(
-        couch_ref_counter:count(RefCtr),
-        1,
+    
+    CheckFun = fun
+        (Iter, nil) ->
+            case couch_ref_counter:count(RefCtr) of
+                1 -> Iter;
+                _ -> nil
+            end;
+        (_, Acc) ->
+            Acc
+    end,
+    Result = lists:foldl(CheckFun, nil, lists:seq(1, 10000)),
+    etap:isnt(
+        Result,
+        nil,
         "The referer count was decremented automatically on process exit."
     ),
 
