@@ -31,9 +31,8 @@
 %%
 %%      This fun uses quorum constants from config
 key_lookup(Key, {M,F,A}, Access) ->
-    {N,_R,_W} = Consts = unpack_config(configuration:get_config()),
-    Const = get_const(Access, Consts),
-    key_lookup(Key, {M,F,A}, Access, Const, N).
+    N = list_to_integer(couch_config:get("cluster", "n", "3")),
+    key_lookup(Key, {M,F,A}, Access, get_const(Access), N).
 
 
 %% @doc Get to the proper shard on N nodes by key lookup
@@ -78,8 +77,7 @@ all_parts({M,F,A}, Access, AndPartners, ResolveFun) ->
 %%
 %%      This fun uses quorum constants from config
 some_parts(KeyFun, SeqsKVPairs, {M,F,A}, Access) ->
-    Const = get_const(Access),
-    some_parts(KeyFun, SeqsKVPairs, {M,F,A}, Access, Const).
+    some_parts(KeyFun, SeqsKVPairs, {M,F,A}, Access, get_const(Access)).
 
 
 %% @doc Do op on some shards, depending on list of keys sent in.
@@ -215,10 +213,6 @@ error_message(Good, Bad, N, T, Access) ->
   [{error, Msg}, {good, Good}, {bad, Bad}].
 
 
-unpack_config(#config{n=N,r=R,w=W}) ->
-  {N, R, W}.
-
-
 pcall(MapFun, Servers, Const) ->
   Replies = lib_misc:pmap(MapFun, Servers, Const),
   lists:partition(fun valid/1, Replies).
@@ -260,14 +254,11 @@ group_by_key(List) ->
     {LastK, LastVs, Acc} = lists:foldl(FoldFun, Acc0, Rest),
     [{LastK, LastVs} | Acc].
 
-get_const(Access) ->
-    get_const(Access, unpack_config(configuration:get_config())).
-
-
-get_const(Access, {_N,R,W}) ->
-    case Access of
-    r -> R;
-    w -> W;
-    r1 -> 1;
-    Other -> throw({bad_access_term, Other})
-    end.
+get_const(r) ->
+    list_to_integer(couch_config:get("cluster", "r", "2"));
+get_const(w) ->
+    list_to_integer(couch_config:get("cluster", "w", "2"));
+get_const(r1) ->
+    1;
+get_const(Other) ->
+    throw({bad_access_term, Other}).
