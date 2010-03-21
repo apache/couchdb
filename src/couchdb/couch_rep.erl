@@ -451,20 +451,21 @@ make_replication_id({Props}, UserCtx) ->
     % Port = mochiweb_socket_server:get(couch_httpd, port),
     Src = get_rep_endpoint(UserCtx, proplists:get_value(<<"source">>, Props)),
     Tgt = get_rep_endpoint(UserCtx, proplists:get_value(<<"target">>, Props)),    
-    Filter = proplists:get_value(<<"filter">>, Props),
-    QueryParams = proplists:get_value(<<"query_params">>, Props),
-    DocIds = proplists:get_value(<<"doc_ids">>, Props),
-    Base = couch_util:to_hex(erlang:md5(
-        case DocIds of
+    Base = [HostName, Src, Tgt] ++
+        case proplists:get_value(<<"filter">>, Props) of
         undefined ->
-            term_to_binary([HostName, Src, Tgt, Filter, QueryParams]);
-        DocIds ->
-            term_to_binary([HostName, Src, Tgt, Filter, QueryParams, DocIds])
-        end
-    )),
+            case proplists:get_value(<<"doc_ids">>, Props) of
+            undefined ->
+                [];
+            DocIds ->
+                [DocIds]
+            end;
+        Filter ->
+            [Filter, proplists:get_value(<<"query_params">>, Props, {[]})]
+        end,
     Extension = maybe_append_options(
         [<<"continuous">>, <<"create_target">>], Props),
-    {Base, Extension}.
+    {couch_util:to_hex(erlang:md5(term_to_binary(Base))), Extension}.
 
 maybe_add_trailing_slash(Url) ->
     re:replace(Url, "[^/]$", "&/", [{return, list}]).
