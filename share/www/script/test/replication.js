@@ -329,12 +329,25 @@ couchTests.replication = function(debug) {
 
   dbA.deleteDb();
   dbA.createDb();
-  dbB.deleteDb();
-  dbB.createDb();
 
-  T(dbA.save({_id:"foo1",value:"a"}).ok);
-  T(dbA.save({_id:"foo2",value:"b"}).ok);
-  T(dbA.save({_id:"foo3",value:"c"}).ok);
+  var all_docs = [
+    {
+      _id: "foo1",
+      value: "a"
+    },
+    {
+      _id: "foo2",
+      value: "b"
+    },
+    {
+      _id: "foo3",
+      value: "c"
+    }
+  ];
+
+  for (var i = 0; i < all_docs.length; i++) {
+    T(dbA.save(all_docs[i]).ok);
+  }
 
   var dbPairs = [
     {source:"test_suite_rep_docs_db_a",
@@ -347,34 +360,71 @@ couchTests.replication = function(debug) {
       target:"http://" + host + "/test_suite_rep_docs_db_b"}
   ];
 
+  var target_doc_ids = [
+    ["foo1", "foo3", "foo666"],
+    ["foo1", "foo666"],
+    ["foo666", "foo2"],
+    ["foo2", "foo9999", "foo1"]
+  ];
+
   for (var i = 0; i < dbPairs.length; i++) {
-    var dbA = dbPairs[i].source;
-    var dbB = dbPairs[i].target;
+    var src_db = dbPairs[i].source;
+    var tgt_db = dbPairs[i].target;
 
-    var repResult = CouchDB.replicate(dbA, dbB, {
-      body: {"doc_ids": ["foo1", "foo3", "foo666"]}
-    });
+    for (var j = 0; j < target_doc_ids.length; j++) {
+      var doc_ids = target_doc_ids[j];
+      var valid_doc_ids = [];
+      var invalid_doc_ids = [];
 
-    T(repResult.ok);
-    T(repResult.docs_written === 2);
-    T(repResult.docs_read === 2);
-    T(repResult.doc_write_failures === 0);
+      $.each(doc_ids, function(index, id) {
+        var found = false;
 
-    dbB = new CouchDB("test_suite_rep_docs_db_b");
+        for (var k = 0; k < all_docs.length; k++) {
+          var doc = all_docs[k];
 
-    var docFoo1 = dbB.open("foo1");
-    T(docFoo1 !== null);
-    T(docFoo1.value === "a");
+          if (id === doc._id) {
+            found = true;
+            break;
+          }
+        }
 
-    var docFoo2 = dbB.open("foo2");
-    T(docFoo2 === null);
+        if (found) {
+          valid_doc_ids.push(id);
+        } else {
+          invalid_doc_ids.push(id);
+        }
+      });
 
-    var docFoo3 = dbB.open("foo3");
-    T(docFoo3 !== null);
-    T(docFoo3.value === "c");
+      dbB.deleteDb();
+      dbB.createDb();
 
-    var docFoo666 = dbB.open("foo666");
-    T(docFoo666 === null);
+      var repResult = CouchDB.replicate(src_db, tgt_db, {
+        body: {"doc_ids": doc_ids}
+      });
+
+      T(repResult.ok);
+      T(repResult.docs_written === valid_doc_ids.length);
+      T(repResult.docs_read === valid_doc_ids.length);
+      T(repResult.doc_write_failures === 0);
+
+      for (var k = 0; k < all_docs.length; k++) {
+        var doc = all_docs[k];
+        var tgt_doc = dbB.open(doc._id);
+
+        if ($.inArray(doc._id, doc_ids) >= 0) {
+          T(tgt_doc !== null);
+          T(tgt_doc.value === doc.value);
+        } else {
+          T(tgt_doc === null);
+        }
+      }
+
+      for (var k = 0; k < invalid_doc_ids.length; k++) {
+        var tgt_doc = dbB.open(invalid_doc_ids[k]);
+
+        T(tgt_doc === null);
+      }
+    }
   }
 
   // test filtered replication
