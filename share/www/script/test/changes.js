@@ -258,7 +258,8 @@ couchTests.changes = function(debug) {
   var req = CouchDB.request("GET", 
     "/test_suite_db/_changes?filter=changes_filter/bop&style=all_docs");
   var resp = JSON.parse(req.responseText);
-  TEquals(3, resp.results.length, "should return matching rows");
+  var expect = (!is_safari && xhr) ? 3: 1;
+  TEquals(expect, resp.results.length, "should return matching rows");
   
   // test for userCtx
   run_on_modified_server(
