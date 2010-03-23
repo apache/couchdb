@@ -25,7 +25,7 @@ endif
 
 nobase_sysconf_DATA = $(default_sysconf_data) $(init_sysconf_data)
 
-EXTRA_DIST = $(init_sysconf_data)
+EXTRA_DIST = default/couchdb
 
 if WINDOWS
 EXTRA_DIST += windows/setup-couchdb-@version@.exe.md5 windows/setup-couchdb-@version@.exe.sha
@@ -72,7 +72,7 @@ if WINDOWS
 # README.txt has \n line endings in the repo and must have \r\n
 # when installed as notepad is used to view it.
 # Also: the targets below don't seem to update after an svn-up (which
-# changes the version string in the generated files) so we trick make 
+# changes the version string in the generated files) so we trick make
 # into always building it with the FORCE pattern...
 windows/README.txt: windows/README.txt.tpl FORCE
 	sed -e "s|%package_name%|@package_name@|g" \
