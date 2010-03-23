@@ -73,7 +73,7 @@ Futon:
 Build and System Integration:
 
  * Updated and improved source documentation.
- * Fixed distribution preparation for building on OS X.
+ * Fixed distribution preparation for building on Mac OS X.
  * Added support for building a Windows installer as part of 'make dist'.
  * Bug fix for building couch.app's module list.
  * ETap tests are now run during make distcheck. This included a number of
