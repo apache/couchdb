@@ -28,6 +28,7 @@ couchTests.reader_acl = function(debug) {
         roles : ["top-secret"]
       }, "funnybone");
       T(usersDb.save(jchrisUserDoc).ok);
+      usersDb.ensureFullCommit();
 
       T(CouchDB.session().userCtx.name == null);
 
@@ -41,12 +42,15 @@ couchTests.reader_acl = function(debug) {
           names : ["joe","barb"]
         }
       }).ok);
-      
-      usersDb.ensureFullCommit();
-      // security changes will always commit synchronously
-      restartServer();
-      
-      // can't read it as jchris
+    } finally {
+      CouchDB.logout();
+    }
+  }
+  
+  // split into 2 funs so we can test restart behavior
+  function testFun2() {
+    try {
+      // can't read it as jchris b/c he's missing the needed role
       T(CouchDB.login("jchris@apache.org", "funnybone").ok);
       T(CouchDB.session().userCtx.name == "jchris@apache.org");
 
@@ -151,7 +155,7 @@ couchTests.reader_acl = function(debug) {
     } finally {
       CouchDB.logout();
     }
-  }
+  };
 
   run_on_modified_server(
     [{section: "httpd",
@@ -160,5 +164,17 @@ couchTests.reader_acl = function(debug) {
      {section: "couch_httpd_auth",
       key: "authentication_db", value: "test_suite_users"}],
     testFun
+  );
+        
+  // security changes will always commit synchronously
+  restartServer();
+  
+  run_on_modified_server(
+    [{section: "httpd",
+      key: "authentication_handlers",
+      value: "{couch_httpd_auth, cookie_authentication_handler}, {couch_httpd_auth, default_authentication_handler}"},
+     {section: "couch_httpd_auth",
+      key: "authentication_db", value: "test_suite_users"}],
+    testFun2
   );
 }

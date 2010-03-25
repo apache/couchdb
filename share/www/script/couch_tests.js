@@ -149,6 +149,25 @@ function stringFun(fun) {
   return string;
 }
 
+function waitForRestart() {
+  var waiting = true;
+  while (waiting) {
+    try {
+      CouchDB.request("GET", "/");
+      CouchDB.request("GET", "/");
+      waiting = false;
+    } catch(e) {
+      // the request will fail until restart completes
+    }
+  }
+};
+
 function restartServer() {
-  CouchDB.request("POST", "/_restart");
+  var xhr;
+  try {
+    CouchDB.request("POST", "/_restart");
+  } catch(e) {
+    // this request may sometimes fail
+  }
+  waitForRestart();
 }
