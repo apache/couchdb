@@ -44,5 +44,8 @@ init(_Pid) ->
 
 join_first(_Pid) ->
     mem3:join(first, [{1, a, []}, {2, b, []}]),
-    ?debugFmt("~nState: ~p~n", [mem3:state()]),
+    Fullmap = mem3:fullmap(),
+    ?assertEqual(16, length(Fullmap)),
+    Pmap = mem3:partitions(),
+    ?assertEqual(8, length(Pmap)),
     ok.

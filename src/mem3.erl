@@ -21,6 +21,8 @@
 %% API
 -export([start_link/0, start_link/1, stop/0, stop/1]).
 -export([join/2, clock/0, state/0]).
+-export([partitions/0, fullmap/0]).
+
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -61,6 +63,18 @@ clock() ->
 
 state() ->
     gen_server:call(?MODULE, state).
+
+
+%% @doc retrieve the primary partition map.  This is a list of partitions and
+%%      their corresponding primary node, no replication partner nodes.
+partitions() ->
+  ets_pmap().
+
+
+%% @doc retrieve the full partition map, like above, but including replication
+%%      partner nodes.  List should number 2^Q * N
+fullmap() ->
+  lists:keysort(2, ets_fullmap()).
 
 
 %%====================================================================
@@ -179,8 +193,8 @@ handle_init(_OldState) ->
 
 %% handle join activities, return NewState
 handle_join(first, ExtNodes, #mem{node=Node, clock=Clock} = State, Config) ->
-    Map = create_map(Config, ExtNodes),
-    ?debugFmt("~nmap: ~p~n", [Map]),
+    {Pmap, Fullmap} = create_maps(Config, ExtNodes),
+    update_ets(Pmap, Fullmap),
     NewClock = vector_clock:increment(Node, Clock),
     State#mem{nodes=ExtNodes, clock=NewClock};
 
@@ -231,8 +245,8 @@ read_latest_state_file(_, Config) ->
     end.
 
 
-%% @doc given Config and a list of Nodes, construct a Fullmap
-create_map(#config{q=Q} = Config, Nodes) ->
+%% @doc given Config and a list of Nodes, construct a {Pmap,Fullmap}
+create_maps(#config{q=Q} = Config, Nodes) ->
     [{_,FirstNode,_}|_] = Nodes,
     Fun = fun({_Pos, Node, Options}, Map) ->
         Hints = proplists:get_value(hints, Options),
@@ -241,7 +255,7 @@ create_map(#config{q=Q} = Config, Nodes) ->
     end,
     Acc0 = partitions:create_partitions(Q, FirstNode),
     Pmap = lists:foldl(Fun, Acc0, lists:keysort(1, Nodes)),
-    make_fullmap(Pmap, Config).
+    {Pmap, make_fullmap(Pmap, Config)}.
 
 
 %% @doc construct a table with all partitions, with the primary node and all
@@ -257,7 +271,28 @@ make_fullmap(PMap, Config) ->
   NodeParts.
 
 
+%% ets table helper functions
 init_ets_table() ->
     Table = list_to_atom(lists:concat(["mem_", atom_to_list(node())])),
     ets:new(Table, [public, set, named_table]),
     Table.
+
+
+ets_name(Node) ->
+    list_to_atom(lists:concat(["mem_", atom_to_list(Node)])).
+
+
+update_ets(Pmap, Fullmap) ->
+    Table = ets_name(node()),
+    ets:insert(Table, {pmap, Pmap}),
+    ets:insert(Table, {fullmap, Fullmap}).
+
+
+ets_pmap() ->
+  [{pmap, PMap}] = ets:lookup(ets_name(node()), pmap),
+  PMap.
+
+
+ets_fullmap() ->
+  [{fullmap, FullMap}] = ets:lookup(ets_name(node()), fullmap),
+  FullMap.
