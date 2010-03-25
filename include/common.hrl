@@ -46,5 +46,5 @@
               nodes,
               clock,
               ets,
-              test=false
+              args
              }).

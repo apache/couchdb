@@ -1,6 +1,7 @@
 -module(mem3_test).
 
 -include("../include/common.hrl").
+-include("../include/config.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 %% TEST SETUP
@@ -23,7 +24,9 @@ all_tests_test_() ->
 
 
 test_setup() ->
-    {ok, Pid} = mem3:start_link(test),
+    Config = #config{n=3,r=2,w=2,q=3,directory="/srv/db",
+                     storage_mod="dynomite_couch_storage"},
+    {ok, Pid} = mem3:start_link([{test,true}, {config, Config}]),
     Pid.
 
 
@@ -34,7 +37,8 @@ test_teardown(Pid) ->
 %% TESTS
 
 init(_Pid) ->
-    #mem{test=Test} = mem3:state(),
+    #mem{args=Args} = mem3:state(),
+    Test = proplists:get_value(test, Args),
     ?assertEqual(true, Test).
 
 

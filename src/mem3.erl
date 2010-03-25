@@ -70,16 +70,17 @@ state() ->
 %% start up membership server
 init(Args) ->
     process_flag(trap_exit,true),
-    Config = configuration:get_config(),
-    OldState = read_latest_state_file(Args, Config),
+    Config = get_config(Args),
+    Test = proplists:get_value(test, Args),
+    OldState = read_latest_state_file(Test, Config),
     State = handle_init(OldState),
-    {ok, State#mem{test=(Args == test)}}.
-
+    {ok, State#mem{args=Args}}.
 
 
 %% new node joining to this node
-handle_call({join, JoinType, ExtNodes}, _From, State) ->
-    Config = configuration:get_config(),
+handle_call({join, JoinType, ExtNodes}, _From,
+            State = #mem{args=Args}) ->
+    Config = get_config(Args),
     NewState = handle_join(JoinType, ExtNodes, State, Config),
     {reply, ok, NewState};
 
@@ -139,6 +140,15 @@ code_change(OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 %%% Internal functions
 %%--------------------------------------------------------------------
+
+%% @doc if Args has config use it, otherwise call configuration module
+%%      most times Args will have config during testing runs
+get_config(Args) ->
+    case proplists:get_value(config, Args) of
+    undefined -> configuration:get_config();
+    Any -> Any
+    end.
+
 
 % we could be automatically:
 %  1. rejoining a cluster after some downtime
@@ -204,7 +214,8 @@ find_latest_state_filename(Config) ->
     end.
 
 
-read_latest_state_file(test, _) ->
+%% (Test, Config)
+read_latest_state_file(true, _) ->
     nil;
 read_latest_state_file(_, Config) ->
     try
@@ -221,7 +232,7 @@ read_latest_state_file(_, Config) ->
 
 
 %% @doc given Config and a list of Nodes, construct a Fullmap
-create_map(#config{q=Q}, Nodes) ->
+create_map(#config{q=Q} = Config, Nodes) ->
     [{_,FirstNode,_}|_] = Nodes,
     Fun = fun({_Pos, Node, Options}, Map) ->
         Hints = proplists:get_value(hints, Options),
@@ -230,16 +241,16 @@ create_map(#config{q=Q}, Nodes) ->
     end,
     Acc0 = partitions:create_partitions(Q, FirstNode),
     Pmap = lists:foldl(Fun, Acc0, lists:keysort(1, Nodes)),
-    make_fullmap(Pmap).
+    make_fullmap(Pmap, Config).
 
 
 %% @doc construct a table with all partitions, with the primary node and all
 %%      replication partner nodes as well.
-make_fullmap(PMap) ->
+make_fullmap(PMap, Config) ->
   {Nodes, _Parts} = lists:unzip(PMap),
   NodeParts = lists:flatmap(
     fun({Node,Part}) ->
-        Partners = replication:partners(Node, lists:usort(Nodes)),
+        Partners = replication:partners(Node, lists:usort(Nodes), Config),
         PartnerList = [{Partner, Part, partner} || Partner <- Partners],
         [{Node, Part, primary} | PartnerList]
     end, PMap),
