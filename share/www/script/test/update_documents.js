@@ -135,7 +135,11 @@ couchTests.update_documents = function(debug) {
     headers : {"X-Couch-Full-Commit":"true"}
   });
   
+  var NewRev = xhr.getResponseHeader("X-Couch-Update-NewRev");
   doc = db.open(docid);
+  T(doc['_rev'] == NewRev);
+  
+  
   T(doc.counter == 2);
 
   // parse xml
