@@ -16,6 +16,7 @@ all_tests_test_() ->
            {with, Pid,
             [
              fun init/1,
+             fun clock/1,
              fun join_first/1
             ]}
        end}
@@ -40,6 +41,12 @@ init(_Pid) ->
     #mem{args=Args} = mem3:state(),
     Test = proplists:get_value(test, Args),
     ?assertEqual(true, Test).
+
+
+clock(_Pid) ->
+    Node = node(),
+    Clock = mem3:clock(),
+    ?assertMatch([{Node, _}], Clock).
 
 
 join_first(_Pid) ->

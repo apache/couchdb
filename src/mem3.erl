@@ -28,39 +28,60 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
+
 %% includes
 -include("../include/config.hrl").
 -include("../include/common.hrl").
 
 
+%% types
+-type join_type() :: first | new | replace.
+-type join_order() :: non_neg_integer().
+-type options() :: list().
+-type mem_node() :: {join_order(), node(), options()}.
+-type mem_node_list() :: [mem_node()].
+-type arg_options() :: {test, boolean()} | {config, #config{}}.
+-type args() :: [] | [arg_options()].
+-type mem_state() :: #mem{}.
+-type epoch() :: float().
+-type clock() :: {node(), epoch()}.
+-type vector_clock() :: [clock()].
+
 %%====================================================================
 %% API
 %%====================================================================
 
+-spec start_link() -> {ok, pid()}.
 start_link() ->
     start_link([]).
 
 
+-spec start_link(args()) -> {ok, pid()}.
 start_link(Args) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Args, []).
 
 
+-spec stop() -> ok.
 stop() ->
     stop(?MODULE).
 
 
+-spec stop(atom()) -> ok.
 stop(Server) ->
     gen_server:cast(Server, stop).
 
 
+-spec join(join_type(), mem_node_list()) -> ok.
 join(JoinType, Nodes) ->
     gen_server:call(?MODULE, {join, JoinType, Nodes}).
 
 
+-spec clock() -> vector_clock().
 clock() ->
     gen_server:call(?MODULE, clock).
 
 
+-spec state() -> mem_state().
 state() ->
     gen_server:call(?MODULE, state).
 
@@ -82,6 +103,7 @@ fullmap() ->
 %%====================================================================
 
 %% start up membership server
+-spec init(args()) -> {ok, mem_state()}.
 init(Args) ->
     process_flag(trap_exit,true),
     Config = get_config(Args),
