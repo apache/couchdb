@@ -89,13 +89,13 @@ state() ->
 %% @doc retrieve the primary partition map.  This is a list of partitions and
 %%      their corresponding primary node, no replication partner nodes.
 partitions() ->
-  ets_pmap().
+  cache_pmap().
 
 
 %% @doc retrieve the full partition map, like above, but including replication
 %%      partner nodes.  List should number 2^Q * N
 fullmap() ->
-  lists:keysort(2, ets_fullmap()).
+  lists:keysort(2, cache_fullmap()).
 
 
 %%====================================================================
@@ -197,11 +197,11 @@ get_config(Args) ->
 handle_init(nil) ->
     showroom_log:message(info, "membership: membership server starting...", []),
     net_kernel:monitor_nodes(true),
-    Table = init_ets_table(),
+    Table = init_cache_table(),
     Node = node(),
     Nodes = [{0, Node, []}],
     Clock = vector_clock:create(Node),
-    #mem{node=Node, nodes=Nodes, clock=Clock, ets=Table};
+    #mem{node=Node, nodes=Nodes, clock=Clock, cache=Table};
 
 handle_init(_OldState) ->
     ?debugHere,
@@ -209,14 +209,14 @@ handle_init(_OldState) ->
     %  but only if we can compare our old state to all other
     %  available nodes and get a match... otherwise get a human involved
     % TODO implement me
-    Table = init_ets_table(),
-    #mem{ets=Table}.
+    Table = init_cache_table(),
+    #mem{cache=Table}.
 
 
 %% handle join activities, return NewState
 handle_join(first, ExtNodes, #mem{node=Node, clock=Clock} = State, Config) ->
     {Pmap, Fullmap} = create_maps(Config, ExtNodes),
-    update_ets(Pmap, Fullmap),
+    update_cache(Pmap, Fullmap),
     NewClock = vector_clock:increment(Node, Clock),
     State#mem{nodes=ExtNodes, clock=NewClock};
 
@@ -293,28 +293,28 @@ make_fullmap(PMap, Config) ->
   NodeParts.
 
 
-%% ets table helper functions
-init_ets_table() ->
+%% cache table helper functions
+init_cache_table() ->
     Table = list_to_atom(lists:concat(["mem_", atom_to_list(node())])),
     ets:new(Table, [public, set, named_table]),
     Table.
 
 
-ets_name(Node) ->
+cache_name(Node) ->
     list_to_atom(lists:concat(["mem_", atom_to_list(Node)])).
 
 
-update_ets(Pmap, Fullmap) ->
-    Table = ets_name(node()),
+update_cache(Pmap, Fullmap) ->
+    Table = cache_name(node()),
     ets:insert(Table, {pmap, Pmap}),
     ets:insert(Table, {fullmap, Fullmap}).
 
 
-ets_pmap() ->
-  [{pmap, PMap}] = ets:lookup(ets_name(node()), pmap),
+cache_pmap() ->
+  [{pmap, PMap}] = ets:lookup(cache_name(node()), pmap),
   PMap.
 
 
-ets_fullmap() ->
-  [{fullmap, FullMap}] = ets:lookup(ets_name(node()), fullmap),
+cache_fullmap() ->
+  [{fullmap, FullMap}] = ets:lookup(cache_name(node()), fullmap),
   FullMap.
