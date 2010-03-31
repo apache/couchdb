@@ -22,7 +22,8 @@
 -export([start_link/0, start_link/1, stop/0, stop/1]).
 -export([join/2, clock/0, state/0]).
 -export([partitions/0, fullmap/0]).
--export([all_nodes_parts/1]).
+-export([nodes_for_part/1, nodes_for_part/2, all_nodes_parts/1]).
+-export([parts_for_node/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -34,7 +35,7 @@
 -include("../include/common.hrl").
 
 
-%% types
+%% types - stick somewhere in includes?
 -type join_type() :: first | new | replace.
 -type join_order() :: non_neg_integer().
 -type options() :: list().
@@ -89,13 +90,35 @@ state() ->
 %% @doc retrieve the primary partition map.  This is a list of partitions and
 %%      their corresponding primary node, no replication partner nodes.
 partitions() ->
-  mochiglobal:get(pmap).
+    mochiglobal:get(pmap).
 
 
 %% @doc retrieve the full partition map, like above, but including replication
 %%      partner nodes.  List should number 2^Q * N
 fullmap() ->
-  lists:keysort(2, mochiglobal:get(fullmap)).
+    lists:keysort(2, mochiglobal:get(fullmap)).
+
+
+%% @doc get all the responsible nodes for a given partition, including
+%%      replication partner nodes
+nodes_for_part(Part) ->
+    nodes_for_part(Part, mochiglobal:get(fullmap)).
+
+
+nodes_for_part(Part, NodePartList) ->
+    Filtered = lists:filter(fun({_N, P, _T}) -> P =:= Part end, NodePartList),
+    {Nodes, _Parts, _Types} = lists:unzip3(Filtered),
+    lists:usort(Nodes).
+
+
+%% @doc return the partitions that reside on a given node
+parts_for_node(Node) ->
+    lists:sort(lists:foldl(fun({N,P,_Type}, AccIn) ->
+        case N of
+        Node -> [P | AccIn];
+        _ -> AccIn
+        end
+    end, [], mochiglobal:get(fullmap))).
 
 
 %% @doc get all the nodes and partitions in the cluster.  Depending on the
@@ -103,9 +126,9 @@ fullmap() ->
 %%      nodes, as well.
 %%      No nodes/parts currently down are returned.
 all_nodes_parts(false) ->
-  mochiglobal:get(pmap);
+    mochiglobal:get(pmap);
 all_nodes_parts(true) ->
-  mem_utils:nodeparts_up(mochiglobal:get(fullmap)).
+    mochiglobal:get(fullmap).
 
 
 %%====================================================================
@@ -276,6 +299,7 @@ read_latest_state_file(_, Config) ->
 
 
 %% @doc given Config and a list of Nodes, construct a {Pmap,Fullmap}
+%%      This is basically replaying all the mem events that have happened.
 create_maps(#config{q=Q} = Config, Nodes) ->
     [{_,FirstNode,_}|_] = Nodes,
     Fun = fun({_Pos, Node, Options}, Map) ->
@@ -305,30 +329,3 @@ make_fullmap(PMap, Config) ->
 update_cache(Pmap, Fullmap) ->
     mochiglobal:put(pmap, Pmap),
     mochiglobal:put(fullmap, Fullmap).
-
-
-% %% cache table helper functions
-% init_cache_table() ->
-%     Table = list_to_atom(lists:concat(["mem_", atom_to_list(node())])),
-%     ets:new(Table, [public, set, named_table]),
-%     Table.
-
-
-% cache_name(Node) ->
-%     list_to_atom(lists:concat(["mem_", atom_to_list(Node)])).
-
-
-% update_cache(Pmap, Fullmap) ->
-%     Table = cache_name(node()),
-%     ets:insert(Table, {pmap, Pmap}),
-%     ets:insert(Table, {fullmap, Fullmap}).
-
-
-% cache_pmap() ->
-%   [{pmap, PMap}] = ets:lookup(cache_name(node()), pmap),
-%   PMap.
-
-
-% cache_fullmap() ->
-%   [{fullmap, FullMap}] = ets:lookup(cache_name(node()), fullmap),
-%   FullMap.
