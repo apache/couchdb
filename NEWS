@@ -7,6 +7,11 @@ For details about backwards incompatible changes, please see:
 
 Each release section notes when backwards incompatible changes have been made.
 
+Version 0.10.2
+--------------
+
+ * Fixed CVE-2010-0009: Apache CouchDB Timing Attack Vulnerability.
+
 Version 0.10.1
 --------------
 

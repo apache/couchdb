@@ -9,6 +9,7 @@ This version has not been released yet.
 Replicator
 
 * Avoid leaking file descriptors on automatic replication restarts.
+* Close security vulnerability CVE-2010-0009.
 
 Version 0.10.1
 --------------
