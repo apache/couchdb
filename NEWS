@@ -17,6 +17,7 @@ Version 0.11.0
 
 This version is a feature-freeze release candidate for Apache CouchDB 1.0.
 
+ * Fixed CVE-2010-0009: Apache CouchDB Timing Attack Vulnerability.
  * Added support for building a Windows installer as part of 'make dist'.
  * Added optional 'raw' binary collation for faster view builds where Unicode
    collation is not important.
