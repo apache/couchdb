@@ -106,14 +106,14 @@ nodes_for_part(Part) ->
 
 
 nodes_for_part(Part, NodePartList) ->
-    Filtered = lists:filter(fun({_N, P, _T}) -> P =:= Part end, NodePartList),
-    {Nodes, _Parts, _Types} = lists:unzip3(Filtered),
+    Filtered = lists:filter(fun({_N, P}) -> P =:= Part end, NodePartList),
+    {Nodes, _Parts} = lists:unzip(Filtered),
     lists:usort(Nodes).
 
 
 %% @doc return the partitions that reside on a given node
 parts_for_node(Node) ->
-    lists:sort(lists:foldl(fun({N,P,_Type}, AccIn) ->
+    lists:sort(lists:foldl(fun({N,P}, AccIn) ->
         case N of
         Node -> [P | AccIn];
         _ -> AccIn
@@ -245,14 +245,13 @@ handle_init(_OldState) ->
 
 
 %% handle join activities, return NewState
-handle_join(first, ExtNodes, #mem{node=Node, clock=Clock} = State, Config) ->
-    {Pmap, Fullmap} = create_maps(Config, ExtNodes),
+handle_join(JoinType, ExtNodes, #mem{node=Node, clock=Clock} = State, Config)
+  when JoinType == first  orelse JoinType == new ->
+    {Pmap, Fullmap} = create_maps(Config, JoinType, ExtNodes),
     update_cache(Pmap, Fullmap),
     NewClock = vector_clock:increment(Node, Clock),
+    % TODO: gossip
     State#mem{nodes=ExtNodes, clock=NewClock};
-
-handle_join(new, _ExtNodes, _State, _Config) ->
-    ok;
 
 handle_join(replace, [_OldNode | _], _State, _Config) ->
     ok;
@@ -300,14 +299,17 @@ read_latest_state_file(_, Config) ->
 
 %% @doc given Config and a list of Nodes, construct a {Pmap,Fullmap}
 %%      This is basically replaying all the mem events that have happened.
-create_maps(#config{q=Q} = Config, Nodes) ->
+create_maps(#config{q=Q} = Config, JoinType, Nodes) ->
     [{_,FirstNode,_}|_] = Nodes,
     Fun = fun({_Pos, Node, Options}, Map) ->
         Hints = proplists:get_value(hints, Options),
         {ok, NewMap} = partitions:join(Node, Map, Hints),
         NewMap
     end,
-    Acc0 = partitions:create_partitions(Q, FirstNode),
+    Acc0 = case JoinType of
+    first -> partitions:create_partitions(Q, FirstNode);
+    new -> mochiglobal:get(pmap)
+    end,
     Pmap = lists:foldl(Fun, Acc0, lists:keysort(1, Nodes)),
     {Pmap, make_fullmap(Pmap, Config)}.
 
@@ -319,8 +321,8 @@ make_fullmap(PMap, Config) ->
   NodeParts = lists:flatmap(
     fun({Node,Part}) ->
         Partners = replication:partners(Node, lists:usort(Nodes), Config),
-        PartnerList = [{Partner, Part, partner} || Partner <- Partners],
-        [{Node, Part, primary} | PartnerList]
+        PartnerList = [{Partner, Part} || Partner <- Partners],
+        [{Node, Part} | PartnerList]
     end, PMap),
   NodeParts.
 

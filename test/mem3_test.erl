@@ -6,6 +6,12 @@
 
 -define(HINT_C1, 365375409332725729550921208179070754913983135744).
 -define(HINT_C2, 1096126227998177188652763624537212264741949407232).
+-define(PARTS_FOR_D1, [365375409332725729550921208179070754913983135744,
+                      548063113999088594326381812268606132370974703616,
+                      730750818665451459101842416358141509827966271488,
+                      913438523331814323877303020447676887284957839360,
+                      1096126227998177188652763624537212264741949407232,
+                      1278813932664540053428224228626747642198940975104]).
 
 %% TEST SETUP
 
@@ -21,7 +27,8 @@ all_tests_test_() ->
              fun init/1,
              fun clock/1,
              fun join_first/1,
-             fun join_first_with_hints/1
+             fun join_first_with_hints/1,
+             fun join_new_node/1
             ]}
        end}
      ]
@@ -75,4 +82,14 @@ join_first_with_hints(_Pid) ->
     %?debugFmt("~nFullmap: ~p~n", [Fullmap]),
     ?assertEqual([c,d,e], mem3:nodes_for_part(?HINT_C1)),
     ?assertEqual([c,d,e], mem3:nodes_for_part(?HINT_C2)),
+    ok.
+
+
+join_new_node(_Pid) ->
+    mem3:join(first, [{1, a, []}, {2, b, []}, {3, c, []}]),
+    ?assertEqual(24, length(mem3:fullmap())),
+    ?assertEqual([], mem3:parts_for_node(d)),
+    mem3:join(new, [{4, d, []}]),
+    ?assertEqual(?PARTS_FOR_D1, mem3:parts_for_node(d)),
+    ?debugFmt("~nFullmap: ~p~n", [mem3:fullmap()]),
     ok.
