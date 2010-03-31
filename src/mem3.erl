@@ -22,7 +22,7 @@
 -export([start_link/0, start_link/1, stop/0, stop/1]).
 -export([join/2, clock/0, state/0]).
 -export([partitions/0, fullmap/0]).
-
+-export([all_nodes_parts/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -89,13 +89,23 @@ state() ->
 %% @doc retrieve the primary partition map.  This is a list of partitions and
 %%      their corresponding primary node, no replication partner nodes.
 partitions() ->
-  cache_pmap().
+  mochiglobal:get(pmap).
 
 
 %% @doc retrieve the full partition map, like above, but including replication
 %%      partner nodes.  List should number 2^Q * N
 fullmap() ->
-  lists:keysort(2, cache_fullmap()).
+  lists:keysort(2, mochiglobal:get(fullmap)).
+
+
+%% @doc get all the nodes and partitions in the cluster.  Depending on the
+%%      AllPartners param, you get only primary nodes or replication partner
+%%      nodes, as well.
+%%      No nodes/parts currently down are returned.
+all_nodes_parts(false) ->
+  mochiglobal:get(pmap);
+all_nodes_parts(true) ->
+  mem_utils:nodeparts_up(mochiglobal:get(fullmap)).
 
 
 %%====================================================================
@@ -197,11 +207,10 @@ get_config(Args) ->
 handle_init(nil) ->
     showroom_log:message(info, "membership: membership server starting...", []),
     net_kernel:monitor_nodes(true),
-    Table = init_cache_table(),
     Node = node(),
     Nodes = [{0, Node, []}],
     Clock = vector_clock:create(Node),
-    #mem{node=Node, nodes=Nodes, clock=Clock, cache=Table};
+    #mem{node=Node, nodes=Nodes, clock=Clock};
 
 handle_init(_OldState) ->
     ?debugHere,
@@ -209,8 +218,7 @@ handle_init(_OldState) ->
     %  but only if we can compare our old state to all other
     %  available nodes and get a match... otherwise get a human involved
     % TODO implement me
-    Table = init_cache_table(),
-    #mem{cache=Table}.
+    #mem{}.
 
 
 %% handle join activities, return NewState
@@ -294,27 +302,33 @@ make_fullmap(PMap, Config) ->
 
 
 %% cache table helper functions
-init_cache_table() ->
-    Table = list_to_atom(lists:concat(["mem_", atom_to_list(node())])),
-    ets:new(Table, [public, set, named_table]),
-    Table.
-
-
-cache_name(Node) ->
-    list_to_atom(lists:concat(["mem_", atom_to_list(Node)])).
-
-
 update_cache(Pmap, Fullmap) ->
-    Table = cache_name(node()),
-    ets:insert(Table, {pmap, Pmap}),
-    ets:insert(Table, {fullmap, Fullmap}).
+    mochiglobal:put(pmap, Pmap),
+    mochiglobal:put(fullmap, Fullmap).
 
 
-cache_pmap() ->
-  [{pmap, PMap}] = ets:lookup(cache_name(node()), pmap),
-  PMap.
+% %% cache table helper functions
+% init_cache_table() ->
+%     Table = list_to_atom(lists:concat(["mem_", atom_to_list(node())])),
+%     ets:new(Table, [public, set, named_table]),
+%     Table.
 
 
-cache_fullmap() ->
-  [{fullmap, FullMap}] = ets:lookup(cache_name(node()), fullmap),
-  FullMap.
+% cache_name(Node) ->
+%     list_to_atom(lists:concat(["mem_", atom_to_list(Node)])).
+
+
+% update_cache(Pmap, Fullmap) ->
+%     Table = cache_name(node()),
+%     ets:insert(Table, {pmap, Pmap}),
+%     ets:insert(Table, {fullmap, Fullmap}).
+
+
+% cache_pmap() ->
+%   [{pmap, PMap}] = ets:lookup(cache_name(node()), pmap),
+%   PMap.
+
+
+% cache_fullmap() ->
+%   [{fullmap, FullMap}] = ets:lookup(cache_name(node()), fullmap),
+%   FullMap.
