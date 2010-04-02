@@ -169,7 +169,7 @@ start_secondary_services() ->
             {list_to_atom(Name),
                 {Module, Fun, Args},
                 permanent,
-                brutal_kill,
+                1000,
                 worker,
                 [Module]}
         end

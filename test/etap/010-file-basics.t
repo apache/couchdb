@@ -16,7 +16,7 @@ filename() -> test_util:build_file("test/etap/temp.010").
 
 main(_) ->
     test_util:init_code_path(),
-    etap:plan(16),
+    etap:plan(19),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -67,6 +67,19 @@ test() ->
     {ok, BinPos} = couch_file:append_binary(Fd, <<131,100,0,3,102,111,111>>),
     etap:is({ok, foo}, couch_file:pread_term(Fd, BinPos),
         "Reading a term from a written binary term representation succeeds."),
+        
+    BigBin = list_to_binary(lists:duplicate(100000, 0)),
+    {ok, BigBinPos} = couch_file:append_binary(Fd, BigBin),
+    etap:is({ok, BigBin}, couch_file:pread_binary(Fd, BigBinPos),
+        "Reading a large term from a written representation succeeds."),
+    
+    ok = couch_file:write_header(Fd, hello),
+    etap:is({ok, hello}, couch_file:read_header(Fd),
+        "Reading a header succeeds."),
+        
+    {ok, BigBinPos2} = couch_file:append_binary(Fd, BigBin),
+    etap:is({ok, BigBin}, couch_file:pread_binary(Fd, BigBinPos2),
+        "Reading a large term from a written representation succeeds 2."),
 
     % append_binary == append_iolist?
     % Possible bug in pread_iolist or iolist() -> append_binary
