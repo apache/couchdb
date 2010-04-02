@@ -15,7 +15,7 @@
 -export([handle_welcome_req/2,handle_favicon_req/2,handle_utils_dir_req/2,
     handle_all_dbs_req/1,handle_replicate_req/1,handle_restart_req/1,
     handle_uuids_req/1,handle_config_req/1,handle_log_req/1,
-    handle_task_status_req/1,handle_sleep_req/1]).
+    handle_task_status_req/1]).
 
 -export([increment_update_seq_req/2]).
 
@@ -62,13 +62,6 @@ handle_utils_dir_req(#httpd{method='GET'}=Req, DocumentRoot) ->
         couch_httpd:send_redirect(Req, RedirectPath)
     end;
 handle_utils_dir_req(Req, _) ->
-    send_method_not_allowed(Req, "GET,HEAD").
-
-handle_sleep_req(#httpd{method='GET'}=Req) ->
-    Time = list_to_integer(couch_httpd:qs_value(Req, "time")),
-    receive snicklefart -> ok after Time -> ok end,
-    send_json(Req, {[{ok, true}]});
-handle_sleep_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 handle_all_dbs_req(#httpd{method='GET'}=Req) ->
