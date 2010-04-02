@@ -70,44 +70,45 @@ couchTests.changes = function(debug) {
     // WebKit (last checked on nightly #47686) does fail on processing
     // the async-request properly while javascript is executed.
 
-    var sleep = function(msecs) {
-      // by making a slow sync request, we allow the waiting XHR request data
-      // to be received.
-      var req = CouchDB.request("GET", "/_sleep?time=" + msecs);
-      T(JSON.parse(req.responseText).ok == true);
-    }
-
     xhr.open("GET", "/test_suite_db/_changes?feed=continuous", true);
     xhr.send("");
 
     var docBar = {_id:"bar", bar:1};
     db.save(docBar);
+    
+    while(true) {
+         var lines = xhr.responseText.split("\n");
+         try {
+             var change1 = JSON.parse(lines[0]);
+             var change2 = JSON.parse(lines[1]);
+             break;
+         } catch (e) {}
+         db.info() // sync http req allow async req to happen
+    }
 
-    sleep(100);
-    var lines = xhr.responseText.split("\n");
-  
-    var change = JSON.parse(lines[0]);
-
-    T(change.seq == 1)
-    T(change.id == "foo")
-
-    change = JSON.parse(lines[1]);
-
-    T(change.seq == 2)
-    T(change.id == "bar")
-    T(change.changes[0].rev == docBar._rev)
-
+    T(change1.seq == 1)
+    T(change1.id == "foo")
+    
+    T(change2.seq == 2)
+    T(change2.id == "bar")
+    T(change2.changes[0].rev == docBar._rev)
+    
+    
     var docBaz = {_id:"baz", baz:1};
     db.save(docBaz);
 
-    sleep(100);
-    var lines = xhr.responseText.split("\n");
-
-    change = JSON.parse(lines[2]);
-
-    T(change.seq == 3);
-    T(change.id == "baz");
-    T(change.changes[0].rev == docBaz._rev);
+    while(true) {
+         var lines = xhr.responseText.split("\n");
+         try {
+             var change3 = JSON.parse(lines[2]);
+             break;
+         } catch (e) {}
+         db.info() // sync http req allow async req to happen
+        
+    }
+    T(change3.seq == 3);
+    T(change3.id == "baz");
+    T(change3.changes[0].rev == docBaz._rev);
 
 
     xhr = CouchDB.newXhr();
@@ -115,10 +116,13 @@ couchTests.changes = function(debug) {
     //verify the hearbeat newlines are sent
     xhr.open("GET", "/test_suite_db/_changes?feed=continuous&heartbeat=10", true);
     xhr.send("");
-
-    sleep(100);
-
-    var str = xhr.responseText;
+    
+    str = xhr.responseText;
+    while(str.charAt(str.length - 1) != "\n" || 
+            str.charAt(str.length - 2) != "\n") {
+        db.info() // sync http req allow async req to happen
+        str = xhr.responseText;
+    }
 
     T(str.charAt(str.length - 1) == "\n")
     T(str.charAt(str.length - 2) == "\n")
@@ -129,39 +133,48 @@ couchTests.changes = function(debug) {
 
     xhr.open("GET", "/test_suite_db/_changes?feed=longpoll", true);
     xhr.send("");
-
-    sleep(100);
-    var lines = xhr.responseText.split("\n");
-    T(lines[5]=='"last_seq":3}');
-
+    
+    while(true) {
+        try {
+            var lines = xhr.responseText.split("\n");
+            if(lines[5]=='"last_seq":3}') {
+                break;
+            }
+        } catch (e) {}
+        db.info(); // sync http req allow async req to happen
+    }
+    
     xhr = CouchDB.newXhr();
 
     xhr.open("GET", "/test_suite_db/_changes?feed=longpoll&since=3", true);
     xhr.send("");
 
-    sleep(100);
-
     var docBarz = {_id:"barz", bar:1};
     db.save(docBarz);
-
-    sleep(100);
-
-    var lines = xhr.responseText.split("\n");
-
+    
     var parse_changes_line = function(line) {
       if (line.charAt(line.length-1) == ",") {
-        line = line.substring(0, line.length-1);
+        var linetrimmed = line.substring(0, line.length-1);
+      } else {
+        var linetrimmed = line
       }
-      return JSON.parse(line);
+      return JSON.parse(linetrimmed);
     }
-
-    change = parse_changes_line(lines[1]);
-
+    
+    while(true) {
+        try {
+            var lines = xhr.responseText.split("\n");
+            if(lines[3]=='"last_seq":4}')
+                break;
+        } catch (e) {}
+        db.info(); // sync http req allow async req to happen
+    }
+    
+    var change = parse_changes_line(lines[1]);
     T(change.seq == 4);
     T(change.id == "barz");
     T(change.changes[0].rev == docBarz._rev);
     T(lines[3]=='"last_seq":4}');
-	
   }
   
   // test the filtered changes
@@ -205,9 +218,8 @@ couchTests.changes = function(debug) {
     // filter with longpoll
     // longpoll filters full history when run without a since seq
     xhr = CouchDB.newXhr();
-    xhr.open("GET", "/test_suite_db/_changes?feed=longpoll&filter=changes_filter/bop", true);
+    xhr.open("GET", "/test_suite_db/_changes?feed=longpoll&filter=changes_filter/bop", false);
     xhr.send("");
-    sleep(100);
     var resp = JSON.parse(xhr.responseText);
     T(resp.last_seq == 7);
     // longpoll waits until a matching change before returning
@@ -216,8 +228,15 @@ couchTests.changes = function(debug) {
     xhr.send("");
     db.save({"_id":"falsy", "bop" : ""}); // empty string is falsy
     db.save({"_id":"bingo","bop" : "bingo"});
-    sleep(100);
-    var resp = JSON.parse(xhr.responseText);
+    
+    while(true) {
+         try {
+             var resp = JSON.parse(xhr.responseText);
+             break;
+         } catch (e) {}
+         db.info() // sync http req allow async req to happen
+    }
+    
     T(resp.last_seq == 9);
     T(resp.results && resp.results.length > 0 && resp.results[0]["id"] == "bingo", "filter the correct update");
 
@@ -226,9 +245,16 @@ couchTests.changes = function(debug) {
     xhr.open("GET", "/test_suite_db/_changes?feed=continuous&filter=changes_filter/bop&timeout=200", true);
     xhr.send("");
     db.save({"_id":"rusty", "bop" : "plankton"});
-    T(db.ensureFullCommit().ok);
-    sleep(300);
-    var lines = xhr.responseText.split("\n");
+    
+    while(true) {
+         try {
+             var lines = xhr.responseText.split("\n");
+             JSON.parse(lines[3])
+             break;
+         } catch (e) {}
+         db.info() // sync http req allow async req to happen
+    }
+    
     T(JSON.parse(lines[1]).id == "bingo", lines[1]);
     T(JSON.parse(lines[2]).id == "rusty", lines[2]);
     T(JSON.parse(lines[3]).last_seq == 10, lines[3]);
