@@ -51,7 +51,7 @@ sup_start_link() ->
     gen_server:start_link({local, couch_server}, couch_server, [], []).
 
 open(DbName, Options) ->
-    case gen_server:call(couch_server, {open, DbName, Options}) of
+    case gen_server:call(couch_server, {open, DbName, Options}, infinity) of
     {ok, Db} ->
         Ctx = proplists:get_value(user_ctx, Options, #user_ctx{}),
         {ok, Db#db{user_ctx=Ctx}};
@@ -60,7 +60,7 @@ open(DbName, Options) ->
     end.
 
 create(DbName, Options) ->
-    case gen_server:call(couch_server, {create, DbName, Options}) of
+    case gen_server:call(couch_server, {create, DbName, Options}, infinity) of
     {ok, Db} ->
         Ctx = proplists:get_value(user_ctx, Options, #user_ctx{}),
         {ok, Db#db{user_ctx=Ctx}};
@@ -69,7 +69,7 @@ create(DbName, Options) ->
     end.
 
 delete(DbName, Options) ->
-    gen_server:call(couch_server, {delete, DbName, Options}).
+    gen_server:call(couch_server, {delete, DbName, Options}, infinity).
 
 check_dbname(#server{dbname_regexp=RegExp}, DbName) ->
     case re:run(DbName, RegExp, [{capture, none}]) of
