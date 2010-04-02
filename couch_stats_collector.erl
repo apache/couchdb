@@ -60,7 +60,7 @@ increment(Key) ->
     Key2 = make_key(Key),
     case catch ets:update_counter(?HIT_TABLE, Key2, 1) of
         {'EXIT', {badarg, _}} ->
-            true = ets:insert(?HIT_TABLE, {Key2, 1}),
+            catch ets:insert(?HIT_TABLE, {Key2, 1}),
             ok;
         _ ->
             ok
@@ -70,16 +70,16 @@ decrement(Key) ->
     Key2 = make_key(Key),
     case catch ets:update_counter(?HIT_TABLE, Key2, -1) of
         {'EXIT', {badarg, _}} ->
-            true = ets:insert(?HIT_TABLE, {Key2, -1}),
+            catch ets:insert(?HIT_TABLE, {Key2, -1}),
             ok;
         _ -> ok
     end.
 
 record(Key, Value) ->
-    true = ets:insert(?ABS_TABLE, {make_key(Key), Value}).
+    catch ets:insert(?ABS_TABLE, {make_key(Key), Value}).
 
 clear(Key) ->
-    true = ets:delete(?ABS_TABLE, make_key(Key)).
+    catch ets:delete(?ABS_TABLE, make_key(Key)).
 
 track_process_count(Stat) ->
     track_process_count(self(), Stat).
