@@ -149,6 +149,22 @@ function stringFun(fun) {
   return string;
 }
 
+function waitForSuccess(fun, tag) {
+  var start = new Date();
+  while(true) {
+    if (new Date() - start > 5000) {
+      throw("timeout: "+tag);
+    } else {
+      try {
+        fun();
+        break;
+      } catch (e) {}
+      // sync http req allow async req to happen
+      CouchDB.request("GET", "/test_suite_db/?tag="+encodeURIComponent(tag));
+    }
+  }
+}
+
 function waitForRestart() {
   var waiting = true;
   while (waiting) {

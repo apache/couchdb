@@ -76,15 +76,12 @@ couchTests.changes = function(debug) {
     var docBar = {_id:"bar", bar:1};
     db.save(docBar);
     
-    while(true) {
-         var lines = xhr.responseText.split("\n");
-         try {
-             var change1 = JSON.parse(lines[0]);
-             var change2 = JSON.parse(lines[1]);
-             break;
-         } catch (e) {}
-         db.info() // sync http req allow async req to happen
-    }
+    var lines, change1, change2;
+    waitForSuccess(function() {
+      lines = xhr.responseText.split("\n");
+      change1 = JSON.parse(lines[0]);
+      change2 = JSON.parse(lines[1]);      
+    }, "bar-only");
 
     T(change1.seq == 1)
     T(change1.id == "foo")
@@ -97,15 +94,12 @@ couchTests.changes = function(debug) {
     var docBaz = {_id:"baz", baz:1};
     db.save(docBaz);
 
-    while(true) {
-         var lines = xhr.responseText.split("\n");
-         try {
-             var change3 = JSON.parse(lines[2]);
-             break;
-         } catch (e) {}
-         db.info() // sync http req allow async req to happen
-        
-    }
+    var change3;
+    waitForSuccess(function() {
+      lines = xhr.responseText.split("\n");
+      change3 = JSON.parse(lines[2]);
+    });
+    
     T(change3.seq == 3);
     T(change3.id == "baz");
     T(change3.changes[0].rev == docBaz._rev);
@@ -117,12 +111,13 @@ couchTests.changes = function(debug) {
     xhr.open("GET", "/test_suite_db/_changes?feed=continuous&heartbeat=10", true);
     xhr.send("");
     
-    str = xhr.responseText;
-    while(str.charAt(str.length - 1) != "\n" || 
-            str.charAt(str.length - 2) != "\n") {
-        db.info() // sync http req allow async req to happen
-        str = xhr.responseText;
-    }
+    var str;
+    waitForSuccess(function() {
+      str = xhr.responseText;
+      if (str.charAt(str.length - 1) != "\n" || str.charAt(str.length - 2) != "\n") {
+        throw("keep waiting");
+      }
+    }, "heartbeat");
 
     T(str.charAt(str.length - 1) == "\n")
     T(str.charAt(str.length - 2) == "\n")
@@ -134,15 +129,12 @@ couchTests.changes = function(debug) {
     xhr.open("GET", "/test_suite_db/_changes?feed=longpoll", true);
     xhr.send("");
     
-    while(true) {
-        try {
-            var lines = xhr.responseText.split("\n");
-            if(lines[5]=='"last_seq":3}') {
-                break;
-            }
-        } catch (e) {}
-        db.info(); // sync http req allow async req to happen
-    }
+    waitForSuccess(function() {
+      lines = xhr.responseText.split("\n");
+      if (lines[5] != '"last_seq":3}') {
+        throw("still waiting");
+      }
+    }, "last_seq");
     
     xhr = CouchDB.newXhr();
 
@@ -161,14 +153,12 @@ couchTests.changes = function(debug) {
       return JSON.parse(linetrimmed);
     }
     
-    while(true) {
-        try {
-            var lines = xhr.responseText.split("\n");
-            if(lines[3]=='"last_seq":4}')
-                break;
-        } catch (e) {}
-        db.info(); // sync http req allow async req to happen
-    }
+    waitForSuccess(function() {
+      lines = xhr.responseText.split("\n");
+      if (lines[3] != '"last_seq":4}') {
+        throw("still waiting");
+      }
+    }, "change_lines");
     
     var change = parse_changes_line(lines[1]);
     T(change.seq == 4);
@@ -229,13 +219,9 @@ couchTests.changes = function(debug) {
     db.save({"_id":"falsy", "bop" : ""}); // empty string is falsy
     db.save({"_id":"bingo","bop" : "bingo"});
     
-    while(true) {
-         try {
-             var resp = JSON.parse(xhr.responseText);
-             break;
-         } catch (e) {}
-         db.info() // sync http req allow async req to happen
-    }
+    waitForSuccess(function() {
+      resp = JSON.parse(xhr.responseText);
+    }, "longpoll-since");
     
     T(resp.last_seq == 9);
     T(resp.results && resp.results.length > 0 && resp.results[0]["id"] == "bingo", "filter the correct update");
@@ -246,14 +232,10 @@ couchTests.changes = function(debug) {
     xhr.send("");
     db.save({"_id":"rusty", "bop" : "plankton"});
     
-    while(true) {
-         try {
-             var lines = xhr.responseText.split("\n");
-             JSON.parse(lines[3])
-             break;
-         } catch (e) {}
-         db.info() // sync http req allow async req to happen
-    }
+    waitForSuccess(function() {
+      lines = xhr.responseText.split("\n");
+      JSON.parse(lines[3]);
+    }, "continuous-timeout");
     
     T(JSON.parse(lines[1]).id == "bingo", lines[1]);
     T(JSON.parse(lines[2]).id == "rusty", lines[2]);

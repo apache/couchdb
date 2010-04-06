@@ -94,17 +94,18 @@ couchTests.oauth = function(debug) {
         headers: {"X-Couch-Persist": "false"},
         body: JSON.stringify(testadminPassword)
       });
-      while (true) {
-          //loop until the couch server has processed the password
-          var xhr = CouchDB.request("GET", "http://" + host + "/_config/admins/testadmin?foo="+i,{
-              headers: {
-                "Authorization": adminBasicAuthHeaderValue()
-              }})
-          if (xhr.responseText.indexOf("\"-hashed-") == 0) {
-              break;
-          }
-          console.log("foo:" + xhr.responseText)
-      }
+      var i = 0;
+      waitForSuccess(function() {
+        //loop until the couch server has processed the password
+        i += 1;
+        var xhr = CouchDB.request("GET", "http://" + host + "/_config/admins/testadmin?foo="+i,{
+            headers: {
+              "Authorization": adminBasicAuthHeaderValue()
+            }});
+        if (xhr.responseText.indexOf("\"-hashed-") != 0) {
+            throw("still waiting");
+        }
+      }, "wait-for-admin");
 
       CouchDB.newUuids(2); // so we have one to make the salt
 
