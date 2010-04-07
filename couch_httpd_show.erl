@@ -288,8 +288,8 @@ make_map_start_resp_fun(QueryServer, Db, LName) ->
     end.
 
 make_reduce_start_resp_fun(QueryServer, Db, LName) ->
-    fun(Req2, Etag, _Acc) ->
-        start_list_resp(QueryServer, LName, Req2, Db, {[]}, Etag)
+    fun(Req2, Etag, _Acc, UpdateSeq) ->
+        start_list_resp(QueryServer, LName, Req2, Db, {[{<<"update_seq">>, UpdateSeq}]}, Etag)
     end.
 
 start_list_resp(QServer, LName, Req, Db, Head, Etag) ->
