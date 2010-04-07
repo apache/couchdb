@@ -492,10 +492,10 @@ all_docs_view(Req, Db, Keys) ->
         true -> EndDocId
         end,
         FoldAccInit = {Limit, SkipCount, undefined, []},
-
+		UpdateSeq = couch_db:get_update_seq(Db),
         case Keys of
         nil ->
-            FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db,
+            FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db, UpdateSeq,
                 TotalRowCount, #view_fold_helper_funs{
                     reduce_count = fun couch_db:enum_docs_reduce_to_count/1
                 }),
@@ -512,7 +512,7 @@ all_docs_view(Req, Db, Keys) ->
                     {if Inclusive -> end_key; true -> end_key_gt end, EndId}]),
             couch_httpd_view:finish_view_fold(Req, TotalRowCount, LastOffset, FoldResult);
         _ ->
-            FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db,
+            FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db, UpdateSeq,
                 TotalRowCount, #view_fold_helper_funs{
                     reduce_count = fun(Offset) -> Offset end
                 }),
