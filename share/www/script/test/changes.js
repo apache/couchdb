@@ -17,7 +17,7 @@ function jsonp(obj) {
 }
 
 couchTests.changes = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
+  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"true"});
   db.deleteDb();
   db.createDb();
   if (debug) debugger;
@@ -29,11 +29,13 @@ couchTests.changes = function(debug) {
   var docFoo = {_id:"foo", bar:1};
   T(db.save(docFoo).ok);
   T(db.ensureFullCommit().ok);
+  T(db.open(docFoo._id)._id == docFoo._id);
   
   req = CouchDB.request("GET", "/test_suite_db/_changes");
   var resp = JSON.parse(req.responseText);
 
-  T(resp.results.length == 1 && resp.last_seq==1, "one doc db")
+  T(resp.last_seq == 1);
+  T(resp.results.length == 1, "one doc db")
   T(resp.results[0].changes[0].rev == docFoo._rev)
 
   // test with callback
@@ -70,7 +72,7 @@ couchTests.changes = function(debug) {
     // WebKit (last checked on nightly #47686) does fail on processing
     // the async-request properly while javascript is executed.
 
-    xhr.open("GET", "/test_suite_db/_changes?feed=continuous", true);
+    xhr.open("GET", "/test_suite_db/_changes?feed=continuous&timeout=500", true);
     xhr.send("");
 
     var docBar = {_id:"bar", bar:1};
@@ -108,7 +110,7 @@ couchTests.changes = function(debug) {
     xhr = CouchDB.newXhr();
 
     //verify the hearbeat newlines are sent
-    xhr.open("GET", "/test_suite_db/_changes?feed=continuous&heartbeat=10", true);
+    xhr.open("GET", "/test_suite_db/_changes?feed=continuous&heartbeat=10&timeout=500", true);
     xhr.send("");
     
     var str;
@@ -122,6 +124,8 @@ couchTests.changes = function(debug) {
     T(str.charAt(str.length - 1) == "\n")
     T(str.charAt(str.length - 2) == "\n")
 
+    // otherwise we'll continue to receive heartbeats forever
+    xhr.abort();
 
     // test longpolling
     xhr = CouchDB.newXhr();
@@ -180,6 +184,14 @@ couchTests.changes = function(debug) {
         return doc.user && (doc.user == req.userCtx.name);
       }),
       "conflicted" : "function(doc, req) { return (doc._conflicts);}",
+    },
+    options : {
+      local_seq : true
+    },
+    views : {
+      local_seq : {
+        map : "function(doc) {emit(doc._local_seq, null)}"
+      }
     }
   }
 
@@ -194,7 +206,7 @@ couchTests.changes = function(debug) {
   
   var req = CouchDB.request("GET", "/test_suite_db/_changes?filter=changes_filter/bop");
   var resp = JSON.parse(req.responseText);
-  T(resp.results.length == 1);
+  T(resp.results.length == 1, "filtered/bop");
     
   req = CouchDB.request("GET", "/test_suite_db/_changes?filter=changes_filter/dynamic&field=woox");
   resp = JSON.parse(req.responseText);
@@ -225,21 +237,46 @@ couchTests.changes = function(debug) {
     
     T(resp.last_seq == 9);
     T(resp.results && resp.results.length > 0 && resp.results[0]["id"] == "bingo", "filter the correct update");
+    xhr.abort();
+    
+    timeout = 500;
+    last_seq = 10
+    while (true) {
 
-    // filter with continuous
-    xhr = CouchDB.newXhr();
-    xhr.open("GET", "/test_suite_db/_changes?feed=continuous&filter=changes_filter/bop&timeout=200", true);
-    xhr.send("");
-    db.save({"_id":"rusty", "bop" : "plankton"});
-    
-    waitForSuccess(function() {
+      // filter with continuous
+      xhr = CouchDB.newXhr();
+      xhr.open("GET", "/test_suite_db/_changes?feed=continuous&filter=changes_filter/bop&timeout="+timeout, true);
+      xhr.send("");
+
+      db.save({"_id":"rusty", "bop" : "plankton"});
+      T(xhr.readyState != 4, "test client too slow");
+      var rusty = db.open("rusty", {cache_bust : new Date()});
+      T(rusty._id == "rusty");
+
+      waitForSuccess(function() { // throws an error after 5 seconds
+        if (xhr.readyState != 4) {
+          throw("still waiting")
+        }
+      }, "continuous-rusty");
       lines = xhr.responseText.split("\n");
-      JSON.parse(lines[3]);
-    }, "continuous-timeout");
-    
-    T(JSON.parse(lines[1]).id == "bingo", lines[1]);
-    T(JSON.parse(lines[2]).id == "rusty", lines[2]);
-    T(JSON.parse(lines[3]).last_seq == 10, lines[3]);
+      try {
+        JSON.parse(lines[3])
+        good = true;
+      } catch(e) {
+        good = false;
+      }
+      if (good) {
+        T(JSON.parse(lines[1]).id == "bingo", lines[1]);
+        T(JSON.parse(lines[2]).id == "rusty", lines[2]);
+        T(JSON.parse(lines[3]).last_seq == last_seq, lines[3]);
+        break;
+      } else {
+        xhr.abort();
+        db.deleteDoc(rusty);
+        timeout = timeout * 2;
+        last_seq = last_seq + 2;
+      }
+    }
   }
   // error conditions
 

@@ -97,7 +97,7 @@ couchTests.uuids = function(debug) {
       T(result.uuids[i].length == 32);
       var u1 = result.uuids[i-1].substr(0, 13);
       var u2 = result.uuids[i].substr(0, 13);
-      T(u1 < u2, "UTC uuids are roughly ordered.");
+      T(u1 < u2, "UTC uuids are only roughly ordered, so this assertion may fail occasionally. Don't sweat it.");
     }
   };
 
