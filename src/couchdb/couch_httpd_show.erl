@@ -190,21 +190,21 @@ handle_view_list(Req, Db, DDoc, LName, {ViewDesignName, ViewName}, Keys) ->
     {ViewType, View, Group, QueryArgs} = couch_httpd_view:load_view(Req, Db, {ViewDesignId, ViewName}, Keys),
     Etag = list_etag(Req, Db, Group, {couch_httpd:doc_etag(DDoc), Keys}),    
     couch_httpd:etag_respond(Req, Etag, fun() ->
-            output_list(ViewType, Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys)
+            output_list(ViewType, Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys, Group)
         end).    
 
 list_etag(#httpd{user_ctx=UserCtx}=Req, Db, Group, More) ->
     Accept = couch_httpd:header_value(Req, "Accept"),
     couch_httpd_view:view_group_etag(Group, Db, {More, Accept, UserCtx#user_ctx.roles}).
 
-output_list(map, Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys) ->
-    output_map_list(Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys);
-output_list(reduce, Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys) ->
-    output_reduce_list(Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys).
+output_list(map, Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys, Group) ->
+    output_map_list(Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys, Group);
+output_list(reduce, Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys, Group) ->
+    output_reduce_list(Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys, Group).
     
 % next step:
 % use with_ddoc_proc/2 to make this simpler
-output_map_list(Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys) ->
+output_map_list(Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys, Group) ->
     #view_query_args{
         limit = Limit,
         skip = SkipCount
@@ -220,11 +220,12 @@ output_map_list(Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys) ->
             reduce_count = fun couch_view:reduce_to_count/1,
             start_response = StartListRespFun = make_map_start_resp_fun(QServer, Db, LName),
             send_row = make_map_send_row_fun(QServer)
-        },        
+        },
+		CurrentSeq = Group#group.current_seq,
 
         {ok, _, FoldResult} = case Keys of
             nil ->
-                FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, Etag, Db, RowCount, ListFoldHelpers),        
+                FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, Etag, Db, CurrentSeq, RowCount, ListFoldHelpers),
                     couch_view:fold(View, FoldlFun, FoldAccInit, 
                     couch_httpd_view:make_key_options(QueryArgs));
             Keys ->
@@ -234,7 +235,7 @@ output_map_list(Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys) ->
                                 start_key = Key,
                                 end_key = Key
                             },
-                        FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs2, Etag, Db, RowCount, ListFoldHelpers),
+                        FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs2, Etag, Db, CurrentSeq, RowCount, ListFoldHelpers),
                         couch_view:fold(View, FoldlFun, FoldAcc,
                             couch_httpd_view:make_key_options(QueryArgs2))
                     end, {ok, nil, FoldAccInit}, Keys)
@@ -243,18 +244,20 @@ output_map_list(Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys) ->
     end).
 
 
-output_reduce_list(Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys) ->
+output_reduce_list(Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys, Group) ->
     #view_query_args{
         limit = Limit,
         skip = SkipCount,
         group_level = GroupLevel
     } = QueryArgs,
 
+	CurrentSeq = Group#group.current_seq,
+
     couch_query_servers:with_ddoc_proc(DDoc, fun(QServer) ->
         StartListRespFun = make_reduce_start_resp_fun(QServer, Db, LName),
         SendListRowFun = make_reduce_send_row_fun(QServer, Db),
         {ok, GroupRowsFun, RespFun} = couch_httpd_view:make_reduce_fold_funs(Req,
-            GroupLevel, QueryArgs, Etag,
+            GroupLevel, QueryArgs, Etag, CurrentSeq,
             #reduce_fold_helper_funs{
                 start_response = StartListRespFun,
                 send_row = SendListRowFun
@@ -279,8 +282,8 @@ output_reduce_list(Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys) ->
 
 
 make_map_start_resp_fun(QueryServer, Db, LName) ->
-    fun(Req, Etag, TotalRows, Offset, _Acc) ->
-        Head = {[{<<"total_rows">>, TotalRows}, {<<"offset">>, Offset}]},
+    fun(Req, Etag, TotalRows, Offset, _Acc, UpdateSeq) ->
+        Head = {[{<<"total_rows">>, TotalRows}, {<<"offset">>, Offset}, {<<"update_seq">>, UpdateSeq}]},
         start_list_resp(QueryServer, LName, Req, Db, Head, Etag)
     end.
 
