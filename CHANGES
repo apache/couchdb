@@ -4,8 +4,6 @@ Apache CouchDB CHANGES
 Version 0.10.2
 --------------
 
-This version has not been released yet.
-
 Replicator
 
 * Avoid leaking file descriptors on automatic replication restarts.
