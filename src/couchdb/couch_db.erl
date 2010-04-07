@@ -26,6 +26,7 @@
 -export([set_security/2,get_security/1]).
 -export([init/1,terminate/2,handle_call/3,handle_cast/2,code_change/3,handle_info/2]).
 -export([changes_since/5,changes_since/6,read_doc/2,new_revid/1]).
+-export([check_is_admin/1, check_is_reader/1]).
 
 -include("couch_db.hrl").
 

@@ -76,9 +76,16 @@ couchTests.reader_acl = function(debug) {
         }
       }).ok);
 
+
       T(CouchDB.login("jchris@apache.org", "funnybone").ok);
 
+      // db admin can read
       T(secretDb.open("baz").foo == "bar");
+
+      // and run temp views
+      TEquals(secretDb.query(function(doc) {
+        emit(null, null)
+      }).total_rows, 1);
 
       CouchDB.logout();
       T(CouchDB.session().userCtx.roles.indexOf("_admin") != -1);
@@ -119,6 +126,17 @@ couchTests.reader_acl = function(debug) {
       T(secretDb.open("baz").foo == "bar");
       // readers can query stored views
       T(secretDb.view("foo/bar").total_rows == 1);
+      
+      // readers can't do temp views
+      try {
+        var results = secretDb.query(function(doc) {
+          emit(null, null);
+        });
+        T(false && "temp view should be admin only");
+      } catch (e) {
+        T(true && "temp view is admin only");
+      }
+      
       
       CouchDB.logout();
 

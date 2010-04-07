@@ -77,6 +77,7 @@ handle_view_req(Req, _Db, _DDoc) ->
     send_method_not_allowed(Req, "GET,POST,HEAD").
 
 handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
+    ok = couch_db:check_is_admin(Db),
     couch_stats_collector:increment({httpd, temporary_view_reads}),
     {Props} = couch_httpd:json_body_obj(Req),
     Language = proplists:get_value(<<"language">>, Props, <<"javascript">>),
