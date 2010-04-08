@@ -223,7 +223,10 @@ couchTests.list_views = function(debug) {
   xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/basicJSON/basicView");
   T(xhr.status == 200, "standard get should be 200");
   var resp = JSON.parse(xhr.responseText);
-  TEquals(resp.head, {total_rows:10, offset:0});
+  TEquals(10, resp.head.total_rows);
+  TEquals(0, resp.head.offset);
+  TEquals(11, resp.head.update_seq);
+  
   T(resp.rows.length == 10);
   TEquals(resp.rows[0], {"id": "0","key": 0,"value": "0"});
 

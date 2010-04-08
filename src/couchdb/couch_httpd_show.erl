@@ -240,7 +240,7 @@ output_map_list(Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys, Group) ->
                             couch_httpd_view:make_key_options(QueryArgs2))
                     end, {ok, nil, FoldAccInit}, Keys)
             end,
-        finish_list(Req, QServer, Etag, FoldResult, StartListRespFun, RowCount)
+        finish_list(Req, QServer, Etag, FoldResult, StartListRespFun, CurrentSeq, RowCount)
     end).
 
 
@@ -277,7 +277,7 @@ output_reduce_list(Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys, Group) ->
                             )    
                     end, {ok, FoldAccInit}, Keys)
             end,
-        finish_list(Req, QServer, Etag, FoldResult, StartListRespFun, null)
+        finish_list(Req, QServer, Etag, FoldResult, StartListRespFun, CurrentSeq, null)
     end).
 
 
@@ -348,7 +348,7 @@ send_non_empty_chunk(Resp, Chunk) ->
         _ -> send_chunk(Resp, Chunk)
     end.
 
-finish_list(Req, {Proc, _DDocId}, Etag, FoldResult, StartFun, TotalRows) ->
+finish_list(Req, {Proc, _DDocId}, Etag, FoldResult, StartFun, CurrentSeq, TotalRows) ->
     FoldResult2 = case FoldResult of
         {Limit, SkipCount, Response, RowAcc} ->
             {Limit, SkipCount, Response, RowAcc, nil};
@@ -358,7 +358,7 @@ finish_list(Req, {Proc, _DDocId}, Etag, FoldResult, StartFun, TotalRows) ->
     case FoldResult2 of
         {_, _, undefined, _, _} ->
             {ok, Resp, BeginBody} =
-                render_head_for_empty_list(StartFun, Req, Etag, TotalRows),
+                render_head_for_empty_list(StartFun, Req, Etag, CurrentSeq, TotalRows),
             [<<"end">>, Chunks] = couch_query_servers:proc_prompt(Proc, [<<"list_end">>]),            
             Chunk = BeginBody ++ ?b2l(?l2b(Chunks)),
             send_non_empty_chunk(Resp, Chunk);
@@ -371,10 +371,10 @@ finish_list(Req, {Proc, _DDocId}, Etag, FoldResult, StartFun, TotalRows) ->
     last_chunk(Resp).
 
 
-render_head_for_empty_list(StartListRespFun, Req, Etag, null) ->
-    StartListRespFun(Req, Etag, []); % for reduce
-render_head_for_empty_list(StartListRespFun, Req, Etag, TotalRows) ->
-    StartListRespFun(Req, Etag, TotalRows, null, []).
+render_head_for_empty_list(StartListRespFun, Req, Etag, CurrentSeq, null) ->
+    StartListRespFun(Req, Etag, [], CurrentSeq); % for reduce
+render_head_for_empty_list(StartListRespFun, Req, Etag, CurrentSeq, TotalRows) ->
+    StartListRespFun(Req, Etag, TotalRows, null, [], CurrentSeq).
 
 
 % Maybe this is in the proplists API
