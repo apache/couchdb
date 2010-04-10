@@ -6,8 +6,12 @@ Version 0.10.2
 
 Replicator
 
-* Avoid leaking file descriptors on automatic replication restarts.
-* Close security vulnerability CVE-2010-0009.
+ * Avoid leaking file descriptors on automatic replication restarts.
+ * Close security vulnerability CVE-2010-0009.
+
+Build and System Integration:
+
+ * Fixed distribution preparation for building on Mac OS X.
 
 Version 0.10.1
 --------------

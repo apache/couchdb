@@ -74,6 +74,10 @@ local-clean: maintainer-clean
 	rm -f $(top_srcdir)/*.tar.gz.*
 	find $(top_srcdir) -name Makefile.in -exec rm {} \;
 
+dist-hook:
+	find $(top_srcdir) -type f -name "._*" -delete
+	find $(top_builddir) -type f -name "._*" -delete
+
 distcheck-hook:
 	grep -rL 'http://www.apache.org/licenses/LICENSE-2.0' * \
             | grep -vEf license.skip; \
