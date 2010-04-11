@@ -25,7 +25,7 @@ endif
 
 nobase_sysconf_DATA = $(default_sysconf_data) $(init_sysconf_data)
 
-EXTRA_DIST = $(init_sysconf_data)
+EXTRA_DIST = default/couchdb
 
 CLEANFILES = $(init_DATA) $(default_sysconf_data) $(launchd_DATA)
 
