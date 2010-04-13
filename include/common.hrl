@@ -45,6 +45,5 @@
               node,
               nodes,
               clock,
-              cache,
               args
              }).
