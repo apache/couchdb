@@ -4,6 +4,7 @@
 -include("../include/config.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
+-define(TEST_NODE_NAME, a).
 -define(HINT_C1, 365375409332725729550921208179070754913983135744).
 -define(HINT_C2, 1096126227998177188652763624537212264741949407232).
 -define(PARTS_FOR_D1, [365375409332725729550921208179070754913983135744,
@@ -42,7 +43,7 @@ all_tests_test_() ->
 test_setup() ->
     Config = #config{n=3,r=2,w=2,q=3,directory="/srv/db",
                      storage_mod="dynomite_couch_storage"},
-    {ok, Pid} = mem3:start_link([{test,true}, {config, Config}]),
+    {ok, Pid} = mem3:start_link([{test,?TEST_NODE_NAME}, {config, Config}]),
     Pid.
 
 
@@ -55,13 +56,12 @@ test_teardown(Pid) ->
 init(_Pid) ->
     #mem{args=Args} = mem3:state(),
     Test = proplists:get_value(test, Args),
-    ?assertEqual(true, Test).
+    ?assertEqual(?TEST_NODE_NAME, Test).
 
 
 clock(_Pid) ->
-    Node = node(),
     Clock = mem3:clock(),
-    ?assertMatch([{Node, _}], Clock).
+    ?assertMatch([{?TEST_NODE_NAME, _}], Clock).
 
 
 join_first(_Pid) ->
