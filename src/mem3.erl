@@ -22,7 +22,7 @@
 -export([start_link/0, start_link/1, stop/0, stop/1, reset/0]).
 -export([join/2, clock/0, state/0]).
 -export([partitions/0, fullmap/0]).
--export([nodes_for_part/1, nodes_for_part/2, all_nodes_parts/1]).
+-export([nodes/0, nodes_for_part/1, nodes_for_part/2, all_nodes_parts/1]).
 -export([parts_for_node/1]).
 
 %% gen_server callbacks
@@ -34,6 +34,7 @@
 -include("../include/config.hrl").
 -include("../include/common.hrl").
 
+-define(SERVER, membership).
 
 %% types - stick somewhere in includes?
 -type join_type() :: first | new | replace.
@@ -59,7 +60,7 @@ start_link() ->
 
 -spec start_link(args()) -> {ok, pid()}.
 start_link(Args) ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, Args, []).
+    gen_server:start_link({local, ?SERVER}, ?MODULE, Args, []).
 
 
 -spec stop() -> ok.
@@ -74,22 +75,22 @@ stop(Server) ->
 
 -spec join(join_type(), mem_node_list()) -> ok.
 join(JoinType, Nodes) ->
-    gen_server:call(?MODULE, {join, JoinType, Nodes}).
+    gen_server:call(?SERVER, {join, JoinType, Nodes}).
 
 
 -spec clock() -> vector_clock().
 clock() ->
-    gen_server:call(?MODULE, clock).
+    gen_server:call(?SERVER, clock).
 
 
 -spec state() -> mem_state().
 state() ->
-    gen_server:call(?MODULE, state).
+    gen_server:call(?SERVER, state).
 
 
 -spec reset() -> ok | not_reset.
 reset() ->
-    gen_server:call(?MODULE, reset).
+    gen_server:call(?SERVER, reset).
 
 
 %% @doc retrieve the primary partition map.  This is a list of partitions and
@@ -102,6 +103,12 @@ partitions() ->
 %%      partner nodes.  List should number 2^Q * N
 fullmap() ->
     lists:keysort(2, mochiglobal:get(fullmap)).
+
+
+%% @doc get the list of cluster nodes (according to membership module)
+%%      This may differ from erlang:nodes()
+nodes() ->
+  gen_server:call(?SERVER, nodes).
 
 
 %% @doc get all the responsible nodes for a given partition, including
@@ -166,11 +173,11 @@ handle_call({join, JoinType, ExtNodes}, _From,
 
 %% clock
 handle_call(clock, _From, #mem{clock=Clock} = State) ->
-    {reply, Clock, State};
+    {reply, {ok, Clock}, State};
 
 %% state
 handle_call(state, _From, State) ->
-    {reply, State, State};
+    {reply, {ok, State}, State};
 
 %% reset - but only if we're in test mode
 handle_call(reset, _From, #mem{args=Args} = State) ->
@@ -182,6 +189,11 @@ handle_call(reset, _From, #mem{args=Args} = State) ->
         mochiglobal:delete(fullmap),
         {reply, ok, int_reset(Test, State)}
     end;
+
+%% nodes
+handle_call(nodes, _From, #mem{nodes=NodeList} = State) ->
+    {_,Nodes,_} = lists:unzip3(NodeList),
+    {reply, {ok, Nodes}, State};
 
 %% ignored call
 handle_call(Msg, _From, State) ->

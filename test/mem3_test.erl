@@ -54,13 +54,13 @@ test_teardown(Pid) ->
 %% TESTS
 
 init(_Pid) ->
-    #mem{args=Args} = mem3:state(),
+    {ok, #mem{args=Args}} = mem3:state(),
     Test = proplists:get_value(test, Args),
     ?assertEqual(?TEST_NODE_NAME, Test).
 
 
 clock(_Pid) ->
-    Clock = mem3:clock(),
+    {ok, Clock} = mem3:clock(),
     ?assertMatch([{?TEST_NODE_NAME, _}], Clock).
 
 
