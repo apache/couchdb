@@ -52,7 +52,7 @@ key_lookup(Key, {M,F,A}, Access, Const, N) ->
             {error, Class, Exception}
         end
     end,
-    {GoodReplies, Bad} = pcall(MapFun, NodeParts, Const),
+    {GoodReplies, Bad} = pcall(MapFun, NodeParts, N),
     if length(Bad) > 0 -> ?LOG_DEBUG("~nBad: ~p~n", [Bad]); true -> ok end,
     Good = lists:map(fun strip_ok/1, GoodReplies),
     final_key_lookup(Good, Bad, N, Const, ResolveFun, NotFoundFun, Access).
