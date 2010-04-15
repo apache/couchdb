@@ -133,7 +133,7 @@
       var templates = {
         javascript: "function(doc) {\n  emit(null, doc);\n}",
         python: "def fun(doc):\n  yield None, doc",
-        ruby: "{|doc|\n  emit(nil, doc);\n}"
+        ruby: "lambda {|doc|\n  emit(nil, doc);\n}"
       }
 
       this.newDocument = function() {
