@@ -1,4 +1,3 @@
-%%% @author Brad Anderson <brad@cloudant.com>
 %%% @doc convenience start/stop functions for Dynomite
 %%%
 -module(dynomite).

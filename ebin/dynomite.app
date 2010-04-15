@@ -14,7 +14,6 @@
       dynomite_app,
       dynomite_couch_api,
       dynomite_couch_storage,
-      dynomite_http,
       dynomite_prof,
       dynomite_sup,
       lib_misc,
