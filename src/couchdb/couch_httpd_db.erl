@@ -853,26 +853,26 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
     case [A || A <- Atts, A#att.name == FileName] of
     [] ->
         throw({not_found, "Document is missing attachment"});
-    [#att{type=Type, comp=Comp}=Att] ->
+    [#att{type=Type, encoding=Enc}=Att] ->
         Etag = couch_httpd:doc_etag(Doc),
-        ReqAcceptsGzip = lists:member(
-           "gzip",
+        ReqAcceptsAttEnc = lists:member(
+           atom_to_list(Enc),
            couch_httpd:accepted_encodings(Req)
         ),
         Headers = [
             {"ETag", Etag},
             {"Cache-Control", "must-revalidate"},
             {"Content-Type", binary_to_list(Type)}
-        ] ++ case {Comp, ReqAcceptsGzip} of
-        {true, true} ->
-            [{"Content-Encoding", "gzip"}];
+        ] ++ case ReqAcceptsAttEnc of
+        true ->
+            [{"Content-Encoding", atom_to_list(Enc)}];
         _ ->
             []
         end,
-        AttFun = case {Comp, ReqAcceptsGzip} of
-        {true, false} ->
-            fun couch_doc:att_foldl_unzip/3;
-        _ ->
+        AttFun = case ReqAcceptsAttEnc of
+        false ->
+            fun couch_doc:att_foldl_decode/3;
+        true ->
             fun couch_doc:att_foldl/3
         end,
         couch_httpd:etag_respond(
@@ -1045,8 +1045,8 @@ parse_doc_query(Req) ->
             Args#doc_query_args{update_type=replicated_changes};
         {"new_edits", "true"} ->
             Args#doc_query_args{update_type=interactive_edit};
-        {"att_gzip_length", "true"} ->
-            Options = [att_gzip_length | Args#doc_query_args.options],
+        {"att_encoding_info", "true"} ->
+            Options = [att_encoding_info | Args#doc_query_args.options],
             Args#doc_query_args{options=Options};
         _Else -> % unknown key value pair, ignore.
             Args

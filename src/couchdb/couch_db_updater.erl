@@ -437,9 +437,9 @@ flush_trees(#db{fd=Fd,header=Header}=Db,
                 case Atts of
                 [] -> [];
                 [#att{data={BinFd, _Sp}} | _ ] when BinFd == Fd ->
-                    [{N,T,P,AL,DL,R,M,C}
+                    [{N,T,P,AL,DL,R,M,E}
                         || #att{name=N,type=T,data={_,P},md5=M,revpos=R,
-                               att_len=AL,disk_len=DL,comp=C}
+                               att_len=AL,disk_len=DL,encoding=E}
                         <- Atts];
                 _ ->
                     % BinFd must not equal our Fd. This can happen when a database
@@ -709,27 +709,37 @@ copy_doc_attachments(#db{fd=SrcFd}=SrcDb, {Pos,_RevId}, SrcSp, DestFd) ->
             % 09 UPGRADE CODE
             {NewBinSp, AttLen, AttLen, Md5, _IdentityMd5} =
                 couch_stream:old_copy_to_new_stream(SrcFd, BinSp, AttLen, DestFd),
-            {Name, Type, NewBinSp, AttLen, AttLen, Pos, Md5, false};
+            {Name, Type, NewBinSp, AttLen, AttLen, Pos, Md5, identity};
         ({Name, {Type, BinSp, AttLen}}) ->
             % 09 UPGRADE CODE
             {NewBinSp, AttLen, AttLen, Md5, _IdentityMd5} =
                 couch_stream:copy_to_new_stream(SrcFd, BinSp, DestFd),
-            {Name, Type, NewBinSp, AttLen, AttLen, Pos, Md5, false};
+            {Name, Type, NewBinSp, AttLen, AttLen, Pos, Md5, identity};
         ({Name, Type, BinSp, AttLen, _RevPos, <<>>}) when
             is_tuple(BinSp) orelse BinSp == null ->
             % 09 UPGRADE CODE
             {NewBinSp, AttLen, AttLen, Md5, _IdentityMd5} =
                 couch_stream:old_copy_to_new_stream(SrcFd, BinSp, AttLen, DestFd),
-            {Name, Type, NewBinSp, AttLen, AttLen, AttLen, Md5, false};
+            {Name, Type, NewBinSp, AttLen, AttLen, AttLen, Md5, identity};
         ({Name, Type, BinSp, AttLen, RevPos, Md5}) ->
             % 010 UPGRADE CODE
             {NewBinSp, AttLen, AttLen, Md5, _IdentityMd5} =
                 couch_stream:copy_to_new_stream(SrcFd, BinSp, DestFd),
-            {Name, Type, NewBinSp, AttLen, AttLen, RevPos, Md5, false};
-        ({Name, Type, BinSp, AttLen, DiskLen, RevPos, Md5, Comp}) ->
+            {Name, Type, NewBinSp, AttLen, AttLen, RevPos, Md5, identity};
+        ({Name, Type, BinSp, AttLen, DiskLen, RevPos, Md5, Enc1}) ->
             {NewBinSp, AttLen, _, Md5, _IdentityMd5} =
                 couch_stream:copy_to_new_stream(SrcFd, BinSp, DestFd),
-            {Name, Type, NewBinSp, AttLen, DiskLen, RevPos, Md5, Comp}
+            Enc = case Enc1 of
+            true ->
+                % 0110 UPGRADE CODE
+                gzip;
+            false ->
+                % 0110 UPGRADE CODE
+                identity;
+            _ ->
+                Enc1
+            end,
+            {Name, Type, NewBinSp, AttLen, DiskLen, RevPos, Md5, Enc}
         end, BinInfos),
     {BodyData, NewBinInfos}.
 

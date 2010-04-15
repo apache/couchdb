@@ -227,7 +227,7 @@ update_sequence_lists(Seq, State) ->
 open_doc_revs(#http_db{} = DbS, DocId, Revs) ->
     %% all this logic just splits up revision lists that are too long for
     %% MochiWeb into multiple requests
-    BaseQS = [{revs,true}, {latest,true}, {att_gzip_length,true}],
+    BaseQS = [{revs,true}, {latest,true}, {att_encoding_info,true}],
     BaseReq = DbS#http_db{resource=url_encode(DocId), qs=BaseQS},
     BaseLength = length(couch_rep_httpc:full_url(BaseReq)) + 11, % &open_revs=
 
@@ -252,7 +252,7 @@ open_doc(#http_db{} = DbS, DocId) ->
     % get latest rev of the doc
     Req = DbS#http_db{
         resource=url_encode(DocId),
-        qs=[{att_gzip_length, true}]
+        qs=[{att_encoding_info, true}]
     },
     case couch_rep_httpc:request(Req) of
     {[{<<"error">>,<<"not_found">>}, {<<"reason">>,<<"missing">>}]} ->

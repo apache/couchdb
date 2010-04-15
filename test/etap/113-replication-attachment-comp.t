@@ -30,7 +30,7 @@ test_db_b_name() ->
 
 main(_) ->
     test_util:init_code_path(),
-    etap:plan(28),
+    etap:plan(30),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -191,7 +191,7 @@ check_server_can_decompress_att(DbName) ->
 check_att_stubs(SourceDbName, TargetDbName) ->
     {ok, {{_, Code1, _}, _Headers1, Body1}} = http:request(
         get,
-        {db_url(SourceDbName) ++ "/testdoc1?att_gzip_length=true", []},
+        {db_url(SourceDbName) ++ "/testdoc1?att_encoding_info=true", []},
         [],
         [{sync, true}]),
     etap:is(
@@ -206,7 +206,7 @@ check_att_stubs(SourceDbName, TargetDbName) ->
     ),
     {ok, {{_, Code2, _}, _Headers2, Body2}} = http:request(
         get,
-        {db_url(TargetDbName) ++ "/testdoc1?att_gzip_length=true", []},
+        {db_url(TargetDbName) ++ "/testdoc1?att_encoding_info=true", []},
         [],
         [{sync, true}]),
     etap:is(
@@ -225,21 +225,30 @@ check_att_stubs(SourceDbName, TargetDbName) ->
         TargetAttStub,
         [<<"length">>]
     ),
-    TargetAttStubGzipLength = couch_util:get_nested_json_value(
+    TargetAttStubEnc = couch_util:get_nested_json_value(
         TargetAttStub,
-        [<<"gzip_length">>]
+        [<<"encoding">>]
     ),
-    GzipLengthDefined = is_integer(TargetAttStubGzipLength),
     etap:is(
-        GzipLengthDefined,
-        true,
-        "Stubs have the gzip_length field properly defined"
+        TargetAttStubEnc,
+        <<"gzip">>,
+        "Attachment stub has encoding property set to gzip"
     ),
-    GzipLengthSmaller = (TargetAttStubGzipLength < TargetAttStubLength),
+    TargetAttStubEncLength = couch_util:get_nested_json_value(
+        TargetAttStub,
+        [<<"encoded_length">>]
+    ),
+    EncLengthDefined = is_integer(TargetAttStubEncLength),
     etap:is(
-        GzipLengthSmaller,
+        EncLengthDefined,
         true,
-        "Stubs have the gzip_length field smaller than their length field"
+        "Stubs have the encoded_length field properly defined"
+    ),
+    EncLengthSmaller = (TargetAttStubEncLength < TargetAttStubLength),
+    etap:is(
+        EncLengthSmaller,
+        true,
+        "Stubs have the encoded_length field smaller than their length field"
     ),
     ok.
 

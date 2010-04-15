@@ -90,7 +90,7 @@ write_multi_part_doc(#http_db{headers=Headers} = Db, #doc{atts=Atts} = Doc) ->
     JsonBytes = ?JSON_ENCODE(
         couch_doc:to_json_obj(
             Doc,
-            [follows, att_gzip_length, {atts_after_revpos, 0}]
+            [follows, att_encoding_info, {atts_after_revpos, 0}]
         )
     ),
     Boundary = couch_uuids:random(),

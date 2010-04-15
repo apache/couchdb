@@ -22,7 +22,7 @@ test_db_name() ->
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(57),
+    etap:plan(65),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -127,26 +127,26 @@ tests_for_1st_text_att() ->
     test_get_1st_text_att_with_accept_encoding_deflate(),
     test_get_1st_text_att_with_accept_encoding_deflate_only(),
     test_get_doc_with_1st_text_att(),
-    test_length_1st_text_att_stub().
+    test_1st_text_att_stub().
 
 tests_for_1st_png_att() ->
     test_get_1st_png_att_without_accept_encoding_header(),
     test_get_1st_png_att_with_accept_encoding_gzip(),
     test_get_1st_png_att_with_accept_encoding_deflate(),
     test_get_doc_with_1st_png_att(),
-    test_length_1st_png_att_stub().
+    test_1st_png_att_stub().
 
 tests_for_2nd_text_att() ->
     test_get_2nd_text_att_with_accept_encoding_gzip(),
     test_get_2nd_text_att_without_accept_encoding_header(),
     test_get_doc_with_2nd_text_att(),
-    test_length_2nd_text_att_stub().
+    test_2nd_text_att_stub().
 
 tests_for_2nd_png_att() ->
     test_get_2nd_png_att_without_accept_encoding_header(),
     test_get_2nd_png_att_with_accept_encoding_gzip(),
     test_get_doc_with_2nd_png_att(),
-    test_length_2nd_png_att_stub().
+    test_2nd_png_att_stub().
 
 test_get_1st_text_att_with_accept_encoding_gzip() ->
     {ok, {{_, Code, _}, Headers, Body}} = http:request(
@@ -297,26 +297,35 @@ test_get_doc_with_1st_text_att() ->
     ),
     ok.
 
-test_length_1st_text_att_stub() ->
+test_1st_text_att_stub() ->
     {ok, {{_, Code, _}, _Headers, Body}} = http:request(
         get,
-        {db_url() ++ "/testdoc1", []},
+        {db_url() ++ "/testdoc1?att_encoding_info=true", []},
         [],
         [{sync, true}]),
     etap:is(Code, 200, "HTTP response code is 200"),
     Json = couch_util:json_decode(Body),
-    TextAttJson = couch_util:get_nested_json_value(
+    {TextAttJson} = couch_util:get_nested_json_value(
         Json,
         [<<"_attachments">>, <<"readme.txt">>]
     ),
-    TextAttLength = couch_util:get_nested_json_value(
-        TextAttJson,
-        [<<"length">>]
-    ),
+    TextAttLength = proplists:get_value(<<"length">>, TextAttJson),
     etap:is(
         TextAttLength,
         length(test_text_data()),
         "1st text attachment stub length matches the uncompressed length"
+    ),
+    TextAttEncoding = proplists:get_value(<<"encoding">>, TextAttJson),
+    etap:is(
+        TextAttEncoding,
+        <<"gzip">>,
+        "1st text attachment stub has the encoding field set to gzip"
+    ),
+    TextAttEncLength = proplists:get_value(<<"encoded_length">>, TextAttJson),
+    etap:is(
+        TextAttEncLength,
+        iolist_size(zlib:gzip(test_text_data())),
+        "1st text attachment stub encoded_length matches the compressed length"
     ),
     ok.
 
@@ -348,26 +357,35 @@ test_get_doc_with_1st_png_att() ->
     ),
     ok.
 
-test_length_1st_png_att_stub() ->
+test_1st_png_att_stub() ->
     {ok, {{_, Code, _}, _Headers, Body}} = http:request(
         get,
-        {db_url() ++ "/testdoc2", []},
+        {db_url() ++ "/testdoc2?att_encoding_info=true", []},
         [],
         [{sync, true}]),
     etap:is(Code, 200, "HTTP response code is 200"),
     Json = couch_util:json_decode(Body),
-    PngAttJson = couch_util:get_nested_json_value(
+    {PngAttJson} = couch_util:get_nested_json_value(
         Json,
         [<<"_attachments">>, <<"icon.png">>]
     ),
-    PngAttLength = couch_util:get_nested_json_value(
-        PngAttJson,
-        [<<"length">>]
-    ),
+    PngAttLength = proplists:get_value(<<"length">>, PngAttJson),
     etap:is(
         PngAttLength,
         length(test_png_data()),
         "1st png attachment stub length matches the uncompressed length"
+    ),
+    PngEncoding = proplists:get_value(<<"encoding">>, PngAttJson),
+    etap:is(
+        PngEncoding,
+        undefined,
+        "1st png attachment stub doesn't have an encoding field"
+    ),
+    PngEncLength = proplists:get_value(<<"encoded_length">>, PngAttJson),
+    etap:is(
+        PngEncLength,
+        undefined,
+        "1st png attachment stub doesn't have an encoded_length field"
     ),
     ok.
 
@@ -466,26 +484,35 @@ test_get_doc_with_2nd_text_att() ->
     ),
     ok.
 
-test_length_2nd_text_att_stub() ->
+test_2nd_text_att_stub() ->
     {ok, {{_, Code, _}, _Headers, Body}} = http:request(
         get,
-        {db_url() ++ "/testdoc3", []},
+        {db_url() ++ "/testdoc3?att_encoding_info=true", []},
         [],
         [{sync, true}]),
     etap:is(Code, 200, "HTTP response code is 200"),
     Json = couch_util:json_decode(Body),
-    TextAttJson = couch_util:get_nested_json_value(
+    {TextAttJson} = couch_util:get_nested_json_value(
         Json,
         [<<"_attachments">>, <<"readme.txt">>]
     ),
-    TextAttLength = couch_util:get_nested_json_value(
-        TextAttJson,
-        [<<"length">>]
-    ),
+    TextAttLength = proplists:get_value(<<"length">>, TextAttJson),
     etap:is(
         TextAttLength,
         length(test_text_data()),
         "2nd text attachment stub length matches the uncompressed length"
+    ),
+    TextAttEncoding = proplists:get_value(<<"encoding">>, TextAttJson),
+    etap:is(
+        TextAttEncoding,
+        <<"gzip">>,
+        "2nd text attachment stub has the encoding field set to gzip"
+    ),
+    TextAttEncLength = proplists:get_value(<<"encoded_length">>, TextAttJson),
+    etap:is(
+        TextAttEncLength,
+        iolist_size(zlib:gzip(test_text_data())),
+        "2nd text attachment stub encoded_length matches the compressed length"
     ),
     ok.
 
@@ -517,26 +544,35 @@ test_get_doc_with_2nd_png_att() ->
     ),
     ok.
 
-test_length_2nd_png_att_stub() ->
+test_2nd_png_att_stub() ->
     {ok, {{_, Code, _}, _Headers, Body}} = http:request(
         get,
-        {db_url() ++ "/testdoc4", []},
+        {db_url() ++ "/testdoc4?att_encoding_info=true", []},
         [],
         [{sync, true}]),
     etap:is(Code, 200, "HTTP response code is 200"),
     Json = couch_util:json_decode(Body),
-    PngAttJson = couch_util:get_nested_json_value(
+    {PngAttJson} = couch_util:get_nested_json_value(
         Json,
         [<<"_attachments">>, <<"icon.png">>]
     ),
-    PngAttLength = couch_util:get_nested_json_value(
-        PngAttJson,
-        [<<"length">>]
-    ),
+    PngAttLength = proplists:get_value(<<"length">>, PngAttJson),
     etap:is(
         PngAttLength,
         length(test_png_data()),
         "2nd png attachment stub length matches the uncompressed length"
+    ),
+    PngEncoding = proplists:get_value(<<"encoding">>, PngAttJson),
+    etap:is(
+        PngEncoding,
+        undefined,
+        "2nd png attachment stub doesn't have an encoding field"
+    ),
+    PngEncLength = proplists:get_value(<<"encoded_length">>, PngAttJson),
+    etap:is(
+        PngEncLength,
+        undefined,
+        "2nd png attachment stub doesn't have an encoded_length field"
     ),
     ok.
 
