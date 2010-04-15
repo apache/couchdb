@@ -31,10 +31,11 @@ resolve({ClockA, ValuesA}, {ClockB, ValuesB}) ->
     greater -> {ClockA, ValuesA};
     equal -> {ClockA, ValuesA};
     concurrent ->
-          io:format("~nConcurrent Clocks~n"
-                    "ClockA : ~p~nClockB : ~p~n"
-                    "ValuesA: ~p~nValuesB: ~p~n"
-                    , [ClockA, ClockB, ValuesA, ValuesB]),
+          showroom_log:message(info,
+              "~nConcurrent Clocks~n"
+              "ClockA : ~p~nClockB : ~p~n"
+              "ValuesA: ~p~nValuesB: ~p~n"
+              , [ClockA, ClockB, ValuesA, ValuesB]),
           {merge(ClockA,ClockB), ValuesA ++ ValuesB}
   end;
 resolve(not_found, {Clock, Values}) ->
