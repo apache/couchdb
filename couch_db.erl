@@ -818,14 +818,14 @@ flush_att(Fd, #att{data=Fun,att_len=AttLen}=Att) when is_function(Fun) ->
 % is present in the request, but there is no Content-MD5
 % trailer, we're free to ignore this inconsistency and
 % pretend that no Content-MD5 exists.
-with_stream(Fd, #att{md5=InMd5,type=Type,comp=AlreadyComp}=Att, Fun) ->
-    {ok, OutputStream} = case (not AlreadyComp) andalso
+with_stream(Fd, #att{md5=InMd5,type=Type,encoding=Enc}=Att, Fun) ->
+    {ok, OutputStream} = case (Enc =:= identity) andalso
         couch_util:compressible_att_type(Type) of
     true ->
         CompLevel = list_to_integer(
             couch_config:get("attachments", "compression_level", "0")
         ),
-        couch_stream:open(Fd, CompLevel);
+        couch_stream:open(Fd, gzip, [{compression_level, CompLevel}]);
     _ ->
         couch_stream:open(Fd)
     end,
@@ -841,18 +841,23 @@ with_stream(Fd, #att{md5=InMd5,type=Type,comp=AlreadyComp}=Att, Fun) ->
     {StreamInfo, Len, IdentityLen, Md5, IdentityMd5} =
         couch_stream:close(OutputStream),
     check_md5(IdentityMd5, ReqMd5),
-    {AttLen, DiskLen} = case AlreadyComp of
-    true ->
-        {Att#att.att_len, Att#att.disk_len};
-    _ ->
-        {Len, IdentityLen}
+    {AttLen, DiskLen, NewEnc} = case Enc of
+    identity ->
+        case {Md5, IdentityMd5} of
+        {Same, Same} ->
+            {Len, IdentityLen, identity};
+        _ ->
+            {Len, IdentityLen, gzip}
+        end;
+    gzip ->
+        {Att#att.att_len, Att#att.disk_len, Enc}
     end,
     Att#att{
         data={Fd,StreamInfo},
         att_len=AttLen,
         disk_len=DiskLen,
         md5=Md5,
-        comp=(AlreadyComp orelse (IdentityMd5 =/= Md5))
+        encoding=NewEnc
     }.
 
 
@@ -1087,7 +1092,7 @@ make_doc(#db{fd=Fd}=Db, Id, Deleted, Bp, RevisionPath) ->
         {ok, {BodyData0, Atts0}} = read_doc(Db, Bp),
         {BodyData0,
             lists:map(
-                fun({Name,Type,Sp,AttLen,DiskLen,RevPos,Md5,Comp}) ->
+                fun({Name,Type,Sp,AttLen,DiskLen,RevPos,Md5,Enc}) ->
                     #att{name=Name,
                         type=Type,
                         att_len=AttLen,
@@ -1095,7 +1100,18 @@ make_doc(#db{fd=Fd}=Db, Id, Deleted, Bp, RevisionPath) ->
                         md5=Md5,
                         revpos=RevPos,
                         data={Fd,Sp},
-                        comp=Comp};
+                        encoding=
+                            case Enc of
+                            true ->
+                                % 0110 UPGRADE CODE
+                                gzip;
+                            false ->
+                                % 0110 UPGRADE CODE
+                                identity;
+                            _ ->
+                                Enc
+                            end
+                    };
                 ({Name,Type,Sp,AttLen,RevPos,Md5}) ->
                     #att{name=Name,
                         type=Type,
