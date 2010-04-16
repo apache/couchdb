@@ -10,13 +10,13 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-var resolveModule = function(names, parent, current) {
+var resolveModule = function(names, parent, current, path) {
   if (names.length == 0) {
     if (typeof current != "string") {
       throw ["error","invalid_require_path",
         'Must require a JavaScript string, not: '+(typeof current)];
     }
-    return [current, parent];
+    return [current, parent, path];
   }
   // we need to traverse the path
   var n = names.shift();
@@ -24,21 +24,23 @@ var resolveModule = function(names, parent, current) {
     if (!(parent && parent.parent)) {
       throw ["error", "invalid_require_path", 'Object has no parent '+JSON.stringify(current)];
     }
-    return resolveModule(names, parent.parent.parent, parent.parent);
+    path = path.slice(0, path.lastIndexOf('/'));
+    return resolveModule(names, parent.parent.parent, parent.parent, path);
   } else if (n == '.') {
     if (!parent) {
       throw ["error", "invalid_require_path", 'Object has no parent '+JSON.stringify(current)];
     }
-    return resolveModule(names, parent.parent, parent);
+    return resolveModule(names, parent.parent, parent, path);
   }
   if (!current[n]) {
     throw ["error", "invalid_require_path", 'Object has no property "'+n+'". '+JSON.stringify(current)];
   }
-  var p = current
+  var p = current;
   current = current[n];
   current.parent = p;
-  return resolveModule(names, p, current)
-}
+  path = path ? path + '/' + n : n;
+  return resolveModule(names, p, current, path);
+};
 
 var Couch = {
   // moving this away from global so we can move to json2.js later
@@ -51,18 +53,18 @@ var Couch = {
       if (sandbox) {
         if (ddoc) {
           var require = function(name, parent) {
-            var exports = {};
-            var resolved = resolveModule(name.split('/'), parent, ddoc);
-            var source = resolved[0]; 
-            parent = resolved[1];
-            var s = "function (exports, require) { " + source + " }";
+            if (!parent) {parent = {}};
+            var resolved = resolveModule(name.split('/'), parent.actual, ddoc, parent.id);
+            var s = "function (module, exports, require) { " + resolved[0] + " }";
+            var module = {id:resolved[2], actual:resolved[1]};
+            module.exports = {};
             try {
               var func = sandbox ? evalcx(s, sandbox) : eval(s);
-              func.apply(sandbox, [exports, function(name) {return require(name, parent, source)}]);
+              func.apply(sandbox, [module, module.exports, function(name) {return require(name, module)}]);
             } catch(e) { 
               throw ["error","compilation_error","Module require('"+name+"') raised error "+e.toSource()]; 
             }
-            return exports;
+            return module.exports;
           }
           sandbox.require = require;
         }
