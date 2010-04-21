@@ -69,14 +69,14 @@ stop() ->
 
 %% @doc turn a couch config proplist into a dynomite configuration record
 couch2dynomite_config(ClusterConfig, Directory) ->
-  Q = ?l2i(proplists:get_value("q", ClusterConfig, "3")),
-  R = ?l2i(proplists:get_value("r", ClusterConfig, "2")),
-  W = ?l2i(proplists:get_value("w", ClusterConfig, "1")),
-  N = ?l2i(proplists:get_value("n", ClusterConfig, "4")),
+  Q = ?l2i(couch_util:get_value("q", ClusterConfig, "3")),
+  R = ?l2i(couch_util:get_value("r", ClusterConfig, "2")),
+  W = ?l2i(couch_util:get_value("w", ClusterConfig, "1")),
+  N = ?l2i(couch_util:get_value("n", ClusterConfig, "4")),
   %% use couch's database_dir here, to avoid /tmp/data not existing
-  Webport = ?l2i(proplists:get_value("webport", ClusterConfig, "8080")),
-  Meta = proplists:get_value("meta", ClusterConfig, []),
-  StorageMod = proplists:get_value("storage_mod", ClusterConfig, []),
+  Webport = ?l2i(couch_util:get_value("webport", ClusterConfig, "8080")),
+  Meta = couch_util:get_value("meta", ClusterConfig, []),
+  StorageMod = couch_util:get_value("storage_mod", ClusterConfig, []),
   #config{q=Q, r=R, w=W, n=N, directory=Directory, web_port=Webport,
           meta=Meta, storage_mod=StorageMod}.
 
