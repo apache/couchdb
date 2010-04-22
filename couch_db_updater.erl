@@ -161,8 +161,12 @@ handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
                 fun(Value, _Offset, Acc) -> {ok, [Value | Acc]} end, []),
         {ok, NewLocalBtree} = couch_btree:add(NewDb#db.local_docs_btree, LocalDocs),
 
-        NewDb2 = commit_data( NewDb#db{local_docs_btree=NewLocalBtree,
-                main_pid = Db#db.main_pid,filepath = Filepath}),
+        NewDb2 = commit_data(NewDb#db{
+            local_docs_btree = NewLocalBtree,
+            main_pid = Db#db.main_pid,
+            filepath = Filepath,
+            instance_start_time = Db#db.instance_start_time
+        }),
 
         ?LOG_DEBUG("CouchDB swapping files ~s and ~s.",
                 [Filepath, CompactFilepath]),
