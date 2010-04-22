@@ -347,5 +347,44 @@ couchTests.changes = function(debug) {
   req = CouchDB.request("GET", "/test_suite_db/_changes?filter=changes_filter/conflicted");
   resp = JSON.parse(req.responseText);
   T(resp.results.length == 1);
+
+  // test with erlang filter function
+  run_on_modified_server([{
+    section: "native_query_servers",
+    key: "erlang",
+    value: "{couch_native_process, start_link, []}"
+  }], function() {
+    var erl_ddoc = {
+      _id: "_design/erlang",
+      language: "erlang",
+      filters: {
+        foo:
+          'fun({Doc}, Req) -> ' +
+          '  Value = proplists:get_value(<<"value">>, Doc),' +
+          '  (Value rem 2) =:= 0' +
+          'end.'
+      }
+    };
+
+    db.deleteDb();
+    db.createDb();
+    T(db.save(erl_ddoc).ok);
+
+    var req = CouchDB.request("GET", "/test_suite_db/_changes?filter=erlang/foo");
+    var resp = JSON.parse(req.responseText);
+    T(resp.results.length === 0);
+
+    T(db.save({_id: "doc1", value : 1}).ok);
+    T(db.save({_id: "doc2", value : 2}).ok);
+    T(db.save({_id: "doc3", value : 3}).ok);
+    T(db.save({_id: "doc4", value : 4}).ok);
+
+    var req = CouchDB.request("GET", "/test_suite_db/_changes?filter=erlang/foo");
+    var resp = JSON.parse(req.responseText);
+    T(resp.results.length === 2);
+    T(resp.results[0].id === "doc2");
+    T(resp.results[1].id === "doc4");
+  });
+
 };
 
