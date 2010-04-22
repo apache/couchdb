@@ -208,8 +208,7 @@ filter_docs(Req, Db, DDoc, FName, Docs) ->
         couch_httpd_external:json_req_obj(HttpReq, Db)
     end,
     JsonDocs = [couch_doc:to_json_obj(Doc, [revs]) || Doc <- Docs],
-    JsonCtx = couch_util:json_user_ctx(Db),
-    [true, Passes] = ddoc_prompt(DDoc, [<<"filters">>, FName], [JsonDocs, JsonReq, JsonCtx]),
+    [true, Passes] = ddoc_prompt(DDoc, [<<"filters">>, FName], [JsonDocs, JsonReq]),
     {ok, Passes}.
 
 ddoc_proc_prompt({Proc, DDocId}, FunPath, Args) -> 
