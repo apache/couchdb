@@ -31,6 +31,7 @@ couchTests.compact = function(debug) {
   T(db.save(binAttDoc).ok);
 
   var originalsize = db.info().disk_size;
+  var start_time = db.info().instance_start_time;
 
   for(var i in docs) {
       db.deleteDoc(docs[i]);
@@ -43,6 +44,7 @@ couchTests.compact = function(debug) {
   T(db.last_req.status == 202);
   // compaction isn't instantaneous, loop until done
   while (db.info().compact_running) {};
+  T(db.info().instance_start_time == start_time);
 
   T(db.ensureFullCommit().ok);
   restartServer();
