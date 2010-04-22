@@ -15,9 +15,8 @@ var Filter = {
     var results = [];
     var docs = args[0];
     var req = args[1];
-    var userCtx = args[2];
     for (var i=0; i < docs.length; i++) {
-      results.push((fun.apply(ddoc, [docs[i], req, userCtx]) && true) || false);
+      results.push((fun.apply(ddoc, [docs[i], req]) && true) || false);
     };
     respond([true, results]);
   }
