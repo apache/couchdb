@@ -853,7 +853,7 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
     case [A || A <- Atts, A#att.name == FileName] of
     [] ->
         throw({not_found, "Document is missing attachment"});
-    [#att{type=Type, encoding=Enc}=Att] ->
+    [#att{type=Type, encoding=Enc, disk_len=DiskLen, att_len=AttLen}=Att] ->
         Etag = couch_httpd:doc_etag(Doc),
         ReqAcceptsAttEnc = lists:member(
            atom_to_list(Enc),
@@ -869,6 +869,25 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
         _ ->
             []
         end,
+        Len = case {Enc, ReqAcceptsAttEnc} of
+        {identity, _} ->
+            % stored and served in identity form
+            DiskLen;
+        {_, false} when DiskLen =/= AttLen ->
+            % Stored encoded, but client doesn't accept the encoding we used,
+            % so we need to decode on the fly.  DiskLen is the identity length
+            % of the attachment.
+            DiskLen;
+        {_, true} ->
+            % Stored and served encoded.  AttLen is the encoded length.
+            AttLen;
+        _ ->
+            % We received an encoded attachment and stored it as such, so we
+            % don't know the identity length.  The client doesn't accept the
+            % encoding, and since we cannot serve a correct Content-Length
+            % header we'll fall back to a chunked response.
+            undefined
+        end,
         AttFun = case ReqAcceptsAttEnc of
         false ->
             fun couch_doc:att_foldl_decode/3;
@@ -879,9 +898,15 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
             Req,
             Etag,
             fun() ->
-                {ok, Resp} = start_chunked_response(Req, 200, Headers),
-                AttFun(Att, fun(Seg, _) -> send_chunk(Resp, Seg) end, ok),
-                last_chunk(Resp)
+                case Len of
+                undefined ->
+                    {ok, Resp} = start_chunked_response(Req, 200, Headers),
+                    AttFun(Att, fun(Seg, _) -> send_chunk(Resp, Seg) end, ok),
+                    last_chunk(Resp);
+                _ ->
+                    {ok, Resp} = start_response_length(Req, 200, Headers, Len),
+                    AttFun(Att, fun(Seg, _) -> send(Resp, Seg) end, ok)
+                end
             end
         )
     end;
