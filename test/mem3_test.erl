@@ -123,3 +123,22 @@ join_with_wrong_order(_Pid) ->
     ?assertEqual({error,{position_exists,3,c}}, Res),
     %?debugFmt("~nFullmap: ~p~n", [mem3:fullmap()]),
     ok.
+
+
+merge_nodes_test() ->
+    A = [{1,a1,[]},{2,a2,[]},{3,a3,[]}],
+    B = [{1,a1,[]},{2,a2,[]},{3,b3,[]}],
+    ?assertEqual(A, mem3:merge_nodes(A,B)),
+    ?assertEqual(mem3:merge_nodes(A,B), mem3:merge_nodes(B,A)),
+    C = [{1,c1,[]},{2,c2,[]},{3,c3,[]}],
+    ?assertEqual(A, mem3:merge_nodes(A,C)),
+    ?assertEqual(A, mem3:merge_nodes(C,A)),
+    ok.
+
+
+merge_nodes_with_init_nodelist_test() ->
+    A = [{1,a1,[]},{2,a2,[]},{3,a3,[]}],
+    B = [{0, b, []}],
+    ?assertEqual(A, mem3:merge_nodes(A,B)),
+    ?assertEqual(mem3:merge_nodes(A,B), mem3:merge_nodes(B,A)),
+    ok.
