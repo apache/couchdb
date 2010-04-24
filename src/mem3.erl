@@ -321,13 +321,16 @@ int_join(JoinType, ExtNodes, #mem{node=Node, nodes=Nodes, clock=Clock} = State,
 
 %% @doc handle the gossip messages
 %%      We're not using vector_clock:resolve b/c we need custom merge strategy
-handle_gossip(RemoteState=#mem{clock=RemoteClock},
+handle_gossip(RemoteState=#mem{clock=RemoteClock, node=RemoteNode},
               LocalState=#mem{clock=LocalClock}) ->
     case vector_clock:compare(RemoteClock, LocalClock) of
     equal -> LocalState;
-    less -> LocalState;
+    less ->
+        % remote node needs updating
+        gen_server:cast({?SERVER, RemoteNode}, {gossip, LocalState}),
+        LocalState;
     greater ->
-        % this node needs updating
+        % local node needs updating
         new_state(RemoteState);
     concurrent ->
         % ick, so let's resolve and merge states
