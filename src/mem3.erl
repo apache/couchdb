@@ -225,13 +225,13 @@ handle_cast(Msg, State) ->
 %% @doc handle nodedown messages because we have
 %%      net_kernel:monitor_nodes(true)
 handle_info({nodedown, Node}, State) ->
-    showroom_log:message(alert, "membership: nodedown from ~p", [Node]),
+    showroom_log:message(alert, "membership: nodedown ~p", [Node]),
     {noreply, State};
 
 %% @doc handle nodeup messages because we have
 %%      net_kernel:monitor_nodes(true)
 handle_info({nodeup, Node}, State) ->
-    showroom_log:message(alert, "membership: nodeup Node: ~p", [Node]),
+    showroom_log:message(alert, "membership: nodeup   ~p", [Node]),
     {noreply, State};
 
 %% ignored info
@@ -319,6 +319,8 @@ int_join(JoinType, ExtNodes, #mem{node=Node, nodes=Nodes, clock=Clock} = State,
     new_state(NewState, Pmap, Fullmap, Config).
 
 
+%% @doc handle the gossip messages
+%%      We're not using vector_clock:resolve b/c we need custom merge strategy
 handle_gossip(RemoteState=#mem{clock=RemoteClock},
               LocalState=#mem{clock=LocalClock}) ->
     case vector_clock:compare(RemoteClock, LocalClock) of
@@ -356,7 +358,6 @@ merge_nodes(Remote, Local) ->
     {R, []} -> R;
     _ -> erlang:min(Remote1, Local1)
     end.
-
 
 
 % notify(Type, Nodes) ->
