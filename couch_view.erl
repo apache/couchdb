@@ -90,8 +90,8 @@ cleanup_index_files(Db) ->
 
     % filter out the ones in use
     DeleteFiles = [FilePath
-		   || FilePath <- FileList,
-		      re:run(FilePath, RegExp, [{capture, none}]) =:= nomatch],
+           || FilePath <- FileList,
+              re:run(FilePath, RegExp, [{capture, none}]) =:= nomatch],
     % delete unused files
     ?LOG_DEBUG("deleting unused view index files: ~p",[DeleteFiles]),
     [file:delete(File)||File <- DeleteFiles],
@@ -369,6 +369,7 @@ nuke_dir(Dir) ->
 
 % keys come back in the language of btree - tuples.
 less_json_ids({JsonA, IdA}, {JsonB, IdB}) ->
+<<<<<<< HEAD
     case less_json0(JsonA, JsonB) of
     0 ->
         IdA < IdB;
