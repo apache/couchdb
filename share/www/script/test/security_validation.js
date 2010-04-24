@@ -13,7 +13,7 @@
 couchTests.security_validation = function(debug) {
   // This tests couchdb's security and validation features. This does
   // not test authentication, except to use test authentication code made
-  // specifically for this testing. It is a WWWW-Authenticate scheme named
+  // specifically for this testing. It is a WWW-Authenticate scheme named
   // X-Couch-Test-Auth, and the user names and passwords are hard coded
   // on the server-side.
   //
@@ -21,7 +21,7 @@ couchTests.security_validation = function(debug) {
   // implementation for Firefox and Safari, and probably other browsers are
   // broken (Firefox always prompts the user on 401 failures, Safari gives
   // odd security errors when using different name/passwords, perhaps due
-  // to cross site scripting prevention).  These problems essentially make Basic
+  // to cross site scripting prevention). These problems essentially make Basic
   // authentication testing in the browser impossible. But while hard to
   // test automated in the browser, Basic auth may still useful for real
   // world use where these bugs/behaviors don't matter.
