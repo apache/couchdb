@@ -41,6 +41,7 @@ couchTests.users_db = function(debug) {
     // test that you can use basic auth aginst the users db
     var s = CouchDB.session({
       headers : {
+        //                 base64_encode("jchris@apache.org:funnybone")
         "Authorization" : "Basic amNocmlzQGFwYWNoZS5vcmc6ZnVubnlib25l"
       }
     });
