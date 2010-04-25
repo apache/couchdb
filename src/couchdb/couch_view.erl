@@ -369,7 +369,6 @@ nuke_dir(Dir) ->
 
 % keys come back in the language of btree - tuples.
 less_json_ids({JsonA, IdA}, {JsonB, IdB}) ->
-<<<<<<< HEAD
     case less_json0(JsonA, JsonB) of
     0 ->
         IdA < IdB;
