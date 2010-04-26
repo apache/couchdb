@@ -43,7 +43,7 @@
 %% version 3 of membership state
 -record(mem, {header=3,
               node,
-              nodes,
-              clock,
+              nodes=[],
+              clock=[],
               args
              }).

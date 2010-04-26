@@ -61,16 +61,14 @@ init(_Pid) ->
 
 clock(_Pid) ->
     {ok, Clock} = mem3:clock(),
-    ?assertMatch([{?TEST_NODE_NAME, _}], Clock).
+    ?assertMatch([], Clock).
 
 
 join_first(_Pid) ->
     mem3:reset(),
     mem3:join(first, [{1, a, []}, {2, b, []}]),
-    Fullmap = mem3:fullmap(),
-    ?assertEqual(16, length(Fullmap)),
-    Pmap = mem3:partitions(),
-    ?assertEqual(8, length(Pmap)),
+    {ok, Nodes} = mem3:nodes(),
+    ?assertEqual(2, length(Nodes)),
     ok.
 
 
@@ -81,35 +79,35 @@ join_first_with_hints(_Pid) ->
                       {3, c, [{hints, [?HINT_C1, ?HINT_C2]}]},
                       {4, d, []},
                       {5, e, []}]),
-    Fullmap = mem3:fullmap(),
-    ?assertEqual(24, length(Fullmap)),
-    Pmap = mem3:partitions(),
-    ?assertEqual(8, length(Pmap)),
+    {ok, Nodes} = mem3:nodes(),
+    ?assertEqual(5, length(Nodes)),
     %?debugFmt("~nFullmap: ~p~n", [Fullmap]),
-    ?assertEqual([c,d,e], mem3:nodes_for_part(?HINT_C1)),
-    ?assertEqual([c,d,e], mem3:nodes_for_part(?HINT_C2)),
+%    ?assertEqual([c,d,e], mem3:nodes_for_part(?HINT_C1)),
+%    ?assertEqual([c,d,e], mem3:nodes_for_part(?HINT_C2)),
     ok.
 
 
 join_new_node(_Pid) ->
     mem3:reset(),
     mem3:join(first, [{1, a, []}, {2, b, []}, {3, c, []}]),
-    ?assertEqual(24, length(mem3:fullmap())),
-    ?assertEqual([], mem3:parts_for_node(d)),
+    {ok, Nodes1} = mem3:nodes(),
+    ?assertEqual(3, length(Nodes1)),
     mem3:join(new, [{4, d, []}]),
-    ?assertEqual(?PARTS_FOR_D1, mem3:parts_for_node(d)),
-    %?debugFmt("~nFullmap: ~p~n", [mem3:fullmap()]),
+    {ok, Nodes2} = mem3:nodes(),
+    ?assertEqual(4, length(Nodes2)),
+    ?debugFmt("~nNodes: ~p~n", [Nodes2]),
     ok.
 
 
 join_two_new_nodes(_Pid) ->
     mem3:reset(),
     mem3:join(first, [{1, a, []}, {2, b, []}, {3, c, []}]),
-    ?assertEqual([], mem3:parts_for_node(d)),
+    {ok, Nodes1} = mem3:nodes(),
+    ?assertEqual(3, length(Nodes1)),
     Res = mem3:join(new, [{4, d, []}, {5, e, []}]),
     ?assertEqual(ok, Res),
-    ?assertEqual([a,d,e], mem3:nodes_for_part(?x40)),
-    ?assertEqual([c,d,e], mem3:nodes_for_part(?x60)),
+    {ok, Nodes2} = mem3:nodes(),
+    ?assertEqual(5, length(Nodes2)),
     %?debugFmt("~nFullmap: ~p~n", [mem3:fullmap()]),
     ok.
 
@@ -117,7 +115,7 @@ join_two_new_nodes(_Pid) ->
 join_with_wrong_order(_Pid) ->
     mem3:reset(),
     mem3:join(first, [{1, a, []}, {2, b, []}, {3, c, []}]),
-    ?assertEqual([], mem3:parts_for_node(d)),
+%    ?assertEqual([], mem3:parts_for_node(d)),
     %?debugFmt("~nFullmap: ~p~n", [mem3:fullmap()]),
     Res = mem3:join(new, [{3, d, []}]),
     ?assertEqual({error,{position_exists,3,c}}, Res),
