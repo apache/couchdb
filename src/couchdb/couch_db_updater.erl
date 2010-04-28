@@ -856,8 +856,8 @@ start_copy_compact(#db{name=Name,filepath=Filepath}=Db) ->
         ok = couch_file:write_header(Fd, Header=#db_header{})
     end,
     NewDb = init_db(Name, CompactFile, Fd, Header),
+    unlink(Fd),
     NewDb2 = copy_compact(Db, NewDb, Retry),
-
-    gen_server:cast(Db#db.update_pid, {compact_done, CompactFile}),
-    close_db(NewDb2).
+    close_db(NewDb2),
+    gen_server:cast(Db#db.update_pid, {compact_done, CompactFile}).
 
