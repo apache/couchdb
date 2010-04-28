@@ -314,15 +314,8 @@ handle_join(first, ExtNodes, nil, State) ->
 
 handle_join(new, ExtNodes, PingNode, #mem{args=Args} = State) ->
     NewState = case get_test(Args) of
-    undefined ->
-        % ping the PingNode and get its state
-        pong = net_adm:ping(PingNode),
-        timer:sleep(1000), % let dist. erl get set up... sigh.
-        {ok, RemoteState} = rpc:call(PingNode, mem3, state, []),
-        RemoteState;
-    _ ->
-        % testing, so meh
-        State
+    undefined -> get_pingnode_state(PingNode);
+    _ -> State % testing, so meh
     end,
     % now use this info to join the ring
     int_join(ExtNodes, NewState);
@@ -347,6 +340,14 @@ int_join(ExtNodes, #mem{nodes=Nodes, clock=Clock} = State) ->
     NewState = State#mem{nodes=NewNodes1, clock=NewClock},
     install_new_state(NewState),
     NewState.
+
+
+get_pingnode_state(PingNode) ->
+    % ping the PingNode and get its state
+    pong = net_adm:ping(PingNode),
+    timer:sleep(1000), % let dist. erl get set up... sigh.
+    {ok, RemoteState} = rpc:call(PingNode, mem3, state, []),
+    RemoteState.
 
 
 %% @doc handle the gossip messages
@@ -529,7 +530,8 @@ get_remote_states(NodeList) ->
     NodeList1 = lists:delete(node(), NodeList),
     {States1, BadNodes} = rpc:multicall(NodeList1, mem3, state, [], 5000),
     {_Status, States2} = lists:unzip(States1),
-    {lists:zip(NodeList1,States2), BadNodes}.
+    NodeList2 = NodeList1 -- BadNodes,
+    {lists:zip(NodeList2,States2), BadNodes}.
 
 
 %% @doc compare state with states based on vector clock
