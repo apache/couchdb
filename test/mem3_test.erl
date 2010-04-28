@@ -66,7 +66,7 @@ clock(_Pid) ->
 
 join_first(_Pid) ->
     mem3:reset(),
-    mem3:join(first, [{1, a, []}, {2, b, []}]),
+    mem3:join(first, [{1, a, []}, {2, b, []}], nil),
     {ok, Nodes} = mem3:nodes(),
     ?assertEqual(2, length(Nodes)),
     ok.
@@ -78,7 +78,8 @@ join_first_with_hints(_Pid) ->
                       {2, b, []},
                       {3, c, [{hints, [?HINT_C1, ?HINT_C2]}]},
                       {4, d, []},
-                      {5, e, []}]),
+                      {5, e, []}],
+              nil),
     {ok, Nodes} = mem3:nodes(),
     ?assertEqual(5, length(Nodes)),
     %?debugFmt("~nFullmap: ~p~n", [Fullmap]),
@@ -89,22 +90,21 @@ join_first_with_hints(_Pid) ->
 
 join_new_node(_Pid) ->
     mem3:reset(),
-    mem3:join(first, [{1, a, []}, {2, b, []}, {3, c, []}]),
+    mem3:join(first, [{1, a, []}, {2, b, []}, {3, c, []}], nil),
     {ok, Nodes1} = mem3:nodes(),
     ?assertEqual(3, length(Nodes1)),
-    mem3:join(new, [{4, d, []}]),
+    mem3:join(new, [{4, d, []}], a),
     {ok, Nodes2} = mem3:nodes(),
     ?assertEqual(4, length(Nodes2)),
-    ?debugFmt("~nNodes: ~p~n", [Nodes2]),
     ok.
 
 
 join_two_new_nodes(_Pid) ->
     mem3:reset(),
-    mem3:join(first, [{1, a, []}, {2, b, []}, {3, c, []}]),
+    mem3:join(first, [{1, a, []}, {2, b, []}, {3, c, []}], nil),
     {ok, Nodes1} = mem3:nodes(),
     ?assertEqual(3, length(Nodes1)),
-    Res = mem3:join(new, [{4, d, []}, {5, e, []}]),
+    Res = mem3:join(new, [{4, d, []}, {5, e, []}], b),
     ?assertEqual(ok, Res),
     {ok, Nodes2} = mem3:nodes(),
     ?assertEqual(5, length(Nodes2)),
@@ -114,15 +114,18 @@ join_two_new_nodes(_Pid) ->
 
 join_with_wrong_order(_Pid) ->
     mem3:reset(),
-    mem3:join(first, [{1, a, []}, {2, b, []}, {3, c, []}]),
+    mem3:join(first, [{1, a, []}, {2, b, []}, {3, c, []}], nil),
 %    ?assertEqual([], mem3:parts_for_node(d)),
     %?debugFmt("~nFullmap: ~p~n", [mem3:fullmap()]),
-    Res = mem3:join(new, [{3, d, []}]),
+    Res = mem3:join(new, [{3, d, []}], c),
     ?assertEqual({error,{position_exists,3,c}}, Res),
     %?debugFmt("~nFullmap: ~p~n", [mem3:fullmap()]),
     ok.
 
 
+%%
+%% tests without running gen_server
+%%
 merge_nodes_test() ->
     A = [{1,a1,[]},{2,a2,[]},{3,a3,[]}],
     B = [{1,a1,[]},{2,a2,[]},{3,b3,[]}],
@@ -139,4 +142,16 @@ merge_nodes_with_init_nodelist_test() ->
     B = [{0, b, []}],
     ?assertEqual(A, mem3:merge_nodes(A,B)),
     ?assertEqual(mem3:merge_nodes(A,B), mem3:merge_nodes(B,A)),
+    ok.
+
+
+next_up_nodes_test() ->
+    Nodes = [a,b,c,d],
+    UpNodes = [a,b,d],
+    ?assertEqual(b, mem3:next_up_node(a,Nodes,UpNodes)),
+    ?assertEqual(d, mem3:next_up_node(b,Nodes,UpNodes)),
+    ?assertEqual(a, mem3:next_up_node(d,Nodes,UpNodes)),
+    ?assertThrow({error, no_gossip_targets_available},
+                 mem3:next_up_node(a,[a,b,c],[])),
+    ?assertEqual(b, mem3:next_up_node(a,[a,b],[a,b])),
     ok.
