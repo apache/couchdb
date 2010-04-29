@@ -26,6 +26,7 @@ level = info
 [couch_httpd_auth]
 authentication_db = _users
 require_valid_user = false
+timeout = 600 ; number of seconds before automatic logout
 
 [query_servers]
 javascript = %bindir%/%couchjs_command_name% %localbuilddatadir%/server/main.js
