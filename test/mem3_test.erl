@@ -29,8 +29,8 @@ all_tests_test_() ->
             [
              fun init/1,
              fun clock/1,
-             fun join_first/1,
-             fun join_first_with_hints/1,
+             fun join_init/1,
+             fun join_init_with_hints/1,
              fun join_new_node/1,
              fun join_two_new_nodes/1,
              fun join_with_wrong_order/1
@@ -64,17 +64,17 @@ clock(_Pid) ->
     ?assertMatch([], Clock).
 
 
-join_first(_Pid) ->
+join_init(_Pid) ->
     mem3:reset(),
-    mem3:join(first, [{1, a, []}, {2, b, []}], nil),
+    mem3:join(init, [{1, a, []}, {2, b, []}], nil),
     {ok, Nodes} = mem3:nodes(),
     ?assertEqual(2, length(Nodes)),
     ok.
 
 
-join_first_with_hints(_Pid) ->
+join_init_with_hints(_Pid) ->
     mem3:reset(),
-    mem3:join(first, [{1, a, []},
+    mem3:join(init, [{1, a, []},
                       {2, b, []},
                       {3, c, [{hints, [?HINT_C1, ?HINT_C2]}]},
                       {4, d, []},
@@ -90,10 +90,10 @@ join_first_with_hints(_Pid) ->
 
 join_new_node(_Pid) ->
     mem3:reset(),
-    mem3:join(first, [{1, a, []}, {2, b, []}, {3, c, []}], nil),
+    mem3:join(init, [{1, a, []}, {2, b, []}, {3, c, []}], nil),
     {ok, Nodes1} = mem3:nodes(),
     ?assertEqual(3, length(Nodes1)),
-    mem3:join(new, [{4, d, []}], a),
+    mem3:join(join, [{4, d, []}], a),
     {ok, Nodes2} = mem3:nodes(),
     ?assertEqual(4, length(Nodes2)),
     ok.
@@ -101,10 +101,10 @@ join_new_node(_Pid) ->
 
 join_two_new_nodes(_Pid) ->
     mem3:reset(),
-    mem3:join(first, [{1, a, []}, {2, b, []}, {3, c, []}], nil),
+    mem3:join(init, [{1, a, []}, {2, b, []}, {3, c, []}], nil),
     {ok, Nodes1} = mem3:nodes(),
     ?assertEqual(3, length(Nodes1)),
-    Res = mem3:join(new, [{4, d, []}, {5, e, []}], b),
+    Res = mem3:join(join, [{4, d, []}, {5, e, []}], b),
     ?assertEqual(ok, Res),
     {ok, Nodes2} = mem3:nodes(),
     ?assertEqual(5, length(Nodes2)),
@@ -114,10 +114,10 @@ join_two_new_nodes(_Pid) ->
 
 join_with_wrong_order(_Pid) ->
     mem3:reset(),
-    mem3:join(first, [{1, a, []}, {2, b, []}, {3, c, []}], nil),
+    mem3:join(init, [{1, a, []}, {2, b, []}, {3, c, []}], nil),
 %    ?assertEqual([], mem3:parts_for_node(d)),
     %?debugFmt("~nFullmap: ~p~n", [mem3:fullmap()]),
-    Res = mem3:join(new, [{3, d, []}], c),
+    Res = mem3:join(join, [{3, d, []}], c),
     ?assertEqual({error,{position_exists,3,c}}, Res),
     %?debugFmt("~nFullmap: ~p~n", [mem3:fullmap()]),
     ok.

@@ -41,7 +41,7 @@
 -define(STATE_FILE_PREFIX, "membership").
 
 %% types - stick somewhere in includes?
--type join_type() :: first | new | replace.
+-type join_type() :: init | join | replace | leave.
 -type join_order() :: non_neg_integer().
 -type options() :: list().
 -type mem_node() :: {join_order(), node(), options()}.
@@ -173,15 +173,17 @@ init(Args) ->
 
 %% new node(s) joining to this node
 handle_call({join, JoinType, ExtNodes, PingNode}, _From, State) ->
-    % NewState = handle_join(JoinType, ExtNodes, PingNode, State),
-    % {reply, ok, NewState};
-    try
-        NewState = handle_join(JoinType, ExtNodes, PingNode, State),
-        {reply, ok, NewState}
-    catch _:Error ->
-        showroom_log:message(error, "~p", [Error]),
-        {reply, Error, State}
-    end;
+     % {ok, NewState} = handle_join(JoinType, ExtNodes, PingNode, State),
+     % {reply, ok, NewState};
+     try
+         case handle_join(JoinType, ExtNodes, PingNode, State) of
+         {ok, NewState} -> {reply, ok, NewState};
+         Other -> {reply, Other, State}
+         end
+     catch _:Error ->
+         showroom_log:message(error, "~p", [Error]),
+         {reply, Error, State}
+     end;
 
 %% clock
 handle_call(clock, _From, #mem{clock=Clock} = State) ->
@@ -306,13 +308,13 @@ handle_init(_Test, #mem{nodes=Nodes, args=Args} = OldState) ->
     end.
 
 
-%% handle join activities, return NewState
-handle_join(first, ExtNodes, nil, State) ->
+%% handle join activities, return {ok,NewState}
+handle_join(init, ExtNodes, nil, State) ->
     {_,Nodes,_} = lists:unzip3(ExtNodes),
     ping_all_yall(Nodes),
     int_join(ExtNodes, State);
 
-handle_join(new, ExtNodes, PingNode, #mem{args=Args} = State) ->
+handle_join(join, ExtNodes, PingNode, #mem{args=Args} = State) ->
     NewState = case get_test(Args) of
     undefined -> get_pingnode_state(PingNode);
     _ -> State % testing, so meh
@@ -324,10 +326,14 @@ handle_join(replace, [_OldNode | _], _PingNode, _State) ->
     % TODO implement me
     ok;
 
+handle_join(leave, [_OldNode | _], _PingNode, _State) ->
+    % TODO implement me
+    ok;
+
 handle_join(JoinType, _, PingNode, _) ->
     showroom_log:message(info, "membership: unknown join type: ~p "
                          "for ping node: ~p", [JoinType, PingNode]),
-    {error, {unknown_join_type, JoinType}}.
+    {error, unknown_join_type}.
 
 
 int_join(ExtNodes, #mem{nodes=Nodes, clock=Clock} = State) ->
@@ -339,7 +345,7 @@ int_join(ExtNodes, #mem{nodes=Nodes, clock=Clock} = State) ->
     NewClock = vector_clock:increment(node(), Clock),
     NewState = State#mem{nodes=NewNodes1, clock=NewClock},
     install_new_state(NewState),
-    NewState.
+    {ok, NewState}.
 
 
 get_pingnode_state(PingNode) ->
@@ -507,9 +513,11 @@ check_pos(Pos, Node, Nodes) ->
         {_,OldNode,_} = Found,
         if
         OldNode =:= Node ->
-            throw({error, {node_exists_at_position, Pos, Node}});
+            Msg = "node_exists_at_position_" ++ integer_to_list(Pos),
+            throw({error, list_to_binary(Msg)});
         true ->
-            throw({error, {position_exists, Pos, OldNode}})
+            Msg = "position_exists_" ++ integer_to_list(Pos),
+            throw({error, list_to_binary(Msg)})
         end
     end.
 
