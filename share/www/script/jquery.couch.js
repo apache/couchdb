@@ -352,6 +352,26 @@
             "An error occurred querying the database"
           );
         },
+        list: function(list, view, options) {
+          var list = list.split('/');
+          var options = options || {};
+          var type = 'GET';
+          var data = null;
+          if (options['keys']) {
+            type = 'POST';
+            var keys = options['keys'];
+            delete options['keys'];
+            data = toJSON({'keys': keys });
+          }
+          ajax({
+              type: type,
+              data: data,
+              url: this.uri + '_design/' + list[0] +
+                   '/_list/' + list[1] + '/' + view + encodeOptions(options)
+              },
+              options, 'An error occured accessing the list'
+          );
+        },
         view: function(name, options) {
           var name = name.split('/');
           var options = options || {};
