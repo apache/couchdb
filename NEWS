@@ -50,6 +50,12 @@ This version is a feature-freeze release candidate for Apache CouchDB 1.0.
  * Added ability to replicate documents by id.
  * Added virtual host handling.
  * Uses json2.js for JSON serialization compatiblity with native JSON.
+ * Fixed CVE-2010-0009: Apache CouchDB Timing Attack Vulnerability.
+
+Version 0.10.2
+--------------
+
+ * Fixed CVE-2010-0009: Apache CouchDB Timing Attack Vulnerability.
 
 Version 0.10.1
 --------------
