@@ -11,6 +11,7 @@ dnl License for the specific language governing permissions and limitations
 dnl under the License.
 
 m4_include([m4/ac_check_icu.m4])
+m4_include([m4/ac_check_curl.m4])
 
 AC_INIT([LOCAL_PACKAGE_NAME], [LOCAL_VERSION], [], [LOCAL_PACKAGE_TARNAME])
 
