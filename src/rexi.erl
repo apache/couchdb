@@ -1,6 +1,6 @@
 -module(rexi).
 -export([start/0, stop/0, restart/0]).
--export([cast/2, cast/3]).
+-export([cast/2, cast/3, kill/2]).
 -export([reply/1]).
 
 -define(SERVER, rexi_server).
@@ -21,7 +21,7 @@ cast(Node, MFA) ->
 %% @doc Executes apply(M, F, A) on Node.
 %% You might want to use this instead of rpc:cast/4 for two reasons.  First,
 %% the Caller pid and the returned reference are inserted into the remote
-%% process' dictionary as 'rexi_from', so it has a way to communicate with you.
+%% process' dictionary as `rexi_from', so it has a way to communicate with you.
 %% Second, the remote process is monitored. If it dies, Caller will receive a
 %% message of the form `{rexi_EXIT, Ref, Reason}' where Ref is the returned 
 %% reference and Reason is the exit reason.
@@ -30,6 +30,12 @@ cast(Node, Caller, MFA) ->
     Ref = make_ref(),
     ok = gen_server:cast({?SERVER, Node}, {doit, {Caller,Ref}, MFA}),
     {ok, Ref}.
+
+%% @doc Sends an async kill signal to the remote process associated with Ref.
+%% No rexi_EXIT message will be sent.
+-spec kill(node(), reference()) -> ok.
+kill(Node, Ref) ->
+    ok = gen_server:cast({?SERVER, Node}, {kill, Ref}).
 
 %% @doc convenience function to reply to the original rexi Caller.
 -spec reply(any()) -> any().

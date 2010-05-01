@@ -22,7 +22,14 @@ handle_call(_Request, _From, St) ->
 
 handle_cast({doit, From, MFA}, #st{workers=Workers} = St) ->
     {LocalPid, Ref} = spawn_monitor(?MODULE, init_p, [From, MFA]),
-    {noreply, St#st{workers = add_worker({LocalPid, Ref, From}, Workers)}}.
+    {noreply, St#st{workers = add_worker({LocalPid, Ref, From}, Workers)}};
+
+handle_cast({kill, Ref}, #st{workers=Workers} = St) ->
+    case find_worker(Ref, Workers) of
+    {Pid, Ref, _} ->
+        exit(Pid, kill);
+    false -> ok end,
+    {noreply, St#st{workers = remove_worker(Ref, Workers)}}.
 
 handle_info({'DOWN', Ref, process, _, normal}, #st{workers=Workers} = St) ->
     {noreply, St#st{workers = remove_worker(Ref, Workers)}};
