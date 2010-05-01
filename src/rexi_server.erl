@@ -30,7 +30,7 @@ handle_info({'DOWN', Ref, process, _, normal}, #st{workers=Workers} = St) ->
 handle_info({'DOWN', Ref, process, Pid, Reason}, #st{workers=Workers} = St) ->
     case find_worker(Ref, Workers) of
     {Pid, Ref, From} ->
-        notify_caller(From, Pid, Reason);
+        notify_caller(From, Reason);
     false -> ok end,
     {noreply, St#st{workers = remove_worker(Ref, Workers)}};
 
@@ -44,6 +44,8 @@ terminate(_Reason, St) ->
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
 
+%% @doc initializes a process started by rexi_server.
+-spec init_p({pid(),reference()}, mfa()) -> any().
 init_p(From, {M,F,A}) ->
     put(rexi_from, From),
     try apply(M, F, A) catch _:Reason -> exit(Reason) end.
@@ -59,5 +61,5 @@ remove_worker(Ref, List) ->
 find_worker(Ref, List) ->
     lists:keyfind(Ref, 2, List).
 
-notify_caller({Caller, CallerRef}, Pid, Reason) ->
-    Caller ! {worker_died, CallerRef, Pid, Reason}.
+notify_caller({Caller, Ref}, Reason) ->
+    erlang:send(Caller, {rexi_EXIT, Ref, Reason}).
