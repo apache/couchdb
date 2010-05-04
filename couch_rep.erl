@@ -465,7 +465,7 @@ make_replication_id({Props}, UserCtx) ->
         end,
     Extension = maybe_append_options(
         [<<"continuous">>, <<"create_target">>], Props),
-    {couch_util:to_hex(erlang:md5(term_to_binary(Base))), Extension}.
+    {couch_util:to_hex(couch_util:md5(term_to_binary(Base))), Extension}.
 
 maybe_add_trailing_slash(Url) ->
     re:replace(Url, "[^/]$", "&/", [{return, list}]).

@@ -89,7 +89,7 @@ append_binary(Fd, Bin) ->
 append_binary_md5(Fd, Bin) ->
     Size = iolist_size(Bin),
     gen_server:call(Fd, {append_bin, 
-            [<<1:1/integer,Size:31/integer>>, erlang:md5(Bin), Bin]}, infinity).
+            [<<1:1/integer,Size:31/integer>>, couch_util:md5(Bin), Bin]}, infinity).
 
 
 %%----------------------------------------------------------------------
@@ -124,7 +124,7 @@ pread_iolist(Fd, Pos) ->
         {ok, Md5List, ValPos} = read_raw_iolist(Fd, NextPos, 16),
         Md5 = iolist_to_binary(Md5List),
         {ok, IoList, _} = read_raw_iolist(Fd,ValPos,Len),
-        case erlang:md5(IoList) of
+        case couch_util:md5(IoList) of
         Md5 -> ok;
         _ ->  throw(file_corruption)
         end, 
@@ -212,7 +212,7 @@ read_header(Fd) ->
 
 write_header(Fd, Data) ->
     Bin = term_to_binary(Data),
-    Md5 = erlang:md5(Bin),
+    Md5 = couch_util:md5(Bin),
     % now we assemble the final header binary and write to disk
     FinalBin = <<Md5/binary, Bin/binary>>,
     gen_server:call(Fd, {write_header, FinalBin}, infinity).
@@ -314,7 +314,7 @@ handle_call({upgrade_old_header, Prefix}, _From, #file{fd=Fd}=File) ->
     {ok, Header} ->
         {ok, TailAppendBegin} = file:position(Fd, eof),
         Bin = term_to_binary(Header),
-        Md5 = erlang:md5(Bin),
+        Md5 = couch_util:md5(Bin),
         % now we assemble the final header binary and write to disk
         FinalBin = <<Md5/binary, Bin/binary>>,
         {reply, ok, _} = handle_call({write_header, FinalBin}, ok, File),
@@ -395,7 +395,7 @@ extract_header(Prefix, Bin) ->
     case HeaderPrefix of
     Prefix ->
         % check the integrity signature
-        case erlang:md5(TermBin) == Sig of
+        case couch_util:md5(TermBin) == Sig of
         true ->
             Header = binary_to_term(TermBin),
             {ok, Header};
@@ -425,7 +425,7 @@ write_old_header(Fd, Prefix, Data) ->
     ok = file:sync(Fd),
     % pad out the header with zeros, then take the md5 hash
     PadZeros = <<0:(8*(?HEADER_SIZE - FilledSize2))>>,
-    Sig = erlang:md5([TermBin2, PadZeros]),
+    Sig = couch_util:md5([TermBin2, PadZeros]),
     % now we assemble the final header binary and write to disk
     WriteBin = <<Prefix/binary, TermBin2/binary, PadZeros/binary, Sig/binary>>,
     ?HEADER_SIZE = size(WriteBin), % sanity check
@@ -465,7 +465,7 @@ load_header(Fd, Block) ->
             file:pread(Fd, (Block*?SIZE_BLOCK) + 5, TotalBytes),
     <<Md5Sig:16/binary, HeaderBin/binary>> =
         iolist_to_binary(remove_block_prefixes(1, RawBin)),
-    Md5Sig = erlang:md5(HeaderBin),
+    Md5Sig = couch_util:md5(HeaderBin),
     {ok, HeaderBin}.
 
 calculate_total_read_len(0, FinalLen) ->

@@ -456,7 +456,7 @@ set_view_sig(#group{
             views=Views,
             def_lang=Language,
             design_options=DesignOptions}=G) ->
-    G#group{sig=erlang:md5(term_to_binary({Views, Language, DesignOptions}))}.
+    G#group{sig=couch_util:md5(term_to_binary({Views, Language, DesignOptions}))}.
 
 open_db_group(DbName, GroupId) ->
     case couch_db:open_int(DbName, []) of
