@@ -283,7 +283,7 @@ db_req(#httpd{path_parts=[_,<<"_ensure_full_commit">>]}=Req, _Db) ->
 db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
     couch_stats_collector:increment({httpd, bulk_requests}),
     {JsonProps} = couch_httpd:json_body_obj(Req),
-    DocsArray = proplists:get_value(<<"docs">>, JsonProps),
+    DocsArray = couch_util:get_value(<<"docs">>, JsonProps),
     case couch_httpd:header_value(Req, "X-Couch-Full-Commit") of
     "true" ->
         Options = [full_commit];
@@ -292,7 +292,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
     _ ->
         Options = []
     end,
-    case proplists:get_value(<<"new_edits">>, JsonProps, true) of
+    case couch_util:get_value(<<"new_edits">>, JsonProps, true) of
     true ->
         Docs = lists:map(
             fun({ObjProps} = JsonObj) ->
@@ -302,7 +302,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
                     <<>> -> couch_uuids:new();
                     Id0 -> Id0
                 end,
-                case proplists:get_value(<<"_rev">>, ObjProps) of
+                case couch_util:get_value(<<"_rev">>, ObjProps) of
                 undefined ->
                     Revs = {0, []};
                 Rev  ->
@@ -313,7 +313,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
             end,
             DocsArray),
         Options2 =
-        case proplists:get_value(<<"all_or_nothing">>, JsonProps) of
+        case couch_util:get_value(<<"all_or_nothing">>, JsonProps) of
         true  -> [all_or_nothing|Options];
         _ -> Options
         end,
@@ -362,7 +362,7 @@ db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs">>]}=Req, Db) ->
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_all_docs">>]}=Req, Db) ->
     {Fields} = couch_httpd:json_body_obj(Req),
-    case proplists:get_value(<<"keys">>, Fields, nil) of
+    case couch_util:get_value(<<"keys">>, Fields, nil) of
     nil ->
         ?LOG_DEBUG("POST to _all_docs with no keys member.", []),
         all_docs_view(Req, Db, nil);
@@ -484,7 +484,7 @@ all_docs_view(Req, Db, Keys) ->
     CurrentEtag = couch_httpd:make_etag(Info),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
 
-        TotalRowCount = proplists:get_value(doc_count, Info),
+        TotalRowCount = couch_util:get_value(doc_count, Info),
         StartId = if is_binary(StartKey) -> StartKey;
         true -> StartDocId
         end,
@@ -609,10 +609,10 @@ db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
     Form = couch_httpd:parse_form(Req),
     case proplists:is_defined("_doc", Form) of
     true ->
-        Json = ?JSON_DECODE(proplists:get_value("_doc", Form)),
+        Json = ?JSON_DECODE(couch_util:get_value("_doc", Form)),
         Doc = couch_doc_from_req(Req, DocId, Json);
     false ->
-        Rev = couch_doc:parse_rev(list_to_binary(proplists:get_value("_rev", Form))),
+        Rev = couch_doc:parse_rev(list_to_binary(couch_util:get_value("_rev", Form))),
         {ok, [{ok, Doc}]} = couch_db:open_doc_revs(Db, DocId, [Rev], [])
     end,
     UpdatedAtts = [
@@ -740,7 +740,7 @@ send_doc_efficiently(Req, #doc{atts=Atts}=Doc, Headers, Options) ->
         true ->
             Boundary = couch_uuids:random(),
             JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, [follows|Options])),
-            AttsSinceRevPos = proplists:get_value(atts_after_revpos, Options, 0),
+            AttsSinceRevPos = couch_util:get_value(atts_after_revpos, Options, 0),
             Len = couch_doc:len_doc_to_multi_part_stream(Boundary,JsonBytes,Atts,
                     AttsSinceRevPos,false),
             CType = {<<"Content-Type">>, 

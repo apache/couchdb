@@ -18,7 +18,7 @@
 % OAuth auth handler using per-node user db
 oauth_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
     serve_oauth(Req, fun(URL, Params, Consumer, Signature) ->
-        AccessToken = proplists:get_value("oauth_token", Params),
+        AccessToken = couch_util:get_value("oauth_token", Params),
         case couch_config:get("oauth_token_secrets", AccessToken) of
             undefined -> 
                 couch_httpd:send_error(Req, 400, <<"invalid_token">>,
@@ -44,14 +44,14 @@ set_user_ctx(Req, AccessToken) ->
     case couch_httpd_auth:get_user(Name) of
         nil -> Req;
         User ->
-            Roles = proplists:get_value(<<"roles">>, User, []),
+            Roles = couch_util:get_value(<<"roles">>, User, []),
             Req#httpd{user_ctx=#user_ctx{name=Name, roles=Roles}}
     end.
 
 % OAuth request_token
 handle_oauth_req(#httpd{path_parts=[_OAuth, <<"request_token">>], method=Method}=Req) ->
     serve_oauth(Req, fun(URL, Params, Consumer, Signature) ->
-        AccessToken = proplists:get_value("oauth_token", Params),
+        AccessToken = couch_util:get_value("oauth_token", Params),
         TokenSecret = couch_config:get("oauth_token_secrets", AccessToken),
         case oauth:verify(Signature, atom_to_list(Method), URL, Params, Consumer, TokenSecret) of
             true ->
@@ -88,7 +88,7 @@ serve_oauth_authorize(#httpd{method=Method}=Req) ->
         'GET' ->
             % Confirm with the User that they want to authenticate the Consumer
             serve_oauth(Req, fun(URL, Params, Consumer, Signature) ->
-                AccessToken = proplists:get_value("oauth_token", Params),
+                AccessToken = couch_util:get_value("oauth_token", Params),
                 TokenSecret = couch_config:get("oauth_token_secrets", AccessToken),
                 case oauth:verify(Signature, "GET", URL, Params, Consumer, TokenSecret) of
                     true ->
@@ -100,7 +100,7 @@ serve_oauth_authorize(#httpd{method=Method}=Req) ->
         'POST' ->
             % If the User has confirmed, we direct the User back to the Consumer with a verification code
             serve_oauth(Req, fun(URL, Params, Consumer, Signature) ->
-                AccessToken = proplists:get_value("oauth_token", Params),
+                AccessToken = couch_util:get_value("oauth_token", Params),
                 TokenSecret = couch_config:get("oauth_token_secrets", AccessToken),
                 case oauth:verify(Signature, "POST", URL, Params, Consumer, TokenSecret) of
                     true ->
@@ -129,24 +129,24 @@ serve_oauth(#httpd{mochi_req=MochiReq}=Req, Fun, FailSilently) ->
             end
     end,
     HeaderParams = oauth_uri:params_from_header_string(AuthHeader),
-    %Realm = proplists:get_value("realm", HeaderParams),
+    %Realm = couch_util:get_value("realm", HeaderParams),
     Params = proplists:delete("realm", HeaderParams) ++ MochiReq:parse_qs(),
     ?LOG_DEBUG("OAuth Params: ~p", [Params]),
-    case proplists:get_value("oauth_version", Params, "1.0") of
+    case couch_util:get_value("oauth_version", Params, "1.0") of
         "1.0" ->
-            case proplists:get_value("oauth_consumer_key", Params, undefined) of
+            case couch_util:get_value("oauth_consumer_key", Params, undefined) of
                 undefined ->
                     case FailSilently of
                         true -> Req;
                         false -> couch_httpd:send_error(Req, 400, <<"invalid_consumer">>, <<"Invalid consumer.">>)
                     end;
                 ConsumerKey ->
-                    SigMethod = proplists:get_value("oauth_signature_method", Params),
+                    SigMethod = couch_util:get_value("oauth_signature_method", Params),
                     case consumer_lookup(ConsumerKey, SigMethod) of
                         none ->
                             couch_httpd:send_error(Req, 400, <<"invalid_consumer">>, <<"Invalid consumer (key or signature method).">>);
                         Consumer ->
-                            Signature = proplists:get_value("oauth_signature", Params),
+                            Signature = couch_util:get_value("oauth_signature", Params),
                             URL = couch_httpd:absolute_uri(Req, MochiReq:get(raw_path)),
                             Fun(URL, proplists:delete("oauth_signature", Params),
                                 Consumer, Signature)

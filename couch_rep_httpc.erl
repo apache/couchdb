@@ -34,7 +34,7 @@ do_request(Req) ->
         qs = QS
     } = Req,
     Url = full_url(Req),
-    Headers = case proplists:get_value(<<"oauth">>, Auth) of
+    Headers = case couch_util:get_value(<<"oauth">>, Auth) of
     undefined ->
         Headers0;
     {OAuthProps} ->
@@ -75,7 +75,7 @@ db_exists(Req, CanonicalUrl, CreateDB) ->
         url = Url
     } = Req,
     HeadersFun = fun(Method) ->
-        case proplists:get_value(<<"oauth">>, Auth) of
+        case couch_util:get_value(<<"oauth">>, Auth) of
         undefined ->
             Headers0;
         {OAuthProps} ->
@@ -178,7 +178,7 @@ process_response({error, Reason}, Req) ->
 redirected_request(Req, RedirectUrl) ->
     {Base, QStr, _} = mochiweb_util:urlsplit_path(RedirectUrl),
     QS = mochiweb_util:parse_qs(QStr),
-    Hdrs = case proplists:get_value(<<"oauth">>, Req#http_db.auth) of
+    Hdrs = case couch_util:get_value(<<"oauth">>, Req#http_db.auth) of
     undefined ->
         Req#http_db.headers;
     _Else ->
@@ -209,11 +209,11 @@ oauth_header(Url, QS, Action, Props) ->
     % erlang-oauth doesn't like iolists
     QSL = [{couch_util:to_list(K), ?b2l(?l2b(couch_util:to_list(V)))} ||
         {K,V} <- QS],
-    ConsumerKey = ?b2l(proplists:get_value(<<"consumer_key">>, Props)),
-    Token = ?b2l(proplists:get_value(<<"token">>, Props)),
-    TokenSecret = ?b2l(proplists:get_value(<<"token_secret">>, Props)),
-    ConsumerSecret = ?b2l(proplists:get_value(<<"consumer_secret">>, Props)),
-    SignatureMethodStr = ?b2l(proplists:get_value(<<"signature_method">>, Props, <<"HMAC-SHA1">>)),
+    ConsumerKey = ?b2l(couch_util:get_value(<<"consumer_key">>, Props)),
+    Token = ?b2l(couch_util:get_value(<<"token">>, Props)),
+    TokenSecret = ?b2l(couch_util:get_value(<<"token_secret">>, Props)),
+    ConsumerSecret = ?b2l(couch_util:get_value(<<"consumer_secret">>, Props)),
+    SignatureMethodStr = ?b2l(couch_util:get_value(<<"signature_method">>, Props, <<"HMAC-SHA1">>)),
     SignatureMethodAtom = case SignatureMethodStr of
         "PLAINTEXT" ->
             plaintext;

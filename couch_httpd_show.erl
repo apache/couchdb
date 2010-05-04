@@ -95,7 +95,7 @@ show_etag(#httpd{user_ctx=UserCtx}=Req, Doc, DDoc, More) ->
 
 get_fun_key(DDoc, Type, Name) ->
     #doc{body={Props}} = DDoc,
-    Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
+    Lang = couch_util:get_value(<<"language">>, Props, <<"javascript">>),
     Src = couch_util:get_nested_json_value({Props}, [Type, Name]),
     {Lang, Src}.
 
@@ -168,7 +168,7 @@ handle_view_list_req(#httpd{method='POST',
     % {Props2} = couch_httpd:json_body(Req),
     ReqBody = couch_httpd:body(Req),
     {Props2} = ?JSON_DECODE(ReqBody),
-    Keys = proplists:get_value(<<"keys">>, Props2, nil),
+    Keys = couch_util:get_value(<<"keys">>, Props2, nil),
     handle_view_list(Req#httpd{req_body=ReqBody}, Db, DDoc, ListName, {DesignName, ViewName}, Keys);
 
 handle_view_list_req(#httpd{method='POST',
@@ -176,7 +176,7 @@ handle_view_list_req(#httpd{method='POST',
     % {Props2} = couch_httpd:json_body(Req),
     ReqBody = couch_httpd:body(Req),
     {Props2} = ?JSON_DECODE(ReqBody),
-    Keys = proplists:get_value(<<"keys">>, Props2, nil),
+    Keys = couch_util:get_value(<<"keys">>, Props2, nil),
     handle_view_list(Req#httpd{req_body=ReqBody}, Db, DDoc, ListName, {ViewDesignName, ViewName}, Keys);
 
 handle_view_list_req(#httpd{method='POST'}=Req, _Db, _DDoc) ->
@@ -396,7 +396,7 @@ apply_etag({ExternalResponse}, CurrentEtag) ->
     % headers on the JsonResponse object. We need to control the Etag and
     % Vary headers. If the external function controls the Etag, we'd have to
     % run it to check for a match, which sort of defeats the purpose.
-    case proplists:get_value(<<"headers">>, ExternalResponse, nil) of
+    case couch_util:get_value(<<"headers">>, ExternalResponse, nil) of
     nil ->
         % no JSON headers
         % add our Etag and Vary headers to the response

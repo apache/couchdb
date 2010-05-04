@@ -80,7 +80,7 @@ write_bulk_docs(#http_db{headers = Headers} = Db, Docs) ->
     },
     ErrorsJson = case couch_rep_httpc:request(Request) of
     {FailProps} ->
-        exit({target_error, proplists:get_value(<<"error">>, FailProps)});
+        exit({target_error, couch_util:get_value(<<"error">>, FailProps)});
     List when is_list(List) ->
         List
     end,
@@ -141,8 +141,8 @@ write_multi_part_doc(#http_db{headers=Headers} = Db, #doc{atts=Atts} = Doc) ->
     end.
 
 write_docs_1({Props}) ->
-    Id = proplists:get_value(<<"id">>, Props),
-    Rev = couch_doc:parse_rev(proplists:get_value(<<"rev">>, Props)),
-    ErrId = couch_util:to_existing_atom(proplists:get_value(<<"error">>, Props)),
-    Reason = proplists:get_value(<<"reason">>, Props),
+    Id = couch_util:get_value(<<"id">>, Props),
+    Rev = couch_doc:parse_rev(couch_util:get_value(<<"rev">>, Props)),
+    ErrId = couch_util:to_existing_atom(couch_util:get_value(<<"error">>, Props)),
+    Reason = couch_util:get_value(<<"reason">>, Props),
     {{Id, Rev}, {ErrId, Reason}}.

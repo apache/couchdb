@@ -80,7 +80,7 @@ cleanup_index_files(Db) ->
     % make unique list of group sigs
     Sigs = lists:map(fun(#doc{id = GroupId}) ->
         {ok, Info} = get_group_info(Db, GroupId),
-        ?b2l(proplists:get_value(signature, Info))
+        ?b2l(couch_util:get_value(signature, Info))
     end, [DD||DD <- DesignDocs, DD#doc.deleted == false]),
 
     FileList = list_index_files(Db),

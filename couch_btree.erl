@@ -70,10 +70,10 @@ final_reduce(Reduce, {KVs, Reductions}) ->
     final_reduce(Reduce, {[], [Red | Reductions]}).
 
 fold_reduce(#btree{root=Root}=Bt, Fun, Acc, Options) ->
-    Dir = proplists:get_value(dir, Options, fwd),
-    StartKey = proplists:get_value(start_key, Options),
-    EndKey = proplists:get_value(end_key, Options),
-    KeyGroupFun = proplists:get_value(key_group_fun, Options, fun(_,_) -> true end),
+    Dir = couch_util:get_value(dir, Options, fwd),
+    StartKey = couch_util:get_value(start_key, Options),
+    EndKey = couch_util:get_value(end_key, Options),
+    KeyGroupFun = couch_util:get_value(key_group_fun, Options, fun(_,_) -> true end),
     {StartKey2, EndKey2} =
     case Dir of
         rev -> {EndKey, StartKey};
@@ -107,9 +107,9 @@ convert_fun_arity(Fun) when is_function(Fun, 3) ->
     Fun.    % Already arity 3
 
 make_key_in_end_range_function(#btree{less=Less}, fwd, Options) ->
-    case proplists:get_value(end_key_gt, Options) of
+    case couch_util:get_value(end_key_gt, Options) of
     undefined ->
-        case proplists:get_value(end_key, Options) of
+        case couch_util:get_value(end_key, Options) of
         undefined ->
             fun(_Key) -> true end;
         LastKey ->
@@ -119,9 +119,9 @@ make_key_in_end_range_function(#btree{less=Less}, fwd, Options) ->
         fun(Key) -> Less(Key, EndKey) end
     end;
 make_key_in_end_range_function(#btree{less=Less}, rev, Options) ->
-    case proplists:get_value(end_key_gt, Options) of
+    case couch_util:get_value(end_key_gt, Options) of
     undefined ->
-        case proplists:get_value(end_key, Options) of
+        case couch_util:get_value(end_key, Options) of
         undefined ->
             fun(_Key) -> true end;
         LastKey ->
@@ -142,10 +142,10 @@ foldl(Bt, Fun, Acc, Options) ->
 fold(#btree{root=nil}, _Fun, Acc, _Options) ->
     {ok, {[], []}, Acc};
 fold(#btree{root=Root}=Bt, Fun, Acc, Options) ->
-    Dir = proplists:get_value(dir, Options, fwd),
+    Dir = couch_util:get_value(dir, Options, fwd),
     InRange = make_key_in_end_range_function(Bt, Dir, Options),
     Result =
-    case proplists:get_value(start_key, Options) of
+    case couch_util:get_value(start_key, Options) of
     undefined ->
         stream_node(Bt, [], Bt#btree.root, InRange, Dir, 
                 convert_fun_arity(Fun), Acc);

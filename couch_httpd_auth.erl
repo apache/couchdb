@@ -70,14 +70,14 @@ default_authentication_handler(Req) ->
             nil ->
                 throw({unauthorized, <<"Name or password is incorrect.">>});
             UserProps ->
-                UserSalt = proplists:get_value(<<"salt">>, UserProps, <<>>),
+                UserSalt = couch_util:get_value(<<"salt">>, UserProps, <<>>),
                 PasswordHash = hash_password(?l2b(Pass), UserSalt),
-                ExpectedHash = proplists:get_value(<<"password_sha">>, UserProps, nil),
+                ExpectedHash = couch_util:get_value(<<"password_sha">>, UserProps, nil),
                 case couch_util:verify(ExpectedHash, PasswordHash) of
                     true ->
                         Req#httpd{user_ctx=#user_ctx{
                             name=?l2b(User),
-                            roles=proplists:get_value(<<"roles">>, UserProps, [])
+                            roles=couch_util:get_value(<<"roles">>, UserProps, [])
                         }};
                     _Else ->
                         throw({unauthorized, <<"Name or password is incorrect.">>})
@@ -170,7 +170,7 @@ get_user(UserName) ->
                   {<<"salt">>, ?l2b(Salt)},
                   {<<"password_sha">>, ?l2b(HashedPwd)}];
             UserProps when is_list(UserProps) ->
-                DocRoles = proplists:get_value(<<"roles">>, UserProps),
+                DocRoles = couch_util:get_value(<<"roles">>, UserProps),
                 [{<<"roles">>, [<<"_admin">> | DocRoles]},
                   {<<"salt">>, ?l2b(Salt)},
                   {<<"password_sha">>, ?l2b(HashedPwd)}]
@@ -186,10 +186,10 @@ get_user_props_from_db(UserName) ->
     try couch_httpd_db:couch_doc_open(Db, DocId, nil, [conflicts]) of
         #doc{meta=Meta}=Doc ->
             %  check here for conflict state and throw error if conflicted
-            case proplists:get_value(conflicts,Meta,[]) of
+            case couch_util:get_value(conflicts,Meta,[]) of
                 [] -> 
                     {DocProps} = couch_query_servers:json_doc(Doc),
-                    case proplists:get_value(<<"type">>, DocProps) of
+                    case couch_util:get_value(<<"type">>, DocProps) of
                         <<"user">> ->
                             DocProps;
                         _Else -> 
@@ -324,7 +324,7 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
             case get_user(?l2b(User)) of
             nil -> Req;
             UserProps ->
-                UserSalt = proplists:get_value(<<"salt">>, UserProps, <<"">>),
+                UserSalt = couch_util:get_value(<<"salt">>, UserProps, <<"">>),
                 FullSecret = <<Secret/binary, UserSalt/binary>>,
                 ExpectedHash = crypto:sha_mac(FullSecret, User ++ ":" ++ TimeStr),
                 Hash = ?l2b(string:join(HashParts, ":")),
@@ -338,7 +338,7 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
                                 ?LOG_DEBUG("Successful cookie auth as: ~p", [User]),
                                 Req#httpd{user_ctx=#user_ctx{
                                     name=?l2b(User),
-                                    roles=proplists:get_value(<<"roles">>, UserProps, [])
+                                    roles=couch_util:get_value(<<"roles">>, UserProps, [])
                                 }, auth={FullSecret, TimeLeft < Timeout*0.9}};
                             _Else ->
                                 Req
@@ -359,9 +359,9 @@ cookie_auth_header(#httpd{user_ctx=#user_ctx{name=User}, auth={Secret, true}}, H
     %    or logout handler.
     % The login and logout handlers need to set the AuthSession cookie
     % themselves.
-    CookieHeader = proplists:get_value("Set-Cookie", Headers, ""),
+    CookieHeader = couch_util:get_value("Set-Cookie", Headers, ""),
     Cookies = mochiweb_cookies:parse_cookie(CookieHeader),
-    AuthSession = proplists:get_value("AuthSession", Cookies),
+    AuthSession = couch_util:get_value("AuthSession", Cookies),
     if AuthSession == undefined ->
         TimeStamp = make_cookie_time(),
         [cookie_auth_cookie(?b2l(User), Secret, TimeStamp)];
@@ -400,16 +400,16 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req) ->
         _ ->
             []
     end,
-    UserName = ?l2b(proplists:get_value("name", Form, "")),
-    Password = ?l2b(proplists:get_value("password", Form, "")),
+    UserName = ?l2b(couch_util:get_value("name", Form, "")),
+    Password = ?l2b(couch_util:get_value("password", Form, "")),
     ?LOG_DEBUG("Attempt Login: ~s",[UserName]),
     User = case get_user(UserName) of
         nil -> [];
         Result -> Result
     end,
-    UserSalt = proplists:get_value(<<"salt">>, User, <<>>),
+    UserSalt = couch_util:get_value(<<"salt">>, User, <<>>),
     PasswordHash = hash_password(Password, UserSalt),
-    ExpectedHash = proplists:get_value(<<"password_sha">>, User, nil),
+    ExpectedHash = couch_util:get_value(<<"password_sha">>, User, nil),
     case couch_util:verify(ExpectedHash, PasswordHash) of
         true ->
             % setup the session cookie
@@ -426,8 +426,8 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req) ->
             send_json(Req#httpd{req_body=ReqBody}, Code, Headers,
                 {[
                     {ok, true},
-                    {name, proplists:get_value(<<"name">>, User, null)},
-                    {roles, proplists:get_value(<<"roles">>, User, [])}
+                    {name, couch_util:get_value(<<"name">>, User, null)},
+                    {roles, couch_util:get_value(<<"roles">>, User, [])}
                 ]});
         _Else ->
             % clear the session

@@ -62,7 +62,7 @@ handle_view_req(#httpd{method='GET',
 handle_view_req(#httpd{method='POST',
         path_parts=[_, _, DName, _, ViewName]}=Req, Db, _DDoc) ->
     {Fields} = couch_httpd:json_body_obj(Req),
-    case proplists:get_value(<<"keys">>, Fields, nil) of
+    case couch_util:get_value(<<"keys">>, Fields, nil) of
     nil ->
         Fmt = "POST to view ~p/~p in database ~p with no keys member.",
         ?LOG_DEBUG(Fmt, [DName, ViewName, Db]),
@@ -80,12 +80,12 @@ handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
     ok = couch_db:check_is_admin(Db),
     couch_stats_collector:increment({httpd, temporary_view_reads}),
     {Props} = couch_httpd:json_body_obj(Req),
-    Language = proplists:get_value(<<"language">>, Props, <<"javascript">>),
-    {DesignOptions} = proplists:get_value(<<"options">>, Props, {[]}),
-    MapSrc = proplists:get_value(<<"map">>, Props),
-    Keys = proplists:get_value(<<"keys">>, Props, nil),
+    Language = couch_util:get_value(<<"language">>, Props, <<"javascript">>),
+    {DesignOptions} = couch_util:get_value(<<"options">>, Props, {[]}),
+    MapSrc = couch_util:get_value(<<"map">>, Props),
+    Keys = couch_util:get_value(<<"keys">>, Props, nil),
     Reduce = get_reduce_type(Req),
-    case proplists:get_value(<<"reduce">>, Props, null) of
+    case couch_util:get_value(<<"reduce">>, Props, null) of
     null ->
         QueryArgs = parse_view_params(Req, Keys, map),
         {ok, View, Group} = couch_view:get_temp_map_view(Db, Language,
@@ -576,13 +576,13 @@ view_row_obj(_Db, {{Key, error}, Value}, _IncludeDocs) ->
     {[{key, Key}, {error, Value}]};
 % include docs in the view output
 view_row_obj(Db, {{Key, DocId}, {Props}}, true) ->
-    Rev = case proplists:get_value(<<"_rev">>, Props) of
+    Rev = case couch_util:get_value(<<"_rev">>, Props) of
     undefined ->
         nil;
     Rev0 ->
         couch_doc:parse_rev(Rev0)
     end,
-    IncludeId = proplists:get_value(<<"_id">>, Props, DocId),
+    IncludeId = couch_util:get_value(<<"_id">>, Props, DocId),
     view_row_with_doc(Db, {{Key, DocId}, {Props}}, {IncludeId, Rev});
 view_row_obj(Db, {{Key, DocId}, Value}, true) ->
     view_row_with_doc(Db, {{Key, DocId}, Value}, {DocId, nil});
