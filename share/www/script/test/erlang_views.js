@@ -29,8 +29,8 @@ couchTests.erlang_views = function(debug) {
       T(db.save(doc).ok);
 
       var mfun = 'fun({Doc}) -> ' +
-                 ' K = proplists:get_value(<<"integer">>, Doc, null), ' +
-                 ' V = proplists:get_value(<<"string">>, Doc, null), ' +
+                 ' K = couch_util:get_value(<<"integer">>, Doc, null), ' +
+                 ' V = couch_util:get_value(<<"string">>, Doc, null), ' +
                  ' Emit(K, V) ' +
                  'end.';
 
@@ -55,9 +55,9 @@ couchTests.erlang_views = function(debug) {
         shows: {
           simple:
             'fun(Doc, {Req}) -> ' +
-            '  {Info} = proplists:get_value(<<"info">>, Req, {[]}), ' +
-            '  Purged = proplists:get_value(<<"purge_seq">>, Info, -1), ' +
-            '  Verb = proplists:get_value(<<"method">>, Req, <<"not_get">>), ' +
+            '  {Info} = couch_util:get_value(<<"info">>, Req, {[]}), ' +
+            '  Purged = couch_util:get_value(<<"purge_seq">>, Info, -1), ' +
+            '  Verb = couch_util:get_value(<<"method">>, Req, <<"not_get">>), ' +
             '  R = list_to_binary(io_lib:format("~b - ~s", [Purged, Verb])), ' +
             '  {[{<<"code">>, 200}, {<<"headers">>, {[]}}, {<<"body">>, R}]} ' +
             'end.'
@@ -67,7 +67,7 @@ couchTests.erlang_views = function(debug) {
             'fun(Head, {Req}) -> ' +
             '  Send(<<"head">>), ' +
             '  Fun = fun({Row}, _) -> ' +
-            '    Val = proplists:get_value(<<"value">>, Row, -1), ' +
+            '    Val = couch_util:get_value(<<"value">>, Row, -1), ' +
             '    Send(list_to_binary(integer_to_list(Val))), ' +
             '    {ok, nil} ' +
             '  end, ' +
@@ -117,10 +117,10 @@ couchTests.erlang_views = function(debug) {
       T(db.bulkSave(docs).length, 250, "Saved big doc set.");
       
       var mfun = 'fun({Doc}) -> ' +
-        'Words = proplists:get_value(<<"words">>, Doc), ' +
+        'Words = couch_util:get_value(<<"words">>, Doc), ' +
         'lists:foreach(fun({Word}) -> ' +
-            'WordString = proplists:get_value(<<"word">>, Word), ' + 
-            'Count = proplists:get_value(<<"count">>, Word), ' + 
+            'WordString = couch_util:get_value(<<"word">>, Word), ' + 
+            'Count = couch_util:get_value(<<"count">>, Word), ' + 
             'Emit(WordString , Count) ' +
           'end, Words) ' +
         'end.';

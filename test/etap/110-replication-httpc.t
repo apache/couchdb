@@ -107,8 +107,8 @@ test_put() ->
         method = put
     },
     {Resp} = couch_rep_httpc:request(Req),
-    etap:ok(proplists:get_value(<<"ok">>, Resp), "ok:true on upload"),
-    etap:is(<<"test_put">>, proplists:get_value(<<"id">>, Resp), "id is correct").
+    etap:ok(couch_util:get_value(<<"ok">>, Resp), "ok:true on upload"),
+    etap:is(<<"test_put">>, couch_util:get_value(<<"id">>, Resp), "id is correct").
 
 test_qs() ->
     Req = #http_db{

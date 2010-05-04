@@ -23,6 +23,7 @@
 -export([json_encode/1, json_decode/1]).
 -export([verify/2,simple_call/2,shutdown_sync/1]).
 -export([compressible_att_type/1]).
+-export([get_value/2, get_value/3]).
 
 -include("couch_db.hrl").
 -include_lib("kernel/include/file.hrl").
@@ -119,9 +120,19 @@ parse_term(List) ->
     {ok, Tokens, _} = erl_scan:string(List ++ "."),
     erl_parse:parse_term(Tokens).
 
+get_value(Key, List) ->
+    get_value(Key, List, undefined).
+
+get_value(Key, List, Default) ->
+    case lists:keysearch(Key, 1, List) of
+    {value, {Key,Value}} ->
+        Value;
+    false ->
+        Default
+    end.
 
 get_nested_json_value({Props}, [Key|Keys]) ->
-    case proplists:get_value(Key, Props, nil) of
+    case couch_util:get_value(Key, Props, nil) of
     nil -> throw({not_found, <<"missing json key: ", Key/binary>>});
     Value -> get_nested_json_value(Value, Keys)
     end;

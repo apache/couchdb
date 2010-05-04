@@ -46,13 +46,13 @@ test_all_empty() ->
 
     etap:is(length(Aggs), 2, "There are only two aggregate types in testing."),
     etap:is(
-        proplists:get_value(testing, Aggs),
+        couch_util:get_value(testing, Aggs),
         {[{stuff, make_agg(<<"yay description">>,
             null, null, null, null, null)}]},
         "{testing, stuff} is empty at start."
     ),
     etap:is(
-        proplists:get_value(number, Aggs),
+        couch_util:get_value(number, Aggs),
         {[{'11', make_agg(<<"randomosity">>,
             null, null, null, null, null)}]},
         "{number, '11'} is empty at start."

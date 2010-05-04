@@ -79,7 +79,7 @@ to_json_attachments(Attachments, Options) ->
     false ->
         % note the default is [], because this sorts higher than all numbers.
         % and will return all the binaries.
-        proplists:get_value(atts_after_revpos, Options, [])
+        couch_util:get_value(atts_after_revpos, Options, [])
     end,
     to_json_attachments(
         Attachments,
@@ -203,26 +203,26 @@ transfer_fields([{<<"_rev">>, _Rev} | Rest], Doc) ->
 
 transfer_fields([{<<"_attachments">>, {JsonBins}} | Rest], Doc) ->
     Atts = lists:map(fun({Name, {BinProps}}) ->
-        case proplists:get_value(<<"stub">>, BinProps) of
+        case couch_util:get_value(<<"stub">>, BinProps) of
         true ->
-            Type = proplists:get_value(<<"content_type">>, BinProps),
-            RevPos = proplists:get_value(<<"revpos">>, BinProps, 0),
-            DiskLen = proplists:get_value(<<"length">>, BinProps),
+            Type = couch_util:get_value(<<"content_type">>, BinProps),
+            RevPos = couch_util:get_value(<<"revpos">>, BinProps, 0),
+            DiskLen = couch_util:get_value(<<"length">>, BinProps),
             {Enc, EncLen} = att_encoding_info(BinProps),
             #att{name=Name, data=stub, type=Type, att_len=EncLen,
                 disk_len=DiskLen, encoding=Enc, revpos=RevPos};
         _ ->
-            Type = proplists:get_value(<<"content_type">>, BinProps,
+            Type = couch_util:get_value(<<"content_type">>, BinProps,
                     ?DEFAULT_ATTACHMENT_CONTENT_TYPE),
-            RevPos = proplists:get_value(<<"revpos">>, BinProps, 0),
-            case proplists:get_value(<<"follows">>, BinProps) of
+            RevPos = couch_util:get_value(<<"revpos">>, BinProps, 0),
+            case couch_util:get_value(<<"follows">>, BinProps) of
             true ->
-                DiskLen = proplists:get_value(<<"length">>, BinProps),
+                DiskLen = couch_util:get_value(<<"length">>, BinProps),
                 {Enc, EncLen} = att_encoding_info(BinProps),
                 #att{name=Name, data=follows, type=Type, encoding=Enc,
                     att_len=EncLen, disk_len=DiskLen, revpos=RevPos};
             _ ->
-                Value = proplists:get_value(<<"data">>, BinProps),
+                Value = couch_util:get_value(<<"data">>, BinProps),
                 Bin = base64:decode(Value),
                 LenBin = size(Bin),
                 #att{name=Name, data=Bin, type=Type, att_len=LenBin,
@@ -233,8 +233,8 @@ transfer_fields([{<<"_attachments">>, {JsonBins}} | Rest], Doc) ->
     transfer_fields(Rest, Doc#doc{atts=Atts});
 
 transfer_fields([{<<"_revisions">>, {Props}} | Rest], Doc) ->
-    RevIds = proplists:get_value(<<"ids">>, Props),
-    Start = proplists:get_value(<<"start">>, Props),
+    RevIds = couch_util:get_value(<<"ids">>, Props),
+    Start = couch_util:get_value(<<"start">>, Props),
     if not is_integer(Start) ->
         throw({doc_validation, "_revisions.start isn't an integer."});
     not is_list(RevIds) ->
@@ -269,12 +269,12 @@ transfer_fields([Field | Rest], #doc{body=Fields}=Doc) ->
     transfer_fields(Rest, Doc#doc{body=[Field|Fields]}).
 
 att_encoding_info(BinProps) ->
-    DiskLen = proplists:get_value(<<"length">>, BinProps),
-    case proplists:get_value(<<"encoding">>, BinProps) of
+    DiskLen = couch_util:get_value(<<"length">>, BinProps),
+    case couch_util:get_value(<<"encoding">>, BinProps) of
     undefined ->
         {identity, DiskLen};
     Enc ->
-        EncodedLen = proplists:get_value(<<"encoded_length">>, BinProps, DiskLen),
+        EncodedLen = couch_util:get_value(<<"encoded_length">>, BinProps, DiskLen),
         {list_to_atom(?b2l(Enc)), EncodedLen}
     end.
 
@@ -341,7 +341,7 @@ att_to_bin(#att{data=DataFun, att_len=Len}) when is_function(DataFun)->
     ).
 
 get_validate_doc_fun(#doc{body={Props}}=DDoc) ->
-    case proplists:get_value(<<"validate_doc_update">>, Props) of
+    case couch_util:get_value(<<"validate_doc_update">>, Props) of
     undefined ->
         nil;
     _Else ->
@@ -458,7 +458,7 @@ doc_from_multi_part_stream(ContentType, DataFun) ->
     Doc#doc{atts=Atts2}.
 
 mp_parse_doc({headers, H}, []) ->
-    {"application/json", _} = proplists:get_value("content-type", H),
+    {"application/json", _} = couch_util:get_value("content-type", H),
     fun (Next) ->
         mp_parse_doc(Next, [])
     end;

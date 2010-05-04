@@ -139,7 +139,7 @@ functions = {
     "js" => %{function(doc){emit("foo",doc.a); emit("bar",doc.a)}},
     "erlang" => <<-ERLANG
       fun({Doc}) ->
-        A = proplists:get_value(<<"a">>, Doc, null),
+        A = couch_util:get_value(<<"a">>, Doc, null),
         Emit(<<"foo">>, A),
         Emit(<<"bar">>, A)
       end.
@@ -153,7 +153,7 @@ functions = {
       JS
     "erlang" => <<-ERLANG
         fun({Doc}) ->
-            A = proplists:get_value(<<"a">>, Doc, null),
+            A = couch_util:get_value(<<"a">>, Doc, null),
             Emit(<<"baz">>, A)
         end.
     ERLANG
@@ -175,7 +175,7 @@ functions = {
       JS
     "erlang" => <<-ERLANG
       fun({NewDoc}, _OldDoc, _UserCtx) ->
-        case proplists:get_value(<<"bad">>, NewDoc) of
+        case couch_util:get_value(<<"bad">>, NewDoc) of
             undefined -> 1;
             _ -> {[{forbidden, <<"bad doc">>}]}
         end
@@ -191,8 +191,8 @@ functions = {
     JS
     "erlang" => <<-ERLANG
       fun({Doc}, Req) ->
-            Title = proplists:get_value(<<"title">>, Doc),
-            Body = proplists:get_value(<<"body">>, Doc),
+            Title = couch_util:get_value(<<"title">>, Doc),
+            Body = couch_util:get_value(<<"body">>, Doc),
             Resp = <<Title/binary, " - ", Body/binary>>,
         {[{<<"body">>, Resp}]}
       end.
@@ -208,8 +208,8 @@ functions = {
      JS
     "erlang" => <<-ERLANG
   fun({Doc}, Req) ->
-        Title = proplists:get_value(<<"title">>, Doc),
-        Body = proplists:get_value(<<"body">>, Doc),
+        Title = couch_util:get_value(<<"title">>, Doc),
+        Body = couch_util:get_value(<<"body">>, Doc),
         Resp = <<Title/binary, " - ", Body/binary>>,
         {[
         {<<"code">>, 200},
@@ -256,9 +256,9 @@ functions = {
     "erlang" => <<-ERLANG,
         fun(Head, {Req}) ->
             Send(<<"first chunk">>),
-            Send(proplists:get_value(<<"q">>, Req)),
+            Send(couch_util:get_value(<<"q">>, Req)),
             Fun = fun({Row}, _) ->
-                Send(proplists:get_value(<<"key">>, Row)),
+                Send(couch_util:get_value(<<"key">>, Row)),
                 {ok, nil}
             end,
             {ok, _} = FoldRows(Fun, nil),
@@ -283,7 +283,7 @@ functions = {
         fun(Head, Req) ->
             Send(<<"bacon">>),
             Fun = fun({Row}, _) ->
-                Send(proplists:get_value(<<"key">>, Row)),
+                Send(couch_util:get_value(<<"key">>, Row)),
                 Send(<<"eggs">>),
                 {ok, nil}
             end,
@@ -307,9 +307,9 @@ functions = {
     "erlang" => <<-ERLANG,
         fun(Head, {Req}) ->
             Send(<<"first chunk">>),
-            Send(proplists:get_value(<<"q">>, Req)),
+            Send(couch_util:get_value(<<"q">>, Req)),
             Fun = fun({Row}, _) ->
-                Send(proplists:get_value(<<"key">>, Row)),
+                Send(couch_util:get_value(<<"key">>, Row)),
                 {ok, nil}
             end,
             FoldRows(Fun, nil),
@@ -335,13 +335,13 @@ functions = {
     "erlang" => <<-ERLANG,
         fun(Head, {Req}) ->
             Send(<<"first chunk">>),
-            Send(proplists:get_value(<<"q">>, Req)),
+            Send(couch_util:get_value(<<"q">>, Req)),
             Fun = fun
                 ({Row}, Count) when Count < 2 ->
-                    Send(proplists:get_value(<<"key">>, Row)),
+                    Send(couch_util:get_value(<<"key">>, Row)),
                     {ok, Count+1};
                 ({Row}, Count) when Count == 2 ->
-                    Send(proplists:get_value(<<"key">>, Row)),
+                    Send(couch_util:get_value(<<"key">>, Row)),
                     {stop, <<"early tail">>}
             end,
             {ok, Tail} = FoldRows(Fun, 0),
@@ -380,10 +380,10 @@ functions = {
             Send(<<"bacon">>),
             Fun = fun
                 ({Row}, Count) when Count < 2 ->
-                    Send(proplists:get_value(<<"key">>, Row)),
+                    Send(couch_util:get_value(<<"key">>, Row)),
                     {ok, Count+1};
                 ({Row}, Count) when Count == 2 ->
-                    Send(proplists:get_value(<<"key">>, Row)),
+                    Send(couch_util:get_value(<<"key">>, Row)),
                     {stop, <<"early">>}
             end,
             {ok, Tail} = FoldRows(Fun, 0),
@@ -408,9 +408,9 @@ functions = {
     "erlang" => <<-ERLANG,
         fun(Head, {Req}) ->
             Send(<<"first chunk">>),
-            Send(proplists:get_value(<<"q">>, Req)),
+            Send(couch_util:get_value(<<"q">>, Req)),
             Fun = fun({Row}, _) ->
-                Send(proplists:get_value(<<"key">>, Row)),
+                Send(couch_util:get_value(<<"key">>, Row)),
                 {ok, nil}
             end,
             FoldRows(Fun, nil),
@@ -428,7 +428,7 @@ functions = {
     JS
     "erlang" => <<-ERLANG,
         fun({Doc}, Req) ->
-            proplists:get_value(<<"good">>, Doc)
+            couch_util:get_value(<<"good">>, Doc)
         end.
     ERLANG
   },

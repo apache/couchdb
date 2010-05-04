@@ -178,7 +178,7 @@ couchTests.list_views = function(debug) {
             'fun(Head, {Req}) -> ' +
             '  Send(<<"[">>), ' +
             '  Fun = fun({Row}, Sep) -> ' +
-            '    Val = proplists:get_value(<<"key">>, Row, 23), ' +
+            '    Val = couch_util:get_value(<<"key">>, Row, 23), ' +
             '    Send(list_to_binary(Sep ++ integer_to_list(Val))), ' +
             '    {ok, ","} ' +
             '  end, ' +

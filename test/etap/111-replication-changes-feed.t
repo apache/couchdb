@@ -153,8 +153,8 @@ test_deleted_conflicts(Type) ->
     {ExpectProps} = generate_conflict(),
 
     %% delete the conflict revision
-    Id = proplists:get_value(<<"id">>, ExpectProps),
-    [Win, {[{<<"rev">>, Lose}]}] = proplists:get_value(<<"changes">>, ExpectProps),
+    Id = couch_util:get_value(<<"id">>, ExpectProps),
+    [Win, {[{<<"rev">>, Lose}]}] = couch_util:get_value(<<"changes">>, ExpectProps),
     Doc = couch_doc:from_json_obj({[
         {<<"_id">>, Id},
         {<<"_rev">>, Lose},

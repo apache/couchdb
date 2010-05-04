@@ -502,16 +502,16 @@ get_group_info(State) ->
 
 % maybe move to another module
 design_doc_to_view_group(#doc{id=Id,body={Fields}}) ->
-    Language = proplists:get_value(<<"language">>, Fields, <<"javascript">>),
-    {DesignOptions} = proplists:get_value(<<"options">>, Fields, {[]}),
-    {RawViews} = proplists:get_value(<<"views">>, Fields, {[]}),
+    Language = couch_util:get_value(<<"language">>, Fields, <<"javascript">>),
+    {DesignOptions} = couch_util:get_value(<<"options">>, Fields, {[]}),
+    {RawViews} = couch_util:get_value(<<"views">>, Fields, {[]}),
     % add the views to a dictionary object, with the map source as the key
     DictBySrc =
     lists:foldl(
         fun({Name, {MRFuns}}, DictBySrcAcc) ->
-            MapSrc = proplists:get_value(<<"map">>, MRFuns),
-            RedSrc = proplists:get_value(<<"reduce">>, MRFuns, null),
-            {ViewOptions} = proplists:get_value(<<"options">>, MRFuns, {[]}),
+            MapSrc = couch_util:get_value(<<"map">>, MRFuns),
+            RedSrc = couch_util:get_value(<<"reduce">>, MRFuns, null),
+            {ViewOptions} = couch_util:get_value(<<"options">>, MRFuns, {[]}),
             View =
             case dict:find({MapSrc, ViewOptions}, DictBySrcAcc) of
                 {ok, View0} -> View0;
@@ -574,7 +574,7 @@ init_group(Db, Fd, #group{def_lang=Lang,views=Views}=
                     {Count, Reduced}
                 end,
             
-            case proplists:get_value(<<"collation">>, Options, <<"default">>) of
+            case couch_util:get_value(<<"collation">>, Options, <<"default">>) of
             <<"default">> ->
                 Less = fun couch_view:less_json_ids/2;
             <<"raw">> ->

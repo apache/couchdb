@@ -344,19 +344,19 @@ test_1st_text_att_stub() ->
         Json,
         [<<"_attachments">>, <<"readme.txt">>]
     ),
-    TextAttLength = proplists:get_value(<<"length">>, TextAttJson),
+    TextAttLength = couch_util:get_value(<<"length">>, TextAttJson),
     etap:is(
         TextAttLength,
         length(test_text_data()),
         "1st text attachment stub length matches the uncompressed length"
     ),
-    TextAttEncoding = proplists:get_value(<<"encoding">>, TextAttJson),
+    TextAttEncoding = couch_util:get_value(<<"encoding">>, TextAttJson),
     etap:is(
         TextAttEncoding,
         <<"gzip">>,
         "1st text attachment stub has the encoding field set to gzip"
     ),
-    TextAttEncLength = proplists:get_value(<<"encoded_length">>, TextAttJson),
+    TextAttEncLength = couch_util:get_value(<<"encoded_length">>, TextAttJson),
     etap:is(
         TextAttEncLength,
         iolist_size(zlib:gzip(test_text_data())),
@@ -404,19 +404,19 @@ test_1st_png_att_stub() ->
         Json,
         [<<"_attachments">>, <<"icon.png">>]
     ),
-    PngAttLength = proplists:get_value(<<"length">>, PngAttJson),
+    PngAttLength = couch_util:get_value(<<"length">>, PngAttJson),
     etap:is(
         PngAttLength,
         length(test_png_data()),
         "1st png attachment stub length matches the uncompressed length"
     ),
-    PngEncoding = proplists:get_value(<<"encoding">>, PngAttJson),
+    PngEncoding = couch_util:get_value(<<"encoding">>, PngAttJson),
     etap:is(
         PngEncoding,
         undefined,
         "1st png attachment stub doesn't have an encoding field"
     ),
-    PngEncLength = proplists:get_value(<<"encoded_length">>, PngAttJson),
+    PngEncLength = couch_util:get_value(<<"encoded_length">>, PngAttJson),
     etap:is(
         PngEncLength,
         undefined,
@@ -531,19 +531,19 @@ test_2nd_text_att_stub() ->
         Json,
         [<<"_attachments">>, <<"readme.txt">>]
     ),
-    TextAttLength = proplists:get_value(<<"length">>, TextAttJson),
+    TextAttLength = couch_util:get_value(<<"length">>, TextAttJson),
     etap:is(
         TextAttLength,
         length(test_text_data()),
         "2nd text attachment stub length matches the uncompressed length"
     ),
-    TextAttEncoding = proplists:get_value(<<"encoding">>, TextAttJson),
+    TextAttEncoding = couch_util:get_value(<<"encoding">>, TextAttJson),
     etap:is(
         TextAttEncoding,
         <<"gzip">>,
         "2nd text attachment stub has the encoding field set to gzip"
     ),
-    TextAttEncLength = proplists:get_value(<<"encoded_length">>, TextAttJson),
+    TextAttEncLength = couch_util:get_value(<<"encoded_length">>, TextAttJson),
     etap:is(
         TextAttEncLength,
         iolist_size(zlib:gzip(test_text_data())),
@@ -591,19 +591,19 @@ test_2nd_png_att_stub() ->
         Json,
         [<<"_attachments">>, <<"icon.png">>]
     ),
-    PngAttLength = proplists:get_value(<<"length">>, PngAttJson),
+    PngAttLength = couch_util:get_value(<<"length">>, PngAttJson),
     etap:is(
         PngAttLength,
         length(test_png_data()),
         "2nd png attachment stub length matches the uncompressed length"
     ),
-    PngEncoding = proplists:get_value(<<"encoding">>, PngAttJson),
+    PngEncoding = couch_util:get_value(<<"encoding">>, PngAttJson),
     etap:is(
         PngEncoding,
         undefined,
         "2nd png attachment stub doesn't have an encoding field"
     ),
-    PngEncLength = proplists:get_value(<<"encoded_length">>, PngAttJson),
+    PngEncLength = couch_util:get_value(<<"encoded_length">>, PngAttJson),
     etap:is(
         PngEncLength,
         undefined,
@@ -660,20 +660,20 @@ test_get_already_compressed_att_stub(DocUri, AttName) ->
         Json,
         [<<"_attachments">>, iolist_to_binary(AttName)]
     ),
-    AttLength = proplists:get_value(<<"length">>, AttJson),
+    AttLength = couch_util:get_value(<<"length">>, AttJson),
     etap:is(
         AttLength,
         iolist_size((zlib:gzip(test_text_data()))),
         "Already compressed attachment stub length matches the "
         "compressed length"
     ),
-    Encoding = proplists:get_value(<<"encoding">>, AttJson),
+    Encoding = couch_util:get_value(<<"encoding">>, AttJson),
     etap:is(
         Encoding,
         <<"gzip">>,
         "Already compressed attachment stub has the encoding field set to gzip"
     ),
-    EncLength = proplists:get_value(<<"encoded_length">>, AttJson),
+    EncLength = couch_util:get_value(<<"encoded_length">>, AttJson),
     etap:is(
         EncLength,
         AttLength,

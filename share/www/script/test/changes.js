@@ -360,7 +360,7 @@ couchTests.changes = function(debug) {
       filters: {
         foo:
           'fun({Doc}, Req) -> ' +
-          '  Value = proplists:get_value(<<"value">>, Doc),' +
+          '  Value = couch_util:get_value(<<"value">>, Doc),' +
           '  (Value rem 2) =:= 0' +
           'end.'
       }

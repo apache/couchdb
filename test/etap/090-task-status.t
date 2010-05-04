@@ -29,7 +29,7 @@ check_status(Pid,ListPropLists) ->
     From = list_to_binary(pid_to_list(Pid)),
     Element = lists:foldl(
         fun(PropList,Acc) ->
-            case proplists:get_value(pid,PropList) of
+            case couch_util:get_value(pid,PropList) of
                 From ->
                     [PropList | Acc];
                 _ ->
@@ -38,7 +38,7 @@ check_status(Pid,ListPropLists) ->
         end,
         [], ListPropLists
     ),
-    proplists:get_value(status,hd(Element)).
+    couch_util:get_value(status,hd(Element)).
 
 loop() ->
     receive
