@@ -103,7 +103,7 @@ test_identity_with_valid_md5() ->
         "PUT /", test_db_name(), "/", docid(), "/readme.txt HTTP/1.1\r\n",
         "Content-Type: text/plain\r\n",
         "Content-Length: 34\r\n",
-        "Content-MD5: ", base64:encode(erlang:md5(AttData)), "\r\n",
+        "Content-MD5: ", base64:encode(couch_util:md5(AttData)), "\r\n",
         "\r\n",
         AttData],
 
@@ -118,7 +118,7 @@ test_chunked_with_valid_md5_header() ->
         "PUT /", test_db_name(), "/", docid(), "/readme.txt HTTP/1.1\r\n",
         "Content-Type: text/plain\r\n",
         "Transfer-Encoding: chunked\r\n",
-        "Content-MD5: ", base64:encode(erlang:md5(AttData)), "\r\n",
+        "Content-MD5: ", base64:encode(couch_util:md5(AttData)), "\r\n",
         "\r\n",
         to_hex(size(Part1)), "\r\n",
         Part1, "\r\n",
@@ -145,7 +145,7 @@ test_chunked_with_valid_md5_trailer() ->
         to_hex(size(Part2)), "\r\n",
         Part2, "\r\n",
         "0\r\n",
-        "Content-MD5: ", base64:encode(erlang:md5(AttData)), "\r\n",
+        "Content-MD5: ", base64:encode(couch_util:md5(AttData)), "\r\n",
         "\r\n"],
 
     {Code, Json} = do_request(Data),

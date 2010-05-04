@@ -94,7 +94,7 @@ foldl(Fd, [Pos|Rest], Fun, Acc) ->
 foldl(Fd, PosList, <<>>, Fun, Acc) ->
     foldl(Fd, PosList, Fun, Acc);
 foldl(Fd, PosList, Md5, Fun, Acc) ->
-    foldl(Fd, PosList, Md5, erlang:md5_init(), Fun, Acc).
+    foldl(Fd, PosList, Md5, couch_util:md5_init(), Fun, Acc).
 
 foldl_decode(Fd, PosList, Md5, Enc, Fun, Acc) ->
     {DecDataFun, DecEndFun} = case Enc of
@@ -104,34 +104,34 @@ foldl_decode(Fd, PosList, Md5, Enc, Fun, Acc) ->
         identity_enc_dec_funs()
     end,
     Result = foldl_decode(
-        DecDataFun, Fd, PosList, Md5, erlang:md5_init(), Fun, Acc
+        DecDataFun, Fd, PosList, Md5, couch_util:md5_init(), Fun, Acc
     ),
     DecEndFun(),
     Result.
 
 foldl(_Fd, [], Md5, Md5Acc, _Fun, Acc) ->
-    Md5 = erlang:md5_final(Md5Acc),
+    Md5 = couch_util:md5_final(Md5Acc),
     Acc;
 foldl(Fd, [Pos], Md5, Md5Acc, Fun, Acc) ->
     {ok, Bin} = couch_file:pread_iolist(Fd, Pos),
-    Md5 = erlang:md5_final(erlang:md5_update(Md5Acc, Bin)),
+    Md5 = couch_util:md5_final(couch_util:md5_update(Md5Acc, Bin)),
     Fun(Bin, Acc);
 foldl(Fd, [Pos|Rest], Md5, Md5Acc, Fun, Acc) ->
     {ok, Bin} = couch_file:pread_iolist(Fd, Pos),
-    foldl(Fd, Rest, Md5, erlang:md5_update(Md5Acc, Bin), Fun, Fun(Bin, Acc)).
+    foldl(Fd, Rest, Md5, couch_util:md5_update(Md5Acc, Bin), Fun, Fun(Bin, Acc)).
 
 foldl_decode(_DecFun, _Fd, [], Md5, Md5Acc, _Fun, Acc) ->
-    Md5 = erlang:md5_final(Md5Acc),
+    Md5 = couch_util:md5_final(Md5Acc),
     Acc;
 foldl_decode(DecFun, Fd, [Pos], Md5, Md5Acc, Fun, Acc) ->
     {ok, EncBin} = couch_file:pread_iolist(Fd, Pos),
-    Md5 = erlang:md5_final(erlang:md5_update(Md5Acc, EncBin)),
+    Md5 = couch_util:md5_final(couch_util:md5_update(Md5Acc, EncBin)),
     Bin = DecFun(EncBin),
     Fun(Bin, Acc);
 foldl_decode(DecFun, Fd, [Pos|Rest], Md5, Md5Acc, Fun, Acc) ->
     {ok, EncBin} = couch_file:pread_iolist(Fd, Pos),
     Bin = DecFun(EncBin),
-    Md5Acc2 = erlang:md5_update(Md5Acc, EncBin),
+    Md5Acc2 = couch_util:md5_update(Md5Acc, EncBin),
     foldl_decode(DecFun, Fd, Rest, Md5, Md5Acc2, Fun, Fun(Bin, Acc)).
 
 gzip_init(Options) ->
@@ -190,8 +190,8 @@ init({Fd, Encoding, Options}) ->
     end,
     {ok, #stream{
             fd=Fd,
-            md5=erlang:md5_init(),
-            identity_md5=erlang:md5_init(),
+            md5=couch_util:md5_init(),
+            identity_md5=couch_util:md5_init(),
             encoding_fun=EncodingFun,
             end_encoding_fun=EndEncodingFun
         }
@@ -215,7 +215,7 @@ handle_call({write, Bin}, _From, Stream) ->
         encoding_fun = EncodingFun} = Stream,
     if BinSize + BufferLen > Max ->
         WriteBin = lists:reverse(Buffer, [Bin]),
-        IdenMd5_2 = erlang:md5_update(IdenMd5, WriteBin),
+        IdenMd5_2 = couch_util:md5_update(IdenMd5, WriteBin),
         case EncodingFun(WriteBin) of
         [] ->
             % case where the encoder did some internal buffering
@@ -226,7 +226,7 @@ handle_call({write, Bin}, _From, Stream) ->
         WriteBin2 ->
             {ok, Pos} = couch_file:append_binary(Fd, WriteBin2),
             WrittenLen2 = WrittenLen + iolist_size(WriteBin2),
-            Md5_2 = erlang:md5_update(Md5, WriteBin2),
+            Md5_2 = couch_util:md5_update(Md5, WriteBin2),
             Written2 = [Pos|Written]
         end,
 
@@ -257,9 +257,9 @@ handle_call(close, _From, Stream) ->
         end_encoding_fun = EndEncodingFun} = Stream,
 
     WriteBin = lists:reverse(Buffer),
-    IdenMd5Final = erlang:md5_final(erlang:md5_update(IdenMd5, WriteBin)),
+    IdenMd5Final = couch_util:md5_final(couch_util:md5_update(IdenMd5, WriteBin)),
     WriteBin2 = EncodingFun(WriteBin) ++ EndEncodingFun(),
-    Md5Final = erlang:md5_final(erlang:md5_update(Md5, WriteBin2)),
+    Md5Final = couch_util:md5_final(couch_util:md5_update(Md5, WriteBin2)),
     Result = case WriteBin2 of
     [] ->
         {lists:reverse(Written), WrittenLen, IdenLen, Md5Final, IdenMd5Final};
