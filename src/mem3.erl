@@ -348,6 +348,13 @@ int_join(ExtNodes, #mem{nodes=Nodes, clock=Clock} = State) ->
     {ok, NewState}.
 
 
+install_new_state(#mem{args=Args} = State) ->
+    Config = get_config(Args),
+    Test = get_test(Args),
+    save_state_file(Test, State, Config),
+    gossip(Test, State).
+
+
 get_pingnode_state(PingNode) ->
     % ping the PingNode and get its state
     pong = net_adm:ping(PingNode),
@@ -411,6 +418,7 @@ gossip(#mem{args=Args} = NewState) ->
 gossip(undefined, #mem{nodes=StateNodes} = State) ->
     {_, Nodes, _} = lists:unzip3(StateNodes),
     TargetNode = next_up_node(Nodes),
+    ?debugFmt("~nNodes: ~p~nTarget: ~p~n", [Nodes, TargetNode]),
     showroom_log:message(info, "membership: firing gossip from ~p to ~p",
         [node(), TargetNode]),
     case gen_server:call({?SERVER, TargetNode}, {gossip, State}) of
@@ -481,13 +489,6 @@ read_latest_state_file(_, _) ->
     nil.
 
 
-install_new_state(#mem{args=Args} = State) ->
-    Config = get_config(Args),
-    Test = get_test(Args),
-    save_state_file(Test, State, Config),
-    gossip(State).
-
-
 %% @doc save the state file to disk, with current timestamp.
 %%      thx to riak_ring_manager:do_write_ringfile/1
 -spec save_state_file(test(), mem_state(), config()) -> ok.
@@ -531,7 +532,10 @@ int_reset(_Test, State) ->
 
 
 ping_all_yall(Nodes) ->
-    lists:map(fun(Node) -> net_adm:ping(Node) end, Nodes).
+    lists:foreach(fun(Node) ->
+        net_adm:ping(Node)
+    end, Nodes),
+    timer:sleep(500). % sigh.
 
 
 get_remote_states(NodeList) ->
