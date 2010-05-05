@@ -137,14 +137,7 @@ couchTests.rewrite = function(debug) {
               "query": {
                 "key": [":a", ":b"]
               }
-            },
-            
-            {
-              "from": "uuids",
-              "to": "../../../_uuids"
             }
-            
-            
           ],
           lists: {
             simpleForm: stringFun(function(head, req) {
@@ -339,12 +332,29 @@ couchTests.rewrite = function(debug) {
         T(/Value: doc 4/.test(xhr.responseText));
         
         // test path relative to server
+        designDoc.rewrites.push({
+           "from": "uuids",
+           "to": "../../../_uuids"
+        });
+        T(db.save(designDoc).ok);
         
         var xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/uuids");
-        T(xhr.status == 200);
+        T(xhr.status == 500);
         var result = JSON.parse(xhr.responseText);
-        T(result.uuids.length == 1);
-        var first = result.uuids[0];
+        T(result.error == "insecure_rewrite_rule");
+
+        run_on_modified_server(
+          [{section: "httpd",
+            key: "secure_rewrites",
+            value: "false"}],
+            function() {
+              var xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/uuids?cache=bust");
+              T(xhr.status == 200);
+              var result = JSON.parse(xhr.responseText);
+              T(result.uuids.length == 1);
+              var first = result.uuids[0];
+        });
+
   });
   
 }

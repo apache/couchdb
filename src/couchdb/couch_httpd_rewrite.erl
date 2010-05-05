@@ -366,24 +366,34 @@ make_rule(Rule) ->
 
 parse_path(Path) ->
     {ok, SlashRE} = re:compile(<<"\\/">>),
-    path_to_list(re:split(Path, SlashRE), []).
+    path_to_list(re:split(Path, SlashRE), [], 0).
 
 %% @doc convert a path rule (from or to) to an erlang list
 %% * and path variable starting by ":" are converted
 %% in erlang atom.
-path_to_list([], Acc) ->
+path_to_list([], Acc, _DotDotCount) ->
     lists:reverse(Acc);
-path_to_list([<<>>|R], Acc) ->
-    path_to_list(R, Acc);
-path_to_list([<<"*">>|R], Acc) ->
-    path_to_list(R, [?MATCH_ALL|Acc]);
-path_to_list([P|R], Acc) ->
+path_to_list([<<>>|R], Acc, DotDotCount) ->
+    path_to_list(R, Acc, DotDotCount);
+path_to_list([<<"*">>|R], Acc, DotDotCount) ->
+    path_to_list(R, [?MATCH_ALL|Acc], DotDotCount);
+path_to_list([<<"..">>|R], Acc, DotDotCount) when DotDotCount == 2 ->
+    case couch_config:get("httpd", "secure_rewrites", "true") of
+    "false" ->
+        path_to_list(R, [<<"..">>|Acc], DotDotCount+1);
+    Else ->
+        ?LOG_INFO("insecure_rewrite_rule ~p blocked", [lists:reverse(Acc) ++ [<<"..">>] ++ R]),
+        throw({insecure_rewrite_rule, "too many ../.. segments"})
+    end;
+path_to_list([<<"..">>|R], Acc, DotDotCount) ->
+    path_to_list(R, [<<"..">>|Acc], DotDotCount+1);
+path_to_list([P|R], Acc, DotDotCount) ->
     P1 = case P of
         <<":", Var/binary>> ->
             list_to_atom(binary_to_list(Var));
         _ -> P
     end,
-    path_to_list(R, [P1|Acc]).
+    path_to_list(R, [P1|Acc], DotDotCount).
 
 encode_query(Props) ->
     Props1 = lists:foldl(fun ({K, V}, Acc) ->
