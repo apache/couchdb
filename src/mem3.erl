@@ -20,10 +20,10 @@
 
 %% API
 -export([start_link/0, start_link/1, stop/0, stop/1, reset/0]).
--export([join/3, clock/0, state/0, start_gossip/0]).
--export([partitions/0, fullmap/0]).
--export([nodes/0, nodes_for_part/1, nodes_for_part/2, all_nodes_parts/1]).
--export([parts_for_node/1]).
+-export([join/3, clock/0, state/0, nodes/0, start_gossip/0]).
+%-export([partitions/0, fullmap/0]).
+%-export([nodes/0, nodes_for_part/1, nodes_for_part/2, all_nodes_parts/1]).
+%-export([parts_for_node/1]).
 
 %% for testing more than anything else
 -export([merge_nodes/2, next_up_node/1, next_up_node/3]).
@@ -104,16 +104,16 @@ reset() ->
     gen_server:call(?SERVER, reset).
 
 
-%% @doc retrieve the primary partition map.  This is a list of partitions and
-%%      their corresponding primary node, no replication partner nodes.
-partitions() ->
-    mochiglobal:get(pmap).
+% %% @doc retrieve the primary partition map.  This is a list of partitions and
+% %%      their corresponding primary node, no replication partner nodes.
+% partitions() ->
+%     mochiglobal:get(pmap).
 
 
-%% @doc retrieve the full partition map, like above, but including replication
-%%      partner nodes.  List should number 2^Q * N
-fullmap() ->
-    lists:keysort(2, mochiglobal:get(fullmap)).
+% %% @doc retrieve the full partition map, like above, but including replication
+% %%      partner nodes.  List should number 2^Q * N
+% fullmap() ->
+%     lists:keysort(2, mochiglobal:get(fullmap)).
 
 
 %% @doc get the list of cluster nodes (according to membership module)
@@ -122,36 +122,36 @@ nodes() ->
   gen_server:call(?SERVER, nodes).
 
 
-%% @doc get all the responsible nodes for a given partition, including
-%%      replication partner nodes
-nodes_for_part(Part) ->
-    nodes_for_part(Part, mochiglobal:get(fullmap)).
+% %% @doc get all the responsible nodes for a given partition, including
+% %%      replication partner nodes
+% nodes_for_part(Part) ->
+%     nodes_for_part(Part, mochiglobal:get(fullmap)).
 
 
-nodes_for_part(Part, NodePartList) ->
-    Filtered = lists:filter(fun({_N, P}) -> P =:= Part end, NodePartList),
-    {Nodes, _Parts} = lists:unzip(Filtered),
-    lists:usort(Nodes).
+% nodes_for_part(Part, NodePartList) ->
+%     Filtered = lists:filter(fun({_N, P}) -> P =:= Part end, NodePartList),
+%     {Nodes, _Parts} = lists:unzip(Filtered),
+%     lists:usort(Nodes).
 
 
-%% @doc return the partitions that reside on a given node
-parts_for_node(Node) ->
-    lists:sort(lists:foldl(fun({N,P}, AccIn) ->
-        case N of
-        Node -> [P | AccIn];
-        _ -> AccIn
-        end
-    end, [], mochiglobal:get(fullmap))).
+% %% @doc return the partitions that reside on a given node
+% parts_for_node(Node) ->
+%     lists:sort(lists:foldl(fun({N,P}, AccIn) ->
+%         case N of
+%         Node -> [P | AccIn];
+%         _ -> AccIn
+%         end
+%     end, [], mochiglobal:get(fullmap))).
 
 
-%% @doc get all the nodes and partitions in the cluster.  Depending on the
-%%      AllPartners param, you get only primary nodes or replication partner
-%%      nodes, as well.
-%%      No nodes/parts currently down are returned.
-all_nodes_parts(false) ->
-    mochiglobal:get(pmap);
-all_nodes_parts(true) ->
-    mochiglobal:get(fullmap).
+% %% @doc get all the nodes and partitions in the cluster.  Depending on the
+% %%      AllPartners param, you get only primary nodes or replication partner
+% %%      nodes, as well.
+% %%      No nodes/parts currently down are returned.
+% all_nodes_parts(false) ->
+%     mochiglobal:get(pmap);
+% all_nodes_parts(true) ->
+%     mochiglobal:get(fullmap).
 
 
 %%====================================================================
