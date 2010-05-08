@@ -118,6 +118,7 @@ reset() ->
 
 %% @doc get the list of cluster nodes (according to membership module)
 %%      This may differ from erlang:nodes()
+%%      Guaranteed to be in order of State's node list (1st elem in 3-tuple)
 nodes() ->
   gen_server:call(?SERVER, nodes).
 
@@ -203,7 +204,7 @@ handle_call(reset, _From, #mem{args=Args} = State) ->
 
 %% nodes
 handle_call(nodes, _From, #mem{nodes=Nodes} = State) ->
-    {_,NodeList,_} = lists:unzip3(Nodes),
+    {_,NodeList,_} = lists:unzip3(lists:keysort(1, Nodes)),
     {reply, {ok, NodeList}, State};
 
 %% gossip
