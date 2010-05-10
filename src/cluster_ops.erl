@@ -59,8 +59,7 @@ key_lookup(Key, {M,F,A}, Access, Const, N) ->
 
 
 %% @doc Do op on all shards (and maybe even replication partners)
-all_parts({M,F,A}, Access, AndPartners, ResolveFun) ->
-    NodePartList = membership2:all_nodes_parts(AndPartners),
+all_parts({M,F,A}, Access, NodeParts, ResolveFun) ->
     MapFun = fun({Node, Part}) ->
         try
             rpc:call(Node, M, F, [[Part | A]])
@@ -68,9 +67,9 @@ all_parts({M,F,A}, Access, AndPartners, ResolveFun) ->
             {error, Class, Exception}
         end
     end,
-    Replies = ?PMAP(MapFun, NodePartList),
+    Replies = ?PMAP(MapFun, NodeParts),
     {Good, Bad} = lists:partition(fun valid/1, Replies),
-    final_all_parts(Good, Bad, length(NodePartList), ResolveFun, Access).
+    final_all_parts(Good, Bad, length(NodeParts), ResolveFun, Access).
 
 
 %% @doc Do op on some shards, depending on list of keys sent in.
