@@ -37,8 +37,35 @@ cast(Node, Caller, MFA) ->
 kill(Node, Ref) ->
     ok = gen_server:cast({?SERVER, Node}, {kill, Ref}).
 
+%% @equiv async_server_call(Server, self(), Request)
+-spec async_server_call(pid() | {atom(),node()}, any()) -> reference().
+async_server_call(Server, Request) ->
+    async_server_call(Server, self(), Request).
+
+%% @doc Sends a properly formatted gen_server:call Request to the Server and
+%% returns the reference which the Server will include in its reply.  The
+%% function acts more like cast() than call() in that the server process
+%% is not monitored.  Clients who want to know if the server is alive should
+%% monitor it themselves before calling this function.
+-spec async_server_call(pid() | {atom(),node()}, pid(), any()) -> reference().
+async_server_call(Server, Caller, Name, Request) ->
+    Ref = make_ref(),
+    do_send(Server, {'$gen_call', {Caller,Ref}, Request}),
+    Ref.
+
 %% @doc convenience function to reply to the original rexi Caller.
 -spec reply(any()) -> any().
 reply(Reply) ->
     {Caller, Ref} = get(rexi_from),
     erlang:send(Caller, {Ref,Reply}).
+
+%% internal functions %%
+
+% send a message as quickly as possible
+do_send(Dest, Msg) ->
+    case erlang:send(Dest, Msg, [noconnect]) of
+    noconnect ->
+        spawn(erlang, send, [Dest, Msg]);
+    ok ->
+        ok
+    end.
