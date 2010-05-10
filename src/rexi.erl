@@ -2,6 +2,7 @@
 -export([start/0, stop/0, restart/0]).
 -export([cast/2, cast/3, kill/2]).
 -export([reply/1]).
+-export([async_server_call/2, async_server_call/3]).
 
 -define(SERVER, rexi_server).
 
@@ -49,7 +50,7 @@ async_server_call(Server, Request) ->
 %% is not monitored.  Clients who want to know if the server is alive should
 %% monitor it themselves before calling this function.
 -spec async_server_call(pid() | {atom(),node()}, pid(), any()) -> reference().
-async_server_call(Server, Caller, Name, Request) ->
+async_server_call(Server, Caller, Request) ->
     Ref = make_ref(),
     do_send(Server, {'$gen_call', {Caller,Ref}, Request}),
     Ref.
