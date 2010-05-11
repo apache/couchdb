@@ -4,7 +4,8 @@
 -include_lib("eunit/include/eunit.hrl").
 
 %% @doc spawn_links a process which monitors the supplied list of items and
-%% returns the process ID.
+%% returns the process ID.  If a monitored process exits, the caller will
+%% receive a {rexi_DOWN, MonitoringPid, DeadPid, Reason} message.
 -spec start([pid() | atom() | {atom(),atom()}]) -> pid().
 start(Procs) ->
     Parent = self(),
