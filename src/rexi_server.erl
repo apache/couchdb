@@ -1,6 +1,6 @@
 -module(rexi_server).
 -behaviour(gen_server).
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, 
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
     code_change/3]).
 
 -export([start_link/0, init_p/2]).
@@ -18,7 +18,7 @@ init([]) ->
     {ok, #st{}}.
 
 handle_call(_Request, _From, St) ->
-    {reply, ok, St}.
+    {reply, ignored, St}.
 
 handle_cast({doit, From, MFA}, #st{workers=Workers} = St) ->
     {LocalPid, Ref} = spawn_monitor(?MODULE, init_p, [From, MFA]),
