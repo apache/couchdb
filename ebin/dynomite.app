@@ -21,7 +21,6 @@
       mem_utils,
       membership2,
       node,
-      partitions,
       replication,
       vector_clock
     ]},
