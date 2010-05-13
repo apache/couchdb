@@ -54,7 +54,7 @@ config_files() ->
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(3),
+    etap:plan(4),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -85,7 +85,8 @@ test() ->
     test_regular_request(),
     test_vhost_request(),
     test_vhost_request_with_qs(),
-
+    test_vhost_request_with_global(),
+    
     %% restart boilerplate
     couch_db:close(Db),
     couch_server:delete(list_to_binary(dbname()), []),
@@ -117,5 +118,15 @@ test_vhost_request_with_qs() ->
             {JsonProps} = couch_util:json_decode(Body),
             HasRevsInfo = proplists:is_defined(<<"_revs_info">>, JsonProps),
             etap:is(HasRevsInfo, true, "should return _revs_info");
+        _Else -> false
+    end.
+
+test_vhost_request_with_global() ->
+    Url = server() ++ "_uuids",
+    case ibrowse:send_req(Url, [], get, [], [{host_header, "example.com"}]) of
+        {ok, _, _, Body} ->
+            {JsonProps} = couch_util:json_decode(Body),
+            HasUuids = proplists:is_defined(<<"uuids">>, JsonProps),
+            etap:is(HasUuids, true, "should return _uuids");
         _Else -> false
     end.

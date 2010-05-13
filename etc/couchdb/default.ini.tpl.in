@@ -19,6 +19,11 @@ max_connections = 2048
 authentication_handlers = {couch_httpd_oauth, oauth_authentication_handler}, {couch_httpd_auth, cookie_authentication_handler}, {couch_httpd_auth, default_authentication_handler}
 default_handler = {couch_httpd_db, handle_request}
 secure_rewrites = true
+vhost_global_handlers = _utils
+ _uuids
+ _session
+ _oauth
+ _users
 
 [log]
 file = %localstatelogdir%/couch.log
