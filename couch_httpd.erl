@@ -13,7 +13,7 @@
 -module(couch_httpd).
 -include("couch_db.hrl").
 
--export([start_link/0, stop/0, handle_request/6]).
+-export([start_link/0, stop/0, handle_request/7]).
 
 -export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,path/1,absolute_uri/2,body_length/1]).
 -export([verify_is_server_admin/1,unquote/1,quote/1,recv/2,recv_chunked/4,error_info/1]).
@@ -37,7 +37,11 @@ start_link() ->
     Port = couch_config:get("httpd", "port", "5984"),
     MaxConnections = couch_config:get("httpd", "max_connections", "2048"),
     VirtualHosts = couch_config:get("vhosts"),
-
+    VhostGlobals = re:split(
+        couch_config:get("httpd", "vhost_global_handlers", ""),
+        "\\s+",
+        [{return, list}]
+    ),
     DefaultSpec = "{couch_httpd_db, handle_request}",
     DefaultFun = make_arity_1_fun(
         couch_config:get("httpd", "default_handler", DefaultSpec)
@@ -64,7 +68,7 @@ start_link() ->
     Loop = fun(Req)->
         apply(?MODULE, handle_request, [
             Req, DefaultFun, UrlHandlers, DbUrlHandlers, DesignUrlHandlers,
-                VirtualHosts
+                VirtualHosts, VhostGlobals
         ])
     end,
 
@@ -157,19 +161,26 @@ redirect_to_vhost(MochiReq, DefaultFun,
         UrlHandlers, DbUrlHandlers, DesignUrlHandlers).
 
 handle_request(MochiReq, DefaultFun,
-    UrlHandlers, DbUrlHandlers, DesignUrlHandlers, VirtualHosts) ->
+    UrlHandlers, DbUrlHandlers, DesignUrlHandlers, VirtualHosts, VhostGlobals) ->
 
     % grab Host from Req
     Vhost = MochiReq:get_header_value("Host"),
 
     % find Vhost in config
     case couch_util:get_value(Vhost, VirtualHosts) of
-        undefined -> % business as usual
+    undefined -> % business as usual
+        handle_request_int(MochiReq, DefaultFun,
+            UrlHandlers, DbUrlHandlers, DesignUrlHandlers);
+    VhostTarget ->
+        case vhost_global(VhostGlobals, MochiReq) of
+        true ->% global handler for vhosts
             handle_request_int(MochiReq, DefaultFun,
-                    UrlHandlers, DbUrlHandlers, DesignUrlHandlers);
-        VhostTarget ->
+                UrlHandlers, DbUrlHandlers, DesignUrlHandlers);
+        _Else ->
+            % do rewrite
             redirect_to_vhost(MochiReq, DefaultFun,
                 UrlHandlers, DbUrlHandlers, DesignUrlHandlers, VhostTarget)
+        end
     end.
 
 
@@ -297,6 +308,11 @@ authenticate_request(Response, _AuthSrcs) ->
 increment_method_stats(Method) ->
     couch_stats_collector:increment({httpd_request_methods, Method}).
 
+% if so, then it will not be rewritten, but will run as a normal couchdb request.
+% normally you'd use this for _uuids _utils and a few of the others you want to keep available on vhosts. You can also use it to make databases 'global'.
+vhost_global(VhostGlobals, MochiReq) ->
+    "/"++Path = MochiReq:get(path),
+    [true] == [true||V <- VhostGlobals, V == Path].
 
 % Utilities
 
