@@ -20,7 +20,7 @@
 
 %% API
 -export([start_link/0, start_link/1, stop/0, stop/1, reset/0]).
--export([join/3, clock/0, state/0, nodes/0, start_gossip/0]).
+-export([join/3, clock/0, state/0, nodes/0, fullnodes/0, start_gossip/0]).
 %-export([partitions/0, fullmap/0]).
 %-export([nodes/0, nodes_for_part/1, nodes_for_part/2, all_nodes_parts/1]).
 %-export([parts_for_node/1]).
@@ -123,6 +123,13 @@ nodes() ->
   gen_server:call(?SERVER, nodes).
 
 
+%% @doc get the list of cluster nodes (according to membership module)
+%%      This may differ from erlang:nodes()
+%%      Guaranteed to be in order of State's node list (1st elem in 3-tuple)
+fullnodes() ->
+  gen_server:call(?SERVER, fullnodes).
+
+
 % %% @doc get all the responsible nodes for a given partition, including
 % %%      replication partner nodes
 % nodes_for_part(Part) ->
@@ -206,6 +213,10 @@ handle_call(reset, _From, #mem{args=Args} = State) ->
 handle_call(nodes, _From, #mem{nodes=Nodes} = State) ->
     {_,NodeList,_} = lists:unzip3(lists:keysort(1, Nodes)),
     {reply, {ok, NodeList}, State};
+
+%% fullnodes
+handle_call(fullnodes, _From, #mem{nodes=Nodes} = State) ->
+    {reply, {ok, Nodes}, State};
 
 %% gossip
 handle_call({gossip, RemoteState}, {Pid,_Tag} = From, LocalState) ->

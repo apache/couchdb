@@ -28,7 +28,6 @@
 
 %% @doc start required apps, join cluster, start dynomite supervisor
 start(_Type, _StartArgs) ->
-    couch_api:create_db(<<"users">>, []), % all nodes have local 'users' db
     % start dynomite supervisor
     dynomite_sup:start_link().
 
