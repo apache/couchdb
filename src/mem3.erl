@@ -20,7 +20,8 @@
 
 %% API
 -export([start_link/0, start_link/1, stop/0, stop/1, reset/0]).
--export([join/3, clock/0, state/0, nodes/0, fullnodes/0, start_gossip/0]).
+-export([join/3, clock/0, state/0, states/0, nodes/0, fullnodes/0,
+         start_gossip/0]).
 %-export([partitions/0, fullmap/0]).
 %-export([nodes/0, nodes_for_part/1, nodes_for_part/2, all_nodes_parts/1]).
 %-export([parts_for_node/1]).
@@ -32,10 +33,15 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
-
 %% includes
--include("../include/config.hrl").
--include("../include/common.hrl").
+-include_lib("eunit/include/eunit.hrl").
+
+%% version 3 of membership state
+-record(mem, {header=3,
+              nodes=[],
+              clock=[],
+              args
+             }).
 
 -define(SERVER, membership).
 -define(STATE_FILE_PREFIX, "membership").
@@ -46,8 +52,7 @@
 -type options() :: list().
 -type mem_node() :: {join_order(), node(), options()}.
 -type mem_node_list() :: [mem_node()].
--type config() :: #config{}.
--type arg_options() :: {test, boolean()} | {config, config()}.
+-type arg_options() :: {test, boolean()}.
 -type args() :: [] | [arg_options()].
 -type mem_state() :: #mem{}.
 -type test() :: undefined | node().
@@ -94,6 +99,15 @@ state() ->
     gen_server:call(?SERVER, state).
 
 
+-spec states() -> {ok, [mem_state()]}.
+states() ->
+    {ok, Nodes} = mem3:nodes(),
+    case rpc:multicall(Nodes, ?MODULE, state, []) of
+    {States, []} -> {ok, lists:map(fun({ok,S}) -> S end, States)};
+    {Good, Bad}  -> {error, {[{good,Good},{bad,Bad}]}}
+    end.
+
+
 -spec start_gossip() -> ok.
 start_gossip() ->
     gen_server:call(?SERVER, start_gossip).
@@ -104,21 +118,10 @@ reset() ->
     gen_server:call(?SERVER, reset).
 
 
-% %% @doc retrieve the primary partition map.  This is a list of partitions and
-% %%      their corresponding primary node, no replication partner nodes.
-% partitions() ->
-%     mochiglobal:get(pmap).
-
-
-% %% @doc retrieve the full partition map, like above, but including replication
-% %%      partner nodes.  List should number 2^Q * N
-% fullmap() ->
-%     lists:keysort(2, mochiglobal:get(fullmap)).
-
-
 %% @doc get the list of cluster nodes (according to membership module)
 %%      This may differ from erlang:nodes()
 %%      Guaranteed to be in order of State's node list (1st elem in 3-tuple)
+-spec nodes() -> {ok, [node()]}.
 nodes() ->
   gen_server:call(?SERVER, nodes).
 
@@ -126,40 +129,9 @@ nodes() ->
 %% @doc get the list of cluster nodes (according to membership module)
 %%      This may differ from erlang:nodes()
 %%      Guaranteed to be in order of State's node list (1st elem in 3-tuple)
+-spec fullnodes() -> {ok, [mem_node()]}.
 fullnodes() ->
   gen_server:call(?SERVER, fullnodes).
-
-
-% %% @doc get all the responsible nodes for a given partition, including
-% %%      replication partner nodes
-% nodes_for_part(Part) ->
-%     nodes_for_part(Part, mochiglobal:get(fullmap)).
-
-
-% nodes_for_part(Part, NodePartList) ->
-%     Filtered = lists:filter(fun({_N, P}) -> P =:= Part end, NodePartList),
-%     {Nodes, _Parts} = lists:unzip(Filtered),
-%     lists:usort(Nodes).
-
-
-% %% @doc return the partitions that reside on a given node
-% parts_for_node(Node) ->
-%     lists:sort(lists:foldl(fun({N,P}, AccIn) ->
-%         case N of
-%         Node -> [P | AccIn];
-%         _ -> AccIn
-%         end
-%     end, [], mochiglobal:get(fullmap))).
-
-
-% %% @doc get all the nodes and partitions in the cluster.  Depending on the
-% %%      AllPartners param, you get only primary nodes or replication partner
-% %%      nodes, as well.
-% %%      No nodes/parts currently down are returned.
-% all_nodes_parts(false) ->
-%     mochiglobal:get(pmap);
-% all_nodes_parts(true) ->
-%     mochiglobal:get(fullmap).
 
 
 %%====================================================================
@@ -170,9 +142,8 @@ fullnodes() ->
 -spec init(args()) -> {ok, mem_state()}.
 init(Args) ->
     process_flag(trap_exit,true),
-    Config = get_config(Args),
     Test = get_test(Args),
-    OldState = read_latest_state_file(Test, Config),
+    OldState = read_latest_state_file(Test),
     showroom_log:message(info, "membership: membership server starting...", []),
     net_kernel:monitor_nodes(true),
     State = handle_init(Test, OldState),
@@ -280,11 +251,11 @@ code_change(OldVsn, State, _Extra) ->
 
 %% @doc if Args has config use it, otherwise call configuration module
 %%      most times Args will have config during testing runs
-get_config(Args) ->
-    case proplists:get_value(config, Args) of
-    undefined -> configuration:get_config();
-    Any -> Any
-    end.
+%get_config(Args) ->
+%    case proplists:get_value(config, Args) of
+%    undefined -> configuration:get_config();
+%    Any -> Any
+%    end.
 
 
 get_test(Args) ->
@@ -361,9 +332,8 @@ int_join(ExtNodes, #mem{nodes=Nodes, clock=Clock} = State) ->
 
 
 install_new_state(#mem{args=Args} = State) ->
-    Config = get_config(Args),
     Test = get_test(Args),
-    save_state_file(Test, State, Config),
+    save_state_file(Test, State),
     gossip(Test, State).
 
 
@@ -430,7 +400,6 @@ gossip(#mem{args=Args} = NewState) ->
 gossip(undefined, #mem{nodes=StateNodes} = State) ->
     {_, Nodes, _} = lists:unzip3(StateNodes),
     TargetNode = next_up_node(Nodes),
-    ?debugFmt("~nNodes: ~p~nTarget: ~p~n", [Nodes, TargetNode]),
     showroom_log:message(info, "membership: firing gossip from ~p to ~p",
         [node(), TargetNode]),
     case gen_server:call({?SERVER, TargetNode}, {gossip, State}) of
@@ -465,8 +434,8 @@ up_nodes() ->
 
 
 %% @doc find the latest state file on disk
-find_latest_state_filename(Config) ->
-    Dir = Config#config.directory,
+find_latest_state_filename() ->
+    Dir = couch_config:get("couchdb", "database_dir"),
     case file:list_dir(Dir) of
     {ok, Filenames} ->
         Timestamps = [list_to_integer(TS) || {?STATE_FILE_PREFIX, TS} <-
@@ -485,9 +454,9 @@ find_latest_state_filename(Config) ->
 
 
 %% (Test, Config)
-read_latest_state_file(undefined, Config) ->
+read_latest_state_file(undefined) ->
     try
-        {ok, File} = find_latest_state_filename(Config),
+        {ok, File} = find_latest_state_filename(),
         case file:consult(File) of
         {ok, [#mem{}=State]} -> State;
         _Else ->
@@ -497,15 +466,15 @@ read_latest_state_file(undefined, Config) ->
         showroom_log:message(info, "membership: ~p", [Error]),
         nil
     end;
-read_latest_state_file(_, _) ->
+read_latest_state_file(_) ->
     nil.
 
 
 %% @doc save the state file to disk, with current timestamp.
 %%      thx to riak_ring_manager:do_write_ringfile/1
--spec save_state_file(test(), mem_state(), config()) -> ok.
-save_state_file(undefined, State, Config) ->
-    Dir = Config#config.directory,
+-spec save_state_file(test(), mem_state()) -> ok.
+save_state_file(undefined, State) ->
+    Dir = couch_config:get("couchdb", "database_dir"),
     {{Year, Month, Day},{Hour, Minute, Second}} = calendar:universal_time(),
     TS = io_lib:format("~B~2.10.0B~2.10.0B~2.10.0B~2.10.0B~2.10.0B",
                        [Year, Month, Day, Hour, Minute, Second]),
@@ -515,7 +484,7 @@ save_state_file(undefined, State, Config) ->
     io:format(File, "~w.~n", [State]),
     file:close(File);
 
-save_state_file(_,_,_) -> ok. % don't save if testing
+save_state_file(_,_) -> ok. % don't save if testing
 
 
 check_pos(Pos, Node, Nodes) ->

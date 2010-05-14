@@ -4,6 +4,13 @@
 -include("../include/config.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
+%% version 3 of membership state
+-record(mem, {header=3,
+              nodes=[],
+              clock=[],
+              args
+             }).
+
 -define(TEST_NODE_NAME, a).
 -define(HINT_C1, 365375409332725729550921208179070754913983135744).
 -define(HINT_C2, 1096126227998177188652763624537212264741949407232).
@@ -41,9 +48,9 @@ all_tests_test_() ->
 
 
 test_setup() ->
-    Config = #config{n=3,r=2,w=2,q=3,directory="/srv/db",
-                     storage_mod="dynomite_couch_storage"},
-    {ok, Pid} = mem3:start_link([{test,?TEST_NODE_NAME}, {config, Config}]),
+    % Config = #config{n=3,r=2,w=2,q=3,directory="/srv/db",
+    %                  storage_mod="dynomite_couch_storage"},
+    {ok, Pid} = mem3:start_link([{test,?TEST_NODE_NAME}]),
     Pid.
 
 
@@ -118,7 +125,7 @@ join_with_wrong_order(_Pid) ->
 %    ?assertEqual([], mem3:parts_for_node(d)),
     %?debugFmt("~nFullmap: ~p~n", [mem3:fullmap()]),
     Res = mem3:join(join, [{3, d, []}], c),
-    ?assertEqual({error,{position_exists,3,c}}, Res),
+    ?assertEqual({error, <<"position_exists_3">>}, Res),
     %?debugFmt("~nFullmap: ~p~n", [mem3:fullmap()]),
     ok.
 

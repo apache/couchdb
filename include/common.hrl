@@ -39,10 +39,3 @@
                      version,
                      fullmap
                     }).
-
-%% version 3 of membership state
--record(mem, {header=3,
-              nodes=[],
-              clock=[],
-              args
-             }).
