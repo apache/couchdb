@@ -118,34 +118,7 @@ pread_binary(Fd, Pos) ->
 
 
 pread_iolist(Fd, Pos) ->
-    {ok, LenIolist, NextPos} = read_raw_iolist(Fd, Pos, 4),
-    case iolist_to_binary(LenIolist) of
-    <<1:1/integer,Len:31/integer>> ->
-        {ok, Md5List, ValPos} = read_raw_iolist(Fd, NextPos, 16),
-        Md5 = iolist_to_binary(Md5List),
-        {ok, IoList, _} = read_raw_iolist(Fd,ValPos,Len),
-        case couch_util:md5(IoList) of
-        Md5 -> ok;
-        _ ->  throw(file_corruption)
-        end, 
-        {ok, IoList};
-    <<0:1/integer,Len:31/integer>> ->
-        {ok, Iolist, _} = read_raw_iolist(Fd, NextPos, Len),
-        {ok, Iolist} 
-    end.
-       
-
-read_raw_iolist(Fd, Pos, Len) ->
-    BlockOffset = Pos rem ?SIZE_BLOCK,
-    TotalBytes = calculate_total_read_len(BlockOffset, Len),
-    {ok, <<RawBin:TotalBytes/binary>>, HasPrefixes} = gen_server:call(Fd, {pread, Pos, TotalBytes}, infinity),
-    if HasPrefixes ->
-        {ok, remove_block_prefixes(BlockOffset, RawBin), Pos + TotalBytes};
-    true ->
-        % 09 UPGRADE CODE
-        <<ReturnBin:Len/binary, _/binary>> = RawBin,
-        {ok, [ReturnBin], Pos + Len}
-    end.
+    gen_server:call(Fd, {pread_iolist, Pos}, infinity).
 
 %%----------------------------------------------------------------------
 %% Purpose: The length of a file, in bytes.
@@ -277,6 +250,22 @@ terminate(_Reason, _Fd) ->
     ok.
 
 
+handle_call({pread_iolist, Pos}, _From, File) ->
+    {LenIolist, NextPos} = read_raw_iolist_int(File, Pos, 4),
+    case iolist_to_binary(LenIolist) of
+    <<1:1/integer,Len:31/integer>> -> % an MD5-prefixed term
+        {Md5AndIoList, _} = read_raw_iolist_int(File, NextPos, Len+16),
+        {Md5, IoList} = extract_md5(Md5AndIoList),
+        case couch_util:md5(IoList) of
+        Md5 ->
+            {reply, {ok, IoList}, File};
+        _ ->
+            {stop, file_corruption, {error,file_corruption}, File}
+        end;
+    <<0:1/integer,Len:31/integer>> ->
+        {Iolist, _} = read_raw_iolist_int(File, NextPos, Len),
+        {reply, {ok, Iolist}, File} 
+    end;
 handle_call({pread, Pos, Bytes}, _From, #file{fd=Fd,tail_append_begin=TailAppendBegin}=File) ->
     {ok, Bin} = file:pread(Fd, Pos, Bytes),
     {reply, {ok, Bin, Pos >= TailAppendBegin}, File};
@@ -468,6 +457,25 @@ load_header(Fd, Block) ->
     Md5Sig = couch_util:md5(HeaderBin),
     {ok, HeaderBin}.
 
+-spec read_raw_iolist_int(#file{}, Pos::non_neg_integer(), Len::non_neg_integer()) ->
+    {Data::iolist(), CurPos::non_neg_integer()}.
+read_raw_iolist_int(#file{fd=Fd, tail_append_begin=TAB}, Pos, Len) ->
+    BlockOffset = Pos rem ?SIZE_BLOCK,
+    TotalBytes = calculate_total_read_len(BlockOffset, Len),
+    {ok, <<RawBin:TotalBytes/binary>>} = file:pread(Fd, Pos, TotalBytes),
+    if Pos >= TAB ->
+        {remove_block_prefixes(BlockOffset, RawBin), Pos + TotalBytes};
+    true ->
+        % 09 UPGRADE CODE
+        <<ReturnBin:Len/binary, _/binary>> = RawBin,
+        {[ReturnBin], Pos + Len}
+    end.
+
+-spec extract_md5(iolist()) -> {binary(), iolist()}.
+extract_md5(FullIoList) ->
+    {Md5List, IoList} = split_iolist(FullIoList, 16, []),
+    {iolist_to_binary(Md5List), IoList}.
+
 calculate_total_read_len(0, FinalLen) ->
     calculate_total_read_len(1, FinalLen) + 1;
 calculate_total_read_len(BlockOffset, FinalLen) ->
@@ -506,6 +514,11 @@ make_blocks(BlockOffset, IoList) ->
         IoList
     end.
 
+%% @doc Returns a tuple where the first element contains the leading SplitAt
+%% bytes of the original iolist, and the 2nd element is the tail. If SplitAt
+%% is larger than byte_size(IoList), return the difference.
+-spec split_iolist(IoList::iolist(), SplitAt::non_neg_integer(), Acc::list()) ->
+    {iolist(), iolist()} | non_neg_integer().
 split_iolist(List, 0, BeginAcc) ->
     {lists:reverse(BeginAcc), List};
 split_iolist([], SplitAt, _BeginAcc) ->
