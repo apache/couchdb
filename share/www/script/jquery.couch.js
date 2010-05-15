@@ -258,6 +258,7 @@
           );
         },
         saveDoc: function(doc, options) {
+          var beforeSend = fullCommit(options);
           options = options || {};
           if (doc._id === undefined) {
             var method = "POST";
@@ -270,6 +271,7 @@
             type: method, url: uri + encodeOptions(options),
             contentType: "application/json",
             dataType: "json", data: toJSON(doc),
+            beforeSend : beforeSend,
             complete: function(req) {
               var resp = $.httpData(req, "json");
               if (req.status == 201) {
@@ -285,7 +287,8 @@
           });
         },
         bulkSave: function(docs, options) {
-          $.extend(options, {successStatus: 201});
+          var beforeSend = fullCommit(options);
+          $.extend(options, {successStatus: 201, beforeSend : beforeSend});
           ajax({
               type: "POST",
               url: this.uri + "_bulk_docs" + encodeOptions(options),
@@ -471,6 +474,16 @@
       }
     }, obj), ajaxOptions));
   }
+
+  function fullCommit(options) {
+    if (typeof options.ensure_full_commit !== "undefined") {
+      var commit = options.ensure_full_commit;
+      delete options.ensure_full_commit;
+      return function(xhr) {
+        xhr.setRequestHeader("X-Couch-Full-Commit", commit.toString());
+      };
+    }
+  };
 
   // Convert a options object to an url query string.
   // ex: {key:'value',key2:'value2'} becomes '?key="value"&key2="value2"'
