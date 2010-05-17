@@ -27,7 +27,10 @@ specific language governing permissions and limitations under the License.
 #include "unicode/ucasemap.h"
 #ifndef WIN32
 #include <string.h> // for memcpy
+#include <fcntl.h> // for O_DSYNC
 #endif
+
+#define SET_OSYNC_OPCODE 2
 
 typedef struct {
     ErlDrvPort port;
@@ -90,6 +93,19 @@ static int return_control_result(void* pLocalResult, int localLen, char **ppRetB
     return localLen;
 }
 
+static char set_osync(int fd) {
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags != -1) {
+        if (fcntl(fd, F_SETFL, flags | O_DSYNC) != -1) {
+            return 0;
+        } else {
+            return 1;
+        }
+    } else {
+        return 2;
+    }
+}
+
 static int couch_drv_control(ErlDrvData drv_data, unsigned int command, char *pBuf,
              int bufLen, char **rbuf, int rlen)
 {
@@ -140,6 +156,14 @@ static int couch_drv_control(ErlDrvData drv_data, unsigned int command, char *pB
 
         return return_control_result(&response, sizeof(response), rbuf, rlen);
         }
+
+    case SET_OSYNC_OPCODE: // set O_SYNC flag on file descriptor
+    {
+        int32_t fd;
+        memcpy(&fd, pBuf, sizeof(fd));
+        char response = set_osync(fd);
+        return return_control_result(&response, sizeof(response), rbuf, rlen);
+    }
 
     default:
         return -1;
