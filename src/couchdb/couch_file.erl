@@ -19,7 +19,8 @@
 
 -record(file, {
     fd,
-    tail_append_begin=0 % 09 UPGRADE CODE
+    tail_append_begin = 0, % 09 UPGRADE CODE
+    eof = 0
     }).
 
 -export([open/1, open/2, close/1, bytes/1, sync/1, append_binary/2,old_pread/3]).
@@ -204,7 +205,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
     case lists:member(create, Options) of
     true ->
         filelib:ensure_dir(Filepath),
-        case file:open(Filepath, [read, write, raw, binary]) of
+        case file:open(Filepath, [read, append, raw, binary]) of
         {ok, Fd} ->
             {ok, Length} = file:position(Fd, eof),
             case Length > 0 of
@@ -236,10 +237,11 @@ init({Filepath, Options, ReturnPid, Ref}) ->
         % open in read mode first, so we don't create the file if it doesn't exist.
         case file:open(Filepath, [read, raw]) of
         {ok, Fd_Read} ->
-            {ok, Fd} = file:open(Filepath, [read, write, raw, binary]),
+            {ok, Fd} = file:open(Filepath, [read, append, raw, binary]),
             ok = file:close(Fd_Read),
             couch_stats_collector:track_process_count({couchdb, open_os_files}),
-            {ok, #file{fd=Fd}};
+            {ok, Length} = file:position(Fd, eof),
+            {ok, #file{fd=Fd, eof=Length}};
         Error ->
             init_status_error(ReturnPid, Ref, Error)
         end
@@ -269,24 +271,27 @@ handle_call({pread_iolist, Pos}, _From, File) ->
 handle_call({pread, Pos, Bytes}, _From, #file{fd=Fd,tail_append_begin=TailAppendBegin}=File) ->
     {ok, Bin} = file:pread(Fd, Pos, Bytes),
     {reply, {ok, Bin, Pos >= TailAppendBegin}, File};
-handle_call(bytes, _From, #file{fd=Fd}=File) ->
-    {reply, file:position(Fd, eof), File};
+handle_call(bytes, _From, #file{eof=Length}=File) ->
+    {reply, {ok, Length}, File};
 handle_call(sync, _From, #file{fd=Fd}=File) ->
     {reply, file:sync(Fd), File};
 handle_call({truncate, Pos}, _From, #file{fd=Fd}=File) ->
     {ok, Pos} = file:position(Fd, Pos),
-    {reply, file:truncate(Fd), File};
-handle_call({append_bin, Bin}, _From, #file{fd=Fd}=File) ->
-    {ok, Pos} = file:position(Fd, eof),
-    Blocks = make_blocks(Pos rem ?SIZE_BLOCK, Bin),
-    case file:pwrite(Fd, Pos, Blocks) of
+    case file:truncate(Fd) of
     ok ->
-        {reply, {ok, Pos}, File};
+        {reply, ok, File#file{eof=Pos}};
     Error ->
         {reply, Error, File}
     end;
-handle_call({write_header, Bin}, _From, #file{fd=Fd}=File) ->
-    {ok, Pos} = file:position(Fd, eof),
+handle_call({append_bin, Bin}, _From, #file{fd=Fd, eof=Pos}=File) ->
+    Blocks = make_blocks(Pos rem ?SIZE_BLOCK, Bin),
+    case file:write(Fd, Blocks) of
+    ok ->
+        {reply, {ok, Pos}, File#file{eof=Pos+iolist_size(Blocks)}};
+    Error ->
+        {reply, Error, File}
+    end;
+handle_call({write_header, Bin}, _From, #file{fd=Fd, eof=Pos}=File) ->
     BinSize = size(Bin),
     case Pos rem ?SIZE_BLOCK of
     0 ->
@@ -295,13 +300,18 @@ handle_call({write_header, Bin}, _From, #file{fd=Fd}=File) ->
         Padding = <<0:(8*(?SIZE_BLOCK-BlockOffset))>>
     end,
     FinalBin = [Padding, <<1, BinSize:32/integer>> | make_blocks(1, [Bin])],
-    {reply, file:pwrite(Fd, Pos, FinalBin), File};
+    case file:write(Fd, FinalBin) of
+    ok ->
+        {reply, ok, File#file{eof=Pos+iolist_size(FinalBin)}};
+    Error ->
+        {reply, Error, File}
+    end;
 
 
 handle_call({upgrade_old_header, Prefix}, _From, #file{fd=Fd}=File) ->
     case (catch read_old_header(Fd, Prefix)) of
     {ok, Header} ->
-        {ok, TailAppendBegin} = file:position(Fd, eof),
+        TailAppendBegin = File#file.eof,
         Bin = term_to_binary(Header),
         Md5 = couch_util:md5(Bin),
         % now we assemble the final header binary and write to disk
@@ -319,8 +329,7 @@ handle_call({upgrade_old_header, Prefix}, _From, #file{fd=Fd}=File) ->
     end;
 
 
-handle_call(find_header, _From, #file{fd=Fd}=File) ->
-    {ok, Pos} = file:position(Fd, eof),
+handle_call(find_header, _From, #file{fd=Fd, eof=Pos}=File) ->
     {reply, find_header(Fd, Pos div ?SIZE_BLOCK), File}.
 
 % 09 UPGRADE CODE
