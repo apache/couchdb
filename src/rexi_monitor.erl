@@ -6,7 +6,7 @@
 %% @doc spawn_links a process which monitors the supplied list of items and
 %% returns the process ID.  If a monitored process exits, the caller will
 %% receive a {rexi_DOWN, MonitoringPid, DeadPid, Reason} message.
--spec start([pid() | atom() | {atom(),atom()}]) -> pid().
+-spec start([pid() | atom() | {atom(),node()}]) -> pid().
 start(Procs) ->
     Parent = self(),
     spawn_link(fun() ->
