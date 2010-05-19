@@ -1,6 +1,13 @@
 Apache CouchDB CHANGES
 ======================
 
+Version 0.12.0
+--------------
+
+This version has not been released yet.
+
+ * Mask passwords in active tasks and logging.
+
 Version 0.11.0
 --------------
 
