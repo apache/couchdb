@@ -381,7 +381,7 @@ path_to_list([<<"..">>|R], Acc, DotDotCount) when DotDotCount == 2 ->
     case couch_config:get("httpd", "secure_rewrites", "true") of
     "false" ->
         path_to_list(R, [<<"..">>|Acc], DotDotCount+1);
-    Else ->
+    _Else ->
         ?LOG_INFO("insecure_rewrite_rule ~p blocked", [lists:reverse(Acc) ++ [<<"..">>] ++ R]),
         throw({insecure_rewrite_rule, "too many ../.. segments"})
     end;
