@@ -593,8 +593,18 @@ start_jsonp(Req) ->
         [] -> [];
         CallBack ->
             try
-                validate_callback(CallBack),
-                CallBack ++ "("
+                % make sure jsonp is configured on (default off)
+                case couch_config:get("httpd", "jsonp", "false") of
+                "true" -> 
+                    validate_callback(CallBack),
+                    CallBack ++ "(";
+                _Else -> 
+                    % this could throw an error message, but instead we just ignore the 
+                    % jsonp parameter
+                    % throw({bad_request, <<"JSONP must be configured before using.">>})
+                    put(jsonp, no_jsonp),
+                    []
+                end
             catch
                 Error ->
                     put(jsonp, no_jsonp),

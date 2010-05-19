@@ -39,12 +39,18 @@ couchTests.changes = function(debug) {
   T(resp.results[0].changes[0].rev == docFoo._rev)
 
   // test with callback
-  var xhr = CouchDB.request("GET", "/test_suite_db/_changes?callback=jsonp");
-  T(xhr.status == 200);
-  jsonp_flag = 0;
-  eval(xhr.responseText);
-  T(jsonp_flag == 1);
-
+  
+  run_on_modified_server(
+    [{section: "httpd",
+      key: "jsonp",
+      value: "true"}],
+  function() {
+    var xhr = CouchDB.request("GET", "/test_suite_db/_changes?callback=jsonp");
+    T(xhr.status == 200);
+    jsonp_flag = 0;
+    eval(xhr.responseText);
+    T(jsonp_flag == 1);
+  });
 
   req = CouchDB.request("GET", "/test_suite_db/_changes?feed=continuous&timeout=10");
   var lines = req.responseText.split("\n");

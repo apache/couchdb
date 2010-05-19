@@ -24,6 +24,7 @@ vhost_global_handlers = _utils
  _session
  _oauth
  _users
+jsonp = false
 
 [log]
 file = %localstatelogdir%/couch.log
