@@ -1171,7 +1171,40 @@
               html: true,
               escapeStrings: false
             });
-            return $(html);
+            var n = $(html);
+            if (n.text().length > 140) {
+              // This code reduces a long string in to a summarized string with a link to expand it.
+              // Someone, somewhere, is doing something nasty with the event after it leaves these handlers.
+              // At this time I can't track down the offender, it might actually be a jQuery propogation issue.
+              var fulltext = n.text();
+              var mintext = n.text().slice(0, 140);
+              var e = $('<a href="#expand">...</a>');
+              var m = $('<a href="#min">X</a>');
+              var expand = function (evt) {
+                n.empty();
+                n.text(fulltext);
+                n.append(m);
+                evt.stopPropagation();
+                evt.stopImmediatePropagation();
+                evt.preventDefault();
+              }
+              var minimize = function (evt) {
+                n.empty();
+                n.text(mintext);
+                // For some reason the old element's handler won't fire after removed and added again.
+                e = $('<a href="#expand">...</a>');
+                e.click(expand);
+                n.append(e);
+                evt.stopPropagation();
+                evt.stopImmediatePropagation();
+                evt.preventDefault();
+              }
+              e.click(expand);
+              n.click(minimize);
+              n.text(mintext);
+              n.append(e)
+            }
+            return n;
           }
         }
         var elem = render(value);
