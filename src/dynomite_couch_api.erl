@@ -47,12 +47,12 @@ get([Part, Db, DocId, Revs, Options]) ->
     end.
 
 
-put([Part, Db, Doc = #doc{clock=Clock}, Options]) ->
+put([Part, Db, Doc, Options]) ->
     case showroom_db:open_shard(node(), Part, Db) of
         {ok, Shard} ->
             {Status, NewRev} = couch_db:update_doc(Shard, Doc, Options),
             showroom_db:close_shard(Shard),
-            {Status, {Clock, [NewRev]}};
+            {Status, [NewRev]};
         Error ->
             Error
     end.
