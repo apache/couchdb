@@ -32,38 +32,51 @@ couchTests.jsonp = function(debug) {
   db.deleteDb();
   db.createDb();
   if (debug) debugger;
-
+  
   var doc = {_id:"0",a:0,b:0};
   T(db.save(doc).ok);
+  
+  // callback param is ignored unless jsonp is configured
+  var xhr = CouchDB.request("GET", "/test_suite_db/0?callback=jsonp_not_configured");
+  JSON.parse(xhr.responseText);
 
-  // Test unchunked callbacks.
-  var xhr = CouchDB.request("GET", "/test_suite_db/0?callback=jsonp_no_chunk");
-  T(xhr.status == 200);
-  jsonp_flag = 0;
-  eval(xhr.responseText);
-  T(jsonp_flag == 1);
-  xhr = CouchDB.request("GET", "/test_suite_db/0?callback=foo\"");
-  T(xhr.status == 400);
+  run_on_modified_server(
+    [{section: "httpd",
+      key: "jsonp",
+      value: "true"}],
+  function() {
 
-  // Test chunked responses
-  var doc = {_id:"1",a:1,b:1};
-  T(db.save(doc).ok);
+    // Test unchunked callbacks.
+    var xhr = CouchDB.request("GET", "/test_suite_db/0?callback=jsonp_no_chunk");
+    T(xhr.status == 200);
+    jsonp_flag = 0;
+    eval(xhr.responseText);
+    T(jsonp_flag == 1);
+    xhr = CouchDB.request("GET", "/test_suite_db/0?callback=foo\"");
+    T(xhr.status == 400);
 
-  var designDoc = {
-    _id:"_design/test",
-    language: "javascript",
-    views: {
-      all_docs: {map: "function(doc) {if(doc.a) emit(null, doc.a);}"}
+    // Test chunked responses
+    var doc = {_id:"1",a:1,b:1};
+    T(db.save(doc).ok);
+
+    var designDoc = {
+      _id:"_design/test",
+      language: "javascript",
+      views: {
+        all_docs: {map: "function(doc) {if(doc.a) emit(null, doc.a);}"}
+      }
     }
-  }
-  T(db.save(designDoc).ok);
+    T(db.save(designDoc).ok);
 
-  var url = "/test_suite_db/_design/test/_view/all_docs?callback=jsonp_chunk";
-  xhr = CouchDB.request("GET", url);
-  T(xhr.status == 200);
-  jsonp_flag = 0;
-  eval(xhr.responseText);
-  T(jsonp_flag == 1);
-  xhr = CouchDB.request("GET", url + "\'");
-  T(xhr.status == 400);
+    var url = "/test_suite_db/_design/test/_view/all_docs?callback=jsonp_chunk";
+    xhr = CouchDB.request("GET", url);
+    T(xhr.status == 200);
+    jsonp_flag = 0;
+    eval(xhr.responseText);
+    T(jsonp_flag == 1);
+    xhr = CouchDB.request("GET", url + "\'");
+    T(xhr.status == 400);
+  });
+
+
 };
