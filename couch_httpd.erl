@@ -39,7 +39,7 @@ start_link() ->
     VirtualHosts = couch_config:get("vhosts"),
     VhostGlobals = re:split(
         couch_config:get("httpd", "vhost_global_handlers", ""),
-        "\\s+",
+        ", ?",
         [{return, list}]
     ),
     DefaultSpec = "{couch_httpd_db, handle_request}",
