@@ -305,9 +305,13 @@ handle_join(join, ExtNodes, PingNode, #mem{args=Args} = State) ->
     % now use this info to join the ring
     int_join(ExtNodes, NewState);
 
-handle_join(replace, [_OldNode | _], _PingNode, _State) ->
-    % TODO implement me
-    ok;
+handle_join(replace, [OldNode | _], PingNode, State) ->
+    handle_join(replace, {OldNode, []}, PingNode, State);
+handle_join(replace, {OldNode, NewOpts}, PingNode, _State) ->
+    OldState = #mem{nodes=OldNodes} = get_pingnode_state(PingNode),
+    {Order, OldNode, _OldOpts} = lists:keyfind(OldNode, 2, OldNodes),
+    NewNodes = lists:keyreplace(OldNode, 2, OldNodes, {Order, node(), NewOpts}),
+    int_join([], OldState#mem{nodes=NewNodes});
 
 handle_join(leave, [_OldNode | _], _PingNode, _State) ->
     % TODO implement me
