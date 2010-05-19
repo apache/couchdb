@@ -594,7 +594,7 @@ start_jsonp(Req) ->
         CallBack ->
             try
                 % make sure jsonp is configured on (default off)
-                case couch_config:get("httpd", "jsonp", "false") of
+                case couch_config:get("httpd", "allow_jsonp", "false") of
                 "true" -> 
                     validate_callback(CallBack),
                     CallBack ++ "(";

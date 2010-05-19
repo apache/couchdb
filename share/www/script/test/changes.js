@@ -42,7 +42,7 @@ couchTests.changes = function(debug) {
   
   run_on_modified_server(
     [{section: "httpd",
-      key: "jsonp",
+      key: "allow_jsonp",
       value: "true"}],
   function() {
     var xhr = CouchDB.request("GET", "/test_suite_db/_changes?callback=jsonp");

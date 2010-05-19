@@ -42,7 +42,7 @@ couchTests.jsonp = function(debug) {
 
   run_on_modified_server(
     [{section: "httpd",
-      key: "jsonp",
+      key: "allow_jsonp",
       value: "true"}],
   function() {
 
