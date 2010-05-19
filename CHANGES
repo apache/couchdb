@@ -6,6 +6,14 @@ Version 0.12.0
 
 This version has not been released yet.
 
+HTTP Interface:
+
+ * Mask passwords in active tasks and logging.
+
+Futon:
+
+ * Use "expando links" for over-long document values in Futon.
+
 Version 0.11.0
 --------------
 

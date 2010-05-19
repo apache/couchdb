@@ -12,6 +12,9 @@ Version 0.12.0
 
 This version has not been released yet.
 
+ * Use "expando links" for over-long document values in Futon.
+
+
 Version 0.11.0
 --------------
 
