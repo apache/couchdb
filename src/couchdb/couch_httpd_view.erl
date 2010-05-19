@@ -197,22 +197,22 @@ get_reduce_type(Req) ->
     list_to_atom(couch_httpd:qs_value(Req, "reduce", "true")).
 
 load_view(Req, Db, {ViewDesignId, ViewName}, Keys) ->
-    Stale = couch_httpd_view:get_stale_type(Req),
-    Reduce = couch_httpd_view:get_reduce_type(Req),
+    Stale = get_stale_type(Req),
+    Reduce = get_reduce_type(Req),
     case couch_view:get_map_view(Db, ViewDesignId, ViewName, Stale) of
     {ok, View, Group} ->
-        QueryArgs = couch_httpd_view:parse_view_params(Req, Keys, map),
+        QueryArgs = parse_view_params(Req, Keys, map),
         {map, View, Group, QueryArgs};
     {not_found, _Reason} ->
         case couch_view:get_reduce_view(Db, ViewDesignId, ViewName, Stale) of
         {ok, ReduceView, Group} ->
             case Reduce of
             false ->
-                QueryArgs = couch_httpd_view:parse_view_params(Req, Keys, map_red),
+                QueryArgs = parse_view_params(Req, Keys, map_red),
                 MapView = couch_view:extract_map_view(ReduceView),
                 {map, MapView, Group, QueryArgs};
             _ ->
-                QueryArgs = couch_httpd_view:parse_view_params(Req, Keys, reduce),                
+                QueryArgs = parse_view_params(Req, Keys, reduce),
                 {reduce, ReduceView, Group, QueryArgs}
             end;
         {not_found, Reason} ->
