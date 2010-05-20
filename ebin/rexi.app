@@ -1,6 +1,6 @@
 {application, rexi, [
     {description, "lightweight RPC server"},
-    {vsn, "1.0"},
+    {vsn, "1.1"},
     {modules, [rexi, rexi_app, rexi_sup, rexi_monitor, rexi_server]},
     {registered, [rexi_sup, rexi_server]},
     {applications, [kernel, stdlib]},
