@@ -305,6 +305,8 @@ handle_join(join, ExtNodes, PingNode, #mem{args=Args} = State) ->
     % now use this info to join the ring
     int_join(ExtNodes, NewState);
 
+handle_join(replace, OldNode, PingNode, State) when is_atom(OldNode) ->
+    handle_join(replace, {OldNode, []}, PingNode, State);
 handle_join(replace, [OldNode | _], PingNode, State) ->
     handle_join(replace, {OldNode, []}, PingNode, State);
 handle_join(replace, {OldNode, NewOpts}, PingNode, _State) ->
