@@ -119,18 +119,47 @@ open_doc(Db, Id, Options) ->
     {ok, #doc{deleted=true}=Doc} ->
         case lists:member(deleted, Options) of
         true ->
-            {ok, Doc};
+            apply_open_options({ok, Doc},Options);
         false ->
             {not_found, deleted}
         end;
     Else ->
-        Else
+        apply_open_options(Else,Options)
+    end.
+
+apply_open_options({ok, Doc},Options) ->
+    apply_open_options2(Doc,Options);
+apply_open_options(Else,_Options) ->
+    Else.
+    
+apply_open_options2(Doc,[]) ->
+    {ok, Doc};
+apply_open_options2(#doc{atts=Atts,revs=Revs}=Doc,
+        [{atts_since, PossibleAncestors}|Rest]) ->
+    RevPos = find_ancestor_rev_pos(Revs, PossibleAncestors),
+    apply_open_options2(Doc#doc{atts=[A#att{data=
+        if AttPos>RevPos -> Data; true -> stub end} 
+        || #att{revpos=AttPos,data=Data}=A <- Atts]}, Rest);
+apply_open_options2(Doc,[_|Rest]) ->
+    apply_open_options2(Doc,Rest).
+
+
+find_ancestor_rev_pos({_, []}, _AttsSinceRevs) ->
+    0;
+find_ancestor_rev_pos(_DocRevs, []) ->
+    0;
+find_ancestor_rev_pos({RevPos, [RevId|Rest]}, AttsSinceRevs) ->
+    case lists:member({RevPos, RevId}, AttsSinceRevs) of
+    true ->
+        RevPos;
+    false ->
+        find_ancestor_rev_pos({RevPos - 1, Rest}, AttsSinceRevs)
     end.
 
 open_doc_revs(Db, Id, Revs, Options) ->
     couch_stats_collector:increment({couchdb, database_reads}),
-    [Result] = open_doc_revs_int(Db, [{Id, Revs}], Options),
-    Result.
+    [{ok, Results}] = open_doc_revs_int(Db, [{Id, Revs}], Options),
+    {ok, [apply_open_options(Result, Options) || Result <- Results]}.
 
 % Each returned result is a list of tuples:
 % {Id, MissingRevs, PossibleAncestors}
@@ -437,7 +466,7 @@ prep_and_validate_updates(Db, [DocBucket|RestBuckets], [not_found|RestLookups],
         fun(#doc{revs=Revs}=Doc, {AccBucket, AccErrors2}) ->       
             case couch_doc:has_stubs(Doc) of
             true ->
-                couch_doc:merge_doc(Doc, #doc{}); % will throw exception
+                couch_doc:merge_stubs(Doc, #doc{}); % will throw exception
             false -> ok
             end,
             case Revs of
@@ -892,15 +921,16 @@ changes_since(Db, Style, StartSeq, Fun, Acc) ->
 changes_since(Db, Style, StartSeq, Fun, Options, Acc) ->
     Wrapper = fun(DocInfo, _Offset, Acc2) ->
             #doc_info{revs=Revs} = DocInfo,
+            DocInfo2 =
             case Style of
-            main_only ->
-                Infos = [DocInfo];
+            main_only ->    
+                DocInfo;
             all_docs ->
-                % make each rev it's own doc info
-                Infos = [DocInfo#doc_info{revs=[RevInfo]} ||
-                    #rev_info{seq=RevSeq}=RevInfo <- Revs, StartSeq < RevSeq]
+                % remove revs before the seq
+                DocInfo#doc_info{revs=[RevInfo ||
+                    #rev_info{seq=RevSeq}=RevInfo <- Revs, StartSeq < RevSeq]}
             end,
-            Fun(Infos, Acc2)
+            Fun(DocInfo2, Acc2)
         end,
     {ok, _LastReduction, AccOut} = couch_btree:fold(Db#db.docinfo_by_seq_btree, 
         Wrapper, Acc, [{start_key, StartSeq + 1}] ++ Options),
