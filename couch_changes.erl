@@ -16,8 +16,9 @@
 -export([handle_changes/3]).
 
 %% @type Req -> #httpd{} | {json_req, JsonObj()}
-handle_changes(#changes_args{}=Args1, Req, Db) ->
-    Args = Args1#changes_args{filter=make_filter_fun(Args1#changes_args.filter, Req, Db)},
+handle_changes(#changes_args{style=Style}=Args1, Req, Db) ->
+    Args = Args1#changes_args{filter=
+            make_filter_fun(Args1#changes_args.filter, Style, Req, Db)},
     StartSeq = case Args#changes_args.dir of
     rev ->
         couch_db:get_update_seq(Db);
@@ -72,14 +73,18 @@ handle_changes(#changes_args{}=Args1, Req, Db) ->
     end.
 
 %% @type Req -> #httpd{} | {json_req, JsonObj()}
-make_filter_fun(FilterName, Req, Db) ->
+make_filter_fun(FilterName, Style, Req, Db) ->
     case [list_to_binary(couch_httpd:unquote(Part))
             || Part <- string:tokens(FilterName, "/")] of
     [] ->
-        fun(DocInfos) ->
-        % doing this as a batch is more efficient for external filters
-            [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]} ||
-                #doc_info{revs=[#rev_info{rev=Rev}|_]} <- DocInfos]
+        fun(#doc_info{revs=[#rev_info{rev=Rev}|_]=Revs}) ->
+            case Style of
+            main_only ->
+                [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]}];
+            all_docs ->
+                [{[{<<"rev">>, couch_doc:rev_to_str(R)}]} 
+                        || #rev_info{rev=R} <- Revs]
+            end
         end;
     [DName, FName] ->
         DesignId = <<"_design/", DName/binary>>,
@@ -87,17 +92,23 @@ make_filter_fun(FilterName, Req, Db) ->
         % validate that the ddoc has the filter fun
         #doc{body={Props}} = DDoc,
         couch_util:get_nested_json_value({Props}, [<<"filters">>, FName]),
-        fun(DocInfos) ->
+        fun(DocInfo) ->
+            DocInfos = 
+            case Style of
+            main_only ->
+                [DocInfo];
+            all_docs ->
+                [DocInfo#doc_info{revs=[Rev]}|| Rev <- DocInfo#doc_info.revs]
+            end,
             Docs = [Doc || {ok, Doc} <- [
-                {ok, _Doc} = couch_db:open_doc(Db, DInfo, [deleted, conflicts])
-                || DInfo <- DocInfos]],
+                    couch_db:open_doc(Db, DocInfo2, [deleted, conflicts])
+                        || DocInfo2 <- DocInfos]],
             {ok, Passes} = couch_query_servers:filter_docs(
                 Req, Db, DDoc, FName, Docs
             ),
-            % ?LOG_INFO("filtering ~p ~w",[FName, [DI#doc_info.high_seq || DI <- DocInfos]]),
-            [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]}
-                || #doc_info{revs=[#rev_info{rev=Rev}|_]} <- DocInfos,
-                Pass <- Passes, Pass == true]
+            [{[{<<"rev">>, couch_doc:rev_to_str({RevPos,RevId})}]}
+                || {Pass, #doc{revs={RevPos,[RevId|_]}}}
+                <- lists:zip(Passes, Docs), Pass == true]
         end;
     _Else ->
         throw({bad_request,
@@ -195,12 +206,12 @@ keep_sending_changes(Args, Callback, Db, StartSeq, Prepend, Timeout,
 end_sending_changes(Callback, EndSeq, ResponseType) ->
     Callback({stop, EndSeq}, ResponseType).
 
-changes_enumerator(DocInfos, {Db, _, _, FilterFun, Callback, "continuous",
+changes_enumerator(DocInfo, {Db, _, _, FilterFun, Callback, "continuous",
     Limit, IncludeDocs}) ->
 
-    [#doc_info{id=Id, high_seq=Seq, revs=[#rev_info{deleted=Del,rev=Rev}|_]}|_]
-        = DocInfos,
-    Results0 = FilterFun(DocInfos),
+    #doc_info{id=Id, high_seq=Seq,
+            revs=[#rev_info{deleted=Del,rev=Rev}|_]} = DocInfo,
+    Results0 = FilterFun(DocInfo),
     Results = [Result || Result <- Results0, Result /= null],
     Go = if Limit =< 1 -> stop; true -> ok end,
     case Results of
@@ -215,12 +226,12 @@ changes_enumerator(DocInfos, {Db, _, _, FilterFun, Callback, "continuous",
                 IncludeDocs}
         }
     end;
-changes_enumerator(DocInfos, {Db, _, Prepend, FilterFun, Callback, ResponseType,
+changes_enumerator(DocInfo, {Db, _, Prepend, FilterFun, Callback, ResponseType,
     Limit, IncludeDocs}) ->
 
-    [#doc_info{id=Id, high_seq=Seq, revs=[#rev_info{deleted=Del,rev=Rev}|_]}|_]
-        = DocInfos,
-    Results0 = FilterFun(DocInfos),
+    #doc_info{id=Id, high_seq=Seq, revs=[#rev_info{deleted=Del,rev=Rev}|_]}
+        = DocInfo,
+    Results0 = FilterFun(DocInfo),
     Results = [Result || Result <- Results0, Result /= null],
     Go = if Limit =< 1 -> stop; true -> ok end,
     case Results of

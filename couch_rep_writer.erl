@@ -90,12 +90,12 @@ write_multi_part_doc(#http_db{headers=Headers} = Db, #doc{atts=Atts} = Doc) ->
     JsonBytes = ?JSON_ENCODE(
         couch_doc:to_json_obj(
             Doc,
-            [follows, att_encoding_info, {atts_after_revpos, 0}]
+            [follows, att_encoding_info, attachments]
         )
     ),
     Boundary = couch_uuids:random(),
     Len = couch_doc:len_doc_to_multi_part_stream(
-        Boundary, JsonBytes, Atts, 0, true
+        Boundary, JsonBytes, Atts, true
     ),
     {ok, DataQueue} = couch_work_queue:new(1024*1024, 1000),
     _StreamerPid = spawn_link(
@@ -104,7 +104,6 @@ write_multi_part_doc(#http_db{headers=Headers} = Db, #doc{atts=Atts} = Doc) ->
                 Boundary,
                 JsonBytes,
                 Atts,
-                0,
                 fun(Data) -> couch_work_queue:queue(DataQueue, Data) end,
                 true
             ),
@@ -116,7 +115,7 @@ write_multi_part_doc(#http_db{headers=Headers} = Db, #doc{atts=Atts} = Doc) ->
         closed ->
             eof;
         {ok, Data} ->
-            {ok, iolist_to_binary(lists:reverse(Data)), Acc}
+            {ok, iolist_to_binary(Data), Acc}
         end
     end,
     Request = Db#http_db{

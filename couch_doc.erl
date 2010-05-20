@@ -17,7 +17,7 @@
 -export([from_json_obj/1,to_json_obj/2,has_stubs/1, merge_stubs/2]).
 -export([validate_docid/1]).
 -export([doc_from_multi_part_stream/2]).
--export([doc_to_multi_part_stream/6, len_doc_to_multi_part_stream/5]).
+-export([doc_to_multi_part_stream/5, len_doc_to_multi_part_stream/4]).
 
 -include("couch_db.hrl").
 
@@ -73,31 +73,25 @@ to_json_meta(Meta) ->
         end, Meta).
 
 to_json_attachments(Attachments, Options) ->
-    RevPos = case lists:member(attachments, Options) of
-    true -> % return all the binaries
-        0;
-    false ->
-        % note the default is [], because this sorts higher than all numbers.
-        % and will return all the binaries.
-        couch_util:get_value(atts_after_revpos, Options, [])
-    end,
     to_json_attachments(
         Attachments,
-        RevPos,
+        lists:member(attachments, Options),
         lists:member(follows, Options),
         lists:member(att_encoding_info, Options)
     ).
 
-to_json_attachments([], _RevPosIncludeAfter, _DataToFollow, _ShowEncInfo) ->
+to_json_attachments([], _OutputData, _DataToFollow, _ShowEncInfo) ->
     [];
-to_json_attachments(Atts, RevPosIncludeAfter, DataToFollow, ShowEncInfo) ->
+to_json_attachments(Atts, OutputData, DataToFollow, ShowEncInfo) ->
     AttProps = lists:map(
         fun(#att{disk_len=DiskLen, att_len=AttLen, encoding=Enc}=Att) ->
             {Att#att.name, {[
                 {<<"content_type">>, Att#att.type},
                 {<<"revpos">>, Att#att.revpos}
                 ] ++
-                if Att#att.revpos > RevPosIncludeAfter ->    
+                if not OutputData orelse Att#att.data == stub ->
+                    [{<<"length">>, DiskLen}, {<<"stub">>, true}];
+                true ->
                     if DataToFollow ->
                         [{<<"length">>, DiskLen}, {<<"follows">>, true}];
                     true ->
@@ -108,9 +102,7 @@ to_json_attachments(Atts, RevPosIncludeAfter, DataToFollow, ShowEncInfo) ->
                             att_to_bin(Att)
                         end,
                         [{<<"data">>, base64:encode(AttData)}]
-                    end;
-                true ->
-                    [{<<"length">>, DiskLen}, {<<"stub">>, true}]
+                    end
                 end ++
                     case {ShowEncInfo, Enc} of
                     {false, _} ->
@@ -383,16 +375,13 @@ fold_streamed_data(RcvFun, LenLeft, Fun, Acc) when LenLeft > 0->
     ResultAcc = Fun(Bin, Acc),
     fold_streamed_data(RcvFun, LenLeft - size(Bin), Fun, ResultAcc).
 
-len_doc_to_multi_part_stream(Boundary, JsonBytes, Atts, AttsSinceRevPos,
+len_doc_to_multi_part_stream(Boundary, JsonBytes, Atts,
     SendEncodedAtts) ->
-    2 + % "--"
-    size(Boundary) +
-    36 + % "\r\ncontent-type: application/json\r\n\r\n"
-    iolist_size(JsonBytes) +
-    4 + % "\r\n--"
-    size(Boundary) +
-    + lists:foldl(fun(#att{revpos=RevPos} = Att, AccAttsSize) ->
-            if RevPos > AttsSinceRevPos ->
+    AttsSize = lists:foldl(fun(#att{data=Data} = Att, AccAttsSize) ->
+            case Data of
+            stub ->
+                AccAttsSize;
+            _ ->
                 AccAttsSize +  
                 4 + % "\r\n\r\n"
                 case SendEncodedAtts of
@@ -402,24 +391,41 @@ len_doc_to_multi_part_stream(Boundary, JsonBytes, Atts, AttsSinceRevPos,
                     Att#att.disk_len
                 end +
                 4 + % "\r\n--"
-                size(Boundary);
-            true ->
-                AccAttsSize
+                size(Boundary)
             end
-        end, 0, Atts) +
-    2. % "--"
+        end, 0, Atts),
+    if AttsSize == 0 ->
+        iolist_size(JsonBytes);
+    true ->
+        2 + % "--"
+        size(Boundary) +
+        36 + % "\r\ncontent-type: application/json\r\n\r\n"
+        iolist_size(JsonBytes) +
+        4 + % "\r\n--"
+        size(Boundary) +
+        + AttsSize +
+        2 % "--"
+    end.
 
-doc_to_multi_part_stream(Boundary, JsonBytes, Atts, AttsSinceRevPos, WriteFun,
+doc_to_multi_part_stream(Boundary, JsonBytes, Atts, WriteFun,
     SendEncodedAtts) ->
-    WriteFun([<<"--", Boundary/binary,
-            "\r\ncontent-type: application/json\r\n\r\n">>,
-            JsonBytes, <<"\r\n--", Boundary/binary>>]),
-    atts_to_mp(Atts, Boundary, WriteFun, AttsSinceRevPos, SendEncodedAtts).
+    case lists:any(fun(#att{data=Data})-> Data /= stub end, Atts) of
+    true ->
+        WriteFun([<<"--", Boundary/binary,
+                "\r\ncontent-type: application/json\r\n\r\n">>,
+                JsonBytes, <<"\r\n--", Boundary/binary>>]),
+        atts_to_mp(Atts, Boundary, WriteFun, SendEncodedAtts);
+    false ->
+        WriteFun(JsonBytes)
+    end.
 
-atts_to_mp([], _Boundary, WriteFun, _AttsSinceRevPos, _SendEncAtts) ->
+atts_to_mp([], _Boundary, WriteFun, _SendEncAtts) ->
     WriteFun(<<"--">>);
-atts_to_mp([#att{revpos=RevPos} = Att | RestAtts], Boundary, WriteFun, 
-        AttsSinceRevPos, SendEncodedAtts) when RevPos > AttsSinceRevPos ->
+atts_to_mp([#att{data=stub} | RestAtts], Boundary, WriteFun,
+        SendEncodedAtts) ->
+    atts_to_mp(RestAtts, Boundary, WriteFun, SendEncodedAtts);
+atts_to_mp([Att | RestAtts], Boundary, WriteFun, 
+        SendEncodedAtts)  ->
     WriteFun(<<"\r\n\r\n">>),
     AttFun = case SendEncodedAtts of
     false ->
@@ -429,16 +435,15 @@ atts_to_mp([#att{revpos=RevPos} = Att | RestAtts], Boundary, WriteFun,
     end,
     AttFun(Att, fun(Data, ok) -> WriteFun(Data) end, ok),
     WriteFun(<<"\r\n--", Boundary/binary>>),
-    atts_to_mp(RestAtts, Boundary, WriteFun, AttsSinceRevPos, SendEncodedAtts);
-atts_to_mp([_ | RestAtts], Boundary, WriteFun, AttsSinceRevPos,
-    SendEncodedAtts) ->
-    atts_to_mp(RestAtts, Boundary, WriteFun, AttsSinceRevPos, SendEncodedAtts).
+    atts_to_mp(RestAtts, Boundary, WriteFun, SendEncodedAtts).
 
 
 doc_from_multi_part_stream(ContentType, DataFun) ->
+    Self = self(),
     Parser = spawn_link(fun() -> 
         couch_httpd:parse_multipart_request(ContentType, DataFun,
-                fun(Next)-> mp_parse_doc(Next, []) end)
+                fun(Next)-> mp_parse_doc(Next, []) end),
+        unlink(Self)
         end),
     Parser ! {get_doc_bytes, self()},
     receive {doc_bytes, DocBytes} -> ok end,

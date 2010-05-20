@@ -266,7 +266,6 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_ensure_full_commit">>]}=Req, Db) -
             throw({bad_request,
                 "can't do a full commit ahead of current update_seq"});
         RequiredSeq > CommittedSeq ->
-            % user asked for an explicit sequence, don't commit any batches
             couch_db:ensure_full_commit(Db);
         true ->
             {ok, Db#db.instance_start_time}
@@ -564,14 +563,13 @@ db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
         atts_since = AttsSince
     } = parse_doc_query(Req),
     case Revs of
-    [] ->
-        Doc = couch_doc_open(Db, DocId, Rev, Options),
+    [] ->    
         Options2 =
         if AttsSince /= nil ->
-            RevPos = find_ancestor_rev_pos(Doc#doc.revs, AttsSince),
-            [{atts_after_revpos, RevPos} | Options];
+            [{atts_since, AttsSince}, attachments | Options];
         true -> Options
         end,
+        Doc = couch_doc_open(Db, DocId, Rev, Options2),
         send_doc(Req, Doc, Options2);
     _ ->
         {ok, Results} = couch_db:open_doc_revs(Db, DocId, Revs, Options),
@@ -699,17 +697,6 @@ db_doc_req(#httpd{method='COPY'}=Req, Db, SourceDocId) ->
 db_doc_req(Req, _Db, _DocId) ->
     send_method_not_allowed(Req, "DELETE,GET,HEAD,POST,PUT,COPY").
 
-find_ancestor_rev_pos({_, []}, _AttsSinceRevs) ->
-    0;
-find_ancestor_rev_pos(_DocRevs, []) ->
-    0;
-find_ancestor_rev_pos({RevPos, [RevId|Rest]}, AttsSinceRevs) ->
-    case lists:member({RevPos, RevId}, AttsSinceRevs) of
-    true ->
-        RevPos;
-    false ->
-        find_ancestor_rev_pos({RevPos - 1, Rest}, AttsSinceRevs)
-    end.
 
 send_doc(Req, Doc, Options) ->
     case Doc#doc.meta of
@@ -727,8 +714,7 @@ send_doc(Req, Doc, Options) ->
 send_doc_efficiently(Req, #doc{atts=[]}=Doc, Headers, Options) ->
         send_json(Req, 200, Headers, couch_doc:to_json_obj(Doc, Options));
 send_doc_efficiently(Req, #doc{atts=Atts}=Doc, Headers, Options) ->
-    case lists:member(attachments, Options) orelse 
-        proplists:is_defined(atts_after_revpos, Options) of
+    case lists:member(attachments, Options) of
     true ->
         AcceptedTypes = case couch_httpd:header_value(Req, "Accept") of
             undefined       -> [];
@@ -740,14 +726,12 @@ send_doc_efficiently(Req, #doc{atts=Atts}=Doc, Headers, Options) ->
         true ->
             Boundary = couch_uuids:random(),
             JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, [follows|Options])),
-            AttsSinceRevPos = couch_util:get_value(atts_after_revpos, Options, 0),
-            Len = couch_doc:len_doc_to_multi_part_stream(Boundary,JsonBytes,Atts,
-                    AttsSinceRevPos,false),
+            Len = couch_doc:len_doc_to_multi_part_stream(Boundary,JsonBytes,
+                    Atts,false),
             CType = {<<"Content-Type">>, 
                     <<"multipart/related; boundary=\"", Boundary/binary, "\"">>},
             {ok, Resp} = start_response_length(Req, 200, [CType|Headers], Len),
             couch_doc:doc_to_multi_part_stream(Boundary,JsonBytes,Atts,
-                    AttsSinceRevPos,
                     fun(Data) -> couch_httpd:send(Resp, Data) end, false)
         end;
     false ->
