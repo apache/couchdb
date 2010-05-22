@@ -121,7 +121,9 @@ EOF
 
 _add_config_dir () {
     for file in "$1"/*.ini; do
-        [ -r "$file" ] && _add_config_file "$file"
+        if [ -r "$file" ]; then
+          _add_config_file "$file"
+        fi
     done
 }
 
