@@ -131,19 +131,19 @@ output_map_view(Req, View, Group, Db, QueryArgs, Keys) ->
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         {ok, RowCount} = couch_view:get_row_count(View),
         FoldAccInit = {Limit, SkipCount, undefined, []},
-        {LastReduce, FoldResult} = lists:foldl(
-            fun(Key, {_, FoldAcc}) ->
-                FoldlFun = make_view_fold_fun(Req,
-                    QueryArgs#view_query_args{
-                    }, CurrentEtag, Db, Group#group.current_seq, RowCount,
+        {LastReduce, FoldResult} = lists:foldl(fun(Key, {_, FoldAcc}) ->
+            FoldlFun = make_view_fold_fun(Req, QueryArgs#view_query_args{},
+                    CurrentEtag, Db, Group#group.current_seq, RowCount,
                     #view_fold_helper_funs{
                         reduce_count = fun couch_view:reduce_to_count/1
                     }),
-                {ok, LastReduce, FoldResult} = couch_view:fold(View, FoldlFun, FoldAcc, 
-                    make_key_options(QueryArgs#view_query_args{start_key=Key, end_key=Key})),
-                {LastReduce, FoldResult}
-            end, {{[],[]}, FoldAccInit}, Keys),
-        finish_view_fold(Req, RowCount, couch_view:reduce_to_count(LastReduce), FoldResult, [{update_seq,Group#group.current_seq}])
+            {ok, LastReduce, FoldResult} = couch_view:fold(View, FoldlFun,
+                    FoldAcc, make_key_options(
+                         QueryArgs#view_query_args{start_key=Key, end_key=Key})),
+            {LastReduce, FoldResult}
+        end, {{[],[]}, FoldAccInit}, Keys),
+        finish_view_fold(Req, RowCount, couch_view:reduce_to_count(LastReduce),
+                FoldResult, [{update_seq,Group#group.current_seq}])
     end).
 
 output_reduce_view(Req, Db, View, Group, QueryArgs, nil) ->
@@ -154,7 +154,9 @@ output_reduce_view(Req, Db, View, Group, QueryArgs, nil) ->
     } = QueryArgs,
     CurrentEtag = view_group_etag(Group, Db),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
-        {ok, GroupRowsFun, RespFun} = make_reduce_fold_funs(Req, GroupLevel, QueryArgs, CurrentEtag, Group#group.current_seq, #reduce_fold_helper_funs{}),
+        {ok, GroupRowsFun, RespFun} = make_reduce_fold_funs(Req, GroupLevel,
+                QueryArgs, CurrentEtag, Group#group.current_seq,
+                #reduce_fold_helper_funs{}),
         FoldAccInit = {Limit, Skip, undefined, []},
         {ok, {_, _, Resp, _}} = couch_view:fold_reduce(View,
                 RespFun, FoldAccInit, [{key_group_fun, GroupRowsFun} |
@@ -170,10 +172,13 @@ output_reduce_view(Req, Db, View, Group, QueryArgs, Keys) ->
     } = QueryArgs,
     CurrentEtag = view_group_etag(Group, Db, Keys),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
-        {ok, GroupRowsFun, RespFun} = make_reduce_fold_funs(Req, GroupLevel, QueryArgs, CurrentEtag, Group#group.current_seq, #reduce_fold_helper_funs{}),
+        {ok, GroupRowsFun, RespFun} = make_reduce_fold_funs(Req, GroupLevel,
+                QueryArgs, CurrentEtag, Group#group.current_seq,
+                #reduce_fold_helper_funs{}),
         {Resp, _RedAcc3} = lists:foldl(
             fun(Key, {Resp, RedAcc}) ->
-                % run the reduce once for each key in keys, with limit etc reapplied for each key
+                % run the reduce once for each key in keys, with limit etc
+                % reapplied for each key
                 FoldAccInit = {Limit, Skip, Resp, RedAcc},
                 {_, {_, _, Resp2, RedAcc2}} = couch_view:fold_reduce(View,
                         RespFun, FoldAccInit, [{key_group_fun, GroupRowsFun} |
@@ -229,8 +234,8 @@ parse_view_params(Req, Keys, ViewType) ->
     QueryList = couch_httpd:qs(Req),
     QueryParams =
     lists:foldl(fun({K, V}, Acc) ->
-            parse_view_param(K, V) ++ Acc
-        end, [], QueryList),
+        parse_view_param(K, V) ++ Acc
+    end, [], QueryList),
     IsMultiGet = (Keys =/= nil),
     Args = #view_query_args{
         view_type=ViewType,
@@ -242,17 +247,17 @@ parse_view_params(Req, Keys, ViewType) ->
 
     GroupLevel = QueryArgs#view_query_args.group_level,
     case {ViewType, GroupLevel, IsMultiGet} of
-        {reduce, exact, true} ->
-            QueryArgs;
-        {reduce, _, false} ->
-            QueryArgs;
-        {reduce, _, _} ->
-            % we can simplify code if we just drop this error message.
-            Msg = <<"Multi-key fetchs for reduce "
-                    "view must include `group=true`">>,
-            throw({query_parse_error, Msg});
-        _ ->
-            QueryArgs
+    {reduce, exact, true} ->
+        QueryArgs;
+    {reduce, _, false} ->
+        QueryArgs;
+    {reduce, _, _} ->
+        % we can simplify code if we just drop this error message.
+        Msg = <<"Multi-key fetchs for reduce "
+                "view must include `group=true`">>,
+        throw({query_parse_error, Msg});
+    _ ->
+        QueryArgs
     end,
     QueryArgs.
 
@@ -305,23 +310,23 @@ parse_view_param(Key, Value) ->
 
 validate_view_query(start_key, Value, Args) ->
     case Args#view_query_args.multi_get of
-        true ->
-            Msg = <<"Query parameter `start_key` is "
-                    "not compatible with multi-get">>,
-            throw({query_parse_error, Msg});
-        _ ->
-            Args#view_query_args{start_key=Value}
+    true ->
+        Msg = <<"Query parameter `start_key` is "
+                "not compatible with multi-get">>,
+        throw({query_parse_error, Msg});
+    _ ->
+        Args#view_query_args{start_key=Value}
     end;
 validate_view_query(start_docid, Value, Args) ->
     Args#view_query_args{start_docid=Value};
 validate_view_query(end_key, Value, Args) ->
     case Args#view_query_args.multi_get of
-        true->
-            Msg = <<"Query parameter `end_key` is "
-                    "not compatible with multi-get">>,
-            throw({query_parse_error, Msg});
-        _ ->
-            Args#view_query_args{end_key=Value}
+    true->
+        Msg = <<"Query parameter `end_key` is "
+                "not compatible with multi-get">>,
+        throw({query_parse_error, Msg});
+    _ ->
+        Args#view_query_args{end_key=Value}
     end;
 validate_view_query(end_docid, Value, Args) ->
     Args#view_query_args{end_docid=Value};
@@ -333,15 +338,15 @@ validate_view_query(stale, _, Args) ->
     Args;
 validate_view_query(descending, true, Args) ->
     case Args#view_query_args.direction of
-        rev -> Args; % Already reversed
-        fwd ->
-            Args#view_query_args{
-                direction = rev,
-                start_docid =
-                    reverse_key_default(Args#view_query_args.start_docid),
-                end_docid =
-                    reverse_key_default(Args#view_query_args.end_docid)
-            }
+    rev -> Args; % Already reversed
+    fwd ->
+        Args#view_query_args{
+            direction = rev,
+            start_docid =
+                reverse_key_default(Args#view_query_args.start_docid),
+            end_docid =
+                reverse_key_default(Args#view_query_args.end_docid)
+        }
     end;
 validate_view_query(descending, false, Args) ->
     Args; % Ignore default condition
@@ -349,32 +354,33 @@ validate_view_query(skip, Value, Args) ->
     Args#view_query_args{skip=Value};
 validate_view_query(group_level, Value, Args) ->
     case Args#view_query_args.view_type of
-        reduce ->
-            Args#view_query_args{group_level=Value};
-        _ ->
-            Msg = <<"Invalid URL parameter 'group' or "
-                    " 'group_level' for non-reduce view.">>,
-            throw({query_parse_error, Msg})
+    reduce ->
+        Args#view_query_args{group_level=Value};
+    _ ->
+        Msg = <<"Invalid URL parameter 'group' or "
+                " 'group_level' for non-reduce view.">>,
+        throw({query_parse_error, Msg})
     end;
 validate_view_query(inclusive_end, Value, Args) ->
     Args#view_query_args{inclusive_end=Value};
 validate_view_query(reduce, _, Args) ->
     case Args#view_query_args.view_type of
-        map ->
-            Msg = <<"Invalid URL parameter `reduce` for map view.">>,
-            throw({query_parse_error, Msg});
-        _ ->
-            Args
+    map ->
+        Msg = <<"Invalid URL parameter `reduce` for map view.">>,
+        throw({query_parse_error, Msg});
+    _ ->
+        Args
     end;
 validate_view_query(include_docs, true, Args) ->
     case Args#view_query_args.view_type of
-        reduce ->
-            Msg = <<"Query parameter `include_docs` "
-                    "is invalid for reduce views.">>,
-            throw({query_parse_error, Msg});
-        _ ->
-            Args#view_query_args{include_docs=true}
+    reduce ->
+        Msg = <<"Query parameter `include_docs` "
+                "is invalid for reduce views.">>,
+        throw({query_parse_error, Msg});
+    _ ->
+        Args#view_query_args{include_docs=true}
     end;
+% Use the view_query_args record's default value
 validate_view_query(include_docs, _Value, Args) ->
     Args;
 validate_view_query(extra, _Value, Args) ->
@@ -391,7 +397,8 @@ make_view_fold_fun(Req, QueryArgs, Etag, Db, UpdateSeq, TotalViewCount, HelperFu
         include_docs = IncludeDocs
     } = QueryArgs,
     
-    fun({{Key, DocId}, Value}, OffsetReds, {AccLimit, AccSkip, Resp, RowFunAcc}) ->
+    fun({{Key, DocId}, Value}, OffsetReds,
+            {AccLimit, AccSkip, Resp, RowFunAcc}) ->
         case {AccLimit, AccSkip, Resp} of
         {0, _, _} ->
             % we've done "limit" rows, stop foldling
@@ -441,7 +448,7 @@ make_reduce_fold_funs(Req, GroupLevel, _QueryArgs, Etag, UpdateSeq, HelperFuns) 
 
     (_Key, Red, {AccLimit, 0, undefined, RowAcc0}) when GroupLevel == 0 ->
         % we haven't started responding yet and group=false
-        {ok, Resp2, RowAcc} = StartRespFun(Req, Etag, RowAcc0,UpdateSeq),
+        {ok, Resp2, RowAcc} = StartRespFun(Req, Etag, RowAcc0, UpdateSeq),
         {Go, RowAcc2} = SendRowFun(Resp2, {null, Red}, RowAcc),
         {Go, {AccLimit - 1, 0, Resp2, RowAcc2}};
     (_Key, Red, {AccLimit, 0, Resp, RowAcc}) when GroupLevel == 0 ->
@@ -452,18 +459,20 @@ make_reduce_fold_funs(Req, GroupLevel, _QueryArgs, Etag, UpdateSeq, HelperFuns) 
     (Key, Red, {AccLimit, 0, undefined, RowAcc0})
             when is_integer(GroupLevel), is_list(Key) ->
         % group_level and we haven't responded yet
-        {ok, Resp2, RowAcc} = StartRespFun(Req, Etag, RowAcc0,UpdateSeq),
-        {Go, RowAcc2} = SendRowFun(Resp2, {lists:sublist(Key, GroupLevel), Red}, RowAcc),
+        {ok, Resp2, RowAcc} = StartRespFun(Req, Etag, RowAcc0, UpdateSeq),
+        {Go, RowAcc2} = SendRowFun(Resp2,
+                {lists:sublist(Key, GroupLevel), Red}, RowAcc),
         {Go, {AccLimit - 1, 0, Resp2, RowAcc2}};
     (Key, Red, {AccLimit, 0, Resp, RowAcc})
             when is_integer(GroupLevel), is_list(Key) ->
         % group_level and we've already started the response
-        {Go, RowAcc2} = SendRowFun(Resp, {lists:sublist(Key, GroupLevel), Red}, RowAcc),
+        {Go, RowAcc2} = SendRowFun(Resp,
+                {lists:sublist(Key, GroupLevel), Red}, RowAcc),
         {Go, {AccLimit - 1, 0, Resp, RowAcc2}};
 
     (Key, Red, {AccLimit, 0, undefined, RowAcc0}) ->
         % group=true and we haven't responded yet
-        {ok, Resp2, RowAcc} = StartRespFun(Req, Etag, RowAcc0,UpdateSeq),
+        {ok, Resp2, RowAcc} = StartRespFun(Req, Etag, RowAcc0, UpdateSeq),
         {Go, RowAcc2} = SendRowFun(Resp2, {Key, Red}, RowAcc),
         {Go, {AccLimit - 1, 0, Resp2, RowAcc2}};
     (Key, Red, {AccLimit, 0, Resp, RowAcc}) ->
@@ -473,11 +482,11 @@ make_reduce_fold_funs(Req, GroupLevel, _QueryArgs, Etag, UpdateSeq, HelperFuns) 
     end,
     {ok, GroupRowsFun, RespFun}.
 
-apply_default_helper_funs(#view_fold_helper_funs{
-    start_response = StartResp,
-    send_row = SendRow
-}=Helpers) ->
-
+apply_default_helper_funs(
+        #view_fold_helper_funs{
+            start_response = StartResp,
+            send_row = SendRow
+        }=Helpers) ->
     StartResp2 = case StartResp of
     undefined -> fun json_view_start_resp/6;
     _ -> StartResp
@@ -494,10 +503,11 @@ apply_default_helper_funs(#view_fold_helper_funs{
     };
 
 
-apply_default_helper_funs(#reduce_fold_helper_funs{
-    start_response = StartResp,
-    send_row = SendRow
-}=Helpers) ->
+apply_default_helper_funs(
+        #reduce_fold_helper_funs{
+            start_response = StartResp,
+            send_row = SendRow
+        }=Helpers) ->
     StartResp2 = case StartResp of
     undefined -> fun json_reduce_start_resp/4;
     _ -> StartResp
@@ -543,7 +553,9 @@ make_end_key_option(
 
 json_view_start_resp(Req, Etag, TotalViewCount, Offset, _Acc, UpdateSeq) ->
     {ok, Resp} = start_json_response(Req, 200, [{"Etag", Etag}]),
-    BeginBody = io_lib:format("{\"total_rows\":~w,\"update_seq\":~w,\"offset\":~w,\"rows\":[\r\n",
+    BeginBody = io_lib:format(
+            "{\"total_rows\":~w,\"update_seq\":~w,"
+            "\"offset\":~w,\"rows\":[\r\n",
             [TotalViewCount, UpdateSeq, Offset]),
     {ok, Resp, BeginBody}.
 
@@ -596,15 +608,15 @@ view_row_with_doc(Db, {{Key, DocId}, Value}, IdRev) ->
 doc_member(Db, {DocId, Rev}) ->
     ?LOG_DEBUG("Include Doc: ~p ~p", [DocId, Rev]),
     case (catch couch_httpd_db:couch_doc_open(Db, DocId, Rev, [])) of
-        #doc{} = Doc ->
-            JsonDoc = couch_doc:to_json_obj(Doc, []),
-            [{doc, JsonDoc}];
-        _Else ->
-            [{doc, null}]
+    #doc{} = Doc ->
+        JsonDoc = couch_doc:to_json_obj(Doc, []),
+        [{doc, JsonDoc}];
+    _Else ->
+        [{doc, null}]
     end.
 
 finish_view_fold(Req, TotalRows, Offset, FoldResult) ->
-	finish_view_fold(Req, TotalRows, Offset, FoldResult, []).
+    finish_view_fold(Req, TotalRows, Offset, FoldResult, []).
 
 finish_view_fold(Req, TotalRows, Offset, FoldResult, Fields) ->
     case FoldResult of
@@ -623,7 +635,7 @@ finish_view_fold(Req, TotalRows, Offset, FoldResult, Fields) ->
     end.
 
 finish_reduce_fold(Req, Resp) ->
-	finish_reduce_fold(Req, Resp, []).
+    finish_reduce_fold(Req, Resp, []).
 
 finish_reduce_fold(Req, Resp, Fields) ->
     case Resp of
@@ -638,11 +650,11 @@ finish_reduce_fold(Req, Resp, Fields) ->
 
 parse_bool_param(Val) ->
     case string:to_lower(Val) of
-        "true" -> true;
-        "false" -> false;
-        _ ->
-            Msg = io_lib:format("Invalid boolean parameter: ~p", [Val]),
-            throw({query_parse_error, ?l2b(Msg)})
+    "true" -> true;
+    "false" -> false;
+    _ ->
+        Msg = io_lib:format("Invalid boolean parameter: ~p", [Val]),
+        throw({query_parse_error, ?l2b(Msg)})
     end.
 
 parse_int_param(Val) ->
