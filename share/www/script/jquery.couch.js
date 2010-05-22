@@ -476,6 +476,7 @@
   }
 
   function fullCommit(options) {
+    var options = options || {};
     if (typeof options.ensure_full_commit !== "undefined") {
       var commit = options.ensure_full_commit;
       delete options.ensure_full_commit;
