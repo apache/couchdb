@@ -120,8 +120,8 @@ EOF
 }
 
 _add_config_dir () {
-    for file in `find "$1" -mindepth 1 -maxdepth 1 -type f -name '*.ini'`; do
-        _add_config_file $file
+    for file in "$1"/*.ini; do
+        [ -r "$file" ] && _add_config_file "$file"
     done
 }
 

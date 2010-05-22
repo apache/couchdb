@@ -179,7 +179,7 @@ couch.app: couch.app.tpl
 	$@ < $<
 else
 couch.app: couch.app.tpl
-	modules=`find . -name "*.erl" -exec basename {} .erl \; | tr '\n' ',' | sed "s/,$$//"`; \
+	modules=`{ find . -name "*.erl" -exec basename {} .erl \; | tr '\n' ','; echo ''; } | sed "s/,$$//"`; \
 	sed -e "s|%package_name%|@package_name@|g" \
 	    -e "s|%version%|@version@|g" \
 	    -e "s|@modules@|$$modules|g" \
