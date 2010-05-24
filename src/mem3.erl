@@ -59,6 +59,7 @@
 -type epoch() :: float().
 -type clock() :: {node(), epoch()}.
 -type vector_clock() :: [clock()].
+-type ping_node() :: node() | nil.
 
 %%====================================================================
 %% API
@@ -262,14 +263,12 @@ get_test(Args) ->
     proplists:get_value(test, Args).
 
 
-% we could be automatically:
-%  1. rejoining a cluster after some downtime
-%
-% we could be manually:
-%  2. beginning a cluster with only this node
-%  3. joining a cluster as a new node
-%  4. replacing a node in an existing cluster
-
+%% @doc handle_init starts a node
+%%      Most of the time, this puts the node in a single-node cluster setup,
+%%      But, we could be automatically rejoining a cluster after some downtime.
+%%      See handle_join for initing, joining, leaving a cluster, or replacing a
+%%      node.
+%% @end
 handle_init(Test, nil) ->
     int_reset(Test);
 
@@ -291,7 +290,10 @@ handle_init(_Test, #mem{nodes=Nodes, args=Args} = OldState) ->
     end.
 
 
-%% handle join activities, return {ok,NewState}
+%% @doc handle join activities, return {ok,NewState}
+-spec handle_join(join_type(), [mem_node()], ping_node(), #mem{}) ->
+             {ok, #mem{}}.
+
 handle_join(init, ExtNodes, nil, State) ->
     {_,Nodes,_} = lists:unzip3(ExtNodes),
     ping_all_yall(Nodes),
@@ -324,7 +326,7 @@ handle_join(JoinType, _, PingNode, _) ->
                          "for ping node: ~p", [JoinType, PingNode]),
     {error, unknown_join_type}.
 
-
+%% @doc common operations for all join types
 int_join(ExtNodes, #mem{nodes=Nodes, clock=Clock} = State) ->
     NewNodes = lists:foldl(fun({Pos, N, _Options}=New, AccIn) ->
         check_pos(Pos, N, Nodes),
