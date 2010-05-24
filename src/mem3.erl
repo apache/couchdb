@@ -85,9 +85,10 @@ stop(Server) ->
     gen_server:cast(Server, stop).
 
 
--spec join(join_type(), mem_node_list(), node() | nil) -> ok.
-join(JoinType, Nodes, PingNode) ->
-    gen_server:call(?SERVER, {join, JoinType, Nodes, PingNode}).
+-spec join(join_type(), mem_node_list() | {node(), options()}, node() | nil) ->
+    ok.
+join(JoinType, Payload, PingNode) ->
+    gen_server:call(?SERVER, {join, JoinType, Payload, PingNode}).
 
 
 -spec clock() -> vector_clock().
@@ -153,8 +154,6 @@ init(Args) ->
 
 %% new node(s) joining to this node
 handle_call({join, JoinType, ExtNodes, PingNode}, _From, State) ->
-     % {ok, NewState} = handle_join(JoinType, ExtNodes, PingNode, State),
-     % {reply, ok, NewState};
      try
          case handle_join(JoinType, ExtNodes, PingNode, State) of
          {ok, NewState} -> {reply, ok, NewState};
