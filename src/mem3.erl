@@ -291,14 +291,14 @@ handle_init(_Test, #mem{nodes=Nodes, args=Args} = OldState) ->
 
 
 %% @doc handle join activities, return {ok,NewState}
--spec handle_join(join_type(), [mem_node()], ping_node(), #mem{}) ->
-             {ok, #mem{}}.
-
+-spec handle_join(join_type(), [mem_node()], ping_node(), mem_state()) ->
+             {ok, mem_state()}.
+% init
 handle_join(init, ExtNodes, nil, State) ->
     {_,Nodes,_} = lists:unzip3(ExtNodes),
     ping_all_yall(Nodes),
     int_join(ExtNodes, State);
-
+% join
 handle_join(join, ExtNodes, PingNode, #mem{args=Args} = State) ->
     NewState = case get_test(Args) of
     undefined -> get_pingnode_state(PingNode);
@@ -306,7 +306,7 @@ handle_join(join, ExtNodes, PingNode, #mem{args=Args} = State) ->
     end,
     % now use this info to join the ring
     int_join(ExtNodes, NewState);
-
+% replace
 handle_join(replace, OldNode, PingNode, State) when is_atom(OldNode) ->
     handle_join(replace, {OldNode, []}, PingNode, State);
 handle_join(replace, [OldNode | _], PingNode, State) ->
@@ -316,7 +316,7 @@ handle_join(replace, {OldNode, NewOpts}, PingNode, _State) ->
     {Order, OldNode, _OldOpts} = lists:keyfind(OldNode, 2, OldNodes),
     NewNodes = lists:keyreplace(OldNode, 2, OldNodes, {Order, node(), NewOpts}),
     int_join([], OldState#mem{nodes=NewNodes});
-
+% leave
 handle_join(leave, [_OldNode | _], _PingNode, _State) ->
     % TODO implement me
     ok;
