@@ -2,15 +2,10 @@
 -author('Brad Anderson <brad@cloudant.com>').
 
 -include("../../couch/src/couch_db.hrl").
+-include("../../dynomite/include/membership.hrl").
 
 %% api
 -export([create_db/2]).
-
--type part() :: integer().
--type ref_node_part() :: {reference(), node(), part()}.
--type tref() :: reference().
--type np() :: {node(), part()}.
--type np_acc() :: [{np(), any()}].
 
 
 %% =====================
@@ -21,10 +16,14 @@
 %%      Options is proplist with user_ctx, n, q
 -spec create_db(binary(), list()) -> {ok, #db{}} | {error, any()}.
 create_db(DbName, Options) ->
-    RefNodePart = send_create_calls(DbName, Options),
+    Fullmap = partitions:fullmap(DbName, Options),
+    {ok, FullNodes} = mem3:fullnodes(),
+    RefNodePart = send_create_calls(DbName, Options, Fullmap),
     {ok, Results} = create_db_loop(RefNodePart),
     case create_results(Results, RefNodePart) of
-    ok -> {ok, #db{name=DbName}};
+    ok ->
+        partitions:install_fullmap(DbName, Fullmap, FullNodes, Options),
+        {ok, #db{name=DbName}};
     Other -> {error, Other}
     end.
 
@@ -34,9 +33,8 @@ create_db(DbName, Options) ->
 %% =====================
 
 %% @doc create the partitions on all appropriate nodes (rexi calls)
--spec send_create_calls(binary(), list()) -> [{reference(), np()}].
-send_create_calls(DbName, Options) ->
-    Fullmap = partitions:fullmap(DbName, Options),
+-spec send_create_calls(binary(), list(), [mem_node()]) -> [{reference(), np()}].
+send_create_calls(DbName, Options, Fullmap) ->
     lists:map(fun({Node, Part}) ->
         ShardName = showroom_utils:shard_name(Part, DbName),
         Ref = rexi:async_server_call({couch_server, Node},

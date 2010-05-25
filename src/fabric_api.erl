@@ -23,7 +23,7 @@ db_path(RawUri, Customer) ->
 
 -spec all_databases(string()) -> {ok, [bstring()]}.
 all_databases(Customer) ->
-    showroom_db:all_databases(Customer).
+    fabric:all_databases(Customer).
 
 -spec create_db(bstring(), [any()]) -> {ok, #db{}} | {error, any()}.
 create_db(DbName, Options) ->
