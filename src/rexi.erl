@@ -1,7 +1,7 @@
 -module(rexi).
 -export([start/0, stop/0, restart/0]).
 -export([cast/2, cast/3, kill/2]).
--export([reply/1]).
+-export([reply/1, sync_reply/1, sync_reply/2]).
 -export([async_server_call/2, async_server_call/3]).
 
 -define(SERVER, rexi_server).
@@ -60,6 +60,24 @@ async_server_call(Server, Caller, Request) ->
 reply(Reply) ->
     {Caller, Ref} = get(rexi_from),
     erlang:send(Caller, {Ref,Reply}).
+
+%% @equiv sync_reply(Reply, infinity)
+sync_reply(Reply) ->
+    sync_reply(Reply, infinity).
+
+%% @doc convenience function to reply to caller and wait for response.  Message
+%% is of the form {OriginalRef, {self(),reference()}, Reply}, which enables the
+%% original caller to respond back.
+-spec sync_reply(any(), pos_integer() | infinity) -> any().
+sync_reply(Reply, Timeout) ->
+    {Caller, Ref} = get(rexi_from),
+    Tag = make_ref(),
+    erlang:send(Caller, {Ref, {self(),Tag}, Reply}),
+    receive {Tag, Response} ->
+        Response
+    after Timeout ->
+        timeout
+    end.
 
 %% internal functions %%
 
