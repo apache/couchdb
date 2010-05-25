@@ -54,13 +54,15 @@ create_db_loop(RefNodePart) ->
     Results.
 
 %% @doc create_db receive loop
+%%      Acc is either an accumulation of responses, or if we've received all
+%%      responses, it's {ok, Responses}
 -spec create_db_loop([ref_node_part()], tref(), np_acc()) ->
     np_acc() | {ok, np_acc()}.
 create_db_loop(_,_,{ok, Acc}) -> {ok, Acc};
 create_db_loop(RefNodePart, TimeoutRef, AccIn) ->
     receive
     {Ref, {ok, MainPid}} when is_reference(Ref) ->
-        % for dev only, close the Fd
+        % for dev only, close the Fd      TODO: remove me
         gen_server:call({couch_server, node(MainPid)}, {force_close, MainPid}),
 
         AccOut = check_all_parts(Ref, RefNodePart, AccIn, ok),
@@ -72,20 +74,25 @@ create_db_loop(RefNodePart, TimeoutRef, AccIn) ->
         {error, timeout}
     end.
 
+%% @doc check the results of the create replies
+%%      If we have a good reply from each partition, return ok
 -spec create_results(np_acc(), [ref_node_part()]) -> ok | create_quorum_error.
 create_results(Results, RefNodePart) ->
-    NPs = create_result(Results, []),
-    DistinctNPs = distinct_parts(RefNodePart),
+    ResultParts = create_result(Results, []),
+    DistinctParts = distinct_parts(RefNodePart),
     if
-        NPs =:= DistinctNPs -> ok;
-        true -> create_quorum_error
+        ResultParts =:= DistinctParts -> ok;
+        true ->
+            ?debugFmt("~nResultParts: ~p~nDistinctParts: ~p~n",
+                      [ResultParts, DistinctParts]),
+            create_quorum_error
     end.
 
 -spec create_result(np_acc(), [np()]) -> [np()] | file_exists.
 create_result([], Acc) ->
-    Acc;
-create_result([{NP, ok}|Rest], Acc) ->
-    create_result(Rest, [NP|Acc]);
+    lists:usort(Acc);
+create_result([{{_N,P}, ok}|Rest], Acc) ->
+    create_result(Rest, [P|Acc]);
 create_result([{_NP, {error, file_exists}}|_Rest], _Acc) ->
     {error, file_exists}; % if any replies were file_exists, return that
 create_result([{{_N,_P}, Result}|Rest], Acc) ->
@@ -95,7 +102,7 @@ create_result([{{_N,_P}, Result}|Rest], Acc) ->
 check_all_parts(Ref, RefNodePart, Acc, Reply) ->
     case couch_util:get_value(Ref, RefNodePart) of
     {Node, Part} ->
-        case lists:keyfind(1, {Node, Part}, Acc) of
+        case lists:keyfind({Node, Part}, 1, Acc) of
         true -> Acc; % already present... that's odd
         _ ->
             NewAcc = [{{Node, Part}, Reply} | Acc],
