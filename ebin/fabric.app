@@ -6,7 +6,9 @@
   {modules, [
        fabric,
        fabric_api,
-       fabric_create
+       fabric_create,
+       fabric_delete,
+       fabric_info
    ]},
   {registered, []},
   {included_applications, []},
