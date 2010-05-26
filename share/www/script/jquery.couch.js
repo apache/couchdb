@@ -164,7 +164,7 @@
             return false;
           } else {
             doc._attachments = doc._attachments || {};
-            doc._attachments["rev-"+doc._rev] = {
+            doc._attachments["rev-"+doc._rev.split("-")[0]] = {
               content_type :"application/json",
               data : Base64.encode(rawDocs[doc._id].raw)
             }
