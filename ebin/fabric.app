@@ -8,7 +8,8 @@
        fabric_api,
        fabric_create,
        fabric_delete,
-       fabric_info
+       fabric_info,
+       fabric_open
    ]},
   {registered, []},
   {included_applications, []},

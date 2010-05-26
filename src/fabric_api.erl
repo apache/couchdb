@@ -43,7 +43,7 @@ close_db(Db) ->
 
 -spec get_db_info(#db{}, bstring()) -> {ok, [{atom(), any()}]}.
 get_db_info(Db, Customer) ->
-    showroom_db:get_db_info(Db, Customer).
+    fabric:get_db_info(Db, Customer).
 
 -spec replicate_db(ejson(), #user_ctx{}) -> {ok, ejson()}.
 replicate_db(PostBody, UserCtx) ->

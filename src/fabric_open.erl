@@ -23,25 +23,12 @@
 %     open_db(<<"S", ShardName/binary>>, Options).
 
 
-open_doc(DbName, DocId, Revs, Options) ->
+open_doc(DbName, DocId, _Revs, _Options) ->
     NPs = partitions:key_nodes_parts(DbName, DocId),
     ?debugFmt("~nNPs: ~p~n", [NPs]),
-    ok.
+    {ok, #doc{}}.
 
 
-open_doc_endpoint(DbName, DocId, Revs, Options) ->
-    case couch_db:open(DbName, []) of
-    {ok, Db} ->
-        try
-            couch_api:open_doc(Db, DocId, Revs, Options)
-        after
-            couch_db:close(Db)
-        end;
-    {not_found, no_db_file} ->
-        throw({not_found, <<"The database does not exist.">>});
-    Error ->
-        throw(Error)
-    end.
 
 
 
