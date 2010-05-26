@@ -153,7 +153,25 @@
       });
     },
 
-    db: function(name) {
+    db: function(name, db_opts) {
+      db_opts = db_opts || {};
+      var rawDocs = {};
+      function maybeApplyVersion(doc) {
+        if (doc._id && doc._rev && rawDocs[doc._id] && rawDocs[doc._id].rev == doc._rev) {
+          // todo: can we use commonjs require here?
+          if (typeof Base64 == "undefined") {
+            alert("please include /_utils/script/base64.js in the page for base64 support");
+            return false;
+          } else {
+            doc._attachments = doc._attachments || {};
+            doc._attachments["rev-"+doc._rev] = {
+              content_type :"application/json",
+              data : Base64.encode(rawDocs[doc._id].raw)
+            }
+            return true;
+          }
+        }
+      };
       return {
         name: name,
         uri: this.urlPrefix + "/" + encodeURIComponent(name) + "/",
@@ -251,6 +269,28 @@
           }
         },
         openDoc: function(docId, options, ajaxOptions) {
+          options = options || {};
+          if (db_opts.attachPrevRev || options.attachPrevRev) {
+            $.extend(options, {
+              beforeSuccess : function(req, doc) {
+                rawDocs[doc._id] = {
+                  rev : doc._rev,
+                  raw : req.responseText
+                };
+              }
+            });
+          } else {
+            $.extend(options, {
+              beforeSuccess : function(req, doc) {
+                if (doc["jquery.couch.attachPrevRev"]) {
+                  rawDocs[doc._id] = {
+                    rev : doc._rev,
+                    raw : req.responseText
+                  };
+                }
+              }
+            });
+          }
           ajax({url: this.uri + encodeDocId(docId) + encodeOptions(options)},
             options,
             "The document could not be retrieved",
@@ -258,8 +298,9 @@
           );
         },
         saveDoc: function(doc, options) {
-          var beforeSend = fullCommit(options);
           options = options || {};
+          var db = this;
+          var beforeSend = fullCommit(options);
           if (doc._id === undefined) {
             var method = "POST";
             var uri = this.uri;
@@ -267,6 +308,7 @@
             var method = "PUT";
             var uri = this.uri + encodeDocId(doc._id);
           }
+          var versioned = maybeApplyVersion(doc);
           $.ajax({
             type: method, url: uri + encodeOptions(options),
             contentType: "application/json",
@@ -277,7 +319,17 @@
               if (req.status == 201) {
                 doc._id = resp.id;
                 doc._rev = resp.rev;
-                if (options.success) options.success(resp);
+                if (versioned) {
+                  db.openDoc(doc._id, {
+                    attachPrevRev : true,
+                    success : function(d) {
+                      doc._attachments = d._attachments;
+                      if (options.success) options.success(resp);
+                    }
+                  });
+                } else {
+                  if (options.success) options.success(resp);
+                }
               } else if (options.error) {
                 options.error(req.status, resp.error, resp.reason);
               } else {
@@ -465,6 +517,7 @@
       complete: function(req) {
         var resp = $.httpData(req, "json");
         if (req.status == options.successStatus) {
+          if (options.beforeSuccess) options.beforeSuccess(req, resp);
           if (options.success) options.success(resp);
         } else if (options.error) {
           options.error(req.status, resp.error, resp.reason);
