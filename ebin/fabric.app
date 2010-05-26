@@ -9,7 +9,8 @@
        fabric_create,
        fabric_delete,
        fabric_info,
-       fabric_open
+       fabric_open,
+       fabric_util
    ]},
   {registered, []},
   {included_applications, []},
