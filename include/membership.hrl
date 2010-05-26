@@ -6,6 +6,9 @@
               args
              }).
 
+%% partition record
+-record(part, {dbname, node, b, e}).
+
 %% types
 -type join_type() :: init | join | replace | leave.
 -type join_order() :: non_neg_integer().
@@ -21,8 +24,9 @@
 -type vector_clock() :: [clock()].
 -type ping_node() :: node() | nil.
 
--type part() :: integer().
--type ref_node_part() :: {reference(), node(), part()}.
+-type part() :: #part{}.
+-type fullmap() :: [part()].
+-type ref_part_map() :: {reference(), part()}.
 -type tref() :: reference().
 -type np() :: {node(), part()}.
--type np_acc() :: [{np(), any()}].
+-type beg_acc() :: [integer()].
