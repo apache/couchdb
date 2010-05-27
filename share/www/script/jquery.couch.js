@@ -231,8 +231,19 @@
           );
         },
         allDocs: function(options) {
-          ajax(
-            {url: this.uri + "_all_docs" + encodeOptions(options)},
+          var type = "GET";
+          var data = null;
+          if (options["keys"]) {
+            type = "POST";
+            var keys = options["keys"];
+            delete options["keys"];
+            data = toJSON({ "keys": keys });
+          }
+          ajax({
+              type: type,
+              data: data,
+              url: this.uri + "_all_docs" + encodeOptions(options)
+            },
             options,
             "An error occurred retrieving a list of all documents"
           );
