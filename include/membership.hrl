@@ -7,7 +7,7 @@
              }).
 
 %% partition record
--record(part, {dbname, node, b, e}).
+-record(shard, {name, node, dbname, range}).
 
 %% types
 -type join_type() :: init | join | replace | leave.
@@ -24,7 +24,7 @@
 -type vector_clock() :: [clock()].
 -type ping_node() :: node() | nil.
 
--type part() :: #part{}.
+-type part() :: #shard{}.
 -type fullmap() :: [part()].
 -type ref_part_map() :: {reference(), part()}.
 -type tref() :: reference().
