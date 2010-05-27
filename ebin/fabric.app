@@ -6,13 +6,10 @@
   {modules, [
        fabric,
        fabric_api,
-       fabric_create,
-       fabric_delete,
-       fabric_info,
-       fabric_open,
+       fabric_db,
+       fabric_doc,
        fabric_rpc,
-       fabric_util,
-       fabric_doc
+       fabric_util
    ]},
   {registered, []},
   {included_applications, []},

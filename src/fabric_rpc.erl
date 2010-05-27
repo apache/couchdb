@@ -13,7 +13,6 @@ open_doc(DbName, DocId, Revs, Options) ->
     with_db(DbName, {couch_api, open_doc, [DocId, Revs, Options]}).
 
 get_db_info(DbName) ->
-    ?debugHere,
     with_db(DbName, {couch_db, get_db_info, []}).
 
 %%
