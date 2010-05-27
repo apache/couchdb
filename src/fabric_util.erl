@@ -1,14 +1,14 @@
 -module(fabric_util).
 
--export([receive_loop/4, receive_loop/6]).
+-export([submit_jobs/3, recv/4, receive_loop/4, receive_loop/6]).
 
 -include("../../dynomite/include/membership.hrl").
 
 submit_jobs(Shards, EndPoint, ExtraArgs) ->
     lists:map(fun(#shard{node=Node, name=ShardName} = Shard) ->
-        Ref = rexi:cast(Node, {?RPC, EndPoint, [ShardName | ExtraArgs]}),
+        Ref = rexi:cast(Node, {fabric_rpc, EndPoint, [ShardName | ExtraArgs]}),
         Shard#shard{ref = Ref}
-    end.
+    end, Shards).
 
 recv(Workers, Keypos, Fun, Acc0) ->
     receive_loop(Workers, Keypos, Fun, Acc0).
