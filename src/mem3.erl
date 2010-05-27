@@ -386,13 +386,17 @@ gossip(#mem{args=Args} = NewState) ->
 -spec gossip(test(), mem_state()) -> mem_state().
 gossip(undefined, #mem{nodes=StateNodes} = State) ->
     {_, Nodes, _} = lists:unzip3(StateNodes),
-    TargetNode = next_up_node(Nodes),
-    showroom_log:message(info, "membership: firing gossip from ~p to ~p",
-        [node(), TargetNode]),
-    case gen_server:call({?SERVER, TargetNode}, {gossip, State}) of
-    ok -> State;
-    {new_state, NewState} -> NewState;
-    Error -> throw({unknown_gossip_response, Error})
+    case next_up_node(Nodes) of
+    no_gossip_targets_available ->
+        State; % skip gossip, I'm the only node
+    TargetNode ->
+        showroom_log:message(info, "membership: firing gossip from ~p to ~p",
+            [node(), TargetNode]),
+        case gen_server:call({?SERVER, TargetNode}, {gossip, State}) of
+        ok -> State;
+        {new_state, NewState} -> NewState;
+        Error -> throw({unknown_gossip_response, Error})
+        end
     end;
 
 gossip(_,_) ->
@@ -411,7 +415,7 @@ next_up_node(Node, Nodes, UpNodes) ->
     DownNodes = Nodes -- UpNodes,
     case List -- DownNodes of
     [Target|_] -> Target;
-    [] -> throw({error, no_gossip_targets_available})
+    [] -> no_gossip_targets_available
     end.
 
 
