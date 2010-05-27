@@ -35,7 +35,7 @@ delete_db(DbName, Options) ->
 %% @doc delete the partitions on all appropriate nodes (rexi calls)
 -spec send_calls(binary(), list(), fullmap()) -> [{reference(), part()}].
 send_calls(DbName, Options, Parts) ->
-    lists:map(fun(#part{node=Node, b=Beg} = Part) ->
+    lists:map(fun(#shard{node=Node, range=[Beg,_]} = Part) ->
         ShardName = showroom_utils:shard_name(Beg, DbName),
         Ref = rexi:async_server_call({couch_server, Node},
                                      {delete, ShardName, Options}),

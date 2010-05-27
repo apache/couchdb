@@ -8,13 +8,13 @@
 %% @doc gets all databases in the cluster.
 -spec all_databases(binary() | []) -> [binary()].
 all_databases([]) ->
-    Dbs = ets:foldl(fun(#part{dbname=DbName}, AccIn) ->
+    Dbs = ets:foldl(fun(#shard{dbname=DbName}, AccIn) ->
         new_acc(DbName, AccIn)
     end, [], partitions),
     {ok, Dbs};
 all_databases(Customer) ->
     ?debugFmt("~nCustomer: ~p~n", [Customer]),
-    Dbs = ets:foldl(fun(#part{dbname=DbName}, AccIn) ->
+    Dbs = ets:foldl(fun(#shard{dbname=DbName}, AccIn) ->
         DbNameStr = ?b2l(DbName),
         case string:str(DbNameStr, Customer) of
         1 ->
@@ -44,7 +44,7 @@ new_acc(DbName, Acc) ->
     end.
 
 send_info_calls(DbName, Parts) ->
-    lists:map(fun(#part{node=Node, b=Beg} = Part) ->
+    lists:map(fun(#shard{node=Node, range=[Beg,_]} = Part) ->
         ShardName = showroom_utils:shard_name(Beg, DbName),
         Ref = rexi:cast(Node, {rexi_rpc, get_db_info, ShardName}),
         {Ref, Part}
