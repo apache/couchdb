@@ -271,7 +271,7 @@
         openDoc: function(docId, options, ajaxOptions) {
           options = options || {};
           if (db_opts.attachPrevRev || options.attachPrevRev) {
-            $.extend(options, {
+            $.extend(ajaxOptions, {
               beforeSuccess : function(req, doc) {
                 rawDocs[doc._id] = {
                   rev : doc._rev,
@@ -280,7 +280,7 @@
               }
             });
           } else {
-            $.extend(options, {
+            $.extend(ajaxOptions, {
               beforeSuccess : function(req, doc) {
                 if (doc["jquery.couch.attachPrevRev"]) {
                   rawDocs[doc._id] = {
@@ -344,7 +344,7 @@
           ajax({
               type: "POST",
               url: this.uri + "_bulk_docs" + encodeOptions(options),
-              data: toJSON(docs)
+              contentType: "application/json", data: toJSON(docs)
             },
             options,
             "The documents could not be saved"
