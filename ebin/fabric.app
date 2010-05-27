@@ -5,7 +5,6 @@
   {vsn, "0.1.0"},
   {modules, [
        fabric,
-       fabric_api,
        fabric_db,
        fabric_doc,
        fabric_rpc,

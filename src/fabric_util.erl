@@ -56,7 +56,7 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
             {ok, Acc0};
         RefPart ->
             % call the Fun that understands the message
-            ?debugFmt("~nAcc0: ~p~n", [Acc0]),
+            %?debugFmt("~nAcc0: ~p~n", [Acc0]),
             Fun(RefPart, Msg, Acc0)
         end;
     {rexi_DOWN, _RexiMonPid, ServerPid, Reason} = Msg ->

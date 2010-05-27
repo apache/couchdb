@@ -13,6 +13,8 @@ open_doc(DbName, DocId, Opts) ->
     case fabric_util:recv(Workers, #shard.ref, fun handle_open_doc/3, Acc0) of
     {ok, #doc{deleted=true}} when SuppressDeletedDoc ->
         {not_found, deleted};
+    {ok, {not_found, missing}} ->
+        {not_found, missing};
     Else ->
         Else
     end.
