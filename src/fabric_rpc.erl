@@ -1,10 +1,9 @@
 -module(fabric_rpc).
 
--export([open_doc/4, get_db_info/1]).
+-export([open_doc/3, open_doc/4, get_db_info/1]).
 
-
-%% rpc endpoints
-%%  call to with_db will supply your M:F with a #db{} and then remaining args
+open_doc(DbName, DocId, Options) ->
+    with_db(DbName, {couch_db, open_doc, [DocId, Options]}).
 
 open_doc(DbName, DocId, Revs, Options) ->
     with_db(DbName, {couch_api, open_doc, [DocId, Revs, Options]}).
