@@ -59,11 +59,13 @@ info_loop(_,_,{ok, Acc}) -> {ok, Acc};
 info_loop(RefPartMap, TimeoutRef, AccIn) ->
     receive
     {Ref, {ok, Info}} when is_reference(Ref) ->
-        AccOut = check_all_parts(Ref, RefPartMap, AccIn, ok),
-        info_loop(RefPartMap, TimeoutRef, AccOut);
+        %AccOut = check_all_parts(Ref, RefPartMap, AccIn, ok),
+        %info_loop(RefPartMap, TimeoutRef, AccOut);
+            ok;
     {Ref, Reply} when is_reference(Ref) ->
-        AccOut = check_all_parts(Ref, RefPartMap, AccIn, Reply),
-        info_loop(RefPartMap, TimeoutRef, AccOut);
+        %AccOut = check_all_parts(Ref, RefPartMap, AccIn, Reply),
+        %info_loop(RefPartMap, TimeoutRef, AccOut);
+            ok;
     {timeout, TimeoutRef} ->
         {error, timeout}
     end.

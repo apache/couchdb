@@ -1,7 +1,6 @@
 -module(fabric_open).
 
 -export([open_doc/4]).
--export([open_doc_endpoint/4]).
 
 -include("../../couch/src/couch_db.hrl").
 

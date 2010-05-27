@@ -10,6 +10,7 @@
        fabric_delete,
        fabric_info,
        fabric_open,
+       fabric_rpc,
        fabric_util
    ]},
   {registered, []},
