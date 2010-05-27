@@ -26,7 +26,7 @@ cast(Node, MFA) ->
 %% process' dictionary as `rexi_from', so it has a way to communicate with you.
 %% Second, the remote process is monitored. If it exits with a Reason other
 %% than normal, Caller will receive a message of the form
-%% `{rexi_EXIT, Ref, Reason}' where Ref is the returned reference.
+%% `{Ref, {rexi_EXIT, Reason}}' where Ref is the returned reference.
 -spec cast(node(), pid(), mfa()) -> reference().
 cast(Node, Caller, MFA) ->
     Ref = make_ref(),
