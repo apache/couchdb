@@ -19,8 +19,8 @@ create_db(DbName, Options) ->
     Fullmap = partitions:fullmap(DbName, Options),
     {ok, FullNodes} = mem3:fullnodes(),
     RefPartMap = send_create_calls(DbName, Options, Fullmap),
-    Acc0 = {false, length(RefPartMap),
-            lists:usort([ {Beg, false} || {_,#shard{range=[Beg,_]}} <- RefPartMap])},
+    Acc0 = {false, length(RefPartMap), lists:usort([ {Beg, false} ||
+         {_,#shard{range=[Beg,_]}} <- RefPartMap])},
     case fabric_util:receive_loop(
         RefPartMap, 1, fun handle_create_msg/3, Acc0, 5000, infinity) of
     {ok, _Results} ->

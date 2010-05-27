@@ -25,13 +25,19 @@ all_databases(Customer) ->
     {ok, Dbs}.
 
 %% @doc get database information tuple
-get_db_info(DbName, _Customer) ->
+get_db_info(DbName, Customer) ->
+    Name = cloudant_db_name(Customer, DbName),
     Parts = partitions:all_parts(DbName),
     RefPartMap = send_info_calls(DbName, Parts),
-    {ok, Results} = fabric_rpc:receive_loop(RefPartMap, 5000, fun info_loop/3),
-    InfoList = Results,
-    %     process_infos(ShardInfos, [{db_name, Name}]);
-    {ok, InfoList}.
+    Acc0 = {false, length(RefPartMap), lists:usort([ {Beg, nil} ||
+         {_,#shard{range=[Beg,_]}} <- RefPartMap])},
+    case fabric_util:receive_loop(
+        RefPartMap, 1, fun handle_info_msg/3, Acc0, 5000, infinity) of
+    {ok, ShardInfos} ->
+        {ok, process_infos(ShardInfos, [{db_name, Name}])};
+    Error -> Error
+    end.
+
 
 %% =====================
 %%   internal
@@ -46,37 +52,38 @@ new_acc(DbName, Acc) ->
 send_info_calls(DbName, Parts) ->
     lists:map(fun(#shard{node=Node, range=[Beg,_]} = Part) ->
         ShardName = showroom_utils:shard_name(Beg, DbName),
-        Ref = rexi:cast(Node, {rexi_rpc, get_db_info, ShardName}),
+        Ref = rexi:cast(Node, {fabric_rpc, get_db_info, ShardName}),
         {Ref, Part}
     end, Parts).
 
-%% @doc create_db receive loop
-%%      Acc is either an accumulation of responses, or if we've received all
-%%      responses, it's {ok, Responses}
--spec info_loop([ref_part_map()], tref(), beg_acc()) ->
-    beg_acc() | {ok, beg_acc()}.
-info_loop(_,_,{ok, Acc}) -> {ok, Acc};
-info_loop(RefPartMap, TimeoutRef, AccIn) ->
-    receive
-    {Ref, {ok, Info}} when is_reference(Ref) ->
-        %AccOut = check_all_parts(Ref, RefPartMap, AccIn, ok),
-        %info_loop(RefPartMap, TimeoutRef, AccOut);
-            ok;
-    {Ref, Reply} when is_reference(Ref) ->
-        %AccOut = check_all_parts(Ref, RefPartMap, AccIn, Reply),
-        %info_loop(RefPartMap, TimeoutRef, AccOut);
-            ok;
-    {timeout, TimeoutRef} ->
-        {error, timeout}
-    end.
+handle_info_msg(_, _, {true, _, Infos0}) ->
+    {stop, Infos0};
+handle_info_msg(_, _, {false, 1, Infos0}) ->
+    MissingShards = lists:keyfind(nil, 2, Infos0),
+    ?LOG_ERROR("get_db_info error, missing shards: ~p", [MissingShards]),
+    {error, get_db_info};
+handle_info_msg({_,#shard{range=[Beg,_]}}, {ok, Info}, {false, N, Infos0}) ->
+    case couch_util:get_value(Beg, Infos0) of
+    nil ->
+        Infos = lists:keyreplace(Beg, 1, Infos0, {Beg, Info}),
+        case is_complete(Infos) of
+        true -> {ok, {true, N-1, Infos}};
+        false -> {ok, {false, N-1, Infos}}
+        end;
+    _ ->
+        {ok, {false, N-1, Infos0}}
+    end;
+handle_info_msg(_, _Other, {Complete, N, Infos0}) ->
+    {ok, {Complete, N-1, Infos0}}.
 
+
+is_complete(List) ->
+    not lists:any(fun({_,nil}) -> true end, List).
 
 cloudant_db_name(Customer, FullName) ->
     case Customer of
-    "" ->
-        FullName;
-    Name ->
-        re:replace(FullName, [Name,"/"], "", [{return, binary}])
+    "" -> FullName;
+    Name -> re:replace(FullName, [Name,"/"], "", [{return, binary}])
     end.
 
 %% Loop through Tasks on the flattened Infos and get the aggregated result

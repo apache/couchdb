@@ -3,6 +3,7 @@
 -export([submit_jobs/3, recv/4, receive_loop/4, receive_loop/6]).
 
 -include("../../dynomite/include/membership.hrl").
+-include_lib("eunit/include/eunit.hrl").
 
 submit_jobs(Shards, EndPoint, ExtraArgs) ->
     lists:map(fun(#shard{node=Node, name=ShardName} = Shard) ->
@@ -55,6 +56,7 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
             {ok, Acc0};
         RefPart ->
             % call the Fun that understands the message
+            ?debugFmt("~nAcc0: ~p~n", [Acc0]),
             Fun(RefPart, Msg, Acc0)
         end;
     {rexi_DOWN, _RexiMonPid, ServerPid, Reason} = Msg ->
