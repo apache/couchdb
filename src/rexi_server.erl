@@ -69,4 +69,4 @@ find_worker(Ref, List) ->
     lists:keyfind(Ref, 2, List).
 
 notify_caller({Caller, Ref}, Reason) ->
-    erlang:send(Caller, {rexi_EXIT, Ref, Reason}).
+    Caller ! {Ref, {rexi_EXIT, Reason}}.
