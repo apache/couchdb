@@ -59,7 +59,7 @@ handle_delete_msg(_, ok, {_NotFound, N}) ->
 delete_fullmap(DbName) ->
     case couch_db:open(<<"dbs">>, []) of
     {ok, Db} ->
-        couch_api:open_doc(Db, DbName, nil, []),
-        couch_api:update_doc(Db, DbName, {[{<<"_deleted">>,true}]});
+        {ok, Doc} = couch_api:open_doc(Db, DbName, nil, []),
+        couch_api:update_doc(Db, Doc#doc{deleted=true});
     Error -> Error
     end.
