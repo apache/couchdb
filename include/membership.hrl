@@ -7,7 +7,7 @@
              }).
 
 %% partition record
--record(shard, {name, node, dbname, range}).
+-record(shard, {name, node, dbname, range, ref}).
 
 %% types
 -type join_type() :: init | join | replace | leave.
