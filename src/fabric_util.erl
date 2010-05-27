@@ -1,14 +1,30 @@
 -module(fabric_util).
 
--export([receive_loop/6]).
+-export([receive_loop/4, receive_loop/6]).
 
 -include("../../dynomite/include/membership.hrl").
 
+submit_jobs(Shards, EndPoint, ExtraArgs) ->
+    lists:map(fun(#shard{node=Node, name=ShardName} = Shard) ->
+        Ref = rexi:cast(Node, {?RPC, EndPoint, [ShardName | ExtraArgs]}),
+        Shard#shard{ref = Ref}
+    end.
+
+recv(Workers, Keypos, Fun, Acc0) ->
+    receive_loop(Workers, Keypos, Fun, Acc0).
+
+receive_loop(Workers, Keypos, Fun, Acc0) ->
+    case couch_config:get("fabric", "request_timeout", "10000") of
+    "infinity" ->
+        Timeout = infinity;
+    N ->
+        Timeout = list_to_integer(N)
+    end,
+    receive_loop(Workers, Keypos, Fun, Acc0, Timeout, infinity).
 
 %% @doc set up the receive loop with an overall timeout
--spec receive_loop([ref_part_map()], integer(), function(), any(),
-                   integer(), integer()) ->
-    {ok, beg_acc()}.
+-spec receive_loop([any()], integer(), function(), any(), timeout(), timeout()) ->
+    {ok, any()}.
 receive_loop(RefPartMap, Keypos, Fun, Acc0, GlobalTimeout, PerMsgTO) ->
     TimeoutRef = erlang:make_ref(),
     {ok, TRef} = timer:send_after(GlobalTimeout, {timeout, TimeoutRef}),
