@@ -35,7 +35,7 @@ delete_db(DbName, Options) ->
 %% @doc delete the partitions on all appropriate nodes (rexi calls)
 -spec send_calls(binary(), list(), fullmap()) -> [{reference(), part()}].
 send_calls(DbName, Options, Parts) ->
-    lists:map(fun(#part{node=Node, b=Beg} = Part) ->
+    lists:map(fun(#shard{node=Node, range=[Beg,_]} = Part) ->
         ShardName = showroom_utils:shard_name(Beg, DbName),
         Ref = rexi:async_server_call({couch_server, Node},
                                      {delete, ShardName, Options}),
@@ -53,7 +53,7 @@ handle_delete_msg(_, {rexi_DOWN, _, _, _}, {Complete, _N, _Parts}) ->
     end;
 handle_delete_msg(_, _, {true, 1, _Acc}) ->
     {stop, ok};
-handle_delete_msg({_, #part{b=Beg}}, {ok, _}, {false, 1, PartResults0}) ->
+handle_delete_msg({_, #shard{range=[Beg,_]}}, {ok, _}, {false, 1, PartResults0}) ->
     PartResults = lists:keyreplace(Beg, 1, PartResults0, {Beg, true}),
     case is_complete(PartResults) of
     true -> {stop, ok};
@@ -61,7 +61,7 @@ handle_delete_msg({_, #part{b=Beg}}, {ok, _}, {false, 1, PartResults0}) ->
     end;
 handle_delete_msg(_RefPart, {ok, _}, {true, N, Parts}) ->
     {ok, {true, N-1, Parts}};
-handle_delete_msg({_Ref, #part{b=Beg}}, {ok, _}, {false, Rem, PartResults0}) ->
+handle_delete_msg({_Ref, #shard{range=[Beg,_]}}, {ok, _}, {false, Rem, PartResults0}) ->
     PartResults = lists:keyreplace(Beg, 1, PartResults0, {Beg, true}),
     {ok, {is_complete(PartResults), Rem-1, PartResults}}.
 
