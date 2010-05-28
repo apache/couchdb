@@ -10,12 +10,12 @@ open_doc(DbName, Id, Options) ->
     SuppressDeletedDoc = not lists:member(deleted, Options),
     Acc0 = {length(Workers), couch_util:get_value(r, Options, 1), []},
     case fabric_util:recv(Workers, #shard.ref, fun handle_open_doc/3, Acc0) of
-    {ok, #doc{deleted=true}} when SuppressDeletedDoc ->
+    {ok, {ok, #doc{deleted=true}}} when SuppressDeletedDoc ->
         {not_found, deleted};
-    {ok, {not_found, missing}} ->
-        {not_found, missing};
-    Else ->
-        Else
+    {ok, Else} ->
+        Else;
+    Error ->
+        Error
     end.
 
 open_revs(DbName, Id, Revs, Options) ->
@@ -154,7 +154,7 @@ make_key({not_found, missing}) ->
     {not_found, missing}.
 
 repair_read_quorum_failure(Replies) ->
-    case [Doc || {ok, Doc} <- Replies] of
+    case [Doc || {_Key, {ok, Doc}, _Count} <- Replies] of
     [] ->
         {stop, {not_found, missing}};
     [Doc|_] ->
