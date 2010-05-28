@@ -2,7 +2,8 @@
 
 -export([all_databases/1, create_db/2, delete_db/2, get_db_info/2,
     db_path/2]).
--export([open_doc/3, open_revs/4, update_doc/3, update_docs/3]).
+-export([open_doc/3, open_revs/4, get_missing_revs/2]).
+-export([update_doc/3, update_docs/3]).
 
 -include("../../couch/src/couch_db.hrl").
 
@@ -33,6 +34,10 @@ open_doc(DbName, Id, Options) ->
 
 open_revs(DbName, Id, Revs, Options) ->
     fabric_doc:open_revs(dbname(DbName), docid(Id), Revs, Options).
+
+get_missing_revs(DbName, IdsRevs) when is_list(IdsRevs) ->
+    Sanitized = [idrevs(IdR) || IdR <- IdsRevs],
+    fabric_doc:get_missing_revs(dbname(DbName), Sanitized).
 
 update_doc(DbName, Doc, Options) ->
     {ok, [Result]} = update_docs(DbName, [Doc], Options),
@@ -69,6 +74,14 @@ doc({_} = Doc) ->
     couch_doc:from_json_obj(Doc);
 doc(Doc) ->
     erlang:error({illegal_doc_format, Doc}).
+
+idrevs({Id, Revs}) when is_list(Revs) ->
+    {docid(Id), [rev(R) || R <- Revs]}.
+
+rev(Rev) when is_list(Rev); is_binary(Rev) ->
+    couch_doc:parse_rev(Rev);
+rev({Seq, Hash} = Rev) when is_integer(Seq), is_binary(Hash) ->
+    Rev.
 
 generate_customer_path("/", _Customer) ->
     "";
