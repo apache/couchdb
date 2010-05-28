@@ -1,1 +1,0 @@
--define(CHUNK_SIZE, 5120).
