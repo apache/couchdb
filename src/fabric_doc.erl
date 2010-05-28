@@ -22,7 +22,12 @@ open_revs(DbName, Id, Revs, Options) ->
     Workers = fabric_util:submit_jobs(partitions:for_key(DbName,Id), open_revs,
         [Id, Revs, Options]),
     Acc0 = {length(Workers), couch_util:get_value(r, Options, 1), []},
-    fabric_util:recv(Workers, #shard.ref, fun handle_open_revs/3, Acc0).
+    case fabric_util:recv(Workers, #shard.ref, fun handle_open_revs/3, Acc0) of
+    {ok, {ok, Reply}} ->
+        {ok, Reply};
+    Else ->
+        Else
+    end.
 
 get_missing_revs(DbName, AllIdsRevs) ->
     Workers = lists:map(fun({#shard{name=Name, node=Node} = Shard, IdsRevs}) ->
@@ -69,8 +74,18 @@ handle_open_revs(_Worker, {rexi_DOWN, _, _, _}, Acc0) ->
     skip_message(Acc0);
 handle_open_revs(_Worker, {rexi_EXIT, _}, Acc0) ->
     skip_message(Acc0);
-handle_open_revs(_Worker, _Reply, {_WaitingCount, _R, _Replies}) ->
-    {stop, not_implemented}.
+handle_open_revs(_Worker, Reply, {WaitingCount, R, Replies}) ->
+    case merge_read_reply(make_key(Reply), Reply, Replies) of
+    {_, KeyCount} when KeyCount =:= R ->
+        {stop, Reply};
+    {NewReplies, KeyCount} when KeyCount < R ->
+        if WaitingCount =:= 1 ->
+            % last message arrived, but still no quorum
+            repair_read_quorum_failure(NewReplies);
+        true ->
+            {ok, {WaitingCount-1, R, NewReplies}}
+        end
+    end.
 
 handle_missing_revs(_Worker, {rexi_DOWN, _, _, _}, Acc0) ->
     skip_message(Acc0);
@@ -200,8 +215,8 @@ append_update_replies([Doc|Rest1], [Reply|Rest2], Dict0) ->
 
 make_key({ok, #doc{id=Id, revs=Revs}}) ->
     {Id, Revs};
-make_key({not_found, missing}) ->
-    {not_found, missing}.
+make_key(Else) ->
+    Else.
 
 repair_read_quorum_failure(Replies) ->
     case [Doc || {_Key, {ok, Doc}, _Count} <- Replies] of
