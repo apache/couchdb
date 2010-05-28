@@ -1,0 +1,2 @@
+-include("../../couch/src/couch_db.hrl").
+-include("../../dynomite/include/membership.hrl").

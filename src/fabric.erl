@@ -30,21 +30,21 @@ delete_db(DbName, Options) ->
 
 
 open_doc(DbName, Id, Options) ->
-    fabric_doc:open_doc(dbname(DbName), docid(Id), Options).
+    fabric_open_doc:go(dbname(DbName), docid(Id), Options).
 
 open_revs(DbName, Id, Revs, Options) ->
-    fabric_doc:open_revs(dbname(DbName), docid(Id), Revs, Options).
+    fabric_open_revs:go(dbname(DbName), docid(Id), Revs, Options).
 
 get_missing_revs(DbName, IdsRevs) when is_list(IdsRevs) ->
     Sanitized = [idrevs(IdR) || IdR <- IdsRevs],
-    fabric_doc:get_missing_revs(dbname(DbName), Sanitized).
+    fabric_missing_revs:go(dbname(DbName), Sanitized).
 
 update_doc(DbName, Doc, Options) ->
     {ok, [Result]} = update_docs(DbName, [Doc], Options),
     Result.
 
 update_docs(DbName, Docs, Options) ->
-    fabric_doc:update_docs(dbname(DbName), docs(Docs), Options).
+    fabric_update_docs:go(dbname(DbName), docs(Docs), Options).
 
 
 %% some simple type validation and transcoding

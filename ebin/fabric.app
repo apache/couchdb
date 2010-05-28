@@ -7,7 +7,11 @@
        fabric,
        fabric_db,
        fabric_doc,
+       fabric_missing_revs,
+       fabric_open_doc,
+       fabric_open_revs,
        fabric_rpc,
+       fabric_update_docs,
        fabric_util
    ]},
   {registered, []},
