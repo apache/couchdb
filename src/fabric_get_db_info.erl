@@ -3,9 +3,7 @@
 
 -export([get_db_info/2]).
 
--include("../../couch/src/couch_db.hrl").
--include("../../dynomite/include/membership.hrl").
-
+-include("fabric.hrl").
 
 %% @doc get database information tuple
 get_db_info(DbName, Customer) ->

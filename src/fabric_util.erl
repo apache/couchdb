@@ -2,8 +2,7 @@
 
 -export([submit_jobs/3, recv/4, receive_loop/4, receive_loop/6]).
 
--include("../../dynomite/include/membership.hrl").
--include_lib("eunit/include/eunit.hrl").
+-include("fabric.hrl").
 
 submit_jobs(Shards, EndPoint, ExtraArgs) ->
     lists:map(fun(#shard{node=Node, name=ShardName} = Shard) ->

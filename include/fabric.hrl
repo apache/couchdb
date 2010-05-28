@@ -1,2 +1,3 @@
 -include("../../couch/src/couch_db.hrl").
 -include("../../dynomite/include/membership.hrl").
+-include_lib("eunit/include/eunit.hrl").

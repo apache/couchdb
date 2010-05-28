@@ -1,12 +1,10 @@
 -module(fabric).
 
--export([all_databases/1, create_db/2, delete_db/2, get_db_info/2,
-    db_path/2]).
+-export([all_databases/1, create_db/2, delete_db/2, get_db_info/2, db_path/2]).
 -export([open_doc/3, open_revs/4, get_missing_revs/2]).
 -export([update_doc/3, update_docs/3]).
 
--include("../../couch/src/couch_db.hrl").
-
+-include("fabric.hrl").
 
 % db operations
 -spec db_path(bstring(), bstring()) -> bstring().

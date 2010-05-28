@@ -1,5 +1,7 @@
 -module(fabric_missing_revs).
+
 -export([go/2]).
+
 -include("fabric.hrl").
 
 go(DbName, AllIdsRevs) ->

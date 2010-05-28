@@ -1,5 +1,7 @@
 -module(fabric_open_doc).
+
 -export([go/3]).
+
 -include("fabric.hrl").
 
 go(DbName, Id, Options) ->

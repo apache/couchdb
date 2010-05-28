@@ -1,5 +1,7 @@
 -module(fabric_open_revs).
+
 -export([go/4]).
+
 -include("fabric.hrl").
 
 go(DbName, Id, Revs, Options) ->

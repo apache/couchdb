@@ -3,9 +3,7 @@
 
 -export([all_databases/1]).
 
--include("../../couch/src/couch_db.hrl").
--include("../../dynomite/include/membership.hrl").
-
+-include("fabric.hrl").
 
 %% @doc gets all databases in the cluster.
 -spec all_databases(binary() | []) -> [binary()].

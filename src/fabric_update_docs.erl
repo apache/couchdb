@@ -1,5 +1,7 @@
 -module(fabric_update_docs).
+
 -export([go/3]).
+
 -include("fabric.hrl").
 
 go(DbName, AllDocs, Options) ->

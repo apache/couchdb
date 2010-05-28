@@ -3,9 +3,7 @@
 
 -export([create_db/2]).
 
--include("../../couch/src/couch_db.hrl").
--include("../../dynomite/include/membership.hrl").
-
+-include("fabric.hrl").
 
 %% @doc Create a new database, and all its partition files across the cluster
 %%      Options is proplist with user_ctx, n, q

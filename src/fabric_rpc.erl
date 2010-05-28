@@ -4,7 +4,6 @@
 -export([open_doc/3, open_revs/4, get_missing_revs/2, update_docs/3]).
 
 -include("fabric.hrl").
--include_lib("eunit/include/eunit.hrl").
 
 %% rpc endpoints
 %%  call to with_db will supply your M:F with a #db{} and then remaining args
