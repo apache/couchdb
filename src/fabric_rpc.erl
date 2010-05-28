@@ -1,13 +1,39 @@
 -module(fabric_rpc).
 
--export([get_db_info/1]).
+-export([get_db_info/1, get_doc_count/1, get_update_seq/1]).
 -export([open_doc/3, open_revs/4, get_missing_revs/2, update_docs/3]).
 
--include("../../couch/src/couch_db.hrl").
+-include("fabric.hrl").
 -include_lib("eunit/include/eunit.hrl").
+
+%% rpc endpoints
+%%  call to with_db will supply your M:F with a #db{} and then remaining args
+
+get_db_info(DbName) ->
+    with_db(DbName, {couch_db, get_db_info, []}).
+
+get_doc_count(DbName) ->
+    rexi:reply(case couch_db:open(DbName) of
+    {ok, Db} ->
+        {ok, {Count, _DelCount}} = couch_btree:full_reduce(Db#db.id_tree),
+        {ok, Count};
+    Error ->
+        Error
+    end).
+
+get_update_seq(DbName) ->
+    rexi:reply(case couch_db:open(DbName) of
+    {ok, #db{update_seq = Seq}} ->
+        {ok, Seq};
+    Error ->
+        Error
+    end).
 
 open_doc(DbName, DocId, Options) ->
     with_db(DbName, {couch_db, open_doc_int, [DocId, Options]}).
+
+open_revs(DbName, Id, Revs, Options) ->
+    with_db(DbName, {couch_db, open_doc_revs, [Id, Revs, Options]}).
 
 get_missing_revs(DbName, IdRevsList) ->
     % reimplement here so we get [] for Ids with no missing revs in response
@@ -25,15 +51,6 @@ get_missing_revs(DbName, IdRevsList) ->
     Error ->
         Error
     end).
-
-open_revs(DbName, Id, Revs, Options) ->
-    with_db(DbName, {couch_db, open_doc_revs, [Id, Revs, Options]}).
-
-%% rpc endpoints
-%%  call to with_db will supply your M:F with a #db{} and then remaining args
-
-get_db_info(DbName) ->
-    with_db(DbName, {couch_db, get_db_info, []}).
 
 update_docs(DbName, Docs, Options) ->
     with_db(DbName, {couch_db, update_docs, [Docs, Options]}).
