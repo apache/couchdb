@@ -7,6 +7,7 @@
 
 submit_jobs(Shards, EndPoint, ExtraArgs) ->
     lists:map(fun(#shard{node=Node, name=ShardName} = Shard) ->
+        io:format("submitting ~p ~p~n", [Node, {fabric_rpc, EndPoint, [ShardName | ExtraArgs]}]),
         Ref = rexi:cast(Node, {fabric_rpc, EndPoint, [ShardName | ExtraArgs]}),
         Shard#shard{ref = Ref}
     end, Shards).
@@ -50,6 +51,7 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
     {timeout, TimeoutRef} ->
         timeout;
     {Ref, Msg} ->
+        io:format("process_message ~p ~p~n", [Ref, Msg]),
         case lists:keyfind(Ref, Keypos, RefList) of
         false ->
             % this was some non-matching message which we will ignore
