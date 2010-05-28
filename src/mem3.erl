@@ -22,9 +22,6 @@
 -export([start_link/0, start_link/1, stop/0, stop/1, reset/0]).
 -export([join/3, clock/0, state/0, states/0, nodes/0, fullnodes/0,
          start_gossip/0]).
-%-export([partitions/0, fullmap/0]).
-%-export([nodes/0, nodes_for_part/1, nodes_for_part/2, all_nodes_parts/1]).
-%-export([parts_for_node/1]).
 
 %% for testing more than anything else
 -export([merge_nodes/2, next_up_node/1, next_up_node/3]).
@@ -34,8 +31,7 @@
          terminate/2, code_change/3]).
 
 %% includes
--include("../include/membership.hrl").
--include_lib("eunit/include/eunit.hrl").
+-include("membership.hrl").
 
 -define(SERVER, membership).
 -define(STATE_FILE_PREFIX, "membership").

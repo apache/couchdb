@@ -1,3 +1,14 @@
+-define(MEMBERSHIP, true).
+
+-ifndef(FABRIC).
+-include("../../fabric/include/fabric.hrl").
+-endif.
+
+-ifndef(COUCH).
+-include("../../couch/src/couch_db.hrl").
+-endif.
+
+-include_lib("eunit/include/eunit.hrl").
 
 %% version 3 of membership state
 -record(mem, {header=3,
