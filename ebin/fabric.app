@@ -5,8 +5,10 @@
   {vsn, "0.1.0"},
   {modules, [
        fabric,
-       fabric_db,
-       fabric_doc,
+       fabric_all_databases,
+       fabric_create_db,
+       fabric_delete_db,
+       fabric_get_db_info,
        fabric_missing_revs,
        fabric_open_doc,
        fabric_open_revs,

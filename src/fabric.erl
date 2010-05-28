@@ -16,16 +16,16 @@ db_path(RawUri, Customer) ->
     Path.
 
 all_databases(Customer) ->
-    fabric_db:all_databases(Customer).
+    fabric_all_databases:all_databases(Customer).
 
 get_db_info(DbName, Customer) ->
-    fabric_db:get_db_info(dbname(DbName), Customer).
+    fabric_get_db_info:get_db_info(dbname(DbName), Customer).
 
 create_db(DbName, Options) ->
-    fabric_db:create_db(dbname(DbName), Options).
+    fabric_create_db:create_db(dbname(DbName), Options).
 
 delete_db(DbName, Options) ->
-    fabric_db:delete_db(dbname(DbName), Options).
+    fabric_delete_db:delete_db(dbname(DbName), Options).
 
 
 
