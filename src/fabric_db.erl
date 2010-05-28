@@ -45,26 +45,27 @@ get_db_info(DbName, Customer) ->
 create_db(DbName, Options) ->
     Fullmap = partitions:fullmap(DbName, Options),
     {ok, FullNodes} = mem3:fullnodes(),
-    RefPartMap = send_create_calls(DbName, Options, Fullmap),
+    RefPartMap = send_create_calls(Fullmap, Options),
     Acc0 = {false, length(RefPartMap), lists:usort([ {Beg, false} ||
          {_,#shard{range=[Beg,_]}} <- RefPartMap])},
-    case fabric_util:receive_loop(
-        RefPartMap, 1, fun handle_create_msg/3, Acc0, 5000, infinity) of
-    {ok, _Results} ->
-        partitions:install_fullmap(DbName, Fullmap, FullNodes, Options),
-        ok;
+    Result = case fabric_util:receive_loop(
+        RefPartMap, 1, fun handle_create_msg/3, Acc0) of
+    {ok, _Results} -> ok;
     Error -> Error
-    end.
+    end,
+    % always install partition map, even w/ errors, so delete is possible
+    partitions:install_fullmap(DbName, Fullmap, FullNodes, Options),
+    Result.
 
 %% @doc Delete a database, and all its partition files across the cluster
 %%      Options is proplist with user_ctx, n, q
 -spec delete_db(binary(), list()) -> {ok, #db{}} | {error, any()}.
 delete_db(DbName, Options) ->
-    Parts = partitions:all_parts(DbName),
-    RefPartMap = send_delete_calls(DbName, Options, Parts),
+    Fullmap = partitions:all_parts(DbName),
+    RefPartMap = send_delete_calls(Fullmap, Options),
     Acc0 = {true, length(RefPartMap)},
     case fabric_util:receive_loop(
-        RefPartMap, 1, fun handle_delete_msg/3, Acc0, 5000, infinity) of
+        RefPartMap, 1, fun handle_delete_msg/3, Acc0) of
     {ok, _Results} ->
         delete_fullmap(DbName),
         ok;
@@ -152,10 +153,9 @@ max(New, Existing) ->
 
 
 %% @doc create the partitions on all appropriate nodes (rexi calls)
--spec send_create_calls(binary(), list(), fullmap()) -> [{reference(), part()}].
-send_create_calls(DbName, Options, Fullmap) ->
-    lists:map(fun(#shard{node=Node, range=[Beg,_]} = Part) ->
-        ShardName = showroom_utils:shard_name(Beg, DbName),
+-spec send_create_calls(fullmap(), list()) -> [{reference(), part()}].
+send_create_calls(Fullmap, Options) ->
+    lists:map(fun(#shard{node=Node, name=ShardName} = Part) ->
         Ref = rexi:async_server_call({couch_server, Node},
                                      {create, ShardName, Options}),
         {Ref, Part}
@@ -186,10 +186,9 @@ handle_create_msg({_Ref, #shard{range=[Beg,_]}}, {ok, _}, {false, Rem, PartResul
 
 
 %% @doc delete the partitions on all appropriate nodes (rexi calls)
--spec send_delete_calls(binary(), list(), fullmap()) -> [{reference(), part()}].
-send_delete_calls(DbName, Options, Parts) ->
-    lists:map(fun(#shard{node=Node, range=[Beg,_]} = Part) ->
-        ShardName = showroom_utils:shard_name(Beg, DbName),
+-spec send_delete_calls(fullmap(), list()) -> [{reference(), part()}].
+send_delete_calls(Parts, Options) ->
+    lists:map(fun(#shard{node=Node, name=ShardName} = Part) ->
         Ref = rexi:async_server_call({couch_server, Node},
                                      {delete, ShardName, Options}),
         {Ref, Part}
