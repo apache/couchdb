@@ -5,7 +5,7 @@
 -endif.
 
 -ifndef(MEMBERSHIP).
--include("../../dynomite/include/membership.hrl").
+-include("../../membership/include/membership.hrl").
 -endif.
 
 -include_lib("eunit/include/eunit.hrl").
