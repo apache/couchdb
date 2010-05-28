@@ -305,7 +305,8 @@ function T(arg1, arg2, testName) {
 }
 
 function TEquals(expected, actual, testName) {
-  T(equals(expected, actual), "expected '" + expected + "', got '" + actual + "'", testName);
+  T(equals(expected, actual), "expected '" + repr(expected) +
+    "', got '" + repr(actual) + "'", testName);
 }
 
 function equals(a,b) {
