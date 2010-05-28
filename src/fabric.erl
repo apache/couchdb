@@ -1,8 +1,8 @@
 -module(fabric).
 
 -export([all_databases/1, create_db/2, delete_db/2, get_db_info/2,
-	db_path/2]).
--export([open_doc/3, open_revs/4, update_docs/3]).
+    db_path/2]).
+-export([open_doc/3, open_revs/4, update_doc/3, update_docs/3]).
 
 -include("../../couch/src/couch_db.hrl").
 
@@ -34,6 +34,10 @@ open_doc(DbName, Id, Options) ->
 open_revs(DbName, Id, Revs, Options) ->
     fabric_doc:open_revs(dbname(DbName), docid(Id), Revs, Options).
 
+update_doc(DbName, Doc, Options) ->
+    {ok, [Result]} = update_docs(DbName, [Doc], Options),
+    Result.
+
 update_docs(DbName, Docs, Options) ->
     fabric_doc:update_docs(dbname(DbName), docs(Docs), Options).
 
@@ -56,10 +60,6 @@ docid(DocId) ->
 
 docs(Docs) when is_list(Docs) ->
     [doc(D) || D <- Docs];
-docs(#doc{} = Doc) ->
-    [Doc];
-docs({_} = Doc) ->
-    [couch_doc:from_json_obj(Doc)];
 docs(Docs) ->
     erlang:error({illegal_docs_list, Docs}).
 
