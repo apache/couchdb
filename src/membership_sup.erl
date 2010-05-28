@@ -21,4 +21,18 @@ init(_Args) ->
                   1000,
                   worker,
                   [mem3]},
-    {ok, {{one_for_one,10,1}, [Membership]}}.
+    DbsRepl =
+        {dbs,
+         {dbs, start_link, []},
+         permanent,
+         infinity,
+         supervisor,
+         [dbs]},
+    DbsCache =
+        {dbs_cache,
+         {dbs_cache, start_link, []},
+         permanent,
+         1000,
+         worker,
+         [dbs_cache]},
+    {ok, {{one_for_one,10,1}, [Membership, DbsRepl, DbsCache]}}.
