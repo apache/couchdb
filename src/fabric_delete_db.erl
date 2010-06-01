@@ -33,18 +33,18 @@ send_delete_calls(Parts, Options) ->
         {Ref, Part}
     end, Parts).
 
-handle_delete_msg(_, not_found, {NotFound, N}) ->
+handle_delete_msg(not_found, _, {NotFound, N}) ->
     {ok, {NotFound, N-1}};
-handle_delete_msg(_, {rexi_EXIT, _Reason}, {NotFound, N}) ->
+handle_delete_msg({rexi_EXIT, _Reason}, _, {NotFound, N}) ->
     {ok, {NotFound, N-1}};
-handle_delete_msg(_, {rexi_DOWN, _, _, _}, _Acc) ->
+handle_delete_msg({rexi_DOWN, _, _, _}, _, _Acc) ->
     {error, delete_db_fubar};
 handle_delete_msg(_, _, {NotFound, 1}) ->
     if
     NotFound -> {stop, not_found};
     true -> {stop, ok}
     end;
-handle_delete_msg(_, ok, {_NotFound, N}) ->
+handle_delete_msg(ok, _, {_NotFound, N}) ->
     {ok, {false, N-1}}.
 
 delete_fullmap(DbName) ->

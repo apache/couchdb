@@ -55,10 +55,16 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
         false ->
             % this was some non-matching message which we will ignore
             {ok, Acc0};
-        RefPart ->
-            % call the Fun that understands the message
-            %?debugFmt("~nAcc0: ~p~n", [Acc0]),
-            Fun(RefPart, Msg, Acc0)
+        Worker ->
+            Fun(Msg, Worker, Acc0)
+        end;
+    {Ref, From, Msg} ->
+        io:format("process sync_reply {~p,~p} ~p~n", [Ref, From, Msg]),
+        case lists:keyfind(Ref, Keypos, RefList) of
+        false ->
+            {ok, Acc0};
+        Worker ->
+            Fun(Msg, {Worker, From}, Acc0)
         end;
     {rexi_DOWN, _RexiMonPid, ServerPid, Reason} = Msg ->
         showroom_log:message(alert, "rexi_DOWN ~p ~p", [ServerPid, Reason]),

@@ -37,26 +37,26 @@ send_create_calls(Fullmap, Options) ->
     end, Fullmap).
 
 %% @doc handle create messages from shards
-handle_create_msg(_, file_exists, _) ->
+handle_create_msg(file_exists, _, _) ->
     {error, file_exists};
-handle_create_msg(_, {rexi_EXIT, _Reason}, {Complete, N, Parts}) ->
+handle_create_msg({rexi_EXIT, _Reason}, _, {Complete, N, Parts}) ->
     {ok, {Complete, N-1, Parts}};
-handle_create_msg(_, {rexi_DOWN, _, _, _}, {Complete, _N, _Parts}) ->
+handle_create_msg({rexi_DOWN, _, _, _}, _, {Complete, _N, _Parts}) ->
     if
         Complete -> {stop, ok};
         true -> {error, create_db_fubar}
     end;
 handle_create_msg(_, _, {true, 1, _Acc}) ->
     {stop, ok};
-handle_create_msg({_, #shard{range=[Beg,_]}}, {ok, _}, {false, 1, PartResults0}) ->
+handle_create_msg({ok, _}, {_, #shard{range=[Beg,_]}}, {false, 1, PartResults0}) ->
     PartResults = lists:keyreplace(Beg, 1, PartResults0, {Beg, true}),
     case is_complete(PartResults) of
     true -> {stop, ok};
     false -> {error, create_db_fubar}
     end;
-handle_create_msg(_RefPart, {ok, _}, {true, N, Parts}) ->
+handle_create_msg({ok, _}, _RefPart, {true, N, Parts}) ->
     {ok, {true, N-1, Parts}};
-handle_create_msg({_Ref, #shard{range=[Beg,_]}}, {ok, _}, {false, Rem, PartResults0}) ->
+handle_create_msg({ok, _}, {_Ref, #shard{range=[Beg,_]}}, {false, Rem, PartResults0}) ->
     PartResults = lists:keyreplace(Beg, 1, PartResults0, {Beg, true}),
     {ok, {is_complete(PartResults), Rem-1, PartResults}}.
 

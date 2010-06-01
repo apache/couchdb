@@ -13,14 +13,14 @@ go(DbName, AllIdsRevs) ->
     Acc0 = {length(Workers), ResultDict},
     fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0).
 
-handle_message(_Worker, {rexi_DOWN, _, _, _}, Acc0) ->
+handle_message({rexi_DOWN, _, _, _}, _Worker, Acc0) ->
     skip_message(Acc0);
-handle_message(_Worker, {rexi_EXIT, _, _, _}, Acc0) ->
+handle_message({rexi_EXIT, _, _, _}, _Worker, Acc0) ->
     skip_message(Acc0);
-handle_message(_Worker, {ok, Results}, {1, D0}) ->
+handle_message({ok, Results}, _Worker, {1, D0}) ->
     D = update_dict(D0, Results),
     {stop, dict:fold(fun force_reply/3, [], D)};
-handle_message(_Worker, {ok, Results}, {WaitingCount, D0}) ->
+handle_message({ok, Results}, _Worker, {WaitingCount, D0}) ->
     D = update_dict(D0, Results),
     case dict:fold(fun maybe_reply/3, {stop, []}, D) of
     continue ->

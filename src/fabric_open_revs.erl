@@ -15,11 +15,11 @@ go(DbName, Id, Revs, Options) ->
         Else
     end.
 
-handle_message(_Worker, {rexi_DOWN, _, _, _}, Acc0) ->
+handle_message({rexi_DOWN, _, _, _}, _Worker, Acc0) ->
     skip_message(Acc0);
-handle_message(_Worker, {rexi_EXIT, _}, Acc0) ->
+handle_message({rexi_EXIT, _}, _Worker, Acc0) ->
     skip_message(Acc0);
-handle_message(_Worker, Reply, {WaitingCount, R, Replies}) ->
+handle_message(Reply, _Worker, {WaitingCount, R, Replies}) ->
     case merge_read_reply(make_key(Reply), Reply, Replies) of
     {_, KeyCount} when KeyCount =:= R ->
         {stop, Reply};

@@ -19,11 +19,11 @@ go(DbName, AllDocs, Options) ->
         Else
     end.
 
-handle_message(_Worker, {rexi_DOWN, _, _, _}, Acc0) ->
+handle_message({rexi_DOWN, _, _, _}, _Worker, Acc0) ->
     skip_message(Acc0);
-handle_message(_Worker, {rexi_EXIT, _}, Acc0) ->
+handle_message({rexi_EXIT, _}, _Worker, Acc0) ->
     skip_message(Acc0);
-handle_message(Worker, {ok, Replies}, Acc0) ->
+handle_message({ok, Replies}, Worker, Acc0) ->
     {WaitingCount, DocCount, W, GroupedDocs, DocReplyDict0} = Acc0,
     Docs = couch_util:get_value(Worker, GroupedDocs),
     DocReplyDict = append_update_replies(Docs, Replies, DocReplyDict0),

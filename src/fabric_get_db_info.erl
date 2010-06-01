@@ -32,7 +32,7 @@ handle_info_msg(_, _, {false, 1, Infos0}) ->
     end, [], Infos0)),
     ?LOG_ERROR("get_db_info error, missing shards: ~p", [MissingShards]),
     {error, get_db_info};
-handle_info_msg(#shard{range=[Beg,_]}, {ok, Info}, {false, N, Infos0}) ->
+handle_info_msg({ok, Info}, #shard{range=[Beg,_]}, {false, N, Infos0}) ->
     case couch_util:get_value(Beg, Infos0) of
     nil ->
         Infos = lists:keyreplace(Beg, 1, Infos0, {Beg, Info}),
@@ -43,7 +43,7 @@ handle_info_msg(#shard{range=[Beg,_]}, {ok, Info}, {false, N, Infos0}) ->
     _ ->
         {ok, {false, N-1, Infos0}}
     end;
-handle_info_msg(_, _Other, {Complete, N, Infos0}) ->
+handle_info_msg(_Other, _, {Complete, N, Infos0}) ->
     {ok, {Complete, N-1, Infos0}}.
 
 is_complete(List) ->
