@@ -311,8 +311,14 @@ increment_method_stats(Method) ->
 % if so, then it will not be rewritten, but will run as a normal couchdb request.
 % normally you'd use this for _uuids _utils and a few of the others you want to keep available on vhosts. You can also use it to make databases 'global'.
 vhost_global(VhostGlobals, MochiReq) ->
-    "/"++Path = MochiReq:get(path),
-    [true] == [true||V <- VhostGlobals, V == Path].
+    "/" ++ Path = MochiReq:get(path),
+    Front = case partition(Path) of
+    {"", "", ""} ->
+        "/"; % Special case the root url handler
+    {FirstPart, _, _} ->
+        FirstPart
+    end,
+    [true] == [true||V <- VhostGlobals, V == Front].
 
 % Utilities
 
