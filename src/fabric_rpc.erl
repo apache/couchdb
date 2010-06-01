@@ -47,13 +47,7 @@ get_db_info(DbName) ->
     with_db(DbName, {couch_db, get_db_info, []}).
 
 get_doc_count(DbName) ->
-    rexi:reply(case couch_db:open(DbName, []) of
-    {ok, Db} ->
-        {ok, {Count, _DelCount}} = couch_btree:full_reduce(Db#db.id_tree),
-        {ok, Count};
-    Error ->
-        Error
-    end).
+    with_db(DbName, {couch_db, get_doc_count, []}).
 
 get_update_seq(DbName) ->
     rexi:reply(case couch_db:open(DbName, []) of
