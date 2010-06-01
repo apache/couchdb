@@ -1266,7 +1266,7 @@
     for (var i=0; i < parts.length; i++) {
       encoded.push(encodeURIComponent(parts[i]));
     };
-    return encoded.join('/');
+    return encoded.join('%2f');
   }
 
 })(jQuery);
