@@ -198,7 +198,7 @@ AC_ARG_WITH([win32-icu-binaries], [AC_HELP_STRING([--with-win32-icu-binaries=PAT
     ICU_LOCAL_LDFLAGS="-L$withval/lib"
     ICU_LOCAL_BIN=$withval/bin
 ], [
-    AC_CHECK_ICU([3])
+    AC_CHECK_ICU([3.4.1])
     ICU_LOCAL_CFLAGS=`$ICU_CONFIG --cppflags-searchpath`
     ICU_LOCAL_LDFLAGS=`$ICU_CONFIG --ldflags-searchpath`
     ICU_LOCAL_BIN=
