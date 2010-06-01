@@ -103,6 +103,7 @@ nobase_dist_localdata_DATA = \
     www/script/json2.js \
     www/script/oauth.js \
     www/script/sha1.js \
+    www/script/base64.js \
     www/script/test/all_docs.js \
     www/script/test/attachments.js \
     www/script/test/attachments_multipart.js \
