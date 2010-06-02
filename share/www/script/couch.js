@@ -22,10 +22,10 @@ function CouchDB(name, httpHeaders) {
   this.last_req = null;
 
   this.request = function(method, uri, requestOptions) {
-      requestOptions = requestOptions || {}
-      requestOptions.headers = combine(requestOptions.headers, httpHeaders)
-      return CouchDB.request(method, uri, requestOptions);
-    }
+    requestOptions = requestOptions || {}
+    requestOptions.headers = combine(requestOptions.headers, httpHeaders)
+    return CouchDB.request(method, uri, requestOptions);
+  }
 
   // Creates the database on the server
   this.createDb = function() {
@@ -198,12 +198,6 @@ function CouchDB(name, httpHeaders) {
     return JSON.parse(this.last_req.responseText);
   }
 
-  this.viewCleanup = function() {
-    this.last_req = this.request("POST", this.uri + "_view_cleanup");
-    CouchDB.maybeThrowError(this.last_req);
-    return JSON.parse(this.last_req.responseText);
-  }
-
   this.allDocs = function(options,keys) {
     if(!keys) {
       this.last_req = this.request("GET", this.uri + "_all_docs"
@@ -223,18 +217,11 @@ function CouchDB(name, httpHeaders) {
     return this.allDocs({startkey:"_design", endkey:"_design0"});
   };
 
-  this.changes = function(options,keys) {
-    var req = null;
-    if(!keys) {
-      req = this.request("GET", this.uri + "_changes" + encodeOptions(options));
-    } else {
-      req = this.request("POST", this.uri + "_changes" + encodeOptions(options), {
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({keys:keys})
-      });
-    }
-    CouchDB.maybeThrowError(req);
-    return JSON.parse(req.responseText);
+  this.changes = function(options) {
+    this.last_req = this.request("GET", this.uri + "_changes" 
+      + encodeOptions(options));
+    CouchDB.maybeThrowError(this.last_req);
+    return JSON.parse(this.last_req.responseText);
   }
 
   this.compact = function() {

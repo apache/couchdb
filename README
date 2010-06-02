@@ -39,6 +39,23 @@ The mailing lists provide a wealth of support and knowledge for you to tap into.
 Feel free to drop by with your questions or discussion. See the official CouchDB
 website for more information about our community resources.
 
+
+Running the Testsuite
+---------------------
+
+Run the testsuite for couch.js and jquery.couch.js by browsing to this site: http://127.0.0.1:5984/_utils/spec/run.html
+It should work in at least Firefox >= 3.6 and Safari >= 4.0.4.
+
+Read more about JSpec here: http://jspec.info/
+
+Trouble shooting
+~~~~~~~~~~~~~~~~
+
+ * When you change the specs, but your changes have no effect, manually reload the changed spec file in the browser.
+
+ * When the spec that tests erlang views fails, make sure you have enabled erlang views as described here: <http://wiki.apache.org/couchdb/EnableErlangViews>
+
+
 Cryptographic Software Notice
 -----------------------------
 
