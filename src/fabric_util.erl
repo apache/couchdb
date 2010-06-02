@@ -26,6 +26,8 @@ receive_loop(Workers, Keypos, Fun, Acc0) ->
 %% @doc set up the receive loop with an overall timeout
 -spec receive_loop([any()], integer(), function(), any(), timeout(), timeout()) ->
     {ok, any()}.
+receive_loop(RefPartMap, Keypos, Fun, Acc0, infinity, PerMsgTO) ->
+    process_mailbox(RefPartMap, Keypos, Fun, Acc0, nil, PerMsgTO);
 receive_loop(RefPartMap, Keypos, Fun, Acc0, GlobalTimeout, PerMsgTO) ->
     TimeoutRef = erlang:make_ref(),
     {ok, TRef} = timer:send_after(GlobalTimeout, {timeout, TimeoutRef}),

@@ -1,9 +1,18 @@
 -module(fabric).
 
--export([all_databases/1, create_db/2, delete_db/2, get_db_info/2, db_path/2]).
--export([open_doc/3, open_revs/4, get_missing_revs/2]).
--export([update_doc/3, update_docs/3]).
+% DBs
+-export([all_databases/1, create_db/2, delete_db/2, get_db_info/2,
+    get_doc_count/1]).
+
+% Documents
+-export([open_doc/3, open_revs/4, get_missing_revs/2, update_doc/3,
+    update_docs/3]).
+
+% Views
 -export([all_docs/4]).
+
+% miscellany
+-export([db_path/2]).
 
 -include("fabric.hrl").
 
@@ -19,6 +28,9 @@ all_databases(Customer) ->
 
 get_db_info(DbName, Customer) ->
     fabric_get_db_info:get_db_info(dbname(DbName), Customer).
+
+get_doc_count(DbName) ->
+    fabric_doc_count:go(dbname(DbName)).
 
 create_db(DbName, Options) ->
     fabric_create_db:create_db(dbname(DbName), Options).

@@ -127,21 +127,17 @@ view_fold({{Key,Id}, Value}, _Offset, Acc) ->
     true ->
         {stop, Acc};
     false ->
-        Row = case IncludeDocs of
-        true ->
+        Doc = if not IncludeDocs -> undefined; true ->
             case couch_db:open_doc(Db, Id, []) of
-              {not_found, missing} ->
-                  #view_row{key=Key, id=Id, value=Value, doc={error,missing}};
-              {not_found, deleted} ->
-                  #view_row{key=Key, id=Id, value=Value};
-              {ok, Doc} ->
-                  JsonDoc = couch_doc:to_json_obj(Doc, []),
-                  #view_row{key=Key, id=Id, value=Value, doc=JsonDoc}
-            end;
-        false ->
-            #view_row{key=Key, id=Id, value=Value}
+            {not_found, deleted} ->
+                null;
+            {not_found, missing} ->
+                undefined;
+            {ok, Doc0} ->
+                couch_doc:to_json_obj(Doc0, [])
+            end
         end,
-        rexi:sync_reply(Row),
+        rexi:sync_reply(#view_row{key=Key, id=Id, value=Value, doc=Doc}),
         {ok, Acc#view_acc{limit=Limit-1}}
     end.
 
