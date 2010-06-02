@@ -108,7 +108,7 @@ hash_admin_passwords(Persist) ->
         ({User, ClearPassword}) ->
             Salt = ?b2l(couch_uuids:random()),
             Hashed = couch_util:to_hex(crypto:sha(ClearPassword ++ Salt)),
-            couch_config:set("admins", 
+            couch_config:set("admins",
                 User, "-hashed-" ++ Hashed ++ "," ++ Salt, Persist)
         end, couch_config:get("admins")).
 
@@ -148,7 +148,7 @@ init([]) ->
                 start_time=httpd_util:rfc1123_date()}}.
 
 terminate(_Reason, _Srv) ->
-    [couch_util:shutdown_sync(Pid) || {_, {Pid, _LruTime}} <- 
+    [couch_util:shutdown_sync(Pid) || {_, {Pid, _LruTime}} <-
             ets:tab2list(couch_dbs_by_name)],
     ok.
 
@@ -232,7 +232,7 @@ handle_call({open_result, DbName, {ok, OpenedDbPid}}, _From, Server) ->
     link(OpenedDbPid),
     [{DbName, {opening,Opener,Froms}}] = ets:lookup(couch_dbs_by_name, DbName),
     lists:foreach(fun({FromPid,_}=From) ->
-        gen_server:reply(From, 
+        gen_server:reply(From,
                 catch couch_db:open_ref_counted(OpenedDbPid, FromPid))
     end, Froms),
     LruTime = now(),
@@ -242,11 +242,11 @@ handle_call({open_result, DbName, {ok, OpenedDbPid}}, _From, Server) ->
     true = ets:insert(couch_dbs_by_pid, {OpenedDbPid, DbName}),
     true = ets:insert(couch_dbs_by_lru, {LruTime, DbName}),
     {reply, ok, Server};
-handle_call({open_result, DbName, Error}, _From, Server) ->    
+handle_call({open_result, DbName, Error}, _From, Server) ->
     [{DbName, {opening,Opener,Froms}}] = ets:lookup(couch_dbs_by_name, DbName),
     lists:foreach(fun(From) ->
         gen_server:reply(From, Error)
-    end, Froms),    
+    end, Froms),
     true = ets:delete(couch_dbs_by_name, DbName),
     true = ets:delete(couch_dbs_by_pid, Opener),
     {reply, ok, Server#server{dbs_open=Server#server.dbs_open - 1}};

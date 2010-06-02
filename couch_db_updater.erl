@@ -187,11 +187,11 @@ handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
     end.
 
 
-handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts, 
+handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts,
         FullCommit}, Db) ->
     GroupedDocs2 = [[{Client, D} || D <- DocGroup] || DocGroup <- GroupedDocs],
     if NonRepDocs == [] ->
-        {GroupedDocs3, Clients, FullCommit2} = collect_updates(GroupedDocs2, 
+        {GroupedDocs3, Clients, FullCommit2} = collect_updates(GroupedDocs2,
                 [Client], MergeConflicts, FullCommit);
     true ->
         GroupedDocs3 = GroupedDocs2,
@@ -199,7 +199,7 @@ handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts,
         Clients = [Client]
     end,
     NonRepDocs2 = [{Client, NRDoc} || NRDoc <- NonRepDocs],
-    try update_docs_int(Db, GroupedDocs3, NonRepDocs2, MergeConflicts, 
+    try update_docs_int(Db, GroupedDocs3, NonRepDocs2, MergeConflicts,
                 FullCommit2) of
     {ok, Db2} ->
         ok = gen_server:call(Db#db.main_pid, {db_updated, Db2}),
@@ -254,7 +254,7 @@ collect_updates(GroupedDocsAcc, ClientsAcc, MergeConflicts, FullCommit) ->
         {update_docs, Client, GroupedDocs, [], MergeConflicts, FullCommit2} ->
             GroupedDocs2 = [[{Client, Doc} || Doc <- DocGroup]
                     || DocGroup <- GroupedDocs],
-            GroupedDocsAcc2 = 
+            GroupedDocsAcc2 =
                 merge_updates(GroupedDocsAcc, GroupedDocs2, []),
             collect_updates(GroupedDocsAcc2, [Client | ClientsAcc],
                     MergeConflicts, (FullCommit or FullCommit2))
@@ -505,7 +505,7 @@ merge_rev_trees(MergeConflicts, [NewDocs|RestDocsList],
                         % this means we are recreating a brand new document
                         % into a state that already existed before.
                         % put the rev into a subsequent edit of the deletion
-                        #doc_info{revs=[#rev_info{rev={OldPos,OldRev}}|_]} = 
+                        #doc_info{revs=[#rev_info{rev={OldPos,OldRev}}|_]} =
                                 couch_doc:to_doc_info(OldDocInfo),
                         NewRevId = couch_db:new_revid(
                                 NewDoc#doc{revs={OldPos, [OldRev]}}),
@@ -513,7 +513,7 @@ merge_rev_trees(MergeConflicts, [NewDocs|RestDocsList],
                         {NewTree2, _} = couch_key_tree:merge(AccTree,
                                 [couch_db:doc_to_tree(NewDoc2)]),
                         % we changed the rev id, this tells the caller we did
-                        send_result(Client, Id, {Pos-1,PrevRevs}, 
+                        send_result(Client, Id, {Pos-1,PrevRevs},
                                 {ok, {OldPos + 1, NewRevId}}),
                         NewTree2;
                     true ->
@@ -527,7 +527,7 @@ merge_rev_trees(MergeConflicts, [NewDocs|RestDocsList],
                 {NewTree, _} = couch_key_tree:merge(AccTree,
                             [couch_db:doc_to_tree(NewDoc)]),
                 NewTree
-            end 
+            end
         end,
         OldTree, NewDocs),
     if NewRevTree == OldTree ->
@@ -823,7 +823,7 @@ copy_compact(Db, NewDb0, Retry) ->
     couch_task_status:set_update_frequency(500),
 
     {ok, _, {NewDb2, Uncopied, TotalChanges}} =
-        couch_btree:foldl(Db#db.docinfo_by_seq_btree, EnumBySeqFun, 
+        couch_btree:foldl(Db#db.docinfo_by_seq_btree, EnumBySeqFun,
             {NewDb, [], 0},
             [{start_key, NewDb#db.update_seq + 1}]),
 

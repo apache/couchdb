@@ -1,16 +1,16 @@
-% Licensed under the Apache License, Version 2.0 (the "License"); 
-% you may not use this file except in compliance with the License. 
+% Licensed under the Apache License, Version 2.0 (the "License");
+% you may not use this file except in compliance with the License.
 %
 % You may obtain a copy of the License at
 % http://www.apache.org/licenses/LICENSE-2.0
 %
-% Unless required by applicable law or agreed to in writing, 
-% software distributed under the License is distributed on an 
-% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, 
-% either express or implied. 
+% Unless required by applicable law or agreed to in writing,
+% software distributed under the License is distributed on an
+% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+% either express or implied.
 %
 % See the License for the specific language governing permissions
-% and limitations under the License. 
+% and limitations under the License.
 %
 % This file drew much inspiration from erlview, which was written by and
 % copyright Michael McDaniel [http://autosys.us], and is also under APL 2.0
@@ -32,7 +32,7 @@
 % which should be roughly the same as the javascript:
 %    emit(doc._id, null);
 %
-% This module exposes enough functions such that a native erlang server can 
+% This module exposes enough functions such that a native erlang server can
 % act as a fully-fleged view server, but no 'helper' functions specifically
 % for simplifying your erlang view code.  It is expected other third-party
 % extensions will evolve which offer useful layers on top of this view server
@@ -370,7 +370,7 @@ start_list_resp(Self, Sig) ->
                 undefined -> {[{<<"headers">>, {[]}}]};
                 CurrHdrs -> CurrHdrs
             end,
-            Chunks = 
+            Chunks =
             case erlang:get(Sig) of
                 undefined -> [];
                 CurrChunks -> CurrChunks

@@ -290,7 +290,7 @@ map(Fun, [{Pos, Tree}|Rest]) ->
 map_simple(_Fun, _Pos, []) ->
     [];
 map_simple(Fun, Pos, [{Key, Value, SubTree} | RestTree]) ->
-    Value2 = Fun({Pos, Key}, Value, 
+    Value2 = Fun({Pos, Key}, Value,
             if SubTree == [] -> leaf; true -> branch end),
     [{Key, Value2, map_simple(Fun, Pos + 1, SubTree)} | map_simple(Fun, Pos, RestTree)].
 

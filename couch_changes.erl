@@ -82,7 +82,7 @@ make_filter_fun(FilterName, Style, Req, Db) ->
             main_only ->
                 [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]}];
             all_docs ->
-                [{[{<<"rev">>, couch_doc:rev_to_str(R)}]} 
+                [{[{<<"rev">>, couch_doc:rev_to_str(R)}]}
                         || #rev_info{rev=R} <- Revs]
             end
         end;
@@ -93,7 +93,7 @@ make_filter_fun(FilterName, Style, Req, Db) ->
         #doc{body={Props}} = DDoc,
         couch_util:get_nested_json_value({Props}, [<<"filters">>, FName]),
         fun(DocInfo) ->
-            DocInfos = 
+            DocInfos =
             case Style of
             main_only ->
                 [DocInfo];

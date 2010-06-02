@@ -231,7 +231,7 @@ parse_ini_file(IniFile) ->
                     [[]] ->
                         % empty line means delete this key
                         ets:delete(?MODULE, {AccSectionName, ValueName}),
-                        {AccSectionName, AccValues};                        
+                        {AccSectionName, AccValues};
                     [LineValue | _Rest] ->
                         {AccSectionName,
                             [{{AccSectionName, ValueName}, LineValue} | AccValues]}

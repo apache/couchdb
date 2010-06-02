@@ -12,7 +12,7 @@
 
 -module(couch_rep).
 -behaviour(gen_server).
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, 
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
     code_change/3]).
 
 -export([replicate/2, checkpoint/1]).
@@ -442,7 +442,7 @@ has_session_id(SessionId, [{Props} | Rest]) ->
 
 maybe_append_options(Options, Props) ->
     lists:foldl(fun(Option, Acc) ->
-        Acc ++ 
+        Acc ++
         case couch_util:get_value(Option, Props, false) of
         true ->
             "+" ++ ?b2l(Option);
@@ -456,7 +456,7 @@ make_replication_id({Props}, UserCtx) ->
     {ok, HostName} = inet:gethostname(),
     % Port = mochiweb_socket_server:get(couch_httpd, port),
     Src = get_rep_endpoint(UserCtx, couch_util:get_value(<<"source">>, Props)),
-    Tgt = get_rep_endpoint(UserCtx, couch_util:get_value(<<"target">>, Props)),    
+    Tgt = get_rep_endpoint(UserCtx, couch_util:get_value(<<"target">>, Props)),
     Base = [HostName, Src, Tgt] ++
         case couch_util:get_value(<<"filter">>, Props) of
         undefined ->
@@ -536,7 +536,7 @@ open_db(<<"https://",_/binary>>=Url, _, CreateTarget) ->
     open_db({[{<<"url">>,Url}]}, [], CreateTarget);
 open_db(<<DbName/binary>>, UserCtx, CreateTarget) ->
     case CreateTarget of
-    true -> 
+    true ->
         ok = couch_httpd:verify_is_server_admin(UserCtx),
         couch_server:create(DbName, [{user_ctx, UserCtx}]);
     false -> ok
@@ -591,7 +591,7 @@ do_checkpoint(State) ->
             {<<"missing_found">>, ets:lookup_element(Stats, missing_revs, 2)},
             {<<"docs_read">>, ets:lookup_element(Stats, docs_read, 2)},
             {<<"docs_written">>, ets:lookup_element(Stats, docs_written, 2)},
-            {<<"doc_write_failures">>, 
+            {<<"doc_write_failures">>,
                 ets:lookup_element(Stats, doc_write_failures, 2)}
         ]},
         % limit history to 50 entries

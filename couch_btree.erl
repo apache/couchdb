@@ -147,10 +147,10 @@ fold(#btree{root=Root}=Bt, Fun, Acc, Options) ->
     Result =
     case couch_util:get_value(start_key, Options) of
     undefined ->
-        stream_node(Bt, [], Bt#btree.root, InRange, Dir, 
+        stream_node(Bt, [], Bt#btree.root, InRange, Dir,
                 convert_fun_arity(Fun), Acc);
     StartKey ->
-        stream_node(Bt, [], Bt#btree.root, StartKey, InRange, Dir, 
+        stream_node(Bt, [], Bt#btree.root, StartKey, InRange, Dir,
                 convert_fun_arity(Fun), Acc)
     end,
     case Result of

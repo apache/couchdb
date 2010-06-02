@@ -116,9 +116,9 @@ output_map_view(Req, View, Group, Db, QueryArgs, nil) ->
         {ok, RowCount} = couch_view:get_row_count(View),
         FoldlFun = make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db, Group#group.current_seq, RowCount, #view_fold_helper_funs{reduce_count=fun couch_view:reduce_to_count/1}),
         FoldAccInit = {Limit, SkipCount, undefined, []},
-        {ok, LastReduce, FoldResult} = couch_view:fold(View, 
+        {ok, LastReduce, FoldResult} = couch_view:fold(View,
                 FoldlFun, FoldAccInit, make_key_options(QueryArgs)),
-        finish_view_fold(Req, RowCount, 
+        finish_view_fold(Req, RowCount,
                 couch_view:reduce_to_count(LastReduce), FoldResult)
     end);
 
@@ -524,7 +524,7 @@ apply_default_helper_funs(
     }.
 
 make_key_options(#view_query_args{direction = Dir}=QueryArgs) ->
-     [{dir,Dir} | make_start_key_option(QueryArgs) ++ 
+     [{dir,Dir} | make_start_key_option(QueryArgs) ++
             make_end_key_option(QueryArgs)].
 
 make_start_key_option(

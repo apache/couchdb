@@ -371,7 +371,7 @@ absolute_uri(#httpd{mochi_req=MochiReq}, Path) ->
     Host = case MochiReq:get_header_value(XHost) of
         undefined ->
             case MochiReq:get_header_value("Host") of
-                undefined ->    
+                undefined ->
                     {ok, {Address, Port}} = inet:sockname(MochiReq:get(socket)),
                     inet_parse:ntoa(Address) ++ ":" ++ integer_to_list(Port);
                 Value1 ->
@@ -601,11 +601,11 @@ start_jsonp(Req) ->
             try
                 % make sure jsonp is configured on (default off)
                 case couch_config:get("httpd", "allow_jsonp", "false") of
-                "true" -> 
+                "true" ->
                     validate_callback(CallBack),
                     CallBack ++ "(";
-                _Else -> 
-                    % this could throw an error message, but instead we just ignore the 
+                _Else ->
+                    % this could throw an error message, but instead we just ignore the
                     % jsonp parameter
                     % throw({bad_request, <<"JSONP must be configured before using.">>})
                     put(jsonp, no_jsonp),
@@ -763,9 +763,9 @@ parse_multipart_request(ContentType, DataFun, Callback) ->
             buffer= <<>>,
             data_fun=DataFun,
             callback=Callback},
-    {Mp2, _NilCallback} = read_until(Mp, <<"--", Boundary0/binary>>, 
+    {Mp2, _NilCallback} = read_until(Mp, <<"--", Boundary0/binary>>,
         fun(Next)-> nil_callback(Next) end),
-    #mp{buffer=Buffer, data_fun=DataFun2, callback=Callback2} = 
+    #mp{buffer=Buffer, data_fun=DataFun2, callback=Callback2} =
             parse_part_header(Mp2),
     {Buffer, DataFun2, Callback2}.
 

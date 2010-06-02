@@ -20,7 +20,7 @@ oauth_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
     serve_oauth(Req, fun(URL, Params, Consumer, Signature) ->
         AccessToken = couch_util:get_value("oauth_token", Params),
         case couch_config:get("oauth_token_secrets", AccessToken) of
-            undefined -> 
+            undefined ->
                 couch_httpd:send_error(Req, 400, <<"invalid_token">>,
                     <<"Invalid OAuth token.">>);
             TokenSecret ->

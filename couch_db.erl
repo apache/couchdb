@@ -138,7 +138,7 @@ apply_open_options2(#doc{atts=Atts,revs=Revs}=Doc,
         [{atts_since, PossibleAncestors}|Rest]) ->
     RevPos = find_ancestor_rev_pos(Revs, PossibleAncestors),
     apply_open_options2(Doc#doc{atts=[A#att{data=
-        if AttPos>RevPos -> Data; true -> stub end} 
+        if AttPos>RevPos -> Data; true -> stub end}
         || #att{revpos=AttPos,data=Data}=A <- Atts]}, Rest);
 apply_open_options2(Doc,[_|Rest]) ->
     apply_open_options2(Doc,Rest).
@@ -180,9 +180,9 @@ find_missing([{Id, Revs}|RestIdRevs], [{ok, FullInfo} | RestLookupInfo]) ->
         % Find the revs that are possible parents of this rev
         PossibleAncestors =
         lists:foldl(fun({LeafPos, LeafRevId}, Acc) ->
-            % this leaf is a "possible ancenstor" of the missing 
+            % this leaf is a "possible ancenstor" of the missing
             % revs if this LeafPos lessthan any of the missing revs
-            case lists:any(fun({MissingPos, _}) -> 
+            case lists:any(fun({MissingPos, _}) ->
                     LeafPos < MissingPos end, MissingRevs) of
             true ->
                 [{LeafPos, LeafRevId} | Acc];
@@ -290,7 +290,7 @@ check_is_reader(#db{user_ctx=#user_ctx{name=Name,roles=Roles}=UserCtx}=Db) ->
         ReaderRoles = couch_util:get_value(<<"roles">>, Readers,[]),
         WithAdminRoles = [<<"_admin">> | ReaderRoles],
         ReaderNames = couch_util:get_value(<<"names">>, Readers,[]),
-        case ReaderRoles ++ ReaderNames of 
+        case ReaderRoles ++ ReaderNames of
         [] -> ok; % no readers == public access
         _Else ->
             case WithAdminRoles -- Roles of
@@ -458,12 +458,12 @@ prep_and_validate_update(Db, #doc{id=Id,revs={RevStart, Revs}}=Doc,
 prep_and_validate_updates(_Db, [], [], _AllowConflict, AccPrepped,
         AccFatalErrors) ->
    {AccPrepped, AccFatalErrors};
-prep_and_validate_updates(Db, [DocBucket|RestBuckets], [not_found|RestLookups], 
+prep_and_validate_updates(Db, [DocBucket|RestBuckets], [not_found|RestLookups],
         AllowConflict, AccPrepped, AccErrors) ->
     [#doc{id=Id}|_]=DocBucket,
     % no existing revs are known,
     {PreppedBucket, AccErrors3} = lists:foldl(
-        fun(#doc{revs=Revs}=Doc, {AccBucket, AccErrors2}) ->       
+        fun(#doc{revs=Revs}=Doc, {AccBucket, AccErrors2}) ->
             case couch_doc:has_stubs(Doc) of
             true ->
                 couch_doc:merge_stubs(Doc, #doc{}); % will throw exception
@@ -504,7 +504,7 @@ prep_and_validate_updates(Db, [DocBucket|RestBuckets],
             end
         end,
         {[], AccErrors}, DocBucket),
-    prep_and_validate_updates(Db, RestBuckets, RestLookups, AllowConflict, 
+    prep_and_validate_updates(Db, RestBuckets, RestLookups, AllowConflict,
             [PreppedBucket | AccPrepped], AccErrors3).
 
 
@@ -520,7 +520,7 @@ prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldI
     case OldInfo of
     not_found ->
         {ValidatedBucket, AccErrors3} = lists:foldl(
-            fun(Doc, {AccPrepped2, AccErrors2}) ->                
+            fun(Doc, {AccPrepped2, AccErrors2}) ->
                 case couch_doc:has_stubs(Doc) of
                 true ->
                     couch_doc:merge_doc(Doc, #doc{}); % will throw exception
@@ -923,7 +923,7 @@ changes_since(Db, Style, StartSeq, Fun, Options, Acc) ->
             #doc_info{revs=Revs} = DocInfo,
             DocInfo2 =
             case Style of
-            main_only ->    
+            main_only ->
                 DocInfo;
             all_docs ->
                 % remove revs before the seq
@@ -932,7 +932,7 @@ changes_since(Db, Style, StartSeq, Fun, Options, Acc) ->
             end,
             Fun(DocInfo2, Acc2)
         end,
-    {ok, _LastReduction, AccOut} = couch_btree:fold(Db#db.docinfo_by_seq_btree, 
+    {ok, _LastReduction, AccOut} = couch_btree:fold(Db#db.docinfo_by_seq_btree,
         Wrapper, Acc, [{start_key, StartSeq + 1}] ++ Options),
     {ok, AccOut}.
 
