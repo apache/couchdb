@@ -18,6 +18,6 @@
    ]},
   {registered, []},
   {included_applications, []},
-  {applications, [kernel, stdlib, couch, rexi, dynomite]},
+  {applications, [kernel, stdlib, couch, rexi, membership]},
   {start_phases, []}
  ]}.
