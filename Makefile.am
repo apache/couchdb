@@ -12,6 +12,8 @@
 
 SUBDIRS = bin etc src share test var utils
 
+ACLOCAL_AMFLAGS = -I m4
+
 localdoc_DATA = \
     AUTHORS.gz \
     BUGS.gz \
