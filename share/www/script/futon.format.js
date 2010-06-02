@@ -44,7 +44,11 @@
             if (type == "string" && !options.escapeStrings) {
               retval = indentLines(retval.replace(/\r\n/g, "\n"), tab.substr(options.indent));
             } else {
-              retval = escape(JSON.stringify(val));
+              if (options.html) {
+                retval = escape(JSON.stringify(val));
+              } else {
+                retval = JSON.stringify(val);
+              }
             }
             if (options.html) {
               retval = "<code class='" + type + "'>" + retval + "</code>";
