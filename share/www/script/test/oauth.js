@@ -94,8 +94,17 @@ couchTests.oauth = function(debug) {
         headers: {"X-Couch-Persist": "false"},
         body: JSON.stringify(testadminPassword)
       });
-
-      CouchDB.request("GET", "/_sleep?time=50");
+      while (true) {
+          //loop until the couch server has processed the password
+          var xhr = CouchDB.request("GET", "http://" + host + "/_config/admins/testadmin?foo="+i,{
+              headers: {
+                "Authorization": adminBasicAuthHeaderValue()
+              }})
+          if (xhr.responseText.indexOf("\"-hashed-") == 0) {
+              break;
+          }
+          console.log("foo:" + xhr.responseText)
+      }
 
       CouchDB.newUuids(2); // so we have one to make the salt
 
