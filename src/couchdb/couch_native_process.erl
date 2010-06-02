@@ -94,8 +94,10 @@ handle_call({prompt, Data}, _From, State) ->
             {reply, Resp, NewState}
     end.
 
-handle_cast(_Msg, State) -> {noreply, State}.
-handle_info(_Msg, State) -> {noreply, State}.
+handle_cast(foo, State) -> {noreply, State}.
+handle_info({'EXIT',_,normal}, State) -> {noreply, State};
+handle_info({'EXIT',_,Reason}, State) ->
+    {stop, Reason, State}.
 terminate(_Reason, _State) -> ok.
 code_change(_OldVersion, State, _Extra) -> {ok, State}.
 

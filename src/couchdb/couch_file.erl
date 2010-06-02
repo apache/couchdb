@@ -176,13 +176,21 @@ sync(Fd) ->
     gen_server:call(Fd, sync, infinity).
 
 %%----------------------------------------------------------------------
-%% Purpose: Close the file. Is performed asynchronously.
+%% Purpose: Close the file.
 %% Returns: ok
 %%----------------------------------------------------------------------
 close(Fd) ->
-    Result = gen_server:cast(Fd, close),
-    catch unlink(Fd),
-    Result.
+    MRef = erlang:monitor(process, Fd),
+    try
+        catch unlink(Fd),
+        catch exit(Fd, shutdown),
+        receive
+        {'DOWN', MRef, _, _, _} ->
+            ok
+        end
+    after
+        erlang:demonitor(MRef, [flush])
+    end.
 
 % 09 UPGRADE CODE
 old_pread(Fd, Pos, Len) ->
@@ -219,6 +227,7 @@ init_status_error(ReturnPid, Ref, Error) ->
 % server functions
 
 init({Filepath, Options, ReturnPid, Ref}) ->
+    process_flag(trap_exit, true),
     case lists:member(create, Options) of
     true ->
         filelib:ensure_dir(Filepath),
@@ -432,6 +441,8 @@ handle_cast(close, Fd) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+handle_info({'EXIT', _, normal}, Fd) ->
+    {noreply, Fd};
 handle_info({'EXIT', _, Reason}, Fd) ->
     {stop, Reason, Fd}.
 
