@@ -202,6 +202,8 @@ get_user_props_from_db(UserName) ->
     catch
         throw:_Throw ->
             nil
+    after
+        couch_db:close(Db)
     end.
 
 % this should handle creating the ddoc
