@@ -36,7 +36,7 @@ handle_message(_Other, _, {N, Infos0}) ->
 
 report_error(Infos) ->
     MissingShards = [S || {S,nil} <- Infos],
-    ?LOG_ERROR("get_db_info error, missing shards: ~p", [MissingShards]).
+    ?LOG_ERROR("doc_count error, missing shards: ~p", [MissingShards]).
 
 is_complete(List) ->
     not lists:keymember(nil, 2, List).
