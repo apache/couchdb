@@ -62,7 +62,12 @@ for_key(DbName, Key) ->
     end.
 
 all_parts(DbName) ->
-    ets:lookup(partitions, DbName).
+    case ets:lookup(partitions, DbName) of
+    [] ->
+        erlang:error(database_does_not_exist);
+    Else ->
+        Else
+    end.
 
 % %% @doc for the given key, return a list of {Node,Part} tuples.  Nodes are both
 % %%      primary and replication partner nodes, and should number N.
