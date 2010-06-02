@@ -52,8 +52,7 @@
 ^etc/windows/README.txt.tpl
 ^libtool
 ^license.skip
-^m4/ac_check_curl.m4*
-^m4/ac_check_icu.m4*
+^m4/*
 ^share/Makefile
 ^share/Makefile.in
 ^share/server/json2.js

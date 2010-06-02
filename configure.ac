@@ -10,15 +10,13 @@ dnl WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 dnl License for the specific language governing permissions and limitations
 dnl under the License.
 
-m4_include([m4/ac_check_icu.m4])
-m4_include([m4/ac_check_curl.m4])
-
 AC_INIT([LOCAL_PACKAGE_NAME], [LOCAL_VERSION], [], [LOCAL_PACKAGE_TARNAME])
 
 AC_PREREQ([2.59])
 
 AC_CONFIG_SRCDIR([CHANGES])
 AC_CONFIG_AUX_DIR([build-aux])
+AC_CONFIG_MACRO_DIR([m4])
 
 AM_CONFIG_HEADER([config.h])
 
