@@ -17,7 +17,7 @@ main(_) ->
     test_util:init_code_path(),
     application:start(crypto),
 
-    etap:plan(16),
+    etap:plan(14),
     case (catch test()) of
         ok ->
             etap:end_tests();

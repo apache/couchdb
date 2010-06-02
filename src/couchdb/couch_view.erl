@@ -312,8 +312,7 @@ do_reset_indexes(DbName, Root) ->
         fun({_DbName, Sig}) ->
             ?LOG_DEBUG("Killing update process for view group ~s. in database ~s.", [Sig, DbName]),
             [{_, Pid}] = ets:lookup(group_servers_by_sig, {DbName, Sig}),
-            couch_util:shutdown_sync(Pid),
-            delete_from_ets(Pid, DbName, Sig)
+            couch_util:shutdown_sync(Pid)
         end, Names),
     delete_index_dir(Root, DbName),
     file:delete(Root ++ "/." ++ ?b2l(DbName) ++ "_temp").
