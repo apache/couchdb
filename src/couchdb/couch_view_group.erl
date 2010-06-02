@@ -178,7 +178,7 @@ handle_cast({compact_done, #group{current_seq=NewSeq} = NewGroup},
         when NewSeq >= OldSeq ->
     #group_state{
         group = #group{name=GroupId, fd=OldFd, sig=GroupSig} = Group,
-        init_args = {RootDir, DbName, _}, 
+        init_args = {RootDir, DbName, _},
         updater_pid = UpdaterPid,
         ref_counter = RefCounter
     } = State,

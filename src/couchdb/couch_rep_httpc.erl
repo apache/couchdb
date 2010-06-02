@@ -46,7 +46,7 @@ do_request(Req) ->
     nil ->
         [];
     _Else ->
-        iolist_to_binary(?JSON_ENCODE(B)) 
+        iolist_to_binary(?JSON_ENCODE(B))
     end,
     Resp = case Conn of
     nil ->
@@ -115,7 +115,7 @@ full_url(Req) ->
         resource = Resource,
         qs = QS
     } = Req,
-    QStr = lists:map(fun({K,V}) -> io_lib:format("~s=~s", 
+    QStr = lists:map(fun({K,V}) -> io_lib:format("~s=~s",
         [couch_util:to_list(K), couch_util:to_list(V)]) end, QS),
     lists:flatten([Url, Resource, "?", string:join(QStr, "&")]).
 
