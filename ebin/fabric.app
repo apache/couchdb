@@ -6,6 +6,7 @@
   {modules, [
        fabric,
        fabric_all_databases,
+       fabric_all_docs,
        fabric_create_db,
        fabric_delete_db,
        fabric_get_db_info,

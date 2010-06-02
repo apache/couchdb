@@ -38,7 +38,7 @@ all_docs(DbName, #view_query_args{keys=nil} = QueryArgs) ->
     },
     {ok, Acc} = couch_db:enum_docs(Db, StartId, Dir, fun view_fold/3, Acc0),
     if Acc#view_acc.offset == nil ->
-        Total = couch_db:get_doc_count(Db),
+        {ok, Total} = couch_db:get_doc_count(Db),
         rexi:sync_reply({total_and_offset, Total, Total});
     true -> ok end,
     rexi:reply(complete).
@@ -108,8 +108,9 @@ view_fold(#full_doc_info{} = FullDocInfo, OffsetReds, Acc) ->
 view_fold(KV, OffsetReds, #view_acc{offset=nil} = Acc) ->
     % calculates the offset for this shard
     #view_acc{db=Db, reduce_fun=Reduce} = Acc,
+    {ok, Total} = couch_db:get_doc_count(Db),
     Offset = Reduce(OffsetReds),
-    rexi:sync_reply({total_and_offset, couch_db:get_doc_count(Db), Offset}),
+    rexi:sync_reply({total_and_offset, Total, Offset}),
     view_fold(KV, OffsetReds, Acc#view_acc{offset=Offset});
 view_fold(_KV, _Offset, #view_acc{limit=0} = Acc) ->
     % we scanned through limit+skip local rows
@@ -126,21 +127,21 @@ view_fold({{Key,Id}, Value}, _Offset, Acc) ->
     true ->
         {stop, Acc};
     false ->
-        RowProps = case IncludeDocs of
+        Row = case IncludeDocs of
         true ->
             case couch_db:open_doc(Db, Id, []) of
               {not_found, missing} ->
-                  [{id, Id}, {key, Key}, {value, Value}, {error, missing}];
+                  #view_row{key=Key, id=Id, value=Value, doc={error,missing}};
               {not_found, deleted} ->
-                  [{id, Id}, {key, Key}, {value, Value}];
+                  #view_row{key=Key, id=Id, value=Value};
               {ok, Doc} ->
                   JsonDoc = couch_doc:to_json_obj(Doc, []),
-                  [{id, Id}, {key, Key}, {value, Value}, {doc, JsonDoc}]
+                  #view_row{key=Key, id=Id, value=Value, doc=JsonDoc}
             end;
         false ->
-            [{id, Id}, {key, Key}, {value, Value}]
+            #view_row{key=Key, id=Id, value=Value}
         end,
-        rexi:sync_reply({row, RowProps}),
+        rexi:sync_reply(Row),
         {ok, Acc#view_acc{limit=Limit-1}}
     end.
 

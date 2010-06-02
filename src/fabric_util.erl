@@ -50,7 +50,6 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
     {timeout, TimeoutRef} ->
         timeout;
     {Ref, Msg} ->
-        io:format("process_message ~p ~p~n", [Ref, Msg]),
         case lists:keyfind(Ref, Keypos, RefList) of
         false ->
             % this was some non-matching message which we will ignore
@@ -59,7 +58,6 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
             Fun(Msg, Worker, Acc0)
         end;
     {Ref, From, Msg} ->
-        io:format("process sync_reply {~p,~p} ~p~n", [Ref, From, Msg]),
         case lists:keyfind(Ref, Keypos, RefList) of
         false ->
             {ok, Acc0};
@@ -68,7 +66,7 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
         end;
     {rexi_DOWN, _RexiMonPid, ServerPid, Reason} = Msg ->
         showroom_log:message(alert, "rexi_DOWN ~p ~p", [ServerPid, Reason]),
-        Fun(nil, Msg, Acc0)
+        Fun(Msg, nil, Acc0)
     after PerMsgTO ->
         timeout
     end.

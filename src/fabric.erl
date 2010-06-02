@@ -3,6 +3,7 @@
 -export([all_databases/1, create_db/2, delete_db/2, get_db_info/2, db_path/2]).
 -export([open_doc/3, open_revs/4, get_missing_revs/2]).
 -export([update_doc/3, update_docs/3]).
+-export([all_docs/4]).
 
 -include("fabric.hrl").
 
@@ -44,6 +45,10 @@ update_doc(DbName, Doc, Options) ->
 update_docs(DbName, Docs, Options) ->
     fabric_update_docs:go(dbname(DbName), docs(Docs), Options).
 
+
+all_docs(DbName, #view_query_args{} = QueryArgs, Callback, Acc0) when
+        is_function(Callback, 2) ->
+    fabric_all_docs:go(dbname(DbName), QueryArgs, Callback, Acc0).
 
 %% some simple type validation and transcoding
 
