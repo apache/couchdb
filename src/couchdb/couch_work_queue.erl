@@ -83,7 +83,7 @@ handle_call({dequeue, Max}, _From, #q{queue=Queue, max_size=MaxSize,
             {reply, {ok, queue:to_list(Queue)}, Q2}
         end;
     true ->
-        {DequeuedItems, Queue2, Blocked2} = 
+        {DequeuedItems, Queue2, Blocked2} =
                 dequeue_items(Max, Queue, Q#q.blocked, []),
         {reply, {ok, DequeuedItems},
                 Q#q{items=Items-Max,blocked=Blocked2,queue=Queue2}}

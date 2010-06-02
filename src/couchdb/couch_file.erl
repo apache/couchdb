@@ -89,7 +89,7 @@ append_binary(Fd, Bin) ->
     
 append_binary_md5(Fd, Bin) ->
     Size = iolist_size(Bin),
-    gen_server:call(Fd, {append_bin, 
+    gen_server:call(Fd, {append_bin,
             [<<1:1/integer,Size:31/integer>>, couch_util:md5(Bin), Bin]}, infinity).
 
 
@@ -266,7 +266,7 @@ handle_call({pread_iolist, Pos}, _From, File) ->
         end;
     <<0:1/integer,Len:31/integer>> ->
         {Iolist, _} = read_raw_iolist_int(File, NextPos, Len),
-        {reply, {ok, Iolist}, File} 
+        {reply, {ok, Iolist}, File}
     end;
 handle_call({pread, Pos, Bytes}, _From, #file{fd=Fd,tail_append_begin=TailAppendBegin}=File) ->
     {ok, Bin} = file:pread(Fd, Pos, Bytes),

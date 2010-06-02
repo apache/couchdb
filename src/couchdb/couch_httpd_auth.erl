@@ -100,18 +100,18 @@ default_authentication_handler(Req) ->
 null_authentication_handler(Req) ->
     Req#httpd{user_ctx=#user_ctx{roles=[<<"_admin">>]}}.
 
-%% @doc proxy auth handler. 
+%% @doc proxy auth handler.
 %
-% This handler allows creation of a userCtx object from a user authenticated remotly. 
-% The client just pass specific headers to CouchDB and the handler create the userCtx. 
+% This handler allows creation of a userCtx object from a user authenticated remotly.
+% The client just pass specific headers to CouchDB and the handler create the userCtx.
 % Headers  name can be defined in local.ini. By thefault they are :
 %
-%   * X-Auth-CouchDB-UserName : contain the username, (x_auth_username in 
+%   * X-Auth-CouchDB-UserName : contain the username, (x_auth_username in
 %   couch_httpd_auth section)
-%   * X-Auth-CouchDB-Roles : contain the user roles, list of roles separated by a 
+%   * X-Auth-CouchDB-Roles : contain the user roles, list of roles separated by a
 %   comma (x_auth_roles in couch_httpd_auth section)
-%   * X-Auth-CouchDB-Token : token to authenticate the authorization (x_auth_token 
-%   in couch_httpd_auth section). This token is an hmac-sha1 created from secret key 
+%   * X-Auth-CouchDB-Token : token to authenticate the authorization (x_auth_token
+%   in couch_httpd_auth section). This token is an hmac-sha1 created from secret key
 %   and username. The secret key should be the same in the client and couchdb node. s
 %   ecret key is the secret key in couch_httpd_auth section of ini. This token is optional
 %   if value of proxy_use_secret key in couch_httpd_auth section of ini isn't true.
@@ -127,14 +127,14 @@ proxy_auth_user(Req) ->
                                 "X-Auth-CouchDB-UserName"),
     XHeaderRoles = couch_config:get("couch_httpd_auth", "x_auth_roles",
                                 "X-Auth-CouchDB-Roles"),
-    XHeaderToken = couch_config:get("couch_httpd_auth", "x_auth_token", 
+    XHeaderToken = couch_config:get("couch_httpd_auth", "x_auth_token",
                                 "X-Auth-CouchDB-Token"),
     case header_value(Req, XHeaderUserName) of
         undefined -> nil;
         UserName ->
             Roles = case header_value(Req, XHeaderRoles) of
                 undefined -> [];
-                Else ->  
+                Else ->
                     [?l2b(R) || R <- string:tokens(Else, ",")]
             end,
             case couch_config:get("couch_httpd_auth", "proxy_use_secret", "false") of
@@ -153,7 +153,7 @@ proxy_auth_user(Req) ->
                     end;
                 _ ->
                     Req#httpd{user_ctx=#user_ctx{name=?l2b(UserName), roles=Roles}}
-            end           
+            end
     end.
 
 % maybe we can use hovercraft to simplify running this view query
@@ -165,7 +165,7 @@ get_user(UserName) ->
         % which has a matching name, salt, and password_sha
         [HashedPwd, Salt] = string:tokens(HashedPwdAndSalt, ","),
         case get_user_props_from_db(UserName) of
-            nil ->        
+            nil ->
                 [{<<"roles">>, [<<"_admin">>]},
                   {<<"salt">>, ?l2b(Salt)},
                   {<<"password_sha">>, ?l2b(HashedPwd)}];
@@ -187,12 +187,12 @@ get_user_props_from_db(UserName) ->
         #doc{meta=Meta}=Doc ->
             %  check here for conflict state and throw error if conflicted
             case couch_util:get_value(conflicts,Meta,[]) of
-                [] -> 
+                [] ->
                     {DocProps} = couch_query_servers:json_doc(Doc),
                     case couch_util:get_value(<<"type">>, DocProps) of
                         <<"user">> ->
                             DocProps;
-                        _Else -> 
+                        _Else ->
                             ?LOG_ERROR("Invalid user doc. Id: ~p",[DocId]),
                             nil
                     end;
@@ -212,17 +212,17 @@ ensure_users_db_exists(DbName) ->
     {ok, Db} ->
         ensure_auth_ddoc_exists(Db, <<"_design/_auth">>),
         {ok, Db};
-    _Error -> 
+    _Error ->
         {ok, Db} = couch_db:create(DbName, [{user_ctx, #user_ctx{roles=[<<"_admin">>]}}]),
         ensure_auth_ddoc_exists(Db, <<"_design/_auth">>),
         {ok, Db}
     end.
     
-ensure_auth_ddoc_exists(Db, DDocId) -> 
+ensure_auth_ddoc_exists(Db, DDocId) ->
     try couch_httpd_db:couch_doc_open(Db, DDocId, nil, []) of
         _Foo -> ok
-    catch 
-        _:_Error -> 
+    catch
+        _:_Error ->
             % create the design document
             {ok, AuthDesign} = auth_design_doc(DDocId),
             {ok, _Rev} = couch_db:update_doc(Db, AuthDesign, []),
@@ -241,7 +241,7 @@ auth_design_doc(DocId) ->
                     throw({forbidden : 'doc.type must be user'});
                 } // we only validate user docs for now
                 if (newDoc._deleted === true) {
-                    // allow deletes by admins and matching users 
+                    // allow deletes by admins and matching users
                     // without checking the other fields
                     if ((userCtx.roles.indexOf('_admin') != -1) || (userCtx.name == oldDoc.name)) {
                         return;
@@ -304,7 +304,7 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
     case MochiReq:get_cookie_value("AuthSession") of
     undefined -> Req;
     [] -> Req;
-    Cookie -> 
+    Cookie ->
         [User, TimeStr | HashParts] = try
             AuthSession = couch_util:decodeBase64Url(Cookie),
             [_A, _B | _Cs] = string:tokens(?b2l(AuthSession), ":")
@@ -316,7 +316,7 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
         % Verify expiry and hash
         CurrentTime = make_cookie_time(),
         case couch_config:get("couch_httpd_auth", "secret", nil) of
-        nil -> 
+        nil ->
             ?LOG_ERROR("cookie auth secret is not set",[]),
             Req;
         SecretStr ->
@@ -454,7 +454,7 @@ handle_session_req(#httpd{method='GET', user_ctx=UserCtx}=Req) ->
                     {authentication_db, ?l2b(couch_config:get("couch_httpd_auth", "authentication_db"))},
                     {authentication_handlers, [auth_name(H) || H <- couch_httpd:make_fun_spec_strs(
                             couch_config:get("httpd", "authentication_handlers"))]}
-                ] ++ maybe_value(authenticated, UserCtx#user_ctx.handler, fun(Handler) -> 
+                ] ++ maybe_value(authenticated, UserCtx#user_ctx.handler, fun(Handler) ->
                         auth_name(?b2l(Handler))
                     end)}}
             ]})
@@ -473,7 +473,7 @@ handle_session_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD,POST,DELETE").
 
 maybe_value(_Key, undefined, _Fun) -> [];
-maybe_value(Key, Else, Fun) -> 
+maybe_value(Key, Else, Fun) ->
     [{Key, Fun(Else)}].
 
 auth_name(String) when is_list(String) ->
@@ -481,7 +481,7 @@ auth_name(String) when is_list(String) ->
     ?l2b(Name).
 
 to_int(Value) when is_binary(Value) ->
-    to_int(?b2l(Value)); 
+    to_int(?b2l(Value));
 to_int(Value) when is_list(Value) ->
     list_to_integer(Value);
 to_int(Value) when is_integer(Value) ->

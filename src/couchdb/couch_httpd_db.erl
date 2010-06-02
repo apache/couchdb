@@ -162,7 +162,7 @@ create_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
     ok = couch_httpd:verify_is_server_admin(Req),
     LDbName = ?b2l(DbName),
     case couch_config:get("couch_httpd_auth", "authentication_db") of
-        LDbName -> 
+        LDbName ->
             % make sure user's db always has the auth ddoc
             {ok, Db} = couch_httpd_auth:ensure_users_db_exists(DbName),
             couch_db:close(Db),
@@ -192,7 +192,7 @@ do_db_req(#httpd{user_ctx=UserCtx,path_parts=[DbName|_]}=Req, Fun) ->
     LDbName = ?b2l(DbName),
     % I hope this lookup is cheap.
     case couch_config:get("couch_httpd_auth", "authentication_db") of
-        LDbName -> 
+        LDbName ->
             % make sure user's db always has the auth ddoc
             {ok, ADb} = couch_httpd_auth:ensure_users_db_exists(DbName),
             couch_db:close(ADb);
@@ -328,7 +328,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
             send_json(Req, 417, ErrorsJson)
         end;
     false ->
-        Docs = lists:map(fun(JsonObj) -> 
+        Docs = lists:map(fun(JsonObj) ->
                 Doc = couch_doc:from_json_obj(JsonObj),
                 validate_attachment_names(Doc),
                 Doc
@@ -389,17 +389,17 @@ db_req(#httpd{path_parts=[_,<<"_missing_revs">>]}=Req, _Db) ->
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_revs_diff">>]}=Req, Db) ->
     {JsonDocIdRevs} = couch_httpd:json_body_obj(Req),
-    JsonDocIdRevs2 = 
+    JsonDocIdRevs2 =
         [{Id, couch_doc:parse_revs(RevStrs)} || {Id, RevStrs} <- JsonDocIdRevs],
     {ok, Results} = couch_db:get_missing_revs(Db, JsonDocIdRevs2),
-    Results2 = 
+    Results2 =
     lists:map(fun({Id, MissingRevs, PossibleAncestors}) ->
         {Id,
-            {[{missing, couch_doc:revs_to_strs(MissingRevs)}] ++ 
+            {[{missing, couch_doc:revs_to_strs(MissingRevs)}] ++
                 if PossibleAncestors == [] ->
                     [];
-                true -> 
-                    [{possible_ancestors, 
+                true ->
+                    [{possible_ancestors,
                         couch_doc:revs_to_strs(PossibleAncestors)}]
                 end}}
     end, Results),
@@ -547,11 +547,11 @@ db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
     couch_doc_open(Db, DocId, nil, []),
     case couch_httpd:qs_value(Req, "rev") of
     undefined ->
-        update_doc(Req, Db, DocId, 
+        update_doc(Req, Db, DocId,
                 couch_doc_from_req(Req, DocId, {[{<<"_deleted">>,true}]}));
     Rev ->
-        update_doc(Req, Db, DocId, 
-                couch_doc_from_req(Req, DocId, 
+        update_doc(Req, Db, DocId,
+                couch_doc_from_req(Req, DocId,
                     {[{<<"_rev">>, ?l2b(Rev)},{<<"_deleted">>,true}]}))
     end;
 
@@ -563,7 +563,7 @@ db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
         atts_since = AttsSince
     } = parse_doc_query(Req),
     case Revs of
-    [] ->    
+    [] ->
         Options2 =
         if AttsSince /= nil ->
             [{atts_since, AttsSince}, attachments | Options];
@@ -703,7 +703,7 @@ send_doc(Req, Doc, Options) ->
     [] ->
         DiskEtag = couch_httpd:doc_etag(Doc),
         % output etag only when we have no meta
-        couch_httpd:etag_respond(Req, DiskEtag, fun() -> 
+        couch_httpd:etag_respond(Req, DiskEtag, fun() ->
             send_doc_efficiently(Req, Doc, [{"Etag", DiskEtag}], Options)
         end);
     _ ->
@@ -728,7 +728,7 @@ send_doc_efficiently(Req, #doc{atts=Atts}=Doc, Headers, Options) ->
             JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, [follows|Options])),
             Len = couch_doc:len_doc_to_multi_part_stream(Boundary,JsonBytes,
                     Atts,false),
-            CType = {<<"Content-Type">>, 
+            CType = {<<"Content-Type">>,
                     <<"multipart/related; boundary=\"", Boundary/binary, "\"">>},
             {ok, Resp} = start_response_length(Req, 200, [CType|Headers], Len),
             couch_doc:doc_to_multi_part_stream(Boundary,JsonBytes,Atts,

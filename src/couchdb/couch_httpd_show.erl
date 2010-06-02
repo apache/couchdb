@@ -24,7 +24,7 @@
 
 
 % /db/_design/foo/_show/bar/docid
-% show converts a json doc to a response of any content-type. 
+% show converts a json doc to a response of any content-type.
 % it looks up the doc an then passes it to the query server.
 % then it sends the response from the query server to the http client.
 
@@ -77,7 +77,7 @@ handle_doc_show(Req, Db, DDoc, ShowName, Doc, DocId) ->
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         JsonReq = couch_httpd_external:json_req_obj(Req, Db, DocId),
         JsonDoc = couch_query_servers:json_doc(Doc),
-        [<<"resp">>, ExternalResp] = 
+        [<<"resp">>, ExternalResp] =
             couch_query_servers:ddoc_prompt(DDoc, [<<"shows">>, ShowName], [JsonDoc, JsonReq]),
         JsonResp = apply_etag(ExternalResp, CurrentEtag),
         couch_httpd_external:send_external_response(Req, JsonResp)
@@ -125,10 +125,10 @@ handle_doc_update_req(Req, _Db, _DDoc) ->
 send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
     JsonReq = couch_httpd_external:json_req_obj(Req, Db, DocId),
     JsonDoc = couch_query_servers:json_doc(Doc),
-    {Code, JsonResp1} = case couch_query_servers:ddoc_prompt(DDoc, 
+    {Code, JsonResp1} = case couch_query_servers:ddoc_prompt(DDoc,
                 [<<"updates">>, UpdateName], [JsonDoc, JsonReq]) of
         [<<"up">>, {NewJsonDoc}, {JsonResp}] ->
-            Options = case couch_httpd:header_value(Req, "X-Couch-Full-Commit", 
+            Options = case couch_httpd:header_value(Req, "X-Couch-Full-Commit",
                 "false") of
             "true" ->
                 [full_commit];
@@ -138,7 +138,7 @@ send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
             NewDoc = couch_doc:from_json_obj({NewJsonDoc}),
             {ok, NewRev} = couch_db:update_doc(Db, NewDoc, Options),
             NewRevStr = couch_doc:rev_to_str(NewRev),
-            JsonRespWithRev =  {[{<<"headers">>, 
+            JsonRespWithRev =  {[{<<"headers">>,
                 {[{<<"X-Couch-Update-NewRev">>, NewRevStr}]}} | JsonResp]},
             {201, JsonRespWithRev};
         [<<"up">>, _Other, JsonResp] ->
@@ -188,10 +188,10 @@ handle_view_list_req(Req, _Db, _DDoc) ->
 handle_view_list(Req, Db, DDoc, LName, {ViewDesignName, ViewName}, Keys) ->
     ViewDesignId = <<"_design/", ViewDesignName/binary>>,
     {ViewType, View, Group, QueryArgs} = couch_httpd_view:load_view(Req, Db, {ViewDesignId, ViewName}, Keys),
-    Etag = list_etag(Req, Db, Group, {couch_httpd:doc_etag(DDoc), Keys}),    
+    Etag = list_etag(Req, Db, Group, {couch_httpd:doc_etag(DDoc), Keys}),
     couch_httpd:etag_respond(Req, Etag, fun() ->
             output_list(ViewType, Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys, Group)
-        end).    
+        end).
 
 list_etag(#httpd{user_ctx=UserCtx}=Req, Db, Group, More) ->
     Accept = couch_httpd:header_value(Req, "Accept"),
@@ -226,7 +226,7 @@ output_map_list(Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys, Group) ->
         {ok, _, FoldResult} = case Keys of
             nil ->
                 FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, Etag, Db, CurrentSeq, RowCount, ListFoldHelpers),
-                    couch_view:fold(View, FoldlFun, FoldAccInit, 
+                    couch_view:fold(View, FoldlFun, FoldAccInit,
                     couch_httpd_view:make_key_options(QueryArgs));
             Keys ->
                 lists:foldl(
@@ -265,16 +265,16 @@ output_reduce_list(Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys, Group) ->
         FoldAccInit = {Limit, SkipCount, undefined, []},
         {ok, FoldResult} = case Keys of
             nil ->
-                couch_view:fold_reduce(View, RespFun, FoldAccInit, [{key_group_fun, GroupRowsFun} | 
+                couch_view:fold_reduce(View, RespFun, FoldAccInit, [{key_group_fun, GroupRowsFun} |
                     couch_httpd_view:make_key_options(QueryArgs)]);
             Keys ->
                 lists:foldl(
                     fun(Key, {ok, FoldAcc}) ->
                         couch_view:fold_reduce(View, RespFun, FoldAcc,
-                            [{key_group_fun, GroupRowsFun} | 
+                            [{key_group_fun, GroupRowsFun} |
                                 couch_httpd_view:make_key_options(
                                 QueryArgs#view_query_args{start_key=Key, end_key=Key})]
-                            )    
+                            )
                     end, {ok, FoldAccInit}, Keys)
             end,
         finish_list(Req, QServer, Etag, FoldResult, StartListRespFun, CurrentSeq, null)
@@ -294,7 +294,7 @@ make_reduce_start_resp_fun(QueryServer, Db, LName) ->
 
 start_list_resp(QServer, LName, Req, Db, Head, Etag) ->
     JsonReq = couch_httpd_external:json_req_obj(Req, Db),
-    [<<"start">>,Chunks,JsonResp] = couch_query_servers:ddoc_proc_prompt(QServer, 
+    [<<"start">>,Chunks,JsonResp] = couch_query_servers:ddoc_proc_prompt(QServer,
         [<<"lists">>, LName], [Head, JsonReq]),
     JsonResp2 = apply_etag(JsonResp, Etag),
     #extern_resp_args{
@@ -359,7 +359,7 @@ finish_list(Req, {Proc, _DDocId}, Etag, FoldResult, StartFun, CurrentSeq, TotalR
         {_, _, undefined, _, _} ->
             {ok, Resp, BeginBody} =
                 render_head_for_empty_list(StartFun, Req, Etag, CurrentSeq, TotalRows),
-            [<<"end">>, Chunks] = couch_query_servers:proc_prompt(Proc, [<<"list_end">>]),            
+            [<<"end">>, Chunks] = couch_query_servers:proc_prompt(Proc, [<<"list_end">>]),
             Chunk = BeginBody ++ ?b2l(?l2b(Chunks)),
             send_non_empty_chunk(Resp, Chunk);
         {_, _, Resp, stop, _} ->

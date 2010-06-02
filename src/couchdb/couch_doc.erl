@@ -382,7 +382,7 @@ len_doc_to_multi_part_stream(Boundary, JsonBytes, Atts,
             stub ->
                 AccAttsSize;
             _ ->
-                AccAttsSize +  
+                AccAttsSize +
                 4 + % "\r\n\r\n"
                 case SendEncodedAtts of
                 true ->
@@ -424,7 +424,7 @@ atts_to_mp([], _Boundary, WriteFun, _SendEncAtts) ->
 atts_to_mp([#att{data=stub} | RestAtts], Boundary, WriteFun,
         SendEncodedAtts) ->
     atts_to_mp(RestAtts, Boundary, WriteFun, SendEncodedAtts);
-atts_to_mp([Att | RestAtts], Boundary, WriteFun, 
+atts_to_mp([Att | RestAtts], Boundary, WriteFun,
         SendEncodedAtts)  ->
     WriteFun(<<"\r\n\r\n">>),
     AttFun = case SendEncodedAtts of
@@ -440,7 +440,7 @@ atts_to_mp([Att | RestAtts], Boundary, WriteFun,
 
 doc_from_multi_part_stream(ContentType, DataFun) ->
     Self = self(),
-    Parser = spawn_link(fun() -> 
+    Parser = spawn_link(fun() ->
         couch_httpd:parse_multipart_request(ContentType, DataFun,
                 fun(Next)-> mp_parse_doc(Next, []) end),
         unlink(Self)
