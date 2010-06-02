@@ -1,7 +1,7 @@
 -module(rexi).
 -export([start/0, stop/0, restart/0]).
 -export([cast/2, cast/3, kill/2]).
--export([reply/1]).
+-export([reply/1, sync_reply/1, sync_reply/2]).
 -export([async_server_call/2, async_server_call/3]).
 
 -define(SERVER, rexi_server).
