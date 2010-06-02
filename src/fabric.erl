@@ -1,7 +1,7 @@
 -module(fabric).
 
 % DBs
--export([all_databases/1, create_db/2, delete_db/2, get_db_info/2,
+-export([all_dbs/0, all_dbs/1, create_db/2, delete_db/2, get_db_info/2,
     get_doc_count/1]).
 
 % Documents
@@ -23,7 +23,10 @@ db_path(RawUri, Customer) ->
     {Path, _, _} = mochiweb_util:urlsplit_path(CustomerUri),
     Path.
 
-all_databases(Customer) ->
+all_dbs() ->
+    fabric_all_databases:all_databases("").
+
+all_dbs(Customer) ->
     fabric_all_databases:all_databases(Customer).
 
 get_db_info(DbName, Customer) ->
