@@ -1,4 +1,4 @@
-// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+a// Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
 // the License at
 //
@@ -247,7 +247,7 @@
               }
             });
           } else {
-            alert("please provide an eachApp function for allApps()");
+            alert("Please provide an eachApp function for allApps()");
           }
         },
         openDoc: function(docId, options, ajaxOptions) {
@@ -272,7 +272,7 @@
             dataType: "json", data: toJSON(doc),
             complete: function(req) {
               var resp = $.httpData(req, "json");
-              if (req.status == 201) {
+              if (req.status == 201 || req.status == 202) {
                 doc._id = resp.id;
                 doc._rev = resp.rev;
                 if (options.success) options.success(resp);
@@ -306,13 +306,27 @@
             "The document could not be deleted"
           );
         },
-        copyDoc: function(doc, options, ajaxOptions) {
+        bulkRemove: function(docs, options){
+          docs.docs = $.each(
+            docs.docs, function(i, doc){
+              doc._deleted = true;
+            }
+          );
+          $.extend(options, {successStatus: 201});
+          ajax({
+              type: "POST",
+              url: this.uri + "_bulk_docs" + encodeOptions(options),
+              data: toJSON(docs)
+            },
+            options,
+            "The documents could not be deleted"
+          );
+        },
+        copyDoc: function(docId, options, ajaxOptions) {
           ajaxOptions = $.extend(ajaxOptions, {
             complete: function(req) {
               var resp = $.httpData(req, "json");
               if (req.status == 201) {
-                doc._id = resp.id;
-                doc._rev = resp.rev;
                 if (options.success) options.success(resp);
               } else if (options.error) {
                 options.error(req.status, resp.error, resp.reason);
@@ -323,9 +337,7 @@
           });
           ajax({
               type: "COPY",
-              url: this.uri +
-                   encodeDocId(doc._id) +
-                   encodeOptions({rev: doc._rev})
+              url: this.uri + encodeDocId(docId)
             },
             options,
             "The document could not be copied",
@@ -404,13 +416,14 @@
       );
     },
 
-    replicate: function(source, target, options) {
+    replicate: function(source, target, ajaxOptions, replicationOptions) {
+      replicationOptions = $.extend({source: source, target: target}, replicationOptions);
       ajax({
           type: "POST", url: this.urlPrefix + "/_replicate",
-          data: JSON.stringify({source: source, target: target}),
+          data: JSON.stringify(replicationOptions),
           contentType: "application/json"
         },
-        options,
+        ajaxOptions,
         "Replication failed"
       );
     },
@@ -430,7 +443,6 @@
       }
       return uuidCache.shift();
     }
-
   });
 
   function ajax(obj, options, errorMessage, ajaxOptions) {
@@ -439,8 +451,18 @@
 
     $.ajax($.extend($.extend({
       type: "GET", dataType: "json",
+      beforeSend: function(xhr){
+        if(ajaxOptions && ajaxOptions.headers){
+          for (var header in ajaxOptions.headers){
+            xhr.setRequestHeader(header, ajaxOptions.headers[header]);
+          }
+        }
+      },
       complete: function(req) {
         var resp = $.httpData(req, "json");
+        if (options.ajaxStart) {
+          options.ajaxStart(resp);
+        }
         if (req.status == options.successStatus) {
           if (options.success) options.success(resp);
         } else if (options.error) {
@@ -458,7 +480,7 @@
     var buf = [];
     if (typeof(options) === "object" && options !== null) {
       for (var name in options) {
-        if ($.inArray(name, ["error", "success"]) >= 0)
+        if ($.inArray(name, ["error", "success", "ajaxStart"]) >= 0)
           continue;
         var value = options[name];
         if ($.inArray(name, ["key", "startkey", "endkey"]) >= 0) {
