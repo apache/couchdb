@@ -97,27 +97,27 @@ couchTests.view_collation_raw = function(debug) {
   // the inclusive_end=true functionality is limited to endkey currently
   // if you need inclusive_start=false for startkey, please do implement. ;)
   var rows = db.view("test/test", {endkey : "b", inclusive_end:true}).rows;
-  T(rows[rows.length-1].key == "b")
+  T(rows[rows.length-1].key == "b");
   // descending=true
   var rows = db.view("test/test", {endkey : "b",
     descending:true, inclusive_end:true}).rows;
-  T(rows[rows.length-1].key == "b")
+  T(rows[rows.length-1].key == "b");
 
   // test inclusive_end=false
   var rows = db.view("test/test", {endkey : "b", inclusive_end:false}).rows;
-  T(rows[rows.length-1].key == "aa")
+  T(rows[rows.length-1].key == "aa");
   // descending=true
   var rows = db.view("test/test", {endkey : "b",
     descending:true, inclusive_end:false}).rows;
-  T(rows[rows.length-1].key == "ba")
+  T(rows[rows.length-1].key == "ba");
   
   var rows = db.view("test/test", {
     endkey : "b", endkey_docid: "10",
     inclusive_end:false}).rows;
-  T(rows[rows.length-1].key == "aa")
+  T(rows[rows.length-1].key == "aa");
   
   var rows = db.view("test/test", {
     endkey : "b", endkey_docid: "11",
     inclusive_end:false}).rows;
-  T(rows[rows.length-1].key == "aa")
+  T(rows[rows.length-1].key == "aa");
 };
