@@ -94,7 +94,7 @@ write_multi_part_doc(#http_db{headers=Headers} = Db, #doc{atts=Atts} = Doc) ->
         )
     ),
     Boundary = couch_uuids:random(),
-    Len = couch_doc:len_doc_to_multi_part_stream(
+    {_ContentType, Len} = couch_doc:len_doc_to_multi_part_stream(
         Boundary, JsonBytes, Atts, true
     ),
     {ok, DataQueue} = couch_work_queue:new(1024*1024, 1000),

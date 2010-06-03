@@ -772,13 +772,15 @@ parse_multipart_request(ContentType, DataFun, Callback) ->
 nil_callback(_Data)->
     fun(Next) -> nil_callback(Next) end.
 
-get_boundary(ContentType) ->
-    {"multipart/" ++ _, Opts} = mochiweb_util:parse_header(ContentType),
+get_boundary({"multipart/" ++ _, Opts}) ->
     case couch_util:get_value("boundary", Opts) of
         S when is_list(S) ->
             S
-    end.
-
+    end;
+get_boundary(ContentType) ->
+    {"multipart/" ++ _ , Opts} = mochiweb_util:parse_header(ContentType),
+    get_boundary({"multipart/", Opts}).
+    
 
 
 split_header(<<>>) ->
