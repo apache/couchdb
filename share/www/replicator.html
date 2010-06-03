@@ -41,6 +41,7 @@ specific language governing permissions and limitations under the License.
 
         $.couch.allDbs({
           success: function(dbs) {
+            dbs.sort();
             $("fieldset select").each(function() {
               var select = this;
               $.each(dbs, function(idx, dbName) {
