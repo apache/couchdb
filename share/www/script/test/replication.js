@@ -342,6 +342,25 @@ couchTests.replication = function(debug) {
     {
       _id: "foo3",
       value: "c"
+    },
+    {
+      _id: "slashed/foo",
+      value: "s"
+    },
+    {
+      _id: "_design/foobar",
+      language: "javascript",
+      value: "I am a design doc",
+      filters: {
+        idfilter: (function(doc, req) {
+          return doc.value == Number(req.filter_value);
+        }).toString()
+      },
+      views: {
+        countview: (function(doc) {
+          emit(doc.value, 1);
+        }).toString()
+      }
     }
   ];
 
@@ -364,7 +383,11 @@ couchTests.replication = function(debug) {
     ["foo1", "foo3", "foo666"],
     ["foo1", "foo666"],
     ["foo666", "foo2"],
-    ["foo2", "foo9999", "foo1"]
+    ["foo2", "foo9999", "foo1"],
+    ["foo3", "slashed/foo"],
+    ["foo3", "slashed%2Ffoo"],
+    ["foo1", "_design/foobar"],
+    ["foo1", "foo1001", "_design%2Ffoobar"]
   ];
 
   for (var i = 0; i < dbPairs.length; i++) {
