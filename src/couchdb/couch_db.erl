@@ -523,7 +523,7 @@ prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldI
             fun(Doc, {AccPrepped2, AccErrors2}) ->
                 case couch_doc:has_stubs(Doc) of
                 true ->
-                    couch_doc:merge_doc(Doc, #doc{}); % will throw exception
+                    couch_doc:merge_stubs(Doc, #doc{}); % will throw exception
                 false -> ok
                 end,
                 case validate_doc_update(Db, Doc, fun() -> nil end) of

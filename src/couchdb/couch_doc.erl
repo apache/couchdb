@@ -375,8 +375,7 @@ fold_streamed_data(RcvFun, LenLeft, Fun, Acc) when LenLeft > 0->
     ResultAcc = Fun(Bin, Acc),
     fold_streamed_data(RcvFun, LenLeft - size(Bin), Fun, ResultAcc).
 
-len_doc_to_multi_part_stream(Boundary, JsonBytes, Atts,
-    SendEncodedAtts) ->
+len_doc_to_multi_part_stream(Boundary, JsonBytes, Atts, SendEncodedAtts) ->
     AttsSize = lists:foldl(fun(#att{data=Data} = Att, AccAttsSize) ->
             case Data of
             stub ->
@@ -395,16 +394,18 @@ len_doc_to_multi_part_stream(Boundary, JsonBytes, Atts,
             end
         end, 0, Atts),
     if AttsSize == 0 ->
-        iolist_size(JsonBytes);
+        {<<"application/json">>, iolist_size(JsonBytes)};
     true ->
-        2 + % "--"
-        size(Boundary) +
-        36 + % "\r\ncontent-type: application/json\r\n\r\n"
-        iolist_size(JsonBytes) +
-        4 + % "\r\n--"
-        size(Boundary) +
-        + AttsSize +
-        2 % "--"
+        {<<"multipart/related; boundary=\"", Boundary/binary, "\"">>,
+            2 + % "--"
+            size(Boundary) +
+            36 + % "\r\ncontent-type: application/json\r\n\r\n"
+            iolist_size(JsonBytes) +
+            4 + % "\r\n--"
+            size(Boundary) +
+            + AttsSize +
+            2 % "--"
+            }
     end.
 
 doc_to_multi_part_stream(Boundary, JsonBytes, Atts, WriteFun,
@@ -446,26 +447,30 @@ doc_from_multi_part_stream(ContentType, DataFun) ->
         unlink(Self)
         end),
     Parser ! {get_doc_bytes, self()},
-    receive {doc_bytes, DocBytes} -> ok end,
-    Doc = from_json_obj(?JSON_DECODE(DocBytes)),
-    % go through the attachments looking for 'follows' in the data,
-    % replace with function that reads the data from MIME stream.
-    ReadAttachmentDataFun = fun() ->
-        Parser ! {get_bytes, self()},
-        receive {bytes, Bytes} -> Bytes end
-    end,
-    Atts2 = lists:map(
-        fun(#att{data=follows}=A) ->
-            A#att{data=ReadAttachmentDataFun};
-        (A) ->
-            A
-        end, Doc#doc.atts),
-    Doc#doc{atts=Atts2}.
+    receive 
+    {doc_bytes, DocBytes} ->
+        Doc = from_json_obj(?JSON_DECODE(DocBytes)),
+        % go through the attachments looking for 'follows' in the data,
+        % replace with function that reads the data from MIME stream.
+        ReadAttachmentDataFun = fun() ->
+            Parser ! {get_bytes, self()},
+            receive {bytes, Bytes} -> Bytes end
+        end,
+        Atts2 = lists:map(
+            fun(#att{data=follows}=A) ->
+                A#att{data=ReadAttachmentDataFun};
+            (A) ->
+                A
+            end, Doc#doc.atts),
+        {ok, Doc#doc{atts=Atts2}}
+    end.
 
 mp_parse_doc({headers, H}, []) ->
-    {"application/json", _} = couch_util:get_value("content-type", H),
-    fun (Next) ->
-        mp_parse_doc(Next, [])
+    case couch_util:get_value("content-type", H) of
+    {"application/json", _} ->
+        fun (Next) ->
+            mp_parse_doc(Next, [])
+        end
     end;
 mp_parse_doc({body, Bytes}, AccBytes) ->
     fun (Next) ->

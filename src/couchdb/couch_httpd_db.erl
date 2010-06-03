@@ -403,7 +403,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_revs_diff">>]}=Req, Db) ->
                         couch_doc:revs_to_strs(PossibleAncestors)}]
                 end}}
     end, Results),
-    send_json(Req, {[{missing, {Results2}}]});
+    send_json(Req, {Results2});
 
 db_req(#httpd{path_parts=[_,<<"_revs_diff">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
@@ -573,27 +573,36 @@ db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
         send_doc(Req, Doc, Options2);
     _ ->
         {ok, Results} = couch_db:open_doc_revs(Db, DocId, Revs, Options),
-        {ok, Resp} = start_json_response(Req, 200),
-        send_chunk(Resp, "["),
-        % We loop through the docs. The first time through the separator
-        % is whitespace, then a comma on subsequent iterations.
-        lists:foldl(
-            fun(Result, AccSeparator) ->
-                case Result of
-                {ok, Doc} ->
-                    JsonDoc = couch_doc:to_json_obj(Doc, Options),
-                    Json = ?JSON_ENCODE({[{ok, JsonDoc}]}),
-                    send_chunk(Resp, AccSeparator ++ Json);
-                {{not_found, missing}, RevId} ->
-                    RevStr = couch_doc:rev_to_str(RevId),
-                    Json = ?JSON_ENCODE({[{"missing", RevStr}]}),
-                    send_chunk(Resp, AccSeparator ++ Json)
+        AcceptedTypes = case couch_httpd:header_value(Req, "Accept") of
+            undefined       -> [];
+            AcceptHeader    -> string:tokens(AcceptHeader, "; ")
+        end,
+        case lists:member("multipart/mixed", AcceptedTypes) of
+        false ->
+            {ok, Resp} = start_json_response(Req, 200),
+            send_chunk(Resp, "["),
+            % We loop through the docs. The first time through the separator
+            % is whitespace, then a comma on subsequent iterations.
+            lists:foldl(
+                fun(Result, AccSeparator) ->
+                    case Result of
+                    {ok, Doc} ->
+                        JsonDoc = couch_doc:to_json_obj(Doc, Options),
+                        Json = ?JSON_ENCODE({[{ok, JsonDoc}]}),
+                        send_chunk(Resp, AccSeparator ++ Json);
+                    {{not_found, missing}, RevId} ->
+                        RevStr = couch_doc:rev_to_str(RevId),
+                        Json = ?JSON_ENCODE({[{"missing", RevStr}]}),
+                        send_chunk(Resp, AccSeparator ++ Json)
+                    end,
+                    "," % AccSeparator now has a comma
                 end,
-                "," % AccSeparator now has a comma
-            end,
-            "", Results),
-        send_chunk(Resp, "]"),
-        end_json_response(Resp)
+                "", Results),
+            send_chunk(Resp, "]"),
+            end_json_response(Resp);
+        true ->
+            send_docs_multipart(Req, Results, Options)
+        end
     end;
 
 db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
@@ -647,13 +656,13 @@ db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
     
     Loc = absolute_uri(Req, "/" ++ ?b2l(Db#db.name) ++ "/" ++ ?b2l(DocId)),
     RespHeaders = [{"Location", Loc}],
-    case couch_httpd:header_value(Req, "Content-Type") of
-    ("multipart/related" ++  _Rest) = ContentType->
-        Doc0 = couch_doc:doc_from_multi_part_stream(ContentType,
+    case couch_util:to_list(couch_httpd:header_value(Req, "Content-Type")) of
+    ("multipart/related;" ++ _) = ContentType ->
+        {ok, Doc0} = couch_doc:doc_from_multi_part_stream(ContentType,
                 fun() -> receive_request_data(Req) end),
         Doc = couch_doc_from_req(Req, DocId, Doc0),
         update_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType);
-    _ ->
+    _Else ->
         case couch_httpd:qs_value(Req, "batch") of
         "ok" ->
             % batch
@@ -672,7 +681,8 @@ db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
             ]});
         _Normal ->
             % normal
-            Doc = couch_doc_from_req(Req, DocId, couch_httpd:json_body(Req)),
+            Body = couch_httpd:json_body(Req),
+            Doc = couch_doc_from_req(Req, DocId, Body),
             update_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType)
         end
     end;
@@ -725,11 +735,11 @@ send_doc_efficiently(Req, #doc{atts=Atts}=Doc, Headers, Options) ->
             send_json(Req, 200, Headers, couch_doc:to_json_obj(Doc, Options));
         true ->
             Boundary = couch_uuids:random(),
-            JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, [follows|Options])),
-            Len = couch_doc:len_doc_to_multi_part_stream(Boundary,JsonBytes,
-                    Atts,false),
-            CType = {<<"Content-Type">>,
-                    <<"multipart/related; boundary=\"", Boundary/binary, "\"">>},
+            JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, 
+                    [attachments, follows|Options])),
+            {ContentType, Len} = couch_doc:len_doc_to_multi_part_stream(
+                    Boundary,JsonBytes, Atts,false),
+            CType = {<<"Content-Type">>, ContentType},
             {ok, Resp} = start_response_length(Req, 200, [CType|Headers], Len),
             couch_doc:doc_to_multi_part_stream(Boundary,JsonBytes,Atts,
                     fun(Data) -> couch_httpd:send(Resp, Data) end, false)
@@ -738,7 +748,35 @@ send_doc_efficiently(Req, #doc{atts=Atts}=Doc, Headers, Options) ->
         send_json(Req, 200, Headers, couch_doc:to_json_obj(Doc, Options))
     end.
 
-
+send_docs_multipart(Req, Results, Options) ->
+    OuterBoundary = couch_uuids:random(),
+    InnerBoundary = couch_uuids:random(),
+    CType = {"Content-Type", 
+        "multipart/mixed; boundary=\"" ++ ?b2l(OuterBoundary) ++ "\""},
+    {ok, Resp} = start_chunked_response(Req, 200, [CType]),
+    couch_httpd:send_chunk(Resp, <<"--", OuterBoundary/binary>>),
+    lists:foreach(
+        fun({ok, #doc{atts=Atts}=Doc}) ->
+            JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, 
+                    [attachments,follows|Options])),
+            {ContentType, _Len} = couch_doc:len_doc_to_multi_part_stream(
+                    InnerBoundary, JsonBytes, Atts, false),
+            couch_httpd:send_chunk(Resp, <<"\r\nContent-Type: ",
+                    ContentType/binary, "\r\n\r\n">>),
+            couch_doc:doc_to_multi_part_stream(InnerBoundary, JsonBytes, Atts,
+                    fun(Data) -> couch_httpd:send_chunk(Resp, Data)
+                    end, false),
+             couch_httpd:send_chunk(Resp, <<"\r\n--", OuterBoundary/binary>>);
+        ({{not_found, missing}, RevId}) ->
+             RevStr = couch_doc:rev_to_str(RevId),
+             Json = ?JSON_ENCODE({[{"missing", RevStr}]}),
+             couch_httpd:send_chunk(Resp, 
+                [<<"\r\nContent-Type: application/json; error=\"true\"\r\n\r\n">>, 
+                Json,
+                <<"\r\n--", OuterBoundary/binary>>])
+         end, Results),
+    couch_httpd:send_chunk(Resp, <<"--">>),
+    couch_httpd:last_chunk(Resp).
 
 receive_request_data(Req) ->
     {couch_httpd:recv(Req, 0), fun() -> receive_request_data(Req) end}.
@@ -791,6 +829,8 @@ couch_doc_from_req(Req, DocId, #doc{revs=Revs}=Doc) ->
     case extract_header_rev(Req, ExplicitDocRev) of
     missing_rev ->
         Revs2 = {0, []};
+    ExplicitDocRev ->
+        Revs2 = Revs;
     {Pos, Rev} ->
         Revs2 = {Pos, [Rev]}
     end,
