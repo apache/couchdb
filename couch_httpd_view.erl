@@ -553,10 +553,17 @@ make_end_key_option(
 
 json_view_start_resp(Req, Etag, TotalViewCount, Offset, _Acc, UpdateSeq) ->
     {ok, Resp} = start_json_response(Req, 200, [{"Etag", Etag}]),
-    BeginBody = io_lib:format(
-            "{\"total_rows\":~w,\"update_seq\":~w,"
-            "\"offset\":~w,\"rows\":[\r\n",
-            [TotalViewCount, UpdateSeq, Offset]),
+    BeginBody = case couch_httpd:qs_value(Req, "update_seq") of
+    "true" ->
+        io_lib:format(
+                "{\"total_rows\":~w,\"update_seq\":~w,"
+                "\"offset\":~w,\"rows\":[\r\n",
+                [TotalViewCount, UpdateSeq, Offset]);
+    _Else ->
+        io_lib:format(
+                "{\"total_rows\":~w,\"offset\":~w,\"rows\":[\r\n",
+                [TotalViewCount, Offset])
+    end,
     {ok, Resp, BeginBody}.
 
 send_json_view_row(Resp, Db, {{Key, DocId}, Value}, IncludeDocs, RowFront) ->
@@ -566,7 +573,12 @@ send_json_view_row(Resp, Db, {{Key, DocId}, Value}, IncludeDocs, RowFront) ->
 
 json_reduce_start_resp(Req, Etag, _Acc0, UpdateSeq) ->
     {ok, Resp} = start_json_response(Req, 200, [{"Etag", Etag}]),
-    {ok, Resp, io_lib:format("{\"update_seq\":~w,\"rows\":[\r\n",[UpdateSeq])}.
+    case couch_httpd:qs_value(Req, "update_seq") of
+    "true" ->
+        {ok, Resp, io_lib:format("{\"update_seq\":~w,\"rows\":[\r\n",[UpdateSeq])};
+    _Else ->
+        {ok, Resp, "{\"rows\":[\r\n"}
+    end.
 
 send_json_reduce_row(Resp, {Key, Value}, RowFront) ->
     send_chunk(Resp, RowFront ++ ?JSON_ENCODE({[{key, Key}, {value, Value}]})),
