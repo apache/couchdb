@@ -11,7 +11,7 @@
 // the License.
 
 couchTests.view_update_seq = function(debug) {
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
+  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"true"});
   db.deleteDb();
   db.createDb();
   if (debug) debugger;
@@ -35,7 +35,7 @@ couchTests.view_update_seq = function(debug) {
 
   T(db.info().update_seq == 1);
 
-  var resp = db.allDocs({});
+  var resp = db.allDocs({update_seq:true});
 
   T(resp.rows.length == 1);
   T(resp.update_seq == 1);
@@ -45,32 +45,40 @@ couchTests.view_update_seq = function(debug) {
 
   resp = db.allDocs({limit: 1});
   T(resp.rows.length == 1);
-  T(resp.update_seq == 101);
+  T(!resp.update_seq, "all docs");
 
-  resp = db.view('test/all_docs', {limit: 1});
+  resp = db.allDocs({limit: 1, update_seq:true});
   T(resp.rows.length == 1);
   T(resp.update_seq == 101);
 
-  resp = db.view('test/summate', {});
+  resp = db.view('test/all_docs', {limit: 1, update_seq:true});
+  T(resp.rows.length == 1);
+  T(resp.update_seq == 101);
+
+  resp = db.view('test/all_docs', {limit: 1, update_seq:false});
+  T(resp.rows.length == 1);
+  T(!resp.update_seq, "view");
+
+  resp = db.view('test/summate', {update_seq:true});
   T(resp.rows.length == 1);
   T(resp.update_seq == 101);
 
   db.save({"id":"0"});
-  resp = db.view('test/all_docs', {limit: 1,stale: "ok"});
+  resp = db.view('test/all_docs', {limit: 1,stale: "ok", update_seq:true});
   T(resp.rows.length == 1);
   T(resp.update_seq == 101);
 
-  resp = db.view('test/all_docs', {limit: 1});
+  resp = db.view('test/all_docs', {limit: 1, update_seq:true});
   T(resp.rows.length == 1);
   T(resp.update_seq == 102);
 
-  resp = db.view('test/all_docs',{},["0","1"]);
+  resp = db.view('test/all_docs',{update_seq:true},["0","1"]);
   T(resp.update_seq == 102);
 
-  resp = db.view('test/all_docs',{},["0","1"]);
+  resp = db.view('test/all_docs',{update_seq:true},["0","1"]);
   T(resp.update_seq == 102);
 
-  resp = db.view('test/summate',{group:true},["0","1"]);
+  resp = db.view('test/summate',{group:true, update_seq:true},["0","1"]);
   T(resp.update_seq == 102);
 
 };
