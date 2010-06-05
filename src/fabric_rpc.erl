@@ -37,11 +37,7 @@ all_docs(DbName, #view_query_args{keys=nil} = QueryArgs) ->
         stop_fun = all_docs_stop_fun(QueryArgs)
     },
     {ok, Acc} = couch_db:enum_docs(Db, StartId, Dir, fun view_fold/3, Acc0),
-    if Acc#view_acc.offset == nil ->
-        {ok, Total} = couch_db:get_doc_count(Db),
-        rexi:sync_reply({total_and_offset, Total, Total});
-    true -> ok end,
-    rexi:reply(complete).
+    final_all_docs_response(Db, Acc#view_acc.offset).
 
 get_db_info(DbName) ->
     with_db(DbName, {couch_db, get_db_info, []}).
@@ -110,8 +106,12 @@ view_fold(KV, OffsetReds, #view_acc{offset=nil} = Acc) ->
     #view_acc{db=Db, reduce_fun=Reduce} = Acc,
     {ok, Total} = couch_db:get_doc_count(Db),
     Offset = Reduce(OffsetReds),
-    rexi:sync_reply({total_and_offset, Total, Offset}),
-    view_fold(KV, OffsetReds, Acc#view_acc{offset=Offset});
+    case rexi:sync_reply({total_and_offset, Total, Offset}) of
+    ok ->
+        view_fold(KV, OffsetReds, Acc#view_acc{offset=Offset});
+    stop ->
+        exit(normal)
+    end;
 view_fold(_KV, _Offset, #view_acc{limit=0} = Acc) ->
     % we scanned through limit+skip local rows
     {stop, Acc};
@@ -149,3 +149,11 @@ all_docs_stop_fun(#view_query_args{direction=rev, end_key=EndKey}) ->
     fun(ViewKey, _) ->
         couch_db_updater:less_docid(ViewKey, EndKey)
     end.
+
+final_all_docs_response(Db, nil) ->
+    {ok, Total} = couch_db:get_doc_count(Db),
+    case rexi:sync_reply({total_and_offset, Total, Total}) of ok ->
+        rexi:reply(complete);
+    stop -> ok end;
+final_all_docs_response(_Db, _Offset) ->
+    rexi:reply(complete).
