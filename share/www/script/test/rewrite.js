@@ -137,6 +137,13 @@ couchTests.rewrite = function(debug) {
               "query": {
                 "key": [":a", ":b"]
               }
+            },
+            {
+              "from": "simpleForm/complexView6",
+              "to": "_list/simpleForm/complexView3",
+              "query": {
+                "key": [":a", ":b"]
+              }
             }
           ],
           lists: {
@@ -328,6 +335,10 @@ couchTests.rewrite = function(debug) {
         T(/Value: doc 5/.test(xhr.responseText));
         
         xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/simpleForm/complexView5/test/essai");
+        T(xhr.status == 200, "with query params");
+        T(/Value: doc 4/.test(xhr.responseText));
+        
+        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/simpleForm/complexView6?a=test&b=essai");
         T(xhr.status == 200, "with query params");
         T(/Value: doc 4/.test(xhr.responseText));
         
