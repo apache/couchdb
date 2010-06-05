@@ -1,4 +1,4 @@
--module(fabric_update_docs).
+-module(fabric_doc_update).
 
 -export([go/3]).
 

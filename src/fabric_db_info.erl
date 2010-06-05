@@ -1,4 +1,4 @@
--module(fabric_get_db_info).
+-module(fabric_db_info).
 -author(brad@cloudant.com).
 
 -export([get_db_info/2]).

@@ -30,40 +30,40 @@ all_dbs(Customer) ->
     fabric_all_databases:all_databases(Customer).
 
 get_db_info(DbName, Customer) ->
-    fabric_get_db_info:get_db_info(dbname(DbName), Customer).
+    fabric_db_info:get_db_info(dbname(DbName), Customer).
 
 get_doc_count(DbName) ->
-    fabric_doc_count:go(dbname(DbName)).
+    fabric_db_doc_count:go(dbname(DbName)).
 
 create_db(DbName, Options) ->
-    fabric_create_db:create_db(dbname(DbName), Options).
+    fabric_db_create:create_db(dbname(DbName), Options).
 
 delete_db(DbName, Options) ->
-    fabric_delete_db:delete_db(dbname(DbName), Options).
+    fabric_db_delete:delete_db(dbname(DbName), Options).
 
 
 
 open_doc(DbName, Id, Options) ->
-    fabric_open_doc:go(dbname(DbName), docid(Id), Options).
+    fabric_doc_open:go(dbname(DbName), docid(Id), Options).
 
 open_revs(DbName, Id, Revs, Options) ->
-    fabric_open_revs:go(dbname(DbName), docid(Id), Revs, Options).
+    fabric_doc_open_revs:go(dbname(DbName), docid(Id), Revs, Options).
 
 get_missing_revs(DbName, IdsRevs) when is_list(IdsRevs) ->
     Sanitized = [idrevs(IdR) || IdR <- IdsRevs],
-    fabric_missing_revs:go(dbname(DbName), Sanitized).
+    fabric_doc_missing_revs:go(dbname(DbName), Sanitized).
 
 update_doc(DbName, Doc, Options) ->
     {ok, [Result]} = update_docs(DbName, [Doc], Options),
     Result.
 
 update_docs(DbName, Docs, Options) ->
-    fabric_update_docs:go(dbname(DbName), docs(Docs), Options).
+    fabric_doc_update:go(dbname(DbName), docs(Docs), Options).
 
 
 all_docs(DbName, #view_query_args{} = QueryArgs, Callback, Acc0) when
         is_function(Callback, 2) ->
-    fabric_all_docs:go(dbname(DbName), QueryArgs, Callback, Acc0).
+    fabric_view_all_docs:go(dbname(DbName), QueryArgs, Callback, Acc0).
 
 %% some simple type validation and transcoding
 

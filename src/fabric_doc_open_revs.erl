@@ -1,4 +1,4 @@
--module(fabric_open_revs).
+-module(fabric_doc_open_revs).
 
 -export([go/4]).
 

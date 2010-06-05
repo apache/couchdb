@@ -1,4 +1,4 @@
--module(fabric_open_doc).
+-module(fabric_doc_open).
 
 -export([go/3]).
 

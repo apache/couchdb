@@ -1,4 +1,4 @@
--module(fabric_create_db).
+-module(fabric_db_create).
 -author(brad@cloudant.com).
 
 -export([create_db/2]).

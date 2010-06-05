@@ -1,4 +1,4 @@
--module(fabric_missing_revs).
+-module(fabric_doc_missing_revs).
 
 -export([go/2]).
 

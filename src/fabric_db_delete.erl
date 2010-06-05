@@ -1,4 +1,4 @@
--module(fabric_delete_db).
+-module(fabric_db_delete).
 -author(brad@cloudant.com).
 
 -export([delete_db/2]).

@@ -1,4 +1,4 @@
--module(fabric_all_docs).
+-module(fabric_view_all_docs).
 
 -export([go/4]).
 -export([open_doc/3]). % exported for spawn

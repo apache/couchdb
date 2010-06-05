@@ -1,4 +1,4 @@
--module(fabric_doc_count).
+-module(fabric_db_doc_count).
 
 -export([go/1]).
 
