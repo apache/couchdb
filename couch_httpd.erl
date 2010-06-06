@@ -250,7 +250,8 @@ handle_request_int(MochiReq, DefaultFun,
         throw:{http_head_abort, Resp0} ->
             {ok, Resp0};
         throw:{invalid_json, S} ->
-            ?LOG_ERROR("attempted upload of invalid JSON ~s", [S]),
+            ?LOG_ERROR("attempted upload of invalid JSON (set log_level to debug to log it)", []),
+            ?LOG_DEBUG("Invalid JSON: ~p",[S]),
             send_error(HttpReq, {bad_request, "invalid UTF-8 JSON"});
         throw:unacceptable_encoding ->
             ?LOG_ERROR("unsupported encoding method for the response", []),
