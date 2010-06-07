@@ -21,6 +21,7 @@
     rows = [],
     skip,
     limit,
+    stop_fun,
     user_acc
 }).
 

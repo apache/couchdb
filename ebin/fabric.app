@@ -10,13 +10,16 @@
        fabric_db_delete,
        fabric_db_doc_count,
        fabric_db_info,
+       fabric_dict,
        fabric_doc_missing_revs,
        fabric_doc_open,
        fabric_doc_open_revs,
        fabric_doc_update,
        fabric_rpc,
        fabric_util,
-       fabric_view_all_docs
+       fabric_view,
+       fabric_view_all_docs,
+       fabric_view_map
    ]},
   {registered, []},
   {included_applications, []},

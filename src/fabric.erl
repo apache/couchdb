@@ -9,7 +9,7 @@
     update_docs/3]).
 
 % Views
--export([all_docs/4]).
+-export([all_docs/4, query_view/5]).
 
 % miscellany
 -export([db_path/2, design_docs/1]).
@@ -65,6 +65,12 @@ all_docs(DbName, #view_query_args{} = QueryArgs, Callback, Acc0) when
         is_function(Callback, 2) ->
     fabric_view_all_docs:go(dbname(DbName), QueryArgs, Callback, Acc0).
 
+query_view(DbName, View, #view_query_args{view_type=reduce} = QueryArgs,
+        Callback, Acc0) ->
+    fabric_view_reduce:go(dbname(DbName), view(View), QueryArgs, Callback, Acc0);
+query_view(DbName, View, #view_query_args{} = QueryArgs, Callback, Acc0) ->
+    fabric_view_map:go(dbname(DbName), view(View), QueryArgs, Callback, Acc0).
+
 design_docs(DbName) ->
     QueryArgs = #view_query_args{start_key = <<"_design/">>, include_docs=true},
     Callback = fun({total_and_offset, _, _}, []) ->
@@ -116,6 +122,10 @@ rev(Rev) when is_list(Rev); is_binary(Rev) ->
     couch_doc:parse_rev(Rev);
 rev({Seq, Hash} = Rev) when is_integer(Seq), is_binary(Hash) ->
     Rev.
+
+view(ViewName) ->
+    [Group, View] = re:split(ViewName, "/"),
+    {Group, View}.
 
 opts(Options) ->
     case couch_util:get_value(user_ctx, Options) of
