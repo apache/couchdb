@@ -42,13 +42,14 @@ all_docs(DbName, #view_query_args{keys=nil} = QueryArgs) ->
     {ok, Acc} = couch_db:enum_docs(Db, StartId, Dir, fun view_fold/3, Acc0),
     final_response(Total, Acc#view_acc.offset).
 
-map_view(DbName, DDoc, ViewName, #view_query_args{keys=nil} = QueryArgs) ->
+map_view(DbName, DDoc, ViewName, QueryArgs) ->
     {ok, Db} = couch_db:open(DbName, []),
     #view_query_args{
         start_key = StartKey,
         start_docid = StartDocId,
         limit = Limit,
         skip = Skip,
+        keys = Keys,
         include_docs = IncludeDocs,
         direction = Dir,
         stale = Stale,
@@ -69,7 +70,19 @@ map_view(DbName, DDoc, ViewName, #view_query_args{keys=nil} = QueryArgs) ->
         reduce_fun = fun couch_view:reduce_to_count/1,
         stop_fun = default_stop_fun(QueryArgs)
     },
-    {ok, Acc} = couch_view:fold(View, Start, Dir, fun view_fold/3, Acc0),
+    case Keys of
+    nil ->
+        {ok, Acc} = couch_view:fold(View, Start, Dir, fun view_fold/3, Acc0);
+    _ ->
+        Acc = lists:foldl(fun(Key, AccIn) ->
+            KeyStart = {Key, StartDocId},
+            KeyStop = default_stop_fun(QueryArgs#view_query_args{start_key=Key,
+                end_key=Key}),
+            {_Go, Out} = couch_view:fold(View, KeyStart, Dir, fun view_fold/3,
+                AccIn#view_acc{stop_fun = KeyStop}),
+            Out
+        end, Acc0, Keys)
+    end,
     final_response(Total, Acc#view_acc.offset).
 
 get_db_info(DbName) ->
