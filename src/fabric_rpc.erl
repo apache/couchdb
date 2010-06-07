@@ -40,10 +40,10 @@ all_docs(DbName, #view_query_args{keys=nil} = QueryArgs) ->
     final_all_docs_response(Db, Acc#view_acc.offset).
 
 get_db_info(DbName) ->
-    with_db(DbName, {couch_db, get_db_info, []}).
+    with_db(DbName, [], {couch_db, get_db_info, []}).
 
 get_doc_count(DbName) ->
-    with_db(DbName, {couch_db, get_doc_count, []}).
+    with_db(DbName, [], {couch_db, get_doc_count, []}).
 
 get_update_seq(DbName) ->
     rexi:reply(case couch_db:open(DbName, []) of
@@ -54,10 +54,10 @@ get_update_seq(DbName) ->
     end).
 
 open_doc(DbName, DocId, Options) ->
-    with_db(DbName, {couch_db, open_doc_int, [DocId, Options]}).
+    with_db(DbName, Options, {couch_db, open_doc_int, [DocId, Options]}).
 
 open_revs(DbName, Id, Revs, Options) ->
-    with_db(DbName, {couch_db, open_doc_revs, [Id, Revs, Options]}).
+    with_db(DbName, Options, {couch_db, open_doc_revs, [Id, Revs, Options]}).
 
 get_missing_revs(DbName, IdRevsList) ->
     % reimplement here so we get [] for Ids with no missing revs in response
@@ -77,14 +77,14 @@ get_missing_revs(DbName, IdRevsList) ->
     end).
 
 update_docs(DbName, Docs, Options) ->
-    with_db(DbName, {couch_db, update_docs, [Docs, Options]}).
+    with_db(DbName, Options, {couch_db, update_docs, [Docs, Options]}).
 
 %%
 %% internal
 %%
 
-with_db(DbName, {M,F,A}) ->
-    case couch_db:open(DbName, []) of
+with_db(DbName, Options, {M,F,A}) ->
+    case couch_db:open(DbName, Options) of
     {ok, Db} ->
         rexi:reply(apply(M, F, [Db | A]));
     Error ->

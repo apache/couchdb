@@ -36,29 +36,29 @@ get_doc_count(DbName) ->
     fabric_db_doc_count:go(dbname(DbName)).
 
 create_db(DbName, Options) ->
-    fabric_db_create:create_db(dbname(DbName), Options).
+    fabric_db_create:create_db(dbname(DbName), opts(Options)).
 
 delete_db(DbName, Options) ->
-    fabric_db_delete:delete_db(dbname(DbName), Options).
+    fabric_db_delete:delete_db(dbname(DbName), opts(Options)).
 
 
 
 open_doc(DbName, Id, Options) ->
-    fabric_doc_open:go(dbname(DbName), docid(Id), Options).
+    fabric_doc_open:go(dbname(DbName), docid(Id), opts(Options)).
 
 open_revs(DbName, Id, Revs, Options) ->
-    fabric_doc_open_revs:go(dbname(DbName), docid(Id), Revs, Options).
+    fabric_doc_open_revs:go(dbname(DbName), docid(Id), Revs, opts(Options)).
 
 get_missing_revs(DbName, IdsRevs) when is_list(IdsRevs) ->
     Sanitized = [idrevs(IdR) || IdR <- IdsRevs],
     fabric_doc_missing_revs:go(dbname(DbName), Sanitized).
 
 update_doc(DbName, Doc, Options) ->
-    {ok, [Result]} = update_docs(DbName, [Doc], Options),
+    {ok, [Result]} = update_docs(DbName, [Doc], opts(Options)),
     Result.
 
 update_docs(DbName, Docs, Options) ->
-    fabric_doc_update:go(dbname(DbName), docs(Docs), Options).
+    fabric_doc_update:go(dbname(DbName), docs(Docs), opts(Options)).
 
 
 all_docs(DbName, #view_query_args{} = QueryArgs, Callback, Acc0) when
@@ -100,6 +100,19 @@ rev(Rev) when is_list(Rev); is_binary(Rev) ->
     couch_doc:parse_rev(Rev);
 rev({Seq, Hash} = Rev) when is_integer(Seq), is_binary(Hash) ->
     Rev.
+
+opts(Options) ->
+    case couch_util:get_value(user_ctx, Options) of
+    undefined ->
+        case erlang:get(user_ctx) of
+        #user_ctx{} = Ctx ->
+            [{user_ctx, Ctx} | Options];
+        _ ->
+            Options
+        end;
+    _ ->
+        Options
+    end.
 
 generate_customer_path("/", _Customer) ->
     "";
