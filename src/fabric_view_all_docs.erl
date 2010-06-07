@@ -21,12 +21,14 @@ go(DbName, #view_query_args{keys=nil} = QueryArgs, Callback, Acc0) ->
         limit = Limit,
         user_acc = Acc0
     },
-    case fabric_util:receive_loop(Workers, #shard.ref, fun handle_message/3,
+    try fabric_util:receive_loop(Workers, #shard.ref, fun handle_message/3,
         State, infinity, 5000) of
     {ok, NewState} ->
         {ok, NewState#collector.user_acc};
     Error ->
         Error
+    after
+        fabric_util:cleanup(Workers)
     end;
 
 go(DbName, QueryArgs, Callback, Acc0) ->

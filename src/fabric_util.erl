@@ -1,6 +1,6 @@
 -module(fabric_util).
 
--export([submit_jobs/3, recv/4, receive_loop/4, receive_loop/6]).
+-export([submit_jobs/3, cleanup/1, recv/4, receive_loop/4, receive_loop/6]).
 
 -include("fabric.hrl").
 
@@ -10,6 +10,9 @@ submit_jobs(Shards, EndPoint, ExtraArgs) ->
         Ref = rexi:cast(Node, {fabric_rpc, EndPoint, [ShardName | ExtraArgs]}),
         Shard#shard{ref = Ref}
     end, Shards).
+
+cleanup(Workers) ->
+    [rexi:kill(Node, Ref) || #shard{node=Node, ref=Ref} <- Workers].
 
 recv(Workers, Keypos, Fun, Acc0) ->
     receive_loop(Workers, Keypos, Fun, Acc0).
