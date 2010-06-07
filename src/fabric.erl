@@ -12,7 +12,7 @@
 -export([all_docs/4]).
 
 % miscellany
--export([db_path/2]).
+-export([db_path/2, design_docs/1]).
 
 -include("fabric.hrl").
 
@@ -64,6 +64,22 @@ update_docs(DbName, Docs, Options) ->
 all_docs(DbName, #view_query_args{} = QueryArgs, Callback, Acc0) when
         is_function(Callback, 2) ->
     fabric_view_all_docs:go(dbname(DbName), QueryArgs, Callback, Acc0).
+
+design_docs(DbName) ->
+    QueryArgs = #view_query_args{start_key = <<"_design/">>, include_docs=true},
+    Callback = fun({total_and_offset, _, _}, []) ->
+        {ok, []};
+    ({row, {Props}}, Acc) ->
+        case couch_util:get_value(id, Props) of
+        <<"_design/", _/binary>> ->
+            {ok, [couch_util:get_value(doc, Props) | Acc]};
+        _ ->
+            {stop, Acc}
+        end;
+    (complete, Acc) ->
+        {ok, lists:reverse(Acc)}
+    end,
+    fabric:all_docs(dbname(DbName), QueryArgs, Callback, []).
 
 %% some simple type validation and transcoding
 
