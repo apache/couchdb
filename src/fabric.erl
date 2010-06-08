@@ -6,7 +6,7 @@
 
 % Documents
 -export([open_doc/3, open_revs/4, get_missing_revs/2, update_doc/3,
-    update_docs/3]).
+    update_docs/3, att_receiver/2]).
 
 % Views
 -export([all_docs/4, query_view/5]).
@@ -42,7 +42,7 @@ delete_db(DbName, Options) ->
     fabric_db_delete:delete_db(dbname(DbName), opts(Options)).
 
 
-
+% doc operations
 open_doc(DbName, Id, Options) ->
     fabric_doc_open:go(dbname(DbName), docid(Id), opts(Options)).
 
@@ -60,6 +60,8 @@ update_doc(DbName, Doc, Options) ->
 update_docs(DbName, Docs, Options) ->
     fabric_doc_update:go(dbname(DbName), docs(Docs), opts(Options)).
 
+att_receiver(Req, Length) ->
+    fabric_doc_attachments:receiver(Req, Length).
 
 all_docs(DbName, #view_query_args{} = QueryArgs, Callback, Acc0) when
         is_function(Callback, 2) ->
