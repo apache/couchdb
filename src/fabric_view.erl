@@ -126,6 +126,8 @@ keydict(Keys) ->
 
 %% internal %%
 
+get_next_row(#collector{rows = []}) ->
+    throw(complete);
 get_next_row(#collector{reducer = RedSrc} = St) when RedSrc =/= undefined ->
     #collector{
         query_args = #view_query_args{direction=Dir},
@@ -146,11 +148,8 @@ get_next_row(#collector{reducer = RedSrc} = St) when RedSrc =/= undefined ->
         NewSt = St#collector{keys=RestKeys, rows=NewRowDict, counters=Counters},
         {#view_row{key=Key, id=reduced, value=Reduced}, NewSt};
     error ->
-        NewSt = St#collector{keys=RestKeys},
-        {#view_row{key=Key, id=reduced, value={error, missing}}, NewSt}
+        get_next_row(St#collector{keys=RestKeys})
     end;
-get_next_row(#collector{rows = []}) ->
-    throw(complete);
 get_next_row(State) ->
     #collector{
         rows = [Row|Rest],
@@ -167,12 +166,12 @@ get_next_row(State) ->
         {Row, NewState#collector{rows = Rest}}
     end.
 
-find_next_key(undefined, Dir, RowDict) ->
+find_next_key(nil, Dir, RowDict) ->
     case lists:sort(sort_fun(Dir), dict:fetch_keys(RowDict)) of
     [] ->
         throw(complete);
     [Key|_] ->
-        {Key, undefined}
+        {Key, nil}
     end;
 find_next_key([], _, _) ->
     throw(complete);

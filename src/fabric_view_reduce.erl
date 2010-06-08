@@ -21,6 +21,7 @@ go(DbName, {GroupId, VName}, Args, Callback, Acc0) ->
         callback = Callback,
         buffer_size = list_to_integer(BufferSize),
         counters = fabric_dict:init(Workers, 0),
+        keys = Args#view_query_args.keys,
         skip = Skip,
         limit = Limit,
         lang = Group#group.def_lang,
@@ -64,21 +65,10 @@ handle_message(#view_row{key=Key} = Row, {Worker, From}, State) ->
         % this worker lost the race with other partition copies, terminate it
         gen_server:reply(From, stop),
         {ok, State};
-    % first ->
-    %     gen_server:reply(From, ok),
-    %     Rows = dict:append(Key, Row#view_row{worker=Worker}, Rows0),
-    %     C1 = fabric_dict:store(Worker, 1, Counters0),
-    %     C2 = fabric_view:remove_overlapping_shards(Worker, C1),
-    %     NewState = State#collector{counters=C2, rows=Rows},
-    %     case fabric_dict:any(first, C2) of
-    %     true ->
-    %         {ok, NewState};
-    %     false ->
-    %         fabric_view:maybe_send_row(State#collector{counters=C2, rows=Rows})
-    %     end;
     _ ->
         Rows = dict:append(Key, Row#view_row{worker=Worker}, Rows0),
         C1 = fabric_dict:update_counter(Worker, 1, Counters0),
+        % TODO time this call, if slow don't do it every time
         C2 = fabric_view:remove_overlapping_shards(Worker, C1),
         State1 = State#collector{rows=Rows, counters=C2},
         State2 = fabric_view:maybe_pause_worker(Worker, From, State1),
