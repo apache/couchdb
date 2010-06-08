@@ -22,7 +22,10 @@
     skip,
     limit,
     stop_fun,
-    keydict,
+    keys,
+    os_proc,
+    reducer,
+    lang,
     user_acc
 }).
 

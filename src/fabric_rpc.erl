@@ -2,7 +2,7 @@
 
 -export([get_db_info/1, get_doc_count/1, get_update_seq/1]).
 -export([open_doc/3, open_revs/4, get_missing_revs/2, update_docs/3]).
--export([all_docs/2, map_view/4]).
+-export([all_docs/2, map_view/4, reduce_view/4]).
 
 -include("fabric.hrl").
 
@@ -60,7 +60,7 @@ map_view(DbName, DDoc, ViewName, QueryArgs) ->
     Group0 = couch_view_group:design_doc_to_view_group(Db, DDoc),
     {ok, Pid} = gen_server:call(couch_view, {get_group_server, DbName, Group0}),
     {ok, Group} = couch_view_group:request_group(Pid, MinSeq),
-    View = extract_view(Pid, ViewName, Group#group.views, ViewType),
+    View = fabric_view:extract_view(Pid, ViewName, Group#group.views, ViewType),
     {ok, Total} = couch_view:get_row_count(View),
     Acc0 = #view_acc{
         db = Db,
@@ -84,6 +84,38 @@ map_view(DbName, DDoc, ViewName, QueryArgs) ->
         end, Acc0, Keys)
     end,
     final_response(Total, Acc#view_acc.offset).
+
+reduce_view(DbName, Group0, ViewName, QueryArgs) ->
+    {ok, Db} = couch_db:open(DbName, []),
+    #view_query_args{
+        start_key = StartKey,
+        start_docid = StartDocId,
+        end_key = EndKey,
+        end_docid = EndDocId,
+        group_level = GroupLevel,
+        limit = Limit,
+        skip = Skip,
+        keys = Keys,
+        direction = Dir,
+        stale = Stale
+    } = QueryArgs,
+    GroupFun = group_rows_fun(GroupLevel),
+    MinSeq = if Stale == ok -> 0; true -> couch_db:get_update_seq(Db) end,
+    {ok, Pid} = gen_server:call(couch_view, {get_group_server, DbName, Group0}),
+    {ok, #group{views=Views, def_lang=Lang}} = couch_view_group:request_group(
+        Pid, MinSeq),
+    {NthRed, View} = fabric_view:extract_view(Pid, ViewName, Views, reduce),
+    ReduceView = {reduce, NthRed, Lang, View},
+    Acc0 = #view_acc{group_level = GroupLevel, limit = Limit+Skip},
+    case Keys of
+    nil ->
+        couch_view:fold_reduce(ReduceView, Dir, {StartKey,StartDocId},
+            {EndKey,EndDocId}, GroupFun, fun reduce_fold/3, Acc0);
+    _ ->
+        [couch_view:fold_reduce(ReduceView, Dir, {K,StartDocId}, {K,EndDocId},
+            GroupFun, fun reduce_fold/3, Acc0) || K <- Keys]
+    end,
+    rexi:reply(complete).
 
 get_db_info(DbName) ->
     with_db(DbName, [], {couch_db, get_db_info, []}).
@@ -229,33 +261,30 @@ default_stop_fun(#view_query_args{direction=rev} = Args) ->
             couch_view:less_json([ViewKey, ViewId], [EndKey, EndDocId])
     end.
 
-extract_view(Pid, ViewName, [], _ViewType) ->
-    ?LOG_ERROR("missing_named_view ~p", [ViewName]),
-    exit(Pid, kill),
-    exit(missing_named_view);
-extract_view(Pid, ViewName, [View|Rest], ViewType) ->
-    case lists:member(ViewName, view_names(View, ViewType)) of
-    true ->
-        if ViewType == reduce ->
-            {index_of(ViewName, view_names(View, reduce)), View};
-        true ->
-            View
-        end;
-    false ->
-        extract_view(Pid, ViewName, Rest, ViewType)
+group_rows_fun(exact) ->
+    fun({Key1,_}, {Key2,_}) -> Key1 == Key2 end;
+group_rows_fun(0) ->
+    fun(_A, _B) -> true end;
+group_rows_fun(GroupLevel) when is_integer(GroupLevel) ->
+    fun({[_|_] = Key1,_}, {[_|_] = Key2,_}) ->
+        lists:sublist(Key1, GroupLevel) == lists:sublist(Key2, GroupLevel);
+    ({Key1,_}, {Key2,_}) ->
+        Key1 == Key2
     end.
 
-view_names(View, Type) when Type == red_map; Type == reduce ->
-    [Name || {Name, _} <- View#view.reduce_funs];
-view_names(View, map) ->
-    View#view.map_names.
+reduce_fold(_Key, _Red, #view_acc{limit=0} = Acc) ->
+    {stop, Acc};
+reduce_fold(_Key, Red, #view_acc{group_level=0} = Acc) ->
+    send(null, Red, Acc);
+reduce_fold(Key, Red, #view_acc{group_level=exact} = Acc) ->
+    send(Key, Red, Acc);
+reduce_fold(K, Red, #view_acc{group_level=I} = Acc) when I > 0, is_list(K) ->
+    send(lists:sublist(K, I), Red, Acc).
 
-index_of(X, List) ->
-    index_of(X, List, 1).
-
-index_of(_X, [], _I) ->
-    not_found;
-index_of(X, [X|_Rest], I) ->
-    I;
-index_of(X, [_|Rest], I) ->
-    index_of(X, Rest, I+1).
+send(Key, Value, #view_acc{limit=Limit} = Acc) ->
+    case rexi:sync_reply(#view_row{key=Key, value=Value}) of
+    ok ->
+        {ok, Acc#view_acc{limit=Limit-1}};
+    stop ->
+        exit(normal)
+    end.

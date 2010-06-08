@@ -19,7 +19,8 @@
        fabric_util,
        fabric_view,
        fabric_view_all_docs,
-       fabric_view_map
+       fabric_view_map,
+       fabric_view_reduce
    ]},
   {registered, []},
   {included_applications, []},

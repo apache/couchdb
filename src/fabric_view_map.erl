@@ -20,7 +20,7 @@ go(DbName, {GroupId, View}, Args, Callback, Acc0) ->
         skip = Skip,
         limit = Limit,
         stop_fun = stop_fun(Args),
-        keydict = fabric_view:keydict(Keys),
+        keys = fabric_view:keydict(Keys),
         user_acc = Acc0
     },
     try fabric_util:receive_loop(Workers, #shard.ref, fun handle_message/3,
@@ -93,7 +93,7 @@ handle_message(#view_row{} = Row, {Worker, From}, State) ->
         query_args = #view_query_args{direction=Dir},
         counters = Counters0,
         rows = Rows0,
-        keydict = KeyDict
+        keys = KeyDict
     } = State,
     Rows = merge_row(Dir, KeyDict, Row#view_row{worker=Worker}, Rows0),
     Counters1 = fabric_dict:update_counter(Worker, 1, Counters0),
