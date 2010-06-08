@@ -26,6 +26,7 @@
     os_proc,
     reducer,
     lang,
+    sorted,
     user_acc
 }).
 

@@ -21,6 +21,7 @@ go(DbName, {GroupId, View}, Args, Callback, Acc0) ->
         limit = Limit,
         stop_fun = stop_fun(Args),
         keys = fabric_view:keydict(Keys),
+        sorted = Args#view_query_args.sorted,
         user_acc = Acc0
     },
     try fabric_util:receive_loop(Workers, #shard.ref, fun handle_message/3,
@@ -88,6 +89,17 @@ handle_message({total_and_offset, Tot, Off}, {Worker, From}, State) ->
         end
     end;
 
+handle_message(#view_row{}, {_, _}, #collector{limit=0} = State) ->
+    #collector{callback=Callback} = State,
+    {_, Acc} = Callback(complete, State#collector.user_acc),
+    {stop, State#collector{user_acc=Acc}};
+
+handle_message(#view_row{} = Row, {_,From}, #collector{sorted=false} = St) ->
+    #collector{callback=Callback, user_acc=AccIn, limit=Limit} = St,
+    {Go, Acc} = Callback(fabric_view:transform_row(Row), AccIn),
+    gen_server:reply(From, ok),
+    {Go, St#collector{user_acc=Acc, limit=Limit-1}};
+    
 handle_message(#view_row{} = Row, {Worker, From}, State) ->
     #collector{
         query_args = #view_query_args{direction=Dir},
