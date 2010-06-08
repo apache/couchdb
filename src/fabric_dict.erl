@@ -11,6 +11,9 @@ init(Keys, InitialValue) ->
 decrement_all(Dict) ->
     [{K,V-1} || {K,V} <- Dict].
 
+store(Key, Value, Dict) ->
+    orddict:store(Key, Value, Dict).
+
 erase(Key, Dict) ->
     orddict:erase(Key, Dict).
 
@@ -21,6 +24,8 @@ update_counter(Key, Incr, Dict0) ->
 lookup_element(Key, Dict) ->
     couch_util:get_value(Key, Dict).
 
+size(Dict) ->
+    orddict:size(Dict).
 
 any(Value, Dict) ->
     lists:keymember(Value, 2, Dict).

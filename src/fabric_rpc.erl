@@ -2,7 +2,7 @@
 
 -export([get_db_info/1, get_doc_count/1, get_update_seq/1]).
 -export([open_doc/3, open_revs/4, get_missing_revs/2, update_docs/3]).
--export([all_docs/2, map_view/4, reduce_view/4]).
+-export([all_docs/2, changes/3, map_view/4, reduce_view/4]).
 
 -include("fabric.hrl").
 
@@ -41,6 +41,28 @@ all_docs(DbName, #view_query_args{keys=nil} = QueryArgs) ->
     },
     {ok, Acc} = couch_db:enum_docs(Db, StartId, Dir, fun view_fold/3, Acc0),
     final_response(Total, Acc#view_acc.offset).
+
+changes(DbName, Args0, StartSeq) ->
+    #changes_args{style=Style, dir=Dir, filter=FilterName} = Args0,
+    case couch_db:open(DbName, []) of
+    {ok, Db} ->
+        % couch code has a MochiReq for 2nd argument, ick
+        Args = Args0#changes_args{
+            filter = couch_changes:make_filter_fun(FilterName, nil, Db)
+        },
+        Enum = fun changes_enumerator/2,
+        Opts = [{dir,Dir}],
+        Acc0 = {Db, StartSeq, Args},
+        try
+            {ok, {_, LastSeq, _}} =
+                couch_db:changes_since(Db, Style, StartSeq, Enum, Opts, Acc0),
+            rexi:reply({complete, LastSeq})
+        after
+            couch_db:close(Db)
+        end;
+    Error ->
+        rexi:reply(Error)
+    end.
 
 map_view(DbName, DDoc, ViewName, QueryArgs) ->
     {ok, Db} = couch_db:open(DbName, []),
@@ -124,12 +146,7 @@ get_doc_count(DbName) ->
     with_db(DbName, [], {couch_db, get_doc_count, []}).
 
 get_update_seq(DbName) ->
-    rexi:reply(case couch_db:open(DbName, []) of
-    {ok, #db{update_seq = Seq}} ->
-        {ok, Seq};
-    Error ->
-        Error
-    end).
+    with_db(DbName, [], {couch_db, get_update_seq, []}).
 
 open_doc(DbName, DocId, Options) ->
     with_db(DbName, Options, {couch_db, open_doc_int, [DocId, Options]}).
@@ -287,4 +304,34 @@ send(Key, Value, #view_acc{limit=Limit} = Acc) ->
         {ok, Acc#view_acc{limit=Limit-1}};
     stop ->
         exit(normal)
+    end.
+
+changes_enumerator(DocInfos, {Db, _Seq, Args}) ->
+    #changes_args{include_docs=IncludeDocs, filter=FilterFun} = Args,
+    [#doc_info{id=Id, high_seq=Seq, revs=[#rev_info{deleted=Del,rev=Rev}|_]}|_]
+        = DocInfos,
+    case [Result || Result <- FilterFun(DocInfos), Result /= null] of
+    [] ->
+        {ok, {Db, Seq, Args}};
+    Results ->
+        ChangesRow = changes_row(Db, Seq, Id, Results, Rev, Del, IncludeDocs),
+        Go = rexi:sync_reply(ChangesRow),
+        {Go, {Db, Seq, Args}}
+    end.
+
+changes_row(_, Seq, Id, Results, _, true, true) ->
+    #view_row{key=Seq, id=Id, value=Results, doc=deleted};
+changes_row(_, Seq, Id, Results, _, true, false) ->
+    #view_row{key=Seq, id=Id, value=Results, doc=deleted};
+changes_row(Db, Seq, Id, Results, Rev, false, true) ->
+    #view_row{key=Seq, id=Id, value=Results, doc=doc_member(Db, Id, Rev)};
+changes_row(_, Seq, Id, Results, _, false, false) ->
+    #view_row{key=Seq, id=Id, value=Results}.
+
+doc_member(Shard, Id, Rev) ->
+    case couch_db:open_doc_revs(Shard, Id, [Rev], []) of
+    {ok, [{ok,Doc}]} ->
+        couch_doc:to_json_obj(Doc, []);
+    Error ->
+        Error
     end.
