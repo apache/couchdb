@@ -165,7 +165,8 @@ handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
             local_docs_btree = NewLocalBtree,
             main_pid = Db#db.main_pid,
             filepath = Filepath,
-            instance_start_time = Db#db.instance_start_time
+            instance_start_time = Db#db.instance_start_time,
+            revs_limit = Db#db.revs_limit
         }),
 
         ?LOG_DEBUG("CouchDB swapping files ~s and ~s.",
