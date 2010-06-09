@@ -16,7 +16,7 @@
     handle_all_dbs_req/1,handle_replicate_req/1,handle_restart_req/1,
     handle_uuids_req/1,handle_config_req/1,handle_log_req/1,
     handle_task_status_req/1,handle_sleep_req/1,handle_welcome_req/1,
-    handle_utils_dir_req/1]).
+    handle_utils_dir_req/1, handle_favicon_req/1]).
 
 -export([increment_update_seq_req/2]).
 
@@ -56,6 +56,9 @@ get_version() ->
         Current
     end,
     list_to_binary(Version).
+
+handle_favicon_req(Req) ->
+    handle_favicon_req(Req, couch_config:get("chttpd", "docroot")).
 
 handle_favicon_req(#httpd{method='GET'}=Req, DocumentRoot) ->
     chttpd:serve_file(Req, "favicon.ico", DocumentRoot);

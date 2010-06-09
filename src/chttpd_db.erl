@@ -308,67 +308,9 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_all_docs">>]}=Req, Db) ->
 db_req(#httpd{path_parts=[_,<<"_all_docs">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "GET,HEAD,POST");
 
-db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs_by_seq">>]}=Req, Db) ->
-    throw(not_implemented),
-    #view_query_args{
-        start_key = StartKey,
-        limit = Limit,
-        skip = SkipCount,
-        direction = Dir
-    } = QueryArgs = chttpd_view:parse_view_params(Req, nil, map),
-
-    {ok, Info} = fabric:get_db_info(Db),
-    CurrentEtag = chttpd:make_etag(Info),
-    chttpd:etag_respond(Req, CurrentEtag, fun() ->
-        TotalRowCount = couch_util:get_value(doc_count, Info),
-        FoldlFun = chttpd_view:make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db,
-            TotalRowCount, #view_fold_helper_funs{
-                reduce_count = fun ?COUCH:enum_docs_since_reduce_to_count/1
-            }),
-        StartKey2 = case StartKey of
-            nil -> 0;
-            <<>> -> 100000000000;
-            {} -> 100000000000;
-            StartKey when is_integer(StartKey) -> StartKey
-        end,
-        {ok, FoldResult} = ?COUCH:enum_docs_since(Db, StartKey2, Dir,
-            fun(DocInfo, Offset, Acc) ->
-                #doc_info{
-                    id=Id,
-                    high_seq=Seq,
-                    revs=[#rev_info{rev=Rev,deleted=Deleted} | RestInfo]
-                } = DocInfo,
-                ConflictRevs = couch_doc:rev_to_strs(
-                    [Rev1 || #rev_info{deleted=false, rev=Rev1} <- RestInfo]),
-                DelConflictRevs = couch_doc:rev_to_strs(
-                    [Rev1 || #rev_info{deleted=true, rev=Rev1} <- RestInfo]),
-                Json = {
-                    [{<<"rev">>, couch_doc:rev_to_str(Rev)}] ++
-                    case ConflictRevs of
-                    []  -> [];
-                    _   -> [{<<"conflicts">>, ConflictRevs}]
-                    end ++
-                    case DelConflictRevs of
-                    []  ->  [];
-                    _   ->  [{<<"deleted_conflicts">>, DelConflictRevs}]
-                    end ++
-                    case Deleted of
-                    true -> [{<<"deleted">>, true}];
-                    false -> []
-                    end
-                },
-                FoldlFun({{Seq, Id}, Json}, Offset, Acc)
-            end, {Limit, SkipCount, undefined, [], nil}),
-        chttpd_view:finish_view_fold(Req, TotalRowCount, {ok, FoldResult})
-    end);
-
-db_req(#httpd{path_parts=[_,<<"_all_docs_by_seq">>]}=Req, _Db) ->
-    send_method_not_allowed(Req, "GET,HEAD");
-
 db_req(#httpd{method='POST',path_parts=[_,<<"_missing_revs">>]}=Req, Db) ->
     {JsonDocIdRevs} = chttpd:json_body_obj(Req),
-    JsonDocIdRevs2 = [{Id, [couch_doc:parse_rev(RevStr) || RevStr <- RevStrs]} || {Id, RevStrs} <- JsonDocIdRevs],
-    {ok, Results} = fabric:get_missing_revs(Db, JsonDocIdRevs2),
+    {ok, Results} = fabric:get_missing_revs(Db, JsonDocIdRevs),
     Results2 = [{Id, [couch_doc:rev_to_str(Rev) || Rev <- Revs]} || {Id, Revs} <- Results],
     send_json(Req, {[
         {missing_revs, {Results2}}
@@ -435,23 +377,29 @@ db_req(#httpd{path_parts=[_, DocId | FileNameParts]}=Req, Db) ->
     db_attachment_req(Req, Db, DocId, FileNameParts).
 
 all_docs_view(Req, Db, Keys) ->
-    Etag = couch_util:new_uuid(),
-    QueryArgs = chttpd_view:parse_view_params(Req, nil, map),
+    T0 = now(),
+    {ok, Info} = fabric:get_db_info(Db),
+    Etag = couch_httpd:make_etag(Info),
+    ?LOG_INFO("_all_docs etag - ~p ms", [timer:now_diff(now(),T0) / 1000]),
+    QueryArgs = chttpd_view:parse_view_params(Req, Keys, map),
     chttpd:etag_respond(Req, Etag, fun() ->
         {ok, Resp} = chttpd:start_json_response(Req, 200, [{"Etag",Etag}]),
-        {ok, Total, Result} = ?COUCH:all_docs_view(Resp, Db, Keys, QueryArgs),
-        send_chunk(Resp, all_docs_final_chunk(Total, Result)),
-        end_json_response(Resp)
+        fabric:all_docs(Db, QueryArgs, fun all_docs_callback/2, {nil, Resp})
     end).
 
-all_docs_final_chunk(Total, {_, _, undefined, _, nil}) ->
-    ?JSON_ENCODE({[{total_rows, Total}, {offset, Total}, {rows, []}]});
-all_docs_final_chunk(Total, {_, _, undefined, _, Offset}) ->
-    ?JSON_ENCODE({[{total_rows, Total}, {offset, Offset}, {rows, []}]});
-all_docs_final_chunk(_, {_, _, _, _, _}) ->
-    "\r\n]}";
-all_docs_final_chunk(_, Error) ->
-    throw(Error).
+all_docs_callback({total_and_offset, Total, Offset}, {_, Resp}) ->
+    Chunk = "{\"total_rows\":~p,\"offset\":~p,\"rows\":[\r\n",
+    send_chunk(Resp, io_lib:format(Chunk, [Total, Offset])),
+    {ok, {"", Resp}};
+all_docs_callback({row, Row}, {Prepend, Resp}) ->
+    send_chunk(Resp, [Prepend, ?JSON_ENCODE(Row)]),
+    {ok, {",\r\n", Resp}};
+all_docs_callback(complete, {_, Resp}) ->
+    send_chunk(Resp, "\r\n]}"),
+    end_json_response(Resp),
+    {stop, Resp};
+all_docs_callback({error, Reason}, Resp) ->
+    chttpd:send_chunked_error(Resp, {error, Reason}).
 
 db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
     % check for the existence of the doc to handle the 404 case.
