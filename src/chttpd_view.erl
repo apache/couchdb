@@ -273,7 +273,8 @@ parse_view_params(Req, Keys, ViewType) ->
     end,
     Args = #view_query_args{
         view_type=ViewType,
-        multi_get=IsMultiGet
+        multi_get=IsMultiGet,
+        keys=Keys
     },
     QueryArgs = lists:foldl(fun({K, V}, Args2) ->
         validate_view_query(K, V, Args2)
