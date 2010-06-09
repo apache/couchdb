@@ -9,7 +9,7 @@
     update_docs/3, att_receiver/2]).
 
 % Views
--export([all_docs/4, changes/3, query_view/5]).
+-export([all_docs/4, changes/3, query_view/3, query_view/4, query_view/6]).
 
 % miscellany
 -export([db_path/2, design_docs/1]).
@@ -72,11 +72,22 @@ changes(DbName, Options, Callback) ->
     Feed = Options#changes_args.feed,
     fabric_view_changes:go(dbname(DbName), Feed, Options, Callback).
 
-query_view(DbName, View, #view_query_args{view_type=reduce} = QueryArgs,
-        Callback, Acc0) ->
-    fabric_view_reduce:go(dbname(DbName), view(View), QueryArgs, Callback, Acc0);
-query_view(DbName, View, #view_query_args{} = QueryArgs, Callback, Acc0) ->
-    fabric_view_map:go(dbname(DbName), view(View), QueryArgs, Callback, Acc0).
+query_view(DbName, DesignName, ViewName) ->
+    query_view(DbName, DesignName, ViewName, #view_query_args{}).
+
+query_view(DbName, DesignName, ViewName, QueryArgs) ->
+    Callback = fun default_callback/2,
+    query_view(DbName, DesignName, ViewName, QueryArgs, Callback, []).
+
+query_view(DbName, DesignName, ViewName, QueryArgs, Callback, Acc0) ->
+    Db = dbname(DbName), Design = name(DesignName), View = name(ViewName),
+    case is_reduce_view(Db, Design, View, QueryArgs) of
+    true ->
+        Mod = fabric_view_reduce;
+    false ->
+        Mod = fabric_view_map
+    end,
+    Mod:go(Db, Design, View, QueryArgs, Callback, Acc0).
 
 design_docs(DbName) ->
     QueryArgs = #view_query_args{start_key = <<"_design/">>, include_docs=true},
@@ -100,8 +111,13 @@ dbname(DbName) when is_list(DbName) ->
     list_to_binary(DbName);
 dbname(DbName) when is_binary(DbName) ->
     DbName;
+dbname(#db{name=Name}) ->
+    Name;
 dbname(DbName) ->
     erlang:error({illegal_database_name, DbName}).
+
+name(Thing) ->
+    couch_util:to_binary(Thing).
 
 docid(DocId) when is_list(DocId) ->
     list_to_binary(DocId);
@@ -130,10 +146,6 @@ rev(Rev) when is_list(Rev); is_binary(Rev) ->
 rev({Seq, Hash} = Rev) when is_integer(Seq), is_binary(Hash) ->
     Rev.
 
-view(ViewName) ->
-    [Group, View] = re:split(ViewName, "/"),
-    {Group, View}.
-
 opts(Options) ->
     case couch_util:get_value(user_ctx, Options) of
     undefined ->
@@ -146,6 +158,14 @@ opts(Options) ->
     _ ->
         Options
     end.
+
+default_callback(complete, Acc) ->
+    {ok, lists:reverse(Acc)};
+default_callback(Row, Acc) ->
+    {ok, [Row | Acc]}.
+
+is_reduce_view(_, _, _, #view_query_args{view_type=Reduce}) ->
+    Reduce =:= reduce.
 
 generate_customer_path("/", _Customer) ->
     "";

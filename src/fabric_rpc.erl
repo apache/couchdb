@@ -172,7 +172,13 @@ get_missing_revs(DbName, IdRevsList) ->
     end).
 
 update_docs(DbName, Docs, Options) ->
-    with_db(DbName, Options, {couch_db, update_docs, [Docs, Options]}).
+    case proplists:get_value(replicated_changes, Options) of
+    true ->
+        X = replicated_changes;
+    _ ->
+        X = interactive_edit
+    end,
+    with_db(DbName, Options, {couch_db, update_docs, [Docs, Options, X]}).
 
 %%
 %% internal
