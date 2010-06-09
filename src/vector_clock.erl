@@ -9,7 +9,7 @@
 %% -include("etest/vector_clock_test.erl").
 %% -endif.
 
-create(NodeName) -> [{NodeName, lib_misc:now_float()}].
+create(NodeName) -> [{NodeName, now_float()}].
 
 truncate(Clock) when length(Clock) > 10 ->
   lists:nthtail(length(Clock) - 10, lists:keysort(2, Clock));
@@ -17,13 +17,13 @@ truncate(Clock) when length(Clock) > 10 ->
 truncate(Clock) -> Clock.
 
 increment(NodeName, [{NodeName, _Version}|Clocks]) ->
-	[{NodeName, lib_misc:now_float()}|Clocks];
+	[{NodeName, now_float()}|Clocks];
 
 increment(NodeName, [NodeClock|Clocks]) ->
 	[NodeClock|increment(NodeName, Clocks)];
 
 increment(NodeName, []) ->
-	[{NodeName, lib_misc:now_float()}].
+	[{NodeName, now_float()}].
 
 resolve({ClockA, ValuesA}, {ClockB, ValuesB}) ->
   case compare(ClockA, ClockB) of
@@ -98,3 +98,12 @@ equals(ClockA, ClockB) ->
     end, ClockB)
   end, ClockA),
   Equivalent and (length(ClockA) == length(ClockB)).
+
+now_float() ->
+  time_to_epoch_float(now()).
+
+time_to_epoch_float(Time) when is_integer(Time) or is_float(Time) ->
+  Time;
+
+time_to_epoch_float({Mega,Sec,Micro}) ->
+  Mega * 1000000 + Sec + Micro / 1000000.
