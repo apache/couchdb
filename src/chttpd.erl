@@ -55,8 +55,6 @@ stop() ->
 handle_request(MochiReq) ->
     Begin = now(),
 
-    DefaultFun = fun chttpd_db:handle_request/1,
-
     AuthenticationFuns = [
         fun chttpd_auth:cookie_authentication_handler/1,
         fun chttpd_auth:default_authentication_handler/1
@@ -67,14 +65,8 @@ handle_request(MochiReq) ->
     RawUri = MochiReq:get(raw_path),
     Customer = cloudant_util:customer_name(MochiReq:get_header_value("X-Cloudant-User"), MochiReq:get_header_value("Host")),
     Path = ?COUCH:db_path(RawUri, Customer),
+    {HandlerKey, _, _} = mochiweb_util:partition(Path, "/"),
 
-    HandlerKey =
-    case mochiweb_util:partition(Path, "/") of
-    {"", "", ""} ->
-        <<"/">>; % Special case the root url handler
-    {FirstPart, _, _} ->
-        list_to_binary(FirstPart)
-    end,
     LogForClosedSocket = io_lib:format("mochiweb_recv_error for ~s - ~p ~s", [
         MochiReq:get(peer),
         MochiReq:get(method),
@@ -106,12 +98,12 @@ handle_request(MochiReq) ->
         design_url_handlers = design_url_handlers()
     },
 
-    HandlerFun = couch_util:get_value(HandlerKey, url_handlers(), DefaultFun),
     {ok, Resp} =
     try
         erase(cookie_auth_failed),
         case authenticate_request(HttpReq, AuthenticationFuns) of
         #httpd{} = Req ->
+            HandlerFun = url_handler(HandlerKey),
             HandlerFun(cloudant_auth:authorize_request(Req));
         Response ->
             Response
@@ -181,25 +173,23 @@ authenticate_request(Response, _AuthFuns) ->
 increment_method_stats(Method) ->
     couch_stats_collector:increment({httpd_request_methods, Method}).
 
-url_handlers() ->
-    [
-        {<<"/">>,               fun chttpd_misc:handle_welcome_req/1},
-        {<<"favicon.ico">>,     fun chttpd_misc:handle_favicon_req/1},
-        {<<"_utils">>,          fun chttpd_misc:handle_utils_dir_req/1},
-        {<<"_all_dbs">>,        fun chttpd_misc:handle_all_dbs_req/1},
-        {<<"_active_tasks">>,   fun chttpd_misc:handle_task_status_req/1},
-        {<<"_config">>,         fun chttpd_misc:handle_config_req/1},
-        {<<"_replicate">>,      fun chttpd_misc:handle_replicate_req/1},
-        {<<"_uuids">>,          fun chttpd_misc:handle_uuids_req/1},
-        {<<"_log">>,            fun chttpd_misc:handle_log_req/1},
-        {<<"_sleep">>,          fun chttpd_misc:handle_sleep_req/1},
-        {<<"_session">>,        fun chttpd_auth:handle_session_req/1},
-        {<<"_user">>,           fun chttpd_auth:handle_user_req/1},
-        {<<"_oauth">>,          fun chttpd_oauth:handle_oauth_req/1},
-        {<<"_stats">>,          fun chttpd_stats:handle_stats_req/1},
-        {<<"_restart">>,        fun showroom_http:handle_restart_req/1},
-        {<<"_cloudant">>,       fun showroom_httpd_admin:handle_cloudant_req/1}
-    ].
+url_handler("") ->              fun chttpd_misc:handle_welcome_req/1;
+url_handler("favicon.ico") ->   fun chttpd_misc:handle_favicon_req/1;
+url_handler("_utils") ->        fun chttpd_misc:handle_utils_dir_req/1;
+url_handler("_all_dbs") ->      fun chttpd_misc:handle_all_dbs_req/1;
+url_handler("_active_tasks") -> fun chttpd_misc:handle_task_status_req/1;
+url_handler("_config") ->       fun chttpd_misc:handle_config_req/1;
+url_handler("_replicate") ->    fun chttpd_misc:handle_replicate_req/1;
+url_handler("_uuids") ->        fun chttpd_misc:handle_uuids_req/1;
+url_handler("_log") ->          fun chttpd_misc:handle_log_req/1;
+url_handler("_sleep") ->        fun chttpd_misc:handle_sleep_req/1;
+url_handler("_session") ->      fun chttpd_auth:handle_session_req/1;
+url_handler("_user") ->         fun chttpd_auth:handle_user_req/1;
+url_handler("_oauth") ->        fun chttpd_oauth:handle_oauth_req/1;
+url_handler("_stats") ->        fun chttpd_stats:handle_stats_req/1;
+url_handler("_restart") ->      fun showroom_http:handle_restart_req/1;
+url_handler("_cloudant") ->     fun showroom_httpd_admin:handle_cloudant_req/1;
+url_handler(_) ->               fun chttpd_db:handle_request/1.
 
 db_url_handlers() ->
     [
