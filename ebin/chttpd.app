@@ -15,8 +15,7 @@
         chttpd_view,
         cloudant_auth
     ]},
-    {registered, []},
+    {registered, [chttpd_sup, chttpd]},
     {applications, [kernel, stdlib, couch, fabric]},
-    {mod, {chttpd_app,[]}},
-    {start_phases, []}
+    {mod, {chttpd_app,[]}}
 ]}.
