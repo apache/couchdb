@@ -13,7 +13,7 @@
 -module(chttpd).
 -include("chttpd.hrl").
 
--export([start_link/0, stop/0, handle_request/5, config_change/2]).
+-export([start_link/0, stop/0, handle_request/1, config_change/2]).
 
 -export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,path/1,absolute_uri/2,body_length/1]).
 -export([verify_is_server_admin/1,unquote/1,quote/1,recv/2,recv_chunked/4,error_info/1]).
@@ -26,67 +26,21 @@
 -export([send_json/2,send_json/3,send_json/4]).
 
 start_link() ->
-    BindAddress = couch_config:get("chttpd", "bind_address", any),
-    Port = couch_config:get("chttpd", "port", "5984"),
-    Backlog = list_to_integer(couch_config:get("chttpd", "backlog", "128")),
-
-    Default = fun chttpd_db:handle_request/1,
-
-    UrlHandlers = [
-        {<<"/">>,               fun chttpd_misc:handle_welcome_req/1},
-        {<<"favicon.ico">>,     fun chttpd_misc:handle_favicon_req/1},
-        {<<"_utils">>,          fun chttpd_misc:handle_utils_dir_req/1},
-        {<<"_all_dbs">>,        fun chttpd_misc:handle_all_dbs_req/1},
-        {<<"_active_tasks">>,   fun chttpd_misc:handle_task_status_req/1},
-        {<<"_config">>,         fun chttpd_misc:handle_config_req/1},
-        {<<"_replicate">>,      fun chttpd_misc:handle_replicate_req/1},
-        {<<"_uuids">>,          fun chttpd_misc:handle_uuids_req/1},
-        {<<"_log">>,            fun chttpd_misc:handle_log_req/1},
-        {<<"_sleep">>,          fun chttpd_misc:handle_sleep_req/1},
-        {<<"_session">>,        fun chttpd_auth:handle_session_req/1},
-        {<<"_user">>,           fun chttpd_auth:handle_user_req/1},
-        {<<"_oauth">>,          fun chttpd_oauth:handle_oauth_req/1},
-        {<<"_stats">>,          fun chttpd_stats:handle_stats_req/1},
-        {<<"_restart">>,        fun showroom_http:handle_restart_req/1},
-        {<<"_cloudant">>,       fun showroom_httpd_admin:handle_cloudant_req/1}
-    ],
-
-    DbHandlers = [
-        {<<"_view_cleanup">>,   fun chttpd_view:handle_view_cleanup_req/2},
-        {<<"_compact">>,        fun chttpd_db:handle_compact_req/2},
-        {<<"_design">>,         fun chttpd_db:handle_design_req/2},
-        {<<"_view">>,           fun chttpd_db:handle_db_view_req/2},
-        {<<"_temp_view">>,      fun chttpd_db:handle_temp_view_req/2},
-        {<<"_changes">>,        fun chttpd_db:handle_changes_req/2}
-    ],
-
-    DesignHandlers = [
-        {<<"_view">>,           fun chttpd_view:handle_view_req/2},
-        {<<"_show">>,           fun chttpd_show:handle_doc_show_req/2},
-        {<<"_list">>,           fun chttpd_show:handle_view_list_req/2},
-        {<<"_update">>,         fun chttpd_show:handle_doc_update_req/2},
-        {<<"_info">>,           fun chttpd_db:handle_design_info_req/2}
-    ],
-
-    Loop = fun(Req)-> ?MODULE:handle_request(Req, Default, UrlHandlers,
-        DbHandlers, DesignHandlers) end,
-
-    {ok, Pid} = case mochiweb_http:start([
-        {loop, Loop},
+    Options = [
+        {loop, fun ?MODULE:handle_request/1},
         {name, ?MODULE},
-        {ip, BindAddress},
-        {port, Port},
-        {backlog, Backlog}
-    ]) of
-    {ok, MochiPid} -> {ok, MochiPid};
+        {ip, couch_config:get("chttpd", "bind_address", any)},
+        {port, couch_config:get("chttpd", "port", "5984")},
+        {backlog, list_to_integer(couch_config:get("chttpd", "backlog", "128"))}
+    ],
+    case mochiweb_http:start(Options) of
+    {ok, Pid} ->
+        ok = couch_config:register(fun ?MODULE:config_change/2, Pid),
+        {ok, Pid};
     {error, Reason} ->
-        io:format("Failure to start Mochiweb: ~s~n",[Reason]),
-        throw({error, Reason})
-    end,
-
-    ok = couch_config:register(fun ?MODULE:config_change/2, Pid),
-
-    {ok, Pid}.
+        io:format("Failure to start Mochiweb: ~s~n", [Reason]),
+        {error, Reason}
+    end.
 
 config_change("chttpd", "bind_address") ->
     ?MODULE:stop();
@@ -98,9 +52,10 @@ config_change("chttpd", "backlog") ->
 stop() ->
     mochiweb_http:stop(?MODULE).
 
-handle_request(MochiReq, DefaultFun,
-        UrlHandlers, DbUrlHandlers, DesignUrlHandlers) ->
+handle_request(MochiReq) ->
     Begin = now(),
+
+    DefaultFun = fun chttpd_db:handle_request/1,
 
     AuthenticationFuns = [
         fun chttpd_auth:cookie_authentication_handler/1,
@@ -147,11 +102,11 @@ handle_request(MochiReq, DefaultFun,
         method = Method,
         path_parts = [list_to_binary(chttpd:unquote(Part))
                 || Part <- string:tokens(Path, "/")],
-        db_url_handlers = DbUrlHandlers,
-        design_url_handlers = DesignUrlHandlers
+        db_url_handlers = db_url_handlers(),
+        design_url_handlers = design_url_handlers()
     },
 
-    HandlerFun = couch_util:get_value(HandlerKey, UrlHandlers, DefaultFun),
+    HandlerFun = couch_util:get_value(HandlerKey, url_handlers(), DefaultFun),
     {ok, Resp} =
     try
         erase(cookie_auth_failed),
@@ -226,6 +181,44 @@ authenticate_request(Response, _AuthFuns) ->
 increment_method_stats(Method) ->
     couch_stats_collector:increment({httpd_request_methods, Method}).
 
+url_handlers() ->
+    [
+        {<<"/">>,               fun chttpd_misc:handle_welcome_req/1},
+        {<<"favicon.ico">>,     fun chttpd_misc:handle_favicon_req/1},
+        {<<"_utils">>,          fun chttpd_misc:handle_utils_dir_req/1},
+        {<<"_all_dbs">>,        fun chttpd_misc:handle_all_dbs_req/1},
+        {<<"_active_tasks">>,   fun chttpd_misc:handle_task_status_req/1},
+        {<<"_config">>,         fun chttpd_misc:handle_config_req/1},
+        {<<"_replicate">>,      fun chttpd_misc:handle_replicate_req/1},
+        {<<"_uuids">>,          fun chttpd_misc:handle_uuids_req/1},
+        {<<"_log">>,            fun chttpd_misc:handle_log_req/1},
+        {<<"_sleep">>,          fun chttpd_misc:handle_sleep_req/1},
+        {<<"_session">>,        fun chttpd_auth:handle_session_req/1},
+        {<<"_user">>,           fun chttpd_auth:handle_user_req/1},
+        {<<"_oauth">>,          fun chttpd_oauth:handle_oauth_req/1},
+        {<<"_stats">>,          fun chttpd_stats:handle_stats_req/1},
+        {<<"_restart">>,        fun showroom_http:handle_restart_req/1},
+        {<<"_cloudant">>,       fun showroom_httpd_admin:handle_cloudant_req/1}
+    ].
+
+db_url_handlers() ->
+    [
+        {<<"_view_cleanup">>,   fun chttpd_view:handle_view_cleanup_req/2},
+        {<<"_compact">>,        fun chttpd_db:handle_compact_req/2},
+        {<<"_design">>,         fun chttpd_db:handle_design_req/2},
+        {<<"_view">>,           fun chttpd_db:handle_db_view_req/2},
+        {<<"_temp_view">>,      fun chttpd_db:handle_temp_view_req/2},
+        {<<"_changes">>,        fun chttpd_db:handle_changes_req/2}
+    ].
+
+design_url_handlers() ->
+    [
+        {<<"_view">>,           fun chttpd_view:handle_view_req/2},
+        {<<"_show">>,           fun chttpd_show:handle_doc_show_req/2},
+        {<<"_list">>,           fun chttpd_show:handle_view_list_req/2},
+        {<<"_update">>,         fun chttpd_show:handle_doc_update_req/2},
+        {<<"_info">>,           fun chttpd_db:handle_design_info_req/2}
+    ].
 
 % Utilities
 
