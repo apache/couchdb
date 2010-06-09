@@ -1,6 +1,6 @@
 -module(fabric_view_reduce).
 
--export([go/5]).
+-export([go/6]).
 
 -include("fabric.hrl").
 
