@@ -165,10 +165,8 @@ do_db_req(#httpd{path_parts=[DbName|_]}=Req, Fun) ->
     Fun(Req, #db{name=DbName}).
 
 db_req(#httpd{method='GET',path_parts=[DbName]}=Req, _Db) ->
-    Customer = cloudant_util:customer_name(chttpd:header_value(Req, "X-Cloudant-User"),
-                                           chttpd:header_value(Req, "Host")),
-    {ok, DbInfo} = ?COUCH:get_db_info(DbName, Customer),
-    send_json(Req, {DbInfo});
+    {ok, DbInfo} = fabric:get_db_info(DbName),
+    send_json(Req, {cloudant_util:customer_db_info(Req, DbInfo)});
 
 db_req(#httpd{method='POST',path_parts=[DbName]}=Req, Db) ->
     Doc = couch_doc:from_json_obj(chttpd:json_body(Req)),
@@ -332,9 +330,7 @@ db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs_by_seq">>]}=Req, Db) ->
         direction = Dir
     } = QueryArgs = chttpd_view:parse_view_params(Req, nil, map),
 
-    Customer = cloudant_util:customer_name(chttpd:header_value(Req, "X-Cloudant-User"),
-                                           chttpd:header_value(Req, "Host")),
-    {ok, Info} = ?COUCH:get_db_info(Db, Customer),
+    {ok, Info} = fabric:get_db_info(Db),
     CurrentEtag = chttpd:make_etag(Info),
     chttpd:etag_respond(Req, CurrentEtag, fun() ->
         TotalRowCount = couch_util:get_value(doc_count, Info),

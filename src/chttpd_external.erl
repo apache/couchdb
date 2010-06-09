@@ -58,7 +58,7 @@ json_req_obj(#httpd{mochi_req=Req,
                method=Verb,
                path_parts=Path,
                req_body=ReqBody
-            }, Db) ->
+            } = HttpReq, Db) ->
     Body = case ReqBody of
         undefined -> Req:recv_body();
         Else -> Else
@@ -71,12 +71,10 @@ json_req_obj(#httpd{mochi_req=Req,
     end,
     Headers = Req:get(headers),
     Hlist = mochiweb_headers:to_list(Headers),
-    Customer = cloudant_util:customer_name(
-        Req:get_header_value("X-Cloudant-User"), Req:get_header_value("Host")),
-    {ok, Info} = ?COUCH:get_db_info(Db, Customer),
+    {ok, Info} = fabric:get_db_info(Db),
 
     % send correct path to customer - BugzID 6849
-    CustomerBin = list_to_binary(Customer),
+    CustomerBin = list_to_binary(cloudant_util:customer_name(HttpReq)),
     Len = byte_size(CustomerBin),
     FixedPath = case Path of
     [<<CustomerBin:Len/binary, "/", DbName/binary>> | Rest] ->
@@ -86,7 +84,7 @@ json_req_obj(#httpd{mochi_req=Req,
     end,
 
     % add headers...
-    {[{<<"info">>, {Info}},
+    {[{<<"info">>, {cloudant_util:customer_db_info(HttpReq, Info)}},
         {<<"verb">>, Verb},
         {<<"path">>, FixedPath},
         {<<"query">>, to_json_terms(Req:parse_qs())},

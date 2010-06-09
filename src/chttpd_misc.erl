@@ -87,8 +87,7 @@ handle_sleep_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 handle_all_dbs_req(#httpd{method='GET'}=Req) ->
-    Customer = cloudant_util:customer_name(chttpd:header_value(Req, "X-Cloudant-User"),
-                                           chttpd:header_value(Req, "Host")),
+    Customer = cloudant_util:customer_name(Req),
     {ok, DbNames} = fabric:all_dbs(Customer),
     send_json(Req, DbNames);
 handle_all_dbs_req(Req) ->

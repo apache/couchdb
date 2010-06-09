@@ -63,9 +63,7 @@ handle_request(MochiReq) ->
     % for the path, use the raw path with the query string and fragment
     % removed, but URL quoting left intact
     RawUri = MochiReq:get(raw_path),
-    Customer = cloudant_util:customer_name(
-        MochiReq:get_header_value("X-Cloudant-User"),
-        MochiReq:get_header_value("Host")),
+    Customer = cloudant_util:customer_name(#httpd{mochi_req=MochiReq}),
     Path = ?COUCH:db_path(RawUri, Customer),
     {HandlerKey, _, _} = mochiweb_util:partition(Path, "/"),
 
@@ -245,7 +243,7 @@ qs(#httpd{mochi_req=MochiReq}) ->
 path(#httpd{mochi_req=MochiReq}) ->
     MochiReq:get(path).
 
-absolute_uri(#httpd{mochi_req=MochiReq}, Path) ->
+absolute_uri(#httpd{mochi_req=MochiReq} = Req, Path) ->
     XHost = couch_config:get("httpd", "x_forwarded_host", "X-Forwarded-Host"),
     Host = case MochiReq:get_header_value(XHost) of
         undefined ->
@@ -270,10 +268,7 @@ absolute_uri(#httpd{mochi_req=MochiReq}, Path) ->
                 _ -> "http"
             end
     end,
-    Customer = cloudant_util:customer_name(
-        MochiReq:get_header_value("X-Cloudant-User"),
-        Host),
-    CustomerRegex = ["^/", Customer, "[/%2F]+"],
+    CustomerRegex = ["^/", cloudant_util:customer_name(Req), "[/%2F]+"],
     NewPath = re:replace(Path, CustomerRegex, "/"),
     Scheme ++ "://" ++ Host ++ NewPath.
 
