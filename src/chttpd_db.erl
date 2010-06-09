@@ -297,13 +297,12 @@ db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs">>]}=Req, Db) ->
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_all_docs">>]}=Req, Db) ->
     {Fields} = chttpd:json_body_obj(Req),
-    Keys = couch_util:get_value(<<"keys">>, Fields, nil),
-    case Keys of
-        Keys when is_list(Keys) -> ok;
-        nil -> ?LOG_DEBUG("POST to _all_docs with no keys member.", []);
-        _ -> throw({bad_request, "`keys` member must be a array."})
-    end,
-    all_docs_view(Req, Db, Keys);
+    case couch_util:get_value(<<"keys">>, Fields) of
+    Keys when is_list(Keys) ->
+        all_docs_view(Req, Db, Keys);
+    _ ->
+        throw({bad_request, "`keys` body member must be an array."})
+    end;
 
 db_req(#httpd{path_parts=[_,<<"_all_docs">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "GET,HEAD,POST");
@@ -397,7 +396,7 @@ all_docs_callback({row, Row}, {Prepend, Resp}) ->
 all_docs_callback(complete, {_, Resp}) ->
     send_chunk(Resp, "\r\n]}"),
     end_json_response(Resp),
-    {stop, Resp};
+    {ok, Resp};
 all_docs_callback({error, Reason}, Resp) ->
     chttpd:send_chunked_error(Resp, {error, Reason}).
 
