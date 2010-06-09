@@ -13,17 +13,17 @@
 -module(chttpd).
 -include("chttpd.hrl").
 
--export([start_link/0, stop/0, handle_request/1, config_change/2]).
-
--export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,path/1,absolute_uri/2,body_length/1]).
--export([verify_is_server_admin/1,unquote/1,quote/1,recv/2,recv_chunked/4,error_info/1]).
--export([parse_form/1,json_body/1,json_body_obj/1,body/1,doc_etag/1, make_etag/1, etag_respond/3]).
--export([primary_header_value/2,partition/1,serve_file/3, server_header/0]).
--export([start_chunked_response/3,send_chunk/2]).
--export([start_response_length/4, send/2]).
--export([start_json_response/2, start_json_response/3, end_json_response/1]).
--export([send_response/4,send_method_not_allowed/2,send_error/4, send_redirect/2,send_chunked_error/2]).
--export([send_json/2,send_json/3,send_json/4]).
+-export([start_link/0, stop/0, handle_request/1, config_change/2,
+    primary_header_value/2, header_value/2, header_value/3, qs_value/2, 
+    qs_value/3, qs/1, path/1, absolute_uri/2, body_length/1,
+    verify_is_server_admin/1, unquote/1, quote/1, recv/2,recv_chunked/4,
+    error_info/1, parse_form/1, json_body/1, json_body_obj/1, body/1,
+    doc_etag/1, make_etag/1, etag_respond/3, partition/1, serve_file/3,
+    server_header/0, start_chunked_response/3,send_chunk/2, 
+    start_response_length/4, send/2, start_json_response/2,
+    start_json_response/3, end_json_response/1, send_response/4,
+    send_method_not_allowed/2, send_error/4, send_redirect/2, 
+    send_chunked_error/2, send_json/2,send_json/3,send_json/4]).
 
 start_link() ->
     Options = [
@@ -63,7 +63,9 @@ handle_request(MochiReq) ->
     % for the path, use the raw path with the query string and fragment
     % removed, but URL quoting left intact
     RawUri = MochiReq:get(raw_path),
-    Customer = cloudant_util:customer_name(MochiReq:get_header_value("X-Cloudant-User"), MochiReq:get_header_value("Host")),
+    Customer = cloudant_util:customer_name(
+        MochiReq:get_header_value("X-Cloudant-User"),
+        MochiReq:get_header_value("Host")),
     Path = ?COUCH:db_path(RawUri, Customer),
     {HandlerKey, _, _} = mochiweb_util:partition(Path, "/"),
 
@@ -155,7 +157,7 @@ authenticate_request(#httpd{user_ctx=#user_ctx{}} = Req, _AuthFuns) ->
 authenticate_request(#httpd{} = Req, [AuthFun|Rest]) ->
     authenticate_request(AuthFun(Req), Rest);
 authenticate_request(#httpd{} = Req, []) ->
-    case couch_config:get("chttpd_auth", "require_valid_user", "false") of
+    case couch_config:get("chttpd", "require_valid_user", "false") of
     "true" ->
         throw({unauthorized, <<"Authentication required.">>});
     "false" ->
@@ -260,15 +262,17 @@ absolute_uri(#httpd{mochi_req=MochiReq}, Path) ->
     Scheme = case MochiReq:get_header_value(XSsl) of
         "on" -> "https";
         _ ->
-            XProto = couch_config:get("httpd", "x_forwarded_proto", "X-Forwarded-Proto"),
+            XProto = couch_config:get("httpd", "x_forwarded_proto",
+                "X-Forwarded-Proto"),
             case MochiReq:get_header_value(XProto) of
                 % Restrict to "https" and "http" schemes only
                 "https" -> "https";
                 _ -> "http"
             end
     end,
-    Customer = cloudant_util:customer_name(MochiReq:get_header_value("X-Cloudant-User"),
-                                       Host),
+    Customer = cloudant_util:customer_name(
+        MochiReq:get_header_value("X-Cloudant-User"),
+        Host),
     CustomerRegex = ["^/", Customer, "[/%2F]+"],
     NewPath = re:replace(Path, CustomerRegex, "/"),
     Scheme ++ "://" ++ Host ++ NewPath.
@@ -329,7 +333,7 @@ doc_etag(#doc{revs={Start, [DiskRev|_]}}) ->
 
 make_etag(Term) ->
     <<SigInt:128/integer>> = erlang:md5(term_to_binary(Term)),
-    list_to_binary("\"" ++ lists:flatten(io_lib:format("~.36B",[SigInt])) ++ "\"").
+    list_to_binary(io_lib:format("\"~.36B\"",[SigInt])).
 
 etag_match(Req, CurrentEtag) when is_binary(CurrentEtag) ->
     etag_match(Req, binary_to_list(CurrentEtag));
@@ -357,7 +361,8 @@ verify_is_server_admin(#httpd{user_ctx=#user_ctx{roles=Roles}}) ->
 
 start_response_length(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Length) ->
     couch_stats_collector:increment({httpd_status_codes, Code}),
-    Resp = MochiReq:start_response_length({Code, Headers ++ server_header() ++ chttpd_auth:cookie_auth_header(Req, Headers), Length}),
+    Resp = MochiReq:start_response_length({Code, Headers ++ server_header() ++
+        chttpd_auth:cookie_auth_header(Req, Headers), Length}),
     case MochiReq:get(method) of
     'HEAD' -> throw({http_head_abort, Resp});
     _ -> ok
@@ -370,7 +375,8 @@ send(Resp, Data) ->
 
 start_chunked_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers) ->
     couch_stats_collector:increment({httpd_status_codes, Code}),
-    Resp = MochiReq:respond({Code, Headers ++ server_header() ++ chttpd_auth:cookie_auth_header(Req, Headers), chunked}),
+    Resp = MochiReq:respond({Code, Headers ++ server_header() ++
+        chttpd_auth:cookie_auth_header(Req, Headers), chunked}),
     case MochiReq:get(method) of
     'HEAD' -> throw({http_head_abort, Resp});
     _ -> ok
@@ -387,10 +393,12 @@ send_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Body) ->
         ?LOG_DEBUG("httpd ~p error response:~n ~s", [Code, Body]);
     true -> ok
     end,
-    {ok, MochiReq:respond({Code, Headers ++ server_header() ++ chttpd_auth:cookie_auth_header(Req, Headers), Body})}.
+    {ok, MochiReq:respond({Code, Headers ++ server_header() ++
+        chttpd_auth:cookie_auth_header(Req, Headers), Body})}.
 
 send_method_not_allowed(Req, Methods) ->
-    send_error(Req, 405, [{"Allow", Methods}], <<"method_not_allowed">>, ?l2b("Only " ++ Methods ++ " allowed")).
+    send_error(Req, 405, [{"Allow", Methods}], <<"method_not_allowed">>,
+        ?l2b("Only " ++ Methods ++ " allowed")).
 
 send_json(Req, Value) ->
     send_json(Req, 200, Value).
