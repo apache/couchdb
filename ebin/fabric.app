@@ -1,8 +1,8 @@
 %% fabric app resource file
 
 {application, fabric,
- [{description, "clustered couchdb functions"},
-  {vsn, "0.1.0"},
+ [{description, "Routing and proxying layer for CouchDB cluster"},
+  {vsn, "1.0"},
   {modules, [
        fabric,
        fabric_all_databases,
@@ -25,8 +25,5 @@
        fabric_view_map,
        fabric_view_reduce
    ]},
-  {registered, []},
-  {included_applications, []},
-  {applications, [kernel, stdlib, couch, rexi, membership]},
-  {start_phases, []}
+  {applications, [kernel, stdlib, couch, rexi, membership]}
  ]}.
