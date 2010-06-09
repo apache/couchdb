@@ -145,7 +145,7 @@ handle_design_info_req(Req, _Db) ->
 create_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
     N = chttpd:qs_value(Req, "n"),
     Q = chttpd:qs_value(Req, "q"),
-    case ?COUCH:create_db(DbName, [{user_ctx, UserCtx},{n,N},{q,Q}]) of
+    case fabric:create_db(DbName, [{user_ctx, UserCtx},{n,N},{q,Q}]) of
     ok ->
         DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
         send_json(Req, 201, [{"Location", DocUrl}], {[{ok, true}]});
@@ -154,7 +154,7 @@ create_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
     end.
 
 delete_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
-    case ?COUCH:delete_db(DbName, [{user_ctx, UserCtx}]) of
+    case fabric:delete_db(DbName, [{user_ctx, UserCtx}]) of
     ok ->
         send_json(Req, 200, {[{ok, true}]});
     Error ->
@@ -188,7 +188,7 @@ db_req(#httpd{method='POST',path_parts=[DbName]}=Req, Db) ->
         ]});
     _Normal ->
         % normal
-        {ok, NewRev} = ?COUCH:update_doc(Db, Doc2, []),
+        {ok, NewRev} = fabric:update_doc(Db, Doc2, []),
         DocUrl = absolute_uri(
             Req, binary_to_list(<<"/",DbName/binary,"/", DocId/binary>>)),
         send_json(Req, 201, [{"Location", DocUrl}], {[
@@ -269,7 +269,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
         true  -> [all_or_nothing|Options];
         _ -> Options
         end,
-        case ?COUCH:update_docs(Db, Docs, Options2) of
+        case fabric:update_docs(Db, Docs, Options2) of
         {ok, Results} ->
             % output the results
             DocResults = lists:zipwith(fun update_doc_result_to_json/2,
@@ -282,7 +282,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
         end;
     false ->
         Docs = [couch_doc:from_json_obj(JsonObj) || JsonObj <- DocsArray],
-        {ok, Errors} = ?COUCH:update_docs(Db, Docs, Options, replicated_changes),
+        {ok, Errors} = fabric:update_docs(Db, Docs, [replicated_changes|Options]),
         ErrorsJson =
             lists:map(fun update_doc_result_to_json/1, Errors),
         send_json(Req, 201, ErrorsJson)
@@ -381,7 +381,7 @@ db_req(#httpd{path_parts=[_,<<"_all_docs_by_seq">>]}=Req, _Db) ->
 db_req(#httpd{method='POST',path_parts=[_,<<"_missing_revs">>]}=Req, Db) ->
     {JsonDocIdRevs} = chttpd:json_body_obj(Req),
     JsonDocIdRevs2 = [{Id, [couch_doc:parse_rev(RevStr) || RevStr <- RevStrs]} || {Id, RevStrs} <- JsonDocIdRevs],
-    {ok, Results} = ?COUCH:get_missing_revs(Db, JsonDocIdRevs2),
+    {ok, Results} = fabric:get_missing_revs(Db, JsonDocIdRevs2),
     Results2 = [{Id, [couch_doc:rev_to_str(Rev) || Rev <- Revs]} || {Id, Revs} <- Results],
     send_json(Req, {[
         {missing_revs, {Results2}}
@@ -499,7 +499,7 @@ db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
                 send_json(Req, 200, [], couch_doc:to_json_obj(Doc, Options))
             end;
         _ ->
-            {ok, Results} = ?COUCH:open_revs(Db, DocId, Revs, Options),
+            {ok, Results} = fabric:open_revs(Db, DocId, Revs, Options),
             {ok, Resp} = start_json_response(Req, 200),
             send_chunk(Resp, "["),
             % We loop through the docs. The first time through the separator
@@ -536,7 +536,7 @@ db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
     end,
     Form = chttpd:parse_form(Req),
     Rev = couch_doc:parse_rev(list_to_binary(couch_util:get_value("_rev", Form))),
-    {ok, [{ok, Doc}]} = ?COUCH:open_revs(Db, DocId, [Rev], []),
+    {ok, [{ok, Doc}]} = fabric:open_revs(Db, DocId, [Rev], []),
 
     UpdatedAtts = [
         #att{name=validate_attachment_name(Name),
@@ -556,7 +556,7 @@ db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
     NewDoc = Doc#doc{
         atts = UpdatedAtts ++ OldAtts2
     },
-    {ok, NewRev} = ?COUCH:update_doc(Db, NewDoc, []),
+    {ok, NewRev} = fabric:update_doc(Db, NewDoc, []),
 
     send_json(Req, 201, [{"Etag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewRev)) ++ "\""}], {[
         {ok, true},
@@ -593,7 +593,7 @@ db_doc_req(#httpd{method='COPY'}=Req, Db, SourceDocId) ->
     % open old doc
     Doc = couch_doc_open(Db, SourceDocId, SourceRev, []),
     % save new doc
-    {ok, NewTargetRev} = ?COUCH:update_doc(Db,
+    {ok, NewTargetRev} = fabric:update_doc(Db,
         Doc#doc{id=TargetDocId, revs=TargetRevs}, []),
     % respond
     send_json(Req, 201,
@@ -632,7 +632,7 @@ update_doc(Req, Db, DocId, Json, Headers) ->
     _ ->
         Options = []
     end,
-    {Status, NewRev} = case ?COUCH:update_doc(Db, Doc, Options) of
+    {Status, NewRev} = case fabric:update_doc(Db, Doc, Options) of
     {ok, NewRev1} -> {201, NewRev1};
     {accepted, NewRev1} -> {202, NewRev1}
     end,
@@ -668,14 +668,14 @@ couch_doc_from_req(Req, DocId, Json) ->
 couch_doc_open(Db, DocId, Rev, Options) ->
     case Rev of
     nil -> % open most recent rev
-        case ?COUCH:open_doc(Db, DocId, Options) of
+        case fabric:open_doc(Db, DocId, Options) of
         {ok, Doc} ->
             Doc;
          Error ->
              throw(Error)
          end;
   _ -> % open a specific rev (deletions come back as stubs)
-      case ?COUCH:open_revs(Db, DocId, [Rev], Options) of
+      case fabric:open_revs(Db, DocId, [Rev], Options) of
           {ok, [{ok, Doc}]} ->
               Doc;
           {ok, [Else]} ->
@@ -748,7 +748,7 @@ db_attachment_req(#httpd{method=Method}=Req, Db, DocId, FileNameParts)
             couch_doc:validate_docid(DocId),
             #doc{id=DocId};
         Rev ->
-            case ?COUCH:open_revs(Db, DocId, [Rev], []) of
+            case fabric:open_revs(Db, DocId, [Rev], []) of
             {ok, [{ok, Doc0}]}  -> Doc0;
             {ok, [Error]}       -> throw(Error)
             end
@@ -758,7 +758,7 @@ db_attachment_req(#httpd{method=Method}=Req, Db, DocId, FileNameParts)
     DocEdited = Doc#doc{
         atts = NewAtt ++ [A || A <- Atts, A#att.name /= FileName]
     },
-    {ok, UpdatedRev} = ?COUCH:update_doc(Db, DocEdited, []),
+    {ok, UpdatedRev} = fabric:update_doc(Db, DocEdited, []),
     DbName = couch_db:name(Db),
 
     {Status, Headers} = case Method of
