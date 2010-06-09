@@ -1,7 +1,7 @@
 -module(fabric).
 
 % DBs
--export([all_dbs/0, all_dbs/1, create_db/2, delete_db/2, get_db_info/2,
+-export([all_dbs/0, all_dbs/1, create_db/2, delete_db/2, get_db_info/1,
     get_doc_count/1]).
 
 % Documents
@@ -29,8 +29,8 @@ all_dbs() ->
 all_dbs(Customer) ->
     fabric_all_databases:all_databases(Customer).
 
-get_db_info(DbName, Customer) ->
-    fabric_db_info:get_db_info(dbname(DbName), Customer).
+get_db_info(DbName) ->
+    fabric_db_info:go(dbname(DbName)).
 
 get_doc_count(DbName) ->
     fabric_db_doc_count:go(dbname(DbName)).
