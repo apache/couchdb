@@ -4,7 +4,7 @@
 
 -include("fabric.hrl").
 
-go(DbName, {GroupId, VName}, Args, Callback, Acc0) ->
+go(DbName, GroupId, VName, Args, Callback, Acc0) ->
     {ok, DDoc} = fabric:open_doc(DbName, <<"_design/", GroupId/binary>>, []),
     #group{def_lang=Lang, views=Views} = Group =
         couch_view_group:design_doc_to_view_group(#db{name=DbName}, DDoc),

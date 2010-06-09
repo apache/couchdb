@@ -16,6 +16,7 @@
        fabric_doc_open,
        fabric_doc_open_revs,
        fabric_doc_update,
+       fabric_group_info,
        fabric_rpc,
        fabric_util,
        fabric_view,

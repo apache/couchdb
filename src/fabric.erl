@@ -9,7 +9,8 @@
     update_docs/3, att_receiver/2]).
 
 % Views
--export([all_docs/4, changes/3, query_view/3, query_view/4, query_view/6]).
+-export([all_docs/4, changes/3, query_view/3, query_view/4, query_view/6,
+    get_view_group_info/2]).
 
 % miscellany
 -export([db_path/2, design_docs/1]).
@@ -88,6 +89,9 @@ query_view(DbName, DesignName, ViewName, QueryArgs, Callback, Acc0) ->
         Mod = fabric_view_map
     end,
     Mod:go(Db, Design, View, QueryArgs, Callback, Acc0).
+
+get_view_group_info(DbName, DesignId) ->
+    fabric_group_info:go(dbname(DbName), name(DesignId)).
 
 design_docs(DbName) ->
     QueryArgs = #view_query_args{start_key = <<"_design/">>, include_docs=true},

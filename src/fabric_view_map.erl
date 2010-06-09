@@ -1,10 +1,10 @@
 -module(fabric_view_map).
 
--export([go/5]).
+-export([go/6]).
 
 -include("fabric.hrl").
 
-go(DbName, {GroupId, View}, Args, Callback, Acc0) ->
+go(DbName, GroupId, View, Args, Callback, Acc0) ->
     {ok, DDoc} = fabric:open_doc(DbName, <<"_design/", GroupId/binary>>, []),
     Workers = lists:map(fun(#shard{name=Name, node=Node} = Shard) ->
         Ref = rexi:cast(Node, {fabric_rpc, map_view, [Name, DDoc, View, Args]}),

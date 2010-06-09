@@ -2,7 +2,7 @@
 
 -export([get_db_info/1, get_doc_count/1, get_update_seq/1]).
 -export([open_doc/3, open_revs/4, get_missing_revs/2, update_docs/3]).
--export([all_docs/2, changes/3, map_view/4, reduce_view/4]).
+-export([all_docs/2, changes/3, map_view/4, reduce_view/4, group_info/2]).
 
 -include("fabric.hrl").
 
@@ -179,6 +179,10 @@ update_docs(DbName, Docs, Options) ->
         X = interactive_edit
     end,
     with_db(DbName, Options, {couch_db, update_docs, [Docs, Options, X]}).
+
+group_info(DbName, Group0) ->
+    {ok, Pid} = gen_server:call(couch_view, {get_group_server, DbName, Group0}),
+    rexi:reply(couch_view_group:request_group_info(Pid)).
 
 %%
 %% internal
