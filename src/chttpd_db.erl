@@ -101,22 +101,13 @@ handle_compact_req(#httpd{method='POST',path_parts=[DbName,_,Id|_]}=Req, _Db) ->
     ok = ?COUCH:compact_view_group(DbName, Id),
     send_json(Req, 202, {[{ok, true}]});
 
-handle_compact_req(#httpd{method='POST'}=Req, Db) ->
-    StartSeq = chttpd:qs_value(Req, "start_seq", "0"),
-    ok = ?COUCH:compact_db(Db, list_to_integer(StartSeq)),
-    send_json(Req, 202, {[{ok, true}]});
+handle_compact_req(Req, _) ->
+    Msg = <<"Compaction is handled automatically by Cloudant">>,
+    chttpd:send_error(Req, 403, Msg).
 
-handle_compact_req(Req, _Db) ->
-    send_method_not_allowed(Req, "POST").
-
-handle_view_cleanup_req(#httpd{method='POST'}=Req, _Db) ->
-    % delete unreferenced index files
-    % ok = ?COUCH:cleanup_view_index_files(Db),
-    send_json(Req, 202, {[{ok, true}]});
-
-handle_view_cleanup_req(Req, _Db) ->
-    send_method_not_allowed(Req, "POST").
-
+handle_view_cleanup_req(Req, _) ->
+    Msg = <<"Old view indices are purged automatically by Cloudant">>,
+    chttpd:send_error(Req, 403, Msg).
 
 handle_design_req(#httpd{
         path_parts=[_DbName,_Design,_DesName, <<"_",_/binary>> = Action | _Rest],
@@ -128,14 +119,10 @@ handle_design_req(#httpd{
 handle_design_req(Req, Db) ->
     db_req(Req, Db).
 
-handle_design_info_req(#httpd{
-            method='GET',
-            path_parts=[_DbName, _Design, DesignName, _]
-        }=Req, Db) ->
-    DesignId = <<"_design/", DesignName/binary>>,
-    {ok, GroupInfoList} = ?COUCH:get_view_group_info(Db, DesignId),
+handle_design_info_req(#httpd{method='GET', path_parts=[_,_,Name,_]}=Req, Db) ->
+    {ok, GroupInfoList} = fabric:get_view_group_info(Db, Name),
     send_json(Req, 200, {[
-        {name, DesignName},
+        {name,  <<"_design/", Name/binary>>},
         {view_index, {GroupInfoList}}
     ]});
 
@@ -168,7 +155,7 @@ db_req(#httpd{method='GET',path_parts=[DbName]}=Req, _Db) ->
     {ok, DbInfo} = fabric:get_db_info(DbName),
     send_json(Req, {cloudant_util:customer_db_info(Req, DbInfo)});
 
-db_req(#httpd{method='POST',path_parts=[DbName]}=Req, Db) ->
+db_req(#httpd{method='POST',path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
     Doc = couch_doc:from_json_obj(chttpd:json_body(Req)),
     Doc2 = case Doc#doc.id of
         <<"">> ->
@@ -188,7 +175,7 @@ db_req(#httpd{method='POST',path_parts=[DbName]}=Req, Db) ->
         ]});
     _Normal ->
         % normal
-        {ok, NewRev} = fabric:update_doc(Db, Doc2, []),
+        {ok, NewRev} = fabric:update_doc(Db, Doc2, [{user_ctx,Ctx}]),
         DocUrl = absolute_uri(
             Req, binary_to_list(<<"/",DbName/binary,"/", DocId/binary>>)),
         send_json(Req, 201, [{"Location", DocUrl}], {[
@@ -232,17 +219,17 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_ensure_full_commit">>]}=Req, Db) -
 db_req(#httpd{path_parts=[_,<<"_ensure_full_commit">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 
-db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
+db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, Db) ->
     couch_stats_collector:increment({httpd, bulk_requests}),
     {JsonProps} = chttpd:json_body_obj(Req),
     DocsArray = couch_util:get_value(<<"docs">>, JsonProps),
     case chttpd:header_value(Req, "X-Couch-Full-Commit") of
     "true" ->
-        Options = [full_commit];
+        Options = [full_commit, {user_ctx,Ctx}];
     "false" ->
-        Options = [delay_commit];
+        Options = [delay_commit, {user_ctx,Ctx}];
     _ ->
-        Options = []
+        Options = [{user_ctx,Ctx}]
     end,
     case couch_util:get_value(<<"new_edits">>, JsonProps, true) of
     true ->
@@ -269,7 +256,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
         true  -> [all_or_nothing|Options];
         _ -> Options
         end,
-        case fabric:update_docs(Db, Docs, Options2) of
+        case fabric:update_docs(Db, Docs, [Options2]) of
         {ok, Results} ->
             % output the results
             DocResults = lists:zipwith(fun update_doc_result_to_json/2,
@@ -526,7 +513,7 @@ db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
         chttpd_show:handle_doc_show(Req, DesignName, ShowName, DocId, Db)
     end;
 
-db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
+db_doc_req(#httpd{method='POST', user_ctx=Ctx}=Req, Db, DocId) ->
     couch_doc:validate_docid(DocId),
     case chttpd:header_value(Req, "content-type") of
     "multipart/form-data" ++  _Rest ->
@@ -556,7 +543,7 @@ db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
     NewDoc = Doc#doc{
         atts = UpdatedAtts ++ OldAtts2
     },
-    {ok, NewRev} = fabric:update_doc(Db, NewDoc, []),
+    {ok, NewRev} = fabric:update_doc(Db, NewDoc, [{user_ctx,Ctx}]),
 
     send_json(Req, 201, [{"Etag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewRev)) ++ "\""}], {[
         {ok, true},
@@ -583,7 +570,7 @@ db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
         update_doc(Req, Db, DocId, Json, [{"Location", Location}])
     end;
 
-db_doc_req(#httpd{method='COPY'}=Req, Db, SourceDocId) ->
+db_doc_req(#httpd{method='COPY', user_ctx=Ctx}=Req, Db, SourceDocId) ->
     SourceRev =
     case extract_header_rev(Req, chttpd:qs_value(Req, "rev")) of
         missing_rev -> nil;
@@ -594,7 +581,7 @@ db_doc_req(#httpd{method='COPY'}=Req, Db, SourceDocId) ->
     Doc = couch_doc_open(Db, SourceDocId, SourceRev, []),
     % save new doc
     {ok, NewTargetRev} = fabric:update_doc(Db,
-        Doc#doc{id=TargetDocId, revs=TargetRevs}, []),
+        Doc#doc{id=TargetDocId, revs=TargetRevs}, [{user_ctx,Ctx}]),
     % respond
     send_json(Req, 201,
         [{"Etag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewTargetRev)) ++ "\""}],
@@ -621,16 +608,16 @@ update_doc_result_to_json(DocId, Error) ->
 update_doc(Req, Db, DocId, Json) ->
     update_doc(Req, Db, DocId, Json, []).
 
-update_doc(Req, Db, DocId, Json, Headers) ->
+update_doc(#httpd{user_ctx=Ctx} = Req, Db, DocId, Json, Headers) ->
     #doc{deleted=Deleted} = Doc = couch_doc_from_req(Req, DocId, Json),
 
     case chttpd:header_value(Req, "X-Couch-Full-Commit") of
     "true" ->
-        Options = [full_commit];
+        Options = [full_commit, {user_ctx,Ctx}];
     "false" ->
-        Options = [delay_commit];
+        Options = [delay_commit, {user_ctx,Ctx}];
     _ ->
-        Options = []
+        Options = [{user_ctx,Ctx}]
     end,
     {Status, NewRev} = case fabric:update_doc(Db, Doc, Options) of
     {ok, NewRev1} -> {201, NewRev1};
@@ -712,7 +699,7 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
     end;
 
 
-db_attachment_req(#httpd{method=Method}=Req, Db, DocId, FileNameParts)
+db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNameParts)
         when (Method == 'PUT') or (Method == 'DELETE') ->
     FileName = validate_attachment_name(
                     mochiweb_util:join(
@@ -758,7 +745,7 @@ db_attachment_req(#httpd{method=Method}=Req, Db, DocId, FileNameParts)
     DocEdited = Doc#doc{
         atts = NewAtt ++ [A || A <- Atts, A#att.name /= FileName]
     },
-    {ok, UpdatedRev} = fabric:update_doc(Db, DocEdited, []),
+    {ok, UpdatedRev} = fabric:update_doc(Db, DocEdited, [{user_ctx,Ctx}]),
     DbName = couch_db:name(Db),
 
     {Status, Headers} = case Method of
