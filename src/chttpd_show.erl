@@ -451,7 +451,7 @@ send_doc_update_response(Lang, UpdateSrc, DocId, Doc, Req, Db) ->
         NewDoc = couch_doc:from_json_obj({NewJsonDoc}),
         Code = 201,
         % todo set location field
-        {ok, _NewRev} = ?COUCH:update_doc(Db, NewDoc, Options);
+        {ok, _NewRev} = fabric:update_doc(Db, NewDoc, Options);
     [<<"up">>, _Other, JsonResp] ->
         Code = 200,
         ok
