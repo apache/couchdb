@@ -308,7 +308,9 @@ att_foldl(#att{data=DataFun,att_len=Len}, Fun, Acc) when is_function(DataFun) ->
    fold_streamed_data(DataFun, Len, Fun, Acc).
 
 att_foldl_decode(#att{data={Fd,Sp},md5=Md5,encoding=Enc}, Fun, Acc) ->
-    couch_stream:foldl_decode(Fd, Sp, Md5, Enc, Fun, Acc).
+    couch_stream:foldl_decode(Fd, Sp, Md5, Enc, Fun, Acc);
+att_foldl_decode(#att{data=Fun,att_len=Len, encoding=identity}, Fun, Acc) ->
+       fold_streamed_data(Fun, Len, Fun, Acc).
 
 att_to_bin(#att{data=Bin}) when is_binary(Bin) ->
     Bin;
