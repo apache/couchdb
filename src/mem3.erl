@@ -321,10 +321,7 @@ install_new_state(#mem{args=Args} = State) ->
 
 
 get_pingnode_state(PingNode) ->
-    % ping the PingNode and get its state
-    pong = net_adm:ping(PingNode),
-    timer:sleep(1000), % let dist. erl get set up... sigh.
-    {ok, RemoteState} = rpc:call(PingNode, mem3, state, []),
+    {ok, RemoteState} = gen_server:call({?SERVER, PingNode}, state),
     RemoteState.
 
 
