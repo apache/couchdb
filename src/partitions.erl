@@ -53,6 +53,7 @@ for_key(DbName, Key) ->
         range = ['$1','$2'],
         ref = '_'
     },
+    % TODO these conditions assume A < B, which we don't require
     Conditions = [{'<', '$1', HashKey}, {'<', HashKey, '$2'}],
     case ets:select(partitions, [{Head, Conditions, ['$_']}]) of
     [] ->
@@ -68,15 +69,6 @@ all_parts(DbName) ->
     Else ->
         Else
     end.
-
-% %% @doc for the given key, return a list of {Node,Part} tuples.  Nodes are both
-% %%      primary and replication partner nodes, and should number N.
-% int_node_parts_for_key(Key) ->
-%   Config = configuration:get_config(),
-%   Hash = lib_misc:hash(Key),
-%   Part = partitions:hash_to_partition(Hash, Config#config.q),
-%   NodePartList = all_nodes_parts(true),
-%   lists:filter(fun({_N,P}) -> P =:= Part end, NodePartList).
 
 %%====================================================================
 %% Internal functions
@@ -191,32 +183,3 @@ shard_name(Part, DbName) when is_list(DbName) ->
 shard_name(Part, DbName) ->
   PartHex = ?l2b(showroom_utils:int_to_hexstr(Part)),
   <<"x", PartHex/binary, "/", DbName/binary, "_", PartHex/binary>>.
-
-% %% @doc given an int and a partition map from ets cache table,
-% %%      get the first part greater than Int.
-% int_to_nps(_, [], _, Acc) -> Acc;
-% int_to_nps(Int, [{_,{N,P}} | Rest], CurrentPart, NPAcc) ->
-%     case P > Int of
-%     true ->
-%         case P =/= CurrentPart of
-%         true -> NPAcc;
-%         _ ->
-%             NewAcc = [{N,P}|NPAcc],
-%             int_to_nps(Int, Rest, P, NewAcc)
-%         end;
-%     _ -> int_to_nps(Int, Rest, P, NPAcc)
-%     end.
-
-
-%     % get parts
-%     {_,NPs} = lists:unzip(Map),
-%     {_,AllParts} = lists:unzip(NPs),
-%     Parts = lists:usort(AllParts),
-%     % lookup part
-%     Rem = lists:dropwhile(fun(E) -> E < Int end, Parts),
-%     Part = case Rem of
-%     [] -> 0;  % wrap-around-ring case (back to 0)
-%     [H|_T] -> H
-%     end,
-%     % get nodes/parts
-%     ok.
