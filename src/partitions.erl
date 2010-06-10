@@ -45,7 +45,7 @@ install_fullmap(DbName, Fullmap, FullNodes, Options) ->
     write_db_doc(Doc).
 
 for_key(DbName, Key) ->
-    HashKey = hash_int(hash(Key)),
+    <<HashKey:160/integer>> = hash(Key),
     Head = #shard{
         name = '_',
         node = '_',
@@ -88,8 +88,7 @@ const(Const, Options) ->
 
 %% @doc hash the dbname, and return the corresponding node for seeding a ring
 seednode(DbName, Nodes) ->
-    Hash = hash(DbName),
-    HashInt = hash_int(Hash),
+    <<HashInt:160/integer>> = hash(DbName),
     Size = partition_range(length(Nodes)),
     Factor = (HashInt div Size),
     lists:nth(Factor+1, Nodes).
@@ -138,14 +137,6 @@ partners(DbName, N, Node, Nodes, {Beg,End}) ->
         #shard{dbname=DbName, node=Partner, range=[Beg,End],
                name=shard_name(Beg,DbName)}
     end, Partners).
-
-
-%% @doc turn hash into an integer
-hash_int(Hash) when is_binary(Hash) ->
-    <<IndexAsInt:160/integer>> = Hash,
-    IndexAsInt;
-hash_int(Hash) when is_integer(Hash) ->
-    Hash.
 
 %% @doc size of one partition in the ring
 partition_range(Q) ->
