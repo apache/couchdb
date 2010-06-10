@@ -376,10 +376,12 @@ db_req(#httpd{path_parts=[_, DocId | FileNameParts]}=Req, Db) ->
     db_attachment_req(Req, Db, DocId, FileNameParts).
 
 all_docs_view(Req, Db, Keys) ->
+    % measure the time required to generate the etag, see if it's worth it
     T0 = now(),
     {ok, Info} = fabric:get_db_info(Db),
     Etag = couch_httpd:make_etag(Info),
-    ?LOG_INFO("_all_docs etag - ~p ms", [timer:now_diff(now(),T0) / 1000]),
+    DeltaT = timer:now_diff(now(), T0) / 1000,
+    couch_stats_collector:record({couchdb, all_docs_etag}, DeltaT),
     QueryArgs = chttpd_view:parse_view_params(Req, Keys, map),
     chttpd:etag_respond(Req, Etag, fun() ->
         {ok, Resp} = chttpd:start_json_response(Req, 200, [{"Etag",Etag}]),

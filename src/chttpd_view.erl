@@ -25,31 +25,45 @@
     start_json_response/2, start_json_response/3, end_json_response/1,
     send_chunked_error/2]).
 
-design_doc_view(Req, Db, Id, ViewName, Keys) ->
-    DesignId = <<"_design/", Id/binary>>,
-    {_ViewGroup, QueryArgs} = case ?COUCH:open_doc(Db, DesignId, []) of
-    {ok, Doc} ->
-        Group = couch_view_group:design_doc_to_view_group(Db, Doc),
+design_doc_view(Req, Db, GroupId, ViewName, Keys) ->
+    % TODO open the ddoc once, not twice (here and fabric)
+    DesignId = <<"_design/", GroupId/binary>>,
+    case fabric:open_doc(Db, DesignId, []) of
+    {ok, DDoc} ->
+        Group = couch_view_group:design_doc_to_view_group(#db{name=Db}, DDoc),
         IsReduce = get_reduce_type(Req),
         ViewType = extract_view_type(ViewName, Group#group.views, IsReduce),
-        {Group, parse_view_params(Req, Keys, ViewType)};
+        QueryArgs = parse_view_params(Req, Keys, ViewType),
+        % TODO proper calculation of etag
+        % Etag = view_group_etag(ViewGroup, Db, Keys),
+        Etag = couch_util:new_uuid(),
+        couch_stats_collector:increment({httpd, view_reads}),
+        chttpd:etag_respond(Req, Etag, fun() ->
+            {ok, Resp} = chttpd:start_json_response(Req, 200, [{"Etag",Etag}]),
+            CB = fun view_callback/2,
+            fabric:query_view(Db, DDoc, ViewName, QueryArgs, CB, {nil, Resp})
+        end);
     {not_found, Reason} ->
         throw({not_found, Reason})
-    end,
-    % this etag is wrong as current_seq == 0 right now, so no caching allowed
-    % Etag = view_group_etag(ViewGroup, Db, Keys),
-    Etag = couch_util:new_uuid(),
-    couch_stats_collector:increment({httpd, view_reads}),
-    chttpd:etag_respond(Req, Etag, fun() ->
-        {ok, Resp} = chttpd:start_json_response(Req, 200, [{"Etag",Etag}]),
-        case ?COUCH:design_view(Resp, Db, DesignId, ViewName, Keys, QueryArgs) of
-        {ok, Total, Result} ->
-            send_chunk(Resp, final_chunk(Total, Result)),
-            end_json_response(Resp);
-        {ok, Resp} ->
-            {ok, Resp}
-        end
-    end).
+    end.
+
+view_callback({total_and_offset, Total, Offset}, {nil, Resp}) ->
+    Chunk = "{\"total_rows\":~p,\"offset\":~p,\"rows\":[\r\n",
+    send_chunk(Resp, io_lib:format(Chunk, [Total, Offset])),
+    {ok, {"", Resp}};
+view_callback({row, Row}, {nil, Resp}) ->
+    % first row of a reduce view
+    send_chunk(Resp, ["{\"rows\":[\r\n", ?JSON_ENCODE(Row)]),
+    {ok, {",\r\n", Resp}};
+view_callback({row, Row}, {Prepend, Resp}) ->
+    send_chunk(Resp, [Prepend, ?JSON_ENCODE(Row)]),
+    {ok, {",\r\n", Resp}};
+view_callback(complete, {_, Resp}) ->
+    send_chunk(Resp, "\r\n]}"),
+    end_json_response(Resp),
+    {ok, Resp};
+view_callback({error, Reason}, Resp) ->
+    chttpd:send_chunked_error(Resp, {error, Reason}).
 
 extract_view_type(_ViewName, [], _IsReduce) ->
     throw({not_found, missing_named_view});
@@ -64,15 +78,6 @@ extract_view_type(ViewName, [View|Rest], IsReduce) ->
         end
     end.
 
-final_chunk(Total, {_, _, undefined, _, nil}) ->
-    ?JSON_ENCODE({[{total_rows, Total}, {offset, Total}, {rows, []}]});
-final_chunk(Total, {_, _, undefined, _, Offset}) ->
-    ?JSON_ENCODE({[{total_rows, Total}, {offset, Offset}, {rows, []}]});
-final_chunk(_, {_, _, _, _, _}) ->
-    "\r\n]}";
-final_chunk(_, Error) ->
-    throw(Error).
-
 handle_view_req(#httpd{method='GET',
         path_parts=[_Db, _Design, DName, _View, ViewName]}=Req, Db) ->
     design_doc_view(Req, Db, DName, ViewName, nil);
@@ -80,15 +85,11 @@ handle_view_req(#httpd{method='GET',
 handle_view_req(#httpd{method='POST',
         path_parts=[_Db, _Design, DName, _View, ViewName]}=Req, Db) ->
     {Fields} = chttpd:json_body_obj(Req),
-    case couch_util:get_value(<<"keys">>, Fields, nil) of
-    nil ->
-        Fmt = "POST to view ~p/~p in database ~p with no keys member.",
-        ?LOG_DEBUG(Fmt, [DName, ViewName, Db]),
-        design_doc_view(Req, Db, DName, ViewName, nil);
+    case couch_util:get_value(<<"keys">>, Fields) of
     Keys when is_list(Keys) ->
         design_doc_view(Req, Db, DName, ViewName, Keys);
     _ ->
-        throw({bad_request, "`keys` member must be a array."})
+        throw({bad_request, "`keys` body member must be an array."})
     end;
 
 handle_view_req(Req, _Db) ->
