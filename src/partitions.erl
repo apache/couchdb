@@ -18,8 +18,7 @@
 
 %% @doc build a full partition map
 fullmap(DbName, Options) ->
-    {ok, FullNodes} = mem3:fullnodes(),
-    {_, Nodes, _} = lists:unzip3(lists:keysort(1, FullNodes)),
+    {ok, Nodes} = mem3:nodes(),
     fullmap(DbName, Nodes, Options).
 
 fullmap(DbName, Nodes, Options) ->
