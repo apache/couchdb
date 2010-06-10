@@ -4,8 +4,11 @@
 
 -include("fabric.hrl").
 
-go(DbName, GroupId, View, Args, Callback, Acc0) ->
+go(DbName, GroupId, View, Args, Callback, Acc0) when is_binary(GroupId) ->
     {ok, DDoc} = fabric:open_doc(DbName, <<"_design/", GroupId/binary>>, []),
+    go(DbName, DDoc, View, Args, Callback, Acc0);
+
+go(DbName, DDoc, View, Args, Callback, Acc0) ->
     Workers = lists:map(fun(#shard{name=Name, node=Node} = Shard) ->
         Ref = rexi:cast(Node, {fabric_rpc, map_view, [Name, DDoc, View, Args]}),
         Shard#shard{ref = Ref}

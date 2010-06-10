@@ -80,8 +80,8 @@ query_view(DbName, DesignName, ViewName, QueryArgs) ->
     Callback = fun default_callback/2,
     query_view(DbName, DesignName, ViewName, QueryArgs, Callback, []).
 
-query_view(DbName, DesignName, ViewName, QueryArgs, Callback, Acc0) ->
-    Db = dbname(DbName), Design = name(DesignName), View = name(ViewName),
+query_view(DbName, Design, ViewName, QueryArgs, Callback, Acc0) ->
+    Db = dbname(DbName), View = name(ViewName),
     case is_reduce_view(Db, Design, View, QueryArgs) of
     true ->
         Mod = fabric_view_reduce;

@@ -4,8 +4,11 @@
 
 -include("fabric.hrl").
 
-go(DbName, GroupId, VName, Args, Callback, Acc0) ->
+go(DbName, GroupId, View, Args, Callback, Acc0) when is_binary(GroupId) ->
     {ok, DDoc} = fabric:open_doc(DbName, <<"_design/", GroupId/binary>>, []),
+    go(DbName, DDoc, View, Args, Callback, Acc0);
+
+go(DbName, DDoc, VName, Args, Callback, Acc0) ->
     #group{def_lang=Lang, views=Views} = Group =
         couch_view_group:design_doc_to_view_group(#db{name=DbName}, DDoc),
     {NthRed, View} = fabric_view:extract_view(nil, VName, Views, reduce),
