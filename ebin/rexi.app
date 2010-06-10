@@ -4,6 +4,5 @@
     {modules, [rexi, rexi_app, rexi_sup, rexi_monitor, rexi_server]},
     {registered, [rexi_sup, rexi_server]},
     {applications, [kernel, stdlib]},
-    {mod, {rexi_app,[]}},
-    {start_phases, []}
+    {mod, {rexi_app,[]}}
 ]}.
