@@ -28,7 +28,6 @@ handle_message({ok, Info}, Shard, {Counters, Acc}) ->
         end
     end;
 handle_message(M, _, Acc) ->
-    ?LOG_INFO("mismatch ~p", [M]),
     {ok, Acc}.
 
 merge_results(Info) ->

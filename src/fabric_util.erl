@@ -6,7 +6,6 @@
 
 submit_jobs(Shards, EndPoint, ExtraArgs) ->
     lists:map(fun(#shard{node=Node, name=ShardName} = Shard) ->
-        io:format("submitting ~p ~p~n", [Node, {fabric_rpc, EndPoint, [ShardName | ExtraArgs]}]),
         Ref = rexi:cast(Node, {fabric_rpc, EndPoint, [ShardName | ExtraArgs]}),
         Shard#shard{ref = Ref}
     end, Shards).

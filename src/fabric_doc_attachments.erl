@@ -10,7 +10,6 @@ receiver(_Req, undefined) ->
 receiver(_Req, {unknown_transfer_encoding, Unknown}) ->
     exit({unknown_transfer_encoding, Unknown});
 receiver(Req, chunked) ->
-    % ?LOG_INFO("generating chunked attachment processes", []),
     MiddleMan = spawn(fun() -> middleman(Req, chunked) end),
     fun(4096, ChunkFun, ok) ->
         write_chunks(MiddleMan, ChunkFun)
