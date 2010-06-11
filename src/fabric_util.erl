@@ -17,7 +17,7 @@ recv(Workers, Keypos, Fun, Acc0) ->
     receive_loop(Workers, Keypos, Fun, Acc0).
 
 receive_loop(Workers, Keypos, Fun, Acc0) ->
-    case couch_config:get("fabric", "request_timeout", "10000") of
+    case couch_config:get("fabric", "request_timeout", "60000") of
     "infinity" ->
         Timeout = infinity;
     N ->
