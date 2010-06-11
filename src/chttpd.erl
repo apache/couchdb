@@ -145,8 +145,8 @@ handle_request(MochiReq) ->
         Resp:get(code),
         RequestTime
     ],
-    Customer = cloudant_util:customer_name(HttpReq),
-    couch_metrics_req:notify({request, [Customer|RequestInfo]}),
+    % Customer = cloudant_util:customer_name(HttpReq),
+    % couch_metrics_req:notify({request, [Customer|RequestInfo]}),
     showroom_log:message(notice, "~s ~s ~s ~s ~B ~B", RequestInfo),
     couch_stats_collector:record({couchdb, request_time}, RequestTime),
     couch_stats_collector:increment({httpd, requests}),
