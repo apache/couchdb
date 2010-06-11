@@ -27,7 +27,7 @@ handle_message({ok, Info}, Shard, {Counters, Acc}) ->
             {stop, merge_results(lists:flatten([Info|Acc]))}
         end
     end;
-handle_message(M, _, Acc) ->
+handle_message(_, _, Acc) ->
     {ok, Acc}.
 
 merge_results(Info) ->
