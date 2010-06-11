@@ -51,8 +51,11 @@ view_callback({total_and_offset, Total, Offset}, {nil, Resp}) ->
     Chunk = "{\"total_rows\":~p,\"offset\":~p,\"rows\":[\r\n",
     send_chunk(Resp, io_lib:format(Chunk, [Total, Offset])),
     {ok, {"", Resp}};
+view_callback({total_and_offset, _, _}, Acc) ->
+    % a sorted=false view where the message came in late.  Ignore.
+    {ok, Acc};
 view_callback({row, Row}, {nil, Resp}) ->
-    % first row of a reduce view
+    % first row of a reduce view, or a sorted=false view
     send_chunk(Resp, ["{\"rows\":[\r\n", ?JSON_ENCODE(Row)]),
     {ok, {",\r\n", Resp}};
 view_callback({row, Row}, {Prepend, Resp}) ->
@@ -342,6 +345,8 @@ parse_view_param("callback", _) ->
     []; % Verified in the JSON response functions
 parse_view_param("show_total_rows", Value) ->
     [{show_total_rows, parse_bool_param(Value)}];
+parse_view_param("sorted", Value) ->
+    [{sorted, parse_bool_param(Value)}];
 parse_view_param(Key, Value) ->
     [{extra, {Key, Value}}].
 
@@ -426,6 +431,10 @@ validate_view_query(include_docs, _Value, Args) ->
 validate_view_query(show_total_rows, false, Args) ->
     Args#view_query_args{show_total_rows=false};
 validate_view_query(show_total_rows, _Value, Args) ->
+    Args;
+validate_view_query(sorted, false, Args) ->
+    Args#view_query_args{sorted=false};
+validate_view_query(sorted, _Value, Args) ->
     Args;
 validate_view_query(extra, _Value, Args) ->
     Args.
