@@ -9,7 +9,7 @@
     update_docs/3, att_receiver/2]).
 
 % Views
--export([all_docs/4, changes/3, query_view/3, query_view/4, query_view/6,
+-export([all_docs/4, changes/4, query_view/3, query_view/4, query_view/6,
     get_view_group_info/2]).
 
 % miscellany
@@ -68,10 +68,10 @@ all_docs(DbName, #view_query_args{} = QueryArgs, Callback, Acc0) when
         is_function(Callback, 2) ->
     fabric_view_all_docs:go(dbname(DbName), QueryArgs, Callback, Acc0).
 
-changes(DbName, Options, Callback) ->
+changes(DbName, Options, Callback, Acc0) ->
     % TODO use a keylist for Options instead of #changes_args, BugzID 10281
     Feed = Options#changes_args.feed,
-    fabric_view_changes:go(dbname(DbName), Feed, Options, Callback).
+    fabric_view_changes:go(dbname(DbName), Feed, Options, Callback, Acc0).
 
 query_view(DbName, DesignName, ViewName) ->
     query_view(DbName, DesignName, ViewName, #view_query_args{}).

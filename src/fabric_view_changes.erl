@@ -1,13 +1,13 @@
 -module(fabric_view_changes).
 
--export([go/4, start_update_notifier/1]).
+-export([go/5, start_update_notifier/1]).
 
 -include("fabric.hrl").
 
-go(DbName, Feed, Options, Callback) when Feed == "continuous" orelse
+go(DbName, Feed, Options, Callback, Acc0) when Feed == "continuous" orelse
         Feed == "longpoll" ->
     Args = make_changes_args(Options),
-    {ok, Acc0} = Callback(start, Feed),
+    {ok, Acc} = Callback(start, Acc0),
     Notifiers = start_update_notifiers(DbName),
     {Timeout, TimeoutFun} = couch_changes:get_changes_timeout(Args, Callback),
     try
@@ -16,7 +16,7 @@ go(DbName, Feed, Options, Callback) when Feed == "continuous" orelse
             Args,
             Callback,
             get_start_seq(DbName, Args),
-            Acc0,
+            Acc,
             Timeout,
             TimeoutFun
         )
@@ -25,24 +25,23 @@ go(DbName, Feed, Options, Callback) when Feed == "continuous" orelse
         couch_changes:get_rest_db_updated()
     end;
 
-go(DbName, "normal", Options, Callback) ->
+go(DbName, "normal", Options, Callback, Acc0) ->
     Args = make_changes_args(Options),
-    {ok, Acc0} = Callback(start, "normal"),
+    {ok, Acc} = Callback(start, Acc0),
     {ok, #collector{counters=Seqs, user_acc=AccOut}} = send_changes(
         DbName,
         Args,
         Callback,
         get_start_seq(DbName, Args),
-        Acc0
+        Acc
     ),
-    Callback({stop, pack_seqs(Seqs)}, AccOut),
-    {ok, AccOut}.
+    Callback({stop, pack_seqs(Seqs)}, AccOut).
 
 keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout, TFun) ->
     #changes_args{limit=Limit, feed=Feed} = Args,
     {ok, Collector} = send_changes(DbName, Args, Callback, Seqs, AccIn),
-    #collector{limit=Limit2, counters=Seqs, user_acc=AccOut} = Collector,
-    LastSeq = pack_seqs(Seqs),
+    #collector{limit=Limit2, counters=NewSeqs, user_acc=AccOut} = Collector,
+    LastSeq = pack_seqs(NewSeqs),
     if Limit > Limit2, Feed == "longpoll" ->
         Callback({stop, LastSeq}, AccOut);
     true ->
@@ -204,7 +203,7 @@ unpack_seqs("0", DbName) ->
 unpack_seqs(Packed, DbName) ->
     % TODO relies on internal structure of fabric_dict as keylist
     lists:map(fun({Node, [A,B], Seq}) ->
-        Name = partitions:shard_name(DbName, A),
+        Name = partitions:shard_name(A, DbName),
         {#shard{node=Node, range=[A,B], dbname=DbName, name=Name}, Seq}
     end, binary_to_term(couch_util:decodeBase64Url(Packed))).
 
