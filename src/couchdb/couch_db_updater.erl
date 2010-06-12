@@ -681,6 +681,7 @@ commit_data(Db, true) ->
 commit_data(Db, _) ->
     #db{
         fd = Fd,
+        filepath = Filepath,
         header = OldHeader,
         fsync_options = FsyncOptions,
         waiting_delayed_commit = Timer
@@ -691,14 +692,14 @@ commit_data(Db, _) ->
         Db;
     Header ->
         case lists:member(before_header, FsyncOptions) of
-        true -> ok = couch_file:sync(Fd);
+        true -> ok = couch_file:sync(Filepath);
         _    -> ok
         end,
 
         ok = couch_file:write_header(Fd, Header),
 
         case lists:member(after_header, FsyncOptions) of
-        true -> ok = couch_file:sync(Fd);
+        true -> ok = couch_file:sync(Filepath);
         _    -> ok
         end,
 
