@@ -54,7 +54,7 @@ attachment_receiver(Ref, Request) ->
         receive_data(Ref, ReqId, ContentEncoding)
     end
     catch
-    throw:{attachment_request_failed, timeout} ->
+    throw:{attachment_request_failed, _} ->
         case {Request#http_db.retries, Request#http_db.pause} of
         {0, _} ->
              ?LOG_INFO("request for ~p failed", [Request#http_db.resource]),
