@@ -478,10 +478,10 @@ verify_is_server_admin(#user_ctx{roles=Roles}) ->
     false -> throw({unauthorized, <<"You are not a server admin.">>})
     end.
 
-log_request(#httpd{mochi_req=MochiReq,peer=Peer,method=Method}, Code) ->
+log_request(#httpd{mochi_req=MochiReq,peer=Peer}, Code) ->
     ?LOG_INFO("~s - - ~p ~s ~B", [
         Peer,
-        Method,
+        couch_util:to_existing_atom(MochiReq:get(method)),
         MochiReq:get(raw_path),
         couch_util:to_integer(Code)
     ]).
