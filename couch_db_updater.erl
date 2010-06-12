@@ -215,6 +215,9 @@ handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts,
             [catch(ClientPid ! {retry, self()}) || ClientPid <- Clients],
             {noreply, Db}
     end;
+handle_info(delayed_commit, #db{waiting_delayed_commit=nil}=Db) ->
+    %no outstanding delayed commits, ignore
+    {noreply, Db};
 handle_info(delayed_commit, Db) ->
     case commit_data(Db) of
         Db ->
@@ -671,23 +674,22 @@ db_to_header(Db, Header) ->
         security_ptr = Db#db.security_ptr,
         revs_limit = Db#db.revs_limit}.
 
-commit_data(#db{fd=Fd,header=OldHeader,fsync_options=FsyncOptions}=Db, Delay) ->
-    Header = db_to_header(Db, OldHeader),
-    if OldHeader == Header ->
+commit_data(#db{waiting_delayed_commit=nil} = Db, true) ->
+    Db#db{waiting_delayed_commit=erlang:send_after(1000,self(),delayed_commit)};
+commit_data(Db, true) ->
+    Db;
+commit_data(Db, _) ->
+    #db{
+        fd = Fd,
+        header = OldHeader,
+        fsync_options = FsyncOptions,
+        waiting_delayed_commit = Timer
+    } = Db,
+    if is_reference(Timer) -> erlang:cancel_timer(Timer); true -> ok end,
+    case db_to_header(Db, OldHeader) of
+    OldHeader ->
         Db;
-    Delay and (Db#db.waiting_delayed_commit == nil) ->
-        Db#db{waiting_delayed_commit=
-                erlang:send_after(1000, self(), delayed_commit)};
-    Delay ->
-        Db;
-    true ->
-        if Db#db.waiting_delayed_commit /= nil ->
-            case erlang:cancel_timer(Db#db.waiting_delayed_commit) of
-            false -> receive delayed_commit -> ok after 0 -> ok end;
-            _ -> ok
-            end;
-        true -> ok
-        end,
+    Header ->
         case lists:member(before_header, FsyncOptions) of
         true -> ok = couch_file:sync(Fd);
         _    -> ok
