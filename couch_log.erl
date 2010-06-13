@@ -50,14 +50,23 @@ init([]) ->
         fun("log", "file") ->
             ?MODULE:stop();
         ("log", "level") ->
+            ?MODULE:stop();
+        ("log", "include_sasl") ->
             ?MODULE:stop()
         end),
 
     Filename = couch_config:get("log", "file", "couchdb.log"),
-    Level = couch_config:get("log", "level", "info"),
+    Level = level_integer(list_to_atom(couch_config:get("log", "level", "info"))),
+    Sasl = list_to_atom(couch_config:get("log", "include_sasl", "true")),
+
+    case ets:info(?MODULE) of
+    undefined -> ets:new(?MODULE, [named_table]);
+    _ -> ok
+    end,
+    ets:insert(?MODULE, {level, Level}),
 
     {ok, Fd} = file:open(Filename, [append]),
-    {ok, {Fd, level_integer(list_to_atom(Level))}}.
+    {ok, {Fd, Level, Sasl}}.
 
 debug_on() ->
     get_level_integer() =< ?LEVEL_DEBUG.
@@ -72,29 +81,31 @@ get_level() ->
     level_atom(get_level_integer()).
 
 get_level_integer() ->
-    catch gen_event:call(error_logger, couch_log, get_level_integer).
+    ets:lookup_element(?MODULE, level, 2).
 
 set_level_integer(Int) ->
     gen_event:call(error_logger, couch_log, {set_level_integer, Int}).
 
-handle_event({error_report, _, {Pid, couch_error, {Format, Args}}}, {Fd, _LogLevel}=State) ->
+handle_event({Pid, couch_error, {Format, Args}}, {Fd, _LogLevel, _Sasl}=State) ->
     log(Fd, Pid, error, Format, Args),
     {ok, State};
-handle_event({error_report, _, {Pid, _, _}}=Event, {Fd, _LogLevel}=State) ->
-    log(Fd, Pid, error, "~p", [Event]),
-    {ok, State};
-handle_event({error, _, {Pid, Format, Args}}, {Fd, _LogLevel}=State) ->
-    log(Fd, Pid, error, Format, Args),
-    {ok, State};
-handle_event({info_report, _, {Pid, couch_info, {Format, Args}}}, {Fd, LogLevel}=State)
+handle_event({Pid, couch_info, {Format, Args}}, {Fd, LogLevel, _Sasl}=State)
 when LogLevel =< ?LEVEL_INFO ->
     log(Fd, Pid, info, Format, Args),
     {ok, State};
-handle_event({info_report, _, {Pid, couch_debug, {Format, Args}}}, {Fd, LogLevel}=State)
+handle_event({Pid, couch_debug, {Format, Args}}, {Fd, LogLevel, _Sasl}=State)
 when LogLevel =< ?LEVEL_DEBUG ->
     log(Fd, Pid, debug, Format, Args),
     {ok, State};
-handle_event({_, _, {Pid, _, _}}=Event, {Fd, LogLevel}=State)
+handle_event({error_report, _, {Pid, _, _}}=Event, {Fd, _LogLevel, Sasl}=State)
+when Sasl =/= false ->
+    log(Fd, Pid, error, "~p", [Event]),
+    {ok, State};
+handle_event({error, _, {Pid, Format, Args}}, {Fd, _LogLevel, Sasl}=State)
+when Sasl =/= false ->
+    log(Fd, Pid, error, Format, Args),
+    {ok, State};
+handle_event({_, _, {Pid, _, _}}=Event, {Fd, LogLevel, _Sasl}=State)
 when LogLevel =< ?LEVEL_TMI ->
     % log every remaining event if tmi!
     log(Fd, Pid, tmi, "~p", [Event]),
@@ -102,10 +113,9 @@ when LogLevel =< ?LEVEL_TMI ->
 handle_event(_Event, State) ->
     {ok, State}.
 
-handle_call(get_level_integer, {_Fd, LogLevel}=State) ->
-    {ok, LogLevel, State};
-handle_call({set_level_integer, NewLevel}, {Fd, _LogLevel}) ->
-    {ok, ok, {Fd, NewLevel}}.
+handle_call({set_level_integer, NewLevel}, {Fd, _LogLevel, Sasl}) ->
+    ets:insert(?MODULE, {level, NewLevel}),
+    {ok, ok, {Fd, NewLevel, Sasl}}.
 
 handle_info(_Info, State) ->
     {ok, State}.
@@ -113,7 +123,7 @@ handle_info(_Info, State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-terminate(_Arg, {Fd, _LoggingLevel}) ->
+terminate(_Arg, {Fd, _LoggingLevel, _Sasl}) ->
     file:close(Fd).
 
 log(Fd, Pid, Level, Format, Args) ->
