@@ -81,7 +81,11 @@ get_level() ->
     level_atom(get_level_integer()).
 
 get_level_integer() ->
-    ets:lookup_element(?MODULE, level, 2).
+    try
+        ets:lookup_element(?MODULE, level, 2)
+    catch error:badarg ->
+        ?LEVEL_ERROR
+    end.
 
 set_level_integer(Int) ->
     gen_event:call(error_logger, couch_log, {set_level_integer, Int}).
