@@ -39,7 +39,8 @@ all_docs(DbName, #view_query_args{keys=nil} = QueryArgs) ->
         total_rows = Total,
         stop_fun = all_docs_stop_fun(QueryArgs)
     },
-    {ok, Acc} = couch_db:enum_docs(Db, StartId, Dir, fun view_fold/3, Acc0),
+    Options = [{start_key, StartId}, {dir, Dir}],
+    {ok, Acc} = couch_db:enum_docs(Db, fun view_fold/3, Acc0, Options),
     final_response(Total, Acc#view_acc.offset).
 
 changes(DbName, Args0, StartSeq) ->
