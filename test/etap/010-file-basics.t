@@ -16,7 +16,7 @@ filename() -> test_util:build_file("test/etap/temp.010").
 
 main(_) ->
     test_util:init_code_path(),
-    etap:plan(19),
+    etap:plan(16),
     case (catch test()) of
         ok ->
             etap:end_tests();

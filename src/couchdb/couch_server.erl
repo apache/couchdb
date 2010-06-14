@@ -212,13 +212,7 @@ open_async(Server, From, DbName, Filepath, Options) ->
     Opener = spawn_link(fun() ->
             Res = couch_db:start_link(DbName, Filepath, Options),
             gen_server:call(Parent, {open_result, DbName, Res}, infinity),
-            unlink(Parent),
-            case Res of
-            {ok, DbReader} ->
-                unlink(DbReader);
-            _ ->
-                ok
-            end
+            unlink(Parent)
         end),
     true = ets:insert(couch_dbs_by_name, {DbName, {opening, Opener, [From]}}),
     true = ets:insert(couch_dbs_by_pid, {Opener, DbName}),
@@ -305,13 +299,15 @@ handle_call({delete, DbName, _Options}, _From, Server) ->
         case ets:lookup(couch_dbs_by_name, DbName) of
         [] -> Server;
         [{_, {opening, Pid, Froms}}] ->
-            couch_util:shutdown_sync(Pid),
+            exit(Pid, kill),
+            receive {'EXIT', Pid, _Reason} -> ok end,
             true = ets:delete(couch_dbs_by_name, DbName),
             true = ets:delete(couch_dbs_by_pid, Pid),
             [gen_server:send_result(F, not_found) || F <- Froms],
             Server#server{dbs_open=Server#server.dbs_open - 1};
         [{_, {opened, Pid, LruTime}}] ->
-            couch_util:shutdown_sync(Pid),
+            exit(Pid, kill),
+            receive {'EXIT', Pid, _Reason} -> ok end,
             true = ets:delete(couch_dbs_by_name, DbName),
             true = ets:delete(couch_dbs_by_pid, Pid),
             true = ets:delete(couch_dbs_by_lru, LruTime),
@@ -341,9 +337,19 @@ handle_cast(Msg, _Server) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-handle_info({'EXIT', _Pid, config_change}, Server) ->
-    {noreply, shutdown, Server};
-handle_info(Error, _Server) ->
-    ?LOG_ERROR("Unexpected message, restarting couch_server: ~p", [Error]),
-    exit(kill).
+handle_info({'EXIT', _Pid, config_change}, _Server) ->
+    {stop, shutdown, Server};
+handle_info({'EXIT', Pid, Reason}, #server{dbs_open=DbsOpen}=Server) ->
+    [{Pid, DbName}] = ets:lookup(couch_dbs_by_pid, Pid),
+    case ets:lookup(couch_dbs_by_name, DbName) of
+    [{DbName, {opened, Pid, LruTime}}] ->
+        true = ets:delete(couch_dbs_by_lru, LruTime);
+    [{DbName, {opening, Pid, Froms}}] ->
+        [gen_server:reply(From, Reason) || From <- Froms]
+    end,
+    true = ets:delete(couch_dbs_by_pid, Pid),
+    true = ets:delete(couch_dbs_by_name, DbName),
+    {noreply, Server#server{dbs_open=DbsOpen - 1}};
+qhandle_info(Info, _Server) ->
+    exit({unknown_message, Info}).
 
