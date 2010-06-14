@@ -48,7 +48,7 @@ basic_name_pw(Req) ->
     AuthorizationHeader = header_value(Req, "Authorization"),
     case AuthorizationHeader of
     "Basic " ++ Base64Value ->
-        case string:tokens(?b2l(couch_util:decodeBase64(Base64Value)),":") of
+        case string:tokens(?b2l(base64:decode(Base64Value)),":") of
         ["_", "_"] ->
             % special name and pass to be logged out
             nil;

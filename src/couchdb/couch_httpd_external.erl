@@ -124,7 +124,7 @@ parse_external_response({Response}) ->
                 Args#extern_resp_args{data=Value, ctype="text/html; charset=utf-8"};
             {<<"base64">>, Value} ->
                 Args#extern_resp_args{
-                    data=couch_util:decodeBase64(Value),
+                    data=base64:decode(Value),
                     ctype="application/binary"
                 };
             {<<"headers">>, {Headers}} ->
