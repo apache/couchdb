@@ -414,7 +414,7 @@ all_docs_callback({row, Row}, {Prepend, Resp}) ->
 all_docs_callback(complete, {_, Resp}) ->
     send_chunk(Resp, "\r\n]}"),
     end_json_response(Resp);
-all_docs_callback({error, Reason}, Resp) ->
+all_docs_callback({error, Reason}, {_, Resp}) ->
     chttpd:send_chunked_error(Resp, {error, Reason}).
 
 db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->

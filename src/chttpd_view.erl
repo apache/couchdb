@@ -65,7 +65,7 @@ view_callback(complete, {_, Resp}) ->
     send_chunk(Resp, "\r\n]}"),
     end_json_response(Resp),
     {ok, Resp};
-view_callback({error, Reason}, Resp) ->
+view_callback({error, Reason}, {_, Resp}) ->
     chttpd:send_chunked_error(Resp, {error, Reason}).
 
 extract_view_type(_ViewName, [], _IsReduce) ->
