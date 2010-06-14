@@ -220,7 +220,7 @@ couchTests.changes = function(debug) {
   
   req = CouchDB.request("GET", "/test_suite_db/_changes?filter=changes_filter/dynamic&field=bop");
   resp = JSON.parse(req.responseText);
-  T(resp.results.length == 1);
+  T(resp.results.length == 1, "changes_filter/dynamic&field=bop");
 
   if (!is_safari && xhr) { // full test requires parallel connections
     // filter with longpoll
@@ -352,7 +352,7 @@ couchTests.changes = function(debug) {
 
   req = CouchDB.request("GET", "/test_suite_db/_changes?filter=changes_filter/conflicted");
   resp = JSON.parse(req.responseText);
-  T(resp.results.length == 1);
+  T(resp.results.length == 1, "filter=changes_filter/conflicted");
 
   // test with erlang filter function
   run_on_modified_server([{
