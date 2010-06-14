@@ -40,18 +40,17 @@ count(RefCounterPid) ->
 
 -record(srv,
     {
-    referrers=dict:new(), % a dict of each ref counting proc.
-    child_procs=[]
+    referrers=dict:new() % a dict of each ref counting proc.
     }).
 
 init({Pid, ChildProcs}) ->
     [link(ChildProc) || ChildProc <- ChildProcs],
     Referrers = dict:from_list([{Pid, {erlang:monitor(process, Pid), 1}}]),
-    {ok, #srv{referrers=Referrers, child_procs=ChildProcs}}.
+    {ok, #srv{referrers=Referrers}}.
 
 
-terminate(_Reason, #srv{child_procs=ChildProcs}) ->
-    [couch_util:shutdown_sync(Pid) || Pid <- ChildProcs],
+terminate(Reason, _Srv) ->
+    couch_util:terminate_linked(Reason),
     ok.
 
 

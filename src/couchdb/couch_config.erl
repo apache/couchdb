@@ -111,7 +111,7 @@ terminate(_Reason, _State) ->
 handle_call(all, _From, Config) ->
     Resp = lists:sort((ets:tab2list(?MODULE))),
     {reply, Resp, Config};
-handle_call({set, Sec, Key, Val, Persist}, From, Config) ->
+handle_call({set, Sec, Key, Val, Persist}, _From, Config) ->
     true = ets:insert(?MODULE, {{Sec, Key}, Val}),
     case {Persist, Config#config.write_filename} of
         {true, undefined} ->
@@ -121,12 +121,9 @@ handle_call({set, Sec, Key, Val, Persist}, From, Config) ->
         _ ->
             ok
     end,
-    spawn_link(fun() ->
-        [catch F(Sec, Key, Val, Persist) || {_Pid, F} <- Config#config.notify_funs],
-            gen_server:reply(From, ok)
-    end),
-    {noreply, Config};
-handle_call({delete, Sec, Key, Persist}, From, Config) ->
+    [catch F(Sec, Key, Val, Persist) || {_Pid, F} <- Config#config.notify_funs],
+    {reply, ok, Config};
+handle_call({delete, Sec, Key, Persist}, _From, Config) ->
     true = ets:delete(?MODULE, {Sec,Key}),
     case {Persist, Config#config.write_filename} of
         {true, undefined} ->
@@ -136,11 +133,8 @@ handle_call({delete, Sec, Key, Persist}, From, Config) ->
         _ ->
             ok
     end,
-    spawn_link(fun() ->
-        [catch F(Sec, Key, deleted, Persist) || {_Pid, F} <- Config#config.notify_funs],
-            gen_server:reply(From, ok)
-    end),
-    {noreply, Config};
+    [catch F(Sec, Key, deleted, Persist) || {_Pid, F} <- Config#config.notify_funs],
+    {reply, ok, Config};
 handle_call({register, Fun, Pid}, _From, #config{notify_funs=PidFuns}=Config) ->
     erlang:monitor(process, Pid),
     % convert 1 and 2 arity to 3 arity

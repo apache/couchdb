@@ -50,11 +50,9 @@ terminate(_Reason, {_Name, _Command, Pid}) ->
 handle_call({execute, JsonReq}, _From, {Name, Command, Pid}) ->
     {reply, couch_os_process:prompt(Pid, JsonReq), {Name, Command, Pid}}.
 
-handle_info({'EXIT', _Pid, normal}, State) ->
-    {noreply, State};
 handle_info({'EXIT', Pid, Reason}, {Name, Command, Pid}) ->
     ?LOG_INFO("EXTERNAL: Process for ~s exiting. (reason: ~w)", [Name, Reason]),
-    {stop, Reason, {Name, Command, Pid}}.
+    {stop, normal, {Name, Command, Pid}}.
 
 handle_cast(stop, {Name, Command, Pid}) ->
     ?LOG_INFO("EXTERNAL: Shutting down ~s", [Name]),
