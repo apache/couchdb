@@ -340,7 +340,11 @@ update_doc(Db, Doc, Options, UpdateType) ->
     {ok, [{ok, NewRev}]} ->
         {ok, NewRev};
     {ok, [Error]} ->
-        throw(Error)
+        throw(Error);
+    {ok, []} ->
+        % replication success
+        {Pos, [RevId | _]} = Doc#doc.revs,
+        {ok, {Pos, RevId}}
     end.
 
 update_docs(Db, Docs) ->
@@ -814,8 +818,9 @@ flush_att(Fd, #att{data=Fun,att_len=AttLen}=Att) when is_function(Fun) ->
 % is present in the request, but there is no Content-MD5
 % trailer, we're free to ignore this inconsistency and
 % pretend that no Content-MD5 exists.
-with_stream(Fd, #att{md5=InMd5,type=Type}=Att, Fun) ->
-    {ok, OutputStream} = case couch_util:compressible_att_type(Type) of
+with_stream(Fd, #att{md5=InMd5,type=Type,comp=AlreadyComp}=Att, Fun) ->
+    {ok, OutputStream} = case (not AlreadyComp) andalso
+        couch_util:compressible_att_type(Type) of
     true ->
         CompLevel = list_to_integer(
             couch_config:get("attachments", "compression_level", "0")
@@ -836,12 +841,18 @@ with_stream(Fd, #att{md5=InMd5,type=Type}=Att, Fun) ->
     {StreamInfo, Len, IdentityLen, Md5, IdentityMd5} =
         couch_stream:close(OutputStream),
     check_md5(IdentityMd5, ReqMd5),
+    {AttLen, DiskLen} = case AlreadyComp of
+    true ->
+        {Att#att.att_len, Att#att.disk_len};
+    _ ->
+        {Len, IdentityLen}
+    end,
     Att#att{
         data={Fd,StreamInfo},
-        att_len=Len,
-        disk_len=IdentityLen,
+        att_len=AttLen,
+        disk_len=DiskLen,
         md5=Md5,
-        comp=(IdentityMd5 =/= Md5)
+        comp=(AlreadyComp orelse (IdentityMd5 =/= Md5))
     }.
 
 

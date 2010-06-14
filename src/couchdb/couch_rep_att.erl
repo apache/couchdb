@@ -79,11 +79,7 @@ receive_data(Ref, ReqId, ContentEncoding) ->
         throw({attachment_request_failed, Err});
     {ibrowse_async_response, ReqId, Data} ->
         % ?LOG_DEBUG("got ~p bytes for ~p", [size(Data), ReqId]),
-        if ContentEncoding =:= "gzip" ->
-            zlib:gunzip(Data);
-        true ->
-            Data
-        end;
+        Data;
     {ibrowse_async_response_end, ReqId} ->
         ?LOG_ERROR("streaming att. ended but more data requested ~p", [ReqId]),
         throw({attachment_request_failed, premature_end})
