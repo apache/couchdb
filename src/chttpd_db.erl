@@ -149,6 +149,8 @@ create_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
     ok ->
         DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
         send_json(Req, 201, [{"Location", DocUrl}], {[{ok, true}]});
+    {error, file_exists} ->
+        chttpd:send_error(Req, file_exists);
     Error ->
         throw(Error)
     end.

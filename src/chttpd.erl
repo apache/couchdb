@@ -22,7 +22,7 @@
     server_header/0, start_chunked_response/3,send_chunk/2, 
     start_response_length/4, send/2, start_json_response/2,
     start_json_response/3, end_json_response/1, send_response/4,
-    send_method_not_allowed/2, send_error/4, send_redirect/2, 
+    send_method_not_allowed/2, send_error/2, send_error/4, send_redirect/2, 
     send_chunked_error/2, send_json/2,send_json/3,send_json/4]).
 
 start_link() ->
