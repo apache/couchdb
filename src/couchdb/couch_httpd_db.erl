@@ -945,7 +945,20 @@ db_attachment_req(#httpd{method=Method,mochi_req=MochiReq}=Req, Db, DocId, FileN
                     Length ->
                         list_to_integer(Length)
                     end,
-                md5 = get_md5_header(Req)
+                md5 = get_md5_header(Req),
+                encoding = case string:to_lower(string:strip(
+                    couch_httpd:header_value(Req,"Content-Encoding","identity")
+                )) of
+                "identity" ->
+                   identity;
+                "gzip" ->
+                   gzip;
+                _ ->
+                   throw({
+                       bad_ctype,
+                       "Only gzip and identity content-encodings are supported"
+                   })
+                end
             }]
     end,
 

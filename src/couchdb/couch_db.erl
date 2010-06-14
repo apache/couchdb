@@ -850,7 +850,16 @@ with_stream(Fd, #att{md5=InMd5,type=Type,encoding=Enc}=Att, Fun) ->
             {Len, IdentityLen, gzip}
         end;
     gzip ->
-        {Att#att.att_len, Att#att.disk_len, Enc}
+        case {Att#att.att_len, Att#att.disk_len} of
+        {AL, DL} when AL =:= undefined orelse DL =:= undefined ->
+            % Compressed attachment uploaded through the standalone API.
+            {Len, Len, gzip};
+        {AL, DL} ->
+            % This case is used for efficient push-replication, where a
+            % compressed attachment is located in the body of multipart
+            % content-type request.
+            {AL, DL, gzip}
+        end
     end,
     Att#att{
         data={Fd,StreamInfo},

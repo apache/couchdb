@@ -22,7 +22,7 @@ test_db_name() ->
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(65),
+    etap:plan(78),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -53,6 +53,27 @@ test() ->
     tests_for_1st_png_att(),
     tests_for_2nd_text_att(),
     tests_for_2nd_png_att(),
+
+    create_already_compressed_att(db_url() ++ "/doc_comp_att", "readme.txt"),
+    test_already_compressed_att(db_url() ++ "/doc_comp_att", "readme.txt"),
+
+    test_create_already_compressed_att_with_invalid_content_encoding(
+        db_url() ++ "/doc_att_deflate",
+        "readme.txt",
+        zlib:compress(test_text_data()),
+        "deflate"
+    ),
+
+    test_create_already_compressed_att_with_invalid_content_encoding(
+        db_url() ++ "/doc_att_compress",
+        "readme.txt",
+        % Note: As of OTP R13B04, it seems there's no LZW compression
+        % (i.e. UNIX compress utility implementation) lib in OTP.
+        % However there's a simple working Erlang implementation at:
+        % http://scienceblogs.com/goodmath/2008/01/simple_lempelziv_compression_i.php
+        test_text_data(),
+        "compress"
+    ),
 
     timer:sleep(3000), % to avoid mochiweb socket closed exceptions
     couch_server:delete(test_db_name(), []),
@@ -119,6 +140,20 @@ create_2nd_png_att() ->
         [],
         [{sync, true}]),
     etap:is(Code, 201, "Created png attachment using the non-standalone api"),
+    ok.
+
+create_already_compressed_att(DocUri, AttName) ->
+    {ok, {{_, Code, _}, _Headers, _Body}} = http:request(
+        put,
+        {DocUri ++ "/" ++ AttName, [{"Content-Encoding", "gzip"}],
+        "text/plain", zlib:gzip(test_text_data())},
+        [],
+        [{sync, true}]),
+    etap:is(
+        Code,
+        201,
+        "Created already compressed attachment using the standalone api"
+    ),
     ok.
 
 tests_for_1st_text_att() ->
@@ -573,6 +608,93 @@ test_2nd_png_att_stub() ->
         PngEncLength,
         undefined,
         "2nd png attachment stub doesn't have an encoded_length field"
+    ),
+    ok.
+
+test_already_compressed_att(DocUri, AttName) ->
+    test_get_already_compressed_att_with_accept_gzip(DocUri, AttName),
+    test_get_already_compressed_att_without_accept(DocUri, AttName),
+    test_get_already_compressed_att_stub(DocUri, AttName).
+
+test_get_already_compressed_att_with_accept_gzip(DocUri, AttName) ->
+    {ok, {{_, Code, _}, Headers, Body}} = http:request(
+        get,
+        {DocUri ++ "/" ++ AttName, [{"Accept-Encoding", "gzip"}]},
+        [],
+        [{sync, true}]),
+    etap:is(Code, 200, "HTTP response code is 200"),
+    Gziped = lists:member({"content-encoding", "gzip"}, Headers),
+    etap:is(Gziped, true, "received body is gziped"),
+    etap:is(
+        iolist_to_binary(Body),
+        iolist_to_binary(zlib:gzip(test_text_data())),
+        "received data for the already compressed attachment is ok"
+    ),
+    ok.
+
+test_get_already_compressed_att_without_accept(DocUri, AttName) ->
+    {ok, {{_, Code, _}, Headers, Body}} = http:request(
+        get,
+        {DocUri ++ "/" ++ AttName, []},
+        [],
+        [{sync, true}]),
+    etap:is(Code, 200, "HTTP response code is 200"),
+    Gziped = lists:member({"content-encoding", "gzip"}, Headers),
+    etap:is(Gziped, false, "received body is not gziped"),
+    etap:is(
+        iolist_to_binary(Body),
+        iolist_to_binary(test_text_data()),
+        "received data for the already compressed attachment is ok"
+    ),
+    ok.
+
+test_get_already_compressed_att_stub(DocUri, AttName) ->
+    {ok, {{_, Code, _}, _Headers, Body}} = http:request(
+        get,
+        {DocUri ++ "?att_encoding_info=true", []},
+        [],
+        [{sync, true}]),
+    etap:is(Code, 200, "HTTP response code is 200"),
+    Json = couch_util:json_decode(Body),
+    {AttJson} = couch_util:get_nested_json_value(
+        Json,
+        [<<"_attachments">>, iolist_to_binary(AttName)]
+    ),
+    AttLength = proplists:get_value(<<"length">>, AttJson),
+    etap:is(
+        AttLength,
+        iolist_size((zlib:gzip(test_text_data()))),
+        "Already compressed attachment stub length matches the "
+        "compressed length"
+    ),
+    Encoding = proplists:get_value(<<"encoding">>, AttJson),
+    etap:is(
+        Encoding,
+        <<"gzip">>,
+        "Already compressed attachment stub has the encoding field set to gzip"
+    ),
+    EncLength = proplists:get_value(<<"encoded_length">>, AttJson),
+    etap:is(
+        EncLength,
+        AttLength,
+        "Already compressed attachment stub encoded_length matches the "
+        "length field value"
+    ),
+    ok.
+
+test_create_already_compressed_att_with_invalid_content_encoding(
+    DocUri, AttName, AttData, Encoding) ->
+    {ok, {{_, Code, _}, _Headers, _Body}} = http:request(
+        put,
+        {DocUri ++ "/" ++ AttName, [{"Content-Encoding", Encoding}],
+        "text/plain", AttData},
+        [],
+        [{sync, true}]),
+    etap:is(
+        Code,
+        415,
+        "Couldn't create an already compressed attachment using the "
+        "unsupported encoding '" ++ Encoding ++ "'"
     ),
     ok.
 
