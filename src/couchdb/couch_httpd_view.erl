@@ -114,9 +114,9 @@ output_map_view(Req, View, Group, Db, QueryArgs, nil) ->
         {ok, RowCount} = couch_view:get_row_count(View),
         FoldlFun = make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db, RowCount, #view_fold_helper_funs{reduce_count=fun couch_view:reduce_to_count/1}),
         FoldAccInit = {Limit, SkipCount, undefined, []},
-        {ok, LastReduce, FoldResult} = couch_view:fold(View,
+        {ok, LastReduce, FoldResult} = couch_view:fold(View, 
                 FoldlFun, FoldAccInit, make_key_options(QueryArgs)),
-        finish_view_fold(Req, RowCount,
+        finish_view_fold(Req, RowCount, 
                 couch_view:reduce_to_count(LastReduce), FoldResult)
     end);
 
@@ -137,7 +137,7 @@ output_map_view(Req, View, Group, Db, QueryArgs, Keys) ->
                     #view_fold_helper_funs{
                         reduce_count = fun couch_view:reduce_to_count/1
                     }),
-                {ok, LastReduce, FoldResult} = couch_view:fold(View, FoldlFun, FoldAcc,
+                {ok, LastReduce, FoldResult} = couch_view:fold(View, FoldlFun, FoldAcc, 
                     make_key_options(QueryArgs#view_query_args{start_key=Key, end_key=Key})),
                 {LastReduce, FoldResult}
             end, {{[],[]}, FoldAccInit}, Keys),
@@ -210,7 +210,7 @@ load_view(Req, Db, {ViewDesignId, ViewName}, Keys) ->
                 MapView = couch_view:extract_map_view(ReduceView),
                 {map, MapView, Group, QueryArgs};
             _ ->
-                QueryArgs = couch_httpd_view:parse_view_params(Req, Keys, reduce),
+                QueryArgs = couch_httpd_view:parse_view_params(Req, Keys, reduce),                
                 {reduce, ReduceView, Group, QueryArgs}
             end;
         {not_found, Reason} ->
@@ -512,7 +512,7 @@ apply_default_helper_funs(#reduce_fold_helper_funs{
     }.
 
 make_key_options(#view_query_args{direction = Dir}=QueryArgs) ->
-     [{dir,Dir} | make_start_key_option(QueryArgs) ++
+     [{dir,Dir} | make_start_key_option(QueryArgs) ++ 
             make_end_key_option(QueryArgs)].
 
 make_start_key_option(

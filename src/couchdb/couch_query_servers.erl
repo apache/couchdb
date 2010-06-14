@@ -90,7 +90,7 @@ group_reductions_results(List) ->
 rereduce(_Lang, [], _ReducedValues) ->
     {ok, []};
 rereduce(Lang, RedSrcs, ReducedValues) ->
-    Grouped = group_reductions_results(ReducedValues),
+    Grouped = group_reductions_results(ReducedValues),    
     Results = lists:zipwith(
         fun
         (<<"_", _/binary>> = FunSrc, Values) ->
@@ -165,7 +165,7 @@ builtin_sum_rows(KVs) ->
 % use the function stored in ddoc.validate_doc_update to test an update.
 validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj) ->
     JsonEditDoc = couch_doc:to_json_obj(EditDoc, [revs]),
-    JsonDiskDoc = json_doc(DiskDoc),
+    JsonDiskDoc = json_doc(DiskDoc),  
     case ddoc_prompt(DDoc, [<<"validate_doc_update">>], [JsonEditDoc, JsonDiskDoc, Ctx, SecObj]) of
         1 ->
             ok;
@@ -190,7 +190,7 @@ filter_docs(Req, Db, DDoc, FName, Docs) ->
     [true, Passes] = ddoc_prompt(DDoc, [<<"filters">>, FName], [JsonDocs, JsonReq]),
     {ok, Passes}.
 
-ddoc_proc_prompt({Proc, DDocId}, FunPath, Args) ->
+ddoc_proc_prompt({Proc, DDocId}, FunPath, Args) -> 
     proc_prompt(Proc, [<<"ddoc">>, DDocId, FunPath, Args]).
 
 ddoc_prompt(DDoc, FunPath, Args) ->
@@ -250,7 +250,7 @@ terminate(_Reason, {_Langs, PidProcs, _LangProcs}) ->
 
 handle_call({get_proc, #doc{body={Props}}=DDoc, DDocKey}, _From, {Langs, PidProcs, LangProcs}=Server) ->
     % Note to future self. Add max process limit.
-    Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),
+    Lang = proplists:get_value(<<"language">>, Props, <<"javascript">>),    
     case ets:lookup(LangProcs, Lang) of
     [{Lang, [P|Rest]}] ->
         % find a proc in the set that has the DDoc
@@ -258,7 +258,7 @@ handle_call({get_proc, #doc{body={Props}}=DDoc, DDocKey}, _From, {Langs, PidProc
         {ok, Proc} ->
             rem_from_list(LangProcs, Lang, Proc),
             {reply, {ok, Proc, get_query_server_config()}, Server};
-        Error ->
+        Error -> 
             {reply, Error, Server}
         end;
     _ ->
@@ -268,7 +268,7 @@ handle_call({get_proc, #doc{body={Props}}=DDoc, DDocKey}, _From, {Langs, PidProc
             case proc_with_ddoc(DDoc, DDocKey, [Proc]) of
             {ok, Proc2} ->
                 {reply, {ok, Proc2, get_query_server_config()}, Server};
-            Error ->
+            Error -> 
                 {reply, Error, Server}
             end;
         Error ->
@@ -290,7 +290,7 @@ handle_call({get_proc, Lang}, _From, {Langs, PidProcs, LangProcs}=Server) ->
             {reply, Error, Server}
         end
     end;
-handle_call({unlink_proc, Pid}, _From, {_, PidProcs, _}=Server) ->
+handle_call({unlink_proc, Pid}, _From, {_, PidProcs, _}=Server) ->    
     rem_value(PidProcs, Pid),
     unlink(Pid),
     {reply, ok, Server};
@@ -349,7 +349,7 @@ new_process(Langs, Lang) ->
     end.
 
 proc_with_ddoc(DDoc, DDocKey, LangProcs) ->
-    DDocProcs = lists:filter(fun(#proc{ddoc_keys=Keys}) ->
+    DDocProcs = lists:filter(fun(#proc{ddoc_keys=Keys}) -> 
             lists:any(fun(Key) ->
                 Key == DDocKey
             end, Keys)

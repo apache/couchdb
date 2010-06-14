@@ -92,7 +92,7 @@ to_json_attachments(Atts, RevPosIncludeAfter, DataToFollow) ->
                 {<<"content_type">>, Att#att.type},
                 {<<"revpos">>, Att#att.revpos}
                 ] ++
-                if Att#att.revpos > RevPosIncludeAfter ->
+                if Att#att.revpos > RevPosIncludeAfter ->    
                     if DataToFollow ->
                         [{<<"length">>, DiskLen}, {<<"follows">>, true}];
                     true ->
@@ -102,7 +102,7 @@ to_json_attachments(Atts, RevPosIncludeAfter, DataToFollow) ->
                         _ ->
                             att_to_iolist(Att)
                         end,
-                        [{<<"data">>,
+                        [{<<"data">>, 
                             couch_util:encodeBase64(AttData)}]
                     end;
                 true ->
@@ -202,7 +202,7 @@ transfer_fields([{<<"_attachments">>, {JsonBins}} | Rest], Doc) ->
             case proplists:get_value(<<"follows">>, BinProps) of
             true ->
                 Len = proplists:get_value(<<"length">>, BinProps),
-                #att{name=Name, data=follows, type=Type,
+                #att{name=Name, data=follows, type=Type, 
                     att_len=Len, disk_len=Len, revpos=RevPos};
             _ ->
                 Value = proplists:get_value(<<"data">>, BinProps),
@@ -354,7 +354,7 @@ len_doc_to_multi_part_stream(Boundary,JsonBytes,Atts,AttsSinceRevPos) ->
     size(Boundary) +
     + lists:foldl(fun(#att{revpos=RevPos,disk_len=DiskLen}, AccAttsSize) ->
             if RevPos > AttsSinceRevPos ->
-                AccAttsSize +
+                AccAttsSize +  
                 4 + % "\r\n\r\n"
                 DiskLen +
                 4 + % "\r\n--"
@@ -373,7 +373,7 @@ doc_to_multi_part_stream(Boundary,JsonBytes,Atts,AttsSinceRevPos,WriteFun) ->
 
 atts_to_mp([], _Boundary, WriteFun, _AttsSinceRevPos) ->
     WriteFun(<<"--">>);
-atts_to_mp([#att{revpos=RevPos} = Att | RestAtts], Boundary, WriteFun,
+atts_to_mp([#att{revpos=RevPos} = Att | RestAtts], Boundary, WriteFun, 
         AttsSinceRevPos) when RevPos > AttsSinceRevPos ->
     WriteFun(<<"\r\n\r\n">>),
     AttFun = case Att#att.comp of
@@ -390,7 +390,7 @@ atts_to_mp([_ | RestAtts], Boundary, WriteFun, AttsSinceRevPos) ->
 
 
 doc_from_multi_part_stream(ContentType, DataFun) ->
-    Parser = spawn_link(fun() ->
+    Parser = spawn_link(fun() -> 
         couch_httpd:parse_multipart_request(ContentType, DataFun,
                 fun(Next)-> mp_parse_doc(Next, []) end)
         end),
