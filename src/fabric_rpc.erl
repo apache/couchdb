@@ -40,7 +40,7 @@ all_docs(DbName, #view_query_args{keys=nil} = QueryArgs) ->
         stop_fun = all_docs_stop_fun(QueryArgs)
     },
     Options = [{start_key, StartId}, {dir, Dir}],
-    {ok, Acc} = couch_db:enum_docs(Db, fun view_fold/3, Acc0, Options),
+    {ok, _, Acc} = couch_db:enum_docs(Db, fun view_fold/3, Acc0, Options),
     final_response(Total, Acc#view_acc.offset).
 
 changes(DbName, Args0, StartSeq) ->
@@ -95,14 +95,16 @@ map_view(DbName, DDoc, ViewName, QueryArgs) ->
     },
     case Keys of
     nil ->
-        {ok, Acc} = couch_view:fold(View, Start, Dir, fun view_fold/3, Acc0);
+        Options = [{start_key, Start}, {dir, Dir}],
+        {ok, _, Acc} = couch_view:fold(View, fun view_fold/3, Acc0, Options);
     _ ->
         Acc = lists:foldl(fun(Key, AccIn) ->
             KeyStart = {Key, StartDocId},
             KeyStop = default_stop_fun(QueryArgs#view_query_args{start_key=Key,
                 end_key=Key}),
-            {_Go, Out} = couch_view:fold(View, KeyStart, Dir, fun view_fold/3,
-                AccIn#view_acc{stop_fun = KeyStop}),
+            Options = [{start_key, KeyStart}, {dir, Dir}],
+            {_Go, _, Out} = couch_view:fold(View, fun view_fold/3,
+                AccIn#view_acc{stop_fun = KeyStop}, Options),
             Out
         end, Acc0, Keys)
     end,
