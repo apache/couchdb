@@ -44,12 +44,12 @@ all_docs(DbName, #view_query_args{keys=nil} = QueryArgs) ->
     final_response(Total, Acc#view_acc.offset).
 
 changes(DbName, Args0, StartSeq) ->
-    #changes_args{style=Style, dir=Dir, filter=FilterName} = Args0,
+    #changes_args{style=Style, dir=Dir} = Args0,
     case couch_db:open(DbName, []) of
     {ok, Db} ->
         % couch code has a MochiReq for 2nd argument, ick
         Args = Args0#changes_args{
-            filter = couch_changes:make_filter_fun(FilterName, nil, Db)
+            filter = couch_changes:make_filter_fun(Args0, nil, Db)
         },
         Enum = fun changes_enumerator/2,
         Opts = [{dir,Dir}],
