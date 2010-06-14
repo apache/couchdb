@@ -66,21 +66,26 @@ cache_dbs() ->
     end.
 
 cache_map(Id, Props) ->
-    Map = couch_util:get_value(map, Props),
-    lists:foreach(fun({[{node,Node},{b,Beg},{e,End}]}) ->
+    Map = couch_util:get_value(<<"map">>, Props),
+    lists:foreach(fun({[{<<"node">>,Node},{<<"b">>,Beg},{<<"e">>,End}]}) ->
         Part = #shard{
             name = partitions:shard_name(Beg, Id),
             dbname = Id,
-            node = Node,
+            node = to_atom(Node),
             range = [Beg,End]
         },
         ets:insert(partitions, Part)
     end, Map).
 
 cache_nodes(Id, Props) ->
-    Nodes = couch_util:get_value(nodes, Props),
-    lists:foreach(fun({[{order,Order},{node, Node},{options,Opts}]}) ->
-        ets:insert(memnodes, {Id, {Order, Node, Opts}})
+    Nodes = couch_util:get_value(<<"nodes">>, Props),
+    lists:foreach(fun({[{<<"order">>,Order},{<<"node">>, Node},{<<"options">>,Opts}]}) ->
+        ets:insert(memnodes, {Id, {Order, to_atom(Node), Opts}})
     end, Nodes).
+
+to_atom(Node) when is_binary(Node) ->
+    list_to_atom(binary_to_list(Node));
+to_atom(Node) when is_atom(Node) ->
+    Node.
 
 %{ok, ets:insert(dbs_cache, {Id, Props})};

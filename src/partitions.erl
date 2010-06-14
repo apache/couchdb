@@ -37,10 +37,10 @@ hash(Item) ->
 install_fullmap(DbName, Fullmap, FullNodes, Options) ->
     {N,Q} = db_init_constants(Options),
     Doc = {[{<<"_id">>,DbName},
-            {map, jsonify(map, Fullmap)},
-            {nodes, jsonify(nodes, FullNodes)},
-            {n,N},
-            {q,Q}]},
+            {<<"map">>, jsonify(<<"map">>, Fullmap)},
+            {<<"nodes">>, jsonify(<<"nodes">>, FullNodes)},
+            {<<"n">>,N},
+            {<<"q">>,Q}]},
     write_db_doc(Doc).
 
 for_key(DbName, Key) ->
@@ -153,13 +153,13 @@ make_map(AllNodes, [Node|RestNodes], [Part|RestParts], Acc) ->
     % add a node/part combo to the Acc
     make_map(AllNodes, RestNodes, RestParts, [{Node,Part}|Acc]).
 
-jsonify(map, Map) ->
+jsonify(<<"map">>, Map) ->
     lists:map(fun(#shard{node=Node, range=[Beg,End]}) ->
-        {[{node, Node}, {b, Beg}, {e, End}]}
+        {[{<<"node">>, Node}, {<<"b">>, Beg}, {<<"e">>, End}]}
     end, Map);
-jsonify(nodes, Nodes) ->
+jsonify(<<"nodes">>, Nodes) ->
     lists:map(fun({Order, Node, Options}) ->
-        {[{order, Order}, {node, Node}, {options, Options}]}
+        {[{<<"order">>, Order}, {<<"node">>, Node}, {<<"options">>, Options}]}
     end, Nodes).
 
 write_db_doc(EDoc) ->
