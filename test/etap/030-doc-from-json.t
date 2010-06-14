@@ -18,7 +18,7 @@
 -record(doc, {id= <<"">>, revs={0, []}, body={[]},
             atts=[], deleted=false, meta=[]}).
 -record(att, {name, type, att_len, disk_len, md5= <<>>, revpos=0, data,
-            comp=false}).
+            encoding=identity}).
 
 default_config() ->
     test_util:build_file("etc/couchdb/default_dev.ini").

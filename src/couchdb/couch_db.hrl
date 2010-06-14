@@ -102,12 +102,16 @@
     name,
     type,
     att_len,
-    disk_len, % length of the attachment in uncompressed form
-              % differs from at_len when comp =:= true
+    disk_len, % length of the attachment in its identity form
+              % (that is, without a content encoding applied to it)
+              % differs from att_len when encoding /= identity
     md5= <<>>,
     revpos=0,
     data,
-    comp=false  % gzip compression Y/N
+    encoding=identity % currently supported values are:
+                      %     identity, gzip
+                      % additional values to support in the future:
+                      %     deflate, compress
     }).
 
 
