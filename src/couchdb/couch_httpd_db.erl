@@ -743,7 +743,7 @@ send_doc_efficiently(Req, #doc{atts=Atts}=Doc, Headers, Options) ->
             AttsSinceRevPos = proplists:get_value(atts_after_revpos, Options, 0),
             Len = couch_doc:len_doc_to_multi_part_stream(Boundary,JsonBytes,Atts,
                     AttsSinceRevPos,false),
-            CType = {<<"Content-Type">>, 
+            CType = {<<"Content-Type">>,
                     <<"multipart/related; boundary=\"", Boundary/binary, "\"">>},
             {ok, Resp} = start_response_length(Req, 200, [CType|Headers], Len),
             couch_doc:doc_to_multi_part_stream(Boundary,JsonBytes,Atts,
