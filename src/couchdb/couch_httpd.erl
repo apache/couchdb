@@ -35,6 +35,7 @@ start_link() ->
 
     BindAddress = couch_config:get("httpd", "bind_address", any),
     Port = couch_config:get("httpd", "port", "5984"),
+    MaxConnections = couch_config:get("httpd", "max_connections", "2048"),
     VirtualHosts = couch_config:get("vhosts"),
 
     DefaultSpec = "{couch_httpd_db, handle_request}",
@@ -73,7 +74,8 @@ start_link() ->
         {loop, Loop},
         {name, ?MODULE},
         {ip, BindAddress},
-        {port, Port}
+        {port, Port},
+        {max, MaxConnections}
     ]) of
     {ok, MochiPid} -> {ok, MochiPid};
     {error, Reason} ->
@@ -85,6 +87,8 @@ start_link() ->
         fun("httpd", "bind_address") ->
             ?MODULE:stop();
         ("httpd", "port") ->
+            ?MODULE:stop();
+        ("httpd", "max_connections") ->
             ?MODULE:stop();
         ("httpd", "default_handler") ->
             ?MODULE:stop();
