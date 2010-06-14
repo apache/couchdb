@@ -163,10 +163,24 @@ jsonify(nodes, Nodes) ->
     end, Nodes).
 
 write_db_doc(EDoc) ->
-    Doc = couch_doc:from_json_obj(EDoc),
     {ok, Db} = couch_db:open(<<"dbs">>, []),
-    {ok, NewRev} = couch_db:update_doc(Db, Doc, []),
-    NewRev.
+    try
+        update_db_doc(Db, couch_doc:from_json_obj(EDoc))
+    catch {conflict, _} ->
+        ?LOG_ERROR("conflict writing db doc, must be a race", [])
+    after
+        couch_db:close(Db)
+    end.
+
+update_db_doc(Db, #doc{id=Id, body=Body} = Doc) ->
+    case couch_db:open_doc(Db, Id, []) of
+    {not_found, _} ->
+        {ok, _} = couch_db:update_doc(Db, Doc, []);
+    {ok, #doc{body=Body}} ->
+        ok;
+    {ok, OldDoc} ->
+        {ok, _} = couch_db:update_doc(Db, OldDoc#doc{body=Body}, [])
+    end.
 
 shard_name(Part, DbName) when is_list(DbName) ->
     shard_name(Part, ?l2b(DbName));
