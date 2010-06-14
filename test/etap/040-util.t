@@ -17,7 +17,7 @@ main(_) ->
     test_util:init_code_path(),
     application:start(crypto),
 
-    etap:plan(16),
+    etap:plan(14),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -34,29 +34,6 @@ test() ->
         "A binary foo is the atom foo."),
     etap:is(foobarbaz, couch_util:to_existing_atom("foobarbaz"),
         "A list of atoms is one munged atom."),
-
-    % terminate_linked
-    Self = self(),
-    
-    spawn(fun() ->
-        SecondSelf = self(),
-        ChildPid = spawn_link(fun() ->
-            SecondSelf ! {child, started},
-            receive shutdown -> ok end
-        end),
-        PidUp = receive
-            {child, started} -> ok
-        after 1000 ->
-            {error, timeout}
-        end,
-        etap:is(ok, PidUp, "Started a linked process."),
-        couch_util:terminate_linked(normal),
-        Self ! {pid, ChildPid}
-    end),
-    receive
-        {pid, Pid} ->
-            etap:ok(not is_process_alive(Pid), "Linked process was killed.")
-    end,
 
     % implode
     etap:is([1, 38, 2, 38, 3], couch_util:implode([1,2,3],"&"),
