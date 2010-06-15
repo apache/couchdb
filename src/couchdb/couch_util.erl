@@ -414,7 +414,7 @@ compressible_att_type(MimeType) ->
         [T || T <- TypeExpList, T /= []]
     ).
 
--spec md5(Data::iodata()) -> Digest::binary().
+-spec md5(Data::(iolist() | binary())) -> Digest::binary().
 md5(Data) ->
     try crypto:md5(Data) catch error:_ -> erlang:md5(Data) end.
 
@@ -422,7 +422,8 @@ md5(Data) ->
 md5_init() ->
     try crypto:md5_init() catch error:_ -> erlang:md5_init() end.
 
--spec md5_update(Context::binary(), Data::iodata()) -> NewContext::binary().
+-spec md5_update(Context::binary(), Data::(iolist() | binary())) ->
+    NewContext::binary().
 md5_update(Ctx, D) ->
     try crypto:md5_update(Ctx,D) catch error:_ -> erlang:md5_update(Ctx,D) end.
 
