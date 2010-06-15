@@ -255,8 +255,8 @@ output_reduce_view(Req, Db, View, Group, QueryArgs, Keys) ->
         finish_reduce_fold(Req, Resp)
     end).
 
-reverse_key_default(nil) -> {};
-reverse_key_default({}) -> nil;
+reverse_key_default(?MIN_STR) -> ?MAX_STR;
+reverse_key_default(?MAX_STR) -> ?MIN_STR;
 reverse_key_default(Key) -> Key.
 
 get_stale_type(Req) ->
@@ -384,12 +384,8 @@ validate_view_query(descending, true, Args) ->
         fwd ->
             Args#view_query_args{
                 direction = rev,
-                start_key =
-                    reverse_key_default(Args#view_query_args.start_key),
                 start_docid =
                     reverse_key_default(Args#view_query_args.start_docid),
-                end_key =
-                    reverse_key_default(Args#view_query_args.end_key),
                 end_docid =
                     reverse_key_default(Args#view_query_args.end_docid)
             }
