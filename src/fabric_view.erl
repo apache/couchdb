@@ -151,20 +151,11 @@ get_next_row(#collector{reducer = RedSrc} = St) when RedSrc =/= undefined ->
         get_next_row(St#collector{keys=RestKeys})
     end;
 get_next_row(State) ->
-    #collector{
-        rows = [Row|Rest],
-        counters = Counters0,
-        stop_fun = Stop
-    } = State,
+    #collector{rows = [Row|Rest], counters = Counters0} = State,
     Worker = Row#view_row.worker,
     Counters1 = fabric_dict:update_counter(Worker, -1, Counters0),
     NewState = maybe_resume_worker(Worker, State#collector{counters=Counters1}),
-    case Stop(Row) of
-    true ->
-        throw(complete);
-    false ->
-        {Row, NewState#collector{rows = Rest}}
-    end.
+    {Row, NewState#collector{rows = Rest}}.
 
 find_next_key(nil, Dir, RowDict) ->
     case lists:sort(sort_fun(Dir), dict:fetch_keys(RowDict)) of

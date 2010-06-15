@@ -21,7 +21,6 @@
     rows = [],
     skip,
     limit,
-    stop_fun,
     keys,
     os_proc,
     reducer,

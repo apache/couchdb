@@ -22,7 +22,6 @@ go(DbName, DDoc, View, Args, Callback, Acc0) ->
         counters = fabric_dict:init(Workers, 0),
         skip = Skip,
         limit = Limit,
-        stop_fun = stop_fun(Args),
         keys = fabric_view:keydict(Keys),
         sorted = Args#view_query_args.sorted,
         user_acc = Acc0
@@ -119,32 +118,6 @@ handle_message(#view_row{} = Row, {Worker, From}, State) ->
 handle_message(complete, Worker, State) ->
     Counters = fabric_dict:update_counter(Worker, 1, State#collector.counters),
     fabric_view:maybe_send_row(State#collector{counters = Counters}).
-
-stop_fun(#view_query_args{} = QueryArgs) ->
-    #view_query_args{
-        direction = Dir,
-        inclusive_end = Inclusive,
-        end_key = EndKey,
-        end_docid = EndDocId
-    } = QueryArgs,
-    stop_fun(Dir, Inclusive, EndKey, EndDocId).
-
-stop_fun(fwd, true, EndKey, EndDocId) ->
-    fun(#view_row{key=Key, id=Id}) ->
-        couch_view:less_json([EndKey, EndDocId], [Key, Id])
-    end;
-stop_fun(fwd, false, EndKey, EndDocId) ->
-    fun(#view_row{key=K}) when K==EndKey -> true; (#view_row{key=Key, id=Id}) ->
-        couch_view:less_json([EndKey, EndDocId], [Key, Id])
-    end;
-stop_fun(rev, true, EndKey, EndDocId) ->
-    fun(#view_row{key=Key, id=Id}) ->
-        couch_view:less_json([Key, Id], [EndKey, EndDocId])
-    end;
-stop_fun(rev, false, EndKey, EndDocId) ->
-    fun(#view_row{key=K}) when K==EndKey -> true; (#view_row{key=Key, id=Id}) ->
-        couch_view:less_json([Key, Id], [EndKey, EndDocId])
-    end.
 
 merge_row(fwd, undefined, Row, Rows) ->
     lists:merge(fun(#view_row{key=KeyA, id=IdA}, #view_row{key=KeyB, id=IdB}) ->

@@ -19,7 +19,6 @@ go(DbName, #view_query_args{keys=nil} = QueryArgs, Callback, Acc0) ->
         counters = fabric_dict:init(Workers, 0),
         skip = Skip,
         limit = Limit,
-        stop_fun = stop_fun(QueryArgs),
         user_acc = Acc0
     },
     try fabric_util:receive_loop(Workers, #shard.ref, fun handle_message/3,
@@ -119,15 +118,6 @@ handle_message(complete, Worker, State) ->
     Counters = fabric_dict:update_counter(Worker, 1, State#collector.counters),
     fabric_view:maybe_send_row(State#collector{counters = Counters}).
 
-
-stop_fun(#view_query_args{direction=fwd, end_key=EndKey}) ->
-    fun(#view_row{id=Id}) ->
-        couch_db_updater:less_docid(EndKey, Id)
-    end;
-stop_fun(#view_query_args{direction=rev, end_key=EndKey}) ->
-    fun(#view_row{id=Id}) ->
-        couch_db_updater:less_docid(Id, EndKey)
-    end.
 
 merge_row(fwd, Row, Rows) ->
     lists:keymerge(#view_row.id, [Row], Rows);

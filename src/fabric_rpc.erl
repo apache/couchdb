@@ -13,7 +13,6 @@
     offset = nil,
     total_rows,
     reduce_fun = fun couch_db:enum_docs_reduce_to_count/1,
-    stop_fun,
     group_level = 0
 }).
 
@@ -25,21 +24,27 @@ all_docs(DbName, #view_query_args{keys=nil} = QueryArgs) ->
     #view_query_args{
         start_key = StartKey,
         start_docid = StartDocId,
+        end_key = EndKey,
+        end_docid = EndDocId,
         limit = Limit,
         skip = Skip,
         include_docs = IncludeDocs,
-        direction = Dir
+        direction = Dir,
+        inclusive_end = Inclusive
     } = QueryArgs,
-    StartId = if is_binary(StartKey) -> StartKey; true -> StartDocId end,
     {ok, Total} = couch_db:get_doc_count(Db),
     Acc0 = #view_acc{
         db = Db,
         include_docs = IncludeDocs,
         limit = Limit+Skip,
-        total_rows = Total,
-        stop_fun = all_docs_stop_fun(QueryArgs)
+        total_rows = Total
     },
-    Options = [{start_key, StartId}, {dir, Dir}],
+    EndKeyType = if Inclusive -> end_key; true -> end_key_gt end,
+    Options = [
+        {dir, Dir},
+        {start_key, if is_binary(StartKey) -> StartKey; true -> StartDocId end},
+        {EndKeyType, if is_binary(EndKey) -> EndKey; true -> EndDocId end}
+    ],
     {ok, _, Acc} = couch_db:enum_docs(Db, fun view_fold/3, Acc0, Options),
     final_response(Total, Acc#view_acc.offset).
 
@@ -68,17 +73,13 @@ changes(DbName, Args0, StartSeq) ->
 map_view(DbName, DDoc, ViewName, QueryArgs) ->
     {ok, Db} = couch_db:open(DbName, []),
     #view_query_args{
-        start_key = StartKey,
-        start_docid = StartDocId,
         limit = Limit,
         skip = Skip,
         keys = Keys,
         include_docs = IncludeDocs,
-        direction = Dir,
         stale = Stale,
         view_type = ViewType
     } = QueryArgs,
-    Start = {StartKey, StartDocId},
     MinSeq = if Stale == ok -> 0; true -> couch_db:get_update_seq(Db) end,
     Group0 = couch_view_group:design_doc_to_view_group(Db, DDoc),
     {ok, Pid} = gen_server:call(couch_view, {get_group_server, DbName, Group0}),
@@ -90,21 +91,18 @@ map_view(DbName, DDoc, ViewName, QueryArgs) ->
         include_docs = IncludeDocs,
         limit = Limit+Skip,
         total_rows = Total,
-        reduce_fun = fun couch_view:reduce_to_count/1,
-        stop_fun = default_stop_fun(QueryArgs)
+        reduce_fun = fun couch_view:reduce_to_count/1
     },
     case Keys of
     nil ->
-        Options = [{start_key, Start}, {dir, Dir}],
+        Options = couch_httpd_view:make_key_options(QueryArgs),
         {ok, _, Acc} = couch_view:fold(View, fun view_fold/3, Acc0, Options);
     _ ->
         Acc = lists:foldl(fun(Key, AccIn) ->
-            KeyStart = {Key, StartDocId},
-            KeyStop = default_stop_fun(QueryArgs#view_query_args{start_key=Key,
-                end_key=Key}),
-            Options = [{start_key, KeyStart}, {dir, Dir}],
-            {_Go, _, Out} = couch_view:fold(View, fun view_fold/3,
-                AccIn#view_acc{stop_fun = KeyStop}, Options),
+            KeyArgs = QueryArgs#view_query_args{start_key=Key, end_key=Key},
+            Options = couch_httpd_view:make_key_options(KeyArgs),
+            {_Go, _, Out} = couch_view:fold(View, fun view_fold/3, AccIn,
+                Options),
             Out
         end, Acc0, Keys)
     end,
@@ -113,10 +111,6 @@ map_view(DbName, DDoc, ViewName, QueryArgs) ->
 reduce_view(DbName, Group0, ViewName, QueryArgs) ->
     {ok, Db} = couch_db:open(DbName, []),
     #view_query_args{
-        start_key = StartKey,
-        start_docid = StartDocId,
-        end_key = EndKey,
-        end_docid = EndDocId,
         group_level = GroupLevel,
         limit = Limit,
         skip = Skip,
@@ -135,14 +129,16 @@ reduce_view(DbName, Group0, ViewName, QueryArgs) ->
     Options0 = [{key_group_fun, GroupFun}, {dir, Dir}],
     case Keys of
     nil ->
-        Options = [{start_key, {StartKey,StartDocId}},
-            {end_key, {EndKey,EndDocId}} | Options0],
+        Options0 = couch_httpd_view:make_key_options(QueryArgs),
+        Options = [{key_group_fun, GroupFun} | Options0],
         couch_view:fold_reduce(ReduceView, fun reduce_fold/3, Acc0, Options);
     _ ->
-        
-        [couch_view:fold_reduce(ReduceView, fun reduce_fold/3, Acc0,
-            [{start_key,{K,StartDocId}}, {end_key,{K,EndDocId}} | Options0])
-            || K <- Keys]
+        lists:map(fun(Key) ->
+            KeyArgs = QueryArgs#view_query_args{start_key=Key, end_key=Key},
+            Options0 = couch_httpd_view:make_key_options(KeyArgs),
+            Options = [{key_group_fun, GroupFun} | Options0],
+            couch_view:fold_reduce(ReduceView, fun reduce_fold/3, Acc0, Options)
+        end, Keys)
     end,
     rexi:reply(complete).
 
@@ -231,35 +227,20 @@ view_fold({{Key,Id}, Value}, _Offset, Acc) ->
     #view_acc{
         db = Db,
         limit = Limit,
-        include_docs = IncludeDocs,
-        stop_fun = PassedEnd
+        include_docs = IncludeDocs
     } = Acc,
-    case PassedEnd(Key, Id) of
-    true ->
-        {stop, Acc};
-    false ->
-        Doc = if not IncludeDocs -> undefined; true ->
-            case couch_db:open_doc(Db, Id, []) of
-            {not_found, deleted} ->
-                null;
-            {not_found, missing} ->
-                undefined;
-            {ok, Doc0} ->
-                couch_doc:to_json_obj(Doc0, [])
-            end
-        end,
-        rexi:sync_reply(#view_row{key=Key, id=Id, value=Value, doc=Doc}),
-        {ok, Acc#view_acc{limit=Limit-1}}
-    end.
-
-all_docs_stop_fun(#view_query_args{direction=fwd, end_key=EndKey}) ->
-    fun(ViewKey, _) ->
-        couch_db_updater:less_docid(EndKey, ViewKey)
-    end;
-all_docs_stop_fun(#view_query_args{direction=rev, end_key=EndKey}) ->
-    fun(ViewKey, _) ->
-        couch_db_updater:less_docid(ViewKey, EndKey)
-    end.
+    Doc = if not IncludeDocs -> undefined; true ->
+        case couch_db:open_doc(Db, Id, []) of
+        {not_found, deleted} ->
+            null;
+        {not_found, missing} ->
+            undefined;
+        {ok, Doc0} ->
+            couch_doc:to_json_obj(Doc0, [])
+        end
+    end,
+    rexi:sync_reply(#view_row{key=Key, id=Id, value=Value, doc=Doc}),
+    {ok, Acc#view_acc{limit=Limit-1}}.
 
 final_response(Total, nil) ->
     case rexi:sync_reply({total_and_offset, Total, Total}) of ok ->
@@ -267,33 +248,6 @@ final_response(Total, nil) ->
     stop -> ok end;
 final_response(_Total, _Offset) ->
     rexi:reply(complete).
-
-default_stop_fun(#view_query_args{direction=fwd, inclusive_end=true} = Args) ->
-    #view_query_args{end_key=EndKey, end_docid=EndDocId} = Args,
-    fun(ViewKey, ViewId) ->
-        couch_view:less_json([EndKey, EndDocId], [ViewKey, ViewId])
-    end;
-default_stop_fun(#view_query_args{direction=fwd} = Args) ->
-    #view_query_args{end_key=EndKey, end_docid=EndDocId} = Args,
-    fun
-        (ViewKey, _ViewId) when ViewKey == EndKey ->
-            true;
-        (ViewKey, ViewId) ->
-            couch_view:less_json([EndKey, EndDocId], [ViewKey, ViewId])
-    end;
-default_stop_fun(#view_query_args{direction=rev, inclusive_end=true} = Args) ->
-    #view_query_args{end_key=EndKey, end_docid=EndDocId} = Args,
-    fun(ViewKey, ViewId) ->
-        couch_view:less_json([ViewKey, ViewId], [EndKey, EndDocId])
-    end;
-default_stop_fun(#view_query_args{direction=rev} = Args) ->
-    #view_query_args{end_key=EndKey, end_docid=EndDocId} = Args,
-    fun
-        (ViewKey, _ViewId) when ViewKey == EndKey ->
-            true;
-        (ViewKey, ViewId) ->
-            couch_view:less_json([ViewKey, ViewId], [EndKey, EndDocId])
-    end.
 
 group_rows_fun(exact) ->
     fun({Key1,_}, {Key2,_}) -> Key1 == Key2 end;
