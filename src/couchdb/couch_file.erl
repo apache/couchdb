@@ -302,7 +302,7 @@ handle_call({write_header, Bin}, _From, #file{fd=Fd, eof=Pos}=File) ->
     BlockOffset ->
         Padding = <<0:(8*(?SIZE_BLOCK-BlockOffset))>>
     end,
-    FinalBin = [Padding, <<1, BinSize:32/integer>> | make_blocks(1, [Bin])],
+    FinalBin = [Padding, <<1, BinSize:32/integer>> | make_blocks(5, [Bin])],
     case file:write(Fd, FinalBin) of
     ok ->
         {reply, ok, File#file{eof=Pos+iolist_size(FinalBin)}};
