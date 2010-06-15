@@ -56,7 +56,12 @@ get_missing_revs(DbName, IdsRevs) when is_list(IdsRevs) ->
 
 update_doc(DbName, Doc, Options) ->
     {ok, [Result]} = update_docs(DbName, [Doc], opts(Options)),
-    Result.
+    case Result of
+    {ok, _} ->
+        Result;
+    Error ->
+        throw(Error)
+    end.
 
 update_docs(DbName, Docs, Options) ->
     fabric_doc_update:go(dbname(DbName), docs(Docs), opts(Options)).
