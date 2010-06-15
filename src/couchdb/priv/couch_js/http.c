@@ -10,6 +10,7 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <jsapi.h>
@@ -403,7 +404,8 @@ go(JSContext* cx, JSObject* obj, HTTPData* http, char* body, size_t bodylen)
     {
         HTTP_HANDLE = curl_easy_init();
         curl_easy_setopt(HTTP_HANDLE, CURLOPT_READFUNCTION, send_body);
-        curl_easy_setopt(HTTP_HANDLE, CURLOPT_SEEKFUNCTION, seek_body);
+        curl_easy_setopt(HTTP_HANDLE, CURLOPT_SEEKFUNCTION,
+                                        (curl_seek_callback) seek_body);
         curl_easy_setopt(HTTP_HANDLE, CURLOPT_HEADERFUNCTION, recv_header);
         curl_easy_setopt(HTTP_HANDLE, CURLOPT_WRITEFUNCTION, recv_body);
         curl_easy_setopt(HTTP_HANDLE, CURLOPT_NOPROGRESS, 1);
