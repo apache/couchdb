@@ -66,7 +66,7 @@ cache_dbs() ->
     end.
 
 cache_map(Id, Props) ->
-    Map = couch_util:get_value(<<"map">>, Props),
+    Map = couch_util:get_value(<<"map">>, Props, []),
     lists:foreach(fun({[{<<"node">>,Node},{<<"b">>,Beg},{<<"e">>,End}]}) ->
         Part = #shard{
             name = partitions:shard_name(Beg, Id),
@@ -78,7 +78,7 @@ cache_map(Id, Props) ->
     end, Map).
 
 cache_nodes(Id, Props) ->
-    Nodes = couch_util:get_value(<<"nodes">>, Props),
+    Nodes = couch_util:get_value(<<"nodes">>, Props, []),
     lists:foreach(fun({[{<<"order">>,Order},{<<"node">>, Node},{<<"options">>,Opts}]}) ->
         ets:insert(memnodes, {Id, {Order, to_atom(Node), Opts}})
     end, Nodes).
