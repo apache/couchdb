@@ -122,11 +122,10 @@ test_vhost_request_with_qs() ->
     end.
 
 test_vhost_request_with_global() ->
-    Url = server() ++ "_uuids",
-    case ibrowse:send_req(Url, [], get, [], [{host_header, "example.com"}]) of
-        {ok, _, _, Body} ->
-            {JsonProps} = couch_util:json_decode(Body),
-            HasUuids = proplists:is_defined(<<"uuids">>, JsonProps),
-            etap:is(HasUuids, true, "should return _uuids");
+    Url2 = server() ++ "_utils/index.html",
+    case ibrowse:send_req(Url2, [], get, [], [{host_header, "example.com"}]) of
+        {ok, _, _, Body2} ->
+            "<!DOCTYPE" ++ _Foo = Body2,
+            etap:is(true, true, "should serve /_utils even inside vhosts");
         _Else -> false
     end.
