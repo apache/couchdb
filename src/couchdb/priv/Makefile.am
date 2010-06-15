@@ -47,7 +47,7 @@ COUCHJS_SRCS = \
 locallibbin_PROGRAMS = couchjs
 couchjs_SOURCES = $(COUCHJS_SRCS)
 couchjs_LDFLAGS = $(CURL_LDFLAGS)
-couchjs_CFLAGS = $(CURL_CFLAGS)
+couchjs_CFLAGS = -D_BSD_SOURCE $(CURL_CFLAGS)
 couchjs_LDADD = $(CURL_LDFLAGS) @JSLIB@
 
 couchpriv_DATA = stat_descriptions.cfg
