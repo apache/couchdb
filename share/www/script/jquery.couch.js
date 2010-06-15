@@ -289,7 +289,7 @@
           ajax({
               type: "POST",
               url: this.uri + "_bulk_docs" + encodeOptions(options),
-              data: toJSON(docs)
+              contentType: "application/json", data: toJSON(docs)
             },
             options,
             "The documents could not be saved"
