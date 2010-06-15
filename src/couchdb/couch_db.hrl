@@ -28,18 +28,23 @@
 
 -define(LOG_DEBUG(Format, Args),
     case couch_log:debug_on() of
-        true -> error_logger:info_report(couch_debug, {Format, Args});
+        true ->
+            gen_event:sync_notify(error_logger,
+                {self(), couch_debug, {Format, Args}});
         false -> ok
     end).
 
 -define(LOG_INFO(Format, Args),
     case couch_log:info_on() of
-        true -> error_logger:info_report(couch_info, {Format, Args});
+        true ->
+            gen_event:sync_notify(error_logger,
+                {self(), couch_info, {Format, Args}});
         false -> ok
     end).
 
 -define(LOG_ERROR(Format, Args),
-    error_logger:error_report(couch_error, {Format, Args})).
+    gen_event:sync_notify(error_logger,
+            {self(), couch_error, {Format, Args}})).
 
 
 -record(rev_info,
