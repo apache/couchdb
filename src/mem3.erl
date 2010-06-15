@@ -202,12 +202,14 @@ handle_cast(Msg, State) ->
 %%      net_kernel:monitor_nodes(true)
 handle_info({nodedown, Node}, State) ->
     showroom_log:message(alert, "membership: nodedown ~p", [Node]),
+    notify(nodedown, [Node]),
     {noreply, State};
 
 %% @doc handle nodeup messages because we have
 %%      net_kernel:monitor_nodes(true)
 handle_info({nodeup, Node}, State) ->
     showroom_log:message(alert, "membership: nodeup   ~p", [Node]),
+    notify(nodeup, [Node]),
     {noreply, State};
 
 %% ignored info
@@ -296,10 +298,12 @@ handle_join(replace, {OldNode, NewOpts}, PingNode, _State) ->
     OldState = #mem{nodes=OldNodes} = get_pingnode_state(PingNode),
     {Order, OldNode, _OldOpts} = lists:keyfind(OldNode, 2, OldNodes),
     NewNodes = lists:keyreplace(OldNode, 2, OldNodes, {Order, node(), NewOpts}),
+    notify(node_leave, [OldNode]),
     int_join([], OldState#mem{nodes=NewNodes});
 % leave
-handle_join(leave, [_OldNode | _], _PingNode, _State) ->
+handle_join(leave, [OldNode | _], _PingNode, _State) ->
     % TODO implement me
+    notify(node_leave, [OldNode]),
     ok;
 
 handle_join(JoinType, _, PingNode, _) ->
@@ -311,6 +315,7 @@ handle_join(JoinType, _, PingNode, _) ->
 int_join(ExtNodes, #mem{nodes=Nodes, clock=Clock} = State) ->
     NewNodes = lists:foldl(fun({Pos, N, _Options}=New, AccIn) ->
         check_pos(Pos, N, Nodes),
+        notify(node_join, [N]),
         [New|AccIn]
     end, Nodes, ExtNodes),
     NewNodes1 = lists:sort(NewNodes),
@@ -530,3 +535,8 @@ compare_state_with_rest(#mem{clock=Clock} = _State, States) ->
     length(BadResults) == 0 -> match;
     true -> {bad_state_match, node(), BadResults}
     end.
+
+notify(Type, Nodes) ->
+  lists:foreach(fun(Node) ->
+      gen_event:notify(membership_events, {Type, Node})
+  end, Nodes).

@@ -21,6 +21,12 @@ init(_Args) ->
                   1000,
                   worker,
                   [mem3]},
+    MemEventMgr = {mem_event_manager,
+                   {gen_event, start_link, [{local, membership_events}]},
+                   permanent,
+                   1000,
+                   worker,
+                   []},
     DbsRepl =
         {dbs,
          {dbs, start_link, []},
@@ -35,4 +41,4 @@ init(_Args) ->
          1000,
          worker,
          [dbs_cache]},
-    {ok, {{one_for_one,10,1}, [Membership, DbsRepl, DbsCache]}}.
+    {ok, {{one_for_one,10,1}, [Membership, MemEventMgr, DbsRepl, DbsCache]}}.

@@ -8,6 +8,7 @@
    [
       dbs,
       dbs_cache,
+      dbs_event,
       membership,
       membership_app,
       membership_sup,

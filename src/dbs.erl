@@ -12,7 +12,7 @@ init([]) ->
     {ok, MemNodes} = mem3:nodes(),
     LiveNodes = nodes(),
     ChildSpecs = [childspec(N) || N <- MemNodes, lists:member(N, LiveNodes)],
-    %gen_event:add_handler(membership_events, showroom_dbs_event, []),
+    gen_event:add_handler(membership_events, dbs_event, []),
     {ok, {{one_for_one, 10, 8}, ChildSpecs}}.
 
 childspec(Node) ->
