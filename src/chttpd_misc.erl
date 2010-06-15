@@ -131,25 +131,8 @@ handle_restart_req(Req) ->
     send_method_not_allowed(Req, "POST").
 
 
-handle_uuids_req(#httpd{method='GET'}=Req) ->
-    Count = list_to_integer(chttpd:qs_value(Req, "count", "1")),
-    % generate the uuids
-    UUIDs = [ couch_util:new_uuid() || _ <- lists:seq(1,Count)],
-    % send a JSON response
-    Etag = chttpd:make_etag(UUIDs),
-    chttpd:etag_respond(Req, Etag, fun() ->
-        CacheBustingHeaders = [
-            {"Date", httpd_util:rfc1123_date()},
-            {"Cache-Control", "no-cache"},
-            % Past date, ON PURPOSE!
-            {"Expires", "Fri, 01 Jan 1990 00:00:00 GMT"},
-            {"Pragma", "no-cache"},
-            {"ETag", Etag}
-        ],
-        send_json(Req, 200, CacheBustingHeaders, {[{<<"uuids">>, UUIDs}]})
-    end);
 handle_uuids_req(Req) ->
-    send_method_not_allowed(Req, "GET").
+    couch_httpd_misc_handlers:handle_uuids_req(Req).
 
 
 % Config request handler

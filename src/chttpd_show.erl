@@ -148,7 +148,7 @@ send_view_list_response(Lang, ListSrc, ViewName, DesignId, Req, Db, Group, Keys)
     QueryArgs = chttpd_view:parse_view_params(Req, Keys, ViewType),
     {ok, QueryServer} = couch_query_servers:start_view_list(Lang, ListSrc),
     StartListRespFun = make_map_start_resp_fun(QueryServer, Db),
-    Etag = couch_util:new_uuid(),
+    Etag = couch_uuids:new(),
     chttpd:etag_respond(Req, Etag, fun() ->
         {ok, Total, Result} = ?COUCH:list_view(Req, Db, DesignId, ViewName,
             Keys, QueryArgs, QueryServer),

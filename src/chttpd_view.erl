@@ -36,7 +36,7 @@ design_doc_view(Req, Db, GroupId, ViewName, Keys) ->
         QueryArgs = parse_view_params(Req, Keys, ViewType),
         % TODO proper calculation of etag
         % Etag = view_group_etag(ViewGroup, Db, Keys),
-        Etag = couch_util:new_uuid(),
+        Etag = couch_uuids:new(),
         couch_stats_collector:increment({httpd, view_reads}),
         chttpd:etag_respond(Req, Etag, fun() ->
             {ok, Resp} = chttpd:start_json_response(Req, 200, [{"Etag",Etag}]),

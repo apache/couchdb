@@ -312,7 +312,7 @@ create_user(#httpd{method='POST', mochi_req=MochiReq}=Req, Db) ->
         true -> ok end,
         Active = chttpd_view:parse_bool_param(couch_util:get_value("active",
             Form, "true")),
-        UserSalt = couch_util:new_uuid(),
+        UserSalt = couch_uuids:random(),
         UserDoc = #doc{
             id = UserName,
             body = {[
