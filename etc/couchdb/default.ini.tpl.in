@@ -25,6 +25,7 @@ allow_jsonp = false
 [log]
 file = %localstatelogdir%/couch.log
 level = info
+include_sasl = true
 
 [couch_httpd_auth]
 authentication_db = _users
