@@ -132,13 +132,17 @@ reduce_view(DbName, Group0, ViewName, QueryArgs) ->
     {NthRed, View} = fabric_view:extract_view(Pid, ViewName, Views, reduce),
     ReduceView = {reduce, NthRed, Lang, View},
     Acc0 = #view_acc{group_level = GroupLevel, limit = Limit+Skip},
+    Options0 = [{key_group_fun, GroupFun}, {dir, Dir}],
     case Keys of
     nil ->
-        couch_view:fold_reduce(ReduceView, Dir, {StartKey,StartDocId},
-            {EndKey,EndDocId}, GroupFun, fun reduce_fold/3, Acc0);
+        Options = [{start_key, {StartKey,StartDocId}},
+            {end_key, {EndKey,EndDocId}} | Options0],
+        couch_view:fold_reduce(ReduceView, fun reduce_fold/3, Acc0, Options);
     _ ->
-        [couch_view:fold_reduce(ReduceView, Dir, {K,StartDocId}, {K,EndDocId},
-            GroupFun, fun reduce_fold/3, Acc0) || K <- Keys]
+        
+        [couch_view:fold_reduce(ReduceView, fun reduce_fold/3, Acc0,
+            [{start_key,{K,StartDocId}}, {end_key,{K,EndDocId}} | Options0])
+            || K <- Keys]
     end,
     rexi:reply(complete).
 
