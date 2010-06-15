@@ -115,7 +115,6 @@ reduce_view(DbName, Group0, ViewName, QueryArgs) ->
         limit = Limit,
         skip = Skip,
         keys = Keys,
-        direction = Dir,
         stale = Stale
     } = QueryArgs,
     GroupFun = group_rows_fun(GroupLevel),
@@ -126,7 +125,6 @@ reduce_view(DbName, Group0, ViewName, QueryArgs) ->
     {NthRed, View} = fabric_view:extract_view(Pid, ViewName, Views, reduce),
     ReduceView = {reduce, NthRed, Lang, View},
     Acc0 = #view_acc{group_level = GroupLevel, limit = Limit+Skip},
-    Options0 = [{key_group_fun, GroupFun}, {dir, Dir}],
     case Keys of
     nil ->
         Options0 = couch_httpd_view:make_key_options(QueryArgs),
