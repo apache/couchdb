@@ -214,6 +214,9 @@ handle_log_req(#httpd{method='GET'}=Req) ->
 handle_log_req(Req) ->
     send_method_not_allowed(Req, "GET").
 
+handle_metrics_req(#httpd{method='GET', path_parts=[_]}=Req) ->
+    {_, L} = lists:unzip(gen_event:which_handlers(couch_metrics_event_manager)),
+    send_json(Req, L);
 handle_metrics_req(#httpd{method='GET', path_parts=[_, Id]}=Req) ->
     case chttpd:qs_value(Req, "slice") of
     undefined ->
