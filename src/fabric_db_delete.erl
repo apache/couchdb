@@ -11,7 +11,7 @@
 delete_db(DbName, Options) ->
     Fullmap = partitions:all_parts(DbName),
     RefPartMap = send_delete_calls(Fullmap, Options),
-    Acc0 = {true, length(RefPartMap)},
+    Acc0 = {not_found, length(RefPartMap)},
     case fabric_util:receive_loop(
         RefPartMap, 1, fun handle_delete_msg/3, Acc0) of
     {ok, _Results} ->
@@ -33,19 +33,19 @@ send_delete_calls(Parts, Options) ->
         {Ref, Part}
     end, Parts).
 
-handle_delete_msg(not_found, _, {NotFound, N}) ->
-    {ok, {NotFound, N-1}};
-handle_delete_msg({rexi_EXIT, _Reason}, _, {NotFound, N}) ->
-    {ok, {NotFound, N-1}};
+handle_delete_msg(ok, _, {_, 1}) ->
+    {stop, ok};
+handle_delete_msg(not_found, _, {Acc, 1}) ->
+    {stop, Acc};
+handle_delete_msg({rexi_EXIT, _Reason}, _, {Acc, N}) ->
+    % TODO is this the appropriate action to take, or should we abort?
+    {ok, {Acc, N-1}};
 handle_delete_msg({rexi_DOWN, _, _, _}, _, _Acc) ->
     {error, delete_db_fubar};
-handle_delete_msg(_, _, {NotFound, 1}) ->
-    if
-    NotFound -> {stop, not_found};
-    true -> {stop, ok}
-    end;
-handle_delete_msg(ok, _, {_NotFound, N}) ->
-    {ok, {false, N-1}}.
+handle_delete_msg(not_found, _, {Acc, N}) ->
+    {ok, {Acc, N-1}};
+handle_delete_msg(ok, _, {_, N}) ->
+    {ok, {ok, N-1}}.
 
 delete_fullmap(DbName) ->
     case couch_db:open(<<"dbs">>, []) of
