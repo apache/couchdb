@@ -547,11 +547,14 @@
       );
     },
 
-    replicate: function(source, target, ajaxOptions, replicationOptions) {
-      replicationOptions = $.extend({source: source, target: target}, replicationOptions);
+    replicate: function(source, target, ajaxOptions, repOpts) {
+      $.extend(repOpts, {source: source, target: target});
+      if (repOpts.continuous) {
+        ajaxOptions.successStatus = 202;
+      }
       ajax({
           type: "POST", url: this.urlPrefix + "/_replicate",
-          data: JSON.stringify(replicationOptions),
+          data: JSON.stringify(repOpts),
           contentType: "application/json"
         },
         ajaxOptions,
