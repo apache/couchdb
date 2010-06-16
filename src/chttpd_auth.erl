@@ -76,17 +76,18 @@ cookie_authentication_handler(#httpd{path_parts=[<<"_session">>],
     % ignore any cookies sent with login request
     Req;
 cookie_authentication_handler(Req) ->
-    case cookie_auth_user(Req) of
+    try cookie_auth_user(Req) of
     nil ->
         Req;
-    cookie_auth_failed ->
-        put(cookie_auth_failed, true),
-        Req#httpd{auth=cookie_auth_failed};
+    {cookie_auth_failed, _} = X ->
+        Req#httpd{auth=X};
     Req2 ->
         Req2
+    catch error:_ ->
+        Req#httpd{auth={cookie_auth_failed, {invalid_cookie, null}}}
     end.
 
-cookie_auth_header(#httpd{auth=cookie_auth_failed}, Headers) ->
+cookie_auth_header(#httpd{auth={cookie_auth_failed, _}}, Headers) ->
     % check for an AuthSession cookie from login handler
     CookieHeader = couch_util:get_value("Set-Cookie", Headers, ""),
     Cookies = mochiweb_cookies:parse_cookie(CookieHeader),
@@ -113,13 +114,8 @@ cookie_auth_header(#httpd{user_ctx=Ctx, auth={Secret,true}}, Headers) ->
     true ->
         []
     end;
-cookie_auth_header(Req, Headers) ->
-    case get(cookie_auth_failed) of
-    true ->
-        cookie_auth_header(Req#httpd{auth=cookie_auth_failed}, Headers);
-    _ ->
-        []
-    end.
+cookie_auth_header(_Req, _Headers) ->
+    [].
 
 handle_session_req(#httpd{method='POST', mochi_req=MochiReq, user_ctx=Ctx}=Req) ->
     % login
@@ -263,12 +259,12 @@ cookie_auth_user(#httpd{mochi_req=MochiReq}=Req) ->
         case couch_config:get("chttpd_auth", "secret") of
         undefined ->
             ?LOG_DEBUG("AuthSession cookie, but no secret in config!", []),
-            cookie_auth_failed;
+            {cookie_auth_failed, {internal_server_error, null}};
         SecretStr ->
             case get_user(User) of
             nil ->
-                ?LOG_DEBUG("no record of user ~s", [User]),
-                cookie_auth_failed;
+                Msg = io_lib:format("no record of user ~s", [User]),
+                {cookie_auth_failed, {bad_user, ?l2b(Msg)}};
             Result ->
                 Secret = ?l2b(SecretStr),
                 UserSalt = couch_util:get_value(<<"salt">>, Result),
@@ -288,14 +284,13 @@ cookie_auth_user(#httpd{mochi_req=MochiReq}=Req) ->
                         }, auth={FullSecret, TimeLeft < Timeout*0.9}};
                     true ->
                         ?LOG_DEBUG("cookie for ~s was expired", [User]),
-                        put(cookie_auth_failed, true),
                         Msg = lists:concat(["Your session has expired after ",
                             Timeout div 60, " minutes of inactivity"]),
-                        throw({credentials_expired, ?l2b(Msg)})
+                        {cookie_auth_failed, {credentials_expired, ?l2b(Msg)}}
                     end;
                 _Else ->
-                    ?LOG_DEBUG("cookie password hash was incorrect", []),
-                    cookie_auth_failed
+                    Msg = <<"cookie password hash was incorrect">>,
+                    {cookie_auth_failed, {bad_password, Msg}}
                 end
             end
         end

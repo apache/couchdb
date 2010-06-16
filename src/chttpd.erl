@@ -100,7 +100,6 @@ handle_request(MochiReq) ->
 
     {ok, Resp} =
     try
-        erase(cookie_auth_failed),
         case authenticate_request(HttpReq, AuthenticationFuns) of
         #httpd{} = Req ->
             HandlerFun = url_handler(HandlerKey),
@@ -507,8 +506,8 @@ error_info({conflict, _}) ->
     {409, <<"conflict">>, <<"Document update conflict.">>};
 error_info({forbidden, Msg}) ->
     {403, <<"forbidden">>, Msg};
-error_info({credentials_expired, Msg}) ->
-    {403, <<"credentials_expired">>, Msg};
+error_info({forbidden, Error, Msg}) ->
+    {403, Error, Msg};
 error_info({unauthorized, Msg}) ->
     {401, <<"unauthorized">>, Msg};
 error_info(file_exists) ->
