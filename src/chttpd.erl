@@ -118,9 +118,9 @@ handle_request(MochiReq) ->
             showroom_log:message(notice, LogForClosedSocket, []),
             exit(normal);
         throw:Error ->
-            % ?LOG_DEBUG("Minor error in HTTP request: ~p",[Error]),
-            % ?LOG_DEBUG("Stacktrace: ~p",[erlang:get_stacktrace()]),
             send_error(HttpReq, Error);
+        error:database_does_not_exist ->
+            send_error(HttpReq, database_does_not_exist);
         error:badarg ->
             ?LOG_ERROR("Badarg error in HTTP request",[]),
             ?LOG_INFO("Stacktrace: ~p",[erlang:get_stacktrace()]),
@@ -494,6 +494,8 @@ error_info({bad_request, Reason}) ->
     {400, <<"bad_request">>, Reason};
 error_info({query_parse_error, Reason}) ->
     {400, <<"query_parse_error">>, Reason};
+error_info(database_does_not_exist) ->
+    {404, <<"not_found">>, <<"database_does_not_exist">>};
 error_info(not_found) ->
     {404, <<"not_found">>, <<"missing">>};
 error_info({not_found, Reason}) ->
