@@ -75,6 +75,7 @@ json_req_obj(#httpd{mochi_req=Req,
     % add headers...
     {[{<<"info">>, {Info}},
         {<<"id">>, DocId},
+        {<<"uuid">>, couch_uuids:new()},
         {<<"method">>, Method},
         {<<"path">>, Path},
         {<<"query">>, json_query_keys(to_json_terms(Req:parse_qs()))},
