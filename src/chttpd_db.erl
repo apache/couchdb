@@ -158,7 +158,6 @@ create_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
 delete_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
     case fabric:delete_db(DbName, [{user_ctx, UserCtx}]) of
     ok ->
-        % couch_metrics_disk:notify({db_delete, {UserCtx#user_ctx.name, DbName}}),
         send_json(Req, 200, {[{ok, true}]});
     Error ->
         throw(Error)

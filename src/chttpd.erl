@@ -136,18 +136,21 @@ handle_request(MochiReq) ->
             send_error(HttpReq, Error)
     end,
 
-    RequestTime = round(timer:now_diff(now(), Begin)/1000),
-    RequestInfo = [
-        MochiReq:get(peer),
-        MochiReq:get_header_value("Host"),
-        atom_to_list(Method1),
-        RawUri,
-        Resp:get(code),
-        RequestTime
-    ],
-    % Customer = cloudant_util:customer_name(HttpReq),
-    % couch_metrics_req:notify({request, [Customer|RequestInfo]}),
-    showroom_log:message(notice, "~s ~s ~s ~s ~B ~B", RequestInfo),
+    RequestTime = timer:now_diff(now(), Begin)/1000,
+    Peer = MochiReq:get(peer),
+    Code = Resp:get(code),
+    Host = MochiReq:get_header_value("Host"),
+    couch_metrics_event:notify(#response{
+        peer = Peer,
+        host = Host,
+        customer = Customer,
+        code = Code,
+        time = RequestTime,
+        method = Method1,
+        uri = RawUri
+    }),
+    showroom_log:message(notice, "~s ~s ~s ~s ~B ~B", [Peer, Host,
+        atom_to_list(Method1), RawUri, Code, round(RequestTime)]),
     couch_stats_collector:record({couchdb, request_time}, RequestTime),
     couch_stats_collector:increment({httpd, requests}),
     {ok, Resp}.
@@ -190,6 +193,7 @@ url_handler("_session") ->      fun chttpd_auth:handle_session_req/1;
 url_handler("_user") ->         fun chttpd_auth:handle_user_req/1;
 url_handler("_oauth") ->        fun chttpd_oauth:handle_oauth_req/1;
 url_handler("_stats") ->        fun chttpd_stats:handle_stats_req/1;
+url_handler("_metrics") ->      fun chttpd_misc:handle_metrics_req/1;
 url_handler("_restart") ->      fun showroom_http:handle_restart_req/1;
 url_handler("_cloudant") ->     fun showroom_httpd_admin:handle_cloudant_req/1;
 url_handler(_) ->               fun chttpd_db:handle_request/1.

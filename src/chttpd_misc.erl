@@ -16,7 +16,7 @@
     handle_all_dbs_req/1,handle_replicate_req/1,handle_restart_req/1,
     handle_uuids_req/1,handle_config_req/1,handle_log_req/1,
     handle_task_status_req/1,handle_sleep_req/1,handle_welcome_req/1,
-    handle_utils_dir_req/1, handle_favicon_req/1]).
+    handle_utils_dir_req/1, handle_favicon_req/1, handle_metrics_req/1]).
 
 -export([increment_update_seq_req/2]).
 
@@ -214,4 +214,15 @@ handle_log_req(#httpd{method='GET'}=Req) ->
 handle_log_req(Req) ->
     send_method_not_allowed(Req, "GET").
 
+handle_metrics_req(#httpd{method='GET', path_parts=[_, Id]}=Req) ->
+    case chttpd:qs_value(Req, "slice") of
+    undefined ->
+        Data = couch_metrics_event:get_global_metrics(?b2a(Id));
+    SliceStr ->
+        Slice = list_to_integer(SliceStr),
+        Data = couch_metrics_event:get_global_metrics(?b2a(Id), Slice)
+    end,
+    send_json(Req, Data);
+handle_metrics_req(Req) ->
+    send_method_not_allowed(Req, "GET,HEAD").
 
