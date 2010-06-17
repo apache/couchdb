@@ -8,7 +8,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -record(st, {
-    workers = []
+    workers = ets:new(workers, [private, {keypos,2}])
 }).
 
 start_link() ->
@@ -45,7 +45,7 @@ handle_info(_Info, St) ->
     {noreply, St}.
 
 terminate(_Reason, St) ->
-    [exit(Pid,kill) || {Pid, _, _} <- St#st.workers],
+    ets:foldl(fun({Pid, _, _}, _) -> exit(Pid,kill) end, nil, St#st.workers),
     ok.
 
 code_change(_OldVsn, St, _Extra) ->
@@ -59,14 +59,14 @@ init_p(From, {M,F,A}) ->
 
 %% internal
 
-add_worker(Worker, List) ->
-    [Worker | List].
+add_worker(Worker, Tab) ->
+    ets:insert(Tab, Worker), Tab.
 
-remove_worker(Ref, List) ->
-    lists:keydelete(Ref, 2, List).
+remove_worker(Ref, Tab) ->
+    ets:delete(Tab, Ref), Tab.
 
-find_worker(Ref, List) ->
-    lists:keyfind(Ref, 2, List).
+find_worker(Ref, Tab) ->
+    case ets:lookup(Tab, Ref) of [] -> false; [Worker] -> Worker end.
 
 notify_caller({Caller, Ref}, Reason) ->
     Caller ! {Ref, {rexi_EXIT, Reason}}.
