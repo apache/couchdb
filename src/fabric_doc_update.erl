@@ -43,7 +43,11 @@ handle_message({ok, Replies}, Worker, Acc0) ->
     {_, N} when N < DocCount ->
         % no point in trying to finalize anything yet
         {ok, {WaitingCount - 1, DocCount, W, GroupedDocs, DocReplyDict}}
-    end.
+    end;
+handle_message({not_found, no_db_file} = X, Worker, Acc0) ->
+    {_, _, _, GroupedDocs, _} = Acc0,
+    Docs = couch_util:get_value(Worker, GroupedDocs),
+    handle_message({ok, [X || _D <- Docs]}, Worker, Acc0).
 
 force_reply(Doc, Replies, {W, Acc}) ->
     % TODO make a real decision here
