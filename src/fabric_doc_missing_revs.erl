@@ -55,7 +55,7 @@ group_idrevs_by_shard(DbName, IdsRevs) ->
     end, dict:new(), IdsRevs)).
 
 update_dict(D0, KVs) ->
-    lists:foldl(fun({K,V}, D1) -> dict:store(K, V, D1) end, D0, KVs).
+    lists:foldl(fun({K,V,_}, D1) -> dict:store(K, V, D1) end, D0, KVs).
 
 skip_message({1, Dict}) ->
     {stop, dict:fold(fun force_reply/3, [], Dict)};

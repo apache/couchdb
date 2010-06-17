@@ -162,10 +162,11 @@ get_missing_revs(DbName, IdRevsList) ->
         Ids = [Id1 || {Id1, _Revs} <- IdRevsList],
         {ok, lists:zipwith(fun({Id, Revs}, FullDocInfoResult) ->
             case FullDocInfoResult of
-            {ok, #full_doc_info{rev_tree=RevisionTree}} ->
-                {Id, couch_key_tree:find_missing(RevisionTree, Revs)};
+            {ok, #full_doc_info{rev_tree=RevisionTree} = FullInfo} ->
+                MissingRevs = couch_key_tree:find_missing(RevisionTree, Revs),
+                {Id, MissingRevs, possible_ancestors(FullInfo, MissingRevs)};
             not_found ->
-                {Id, Revs}
+                {Id, Revs, []}
             end
         end, IdRevsList, couch_btree:lookup(Db#db.id_tree, Ids))};
     Error ->
@@ -304,3 +305,21 @@ doc_member(Shard, Id, Rev) ->
     Error ->
         Error
     end.
+
+possible_ancestors(_FullInfo, []) ->
+    [];
+possible_ancestors(FullInfo, MissingRevs) ->
+    #doc_info{revs=RevsInfo} = couch_doc:to_doc_info(FullInfo),
+    LeafRevs = [Rev || #rev_info{rev=Rev} <- RevsInfo],
+    % Find the revs that are possible parents of this rev
+    lists:foldl(fun({LeafPos, LeafRevId}, Acc) ->
+        % this leaf is a "possible ancenstor" of the missing 
+        % revs if this LeafPos lessthan any of the missing revs
+        case lists:any(fun({MissingPos, _}) -> 
+                LeafPos < MissingPos end, MissingRevs) of
+        true ->
+            [{LeafPos, LeafRevId} | Acc];
+        false ->
+            Acc
+        end
+    end, [], LeafRevs).
