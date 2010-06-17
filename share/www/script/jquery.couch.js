@@ -372,7 +372,7 @@
             beforeSend : beforeSend,
             complete: function(req) {
               var resp = $.httpData(req, "json");
-              if (req.status == 201 || req.status == 202) {
+              if (req.status == 200 || req.status == 201 || req.status == 202) {
                 doc._id = resp.id;
                 doc._rev = resp.rev;
                 if (versioned) {
