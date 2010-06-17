@@ -34,6 +34,7 @@
 -type clock() :: {node(), epoch()}.
 -type vector_clock() :: [clock()].
 -type ping_node() :: node() | nil.
+-type gossip_fun() :: call | cast.
 
 -type part() :: #shard{}.
 -type fullmap() :: [part()].
