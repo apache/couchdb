@@ -231,7 +231,7 @@
           );
         },
         changes: function(since, options) {
-          options = {} || options;
+          options = options || {};
           // set up the promise object within a closure for this handler
           var db = this, active = true, listeners = [], promise = {
             onChange : function(fun) {
@@ -257,8 +257,13 @@
           };
           // actually make the changes request
           function getChangesSince(seq) {
+            var opts = {};
+            $.extend(opts, options, {
+              feed : "longpoll",
+              since : seq
+            });
             ajax(
-              {url: db.uri + "_changes?feed=longpoll&since="+seq},
+              {url: db.uri + "_changes"+encodeOptions(opts)},
               options,
               "Error connecting to "+db.uri+"/_changes."
             );
