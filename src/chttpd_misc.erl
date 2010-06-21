@@ -105,7 +105,7 @@ handle_task_status_req(Req) ->
 
 handle_replicate_req(#httpd{method='POST'}=Req) ->
     PostBody = get(post_body),
-    try ?COUCH:replicate_db(PostBody, Req#httpd.user_ctx) of
+    try showroom_api:replicate_db(PostBody, Req#httpd.user_ctx) of
     {ok, {continuous, RepId}} ->
         send_json(Req, 202, {[{ok, true}, {<<"_local_id">>, RepId}]});
     {ok, {JsonResults}} ->
