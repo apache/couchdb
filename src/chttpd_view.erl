@@ -25,27 +25,20 @@
     start_json_response/2, start_json_response/3, end_json_response/1,
     send_chunked_error/2]).
 
-design_doc_view(Req, Db, GroupId, ViewName, Keys) ->
-    % TODO open the ddoc once, not twice (here and fabric)
-    DesignId = <<"_design/", GroupId/binary>>,
-    case fabric:open_doc(Db, DesignId, []) of
-    {ok, DDoc} ->
-        Group = couch_view_group:design_doc_to_view_group(#db{name=Db}, DDoc),
-        IsReduce = get_reduce_type(Req),
-        ViewType = extract_view_type(ViewName, Group#group.views, IsReduce),
-        QueryArgs = parse_view_params(Req, Keys, ViewType),
-        % TODO proper calculation of etag
-        % Etag = view_group_etag(ViewGroup, Db, Keys),
-        Etag = couch_uuids:new(),
-        couch_stats_collector:increment({httpd, view_reads}),
-        chttpd:etag_respond(Req, Etag, fun() ->
-            {ok, Resp} = chttpd:start_json_response(Req, 200, [{"Etag",Etag}]),
-            CB = fun view_callback/2,
-            fabric:query_view(Db, DDoc, ViewName, QueryArgs, CB, {nil, Resp})
-        end);
-    {not_found, Reason} ->
-        throw({not_found, Reason})
-    end.
+design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
+    Group = couch_view_group:design_doc_to_view_group(#db{name=Db}, DDoc),
+    IsReduce = get_reduce_type(Req),
+    ViewType = extract_view_type(ViewName, Group#group.views, IsReduce),
+    QueryArgs = parse_view_params(Req, Keys, ViewType),
+    % TODO proper calculation of etag
+    % Etag = view_group_etag(ViewGroup, Db, Keys),
+    Etag = couch_uuids:new(),
+    couch_stats_collector:increment({httpd, view_reads}),
+    chttpd:etag_respond(Req, Etag, fun() ->
+        {ok, Resp} = chttpd:start_json_response(Req, 200, [{"Etag",Etag}]),
+        CB = fun view_callback/2,
+        fabric:query_view(Db, DDoc, ViewName, QueryArgs, CB, {nil, Resp})
+    end).
 
 view_callback({total_and_offset, Total, Offset}, {nil, Resp}) ->
     Chunk = "{\"total_rows\":~p,\"offset\":~p,\"rows\":[\r\n",
@@ -82,15 +75,15 @@ extract_view_type(ViewName, [View|Rest], IsReduce) ->
     end.
 
 handle_view_req(#httpd{method='GET',
-        path_parts=[_Db, _Design, DName, _View, ViewName]}=Req, Db, DDoc) ->
-    design_doc_view(Req, Db, DName, ViewName, nil);
+        path_parts=[_, _, _, _, ViewName]}=Req, Db, DDoc) ->
+    design_doc_view(Req, Db, DDoc, ViewName, nil);
 
 handle_view_req(#httpd{method='POST',
-        path_parts=[_Db, _Design, DName, _View, ViewName]}=Req, Db, DDoc) ->
+        path_parts=[_, _, _, _, ViewName]}=Req, Db, DDoc) ->
     {Fields} = chttpd:json_body_obj(Req),
     case couch_util:get_value(<<"keys">>, Fields) of
     Keys when is_list(Keys) ->
-        design_doc_view(Req, Db, DName, ViewName, Keys);
+        design_doc_view(Req, Db, DDoc, ViewName, Keys);
     _ ->
         throw({bad_request, "`keys` body member must be an array."})
     end;
