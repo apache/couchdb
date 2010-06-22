@@ -96,7 +96,7 @@ query_view(DbName, Design, ViewName, QueryArgs, Callback, Acc0) ->
     Mod:go(Db, Design, View, QueryArgs, Callback, Acc0).
 
 get_view_group_info(DbName, DesignId) ->
-    fabric_group_info:go(dbname(DbName), name(DesignId)).
+    fabric_group_info:go(dbname(DbName), design_doc(DesignId)).
 
 design_docs(DbName) ->
     QueryArgs = #view_query_args{start_key = <<"_design/">>, include_docs=true},
@@ -146,6 +146,15 @@ doc({_} = Doc) ->
     couch_doc:from_json_obj(Doc);
 doc(Doc) ->
     erlang:error({illegal_doc_format, Doc}).
+
+design_doc(#doc{} = DDoc) ->
+    DDoc;
+design_doc(DocId) when is_list(DocId) ->
+    design_doc(list_to_binary(DocId));
+design_doc(<<"_design/", _/binary>> = DocId) ->
+    DocId;
+design_doc(GroupName) ->
+    <<"_design/", GroupName/binary>>.
 
 idrevs({Id, Revs}) when is_list(Revs) ->
     {docid(Id), [rev(R) || R <- Revs]}.

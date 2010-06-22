@@ -4,8 +4,11 @@
 
 -include("fabric.hrl").
 
-go(DbName, GroupId) ->
-    {ok, DDoc} = fabric:open_doc(DbName, <<"_design/", GroupId/binary>>, []),
+go(DbName, GroupId) when is_binary(GroupId) ->
+    {ok, DDoc} = fabric:open_doc(DbName, GroupId, []),
+    go(DbName, DDoc);
+
+go(DbName, #doc{} = DDoc) ->
     Group = couch_view_group:design_doc_to_view_group(#db{name=DbName}, DDoc),
     Shards = partitions:all_parts(DbName),
     Workers = fabric_util:submit_jobs(Shards, group_info, [Group]),
