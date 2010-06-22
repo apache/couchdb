@@ -12,38 +12,98 @@
 
 -module(chttpd_show).
 
--export([handle_doc_show_req/2, handle_doc_update_req/2, handle_view_list_req/2,
-        handle_doc_show/5, handle_view_list/7, start_list_resp/5,
-        send_list_row/6]).
+-export([handle_doc_show_req/3, handle_doc_update_req/3, handle_view_list_req/3,
+        handle_view_list/7, get_fun_key/3]).
 
 -include("chttpd.hrl").
 
 -import(chttpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
-    start_json_response/2,send_chunk/2,send_chunked_error/2,
+    start_json_response/2,send_chunk/2,last_chunk/1,send_chunked_error/2,
     start_chunked_response/3, send_error/4]).
 
-handle_doc_show_req(#httpd{
-        method='GET',
-        path_parts=[_DbName, _Design, DesignName, _Show, ShowName, DocId]
-    }=Req, Db) ->
-    handle_doc_show(Req, DesignName, ShowName, DocId, Db);
+% /db/_design/foo/_show/bar/docid
+% show converts a json doc to a response of any content-type. 
+% it looks up the doc an then passes it to the query server.
+% then it sends the response from the query server to the http client.
+
+maybe_open_doc(Db, DocId) ->
+    case fabric:open_doc(Db, DocId, [conflicts]) of
+    {ok, Doc} ->
+        Doc;
+    {not_found, _} ->
+        nil
+    end.
 
 handle_doc_show_req(#httpd{
-        path_parts=[_DbName, _Design, DesignName, _Show, ShowName]
-    }=Req, Db) ->
-    handle_doc_show(Req, DesignName, ShowName, nil, Db);
+        path_parts=[_, _, _, _, ShowName, DocId]
+    }=Req, Db, DDoc) ->
 
-handle_doc_show_req(#httpd{method='GET'}=Req, _Db) ->
-    send_error(Req, 404, <<"show_error">>, <<"Invalid path.">>);
+    % open the doc
+    Doc = maybe_open_doc(Db, DocId),
 
-handle_doc_show_req(Req, _Db) ->
-    send_method_not_allowed(Req, "GET,POST,HEAD").
+    % we don't handle revs here b/c they are an internal api
+    % returns 404 if there is no doc with DocId
+    handle_doc_show(Req, Db, DDoc, ShowName, Doc, DocId);
+
+handle_doc_show_req(#httpd{
+        path_parts=[_, _, _, _, ShowName, DocId|Rest]
+    }=Req, Db, DDoc) ->
+    
+    DocParts = [DocId|Rest],
+    DocId1 = ?l2b(string:join([?b2l(P)|| P <- DocParts], "/")),
+
+    % open the doc
+    Doc = maybe_open_doc(Db, DocId1),
+
+    % we don't handle revs here b/c they are an internal api
+    % pass 404 docs to the show function
+    handle_doc_show(Req, Db, DDoc, ShowName, Doc, DocId1);
+
+handle_doc_show_req(#httpd{
+        path_parts=[_, _, _, _, ShowName]
+    }=Req, Db, DDoc) ->
+    % with no docid the doc is nil
+    handle_doc_show(Req, Db, DDoc, ShowName, nil);
+
+handle_doc_show_req(Req, _Db, _DDoc) ->
+    send_error(Req, 404, <<"show_error">>, <<"Invalid path.">>).
+
+handle_doc_show(Req, Db, DDoc, ShowName, Doc) ->
+    handle_doc_show(Req, Db, DDoc, ShowName, Doc, null).
+
+handle_doc_show(Req, Db, DDoc, ShowName, Doc, DocId) ->
+    % get responder for ddoc/showname
+    CurrentEtag = show_etag(Req, Doc, DDoc, []),
+    chttpd:etag_respond(Req, CurrentEtag, fun() ->
+        JsonReq = chttpd_external:json_req_obj(Req, Db, DocId),
+        JsonDoc = couch_query_servers:json_doc(Doc),
+        [<<"resp">>, ExternalResp] = 
+            couch_query_servers:ddoc_prompt(DDoc, [<<"shows">>, ShowName],
+                [JsonDoc, JsonReq]),
+        JsonResp = apply_etag(ExternalResp, CurrentEtag),
+        chttpd_external:send_external_response(Req, JsonResp)
+    end).
+
+
+show_etag(#httpd{user_ctx=UserCtx}=Req, Doc, DDoc, More) ->
+    Accept = chttpd:header_value(Req, "Accept"),
+    DocPart = case Doc of
+        nil -> nil;
+        Doc -> chttpd:doc_etag(Doc)
+    end,
+    couch_httpd:make_etag({couch_httpd:doc_etag(DDoc), DocPart, Accept,
+        UserCtx#user_ctx.roles, More}).
+
+get_fun_key(#doc{body={Props}}, Type, Name) ->
+    Lang = couch_util:get_value(<<"language">>, Props, <<"javascript">>),
+    Src = couch_util:get_nested_json_value({Props}, [Type, Name]),
+    {Lang, Src}.
 
 handle_doc_update_req(#httpd{
         method = 'PUT',
         path_parts=[_DbName, _Design, DesignName, _Update, UpdateName, DocId]
-    }=Req, Db) ->
+    }=Req, Db, _) ->
     DesignId = <<"_design/", DesignName/binary>>,
     #doc{body={Props}} = chttpd_db:couch_doc_open(Db, DesignId, nil, []),
     Lang = couch_util:get_value(<<"language">>, Props, <<"javascript">>),
@@ -58,7 +118,7 @@ handle_doc_update_req(#httpd{
 handle_doc_update_req(#httpd{
         method = 'POST',
         path_parts=[_DbName, _Design, DesignName, _Update, UpdateName]
-    }=Req, Db) ->
+    }=Req, Db, _) ->
     DesignId = <<"_design/", DesignName/binary>>,
     #doc{body={Props}} = chttpd_db:couch_doc_open(Db, DesignId, nil, []),
     Lang = couch_util:get_value(<<"language">>, Props, <<"javascript">>),
@@ -67,57 +127,38 @@ handle_doc_update_req(#httpd{
 
 handle_doc_update_req(#httpd{
         path_parts=[_DbName, _Design, _DesignName, _Update, _UpdateName, _DocId]
-    }=Req, _Db) ->
+    }=Req, _Db, _) ->
     send_method_not_allowed(Req, "PUT");
 
 handle_doc_update_req(#httpd{
         path_parts=[_DbName, _Design, _DesignName, _Update, _UpdateName]
-    }=Req, _Db) ->
+    }=Req, _Db, _) ->
     send_method_not_allowed(Req, "POST");
 
-handle_doc_update_req(Req, _Db) ->
+handle_doc_update_req(Req, _Db, _) ->
     send_error(Req, 404, <<"update_error">>, <<"Invalid path.">>).
-
-
-
-
-handle_doc_show(Req, DesignName, ShowName, DocId, Db) ->
-    DesignId = <<"_design/", DesignName/binary>>,
-    #doc{body={Props}} = chttpd_db:couch_doc_open(Db, DesignId, nil, []),
-    Lang = couch_util:get_value(<<"language">>, Props, <<"javascript">>),
-    ShowSrc = couch_util:get_nested_json_value({Props}, [<<"shows">>, ShowName]),
-    Doc = case DocId of
-        nil -> nil;
-        _ ->
-        try chttpd_db:couch_doc_open(Db, DocId, nil, [conflicts]) of
-            FoundDoc -> FoundDoc
-        catch
-            _ -> nil
-        end
-    end,
-    send_doc_show_response(Lang, ShowSrc, DocId, Doc, Req, Db).
 
 % view-list request with view and list from same design doc.
 handle_view_list_req(#httpd{method='GET',
-        path_parts=[_DbName, _Design, DesignName, _List, ListName, ViewName]}=Req, Db) ->
+        path_parts=[_DbName, _Design, DesignName, _List, ListName, ViewName]}=Req, Db, _) ->
     handle_view_list(Req, DesignName, ListName, DesignName, ViewName, Db, nil);
 
 % view-list request with view and list from different design docs.
 handle_view_list_req(#httpd{method='GET',
-        path_parts=[_DbName, _Design, DesignName, _List, ListName, ViewDesignName, ViewName]}=Req, Db) ->
+        path_parts=[_DbName, _Design, DesignName, _List, ListName, ViewDesignName, ViewName]}=Req, Db, _) ->
     handle_view_list(Req, DesignName, ListName, ViewDesignName, ViewName, Db, nil);
 
-handle_view_list_req(#httpd{method='GET'}=Req, _Db) ->
+handle_view_list_req(#httpd{method='GET'}=Req, _Db, _) ->
     send_error(Req, 404, <<"list_error">>, <<"Invalid path.">>);
 
 handle_view_list_req(#httpd{method='POST',
-        path_parts=[_DbName, _Design, DesignName, _List, ListName, ViewName]}=Req, Db) ->
+        path_parts=[_DbName, _Design, DesignName, _List, ListName, ViewName]}=Req, Db, _) ->
     ReqBody = chttpd:body(Req),
     {Props2} = ?JSON_DECODE(ReqBody),
     Keys = couch_util:get_value(<<"keys">>, Props2, nil),
     handle_view_list(Req#httpd{req_body=ReqBody}, DesignName, ListName, DesignName, ViewName, Db, Keys);
 
-handle_view_list_req(Req, _Db) ->
+handle_view_list_req(Req, _Db, _) ->
     send_method_not_allowed(Req, "GET,POST,HEAD").
 
 handle_view_list(Req, ListDesignName, ListName, ViewDesignName, ViewName, Db, Keys) ->

@@ -13,7 +13,7 @@
 -module(chttpd_view).
 -include("chttpd.hrl").
 
--export([handle_view_req/2,handle_temp_view_req/2,handle_db_view_req/2]).
+-export([handle_view_req/3,handle_temp_view_req/2]).
 
 -export([get_stale_type/1, get_reduce_type/1, parse_view_params/3]).
 -export([make_view_fold_fun/6, finish_view_fold/3, view_row_obj/3]).
@@ -82,11 +82,11 @@ extract_view_type(ViewName, [View|Rest], IsReduce) ->
     end.
 
 handle_view_req(#httpd{method='GET',
-        path_parts=[_Db, _Design, DName, _View, ViewName]}=Req, Db) ->
+        path_parts=[_Db, _Design, DName, _View, ViewName]}=Req, Db, DDoc) ->
     design_doc_view(Req, Db, DName, ViewName, nil);
 
 handle_view_req(#httpd{method='POST',
-        path_parts=[_Db, _Design, DName, _View, ViewName]}=Req, Db) ->
+        path_parts=[_Db, _Design, DName, _View, ViewName]}=Req, Db, DDoc) ->
     {Fields} = chttpd:json_body_obj(Req),
     case couch_util:get_value(<<"keys">>, Fields) of
     Keys when is_list(Keys) ->
@@ -95,50 +95,7 @@ handle_view_req(#httpd{method='POST',
         throw({bad_request, "`keys` body member must be an array."})
     end;
 
-handle_view_req(Req, _Db) ->
-    send_method_not_allowed(Req, "GET,POST,HEAD").
-
-handle_db_view_req(#httpd{method='GET',
-        path_parts=[_Db, _View, DName, ViewName]}=Req, Db) ->
-    QueryArgs = chttpd_view:parse_view_params(Req, nil, nil),
-    #view_query_args{
-        list = ListName
-    } = QueryArgs,
-    ?LOG_DEBUG("ici ~p", [ListName]),
-    case ListName of
-        nil -> chttpd_view:design_doc_view(Req, Db, DName, ViewName, nil);
-        _ ->
-            chttpd_show:handle_view_list(Req, DName, ListName, DName, ViewName, Db, nil)
-    end;
-
-handle_db_view_req(#httpd{method='POST',
-        path_parts=[_Db, _View, DName, ViewName]}=Req, Db) ->
-    QueryArgs = chttpd_view:parse_view_params(Req, nil, nil),
-    #view_query_args{
-        list = ListName
-    } = QueryArgs,
-    case ListName of
-    nil ->
-        {Fields} = chttpd:json_body_obj(Req),
-        case couch_util:get_value(<<"keys">>, Fields, nil) of
-        nil ->
-            Fmt = "POST to view ~p/~p in database ~p with no keys member.",
-            ?LOG_DEBUG(Fmt, [DName, ViewName, Db]),
-            chttpd_view:design_doc_view(Req, Db, DName, ViewName, nil);
-        Keys when is_list(Keys) ->
-            chttpd_view:design_doc_view(Req, Db, DName, ViewName, Keys);
-        _ ->
-            throw({bad_request, "`keys` member must be a array."})
-        end;
-    _ ->
-        ReqBody = chttpd:body(Req),
-        {Props2} = ?JSON_DECODE(ReqBody),
-        Keys = couch_util:get_value(<<"keys">>, Props2, nil),
-        chttpd_show:handle_view_list(Req#httpd{req_body=ReqBody},
-            DName, ListName, DName, ViewName, Db, Keys)
-    end;
-
-handle_db_view_req(Req, _Db) ->
+handle_view_req(Req, _Db, _DDoc) ->
     send_method_not_allowed(Req, "GET,POST,HEAD").
 
 handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->

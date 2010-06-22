@@ -16,7 +16,7 @@
 -export([handle_request/1, handle_compact_req/2, handle_design_req/2,
     db_req/2, couch_doc_open/4,handle_changes_req/2,
     update_doc_result_to_json/1, update_doc_result_to_json/2,
-    handle_design_info_req/2, handle_view_cleanup_req/2]).
+    handle_design_info_req/3, handle_view_cleanup_req/2]).
 
 -import(chttpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
@@ -123,23 +123,30 @@ handle_view_cleanup_req(Req, _) ->
     chttpd:send_error(Req, 403, Msg).
 
 handle_design_req(#httpd{
-        path_parts=[_DbName,_Design,_DesName, <<"_",_/binary>> = Action | _Rest],
+        path_parts=[_DbName, _Design, Name, <<"_",_/binary>> = Action | _Rest],
         design_url_handlers = DesignUrlHandlers
     }=Req, Db) ->
-    Handler = couch_util:get_value(Action, DesignUrlHandlers, fun db_req/2),
-    Handler(Req, Db);
+    case fabric:open_doc(Db, <<"_design/", Name/binary>>, []) of
+    {ok, DDoc} ->
+        % TODO we'll trigger a badarity here if ddoc attachment starts with "_",
+        % or if user tries an unknown Action
+        Handler = couch_util:get_value(Action, DesignUrlHandlers, fun db_req/2),
+        Handler(Req, Db, DDoc);
+    Error ->
+        throw(Error)
+    end;
 
 handle_design_req(Req, Db) ->
     db_req(Req, Db).
 
-handle_design_info_req(#httpd{method='GET', path_parts=[_,_,Name,_]}=Req, Db) ->
-    {ok, GroupInfoList} = fabric:get_view_group_info(Db, Name),
+handle_design_info_req(#httpd{method='GET'}=Req, Db, #doc{id=Id} = DDoc) ->
+    {ok, GroupInfoList} = fabric:get_view_group_info(Db, DDoc),
     send_json(Req, 200, {[
-        {name,  <<"_design/", Name/binary>>},
+        {name,  Id},
         {view_index, {GroupInfoList}}
     ]});
 
-handle_design_info_req(Req, _Db) ->
+handle_design_info_req(Req, _Db, _DDoc) ->
     send_method_not_allowed(Req, "GET").
 
 create_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->

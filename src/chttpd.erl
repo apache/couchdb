@@ -202,18 +202,17 @@ db_url_handlers() ->
         {<<"_view_cleanup">>,   fun chttpd_view:handle_view_cleanup_req/2},
         {<<"_compact">>,        fun chttpd_db:handle_compact_req/2},
         {<<"_design">>,         fun chttpd_db:handle_design_req/2},
-        {<<"_view">>,           fun chttpd_db:handle_db_view_req/2},
         {<<"_temp_view">>,      fun chttpd_db:handle_temp_view_req/2},
         {<<"_changes">>,        fun chttpd_db:handle_changes_req/2}
     ].
 
 design_url_handlers() ->
     [
-        {<<"_view">>,           fun chttpd_view:handle_view_req/2},
-        {<<"_show">>,           fun chttpd_show:handle_doc_show_req/2},
-        {<<"_list">>,           fun chttpd_show:handle_view_list_req/2},
-        {<<"_update">>,         fun chttpd_show:handle_doc_update_req/2},
-        {<<"_info">>,           fun chttpd_db:handle_design_info_req/2}
+        {<<"_view">>,           fun chttpd_view:handle_view_req/3},
+        {<<"_show">>,           fun chttpd_show:handle_doc_show_req/3},
+        {<<"_list">>,           fun chttpd_show:handle_view_list_req/3},
+        {<<"_update">>,         fun chttpd_show:handle_doc_update_req/3},
+        {<<"_info">>,           fun chttpd_db:handle_design_info_req/3}
     ].
 
 % Utilities
