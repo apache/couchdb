@@ -271,7 +271,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
         true  -> [all_or_nothing|Options];
         _ -> Options
         end,
-        case fabric:update_docs(Db, Docs, [Options2]) of
+        case fabric:update_docs(Db, Docs, Options2) of
         {ok, Results} ->
             % output the results
             DocResults = lists:zipwith(fun update_doc_result_to_json/2,
