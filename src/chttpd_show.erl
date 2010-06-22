@@ -100,43 +100,48 @@ get_fun_key(#doc{body={Props}}, Type, Name) ->
     Src = couch_util:get_nested_json_value({Props}, [Type, Name]),
     {Lang, Src}.
 
-handle_doc_update_req(#httpd{
-        method = 'PUT',
-        path_parts=[_DbName, _Design, DesignName, _Update, UpdateName, DocId]
-    }=Req, Db, _) ->
-    DesignId = <<"_design/", DesignName/binary>>,
-    #doc{body={Props}} = chttpd_db:couch_doc_open(Db, DesignId, nil, []),
-    Lang = couch_util:get_value(<<"language">>, Props, <<"javascript">>),
-    UpdateSrc = couch_util:get_nested_json_value({Props}, [<<"updates">>, UpdateName]),
-    Doc = try chttpd_db:couch_doc_open(Db, DocId, nil, [conflicts]) of
-        FoundDoc -> FoundDoc
-    catch
-        _ -> nil
-    end,
-    send_doc_update_response(Lang, UpdateSrc, DocId, Doc, Req, Db);
+% /db/_design/foo/update/bar/docid
+% updates a doc based on a request
+% handle_doc_update_req(#httpd{method = 'GET'}=Req, _Db, _DDoc) ->
+%     % anything but GET
+%     send_method_not_allowed(Req, "POST,PUT,DELETE,ETC");
 
 handle_doc_update_req(#httpd{
-        method = 'POST',
-        path_parts=[_DbName, _Design, DesignName, _Update, UpdateName]
-    }=Req, Db, _) ->
-    DesignId = <<"_design/", DesignName/binary>>,
-    #doc{body={Props}} = chttpd_db:couch_doc_open(Db, DesignId, nil, []),
-    Lang = couch_util:get_value(<<"language">>, Props, <<"javascript">>),
-    UpdateSrc = couch_util:get_nested_json_value({Props}, [<<"updates">>, UpdateName]),
-    send_doc_update_response(Lang, UpdateSrc, nil, nil, Req, Db);
+        path_parts=[_, _, _, _, UpdateName, DocId]
+    }=Req, Db, DDoc) ->
+    Doc = maybe_open_doc(Db, DocId),
+    send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId);
 
 handle_doc_update_req(#httpd{
-        path_parts=[_DbName, _Design, _DesignName, _Update, _UpdateName, _DocId]
-    }=Req, _Db, _) ->
-    send_method_not_allowed(Req, "PUT");
+        path_parts=[_, _, _, _, UpdateName]
+    }=Req, Db, DDoc) ->
+    send_doc_update_response(Req, Db, DDoc, UpdateName, nil, null);
 
-handle_doc_update_req(#httpd{
-        path_parts=[_DbName, _Design, _DesignName, _Update, _UpdateName]
-    }=Req, _Db, _) ->
-    send_method_not_allowed(Req, "POST");
-
-handle_doc_update_req(Req, _Db, _) ->
+handle_doc_update_req(Req, _Db, _DDoc) ->
     send_error(Req, 404, <<"update_error">>, <<"Invalid path.">>).
+
+send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
+    JsonReq = chttpd_external:json_req_obj(Req, Db, DocId),
+    JsonDoc = couch_query_servers:json_doc(Doc),
+    Cmd = [<<"updates">>, UpdateName],
+    case couch_query_servers:ddoc_prompt(DDoc, Cmd, [JsonDoc, JsonReq]) of
+    [<<"up">>, {NewJsonDoc}, JsonResp] ->
+        case chttpd:header_value(Req, "X-Couch-Full-Commit", "false") of
+        "true" ->
+            Options = [full_commit, {user_ctx, Req#httpd.user_ctx}];
+        _ ->
+            Options = [{user_ctx, Req#httpd.user_ctx}]
+        end,
+        NewDoc = couch_doc:from_json_obj({NewJsonDoc}),
+        Code = 201,
+        {ok, _NewRev} = fabric:update_doc(Db, NewDoc, Options);
+    [<<"up">>, _Other, JsonResp] ->
+        Code = 200
+    end,
+    JsonResp2 = json_apply_field({<<"code">>, Code}, JsonResp),
+    % todo set location field
+    chttpd_external:send_external_response(Req, JsonResp2).
+
 
 % view-list request with view and list from same design doc.
 handle_view_list_req(#httpd{method='GET',
@@ -451,54 +456,6 @@ render_head_for_empty_list(StartListRespFun, Req, Etag, null) ->
     StartListRespFun(Req, Etag, []); % for reduce
 render_head_for_empty_list(StartListRespFun, Req, Etag, TotalRows) ->
     StartListRespFun(Req, Etag, TotalRows, null, []).
-
-send_doc_show_response(Lang, ShowSrc, DocId, nil, #httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Db) ->
-    % compute etag with no doc
-    Headers = MReq:get(headers),
-    Hlist = mochiweb_headers:to_list(Headers),
-    Accept = couch_util:get_value('Accept', Hlist),
-    CurrentEtag = chttpd:make_etag({Lang, ShowSrc, nil, Accept, UserCtx}),
-    chttpd:etag_respond(Req, CurrentEtag, fun() ->
-        [<<"resp">>, ExternalResp] = couch_query_servers:render_doc_show(Lang, ShowSrc,
-            DocId, nil, Req, Db),
-        JsonResp = apply_etag(ExternalResp, CurrentEtag),
-        chttpd_external:send_external_response(Req, JsonResp)
-    end);
-
-send_doc_show_response(Lang, ShowSrc, DocId, #doc{revs=Revs}=Doc, #httpd{mochi_req=MReq, user_ctx=UserCtx}=Req, Db) ->
-    % calculate the etag
-    Headers = MReq:get(headers),
-    Hlist = mochiweb_headers:to_list(Headers),
-    Accept = couch_util:get_value('Accept', Hlist),
-    CurrentEtag = chttpd:make_etag({Lang, ShowSrc, Revs, Accept, UserCtx}),
-    % We know our etag now
-    chttpd:etag_respond(Req, CurrentEtag, fun() ->
-        [<<"resp">>, ExternalResp] = couch_query_servers:render_doc_show(Lang, ShowSrc,
-            DocId, Doc, Req, Db),
-        JsonResp = apply_etag(ExternalResp, CurrentEtag),
-        chttpd_external:send_external_response(Req, JsonResp)
-    end).
-
-send_doc_update_response(Lang, UpdateSrc, DocId, Doc, Req, Db) ->
-    case couch_query_servers:render_doc_update(Lang, UpdateSrc, 
-        DocId, Doc, Req, Db) of
-    [<<"up">>, {NewJsonDoc}, JsonResp] ->
-        Options = case chttpd:header_value(Req, "X-Couch-Full-Commit", "false") of
-        "true" ->
-            [full_commit];
-        _ ->
-            []
-        end,
-        NewDoc = couch_doc:from_json_obj({NewJsonDoc}),
-        Code = 201,
-        % todo set location field
-        {ok, _NewRev} = fabric:update_doc(Db, NewDoc, Options);
-    [<<"up">>, _Other, JsonResp] ->
-        Code = 200,
-        ok
-    end,
-    JsonResp2 = json_apply_field({<<"code">>, Code}, JsonResp),
-    chttpd_external:send_external_response(Req, JsonResp2).
 
 % Maybe this is in the proplists API
 % todo move to couch_util
