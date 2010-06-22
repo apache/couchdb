@@ -13,7 +13,7 @@
 -module(chttpd_external).
 
 -export([handle_external_req/2, handle_external_req/3]).
--export([send_external_response/2, json_req_obj/2]).
+-export([send_external_response/2, json_req_obj/2, json_req_obj/3]).
 -export([default_or_content_type/2, parse_external_response/1]).
 
 -import(chttpd,[send_error/4]).
@@ -54,11 +54,12 @@ process_external_req(HttpReq, Db, Name) ->
         send_external_response(HttpReq, Response)
     end.
 
+json_req_obj(Req, Db) -> json_req_obj(Req, Db, null).
 json_req_obj(#httpd{mochi_req=Req,
-               method=Verb,
+               method=Method,
                path_parts=Path,
                req_body=ReqBody
-            } = HttpReq, Db) ->
+            } = HttpReq, Db, DocId) ->
     Body = case ReqBody of
         undefined -> Req:recv_body();
         Else -> Else
@@ -82,17 +83,18 @@ json_req_obj(#httpd{mochi_req=Req,
     NoCustomer ->
         NoCustomer
     end,
-
     % add headers...
     {[{<<"info">>, {cloudant_util:customer_db_info(HttpReq, Info)}},
-        {<<"verb">>, Verb},
+        {<<"id">>, DocId},
+        {<<"method">>, Method},
         {<<"path">>, FixedPath},
-        {<<"query">>, to_json_terms(Req:parse_qs())},
+        {<<"query">>, json_query_keys(to_json_terms(Req:parse_qs()))},
         {<<"headers">>, to_json_terms(Hlist)},
         {<<"body">>, Body},
+        {<<"peer">>, ?l2b(Req:get(peer))},
         {<<"form">>, to_json_terms(ParsedForm)},
         {<<"cookie">>, to_json_terms(Req:parse_cookie())},
-        {<<"userCtx">>, couch_util:json_user_ctx(Db)}]}.
+        {<<"userCtx">>, couch_util:json_user_ctx(Db#db{name=hd(FixedPath)})}]}.
 
 to_json_terms(Data) ->
     to_json_terms(Data, []).
@@ -103,6 +105,18 @@ to_json_terms([{Key, Value} | Rest], Acc) when is_atom(Key) ->
 to_json_terms([{Key, Value} | Rest], Acc) ->
     to_json_terms(Rest, [{list_to_binary(Key), list_to_binary(Value)} | Acc]).
 
+json_query_keys({Json}) ->
+    json_query_keys(Json, []).
+json_query_keys([], Acc) ->
+    {lists:reverse(Acc)};
+json_query_keys([{<<"startkey">>, Value} | Rest], Acc) ->
+    json_query_keys(Rest, [{<<"startkey">>, couch_util:json_decode(Value)}|Acc]);
+json_query_keys([{<<"endkey">>, Value} | Rest], Acc) ->
+    json_query_keys(Rest, [{<<"endkey">>, couch_util:json_decode(Value)}|Acc]);
+json_query_keys([{<<"key">>, Value} | Rest], Acc) ->
+    json_query_keys(Rest, [{<<"key">>, couch_util:json_decode(Value)}|Acc]);
+json_query_keys([Term | Rest], Acc) ->
+    json_query_keys(Rest, [Term|Acc]).
 
 send_external_response(#httpd{mochi_req=MochiReq}, Response) ->
     #extern_resp_args{
