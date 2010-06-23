@@ -28,6 +28,7 @@
 -export([pread_binary/2, read_header/1, truncate/2, upgrade_old_header/2]).
 -export([append_term_md5/2,append_binary_md5/2]).
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, code_change/3, handle_info/2]).
+-export([delete/1]).
 
 %%----------------------------------------------------------------------
 %% Args:   Valid Options are [create] and [create,overwrite].
@@ -167,6 +168,15 @@ close(Fd) ->
         end
     after
         erlang:demonitor(MRef, [flush])
+    end.
+
+delete(Filepath) ->
+    case file:rename(Filepath, Filepath ++ ".delete") of
+    ok ->
+        spawn(file, delete, [Filepath ++ ".delete"]),
+        ok;
+    Error ->
+        Error
     end.
 
 % 09 UPGRADE CODE
