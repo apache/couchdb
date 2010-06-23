@@ -320,9 +320,9 @@ handle_call({delete, DbName, _Options}, _From, Server) ->
 
         %% Delete any leftover .compact files.  If we don't do this a subsequent
         %% request for this DB will try to open the .compact file and use it.
-        file:delete(FullFilepath ++ ".compact"),
+        couch_file:delete(FullFilepath ++ ".compact"),
 
-        case file:delete(FullFilepath) of
+        case couch_file:delete(FullFilepath) of
         ok ->
             couch_db_update_notifier:notify({deleted, DbName}),
             {reply, ok, Server2};

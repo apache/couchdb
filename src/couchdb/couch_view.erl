@@ -94,7 +94,7 @@ cleanup_index_files(Db) ->
               re:run(FilePath, RegExp, [{capture, none}]) =:= nomatch],
     % delete unused files
     ?LOG_DEBUG("deleting unused view index files: ~p",[DeleteFiles]),
-    [file:delete(File)||File <- DeleteFiles],
+    [couch_file:delete(File)||File <- DeleteFiles],
     ok.
 
 list_index_files(Db) ->
@@ -316,7 +316,7 @@ do_reset_indexes(DbName, Root) ->
             delete_from_ets(Pid, DbName, Sig)
         end, Names),
     delete_index_dir(Root, DbName),
-    file:delete(Root ++ "/." ++ ?b2l(DbName) ++ "_temp").
+    couch_file:delete(Root ++ "/." ++ ?b2l(DbName) ++ "_temp").
 
 handle_info({'EXIT', FromPid, Reason}, Server) ->
     case ets:lookup(couch_groups_by_updater, FromPid) of
