@@ -231,16 +231,14 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                     {ok, 0} = file:position(Fd, 0),
                     ok = file:truncate(Fd),
                     ok = file:sync(Fd),
-                    couch_stats_collector:track_process_count(
-                            {couchdb, open_os_files}),
+                    maybe_track_open_os_files(Options),
                     {ok, #file{fd=Fd}};
                 false ->
                     ok = file:close(Fd),
                     init_status_error(ReturnPid, Ref, file_exists)
                 end;
             false ->
-                couch_stats_collector:track_process_count(
-                        {couchdb, open_os_files}),
+                maybe_track_open_os_files(Options),
                 {ok, #file{fd=Fd}}
             end;
         Error ->
@@ -252,7 +250,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
         {ok, Fd_Read} ->
             {ok, Fd} = file:open(Filepath, [read, append, raw, binary]),
             ok = file:close(Fd_Read),
-            couch_stats_collector:track_process_count({couchdb, open_os_files}),
+            maybe_track_open_os_files(Options),
             {ok, Length} = file:position(Fd, eof),
             {ok, #file{fd=Fd, eof=Length}};
         Error ->
@@ -260,6 +258,13 @@ init({Filepath, Options, ReturnPid, Ref}) ->
         end
     end.
 
+maybe_track_open_os_files(FileOptions) ->
+    case lists:member(sys_db, FileOptions) of
+    true ->
+        ok;
+    false ->
+        couch_stats_collector:track_process_count({couchdb, open_os_files})
+    end.
 
 terminate(_Reason, _Fd) ->
     ok.

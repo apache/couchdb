@@ -19,6 +19,8 @@
 {couchdb, open_databases, "number of open databases"}.
 {couchdb, open_os_files, "number of file descriptors CouchDB has open"}.
 {couchdb, request_time, "length of a request inside CouchDB without MochiWeb"}.
+{couchdb, auth_cache_hits, "number of authentication cache hits"}.
+{couchdb, auth_cache_misses, "number of authentication cache misses"}.
 
 {httpd, bulk_requests, "number of bulk requests"}.
 {httpd, requests, "number of HTTP requests"}.

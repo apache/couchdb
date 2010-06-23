@@ -173,7 +173,8 @@
     user_ctx = #user_ctx{},
     waiting_delayed_commit = nil,
     revs_limit = 1000,
-    fsync_options = []
+    fsync_options = [],
+    is_sys_db = false
     }).
 
 

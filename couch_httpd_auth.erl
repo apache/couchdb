@@ -19,7 +19,6 @@
 -export([proxy_authentification_handler/1]).
 -export([cookie_auth_header/2]).
 -export([handle_session_req/1]).
--export([ensure_users_db_exists/1, get_user/1]).
 
 -import(couch_httpd, [header_value/2, send_json/2,send_json/4, send_method_not_allowed/2]).
 
@@ -66,7 +65,7 @@ basic_name_pw(Req) ->
 default_authentication_handler(Req) ->
     case basic_name_pw(Req) of
     {User, Pass} ->
-        case get_user(?l2b(User)) of
+        case couch_auth_cache:get_user_creds(User) of
             nil ->
                 throw({unauthorized, <<"Name or password is incorrect.">>});
             UserProps ->
@@ -156,149 +155,6 @@ proxy_auth_user(Req) ->
             end
     end.
 
-% maybe we can use hovercraft to simplify running this view query
-% rename to get_user_from_users_db
-get_user(UserName) ->
-    case couch_config:get("admins", ?b2l(UserName)) of
-    "-hashed-" ++ HashedPwdAndSalt ->
-        % the name is an admin, now check to see if there is a user doc
-        % which has a matching name, salt, and password_sha
-        [HashedPwd, Salt] = string:tokens(HashedPwdAndSalt, ","),
-        case get_user_props_from_db(UserName) of
-            nil ->
-                [{<<"roles">>, [<<"_admin">>]},
-                  {<<"salt">>, ?l2b(Salt)},
-                  {<<"password_sha">>, ?l2b(HashedPwd)}];
-            UserProps when is_list(UserProps) ->
-                DocRoles = couch_util:get_value(<<"roles">>, UserProps),
-                [{<<"roles">>, [<<"_admin">> | DocRoles]},
-                  {<<"salt">>, ?l2b(Salt)},
-                  {<<"password_sha">>, ?l2b(HashedPwd)}]
-        end;
-    _Else ->
-        get_user_props_from_db(UserName)
-    end.
-
-get_user_props_from_db(UserName) ->
-    DbName = couch_config:get("couch_httpd_auth", "authentication_db"),
-    {ok, Db} = ensure_users_db_exists(?l2b(DbName)),
-    DocId = <<"org.couchdb.user:", UserName/binary>>,
-    try couch_httpd_db:couch_doc_open(Db, DocId, nil, [conflicts]) of
-        #doc{meta=Meta}=Doc ->
-            %  check here for conflict state and throw error if conflicted
-            case couch_util:get_value(conflicts,Meta,[]) of
-                [] ->
-                    {DocProps} = couch_query_servers:json_doc(Doc),
-                    case couch_util:get_value(<<"type">>, DocProps) of
-                        <<"user">> ->
-                            DocProps;
-                        _Else ->
-                            ?LOG_ERROR("Invalid user doc. Id: ~p",[DocId]),
-                            nil
-                    end;
-                _Else ->
-                    throw({unauthorized, <<"User document conflict must be resolved before login.">>})
-            end
-    catch
-        throw:_Throw ->
-            nil
-    after
-        couch_db:close(Db)
-    end.
-
-% this should handle creating the ddoc
-ensure_users_db_exists(DbName) ->
-    case couch_db:open(DbName, [{user_ctx, #user_ctx{roles=[<<"_admin">>]}}]) of
-    {ok, Db} ->
-        ensure_auth_ddoc_exists(Db, <<"_design/_auth">>),
-        {ok, Db};
-    _Error ->
-        {ok, Db} = couch_db:create(DbName, [{user_ctx, #user_ctx{roles=[<<"_admin">>]}}]),
-        ensure_auth_ddoc_exists(Db, <<"_design/_auth">>),
-        {ok, Db}
-    end.
-    
-ensure_auth_ddoc_exists(Db, DDocId) ->
-    try couch_httpd_db:couch_doc_open(Db, DDocId, nil, []) of
-        _Foo -> ok
-    catch
-        _:_Error ->
-            % create the design document
-            {ok, AuthDesign} = auth_design_doc(DDocId),
-            {ok, _Rev} = couch_db:update_doc(Db, AuthDesign, []),
-            ok
-    end.
-
-% add the validation function here
-auth_design_doc(DocId) ->
-    DocProps = [
-        {<<"_id">>, DocId},
-        {<<"language">>,<<"javascript">>},
-        {
-            <<"validate_doc_update">>,
-            <<"function(newDoc, oldDoc, userCtx) {
-                if ((oldDoc || newDoc).type != 'user') {
-                    throw({forbidden : 'doc.type must be user'});
-                } // we only validate user docs for now
-                if (newDoc._deleted === true) {
-                    // allow deletes by admins and matching users
-                    // without checking the other fields
-                    if ((userCtx.roles.indexOf('_admin') != -1) || (userCtx.name == oldDoc.name)) {
-                        return;
-                    } else {
-                        throw({forbidden : 'Only admins may delete other user docs.'});
-                    }
-                }
-                if (!newDoc.name) {
-                    throw({forbidden : 'doc.name is required'});
-                }
-                if (!(newDoc.roles && (typeof newDoc.roles.length != 'undefined') )) {
-                    throw({forbidden : 'doc.roles must be an array'});
-                }
-                if (newDoc._id != 'org.couchdb.user:'+newDoc.name) {
-                    throw({forbidden : 'Docid must be of the form org.couchdb.user:name'});
-                }
-                if (oldDoc) { // validate all updates
-                    if (oldDoc.name != newDoc.name) {
-                      throw({forbidden : 'Usernames may not be changed.'});
-                    }
-                }
-                if (newDoc.password_sha && !newDoc.salt) {
-                    throw({forbidden : 'Users with password_sha must have a salt. See /_utils/script/couch.js for example code.'});
-                }
-                if (userCtx.roles.indexOf('_admin') == -1) { // not an admin
-                    if (oldDoc) { // validate non-admin updates
-                        if (userCtx.name != newDoc.name) {
-                          throw({forbidden : 'You may only update your own user document.'});
-                        }
-                        // validate role updates
-                        var oldRoles = oldDoc.roles.sort();
-                        var newRoles = newDoc.roles.sort();
-                        if (oldRoles.length != newRoles.length) {
-                            throw({forbidden : 'Only _admin may edit roles'});
-                        }
-                        for (var i=0; i < oldRoles.length; i++) {
-                            if (oldRoles[i] != newRoles[i]) {
-                                throw({forbidden : 'Only _admin may edit roles'});
-                            }
-                        };
-                    } else if (newDoc.roles.length > 0) {
-                        throw({forbidden : 'Only _admin may set roles'});
-                    }
-                }
-                // no system roles in users db
-                for (var i=0; i < newDoc.roles.length; i++) {
-                    if (newDoc.roles[i][0] == '_') {
-                        throw({forbidden : 'No system roles (starting with underscore) in users db.'});
-                    }
-                };
-                // no system names as names
-                if (newDoc.name[0] == '_') {
-                    throw({forbidden : 'Username may not start with underscore.'});
-                }
-            }">>
-        }],
-    {ok, couch_doc:from_json_obj({DocProps})}.
 
 cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
     case MochiReq:get_cookie_value("AuthSession") of
@@ -321,7 +177,7 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
             Req;
         SecretStr ->
             Secret = ?l2b(SecretStr),
-            case get_user(?l2b(User)) of
+            case couch_auth_cache:get_user_creds(User) of
             nil -> Req;
             UserProps ->
                 UserSalt = couch_util:get_value(<<"salt">>, UserProps, <<"">>),
@@ -403,7 +259,7 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req) ->
     UserName = ?l2b(couch_util:get_value("name", Form, "")),
     Password = ?l2b(couch_util:get_value("password", Form, "")),
     ?LOG_DEBUG("Attempt Login: ~s",[UserName]),
-    User = case get_user(UserName) of
+    User = case couch_auth_cache:get_user_creds(UserName) of
         nil -> [];
         Result -> Result
     end,

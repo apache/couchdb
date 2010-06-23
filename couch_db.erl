@@ -114,7 +114,7 @@ open_doc(Db, IdOrDocInfo) ->
     open_doc(Db, IdOrDocInfo, []).
 
 open_doc(Db, Id, Options) ->
-    couch_stats_collector:increment({couchdb, database_reads}),
+    increment_stat(Db, {couchdb, database_reads}),
     case open_doc_int(Db, Id, Options) of
     {ok, #doc{deleted=true}=Doc} ->
         case lists:member(deleted, Options) of
@@ -157,7 +157,7 @@ find_ancestor_rev_pos({RevPos, [RevId|Rest]}, AttsSinceRevs) ->
     end.
 
 open_doc_revs(Db, Id, Revs, Options) ->
-    couch_stats_collector:increment({couchdb, database_reads}),
+    increment_stat(Db, {couchdb, database_reads}),
     [{ok, Results}] = open_doc_revs_int(Db, [{Id, Revs}], Options),
     {ok, [apply_open_options(Result, Options) || Result <- Results]}.
 
@@ -621,7 +621,7 @@ check_dup_atts2(_) ->
 
 
 update_docs(Db, Docs, Options, replicated_changes) ->
-    couch_stats_collector:increment({couchdb, database_writes}),
+    increment_stat(Db, {couchdb, database_writes}),
     DocBuckets = group_alike_docs(Docs),
 
     case (Db#db.validate_doc_funs /= []) orelse
@@ -647,7 +647,7 @@ update_docs(Db, Docs, Options, replicated_changes) ->
     {ok, DocErrors};
 
 update_docs(Db, Docs, Options, interactive_edit) ->
-    couch_stats_collector:increment({couchdb, database_writes}),
+    increment_stat(Db, {couchdb, database_writes}),
     AllOrNothing = lists:member(all_or_nothing, Options),
     % go ahead and generate the new revision ids for the documents.
     % separate out the NonRep documents from the rest of the documents
@@ -959,7 +959,12 @@ init({DbName, Filepath, Fd, Options}) ->
     {ok, UpdaterPid} = gen_server:start_link(couch_db_updater, {self(), DbName, Filepath, Fd, Options}, []),
     {ok, #db{fd_ref_counter=RefCntr}=Db} = gen_server:call(UpdaterPid, get_db),
     couch_ref_counter:add(RefCntr),
-    couch_stats_collector:track_process_count({couchdb, open_databases}),
+    case lists:member(sys_db, Options) of
+    true ->
+        ok;
+    false ->
+        couch_stats_collector:track_process_count({couchdb, open_databases})
+    end,
     process_flag(trap_exit, true),
     {ok, Db}.
 
@@ -983,7 +988,9 @@ handle_call({db_updated, NewDb}, _From, #db{fd_ref_counter=OldRefCntr}) ->
         couch_ref_counter:add(NewRefCntr),
         couch_ref_counter:drop(OldRefCntr)
     end,
-    {reply, ok, NewDb}.
+    {reply, ok, NewDb};
+handle_call(get_db, _From, Db) ->
+    {reply, {ok, Db}, Db}.
 
 
 handle_cast(Msg, Db) ->
@@ -1178,4 +1185,7 @@ make_doc(#db{fd=Fd}=Db, Id, Deleted, Bp, RevisionPath) ->
         }.
 
 
-
+increment_stat(#db{is_sys_db = true}, _Stat) ->
+    ok;
+increment_stat(#db{}, Stat) ->
+    couch_stats_collector:increment(Stat).

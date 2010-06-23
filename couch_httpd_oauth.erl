@@ -41,7 +41,7 @@ set_user_ctx(Req, AccessToken) ->
         undefined -> throw({bad_request, unknown_oauth_token});
         Value -> ?l2b(Value)
     end,
-    case couch_httpd_auth:get_user(Name) of
+    case couch_auth_cache:get_user_creds(Name) of
         nil -> Req;
         User ->
             Roles = couch_util:get_value(<<"roles">>, User, []),
