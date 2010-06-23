@@ -110,6 +110,7 @@ nobase_dist_localdata_DATA = \
     www/script/test/attachment_names.js \
     www/script/test/attachment_paths.js \
     www/script/test/attachment_views.js \
+    www/script/test/auth_cache.js \
     www/script/test/basics.js \
     www/script/test/batch_save.js \
     www/script/test/bulk_docs.js \

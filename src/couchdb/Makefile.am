@@ -17,7 +17,7 @@ couchlibdir = $(localerlanglibdir)/couch-$(version)
 couchincludedir = $(couchlibdir)/include
 couchebindir = $(couchlibdir)/ebin
 
-couchinclude_DATA = couch_db.hrl
+couchinclude_DATA = couch_db.hrl couch_js_functions.hrl
 couchebin_DATA = $(compiled_files)
 
 # dist_devdoc_DATA = $(doc_base) $(doc_modules)
@@ -29,6 +29,7 @@ CLEANFILES = $(compiled_files) $(doc_base)
 source_files = \
     couch.erl \
     couch_app.erl \
+    couch_auth_cache.erl \
     couch_btree.erl \
     couch_changes.erl \
     couch_config.erl \
@@ -80,12 +81,13 @@ source_files = \
     couch_db_updater.erl \
     couch_work_queue.erl
 
-EXTRA_DIST = $(source_files) couch_db.hrl
+EXTRA_DIST = $(source_files) couch_db.hrl couch_js_functions.hrl
 
 compiled_files = \
     couch.app \
     couch.beam \
     couch_app.beam \
+    couch_auth_cache.beam \
     couch_btree.beam \
     couch_changes.beam \
     couch_config.beam \
@@ -194,6 +196,6 @@ endif
 
 # $(ERL) -noshell -run edoc_run files [\"$<\"]
 
-%.beam: %.erl couch_db.hrl
+%.beam: %.erl couch_db.hrl couch_js_functions.hrl
 	$(ERLC) $(ERLC_FLAGS) ${TEST} $<;
 

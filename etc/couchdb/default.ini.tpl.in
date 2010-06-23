@@ -31,6 +31,7 @@ include_sasl = true
 authentication_db = _users
 require_valid_user = false
 timeout = 600 ; number of seconds before automatic logout
+auth_cache_size = 50 ; size is number of cache entries
 
 [query_servers]
 javascript = %bindir%/%couchjs_command_name% %localbuilddatadir%/server/main.js
@@ -55,6 +56,7 @@ httpd={couch_httpd, start_link, []}
 stats_aggregator={couch_stats_aggregator, start, []}
 stats_collector={couch_stats_collector, start, []}
 uuids={couch_uuids, start, []}
+auth_cache={couch_auth_cache, start_link, []}
 
 [httpd_global_handlers]
 / = {couch_httpd_misc_handlers, handle_welcome_req, <<"Welcome">>}

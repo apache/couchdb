@@ -24,8 +24,6 @@ couchTests.users_db = function(debug) {
   // to determine the actual users db name.
 
   function testFun() {
-    usersDb.deleteDb();
-    
     // test that the validation function is installed
     var ddoc = usersDb.open("_design/_auth");
     T(ddoc.validate_doc_update);
@@ -89,10 +87,12 @@ couchTests.users_db = function(debug) {
 
   };
   
+  usersDb.deleteDb();
   run_on_modified_server(
     [{section: "couch_httpd_auth",
-      key: "authentication_db", value: "test_suite_users"}],
+      key: "authentication_db", value: usersDb.name}],
     testFun
   );
+  usersDb.deleteDb(); // cleanup
   
 }

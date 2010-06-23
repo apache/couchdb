@@ -35,7 +35,7 @@ init({MainPid, DbName, Filepath, Fd, Options}) ->
 
     Db = init_db(DbName, Filepath, Fd, Header),
     Db2 = refresh_validate_doc_funs(Db),
-    {ok, Db2#db{main_pid=MainPid}}.
+    {ok, Db2#db{main_pid = MainPid, is_sys_db = lists:member(sys_db, Options)}}.
 
 
 terminate(_Reason, Db) ->

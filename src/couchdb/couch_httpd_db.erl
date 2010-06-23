@@ -160,23 +160,13 @@ handle_design_info_req(Req, _Db, _DDoc) ->
 
 create_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
     ok = couch_httpd:verify_is_server_admin(Req),
-    LDbName = ?b2l(DbName),
-    case couch_config:get("couch_httpd_auth", "authentication_db") of
-        LDbName ->
-            % make sure user's db always has the auth ddoc
-            {ok, Db} = couch_httpd_auth:ensure_users_db_exists(DbName),
-            couch_db:close(Db),
-            DbUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
-            send_json(Req, 201, [{"Location", DbUrl}], {[{ok, true}]});
-        _Else ->
-            case couch_server:create(DbName, [{user_ctx, UserCtx}]) of
-            {ok, Db} ->
-                couch_db:close(Db),
-                DbUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
-                send_json(Req, 201, [{"Location", DbUrl}], {[{ok, true}]});
-            Error ->
-                throw(Error)
-            end
+    case couch_server:create(DbName, [{user_ctx, UserCtx}]) of
+    {ok, Db} ->
+        couch_db:close(Db),
+        DbUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
+        send_json(Req, 201, [{"Location", DbUrl}], {[{ok, true}]});
+    Error ->
+        throw(Error)
     end.
 
 delete_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
@@ -189,15 +179,6 @@ delete_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
     end.
 
 do_db_req(#httpd{user_ctx=UserCtx,path_parts=[DbName|_]}=Req, Fun) ->
-    LDbName = ?b2l(DbName),
-    % I hope this lookup is cheap.
-    case couch_config:get("couch_httpd_auth", "authentication_db") of
-        LDbName ->
-            % make sure user's db always has the auth ddoc
-            {ok, ADb} = couch_httpd_auth:ensure_users_db_exists(DbName),
-            couch_db:close(ADb);
-        _Else -> ok
-    end,
     case couch_db:open(DbName, [{user_ctx, UserCtx}]) of
     {ok, Db} ->
         try
