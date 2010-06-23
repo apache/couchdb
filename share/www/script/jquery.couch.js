@@ -233,7 +233,9 @@
         changes: function(since, options) {
           options = options || {};
           // set up the promise object within a closure for this handler
-          var db = this, active = true, listeners = [], promise = {
+          var timeout = 100, db = this, active = true,
+            listeners = [],
+            promise = {
             onChange : function(fun) {
               listeners.push(fun);
             },
@@ -249,18 +251,24 @@
           };
           // when there is a change, call any listeners, then check for another change
           options.success = function(resp) {
+            timeout = 100;
             if (active) {
-              var seq = resp.last_seq;
+              since = resp.last_seq;
               triggerListeners(resp);
-              getChangesSince(seq);
+              getChangesSince();
             };
           };
+          options.error = function() {
+            if (active) {
+              setTimeout(getChangesSince, timeout);
+              timeout = timeout * 2;
+            }
+          };
           // actually make the changes request
-          function getChangesSince(seq) {
-            var opts = {};
-            $.extend(opts, options, {
+          function getChangesSince() {
+            var opts = $.extend({heartbeat : 10 * 1000}, options, {
               feed : "longpoll",
-              since : seq
+              since : since
             });
             ajax(
               {url: db.uri + "_changes"+encodeOptions(opts)},
@@ -270,11 +278,12 @@
           }
           // start the first request
           if (since) {
-            getChangesSince(since);
+            getChangesSince();
           } else {
             db.info({
               success : function(info) {
-                getChangesSince(info.update_seq);
+                since = info.update_seq;
+                getChangesSince();
               }
             });
           }
@@ -597,7 +606,16 @@
         }
       },
       complete: function(req) {
-        var resp = $.httpData(req, "json");
+        try {
+          var resp = $.httpData(req, "json");
+        } catch(e) {
+          if (options.error) {
+            options.error(req.status, req, e);
+          } else {
+            alert(errorMessage + ": " + e);
+          }
+          return;
+        }
         if (options.ajaxStart) {
           options.ajaxStart(resp);
         }
@@ -605,7 +623,7 @@
           if (options.beforeSuccess) options.beforeSuccess(req, resp);
           if (options.success) options.success(resp);
         } else if (options.error) {
-          options.error(req.status, resp.error, resp.reason);
+          options.error(req.status, resp && resp.error || errorMessage, resp && resp.reason || "no response");
         } else {
           alert(errorMessage + ": " + resp.reason);
         }
