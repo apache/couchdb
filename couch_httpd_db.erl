@@ -112,6 +112,7 @@ handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 handle_compact_req(#httpd{method='POST',path_parts=[DbName,_,Id|_]}=Req, _Db) ->
+    couch_httpd:validate_ctype(Req, "application/json"),
     ok = couch_view_compactor:start_compact(DbName, Id),
     send_json(Req, 202, {[{ok, true}]});
 
@@ -195,6 +196,7 @@ db_req(#httpd{method='GET',path_parts=[_DbName]}=Req, Db) ->
     send_json(Req, {DbInfo});
 
 db_req(#httpd{method='POST',path_parts=[DbName]}=Req, Db) ->
+    couch_httpd:validate_ctype(Req, "application/json"),
     Doc = couch_doc:from_json_obj(couch_httpd:json_body(Req)),
     Doc2 = case Doc#doc.id of
         <<"">> ->
@@ -262,6 +264,7 @@ db_req(#httpd{path_parts=[_,<<"_ensure_full_commit">>]}=Req, _Db) ->
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
     couch_stats_collector:increment({httpd, bulk_requests}),
+    couch_httpd:validate_ctype(Req, "application/json"),
     {JsonProps} = couch_httpd:json_body_obj(Req),
     DocsArray = couch_util:get_value(<<"docs">>, JsonProps),
     case couch_httpd:header_value(Req, "X-Couch-Full-Commit") of
@@ -323,6 +326,7 @@ db_req(#httpd{path_parts=[_,<<"_bulk_docs">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_purge">>]}=Req, Db) ->
+    couch_httpd:validate_ctype(Req, "application/json"),
     {IdsRevs} = couch_httpd:json_body_obj(Req),
     IdsRevs2 = [{Id, couch_doc:parse_revs(Revs)} || {Id, Revs} <- IdsRevs],
 
@@ -366,7 +370,6 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_missing_revs">>]}=Req, Db) ->
 
 db_req(#httpd{path_parts=[_,<<"_missing_revs">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
-
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_revs_diff">>]}=Req, Db) ->
     {JsonDocIdRevs} = couch_httpd:json_body_obj(Req),
@@ -586,14 +589,11 @@ db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
         end
     end;
 
+
 db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
+    couch_httpd:validate_referer(Req),
     couch_doc:validate_docid(DocId),
-    case couch_httpd:header_value(Req, "Content-Type") of
-    "multipart/form-data" ++  _Rest ->
-        ok;
-    _Else ->
-        throw({bad_ctype, <<"Invalid Content-Type header for form upload">>})
-    end,
+    couch_httpd:validate_ctype(Req, "multipart/form-data"),
     Form = couch_httpd:parse_form(Req),
     case proplists:is_defined("_doc", Form) of
     true ->

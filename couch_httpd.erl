@@ -25,7 +25,7 @@
 -export([start_json_response/2, start_json_response/3, end_json_response/1]).
 -export([send_response/4,send_method_not_allowed/2,send_error/4, send_redirect/2,send_chunked_error/2]).
 -export([send_json/2,send_json/3,send_json/4,last_chunk/1,parse_multipart_request/3]).
--export([accepted_encodings/1,handle_request_int/5]).
+-export([accepted_encodings/1,handle_request_int/5,validate_referer/1,validate_ctype/2]).
 
 start_link() ->
     % read config and register for configuration changes
@@ -321,6 +321,34 @@ vhost_global(VhostGlobals, MochiReq) ->
     end,
     [true] == [true||V <- VhostGlobals, V == Front].
 
+validate_referer(Req) ->
+    Host = host_for_request(Req),
+    Referer = header_value(Req, "Referer", fail),
+    case Referer of
+    fail ->
+        throw({bad_request, <<"Referer header required.">>});
+    Referer ->
+        {_,RefererHost,_,_,_} = mochiweb_util:urlsplit(Referer),
+        if
+            RefererHost =:= Host -> ok;
+            true -> throw({bad_request, <<"Referer header must match host.">>})
+        end
+    end.
+
+validate_ctype(Req, Ctype) ->
+    case couch_httpd:header_value(Req, "Content-Type") of
+    undefined ->
+        throw({bad_ctype, "Content-Type must be "++Ctype});
+    ReqCtype ->
+        % ?LOG_ERROR("Ctype ~p ReqCtype ~p",[Ctype,ReqCtype]),
+        case re:split(ReqCtype, ";", [{return, list}]) of
+        [Ctype] -> ok;
+        [Ctype, _Rest] -> ok;
+        _Else ->
+            throw({bad_ctype, "Content-Type must be "++Ctype})
+        end
+    end.
+
 % Utilities
 
 partition(Path) ->
@@ -367,9 +395,9 @@ qs(#httpd{mochi_req=MochiReq}) ->
 path(#httpd{mochi_req=MochiReq}) ->
     MochiReq:get(path).
 
-absolute_uri(#httpd{mochi_req=MochiReq}, Path) ->
+host_for_request(#httpd{mochi_req=MochiReq}) ->
     XHost = couch_config:get("httpd", "x_forwarded_host", "X-Forwarded-Host"),
-    Host = case MochiReq:get_header_value(XHost) of
+    case MochiReq:get_header_value(XHost) of
         undefined ->
             case MochiReq:get_header_value("Host") of
                 undefined ->
@@ -379,7 +407,10 @@ absolute_uri(#httpd{mochi_req=MochiReq}, Path) ->
                     Value1
             end;
         Value -> Value
-    end,
+    end.
+
+absolute_uri(#httpd{mochi_req=MochiReq}=Req, Path) ->
+    Host = host_for_request(Req),
     XSsl = couch_config:get("httpd", "x_forwarded_ssl", "X-Forwarded-Ssl"),
     Scheme = case MochiReq:get_header_value(XSsl) of
         "on" -> "https";

@@ -145,7 +145,7 @@ send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
             {200, JsonResp}
     end,
     
-    JsonResp2 = json_apply_field({<<"code">>, Code}, JsonResp1),
+    JsonResp2 = couch_util:json_apply_field({<<"code">>, Code}, JsonResp1),
     % todo set location field
     couch_httpd_external:send_external_response(Req, JsonResp2).
 
@@ -376,21 +376,6 @@ render_head_for_empty_list(StartListRespFun, Req, Etag, CurrentSeq, null) ->
 render_head_for_empty_list(StartListRespFun, Req, Etag, CurrentSeq, TotalRows) ->
     StartListRespFun(Req, Etag, TotalRows, null, [], CurrentSeq).
 
-
-% Maybe this is in the proplists API
-% todo move to couch_util
-json_apply_field(H, {L}) ->
-    json_apply_field(H, L, []).
-json_apply_field({Key, NewValue}, [{Key, _OldVal} | Headers], Acc) ->
-    % drop matching keys
-    json_apply_field({Key, NewValue}, Headers, Acc);
-json_apply_field({Key, NewValue}, [{OtherKey, OtherVal} | Headers], Acc) ->
-    % something else is next, leave it alone.
-    json_apply_field({Key, NewValue}, Headers, [{OtherKey, OtherVal} | Acc]);
-json_apply_field({Key, NewValue}, [], Acc) ->
-    % end of list, add ours
-    {[{Key, NewValue}|Acc]}.
-
 apply_etag({ExternalResponse}, CurrentEtag) ->
     % Here we embark on the delicate task of replacing or creating the
     % headers on the JsonResponse object. We need to control the Etag and
@@ -404,8 +389,8 @@ apply_etag({ExternalResponse}, CurrentEtag) ->
     JsonHeaders ->
         {[case Field of
         {<<"headers">>, JsonHeaders} -> % add our headers
-            JsonHeadersEtagged = json_apply_field({<<"Etag">>, CurrentEtag}, JsonHeaders),
-            JsonHeadersVaried = json_apply_field({<<"Vary">>, <<"Accept">>}, JsonHeadersEtagged),
+            JsonHeadersEtagged = couch_util:json_apply_field({<<"Etag">>, CurrentEtag}, JsonHeaders),
+            JsonHeadersVaried = couch_util:json_apply_field({<<"Vary">>, <<"Accept">>}, JsonHeadersEtagged),
             {<<"headers">>, JsonHeadersVaried};
         _ -> % skip non-header fields
             Field
