@@ -76,8 +76,9 @@ write_bulk_docs(#http_db{headers = Headers} = Db, Docs) ->
         resource = "_bulk_docs",
         method = post,
         body = {[{new_edits, false}, {docs, JsonDocs}]},
-        headers = [{"x-couch-full-commit", "false"} | Headers]
+        headers = couch_util:proplist_apply_field({"Content-Type", "application/json"}, [{"X-Couch-Full-Commit", "false"} | Headers])
     },
+    ?LOG_ERROR("headers ~p",[Request#http_db.headers]),
     ErrorsJson = case couch_rep_httpc:request(Request) of
     {FailProps} ->
         exit({target_error, couch_util:get_value(<<"error">>, FailProps)});

@@ -36,7 +36,10 @@ couchTests.batch_save = function(debug) {
 
   // repeat the tests for POST
   for(i=0; i < 100; i++) {
-    var resp = db.request("POST", db.uri + "?batch=ok", {body: JSON.stringify({a:1})});
+    var resp = db.request("POST", db.uri + "?batch=ok", {
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({a:1})
+    });
     T(JSON.parse(resp.responseText).ok);
   }
   

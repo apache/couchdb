@@ -653,10 +653,11 @@ commit_to_both(Source, Target, RequiredSeq) ->
     end,
     {SourceStartTime, TargetStartTime}.
     
-ensure_full_commit(#http_db{} = Target) ->
+ensure_full_commit(#http_db{headers = Headers} = Target) ->
     Req = Target#http_db{
         resource = "_ensure_full_commit",
-        method = post
+        method = post,
+        headers = [{"content-type", "application/json"} | Headers]
     },
     {ResultProps} = couch_rep_httpc:request(Req),
     true = couch_util:get_value(<<"ok">>, ResultProps),
@@ -677,11 +678,12 @@ ensure_full_commit(Target) ->
         InstanceStartTime
     end.
 
-ensure_full_commit(#http_db{} = Source, RequiredSeq) ->
+ensure_full_commit(#http_db{headers = Headers} = Source, RequiredSeq) ->
     Req = Source#http_db{
         resource = "_ensure_full_commit",
         method = post,
-        qs = [{seq, RequiredSeq}]
+        qs = [{seq, RequiredSeq}],
+        headers = [{"content-type", "application/json"} | Headers]
     },
     {ResultProps} = couch_rep_httpc:request(Req),
     case couch_util:get_value(<<"ok">>, ResultProps) of

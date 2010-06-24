@@ -398,6 +398,8 @@ CouchDB.newXhr = function() {
 
 CouchDB.request = function(method, uri, options) {
   options = options || {};
+  options.headers = options.headers || {};
+  options.headers["Content-Type"] = options.headers["Content-Type"] || "application/json";
   var req = CouchDB.newXhr();
   if(uri.substr(0, "http://".length) != "http://") {
     uri = CouchDB.urlPrefix + uri
