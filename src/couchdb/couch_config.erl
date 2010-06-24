@@ -44,7 +44,7 @@ stop() ->
 
 
 all() ->
-    lists:sort(gen_server:call(?MODULE, all)).
+    lists:sort(gen_server:call(?MODULE, all, infinity)).
 
 
 get(Section) when is_binary(Section) ->
