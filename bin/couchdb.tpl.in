@@ -67,15 +67,13 @@ Erlang is called with:
 
 Erlang inherits the environment of this command.
 
-You can override any of the flags using the environment:
+You can override these options using the environment:
 
     ERL_AFLAGS, ERL_FLAGS, ERL_ZFLAGS
 
 See erl(1) for more information about the environment variables.
 
 The exit status is 0 for success or 1 for failure.
-
-The \`-s' option will exit 0 for running and 1 for not running.
 
 Options:
 
