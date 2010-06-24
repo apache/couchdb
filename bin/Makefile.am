@@ -75,7 +75,7 @@ couchdb.bat: couchdb.bat.tpl
 	    -e "s|%version%|@version@|g" \
 	$< > $@
 
-HELP2MAN_OPTION=--no-info --help-option="-h" --version-option="-V"
+HELP2MAN_OPTION=--no-info --no-discard-stderr --help-option="-h" --version-option="-V"
 
 # XXX: Because the scripts are made at build time for the user we need to
 # XXX: depend on the original templates so as not to cause the rebuilding of
