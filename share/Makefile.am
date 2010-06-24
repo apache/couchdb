@@ -138,6 +138,7 @@ nobase_dist_localdata_DATA = \
     www/script/test/lorem.txt \
     www/script/test/lorem_b64.txt \
     www/script/test/lots_of_docs.js \
+    www/script/test/method_override.js \
     www/script/test/multiple_rows.js \
     www/script/test/oauth.js \
     www/script/test/proxyauth.js \

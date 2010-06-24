@@ -59,6 +59,7 @@ loadTest("jsonp.js");
 loadTest("large_docs.js");
 loadTest("list_views.js");
 loadTest("lots_of_docs.js");
+loadTest("method_override.js");
 loadTest("multiple_rows.js");
 loadScript("script/oauth.js");
 loadScript("script/sha1.js");
