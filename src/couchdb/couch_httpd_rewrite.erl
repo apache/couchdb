@@ -242,8 +242,18 @@ make_query_list([{Key, Value}|Rest], Bindings, Acc) ->
 replace_var(Key, Value, Bindings) ->
     case Value of
         <<":", Var/binary>> ->
-            Var1 = list_to_atom(binary_to_list(Var)),
-            proplists:get_value(Var1, Bindings, Value);
+            get_var(Var, Bindings, Value);
+        _ when is_list(Value) ->
+            Value1 = lists:foldr(fun(V, Acc) ->
+                V1 = case V of
+                    <<":", VName/binary>> ->
+                        get_var(VName, Bindings, V);
+                    _ ->
+                        V
+                end,
+                [V1|Acc]
+            end, [], Value),
+            to_json(Value1);
         _ when is_binary(Value) ->
             Value;
         _ ->
@@ -256,6 +266,10 @@ replace_var(Key, Value, Bindings) ->
             end
     end.
 
+
+get_var(VarName, Props, Default) ->
+    VarName1 = list_to_atom(binary_to_list(VarName)),
+    proplists:get_value(VarName1, Props, Default).
 
 %% doc: build new patch from bindings. bindings are query args
 %% (+ dynamic query rewritten if needed) and bindings found in

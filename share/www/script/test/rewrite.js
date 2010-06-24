@@ -212,6 +212,13 @@ couchTests.rewrite = function(debug) {
                   emit(doc.a, doc.string);
                 }
               })
+            },
+            complexView3: {
+              map: stringFun(function(doc) {
+                if (doc.type == "complex") {
+                  emit(doc.b, doc.string);
+                }
+              })
             }
           }
         }
@@ -320,6 +327,9 @@ couchTests.rewrite = function(debug) {
         T(xhr.status == 200, "with query params");
         T(/Value: doc 5/.test(xhr.responseText));
         
+        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/simpleForm/complexView5/test/essai");
+        T(xhr.status == 200, "with query params");
+        T(/Value: doc 4/.test(xhr.responseText));
         
         // test path relative to server
         designDoc.rewrites.push({
