@@ -686,28 +686,46 @@ error_info({Error, Reason}) ->
 error_info(Error) ->
     {500, <<"unknown_error">>, couch_util:to_binary(Error)}.
 
-send_error(_Req, {already_sent, Resp, _Error}) ->
-    {ok, Resp};
-
-send_error(#httpd{mochi_req=MochiReq}=Req, Error) ->
-    {Code, ErrorStr, ReasonStr} = error_info(Error),
-    Headers = if Code == 401 ->
+error_headers(#httpd{mochi_req=MochiReq}=Req, Code, ErrorStr, ReasonStr) ->
+    if Code == 401 ->
         % this is where the basic auth popup is triggered
         case MochiReq:get_header_value("X-CouchDB-WWW-Authenticate") of
         undefined ->
             case couch_config:get("httpd", "WWW-Authenticate", nil) of
             nil ->
-                [];
+                % If the client is a browser and the basic auth popup isn't turned on
+                % redirect to the session page.
+                case ErrorStr of
+                <<"unauthorized">> ->
+                    % if the accept header matches html, then do the redirect. else proceed as usual.
+                    case re:run(MochiReq:get_header_value("Accept"), "html", [{capture, none}]) of
+                    nomatch ->
+                        {Code, []};
+                    match ->
+                        UrlReturn = ?l2b(couch_util:url_encode(MochiReq:get(path))),
+                        UrlReason = ?l2b(couch_util:url_encode(ReasonStr)),
+                        {302, [{"Location", couch_httpd:absolute_uri(Req, <<"/_utils/session.html?return=",UrlReturn/binary,"&reason=",UrlReason/binary>>)}]}
+                    end;
+                _Else ->
+                    {Code, []}
+                end;
             Type ->
-                [{"WWW-Authenticate", Type}]
+                {Code, [{"WWW-Authenticate", Type}]}
             end;
         Type ->
-            [{"WWW-Authenticate", Type}]
+           {Code, [{"WWW-Authenticate", Type}]}
         end;
     true ->
-        []
-    end,
-    send_error(Req, Code, Headers, ErrorStr, ReasonStr).
+        {Code, []}
+    end.
+
+send_error(_Req, {already_sent, Resp, _Error}) ->
+    {ok, Resp};
+
+send_error(Req, Error) ->
+    {Code, ErrorStr, ReasonStr} = error_info(Error),
+    {Code1, Headers} = error_headers(Req, Code, ErrorStr, ReasonStr),
+    send_error(Req, Code1, Headers, ErrorStr, ReasonStr).
 
 send_error(Req, Code, ErrorStr, ReasonStr) ->
     send_error(Req, Code, [], ErrorStr, ReasonStr).

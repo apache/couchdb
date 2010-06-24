@@ -603,3 +603,9 @@ form#replicator p.actions { padding: 1px; clear: left; margin: 0;
   font-family: "DejaVu Sans Mono",Menlo,Courier,monospace;
   font-size: 11px;
 }
+
+
+/* Session */
+#loginSignup {
+  font-size:200%;
+}

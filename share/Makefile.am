@@ -42,6 +42,7 @@ nobase_dist_localdata_DATA = \
     www/couch_tests.html \
     www/custom_test.html \
     www/database.html \
+    www/session.html \
     www/dialog/_admin_party.html \
     www/dialog/_compact_cleanup.html \
     www/dialog/_create_admin.html \
