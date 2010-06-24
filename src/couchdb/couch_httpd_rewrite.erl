@@ -118,6 +118,7 @@ handle_rewrite_req(#httpd{
     DesignId = <<"_design/", DesignName/binary>>,
     Prefix = <<"/", DbName/binary, "/", DesignId/binary>>,
     QueryList = couch_httpd:qs(Req),
+    QueryList1 = [{to_atom(K), V} || {K, V} <- QueryList],
 
     #doc{body={Props}} = DDoc,
 
@@ -132,7 +133,7 @@ handle_rewrite_req(#httpd{
 
             %% get raw path by matching url to a rule.
             RawPath = case try_bind_path(DispatchList, Method, PathParts,
-                                    QueryList) of
+                                    QueryList1) of
                 no_dispatch_path ->
                     throw(not_found);
                 {NewPathParts, Bindings} ->
@@ -146,7 +147,7 @@ handle_rewrite_req(#httpd{
                             [] -> [];
                             _ -> [$?, encode_query(Bindings)]
                         end),
-
+                    
                     % if path is relative detect it and rewrite path
                     case mochiweb_util:safe_relative_path(Path) of
                         undefined ->
@@ -199,7 +200,7 @@ try_bind_path([Dispatch|Rest], Method, PathParts, QueryList) ->
                     % we parse query args from the rule and fill
                     % it eventually with bindings vars
                     QueryArgs1 = make_query_list(QueryArgs, Bindings1, []),
-
+                    
                     % remove params in QueryLists1 that are already in
                     % QueryArgs1
                     Bindings2 = lists:foldl(fun({K, V}, Acc) ->
@@ -247,8 +248,13 @@ replace_var(Key, Value, Bindings) ->
             Value1 = lists:foldr(fun(V, Acc) ->
                 V1 = case V of
                     <<":", VName/binary>> ->
-                        get_var(VName, Bindings, V);
+                        case get_var(VName, Bindings, V) of
+                            V2 when is_list(V2) ->
+                                iolist_to_binary(V2);
+                            V2 -> V2
+                        end;
                     _ ->
+                        
                         V
                 end,
                 [V1|Acc]
