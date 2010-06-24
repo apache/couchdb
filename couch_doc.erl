@@ -357,9 +357,9 @@ has_stubs([_Att|Rest]) ->
 merge_stubs(#doc{id=Id,atts=MemBins}=StubsDoc, #doc{atts=DiskBins}) ->
     BinDict = dict:from_list([{Name, Att} || #att{name=Name}=Att <- DiskBins]),
     MergedBins = lists:map(
-        fun(#att{name=Name, data=stub, revpos=RevPos}) ->
+        fun(#att{name=Name, data=stub}) ->
             case dict:find(Name, BinDict) of
-            {ok, #att{revpos=RevPos}=DiskAtt} ->
+            {ok, #att{}=DiskAtt} ->
                 DiskAtt;
             _ ->
                 throw({missing_stub,
