@@ -61,7 +61,17 @@ Usage: $basename [OPTION]
 
 The $basename command runs the %package_name% server.
 
+Erlang is called with:
+
+    -sasl errlog_type error +K true
+
 Erlang inherits the environment of this command.
+
+You can override any of the flags using the environment:
+
+    ERL_AFLAGS, ERL_FLAGS, ERL_ZFLAGS
+
+See erl(1) for more information about the environment variables.
 
 The exit status is 0 for success or 1 for failure.
 
