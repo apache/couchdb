@@ -87,7 +87,11 @@ function $$(node) {
                   return;
                 }
                 doSignup(data.name, null, function(errors) {
-                  callback(errors);
+                  if (errors && errors.name && errors.name.indexOf && errors.name.indexOf("taken") == -1) {
+                    callback(errors);
+                  } else {
+                    callback();
+                  }
                   }, false);
                 });            
             }
