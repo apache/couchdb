@@ -35,6 +35,14 @@ specific language governing permissions and limitations under the License.
         $("#toolbar button.load").click(function() {
           location.reload(true);
         });
+        $("#toolbar button.share").click(function() {
+          $.showDialog("dialog/_share_test_reports.html", {
+            submit: function(data, callback) {
+              $.couch.replicate("test_suite_reports", "http://couchdb.couchdb.org/test_suite_reports");
+              callback();
+            }
+          });
+        });
         $("#toolbar button.add").click(function() {
           location = "custom_test.html";
         });
@@ -52,6 +60,7 @@ specific language governing permissions and limitations under the License.
       <ul id="toolbar">
         <li><button class="run">Run All</button></li>
         <li><button class="load">Reload</button></li>
+        <li><button class="share">Share Test Reports</button></li>
         <li><button class="add">Custom Test</button></li>
       </ul>
       <p class="help">

@@ -242,6 +242,7 @@ body.fullwidth #wrap { margin-right: 0; }
 #toolbar button.load { background-image: url(../image/load.png); }
 #toolbar button.run { background-image: url(../image/run.png); }
 #toolbar button.save { background-image: url(../image/save.png); }
+#toolbar button.share { background-image: url(../image/compact.png); }
 
 /* Dialogs */
 
