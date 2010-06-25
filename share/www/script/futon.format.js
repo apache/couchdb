@@ -13,6 +13,11 @@
 (function($) {
   $.futon = $.futon || {};
   $.extend($.futon, {
+    escape: function(string) {
+      return string.replace(/&/g, "&amp;")
+                   .replace(/</g, "&lt;")
+                   .replace(/>/g, "&gt;");
+    },
 
     // JSON pretty printing
     formatJSON: function(val, options) {
@@ -23,12 +28,6 @@
         quoteKeys: true
       }, options || {});
       var itemsep = options.linesep.length ? "," + options.linesep : ", ";
-
-      function escape(string) {
-        return string.replace(/&/g, "&amp;")
-                     .replace(/</g, "&lt;")
-                     .replace(/>/g, "&gt;");
-      }
 
       function format(val, depth) {
         var tab = [];
@@ -45,7 +44,7 @@
               retval = indentLines(retval.replace(/\r\n/g, "\n"), tab.substr(options.indent));
             } else {
               if (options.html) {
-                retval = escape(JSON.stringify(val));
+                retval = $.futon.escape(JSON.stringify(val));
               } else {
                 retval = JSON.stringify(val);
               }
@@ -92,7 +91,7 @@
                   if (options.quoteKeys) {
                     keyDisplay = keyDisplay.substr(1, keyDisplay.length - 2);
                   }
-                  keyDisplay = "<code class='key'>" + escape(keyDisplay) + "</code>";
+                  keyDisplay = "<code class='key'>" + $.futon.escape(keyDisplay) + "</code>";
                   if (options.quoteKeys) {
                     keyDisplay = '"' + keyDisplay + '"';
                   }
@@ -118,7 +117,7 @@
       function indentLines(text, tab) {
         var lines = text.split("\n");
         for (var i in lines) {
-          lines[i] = (i > 0 ? tab : "") + escape(lines[i]);
+          lines[i] = (i > 0 ? tab : "") + $.futon.escape(lines[i]);
         }
         return lines.join("<br>");
       }
