@@ -72,6 +72,9 @@ couchTests.update_documents = function(debug) {
         };
          
          return [doc, resp];
+       }),
+       "get-uuid" : stringFun(function(doc, req) {
+         return [null, req.uuid];
        })
     }
   };
@@ -123,7 +126,7 @@ couchTests.update_documents = function(debug) {
   
   // bump counter
   xhr = CouchDB.request("PUT", "/test_suite_db/_design/update/_update/bump-counter/"+docid, {
-    headers : {"X-Couch-Full-Commit":"false"}
+    headers : {"X-Couch-Full-Commit":"true"}
   });
   T(xhr.status == 201);
   T(xhr.responseText == "<h1>bumped it!</h1>");
@@ -144,7 +147,7 @@ couchTests.update_documents = function(debug) {
 
   // parse xml
   xhr = CouchDB.request("PUT", "/test_suite_db/_design/update/_update/xml/"+docid, {
-    headers : {"X-Couch-Full-Commit":"false"},
+    headers : {"X-Couch-Full-Commit":"true"},
     "body" : '<xml><foo>bar</foo></xml>'
   });
   T(xhr.status == 201);
@@ -152,5 +155,10 @@ couchTests.update_documents = function(debug) {
   
   doc = db.open(docid);
   T(doc.via_xml == "bar");
+  
+  // Server provides UUID when POSTing without an ID in the URL
+  xhr = CouchDB.request("POST", "/test_suite_db/_design/update/_update/get-uuid/");
+  T(xhr.status == 200);
+  T(xhr.responseText.length == 32);
 
 };
