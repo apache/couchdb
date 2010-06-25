@@ -745,14 +745,19 @@ error_headers(#httpd{mochi_req=MochiReq}=Req, Code, ErrorStr, ReasonStr) ->
                 % redirect to the session page.
                 case ErrorStr of
                 <<"unauthorized">> ->
-                    % if the accept header matches html, then do the redirect. else proceed as usual.
-                    case re:run(MochiReq:get_header_value("Accept"), "html", [{capture, none}]) of
-                    nomatch ->
-                        {Code, []};
-                    match ->
-                        UrlReturn = ?l2b(couch_util:url_encode(MochiReq:get(path))),
-                        UrlReason = ?l2b(couch_util:url_encode(ReasonStr)),
-                        {302, [{"Location", couch_httpd:absolute_uri(Req, <<"/_utils/session.html?return=",UrlReturn/binary,"&reason=",UrlReason/binary>>)}]}
+                    case couch_config:get("couch_httpd_auth", "authentication_redirect", nil) of
+                    nil -> {Code, []};
+                    AuthRedirect ->
+                        % if the accept header matches html, then do the redirect. else proceed as usual.
+                        case re:run(MochiReq:get_header_value("Accept"), "html", [{capture, none}]) of
+                        nomatch ->
+                            {Code, []};
+                        match ->
+                            AuthRedirectBin = ?l2b(AuthRedirect),
+                            UrlReturn = ?l2b(couch_util:url_encode(MochiReq:get(path))),
+                            UrlReason = ?l2b(couch_util:url_encode(ReasonStr)),
+                            {302, [{"Location", couch_httpd:absolute_uri(Req, <<AuthRedirectBin/binary,"?return=",UrlReturn/binary,"&reason=",UrlReason/binary>>)}]}
+                        end
                     end;
                 _Else ->
                     {Code, []}
