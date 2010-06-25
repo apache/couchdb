@@ -1,7 +1,7 @@
 Apache CouchDB CHANGES
 ======================
 
-Version 0.12.0
+Version 1.1.0
 --------------
 
 This version has not been released yet.
@@ -9,14 +9,106 @@ This version has not been released yet.
 HTTP Interface:
 
  * Mask passwords in active tasks and logging.
+ * Update mochijson2 to allow output of BigNums not in float form.
+ * Added support for X-HTTP-METHOD-OVERRIDE.
+ * Better error message for database names.
+ * Disable jsonp by default.
+ * Accept gzip encoded standalone attachments.
+ * Made max_concurrent_connections configurable.
+ * Made changes API more robust.
+ * Send newly generated document rev to callers of an update function.
 
 Futon:
 
  * Use "expando links" for over-long document values in Futon.
+ * Added continuous replication option.
+ * Added option to replicating test results anonymously to a community
+   CouchDB instance.
+ * Allow creation and deletion of config entries.
+ * Fixed display issues with doc ids that have escaped characters.
+ * Fixed various UI issues.
 
 Build and System Integration:
 
  * Output of `couchdb --help` has been improved.
+ * Fixed compatibility with the Erlang R14 series.
+ * Fixed warnings on Linux builds.
+ * Fixed build error when aclocal needs to be called during the build.
+ * Require ICU 4.3.1.
+ * Fixed compatibility with Solaris.
+
+Security:
+
+ * Added authentication redirect URL to log in clients.
+ * Added authentication caching, to avoid repeated opening and closing of the
+   users database for each request requiring authentication.
+ * Fixed query parameter encoding issue in oauth.js.
+ * Made authentication timeout configurable.
+ * Temporary views are now admin-only resources.
+
+Storage System:
+
+ * Don't require a revpos for attachment stubs.
+ * Added checking to ensure when a revpos is sent with an attachment stub,
+   it's correct.
+ * Make file deletions async to avoid pauses during compaction and db
+   deletion.
+ * Small optimization for reordering result lists.
+ * Fixed for wrong offset when writing headers and converting them to blocks,
+   only triggered when header is larger than 4k.
+ * More efficient header commits.
+ * Preserve _revs_limit and instance_start_time after compaction.
+ * Use O_APPEND to save lseeks.
+ * Faster implementation of pread_iolist(). Further improves performance on
+   concurrent reads.
+
+Configuration System:
+
+ * Fixed timeout with large .ini files.
+
+JavaScript Clients:
+
+ * Added tests for couch.js and jquery.couch.js
+ * Added changes handler to jquery.couch.js.
+ * Added cache busting to jquery.couch.js if the user agent is msie.
+ * Added support for multi-document-fetch (via _all_docs) to jquery.couch.js.
+ * Added attachment versioning to jquery.couch.js.
+ * Added option to control ensure_full_commit to jquery.couch.js.
+ * Added list functionality to jquery.couch.js.
+ * Fixed issues where bulkSave() wasn't sending a POST body.
+
+View Server:
+
+ * Provide a UUID to update functions (and all other functions) that they can
+   use to create new docs.
+ * Faster default view collation.
+ * Upgrade CommonJS modules support to 1.1.1.
+ * Added option to include update_seq in view responses.
+ * Fixed erlang filter funs and normalize filter fun API.
+ * Fixed hang in view shutdown.
+
+Log System:
+
+ * Log HEAD requests as HEAD, not GET.
+ * Keep massive JSON blobs out of the error log.
+ * Fixed a timeout issue.
+
+Replication System:
+
+ * Refactored various internal APIs related to attachment streaming.
+ * Fixed hanging replication.
+ * Fixed keepalive issue.
+
+URL Rewriter & Vhosts:
+
+ * Allow more complex keys in rewriter.
+ * Allow global rewrites so system defaults are available in vhosts.
+ * Allow isolation of databases with vhosts.
+ * Fix issue with passing variables to query parameters.
+
+Test Suite:
+
+ * Made the test suite overall more reliable.
 
 Version 0.11.0
 --------------

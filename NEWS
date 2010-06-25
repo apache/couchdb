@@ -7,13 +7,56 @@ For details about backwards incompatible changes, see:
 
 Each release section notes when backwards incompatible changes have been made.
 
-Version 0.12.0
+Version 1.1.0
 --------------
 
 This version has not been released yet.
 
- * Use "expando links" for over-long document values in Futon.
- * Miscellaneous improvements to system integration.
+ * Mask passwords in active tasks and logging.
+ * Update mochijson2 to allow output of BigNums not in float form.
+ * Added support for X-HTTP-METHOD-OVERRIDE.
+ * Disable jsonp by default.
+ * Accept gzip encoded standalone attachments.
+ * Made max_concurrent_connections configurable.
+ * Added continuous replication option to Futon.
+ * Added option to replicating test results anonymously to a community
+   CouchDB instance.
+ * Allow creation and deletion of config entries in Futon.
+ * Fixed various UI issues in Futon.
+ * Fixed compatibility with the Erlang R14 series.
+ * Fixed warnings on Linux builds.
+ * Fixed build error when aclocal needs to be called during the build.
+ * Require ICU 4.3.1.
+ * Fixed compatibility with Solaris.
+ * Added authentication redirect URL to log in clients.
+ * Added authentication caching, to avoid repeated opening and closing of the
+   users database for each request requiring authentication.
+ * Made authentication timeout configurable.
+ * Temporary views are now admin-only resources.
+ * Don't require a revpos for attachment stubs.
+ * Make file deletions async to avoid pauses during compaction and db
+   deletion.
+ * Fixed for wrong offset when writing headers and converting them to blocks,
+   only triggered when header is larger than 4k.
+ * More efficient header commits.
+ * Preserve _revs_limit and instance_start_time after compaction.
+ * Use O_APPEND to save lseeks.
+ * Faster implementation of pread_iolist(). Further improves performance on
+   concurrent reads.
+ * Fixed timeout with large .ini files.
+ * Added tests for couch.js and jquery.couch.js
+ * Added various API features to jquery.couch.js
+ * Faster default view collation.
+ * Upgrade CommonJS modules support to 1.1.1.
+ * Added option to include update_seq in view responses.
+ * Fixed erlang filter funs and normalize filter fun API.
+ * Fixed hang in view shutdown.
+ * Refactored various internal APIs related to attachment streaming.
+ * Fixed hanging replication.
+ * Fixed keepalive issue.
+ * Allow global rewrites so system defaults are available in vhosts.
+ * Allow isolation of databases with vhosts.
+ * Made the test suite overall more reliable.
 
 
 Version 0.11.0
