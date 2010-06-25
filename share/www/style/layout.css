@@ -229,6 +229,7 @@ body.fullwidth #wrap { margin-right: 0; }
   margin: 0 0 .5em; padding: 5px 5px 5px 3px;
 }
 #toolbar li { display: inline; }
+#toolbar li.current {float:right;}
 #toolbar button { background: transparent 2px 2px no-repeat; border: none;
   color: #666; margin: 0; padding: 2px 1em 2px 22px; cursor: pointer;
   font-size: 95%; line-height: 16px;

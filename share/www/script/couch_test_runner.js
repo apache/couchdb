@@ -72,6 +72,7 @@ function runTest(button, callback, debug, noSave) {
   var row = currentRow = $(button).parents("tr").get(0);
   $("td.status", row).removeClass("error").removeClass("failure").removeClass("success");
   $("td", row).text("");
+  $("#toolbar li.current").text("Running: "+row.id);
   var testFun = couchTests[row.id];
   function run() {
     numFailures = 0;
@@ -103,6 +104,7 @@ function runTest(button, callback, debug, noSave) {
     var duration = new Date().getTime() - start;
     $("td.status", row).removeClass("running").addClass(status).text(status);
     $("td.duration", row).text(duration + "ms");
+    $("#toolbar li.current").text("Finished: "+row.id);
     updateTestsFooter();
     currentRow = null;
     if (callback) callback();
