@@ -15,6 +15,7 @@
 BACKGROUND=false
 DEFAULT_CONFIG_DIR=%localconfdir%/default.d
 DEFAULT_CONFIG_FILE=%localconfdir%/%defaultini%
+ERL_START_OPTIONS="-sasl errlog_type error +K true +A 4"
 HEART_BEAT_TIMEOUT=11
 HEART_COMMAND="%bindir%/%couchdb_command_name% -k"
 INTERACTIVE=false
@@ -63,7 +64,7 @@ The $basename command runs the %package_name% server.
 
 Erlang is called with:
 
-    -sasl errlog_type error +K true
+    $ERL_START_OPTIONS
 
 Erlang inherits the environment of this command.
 
@@ -221,7 +222,7 @@ start_couchdb () {
         touch $PID_FILE
         interactive_option="+Bd -noinput"
     fi
-    command="%ERL% $interactive_option -sasl errlog_type error +K true +A 4 \ 
+    command="%ERL% $interactive_option $ERL_START_OPTIONS \
         -env ERL_LIBS %localerlanglibdir% -couch_ini $start_arguments -s couch"
     if test "$BACKGROUND" = "true" -a "$RECURSED" = "false"; then
         $0 $background_start_arguments -b -r $RESPAWN_TIMEOUT -p $PID_FILE \
