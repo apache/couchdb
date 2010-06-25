@@ -152,7 +152,8 @@ couchTests.basics = function(debug) {
 
   // test that the POST response has a Location header
   var xhr = CouchDB.request("POST", "/test_suite_db", {
-    body: JSON.stringify({"foo":"bar"})
+    body: JSON.stringify({"foo":"bar"}),
+    headers: {"Content-Type": "application/json"}
   });
   var resp = JSON.parse(xhr.responseText);
   T(resp.ok);
@@ -164,6 +165,7 @@ couchTests.basics = function(debug) {
 
   // test that that POST's with an _id aren't overriden with a UUID.
   var xhr = CouchDB.request("POST", "/test_suite_db", {
+    headers: {"Content-Type": "application/json"},
     body: JSON.stringify({"_id": "oppossum", "yar": "matey"})
   });
   var resp = JSON.parse(xhr.responseText);
@@ -202,7 +204,10 @@ couchTests.basics = function(debug) {
     result = JSON.parse(xhr.responseText);
     T(result.error == "doc_validation");
 
-    xhr = CouchDB.request("POST", "/test_suite_db/", {body: data});
+    xhr = CouchDB.request("POST", "/test_suite_db/", {
+      headers: {"Content-Type": "application/json"},
+      body: data
+    });
     T(xhr.status == 500);
     result = JSON.parse(xhr.responseText);
     T(result.error == "doc_validation");

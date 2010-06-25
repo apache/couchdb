@@ -160,7 +160,10 @@ couchTests.stats = function(debug) {
   
   runTest("couchdb", "database_writes", {
     run: function(db) {
-      CouchDB.request("POST", "/test_suite_db", {body: '{"a": "1"}'})
+      CouchDB.request("POST", "/test_suite_db", {
+        headers: {"Content-Type": "application/json"},
+        body: '{"a": "1"}'
+      })
     },
     test: function(before, after) {
       TEquals(before+1, after, "POST'ing new docs increments doc writes.");
