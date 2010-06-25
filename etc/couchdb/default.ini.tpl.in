@@ -30,6 +30,7 @@ level = info
 authentication_db = _users
 authentication_redirect = /_utils/session.html
 require_valid_user = false
+timeout = 600 ; number of seconds before automatic logout
 
 [query_servers]
 javascript = %bindir%/%couchjs_command_name% %localbuilddatadir%/server/main.js
