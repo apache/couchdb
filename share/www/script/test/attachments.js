@@ -244,4 +244,24 @@ couchTests.attachments= function(debug) {
     body: "THIS IS AN ATTACHMENT. BOOYA!"
   });
   TEquals(400, xhr.status, "should return error code 400 Bad Request");
+
+  // test COUCHDB-809 - stubs should only require the 'stub' field
+  var bin_doc6 = {
+    _id: "bin_doc6",
+    _attachments:{
+      "foo.txt": {
+        content_type:"text/plain",
+        data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+      }
+    }
+  }
+  var save_response = db.save(bin_doc6);
+  bin_doc6._rev = save_response["rev"];
+  // stub out the attachment
+  bin_doc6._attachments["foo.txt"] = { stub: true };
+
+  var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc6", {
+    body: JSON.stringify(bin_doc6)
+  });
+  TEquals(201, xhr.status, "should send 201 Created when attachment stub contains only the 'stub' field");
 };
