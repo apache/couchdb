@@ -92,14 +92,16 @@ test_from_json_success() ->
                     data = stub,
                     type = <<"application/awesome">>,
                     att_len = 45,
-                    disk_len = 45
+                    disk_len = 45,
+                    revpos = nil
                 },
                 #att{
                     name = <<"noahs_private_key.gpg">>,
                     data = <<"I have a pet fish!">>,
                     type = <<"application/pgp-signature">>,
                     att_len = 18,
-                    disk_len = 18
+                    disk_len = 18,
+                    revpos = 0
                 }
             ]},
             "Attachments are parsed correctly."
