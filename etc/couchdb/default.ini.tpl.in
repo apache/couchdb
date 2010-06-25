@@ -29,6 +29,7 @@ include_sasl = true
 
 [couch_httpd_auth]
 authentication_db = _users
+authentication_redirect = /_utils/session.html
 require_valid_user = false
 timeout = 600 ; number of seconds before automatic logout
 auth_cache_size = 50 ; size is number of cache entries
