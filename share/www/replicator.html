@@ -78,17 +78,28 @@ specific language governing permissions and limitations under the License.
           $("#records tbody.content").empty();
           var source = $("#from_local")[0].checked ? $("#from_name").val() : $("#from_url").val();
           var target = $("#to_local")[0].checked ? $("#to_name").val() : $("#to_url").val();
+          var repOpts = {};
+          if ($("#continuous")[0].checked) {
+            repOpts.continuous = true;
+          }
           $.couch.replicate(source, target, {
             success: function(resp) {
-              $.each(resp.history, function(idx, record) {
+              if (resp._local_id) {
                 $("<tr><th></th></tr>")
-                  .find("th").text(JSON.stringify(record)).end()
+                  .find("th").text(JSON.stringify(resp)).end()
                   .appendTo("#records tbody.content");
-              });
-              $("#records tbody tr").removeClass("odd").filter(":odd").addClass("odd");
-              $("#records tbody.footer td").text("Replication session " + resp.session_id);
+                $("#records tbody tr").removeClass("odd").filter(":odd").addClass("odd");
+              } else {
+                $.each(resp.history, function(idx, record) {
+                  $("<tr><th></th></tr>")
+                    .find("th").text(JSON.stringify(record)).end()
+                    .appendTo("#records tbody.content");
+                });
+                $("#records tbody tr").removeClass("odd").filter(":odd").addClass("odd");
+                $("#records tbody.footer td").text("Replication session " + resp.session_id);
+              }
             }
-          });
+          }, repOpts);
         });
       });
     </script>
@@ -123,6 +134,7 @@ specific language governing permissions and limitations under the License.
           </p>
         </fieldset>
         <p class="actions">
+          <label><input type="checkbox" name="continuous" value="continuous" id="continuous"> Continuous</label>
           <button id="replicate" type="button">Replicate</button>
         </p>
       </form>
