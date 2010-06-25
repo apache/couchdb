@@ -198,7 +198,7 @@ transfer_fields([{<<"_attachments">>, {JsonBins}} | Rest], Doc) ->
         case couch_util:get_value(<<"stub">>, BinProps) of
         true ->
             Type = couch_util:get_value(<<"content_type">>, BinProps),
-            RevPos = couch_util:get_value(<<"revpos">>, BinProps, 0),
+            RevPos = couch_util:get_value(<<"revpos">>, BinProps, nil),
             DiskLen = couch_util:get_value(<<"length">>, BinProps),
             {Enc, EncLen} = att_encoding_info(BinProps),
             #att{name=Name, data=stub, type=Type, att_len=EncLen,
@@ -309,8 +309,8 @@ att_foldl(#att{data=DataFun,att_len=Len}, Fun, Acc) when is_function(DataFun) ->
 
 att_foldl_decode(#att{data={Fd,Sp},md5=Md5,encoding=Enc}, Fun, Acc) ->
     couch_stream:foldl_decode(Fd, Sp, Md5, Enc, Fun, Acc);
-att_foldl_decode(#att{data=Fun,att_len=Len, encoding=identity}, Fun, Acc) ->
-       fold_streamed_data(Fun, Len, Fun, Acc).
+att_foldl_decode(#att{data=Fun2,att_len=Len, encoding=identity}, Fun, Acc) ->
+       fold_streamed_data(Fun2, Len, Fun, Acc).
 
 att_to_bin(#att{data=Bin}) when is_binary(Bin) ->
     Bin;
@@ -357,9 +357,10 @@ has_stubs([_Att|Rest]) ->
 merge_stubs(#doc{id=Id,atts=MemBins}=StubsDoc, #doc{atts=DiskBins}) ->
     BinDict = dict:from_list([{Name, Att} || #att{name=Name}=Att <- DiskBins]),
     MergedBins = lists:map(
-        fun(#att{name=Name, data=stub}) ->
+        fun(#att{name=Name, data=stub, revpos=StubRevPos}) ->
             case dict:find(Name, BinDict) of
-            {ok, #att{}=DiskAtt} ->
+            {ok, #att{revpos=DiskRevPos}=DiskAtt} 
+                    when DiskRevPos == StubRevPos orelse StubRevPos == nil ->
                 DiskAtt;
             _ ->
                 throw({missing_stub,

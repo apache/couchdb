@@ -255,13 +255,19 @@ couchTests.attachments= function(debug) {
       }
     }
   }
-  var save_response = db.save(bin_doc6);
-  bin_doc6._rev = save_response["rev"];
+  T(db.save(bin_doc6).ok);
   // stub out the attachment
   bin_doc6._attachments["foo.txt"] = { stub: true };
+  T(db.save(bin_doc6).ok == true);
 
-  var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc6", {
-    body: JSON.stringify(bin_doc6)
-  });
-  TEquals(201, xhr.status, "should send 201 Created when attachment stub contains only the 'stub' field");
+  // wrong rev pos specified
+  
+  // stub out the attachment with the wrong revpos
+  bin_doc6._attachments["foo.txt"] = { stub: true, revpos: 10};
+  try {
+      T(db.save(bin_doc6).ok == true);
+      T(false && "Shouldn't get here!");
+  } catch (e) {
+      T(e.error == "missing_stub")
+  }
 };
