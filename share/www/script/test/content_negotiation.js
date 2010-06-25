@@ -17,11 +17,14 @@ couchTests.content_negotiation = function(debug) {
   if (debug) debugger;
   var xhr;
 
-  xhr = CouchDB.request("GET", "/test_suite_db/");
-  TEquals("text/plain;charset=utf-8", xhr.getResponseHeader("Content-Type"));
+  // with no accept header
+  var req = CouchDB.newXhr();
+  req.open("GET", "/test_suite_db/", false);
+  req.send("");
+  TEquals("text/plain;charset=utf-8", req.getResponseHeader("Content-Type"));
 
   // make sure JSON responses end in a newline
-  var text = xhr.responseText;
+  var text = req.responseText;
   TEquals("\n", text[text.length-1]);
 
   xhr = CouchDB.request("GET", "/test_suite_db/", {

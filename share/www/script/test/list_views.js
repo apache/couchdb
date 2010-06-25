@@ -346,13 +346,21 @@ couchTests.list_views = function(debug) {
   // T(xhr.getResponseHeader("Content-Type") == "text/plain");
   T(xhr.responseText.match(/^head 0 1 2 tail$/) && "basic stop");
 
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/stopIter2/basicView");
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/stopIter2/basicView", {
+    headers : {
+      "Accept" : "text/html"
+    }
+  });
   T(xhr.responseText.match(/^head 0 1 2 tail$/) && "stop 2");
 
   // aborting iteration with reduce
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/stopIter/withReduce?group=true");
   T(xhr.responseText.match(/^head 0 1 2 tail$/) && "reduce stop");
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/stopIter2/withReduce?group=true");
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/stopIter2/withReduce?group=true", {
+    headers : {
+      "Accept" : "text/html"
+    }
+  });
   T(xhr.responseText.match(/^head 0 1 2 tail$/) && "reduce stop 2");
 
   // with accept headers for HTML
