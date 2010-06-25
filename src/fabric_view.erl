@@ -174,11 +174,11 @@ transform_row(#view_row{key=Key, id=reduced, value=Value}) ->
 transform_row(#view_row{key=Key, id=undefined}) ->
     {row, {[{key,Key}, {error,not_found}]}};
 transform_row(#view_row{key=Key, id=Id, value=Value, doc=undefined}) ->
-    {row, {[{key,Key}, {id,Id}, {value,Value}]}};
+    {row, {[{id,Id}, {key,Key}, {value,Value}]}};
 transform_row(#view_row{key=Key, id=Id, value=Value, doc={error,Reason}}) ->
-    {row, {[{key,Key}, {id,Id}, {value,Value}, {error,Reason}]}};
+    {row, {[{id,Id}, {key,Key}, {value,Value}, {error,Reason}]}};
 transform_row(#view_row{key=Key, id=Id, value=Value, doc=Doc}) ->
-    {row, {[{key,Key}, {id,Id}, {value,Value}, {doc,Doc}]}}.
+    {row, {[{id,Id}, {key,Key}, {value,Value}, {doc,Doc}]}}.
 
 sort_fun(fwd) ->
     fun(A,A) -> true; (A,B) -> couch_view:less_json(A,B) end;
