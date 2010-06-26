@@ -47,7 +47,8 @@ handle_request(#httpd{path_parts=[DbName|RestParts],method=Method,
     end.
 
 handle_changes_req(#httpd{method='GET'}=Req, Db) ->
-    ChangesArgs = parse_changes_query(Req),
+    #changes_args{filter=Filter} = Args0 = parse_changes_query(Req),
+    ChangesArgs = Args0#changes_args{filter=make_filter_fun(Filter, Req, Db)},
     case ChangesArgs#changes_args.feed of
     "normal" ->
         T0 = now(),
@@ -798,6 +799,34 @@ parse_changes_query(Req) ->
             Args
         end
     end, #changes_args{}, chttpd:qs(Req)).
+
+make_filter_fun(Filter, _, _) when is_function(Filter, 1) ->
+    Filter;
+make_filter_fun(FilterName, Req, Db) ->
+    case [?l2b(chttpd:unquote(X)) || X <- string:tokens(FilterName, "/")] of
+    [DName, FName] ->
+        case fabric:open_doc(Db, <<"_design/", DName/binary>>, []) of
+        {ok, #doc{body={Props}} = DDoc} ->
+            couch_util:get_nested_json_value({Props}, [<<"filters">>, FName]),
+            JsonReq = chttpd_external:json_req_obj(Req, Db),
+            fun(DocInfos) ->
+                Docs = [Doc || {ok, Doc} <- [
+                    {ok, _Doc} = fabric:open_doc(Db, Id, [deleted, conflicts])
+                    || #doc_info{id=Id} <- DocInfos]],
+                {ok, Passes} = couch_query_servers:filter_docs(
+                    {json_req,JsonReq}, Db, DDoc, FName, Docs
+                ),
+                [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]}
+                    || #doc_info{revs=[#rev_info{rev=Rev}|_]} <- DocInfos,
+                    Pass <- Passes, Pass == true]
+            end;
+        Error ->
+            throw(Error)
+        end;
+    _Else ->
+        throw({bad_request,
+            "filter parameter must be of the form `designname/filtername`"})
+    end.
 
 extract_header_rev(Req, ExplicitRev) when is_binary(ExplicitRev) or is_list(ExplicitRev)->
     extract_header_rev(Req, couch_doc:parse_rev(ExplicitRev));
