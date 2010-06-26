@@ -48,14 +48,10 @@ all_docs(DbName, #view_query_args{keys=nil} = QueryArgs) ->
     {ok, _, Acc} = couch_db:enum_docs(Db, fun view_fold/3, Acc0, Options),
     final_response(Total, Acc#view_acc.offset).
 
-changes(DbName, Args0, StartSeq) ->
-    #changes_args{style=Style, dir=Dir} = Args0,
+changes(DbName, Args, StartSeq) ->
+    #changes_args{style=Style, dir=Dir} = Args,
     case couch_db:open(DbName, []) of
     {ok, Db} ->
-        % couch code has a MochiReq for 2nd argument, ick
-        Args = Args0#changes_args{
-            filter = couch_changes:make_filter_fun(Args0, nil, Db)
-        },
         Enum = fun changes_enumerator/2,
         Opts = [{dir,Dir}],
         Acc0 = {Db, StartSeq, Args},
