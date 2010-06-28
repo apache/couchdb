@@ -163,26 +163,20 @@ handle_session_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD,POST,DELETE").
 
 handle_user_req(#httpd{method='POST'}=Req) ->
-    DbName = couch_config:get("chttpd_auth", "authentication_db"),
-    {ok, Db} = ensure_users_db_exists(?l2b(DbName)),
-    Result = create_user(Req, Db),
-    couch_db:close(Db),
-    Result;
+    DbName = couch_config:get("chttpd_auth", "authentication_db", "users"),
+    ensure_users_db_exists(DbName),
+    create_user(Req, DbName);
 handle_user_req(#httpd{method=Method, path_parts=[_]}=_Req) when
         Method == 'PUT' orelse Method == 'DELETE' ->
     throw({bad_request, <<"Username is missing">>});
 handle_user_req(#httpd{method='PUT', path_parts=[_, UserName]}=Req) ->
-    DbName = couch_config:get("chttpd_auth", "authentication_db"),
-    {ok, Db} = ensure_users_db_exists(?l2b(DbName)),
-    Result = update_user(Req, Db, UserName),
-    couch_db:close(Db),
-    Result;
+    DbName = couch_config:get("chttpd_auth", "authentication_db", "users"),
+    ensure_users_db_exists(DbName),
+    update_user(Req, DbName, UserName);
 handle_user_req(#httpd{method='DELETE', path_parts=[_, UserName]}=Req) ->
-    DbName = couch_config:get("chttpd_auth", "authentication_db"),
-    {ok, Db} = ensure_users_db_exists(?l2b(DbName)),
-    Result = delete_user(Req, Db, UserName),
-    couch_db:close(Db),
-    Result;
+    DbName = couch_config:get("chttpd_auth", "authentication_db", "users"),
+    ensure_users_db_exists(DbName),
+    delete_user(Req, DbName, UserName);
 handle_user_req(Req) ->
     send_method_not_allowed(Req, "DELETE,POST,PUT").
 
@@ -210,9 +204,8 @@ get_user(UserName) ->
     end.
 
 load_user_from_db(UserName) ->
-    DbName = couch_config:get("chttpd_auth", "authentication_db"),
-    {ok, Db} = ensure_users_db_exists(?l2b(DbName)),
-    UserProps = case couch_db:open_doc(Db, UserName, []) of
+    DbName = couch_config:get("chttpd_auth", "authentication_db", "users"),
+    try fabric:open_doc(DbName, UserName, []) of
     {ok, Doc} ->
         ?LOG_INFO("cache miss on username ~s", [UserName]),
         {Props} = couch_doc:to_json_obj(Doc, []),
@@ -220,17 +213,18 @@ load_user_from_db(UserName) ->
     _Else ->
         ?LOG_INFO("no record of user ~s", [UserName]),
         nil
-    end,
-    couch_db:close(Db),
-    UserProps.
+    catch error:database_does_not_exist ->
+        nil
+    end.
 
 ensure_users_db_exists(DbName) ->
-    Options = [{user_ctx, #user_ctx{roles=[<<"_admin">>]}}],
-    case couch_db:open(DbName, Options) of
-    {ok, Db} ->
-        {ok, Db};
-    {error, _} -> 
-        couch_db:create(DbName, Options)
+    try fabric:get_doc_count(DbName) of
+    {ok, N} when is_integer(N) ->
+        ok;
+    {error, _} ->
+        fabric:create_db(DbName, [])
+    catch error:database_does_not_exist ->
+        fabric:create_db(DbName, [])
     end.
 
 % internal functions
@@ -323,7 +317,7 @@ create_user(#httpd{method='POST', mochi_req=MochiReq}=Req, Db) ->
                 {<<"username">>, UserName}
             ]}
         },
-        {ok, _Rev} = couch_db:update_doc(Db, UserDoc, []),
+        {ok, _Rev} = fabric:update_doc(Db, UserDoc, []),
         ?LOG_DEBUG("User ~s (~s) with password, ~s created.", [UserName,
             UserName, Password]),
         send_response(Req);
@@ -351,7 +345,7 @@ delete_user(#httpd{user_ctx=UserCtx}=Req, Db, UserName) ->
             revs = {Pos, [Rev]},
             deleted = true
         },
-        {ok, _Rev} = couch_db:update_doc(Db, UserDoc, []),
+        {ok, _Rev} = fabric:update_doc(Db, UserDoc, []),
         send_response(Req)
     end.
 
@@ -473,7 +467,7 @@ update_user(#httpd{mochi_req=MochiReq, user_ctx=UserCtx}=Req, Db, UserName) ->
                 {<<"username">>, UserName}
             ]}
         },
-        {ok, _Rev} = couch_db:update_doc(Db, UserDoc, []),
+        {ok, _Rev} = fabric:update_doc(Db, UserDoc, []),
         ?LOG_DEBUG("User ~s updated.", [UserName]),
         send_response(Req)
     end.
