@@ -11,10 +11,11 @@ go(DbName, AllDocs, Options) ->
     end, group_docs_by_shard(DbName, AllDocs)),
     {Workers, _} = lists:unzip(GroupedDocs),
     Acc0 = {length(Workers), length(AllDocs), couch_util:get_value(w, Options, 1),
-        GroupedDocs, dict:new()},
+        GroupedDocs, dict:from_list([{Doc,[]} || Doc <- AllDocs])},
     case fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
     {ok, Results} ->
-        {ok, couch_util:reorder_results(AllDocs, Results)};
+        Reordered = couch_util:reorder_results(AllDocs, Results),
+        {ok, [R || R <- Reordered, R =/= noreply]};
     Else ->
         Else
     end.
@@ -88,6 +89,9 @@ group_docs_by_shard(DbName, Docs) ->
 
 append_update_replies([], [], DocReplyDict) ->
     DocReplyDict;
+append_update_replies([Doc|Rest], [], Dict0) ->
+    % icky, if replicated_changes only errors show up in result
+    append_update_replies(Rest, [], dict:append(Doc, noreply, Dict0));
 append_update_replies([Doc|Rest1], [Reply|Rest2], Dict0) ->
     % TODO what if the same document shows up twice in one update_docs call?
     append_update_replies(Rest1, Rest2, dict:append(Doc, Reply, Dict0)).
