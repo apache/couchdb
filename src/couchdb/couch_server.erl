@@ -329,13 +329,19 @@ handle_call({create, DbName, Options}, From, Server) ->
     ok ->
         case ets:lookup(couch_dbs_by_name, DbName) of
         [] ->
-            case maybe_close_lru_db(Server) of
-            {ok, Server2} ->
-                Filepath = get_full_filename(Server, DbNameList),
-                {noreply, open_async(Server2, From, DbName, Filepath,
+            Filepath = get_full_filename(Server, DbNameList),
+            case lists:member(sys_db, Options) of
+            true ->
+                {noreply, open_async(Server, From, DbName, Filepath,
+                    [create | Options])};
+            false ->
+                case maybe_close_lru_db(Server) of
+                {ok, Server2} ->
+                    {noreply, open_async(Server2, From, DbName, Filepath,
                         [create | Options])};
-            CloseError ->
-                {reply, CloseError, Server}
+                CloseError ->
+                    {reply, CloseError, Server}
+                end
             end;
         [_AlreadyRunningDb] ->
             {reply, file_exists, Server}
