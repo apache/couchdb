@@ -329,7 +329,7 @@ int_join(ExtNodes, #mem{nodes=Nodes, clock=Clock} = State) ->
         [New|AccIn]
     end, Nodes, ExtNodes),
     NewNodes1 = lists:sort(NewNodes),
-    NewClock = vector_clock:increment(node(), Clock),
+    NewClock = mem3_vclock:increment(node(), Clock),
     NewState = State#mem{nodes=NewNodes1, clock=NewClock},
     install_new_state(NewState),
     {ok, NewState}.
@@ -347,10 +347,10 @@ get_pingnode_state(PingNode) ->
 
 
 %% @doc handle the gossip messages
-%%      We're not using vector_clock:resolve b/c we need custom merge strategy
+%%      We're not using mem3_vclock:resolve b/c we need custom merge strategy
 handle_gossip(From, RemoteState=#mem{clock=RemoteClock},
               LocalState=#mem{clock=LocalClock}) ->
-    case vector_clock:compare(RemoteClock, LocalClock) of
+    case mem3_vclock:compare(RemoteClock, LocalClock) of
     equal ->
         {reply, ok, LocalState};
     less ->
@@ -379,7 +379,7 @@ handle_gossip(From, RemoteState=#mem{clock=RemoteClock},
 
 merge_states(#mem{clock=RemoteClock, nodes=RemoteNodes} = _RemoteState,
              #mem{clock=LocalClock, nodes=LocalNodes} = LocalState) ->
-    MergedClock = vector_clock:merge(RemoteClock, LocalClock),
+    MergedClock = mem3_vclock:merge(RemoteClock, LocalClock),
     MergedNodes = merge_nodes(RemoteNodes, LocalNodes),
     LocalState#mem{clock=MergedClock, nodes=MergedNodes}.
 
@@ -547,7 +547,7 @@ get_remote_states(NodeList) ->
 %%      return match | {bad_state_match, Node, NodesThatDontMatch}
 compare_state_with_rest(#mem{clock=Clock} = _State, States) ->
     Results = lists:map(fun({Node, #mem{clock=Clock1}}) ->
-        {vector_clock:equals(Clock, Clock1), Node}
+        {mem3_vclock:equals(Clock, Clock1), Node}
     end, States),
     BadResults = lists:foldl(fun({true, _N}, AccIn) -> AccIn;
                                 ({false, N}, AccIn) -> [N | AccIn]
