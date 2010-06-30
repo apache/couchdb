@@ -5,7 +5,7 @@
 -endif.
 
 -ifndef(MEMBERSHIP).
--include("../../membership/include/membership.hrl").
+-include("../../mem3/include/mem3.hrl").
 -endif.
 
 -include_lib("eunit/include/eunit.hrl").
