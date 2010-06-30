@@ -11,6 +11,7 @@
       dbs_event,
       membership,
       membership_app,
+      membership_httpd,
       membership_sup,
       mem3,
       partitions,
