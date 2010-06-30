@@ -1,20 +1,11 @@
 -module(membership_app).
--author('brad@cloudant.com').
-
 -behaviour(application).
-
--include("membership.hrl").
-
-%% Application callbacks
 -export([start/2, stop/1]).
 
-%% @doc start required apps, join cluster, start supervisor
-start(_Type, _StartArgs) ->
-    couch_api:create_db(<<"dbs">>, []), % all nodes have local 'dbs' db
-    % start membership supervisor
+start(_Type, []) ->
+    DbName = couch_config:get("membership", "db", "dbs"),
+    couch_server:create(list_to_binary(DbName), []),
     membership_sup:start_link().
 
-stop({_, Sup}) ->
-    ?LOG_ALERT("membership application stopped", []),
-    exit(Sup, normal),
+stop([]) ->
     ok.
