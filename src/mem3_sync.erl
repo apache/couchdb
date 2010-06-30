@@ -1,9 +1,9 @@
--module(dbs).
+-module(mem3_sync).
 -behaviour(supervisor).
 
 -export([start_link/0, init/1, childspec/1, sup_upgrade_notify/2]).
 
--include("membership.hrl").
+-include("mem3.hrl").
 
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).

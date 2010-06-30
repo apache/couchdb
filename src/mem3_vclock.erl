@@ -1,7 +1,7 @@
 %%% @author    Cliff Moon <cliff@powerset.com> []
 %%% @copyright 2008 Cliff Moon
 
--module (vector_clock).
+-module (mem3_vclock).
 -export ([create/1, truncate/1, increment/2, compare/2, resolve/2, merge/2,
     equals/2]).
 
