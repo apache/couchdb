@@ -1,4 +1,4 @@
--module(mem3_event).
+-module(mem3_sync_event).
 
 -behaviour(gen_event).
 
