@@ -20,7 +20,7 @@
 
 %% API
 -export([start_link/0, start_link/1, stop/0, stop/1, reset/0]).
--export([join/3, clock/0, state/0, states/0, nodes/0, fullnodes/0,
+-export([join/3, clock/0, state/0, nodes/0, fullnodes/0,
          start_gossip/0]).
 
 %% for testing more than anything else
@@ -75,22 +75,6 @@ clock() ->
 -spec state() -> mem_state().
 state() ->
     gen_server:call(?SERVER, state).
-
-
-%% @doc Detailed report of cluster-wide membership state.  Queries the state
-%%      on all member nodes and builds a dictionary with unique states as the
-%%      key and the nodes holding that state as the value.  Also reports member
-%%      nodes which fail to respond and nodes which are connected but are not
-%%      cluster members.  Useful for debugging.
--spec states() -> [{mem_state() | bad_nodes | non_member_nodes, [node()]}].
-states() ->
-    {ok, Nodes} = mem3:nodes(),
-    AllNodes = [node()|erlang:nodes()],
-    {Replies, BadNodes} = gen_server:multi_call(Nodes, ?SERVER, state),
-    Dict = lists:foldl(fun({Node, {ok,State}}, D) ->
-        orddict:append(State, Node, D)
-    end, orddict:new(), Replies),
-    [{non_member_nodes, AllNodes -- Nodes}, {bad_nodes, BadNodes} | Dict].
 
 -spec start_gossip() -> ok.
 start_gossip() ->
