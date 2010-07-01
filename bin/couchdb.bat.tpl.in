@@ -18,6 +18,8 @@ rem then change to the erlang bin directory
 cd %~dp0
 
 rem Allow a different erlang executable (eg, erl) to be used.
+rem When using erl instead of werl, server restarts during test runs can fail
+rem intermittently. But using erl should be fine for production use.
 if "%ERL%x" == "x" set ERL=werl.exe
 
 echo CouchDB %version% - prepare to relax...
