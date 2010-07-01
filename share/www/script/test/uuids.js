@@ -93,12 +93,20 @@ couchTests.uuids = function(debug) {
     xhr = CouchDB.request("GET", "/_uuids?count=1000");
     T(xhr.status == 200);
     result = JSON.parse(xhr.responseText);
-    for(var i = 1; i < result.uuids.length; i++) {
-      T(result.uuids[i].length == 32);
-      var u1 = result.uuids[i-1].substr(0, 13);
-      var u2 = result.uuids[i].substr(0, 13);
-      T(u1 < u2, "UTC uuids are only roughly ordered, so this assertion may fail occasionally. Don't sweat it.");
+    T(result.uuids[1].length == 32);
+
+    // no collisions
+    var seen = {};
+    for(var i in result.uuids) {
+      var id = result.uuids[i];
+      T(seen[id] === undefined);
+      seen[id] = 1;
     }
+
+    // roughly ordered
+    var u1 = result.uuids[1].substr(0, 13);
+    var u2 = result.uuids[result.uuids.length-1].substr(0, 13);
+    T(u1 < u2, "UTC uuids are only roughly ordered, so this assertion may fail occasionally. Don't sweat it.");
   };
 
   run_on_modified_server([{
