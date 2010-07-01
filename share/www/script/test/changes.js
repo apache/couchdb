@@ -88,7 +88,10 @@ couchTests.changes = function(debug) {
     waitForSuccess(function() {
       lines = xhr.responseText.split("\n");
       change1 = JSON.parse(lines[0]);
-      change2 = JSON.parse(lines[1]);      
+      change2 = JSON.parse(lines[1]);
+      if (change2.seq != 2) {
+          throw "bad seq, try again"
+      }
     }, "bar-only");
 
     T(change1.seq == 1)
@@ -106,6 +109,9 @@ couchTests.changes = function(debug) {
     waitForSuccess(function() {
       lines = xhr.responseText.split("\n");
       change3 = JSON.parse(lines[2]);
+      if (change3.seq != 3) {
+        throw "bad seq, try again"
+      }
     });
     
     T(change3.seq == 3);

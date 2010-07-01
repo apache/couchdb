@@ -148,7 +148,7 @@ truncate(Fd, Pos) ->
 %%----------------------------------------------------------------------
 
 sync(Filepath) when is_list(Filepath) ->
-    {ok, Fd} = file:open(Filepath, [read, raw]),
+    {ok, Fd} = file:open(Filepath, [append, raw]),
     try file:sync(Fd) after file:close(Fd) end;
 sync(Fd) ->
     gen_server:call(Fd, sync, infinity).
