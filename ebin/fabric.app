@@ -25,5 +25,5 @@
        fabric_view_map,
        fabric_view_reduce
    ]},
-  {applications, [kernel, stdlib, couch, rexi, membership]}
+  {applications, [kernel, stdlib, couch, rexi, mem3]}
  ]}.
