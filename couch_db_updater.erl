@@ -30,7 +30,16 @@ init({MainPid, DbName, Filepath, Fd, Options}) ->
         couch_file:delete(Filepath ++ ".compact");
     false ->
         ok = couch_file:upgrade_old_header(Fd, <<$g, $m, $k, 0>>), % 09 UPGRADE CODE
-        {ok, Header} = couch_file:read_header(Fd)
+        case couch_file:read_header(Fd) of
+        {ok, Header} ->
+            ok;
+        no_valid_header ->
+            % create a new header and writes it to the file
+            Header =  #db_header{},
+            ok = couch_file:write_header(Fd, Header),
+            % delete any old compaction files that might be hanging around
+            file:delete(Filepath ++ ".compact")
+        end
     end,
 
     Db = init_db(DbName, Filepath, Fd, Header),
