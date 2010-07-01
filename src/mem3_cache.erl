@@ -79,23 +79,9 @@ changes_callback({change, {Change}, _}, _) ->
             ?LOG_ERROR("missing partition table for ~s: ~p", [DbName, Reason]);
         {Doc} ->
             ets:delete(partitions, DbName),
-            cache_partition_table(DbName, Doc)
+            ets:insert(partitions, mem3_util:build_shards(DbName, Doc))
         end
     end,
     {ok, couch_util:get_value(seq, Change)};
 changes_callback(timeout, _) ->
     {ok, nil}.
-
-cache_partition_table(DbName, Doc) ->
-    ets:insert(partitions, lists:map(fun({Map}) ->
-        Begin = couch_util:get_value(<<"b">>, Map),
-        #shard{
-            name = mem3_util:shard_name(Begin, DbName),
-            dbname = DbName,
-            node = to_atom(couch_util:get_value(<<"node">>, Map)),
-            range = [Begin, couch_util:get_value(<<"e">>, Map)]
-        }
-    end, couch_util:get_value(<<"map">>, Doc, {[]}))).
-
-to_atom(Node) when is_binary(Node) ->
-    list_to_atom(binary_to_list(Node)).

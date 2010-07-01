@@ -4,7 +4,7 @@
 %% API
 -export([fullmap/2, fullmap/3, hash/1, install_fullmap/4]).
 -export([for_key/2, all_parts/1]).
--export([shard_name/2]).
+-export([shard_name/2, build_shards/2]).
 
 -define(RINGTOP, trunc(math:pow(2,160))).  % SHA-1 space
 
@@ -185,3 +185,17 @@ shard_name(Part, DbName) when is_list(DbName) ->
 shard_name(Part, DbName) ->
   PartHex = ?l2b(showroom_utils:int_to_hexstr(Part)),
   <<"x", PartHex/binary, "/", DbName/binary, "_", PartHex/binary>>.
+
+build_shards(DbName, DocProps) ->
+    lists:map(fun({Map}) ->
+        Begin = couch_util:get_value(<<"b">>, Map),
+        #shard{
+            name = mem3_util:shard_name(Begin, DbName),
+            dbname = DbName,
+            node = to_atom(couch_util:get_value(<<"node">>, Map)),
+            range = [Begin, couch_util:get_value(<<"e">>, Map)]
+        }
+    end, couch_util:get_value(<<"map">>, DocProps, {[]})).
+
+to_atom(Node) when is_binary(Node) ->
+    list_to_atom(binary_to_list(Node)).
