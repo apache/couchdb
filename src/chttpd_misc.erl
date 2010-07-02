@@ -98,8 +98,12 @@ handle_all_dbs_req(Req) ->
 
 
 handle_task_status_req(#httpd{method='GET'}=Req) ->
-    % convert the list of prop lists to a list of json objects
-    send_json(Req, [{Props} || Props <- couch_task_status:all()]);
+    {Replies, _BadNodes} = gen_server:multi_call(couch_task_status, all),
+    Response = lists:flatmap(fun({Node, Tasks}) ->
+        [{[{node,Node} | Task]} || Task <- Tasks]
+    end, Replies),
+    % TODO filter by customer
+    send_json(Req, Response);
 handle_task_status_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
