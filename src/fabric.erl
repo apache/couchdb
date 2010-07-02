@@ -1,8 +1,8 @@
 -module(fabric).
 
 % DBs
--export([all_dbs/0, all_dbs/1, create_db/2, delete_db/2, get_db_info/1,
-    get_doc_count/1]).
+-export([all_dbs/0, all_dbs/1, create_db/1, create_db/2, delete_db/1,
+    delete_db/2, get_db_info/1, get_doc_count/1]).
 
 % Documents
 -export([open_doc/3, open_revs/4, get_missing_revs/2, update_doc/3,
@@ -36,11 +36,17 @@ get_db_info(DbName) ->
 get_doc_count(DbName) ->
     fabric_db_doc_count:go(dbname(DbName)).
 
+create_db(DbName) ->
+    create_db(DbName, []).
+
 create_db(DbName, Options) ->
-    fabric_db_create:create_db(dbname(DbName), opts(Options)).
+    fabric_db_create:go(dbname(DbName), opts(Options)).
+
+delete_db(DbName) ->
+    delete_db(DbName, []).
 
 delete_db(DbName, Options) ->
-    fabric_db_delete:delete_db(dbname(DbName), opts(Options)).
+    fabric_db_delete:go(dbname(DbName), opts(Options)).
 
 
 % doc operations

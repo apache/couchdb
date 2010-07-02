@@ -10,7 +10,7 @@ go(DbName, GroupId) when is_binary(GroupId) ->
 
 go(DbName, #doc{} = DDoc) ->
     Group = couch_view_group:design_doc_to_view_group(#db{name=DbName}, DDoc),
-    Shards = partitions:all_parts(DbName),
+    Shards = mem3:shards(DbName),
     Workers = fabric_util:submit_jobs(Shards, group_info, [Group]),
     Acc0 = {fabric_dict:init(Workers, nil), []},
     fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0).

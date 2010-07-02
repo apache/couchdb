@@ -62,7 +62,7 @@ keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout, TFun) ->
     end.
 
 send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn) ->
-    AllShards = partitions:all_parts(DbName),
+    AllShards = mem3:shards(DbName),
     Seqs = lists:flatmap(fun({#shard{name=Name, node=N} = Shard, Seq}) ->
         case lists:member(Shard, AllShards) of
         true ->
@@ -168,7 +168,7 @@ make_changes_args(Options) ->
 get_start_seq(_DbName, #changes_args{dir=fwd, since=Since}) ->
     Since;
 get_start_seq(DbName, #changes_args{dir=rev}) ->
-    Shards = partitions:all_parts(DbName),
+    Shards = mem3:shards(DbName),
     Workers = fabric_util:submit_jobs(Shards, get_update_seq, []),
     {ok, Since} = fabric_util:recv(Workers, #shard.ref,
         fun collect_update_seqs/3, fabric_dict:init(Workers, -1)),
@@ -195,10 +195,10 @@ pack_seqs(Workers) ->
     couch_util:encodeBase64Url(term_to_binary(SeqList, [compressed])).
 
 unpack_seqs(0, DbName) ->
-    fabric_dict:init(partitions:all_parts(DbName), 0);
+    fabric_dict:init(mem3:shards(DbName), 0);
 
 unpack_seqs("0", DbName) ->
-    fabric_dict:init(partitions:all_parts(DbName), 0);
+    fabric_dict:init(mem3:shards(DbName), 0);
     
 unpack_seqs(Packed, DbName) ->
     % TODO relies on internal structure of fabric_dict as keylist
@@ -210,7 +210,7 @@ unpack_seqs(Packed, DbName) ->
 start_update_notifiers(DbName) ->
     lists:map(fun(#shard{node=Node, name=Name}) ->
         {Node, rexi:cast(Node, {?MODULE, start_update_notifier, [Name]})}
-    end, partitions:all_parts(DbName)).
+    end, mem3:shards(DbName)).
 
 % rexi endpoint
 start_update_notifier(DbName) ->

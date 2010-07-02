@@ -51,7 +51,7 @@ group_idrevs_by_shard(DbName, IdsRevs) ->
     dict:to_list(lists:foldl(fun({Id, Revs}, D0) ->
         lists:foldl(fun(Shard, D1) ->
             dict:append(Shard, {Id, Revs}, D1)
-        end, D0, partitions:for_key(DbName,Id))
+        end, D0, mem3:shards(DbName,Id))
     end, dict:new(), IdsRevs)).
 
 update_dict(D0, KVs) ->

@@ -5,7 +5,7 @@
 -include("fabric.hrl").
 
 go(DbName) ->
-    Shards = partitions:all_parts(DbName),
+    Shards = mem3:shards(DbName),
     Workers = fabric_util:submit_jobs(Shards, get_doc_count, []),
     Acc0 = {length(Workers), [{Beg,nil} || #shard{range=[Beg,_]} <- Workers]},
     fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0).

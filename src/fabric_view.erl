@@ -8,34 +8,32 @@
 
 %% @doc looks for a fully covered keyrange in the list of counters
 -spec is_progress_possible([{#shard{}, non_neg_integer()}]) -> boolean().
+is_progress_possible([]) ->
+    false;
 is_progress_possible(Counters) ->
     Ranges = fabric_dict:fold(fun(#shard{range=[X,Y]}, _, A) -> [{X,Y}|A] end,
         [], Counters),
-    [First | Rest] = lists:ukeysort(1, Ranges),
-    {Head, Tail} = lists:foldl(fun
-    (_, {Head, Tail}) when Head =:= Tail ->
-        % this is the success condition, we can fast-forward
-        {Head, Tail};
-    (_, {foo, bar}) ->
+    [{0, Tail0} | Rest] = lists:ukeysort(1, Ranges),
+    Result = lists:foldl(fun
+    (_, fail) ->
         % we've already declared failure
-        {foo, bar};
-    ({X,_}, {Head, Tail}) when Head < Tail, X > Tail ->
+        fail;
+    (_, complete) ->
+        % this is the success condition, we can fast-forward
+        complete;
+    ({X,_}, Tail) when X > (Tail+1) ->
         % gap in the keyrange, we're dead
-        {foo, bar};
-    ({X,Y}, {Head, Tail}) when Head < Tail, X < Y ->
-        % the normal condition, adding to the tail
-        {Head, erlang:max(Tail, Y)};
-    ({X,Y}, {Head, Tail}) when Head < Tail, X > Y, Y >= Head ->
-        % we've wrapped all the way around, trigger success condition
-        {Head, Head};
-    ({X,Y}, {Head, Tail}) when Head < Tail, X > Y ->
-        % this wraps the keyspace, but there's still a gap.  We're dead
-        % TODO technically, another shard could be a superset of this one, and
-        % we could still be alive.  Pretty unlikely though, and impossible if
-        % we don't allow shards to wrap around the boundary
-        {foo, bar}
-    end, First, Rest),
-    Head =:= Tail.
+        fail;
+    ({_,Y}, Tail) ->
+        case erlang:max(Tail, Y) of
+        End when (End+1) =:= (2 bsl 31) ->
+            complete;
+        Else ->
+            % the normal condition, adding to the tail
+            Else
+        end
+    end, Tail0, Rest),
+    Result =:= complete.
 
 -spec remove_overlapping_shards(#shard{}, [#shard{}]) -> [#shard{}].
 remove_overlapping_shards(#shard{range=[A,B]} = Shard0, Shards) ->

@@ -5,7 +5,7 @@
 -include("fabric.hrl").
 
 go(DbName, Id, Options) ->
-    Workers = fabric_util:submit_jobs(partitions:for_key(DbName,Id), open_doc,
+    Workers = fabric_util:submit_jobs(mem3:shards(DbName,Id), open_doc,
         [Id, Options]),
     SuppressDeletedDoc = not lists:member(deleted, Options),
     Acc0 = {length(Workers), couch_util:get_value(r, Options, 1), []},

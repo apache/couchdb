@@ -5,7 +5,7 @@
 -include("fabric.hrl").
 
 go(DbName, Id, Revs, Options) ->
-    Workers = fabric_util:submit_jobs(partitions:for_key(DbName,Id), open_revs,
+    Workers = fabric_util:submit_jobs(mem3:shards(DbName,Id), open_revs,
         [Id, Revs, Options]),
     Acc0 = {length(Workers), couch_util:get_value(r, Options, 1), []},
     case fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of

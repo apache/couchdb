@@ -1,56 +1,40 @@
 -module(fabric_db_delete).
--author(brad@cloudant.com).
-
--export([delete_db/2]).
+-export([go/2]).
 
 -include("fabric.hrl").
 
-%% @doc Delete a database, and all its partition files across the cluster
-%%      Options is proplist with user_ctx, n, q
--spec delete_db(binary(), list()) -> {ok, #db{}} | {error, any()}.
-delete_db(DbName, Options) ->
-    Fullmap = partitions:all_parts(DbName),
-    RefPartMap = send_delete_calls(Fullmap, Options),
-    Acc0 = {not_found, length(RefPartMap)},
-    case fabric_util:receive_loop(
-        RefPartMap, 1, fun handle_delete_msg/3, Acc0) of
-    {ok, _Results} ->
-        delete_fullmap(DbName),
+go(DbName, Options) ->
+    Shards = mem3:shards(DbName),
+    Workers = fabric_util:submit_jobs(Shards, delete_db, [Options, DbName]),
+    Acc0 = fabric_dict:init(Workers, nil),
+    case fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
+    {ok, ok} ->
         ok;
-    Error -> Error
+    {ok, not_found} ->
+        erlang:error(database_does_not_exist);
+    Error ->
+        Error
     end.
 
-%%
-%% internal
-%%
+handle_message(Msg, Shard, Counters) ->
+    C1 = fabric_dict:store(Shard, Msg, Counters),
+    case fabric_dict:any(nil, C1) of
+    true ->
+        {ok, C1};
+    false ->
+        final_answer(C1)
+    end.
 
-%% @doc delete the partitions on all appropriate nodes (rexi calls)
--spec send_delete_calls(fullmap(), list()) -> [{reference(), part()}].
-send_delete_calls(Parts, Options) ->
-    lists:map(fun(#shard{node=Node, name=ShardName} = Part) ->
-        Ref = rexi:async_server_call({couch_server, Node},
-                                     {delete, ShardName, Options}),
-        {Ref, Part}
-    end, Parts).
-
-handle_delete_msg(ok, _, {_, 1}) ->
-    {stop, ok};
-handle_delete_msg(not_found, _, {Acc, 1}) ->
-    {stop, Acc};
-handle_delete_msg({rexi_EXIT, _Reason}, _, {Acc, N}) ->
-    % TODO is this the appropriate action to take, or should we abort?
-    {ok, {Acc, N-1}};
-handle_delete_msg({rexi_DOWN, _, _, _}, _, _Acc) ->
-    {error, delete_db_fubar};
-handle_delete_msg(not_found, _, {Acc, N}) ->
-    {ok, {Acc, N-1}};
-handle_delete_msg(ok, _, {_, N}) ->
-    {ok, {ok, N-1}}.
-
-delete_fullmap(DbName) ->
-    case couch_db:open(<<"dbs">>, []) of
-    {ok, Db} ->
-        {ok, Doc} = couch_api:open_doc(Db, DbName, nil, []),
-        couch_api:update_doc(Db, Doc#doc{deleted=true});
-    Error -> Error
+final_answer(Counters) ->
+    Successes = [X || {_, M} = X <- Counters, M == ok orelse M == not_found],
+    case fabric_view:is_progress_possible(Successes) of
+    true ->
+        case lists:keymember(ok, 2, Successes) of
+        true ->
+            {stop, ok};
+        false ->
+            {stop, not_found}
+        end;
+    false ->
+        {error, internal_server_error}
     end.
