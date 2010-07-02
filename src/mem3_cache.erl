@@ -69,7 +69,7 @@ changes_callback(start, _) ->
 changes_callback({stop, EndSeq}, _) ->
     exit({seq, EndSeq});
 changes_callback({change, {Change}, _}, _) ->
-    DbName = couch_util:get_value(id, Change),
+    DbName = couch_util:get_value(<<"id">>, Change),
     case couch_util:get_value(deleted, Change, false) of
     true ->
         ets:delete(partitions, DbName);
@@ -82,6 +82,6 @@ changes_callback({change, {Change}, _}, _) ->
             ets:insert(partitions, mem3_util:build_shards(DbName, Doc))
         end
     end,
-    {ok, couch_util:get_value(seq, Change)};
+    {ok, couch_util:get_value(<<"seq">>, Change)};
 changes_callback(timeout, _) ->
     {ok, nil}.

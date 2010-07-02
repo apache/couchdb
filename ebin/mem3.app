@@ -7,17 +7,16 @@
         mem3_app,
         mem3_cache,
         mem3_httpd,
-        mem3_server,
+        mem3_nodes,
         mem3_sup,
         mem3_sync,
         mem3_sync_event,
-        mem3_util,
-        mem3_vclock
+        mem3_util
     ]},
     {registered, [
         mem3_cache,
         mem3_events,
-        mem3_server,
+        mem3_nodes,
         mem3_sync,
         mem3_sup
     ]},

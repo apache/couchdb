@@ -7,11 +7,26 @@
 init(_) ->
     {ok, nil}.
 
-handle_event({Up, Node}, State) when Up == nodeup; Up == node_join ->
-    mem3_sync:add_node(Node);
+handle_event({add_node, Node}, State) ->
+    Db1 = list_to_binary(couch_config:get("mem3", "node_db", "nodes")),
+    Db2 = list_to_binary(couch_config:get("mem3", "shard_db", "dbs")),
+    [mem3_sync:push(Db, Node) || Db <- [Db1, Db2]],
+    {ok, State};
 
-handle_event({Down, Node}, State) when Down == nodedown; Down == node_leave ->
-    mem3_sync:remove_node(Node);
+handle_event({nodeup, Node}, State) ->
+    case lists:member(Node, mem3:nodes()) of
+    true ->
+        Db1 = list_to_binary(couch_config:get("mem3", "node_db", "nodes")),
+        Db2 = list_to_binary(couch_config:get("mem3", "shard_db", "dbs")),
+        [mem3_sync:push(Db, Node) || Db <- [Db1, Db2]];
+    false ->
+        ok
+    end,
+    {ok, State};
+
+handle_event({Down, Node}, State) when Down == nodedown; Down == remove_node ->
+    mem3_sync:remove_node(Node),
+    {ok, State};
 
 handle_event(_Event, State) ->
     {ok, State}.

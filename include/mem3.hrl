@@ -10,13 +10,6 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
-%% version 3 of membership state
--record(mem, {header=3,
-              nodes=[],
-              clock=[],
-              args
-             }).
-
 %% partition record
 -record(shard, {name, node, dbname, range, ref}).
 
@@ -28,7 +21,6 @@
 -type mem_node_list() :: [mem_node()].
 -type arg_options() :: {test, boolean()}.
 -type args() :: [] | [arg_options()].
--type mem_state() :: #mem{}.
 -type test() :: undefined | node().
 -type epoch() :: float().
 -type clock() :: {node(), epoch()}.
