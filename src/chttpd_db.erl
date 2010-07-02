@@ -151,8 +151,8 @@ handle_design_info_req(Req, _Db, _DDoc) ->
     send_method_not_allowed(Req, "GET").
 
 create_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
-    N = chttpd:qs_value(Req, "n"),
-    Q = chttpd:qs_value(Req, "q"),
+    N = chttpd:qs_value(Req, "n", couch_config:get("cluster", "n", "3")),
+    Q = chttpd:qs_value(Req, "q", couch_config:get("cluster", "q", "8")),
     case fabric:create_db(DbName, [{user_ctx, UserCtx},{n,N},{q,Q}]) of
     ok ->
         DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
