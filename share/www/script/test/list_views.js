@@ -220,7 +220,7 @@ couchTests.list_views = function(debug) {
   T(etag1 != etag2, "POST to map _list generates key-depdendent ETags");
 
   // test the richness of the arguments
-  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/basicJSON/basicView");
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/basicJSON/basicView?update_seq=true");
   T(xhr.status == 200, "standard get should be 200");
   var resp = JSON.parse(xhr.responseText);
   TEquals(10, resp.head.total_rows);
