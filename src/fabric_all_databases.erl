@@ -1,5 +1,4 @@
 -module(fabric_all_databases).
--author(brad@cloudant.com).
 
 -export([all_databases/1]).
 
