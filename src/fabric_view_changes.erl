@@ -203,8 +203,8 @@ unpack_seqs("0", DbName) ->
 unpack_seqs(Packed, DbName) ->
     % TODO relies on internal structure of fabric_dict as keylist
     lists:map(fun({Node, [A,B], Seq}) ->
-        Name = partitions:shard_name(A, DbName),
-        {#shard{node=Node, range=[A,B], dbname=DbName, name=Name}, Seq}
+        Shard = #shard{node=Node, range=[A,B], dbname=DbName},
+        {mem3_util:name_shard(Shard), Seq}
     end, binary_to_term(couch_util:decodeBase64Url(Packed))).
 
 start_update_notifiers(DbName) ->
