@@ -154,7 +154,8 @@ handle_session_req(#httpd{method='GET', user_ctx=UserCtx}=Req) ->
     {null, "true"} ->
         throw({unauthorized, <<"Please login.">>});
     _False -> 
-        send_json(Req, {[{ok,true}, {name,Name}, {roles,Roles}]})
+        Props = [{name,Name}, {roles,Roles}],
+        send_json(Req, {[{ok,true}, {userCtx, {Props}} | Props]})
     end;
 handle_session_req(#httpd{method='DELETE'}=Req) ->
     % logout
