@@ -12,9 +12,9 @@
 
 -define(AUTH_DB_DOC_VALIDATE_FUNCTION, <<"
     function(newDoc, oldDoc, userCtx) {
-        if ((oldDoc || newDoc).type !== 'user') {
+        if ((oldDoc && oldDoc.type !== 'user') || newDoc.type !== 'user') {
             throw({forbidden : 'doc.type must be user'});
-        } // we only validate user docs for now
+        } // we only allow user docs for now
 
         if (newDoc._deleted === true) {
             // allow deletes by admins and matching users
