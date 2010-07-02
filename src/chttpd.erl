@@ -212,7 +212,8 @@ design_url_handlers() ->
         {<<"_show">>,           fun chttpd_show:handle_doc_show_req/3},
         {<<"_list">>,           fun chttpd_show:handle_view_list_req/3},
         {<<"_update">>,         fun chttpd_show:handle_doc_update_req/3},
-        {<<"_info">>,           fun chttpd_db:handle_design_info_req/3}
+        {<<"_info">>,           fun chttpd_db:handle_design_info_req/3},
+        {<<"_rewrite">>,        fun chttpd_rewrite:handle_rewrite_req/3}
     ].
 
 % Utilities

@@ -9,6 +9,7 @@
         chttpd_external,
         chttpd_misc,
         chttpd_oauth,
+        chttpd_rewrite,
         chttpd_show,
         chttpd_stats,
         chttpd_sup,
