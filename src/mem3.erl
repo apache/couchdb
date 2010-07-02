@@ -1,11 +1,10 @@
 -module(mem3).
 
--export([start/0, stop/0, restart/0, state/0, nodes/0, shards/1, shards/2,
+-export([start/0, stop/0, restart/0, nodes/0, shards/1, shards/2,
     choose_shards/2]).
+-export([compare_nodelists/0, compare_shards/1]).
 
 -include("mem3.hrl").
-
--define(SERVER, mem3_server).
 
 start() ->
     application:start(mem3).
@@ -22,21 +21,36 @@ restart() ->
 %%      key and the nodes holding that state as the value.  Also reports member
 %%      nodes which fail to respond and nodes which are connected but are not
 %%      cluster members.  Useful for debugging.
--spec state() -> [{any | bad_nodes | non_member_nodes, [node()]}].
-state() ->
-    {ok, Nodes} = mem3:nodes(),
+-spec compare_nodelists() -> [{{cluster_nodes, [node()]} | bad_nodes
+    | non_member_nodes, [node()]}].
+compare_nodelists() ->
+    Nodes = mem3:nodes(),
     AllNodes = erlang:nodes([this, visible]),
-    {Replies, BadNodes} = gen_server:multi_call(Nodes, ?SERVER, state),
-    Dict = lists:foldl(fun({Node, {ok,State}}, D) ->
-        orddict:append(State, Node, D)
+    {Replies, BadNodes} = gen_server:multi_call(Nodes, mem3_nodes, get_nodelist),
+    Dict = lists:foldl(fun({Node, Nodelist}, D) ->
+        orddict:append({cluster_nodes, Nodelist}, Node, D)
     end, orddict:new(), Replies),
     [{non_member_nodes, AllNodes -- Nodes}, {bad_nodes, BadNodes} | Dict].
+
+-spec compare_shards(DbName::iolist()) -> [{bad_nodes | [#shard{}], [node()]}].
+compare_shards(DbName) when is_list(DbName) ->
+    compare_shards(list_to_binary(DbName));
+compare_shards(DbName) ->
+    Nodes = mem3:nodes(),
+    {Replies, BadNodes} = rpc:multicall(mem3, shards, [DbName]),
+    GoodNodes = [N || N <- Nodes, not lists:member(N, BadNodes)],
+    Dict = lists:foldl(fun({Shards, Node}, D) ->
+        orddict:append(Shards, Node, D)
+    end, orddict:new(), lists:zip(Replies, GoodNodes)),
+    [{bad_nodes, BadNodes} | Dict].
 
 -spec nodes() -> [node()].
 nodes() ->
     mem3_nodes:get_nodelist().
 
--spec shards(DbName::binary()) -> [#shard{}].
+-spec shards(DbName::iolist()) -> [#shard{}].
+shards(DbName) when is_list(DbName) ->
+    shards(list_to_binary(DbName));
 shards(DbName) ->
     case ets:lookup(partitions, DbName) of
     [] ->
@@ -46,7 +60,11 @@ shards(DbName) ->
         Else
     end.
 
--spec shards(DbName::binary(), DocId::binary()) -> [#shard{}].
+-spec shards(DbName::iolist(), DocId::binary()) -> [#shard{}].
+shards(DbName, DocId) when is_list(DbName) ->
+    shards(list_to_binary(DbName), DocId);
+shards(DbName, DocId) when is_list(DocId) ->
+    shards(DbName, list_to_binary(DocId));
 shards(DbName, DocId) ->
     HashKey = mem3_util:hash(DocId),
     Head = #shard{
@@ -66,6 +84,9 @@ shards(DbName, DocId) ->
         Shards
     end.
 
+-spec choose_shards(DbName::iolist(), Options::list()) -> [#shard{}].
+choose_shards(DbName, Options) when is_list(DbName) ->
+    choose_shards(list_to_binary(DbName), Options);
 choose_shards(DbName, Options) ->
     try shards(DbName)
     catch error:database_does_not_exist ->
