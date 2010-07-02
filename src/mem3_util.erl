@@ -1,5 +1,4 @@
 -module(mem3_util).
--author('brad@cloudant.com').
 
 -export([hash/1, name_shard/1, create_partition_map/4, build_shards/2,
     n_val/2, to_atom/1, to_integer/1, write_db_doc/1, delete_db_doc/1,
