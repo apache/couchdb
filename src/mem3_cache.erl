@@ -23,6 +23,10 @@ handle_call(_Call, _From, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+handle_info({'DOWN', _, _, Pid, {badarg, [{ets,delete,[partitions,_]}|_]}},
+        #state{changes_pid=Pid} = State) ->
+    % fatal error, somebody deleted our ets table
+    {stop, ets_table_error, State};
 handle_info({'DOWN', _, _, Pid, Reason}, #state{changes_pid=Pid} = State) ->
     ?LOG_INFO("~p changes listener died ~p", [?MODULE, Reason]),
     Seq = case Reason of {seq, EndSeq} -> EndSeq; _ -> 0 end,
