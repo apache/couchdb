@@ -203,7 +203,15 @@ group_info(DbName, Group0) ->
 with_db(DbName, Options, {M,F,A}) ->
     case couch_db:open(DbName, Options) of
     {ok, Db} ->
-        rexi:reply(apply(M, F, [Db | A]));
+        rexi:reply(try
+            apply(M, F, [Db | A])
+        catch Exception ->
+            Exception;
+        error:Reason ->
+            ?LOG_ERROR("~p ~p ~p~n~p", [?MODULE, {M,F}, Reason,
+                erlang:get_stacktrace()]),
+            {error, Reason}
+        end);
     Error ->
         rexi:reply(Error)
     end.
