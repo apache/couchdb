@@ -90,7 +90,7 @@
       allowEmpty: true,
       acceptLabel: "",
       cancelLabel: "",
-      toolTip: "Click to edit",
+      toolTip: "Double click to edit",
       acceptOnBlur: true,
 
       // callbacks
@@ -105,7 +105,7 @@
     }, options || {});
 
     return this.each(function() {
-      $(this).attr("title", options.toolTip).click(function() {
+      $(this).attr("title", options.toolTip).dblclick(function() {
         startEditing(this, options);
       });
     });
