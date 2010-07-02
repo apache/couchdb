@@ -13,7 +13,7 @@
     get_view_group_info/2]).
 
 % miscellany
--export([db_path/2, design_docs/1]).
+-export([db_path/2, design_docs/1, reset_validation_funs/1]).
 
 -include("fabric.hrl").
 
@@ -119,6 +119,10 @@ design_docs(DbName) ->
         {ok, lists:reverse(Acc)}
     end,
     fabric:all_docs(dbname(DbName), QueryArgs, Callback, []).
+
+reset_validation_funs(DbName) ->
+    [rexi:cast(Node, {fabric_rpc, reset_validation_funs, [Name]}) ||
+        #shard{node=Node, name=Name} <-  mem3:shards(DbName)].
 
 %% some simple type validation and transcoding
 

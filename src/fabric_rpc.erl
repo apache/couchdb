@@ -3,7 +3,7 @@
 -export([get_db_info/1, get_doc_count/1, get_update_seq/1]).
 -export([open_doc/3, open_revs/4, get_missing_revs/2, update_docs/3]).
 -export([all_docs/2, changes/3, map_view/4, reduce_view/4, group_info/2]).
--export([create_db/3, delete_db/3]).
+-export([create_db/3, delete_db/3, reset_validation_funs/1]).
 
 -include("fabric.hrl").
 
@@ -195,6 +195,14 @@ update_docs(DbName, Docs, Options) ->
 group_info(DbName, Group0) ->
     {ok, Pid} = gen_server:call(couch_view, {get_group_server, DbName, Group0}),
     rexi:reply(couch_view_group:request_group_info(Pid)).
+
+reset_validation_funs(DbName) ->
+    case couch_db:open(DbName, []) of
+    {ok, Db} ->
+        gen_server:cast(Db#db.update_pid, {load_validation_funs, undefined});
+    _ ->
+        ok
+    end.
 
 %%
 %% internal
