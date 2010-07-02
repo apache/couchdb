@@ -352,7 +352,7 @@ accumulate_response(Data, #state{reply_buffer = RepBuf,
 	     stream_chunk_size = Stream_chunk_size,
 	     response_format = Response_format,
 	     caller_controls_socket = Caller_controls_socket} = CurReq,
-    RepBuf_1 = concat_binary([RepBuf, Data]),
+    RepBuf_1 = list_to_binary([RepBuf, Data]),
     New_data_size = RepBufSize - Streamed_size,
     case StreamTo of
 	undefined ->
@@ -1201,9 +1201,9 @@ scan_crlf_1(Bin1_head_size, Bin1, Bin2) ->
     case get_crlf_pos(Bin3) of
 	{yes, Pos} ->
 	    {Prefix, <<_, _, Suffix/binary>>} = split_binary(Bin3, Pos),
-	    {yes, concat_binary([Bin1_head, Prefix]), Suffix};
+	    {yes, list_to_binary([Bin1_head, Prefix]), Suffix};
 	no ->
-	    {no, concat_binary([Bin1, Bin2])}
+	    {no, list_to_binary([Bin1, Bin2])}
     end.
 
 get_crlf_pos(Bin) ->
