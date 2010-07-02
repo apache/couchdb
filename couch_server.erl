@@ -296,24 +296,7 @@ handle_call({open, DbName, Options}, {FromPid,_}=From, Server) ->
     LruTime = now(),
     case ets:lookup(couch_dbs_by_name, DbName) of
     [] ->
-        DbNameList = binary_to_list(DbName),
-        case check_dbname(Server, DbNameList) of
-        ok ->
-            Path = get_full_filename(Server, DbNameList),
-            case lists:member(sys_db, Options) of
-            true ->
-                {noreply, open_async(Server, From, DbName, Path, Options)};
-            false ->
-                case maybe_close_lru_db(Server) of
-                {ok, Server2} ->
-                    {noreply, open_async(Server2, From, DbName, Path, Options)};
-                CloseError ->
-                    {reply, CloseError, Server}
-                end
-            end;
-        Error ->
-            {reply, Error, Server}
-        end;
+        open_db(DbName, Server, Options, From);
     [{_, {opening, Opener, Froms}}] ->
         true = ets:insert(couch_dbs_by_name, {DbName, {opening, Opener, [From|Froms]}}),
         {noreply, Server};
@@ -324,30 +307,11 @@ handle_call({open, DbName, Options}, {FromPid,_}=From, Server) ->
         {reply, couch_db:open_ref_counted(MainPid, FromPid), Server}
     end;
 handle_call({create, DbName, Options}, From, Server) ->
-    DbNameList = binary_to_list(DbName),
-    case check_dbname(Server, DbNameList) of
-    ok ->
-        case ets:lookup(couch_dbs_by_name, DbName) of
-        [] ->
-            Filepath = get_full_filename(Server, DbNameList),
-            case lists:member(sys_db, Options) of
-            true ->
-                {noreply, open_async(Server, From, DbName, Filepath,
-                    [create | Options])};
-            false ->
-                case maybe_close_lru_db(Server) of
-                {ok, Server2} ->
-                    {noreply, open_async(Server2, From, DbName, Filepath,
-                        [create | Options])};
-                CloseError ->
-                    {reply, CloseError, Server}
-                end
-            end;
-        [_AlreadyRunningDb] ->
-            {reply, file_exists, Server}
-        end;
-    Error ->
-        {reply, Error, Server}
+    case ets:lookup(couch_dbs_by_name, DbName) of
+    [] ->
+        open_db(DbName, Server, [create | Options], From);
+    [_AlreadyRunningDb] ->
+        {reply, file_exists, Server}
     end;
 handle_call({delete, DbName, _Options}, _From, Server) ->
     DbNameList = binary_to_list(DbName),
@@ -413,3 +377,22 @@ handle_info(Error, _Server) ->
     ?LOG_ERROR("Unexpected message, restarting couch_server: ~p", [Error]),
     exit(kill).
 
+open_db(DbName, Server, Options, From) ->
+    DbNameList = binary_to_list(DbName),
+    case check_dbname(Server, DbNameList) of
+    ok ->
+        Filepath = get_full_filename(Server, DbNameList),
+        case lists:member(sys_db, Options) of
+        true ->
+            {noreply, open_async(Server, From, DbName, Filepath, Options)};
+        false ->
+            case maybe_close_lru_db(Server) of
+            {ok, Server2} ->
+                {noreply, open_async(Server2, From, DbName, Filepath, Options)};
+            CloseError ->
+                {reply, CloseError, Server}
+            end
+        end;
+     Error ->
+        {reply, Error, Server}
+     end.
