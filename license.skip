@@ -63,6 +63,7 @@
 ^share/www/script/json2.js
 ^share/www/script/jspec/*
 ^share/www/script/sha1.js
+^share/www/script/base64.js
 ^share/www/script/test/lorem*
 ^src/Makefile
 ^src/Makefile.in
