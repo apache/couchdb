@@ -66,7 +66,7 @@ start_server(IniFiles) ->
         [io:format("  [~s] ~s=~p~n", [Module, Variable, Value])
             || {{Module, Variable}, Value} <- couch_config:all()];
     _ -> ok
-    end,
+    end, 
 
     LibDir =
     case couch_config:get("couchdb", "util_driver_dir", null) of
@@ -122,6 +122,13 @@ start_server(IniFiles) ->
     Port = mochiweb_socket_server:get(couch_httpd, port),
     io:format("Apache CouchDB has started. Time to relax.~n"),
     ?LOG_INFO("Apache CouchDB has started on http://~s:~w/", [Ip, Port]),
+    
+    case couch_config:get("couchdb", "uri_file", null) of 
+    null -> ok;
+    UriFile ->
+        Line = io_lib:format("http://~s:~w/", [Ip, Port]),
+        file:write_file(UriFile, Line)
+    end,
 
     {ok, Pid}.
 

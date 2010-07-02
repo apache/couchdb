@@ -11,6 +11,7 @@ max_attachment_chunk_size = 4294967296 ; 4GB
 os_process_timeout = 5000 ; 5 seconds. for view and external servers.
 max_dbs_open = 100
 delayed_commits = true ; set this to false to ensure an fsync before 201 Created is returned
+uri_file = %localstatelibdir%/couch.uri
 
 [httpd]
 port = 5984
