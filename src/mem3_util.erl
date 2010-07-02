@@ -2,7 +2,8 @@
 -author('brad@cloudant.com').
 
 -export([hash/1, name_shard/1, create_partition_map/4, build_shards/2,
-    n_val/2, to_atom/1, to_integer/1, write_db_doc/1, delete_db_doc/1]).
+    n_val/2, to_atom/1, to_integer/1, write_db_doc/1, delete_db_doc/1,
+    load_shards_from_disk/1, load_shards_from_disk/2]).
 
 -define(RINGTOP, 2 bsl 31).  % CRC32 space
 
@@ -114,3 +115,21 @@ n_val(N, NodeCount) when N > NodeCount ->
     NodeCount;
 n_val(N, _) ->
     N.
+
+load_shards_from_disk(DbName) when is_binary(DbName) ->
+    {ok, Db} = couch_db:open(<<"dbs">>, []),
+    try load_shards_from_db(Db, DbName) after couch_db:close(Db) end.
+
+load_shards_from_db(#db{} = ShardDb, DbName) ->
+    case couch_db:open_doc(ShardDb, DbName, []) of
+    {ok, #doc{body = {Props}}} ->
+        ?LOG_INFO("dbs cache miss for ~s", [DbName]),
+        build_shards(DbName, Props);
+    {not_found, _} ->
+        erlang:error(database_does_not_exist)
+    end.
+
+load_shards_from_disk(DbName, DocId)->
+    Shards = load_shards_from_disk(DbName),
+    HashKey = hash(DocId),
+    [S || #shard{range = [B,E]} = S <- Shards, B < HashKey, HashKey =< E].

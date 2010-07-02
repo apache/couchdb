@@ -52,12 +52,13 @@ nodes() ->
 shards(DbName) when is_list(DbName) ->
     shards(list_to_binary(DbName));
 shards(DbName) ->
-    case ets:lookup(partitions, DbName) of
+    try ets:lookup(partitions, DbName) of
     [] ->
-        % TODO fall back to checking dbs.couch directly
-        erlang:error(database_does_not_exist);
+        mem3_util:load_shards_from_disk(DbName);
     Else ->
         Else
+    catch error:badarg ->
+        mem3_util:load_shards_from_disk(DbName)
     end.
 
 -spec shards(DbName::iolist(), DocId::binary()) -> [#shard{}].
@@ -74,14 +75,14 @@ shards(DbName, DocId) ->
         range = ['$1','$2'],
         ref = '_'
     },
-    % TODO these conditions assume A < B, which we don't require
     Conditions = [{'<', '$1', HashKey}, {'=<', HashKey, '$2'}],
-    case ets:select(partitions, [{Head, Conditions, ['$_']}]) of
+    try ets:select(partitions, [{Head, Conditions, ['$_']}]) of
     [] ->
-        % TODO fall back to checking dbs.couch directly
-        erlang:error(database_does_not_exist);
+        mem3_util:load_shards_from_disk(DbName, DocId);
     Shards ->
         Shards
+    catch error:badarg ->
+        mem3_util:load_shards_from_disk(DbName, DocId)
     end.
 
 -spec choose_shards(DbName::iolist(), Options::list()) -> [#shard{}].
@@ -89,7 +90,7 @@ choose_shards(DbName, Options) when is_list(DbName) ->
     choose_shards(list_to_binary(DbName), Options);
 choose_shards(DbName, Options) ->
     try shards(DbName)
-    catch error:database_does_not_exist ->
+    catch error:E when E==database_does_not_exist; E==badarg ->
         Nodes = mem3:nodes(),
         NodeCount = length(Nodes),
         N = mem3_util:n_val(couch_util:get_value(n, Options), NodeCount),
