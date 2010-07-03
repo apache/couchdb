@@ -108,8 +108,10 @@ to_integer(N) when is_list(N) ->
     list_to_integer(N).
 
 n_val(undefined, NodeCount) ->
-    n_val(list_to_integer(couch_config:get("cluster", "n", "3")), NodeCount);
-n_val(N, NodeCount) when N > NodeCount ->
+    n_val(couch_config:get("cluster", "n", "3"), NodeCount);
+n_val(N, NodeCount) when is_list(N) ->
+    n_val(list_to_integer(N), NodeCount);
+n_val(N, NodeCount) when is_integer(NodeCount), N > NodeCount ->
     ?LOG_ERROR("Request to create N=~p DB but only ~p node(s)", [N, NodeCount]),
     NodeCount;
 n_val(N, _) ->
