@@ -28,7 +28,7 @@
 -export([pread_binary/2, read_header/1, truncate/2, upgrade_old_header/2]).
 -export([append_term_md5/2,append_binary_md5/2]).
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, code_change/3, handle_info/2]).
--export([delete/1,init_delete_dir/0]).
+-export([delete/2,delete/3,init_delete_dir/1]).
 
 %%----------------------------------------------------------------------
 %% Args:   Valid Options are [create] and [create,overwrite].
@@ -170,20 +170,28 @@ close(Fd) ->
         erlang:demonitor(MRef, [flush])
     end.
 
-delete(Filepath) ->
-    DbDir = couch_config:get("couchdb", "database_dir"),
-    DelFile = filename:join([DbDir,".delete", ?b2l(couch_uuids:random())]),
+
+delete(RootDir, Filepath) ->
+    delete(RootDir, Filepath, true).
+
+
+delete(RootDir, Filepath, Async) ->
+    DelFile = filename:join([RootDir,".delete", ?b2l(couch_uuids:random())]),
     case file:rename(Filepath, DelFile) of
     ok ->
-        spawn(file, delete, [DelFile]),
-        ok;
+        if (Async) ->
+            spawn(file, delete, [DelFile]),
+            ok;
+        true ->
+            file:delete(DelFile)
+        end;
     Error ->
         Error
     end.
 
 
-init_delete_dir() ->
-    Dir = filename:join(couch_config:get("couchdb","database_dir"),".delete"),
+init_delete_dir(RootDir) ->
+    Dir = filename:join(RootDir,".delete"),
     % note: ensure_dir requires an actual filename companent, which is the
     % reason for "foo".
     filelib:ensure_dir(filename:join(Dir,"foo")),
