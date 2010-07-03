@@ -392,12 +392,12 @@ ensure_users_db_exists(DbName, Options) ->
     end.
 
 ensure_auth_ddoc_exists(Db, DDocId) ->
-    try
-        couch_httpd_db:couch_doc_open(Db, DDocId, nil, [])
-    catch
-    _:_Error ->
+    case couch_db:open_doc(Db, DDocId) of
+    {not_found, _Reason} ->
         {ok, AuthDesign} = auth_design_doc(DDocId),
-        {ok, _Rev} = couch_db:update_doc(Db, AuthDesign, [])
+        {ok, _Rev} = couch_db:update_doc(Db, AuthDesign, []);
+    _ ->
+        ok
     end,
     ok.
 
