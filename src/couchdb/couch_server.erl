@@ -131,6 +131,7 @@ init([]) ->
             gen_server:call(couch_server,
                     {set_max_dbs_open, list_to_integer(Max)})
         end),
+    ok = couch_file:init_delete_dir(),
     hash_admin_passwords(),
     ok = couch_config:register(
         fun("admins", _Key, _Value, Persist) ->
