@@ -28,7 +28,7 @@
 -export([pread_binary/2, read_header/1, truncate/2, upgrade_old_header/2]).
 -export([append_term_md5/2,append_binary_md5/2]).
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, code_change/3, handle_info/2]).
--export([delete/1]).
+-export([delete/1,init_delete_dir/0]).
 
 %%----------------------------------------------------------------------
 %% Args:   Valid Options are [create] and [create,overwrite].
@@ -171,13 +171,27 @@ close(Fd) ->
     end.
 
 delete(Filepath) ->
-    case file:rename(Filepath, Filepath ++ ".delete") of
+    DbDir = couch_config:get("couchdb", "database_dir"),
+    DelFile = filename:join([DbDir,".delete", ?b2l(couch_uuids:random())]),
+    case file:rename(Filepath, DelFile) of
     ok ->
-        spawn(file, delete, [Filepath ++ ".delete"]),
+        spawn(file, delete, [DelFile]),
         ok;
     Error ->
         Error
     end.
+
+
+init_delete_dir() ->
+    Dir = filename:join(couch_config:get("couchdb","database_dir"),".delete"),
+    % note: ensure_dir requires an actual filename companent, which is the
+    % reason for "foo".
+    filelib:ensure_dir(filename:join(Dir,"foo")),
+    filelib:fold_files(Dir, ".*", true,
+        fun(Filename, _) ->
+            ok = file:delete(Filename)
+        end, ok).
+
 
 % 09 UPGRADE CODE
 old_pread(Fd, Pos, Len) ->
