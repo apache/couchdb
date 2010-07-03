@@ -562,7 +562,7 @@
     },
 
     replicate: function(source, target, ajaxOptions, repOpts) {
-      $.extend(repOpts, {source: source, target: target});
+      repOpts = $.extend({source: source, target: target}, repOpts);
       if (repOpts.continuous) {
         ajaxOptions.successStatus = 202;
       }
