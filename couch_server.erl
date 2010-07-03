@@ -131,7 +131,7 @@ init([]) ->
             gen_server:call(couch_server,
                     {set_max_dbs_open, list_to_integer(Max)})
         end),
-    ok = couch_file:init_delete_dir(),
+    ok = couch_file:init_delete_dir(RootDir),
     hash_admin_passwords(),
     ok = couch_config:register(
         fun("admins", _Key, _Value, Persist) ->
@@ -351,9 +351,9 @@ handle_call({delete, DbName, _Options}, _From, Server) ->
 
         %% Delete any leftover .compact files.  If we don't do this a subsequent
         %% request for this DB will try to open the .compact file and use it.
-        couch_file:delete(FullFilepath ++ ".compact"),
+        couch_file:delete(Server#server.root_dir, FullFilepath ++ ".compact"),
 
-        case couch_file:delete(FullFilepath) of
+        case couch_file:delete(Server#server.root_dir, FullFilepath) of
         ok ->
             couch_db_update_notifier:notify({deleted, DbName}),
             {reply, ok, Server2};

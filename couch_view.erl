@@ -94,7 +94,8 @@ cleanup_index_files(Db) ->
               re:run(FilePath, RegExp, [{capture, none}]) =:= nomatch],
     % delete unused files
     ?LOG_DEBUG("deleting unused view index files: ~p",[DeleteFiles]),
-    [couch_file:delete(File)||File <- DeleteFiles],
+    RootDir = couch_config:get("couchdb", "view_index_dir"),
+    [couch_file:delete(RootDir,File,false)||File <- DeleteFiles],
     ok.
 
 list_index_files(Db) ->
@@ -266,6 +267,7 @@ init([]) ->
     ets:new(group_servers_by_sig, [set, protected, named_table]),
     ets:new(couch_groups_by_updater, [set, private, named_table]),
     process_flag(trap_exit, true),
+    ok = couch_file:init_delete_dir(RootDir),
     {ok, #server{root_dir=RootDir}}.
 
 
@@ -316,7 +318,8 @@ do_reset_indexes(DbName, Root) ->
             delete_from_ets(Pid, DbName, Sig)
         end, Names),
     delete_index_dir(Root, DbName),
-    couch_file:delete(Root ++ "/." ++ ?b2l(DbName) ++ "_temp").
+    RootDelDir = couch_config:get("couchdb", "view_index_dir"),
+    couch_file:delete(RootDelDir, Root ++ "/." ++ ?b2l(DbName) ++ "_temp").
 
 handle_info({'EXIT', FromPid, Reason}, Server) ->
     case ets:lookup(couch_groups_by_updater, FromPid) of
@@ -347,19 +350,19 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 delete_index_dir(RootDir, DbName) ->
-    nuke_dir(RootDir ++ "/." ++ ?b2l(DbName) ++ "_design").
+    nuke_dir(RootDir, RootDir ++ "/." ++ ?b2l(DbName) ++ "_design").
 
-nuke_dir(Dir) ->
+nuke_dir(RootDelDir, Dir) ->
     case file:list_dir(Dir) of
     {error, enoent} -> ok; % doesn't exist
     {ok, Files} ->
         lists:foreach(
             fun(File)->
                 Full = Dir ++ "/" ++ File,
-                case file:delete(Full) of
+                case couch_file:delete(RootDelDir, Full, false) of
                 ok -> ok;
                 {error, eperm} ->
-                    ok = nuke_dir(Full)
+                    ok = nuke_dir(RootDelDir, Full)
                 end
             end,
             Files),
