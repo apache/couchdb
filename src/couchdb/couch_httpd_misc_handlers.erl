@@ -199,6 +199,7 @@ increment_update_seq_req(Req, _Db) ->
 % httpd log handlers
 
 handle_log_req(#httpd{method='GET'}=Req) ->
+    ok = couch_httpd:verify_is_server_admin(Req),
     Bytes = list_to_integer(couch_httpd:qs_value(Req, "bytes", "1000")),
     Offset = list_to_integer(couch_httpd:qs_value(Req, "offset", "0")),
     Chunk = couch_log:read(Bytes, Offset),
