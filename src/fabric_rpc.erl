@@ -198,8 +198,8 @@ group_info(DbName, Group0) ->
 
 reset_validation_funs(DbName) ->
     case couch_db:open(DbName, []) of
-    {ok, Db} ->
-        gen_server:cast(Db#db.update_pid, {load_validation_funs, undefined});
+    {ok, #db{main_pid = Pid}} ->
+        gen_server:cast(Pid, {load_validation_funs, undefined});
     _ ->
         ok
     end.
