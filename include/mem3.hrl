@@ -1,5 +1,3 @@
--include_lib("couch/include/couch_db.hrl").
-
 -record(shard, {name, node, dbname, range, ref}).
 
 %% types

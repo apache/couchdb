@@ -4,6 +4,7 @@
 
 %% includes
 -include("mem3.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 
 handle_membership_req(#httpd{method='GET',
