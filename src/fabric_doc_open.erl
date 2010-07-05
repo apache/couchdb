@@ -3,6 +3,8 @@
 -export([go/3]).
 
 -include("fabric.hrl").
+-include_lib("mem3/include/mem3.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 go(DbName, Id, Options) ->
     Workers = fabric_util:submit_jobs(mem3:shards(DbName,Id), open_doc,

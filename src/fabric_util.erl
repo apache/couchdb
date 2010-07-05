@@ -3,6 +3,7 @@
 -export([submit_jobs/3, cleanup/1, recv/4, receive_loop/4, receive_loop/6]).
 
 -include("fabric.hrl").
+-include_lib("mem3/include/mem3.hrl").
 
 submit_jobs(Shards, EndPoint, ExtraArgs) ->
     lists:map(fun(#shard{node=Node, name=ShardName} = Shard) ->

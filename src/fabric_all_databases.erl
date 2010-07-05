@@ -3,6 +3,7 @@
 -export([all_databases/1]).
 
 -include("fabric.hrl").
+-include_lib("mem3/include/mem3.hrl").
 
 %% @doc gets all databases in the cluster.
 -spec all_databases(binary() | []) -> [binary()].
@@ -14,7 +15,7 @@ all_databases([]) ->
 all_databases(Customer) ->
     ?debugFmt("~nCustomer: ~p~n", [Customer]),
     Dbs = ets:foldl(fun(#shard{dbname=DbName}, AccIn) ->
-        DbNameStr = ?b2l(DbName),
+        DbNameStr = binary_to_list(DbName),
         case string:str(DbNameStr, Customer) of
         1 ->
             new_acc(DbNameStr, AccIn);

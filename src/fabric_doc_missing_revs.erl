@@ -3,6 +3,7 @@
 -export([go/2]).
 
 -include("fabric.hrl").
+-include_lib("mem3/include/mem3.hrl").
 
 go(DbName, AllIdsRevs) ->
     Workers = lists:map(fun({#shard{name=Name, node=Node} = Shard, IdsRevs}) ->

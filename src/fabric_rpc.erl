@@ -6,6 +6,7 @@
 -export([create_db/3, delete_db/3, reset_validation_funs/1]).
 
 -include("fabric.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 -record (view_acc, {
     db,

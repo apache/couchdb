@@ -2,6 +2,7 @@
 -export([go/2]).
 
 -include("fabric.hrl").
+-include_lib("mem3/include/mem3.hrl").
 
 go(DbName, Options) ->
     Shards = mem3:shards(DbName),

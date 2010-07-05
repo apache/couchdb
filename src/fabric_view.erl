@@ -5,6 +5,8 @@
     extract_view/4]).
 
 -include("fabric.hrl").
+-include_lib("mem3/include/mem3.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 %% @doc looks for a fully covered keyrange in the list of counters
 -spec is_progress_possible([{#shard{}, non_neg_integer()}]) -> boolean().

@@ -1,5 +1,4 @@
 -include_lib("eunit/include/eunit.hrl").
--include_lib("mem3/include/mem3.hrl").
 
 -record(collector, {
     query_args,

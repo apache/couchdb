@@ -4,6 +4,8 @@
 -export([open_doc/3]). % exported for spawn
 
 -include("fabric.hrl").
+-include_lib("mem3/include/mem3.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 go(DbName, #view_query_args{keys=nil} = QueryArgs, Callback, Acc0) ->
     Workers = lists:map(fun(#shard{name=Name, node=Node} = Shard) ->
