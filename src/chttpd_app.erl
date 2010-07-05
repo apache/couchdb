@@ -2,8 +2,6 @@
 -behaviour(application).
 -export([start/2, stop/1]).
 
--include("chttpd.hrl").
-
 start(_Type, StartArgs) ->
     chttpd_sup:start_link(StartArgs).
 

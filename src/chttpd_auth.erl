@@ -11,7 +11,7 @@
 % the License.
 
 -module(chttpd_auth).
--include("chttpd.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 -export([special_test_authentication_handler/1, null_authentication_handler/1,
     cookie_authentication_handler/1, default_authentication_handler/1,

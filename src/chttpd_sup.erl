@@ -4,8 +4,6 @@
 
 -export([start_link/1]).
 
--include("chttpd.hrl").
-
 start_link(Args) ->
     supervisor:start_link({local,?MODULE}, ?MODULE, Args).
 

@@ -1,2 +1,0 @@
--include_lib("couch/include/couch_db.hrl").
--include_lib("eunit/include/eunit.hrl").

@@ -11,8 +11,8 @@
 % the License.
 
 -module(chttpd_stats).
--include("chttpd.hrl").
--include("../../couch/src/couch_stats.hrl").
+-include_lib("couch/include/couch_db.hrl").
+-include_lib("couch/include/couch_stats.hrl").
 
 -export([handle_stats_req/1]).
 -import(chttpd,

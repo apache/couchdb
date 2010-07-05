@@ -14,7 +14,7 @@
 
 -export([handle_doc_show_req/3, handle_doc_update_req/3, handle_view_list_req/3]).
 
--include("chttpd.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 -import(chttpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
