@@ -16,16 +16,11 @@
     get_view_group_info/2]).
 
 % miscellany
--export([db_path/2, design_docs/1, reset_validation_funs/1]).
+-export([design_docs/1, reset_validation_funs/1]).
 
 -include("fabric.hrl").
 
 % db operations
--spec db_path(bstring(), bstring()) -> bstring().
-db_path(RawUri, Customer) ->
-    CustomerUri = generate_customer_path(RawUri, Customer),
-    {Path, _, _} = mochiweb_util:urlsplit_path(CustomerUri),
-    Path.
 
 all_dbs() ->
     fabric_all_databases:all_databases("").
@@ -197,17 +192,3 @@ default_callback(Row, Acc) ->
 
 is_reduce_view(_, _, _, #view_query_args{view_type=Reduce}) ->
     Reduce =:= reduce.
-
-generate_customer_path("/", _Customer) ->
-    "";
-generate_customer_path("/favicon.ico", _Customer) ->
-    "favicon.ico";
-generate_customer_path([$/,$_|Rest], _Customer) ->
-    lists:flatten([$_|Rest]);
-generate_customer_path([$/|RawPath], Customer) ->
-    case Customer of
-    "" ->
-        RawPath;
-    Else ->
-        lists:flatten([Else, "%2F", RawPath])
-    end.
