@@ -8,7 +8,8 @@ go(DbName, Id, Options) ->
     Workers = fabric_util:submit_jobs(mem3:shards(DbName,Id), open_doc,
         [Id, Options]),
     SuppressDeletedDoc = not lists:member(deleted, Options),
-    Acc0 = {length(Workers), couch_util:get_value(r, Options, 1), []},
+    R = couch_util:get_value(r, Options, couch_config:get("cluster","r","2")),
+    Acc0 = {length(Workers), list_to_integer(R), []},
     case fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
     {ok, {ok, #doc{deleted=true}}} when SuppressDeletedDoc ->
         {not_found, deleted};
