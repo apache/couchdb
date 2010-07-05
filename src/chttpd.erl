@@ -64,7 +64,8 @@ handle_request(MochiReq) ->
     % removed, but URL quoting left intact
     RawUri = MochiReq:get(raw_path),
     Customer = cloudant_util:customer_name(#httpd{mochi_req=MochiReq}),
-    Path = ?COUCH:db_path(RawUri, Customer),
+    {Path, _, _} = mochiweb_util:urlsplit_path(generate_customer_path(RawUri,
+        Customer)),
     {HandlerKey, _, _} = mochiweb_util:partition(Path, "/"),
 
     LogForClosedSocket = io_lib:format("mochiweb_recv_error for ~s - ~p ~s", [
@@ -153,6 +154,20 @@ handle_request(MochiReq) ->
     couch_stats_collector:record({couchdb, request_time}, RequestTime),
     couch_stats_collector:increment({httpd, requests}),
     {ok, Resp}.
+
+generate_customer_path("/", _Customer) ->
+    "";
+generate_customer_path("/favicon.ico", _Customer) ->
+    "favicon.ico";
+generate_customer_path([$/,$_|Rest], _Customer) ->
+    lists:flatten([$_|Rest]);
+generate_customer_path([$/|RawPath], Customer) ->
+    case Customer of
+    "" ->
+        RawPath;
+    Else ->
+        lists:flatten([Else, "%2F", RawPath])
+    end.
 
 % Try authentication handlers in order until one returns a result
 authenticate_request(#httpd{user_ctx=#user_ctx{}} = Req, _AuthFuns) ->
