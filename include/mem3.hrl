@@ -1,16 +1,5 @@
--define(MEMBERSHIP, true).
+-include_lib("couch/include/couch_db.hrl").
 
--ifndef(FABRIC).
--include("../../fabric/include/fabric.hrl").
--endif.
-
--ifndef(COUCH).
--include("../../couch/src/couch_db.hrl").
--endif.
-
--include_lib("eunit/include/eunit.hrl").
-
-%% partition record
 -record(shard, {name, node, dbname, range, ref}).
 
 %% types

@@ -5,7 +5,7 @@
 
 -export([start_link/0, get_active/0, get_queue/0, push/2, remove_node/1]).
 
--include_lib("../../couch/src/couch_db.hrl").
+-include("mem3.hrl").
 
 -record(state, {
     active = [],
