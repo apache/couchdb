@@ -1,6 +1,6 @@
 ## chttpd
 
-chttpd is a cluster-aware http layer for CouchDB[1].  It is used in cloudant-core[2] as the http front-end.
+chttpd is a cluster-aware http layer for [CouchDB][1].  It is used in [cloudant-core][2] as the http front-end.
 
 ### Getting Started
 Dependencies:
@@ -10,11 +10,11 @@ Build with rebar:
     make
 
 ### License
-Apache 2.0[3]
+[Apache 2.0][3]
 
 ### Contact
-  http://cloudant.com
-  info@cloudant.com
+ * [http://cloudant.com][http://cloudant.com]
+ * [info@cloudant.com][mailto:info@cloudant.com]
 
 [1]: http://couchdb.apache.org
 [2]: http://github.com/cloudant/cloudant-core
