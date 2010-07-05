@@ -1,14 +1,5 @@
--define(FABRIC, true).
-
--ifndef(COUCH).
--include("../../couch/src/couch_db.hrl").
--endif.
-
--ifndef(MEMBERSHIP).
--include("../../mem3/include/mem3.hrl").
--endif.
-
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("mem3/include/mem3.hrl").
 
 -record(collector, {
     query_args,
