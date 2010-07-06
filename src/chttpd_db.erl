@@ -58,13 +58,13 @@ handle_changes_req(#httpd{method='GET'}=Req, Db) ->
         couch_stats_collector:record({couchdb, dbinfo}, DeltaT),
         chttpd:etag_respond(Req, Etag, fun() ->
             {ok, Resp} = chttpd:start_json_response(Req, 200, [{"Etag",Etag}]),
-            fabric:changes(Db, ChangesArgs, fun changes_callback/2,
-                {"normal", Resp})
+            fabric:changes(Db, fun changes_callback/2, {"normal", Resp},
+                ChangesArgs)
         end);
     Feed ->
         % "longpoll" or "continuous"
         {ok, Resp} = chttpd:start_json_response(Req, 200),
-        fabric:changes(Db, ChangesArgs, fun changes_callback/2, {Feed, Resp})
+        fabric:changes(Db, fun changes_callback/2, {Feed, Resp}, ChangesArgs)
     end;
 handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "GET,HEAD").
@@ -387,7 +387,7 @@ all_docs_view(Req, Db, Keys) ->
     QueryArgs = chttpd_view:parse_view_params(Req, Keys, map),
     chttpd:etag_respond(Req, Etag, fun() ->
         {ok, Resp} = chttpd:start_json_response(Req, 200, [{"Etag",Etag}]),
-        fabric:all_docs(Db, QueryArgs, fun all_docs_callback/2, {nil, Resp})
+        fabric:all_docs(Db, fun all_docs_callback/2, {nil, Resp}, QueryArgs)
     end).
 
 all_docs_callback({total_and_offset, Total, Offset}, {_, Resp}) ->

@@ -37,7 +37,7 @@ design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
     chttpd:etag_respond(Req, Etag, fun() ->
         {ok, Resp} = chttpd:start_json_response(Req, 200, [{"Etag",Etag}]),
         CB = fun view_callback/2,
-        fabric:query_view(Db, DDoc, ViewName, QueryArgs, CB, {nil, Resp})
+        fabric:query_view(Db, DDoc, ViewName, CB, {nil, Resp}, QueryArgs)
     end).
 
 view_callback({total_and_offset, Total, Offset}, {nil, Resp}) ->

@@ -199,7 +199,7 @@ handle_view_list(Req, Db, DDoc, LName, {ViewDesignName, ViewName}, Keys) ->
                 db = Db,
                 etag = Etag
             },
-            fabric:query_view(Db, VDoc, ViewName, QueryArgs, CB, Acc0)            
+            fabric:query_view(Db, VDoc, ViewName, CB, Acc0, QueryArgs)
         end)
     end).
 
