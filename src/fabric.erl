@@ -73,11 +73,11 @@ update_docs(DbName, Docs, Options) ->
 att_receiver(Req, Length) ->
     fabric_doc_attachments:receiver(Req, Length).
 
-all_docs(DbName, #view_query_args{} = QueryArgs, Callback, Acc0) when
+all_docs(DbName, Callback, Acc0, #view_query_args{} = QueryArgs) when
         is_function(Callback, 2) ->
     fabric_view_all_docs:go(dbname(DbName), QueryArgs, Callback, Acc0).
 
-changes(DbName, Options, Callback, Acc0) ->
+changes(DbName, Callback, Acc0, Options) ->
     % TODO use a keylist for Options instead of #changes_args, BugzID 10281
     Feed = Options#changes_args.feed,
     fabric_view_changes:go(dbname(DbName), Feed, Options, Callback, Acc0).
@@ -87,9 +87,9 @@ query_view(DbName, DesignName, ViewName) ->
 
 query_view(DbName, DesignName, ViewName, QueryArgs) ->
     Callback = fun default_callback/2,
-    query_view(DbName, DesignName, ViewName, QueryArgs, Callback, []).
+    query_view(DbName, DesignName, ViewName, Callback, [], QueryArgs).
 
-query_view(DbName, Design, ViewName, QueryArgs, Callback, Acc0) ->
+query_view(DbName, Design, ViewName, Callback, Acc0, QueryArgs) ->
     Db = dbname(DbName), View = name(ViewName),
     case is_reduce_view(Db, Design, View, QueryArgs) of
     true ->
@@ -116,7 +116,7 @@ design_docs(DbName) ->
     (complete, Acc) ->
         {ok, lists:reverse(Acc)}
     end,
-    fabric:all_docs(dbname(DbName), QueryArgs, Callback, []).
+    fabric:all_docs(dbname(DbName), Callback, [], QueryArgs).
 
 reset_validation_funs(DbName) ->
     [rexi:cast(Node, {fabric_rpc, reset_validation_funs, [Name]}) ||
