@@ -290,8 +290,19 @@
           return promise;
         },
         allDocs: function(options) {
-          ajax(
-            {url: this.uri + "_all_docs" + encodeOptions(options)},
+          var type = "GET";
+          var data = null;
+          if (options["keys"]) {
+            type = "POST";
+            var keys = options["keys"];
+            delete options["keys"];
+            data = toJSON({ "keys": keys });
+          }
+          ajax({
+              type: type,
+              data: data,
+              url: this.uri + "_all_docs" + encodeOptions(options)
+            },
             options,
             "An error occurred retrieving a list of all documents"
           );
@@ -330,7 +341,7 @@
         openDoc: function(docId, options, ajaxOptions) {
           options = options || {};
           if (db_opts.attachPrevRev || options.attachPrevRev) {
-            $.extend(options, {
+            $.extend(ajaxOptions, {
               beforeSuccess : function(req, doc) {
                 rawDocs[doc._id] = {
                   rev : doc._rev,
@@ -339,7 +350,7 @@
               }
             });
           } else {
-            $.extend(options, {
+            $.extend(ajaxOptions, {
               beforeSuccess : function(req, doc) {
                 if (doc["jquery.couch.attachPrevRev"]) {
                   rawDocs[doc._id] = {
@@ -372,6 +383,7 @@
             type: method, url: uri + encodeOptions(options),
             contentType: "application/json",
             dataType: "json", data: toJSON(doc),
+            beforeSend : beforeSend,
             complete: function(req) {
               var resp = $.httpData(req, "json");
               if (req.status == 200 || req.status == 201 || req.status == 202) {
@@ -397,7 +409,8 @@
           });
         },
         bulkSave: function(docs, options) {
-          $.extend(options, {successStatus: 201});
+          var beforeSend = fullCommit(options);
+          $.extend(options, {successStatus: 201, beforeSend : beforeSend});
           ajax({
               type: "POST",
               url: this.uri + "_bulk_docs" + encodeOptions(options),
@@ -549,7 +562,7 @@
     },
 
     replicate: function(source, target, ajaxOptions, repOpts) {
-      $.extend(repOpts, {source: source, target: target});
+      repOpts = $.extend({source: source, target: target}, repOpts);
       if (repOpts.continuous) {
         ajaxOptions.successStatus = 202;
       }
@@ -617,6 +630,17 @@
       }
     }, obj), ajaxOptions));
   }
+
+  function fullCommit(options) {
+    var options = options || {};
+    if (typeof options.ensure_full_commit !== "undefined") {
+      var commit = options.ensure_full_commit;
+      delete options.ensure_full_commit;
+      return function(xhr) {
+        xhr.setRequestHeader("X-Couch-Full-Commit", commit.toString());
+      };
+    }
+  };
 
   // Convert a options object to an url query string.
   // ex: {key:'value',key2:'value2'} becomes '?key="value"&key2="value2"'
