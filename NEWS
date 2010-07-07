@@ -8,9 +8,7 @@ For details about backwards incompatible changes, see:
 Each release section notes when backwards incompatible changes have been made.
 
 Version 0.11.1
--------------
-
-This Version has not been released yet.
+--------------
 
  * Mask passwords in active tasks and logging.
  * Update mochijson2 to allow output of BigNums not in float form.
