@@ -116,7 +116,9 @@ specific language governing permissions and limitations under the License.
         <strong>Note:</strong> Some configuration options may require
         restarting the server to take effect after modification.
       </p>
-
+      <p class="help">
+       For the strongest consistency guarantees, <tt>delayed_commits</tt> should be set to <tt>false</tt>. The default value of <tt>true</tt> is designed for single-user performance. For more details see <a href="http://wiki.apache.org/couchdb/Durability_Matrix">a discussion of durability on the CouchDB wiki</a>.
+      </p>
       <table id="config" class="listing" cellspacing="0">
         <caption>Configuration</caption>
         <thead><tr>
