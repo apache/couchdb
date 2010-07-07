@@ -8,9 +8,7 @@ For details about backwards incompatible changes, see:
 Each release section notes when backwards incompatible changes have been made.
 
 Version 1.0.0
---------------
-
-This version has not yet been released.
+-------------
 
 * More efficient header commits.
 * Use O_APPEND to save lseeks.
@@ -22,8 +20,6 @@ This version has not yet been released.
 
 Version 0.11.1
 --------------
-
-This version has not yet been released.
 
  * Mask passwords in active tasks and logging.
  * Update mochijson2 to allow output of BigNums not in float form.
@@ -66,7 +62,6 @@ This version has not yet been released.
  * Allow global rewrites so system defaults are available in vhosts.
  * Allow isolation of databases with vhosts.
  * Made the test suite overall more reliable.
-
 
 Version 0.11.0
 --------------
