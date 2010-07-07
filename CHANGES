@@ -4,8 +4,6 @@ Apache CouchDB CHANGES
 Version 1.0.0
 --------------
 
-This version has not been released yet.
-
 HTTP Interface:
 
  * Mask passwords in active tasks and logging.

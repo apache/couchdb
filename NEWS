@@ -10,8 +10,6 @@ Each release section notes when backwards incompatible changes have been made.
 Version 1.0.0
 --------------
 
-This version has not been released yet.
-
  * Mask passwords in active tasks and logging.
  * Update mochijson2 to allow output of BigNums not in float form.
  * Added support for X-HTTP-METHOD-OVERRIDE.
