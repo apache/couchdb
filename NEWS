@@ -8,11 +8,22 @@ For details about backwards incompatible changes, see:
 Each release section notes when backwards incompatible changes have been made.
 
 Version 1.1.0
---------------
+-------------
 
 This version has not been released yet.
 
 Version 1.0.0
+-------------
+
+* More efficient header commits.
+* Use O_APPEND to save lseeks.
+* Faster implementation of pread_iolist(). Further improves performance on
+  concurrent reads.
+* Added authentication caching
+* Faster default view collation.
+* Added option to include update_seq in view responses.
+
+Version 0.11.1
 --------------
 
  * Mask passwords in active tasks and logging.
@@ -41,11 +52,7 @@ Version 1.0.0
    deletion.
  * Fixed for wrong offset when writing headers and converting them to blocks,
    only triggered when header is larger than 4k.
- * More efficient header commits.
  * Preserve _revs_limit and instance_start_time after compaction.
- * Use O_APPEND to save lseeks.
- * Faster implementation of pread_iolist(). Further improves performance on
-   concurrent reads.
  * Fixed timeout with large .ini files.
  * Added tests for couch.js and jquery.couch.js
  * Added various API features to jquery.couch.js
@@ -60,7 +67,6 @@ Version 1.0.0
  * Allow global rewrites so system defaults are available in vhosts.
  * Allow isolation of databases with vhosts.
  * Made the test suite overall more reliable.
-
 
 Version 0.11.0
 --------------

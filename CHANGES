@@ -2,11 +2,32 @@ Apache CouchDB CHANGES
 ======================
 
 Version 1.1.0
---------------
+-------------
 
 This version has not been released yet.
 
 Version 1.0.0
+-------------
+
+Security:
+
+* Added authentication caching, to avoid repeated opening and closing of the
+  users database for each request requiring authentication.
+
+Storage System:
+
+* Small optimization for reordering result lists.
+* More efficient header commits.
+* Use O_APPEND to save lseeks.
+* Faster implementation of pread_iolist(). Further improves performance on
+  concurrent reads.
+
+View Server:
+
+* Faster default view collation.
+* Added option to include update_seq in view responses.
+
+Version 0.11.1
 --------------
 
 HTTP Interface:
@@ -43,8 +64,6 @@ Build and System Integration:
 Security:
 
  * Added authentication redirect URL to log in clients.
- * Added authentication caching, to avoid repeated opening and closing of the
-   users database for each request requiring authentication.
  * Fixed query parameter encoding issue in oauth.js.
  * Made authentication timeout configurable.
  * Temporary views are now admin-only resources.
@@ -56,14 +75,9 @@ Storage System:
    it's correct.
  * Make file deletions async to avoid pauses during compaction and db
    deletion.
- * Small optimization for reordering result lists.
  * Fixed for wrong offset when writing headers and converting them to blocks,
    only triggered when header is larger than 4k.
- * More efficient header commits.
  * Preserve _revs_limit and instance_start_time after compaction.
- * Use O_APPEND to save lseeks.
- * Faster implementation of pread_iolist(). Further improves performance on
-   concurrent reads.
 
 Configuration System:
 
@@ -84,9 +98,7 @@ View Server:
 
  * Provide a UUID to update functions (and all other functions) that they can
    use to create new docs.
- * Faster default view collation.
  * Upgrade CommonJS modules support to 1.1.1.
- * Added option to include update_seq in view responses.
  * Fixed erlang filter funs and normalize filter fun API.
  * Fixed hang in view shutdown.
 
