@@ -143,21 +143,22 @@ handle_call({purge_docs, IdRevs}, _From, Db) ->
 
     ok = gen_server:call(Db2#db.main_pid, {db_updated, Db2}),
     couch_db_update_notifier:notify({updated, Db#db.name}),
-    {reply, {ok, (Db2#db.header)#db_header.purge_seq, IdRevsPurged}, Db2}.
-
-
-handle_cast(start_compact, Db) ->
+    {reply, {ok, (Db2#db.header)#db_header.purge_seq, IdRevsPurged}, Db2};
+handle_call(start_compact, _From, Db) ->
     case Db#db.compactor_pid of
     nil ->
         ?LOG_INFO("Starting compaction for db \"~s\"", [Db#db.name]),
         Pid = spawn_link(fun() -> start_copy_compact(Db) end),
         Db2 = Db#db{compactor_pid=Pid},
         ok = gen_server:call(Db#db.main_pid, {db_updated, Db2}),
-        {noreply, Db2};
+        {reply, ok, Db2};
     _ ->
         % compact currently running, this is a no-op
-        {noreply, Db}
-    end;
+        {reply, ok, Db}
+    end.
+
+
+
 handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
     {ok, NewFd} = couch_file:open(CompactFilepath),
     {ok, NewHeader} = couch_file:read_header(NewFd),
