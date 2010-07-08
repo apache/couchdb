@@ -634,18 +634,62 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
     case [A || A <- Atts, A#att.name == FileName] of
     [] ->
         throw({not_found, "Document is missing attachment"});
-    [#att{type=Type, len=Len}=Att] ->
+    [#att{type=Type, encoding=Enc, disk_len=DiskLen, att_len=AttLen}=Att] ->
         Etag = chttpd:doc_etag(Doc),
-        chttpd:etag_respond(Req, Etag, fun() ->
-            {ok, Resp} = start_response_length(Req, 200, [
-                {"ETag", Etag},
-                {"Cache-Control", "must-revalidate"},
-                {"Content-Type", binary_to_list(Type)}
-                ], integer_to_list(Len)),
-            couch_doc:att_foldl(Att, fun(BinSegment, _) ->
-                send(Resp, BinSegment)
-            end, {ok, Resp})
-        end)
+        ReqAcceptsAttEnc = lists:member(
+           atom_to_list(Enc),
+           chttpd:accepted_encodings(Req)
+        ),
+        Headers = [
+            {"ETag", Etag},
+            {"Cache-Control", "must-revalidate"},
+            {"Content-Type", binary_to_list(Type)}
+        ] ++ case ReqAcceptsAttEnc of
+        true ->
+            [{"Content-Encoding", atom_to_list(Enc)}];
+        _ ->
+            []
+        end,
+        Len = case {Enc, ReqAcceptsAttEnc} of
+        {identity, _} ->
+            % stored and served in identity form
+            DiskLen;
+        {_, false} when DiskLen =/= AttLen ->
+            % Stored encoded, but client doesn't accept the encoding we used,
+            % so we need to decode on the fly.  DiskLen is the identity length
+            % of the attachment.
+            DiskLen;
+        {_, true} ->
+            % Stored and served encoded.  AttLen is the encoded length.
+            AttLen;
+        _ ->
+            % We received an encoded attachment and stored it as such, so we
+            % don't know the identity length.  The client doesn't accept the
+            % encoding, and since we cannot serve a correct Content-Length
+            % header we'll fall back to a chunked response.
+            undefined
+        end,
+        AttFun = case ReqAcceptsAttEnc of
+        false ->
+            fun couch_doc:att_foldl_decode/3;
+        true ->
+            fun couch_doc:att_foldl/3
+        end,
+        couch_httpd:etag_respond(
+            Req,
+            Etag,
+            fun() ->
+                case Len of
+                undefined ->
+                    {ok, Resp} = start_chunked_response(Req, 200, Headers),
+                    AttFun(Att, fun(Seg, _) -> send_chunk(Resp, Seg) end, ok),
+                    couch_httpd:last_chunk(Resp);
+                _ ->
+                    {ok, Resp} = start_response_length(Req, 200, Headers, Len),
+                    AttFun(Att, fun(Seg, _) -> send(Resp, Seg) end, ok)
+                end
+            end
+        )
     end;
 
 
@@ -670,14 +714,28 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
                     CType ->
                         list_to_binary(CType)
                     end,
-                data = ?COUCH:att_receiver(Req, chttpd:body_length(Req)),
-                len = case chttpd:header_value(Req,"Content-Length") of
+                data = fabric:att_receiver(Req, chttpd:body_length(Req)),
+                att_len = case chttpd:header_value(Req,"Content-Length") of
                     undefined ->
                         undefined;
                     Length ->
                         list_to_integer(Length)
-                    end
-                    }]
+                    end,
+                md5 = get_md5_header(Req),
+                encoding = case string:to_lower(string:strip(
+                    chttpd:header_value(Req,"Content-Encoding","identity")
+                )) of
+                "identity" ->
+                   identity;
+                "gzip" ->
+                   gzip;
+                _ ->
+                   throw({
+                       bad_ctype,
+                       "Only gzip and identity content-encodings are supported"
+                   })
+                end
+            }]
     end,
 
     Doc = case extract_header_rev(Req, chttpd:qs_value(Req, "rev")) of
@@ -727,6 +785,26 @@ parse_doc_format(FormatStr) when is_list(FormatStr) ->
     end;
 parse_doc_format(_BadFormatStr) ->
     throw({bad_request, <<"Invalid doc format">>}).
+
+get_md5_header(Req) ->
+    ContentMD5 = couch_httpd:header_value(Req, "Content-MD5"),
+    Length = couch_httpd:body_length(Req),
+    Trailer = couch_httpd:header_value(Req, "Trailer"),
+    case {ContentMD5, Length, Trailer} of
+        _ when is_list(ContentMD5) orelse is_binary(ContentMD5) ->
+            base64:decode(ContentMD5);
+        {_, chunked, undefined} ->
+            <<>>;
+        {_, chunked, _} ->
+            case re:run(Trailer, "\\bContent-MD5\\b", [caseless]) of
+                {match, _} ->
+                    md5_in_footer;
+                _ ->
+                    <<>>
+            end;
+        _ ->
+            <<>>
+    end.
 
 parse_doc_query(Req) ->
     lists:foldl(fun({Key,Value}, Args) ->
