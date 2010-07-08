@@ -36,7 +36,7 @@ handle_welcome_req(Req) ->
 handle_welcome_req(#httpd{method='GET'}=Req, WelcomeMessage) ->
     send_json(Req, {[
         {couchdb, WelcomeMessage},
-        {version, <<"0.10.1+">>},
+        {version, list_to_binary(couch:version())},
         {cloudant_build, get_version()}
     ]});
 handle_welcome_req(Req, _) ->
