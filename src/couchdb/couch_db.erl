@@ -103,7 +103,7 @@ monitor(#db{main_pid=MainPid}) ->
     erlang:monitor(process, MainPid).
 
 start_compact(#db{update_pid=Pid}) ->
-    gen_server:cast(Pid, start_compact).
+    gen_server:call(Pid, start_compact).
 
 delete_doc(Db, Id, Revisions) ->
     DeletedDocs = [#doc{id=Id, revs=[Rev], deleted=true} || Rev <- Revisions],
