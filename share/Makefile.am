@@ -162,6 +162,7 @@ nobase_dist_localdata_DATA = \
     www/script/test/view_collation.js \
     www/script/test/view_collation_raw.js \
     www/script/test/view_conflicts.js \
+    www/script/test/view_compaction.js \
     www/script/test/view_errors.js \
     www/script/test/view_include_docs.js \
     www/script/test/view_multi_key_all_docs.js \
