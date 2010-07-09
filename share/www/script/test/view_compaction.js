@@ -80,6 +80,7 @@ couchTests.view_compaction = function(debug) {
   resp = db.designInfo("_design/foo");
   T(resp.view_index.update_seq === 3001);
 
+  var disk_size_before_compact = resp.view_index.disk_size;
 
   // compact view group
   var xhr = CouchDB.request("POST", "/" + db.name + "/_compact" + "/foo");
@@ -99,4 +100,5 @@ couchTests.view_compaction = function(debug) {
 
   resp = db.designInfo("_design/foo");
   T(resp.view_index.update_seq === 3001);
+  T(resp.view_index.disk_size < disk_size_before_compact);
 };
