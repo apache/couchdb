@@ -11,21 +11,21 @@ Version 1.0.0
 
 Security:
 
-* Added authentication caching, to avoid repeated opening and closing of the
-  users database for each request requiring authentication.
+ * Added authentication caching, to avoid repeated opening and closing of the
+   users database for each request requiring authentication.
 
 Storage System:
 
-* Small optimization for reordering result lists.
-* More efficient header commits.
-* Use O_APPEND to save lseeks.
-* Faster implementation of pread_iolist(). Further improves performance on
-  concurrent reads.
+ * Small optimization for reordering result lists.
+ * More efficient header commits.
+ * Use O_APPEND to save lseeks.
+ * Faster implementation of pread_iolist(). Further improves performance on
+   concurrent reads.
 
 View Server:
 
-* Faster default view collation.
-* Added option to include update_seq in view responses.
+ * Faster default view collation.
+ * Added option to include update_seq in view responses.
 
 Version 0.11.1
 --------------

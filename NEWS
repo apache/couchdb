@@ -15,13 +15,13 @@ This version has not been released yet.
 Version 1.0.0
 -------------
 
-* More efficient header commits.
-* Use O_APPEND to save lseeks.
-* Faster implementation of pread_iolist(). Further improves performance on
-  concurrent reads.
-* Added authentication caching
-* Faster default view collation.
-* Added option to include update_seq in view responses.
+ * More efficient header commits.
+ * Use O_APPEND to save lseeks.
+ * Faster implementation of pread_iolist(). Further improves performance on
+   concurrent reads.
+ * Added authentication caching
+ * Faster default view collation.
+ * Added option to include update_seq in view responses.
 
 Version 0.11.1
 --------------
