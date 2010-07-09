@@ -111,12 +111,15 @@ handle_changes_req(#httpd{method='GET'}=Req, Db) ->
 handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
-handle_compact_req(#httpd{method='POST',path_parts=[DbName,_,Id|_]}=Req, _Db) ->
+handle_compact_req(#httpd{method='POST',path_parts=[DbName,_,Id|_]}=Req, Db) ->
+    ok = couch_db:check_is_admin(Db),
     couch_httpd:validate_ctype(Req, "application/json"),
     ok = couch_view_compactor:start_compact(DbName, Id),
     send_json(Req, 202, {[{ok, true}]});
 
 handle_compact_req(#httpd{method='POST'}=Req, Db) ->
+    ok = couch_db:check_is_admin(Db),
+    couch_httpd:validate_ctype(Req, "application/json"),
     ok = couch_db:start_compact(Db),
     send_json(Req, 202, {[{ok, true}]});
 
@@ -125,6 +128,8 @@ handle_compact_req(Req, _Db) ->
 
 handle_view_cleanup_req(#httpd{method='POST'}=Req, Db) ->
     % delete unreferenced index files
+    ok = couch_db:check_is_admin(Db),
+    couch_httpd:validate_ctype(Req, "application/json"),
     ok = couch_view:cleanup_index_files(Db),
     send_json(Req, 202, {[{ok, true}]});
 
