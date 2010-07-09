@@ -186,7 +186,7 @@ handle_cast({compact_done, #group{current_seq=NewSeq} = NewGroup},
     ?LOG_INFO("View index compaction complete for ~s ~s", [DbName, GroupId]),
     FileName = index_file_name(RootDir, DbName, GroupSig),
     CompactName = index_file_name(compact, RootDir, DbName, GroupSig),
-    couch_file:delete(FileName),
+    ok = couch_file:delete(RootDir, FileName),
     ok = file:rename(CompactName, FileName),
 
     %% if an updater is running, kill it and start a new one
@@ -545,7 +545,7 @@ reset_file(Db, Fd, DbName, #group{sig=Sig,name=Name} = Group) ->
     init_group(Db, Fd, reset_group(Group), nil).
 
 delete_index_file(RootDir, DbName, GroupSig) ->
-    couch_file:delete(index_file_name(RootDir, DbName, GroupSig)).
+    couch_file:delete(RootDir, index_file_name(RootDir, DbName, GroupSig)).
 
 init_group(Db, Fd, #group{views=Views}=Group, nil) ->
     init_group(Db, Fd, Group,

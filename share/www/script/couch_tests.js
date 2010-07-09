@@ -85,6 +85,7 @@ loadTest("uuids.js");
 loadTest("view_collation.js");
 loadTest("view_collation_raw.js");
 loadTest("view_conflicts.js");
+loadTest("view_compaction.js");
 loadTest("view_errors.js");
 loadTest("view_include_docs.js");
 loadTest("view_multi_key_all_docs.js");
