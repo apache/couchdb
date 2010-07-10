@@ -32,7 +32,7 @@ compare_nodelists() ->
     end, orddict:new(), Replies),
     [{non_member_nodes, AllNodes -- Nodes}, {bad_nodes, BadNodes} | Dict].
 
--spec compare_shards(DbName::iolist()) -> [{bad_nodes | [#shard{}], [node()]}].
+-spec compare_shards(DbName::iodata()) -> [{bad_nodes | [#shard{}], [node()]}].
 compare_shards(DbName) when is_list(DbName) ->
     compare_shards(list_to_binary(DbName));
 compare_shards(DbName) ->
@@ -48,7 +48,7 @@ compare_shards(DbName) ->
 nodes() ->
     mem3_nodes:get_nodelist().
 
--spec shards(DbName::iolist()) -> [#shard{}].
+-spec shards(DbName::iodata()) -> [#shard{}].
 shards(DbName) when is_list(DbName) ->
     shards(list_to_binary(DbName));
 shards(DbName) ->
@@ -61,7 +61,7 @@ shards(DbName) ->
         mem3_util:load_shards_from_disk(DbName)
     end.
 
--spec shards(DbName::iolist(), DocId::binary()) -> [#shard{}].
+-spec shards(DbName::iodata(), DocId::binary()) -> [#shard{}].
 shards(DbName, DocId) when is_list(DbName) ->
     shards(list_to_binary(DbName), DocId);
 shards(DbName, DocId) when is_list(DocId) ->
@@ -85,7 +85,7 @@ shards(DbName, DocId) ->
         mem3_util:load_shards_from_disk(DbName, DocId)
     end.
 
--spec choose_shards(DbName::iolist(), Options::list()) -> [#shard{}].
+-spec choose_shards(DbName::iodata(), Options::list()) -> [#shard{}].
 choose_shards(DbName, Options) when is_list(DbName) ->
     choose_shards(list_to_binary(DbName), Options);
 choose_shards(DbName, Options) ->

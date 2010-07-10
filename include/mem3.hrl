@@ -1,4 +1,11 @@
--record(shard, {name, node, dbname, range, ref}).
+% type specification hacked to suppress dialyzer warning re: match spec
+-record(shard, {
+    name :: binary() | '_',
+    node :: node() | '_',
+    dbname :: binary(),
+    range :: [non_neg_integer() | '$1' | '$2'],
+    ref :: reference() | 'undefined' | '_'
+}).
 
 %% types
 -type join_type() :: init | join | replace | leave.
