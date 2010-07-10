@@ -9,7 +9,7 @@
 -include_lib("couch/include/couch_db.hrl").
 
 %% @doc looks for a fully covered keyrange in the list of counters
--spec is_progress_possible([{#shard{}, non_neg_integer()}]) -> boolean().
+-spec is_progress_possible([{#shard{}, term()}]) -> boolean().
 is_progress_possible([]) ->
     false;
 is_progress_possible(Counters) ->
@@ -37,7 +37,8 @@ is_progress_possible(Counters) ->
     end, Tail0, Rest),
     Result =:= complete.
 
--spec remove_overlapping_shards(#shard{}, [#shard{}]) -> [#shard{}].
+-spec remove_overlapping_shards(#shard{}, [{#shard{}, any()}]) ->
+    [{#shard{}, any()}].
 remove_overlapping_shards(#shard{range=[A,B]} = Shard0, Shards) ->
     fabric_dict:filter(fun(#shard{range=[X,Y]} = Shard, _Value) ->
         if Shard =:= Shard0 ->

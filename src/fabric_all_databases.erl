@@ -6,7 +6,7 @@
 -include_lib("mem3/include/mem3.hrl").
 
 %% @doc gets all databases in the cluster.
--spec all_databases(binary() | []) -> [binary()].
+-spec all_databases(string()) -> {ok, [binary()]}.
 all_databases([]) ->
     Dbs = ets:foldl(fun(#shard{dbname=DbName}, AccIn) ->
         new_acc(DbName, AccIn)
