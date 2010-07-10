@@ -53,7 +53,7 @@ code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
 
 %% @doc initializes a process started by rexi_server.
--spec init_p({pid(),reference()}, mfa()) -> any().
+-spec init_p({pid(), reference()}, {atom(), atom(), list()}) -> any().
 init_p(From, {M,F,A}) ->
     put(rexi_from, From),
     try apply(M, F, A) catch _:Reason -> exit(Reason) end.

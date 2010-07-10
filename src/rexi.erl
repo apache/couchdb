@@ -16,7 +16,7 @@ restart() ->
     stop(), start().
 
 %% @equiv cast(Node, self(), MFA)
--spec cast(node(), mfa()) -> reference().
+-spec cast(node(), {atom(), atom(), list()}) -> reference().
 cast(Node, MFA) ->
     cast(Node, self(), MFA).
 
@@ -27,7 +27,7 @@ cast(Node, MFA) ->
 %% Second, the remote process is monitored. If it exits with a Reason other
 %% than normal, Caller will receive a message of the form
 %% `{Ref, {rexi_EXIT, Reason}}' where Ref is the returned reference.
--spec cast(node(), pid(), mfa()) -> reference().
+-spec cast(node(), pid(), {atom(), atom(), list()}) -> reference().
 cast(Node, Caller, MFA) ->
     Ref = make_ref(),
     ok = gen_server:cast({?SERVER, Node}, {doit, {Caller,Ref}, MFA}),
