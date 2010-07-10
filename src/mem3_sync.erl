@@ -132,15 +132,15 @@ start_push_replication(DbName, Node) ->
         link(Pid),
         Pid;
     {db_not_found, _Msg} ->
-        case couch_api:open_db(DbName, []) of
+        case couch_db:open(DbName, []) of
         {ok, Db} ->
             % source exists, let's (re)create the target
-            couch_api:close_db(Db),
+            couch_db:close(Db),
             case rpc:call(Node, couch_api, create_db, [DbName, []]) of
             {ok, Target} ->
                 ?LOG_INFO("~p successfully created ~s on ~p", [?MODULE, DbName,
                     Node]),
-                couch_api:close_db(Target),
+                couch_db:close(Target),
                 start_push_replication(DbName, Node);
             file_exists ->
                 start_push_replication(DbName, Node);
