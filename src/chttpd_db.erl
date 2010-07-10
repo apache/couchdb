@@ -111,17 +111,13 @@ is_old_couch(Resp) ->
         string:str(UserAgent, "CouchDB/0") > 0
     end.
 
-handle_compact_req(#httpd{method='POST',path_parts=[DbName,_,Id|_]}=Req, _Db) ->
-    ok = ?COUCH:compact_view_group(DbName, Id),
-    send_json(Req, 202, {[{ok, true}]});
-
 handle_compact_req(Req, _) ->
     Msg = <<"Compaction is handled automatically by Cloudant">>,
-    chttpd:send_error(Req, 403, Msg).
+    couch_httpd:send_error(Req, 403, forbidden, Msg).
 
 handle_view_cleanup_req(Req, _) ->
     Msg = <<"Old view indices are purged automatically by Cloudant">>,
-    chttpd:send_error(Req, 403, Msg).
+    couch_httpd:send_error(Req, 403, forbidden, Msg).
 
 handle_design_req(#httpd{
         path_parts=[_DbName, _Design, Name, <<"_",_/binary>> = Action | _Rest],
@@ -282,11 +278,14 @@ db_req(#httpd{path_parts=[_,<<"_bulk_docs">>]}=Req, _Db) ->
 db_req(#httpd{method='POST',path_parts=[_,<<"_purge">>]}=Req, Db) ->
     {IdsRevs} = chttpd:json_body_obj(Req),
     IdsRevs2 = [{Id, couch_doc:parse_revs(Revs)} || {Id, Revs} <- IdsRevs],
-
-    case ?COUCH:purge_docs(Db, IdsRevs2) of
+    case fabric:purge_docs(Db, IdsRevs2) of
     {ok, PurgeSeq, PurgedIdsRevs} ->
-        PurgedIdsRevs2 = [{Id, couch_doc:rev_to_strs(Revs)} || {Id, Revs} <- PurgedIdsRevs],
-        send_json(Req, 200, {[{<<"purge_seq">>, PurgeSeq}, {<<"purged">>, {PurgedIdsRevs2}}]});
+        PurgedIdsRevs2 = [{Id, couch_doc:revs_to_strs(Revs)} || {Id, Revs}
+            <- PurgedIdsRevs],
+        send_json(Req, 200, {[
+            {<<"purge_seq">>, PurgeSeq},
+            {<<"purged">>, {PurgedIdsRevs2}}
+        ]});
     Error ->
         throw(Error)
     end;
@@ -638,7 +637,7 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
         Etag = chttpd:doc_etag(Doc),
         ReqAcceptsAttEnc = lists:member(
            atom_to_list(Enc),
-           chttpd:accepted_encodings(Req)
+           couch_httpd:accepted_encodings(Req)
         ),
         Headers = [
             {"ETag", Etag},

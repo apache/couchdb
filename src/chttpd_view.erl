@@ -90,7 +90,7 @@ handle_view_req(Req, _Db, _DDoc) ->
 
 handle_temp_view_req(Req, _Db) ->
     Msg = <<"Temporary views are not supported by Cloudant">>,
-    chttpd:send_error(Req, 403, Msg).
+    chttpd:send_error(Req, 403, forbidden, Msg).
 
 reverse_key_default(?MIN_STR) -> ?MAX_STR;
 reverse_key_default(?MAX_STR) -> ?MIN_STR;
