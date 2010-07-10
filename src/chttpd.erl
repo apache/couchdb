@@ -206,7 +206,6 @@ url_handler("_sleep") ->        fun chttpd_misc:handle_sleep_req/1;
 url_handler("_session") ->      fun chttpd_auth:handle_session_req/1;
 url_handler("_user") ->         fun chttpd_auth:handle_user_req/1;
 url_handler("_oauth") ->        fun chttpd_oauth:handle_oauth_req/1;
-url_handler("_stats") ->        fun chttpd_stats:handle_stats_req/1;
 url_handler("_metrics") ->      fun chttpd_misc:handle_metrics_req/1;
 url_handler("_restart") ->      fun showroom_http:handle_restart_req/1;
 url_handler("_cloudant") ->     fun showroom_httpd_admin:handle_cloudant_req/1;
