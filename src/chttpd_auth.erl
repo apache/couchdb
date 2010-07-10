@@ -233,7 +233,7 @@ ensure_users_db_exists(DbName) ->
 basic_username_pw(Req) ->
     case chttpd:header_value(Req, "Authorization") of
     "Basic " ++ Base64Value ->
-        case string:tokens(?b2l(couch_util:decodeBase64(Base64Value)),":") of
+        case string:tokens(?b2l(base64:decode(Base64Value)),":") of
         [User, Pass] ->
             {User, Pass};
         [User] ->
