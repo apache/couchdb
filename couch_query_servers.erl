@@ -130,8 +130,6 @@ os_reduce(Lang, OsRedSrcs, KVs) ->
     end,
     {ok, OsResults}.
 
-os_rereduce(_Lang, [], _KVs) ->
-    {ok, []};
 os_rereduce(Lang, OsRedSrcs, KVs) ->
     Proc = get_os_process(Lang),
     try proc_prompt(Proc, [<<"rereduce">>, OsRedSrcs, KVs]) of
@@ -275,23 +273,15 @@ handle_call({get_proc, #doc{body={Props}}=DDoc, DDocKey}, _From, {Langs, PidProc
     case ets:lookup(LangProcs, Lang) of
     [{Lang, [P|Rest]}] ->
         % find a proc in the set that has the DDoc
-        case proc_with_ddoc(DDoc, DDocKey, [P|Rest]) of
-        {ok, Proc} ->
-            rem_from_list(LangProcs, Lang, Proc),
-            {reply, {ok, Proc, get_query_server_config()}, Server};
-        Error ->
-            {reply, Error, Server}
-        end;
+        {ok, Proc} = proc_with_ddoc(DDoc, DDocKey, [P|Rest]),
+        rem_from_list(LangProcs, Lang, Proc),
+        {reply, {ok, Proc, get_query_server_config()}, Server};
     _ ->
         case (catch new_process(Langs, Lang)) of
         {ok, Proc} ->
             add_value(PidProcs, Proc#proc.pid, Proc),
-            case proc_with_ddoc(DDoc, DDocKey, [Proc]) of
-            {ok, Proc2} ->
-                {reply, {ok, Proc2, get_query_server_config()}, Server};
-            Error ->
-                {reply, Error, Server}
-            end;
+            {ok, Proc2} = proc_with_ddoc(DDoc, DDocKey, [Proc]),
+            {reply, {ok, Proc2, get_query_server_config()}, Server};
         Error ->
             {reply, Error, Server}
         end
