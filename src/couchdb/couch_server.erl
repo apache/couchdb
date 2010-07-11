@@ -326,7 +326,7 @@ handle_call({delete, DbName, _Options}, _From, Server) ->
             couch_util:shutdown_sync(Pid),
             true = ets:delete(couch_dbs_by_name, DbName),
             true = ets:delete(couch_dbs_by_pid, Pid),
-            [gen_server:send_result(F, not_found) || F <- Froms],
+            [gen_server:reply(F, not_found) || F <- Froms],
             true;
         [{_, {opened, Pid, LruTime}}] ->
             couch_util:shutdown_sync(Pid),
