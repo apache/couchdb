@@ -600,13 +600,12 @@ db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
     couch_doc:validate_docid(DocId),
     couch_httpd:validate_ctype(Req, "multipart/form-data"),
     Form = couch_httpd:parse_form(Req),
-    case proplists:is_defined("_doc", Form) of
-    true ->
-        Json = ?JSON_DECODE(couch_util:get_value("_doc", Form)),
-        Doc = couch_doc_from_req(Req, DocId, Json);
-    false ->
-        Rev = couch_doc:parse_rev(list_to_binary(couch_util:get_value("_rev", Form))),
-        {ok, [{ok, Doc}]} = couch_db:open_doc_revs(Db, DocId, [Rev], [])
+    case couch_util:get_value("_doc", Form) of
+    undefined ->
+        Rev = couch_doc:parse_rev(couch_util:get_value("_rev", Form)),
+        {ok, [{ok, Doc}]} = couch_db:open_doc_revs(Db, DocId, [Rev], []);
+    Json ->
+        Doc = couch_doc_from_req(Req, DocId, ?JSON_DECODE(Json))
     end,
     UpdatedAtts = [
         #att{name=validate_attachment_name(Name),
