@@ -139,7 +139,7 @@ log(Fd, Pid, Level, Format, Args) ->
 
 read(Bytes, Offset) ->
     LogFileName = couch_config:get("log", "file"),
-    LogFileSize = couch_util:file_read_size(LogFileName),
+    LogFileSize = filelib:file_size(LogFileName),
 
     {ok, Fd} = file:open(LogFileName, [read]),
     Start = lists:max([LogFileSize - Bytes, 0]) + Offset,

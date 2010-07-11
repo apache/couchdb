@@ -18,7 +18,7 @@
 -export([abs_pathname/1,abs_pathname/2, trim/1, ascii_lower/1]).
 -export([encodeBase64Url/1, decodeBase64Url/1]).
 -export([to_hex/1, parse_term/1, dict_find/3]).
--export([file_read_size/1, get_nested_json_value/2, json_user_ctx/1]).
+-export([get_nested_json_value/2, json_user_ctx/1]).
 -export([proplist_apply_field/2, json_apply_field/2]).
 -export([to_binary/1, to_integer/1, to_list/1, url_encode/1]).
 -export([json_encode/1, json_decode/1]).
@@ -312,14 +312,6 @@ dict_find(Key, Dict, DefaultValue) ->
         Value;
     error ->
         DefaultValue
-    end.
-
-
-file_read_size(FileName) ->
-    case file:read_file_info(FileName) of
-        {ok, FileInfo} ->
-            FileInfo#file_info.size;
-        Error -> Error
     end.
 
 to_binary(V) when is_binary(V) ->
