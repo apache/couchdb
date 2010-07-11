@@ -970,9 +970,7 @@ db_attachment_req(#httpd{method=Method,mochi_req=MochiReq}=Req, Db, DocId, FileN
                         end,
                         
                         
-                        fun() -> couch_httpd:recv(Req, 0) end;
-                    Length ->
-                        exit({length_not_integer, Length})
+                        fun() -> couch_httpd:recv(Req, 0) end
                     end,
                 att_len = case couch_httpd:header_value(Req,"Content-Length") of
                     undefined ->
