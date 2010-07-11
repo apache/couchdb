@@ -15,7 +15,7 @@
 -export([priv_dir/0, start_driver/1, normpath/1]).
 -export([should_flush/0, should_flush/1, to_existing_atom/1]).
 -export([rand32/0, implode/2, collate/2, collate/3]).
--export([abs_pathname/1,abs_pathname/2, trim/1, ascii_lower/1]).
+-export([abs_pathname/1,abs_pathname/2, trim/1]).
 -export([encodeBase64Url/1, decodeBase64Url/1]).
 -export([to_hex/1, parse_term/1, dict_find/3]).
 -export([get_nested_json_value/2, json_user_ctx/1]).
@@ -195,18 +195,6 @@ separate_cmd_args(" " ++ Rest, CmdAcc) ->
     {lists:reverse(CmdAcc), " " ++ Rest};
 separate_cmd_args([Char|Rest], CmdAcc) ->
     separate_cmd_args(Rest, [Char | CmdAcc]).
-
-% lowercases string bytes that are the ascii characters A-Z.
-% All other characters/bytes are ignored.
-ascii_lower(String) ->
-    ascii_lower(String, []).
-
-ascii_lower([], Acc) ->
-    lists:reverse(Acc);
-ascii_lower([Char | RestString], Acc) when Char >= $A, Char =< $B ->
-    ascii_lower(RestString, [Char + ($a-$A) | Acc]);
-ascii_lower([Char | RestString], Acc) ->
-    ascii_lower(RestString, [Char | Acc]).
 
 % Is a character whitespace?
 is_whitespace($\s) -> true;
