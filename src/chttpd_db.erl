@@ -28,7 +28,8 @@
     options = [],
     rev = nil,
     open_revs = [],
-    show = nil
+    update_type = interactive_edit,
+    atts_since = nil
 }).
 
 % Database request handlers
@@ -414,52 +415,45 @@ db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
 
 db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
     #doc_query_args{
-        show = Format,
         rev = Rev,
         open_revs = Revs,
         options = Options
     } = parse_doc_query(Req),
-    case Format of
-    nil ->
-        case Revs of
+    case Revs of
+    [] ->
+        Doc = couch_doc_open(Db, DocId, Rev, Options),
+        DiskEtag = chttpd:doc_etag(Doc),
+        case Doc#doc.meta of
         [] ->
-            Doc = couch_doc_open(Db, DocId, Rev, Options),
-            DiskEtag = chttpd:doc_etag(Doc),
-            case Doc#doc.meta of
-            [] ->
-                % output etag only when we have no meta
-                chttpd:etag_respond(Req, DiskEtag, fun() ->
-                    send_json(Req, 200, [{"Etag", DiskEtag}], couch_doc:to_json_obj(Doc, Options))
-                end);
-            _ ->
-                send_json(Req, 200, [], couch_doc:to_json_obj(Doc, Options))
-            end;
+            % output etag only when we have no meta
+            chttpd:etag_respond(Req, DiskEtag, fun() ->
+                send_json(Req, 200, [{"Etag", DiskEtag}], couch_doc:to_json_obj(Doc, Options))
+            end);
         _ ->
-            {ok, Results} = fabric:open_revs(Db, DocId, Revs, Options),
-            {ok, Resp} = start_json_response(Req, 200),
-            send_chunk(Resp, "["),
-            % We loop through the docs. The first time through the separator
-            % is whitespace, then a comma on subsequent iterations.
-            lists:foldl(
-                fun(Result, AccSeparator) ->
-                    case Result of
-                    {ok, Doc} ->
-                        JsonDoc = couch_doc:to_json_obj(Doc, Options),
-                        Json = ?JSON_ENCODE({[{ok, JsonDoc}]}),
-                        send_chunk(Resp, AccSeparator ++ Json);
-                    {{not_found, missing}, RevId} ->
-                        Json = ?JSON_ENCODE({[{"missing", RevId}]}),
-                        send_chunk(Resp, AccSeparator ++ Json)
-                    end,
-                    "," % AccSeparator now has a comma
-                end,
-                "", Results),
-            send_chunk(Resp, "]"),
-            end_json_response(Resp)
+            send_json(Req, 200, [], couch_doc:to_json_obj(Doc, Options))
         end;
     _ ->
-        {DesignName, ShowName} = Format,
-        chttpd_show:handle_doc_show(Req, DesignName, ShowName, DocId, Db)
+        {ok, Results} = fabric:open_revs(Db, DocId, Revs, Options),
+        {ok, Resp} = start_json_response(Req, 200),
+        send_chunk(Resp, "["),
+        % We loop through the docs. The first time through the separator
+        % is whitespace, then a comma on subsequent iterations.
+        lists:foldl(
+            fun(Result, AccSeparator) ->
+                case Result of
+                {ok, Doc} ->
+                    JsonDoc = couch_doc:to_json_obj(Doc, Options),
+                    Json = ?JSON_ENCODE({[{ok, JsonDoc}]}),
+                    send_chunk(Resp, AccSeparator ++ Json);
+                {{not_found, missing}, RevId} ->
+                    Json = ?JSON_ENCODE({[{"missing", RevId}]}),
+                    send_chunk(Resp, AccSeparator ++ Json)
+                end,
+                "," % AccSeparator now has a comma
+            end,
+            "", Results),
+        send_chunk(Resp, "]"),
+        end_json_response(Resp)
     end;
 
 db_doc_req(#httpd{method='POST', user_ctx=Ctx}=Req, Db, DocId) ->
@@ -500,23 +494,43 @@ db_doc_req(#httpd{method='POST', user_ctx=Ctx}=Req, Db, DocId) ->
         {rev, couch_doc:rev_to_str(NewRev)}
     ]});
 
-db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
+db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
+    #doc_query_args{
+        update_type = UpdateType
+    } = parse_doc_query(Req),
     couch_doc:validate_docid(DocId),
-    Json = chttpd:json_body(Req),
-    case chttpd:qs_value(Req, "batch") of
-    "ok" ->
-        % batch
-        Doc = couch_doc_from_req(Req, DocId, Json),
-        ok = couch_batch_save:eventually_save_doc(Db#db.name, Doc, Db#db.user_ctx),
-        send_json(Req, 202, [], {[
-            {ok, true},
-            {id, DocId}
-        ]});
-    _Normal ->
-        % normal
-        DbName = couch_db:name(Db),
-        Location = absolute_uri(Req, <<"/", DbName/binary, "/", DocId/binary>>),
-        update_doc(Req, Db, DocId, Json, [{"Location", Location}])
+    
+    Loc = absolute_uri(Req, [$/, Db#db.name, $/, DocId]),
+    RespHeaders = [{"Location", Loc}],
+    case couch_util:to_list(couch_httpd:header_value(Req, "Content-Type")) of
+    ("multipart/related;" ++ _) = ContentType ->
+        {ok, Doc0} = couch_doc:doc_from_multi_part_stream(ContentType,
+                fun() -> receive_request_data(Req) end),
+        Doc = couch_doc_from_req(Req, DocId, Doc0),
+        update_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType);
+    _Else ->
+        case couch_httpd:qs_value(Req, "batch") of
+        "ok" ->
+            % batch
+            Doc = couch_doc_from_req(Req, DocId, couch_httpd:json_body(Req)),
+        
+            spawn(fun() ->
+                    case catch(fabric:update_doc(Db, Doc, [{user_ctx,Ctx}])) of
+                    {ok, _} -> ok;
+                    Error ->
+                        ?LOG_INFO("Batch doc error (~s): ~p",[DocId, Error])
+                    end
+                end),
+            send_json(Req, 202, [], {[
+                {ok, true},
+                {id, DocId}
+            ]});
+        _Normal ->
+            % normal
+            Body = couch_httpd:json_body(Req),
+            Doc = couch_doc_from_req(Req, DocId, Body),
+            update_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType)
+        end
     end;
 
 db_doc_req(#httpd{method='COPY', user_ctx=Ctx}=Req, Db, SourceDocId) ->
@@ -539,6 +553,8 @@ db_doc_req(#httpd{method='COPY', user_ctx=Ctx}=Req, Db, SourceDocId) ->
 db_doc_req(Req, _Db, _DocId) ->
     send_method_not_allowed(Req, "DELETE,GET,HEAD,POST,PUT,COPY").
 
+receive_request_data(Req) ->
+    {couch_httpd:recv(Req, 0), fun() -> receive_request_data(Req) end}.
 
 update_doc_result_to_json({{Id, Rev}, Error}) ->
         {_Code, Err, Msg} = chttpd:error_info(Error),
@@ -557,28 +573,27 @@ update_doc_result_to_json(DocId, Error) ->
 update_doc(Req, Db, DocId, Json) ->
     update_doc(Req, Db, DocId, Json, []).
 
-update_doc(#httpd{user_ctx=Ctx} = Req, Db, DocId, Json, Headers) ->
-    #doc{deleted=Deleted} = Doc = couch_doc_from_req(Req, DocId, Json),
+update_doc(Req, Db, DocId, Doc, Headers) ->
+    update_doc(Req, Db, DocId, Doc, Headers, interactive_edit).
 
-    case chttpd:header_value(Req, "X-Couch-Full-Commit") of
+update_doc(#httpd{user_ctx=Ctx} = Req, Db, DocId, #doc{deleted=Deleted}=Doc,
+        Headers, UpdateType) ->
+    case couch_httpd:header_value(Req, "X-Couch-Full-Commit") of
     "true" ->
-        Options = [full_commit, {user_ctx,Ctx}];
+        Options = [full_commit, UpdateType, {user_ctx,Ctx}];
     "false" ->
-        Options = [delay_commit, {user_ctx,Ctx}];
+        Options = [delay_commit, UpdateType, {user_ctx,Ctx}];
     _ ->
-        Options = [{user_ctx,Ctx}]
+        Options = [UpdateType, {user_ctx,Ctx}]
     end,
-    {Status, NewRev} = case fabric:update_doc(Db, Doc, Options) of
-    {ok, NewRev1} -> {201, NewRev1};
-    {accepted, NewRev1} -> {202, NewRev1}
-    end,
+    {ok, NewRev} = fabric:update_doc(Db, Doc, Options),
     NewRevStr = couch_doc:rev_to_str(NewRev),
-    ResponseHeaders = [{"Etag", <<"\"", NewRevStr/binary, "\"">>}] ++ Headers,
-    send_json(Req, if Deleted -> 200; true -> Status end,
-        ResponseHeaders, {[
-            {ok, true},
-            {id, DocId},
-            {rev, NewRevStr}]}).
+    ResponseHeaders = [{"Etag", <<"\"", NewRevStr/binary, "\"">>} | Headers],
+    send_json(Req, if Deleted -> 200; true -> 201 end, ResponseHeaders, {[
+        {ok, true},
+        {id, DocId},
+        {rev, NewRevStr}
+    ]}).
 
 couch_doc_from_req(Req, DocId, Json) ->
     Doc = couch_doc:from_json_obj(Json),
@@ -774,17 +789,6 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
 db_attachment_req(Req, _Db, _DocId, _FileNameParts) ->
     send_method_not_allowed(Req, "DELETE,GET,HEAD,PUT").
 
-parse_doc_format(FormatStr) when is_binary(FormatStr) ->
-    parse_doc_format(?b2l(FormatStr));
-parse_doc_format(FormatStr) when is_list(FormatStr) ->
-    SplitFormat = lists:splitwith(fun($/) -> false; (_) -> true end, FormatStr),
-    case SplitFormat of
-        {DesignName, [$/ | ShowName]} -> {?l2b(DesignName), ?l2b(ShowName)};
-        _Else -> throw({bad_request, <<"Invalid doc format">>})
-    end;
-parse_doc_format(_BadFormatStr) ->
-    throw({bad_request, <<"Invalid doc format">>}).
-
 get_md5_header(Req) ->
     ContentMD5 = couch_httpd:header_value(Req, "Content-MD5"),
     Length = couch_httpd:body_length(Req),
@@ -836,8 +840,16 @@ parse_doc_query(Req) ->
         {"open_revs", RevsJsonStr} ->
             JsonArray = ?JSON_DECODE(RevsJsonStr),
             Args#doc_query_args{open_revs=[couch_doc:parse_rev(Rev) || Rev <- JsonArray]};
-        {"show", FormatStr} ->
-            Args#doc_query_args{show=parse_doc_format(FormatStr)};
+        {"atts_since", RevsJsonStr} ->
+            JsonArray = ?JSON_DECODE(RevsJsonStr),
+            Args#doc_query_args{atts_since = couch_doc:parse_revs(JsonArray)};
+        {"new_edits", "false"} ->
+            Args#doc_query_args{update_type=replicated_changes};
+        {"new_edits", "true"} ->
+            Args#doc_query_args{update_type=interactive_edit};
+        {"att_encoding_info", "true"} ->
+            Options = [att_encoding_info | Args#doc_query_args.options],
+            Args#doc_query_args{options=Options};
         {"r", R} ->
             Options = [{r,R} | Args#doc_query_args.options],
             Args#doc_query_args{options=Options};

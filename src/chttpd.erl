@@ -289,7 +289,7 @@ absolute_uri(#httpd{mochi_req=MochiReq} = Req, Path) ->
             end
     end,
     CustomerRegex = ["^/", cloudant_util:customer_name(Req), "[/%2F]+"],
-    NewPath = re:replace(Path, CustomerRegex, "/"),
+    NewPath = re:replace(Path, CustomerRegex, "/", [{return,list}]),
     Scheme ++ "://" ++ Host ++ NewPath.
 
 unquote(UrlEncodedString) ->
