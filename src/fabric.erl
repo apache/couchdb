@@ -70,12 +70,15 @@ get_missing_revs(DbName, IdsRevs) when is_list(IdsRevs) ->
     fabric_doc_missing_revs:go(dbname(DbName), Sanitized).
 
 update_doc(DbName, Doc, Options) ->
-    {ok, [Result]} = update_docs(DbName, [Doc], opts(Options)),
-    case Result of
-    {ok, _} ->
-        Result;
-    Error ->
-        throw(Error)
+    case update_docs(DbName, [Doc], opts(Options)) of
+    {ok, [{ok, NewRev}]} ->
+        {ok, NewRev};
+    {ok, [Error]} ->
+        throw(Error);
+    {ok, []} ->
+        % replication success
+        #doc{revs = {Pos, [RevId | _]}} = doc(Doc),
+        {ok, {Pos, RevId}}
     end.
 
 update_docs(DbName, Docs, Options) ->
