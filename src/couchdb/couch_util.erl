@@ -144,11 +144,18 @@ get_nested_json_value(Value, []) ->
 get_nested_json_value(_NotJSONObj, _) ->
     throw({not_found, json_mismatch}).
 
-proplist_apply_field({K, _V} = KV, L) ->
-    lists:keystore(K, 1, L, KV).
+proplist_apply_field(H, L) ->
+    {R} = json_apply_field(H, {L}),
+    R.
 
-json_apply_field({K, _V} = KV, {L}) ->
-    {lists:keystore(K, 1, L, KV)}.
+json_apply_field(H, {L}) ->
+    json_apply_field(H, L, []).
+json_apply_field({Key, NewValue}, [{Key, _OldVal} | Headers], Acc) ->
+    json_apply_field({Key, NewValue}, Headers, Acc);
+json_apply_field({Key, NewValue}, [{OtherKey, OtherVal} | Headers], Acc) ->
+    json_apply_field({Key, NewValue}, Headers, [{OtherKey, OtherVal} | Acc]);
+json_apply_field({Key, NewValue}, [], Acc) ->
+    {[{Key, NewValue}|Acc]}.
 
 json_user_ctx(#db{name=DbName, user_ctx=Ctx}) ->
     {[{<<"db">>, DbName},
