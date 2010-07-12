@@ -5,7 +5,6 @@
   {vsn, "1.0"},
   {modules, [
        fabric,
-       fabric_all_databases,
        fabric_db_create,
        fabric_db_delete,
        fabric_db_doc_count,

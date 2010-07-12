@@ -23,10 +23,21 @@
 % db operations
 
 all_dbs() ->
-    fabric_all_databases:all_databases("").
+    all_dbs(<<>>).
 
-all_dbs(Customer) ->
-    fabric_all_databases:all_databases(Customer).
+all_dbs(Prefix) when is_list(Prefix) ->
+    all_dbs(list_to_binary(Prefix));
+all_dbs(Prefix) when is_binary(Prefix) ->
+    Length = byte_size(Prefix),
+    MatchingDbs = ets:foldl(fun(#shard{dbname=DbName}, Acc) ->
+        case DbName of
+        <<Prefix:Length/binary, _/binary>> ->
+            [DbName | Acc];
+        _ ->
+            Acc
+        end
+    end, [], partitions),
+    {ok, lists:usort(MatchingDbs)}.
 
 get_db_info(DbName) ->
     fabric_db_info:go(dbname(DbName)).
