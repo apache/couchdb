@@ -14,15 +14,15 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -export([start_link/0, stop/0, handle_request/1, config_change/2,
-    primary_header_value/2, header_value/2, header_value/3, qs_value/2, 
+    primary_header_value/2, header_value/2, header_value/3, qs_value/2,
     qs_value/3, qs/1, path/1, absolute_uri/2, body_length/1,
     verify_is_server_admin/1, unquote/1, quote/1, recv/2,recv_chunked/4,
     error_info/1, parse_form/1, json_body/1, json_body_obj/1, body/1,
     doc_etag/1, make_etag/1, etag_respond/3, partition/1, serve_file/3,
-    server_header/0, start_chunked_response/3,send_chunk/2, 
+    server_header/0, start_chunked_response/3,send_chunk/2,
     start_response_length/4, send/2, start_json_response/2,
     start_json_response/3, end_json_response/1, send_response/4,
-    send_method_not_allowed/2, send_error/2, send_error/4, send_redirect/2, 
+    send_method_not_allowed/2, send_error/2, send_error/4, send_redirect/2,
     send_chunked_error/2, send_json/2,send_json/3,send_json/4]).
 
 start_link() ->
@@ -268,7 +268,7 @@ absolute_uri(#httpd{mochi_req=MochiReq} = Req, Path) ->
     Host = case MochiReq:get_header_value(XHost) of
         undefined ->
             case MochiReq:get_header_value("Host") of
-                undefined ->    
+                undefined ->
                     {ok, {Address, Port}} = inet:sockname(MochiReq:get(socket)),
                     inet_parse:ntoa(Address) ++ ":" ++ integer_to_list(Port);
                 Value1 ->
@@ -309,7 +309,7 @@ recv_chunked(#httpd{mochi_req=MochiReq}, MaxChunkSize, ChunkFun, InitState) ->
     % Fun({Length, Binary}, State)
     % called with Length == 0 on the last time.
     MochiReq:stream_body(MaxChunkSize, ChunkFun, InitState).
-    
+
 body_length(Req) ->
     case header_value(Req, "Transfer-Encoding") of
         undefined ->
