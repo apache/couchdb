@@ -18,8 +18,6 @@
     handle_task_status_req/1,handle_sleep_req/1,handle_welcome_req/1,
     handle_utils_dir_req/1, handle_favicon_req/1, handle_metrics_req/1]).
 
--export([increment_update_seq_req/2]).
-
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -190,17 +188,6 @@ handle_config_req(#httpd{method='DELETE',path_parts=[_,Section,Key]}=Req) ->
     end;
 handle_config_req(Req) ->
     send_method_not_allowed(Req, "GET,PUT,DELETE").
-
-
-% httpd db handlers
-
-increment_update_seq_req(#httpd{method='POST'}=Req, Db) ->
-    {ok, NewSeq} = ?COUCH:increment_update_seq(Db),
-    send_json(Req, {[{ok, true},
-        {update_seq, NewSeq}
-    ]});
-increment_update_seq_req(Req, _Db) ->
-    send_method_not_allowed(Req, "POST").
 
 % httpd log handlers
 
