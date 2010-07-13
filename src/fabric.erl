@@ -82,7 +82,10 @@ update_doc(DbName, Doc, Options) ->
     end.
 
 update_docs(DbName, Docs, Options) ->
-    fabric_doc_update:go(dbname(DbName), docs(Docs), opts(Options)).
+    try fabric_doc_update:go(dbname(DbName), docs(Docs), opts(Options))
+    catch {aborted, PreCommitFailures} ->
+        {aborted, PreCommitFailures}
+    end.
 
 att_receiver(Req, Length) ->
     fabric_doc_attachments:receiver(Req, Length).

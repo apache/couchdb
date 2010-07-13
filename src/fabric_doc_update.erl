@@ -6,7 +6,9 @@
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
-go(DbName, AllDocs, Options) ->
+go(DbName, AllDocs, Opts) ->
+    validate_atomic_update(DbName, AllDocs, lists:member(all_or_nothing, Opts)),
+    Options = lists:delete(all_or_nothing, Opts),
     GroupedDocs = lists:map(fun({#shard{name=Name, node=Node} = Shard, Docs}) ->
         Ref = rexi:cast(Node, {fabric_rpc, update_docs, [Name, Docs, Options]}),
         {Shard#shard{ref=Ref}, Docs}
@@ -107,3 +109,15 @@ skip_message(Acc0) ->
     % TODO fix this
     {ok, Acc0}.
 
+validate_atomic_update(_, _, false) ->
+    ok;
+validate_atomic_update(_DbName, AllDocs, true) ->
+    % TODO actually perform the validation.  This requires some hackery, we need
+    % to basically extract the prep_and_validate_updates function from couch_db
+    % and only run that, without actually writing in case of a success.
+    Error = {not_implemented, <<"all_or_nothing is not supported yet">>},
+    PreCommitFailures = lists:map(fun(#doc{id=Id, revs = {Pos,Revs}}) ->
+        case Revs of [] -> RevId = <<>>; [RevId|_] -> ok end,
+        {{Id, {Pos, RevId}}, Error}
+    end, AllDocs),
+    throw({aborted, PreCommitFailures}).
