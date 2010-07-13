@@ -208,6 +208,7 @@ url_handler("_user") ->         fun chttpd_auth:handle_user_req/1;
 url_handler("_oauth") ->        fun chttpd_oauth:handle_oauth_req/1;
 url_handler("_metrics") ->      fun chttpd_misc:handle_metrics_req/1;
 url_handler("_restart") ->      fun showroom_http:handle_restart_req/1;
+url_handler("_membership") ->   fun mem3_httpd:handle_membership_req/1;
 url_handler("_cloudant") ->     fun showroom_httpd_admin:handle_cloudant_req/1;
 url_handler(_) ->               fun chttpd_db:handle_request/1.
 
