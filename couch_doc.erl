@@ -27,8 +27,8 @@ to_json_rev(0, []) ->
 to_json_rev(Start, [FirstRevId|_]) ->
     [{<<"_rev">>, ?l2b([integer_to_list(Start),"-",revid_to_str(FirstRevId)])}].
 
-to_json_body(true, _Body) ->
-    [{<<"_deleted">>, true}];
+to_json_body(true, {Body}) ->
+    Body ++ [{<<"_deleted">>, true}];
 to_json_body(false, {Body}) ->
     Body.
 
