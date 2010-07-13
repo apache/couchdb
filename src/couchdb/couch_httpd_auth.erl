@@ -237,18 +237,21 @@ auth_design_doc(DocId) ->
         {
             <<"validate_doc_update">>,
             <<"function(newDoc, oldDoc, userCtx) {
-                if ((oldDoc || newDoc).type != 'user') {
-                    throw({forbidden : 'doc.type must be user'});
-                } // we only validate user docs for now
                 if (newDoc._deleted === true) {
-                    // allow deletes by admins and matching users 
+                    // allow deletes by admins and matching users
                     // without checking the other fields
-                    if ((userCtx.roles.indexOf('_admin') != -1) || (userCtx.name == oldDoc.name)) {
+                    if ((userCtx.roles.indexOf('_admin') !== -1) ||
+                        (userCtx.name == oldDoc.name)) {
                         return;
                     } else {
-                        throw({forbidden : 'Only admins may delete other user docs.'});
+                        throw({forbidden: 'Only admins may delete other user docs.'});
                     }
                 }
+
+                if ((oldDoc && oldDoc.type !== 'user') || newDoc.type !== 'user') {
+                    throw({forbidden : 'doc.type must be user'});
+                } // we only allow user docs for now
+
                 if (!newDoc.name) {
                     throw({forbidden : 'doc.name is required'});
                 }

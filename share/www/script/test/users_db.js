@@ -85,7 +85,11 @@ couchTests.users_db = function(debug) {
       T(e.error == "unauthorized")
       T(/conflict/.test(e.reason))
     }
-
+    // you can delete a user doc
+    s = CouchDB.session().userCtx;
+    T(s.name == null);
+    T(s.roles.indexOf("_admin") !== -1);
+    T(usersDb.deleteDoc(jchrisWithConflict).ok);
   };
   
   run_on_modified_server(
