@@ -12,10 +12,6 @@
 
 -define(AUTH_DB_DOC_VALIDATE_FUNCTION, <<"
     function(newDoc, oldDoc, userCtx) {
-        if ((oldDoc && oldDoc.type !== 'user') || newDoc.type !== 'user') {
-            throw({forbidden : 'doc.type must be user'});
-        } // we only allow user docs for now
-
         if (newDoc._deleted === true) {
             // allow deletes by admins and matching users
             // without checking the other fields
@@ -26,6 +22,10 @@
                 throw({forbidden: 'Only admins may delete other user docs.'});
             }
         }
+
+        if ((oldDoc && oldDoc.type !== 'user') || newDoc.type !== 'user') {
+            throw({forbidden : 'doc.type must be user'});
+        } // we only allow user docs for now
 
         if (!newDoc.name) {
             throw({forbidden: 'doc.name is required'});
