@@ -9,7 +9,7 @@
 
 handle_membership_req(#httpd{method='GET',
                            path_parts=[<<"_membership">>]} = Req) ->
-    {ok,ClusterNodes} = try mem3:nodes()
+    ClusterNodes = try mem3:nodes()
     catch _:_ -> {ok,[]} end,
     couch_httpd:send_json(Req, {[
         {all_nodes, lists:sort([node()|nodes()])},
