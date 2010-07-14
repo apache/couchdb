@@ -52,6 +52,7 @@ nobase_dist_localdata_DATA = \
     www/dialog/_delete_database.html \
     www/dialog/_delete_document.html \
     www/dialog/_database_security.html \
+    www/dialog/_share_test_reports.html \
     www/dialog/_save_view_as.html \
     www/dialog/_upload_attachment.html \
     www/document.html \
