@@ -250,7 +250,9 @@ view_fold(KV, OffsetReds, #view_acc{offset=nil, total_rows=Total} = Acc) ->
     ok ->
         view_fold(KV, OffsetReds, Acc#view_acc{offset=Offset});
     stop ->
-        exit(normal)
+        exit(normal);
+    timeout ->
+        exit(timeout)
     end;
 view_fold(_KV, _Offset, #view_acc{limit=0} = Acc) ->
     % we scanned through limit+skip local rows
@@ -272,13 +274,21 @@ view_fold({{Key,Id}, Value}, _Offset, Acc) ->
             couch_doc:to_json_obj(Doc0, [])
         end
     end,
-    rexi:sync_reply(#view_row{key=Key, id=Id, value=Value, doc=Doc}),
-    {ok, Acc#view_acc{limit=Limit-1}}.
+    case rexi:sync_reply(#view_row{key=Key, id=Id, value=Value, doc=Doc}) of
+    ok ->
+        {ok, Acc#view_acc{limit=Limit-1}};
+    timeout ->
+        exit(timeout)
+    end.
 
 final_response(Total, nil) ->
     case rexi:sync_reply({total_and_offset, Total, Total}) of ok ->
         rexi:reply(complete);
-    stop -> ok end;
+    stop ->
+        ok;
+    timeout ->
+        exit(timeout)
+    end;
 final_response(_Total, _Offset) ->
     rexi:reply(complete).
 
@@ -307,7 +317,9 @@ send(Key, Value, #view_acc{limit=Limit} = Acc) ->
     ok ->
         {ok, Acc#view_acc{limit=Limit-1}};
     stop ->
-        exit(normal)
+        exit(normal);
+    timeout ->
+        exit(timeout)
     end.
 
 changes_enumerator(DocInfos, {Db, _Seq, Args}) ->
