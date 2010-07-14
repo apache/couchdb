@@ -9,6 +9,7 @@
        fabric_db_delete,
        fabric_db_doc_count,
        fabric_db_info,
+       fabric_db_meta,
        fabric_dict,
        fabric_doc_attachments,
        fabric_doc_missing_revs,

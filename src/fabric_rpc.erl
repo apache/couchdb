@@ -3,7 +3,8 @@
 -export([get_db_info/1, get_doc_count/1, get_update_seq/1]).
 -export([open_doc/3, open_revs/4, get_missing_revs/2, update_docs/3]).
 -export([all_docs/2, changes/3, map_view/4, reduce_view/4, group_info/2]).
--export([create_db/3, delete_db/3, reset_validation_funs/1]).
+-export([create_db/3, delete_db/3, reset_validation_funs/1, set_security/3,
+    set_revs_limit/3]).
 
 -include("fabric.hrl").
 -include_lib("couch/include/couch_db.hrl").
@@ -159,6 +160,12 @@ get_doc_count(DbName) ->
 
 get_update_seq(DbName) ->
     with_db(DbName, [], {couch_db, get_update_seq, []}).
+
+set_security(DbName, SecObj, Options) ->
+    with_db(DbName, Options, {couch_db, set_security, [SecObj]}).
+
+set_revs_limit(DbName, Limit, Options) ->
+    with_db(DbName, Options, {couch_db, set_revs_limit, [Limit]}).
 
 open_doc(DbName, DocId, Options) ->
     with_db(DbName, Options, {couch_db, open_doc, [DocId, Options]}).

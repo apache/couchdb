@@ -5,7 +5,8 @@
 
 % DBs
 -export([all_dbs/0, all_dbs/1, create_db/1, create_db/2, delete_db/1,
-    delete_db/2, get_db_info/1, get_doc_count/1]).
+    delete_db/2, get_db_info/1, get_doc_count/1, set_revs_limit/3,
+    set_security/3, get_revs_limit/1, get_security/1]).
 
 % Documents
 -export([open_doc/3, open_revs/4, get_missing_revs/2, update_doc/3,
@@ -57,6 +58,19 @@ delete_db(DbName) ->
 delete_db(DbName, Options) ->
     fabric_db_delete:go(dbname(DbName), opts(Options)).
 
+set_revs_limit(DbName, Limit, Options) when is_integer(Limit), Limit > 0 ->
+    fabric_db_meta:set_revs_limit(dbname(DbName), Limit, opts(Options)).
+
+get_revs_limit(DbName) ->
+    {ok, Db} = fabric_util:get_db(dbname(DbName)),
+    try couch_db:get_revs_limit(Db) after catch couch_db:close(Db) end.
+
+set_security(DbName, SecObj, Options) ->
+    fabric_db_meta:set_security(dbname(DbName), SecObj, opts(Options)).
+
+get_security(DbName) ->
+    {ok, Db} = fabric_util:get_db(dbname(DbName)),
+    try couch_db:get_security(Db) after catch couch_db:close(Db) end.
 
 % doc operations
 open_doc(DbName, Id, Options) ->

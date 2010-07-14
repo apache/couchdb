@@ -1,6 +1,7 @@
 -module(fabric_util).
 
--export([submit_jobs/3, cleanup/1, recv/4, receive_loop/4, receive_loop/6]).
+-export([submit_jobs/3, cleanup/1, recv/4, receive_loop/4, receive_loop/6,
+    get_db/1]).
 
 -include("fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
@@ -74,4 +75,15 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
         Fun(Msg, nil, Acc0)
     after PerMsgTO ->
         timeout
+    end.
+
+get_db(DbName) ->
+    Shards = mem3:shards(DbName),
+    case lists:partition(fun(#shard{node = N}) -> N =:= node() end, Shards) of
+    {[#shard{name = ShardName}|_], _} ->
+        % prefer node-local DBs
+        couch_db:open(ShardName, []);
+    {[], #shard{node = Node, name = ShardName}} ->
+        % but don't require them
+        rpc:call(Node, couch_db, open, [ShardName, []])
     end.
