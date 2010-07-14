@@ -351,9 +351,10 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_revs_diff">>]}=Req, Db) ->
 db_req(#httpd{path_parts=[_,<<"_revs_diff">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 
-db_req(#httpd{method='PUT',path_parts=[_,<<"_security">>]}=Req, Db) ->
+db_req(#httpd{method='PUT',path_parts=[_,<<"_security">>],user_ctx=Ctx}=Req,
+        Db) ->
     SecObj = couch_httpd:json_body(Req),
-    ok = fabric:set_security(Db, SecObj),
+    ok = fabric:set_security(Db, SecObj, [{user_ctx,Ctx}]),
     send_json(Req, {[{<<"ok">>, true}]});
 
 db_req(#httpd{method='GET',path_parts=[_,<<"_security">>]}=Req, Db) ->
@@ -362,10 +363,10 @@ db_req(#httpd{method='GET',path_parts=[_,<<"_security">>]}=Req, Db) ->
 db_req(#httpd{path_parts=[_,<<"_security">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "PUT,GET");
 
-db_req(#httpd{method='PUT',path_parts=[_,<<"_revs_limit">>]}=Req,
+db_req(#httpd{method='PUT',path_parts=[_,<<"_revs_limit">>],user_ctx=Ctx}=Req,
         Db) ->
     Limit = chttpd:json_body(Req),
-    ok = fabric:set_revs_limit(Db, Limit),
+    ok = fabric:set_revs_limit(Db, Limit, [{user_ctx,Ctx}]),
     send_json(Req, {[{<<"ok">>, true}]});
 
 db_req(#httpd{method='GET',path_parts=[_,<<"_revs_limit">>]}=Req, Db) ->
