@@ -164,18 +164,18 @@ handle_session_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD,POST,DELETE").
 
 handle_user_req(#httpd{method='POST'}=Req) ->
-    DbName = couch_config:get("chttpd_auth", "authentication_db", "users"),
+    DbName = couch_config:get("couch_httpd_auth", "authentication_db", "users"),
     ensure_users_db_exists(DbName),
     create_user(Req, DbName);
 handle_user_req(#httpd{method=Method, path_parts=[_]}=_Req) when
         Method == 'PUT' orelse Method == 'DELETE' ->
     throw({bad_request, <<"Username is missing">>});
 handle_user_req(#httpd{method='PUT', path_parts=[_, UserName]}=Req) ->
-    DbName = couch_config:get("chttpd_auth", "authentication_db", "users"),
+    DbName = couch_config:get("couch_httpd_auth", "authentication_db", "users"),
     ensure_users_db_exists(DbName),
     update_user(Req, DbName, UserName);
 handle_user_req(#httpd{method='DELETE', path_parts=[_, UserName]}=Req) ->
-    DbName = couch_config:get("chttpd_auth", "authentication_db", "users"),
+    DbName = couch_config:get("couch_httpd_auth", "authentication_db", "users"),
     ensure_users_db_exists(DbName),
     delete_user(Req, DbName, UserName);
 handle_user_req(Req) ->
@@ -205,7 +205,7 @@ get_user(UserName) ->
     end.
 
 load_user_from_db(UserName) ->
-    DbName = couch_config:get("chttpd_auth", "authentication_db", "users"),
+    DbName = couch_config:get("couch_httpd_auth", "authentication_db", "users"),
     try fabric:open_doc(DbName, UserName, []) of
     {ok, Doc} ->
         ?LOG_INFO("cache miss on username ~s", [UserName]),
