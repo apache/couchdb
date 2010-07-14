@@ -78,8 +78,8 @@ test_to_json_success() ->
         },
         {
             #doc{deleted=true, body={[{<<"foo">>, <<"bar">>}]}},
-            {[{<<"_id">>, <<>>}, {<<"_deleted">>, true}]},
-            "Deleted docs drop body members."
+            {[{<<"_id">>, <<>>}, {<<"foo">>, <<"bar">>}, {<<"_deleted">>, true}]},
+            "Deleted docs no longer drop body members."
         },
         {
             #doc{meta=[
