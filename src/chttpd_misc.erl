@@ -16,7 +16,8 @@
     handle_all_dbs_req/1,handle_replicate_req/1,handle_restart_req/1,
     handle_uuids_req/1,handle_config_req/1,handle_log_req/1,
     handle_task_status_req/1,handle_sleep_req/1,handle_welcome_req/1,
-    handle_utils_dir_req/1, handle_favicon_req/1, handle_metrics_req/1]).
+    handle_utils_dir_req/1, handle_favicon_req/1, handle_metrics_req/1,
+    handle_system_req/1]).
 
 
 -include_lib("couch/include/couch_db.hrl").
@@ -220,3 +221,16 @@ handle_metrics_req(#httpd{method='GET', path_parts=[_, Id]}=Req) ->
 handle_metrics_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
+% Note: this resource is exposed on the backdoor interface, but it's in chttpd
+% because it's not couch trunk
+handle_system_req(Req) ->
+    Other = erlang:memory(system) - lists:sum([X || {_,X} <-
+        erlang:memory([atom, code, binary, ets])]),
+    Memory = [{other, Other} | erlang:memory([atom, atom_used, processes,
+        processes_used, binary, code, ets])],
+    send_json(Req, {[
+        {memory, {Memory}},
+        {run_queue, statistics(run_queue)},
+        {process_count, erlang:system_info(process_count)},
+        {process_limit, erlang:system_info(process_limit)}
+    ]}).
