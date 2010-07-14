@@ -161,7 +161,7 @@ get_update_seq(DbName) ->
     with_db(DbName, [], {couch_db, get_update_seq, []}).
 
 open_doc(DbName, DocId, Options) ->
-    with_db(DbName, Options, {couch_db, open_doc_int, [DocId, Options]}).
+    with_db(DbName, Options, {couch_db, open_doc, [DocId, Options]}).
 
 open_revs(DbName, Id, Revs, Options) ->
     with_db(DbName, Options, {couch_db, open_doc_revs, [Id, Revs, Options]}).

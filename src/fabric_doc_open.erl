@@ -8,7 +8,7 @@
 
 go(DbName, Id, Options) ->
     Workers = fabric_util:submit_jobs(mem3:shards(DbName,Id), open_doc,
-        [Id, Options]),
+        [Id, [deleted|Options]]),
     SuppressDeletedDoc = not lists:member(deleted, Options),
     R = couch_util:get_value(r, Options, couch_config:get("cluster","r","2")),
     Acc0 = {length(Workers), list_to_integer(R), []},
