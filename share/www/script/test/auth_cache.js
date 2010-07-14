@@ -225,7 +225,19 @@ couchTests.auth_cache = function(debug) {
     T(misses_after === misses_before);
     T(hits_after === (hits_before + 2));
 
+    T(authDb.deleteDoc(fdmanana).ok);
     T(CouchDB.logout().ok);
+
+    hits_before = hits_after;
+    misses_before = misses_after;
+
+    T(CouchDB.login("fdmanana", "javascript").error === "unauthorized");
+
+    hits_after = hits();
+    misses_after = misses();
+
+    T(misses_after === (misses_before + 1));
+    T(hits_after === hits_before);
   }
 
 

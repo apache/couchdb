@@ -289,7 +289,7 @@ refresh_entry(Db, #doc_info{high_seq = DocSeq} = DocInfo) ->
         [] ->
             ok;
         [{UserName, {_OldCreds, ATime}}] ->
-            {ok, Doc} = couch_db:open_doc(Db, DocInfo, [conflicts]),
+            {ok, Doc} = couch_db:open_doc(Db, DocInfo, [conflicts, deleted]),
             NewCreds = user_creds(Doc),
             true = ets:insert(?BY_USER, {UserName, {NewCreds, ATime}})
         end;
