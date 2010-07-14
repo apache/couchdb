@@ -236,8 +236,8 @@ couchTests.auth_cache = function(debug) {
     hits_after = hits();
     misses_after = misses();
 
-    T(misses_after === (misses_before + 1));
-    T(hits_after === hits_before);
+    T(misses_after === misses_before);
+    T(hits_after === (hits_before + 1));
   }
 
 
