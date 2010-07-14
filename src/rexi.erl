@@ -61,9 +61,9 @@ reply(Reply) ->
     {Caller, Ref} = get(rexi_from),
     erlang:send(Caller, {Ref,Reply}).
 
-%% @equiv sync_reply(Reply, infinity)
+%% @equiv sync_reply(Reply, 300000)
 sync_reply(Reply) ->
-    sync_reply(Reply, infinity).
+    sync_reply(Reply, 300000).
 
 %% @doc convenience function to reply to caller and wait for response.  Message
 %% is of the form {OriginalRef, {self(),reference()}, Reply}, which enables the
