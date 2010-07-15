@@ -141,7 +141,7 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq, user_ctx=Ctx}=Req) 
                 throw({forbidden, <<"Name or password is incorrect.">>})
             end
         end,
-        Secret = ?l2b(couch_config:get("chttpd_auth", "secret")),
+        Secret = ?l2b(couch_config:get("couch_httpd_auth", "secret")),
         SecretAndSalt = <<Secret/binary, UserSalt/binary>>,
         Cookie = generate_cookie(UserName, SecretAndSalt, timestamp()),
         send_response(Req, [Cookie])
@@ -253,7 +253,7 @@ cookie_auth_user(#httpd{mochi_req=MochiReq}=Req) ->
         AuthSession = couch_util:decodeBase64Url(Cookie),
         [User, TimeStr | HashParts] = string:tokens(?b2l(AuthSession), ":"),
         % Verify expiry and hash
-        case couch_config:get("chttpd_auth", "secret") of
+        case couch_config:get("couch_httpd_auth", "secret") of
         undefined ->
             ?LOG_DEBUG("AuthSession cookie, but no secret in config!", []),
             {cookie_auth_failed, {internal_server_error, null}};
@@ -272,7 +272,7 @@ cookie_auth_user(#httpd{mochi_req=MochiReq}=Req) ->
                 true ->
                     TimeStamp = erlang:list_to_integer(TimeStr, 16),
                     Timeout = erlang:list_to_integer(couch_config:get(
-                        "chttpd_auth", "timeout", "600")),
+                        "couch_httpd_auth", "timeout", "600")),
                     CurrentTime = timestamp(),
                     if CurrentTime < TimeStamp + Timeout ->
                         TimeLeft = TimeStamp + Timeout - CurrentTime,
@@ -380,11 +380,8 @@ generate_cookie(User, Secret, TimeStamp) ->
     SessionData = ?b2l(User) ++ ":" ++ erlang:integer_to_list(TimeStamp, 16),
     Hash = crypto:sha_mac(Secret, SessionData),
     Cookie = couch_util:encodeBase64Url(SessionData ++ ":" ++ ?b2l(Hash)),
-    % MaxAge = erlang:list_to_integer(couch_config:get("chttpd_auth",
-    %     "timeout", "600")),
     % TODO add {secure, true} to options when SSL is detected
     mochiweb_cookies:cookie("AuthSession", Cookie, [{path, "/"}]).
-        % {max_age, MaxAge}]).
 
 hash_password(Password, Salt) ->
     ?l2b(couch_util:to_hex(crypto:sha(<<Password/binary, Salt/binary>>))).
