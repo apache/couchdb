@@ -24,13 +24,15 @@ handle_cast({doit, From, MFA}, #st{workers=Workers} = St) ->
     {LocalPid, Ref} = spawn_monitor(?MODULE, init_p, [From, MFA]),
     {noreply, St#st{workers = add_worker({LocalPid, Ref, From}, Workers)}};
 
-handle_cast({kill, Ref}, #st{workers=Workers} = St) ->
-    case find_worker(Ref, Workers) of
-    {Pid, Ref, _} ->
+handle_cast({kill, FromRef}, #st{workers=Workers} = St) ->
+    case find_worker_from(FromRef, Workers) of
+    {Pid, KeyRef, {_, FromRef}} ->
         erlang:demonitor(Ref),
-        exit(Pid, kill);
-    false -> ok end,
-    {noreply, St#st{workers = remove_worker(Ref, Workers)}}.
+        exit(Pid, kill),
+        {noreply, St#st{workers = remove_worker(KeyRef, Workers)}};
+    false ->
+        {noreply, St}
+    end.
 
 handle_info({'DOWN', Ref, process, _, normal}, #st{workers=Workers} = St) ->
     {noreply, St#st{workers = remove_worker(Ref, Workers)}};
@@ -38,9 +40,11 @@ handle_info({'DOWN', Ref, process, _, normal}, #st{workers=Workers} = St) ->
 handle_info({'DOWN', Ref, process, Pid, Reason}, #st{workers=Workers} = St) ->
     case find_worker(Ref, Workers) of
     {Pid, Ref, From} ->
-        notify_caller(From, Reason);
-    false -> ok end,
-    {noreply, St#st{workers = remove_worker(Ref, Workers)}};
+        notify_caller(From, Reason),
+        {noreply, St#st{workers = remove_worker(Ref, Workers)}};
+    false ->
+        {noreply, St}
+    end;
 
 handle_info(_Info, St) ->
     {noreply, St}.
@@ -56,6 +60,7 @@ code_change(_OldVsn, St, _Extra) ->
 -spec init_p({pid(), reference()}, {atom(), atom(), list()}) -> any().
 init_p(From, {M,F,A}) ->
     put(rexi_from, From),
+    put(initial_call, {M,F,length(A)}),
     try apply(M, F, A) catch _:Reason -> exit(Reason) end.
 
 %% internal
@@ -68,6 +73,14 @@ remove_worker(Ref, Tab) ->
 
 find_worker(Ref, Tab) ->
     case ets:lookup(Tab, Ref) of [] -> false; [Worker] -> Worker end.
+
+find_worker_from(Ref, Tab) ->
+    case ets:match_object(Tab, {'_', '_', {'_', Ref}}) of
+    [] ->
+        false;
+    [Worker] ->
+        Worker
+    end.
 
 notify_caller({Caller, Ref}, Reason) ->
     Caller ! {Ref, {rexi_EXIT, Reason}}.
