@@ -27,7 +27,7 @@ handle_cast({doit, From, MFA}, #st{workers=Workers} = St) ->
 handle_cast({kill, FromRef}, #st{workers=Workers} = St) ->
     case find_worker_from(FromRef, Workers) of
     {Pid, KeyRef, {_, FromRef}} ->
-        erlang:demonitor(Ref),
+        erlang:demonitor(KeyRef),
         exit(Pid, kill),
         {noreply, St#st{workers = remove_worker(KeyRef, Workers)}};
     false ->
