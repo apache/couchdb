@@ -73,6 +73,8 @@ initialize_nodelist() ->
 
 first_fold(#full_doc_info{id = <<"_design/", _/binary>>}, _, Acc) ->
     {ok, Acc};
+first_fold(#full_doc_info{deleted=true}, _, Acc) ->
+    {ok, Acc};
 first_fold(#full_doc_info{id=Id}, _, Acc) ->
     {ok, [mem3_util:to_atom(Id) | Acc]}.
 
