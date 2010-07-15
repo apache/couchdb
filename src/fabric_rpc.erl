@@ -322,11 +322,11 @@ send(Key, Value, #view_acc{limit=Limit} = Acc) ->
         exit(timeout)
     end.
 
-changes_enumerator(DocInfos, {Db, _Seq, Args}) ->
+changes_enumerator(DocInfo, {Db, _Seq, Args}) ->
     #changes_args{include_docs=IncludeDocs, filter=FilterFun} = Args,
-    [#doc_info{id=Id, high_seq=Seq, revs=[#rev_info{deleted=Del,rev=Rev}|_]}|_]
-        = DocInfos,
-    case [Result || Result <- FilterFun(DocInfos), Result /= null] of
+    #doc_info{id=Id, high_seq=Seq, revs=[#rev_info{deleted=Del,rev=Rev}|_]}
+        = DocInfo,
+    case [Result || Result <- FilterFun(DocInfo), Result /= null] of
     [] ->
         {ok, {Db, Seq, Args}};
     Results ->
