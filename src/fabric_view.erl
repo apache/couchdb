@@ -15,7 +15,7 @@ is_progress_possible([]) ->
 is_progress_possible(Counters) ->
     Ranges = fabric_dict:fold(fun(#shard{range=[X,Y]}, _, A) -> [{X,Y}|A] end,
         [], Counters),
-    [{0, Tail0} | Rest] = lists:ukeysort(1, Ranges),
+    [{Start, Tail0} | Rest] = lists:ukeysort(1, Ranges),
     Result = lists:foldl(fun
     (_, fail) ->
         % we've already declared failure
@@ -35,7 +35,7 @@ is_progress_possible(Counters) ->
             Else
         end
     end, Tail0, Rest),
-    Result =:= complete.
+    (Start =:= 0) andalso (Result =:= complete).
 
 -spec remove_overlapping_shards(#shard{}, [{#shard{}, any()}]) ->
     [{#shard{}, any()}].
