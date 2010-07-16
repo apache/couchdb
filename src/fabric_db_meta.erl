@@ -20,7 +20,12 @@ set_security(DbName, SecObj, Options) ->
     Shards = mem3:shards(DbName),
     Workers = fabric_util:submit_jobs(Shards, set_security, [SecObj, Options]),
     Waiting = length(Workers) - 1,
-    fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Waiting).
+    case fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Waiting) of
+    {ok, ok} ->
+        ok;
+    Error ->
+        Error
+    end.
 
 handle_message(ok, _, 0) ->
     {stop, ok};
