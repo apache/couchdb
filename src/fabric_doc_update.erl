@@ -50,6 +50,8 @@ handle_message({ok, Replies}, Worker, Acc0) ->
         % no point in trying to finalize anything yet
         {ok, {WaitingCount - 1, DocCount, W, GroupedDocs, DocReplyDict}}
     end;
+handle_message({missing_stub, Stub}, _, _) ->
+    throw({missing_stub, Stub});
 handle_message({not_found, no_db_file} = X, Worker, Acc0) ->
     {_, _, _, GroupedDocs, _} = Acc0,
     Docs = couch_util:get_value(Worker, GroupedDocs),
