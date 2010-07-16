@@ -510,7 +510,7 @@ error_info({bad_request, Reason}) ->
 error_info({query_parse_error, Reason}) ->
     {400, <<"query_parse_error">>, Reason};
 error_info(database_does_not_exist) ->
-    {404, <<"not_found">>, <<"database_does_not_exist">>};
+    {404, <<"not_found">>, <<"Database does not exist.">>};
 error_info(not_found) ->
     {404, <<"not_found">>, <<"missing">>};
 error_info({not_found, Reason}) ->
