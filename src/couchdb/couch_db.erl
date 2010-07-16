@@ -901,10 +901,20 @@ with_stream(Fd, #att{md5=InMd5,type=Type,encoding=Enc}=Att, Fun) ->
 
 write_streamed_attachment(_Stream, _F, 0) ->
     ok;
+% LenLeft might be different from the total size of what function F returns.
+% This happens when doing a pull replication of compressed attachments from a
+% 0.11.0 server, where LenLeft will match the uncompressed size but we end up
+% receiving the attachment compressed (therefore a size different from LenLeft).
+% This is because 0.11.0 doesn't understand the query parameter
+% "?att_encoding_info=true" when we do a doc request (GET /somedb/somedoc).
 write_streamed_attachment(Stream, F, LenLeft) ->
-    Bin = F(),
-    ok = couch_stream:write(Stream, Bin),
-    write_streamed_attachment(Stream, F, LenLeft - size(Bin)).
+    case F() of
+    Bin when is_binary(Bin) ->
+        ok = couch_stream:write(Stream, Bin),
+        write_streamed_attachment(Stream, F, LenLeft - size(Bin));
+    eof ->
+        ok
+    end.
 
 enum_docs_since_reduce_to_count(Reds) ->
     couch_btree:final_reduce(

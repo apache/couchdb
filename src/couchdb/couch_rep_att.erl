@@ -81,8 +81,12 @@ receive_data(Ref, ReqId, ContentEncoding) ->
         % ?LOG_DEBUG("got ~p bytes for ~p", [size(Data), ReqId]),
         Data;
     {ibrowse_async_response_end, ReqId} ->
-        ?LOG_ERROR("streaming att. ended but more data requested ~p", [ReqId]),
-        throw({attachment_request_failed, premature_end})
+        % This means ibrowse received all the data it was supposed to.
+        % In case of not receiving the whole data, due to a network link
+        % failure for example, we would have received an error message.
+        % In other words, this message doesn't represent an error - look into
+        % ibrowse_http_client.erl.
+        eof
     after 31000 ->
         throw({attachment_request_failed, timeout})
     end.
