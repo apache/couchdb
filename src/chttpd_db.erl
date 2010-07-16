@@ -174,7 +174,11 @@ do_db_req(#httpd{path_parts=[DbName|_]}=Req, Fun) ->
     Fun(Req, #db{name=DbName}).
 
 db_req(#httpd{method='GET',path_parts=[DbName]}=Req, _Db) ->
+    % measure the time required to generate the etag, see if it's worth it
+    T0 = now(),
     {ok, DbInfo} = fabric:get_db_info(DbName),
+    DeltaT = timer:now_diff(now(), T0) / 1000,
+    couch_stats_collector:record({couchdb, dbinfo}, DeltaT),
     send_json(Req, {cloudant_util:customer_db_info(Req, DbInfo)});
 
 db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
