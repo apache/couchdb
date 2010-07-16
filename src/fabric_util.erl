@@ -83,7 +83,7 @@ get_db(DbName) ->
     {[#shard{name = ShardName}|_], _} ->
         % prefer node-local DBs
         couch_db:open(ShardName, []);
-    {[], #shard{node = Node, name = ShardName}} ->
+    {[], [#shard{node = Node, name = ShardName}|_]} ->
         % but don't require them
         rpc:call(Node, couch_db, open, [ShardName, []])
     end.
