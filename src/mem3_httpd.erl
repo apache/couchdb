@@ -20,7 +20,7 @@ handle_membership_req(#httpd{method='GET',
     ClusterNodes = try mem3:nodes()
     catch _:_ -> {ok,[]} end,
     Shards = mem3:shards(DbName),
-    JsonShards = json_shards(Shards, []),
+    JsonShards = json_shards(Shards, dict:new()),
     couch_httpd:send_json(Req, {[
         {all_nodes, lists:sort([node()|nodes()])},
         {cluster_nodes, lists:sort(ClusterNodes)},
@@ -31,7 +31,9 @@ handle_membership_req(#httpd{method='GET',
 %% internal
 %%
 
-json_shards([], Acc) -> {lists:sort(Acc)};
+json_shards([], AccIn) ->
+    List = dict:to_list(AccIn),
+    {lists:sort(List)};
 json_shards([#shard{node=Node, range=[B,_E]} | Rest], AccIn) ->
     HexBeg = couch_util:to_hex(<<B:32/integer>>),
-    json_shards(Rest, [{HexBeg,[Node]}|AccIn]).
+    json_shards(Rest, dict:append(HexBeg, Node, AccIn)).
