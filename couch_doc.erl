@@ -437,7 +437,7 @@ atts_to_mp([Att | RestAtts], Boundary, WriteFun,
     true ->
         fun att_foldl/3
     end,
-    AttFun(Att, fun(Data, ok) -> WriteFun(Data) end, ok),
+    AttFun(Att, fun(Data, _) -> WriteFun(Data) end, ok),
     WriteFun(<<"\r\n--", Boundary/binary>>),
     atts_to_mp(RestAtts, Boundary, WriteFun, SendEncodedAtts).
 
