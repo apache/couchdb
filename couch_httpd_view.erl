@@ -196,10 +196,10 @@ reverse_key_default(?MAX_STR) -> ?MIN_STR;
 reverse_key_default(Key) -> Key.
 
 get_stale_type(Req) ->
-    list_to_atom(couch_httpd:qs_value(Req, "stale", "nil")).
+    list_to_existing_atom(couch_httpd:qs_value(Req, "stale", "nil")).
 
 get_reduce_type(Req) ->
-    list_to_atom(couch_httpd:qs_value(Req, "reduce", "true")).
+    list_to_existing_atom(couch_httpd:qs_value(Req, "reduce", "true")).
 
 load_view(Req, Db, {ViewDesignId, ViewName}, Keys) ->
     Stale = get_stale_type(Req),
