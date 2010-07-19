@@ -20,7 +20,6 @@
 -define(JSON_ENCODE(V), couch_util:json_encode(V)).
 -define(JSON_DECODE(V), couch_util:json_decode(V)).
 
--define(b2a(V), list_to_atom(binary_to_list(V))).
 -define(b2l(V), binary_to_list(V)).
 -define(l2b(V), list_to_binary(V)).
 

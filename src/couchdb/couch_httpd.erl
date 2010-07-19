@@ -225,7 +225,7 @@ handle_request_int(MochiReq, DefaultFun,
     true -> 
         ?LOG_INFO("MethodOverride: ~s (real method was ~s)", [MethodOverride, Method1]),
         case Method1 of
-        'POST' -> list_to_atom(MethodOverride);
+        'POST' -> couch_util:to_existing_atom(MethodOverride);
         _ -> 
             % Ignore X-HTTP-Method-Override when the original verb isn't POST.
             % I'd like to send a 406 error to the client, but that'd require a nasty refactor.

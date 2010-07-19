@@ -267,7 +267,7 @@ att_encoding_info(BinProps) ->
         {identity, DiskLen};
     Enc ->
         EncodedLen = proplists:get_value(<<"encoded_length">>, BinProps, DiskLen),
-        {list_to_atom(?b2l(Enc)), EncodedLen}
+        {list_to_existing_atom(?b2l(Enc)), EncodedLen}
     end.
 
 to_doc_info(FullDocInfo) ->
