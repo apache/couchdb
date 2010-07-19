@@ -367,7 +367,7 @@ strip_password(Url) ->
 
 dbinfo(#http_db{} = Db) ->
     {DbProps} = couch_rep_httpc:request(Db),
-    [{list_to_atom(?b2l(K)), V} || {K,V} <- DbProps];
+    [{list_to_existing_atom(?b2l(K)), V} || {K,V} <- DbProps];
 dbinfo(Db) ->
     {ok, Info} = couch_db:get_db_info(Db),
     Info.

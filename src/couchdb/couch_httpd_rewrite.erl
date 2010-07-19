@@ -20,7 +20,7 @@
 -include("couch_db.hrl").
 
 -define(SEPARATOR, $\/).
--define(MATCH_ALL, '*').
+-define(MATCH_ALL, {bind, <<"*">>}).
 
 
 %% doc The http rewrite handler. All rewriting is done from
@@ -118,7 +118,7 @@ handle_rewrite_req(#httpd{
     DesignId = <<"_design/", DesignName/binary>>,
     Prefix = <<"/", DbName/binary, "/", DesignId/binary>>,
     QueryList = couch_httpd:qs(Req),
-    QueryList1 = [{to_atom(K), V} || {K, V} <- QueryList],
+    QueryList1 = [{to_binding(K), V} || {K, V} <- QueryList],
 
     #doc{body={Props}} = DDoc,
 
@@ -132,12 +132,12 @@ handle_rewrite_req(#httpd{
             DispatchList =  [make_rule(Rule) || {Rule} <- Rules],
 
             %% get raw path by matching url to a rule.
-            RawPath = case try_bind_path(DispatchList, Method, PathParts,
+            RawPath = case try_bind_path(DispatchList, couch_util:to_binary(Method), PathParts,
                                     QueryList1) of
                 no_dispatch_path ->
                     throw(not_found);
                 {NewPathParts, Bindings} ->
-                    Parts = [mochiweb_util:quote_plus(X) || X <- NewPathParts],
+                    Parts = [quote_plus(X) || X <- NewPathParts],
 
                     % build new path, reencode query args, eventually convert
                     % them to json
@@ -183,7 +183,10 @@ handle_rewrite_req(#httpd{
                     UrlHandlers, DbUrlHandlers, DesignUrlHandlers)
         end.
 
-
+quote_plus({bind, X}) ->
+    mochiweb_util:quote_plus(X);
+quote_plus(X) ->
+    mochiweb_util:quote_plus(X).
 
 %% @doc Try to find a rule matching current url. If none is found
 %% 404 error not_found is raised
@@ -196,15 +199,13 @@ try_bind_path([Dispatch|Rest], Method, PathParts, QueryList) ->
             case bind_path(PathParts1, PathParts, []) of
                 {ok, Remaining, Bindings} ->
                     Bindings1 = Bindings ++ QueryList,
-
                     % we parse query args from the rule and fill
                     % it eventually with bindings vars
                     QueryArgs1 = make_query_list(QueryArgs, Bindings1, []),
-                    
                     % remove params in QueryLists1 that are already in
                     % QueryArgs1
                     Bindings2 = lists:foldl(fun({K, V}, Acc) ->
-                        K1 = to_atom(K),
+                        K1 = to_binding(K),
                         KV = case couch_util:get_value(K1, QueryArgs1) of
                             undefined -> [{K1, V}];
                             _V1 -> []
@@ -230,15 +231,15 @@ make_query_list([], _Bindings, Acc) ->
     Acc;
 make_query_list([{Key, {Value}}|Rest], Bindings, Acc) ->
     Value1 = to_json({Value}),
-    make_query_list(Rest, Bindings, [{to_atom(Key), Value1}|Acc]);
+    make_query_list(Rest, Bindings, [{to_binding(Key), Value1}|Acc]);
 make_query_list([{Key, Value}|Rest], Bindings, Acc) when is_binary(Value) ->
     Value1 = replace_var(Key, Value, Bindings),
-    make_query_list(Rest, Bindings, [{to_atom(Key), Value1}|Acc]);
+    make_query_list(Rest, Bindings, [{to_binding(Key), Value1}|Acc]);
 make_query_list([{Key, Value}|Rest], Bindings, Acc) when is_list(Value) ->
     Value1 = replace_var(Key, Value, Bindings),
-    make_query_list(Rest, Bindings, [{to_atom(Key), Value1}|Acc]);
+    make_query_list(Rest, Bindings, [{to_binding(Key), Value1}|Acc]);
 make_query_list([{Key, Value}|Rest], Bindings, Acc) ->
-    make_query_list(Rest, Bindings, [{to_atom(Key), Value}|Acc]).
+    make_query_list(Rest, Bindings, [{to_binding(Key), Value}|Acc]).
 
 replace_var(Key, Value, Bindings) ->
     case Value of
@@ -274,7 +275,7 @@ replace_var(Key, Value, Bindings) ->
 
 
 get_var(VarName, Props, Default) ->
-    VarName1 = list_to_atom(binary_to_list(VarName)),
+    VarName1 = to_binding(VarName),
     couch_util:get_value(VarName1, Props, Default).
 
 %% doc: build new patch from bindings. bindings are query args
@@ -288,8 +289,8 @@ make_new_path([?MATCH_ALL], _Bindings, Remaining, Acc) ->
 make_new_path([?MATCH_ALL|_Rest], _Bindings, Remaining, Acc) ->
     Acc1 = lists:reverse(Acc) ++ Remaining,
     Acc1;
-make_new_path([P|Rest], Bindings, Remaining, Acc) when is_atom(P) ->
-    P2 = case couch_util:get_value(P, Bindings) of
+make_new_path([{bind, P}|Rest], Bindings, Remaining, Acc) ->
+    P2 = case couch_util:get_value({bind, P}, Bindings) of
         undefined -> << "undefined">>;
         P1 -> P1
     end,
@@ -304,7 +305,7 @@ make_new_path([P|Rest], Bindings, Remaining, Acc) ->
 %% depending on HTTP method.
 bind_method(?MATCH_ALL, _Method) ->
     true;
-bind_method(Method, Method) ->
+bind_method({bind, Method}, Method) ->
     true;
 bind_method(_, _) ->
     false.
@@ -318,8 +319,8 @@ bind_path([?MATCH_ALL], Rest, Bindings) when is_list(Rest) ->
     {ok, Rest, Bindings};
 bind_path(_, [], _) ->
     fail;
-bind_path([Token|RestToken],[Match|RestMatch],Bindings) when is_atom(Token) ->
-    bind_path(RestToken, RestMatch, [{Token, Match}|Bindings]);
+bind_path([{bind, Token}|RestToken],[Match|RestMatch],Bindings) ->
+    bind_path(RestToken, RestMatch, [{{bind, Token}, Match}|Bindings]);
 bind_path([Token|RestToken], [Token|RestMatch], Bindings) ->
     bind_path(RestToken, RestMatch, Bindings);
 bind_path(_, _, _) ->
@@ -350,15 +351,15 @@ normalize_path1([Path|Rest], Acc) ->
 %% @doc transform json rule in erlang for pattern matching
 make_rule(Rule) ->
     Method = case couch_util:get_value(<<"method">>, Rule) of
-        undefined -> '*';
-        M -> list_to_atom(?b2l(M))
+        undefined -> ?MATCH_ALL;
+        M -> to_binding(M)
     end,
     QueryArgs = case couch_util:get_value(<<"query">>, Rule) of
         undefined -> [];
         {Args} -> Args
         end,
     FromParts  = case couch_util:get_value(<<"from">>, Rule) of
-        undefined -> ['*'];
+        undefined -> [?MATCH_ALL];
         From ->
             parse_path(From)
         end,
@@ -396,30 +397,29 @@ path_to_list([<<"..">>|R], Acc, DotDotCount) ->
 path_to_list([P|R], Acc, DotDotCount) ->
     P1 = case P of
         <<":", Var/binary>> ->
-            list_to_atom(binary_to_list(Var));
+            to_binding(Var);
         _ -> P
     end,
     path_to_list(R, [P1|Acc], DotDotCount).
 
 encode_query(Props) ->
-    Props1 = lists:foldl(fun ({K, V}, Acc) ->
-        V1 = case is_list(V) of
+    Props1 = lists:foldl(fun ({{bind, K}, V}, Acc) ->
+        V1 = case is_list(V) orelse is_binary(V) of
             true -> V;
-            false when is_binary(V) ->
-                V;
             false ->
-                mochiweb_util:quote_plus(V)
+                % probably it's a number
+                quote_plus(V)
         end,
         [{K, V1} | Acc]
     end, [], Props),
     lists:flatten(mochiweb_util:urlencode(Props1)).
 
-to_atom(V) when is_atom(V) ->
-    V;
-to_atom(V) when is_binary(V) ->
-    to_atom(?b2l(V));
-to_atom(V) ->
-    list_to_atom(V).
+to_binding({bind, V}) ->
+    {bind, V};
+to_binding(V) when is_list(V) ->
+    to_binding(?l2b(V));
+to_binding(V) ->
+    {bind, V}.
 
 to_json(V) ->
     iolist_to_binary(?JSON_ENCODE(V)).
