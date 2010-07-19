@@ -70,9 +70,9 @@ normparts([Part | RestParts], Acc) ->
 % works like list_to_existing_atom, except can be list or binary and it
 % gives you the original value instead of an error if no existing atom.
 to_existing_atom(V) when is_list(V) ->
-    try list_to_existing_atom(V) catch _ -> V end;
+    try list_to_existing_atom(V) catch _:_ -> V end;
 to_existing_atom(V) when is_binary(V) ->
-    try list_to_existing_atom(?b2l(V)) catch _ -> V end;
+    try list_to_existing_atom(?b2l(V)) catch _:_ -> V end;
 to_existing_atom(V) when is_atom(V) ->
     V.
 
