@@ -18,8 +18,17 @@ You will need the following installed:
 
 It is recommended that you install Erlang OTP R12B-5 or above where possible.
 
-Debian-based (inc. Ubuntu) Systems
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Ubuntu
+~~~~~~
+
+See
+
+  http://wiki.apache.org/couchdb/Installing_on_Ubuntu
+
+for updated instructions on how to install on Ubuntu.
+
+Debian-based Systems
+~~~~~~~~~~~~~~~~~~~~
 
 You can install the build tools by running:
 
