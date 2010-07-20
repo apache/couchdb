@@ -101,8 +101,7 @@ handle_task_status_req(#httpd{method='GET'}=Req) ->
     Response = lists:flatmap(fun({Node, Tasks}) ->
         [{[{node,Node} | Task]} || Task <- Tasks]
     end, Replies),
-    % TODO filter by customer
-    send_json(Req, Response);
+    send_json(Req, lists:sort(Response));
 handle_task_status_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
