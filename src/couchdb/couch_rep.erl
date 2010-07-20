@@ -696,8 +696,9 @@ ensure_full_commit(#http_db{headers = Headers} = Target) ->
     Req = Target#http_db{
         resource = "_ensure_full_commit",
         method = post,
-        headers = [{"content-type", "application/json"} | Headers]
+        headers = couch_util:proplist_apply_field({"Content-Type", "application/json"}, Headers)
     },
+    ?LOG_ERROR("Req ~p",[Req]),
     {ResultProps} = couch_rep_httpc:request(Req),
     true = couch_util:get_value(<<"ok">>, ResultProps),
     couch_util:get_value(<<"instance_start_time">>, ResultProps);
@@ -722,7 +723,7 @@ ensure_full_commit(#http_db{headers = Headers} = Source, RequiredSeq) ->
         resource = "_ensure_full_commit",
         method = post,
         qs = [{seq, RequiredSeq}],
-        headers = [{"content-type", "application/json"} | Headers]
+        headers = couch_util:proplist_apply_field({"Content-Type", "application/json"}, Headers)
     },
     {ResultProps} = couch_rep_httpc:request(Req),
     case couch_util:get_value(<<"ok">>, ResultProps) of
