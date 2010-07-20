@@ -242,6 +242,7 @@ db_req(#httpd{path_parts=[_DbName]}=Req, _Db) ->
     send_method_not_allowed(Req, "DELETE,GET,HEAD,POST");
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_ensure_full_commit">>]}=Req, Db) ->
+    couch_httpd:validate_ctype(Req, "application/json"),
     UpdateSeq = couch_db:get_update_seq(Db),
     CommittedSeq = couch_db:get_committed_update_seq(Db),
     {ok, StartTime} =
