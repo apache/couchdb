@@ -107,7 +107,8 @@
         reduce: {},
         group_level: {defaultValue: 100},
         per_page: {defaultValue: 10},
-        view: {defaultValue: ""}
+        view: {defaultValue: ""},
+        stale: {defaultValue: false}
       });
 
       var viewName = (urlParts.length > 0) ? urlParts.join("/") : null;
@@ -765,6 +766,11 @@
               db.query(currentMapCode, currentReduceCode, page.viewLanguage, options);
             } else {
               var viewParts = viewName.split('/');
+
+              if ($.futon.storage.get("stale")) {
+                 options.stale = "ok";
+              }
+
               db.view(viewParts[1] + "/" + viewParts[3], options);
             }
           }

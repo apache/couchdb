@@ -324,6 +324,13 @@ body.loading #dialog h2 {
 }
 #switch select { font-size: 90%; }
 
+/* Stale views checkbox */
+
+#staleviews {
+  color: #666; float: right; font-size: 90%;
+  font-weight: bold; line-height: 16px; padding: 5px;
+}
+
 /* View function editing */
 
 #viewcode { background: #fff; border: 1px solid;
