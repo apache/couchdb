@@ -81,6 +81,9 @@ specific language governing permissions and limitations under the License.
 
         $("#perpage").val($.futon.storage.get("per_page"));
 
+        var staleViews = $.futon.storage.get("stale");
+        $("#staleviews :checkbox")[0].checked = staleViews;
+
         page.populateViewsMenu();
         page.populateViewEditor();
         if (page.isTempView) {
@@ -93,6 +96,9 @@ specific language governing permissions and limitations under the License.
           if (!viewName) $.futon.storage.del("view");
           location.href = "?" + encodeURIComponent(page.db.name) +
             (viewName ? "/" + viewName  : "");
+        });
+        $("#staleviews :checkbox").click(function() {
+          $.futon.storage.set("stale", this.checked);
         });
         $("#documents thead th.key span").click(function() {
           $(this).closest("th").toggleClass("desc");
@@ -148,6 +154,11 @@ specific language governing permissions and limitations under the License.
       <a class="raw" title="Raw view"></a>
     </h1>
     <div id="content">
+      <div id="staleviews">
+        <label>Stale views
+           <input name="staleviews" type="checkbox" />
+        </label>
+      </div>
       <div id="switch">
         <label>View: <select autocomplete="false">
           <option value="_all_docs">All documents</option>
