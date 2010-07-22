@@ -55,7 +55,7 @@ code.null { color: #666; }
 button { font-size: 100%; -webkit-appearance: square-button; }
 button[disabled] { color: #999; }
 input, select, textarea { background: #fff; border: 1px solid;
-  border-color: #999 #ddd #ddd #999; margin: 0; padding: 1px;
+  border-color: #999 #ddd #ddd #999; color: #000; margin: 0; padding: 1px;
 }
 input.placeholder { color: #999; }
 textarea {
