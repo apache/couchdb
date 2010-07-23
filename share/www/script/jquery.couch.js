@@ -341,7 +341,7 @@
         openDoc: function(docId, options, ajaxOptions) {
           options = options || {};
           if (db_opts.attachPrevRev || options.attachPrevRev) {
-            $.extend(ajaxOptions, {
+            $.extend(options, {
               beforeSuccess : function(req, doc) {
                 rawDocs[doc._id] = {
                   rev : doc._rev,
@@ -350,7 +350,7 @@
               }
             });
           } else {
-            $.extend(ajaxOptions, {
+            $.extend(options, {
               beforeSuccess : function(req, doc) {
                 if (doc["jquery.couch.attachPrevRev"]) {
                   rawDocs[doc._id] = {
@@ -649,7 +649,7 @@
     var buf = [];
     if (typeof(options) === "object" && options !== null) {
       for (var name in options) {
-        if ($.inArray(name, ["error", "success", "ajaxStart"]) >= 0)
+        if ($.inArray(name, ["error", "success", "beforeSuccess", "ajaxStart"]) >= 0)
           continue;
         var value = options[name];
         if ($.inArray(name, ["key", "startkey", "endkey"]) >= 0) {
