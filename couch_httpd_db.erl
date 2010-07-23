@@ -144,7 +144,7 @@ handle_design_req(#httpd{
     % load ddoc
     DesignId = <<"_design/", DesignName/binary>>,
     DDoc = couch_httpd_db:couch_doc_open(Db, DesignId, nil, []),
-    Handler = couch_util:dict_find(Action, DesignUrlHandlers, fun(A,B,C) -> 
+    Handler = couch_util:dict_find(Action, DesignUrlHandlers, fun(_, _, _) ->
             throw({not_found, <<"missing handler: ", Action/binary>>})
         end),
     Handler(Req, Db, DDoc);
