@@ -506,32 +506,32 @@ get_rep_endpoint(_UserCtx, <<"https://",_/binary>>=Url) ->
 get_rep_endpoint(UserCtx, <<DbName/binary>>) ->
     {local, DbName, UserCtx}.
 
-find_replication_logs(Logs, RepId, {Props}, UserCtx) ->
+find_replication_logs(DbList, RepId, RepProps, UserCtx) ->
     LogId = ?l2b(?LOCAL_DOC_PREFIX ++ RepId),
-    fold_replication_logs(Logs, ?REP_ID_VERSION,
-        LogId, LogId, {Props}, UserCtx, []).
+    fold_replication_logs(DbList, ?REP_ID_VERSION,
+        LogId, LogId, RepProps, UserCtx, []).
 
 % Accumulate the replication logs
 % Falls back to older log document ids and migrates them
-fold_replication_logs([], _Vsn, _LogId, _NewId, {_Props}, _UserCtx, Acc) ->
+fold_replication_logs([], _Vsn, _LogId, _NewId, _RepProps, _UserCtx, Acc) ->
     lists:reverse(Acc);
 fold_replication_logs([Db|Rest]=Dbs, Vsn, LogId, NewId,
-        {Props}, UserCtx, Acc) ->
+        RepProps, UserCtx, Acc) ->
     case open_replication_log(Db, LogId) of
     {error, not_found} when Vsn > 1 ->
-        OldRepId = make_replication_id({Props}, UserCtx, Vsn - 1),
+        OldRepId = make_replication_id(RepProps, UserCtx, Vsn - 1),
         fold_replication_logs(Dbs, Vsn - 1,
-            ?l2b(?LOCAL_DOC_PREFIX ++ OldRepId), NewId, {Props}, UserCtx, Acc);
+            ?l2b(?LOCAL_DOC_PREFIX ++ OldRepId), NewId, RepProps, UserCtx, Acc);
     {error, not_found} ->
         fold_replication_logs(Rest, ?REP_ID_VERSION, NewId, NewId,
-            {Props}, UserCtx, [#doc{id=NewId}|Acc]);
+            RepProps, UserCtx, [#doc{id=NewId}|Acc]);
     {ok, Doc} when LogId =:= NewId ->
         fold_replication_logs(Rest, ?REP_ID_VERSION, NewId, NewId,
-            {Props}, UserCtx, [Doc|Acc]);
+            RepProps, UserCtx, [Doc|Acc]);
     {ok, Doc} ->
         MigratedLog = #doc{id=NewId,body=Doc#doc.body},
         fold_replication_logs(Rest, ?REP_ID_VERSION, NewId, NewId,
-            {Props}, UserCtx, [MigratedLog|Acc])
+            RepProps, UserCtx, [MigratedLog|Acc])
     end.
 
 open_replication_log(#http_db{}=Db, DocId) ->
