@@ -1,6 +1,6 @@
 /*
     http://www.JSON.org/json2.js
-    2009-09-29
+    2010-03-20
 
     Public Domain.
 
@@ -433,6 +433,7 @@ if (!this.JSON) {
 // Unicode characters with escape sequences. JavaScript handles many characters
 // incorrectly, either silently deleting them, or treating them as line endings.
 
+            text = String(text);
             cx.lastIndex = 0;
             if (cx.test(text)) {
                 text = text.replace(cx, function (a) {
