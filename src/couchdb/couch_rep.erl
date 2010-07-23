@@ -698,7 +698,6 @@ ensure_full_commit(#http_db{headers = Headers} = Target) ->
         method = post,
         headers = couch_util:proplist_apply_field({"Content-Type", "application/json"}, Headers)
     },
-    ?LOG_ERROR("Req ~p",[Req]),
     {ResultProps} = couch_rep_httpc:request(Req),
     true = couch_util:get_value(<<"ok">>, ResultProps),
     couch_util:get_value(<<"instance_start_time">>, ResultProps);
