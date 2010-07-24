@@ -38,10 +38,6 @@ handle_changes(#changes_args{style=Style}=Args1, Req, Db) ->
             ),
             start_sending_changes(Callback, Args#changes_args.feed),
             {Timeout, TimeoutFun} = get_changes_timeout(Args, Callback),
-            couch_stats_collector:track_process_count(
-                Self,
-                {httpd, clients_requesting_changes}
-            ),
             try
                 keep_sending_changes(
                     Args,

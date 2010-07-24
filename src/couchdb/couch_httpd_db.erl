@@ -106,6 +106,9 @@ handle_changes_req(#httpd{method='GET'}=Req, Db) ->
             FeedChangesFun(MakeCallback(Resp))
         end
     end,
+    couch_stats_collector:track_process_count(
+        {httpd, clients_requesting_changes}
+    ),
     WrapperFun(ChangesFun);
 
 handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
