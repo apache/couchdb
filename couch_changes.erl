@@ -251,7 +251,7 @@ changes_row(_, Seq, Id, Del, Results, _, false) ->
     {[{<<"seq">>, Seq}, {<<"id">>, Id}, {<<"changes">>, Results}] ++
         deleted_item(Del)}.
 
-deleted_item(true) -> [{deleted, true}];
+deleted_item(true) -> [{<<"deleted">>, true}];
 deleted_item(_) -> [].
 
 % waits for a db_updated msg, if there are multiple msgs, collects them.
