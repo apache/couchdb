@@ -49,6 +49,7 @@ nobase_dist_localdata_DATA = \
     www/dialog/_login.html \
     www/dialog/_signup.html \
     www/dialog/_create_database.html \
+    www/dialog/_create_config.html \
     www/dialog/_delete_database.html \
     www/dialog/_delete_document.html \
     www/dialog/_database_security.html \
