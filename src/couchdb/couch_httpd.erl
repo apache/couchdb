@@ -750,7 +750,8 @@ error_headers(#httpd{mochi_req=MochiReq}=Req, Code, ErrorStr, ReasonStr) ->
                     AuthRedirect ->
                         case couch_config:get("couch_httpd_auth", "require_valid_user", "false") of
                         "true" ->
-                            {Code, []};
+                            % send the browser popup header no matter what if we are require_valid_user
+                            {Code, [{"WWW-Authenticate", "Basic realm=\"server\""}]};
                         _False ->
                             % if the accept header matches html, then do the redirect. else proceed as usual.
                             case re:run(MochiReq:get_header_value("Accept"), "html", [{capture, none}]) of
