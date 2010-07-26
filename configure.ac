@@ -259,6 +259,12 @@ if test `echo $version | ${AWK} "{print \\$2}"` -eq 6; then
     fi
 fi
 
+has_crypto=`${ERL} -eval "case application:load(crypto) of ok -> ok; _ -> exit(no_crypto) end." -noshell -s init stop`
+
+if test -n "$has_crypto"; then
+    AC_MSG_ERROR([Could not find the Erlang crypto library. Has Erlang been compiled with OpenSSL support?])
+fi
+
 AC_PATH_PROG([ERLC], [erlc])
 
 if test x${ERLC} = x; then
