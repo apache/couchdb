@@ -13,7 +13,7 @@
 -module(couch_httpd).
 -include("couch_db.hrl").
 
--export([start_link/0, stop/0, handle_request/7]).
+-export([start_link/0, start_link/1, stop/0, handle_request/7]).
 
 -export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,path/1,absolute_uri/2,body_length/1]).
 -export([verify_is_server_admin/1,unquote/1,quote/1,recv/2,recv_chunked/4,error_info/1]).
@@ -28,14 +28,34 @@
 -export([accepted_encodings/1,handle_request_int/5,validate_referer/1,validate_ctype/2]).
 
 start_link() ->
+    start_link(http).
+start_link(http) ->
+    Port = couch_config:get("httpd", "port", "5984"),
+    start_link(?MODULE, [{port, Port}]);
+start_link(https) ->
+    Port = couch_config:get("ssl", "port", "5984"),
+    CertFile = couch_config:get("ssl", "cert_file", nil),
+    KeyFile = couch_config:get("ssl", "key_file", nil),
+    Options = case CertFile /= nil andalso KeyFile /= nil of
+                  true ->
+                      [{port, Port},
+                       {ssl, true},
+                       {ssl_opts, [
+                             {certfile, CertFile},
+                             {keyfile, KeyFile}]}];
+                  false ->
+                      io:format("SSL enabled but PEM certificates are missing.", []),
+                      throw({error, missing_certs})
+              end,
+    start_link(https, Options).
+start_link(Name, Options) ->
     % read config and register for configuration changes
 
     % just stop if one of the config settings change. couch_server_sup
     % will restart us and then we will pick up the new settings.
 
     BindAddress = couch_config:get("httpd", "bind_address", any),
-    Port = couch_config:get("httpd", "port", "5984"),
-    MaxConnections = couch_config:get("httpd", "max_connections", "2048"),
+    %% MaxConnections = couch_config:get("httpd", "max_connections", "2048"),
     VirtualHosts = couch_config:get("vhosts"),
     VhostGlobals = re:split(
         couch_config:get("httpd", "vhost_global_handlers", ""),
@@ -74,12 +94,10 @@ start_link() ->
 
     % and off we go
 
-    {ok, Pid} = case mochiweb_http:start([
+    {ok, Pid} = case mochiweb_http:start(Options ++ [
         {loop, Loop},
-        {name, ?MODULE},
-        {ip, BindAddress},
-        {port, Port},
-        {max, MaxConnections}
+        {name, Name},
+        {ip, BindAddress}
     ]) of
     {ok, MochiPid} -> {ok, MochiPid};
     {error, Reason} ->
@@ -101,6 +119,8 @@ start_link() ->
         ("httpd_db_handlers", _) ->
             ?MODULE:stop();
         ("vhosts", _) ->
+            ?MODULE:stop();
+        ("ssl", _) ->
             ?MODULE:stop()
         end, Pid),
 
@@ -430,15 +450,18 @@ absolute_uri(#httpd{mochi_req=MochiReq}=Req, Path) ->
     Host = host_for_request(Req),
     XSsl = couch_config:get("httpd", "x_forwarded_ssl", "X-Forwarded-Ssl"),
     Scheme = case MochiReq:get_header_value(XSsl) of
-        "on" -> "https";
-        _ ->
-            XProto = couch_config:get("httpd", "x_forwarded_proto", "X-Forwarded-Proto"),
-            case MochiReq:get_header_value(XProto) of
-                % Restrict to "https" and "http" schemes only
-                "https" -> "https";
-                _ -> "http"
-            end
-    end,
+                 "on" -> "https";
+                 _ ->
+                     XProto = couch_config:get("httpd", "x_forwarded_proto", "X-Forwarded-Proto"),
+                     case MochiReq:get_header_value(XProto) of
+                         %% Restrict to "https" and "http" schemes only
+                         "https" -> "https";
+                         _ -> case MochiReq:get(scheme) of
+                                  https -> "https";
+                                  http -> "http"
+                              end
+                     end
+             end,
     Scheme ++ "://" ++ Host ++ Path.
 
 unquote(UrlEncodedString) ->
