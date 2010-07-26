@@ -155,15 +155,6 @@ handle_config_req(#httpd{method='GET', path_parts=[_,Section]}=Req) ->
     KVs = [{list_to_binary(Key), list_to_binary(Value)}
             || {Key, Value} <- couch_config:get(Section)],
     send_json(Req, 200, {KVs});
-% PUT /_config/Section/Key
-% "value"
-handle_config_req(#httpd{method='PUT', path_parts=[_, Section, Key]}=Req) ->
-    ok = couch_httpd:verify_is_server_admin(Req),
-    Value = couch_httpd:json_body(Req),
-    Persist = couch_httpd:header_value(Req, "X-Couch-Persist") /= "false",
-    OldValue = couch_config:get(Section, Key, ""),
-    ok = couch_config:set(Section, Key, ?b2l(Value), Persist),
-    send_json(Req, 200, list_to_binary(OldValue));
 % GET /_config/Section/Key
 handle_config_req(#httpd{method='GET', path_parts=[_, Section, Key]}=Req) ->
     ok = couch_httpd:verify_is_server_admin(Req),
@@ -173,19 +164,82 @@ handle_config_req(#httpd{method='GET', path_parts=[_, Section, Key]}=Req) ->
     Value ->
         send_json(Req, 200, list_to_binary(Value))
     end;
-% DELETE /_config/Section/Key
-handle_config_req(#httpd{method='DELETE',path_parts=[_,Section,Key]}=Req) ->
+% PUT or DELETE /_config/Section/Key
+handle_config_req(#httpd{method=Method, path_parts=[_, Section, Key]}=Req)
+      when (Method == 'PUT') or (Method == 'DELETE') ->
     ok = couch_httpd:verify_is_server_admin(Req),
     Persist = couch_httpd:header_value(Req, "X-Couch-Persist") /= "false",
+    case couch_config:get(<<"httpd">>, <<"config_whitelist">>, null) of
+        null ->
+            % No whitelist; allow all changes.
+            handle_approved_config_req(Req, Persist);
+        WhitelistValue ->
+            % Provide a failsafe to protect against inadvertently locking
+            % onesself out of the config by supplying a syntactically-incorrect
+            % Erlang term. To intentionally lock down the whitelist, supply a
+            % well-formed list which does not include the whitelist config
+            % variable itself.
+            FallbackWhitelist = [{<<"httpd">>, <<"config_whitelist">>}],
+
+            Whitelist = case couch_util:parse_term(WhitelistValue) of
+                {ok, Value} when is_list(Value) ->
+                    Value;
+                {ok, _NonListValue} ->
+                    FallbackWhitelist;
+                {error, _} ->
+                    [{WhitelistSection, WhitelistKey}] = FallbackWhitelist,
+                    ?LOG_ERROR("Only whitelisting ~s/~s due to error parsing: ~p",
+                               [WhitelistSection, WhitelistKey, WhitelistValue]),
+                    FallbackWhitelist
+            end,
+
+            IsRequestedKeyVal = fun(Element) ->
+                case Element of
+                    {A, B} ->
+                        % For readability, tuples may be used instead of binaries
+                        % in the whitelist.
+                        case {couch_util:to_binary(A), couch_util:to_binary(B)} of
+                            {Section, Key} ->
+                                true;
+                            {Section, <<"*">>} ->
+                                true;
+                            _Else ->
+                                false
+                        end;
+                    _Else ->
+                        false
+                end
+            end,
+
+            case lists:any(IsRequestedKeyVal, Whitelist) of
+                true ->
+                    % Allow modifying this whitelisted variable.
+                    handle_approved_config_req(Req, Persist);
+                _NotWhitelisted ->
+                    % Disallow modifying this non-whitelisted variable.
+                    send_error(Req, 400, <<"modification_not_allowed">>,
+                               ?l2b("This config variable is read-only"))
+            end
+    end;
+handle_config_req(Req) ->
+    send_method_not_allowed(Req, "GET,PUT,DELETE").
+
+% PUT /_config/Section/Key
+% "value"
+handle_approved_config_req(#httpd{method='PUT', path_parts=[_, Section, Key]}=Req, Persist) ->
+    Value = couch_httpd:json_body(Req),
+    OldValue = couch_config:get(Section, Key, ""),
+    ok = couch_config:set(Section, Key, ?b2l(Value), Persist),
+    send_json(Req, 200, list_to_binary(OldValue));
+% DELETE /_config/Section/Key
+handle_approved_config_req(#httpd{method='DELETE',path_parts=[_,Section,Key]}=Req, Persist) ->
     case couch_config:get(Section, Key, null) of
     null ->
         throw({not_found, unknown_config_value});
     OldValue ->
         couch_config:delete(Section, Key, Persist),
         send_json(Req, 200, list_to_binary(OldValue))
-    end;
-handle_config_req(Req) ->
-    send_method_not_allowed(Req, "GET,PUT,DELETE").
+    end.
 
 
 % httpd db handlers
