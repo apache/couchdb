@@ -23,6 +23,9 @@ secure_rewrites = true
 vhost_global_handlers = _utils, _uuids, _session, _oauth, _users
 allow_jsonp = false
 
+[ssl]
+port = 6984
+
 [log]
 file = %localstatelogdir%/couch.log
 level = info

@@ -1,6 +1,6 @@
 {application, mochiweb,
  [{description, "MochiMedia Web Server"},
-  {vsn, "113"},
+  {vsn, "7c2bc2"},
   {modules, [
         mochihex,
         mochijson,

@@ -3,7 +3,7 @@
 
 %% @doc Converts HTML 4 charrefs and entities to codepoints.
 -module(mochiweb_charref).
--export([charref/1, test/0]).
+-export([charref/1]).
 
 %% External API.
 
@@ -26,16 +26,6 @@ charref([$# | L]) ->
     end;
 charref(L) ->
     entity(L).
-
-%% @spec test() -> ok
-%% @doc Run tests for mochiweb_charref.
-test() ->
-    1234 = charref("#1234"),
-    255 = charref("#xfF"),
-    255 = charref("#XFf"),
-    38 = charref("amp"),
-    undefined = charref("not_an_entity"),
-    ok.
 
 %% Internal API.
 
@@ -293,3 +283,26 @@ entity("rsaquo") -> 8250;
 entity("euro") -> 8364;
 entity(_) -> undefined.
 
+
+%%
+%% Tests
+%%
+-include_lib("eunit/include/eunit.hrl").
+-ifdef(TEST).
+
+exhaustive_entity_test() ->
+    T = mochiweb_cover:clause_lookup_table(?MODULE, entity),
+    [?assertEqual(V, entity(K)) || {K, V} <- T].
+
+charref_test() ->
+    1234 = charref("#1234"),
+    255 = charref("#xfF"),
+    255 = charref(<<"#XFf">>),
+    38 = charref("amp"),
+    38 = charref(<<"amp">>),
+    undefined = charref("not_an_entity"),
+    undefined = charref("#not_an_entity"),
+    undefined = charref("#xnot_an_entity"),
+    ok.
+
+-endif.

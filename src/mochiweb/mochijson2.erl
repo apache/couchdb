@@ -9,7 +9,6 @@
 -author('bob@mochimedia.com').
 -export([encoder/1, encode/1]).
 -export([decoder/1, decode/1]).
--export([test/0]).
 
 % This is a macro to placate syntax highlighters..
 -define(Q, $\").
@@ -39,8 +38,9 @@
 %% @type json_number() = integer() | float()
 %% @type json_array() = [json_term()]
 %% @type json_object() = {struct, [{json_string(), json_term()}]}
+%% @type json_iolist() = {json, iolist()}
 %% @type json_term() = json_string() | json_number() | json_array() |
-%%                     json_object()
+%%                     json_object() | json_iolist()
 
 -record(encoder, {handler=null,
                   utf8=false}).
@@ -75,9 +75,6 @@ decoder(Options) ->
 decode(S) ->
     json_decode(S, #decoder{}).
 
-test() ->
-    test_all().
-
 %% Internal API
 
 parse_encoder_options([], State) ->
@@ -108,6 +105,8 @@ json_encode(Array, State) when is_list(Array) ->
     json_encode_array(Array, State);
 json_encode({struct, Props}, State) when is_list(Props) ->
     json_encode_proplist(Props, State);
+json_encode({json, IoList}, _State) ->
+    IoList;
 json_encode(Bad, #encoder{handler=null}) ->
     exit({json_encode, {bad_term, Bad}});
 json_encode(Bad, State=#encoder{handler=Handler}) ->
@@ -202,12 +201,10 @@ json_bin_is_safe(<<C, Rest/binary>>) ->
             false;
         $\t ->
             false;
-        C when C >= 0, C < $\s; C >= 16#7f, C =< 16#10FFFF ->
+        C when C >= 0, C < $\s; C >= 16#7f ->
             false;
         C when C < 16#7f ->
-            json_bin_is_safe(Rest);
-        _ ->
-            false
+            json_bin_is_safe(Rest)
     end.
 
 json_encode_string_unicode([], _State, Acc) ->
@@ -507,6 +504,12 @@ tokenize(B, S=#decoder{offset=O}) ->
             trim = S#decoder.state,
             {eof, S}
     end.
+%%
+%% Tests
+%%
+-include_lib("eunit/include/eunit.hrl").
+-ifdef(TEST).
+
 
 %% testing constructs borrowed from the Yaws JSON implementation.
 
@@ -516,19 +519,13 @@ obj_new() ->
     {struct, []}.
 
 is_obj({struct, Props}) ->
-    F = fun ({K, _}) when is_binary(K) ->
-                true;
-            (_) ->
-                false
-        end,
+    F = fun ({K, _}) when is_binary(K) -> true end,
     lists:all(F, Props).
 
 obj_from_list(Props) ->
     Obj = {struct, Props},
-    case is_obj(Obj) of
-        true -> Obj;
-        false -> exit({json_bad_object, Obj})
-    end.
+    ?assert(is_obj(Obj)),
+    Obj.
 
 %% Test for equivalence of Erlang terms.
 %% Due to arbitrary order of construction, equivalent objects might
@@ -541,9 +538,7 @@ equiv(L1, L2) when is_list(L1), is_list(L2) ->
     equiv_list(L1, L2);
 equiv(N1, N2) when is_number(N1), is_number(N2) -> N1 == N2;
 equiv(B1, B2) when is_binary(B1), is_binary(B2) -> B1 == B2;
-equiv(true, true) -> true;
-equiv(false, false) -> true;
-equiv(null, null) -> true.
+equiv(A, A) when A =:= true orelse A =:= false orelse A =:= null -> true.
 
 %% Object representation and traversal order is unknown.
 %% Use the sledgehammer and sort property lists.
@@ -563,11 +558,11 @@ equiv_list([], []) ->
 equiv_list([V1 | L1], [V2 | L2]) ->
     equiv(V1, V2) andalso equiv_list(L1, L2).
 
-test_all() ->
+decode_test() ->
     [1199344435545.0, 1] = decode(<<"[1199344435545.0,1]">>),
-    <<16#F0,16#9D,16#9C,16#95>> = decode([34,"\\ud835","\\udf15",34]),
-    test_encoder_utf8(),
-    test_input_validation(),
+    <<16#F0,16#9D,16#9C,16#95>> = decode([34,"\\ud835","\\udf15",34]).
+
+e2j_vec_test() ->
     test_one(e2j_test_vec(utf8), 1).
 
 test_one([], _N) ->
@@ -624,7 +619,7 @@ e2j_test_vec(utf8) ->
     ].
 
 %% test utf8 encoding
-test_encoder_utf8() ->
+encoder_utf8_test() ->
     %% safe conversion case (default)
     [34,"\\u0001","\\u0442","\\u0435","\\u0441","\\u0442",34] =
         encode(<<1,"\321\202\320\265\321\201\321\202">>),
@@ -634,11 +629,11 @@ test_encoder_utf8() ->
     [34,"\\u0001",[209,130],[208,181],[209,129],[209,130],34] =
         Enc(<<1,"\321\202\320\265\321\201\321\202">>).
 
-test_input_validation() ->
+input_validation_test() ->
     Good = [
-        {16#00A3, <<?Q, 16#C2, 16#A3, ?Q>>}, % pound
-        {16#20AC, <<?Q, 16#E2, 16#82, 16#AC, ?Q>>}, % euro
-        {16#10196, <<?Q, 16#F0, 16#90, 16#86, 16#96, ?Q>>} % denarius
+        {16#00A3, <<?Q, 16#C2, 16#A3, ?Q>>}, %% pound
+        {16#20AC, <<?Q, 16#E2, 16#82, 16#AC, ?Q>>}, %% euro
+        {16#10196, <<?Q, 16#F0, 16#90, 16#86, 16#96, ?Q>>} %% denarius
     ],
     lists:foreach(fun({CodePoint, UTF8}) ->
         Expect = list_to_binary(xmerl_ucs:to_utf8(CodePoint)),
@@ -646,15 +641,146 @@ test_input_validation() ->
     end, Good),
 
     Bad = [
-        % 2nd, 3rd, or 4th byte of a multi-byte sequence w/o leading byte
+        %% 2nd, 3rd, or 4th byte of a multi-byte sequence w/o leading byte
         <<?Q, 16#80, ?Q>>,
-        % missing continuations, last byte in each should be 80-BF
+        %% missing continuations, last byte in each should be 80-BF
         <<?Q, 16#C2, 16#7F, ?Q>>,
         <<?Q, 16#E0, 16#80,16#7F, ?Q>>,
         <<?Q, 16#F0, 16#80, 16#80, 16#7F, ?Q>>,
-        % we don't support code points > 10FFFF per RFC 3629
+        %% we don't support code points > 10FFFF per RFC 3629
         <<?Q, 16#F5, 16#80, 16#80, 16#80, ?Q>>
     ],
-    lists:foreach(fun(X) ->
-        ok = try decode(X) catch invalid_utf8 -> ok end
-    end, Bad).
+    lists:foreach(
+      fun(X) ->
+              ok = try decode(X) catch invalid_utf8 -> ok end,
+              %% could be {ucs,{bad_utf8_character_code}} or
+              %%          {json_encode,{bad_char,_}}
+              {'EXIT', _} = (catch encode(X))
+      end, Bad).
+
+inline_json_test() ->
+    ?assertEqual(<<"\"iodata iodata\"">>,
+                 iolist_to_binary(
+                   encode({json, [<<"\"iodata">>, " iodata\""]}))),
+    ?assertEqual({struct, [{<<"key">>, <<"iodata iodata">>}]},
+                 decode(
+                   encode({struct,
+                           [{key, {json, [<<"\"iodata">>, " iodata\""]}}]}))),
+    ok.
+
+big_unicode_test() ->
+    UTF8Seq = list_to_binary(xmerl_ucs:to_utf8(16#0001d120)),
+    ?assertEqual(
+       <<"\"\\ud834\\udd20\"">>,
+       iolist_to_binary(encode(UTF8Seq))),
+    ?assertEqual(
+       UTF8Seq,
+       decode(iolist_to_binary(encode(UTF8Seq)))),
+    ok.
+
+custom_decoder_test() ->
+    ?assertEqual(
+       {struct, [{<<"key">>, <<"value">>}]},
+       (decoder([]))("{\"key\": \"value\"}")),
+    F = fun ({struct, [{<<"key">>, <<"value">>}]}) -> win end,
+    ?assertEqual(
+       win,
+       (decoder([{object_hook, F}]))("{\"key\": \"value\"}")),
+    ok.
+
+atom_test() ->
+    %% JSON native atoms
+    [begin
+         ?assertEqual(A, decode(atom_to_list(A))),
+         ?assertEqual(iolist_to_binary(atom_to_list(A)),
+                      iolist_to_binary(encode(A)))
+     end || A <- [true, false, null]],
+    %% Atom to string
+    ?assertEqual(
+       <<"\"foo\"">>,
+       iolist_to_binary(encode(foo))),
+    ?assertEqual(
+       <<"\"\\ud834\\udd20\"">>,
+       iolist_to_binary(encode(list_to_atom(xmerl_ucs:to_utf8(16#0001d120))))),
+    ok.
+
+key_encode_test() ->
+    %% Some forms are accepted as keys that would not be strings in other
+    %% cases
+    ?assertEqual(
+       <<"{\"foo\":1}">>,
+       iolist_to_binary(encode({struct, [{foo, 1}]}))),
+    ?assertEqual(
+       <<"{\"foo\":1}">>,
+       iolist_to_binary(encode({struct, [{<<"foo">>, 1}]}))),
+    ?assertEqual(
+       <<"{\"foo\":1}">>,
+       iolist_to_binary(encode({struct, [{"foo", 1}]}))),
+    ?assertEqual(
+       <<"{\"\\ud834\\udd20\":1}">>,
+       iolist_to_binary(
+         encode({struct, [{[16#0001d120], 1}]}))),
+    ?assertEqual(
+       <<"{\"1\":1}">>,
+       iolist_to_binary(encode({struct, [{1, 1}]}))),
+    ok.
+
+unsafe_chars_test() ->
+    Chars = "\"\\\b\f\n\r\t",
+    [begin
+         ?assertEqual(false, json_string_is_safe([C])),
+         ?assertEqual(false, json_bin_is_safe(<<C>>)),
+         ?assertEqual(<<C>>, decode(encode(<<C>>)))
+     end || C <- Chars],
+    ?assertEqual(
+       false,
+       json_string_is_safe([16#0001d120])),
+    ?assertEqual(
+       false,
+       json_bin_is_safe(list_to_binary(xmerl_ucs:to_utf8(16#0001d120)))),
+    ?assertEqual(
+       [16#0001d120],
+       xmerl_ucs:from_utf8(
+         binary_to_list(
+           decode(encode(list_to_atom(xmerl_ucs:to_utf8(16#0001d120))))))),
+    ?assertEqual(
+       false,
+       json_string_is_safe([16#110000])),
+    ?assertEqual(
+       false,
+       json_bin_is_safe(list_to_binary(xmerl_ucs:to_utf8([16#110000])))),
+    %% solidus can be escaped but isn't unsafe by default
+    ?assertEqual(
+       <<"/">>,
+       decode(<<"\"\\/\"">>)),
+    ok.
+
+int_test() ->
+    ?assertEqual(0, decode("0")),
+    ?assertEqual(1, decode("1")),
+    ?assertEqual(11, decode("11")),
+    ok.
+
+large_int_test() ->
+    ?assertEqual(<<"-2147483649214748364921474836492147483649">>,
+        iolist_to_binary(encode(-2147483649214748364921474836492147483649))),
+    ?assertEqual(<<"2147483649214748364921474836492147483649">>,
+        iolist_to_binary(encode(2147483649214748364921474836492147483649))),
+    ok.
+
+float_test() ->
+    ?assertEqual(<<"-2147483649.0">>, iolist_to_binary(encode(-2147483649.0))),
+    ?assertEqual(<<"2147483648.0">>, iolist_to_binary(encode(2147483648.0))),
+    ok.
+
+handler_test() ->
+    ?assertEqual(
+       {'EXIT',{json_encode,{bad_term,{}}}},
+       catch encode({})),
+    F = fun ({}) -> [] end,
+    ?assertEqual(
+       <<"[]">>,
+       iolist_to_binary((encoder([{handler, F}]))({}))),
+    ok.
+
+-endif.

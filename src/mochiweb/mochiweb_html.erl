@@ -4,9 +4,9 @@
 %% @doc Loosely tokenizes and generates parse trees for HTML 4.
 -module(mochiweb_html).
 -export([tokens/1, parse/1, parse_tokens/1, to_tokens/1, escape/1,
-         escape_attr/1, to_html/1, test/0]).
+         escape_attr/1, to_html/1]).
 
-% This is a macro to placate syntax highlighters..
+%% This is a macro to placate syntax highlighters..
 -define(QUOTE, $\").
 -define(SQUOTE, $\').
 -define(ADV_COL(S, N),
@@ -35,6 +35,8 @@
 -define(IS_LITERAL_SAFE(C),
         ((C >= $A andalso C =< $Z) orelse (C >= $a andalso C =< $z)
          orelse (C >= $0 andalso C =< $9))).
+-define(PROBABLE_CLOSE(C),
+        (C =:= $> orelse ?IS_WHITESPACE(C))).
 
 -record(decoder, {line=1,
                   column=1,
@@ -89,6 +91,7 @@ to_tokens(T={doctype, _}) ->
 to_tokens(T={comment, _}) ->
     [T];
 to_tokens({Tag0, Acc}) ->
+    %% This is only allowed in sub-tags: {p, [{"class", "foo"}]}
     to_tokens({Tag0, [], Acc});
 to_tokens({Tag0, Attrs, Acc}) ->
     Tag = to_tag(Tag0),
@@ -124,40 +127,6 @@ escape_attr(I) when is_integer(I) ->
 escape_attr(F) when is_float(F) ->
     escape_attr(mochinum:digits(F), []).
 
-%% @spec test() -> ok
-%% @doc Run tests for mochiweb_html.
-test() ->
-    test_destack(),
-    test_tokens(),
-    test_tokens2(),
-    test_parse(),
-    test_parse2(),
-    test_parse_tokens(),
-    test_escape(),
-    test_escape_attr(),
-    test_to_html(),
-    ok.
-
-
-%% Internal API
-
-test_to_html() ->
-    Expect = <<"<html><head><title>hey!</title></head><body><p class=\"foo\">what's up<br /></p><div>sucka</div><!-- comment! --></body></html>">>,
-    Expect = iolist_to_binary(
-               to_html({html, [],
-                        [{<<"head">>, [],
-                          [{title, <<"hey!">>}]},
-                         {body, [],
-                          [{p, [{class, foo}], [<<"what's">>, <<" up">>, {br}]},
-                           {'div', <<"sucka">>},
-                           {comment, <<" comment! ">>}]}]})),
-    Expect1 = <<"<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">">>,
-    Expect1 = iolist_to_binary(
-                to_html({doctype,
-                         [<<"html">>, <<"PUBLIC">>,
-                          <<"-//W3C//DTD XHTML 1.0 Transitional//EN">>,
-                          <<"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">>]})),
-    ok.
 to_html([], Acc) ->
     lists:reverse(Acc);
 to_html([{'=', Content} | Rest], Acc) ->
@@ -205,16 +174,6 @@ attrs_to_html([{K, V} | Rest], Acc) ->
                   [[<<" ">>, escape(K), <<"=\"">>,
                     escape_attr(V), <<"\"">>] | Acc]).
 
-test_escape() ->
-    <<"&amp;quot;\"word &lt;&lt;up!&amp;quot;">> =
-        escape(<<"&quot;\"word <<up!&quot;">>),
-    ok.
-
-test_escape_attr() ->
-    <<"&amp;quot;&quot;word &lt;&lt;up!&amp;quot;">> =
-        escape_attr(<<"&quot;\"word <<up!&quot;">>),
-    ok.
-
 escape([], Acc) ->
     list_to_binary(lists:reverse(Acc));
 escape("<" ++ Rest, Acc) ->
@@ -257,6 +216,9 @@ to_tokens([{Tag0, [T0={'=', _C0} | R1]} | Rest], Acc) ->
 to_tokens([{Tag0, [T0={comment, _C0} | R1]} | Rest], Acc) ->
     %% Allow {comment, iolist()}
     to_tokens([{Tag0, R1} | Rest], [T0 | Acc]);
+to_tokens([{Tag0, [T0={pi, _S0, _A0} | R1]} | Rest], Acc) ->
+    %% Allow {pi, binary(), list()}
+    to_tokens([{Tag0, R1} | Rest], [T0 | Acc]);
 to_tokens([{Tag0, [{T0, A0=[{_, _} | _]} | R1]} | Rest], Acc) ->
     %% Allow {p, [{"class", "foo"}]}
     to_tokens([{Tag0, [{T0, A0, []} | R1]} | Rest], Acc);
@@ -289,39 +251,6 @@ to_tokens([{Tag0, [B | R1]} | Rest], Acc) when is_binary(B) ->
     %% Binary text
     Tag = to_tag(Tag0),
     to_tokens([{Tag, R1} | Rest], [{data, B, false} | Acc]).
-
-test_tokens() ->
-    [{start_tag, <<"foo">>, [{<<"bar">>, <<"baz">>},
-                             {<<"wibble">>, <<"wibble">>},
-                             {<<"alice">>, <<"bob">>}], true}] =
-        tokens(<<"<foo bar=baz wibble='wibble' alice=\"bob\"/>">>),
-    [{start_tag, <<"foo">>, [{<<"bar">>, <<"baz">>},
-                             {<<"wibble">>, <<"wibble">>},
-                             {<<"alice">>, <<"bob">>}], true}] =
-        tokens(<<"<foo bar=baz wibble='wibble' alice=bob/>">>),
-    [{comment, <<"[if lt IE 7]>\n<style type=\"text/css\">\n.no_ie { display: none; }\n</style>\n<![endif]">>}] =
-        tokens(<<"<!--[if lt IE 7]>\n<style type=\"text/css\">\n.no_ie { display: none; }\n</style>\n<![endif]-->">>),
-    [{start_tag, <<"script">>, [{<<"type">>, <<"text/javascript">>}], false},
-     {data, <<" A= B <= C ">>, false},
-     {end_tag, <<"script">>}] =
-        tokens(<<"<script type=\"text/javascript\"> A= B <= C </script>">>),
-    [{start_tag, <<"script">>, [{<<"type">>, <<"text/javascript">>}], false},
-     {data, <<" A= B <= C ">>, false},
-     {end_tag, <<"script">>}] =
-        tokens(<<"<script type =\"text/javascript\"> A= B <= C </script>">>),
-    [{start_tag, <<"script">>, [{<<"type">>, <<"text/javascript">>}], false},
-     {data, <<" A= B <= C ">>, false},
-     {end_tag, <<"script">>}] =
-        tokens(<<"<script type = \"text/javascript\"> A= B <= C </script>">>),
-    [{start_tag, <<"script">>, [{<<"type">>, <<"text/javascript">>}], false},
-     {data, <<" A= B <= C ">>, false},
-     {end_tag, <<"script">>}] =
-        tokens(<<"<script type= \"text/javascript\"> A= B <= C </script>">>),
-    [{start_tag, <<"textarea">>, [], false},
-     {data, <<"<html></body>">>, false},
-     {end_tag, <<"textarea">>}] =
-        tokens(<<"<textarea><html></body></textarea>">>),
-    ok.
 
 tokens(B, S=#decoder{offset=O}, Acc) ->
     case B of
@@ -374,7 +303,8 @@ tokenize(B, S=#decoder{offset=O}) ->
             {{end_tag, Tag}, S2};
         <<_:O/binary, "<", C, _/binary>> when ?IS_WHITESPACE(C) ->
             %% This isn't really strict HTML
-            tokenize_data(B, ?INC_COL(S));
+            {{data, Data, _Whitespace}, S1} = tokenize_data(B, ?INC_COL(S)),
+            {{data, <<$<, Data/binary>>, false}, S1};
         <<_:O/binary, "<", _/binary>> ->
             {Tag, S1} = tokenize_literal(B, ?INC_COL(S)),
             {Attrs, S2} = tokenize_attributes(B, S1),
@@ -384,149 +314,6 @@ tokenize(B, S=#decoder{offset=O}) ->
         _ ->
             tokenize_data(B, S)
     end.
-
-test_parse() ->
-    D0 = <<"<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\">
-<html>
- <head>
-   <meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\">
-   <title>Foo</title>
-   <link rel=\"stylesheet\" type=\"text/css\" href=\"/static/rel/dojo/resources/dojo.css\" media=\"screen\">
-   <link rel=\"stylesheet\" type=\"text/css\" href=\"/static/foo.css\" media=\"screen\">
-   <!--[if lt IE 7]>
-   <style type=\"text/css\">
-     .no_ie { display: none; }
-   </style>
-   <![endif]-->
-   <link rel=\"icon\" href=\"/static/images/favicon.ico\" type=\"image/x-icon\">
-   <link rel=\"shortcut icon\" href=\"/static/images/favicon.ico\" type=\"image/x-icon\">
- </head>
- <body id=\"home\" class=\"tundra\"><![CDATA[&lt;<this<!-- is -->CDATA>&gt;]]></body>
-</html>">>,
-    Expect = {<<"html">>, [],
-              [{<<"head">>, [],
-                [{<<"meta">>,
-                  [{<<"http-equiv">>,<<"Content-Type">>},
-                   {<<"content">>,<<"text/html; charset=UTF-8">>}],
-                  []},
-                 {<<"title">>,[],[<<"Foo">>]},
-                 {<<"link">>,
-                  [{<<"rel">>,<<"stylesheet">>},
-                   {<<"type">>,<<"text/css">>},
-                   {<<"href">>,<<"/static/rel/dojo/resources/dojo.css">>},
-                   {<<"media">>,<<"screen">>}],
-                  []},
-                 {<<"link">>,
-                  [{<<"rel">>,<<"stylesheet">>},
-                   {<<"type">>,<<"text/css">>},
-                   {<<"href">>,<<"/static/foo.css">>},
-                   {<<"media">>,<<"screen">>}],
-                  []},
-                 {comment,<<"[if lt IE 7]>\n   <style type=\"text/css\">\n     .no_ie { display: none; }\n   </style>\n   <![endif]">>},
-                 {<<"link">>,
-                  [{<<"rel">>,<<"icon">>},
-                   {<<"href">>,<<"/static/images/favicon.ico">>},
-                   {<<"type">>,<<"image/x-icon">>}],
-                  []},
-                 {<<"link">>,
-                  [{<<"rel">>,<<"shortcut icon">>},
-                   {<<"href">>,<<"/static/images/favicon.ico">>},
-                   {<<"type">>,<<"image/x-icon">>}],
-                  []}]},
-               {<<"body">>,
-                [{<<"id">>,<<"home">>},
-                 {<<"class">>,<<"tundra">>}],
-                [<<"&lt;<this<!-- is -->CDATA>&gt;">>]}]},
-    Expect = parse(D0),
-    ok.
-
-test_tokens2() ->
-    D0 = <<"<channel><title>from __future__ import *</title><link>http://bob.pythonmac.org</link><description>Bob's Rants</description></channel>">>,
-    Expect = [{start_tag,<<"channel">>,[],false},
-              {start_tag,<<"title">>,[],false},
-              {data,<<"from __future__ import *">>,false},
-              {end_tag,<<"title">>},
-              {start_tag,<<"link">>,[],true},
-              {data,<<"http://bob.pythonmac.org">>,false},
-              {end_tag,<<"link">>},
-              {start_tag,<<"description">>,[],false},
-              {data,<<"Bob's Rants">>,false},
-              {end_tag,<<"description">>},
-              {end_tag,<<"channel">>}],
-    Expect = tokens(D0),
-    ok.
-
-test_parse2() ->
-    D0 = <<"<channel><title>from __future__ import *</title><link>http://bob.pythonmac.org<br>foo</link><description>Bob's Rants</description></channel>">>,
-    Expect = {<<"channel">>,[],
-              [{<<"title">>,[],[<<"from __future__ import *">>]},
-               {<<"link">>,[],[
-                               <<"http://bob.pythonmac.org">>,
-                               {<<"br">>,[],[]},
-                               <<"foo">>]},
-               {<<"description">>,[],[<<"Bob's Rants">>]}]},
-    Expect = parse(D0),
-    ok.
-
-test_parse_tokens() ->
-    D0 = [{doctype,[<<"HTML">>,<<"PUBLIC">>,<<"-//W3C//DTD HTML 4.01 Transitional//EN">>]},
-          {data,<<"\n">>,true},
-          {start_tag,<<"html">>,[],false}],
-    {<<"html">>, [], []} = parse_tokens(D0),
-    D1 = D0 ++ [{end_tag, <<"html">>}],
-    {<<"html">>, [], []} = parse_tokens(D1),
-    D2 = D0 ++ [{start_tag, <<"body">>, [], false}],
-    {<<"html">>, [], [{<<"body">>, [], []}]} = parse_tokens(D2),
-    D3 = D0 ++ [{start_tag, <<"head">>, [], false},
-                {end_tag, <<"head">>},
-                {start_tag, <<"body">>, [], false}],
-    {<<"html">>, [], [{<<"head">>, [], []}, {<<"body">>, [], []}]} = parse_tokens(D3),
-    D4 = D3 ++ [{data,<<"\n">>,true},
-                {start_tag,<<"div">>,[{<<"class">>,<<"a">>}],false},
-                {start_tag,<<"a">>,[{<<"name">>,<<"#anchor">>}],false},
-                {end_tag,<<"a">>},
-                {end_tag,<<"div">>},
-                {start_tag,<<"div">>,[{<<"class">>,<<"b">>}],false},
-                {start_tag,<<"div">>,[{<<"class">>,<<"c">>}],false},
-                {end_tag,<<"div">>},
-                {end_tag,<<"div">>}],
-    {<<"html">>, [],
-     [{<<"head">>, [], []},
-      {<<"body">>, [],
-       [{<<"div">>, [{<<"class">>, <<"a">>}], [{<<"a">>, [{<<"name">>, <<"#anchor">>}], []}]},
-        {<<"div">>, [{<<"class">>, <<"b">>}], [{<<"div">>, [{<<"class">>, <<"c">>}], []}]}
-       ]}]} = parse_tokens(D4),
-    D5 = [{start_tag,<<"html">>,[],false},
-          {data,<<"\n">>,true},
-          {data,<<"boo">>,false},
-          {data,<<"hoo">>,false},
-          {data,<<"\n">>,true},
-          {end_tag,<<"html">>}],
-    {<<"html">>, [], [<<"\nboohoo\n">>]} = parse_tokens(D5),
-    D6 = [{start_tag,<<"html">>,[],false},
-          {data,<<"\n">>,true},
-          {data,<<"\n">>,true},
-          {end_tag,<<"html">>}],
-    {<<"html">>, [], []} = parse_tokens(D6),
-    D7 = [{start_tag,<<"html">>,[],false},
-          {start_tag,<<"ul">>,[],false},
-          {start_tag,<<"li">>,[],false},
-          {data,<<"word">>,false},
-          {start_tag,<<"li">>,[],false},
-          {data,<<"up">>,false},
-          {end_tag,<<"li">>},
-          {start_tag,<<"li">>,[],false},
-          {data,<<"fdsa">>,false},
-          {start_tag,<<"br">>,[],true},
-          {data,<<"asdf">>,false},
-          {end_tag,<<"ul">>},
-          {end_tag,<<"html">>}],
-    {<<"html">>, [],
-     [{<<"ul">>, [],
-       [{<<"li">>, [], [<<"word">>]},
-        {<<"li">>, [], [<<"up">>]},
-        {<<"li">>, [], [<<"fdsa">>,{<<"br">>, [], []}, <<"asdf">>]}]}]} = parse_tokens(D7),
-    ok.
 
 tree_data([{data, Data, Whitespace} | Rest], AllWhitespace, Acc) ->
     tree_data(Rest, (Whitespace andalso AllWhitespace), [Data | Acc]);
@@ -556,7 +343,9 @@ tree(L=[{data, _Data, _Whitespace} | _], S) ->
             tree(Rest, S);
         {Data, false, Rest} ->
             tree(Rest, append_stack_child(Data, S))
-    end.
+    end;
+tree([{doctype, _} | Rest], Stack) ->
+    tree(Rest, Stack).
 
 norm({Tag, Attrs}) ->
     {norm(Tag), [{norm(K), iolist_to_binary(V)} || {K, V} <- Attrs], []};
@@ -564,21 +353,6 @@ norm(Tag) when is_binary(Tag) ->
     Tag;
 norm(Tag) ->
     list_to_binary(string:to_lower(Tag)).
-
-test_destack() ->
-    {<<"a">>, [], []} =
-        destack([{<<"a">>, [], []}]),
-    {<<"a">>, [], [{<<"b">>, [], []}]} =
-        destack([{<<"b">>, [], []}, {<<"a">>, [], []}]),
-    {<<"a">>, [], [{<<"b">>, [], [{<<"c">>, [], []}]}]} =
-     destack([{<<"c">>, [], []}, {<<"b">>, [], []}, {<<"a">>, [], []}]),
-    [{<<"a">>, [], [{<<"b">>, [], [{<<"c">>, [], []}]}]}] =
-     destack(<<"b">>,
-             [{<<"c">>, [], []}, {<<"b">>, [], []}, {<<"a">>, [], []}]),
-    [{<<"b">>, [], [{<<"c">>, [], []}]}, {<<"a">>, [], []}] =
-     destack(<<"c">>,
-             [{<<"c">>, [], []}, {<<"b">>, [], []},{<<"a">>, [], []}]),
-    ok.
 
 stack(T1={TN, _, _}, Stack=[{TN, _, _} | _Rest])
   when TN =:= <<"li">> orelse TN =:= <<"option">> ->
@@ -719,9 +493,10 @@ find_qgt(Bin, S=#decoder{offset=O}) ->
     case Bin of
         <<_:O/binary, "?>", _/binary>> ->
             ?ADV_COL(S, 2);
-        <<_:O/binary, C, _/binary>> ->
-            find_qgt(Bin, ?INC_CHAR(S, C));
-        _ ->
+        %% tokenize_attributes takes care of this state:
+        %% <<_:O/binary, C, _/binary>> ->
+        %%     find_qgt(Bin, ?INC_CHAR(S, C));
+        <<_:O/binary>> ->
             S
     end.
 
@@ -766,7 +541,7 @@ tokenize_charref(Bin, S=#decoder{offset=O}, Start) ->
                            <<_:Start1/binary, R:Len1/binary, _/binary>> = Bin,
                            R;
                        Unichar ->
-                           list_to_binary(xmerl_ucs:to_utf8(Unichar))
+                           mochiutf8:codepoint_to_bytes(Unichar)
                    end,
             {{data, Data, false}, ?INC_COL(S)};
         _ ->
@@ -791,11 +566,10 @@ tokenize_doctype(Bin, S=#decoder{offset=O}, Acc) ->
 
 tokenize_word_or_literal(Bin, S=#decoder{offset=O}) ->
     case Bin of
-        <<_:O/binary, C, _/binary>> when ?IS_WHITESPACE(C) ->
-            {error, {whitespace, [C], S}};
         <<_:O/binary, C, _/binary>> when C =:= ?QUOTE orelse C =:= ?SQUOTE ->
             tokenize_word(Bin, ?INC_COL(S), C);
-        _ ->
+        <<_:O/binary, C, _/binary>> when not ?IS_WHITESPACE(C) ->
+            %% Sanity check for whitespace
             tokenize_literal(Bin, S, [])
     end.
 
@@ -852,13 +626,14 @@ tokenize_script(Bin, S=#decoder{offset=O}) ->
 tokenize_script(Bin, S=#decoder{offset=O}, Start) ->
     case Bin of
         %% Just a look-ahead, we want the end_tag separately
-        <<_:O/binary, $<, $/, SS, CC, RR, II, PP, TT, _/binary>>
+        <<_:O/binary, $<, $/, SS, CC, RR, II, PP, TT, ZZ, _/binary>>
         when (SS =:= $s orelse SS =:= $S) andalso
              (CC =:= $c orelse CC =:= $C) andalso
              (RR =:= $r orelse RR =:= $R) andalso
              (II =:= $i orelse II =:= $I) andalso
              (PP =:= $p orelse PP =:= $P) andalso
-             (TT=:= $t orelse TT =:= $T) ->
+             (TT=:= $t orelse TT =:= $T) andalso
+             ?PROBABLE_CLOSE(ZZ) ->
             Len = O - Start,
             <<_:Start/binary, Raw:Len/binary, _/binary>> = Bin,
             {{data, Raw, false}, S};
@@ -874,7 +649,7 @@ tokenize_textarea(Bin, S=#decoder{offset=O}) ->
 tokenize_textarea(Bin, S=#decoder{offset=O}, Start) ->
     case Bin of
         %% Just a look-ahead, we want the end_tag separately
-        <<_:O/binary, $<, $/, TT, EE, XX, TT2, AA, RR, EE2, AA2, _/binary>>
+        <<_:O/binary, $<, $/, TT, EE, XX, TT2, AA, RR, EE2, AA2, ZZ, _/binary>>
         when (TT =:= $t orelse TT =:= $T) andalso
              (EE =:= $e orelse EE =:= $E) andalso
              (XX =:= $x orelse XX =:= $X) andalso
@@ -882,7 +657,8 @@ tokenize_textarea(Bin, S=#decoder{offset=O}, Start) ->
              (AA =:= $a orelse AA =:= $A) andalso
              (RR =:= $r orelse RR =:= $R) andalso
              (EE2 =:= $e orelse EE2 =:= $E) andalso
-             (AA2 =:= $a orelse AA2 =:= $A) ->
+             (AA2 =:= $a orelse AA2 =:= $A) andalso
+             ?PROBABLE_CLOSE(ZZ) ->
             Len = O - Start,
             <<_:Start/binary, Raw:Len/binary, _/binary>> = Bin,
             {{data, Raw, false}, S};
@@ -891,3 +667,395 @@ tokenize_textarea(Bin, S=#decoder{offset=O}, Start) ->
         <<_:Start/binary, Raw/binary>> ->
             {{data, Raw, false}, S}
     end.
+
+
+%%
+%% Tests
+%%
+-include_lib("eunit/include/eunit.hrl").
+-ifdef(TEST).
+
+to_html_test() ->
+    ?assertEqual(
+       <<"<html><head><title>hey!</title></head><body><p class=\"foo\">what's up<br /></p><div>sucka</div>RAW!<!-- comment! --></body></html>">>,
+       iolist_to_binary(
+         to_html({html, [],
+                  [{<<"head">>, [],
+                    [{title, <<"hey!">>}]},
+                   {body, [],
+                    [{p, [{class, foo}], [<<"what's">>, <<" up">>, {br}]},
+                     {'div', <<"sucka">>},
+                     {'=', <<"RAW!">>},
+                     {comment, <<" comment! ">>}]}]}))),
+    ?assertEqual(
+       <<"<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">">>,
+       iolist_to_binary(
+         to_html({doctype,
+                  [<<"html">>, <<"PUBLIC">>,
+                   <<"-//W3C//DTD XHTML 1.0 Transitional//EN">>,
+                   <<"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">>]}))),
+    ?assertEqual(
+       <<"<html><?xml:namespace prefix=\"o\" ns=\"urn:schemas-microsoft-com:office:office\"?></html>">>,
+       iolist_to_binary(
+         to_html({<<"html">>,[],
+                  [{pi, <<"xml:namespace">>,
+                    [{<<"prefix">>,<<"o">>},
+                     {<<"ns">>,<<"urn:schemas-microsoft-com:office:office">>}]}]}))),
+    ok.
+
+escape_test() ->
+    ?assertEqual(
+       <<"&amp;quot;\"word &gt;&lt;&lt;up!&amp;quot;">>,
+       escape(<<"&quot;\"word ><<up!&quot;">>)),
+    ?assertEqual(
+       <<"&amp;quot;\"word &gt;&lt;&lt;up!&amp;quot;">>,
+       escape("&quot;\"word ><<up!&quot;")),
+    ?assertEqual(
+       <<"&amp;quot;\"word &gt;&lt;&lt;up!&amp;quot;">>,
+       escape('&quot;\"word ><<up!&quot;')),
+    ok.
+
+escape_attr_test() ->
+    ?assertEqual(
+       <<"&amp;quot;&quot;word &gt;&lt;&lt;up!&amp;quot;">>,
+       escape_attr(<<"&quot;\"word ><<up!&quot;">>)),
+    ?assertEqual(
+       <<"&amp;quot;&quot;word &gt;&lt;&lt;up!&amp;quot;">>,
+       escape_attr("&quot;\"word ><<up!&quot;")),
+    ?assertEqual(
+       <<"&amp;quot;&quot;word &gt;&lt;&lt;up!&amp;quot;">>,
+       escape_attr('&quot;\"word ><<up!&quot;')),
+    ?assertEqual(
+       <<"12345">>,
+       escape_attr(12345)),
+    ?assertEqual(
+       <<"1.5">>,
+       escape_attr(1.5)),
+    ok.
+
+tokens_test() ->
+    ?assertEqual(
+       [{start_tag, <<"foo">>, [{<<"bar">>, <<"baz">>},
+                                {<<"wibble">>, <<"wibble">>},
+                                {<<"alice">>, <<"bob">>}], true}],
+       tokens(<<"<foo bar=baz wibble='wibble' alice=\"bob\"/>">>)),
+    ?assertEqual(
+       [{start_tag, <<"foo">>, [{<<"bar">>, <<"baz">>},
+                                {<<"wibble">>, <<"wibble">>},
+                                {<<"alice">>, <<"bob">>}], true}],
+       tokens(<<"<foo bar=baz wibble='wibble' alice=bob/>">>)),
+    ?assertEqual(
+       [{comment, <<"[if lt IE 7]>\n<style type=\"text/css\">\n.no_ie { display: none; }\n</style>\n<![endif]">>}],
+       tokens(<<"<!--[if lt IE 7]>\n<style type=\"text/css\">\n.no_ie { display: none; }\n</style>\n<![endif]-->">>)),
+    ?assertEqual(
+       [{start_tag, <<"script">>, [{<<"type">>, <<"text/javascript">>}], false},
+        {data, <<" A= B <= C ">>, false},
+        {end_tag, <<"script">>}],
+       tokens(<<"<script type=\"text/javascript\"> A= B <= C </script>">>)),
+    ?assertEqual(
+       [{start_tag, <<"script">>, [{<<"type">>, <<"text/javascript">>}], false},
+        {data, <<" A= B <= C ">>, false},
+        {end_tag, <<"script">>}],
+       tokens(<<"<script type =\"text/javascript\"> A= B <= C </script>">>)),
+    ?assertEqual(
+       [{start_tag, <<"script">>, [{<<"type">>, <<"text/javascript">>}], false},
+        {data, <<" A= B <= C ">>, false},
+        {end_tag, <<"script">>}],
+       tokens(<<"<script type = \"text/javascript\"> A= B <= C </script>">>)),
+    ?assertEqual(
+       [{start_tag, <<"script">>, [{<<"type">>, <<"text/javascript">>}], false},
+        {data, <<" A= B <= C ">>, false},
+        {end_tag, <<"script">>}],
+       tokens(<<"<script type= \"text/javascript\"> A= B <= C </script>">>)),
+    ?assertEqual(
+       [{start_tag, <<"textarea">>, [], false},
+        {data, <<"<html></body>">>, false},
+        {end_tag, <<"textarea">>}],
+       tokens(<<"<textarea><html></body></textarea>">>)),
+    ?assertEqual(
+       [{start_tag, <<"textarea">>, [], false},
+        {data, <<"<html></body></textareaz>">>, false}],
+       tokens(<<"<textarea ><html></body></textareaz>">>)),
+    ?assertEqual(
+       [{pi, <<"xml:namespace">>,
+         [{<<"prefix">>,<<"o">>},
+          {<<"ns">>,<<"urn:schemas-microsoft-com:office:office">>}]}],
+       tokens(<<"<?xml:namespace prefix=\"o\" ns=\"urn:schemas-microsoft-com:office:office\"?>">>)),
+    ?assertEqual(
+       [{pi, <<"xml:namespace">>,
+         [{<<"prefix">>,<<"o">>},
+          {<<"ns">>,<<"urn:schemas-microsoft-com:office:office">>}]}],
+       tokens(<<"<?xml:namespace prefix=o ns=urn:schemas-microsoft-com:office:office \n?>">>)),
+    ?assertEqual(
+       [{pi, <<"xml:namespace">>,
+         [{<<"prefix">>,<<"o">>},
+          {<<"ns">>,<<"urn:schemas-microsoft-com:office:office">>}]}],
+       tokens(<<"<?xml:namespace prefix=o ns=urn:schemas-microsoft-com:office:office">>)),
+    ?assertEqual(
+       [{data, <<"<">>, false}],
+       tokens(<<"&lt;">>)),
+    ?assertEqual(
+       [{data, <<"not html ">>, false},
+        {data, <<"< at all">>, false}],
+       tokens(<<"not html < at all">>)),
+    ok.
+
+parse_test() ->
+    D0 = <<"<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\">
+<html>
+ <head>
+   <meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\">
+   <title>Foo</title>
+   <link rel=\"stylesheet\" type=\"text/css\" href=\"/static/rel/dojo/resources/dojo.css\" media=\"screen\">
+   <link rel=\"stylesheet\" type=\"text/css\" href=\"/static/foo.css\" media=\"screen\">
+   <!--[if lt IE 7]>
+   <style type=\"text/css\">
+     .no_ie { display: none; }
+   </style>
+   <![endif]-->
+   <link rel=\"icon\" href=\"/static/images/favicon.ico\" type=\"image/x-icon\">
+   <link rel=\"shortcut icon\" href=\"/static/images/favicon.ico\" type=\"image/x-icon\">
+ </head>
+ <body id=\"home\" class=\"tundra\"><![CDATA[&lt;<this<!-- is -->CDATA>&gt;]]></body>
+</html>">>,
+    ?assertEqual(
+       {<<"html">>, [],
+        [{<<"head">>, [],
+          [{<<"meta">>,
+            [{<<"http-equiv">>,<<"Content-Type">>},
+             {<<"content">>,<<"text/html; charset=UTF-8">>}],
+            []},
+           {<<"title">>,[],[<<"Foo">>]},
+           {<<"link">>,
+            [{<<"rel">>,<<"stylesheet">>},
+             {<<"type">>,<<"text/css">>},
+             {<<"href">>,<<"/static/rel/dojo/resources/dojo.css">>},
+             {<<"media">>,<<"screen">>}],
+            []},
+           {<<"link">>,
+            [{<<"rel">>,<<"stylesheet">>},
+             {<<"type">>,<<"text/css">>},
+             {<<"href">>,<<"/static/foo.css">>},
+             {<<"media">>,<<"screen">>}],
+            []},
+           {comment,<<"[if lt IE 7]>\n   <style type=\"text/css\">\n     .no_ie { display: none; }\n   </style>\n   <![endif]">>},
+           {<<"link">>,
+            [{<<"rel">>,<<"icon">>},
+             {<<"href">>,<<"/static/images/favicon.ico">>},
+             {<<"type">>,<<"image/x-icon">>}],
+            []},
+           {<<"link">>,
+            [{<<"rel">>,<<"shortcut icon">>},
+             {<<"href">>,<<"/static/images/favicon.ico">>},
+             {<<"type">>,<<"image/x-icon">>}],
+            []}]},
+         {<<"body">>,
+          [{<<"id">>,<<"home">>},
+           {<<"class">>,<<"tundra">>}],
+          [<<"&lt;<this<!-- is -->CDATA>&gt;">>]}]},
+       parse(D0)),
+    ?assertEqual(
+       {<<"html">>,[],
+        [{pi, <<"xml:namespace">>,
+          [{<<"prefix">>,<<"o">>},
+           {<<"ns">>,<<"urn:schemas-microsoft-com:office:office">>}]}]},
+       parse(
+         <<"<html><?xml:namespace prefix=\"o\" ns=\"urn:schemas-microsoft-com:office:office\"?></html>">>)),
+    ?assertEqual(
+       {<<"html">>, [],
+        [{<<"dd">>, [], [<<"foo">>]},
+         {<<"dt">>, [], [<<"bar">>]}]},
+       parse(<<"<html><dd>foo<dt>bar</html>">>)),
+    %% Singleton sadness
+    ?assertEqual(
+       {<<"html">>, [],
+        [{<<"link">>, [], []},
+         <<"foo">>,
+         {<<"br">>, [], []},
+         <<"bar">>]},
+       parse(<<"<html><link>foo<br>bar</html>">>)),
+    ?assertEqual(
+       {<<"html">>, [],
+        [{<<"link">>, [], [<<"foo">>,
+                           {<<"br">>, [], []},
+                           <<"bar">>]}]},
+       parse(<<"<html><link>foo<br>bar</link></html>">>)),
+    ok.
+
+exhaustive_is_singleton_test() ->
+    T = mochiweb_cover:clause_lookup_table(?MODULE, is_singleton),
+    [?assertEqual(V, is_singleton(K)) || {K, V} <- T].
+
+tokenize_attributes_test() ->
+    ?assertEqual(
+       {<<"foo">>,
+        [{<<"bar">>, <<"b\"az">>},
+         {<<"wibble">>, <<"wibble">>},
+         {<<"taco", 16#c2, 16#a9>>, <<"bell">>},
+         {<<"quux">>, <<"quux">>}],
+        []},
+       parse(<<"<foo bar=\"b&quot;az\" wibble taco&copy;=bell quux">>)),
+    ok.
+
+tokens2_test() ->
+    D0 = <<"<channel><title>from __future__ import *</title><link>http://bob.pythonmac.org</link><description>Bob's Rants</description></channel>">>,
+    ?assertEqual(
+       [{start_tag,<<"channel">>,[],false},
+        {start_tag,<<"title">>,[],false},
+        {data,<<"from __future__ import *">>,false},
+        {end_tag,<<"title">>},
+        {start_tag,<<"link">>,[],true},
+        {data,<<"http://bob.pythonmac.org">>,false},
+        {end_tag,<<"link">>},
+        {start_tag,<<"description">>,[],false},
+        {data,<<"Bob's Rants">>,false},
+        {end_tag,<<"description">>},
+        {end_tag,<<"channel">>}],
+       tokens(D0)),
+    ok.
+
+to_tokens_test() ->
+    ?assertEqual(
+       [{start_tag, <<"p">>, [{class, 1}], false},
+        {end_tag, <<"p">>}],
+       to_tokens({p, [{class, 1}], []})),
+    ?assertEqual(
+       [{start_tag, <<"p">>, [], false},
+        {end_tag, <<"p">>}],
+       to_tokens({p})),
+    ?assertEqual(
+       [{'=', <<"data">>}],
+       to_tokens({'=', <<"data">>})),
+    ?assertEqual(
+       [{comment, <<"comment">>}],
+       to_tokens({comment, <<"comment">>})),
+    %% This is only allowed in sub-tags:
+    %% {p, [{"class", "foo"}]} as {p, [{"class", "foo"}], []}
+    %% On the outside it's always treated as follows:
+    %% {p, [], [{"class", "foo"}]} as {p, [], [{"class", "foo"}]}
+    ?assertEqual(
+       [{start_tag, <<"html">>, [], false},
+        {start_tag, <<"p">>, [{class, 1}], false},
+        {end_tag, <<"p">>},
+        {end_tag, <<"html">>}],
+       to_tokens({html, [{p, [{class, 1}]}]})),
+    ok.
+
+parse2_test() ->
+    D0 = <<"<channel><title>from __future__ import *</title><link>http://bob.pythonmac.org<br>foo</link><description>Bob's Rants</description></channel>">>,
+    ?assertEqual(
+       {<<"channel">>,[],
+        [{<<"title">>,[],[<<"from __future__ import *">>]},
+         {<<"link">>,[],[
+                         <<"http://bob.pythonmac.org">>,
+                         {<<"br">>,[],[]},
+                         <<"foo">>]},
+         {<<"description">>,[],[<<"Bob's Rants">>]}]},
+       parse(D0)),
+    ok.
+
+parse_tokens_test() ->
+    D0 = [{doctype,[<<"HTML">>,<<"PUBLIC">>,<<"-//W3C//DTD HTML 4.01 Transitional//EN">>]},
+          {data,<<"\n">>,true},
+          {start_tag,<<"html">>,[],false}],
+    ?assertEqual(
+       {<<"html">>, [], []},
+       parse_tokens(D0)),
+    D1 = D0 ++ [{end_tag, <<"html">>}],
+    ?assertEqual(
+       {<<"html">>, [], []},
+       parse_tokens(D1)),
+    D2 = D0 ++ [{start_tag, <<"body">>, [], false}],
+    ?assertEqual(
+       {<<"html">>, [], [{<<"body">>, [], []}]},
+       parse_tokens(D2)),
+    D3 = D0 ++ [{start_tag, <<"head">>, [], false},
+                {end_tag, <<"head">>},
+                {start_tag, <<"body">>, [], false}],
+    ?assertEqual(
+       {<<"html">>, [], [{<<"head">>, [], []}, {<<"body">>, [], []}]},
+       parse_tokens(D3)),
+    D4 = D3 ++ [{data,<<"\n">>,true},
+                {start_tag,<<"div">>,[{<<"class">>,<<"a">>}],false},
+                {start_tag,<<"a">>,[{<<"name">>,<<"#anchor">>}],false},
+                {end_tag,<<"a">>},
+                {end_tag,<<"div">>},
+                {start_tag,<<"div">>,[{<<"class">>,<<"b">>}],false},
+                {start_tag,<<"div">>,[{<<"class">>,<<"c">>}],false},
+                {end_tag,<<"div">>},
+                {end_tag,<<"div">>}],
+    ?assertEqual(
+       {<<"html">>, [],
+        [{<<"head">>, [], []},
+         {<<"body">>, [],
+          [{<<"div">>, [{<<"class">>, <<"a">>}], [{<<"a">>, [{<<"name">>, <<"#anchor">>}], []}]},
+           {<<"div">>, [{<<"class">>, <<"b">>}], [{<<"div">>, [{<<"class">>, <<"c">>}], []}]}
+          ]}]},
+       parse_tokens(D4)),
+    D5 = [{start_tag,<<"html">>,[],false},
+          {data,<<"\n">>,true},
+          {data,<<"boo">>,false},
+          {data,<<"hoo">>,false},
+          {data,<<"\n">>,true},
+          {end_tag,<<"html">>}],
+    ?assertEqual(
+       {<<"html">>, [], [<<"\nboohoo\n">>]},
+       parse_tokens(D5)),
+    D6 = [{start_tag,<<"html">>,[],false},
+          {data,<<"\n">>,true},
+          {data,<<"\n">>,true},
+          {end_tag,<<"html">>}],
+    ?assertEqual(
+       {<<"html">>, [], []},
+       parse_tokens(D6)),
+    D7 = [{start_tag,<<"html">>,[],false},
+          {start_tag,<<"ul">>,[],false},
+          {start_tag,<<"li">>,[],false},
+          {data,<<"word">>,false},
+          {start_tag,<<"li">>,[],false},
+          {data,<<"up">>,false},
+          {end_tag,<<"li">>},
+          {start_tag,<<"li">>,[],false},
+          {data,<<"fdsa">>,false},
+          {start_tag,<<"br">>,[],true},
+          {data,<<"asdf">>,false},
+          {end_tag,<<"ul">>},
+          {end_tag,<<"html">>}],
+    ?assertEqual(
+       {<<"html">>, [],
+        [{<<"ul">>, [],
+          [{<<"li">>, [], [<<"word">>]},
+           {<<"li">>, [], [<<"up">>]},
+           {<<"li">>, [], [<<"fdsa">>,{<<"br">>, [], []}, <<"asdf">>]}]}]},
+       parse_tokens(D7)),
+    ok.
+
+destack_test() ->
+    {<<"a">>, [], []} =
+        destack([{<<"a">>, [], []}]),
+    {<<"a">>, [], [{<<"b">>, [], []}]} =
+        destack([{<<"b">>, [], []}, {<<"a">>, [], []}]),
+    {<<"a">>, [], [{<<"b">>, [], [{<<"c">>, [], []}]}]} =
+     destack([{<<"c">>, [], []}, {<<"b">>, [], []}, {<<"a">>, [], []}]),
+    [{<<"a">>, [], [{<<"b">>, [], [{<<"c">>, [], []}]}]}] =
+     destack(<<"b">>,
+             [{<<"c">>, [], []}, {<<"b">>, [], []}, {<<"a">>, [], []}]),
+    [{<<"b">>, [], [{<<"c">>, [], []}]}, {<<"a">>, [], []}] =
+     destack(<<"c">>,
+             [{<<"c">>, [], []}, {<<"b">>, [], []},{<<"a">>, [], []}]),
+    ok.
+
+doctype_test() ->
+    ?assertEqual(
+       {<<"html">>,[],[{<<"head">>,[],[]}]},
+       mochiweb_html:parse("<!DOCTYPE html PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\" \"http://www.w3.org/TR/html4/loose.dtd\">"
+                           "<html><head></head></body></html>")),
+    %% http://code.google.com/p/mochiweb/issues/detail?id=52
+    ?assertEqual(
+       {<<"html">>,[],[{<<"head">>,[],[]}]},
+       mochiweb_html:parse("<html>"
+                           "<!DOCTYPE html PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\" \"http://www.w3.org/TR/html4/loose.dtd\">"
+                           "<head></head></body></html>")),
+    ok.
+
+-endif.

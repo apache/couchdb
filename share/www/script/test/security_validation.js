@@ -235,16 +235,16 @@ couchTests.security_validation = function(debug) {
           target:"test_suite_db_b"},
 
         {source:"test_suite_db_a",
-          target:{url: "http://" + host + "/test_suite_db_b",
+          target:{url: window.location.protocol + "//" + host + "/test_suite_db_b",
                   headers: AuthHeaders}},
 
-        {source:{url:"http://" + host + "/test_suite_db_a",
+        {source:{url:window.location.protocol + "//" + host + "/test_suite_db_a",
                  headers: AuthHeaders},
           target:"test_suite_db_b"},
 
-        {source:{url:"http://" + host + "/test_suite_db_a",
+        {source:{url:window.location.protocol + "//" + host + "/test_suite_db_a",
                  headers: AuthHeaders},
-         target:{url:"http://" + host + "/test_suite_db_b",
+         target:{url:window.location.protocol + "//" + host + "/test_suite_db_b",
                  headers: AuthHeaders}},
       ]
       var adminDbA = new CouchDB("test_suite_db_a", {"X-Couch-Full-Commit":"false"});

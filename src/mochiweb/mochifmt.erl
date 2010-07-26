@@ -10,7 +10,6 @@
 -export([tokenize/1, format/3, get_field/3, format_field/3]).
 -export([bformat/2, bformat/3]).
 -export([f/2, f/3]).
--export([test/0]).
 
 -record(conversion, {length, precision, ctype, align, fill_char, sign}).
 
@@ -112,15 +111,6 @@ bformat(Format, Args) ->
 %% @doc Format Args with Format using Module and return a binary().
 bformat(Format, Args, Module) ->
     iolist_to_binary(format(Format, Args, Module)).
-
-%% @spec test() -> ok
-%% @doc Run tests.
-test() ->
-    ok = test_tokenize(),
-    ok = test_format(),
-    ok = test_std(),
-    ok = test_records(),
-    ok.
 
 %% Internal API
 
@@ -375,14 +365,21 @@ parse_std_conversion([$. | Spec], Acc) ->
 parse_std_conversion([Type], Acc) ->
     parse_std_conversion("", Acc#conversion{ctype=ctype(Type)}).
 
-test_tokenize() ->
+
+%%
+%% Tests
+%%
+-include_lib("eunit/include/eunit.hrl").
+-ifdef(TEST).
+
+tokenize_test() ->
     {?MODULE, [{raw, "ABC"}]} = tokenize("ABC"),
     {?MODULE, [{format, {"0", "", ""}}]} = tokenize("{0}"),
     {?MODULE, [{raw, "ABC"}, {format, {"1", "", ""}}, {raw, "DEF"}]} =
         tokenize("ABC{1}DEF"),
     ok.
 
-test_format() ->
+format_test() ->
     <<"  -4">> = bformat("{0:4}", [-4]),
     <<"   4">> = bformat("{0:4}", [4]),
     <<"   4">> = bformat("{0:{0}}", [4]),
@@ -410,12 +407,12 @@ test_format() ->
                                {{2008,5,4}, {4, 2, 2}}),
     ok.
 
-test_std() ->
+std_test() ->
     M = mochifmt_std:new(),
     <<"01">> = bformat("{0}{1}", [0, 1], M),
     ok.
 
-test_records() ->
+records_test() ->
     M = mochifmt_records:new([{conversion, record_info(fields, conversion)}]),
     R = #conversion{length=long, precision=hard, sign=peace},
     long = M:get_value("length", R),
@@ -424,3 +421,5 @@ test_records() ->
     <<"long hard">> = bformat("{length} {precision}", R, M),
     <<"long hard">> = bformat("{0.length} {0.precision}", [R], M),
     ok.
+
+-endif.

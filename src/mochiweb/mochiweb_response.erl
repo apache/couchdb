@@ -54,3 +54,11 @@ write_chunk(Data) ->
         _ ->
             send(Data)
     end.
+
+
+%%
+%% Tests
+%%
+-include_lib("eunit/include/eunit.hrl").
+-ifdef(TEST).
+-endif.

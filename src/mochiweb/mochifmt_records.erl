@@ -28,3 +28,11 @@ get_rec_index(Atom, [Atom | _], Index) ->
     Index;
 get_rec_index(Atom, [_ | Rest], Index) ->
     get_rec_index(Atom, Rest, 1 + Index).
+
+
+%%
+%% Tests
+%%
+-include_lib("eunit/include/eunit.hrl").
+-ifdef(TEST).
+-endif.

@@ -21,3 +21,10 @@ get_value(Key, Args) ->
 
 format_field(Arg, Format) ->
     mochifmt:format_field(Arg, Format, THIS).
+
+%%
+%% Tests
+%%
+-include_lib("eunit/include/eunit.hrl").
+-ifdef(TEST).
+-endif.

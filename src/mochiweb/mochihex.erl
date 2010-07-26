@@ -6,7 +6,7 @@
 -module(mochihex).
 -author('bob@mochimedia.com').
 
--export([test/0, to_hex/1, to_bin/1, to_int/1, dehex/1, hexdigit/1]).
+-export([to_hex/1, to_bin/1, to_int/1, dehex/1, hexdigit/1]).
 
 %% @type iolist() = [char() | binary() | iolist()]
 %% @type iodata() = iolist() | binary()
@@ -46,16 +46,6 @@ hexdigit(C) when C >= 0, C =< 9 ->
 hexdigit(C) when C =< 15 ->
     C + $a - 10.
 
-%% @spec test() -> ok
-%% @doc Test this module.
-test() ->
-    "ff000ff1" = to_hex([255, 0, 15, 241]),
-    <<255, 0, 15, 241>> = to_bin("ff000ff1"),
-    16#ff000ff1 = to_int("ff000ff1"),
-    "ff000ff1" = to_hex(16#ff000ff1),
-    ok.
-
-
 %% Internal API
 
 to_hex(<<>>, Acc) ->
@@ -73,3 +63,29 @@ to_bin([], Acc) ->
 to_bin([C1, C2 | Rest], Acc) ->
     to_bin(Rest, [(dehex(C1) bsl 4) bor dehex(C2) | Acc]).
 
+
+
+%%
+%% Tests
+%%
+-include_lib("eunit/include/eunit.hrl").
+-ifdef(TEST).
+
+to_hex_test() ->
+    "ff000ff1" = to_hex([255, 0, 15, 241]),
+    "ff000ff1" = to_hex(16#ff000ff1),
+    "0" = to_hex(16#0),
+    ok.
+
+to_bin_test() ->
+    <<255, 0, 15, 241>> = to_bin("ff000ff1"),
+    <<255, 0, 10, 161>> = to_bin("Ff000aA1"),
+    ok.
+
+to_int_test() ->
+    16#ff000ff1 = to_int("ff000ff1"),
+    16#ff000aa1 = to_int("FF000Aa1"),
+    16#0 = to_int("0"),
+    ok.
+
+-endif.

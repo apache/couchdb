@@ -8,7 +8,6 @@
 -export([decoder/1, decode/1]).
 -export([binary_encoder/1, binary_encode/1]).
 -export([binary_decoder/1, binary_decode/1]).
--export([test/0]).
 
 % This is a macro to placate syntax highlighters..
 -define(Q, $\").
@@ -91,10 +90,6 @@ binary_encode(Any) ->
 binary_decode(S) ->
     mochijson2:decode(S).
 
-test() ->
-    test_all(),
-    mochijson2:test().
-
 %% Internal API
 
 parse_encoder_options([], State) ->
@@ -145,7 +140,7 @@ json_encode_proplist([], _State) ->
     "{}";
 json_encode_proplist(Props, State) ->
     F = fun ({K, V}, Acc) ->
-                KS = case K of
+                KS = case K of 
                          K when is_atom(K) ->
                              json_encode_string_utf8(atom_to_list(K));
                          K when is_integer(K) ->
@@ -321,12 +316,12 @@ tokenize_string([$\\, $u, C3, C2, C1, C0 | Rest], S, Acc) ->
     % coalesce UTF-16 surrogate pair?
     C = dehex(C0) bor
         (dehex(C1) bsl 4) bor
-        (dehex(C2) bsl 8) bor
+        (dehex(C2) bsl 8) bor 
         (dehex(C3) bsl 12),
     tokenize_string(Rest, ?ADV_COL(S, 6), [C | Acc]);
 tokenize_string([C | Rest], S, Acc) when C >= $\s; C < 16#10FFFF ->
     tokenize_string(Rest, ?ADV_COL(S, 1), [C | Acc]).
-
+    
 tokenize_number(IoList=[C | _], Mode, S=#decoder{input_encoding=utf8}, Acc)
   when is_list(C); is_binary(C); C >= 16#7f ->
     List = xmerl_ucs:from_utf8(iolist_to_binary(IoList)),
@@ -407,6 +402,13 @@ tokenize(L=[C | _], S) when C >= $0, C =< $9; C == $- ->
             {{const, list_to_float(Float)}, Rest, S1}
     end.
 
+
+%%
+%% Tests
+%%
+-include_lib("eunit/include/eunit.hrl").
+-ifdef(TEST).
+
 %% testing constructs borrowed from the Yaws JSON implementation.
 
 %% Create an object from a list of Key/Value pairs.
@@ -419,7 +421,7 @@ is_obj({struct, Props}) ->
                 true;
             (_) ->
                 false
-        end,
+        end,    
     lists:all(F, Props).
 
 obj_from_list(Props) ->
@@ -462,11 +464,10 @@ equiv_list([], []) ->
 equiv_list([V1 | L1], [V2 | L2]) ->
     equiv(V1, V2) andalso equiv_list(L1, L2).
 
-test_all() ->
-    test_issue33(),
+e2j_vec_test() ->
     test_one(e2j_test_vec(utf8), 1).
 
-test_issue33() ->
+issue33_test() ->
     %% http://code.google.com/p/mochiweb/issues/detail?id=33
     Js = {struct, [{"key", [194, 163]}]},
     Encoder = encoder([{input_encoding, utf8}]),
@@ -526,3 +527,5 @@ e2j_test_vec(utf8) ->
     {{array, [-123, "foo", obj_from_list([{"bar", {array, []}}]), null]},
      "[-123,\"foo\",{\"bar\":[]},null]"}
     ].
+
+-endif.

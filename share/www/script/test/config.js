@@ -28,8 +28,8 @@ couchTests.config = function(debug) {
     Overengineering FTW.
   */
   var server_port = CouchDB.host.split(':');
+  var proto = window.location.protocol;
   if(server_port.length == 1 && CouchDB.inBrowser) {
-    var proto = window.location.protocol;
     if(proto == "http:") {
       port = 80;
     }
@@ -40,8 +40,15 @@ couchTests.config = function(debug) {
     port = server_port.pop();
   }
 
+  if(proto == "http:") {
+    config_port = config.httpd.port;
+  }
+  if(proto == "https:") {
+    config_port = config.ssl.port;
+  }
+
   if(port) {
-    T(config.httpd.port == port);
+    TEquals(config_port, port, "ports should match");
   }
 
   T(config.couchdb.database_dir);

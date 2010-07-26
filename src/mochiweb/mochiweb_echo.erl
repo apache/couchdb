@@ -18,9 +18,9 @@ start() ->
                                   {loop, {?MODULE, loop}}]).
 
 loop(Socket) ->
-    case gen_tcp:recv(Socket, 0, 30000) of
+    case mochiweb_socket:recv(Socket, 0, 30000) of
         {ok, Data} ->
-            case gen_tcp:send(Socket, Data) of
+            case mochiweb_socket:send(Socket, Data) of
                 ok ->
                     loop(Socket);
                 _ ->
@@ -29,3 +29,10 @@ loop(Socket) ->
         _Other ->
             exit(normal)
     end.
+
+%%
+%% Tests
+%%
+-include_lib("eunit/include/eunit.hrl").
+-ifdef(TEST).
+-endif.

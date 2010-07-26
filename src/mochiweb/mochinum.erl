@@ -11,7 +11,7 @@
 
 -module(mochinum).
 -author("Bob Ippolito <bob@mochimedia.com>").
--export([digits/1, frexp/1, int_pow/2, int_ceil/1, test/0]).
+-export([digits/1, frexp/1, int_pow/2, int_ceil/1]).
 
 %% IEEE 754 Float exponent bias
 -define(FLOAT_BIAS, 1022).
@@ -120,7 +120,7 @@ digits1(Float, Exp, Frac) ->
     case Exp >= 0 of
         true ->
             BExp = 1 bsl Exp,
-            case (Frac /= ?BIG_POW) of
+            case (Frac =/= ?BIG_POW) of
                 true ->
                     scale((Frac * BExp * 2), 2, BExp, BExp,
                           Round, Round, Float);
@@ -129,7 +129,7 @@ digits1(Float, Exp, Frac) ->
                           Round, Round, Float)
             end;
         false ->
-            case (Exp == ?MIN_EXP) orelse (Frac /= ?BIG_POW) of
+            case (Exp =:= ?MIN_EXP) orelse (Frac =/= ?BIG_POW) of
                 true ->
                     scale((Frac * 2), 1 bsl (1 - Exp), 1, 1,
                           Round, Round, Float);
@@ -228,14 +228,13 @@ log2floor(Int, N) ->
     log2floor(Int bsr 1, 1 + N).
 
 
-test() ->
-    ok = test_frexp(),
-    ok = test_int_ceil(),
-    ok = test_int_pow(),
-    ok = test_digits(),
-    ok.
+%%
+%% Tests
+%%
+-include_lib("eunit/include/eunit.hrl").
+-ifdef(TEST).
 
-test_int_ceil() ->
+int_ceil_test() ->
     1 = int_ceil(0.0001),
     0 = int_ceil(0.0),
     1 = int_ceil(0.99),
@@ -244,7 +243,7 @@ test_int_ceil() ->
     -2 = int_ceil(-2.0),
     ok.
 
-test_int_pow() ->
+int_pow_test() ->
     1 = int_pow(1, 1),
     1 = int_pow(1, 0),
     1 = int_pow(10, 0),
@@ -253,17 +252,58 @@ test_int_pow() ->
     1000 = int_pow(10, 3),
     ok.
 
-test_digits() ->
-    "0" = digits(0),
-    "0.0" = digits(0.0),
-    "1.0" = digits(1.0),
-    "-1.0" = digits(-1.0),
-    "0.1" = digits(0.1),
-    "0.01" = digits(0.01),
-    "0.001" = digits(0.001),
+digits_test() ->
+    ?assertEqual("0",
+                 digits(0)),
+    ?assertEqual("0.0",
+                 digits(0.0)),
+    ?assertEqual("1.0",
+                 digits(1.0)),
+    ?assertEqual("-1.0",
+                 digits(-1.0)),
+    ?assertEqual("0.1",
+                 digits(0.1)),
+    ?assertEqual("0.01",
+                 digits(0.01)),
+    ?assertEqual("0.001",
+                 digits(0.001)),
+    ?assertEqual("1.0e+6",
+                 digits(1000000.0)),
+    ?assertEqual("0.5",
+                 digits(0.5)),
+    ?assertEqual("4503599627370496.0",
+                 digits(4503599627370496.0)),
+    %% small denormalized number
+    %% 4.94065645841246544177e-324
+    <<SmallDenorm/float>> = <<0,0,0,0,0,0,0,1>>,
+    ?assertEqual("4.9406564584124654e-324",
+                 digits(SmallDenorm)),
+    ?assertEqual(SmallDenorm,
+                 list_to_float(digits(SmallDenorm))),
+    %% large denormalized number
+    %% 2.22507385850720088902e-308
+    <<BigDenorm/float>> = <<0,15,255,255,255,255,255,255>>,
+    ?assertEqual("2.225073858507201e-308",
+                 digits(BigDenorm)),
+    ?assertEqual(BigDenorm,
+                 list_to_float(digits(BigDenorm))),
+    %% small normalized number
+    %% 2.22507385850720138309e-308
+    <<SmallNorm/float>> = <<0,16,0,0,0,0,0,0>>,
+    ?assertEqual("2.2250738585072014e-308",
+                 digits(SmallNorm)),
+    ?assertEqual(SmallNorm,
+                 list_to_float(digits(SmallNorm))),
+    %% large normalized number
+    %% 1.79769313486231570815e+308
+    <<LargeNorm/float>> = <<127,239,255,255,255,255,255,255>>,
+    ?assertEqual("1.7976931348623157e+308",
+                 digits(LargeNorm)),
+    ?assertEqual(LargeNorm,
+                 list_to_float(digits(LargeNorm))),
     ok.
 
-test_frexp() ->
+frexp_test() ->
     %% zero
     {0.0, 0} = frexp(0.0),
     %% one
@@ -287,3 +327,5 @@ test_frexp() ->
     <<LargeNorm/float>> = <<127,239,255,255,255,255,255,255>>,
     {0.99999999999999989, 1024} = frexp(LargeNorm),
     ok.
+
+-endif.
