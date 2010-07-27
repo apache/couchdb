@@ -402,8 +402,7 @@ CouchDB.request = function(method, uri, options) {
   options.headers["Content-Type"] = options.headers["Content-Type"] || options.headers["content-type"] || "application/json";
   options.headers["Accept"] = options.headers["Accept"] || options.headers["accept"] || "application/json";
   var req = CouchDB.newXhr();
-  var proto = window.location.protocol + "//";
-  if(uri.substr(0, proto.length) != proto) {
+  if(uri.substr(0, CouchDB.protocol.length) != CouchDB.protocol) {
     uri = CouchDB.urlPrefix + uri
   }
   req.open(method, uri, false);

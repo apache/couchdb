@@ -28,22 +28,21 @@ couchTests.config = function(debug) {
     Overengineering FTW.
   */
   var server_port = CouchDB.host.split(':');
-  var proto = window.location.protocol;
   if(server_port.length == 1 && CouchDB.inBrowser) {
-    if(proto == "http:") {
+    if(CouchDB.protocol == "http://") {
       port = 80;
     }
-    if(proto == "https:") {
+    if(CouchDB.protocol == "https://") {
       port = 443;
     }
   } else {
     port = server_port.pop();
   }
 
-  if(proto == "http:") {
+  if(CouchDB.protocol == "http://") {
     config_port = config.httpd.port;
   }
-  if(proto == "https:") {
+  if(CouchDB.protocol == "https://") {
     config_port = config.ssl.port;
   }
 

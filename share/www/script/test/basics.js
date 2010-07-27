@@ -37,9 +37,8 @@ couchTests.basics = function(debug) {
     TEquals(dbname,
       xhr.getResponseHeader("Location").substr(-dbname.length),
       "should return Location header to newly created document");
-    var expected = window.location.protocol + "//";
-    TEquals(expected,
-      xhr.getResponseHeader("Location").substr(0, expected.length),
+    TEquals(CouchDB.protocol,
+      xhr.getResponseHeader("Location").substr(0, CouchDB.protocol.length),
       "should return absolute Location header to newly created document");
   });
 
@@ -181,9 +180,8 @@ couchTests.basics = function(debug) {
   TEquals("/test_suite_db/newdoc",
     xhr.getResponseHeader("Location").substr(-21),
     "should return Location header to newly created document");
-  var expected = window.location.protocol + "//";
-  TEquals(expected,
-    xhr.getResponseHeader("Location").substr(0, expected.length),
+  TEquals(CouchDB.protocol,
+    xhr.getResponseHeader("Location").substr(0, CouchDB.protocol.length),
     "should return absolute Location header to newly created document");
 
   // deleting a non-existent doc should be 404
