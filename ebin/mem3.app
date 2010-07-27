@@ -1,7 +1,7 @@
 {application, mem3, [
     {description, "CouchDB Cluster Membership"},
     {mod, {mem3_app, []}},
-    {vsn, "1.0"},
+    {vsn, "1.0.1"},
     {modules, [
         mem3,
         mem3_app,
