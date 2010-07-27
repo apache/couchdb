@@ -611,5 +611,4 @@ negotiate_content_type(#httpd{mochi_req=MochiReq}) ->
     end.
 
 server_header() ->
-    OTPVersion = erlang:system_info(otp_release),
-    [{"Server", "CouchDB/0.11.0 (Erlang OTP/" ++ OTPVersion ++ ")"}].
+    couch_httpd:server_header().
