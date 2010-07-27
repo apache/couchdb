@@ -91,17 +91,29 @@ db_exists(Req, CanonicalUrl, CreateDB) ->
     {ok, "200", _, _} ->
         Req#http_db{url = CanonicalUrl};
     {ok, "301", RespHeaders, _} ->
-        MochiHeaders = mochiweb_headers:make(RespHeaders),
-        RedirectUrl = mochiweb_headers:get_value("Location", MochiHeaders),
+        RedirectUrl = redirect_url(RespHeaders, Req#http_db.url),
         db_exists(Req#http_db{url = RedirectUrl}, RedirectUrl);
     {ok, "302", RespHeaders, _} ->
-        MochiHeaders = mochiweb_headers:make(RespHeaders),
-        RedirectUrl = mochiweb_headers:get_value("Location", MochiHeaders),
+        RedirectUrl = redirect_url(RespHeaders, Req#http_db.url),
         db_exists(Req#http_db{url = RedirectUrl}, CanonicalUrl);
     Error ->
         ?LOG_DEBUG("DB at ~s could not be found because ~p", [Url, Error]),
         throw({db_not_found, ?l2b(Url)})
     end.
+
+redirect_url(RespHeaders, OrigUrl) ->
+    MochiHeaders = mochiweb_headers:make(RespHeaders),
+    RedUrl = mochiweb_headers:get_value("Location", MochiHeaders),
+    {url, _, Base, Port, _, _, Path, Proto} = ibrowse_lib:parse_url(RedUrl),
+    {url, _, _, _, User, Passwd, _, _} = ibrowse_lib:parse_url(OrigUrl),
+    Creds = case is_list(User) andalso is_list(Passwd) of
+    true ->
+        User ++ ":" ++ Passwd ++ "@";
+    false ->
+        []
+    end,
+    atom_to_list(Proto) ++ "://" ++ Creds ++ Base ++ ":" ++
+        integer_to_list(Port) ++ Path.
 
 full_url(#http_db{url=Url} = Req) when is_binary(Url) ->
     full_url(Req#http_db{url = ?b2l(Url)});
@@ -124,8 +136,7 @@ process_response({ok, Status, Headers, Body}, Req) ->
     if Code =:= 200; Code =:= 201 ->
         ?JSON_DECODE(maybe_decompress(Headers, Body));
     Code =:= 301; Code =:= 302 ->
-        MochiHeaders = mochiweb_headers:make(Headers),
-        RedirectUrl = mochiweb_headers:get_value("Location", MochiHeaders),
+        RedirectUrl = redirect_url(Headers, Req#http_db.url),
         do_request(redirected_request(Req, RedirectUrl));
     Code =:= 409 ->
         throw(conflict);
