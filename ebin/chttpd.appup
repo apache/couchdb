@@ -1,5 +1,4 @@
-{"1.0.1",[{"1.0",[
+{"1.0.2",[{"1.0.1",[
     {load_module, chttpd_misc},
-    {load_module, chttpd},
     {load_module, cloudant_auth}
-]}],[{"1.0",[]}]}.
+]}],[{"1.0.1",[]}]}.
