@@ -34,7 +34,7 @@ is_progress_possible(Counters) ->
             % the normal condition, adding to the tail
             Else
         end
-    end, Tail0, Rest),
+    end, if (Tail0+1) =:= (2 bsl 31) -> complete; true -> Tail0 end, Rest),
     (Start =:= 0) andalso (Result =:= complete).
 
 -spec remove_overlapping_shards(#shard{}, [{#shard{}, any()}]) ->
