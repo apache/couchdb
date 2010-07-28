@@ -273,12 +273,10 @@ handle_messages([], State) ->
     {noreply, State};
 handle_messages([<<"{\"results\":[">>|Rest], State) ->
     handle_messages(Rest, State);
-handle_messages([<<"]">>, <<"\"last_seq\":", LastSeqStr/binary>>], State) ->
-    LastSeq = list_to_integer(?b2l(hd(re:split(LastSeqStr, "}")))),
-    handle_feed_completion(State#state{last_seq = LastSeq});
-handle_messages([<<"{\"last_seq\":", LastSeqStr/binary>>], State) ->
-    LastSeq = list_to_integer(?b2l(hd(re:split(LastSeqStr, "}")))),
-    handle_feed_completion(State#state{last_seq = LastSeq});
+handle_messages([<<"]">>, <<"\"last_seq\":", _/binary>>], State) ->
+    handle_feed_completion(State);
+handle_messages([<<"{\"last_seq\":", _/binary>>], State) ->
+    handle_feed_completion(State);
 handle_messages([Chunk|Rest], State) ->
     #state{
         count = Count,
