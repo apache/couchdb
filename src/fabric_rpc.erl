@@ -191,13 +191,14 @@ get_missing_revs(DbName, IdRevsList) ->
         Error
     end).
 
-update_docs(DbName, Docs, Options) ->
+update_docs(DbName, Docs0, Options) ->
     case proplists:get_value(replicated_changes, Options) of
     true ->
         X = replicated_changes;
     _ ->
         X = interactive_edit
     end,
+    Docs = make_att_readers(Docs0),
     with_db(DbName, Options, {couch_db, update_docs, [Docs, Options, X]}).
 
 group_info(DbName, Group0) ->
@@ -369,3 +370,19 @@ possible_ancestors(FullInfo, MissingRevs) ->
             Acc
         end
     end, [], LeafRevs).
+
+make_att_readers([]) ->
+    [];
+make_att_readers([#doc{atts=Atts0} = Doc | Rest]) ->
+    % % go through the attachments looking for 'follows' in the data,
+    % % replace with function that reads the data from MIME stream.
+    Atts = [Att#att{data=make_att_reader(D)} || #att{data=D} = Att <- Atts0],
+    [Doc#doc{atts = Atts} | make_att_readers(Rest)].
+
+make_att_reader({follows, Parser}) ->
+    fun() ->
+        Parser ! {get_bytes, self()},
+        receive {bytes, Bytes} -> Bytes end
+    end;
+make_att_reader(Else) ->
+    Else.
