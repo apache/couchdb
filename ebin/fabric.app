@@ -1,6 +1,6 @@
 {application, fabric, [
     {description, "Routing and proxying layer for CouchDB cluster"},
-    {vsn, "1.0.1"},
+    {vsn, "1.0.2"},
     {modules, [
         fabric,
         fabric_db_create,
