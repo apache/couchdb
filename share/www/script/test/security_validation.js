@@ -111,6 +111,18 @@ couchTests.security_validation = function(debug) {
 
       T(userDb.save(designDoc).ok);
 
+      var user2Db = new CouchDB("test_suite_db",
+        {"WWW-Authenticate": "X-Couch-Test-Auth Jan Lehnardt:apple"}
+      );
+      // Attempt to save the design as a non-admin (in replication scenario)
+      try {
+        user2Db.save(designDoc, {new_edits : false});
+        T(false && "Can't get here. Should have thrown an error on design doc");
+      } catch (e) {
+        T(e.error == "unauthorized");
+        T(user2Db.last_req.status == 401);
+      }
+
       // test the _session API
       var resp = userDb.request("GET", "/_session");
       var user = JSON.parse(resp.responseText).userCtx;
@@ -134,10 +146,6 @@ couchTests.security_validation = function(debug) {
       }
 
       // Now attempt to update the document as a different user, Jan
-      var user2Db = new CouchDB("test_suite_db",
-        {"WWW-Authenticate": "X-Couch-Test-Auth Jan Lehnardt:apple"}
-      );
-
       var doc = user2Db.open("testdoc");
       doc.foo=3;
       try {
