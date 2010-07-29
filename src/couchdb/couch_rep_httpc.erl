@@ -140,7 +140,7 @@ process_response({ok, Status, Headers, Body}, Req) ->
         do_request(redirected_request(Req, RedirectUrl));
     Code =:= 409 ->
         throw(conflict);
-    Code >= 400, Code =< 500 ->
+    Code >= 400, Code < 500 ->
         ?JSON_DECODE(maybe_decompress(Headers, Body));
     Code =:= 500; Code =:= 502; Code =:= 503 ->
         #http_db{pause = Pause, retries = Retries} = Req,
