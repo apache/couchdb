@@ -119,7 +119,7 @@ init(#url{host=Host, port=Port, protocol=Protocol}) ->
         host = Host,
         port = Port,
         is_ssl = (Protocol == https),
-        ssl_options = [{ssl_imp, new}]
+        ssl_options = [{ssl_imp, new}, {depth, 9}]
     },
     put(ibrowse_trace_token, [Host, $:, integer_to_list(Port)]),
     put(my_trace_flag, ibrowse_lib:get_trace_status(Host, Port)),
