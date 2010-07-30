@@ -198,7 +198,9 @@ collect_update_seqs(Seq, Shard, Counters) when is_integer(Seq) ->
 
 pack_seqs(Workers) ->
     SeqList = [{N,R,S} || {#shard{node=N, range=R}, S} <- Workers],
-    couch_util:encodeBase64Url(term_to_binary(SeqList, [compressed])).
+    SeqSum = lists:sum(element(2, lists:unzip(Workers))),
+    Opaque = couch_util:encodeBase64Url(term_to_binary(SeqList, [compressed])),
+    list_to_binary([integer_to_list(SeqSum), $-, Opaque]).
 
 unpack_seqs(0, DbName) ->
     fabric_dict:init(mem3:shards(DbName), 0);
@@ -207,11 +209,13 @@ unpack_seqs("0", DbName) ->
     fabric_dict:init(mem3:shards(DbName), 0);
     
 unpack_seqs(Packed, DbName) ->
+    {match, [Opaque]} = re:run(Packed, "^([0-9]+-)?(?<opaque>.*)", [{capture,
+        [opaque], binary}]),
     % TODO relies on internal structure of fabric_dict as keylist
     lists:map(fun({Node, [A,B], Seq}) ->
         Shard = #shard{node=Node, range=[A,B], dbname=DbName},
         {mem3_util:name_shard(Shard), Seq}
-    end, binary_to_term(couch_util:decodeBase64Url(Packed))).
+    end, binary_to_term(couch_util:decodeBase64Url(Opaque))).
 
 start_update_notifiers(DbName) ->
     lists:map(fun(#shard{node=Node, name=Name}) ->
