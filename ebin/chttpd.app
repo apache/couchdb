@@ -1,6 +1,6 @@
 {application, chttpd, [
     {description, "HTTP interface for CouchDB cluster"},
-    {vsn, "1.0.2"},
+    {vsn, "1.0.3"},
     {modules, [
         chttpd,
         chttpd_app,
