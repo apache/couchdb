@@ -122,8 +122,10 @@ do_init([RepId, {PostProps}, UserCtx] = InitArgs) ->
     Continuous = couch_util:get_value(<<"continuous">>, PostProps, false),
     CreateTarget = couch_util:get_value(<<"create_target">>, PostProps, false),
 
-    Source = open_db(SourceProps, UserCtx),
-    Target = open_db(TargetProps, UserCtx, CreateTarget),
+    ProxyParams = parse_proxy_params(
+        couch_util:get_value(<<"proxy">>, PostProps, [])),
+    Source = open_db(SourceProps, UserCtx, ProxyParams),
+    Target = open_db(TargetProps, UserCtx, ProxyParams, CreateTarget),
 
     SourceInfo = dbinfo(Source),
     TargetInfo = dbinfo(Target),
@@ -554,26 +556,27 @@ open_replication_log(Db, DocId) ->
         {error, not_found}
     end.
 
-open_db(Props, UserCtx) ->
-    open_db(Props, UserCtx, false).
+open_db(Props, UserCtx, ProxyParams) ->
+    open_db(Props, UserCtx, ProxyParams, false).
 
-open_db({Props}, _UserCtx, CreateTarget) ->
+open_db({Props}, _UserCtx, ProxyParams, CreateTarget) ->
     Url = maybe_add_trailing_slash(couch_util:get_value(<<"url">>, Props)),
     {AuthProps} = couch_util:get_value(<<"auth">>, Props, {[]}),
     {BinHeaders} = couch_util:get_value(<<"headers">>, Props, {[]}),
     Headers = [{?b2l(K),?b2l(V)} || {K,V} <- BinHeaders],
     DefaultHeaders = (#http_db{})#http_db.headers,
-    Db = #http_db{
+    Db1 = #http_db{
         url = Url,
         auth = AuthProps,
         headers = lists:ukeymerge(1, Headers, DefaultHeaders)
     },
+    Db = Db1#http_db{options = Db1#http_db.options ++ ProxyParams},
     couch_rep_httpc:db_exists(Db, CreateTarget);
-open_db(<<"http://",_/binary>>=Url, _, CreateTarget) ->
-    open_db({[{<<"url">>,Url}]}, [], CreateTarget);
-open_db(<<"https://",_/binary>>=Url, _, CreateTarget) ->
-    open_db({[{<<"url">>,Url}]}, [], CreateTarget);
-open_db(<<DbName/binary>>, UserCtx, CreateTarget) ->
+open_db(<<"http://",_/binary>>=Url, _, ProxyParams, CreateTarget) ->
+    open_db({[{<<"url">>,Url}]}, [], ProxyParams, CreateTarget);
+open_db(<<"https://",_/binary>>=Url, _, ProxyParams, CreateTarget) ->
+    open_db({[{<<"url">>,Url}]}, [], ProxyParams, CreateTarget);
+open_db(<<DbName/binary>>, UserCtx, _ProxyParams, CreateTarget) ->
     case CreateTarget of
     true ->
         ok = couch_httpd:verify_is_server_admin(UserCtx),
@@ -765,3 +768,18 @@ up_to_date(Source, Seq) ->
     T = NewDb#db.update_seq == Seq,
     couch_db:close(NewDb),
     T.
+
+parse_proxy_params(ProxyUrl) when is_binary(ProxyUrl) ->
+    parse_proxy_params(?b2l(ProxyUrl));
+parse_proxy_params([]) ->
+    [];
+parse_proxy_params(ProxyUrl) ->
+    {url, _, Base, Port, User, Passwd, _Path, _Proto} =
+        ibrowse_lib:parse_url(ProxyUrl),
+    [{proxy_host, Base}, {proxy_port, Port}] ++
+        case is_list(User) andalso is_list(Passwd) of
+        false ->
+            [];
+        true ->
+            [{proxy_user, User}, {proxy_password, Passwd}]
+        end.
