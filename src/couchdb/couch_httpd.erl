@@ -777,7 +777,16 @@ error_headers(#httpd{mochi_req=MochiReq}=Req, Code, ErrorStr, ReasonStr) ->
                             {Code, [{"WWW-Authenticate", "Basic realm=\"server\""}]};
                         _False ->
                             % if the accept header matches html, then do the redirect. else proceed as usual.
-                            case re:run(MochiReq:get_header_value("Accept"), "html", [{capture, none}]) of
+                            Accepts = case MochiReq:get_header_value("Accept") of
+                            undefined ->
+                               % According to the HTTP 1.1 spec, if the Accept
+                               % header is missing, it means the client accepts
+                               % all media types.
+                               "html";
+                            Else ->
+                                Else
+                            end,
+                            case re:run(Accepts, "html", [{capture, none}, caseless]) of
                             nomatch ->
                                 {Code, []};
                             match ->
