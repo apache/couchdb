@@ -786,7 +786,8 @@ error_headers(#httpd{mochi_req=MochiReq}=Req, Code, ErrorStr, ReasonStr) ->
                             Else ->
                                 Else
                             end,
-                            case re:run(Accepts, "html", [{capture, none}, caseless]) of
+                            case re:run(Accepts, "\\bhtml\\b",
+                                    [{capture, none}, caseless]) of
                             nomatch ->
                                 {Code, []};
                             match ->
