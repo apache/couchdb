@@ -297,7 +297,9 @@ start_replication_server(Replicator) ->
             {error, {already_started, Pid}} =
                 supervisor:start_child(couch_rep_sup, Replicator),
             ?LOG_DEBUG("replication ~p already running at ~p", [RepId, Pid]),
-            Pid
+            Pid;
+        {error, {db_not_found, DbUrl}} ->
+            throw({db_not_found, <<"could not open ", DbUrl/binary>>})
         end;
     {error, {already_started, Pid}} ->
         ?LOG_DEBUG("replication ~p already running at ~p", [RepId, Pid]),
