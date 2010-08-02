@@ -58,11 +58,23 @@ get_group_server(DbName, GroupId) ->
 get_group(Db, GroupId, Stale) ->
     MinUpdateSeq = case Stale of
     ok -> 0;
+    update_after -> 0;
     _Else -> couch_db:get_update_seq(Db)
     end,
-    couch_view_group:request_group(
+    Result = {ok, Group} = couch_view_group:request_group(
             get_group_server(couch_db:name(Db), GroupId),
-            MinUpdateSeq).
+            MinUpdateSeq),
+    case Stale of
+    update_after ->
+        % best effort, process might die
+        spawn(fun() ->
+            LastSeq = couch_db:get_update_seq(Db),
+            couch_view_group:request_group(Group, LastSeq)
+        end);
+    _ ->
+        ok
+    end,
+    Result.
 
 get_temp_group(Db, Language, DesignOptions, MapSrc, RedSrc) ->
     couch_view_group:request_group(

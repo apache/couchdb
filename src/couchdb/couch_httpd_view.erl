@@ -282,8 +282,11 @@ parse_view_param("count", _Value) ->
     throw({query_parse_error, <<"Query parameter 'count' is now 'limit'.">>});
 parse_view_param("stale", "ok") ->
     [{stale, ok}];
+parse_view_param("stale", "update_after") ->
+    [{stale, update_after}];
 parse_view_param("stale", _Value) ->
-    throw({query_parse_error, <<"stale only available as stale=ok">>});
+    throw({query_parse_error,
+            <<"stale only available as stale=ok or as stale=update_after">>});
 parse_view_param("update", _Value) ->
     throw({query_parse_error, <<"update=false is now stale=ok">>});
 parse_view_param("descending", Value) ->

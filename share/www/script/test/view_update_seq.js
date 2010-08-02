@@ -68,17 +68,23 @@ couchTests.view_update_seq = function(debug) {
   T(resp.rows.length == 1);
   T(resp.update_seq == 101);
 
+  db.save({"id":"00"});
+  resp = db.view('test/all_docs',
+    {limit: 1, stale: "update_after", update_seq: true});
+  T(resp.rows.length == 1);
+  T(resp.update_seq == 101);
+
   resp = db.view('test/all_docs', {limit: 1, update_seq:true});
   T(resp.rows.length == 1);
-  T(resp.update_seq == 102);
+  T(resp.update_seq == 103);
 
   resp = db.view('test/all_docs',{update_seq:true},["0","1"]);
-  T(resp.update_seq == 102);
+  T(resp.update_seq == 103);
 
   resp = db.view('test/all_docs',{update_seq:true},["0","1"]);
-  T(resp.update_seq == 102);
+  T(resp.update_seq == 103);
 
   resp = db.view('test/summate',{group:true, update_seq:true},["0","1"]);
-  T(resp.update_seq == 102);
+  T(resp.update_seq == 103);
 
 };
