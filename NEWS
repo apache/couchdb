@@ -7,6 +7,19 @@ For details about backwards incompatible changes, see:
 
 Each release section notes when backwards incompatible changes have been made.
 
+Version 1.0.1
+-------------
+
+  * Added support for replication via an HTTP/HTTP proxy.
+  * Fixed various replicator bugs for security and interop with older CouchDB 
+    versions.
+  * Show fields saved along with _deleted=true. Allows for auditing of deletes.
+  * Better error messages on bad URL requests.
+  * Anable basic-auth popup when required to access the server, to prevent
+    people from getting locked out.
+  * Avoid potential DOS attack by guarding all creation of atoms.
+  * User interface element for querying stale (cached) views.
+
 Version 1.0.0
 -------------
 
