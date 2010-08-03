@@ -17,12 +17,12 @@ Replicator:
 HTTP Interface:
 
   * Show fields saved along with _deleted=true. Allows for auditing of deletes.
-  * Better error messages on bad URL requests.
+  * Better error messages on invalid URL requests.
   * More robust Accept-header detection.
 
 Authentication:
 
-  * Anable basic-auth popup when required to access the server, to prevent
+  * Enable basic-auth popup when required to access the server, to prevent
     people from getting locked out.
   * User documents can now be deleted by admins or the user.
 
