@@ -1,6 +1,32 @@
 Apache CouchDB CHANGES
 ======================
 
+Version 0.11.2
+--------------
+
+Replicator:
+
+  * Fix bug when pushing design docs by non-admins, which was hanging the 
+    replicator for no good reason.
+  * Fix bug when pulling design documents from a source that requires 
+    basic-auth.
+    
+HTTP Interface:
+
+  * Better error messages on invalid URL requests.
+
+Authentication:
+
+  * User documents can now be deleted by admins or the user.
+
+Security:
+
+  * Avoid potential DOS attack by guarding all creation of atoms.
+  
+Futon:
+
+  * Add some Futon files that were missing from the Makefile.
+
 Version 0.11.1
 --------------
 

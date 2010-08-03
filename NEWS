@@ -7,6 +7,15 @@ For details about backwards incompatible changes, see:
 
 Each release section notes when backwards incompatible changes have been made.
 
+Version 0.11.2
+--------------
+
+  * Replicator buxfixes for replicating design documents from secured databases.
+  * Better error messages on invalid URL requests.
+  * User documents can now be deleted by admins or the user.
+  * Avoid potential DOS attack by guarding all creation of atoms.
+  * Some Futon and JavaScript library bugfixes.
+
 Version 0.11.1
 --------------
 
