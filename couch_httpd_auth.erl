@@ -247,13 +247,17 @@ ensure_cookie_auth_secret() ->
 
 % session handlers
 % Login handler with user db
-% TODO this should also allow a JSON POST
 handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req) ->
     ReqBody = MochiReq:recv_body(),
     Form = case MochiReq:get_primary_header_value("content-type") of
         % content type should be json
         "application/x-www-form-urlencoded" ++ _ ->
             mochiweb_util:parse_qs(ReqBody);
+        "application/json" ++ _ ->
+            {Pairs} = ?JSON_DECODE(ReqBody),
+            lists:map(fun({Key, Value}) ->
+              {?b2l(Key), ?b2l(Value)}
+            end, Pairs);
         _ ->
             []
     end,
