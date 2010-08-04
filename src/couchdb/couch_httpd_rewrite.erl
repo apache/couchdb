@@ -245,6 +245,8 @@ replace_var(Key, Value, Bindings) ->
     case Value of
         <<":", Var/binary>> ->
             get_var(Var, Bindings, Value);
+        <<"*">> ->
+            get_var(Value, Bindings, Value);
         _ when is_list(Value) ->
             Value1 = lists:foldr(fun(V, Acc) ->
                 V1 = case V of
@@ -254,8 +256,9 @@ replace_var(Key, Value, Bindings) ->
                                 iolist_to_binary(V2);
                             V2 -> V2
                         end;
+                    <<"*">> ->
+                        get_var(V, Bindings, V);
                     _ ->
-                        
                         V
                 end,
                 [V1|Acc]
@@ -303,7 +306,7 @@ make_new_path([P|Rest], Bindings, Remaining, Acc) ->
 %% method rule is '*', which is the default, all
 %% request method will bind. It allows us to make rules
 %% depending on HTTP method.
-bind_method(?MATCH_ALL, _Method) ->
+bind_method(?MATCH_ALL, _Method ) ->
     true;
 bind_method({bind, Method}, Method) ->
     true;
@@ -315,8 +318,8 @@ bind_method(_, _) ->
 %% to the current url by pattern matching
 bind_path([], [], Bindings) ->
     {ok, [], Bindings};
-bind_path([?MATCH_ALL], Rest, Bindings) when is_list(Rest) ->
-    {ok, Rest, Bindings};
+bind_path([?MATCH_ALL], [Match|RestMatch]=Rest, Bindings) when is_list(Rest) ->
+    {ok, Rest, [{?MATCH_ALL, Match}|Bindings]};
 bind_path(_, [], _) ->
     fail;
 bind_path([{bind, Token}|RestToken],[Match|RestMatch],Bindings) ->
@@ -402,15 +405,19 @@ path_to_list([P|R], Acc, DotDotCount) ->
     end,
     path_to_list(R, [P1|Acc], DotDotCount).
 
-encode_query(Props) ->
+encode_query(Props) -> 
     Props1 = lists:foldl(fun ({{bind, K}, V}, Acc) ->
-        V1 = case is_list(V) orelse is_binary(V) of
-            true -> V;
-            false ->
-                % probably it's a number
-                quote_plus(V)
-        end,
-        [{K, V1} | Acc]
+        case K of
+            <<"*">> -> Acc;
+            _ ->
+                V1 = case is_list(V) orelse is_binary(V) of
+                    true -> V;
+                    false ->
+                        % probably it's a number
+                        quote_plus(V)
+                end,
+                [{K, V1} | Acc]
+        end
     end, [], Props),
     lists:flatten(mochiweb_util:urlencode(Props1)).
 
