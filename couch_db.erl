@@ -510,8 +510,8 @@ prep_and_validate_updates(Db, [DocBucket|RestBuckets],
             [PreppedBucket | AccPrepped], AccErrors3).
 
 
-update_docs(#db{update_pid=UpdatePid}=Db, Docs, Options) ->
-    update_docs(#db{update_pid=UpdatePid}=Db, Docs, Options, interactive_edit).
+update_docs(Db, Docs, Options) ->
+    update_docs(Db, Docs, Options, interactive_edit).
 
 
 prep_and_validate_replicated_updates(_Db, [], [], AccPrepped, AccErrors) ->
