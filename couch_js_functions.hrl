@@ -95,3 +95,76 @@
         }
     }
 ">>).
+
+
+-define(REP_DB_DOC_VALIDATE_FUN, <<"
+    function(newDoc, oldDoc, userCtx) {
+        var isAdmin = (userCtx.roles.indexOf('_admin') >= 0);
+        var isReplicator = (userCtx.roles.indexOf('_replicator') >= 0);
+
+        if (oldDoc && !newDoc._deleted && !isReplicator) {
+            throw({forbidden:
+                'Only the replicator can edit replication documents. ' +
+                'Admins can only add and delete replication documents.'
+            });
+        } else if (!isAdmin) {
+            throw({forbidden:
+                'Only admins may add/delete replication documents.'
+            });
+        }
+
+        if (!oldDoc && newDoc.state) {
+            throw({forbidden:
+                'The state field can only be set by the replicator.'
+            });
+        }
+
+        if (!oldDoc && newDoc.replication_id) {
+            throw({forbidden:
+                'The replication_id field can only be set by the replicator.'
+            });
+        }
+
+        if (newDoc.user_ctx) {
+            var user_ctx = newDoc.user_ctx;
+
+            if (typeof user_ctx !== 'object') {
+                throw({forbidden: 'The user_ctx property must be an object.'});
+            }
+
+            if (!(user_ctx.name === null ||
+                    (typeof user_ctx.name === 'undefined') ||
+                    ((typeof user_ctx.name === 'string') &&
+                        user_ctx.name.length > 0))) {
+                throw({forbidden:
+                    'The name property of the user_ctx must be a ' +
+                    'non-empty string.'
+                });
+            }
+
+            if ((typeof user_ctx.roles !== 'undefined') &&
+                    (typeof user_ctx.roles.length !== 'number')) {
+                throw({forbidden:
+                    'The roles property of the user_ctx must be ' +
+                    'an array of strings.'
+                });
+            }
+
+            if (user_ctx.roles) {
+                for (var i = 0; i < user_ctx.roles.length; i++) {
+                    var role = user_ctx.roles[i];
+
+                    if (typeof role !== 'string' || role.length === 0) {
+                        throw({forbidden: 'Roles must be non-empty strings.'});
+                    }
+                    if (role[0] === '_') {
+                        throw({forbidden:
+                            'System roles (starting with underscore) ' +
+                            'are not allowed.'
+                        });
+                    }
+                }
+            }
+        }
+    }
+">>).

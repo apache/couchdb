@@ -76,6 +76,7 @@ check_dbname(#server{dbname_regexp=RegExp}, DbName) ->
     nomatch ->
         case DbName of
             "_users" -> ok;
+            "_replicator" -> ok;
             _Else ->
                 {error, illegal_database_name}
             end;
