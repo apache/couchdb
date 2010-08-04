@@ -165,7 +165,8 @@ keep_sending_changes(Args, Callback, Db, StartSeq, Prepend, Timeout,
     TimeoutFun) ->
     #changes_args{
         feed = ResponseType,
-        limit = Limit
+        limit = Limit,
+        db_open_options = DbOptions
     } = Args,
     % ?LOG_INFO("send_changes start ~p",[StartSeq]),
     {ok, {_, EndSeq, Prepend2, _, _, _, NewLimit, _}} = send_changes(
@@ -179,7 +180,8 @@ keep_sending_changes(Args, Callback, Db, StartSeq, Prepend, Timeout,
         case wait_db_updated(Timeout, TimeoutFun) of
         updated ->
             % ?LOG_INFO("wait_db_updated updated ~p",[{Db#db.name, EndSeq}]),
-            case couch_db:open(Db#db.name, [{user_ctx, Db#db.user_ctx}]) of
+            DbOptions1 = [{user_ctx, Db#db.user_ctx} | DbOptions],
+            case couch_db:open(Db#db.name, DbOptions1) of
             {ok, Db2} ->
                 keep_sending_changes(
                     Args#changes_args{limit=NewLimit},

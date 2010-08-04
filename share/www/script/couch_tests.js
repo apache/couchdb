@@ -75,6 +75,7 @@ loadTest("reduce_builtin.js");
 loadTest("reduce_false.js");
 loadTest("reduce_false_temp.js");
 loadTest("replication.js");
+loadTest("replicator_db.js");
 loadTest("rev_stemming.js");
 loadTest("rewrite.js");
 loadTest("security_validation.js");

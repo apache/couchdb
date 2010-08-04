@@ -152,6 +152,7 @@ nobase_dist_localdata_DATA = \
     www/script/test/reduce_false.js \
     www/script/test/reduce_false_temp.js \
     www/script/test/replication.js \
+    www/script/test/replicator_db.js \
     www/script/test/rev_stemming.js \
     www/script/test/rewrite.js \
     www/script/test/security_validation.js \

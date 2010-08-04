@@ -66,6 +66,7 @@ source_files = \
     couch_rep_reader.erl \
     couch_rep_sup.erl \
     couch_rep_writer.erl \
+    couch_rep_db_listener.erl \
     couch_server.erl \
     couch_server_sup.erl \
     couch_stats_aggregator.erl \
@@ -124,6 +125,7 @@ compiled_files = \
     couch_rep_reader.beam \
     couch_rep_sup.beam \
     couch_rep_writer.beam \
+    couch_rep_db_listener.beam \
     couch_server.beam \
     couch_server_sup.beam \
     couch_stats_aggregator.beam \
