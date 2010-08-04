@@ -104,6 +104,18 @@ couchTests.cookie_auth = function(debug) {
       T(CouchDB.login('Jason Davies', password).ok);
       T(CouchDB.session().userCtx.name == 'Jason Davies');
       
+      // JSON login works
+      xhr = CouchDB.request("POST", "/_session", {
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          name: 'Jason Davies',
+          password: password
+        })
+      });
+
+      T(JSON.parse(xhr.responseText).ok);
+      T(CouchDB.session().userCtx.name == 'Jason Davies');
+
       // update one's own credentials document
       jasonUserDoc.foo=2;
       T(usersDb.save(jasonUserDoc).ok);
