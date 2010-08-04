@@ -192,12 +192,7 @@ try_close_lru(StartTime) ->
         [{_, {opened, MainPid, LruTime}}] = ets:lookup(couch_dbs_by_name, DbName),
         case couch_db:is_idle(MainPid) of
         true ->
-            couch_util:shutdown_sync(MainPid),
-            true = ets:delete(couch_dbs_by_lru, LruTime),
-            true = ets:delete(couch_dbs_by_name, DbName),
-            true = ets:delete(couch_dbs_by_pid, MainPid),
-            true = ets:delete(couch_sys_dbs, DbName),
-            ok;
+            ok = shutdown_idle_db(DbName, MainPid, LruTime);
         false ->
             % this still has referrers. Go ahead and give it a current lru time
             % and try the next one in the table.
@@ -222,11 +217,21 @@ get_lru(LruTime) ->
         [{_, {opened, MainPid, _}}] = ets:lookup(couch_dbs_by_name, DbName),
         case couch_db:is_idle(MainPid) of
         true ->
-            LruTime;
+            NextLru = ets:next(couch_dbs_by_lru, LruTime),
+            ok = shutdown_idle_db(DbName, MainPid, LruTime),
+            get_lru(NextLru);
         false ->
             get_lru(ets:next(couch_dbs_by_lru, LruTime))
         end
     end.
+
+shutdown_idle_db(DbName, MainPid, LruTime) ->
+    couch_util:shutdown_sync(MainPid),
+    true = ets:delete(couch_dbs_by_lru, LruTime),
+    true = ets:delete(couch_dbs_by_name, DbName),
+    true = ets:delete(couch_dbs_by_pid, MainPid),
+    true = ets:delete(couch_sys_dbs, DbName),
+    ok.
 
 open_async(Server, From, DbName, Filepath, Options) ->
     Parent = self(),
