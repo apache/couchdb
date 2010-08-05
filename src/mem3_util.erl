@@ -115,6 +115,8 @@ n_val(N, NodeCount) when is_list(N) ->
 n_val(N, NodeCount) when is_integer(NodeCount), N > NodeCount ->
     ?LOG_ERROR("Request to create N=~p DB but only ~p node(s)", [N, NodeCount]),
     NodeCount;
+n_val(N, _) when N < 1 ->
+    1;
 n_val(N, _) ->
     N.
 
