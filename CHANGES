@@ -6,6 +6,29 @@ Version 1.1.0
 
 This version has not been released yet.
 
+Version 1.0.1
+-------------
+
+Replicator:
+
+  * Added support for replication via an HTTP/HTTP proxy.
+  * Fix pull replication of attachments from 0.11 to 1.0.x.
+  * Make the _changes feed work with non-integer seqnums.
+
+HTTP Interface:
+
+  * Show fields saved along with _deleted=true. Allows for auditing of deletes.
+  * More robust Accept-header detection.
+
+Authentication:
+
+  * Enable basic-auth popup when required to access the server, to prevent
+    people from getting locked out.
+
+Futon:
+
+  * User interface element for querying stale (cached) views.
+
 Version 1.0.0
 -------------
 
@@ -26,6 +49,32 @@ View Server:
 
  * Faster default view collation.
  * Added option to include update_seq in view responses.
+
+Version 0.11.2
+--------------
+
+Replicator:
+
+  * Fix bug when pushing design docs by non-admins, which was hanging the
+    replicator for no good reason.
+  * Fix bug when pulling design documents from a source that requires
+    basic-auth.
+
+HTTP Interface:
+
+  * Better error messages on invalid URL requests.
+
+Authentication:
+
+  * User documents can now be deleted by admins or the user.
+
+Security:
+
+  * Avoid potential DOS attack by guarding all creation of atoms.
+
+Futon:
+
+  * Add some Futon files that were missing from the Makefile.
 
 Version 0.11.1
 --------------

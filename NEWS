@@ -12,6 +12,16 @@ Version 1.1.0
 
 This version has not been released yet.
 
+Version 1.0.1
+-------------
+
+  * Added support for replication via an HTTP/HTTP proxy.
+  * Fixed various replicator bugs for interop with older CouchDB versions.
+  * Show fields saved along with _deleted=true. Allows for auditing of deletes.
+  * Enable basic-auth popup when required to access the server, to prevent
+    people from getting locked out.
+  * User interface element for querying stale (cached) views.
+
 Version 1.0.0
 -------------
 
@@ -22,6 +32,15 @@ Version 1.0.0
  * Added authentication caching
  * Faster default view collation.
  * Added option to include update_seq in view responses.
+
+Version 0.11.2
+--------------
+
+  * Replicator buxfixes for design documents and secured databases.
+  * Better error messages on invalid URL requests.
+  * User documents can now be deleted by admins or the user.
+  * Avoid potential DOS attack by guarding all creation of atoms.
+  * Some Futon and JavaScript library bugfixes.
 
 Version 0.11.1
 --------------
