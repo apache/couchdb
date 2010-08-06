@@ -1022,7 +1022,8 @@ db_attachment_req(#httpd{method=Method,mochi_req=MochiReq}=Req, Db, DocId, FileN
         'DELETE' ->
             {200, []};
         _ ->
-            {201, [{"Location", absolute_uri(Req, "/" ++
+            {201, [{"Etag", "\"" ++ ?b2l(couch_doc:rev_to_str(UpdatedRev)) ++ "\""},
+               {"Location", absolute_uri(Req, "/" ++
                 binary_to_list(DbName) ++ "/" ++
                 binary_to_list(DocId) ++ "/" ++
                 binary_to_list(FileName)
