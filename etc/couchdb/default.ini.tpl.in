@@ -46,6 +46,7 @@ javascript = %bindir%/%couchjs_command_name% %localbuilddatadir%/server/main.js
 ; please let us know on the mailing list so we can fine tune the heuristic.
 [query_server_config]
 reduce_limit = true
+os_process_limit = 25
 
 ; enable external as an httpd handler, then link it with commands here.
 ; note, this api is still under consideration.
