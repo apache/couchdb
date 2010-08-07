@@ -318,7 +318,7 @@ bind_method(_, _) ->
 %% to the current url by pattern matching
 bind_path([], [], Bindings) ->
     {ok, [], Bindings};
-bind_path([?MATCH_ALL], [Match|RestMatch]=Rest, Bindings) when is_list(Rest) ->
+bind_path([?MATCH_ALL], [Match|_RestMatch]=Rest, Bindings) when is_list(Rest) ->
     {ok, Rest, [{?MATCH_ALL, Match}|Bindings]};
 bind_path(_, [], _) ->
     fail;
