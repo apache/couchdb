@@ -72,6 +72,26 @@ couchTests.reduce_builtin = function(debug) {
     T(result.rows[0].value == 2*(summate(numDocs-i) - summate(i-1)));
   }
 
+  // test for trailing characters after builtin functions, desired behaviour
+  // is to disregard any trailing characters
+  // I think the behavior should be a prefix test, so that even "_statsorama" 
+  // or "_stats\nare\awesome" should work just as "_stats" does. - JChris
+
+  var trailing = ["\u000a", "orama", "\nare\nawesome", " ", "     \n  "];
+
+  for(var i=0; i < trailing.length; i++) {
+    result = db.query(map, "_sum" + trailing[i]);
+    T(result.rows[0].value == 2*summate(numDocs));
+    result = db.query(map, "_count" + trailing[i]);
+    T(result.rows[0].value == 1000);
+    result = db.query(map, "_stats" + trailing[i]);
+    T(result.rows[0].value.sum == 2*summate(numDocs));
+    T(result.rows[0].value.count == 1000);
+    T(result.rows[0].value.min == 1);
+    T(result.rows[0].value.max == 500);
+    T(result.rows[0].value.sumsqr == 2*sumsqr(numDocs));
+  }
+
   db.deleteDb();
   db.createDb();
 
