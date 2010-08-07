@@ -115,22 +115,26 @@ specific language governing permissions and limitations under the License.
         <fieldset id="source">
           <legend>Replicate changes from:</legend>
           <p>
-            <label><input type="radio" id="from_local" name="from_type" value="local" checked> Local</label>
-            <label>database: <select id="from_name" name="from_name"></select></label>
+            <input type="radio" id="from_local" name="from_type" value="local" checked> 
+            <label for="from_local">Local Database: </label>
+            <select id="from_name" name="from_name"></select>
           </p><p>
-            <label><input type="radio" id="from_to_remote" name="from_type" value="remote"> Remote</label>
-            <label>database: <input type="text" id="from_url" name="from_url" size="30" value="http://" disabled></label>
+            <input type="radio" id="from_to_remote" name="from_type" value="remote"> 
+            <label for="from_to_remote">Remote database: </label>
+            <input type="text" id="from_url" name="from_url" size="30" value="http://" disabled>
           </p>
         </fieldset>
         <p class="swap"><button id="swap" tabindex="99">⇄</button></p>
         <fieldset id="target">
           <legend>to:</legend>
           <p>
-            <label><input type="radio" id="to_local" name="to_type" value="local" checked> Local</label>
-            <label>database: <select id="to_name" name="to_name"></select></label>
+            <input type="radio" id="to_local" name="to_type" value="local" checked> 
+            <label for="to_local">Local database: </label>
+            <select id="to_name" name="to_name"></select>
           </p><p>
-            <label><input type="radio" id="to_remote" name="to_type" value="remote"> Remote</label>
-            <label>database: <input type="text" id="to_url" name="to_url" size="30" value="http://" disabled></label>
+            <input type="radio" id="to_remote" name="to_type" value="remote"> 
+            <label for="to_remote">Remote database: </label>
+            <input type="text" id="to_url" name="to_url" size="30" value="http://" disabled>
           </p>
         </fieldset>
         <p class="actions">
