@@ -122,4 +122,33 @@ couchTests.delayed_commits = function(debug) {
       }
     });
 
+
+  // Test that a conflict can't cause delayed commits to fail
+  run_on_modified_server(
+    [{section: "couchdb",
+      key: "delayed_commits",
+      value: "true"}],
+
+    function() {
+      //First save a document and commit it
+      T(db.save({_id:"6",a:2,b:4}).ok);
+      T(db.ensureFullCommit().ok);
+      //Generate a conflict
+      try {
+        db.save({_id:"6",a:2,b:4});
+      } catch( e) {
+        T(e.error == "conflict");
+      }
+      //Wait for the delayed commit interval to pass
+      var time = new Date();
+      while(new Date() - time < 2000);
+      //Save a new doc
+      T(db.save({_id:"7",a:2,b:4}).ok);
+      //Wait for the delayed commit interval to pass
+      var time = new Date();
+      while(new Date() - time < 2000);
+      //Crash the server and make sure the last doc was written
+      restartServer();
+      T(db.open("7") != null);
+    });
 };
