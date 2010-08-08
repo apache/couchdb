@@ -701,7 +701,7 @@ commit_data(Db, _) ->
     if is_reference(Timer) -> erlang:cancel_timer(Timer); true -> ok end,
     case db_to_header(Db, OldHeader) of
     OldHeader ->
-        Db;
+        Db#db{waiting_delayed_commit=nil};
     Header ->
         case lists:member(before_header, FsyncOptions) of
         true -> ok = couch_file:sync(Filepath);
