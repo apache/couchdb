@@ -167,15 +167,17 @@ compute_map_results(#mrst{qserver = Qs}, Dequeued) ->
 
 
 write_results(Parent, State) ->
-    case couch_work_queue:dequeue(State#mrst.write_queue) of
-        closed ->
+    case accumulate_writes(State, State#mrst.write_queue, nil) of
+        stop ->
             Parent ! {new_state, State};
-        {ok, Info} ->
-            EmptyKVs = [{V#mrview.id_num, []} || V <- State#mrst.views],
-            {Seq, ViewKVs, DocIdKeys} = merge_results(Info, 0, EmptyKVs, []),
+        {Go, {Seq, ViewKVs, DocIdKeys}} ->
             NewState = write_kvs(State, Seq, ViewKVs, DocIdKeys),
-            send_partial(NewState#mrst.partial_resp_pid, NewState),
-            write_results(Parent, NewState)
+            if Go == stop ->
+                Parent ! {new_state, NewState};
+            true ->
+                send_partial(NewState#mrst.partial_resp_pid, NewState),
+                write_results(Parent, NewState)
+            end
     end.
 
 
@@ -188,6 +190,34 @@ start_query_server(State) ->
     Defs = [View#mrview.def || View <- Views],
     {ok, QServer} = couch_query_servers:start_doc_map(Language, Defs, Lib),
     State#mrst{qserver=QServer}.
+
+
+accumulate_writes(State, W, Acc0) ->
+    {Seq, ViewKVs, DocIdKVs} = case Acc0 of
+        nil -> {0, [{V#mrview.id_num, []} || V <- State#mrst.views], []};
+        _ -> Acc0
+    end,
+    case couch_work_queue:dequeue(W) of
+        closed when Seq == 0 ->
+            stop;
+        closed ->
+            {stop, {Seq, ViewKVs, DocIdKVs}};
+        {ok, Info} ->
+            {_, _, NewIds} = Acc = merge_results(Info, Seq, ViewKVs, DocIdKVs),
+            case accumulate_more(length(NewIds)) of
+                true -> accumulate_writes(State, W, Acc);
+                false -> {ok, Acc}
+            end
+    end.
+
+
+accumulate_more(NumDocIds) ->
+    % check if we have enough items now
+    MinItems = couch_config:get("view_updater", "min_writer_items", "100"),
+    MinSize = couch_config:get("view_updater", "min_writer_size", "16777216"),
+    {memory, CurrMem} = process_info(self(), memory),
+    NumDocIds < list_to_integer(MinItems)
+        andalso CurrMem < list_to_integer(MinSize).
 
 
 merge_results([], SeqAcc, ViewKVs, DocIdKeys) ->
