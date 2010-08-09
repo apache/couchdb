@@ -4,6 +4,11 @@ Apache CouchDB CHANGES
 Version 1.0.1
 -------------
 
+Storage System:
+
+  * Fix data corruption bug COUCHDB-844. Please see
+    http://couchdb.apache.org/notice/1.0.1.html for details.
+
 Replicator:
 
   * Added support for replication via an HTTP/HTTP proxy.
@@ -12,6 +17,7 @@ Replicator:
 
 HTTP Interface:
 
+  * Expose `committed_update_seq` for monitoring purposes.
   * Show fields saved along with _deleted=true. Allows for auditing of deletes.
   * More robust Accept-header detection.
 

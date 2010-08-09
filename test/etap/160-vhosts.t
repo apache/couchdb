@@ -105,7 +105,7 @@ test_regular_request() ->
 test_vhost_request() ->
     case ibrowse:send_req(server(), [], get, [], [{host_header, "example.com"}]) of
         {ok, _, _, Body} ->
-            {[{<<"db_name">>, <<"etap-test-db">>},_,_,_,_,_,_,_,_]}
+            {[{<<"db_name">>, <<"etap-test-db">>},_,_,_,_,_,_,_,_,_]}
                 = couch_util:json_decode(Body),
             etap:is(true, true, "should return database info");
         _Else -> false

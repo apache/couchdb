@@ -486,7 +486,13 @@ all_docs_view(Req, Db, Keys) ->
         true -> EndDocId
         end,
         FoldAccInit = {Limit, SkipCount, undefined, []},
-		UpdateSeq = couch_db:get_update_seq(Db),
+        UpdateSeq = couch_db:get_update_seq(Db),
+        JsonParams = case couch_httpd:qs_value(Req, "update_seq") of
+        "true" ->
+            [{update_seq, UpdateSeq}];
+        _Else ->
+            []
+        end,
         case Keys of
         nil ->
             FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db, UpdateSeq,
@@ -504,7 +510,7 @@ all_docs_view(Req, Db, Keys) ->
             {ok, LastOffset, FoldResult} = couch_db:enum_docs(Db,
                 AdapterFun, FoldAccInit, [{start_key, StartId}, {dir, Dir},
                     {if Inclusive -> end_key; true -> end_key_gt end, EndId}]),
-            couch_httpd_view:finish_view_fold(Req, TotalRowCount, LastOffset, FoldResult);
+            couch_httpd_view:finish_view_fold(Req, TotalRowCount, LastOffset, FoldResult, JsonParams);
         _ ->
             FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db, UpdateSeq,
                 TotalRowCount, #view_fold_helper_funs{
@@ -533,7 +539,7 @@ all_docs_view(Req, Db, Keys) ->
                     {_, FoldAcc2} = FoldlFun(Doc, 0, FoldAcc),
                     FoldAcc2
                 end, FoldAccInit, Keys),
-            couch_httpd_view:finish_view_fold(Req, TotalRowCount, 0, FoldResult)
+            couch_httpd_view:finish_view_fold(Req, TotalRowCount, 0, FoldResult, JsonParams)
         end
     end).
 
@@ -1025,7 +1031,8 @@ db_attachment_req(#httpd{method=Method,mochi_req=MochiReq}=Req, Db, DocId, FileN
         'DELETE' ->
             {200, []};
         _ ->
-            {201, [{"Location", absolute_uri(Req, "/" ++
+            {201, [{"Etag", "\"" ++ ?b2l(couch_doc:rev_to_str(UpdatedRev)) ++ "\""},
+               {"Location", absolute_uri(Req, "/" ++
                 binary_to_list(DbName) ++ "/" ++
                 binary_to_list(DocId) ++ "/" ++
                 binary_to_list(FileName)

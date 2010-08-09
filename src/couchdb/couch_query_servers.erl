@@ -143,16 +143,16 @@ os_rereduce(Lang, OsRedSrcs, KVs) ->
 
 builtin_reduce(_Re, [], _KVs, Acc) ->
     {ok, lists:reverse(Acc)};
-builtin_reduce(Re, [<<"_sum">>|BuiltinReds], KVs, Acc) ->
+builtin_reduce(Re, [<<"_sum",_/binary>>|BuiltinReds], KVs, Acc) ->
     Sum = builtin_sum_rows(KVs),
     builtin_reduce(Re, BuiltinReds, KVs, [Sum|Acc]);
-builtin_reduce(reduce, [<<"_count">>|BuiltinReds], KVs, Acc) ->
+builtin_reduce(reduce, [<<"_count",_/binary>>|BuiltinReds], KVs, Acc) ->
     Count = length(KVs),
     builtin_reduce(reduce, BuiltinReds, KVs, [Count|Acc]);
-builtin_reduce(rereduce, [<<"_count">>|BuiltinReds], KVs, Acc) ->
+builtin_reduce(rereduce, [<<"_count",_/binary>>|BuiltinReds], KVs, Acc) ->
     Count = builtin_sum_rows(KVs),
     builtin_reduce(rereduce, BuiltinReds, KVs, [Count|Acc]);
-builtin_reduce(Re, [<<"_stats">>|BuiltinReds], KVs, Acc) ->
+builtin_reduce(Re, [<<"_stats",_/binary>>|BuiltinReds], KVs, Acc) ->
     Stats = builtin_stats(Re, KVs),
     builtin_reduce(Re, BuiltinReds, KVs, [Stats|Acc]).
 
