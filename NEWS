@@ -10,6 +10,8 @@ Each release section notes when backwards incompatible changes have been made.
 Version 1.0.1
 -------------
 
+  * Fix data corruption bug COUCHDB-844. Please see
+    http://couchdb.apache.org/notice/1.0.1.html for details.
   * Added support for replication via an HTTP/HTTP proxy.
   * Fixed various replicator bugs for interop with older CouchDB versions.
   * Show fields saved along with _deleted=true. Allows for auditing of deletes.
