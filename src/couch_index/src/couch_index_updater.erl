@@ -17,6 +17,9 @@
 %% API
 -export([start_link/2, run/2, is_running/1, update/2, restart/2]).
 
+%% for upgrades
+-export([update/3]).
+
 %% gen_server callbacks
 -export([init/1, terminate/2, code_change/3]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
@@ -65,7 +68,7 @@ handle_call({update, _IdxState}, _From, #st{pid=Pid}=State) when is_pid(Pid) ->
 handle_call({update, IdxState}, _From, #st{idx=Idx, mod=Mod}=State) ->
     Args = [Mod:get(db_name, IdxState), Mod:get(idx_name, IdxState)],
     ?LOG_INFO("Starting index update for db: ~s idx: ~s", Args),
-    Pid = spawn_link(fun() -> update(Idx, Mod, IdxState) end),
+    Pid = spawn_link(?MODULE, update, [Idx, Mod, IdxState]),
     {reply, ok, State#st{pid=Pid}};
 handle_call({restart, IdxState}, _From, #st{idx=Idx, mod=Mod}=State) ->
     Args = [Mod:get(db_name, IdxState), Mod:get(idx_name, IdxState)],
@@ -74,7 +77,7 @@ handle_call({restart, IdxState}, _From, #st{idx=Idx, mod=Mod}=State) ->
         true -> couch_util:shutdown_sync(State#st.pid);
         _ -> ok
     end,
-    Pid = spawn_link(fun() -> update(Idx, State#st.mod, IdxState) end),
+    Pid = spawn_link(?MODULE, update, [Idx, State#st.mod, IdxState]),
     {reply, ok, State#st{pid=Pid}};
 handle_call(is_running, _From, #st{pid=Pid}=State) when is_pid(Pid) ->
     {reply, true, State};
@@ -94,7 +97,7 @@ handle_info({'EXIT', _, {updated, Pid, IdxState}}, #st{pid=Pid}=State) ->
     {noreply, State#st{pid=undefined}};
 handle_info({'EXIT', _, {reset, Pid}}, #st{idx=Idx, pid=Pid}=State) ->
     {ok, NewIdxState} = gen_server:call(State#st.idx, reset),
-    Pid2 = spawn_link(fun() -> update(Idx, State#st.mod, NewIdxState) end),
+    Pid2 = spawn_link(?MODULE, update, [Idx, State#st.mod, NewIdxState]),
     {noreply, State#st{pid=Pid2}};
 handle_info({'EXIT', Pid, normal}, #st{pid=Pid}=State) ->
     {noreply, State#st{pid=undefined}};
