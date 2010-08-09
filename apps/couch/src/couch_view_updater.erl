@@ -12,7 +12,7 @@
 
 -module(couch_view_updater).
 
--export([update/2]).
+-export([update/2, do_maps/4, do_writes/5, load_docs/3]).
 
 -include("couch_db.hrl").
 
@@ -43,8 +43,8 @@ update(Owner, Group) ->
     {ok, WriteQueue} = couch_work_queue:new(100000, 500),
     Self = self(),
     ViewEmptyKVs = [{View, []} || View <- Group2#group.views],
-    spawn_link(fun() -> do_maps(Group, MapQueue, WriteQueue, ViewEmptyKVs) end),
-    spawn_link(fun() -> do_writes(Self, Owner, Group2, WriteQueue, Seq == 0) end),
+    spawn_link(?MODULE, do_maps, [Group, MapQueue, WriteQueue, ViewEmptyKVs]),
+    spawn_link(?MODULE, do_writes, [Self, Owner, Group2, WriteQueue, Seq == 0]),
     % compute on all docs modified since we last computed.
     TotalChanges = couch_db:count_changes_since(Db, Seq),
     % update status every half second
@@ -58,17 +58,9 @@ update(Owner, Group) ->
     true -> [conflicts, deleted_conflicts, local_seq];
     _ -> [conflicts, deleted_conflicts]
     end,
-    {ok, _, _}
-        = couch_db:enum_docs_since(
-            Db,
-            Seq,
-            fun(DocInfo, _, ChangesProcessed) ->
-                couch_task_status:update("Processed ~p of ~p changes (~p%)",
-                        [ChangesProcessed, TotalChanges, (ChangesProcessed*100) div TotalChanges]),
-                load_doc(Db, DocInfo, MapQueue, DocOpts, IncludeDesign),
-                {ok, ChangesProcessed+1}
-            end,
-            0, []),
+    EnumFun = fun ?MODULE:load_docs/3,
+    Acc0 = {0, Db, MapQueue, DocOpts, IncludeDesign, TotalChanges},
+    {ok, _, _} = couch_db:enum_docs_since(Db, Seq, EnumFun, Acc0, []),
     couch_task_status:set_update_frequency(0),
     couch_task_status:update("Finishing."),
     couch_work_queue:close(MapQueue),
@@ -77,6 +69,11 @@ update(Owner, Group) ->
                 NewGroup#group{current_seq=couch_db:get_update_seq(Db)}})
     end.
 
+load_docs(DocInfo, _, {I, Db, MapQueue, DocOpts, IncludeDesign, Total} = Acc) ->
+    couch_task_status:update("Processed ~p of ~p changes (~p%)", [I, Total,
+        (I*100) div Total]),
+    load_doc(Db, DocInfo, MapQueue, DocOpts, IncludeDesign),
+    {ok, setelement(1, Acc, I+1)}.
 
 purge_index(Db, #group{views=Views, id_btree=IdBtree}=Group) ->
     {ok, PurgedIdsRevs} = couch_db:get_last_purged(Db),
@@ -143,7 +140,7 @@ do_maps(Group, MapQueue, WriteQueue, ViewEmptyKVs) ->
         {ViewKVs, DocIdViewIdKeys} = view_insert_query_results(Docs,
                     Results, ViewEmptyKVs, DelKVs),
         couch_work_queue:queue(WriteQueue, {LastSeq, ViewKVs, DocIdViewIdKeys}),
-        do_maps(Group1, MapQueue, WriteQueue, ViewEmptyKVs)
+        ?MODULE:do_maps(Group1, MapQueue, WriteQueue, ViewEmptyKVs)
     end.
 
 -spec do_writes(pid(), pid() | nil, #group{}, pid(), boolean()) -> any().
@@ -170,7 +167,7 @@ do_writes(Parent, Owner, Group, WriteQueue, InitialBuild) ->
         nil -> ok;
         _ -> ok = gen_server:cast(Owner, {partial_update, Parent, Group2})
         end,
-        do_writes(Parent, Owner, Group2, WriteQueue, InitialBuild)
+        ?MODULE:do_writes(Parent, Owner, Group2, WriteQueue, InitialBuild)
     end.
 
 -spec view_insert_query_results([#doc{}], list(), any(), any()) -> any().
