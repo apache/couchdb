@@ -10,7 +10,7 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
-SUBDIRS = couchdb default init launchd logrotate.d
+SUBDIRS = couchdb default init launchd logrotate.d windows
 
 default_sysconf_data = logrotate.d/couchdb
 
