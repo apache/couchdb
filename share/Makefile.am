@@ -104,6 +104,10 @@ nobase_dist_localdata_DATA = \
     www/script/jquery.resizer.js \
     www/script/jquery.suggest.js \
     www/script/json2.js \
+    www/script/jspec/jspec.css \
+    www/script/jspec/jspec.jquery.js \
+    www/script/jspec/jspec.js \
+    www/script/jspec/jspec.xhr.js \
     www/script/oauth.js \
     www/script/sha1.js \
     www/script/base64.js \
@@ -175,6 +179,16 @@ nobase_dist_localdata_DATA = \
     www/script/test/view_pagination.js \
     www/script/test/view_sandboxing.js \
     www/script/test/view_xml.js \
+    www/spec/couch_js_class_methods_spec.js \
+    www/spec/couch_js_instance_methods_1_spec.js \
+    www/spec/couch_js_instance_methods_2_spec.js \
+    www/spec/couch_js_instance_methods_3_spec.js \
+    www/spec/custom_helpers.js \
+    www/spec/jquery_couch_js_class_methods_spec.js \
+    www/spec/jquery_couch_js_instance_methods_1_spec.js \
+    www/spec/jquery_couch_js_instance_methods_2_spec.js \
+    www/spec/jquery_couch_js_instance_methods_3_spec.js \
+    www/spec/run.html \
     www/status.html \
     www/style/layout.css \
     www/_sidebar.html
