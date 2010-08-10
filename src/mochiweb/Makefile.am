@@ -88,7 +88,8 @@ mochiwebebin_DATA = \
     $(mochiwebebin_make_generated_file_list)
 
 EXTRA_DIST =  \
-    $(mochiweb_file_collection)
+    $(mochiweb_file_collection) \
+    internal.hrl
 
 CLEANFILES = \
     $(mochiwebebin_make_generated_file_list)
