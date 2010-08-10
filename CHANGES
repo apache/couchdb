@@ -9,6 +9,11 @@ This version has not been released yet.
 Version 1.0.1
 -------------
 
+Storage System:
+
+  * Fix data corruption bug COUCHDB-844. Please see
+    http://couchdb.apache.org/notice/1.0.1.html for details.
+
 Replicator:
 
   * Added support for replication via an HTTP/HTTP proxy.
