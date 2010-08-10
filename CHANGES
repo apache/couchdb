@@ -30,6 +30,10 @@ Futon:
 
   * User interface element for querying stale (cached) views.
 
+Build and System Integration:
+
+  * Included additional source files for distribution.
+
 Version 1.0.0
 -------------
 

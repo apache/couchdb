@@ -10,7 +10,7 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
-SUBDIRS = couchdb default init launchd logrotate.d
+SUBDIRS = couchdb default init launchd logrotate.d windows
 
 default_sysconf_data = logrotate.d/couchdb
 
@@ -25,10 +25,15 @@ endif
 
 nobase_sysconf_DATA = $(default_sysconf_data) $(init_sysconf_data)
 
-EXTRA_DIST = default/couchdb
+EXTRA_DIST = \
+    default/couchdb \
+    windows/couchdb.iss.tpl \
+    windows/README.txt.tpl
 
 if WINDOWS
-EXTRA_DIST += windows/setup-couchdb-@version@.exe.md5 windows/setup-couchdb-@version@.exe.sha
+EXTRA_DIST += \
+    windows/setup-couchdb-@version@.exe.md5 \
+    windows/setup-couchdb-@version@.exe.sha
 endif
 
 CLEANFILES = $(init_DATA) $(default_sysconf_data) $(launchd_DATA)
