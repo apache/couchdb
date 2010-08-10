@@ -49,6 +49,7 @@
 ^etc/logrotate.d/Makefile
 ^etc/logrotate.d/Makefile.in
 ^etc/logrotate.d/couchdb*
+^etc/windows/Makefile
 ^etc/windows/README.txt.tpl
 ^libtool
 ^license.skip
