@@ -22,6 +22,7 @@ Replicator:
 
 HTTP Interface:
 
+  * Expose `committed_update_seq` for monitoring purposes.
   * Show fields saved along with _deleted=true. Allows for auditing of deletes.
   * More robust Accept-header detection.
 
@@ -33,6 +34,10 @@ Authentication:
 Futon:
 
   * User interface element for querying stale (cached) views.
+
+Build and System Integration:
+
+  * Included additional source files for distribution.
 
 Version 1.0.0
 -------------
