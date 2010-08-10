@@ -5,18 +5,25 @@
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
+-define(DBNAME_REGEX, "^[a-z][a-z0-9\\_\\$()\\+\\-\\/\\s.]*$").
+
 %% @doc Create a new database, and all its partition files across the cluster
 %%      Options is proplist with user_ctx, n, q
 go(DbName, Options) ->
-    Shards = mem3:choose_shards(DbName, Options),
-    Doc = make_document(Shards),
-    Workers = fabric_util:submit_jobs(Shards, create_db, [Options, Doc]),
-    Acc0 = fabric_dict:init(Workers, nil),
-    case fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
-    {ok, _} ->
-        ok;
-    Else ->
-        Else
+    case re:run(DbName, ?DBNAME_REGEX, [{capture,none}]) of
+    match ->
+        Shards = mem3:choose_shards(DbName, Options),
+        Doc = make_document(Shards),
+        Workers = fabric_util:submit_jobs(Shards, create_db, [Options, Doc]),
+        Acc0 = fabric_dict:init(Workers, nil),
+        case fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
+        {ok, _} ->
+            ok;
+        Else ->
+            Else
+        end;
+    nomatch ->
+        {error, illegal_database_name}
     end.
 
 handle_message(Msg, Shard, Counters) ->
