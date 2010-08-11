@@ -109,6 +109,8 @@ install-data-hook:
 	@echo "You have installed Apache CouchDB, time to relax."
 
 distclean-local:
+	rm -fr $(top_builddir)/etc/couchdb/default.d
+	rm -fr $(top_builddir)/etc/couchdb/local.d
 	rm -fr $(top_builddir)/tmp
 
 .PHONY: local-clean
