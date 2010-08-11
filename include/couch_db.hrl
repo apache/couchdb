@@ -182,7 +182,7 @@
     update_seq,
     name,
     filepath,
-    validate_doc_funs = [],
+    validate_doc_funs = undefined,
     security = [],
     security_ptr = nil,
     user_ctx = #user_ctx{},
