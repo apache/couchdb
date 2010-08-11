@@ -520,11 +520,11 @@ refresh_validate_doc_funs(Db0) ->
         end, DesignDocs),
     case Db#db.name of
         <<"shards/", _:18/binary, DbName/binary>> ->
-            fabric:reset_validation_funs(DbName);
+            fabric:reset_validation_funs(DbName),
+            Db#db{validate_doc_funs=undefined};
         _ ->
-            ok
-    end,
-    Db0#db{validate_doc_funs=ProcessDocFuns}.
+            Db0#db{validate_doc_funs=ProcessDocFuns}
+    end.
 
 % rev tree functions
 
