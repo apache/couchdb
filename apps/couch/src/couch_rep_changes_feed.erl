@@ -20,7 +20,7 @@
 -define(BUFFER_SIZE, 1000).
 
 -include("couch_db.hrl").
--include("../ibrowse/ibrowse.hrl").
+-include_lib("ibrowse/include/ibrowse.hrl").
 
 -record (state, {
     changes_from = nil,

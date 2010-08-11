@@ -25,7 +25,7 @@
 -define (MAX_PIPELINE_SIZE, 50).
 
 -include("couch_db.hrl").
--include("../ibrowse/ibrowse.hrl").
+-include_lib("ibrowse/include/ibrowse.hrl").
 
 -record (state, {
     parent,
