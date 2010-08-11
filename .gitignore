@@ -96,3 +96,9 @@ couchdb.stdout
 
 cover/*
 INSTALL
+
+# for rebar
+
+apps/*/ebin
+apps/couch/priv/couch_drv.so
+
