@@ -23,7 +23,6 @@ Version 1.0.1
   * Enable basic-auth popup when required to access the server, to prevent
     people from getting locked out.
   * User interface element for querying stale (cached) views.
-  * Included additional source files for distribution.
 
 Version 1.0.0
 -------------
