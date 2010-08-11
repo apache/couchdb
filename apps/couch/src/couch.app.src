@@ -1,7 +1,6 @@
 {application, couch, [
-    {description, "@package_name@"},
-    {vsn, "@version@"},
-    {modules, [@modules@]},
+    {description, "Apache CouchDB"},
+    {vsn, "1.0.1"},
     {registered, [
         couch_config,
         couch_db_update,
@@ -20,10 +19,7 @@
         couch_task_status,
         couch_view
     ]},
-    {mod, {couch_app, [
-        "%localconfdir%/@defaultini@",
-        "%localconfdir%/@localini@"
-    ]}},
-    {applications, [kernel, stdlib]},
-    {included_applications, [crypto, sasl, inets, oauth, ibrowse, mochiweb]}
+    {mod, {couch_app, []}},
+    {applications, [kernel, stdlib, crypto, sasl, inets, oauth, ibrowse,
+        mochiweb, ssl]}
 ]}.
