@@ -463,7 +463,7 @@ refresh_validate_doc_funs(Db) ->
     case Db#db.name of
     <<"shards/", _:18/binary, DbName/binary>> ->
         fabric:reset_validation_funs(DbName),
-        Db#db{validate_doc_funs=ProcessDocFuns};
+        Db#db{validate_doc_funs=undefined};
     _ ->
         Db#db{validate_doc_funs=ProcessDocFuns}
     end.
