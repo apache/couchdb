@@ -100,5 +100,5 @@ INSTALL
 # for rebar
 
 apps/*/ebin
-apps/couch/priv/couch_drv.so
+apps/couch/priv/couch_icu_driver.so
 
