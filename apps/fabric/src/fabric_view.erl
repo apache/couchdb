@@ -161,7 +161,10 @@ get_next_row(#collector{reducer = RedSrc} = St) when RedSrc =/= undefined ->
         Wrapped = [[V] || #view_row{value=V} <- Records],
         {ok, [Reduced]} = couch_query_servers:rereduce(Proc, [RedSrc], Wrapped),
         NewSt = St#collector{keys=RestKeys, rows=NewRowDict, counters=Counters},
-        {#view_row{key=Key, id=reduced, value=Reduced}, NewSt};
+        NewState = lists:foldl(fun(#view_row{worker=Worker}, StateAcc) ->
+            maybe_resume_worker(Worker, StateAcc)
+        end, NewSt, Records),
+        {#view_row{key=Key, id=reduced, value=Reduced}, NewState};
     error ->
         get_next_row(St#collector{keys=RestKeys})
     end;
