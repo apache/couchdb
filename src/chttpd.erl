@@ -63,9 +63,7 @@ handle_request(MochiReq) ->
     % for the path, use the raw path with the query string and fragment
     % removed, but URL quoting left intact
     RawUri = MochiReq:get(raw_path),
-    Customer = cloudant_util:customer_name(#httpd{mochi_req=MochiReq}),
-    {Path, _, _} = mochiweb_util:urlsplit_path(generate_customer_path(RawUri,
-        Customer)),
+    {"/" ++ Path, _, _} = mochiweb_util:urlsplit_path(RawUri),
     {HandlerKey, _, _} = mochiweb_util:partition(Path, "/"),
 
     LogForClosedSocket = io_lib:format("mochiweb_recv_error for ~s - ~p ~s", [
@@ -104,7 +102,7 @@ handle_request(MochiReq) ->
         case authenticate_request(HttpReq, AuthenticationFuns) of
         #httpd{} = Req ->
             HandlerFun = url_handler(HandlerKey),
-            HandlerFun(cloudant_auth:authorize_request(Req));
+            HandlerFun(Req);
         Response ->
             Response
         end
@@ -140,34 +138,11 @@ handle_request(MochiReq) ->
     Peer = MochiReq:get(peer),
     Code = Resp:get(code),
     Host = MochiReq:get_header_value("Host"),
-    couch_metrics_event:notify(#response{
-        peer = Peer,
-        host = Host,
-        customer = Customer,
-        code = Code,
-        time = RequestTime,
-        method = Method1,
-        uri = RawUri
-    }),
-    showroom_log:message(notice, "~s ~s ~s ~s ~B ~B", [Peer, Host,
+    ?LOG_INFO("~s ~s ~s ~s ~B ~B", [Peer, Host,
         atom_to_list(Method1), RawUri, Code, round(RequestTime)]),
     couch_stats_collector:record({couchdb, request_time}, RequestTime),
     couch_stats_collector:increment({httpd, requests}),
     {ok, Resp}.
-
-generate_customer_path("/", _Customer) ->
-    "";
-generate_customer_path("/favicon.ico", _Customer) ->
-    "favicon.ico";
-generate_customer_path([$/,$_|Rest], _Customer) ->
-    lists:flatten([$_|Rest]);
-generate_customer_path([$/|RawPath], Customer) ->
-    case Customer of
-    "" ->
-        RawPath;
-    Else ->
-        lists:flatten([Else, "%2F", RawPath])
-    end.
 
 % Try authentication handlers in order until one returns a result
 authenticate_request(#httpd{user_ctx=#user_ctx{}} = Req, _AuthFuns) ->
@@ -206,10 +181,8 @@ url_handler("_sleep") ->        fun chttpd_misc:handle_sleep_req/1;
 url_handler("_session") ->      fun chttpd_auth:handle_session_req/1;
 url_handler("_user") ->         fun chttpd_auth:handle_user_req/1;
 url_handler("_oauth") ->        fun chttpd_oauth:handle_oauth_req/1;
-url_handler("_metrics") ->      fun chttpd_misc:handle_metrics_req/1;
 url_handler("_restart") ->      fun showroom_http:handle_restart_req/1;
 url_handler("_membership") ->   fun mem3_httpd:handle_membership_req/1;
-url_handler("_cloudant") ->     fun showroom_httpd_admin:handle_cloudant_req/1;
 url_handler(_) ->               fun chttpd_db:handle_request/1.
 
 db_url_handlers() ->
@@ -265,7 +238,7 @@ qs(#httpd{mochi_req=MochiReq}) ->
 path(#httpd{mochi_req=MochiReq}) ->
     MochiReq:get(path).
 
-absolute_uri(#httpd{mochi_req=MochiReq} = Req, Path) ->
+absolute_uri(#httpd{mochi_req=MochiReq}, Path) ->
     XHost = couch_config:get("httpd", "x_forwarded_host", "X-Forwarded-Host"),
     Host = case MochiReq:get_header_value(XHost) of
         undefined ->
@@ -290,9 +263,7 @@ absolute_uri(#httpd{mochi_req=MochiReq} = Req, Path) ->
                 _ -> "http"
             end
     end,
-    CustomerRegex = ["^/", cloudant_util:customer_name(Req), "[/%2F]+"],
-    NewPath = re:replace(Path, CustomerRegex, "/", [{return,list}]),
-    Scheme ++ "://" ++ Host ++ NewPath.
+    Scheme ++ "://" ++ Host ++ Path.
 
 unquote(UrlEncodedString) ->
     mochiweb_util:unquote(UrlEncodedString).

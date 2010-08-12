@@ -12,8 +12,7 @@
         chttpd_rewrite,
         chttpd_show,
         chttpd_sup,
-        chttpd_view,
-        cloudant_auth
+        chttpd_view
     ]},
     {registered, [chttpd_sup, chttpd]},
     {applications, [kernel, stdlib, couch, fabric]},

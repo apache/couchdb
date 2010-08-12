@@ -258,10 +258,6 @@ validate_view_query(include_docs, true, Args) ->
     end;
 validate_view_query(include_docs, _Value, Args) ->
     Args;
-validate_view_query(show_total_rows, false, Args) ->
-    Args#view_query_args{show_total_rows=false};
-validate_view_query(show_total_rows, _Value, Args) ->
-    Args;
 validate_view_query(sorted, false, Args) ->
     Args#view_query_args{sorted=false};
 validate_view_query(sorted, _Value, Args) ->

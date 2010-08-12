@@ -63,7 +63,7 @@ json_req_obj(#httpd{mochi_req=Req,
                method=Method,
                path_parts=Path,
                req_body=ReqBody
-            } = HttpReq, Db, DocId) ->
+            }, Db, DocId) ->
     Body = case ReqBody of
         undefined -> Req:recv_body();
         Else -> Else
@@ -78,27 +78,18 @@ json_req_obj(#httpd{mochi_req=Req,
     Hlist = mochiweb_headers:to_list(Headers),
     {ok, Info} = fabric:get_db_info(Db),
 
-    % send correct path to customer - BugzID 6849
-    CustomerBin = list_to_binary(cloudant_util:customer_name(HttpReq)),
-    Len = byte_size(CustomerBin),
-    FixedPath = case Path of
-    [<<CustomerBin:Len/binary, "/", DbName/binary>> | Rest] ->
-        [DbName | Rest];
-    NoCustomer ->
-        NoCustomer
-    end,
     % add headers...
-    {[{<<"info">>, {cloudant_util:customer_db_info(HttpReq, Info)}},
+    {[{<<"info">>, {Info}},
         {<<"id">>, DocId},
         {<<"method">>, Method},
-        {<<"path">>, FixedPath},
+        {<<"path">>, Path},
         {<<"query">>, json_query_keys(to_json_terms(Req:parse_qs()))},
         {<<"headers">>, to_json_terms(Hlist)},
         {<<"body">>, Body},
         {<<"peer">>, ?l2b(Req:get(peer))},
         {<<"form">>, to_json_terms(ParsedForm)},
         {<<"cookie">>, to_json_terms(Req:parse_cookie())},
-        {<<"userCtx">>, couch_util:json_user_ctx(Db#db{name=hd(FixedPath)})}]}.
+        {<<"userCtx">>, couch_util:json_user_ctx(Db)}]}.
 
 to_json_terms(Data) ->
     to_json_terms(Data, []).
