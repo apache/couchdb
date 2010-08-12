@@ -5,6 +5,7 @@
 
 -include("fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 submit_jobs(Shards, EndPoint, ExtraArgs) ->
     lists:map(fun(#shard{node=Node, name=ShardName} = Shard) ->
@@ -71,7 +72,7 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
             Fun(Msg, {Worker, From}, Acc0)
         end;
     {rexi_DOWN, _RexiMonPid, ServerPid, Reason} = Msg ->
-        showroom_log:message(alert, "rexi_DOWN ~p ~p", [ServerPid, Reason]),
+        ?LOG_ERROR("rexi_DOWN ~p ~p", [ServerPid, Reason]),
         Fun(Msg, nil, Acc0)
     after PerMsgTO ->
         timeout
