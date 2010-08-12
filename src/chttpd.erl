@@ -113,8 +113,7 @@ handle_request(MochiReq) ->
             ?LOG_ERROR("attempted upload of invalid JSON ~s", [S]),
             send_error(HttpReq, {bad_request, "invalid UTF-8 JSON"});
         exit:{mochiweb_recv_error, E} ->
-            ?LOG_INFO("mochiweb_recv_error: ~p", [E]),
-            showroom_log:message(notice, LogForClosedSocket, []),
+            ?LOG_INFO(LogForClosedSocket ++ " - ~p", [E]),
             exit(normal);
         throw:Error ->
             send_error(HttpReq, Error);
