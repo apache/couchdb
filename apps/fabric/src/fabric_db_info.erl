@@ -1,0 +1,52 @@
+-module(fabric_db_info).
+
+-export([go/1]).
+
+-include("fabric.hrl").
+-include_lib("mem3/include/mem3.hrl").
+
+go(DbName) ->
+    Shards = mem3:shards(DbName),
+    Workers = fabric_util:submit_jobs(Shards, get_db_info, []),
+    Acc0 = {fabric_dict:init(Workers, nil), []},
+    fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0).
+
+handle_message({ok, Info}, #shard{dbname=Name} = Shard, {Counters, Acc}) ->
+    case fabric_dict:lookup_element(Shard, Counters) of
+    undefined ->
+        % already heard from someone else in this range
+        {ok, {Counters, Acc}};
+    nil ->
+        C1 = fabric_dict:store(Shard, ok, Counters),
+        C2 = fabric_view:remove_overlapping_shards(Shard, C1),
+        case fabric_dict:any(nil, C2) of
+        true ->
+            {ok, {C2, [Info|Acc]}};
+        false ->
+            {stop, [{db_name,Name}|merge_results(lists:flatten([Info|Acc]))]}
+        end
+    end;
+handle_message(_, _, Acc) ->
+    {ok, Acc}.
+
+merge_results(Info) ->
+    Dict = lists:foldl(fun({K,V},D0) -> orddict:append(K,V,D0) end,
+        orddict:new(), Info),
+    orddict:fold(fun
+        (doc_count, X, Acc) ->
+            [{doc_count, lists:sum(X)} | Acc];
+        (doc_del_count, X, Acc) ->
+            [{doc_del_count, lists:sum(X)} | Acc];
+        (update_seq, X, Acc) ->
+            [{update_seq, lists:sum(X)} | Acc];
+        (purge_seq, X, Acc) ->
+            [{purge_seq, lists:sum(X)} | Acc];
+        (compact_running, X, Acc) ->
+            [{compact_running, lists:member(true, X)} | Acc];
+        (disk_size, X, Acc) ->
+            [{disk_size, lists:sum(X)} | Acc];
+        (disk_format_version, X, Acc) ->
+            [{disk_format_version, lists:max(X)} | Acc];
+        (_, _, Acc) ->
+            Acc
+    end, [{instance_start_time, <<"0">>}], Dict).
