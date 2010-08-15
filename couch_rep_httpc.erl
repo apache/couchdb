@@ -203,8 +203,7 @@ spawn_worker_process(Req) ->
     Pid.
 
 spawn_link_worker_process(Req) ->
-    Url = ibrowse_lib:parse_url(Req#http_db.url),
-    {ok, Pid} = ibrowse_http_client:start_link(Url),
+    {ok, Pid} = ibrowse:spawn_link_worker_process(Req#http_db.url),
     Pid.
 
 maybe_decompress(Headers, Body) ->
