@@ -168,12 +168,16 @@ redirect_to_vhost(MochiReq, DefaultFun,
     Path = MochiReq:get(raw_path),
     Target = VhostTarget ++ Path,
     ?LOG_DEBUG("Vhost Target: '~p'~n", [Target]),
+    
+    Headers = mochiweb_headers:enter("x-couchdb-vhost-path", Path, 
+        MochiReq:get(headers)),
+
     % build a new mochiweb request
     MochiReq1 = mochiweb_request:new(MochiReq:get(socket),
                                       MochiReq:get(method),
                                       Target,
                                       MochiReq:get(version),
-                                      MochiReq:get(headers)),
+                                      Headers),
     % cleanup, It force mochiweb to reparse raw uri.
     MochiReq1:cleanup(),
 
@@ -214,6 +218,14 @@ handle_request_int(MochiReq, DefaultFun,
     RawUri = MochiReq:get(raw_path),
     {"/" ++ Path, _, _} = mochiweb_util:urlsplit_path(RawUri),
 
+    Headers = MochiReq:get(headers), 
+
+    % get requested path
+    RequestedPath = case MochiReq:get_header_value("x-couchdb-vhost-path") of
+        undefined -> RawUri;
+        P -> P
+    end,
+    
     HandlerKey =
     case mochiweb_util:partition(Path, "/") of
     {"", "", ""} ->
@@ -261,10 +273,14 @@ handle_request_int(MochiReq, DefaultFun,
         Other -> Other
     end,
 
+    
+
     HttpReq = #httpd{
         mochi_req = MochiReq,
         peer = MochiReq:get(peer),
         method = Method,
+        requested_path_parts = [list_to_binary(couch_httpd:unquote(Part))
+                || Part <- string:tokens(RequestedPath, "/")],
         path_parts = [list_to_binary(couch_httpd:unquote(Part))
                 || Part <- string:tokens(Path, "/")],
         db_url_handlers = DbUrlHandlers,

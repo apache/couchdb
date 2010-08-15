@@ -72,6 +72,7 @@
     {mochi_req,
     peer,
     method,
+    requested_path_parts,
     path_parts,
     db_url_handlers,
     user_ctx,

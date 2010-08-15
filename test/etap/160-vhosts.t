@@ -54,7 +54,7 @@ config_files() ->
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(4),
+    etap:plan(6),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -76,16 +76,41 @@ test() ->
         {<<"_id">>, <<"doc1">>},
         {<<"value">>, 666}
     ]}),
-    {ok, _} = couch_db:update_docs(Db, [Doc]),
+
+    Doc1 = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/doc1">>},
+        {<<"shows">>, {[
+            {<<"test">>, <<"function(doc, req) {
+    return { json: {
+        requested_path: '/' + req.requested_path.join('/'),
+        path: '/' + req.path.join('/')
+    }};
+}">>}
+        ]}},
+        {<<"rewrites">>, [
+            {[
+                {<<"from">>, <<"/">>},
+                {<<"to">>, <<"_show/test">>}
+            ]}
+        ]}
+    ]}),
+
+    {ok, _} = couch_db:update_docs(Db, [Doc, Doc1]),
+
     couch_db:ensure_full_commit(Db),
 
     %% end boilerplate, start test
 
     couch_config:set("vhosts", "example.com", "/etap-test-db", false),
+    couch_config:set("vhosts", "example1.com",
+"/etap-test-db/_design/doc1/_rewrite/", false),
+
     test_regular_request(),
     test_vhost_request(),
     test_vhost_request_with_qs(),
     test_vhost_request_with_global(),
+    test_vhost_requested_path(),    
+    test_vhost_requested_path_path(),
     
     %% restart boilerplate
     couch_db:close(Db),
@@ -129,3 +154,27 @@ test_vhost_request_with_global() ->
             etap:is(true, true, "should serve /_utils even inside vhosts");
         _Else -> false
     end.
+
+test_vhost_requested_path() ->
+    case ibrowse:send_req(server(), [], get, [], [{host_header, "example1.com"}]) of
+        {ok, _, _, Body} ->
+            {Json} = couch_util:json_decode(Body), 
+            etap:is(case proplists:get_value(<<"requested_path">>, Json) of
+                <<"/">> -> true;
+                _ -> false
+            end, true, <<"requested path in req ok">>);
+        _Else -> false
+    end.
+
+
+test_vhost_requested_path_path() ->
+    case ibrowse:send_req(server(), [], get, [], [{host_header, "example1.com"}]) of
+        {ok, _, _, Body} ->
+            {Json} = couch_util:json_decode(Body),
+            etap:is(case proplists:get_value(<<"path">>, Json) of
+                <<"/etap-test-db/_design/doc1/_show/test">> -> true;
+                _ -> false
+            end, true, <<"path in req ok">>);
+        _Else -> false
+    end.
+
