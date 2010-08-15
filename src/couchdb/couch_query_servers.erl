@@ -398,7 +398,7 @@ service_waiting({{#doc{body={Props}}=DDoc, DDocKey}, From}, Server) ->
         ok
     end;
 service_waiting({{Lang}, From}, Server) ->
-    case lang_proc(Lang, Server, fun([P|Procs]) ->
+    case lang_proc(Lang, Server, fun([P|_Procs]) ->
             {ok, P}
         end) of
     {ok, Proc} ->
@@ -426,7 +426,7 @@ lang_proc(Lang, #qserver{
         case (catch new_process(Langs, LangLimits, Lang)) of
         {ok, Proc} ->
             add_value(PidProcs, Proc#proc.pid, Proc),
-            {ok, Proc2} = PickFun([Proc]);
+            PickFun([Proc]);
         ErrorOrWait ->
             ErrorOrWait
         end
