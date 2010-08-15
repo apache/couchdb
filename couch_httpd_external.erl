@@ -56,6 +56,7 @@ process_external_req(HttpReq, Db, Name) ->
 json_req_obj(Req, Db) -> json_req_obj(Req, Db, null).
 json_req_obj(#httpd{mochi_req=Req,
                method=Method,
+               requested_path_parts=RequestedPath,
                path_parts=Path,
                req_body=ReqBody
             }, Db, DocId) ->
@@ -77,6 +78,7 @@ json_req_obj(#httpd{mochi_req=Req,
         {<<"id">>, DocId},
         {<<"uuid">>, couch_uuids:new()},
         {<<"method">>, Method},
+        {<<"requested_path">>, RequestedPath},
         {<<"path">>, Path},
         {<<"query">>, json_query_keys(to_json_terms(Req:parse_qs()))},
         {<<"headers">>, to_json_terms(Hlist)},
