@@ -4,7 +4,6 @@
 %%% Created : 14 Oct 2003 by Chandrashekhar Mullaparthi <chandrashekhar.mullaparthi@t-mobile.co.uk>
 
 -module(ibrowse_test).
--vsn('$Id: ibrowse_test.erl,v 1.4 2009/07/01 22:43:19 chandrusf Exp $ ').
 -export([
 	 load_test/3,
 	 send_reqs_1/3,
@@ -193,6 +192,7 @@ dump_errors(Key, Iod) ->
 		    {"http://www.google.co.uk", get},
 		    {"http://www.google.com", get},
 		    {"http://www.google.com", options},
+                    {"https://mail.google.com", get},
 		    {"http://www.sun.com", get},
 		    {"http://www.oracle.com", get},
 		    {"http://www.bbc.co.uk", get},
@@ -223,9 +223,10 @@ unit_tests() ->
     unit_tests([]).
 
 unit_tests(Options) ->
+    application:start(ssl),
     Options_1 = Options ++ [{connect_timeout, 5000}],
     {Pid, Ref} = erlang:spawn_monitor(?MODULE, unit_tests_1, [self(), Options_1]),
-    receive
+    receive 
 	{done, Pid} ->
 	    ok;
 	{'DOWN', Ref, _, _, Info} ->
@@ -293,7 +294,7 @@ compare_responses(R1, R2, R3) ->
 
 do_async_req_list(Url, Method, Options) ->
     {Pid,_} = erlang:spawn_monitor(?MODULE, i_do_async_req_list,
-				   [self(), Url, Method,
+				   [self(), Url, Method, 
 				    Options ++ [{stream_chunk_size, 1000}]]),
     io:format("Spawned process ~p~n", [Pid]),
     wait_for_resp(Pid).

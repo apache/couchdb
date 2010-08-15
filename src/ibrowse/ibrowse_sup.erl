@@ -1,13 +1,11 @@
 %%%-------------------------------------------------------------------
 %%% File    : ibrowse_sup.erl
 %%% Author  : Chandrashekhar Mullaparthi <chandrashekhar.mullaparthi@t-mobile.co.uk>
-%%% Description :
+%%% Description : 
 %%%
 %%% Created : 15 Oct 2003 by Chandrashekhar Mullaparthi <chandrashekhar.mullaparthi@t-mobile.co.uk>
 %%%-------------------------------------------------------------------
 -module(ibrowse_sup).
--vsn('$Id: ibrowse_sup.erl,v 1.1 2005/05/05 22:28:28 chandrusf Exp $ ').
-
 -behaviour(supervisor).
 %%--------------------------------------------------------------------
 %% Include files
@@ -53,7 +51,7 @@ start_link() ->
 %% Func: init/1
 %% Returns: {ok,  {SupFlags,  [ChildSpec]}} |
 %%          ignore                          |
-%%          {error, Reason}
+%%          {error, Reason}   
 %%--------------------------------------------------------------------
 init([]) ->
     AChild = {ibrowse,{ibrowse,start_link,[]},

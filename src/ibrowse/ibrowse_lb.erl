@@ -1,13 +1,11 @@
 %%%-------------------------------------------------------------------
 %%% File    : ibrowse_lb.erl
 %%% Author  : chandru <chandrashekhar.mullaparthi@t-mobile.co.uk>
-%%% Description :
+%%% Description : 
 %%%
 %%% Created :  6 Mar 2008 by chandru <chandrashekhar.mullaparthi@t-mobile.co.uk>
 %%%-------------------------------------------------------------------
 -module(ibrowse_lb).
-
--vsn('$Id: ibrowse_lb.erl,v 1.2 2009/07/01 22:43:19 chandrusf Exp $ ').
 -author(chandru).
 -behaviour(gen_server).
 %%--------------------------------------------------------------------
@@ -101,14 +99,14 @@ spawn_connection(Lb_pid, Url,
 % 	    #state{max_sessions = Max_sess,
 % 		   ets_tid = Tid,
 % 		   max_pipeline_size = Max_pipe_sz,
-% 		   num_cur_sessions = Num} = State)
+% 		   num_cur_sessions = Num} = State) 
 %     when Num >= Max ->
 %     Reply = find_best_connection(Tid),
 %     {reply, sorry_dude_reuse, State};
 
 %% Update max_sessions in #state with supplied value
 handle_call({spawn_connection, _Url, Max_sess, Max_pipe, _}, _From,
-	    #state{num_cur_sessions = Num} = State)
+	    #state{num_cur_sessions = Num} = State) 
     when Num >= Max_sess ->
     State_1 = maybe_create_ets(State),
     Reply = find_best_connection(State_1#state.ets_tid, Max_pipe),

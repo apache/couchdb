@@ -1,11 +1,10 @@
 %%% File    : ibrowse_lib.erl
 %%% Author  : Chandrashekhar Mullaparthi <chandrashekhar.mullaparthi@t-mobile.co.uk>
-%%% Description :
+%%% Description : 
 %%% Created : 27 Feb 2004 by Chandrashekhar Mullaparthi <chandrashekhar.mullaparthi@t-mobile.co.uk>
 %% @doc Module with a few useful functions
 
 -module(ibrowse_lib).
--vsn('$Id: ibrowse_lib.erl,v 1.6 2008/03/27 01:35:50 chandrusf Exp $ ').
 -author('chandru').
 -ifdef(debug).
 -compile(export_all).
@@ -14,22 +13,22 @@
 -include("ibrowse.hrl").
 
 -export([
-	 get_trace_status/2,
-	 do_trace/2,
-	 do_trace/3,
-	 url_encode/1,
-	 decode_rfc822_date/1,
-	 status_code/1,
-	 dec2hex/2,
-	 drv_ue/1,
-	 drv_ue/2,
-	 encode_base64/1,
-	 decode_base64/1,
-	 get_value/2,
-	 get_value/3,
-	 parse_url/1,
-	 printable_date/0
-	]).
+         get_trace_status/2,
+         do_trace/2,
+         do_trace/3,
+         url_encode/1,
+         decode_rfc822_date/1,
+         status_code/1,
+         dec2hex/2,
+         drv_ue/1,
+         drv_ue/2,
+         encode_base64/1,
+         decode_base64/1,
+         get_value/2,
+         get_value/3,
+         parse_url/1,
+         printable_date/0
+        ]).
 
 get_trace_status(Host, Port) ->
     ibrowse:get_config_value({trace, Host, Port}, false).
@@ -39,10 +38,10 @@ drv_ue(Str) ->
     drv_ue(Str, Port).
 drv_ue(Str, Port) ->
     case erlang:port_control(Port, 1, Str) of
-	[] ->
-	    Str;
-	Res ->
-	    Res
+        [] ->
+            Str;
+        Res ->
+            Res
     end.
 
 %% @doc URL-encodes a string based on RFC 1738. Returns a flat list.
@@ -72,10 +71,10 @@ d2h(N) -> N+$a-10.
 
 decode_rfc822_date(String) when is_list(String) ->
     case catch decode_rfc822_date_1(string:tokens(String, ", \t\r\n")) of
-	{'EXIT', _} ->
-	    {error, invalid_date};
-	Res ->
-	    Res
+        {'EXIT', _} ->
+            {error, invalid_date};
+        Res ->
+            Res
     end.
 
 % TODO: Have to handle the Zone
@@ -86,15 +85,15 @@ decode_rfc822_date_1([Day,Month,Year, Time,_Zone]) ->
     MonthI = month_int(Month),
     YearI = list_to_integer(Year),
     TimeTup = case string:tokens(Time, ":") of
-		  [H,M] ->
-		      {list_to_integer(H),
-		       list_to_integer(M),
-		       0};
-		  [H,M,S] ->
-		      {list_to_integer(H),
-		       list_to_integer(M),
-		       list_to_integer(S)}
-	      end,
+                  [H,M] ->
+                      {list_to_integer(H),
+                       list_to_integer(M),
+                       0};
+                  [H,M,S] ->
+                      {list_to_integer(H),
+                       list_to_integer(M),
+                       list_to_integer(S)}
+              end,
     {{YearI,MonthI,DayI}, TimeTup}.
 
 month_int("Jan") -> 1;
@@ -110,7 +109,7 @@ month_int("Oct") -> 10;
 month_int("Nov") -> 11;
 month_int("Dec") -> 12.
 
-%% @doc Given a status code, returns an atom describing the status code.
+%% @doc Given a status code, returns an atom describing the status code. 
 %% @spec status_code(StatusCode::status_code()) -> StatusDescription
 %% status_code() = string() | integer()
 %% StatusDescription = atom()
@@ -178,86 +177,25 @@ dec2hex(M,N,Ack) -> dec2hex(M-1,N bsr 4,[d2h(N band 15)|Ack]).
 %% In = string() | binary()
 %% Out = string() | binary()
 encode_base64(List) when is_list(List) ->
-    encode_base64_1(list_to_binary(List));
+    binary_to_list(base64:encode(List));
 encode_base64(Bin) when is_binary(Bin) ->
-    List = encode_base64_1(Bin),
-    list_to_binary(List).
-
-encode_base64_1(<<A:6, B:6, C:6, D:6, Rest/binary>>) ->
-    [int_to_b64(A), int_to_b64(B),
-     int_to_b64(C), int_to_b64(D) | encode_base64_1(Rest)];
-encode_base64_1(<<A:6, B:6, C:4>>) ->
-    [int_to_b64(A), int_to_b64(B), int_to_b64(C bsl 2), $=];
-encode_base64_1(<<A:6, B:2>>) ->
-    [int_to_b64(A), int_to_b64(B bsl 4), $=, $=];
-encode_base64_1(<<>>) ->
-    [].
+    base64:encode(Bin).
 
 %% @doc Implements the base64 decoding algorithm. The output data type matches in the input data type.
 %% @spec decode_base64(In) -> Out | exit({error, invalid_input})
 %% In = string() | binary()
 %% Out = string() | binary()
 decode_base64(List) when is_list(List) ->
-    decode_base64_1(List, []);
+    binary_to_list(base64:decode(List));
 decode_base64(Bin) when is_binary(Bin) ->
-    List = decode_base64_1(binary_to_list(Bin), []),
-    list_to_binary(List).
-
-decode_base64_1([H | T], Acc) when ((H == $\t) or
-				    (H == 32) or
-				    (H == $\r) or
-				    (H == $\n)) ->
-    decode_base64_1(T, Acc);
-
-decode_base64_1([$=, $=], Acc) ->
-    lists:reverse(Acc);
-decode_base64_1([$=, _ | _], _Acc) ->
-    exit({error, invalid_input});
-
-decode_base64_1([A1, B1, $=, $=], Acc) ->
-    A = b64_to_int(A1),
-    B = b64_to_int(B1),
-    Oct1 = (A bsl 2) bor (B bsr 4),
-    decode_base64_1([], [Oct1 | Acc]);
-decode_base64_1([A1, B1, C1, $=], Acc) ->
-    A = b64_to_int(A1),
-    B = b64_to_int(B1),
-    C = b64_to_int(C1),
-    Oct1 = (A bsl 2) bor (B bsr 4),
-    Oct2 = ((B band 16#f) bsl 6) bor (C bsr 2),
-    decode_base64_1([], [Oct2, Oct1 | Acc]);
-decode_base64_1([A1, B1, C1, D1 | T], Acc) ->
-    A = b64_to_int(A1),
-    B = b64_to_int(B1),
-    C = b64_to_int(C1),
-    D = b64_to_int(D1),
-    Oct1 = (A bsl 2) bor (B bsr 4),
-    Oct2 = ((B band 16#f) bsl 4) bor (C bsr 2),
-    Oct3 = ((C band 2#11) bsl 6) bor D,
-    decode_base64_1(T, [Oct3, Oct2, Oct1 | Acc]);
-decode_base64_1([], Acc) ->
-    lists:reverse(Acc).
-
-%% Taken from httpd_util.erl
-int_to_b64(X) when X >= 0, X =< 25 -> X + $A;
-int_to_b64(X) when X >= 26, X =< 51 -> X - 26 + $a;
-int_to_b64(X) when X >= 52, X =< 61 -> X - 52 + $0;
-int_to_b64(62) -> $+;
-int_to_b64(63) -> $/.
-
-%% Taken from httpd_util.erl
-b64_to_int(X) when X >= $A, X =< $Z -> X - $A;
-b64_to_int(X) when X >= $a, X =< $z -> X - $a + 26;
-b64_to_int(X) when X >= $0, X =< $9 -> X - $0 + 52;
-b64_to_int($+) -> 62;
-b64_to_int($/) -> 63.
+    base64:decode(Bin).
 
 get_value(Tag, TVL, DefVal) ->
     case lists:keysearch(Tag, 1, TVL) of
-	false ->
-	    DefVal;
-	{value, {_, Val}} ->
-	    Val
+        false ->
+            DefVal;
+        {value, {_, Val}} ->
+            Val
     end.
 
 get_value(Tag, TVL) ->
@@ -271,92 +209,120 @@ parse_url([$:, $/, $/ | _], get_protocol, Url, []) ->
     {invalid_uri_1, Url};
 parse_url([$:, $/, $/ | T], get_protocol, Url, TmpAcc) ->
     Prot = list_to_atom(lists:reverse(TmpAcc)),
-    parse_url(T, get_username,
-	      Url#url{protocol = Prot},
-	      []);
-parse_url([$/ | T], get_username, Url, TmpAcc) ->
+    parse_url(T, get_username, 
+              Url#url{protocol = Prot},
+              []);
+parse_url([H | T], get_username, Url, TmpAcc) when H == $/;
+                                                   H == $? ->
+    Path = case H of
+               $/ ->
+                   [$/ | T];
+               $? ->
+                   [$/, $? | T]
+           end,
     %% No username/password. No  port number
     Url#url{host = lists:reverse(TmpAcc),
-	    port = default_port(Url#url.protocol),
-	    path = [$/ | T]};
+            port = default_port(Url#url.protocol),
+           path = Path};
 parse_url([$: | T], get_username, Url, TmpAcc) ->
     %% It is possible that no username/password has been
     %% specified. But we'll continue with the assumption that there is
     %% a username/password. If we encounter a '@' later on, there is a
     %% username/password indeed. If we encounter a '/', it was
     %% actually the hostname
-    parse_url(T, get_password,
-	      Url#url{username = lists:reverse(TmpAcc)},
-	      []);
+    parse_url(T, get_password, 
+              Url#url{username = lists:reverse(TmpAcc)},
+              []);
 parse_url([$@ | T], get_username, Url, TmpAcc) ->
-    parse_url(T, get_host,
-	      Url#url{username = lists:reverse(TmpAcc),
-		      password = ""},
-	      []);
+    parse_url(T, get_host, 
+              Url#url{username = lists:reverse(TmpAcc),
+                      password = ""},
+              []);
 parse_url([$@ | T], get_password, Url, TmpAcc) ->
-    parse_url(T, get_host,
-	      Url#url{password = lists:reverse(TmpAcc)},
-	      []);
-parse_url([$/ | T], get_password, Url, TmpAcc) ->
+    parse_url(T, get_host, 
+              Url#url{password = lists:reverse(TmpAcc)},
+              []);
+parse_url([H | T], get_password, Url, TmpAcc) when H == $/;
+                                                   H == $? ->
     %% Ok, what we thought was the username/password was the hostname
     %% and portnumber
     #url{username=User} = Url,
     Port = list_to_integer(lists:reverse(TmpAcc)),
+    Path = case H of
+               $/ ->
+                   [$/ | T];
+               $? ->
+                   [$/, $? | T]
+           end,
     Url#url{host = User,
-	    port = Port,
-	    username = undefined,
-	    password = undefined,
-	    path = [$/ | T]};
+            port = Port,
+            username = undefined,
+            password = undefined,
+           path = Path};
 parse_url([$: | T], get_host, #url{} = Url, TmpAcc) ->
-    parse_url(T, get_port,
-	      Url#url{host = lists:reverse(TmpAcc)},
-	      []);
-parse_url([$/ | T], get_host, #url{protocol=Prot} = Url, TmpAcc) ->
+    parse_url(T, get_port, 
+              Url#url{host = lists:reverse(TmpAcc)},
+              []);
+parse_url([H | T], get_host, #url{protocol=Prot} = Url, TmpAcc) when H == $/;
+                                                                     H == $? ->
+    Path = case H of
+               $/ ->
+                   [$/ | T];
+               $? ->
+                   [$/, $? | T]
+           end,
     Url#url{host = lists:reverse(TmpAcc),
-	    port = default_port(Prot),
-	    path = [$/ | T]};
-parse_url([$/ | T], get_port, #url{protocol=Prot} = Url, TmpAcc) ->
+            port = default_port(Prot),
+           path = Path};
+parse_url([H | T], get_port, #url{protocol=Prot} = Url, TmpAcc) when H == $/;
+                                                                     H == $? ->
+    Path = case H of
+               $/ ->
+                   [$/ | T];
+               $? ->
+                   [$/, $? | T]
+           end,
     Port = case TmpAcc of
-	       [] ->
-		   default_port(Prot);
-	       _ ->
-		   list_to_integer(lists:reverse(TmpAcc))
-	   end,
-    Url#url{port = Port, path = [$/ | T]};
+               [] ->
+                   default_port(Prot);
+               _ ->
+                   list_to_integer(lists:reverse(TmpAcc))
+           end,
+    Url#url{port = Port, path = Path};
 parse_url([H | T], State, Url, TmpAcc) ->
     parse_url(T, State, Url, [H | TmpAcc]);
 parse_url([], get_host, Url, TmpAcc) when TmpAcc /= [] ->
     Url#url{host = lists:reverse(TmpAcc),
-	    port = default_port(Url#url.protocol),
-	    path = "/"};
+            port = default_port(Url#url.protocol),
+            path = "/"};
 parse_url([], get_username, Url, TmpAcc) when TmpAcc /= [] ->
     Url#url{host = lists:reverse(TmpAcc),
-	    port = default_port(Url#url.protocol),
-	    path = "/"};
+            port = default_port(Url#url.protocol),
+            path = "/"};
 parse_url([], get_port, #url{protocol=Prot} = Url, TmpAcc) ->
     Port = case TmpAcc of
-	       [] ->
-		   default_port(Prot);
-	       _ ->
-		   list_to_integer(lists:reverse(TmpAcc))
-	   end,
-    Url#url{port = Port,
-	    path = "/"};
+               [] ->
+                   default_port(Prot);
+               _ ->
+                   list_to_integer(lists:reverse(TmpAcc))
+           end,
+    Url#url{port = Port, 
+            path = "/"};
 parse_url([], get_password, Url, TmpAcc) ->
     %% Ok, what we thought was the username/password was the hostname
     %% and portnumber
     #url{username=User} = Url,
     Port = case TmpAcc of
-	       [] ->
-		   default_port(Url#url.protocol);
-	       _ ->
-		   list_to_integer(lists:reverse(TmpAcc))
-	   end,
+               [] ->
+                   default_port(Url#url.protocol);
+               _ ->
+                   list_to_integer(lists:reverse(TmpAcc))
+           end,
     Url#url{host = User,
-	    port = Port,
-	    username = undefined,
-	    password = undefined,
-	    path = "/"};
+            port = Port,
+            username = undefined,
+            password = undefined,
+            path = "/"};
 parse_url([], State, Url, TmpAcc) ->
     {invalid_uri_2, State, Url, TmpAcc}.
 
@@ -387,13 +353,13 @@ do_trace(Fmt, Args) ->
 -ifdef(DEBUG).
 do_trace(_, Fmt, Args) ->
     io:format("~s -- (~s) - "++Fmt,
-	      [printable_date(),
-	       get(ibrowse_trace_token) | Args]).
+              [printable_date(), 
+               get(ibrowse_trace_token) | Args]).
 -else.
 do_trace(true, Fmt, Args) ->
     io:format("~s -- (~s) - "++Fmt,
-	      [printable_date(),
-	       get(ibrowse_trace_token) | Args]);
+              [printable_date(), 
+               get(ibrowse_trace_token) | Args]);
 do_trace(_, _, _) ->
     ok.
 -endif.
