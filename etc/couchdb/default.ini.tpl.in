@@ -64,6 +64,7 @@ stats_collector={couch_stats_collector, start, []}
 uuids={couch_uuids, start, []}
 auth_cache={couch_auth_cache, start_link, []}
 rep_db_changes_listener={couch_rep_db_listener, start_link, []}
+vhosts={couch_httpd_vhost, start_link, []}
 
 [httpd_global_handlers]
 / = {couch_httpd_misc_handlers, handle_welcome_req, <<"Welcome">>}
