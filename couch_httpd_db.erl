@@ -922,11 +922,11 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
                 case Len of
                 undefined ->
                     {ok, Resp} = start_chunked_response(Req, 200, Headers),
-                    AttFun(Att, fun(Seg, _) -> send_chunk(Resp, Seg) end, ok),
+                    AttFun(Att, fun(Seg, _) -> send_chunk(Resp, Seg) end, {ok, Resp}),
                     last_chunk(Resp);
                 _ ->
                     {ok, Resp} = start_response_length(Req, 200, Headers, Len),
-                    AttFun(Att, fun(Seg, _) -> send(Resp, Seg) end, ok)
+                    AttFun(Att, fun(Seg, _) -> send(Resp, Seg) end, {ok, Resp})
                 end
             end
         )
