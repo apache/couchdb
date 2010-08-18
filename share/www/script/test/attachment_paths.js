@@ -73,7 +73,10 @@ couchTests.attachment_paths = function(debug) {
     T(binAttDoc._attachments["foo/bar.txt"] !== undefined);
     T(binAttDoc._attachments["foo%2Fbaz.txt"] !== undefined);
     T(binAttDoc._attachments["foo/bar2.txt"] !== undefined);
-    T(binAttDoc._attachments["foo/bar2.txt"].content_type == "text/plain;charset=utf-8");
+    TEquals("text/plain;charset=utf-8",                   // thank you Safari
+      binAttDoc._attachments["foo/bar2.txt"].content_type.toLowerCase(),
+      "correct content-type"
+    );
     T(binAttDoc._attachments["foo/bar2.txt"].length == 30);
 
     //// now repeat the while thing with a design doc
@@ -141,7 +144,10 @@ couchTests.attachment_paths = function(debug) {
 
     T(binAttDoc._attachments["foo/bar.txt"] !== undefined);
     T(binAttDoc._attachments["foo/bar2.txt"] !== undefined);
-    T(binAttDoc._attachments["foo/bar2.txt"].content_type == "text/plain;charset=utf-8");
+    TEquals("text/plain;charset=utf-8",                   // thank you Safari
+      binAttDoc._attachments["foo/bar2.txt"].content_type.toLowerCase(),
+      "correct content-type"
+    );
     T(binAttDoc._attachments["foo/bar2.txt"].length == 30);
   }
 };

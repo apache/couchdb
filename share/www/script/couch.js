@@ -397,8 +397,8 @@ CouchDB.newXhr = function() {
 }
 
 CouchDB.request = function(method, uri, options) {
-  options = options || {};
-  options.headers = options.headers || {};
+  options = typeof(options) == 'object' ? options : {};
+  options.headers = typeof(options.headers) == 'object' ? options.headers : {};
   options.headers["Content-Type"] = options.headers["Content-Type"] || options.headers["content-type"] || "application/json";
   options.headers["Accept"] = options.headers["Accept"] || options.headers["accept"] || "application/json";
   var req = CouchDB.newXhr();
