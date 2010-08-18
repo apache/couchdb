@@ -37,7 +37,7 @@ go(DbName, #view_query_args{keys=nil} = QueryArgs, Callback, Acc0) ->
         limit = Limit,
         user_acc = Acc0
     },
-    try fabric_util:receive_loop(Workers, #shard.ref, fun handle_message/3,
+    try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3,
         State, infinity, 5000) of
     {ok, NewState} ->
         {ok, NewState#collector.user_acc};

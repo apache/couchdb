@@ -42,7 +42,7 @@ go(DbName, DDoc, View, Args, Callback, Acc0) ->
         sorted = Args#view_query_args.sorted,
         user_acc = Acc0
     },
-    try fabric_util:receive_loop(Workers, #shard.ref, fun handle_message/3,
+    try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3,
         State, infinity, 1000 * 60 * 60) of
     {ok, NewState} ->
         {ok, NewState#collector.user_acc};
@@ -117,7 +117,7 @@ handle_message(#view_row{} = Row, {_,From}, #collector{sorted=false} = St) ->
     {Go, Acc} = Callback(fabric_view:transform_row(Row), AccIn),
     gen_server:reply(From, ok),
     {Go, St#collector{user_acc=Acc, limit=Limit-1}};
-    
+
 handle_message(#view_row{} = Row, {Worker, From}, State) ->
     #collector{
         query_args = #view_query_args{direction=Dir},
@@ -149,4 +149,3 @@ merge_row(_, KeyDict, Row, Rows) ->
             dict:fetch(A, KeyDict) < dict:fetch(B, KeyDict)
         end
     end, [Row], Rows).
-
