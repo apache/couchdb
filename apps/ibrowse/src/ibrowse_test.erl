@@ -12,8 +12,8 @@
 	 unit_tests/0,
 	 unit_tests/1,
 	 unit_tests_1/2,
-	 drv_ue_test/0,
-	 drv_ue_test/1,
+%	 drv_ue_test/0,
+%	 drv_ue_test/1,
 	 ue_test/0,
 	 ue_test/1,
 	 verify_chunked_streaming/0,
@@ -349,19 +349,19 @@ execute_req(Url, Method, Options) ->
 	    io:format("Err -> ~p~n", [Err])
     end.
 
-drv_ue_test() ->
-    drv_ue_test(lists:duplicate(1024, 127)).
-drv_ue_test(Data) ->
-    [{port, Port}| _] = ets:lookup(ibrowse_table, port),
-%     erl_ddll:unload_driver("ibrowse_drv"),
-%     timer:sleep(1000),
-%     erl_ddll:load_driver("../priv", "ibrowse_drv"),
-%     Port = open_port({spawn, "ibrowse_drv"}, []),
-    {Time, Res} = timer:tc(ibrowse_lib, drv_ue, [Data, Port]),
-    io:format("Time -> ~p~n", [Time]),
-    io:format("Data Length -> ~p~n", [length(Data)]),
-    io:format("Res Length -> ~p~n", [length(Res)]).
-%    io:format("Result -> ~s~n", [Res]).
+% drv_ue_test() ->
+%     drv_ue_test(lists:duplicate(1024, 127)).
+% drv_ue_test(Data) ->
+%     [{port, Port}| _] = ets:lookup(ibrowse_table, port),
+% %     erl_ddll:unload_driver("ibrowse_drv"),
+% %     timer:sleep(1000),
+% %     erl_ddll:load_driver("../priv", "ibrowse_drv"),
+% %     Port = open_port({spawn, "ibrowse_drv"}, []),
+%     {Time, Res} = timer:tc(ibrowse_lib, drv_ue, [Data, Port]),
+%     io:format("Time -> ~p~n", [Time]),
+%     io:format("Data Length -> ~p~n", [length(Data)]),
+%     io:format("Res Length -> ~p~n", [length(Res)]).
+% %    io:format("Result -> ~s~n", [Res]).
 
 ue_test() ->
     ue_test(lists:duplicate(1024, $?)).
