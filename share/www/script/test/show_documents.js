@@ -157,6 +157,9 @@ couchTests.show_documents = function(debug) {
       }),
       "withSlash": stringFun(function(doc, req) {
         return { json: doc }
+      }),
+      "secObj": stringFun(function(doc, req) {
+        return { json: req.secObj };
       })
     }
   };
@@ -410,5 +413,24 @@ couchTests.show_documents = function(debug) {
   db.deleteDoc(doc);
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/show-deleted/testdoc");
   TEquals("No doc testdoc", xhr.responseText, "should return 'no doc testdoc'");
+
+
+  run_on_modified_server(
+    [{section: "httpd",
+      key: "authentication_handlers",
+      value: "{couch_httpd_auth, special_test_authentication_handler}"},
+     {section:"httpd",
+      key: "WWW-Authenticate",
+      value:  "X-Couch-Test-Auth"}],
+
+      function() {
+        T(db.setDbProperty("_security", {foo: true}).ok);
+        T(db.save(doc).ok);
+
+        xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/secObj");
+        var resp = JSON.parse(xhr.responseText);
+        T(resp.foo == true);
+      }
+  );
   
 };

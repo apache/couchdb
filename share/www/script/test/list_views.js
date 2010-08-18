@@ -156,6 +156,9 @@ couchTests.list_views = function(debug) {
         var row = getRow();
         send(row.doc.integer);
         return "tail";
+      }),
+      secObj: stringFun(function(head, req) {
+        return toJSON(req.secObj);
       })
     }
   };
@@ -200,6 +203,7 @@ couchTests.list_views = function(debug) {
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/basicBasic/basicView");
   T(xhr.status == 200, "standard get should be 200");
   T(/head0123456789tail/.test(xhr.responseText));
+
 
   // test that etags are available
   var etag = xhr.getResponseHeader("etag");
@@ -405,6 +409,12 @@ couchTests.list_views = function(debug) {
   T(/FirstKey: -2/.test(xhr.responseText));
   T(/LastKey: -7/.test(xhr.responseText));
 
+    // Test if secObj is available
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/secObj/basicView");
+  T(xhr.status == 200, "standard get should be 200");
+  var resp = JSON.parse(xhr.responseText);
+  T(typeof(resp) == "object");
+
   var erlViewTest = function() {
     T(db.save(erlListDoc).ok);
     var url = "/test_suite_db/_design/erlang/_list/simple/views/basicView" +
@@ -418,6 +428,8 @@ couchTests.list_views = function(debug) {
         T(list[i] + 3 == i);
     }
   };
+
+  
 
   run_on_modified_server([{
     section: "native_query_servers",
