@@ -508,6 +508,8 @@ load_header(Fd, Block) ->
 
 -spec read_raw_iolist_int(#file{}, Pos::non_neg_integer(), Len::non_neg_integer()) ->
     {Data::iolist(), CurPos::non_neg_integer()}.
+read_raw_iolist_int(Fd, {Pos, _Size}, Len) -> % 0110 UPGRADE CODE
+    read_raw_iolist_int(Fd, Pos, Len);
 read_raw_iolist_int(#file{fd=Fd, tail_append_begin=TAB}, Pos, Len) ->
     BlockOffset = Pos rem ?SIZE_BLOCK,
     TotalBytes = calculate_total_read_len(BlockOffset, Len),

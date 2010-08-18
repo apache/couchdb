@@ -24,7 +24,7 @@
 
 -define(DEFAULT_STREAM_CHUNK, 16#00100000). % 1 meg chunks when streaming data
 
--export([open/1, open/3, close/1, write/2, foldl/4, foldl/5, foldl_decode/6,
+-export([open/1, open/3, close/1, write/2, foldl/4, foldl/5, range_foldl/6, foldl_decode/6,
         old_foldl/5,old_copy_to_new_stream/4]).
 -export([copy_to_new_stream/3,old_read_term/2]).
 -export([init/1, terminate/2, handle_call/3]).
@@ -112,22 +112,57 @@ foldl_decode(Fd, PosList, Md5, Enc, Fun, Acc) ->
 foldl(_Fd, [], Md5, Md5Acc, _Fun, Acc) ->
     Md5 = couch_util:md5_final(Md5Acc),
     Acc;
+foldl(Fd, [{Pos, _Size}], Md5, Md5Acc, Fun, Acc) -> % 0110 UPGRADE CODE
+    foldl(Fd, [Pos], Md5, Md5Acc, Fun, Acc);
 foldl(Fd, [Pos], Md5, Md5Acc, Fun, Acc) ->
     {ok, Bin} = couch_file:pread_iolist(Fd, Pos),
     Md5 = couch_util:md5_final(couch_util:md5_update(Md5Acc, Bin)),
     Fun(Bin, Acc);
+foldl(Fd, [{Pos, _Size}|Rest], Md5, Md5Acc, Fun, Acc) ->
+    foldl(Fd, [Pos|Rest], Md5, Md5Acc, Fun, Acc);
 foldl(Fd, [Pos|Rest], Md5, Md5Acc, Fun, Acc) ->
     {ok, Bin} = couch_file:pread_iolist(Fd, Pos),
     foldl(Fd, Rest, Md5, couch_util:md5_update(Md5Acc, Bin), Fun, Fun(Bin, Acc)).
 
+range_foldl(Fd, PosList, From, To, Fun, Acc) ->
+    range_foldl(Fd, PosList, From, To, 0, Fun, Acc).
+
+range_foldl(_Fd, _PosList, _From, To, Off, _Fun, Acc) when Off >= To ->
+    Acc;
+range_foldl(Fd, [{_Pos, Size}|Rest], From, To, Off, Fun, Acc) when From > Off + Size ->
+    range_foldl(Fd, Rest, From, To, Off + Size, Fun, Acc);
+range_foldl(Fd, [{Pos, Size}|Rest], From, To, Off, Fun, Acc) ->
+    {ok, Bin} = couch_file:pread_iolist(Fd, Pos),
+    Bin1 = if
+        From =< Off andalso To >= Off + Size -> Bin; %% the whole block is covered
+        true ->
+            PrefixLen = clip(From - Off, 0, Size),
+            PostfixLen = clip(Off + Size - To, 0, Size),
+            MatchLen = Size - PrefixLen - PostfixLen,
+            <<_Prefix:PrefixLen/binary,Match:MatchLen/binary,_Postfix:PostfixLen/binary>> = iolist_to_binary(Bin),
+            Match
+    end,
+    range_foldl(Fd, Rest, From, To, Off + Size, Fun, Fun(Bin1, Acc)).
+
+clip(Value, Lo, Hi) ->
+    if
+        Value < Lo -> Lo;
+        Value > Hi -> Hi;
+        true -> Value
+    end.
+
 foldl_decode(_DecFun, _Fd, [], Md5, Md5Acc, _Fun, Acc) ->
     Md5 = couch_util:md5_final(Md5Acc),
     Acc;
+foldl_decode(DecFun, Fd, [{Pos, _Size}], Md5, Md5Acc, Fun, Acc) ->
+    foldl_decode(DecFun, Fd, [Pos], Md5, Md5Acc, Fun, Acc);
 foldl_decode(DecFun, Fd, [Pos], Md5, Md5Acc, Fun, Acc) ->
     {ok, EncBin} = couch_file:pread_iolist(Fd, Pos),
     Md5 = couch_util:md5_final(couch_util:md5_update(Md5Acc, EncBin)),
     Bin = DecFun(EncBin),
     Fun(Bin, Acc);
+foldl_decode(DecFun, Fd, [{Pos, _Size}|Rest], Md5, Md5Acc, Fun, Acc) ->
+    foldl_decode(DecFun, Fd, [Pos|Rest], Md5, Md5Acc, Fun, Acc);
 foldl_decode(DecFun, Fd, [Pos|Rest], Md5, Md5Acc, Fun, Acc) ->
     {ok, EncBin} = couch_file:pread_iolist(Fd, Pos),
     Bin = DecFun(EncBin),
@@ -227,7 +262,7 @@ handle_call({write, Bin}, _From, Stream) ->
             {ok, Pos} = couch_file:append_binary(Fd, WriteBin2),
             WrittenLen2 = WrittenLen + iolist_size(WriteBin2),
             Md5_2 = couch_util:md5_update(Md5, WriteBin2),
-            Written2 = [Pos|Written]
+            Written2 = [{Pos, iolist_size(WriteBin2)}|Written]
         end,
 
         {reply, ok, Stream#stream{
@@ -265,7 +300,7 @@ handle_call(close, _From, Stream) ->
         {lists:reverse(Written), WrittenLen, IdenLen, Md5Final, IdenMd5Final};
     _ ->
         {ok, Pos} = couch_file:append_binary(Fd, WriteBin2),
-        StreamInfo = lists:reverse(Written, [Pos]),
+        StreamInfo = lists:reverse(Written, [{Pos, iolist_size(WriteBin2)}]),
         StreamLen = WrittenLen + iolist_size(WriteBin2),
         {StreamInfo, StreamLen, IdenLen, Md5Final, IdenMd5Final}
     end,
