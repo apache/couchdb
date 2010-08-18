@@ -200,6 +200,21 @@ couchTests.replicator_db = function(debug) {
     T(repDoc1.state === "triggered");
     T(typeof repDoc1.replication_id  === "string");
 
+    // add a design doc to source, it will be replicated to target
+    // when the "user_ctx" property is not defined in the replication doc,
+    // the replication will be done under an _admin context, therefore
+    // design docs will be replicated
+    var ddoc = {
+      _id: "_design/foobar",
+      language: "javascript"
+    };
+
+    T(dbA.save(ddoc).ok);
+
+    waitForSeq(dbA, dbB);
+    var ddoc_copy = dbB.open("_design/foobar");
+    T(ddoc_copy !== null);
+
     // stop replication by deleting the replication document
     T(repDb.deleteDoc(repDoc1).ok);
 
