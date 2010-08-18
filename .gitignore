@@ -16,4 +16,4 @@ rebar.config
 .eunit
 @abs_top_builddir@/
 apps/couch/test/temp*
-test/etap/
+apps/couch/test/etap/
