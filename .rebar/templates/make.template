@@ -1,0 +1,5 @@
+{variables, [{prefix, "/opt"},
+             {data, "/srv/db"},
+             {view, "/srv/view_index"},
+             {user, "dbcore"}]}.
+{template, "./Makefile", "Makefile"}.

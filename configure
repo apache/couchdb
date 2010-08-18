@@ -1,0 +1,51 @@
+#!/bin/bash
+
+function quit {
+  exit
+}
+
+PREFIX="/opt"
+TEMPLATE="production"
+DATA="/srv/db"
+VIEW="/srv/view_index"
+DBCORE_USER=`whoami`
+
+while [ $# -gt 0 ]
+do
+  case $1
+  in
+    -p)
+      PREFIX=$2
+      shift 2
+    ;;
+    -t)
+      TEMPLATE=$2
+      shift 2
+    ;;
+    -d)
+      DATA=$2
+      shift 2
+    ;;
+    -v)
+      VIEW=$2
+      shift 2
+    ;;
+    -u)
+      DBCORE_USER=$2
+      shift 2
+    ;;
+    *)
+      echo "usage: $0 [-p {prefix} -t {template} -d {data_dir} -v {view_dir} -u {user}]"
+      quit
+    ;;
+  esac
+done
+
+
+echo "configuring dbcore"
+
+rm -f rebar.config
+# Makefile
+./rebar create template=make prefix=$PREFIX data=$DATA view=$VIEW user=$DBCORE_USER force=1
+# dbcore template
+./rebar create template=$TEMPLATE prefix=$PREFIX force=1
