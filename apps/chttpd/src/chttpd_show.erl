@@ -183,7 +183,7 @@ handle_view_list_req(Req, _Db, _DDoc) ->
 
 handle_view_list(Req, Db, DDoc, LName, {ViewDesignName, ViewName}, Keys) ->
     {ok, VDoc} = fabric:open_doc(Db, <<"_design/", ViewDesignName/binary>>, []),
-    Group = couch_view_group:design_doc_to_view_group(Db, VDoc),
+    Group = couch_view_group:design_doc_to_view_group(VDoc),
     IsReduce = chttpd_view:get_reduce_type(Req),
     ViewType = chttpd_view:extract_view_type(ViewName, Group#group.views,
         IsReduce),

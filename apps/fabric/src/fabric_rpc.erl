@@ -80,7 +80,7 @@ map_view(DbName, DDoc, ViewName, QueryArgs) ->
         view_type = ViewType
     } = QueryArgs,
     MinSeq = if Stale == ok -> 0; true -> couch_db:get_update_seq(Db) end,
-    Group0 = couch_view_group:design_doc_to_view_group(Db, DDoc),
+    Group0 = couch_view_group:design_doc_to_view_group(DDoc),
     {ok, Pid} = gen_server:call(couch_view, {get_group_server, DbName, Group0}),
     {ok, Group} = couch_view_group:request_group(Pid, MinSeq),
     View = fabric_view:extract_view(Pid, ViewName, Group#group.views, ViewType),

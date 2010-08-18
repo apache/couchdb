@@ -11,7 +11,7 @@ go(DbName, GroupId) when is_binary(GroupId) ->
     go(DbName, DDoc);
 
 go(DbName, #doc{} = DDoc) ->
-    Group = couch_view_group:design_doc_to_view_group(#db{name=DbName}, DDoc),
+    Group = couch_view_group:design_doc_to_view_group(DDoc),
     Shards = mem3:shards(DbName),
     Workers = fabric_util:submit_jobs(Shards, group_info, [Group]),
     Acc0 = {fabric_dict:init(Workers, nil), []},
