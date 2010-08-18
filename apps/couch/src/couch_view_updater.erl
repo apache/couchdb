@@ -20,20 +20,21 @@
 
 update(Owner, Group) ->
     #group{
-        db = #db{name=DbName} = Db,
+        dbname = DbName,
         name = GroupName,
         current_seq = Seq,
         purge_seq = PurgeSeq
     } = Group,
     couch_task_status:add_task(<<"View Group Indexer">>, <<DbName/binary," ",GroupName/binary>>, <<"Starting index update">>),
 
+    {ok, Db} = couch_db:open(DbName, []),
     DbPurgeSeq = couch_db:get_purge_seq(Db),
     Group2 =
     if DbPurgeSeq == PurgeSeq ->
         Group;
     DbPurgeSeq == PurgeSeq + 1 ->
         couch_task_status:update(<<"Removing purged entries from view index.">>),
-        purge_index(Group);
+        purge_index(Db, Group);
     true ->
         couch_task_status:update(<<"Resetting view index due to lost purge entries.">>),
         exit(reset)
@@ -77,7 +78,7 @@ update(Owner, Group) ->
     end.
 
 
-purge_index(#group{db=Db, views=Views, id_btree=IdBtree}=Group) ->
+purge_index(Db, #group{views=Views, id_btree=IdBtree}=Group) ->
     {ok, PurgedIdsRevs} = couch_db:get_last_purged(Db),
     Ids = [Id || {Id, _Revs} <- PurgedIdsRevs],
     {ok, Lookups, IdBtree2} = couch_btree:query_modify(IdBtree, Ids, [], Ids),
@@ -108,9 +109,14 @@ purge_index(#group{db=Db, views=Views, id_btree=IdBtree}=Group) ->
             views=Views2,
             purge_seq=couch_db:get_purge_seq(Db)}.
 
-
-load_doc(Db, DocInfo, MapQueue, DocOpts, IncludeDesign) ->
-    #doc_info{id=DocId, high_seq=Seq, revs=[#rev_info{deleted=Deleted}|_]} = DocInfo,
+-spec load_doc(#db{}, #doc_info{}, pid(), [atom()], boolean()) -> ok.
+load_doc(Db, DI, MapQueue, DocOpts, IncludeDesign) ->
+    DocInfo = case DI of
+    #full_doc_info{id=DocId, update_seq=Seq, deleted=Deleted} ->
+        couch_doc:to_doc_info(DI);
+    #doc_info{id=DocId, high_seq=Seq, revs=[#rev_info{deleted=Deleted}|_]} ->
+        DI
+    end,
     case {IncludeDesign, DocId} of
     {false, <<?DESIGN_DOC_PREFIX, _/binary>>} -> % we skip design docs
         ok;
@@ -122,7 +128,8 @@ load_doc(Db, DocInfo, MapQueue, DocOpts, IncludeDesign) ->
             couch_work_queue:queue(MapQueue, {Seq, Doc})
         end
     end.
-    
+
+-spec do_maps(#group{}, pid(), pid(), any()) -> any().
 do_maps(Group, MapQueue, WriteQueue, ViewEmptyKVs) ->
     case couch_work_queue:dequeue(MapQueue) of
     closed ->
@@ -139,6 +146,7 @@ do_maps(Group, MapQueue, WriteQueue, ViewEmptyKVs) ->
         do_maps(Group1, MapQueue, WriteQueue, ViewEmptyKVs)
     end.
 
+-spec do_writes(pid(), pid() | nil, #group{}, pid(), boolean()) -> any().
 do_writes(Parent, Owner, Group, WriteQueue, InitialBuild) ->
     case couch_work_queue:dequeue(WriteQueue) of
     closed ->
@@ -165,6 +173,7 @@ do_writes(Parent, Owner, Group, WriteQueue, InitialBuild) ->
         do_writes(Parent, Owner, Group2, WriteQueue, InitialBuild)
     end.
 
+-spec view_insert_query_results([#doc{}], list(), any(), any()) -> any().
 view_insert_query_results([], [], ViewKVs, DocIdViewIdKeysAcc) ->
     {ViewKVs, DocIdViewIdKeysAcc};
 view_insert_query_results([Doc|RestDocs], [QueryResults | RestResults], ViewKVs, DocIdViewIdKeysAcc) ->
@@ -172,7 +181,8 @@ view_insert_query_results([Doc|RestDocs], [QueryResults | RestResults], ViewKVs,
     NewDocIdViewIdKeys = [{Doc#doc.id, NewViewIdKeys} | DocIdViewIdKeysAcc],
     view_insert_query_results(RestDocs, RestResults, NewViewKVs, NewDocIdViewIdKeys).
 
-
+-spec view_insert_doc_query_results(#doc{}, list(), list(), any(), any()) ->
+    any().
 view_insert_doc_query_results(_Doc, [], [], ViewKVsAcc, ViewIdKeysAcc) ->
     {lists:reverse(ViewKVsAcc), lists:reverse(ViewIdKeysAcc)};
 view_insert_doc_query_results(#doc{id=DocId}=Doc, [ResultKVs|RestResults], [{View, KVs}|RestViewKVs], ViewKVsAcc, ViewIdKeysAcc) ->
@@ -199,6 +209,7 @@ view_insert_doc_query_results(#doc{id=DocId}=Doc, [ResultKVs|RestResults], [{Vie
     NewViewIdKeysAcc = NewViewIdKeys ++ ViewIdKeysAcc,
     view_insert_doc_query_results(Doc, RestResults, RestViewKVs, NewViewKVsAcc, NewViewIdKeysAcc).
 
+-spec view_compute(#group{}, [#doc{}]) -> {#group{}, any()}.
 view_compute(Group, []) ->
     {Group, []};
 view_compute(#group{def_lang=DefLang, query_server=QueryServerIn}=Group, Docs) ->
@@ -212,7 +223,6 @@ view_compute(#group{def_lang=DefLang, query_server=QueryServerIn}=Group, Docs) -
     end,
     {ok, Results} = couch_query_servers:map_docs(QueryServer, Docs),
     {Group#group{query_server=QueryServer}, Results}.
-
 
 
 write_changes(Group, ViewKeyValuesToAdd, DocIdViewIdKeys, NewSeq, InitialBuild) ->

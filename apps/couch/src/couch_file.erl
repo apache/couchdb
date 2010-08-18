@@ -69,10 +69,10 @@ open(Filepath, Options) ->
 %%----------------------------------------------------------------------
 
 append_term(Fd, Term) ->
-    append_binary(Fd, term_to_binary(Term)).
+    append_binary(Fd, term_to_binary(Term, [compressed, {minor_version,1}])).
     
 append_term_md5(Fd, Term) ->
-    append_binary_md5(Fd, term_to_binary(Term)).
+    append_binary_md5(Fd, term_to_binary(Term, [compressed, {minor_version,1}])).
 
 
 %%----------------------------------------------------------------------
@@ -237,6 +237,7 @@ init_status_error(ReturnPid, Ref, Error) ->
 
 init({Filepath, Options, ReturnPid, Ref}) ->
     process_flag(trap_exit, true),
+    timer:send_after(60000, maybe_close),
     case lists:member(create, Options) of
     true ->
         filelib:ensure_dir(Filepath),
@@ -479,6 +480,18 @@ handle_cast(close, Fd) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+handle_info(maybe_close, Fd) ->
+    case process_info(self(), monitored_by) of
+    {monitored_by, [_StatsCollector]} ->
+        {stop, normal, Fd};
+    {monitored_by, []} ->
+        ?LOG_ERROR("~p ~p is un-monitored, maybe stats collector died",
+            [?MODULE, self()]),
+        {stop, normal, Fd};
+    _Else ->
+        timer:send_after(10000, maybe_close),
+        {noreply, Fd}
+    end;
 handle_info({'EXIT', _, normal}, Fd) ->
     {noreply, Fd};
 handle_info({'EXIT', _, Reason}, Fd) ->

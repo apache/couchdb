@@ -88,7 +88,7 @@ register(Fun) ->
     ?MODULE:register(Fun, self()).
 
 register(Fun, Pid) ->
-    gen_server:call(?MODULE, {register, Fun, Pid}).
+    couch_config_event:register(Fun, Pid).
 
 
 init(IniFiles) ->
@@ -111,7 +111,7 @@ terminate(_Reason, _State) ->
 handle_call(all, _From, Config) ->
     Resp = lists:sort((ets:tab2list(?MODULE))),
     {reply, Resp, Config};
-handle_call({set, Sec, Key, Val, Persist}, From, Config) ->
+handle_call({set, Sec, Key, Val, Persist}, _From, Config) ->
     true = ets:insert(?MODULE, {{Sec, Key}, Val}),
     case {Persist, Config#config.write_filename} of
         {true, undefined} ->
@@ -121,12 +121,10 @@ handle_call({set, Sec, Key, Val, Persist}, From, Config) ->
         _ ->
             ok
     end,
-    spawn_link(fun() ->
-        [catch F(Sec, Key, Val, Persist) || {_Pid, F} <- Config#config.notify_funs],
-            gen_server:reply(From, ok)
-    end),
-    {noreply, Config};
-handle_call({delete, Sec, Key, Persist}, From, Config) ->
+    Event = {config_change, Sec, Key, Val, Persist},
+    gen_event:sync_notify(couch_config_event, Event),
+    {reply, ok, Config};
+handle_call({delete, Sec, Key, Persist}, _From, Config) ->
     true = ets:delete(?MODULE, {Sec,Key}),
     case {Persist, Config#config.write_filename} of
         {true, undefined} ->
@@ -136,26 +134,9 @@ handle_call({delete, Sec, Key, Persist}, From, Config) ->
         _ ->
             ok
     end,
-    spawn_link(fun() ->
-        [catch F(Sec, Key, deleted, Persist) || {_Pid, F} <- Config#config.notify_funs],
-            gen_server:reply(From, ok)
-    end),
-    {noreply, Config};
-handle_call({register, Fun, Pid}, _From, #config{notify_funs=PidFuns}=Config) ->
-    erlang:monitor(process, Pid),
-    % convert 1 and 2 arity to 3 arity
-    Fun2 =
-    case Fun of
-        _ when is_function(Fun, 1) ->
-            fun(Section, _Key, _Value, _Persist) -> Fun(Section) end;
-        _ when is_function(Fun, 2) ->
-            fun(Section, Key, _Value, _Persist) -> Fun(Section, Key) end;
-        _ when is_function(Fun, 3) ->
-            fun(Section, Key, Value, _Persist) -> Fun(Section, Key, Value) end;
-        _ when is_function(Fun, 4) ->
-            Fun
-    end,
-    {reply, ok, Config#config{notify_funs=[{Pid, Fun2} | PidFuns]}}.
+    Event = {config_change, Sec, Key, deleted, Persist},
+    gen_event:sync_notify(couch_config_event, Event),
+    {reply, ok, Config}.
 
 
 handle_cast(stop, State) ->
@@ -163,10 +144,9 @@ handle_cast(stop, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({'DOWN', _, _, DownPid, _}, #config{notify_funs=PidFuns}=Config) ->
-    % remove any funs registered by the downed process
-    FilteredPidFuns = [{Pid,Fun} || {Pid,Fun} <- PidFuns, Pid /= DownPid],
-    {noreply, Config#config{notify_funs=FilteredPidFuns}}.
+handle_info(Info, State) ->
+    ?LOG_ERROR("couch_config:handle_info Info: ~p~n", [Info]),
+    {noreply, State}.
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.

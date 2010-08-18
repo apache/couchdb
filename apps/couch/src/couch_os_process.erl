@@ -59,12 +59,12 @@ prompt(Pid, Data) ->
 
 % Utility functions for reading and writing
 % in custom functions
-writeline(OsProc, Data) when is_record(OsProc, os_proc) ->
-    port_command(OsProc#os_proc.port, Data ++ "\n").
+writeline(#os_proc{port=Port}, Data) ->
+    port_command(Port, Data ++ "\n").
 
 readline(#os_proc{} = OsProc) ->
     readline(OsProc, []).
-readline(#os_proc{port = Port} = OsProc, Acc) ->
+readline(#os_proc{port=Port, timeout=Timeout} = OsProc, Acc) ->
     receive
     {Port, {data, {noeol, Data}}} ->
         readline(OsProc, [Data|Acc]);
@@ -73,7 +73,7 @@ readline(#os_proc{port = Port} = OsProc, Acc) ->
     {Port, Err} ->
         catch port_close(Port),
         throw({os_process_error, Err})
-    after OsProc#os_proc.timeout ->
+    after Timeout ->
         catch port_close(Port),
         throw({os_process_error, "OS process timed out."})
     end.
@@ -81,12 +81,12 @@ readline(#os_proc{port = Port} = OsProc, Acc) ->
 % Standard JSON functions
 writejson(OsProc, Data) when is_record(OsProc, os_proc) ->
     JsonData = ?JSON_ENCODE(Data),
-    ?LOG_DEBUG("OS Process ~p Input  :: ~s", [OsProc#os_proc.port, JsonData]),
+    % ?LOG_DEBUG("OS Process ~p Input  :: ~s", [OsProc#os_proc.port, JsonData]),
     true = writeline(OsProc, JsonData).
 
-readjson(OsProc) when is_record(OsProc, os_proc) ->
+readjson(#os_proc{} = OsProc) ->
     Line = readline(OsProc),
-    ?LOG_DEBUG("OS Process ~p Output :: ~s", [OsProc#os_proc.port, Line]),
+    % ?LOG_DEBUG("OS Process ~p Output :: ~s", [OsProc#os_proc.port, Line]),
     case ?JSON_DECODE(Line) of
     [<<"log">>, Msg] when is_binary(Msg) ->
         % we got a message to log. Log it and continue
@@ -104,9 +104,7 @@ readjson(OsProc) when is_record(OsProc, os_proc) ->
 
 % gen_server API
 init([Command, Options, PortOptions]) ->
-    process_flag(trap_exit, true),
-    PrivDir = couch_util:priv_dir(),
-    Spawnkiller = filename:join(PrivDir, "couchspawnkillable"),
+    Spawnkiller = filename:join([code:root_dir(), "bin", "couchspawnkillable"]),
     BaseProc = #os_proc{
         command=Command,
         port=open_port({spawn, Spawnkiller ++ " " ++ Command}, PortOptions),
@@ -115,7 +113,7 @@ init([Command, Options, PortOptions]) ->
     },
     KillCmd = readline(BaseProc),
     Pid = self(),
-    ?LOG_DEBUG("OS Process Start :: ~p", [BaseProc#os_proc.port]),
+    % ?LOG_DEBUG("OS Process Start :: ~p", [BaseProc#os_proc.port]),
     spawn(fun() ->
             % this ensure the real os process is killed when this process dies.
             erlang:monitor(process, Pid),

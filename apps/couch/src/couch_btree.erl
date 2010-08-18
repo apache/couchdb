@@ -16,23 +16,27 @@
 -export([fold/4, full_reduce/1, final_reduce/2, foldl/3, foldl/4]).
 -export([fold_reduce/4, lookup/2, get_state/1, set_options/2]).
 
--define(CHUNK_THRESHOLD, 16#4ff).
-
 -record(btree,
     {fd,
     root,
-    extract_kv = fun({Key, Value}) -> {Key, Value} end,
-    assemble_kv =  fun(Key, Value) -> {Key, Value} end,
-    less = fun(A, B) -> A < B end,
+    extract_kv,
+    assemble_kv,
+    less,
     reduce = nil
     }).
 
+extract(#btree{extract_kv = undefined}, Value) ->
+    Value;
 extract(#btree{extract_kv=Extract}, Value) ->
     Extract(Value).
 
+assemble(#btree{assemble_kv = undefined}, Key, Value) ->
+    {Key, Value};
 assemble(#btree{assemble_kv=Assemble}, Key, Value) ->
     Assemble(Key, Value).
 
+less(#btree{less = undefined}, A, B) ->
+    A < B;
 less(#btree{less=Less}, A, B) ->
     Less(A, B).
 
@@ -106,29 +110,29 @@ convert_fun_arity(Fun) when is_function(Fun, 2) ->
 convert_fun_arity(Fun) when is_function(Fun, 3) ->
     Fun.    % Already arity 3
 
-make_key_in_end_range_function(#btree{less=Less}, fwd, Options) ->
+make_key_in_end_range_function(Bt, fwd, Options) ->
     case couch_util:get_value(end_key_gt, Options) of
     undefined ->
         case couch_util:get_value(end_key, Options) of
         undefined ->
             fun(_Key) -> true end;
         LastKey ->
-            fun(Key) -> not Less(LastKey, Key) end
+            fun(Key) -> not less(Bt, LastKey, Key) end
         end;
     EndKey ->
-        fun(Key) -> Less(Key, EndKey) end
+        fun(Key) -> less(Bt, Key, EndKey) end
     end;
-make_key_in_end_range_function(#btree{less=Less}, rev, Options) ->
+make_key_in_end_range_function(Bt, rev, Options) ->
     case couch_util:get_value(end_key_gt, Options) of
     undefined ->
         case couch_util:get_value(end_key, Options) of
         undefined ->
             fun(_Key) -> true end;
         LastKey ->
-            fun(Key) -> not Less(Key, LastKey) end
+            fun(Key) -> not less(Bt, Key, LastKey) end
         end;
     EndKey ->
-        fun(Key) -> Less(EndKey, Key) end
+        fun(Key) -> less(Bt, EndKey, Key) end
     end.
 
 
@@ -198,7 +202,11 @@ op_order(remove) -> 2;
 op_order(insert) -> 3.
 
 lookup(#btree{root=Root, less=Less}=Bt, Keys) ->
-    SortedKeys = lists:sort(Less, Keys),
+    case Less of undefined ->
+        SortedKeys = lists:sort(Keys);
+    _ ->
+        SortedKeys = lists:sort(Less, Keys)
+    end,
     {ok, SortedResults} = lookup(Bt, Root, SortedKeys),
     % We want to return the results in the same order as the keys were input
     % but we may have changed the order when we sorted. So we need to put the
@@ -271,9 +279,11 @@ complete_root(Bt, KPs) ->
 % it's probably really inefficient.
 
 chunkify(InList) ->
+    BaseChunkSize = list_to_integer(couch_config:get("couchdb",
+        "btree_chunk_size", "1279")),
     case byte_size(term_to_binary(InList)) of
-    Size when Size > ?CHUNK_THRESHOLD ->
-        NumberOfChunksLikely = ((Size div ?CHUNK_THRESHOLD) + 1),
+    Size when Size > BaseChunkSize ->
+        NumberOfChunksLikely = ((Size div BaseChunkSize) + 1),
         ChunkThreshold = Size div NumberOfChunksLikely,
         chunkify(InList, ChunkThreshold, [], 0, []);
     _Else ->

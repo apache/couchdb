@@ -176,8 +176,8 @@ process_response({error, Reason}, Req) ->
     Else ->
         Else
     end,
-    ?LOG_DEBUG("retrying couch_rep_httpc ~p request in ~p seconds due to " ++
-        "{error, ~p}", [Method, Pause/1000, ShortReason]),
+    ?LOG_ERROR("~p retry ~p ~s in ~p seconds due to {error, ~p}",
+        [?MODULE, Method, full_url(Req), Pause/1000, ShortReason]),
     timer:sleep(Pause),
     if Reason == worker_is_dead ->
         C = spawn_link_worker_process(Req),

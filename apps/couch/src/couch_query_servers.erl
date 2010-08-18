@@ -13,7 +13,7 @@
 -module(couch_query_servers).
 -behaviour(gen_server).
 
--export([start_link/0]).
+-export([start_link/0, config_change/1]).
 
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2,code_change/3]).
 -export([start_doc_map/2, map_docs/2, stop_doc_map/1]).
@@ -21,6 +21,7 @@
 -export([filter_docs/5]).
 
 -export([with_ddoc_proc/2, proc_prompt/2, ddoc_prompt/3, ddoc_proc_prompt/3, json_doc/1]).
+-export([get_os_process/1, ret_os_process/1]).
 
 % -export([test/0]).
 
@@ -121,25 +122,19 @@ recombine_reduce_results([_OsFun|RedSrcs], [OsR|OsResults], BuiltinResults, Acc)
 
 os_reduce(_Lang, [], _KVs) ->
     {ok, []};
+os_reduce(#proc{} = Proc, OsRedSrcs, KVs) ->
+    [true, Reductions] = proc_prompt(Proc, [<<"reduce">>, OsRedSrcs, KVs]),
+    {ok, Reductions};
 os_reduce(Lang, OsRedSrcs, KVs) ->
     Proc = get_os_process(Lang),
-    OsResults = try proc_prompt(Proc, [<<"reduce">>, OsRedSrcs, KVs]) of
-        [true, Reductions] -> Reductions
-    after
-        ok = ret_os_process(Proc)
-    end,
-    {ok, OsResults}.
+    try os_reduce(Proc, OsRedSrcs, KVs) after ok = ret_os_process(Proc) end.
 
-os_rereduce(_Lang, [], _KVs) ->
-    {ok, []};
+os_rereduce(#proc{} = Proc, OsRedSrcs, KVs) ->
+    [true, [Reduction]] = proc_prompt(Proc, [<<"rereduce">>, OsRedSrcs, KVs]),
+    Reduction;
 os_rereduce(Lang, OsRedSrcs, KVs) ->
     Proc = get_os_process(Lang),
-    try proc_prompt(Proc, [<<"rereduce">>, OsRedSrcs, KVs]) of
-        [true, [Reduction]] -> Reduction
-    after
-        ok = ret_os_process(Proc)
-    end.
-
+    try os_rereduce(Proc, OsRedSrcs, KVs) after ok = ret_os_process(Proc) end.
 
 builtin_reduce(_Re, [], _KVs, Acc) ->
     {ok, lists:reverse(Acc)};
@@ -234,16 +229,7 @@ init([]) ->
     % just stop if one of the config settings change. couch_server_sup
     % will restart us and then we will pick up the new settings.
 
-    ok = couch_config:register(
-        fun("query_servers" ++ _, _) ->
-            supervisor:terminate_child(couch_secondary_services, query_servers),
-            supervisor:restart_child(couch_secondary_services, query_servers)
-        end),
-    ok = couch_config:register(
-        fun("native_query_servers" ++ _, _) ->
-            supervisor:terminate_child(couch_secondary_services, query_servers),
-            [supervisor:restart_child(couch_secondary_services, query_servers)]
-        end),
+    ok = couch_config:register(fun ?MODULE:config_change/1),
 
     Langs = ets:new(couch_query_server_langs, [set, private]),
     PidProcs = ets:new(couch_query_server_pid_langs, [set, private]),
@@ -275,23 +261,15 @@ handle_call({get_proc, #doc{body={Props}}=DDoc, DDocKey}, _From, {Langs, PidProc
     case ets:lookup(LangProcs, Lang) of
     [{Lang, [P|Rest]}] ->
         % find a proc in the set that has the DDoc
-        case proc_with_ddoc(DDoc, DDocKey, [P|Rest]) of
-        {ok, Proc} ->
-            rem_from_list(LangProcs, Lang, Proc),
-            {reply, {ok, Proc, get_query_server_config()}, Server};
-        Error ->
-            {reply, Error, Server}
-        end;
+        {ok, Proc} = proc_with_ddoc(DDoc, DDocKey, [P|Rest]),
+        rem_from_list(LangProcs, Lang, Proc),
+        {reply, {ok, Proc, get_query_server_config()}, Server};
     _ ->
         case (catch new_process(Langs, Lang)) of
         {ok, Proc} ->
             add_value(PidProcs, Proc#proc.pid, Proc),
-            case proc_with_ddoc(DDoc, DDocKey, [Proc]) of
-            {ok, Proc2} ->
-                {reply, {ok, Proc2, get_query_server_config()}, Server};
-            Error ->
-                {reply, Error, Server}
-            end;
+            {ok, Proc2} = proc_with_ddoc(DDoc, DDocKey, [Proc]),
+            {reply, {ok, Proc2, get_query_server_config()}, Server};
         Error ->
             {reply, Error, Server}
         end
@@ -347,6 +325,13 @@ handle_info({'EXIT', Pid, Status}, {_, PidProcs, LangProcs}=Server) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+config_change("query_servers") ->
+    supervisor:terminate_child(couch_secondary_services, query_servers),
+    supervisor:restart_child(couch_secondary_services, query_servers);
+config_change("native_query_servers") ->
+    supervisor:terminate_child(couch_secondary_services, query_servers),
+    supervisor:restart_child(couch_secondary_services, query_servers).
 
 % Private API
 

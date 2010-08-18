@@ -94,7 +94,12 @@ init(StatDescsFileName) ->
     ets:new(?MODULE, [named_table, set, protected]),
     SampleStr = couch_config:get("stats", "samples", "[0]"),
     {ok, Samples} = couch_util:parse_term(SampleStr),
-    {ok, Descs} = file:consult(StatDescsFileName),
+    case file:consult(StatDescsFileName) of
+    {ok, Descs} ->
+        ok;
+    {error, _} ->
+        Descs = []
+    end,
     lists:foreach(fun({Sect, Key, Value}) ->
         lists:foreach(fun(Secs) ->
             Agg = #aggregate{

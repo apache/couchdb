@@ -13,12 +13,13 @@
 -module(couch_changes).
 -include("couch_db.hrl").
 
--export([handle_changes/3]).
+-export([handle_changes/3, get_changes_timeout/2, main_only_filter/1,
+    all_docs_filter/1, wait_db_updated/2, get_rest_db_updated/0,
+    make_filter_fun/4]).
 
-%% @type Req -> #httpd{} | {json_req, JsonObj()}
-handle_changes(#changes_args{style=Style}=Args1, Req, Db) ->
-    Args = Args1#changes_args{filter=
-            make_filter_fun(Args1#changes_args.filter, Style, Req, Db)},
+%% @spec handle_changes(#changes_args{}, #httpd{} | {json_req, {[any()]}}, #db{}) -> any()
+handle_changes(#changes_args{filter=Raw, style=Style}=Args1, Req, Db) ->
+    Args = Args1#changes_args{filter=make_filter_fun(Raw, Style, Req, Db)},
     StartSeq = case Args#changes_args.dir of
     rev ->
         couch_db:get_update_seq(Db);
@@ -68,20 +69,12 @@ handle_changes(#changes_args{style=Style}=Args1, Req, Db) ->
         end
     end.
 
-%% @type Req -> #httpd{} | {json_req, JsonObj()}
-make_filter_fun(FilterName, Style, Req, Db) ->
-    case [list_to_binary(couch_httpd:unquote(Part))
-            || Part <- string:tokens(FilterName, "/")] of
+%% @spec make_filter_fun(string(), main_only|all_docs, #httpd{} | {json_req,
+%%      {[any()]}}, #db{}) -> fun()
+make_filter_fun(Filter, Style, Req, Db) when is_list(Filter) ->
+    case [?l2b(couch_httpd:unquote(X)) || X <- string:tokens(Filter, "/")] of
     [] ->
-        fun(#doc_info{revs=[#rev_info{rev=Rev}|_]=Revs}) ->
-            case Style of
-            main_only ->
-                [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]}];
-            all_docs ->
-                [{[{<<"rev">>, couch_doc:rev_to_str(R)}]}
-                        || #rev_info{rev=R} <- Revs]
-            end
-        end;
+        make_filter_fun(nil, Style, Req, Db);
     [DName, FName] ->
         DesignId = <<"_design/", DName/binary>>,
         DDoc = couch_httpd_db:couch_doc_open(Db, DesignId, nil, []),
@@ -105,11 +98,21 @@ make_filter_fun(FilterName, Style, Req, Db) ->
             [{[{<<"rev">>, couch_doc:rev_to_str({RevPos,RevId})}]}
                 || {Pass, #doc{revs={RevPos,[RevId|_]}}}
                 <- lists:zip(Passes, Docs), Pass == true]
-        end;
+            end;
     _Else ->
         throw({bad_request,
             "filter parameter must be of the form `designname/filtername`"})
-    end.
+    end;
+make_filter_fun(_, main_only, _, _) ->
+    fun ?MODULE:main_only_filter/1;
+make_filter_fun(_, all_docs, _, _) ->
+    fun ?MODULE:all_docs_filter/1.
+
+main_only_filter(#doc_info{revs=[#rev_info{rev=Rev}|_]}) ->
+    [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]}].
+
+all_docs_filter(#doc_info{revs=Revs}) ->
+    [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]} || #rev_info{rev=Rev} <- Revs].
 
 get_changes_timeout(Args, Callback) ->
     #changes_args{
@@ -205,8 +208,8 @@ end_sending_changes(Callback, EndSeq, ResponseType) ->
 changes_enumerator(DocInfo, {Db, _, _, FilterFun, Callback, "continuous",
     Limit, IncludeDocs}) ->
 
-    #doc_info{id=Id, high_seq=Seq,
-            revs=[#rev_info{deleted=Del,rev=Rev}|_]} = DocInfo,
+    #doc_info{id=Id, high_seq=Seq, revs=[#rev_info{deleted=Del,rev=Rev}|_]}
+        = DocInfo,
     Results0 = FilterFun(DocInfo),
     Results = [Result || Result <- Results0, Result /= null],
     Go = if Limit =< 1 -> stop; true -> ok end,

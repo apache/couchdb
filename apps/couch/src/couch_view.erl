@@ -17,7 +17,8 @@
     detuple_kvs/2,init/1,terminate/2,handle_call/3,handle_cast/2,handle_info/2,
     code_change/3,get_reduce_view/4,get_temp_reduce_view/5,get_temp_map_view/4,
     get_map_view/4,get_row_count/1,reduce_to_count/1,fold_reduce/4,
-    extract_map_view/1,get_group_server/2,get_group_info/2,cleanup_index_files/1]).
+    extract_map_view/1,get_group_server/2,get_group_info/2,
+    cleanup_index_files/1,config_change/2]).
 
 -include("couch_db.hrl").
 
@@ -249,11 +250,7 @@ fold(#view{btree=Btree}, Fun, Acc, Options) ->
 init([]) ->
     % read configuration settings and register for configuration changes
     RootDir = couch_config:get("couchdb", "view_index_dir"),
-    Self = self(),
-    ok = couch_config:register(
-        fun("couchdb", "view_index_dir")->
-            exit(Self, config_change)
-        end),
+    ok = couch_config:register(fun ?MODULE:config_change/2),
 
     couch_db_update_notifier:start_link(
         fun({deleted, DbName}) ->
@@ -334,6 +331,9 @@ handle_info({'EXIT', FromPid, Reason}, Server) ->
         delete_from_ets(FromPid, DbName, GroupId)
     end,
     {noreply, Server}.
+
+config_change("couchdb", "view_index_dir") ->
+    exit(whereis(couch_view), config_change).
 
 add_to_ets(Pid, DbName, Sig) ->
     true = ets:insert(couch_groups_by_updater, {Pid, {DbName, Sig}}),

@@ -78,7 +78,6 @@ receive_data(Ref, ReqId, ContentEncoding) ->
         ?LOG_ERROR("streaming attachment ~p failed with ~p", [ReqId, Err]),
         throw({attachment_request_failed, Err});
     {ibrowse_async_response, ReqId, Data} ->
-        % ?LOG_DEBUG("got ~p bytes for ~p", [size(Data), ReqId]),
         Data;
     {ibrowse_async_response_end, ReqId} ->
         ?LOG_ERROR("streaming att. ended but more data requested ~p", [ReqId]),

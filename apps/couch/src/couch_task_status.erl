@@ -107,7 +107,6 @@ handle_call(all, _, Server) ->
 
 handle_cast({update_status, Pid, StatusText}, Server) ->
     [{Pid, {Type, TaskName, _StatusText}}] = ets:lookup(?MODULE, Pid),
-    ?LOG_DEBUG("New task status for ~s: ~s",[TaskName, StatusText]),
     true = ets:insert(?MODULE, {Pid, {Type, TaskName, StatusText}}),
     {noreply, Server};
 handle_cast(stop, State) ->

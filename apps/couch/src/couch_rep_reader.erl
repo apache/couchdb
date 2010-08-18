@@ -20,7 +20,7 @@
 -import(couch_util, [url_encode/1]).
 
 -define (BUFFER_SIZE, 1000).
--define (MAX_CONCURRENT_REQUESTS, 100).
+-define (MAX_CONCURRENT_REQUESTS, 10).
 -define (MAX_CONNECTIONS, 20).
 -define (MAX_PIPELINE_SIZE, 50).
 

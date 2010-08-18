@@ -36,15 +36,20 @@ compact_group(Group, EmptyGroup) ->
     } = Group,
 
     #group{
-        db = Db,
+        dbname = DbName,
+        fd = Fd,
         id_btree = EmptyIdBtree,
+        sig = Sig,
         views = EmptyViews
     } = EmptyGroup,
 
-    {ok, {Count, _}} = couch_btree:full_reduce(Db#db.fulldocinfo_by_id_btree),
+    erlang:monitor(process, Fd),
+
+    {ok, Db} = couch_db:open(DbName, []),
+
+    {ok, {Count, _}} = couch_btree:full_reduce(Db#db.id_tree),
 
     <<"_design", ShortName/binary>> = GroupId,
-    DbName = couch_db:name(Db),
     TaskName = <<DbName/binary, ShortName/binary>>,
     couch_task_status:add_task(<<"View Group Compaction">>, TaskName, <<"">>),
 
@@ -72,10 +77,10 @@ compact_group(Group, EmptyGroup) ->
         current_seq=Seq
     },
 
-    Pid = couch_view:get_group_server(DbName, GroupId),
+    Pid = ets:lookup_element(group_servers_by_sig, {DbName, Sig}, 2),
     gen_server:cast(Pid, {compact_done, NewGroup}).
 
-%% @spec compact_view(View, EmptyView, Retry) -> CompactView
+%% @spec compact_view(View, EmptyView) -> CompactView
 compact_view(View, EmptyView) ->
     {ok, Count} = couch_view:get_row_count(View),
 

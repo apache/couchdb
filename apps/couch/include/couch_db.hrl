@@ -142,9 +142,9 @@
     {disk_version = ?LATEST_DISK_VERSION,
      update_seq = 0,
      unused = 0,
-     fulldocinfo_by_id_btree_state = nil,
-     docinfo_by_seq_btree_state = nil,
-     local_docs_btree_state = nil,
+     id_tree_state = nil,
+     seq_tree_state = nil,
+     local_tree_state = nil,
      purge_seq = 0,
      purged_docs = nil,
      security_ptr = nil,
@@ -157,12 +157,12 @@
     compactor_pid = nil,
     instance_start_time, % number of microsecs since jan 1 1970 as a binary string
     fd,
-    fd_ref_counter,
+    fd_monitor,
     header = #db_header{},
     committed_update_seq,
-    fulldocinfo_by_id_btree,
-    docinfo_by_seq_btree,
-    local_docs_btree,
+    id_tree,
+    seq_tree,
+    local_tree,
     update_seq,
     name,
     filepath,
@@ -196,7 +196,9 @@
     stale = false,
     multi_get = false,
     callback = nil,
-    list = nil
+    list = nil,
+    keys = nil,
+    sorted = true
 }).
 
 -record(view_fold_helper_funs, {
@@ -221,7 +223,7 @@
 
 -record(group, {
     sig=nil,
-    db=nil,
+    dbname,
     fd=nil,
     name,
     def_lang,

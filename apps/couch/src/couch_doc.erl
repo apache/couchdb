@@ -334,6 +334,8 @@ att_to_bin(#att{data=DataFun, att_len=Len}) when is_function(DataFun)->
         ))
     ).
 
+get_validate_doc_fun({Props}) ->
+    get_validate_doc_fun(couch_doc:from_json_obj({Props}));
 get_validate_doc_fun(#doc{body={Props}}=DDoc) ->
     case couch_util:get_value(<<"validate_doc_update">>, Props) of
     undefined ->
@@ -364,7 +366,7 @@ merge_stubs(#doc{id=Id,atts=MemBins}=StubsDoc, #doc{atts=DiskBins}) ->
                 DiskAtt;
             _ ->
                 throw({missing_stub,
-                        <<"id:", Id/binary, ", name:", Name/binary>>})
+                    <<"Invalid attachment stub in ", Id/binary, " for ", Name/binary>>})
             end;
         (Att) ->
             Att
@@ -453,15 +455,11 @@ doc_from_multi_part_stream(ContentType, DataFun) ->
     receive 
     {doc_bytes, DocBytes} ->
         Doc = from_json_obj(?JSON_DECODE(DocBytes)),
-        % go through the attachments looking for 'follows' in the data,
-        % replace with function that reads the data from MIME stream.
-        ReadAttachmentDataFun = fun() ->
-            Parser ! {get_bytes, self()},
-            receive {bytes, Bytes} -> Bytes end
-        end,
+        % we'll send the Parser process ID to the remote nodes so they can
+        % retrieve their own copies of the attachment data
         Atts2 = lists:map(
             fun(#att{data=follows}=A) ->
-                A#att{data=ReadAttachmentDataFun};
+                A#att{data={follows, Parser}};
             (A) ->
                 A
             end, Doc#doc.atts),
@@ -484,25 +482,75 @@ mp_parse_doc(body_end, AccBytes) ->
         From ! {doc_bytes, lists:reverse(AccBytes)}
     end,
     fun (Next) ->
-        mp_parse_atts(Next)
+        mp_parse_atts(Next, {[], 0, orddict:new(), []})
     end.
 
-mp_parse_atts(eof) ->
-    ok;
-mp_parse_atts({headers, _H}) ->
-    fun (Next) ->
-        mp_parse_atts(Next)
-    end;
-mp_parse_atts({body, Bytes}) ->
+mp_parse_atts({headers, _}, Acc) ->
+    fun(Next) -> mp_parse_atts(Next, Acc) end;
+mp_parse_atts(body_end, Acc) ->
+    fun(Next) -> mp_parse_atts(Next, Acc) end;
+mp_parse_atts({body, Bytes}, {DataList, Offset, Counters, Waiting}) ->
+    NewAcc = maybe_send_data({DataList++[Bytes], Offset, Counters, Waiting}),
+    fun(Next) -> mp_parse_atts(Next, NewAcc) end;
+mp_parse_atts(eof, {DataList, Offset, Counters, Waiting}) ->
+    N = list_to_integer(couch_config:get("cluster", "n", "3")),
+    M = length(Counters),
+    case (M == N) andalso DataList == [] of
+    true ->
+        ok;
+    false ->
+        receive {get_bytes, From} ->
+            C2 = orddict:update_counter(From, 1, Counters),
+            NewAcc = maybe_send_data({DataList, Offset, C2, [From|Waiting]}),
+            mp_parse_atts(eof, NewAcc)
+        after 3600000 ->
+            ok
+        end
+    end.
+
+maybe_send_data({ChunkList, Offset, Counters, Waiting}) ->
     receive {get_bytes, From} ->
-        From ! {bytes, Bytes}
-    end,
-    fun (Next) ->
-        mp_parse_atts(Next)
-    end;
-mp_parse_atts(body_end) ->
-    fun (Next) ->
-        mp_parse_atts(Next)
+        NewCounters = orddict:update_counter(From, 1, Counters),
+        maybe_send_data({ChunkList, Offset, NewCounters, [From|Waiting]})
+    after 0 ->
+        % reply to as many writers as possible
+        NewWaiting = lists:filter(fun(Writer) ->
+            WhichChunk = orddict:fetch(Writer, Counters),
+            ListIndex = WhichChunk - Offset,
+            if ListIndex =< length(ChunkList) ->
+                Writer ! {bytes, lists:nth(ListIndex, ChunkList)},
+                false;
+            true ->
+                true
+            end
+        end, Waiting),
+
+        % check if we can drop a chunk from the head of the list
+        case Counters of
+        [] ->
+            SmallestIndex = 0;
+        _ ->
+            SmallestIndex = lists:min(element(2, lists:unzip(Counters)))
+        end,
+        Size = length(Counters),
+        N = list_to_integer(couch_config:get("cluster", "n", "3")),
+        if Size == N andalso SmallestIndex == (Offset+1) ->
+            NewChunkList = tl(ChunkList),
+            NewOffset = Offset+1;
+        true ->
+            NewChunkList = ChunkList,
+            NewOffset = Offset
+        end,
+
+        % we should wait for a writer if no one has written the last chunk
+        LargestIndex = lists:max([0|element(2, lists:unzip(Counters))]),
+        if LargestIndex  >= (Offset + length(ChunkList)) ->
+            % someone has written all possible chunks, keep moving
+            {NewChunkList, NewOffset, Counters, NewWaiting};
+        true ->
+            receive {get_bytes, X} ->
+                C2 = orddict:update_counter(X, 1, Counters),
+                maybe_send_data({NewChunkList, NewOffset, C2, [X|NewWaiting]})
+            end
+        end
     end.
-
-
