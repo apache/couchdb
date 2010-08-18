@@ -103,7 +103,7 @@ send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn) ->
         limit = ChangesArgs#changes_args.limit,
         rows = Seqs % store sequence positions instead
     },
-    try fabric_util:receive_loop(Workers, #shard.ref, fun handle_message/3,
+    try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3,
             State, infinity, 5000)
     after
         fabric_util:cleanup(Workers)
@@ -221,7 +221,7 @@ unpack_seqs(0, DbName) ->
 
 unpack_seqs("0", DbName) ->
     fabric_dict:init(mem3:shards(DbName), 0);
-    
+
 unpack_seqs(Packed, DbName) ->
     {match, [Opaque]} = re:run(Packed, "^([0-9]+-)?(?<opaque>.*)", [{capture,
         [opaque], binary}]),
