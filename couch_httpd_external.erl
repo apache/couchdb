@@ -73,7 +73,8 @@ json_req_obj(#httpd{mochi_req=Req,
     Headers = Req:get(headers),
     Hlist = mochiweb_headers:to_list(Headers),
     {ok, Info} = couch_db:get_db_info(Db),
-    % add headers...
+    
+% add headers...
     {[{<<"info">>, {Info}},
         {<<"id">>, DocId},
         {<<"uuid">>, couch_uuids:new()},
@@ -86,7 +87,8 @@ json_req_obj(#httpd{mochi_req=Req,
         {<<"peer">>, ?l2b(Req:get(peer))},
         {<<"form">>, to_json_terms(ParsedForm)},
         {<<"cookie">>, to_json_terms(Req:parse_cookie())},
-        {<<"userCtx">>, couch_util:json_user_ctx(Db)}]}.
+        {<<"userCtx">>, couch_util:json_user_ctx(Db)},
+        {<<"secObj">>, couch_db:get_security(Db)}]}.
 
 to_json_terms(Data) ->
     to_json_terms(Data, []).
