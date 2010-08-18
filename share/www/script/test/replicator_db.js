@@ -214,6 +214,18 @@ couchTests.replicator_db = function(debug) {
     waitForSeq(dbA, dbB);
     var ddoc_copy = dbB.open("_design/foobar");
     T(ddoc_copy !== null);
+    T(ddoc.language === "javascript");
+
+    // update the design doc on source, test that the new revision is replicated
+    ddoc.language = "erlang";
+    T(dbA.save(ddoc).ok);
+    T(ddoc._rev.indexOf("2-") === 0);
+
+    waitForSeq(dbA, dbB);
+    ddoc_copy = dbB.open("_design/foobar");
+    T(ddoc_copy !== null);
+    T(ddoc_copy._rev === ddoc._rev);
+    T(ddoc.language === "erlang");
 
     // stop replication by deleting the replication document
     T(repDb.deleteDoc(repDoc1).ok);
