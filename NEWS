@@ -17,7 +17,7 @@ Version 1.0.1
 
   * Fix data corruption bug COUCHDB-844. Please see
     http://couchdb.apache.org/notice/1.0.1.html for details.
-  * Added support for replication via an HTTP/HTTP proxy.
+  * Added support for replication via an HTTP/HTTPS proxy.
   * Fixed various replicator bugs for interop with older CouchDB versions.
   * Show fields saved along with _deleted=true. Allows for auditing of deletes.
   * Enable basic-auth popup when required to access the server, to prevent
