@@ -242,6 +242,7 @@ handle_call({open_result, DbName, {ok, Db}}, _From, Server) ->
     [#db{compactor_pid=Froms}] = ets:lookup(couch_dbs, DbName),
     [gen_server:reply(From, {ok, Db}) || From <- Froms],
     true = ets:insert(couch_dbs, Db),
+    true = ets:insert(couch_lru, {DbName, now()}),
     {reply, ok, Server};
 handle_call({open_result, DbName, Error}, _From, Server) ->
     % icky hack of field values - compactor_pid used to store clients
@@ -331,7 +332,8 @@ handle_call({delete, DbName, _Options}, _From, Server) ->
         {reply, Error, Server}
     end;
 handle_call({db_updated, Db}, _From, Server) ->
-    ets:insert(couch_dbs, Db),
+    true = ets:insert(couch_dbs, Db),
+    true = ets:insert(couch_lru, {DbName, now()}),
     {reply, ok, Server}.
 
 
