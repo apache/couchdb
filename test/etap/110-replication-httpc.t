@@ -19,7 +19,7 @@
     auth = [],
     resource = "",
     headers = [
-        {"User-Agent", "CouchDB/"++couch_server:get_version()},
+        {"User-Agent", "CouchDB/"++couch:version()},
         {"Accept", "application/json"},
         {"Accept-Encoding", "gzip"}
     ],
@@ -79,7 +79,7 @@ test_welcome() ->
     WelcomeReq = #http_db{url=server()},
     Expect = {[
         {<<"couchdb">>, <<"Welcome">>},
-        {<<"version">>, list_to_binary(couch_server:get_version())}
+        {<<"version">>, list_to_binary(couch:version())}
     ]},
     etap:is(
         couch_rep_httpc:request(WelcomeReq),
@@ -91,7 +91,7 @@ test_binary_url() ->
     Req = #http_db{url=list_to_binary(server())},
     Expect = {[
         {<<"couchdb">>, <<"Welcome">>},
-        {<<"version">>, list_to_binary(couch_server:get_version())}
+        {<<"version">>, list_to_binary(couch:version())}
     ]},
     etap:is(
         couch_rep_httpc:request(Req),

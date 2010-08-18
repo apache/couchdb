@@ -14,7 +14,7 @@
 -behaviour(gen_server).
 
 -export([open/2,create/2,delete/2,all_databases/0,all_databases/1]).
--export([init/1, handle_call/3,sup_start_link/0,get_version/0]).
+-export([init/1, handle_call/3,sup_start_link/0]).
 -export([handle_cast/2,code_change/3,handle_info/2,terminate/2]).
 -export([dev_start/0,is_admin/2,has_admins/0,get_stats/0,config_change/4]).
 -export([close_lru/0]).
@@ -33,15 +33,6 @@ dev_start() ->
     couch:stop(),
     up_to_date = make:all([load, debug_info]),
     couch:start().
-
-get_version() ->
-    Apps = application:loaded_applications(),
-    case lists:keysearch(couch, 1, Apps) of
-    {value, {_, _, Vsn}} ->
-        Vsn;
-    false ->
-        "0.0.0"
-    end.
 
 get_stats() ->
     {ok, #server{start_time=Time,dbs_open=Open}} =

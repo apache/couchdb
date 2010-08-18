@@ -837,7 +837,7 @@ negotiate_content_type(#httpd{mochi_req=MochiReq}) ->
 
 server_header() ->
     OTPVersion = "R" ++ integer_to_list(erlang:system_info(compat_rel)) ++ "B",
-    [{"Server", "CouchDB/" ++ couch_server:get_version() ++
+    [{"Server", "CouchDB/" ++ couch:version() ++
                 " (Erlang OTP/" ++ OTPVersion ++ ")"}].
 
 

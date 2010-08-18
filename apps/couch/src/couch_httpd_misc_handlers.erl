@@ -32,7 +32,7 @@
 handle_welcome_req(#httpd{method='GET'}=Req, WelcomeMessage) ->
     send_json(Req, {[
         {couchdb, WelcomeMessage},
-        {version, list_to_binary(couch_server:get_version())}
+        {version, list_to_binary(couch:version())}
     ]});
 handle_welcome_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").

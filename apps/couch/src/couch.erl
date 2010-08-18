@@ -37,3 +37,7 @@ reload() ->
     {error, Reason} ->
         {error, Reason}
     end.
+
+version() ->
+    {ok, FullVersion} = application:get_key(couch, vsn),
+    hd(string:tokens(FullVersion, "-")).
