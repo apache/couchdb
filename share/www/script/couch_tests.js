@@ -36,6 +36,7 @@ loadTest("attachments.js");
 loadTest("attachments_multipart.js");
 loadTest("attachment_names.js");
 loadTest("attachment_paths.js");
+loadTest("attachment_ranges.js");
 loadTest("attachment_views.js");
 loadTest("auth_cache.js");
 loadTest("batch_save.js");

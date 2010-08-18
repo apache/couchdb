@@ -702,6 +702,8 @@ error_info(file_exists) ->
         "created, the file already exists.">>};
 error_info({bad_ctype, Reason}) ->
     {415, <<"bad_content_type">>, Reason};
+error_info(requested_range_not_satisfiable) ->
+    {416, <<"requested_range_not_satisfiable">>, <<"Requested range not satisfiable">>};
 error_info({error, illegal_database_name}) ->
     {400, <<"illegal_database_name">>, <<"Only lowercase characters (a-z), "
         "digits (0-9), and any of the characters _, $, (, ), +, -, and / "

@@ -43,7 +43,7 @@ test() ->
         "Writing an empty binary does nothing."),
 
     {Ptrs, Length, _, _, _} = couch_stream:close(Stream),
-    etap:is(Ptrs, [0], "Close returns the file pointers."),
+    etap:is(Ptrs, [{0, 8}], "Close returns the file pointers."),
     etap:is(Length, 8, "Close also returns the number of bytes written."),
     etap:is(<<"foodfoob">>, read_all(Fd, Ptrs), "Returned pointers are valid."),
 
@@ -59,7 +59,7 @@ test() ->
         "Successfully wrote 80 0 bits."),
 
     {Ptrs2, Length2, _, _, _} = couch_stream:close(Stream2),
-    etap:is(Ptrs2, [ExpPtr], "Closing stream returns the file pointers."),
+    etap:is(Ptrs2, [{ExpPtr, 20}], "Closing stream returns the file pointers."),
     etap:is(Length2, 20, "Length written is 160 bytes."),
 
     AllBits = iolist_to_binary([OneBits,ZeroBits]),
@@ -80,7 +80,7 @@ test() ->
     % + 4 bytes for the term_to_binary adding a length header
     % + 1 byte every 4K for tail append headers
     SecondPtr = ExpPtr2 + 4095 + 5 + 4 + 1,
-    etap:is(Ptrs3, [ExpPtr2, SecondPtr], "Pointers every 4K bytes."),
+    etap:is(Ptrs3, [{ExpPtr2, 4100}, {SecondPtr, 1020}], "Pointers every 4K bytes."),
     etap:is(Length3, 5120, "Wrote the expected 5K bytes."),
 
     couch_file:close(Fd),

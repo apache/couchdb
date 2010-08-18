@@ -20,7 +20,7 @@
 
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
-    start_json_response/2,start_json_response/3,
+    send_response/4,start_json_response/2,start_json_response/3,
     send_chunk/2,last_chunk/1,end_json_response/1,
     start_chunked_response/3, absolute_uri/2, send/2,
     start_response_length/4]).
@@ -862,7 +862,7 @@ couch_doc_open(Db, DocId, Rev, Options) ->
 
 % Attachment request handlers
 
-db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
+db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNameParts) ->
     FileName = list_to_binary(mochiweb_util:join(lists:map(fun binary_to_list/1, FileNameParts),"/")),
     #doc_query_args{
         rev=Rev,
@@ -925,8 +925,46 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
                     AttFun(Att, fun(Seg, _) -> send_chunk(Resp, Seg) end, {ok, Resp}),
                     last_chunk(Resp);
                 _ ->
-                    {ok, Resp} = start_response_length(Req, 200, Headers, Len),
-                    AttFun(Att, fun(Seg, _) -> send(Resp, Seg) end, {ok, Resp})
+                    #att{data={_,StreamInfo}} = Att, %% layering violation
+                    SupportsRange = case StreamInfo of
+                        [{_,_}|_] -> true;
+                        _ -> false
+                    end,
+                    Ranges = MochiReq:get(range),
+                    HasSingleRange = case Ranges of
+                        [_] -> true;
+                        _ -> false
+                    end,
+                    Headers1 = case SupportsRange of
+                        false ->[{<<"Accept-Ranges">>, <<"none">>}] ++ Headers;
+                        true -> [{<<"Accept-Ranges">>, <<"bytes">>}] ++ Headers
+                    end,
+                    if
+                        Enc == identity andalso SupportsRange == true andalso HasSingleRange == true ->
+                            [{From, To}] = Ranges,
+                            {From1, To1} = case {From, To} of
+                                {none, To} ->
+                                    {Len - To - 1, Len - 1};
+                                {From, none} ->
+                                    {From, Len - 1};
+                                _ ->
+                                    {From, To}
+                            end,
+                            if
+                                From < 0 orelse To1 >= Len ->
+                                    throw(requested_range_not_satisfiable);
+                                true ->
+                                    ok
+                            end,
+                            Headers2 = [{<<"Content-Range">>,
+                                ?l2b(io_lib:format("bytes ~B-~B/~B", [From1, To1, Len]))}]
+                                ++ Headers1,
+                            {ok, Resp} = start_response_length(Req, 206, Headers2, To1 - From1 + 1),
+                            couch_doc:range_att_foldl(Att, From1, To1 + 1, fun(Seg, _) -> send(Resp, Seg) end, {ok, Resp});
+                        true ->
+                            {ok, Resp} = start_response_length(Req, 200, Headers1, Len),
+                            AttFun(Att, fun(Seg, _) -> send(Resp, Seg) end, {ok, Resp})
+                    end
                 end
             end
         )
