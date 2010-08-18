@@ -11,7 +11,7 @@ Storage System:
 
 Replicator:
 
-  * Added support for replication via an HTTP/HTTP proxy.
+  * Added support for replication via an HTTP/HTTPS proxy.
   * Fix pull replication of attachments from 0.11 to 1.0.x.
   * Make the _changes feed work with non-integer seqnums.
 
