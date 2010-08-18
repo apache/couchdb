@@ -44,7 +44,13 @@ go(DbName, AllDocs, Opts) ->
 handle_message({rexi_DOWN, _, _, _}, _Worker, Acc0) ->
     skip_message(Acc0);
 handle_message({rexi_EXIT, _}, _Worker, Acc0) ->
-    skip_message(Acc0);
+    {WaitingCount, _, W, _, DocReplyDict} = Acc0,
+    if WaitingCount =:= 1 ->
+        {W, Reply} = dict:fold(fun force_reply/3, {W,[]}, DocReplyDict),
+        {stop, Reply};
+    true ->
+        {ok, setelement(1, Acc0, WaitingCount-1)}
+    end;
 handle_message({ok, Replies}, Worker, Acc0) ->
     {WaitingCount, DocCount, W, GroupedDocs, DocReplyDict0} = Acc0,
     Docs = couch_util:get_value(Worker, GroupedDocs),
