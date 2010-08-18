@@ -23,7 +23,7 @@
     send_chunked_error/2]).
 
 design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
-    Group = couch_view_group:design_doc_to_view_group(Db, DDoc),
+    Group = couch_view_group:design_doc_to_view_group(DDoc),
     IsReduce = get_reduce_type(Req),
     ViewType = extract_view_type(ViewName, Group#group.views, IsReduce),
     QueryArgs = parse_view_params(Req, Keys, ViewType),
