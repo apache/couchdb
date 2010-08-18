@@ -51,6 +51,10 @@ view_callback({row, Row}, {nil, Resp}) ->
 view_callback({row, Row}, {Prepend, Resp}) ->
     send_chunk(Resp, [Prepend, ?JSON_ENCODE(Row)]),
     {ok, {",\r\n", Resp}};
+view_callback(complete, {nil, Resp}) ->
+    send_chunk(Resp, "{\"rows\":[]}"),
+    end_json_response(Resp),
+    {ok, Resp};
 view_callback(complete, {_, Resp}) ->
     send_chunk(Resp, "\r\n]}"),
     end_json_response(Resp),
