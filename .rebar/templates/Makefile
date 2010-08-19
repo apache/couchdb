@@ -8,7 +8,7 @@ clean:
 
 check: compile
 	@ERL_LIBS="`pwd`/apps" ./rebar eunit
-	@ERL_LIBS="`pwd`/apps" prove apps/couch/test/*.t
+	@ERL_LIBS="`pwd`/apps" prove apps/couch/test/etap/*.t
 
 compilenative:
 	@./rebar compile erl_opts=native
