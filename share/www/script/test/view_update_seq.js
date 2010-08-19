@@ -79,6 +79,17 @@ couchTests.view_update_seq = function(debug) {
   T(resp.rows.length == 1);
   T(resp.update_seq == 101);
 
+  // wait 5 seconds for the next assertions to pass in very slow machines
+  var t0 = new Date(), t1;
+  do {
+    CouchDB.request("GET", "/");
+    t1 = new Date();
+  } while ((t1 - t0) < 5000);
+
+  resp = db.view('test/all_docs', {limit: 1, stale: "ok", update_seq: true});
+  T(resp.rows.length == 1);
+  T(resp.update_seq == 103);
+
   resp = db.view('test/all_docs', {limit: 1, update_seq:true});
   T(resp.rows.length == 1);
   T(resp.update_seq == 103);
