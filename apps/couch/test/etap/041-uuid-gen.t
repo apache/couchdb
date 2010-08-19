@@ -13,17 +13,15 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-default_config() ->
-    test_util:build_file("etc/couchdb/default_dev.ini").
-
 seq_alg_config() ->
-    test_util:source_file("test/etap/041-uuid-gen-seq.ini").
+    filename:join([code:lib_dir(couch, test), "etap/041-uuid-gen-seq.ini"]).
 
 utc_alg_config() ->
-    test_util:source_file("test/etap/041-uuid-gen-utc.ini").
+    filename:join([code:lib_dir(couch, test), "etap/041-uuid-gen-utc.ini"]).
 
 % Run tests and wait for the gen_servers to shutdown
 run_test(IniFiles, Test) ->
+    couch_config_event:start_link(),
     {ok, Pid} = couch_config:start_link(IniFiles),
     erlang:monitor(process, Pid),
     couch_uuids:start(),
@@ -40,7 +38,7 @@ run_test(IniFiles, Test) ->
 main(_) ->
     test_util:init_code_path(),
     application:start(crypto),
-    etap:plan(6),
+    etap:plan(5),
 
     case (catch test()) of
         ok ->
@@ -60,9 +58,9 @@ test() ->
             "Can generate 10K unique IDs"
         )
     end,
-    run_test([default_config()], TestUnique),
-    run_test([default_config(), seq_alg_config()], TestUnique),
-    run_test([default_config(), utc_alg_config()], TestUnique),
+    %run_test([default_config()], TestUnique),
+    run_test([seq_alg_config()], TestUnique),
+    run_test([utc_alg_config()], TestUnique),
 
     TestMonotonic = fun () ->
         etap:is(
@@ -71,8 +69,8 @@ test() ->
             "should produce monotonically increasing ids"
         )
     end,
-    run_test([default_config(), seq_alg_config()], TestMonotonic),
-    run_test([default_config(), utc_alg_config()], TestMonotonic),
+    run_test([seq_alg_config()], TestMonotonic),
+    run_test([utc_alg_config()], TestMonotonic),
 
     % Pretty sure that the average of a uniform distribution is the
     % midpoint of the range. Thus, to exceed a threshold, we need
@@ -87,14 +85,14 @@ test() ->
         UUID = binary_to_list(couch_uuids:new()),
         Prefix = element(1, lists:split(26, UUID)),
         N = gen_until_pref_change(Prefix,0),
-        etap:diag("N is: ~p~n",[N]),                           
+        etap:diag("N is: ~p~n",[N]),
         etap:is(
             N >= 5000 andalso N =< 11000,
             true,
             "should roll over every so often."
         )
     end,
-    run_test([default_config(), seq_alg_config()], TestRollOver).
+    run_test([seq_alg_config()], TestRollOver).
 
 test_unique(0, _) ->
     true;

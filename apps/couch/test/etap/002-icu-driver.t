@@ -16,7 +16,7 @@ main(_) ->
     test_util:init_code_path(),
     etap:plan(3),
     etap:is(
-        couch_util:start_driver("src/couchdb/priv/.libs"),
+        erl_ddll:load(code:priv_dir(couch), "couch_icu_driver"),
         ok,
         "Started couch_icu_driver."
     ),

@@ -14,7 +14,7 @@
 % the License.
 
 default_config() ->
-    test_util:build_file("etc/couchdb/default_dev.ini").
+    filename:join([code:lib_dir(couch, test), "etap/082-config-default.ini"]).
 
 main(_) ->
     test_util:init_code_path(),
@@ -29,6 +29,7 @@ main(_) ->
     ok.
 
 test() ->
+    couch_config_event:start_link(),
     couch_config:start_link([default_config()]),
 
     etap:is(

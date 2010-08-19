@@ -21,6 +21,7 @@ rows() -> 250.
 
 main(_) ->
     test_util:init_code_path(),
+    couch_config:start_link([]),
     etap:plan(48),
     case (catch test()) of
         ok ->

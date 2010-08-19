@@ -22,9 +22,9 @@ builddir() ->
     "@abs_top_builddir@".
 
 init_code_path() ->
-    Paths = ["etap", "couchdb", "erlang-oauth", "ibrowse", "mochiweb"],
+    Paths = ["etap", "couch", "oauth", "ibrowse", "mochiweb"],
     lists:foreach(fun(Name) ->
-        code:add_pathz(filename:join([builddir(), "src", Name]))
+        code:add_pathz(filename:join([builddir(), "ebin", Name]))
     end, Paths).
 
 source_file(Name) ->
@@ -32,4 +32,3 @@ source_file(Name) ->
 
 build_file(Name) ->
     filename:join([builddir(), Name]).
-

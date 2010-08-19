@@ -14,7 +14,7 @@
 % the License.
 
 default_config() ->
-    test_util:build_file("etc/couchdb/default_dev.ini").
+    "rel/overlay/etc/default.ini".
 
 main(_) ->
     test_util:init_code_path(),
@@ -29,6 +29,7 @@ main(_) ->
     ok.
 
 test() ->
+    couch_config_event:start_link(),
     couch_config:start_link([]),
 
     etap:fun_is(

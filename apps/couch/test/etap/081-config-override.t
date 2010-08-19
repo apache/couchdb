@@ -14,19 +14,20 @@
 % the License.
 
 default_config() ->
-    test_util:build_file("etc/couchdb/default_dev.ini").
+    filename:join([code:lib_dir(couch, test),"etap/081-config-default.ini"]).
 
 local_config_1() ->
-    test_util:source_file("test/etap/081-config-override.1.ini").
+    filename:join([code:lib_dir(couch, test),"etap/081-config-override.1.ini"]).
 
 local_config_2() ->
-    test_util:source_file("test/etap/081-config-override.2.ini").
+    filename:join([code:lib_dir(couch, test),"etap/081-config-override.2.ini"]).
 
 local_config_write() ->
     test_util:build_file("test/etap/temp.081").
 
 % Run tests and wait for the config gen_server to shutdown.
 run_tests(IniFiles, Tests) ->
+    couch_config_event:start_link(),
     {ok, Pid} = couch_config:start_link(IniFiles),
     erlang:monitor(process, Pid),
     Tests(),

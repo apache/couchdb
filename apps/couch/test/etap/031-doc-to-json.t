@@ -20,9 +20,6 @@
 -record(att, {name, type, att_len, disk_len, md5= <<>>, revpos=0, data,
             encoding=identity}).
 
-default_config() ->
-    test_util:build_file("etc/couchdb/default_dev.ini").
-
 main(_) ->
     test_util:init_code_path(),
     etap:plan(12),
@@ -36,8 +33,6 @@ main(_) ->
     ok.
 
 test() ->
-    couch_config:start_link([default_config()]),
-    couch_config:set("attachments", "compression_level", "0"),
     ok = test_to_json_success(),
     ok.
 
@@ -118,16 +113,16 @@ test_to_json_success() ->
         {
             #doc{atts=[
                 #att{
-                    name = <<"big.xml">>, 
-                    type = <<"xml/sucks">>, 
+                    name = <<"big.xml">>,
+                    type = <<"xml/sucks">>,
                     data = fun() -> ok end,
                     revpos = 1,
                     att_len = 400,
                     disk_len = 400
                 },
                 #att{
-                    name = <<"fast.json">>, 
-                    type = <<"json/ftw">>, 
+                    name = <<"fast.json">>,
+                    type = <<"json/ftw">>,
                     data = <<"{\"so\": \"there!\"}">>,
                     revpos = 1,
                     att_len = 16,
@@ -197,4 +192,3 @@ test_to_json_success() ->
             etap:is(couch_doc:to_json_obj(Doc, Options), EJson, Mesg)
     end, Cases),
     ok.
-
