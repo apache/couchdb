@@ -883,7 +883,8 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
         Headers = [
             {"ETag", Etag},
             {"Cache-Control", "must-revalidate"},
-            {"Content-Type", binary_to_list(Type)}
+            {"Content-Type", binary_to_list(Type)},
+            {"Accept-Ranges", "bytes"}
         ] ++ case ReqAcceptsAttEnc of
         true ->
             [{"Content-Encoding", atom_to_list(Enc)}];
@@ -925,22 +926,13 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
                     AttFun(Att, fun(Seg, _) -> send_chunk(Resp, Seg) end, {ok, Resp}),
                     last_chunk(Resp);
                 _ ->
-                    #att{data={_,StreamInfo}} = Att, %% layering violation
-                    SupportsRange = case StreamInfo of
-                        [{_,_}|_] -> true;
-                        _ -> false
-                    end,
                     Ranges = MochiReq:get(range),
                     HasSingleRange = case Ranges of
                         [_] -> true;
                         _ -> false
                     end,
-                    Headers1 = case SupportsRange of
-                        false ->[{<<"Accept-Ranges">>, <<"none">>}] ++ Headers;
-                        true -> [{<<"Accept-Ranges">>, <<"bytes">>}] ++ Headers
-                    end,
                     if
-                        Enc == identity andalso SupportsRange == true andalso HasSingleRange == true ->
+                        Enc == identity andalso HasSingleRange == true ->
                             [{From, To}] = Ranges,
                             {From1, To1} = case {From, To} of
                                 {none, To} ->
@@ -956,13 +948,13 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
                                 true ->
                                     ok
                             end,
-                            Headers2 = [{<<"Content-Range">>,
+                            Headers1 = [{<<"Content-Range">>,
                                 ?l2b(io_lib:format("bytes ~B-~B/~B", [From1, To1, Len]))}]
-                                ++ Headers1,
-                            {ok, Resp} = start_response_length(Req, 206, Headers2, To1 - From1 + 1),
+                                ++ Headers,
+                            {ok, Resp} = start_response_length(Req, 206, Headers1, To1 - From1 + 1),
                             couch_doc:range_att_foldl(Att, From1, To1 + 1, fun(Seg, _) -> send(Resp, Seg) end, {ok, Resp});
                         true ->
-                            {ok, Resp} = start_response_length(Req, 200, Headers1, Len),
+                            {ok, Resp} = start_response_length(Req, 200, Headers, Len),
                             AttFun(Att, fun(Seg, _) -> send(Resp, Seg) end, {ok, Resp})
                     end
                 end

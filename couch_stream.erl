@@ -129,6 +129,9 @@ range_foldl(Fd, PosList, From, To, Fun, Acc) ->
 
 range_foldl(_Fd, _PosList, _From, To, Off, _Fun, Acc) when Off >= To ->
     Acc;
+range_foldl(Fd, [Pos|Rest], From, To, Off, Fun, Acc) when is_integer(Pos) -> % old-style attachment
+    {ok, Bin} = couch_file:pread_iolist(Fd, Pos),
+    range_foldl(Fd, [{Pos, iolist_size(Bin)}] ++ Rest, From, To, Off, Fun, Acc);
 range_foldl(Fd, [{_Pos, Size}|Rest], From, To, Off, Fun, Acc) when From > Off + Size ->
     range_foldl(Fd, Rest, From, To, Off + Size, Fun, Acc);
 range_foldl(Fd, [{Pos, Size}|Rest], From, To, Off, Fun, Acc) ->
