@@ -31,7 +31,8 @@
     get_view_group_info/2]).
 
 % miscellany
--export([design_docs/1, reset_validation_funs/1]).
+-export([design_docs/1, reset_validation_funs/1, cleanup_index_files/0,
+    cleanup_index_files/1]).
 
 -include("fabric.hrl").
 
@@ -166,6 +167,29 @@ design_docs(DbName) ->
 reset_validation_funs(DbName) ->
     [rexi:cast(Node, {fabric_rpc, reset_validation_funs, [Name]}) ||
         #shard{node=Node, name=Name} <-  mem3:shards(DbName)].
+
+cleanup_index_files() ->
+    {ok, DbNames} = fabric:all_dbs(),
+    [cleanup_index_files(Name) || Name <- DbNames].
+
+cleanup_index_files(DbName) ->
+    {ok, DesignDocs} = fabric:design_docs(DbName),
+
+    ActiveSigs = lists:map(fun(#doc{id = GroupId}) ->
+        {ok, Info} = fabric:get_view_group_info(DbName, GroupId),
+        binary_to_list(couch_util:get_value(signature, Info))
+    end, [couch_doc:from_json_obj(DD) || DD <- DesignDocs]),
+
+    FileList = filelib:wildcard([couch_config:get("couchdb", "view_index_dir"),
+        "/.shards/*/", couch_util:to_list(DbName), "_design/*"]),
+
+    DeleteFiles = if ActiveSigs =:= [] -> FileList; true ->
+        {ok, RegExp} = re:compile([$(, string:join(ActiveSigs, "|"), $)]),
+        lists:filter(fun(FilePath) ->
+            re:run(FilePath, RegExp, [{capture, none}]) == nomatch
+        end, FileList)
+    end,
+    [file:delete(File) || File <- DeleteFiles].
 
 %% some simple type validation and transcoding
 
