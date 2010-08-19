@@ -165,11 +165,28 @@ builtin_reduce(Re, [<<"_stats",_/binary>>|BuiltinReds], KVs, Acc) ->
 
 builtin_sum_rows(KVs) ->
     lists:foldl(fun
-        ([_Key, Value], Acc) when is_number(Value) ->
+        ([_Key, Value], Acc) when is_number(Value), is_number(Acc) ->
             Acc + Value;
+        ([_Key, Value], Acc) when is_list(Value), is_list(Acc) ->
+            sum_terms(Acc, Value);
+        ([_Key, Value], Acc) when is_number(Value), is_list(Acc) ->
+            sum_terms(Acc, [Value]);
+        ([_Key, Value], Acc) when is_list(Value), is_number(Acc) ->
+            sum_terms([Acc], Value);
         (_Else, _Acc) ->
-            throw({invalid_value, <<"builtin _sum function requires map values to be numbers">>})
+            throw({invalid_value, <<"builtin _sum function requires map values to be numbers or lists of numbers">>})
     end, 0, KVs).
+
+sum_terms([], []) ->
+    [];
+sum_terms([_|_]=Xs, []) ->
+    Xs;
+sum_terms([], [_|_]=Ys) ->
+    Ys;
+sum_terms([X|Xs], [Y|Ys]) when is_number(X), is_number(Y) ->
+    [X+Y | sum_terms(Xs,Ys)];
+sum_terms(_, _) ->
+    throw({invalid_value, <<"builtin _sum function requires map values to be numbers or lists of numbers">>}).
 
 builtin_stats(reduce, [[_,First]|Rest]) when is_number(First) ->
     Stats = lists:foldl(fun([_K,V], {S,C,Mi,Ma,Sq}) when is_number(V) ->

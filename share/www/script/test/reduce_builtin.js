@@ -149,5 +149,30 @@ couchTests.reduce_builtin = function(debug) {
       T(equals(results.rows[5], {key:["d","b"],value:10*i}));
       T(equals(results.rows[6], {key:["d","c"],value:10*i}));
     };
+
+    map = function (doc) {emit(doc.keys, [1, 1])};
+
+    var results = db.query(map, "_sum", {group:true});
+    T(equals(results.rows[0], {key:["a"],value:[20*i,20*i]}));
+    T(equals(results.rows[1], {key:["a","b"],value:[20*i,20*i]}));
+    T(equals(results.rows[2], {key:["a", "b", "c"],value:[10*i,10*i]}));
+    T(equals(results.rows[3], {key:["a", "b", "d"],value:[10*i,10*i]}));
+
+    var results = db.query(map, "_sum", {group: true, limit: 2});
+    T(equals(results.rows[0], {key: ["a"], value: [20*i,20*i]}));
+    T(equals(results.rows.length, 2));
+
+    var results = db.query(map, "_sum", {group_level:1});
+    T(equals(results.rows[0], {key:["a"],value:[70*i,70*i]}));
+    T(equals(results.rows[1], {key:["d"],value:[40*i,40*i]}));
+
+    var results = db.query(map, "_sum", {group_level:2});
+    T(equals(results.rows[0], {key:["a"],value:[20*i,20*i]}));
+    T(equals(results.rows[1], {key:["a","b"],value:[40*i,40*i]}));
+    T(equals(results.rows[2], {key:["a","c"],value:[10*i,10*i]}));
+    T(equals(results.rows[3], {key:["d"],value:[10*i,10*i]}));
+    T(equals(results.rows[4], {key:["d","a"],value:[10*i,10*i]}));
+    T(equals(results.rows[5], {key:["d","b"],value:[10*i,10*i]}));
+    T(equals(results.rows[6], {key:["d","c"],value:[10*i,10*i]}));
   }
 }
