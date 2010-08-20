@@ -224,12 +224,9 @@ with_ddoc_proc(#doc{id=DDocId,revs={Start, [DiskRev|_]}}=DDoc, Fun) ->
     end.
 
 init([]) ->
-    % read config and register for configuration changes
-
-    % just stop if one of the config settings change. couch_server_sup
-    % will restart us and then we will pick up the new settings.
-
-    ok = couch_config:register(fun ?MODULE:config_change/1),
+    % register async to avoid deadlock on restart_child
+    Self = self(),
+    spawn(couch_config, register, [fun ?MODULE:config_change/1, Self]),
 
     Langs = ets:new(couch_query_server_langs, [set, private]),
     PidProcs = ets:new(couch_query_server_pid_langs, [set, private]),
