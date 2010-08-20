@@ -63,8 +63,8 @@
 %%
 %%    [vhosts]
 %%    *.example.com = /*
-%%    $dbname.example.com = /$dbname
-%%    $ddocname.$dbname.example.com = /$dbname/_design/$ddocname/_rewrite
+%%    :dbname.example.com = /:dbname
+%%    :ddocname.:dbname.example.com = /:dbname/_design/:ddocname/_rewrite
 %%
 %% First rule pass wildcard as dbname, second do the same but use a
 %% variable name and the third one allows you to use any app with
@@ -312,14 +312,18 @@ make_vhosts() ->
 
 
 split_host_port(HostAsString) ->
-    case string:tokens(HostAsString, ":") of
-        [HostPart, PortPart] ->
-            {split_host(HostPart), list_to_integer(PortPart)};
-        [HostPart] ->
-            {split_host(HostPart), 80};
-        [] ->
-            %% no host header
-            {[], 80}
+    case string:rchr(HostAsString, $:) of
+        0 ->
+            {split_host(HostAsString), 80};
+        N ->
+            HostPart = string:substr(HostAsString, 1, N-1), 
+            case (catch erlang:list_to_integer(HostAsString, N+1,
+                        length(HostAsString))) of
+                {'EXIT', _} ->
+                    {split_host(HostAsString), 80};
+                Port ->
+                    {split_host(HostPart), Port}
+            end
     end.
 
 split_host(HostAsString) ->
@@ -342,7 +346,7 @@ make_spec([P|R], Acc) ->
 
 parse_var(P) ->
     case P of 
-        "$" ++ Var ->
+        ":" ++ Var ->
             {bind, Var};
         _ -> P
     end.

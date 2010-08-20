@@ -107,9 +107,9 @@ test() ->
             "/etap-test-db/_design/doc1/_rewrite", false),
     ok = couch_config:set("vhosts", "example1.com", 
             "/etap-test-db/_design/doc1/_rewrite/", false),
-    ok = couch_config:set("vhosts","$appname.$dbname.example1.com",
-            "/$dbname/_design/$appname/_rewrite/", false),
-    ok = couch_config:set("vhosts", "$dbname.example1.com", "/$dbname", false),
+    ok = couch_config:set("vhosts",":appname.:dbname.example1.com",
+            "/:dbname/_design/:appname/_rewrite/", false),
+    ok = couch_config:set("vhosts", ":dbname.example1.com", "/:dbname", false),
     ok = couch_config:set("vhosts", "*.example2.com", "/*", false),
 
 
