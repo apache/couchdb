@@ -62,10 +62,14 @@ merge_read_reply(Key, Reply, Replies) ->
         {lists:keyreplace(Key, 1, Replies, {Key, Reply, N+1}), N+1}
     end.
 
-make_key({ok, #doc{id=Id, revs=Revs}}) ->
-    {Id, Revs};
-make_key(Else) ->
-    Else.
+make_key({ok, L}) when is_list(L) ->
+    make_key(L);
+make_key([]) ->
+    [];
+make_key([{ok, #doc{revs= {Pos,[RevId | _]}}} | Rest]) ->
+    [{ok, {Pos, RevId}} | make_key(Rest)];
+make_key([{{not_found, missing}, Rev} | Rest]) ->
+    [{not_found, Rev} | make_key(Rest)].
 
 repair_read_quorum_failure(Replies) ->
     case [Doc || {_Key, {ok, Doc}, _Count} <- Replies] of
