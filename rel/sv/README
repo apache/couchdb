@@ -1,0 +1,1 @@
+This is an example of a cloudant-dbcore runit (http://smarden.org/runit/) service. Use it to start/stop/restart cloudant-dbcore. You may need to adjust the "run" script for install location and the home directory cloudant-dbcore will run as.

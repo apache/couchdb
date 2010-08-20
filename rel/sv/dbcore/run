@@ -1,0 +1,4 @@
+#!/bin/bash
+exec 2>&1
+export HOME=/home/dbcore
+exec chpst -u dbcore /opt/dbcore/bin/dbcore
