@@ -2,6 +2,7 @@ all:  compile
 
 compile:
 	@ERL_LIBS="`pwd`/apps" ./rebar compile
+	scons
 
 clean:
 	@./rebar clean
@@ -16,6 +17,9 @@ compilenative:
 dist: compile
 	@rm -rf rel/dbcore
 	@./rebar generate
+	@mkdir -p rel/dbcore/var/share/server
+	@cp build/main.js rel/dbcore/var/share/server/
+	@cp build/couchjs rel/dbcore/bin/
 
 distclean: clean
 	@rm -rf rel/dbcore
