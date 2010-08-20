@@ -23,6 +23,7 @@ For detailed installation instructions, please consult the INSTALL file
  * Spidermonkey (1.9.2 preferable, [https://launchpad.net/~commonjs/+archive/ppa/][6]) and symlink /usr/lib/libmozjs-1.9.2.so to /usr/lib/libmozjs.so to make things easier
  * OpenSSL
  * make
+ * Python 2.4 or higher
 
 #### Building and installing dbcore
 

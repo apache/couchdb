@@ -2,7 +2,7 @@ all:  compile
 
 compile:
 	@ERL_LIBS="`pwd`/apps" ./rebar compile
-	scons
+	python scons/scons.py
 
 clean:
 	@./rebar clean

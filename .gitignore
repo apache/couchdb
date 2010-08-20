@@ -17,6 +17,7 @@ rebar.config
 .sconsign.dblite
 build/
 config.log
+*.pyc
 
 # testing
 .eunit
