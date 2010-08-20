@@ -12,6 +12,12 @@ rel/overlay/erts-vsn/bin/erl_call
 Makefile
 rebar.config
 
+# scons building
+.sconf_temp/
+.sconsign.dblite
+build/
+config.log
+
 # testing
 .eunit
 @abs_top_builddir@/

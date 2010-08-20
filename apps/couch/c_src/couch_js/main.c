@@ -13,8 +13,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <jsapi.h>
+
 #include "config.h"
+#ifdef HAVE_JS_JSAPI_H
+#include <js/jsapi.h>
+#elif HAVE_MOZJS_JSAPI_H
+#include <mozjs/jsapi.h>
+#else
+#include <jsapi.h>
+#endif
 
 #include "utf8.h"
 #include "http.h"
@@ -76,7 +83,7 @@ evalcx(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     {
         JS_EvaluateUCScript(subcx, sandbox, src, srclen, NULL, 0, rval);
     }
-    
+
     ret = JS_TRUE;
 
 done:
@@ -130,7 +137,7 @@ readfp(JSContext* cx, FILE* fp, size_t* buflen)
 
     bytes = JS_malloc(cx, byteslen);
     if(bytes == NULL) return NULL;
-    
+
     while((readlen = js_fgets(bytes+used, byteslen-used, stdin)) > 0)
     {
         used += readlen;
@@ -169,7 +176,7 @@ readline(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
 
     bytes = readfp(cx, stdin, &byteslen);
     if(!bytes) return JS_FALSE;
-    
+
     /* Treat the empty string specially */
     if(byteslen == 0)
     {
@@ -186,7 +193,7 @@ readline(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
         return JS_FALSE;
     }
     bytes = tmp;
-    
+
     str = dec_string(cx, bytes, byteslen);
     JS_free(cx, bytes);
 
@@ -279,7 +286,7 @@ main(int argc, const char * argv[])
     JSObject* global = NULL;
     JSFunctionSpec* sp = NULL;
     int i = 0;
-    
+
     rt = JS_NewRuntime(64L * 1024L * 1024L);
     if (!rt) return 1;
 
@@ -288,13 +295,13 @@ main(int argc, const char * argv[])
 
     JS_SetErrorReporter(cx, printerror);
     JS_ToggleOptions(cx, JSOPTION_XML);
-    
+
     SETUP_REQUEST(cx);
 
     global = JS_NewObject(cx, &global_class, NULL, NULL);
     if (!global) return 1;
     if (!JS_InitStandardClasses(cx, global)) return 1;
-    
+
     for(sp = global_functions; sp->name != NULL; sp++)
     {
         if(!JS_DefineFunction(cx, global,
@@ -309,7 +316,7 @@ main(int argc, const char * argv[])
     {
         return 1;
     }
-    
+
     JS_SetGlobalObject(cx, global);
 
     if(argc > 2)

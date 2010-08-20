@@ -1,0 +1,53 @@
+#  Copyright (c) 2010 Cloudant
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+def require_lib(name):
+    if not conf.CheckLib(name):
+        print 'Could not find required library', name
+        Exit(1)
+
+env = Environment(CCFLAGS='-g -O2 -DXP_UNIX')
+if not env.GetOption('clean'):
+    conf = Configure(env, config_h='config.h')
+
+    require_lib('m')
+    require_lib('pthread')
+    require_lib('curl')
+
+    ## check for SpiderMonkey development header
+    if conf.CheckHeader('js/jsapi.h'):
+        jsapi = 'js/jsapi.h'
+    elif conf.CheckHeader('mozjs/jsapi.h'):
+        jsapi = 'mozjs/jsapi.h'
+    elif conf.CheckHeader('jsapi.h'):
+        jsapi = 'jsapi.h'
+    else:
+        print 'Could not find jsapi.h.', \
+            'Are Mozilla SpiderMonkey headers installed?'
+        Exit(1)
+
+    ## check for SpiderMonkey library as libjs or libmozjs
+    if not conf.CheckLibWithHeader('mozjs', jsapi, 'c', autoadd=1):
+        if not conf.CheckLibWithHeader('js', jsapi, 'c', autoadd=1):
+            print 'Could not find JS library.', \
+                'Is Mozilla SpiderMonkey installed?'
+            Exit(1)
+
+    ## SpiderMonkey 1.8 has this callback we use for memory management
+    if conf.CheckDeclaration('JS_SetOperationCallback', '#include <%s>' % jsapi):
+        conf.Define('USE_JS_SETOPCB')
+
+    env = conf.Finish()
+
+env.Program('couchjs', ['main.c', 'http.c', 'utf8.c'])
