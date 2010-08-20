@@ -540,10 +540,15 @@ delete_index_file(RootDir, DbName, GroupSig) ->
     couch_file:delete(RootDir, index_file_name(RootDir, DbName, GroupSig)).
 
 init_group(Fd, #group{dbname=DbName, views=Views}=Group, nil) ->
-    {ok, Db} = couch_db:open(DbName, []),
-    PurgeSeq = try couch_db:get_purge_seq(Db) after couch_db:close(Db) end,
-    Header = #index_header{purge_seq=PurgeSeq, view_states=[nil || _ <- Views]},
-    init_group(Fd, Group, Header);
+    case couch_db:open(DbName, []) of
+    {ok, Db} ->
+        PurgeSeq = try couch_db:get_purge_seq(Db) after couch_db:close(Db) end,
+        Header = #index_header{purge_seq=PurgeSeq, view_states=[nil || _ <- Views]},
+        init_group(Fd, Group, Header);
+    {not_found, no_db_file} ->
+        ?LOG_ERROR("~p no_db_file ~p", [?MODULE, DbName]),
+        exit(no_db_file)
+    end;
 init_group(Fd, #group{def_lang=Lang,views=Views}=Group, IndexHeader) ->
      #index_header{seq=Seq, purge_seq=PurgeSeq,
             id_btree_state=IdBtreeState, view_states=ViewStates} = IndexHeader,

@@ -321,7 +321,7 @@ do_reset_indexes(DbName, Root) ->
 handle_info({'EXIT', FromPid, Reason}, Server) ->
     case ets:lookup(couch_groups_by_updater, FromPid) of
     [] ->
-        if Reason /= normal ->
+        if Reason =/= normal, Reason =/= no_db_file ->
             % non-updater linked process died, we propagate the error
             ?LOG_ERROR("Exit on non-updater process: ~p", [Reason]),
             exit(Reason);
