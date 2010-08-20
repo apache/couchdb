@@ -399,24 +399,25 @@ couchTests.replication = function(debug) {
       var valid_doc_ids = [];
       var invalid_doc_ids = [];
 
-      $.each(doc_ids, function(index, id) {
-        var found = false;
+        for (var p = 0; p < doc_ids.length; p++) {
+            var id = doc_ids[p];
+            var found = false;
 
-        for (var k = 0; k < all_docs.length; k++) {
-          var doc = all_docs[k];
+            for (var k = 0; k < all_docs.length; k++) {
+                var doc = all_docs[k];
 
-          if (id === doc._id) {
-            found = true;
-            break;
-          }
-        }
+                if (id === doc._id) {
+                    found = true;
+                    break;
+                }
+            }
 
-        if (found) {
-          valid_doc_ids.push(id);
-        } else {
-          invalid_doc_ids.push(id);
-        }
-      });
+            if (found) {
+                valid_doc_ids.push(id);
+            } else {
+                invalid_doc_ids.push(id);
+            }
+        };
 
       dbB.deleteDb();
       dbB.createDb();
@@ -434,7 +435,7 @@ couchTests.replication = function(debug) {
         var doc = all_docs[k];
         var tgt_doc = dbB.open(doc._id);
 
-        if ($.inArray(doc._id, doc_ids) >= 0) {
+        if (doc_ids.indexOf(doc._id) >= 0) {
           T(tgt_doc !== null);
           T(tgt_doc.value === doc.value);
         } else {
@@ -506,7 +507,7 @@ couchTests.replication = function(debug) {
     });
 
     T(repResult.ok);
-    T($.isArray(repResult.history));
+    T(repResult.history instanceof Array);
     T(repResult.history.length === 1);
     T(repResult.history[0].docs_written === 2);
     T(repResult.history[0].docs_read === 2);
