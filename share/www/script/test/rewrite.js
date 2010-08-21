@@ -98,6 +98,10 @@ couchTests.rewrite = function(debug) {
              }
             },
             {
+              "from": "basicView",
+              "to": "_view/basicView",
+            },
+            {
               "from": "simpleForm/basicView",
               "to": "_list/simpleForm/basicView",
             },
@@ -158,6 +162,10 @@ couchTests.rewrite = function(debug) {
               "query": {
                 "key": [":a", ":b"]
               }
+            },
+            {
+              "from": "/",
+              "to": "_view/basicView",
             }
           ],
           lists: {
@@ -311,7 +319,15 @@ couchTests.rewrite = function(debug) {
 
         req = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/welcome5/welcome3");
         T(req.responseText == "Welcome welcome3");
-        
+       
+        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/basicView");
+        T(xhr.status == 200, "view call");
+        T(/{"total_rows":9/.test(xhr.responseText)); 
+
+        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/");
+        T(xhr.status == 200, "view call");
+        T(/{"total_rows":9/.test(xhr.responseText)); 
+
         
         // get with query params
         xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/simpleForm/basicView?startkey=3&endkey=8");
