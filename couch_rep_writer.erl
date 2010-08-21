@@ -147,7 +147,8 @@ streamer_fun(Boundary, JsonBytes, Atts) ->
     {start, From} ->
         % better use a brand new queue, to ensure there's no garbage from
         % a previous (failed) iteration
-        {ok, DataQueue} = couch_work_queue:new(1024 * 1024, 1000),
+        {ok, DataQueue} = couch_work_queue:new(
+            [{max_size, 1024 * 1024}, {max_items, 1000}]),
         From ! {queue, DataQueue},
         couch_doc:doc_to_multi_part_stream(
             Boundary,

@@ -13,7 +13,7 @@
 -module(couch_work_queue).
 -behaviour(gen_server).
 
--export([new/2,queue/2,dequeue/1,dequeue/2,close/1]).
+-export([new/1,queue/2,dequeue/1,dequeue/2,close/1]).
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, code_change/3, handle_info/2]).
 
 -record(q, {
@@ -27,8 +27,8 @@
     close_on_dequeue=false
 }).
 
-new(MaxSize, MaxItems) ->
-    gen_server:start_link(couch_work_queue, {MaxSize, MaxItems}, []).
+new(Options) ->
+    gen_server:start_link(couch_work_queue, Options, []).
 
 queue(Wq, Item) ->
     gen_server:call(Wq, {queue, Item}, infinity).
@@ -46,8 +46,12 @@ close(Wq) ->
     gen_server:cast(Wq, close).
     
 
-init({MaxSize,MaxItems}) ->
-    {ok, #q{max_size=MaxSize, max_items=MaxItems}}.
+init(Options) ->
+    Q = #q{
+        max_size = couch_util:get_value(max_size, Options),
+        max_items = couch_util:get_value(max_items, Options)
+    },
+    {ok, Q}.
 
 terminate(_Reason, #q{work_waiter=nil}) ->
     ok;

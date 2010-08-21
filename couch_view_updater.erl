@@ -38,8 +38,10 @@ update(Owner, Group) ->
         couch_task_status:update(<<"Resetting view index due to lost purge entries.">>),
         exit(reset)
     end,
-    {ok, MapQueue} = couch_work_queue:new(100000, 500),
-    {ok, WriteQueue} = couch_work_queue:new(100000, 500),
+    {ok, MapQueue} = couch_work_queue:new(
+        [{max_size, 100000}, {max_items, 500}]),
+    {ok, WriteQueue} = couch_work_queue:new(
+        [{max_size, 100000}, {max_items, 500}]),
     Self = self(),
     ViewEmptyKVs = [{View, []} || View <- Group2#group.views],
     spawn_link(fun() -> do_maps(Group, MapQueue, WriteQueue, ViewEmptyKVs) end),
