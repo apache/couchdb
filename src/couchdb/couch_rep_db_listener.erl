@@ -33,7 +33,8 @@ start_link() ->
 
 init(_) ->
     process_flag(trap_exit, true),
-    {ok, Queue} = couch_work_queue:new(1024 * 1024, 1000),
+    {ok, Queue} = couch_work_queue:new(
+        [{max_size, 1024 * 1024}, {max_items, 1000}]),
     {ok, Processor} = changes_processor(Queue),
     {ok, Loop} = changes_feed_loop(Queue),
     Server = self(),

@@ -132,7 +132,7 @@ dequeue_items(0, Queue, Blocked, DequeuedAcc) ->
 
 dequeue_items(NumItems, Queue, Blocked, DequeuedAcc) ->
     {{value, Item}, Queue2} = queue:out(Queue),
-    Blocked2 = case Blocked of
+    case Blocked of
     [] ->
         Blocked2 = Blocked;
     [From | Blocked2] ->
