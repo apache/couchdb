@@ -13,35 +13,45 @@
 -module(couch_work_queue).
 -behaviour(gen_server).
 
--export([new/1,queue/2,dequeue/1,dequeue/2,close/1]).
--export([init/1, terminate/2, handle_call/3, handle_cast/2, code_change/3, handle_info/2]).
+% public API
+-export([new/1, queue/2, dequeue/1, dequeue/2, close/1]).
+
+% gen_server callbacks
+-export([init/1, terminate/2]).
+-export([handle_call/3, handle_cast/2, code_change/3, handle_info/2]).
 
 -record(q, {
-    queue=queue:new(),
-    blocked=[],
+    queue = queue:new(),
+    blocked = [],
     max_size,
     max_items,
-    items=0,
-    size=0,
-    work_waiters=[],
-    close_on_dequeue=false,
-    multi_workers=false
+    items = 0,
+    size = 0,
+    work_waiters = [],
+    close_on_dequeue = false,
+    multi_workers = false
 }).
+
 
 new(Options) ->
     gen_server:start_link(couch_work_queue, Options, []).
 
+
 queue(Wq, Item) ->
     gen_server:call(Wq, {queue, Item}, infinity).
 
+
 dequeue(Wq) ->
     dequeue(Wq, all).
+
     
 dequeue(Wq, MaxItems) ->
-    try gen_server:call(Wq, {dequeue, MaxItems}, infinity)
+    try
+        gen_server:call(Wq, {dequeue, MaxItems}, infinity)
     catch
         _:_ -> closed
     end.
+
 
 close(Wq) ->
     gen_server:cast(Wq, close).
@@ -55,23 +65,26 @@ init(Options) ->
     },
     {ok, Q}.
 
+
 terminate(_Reason, #q{work_waiters=Workers}) ->
     lists:foreach(fun({W, _}) -> gen_server:reply(W, closed) end, Workers).
+
     
-handle_call({queue, Item}, From, #q{work_waiters=[]}=Q0) ->
-    Q = Q0#q{size=Q0#q.size + byte_size(term_to_binary(Item)),
-                items=Q0#q.items + 1,
-                queue=queue:in(Item, Q0#q.queue)},
+handle_call({queue, Item}, From, #q{work_waiters = []} = Q0) ->
+    Q = Q0#q{size = Q0#q.size + byte_size(term_to_binary(Item)),
+                items = Q0#q.items + 1,
+                queue = queue:in(Item, Q0#q.queue)},
     case (Q#q.size >= Q#q.max_size) orelse
             (Q#q.items >= Q#q.max_items) of
     true ->
-        {noreply, Q#q{blocked=[From | Q#q.blocked]}};
+        {noreply, Q#q{blocked = [From | Q#q.blocked]}};
     false ->
         {reply, ok, Q}
     end;
+
 handle_call({queue, Item}, _From, #q{work_waiters = [{W, _Max} | Rest]} = Q) ->
     gen_server:reply(W, {ok, [Item]}),
-    {reply, ok, Q#q{work_waiters=Rest}};
+    {reply, ok, Q#q{work_waiters = Rest}};
 
 handle_call({dequeue, Max}, From, Q) ->
     #q{work_waiters = Workers, multi_workers = Multi, items = Count} = Q,
@@ -88,6 +101,7 @@ handle_call({dequeue, Max}, From, Q) ->
             deliver_queue_items(Max, Q)
         end
     end.
+
 
 deliver_queue_items(Max, Q) ->
     #q{
@@ -112,23 +126,26 @@ deliver_queue_items(Max, Q) ->
         end
     end.
 
+
 dequeue_items(0, Queue, Blocked, DequeuedAcc) ->
     {lists:reverse(DequeuedAcc), Queue, Blocked};
+
 dequeue_items(NumItems, Queue, Blocked, DequeuedAcc) ->
     {{value, Item}, Queue2} = queue:out(Queue),
-    case Blocked of
+    Blocked2 = case Blocked of
     [] ->
         Blocked2 = Blocked;
-    [From|Blocked2] ->
+    [From | Blocked2] ->
         gen_server:reply(From, ok)
     end,
-    dequeue_items(NumItems-1, Queue2, Blocked2, [Item | DequeuedAcc]).
+    dequeue_items(NumItems - 1, Queue2, Blocked2, [Item | DequeuedAcc]).
     
 
-handle_cast(close, #q{items=0}=Q) ->
+handle_cast(close, #q{items = 0} = Q) ->
     {stop, normal, Q};
+
 handle_cast(close, Q) ->
-    {noreply, Q#q{close_on_dequeue=true}}.
+    {noreply, Q#q{close_on_dequeue = true}}.
 
 
 code_change(_OldVsn, State, _Extra) ->
