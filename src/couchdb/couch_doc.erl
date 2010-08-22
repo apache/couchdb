@@ -455,6 +455,7 @@ doc_from_multi_part_stream(ContentType, DataFun) ->
     Parser ! {get_doc_bytes, self()},
     receive 
     {doc_bytes, DocBytes} ->
+        erlang:put(mochiweb_request_recv, true),
         Doc = from_json_obj(?JSON_DECODE(DocBytes)),
         % go through the attachments looking for 'follows' in the data,
         % replace with function that reads the data from MIME stream.
