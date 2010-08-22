@@ -926,34 +926,17 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
                     AttFun(Att, fun(Seg, _) -> send_chunk(Resp, Seg) end, {ok, Resp}),
                     last_chunk(Resp);
                 _ ->
-                    Ranges = MochiReq:get(range),
-                    HasSingleRange = case Ranges of
-                        [_] -> true;
-                        _ -> false
-                    end,
-                    if
-                        Enc == identity andalso HasSingleRange == true ->
-                            [{From, To}] = Ranges,
-                            {From1, To1} = case {From, To} of
-                                {none, To} ->
-                                    {Len - To - 1, Len - 1};
-                                {From, none} ->
-                                    {From, Len - 1};
-                                _ ->
-                                    {From, To}
-                            end,
-                            if
-                                From < 0 orelse To1 >= Len ->
-                                    throw(requested_range_not_satisfiable);
-                                true ->
-                                    ok
-                            end,
+                    Ranges = parse_ranges(MochiReq:get(range), Len),
+                    case {Enc, Ranges} of
+                        {identity, [{From, To}]} ->
                             Headers1 = [{<<"Content-Range">>,
-                                ?l2b(io_lib:format("bytes ~B-~B/~B", [From1, To1, Len]))}]
+                                ?l2b(io_lib:format("bytes ~B-~B/~B", [From, To, Len]))}]
                                 ++ Headers,
-                            {ok, Resp} = start_response_length(Req, 206, Headers1, To1 - From1 + 1),
-                            couch_doc:range_att_foldl(Att, From1, To1 + 1, fun(Seg, _) -> send(Resp, Seg) end, {ok, Resp});
-                        true ->
+                            {ok, Resp} = start_response_length(Req, 206, Headers1, To - From + 1),
+                            couch_doc:range_att_foldl(Att, From, To + 1,
+                                fun(Seg, _) -> send(Resp, Seg) end, {ok, Resp});
+                        %% {identity, Ranges} when is_list(Ranges) ->
+                        _ ->
                             {ok, Resp} = start_response_length(Req, 200, Headers, Len),
                             AttFun(Att, fun(Seg, _) -> send(Resp, Seg) end, {ok, Resp})
                     end
@@ -1074,6 +1057,29 @@ db_attachment_req(#httpd{method=Method,mochi_req=MochiReq}=Req, Db, DocId, FileN
 db_attachment_req(Req, _Db, _DocId, _FileNameParts) ->
     send_method_not_allowed(Req, "DELETE,GET,HEAD,PUT").
 
+parse_ranges(undefined, Len) ->
+    undefined;
+parse_ranges(Ranges, Len) ->
+    parse_ranges(Ranges, Len, []).
+
+parse_ranges([], Len, Acc) ->
+    lists:reverse(Acc);
+parse_ranges([{From,To}|Rest], Len, Acc) ->
+    {From1, To1} = case {From, To} of
+        {none, To} ->
+            {Len - To - 1, Len - 1};
+        {From, none} ->
+            {From, Len - 1};
+        _ ->
+            {From, To}
+        end,
+    if
+        From < 0 orelse To1 >= Len ->
+            throw(requested_range_not_satisfiable);
+        true ->
+            ok
+    end,
+    parse_ranges(Rest, Len, [{From1, To1}] ++ Acc).
 
 get_md5_header(Req) ->
     ContentMD5 = couch_httpd:header_value(Req, "Content-MD5"),
