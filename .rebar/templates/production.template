@@ -6,5 +6,3 @@
 {template, "./Makefile", "Makefile"}.
 {template, "./etc/default.ini", "rel/overlay/etc/default.ini"}.
 {file, "rebar.config", "rebar.config"}.
-{file, "/usr/local/lib/erlang/lib/erl_interface-3.6.5/bin/erl_call", "rel/overlay/erts-vsn/bin/erl_call"}.
-{chmod, 8#755, "rel/overlay/erts-vsn/bin/erl_call"}.
