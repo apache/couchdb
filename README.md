@@ -36,7 +36,7 @@ To install Spidermonkey 1.9.2 from PPA:
     sudo apt-get update
     sudo apt-get install libmozjs-1.9.2 libmozjs-1.9.2-dev
 
-#### Installing prerequisites on Mac OS X with (Homebrew)[7]
+#### Installing prerequisites on Mac OS X with [Homebrew][7]
 
     brew install erlang icu4c spidermonkey
 
