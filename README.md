@@ -9,21 +9,36 @@ Clusters behave according to concepts outlined in [Amazon's Dynamo paper][4], na
 ### Contents
 
  * README.md   this file
- * INSTALL     instructions on how to install dbcore
  * LICENSE     open-source license governing dbcore
 
 ### Getting Started
 
-For detailed installation instructions, please consult the INSTALL file
-
 #### Prerequisites
 
- * Erlang R13B03 or higher
+Cloudant Core has the same dependencies as CouchDB:
+
+ * Erlang (R13B03 or higher)
  * ICU (4.2 is preferable)
- * Spidermonkey (1.9.2 preferable, [https://launchpad.net/~commonjs/+archive/ppa/][6]) and symlink /usr/lib/libmozjs-1.9.2.so to /usr/lib/libmozjs.so to make things easier
+ * Spidermonkey (1.9.2 preferable, [https://launchpad.net/~commonjs/+archive/ppa/][6])
+ * LibCurl
  * OpenSSL
  * make
- * Python 2.4 or higher
+ * Python (2.4 or higher)
+
+#### Installing prerequisites on Ubuntu
+
+    sudo apt-get install erlang libicu42 libcurl-openssl-dev
+
+To install Spidermonkey 1.9.2 from PPA:
+
+    sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 74EE6429
+    sudo echo "deb http://ppa.launchpad.net/commonjs/ppa/ubuntu karmic main" >> /etc/apt/sources.list
+    sudo apt-get update
+    sudo apt-get install libmozjs-1.9.2 libmozjs-1.9.2-dev
+
+#### Installing prerequisites on Mac OS X with (Homebrew)[7]
+
+    brew install erlang icu4c spidermonkey
 
 #### Building and installing dbcore
 
@@ -107,3 +122,4 @@ Cloudant folks are usually hanging out in IRC.  Freenode, channel #cloudant.  We
 [4]: http://www.allthingsdistributed.com/2007/10/amazons_dynamo.html
 [5]: http://loadbalancer:5984/_utils
 [6]: https://launchpad.net/~commonjs/+archive/ppa/
+[7]: http://mxcl.github.com/homebrew/
