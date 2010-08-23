@@ -15,7 +15,7 @@ Clusters behave according to concepts outlined in [Amazon's Dynamo paper][4], na
 
 #### Prerequisites
 
-Cloudant Core has the same dependencies as CouchDB:
+Cloudant-dbcore has the same dependencies as CouchDB:
 
  * Erlang (R13B03 or higher)
  * ICU (4.2 is preferable)
@@ -36,10 +36,6 @@ To install Spidermonkey 1.9.2 from PPA:
     sudo apt-get update
     sudo apt-get install libmozjs-1.9.2
     sudo ln -s /usr/lib/libmozjs-1.9.2.so /usr/lib/libmozjs.so
-
-Odd cleanup tasks:
-
-    sudo rm /usr/lib/erlang/man/man5/modprobe.d.5
 
 #### Installing prerequisites on Mac OS X with [Homebrew][7]
 
@@ -111,6 +107,18 @@ _N_ - replication constant.  N defaults to 3, but can vary by database just as Q
 _R_ - read quorum constant.  N writes have occurred for each document, as noted above.  When reads are requested, N reads are sent to the N nodes that store the particular document.  The system will return to the requesting client with the document when R successful reads have returned, and agree on versioning.  R defaults to 2.  Lower R values often result in faster reads at the expense of consistency.  Higher R values usually result in slower reads, but more consistent, or agreed-upon data values returning.
 
 _W_ - write quorum constant.  When writing the N copies, the data store will respond to the write client after W successful writes have completed.  The remaining N-W writes are still being attempted in the background, but the client receives a 201 Created status and can resume execution.  W defaults to 2.  Lower W values mean more write throughput, and higher W values mean more data durability.
+
+### Troubleshooting
+
+#### `make install` fails with "read file info /usr/lib/erlang/man/man5/modprobe.d.5 failed"
+
+You can fix this by removing that file:
+
+   `sudo rm /usr/lib/erlang/man/man5/modprobe.d.5`
+
+#### Dbcore fails on startup with a "Can't set long node name!" error
+
+Cloudant-dbcore requires that your system be set up with a fully qualified domain name. Make sure tha the command `hostname -f` outputs a full hostname. If not, add the full hostname of your server to the `/etc/hosts` file.
 
 ### Contact
 
