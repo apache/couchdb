@@ -35,6 +35,7 @@ To install Spidermonkey 1.9.2 from PPA:
     sudo echo "deb http://ppa.launchpad.net/commonjs/ppa/ubuntu karmic main" >> /etc/apt/sources.list
     sudo apt-get update
     sudo apt-get install libmozjs-1.9.2 libmozjs-1.9.2-dev
+    sudo ln -s /usr/lib/libmozjs-1.9.2.so /usr/lib/libmozjs.so
 
 #### Installing prerequisites on Mac OS X with [Homebrew][7]
 
