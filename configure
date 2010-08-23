@@ -45,7 +45,5 @@ done
 echo "configuring dbcore"
 
 rm -f rebar.config
-# Makefile
-./rebar create template=make prefix=$PREFIX data=$DATA view=$VIEW user=$DBCORE_USER force=1
 # dbcore template
 ./rebar create template=$TEMPLATE prefix=$PREFIX force=1

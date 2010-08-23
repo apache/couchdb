@@ -30,7 +30,7 @@ distclean: clean
 install: dist
 	@mkdir -p {{prefix}}/dbcore/
 	@cp -R rel/dbcore/* {{prefix}}/dbcore/
-	@mkdir -p {{data}}
-	@chown {{user}} {{data}}
-	@mkdir -p {{view}}
-	@chown {{user}} {{view}}
+	@mkdir -p {{data_dir}}
+	@chown {{user}} {{data_dir}}
+	@mkdir -p {{view_dir}}
+	@chown {{user}} {{view_dir}}
