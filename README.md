@@ -44,14 +44,14 @@ To install Spidermonkey 1.9.2 from PPA:
 
 `$CLOUDANT_SRC` is the directory holding your downloaded source files, while `$CLOUDANT_PREFIX` is the prefix to which the software is installed (defaults to `/opt`):
 
-    $ cd $CLOUDANT_SRC
-    $ ./configure -p $CLOUDANT_PREFIX
-    $ make
-    $ sudo make install
+    cd $CLOUDANT_SRC
+    ./configure -p $CLOUDANT_PREFIX
+    make
+    sudo make install
 
 #### Starting dbcore
 
-    $ $CLOUDANT_PREFIX/dbcore/bin/dbcore
+    $CLOUDANT_PREFIX/dbcore/bin/dbcore
 
 Now, visit http://localhost:5984/_utils in a browser to verify the CouchDB node is operational.
 
@@ -65,10 +65,10 @@ First, dbcore listens on two ports.  Defaults and explanations:
  * 5986 - back door, single-node port, used for admin functions
 
 Next, once the first node is started, and assuming its hostname is 'node1_host' start dbcore on another node, with hostname 'node2_host'.  Once it's started successfully, on node1_host, join the new node:
-    $ curl -X PUT http://localhost:5986/nodes/dbcore@node2_host -d {}
+    curl -X PUT http://localhost:5986/nodes/dbcore@node2_host -d {}
 
 To verify the two-node cluster has been linked properly, on either node, try:
-    $ curl http://locahost:5984/_membership
+    curl http://locahost:5984/_membership
 
 You should see something similar to this:
     {"all_nodes":["dbcore@node1_host","dbcore@node2_host"],"cluster_nodes":["dbcore@node1_host","dbcore@node2_host"]}
