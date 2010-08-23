@@ -13,10 +13,10 @@ Makefile
 rebar.config
 
 # scons building
-.sconf_temp/
-.sconsign.dblite
-build/
-config.log
+couchjs/.sconf_temp/
+couchjs/.sconsign.dblite
+couchjs/build/
+couchjs/config.log
 *.pyc
 
 # testing

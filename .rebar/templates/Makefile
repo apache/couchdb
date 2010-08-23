@@ -2,7 +2,8 @@ all:  compile
 
 compile:
 	@ERL_LIBS="`pwd`/apps" ./rebar compile
-	python scons/scons.py
+	@echo "==> couchjs (compile)"
+	@cd couchjs && python scons/scons.py
 
 clean:
 	@./rebar clean
@@ -18,8 +19,8 @@ dist: compile
 	@rm -rf rel/dbcore
 	@./rebar generate
 	@mkdir -p rel/dbcore/var/share/server
-	@cp build/main.js rel/dbcore/var/share/server/
-	@cp build/couchjs rel/dbcore/bin/
+	@cp couchjs/build/main.js rel/dbcore/var/share/server/
+	@cp couchjs/build/couchjs rel/dbcore/bin/
 
 distclean: clean
 	@rm -rf rel/dbcore
