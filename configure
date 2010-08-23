@@ -46,4 +46,4 @@ echo "configuring dbcore"
 
 rm -f rebar.config
 # dbcore template
-./rebar create template=$TEMPLATE prefix=$PREFIX force=1
+./rebar create template=$TEMPLATE prefix=$PREFIX data_dir=$DATA view_dir=$VIEW user=$DBCORE_USER force=1
