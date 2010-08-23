@@ -1,3 +1,0 @@
-{variables, [{base_dir, "/opt/dbcore"}]}.
-{template, "./etc/default.ini", "rel/overlay/etc/default.ini"}.
-{file, "rebar-dev.config", "rebar.config"}.

@@ -1,5 +1,0 @@
-#!/bin/bash
-
-# copy templates into place
-echo "copying default rebar templates to ~/.rebar"
-cp -R .rebar ~/
