@@ -32,10 +32,14 @@ Cloudant Core has the same dependencies as CouchDB:
 To install Spidermonkey 1.9.2 from PPA:
 
     sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 74EE6429
-    sudo echo "deb http://ppa.launchpad.net/commonjs/ppa/ubuntu karmic main" >> /etc/apt/sources.list
+    sudo bash -c 'echo "deb http://ppa.launchpad.net/commonjs/ppa/ubuntu karmic main" >> /etc/apt/sources.list'
     sudo apt-get update
-    sudo apt-get install libmozjs-1.9.2 libmozjs-1.9.2-dev
+    sudo apt-get install libmozjs-1.9.2
     sudo ln -s /usr/lib/libmozjs-1.9.2.so /usr/lib/libmozjs.so
+
+Odd cleanup tasks:
+
+    sudo rm /usr/lib/erlang/man/man5/modprobe.d.5
 
 #### Installing prerequisites on Mac OS X with [Homebrew][7]
 
