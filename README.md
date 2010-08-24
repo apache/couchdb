@@ -40,6 +40,7 @@ To install Spidermonkey 1.9.2 from PPA:
 #### Installing prerequisites on Mac OS X with [Homebrew][7]
 
     brew install erlang icu4c spidermonkey
+    brew ln icu4c
 
 #### Building and installing dbcore
 
