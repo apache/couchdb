@@ -56,7 +56,7 @@ start_link(Name, Options) ->
     % will restart us and then we will pick up the new settings.
 
     BindAddress = couch_config:get("httpd", "bind_address", any),
-    %% MaxConnections = couch_config:get("httpd", "max_connections", "2048"),
+    NoDelay = "true" == couch_config:get("httpd", "nodelay", "false"),
 
     DefaultSpec = "{couch_httpd_db, handle_request}",
     DefaultFun = make_arity_1_fun(
@@ -92,7 +92,8 @@ start_link(Name, Options) ->
     {ok, Pid} = case mochiweb_http:start(Options ++ [
         {loop, Loop},
         {name, Name},
-        {ip, BindAddress}
+        {ip, BindAddress},
+        {nodelay,NoDelay}
     ]) of
     {ok, MochiPid} -> {ok, MochiPid};
     {error, Reason} ->
