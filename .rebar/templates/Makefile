@@ -1,19 +1,18 @@
 all:  compile
 
 compile:
-	@ERL_LIBS="`pwd`/apps" ./rebar compile
 	@echo "==> couchjs (compile)"
 	@cd couchjs && python scons/scons.py
+	@./rebar compile
 
 clean:
+	@echo "==> couchjs (clean)"
+	@cd couchjs && python scons/scons.py --clean
 	@./rebar clean
 
-check: compile
-	@ERL_LIBS="`pwd`/apps" ./rebar eunit
+check:
+	@./rebar eunit
 	@ERL_LIBS="`pwd`/apps" prove apps/couch/test/etap/*.t
-
-compilenative:
-	@./rebar compile erl_opts=native
 
 dist: compile
 	@rm -rf rel/dbcore
@@ -25,7 +24,6 @@ dist: compile
 distclean: clean
 	@rm -rf rel/dbcore
 	@rm -f rel/overlay/etc/default.ini
-	@rm -f rel/overlay/erts-vsn/bin/erl_call
 
 install: dist
 	@mkdir -p {{prefix}}/dbcore/
