@@ -108,9 +108,9 @@ couchTests.attachment_ranges = function(debug) {
         }
     });
     TEquals(206, xhr.status);
-    TEquals("text", xhr.responseText);
-    TEquals("4", xhr.getResponseHeader("Content-Length"));
-    TEquals("bytes 25-28/29", xhr.getResponseHeader("Content-Range"));
+    TEquals("ext", xhr.responseText);
+    TEquals("3", xhr.getResponseHeader("Content-Length"));
+    TEquals("bytes 26-28/29", xhr.getResponseHeader("Content-Range"));
 
 
 };
