@@ -6,11 +6,9 @@ erl_crash.dump
 
 # building
 apps/*/ebin/
-rel/overlay/etc/default*.ini
 rel/dbcore
-rel/overlay/erts-vsn/bin/erl_call
-Makefile
-rebar.config
+rel/overlay.config
+install.mk
 
 # scons building
 couchjs/.sconf_temp/

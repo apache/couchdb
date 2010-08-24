@@ -1,8 +1,0 @@
-{variables, [{prefix, "{{prefix}}"},
-             {core_dir, "{{prefix}}/dbcore"},
-             {data_dir, "/srv/db"},
-             {view_dir, "/srv/view_index"},
-             {user, "dbcore"}]}.
-{template, "./Makefile", "Makefile"}.
-{template, "./etc/default.ini", "rel/overlay/etc/default.ini"}.
-{file, "rebar.config", "rebar.config"}.

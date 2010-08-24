@@ -25,10 +25,11 @@ distclean: clean
 	@rm -rf rel/dbcore
 	@rm -f rel/overlay/etc/default.ini
 
+include install.mk
 install: dist
-	@mkdir -p {{prefix}}/dbcore/
-	@cp -R rel/dbcore/* {{prefix}}/dbcore/
-	@mkdir -p {{data_dir}}
-	@chown {{user}} {{data_dir}}
-	@mkdir -p {{view_dir}}
-	@chown {{user}} {{view_dir}}
+	@mkdir -p $(prefix)
+	@cp -R rel/dbcore/* $(prefix)
+	@mkdir -p $(data_dir)
+	@chown $(user) $(data_dir)
+	@mkdir -p $(view_dir)
+	@chown $(user) $(view_dir)
