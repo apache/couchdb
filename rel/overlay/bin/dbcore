@@ -4,7 +4,7 @@
 
 ERTS_BIN_DIR=$(cd ${0%/*} && pwd)
 
-ROOTDIR=${ERTS_BIN_DIR%/*/*}/dbcore
+ROOTDIR=${ERTS_BIN_DIR%/*}
 
 START_ERL=`cat $ROOTDIR/releases/start_erl.data`
 ERTS_VSN=${START_ERL% *}
