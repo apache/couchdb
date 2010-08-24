@@ -4,7 +4,7 @@ function quit {
   exit
 }
 
-PREFIX="/opt"
+PREFIX="/opt/dbcore"
 DATA="/srv/db"
 VIEW="/srv/view_index"
 DBCORE_USER=`whoami`
