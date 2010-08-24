@@ -270,6 +270,6 @@ couchTests.attachments= function(debug) {
       T(db.save(bin_doc6).ok == true);
       T(false && "Shouldn't get here!");
   } catch (e) {
-      T(e.error == "missing_stub")
+      T(e.error == "missing_stub");
   }
 };
