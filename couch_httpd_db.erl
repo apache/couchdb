@@ -1059,6 +1059,8 @@ db_attachment_req(Req, _Db, _DocId, _FileNameParts) ->
 
 parse_ranges(undefined, Len) ->
     undefined;
+parse_ranges(fail, Len) ->
+    throw(bad_request);
 parse_ranges(Ranges, Len) ->
     parse_ranges(Ranges, Len, []).
 
