@@ -52,6 +52,14 @@ couchTests.attachment_ranges = function(debug) {
     TEquals("This is a base64 encoded text", xhr.responseText);
     TEquals("29", xhr.getResponseHeader("Content-Length"));
 
+    // Badly formed range header is a 400.
+    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt", {
+        headers: {
+            "Range": "bytes:0-"
+        }
+    });
+    TEquals(400, xhr.status);
+
     // Fetch the end of an entity without an end offset is a 206.
     var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt", {
         headers: {
