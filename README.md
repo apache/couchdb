@@ -44,16 +44,16 @@ To install Spidermonkey 1.9.2 from PPA:
 
 #### Building and installing dbcore
 
-`$CLOUDANT_SRC` is the directory holding your downloaded source files, while `$CLOUDANT_PREFIX` is the prefix to which the software is installed (defaults to `/opt`):
+`$CLOUDANT_SRC` is the directory holding your downloaded source files, while `$PREFIX` is the prefix to which the software is installed (defaults to `/opt/dbcore`):
 
     cd $CLOUDANT_SRC
-    ./configure -p $CLOUDANT_PREFIX
+    ./configure -p $PREFIX
     make
     sudo make install
 
 #### Starting dbcore
 
-    $CLOUDANT_PREFIX/dbcore/bin/dbcore
+    $PREFIX/bin/dbcore
 
 Now, visit http://localhost:5984/_utils in a browser to verify the CouchDB node is operational.
 
