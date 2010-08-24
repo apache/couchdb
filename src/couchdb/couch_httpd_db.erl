@@ -903,17 +903,6 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
            atom_to_list(Enc),
            couch_httpd:accepted_encodings(Req)
         ),
-        Headers = [
-            {"ETag", Etag},
-            {"Cache-Control", "must-revalidate"},
-            {"Content-Type", binary_to_list(Type)},
-            {"Accept-Ranges", "bytes"}
-        ] ++ case ReqAcceptsAttEnc of
-        true ->
-            [{"Content-Encoding", atom_to_list(Enc)}];
-        _ ->
-            []
-        end,
         Len = case {Enc, ReqAcceptsAttEnc} of
         {identity, _} ->
             % stored and served in identity form
@@ -932,6 +921,21 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
             % encoding, and since we cannot serve a correct Content-Length
             % header we'll fall back to a chunked response.
             undefined
+        end,
+        Headers = [
+            {"ETag", Etag},
+            {"Cache-Control", "must-revalidate"},
+            {"Content-Type", binary_to_list(Type)}
+        ] ++ case ReqAcceptsAttEnc of
+        true ->
+            [{"Content-Encoding", atom_to_list(Enc)}];
+        _ ->
+            []
+        end ++ case Enc of
+            identity ->
+                [{"Accept-Ranges", "bytes"}];
+            _ ->
+                [{"Accept-Ranges", "none"}]
         end,
         AttFun = case ReqAcceptsAttEnc of
         false ->
