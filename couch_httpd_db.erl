@@ -1096,7 +1096,7 @@ parse_ranges([], _Len, Acc) ->
 parse_ranges([{From,To}|Rest], Len, Acc) ->
     {From1, To1} = case {From, To} of
         {none, To} ->
-            {Len - To - 1, Len - 1};
+            {Len - To, Len - 1};
         {From, none} ->
             {From, Len - 1};
         _ ->
