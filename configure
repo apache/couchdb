@@ -43,7 +43,6 @@ done
 echo "==> configuring dbcore in rel/overlay.config"
 cat > rel/overlay.config << EOF
 {prefix, "$PREFIX"}.
-{core_dir, "$PREFIX/dbcore"}.
 {data_dir, "$DATA"}.
 {view_dir, "$VIEW"}.
 {user, "$DBCORE_USER"}.
