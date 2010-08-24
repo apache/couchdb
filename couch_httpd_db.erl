@@ -1084,14 +1084,14 @@ db_attachment_req(#httpd{method=Method,mochi_req=MochiReq}=Req, Db, DocId, FileN
 db_attachment_req(Req, _Db, _DocId, _FileNameParts) ->
     send_method_not_allowed(Req, "DELETE,GET,HEAD,PUT").
 
-parse_ranges(undefined, Len) ->
+parse_ranges(undefined, _Len) ->
     undefined;
-parse_ranges(fail, Len) ->
+parse_ranges(fail, _Len) ->
     throw(bad_request);
 parse_ranges(Ranges, Len) ->
     parse_ranges(Ranges, Len, []).
 
-parse_ranges([], Len, Acc) ->
+parse_ranges([], _Len, Acc) ->
     lists:reverse(Acc);
 parse_ranges([{From,To}|Rest], Len, Acc) ->
     {From1, To1} = case {From, To} of
