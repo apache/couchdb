@@ -1086,29 +1086,23 @@ db_attachment_req(Req, _Db, _DocId, _FileNameParts) ->
 
 parse_ranges(undefined, _Len) ->
     undefined;
-parse_ranges(fail, _Len) ->
-    throw(bad_request);
+parse_ranges(fail, Len) ->
+    undefined;
 parse_ranges(Ranges, Len) ->
     parse_ranges(Ranges, Len, []).
 
 parse_ranges([], _Len, Acc) ->
     lists:reverse(Acc);
+parse_ranges([{From, To}|_], Len, _Acc) when is_integer(From) andalso is_integer(To) andalso To < From ->
+    throw(requested_range_not_satisfiable);
+parse_ranges([{From, To}|Rest], Len, Acc) when is_integer(To) andalso To >= Len ->
+    parse_ranges([{From, Len-1}] ++ Rest, Len, Acc);
+parse_ranges([{none, To}|Rest], Len, Acc) ->
+    parse_ranges([{Len - To, Len - 1}] ++ Rest, Len, Acc);
+parse_ranges([{From, none}|Rest], Len, Acc) ->
+    parse_ranges([{From, Len - 1}] ++ Rest, Len, Acc);
 parse_ranges([{From,To}|Rest], Len, Acc) ->
-    {From1, To1} = case {From, To} of
-        {none, To} ->
-            {Len - To, Len - 1};
-        {From, none} ->
-            {From, Len - 1};
-        _ ->
-            {From, To}
-        end,
-    if
-        From < 0 orelse To1 >= Len ->
-            throw(requested_range_not_satisfiable);
-        true ->
-            ok
-    end,
-    parse_ranges(Rest, Len, [{From1, To1}] ++ Acc).
+    parse_ranges(Rest, Len, [{From, To}] ++ Acc).
 
 get_md5_header(Req) ->
     ContentMD5 = couch_httpd:header_value(Req, "Content-MD5"),

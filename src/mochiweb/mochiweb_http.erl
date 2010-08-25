@@ -162,8 +162,6 @@ after_response(Body, Req) ->
             ?MODULE:loop(Socket, Body)
     end.
 
-parse_range_request("bytes=0-") ->
-    undefined;
 parse_range_request(RawRange) when is_list(RawRange) ->
     try
         "bytes=" ++ RangeString = RawRange,

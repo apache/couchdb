@@ -37,28 +37,29 @@ couchTests.attachment_ranges = function(debug) {
             "Range": "bytes=0-28"
         }
     });
-    TEquals(206, xhr.status);
+    TEquals(206, xhr.status, "fetch 0-28");
     TEquals("This is a base64 encoded text", xhr.responseText);
     TEquals("bytes 0-28/29", xhr.getResponseHeader("Content-Range"));
     TEquals("29", xhr.getResponseHeader("Content-Length"));
 
-    // Fetch the whole entity without an end offset is a 200.
+    // Fetch the whole entity without an end offset is a 206.
     var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt", {
         headers: {
             "Range": "bytes=0-"
         }
     });
-    TEquals(200, xhr.status);
+    TEquals(206, xhr.status, "fetch 0-");
     TEquals("This is a base64 encoded text", xhr.responseText);
+    TEquals("bytes 0-28/29", xhr.getResponseHeader("Content-Range"));
     TEquals("29", xhr.getResponseHeader("Content-Length"));
 
-    // Badly formed range header is a 400.
+    // Badly formed range header is a 200.
     var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt", {
         headers: {
             "Range": "bytes:0-"
         }
     });
-    TEquals(400, xhr.status);
+    TEquals(200, xhr.status, "fetch with bad range header");
 
     // Fetch the end of an entity without an end offset is a 206.
     var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt", {
@@ -66,18 +67,20 @@ couchTests.attachment_ranges = function(debug) {
             "Range": "bytes=2-"
         }
     });
-    TEquals(206, xhr.status);
+    TEquals(206, xhr.status, "fetch 2-");
     TEquals("is is a base64 encoded text", xhr.responseText);
     TEquals("bytes 2-28/29", xhr.getResponseHeader("Content-Range"));
     TEquals("27", xhr.getResponseHeader("Content-Length"));
 
-    // Fetch past the end of the entity is a 416
+    // Fetch past the end of the entity is a 206
     var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt", {
         headers: {
             "Range": "bytes=0-29"
         }
     });
-    TEquals(416, xhr.status);
+    TEquals(206, xhr.status, "fetch 0-29");
+    TEquals("bytes 0-28/29", xhr.getResponseHeader("Content-Range"));
+    TEquals("29", xhr.getResponseHeader("Content-Length"));
 
     // Fetch first part of entity is a 206
     var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt", {
@@ -85,7 +88,7 @@ couchTests.attachment_ranges = function(debug) {
             "Range": "bytes=0-3"
         }
     });
-    TEquals(206, xhr.status);
+    TEquals(206, xhr.status, "fetch 0-3");
     TEquals("This", xhr.responseText);
     TEquals("4", xhr.getResponseHeader("Content-Length"));
     TEquals("bytes 0-3/29", xhr.getResponseHeader("Content-Range"));
@@ -96,7 +99,7 @@ couchTests.attachment_ranges = function(debug) {
             "Range": "bytes=10-15"
         }
     });
-    TEquals(206, xhr.status);
+    TEquals(206, xhr.status, "fetch 10-15");
     TEquals("base64", xhr.responseText);
     TEquals("6", xhr.getResponseHeader("Content-Length"));
     TEquals("bytes 10-15/29", xhr.getResponseHeader("Content-Range"));
@@ -107,10 +110,25 @@ couchTests.attachment_ranges = function(debug) {
             "Range": "bytes=-3"
         }
     });
-    TEquals(206, xhr.status);
+    TEquals(206, xhr.status, "fetch -3");
     TEquals("ext", xhr.responseText);
     TEquals("3", xhr.getResponseHeader("Content-Length"));
     TEquals("bytes 26-28/29", xhr.getResponseHeader("Content-Range"));
+    
+    // backward range is 416
+    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt", {
+       headers: {
+           "Range": "bytes=5-3"
+       }
+    });
+    TEquals(416, xhr.status, "fetch 5-3");
 
+    // range completely outside of entity is 416
+    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt", {
+        headers: {
+            "Range": "bytes=300-310"
+        }
+    });
+    TEquals(416, xhr.status, "fetch 300-310");
 
 };
