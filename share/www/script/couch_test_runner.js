@@ -311,6 +311,11 @@ function TEquals(expected, actual, testName) {
     "', got '" + repr(actual) + "'", testName);
 }
 
+function TEqualsIgnoreCase(expected, actual, testName) {
+  T(equals(expected.toUpperCase(), actual.toUpperCase()), "expected '" + repr(expected) +
+    "', got '" + repr(actual) + "'", testName);
+}
+
 function equals(a,b) {
   if (a === b) return true;
   try {
