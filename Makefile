@@ -17,9 +17,6 @@ check:
 dist: compile
 	@rm -rf rel/dbcore
 	@./rebar generate
-	@mkdir -p rel/dbcore/var/share/server
-	@cp couchjs/build/main.js rel/dbcore/var/share/server/
-	@cp couchjs/build/couchjs rel/dbcore/bin/
 
 distclean: clean
 	@rm -rf rel/dbcore
