@@ -5,8 +5,6 @@ function quit {
 }
 
 PREFIX="/opt/dbcore"
-DATA="/srv/db"
-VIEW="/srv/view_index"
 DBCORE_USER=`whoami`
 
 while [ $# -gt 0 ]
@@ -39,6 +37,9 @@ do
     ;;
   esac
 done
+
+if test ! -n "$DATA"; then DATA="$PREFIX/var/lib"; fi
+if test ! -n "$VIEW"; then VIEW="$PREFIX/var/lib"; fi
 
 echo "==> configuring dbcore in rel/overlay.config"
 cat > rel/overlay.config << EOF
