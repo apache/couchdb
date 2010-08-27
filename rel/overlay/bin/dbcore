@@ -4,23 +4,15 @@
 
 ERTS_BIN_DIR=$(cd ${0%/*} && pwd)
 
-ROOTDIR=${ERTS_BIN_DIR%/*}
+export ROOTDIR=${ERTS_BIN_DIR%/*}
 
 START_ERL=`cat $ROOTDIR/releases/start_erl.data`
 ERTS_VSN=${START_ERL% *}
 APP_VSN=${START_ERL#* }
 
-BINDIR=$ROOTDIR/erts-$ERTS_VSN/bin
-EMU=beam
-PROGNAME=`echo $0 | sed 's/.*\///'`
-CMD="$BINDIR/erlexec"
+export BINDIR=$ROOTDIR/erts-$ERTS_VSN/bin
+export EMU=beam
+export PROGNAME=`echo $0 | sed 's/.*\///'`
 
-export EMU
-export ROOTDIR
-export BINDIR
-export PROGNAME
-
-exec $CMD -boot $ROOTDIR/releases/$APP_VSN/dbcore \
-    +Bd -noinput -sasl errlog_type error \
-    +A 16 +K true \
-    -name dbcore
+exec $BINDIR/erlexec -boot $ROOTDIR/releases/$APP_VSN/dbcore \
+    -args_file $ROOTDIR/etc/vm.args
