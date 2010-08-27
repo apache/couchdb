@@ -6,6 +6,8 @@ function quit {
 
 PREFIX="/opt/dbcore"
 DBCORE_USER=`whoami`
+ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
+DIRPATH=`dirname "$ABSPATH"`
 
 while [ $# -gt 0 ]
 do
@@ -56,5 +58,13 @@ data_dir = $DATA
 view_dir = $VIEW
 user = $DBCORE_USER
 EOF
+
+# finally, a few config files for local development nodes
+for i in 1 2 3; do
+cat > rel/dev$i.config << EOF
+{prefix, "$DIRPATH/rel/dev$i"}.
+{data_dir, "$DIRPATH/rel/tmpdata/dev$i"}.
+EOF
+done
 
 cat rel/overlay.config

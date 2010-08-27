@@ -20,7 +20,6 @@ dist: compile
 
 distclean: clean
 	@rm -rf rel/dbcore
-	@rm -f rel/overlay/etc/default.ini
 
 include install.mk
 install: dist
@@ -30,3 +29,12 @@ install: dist
 	@chown $(user) $(data_dir)
 	@mkdir -p $(view_dir)
 	@chown $(user) $(view_dir)
+
+dev: compile
+	@rm -rf rel/dev1 rel/dev2 rel/dev3
+	@echo "==> Building development node #1"
+	@./rebar generate target_dir=dev1 overlay_vars=dev1.config
+	@echo "==> Building development node #2"
+	@./rebar generate target_dir=dev2 overlay_vars=dev2.config
+	@echo "==> Building development node #3"
+	@./rebar generate target_dir=dev3 overlay_vars=dev3.config
