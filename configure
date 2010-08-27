@@ -74,4 +74,4 @@ cat > rel/dev$i.config << EOF
 EOF
 done
 
-cat rel/overlay.config
+cat rel/dbcore.config
