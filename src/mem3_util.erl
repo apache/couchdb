@@ -48,7 +48,7 @@ write_db_doc(Doc) ->
     try
         update_db_doc(Db, Doc)
     catch conflict ->
-        ?LOG_ERROR("conflict writing db doc, must be a race", [])
+        ok % assume this is a race with another shard on this node
     after
         couch_db:close(Db)
     end.
