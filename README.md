@@ -51,39 +51,47 @@ To install Spidermonkey 1.9.2 from PPA:
     make
     sudo make install
 
+`sudo` is only necessary when installing to a prefix which is not user-writeable.  In any case, the installer tries to chown the database directory and logfile to the user who configured dbcore.
+
 #### Starting dbcore
 
     $PREFIX/bin/dbcore
 
 Now, visit http://localhost:5984/_utils in a browser to verify the CouchDB node is operational.
 
-Note: see the rel/sv/README file for information on using runit to stop/start dbcore.
-
-#### Joining a new node to the cluster
-
-To try a development cluster locally, try
-
-    make dev
-
-This will build a three-node cluster under the rel/ directory.  Get the nodes running, like above, by doing the following (in separate terminals):
-
-    ./rel/dev1/bin/dbcore
-    ./rel/dev2/bin/dbcore
-    ./rel/dev3/bin/dbcore
-
 dbcore listens on two ports.  Defaults and explanations:
 
  * 5984 - front door, cluster-aware port, appears as a standalone CouchDB.
  * 5986 - back door, single-node port, used for admin functions
 
-For the three-node dev cluster created with 'make dev' the ports are 15984 & 15986 for dev1, 25984 & 25986 for dev2, and 35984 & 35986 fro dev3.  Now, once the nodes are started, and assuming the hostname is '127.0.0.1', join the dev2 node by sending this PUT to dev1's listening backend port:
+Note: see the rel/sv/README file for information on using runit to stop/start dbcore.
+
+#### Joining a new node to the cluster
+
+Each dbcore node has a local `nodes` database, accessible through the backend interface on port 5986.  Documents in the `nodes` DB name nodes in the cluster.  To add a new node, create a document with that node's name as the ID.  For example
+
+    curl -X PUT http://foo.example.com:5986/nodes/dbcore@bar.example.com -d {}
+
+Everything else should be automatic.
+
+#### Local development cluster
+
+The `make dev` target will build a three-node cluster under the rel/ directory.  Get the nodes running, like above, by doing the following (in separate terminals):
+
+    ./rel/dev1/bin/dbcore
+    ./rel/dev2/bin/dbcore
+    ./rel/dev3/bin/dbcore
+
+These development nodes listen on ports 15984/15986 (dev1), 25984/25986 (dev2), and 35984/35986 (dev3).  Now, once the nodes are started, join the dev2 node by sending this PUT to dev1's listening backend port:
 
     curl -X PUT http://127.0.0.1:15986/nodes/dev2@127.0.0.1 -d {}
 
 To verify the two-node cluster has been linked properly, on either node (via proper frontend port), try:
+
     curl http://127.0.0.1:15984/_membership
 
 You should see something similar to this:
+
     {"all_nodes":["dev1@127.0.0.1","dev2@127.0.0.1"],"cluster_nodes":["dev1@127.0.0.1","dev2@127.0.0.1"]}
 
 Add node 3 to the cluster by sending a similar PUT to either of the first two nodes.
