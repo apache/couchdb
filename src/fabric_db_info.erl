@@ -31,13 +31,18 @@ handle_message({ok, Info}, #shard{dbname=Name} = Shard, {Counters, Acc}) ->
         % already heard from someone else in this range
         {ok, {Counters, Acc}};
     nil ->
-        C1 = fabric_dict:store(Shard, ok, Counters),
+        Seq = couch_util:get_value(update_seq, Info),
+        C1 = fabric_dict:store(Shard, Seq, Counters),
         C2 = fabric_view:remove_overlapping_shards(Shard, C1),
         case fabric_dict:any(nil, C2) of
         true ->
             {ok, {C2, [Info|Acc]}};
         false ->
-            {stop, [{db_name,Name}|merge_results(lists:flatten([Info|Acc]))]}
+            {stop, [
+                {db_name,Name},
+                {update_seq, fabric_view_changes:pack_seqs(C2)} |
+                merge_results(lists:flatten([Info|Acc]))
+            ]}
         end
     end;
 handle_message(_, _, Acc) ->
@@ -51,8 +56,6 @@ merge_results(Info) ->
             [{doc_count, lists:sum(X)} | Acc];
         (doc_del_count, X, Acc) ->
             [{doc_del_count, lists:sum(X)} | Acc];
-        (update_seq, X, Acc) ->
-            [{update_seq, lists:sum(X)} | Acc];
         (purge_seq, X, Acc) ->
             [{purge_seq, lists:sum(X)} | Acc];
         (compact_running, X, Acc) ->

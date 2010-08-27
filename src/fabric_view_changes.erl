@@ -14,7 +14,7 @@
 
 -module(fabric_view_changes).
 
--export([go/5, start_update_notifier/1]).
+-export([go/5, start_update_notifier/1, pack_seqs/1]).
 
 -include("fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
