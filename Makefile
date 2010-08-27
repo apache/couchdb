@@ -29,6 +29,8 @@ install: dist
 	@chown $(user) $(data_dir)
 	@mkdir -p $(view_dir)
 	@chown $(user) $(view_dir)
+	@touch $(prefix)/var/log/dbcore.log
+	@chown $(user) $(prefix)/var/log/dbcore.log
 
 dev: compile
 	@rm -rf rel/dev1 rel/dev2 rel/dev3
