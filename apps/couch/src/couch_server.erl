@@ -207,7 +207,6 @@ try_close_lru(StartTime) ->
 
 open_async(Server, From, DbName, Filepath, Options) ->
     Parent = self(),
-    put({async_open, DbName}, now()),
     Opener = spawn_link(fun() ->
         Res = couch_db:start_link(DbName, Filepath, Options),
         gen_server:call(Parent, {open_result, DbName, Res}, infinity),
@@ -239,10 +238,6 @@ handle_call(get_server, _From, Server) ->
     {reply, {ok, Server}, Server};
 handle_call({open_result, DbName, {ok, Db}}, _From, Server) ->
     link(Db#db.main_pid),
-    case erase({async_open, DbName}) of undefined -> ok; T0 ->
-        ?LOG_INFO("needed ~p ms to open new ~s", [timer:now_diff(now(),T0)/1000,
-            DbName])
-    end,
     % icky hack of field values - compactor_pid used to store clients
     [#db{compactor_pid=Froms}] = ets:lookup(couch_dbs, DbName),
     [gen_server:reply(From, {ok, Db}) || From <- Froms],
@@ -252,7 +247,6 @@ handle_call({open_result, DbName, Error}, _From, Server) ->
     % icky hack of field values - compactor_pid used to store clients
     [#db{compactor_pid=Froms}] = ets:lookup(couch_dbs, DbName),
     [gen_server:reply(From, Error) || From <- Froms],
-    ?LOG_INFO("open_result error ~p for ~s", [Error, DbName]),
     true = ets:delete(couch_dbs, DbName),
     {reply, ok, Server#server{dbs_open=Server#server.dbs_open - 1}};
 handle_call({open, DbName, Options}, From, Server) ->
@@ -273,7 +267,6 @@ handle_call({open, DbName, Options}, From, Server) ->
         end;
     [#db{compactor_pid = Froms} = Db] when is_list(Froms) ->
         % icky hack of field values - compactor_pid used to store clients
-        ?LOG_INFO("adding another listener to async open for ~s", [DbName]),
         true = ets:insert(couch_dbs, Db#db{compactor_pid = [From|Froms]}),
         {noreply, Server};
     [#db{} = Db] ->
