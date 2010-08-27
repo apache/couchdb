@@ -72,7 +72,7 @@ Each dbcore node has a local `nodes` database, accessible through the backend in
 
     curl -X PUT http://foo.example.com:5986/nodes/dbcore@bar.example.com -d {}
 
-Everything else should be automatic.
+Everything else should be automatic, provided the machines can ping each other and the nodes set the same magic cookie.  You are advised to change the magic cookie from the default in `rel/etc/vm.args` when on a public network.
 
 #### Local development cluster
 
@@ -140,7 +140,7 @@ You can fix this by removing that file:
 
 #### Dbcore fails on startup with a "Can't set long node name!" error
 
-Cloudant-dbcore requires that your system be set up with a fully qualified domain name. Make sure tha the command `hostname -f` outputs a full hostname. If not, add the full hostname of your server to the `/etc/hosts` file.
+Cloudant-dbcore requires that your system be set up with a fully qualified domain name. Make sure that the command `hostname -f` outputs a full hostname. If not, add the full hostname of your server to the `/etc/hosts` file.
 
 ### Contact
 
