@@ -22,3 +22,7 @@ couchjs/config.log
 @abs_top_builddir@/
 apps/couch/test/temp*
 apps/couch/test/etap/
+
+# dev
+rel/dev*
+rel/tmpdata
