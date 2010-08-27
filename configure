@@ -49,6 +49,9 @@ cat > rel/overlay.config << EOF
 {data_dir, "$DATA"}.
 {view_dir, "$VIEW"}.
 {user, "$DBCORE_USER"}.
+{node_name, "-name dbcore"}.
+{cluster_port, 5984}.
+{backend_port, 5986}.
 EOF
 
 cat > install.mk << EOF
@@ -64,6 +67,10 @@ for i in 1 2 3; do
 cat > rel/dev$i.config << EOF
 {prefix, "$DIRPATH/rel/dev$i"}.
 {data_dir, "$DIRPATH/rel/tmpdata/dev$i"}.
+{view_dir, "$DIRPATH/rel/tmpdata/dev$i"}.
+{node_name, "-name dev$i@127.0.0.1"}.
+{cluster_port, `expr 10000 \* $i + 5984`}.
+{backend_port, `expr 10000 \* $i + 5986`}.
 EOF
 done
 
