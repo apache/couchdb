@@ -132,15 +132,7 @@ _W_ - write quorum constant.  When writing the N copies, the data store will res
 
 ### Troubleshooting
 
-#### `make install` fails with "read file info /usr/lib/erlang/man/man5/modprobe.d.5 failed"
-
-You can fix this by removing that file:
-
-   `sudo rm /usr/lib/erlang/man/man5/modprobe.d.5`
-
-#### Dbcore fails on startup with a "Can't set long node name!" error
-
-Cloudant-dbcore requires that your system be set up with a fully qualified domain name. Make sure that the command `hostname -f` outputs a full hostname. If not, add the full hostname of your server to the `/etc/hosts` file.
+Please see [http://github.com/cloudant/dbcore/wiki/troubleshooting][8]
 
 ### Contact
 
@@ -158,3 +150,4 @@ Cloudant folks are usually hanging out in IRC.  Freenode, channel #cloudant.  We
 [5]: http://loadbalancer:5984/_utils
 [6]: https://launchpad.net/~commonjs/+archive/ppa/
 [7]: http://mxcl.github.com/homebrew/
+[8]: http://github.com/cloudant/dbcore/wiki/troubleshooting
