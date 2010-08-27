@@ -331,7 +331,7 @@ handle_call({delete, DbName, _Options}, _From, Server) ->
     Error ->
         {reply, Error, Server}
     end;
-handle_call({db_updated, Db}, _From, Server) ->
+handle_call({db_updated, #db{name = DbName} = Db}, _From, Server) ->
     true = ets:insert(couch_dbs, Db),
     true = ets:insert(couch_lru, {DbName, now()}),
     {reply, ok, Server}.
