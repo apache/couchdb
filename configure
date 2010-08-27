@@ -43,8 +43,8 @@ done
 if test ! -n "$DATA"; then DATA="$PREFIX/var/lib"; fi
 if test ! -n "$VIEW"; then VIEW="$PREFIX/var/lib"; fi
 
-echo "==> configuring dbcore in rel/overlay.config"
-cat > rel/overlay.config << EOF
+echo "==> configuring dbcore in rel/dbcore.config"
+cat > rel/dbcore.config << EOF
 {prefix, "$PREFIX"}.
 {data_dir, "$DATA"}.
 {view_dir, "$VIEW"}.
