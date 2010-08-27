@@ -61,19 +61,32 @@ Note: see the rel/sv/README file for information on using runit to stop/start db
 
 #### Joining a new node to the cluster
 
-First, dbcore listens on two ports.  Defaults and explanations:
+To try a development cluster locally, try
+
+    make dev
+
+This will build a three-node cluster under the rel/ directory.  Get the nodes running, like above, by doing the following (in separate terminals):
+
+    ./rel/dev1/bin/dbcore
+    ./rel/dev2/bin/dbcore
+    ./rel/dev3/bin/dbcore
+
+dbcore listens on two ports.  Defaults and explanations:
 
  * 5984 - front door, cluster-aware port, appears as a standalone CouchDB.
  * 5986 - back door, single-node port, used for admin functions
 
-Next, once the first node is started, and assuming its hostname is 'node1_host' start dbcore on another node, with hostname 'node2_host'.  Once it's started successfully, on node1_host, join the new node:
-    curl -X PUT http://localhost:5986/nodes/dbcore@node2_host -d {}
+For the three-node dev cluster created with 'make dev' the ports are 15984 & 15986 for dev1, 25984 & 25986 for dev2, and 35984 & 35986 fro dev3.  Now, once the nodes are started, and assuming the hostname is '127.0.0.1', join the dev2 node by sending this PUT to dev1's listening backend port:
 
-To verify the two-node cluster has been linked properly, on either node, try:
-    curl http://locahost:5984/_membership
+    curl -X PUT http://127.0.0.1:15986/nodes/dev2@127.0.0.1 -d {}
+
+To verify the two-node cluster has been linked properly, on either node (via proper frontend port), try:
+    curl http://127.0.0.1:15984/_membership
 
 You should see something similar to this:
-    {"all_nodes":["dbcore@node1_host","dbcore@node2_host"],"cluster_nodes":["dbcore@node1_host","dbcore@node2_host"]}
+    {"all_nodes":["dev1@127.0.0.1","dev2@127.0.0.1"],"cluster_nodes":["dev1@127.0.0.1","dev2@127.0.0.1"]}
+
+Add node 3 to the cluster by sending a similar PUT to either of the first two nodes.
 
 #### Now What?
 
