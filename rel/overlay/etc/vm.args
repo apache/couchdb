@@ -18,5 +18,5 @@
 # Start a pool of asynchronous IO threads
 +A 16
 
-# Uncomment this line to disable the interactive Erlang shell
-# +Bd -noinput
+# Comment this line out to enable the interactive Erlang shell on startup
++Bd -noinput
