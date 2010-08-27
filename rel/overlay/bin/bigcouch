@@ -24,5 +24,5 @@ export BINDIR=$ROOTDIR/erts-$ERTS_VSN/bin
 export EMU=beam
 export PROGNAME=`echo $0 | sed 's/.*\///'`
 
-exec $BINDIR/erlexec -boot $ROOTDIR/releases/$APP_VSN/dbcore \
+exec $BINDIR/erlexec -boot $ROOTDIR/releases/$APP_VSN/bigcouch \
     -args_file $ROOTDIR/etc/vm.args

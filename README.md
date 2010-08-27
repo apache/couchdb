@@ -1,21 +1,19 @@
-## cloudant-dbcore
-
 ### Overview
 
-Cloudant-dbcore is a highly available, fault-tolerant, clustered, fully api-compliant version of [Apache CouchDB][1].  While it appears to the end-user as one CouchDB instance, it is in fact one or more nodes in an elastic cluster, acting in concert to store and retrieve documents, index and serve views, and serve CouchApps.  Dbcore has been developed and is continually maintained by [Cloudant][2] who offer hosted CouchDB as a service.
+BigCouch is a highly available, fault-tolerant, clustered, mostly api-compliant version of [Apache CouchDB][1].  While it appears to the end-user as one CouchDB instance, it is in fact one or more nodes in an elastic cluster, acting in concert to store and retrieve documents, index and serve views, and serve CouchApps.  BigCouch has been developed and is continually maintained by [Cloudant][2] who offer hosted CouchDB as a service.
 
 Clusters behave according to concepts outlined in [Amazon's Dynamo paper][4], namely that each node can accept requests, data is placed on partitions based on a consistent hashing algorithm, and quorum protocols are for read/write operations.
 
 ### Contents
 
  * README.md   this file
- * LICENSE     open-source license governing dbcore
+ * LICENSE     open-source license governing BigCouch
 
 ### Getting Started
 
 #### Prerequisites
 
-Cloudant-dbcore has the same dependencies as CouchDB:
+BigCouch has the same dependencies as CouchDB:
 
  * Erlang (R13B03 or higher)
  * ICU (4.2 is preferable)
@@ -42,35 +40,35 @@ To install Spidermonkey 1.9.2 from PPA:
     brew install erlang icu4c spidermonkey
     brew ln icu4c
 
-#### Building and installing dbcore
+#### Building and installing BigCouch
 
-`$CLOUDANT_SRC` is the directory holding your downloaded source files, while `$PREFIX` is the prefix to which the software is installed (defaults to `/opt/dbcore`):
+`$CLOUDANT_SRC` is the directory holding your downloaded source files, while `$PREFIX` is the prefix to which the software is installed (defaults to `/opt/bigcouch`):
 
     cd $CLOUDANT_SRC
     ./configure -p $PREFIX
     make
     sudo make install
 
-`sudo` is only necessary when installing to a prefix which is not user-writeable.  In any case, the installer tries to chown the database directory and logfile to the user who configured dbcore.
+`sudo` is only necessary when installing to a prefix which is not user-writeable.  In any case, the installer tries to chown the database directory and logfile to the user who configured BigCouchbigcouch.
 
-#### Starting dbcore
+#### Starting BigCouch
 
-    $PREFIX/bin/dbcore
+    $PREFIX/bin/bigcouch
 
 Now, visit http://localhost:5984/_utils in a browser to verify the CouchDB node is operational.
 
-dbcore listens on two ports.  Defaults and explanations:
+BigCouch listens on two ports.  Defaults and explanations:
 
  * 5984 - front door, cluster-aware port, appears as a standalone CouchDB.
  * 5986 - back door, single-node port, used for admin functions
 
-Note: see the rel/sv/README file for information on using runit to stop/start dbcore.
+Note: see the `rel/sv/README` file for information on using `runit` to stop/start BigCouch.
 
 #### Joining a new node to the cluster
 
-Each dbcore node has a local `nodes` database, accessible through the backend interface on port 5986.  Documents in the `nodes` DB name nodes in the cluster.  To add a new node, create a document with that node's name as the ID.  For example
+Each BigCouch node has a local `nodes` database, accessible through the backend interface on port 5986.  Documents in the `nodes` DB name nodes in the cluster.  To add a new node, create a document with that node's name as the ID.  For example
 
-    curl -X PUT http://foo.example.com:5986/nodes/dbcore@bar.example.com -d {}
+    curl -X PUT http://foo.example.com:5986/nodes/bigcouch@bar.example.com -d {}
 
 Everything else should be automatic, provided the machines can ping each other and the nodes set the same magic cookie.  You are advised to change the magic cookie from the default in `rel/etc/vm.args` when on a public network.
 
@@ -78,9 +76,9 @@ Everything else should be automatic, provided the machines can ping each other a
 
 The `make dev` target will build a three-node cluster under the rel/ directory.  Get the nodes running, like above, by doing the following (in separate terminals):
 
-    ./rel/dev1/bin/dbcore
-    ./rel/dev2/bin/dbcore
-    ./rel/dev3/bin/dbcore
+    ./rel/dev1/bin/bigcouch
+    ./rel/dev2/bin/bigcouch
+    ./rel/dev3/bin/bigcouch
 
 These development nodes listen on ports 15984/15986 (dev1), 25984/25986 (dev2), and 35984/35986 (dev3).  Now, once the nodes are started, join the dev2 node by sending this PUT to dev1's listening backend port:
 
@@ -98,7 +96,7 @@ Add node 3 to the cluster by sending a similar PUT to either of the first two no
 
 #### Now What?
 
-If the above steps were successful, you should have a running dbcore cluster that looks just like a standalone CouchDB.  You may interact with it the same way you would a standalone CouchDB, via the HTTP REST interface.
+If the above steps were successful, you should have a running BigCouch cluster that looks just like a standalone CouchDB.  You may interact with it the same way you would a standalone CouchDB, via the HTTP REST interface.
 
 Because every node can handle requests equally, you may want to put a load balancer in front of the cluster and set up a round-robin strategy for distributing incoming requests across all of your cluster's nodes.
 
@@ -132,7 +130,7 @@ _W_ - write quorum constant.  When writing the N copies, the data store will res
 
 ### Troubleshooting
 
-Please see [http://github.com/cloudant/dbcore/wiki/troubleshooting][8]
+Please see [http://github.com/cloudant/bigcouch/wiki/troubleshooting][8]
 
 ### Contact
 
@@ -150,4 +148,4 @@ Cloudant folks are usually hanging out in IRC.  Freenode, channel #cloudant.  We
 [5]: http://loadbalancer:5984/_utils
 [6]: https://launchpad.net/~commonjs/+archive/ppa/
 [7]: http://mxcl.github.com/homebrew/
-[8]: http://github.com/cloudant/dbcore/wiki/troubleshooting
+[8]: http://github.com/cloudant/bigcouch/wiki/troubleshooting

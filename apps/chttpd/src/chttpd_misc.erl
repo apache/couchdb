@@ -35,16 +35,16 @@ handle_welcome_req(#httpd{method='GET'}=Req, WelcomeMessage) ->
     send_json(Req, {[
         {couchdb, WelcomeMessage},
         {version, list_to_binary(couch:version())},
-        {dbcore, get_version()}
+        {bigcouch, get_version()}
     ]});
 handle_welcome_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 get_version() ->
     Releases = release_handler:which_releases(),
-    Version = case [V || {"dbcore", V, _, current} <- Releases] of
+    Version = case [V || {"bigcouch", V, _, current} <- Releases] of
     [] ->
-        case [V || {"dbcore", V, _, permanent} <- Releases] of
+        case [V || {"bigcouch", V, _, permanent} <- Releases] of
         [] ->
             "dev";
         [Permanent] ->
