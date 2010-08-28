@@ -104,7 +104,7 @@ readjson(#os_proc{} = OsProc) ->
 
 % gen_server API
 init([Command, Options, PortOptions]) ->
-    Spawnkiller = filename:join([code:root_dir(), "bin", "couchspawnkillable"]),
+    Spawnkiller = filename:join([code:priv_dir(couch), "couchspawnkillable.sh"]),
     BaseProc = #os_proc{
         command=Command,
         port=open_port({spawn, Spawnkiller ++ " " ++ Command}, PortOptions),
