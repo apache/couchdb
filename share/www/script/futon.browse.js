@@ -93,7 +93,7 @@
                   $("#databases tbody.content tr:eq(" + idx + ")")
                     .find("td.size").text($.futon.formatSize(info.disk_size)).end()
                     .find("td.count").text(info.doc_count).end()
-                    .find("td.seq").text(info.update_seq);
+                    .find("td.seq").text(info.update_seq.split("-")[0]);
                 },
                 error : function() {}
               });
