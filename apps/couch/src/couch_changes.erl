@@ -14,8 +14,7 @@
 -include("couch_db.hrl").
 
 -export([handle_changes/3, get_changes_timeout/2, main_only_filter/1,
-    all_docs_filter/1, wait_db_updated/2, get_rest_db_updated/0,
-    make_filter_fun/4]).
+    all_docs_filter/1, get_rest_db_updated/0, make_filter_fun/4]).
 
 %% @spec handle_changes(#changes_args{}, #httpd{} | {json_req, {[any()]}}, #db{}) -> any()
 handle_changes(#changes_args{filter=Raw, style=Style}=Args1, Req, Db) ->
