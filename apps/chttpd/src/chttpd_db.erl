@@ -201,7 +201,7 @@ db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
                     ?LOG_INFO("Batch doc error (~s): ~p",[DocId, Error])
                 end
             end),
-            
+
         send_json(Req, 202, [], {[
             {ok, true},
             {id, DocId}
@@ -624,7 +624,7 @@ send_doc_efficiently(Req, #doc{atts=Atts}=Doc, Headers, Options) ->
             send_json(Req, 200, Headers, couch_doc:to_json_obj(Doc, Options));
         true ->
             Boundary = couch_uuids:random(),
-            JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, 
+            JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc,
                     [attachments, follows|Options])),
             {ContentType, Len} = couch_doc:len_doc_to_multi_part_stream(
                     Boundary,JsonBytes, Atts,false),
@@ -640,13 +640,13 @@ send_doc_efficiently(Req, #doc{atts=Atts}=Doc, Headers, Options) ->
 send_docs_multipart(Req, Results, Options) ->
     OuterBoundary = couch_uuids:random(),
     InnerBoundary = couch_uuids:random(),
-    CType = {"Content-Type", 
+    CType = {"Content-Type",
         "multipart/mixed; boundary=\"" ++ ?b2l(OuterBoundary) ++ "\""},
     {ok, Resp} = start_chunked_response(Req, 200, [CType]),
     couch_httpd:send_chunk(Resp, <<"--", OuterBoundary/binary>>),
     lists:foreach(
         fun({ok, #doc{atts=Atts}=Doc}) ->
-            JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, 
+            JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc,
                     [attachments,follows|Options])),
             {ContentType, _Len} = couch_doc:len_doc_to_multi_part_stream(
                     InnerBoundary, JsonBytes, Atts, false),
@@ -659,8 +659,8 @@ send_docs_multipart(Req, Results, Options) ->
         ({{not_found, missing}, RevId}) ->
              RevStr = couch_doc:rev_to_str(RevId),
              Json = ?JSON_ENCODE({[{"missing", RevStr}]}),
-             couch_httpd:send_chunk(Resp, 
-                [<<"\r\nContent-Type: application/json; error=\"true\"\r\n\r\n">>, 
+             couch_httpd:send_chunk(Resp,
+                [<<"\r\nContent-Type: application/json; error=\"true\"\r\n\r\n">>,
                 Json,
                 <<"\r\n--", OuterBoundary/binary>>])
          end, Results),
