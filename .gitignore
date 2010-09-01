@@ -7,6 +7,7 @@ erl_crash.dump
 # building
 apps/*/ebin/
 rel/dbcore
+rel/bigcouch.config
 rel/overlay.config
 install.mk
 
