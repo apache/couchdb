@@ -544,7 +544,10 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
         update_type = UpdateType
     } = parse_doc_query(Req),
     couch_doc:validate_docid(DocId),
-    
+
+    W = couch_httpd:qs_value(Req, "w", couch_config:get("cluster", "w", "2")),
+    Options = [{user_ctx,Ctx}, {w,W}],
+
     Loc = absolute_uri(Req, [$/, Db#db.name, $/, DocId]),
     RespHeaders = [{"Location", Loc}],
     case couch_util:to_list(couch_httpd:header_value(Req, "Content-Type")) of
@@ -558,9 +561,9 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
         "ok" ->
             % batch
             Doc = couch_doc_from_req(Req, DocId, couch_httpd:json_body(Req)),
-        
+
             spawn(fun() ->
-                    case catch(fabric:update_doc(Db, Doc, [{user_ctx,Ctx}])) of
+                    case catch(fabric:update_doc(Db, Doc, Options)) of
                     {ok, _} -> ok;
                     Error ->
                         ?LOG_INFO("Batch doc error (~s): ~p",[DocId, Error])
@@ -692,13 +695,14 @@ update_doc(Req, Db, DocId, Doc, Headers) ->
 
 update_doc(#httpd{user_ctx=Ctx} = Req, Db, DocId, #doc{deleted=Deleted}=Doc,
         Headers, UpdateType) ->
+    W = couch_httpd:qs_value(Req, "w", couch_config:get("cluster", "w", "2")),
     case couch_httpd:header_value(Req, "X-Couch-Full-Commit") of
     "true" ->
-        Options = [full_commit, UpdateType, {user_ctx,Ctx}];
+        Options = [full_commit, UpdateType, {user_ctx,Ctx}, {w,W}];
     "false" ->
-        Options = [delay_commit, UpdateType, {user_ctx,Ctx}];
+        Options = [delay_commit, UpdateType, {user_ctx,Ctx}, {w,W}];
     _ ->
-        Options = [UpdateType, {user_ctx,Ctx}]
+        Options = [UpdateType, {user_ctx,Ctx}, {w,W}]
     end,
     {ok, NewRev} = fabric:update_doc(Db, Doc, Options),
     NewRevStr = couch_doc:rev_to_str(NewRev),
