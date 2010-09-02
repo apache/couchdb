@@ -1086,14 +1086,14 @@ db_attachment_req(Req, _Db, _DocId, _FileNameParts) ->
 
 parse_ranges(undefined, _Len) ->
     undefined;
-parse_ranges(fail, Len) ->
+parse_ranges(fail, _Len) ->
     undefined;
 parse_ranges(Ranges, Len) ->
     parse_ranges(Ranges, Len, []).
 
 parse_ranges([], _Len, Acc) ->
     lists:reverse(Acc);
-parse_ranges([{From, To}|_], Len, _Acc) when is_integer(From) andalso is_integer(To) andalso To < From ->
+parse_ranges([{From, To}|_], _Len, _Acc) when is_integer(From) andalso is_integer(To) andalso To < From ->
     throw(requested_range_not_satisfiable);
 parse_ranges([{From, To}|Rest], Len, Acc) when is_integer(To) andalso To >= Len ->
     parse_ranges([{From, Len-1}] ++ Rest, Len, Acc);
