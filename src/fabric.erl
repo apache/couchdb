@@ -189,7 +189,8 @@ cleanup_index_files(DbName) ->
             re:run(FilePath, RegExp, [{capture, none}]) == nomatch
         end, FileList)
     end,
-    [file:delete(File) || File <- DeleteFiles].
+    [file:delete(File) || File <- DeleteFiles],
+    ok.
 
 %% some simple type validation and transcoding
 
