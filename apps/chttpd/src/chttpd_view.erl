@@ -93,7 +93,7 @@ handle_view_req(Req, _Db, _DDoc) ->
     send_method_not_allowed(Req, "GET,POST,HEAD").
 
 handle_temp_view_req(Req, _Db) ->
-    Msg = <<"Temporary views are not supported by Cloudant">>,
+    Msg = <<"Temporary views are not supported in BigCouch">>,
     chttpd:send_error(Req, 403, forbidden, Msg).
 
 reverse_key_default(?MIN_STR) -> ?MAX_STR;
