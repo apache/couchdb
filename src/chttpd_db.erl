@@ -118,9 +118,9 @@ handle_compact_req(Req, _) ->
     Msg = <<"Compaction is handled automatically by Cloudant">>,
     couch_httpd:send_error(Req, 403, forbidden, Msg).
 
-handle_view_cleanup_req(Req, _) ->
-    Msg = <<"Old view indices are purged automatically by Cloudant">>,
-    couch_httpd:send_error(Req, 403, forbidden, Msg).
+handle_view_cleanup_req(Req, Db) ->
+    ok = fabric:cleanup_index_files(Db),
+    send_json(Req, 202, {[{ok, true}]}).
 
 handle_design_req(#httpd{
         path_parts=[_DbName, _Design, Name, <<"_",_/binary>> = Action | _Rest],
