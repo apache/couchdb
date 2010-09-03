@@ -1,4 +1,5 @@
 -module(oauth_http).
+-compile({nowarn_deprecated_function, {http,request,4}}).
 
 -export([get/1, post/2, response_params/1, response_body/1, response_code/1]).
 
