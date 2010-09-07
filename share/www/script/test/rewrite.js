@@ -91,6 +91,27 @@ couchTests.rewrite = function(debug) {
              }
             },
             {
+             "from": "/type/<type>.json",
+             "to": "_show/type/:type",
+             "query": {
+                 "format": "json"
+             }
+            },
+            {
+             "from": "/type/<type>.xml",
+             "to": "_show/type/:type",
+             "query": {
+                 "format": "xml"
+             }
+            },
+            {
+             "from": "/type/<type>",
+             "to": "_show/type/:type",
+             "query": {
+                 "format": "html"
+             }
+            },
+            {
              "from": "/welcome5/*",
              "to" : "_show/*",
              "query": {
@@ -193,6 +214,9 @@ couchTests.rewrite = function(debug) {
             }),
             "welcome3": stringFun(function(doc,req) {
               return "Welcome " + req.query["name"];
+            }),
+            "type": stringFun(function(doc, req) {
+                return req.id + " as " + req.query.format;
             })
           },
           updates: {
@@ -380,6 +404,15 @@ couchTests.rewrite = function(debug) {
         xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/simpleForm/complexView6?a=test&b=essai");
         T(xhr.status == 200, "with query params");
         T(/Value: doc 4/.test(xhr.responseText));
+
+        req = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/type/test.json");
+        T(req.responseText == "test as json");
+
+        req = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/type/test.xml");
+        T(req.responseText == "test as xml");
+
+         req = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/type/test");
+        T(req.responseText == "test as html");
         
         // test path relative to server
         designDoc.rewrites.push({
