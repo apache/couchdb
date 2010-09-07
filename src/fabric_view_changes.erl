@@ -182,10 +182,8 @@ handle_message({complete, EndSeq}, Worker, State) ->
         end
     end.
 
-make_changes_args(#changes_args{style=main_only, filter=undefined}=Args) ->
-    Args#changes_args{filter = fun couch_changes:main_only_filter/1};
-make_changes_args(#changes_args{style=all_docs, filter=undefined}=Args) ->
-    Args#changes_args{filter = fun couch_changes:all_docs_filter/1};
+make_changes_args(#changes_args{style=Style, filter=undefined}=Args) ->
+    Args#changes_args{filter = Style};
 make_changes_args(Args) ->
     Args.
 

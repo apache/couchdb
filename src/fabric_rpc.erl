@@ -338,10 +338,10 @@ send(Key, Value, #view_acc{limit=Limit} = Acc) ->
     end.
 
 changes_enumerator(DocInfo, {Db, _Seq, Args}) ->
-    #changes_args{include_docs=IncludeDocs, filter=FilterFun} = Args,
+    #changes_args{include_docs=IncludeDocs, filter=Acc} = Args,
     #doc_info{id=Id, high_seq=Seq, revs=[#rev_info{deleted=Del,rev=Rev}|_]}
         = DocInfo,
-    case [Result || Result <- FilterFun(DocInfo), Result /= null] of
+    case [X || X <- couch_changes:filter(DocInfo, Acc), X /= null] of
     [] ->
         {ok, {Db, Seq, Args}};
     Results ->
