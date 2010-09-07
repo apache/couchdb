@@ -13,8 +13,8 @@
 -module(couch_changes).
 -include("couch_db.hrl").
 
--export([handle_changes/3, get_changes_timeout/2, main_only_filter/1,
-    all_docs_filter/1, get_rest_db_updated/0, make_filter_fun/4]).
+-export([handle_changes/3, get_changes_timeout/2, get_rest_db_updated/0,
+    configure_filter/4, filter/2]).
 
 %% @spec handle_changes(#changes_args{}, #httpd{} | {json_req, {[any()]}}, #db{}) -> any()
 handle_changes(#changes_args{filter=Raw, style=Style}=Args1, Req, Db) ->
@@ -102,16 +102,47 @@ make_filter_fun(Filter, Style, Req, Db) when is_list(Filter) ->
         throw({bad_request,
             "filter parameter must be of the form `designname/filtername`"})
     end;
-make_filter_fun(_, main_only, _, _) ->
-    fun ?MODULE:main_only_filter/1;
-make_filter_fun(_, all_docs, _, _) ->
-    fun ?MODULE:all_docs_filter/1.
+make_filter_fun(_, Style, _, _) ->
+    fun(DI) -> ?MODULE:filter(DI, Style) end.
 
-main_only_filter(#doc_info{revs=[#rev_info{rev=Rev}|_]}) ->
-    [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]}].
+configure_filter(Filter, Style, Req, Db) when is_list(Filter) ->
+    case [?l2b(couch_httpd:unquote(X)) || X <- string:tokens(Filter, "/")] of
+    [] ->
+        % fall back to standard filter
+        Style;
+    [DName, FName] ->
+        JsonReq = chttpd_external:json_req_obj(Req, Db),
+        DesignId = <<"_design/", DName/binary>>,
+        DDoc = chttpd_db:couch_doc_open(Db, DesignId, nil, []),
+        % validate that the ddoc has the filter fun
+        #doc{body={Props}} = DDoc,
+        couch_util:get_nested_json_value({Props}, [<<"filters">>, FName]),
+        {custom, Style, {Db, JsonReq, DDoc, FName}};
+    _Else ->
+        throw({bad_request,
+            "filter parameter must be of the form `designname/filtername`"})
+    end;
+configure_filter(_, Style, _, _) ->
+    Style.
 
-all_docs_filter(#doc_info{revs=Revs}) ->
-    [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]} || #rev_info{rev=Rev} <- Revs].
+filter(#doc_info{revs=[#rev_info{rev=Rev}|_]}, main_only) ->
+    [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]}];
+filter(#doc_info{revs=Revs}, all_docs) ->
+    [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]} || #rev_info{rev=Rev} <- Revs];
+filter(#doc_info{id=Id, revs=RevInfos}, {custom, main_only, Acc}) ->
+    custom_filter(Id, [(hd(RevInfos))#rev_info.rev], Acc);
+filter(#doc_info{id=Id, revs=RevInfos}, {custom, all_docs, Acc}) ->
+    custom_filter(Id, [R || #rev_info{rev=R} <- RevInfos], Acc).
+
+custom_filter(Id, Revs, {Db, JsonReq, DDoc, Filter}) ->
+    {ok, Results} = fabric:open_revs(Db, Id, Revs, [deleted, conflicts]),
+    Docs = [Doc || {ok, Doc} <- Results],
+    {ok, Passes} = couch_query_servers:filter_docs({json_req,JsonReq}, Db,
+        DDoc, Filter, Docs),
+    ?LOG_INFO("filtering ~p ~p", [Id, Passes]),
+    [{[{<<"rev">>, couch_doc:rev_to_str({RevPos,RevId})}]}
+        || {Pass, #doc{revs={RevPos,[RevId|_]}}}
+        <- lists:zip(Passes, Docs), Pass == true].
 
 get_changes_timeout(Args, Callback) ->
     #changes_args{
