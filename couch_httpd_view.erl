@@ -321,7 +321,6 @@ warn_on_empty_key_range(#view_query_args{start_key=A, end_key=A}) ->
     ok;
 warn_on_empty_key_range(#view_query_args{
     start_key=StartKey, end_key=EndKey, direction=Dir}) ->
-    ?LOG_ERROR("view_query_args ~p", [{StartKey, EndKey, Dir}]),
     case {Dir, couch_view:less_json(StartKey, EndKey)} of
         {fwd, false} ->
             throw({query_parse_error,
