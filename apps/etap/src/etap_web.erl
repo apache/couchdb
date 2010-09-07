@@ -26,7 +26,6 @@
 %% @todo Support cookies.
 %% @doc Provide testing functionality for web requests.
 -module(etap_web).
--compile({nowarn_deprecated_function, {http,request,4}}).
 
 -export([simple_200/2, simple_404/2, build_request/4]).
 
