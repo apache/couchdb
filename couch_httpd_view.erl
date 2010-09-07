@@ -246,7 +246,7 @@ parse_view_params(Req, Keys, ViewType) ->
     QueryArgs = lists:foldl(fun({K, V}, Args2) ->
         validate_view_query(K, V, Args2)
     end, Args, lists:reverse(QueryParams)), % Reverse to match QS order.
-
+    warn_on_empty_key_range(QueryArgs),
     GroupLevel = QueryArgs#view_query_args.group_level,
     case {ViewType, GroupLevel, IsMultiGet} of
     {reduce, exact, true} ->
@@ -312,6 +312,25 @@ parse_view_param("callback", _) ->
     []; % Verified in the JSON response functions
 parse_view_param(Key, Value) ->
     [{extra, {Key, Value}}].
+
+warn_on_empty_key_range(#view_query_args{start_key=undefined}) ->
+    ok;
+warn_on_empty_key_range(#view_query_args{end_key=undefined}) ->
+    ok;
+warn_on_empty_key_range(#view_query_args{start_key=A, end_key=A}) ->
+    ok;
+warn_on_empty_key_range(#view_query_args{
+    start_key=StartKey, end_key=EndKey, direction=Dir}) ->
+    ?LOG_ERROR("view_query_args ~p", [{StartKey, EndKey, Dir}]),
+    case {Dir, couch_view:less_json(StartKey, EndKey)} of
+        {fwd, false} ->
+            throw({query_parse_error,
+            <<"No rows can match your key range, reverse your startkey and endkey or set descending=true">>});
+        {rev, true} ->
+            throw({query_parse_error,
+            <<"No rows can match your key range, reverse your startkey and endkey or set descending=false">>});
+        _ -> ok
+    end.
 
 validate_view_query(start_key, Value, Args) ->
     case Args#view_query_args.multi_get of
