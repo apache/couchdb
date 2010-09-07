@@ -158,5 +158,13 @@ couchTests.view_errors = function(debug) {
       T(xhr.status == 500);
       result = JSON.parse(xhr.responseText);
       T(result.error == "reduce_overflow_error");
+
+      try {
+          db.query(function() {emit(null, null)}, null, {startkey: 2, endkey:1});
+          T(0 == 1);
+      } catch(e) {
+          T(e.error == "query_parse_error");
+          T(e.reason.match(/no rows can match/i));
+      }
     });
 };
