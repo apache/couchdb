@@ -17,7 +17,7 @@
 
 -export([start_link/0, init/1, handle_call/3, handle_info/2, handle_cast/2]).
 -export([code_change/3, terminate/2]).
--export([match_vhost/1]).
+-export([match_vhost/1, urlsplit_netloc/2]).
 -export([redirect_to_vhost/2]).
 
 -include("couch_db.hrl").
@@ -149,6 +149,8 @@ handle_call({match_vhost, MochiReq}, _From, State) ->
         vhost_fun = Fun
     } = State,
 
+    {"/" ++ VPath, Query, Fragment} = mochiweb_util:urlsplit_path(MochiReq:get(raw_path)),
+    VPathParts =  string:tokens(VPath, "/"),
 
     XHost = couch_config:get("httpd", "x_forwarded_host", "X-Forwarded-Host"),
     VHost = case MochiReq:get_header_value(XHost) of
@@ -160,18 +162,25 @@ handle_call({match_vhost, MochiReq}, _From, State) ->
         Value -> Value
     end,
     {VHostParts, VhostPort} = split_host_port(VHost),
-    MochiReq1 = case try_bind_vhost(VHosts, lists:reverse(VHostParts),
-            VhostPort) of
+    FinalMochiReq = case try_bind_vhost(VHosts, lists:reverse(VHostParts),
+            VhostPort, VPathParts) of
         no_vhost_matched -> MochiReq;
-        VhostTarget ->
+        {VhostTarget, NewPath} ->
             case vhost_global(VHostGlobals, MochiReq) of
                 true ->
                     MochiReq;
                 _Else ->
-                    Fun(MochiReq, VhostTarget)
+                    NewPath1 = mochiweb_util:urlunsplit_path({NewPath, Query,
+                                          Fragment}),
+                    MochiReq1 = mochiweb_request:new(MochiReq:get(socket),
+                                      MochiReq:get(method),
+                                      NewPath1,
+                                      MochiReq:get(version),
+                                      MochiReq:get(headers)),
+                    Fun(MochiReq1, VhostTarget)
             end
     end,
-    {reply, {ok, MochiReq1}, State}; 
+    {reply, {ok, FinalMochiReq}, State}; 
         
 % update vhosts
 handle_call(vhosts_changed, _From, State) ->
@@ -247,19 +256,25 @@ vhost_global( VhostGlobals, MochiReq) ->
 
 %% bind host
 %% first it try to bind the port then the hostname.
-try_bind_vhost([], _HostParts, _Port) ->
+try_bind_vhost([], _HostParts, _Port, _PathParts) ->
     no_vhost_matched;
-try_bind_vhost([VhostSpec|Rest], HostParts, Port) ->
-    {{VHostParts, VPort}, Path} = VhostSpec,
+try_bind_vhost([VhostSpec|Rest], HostParts, Port, PathParts) ->
+    {{VHostParts, VPort, VPath}, Path} = VhostSpec,
     case bind_port(VPort, Port) of
         ok -> 
             case bind_vhost(lists:reverse(VHostParts), HostParts, []) of
-                {ok, Bindings, Remainings} -> 
-                    Path1 = make_target(Path, Bindings, Remainings, []),
-                    "/" ++ string:join(Path1,[?SEPARATOR]);
-                fail -> try_bind_vhost(Rest, HostParts, Port)
+                {ok, Bindings, Remainings} ->
+                    case bind_path(VPath, PathParts) of
+                        {ok, PathParts1} ->
+                            Path1 = make_target(Path, Bindings, Remainings, []),
+                            {make_path(Path1), make_path(PathParts1)};
+                        fail -> 
+                            try_bind_vhost(Rest, HostParts, Port,
+                                PathParts)
+                    end;
+                fail -> try_bind_vhost(Rest, HostParts, Port, PathParts)
             end;
-        fail ->  try_bind_vhost(Rest, HostParts, Port)
+        fail ->  try_bind_vhost(Rest, HostParts, Port, PathParts)
     end.
 
 %% doc: build new patch from bindings. bindings are query args
@@ -288,7 +303,7 @@ make_target([P|Rest], Bindings, Remaining, Acc) ->
 bind_port(Port, Port) -> ok;
 bind_port(_,_) -> fail.
 
-% bind bhost
+%% bind bhost
 bind_vhost([],[], Bindings) -> {ok, Bindings, []};
 bind_vhost([?MATCH_ALL], [], _Bindings) -> fail;
 bind_vhost([?MATCH_ALL], Rest, Bindings) -> {ok, Bindings, Rest};
@@ -299,17 +314,40 @@ bind_vhost([Cname|Rest], [Cname|RestHost], Bindings) ->
     bind_vhost(Rest, RestHost, Bindings);
 bind_vhost(_, _, _) -> fail.
 
+%% bind path
+bind_path([], PathParts) ->
+    {ok, PathParts};
+bind_path(_VPathParts, []) ->
+    fail;
+bind_path([Path|VRest],[Path|Rest]) ->
+   bind_path(VRest, Rest);
+bind_path(_, _) ->
+    fail.
+
 % utilities
 
 
 %% create vhost list from ini
 make_vhosts() ->
     lists:foldl(fun({Vhost, Path}, Acc) ->
-        {H, P} = split_host_port(Vhost),
-        H1 = make_spec(H, []),
-        [{{H1,P}, split_path(Path)}|Acc]
+        [{parse_vhost(Vhost), split_path(Path)}|Acc]
     end, [], couch_config:get("vhosts")).
 
+
+parse_vhost(Vhost) ->
+    case urlsplit_netloc(Vhost, []) of
+        {[], Path} ->
+            {make_spec("*", []), 80, Path};
+        {HostPort, []} ->
+            {H, P} = split_host_port(HostPort),
+            H1 = make_spec(H, []),
+            {H1, P, []};
+        {HostPort, Path} ->
+            {H, P} = split_host_port(HostPort),
+            H1 = make_spec(H, []),
+            {H1, P, string:tokens(Path, "/")}
+    end.
+            
 
 split_host_port(HostAsString) ->
     case string:rchr(HostAsString, $:) of
@@ -351,3 +389,14 @@ parse_var(P) ->
         _ -> P
     end.
 
+
+% mochiweb doesn't export it.
+urlsplit_netloc("", Acc) ->
+    {lists:reverse(Acc), ""};
+urlsplit_netloc(Rest=[C | _], Acc) when C =:= $/; C =:= $?; C =:= $# ->
+    {lists:reverse(Acc), Rest};
+urlsplit_netloc([C | Rest], Acc) ->
+    urlsplit_netloc(Rest, [C | Acc]).
+
+make_path(Parts) ->
+     "/" ++ string:join(Parts,[?SEPARATOR]).
