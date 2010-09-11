@@ -35,7 +35,7 @@ include_sasl = true
 authentication_db = _users
 authentication_redirect = /_utils/session.html
 require_valid_user = false
-timeout = 600 ; number of seconds before automatic logout
+timeout = 43200 ; (default to 12 hours) number of seconds before automatic logout
 auth_cache_size = 50 ; size is number of cache entries
 
 [query_servers]
