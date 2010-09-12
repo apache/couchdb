@@ -41,8 +41,8 @@ function() {
     whatever : {
       stringzone : "exports.string = 'plankton';",
       commonjs : {
-        whynot : "exports.test = require('../stringzone')",
-        upper : "exports.testing = require('./whynot').test.string.toUpperCase()+module.id"
+        whynot : "exports.test = require('../stringzone'); exports.foo = require('whatever/stringzone');",
+        upper : "exports.testing = require('./whynot').test.string.toUpperCase()+module.id+require('./whynot').foo.string"
       }
     },
     views: {
@@ -86,7 +86,7 @@ function() {
   // test commonjs require
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/requirey");
   T(xhr.status == 200);
-  TEquals("PLANKTONwhatever/commonjs/upper", xhr.responseText);
+  TEquals("PLANKTONwhatever/commonjs/upperplankton", xhr.responseText);
 
   // test that we get design doc info back
   var dinfo = db.designInfo("_design/test");
