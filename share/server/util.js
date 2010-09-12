@@ -10,36 +10,50 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-var resolveModule = function(names, parent, current, path) {
+var resolveModule = function(names, mod, root) {
   if (names.length == 0) {
-    if (typeof current != "string") {
+    if (typeof mod.current != "string") {
       throw ["error","invalid_require_path",
-        'Must require a JavaScript string, not: '+(typeof current)];
+        'Must require a JavaScript string, not: '+(typeof mod.current)];
     }
-    return [current, parent, path];
+    return {
+      current : mod.current,
+      parent : mod.parent,
+      id : mod.id,
+      exports : {}
+    }
   }
   // we need to traverse the path
   var n = names.shift();
   if (n == '..') {
-    if (!(parent && parent.parent)) {
-      throw ["error", "invalid_require_path", 'Object has no parent '+JSON.stringify(current)];
+    if (!(mod.parent && mod.parent.parent)) {
+      throw ["error", "invalid_require_path", 'Object has no parent '+JSON.stringify(mod.current)];
     }
-    path = path.slice(0, path.lastIndexOf('/'));
-    return resolveModule(names, parent.parent.parent, parent.parent, path);
+    return resolveModule(names, {
+      id : mod.id.slice(0, mod.id.lastIndexOf('/')),
+      parent : mod.parent.parent.parent,
+      current : mod.parent.parent.current
+    });
   } else if (n == '.') {
-    if (!parent) {
-      throw ["error", "invalid_require_path", 'Object has no parent '+JSON.stringify(current)];
+    if (!mod.parent) {
+      throw ["error", "invalid_require_path", 'Object has no parent '+JSON.stringify(mod.current)];
     }
-    return resolveModule(names, parent.parent, parent, path);
+    return resolveModule(names, {
+      parent : mod.parent.parent,
+      current : mod.parent.current,
+      id : mod.id
+    });
+  } else if (root) {
+    mod = {current : root};
   }
-  if (!current[n]) {
-    throw ["error", "invalid_require_path", 'Object has no property "'+n+'". '+JSON.stringify(current)];
+  if (!mod.current[n]) {
+    throw ["error", "invalid_require_path", 'Object has no property "'+n+'". '+JSON.stringify(mod.current)];
   }
-  var p = current;
-  current = current[n];
-  current.parent = p;
-  path = path ? path + '/' + n : n;
-  return resolveModule(names, p, current, path);
+  return resolveModule(names, {
+    current : mod.current[n],
+    parent : mod,
+    id : mod.id ? mod.id + '/' + n : n
+  });
 };
 
 var Couch = {
@@ -52,19 +66,17 @@ var Couch = {
     try {
       if (sandbox) {
         if (ddoc) {
-          var require = function(name, parent) {
-            if (!parent) {parent = {}};
-            var resolved = resolveModule(name.split('/'), parent.actual, ddoc, parent.id);
-            var s = "function (module, exports, require) { " + resolved[0] + " }";
-            var module = {id:resolved[2], actual:resolved[1]};
-            module.exports = {};
+          var require = function(name, module) {
+            module = module || {};
+            var newModule = resolveModule(name.split('/'), module, ddoc);
+            var s = "function (module, exports, require) { " + newModule.current + " }";
             try {
               var func = sandbox ? evalcx(s, sandbox) : eval(s);
-              func.apply(sandbox, [module, module.exports, function(name) {return require(name, module)}]);
+              func.apply(sandbox, [newModule, newModule.exports, function(name) {return require(name, newModule)}]);
             } catch(e) { 
               throw ["error","compilation_error","Module require('"+name+"') raised error "+e.toSource()]; 
             }
-            return module.exports;
+            return newModule.exports;
           }
           sandbox.require = require;
         }
