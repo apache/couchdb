@@ -58,7 +58,8 @@ function() {
     },
     shows: {
       simple: "function() {return 'ok'};",
-      requirey : "function() { var lib = require('whatever/commonjs/upper'); return lib.testing; };"
+      requirey : "function() { var lib = require('whatever/commonjs/upper'); return lib.testing; };",
+      circular : "function() { var lib = require('whatever/commonjs/upper'); return JSON.stringify(this); };"
     }
   }; 
 
@@ -87,6 +88,10 @@ function() {
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/requirey");
   T(xhr.status == 200);
   TEquals("PLANKTONwhatever/commonjs/upperplankton", xhr.responseText);
+
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/circular");
+  T(xhr.status == 200);
+  TEquals("javascript", JSON.parse(xhr.responseText).language);
 
   // test that we get design doc info back
   var dinfo = db.designInfo("_design/test");
