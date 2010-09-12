@@ -94,7 +94,7 @@ init([_Parent, #http_db{}=Source, Since, PostProps] = Args) ->
         {ok, #state{conn=Pid, last_seq=Since, reqid=ReqId, init_args=Args}};
     {ibrowse_async_headers, ReqId, Code, Hdrs} when Code=="301"; Code=="302" ->
         catch ibrowse:stop_worker_process(Pid),
-        Url2 = mochiweb_headers:get_value("Location", mochiweb_headers:make(Hdrs)),
+        Url2 = redirect_url(Hdrs, Req#http_db.url),
         %% TODO use couch_httpc:request instead of start_http_request
         {Pid2, ReqId2} = start_http_request(Url2),
         receive {ibrowse_async_headers, ReqId2, "200", _} ->
