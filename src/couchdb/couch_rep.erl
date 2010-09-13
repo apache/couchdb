@@ -354,15 +354,9 @@ close_db(Db) ->
     couch_db:close(Db).
 
 dbname(#http_db{url = Url}) ->
-    strip_password(Url);
+    couch_util:url_strip_password(Url);
 dbname(#db{name = Name}) ->
     Name.
-
-strip_password(Url) ->
-    re:replace(Url,
-        "http(s)?://([^:]+):[^@]+@(.*)$",
-        "http\\1://\\2:*****@\\3",
-        [{return, list}]).
 
 dbinfo(#http_db{} = Db) ->
     {DbProps} = couch_rep_httpc:request(Db),
