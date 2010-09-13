@@ -1,12 +1,11 @@
 %%%-------------------------------------------------------------------
 %%% File    : ibrowse_app.erl
 %%% Author  : Chandrashekhar Mullaparthi <chandrashekhar.mullaparthi@t-mobile.co.uk>
-%%% Description :
+%%% Description : 
 %%%
 %%% Created : 15 Oct 2003 by Chandrashekhar Mullaparthi <chandrashekhar.mullaparthi@t-mobile.co.uk>
 %%%-------------------------------------------------------------------
 -module(ibrowse_app).
--vsn('$Id: ibrowse_app.erl,v 1.1 2005/05/05 22:28:28 chandrusf Exp $ ').
 
 -behaviour(application).
 %%--------------------------------------------------------------------
@@ -42,11 +41,11 @@
 %% Func: start/2
 %% Returns: {ok, Pid}        |
 %%          {ok, Pid, State} |
-%%          {error, Reason}
+%%          {error, Reason}   
 %%--------------------------------------------------------------------
 start(_Type, _StartArgs) ->
     case ibrowse_sup:start_link() of
-	{ok, Pid} ->
+	{ok, Pid} -> 
 	    {ok, Pid};
 	Error ->
 	    Error
@@ -54,7 +53,7 @@ start(_Type, _StartArgs) ->
 
 %%--------------------------------------------------------------------
 %% Func: stop/1
-%% Returns: any
+%% Returns: any 
 %%--------------------------------------------------------------------
 stop(_State) ->
     ok.
