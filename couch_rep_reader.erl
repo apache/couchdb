@@ -230,7 +230,7 @@ update_sequence_lists(Seq, State) ->
         opened_seqs = Opened
     }.
 
-open_doc_revs(#http_db{} = DbS, DocId, Revs) ->
+open_doc_revs(#http_db{url = Url} = DbS, DocId, Revs) ->
     %% all this logic just splits up revision lists that are too long for
     %% MochiWeb into multiple requests
     BaseQS = [{revs,true}, {latest,true}, {att_encoding_info,true}],
@@ -246,28 +246,39 @@ open_doc_revs(#http_db{} = DbS, DocId, Revs) ->
     JsonResults = lists:flatten([couch_rep_httpc:request(R) || R <- Requests]),
 
     Transform =
-    fun({[{<<"missing">>, Rev}]}) ->
-        {{not_found, missing}, couch_doc:parse_rev(Rev)};
-    ({[{<<"ok">>, Json}]}) ->
+    fun({[{<<"ok">>, Json}]}, Acc) ->
         #doc{id=Id, revs=Rev, atts=Atts} = Doc = couch_doc:from_json_obj(Json),
-        Doc#doc{atts=[couch_rep_att:convert_stub(A, {DbS,Id,Rev}) || A <- Atts]}
+        Doc1 = Doc#doc{
+            atts=[couch_rep_att:convert_stub(A, {DbS,Id,Rev}) || A <- Atts]
+        },
+        [Doc1 | Acc];
+    ({ErrorProps}, Acc) ->
+        Err = couch_util:get_value(<<"error">>, ErrorProps,
+            ?JSON_ENCODE({ErrorProps})),
+        ?LOG_ERROR("Replicator: error accessing doc ~s at ~s, reason: ~s",
+           [DocId, couch_util:url_strip_password(Url), Err]),
+        Acc
     end,
-    [Transform(Result) || Result <- JsonResults].
+    lists:reverse(lists:foldl(Transform, [], JsonResults)).
 
-open_doc(#http_db{} = DbS, DocId) ->
+open_doc(#http_db{url = Url} = DbS, DocId) ->
     % get latest rev of the doc
     Req = DbS#http_db{
         resource=url_encode(DocId),
         qs=[{att_encoding_info, true}]
     },
-    case couch_rep_httpc:request(Req) of
-    {[{<<"error">>,<<"not_found">>}, {<<"reason">>,<<"missing">>}]} ->
-        [];
-    Json ->
+    {Props} = Json = couch_rep_httpc:request(Req),
+    case couch_util:get_value(<<"_id">>, Props) of
+    Id when is_binary(Id) ->
         #doc{id=Id, revs=Rev, atts=Atts} = Doc = couch_doc:from_json_obj(Json),
         [Doc#doc{
             atts=[couch_rep_att:convert_stub(A, {DbS,Id,Rev}) || A <- Atts]
-        }]
+        }];
+    undefined ->
+        Err = couch_util:get_value(<<"error">>, Props, ?JSON_ENCODE(Json)),
+        ?LOG_ERROR("Replicator: error accessing doc ~s at ~s, reason: ~s",
+            [DocId, couch_util:url_strip_password(Url), Err]),
+        []
     end.
 
 reader_loop(ReaderServer, Source, DocIds) when is_list(DocIds) ->
