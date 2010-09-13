@@ -257,9 +257,10 @@ handle_next_changes(_From, State) ->
 handle_headers(200, _, State) ->
     maybe_stream_next(State),
     {noreply, State};
-handle_headers(301, Hdrs, State) ->
+handle_headers(301, Hdrs, #state{init_args = InitArgs} = State) ->
     catch ibrowse:stop_worker_process(State#state.conn),
-    Url = mochiweb_headers:get_value("Location", mochiweb_headers:make(Hdrs)),
+    [_, #http_db{url = Url1} | _] = InitArgs,
+    Url = couch_rep_httpc:redirect_url(Hdrs, Url1),
     %% TODO use couch_httpc:request instead of start_http_request
     {Pid, ReqId} = start_http_request(Url),
     {noreply, State#state{conn=Pid, reqid=ReqId}};
