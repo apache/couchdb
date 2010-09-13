@@ -351,7 +351,8 @@ delete_user(#httpd{user_ctx=UserCtx}=Req, Db, UserName) ->
     end.
 
 extract_username(Form) ->
-    try ?l2b(couch_util:get_value("username", Form))
+    CouchFormat = couch_util:get_value("name", Form),
+    try ?l2b(couch_util:get_value("username", Form, CouchFormat))
     catch error:badarg ->
         throw({bad_request, <<"user accounts must have a username">>})
     end.
@@ -363,8 +364,9 @@ extract_password(Form) ->
     end.
 
 extract_username_password(Form) ->
+    CouchFormat = couch_util:get_value("name", Form),
     try
-        {?l2b(couch_util:get_value("username", Form)),
+        {?l2b(couch_util:get_value("username", Form, CouchFormat)),
          ?l2b(couch_util:get_value("password", Form))}
     catch error:badarg ->
         Msg = <<"user accounts must have a username and password">>,
