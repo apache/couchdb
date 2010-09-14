@@ -210,9 +210,16 @@ handle_info({'EXIT', From, Reason}, #state{changes_loop=From} = State) ->
 handle_info({'EXIT', _From, normal}, State) ->
     {noreply, State};
 
-handle_info(Msg, State) ->
-    ?LOG_DEBUG("unexpected message at changes_feed ~p", [Msg]),
-    {noreply, State}.
+handle_info(Msg, #state{init_args = InitArgs} = State) ->
+    case Msg of
+    changes_timeout ->
+        [_, #http_db{url = Url} | _] = InitArgs,
+        ?LOG_ERROR("changes loop timeout, no data received from ~s",
+            [couch_util:url_strip_password(Url)]);
+    _ ->
+        ?LOG_ERROR("changes loop received unexpected message ~p", [Msg])
+    end,
+    {stop, Msg, State}.
 
 terminate(_Reason, State) ->
     #state{
@@ -377,7 +384,7 @@ maybe_stream_next(#state{reqid=nil}) ->
     ok;
 maybe_stream_next(#state{complete=false, count=N} = S) when N < ?BUFFER_SIZE ->
     timer:cancel(get(timeout)),
-    {ok, Timeout} = timer:exit_after(31000, changes_timeout),
+    {ok, Timeout} = timer:send_after(31000, changes_timeout),
     put(timeout, Timeout),
     ibrowse:stream_next(S#state.reqid);
 maybe_stream_next(_) ->
