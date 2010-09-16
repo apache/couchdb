@@ -43,7 +43,8 @@ next(Server) ->
     gen_server:call(Server, next_changes, infinity).
 
 stop(Server) ->
-    gen_server:call(Server, stop).
+    catch gen_server:call(Server, stop),
+    ok.
 
 init([Parent, #http_db{}=Source, Since, PostProps]) ->
     process_flag(trap_exit, true),
@@ -95,7 +96,7 @@ init([Parent, #http_db{}=Source, Since, PostProps]) ->
         ibrowse:stream_next(ReqId),
         {ok, #state{conn=Pid, last_seq=Since, reqid=ReqId, init_args=Args}};
     {ibrowse_async_headers, ReqId, Code, Hdrs} when Code=="301"; Code=="302" ->
-        catch ibrowse:stop_worker_process(Pid),
+        stop_link_worker(Pid),
         Url2 = couch_rep_httpc:redirect_url(Hdrs, Req#http_db.url),
         Req2 = couch_rep_httpc:redirected_request(Req, Url2),
         Pid2 = couch_rep_httpc:spawn_link_worker_process(Req2),
@@ -108,7 +109,7 @@ init([Parent, #http_db{}=Source, Since, PostProps]) ->
             {stop, changes_timeout}
         end;
     {ibrowse_async_headers, ReqId, "404", _} ->
-        catch ibrowse:stop_worker_process(Pid),
+        stop_link_worker(Pid),
         ?LOG_INFO("source doesn't have _changes, trying _all_docs_by_seq", []),
         Self = self(),
         BySeqPid = spawn_link(fun() -> by_seq_loop(Self, Source, Since) end),
@@ -207,8 +208,9 @@ handle_info({'EXIT', From, Reason}, #state{changes_loop=From} = State) ->
     ?LOG_ERROR("changes_loop died with reason ~p", [Reason]),
     {stop, changes_loop_died, State};
 
-handle_info({'EXIT', _From, normal}, State) ->
-    {noreply, State};
+handle_info({'EXIT', From, Reason}, State) ->
+    ?LOG_ERROR("changes loop, process ~p died with reason ~p", [From, Reason]),
+    {stop, {From, Reason}, State};
 
 handle_info(Msg, #state{init_args = InitArgs} = State) ->
     case Msg of
@@ -227,8 +229,7 @@ terminate(_Reason, State) ->
         conn = Conn
     } = State,
     if is_pid(ChangesPid) -> exit(ChangesPid, stop); true -> ok end,
-    if is_pid(Conn) -> catch ibrowse:stop_worker_process(Conn); true -> ok end,
-    ok.
+    stop_link_worker(Conn).
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
@@ -271,7 +272,7 @@ handle_headers(200, _, State) ->
     {noreply, State};
 handle_headers(Code, Hdrs, #state{init_args = InitArgs} = State)
         when Code =:= 301 ; Code =:= 302 ->
-    catch ibrowse:stop_worker_process(State#state.conn),
+    stop_link_worker(State#state.conn),
     [Parent, #http_db{url = Url1} = Source, Since, PostProps] = InitArgs,
     Url = couch_rep_httpc:redirect_url(Hdrs, Url1),
     Source2 = couch_rep_httpc:redirected_request(Source, Url),
@@ -389,3 +390,10 @@ maybe_stream_next(#state{complete=false, count=N} = S) when N < ?BUFFER_SIZE ->
     ibrowse:stream_next(S#state.reqid);
 maybe_stream_next(_) ->
     timer:cancel(get(timeout)).
+
+stop_link_worker(Conn) when is_pid(Conn) ->
+    unlink(Conn),
+    receive {'EXIT', Conn, _} -> ok after 0 -> ok end,
+    catch ibrowse:stop_worker_process(Conn);
+stop_link_worker(_) ->
+    ok.
