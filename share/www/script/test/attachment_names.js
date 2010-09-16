@@ -24,7 +24,7 @@ couchTests.attachment_names = function(debug) {
         data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
       }
     }
-  }
+  };
 
   // inline attachments
   try {
@@ -72,7 +72,7 @@ couchTests.attachment_names = function(debug) {
         data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
       }
     }
-  }
+  };
 
   try {
     db.save(binAttDoc);

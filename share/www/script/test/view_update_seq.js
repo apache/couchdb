@@ -35,7 +35,7 @@ couchTests.view_update_seq = function(debug) {
         reduce:"function (keys, values) { return sum(values); };"
       }
     }
-  }
+  };
   T(db.save(designDoc).ok);
 
   T(db.info().update_seq == 1);

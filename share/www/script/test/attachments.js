@@ -24,7 +24,7 @@ couchTests.attachments= function(debug) {
         data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
       }
     }
-  }
+  };
 
   var save_response = db.save(binAttDoc);
   T(save_response.ok);
@@ -158,7 +158,7 @@ couchTests.attachments= function(debug) {
 
   // Attachment sparseness COUCHDB-220
 
-  var docs = []
+  var docs = [];
   for (var i = 0; i < 5; i++) {
     var doc = {
       _id: (i).toString(),
@@ -168,8 +168,8 @@ couchTests.attachments= function(debug) {
           data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
         }
       }
-    }
-    docs.push(doc)
+    };
+    docs.push(doc);
   }
 
   var saved = db.bulkSave(docs);
@@ -256,7 +256,7 @@ couchTests.attachments= function(debug) {
         data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
       }
     }
-  }
+  };
   T(db.save(bin_doc6).ok);
   // stub out the attachment
   bin_doc6._attachments["foo.txt"] = { stub: true };

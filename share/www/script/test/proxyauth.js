@@ -39,7 +39,7 @@ couchTests.proxyauth = function(debug) {
     db.createDb();
     
     var benoitcUserDoc = CouchDB.prepareUserDoc({
-      name: "benoitc@apache.org", 
+      name: "benoitc@apache.org"
     }, "test");
     T(usersDb.save(benoitcUserDoc).ok);
     
@@ -72,10 +72,9 @@ couchTests.proxyauth = function(debug) {
         }),
         "role": stringFun(function(doc, req) {
           return req.userCtx['roles'][0];
-        }),
+        })
       }
-      
-    }
+    };
 
     db.save(designDoc);
     
@@ -128,4 +127,4 @@ couchTests.proxyauth = function(debug) {
     TestFun
   );
   
-}
+};

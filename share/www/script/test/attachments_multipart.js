@@ -58,7 +58,7 @@ couchTests.attachments_multipart= function(debug) {
     
   var result = JSON.parse(xhr.responseText);
   
-  T(result.ok)
+  T(result.ok);
   
   
     

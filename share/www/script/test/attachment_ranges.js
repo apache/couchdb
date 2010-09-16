@@ -26,7 +26,7 @@ couchTests.attachment_ranges = function(debug) {
                 data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
             }
         }
-    }
+    };
 
     var save_response = db.save(binAttDoc);
     T(save_response.ok);

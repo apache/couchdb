@@ -33,7 +33,7 @@ couchTests.attachment_paths = function(debug) {
           data: "V2UgbGlrZSBwZXJjZW50IHR3byBGLg=="
         }
       }
-    }
+    };
 
     T(db.save(binAttDoc).ok);
 
@@ -95,7 +95,7 @@ couchTests.attachment_paths = function(debug) {
           data: "V2UgbGlrZSBwZXJjZW50IHR3byBGLg=="
         }
       }
-    }
+    };
 
     T(db.save(binAttDoc).ok);
 

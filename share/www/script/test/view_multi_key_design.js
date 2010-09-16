@@ -34,11 +34,11 @@ couchTests.view_multi_key_design = function(debug) {
         reduce:"function (keys, values) { return sum(values); };"
       }
     }
-  }
+  };
   T(db.save(designDoc).ok);
 
   // Test that missing keys work too
-  var keys = [101,30,15,37,50]
+  var keys = [101,30,15,37,50];
   var reduce = db.view("test/summate",{group:true},keys).rows;
   T(reduce.length == keys.length-1); // 101 is missing
   for(var i=0; i<reduce.length; i++) {

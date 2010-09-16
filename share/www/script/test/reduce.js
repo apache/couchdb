@@ -15,14 +15,15 @@ couchTests.reduce = function(debug) {
   db.deleteDb();
   db.createDb();
   if (debug) debugger;
-  var numDocs = 500
+  var numDocs = 500;
   var docs = makeDocs(1,numDocs + 1);
   db.bulkSave(docs);
   var summate = function(N) {return (N+1)*N/2;};
 
   var map = function (doc) {
       emit(doc.integer, doc.integer);
-      emit(doc.integer, doc.integer)};
+      emit(doc.integer, doc.integer);
+  };
   var reduce = function (keys, values) { return sum(values); };
   var result = db.query(map, reduce);
   T(result.rows[0].value == 2*summate(numDocs));
@@ -69,7 +70,7 @@ couchTests.reduce = function(debug) {
       T(db.info().doc_count == ((i - 1) * 10 * 11) + ((j + 1) * 11));
     }
 
-    map = function (doc) {emit(doc.keys, 1)};
+    map = function (doc) { emit(doc.keys, 1); };
     reduce = function (keys, values) { return sum(values); };
 
     var results = db.query(map, reduce, {group:true});
@@ -107,7 +108,7 @@ couchTests.reduce = function(debug) {
   db.createDb();
 
 
-  var map = function (doc) {emit(doc.val, doc.val)};
+  var map = function (doc) { emit(doc.val, doc.val); };
   var reduceCombine = function (keys, values, rereduce) {
       // This computes the standard deviation of the mapped results
       var stdDeviation=0.0;

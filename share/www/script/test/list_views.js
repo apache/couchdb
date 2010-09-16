@@ -398,7 +398,7 @@ couchTests.list_views = function(debug) {
   T(/LastKey: 0/.test(xhr.responseText));
 
   // Test we do multi-key requests on lists and views in separate docs.
-  var url = "/test_suite_db/_design/lists/_list/simpleForm/views/basicView"
+  var url = "/test_suite_db/_design/lists/_list/simpleForm/views/basicView";
   xhr = CouchDB.request("POST", url, {
     body: '{"keys":[-2,-4,-5,-7]}'
   });

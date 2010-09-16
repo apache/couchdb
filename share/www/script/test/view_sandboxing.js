@@ -42,11 +42,11 @@ couchTests.view_sandboxing = function(debug) {
 
     // make sure that a view cannot access the map_funs array defined used by
     // the view server
-    var results = db.query(function(doc) { map_funs.push(1); emit(null, doc) });
+    var results = db.query(function(doc) { map_funs.push(1); emit(null, doc); });
     T(results.total_rows == 0);
 
     // make sure that a view cannot access the map_results array defined used by
     // the view server
-    var results = db.query(function(doc) { map_results.push(1); emit(null, doc) });
+    var results = db.query(function(doc) { map_results.push(1); emit(null, doc); });
     T(results.total_rows == 0);
 };

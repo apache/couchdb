@@ -64,7 +64,7 @@ couchTests.bulk_docs = function(debug) {
 
   // save doc 0, this will cause a conflict when we save docs[0]
   var doc = db.open("0");
-  docs[0] = db.open("0")
+  docs[0] = db.open("0");
   db.save(doc);
 
   docs[0].shooby = "dooby";
