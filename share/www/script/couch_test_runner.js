@@ -21,7 +21,7 @@ function patchTest(fun) {
   var source = fun.toString();
   var output = "";
   var i = 0;
-  var testMarker = "T("
+  var testMarker = "T(";
   while (i < source.length) {
     var testStart = source.indexOf(testMarker, i);
     if (testStart == -1) {
@@ -232,13 +232,13 @@ function saveTestReport(report) {
       $.couch.info({success : function(node_info) {
         report.node = node_info;
         db.saveDoc(report);        
-      }})
+      }});
     };
     var createDb = function() {
       db.create({success: function() {
         db.info({success:saveReport});        
       }});    
-    }
+    };
     db.info({error: createDb, success:saveReport});
   }
 };
@@ -302,7 +302,7 @@ function T(arg1, arg2, testName) {
         .find("code").text(message).end()
         .appendTo($("td.details ol", currentRow));
     }
-    numFailures += 1
+    numFailures += 1;
   }
 }
 
@@ -336,18 +336,18 @@ function repr(val) {
 }
 
 function makeDocs(start, end, templateDoc) {
-  var templateDocSrc = templateDoc ? JSON.stringify(templateDoc) : "{}"
+  var templateDocSrc = templateDoc ? JSON.stringify(templateDoc) : "{}";
   if (end === undefined) {
     end = start;
     start = 0;
   }
-  var docs = []
+  var docs = [];
   for (var i = start; i < end; i++) {
     var newDoc = eval("(" + templateDocSrc + ")");
     newDoc._id = (i).toString();
     newDoc.integer = i;
     newDoc.string = (i).toString();
-    docs.push(newDoc)
+    docs.push(newDoc);
   }
   return docs;
 }
