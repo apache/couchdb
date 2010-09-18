@@ -188,10 +188,11 @@ handle_request_int(MochiReq, DefaultFun,
     {FirstPart, _, _} ->
         list_to_binary(FirstPart)
     end,
-    ?LOG_DEBUG("~p ~s ~p~nHeaders: ~p", [
+    ?LOG_DEBUG("~p ~s ~p from ~p~nHeaders: ~p", [
         MochiReq:get(method),
         RawUri,
         MochiReq:get(version),
+        MochiReq:get(peer),
         mochiweb_headers:to_list(MochiReq:get(headers))
     ]),
     
