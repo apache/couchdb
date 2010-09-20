@@ -133,9 +133,9 @@ get_changes_timeout(Args, Callback) ->
     undefined ->
         case Timeout of
         undefined ->
-            {DefaultTimeout, fun() -> stop end};
+            {DefaultTimeout, fun(UserAcc) -> {stop, UserAcc} end};
         infinity ->
-            {infinity, fun() -> stop end};
+            {infinity, fun(UserAcc) -> {stop, UserAcc} end};
         _ ->
             {lists:min([DefaultTimeout, Timeout]),
                 fun(UserAcc) -> {stop, UserAcc} end}
