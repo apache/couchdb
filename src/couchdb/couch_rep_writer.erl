@@ -119,7 +119,7 @@ write_multi_part_doc(#http_db{headers=Headers} = Db, #doc{atts=Atts} = Doc) ->
         end
     end,
     Request = Db#http_db{
-        resource = couch_util:url_encode(Doc#doc.id),
+        resource = couch_util:encode_doc_id(Doc),
         method = put,
         qs = [{new_edits, false}],
         body = {BodyFun, nil},

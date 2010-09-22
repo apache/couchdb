@@ -557,7 +557,7 @@ fold_replication_logs([Db|Rest]=Dbs, Vsn, LogId, NewId,
     end.
 
 open_replication_log(#http_db{}=Db, DocId) ->
-    Req = Db#http_db{resource=couch_util:url_encode(?b2l(DocId))},
+    Req = Db#http_db{resource=couch_util:encode_doc_id(DocId)},
     case couch_rep_httpc:request(Req) of
     {[{<<"error">>, _}, {<<"reason">>, _}]} ->
         ?LOG_DEBUG("didn't find a replication log for ~s", [Db#http_db.url]),
@@ -767,9 +767,9 @@ ensure_full_commit(Source, RequiredSeq) ->
         InstanceStartTime
     end.
 
-update_local_doc(#http_db{} = Db, #doc{id=DocId} = Doc) ->
+update_local_doc(#http_db{} = Db, Doc) ->
     Req = Db#http_db{
-        resource = couch_util:url_encode(DocId),
+        resource = couch_util:encode_doc_id(Doc),
         method = put,
         body = couch_doc:to_json_obj(Doc, [attachments]),
         headers = [{"x-couch-full-commit", "false"} | Db#http_db.headers]

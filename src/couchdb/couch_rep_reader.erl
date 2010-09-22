@@ -17,7 +17,7 @@
 
 -export([start_link/4, next/1]).
 
--import(couch_util, [url_encode/1]).
+-import(couch_util, [encode_doc_id/1]).
 
 -define (BUFFER_SIZE, 1000).
 -define (MAX_CONCURRENT_REQUESTS, 100).
@@ -234,7 +234,7 @@ open_doc_revs(#http_db{url = Url} = DbS, DocId, Revs) ->
     %% all this logic just splits up revision lists that are too long for
     %% MochiWeb into multiple requests
     BaseQS = [{revs,true}, {latest,true}, {att_encoding_info,true}],
-    BaseReq = DbS#http_db{resource=url_encode(DocId), qs=BaseQS},
+    BaseReq = DbS#http_db{resource=encode_doc_id(DocId), qs=BaseQS},
     BaseLength = length(couch_rep_httpc:full_url(BaseReq)) + 11, % &open_revs=
 
     {RevLists, _, _} = lists:foldl(fun split_revlist/2,
@@ -264,7 +264,7 @@ open_doc_revs(#http_db{url = Url} = DbS, DocId, Revs) ->
 open_doc(#http_db{url = Url} = DbS, DocId) ->
     % get latest rev of the doc
     Req = DbS#http_db{
-        resource=url_encode(DocId),
+        resource=encode_doc_id(DocId),
         qs=[{att_encoding_info, true}]
     },
     {Props} = Json = couch_rep_httpc:request(Req),
