@@ -28,6 +28,7 @@
 -export([md5/1, md5_init/0, md5_update/2, md5_final/1]).
 -export([reorder_results/2]).
 -export([url_strip_password/1]).
+-export([encode_doc_id/1]).
 
 -include("couch_db.hrl").
 -include_lib("kernel/include/file.hrl").
@@ -439,3 +440,14 @@ url_strip_password(Url) ->
         "http(s)?://([^:]+):[^@]+@(.*)$",
         "http\\1://\\2:*****@\\3",
         [{return, list}]).
+
+encode_doc_id(#doc{id = Id}) ->
+    encode_doc_id(Id);
+encode_doc_id(Id) when is_list(Id) ->
+    encode_doc_id(?l2b(Id));
+encode_doc_id(<<"_design/", Rest/binary>>) ->
+    "_design/" ++ url_encode(Rest);
+encode_doc_id(<<"_local/", Rest/binary>>) ->
+    "_local/" ++ url_encode(Rest);
+encode_doc_id(Id) ->
+    url_encode(Id).
