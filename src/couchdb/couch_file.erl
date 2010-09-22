@@ -158,17 +158,7 @@ sync(Fd) ->
 %% Returns: ok
 %%----------------------------------------------------------------------
 close(Fd) ->
-    MRef = erlang:monitor(process, Fd),
-    try
-        catch unlink(Fd),
-        catch exit(Fd, shutdown),
-        receive
-        {'DOWN', MRef, _, _, _} ->
-            ok
-        end
-    after
-        erlang:demonitor(MRef, [flush])
-    end.
+    couch_util:shutdown_sync(Fd).
 
 
 delete(RootDir, Filepath) ->
