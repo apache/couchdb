@@ -168,7 +168,7 @@ process_response({error, Reason}, Req) ->
         pause = Pause
     } = Req,
     ShortReason = case Reason of
-    connection_closed ->
+    sel_conn_closed ->
         connection_closed;
     {'EXIT', {noproc, _}} ->
         noproc;
