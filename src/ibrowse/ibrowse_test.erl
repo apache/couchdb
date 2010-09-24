@@ -17,6 +17,7 @@
 	 ue_test/1,
 	 verify_chunked_streaming/0,
 	 verify_chunked_streaming/1,
+         test_chunked_streaming_once/0,
 	 i_do_async_req_list/4,
 	 test_stream_once/3,
 	 test_stream_once/4
@@ -260,7 +261,20 @@ verify_chunked_streaming(Options) ->
     io:format("Fetching data with streaming as binary...~n", []),
     Async_response_bin = do_async_req_list(
 			   Url, get, [{response_format, binary} | Options]),
-    compare_responses(Result_without_streaming, Async_response_list, Async_response_bin).
+    io:format("Fetching data with streaming as binary, {active, once}...~n", []),
+    Async_response_bin_once = do_async_req_list(
+                                Url, get, [once, {response_format, binary} | Options]),
+    compare_responses(Result_without_streaming, Async_response_list, Async_response_bin),
+    compare_responses(Result_without_streaming, Async_response_list, Async_response_bin_once).
+
+test_chunked_streaming_once() ->
+    test_chunked_streaming_once([]).
+
+test_chunked_streaming_once(Options) ->
+    Url = "http://www.httpwatch.com/httpgallery/chunked/",
+    io:format("URL: ~s~n", [Url]),
+    io:format("Fetching data with streaming as binary, {active, once}...~n", []),
+    do_async_req_list(Url, get, [once, {response_format, binary} | Options]).
 
 compare_responses({ok, St_code, _, Body}, {ok, St_code, _, Body}, {ok, St_code, _, Body}) ->
     success;
@@ -313,31 +327,54 @@ wait_for_resp(Pid) ->
 	Msg ->
 	    io:format("Recvd unknown message: ~p~n", [Msg]),
 	    wait_for_resp(Pid)
-    after 10000 ->
+    after 100000 ->
 	  {error, timeout}
     end.
 
 i_do_async_req_list(Parent, Url, Method, Options) ->
-    Res = ibrowse:send_req(Url, [], Method, [], [{stream_to, self()} | Options]),
+    Options_1 = case lists:member(once, Options) of
+                    true ->
+                        [{stream_to, {self(), once}} | (Options -- [once])];
+                    false ->
+                        [{stream_to, self()} | Options]
+                end,
+    Res = ibrowse:send_req(Url, [], Method, [], Options_1),
     case Res of
 	{ibrowse_req_id, Req_id} ->
-	    Result = wait_for_async_resp(Req_id, undefined, undefined, []),
+	    Result = wait_for_async_resp(Req_id, Options, undefined, undefined, []),
 	    Parent ! {async_result, self(), Result};
 	Err ->
 	    Parent ! {async_result, self(), Err}
     end.
 
-wait_for_async_resp(Req_id, Acc_Stat_code, Acc_Headers, Body) ->
+wait_for_async_resp(Req_id, Options, Acc_Stat_code, Acc_Headers, Body) ->    
     receive
 	{ibrowse_async_headers, Req_id, StatCode, Headers} ->
-	    wait_for_async_resp(Req_id, StatCode, Headers, Body);
+            %% io:format("Recvd headers...~n", []),
+            maybe_stream_next(Req_id, Options),
+	    wait_for_async_resp(Req_id, Options, StatCode, Headers, Body);
 	{ibrowse_async_response_end, Req_id} ->
+            io:format("Recvd end of response.~n", []),
 	    Body_1 = list_to_binary(lists:reverse(Body)),
 	    {ok, Acc_Stat_code, Acc_Headers, Body_1};
 	{ibrowse_async_response, Req_id, Data} ->
-	    wait_for_async_resp(Req_id, Acc_Stat_code, Acc_Headers, [Data | Body]);
+            maybe_stream_next(Req_id, Options),
+            %% io:format("Recvd data...~n", []),
+	    wait_for_async_resp(Req_id, Options, Acc_Stat_code, Acc_Headers, [Data | Body]);
+	{ibrowse_async_response, Req_id, {error, _} = Err} ->
+            {ok, Acc_Stat_code, Acc_Headers, Err};
 	Err ->
 	    {ok, Acc_Stat_code, Acc_Headers, Err}
+    after 10000 ->
+            {timeout, Acc_Stat_code, Acc_Headers, Body}
+    end.
+
+maybe_stream_next(Req_id, Options) ->
+    case lists:member(once, Options) of
+        true ->
+            ibrowse:stream_next(Req_id);
+        false ->
+            ok
     end.
 
 execute_req(Url, Method, Options) ->

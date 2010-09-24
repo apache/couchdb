@@ -16,7 +16,8 @@
 %% External exports
 -export([
 	 start_link/1,
-	 spawn_connection/5
+	 spawn_connection/5,
+         stop/1
 	]).
 
 %% gen_server callbacks
@@ -85,6 +86,14 @@ spawn_connection(Lb_pid, Url,
        is_integer(Max_sessions) ->
     gen_server:call(Lb_pid,
 		    {spawn_connection, Url, Max_sessions, Max_pipeline_size, SSL_options}).
+
+stop(Lb_pid) ->
+    case catch gen_server:call(Lb_pid, stop) of
+        {'EXIT', {timeout, _}} ->
+            exit(Lb_pid, kill);
+        ok ->
+            ok
+    end.
 %%--------------------------------------------------------------------
 %% Function: handle_call/3
 %% Description: Handling call messages
@@ -119,6 +128,18 @@ handle_call({spawn_connection, Url, _Max_sess, _Max_pipe, SSL_options}, _From,
     {ok, Pid} = ibrowse_http_client:start_link({Tid, Url, SSL_options}),
     ets:insert(Tid, {{1, Pid}, []}),
     {reply, {ok, Pid}, State_1#state{num_cur_sessions = Cur + 1}};
+
+handle_call(stop, _From, #state{ets_tid = undefined} = State) ->
+    gen_server:reply(_From, ok),
+    {stop, normal, State};
+
+handle_call(stop, _From, #state{ets_tid = Tid} = State) ->
+    ets:foldl(fun({{_, Pid}, _}, Acc) ->
+                      ibrowse_http_client:stop(Pid),
+                      Acc
+              end, [], Tid),
+    gen_server:reply(_From, ok),
+    {stop, normal, State};
 
 handle_call(Request, _From, State) ->
     Reply = {unknown_request, Request},

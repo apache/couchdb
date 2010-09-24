@@ -7,7 +7,7 @@
 %%%-------------------------------------------------------------------
 %% @author Chandrashekhar Mullaparthi <chandrashekhar dot mullaparthi at gmail dot com>
 %% @copyright 2005-2010 Chandrashekhar Mullaparthi
-%% @version 1.6.0
+%% @version 2.0.1
 %% @doc The ibrowse application implements an HTTP 1.1 client. This
 %% module implements the API of the HTTP client. There is one named
 %% process called 'ibrowse' which assists in load balancing and maintaining configuration. There is one load balancing process per unique webserver. There is
@@ -236,6 +236,11 @@ send_req(Url, Headers, Method, Body) ->
 %% caller to get access to the raw status line and raw unparsed
 %% headers. Not quite sure why someone would want this, but one of my
 %% users asked for it, so here it is. </li>
+%%
+%% <li> The <code>preserve_chunked_encoding</code> option enables the caller
+%% to receive the raw data stream when the Transfer-Encoding of the server
+%% response is Chunked.
+%% </li>
 %% </ul>
 %%
 %% @spec send_req(Url::string(), Headers::headerList(), Method::method(), Body::body(), Options::optionList()) -> response()
@@ -266,7 +271,8 @@ send_req(Url, Headers, Method, Body) ->
 %%          {socket_options, Sock_opts}        |
 %%          {transfer_encoding, {chunked, ChunkSize}} | 
 %%          {headers_as_is, boolean()}         |
-%%          {give_raw_headers, boolean()}
+%%          {give_raw_headers, boolean()}      |
+%%          {preserve_chunked_encoding,boolean()}
 %%
 %% stream_to() = process() | {process(), once}
 %% process() = pid() | atom()
@@ -302,23 +308,45 @@ send_req(Url, Headers, Method, Body, Options, Timeout) ->
             Options_1 = merge_options(Host, Port, Options),
             {SSLOptions, IsSSL} =
                 case (Protocol == https) orelse
-                     get_value(is_ssl, Options_1, false) of
+                    get_value(is_ssl, Options_1, false) of
                     false -> {[], false};
                     true -> {get_value(ssl_options, Options_1, []), true}
                 end,
-            case ibrowse_lb:spawn_connection(Lb_pid, Parsed_url,
-                                             Max_sessions, 
-                                             Max_pipeline_size,
-                                             {SSLOptions, IsSSL}) of
-                {ok, Conn_Pid} ->
-                    do_send_req(Conn_Pid, Parsed_url, Headers,
-                                Method, Body, Options_1, Timeout);
-                Err ->
-                    Err
-            end;
+            try_routing_request(Lb_pid, Parsed_url,
+                                Max_sessions, 
+                                Max_pipeline_size,
+                                {SSLOptions, IsSSL}, 
+                                Headers, Method, Body, Options_1, Timeout, 0);
         Err ->
             {error, {url_parsing_failed, Err}}
     end.
+
+try_routing_request(Lb_pid, Parsed_url,
+                    Max_sessions, 
+                    Max_pipeline_size,
+                    {SSLOptions, IsSSL}, 
+                    Headers, Method, Body, Options_1, Timeout, Try_count) when Try_count < 3 ->
+    case ibrowse_lb:spawn_connection(Lb_pid, Parsed_url,
+                                             Max_sessions, 
+                                             Max_pipeline_size,
+                                             {SSLOptions, IsSSL}) of
+        {ok, Conn_Pid} ->
+            case do_send_req(Conn_Pid, Parsed_url, Headers,
+                             Method, Body, Options_1, Timeout) of
+                {error, sel_conn_closed} ->
+                    try_routing_request(Lb_pid, Parsed_url,
+                                        Max_sessions, 
+                                        Max_pipeline_size,
+                                        {SSLOptions, IsSSL}, 
+                                        Headers, Method, Body, Options_1, Timeout, Try_count + 1);
+                Res ->
+                    Res
+            end;
+        Err ->
+            Err
+    end;
+try_routing_request(_, _, _, _, _, _, _, _, _, _, _) ->
+    {error, retry_later}.
 
 merge_options(Host, Port, Options) ->
     Config_options = get_config_value({options, Host, Port}, []),
@@ -337,11 +365,27 @@ get_lb_pid(Url) ->
 
 get_max_sessions(Host, Port, Options) ->
     get_value(max_sessions, Options,
-              get_config_value({max_sessions, Host, Port}, ?DEF_MAX_SESSIONS)).
+              get_config_value({max_sessions, Host, Port},
+                               default_max_sessions())).
 
 get_max_pipeline_size(Host, Port, Options) ->
     get_value(max_pipeline_size, Options,
-              get_config_value({max_pipeline_size, Host, Port}, ?DEF_MAX_PIPELINE_SIZE)).
+              get_config_value({max_pipeline_size, Host, Port},
+                               default_max_pipeline_size())).
+
+default_max_sessions() ->
+    safe_get_env(ibrowse, default_max_sessions, ?DEF_MAX_SESSIONS).
+
+default_max_pipeline_size() ->
+    safe_get_env(ibrowse, default_max_pipeline_size, ?DEF_MAX_PIPELINE_SIZE).
+
+safe_get_env(App, Key, Def_val) ->
+    case application:get_env(App, Key) of
+        undefined ->
+            Def_val;
+        {ok, Val} ->
+            Val
+    end.
 
 %% @doc Deprecated. Use set_max_sessions/3 and set_max_pipeline_size/3
 %% for achieving the same effect.
@@ -375,6 +419,10 @@ do_send_req(Conn_Pid, Parsed_url, Headers, Method, Body, Options, Timeout) ->
                                             Options, Timeout) of
         {'EXIT', {timeout, _}} ->
             {error, req_timedout};
+        {'EXIT', {noproc, {gen_server, call, [Conn_Pid, _, _]}}} ->
+            {error, sel_conn_closed};
+        {error, connection_closed} ->
+            {error, sel_conn_closed};
         {'EXIT', Reason} ->
             {error, {'EXIT', Reason}};
         {ok, St_code, Headers, Body} = Ret when is_binary(Body) ->
@@ -684,6 +732,10 @@ handle_call({get_lb_pid, #url{host = Host, port = Port} = Url}, _From, State) ->
 
 handle_call(stop, _From, State) ->
     do_trace("IBROWSE shutting down~n", []),
+    ets:foldl(fun(#lb_pid{pid = Pid}, Acc) ->
+                      ibrowse_lb:stop(Pid),
+                      Acc
+              end, [], ibrowse_lb),
     {stop, normal, ok, State};
 
 handle_call({set_config_value, Key, Val}, _From, State) ->
