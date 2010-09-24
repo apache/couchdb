@@ -187,7 +187,7 @@ handle_cast(_Msg, State) ->
 handle_info({ibrowse_async_headers, Id, Code, Hdrs}, #state{reqid=Id}=State) ->
     handle_headers(list_to_integer(Code), Hdrs, State);
 
-handle_info({ibrowse_async_response, Id, {error,connection_closed}},
+handle_info({ibrowse_async_response, Id, {error, sel_conn_closed}},
         #state{reqid=Id}=State) ->
     handle_retry(State);
 
