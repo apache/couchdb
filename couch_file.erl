@@ -278,8 +278,8 @@ maybe_track_open_os_files(FileOptions) ->
         couch_stats_collector:track_process_count({couchdb, open_os_files})
     end.
 
-terminate(_Reason, _Fd) ->
-    ok.
+terminate(_Reason, #file{fd = Fd}) ->
+    ok = file:close(Fd).
 
 
 handle_call({pread_iolist, Pos}, _From, File) ->
