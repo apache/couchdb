@@ -32,6 +32,7 @@ default.ini: default.ini.tpl
 		-e "s|%localbuilddatadir%|../share/couchdb|g" \
 	    -e "s|%localstatelibdir%|../var/lib/couchdb|g" \
 	    -e "s|%localstatelogdir%|../var/log/couchdb|g" \
+	    -e "s|%localstaterundir%|../var/run/couchdb|g" \
 	    -e "s|%couchprivlibdir%|../lib/couch-$(version)/priv/lib|g" \
 	    -e "s|%couchjs_command_name%|couchjs.exe|g" \
 	< $< > $@
@@ -43,6 +44,7 @@ default.ini: default.ini.tpl
 		-e "s|%localbuilddatadir%|$(localdatadir)|g" \
 	    -e "s|%localstatelibdir%|$(localstatelibdir)|g" \
 	    -e "s|%localstatelogdir%|$(localstatelogdir)|g" \
+	    -e "s|%localstaterundir%|$(localstaterundir)|g" \
 	    -e "s|%couchprivlibdir%|$(couchprivlibdir)|g" \
 	    -e "s|%couchjs_command_name%|$(couchjs_command_name)|g" \
 	< $< > $@
@@ -55,6 +57,7 @@ default_dev.ini: default.ini.tpl
 		-e "s|%localbuilddatadir%|$(abs_top_builddir)/share|g" \
 	    -e "s|%localstatelibdir%|$(abs_top_builddir)/tmp/lib|g" \
 	    -e "s|%localstatelogdir%|$(abs_top_builddir)/tmp/log|g" \
+	    -e "s|%localstaterundir%|$(abs_top_builddir)/tmp/run|g" \
 	    -e "s|%couchprivlibdir%|$(devcouchprivlibdir)|g" \
 	    -e "s|%couchjs_command_name%|$(couchjs_dev_command_name)|g" \
 	< $< > $@
