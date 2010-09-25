@@ -113,9 +113,13 @@ couchTests.update_documents = function(debug) {
   T(JSON.parse(xhr.responseText).error == "method_not_allowed");
 
   // // hello update world (non-existing docid)
+  xhr = CouchDB.request("GET", "/test_suite_db/nonExistingDoc");
+  T(xhr.status == 404);
   xhr = CouchDB.request("PUT", "/test_suite_db/_design/update/_update/hello/nonExistingDoc");
   T(xhr.status == 201);
   T(xhr.responseText == "<p>New World</p>");
+  xhr = CouchDB.request("GET", "/test_suite_db/nonExistingDoc");
+  T(xhr.status == 200);
 
   // in place update 
   xhr = CouchDB.request("PUT", "/test_suite_db/_design/update/_update/in-place/"+docid+'?field=title&value=test');
