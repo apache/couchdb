@@ -382,7 +382,7 @@ qs_value(Req, Key) ->
     qs_value(Req, Key, undefined).
 
 qs_value(Req, Key, Default) ->
-    couch_util:get_value(Key, qs(Req), Default).
+    ?getv(Key, qs(Req), Default).
 
 qs(#httpd{mochi_req=MochiReq}) ->
     MochiReq:parse_qs().
@@ -844,7 +844,7 @@ nil_callback(_Data)->
     fun(Next) -> nil_callback(Next) end.
 
 get_boundary({"multipart/" ++ _, Opts}) ->
-    case couch_util:get_value("boundary", Opts) of
+    case ?getv("boundary", Opts) of
         S when is_list(S) ->
             S
     end;

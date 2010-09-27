@@ -315,7 +315,7 @@ terminate(_Reason, #qserver{pid_procs=PidProcs}) ->
     ok.
 
 handle_call({get_proc, #doc{body={Props}}=DDoc, DDocKey}, From, Server) ->
-    Lang = couch_util:get_value(<<"language">>, Props, <<"javascript">>),
+    Lang = ?getv(<<"language">>, Props, <<"javascript">>),
     case lang_proc(Lang, Server, fun(Procs) ->
             % find a proc in the set that has the DDoc
             proc_with_ddoc(DDoc, DDocKey, Procs)
@@ -400,7 +400,7 @@ service_waitlist(#qserver{waitlist=Waitlist}=Server) ->
 
 % todo get rid of duplication
 service_waiting({{#doc{body={Props}}=DDoc, DDocKey}, From}, Server) ->
-    Lang = couch_util:get_value(<<"language">>, Props, <<"javascript">>),
+    Lang = ?getv(<<"language">>, Props, <<"javascript">>),
     case lang_proc(Lang, Server, fun(Procs) ->
             % find a proc in the set that has the DDoc
             proc_with_ddoc(DDoc, DDocKey, Procs)
@@ -517,7 +517,7 @@ get_ddoc_process(#doc{} = DDoc, DDocKey) ->
         % process knows the ddoc
         case (catch proc_prompt(Proc, [<<"reset">>, {QueryConfig}])) of
         true ->
-            proc_set_timeout(Proc, couch_util:get_value(<<"timeout">>, QueryConfig)),
+            proc_set_timeout(Proc, ?getv(<<"timeout">>, QueryConfig)),
             link(Proc#proc.pid),
             gen_server:call(couch_query_servers, {unlink_proc, Proc#proc.pid}),
             Proc;
@@ -534,7 +534,7 @@ get_os_process(Lang) ->
     {ok, Proc, {QueryConfig}} ->
         case (catch proc_prompt(Proc, [<<"reset">>, {QueryConfig}])) of
         true ->
-            proc_set_timeout(Proc, couch_util:get_value(<<"timeout">>, QueryConfig)),
+            proc_set_timeout(Proc, ?getv(<<"timeout">>, QueryConfig)),
             link(Proc#proc.pid),
             gen_server:call(couch_query_servers, {unlink_proc, Proc#proc.pid}),
             Proc;

@@ -52,7 +52,7 @@ get_user_creds(UserName) ->
                 {<<"salt">>, ?l2b(Salt)},
                 {<<"password_sha">>, ?l2b(HashedPwd)}];
         UserProps when is_list(UserProps) ->
-            DocRoles = couch_util:get_value(<<"roles">>, UserProps),
+            DocRoles = ?getv(<<"roles">>, UserProps),
             [{<<"roles">>, [<<"_admin">> | DocRoles]},
                 {<<"salt">>, ?l2b(Salt)},
                 {<<"password_sha">>, ?l2b(HashedPwd)}]
@@ -83,7 +83,7 @@ get_from_cache(UserName) ->
 validate_user_creds(nil) ->
     nil;
 validate_user_creds(UserCreds) ->
-    case couch_util:get_value(<<"_conflicts">>, UserCreds) of
+    case ?getv(<<"_conflicts">>, UserCreds) of
     undefined ->
         ok;
     _ConflictList ->
@@ -240,7 +240,7 @@ add_cache_entry(UserName, Credentials, ATime, State) ->
     end,
     true = ets:insert(?BY_ATIME, {ATime, UserName}),
     true = ets:insert(?BY_USER, {UserName, {Credentials, ATime}}),
-    State#state{cache_size = couch_util:get_value(size, ets:info(?BY_USER))}.
+    State#state{cache_size = ?getv(size, ets:info(?BY_USER))}.
 
 
 free_mru_cache_entry() ->
