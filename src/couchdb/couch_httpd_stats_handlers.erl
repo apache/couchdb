@@ -40,7 +40,7 @@ handle_stats_req(Req) ->
     send_method_not_allowed(Req, "GET").
 
 range(Req) ->
-    case couch_util:get_value("range", couch_httpd:qs(Req)) of
+    case ?getv("range", couch_httpd:qs(Req)) of
         undefined ->
             0;
         Value ->
@@ -48,7 +48,7 @@ range(Req) ->
     end.
 
 flush(Req) ->
-    case couch_util:get_value("flush", couch_httpd:qs(Req)) of
+    case ?getv("flush", couch_httpd:qs(Req)) of
         "true" ->
             couch_stats_aggregator:collect_sample();
         _Else ->

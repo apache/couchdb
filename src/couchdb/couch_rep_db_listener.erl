@@ -142,7 +142,7 @@ consume_changes(ChangesQueue) ->
 
 
 has_valid_rep_id({Change}) ->
-    has_valid_rep_id(couch_util:get_value(<<"id">>, Change));
+    has_valid_rep_id(?getv(<<"id">>, Change));
 has_valid_rep_id(<<?DESIGN_DOC_PREFIX, _Rest/binary>>) ->
     false;
 has_valid_rep_id(_Else) ->
@@ -150,12 +150,12 @@ has_valid_rep_id(_Else) ->
 
 
 process_change({Change}) ->
-    {RepProps} = JsonRepDoc = couch_util:get_value(doc, Change),
-    case couch_util:get_value(<<"deleted">>, Change, false) of
+    {RepProps} = JsonRepDoc = ?getv(doc, Change),
+    case ?getv(<<"deleted">>, Change, false) of
     true ->
         maybe_stop_replication(JsonRepDoc);
     false ->
-        case couch_util:get_value(<<"state">>, RepProps) of
+        case ?getv(<<"state">>, RepProps) of
         <<"completed">> ->
             maybe_stop_replication(JsonRepDoc);
         <<"error">> ->
@@ -164,7 +164,7 @@ process_change({Change}) ->
         <<"triggered">> ->
             maybe_start_replication(JsonRepDoc);
         undefined ->
-            case couch_util:get_value(<<"replication_id">>, RepProps) of
+            case ?getv(<<"replication_id">>, RepProps) of
             undefined ->
                 maybe_start_replication(JsonRepDoc);
             _ ->
@@ -176,13 +176,13 @@ process_change({Change}) ->
 
 
 rep_user_ctx({RepDoc}) ->
-    case couch_util:get_value(<<"user_ctx">>, RepDoc) of
+    case ?getv(<<"user_ctx">>, RepDoc) of
     undefined ->
         #user_ctx{roles = [<<"_admin">>]};
     {UserCtx} ->
         #user_ctx{
-            name = couch_util:get_value(<<"name">>, UserCtx, null),
-            roles = couch_util:get_value(<<"roles">>, UserCtx, [])
+            name = ?getv(<<"name">>, UserCtx, null),
+            roles = ?getv(<<"roles">>, UserCtx, [])
         }
     end.
 
@@ -190,7 +190,7 @@ rep_user_ctx({RepDoc}) ->
 maybe_start_replication({RepProps} = JsonRepDoc) ->
     UserCtx = rep_user_ctx(JsonRepDoc),
     RepId = couch_rep:make_replication_id(JsonRepDoc, UserCtx),
-    DocId = couch_util:get_value(<<"_id">>, RepProps),
+    DocId = ?getv(<<"_id">>, RepProps),
     case ets:lookup(?REP_ID_TO_DOC_ID_MAP, RepId) of
     [] ->
         true = ets:insert(?REP_ID_TO_DOC_ID_MAP, {RepId, DocId}),
@@ -222,7 +222,7 @@ start_replication(RepDoc, RepId, UserCtx) ->
 
 
 maybe_stop_replication({RepProps}) ->
-    DocId = couch_util:get_value(<<"_id">>, RepProps),
+    DocId = ?getv(<<"_id">>, RepProps),
     case ets:lookup(?DOC_TO_REP_ID_MAP, DocId) of
     [{DocId, RepId}] ->
         couch_rep:end_replication(RepId),

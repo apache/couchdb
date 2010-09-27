@@ -67,7 +67,7 @@ replicate(Source, Target) when is_binary(Source), is_binary(Target) ->
 %% function handling POST to _replicate
 replicate({Props}=PostBody, UserCtx) ->
     RepId = make_replication_id(PostBody, UserCtx),
-    case couch_util:get_value(<<"cancel">>, Props, false) of
+    case ?getv(<<"cancel">>, Props, false) of
     true ->
         end_replication(RepId);
     false ->
@@ -101,7 +101,7 @@ checkpoint(Server) ->
     gen_server:cast(Server, do_checkpoint).
 
 get_result(Server, {BaseId, _Extension}, {Props} = PostBody, UserCtx) ->
-    case couch_util:get_value(<<"continuous">>, Props, false) of
+    case ?getv(<<"continuous">>, Props, false) of
     true ->
         {ok, {continuous, ?l2b(BaseId)}};
     false ->
@@ -125,15 +125,15 @@ init(InitArgs) ->
 do_init([RepId, {PostProps} = RepDoc, UserCtx] = InitArgs) ->
     process_flag(trap_exit, true),
 
-    SourceProps = couch_util:get_value(<<"source">>, PostProps),
-    TargetProps = couch_util:get_value(<<"target">>, PostProps),
+    SourceProps = ?getv(<<"source">>, PostProps),
+    TargetProps = ?getv(<<"target">>, PostProps),
 
-    DocIds = couch_util:get_value(<<"doc_ids">>, PostProps, nil),
-    Continuous = couch_util:get_value(<<"continuous">>, PostProps, false),
-    CreateTarget = couch_util:get_value(<<"create_target">>, PostProps, false),
+    DocIds = ?getv(<<"doc_ids">>, PostProps, nil),
+    Continuous = ?getv(<<"continuous">>, PostProps, false),
+    CreateTarget = ?getv(<<"create_target">>, PostProps, false),
 
     ProxyParams = parse_proxy_params(
-        couch_util:get_value(<<"proxy">>, PostProps, [])),
+        ?getv(<<"proxy">>, PostProps, [])),
     Source = open_db(SourceProps, UserCtx, ProxyParams),
     Target = open_db(TargetProps, UserCtx, ProxyParams, CreateTarget),
 
@@ -209,8 +209,8 @@ do_init([RepId, {PostProps} = RepDoc, UserCtx] = InitArgs) ->
         source_log = SourceLog,
         target_log = TargetLog,
         rep_starttime = httpd_util:rfc1123_date(),
-        src_starttime = couch_util:get_value(instance_start_time, SourceInfo),
-        tgt_starttime = couch_util:get_value(instance_start_time, TargetInfo),
+        src_starttime = ?getv(instance_start_time, SourceInfo),
+        tgt_starttime = ?getv(instance_start_time, TargetInfo),
         doc_ids = DocIds,
         rep_doc = RepDoc
     },
@@ -329,17 +329,17 @@ start_replication_server(Replicator) ->
 compare_replication_logs(SrcDoc, TgtDoc) ->
     #doc{body={RepRecProps}} = SrcDoc,
     #doc{body={RepRecPropsTgt}} = TgtDoc,
-    case couch_util:get_value(<<"session_id">>, RepRecProps) ==
-            couch_util:get_value(<<"session_id">>, RepRecPropsTgt) of
+    case ?getv(<<"session_id">>, RepRecProps) ==
+            ?getv(<<"session_id">>, RepRecPropsTgt) of
     true ->
         % if the records have the same session id,
         % then we have a valid replication history
-        OldSeqNum = couch_util:get_value(<<"source_last_seq">>, RepRecProps, 0),
-        OldHistory = couch_util:get_value(<<"history">>, RepRecProps, []),
+        OldSeqNum = ?getv(<<"source_last_seq">>, RepRecProps, 0),
+        OldHistory = ?getv(<<"history">>, RepRecProps, []),
         {OldSeqNum, OldHistory};
     false ->
-        SourceHistory = couch_util:get_value(<<"history">>, RepRecProps, []),
-        TargetHistory = couch_util:get_value(<<"history">>, RepRecPropsTgt, []),
+        SourceHistory = ?getv(<<"history">>, RepRecProps, []),
+        TargetHistory = ?getv(<<"history">>, RepRecPropsTgt, []),
         ?LOG_INFO("Replication records differ. "
                 "Scanning histories to find a common ancestor.", []),
         ?LOG_DEBUG("Record on source:~p~nRecord on target:~p~n",
@@ -351,18 +351,18 @@ compare_rep_history(S, T) when S =:= [] orelse T =:= [] ->
     ?LOG_INFO("no common ancestry -- performing full replication", []),
     {0, []};
 compare_rep_history([{S}|SourceRest], [{T}|TargetRest]=Target) ->
-    SourceId = couch_util:get_value(<<"session_id">>, S),
+    SourceId = ?getv(<<"session_id">>, S),
     case has_session_id(SourceId, Target) of
     true ->
-        RecordSeqNum = couch_util:get_value(<<"recorded_seq">>, S, 0),
+        RecordSeqNum = ?getv(<<"recorded_seq">>, S, 0),
         ?LOG_INFO("found a common replication record with source_seq ~p",
             [RecordSeqNum]),
         {RecordSeqNum, SourceRest};
     false ->
-        TargetId = couch_util:get_value(<<"session_id">>, T),
+        TargetId = ?getv(<<"session_id">>, T),
         case has_session_id(TargetId, SourceRest) of
         true ->
-            RecordSeqNum = couch_util:get_value(<<"recorded_seq">>, T, 0),
+            RecordSeqNum = ?getv(<<"recorded_seq">>, T, 0),
             ?LOG_INFO("found a common replication record with source_seq ~p",
                 [RecordSeqNum]),
             {RecordSeqNum, TargetRest};
@@ -454,7 +454,7 @@ terminate_cleanup(#state{source=Source, target=Target, stats=Stats}) ->
 has_session_id(_SessionId, []) ->
     false;
 has_session_id(SessionId, [{Props} | Rest]) ->
-    case couch_util:get_value(<<"session_id">>, Props, nil) of
+    case ?getv(<<"session_id">>, Props, nil) of
     SessionId ->
         true;
     _Else ->
@@ -464,7 +464,7 @@ has_session_id(SessionId, [{Props} | Rest]) ->
 maybe_append_options(Options, {Props}) ->
     lists:foldl(fun(Option, Acc) ->
         Acc ++
-        case couch_util:get_value(Option, Props, false) of
+        case ?getv(Option, Props, false) of
         true ->
             "+" ++ ?b2l(Option);
         false ->
@@ -484,27 +484,27 @@ make_replication_id(RepProps, UserCtx) ->
 make_replication_id({Props}, UserCtx, 2) ->
     {ok, HostName} = inet:gethostname(),
     Port = mochiweb_socket_server:get(couch_httpd, port),
-    Src = get_rep_endpoint(UserCtx, couch_util:get_value(<<"source">>, Props)),
-    Tgt = get_rep_endpoint(UserCtx, couch_util:get_value(<<"target">>, Props)),
+    Src = get_rep_endpoint(UserCtx, ?getv(<<"source">>, Props)),
+    Tgt = get_rep_endpoint(UserCtx, ?getv(<<"target">>, Props)),
     maybe_append_filters({Props}, [HostName, Port, Src, Tgt]);
 make_replication_id({Props}, UserCtx, 1) ->
     {ok, HostName} = inet:gethostname(),
-    Src = get_rep_endpoint(UserCtx, couch_util:get_value(<<"source">>, Props)),
-    Tgt = get_rep_endpoint(UserCtx, couch_util:get_value(<<"target">>, Props)),
+    Src = get_rep_endpoint(UserCtx, ?getv(<<"source">>, Props)),
+    Tgt = get_rep_endpoint(UserCtx, ?getv(<<"target">>, Props)),
     maybe_append_filters({Props}, [HostName, Src, Tgt]).
 
 maybe_append_filters({Props}, Base) ->
     Base2 = Base ++ 
-        case couch_util:get_value(<<"filter">>, Props) of
+        case ?getv(<<"filter">>, Props) of
         undefined ->
-            case couch_util:get_value(<<"doc_ids">>, Props) of
+            case ?getv(<<"doc_ids">>, Props) of
             undefined ->
                 [];
             DocIds ->
                 [DocIds]
             end;
         Filter ->
-            [Filter, couch_util:get_value(<<"query_params">>, Props, {[]})]
+            [Filter, ?getv(<<"query_params">>, Props, {[]})]
         end,
     couch_util:to_hex(couch_util:md5(term_to_binary(Base2))).
 
@@ -512,10 +512,10 @@ maybe_add_trailing_slash(Url) ->
     re:replace(Url, "[^/]$", "&/", [{return, list}]).
 
 get_rep_endpoint(_UserCtx, {Props}) ->
-    Url = maybe_add_trailing_slash(couch_util:get_value(<<"url">>, Props)),
-    {BinHeaders} = couch_util:get_value(<<"headers">>, Props, {[]}),
-    {Auth} = couch_util:get_value(<<"auth">>, Props, {[]}),
-    case couch_util:get_value(<<"oauth">>, Auth) of
+    Url = maybe_add_trailing_slash(?getv(<<"url">>, Props)),
+    {BinHeaders} = ?getv(<<"headers">>, Props, {[]}),
+    {Auth} = ?getv(<<"auth">>, Props, {[]}),
+    case ?getv(<<"oauth">>, Auth) of
     undefined ->
         {remote, Url, [{?b2l(K),?b2l(V)} || {K,V} <- BinHeaders]};
     {OAuth} ->
@@ -580,9 +580,9 @@ open_db(Props, UserCtx, ProxyParams) ->
     open_db(Props, UserCtx, ProxyParams, false).
 
 open_db({Props}, _UserCtx, ProxyParams, CreateTarget) ->
-    Url = maybe_add_trailing_slash(couch_util:get_value(<<"url">>, Props)),
-    {AuthProps} = couch_util:get_value(<<"auth">>, Props, {[]}),
-    {BinHeaders} = couch_util:get_value(<<"headers">>, Props, {[]}),
+    Url = maybe_add_trailing_slash(?getv(<<"url">>, Props)),
+    {AuthProps} = ?getv(<<"auth">>, Props, {[]}),
+    {BinHeaders} = ?getv(<<"headers">>, Props, {[]}),
     Headers = [{?b2l(K),?b2l(V)} || {K,V} <- BinHeaders],
     DefaultHeaders = (#http_db{})#http_db.headers,
     Db1 = #http_db{
@@ -722,8 +722,8 @@ ensure_full_commit(#http_db{headers = Headers} = Target) ->
         headers = couch_util:proplist_apply_field({"Content-Type", "application/json"}, Headers)
     },
     {ResultProps} = couch_rep_httpc:request(Req),
-    true = couch_util:get_value(<<"ok">>, ResultProps),
-    couch_util:get_value(<<"instance_start_time">>, ResultProps);
+    true = ?getv(<<"ok">>, ResultProps),
+    ?getv(<<"instance_start_time">>, ResultProps);
 ensure_full_commit(Target) ->
     {ok, NewDb} = couch_db:open_int(Target#db.name, []),
     UpdateSeq = couch_db:get_update_seq(Target),
@@ -748,9 +748,9 @@ ensure_full_commit(#http_db{headers = Headers} = Source, RequiredSeq) ->
         headers = couch_util:proplist_apply_field({"Content-Type", "application/json"}, Headers)
     },
     {ResultProps} = couch_rep_httpc:request(Req),
-    case couch_util:get_value(<<"ok">>, ResultProps) of
+    case ?getv(<<"ok">>, ResultProps) of
     true ->
-        couch_util:get_value(<<"instance_start_time">>, ResultProps);
+        ?getv(<<"instance_start_time">>, ResultProps);
     undefined -> nil end;
 ensure_full_commit(Source, RequiredSeq) ->
     {ok, NewDb} = couch_db:open_int(Source#db.name, []),
@@ -775,7 +775,7 @@ update_local_doc(#http_db{} = Db, Doc) ->
         headers = [{"x-couch-full-commit", "false"} | Db#http_db.headers]
     },
     {ResponseMembers} = couch_rep_httpc:request(Req),
-    Rev = couch_util:get_value(<<"rev">>, ResponseMembers),
+    Rev = ?getv(<<"rev">>, ResponseMembers),
     couch_doc:parse_rev(Rev);
 update_local_doc(Db, Doc) ->
     {ok, Result} = couch_db:update_doc(Db, Doc, [delay_commit]),
@@ -805,7 +805,7 @@ parse_proxy_params(ProxyUrl) ->
         end.
 
 update_rep_doc({Props} = _RepDoc, KVs) ->
-    case couch_util:get_value(<<"_id">>, Props) of
+    case ?getv(<<"_id">>, Props) of
     undefined ->
         % replication triggered by POSTing to _replicate/
         ok;
@@ -838,7 +838,7 @@ update_rep_doc(RepDb, #doc{body = {RepDocBody}} = RepDoc, KVs) ->
     ).
 
 maybe_set_triggered({RepProps} = RepDoc, RepId) ->
-    case couch_util:get_value(<<"state">>, RepProps) of
+    case ?getv(<<"state">>, RepProps) of
     <<"triggered">> ->
         ok;
     _ ->
