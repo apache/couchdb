@@ -231,6 +231,7 @@
     def_lang,
     design_options=[],
     views,
+    lib,
     id_btree=nil,
     current_seq=0,
     purge_seq=0,

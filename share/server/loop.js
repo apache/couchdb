@@ -100,6 +100,7 @@ var Loop = function() {
     // "view"    : Views.handler,
     "reset"    : State.reset,
     "add_fun"  : State.addFun,
+    "add_lib"  : State.addLib,
     "map_doc"  : Views.mapDoc,
     "reduce"   : Views.reduce,
     "rereduce" : Views.rereduce

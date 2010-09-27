@@ -16,7 +16,7 @@
 -export([start_link/0]).
 
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2,code_change/3]).
--export([start_doc_map/2, map_docs/2, stop_doc_map/1]).
+-export([start_doc_map/3, map_docs/2, stop_doc_map/1]).
 -export([reduce/3, rereduce/3,validate_doc_update/5]).
 -export([filter_docs/5]).
 
@@ -47,8 +47,13 @@
 start_link() ->
     gen_server:start_link({local, couch_query_servers}, couch_query_servers, [], []).
 
-start_doc_map(Lang, Functions) ->
+start_doc_map(Lang, Functions, Lib) ->
     Proc = get_os_process(Lang),
+    case Lib of
+    {[]} -> ok;
+    Lib ->
+        true = proc_prompt(Proc, [<<"add_lib">>, Lib])
+    end,
     lists:foreach(fun(FunctionSource) ->
         true = proc_prompt(Proc, [<<"add_fun">>, FunctionSource])
     end, Functions),

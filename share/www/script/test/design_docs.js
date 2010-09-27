@@ -54,7 +54,18 @@ function() {
       summate2: {map:"function (doc) {emit(doc.integer, doc.integer)};",
                 reduce:"function (keys, values) { return sum(values); };"},
       huge_src_and_results: {map: "function(doc) { if (doc._id == \"1\") { emit(\"" + makebigstring(16) + "\", null) }}",
-                reduce:"function (keys, values) { return \"" + makebigstring(16) + "\"; };"}
+                reduce:"function (keys, values) { return \"" + makebigstring(16) + "\"; };"},
+      lib : {
+        baz : "exports.baz = 'bam';",
+        foo : {
+          foo : "exports.foo = 'bar';",
+          boom : "exports.boom = 'ok';",
+          zoom : "exports.zoom = 'yeah';"
+        }
+      },
+      commonjs : {
+        map : "function(doc) { emit(null, require('views/lib/foo/boom').boom)}"
+      }
     },
     shows: {
       simple: "function() {return 'ok'};",
@@ -99,9 +110,13 @@ function() {
   var vinfo = dinfo.view_index;
   TEquals(51, vinfo.disk_size);
   TEquals(false, vinfo.compact_running);
-  TEquals("3f88e53b303e2342e49a66c538c30679", vinfo.signature);
+  TEquals("dc3264b45b74cc6d94666e3043e07154", vinfo.signature, 'ddoc sig');
 
   db.bulkSave(makeDocs(1, numDocs + 1));
+
+  // test commonjs in map functions
+  resp = db.view("test/commonjs", {limit:1});
+  T(resp.rows[0].value == 'ok');
 
   // test that the _all_docs view returns correctly with keys
   var results = db.allDocs({startkey:"_design", endkey:"_design0"});

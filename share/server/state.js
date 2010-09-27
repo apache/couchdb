@@ -14,6 +14,7 @@ var State = {
   reset : function(config) {
     // clear the globals and run gc
     State.funs = [];
+    State.lib = null;
     State.query_config = config || {};
     init_sandbox();
     gc();
@@ -21,7 +22,11 @@ var State = {
   },
   addFun : function(newFun) {
     // Compile to a function and add it to funs array
-    State.funs.push(Couch.compileFunction(newFun));
+    State.funs.push(Couch.compileFunction(newFun, {views : {lib : State.lib}}));
+    print("true");
+  },
+  addLib : function(lib) {
+    State.lib = lib;
     print("true");
   }
 }
