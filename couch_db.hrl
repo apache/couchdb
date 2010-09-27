@@ -23,6 +23,9 @@
 -define(b2l(V), binary_to_list(V)).
 -define(l2b(V), list_to_binary(V)).
 
+-define(getv(Key, List), couch_util:get_value(Key, List)).
+-define(getv(Key, List, Default), couch_util:get_value(Key, List, Default)).
+
 -define(DEFAULT_ATTACHMENT_CONTENT_TYPE, <<"application/octet-stream">>).
 
 -define(LOG_DEBUG(Format, Args),
