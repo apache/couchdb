@@ -446,7 +446,7 @@ open_temp_group(DbName, Language, DesignOptions, MapSrc, RedSrc) ->
             reduce_funs= if RedSrc==[] -> []; true -> [{<<"_temp">>, RedSrc}] end,
             options=DesignOptions},
 
-        {ok, Db, set_view_sig(#group{name = <<"_temp">>, db=Db, views=[View],
+        {ok, Db, set_view_sig(#group{name = <<"_temp">>,lib={[]}, db=Db, views=[View],
             def_lang=Language, design_options=DesignOptions})};
     Error ->
         Error
@@ -454,9 +454,26 @@ open_temp_group(DbName, Language, DesignOptions, MapSrc, RedSrc) ->
 
 set_view_sig(#group{
             views=Views,
+            lib={[]},
             def_lang=Language,
             design_options=DesignOptions}=G) ->
-    G#group{sig=couch_util:md5(term_to_binary({Views, Language, DesignOptions}))}.
+    G#group{sig=couch_util:md5(term_to_binary({Views, Language, DesignOptions}))};
+set_view_sig(#group{
+            views=Views,
+            lib=Lib,
+            def_lang=Language,
+            design_options=DesignOptions}=G) ->
+    G#group{sig=couch_util:md5(term_to_binary({Views, Language, DesignOptions, sort_lib(Lib)}))}.
+
+sort_lib({Lib}) ->
+    sort_lib(Lib, []).
+sort_lib([], LAcc) ->
+    lists:keysort(1, LAcc);
+sort_lib([{LName, {LObj}}|Rest], LAcc) ->
+    LSorted = sort_lib(LObj, []), % descend into nested object
+    sort_lib(Rest, [{LName, LSorted}|LAcc]);
+sort_lib([{LName, LCode}|Rest], LAcc) ->
+    sort_lib(Rest, [{LName, LCode}|LAcc]).
 
 open_db_group(DbName, GroupId) ->
     case couch_db:open_int(DbName, []) of
@@ -505,33 +522,36 @@ design_doc_to_view_group(#doc{id=Id,body={Fields}}) ->
     Language = ?getv(<<"language">>, Fields, <<"javascript">>),
     {DesignOptions} = ?getv(<<"options">>, Fields, {[]}),
     {RawViews} = ?getv(<<"views">>, Fields, {[]}),
+    Lib = ?getv(<<"lib">>, RawViews, {[]}),
     % add the views to a dictionary object, with the map source as the key
     DictBySrc =
     lists:foldl(
         fun({Name, {MRFuns}}, DictBySrcAcc) ->
-            MapSrc = ?getv(<<"map">>, MRFuns),
-            RedSrc = ?getv(<<"reduce">>, MRFuns, null),
-            {ViewOptions} = ?getv(<<"options">>, MRFuns, {[]}),
-            View =
-            case dict:find({MapSrc, ViewOptions}, DictBySrcAcc) of
-                {ok, View0} -> View0;
-                error -> #view{def=MapSrc, options=ViewOptions} % create new view object
-            end,
-            View2 =
-            if RedSrc == null ->
-                View#view{map_names=[Name|View#view.map_names]};
-            true ->
-                View#view{reduce_funs=[{Name,RedSrc}|View#view.reduce_funs]}
-            end,
-            dict:store({MapSrc, ViewOptions}, View2, DictBySrcAcc)
+            case ?getv(<<"map">>, MRFuns) of
+            undefined -> DictBySrcAcc;
+            MapSrc ->
+                RedSrc = ?getv(<<"reduce">>, MRFuns, null),
+                {ViewOptions} = ?getv(<<"options">>, MRFuns, {[]}),
+                View =
+                case dict:find({MapSrc, ViewOptions}, DictBySrcAcc) of
+                    {ok, View0} -> View0;
+                    error -> #view{def=MapSrc, options=ViewOptions} % create new view object
+                end,
+                View2 =
+                if RedSrc == null ->
+                    View#view{map_names=[Name|View#view.map_names]};
+                true ->
+                    View#view{reduce_funs=[{Name,RedSrc}|View#view.reduce_funs]}
+                end,
+                dict:store({MapSrc, ViewOptions}, View2, DictBySrcAcc)
+            end
         end, dict:new(), RawViews),
     % number the views
     {Views, _N} = lists:mapfoldl(
         fun({_Src, View}, N) ->
             {View#view{id_num=N},N+1}
         end, 0, lists:sort(dict:to_list(DictBySrc))),
-
-    set_view_sig(#group{name=Id, views=Views, def_lang=Language, design_options=DesignOptions}).
+    set_view_sig(#group{name=Id, lib=Lib, views=Views, def_lang=Language, design_options=DesignOptions}).
 
 reset_group(#group{views=Views}=Group) ->
     Views2 = [View#view{btree=nil} || View <- Views],
