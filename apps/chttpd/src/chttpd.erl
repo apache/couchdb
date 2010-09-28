@@ -186,7 +186,7 @@ url_handler(_) ->               fun chttpd_db:handle_request/1.
 
 db_url_handlers() ->
     [
-        {<<"_view_cleanup">>,   fun chttpd_view:handle_view_cleanup_req/2},
+        {<<"_view_cleanup">>,   fun chttpd_db:handle_view_cleanup_req/2},
         {<<"_compact">>,        fun chttpd_db:handle_compact_req/2},
         {<<"_design">>,         fun chttpd_db:handle_design_req/2},
         {<<"_temp_view">>,      fun chttpd_db:handle_temp_view_req/2},
