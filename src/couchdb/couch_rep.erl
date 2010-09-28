@@ -486,14 +486,14 @@ make_replication_id({Props}, UserCtx, 2) ->
     Port = mochiweb_socket_server:get(couch_httpd, port),
     Src = get_rep_endpoint(UserCtx, ?getv(<<"source">>, Props)),
     Tgt = get_rep_endpoint(UserCtx, ?getv(<<"target">>, Props)),
-    maybe_append_filters({Props}, [HostName, Port, Src, Tgt]);
+    maybe_append_filters({Props}, [HostName, Port, Src, Tgt], UserCtx);
 make_replication_id({Props}, UserCtx, 1) ->
     {ok, HostName} = inet:gethostname(),
     Src = get_rep_endpoint(UserCtx, ?getv(<<"source">>, Props)),
     Tgt = get_rep_endpoint(UserCtx, ?getv(<<"target">>, Props)),
-    maybe_append_filters({Props}, [HostName, Src, Tgt]).
+    maybe_append_filters({Props}, [HostName, Src, Tgt], UserCtx).
 
-maybe_append_filters({Props}, Base) ->
+maybe_append_filters({Props}, Base, UserCtx) ->
     Base2 = Base ++ 
         case ?getv(<<"filter">>, Props) of
         undefined ->
@@ -504,9 +504,19 @@ maybe_append_filters({Props}, Base) ->
                 [DocIds]
             end;
         Filter ->
-            [Filter, ?getv(<<"query_params">>, Props, {[]})]
+            [filter_code(Filter, Props, UserCtx),
+                ?getv(<<"query_params">>, Props, {[]})]
         end,
     couch_util:to_hex(couch_util:md5(term_to_binary(Base2))).
+
+filter_code(Filter, Props, UserCtx) ->
+    {match, [DDocName, FilterName]} =
+        re:run(Filter, "(.*?)/(.*)", [{capture, [1, 2], binary}]),
+    ProxyParams = parse_proxy_params(?getv(<<"proxy">>, Props, [])),
+    Source = open_db(?getv(<<"source">>, Props), UserCtx, ProxyParams),
+    {ok, #doc{body = Body}} = open_doc(Source, <<"_design/", DDocName/binary>>),
+    Code = couch_util:get_nested_json_value(Body, [<<"filters">>, FilterName]),
+    re:replace(Code, "^\s*(.*?)\s*$", "\\1", [{return, binary}]).
 
 maybe_add_trailing_slash(Url) ->
     re:replace(Url, "[^/]$", "&/", [{return, list}]).
@@ -556,25 +566,26 @@ fold_replication_logs([Db|Rest]=Dbs, Vsn, LogId, NewId,
             RepProps, UserCtx, [MigratedLog|Acc])
     end.
 
-open_replication_log(#http_db{}=Db, DocId) ->
-    Req = Db#http_db{resource=couch_util:encode_doc_id(DocId)},
-    case couch_rep_httpc:request(Req) of
-    {[{<<"error">>, _}, {<<"reason">>, _}]} ->
-        ?LOG_DEBUG("didn't find a replication log for ~s", [Db#http_db.url]),
-        {error, not_found};
-    Doc ->
-        ?LOG_DEBUG("found a replication log for ~s", [Db#http_db.url]),
-        {ok, couch_doc:from_json_obj(Doc)}
-    end;
 open_replication_log(Db, DocId) ->
-    case couch_db:open_doc(Db, DocId, []) of
+    case open_doc(Db, DocId) of
     {ok, Doc} ->
-        ?LOG_DEBUG("found a replication log for ~s", [Db#db.name]),
+        ?LOG_DEBUG("found a replication log for ~s", [dbname(Db)]),
         {ok, Doc};
     _ ->
-        ?LOG_DEBUG("didn't find a replication log for ~s", [Db#db.name]),
+        ?LOG_DEBUG("didn't find a replication log for ~s", [dbname(Db)]),
         {error, not_found}
     end.
+
+open_doc(#http_db{} = Db, DocId) ->
+    Req = Db#http_db{resource = couch_util:encode_doc_id(DocId)},
+    case couch_rep_httpc:request(Req) of
+    {[{<<"error">>, _}, {<<"reason">>, _}]} ->
+        {error, not_found};
+    Doc ->
+        {ok, couch_doc:from_json_obj(Doc)}
+    end;
+open_doc(Db, DocId) ->
+    couch_db:open_doc(Db, DocId).
 
 open_db(Props, UserCtx, ProxyParams) ->
     open_db(Props, UserCtx, ProxyParams, false).

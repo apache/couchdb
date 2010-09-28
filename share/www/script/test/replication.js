@@ -452,31 +452,17 @@ couchTests.replication = function(debug) {
   }
 
   // test filtered replication
-
-  var sourceDb = new CouchDB(
-    "test_suite_filtered_rep_db_a", {"X-Couch-Full-Commit":"false"}
-  );
-
-  sourceDb.deleteDb();
-  sourceDb.createDb();
-
-  T(sourceDb.save({_id:"foo1",value:1}).ok);
-  T(sourceDb.save({_id:"foo2",value:2}).ok);
-  T(sourceDb.save({_id:"foo3",value:3}).ok);
-  T(sourceDb.save({_id:"foo4",value:4}).ok);
-  T(sourceDb.save({
-    "_id": "_design/mydesign",
-    "language" : "javascript",
-    "filters" : {
-      "myfilter" : (function(doc, req) {
-        if (doc.value < Number(req.query.maxvalue)) {
-          return true;
-        } else {
-          return false;
-        }
-      }).toString()
+  var filterFun1 = (function(doc, req) {
+    if (doc.value < Number(req.query.maxvalue)) {
+      return true;
+    } else {
+      return false;
     }
-  }).ok);
+  }).toString();
+
+  var filterFun2 = (function(doc, req) {
+    return true;
+  }).toString();
 
   var dbPairs = [
     {source:"test_suite_filtered_rep_db_a",
@@ -488,9 +474,28 @@ couchTests.replication = function(debug) {
     {source:CouchDB.protocol + host + "/test_suite_filtered_rep_db_a",
       target:CouchDB.protocol + host + "/test_suite_filtered_rep_db_b"}
   ];
+  var sourceDb = new CouchDB("test_suite_filtered_rep_db_a");
+  var targetDb = new CouchDB("test_suite_filtered_rep_db_b");
 
   for (var i = 0; i < dbPairs.length; i++) {
-    var targetDb = new CouchDB("test_suite_filtered_rep_db_b");
+    sourceDb.deleteDb();
+    sourceDb.createDb();
+
+    T(sourceDb.save({_id: "foo1", value: 1}).ok);
+    T(sourceDb.save({_id: "foo2", value: 2}).ok);
+    T(sourceDb.save({_id: "foo3", value: 3}).ok);
+    T(sourceDb.save({_id: "foo4", value: 4}).ok);
+
+    var ddoc = {
+      "_id": "_design/mydesign",
+      "language": "javascript",
+      "filters": {
+        "myfilter": filterFun1
+       }
+    };
+
+    T(sourceDb.save(ddoc).ok);
+
     targetDb.deleteDb();
     targetDb.createDb();
 
@@ -526,6 +531,45 @@ couchTests.replication = function(debug) {
 
     var docFoo4 = targetDb.open("foo4");
     T(docFoo4 === null);
+
+    // replication should start from scratch after the filter's code changed
+
+    ddoc.filters.myfilter = filterFun2;
+    T(sourceDb.save(ddoc).ok);
+
+    repResult = CouchDB.replicate(dbA, dbB, {
+      body: {
+        "filter" : "mydesign/myfilter",
+        "query_params" : {
+          "maxvalue": "3"
+        }
+      }
+    });
+
+    T(repResult.ok);
+    T(repResult.history instanceof Array);
+    T(repResult.history.length === 1);
+    T(repResult.history[0].docs_written === 3);
+    T(repResult.history[0].docs_read === 3);
+    T(repResult.history[0].doc_write_failures === 0);
+
+    docFoo1 = targetDb.open("foo1");
+    T(docFoo1 !== null);
+    T(docFoo1.value === 1);
+
+    docFoo2 = targetDb.open("foo2");
+    T(docFoo2 !== null);
+    T(docFoo2.value === 2);
+
+    docFoo3 = targetDb.open("foo3");
+    T(docFoo3 !== null);
+    T(docFoo3.value === 3);
+
+    docFoo4 = targetDb.open("foo4");
+    T(docFoo4 !== null);
+    T(docFoo4.value === 4);
+
+    T(targetDb.open("_design/mydesign") !== null);
   }
 
 };
