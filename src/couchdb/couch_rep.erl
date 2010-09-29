@@ -514,9 +514,14 @@ filter_code(Filter, Props, UserCtx) ->
         re:run(Filter, "(.*?)/(.*)", [{capture, [1, 2], binary}]),
     ProxyParams = parse_proxy_params(?getv(<<"proxy">>, Props, [])),
     Source = open_db(?getv(<<"source">>, Props), UserCtx, ProxyParams),
-    {ok, #doc{body = Body}} = open_doc(Source, <<"_design/", DDocName/binary>>),
-    Code = couch_util:get_nested_json_value(Body, [<<"filters">>, FilterName]),
-    re:replace(Code, "^\s*(.*?)\s*$", "\\1", [{return, binary}]).
+    try
+        {ok, DDoc} = open_doc(Source, <<"_design/", DDocName/binary>>),
+        Code = couch_util:get_nested_json_value(
+            DDoc#doc.body, [<<"filters">>, FilterName]),
+        re:replace(Code, "^\s*(.*?)\s*$", "\\1", [{return, binary}])
+    after
+        close_db(Source)
+    end.
 
 maybe_add_trailing_slash(Url) ->
     re:replace(Url, "[^/]$", "&/", [{return, list}]).
