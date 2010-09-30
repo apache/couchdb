@@ -1216,15 +1216,19 @@ extract_header_rev(Req, ExplicitRev) ->
 
 
 parse_copy_destination_header(Req) ->
-    Destination = couch_httpd:header_value(Req, "Destination"),
-    case re:run(Destination, "\\?", [{capture, none}]) of
-    nomatch ->
-        {list_to_binary(Destination), {0, []}};
-    match ->
-        [DocId, RevQs] = re:split(Destination, "\\?", [{return, list}]),
-        [_RevQueryKey, Rev] = re:split(RevQs, "=", [{return, list}]),
-        {Pos, RevId} = couch_doc:parse_rev(Rev),
-        {list_to_binary(DocId), {Pos, [RevId]}}
+    case couch_httpd:header_value(Req, "Destination") of
+        undefined ->
+            throw({bad_request, "Destination header in mandatory for COPY."});
+        Destination ->
+            case re:run(Destination, "\\?", [{capture, none}]) of
+                nomatch ->
+                    {list_to_binary(Destination), {0, []}};
+                match ->
+                    [DocId, RevQs] = re:split(Destination, "\\?", [{return, list}]),
+                    [_RevQueryKey, Rev] = re:split(RevQs, "=", [{return, list}]),
+                    {Pos, RevId} = couch_doc:parse_rev(Rev),
+                    {list_to_binary(DocId), {Pos, [RevId]}}
+            end
     end.
 
 validate_attachment_names(Doc) ->
