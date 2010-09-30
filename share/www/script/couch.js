@@ -121,7 +121,7 @@ function CouchDB(name, httpHeaders) {
       CouchDB.maybeThrowError(this.last_req);
       var results = JSON.parse(this.last_req.responseText);
       for (var i = 0; i < docs.length; i++) {
-        if(results[i] && results[i].rev && results[i].ok) {
+        if(results[i] && results[i].rev) {
           docs[i]._rev = results[i].rev;
         }
       }
