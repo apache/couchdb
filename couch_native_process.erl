@@ -25,7 +25,7 @@
 %
 %  fun({Doc}) ->
 %    % Below, we emit a single record - the _id as key, null as value
-%    DocId = ?getv(Doc, <<"_id">>, null),
+%    DocId = couch_util:get_value(Doc, <<"_id">>, null),
 %    Emit(DocId, null)
 %  end.
 %
@@ -173,7 +173,7 @@ ddoc(State, {DDoc}, [FunPath, Args]) ->
     % load fun from the FunPath
     BFun = lists:foldl(fun
         (Key, {Props}) when is_list(Props) ->
-            ?getv(Key, Props, nil);
+            couch_util:get_value(Key, Props, nil);
         (_Key, Fun) when is_binary(Fun) ->
             Fun;
         (_Key, nil) ->

@@ -145,44 +145,44 @@ changes_loop(OurServer, SourceChangesServer, Target) ->
 
 get_missing_revs(#http_db{}=Target, Changes) ->
     Transform = fun({Props}) ->
-        C = ?getv(<<"changes">>, Props),
-        Id = ?getv(<<"id">>, Props),
+        C = couch_util:get_value(<<"changes">>, Props),
+        Id = couch_util:get_value(<<"id">>, Props),
         {Id, [R || {[{<<"rev">>, R}]} <- C]}
     end,
     IdRevsList = [Transform(Change) || Change <- Changes],
     SeqDict = changes_dictionary(Changes),
     {LastProps} = lists:last(Changes),
-    HighSeq = ?getv(<<"seq">>, LastProps),
+    HighSeq = couch_util:get_value(<<"seq">>, LastProps),
     Request = Target#http_db{
         resource = "_missing_revs",
         method = post,
         body = {IdRevsList}
     },
     {Resp} = couch_rep_httpc:request(Request),
-    case ?getv(<<"missing_revs">>, Resp) of
+    case couch_util:get_value(<<"missing_revs">>, Resp) of
     {MissingRevs} ->
         X = [{Id, dict:fetch(Id, SeqDict), couch_doc:parse_revs(RevStrs)} ||
             {Id,RevStrs} <- MissingRevs],
         {HighSeq, X};
     _ ->
-        exit({target_error, ?getv(<<"error">>, Resp)})
+        exit({target_error, couch_util:get_value(<<"error">>, Resp)})
     end;
 
 get_missing_revs(Target, Changes) ->
     Transform = fun({Props}) ->
-        C = ?getv(<<"changes">>, Props),
-        Id = ?getv(<<"id">>, Props),
+        C = couch_util:get_value(<<"changes">>, Props),
+        Id = couch_util:get_value(<<"id">>, Props),
         {Id, [couch_doc:parse_rev(R) || {[{<<"rev">>, R}]} <- C]}
     end,
     IdRevsList = [Transform(Change) || Change <- Changes],
     SeqDict = changes_dictionary(Changes),
     {LastProps} = lists:last(Changes),
-    HighSeq = ?getv(<<"seq">>, LastProps),
+    HighSeq = couch_util:get_value(<<"seq">>, LastProps),
     {ok, Results} = couch_db:get_missing_revs(Target, IdRevsList),
     {HighSeq, [{Id, dict:fetch(Id, SeqDict), Revs} || {Id, Revs, _} <- Results]}.
 
 changes_dictionary(ChangeList) ->
-    KVs = [{?getv(<<"id">>,C), ?getv(<<"seq">>,C)}
+    KVs = [{couch_util:get_value(<<"id">>,C), couch_util:get_value(<<"seq">>,C)}
         || {C} <- ChangeList],
     dict:from_list(KVs).
 

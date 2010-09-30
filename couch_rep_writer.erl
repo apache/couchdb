@@ -80,7 +80,7 @@ write_bulk_docs(#http_db{headers = Headers} = Db, Docs) ->
     },
     ErrorsJson = case couch_rep_httpc:request(Request) of
     {FailProps} ->
-        exit({target_error, ?getv(<<"error">>, FailProps)});
+        exit({target_error, couch_util:get_value(<<"error">>, FailProps)});
     List when is_list(List) ->
         List
     end,
@@ -164,8 +164,8 @@ streamer_fun(Boundary, JsonBytes, Atts) ->
     end.
 
 write_docs_1({Props}) ->
-    Id = ?getv(<<"id">>, Props),
-    Rev = couch_doc:parse_rev(?getv(<<"rev">>, Props)),
-    ErrId = couch_util:to_existing_atom(?getv(<<"error">>, Props)),
-    Reason = ?getv(<<"reason">>, Props),
+    Id = couch_util:get_value(<<"id">>, Props),
+    Rev = couch_doc:parse_rev(couch_util:get_value(<<"rev">>, Props)),
+    ErrId = couch_util:to_existing_atom(couch_util:get_value(<<"error">>, Props)),
+    Reason = couch_util:get_value(<<"reason">>, Props),
     {{Id, Rev}, {ErrId, Reason}}.
