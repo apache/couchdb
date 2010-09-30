@@ -253,7 +253,7 @@ open_doc_revs(#http_db{url = Url} = DbS, DocId, Revs) ->
         },
         [Doc1 | Acc];
     ({ErrorProps}, Acc) ->
-        Err = ?getv(<<"error">>, ErrorProps,
+        Err = couch_util:get_value(<<"error">>, ErrorProps,
             ?JSON_ENCODE({ErrorProps})),
         ?LOG_ERROR("Replicator: error accessing doc ~s at ~s, reason: ~s",
            [DocId, couch_util:url_strip_password(Url), Err]),
@@ -268,14 +268,14 @@ open_doc(#http_db{url = Url} = DbS, DocId) ->
         qs=[{att_encoding_info, true}]
     },
     {Props} = Json = couch_rep_httpc:request(Req),
-    case ?getv(<<"_id">>, Props) of
+    case couch_util:get_value(<<"_id">>, Props) of
     Id when is_binary(Id) ->
         #doc{id=Id, revs=Rev, atts=Atts} = Doc = couch_doc:from_json_obj(Json),
         [Doc#doc{
             atts=[couch_rep_att:convert_stub(A, {DbS,Id,Rev}) || A <- Atts]
         }];
     undefined ->
-        Err = ?getv(<<"error">>, Props, ?JSON_ENCODE(Json)),
+        Err = couch_util:get_value(<<"error">>, Props, ?JSON_ENCODE(Json)),
         ?LOG_ERROR("Replicator: error accessing doc ~s at ~s, reason: ~s",
             [DocId, couch_util:url_strip_password(Url), Err]),
         []

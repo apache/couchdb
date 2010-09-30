@@ -270,8 +270,8 @@ get_design_docs(#db{fulldocinfo_by_id_btree=Btree}=Db) ->
 
 check_is_admin(#db{user_ctx=#user_ctx{name=Name,roles=Roles}}=Db) ->
     {Admins} = get_admins(Db),
-    AdminRoles = [<<"_admin">> | ?getv(<<"roles">>, Admins, [])],
-    AdminNames = ?getv(<<"names">>, Admins,[]),
+    AdminRoles = [<<"_admin">> | couch_util:get_value(<<"roles">>, Admins, [])],
+    AdminNames = couch_util:get_value(<<"names">>, Admins,[]),
     case AdminRoles -- Roles of
     AdminRoles -> % same list, not an admin role
         case AdminNames -- [Name] of
@@ -289,9 +289,9 @@ check_is_reader(#db{user_ctx=#user_ctx{name=Name,roles=Roles}=UserCtx}=Db) ->
     ok -> ok;
     _ ->
         {Readers} = get_readers(Db),
-        ReaderRoles = ?getv(<<"roles">>, Readers,[]),
+        ReaderRoles = couch_util:get_value(<<"roles">>, Readers,[]),
         WithAdminRoles = [<<"_admin">> | ReaderRoles],
-        ReaderNames = ?getv(<<"names">>, Readers,[]),
+        ReaderNames = couch_util:get_value(<<"names">>, Readers,[]),
         case ReaderRoles ++ ReaderNames of
         [] -> ok; % no readers == public access
         _Else ->
@@ -311,10 +311,10 @@ check_is_reader(#db{user_ctx=#user_ctx{name=Name,roles=Roles}=UserCtx}=Db) ->
     end.
 
 get_admins(#db{security=SecProps}) ->
-    ?getv(<<"admins">>, SecProps, {[]}).
+    couch_util:get_value(<<"admins">>, SecProps, {[]}).
 
 get_readers(#db{security=SecProps}) ->
-    ?getv(<<"readers">>, SecProps, {[]}).
+    couch_util:get_value(<<"readers">>, SecProps, {[]}).
 
 get_security(#db{security=SecProps}) ->
     {SecProps}.
@@ -329,21 +329,21 @@ set_security(_, _) ->
     throw(bad_request).
 
 validate_security_object(SecProps) ->
-    Admins = ?getv(<<"admins">>, SecProps, {[]}),
-    Readers = ?getv(<<"readers">>, SecProps, {[]}),
+    Admins = couch_util:get_value(<<"admins">>, SecProps, {[]}),
+    Readers = couch_util:get_value(<<"readers">>, SecProps, {[]}),
     ok = validate_names_and_roles(Admins),
     ok = validate_names_and_roles(Readers),
     ok.
 
 % validate user input
 validate_names_and_roles({Props}) when is_list(Props) ->
-    case ?getv(<<"names">>,Props,[]) of
+    case couch_util:get_value(<<"names">>,Props,[]) of
     Ns when is_list(Ns) ->
             [throw("names must be a JSON list of strings") ||N <- Ns, not is_binary(N)],
             Ns;
     _ -> throw("names must be a JSON list of strings")
     end,
-    case ?getv(<<"roles">>,Props,[]) of
+    case couch_util:get_value(<<"roles">>,Props,[]) of
     Rs when is_list(Rs) ->
         [throw("roles must be a JSON list of strings") ||R <- Rs, not is_binary(R)],
         Rs;

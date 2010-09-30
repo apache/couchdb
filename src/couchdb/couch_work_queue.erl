@@ -20,8 +20,6 @@
 -export([init/1, terminate/2]).
 -export([handle_call/3, handle_cast/2, code_change/3, handle_info/2]).
 
--include("couch_db.hrl").
-
 -record(q, {
     queue = queue:new(),
     blocked = [],
@@ -61,9 +59,9 @@ close(Wq) ->
 
 init(Options) ->
     Q = #q{
-        max_size = ?getv(max_size, Options),
-        max_items = ?getv(max_items, Options),
-        multi_workers = ?getv(multi_workers, Options, false)
+        max_size = couch_util:get_value(max_size, Options),
+        max_items = couch_util:get_value(max_items, Options),
+        multi_workers = couch_util:get_value(multi_workers, Options, false)
     },
     {ok, Q}.
 

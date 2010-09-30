@@ -48,7 +48,7 @@ stop(Server) ->
 
 init([Parent, #http_db{}=Source, Since, PostProps]) ->
     process_flag(trap_exit, true),
-    Feed = case ?getv(<<"continuous">>, PostProps, false) of
+    Feed = case couch_util:get_value(<<"continuous">>, PostProps, false) of
     false ->
         normal;
     true ->
@@ -60,11 +60,11 @@ init([Parent, #http_db{}=Source, Since, PostProps]) ->
         {"since", Since},
         {"feed", Feed}
     ],
-    QS = case ?getv(<<"filter">>, PostProps) of
+    QS = case couch_util:get_value(<<"filter">>, PostProps) of
     undefined ->
         BaseQS;
     FilterName ->
-        {Params} = ?getv(<<"query_params">>, PostProps, {[]}),
+        {Params} = couch_util:get_value(<<"query_params">>, PostProps, {[]}),
         lists:foldr(
             fun({K, V}, QSAcc) ->
                 Ks = couch_util:to_list(K),
@@ -126,8 +126,8 @@ init([_Parent, Source, Since, PostProps] = InitArgs) ->
     ChangesArgs = #changes_args{
         style = all_docs,
         since = Since,
-        filter = ?b2l(?getv(<<"filter">>, PostProps, <<>>)),
-        feed = case ?getv(<<"continuous">>, PostProps, false) of
+        filter = ?b2l(couch_util:get_value(<<"filter">>, PostProps, <<>>)),
+        feed = case couch_util:get_value(<<"continuous">>, PostProps, false) of
             true ->
                 "continuous";
             false ->
@@ -150,11 +150,11 @@ init([_Parent, Source, Since, PostProps] = InitArgs) ->
     {ok, #state{changes_loop=ChangesPid, init_args=InitArgs}}.
 
 filter_json_req(Db, PostProps) ->
-    case ?getv(<<"filter">>, PostProps) of
+    case couch_util:get_value(<<"filter">>, PostProps) of
     undefined ->
         {[]};
     FilterName ->
-        {Query} = ?getv(<<"query_params">>, PostProps, {[]}),
+        {Query} = couch_util:get_value(<<"query_params">>, PostProps, {[]}),
         {ok, Info} = couch_db:get_db_info(Db),
         % simulate a request to db_name/_changes
         {[
@@ -307,7 +307,7 @@ handle_messages([Chunk|Rest], State) ->
         #state{reply_to=nil} ->
             State#state{
                 count = Count+1,
-                last_seq = ?getv(<<"seq">>, Props),
+                last_seq = couch_util:get_value(<<"seq">>, Props),
                 partial_chunk = <<>>,
                 rows=queue:in(Row,Rows)
             };
@@ -354,16 +354,16 @@ by_seq_loop(Server, Source, StartSeq) ->
         qs = [{limit, 1000}, {startkey, StartSeq}]
     },
     {Results} = couch_rep_httpc:request(Req),
-    Rows = ?getv(<<"rows">>, Results),
+    Rows = couch_util:get_value(<<"rows">>, Results),
     if Rows =:= [] -> exit(normal); true -> ok end,
     EndSeq = lists:foldl(fun({RowInfoList}, _) ->
-        Id = ?getv(<<"id">>, RowInfoList),
-        Seq = ?getv(<<"key">>, RowInfoList),
-        {RowProps} = ?getv(<<"value">>, RowInfoList),
+        Id = couch_util:get_value(<<"id">>, RowInfoList),
+        Seq = couch_util:get_value(<<"key">>, RowInfoList),
+        {RowProps} = couch_util:get_value(<<"value">>, RowInfoList),
         RawRevs = [
-            ?getv(<<"rev">>, RowProps),
-            ?getv(<<"conflicts">>, RowProps, []),
-            ?getv(<<"deleted_conflicts">>, RowProps, [])
+            couch_util:get_value(<<"rev">>, RowProps),
+            couch_util:get_value(<<"conflicts">>, RowProps, []),
+            couch_util:get_value(<<"deleted_conflicts">>, RowProps, [])
         ],
         ParsedRevs = couch_doc:parse_revs(lists:flatten(RawRevs)),
         Change = {[

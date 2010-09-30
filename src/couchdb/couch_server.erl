@@ -53,7 +53,7 @@ sup_start_link() ->
 open(DbName, Options) ->
     case gen_server:call(couch_server, {open, DbName, Options}, infinity) of
     {ok, Db} ->
-        Ctx = ?getv(user_ctx, Options, #user_ctx{}),
+        Ctx = couch_util:get_value(user_ctx, Options, #user_ctx{}),
         {ok, Db#db{user_ctx=Ctx}};
     Error ->
         Error
@@ -62,7 +62,7 @@ open(DbName, Options) ->
 create(DbName, Options) ->
     case gen_server:call(couch_server, {create, DbName, Options}, infinity) of
     {ok, Db} ->
-        Ctx = ?getv(user_ctx, Options, #user_ctx{}),
+        Ctx = couch_util:get_value(user_ctx, Options, #user_ctx{}),
         {ok, Db#db{user_ctx=Ctx}};
     Error ->
         Error

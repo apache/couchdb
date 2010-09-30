@@ -51,9 +51,9 @@ update(Owner, Group) ->
     % update status every half second
     couch_task_status:set_update_frequency(500),
     #group{ design_options = DesignOptions } = Group,
-    IncludeDesign = ?getv(<<"include_design">>,
+    IncludeDesign = couch_util:get_value(<<"include_design">>,
         DesignOptions, false),
-    LocalSeq = ?getv(<<"local_seq">>, DesignOptions, false),
+    LocalSeq = couch_util:get_value(<<"local_seq">>, DesignOptions, false),
     DocOpts =
     case LocalSeq of
     true -> [conflicts, deleted_conflicts, local_seq];

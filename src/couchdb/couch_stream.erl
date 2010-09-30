@@ -173,7 +173,7 @@ foldl_decode(DecFun, Fd, [Pos|Rest], Md5, Md5Acc, Fun, Acc) ->
     foldl_decode(DecFun, Fd, Rest, Md5, Md5Acc2, Fun, Fun(Bin, Acc)).
 
 gzip_init(Options) ->
-    case ?getv(compression_level, Options, 0) of
+    case couch_util:get_value(compression_level, Options, 0) of
     Lvl when Lvl >= 1 andalso Lvl =< 9 ->
         Z = zlib:open(),
         % 15 = ?MAX_WBITS (defined in the zlib module)
