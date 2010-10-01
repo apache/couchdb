@@ -173,7 +173,7 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
         CurrentTime = make_cookie_time(),
         case couch_config:get("couch_httpd_auth", "secret", nil) of
         nil ->
-            ?LOG_ERROR("cookie auth secret is not set",[]),
+            ?LOG_DEBUG("cookie auth secret is not set",[]),
             Req;
         SecretStr ->
             Secret = ?l2b(SecretStr),
