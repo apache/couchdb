@@ -31,7 +31,6 @@
 -export([encode_doc_id/1]).
 
 -include("couch_db.hrl").
--include_lib("kernel/include/file.hrl").
 
 % arbitrarily chosen amount of memory to use before flushing to disk
 -define(FLUSH_MAX_MEM, 10000000).
