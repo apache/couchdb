@@ -445,8 +445,8 @@ open_temp_group(DbName, Language, DesignOptions, MapSrc, RedSrc) ->
             def=MapSrc,
             reduce_funs= if RedSrc==[] -> []; true -> [{<<"_temp">>, RedSrc}] end,
             options=DesignOptions},
-
-        {ok, Db, set_view_sig(#group{name = <<"_temp">>,lib={[]}, db=Db, views=[View],
+        couch_db:close(Db),
+        {ok, set_view_sig(#group{name = <<"_temp">>,lib={[]}, db=Db, views=[View],
             def_lang=Language, design_options=DesignOptions})};
     Error ->
         Error
@@ -480,7 +480,8 @@ open_db_group(DbName, GroupId) ->
     {ok, Db} ->
         case couch_db:open_doc(Db, GroupId) of
         {ok, Doc} ->
-            {ok, Db, design_doc_to_view_group(Doc)};
+            couch_db:close(Db),
+            {ok, design_doc_to_view_group(Doc)};
         Else ->
             couch_db:close(Db),
             Else

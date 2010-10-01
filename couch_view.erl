@@ -29,9 +29,7 @@ start_link() ->
     gen_server:start_link({local, couch_view}, couch_view, [], []).
 
 get_temp_updater(DbName, Language, DesignOptions, MapSrc, RedSrc) ->
-    % make temp group
-    % do we need to close this db?
-    {ok, _Db, Group} =
+    {ok, Group} =
         couch_view_group:open_temp_group(DbName, Language, DesignOptions, MapSrc, RedSrc),
     case gen_server:call(couch_view, {get_group_server, DbName, Group}) of
     {ok, Pid} ->
@@ -41,10 +39,8 @@ get_temp_updater(DbName, Language, DesignOptions, MapSrc, RedSrc) ->
     end.
 
 get_group_server(DbName, GroupId) ->
-    % get signature for group
     case couch_view_group:open_db_group(DbName, GroupId) of
-    % do we need to close this db?
-    {ok, _Db, Group} ->
+    {ok, Group} ->
         case gen_server:call(couch_view, {get_group_server, DbName, Group}) of
         {ok, Pid} ->
             Pid;
