@@ -446,7 +446,7 @@ open_temp_group(DbName, Language, DesignOptions, MapSrc, RedSrc) ->
             reduce_funs= if RedSrc==[] -> []; true -> [{<<"_temp">>, RedSrc}] end,
             options=DesignOptions},
         couch_db:close(Db),
-        {ok, set_view_sig(#group{name = <<"_temp">>,lib={[]}, db=Db, views=[View],
+        {ok, set_view_sig(#group{name = <<"_temp">>,lib={[]}, views=[View],
             def_lang=Language, design_options=DesignOptions})};
     Error ->
         Error
