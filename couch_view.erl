@@ -31,7 +31,7 @@ start_link() ->
 get_temp_updater(DbName, Language, DesignOptions, MapSrc, RedSrc) ->
     {ok, Group} =
         couch_view_group:open_temp_group(DbName, Language, DesignOptions, MapSrc, RedSrc),
-    case gen_server:call(couch_view, {get_group_server, DbName, Group}) of
+    case gen_server:call(couch_view, {get_group_server, DbName, Group}, infinity) of
     {ok, Pid} ->
         Pid;
     Error ->
@@ -41,7 +41,7 @@ get_temp_updater(DbName, Language, DesignOptions, MapSrc, RedSrc) ->
 get_group_server(DbName, GroupId) ->
     case couch_view_group:open_db_group(DbName, GroupId) of
     {ok, Group} ->
-        case gen_server:call(couch_view, {get_group_server, DbName, Group}) of
+        case gen_server:call(couch_view, {get_group_server, DbName, Group}, infinity) of
         {ok, Pid} ->
             Pid;
         Error ->
