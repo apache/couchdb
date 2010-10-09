@@ -180,6 +180,7 @@ handle_cast({compact_done, #group{current_seq=NewSeq} = NewGroup},
         group = #group{name=GroupId, fd=OldFd, sig=GroupSig} = Group,
         init_args = {RootDir, DbName, _},
         updater_pid = UpdaterPid,
+        compactor_pid = CompactorPid,
         ref_counter = RefCounter
     } = State,
 
@@ -201,6 +202,8 @@ handle_cast({compact_done, #group{current_seq=NewSeq} = NewGroup},
     end,
 
     %% cleanup old group
+    unlink(CompactorPid),
+    receive {'EXIT', CompactorPid, normal} -> ok after 0 -> ok end,
     unlink(OldFd),
     couch_ref_counter:drop(RefCounter),
     {ok, NewRefCounter} = couch_ref_counter:start([NewGroup#group.fd]),
