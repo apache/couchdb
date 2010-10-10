@@ -238,6 +238,8 @@
 
 -record(view,
     {id_num,
+    update_seq=0,
+    purge_seq=0,
     map_names=[],
     def,
     btree=nil,
