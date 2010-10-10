@@ -96,19 +96,25 @@ purge_index(#group{db=Db, views=Views, id_btree=IdBtree}=Group) ->
         end, dict:new(), Lookups),
 
     % Now remove the values from the btrees
+    PurgeSeq = couch_db:get_purge_seq(Db),
     Views2 = lists:map(
         fun(#view{id_num=Num,btree=Btree}=View) ->
             case dict:find(Num, ViewKeysToRemoveDict) of
             {ok, RemoveKeys} ->
-                {ok, Btree2} = couch_btree:add_remove(Btree, [], RemoveKeys),
-                View#view{btree=Btree2};
+                {ok, ViewBtree2} = couch_btree:add_remove(Btree, [], RemoveKeys),
+                case ViewBtree2 =/= Btree of
+                    true ->
+                        View#view{btree=ViewBtree2, purge_seq=PurgeSeq};
+                    _ ->
+                        View#view{btree=ViewBtree2}
+                end;
             error -> % no keys to remove in this view
                 View
             end
         end, Views),
     Group#group{id_btree=IdBtree2,
             views=Views2,
-            purge_seq=couch_db:get_purge_seq(Db)}.
+            purge_seq=PurgeSeq}.
 
 
 load_doc(Db, DocInfo, MapQueue, DocOpts, IncludeDesign) ->
@@ -247,7 +253,12 @@ write_changes(Group, ViewKeyValuesToAdd, DocIdViewIdKeys, NewSeq, InitialBuild) 
     Views2 = lists:zipwith(fun(View, {_View, AddKeyValues}) ->
             KeysToRemove = couch_util:dict_find(View#view.id_num, KeysToRemoveByView, []),
             {ok, ViewBtree2} = couch_btree:add_remove(View#view.btree, AddKeyValues, KeysToRemove),
-            View#view{btree = ViewBtree2}
+            case ViewBtree2 =/= View#view.btree of
+                true ->
+                    View#view{btree=ViewBtree2, update_seq=NewSeq};
+                _ ->
+                    View#view{btree=ViewBtree2}
+            end
         end,    Group#group.views, ViewKeyValuesToAdd),
     Group#group{views=Views2, current_seq=NewSeq, id_btree=IdBtree2}.
 
