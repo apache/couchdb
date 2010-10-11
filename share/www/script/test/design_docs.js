@@ -110,7 +110,7 @@ function() {
   var vinfo = dinfo.view_index;
   TEquals(51, vinfo.disk_size);
   TEquals(false, vinfo.compact_running);
-  TEquals("86e9b34892b4df35cd2f7c27da30c94d", vinfo.signature, 'ddoc sig');
+  TEquals("dc3264b45b74cc6d94666e3043e07154", vinfo.signature, 'ddoc sig');
 
   db.bulkSave(makeDocs(1, numDocs + 1));
 
