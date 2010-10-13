@@ -181,6 +181,8 @@ couchTests.changes = function(debug) {
     T(change.id == "barz");
     T(change.changes[0].rev == docBarz._rev);
     T(lines[3]=='"last_seq":4}');
+
+
   }
   
   // test the filtered changes
@@ -396,6 +398,57 @@ couchTests.changes = function(debug) {
     T(resp.results.length === 2);
     T(resp.results[0].id === "doc2");
     T(resp.results[1].id === "doc4");
+
+    // test filtering on docids
+    //
+
+    options = {
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({"doc_ids": ["something", "anotherthing", "andmore"]})         
+    };
+
+    var req = CouchDB.request("POST", "/test_suite_db/_changes", options);
+    var resp = JSON.parse(req.responseText);
+    T(resp.results.length === 0);
+
+    T(db.save({"_id":"something", "bop" : "plankton"}).ok);
+    var req = CouchDB.request("POST", "/test_suite_db/_changes", options);
+    var resp = JSON.parse(req.responseText);
+    T(resp.results.length === 1);
+    T(resp.results[0].id === "something");
+
+    T(db.save({"_id":"anotherthing", "bop" : "plankton"}).ok);
+    var req = CouchDB.request("POST", "/test_suite_db/_changes", options);
+    var resp = JSON.parse(req.responseText);
+    T(resp.results.length === 2);
+    T(resp.results[0].id === "something");
+    T(resp.results[1].id === "anotherthing");
+
+
+    if (!is_safari && xhr) {
+        // filter docids with continuous
+        xhr = CouchDB.newXhr();
+        xhr.open("POST", "/test_suite_db/_changes?feed=continuous&timeout=500&since=7", true);
+        xhr.setRequestHeader("Content-Type", "application/json");
+        
+        xhr.send(options.body);
+        
+        T(db.save({"_id":"andmore", "bop" : "plankton"}).ok);
+
+        
+        waitForSuccess(function() {
+            if (xhr.readyState != 4) {
+              throw("still waiting");
+            }
+           console.log(xhr.readyState);
+        }, "andmore-only");
+
+        line = JSON.parse(xhr.responseText.split("\n")[0]);
+        console.log(line);
+        T(line.seq == 8);
+        T(line.id == "andmore");
+    }
+    
   });
 
 };

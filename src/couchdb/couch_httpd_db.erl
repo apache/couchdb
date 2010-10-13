@@ -56,6 +56,25 @@ handle_request(#httpd{path_parts=[DbName|RestParts],method=Method,
     end.
 
 handle_changes_req(#httpd{method='GET'}=Req, Db) ->
+    handle_changes_req1(Req, Db, nil);
+
+handle_changes_req(#httpd{method='POST'}=Req, Db) ->
+    couch_httpd:validate_ctype(Req, "application/json"),
+    {Props} = couch_httpd:json_body_obj(Req),
+    case couch_util:get_value(<<"doc_ids">>, Props, nil) of
+    nil ->
+        handle_changes_req1(Req, Db, nil);
+    Docids when is_list(Docids) ->
+        handle_changes_req1(Req, Db, Docids);
+    _ ->
+        throw({bad_request, "`docids` member must be a array."}) 
+    end;
+
+handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
+    send_method_not_allowed(Req, "GET,HEAD,POST").
+
+
+handle_changes_req1(Req, Db, Docids) ->
     MakeCallback = fun(Resp) ->
         fun({change, Change, _}, "continuous") ->
             send_chunk(Resp, [?JSON_ENCODE(Change) | "\n"]);
@@ -82,8 +101,13 @@ handle_changes_req(#httpd{method='GET'}=Req, Db) ->
         end
     end,
     ChangesArgs = parse_changes_query(Req),
-    ChangesFun = couch_changes:handle_changes(ChangesArgs, Req, Db),
-    WrapperFun = case ChangesArgs#changes_args.feed of
+    ChangesArgs1 = case Docids of
+        nil -> ChangesArgs;
+        _ -> ChangesArgs#changes_args{filter={docids, Docids}}
+    end,
+
+    ChangesFun = couch_changes:handle_changes(ChangesArgs1, Req, Db),
+    WrapperFun = case ChangesArgs1#changes_args.feed of
     "normal" ->
         {ok, Info} = couch_db:get_db_info(Db),
         CurrentEtag = couch_httpd:make_etag(Info),
@@ -109,10 +133,8 @@ handle_changes_req(#httpd{method='GET'}=Req, Db) ->
     couch_stats_collector:track_process_count(
         {httpd, clients_requesting_changes}
     ),
-    WrapperFun(ChangesFun);
+    WrapperFun(ChangesFun).
 
-handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
-    send_method_not_allowed(Req, "GET,HEAD").
 
 handle_compact_req(#httpd{method='POST',path_parts=[DbName,_,Id|_]}=Req, Db) ->
     ok = couch_db:check_is_admin(Db),
