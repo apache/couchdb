@@ -78,6 +78,21 @@ get_callback_acc(Callback) when is_function(Callback, 2) ->
     {fun(Ev, Data, _) -> Callback(Ev, Data) end, ok}.
 
 %% @type Req -> #httpd{} | {json_req, JsonObj()}
+make_filter_fun({docids, Docids}, Style, _Req, _Db) ->
+    fun(#doc_info{id=DocId, revs=[#rev_info{rev=Rev}|_]=Revs}) ->
+        case lists:member(DocId, Docids) of
+        true ->
+            case Style of
+            main_only ->
+                [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]}];
+            all_docs ->
+                [{[{<<"rev">>, couch_doc:rev_to_str(R)}]}
+                        || #rev_info{rev=R} <- Revs]
+            end;
+        _ -> []
+        end
+    end;
+
 make_filter_fun(FilterName, Style, Req, Db) ->
     case [list_to_binary(couch_httpd:unquote(Part))
             || Part <- string:tokens(FilterName, "/")] of
