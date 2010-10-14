@@ -191,7 +191,7 @@ query_modify(Bt, LookupKeys, InsertValues, RemoveKeys) ->
     {ok, NewRoot, Bt3} = complete_root(Bt2, KeyPointers),
     {ok, QueryResults, Bt3#btree{root=NewRoot}}.
 
-% for ordering different operatations with the same key.
+% for ordering different operations with the same key.
 % fetch < remove < insert
 op_order(fetch) -> 1;
 op_order(remove) -> 2;
