@@ -378,6 +378,7 @@ db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs">>]}=Req, Db) ->
     all_docs_view(Req, Db, nil);
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_all_docs">>]}=Req, Db) ->
+    couch_httpd:validate_ctype(Req, "application/json"),
     {Fields} = couch_httpd:json_body_obj(Req),
     case couch_util:get_value(<<"keys">>, Fields, nil) of
     nil ->
