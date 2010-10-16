@@ -608,7 +608,10 @@ open_db({Props}, _UserCtx, ProxyParams, CreateTarget) ->
         auth = AuthProps,
         headers = lists:ukeymerge(1, Headers, DefaultHeaders)
     },
-    Db = Db1#http_db{options = Db1#http_db.options ++ ProxyParams},
+    Db = Db1#http_db{
+        options = Db1#http_db.options ++ ProxyParams ++
+            couch_rep_httpc:ssl_options(Db1)
+    },
     couch_rep_httpc:db_exists(Db, CreateTarget);
 open_db(<<"http://",_/binary>>=Url, _, ProxyParams, CreateTarget) ->
     open_db({[{<<"url">>,Url}]}, [], ProxyParams, CreateTarget);

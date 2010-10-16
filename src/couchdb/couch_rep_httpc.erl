@@ -16,6 +16,7 @@
 
 -export([db_exists/1, db_exists/2, full_url/1, request/1, redirected_request/2,
     redirect_url/2, spawn_worker_process/1, spawn_link_worker_process/1]).
+-export([ssl_options/1]).
 
 request(#http_db{} = Req) ->
     do_request(Req).
@@ -243,3 +244,35 @@ oauth_header(Url, QS, Action, Props) ->
     Params = oauth:signed_params(Method, Url, QSL, Consumer, Token, TokenSecret)
         -- QSL,
     {"Authorization", "OAuth " ++ oauth_uri:params_to_header_string(Params)}.
+
+ssl_options(#http_db{url = Url}) ->
+    case ibrowse_lib:parse_url(Url) of
+    #url{protocol = https} ->
+        Depth = list_to_integer(
+            couch_config:get("replicator", "ssl_certificate_max_depth", "3")
+        ),
+        SslOpts = [{depth, Depth} |
+        case couch_config:get("replicator", "verify_ssl_certificates") of
+        "true" ->
+            ssl_verify_options(true);
+        _ ->
+            ssl_verify_options(false)
+        end],
+        [{is_ssl, true}, {ssl_options, SslOpts}];
+    #url{protocol = http} ->
+        []
+    end.
+
+ssl_verify_options(Value) ->
+    ssl_verify_options(Value, erlang:system_info(otp_release)).
+
+ssl_verify_options(true, OTPVersion) when OTPVersion >= "R14" ->
+    CAFile = couch_config:get("replicator", "ssl_trusted_certificates_file"),
+    [{verify, verify_peer}, {cacertfile, CAFile}];
+ssl_verify_options(false, OTPVersion) when OTPVersion >= "R14" ->
+    [{verify, verify_none}];
+ssl_verify_options(true, _OTPVersion) ->
+    CAFile = couch_config:get("replicator", "ssl_trusted_certificates_file"),
+    [{verify, 2}, {cacertfile, CAFile}];
+ssl_verify_options(false, _OTPVersion) ->
+    [{verify, 0}].
