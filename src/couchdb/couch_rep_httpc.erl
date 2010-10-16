@@ -106,15 +106,18 @@ db_exists(Req, CanonicalUrl, CreateDB) ->
 redirect_url(RespHeaders, OrigUrl) ->
     MochiHeaders = mochiweb_headers:make(RespHeaders),
     RedUrl = mochiweb_headers:get_value("Location", MochiHeaders),
-    {url, _, Base, Port, _, _, Path, Proto} = ibrowse_lib:parse_url(RedUrl),
-    {url, _, _, _, User, Passwd, _, _} = ibrowse_lib:parse_url(OrigUrl),
+    #url{
+        host = Host, port = Port,
+        path = Path, protocol = Proto
+    } = ibrowse_lib:parse_url(RedUrl),
+    #url{username = User, password = Passwd} = ibrowse_lib:parse_url(OrigUrl),
     Creds = case is_list(User) andalso is_list(Passwd) of
     true ->
         User ++ ":" ++ Passwd ++ "@";
     false ->
         []
     end,
-    atom_to_list(Proto) ++ "://" ++ Creds ++ Base ++ ":" ++
+    atom_to_list(Proto) ++ "://" ++ Creds ++ Host ++ ":" ++
         integer_to_list(Port) ++ Path.
 
 full_url(#http_db{url=Url} = Req) when is_binary(Url) ->
