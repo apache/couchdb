@@ -106,8 +106,7 @@ validate_headers(_Req, 200, Headers) ->
     MochiHeaders = mochiweb_headers:make(Headers),
     {ok, mochiweb_headers:get_value("Content-Encoding", MochiHeaders)};
 validate_headers(Req, Code, Headers) when Code > 299, Code < 400 ->
-    Url = couch_rep_httpc:redirect_url(Headers, Req#http_db.url),
-    NewReq = couch_rep_httpc:redirected_request(Req, Url),
+    NewReq = couch_rep_httpc:redirected_request(Code, Headers, Req),
     {ibrowse_req_id, ReqId} = couch_rep_httpc:request(NewReq),
     receive {ibrowse_async_headers, ReqId, NewCode, NewHeaders} ->
         {ok, Encoding} = validate_headers(NewReq, list_to_integer(NewCode),

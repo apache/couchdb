@@ -14,8 +14,8 @@
 -include("couch_db.hrl").
 -include("../ibrowse/ibrowse.hrl").
 
--export([db_exists/1, db_exists/2, full_url/1, request/1, redirected_request/2,
-    redirect_url/2, spawn_worker_process/1, spawn_link_worker_process/1]).
+-export([db_exists/1, db_exists/2, full_url/1, request/1, redirected_request/3,
+    spawn_worker_process/1, spawn_link_worker_process/1]).
 -export([ssl_options/1]).
 
 request(#http_db{} = Req) ->
@@ -98,6 +98,9 @@ db_exists(Req, CanonicalUrl, CreateDB) ->
     {ok, "302", RespHeaders, _} ->
         RedirectUrl = redirect_url(RespHeaders, Req#http_db.url),
         db_exists(Req#http_db{url = RedirectUrl}, CanonicalUrl);
+    {ok, "303", RespHeaders, _} ->
+        RedirectUrl = redirect_url(RespHeaders, Req#http_db.url),
+        db_exists(Req#http_db{method = get, url = RedirectUrl}, CanonicalUrl);
     Error ->
         ?LOG_DEBUG("DB at ~s could not be found because ~p", [Url, Error]),
         throw({db_not_found, ?l2b(Url)})
@@ -140,9 +143,8 @@ process_response({ok, Status, Headers, Body}, Req) ->
     Code = list_to_integer(Status),
     if Code =:= 200; Code =:= 201 ->
         ?JSON_DECODE(maybe_decompress(Headers, Body));
-    Code =:= 301; Code =:= 302 ->
-        RedirectUrl = redirect_url(Headers, Req#http_db.url),
-        do_request(redirected_request(Req, RedirectUrl));
+    Code =:= 301; Code =:= 302 ; Code =:= 303 ->
+        do_request(redirected_request(Code, Headers, Req));
     Code =:= 409 ->
         throw(conflict);
     Code >= 400, Code < 500 ->
@@ -191,16 +193,26 @@ process_response({error, Reason}, Req) ->
         do_request(Req#http_db{retries = Retries-1, pause = 2*Pause})
     end.
 
-redirected_request(Req, RedirectUrl) ->
+redirected_request(Code, Headers, Req) ->
+    RedirectUrl = redirect_url(Headers, Req#http_db.url),
     {Base, QStr, _} = mochiweb_util:urlsplit_path(RedirectUrl),
     QS = mochiweb_util:parse_qs(QStr),
-    Hdrs = case couch_util:get_value(<<"oauth">>, Req#http_db.auth) of
+    ReqHeaders = case couch_util:get_value(<<"oauth">>, Req#http_db.auth) of
     undefined ->
         Req#http_db.headers;
     _Else ->
         lists:keydelete("Authorization", 1, Req#http_db.headers)
     end,
-    Req#http_db{url=Base, resource="", qs=QS, headers=Hdrs}.
+    Req#http_db{
+        method = case couch_util:to_integer(Code) of
+            303 -> get;
+            _ -> Req#http_db.method
+            end,
+        url = Base,
+        resource = "",
+        qs = QS,
+        headers = ReqHeaders
+    }.
 
 spawn_worker_process(Req) ->
     Url = ibrowse_lib:parse_url(Req#http_db.url),
