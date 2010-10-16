@@ -95,10 +95,10 @@ init([Parent, #http_db{}=Source, Since, PostProps]) ->
     {ibrowse_async_headers, ReqId, "200", _} ->
         ibrowse:stream_next(ReqId),
         {ok, #state{conn=Pid, last_seq=Since, reqid=ReqId, init_args=Args}};
-    {ibrowse_async_headers, ReqId, Code, Hdrs} when Code=="301"; Code=="302" ->
+    {ibrowse_async_headers, ReqId, Code, Hdrs}
+            when Code =:= "301"; Code =:= "302"; Code =:= "303" ->
         stop_link_worker(Pid),
-        Url2 = couch_rep_httpc:redirect_url(Hdrs, Req#http_db.url),
-        Req2 = couch_rep_httpc:redirected_request(Req, Url2),
+        Req2 = couch_rep_httpc:redirected_request(Code, Hdrs, Req),
         Pid2 = couch_rep_httpc:spawn_link_worker_process(Req2),
         Req3 = Req2#http_db{conn = Pid2},
         {ibrowse_req_id, ReqId2} = couch_rep_httpc:request(Req3),
@@ -271,11 +271,10 @@ handle_headers(200, _, State) ->
     maybe_stream_next(State),
     {noreply, State};
 handle_headers(Code, Hdrs, #state{init_args = InitArgs} = State)
-        when Code =:= 301 ; Code =:= 302 ->
+        when Code =:= 301 ; Code =:= 302 ; Code =:= 303 ->
     stop_link_worker(State#state.conn),
-    [Parent, #http_db{url = Url1} = Source, Since, PostProps] = InitArgs,
-    Url = couch_rep_httpc:redirect_url(Hdrs, Url1),
-    Source2 = couch_rep_httpc:redirected_request(Source, Url),
+    [Parent, Source, Since, PostProps] = InitArgs,
+    Source2 = couch_rep_httpc:redirected_request(Code, Hdrs, Source),
     Pid2 = couch_rep_httpc:spawn_link_worker_process(Source2),
     Source3 = Source2#http_db{conn = Pid2},
     {ibrowse_req_id, ReqId} = couch_rep_httpc:request(Source3),
