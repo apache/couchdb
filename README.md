@@ -25,7 +25,7 @@ BigCouch has the same dependencies as CouchDB:
 
 #### Installing prerequisites on Ubuntu
 
-    sudo apt-get install erlang libicu42 lbicu-dev libcurl4-openssl-dev
+    sudo apt-get install erlang libicu42 libicu-dev libcurl4-openssl-dev
 
 To install Spidermonkey 1.9.2 from PPA:
 
