@@ -310,6 +310,14 @@ function CouchDB(name, httpHeaders) {
 CouchDB.last_req = null;
 CouchDB.urlPrefix = '';
 
+CouchDB.signup = function(user_doc, password, options) {
+	// prepare user doc based on name and password
+	user_doc = CouchDB.prepareUserDoc(user_doc, password);
+	CouchDB.userDb(function(db) {
+		db.save(user_doc, options);
+	});
+};
+
 CouchDB.login = function(name, password) {
   CouchDB.last_req = CouchDB.request("POST", "/_session", {
     headers: {"Content-Type": "application/x-www-form-urlencoded",
@@ -333,6 +341,12 @@ CouchDB.session = function(options) {
   CouchDB.last_req = CouchDB.request("GET", "/_session", options);
   CouchDB.maybeThrowError(CouchDB.last_req);
   return JSON.parse(CouchDB.last_req.responseText);
+};
+
+CouchDB.userDb = function(callback) {
+	var session = CouchDB.session();
+	var userDb = new CouchDB(session.info.authentication_db);
+	callback(userDb);
 };
 
 CouchDB.user_prefix = "org.couchdb.user:";
