@@ -235,6 +235,12 @@ function CouchDB(name, httpHeaders) {
     CouchDB.maybeThrowError(this.last_req);
     return JSON.parse(this.last_req.responseText);
   };
+  
+  this.compactView = function(groupname) {
+  	this.last_req = this.request("POST", this.uri + "_compact/" + groupname);
+    CouchDB.maybeThrowError(this.last_req);
+    return JSON.parse(this.last_req.responseText);
+  };
 
   this.setDbProperty = function(propId, propValue) {
     this.last_req = this.request("PUT", this.uri + propId,{
