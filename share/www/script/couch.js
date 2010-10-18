@@ -216,6 +216,27 @@ function CouchDB(name, httpHeaders) {
   this.designDocs = function() {
     return this.allDocs({startkey:"_design", endkey:"_design0"});
   };
+  
+  this.allApps = function(options) {
+  	options = options || {};
+	if (options.eachApp) {
+	  for (var listedDoc in this.designDocs) {
+	  	var ddoc = this.open(listedDoc.id);
+	    var index, appPath, appName = ddoc._id.split('/');
+        appName.shift();
+        appName = appName.join('/');
+        index = ddoc.couchapp && ddoc.couchapp.index;
+        if (index) {
+          appPath = ['', name, ddoc._id, index].join('/');
+        } else if (ddoc._attachments && ddoc._attachments["index.html"]) {
+          appPath = ['', name, ddoc._id, "index.html"].join('/');
+        }
+        if (appPath) options.eachApp(appName, appPath, ddoc);
+	  }
+	} else {
+	  alert("Please provide an eachApp function for allApps()");
+	}
+  };
 
   this.changes = function(options) {
     this.last_req = this.request("GET", this.uri + "_changes" 
