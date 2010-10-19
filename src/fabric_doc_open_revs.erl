@@ -66,8 +66,11 @@ handle_message({ok, RawReplies}, _Worker, #state{revs = all} = State) ->
         All0, RawReplies),
     Reduced = remove_ancestors(All, []),
     Complete = (ReplyCount =:= (WorkerCount - 1)),
-    Repair = case Reduced of All -> false; _ ->
-        [D || {{ok,D}, _} <- Reduced]
+    QuorumMet = lists:all(fun({_, C}) -> C >= R end, Reduced),
+    case Reduced of All when QuorumMet andalso ReplyCount =:= (R-1) ->
+        Repair = false;
+    _ ->
+        Repair = [D || {{ok,D}, _} <- Reduced]
     end,
     case maybe_reply(DbName, Reduced, Complete, Repair, R) of
     noreply ->
@@ -113,6 +116,8 @@ skip(#state{revs=all} = State) ->
 skip(#state{revs=Revs} = State) ->
     handle_message({ok, [error || _Rev <- Revs]}, nil, State).
 
+maybe_reply(_, [], false, _, _) ->
+    noreply;
 maybe_reply(DbName, ReplyDict, IsComplete, RepairDocs, R) ->
     case lists:all(fun({_, C}) -> C >= R end, ReplyDict) of
     true ->
@@ -223,6 +228,13 @@ all_revs_test() ->
     Foo1 = {ok, #doc{revs = {1, [<<"foo">>]}}},
     Foo2 = {ok, #doc{revs = {2, [<<"foo2">>, <<"foo">>]}}},
     Bar1 = {ok, #doc{revs = {1, [<<"bar">>]}}},
+
+    % an empty worker response does not count as meeting quorum
+    ?assertMatch(
+        {ok, #state{}},
+        handle_message({ok, []}, nil, State0)
+    ),
+
     ?assertMatch(
         {ok, #state{}},
         handle_message({ok, [Foo1, Bar1]}, nil, State0)
