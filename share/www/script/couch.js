@@ -129,6 +129,33 @@ function CouchDB(name, httpHeaders) {
     }
   };
   
+  this.bulkDelete = function(docs, options) {
+  	for (var i = docs.length - 1; i >= 0; i--) {
+	  docs[i]._deleted = true;
+    }
+	var json = {"docs": docs};
+    // put any options in the json
+    for (var option in options) {
+      json[option] = options[option];
+    }
+    this.last_req = this.request("POST", this.uri + "_bulk_docs", {
+      body: JSON.stringify(json)
+    });
+    if (this.last_req.status == 417) {
+      return {errors: JSON.parse(this.last_req.responseText)};
+    }
+    else {
+      CouchDB.maybeThrowError(this.last_req);
+      var results = JSON.parse(this.last_req.responseText);
+      for (var i = 0; i < docs.length; i++) {
+        if(results[i] && results[i].rev) {
+          docs[i]._rev = results[i].rev;
+        }
+      }
+      return results;
+    }
+  };
+  
   this.copyDoc = function(docId, destId, options) {
   	options = options || {};
 	options.headers = options.headers || {};
