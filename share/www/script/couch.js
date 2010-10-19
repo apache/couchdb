@@ -128,6 +128,15 @@ function CouchDB(name, httpHeaders) {
       return results;
     }
   };
+  
+  this.copyDoc = function(docId, destId, options) {
+  	options = options || {};
+	options.headers = options.headers || {};
+	options.headers.Destination = destId.toString();
+  	this.last_req = this.request("COPY", this.uri + encodeURIComponent(docId), options);
+	CouchDB.maybeThrowError(this.last_req);
+	return JSON.parse(this.last_req.responseText);
+  };
 
   this.ensureFullCommit = function() {
     this.last_req = this.request("POST", this.uri + "_ensure_full_commit");
