@@ -143,7 +143,7 @@ is_repair_needed([], []) ->
     false;
 is_repair_needed([{_Rev, [Reply]} | Tail1], [Reply | Tail2]) ->
     is_repair_needed(Tail1, Tail2);
-is_repair_needed([H1|_], [H2|_]) ->
+is_repair_needed(_, _) ->
     true.
 
 % this presumes the incoming list is sorted, i.e. shorter revlists come first
