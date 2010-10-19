@@ -64,7 +64,7 @@ handle_message({ok, RawReplies}, _Worker, #state{revs = all} = State) ->
     } = State,
     All = lists:foldl(fun(Reply,D) -> orddict:update_counter(Reply,1,D) end,
         All0, RawReplies),
-    Reduced = remove_ancestors(All, []),
+    Reduced = fabric_util:remove_ancestors(All, []),
     Complete = (ReplyCount =:= (WorkerCount - 1)),
     QuorumMet = lists:all(fun({_, C}) -> C >= R end, Reduced),
     case Reduced of All when QuorumMet andalso ReplyCount =:= (R-1) ->
@@ -95,7 +95,7 @@ handle_message({ok, RawReplies0}, _Worker, State) ->
             {Rev, orddict:update_counter(Reply, 1, D)}
         end
     end, All0, RawReplies),
-    Reduced = [remove_ancestors(X, []) || {_, X} <- All],
+    Reduced = [fabric_util:remove_ancestors(X, []) || {_, X} <- All],
     FinalReplies = [choose_winner(X, R) || X <- Reduced],
     Complete = (ReplyCount =:= (WorkerCount - 1)),
     case is_repair_needed(All, FinalReplies) of
@@ -151,35 +151,6 @@ is_repair_needed([{_Rev, [Reply]} | Tail1], [Reply | Tail2]) ->
 is_repair_needed(_, _) ->
     true.
 
-% this presumes the incoming list is sorted, i.e. shorter revlists come first
-remove_ancestors([], Acc) ->
-    lists:reverse(Acc);
-remove_ancestors([{{not_found, _}, Count} = Head | Tail], Acc) ->
-    % any document is a descendant
-    case lists:filter(fun({{ok, #doc{}}, _}) -> true; (_) -> false end, Tail) of
-    [{{ok, #doc{}} = Descendant, _} | _] ->
-        remove_ancestors(orddict:update_counter(Descendant, Count, Tail), Acc);
-    [] ->
-        remove_ancestors(Tail, [Head | Acc])
-    end;
-remove_ancestors([{{ok, #doc{revs = {Pos, Revs}}}, Count} = Head | Tail], Acc) ->
-    Descendants = lists:dropwhile(fun
-    ({{ok, #doc{revs = {Pos2, Revs2}}}, _}) ->
-        case lists:nthtail(Pos2 - Pos, Revs2) of
-        [] ->
-            % impossible to tell if Revs2 is a descendant - assume no
-            true;
-        History ->
-            % if Revs2 is a descendant, History is a prefix of Revs
-            not lists:prefix(History, Revs)
-        end
-    end, Tail),
-    case Descendants of [] ->
-        remove_ancestors(Tail, [Head | Acc]);
-    [{Descendant, _} | _] ->
-        remove_ancestors(orddict:update_counter(Descendant, Count, Tail), Acc)
-    end.
-
 maybe_execute_read_repair(_Db, false) ->
     ok;
 maybe_execute_read_repair(Db, Docs) ->
@@ -204,24 +175,6 @@ unstrip_not_found_missing([{not_found, Rev} | Rest]) ->
     [{{not_found, missing}, Rev} | unstrip_not_found_missing(Rest)];
 unstrip_not_found_missing([Else | Rest]) ->
     [Else | unstrip_not_found_missing(Rest)].
-
-remove_ancestors_test() ->
-    Foo1 = {ok, #doc{revs = {1, [<<"foo">>]}}},
-    Foo2 = {ok, #doc{revs = {2, [<<"foo2">>, <<"foo">>]}}},
-    Bar1 = {ok, #doc{revs = {1, [<<"bar">>]}}},
-    Bar2 = {not_found, {1,<<"bar">>}},
-    ?assertEqual(
-        [{Bar1,1}, {Foo1,1}],
-        remove_ancestors([{Bar1,1}, {Foo1,1}], [])
-    ),
-    ?assertEqual(
-        [{Bar1,1}, {Foo2,2}],
-        remove_ancestors([{Bar1,1}, {Foo1,1}, {Foo2,1}], [])
-    ),
-    ?assertEqual(
-        [{Bar1,2}],
-        remove_ancestors([{Bar2,1}, {Bar1,1}], [])
-    ).
 
 all_revs_test() ->
     State0 = #state{worker_count = 3, r = 2, revs = all},

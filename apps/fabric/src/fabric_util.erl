@@ -14,10 +14,12 @@
 
 -module(fabric_util).
 
--export([submit_jobs/3, cleanup/1, recv/4, get_db/1]).
+-export([submit_jobs/3, cleanup/1, recv/4, get_db/1, remove_ancestors/2]).
 
 -include("fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
+-include_lib("couch/include/couch_db.hrl").
+-include_lib("eunit/include/eunit.hrl").
 
 submit_jobs(Shards, EndPoint, ExtraArgs) ->
     lists:map(fun(#shard{node=Node, name=ShardName} = Shard) ->
@@ -46,3 +48,50 @@ get_db(DbName) ->
         % but don't require them
         rpc:call(Node, couch_db, open, [ShardName, []])
     end.
+
+% this presumes the incoming list is sorted, i.e. shorter revlists come first
+remove_ancestors([], Acc) ->
+    lists:reverse(Acc);
+remove_ancestors([{{not_found, _}, Count} = Head | Tail], Acc) ->
+    % any document is a descendant
+    case lists:filter(fun({{ok, #doc{}}, _}) -> true; (_) -> false end, Tail) of
+    [{{ok, #doc{}} = Descendant, _} | _] ->
+        remove_ancestors(orddict:update_counter(Descendant, Count, Tail), Acc);
+    [] ->
+        remove_ancestors(Tail, [Head | Acc])
+    end;
+remove_ancestors([{{ok, #doc{revs = {Pos, Revs}}}, Count} = Head | Tail], Acc) ->
+    Descendants = lists:dropwhile(fun
+    ({{ok, #doc{revs = {Pos2, Revs2}}}, _}) ->
+        case lists:nthtail(Pos2 - Pos, Revs2) of
+        [] ->
+            % impossible to tell if Revs2 is a descendant - assume no
+            true;
+        History ->
+            % if Revs2 is a descendant, History is a prefix of Revs
+            not lists:prefix(History, Revs)
+        end
+    end, Tail),
+    case Descendants of [] ->
+        remove_ancestors(Tail, [Head | Acc]);
+    [{Descendant, _} | _] ->
+        remove_ancestors(orddict:update_counter(Descendant, Count, Tail), Acc)
+    end.
+
+remove_ancestors_test() ->
+    Foo1 = {ok, #doc{revs = {1, [<<"foo">>]}}},
+    Foo2 = {ok, #doc{revs = {2, [<<"foo2">>, <<"foo">>]}}},
+    Bar1 = {ok, #doc{revs = {1, [<<"bar">>]}}},
+    Bar2 = {not_found, {1,<<"bar">>}},
+    ?assertEqual(
+        [{Bar1,1}, {Foo1,1}],
+        remove_ancestors([{Bar1,1}, {Foo1,1}], [])
+    ),
+    ?assertEqual(
+        [{Bar1,1}, {Foo2,2}],
+        remove_ancestors([{Bar1,1}, {Foo1,1}, {Foo2,1}], [])
+    ),
+    ?assertEqual(
+        [{Bar1,2}],
+        remove_ancestors([{Bar2,1}, {Bar1,1}], [])
+    ).
