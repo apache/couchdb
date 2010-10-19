@@ -918,5 +918,5 @@ start_copy_compact(#db{name=Name,filepath=Filepath}=Db) ->
     unlink(Fd),
     NewDb2 = copy_compact(Db, NewDb, Retry),
     close_db(NewDb2),
-    gen_server:cast(Db#db.update_pid, {compact_done, CompactFile}).
+    gen_server:cast(Db#db.main_pid, {compact_done, CompactFile}).
 
