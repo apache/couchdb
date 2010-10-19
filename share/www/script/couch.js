@@ -443,6 +443,25 @@ CouchDB.allDesignDocs = function() {
   return ddocs;
 };
 
+CouchDB.config = function(section, option, value) {
+  var url = "/_config/";
+  if (section) {
+  	url += encodeURIComponent(section) + "/";
+    if (option) {
+      url += encodeURIComponent(option) + "/";
+    }
+  }
+  if (value === null) {
+  	this.last_req = this.request("DELETE", url);
+    CouchDB.maybeThrowError(this.last_req);
+	return JSON.parse(CouchDB.last_req.responseText);
+  } else {
+    this.last_req = this.request("PUT", url, {body: JSON.stringify(value)});
+    CouchDB.maybeThrowError(this.last_req);
+	return JSON.parse(CouchDB.last_req.responseText);
+  }
+};
+
 CouchDB.getVersion = function() {
   CouchDB.last_req = CouchDB.request("GET", "/");
   CouchDB.maybeThrowError(CouchDB.last_req);
