@@ -25,16 +25,17 @@ go(DbName, Id, Options) ->
         [Id, [deleted|Options]]),
     SuppressDeletedDoc = not lists:member(deleted, Options),
     R = couch_util:get_value(r, Options, couch_config:get("cluster","r","2")),
+    RepairOpts = [{r, integer_to_list(mem3:n(DbName))} | Options],
     Acc0 = {length(Workers), list_to_integer(R), []},
     case fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
     {ok, Reply} ->
         format_reply(Reply, SuppressDeletedDoc);
     {error, needs_repair, Reply} ->
-        spawn(fabric, open_revs, [DbName, Id, all, Options]),
+        spawn(fabric, open_revs, [DbName, Id, all, RepairOpts]),
         format_reply(Reply, SuppressDeletedDoc);
     {error, needs_repair} ->
         % we couldn't determine the correct reply, so we'll run a sync repair
-        {ok, Results} = fabric:open_revs(DbName, Id, all, Options),
+        {ok, Results} = fabric:open_revs(DbName, Id, all, RepairOpts),
         case lists:partition(fun({ok, #doc{deleted=Del}}) -> Del end, Results) of
         {[], []} ->
             {not_found, missing};
