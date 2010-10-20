@@ -15,7 +15,7 @@
 -module(mem3).
 
 -export([start/0, stop/0, restart/0, nodes/0, shards/1, shards/2,
-    choose_shards/2]).
+    choose_shards/2, n/1]).
 -export([compare_nodelists/0, compare_shards/1]).
 
 -include("mem3.hrl").
@@ -57,6 +57,10 @@ compare_shards(DbName) ->
         orddict:append(Shards, Node, D)
     end, orddict:new(), lists:zip(Replies, GoodNodes)),
     [{bad_nodes, BadNodes} | Dict].
+
+-spec n(DbName::iodata()) -> integer().
+n(DbName) ->
+    length(mem3:shards(DbName, <<"foo">>)).
 
 -spec nodes() -> [node()].
 nodes() ->
