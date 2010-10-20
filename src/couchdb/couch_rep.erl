@@ -40,6 +40,7 @@
 
     start_seq,
     history,
+    session_id,
     source_log,
     target_log,
     rep_starttime,
@@ -206,6 +207,7 @@ do_init([RepId, {PostProps} = RepDoc, UserCtx] = InitArgs) ->
 
         start_seq = StartSeq,
         history = History,
+        session_id = couch_uuids:random(),
         source_log = SourceLog,
         target_log = TargetLog,
         rep_starttime = httpd_util:rfc1123_date(),
@@ -651,6 +653,7 @@ do_checkpoint(State) ->
         committed_seq = NewSeqNum,
         start_seq = StartSeqNum,
         history = OldHistory,
+        session_id = SessionId,
         source_log = SourceLog,
         target_log = TargetLog,
         rep_starttime = ReplicationStartTime,
@@ -662,7 +665,6 @@ do_checkpoint(State) ->
     {SrcInstanceStartTime, TgtInstanceStartTime} ->
         ?LOG_INFO("recording a checkpoint for ~s -> ~s at source update_seq ~p",
             [dbname(Source), dbname(Target), NewSeqNum]),
-        SessionId = couch_uuids:random(),
         NewHistoryEntry = {[
             {<<"session_id">>, SessionId},
             {<<"start_time">>, list_to_binary(ReplicationStartTime)},
