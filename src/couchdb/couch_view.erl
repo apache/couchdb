@@ -284,35 +284,41 @@ terminate(_Reason, _Srv) ->
     ok.
 
 
-handle_call({get_group_server, DbName,
-    #group{name=GroupId,sig=Sig}=Group}, _From, #server{root_dir=Root}=Server) ->
+handle_call({get_group_server, DbName, #group{sig=Sig}=Group}, From,
+    #server{root_dir=Root}=Server) ->
     case ets:lookup(group_servers_by_sig, {DbName, Sig}) of
     [] ->
-        ?LOG_DEBUG("Spawning new group server for view group ~s in database ~s.",
-            [GroupId, DbName]),
-        case (catch couch_view_group:start_link({Root, DbName, Group})) of
-        {ok, NewPid} ->
-            add_to_ets(NewPid, DbName, Sig),
-            {reply, {ok, NewPid}, Server};
-        {error, invalid_view_seq} ->
-            do_reset_indexes(DbName, Root),
-            case (catch couch_view_group:start_link({Root, DbName, Group})) of
-            {ok, NewPid} ->
-                add_to_ets(NewPid, DbName, Sig),
-                {reply, {ok, NewPid}, Server};
-            Error ->
-                {reply, Error, Server}
-            end;
-        Error ->
-            {reply, Error, Server}
-        end;
+        spawn_monitor(fun() -> new_group(Root, DbName, Group) end),
+        ets:insert(group_servers_by_sig, {{DbName, Sig}, [From]}),
+        {noreply, Server};
+    [{_, WaitList}] when is_list(WaitList) ->
+        ets:insert(group_servers_by_sig, {{DbName, Sig}, [From | WaitList]}),
+        {noreply, Server};
     [{_, ExistingPid}] ->
         {reply, {ok, ExistingPid}, Server}
-    end.
+    end;
+
+handle_call({reset_indexes, DbName}, _From, #server{root_dir=Root}=Server) ->
+    do_reset_indexes(DbName, Root),
+    {reply, ok, Server}.
 
 handle_cast({reset_indexes, DbName}, #server{root_dir=Root}=Server) ->
     do_reset_indexes(DbName, Root),
     {noreply, Server}.
+
+new_group(Root, DbName, #group{name=GroupId, sig=Sig} = Group) ->
+    ?LOG_DEBUG("Spawning new group server for view group ~s in database ~s.",
+        [GroupId, DbName]),
+    case (catch couch_view_group:start_link({Root, DbName, Group})) of
+    {ok, NewPid} ->
+        unlink(NewPid),
+        exit({DbName, Sig, {ok, NewPid}});
+    {error, invalid_view_seq} ->
+        ok = gen_server:call(couch_view, {reset_indexes, DbName}),
+        new_group(Root, DbName, Group);
+    Error ->
+        exit({DbName, Sig, Error})
+    end.
 
 do_reset_indexes(DbName, Root) ->
     % shutdown all the updaters and clear the files, the db got changed
@@ -340,6 +346,15 @@ handle_info({'EXIT', FromPid, Reason}, Server) ->
     [{_, {DbName, GroupId}}] ->
         delete_from_ets(FromPid, DbName, GroupId)
     end,
+    {noreply, Server};
+
+handle_info({'DOWN', _, _, _, {DbName, Sig, Reply}}, Server) ->
+    [{_, WaitList}] = ets:lookup(group_servers_by_sig, {DbName, Sig}),
+    [gen_server:reply(From, Reply) || From <- WaitList],
+    case Reply of {ok, NewPid} ->
+        link(NewPid),
+        add_to_ets(NewPid, DbName, Sig);
+     _ -> ok end,
     {noreply, Server}.
 
 add_to_ets(Pid, DbName, Sig) ->
