@@ -45,7 +45,7 @@ handle_info({'DOWN', _, _, Pid, {badarg, [{ets,delete,[partitions,_]}|_]}},
 handle_info({'DOWN', _, _, Pid, Reason}, #state{changes_pid=Pid} = State) ->
     ?LOG_INFO("~p changes listener died ~p", [?MODULE, Reason]),
     Seq = case Reason of {seq, EndSeq} -> EndSeq; _ -> 0 end,
-    timer:send_after(5000, {start_listener, Seq}),
+    erlang:send_after(5000, self(), {start_listener, Seq}),
     {noreply, State};
 handle_info({start_listener, Seq}, State) ->
     {NewPid, _} = spawn_monitor(fun() -> listen_for_changes(Seq) end),
