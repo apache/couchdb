@@ -53,7 +53,7 @@ handle_info({'DOWN', _, _, Pid, Reason}, #state{changes_pid=Pid} = State) ->
     ?LOG_INFO("~p changes listener died ~p", [?MODULE, Reason]),
     StartSeq = State#state.update_seq,
     Seq = case Reason of {seq, EndSeq} -> EndSeq; _ -> StartSeq end,
-    timer:send_after(5000, start_listener),
+    erlang:send_after(5000, self(), start_listener),
     {noreply, State#state{update_seq = Seq}};
 handle_info(start_listener, #state{update_seq = Seq} = State) ->
     {NewPid, _} = spawn_monitor(fun() -> listen_for_changes(Seq) end),

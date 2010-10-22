@@ -237,7 +237,7 @@ init_status_error(ReturnPid, Ref, Error) ->
 
 init({Filepath, Options, ReturnPid, Ref}) ->
     process_flag(trap_exit, true),
-    timer:send_after(60000, maybe_close),
+    erlang:send_after(60000, self(), maybe_close),
     case lists:member(create, Options) of
     true ->
         filelib:ensure_dir(Filepath),
@@ -489,7 +489,7 @@ handle_info(maybe_close, Fd) ->
             [?MODULE, self()]),
         {stop, normal, Fd};
     _Else ->
-        timer:send_after(10000, maybe_close),
+        erlang:send_after(10000, self(), maybe_close),
         {noreply, Fd}
     end;
 handle_info({'EXIT', _, normal}, Fd) ->
