@@ -9,7 +9,7 @@ recv(Refs, Keypos, Fun, Acc0, infinity, PerMsgTO) ->
     process_mailbox(Refs, Keypos, Fun, Acc0, nil, PerMsgTO);
 recv(Refs, Keypos, Fun, Acc0, GlobalTimeout, PerMsgTO) ->
     TimeoutRef = erlang:make_ref(),
-    {ok, TRef} = timer:send_after(GlobalTimeout, {timeout, TimeoutRef}),
+    {ok, TRef} = erlang:send_after(GlobalTimeout, self(), {timeout, TimeoutRef}),
     try
         process_mailbox(Refs, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO)
     after
