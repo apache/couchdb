@@ -17,7 +17,7 @@ def require_lib(name):
         print 'Could not find required library', name
         Exit(1)
 
-env = Environment(CCFLAGS='-g -O2 -DXP_UNIX')
+env = Environment(CCFLAGS='-g -O2 -DXP_UNIX', LIBPATH='/opt/csw')
 if not env.GetOption('clean'):
     conf = Configure(env, config_h='config.h')
 
