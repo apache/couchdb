@@ -88,4 +88,4 @@ cat > rel/dev$i.config << EOF
 EOF
 done
 
-cat rel/bigcouch.config
+./rebar get-deps && cat rel/bigcouch.config

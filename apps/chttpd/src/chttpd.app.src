@@ -1,7 +1,0 @@
-{application, chttpd, [
-    {description, "HTTP interface for CouchDB cluster"},
-    {vsn, "1.0.3"},
-    {registered, [chttpd_sup, chttpd]},
-    {applications, [kernel, stdlib, couch, fabric]},
-    {mod, {chttpd_app,[]}}
-]}.
