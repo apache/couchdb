@@ -181,8 +181,6 @@ parse_view_param("list", Value) ->
     [{list, ?l2b(Value)}];
 parse_view_param("callback", _) ->
     []; % Verified in the JSON response functions
-parse_view_param("show_total_rows", Value) ->
-    [{show_total_rows, parse_bool_param(Value)}];
 parse_view_param("sorted", Value) ->
     [{sorted, parse_bool_param(Value)}];
 parse_view_param(Key, Value) ->

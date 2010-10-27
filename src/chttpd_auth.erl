@@ -352,7 +352,11 @@ delete_user(#httpd{user_ctx=UserCtx}=Req, Db, UserName) ->
 
 extract_username(Form) ->
     CouchFormat = couch_util:get_value("name", Form),
-    try ?l2b(couch_util:get_value("username", Form, CouchFormat))
+    try ?l2b(couch_util:get_value("username", Form, CouchFormat)) of
+    <<>> ->
+        throw({bad_request, <<"user accounts must have a username">>});
+    Else ->
+        Else
     catch error:badarg ->
         throw({bad_request, <<"user accounts must have a username">>})
     end.
@@ -364,14 +368,7 @@ extract_password(Form) ->
     end.
 
 extract_username_password(Form) ->
-    CouchFormat = couch_util:get_value("name", Form),
-    try
-        {?l2b(couch_util:get_value("username", Form, CouchFormat)),
-         ?l2b(couch_util:get_value("password", Form))}
-    catch error:badarg ->
-        Msg = <<"user accounts must have a username and password">>,
-        throw({bad_request, Msg})
-    end.
+    {extract_username(Form), extract_password(Form)}.
 
 generate_cookie_buster() ->
     T0 = calendar:now_to_datetime({0,86400,0}),

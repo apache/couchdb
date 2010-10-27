@@ -110,6 +110,8 @@ is_old_couch(Resp) ->
     case MochiReq:get_header_value("user-agent") of
     undefined ->
         false;
+    "CouchDB/1.0.0" ->
+        true;
     UserAgent ->
         string:str(UserAgent, "CouchDB/0") > 0
     end.
@@ -170,8 +172,8 @@ delete_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
         throw(Error)
     end.
 
-do_db_req(#httpd{path_parts=[DbName|_]}=Req, Fun) ->
-    Fun(Req, #db{name=DbName}).
+do_db_req(#httpd{path_parts=[DbName|_], user_ctx=Ctx}=Req, Fun) ->
+    Fun(Req, #db{name=DbName, user_ctx=Ctx}).
 
 db_req(#httpd{method='GET',path_parts=[DbName]}=Req, _Db) ->
     % measure the time required to generate the etag, see if it's worth it
