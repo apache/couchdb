@@ -22,10 +22,7 @@
 -include_lib("couch/include/couch_db.hrl").
 
 go(DbName, #view_query_args{keys=nil} = QueryArgs, Callback, Acc0) ->
-    Workers = lists:map(fun(#shard{name=Name, node=Node} = Shard) ->
-        Ref = rexi:cast(Node, {fabric_rpc, all_docs, [Name, QueryArgs]}),
-        Shard#shard{ref = Ref}
-    end, mem3:shards(DbName)),
+    Workers = fabric_util:submit_jobs(mem3:shards(DbName),all_docs,[QueryArgs]),
     BufferSize = couch_config:get("fabric", "map_buffer_size", "2"),
     #view_query_args{limit = Limit, skip = Skip} = QueryArgs,
     State = #collector{

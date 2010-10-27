@@ -145,8 +145,8 @@ query_view(DbName, Design, ViewName, Callback, Acc0, QueryArgs) ->
     end,
     Mod:go(Db, Design, View, QueryArgs, Callback, Acc0).
 
-get_view_group_info(DbName, DesignId) ->
-    fabric_group_info:go(dbname(DbName), design_doc(DesignId)).
+get_view_group_info(Db, DesignId) ->
+    fabric_group_info:go(dbname(Db), design_doc(DesignId)).
 
 design_docs(DbName) ->
     QueryArgs = #view_query_args{start_key = <<"_design/">>, include_docs=true},
@@ -169,19 +169,19 @@ reset_validation_funs(DbName) ->
         #shard{node=Node, name=Name} <-  mem3:shards(DbName)].
 
 cleanup_index_files() ->
-    {ok, DbNames} = fabric:all_dbs(),
-    [cleanup_index_files(Name) || Name <- DbNames].
+    {ok, Dbs} = fabric:all_dbs(),
+    [cleanup_index_files(Db) || Db <- Dbs].
 
-cleanup_index_files(DbName) ->
-    {ok, DesignDocs} = fabric:design_docs(DbName),
+cleanup_index_files(Db) ->
+    {ok, DesignDocs} = fabric:design_docs(Db),
 
     ActiveSigs = lists:map(fun(#doc{id = GroupId}) ->
-        {ok, Info} = fabric:get_view_group_info(DbName, GroupId),
+        {ok, Info} = fabric:get_view_group_info(Db, GroupId),
         binary_to_list(couch_util:get_value(signature, Info))
     end, [couch_doc:from_json_obj(DD) || DD <- DesignDocs]),
 
     FileList = filelib:wildcard([couch_config:get("couchdb", "view_index_dir"),
-        "/.shards/*/", couch_util:to_list(DbName), "_design/*"]),
+        "/.shards/*/", couch_util:to_list(dbname(Db)), "_design/*"]),
 
     DeleteFiles = if ActiveSigs =:= [] -> FileList; true ->
         {ok, RegExp} = re:compile([$(, string:join(ActiveSigs, "|"), $)]),

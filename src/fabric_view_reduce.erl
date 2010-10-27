@@ -36,6 +36,7 @@ go(DbName, DDoc, VName, Args, Callback, Acc0) ->
     BufferSize = couch_config:get("fabric", "reduce_buffer_size", "20"),
     #view_query_args{limit = Limit, skip = Skip} = Args,
     State = #collector{
+        db_name = DbName,
         query_args = Args,
         callback = Callback,
         buffer_size = list_to_integer(BufferSize),

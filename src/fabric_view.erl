@@ -118,9 +118,9 @@ maybe_send_row(State) ->
     false ->
         try get_next_row(State) of
         {_, NewState} when Skip > 0 ->
-            maybe_send_row(NewState#collector{skip=Skip-1, limit=Limit-1});
+            maybe_send_row(NewState#collector{skip=Skip-1});
         {Row, NewState} ->
-            case Callback(transform_row(Row), AccIn) of
+            case Callback(transform_row(possibly_embed_doc(NewState,Row)), AccIn) of
             {stop, Acc} ->
                 {stop, NewState#collector{user_acc=Acc, limit=Limit-1}};
             {ok, Acc} ->
@@ -131,6 +131,40 @@ maybe_send_row(State) ->
             {stop, State#collector{user_acc=Acc}}
         end
     end.
+
+%% if include_docs=true is used when keys and
+%% the values contain "_id" then use the "_id"s
+%% to retrieve documents and embed in result
+possibly_embed_doc(_State,
+              #view_row{id=reduced}=Row) ->
+    Row;
+possibly_embed_doc(_State,
+                   #view_row{value=undefined}=Row) ->
+    Row;
+possibly_embed_doc(#collector{db_name=DbName, query_args=Args},
+              #view_row{key=_Key, id=_Id, value=Value, doc=_Doc}=Row) ->
+    #view_query_args{include_docs=IncludeDocs, keys=Keys} = Args,
+    case IncludeDocs andalso (Keys =/= nil) andalso is_tuple(Value) of
+        true ->
+            {Props} = Value,
+            case couch_util:get_value(<<"_id">>,Props) of
+                undefined -> Row;
+                IncId ->
+                    % use separate process to call fabric:open_doc
+                    % to not interfere with current call
+                    {Pid, Ref} = spawn_monitor(fun() ->
+                                          exit(fabric:open_doc(DbName, IncId, [])) end),
+                    {ok, NewDoc} =
+                        receive {'DOWN',Ref,process,Pid, Resp} ->
+                                Resp
+                        end,
+                    Row#view_row{doc=couch_doc:to_json_obj(NewDoc,[])}
+            end;
+        _ -> Row
+    end;
+possibly_embed_doc(_State,Row) ->
+    Row.
+
 
 keydict(nil) ->
     undefined;
@@ -197,6 +231,7 @@ transform_row(#view_row{key=Key, id=Id, value=Value, doc={error,Reason}}) ->
     {row, {[{id,Id}, {key,Key}, {value,Value}, {error,Reason}]}};
 transform_row(#view_row{key=Key, id=Id, value=Value, doc=Doc}) ->
     {row, {[{id,Id}, {key,Key}, {value,Value}, {doc,Doc}]}}.
+
 
 sort_fun(fwd) ->
     fun(A,A) -> true; (A,B) -> couch_view:less_json(A,B) end;

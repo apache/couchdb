@@ -15,6 +15,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -record(collector, {
+    db_name=nil,
     query_args,
     callback,
     counters,

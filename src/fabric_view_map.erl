@@ -25,13 +25,11 @@ go(DbName, GroupId, View, Args, Callback, Acc0) when is_binary(GroupId) ->
     go(DbName, DDoc, View, Args, Callback, Acc0);
 
 go(DbName, DDoc, View, Args, Callback, Acc0) ->
-    Workers = lists:map(fun(#shard{name=Name, node=Node} = Shard) ->
-        Ref = rexi:cast(Node, {fabric_rpc, map_view, [Name, DDoc, View, Args]}),
-        Shard#shard{ref = Ref}
-    end, mem3:shards(DbName)),
+    Workers = fabric_util:submit_jobs(mem3:shards(DbName),map_view,[DDoc,View,Args]),
     BufferSize = couch_config:get("fabric", "map_buffer_size", "2"),
     #view_query_args{limit = Limit, skip = Skip, keys = Keys} = Args,
     State = #collector{
+        db_name=DbName,
         query_args = Args,
         callback = Callback,
         buffer_size = list_to_integer(BufferSize),

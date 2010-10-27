@@ -77,3 +77,36 @@ final_answer(Counters) ->
     false ->
         {error, internal_server_error}
     end.
+
+db_create_ok_test() ->
+    Shards = mem3_util:create_partition_map("foo",3,12,["node1","node2","node3"]),
+    Acc0 = fabric_dict:init(Shards, nil),
+    Result = lists:foldl(fun(Shard,{Acc,_}) ->
+                        case handle_message(ok,Shard,Acc) of
+                            {ok, NewAcc} ->
+                                {NewAcc,true};
+                            {stop, ok} -> {Acc,true};
+                            {error, _} -> {Acc, false}
+                        end end, {Acc0, true}, Shards),
+    ?assert(element(2,Result)).
+
+db_create_file_exists_test() ->
+    Shards = mem3_util:create_partition_map("foo",3,12,["node1","node2","node3","node4","node5"]),
+    BadNo = random:uniform(length(Shards)),
+    Acc0 = fabric_dict:init(Shards, nil),
+    Result = lists:foldl(
+               fun(Shard,{Acc,Iter,Bool}) ->
+                       MessResult = case Iter of
+                                        BadNo ->
+                                            handle_message(file_exists,Shard,Acc);
+                                        _ ->
+                                            handle_message(ok,Shard,Acc)
+                                    end,
+                       case MessResult of
+                           {ok, NewAcc} ->
+                               {NewAcc, Iter+1, Bool};
+                           {stop, ok} -> {Acc, Iter+1, Bool};
+                           {error, _} -> {Acc, Iter+1, false}
+                       end
+               end,{Acc0, 1, true}, Shards),
+    ?assert(not element(3,Result)).
