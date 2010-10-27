@@ -75,9 +75,17 @@ code_change(_OldVsn, St, _Extra) ->
 init_p(From, {M,F,A}) ->
     put(rexi_from, From),
     put(initial_call, {M,F,length(A)}),
-    try apply(M, F, A) catch _:Reason -> exit(Reason) end.
+    try apply(M, F, A) catch exit:normal -> ok; Class:Reason ->
+        Stack = clean_stack(),
+        error_logger:error_report([{?MODULE, {Class, Reason}}, Stack]),
+        exit({Reason, Stack})
+    end.
 
 %% internal
+
+clean_stack() ->
+    lists:map(fun({M,F,A}) when is_list(A) -> {M,F,length(A)}; (X) -> X end,
+        erlang:get_stacktrace()).
 
 add_worker(Worker, Tab) ->
     ets:insert(Tab, Worker), Tab.
