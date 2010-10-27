@@ -168,7 +168,7 @@ all_databases() ->
             end,
             [list_to_binary(filename:rootname(RelativeFilename, ".couch")) | AccIn]
         end, []),
-    {ok, Filenames}.
+    {ok, lists:usort(Filenames)}.
 
 
 maybe_close_lru_db(#server{dbs_open=NumOpen, max_dbs_open=MaxOpen}=Server)
