@@ -594,9 +594,10 @@ db_doc_req(#httpd{method='COPY', user_ctx=Ctx}=Req, Db, SourceDocId) ->
     {ok, NewTargetRev} = fabric:update_doc(Db,
         Doc#doc{id=TargetDocId, revs=TargetRevs}, [{user_ctx,Ctx}]),
     % respond
+    {PartRes} = update_doc_result_to_json(TargetDocId, {ok, NewTargetRev}),
     send_json(Req, 201,
         [{"Etag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewTargetRev)) ++ "\""}],
-        update_doc_result_to_json(TargetDocId, {ok, NewTargetRev}));
+        {[{ok, true}] ++ PartRes});
 
 db_doc_req(Req, _Db, _DocId) ->
     send_method_not_allowed(Req, "DELETE,GET,HEAD,POST,PUT,COPY").
@@ -606,7 +607,7 @@ send_doc(Req, Doc, Options) ->
     [] ->
         DiskEtag = couch_httpd:doc_etag(Doc),
         % output etag only when we have no meta
-        couch_httpd:etag_respond(Req, DiskEtag, fun() ->
+        chttpd:etag_respond(Req, DiskEtag, fun() ->
             send_doc_efficiently(Req, Doc, [{"Etag", DiskEtag}], Options)
         end);
     _ ->
@@ -813,7 +814,7 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
         true ->
             fun couch_doc:att_foldl/3
         end,
-        couch_httpd:etag_respond(
+        chttpd:etag_respond(
             Req,
             Etag,
             fun() ->

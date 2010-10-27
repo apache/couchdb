@@ -16,7 +16,8 @@
 -export([start_link/0, stop/0, handle_request/1, config_change/2,
     primary_header_value/2, header_value/2, header_value/3, qs_value/2,
     qs_value/3, qs/1, path/1, absolute_uri/2, body_length/1,
-    verify_is_server_admin/1, unquote/1, quote/1, recv/2,recv_chunked/4,
+    verify_is_server_admin/1, validate_ctype/2,
+    unquote/1, quote/1, recv/2,recv_chunked/4,
     error_info/1, parse_form/1, json_body/1, json_body_obj/1, body/1,
     doc_etag/1, make_etag/1, etag_respond/3, partition/1, serve_file/3,
     server_header/0, start_chunked_response/3,send_chunk/2,
@@ -102,7 +103,7 @@ handle_request(MochiReq) ->
         case authenticate_request(HttpReq, AuthenticationFuns) of
         #httpd{} = Req ->
             HandlerFun = url_handler(HandlerKey),
-            HandlerFun(Req);
+            HandlerFun(possibly_hack(Req));
         Response ->
             Response
         end
@@ -143,6 +144,57 @@ handle_request(MochiReq) ->
     couch_stats_collector:increment({httpd, requests}),
     {ok, Resp}.
 
+%% HACK: replication currently handles two forms of input, #db{} style
+%% and #http_db style. We need a third that makes use of fabric. #db{}
+%% works fine for replicating the dbs and nodes database because they
+%% aren't sharded. So for now when a local db is specified as the source or
+%% the target, it's hacked to make it a full url and treated as a remote.
+possibly_hack(#httpd{path_parts=[<<"_replicate">>]}=Req) ->
+    {Props0} = couch_httpd:json_body_obj(Req),
+    Props1 = fix_uri(Req, Props0, <<"source">>),
+    Props2 = fix_uri(Req, Props1, <<"target">>),
+    put(post_body, {Props2}),
+    Req;
+possibly_hack(Req) ->
+    Req.
+
+fix_uri(Req, Props, Type) ->
+    case is_http(replication_uri(Type, Props)) of
+    true ->
+        Props;
+    false ->
+        Uri = make_uri(Req,replication_uri(Type, Props)),
+        [{Type,Uri}|proplists:delete(Type,Props)]
+    end.
+
+replication_uri(Type, PostProps) ->
+    case couch_util:get_value(Type, PostProps) of
+    {Props} ->
+        couch_util:get_value(<<"url">>, Props);
+    Else ->
+        Else
+    end.
+
+is_http(<<"http://", _/binary>>) ->
+    true;
+is_http(<<"https://", _/binary>>) ->
+    true;
+is_http(_) ->
+    false.
+
+make_uri(Req, Raw) ->
+    Url = list_to_binary(["http://", couch_config:get("httpd", "bind_address"),
+                         ":", couch_config:get("chttpd", "port"), "/", Raw]),
+    case chttpd:header_value(Req, "authorization") of
+        undefined ->
+            Headers = [];
+        AuthHeader ->
+            Headers = [{<<"authorization">>, AuthHeader}]
+    end,
+    {[{<<"url">>,Url}, {<<"headers">>,{Headers}}]}.
+%%% end hack
+
+
 % Try authentication handlers in order until one returns a result
 authenticate_request(#httpd{user_ctx=#user_ctx{}} = Req, _AuthFuns) ->
     Req;
@@ -164,6 +216,23 @@ authenticate_request(#httpd{} = Req, []) ->
 authenticate_request(Response, _AuthFuns) ->
     Response.
 
+%%
+%% something like this needs to be called for replication
+validate_ctype(Req, Ctype) ->
+    case header_value(Req, "Content-Type") of
+    undefined ->
+        throw({bad_ctype, "Content-Type must be "++Ctype});
+    ReqCtype ->
+        % ?LOG_ERROR("Ctype ~p ReqCtype ~p",[Ctype,ReqCtype]),
+        case re:split(ReqCtype, ";", [{return, list}]) of
+        [Ctype] -> ok;
+        [Ctype, _Rest] -> ok;
+        _Else ->
+            throw({bad_ctype, "Content-Type must be "++Ctype})
+        end
+    end.
+
+
 increment_method_stats(Method) ->
     couch_stats_collector:increment({httpd_request_methods, Method}).
 
@@ -180,6 +249,7 @@ url_handler("_sleep") ->        fun chttpd_misc:handle_sleep_req/1;
 url_handler("_session") ->      fun chttpd_auth:handle_session_req/1;
 url_handler("_user") ->         fun chttpd_auth:handle_user_req/1;
 url_handler("_oauth") ->        fun chttpd_oauth:handle_oauth_req/1;
+%% showroom_http module missing in bigcouch
 url_handler("_restart") ->      fun showroom_http:handle_restart_req/1;
 url_handler("_membership") ->   fun mem3_httpd:handle_membership_req/1;
 url_handler(_) ->               fun chttpd_db:handle_request/1.
