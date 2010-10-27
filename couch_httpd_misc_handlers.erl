@@ -66,7 +66,7 @@ handle_utils_dir_req(Req, _) ->
 
 handle_all_dbs_req(#httpd{method='GET'}=Req) ->
     {ok, DbNames} = couch_server:all_databases(),
-    send_json(Req, lists:usort(DbNames));
+    send_json(Req, DbNames);
 handle_all_dbs_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
