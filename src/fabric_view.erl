@@ -268,3 +268,32 @@ index_of(X, [X|_Rest], I) ->
     I;
 index_of(X, [_|Rest], I) ->
     index_of(X, Rest, I+1).
+
+% unit test
+is_progress_possible_test() ->
+    EndPoint = 2 bsl 31,
+    T1 = [[0, EndPoint-1]],
+    ?assert(is_progress_possible(mk_cnts(T1))),
+    T2 = [[0,10],[11,20],[21,EndPoint-1]],
+    ?assert(is_progress_possible(mk_cnts(T2))),
+    % gap
+    T3 = [[0,10],[12,EndPoint-1]],
+    ?assert(not is_progress_possible(mk_cnts(T3))),
+    % outside range
+    T4 = [[1,10],[11,20],[21,EndPoint-1]],
+    ?assert(not is_progress_possible(mk_cnts(T4))),
+    % outside range
+    T5 = [[0,10],[11,20],[21,EndPoint]],
+    ?assert(not is_progress_possible(mk_cnts(T5))).    
+    
+
+mk_cnts(Ranges) ->
+    Shards = lists:map(fun(Range) ->
+                               #shard{range=Range}
+                                    end,
+                        Ranges),
+    orddict:from_list([{Shard,nil} || Shard <- Shards]).
+    
+    
+
+
