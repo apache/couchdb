@@ -145,21 +145,21 @@ possibly_embed_doc(#collector{db_name=DbName, query_args=Args},
               #view_row{key=_Key, id=_Id, value=Value, doc=_Doc}=Row) ->
     #view_query_args{include_docs=IncludeDocs, keys=Keys} = Args,
     case IncludeDocs andalso (Keys =/= nil) andalso is_tuple(Value) of
-        true ->
-            {Props} = Value,
-            case couch_util:get_value(<<"_id">>,Props) of
-                undefined -> Row;
-                IncId ->
-                    % use separate process to call fabric:open_doc
-                    % to not interfere with current call
-                    {Pid, Ref} = spawn_monitor(fun() ->
-                                          exit(fabric:open_doc(DbName, IncId, [])) end),
-                    {ok, NewDoc} =
-                        receive {'DOWN',Ref,process,Pid, Resp} ->
-                                Resp
-                        end,
-                    Row#view_row{doc=couch_doc:to_json_obj(NewDoc,[])}
-            end;
+    true ->
+        {Props} = Value,
+        case couch_util:get_value(<<"_id">>,Props) of
+        undefined -> Row;
+        IncId ->
+            % use separate process to call fabric:open_doc
+            % to not interfere with current call
+            {Pid, Ref} = spawn_monitor(fun() ->
+                                  exit(fabric:open_doc(DbName, IncId, [])) end),
+            {ok, NewDoc} =
+                receive {'DOWN',Ref,process,Pid, Resp} ->
+                        Resp
+                end,
+            Row#view_row{doc=couch_doc:to_json_obj(NewDoc,[])}
+        end;
         _ -> Row
     end;
 possibly_embed_doc(_State,Row) ->
