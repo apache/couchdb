@@ -284,8 +284,19 @@ is_progress_possible_test() ->
     ?assert(not is_progress_possible(mk_cnts(T4))),
     % outside range
     T5 = [[0,10],[11,20],[21,EndPoint]],
-    ?assert(not is_progress_possible(mk_cnts(T5))).    
-    
+    ?assert(not is_progress_possible(mk_cnts(T5))). 
+
+remove_overlapping_shards_test() ->
+    EndPoint = 2 bsl 31,
+    T1 = [[0,10],[11,20],[21,EndPoint-1]],
+    Shards = mk_cnts(T1,3),
+    ?debugFmt("there are ~p shards ~n",[orddict:size(Shards)]),
+    ?assert(orddict:size(
+              remove_overlapping_shards(#shard{name=list_to_atom("node-3"),
+                                               node=list_to_atom("node-3"),
+                                               range=[11,20]},
+                                        Shards))
+       == 7).    
 
 mk_cnts(Ranges) ->
     Shards = lists:map(fun(Range) ->
@@ -293,6 +304,25 @@ mk_cnts(Ranges) ->
                                     end,
                         Ranges),
     orddict:from_list([{Shard,nil} || Shard <- Shards]).
+
+mk_cnts(Ranges, NoNodes) ->
+    orddict:from_list([{Shard,nil}
+                       || Shard <-
+                              lists:flatten(lists:map(
+                                 fun(Range) ->
+                                         mk_shards(NoNodes,Range,[])
+                                 end, Ranges))]
+                     ).
+
+mk_shards(0,_Range,Shards) ->
+    Shards;
+mk_shards(NoNodes,Range,Shards) ->
+    NodeName = list_to_atom("node-" ++ integer_to_list(NoNodes)), 
+    mk_shards(NoNodes-1,Range,
+              [#shard{name=NodeName, node=NodeName, range=Range} | Shards]).
+                            
+                                        
+                      
     
     
 
