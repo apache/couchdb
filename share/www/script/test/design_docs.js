@@ -105,6 +105,7 @@ function() {
   TEquals("javascript", JSON.parse(xhr.responseText).language);
 
   var prev_view_sig = db.designInfo("_design/test").view_index.signature;
+  var prev_view_size = db.designInfo("_design/test").view_index.disk_size;
 
   db.bulkSave(makeDocs(1, numDocs + 1));
   T(db.ensureFullCommit().ok);
@@ -117,7 +118,7 @@ function() {
     var dinfo = db.designInfo("_design/test");
     TEquals("test", dinfo.name);
     var vinfo = dinfo.view_index;
-    TEquals(51, vinfo.disk_size);
+    TEquals(prev_view_size, vinfo.disk_size, "view group disk size didn't change");
     TEquals(false, vinfo.compact_running);
     TEquals(prev_view_sig, vinfo.signature, 'ddoc sig');
     // wait some time (there were issues where an update
