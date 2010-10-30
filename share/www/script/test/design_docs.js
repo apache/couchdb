@@ -107,33 +107,58 @@ function() {
   var prev_view_sig = db.designInfo("_design/test").view_index.signature;
 
   db.bulkSave(makeDocs(1, numDocs + 1));
+  T(db.ensureFullCommit().ok);
 
-  // test that we get design doc info back
-  var dinfo = db.designInfo("_design/test");
-  TEquals("test", dinfo.name);
-  var vinfo = dinfo.view_index;
-  TEquals(51, vinfo.disk_size);
-  TEquals(false, vinfo.compact_running);
-  // test that GET /db/_design/test/_info
+  // test that we get correct design doc info back,
+  // and also that GET /db/_design/test/_info
   // hasn't triggered an update of the views
-  TEquals(prev_view_sig, vinfo.signature, 'ddoc sig');
+  db.view("test/summate", {stale: "ok"}); // make sure view group's open
   for (var loop = 0; loop < 2; loop++) {
-    T(db.view("test/all_docs_twice", {stale: "ok"}).total_rows === 0);
-    T(db.view("test/single_doc", {stale: "ok"}).total_rows === 0);
-    T(db.view("test/summate", {stale: "ok"}).rows.length === 0);
+    var dinfo = db.designInfo("_design/test");
+    TEquals("test", dinfo.name);
+    var vinfo = dinfo.view_index;
+    TEquals(51, vinfo.disk_size);
+    TEquals(false, vinfo.compact_running);
+    TEquals(prev_view_sig, vinfo.signature, 'ddoc sig');
+    // wait some time (there were issues where an update
+    // of the views had been triggered in the background)
+    var start = new Date().getTime();
+    while (new Date().getTime() < start + 2000);
+    TEquals(0, db.view("test/all_docs_twice", {stale: "ok"}).total_rows, 'view info');
+    TEquals(0, db.view("test/single_doc", {stale: "ok"}).total_rows, 'view info');
+    TEquals(0, db.view("test/summate", {stale: "ok"}).rows.length, 'view info');
     T(db.ensureFullCommit().ok);
     restartServer();
   };
 
+  db.bulkSave(makeDocs(numDocs + 1, numDocs * 2 + 1));
+  T(db.ensureFullCommit().ok);
+
+  // open view group
+  db.view("test/summate", {stale: "ok"});
+  // wait so the views can get initialized
+  var start = new Date().getTime();
+  while (new Date().getTime() < start + 2000);
+
   // test that POST /db/_view_cleanup
   // doesn't trigger an update of the views
-  T(db.viewCleanup().ok);
+  var len1 = db.view("test/all_docs_twice", {stale: "ok"}).total_rows;
+  var len2 = db.view("test/single_doc", {stale: "ok"}).total_rows;
+  var len3 = db.view("test/summate", {stale: "ok"}).rows.length;
   for (var loop = 0; loop < 2; loop++) {
-    T(db.view("test/all_docs_twice", {stale: "ok"}).total_rows == 0);
-    T(db.view("test/single_doc", {stale: "ok"}).total_rows == 0);
-    T(db.view("test/summate", {stale: "ok"}).rows.length == 0);
+    T(db.viewCleanup().ok);
+    // wait some time (there were issues where an update
+    // of the views had been triggered in the background)
+    var start = new Date().getTime();
+    while (new Date().getTime() < start + 2000);
+    TEquals(len1, db.view("test/all_docs_twice", {stale: "ok"}).total_rows, 'view cleanup');
+    TEquals(len2, db.view("test/single_doc", {stale: "ok"}).total_rows, 'view cleanup');
+    TEquals(len3, db.view("test/summate", {stale: "ok"}).rows.length, 'view cleanup');
     T(db.ensureFullCommit().ok);
     restartServer();
+    // we'll test whether the view group stays closed
+    // and the views stay uninitialized (they should!)
+    len1 = len2 = len3 = 0;
   };
 
   // test commonjs in map functions
@@ -170,7 +195,7 @@ function() {
 
   var summate = function(N) {return (N+1)*N/2;};
   var result = db.view("test/summate");
-  T(result.rows[0].value == summate(numDocs));
+  T(result.rows[0].value == summate(numDocs*2));
 
   result = db.view("test/summate", {startkey:4,endkey:4});
   T(result.rows[0].value == 4);
