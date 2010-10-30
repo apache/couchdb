@@ -84,7 +84,7 @@ function() {
   T(xhr.status == 200);
   TEquals(xhr.responseText, "ok");
 
-  designDoc.shows.simple = "function() {return 'ko'};"
+  designDoc.shows.simple = "function() { return 'ko'; }";
   T(db.save(designDoc).ok);
 
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/simple");
