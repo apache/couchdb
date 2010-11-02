@@ -42,9 +42,9 @@ specific language governing permissions and limitations under the License.
       });
 
       $(function() {
-        $("h1 a.dbname").text(page.dbName)
+        $("h1 a.dbname").text(encodeURIComponent(page.dbName))
           .attr("href", "database.html?" + encodeURIComponent(page.db.name));
-        $("h1 strong").text(page.docId);
+        $("h1 strong").text(encodeURIComponent(page.docId));
         $("h1 a.raw").attr("href", "/" + encodeURIComponent(page.db.name) +
           "/" + encodeURIComponent(page.docId));
         page.updateFieldListing();

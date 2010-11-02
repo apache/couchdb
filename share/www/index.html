@@ -34,7 +34,7 @@ specific language governing permissions and limitations under the License.
             this.updateSelection(location.pathname + "index.html");
           });
         }
-        var dbsPerPage = $.futon.storage.get("per_page");
+        var dbsPerPage = parseInt($.futon.storage.get("per_page"));
         if (dbsPerPage) $("#perpage").val(dbsPerPage);
         $("#perpage").change(function() {
           page.updateDatabaseListing();

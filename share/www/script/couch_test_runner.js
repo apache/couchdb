@@ -14,6 +14,13 @@
 
 
 function loadScript(url) {
+  // disallow loading remote URLs
+  if((url.substr(0, 7) == "http://")
+    || (url.substr(0, 2) == "//")
+    || (url.substr(0, 5) == "data:")
+    || (url.substr(0, 11) == "javsacript:")) {
+        throw "Not loading remote test scripts";
+  }
   if (typeof document != "undefined") document.write('<script src="'+url+'"></script>');
 };
 
