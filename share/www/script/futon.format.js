@@ -16,7 +16,10 @@
     escape: function(string) {
       return string.replace(/&/g, "&amp;")
                    .replace(/</g, "&lt;")
-                   .replace(/>/g, "&gt;");
+                   .replace(/>/g, "&gt;")
+                   .replace(/"/, "&quot;")
+                   .replace(/'/, "&#39;;")
+                   ;
     },
 
     // JSON pretty printing

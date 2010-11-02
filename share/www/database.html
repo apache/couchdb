@@ -71,17 +71,17 @@ specific language governing permissions and limitations under the License.
         });
 
         // Restore preferences/state
-        $("#documents thead th.key").toggleClass("desc", $.futon.storage.get("desc"));
-        var reduce = $.futon.storage.get("reduce");
+        $("#documents thead th.key").toggleClass("desc", !!$.futon.storage.get("desc"));
+        var reduce = !!$.futon.storage.get("reduce");
         $("#reduce :checkbox")[0].checked = reduce;
-        $("#grouplevel select").val($.futon.storage.get("group_level"));
+        $("#grouplevel select").val(parseInt($.futon.storage.get("group_level")));
         $("#grouplevel").toggleClass("disabled", !reduce).find("select").each(function() {
           this.disabled = !reduce;
         });
 
-        $("#perpage").val($.futon.storage.get("per_page"));
+        $("#perpage").val(parseInt($.futon.storage.get("per_page")));
 
-        var staleViews = $.futon.storage.get("stale");
+        var staleViews = !!$.futon.storage.get("stale");
         $("#staleviews :checkbox")[0].checked = staleViews;
 
         page.populateViewsMenu();
