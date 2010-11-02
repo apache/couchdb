@@ -54,8 +54,8 @@ go(DbName, DDoc, VName, Args, Callback, Acc0) ->
         State, infinity, 1000 * 60 * 60) of
     {ok, NewState} ->
         {ok, NewState#collector.user_acc};
-    Error ->
-        Error
+    {error, Resp} ->
+        {ok, Resp}
     after
         fabric_util:cleanup(Workers),
         catch couch_query_servers:ret_os_process(State#collector.os_proc)
@@ -74,8 +74,8 @@ handle_message({rexi_EXIT, Reason}, Worker, State) ->
     true ->
         {ok, State#collector{counters = Counters}};
     false ->
-        Callback({error, dead_shards}, Acc),
-        {error, dead_shards}
+        {ok, Resp} = Callback({error, Reason}, Acc),
+        {error, Resp}
     end;
 
 handle_message(#view_row{key=Key} = Row, {Worker, From}, State) ->

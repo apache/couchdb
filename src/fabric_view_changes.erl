@@ -107,6 +107,7 @@ send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn) ->
         limit = ChangesArgs#changes_args.limit,
         rows = Seqs % store sequence positions instead
     },
+    %% TODO: errors need to be handled here
     try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3,
             State, infinity, 5000)
     after
@@ -132,8 +133,8 @@ handle_message({rexi_EXIT, Reason}, Worker, State) ->
     true ->
         {ok, State#collector{counters = Counters, rows=Seqs}};
     false ->
-        Callback({error, dead_shards}, Acc),
-        {error, dead_shards}
+        {ok, Resp} = Callback({error, Reason}, Acc),
+        {error, Resp}
     end;
 
 handle_message(_, _, #collector{limit=0} = State) ->

@@ -44,8 +44,8 @@ go(DbName, DDoc, View, Args, Callback, Acc0) ->
         State, infinity, 1000 * 60 * 60) of
     {ok, NewState} ->
         {ok, NewState#collector.user_acc};
-    Error ->
-        Error
+    {error, Resp} ->
+        {ok, Resp}
     after
         fabric_util:cleanup(Workers)
     end.
@@ -63,8 +63,8 @@ handle_message({rexi_EXIT, Reason}, Worker, State) ->
     true ->
         {ok, State#collector{counters = Counters}};
     false ->
-        Callback({error, dead_shards}, Acc),
-        {error, dead_shards}
+        {ok, Resp} = Callback({error, Reason}, Acc),
+        {error, Resp}
     end;
 
 handle_message({total_and_offset, Tot, Off}, {Worker, From}, State) ->

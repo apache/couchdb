@@ -38,11 +38,12 @@ go(DbName, #view_query_args{keys=nil} = QueryArgs, Callback, Acc0) ->
         State, infinity, 5000) of
     {ok, NewState} ->
         {ok, NewState#collector.user_acc};
-    Error ->
-        Error
+    {error, Resp} ->
+        {ok, Resp}
     after
         fabric_util:cleanup(Workers)
     end;
+
 
 go(DbName, QueryArgs, Callback, Acc0) ->
     #view_query_args{
@@ -69,15 +70,15 @@ handle_message({rexi_DOWN, _, _, _}, nil, State) ->
     % from that node and checking is_progress_possible
     {ok, State};
 
-handle_message({rexi_EXIT, _}, Worker, State) ->
+handle_message({rexi_EXIT, Reason}, Worker, State) ->
     #collector{callback=Callback, counters=Counters0, user_acc=Acc} = State,
     Counters = fabric_dict:erase(Worker, Counters0),
     case fabric_view:is_progress_possible(Counters) of
     true ->
         {ok, State#collector{counters = Counters}};
     false ->
-        Callback({error, dead_shards}, Acc),
-        {error, dead_shards}
+        {ok, Resp} = Callback({error, Reason}, Acc),
+        {error, Resp}
     end;
 
 handle_message({total_and_offset, Tot, Off}, {Worker, From}, State) ->
