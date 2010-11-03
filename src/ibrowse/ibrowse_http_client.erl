@@ -1713,7 +1713,15 @@ set_inac_timer(State) ->
     set_inac_timer(State, get_inac_timeout(State)).
 
 set_inac_timer(_State, Timeout) when is_integer(Timeout) ->
-    erlang:send_after(Timeout, self(), timeout);
+    TimerRef = erlang:send_after(Timeout, self(), timeout),
+    case erlang:put(inac_timer, TimerRef) of
+    OldTimer when is_reference(OldTimer) ->
+        erlang:cancel_timer(OldTimer),
+        receive timeout -> ok after 0 -> ok end;
+    _ ->
+        ok
+    end,
+    TimerRef;
 set_inac_timer(_, _) ->
     undefined.
 
