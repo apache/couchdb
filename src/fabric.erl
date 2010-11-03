@@ -111,7 +111,13 @@ update_doc(DbName, Doc, Options) ->
     end.
 
 update_docs(DbName, Docs, Options) ->
-    try fabric_doc_update:go(dbname(DbName), docs(Docs), opts(Options))
+    try 
+        case fabric_doc_update:go(dbname(DbName), docs(Docs), opts(Options)) of
+        {ok, Results} ->
+            {ok, Results};
+        Error ->
+            throw(Error)
+        end        
     catch {aborted, PreCommitFailures} ->
         {aborted, PreCommitFailures}
     end.
