@@ -87,7 +87,8 @@ db_exists(Req, CanonicalUrl, CreateDB) ->
     end,
     case CreateDB of
         true ->
-            catch ibrowse:send_req(Url, HeadersFun(put), put, [], Options);
+            Headers = [{"Content-Length", 0} | HeadersFun(put)],
+            catch ibrowse:send_req(Url, Headers, put, [], Options);
         _Else -> ok
     end,
     case catch ibrowse:send_req(Url, HeadersFun(head), head, [], Options) of
