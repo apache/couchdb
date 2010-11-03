@@ -137,7 +137,8 @@ start_push_replication(DbName, Node) ->
         {<<"source">>, DbName},
         {<<"target">>, {[{<<"node">>, Node}, {<<"name">>, DbName}]}},
         {<<"continuous">>, false},
-        {<<"async">>, true}
+        {<<"async">>, true},
+        {<<"use_hostname">>, true}
     ]},
     ?LOG_INFO("starting ~s -> ~p internal replication", [DbName, Node]),
     UserCtx = #user_ctx{name = <<"replicator">>, roles = [<<"_admin">>]},
