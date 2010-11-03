@@ -18,7 +18,7 @@
                    .replace(/</g, "&lt;")
                    .replace(/>/g, "&gt;")
                    .replace(/"/, "&quot;")
-                   .replace(/'/, "&#39;;")
+                   .replace(/'/, "&#39;")
                    ;
     },
 
