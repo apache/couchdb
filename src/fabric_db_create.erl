@@ -88,7 +88,7 @@ db_create_ok_test() ->
                             {stop, ok} -> {Acc,true};
                             {error, _} -> {Acc, false}
                         end end, {Acc0, true}, Shards),
-    ?assert(element(2,Result)).
+    ?assertEqual(element(2,Result), true).
 
 db_create_file_exists_test() ->
     Shards = mem3_util:create_partition_map("foo",3,12,["node1","node2","node3","node4","node5"]),
@@ -109,4 +109,4 @@ db_create_file_exists_test() ->
                            {error, _} -> {Acc, Iter+1, false}
                        end
                end,{Acc0, 1, true}, Shards),
-    ?assert(not element(3,Result)).
+    ?assertEqual(element(3,Result),false).

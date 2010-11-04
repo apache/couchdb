@@ -161,9 +161,7 @@ possibly_embed_doc(#collector{db_name=DbName, query_args=Args},
             Row#view_row{doc=couch_doc:to_json_obj(NewDoc,[])}
         end;
         _ -> Row
-    end;
-possibly_embed_doc(_State,Row) ->
-    Row.
+    end.
 
 
 keydict(nil) ->
@@ -273,30 +271,29 @@ index_of(X, [_|Rest], I) ->
 is_progress_possible_test() ->
     EndPoint = 2 bsl 31,
     T1 = [[0, EndPoint-1]],
-    ?assert(is_progress_possible(mk_cnts(T1))),
+    ?assertEqual(is_progress_possible(mk_cnts(T1)),true),
     T2 = [[0,10],[11,20],[21,EndPoint-1]],
-    ?assert(is_progress_possible(mk_cnts(T2))),
+    ?assertEqual(is_progress_possible(mk_cnts(T2)),true),
     % gap
     T3 = [[0,10],[12,EndPoint-1]],
-    ?assert(not is_progress_possible(mk_cnts(T3))),
+    ?assertEqual(is_progress_possible(mk_cnts(T3)),false),
     % outside range
     T4 = [[1,10],[11,20],[21,EndPoint-1]],
-    ?assert(not is_progress_possible(mk_cnts(T4))),
+    ?assertEqual(is_progress_possible(mk_cnts(T4)),false),
     % outside range
     T5 = [[0,10],[11,20],[21,EndPoint]],
-    ?assert(not is_progress_possible(mk_cnts(T5))). 
+    ?assertEqual(is_progress_possible(mk_cnts(T5)),false). 
 
 remove_overlapping_shards_test() ->
     EndPoint = 2 bsl 31,
     T1 = [[0,10],[11,20],[21,EndPoint-1]],
     Shards = mk_cnts(T1,3),
     ?debugFmt("there are ~p shards ~n",[orddict:size(Shards)]),
-    ?assert(orddict:size(
+    ?assertEqual(orddict:size(
               remove_overlapping_shards(#shard{name=list_to_atom("node-3"),
                                                node=list_to_atom("node-3"),
                                                range=[11,20]},
-                                        Shards))
-       == 7).    
+                                        Shards)),7).    
 
 mk_cnts(Ranges) ->
     Shards = lists:map(fun(Range) ->
