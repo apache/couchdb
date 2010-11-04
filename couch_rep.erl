@@ -739,10 +739,15 @@ commit_to_both(Source, Target, RequiredSeq) ->
     {SourceStartTime, TargetStartTime}.
     
 ensure_full_commit(#http_db{headers = Headers} = Target) ->
+    Headers1 = [
+        {"Content-Length", 0} |
+        couch_util:proplist_apply_field(
+            {"Content-Type", "application/json"}, Headers)
+    ],
     Req = Target#http_db{
         resource = "_ensure_full_commit",
         method = post,
-        headers = couch_util:proplist_apply_field({"Content-Type", "application/json"}, Headers)
+        headers = Headers1
     },
     {ResultProps} = couch_rep_httpc:request(Req),
     true = couch_util:get_value(<<"ok">>, ResultProps),
@@ -764,11 +769,16 @@ ensure_full_commit(Target) ->
     end.
 
 ensure_full_commit(#http_db{headers = Headers} = Source, RequiredSeq) ->
+    Headers1 = [
+        {"Content-Length", 0} |
+        couch_util:proplist_apply_field(
+            {"Content-Type", "application/json"}, Headers)
+    ],
     Req = Source#http_db{
         resource = "_ensure_full_commit",
         method = post,
         qs = [{seq, RequiredSeq}],
-        headers = couch_util:proplist_apply_field({"Content-Type", "application/json"}, Headers)
+        headers = Headers1
     },
     {ResultProps} = couch_rep_httpc:request(Req),
     case couch_util:get_value(<<"ok">>, ResultProps) of
