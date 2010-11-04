@@ -4,7 +4,7 @@
 
 %% @doc set up the receive loop with an overall timeout
 -spec recv([any()], integer(), function(), any(), timeout(), timeout()) ->
-    {ok, any()} | timeout | {error, any()}.
+    {ok, any()} | timeout | {error, atom()} | {error, atom(), any()}.
 recv(Refs, Keypos, Fun, Acc0, infinity, PerMsgTO) ->
     process_mailbox(Refs, Keypos, Fun, Acc0, nil, PerMsgTO);
 recv(Refs, Keypos, Fun, Acc0, GlobalTimeout, PerMsgTO) ->
