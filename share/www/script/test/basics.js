@@ -159,8 +159,8 @@ couchTests.basics = function(debug) {
   var loc = xhr.getResponseHeader("Location");
   T(loc, "should have a Location header");
   var locs = loc.split('/');
-  T(locs[4] == resp.id);
-  T(locs[3] == "test_suite_db");
+  T(locs[locs.length-1] == resp.id);
+  T(locs[locs.length-2] == "test_suite_db");
 
   // test that that POST's with an _id aren't overriden with a UUID.
   var xhr = CouchDB.request("POST", "/test_suite_db", {
