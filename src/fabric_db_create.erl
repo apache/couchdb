@@ -28,7 +28,7 @@ go(DbName, Options) ->
     match ->
         Shards = mem3:choose_shards(DbName, Options),
         Doc = make_document(Shards),
-        Workers = fabric_util:submit_jobs(Shards, create_db, [Options, Doc]),
+        Workers = fabric_util:submit_jobs(Shards, create_db, [Doc]),
         Acc0 = fabric_dict:init(Workers, nil),
         case fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
         {ok, _} ->

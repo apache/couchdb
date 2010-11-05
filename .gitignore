@@ -1,3 +1,4 @@
 *.beam
 .eunit
 ebin/fabric.app
+.DS_Store

@@ -18,9 +18,13 @@
 -include("fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
-go(DbName, Options) ->
+%% @doc Options aren't used at all now in couch on delete but are left here
+%%      to be consistent with fabric_db_create for possible future use
+%% @see couch_server:delete_db
+%%
+go(DbName, _Options) ->
     Shards = mem3:shards(DbName),
-    Workers = fabric_util:submit_jobs(Shards, delete_db, [Options, DbName]),
+    Workers = fabric_util:submit_jobs(Shards, delete_db, [DbName]),
     Acc0 = fabric_dict:init(Workers, nil),
     case fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
     {ok, ok} ->

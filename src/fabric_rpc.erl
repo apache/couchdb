@@ -17,7 +17,7 @@
 -export([get_db_info/1, get_doc_count/1, get_update_seq/1]).
 -export([open_doc/3, open_revs/4, get_missing_revs/2, update_docs/3]).
 -export([all_docs/2, changes/3, map_view/4, reduce_view/4, group_info/2]).
--export([create_db/3, delete_db/3, reset_validation_funs/1, set_security/3,
+-export([create_db/2, delete_db/2, reset_validation_funs/1, set_security/3,
     set_revs_limit/3]).
 
 -include("fabric.hrl").
@@ -153,18 +153,18 @@ reduce_view(DbName, Group0, ViewName, QueryArgs) ->
     end,
     rexi:reply(complete).
 
-create_db(DbName, Options, Doc) ->
+create_db(DbName, Doc) ->
     mem3_util:write_db_doc(Doc),
-    rexi:reply(case couch_server:create(DbName, Options) of
+    rexi:reply(case couch_server:create(DbName, []) of
     {ok, _} ->
         ok;
     Error ->
         Error
     end).
 
-delete_db(DbName, Options, DocId) ->
+delete_db(DbName, DocId) ->
     mem3_util:delete_db_doc(DocId),
-    rexi:reply(couch_server:delete(DbName, Options)).
+    rexi:reply(couch_server:delete(DbName, [])).
 
 get_db_info(DbName) ->
     with_db(DbName, [], {couch_db, get_db_info, []}).
