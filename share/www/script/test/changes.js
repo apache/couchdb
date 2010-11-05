@@ -440,11 +440,9 @@ couchTests.changes = function(debug) {
             if (xhr.readyState != 4) {
               throw("still waiting");
             }
-           console.log(xhr.readyState);
         }, "andmore-only");
 
         var line = JSON.parse(xhr.responseText.split("\n")[0]);
-        console.log(line);
         T(line.seq == 8);
         T(line.id == "andmore");
     }
