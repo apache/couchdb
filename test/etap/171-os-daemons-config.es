@@ -50,6 +50,10 @@ test_get_cfg2() ->
     FileName = get_cfg(<<"os_daemons">>, <<"foo">>),
     <<"sequential">> = get_cfg(<<"uuids">>, <<"algorithm">>).
 
+test_get_unknown_cfg() ->
+    {[]} = get_cfg(<<"aal;3p4">>),
+    null = get_cfg(<<"aal;3p4">>, <<"313234kjhsdfl">>).
+
 test_log() ->
     log(<<"foobar!">>),
     log(<<"some stuff!">>, <<"debug">>),
@@ -63,6 +67,7 @@ test_log() ->
 do_tests() ->
     test_get_cfg1(),
     test_get_cfg2(),
+    test_get_unknown_cfg(),
     test_log(),
     loop(io:read("")).
 
