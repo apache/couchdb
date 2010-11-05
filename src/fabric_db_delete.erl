@@ -35,6 +35,9 @@ go(DbName, _Options) ->
         Error
     end.
 
+handle_message({rexi_EXIT, Reason}, _Worker, _Counters) ->
+    {error, Reason};
+
 handle_message(Msg, Shard, Counters) ->
     C1 = fabric_dict:store(Shard, Msg, Counters),
     case fabric_dict:any(nil, C1) of
