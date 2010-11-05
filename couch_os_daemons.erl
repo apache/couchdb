@@ -210,12 +210,16 @@ stop_port(#daemon{port=Port}=D) ->
 handle_port_message(#daemon{port=Port}=Daemon, [<<"get">>, Section]) ->
     KVs = couch_config:get(Section),
     Data = lists:map(fun({K, V}) -> {?l2b(K), ?l2b(V)} end, KVs),
-    JsonData = ?JSON_ENCODE({Data}),
-    port_command(Port, JsonData ++ "\n"),
+    Json = iolist_to_binary(?JSON_ENCODE({Data})),
+    port_command(Port, <<Json/binary, "\n">>),
     {ok, Daemon};
 handle_port_message(#daemon{port=Port}=Daemon, [<<"get">>, Section, Key]) ->
-    Value = couch_config:get(Section, Key, null),
-    port_command(Port, ?JSON_ENCODE(?l2b(Value)) ++ "\n"),
+    Value = case couch_config:get(Section, Key, null) of
+        null -> null;
+        String -> ?l2b(String)
+    end,
+    Json = iolist_to_binary(?JSON_ENCODE(Value)),
+    port_command(Port, <<Json/binary, "\n">>),
     {ok, Daemon};
 handle_port_message(Daemon, [<<"register">>, Sec]) when is_binary(Sec) ->
     Patterns = lists:usort(Daemon#daemon.cfg_patterns ++ [{?b2l(Sec)}]),
