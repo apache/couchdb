@@ -48,11 +48,6 @@ javascript = %bindir%/%couchjs_command_name% %localbuilddatadir%/server/main.js
 reduce_limit = true
 os_process_limit = 25
 
-; enable external as an httpd handler, then link it with commands here.
-; note, this api is still under consideration.
-; [external]
-; mykey = /path/to/mycommand
-
 [daemons]
 view_manager={couch_view, start_link, []}
 external_manager={couch_external_manager, start_link, []}
@@ -65,6 +60,7 @@ uuids={couch_uuids, start, []}
 auth_cache={couch_auth_cache, start_link, []}
 rep_db_changes_listener={couch_rep_db_listener, start_link, []}
 vhosts={couch_httpd_vhost, start_link, []}
+os_daemons={couch_os_daemons, start_link, []}
 
 [httpd_global_handlers]
 / = {couch_httpd_misc_handlers, handle_welcome_req, <<"Welcome">>}
@@ -102,6 +98,18 @@ _list = {couch_httpd_show, handle_view_list_req}
 _info = {couch_httpd_db,   handle_design_info_req}
 _rewrite = {couch_httpd_rewrite, handle_rewrite_req}
 _update = {couch_httpd_show, handle_doc_update_req}
+
+; enable external as an httpd handler, then link it with commands here.
+; note, this api is still under consideration.
+; [external]
+; mykey = /path/to/mycommand
+
+; Here you can setup commands for CouchDB to manage
+; while it is alive. It will attempt to keep each command
+; alive if it exits.
+; [os_daemons]
+; some_daemon_name = /path/to/script -with args
+
 
 [uuids]
 ; Known algorithms:

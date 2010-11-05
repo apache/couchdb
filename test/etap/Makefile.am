@@ -66,4 +66,15 @@ EXTRA_DIST = \
     130-attachments-md5.t \
     140-attachment-comp.t \
     150-invalid-view-seq.t \
-    160-vhosts.t
+    160-vhosts.t \
+    170-os-daemons.es \
+	170-os-daemons.t \
+    171-os-daemons-config.es \
+    171-os-daemons-config.t \
+    172-os-daemon-errors.1.es \
+    172-os-daemon-errors.2.es \
+    172-os-daemon-errors.3.es \
+    172-os-daemon-errors.4.es \
+    172-os-daemon-errors.t \
+	173-os-daemon-cfg-register.es \
+	173-os-daemon-cfg-register.t
