@@ -22,7 +22,7 @@
 -export([parse_form/1,json_body/1,json_body_obj/1,body/1,doc_etag/1, make_etag/1, etag_respond/3]).
 -export([primary_header_value/2,partition/1,serve_file/3,serve_file/4, server_header/0]).
 -export([start_chunked_response/3,send_chunk/2,log_request/2]).
--export([start_response_length/4, send/2]).
+-export([start_response_length/4, start_response/3, send/2]).
 -export([start_json_response/2, start_json_response/3, end_json_response/1]).
 -export([send_response/4,send_method_not_allowed/2,send_error/4, send_redirect/2,send_chunked_error/2]).
 -export([send_json/2,send_json/3,send_json/4,last_chunk/1,parse_multipart_request/3]).
@@ -523,6 +523,18 @@ start_response_length(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Length) ->
     case MochiReq:get(method) of
     'HEAD' -> throw({http_head_abort, Resp});
     _ -> ok
+    end,
+    {ok, Resp}.
+
+start_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers) ->
+    log_request(Req, Code),
+    couch_stats_collector:increment({httpd_status_cdes, Code}),
+    CookieHeader = couch_httpd_auth:cookie_auth_header(Req, Headers),
+    Headers2 = Headers ++ server_header() ++ CookieHeader,
+    Resp = MochiReq:start_response({Code, Headers2}),
+    case MochiReq:get(method) of
+        'HEAD' -> throw({http_head_abort, Resp});
+        _ -> ok
     end,
     {ok, Resp}.
 
