@@ -294,12 +294,12 @@ stream_response(Req, ProxyDest, ReqId) ->
 
 stream_chunked_response(Req, ReqId, Resp) ->
     receive
+        {ibrowse_async_response, ReqId, {error, Reason}} ->
+            throw({error, Reason});
         {ibrowse_async_response, ReqId, Chunk} ->
             couch_httpd:send_chunk(Resp, Chunk),
             ibrowse:stream_next(ReqId),
             stream_chunked_response(Req, ReqId, Resp);
-        {ibrowse_async_response, ReqId, {error, Reason}} ->
-            throw({error, Reason});
         {ibrowse_async_response_end, ReqId} ->
             couch_httpd:last_chunk(Resp)
     end.
@@ -307,12 +307,12 @@ stream_chunked_response(Req, ReqId, Resp) ->
 
 stream_length_response(Req, ReqId, Resp) ->
     receive
+        {ibrowse_async_response, ReqId, {error, Reason}} ->
+            throw({error, Reason});
         {ibrowse_async_response, ReqId, Chunk} ->
             couch_httpd:send(Resp, Chunk),
             ibrowse:stream_next(ReqId),
             stream_length_response(Req, ReqId, Resp);
-        {ibrowse_async_response, {error, Reason}} ->
-            throw({error, Reason});
         {ibrowse_async_response_end, ReqId} ->
             ok
     end.
