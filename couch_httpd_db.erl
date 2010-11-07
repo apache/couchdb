@@ -583,18 +583,19 @@ db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
     #doc_query_args{
         rev = Rev,
         open_revs = Revs,
-        options = Options,
+        options = Options1,
         atts_since = AttsSince
     } = parse_doc_query(Req),
+    Options = case AttsSince of
+    nil ->
+        Options1;
+    RevList when is_list(RevList) ->
+        [{atts_since, RevList}, attachments | Options1]
+    end,
     case Revs of
     [] ->
-        Options2 =
-        if AttsSince /= nil ->
-            [{atts_since, AttsSince}, attachments | Options];
-        true -> Options
-        end,
-        Doc = couch_doc_open(Db, DocId, Rev, Options2),
-        send_doc(Req, Doc, Options2);
+        Doc = couch_doc_open(Db, DocId, Rev, Options),
+        send_doc(Req, Doc, Options);
     _ ->
         {ok, Results} = couch_db:open_doc_revs(Db, DocId, Revs, Options),
         AcceptedTypes = case couch_httpd:header_value(Req, "Accept") of
