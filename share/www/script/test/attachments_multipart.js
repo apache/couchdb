@@ -115,8 +115,11 @@ couchTests.attachments_multipart= function(debug) {
   // now test receiving multipart docs
   
   function getBoundary(xhr) {
-    var ctype = xhr.getResponseHeader("Content-Type");
-  
+    if (xhr instanceof XMLHttpRequest) {
+      var ctype = xhr.getResponseHeader("Content-Type");
+    } else {
+      var ctype = xhr.headers['Content-Type'];
+    }
     var ctypeArgs = ctype.split("; ").slice(1);
     var boundary = null;
     for(var i=0; i<ctypeArgs.length; i++) {
@@ -134,7 +137,11 @@ couchTests.attachments_multipart= function(debug) {
   
   function parseMultipart(xhr) {
     var boundary = getBoundary(xhr);
-    var mimetext = xhr.responseText;
+    if (xhr instanceof XMLHttpRequest) {
+      var mimetext = xhr.responseText;
+    } else {
+      var mimetext = xhr.body;
+    }
     // strip off leading boundary
     var leading = "--" + boundary + "\r\n";
     var last = "\r\n--" + boundary + "--";
@@ -207,7 +214,34 @@ couchTests.attachments_multipart= function(debug) {
   T(doc._attachments['bar.txt'].follows == true);
   
   T(sections[1].body == "this is 18 chars l");
-  
+
+  // try the atts_since parameter together with the open_revs parameter
+  xhr = CouchDB.request(
+    "GET",
+    '/test_suite_db/multipart?open_revs=["' +
+      doc._rev + '"]&atts_since=["' + firstrev + '"]',
+    {headers: {"accept": "multipart/mixed"}}
+  );
+
+  T(xhr.status === 200);
+
+  sections = parseMultipart(xhr);
+  // 1 section, with a multipart/related Content-Type
+  T(sections.length === 1);
+  T(sections[0].headers['Content-Type'].indexOf('multipart/related;') === 0);
+
+  var innerSections = parseMultipart(sections[0]);
+  // 2 inner sections: a document body section plus an attachment data section
+  T(innerSections.length === 2);
+  T(innerSections[0].headers['content-type'] === 'application/json');
+
+  doc = JSON.parse(innerSections[0].body);
+
+  T(doc._attachments['foo.txt'].stub === true);
+  T(doc._attachments['bar.txt'].follows === true);
+
+  T(innerSections[1].body === "this is 18 chars l");
+
   // try it with a rev that doesn't exist (should get all attachments)
   
   xhr = CouchDB.request("GET", "/test_suite_db/multipart?atts_since=[\"1-2897589\"]",
