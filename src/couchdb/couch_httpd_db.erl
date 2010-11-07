@@ -576,7 +576,7 @@ db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
         {ok, Results} = couch_db:open_doc_revs(Db, DocId, Revs, Options),
         AcceptedTypes = case couch_httpd:header_value(Req, "Accept") of
             undefined       -> [];
-            AcceptHeader    -> string:tokens(AcceptHeader, "; ")
+            AcceptHeader    -> string:tokens(AcceptHeader, ", ")
         end,
         case lists:member("multipart/mixed", AcceptedTypes) of
         false ->
