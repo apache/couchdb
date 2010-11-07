@@ -200,7 +200,7 @@ couchTests.attachments_multipart= function(debug) {
   // a certain rev).
   
   xhr = CouchDB.request("GET", "/test_suite_db/multipart?atts_since=[\"" + firstrev + "\"]",
-    {headers:{"accept": "multipart/related,*/*;"}});
+    {headers:{"accept": "multipart/related, */*"}});
   
   T(xhr.status == 200);
   
