@@ -36,13 +36,13 @@
 
 -include("fabric.hrl").
 
-% db operations
-
+%% db operations
+%% @equiv all_dbs(<<>>)
 all_dbs() ->
     all_dbs(<<>>).
 
-all_dbs(Prefix) when is_list(Prefix) ->
-    all_dbs(list_to_binary(Prefix));
+%% @doc returns a list of all database names
+-spec all_dbs(Prefix::binary()) -> {ok,[binary()]}.
 all_dbs(Prefix) when is_binary(Prefix) ->
     Length = byte_size(Prefix),
     MatchingDbs = ets:foldl(fun(#shard{dbname=DbName}, Acc) ->
@@ -53,51 +53,97 @@ all_dbs(Prefix) when is_binary(Prefix) ->
             Acc
         end
     end, [], partitions),
-    {ok, lists:usort(MatchingDbs)}.
+    {ok, lists:usort(MatchingDbs)};
 
+%% @equiv all_dbs(list_to_binary(Prefix))
+all_dbs(Prefix) when is_list(Prefix) ->
+    all_dbs(list_to_binary(Prefix)).
+
+%% @doc returns a property list of interesting properties
+%%      about the database such as `doc_count', `disk_size',
+%%      etc.
+-spec get_db_info(string()) -> {ok,[tuple()]}.
 get_db_info(DbName) ->
     fabric_db_info:go(dbname(DbName)).
 
+%% @doc the number of docs in a database
+-spec get_doc_count(string()) -> {ok,integer()}.
 get_doc_count(DbName) ->
     fabric_db_doc_count:go(dbname(DbName)).
 
+%% @equiv create_db(DbName, [])
 create_db(DbName) ->
     create_db(DbName, []).
 
+%% @doc creates a database with the given name.
+%%
+%% Options can include values for q and n,
+%% for example `{q, "8"}' and `{n, "3"}', which
+%% control how many shards to split a database into
+%% and how many nodes each doc is copied to respectively.
+%%
+-spec create_db(string(), [tuple()]) -> ok | {error, atom()}.
 create_db(DbName, Options) ->
     fabric_db_create:go(dbname(DbName), opts(Options)).
 
+%% @equiv delete_db([])
 delete_db(DbName) ->
     delete_db(DbName, []).
 
+%% @doc delete a database
+-spec delete_db(string(), [tuple()]) -> ok.
 delete_db(DbName, Options) ->
     fabric_db_delete:go(dbname(DbName), opts(Options)).
 
+%% @doc provide an upper bound for the number of tracked document revisions
+-spec set_revs_limit(string(), pos_integer(), [{usr_ctx,#user_ctx{}}]) -> ok.
 set_revs_limit(DbName, Limit, Options) when is_integer(Limit), Limit > 0 ->
     fabric_db_meta:set_revs_limit(dbname(DbName), Limit, opts(Options)).
 
+%% @doc retrieves the maximum number of document revisions
+-spec get_revs_limit(DbName::string()) -> pos_integer().
 get_revs_limit(DbName) ->
     {ok, Db} = fabric_util:get_db(dbname(DbName)),
     try couch_db:get_revs_limit(Db) after catch couch_db:close(Db) end.
 
+%% @doc sets the readers/writers/admin permissions for a database
+-spec set_security(DbName::string(), SecObj::[tuple()],
+                   Options::[{usr_ctx,#user_ctx{}}]) -> ok.
 set_security(DbName, SecObj, Options) ->
     fabric_db_meta:set_security(dbname(DbName), SecObj, opts(Options)).
 
+%% @doc retrieve the security object for a database
+-spec get_security(DbName::string()) -> json_obj().
 get_security(DbName) ->
     {ok, Db} = fabric_util:get_db(dbname(DbName)),
     try couch_db:get_security(Db) after catch couch_db:close(Db) end.
 
 % doc operations
+
+%% @doc retrieve the doc with a given id
+-spec open_doc(DbName::db_name(), Id::doc_id(),[any()]) ->
+                  {ok, #doc{}} | {not_found, atom()}.
 open_doc(DbName, Id, Options) ->
     fabric_doc_open:go(dbname(DbName), docid(Id), opts(Options)).
 
+%% @doc retrieve a collection of revisions, possible all
+-spec open_revs(DbName::db_name(), Id::doc_id(), Revs :: [string()] | all,
+                Options::[any()]) ->
+                   {ok, [#doc{}]} | {error, atom()} | timeout.
 open_revs(DbName, Id, Revs, Options) ->
     fabric_doc_open_revs:go(dbname(DbName), docid(Id), Revs, opts(Options)).
 
+%% @doc retrieve missing revisions for a list of `{Id, Revs}'
+-spec get_missing_revs(DbName::db_name(),IdRevs::[{doc_id(),any()}]) ->
+                          {ok, [{doc_id(),any()}]}.
 get_missing_revs(DbName, IdsRevs) when is_list(IdsRevs) ->
     Sanitized = [idrevs(IdR) || IdR <- IdsRevs],
     fabric_doc_missing_revs:go(dbname(DbName), Sanitized).
 
+%% @doc update a single doc
+%% @equiv update_docs(DbName,[Doc],Options)
+-spec update_doc(DbName::db_name(), Doc::#doc{}, Options::[tuple()]) ->
+                    {ok, any()} | any().
 update_doc(DbName, Doc, Options) ->
     case update_docs(DbName, [Doc], opts(Options)) of
     {ok, [{ok, NewRev}]} ->
@@ -110,6 +156,9 @@ update_doc(DbName, Doc, Options) ->
         {ok, {Pos, RevId}}
     end.
 
+%% @doc update a list of docs
+-spec update_docs(DbName::db_name(), [Doc::#doc{}], Options::[tuple()]) ->
+                    {ok, any()} | any().
 update_docs(DbName, Docs, Options) ->
     try 
         fabric_doc_update:go(dbname(DbName), docs(Docs), opts(Options)) of
@@ -121,13 +170,32 @@ update_docs(DbName, Docs, Options) ->
         {aborted, PreCommitFailures}
     end.
 
+%% @doc spawns a process to upload attachment data and
+%%      returns a function that shards can use to communicate
+%%      with the spawned middleman process
+-spec att_receiver(Req::#httpd{}, Length :: undefined |
+                                               {unknown_transfer_encoding, any()} |
+                                               chunked |
+                                               pos_integer()) ->
+                      function() | binary().
 att_receiver(Req, Length) ->
     fabric_doc_attachments:receiver(Req, Length).
 
+%% @doc retrieves all docs. Additional query parameters, such as `limit',
+%%      `start_key' and `end_key', `descending', and `include_docs', can
+%%      also be passed to further constrain the query. See <a href=
+%%      "http://wiki.apache.org/couchdb/HTTP_Document_API#All_Documents">
+%%      all_docs</a> for details
+-spec all_docs(DbName::db_name(), Callback::fun((atom() | tuple(), tuple())
+                                                    -> {ok, any()}),
+               [] | tuple(), #view_query_args{}) -> {ok, [any()]}.
 all_docs(DbName, Callback, Acc0, #view_query_args{} = QueryArgs) when
         is_function(Callback, 2) ->
     fabric_view_all_docs:go(dbname(DbName), QueryArgs, Callback, Acc0).
 
+-spec changes(DbName::db_name(), Callback::fun((atom() | tuple(), tuple())
+                                                    -> {ok, any()}),
+              Acc0::tuple(),Options::#changes_args{}) -> {ok, any()}.
 changes(DbName, Callback, Acc0, Options) ->
     % TODO use a keylist for Options instead of #changes_args, BugzID 10281
     Feed = Options#changes_args.feed,
@@ -247,6 +315,7 @@ rev(Rev) when is_list(Rev); is_binary(Rev) ->
 rev({Seq, Hash} = Rev) when is_integer(Seq), is_binary(Hash) ->
     Rev.
 
+%% @doc convenience method, useful when testing or calling fabric from the shell
 opts(Options) ->
     case couch_util:get_value(user_ctx, Options) of
     undefined ->
