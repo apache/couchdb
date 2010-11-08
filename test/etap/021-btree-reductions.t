@@ -106,7 +106,7 @@ test()->
             (_) -> false
         end,
         couch_btree:fold_reduce(Btree2, FoldFun, [], [{dir, fwd}, {key_group_fun, GroupFun}, {start_key, SK1}, {end_key, EK1}]),
-        "Reducing foward over first half works with a startkey and endkey."
+        "Reducing forward over first half works with a startkey and endkey."
     ),
 
     etap:fun_is(
@@ -115,7 +115,7 @@ test()->
             (_) -> false
         end,
         couch_btree:fold_reduce(Btree2, FoldFun, [], [{dir, fwd}, {key_group_fun, GroupFun}, {start_key, SK2}, {end_key, EK2}]),
-        "Reducing foward over second half works with second startkey and endkey"
+        "Reducing forward over second half works with second startkey and endkey"
     ),
 
     etap:fun_is(
