@@ -16,7 +16,7 @@
 
 -export([hash/1, name_shard/1, create_partition_map/4, build_shards/2,
     n_val/2, to_atom/1, to_integer/1, write_db_doc/1, delete_db_doc/1,
-    load_shards_from_disk/1, load_shards_from_disk/2]).
+    load_shards_from_disk/1, load_shards_from_disk/2, shard_info/1]).
 
 -define(RINGTOP, 2 bsl 31).  % CRC32 space
 
@@ -151,3 +151,11 @@ load_shards_from_disk(DbName, DocId)->
     Shards = load_shards_from_disk(DbName),
     HashKey = hash(DocId),
     [S || #shard{range = [B,E]} = S <- Shards, B < HashKey, HashKey =< E].
+
+shard_info(DbName) ->
+    [{n, mem3:n(DbName)},
+     {q, length(mem3:shards(DbName)) div mem3:n(DbName)}].
+    
+    
+
+
