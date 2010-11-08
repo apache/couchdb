@@ -803,11 +803,12 @@ flush_att(Fd, #att{data={Fd0, _}}=Att) when Fd0 == Fd ->
     % already written to our file, nothing to write
     Att;
 
-flush_att(Fd, #att{data={OtherFd,StreamPointer}, md5=InMd5}=Att) ->
+flush_att(Fd, #att{data={OtherFd,StreamPointer}, md5=InMd5,
+    disk_len=InDiskLen} = Att) ->
     {NewStreamData, Len, _IdentityLen, Md5, IdentityMd5} =
             couch_stream:copy_to_new_stream(OtherFd, StreamPointer, Fd),
     check_md5(IdentityMd5, InMd5),
-    Att#att{data={Fd, NewStreamData}, md5=Md5, att_len=Len, disk_len=Len};
+    Att#att{data={Fd, NewStreamData}, md5=Md5, att_len=Len, disk_len=InDiskLen};
 
 flush_att(Fd, #att{data=Data}=Att) when is_binary(Data) ->
     with_stream(Fd, Att, fun(OutputStream) ->
