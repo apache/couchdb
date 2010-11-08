@@ -155,7 +155,3 @@ load_shards_from_disk(DbName, DocId)->
 shard_info(DbName) ->
     [{n, mem3:n(DbName)},
      {q, length(mem3:shards(DbName)) div mem3:n(DbName)}].
-    
-    
-
-
