@@ -77,7 +77,7 @@ start_link(InitArgs) ->
 % init creates a closure which spawns the appropriate view_updater.
 init({InitArgs, ReturnPid, Ref}) ->
     process_flag(trap_exit, true),
-    case prepare_group(InitArgs, false) of
+    try prepare_group(InitArgs, false) of
     {ok, #group{db=Db, fd=Fd, current_seq=Seq}=Group} ->
         case Seq > couch_db:get_update_seq(Db) of
         true ->
@@ -94,6 +94,9 @@ init({InitArgs, ReturnPid, Ref}) ->
         end;
     Error ->
         ReturnPid ! {Ref, self(), Error},
+        ignore
+    catch exit:no_db_file ->
+        ReturnPid ! {Ref, self(), {error, no_db_file}},
         ignore
     end.
 
