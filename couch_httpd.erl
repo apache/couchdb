@@ -15,7 +15,8 @@
 
 -export([start_link/0, start_link/1, stop/0, handle_request/5]).
 
--export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,path/1,absolute_uri/2,body_length/1]).
+-export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,qs_json_value/3]).
+-export([path/1,absolute_uri/2,body_length/1]).
 -export([verify_is_server_admin/1,unquote/1,quote/1,recv/2,recv_chunked/4,error_info/1]).
 -export([make_fun_spec_strs/1]).
 -export([make_arity_1_fun/1, make_arity_2_fun/1, make_arity_3_fun/1]).
@@ -383,6 +384,14 @@ qs_value(Req, Key) ->
 
 qs_value(Req, Key, Default) ->
     couch_util:get_value(Key, qs(Req), Default).
+
+qs_json_value(Req, Key, Default) ->
+    case qs_value(Req, Key, Default) of
+    Default ->
+        Default;
+    Result ->
+        ?JSON_DECODE(Result)
+    end.
 
 qs(#httpd{mochi_req=MochiReq}) ->
     MochiReq:parse_qs().
