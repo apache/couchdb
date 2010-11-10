@@ -211,14 +211,25 @@ changes(DbName, Callback, Acc0, #changes_args{}=Options) ->
 changes(DbName, Callback, Acc0, Options) ->
     changes(DbName, Callback, Acc0, kl_to_changes_args(Options)).
 
-
+%% @equiv query_view(DbName, DesignName, ViewName, #view_query_args{})
 query_view(DbName, DesignName, ViewName) ->
     query_view(DbName, DesignName, ViewName, #view_query_args{}).
 
+%% @equiv query_view(DbName, DesignName,
+%%                     ViewName, fun default_callback/2, [], QueryArgs)
 query_view(DbName, DesignName, ViewName, QueryArgs) ->
     Callback = fun default_callback/2,
     query_view(DbName, DesignName, ViewName, Callback, [], QueryArgs).
 
+%% @doc execute a given view.
+%%      There are many additional query args that can be passed to a view,
+%%      see <a href="http://wiki.apache.org/couchdb/HTTP_view_API#Querying_Options">
+%%      query args</a> for details.
+-spec query_view(DbName::db_name(), Design::#doc{}, ViewName::string(),
+                 Callback::fun((atom() | tuple(),tuple()) ->
+                                  tuple()), Acc0::list(),
+                 QueryArgs::#view_query_args{}) ->
+                    any().
 query_view(DbName, Design, ViewName, Callback, Acc0, QueryArgs) ->
     Db = dbname(DbName), View = name(ViewName),
     case is_reduce_view(Db, Design, View, QueryArgs) of
@@ -229,9 +240,16 @@ query_view(DbName, Design, ViewName, Callback, Acc0, QueryArgs) ->
     end,
     Mod:go(Db, Design, View, QueryArgs, Callback, Acc0).
 
-get_view_group_info(Db, DesignId) ->
-    fabric_group_info:go(dbname(Db), design_doc(DesignId)).
+%% @doc retrieve info about a view group, disk size, language, whether compaction
+%%      is running and so forth
+-spec get_view_group_info(Db::db_name(), DesignId::(#doc{} | list() | binary())) ->
+                             {ok, list(tuple())}.
+get_view_group_info(DbName, DesignId) ->
+    fabric_group_info:go(dbname(DbName), design_doc(DesignId)).
 
+%% @doc retrieve all the design docs from a database
+-spec design_docs(DbName:: db_name()) ->
+                     {ok, [json_obj()]}.
 design_docs(DbName) ->
     QueryArgs = #view_query_args{start_key = <<"_design/">>, include_docs=true},
     Callback = fun({total_and_offset, _, _}, []) ->
@@ -248,24 +266,33 @@ design_docs(DbName) ->
     end,
     fabric:all_docs(dbname(DbName), Callback, [], QueryArgs).
 
+%% @doc forces a reload of validation functions, this is performed after
+%%      design docs are update
+%% NOTE: This function probably doesn't belong here as part fo the API
+-spec reset_validation_funs(DbName::db_name()) ->
+                               [any()].
 reset_validation_funs(DbName) ->
     [rexi:cast(Node, {fabric_rpc, reset_validation_funs, [Name]}) ||
         #shard{node=Node, name=Name} <-  mem3:shards(DbName)].
 
+%% @doc clean up index files for all Dbs
+-spec cleanup_index_files() -> [ok].
 cleanup_index_files() ->
     {ok, Dbs} = fabric:all_dbs(),
     [cleanup_index_files(Db) || Db <- Dbs].
 
-cleanup_index_files(Db) ->
-    {ok, DesignDocs} = fabric:design_docs(Db),
+%% @doc clean up index files for a specific db
+-spec cleanup_index_files(DbName::db_name()) -> ok.
+cleanup_index_files(DbName) ->
+    {ok, DesignDocs} = fabric:design_docs(DbName),
 
     ActiveSigs = lists:map(fun(#doc{id = GroupId}) ->
-        {ok, Info} = fabric:get_view_group_info(Db, GroupId),
+        {ok, Info} = fabric:get_view_group_info(DbName, GroupId),
         binary_to_list(couch_util:get_value(signature, Info))
     end, [couch_doc:from_json_obj(DD) || DD <- DesignDocs]),
 
     FileList = filelib:wildcard([couch_config:get("couchdb", "view_index_dir"),
-        "/.shards/*/", couch_util:to_list(dbname(Db)), "_design/*"]),
+        "/.shards/*/", couch_util:to_list(dbname(DbName)), "_design/*"]),
 
     DeleteFiles = if ActiveSigs =:= [] -> FileList; true ->
         {ok, RegExp} = re:compile([$(, string:join(ActiveSigs, "|"), $)]),
@@ -358,7 +385,10 @@ kl_to_changes_args(KeyList) ->
 kl_to_query_args(KeyList) ->
     kl_to_record(KeyList, view_query_args).
 
-
+%% @doc finds the index of the given Key in the record.
+%%      note that record_info is only known at compile time
+%%      so the code must be written in this way. For each new
+%%      record type add a case clause
 lookup_index(Key,RecName) ->
     Indexes =
         case RecName of
@@ -371,7 +401,8 @@ lookup_index(Key,RecName) ->
         end,
     couch_util:get_value(Key, Indexes).
 
-
+%% @doc convert a keylist to record with given `RecName'
+%% @see lookup_index
 kl_to_record(KeyList,RecName) ->
     Acc0 = case RecName of
           changes_args -> #changes_args{};
