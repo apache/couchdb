@@ -136,13 +136,20 @@ couchTests.security_validation = function(debug) {
       doc.foo=2;
       T(userDb.save(doc).ok);
 
-      // Save a document that's missing an author field.
-      try {
-        userDb.save({foo:1});
-        T(false && "Can't get here. Should have thrown an error 2");
-      } catch (e) {
-        T(e.error == "forbidden");
-        T(userDb.last_req.status == 403);
+      // Save a document that's missing an author field (before and after compaction)
+      for (var i=0; i<2; i++) {
+          try {
+              userDb.save({foo:1});
+              T(false && "Can't get here. Should have thrown an error 2");
+          } catch (e) {
+              T(e.error == "forbidden");
+              T(userDb.last_req.status == 403);
+          }
+          // compact.
+          T(db.compact().ok);
+          T(db.last_req.status == 202);
+          // compaction isn't instantaneous, loop until done
+          while (db.info().compact_running) {};
       }
 
       // Now attempt to update the document as a different user, Jan
