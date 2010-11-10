@@ -486,11 +486,18 @@ find_header(Fd, Block) ->
     end.
 
 load_header(Fd, Block) ->
-    {ok, <<1>>} = file:pread(Fd, Block*?SIZE_BLOCK, 1),
-    {ok, <<HeaderLen:32/integer>>} = file:pread(Fd, (Block*?SIZE_BLOCK) + 1, 4),
+    {ok, <<1, HeaderLen:32/integer, RestBlock/binary>>} =
+        file:pread(Fd, Block * ?SIZE_BLOCK, ?SIZE_BLOCK),
     TotalBytes = calculate_total_read_len(1, HeaderLen),
-    {ok, <<RawBin:TotalBytes/binary>>} =
-            file:pread(Fd, (Block*?SIZE_BLOCK) + 5, TotalBytes),
+    case TotalBytes > byte_size(RestBlock) of
+    false ->
+        <<RawBin:TotalBytes/binary, _/binary>> = RestBlock;
+    true ->
+        {ok, Missing} = file:pread(
+            Fd, (Block * ?SIZE_BLOCK) + 5 + byte_size(RestBlock),
+            TotalBytes - byte_size(RestBlock)),
+        RawBin = <<RestBlock/binary, Missing/binary>>
+    end,
     <<Md5Sig:16/binary, HeaderBin/binary>> =
         iolist_to_binary(remove_block_prefixes(1, RawBin)),
     Md5Sig = couch_util:md5(HeaderBin),
