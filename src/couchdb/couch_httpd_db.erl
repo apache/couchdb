@@ -375,7 +375,8 @@ db_req(#httpd{path_parts=[_,<<"_purge">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 
 db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs">>]}=Req, Db) ->
-    all_docs_view(Req, Db, nil);
+    Keys = couch_httpd:qs_json_value(Req, "keys", nil),
+    all_docs_view(Req, Db, Keys);
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_all_docs">>]}=Req, Db) ->
     couch_httpd:validate_ctype(Req, "application/json"),

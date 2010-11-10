@@ -57,7 +57,8 @@ design_doc_view(Req, Db, DName, ViewName, Keys) ->
 
 handle_view_req(#httpd{method='GET',
         path_parts=[_, _, DName, _, ViewName]}=Req, Db, _DDoc) ->
-    design_doc_view(Req, Db, DName, ViewName, nil);
+    Keys = couch_httpd:qs_json_value(Req, "keys", nil),
+    design_doc_view(Req, Db, DName, ViewName, Keys);
 
 handle_view_req(#httpd{method='POST',
         path_parts=[_, _, DName, _, ViewName]}=Req, Db, _DDoc) ->

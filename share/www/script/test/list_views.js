@@ -327,6 +327,16 @@ couchTests.list_views = function(debug) {
   T(/FirstKey: 2/.test(xhr.responseText));
   T(/LastKey: 7/.test(xhr.responseText));
 
+  // multi-key fetch with GET
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/basicView" +
+    "?keys=[2,4,5,7]");
+
+  T(xhr.status == 200, "multi key");
+  T(!(/Key: 1 /.test(xhr.responseText)));
+  T(/Key: 2/.test(xhr.responseText));
+  T(/FirstKey: 2/.test(xhr.responseText));
+  T(/LastKey: 7/.test(xhr.responseText));
+
   // no multi-key fetch allowed when group=false
   xhr = CouchDB.request("POST", "/test_suite_db/_design/lists/_list/simpleForm/withReduce?group=false", {
     body: '{"keys":[2,4,5,7]}'
