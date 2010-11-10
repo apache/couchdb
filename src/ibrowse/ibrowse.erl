@@ -7,8 +7,8 @@
 %%%-------------------------------------------------------------------
 %% @author Chandrashekhar Mullaparthi <chandrashekhar dot mullaparthi at gmail dot com>
 %% @copyright 2005-2010 Chandrashekhar Mullaparthi
-%% @version 2.0.1
-%% @doc The ibrowse application implements an HTTP 1.1 client. This
+%% @version 2.1.0
+%% @doc The ibrowse application implements an HTTP 1.1 client in erlang. This
 %% module implements the API of the HTTP client. There is one named
 %% process called 'ibrowse' which assists in load balancing and maintaining configuration. There is one load balancing process per unique webserver. There is
 %% one process to handle one TCP connection to a webserver
@@ -87,6 +87,7 @@
          send_req_direct/6,
          send_req_direct/7,
          stream_next/1,
+         stream_close/1,
          set_max_sessions/3,
          set_max_pipeline_size/3,
          set_dest/3,
@@ -201,7 +202,11 @@ send_req(Url, Headers, Method, Body) ->
 %% dealing with large response bodies and/or slow links. In these
 %% cases, it might be hard to estimate how long a request will take to
 %% complete. In such cases, the client might want to timeout if no
-%% data has been received on the link for a certain time interval.</li>
+%% data has been received on the link for a certain time interval.
+%% 
+%% This value is also used to close connections which are not in use for 
+%% the specified timeout value.
+%% </li>
 %%
 %% <li>
 %% The <code>connect_timeout</code> option is to specify how long the
@@ -458,6 +463,8 @@ ensure_bin({Fun, _} = Body) when is_function(Fun) -> Body.
 spawn_worker_process(Url) ->
     ibrowse_http_client:start(Url).
 
+%% @doc Same as spawn_worker_process/1 but takes as input a Host and Port
+%% instead of a URL.
 %% @spec spawn_worker_process(Host::string(), Port::integer()) -> {ok, pid()}
 spawn_worker_process(Host, Port) ->
     ibrowse_http_client:start({Host, Port}).
@@ -468,6 +475,8 @@ spawn_worker_process(Host, Port) ->
 spawn_link_worker_process(Url) ->
     ibrowse_http_client:start_link(Url).
 
+%% @doc Same as spawn_worker_process/2 except the the calling process
+%% is linked to the worker process which is spawned.
 %% @spec spawn_link_worker_process(Host::string(), Port::integer()) -> {ok, pid()}
 spawn_link_worker_process(Host, Port) ->
     ibrowse_http_client:start_link({Host, Port}).
@@ -524,6 +533,21 @@ stream_next(Req_id) ->
             ok
     end.
 
+%% @doc Tell ibrowse to close the connection associated with the
+%% specified stream.  Should be used in conjunction with the
+%% <code>stream_to</code> option. Note that all requests in progress on
+%% the connection which is serving this Req_id will be aborted, and an
+%% error returned.
+%% @spec stream_close(Req_id :: req_id()) -> ok | {error, unknown_req_id}
+stream_close(Req_id) ->    
+    case ets:lookup(ibrowse_stream, {req_id_pid, Req_id}) of
+        [] ->
+            {error, unknown_req_id};
+        [{_, Pid}] ->
+            catch Pid ! {stream_close, Req_id},
+            ok
+    end.
+
 %% @doc Turn tracing on for the ibrowse process
 trace_on() ->
     ibrowse ! {trace, true}.
@@ -553,6 +577,9 @@ all_trace_off() ->
     ibrowse ! all_trace_off,
     ok.
 
+%% @doc Shows some internal information about load balancing. Info
+%% about workers spawned using spawn_worker_process/2 or
+%% spawn_link_worker_process/2 is not included.
 show_dest_status() ->
     Dests = lists:filter(fun({lb_pid, {Host, Port}, _}) when is_list(Host),
                                                              is_integer(Port) ->
