@@ -191,15 +191,26 @@ att_receiver(Req, Length) ->
                [] | tuple(), #view_query_args{}) -> {ok, [any()]}.
 all_docs(DbName, Callback, Acc0, #view_query_args{} = QueryArgs) when
         is_function(Callback, 2) ->
-    fabric_view_all_docs:go(dbname(DbName), QueryArgs, Callback, Acc0).
+    fabric_view_all_docs:go(dbname(DbName), QueryArgs, Callback, Acc0);
+
+%% @doc convenience function that takes a keylist rather than a record
+%% @equiv all_docs(DbName, Callback, Acc0, kl_to_query_args(QueryArgs))
+all_docs(DbName, Callback, Acc0, QueryArgs) ->
+    all_docs(DbName, Callback, Acc0, kl_to_query_args(QueryArgs)).
+
 
 -spec changes(DbName::db_name(), Callback::fun((atom() | tuple(), tuple())
                                                     -> {ok, any()}),
               Acc0::tuple(),Options::#changes_args{}) -> {ok, any()}.
-changes(DbName, Callback, Acc0, Options) ->
-    % TODO use a keylist for Options instead of #changes_args, BugzID 10281
+changes(DbName, Callback, Acc0, #changes_args{}=Options) ->
     Feed = Options#changes_args.feed,
-    fabric_view_changes:go(dbname(DbName), Feed, Options, Callback, Acc0).
+    fabric_view_changes:go(dbname(DbName), Feed, Options, Callback, Acc0);
+
+%% @doc convenience function, takes keylist instead of record
+%% @equiv changes(DbName, Callback, Acc0, kl_to_changes_args(Options))
+changes(DbName, Callback, Acc0, Options) ->
+    changes(DbName, Callback, Acc0, kl_to_changes_args(Options)).
+
 
 query_view(DbName, DesignName, ViewName) ->
     query_view(DbName, DesignName, ViewName, #view_query_args{}).
@@ -336,3 +347,37 @@ default_callback(Row, Acc) ->
 
 is_reduce_view(_, _, _, #view_query_args{view_type=Reduce}) ->
     Reduce =:= reduce.
+
+%% @doc convenience method for use in the shell, converts a keylist
+%%      to a `changes_args' record
+kl_to_changes_args(KeyList) ->
+    kl_to_record(KeyList, changes_args).
+
+%% @doc convenience method for use in the shell, converts a keylist
+%%      to a `view_query_args' record
+kl_to_query_args(KeyList) ->
+    kl_to_record(KeyList, view_query_args).
+
+
+lookup_index(Key,RecName) ->
+    Indexes =
+        case RecName of
+        changes_args ->
+            lists:zip(record_info(fields, changes_args),
+                        lists:seq(2, record_info(size, changes_args)));
+        view_query_args ->
+            lists:zip(record_info(fields, view_query_args),
+                        lists:seq(2, record_info(size, view_query_args)))
+        end,
+    couch_util:get_value(Key, Indexes).
+
+
+kl_to_record(KeyList,RecName) ->
+    Acc0 = case RecName of
+          changes_args -> #changes_args{};
+          view_query_args -> #view_query_args{}
+          end,
+    lists:foldl(fun({Key, Value}, Acc) ->
+                    Index = lookup_index(couch_util:to_existing_atom(Key),RecName),
+                    setelement(Index, Acc, Value)
+                        end, Acc0, KeyList).
