@@ -208,7 +208,7 @@ parse_url(Url) ->
 parse_url([$:, $/, $/ | _], get_protocol, Url, []) ->
     {invalid_uri_1, Url};
 parse_url([$:, $/, $/ | T], get_protocol, Url, TmpAcc) ->
-    Prot = list_to_atom(lists:reverse(TmpAcc)),
+    Prot = list_to_existing_atom(lists:reverse(TmpAcc)),
     parse_url(T, get_username, 
               Url#url{protocol = Prot},
               []);

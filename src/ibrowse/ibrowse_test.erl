@@ -217,14 +217,18 @@ dump_errors(Key, Iod) ->
 		    {"http://jigsaw.w3.org/HTTP/300/", get},
 		    {"http://jigsaw.w3.org/HTTP/Basic/", get, [{basic_auth, {"guest", "guest"}}]},
 		    {"http://jigsaw.w3.org/HTTP/CL/", get},
-		    {"http://www.httpwatch.com/httpgallery/chunked/", get}
+		    {"http://www.httpwatch.com/httpgallery/chunked/", get},
+                    {"https://github.com", get, [{ssl_options, [{depth, 2}]}]}
 		   ]).
 
 unit_tests() ->
     unit_tests([]).
 
 unit_tests(Options) ->
+    application:start(crypto),
+    application:start(public_key),
     application:start(ssl),
+    ibrowse:start(),
     Options_1 = Options ++ [{connect_timeout, 5000}],
     {Pid, Ref} = erlang:spawn_monitor(?MODULE, unit_tests_1, [self(), Options_1]),
     receive 
@@ -249,32 +253,45 @@ verify_chunked_streaming() ->
     verify_chunked_streaming([]).
 
 verify_chunked_streaming(Options) ->
+    io:format("~nVerifying that chunked streaming is working...~n", []),
     Url = "http://www.httpwatch.com/httpgallery/chunked/",
-    io:format("URL: ~s~n", [Url]),
-    io:format("Fetching data without streaming...~n", []),
+    io:format("  URL: ~s~n", [Url]),
+    io:format("  Fetching data without streaming...~n", []),
     Result_without_streaming = ibrowse:send_req(
 				 Url, [], get, [],
 				 [{response_format, binary} | Options]),
-    io:format("Fetching data with streaming as list...~n", []),
+    io:format("  Fetching data with streaming as list...~n", []),
     Async_response_list = do_async_req_list(
 			    Url, get, [{response_format, list} | Options]),
-    io:format("Fetching data with streaming as binary...~n", []),
+    io:format("  Fetching data with streaming as binary...~n", []),
     Async_response_bin = do_async_req_list(
 			   Url, get, [{response_format, binary} | Options]),
-    io:format("Fetching data with streaming as binary, {active, once}...~n", []),
+    io:format("  Fetching data with streaming as binary, {active, once}...~n", []),
     Async_response_bin_once = do_async_req_list(
                                 Url, get, [once, {response_format, binary} | Options]),
-    compare_responses(Result_without_streaming, Async_response_list, Async_response_bin),
-    compare_responses(Result_without_streaming, Async_response_list, Async_response_bin_once).
+    Res1 = compare_responses(Result_without_streaming, Async_response_list, Async_response_bin),
+    Res2 = compare_responses(Result_without_streaming, Async_response_list, Async_response_bin_once),
+    case {Res1, Res2} of
+        {success, success} ->
+            io:format("  Chunked streaming working~n", []);
+        _ ->
+            ok
+    end.
 
 test_chunked_streaming_once() ->
     test_chunked_streaming_once([]).
 
 test_chunked_streaming_once(Options) ->
+    io:format("~nTesting chunked streaming with the {stream_to, {Pid, once}} option...~n", []),
     Url = "http://www.httpwatch.com/httpgallery/chunked/",
-    io:format("URL: ~s~n", [Url]),
-    io:format("Fetching data with streaming as binary, {active, once}...~n", []),
-    do_async_req_list(Url, get, [once, {response_format, binary} | Options]).
+    io:format("  URL: ~s~n", [Url]),
+    io:format("  Fetching data with streaming as binary, {active, once}...~n", []),
+    case do_async_req_list(Url, get, [once, {response_format, binary} | Options]) of
+        {ok, _, _, _} ->
+            io:format("  Success!~n", []);
+        Err ->
+            io:format("  Fail: ~p~n", [Err])
+    end.
 
 compare_responses({ok, St_code, _, Body}, {ok, St_code, _, Body}, {ok, St_code, _, Body}) ->
     success;
@@ -310,7 +327,7 @@ do_async_req_list(Url, Method, Options) ->
     {Pid,_} = erlang:spawn_monitor(?MODULE, i_do_async_req_list,
 				   [self(), Url, Method, 
 				    Options ++ [{stream_chunk_size, 1000}]]),
-    io:format("Spawned process ~p~n", [Pid]),
+%%    io:format("Spawned process ~p~n", [Pid]),
     wait_for_resp(Pid).
 
 wait_for_resp(Pid) ->
@@ -354,7 +371,7 @@ wait_for_async_resp(Req_id, Options, Acc_Stat_code, Acc_Headers, Body) ->
             maybe_stream_next(Req_id, Options),
 	    wait_for_async_resp(Req_id, Options, StatCode, Headers, Body);
 	{ibrowse_async_response_end, Req_id} ->
-            io:format("Recvd end of response.~n", []),
+            %% io:format("Recvd end of response.~n", []),
 	    Body_1 = list_to_binary(lists:reverse(Body)),
 	    {ok, Acc_Stat_code, Acc_Headers, Body_1};
 	{ibrowse_async_response, Req_id, Data} ->
@@ -384,7 +401,7 @@ execute_req(Url, Method, Options) ->
 	{ok, SCode, _H, _B} ->
 	    io:format("Status code: ~p~n", [SCode]);
 	Err ->
-	    io:format("Err -> ~p~n", [Err])
+	    io:format("~p~n", [Err])
     end.
 
 drv_ue_test() ->
