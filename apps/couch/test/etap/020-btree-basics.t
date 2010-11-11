@@ -22,7 +22,7 @@ rows() -> 250.
 main(_) ->
     test_util:init_code_path(),
     couch_config:start_link([]),
-    etap:plan(48),
+    etap:plan(51),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -40,6 +40,7 @@ test()->
     etap:ok(test_kvs(Sorted), "Testing sorted keys"),
     etap:ok(test_kvs(lists:reverse(Sorted)), "Testing reversed sorted keys"),
     etap:ok(test_kvs(shuffle(Sorted)), "Testing shuffled keys."),
+    etap:ok(test_fold_reductions(Sorted), "Testing fold_reduce."),
     ok.
 
 test_kvs(KeyValues) ->
@@ -187,6 +188,33 @@ test_final_reductions(Btree, KeyValues) ->
     {ok, _, FoldRRed} = couch_btree:fold(Btree, FoldRFun, 0, [{dir, rev}, {start_key, RStartKey}]),
     KVLen = FoldLRed + FoldRRed,
     ok.
+
+test_fold_reductions(KeyValues) ->
+
+    {ok, Fd} = couch_file:open(filename(), [create,overwrite]),
+    {ok, Btree} = couch_btree:open(nil, Fd),
+    {ok, Btree2} = couch_btree:add_remove(Btree, KeyValues, []),
+
+    GroupFun = fun(Key1,Key2) -> Key1 == Key2 end,
+
+    FoldLFun = fun(_X, _LeadingReds, Acc) ->
+                   {ok, Acc + 1} end,
+    {ok, Res1} =
+        couch_btree:fold_reduce(Btree2,
+                                FoldLFun,0,
+                                [{key_group_fun, GroupFun},
+                                 {start_key,126},
+                                 {end_key,250}]),
+    etap:is(Res1,125,"including the end key ought to return half the keys"),
+    {ok, Res2} =
+        couch_btree:fold_reduce(Btree2,
+                                FoldLFun,0,
+                                [{key_group_fun, GroupFun},
+                                 {start_key,126},
+                                 {end_key_gt,250}]),
+    etap:is(Res2,124,"not including the end key ought to return one less than half the keys"),
+    true.
+
 
 shuffle(List) ->
    randomize(round(math:log(length(List)) + 0.5), List).
