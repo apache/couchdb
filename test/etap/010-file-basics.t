@@ -84,7 +84,8 @@ test() ->
     % append_binary == append_iolist?
     % Possible bug in pread_iolist or iolist() -> append_binary
     {ok, IOLPos} = couch_file:append_binary(Fd, ["foo", $m, <<"bam">>]),
-    etap:is({ok, [<<"foombam">>]}, couch_file:pread_iolist(Fd, IOLPos),
+    {ok, IoList} = couch_file:pread_iolist(Fd, IOLPos),
+    etap:is(<<"foombam">>, iolist_to_binary(IoList),
         "Reading an results in a binary form of the written iolist()"),
 
     % XXX: How does on test fsync?
