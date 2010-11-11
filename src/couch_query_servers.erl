@@ -24,6 +24,16 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
+% https://gist.github.com/df10284c76d85f988c3f
+-define(SUMREGEX, {re_pattern,3,0,<<69,82,67,80,194,0,0,0,8,0,0,0,5,0,0,0,3,0,
+2,0,0,0,125,2,48,0,9,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,118,97,108,
+117,101,115,0,93,0,130,65,9,27,102,27,117,27,110,27,99,27,116,27,105,27,111,27,
+110,102,94,0,9,0,1,66,9,58,11,84,0,9,65,9,27,40,65,9,58,11,65,9,27,44,56,9,94,
+0,7,0,2,58,11,84,0,7,102,94,0,15,0,3,65,9,27,44,65,9,58,11,56,9,84,0,15,65,9,
+27,41,65,9,27,123,65,9,27,114,27,101,27,116,27,117,27,114,27,110,66,9,27,115,
+27,117,27,109,65,9,27,40,56,9,80,0,2,65,9,27,41,56,9,34,59,65,9,27,125,56,9,84,
+0,130,0,0,0,0>>}).
+
 start_doc_map(Lang, Functions, Lib) ->
     Proc = get_os_process(Lang),
     case Lib of
@@ -98,12 +108,13 @@ rereduce(Lang, RedSrcs, ReducedValues) ->
             Result;
         (FunSrc, Values) ->
             os_rereduce(Lang, [FunSrc], Values)
-        end, RedSrcs, Grouped),
+        end, replace_builtin_equivalents(RedSrcs), Grouped),
     {ok, Results}.
 
 reduce(_Lang, [], _KVs) ->
     {ok, []};
-reduce(Lang, RedSrcs, KVs) ->
+reduce(Lang, RedSrcs0, KVs) ->
+    RedSrcs = replace_builtin_equivalents(RedSrcs0),
     {OsRedSrcs, BuiltinReds} = lists:partition(fun
         (<<"_", _/binary>>) -> false;
         (_OsFun) -> true
@@ -111,6 +122,18 @@ reduce(Lang, RedSrcs, KVs) ->
     {ok, OsResults} = os_reduce(Lang, OsRedSrcs, KVs),
     {ok, BuiltinResults} = builtin_reduce(reduce, BuiltinReds, KVs, []),
     recombine_reduce_results(RedSrcs, OsResults, BuiltinResults, []).
+
+replace_builtin_equivalents([<<"_", _/binary>> = R | Rest]) ->
+    [R | replace_builtin_equivalents(Rest)];
+replace_builtin_equivalents([OsFun | Rest]) ->
+    case re:run(OsFun, ?SUMREGEX) of nomatch ->
+        [OsFun | replace_builtin_equivalents(Rest)];
+    {match, _} ->
+        % replace JS sum() with builtin version
+        [<<"_sum">> | replace_builtin_equivalents(Rest)]
+    end;
+replace_builtin_equivalents([]) ->
+    [].
 
 recombine_reduce_results([], [], [], Acc) ->
     {ok, lists:reverse(Acc)};
