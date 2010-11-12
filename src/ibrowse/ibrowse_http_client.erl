@@ -544,7 +544,7 @@ do_send_body1(Source, Resp, State, TE) ->
 maybe_chunked_encode(Data, false) ->
     Data;
 maybe_chunked_encode(Data, true) ->
-    [ibrowse_lib:dec2hex(4, size(to_binary(Data))), "\r\n", Data, "\r\n"].
+    [ibrowse_lib:dec2hex(byte_size(to_binary(Data))), "\r\n", Data, "\r\n"].
 
 do_close(#state{socket = undefined})            ->  ok;
 do_close(#state{socket = Sock,
@@ -927,23 +927,23 @@ chunk_request_body(Body, _ChunkSize, Acc) when Body == <<>>; Body == [] ->
 chunk_request_body(Body, ChunkSize, Acc) when is_binary(Body),
                                               size(Body) >= ChunkSize ->
     <<ChunkBody:ChunkSize/binary, Rest/binary>> = Body,
-    Chunk = [ibrowse_lib:dec2hex(4, ChunkSize),"\r\n",
+    Chunk = [ibrowse_lib:dec2hex(ChunkSize),"\r\n",
              ChunkBody, "\r\n"],
     chunk_request_body(Rest, ChunkSize, [Chunk | Acc]);
 chunk_request_body(Body, _ChunkSize, Acc) when is_binary(Body) ->
     BodySize = size(Body),
-    Chunk = [ibrowse_lib:dec2hex(4, BodySize),"\r\n",
+    Chunk = [ibrowse_lib:dec2hex(BodySize),"\r\n",
              Body, "\r\n"],
     LastChunk = "0\r\n",
     lists:reverse(["\r\n", LastChunk, Chunk | Acc]);
 chunk_request_body(Body, ChunkSize, Acc) when length(Body) >= ChunkSize ->
     {ChunkBody, Rest} = split_list_at(Body, ChunkSize),
-    Chunk = [ibrowse_lib:dec2hex(4, ChunkSize),"\r\n",
+    Chunk = [ibrowse_lib:dec2hex(ChunkSize),"\r\n",
              ChunkBody, "\r\n"],
     chunk_request_body(Rest, ChunkSize, [Chunk | Acc]);
 chunk_request_body(Body, _ChunkSize, Acc) when is_list(Body) ->
     BodySize = length(Body),
-    Chunk = [ibrowse_lib:dec2hex(4, BodySize),"\r\n",
+    Chunk = [ibrowse_lib:dec2hex(BodySize),"\r\n",
              Body, "\r\n"],
     LastChunk = "0\r\n",
     lists:reverse(["\r\n", LastChunk, Chunk | Acc]).
