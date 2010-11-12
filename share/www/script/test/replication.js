@@ -572,4 +572,160 @@ couchTests.replication = function(debug) {
     T(targetDb.open("_design/mydesign") !== null);
   }
 
+  // test for COUCHDB-868 - design docs' attachments not getting replicated
+  // when doing a pull replication with HTTP basic auth
+  dbA = new CouchDB("test_suite_db_a");
+  dbB = new CouchDB("test_suite_db_b");
+  var usersDb = new CouchDB("test_suite_auth");
+  var lorem = CouchDB.request(
+    "GET", "/_utils/script/test/lorem.txt").responseText;
+  var lorem_b64 = CouchDB.request(
+    "GET", "/_utils/script/test/lorem_b64.txt").responseText;
+
+  usersDb.deleteDb();
+  usersDb.createDb();
+  dbA.deleteDb();
+  dbA.createDb();
+  dbB.deleteDb();
+  dbB.createDb();
+
+  var atts_ddoc = {
+    _id: "_design/i_have_atts",
+    language: "javascript"
+  };
+  T(dbA.save(atts_ddoc).ok);
+
+  var rev = atts_ddoc._rev;
+  var att_1_name = "lorem.txt";
+  var att_2_name = "lorem.dat";
+  var xhr = CouchDB.request(
+    "PUT", "/" + dbA.name + "/" + atts_ddoc._id + "/" + att_1_name + "?rev=" + rev, {
+      headers: {"Content-Type": "text/plain;charset=utf-8"},
+      body: lorem
+  });
+  rev = JSON.parse(xhr.responseText).rev;
+  T(xhr.status === 201);
+  xhr = CouchDB.request(
+    "PUT", "/" + dbA.name + "/" + atts_ddoc._id + "/" + att_2_name + "?rev=" + rev, {
+      headers: {"Content-Type": "application/data"},
+      body: lorem_b64
+  });
+  T(xhr.status === 201);
+
+  var fdmananaUserDoc = CouchDB.prepareUserDoc({
+    name: "fdmanana",
+    roles: ["reader"]
+  }, "qwerty");
+  T(usersDb.save(fdmananaUserDoc).ok);
+
+  T(dbA.setSecObj({
+    admins: {
+      names: [],
+      roles: ["admin"]
+    },
+    readers: {
+      names: [],
+      roles: ["reader"]
+    }
+  }).ok);
+  T(dbB.setSecObj({
+    admins: {
+      names: ["fdmanana"],
+      roles: []
+    }
+  }).ok);
+
+  var server_config = [
+    {
+      section: "couch_httpd_auth",
+      key: "authentication_db",
+      value: usersDb.name
+    },
+    // to prevent admin party mode
+    {
+      section: "admins",
+      key: "joe",
+      value: "erlang"
+    }
+  ];
+
+  var test_fun = function() {
+    T(CouchDB.login("fdmanana", "qwerty").ok);
+    T(CouchDB.session().userCtx.name === "fdmanana");
+    T(CouchDB.session().userCtx.roles.indexOf("_admin") === -1);
+
+    var repResult = CouchDB.replicate(
+      CouchDB.protocol + "fdmanana:qwerty@" + host + "/" + dbA.name,
+      dbB.name
+    );
+    T(repResult.ok === true);
+    T(repResult.history instanceof Array);
+    T(repResult.history.length === 1);
+    T(repResult.history[0].docs_written === 1);
+    T(repResult.history[0].docs_read === 1);
+    T(repResult.history[0].doc_write_failures === 0);
+
+    var atts_ddoc_copy = dbB.open(atts_ddoc._id);
+    T(atts_ddoc_copy !== null);
+    T(typeof atts_ddoc_copy._attachments === "object");
+    T(atts_ddoc_copy._attachments !== null);
+    T(att_1_name in atts_ddoc_copy._attachments);
+    T(att_2_name in atts_ddoc_copy._attachments);
+
+    var xhr = CouchDB.request("GET", "/" + dbB.name + "/" + atts_ddoc._id + "/" + att_1_name);
+    T(xhr.status === 200);
+    T(xhr.responseText === lorem);
+
+    xhr = CouchDB.request("GET", "/" + dbB.name + "/" + atts_ddoc._id + "/" + att_2_name);
+    T(xhr.status === 200);
+    T(xhr.responseText === lorem_b64);
+
+    CouchDB.logout();
+    T(CouchDB.login("joe", "erlang").ok);
+    T(dbA.setSecObj({
+      admins: {
+        names: [],
+        roles: ["bar"]
+      },
+      readers: {
+        names: [],
+        roles: ["foo"]
+      }
+    }).ok);
+    T(dbB.deleteDb().ok === true);
+    T(dbB.createDb().ok === true);
+    T(dbB.setSecObj({
+      admins: {
+        names: ["fdmanana"],
+        roles: []
+      }
+    }).ok);
+    CouchDB.logout();
+
+    T(CouchDB.login("fdmanana", "qwerty").ok);
+    T(CouchDB.session().userCtx.name === "fdmanana");
+    T(CouchDB.session().userCtx.roles.indexOf("_admin") === -1);
+    try {
+      repResult = CouchDB.replicate(
+        CouchDB.protocol + "fdmanana:qwerty@" + host + "/" + dbA.name,
+        dbB.name
+      );
+      T(false, "replication should have failed");
+    } catch(x) {
+      T(x.error === "db_not_found");
+    }
+
+    atts_ddoc_copy = dbB.open(atts_ddoc._id);
+    T(atts_ddoc_copy === null);
+
+    CouchDB.logout();
+    T(CouchDB.login("joe", "erlang").ok);
+  };
+
+  run_on_modified_server(server_config, test_fun);
+
+  // cleanup
+  dbA.deleteDb();
+  dbB.deleteDb();
+  usersDb.deleteDb();
 };
