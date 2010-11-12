@@ -301,7 +301,8 @@ test_get_1st_png_att_with_accept_encoding_deflate() ->
 test_get_doc_with_1st_text_att() ->
     {ok, {{_, Code, _}, _Headers, Body}} = http:request(
         get,
-        {db_url() ++ "/testdoc1?attachments=true", []},
+        {db_url() ++ "/testdoc1?attachments=true",
+            [{"Accept", "application/json"}]},
         [],
         [{sync, true}]),
     etap:is(Code, 200, "HTTP response code is 200"),
@@ -367,7 +368,8 @@ test_1st_text_att_stub() ->
 test_get_doc_with_1st_png_att() ->
     {ok, {{_, Code, _}, _Headers, Body}} = http:request(
         get,
-        {db_url() ++ "/testdoc2?attachments=true", []},
+        {db_url() ++ "/testdoc2?attachments=true",
+            [{"Accept", "application/json"}]},
         [],
         [{sync, true}]),
     etap:is(Code, 200, "HTTP response code is 200"),
@@ -492,7 +494,8 @@ test_get_2nd_png_att_with_accept_encoding_gzip() ->
 test_get_doc_with_2nd_text_att() ->
     {ok, {{_, Code, _}, _Headers, Body}} = http:request(
         get,
-        {db_url() ++ "/testdoc3?attachments=true", []},
+        {db_url() ++ "/testdoc3?attachments=true",
+            [{"Accept", "application/json"}]},
         [],
         [{sync, true}]),
     etap:is(Code, 200, "HTTP response code is 200"),
@@ -554,7 +557,8 @@ test_2nd_text_att_stub() ->
 test_get_doc_with_2nd_png_att() ->
     {ok, {{_, Code, _}, _Headers, Body}} = http:request(
         get,
-        {db_url() ++ "/testdoc4?attachments=true", []},
+        {db_url() ++ "/testdoc4?attachments=true",
+            [{"Accept", "application/json"}]},
         [],
         [{sync, true}]),
     etap:is(Code, 200, "HTTP response code is 200"),
