@@ -175,7 +175,7 @@ handle_call({new_max_cache_size, NewSize}, _From, State) ->
     end,
     NewState = State#state{
         max_cache_size = NewSize,
-        cache_size = erlang:min(NewSize, State#state.cache_size)
+        cache_size = lists:min([NewSize, State#state.cache_size])
     },
     {reply, ok, NewState};
 
