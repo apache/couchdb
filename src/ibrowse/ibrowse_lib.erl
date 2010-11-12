@@ -19,7 +19,7 @@
          url_encode/1,
          decode_rfc822_date/1,
          status_code/1,
-         dec2hex/2,
+         dec2hex/1,
          drv_ue/1,
          drv_ue/2,
          encode_base64/1,
@@ -163,14 +163,10 @@ status_code(507) -> insufficient_storage;
 status_code(X) when is_list(X) -> status_code(list_to_integer(X));
 status_code(_)   -> unknown_status_code.
 
-%% @doc dec2hex taken from gtk.erl in std dist
-%% M = integer() -- number of hex digits required
+%% @doc Returns a string with the hexadecimal representation of a given decimal.
 %% N = integer() -- the number to represent as hex
-%% @spec dec2hex(M::integer(), N::integer()) -> string()
-dec2hex(M,N) -> dec2hex(M,N,[]).
-
-dec2hex(0,_N,Ack) -> Ack;
-dec2hex(M,N,Ack) -> dec2hex(M-1,N bsr 4,[d2h(N band 15)|Ack]).
+%% @spec dec2hex(N::integer()) -> string()
+dec2hex(N) -> lists:flatten(io_lib:format("~.16B", [N])).
 
 %% @doc Implements the base64 encoding algorithm. The output data type matches in the input data type.
 %% @spec encode_base64(In) -> Out
