@@ -414,7 +414,8 @@ shell_quote([C | Rest], Acc) ->
     shell_quote(Rest, [C | Acc]).
 
 %% @spec parse_qvalues(string()) -> [qvalue()] | invalid_qvalue_string
-%% @type qvalue() = {encoding(), float()}.
+%% @type qvalue() = {media_type() | encoding() , float()}.
+%% @type media_type() = string().
 %% @type encoding() = string().
 %%
 %% @doc Parses a list (given as a string) of elements with Q values associated
@@ -422,7 +423,7 @@ shell_quote([C | Rest], Acc) ->
 %%      from its Q value by a semicolon. Q values are optional but when missing
 %%      the value of an element is considered as 1.0. A Q value is always in the
 %%      range [0.0, 1.0]. A Q value list is used for example as the value of the
-%%      HTTP "Accept-Encoding" header.
+%%      HTTP "Accept" and "Accept-Encoding" headers.
 %%
 %%      Q values are described in section 2.9 of the RFC 2616 (HTTP 1.1).
 %%
@@ -433,35 +434,58 @@ shell_quote([C | Rest], Acc) ->
 %%
 parse_qvalues(QValuesStr) ->
     try
-        {ok, Re} = re:compile("^\\s*q\\s*=\\s*((?:0|1)(?:\\.\\d{1,3})?)\\s*$"),
         lists:map(
             fun(Pair) ->
-                case string:tokens(Pair, ";") of
-                    [Enc] ->
-                        {string:strip(Enc), 1.0};
-                    [Enc, QStr] ->
-                        case re:run(QStr, Re, [{capture, [1], list}]) of
-                            {match, [Q]} ->
-                                QVal = case Q of
-                                    "0" ->
-                                        0.0;
-                                    "1" ->
-                                        1.0;
-                                    Else ->
-                                        list_to_float(Else)
-                                end,
-                                case QVal < 0.0 orelse QVal > 1.0 of
-                                    false ->
-                                        {string:strip(Enc), QVal}
-                                end
-                        end
-                end
+                [Type | Params] = string:tokens(Pair, ";"),
+                NormParams = normalize_media_params(Params),
+                {Q, NonQParams} = extract_q(NormParams),
+                {string:join([string:strip(Type) | NonQParams], ";"), Q}
             end,
             string:tokens(string:to_lower(QValuesStr), ",")
         )
     catch
         _Type:_Error ->
             invalid_qvalue_string
+    end.
+
+normalize_media_params(Params) ->
+    {ok, Re} = re:compile("\\s"),
+    normalize_media_params(Re, Params, []).
+
+normalize_media_params(_Re, [], Acc) ->
+    lists:reverse(Acc);
+normalize_media_params(Re, [Param | Rest], Acc) ->
+    NormParam = re:replace(Param, Re, "", [global, {return, list}]),
+    normalize_media_params(Re, Rest, [NormParam | Acc]).
+
+extract_q(NormParams) ->
+    {ok, KVRe} = re:compile("^([^=]+)=([^=]+)$"),
+    {ok, QRe} = re:compile("^((?:0|1)(?:\\.\\d{1,3})?)$"),
+    extract_q(KVRe, QRe, NormParams, []).
+
+extract_q(_KVRe, _QRe, [], Acc) ->
+    {1.0, lists:reverse(Acc)};
+extract_q(KVRe, QRe, [Param | Rest], Acc) ->
+    case re:run(Param, KVRe, [{capture, [1, 2], list}]) of
+        {match, [Name, Value]} ->
+            case Name of
+            "q" ->
+                {match, [Q]} = re:run(Value, QRe, [{capture, [1], list}]),
+                QVal = case Q of
+                    "0" ->
+                        0.0;
+                    "1" ->
+                        1.0;
+                    Else ->
+                        list_to_float(Else)
+                end,
+                case QVal < 0.0 orelse QVal > 1.0 of
+                false ->
+                    {QVal, lists:reverse(Acc) ++ Rest}
+                end;
+            _ ->
+                extract_q(KVRe, QRe, Rest, [Param | Acc])
+            end
     end.
 
 %% @spec pick_accepted_encodings([qvalue()], [encoding()], encoding()) ->
@@ -822,11 +846,20 @@ parse_qvalues_test() ->
     ),
     [{"gzip", 0.5}, {"deflate", 1.0}, {"identity", 1.0}, {"identity", 1.0}] =
         parse_qvalues("gzip; q=0.5,deflate,identity, identity "),
+    [{"text/html;level=1", 1.0}, {"text/plain", 0.5}] =
+        parse_qvalues("text/html;level=1, text/plain;q=0.5"),
+    [{"text/html;level=1", 0.3}, {"text/plain", 1.0}] =
+        parse_qvalues("text/html;level=1;q=0.3, text/plain"),
+    [{"text/html;level=1", 0.3}, {"text/plain", 1.0}] =
+        parse_qvalues("text/html; level = 1; q = 0.3, text/plain"),
+    [{"text/html;level=1", 0.3}, {"text/plain", 1.0}] =
+        parse_qvalues("text/html;q=0.3;level=1, text/plain"),
     invalid_qvalue_string = parse_qvalues("gzip; q=1.1, deflate"),
     invalid_qvalue_string = parse_qvalues("gzip; q=0.5, deflate;q=2"),
     invalid_qvalue_string = parse_qvalues("gzip, deflate;q=AB"),
     invalid_qvalue_string = parse_qvalues("gzip; q=2.1, deflate"),
     invalid_qvalue_string = parse_qvalues("gzip; q=0.1234, deflate"),
+    invalid_qvalue_string = parse_qvalues("text/html;level=1;q=0.3, text/html;level"),
     ok.
 
 pick_accepted_encodings_test() ->

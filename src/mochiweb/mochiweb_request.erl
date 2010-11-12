@@ -21,6 +21,7 @@
 -export([parse_cookie/0, get_cookie_value/1]).
 -export([serve_file/2, serve_file/3]).
 -export([accepted_encodings/1]).
+-export([accepts_content_type/1]).
 
 -define(SAVE_QS, mochiweb_request_qs).
 -define(SAVE_PATH, mochiweb_request_path).
@@ -705,6 +706,58 @@ accepted_encodings(SupportedEncodings) ->
             mochiweb_util:pick_accepted_encodings(
                 QList, SupportedEncodings, "identity"
             )
+    end.
+
+%% @spec accepts_content_type(string() | binary()) -> boolean() | bad_accept_header
+%%
+%% @doc Determines whether a request accepts a given media type by analyzing its
+%%      "Accept" header.
+%%
+%%      Examples
+%%
+%%      1) For a missing "Accept" header:
+%%         accepts_content_type("application/json") -> true
+%%
+%%      2) For an "Accept" header with value "text/plain, application/*":
+%%         accepts_content_type("application/json") -> true
+%%
+%%      3) For an "Accept" header with value "text/plain, */*; q=0.0":
+%%         accepts_content_type("application/json") -> false
+%%
+%%      4) For an "Accept" header with value "text/plain; q=0.5, */*; q=0.1":
+%%         accepts_content_type("application/json") -> true
+%%
+%%      5) For an "Accept" header with value "text/*; q=0.0, */*":
+%%         accepts_content_type("text/plain") -> false
+%%
+accepts_content_type(ContentType) when is_binary(ContentType) ->
+    accepts_content_type(binary_to_list(ContentType));
+accepts_content_type(ContentType1) ->
+    ContentType = re:replace(ContentType1, "\\s", "", [global, {return, list}]),
+    AcceptHeader = case get_header_value("Accept") of
+        undefined ->
+            "*/*";
+        Value ->
+            Value
+    end,
+    case mochiweb_util:parse_qvalues(AcceptHeader) of
+        invalid_qvalue_string ->
+            bad_accept_header;
+        QList ->
+            [MainType, _SubType] = string:tokens(ContentType, "/"),
+            SuperType = MainType ++ "/*",
+            lists:any(
+                fun({"*/*", Q}) when Q > 0.0 ->
+                        true;
+                    ({Type, Q}) when Q > 0.0 ->
+                        Type =:= ContentType orelse Type =:= SuperType;
+                    (_) ->
+                        false
+                end,
+                QList
+            ) andalso
+            (not lists:member({ContentType, 0.0}, QList)) andalso
+            (not lists:member({SuperType, 0.0}, QList))
     end.
 
 %%
