@@ -78,33 +78,21 @@ get_callback_acc(Callback) when is_function(Callback, 2) ->
     {fun(Ev, Data, _) -> Callback(Ev, Data) end, ok}.
 
 %% @type Req -> #httpd{} | {json_req, JsonObj()}
-make_filter_fun({docids, Docids}, Style, _Req, _Db) ->
-    fun(#doc_info{id=DocId, revs=[#rev_info{rev=Rev}|_]=Revs}) ->
-        case lists:member(DocId, Docids) of
-        true ->
-            case Style of
-            main_only ->
-                [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]}];
-            all_docs ->
-                [{[{<<"rev">>, couch_doc:rev_to_str(R)}]}
-                        || #rev_info{rev=R} <- Revs]
-            end;
-        _ -> []
-        end
-    end;
-
 make_filter_fun(FilterName, Style, Req, Db) ->
+    FilterName1 = list_to_binary(FilterName),
+    case FilterName1 of
+        (<<"_", _/binary>>) ->
+            builtin_filter_fun(FilterName1, Style, Req, Db);
+        (_OSFun) -> 
+            os_filter_fun(FilterName, Style, Req, Db)
+    end.
+
+os_filter_fun(FilterName, Style, Req, Db) ->
     case [list_to_binary(couch_httpd:unquote(Part))
             || Part <- string:tokens(FilterName, "/")] of
     [] ->
-        fun(#doc_info{revs=[#rev_info{rev=Rev}|_]=Revs}) ->
-            case Style of
-            main_only ->
-                [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]}];
-            all_docs ->
-                [{[{<<"rev">>, couch_doc:rev_to_str(R)}]}
-                        || #rev_info{rev=R} <- Revs]
-            end
+        fun(#doc_info{revs=Revs}) ->
+                builtin_results(Style, Revs)
         end;
     [DName, FName] ->
         DesignId = <<"_design/", DName/binary>>,
@@ -133,6 +121,57 @@ make_filter_fun(FilterName, Style, Req, Db) ->
     _Else ->
         throw({bad_request,
             "filter parameter must be of the form `designname/filtername`"})
+    end.
+
+builtin_filter_fun(<<"_doc_ids",_/binary>>, Style, 
+        #httpd{method='POST'}=Req, _Db) ->
+    {Props} = couch_httpd:json_body_obj(Req),
+    DocIds =  couch_util:get_value(<<"doc_ids">>, Props, nil),
+    filter_docids(DocIds, Style);
+builtin_filter_fun(<<"_doc_ids", _/binary>>, Style, 
+        #httpd{method='GET'}=Req, _Db) ->
+    QS = couch_httpd:qs(Req),
+    DocIds = case couch_util:get_value("doc_ids", QS, nil) of
+        nil ->
+            throw({bad_request, "`doc_ids` parameter is not set"});
+        DocIds1 ->
+            ?JSON_DECODE(DocIds1)
+    end,
+    filter_docids(DocIds, Style);
+builtin_filter_fun(<<"_design", _/binary>>, Style, _Req, _Db) ->
+    filter_designdoc(Style);
+builtin_filter_fun(_FilterName, _Style, _Req, _Db) ->
+    throw({bad_request,
+            "unkown builtin filter name"}).
+
+filter_docids(DocIds, Style) when is_list(DocIds)->
+    fun(#doc_info{id=DocId, revs=Revs}) ->
+            case lists:member(DocId, DocIds) of
+                true ->
+                    builtin_results(Style, Revs);
+                _ -> []
+            end
+    end;
+filter_docids(_, _) ->
+    throw({bad_request, "`doc_ids` member is undefined or not a
+            list."}).
+
+filter_designdoc(Style) ->
+    fun(#doc_info{id=DocId, revs=Revs}) ->
+            case DocId of
+            <<"_design", _/binary>> ->
+                    builtin_results(Style, Revs);
+                _ -> []
+            end
+    end.
+
+builtin_results(Style, [#rev_info{rev=Rev}|_]=Revs) ->
+    case Style of
+        main_only ->
+            [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]}];
+        all_docs ->
+            [{[{<<"rev">>, couch_doc:rev_to_str(R)}]}
+                || #rev_info{rev=R} <- Revs]
     end.
 
 get_changes_timeout(Args, Callback) ->
