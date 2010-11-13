@@ -407,28 +407,40 @@ couchTests.changes = function(debug) {
         body: JSON.stringify({"doc_ids": ["something", "anotherthing", "andmore"]})         
     };
 
-    var req = CouchDB.request("POST", "/test_suite_db/_changes", options);
+    var req = CouchDB.request("POST", "/test_suite_db/_changes?filter=_doc_ids", options);
     var resp = JSON.parse(req.responseText);
     T(resp.results.length === 0);
 
     T(db.save({"_id":"something", "bop" : "plankton"}).ok);
-    var req = CouchDB.request("POST", "/test_suite_db/_changes", options);
+    var req = CouchDB.request("POST", "/test_suite_db/_changes?filter=_doc_ids", options);
     var resp = JSON.parse(req.responseText);
     T(resp.results.length === 1);
     T(resp.results[0].id === "something");
 
     T(db.save({"_id":"anotherthing", "bop" : "plankton"}).ok);
-    var req = CouchDB.request("POST", "/test_suite_db/_changes", options);
+    var req = CouchDB.request("POST", "/test_suite_db/_changes?filter=_doc_ids", options);
+    var resp = JSON.parse(req.responseText);
+    T(resp.results.length === 2);
+    T(resp.results[0].id === "something");
+    T(resp.results[1].id === "anotherthing");
+    
+    var docids = JSON.stringify(["something", "anotherthing", "andmore"]),
+        req = CouchDB.request("GET", "/test_suite_db/_changes?filter=_doc_ids&doc_ids="+docids, options);
     var resp = JSON.parse(req.responseText);
     T(resp.results.length === 2);
     T(resp.results[0].id === "something");
     T(resp.results[1].id === "anotherthing");
 
+    var req = CouchDB.request("GET", "/test_suite_db/_changes?filter=_design");
+    var resp = JSON.parse(req.responseText);
+    T(resp.results.length === 1);
+    T(resp.results[0].id === "_design/erlang");
+
 
     if (!is_safari && xhr) {
         // filter docids with continuous
         xhr = CouchDB.newXhr();
-        xhr.open("POST", "/test_suite_db/_changes?feed=continuous&timeout=500&since=7", true);
+        xhr.open("POST", "/test_suite_db/_changes?feed=continuous&timeout=500&since=7&filter=_doc_ids", true);
         xhr.setRequestHeader("Content-Type", "application/json");
         
         xhr.send(options.body);
