@@ -22,14 +22,14 @@ couchTests.replication = function(debug) {
       target:"test_suite_db_b"},
     {source:CouchDB.protocol + host + "/test_suite_db_a",
       target:CouchDB.protocol + host + "/test_suite_db_b"}
-  ]
+  ];
   var dbA = new CouchDB("test_suite_db_a", {"X-Couch-Full-Commit":"false"});
   var dbB = new CouchDB("test_suite_db_b", {"X-Couch-Full-Commit":"false"});
   var numDocs = 10;
   var xhr;
   for (var testPair = 0; testPair < dbPairs.length; testPair++) {
-    var A = dbPairs[testPair].source
-    var B = dbPairs[testPair].target
+    var A = dbPairs[testPair].source;
+    var B = dbPairs[testPair].target;
 
     dbA.deleteDb();
     dbA.createDb();
@@ -41,7 +41,7 @@ couchTests.replication = function(debug) {
       test_template: new function () {
         this.init = function(dbA, dbB) {
           // before anything has happened
-        }
+        };
         this.afterAB1 = function(dbA, dbB) {
           // called after replicating src=A  tgt=B first time.
         };
@@ -165,20 +165,20 @@ couchTests.replication = function(debug) {
         this.afterAB1 = function(dbA, dbB) {
           var xhr = CouchDB.request("GET",
             "/test_suite_db_a/bin_doc/foo%2Bbar.txt");
-          T(xhr.responseText == "This is a base64 encoded text")
+          T(xhr.responseText == "This is a base64 encoded text");
 
           xhr = CouchDB.request("GET",
             "/test_suite_db_b/bin_doc/foo%2Bbar.txt");
-          T(xhr.responseText == "This is a base64 encoded text")
+          T(xhr.responseText == "This is a base64 encoded text");
 
           // and the design-doc
           xhr = CouchDB.request("GET",
             "/test_suite_db_a/_design/with_bin/foo%2Bbar.txt");
-          T(xhr.responseText == "This is a base64 encoded text")
+          T(xhr.responseText == "This is a base64 encoded text");
 
           xhr = CouchDB.request("GET",
             "/test_suite_db_b/_design/with_bin/foo%2Bbar.txt");
-          T(xhr.responseText == "This is a base64 encoded text")
+          T(xhr.responseText == "This is a base64 encoded text");
         };
       },
 
@@ -209,8 +209,8 @@ couchTests.replication = function(debug) {
           var docB = dbB.open("foo", {conflicts: true, deleted_conflicts: true});
 
           // We should have no conflicts this time
-          T(docA._conflicts === undefined)
-          T(docB._conflicts === undefined);
+          T(typeof docA._conflicts === "undefined");
+          T(typeof docB._conflicts === "undefined");
 
           // They show up as deleted conflicts instead
           T(docA._deleted_conflicts[0] == docB._deleted_conflicts[0]);
@@ -229,7 +229,7 @@ couchTests.replication = function(debug) {
 
     var seqA = result.source_last_seq;
     T(0 == result.history[0].start_last_seq);
-    T(result.history[1] === undefined)
+    T(typeof result.history[1] === "undefined");
 
     for(test in repTests) {
       if(repTests[test].afterAB1) repTests[test].afterAB1(dbA, dbB);
@@ -239,7 +239,7 @@ couchTests.replication = function(debug) {
 
     var seqB = result.source_last_seq;
     T(0 == result.history[0].start_last_seq);
-    T(result.history[1] === undefined)
+    T(typeof result.history[1] === "undefined");
 
     for(test in repTests) {
       if(repTests[test].afterBA1) repTests[test].afterBA1(dbA, dbB);
@@ -252,7 +252,7 @@ couchTests.replication = function(debug) {
 
     T(seqA < result2.source_last_seq);
     T(seqA == result2.history[0].start_last_seq);
-    T(result2.history[1].end_last_seq == seqA)
+    T(result2.history[1].end_last_seq == seqA);
 
     seqA = result2.source_last_seq;
 
@@ -260,11 +260,11 @@ couchTests.replication = function(debug) {
       if(repTests[test].afterAB2) repTests[test].afterAB2(dbA, dbB);
     }
 
-    result = CouchDB.replicate(B, A)
+    result = CouchDB.replicate(B, A);
 
     T(seqB < result.source_last_seq);
     T(seqB == result.history[0].start_last_seq);
-    T(result.history[1].end_last_seq == seqB)
+    T(result.history[1].end_last_seq == seqB);
 
     seqB = result.source_last_seq;
 
@@ -306,21 +306,21 @@ couchTests.replication = function(debug) {
   var continuousResult = CouchDB.replicate(dbA.name, "test_suite_db_b", {
     body: {"continuous": true}
   });
-  T(continuousResult.ok)
-  T(continuousResult._local_id)
+  T(continuousResult.ok);
+  T(continuousResult._local_id);
 
   var cancelResult = CouchDB.replicate(dbA.name, "test_suite_db_b", {
     body: {"cancel": true}
   });
-  T(cancelResult.ok)
-  T(continuousResult._local_id == cancelResult._local_id)
+  T(cancelResult.ok);
+  T(continuousResult._local_id == cancelResult._local_id);
 
   try {
    var cancelResult2 = CouchDB.replicate(dbA.name, "test_suite_db_b", {
      body: {"cancel": true}
    });
   } catch (e) {
-    T(e.error == "not_found")
+    T(e.error == "not_found");
   }
   // test replication object option doc_ids
 
