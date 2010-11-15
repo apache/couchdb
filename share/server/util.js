@@ -117,8 +117,10 @@ function respond(obj) {
 
 function log(message) {
   // idea: query_server_config option for log level
-  if (typeof message != "string") {
+  if (typeof message == "xml") {
+    message = message.toXMLString();
+  } else if (typeof message != "string") {
     message = Couch.toJSON(message);
   }
-  respond(["log", message]);
+  respond(["log", String(message)]);
 };
