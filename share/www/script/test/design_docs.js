@@ -13,221 +13,305 @@
 couchTests.design_docs = function(debug) {
   var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
   var db2 = new CouchDB("test_suite_db_a", {"X-Couch-Full-Commit":"false"});
+
+  if (debug) debugger;
+
   db.deleteDb();
   db.createDb();
   db2.deleteDb();
   db2.createDb();
-  if (debug) debugger;
 
-  run_on_modified_server(
-    [{section: "query_server_config",
+  var server_config = [
+    {
+      section: "query_server_config",
       key: "reduce_limit",
-      value: "false"}],
-function() {
-
-  var numDocs = 500;
-
-  function makebigstring(power) {
-    var str = "a";
-    while(power-- > 0) {
-      str = str + str;
+      value: "false"
     }
-    return str;
-  }
+  ];
 
-  var designDoc = {
-    _id:"_design/test", // turn off couch.js id escaping?
-    language: "javascript",
-    whatever : {
-      stringzone : "exports.string = 'plankton';",
-      commonjs : {
-        whynot : "exports.test = require('../stringzone'); exports.foo = require('whatever/stringzone');",
-        upper : "exports.testing = require('./whynot').test.string.toUpperCase()+module.id+require('./whynot').foo.string"
+  var testFun = function() {
+    var numDocs = 500;
+
+    function makebigstring(power) {
+      var str = "a";
+      while(power-- > 0) {
+        str = str + str;
       }
-    },
-    views: {
-      all_docs_twice: {map: "function(doc) { emit(doc.integer, null); emit(doc.integer, null) }"},
-      no_docs: {map: "function(doc) {}"},
-      single_doc: {map: "function(doc) { if (doc._id == \"1\") { emit(1, null) }}"},
-      summate: {map:"function (doc) {emit(doc.integer, doc.integer)};",
-                reduce:"function (keys, values) { return sum(values); };"},
-      summate2: {map:"function (doc) {emit(doc.integer, doc.integer)};",
-                reduce:"function (keys, values) { return sum(values); };"},
-      huge_src_and_results: {map: "function(doc) { if (doc._id == \"1\") { emit(\"" + makebigstring(16) + "\", null) }}",
-                reduce:"function (keys, values) { return \"" + makebigstring(16) + "\"; };"},
-      lib : {
-        baz : "exports.baz = 'bam';",
-        foo : {
-          foo : "exports.foo = 'bar';",
-          boom : "exports.boom = 'ok';",
-          zoom : "exports.zoom = 'yeah';"
+      return str;
+    }
+
+    var designDoc = {
+      _id: "_design/test",
+      language: "javascript",
+      whatever : {
+        stringzone : "exports.string = 'plankton';",
+        commonjs : {
+          whynot : "exports.test = require('../stringzone'); " +
+            "exports.foo = require('whatever/stringzone');",
+          upper : "exports.testing = require('./whynot').test.string.toUpperCase()+" +
+            "module.id+require('./whynot').foo.string"
         }
       },
-      commonjs : {
-        map : "function(doc) { emit(null, require('views/lib/foo/boom').boom)}"
+      views: {
+        all_docs_twice: {
+          map:
+            (function(doc) {
+              emit(doc.integer, null);
+              emit(doc.integer, null);
+            }).toString()
+        },
+        no_docs: {
+          map:
+            (function(doc) {
+            }).toString()
+        },
+        single_doc: {
+          map:
+            (function(doc) {
+              if (doc._id === "1") {
+                emit(1, null);
+              }
+            }).toString()
+        },
+        summate: {
+          map:
+            (function(doc) {
+              emit(doc.integer, doc.integer);
+            }).toString(),
+          reduce:
+            (function(keys, values) {
+              return sum(values);
+            }).toString()
+        },
+        summate2: {
+          map:
+            (function(doc) {
+              emit(doc.integer, doc.integer);
+            }).toString(),
+          reduce:
+            (function(keys, values) {
+              return sum(values);
+            }).toString()
+        },
+        huge_src_and_results: {
+          map:
+            (function(doc) {
+              if (doc._id === "1") {
+                emit(makebigstring(16), null);
+              }
+            }).toString(),
+          reduce:
+            (function(keys, values) {
+              return makebigstring(16);
+            }).toString()
+        },
+        lib : {
+          baz : "exports.baz = 'bam';",
+          foo : {
+            foo : "exports.foo = 'bar';",
+            boom : "exports.boom = 'ok';",
+            zoom : "exports.zoom = 'yeah';"
+          }
+        },
+        commonjs : {
+          map :
+            (function(doc) {
+              emit(null, require('views/lib/foo/boom').boom);
+            }).toString()
+        }
+      },
+      shows: {
+        simple:
+          (function() {
+            return 'ok';
+          }).toString(),
+        requirey:
+          (function() {
+            var lib = require('whatever/commonjs/upper');
+            return lib.testing;
+          }).toString(),
+        circular:
+          (function() {
+            var lib = require('whatever/commonjs/upper');
+            return JSON.stringify(this);
+          }).toString()
       }
-    },
-    shows: {
-      simple: "function() {return 'ok'};",
-      requirey : "function() { var lib = require('whatever/commonjs/upper'); return lib.testing; };",
-      circular : "function() { var lib = require('whatever/commonjs/upper'); return JSON.stringify(this); };"
-    }
-  }; 
+    }; // designDoc
 
-  var xhr = CouchDB.request("PUT", "/test_suite_db_a/_design/test", {body: JSON.stringify(designDoc)});
-  var resp = JSON.parse(xhr.responseText);
-  
-  TEquals(resp.rev, db.save(designDoc).rev);
+    var xhr = CouchDB.request(
+      "PUT", "/test_suite_db_a/_design/test", {body: JSON.stringify(designDoc)}
+    );
+    var resp = JSON.parse(xhr.responseText);
 
-  // test that editing a show fun on the ddoc results in a change in output
-  var xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/simple");
-  T(xhr.status == 200);
-  TEquals(xhr.responseText, "ok");
+    TEquals(resp.rev, db.save(designDoc).rev);
 
-  designDoc.shows.simple = "function() { return 'ko'; }";
-  T(db.save(designDoc).ok);
+    // test that editing a show fun on the ddoc results in a change in output
+    xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/simple");
+    T(xhr.status == 200);
+    TEquals(xhr.responseText, "ok");
 
-  var xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/simple");
-  T(xhr.status == 200);
-  TEquals(xhr.responseText, "ko");
+    designDoc.shows.simple = (function() {
+      return 'ko';
+    }).toString();
+    T(db.save(designDoc).ok);
 
-  var xhr = CouchDB.request("GET", "/test_suite_db_a/_design/test/_show/simple?cache=buster");
-  T(xhr.status == 200);
-  TEquals("ok", xhr.responseText, 'query server used wrong ddoc');
+    xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/simple");
+    T(xhr.status == 200);
+    TEquals(xhr.responseText, "ko");
 
-  // test commonjs require
-  var xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/requirey");
-  T(xhr.status == 200);
-  TEquals("PLANKTONwhatever/commonjs/upperplankton", xhr.responseText);
+    xhr = CouchDB.request(
+      "GET", "/test_suite_db_a/_design/test/_show/simple?cache=buster"
+    );
+    T(xhr.status == 200);
+    TEquals("ok", xhr.responseText, 'query server used wrong ddoc');
 
-  var xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/circular");
-  T(xhr.status == 200);
-  TEquals("javascript", JSON.parse(xhr.responseText).language);
+    // test commonjs require
+    xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/requirey");
+    T(xhr.status == 200);
+    TEquals("PLANKTONwhatever/commonjs/upperplankton", xhr.responseText);
 
-  var prev_view_sig = db.designInfo("_design/test").view_index.signature;
-  var prev_view_size = db.designInfo("_design/test").view_index.disk_size;
+    xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/circular");
+    T(xhr.status == 200);
+    TEquals("javascript", JSON.parse(xhr.responseText).language);
 
-  db.bulkSave(makeDocs(1, numDocs + 1));
-  T(db.ensureFullCommit().ok);
+    var prev_view_sig = db.designInfo("_design/test").view_index.signature;
+    var prev_view_size = db.designInfo("_design/test").view_index.disk_size;
 
-  // test that we get correct design doc info back,
-  // and also that GET /db/_design/test/_info
-  // hasn't triggered an update of the views
-  db.view("test/summate", {stale: "ok"}); // make sure view group's open
-  for (var loop = 0; loop < 2; loop++) {
-    var dinfo = db.designInfo("_design/test");
-    TEquals("test", dinfo.name);
-    var vinfo = dinfo.view_index;
-    TEquals(prev_view_size, vinfo.disk_size, "view group disk size didn't change");
-    TEquals(false, vinfo.compact_running);
-    TEquals(prev_view_sig, vinfo.signature, 'ddoc sig');
-    // wait some time (there were issues where an update
-    // of the views had been triggered in the background)
-    var start = new Date().getTime();
-    while (new Date().getTime() < start + 2000);
-    TEquals(0, db.view("test/all_docs_twice", {stale: "ok"}).total_rows, 'view info');
-    TEquals(0, db.view("test/single_doc", {stale: "ok"}).total_rows, 'view info');
-    TEquals(0, db.view("test/summate", {stale: "ok"}).rows.length, 'view info');
+    db.bulkSave(makeDocs(1, numDocs + 1));
     T(db.ensureFullCommit().ok);
-    restartServer();
-  };
 
-  db.bulkSave(makeDocs(numDocs + 1, numDocs * 2 + 1));
-  T(db.ensureFullCommit().ok);
-
-  // open view group
-  db.view("test/summate", {stale: "ok"});
-  // wait so the views can get initialized
-  var start = new Date().getTime();
-  while (new Date().getTime() < start + 2000);
-
-  // test that POST /db/_view_cleanup
-  // doesn't trigger an update of the views
-  var len1 = db.view("test/all_docs_twice", {stale: "ok"}).total_rows;
-  var len2 = db.view("test/single_doc", {stale: "ok"}).total_rows;
-  var len3 = db.view("test/summate", {stale: "ok"}).rows.length;
-  for (var loop = 0; loop < 2; loop++) {
-    T(db.viewCleanup().ok);
-    // wait some time (there were issues where an update
-    // of the views had been triggered in the background)
-    var start = new Date().getTime();
-    while (new Date().getTime() < start + 2000);
-    TEquals(len1, db.view("test/all_docs_twice", {stale: "ok"}).total_rows, 'view cleanup');
-    TEquals(len2, db.view("test/single_doc", {stale: "ok"}).total_rows, 'view cleanup');
-    TEquals(len3, db.view("test/summate", {stale: "ok"}).rows.length, 'view cleanup');
-    T(db.ensureFullCommit().ok);
-    restartServer();
-    // we'll test whether the view group stays closed
-    // and the views stay uninitialized (they should!)
-    len1 = len2 = len3 = 0;
-  };
-
-  // test commonjs in map functions
-  resp = db.view("test/commonjs", {limit:1});
-  T(resp.rows[0].value == 'ok');
-
-  // test that the _all_docs view returns correctly with keys
-  var results = db.allDocs({startkey:"_design", endkey:"_design0"});
-  T(results.rows.length == 1);
-
-  for (var loop = 0; loop < 2; loop++) {
-    var rows = db.view("test/all_docs_twice").rows;
-    for (var i = 0; i < numDocs; i++) {
-      T(rows[2*i].key == i+1);
-      T(rows[(2*i)+1].key == i+1);
+    // test that we get correct design doc info back,
+    // and also that GET /db/_design/test/_info
+    // hasn't triggered an update of the views
+    db.view("test/summate", {stale: "ok"}); // make sure view group's open
+    for (var i = 0; i < 2; i++) {
+      var dinfo = db.designInfo("_design/test");
+      TEquals("test", dinfo.name);
+      var vinfo = dinfo.view_index;
+      TEquals(prev_view_size, vinfo.disk_size, "view group disk size didn't change");
+      TEquals(false, vinfo.compact_running);
+      TEquals(prev_view_sig, vinfo.signature, 'ddoc sig');
+      // wait some time (there were issues where an update
+      // of the views had been triggered in the background)
+      var start = new Date().getTime();
+      while (new Date().getTime() < start + 2000);
+      TEquals(0, db.view("test/all_docs_twice", {stale: "ok"}).total_rows, 'view info');
+      TEquals(0, db.view("test/single_doc", {stale: "ok"}).total_rows, 'view info');
+      TEquals(0, db.view("test/summate", {stale: "ok"}).rows.length, 'view info');
+      T(db.ensureFullCommit().ok);
+      restartServer();
     };
-    T(db.view("test/no_docs").total_rows == 0);
-    T(db.view("test/single_doc").total_rows == 1);
+
+    db.bulkSave(makeDocs(numDocs + 1, numDocs * 2 + 1));
+    T(db.ensureFullCommit().ok);
+
+    // open view group
+    db.view("test/summate", {stale: "ok"});
+    // wait so the views can get initialized
+    var start = new Date().getTime();
+    while (new Date().getTime() < start + 2000);
+
+    // test that POST /db/_view_cleanup
+    // doesn't trigger an update of the views
+    var len1 = db.view("test/all_docs_twice", {stale: "ok"}).total_rows;
+    var len2 = db.view("test/single_doc", {stale: "ok"}).total_rows;
+    var len3 = db.view("test/summate", {stale: "ok"}).rows.length;
+    for (i = 0; i < 2; i++) {
+      T(db.viewCleanup().ok);
+      // wait some time (there were issues where an update
+      // of the views had been triggered in the background)
+      start = new Date().getTime();
+      while (new Date().getTime() < start + 2000);
+      TEquals(len1, db.view("test/all_docs_twice", {stale: "ok"}).total_rows, 'view cleanup');
+      TEquals(len2, db.view("test/single_doc", {stale: "ok"}).total_rows, 'view cleanup');
+      TEquals(len3, db.view("test/summate", {stale: "ok"}).rows.length, 'view cleanup');
+      T(db.ensureFullCommit().ok);
+      restartServer();
+      // we'll test whether the view group stays closed
+      // and the views stay uninitialized (they should!)
+      len1 = len2 = len3 = 0;
+    };
+
+    // test commonjs in map functions
+    resp = db.view("test/commonjs", {limit:1});
+    T(resp.rows[0].value == 'ok');
+
+    // test that the _all_docs view returns correctly with keys
+    var results = db.allDocs({startkey:"_design", endkey:"_design0"});
+    T(results.rows.length == 1);
+
+    for (i = 0; i < 2; i++) {
+      var rows = db.view("test/all_docs_twice").rows;
+      for (var j = 0; j < numDocs; j++) {
+        T(rows[2 * j].key == (j + 1));
+        T(rows[(2 * j) + 1].key == (j + 1));
+      };
+      T(db.view("test/no_docs").total_rows == 0);
+      T(db.view("test/single_doc").total_rows == 1);
+      T(db.ensureFullCommit().ok);
+      restartServer();
+    };
+
+    // test when language not specified, Javascript is implied
+    var designDoc2 = {
+      _id: "_design/test2",
+      // language: "javascript",
+      views: {
+        single_doc: {
+          map:
+            (function(doc) {
+              if (doc._id === "1") {
+                emit(1, null);
+              }
+            }).toString()
+        }
+      }
+    };
+
+    T(db.save(designDoc2).ok);
+    T(db.view("test2/single_doc").total_rows == 1);
+
+    var summate = function(N) {
+      return (N + 1) * (N / 2);
+    };
+    var result = db.view("test/summate");
+    T(result.rows[0].value == summate(numDocs * 2));
+
+    result = db.view("test/summate", {startkey: 4, endkey: 4});
+    T(result.rows[0].value == 4);
+
+    result = db.view("test/summate", {startkey: 4, endkey: 5});
+    T(result.rows[0].value == 9);
+
+    result = db.view("test/summate", {startkey: 4, endkey: 6});
+    T(result.rows[0].value == 15);
+
+    // Verify that a shared index (view def is an exact copy of "summate")
+    // does not confuse the reduce stage
+    result = db.view("test/summate2", {startkey: 4, endkey: 6});
+    T(result.rows[0].value == 15);
+
+    for(i = 1; i < (numDocs / 2); i += 30) {
+      result = db.view("test/summate", {startkey: i, endkey: (numDocs - i)});
+      T(result.rows[0].value == summate(numDocs - i) - summate(i - 1));
+    }
+
+    T(db.deleteDoc(designDoc).ok);
+    T(db.open(designDoc._id) == null);
+    T(db.view("test/no_docs") == null);
+
     T(db.ensureFullCommit().ok);
     restartServer();
-  };
+    T(db.open(designDoc._id) == null);
+    T(db.view("test/no_docs") == null);
 
-  // test when language not specified, Javascript is implied
-  var designDoc2 = {
-    _id:"_design/test2",
-    // language: "javascript",
-    views: {
-      single_doc: {map: "function(doc) { if (doc._id == \"1\") { emit(1, null) }}"}
-    }
-  };
+    // trigger ddoc cleanup
+    T(db.viewCleanup().ok);
+  }; // enf of testFun
 
-  T(db.save(designDoc2).ok);
-  T(db.view("test2/single_doc").total_rows == 1);
+  run_on_modified_server(server_config, testFun);
 
-  var summate = function(N) {return (N+1)*N/2;};
-  var result = db.view("test/summate");
-  T(result.rows[0].value == summate(numDocs*2));
-
-  result = db.view("test/summate", {startkey:4,endkey:4});
-  T(result.rows[0].value == 4);
-
-  result = db.view("test/summate", {startkey:4,endkey:5});
-  T(result.rows[0].value == 9);
-
-  result = db.view("test/summate", {startkey:4,endkey:6});
-  T(result.rows[0].value == 15);
-
-  // Verify that a shared index (view def is an exact copy of "summate")
-  // does not confuse the reduce stage
-  result = db.view("test/summate2", {startkey:4,endkey:6});
-  T(result.rows[0].value == 15);
-
-  for(var i=1; i<numDocs/2; i+=30) {
-    result = db.view("test/summate", {startkey:i,endkey:numDocs-i});
-    T(result.rows[0].value == summate(numDocs-i) - summate(i-1));
-  }
-
-  T(db.deleteDoc(designDoc).ok);
-  T(db.open(designDoc._id) == null);
-  T(db.view("test/no_docs") == null);
-
-  T(db.ensureFullCommit().ok);
-  restartServer();
-  T(db.open(designDoc._id) == null);
-  T(db.view("test/no_docs") == null);
-
-  // trigger ddoc cleanup
-  T(db.viewCleanup().ok);
-
-});
+  // cleanup
+  db.deleteDb();
+  db2.deleteDb();
 };
