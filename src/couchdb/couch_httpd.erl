@@ -769,7 +769,13 @@ error_headers(#httpd{mochi_req=MochiReq}=Req, Code, ErrorStr, ReasonStr) ->
                                 {Code, []};
                             match ->
                                 AuthRedirectBin = ?l2b(AuthRedirect),
-                                UrlReturn = ?l2b(couch_util:url_encode(MochiReq:get(path))),
+                                % Redirect to the path the user requested, not
+                                % the one that is used internally.
+                                UrlReturnRaw = case MochiReq:get_header_value("x-couchdb-vhost-path") of
+                                    undefined -> MochiReq:get(path);
+                                    VHostPath -> VHostPath
+                                end,
+                                UrlReturn = ?l2b(couch_util:url_encode(UrlReturnRaw)),
                                 UrlReason = ?l2b(couch_util:url_encode(ReasonStr)),
                                 {302, [{"Location", couch_httpd:absolute_uri(Req, <<AuthRedirectBin/binary,"?return=",UrlReturn/binary,"&reason=",UrlReason/binary>>)}]}
                             end
