@@ -119,6 +119,8 @@ os_filter_fun(FilterName, Style, Req, Db) ->
             "filter parameter must be of the form `designname/filtername`"})
     end.
 
+builtin_filter_fun("_doc_ids", Style, {json_req, {Props}}, _Db) ->
+    filter_docids(couch_util:get_value(<<"doc_ids">>, Props), Style);
 builtin_filter_fun("_doc_ids", Style, #httpd{method='POST'}=Req, _Db) ->
     {Props} = couch_httpd:json_body_obj(Req),
     DocIds =  couch_util:get_value(<<"doc_ids">>, Props, nil),
