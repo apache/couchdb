@@ -78,14 +78,10 @@ get_callback_acc(Callback) when is_function(Callback, 2) ->
     {fun(Ev, Data, _) -> Callback(Ev, Data) end, ok}.
 
 %% @type Req -> #httpd{} | {json_req, JsonObj()}
+make_filter_fun([$_ | _] = FilterName, Style, Req, Db) ->
+    builtin_filter_fun(FilterName, Style, Req, Db);
 make_filter_fun(FilterName, Style, Req, Db) ->
-    FilterName1 = list_to_binary(FilterName),
-    case FilterName1 of
-        (<<"_", _/binary>>) ->
-            builtin_filter_fun(FilterName1, Style, Req, Db);
-        (_OSFun) -> 
-            os_filter_fun(FilterName, Style, Req, Db)
-    end.
+    os_filter_fun(FilterName, Style, Req, Db).
 
 os_filter_fun(FilterName, Style, Req, Db) ->
     case [list_to_binary(couch_httpd:unquote(Part))
@@ -123,26 +119,17 @@ os_filter_fun(FilterName, Style, Req, Db) ->
             "filter parameter must be of the form `designname/filtername`"})
     end.
 
-builtin_filter_fun(<<"_doc_ids",_/binary>>, Style, 
-        #httpd{method='POST'}=Req, _Db) ->
+builtin_filter_fun("_doc_ids", Style, #httpd{method='POST'}=Req, _Db) ->
     {Props} = couch_httpd:json_body_obj(Req),
     DocIds =  couch_util:get_value(<<"doc_ids">>, Props, nil),
     filter_docids(DocIds, Style);
-builtin_filter_fun(<<"_doc_ids", _/binary>>, Style, 
-        #httpd{method='GET'}=Req, _Db) ->
-    QS = couch_httpd:qs(Req),
-    DocIds = case couch_util:get_value("doc_ids", QS, nil) of
-        nil ->
-            throw({bad_request, "`doc_ids` parameter is not set"});
-        DocIds1 ->
-            ?JSON_DECODE(DocIds1)
-    end,
+builtin_filter_fun("_doc_ids", Style, #httpd{method='GET'}=Req, _Db) ->
+    DocIds = ?JSON_DECODE(couch_httpd:qs_value(Req, "doc_ids", "null")),
     filter_docids(DocIds, Style);
-builtin_filter_fun(<<"_design", _/binary>>, Style, _Req, _Db) ->
+builtin_filter_fun("_design", Style, _Req, _Db) ->
     filter_designdoc(Style);
 builtin_filter_fun(_FilterName, _Style, _Req, _Db) ->
-    throw({bad_request,
-            "unknown builtin filter name"}).
+    throw({bad_request, "unknown builtin filter name"}).
 
 filter_docids(DocIds, Style) when is_list(DocIds)->
     fun(#doc_info{id=DocId, revs=Revs}) ->
@@ -153,7 +140,7 @@ filter_docids(DocIds, Style) when is_list(DocIds)->
             end
     end;
 filter_docids(_, _) ->
-    throw({bad_request, "`doc_ids` member must be defined as a list"}).
+    throw({bad_request, "`doc_ids` filter parameter is not a list."}).
 
 filter_designdoc(Style) ->
     fun(#doc_info{id=DocId, revs=Revs}) ->
