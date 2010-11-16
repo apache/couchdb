@@ -142,7 +142,7 @@ builtin_filter_fun(<<"_design", _/binary>>, Style, _Req, _Db) ->
     filter_designdoc(Style);
 builtin_filter_fun(_FilterName, _Style, _Req, _Db) ->
     throw({bad_request,
-            "unkown builtin filter name"}).
+            "unknown builtin filter name"}).
 
 filter_docids(DocIds, Style) when is_list(DocIds)->
     fun(#doc_info{id=DocId, revs=Revs}) ->
@@ -153,8 +153,7 @@ filter_docids(DocIds, Style) when is_list(DocIds)->
             end
     end;
 filter_docids(_, _) ->
-    throw({bad_request, "`doc_ids` member is undefined or not a
-            list."}).
+    throw({bad_request, "`doc_ids` member must be defined as a list"}).
 
 filter_designdoc(Style) ->
     fun(#doc_info{id=DocId, revs=Revs}) ->
