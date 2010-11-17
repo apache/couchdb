@@ -470,64 +470,6 @@ couchTests.replicator_db = function(debug) {
   }
 
 
-  function rep_db_write_authorization() {
-    populate_db(dbA, docs1);
-    populate_db(dbB, []);
-
-    var server_admins_config = [
-      {
-        section: "admins",
-        key: "fdmanana",
-        value: "qwerty"
-      }
-    ];
-
-    run_on_modified_server(server_admins_config, function() {
-      var repDoc = {
-        _id: "foo_rep_doc",
-        source: dbA.name,
-        target: dbB.name
-      };
-
-      try {
-        repDb.save(repDoc);
-        T(false && "Should have thrown an exception");
-      } catch (x) {
-        T(x["error"] === "forbidden");
-      }
-
-      T(CouchDB.login("fdmanana", "qwerty").ok);
-      T(CouchDB.session().userCtx.name === "fdmanana");
-      T(CouchDB.session().userCtx.roles.indexOf("_admin") !== -1);
-
-      T(repDb.save(repDoc).ok);
-
-      waitForRep(repDb, repDoc, "completed");
-      for (var i = 0; i < docs1.length; i++) {
-        var doc = docs1[i];
-        var copy = dbB.open(doc._id);
-        T(copy !== null);
-        T(copy.value === doc.value);
-      }
-
-      repDoc = repDb.open("foo_rep_doc");
-      T(repDoc !== null);
-
-      repDoc.target = "test_suite_foo_db";
-      repDoc.create_target = true;
-
-      // Only the replicator can update replication documents.
-      // Admins can only add and delete replication documents.
-      try {
-        repDb.save(repDoc);
-        T(false && "Should have thrown an exception");
-      } catch (x) {
-        T(x["error"] === "forbidden");
-      }
-    });
-  }
-
-
   function test_replication_credentials_delegation() {
     populate_db(usersDb, []);
 
@@ -744,10 +686,6 @@ couchTests.replicator_db = function(debug) {
   repDb.deleteDb();
   restartServer();
   run_on_modified_server(server_config, identical_continuous_rep_docs);
-
-  repDb.deleteDb();
-  restartServer();
-  run_on_modified_server(server_config, rep_db_write_authorization);
 
   var server_config_2 = server_config.concat([
     {
