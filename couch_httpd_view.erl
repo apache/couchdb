@@ -358,6 +358,8 @@ validate_view_query(limit, Value, Args) ->
     Args#view_query_args{limit=Value};
 validate_view_query(list, Value, Args) ->
     Args#view_query_args{list=Value};
+validate_view_query(stale, ok, Args) ->
+    Args#view_query_args{stale=ok};
 validate_view_query(stale, _, Args) ->
     Args;
 validate_view_query(descending, true, Args) ->
