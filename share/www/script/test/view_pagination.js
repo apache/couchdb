@@ -19,7 +19,7 @@ couchTests.view_pagination = function(debug) {
     var docs = makeDocs(0, 100);
     db.bulkSave(docs);
 
-    var queryFun = function(doc) { emit(doc.integer, null) };
+    var queryFun = function(doc) { emit(doc.integer, null); };
     var i;
 
     // page through the view ascending
@@ -29,9 +29,9 @@ couchTests.view_pagination = function(debug) {
         startkey_docid: i,
         limit: 10
       });
-      T(queryResults.rows.length == 10)
-      T(queryResults.total_rows == docs.length)
-      T(queryResults.offset == i)
+      T(queryResults.rows.length == 10);
+      T(queryResults.total_rows == docs.length);
+      T(queryResults.offset == i);
       var j;
       for (j = 0; j < 10;j++) {
         T(queryResults.rows[j].key == i + j);
@@ -46,9 +46,9 @@ couchTests.view_pagination = function(debug) {
         descending: true,
         limit: 10
       });
-      T(queryResults.rows.length == 10)
-      T(queryResults.total_rows == docs.length)
-      T(queryResults.offset == docs.length - i - 1)
+      T(queryResults.rows.length == 10);
+      T(queryResults.total_rows == docs.length);
+      T(queryResults.offset == docs.length - i - 1);
       var j;
       for (j = 0; j < 10; j++) {
         T(queryResults.rows[j].key == i - j);
@@ -63,9 +63,9 @@ couchTests.view_pagination = function(debug) {
         descending: false,
         limit: 10
       });
-      T(queryResults.rows.length == 10)
-      T(queryResults.total_rows == docs.length)
-      T(queryResults.offset == i)
+      T(queryResults.rows.length == 10);
+      T(queryResults.total_rows == docs.length);
+      T(queryResults.offset == i);
       var j;
       for (j = 0; j < 10;j++) {
         T(queryResults.rows[j].key == i + j);
@@ -80,9 +80,9 @@ couchTests.view_pagination = function(debug) {
       endkey_docid: 40
     });
 
-    T(queryResults.rows.length == 35)
-    T(queryResults.total_rows == docs.length)
-    T(queryResults.offset == 1)
+    T(queryResults.rows.length == 35);
+    T(queryResults.total_rows == docs.length);
+    T(queryResults.offset == 1);
     T(queryResults.rows[0].id == "1");
     T(queryResults.rows[1].id == "10");
     T(queryResults.rows[2].id == "11");
