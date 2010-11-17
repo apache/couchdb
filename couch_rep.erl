@@ -862,7 +862,7 @@ maybe_set_triggered({RepProps} = RepDoc, RepId) ->
 ensure_rep_db_exists() ->
     DbName = ?l2b(couch_config:get("replicator", "db", "_replicator")),
     Opts = [
-        {user_ctx, #user_ctx{roles=[<<"_admin">>, <<"_replicator">>]}},
+        {user_ctx, #user_ctx{roles=[<<"_admin">>]}},
         sys_db
     ],
     case couch_db:open(DbName, Opts) of
