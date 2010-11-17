@@ -197,7 +197,8 @@
     stale = false,
     multi_get = false,
     callback = nil,
-    list = nil
+    list = nil,
+    stale = nil
 }).
 
 -record(view_fold_helper_funs, {
