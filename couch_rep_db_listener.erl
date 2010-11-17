@@ -198,16 +198,20 @@ maybe_start_replication({RepProps} = JsonRepDoc) ->
         spawn_link(fun() -> start_replication(JsonRepDoc, RepId, UserCtx) end);
     [{RepId, DocId}] ->
         ok;
-    [{RepId, _OtherDocId}] ->
+    [{RepId, OtherDocId}] ->
+        ?LOG_INFO("The replication specified by the document `~s` was already"
+            " triggered by the document `~s`", [DocId, OtherDocId]),
         couch_rep:update_rep_doc(
             JsonRepDoc, [{<<"replication_id">>, ?l2b(element(1, RepId))}]
         )
     end.
 
 
-start_replication(RepDoc, RepId, UserCtx) ->
+start_replication({RepProps} = RepDoc, {Base, Ext} = RepId, UserCtx) ->
     case (catch couch_rep:start_replication(RepDoc, RepId, UserCtx)) of
     RepPid when is_pid(RepPid) ->
+        ?LOG_INFO("Document `~s` triggered replication `~s`",
+            [couch_util:get_value(<<"_id">>, RepProps), Base ++ Ext]),
         couch_rep:get_result(RepPid, RepId, RepDoc, UserCtx);
     Error ->
         couch_rep:update_rep_doc(
