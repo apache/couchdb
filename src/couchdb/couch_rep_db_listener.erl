@@ -228,10 +228,12 @@ start_replication({RepProps} = RepDoc, {Base, Ext} = RepId, UserCtx) ->
 maybe_stop_replication({RepProps}) ->
     DocId = couch_util:get_value(<<"_id">>, RepProps),
     case ets:lookup(?DOC_TO_REP_ID_MAP, DocId) of
-    [{DocId, RepId}] ->
+    [{DocId, {Base, Ext} = RepId}] ->
         couch_rep:end_replication(RepId),
         true = ets:delete(?REP_ID_TO_DOC_ID_MAP, RepId),
-        true = ets:delete(?DOC_TO_REP_ID_MAP, DocId);
+        true = ets:delete(?DOC_TO_REP_ID_MAP, DocId),
+        ?LOG_INFO("Stopped replication `~s` because replication document `~s`"
+            " was deleted", [Base ++ Ext, DocId]);
     [] ->
         ok
     end.
