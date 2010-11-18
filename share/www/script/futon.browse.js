@@ -153,9 +153,13 @@
                 db.compact({success: function(resp) { callback() }});
                 break;
               case "compact_views":
-                var groupname = page.viewName.substring(8,
-                    page.viewName.indexOf("/_view"));
-                db.compactView(groupname, {success: function(resp) { callback() }});
+                var idx = page.viewName.indexOf("/_view");
+                if (idx == -1) {
+                    alert("Compact Views requires focus on a view!");
+                } else {
+                    var groupname = page.viewName.substring(8, idx);
+                    db.compactView(groupname, {success: function(resp) { callback() }});
+                }
                 break;
               case "view_cleanup":
                 db.viewCleanup({success: function(resp) { callback() }});
