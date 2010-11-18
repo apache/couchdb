@@ -7,6 +7,23 @@ For details about backwards incompatible changes, see:
 
 Each release section notes when backwards incompatible changes have been made.
 
+Version 1.0.2
+-------------
+
+Note: This version has not been released yet.
+
+ * Make test suite work with Safari and Chrome.
+ * Fix leaking file handles after compacting databases views.
+ * Fix databases forgetting their validation function after compaction.
+ * Fix occasional timeout errors.
+ * Reduce lengthy stack traces.
+ * Allow logging of native <xml> types.
+ * Updated ibrowse library to 2.1.0 fixing numerous replication issues.
+ * Fix authenticated replication of design documents with attachments.
+ * Various fixes to make replicated more resilient for edge-cases.
+ * Don't trigger a view update when requesting `_design/doc/_info`.
+ * Fix for circular references in CommonJS requires.
+
 Version 1.0.1
 -------------
 
