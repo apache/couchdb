@@ -30,7 +30,7 @@ test_db_b_name() ->
 
 main(_) ->
     test_util:init_code_path(),
-    etap:plan(30),
+    etap:plan(45),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -102,6 +102,33 @@ test() ->
     check_server_can_decompress_att(test_db_b_name()),
     check_att_stubs(test_db_a_name(), test_db_b_name()),
 
+    %
+    % test local replication
+    %
+
+    delete_db(test_db_a_name()),
+    delete_db(test_db_b_name()),
+    create_db(test_db_a_name()),
+    create_db(test_db_b_name()),
+
+    % enable compression
+    couch_config:set("attachments", "compression_level", "8"),
+    couch_config:set("attachments", "compressible_types", "text/*"),
+
+    % store doc with text attachment in DB A
+    put_text_att(test_db_a_name()),
+
+    % disable attachment compression
+    couch_config:set("attachments", "compression_level", "0"),
+
+    % do local-local replication
+    do_local_replication(test_db_a_name(), test_db_b_name()),
+
+    % verify that DB B has the attachment stored in compressed form
+    check_att_is_compressed(test_db_b_name()),
+    check_server_can_decompress_att(test_db_b_name()),
+    check_att_stubs(test_db_a_name(), test_db_b_name()),
+
     timer:sleep(3000), % to avoid mochiweb socket closed exceptions
     delete_db(test_db_a_name()),
     delete_db(test_db_b_name()),
@@ -150,6 +177,23 @@ do_push_replication(SourceDbName, TargetDbName) ->
     Json = couch_util:json_decode(Body),
     RepOk = couch_util:get_nested_json_value(Json, [<<"ok">>]),
     etap:is(RepOk, true, "Push replication completed with success"),
+    ok.
+
+do_local_replication(SourceDbName, TargetDbName) ->
+    RepObj = {[
+        {<<"source">>, SourceDbName},
+        {<<"target">>, TargetDbName}
+    ]},
+    {ok, {{_, Code, _}, _Headers, Body}} = http:request(
+        post,
+        {rep_url(), [],
+        "application/json", list_to_binary(couch_util:json_encode(RepObj))},
+        [],
+        [{sync, true}]),
+    etap:is(Code, 200, "Local replication successfully triggered"),
+    Json = couch_util:json_decode(Body),
+    RepOk = couch_util:get_nested_json_value(Json, [<<"ok">>]),
+    etap:is(RepOk, true, "Local replication completed with success"),
     ok.
 
 check_att_is_compressed(DbName) ->
