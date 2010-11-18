@@ -336,7 +336,7 @@ cache_needs_refresh() ->
 
 
 reopen_auth_db(AuthDb) ->
-    case (catch gen_server:call(AuthDb#db.main_pid, get_db, infinity)) of
+    case (catch couch_db:reopen(AuthDb)) of
     {ok, AuthDb2} ->
         AuthDb2;
     _ ->
