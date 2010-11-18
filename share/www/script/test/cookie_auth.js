@@ -65,7 +65,7 @@ couchTests.cookie_auth = function(debug) {
       }, "eh, Boo-Boo?");
 
       try {
-        usersDb.save(duplicateJchrisDoc)
+        usersDb.save(duplicateJchrisDoc);
         T(false && "Can't create duplicate user names. Should have thrown an error.");
       } catch (e) {
         T(e.error == "conflict");
@@ -78,7 +78,7 @@ couchTests.cookie_auth = function(debug) {
       }, "copperfield");
 
       try {
-        usersDb.save(underscoreUserDoc)
+        usersDb.save(underscoreUserDoc);
         T(false && "Can't create underscore user names. Should have thrown an error.");
       } catch (e) {
         T(e.error == "forbidden");
@@ -93,7 +93,7 @@ couchTests.cookie_auth = function(debug) {
       badIdDoc._id = "org.apache.couchdb:w00x";
 
       try {
-        usersDb.save(badIdDoc)
+        usersDb.save(badIdDoc);
         T(false && "Can't create malformed docids. Should have thrown an error.");
       } catch (e) {
         T(e.error == "forbidden");
@@ -125,7 +125,7 @@ couchTests.cookie_auth = function(debug) {
        T(CouchDB.session().userCtx.name != 'Jason Davies');
 
        // test redirect
-       xhr = CouchDB.request("POST", "/_session?next=/", {
+       var xhr = CouchDB.request("POST", "/_session?next=/", {
          headers: {"Content-Type": "application/x-www-form-urlencoded"},
          body: "name=Jason%20Davies&password="+encodeURIComponent(password)
        });
@@ -135,10 +135,10 @@ couchTests.cookie_auth = function(debug) {
        // to follow the redirect, ie, the browser follows and does a
        // GET on the returned Location
        if (xhr.status == 200) {
-         T(/Welcome/.test(xhr.responseText))
+         T(/Welcome/.test(xhr.responseText));
        } else {
-         T(xhr.status == 302)
-         T(xhr.getResponseHeader("Location"))
+         T(xhr.status == 302);
+         T(xhr.getResponseHeader("Location"));
        }
 
       // test users db validations
@@ -151,7 +151,7 @@ couchTests.cookie_auth = function(debug) {
       jasonUserDoc.foo=3;
 
       try {
-        usersDb.save(jasonUserDoc)
+        usersDb.save(jasonUserDoc);
         T(false && "Can't update someone else's user doc. Should have thrown an error.");
       } catch (e) {
         T(e.error == "forbidden");
@@ -162,7 +162,7 @@ couchTests.cookie_auth = function(debug) {
       jchrisUserDoc.roles = ["foo"];
       
       try {
-        usersDb.save(jchrisUserDoc)
+        usersDb.save(jchrisUserDoc);
         T(false && "Can't set roles unless you are admin. Should have thrown an error.");
       } catch (e) {
         T(e.error == "forbidden");
@@ -179,7 +179,7 @@ couchTests.cookie_auth = function(debug) {
       jchrisUserDoc.roles = ["_bar"];
       
       try {
-        usersDb.save(jchrisUserDoc)
+        usersDb.save(jchrisUserDoc);
         T(false && "Can't add system roles to user's db. Should have thrown an error.");
       } catch (e) {
         T(e.error == "forbidden");

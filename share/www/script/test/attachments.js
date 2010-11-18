@@ -24,7 +24,7 @@ couchTests.attachments= function(debug) {
         data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
       }
     }
-  }
+  };
 
   var save_response = db.save(binAttDoc);
   T(save_response.ok);
@@ -43,7 +43,7 @@ couchTests.attachments= function(debug) {
         data: ""
       }
     }
-  }
+  };
 
   T(db.save(binAttDoc2).ok);
 
@@ -68,12 +68,12 @@ couchTests.attachments= function(debug) {
 
   T(binAttDoc2._attachments["foo.txt"] !== undefined);
   T(binAttDoc2._attachments["foo2.txt"] !== undefined);
-  T(binAttDoc2._attachments["foo2.txt"].content_type == "text/plain;charset=utf-8");
+  TEqualsIgnoreCase("text/plain;charset=utf-8", binAttDoc2._attachments["foo2.txt"].content_type);
   T(binAttDoc2._attachments["foo2.txt"].length == 30);
 
   var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc2/foo2.txt");
   T(xhr.responseText == "This is no base64 encoded text");
-  T(xhr.getResponseHeader("Content-Type") == "text/plain;charset=utf-8");
+  TEqualsIgnoreCase("text/plain;charset=utf-8", xhr.getResponseHeader("Content-Type"));
 
   // test without rev, should fail
   var xhr = CouchDB.request("DELETE", "/test_suite_db/bin_doc2/foo2.txt");
@@ -96,7 +96,7 @@ couchTests.attachments= function(debug) {
 
   var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc3/attachment.txt");
   T(xhr.responseText == bin_data);
-  T(xhr.getResponseHeader("Content-Type") == "text/plain;charset=utf-8");
+  TEqualsIgnoreCase("text/plain;charset=utf-8", xhr.getResponseHeader("Content-Type"));
 
   var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc3/attachment.txt", {
     headers:{"Content-Type":"text/plain;charset=utf-8"},
@@ -113,11 +113,11 @@ couchTests.attachments= function(debug) {
 
   var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc3/attachment.txt");
   T(xhr.responseText == bin_data);
-  T(xhr.getResponseHeader("Content-Type") == "text/plain;charset=utf-8");
+  TEqualsIgnoreCase("text/plain;charset=utf-8", xhr.getResponseHeader("Content-Type"));
 
   var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc3/attachment.txt?rev=" + rev);
   T(xhr.responseText == bin_data);
-  T(xhr.getResponseHeader("Content-Type") == "text/plain;charset=utf-8");
+  TEqualsIgnoreCase("text/plain;charset=utf-8", xhr.getResponseHeader("Content-Type"));
 
   var xhr = CouchDB.request("DELETE", "/test_suite_db/bin_doc3/attachment.txt?rev=" + rev);
   T(xhr.status == 200);
@@ -129,7 +129,7 @@ couchTests.attachments= function(debug) {
   var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc3/attachment.txt?rev=" + rev);
   T(xhr.status == 200);
   T(xhr.responseText == bin_data);
-  T(xhr.getResponseHeader("Content-Type") == "text/plain;charset=utf-8");
+  TEqualsIgnoreCase("text/plain;charset=utf-8", xhr.getResponseHeader("Content-Type"));
 
   // empty attachments
   var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc4/attachment.txt", {
@@ -156,7 +156,7 @@ couchTests.attachments= function(debug) {
 
   // Attachment sparseness COUCHDB-220
 
-  var docs = []
+  var docs = [];
   for (var i = 0; i < 5; i++) {
     var doc = {
       _id: (i).toString(),
@@ -166,8 +166,8 @@ couchTests.attachments= function(debug) {
           data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
         }
       }
-    }
-    docs.push(doc)
+    };
+    docs.push(doc);
   }
 
   var saved = db.bulkSave(docs);
@@ -210,7 +210,7 @@ couchTests.attachments= function(debug) {
 
   var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc5/lorem.txt");
   T(xhr.responseText == lorem);
-  T(xhr.getResponseHeader("Content-Type") == "text/plain;charset=utf-8");
+  TEqualsIgnoreCase("text/plain;charset=utf-8", xhr.getResponseHeader("Content-Type"));
 
   // test large inline attachment too
   var lorem_b64 = CouchDB.request("GET", "/_utils/script/test/lorem_b64.txt").responseText;
@@ -254,7 +254,7 @@ couchTests.attachments= function(debug) {
         data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
       }
     }
-  }
+  };
   T(db.save(bin_doc6).ok);
   // stub out the attachment
   bin_doc6._attachments["foo.txt"] = { stub: true };
@@ -268,6 +268,6 @@ couchTests.attachments= function(debug) {
       T(db.save(bin_doc6).ok == true);
       T(false && "Shouldn't get here!");
   } catch (e) {
-      T(e.error == "missing_stub")
+      T(e.error == "missing_stub");
   }
 };

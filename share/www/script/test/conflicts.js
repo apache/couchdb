@@ -44,7 +44,7 @@ couchTests.conflicts = function(debug) {
 
   var changes = db.changes();
 
-  T( changes.results.length == 1)
+  T(changes.results.length == 1);
 
   // Now clear out the _rev member and save. This indicates this document is
   // new, not based on an existing revision.

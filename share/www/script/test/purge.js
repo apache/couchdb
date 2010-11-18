@@ -30,7 +30,7 @@ couchTests.purge = function(debug) {
       all_docs_twice: {map: "function(doc) { emit(doc.integer, null); emit(doc.integer, null) }"},
       single_doc: {map: "function(doc) { if (doc._id == \"1\") { emit(1, null) }}"}
     }
-  }
+  };
 
   T(db.save(designDoc).ok);
 
@@ -50,7 +50,7 @@ couchTests.purge = function(debug) {
 
   // purge the documents
   var xhr = CouchDB.request("POST", "/test_suite_db/_purge", {
-    body: JSON.stringify({"1":[doc1._rev], "2":[doc2._rev]}),
+    body: JSON.stringify({"1":[doc1._rev], "2":[doc2._rev]})
   });
   T(xhr.status == 200);
 
@@ -83,13 +83,13 @@ couchTests.purge = function(debug) {
   var doc4 = db.open("4");
 
   xhr = CouchDB.request("POST", "/test_suite_db/_purge", {
-    body: JSON.stringify({"3":[doc3._rev]}),
+    body: JSON.stringify({"3":[doc3._rev]})
   });
 
   T(xhr.status == 200);
 
   xhr = CouchDB.request("POST", "/test_suite_db/_purge", {
-    body: JSON.stringify({"4":[doc4._rev]}),
+    body: JSON.stringify({"4":[doc4._rev]})
   });
 
   T(xhr.status == 200);

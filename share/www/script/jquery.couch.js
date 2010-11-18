@@ -36,7 +36,7 @@
     }
     user_doc.type = "user";
     if (!user_doc.roles) {
-      user_doc.roles = []
+      user_doc.roles = [];
     }
     return user_doc;
   };
@@ -75,7 +75,7 @@
         req.type = "PUT";
         req.data = toJSON(value);
         req.contentType = "application/json";
-        req.processData = false
+        req.processData = false;
       }
 
       ajax(req, options,
@@ -115,7 +115,7 @@
       user_doc = prepareUserDoc(user_doc, password);
       $.couch.userDb(function(db) {
         db.saveDoc(user_doc, options);
-      })
+      });
     },
     
     login: function(options) {
@@ -167,7 +167,7 @@
             doc._attachments["rev-"+doc._rev.split("-")[0]] = {
               content_type :"application/json",
               data : Base64.encode(rawDocs[doc._id].raw)
-            }
+            };
             return true;
           }
         }
@@ -583,7 +583,7 @@
       if (!uuidCache.length) {
         ajax({url: this.urlPrefix + "/_uuids", data: {count: cacheNum}, async: false}, {
             success: function(resp) {
-              uuidCache = resp.uuids
+              uuidCache = resp.uuids;
             }
           },
           "Failed to retrieve UUID batch."

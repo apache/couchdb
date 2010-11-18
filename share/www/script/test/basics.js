@@ -45,7 +45,7 @@ couchTests.basics = function(debug) {
 
   // Get the database info, check the db_name
   T(db.info().db_name == "test_suite_db");
-  T(CouchDB.allDbs().indexOf("test_suite_db") != -1)
+  T(CouchDB.allDbs().indexOf("test_suite_db") != -1);
 
   // Get the database info, check the doc_count
   T(db.info().doc_count == 0);
@@ -91,13 +91,13 @@ couchTests.basics = function(debug) {
       emit(null, doc.b);
   };
 
-  results = db.query(mapFunction);
+  var results = db.query(mapFunction);
 
   // verify only one document found and the result value (doc.b).
   T(results.total_rows == 1 && results.rows[0].value == 16);
 
   // reopen document we saved earlier
-  existingDoc = db.open(id);
+  var existingDoc = db.open(id);
 
   T(existingDoc.a==1);
 
@@ -191,12 +191,12 @@ couchTests.basics = function(debug) {
   T(xhr.status == 404);
 
   // Check for invalid document members
-  bad_docs = [
+  var bad_docs = [
     ["goldfish", {"_zing": 4}],
     ["zebrafish", {"_zoom": "hello"}],
     ["mudfish", {"zane": "goldfish", "_fan": "something smells delicious"}],
     ["tastyfish", {"_bing": {"wha?": "soda can"}}]
-  ]
+  ];
   var test_doc = function(info) {
   var data = JSON.stringify(info[1]);
     xhr = CouchDB.request("PUT", "/test_suite_db/" + info[0], {body: data});

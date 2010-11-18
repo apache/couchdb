@@ -26,7 +26,7 @@ couchTests.compact = function(debug) {
         data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
       }
     }
-  }
+  };
 
   T(db.save(binAttDoc).ok);
 
@@ -51,8 +51,8 @@ couchTests.compact = function(debug) {
   T(db.ensureFullCommit().ok);
   restartServer();
   var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt");
-  T(xhr.responseText == "This is a base64 encoded text")
-  T(xhr.getResponseHeader("Content-Type") == "text/plain")
+  T(xhr.responseText == "This is a base64 encoded text");
+  T(xhr.getResponseHeader("Content-Type") == "text/plain");
   T(db.info().doc_count == 1);
   T(db.info().disk_size < deletesize);
 
