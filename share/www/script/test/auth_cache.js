@@ -238,6 +238,37 @@ couchTests.auth_cache = function(debug) {
 
     T(misses_after === misses_before);
     T(hits_after === (hits_before + 1));
+
+    // login, compact authentication DB, login again and verify that
+    // there was a cache hit
+    hits_before = hits_after;
+    misses_before = misses_after;
+
+    T(CouchDB.login("johndoe", "123456").ok);
+
+    hits_after = hits();
+    misses_after = misses();
+
+    T(misses_after === (misses_before + 1));
+    T(hits_after === hits_before);
+
+    T(CouchDB.logout().ok);
+    T(authDb.compact().ok);
+
+    while (authDb.info().compact_running);
+
+    hits_before = hits_after;
+    misses_before = misses_after;
+
+    T(CouchDB.login("johndoe", "123456").ok);
+
+    hits_after = hits();
+    misses_after = misses();
+
+    T(misses_after === misses_before);
+    T(hits_after === (hits_before + 1));
+
+    T(CouchDB.logout().ok);
   }
 
 
