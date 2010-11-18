@@ -32,7 +32,8 @@
     compactor_pid=nil,
     waiting_commit=false,
     waiting_list=[],
-    ref_counter=nil
+    ref_counter=nil,
+    db_update_notifier=nil
 }).
 
 % api methods
@@ -75,7 +76,7 @@ start_link(InitArgs) ->
     end.
 
 % init creates a closure which spawns the appropriate view_updater.
-init({InitArgs, ReturnPid, Ref}) ->
+init({{_, DbName, _} = InitArgs, ReturnPid, Ref}) ->
     process_flag(trap_exit, true),
     try prepare_group(InitArgs, false) of
     {ok, #group{db=Db, fd=Fd, current_seq=Seq}=Group} ->
@@ -86,7 +87,15 @@ init({InitArgs, ReturnPid, Ref}) ->
         _ ->
             couch_db:monitor(Db),
             {ok, RefCounter} = couch_ref_counter:start([Fd]),
+            Server = self(),
+            {ok, Notifier} = couch_db_update_notifier:start_link(
+                fun({compacted, DbName1}) when DbName1 =:= DbName ->
+                        ok = gen_server:cast(Server, reopen_db);
+                    (_) ->
+                        ok
+                end),
             {ok, #group_state{
+                    db_update_notifier=Notifier,
                     db_name=couch_db:name(Db),
                     init_args=InitArgs,
                     group=Group,
@@ -119,11 +128,11 @@ init({InitArgs, ReturnPid, Ref}) ->
 handle_call({request_group, RequestSeq}, From,
         #group_state{
             db_name=DbName,
-            group=#group{current_seq=Seq}=Group,
+            group=#group{current_seq=Seq, db=OldDb}=Group,
             updater_pid=nil,
             waiting_list=WaitList
             }=State) when RequestSeq > Seq ->
-    {ok, Db} = couch_db:open_int(DbName, []),
+    {ok, Db} = reopen_db(DbName, OldDb),
     Group2 = Group#group{db=Db},
     Owner = self(),
     Pid = spawn_link(fun()-> couch_view_updater:update(Owner, Group2) end),
@@ -158,11 +167,11 @@ handle_call(request_group_info, _From, State) ->
 handle_cast({start_compact, CompactFun}, #group_state{compactor_pid=nil}
         = State) ->
     #group_state{
-        group = #group{name = GroupId, sig = GroupSig} = Group,
+        group = #group{name = GroupId, sig = GroupSig, db = OldDb} = Group,
         init_args = {RootDir, DbName, _}
     } = State,
     ?LOG_INFO("View index compaction starting for ~s ~s", [DbName, GroupId]),
-    {ok, Db} = couch_db:open_int(DbName, []),
+    {ok, Db} = reopen_db(DbName, OldDb),
     {ok, Fd} = open_index_file(compact, RootDir, DbName, GroupSig),
     NewGroup = reset_file(Db, Fd, DbName, Group),
     Pid = spawn_link(fun() -> CompactFun(Group, NewGroup) end),
@@ -225,13 +234,14 @@ handle_cast({compact_done, NewGroup}, State) ->
     ?LOG_INFO("View index compaction still behind for ~s ~s -- current: ~p " ++
         "compact: ~p", [DbName, GroupId, CurrentSeq, NewGroup#group.current_seq]),
     couch_db:close(NewGroup#group.db),
-    {ok, Db} = couch_db:open_int(DbName, []),
     Pid = spawn_link(fun() ->
+        {ok, Db} = couch_db:open_int(DbName, []),
         {_,Ref} = erlang:spawn_monitor(fun() ->
             couch_view_updater:update(nil, NewGroup#group{db = Db})
         end),
         receive
             {'DOWN', Ref, _, _, {new_group, NewGroup2}} ->
+                couch_db:close(Db),
                 #group{name=GroupId} = NewGroup2,
                 Pid2 = couch_view:get_group_server(DbName, GroupId),
                 gen_server:cast(Pid2, {compact_done, NewGroup2})
@@ -255,7 +265,11 @@ handle_cast({partial_update, Pid, NewGroup}, #group_state{updater_pid=Pid}
     {noreply, State#group_state{group=NewGroup, waiting_commit=true}};
 handle_cast({partial_update, _, _}, State) ->
     %% message from an old (probably pre-compaction) updater; ignore
-    {noreply, State}.
+    {noreply, State};
+
+handle_cast(reopen_db, #group_state{group = Group, db_name = DbName} = State) ->
+    {ok, Db} = reopen_db(DbName, Group#group.db),
+    {noreply, State#group_state{group = Group#group{db = Db}}}.
 
 handle_info(delayed_commit, #group_state{db_name=DbName,group=Group}=State) ->
     {ok, Db} = couch_db:open_int(DbName, []),
@@ -341,6 +355,7 @@ handle_info({'DOWN',_,_,_,_}, State) ->
 
 
 terminate(Reason, #group_state{updater_pid=Update, compactor_pid=Compact}=S) ->
+    couch_db_update_notifier:stop(S#group_state.db_update_notifier),
     reply_all(S, Reason),
     couch_util:shutdown_sync(Update),
     couch_util:shutdown_sync(Compact),
@@ -372,8 +387,8 @@ reply_all(#group_state{waiting_list=WaitList}=State, Reply) ->
     [catch gen_server:reply(Pid, Reply) || {Pid, _} <- WaitList],
     State#group_state{waiting_list=[]}.
 
-prepare_group({RootDir, DbName, #group{sig=Sig}=Group}, ForceReset)->
-    case couch_db:open_int(DbName, []) of
+prepare_group({RootDir, DbName, #group{sig=Sig, db=OldDb}=Group}, ForceReset)->
+    case reopen_db(DbName, OldDb) of
     {ok, Db} ->
         case open_index_file(RootDir, DbName, Sig) of
         {ok, Fd} ->
@@ -634,4 +649,7 @@ init_group(Db, Fd, #group{def_lang=Lang,views=Views}=
     Group#group{db=Db, fd=Fd, current_seq=Seq, purge_seq=PurgeSeq,
         id_btree=IdBtree, views=Views2}.
 
-
+reopen_db(DbName, nil) ->
+    couch_db:open_int(DbName, []);
+reopen_db(_DbName, Db) ->
+    couch_db:reopen(Db).
