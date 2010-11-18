@@ -253,7 +253,7 @@ stop_update_notifiers(Notifiers) ->
     [rexi:kill(Node, Ref) || {Node, Ref} <- Notifiers].
 
 changes_row(#view_row{key=Seq, id=Id, value=Value, doc=deleted}, true) ->
-    {change, {[{seq,Seq}, {id,Id}, {changes,Value}, {deleted, true}, {doc, null}]}};
+    {change, {[{seq,Seq}, {id,Id}, {changes,Value}, {deleted, true}]}};
 changes_row(#view_row{key=Seq, id=Id, value=Value, doc=deleted}, false) ->
     {change, {[{seq,Seq}, {id,Id}, {changes,Value}, {deleted, true}]}};
 changes_row(#view_row{key=Seq, id=Id, value=Value, doc={error,Reason}}, true) ->
