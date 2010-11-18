@@ -98,6 +98,9 @@ handle_request(MochiReq) ->
         design_url_handlers = design_url_handlers()
     },
 
+    % put small token on heap to keep requests synced to backend calls
+    erlang:put(nonce, couch_util:to_hex(crypto:rand_bytes(4))),
+
     {ok, Resp} =
     try
         case authenticate_request(HttpReq, AuthenticationFuns) of
@@ -464,26 +467,20 @@ send_json(Req, Code, Value) ->
     send_json(Req, Code, [], Value).
 
 send_json(Req, Code, Headers, Value) ->
-    DefaultHeaders = [
-        {"Content-Type", negotiate_content_type(Req)},
-        {"Cache-Control", "must-revalidate"}
-    ],
     Body = list_to_binary(
         [start_jsonp(Req), ?JSON_ENCODE(Value), end_jsonp(), $\n]
     ),
-    send_response(Req, Code, DefaultHeaders ++ Headers, Body).
+    ConType = negotiate_content_type(Req),
+    send_response(Req, Code, default_headers(ConType) ++ Headers, Body).
 
 start_json_response(Req, Code) ->
     start_json_response(Req, Code, []).
 
 start_json_response(Req, Code, Headers) ->
-    DefaultHeaders = [
-        {"Content-Type", negotiate_content_type(Req)},
-        {"Cache-Control", "must-revalidate"}
-    ],
     start_jsonp(Req), % Validate before starting chunked.
     %start_chunked_response(Req, Code, DefaultHeaders ++ Headers).
-    {ok, Resp} = start_chunked_response(Req, Code, DefaultHeaders ++ Headers),
+    ConType = negotiate_content_type(Req),
+    {ok, Resp} = start_chunked_response(Req, Code, default_headers(ConType) ++ Headers),
     case start_jsonp(Req) of
         [] -> ok;
         Start -> send_chunk(Resp, Start)
@@ -653,3 +650,10 @@ negotiate_content_type(#httpd{mochi_req=MochiReq}) ->
 
 server_header() ->
     couch_httpd:server_header().
+
+default_headers(ConType) ->
+    [
+        {"Content-Type", ConType},
+        {"Cache-Control", "must-revalidate"},
+        {"X-Couch-Request-ID", get(nonce)}
+    ].
