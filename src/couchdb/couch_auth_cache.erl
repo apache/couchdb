@@ -135,6 +135,7 @@ handle_db_event({Event, DbName}) ->
         case Event of
         deleted -> gen_server:call(?MODULE, auth_db_deleted, infinity);
         created -> gen_server:call(?MODULE, auth_db_created, infinity);
+        compacted -> gen_server:call(?MODULE, auth_db_compacted, infinity);
         _Else   -> ok
         end;
     false ->
@@ -157,6 +158,14 @@ handle_call(auth_db_created, _From, State) ->
     NewState = clear_cache(State),
     true = ets:insert(?STATE, {auth_db, open_auth_db()}),
     {reply, ok, NewState};
+
+handle_call(auth_db_compacted, _From, State) ->
+    exec_if_auth_db(
+        fun(AuthDb) ->
+            true = ets:insert(?STATE, {auth_db, reopen_auth_db(AuthDb)})
+        end
+    ),
+    {reply, ok, State};
 
 handle_call({new_max_cache_size, NewSize}, _From, State) ->
     case NewSize >= State#state.cache_size of
