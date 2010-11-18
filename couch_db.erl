@@ -87,17 +87,17 @@ open(DbName, Options) ->
         Else -> Else
     end.
 
-reopen(#db{main_pid = Pid, fd_ref_counter = OldRefCntr}) ->
+reopen(#db{main_pid = Pid, fd_ref_counter = OldRefCntr, user_ctx = UserCtx}) ->
     {ok, #db{fd_ref_counter = NewRefCntr} = NewDb} =
         gen_server:call(Pid, get_db, infinity),
     case NewRefCntr =:= OldRefCntr of
     true ->
-        {ok, NewDb};
+        ok;
     false ->
         couch_ref_counter:add(NewRefCntr),
-        couch_ref_counter:drop(OldRefCntr),
-        {ok, NewDb}
-    end.
+        couch_ref_counter:drop(OldRefCntr)
+    end,
+    {ok, NewDb#db{user_ctx = UserCtx}}.
 
 ensure_full_commit(#db{update_pid=UpdatePid,instance_start_time=StartTime}) ->
     ok = gen_server:call(UpdatePid, full_commit, infinity),
