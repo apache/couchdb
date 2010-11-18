@@ -90,13 +90,13 @@ couchTests.basics = function(debug) {
       emit(null, doc.b);
   };
 
-  results = db.query(mapFunction);
+  var results = db.query(mapFunction);
 
   // verify only one document found and the result value (doc.b).
   T(results.total_rows == 1 && results.rows[0].value == 16);
 
   // reopen document we saved earlier
-  existingDoc = db.open(id);
+  var existingDoc = db.open(id);
 
   T(existingDoc.a==1);
 
@@ -189,7 +189,7 @@ couchTests.basics = function(debug) {
   T(xhr.status == 404);
 
   // Check for invalid document members
-  bad_docs = [
+  var bad_docs = [
     ["goldfish", {"_zing": 4}],
     ["zebrafish", {"_zoom": "hello"}],
     ["mudfish", {"zane": "goldfish", "_fan": "something smells delicious"}],

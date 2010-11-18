@@ -112,7 +112,7 @@ couchTests.view_multi_key_design = function(debug) {
   }
 
   // Test that a map & reduce containing func support keys when reduce=false
-  resp = db.view("test/summate", {reduce: false}, keys);
+  var resp = db.view("test/summate", {reduce: false}, keys);
   T(resp.rows.length == 5);
 
   resp = db.view("test/summate", {reduce: false, keys: keys}, null);

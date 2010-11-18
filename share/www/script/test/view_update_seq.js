@@ -18,7 +18,7 @@ couchTests.view_update_seq = function(debug) {
 
   T(db.info().update_seq == 0);
 
-  resp = db.allDocs({update_seq:true});
+  var resp = db.allDocs({update_seq:true});
 
   T(resp.rows.length == 0);
   T(resp.update_seq == 0);

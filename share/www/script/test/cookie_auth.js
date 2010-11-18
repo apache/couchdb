@@ -105,7 +105,7 @@ couchTests.cookie_auth = function(debug) {
       T(CouchDB.session().userCtx.name == 'Jason Davies');
       
       // JSON login works
-      xhr = CouchDB.request("POST", "/_session", {
+      var xhr = CouchDB.request("POST", "/_session", {
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
           name: 'Jason Davies',
