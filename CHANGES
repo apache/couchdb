@@ -12,7 +12,7 @@ Futon:
 
 Storage System:
 
- * Fix leaking file handles after compacting databases views.
+ * Fix leaking file handles after compacting databases and views.
  * Fix databases forgetting their validation function after compaction.
  * Fix occasional timeout errors after compacting large databases.
  * Fix occasional timeout errors on systems with slow or heavily loaded IO.
@@ -25,7 +25,7 @@ Log System:
 HTTP Interface:
 
  * Allow reduce=false parameter in map-only views.
- * Support "Q values" in HTTP headers.
+ * Fix parsing of Accept headers.
 
 Replicator:
 

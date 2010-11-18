@@ -13,7 +13,7 @@ Version 1.0.2
 Note: This version has not been released yet.
 
  * Make test suite work with Safari and Chrome.
- * Fix leaking file handles after compacting databases views.
+ * Fix leaking file handles after compacting databases and views.
  * Fix databases forgetting their validation function after compaction.
  * Fix occasional timeout errors.
  * Reduce lengthy stack traces.
