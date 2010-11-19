@@ -14,7 +14,8 @@ Storage System:
 
  * Fix leaking file handles after compacting databases and views.
  * Fix databases forgetting their validation function after compaction.
- * Fix occasional timeout errors after compacting large databases.
+ * Fix occasional timeout errors after successfully compacting large databases.
+ * Fix ocassional error when writing to a database that has just been compacted.
  * Fix occasional timeout errors on systems with slow or heavily loaded IO.
 
 Log System:
@@ -30,12 +31,13 @@ HTTP Interface:
 Replicator:
 
  * Updated ibrowse library to 2.1.0 fixing numerous replication issues.
- * Fix authenticated replication of design documents with attachments.
- * Various fixes to make replicated more resilient for edge-cases.
+ * Fix authenticated replication (with HTTP basic auth) of design documents
+   with attachments.
+ * Various fixes to make replication more resilient for edge-cases.
 
 View Server:
 
- * Don't trigger a view update when requesting `_design/doc/_info`.
+ * Don't trigger view updates when requesting `_design/doc/_info`.
  * Fix for circular references in CommonJS requires.
 
 Version 1.0.1
