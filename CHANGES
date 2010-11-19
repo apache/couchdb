@@ -19,8 +19,6 @@ HTTP Interface:
  * Allow wildcards in vhosts definitions.
  * More granular ETag support for views.
  * More flexible URL rewriter.
- * Added support for recognizing "Q values" and media parameters in
-   HTTP Accept headers.
 
 Externals:
 
@@ -30,7 +28,6 @@ Externals:
 Replicator:
 
  * Added `_replicator` database to manage replications.
- * Fixed issues when an endpoint is a remote database acessible via SSL.
 
 Storage System:
 
