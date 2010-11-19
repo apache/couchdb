@@ -57,7 +57,8 @@ init([Parent, Source, MissingRevs, _PostProps]) ->
         ibrowse:set_max_pipeline_size(Host, Port, ?MAX_PIPELINE_SIZE);
     true -> ok end,
     Self = self(),
-    ReaderLoop = spawn_link(fun() -> reader_loop(Self, Source, MissingRevs) end),
+    ReaderLoop = spawn_link(
+        fun() -> reader_loop(Self, Parent, Source, MissingRevs) end),
     State = #state{
         parent = Parent,
         source = Source,
@@ -247,7 +248,7 @@ open_doc_revs(#http_db{url = Url} = DbS, DocId, Revs) ->
     end,
     lists:reverse(lists:foldl(Transform, [], JsonResults)).
 
-reader_loop(ReaderServer, Source, MissingRevsServer) ->
+reader_loop(ReaderServer, Parent, Source, MissingRevsServer) ->
     case couch_rep_missing_revs:next(MissingRevsServer) of
     complete ->
         exit(complete);
@@ -260,22 +261,23 @@ reader_loop(ReaderServer, Source, MissingRevsServer) ->
         #http_db{} ->
             [gen_server:call(ReaderServer, {open_remote_doc, Id, Seq, Revs},
                 infinity) || {Id,Seq,Revs} <- SortedIdsRevs],
-            reader_loop(ReaderServer, Source, MissingRevsServer);
+            reader_loop(ReaderServer, Parent, Source, MissingRevsServer);
         _Local ->
-            Source2 = maybe_reopen_db(Source, HighSeq),
+            {ok, Source1} = gen_server:call(Parent, get_source_db, infinity),
+            Source2 = maybe_reopen_db(Source1, HighSeq),
             lists:foreach(fun({Id,Seq,Revs}) ->
                 {ok, Docs} = couch_db:open_doc_revs(Source2, Id, Revs, [latest]),
                 JustTheDocs = [Doc || {ok, Doc} <- Docs],
                 gen_server:call(ReaderServer, {add_docs, Seq, JustTheDocs},
                     infinity)
             end, SortedIdsRevs),
-            reader_loop(ReaderServer, Source2, MissingRevsServer)
+            couch_db:close(Source2),
+            reader_loop(ReaderServer, Parent, Source2, MissingRevsServer)
         end
     end.
 
 maybe_reopen_db(#db{update_seq=OldSeq} = Db, HighSeq) when HighSeq > OldSeq ->
     {ok, NewDb} = couch_db:open(Db#db.name, [{user_ctx, Db#db.user_ctx}]),
-    couch_db:close(Db),
     NewDb;
 maybe_reopen_db(Db, _HighSeq) ->
     Db.
