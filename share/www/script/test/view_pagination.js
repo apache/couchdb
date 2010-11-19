@@ -37,10 +37,10 @@ couchTests.view_pagination = function(debug) {
         T(queryResults.rows[j].key == i + j);
       }
 
-      // test aliases start_key and start_key_docid
+      // test aliases start_key and start_key_doc_id
       queryResults = db.query(queryFun, null, {
         start_key: i,
-        start_key_docid: i,
+        start_key_doc_id: i,
         limit: 10
       });
       T(queryResults.rows.length == 10);
@@ -135,12 +135,12 @@ couchTests.view_pagination = function(debug) {
     });
     testEndkeyDocId(queryResults);
 
-    // test aliases end_key_docid and end_key
+    // test aliases end_key_doc_id and end_key
     queryResults = db.query(function(doc) { emit(null, null); }, null, {
       start_key: null,
-      start_key_docid: 1,
+      start_key_doc_id: 1,
       end_key: null,
-      end_key_docid: 40
+      end_key_doc_id: 40
     });
     testEndkeyDocId(queryResults);
 

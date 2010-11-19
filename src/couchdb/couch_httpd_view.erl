@@ -272,12 +272,12 @@ parse_view_param("key", Value) ->
 % TODO: maybe deprecate startkey_docid
 parse_view_param("startkey_docid", Value) ->
     [{start_docid, ?l2b(Value)}];
-parse_view_param("start_key_docid", Value) ->
+parse_view_param("start_key_doc_id", Value) ->
     [{start_docid, ?l2b(Value)}];
 % TODO: maybe deprecate endkey_docid
 parse_view_param("endkey_docid", Value) ->
     [{end_docid, ?l2b(Value)}];
-parse_view_param("end_key_docid", Value) ->
+parse_view_param("end_key_doc_id", Value) ->
     [{end_docid, ?l2b(Value)}];
 % TODO: maybe deprecate startkey
 parse_view_param("startkey", Value) ->
