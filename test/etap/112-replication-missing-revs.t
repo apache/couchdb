@@ -188,8 +188,21 @@ start_changes_feed(remote, Since, Continuous) ->
     Db = #http_db{url = "http://127.0.0.1:5984/etap-test-source/"},
     couch_rep_changes_feed:start_link(self(), Db, Since, Props).
 
+couch_rep_pid(Db) ->
+    spawn(fun() -> couch_rep_pid_loop(Db) end).
+
+couch_rep_pid_loop(Db) ->
+    receive
+    {'$gen_call', From, get_target_db} ->
+        gen_server:reply(From, {ok, Db})
+    end,
+    couch_rep_pid_loop(Db).
+
 start_missing_revs(local, Changes) ->
-    couch_rep_missing_revs:start_link(self(), get_db(target), Changes, []);
+    TargetDb = get_db(target),
+    MainPid = couch_rep_pid(TargetDb),
+    couch_rep_missing_revs:start_link(MainPid, TargetDb, Changes, []);
 start_missing_revs(remote, Changes) ->
-    Db = #http_db{url = "http://127.0.0.1:5984/etap-test-target/"},
-    couch_rep_missing_revs:start_link(self(), Db, Changes, []).
+    TargetDb = #http_db{url = "http://127.0.0.1:5984/etap-test-target/"},
+    MainPid = couch_rep_pid(TargetDb),
+    couch_rep_missing_revs:start_link(MainPid, TargetDb, Changes, []).

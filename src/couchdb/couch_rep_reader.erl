@@ -60,7 +60,7 @@ init([Parent, Source, MissingRevs_or_DocIds, _PostProps]) ->
     true -> ok end,
     Self = self(),
     ReaderLoop = spawn_link(
-        fun() -> reader_loop(Self, Source, MissingRevs_or_DocIds) end
+        fun() -> reader_loop(Self, Parent, Source, MissingRevs_or_DocIds) end
     ),
     MissingRevs = case MissingRevs_or_DocIds of
     Pid when is_pid(Pid) ->
@@ -281,12 +281,13 @@ open_doc(#http_db{url = Url} = DbS, DocId) ->
         []
     end.
 
-reader_loop(ReaderServer, Source, DocIds) when is_list(DocIds) ->
-    case Source of
+reader_loop(ReaderServer, Parent, Source1, DocIds) when is_list(DocIds) ->
+    case Source1 of
     #http_db{} ->
         [gen_server:call(ReaderServer, {open_remote_doc, Id, nil, nil},
             infinity) || Id <- DocIds];
     _LocalDb ->
+        {ok, Source} = gen_server:call(Parent, get_source_db, infinity),
         Docs = lists:foldr(fun(Id, Acc) ->
             case couch_db:open_doc(Source, Id) of
             {ok, Doc} ->
@@ -299,7 +300,7 @@ reader_loop(ReaderServer, Source, DocIds) when is_list(DocIds) ->
     end,
     exit(complete);
     
-reader_loop(ReaderServer, Source, MissingRevsServer) ->
+reader_loop(ReaderServer, Parent, Source, MissingRevsServer) ->
     case couch_rep_missing_revs:next(MissingRevsServer) of
     complete ->
         exit(complete);
@@ -312,22 +313,23 @@ reader_loop(ReaderServer, Source, MissingRevsServer) ->
         #http_db{} ->
             [gen_server:call(ReaderServer, {open_remote_doc, Id, Seq, Revs},
                 infinity) || {Id,Seq,Revs} <- SortedIdsRevs],
-            reader_loop(ReaderServer, Source, MissingRevsServer);
+            reader_loop(ReaderServer, Parent, Source, MissingRevsServer);
         _Local ->
-            Source2 = maybe_reopen_db(Source, HighSeq),
+            {ok, Source1} = gen_server:call(Parent, get_source_db, infinity),
+            Source2 = maybe_reopen_db(Source1, HighSeq),
             lists:foreach(fun({Id,Seq,Revs}) ->
                 {ok, Docs} = couch_db:open_doc_revs(Source2, Id, Revs, [latest]),
                 JustTheDocs = [Doc || {ok, Doc} <- Docs],
                 gen_server:call(ReaderServer, {add_docs, Seq, JustTheDocs},
                     infinity)
             end, SortedIdsRevs),
-            reader_loop(ReaderServer, Source2, MissingRevsServer)
+            couch_db:close(Source2),
+            reader_loop(ReaderServer, Parent, Source2, MissingRevsServer)
         end
     end.
 
 maybe_reopen_db(#db{update_seq=OldSeq} = Db, HighSeq) when HighSeq > OldSeq ->
     {ok, NewDb} = couch_db:open(Db#db.name, [{user_ctx, Db#db.user_ctx}]),
-    couch_db:close(Db),
     NewDb;
 maybe_reopen_db(Db, _HighSeq) ->
     Db.
