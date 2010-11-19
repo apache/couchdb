@@ -37,7 +37,7 @@ specific language governing permissions and limitations under the License.
 
       $(function() {
         if (page.redirecting) return;
-        $("h1 strong").html('<a href="?' + page.db.name + '">' + page.db.name + '</a>');
+        $("h1 strong").text(page.db.name);
         var viewPath = page.viewName || "_all_docs";
         if (viewPath != "_temp_view" && viewPath != "_design_docs") {
           $("h1 a.raw").attr("href", "/" + encodeURIComponent(page.db.name) +
