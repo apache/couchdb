@@ -286,6 +286,10 @@ couchTests.design_docs = function(debug) {
     result = db.view("test/summate", {startkey: 4, endkey: 6});
     T(result.rows[0].value == 15);
 
+    // test start_key and end_key aliases
+    result = db.view("test/summate", {start_key: 4, end_key: 6});
+    T(result.rows[0].value == 15);
+
     // Verify that a shared index (view def is an exact copy of "summate")
     // does not confuse the reduce stage
     result = db.view("test/summate2", {startkey: 4, endkey: 6});
