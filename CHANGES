@@ -40,6 +40,8 @@ View Server:
    returning a `stale=ok` response.
  * Warn about empty result caused by `startkey` and `endkey` limiting.
  * Built-in reduce function `_sum` now accepts lists of integers as input.
+ * Added view query aliases start_key, end_key, start_key_docid and
+   end_key_docid.
 
 Version 1.0.1
 -------------
