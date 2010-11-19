@@ -93,7 +93,7 @@ readjson(OsProc) when is_record(OsProc, os_proc) ->
         ?LOG_INFO("OS Process ~p Log :: ~s", [OsProc#os_proc.port, Msg]),
         readjson(OsProc);
     [<<"error">>, Id, Reason] ->
-        throw({couch_util:to_existing_atom(Id),Reason});
+        throw({error, {couch_util:to_existing_atom(Id),Reason}});
     [<<"fatal">>, Id, Reason] ->
         ?LOG_INFO("OS Process ~p Fatal Error :: ~s ~p",[OsProc#os_proc.port, Id, Reason]),
         throw({couch_util:to_existing_atom(Id),Reason});
@@ -149,8 +149,6 @@ handle_call({prompt, Data}, _From, OsProc) ->
     catch
         throw:{error, OsError} ->
             {reply, OsError, OsProc};
-        throw:{fatal, OsError} ->
-            {stop, normal, OsError, OsProc};
         throw:OtherError ->
             {stop, normal, OtherError, OsProc}
     end.
