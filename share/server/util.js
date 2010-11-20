@@ -101,7 +101,7 @@ var Couch = {
     seal(obj);
     for (var propname in obj) {
       if (typeof obj[propname] == "object") {
-        recursivelySeal(obj[propname]);
+        arguments.callee(obj[propname]);
       }
     }
   }
