@@ -31,6 +31,7 @@ Replicator:
 
  * Added `_replicator` database to manage replications.
  * Fixed issues when an endpoint is a remote database acessible via SSL.
+ * Added support for continuous by-doc-IDs replication.
 
 Storage System:
 
