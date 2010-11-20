@@ -11,42 +11,42 @@
 // the License.
 
 couchTests.view_sandboxing = function(debug) {
-    var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-    db.deleteDb();
-    db.createDb();
-    if (debug) debugger;
+  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
+  db.deleteDb();
+  db.createDb();
+  if (debug) debugger;
 
-    var doc = {integer: 1, string: "1", array: [1, 2, 3]};
-    T(db.save(doc).ok);
+  var doc = {integer: 1, string: "1", array: [1, 2, 3]};
+  T(db.save(doc).ok);
 /*
-    // make sure that attempting to change the document throws an error
-    var results = db.query(function(doc) {
-      doc.integer = 2;
-      emit(null, doc);
-    });
-    T(results.total_rows == 0);
+  // make sure that attempting to change the document throws an error
+  var results = db.query(function(doc) {
+    doc.integer = 2;
+    emit(null, doc);
+  });
+  T(results.total_rows == 0);
 
-    var results = db.query(function(doc) {
-      doc.array[0] = 0;
-      emit(null, doc);
-    });
-    T(results.total_rows == 0);
+  var results = db.query(function(doc) {
+    doc.array[0] = 0;
+    emit(null, doc);
+  });
+  T(results.total_rows == 0);
 */
-    // make sure that a view cannot invoke interpreter internals such as the
-    // garbage collector
-    var results = db.query(function(doc) {
-      gc();
-      emit(null, doc);
-    });
-    T(results.total_rows == 0);
+  // make sure that a view cannot invoke interpreter internals such as the
+  // garbage collector
+  var results = db.query(function(doc) {
+    gc();
+    emit(null, doc);
+  });
+  T(results.total_rows == 0);
 
-    // make sure that a view cannot access the map_funs array defined used by
-    // the view server
-    var results = db.query(function(doc) { map_funs.push(1); emit(null, doc); });
-    T(results.total_rows == 0);
+  // make sure that a view cannot access the map_funs array defined used by
+  // the view server
+  var results = db.query(function(doc) { map_funs.push(1); emit(null, doc); });
+  T(results.total_rows == 0);
 
-    // make sure that a view cannot access the map_results array defined used by
-    // the view server
-    var results = db.query(function(doc) { map_results.push(1); emit(null, doc); });
-    T(results.total_rows == 0);
+  // make sure that a view cannot access the map_results array defined used by
+  // the view server
+  var results = db.query(function(doc) { map_results.push(1); emit(null, doc); });
+  T(results.total_rows == 0);
 };
