@@ -100,8 +100,8 @@ var Couch = {
     // seal() is broken in current Spidermonkey
     seal(obj);
     for (var propname in obj) {
-      if (typeof doc[propname] == "object") {
-        recursivelySeal(doc[propname]);
+      if (typeof obj[propname] == "object") {
+        recursivelySeal(obj[propname]);
       }
     }
   }
