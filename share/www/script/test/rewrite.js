@@ -365,7 +365,16 @@ couchTests.rewrite = function(debug) {
               T(result.uuids.length == 1);
               var first = result.uuids[0];
         });
-
   });
-  
+
+  // test invalid rewrites
+  // string
+  var ddoc = {
+    _id: "_design/invalid",
+    rewrites: "[{\"from\":\"foo\",\"to\":\"bar\"}]"
+  }
+  db.save(ddoc);
+  var res = CouchDB.request("GET", "/test_suite_db/_design/invalid/_rewrite/foo");
+  TEquals(400, res.status, "should return 400");
+
 }
