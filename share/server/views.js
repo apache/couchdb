@@ -133,5 +133,5 @@ var Views = (function() {
       }
       print("[" + buf.join(", ") + "]");
     }
-  }
+  };
 })();

@@ -19,13 +19,13 @@
 var Mimeparse = (function() {
   // private helpers
   function strip(string) {
-    return string.replace(/^\s+/, '').replace(/\s+$/, '')
+    return string.replace(/^\s+/, '').replace(/\s+$/, '');
   };
 
   function parseRanges(ranges) {
     var parsedRanges = [], rangeParts = ranges.split(",");
     for (var i=0; i < rangeParts.length; i++) {
-      parsedRanges.push(publicMethods.parseMediaRange(rangeParts[i]))
+      parsedRanges.push(publicMethods.parseMediaRange(rangeParts[i]));
     };
     return parsedRanges;
   };
@@ -148,11 +148,11 @@ var Mimeparse = (function() {
       var parsedHeader = parseRanges(header);
       var weighted = [];
       for (var i=0; i < supported.length; i++) {
-        weighted.push([publicMethods.fitnessAndQualityParsed(supported[i], parsedHeader), i, supported[i]])
+        weighted.push([publicMethods.fitnessAndQualityParsed(supported[i], parsedHeader), i, supported[i]]);
       };
       weighted.sort();
       return weighted[weighted.length-1][0][1] ? weighted[weighted.length-1][2] : '';
     }
-  }
+  };
   return publicMethods;
 })();

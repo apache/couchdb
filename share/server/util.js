@@ -21,7 +21,7 @@ var resolveModule = function(names, mod, root) {
       parent : mod.parent,
       id : mod.id,
       exports : {}
-    }
+    };
   }
   // we need to traverse the path
   var n = names.shift();
@@ -72,12 +72,14 @@ var Couch = {
             var s = "function (module, exports, require) { " + newModule.current + " }";
             try {
               var func = sandbox ? evalcx(s, sandbox) : eval(s);
-              func.apply(sandbox, [newModule, newModule.exports, function(name) {return require(name, newModule)}]);
+              func.apply(sandbox, [newModule, newModule.exports, function(name) {
+                return require(name, newModule);
+              }]);
             } catch(e) { 
               throw ["error","compilation_error","Module require('"+name+"') raised error "+e.toSource()]; 
             }
             return newModule.exports;
-          }
+          };
           sandbox.require = require;
         }
         var functionObject = evalcx(source, sandbox);
@@ -103,7 +105,7 @@ var Couch = {
       }
     }
   }
-}
+};
 
 // prints the object as JSON, and rescues and logs any toJSON() related errors
 function respond(obj) {

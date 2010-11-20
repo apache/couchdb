@@ -72,14 +72,14 @@ var DDoc = (function() {
           var point = ddoc;
           for (var i=0; i < funPath.length; i++) {
             if (i+1 == funPath.length) {
-              fun = point[funPath[i]]
+              var fun = point[funPath[i]];
               if (typeof fun != "function") {
                 fun = Couch.compileFunction(fun, ddoc);
                 // cache the compiled fun on the ddoc
-                point[funPath[i]] = fun
+                point[funPath[i]] = fun;
               };
             } else {
-              point = point[funPath[i]]              
+              point = point[funPath[i]];
             }
           };
 
