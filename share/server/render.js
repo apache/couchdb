@@ -228,7 +228,7 @@ var Render = (function() {
         resp = maybeWrapResponse(resp);
         resp.headers = resp.headers || {};
         for(var header in startResp) {
-          resp.headers[header] = startResp[header]
+          resp.headers[header] = startResp[header];
         }
         resp.body = chunks.join("") + (resp.body || "");
         resetList();
@@ -284,8 +284,8 @@ var Render = (function() {
     try {
       Mime.resetProvides();
       resetList();
-      head = args[0]
-      req = args[1]
+      var head = args[0];
+      var req = args[1];
       var tail = listFun.apply(ddoc, args);
 
       if (Mime.providesUsed) {
