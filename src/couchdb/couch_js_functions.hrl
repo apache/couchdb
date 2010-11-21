@@ -121,8 +121,7 @@
                     'non-empty string.');
             }
 
-            if ((typeof user_ctx.roles !== 'undefined') &&
-                    (typeof user_ctx.roles.length !== 'number')) {
+            if (user_ctx.roles && !isArray(user_ctx.roles)) {
                 reportError('The roles property of the user_ctx must be ' +
                     'an array of strings.');
             }
