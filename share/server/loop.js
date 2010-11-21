@@ -26,6 +26,7 @@ function init_sandbox() {
     sandbox.start = Render.start;
     sandbox.send = Render.send;
     sandbox.getRow = Render.getRow;
+    sandbox.isArray = isArray;
   } catch (e) {
     log(e.toSource());
   }
