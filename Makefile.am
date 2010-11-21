@@ -51,9 +51,9 @@ source_files = \
     couch_httpd_view.erl \
     couch_httpd_misc_handlers.erl \
     couch_httpd_proxy.erl \
-	couch_httpd_rewrite.erl \
+    couch_httpd_rewrite.erl \
     couch_httpd_stats_handlers.erl \
-	couch_httpd_vhost.erl \
+    couch_httpd_vhost.erl \
     couch_key_tree.erl \
     couch_log.erl \
     couch_native_process.erl \
@@ -113,9 +113,9 @@ compiled_files = \
     couch_httpd_show.beam \
     couch_httpd_view.beam \
     couch_httpd_misc_handlers.beam \
-	couch_httpd_rewrite.beam \
+    couch_httpd_rewrite.beam \
     couch_httpd_stats_handlers.beam \
-	couch_httpd_vhost.beam \
+    couch_httpd_vhost.beam \
     couch_key_tree.beam \
     couch_log.beam \
     couch_native_process.beam \
@@ -179,25 +179,25 @@ compiled_files = \
 
 if WINDOWS
 couch.app: couch.app.tpl
-	modules=`find . -name "couch*.erl" -exec basename {} .erl \; | tr '\n' ',' | sed "s/,$$//"`; \
-	sed -e "s|%package_name%|@package_name@|g" \
-	    -e "s|%version%|@version@|g" \
-	    -e "s|@modules@|$$modules|g" \
-	    -e "s|%localconfdir%|../etc/couchdb|g" \
-	    -e "s|@defaultini@|default.ini|g" \
-	    -e "s|@localini@|local.ini|g" > \
-	$@ < $<
+  modules=`find . -name "couch*.erl" -exec basename {} .erl \; | tr '\n' ',' | sed "s/,$$//"`; \
+  sed -e "s|%package_name%|@package_name@|g" \
+      -e "s|%version%|@version@|g" \
+      -e "s|@modules@|$$modules|g" \
+      -e "s|%localconfdir%|../etc/couchdb|g" \
+      -e "s|@defaultini@|default.ini|g" \
+      -e "s|@localini@|local.ini|g" > \
+  $@ < $<
 else
 couch.app: couch.app.tpl
-	modules=`{ find . -name "*.erl" -exec basename {} .erl \; | tr '\n' ','; echo ''; } | sed "s/,$$//"`; \
-	sed -e "s|%package_name%|@package_name@|g" \
-	    -e "s|%version%|@version@|g" \
-	    -e "s|@modules@|$$modules|g" \
-	    -e "s|%localconfdir%|@localconfdir@|g" \
-	    -e "s|@defaultini@|default.ini|g" \
-	    -e "s|@localini@|local.ini|g" > \
-	$@ < $<
-	chmod +x $@
+  modules=`{ find . -name "*.erl" -exec basename {} .erl \; | tr '\n' ','; echo ''; } | sed "s/,$$//"`; \
+  sed -e "s|%package_name%|@package_name@|g" \
+      -e "s|%version%|@version@|g" \
+      -e "s|@modules@|$$modules|g" \
+      -e "s|%localconfdir%|@localconfdir@|g" \
+      -e "s|@defaultini@|default.ini|g" \
+      -e "s|@localini@|local.ini|g" > \
+  $@ < $<
+  chmod +x $@
 endif
 
 # $(dist_devdoc_DATA): edoc-info
@@ -205,5 +205,5 @@ endif
 # $(ERL) -noshell -run edoc_run files [\"$<\"]
 
 %.beam: %.erl couch_db.hrl couch_js_functions.hrl
-	$(ERLC) $(ERLC_FLAGS) ${TEST} $<;
+  $(ERLC) $(ERLC_FLAGS) ${TEST} $<;
 
