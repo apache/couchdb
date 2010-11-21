@@ -179,25 +179,25 @@ compiled_files = \
 
 if WINDOWS
 couch.app: couch.app.tpl
-  modules=`find . -name "couch*.erl" -exec basename {} .erl \; | tr '\n' ',' | sed "s/,$$//"`; \
-  sed -e "s|%package_name%|@package_name@|g" \
-      -e "s|%version%|@version@|g" \
-      -e "s|@modules@|$$modules|g" \
-      -e "s|%localconfdir%|../etc/couchdb|g" \
-      -e "s|@defaultini@|default.ini|g" \
-      -e "s|@localini@|local.ini|g" > \
-  $@ < $<
+	modules=`find . -name "couch*.erl" -exec basename {} .erl \; | tr '\n' ',' | sed "s/,$$//"`; \
+	sed -e "s|%package_name%|@package_name@|g" \
+			-e "s|%version%|@version@|g" \
+			-e "s|@modules@|$$modules|g" \
+			-e "s|%localconfdir%|../etc/couchdb|g" \
+			-e "s|@defaultini@|default.ini|g" \
+			-e "s|@localini@|local.ini|g" > \
+	$@ < $<
 else
 couch.app: couch.app.tpl
-  modules=`{ find . -name "*.erl" -exec basename {} .erl \; | tr '\n' ','; echo ''; } | sed "s/,$$//"`; \
-  sed -e "s|%package_name%|@package_name@|g" \
-      -e "s|%version%|@version@|g" \
-      -e "s|@modules@|$$modules|g" \
-      -e "s|%localconfdir%|@localconfdir@|g" \
-      -e "s|@defaultini@|default.ini|g" \
-      -e "s|@localini@|local.ini|g" > \
-  $@ < $<
-  chmod +x $@
+	modules=`{ find . -name "*.erl" -exec basename {} .erl \; | tr '\n' ','; echo ''; } | sed "s/,$$//"`; \
+	sed -e "s|%package_name%|@package_name@|g" \
+			-e "s|%version%|@version@|g" \
+			-e "s|@modules@|$$modules|g" \
+			-e "s|%localconfdir%|@localconfdir@|g" \
+			-e "s|@defaultini@|default.ini|g" \
+			-e "s|@localini@|local.ini|g" > \
+	$@ < $<
+	chmod +x $@
 endif
 
 # $(dist_devdoc_DATA): edoc-info
@@ -205,5 +205,5 @@ endif
 # $(ERL) -noshell -run edoc_run files [\"$<\"]
 
 %.beam: %.erl couch_db.hrl couch_js_functions.hrl
-  $(ERLC) $(ERLC_FLAGS) ${TEST} $<;
+	$(ERLC) $(ERLC_FLAGS) ${TEST} $<;
 
