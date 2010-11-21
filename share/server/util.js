@@ -124,3 +124,7 @@ function log(message) {
   }
   respond(["log", String(message)]);
 };
+
+function isArray(obj) {
+  return toString.call(obj) === "[object Array]";
+}

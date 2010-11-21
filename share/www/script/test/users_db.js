@@ -90,6 +90,27 @@ couchTests.users_db = function(debug) {
     T(s.name == null);
     T(s.roles.indexOf("_admin") !== -1);
     T(usersDb.deleteDoc(jchrisWithConflict).ok);
+
+    // you can't change doc from type "user"
+    jchrisUserDoc = usersDb.open(jchrisUserDoc._id);
+    jchrisUserDoc.type = "not user";
+    try {
+      usersDb.save(jchrisUserDoc);
+      T(false && "should only allow us to save doc when type == 'user'");
+    } catch(e) {
+      T(e.reason == "doc.type must be user");
+    }
+    jchrisUserDoc.type = "user";
+
+    // "roles" must be an array
+    jchrisUserDoc.roles = "not an array";
+    try {
+      usersDb.save(jchrisUserDoc);
+      T(false && "should only allow us to save doc when roles is an array");
+    } catch(e) {
+      T(e.reason == "doc.roles must be an array");
+    }
+    jchrisUserDoc.roles = [];
   };
 
   usersDb.deleteDb();
