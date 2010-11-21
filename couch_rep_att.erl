@@ -17,7 +17,7 @@
 -include("couch_db.hrl").
 
 convert_stub(#att{data=stub, name=Name} = Attachment,
-	     {#http_db{} = Db, Id, Rev}) ->
+            {#http_db{} = Db, Id, Rev}) ->
     {Pos, [RevId|_]} = Rev,
     Request = Db#http_db{
         resource = lists:flatten([couch_util:url_encode(Id), "/",
