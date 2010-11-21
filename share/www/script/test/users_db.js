@@ -62,7 +62,7 @@ couchTests.users_db = function(debug) {
     T(usersDb.save(jchrisUser2).ok);
     try {
       usersDb.save(jchrisUserDoc);
-      T(false && "should be an update conflict")
+      T(false && "should be an update conflict");
     } catch(e) {
       T(true);
     }
@@ -70,7 +70,7 @@ couchTests.users_db = function(debug) {
     var resp = usersDb.bulkSave([jchrisUserDoc],{all_or_nothing : true});
     
     var jchrisWithConflict = usersDb.open(jchrisUserDoc._id, {conflicts : true});
-    T(jchrisWithConflict._conflicts.length == 1)
+    T(jchrisWithConflict._conflicts.length == 1);
     
     // no login with conflicted user doc
     try {
@@ -79,10 +79,10 @@ couchTests.users_db = function(debug) {
           "Authorization" : "Basic amNocmlzQGFwYWNoZS5vcmc6ZnVubnlib25l"
         }
       });
-      T(false && "this will throw")
+      T(false && "this will throw");
     } catch(e) {
-      T(e.error == "unauthorized")
-      T(/conflict/.test(e.reason))
+      T(e.error == "unauthorized");
+      T(/conflict/.test(e.reason));
     }
 
     // you can delete a user doc
