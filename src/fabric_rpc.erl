@@ -315,6 +315,7 @@ final_response(Total, nil) ->
 final_response(_Total, _Offset) ->
     rexi:reply(complete).
 
+%% TODO: handle case of bogus group level
 group_rows_fun(exact) ->
     fun({Key1,_}, {Key2,_}) -> Key1 == Key2 end;
 group_rows_fun(0) ->
@@ -326,6 +327,7 @@ group_rows_fun(GroupLevel) when is_integer(GroupLevel) ->
         Key1 == Key2
     end.
 
+%% TODO: handle case where group_level is specified but don't have an array
 reduce_fold(_Key, _Red, #view_acc{limit=0} = Acc) ->
     {stop, Acc};
 reduce_fold(_Key, Red, #view_acc{group_level=0} = Acc) ->
@@ -358,14 +360,12 @@ changes_enumerator(DocInfo, {Db, _Seq, Args}) ->
         {Go, {Db, Seq, Args}}
     end.
 
-changes_row(_, Seq, Id, Results, _, true, true) ->
-    #view_row{key=Seq, id=Id, value=Results, doc=deleted};
+changes_row(Db, Seq, Id, Results, Rev, Del, true) ->
+    #change{key=Seq, id=Id, value=Results, doc=doc_member(Db, Id, Rev), deleted=Del};
 changes_row(_, Seq, Id, Results, _, true, false) ->
-    #view_row{key=Seq, id=Id, value=Results, doc=deleted};
-changes_row(Db, Seq, Id, Results, Rev, false, true) ->
-    #view_row{key=Seq, id=Id, value=Results, doc=doc_member(Db, Id, Rev)};
+    #change{key=Seq, id=Id, value=Results, deleted=true};
 changes_row(_, Seq, Id, Results, _, false, false) ->
-    #view_row{key=Seq, id=Id, value=Results}.
+    #change{key=Seq, id=Id, value=Results}.
 
 doc_member(Shard, Id, Rev) ->
     case couch_db:open_doc_revs(Shard, Id, [Rev], []) of

@@ -140,7 +140,7 @@ handle_message({rexi_EXIT, Reason}, Worker, State) ->
 handle_message(_, _, #collector{limit=0} = State) ->
     {stop, State};
 
-handle_message(#view_row{key=Seq} = Row0, {Worker, From}, St) ->
+handle_message(#change{key=Seq} = Row0, {Worker, From}, St) ->
     #collector{
         query_args = #changes_args{include_docs=IncludeDocs},
         callback = Callback,
@@ -156,7 +156,7 @@ handle_message(#view_row{key=Seq} = Row0, {Worker, From}, St) ->
     _ ->
         S1 = fabric_dict:store(Worker, Seq, S0),
         S2 = fabric_view:remove_overlapping_shards(Worker, S1),
-        Row = Row0#view_row{key = pack_seqs(S2)},
+        Row = Row0#change{key = pack_seqs(S2)},
         {Go, Acc} = Callback(changes_row(Row, IncludeDocs), AccIn),
         gen_server:reply(From, Go),
         {Go, St#collector{counters=S2, limit=Limit-1, user_acc=Acc}}
@@ -252,15 +252,15 @@ start_update_notifier(DbName) ->
 stop_update_notifiers(Notifiers) ->
     [rexi:kill(Node, Ref) || {Node, Ref} <- Notifiers].
 
-changes_row(#view_row{key=Seq, id=Id, value=Value, doc=deleted}, true) ->
+changes_row(#change{key=Seq, id=Id, value=Value, deleted=true, doc=Doc}, true) ->
+    {change, {[{seq,Seq}, {id,Id}, {changes,Value}, {deleted, true}, {doc, Doc}]}};
+changes_row(#change{key=Seq, id=Id, value=Value, deleted=true}, false) ->
     {change, {[{seq,Seq}, {id,Id}, {changes,Value}, {deleted, true}]}};
-changes_row(#view_row{key=Seq, id=Id, value=Value, doc=deleted}, false) ->
-    {change, {[{seq,Seq}, {id,Id}, {changes,Value}, {deleted, true}]}};
-changes_row(#view_row{key=Seq, id=Id, value=Value, doc={error,Reason}}, true) ->
+changes_row(#change{key=Seq, id=Id, value=Value, doc={error,Reason}}, true) ->
     {change, {[{seq,Seq}, {id,Id}, {changes,Value}, {error,Reason}]}};
-changes_row(#view_row{key=Seq, id=Id, value=Value, doc=Doc}, true) ->
+changes_row(#change{key=Seq, id=Id, value=Value, doc=Doc}, true) ->
     {change, {[{seq,Seq}, {id,Id}, {changes,Value}, {doc,Doc}]}};
-changes_row(#view_row{key=Seq, id=Id, value=Value}, false) ->
+changes_row(#change{key=Seq, id=Id, value=Value}, false) ->
     {change, {[{seq,Seq}, {id,Id}, {changes,Value}]}}.
 
 find_replacement_shards(#shard{range=Range}, AllShards) ->
