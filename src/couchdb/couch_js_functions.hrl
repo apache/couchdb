@@ -99,14 +99,18 @@
 
 -define(REP_DB_DOC_VALIDATE_FUN, <<"
     function(newDoc, oldDoc, userCtx) {
+        function reportError(error_msg) {
+            log('Error writing document `' + newDoc._id +
+                '` to replicator DB: ' + error_msg);
+            throw({forbidden: error_msg});
+        }
+
+        var isReplicator = (userCtx.roles.indexOf('_replicator') >= 0);
+        if (oldDoc && !newDoc._deleted && !isReplicator) {
+            reportError('Only the replicator can edit replication documents.');
+        }
+
         if (newDoc.user_ctx) {
-
-            function reportError(error_msg) {
-                log('Error writing document ' + newDoc._id +
-                    ' to replicator DB: ' + error_msg);
-                throw({forbidden: error_msg});
-            }
-
             var user_ctx = newDoc.user_ctx;
 
             if (typeof user_ctx !== 'object') {

@@ -151,25 +151,23 @@ has_valid_rep_id(_Else) ->
 
 process_change({Change}) ->
     {RepProps} = JsonRepDoc = couch_util:get_value(doc, Change),
+    DocId = couch_util:get_value(<<"_id">>, RepProps),
     case couch_util:get_value(<<"deleted">>, Change, false) of
     true ->
-        maybe_stop_replication(JsonRepDoc);
+        rep_doc_deleted(DocId);
     false ->
         case couch_util:get_value(<<"state">>, RepProps) of
         <<"completed">> ->
-            maybe_stop_replication(JsonRepDoc);
+            replication_complete(DocId);
         <<"error">> ->
-            % cleanup ets table entries
-            maybe_stop_replication(JsonRepDoc);
+            stop_replication(DocId);
         <<"triggered">> ->
-            maybe_start_replication(JsonRepDoc);
+            maybe_start_replication(DocId, JsonRepDoc);
         undefined ->
-            case couch_util:get_value(<<"replication_id">>, RepProps) of
-            undefined ->
-                maybe_start_replication(JsonRepDoc);
-            _ ->
-                ok
-            end
+            maybe_start_replication(DocId, JsonRepDoc);
+        _ ->
+            ?LOG_ERROR("Invalid value for the `state` property of the "
+                "replication document `~s`", [DocId])
         end
     end,
     ok.
@@ -187,24 +185,31 @@ rep_user_ctx({RepDoc}) ->
     end.
 
 
-maybe_start_replication({RepProps} = JsonRepDoc) ->
+maybe_start_replication(DocId, JsonRepDoc) ->
     UserCtx = rep_user_ctx(JsonRepDoc),
-    RepId = couch_rep:make_replication_id(JsonRepDoc, UserCtx),
-    DocId = couch_util:get_value(<<"_id">>, RepProps),
-    case ets:lookup(?REP_ID_TO_DOC_ID_MAP, RepId) of
+    {BaseId, _} = RepId = couch_rep:make_replication_id(JsonRepDoc, UserCtx),
+    case ets:lookup(?REP_ID_TO_DOC_ID_MAP, BaseId) of
     [] ->
-        true = ets:insert(?REP_ID_TO_DOC_ID_MAP, {RepId, DocId}),
+        true = ets:insert(?REP_ID_TO_DOC_ID_MAP, {BaseId, DocId}),
         true = ets:insert(?DOC_TO_REP_ID_MAP, {DocId, RepId}),
         spawn_link(fun() -> start_replication(JsonRepDoc, RepId, UserCtx) end);
-    [{RepId, DocId}] ->
+    [{BaseId, DocId}] ->
         ok;
-    [{RepId, OtherDocId}] ->
+    [{BaseId, OtherDocId}] ->
+        maybe_tag_rep_doc(DocId, JsonRepDoc, ?l2b(BaseId), OtherDocId)
+    end.
+
+
+maybe_tag_rep_doc(DocId, {Props} = JsonRepDoc, RepId, OtherDocId) ->
+    case couch_util:get_value(<<"replication_id">>, Props) of
+    RepId ->
+        ok;
+    _ ->
         ?LOG_INFO("The replication specified by the document `~s` was already"
             " triggered by the document `~s`", [DocId, OtherDocId]),
-        couch_rep:update_rep_doc(
-            JsonRepDoc, [{<<"replication_id">>, ?l2b(element(1, RepId))}]
-        )
+        couch_rep:update_rep_doc(JsonRepDoc, [{<<"replication_id">>, RepId}])
     end.
+
 
 
 start_replication({RepProps} = RepDoc, {Base, Ext} = RepId, UserCtx) ->
@@ -224,16 +229,31 @@ start_replication({RepProps} = RepDoc, {Base, Ext} = RepId, UserCtx) ->
         ?LOG_ERROR("Error starting replication ~p: ~p", [RepId, Error])
     end.
 
-
-maybe_stop_replication({RepProps}) ->
-    DocId = couch_util:get_value(<<"_id">>, RepProps),
-    case ets:lookup(?DOC_TO_REP_ID_MAP, DocId) of
-    [{DocId, {Base, Ext} = RepId}] ->
-        couch_rep:end_replication(RepId),
-        true = ets:delete(?REP_ID_TO_DOC_ID_MAP, RepId),
-        true = ets:delete(?DOC_TO_REP_ID_MAP, DocId),
+rep_doc_deleted(DocId) ->
+    case stop_replication(DocId) of
+    {ok, {Base, Ext}} ->
         ?LOG_INFO("Stopped replication `~s` because replication document `~s`"
             " was deleted", [Base ++ Ext, DocId]);
-    [] ->
+    none ->
         ok
+    end.
+
+replication_complete(DocId) ->
+    case stop_replication(DocId) of
+    {ok, {Base, Ext}} ->
+        ?LOG_INFO("Replication `~s` finished (triggered by document `~s`)",
+            [Base ++ Ext, DocId]);
+    none ->
+        ok
+    end.
+
+stop_replication(DocId) ->
+    case ets:lookup(?DOC_TO_REP_ID_MAP, DocId) of
+    [{DocId, {BaseId, _} = RepId}] ->
+        couch_rep:end_replication(RepId),
+        true = ets:delete(?REP_ID_TO_DOC_ID_MAP, BaseId),
+        true = ets:delete(?DOC_TO_REP_ID_MAP, DocId),
+        {ok, RepId};
+    [] ->
+        none
     end.

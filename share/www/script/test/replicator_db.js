@@ -633,6 +633,89 @@ couchTests.replicator_db = function(debug) {
   }
 
 
+  function rep_db_write_authorization() {
+    populate_db(dbA, docs1);
+    populate_db(dbB, []);
+
+    var server_admins_config = [
+      {
+        section: "admins",
+        key: "fdmanana",
+        value: "qwerty"
+      }
+    ];
+
+    run_on_modified_server(server_admins_config, function() {
+      var repDoc = {
+        _id: "foo_rep_doc",
+        source: dbA.name,
+        target: dbB.name
+      };
+
+      T(CouchDB.login("fdmanana", "qwerty").ok);
+      T(CouchDB.session().userCtx.name === "fdmanana");
+      T(CouchDB.session().userCtx.roles.indexOf("_admin") !== -1);
+
+      T(repDb.save(repDoc).ok);
+
+      waitForRep(repDb, repDoc, "completed");
+
+      for (var i = 0; i < docs1.length; i++) {
+        var doc = docs1[i];
+        var copy = dbB.open(doc._id);
+
+        T(copy !== null);
+        T(copy.value === doc.value);
+      }
+
+      repDoc = repDb.open("foo_rep_doc");
+      T(repDoc !== null);
+      repDoc.target = "test_suite_foo_db";
+      repDoc.create_target = true;
+
+      // Only the replicator can update replication documents.
+      // Admins can only add and delete replication documents.
+      try {
+        repDb.save(repDoc);
+        T(false && "Should have thrown an exception");
+      } catch (x) {
+        T(x["error"] === "forbidden");
+      }
+    });
+  }
+
+
+  function rep_doc_with_bad_rep_id() {
+    populate_db(dbA, docs1);
+    populate_db(dbB, []);
+
+    var repDoc = {
+      _id: "foo_rep",
+      source: dbA.name,
+      target: dbB.name,
+      replication_id: "1234abc"
+    };
+    T(repDb.save(repDoc).ok);
+
+    waitForRep(repDb, repDoc, "completed");
+    for (var i = 0; i < docs1.length; i++) {
+      var doc = docs1[i];
+      var copy = dbB.open(doc._id);
+      T(copy !== null);
+      T(copy.value === doc.value);
+    }
+
+    var repDoc1 = repDb.open(repDoc._id);
+    T(repDoc1 !== null);
+    T(repDoc1.source === repDoc.source);
+    T(repDoc1.target === repDoc.target);
+    T(repDoc1.state === "completed",
+      "replication document with bad replication id failed");
+    T(typeof repDoc1.replication_id  === "string");
+    T(repDoc1.replication_id !== "1234abc");
+  }
+
+
   function error_state_replication() {
     populate_db(dbA, docs1);
 
@@ -686,6 +769,14 @@ couchTests.replicator_db = function(debug) {
   repDb.deleteDb();
   restartServer();
   run_on_modified_server(server_config, identical_continuous_rep_docs);
+
+  repDb.deleteDb();
+  restartServer();
+  run_on_modified_server(server_config, rep_db_write_authorization);
+
+  repDb.deleteDb();
+  restartServer();
+  run_on_modified_server(server_config, rep_doc_with_bad_rep_id);
 
   var server_config_2 = server_config.concat([
     {
