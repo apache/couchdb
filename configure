@@ -21,7 +21,7 @@ function quit {
 PREFIX="/opt/bigcouch"
 BIGCOUCH_USER=`whoami`
 ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
-DIRPATH=`dirname "$ABSPATH"`
+if test ! -n "$DIRPATH"; then DIRPATH=`dirname "$ABSPATH"`; fi
 
 while [ $# -gt 0 ]
 do
