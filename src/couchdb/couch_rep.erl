@@ -263,12 +263,14 @@ handle_info({'EXIT', _Pid, Reason}, State) ->
 
 terminate(normal, #state{checkpoint_scheduled=nil} = State) ->
     do_terminate(State),
-    update_rep_doc(State#state.rep_doc, [{<<"state">>, <<"completed">>}]);
+    update_rep_doc(
+        State#state.rep_doc, [{<<"_replication_state">>, <<"completed">>}]);
     
 terminate(normal, State) ->
     timer:cancel(State#state.checkpoint_scheduled),
     do_terminate(do_checkpoint(State)),
-    update_rep_doc(State#state.rep_doc, [{<<"state">>, <<"completed">>}]);
+    update_rep_doc(
+        State#state.rep_doc, [{<<"_replication_state">>, <<"completed">>}]);
 
 terminate(shutdown, #state{listeners = Listeners} = State) ->
     % continuous replication stopped
@@ -278,7 +280,8 @@ terminate(shutdown, #state{listeners = Listeners} = State) ->
 terminate(Reason, #state{listeners = Listeners} = State) ->
     [gen_server:reply(L, {error, Reason}) || L <- Listeners],
     terminate_cleanup(State),
-    update_rep_doc(State#state.rep_doc, [{<<"state">>, <<"error">>}]).
+    update_rep_doc(
+        State#state.rep_doc, [{<<"_replication_state">>, <<"error">>}]).
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
@@ -866,15 +869,15 @@ update_rep_doc(RepDb, #doc{body = {RepDocBody}} = RepDoc, KVs) ->
     ).
 
 maybe_set_triggered({RepProps} = RepDoc, RepId) ->
-    case couch_util:get_value(<<"state">>, RepProps) of
+    case couch_util:get_value(<<"_replication_state">>, RepProps) of
     <<"triggered">> ->
         ok;
     _ ->
         update_rep_doc(
             RepDoc,
             [
-                {<<"state">>, <<"triggered">>},
-                {<<"replication_id">>, ?l2b(RepId)}
+                {<<"_replication_state">>, <<"triggered">>},
+                {<<"_replication_id">>, ?l2b(RepId)}
             ]
         )
     end.
