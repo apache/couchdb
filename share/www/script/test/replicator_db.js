@@ -45,7 +45,7 @@ couchTests.replicator_db = function(debug) {
     do {
       newRep = repDb.open(repDoc._id);
       t1 = new Date();
-    } while (((t1 - t0) <= ms) && newRep.state !== state);
+    } while (((t1 - t0) <= ms) && newRep._replication_state !== state);
   }
 
   function waitForSeq(sourceDb, targetDb) {
@@ -103,8 +103,8 @@ couchTests.replicator_db = function(debug) {
     T(repDoc1 !== null);
     T(repDoc1.source === repDoc.source);
     T(repDoc1.target === repDoc.target);
-    T(repDoc1.state === "completed", "simple");
-    T(typeof repDoc1.replication_id  === "string");
+    T(repDoc1._replication_state === "completed", "simple");
+    T(typeof repDoc1._replication_id  === "string");
   }
 
 
@@ -154,8 +154,8 @@ couchTests.replicator_db = function(debug) {
     T(repDoc1 !== null);
     T(repDoc1.source === repDoc.source);
     T(repDoc1.target === repDoc.target);
-    T(repDoc1.state === "completed", "filtered");
-    T(typeof repDoc1.replication_id  === "string");
+    T(repDoc1._replication_state === "completed", "filtered");
+    T(typeof repDoc1._replication_id  === "string");
   }
 
 
@@ -197,8 +197,8 @@ couchTests.replicator_db = function(debug) {
     T(repDoc1 !== null);
     T(repDoc1.source === repDoc.source);
     T(repDoc1.target === repDoc.target);
-    T(repDoc1.state === "triggered");
-    T(typeof repDoc1.replication_id  === "string");
+    T(repDoc1._replication_state === "triggered");
+    T(typeof repDoc1._replication_id  === "string");
 
     // add a design doc to source, it will be replicated to target
     // when the "user_ctx" property is not defined in the replication doc,
@@ -311,8 +311,8 @@ couchTests.replicator_db = function(debug) {
     T(repDoc1_copy !== null);
     T(repDoc1_copy.source === repDoc1.source);
     T(repDoc1_copy.target === repDoc1.target);
-    T(repDoc1_copy.state === "completed");
-    T(typeof repDoc1_copy.replication_id  === "string");
+    T(repDoc1_copy._replication_state === "completed");
+    T(typeof repDoc1_copy._replication_id  === "string");
 
     var newDoc = {
       _id: "doc666",
@@ -341,9 +341,9 @@ couchTests.replicator_db = function(debug) {
     T(repDoc2_copy !== null);
     T(repDoc2_copy.source === repDoc1.source);
     T(repDoc2_copy.target === repDoc1.target);
-    T(repDoc2_copy.state === "completed");
-    T(typeof repDoc2_copy.replication_id  === "string");
-    T(repDoc2_copy.replication_id  === repDoc1_copy.replication_id);
+    T(repDoc2_copy._replication_state === "completed");
+    T(typeof repDoc2_copy._replication_id === "string");
+    T(repDoc2_copy._replication_id === repDoc1_copy._replication_id);
   }
 
 
@@ -377,13 +377,13 @@ couchTests.replicator_db = function(debug) {
 
     repDoc1 = repDb.open("foo_dup_rep_doc_1");
     T(repDoc1 !== null);
-    T(repDoc1.state === "completed", "identical");
-    T(typeof repDoc1.replication_id  === "string");
+    T(repDoc1._replication_state === "completed", "identical");
+    T(typeof repDoc1._replication_id  === "string");
 
     repDoc2 = repDb.open("foo_dup_rep_doc_2");
     T(repDoc2 !== null);
-    T(typeof repDoc2.state === "undefined");
-    T(repDoc2.replication_id === repDoc1.replication_id);
+    T(typeof repDoc2._replication_state === "undefined");
+    T(repDoc2._replication_id === repDoc1._replication_id);
   }
 
 
@@ -419,13 +419,13 @@ couchTests.replicator_db = function(debug) {
 
     repDoc1 = repDb.open("foo_dup_cont_rep_doc_1");
     T(repDoc1 !== null);
-    T(repDoc1.state === "triggered");
-    T(typeof repDoc1.replication_id  === "string");
+    T(repDoc1._replication_state === "triggered");
+    T(typeof repDoc1._replication_id  === "string");
 
     repDoc2 = repDb.open("foo_dup_cont_rep_doc_2");
     T(repDoc2 !== null);
-    T(typeof repDoc2.state === "undefined");
-    T(repDoc2.replication_id === repDoc1.replication_id);
+    T(typeof repDoc2._replication_state === "undefined");
+    T(repDoc2._replication_id === repDoc1._replication_id);
 
     var newDoc = {
       _id: "foo666",
@@ -443,7 +443,7 @@ couchTests.replicator_db = function(debug) {
     T(repDb.deleteDoc(repDoc2).ok);
     repDoc1 = repDb.open("foo_dup_cont_rep_doc_1");
     T(repDoc1 !== null);
-    T(repDoc1.state === "triggered");
+    T(repDoc1._replication_state === "triggered");
 
     var newDoc2 = {
         _id: "foo5000",
@@ -709,10 +709,10 @@ couchTests.replicator_db = function(debug) {
     T(repDoc1 !== null);
     T(repDoc1.source === repDoc.source);
     T(repDoc1.target === repDoc.target);
-    T(repDoc1.state === "completed",
+    T(repDoc1._replication_state === "completed",
       "replication document with bad replication id failed");
-    T(typeof repDoc1.replication_id  === "string");
-    T(repDoc1.replication_id !== "1234abc");
+    T(typeof repDoc1._replication_id  === "string");
+    T(repDoc1._replication_id !== "1234abc");
   }
 
 
@@ -729,8 +729,8 @@ couchTests.replicator_db = function(debug) {
     waitForRep(repDb, repDoc, "error");
     var repDoc1 = repDb.open(repDoc._id);
     T(repDoc1 !== null);
-    T(repDoc1.state === "error");
-    T(typeof repDoc1.replication_id  === "string");
+    T(repDoc1._replication_state === "error");
+    T(typeof repDoc1._replication_id  === "string");
   }
 
 
