@@ -440,17 +440,13 @@ set_view_sig(#group{
     G#group{sig=couch_util:md5(term_to_binary({Views, Language, DesignOptions}))}.
 
 open_db_group(DbName, GroupId) ->
-    case couch_db:open_int(DbName, []) of
-    {ok, Db} ->
-        case couch_db:open_doc(Db, GroupId) of
-        {ok, Doc} ->
-            {ok, Db, design_doc_to_view_group(Doc)};
-        Else ->
-            couch_db:close(Db),
-            Else
-        end;
-    Else ->
-        Else
+    {Pid, Ref} = spawn_monitor(fun() ->
+        exit(fabric:open_doc(mem3:dbname(DbName), GroupId, []))
+    end),
+    receive {'DOWN', Ref, process, Pid, {ok, Doc}} ->
+        {ok, design_doc_to_view_group(Doc)};
+    {'DOWN', Ref, process, Pid, Error} ->
+        Error
     end.
 
 get_group_info(State) ->
