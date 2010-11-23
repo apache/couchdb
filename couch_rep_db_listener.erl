@@ -156,7 +156,7 @@ process_change({Change}) ->
     true ->
         rep_doc_deleted(DocId);
     false ->
-        case couch_util:get_value(<<"state">>, RepProps) of
+        case couch_util:get_value(<<"_replication_state">>, RepProps) of
         <<"completed">> ->
             replication_complete(DocId);
         <<"error">> ->
@@ -166,8 +166,8 @@ process_change({Change}) ->
         undefined ->
             maybe_start_replication(DocId, JsonRepDoc);
         _ ->
-            ?LOG_ERROR("Invalid value for the `state` property of the "
-                "replication document `~s`", [DocId])
+            ?LOG_ERROR("Invalid value for the `_replication_state` property"
+                " of the replication document `~s`", [DocId])
         end
     end,
     ok.
@@ -201,13 +201,13 @@ maybe_start_replication(DocId, JsonRepDoc) ->
 
 
 maybe_tag_rep_doc(DocId, {Props} = JsonRepDoc, RepId, OtherDocId) ->
-    case couch_util:get_value(<<"replication_id">>, Props) of
+    case couch_util:get_value(<<"_replication_id">>, Props) of
     RepId ->
         ok;
     _ ->
         ?LOG_INFO("The replication specified by the document `~s` was already"
             " triggered by the document `~s`", [DocId, OtherDocId]),
-        couch_rep:update_rep_doc(JsonRepDoc, [{<<"replication_id">>, RepId}])
+        couch_rep:update_rep_doc(JsonRepDoc, [{<<"_replication_id">>, RepId}])
     end.
 
 
@@ -222,11 +222,11 @@ start_replication({RepProps} = RepDoc, {Base, Ext} = RepId, UserCtx) ->
         couch_rep:update_rep_doc(
             RepDoc,
             [
-                {<<"state">>, <<"error">>},
-                {<<"replication_id">>, ?l2b(element(1, RepId))}
+                {<<"_replication_state">>, <<"error">>},
+                {<<"_replication_id">>, ?l2b(Base)}
             ]
         ),
-        ?LOG_ERROR("Error starting replication ~p: ~p", [RepId, Error])
+        ?LOG_ERROR("Error starting replication `~s`: ~p", [Base ++ Ext, Error])
     end.
 
 rep_doc_deleted(DocId) ->

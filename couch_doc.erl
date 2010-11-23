@@ -252,6 +252,14 @@ transfer_fields([{<<"_conflicts">>, _} | Rest], Doc) ->
 transfer_fields([{<<"_deleted_conflicts">>, _} | Rest], Doc) ->
     transfer_fields(Rest, Doc);
 
+% special fields for replication documents
+transfer_fields([{<<"_replication_state">>, _} = Field | Rest],
+    #doc{body=Fields} = Doc) ->
+    transfer_fields(Rest, Doc#doc{body=[Field|Fields]});
+transfer_fields([{<<"_replication_id">>, _} = Field | Rest],
+    #doc{body=Fields} = Doc) ->
+    transfer_fields(Rest, Doc#doc{body=[Field|Fields]});
+
 % unknown special field
 transfer_fields([{<<"_",Name/binary>>, _} | _], _) ->
     throw({doc_validation,
