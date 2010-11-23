@@ -39,6 +39,8 @@ View Server:
 
  * Don't trigger view updates when requesting `_design/doc/_info`.
  * Fix for circular references in CommonJS requires.
+ * Made isArray() function available to functions executed in the query server.
+ * Documents are now sealed before being passed to map functions.
 
 Version 1.0.1
 -------------
