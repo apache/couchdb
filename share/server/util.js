@@ -98,7 +98,13 @@ var Couch = {
   },
   recursivelySeal : function(obj) {
     // seal() is broken in current Spidermonkey
-    seal(obj);
+    try {
+      seal(obj);
+    } catch (x) {
+      // Sealing of arrays broken in some SpiderMonkey versions.
+      // https://bugzilla.mozilla.org/show_bug.cgi?id=449657
+      return;
+    }
     for (var propname in obj) {
       if (typeof obj[propname] == "object") {
         arguments.callee(obj[propname]);
