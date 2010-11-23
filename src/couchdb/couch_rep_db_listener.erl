@@ -53,7 +53,7 @@ init(_) ->
 
 
 handle_call(Msg, From, State) ->
-    ?LOG_ERROR("Replicator DB listener receive unexpected call ~p from ~p",
+    ?LOG_ERROR("Replicator DB listener received unexpected call ~p from ~p",
         [Msg, From]),
     {stop, {error, {unexpected_call, Msg}}, State}.
 
@@ -73,7 +73,7 @@ handle_cast(rep_db_created, #state{changes_feed_loop = nil} = State) ->
     {noreply, State#state{changes_feed_loop = NewLoop}};
 
 handle_cast(Msg, State) ->
-    ?LOG_ERROR("Replicator DB listener receive unexpected cast ~p", [Msg]),
+    ?LOG_ERROR("Replicator DB listener received unexpected cast ~p", [Msg]),
     {stop, {error, {unexpected_cast, Msg}}, State}.
 
 
