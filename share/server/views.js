@@ -105,19 +105,8 @@ var Views = (function() {
       // ]
       //
 
-      /*
-      Immutable document support temporarily removed.
+      Couch.recursivelySeal(doc);
 
-      Removed because the seal function no longer works on JS 1.8 arrays,
-      instead returning an error. The sealing is meant to prevent map
-      functions from modifying the same document that is passed to other map
-      functions. However, only map functions in the same design document are
-      run together, so we have a reasonable expectation they can trust each
-      other. Any map fun that can't be trusted can be placed in its own
-      design document, and it cannot affect other map functions.
-
-      recursivelySeal(doc); // seal to prevent map functions from changing doc
-      */
       var buf = [];
       for (var i = 0; i < State.funs.length; i++) {
         map_results = [];
