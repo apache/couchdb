@@ -22,7 +22,6 @@ couchjs/config.log
 .eunit
 @abs_top_builddir@/
 apps/couch/test/temp*
-apps/couch/test/etap/
 
 # dev
 rel/dev*

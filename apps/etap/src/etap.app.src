@@ -1,6 +1,0 @@
-{application, etap, [
-    {description, "TAP compliant testing library"},
-    {vsn, "unknown"},
-    {registered, []},
-    {applications, [kernel, stdlib]}
-]}.

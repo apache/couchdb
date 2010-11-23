@@ -26,7 +26,8 @@ clean:
 
 check:
 	@./rebar eunit
-	@ERL_LIBS="`pwd`/apps" prove apps/couch/test/etap/*.t
+	@ERL_FLAGS="-pa `pwd`/apps/couch/ebin `pwd`/apps/couch/test/etap" \
+		prove apps/couch/test/etap/*.t
 
 dist: compile
 	@rm -rf rel/bigcouch
