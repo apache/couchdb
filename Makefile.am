@@ -140,7 +140,7 @@ distcheck-hook:
 distsign: distcheck check
 	@# @@ unpack archive and run diff -r to double check missing files
 	@# @@ does automake have anything that does this?
-	gpg --armor --detach-sig --default-key 8FBFCFBF \
+	gpg --armor --detach-sig --default-key 43ECCEE1 \
 	    < $(top_srcdir)/$(distdir).tar.gz \
 	    > $(top_srcdir)/$(distdir).tar.gz.asc
 	md5sum $(top_srcdir)/$(distdir).tar.gz \
