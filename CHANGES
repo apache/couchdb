@@ -1,47 +1,14 @@
 Apache CouchDB CHANGES
 ======================
 
-Version 1.1.0
+Version 1.2.0
 -------------
 
 This version has not been released yet.
 
-All CHANGES for 1.0.2 also apply to 1.1.0.
+OAuth:
 
-HTTP Interface:
-
- * Native SSL support.
- * Added support for HTTP range requests for attachments.
- * Added built-in filters for `_changes`: `_doc_ids` and `_design`.
- * Added configuration option for TCP_NODELAY aka "Nagle".
- * Allow POSTing arguments to `_changes`.
- * Allow `keys` parameter for GET requests to views.
- * Allow wildcards in vhosts definitions.
- * More granular ETag support for views.
- * More flexible URL rewriter.
-
-Externals:
-
- * Added OS Process module to manage daemons outside of CouchDB.
- * Added HTTP Proxy handler for more scalable externals.
-
-Replicator:
-
- * Added `_replicator` database to manage replications.
-
-Storage System:
-
- * Multiple micro-optimizations when reading data.
-
-View Server:
-
- * Added CommonJS support to map functions.
- * Added `stale=update_after` query option that triggers a view update after
-   returning a `stale=ok` response.
- * Warn about empty result caused by `startkey` and `endkey` limiting.
- * Built-in reduce function `_sum` now accepts lists of integers as input.
- * Added view query aliases start_key, end_key, start_key_doc_id and
-   end_key_doc_id.
+ * Updated budled erlang_oauth library to the latest version.
 
 Version 1.0.1
 -------------
