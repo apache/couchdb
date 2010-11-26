@@ -26,6 +26,7 @@ etc/Makefile
 etc/couchdb/Makefile
 etc/default/Makefile
 etc/init/Makefile
+etc/init/couchdb
 etc/launchd/Makefile
 etc/logrotate.d/Makefile
 libtool
