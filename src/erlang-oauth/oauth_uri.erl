@@ -6,14 +6,6 @@
 
 -import(lists, [concat/1]).
 
--define(is_uppercase_alpha(C), C >= $A, C =< $Z).
--define(is_lowercase_alpha(C), C >= $a, C =< $z).
--define(is_alpha(C), ?is_uppercase_alpha(C); ?is_lowercase_alpha(C)).
--define(is_digit(C), C >= $0, C =< $9).
--define(is_alphanumeric(C), ?is_alpha(C); ?is_digit(C)).
--define(is_unreserved(C), ?is_alphanumeric(C); C =:= $-; C =:= $_; C =:= $.; C =:= $~).
--define(is_hex(C), ?is_digit(C); C >= $A, C =< $F).
-
 
 normalize(URI) ->
   case http_uri:parse(URI) of
@@ -66,23 +58,41 @@ intersperse(_, [X]) -> [X];
 intersperse(Sep, [X|Xs]) ->
   [X, Sep|intersperse(Sep, Xs)].
 
-decode(Chars) ->
-  decode(Chars, []).
+-define(is_alphanum(C), C >= $A, C =< $Z; C >= $a, C =< $z; C >= $0, C =< $9).
 
-decode([], Decoded) ->
-  lists:reverse(Decoded);
-decode([$%,A,B|Etc], Decoded) when ?is_hex(A), ?is_hex(B) ->
-  decode(Etc, [erlang:list_to_integer([A,B], 16)|Decoded]);
-decode([C|Etc], Decoded) when ?is_unreserved(C) ->
-  decode(Etc, [C|Decoded]).
+encode(Term) when is_integer(Term) ->
+  integer_to_list(Term);
+encode(Term) when is_atom(Term) ->
+  encode(atom_to_list(Term));
+encode(Term) when is_list(Term) ->
+  encode(lists:reverse(Term, []), []).
 
-encode(Chars) ->
-  encode(Chars, []).
+encode([X | T], Acc) when ?is_alphanum(X); X =:= $-; X =:= $_; X =:= $.; X =:= $~ ->
+  encode(T, [X | Acc]);
+encode([X | T], Acc) ->
+  NewAcc = [$%, dec2hex(X bsr 4), dec2hex(X band 16#0f) | Acc],
+  encode(T, NewAcc);
+encode([], Acc) ->
+  Acc.
 
-encode([], Encoded) ->
-  lists:flatten(lists:reverse(Encoded));
-encode([C|Etc], Encoded) when ?is_unreserved(C) ->
-  encode(Etc, [C|Encoded]);
-encode([C|Etc], Encoded) ->
-  Value = io_lib:format("%~2.1.0s", [erlang:integer_to_list(C, 16)]),
-  encode(Etc, [Value|Encoded]).
+decode(Str) when is_list(Str) ->
+  decode(Str, []).
+
+decode([$%, A, B | T], Acc) ->
+  decode(T, [(hex2dec(A) bsl 4) + hex2dec(B) | Acc]);
+decode([X | T], Acc) ->
+  decode(T, [X | Acc]);
+decode([], Acc) ->
+  lists:reverse(Acc, []).
+
+-compile({inline, [{dec2hex, 1}, {hex2dec, 1}]}).
+
+dec2hex(N) when N >= 10 andalso N =< 15 ->
+  N + $A - 10;
+dec2hex(N) when N >= 0 andalso N =< 9 ->
+  N + $0.
+
+hex2dec(C) when C >= $A andalso C =< $F ->
+  C - $A + 10;
+hex2dec(C) when C >= $0 andalso C =< $9 ->
+  C - $0.

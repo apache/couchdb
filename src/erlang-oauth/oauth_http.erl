@@ -10,7 +10,7 @@ post(URL, Data) ->
   request(post, {URL, [], "application/x-www-form-urlencoded", Data}).
 
 request(Method, Request) ->
-  http:request(Method, Request, [{autoredirect, false}], []).
+  httpc:request(Method, Request, [{autoredirect, false}], []).
 
 response_params(Response) ->
   oauth_uri:params_from_string(response_body(Response)).

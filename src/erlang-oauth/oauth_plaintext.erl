@@ -7,4 +7,4 @@ signature(CS, TS) ->
   oauth_uri:calate("&", [CS, TS]).
 
 verify(Signature, CS, TS) ->
-  couch_util:verify(signature(CS, TS), Signature).
+  Signature =:= signature(CS, TS).
