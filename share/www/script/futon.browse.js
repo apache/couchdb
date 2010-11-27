@@ -189,26 +189,34 @@
       }
 
       this.databaseSecurity = function() {
+        function namesAndRoles(r, key) {
+          var names = [];
+          var roles = [];
+          if (r && typeof r[key + "s"] === "object") {
+            if ($.isArray(r[key + "s"]["names"])) {
+              names = r[key + "s"]["names"];
+            }
+            if ($.isArray(r[key + "s"]["roles"])) {
+              roles = r[key + "s"]["roles"];
+            }
+          }
+          return {names : names, roles: roles};
+        };
+
         $.showDialog("dialog/_database_security.html", {
           load : function(d) {
             db.getDbProperty("_security", {
               success: function(r) {
-                ["admin", "reader"].forEach(function(key) {
-                  var names = [];
-                  var roles = [];
-
-                  if (r && typeof r[key + "s"] === "object") {
-                    if ($.isArray(r[key + "s"]["names"])) {
-                      names = r[key + "s"]["names"];
-                    }
-                    if ($.isArray(r[key + "s"]["roles"])) {
-                      roles = r[key + "s"]["roles"];
-                    }
-                  }
-
-                  $("input[name=" + key + "_names]", d).val(JSON.stringify(names));
-                  $("input[name=" + key + "_roles]", d).val(JSON.stringify(roles));
-                });
+                var admins = namesAndRoles(r, "admin")
+                  , members = namesAndRoles(r, "member");
+                if (members.names.length + members.roles.length == 0) {
+                  // backwards compatibility with readers for 1.x
+                  members = namesAndRoles(r, "reader");
+                }
+                $("input[name=admin_names]", d).val(JSON.stringify(admins.names));
+                $("input[name=admin_roles]", d).val(JSON.stringify(admins.roles));
+                $("input[name=member_names]", d).val(JSON.stringify(members.names));
+                $("input[name=member_roles]", d).val(JSON.stringify(members.roles));
               }
             });
           },
@@ -220,13 +228,13 @@
                 names: [],
                 roles: []
               },
-              readers: {
+              members: {
                 names: [],
                 roles: []
               }
             };
 
-            ["admin", "reader"].forEach(function(key) {
+            ["admin", "member"].forEach(function(key) {
               var names, roles;
 
               try {

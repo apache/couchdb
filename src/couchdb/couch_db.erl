@@ -26,7 +26,7 @@
 -export([set_security/2,get_security/1]).
 -export([init/1,terminate/2,handle_call/3,handle_cast/2,code_change/3,handle_info/2]).
 -export([changes_since/5,changes_since/6,read_doc/2,new_revid/1]).
--export([check_is_admin/1, check_is_reader/1]).
+-export([check_is_admin/1, check_is_member/1]).
 -export([reopen/1]).
 
 -include("couch_db.hrl").
@@ -77,7 +77,7 @@ open(DbName, Options) ->
     case couch_server:open(DbName, Options) of
         {ok, Db} ->
             try
-                check_is_reader(Db),
+                check_is_member(Db),
                 {ok, Db}
             catch
                 throw:Error ->
@@ -297,14 +297,14 @@ check_is_admin(#db{user_ctx=#user_ctx{name=Name,roles=Roles}}=Db) ->
         ok
     end.
 
-check_is_reader(#db{user_ctx=#user_ctx{name=Name,roles=Roles}=UserCtx}=Db) ->
+check_is_member(#db{user_ctx=#user_ctx{name=Name,roles=Roles}=UserCtx}=Db) ->
     case (catch check_is_admin(Db)) of
     ok -> ok;
     _ ->
-        {Readers} = get_readers(Db),
-        ReaderRoles = couch_util:get_value(<<"roles">>, Readers,[]),
+        {Members} = get_members(Db),
+        ReaderRoles = couch_util:get_value(<<"roles">>, Members,[]),
         WithAdminRoles = [<<"_admin">> | ReaderRoles],
-        ReaderNames = couch_util:get_value(<<"names">>, Readers,[]),
+        ReaderNames = couch_util:get_value(<<"names">>, Members,[]),
         case ReaderRoles ++ ReaderNames of
         [] -> ok; % no readers == public access
         _Else ->
@@ -326,8 +326,10 @@ check_is_reader(#db{user_ctx=#user_ctx{name=Name,roles=Roles}=UserCtx}=Db) ->
 get_admins(#db{security=SecProps}) ->
     couch_util:get_value(<<"admins">>, SecProps, {[]}).
 
-get_readers(#db{security=SecProps}) ->
-    couch_util:get_value(<<"readers">>, SecProps, {[]}).
+get_members(#db{security=SecProps}) ->
+    % we fallback to readers here for backwards compatibility
+    couch_util:get_value(<<"members">>, SecProps,
+        couch_util:get_value(<<"readers">>, SecProps, {[]})).
 
 get_security(#db{security=SecProps}) ->
     {SecProps}.
@@ -343,9 +345,11 @@ set_security(_, _) ->
 
 validate_security_object(SecProps) ->
     Admins = couch_util:get_value(<<"admins">>, SecProps, {[]}),
-    Readers = couch_util:get_value(<<"readers">>, SecProps, {[]}),
+    % we fallback to readers here for backwards compatibility
+    Members = couch_util:get_value(<<"members">>, SecProps,
+        couch_util:get_value(<<"readers">>, SecProps, {[]})),
     ok = validate_names_and_roles(Admins),
-    ok = validate_names_and_roles(Readers),
+    ok = validate_names_and_roles(Members),
     ok.
 
 % validate user input

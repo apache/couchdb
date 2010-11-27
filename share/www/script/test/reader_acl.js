@@ -37,7 +37,7 @@ couchTests.reader_acl = function(debug) {
       T(secretDb.open("baz").foo == "bar");
 
       T(secretDb.setSecObj({
-        "readers" : {
+        "members" : {
           roles : ["super-secret-club"],
           names : ["joe","barb"]
         }
@@ -64,13 +64,13 @@ couchTests.reader_acl = function(debug) {
       CouchDB.logout();
       
       // make anyone with the top-secret role an admin
-      // db admins are automatically readers
+      // db admins are automatically members
       T(secretDb.setSecObj({
         "admins" : {
           roles : ["top-secret"],
           names : []
         },
-        "readers" : {
+        "members" : {
           roles : ["super-secret-club"],
           names : ["joe","barb"]
         }
@@ -90,14 +90,14 @@ couchTests.reader_acl = function(debug) {
       CouchDB.logout();
       T(CouchDB.session().userCtx.roles.indexOf("_admin") != -1);
 
-      // admin now adds the top-secret role to the db's readers
+      // admin now adds the top-secret role to the db's members
       // and removes db-admins
       T(secretDb.setSecObj({
         "admins" : {
           roles : [],
           names : []
         },
-        "readers" : {
+        "members" : {
           roles : ["super-secret-club", "top-secret"],
           names : ["joe","barb"]
         }
@@ -124,10 +124,10 @@ couchTests.reader_acl = function(debug) {
       T(CouchDB.login("jchris@apache.org", "funnybone").ok);
       T(CouchDB.session().userCtx.roles.indexOf("_admin") == -1);
       T(secretDb.open("baz").foo == "bar");
-      // readers can query stored views
+      // members can query stored views
       T(secretDb.view("foo/bar").total_rows == 1);
       
-      // readers can't do temp views
+      // members can't do temp views
       try {
         var results = secretDb.query(function(doc) {
           emit(null, null);
@@ -137,13 +137,28 @@ couchTests.reader_acl = function(debug) {
         T(true && "temp view is admin only");
       }
       
-      
       CouchDB.logout();
+
+      // works with readers (backwards compat with 1.0)
+      T(secretDb.setSecObj({
+        "admins" : {
+          roles : [],
+          names : []
+        },
+        "readers" : {
+          roles : ["super-secret-club", "top-secret"],
+          names : ["joe","barb"]
+        }
+      }).ok);
+
+      T(CouchDB.login("jchris@apache.org", "funnybone").ok);
+      T(CouchDB.session().userCtx.roles.indexOf("_admin") == -1);
+      T(secretDb.open("baz").foo == "bar");
 
       // can't set non string reader names or roles
       try {
         secretDb.setSecObj({
-          "readers" : {
+          "members" : {
             roles : ["super-secret-club", {"top-secret":"awesome"}],
             names : ["joe","barb"]
           }
@@ -153,7 +168,7 @@ couchTests.reader_acl = function(debug) {
 
       try {
         secretDb.setSecObj({
-          "readers" : {
+          "members" : {
             roles : ["super-secret-club", {"top-secret":"awesome"}],
             names : ["joe",22]
           }
@@ -163,7 +178,7 @@ couchTests.reader_acl = function(debug) {
       
       try {
         secretDb.setSecObj({
-          "readers" : {
+          "members" : {
             roles : ["super-secret-club", {"top-secret":"awesome"}],
             names : "joe"
           }

@@ -16,12 +16,12 @@ specific language governing permissions and limitations under the License.
   <h2>Security</h2>
   <fieldset>
     <p class="help">
-      Each database contains lists of admins and readers. 
-      Admins and readers are each defined by <tt>names</tt> and <tt>roles</tt>, which are lists of strings.
+      Each database contains lists of admins and members.
+      Admins and members are each defined by <tt>names</tt> and <tt>roles</tt>, which are lists of strings.
     </p>
 
     <h3>Admins</h3>
-    <p class="help">Database admins can update design documents and edit the readers list.</p>
+    <p class="help">Database admins can update design documents and edit the admin and member lists.</p>
     <table summary=""><tbody><tr>
       <th><label>Names:</label></th>
       <td><input type="text" name="admin_names" size="40"></td>
@@ -31,14 +31,14 @@ specific language governing permissions and limitations under the License.
     </tr>
     </tbody></table>
 
-    <h3>Readers</h3>
-    <p class="help">Database readers can access the database. If no readers are defined, the database is public.</p>
+    <h3>Members</h3>
+    <p class="help">Database members can access the database. If no members are defined, the database is public.</p>
     <table summary=""><tbody><tr>
       <th><label>Names:</label></th>
-      <td><input type="text" name="reader_names" size="40"></td>
+      <td><input type="text" name="member_names" size="40"></td>
     </tr><tr>
       <th><label>Roles:</label></th>
-      <td><input type="text" name="reader_roles" size="40"></td>
+      <td><input type="text" name="member_roles" size="40"></td>
     </tr>
     </tbody></table>
 

@@ -184,15 +184,15 @@ describe 'CouchDB instance'
   
   describe '.setSecObj'
     it 'should return ok true'
-      db.setSecObj({"readers":{"names":["laura"],"roles":["president"]}}).ok.should.be_true
+      db.setSecObj({"members":{"names":["laura"],"roles":["president"]}}).ok.should.be_true
     end
       
     it 'should save a well formed object into the _security object '
-      db.should.receive("request", "once").with_args("PUT", "/spec_db/_security", {body: '{"readers":{"names":["laura"],"roles":["president"]}}'})
-      db.setSecObj({"readers": {"names" : ["laura"], "roles" : ["president"]}})
+      db.should.receive("request", "once").with_args("PUT", "/spec_db/_security", {body: '{"members":{"names":["laura"],"roles":["president"]}}'})
+      db.setSecObj({"members": {"names" : ["laura"], "roles" : ["president"]}})
     end
     
-    it 'should throw an error when the readers or admins object is malformed'
+    it 'should throw an error when the members or admins object is malformed'
       -{ db.setSecObj({"admins":["cylon"]}) }.should.throw_error
     end
     
