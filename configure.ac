@@ -284,6 +284,7 @@ fi
 
 use_init=yes
 use_launchd=yes
+native_mochijson_enabled=no
 
 AC_ARG_ENABLE([init], [AC_HELP_STRING([--disable-init],
     [don't install init script where applicable])], [
@@ -293,6 +294,11 @@ AC_ARG_ENABLE([init], [AC_HELP_STRING([--disable-init],
 AC_ARG_ENABLE([launchd], [AC_HELP_STRING([--disable-launchd],
     [don't install launchd configuration where applicable])], [
     use_launchd=$enableval
+], [])
+
+AC_ARG_ENABLE([native-mochijson], [AC_HELP_STRING([--enable-native-mochijson],
+    [compile mochijson to native code (EXPERIMENTAL)])], [
+    native_mochijson_enabled=$enableval
 ], [])
 
 init_enabled=false
@@ -344,6 +350,7 @@ fi
 AM_CONDITIONAL([INIT], [test x${init_enabled} = xtrue])
 AM_CONDITIONAL([LAUNCHD], [test x${launchd_enabled} = xtrue])
 AM_CONDITIONAL([HELP2MAN], [test x${help2man_enabled} = xtrue])
+AM_CONDITIONAL([USE_NATIVE_MOCHIJSON], [test x${native_mochijson_enabled} = xyes])
 
 AC_SUBST([package_author_name], ["LOCAL_PACKAGE_AUTHOR_NAME"])
 AC_SUBST([package_author_address], ["LOCAL_PACKAGE_AUTHOR_ADDRESS"])

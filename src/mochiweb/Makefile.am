@@ -10,6 +10,10 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
+if USE_NATIVE_MOCHIJSON
+MOCHIJSON_ERLC_FLAGS=+native
+endif
+
 mochiwebebindir = $(localerlanglibdir)/mochiweb-7c2bc2/ebin
 
 mochiweb_file_collection = \
@@ -98,7 +102,7 @@ CLEANFILES = \
 	cp $< $@
 
 mochijson2.beam: mochijson2.erl
-	$(ERLC) $(ERLC_FLAGS) +native $<
+	$(ERLC) $(ERLC_FLAGS) $(MOCHIJSON_ERLC_FLAGS) $<
 
 %.beam: %.erl
 	$(ERLC) $(ERLC_FLAGS) $<
