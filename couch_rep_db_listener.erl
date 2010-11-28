@@ -79,9 +79,6 @@ handle_cast(Msg, State) ->
     ?LOG_ERROR("Replicator DB listener received unexpected cast ~p", [Msg]),
     {stop, {error, {unexpected_cast, Msg}}, State}.
 
-handle_info({'EXIT', _OldChangesLoop, rep_db_changed}, State) ->
-    {noreply, State};
-
 handle_info({'EXIT', From, normal}, #state{changes_feed_loop = From} = State) ->
     % replicator DB deleted
     couch_work_queue:queue(State#state.changes_queue, stop_all_replications),
