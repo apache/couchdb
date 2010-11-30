@@ -12,7 +12,7 @@
 -export([start/1, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2, terminate/2, code_change/3,
          handle_info/2]).
--export([get/2]).
+-export([get/2, set/3]).
 
 -record(mochiweb_socket_server,
         {port,
@@ -28,7 +28,10 @@
          acceptor_pool_size=16,
          ssl=false,
          ssl_opts=[{ssl_imp, new}],
-         acceptor_pool=sets:new()}).
+         acceptor_pool=sets:new(),
+         profile_fun=undefined}).
+
+-define(is_old_state(State), not is_record(State, mochiweb_socket_server)).
 
 start(State=#mochiweb_socket_server{}) ->
     start_server(State);
@@ -37,6 +40,12 @@ start(Options) ->
 
 get(Name, Property) ->
     gen_server:call(Name, {get, Property}).
+
+set(Name, profile_fun, Fun) ->
+    gen_server:cast(Name, {set, profile_fun, Fun});
+set(Name, Property, _Value) ->
+    error_logger:info_msg("?MODULE:set for ~p with ~p not implemented~n",
+                          [Name, Property]).
 
 stop(Name) when is_atom(Name) ->
     gen_server:cast(Name, stop);
@@ -102,7 +111,10 @@ parse_options([{ssl, Ssl} | Rest], State) when is_boolean(Ssl) ->
     parse_options(Rest, State#mochiweb_socket_server{ssl=Ssl});
 parse_options([{ssl_opts, SslOpts} | Rest], State) when is_list(SslOpts) ->
     SslOpts1 = [{ssl_imp, new} | proplists:delete(ssl_imp, SslOpts)],
-    parse_options(Rest, State#mochiweb_socket_server{ssl_opts=SslOpts1}).
+    parse_options(Rest, State#mochiweb_socket_server{ssl_opts=SslOpts1});
+parse_options([{profile_fun, ProfileFun} | Rest], State) when is_function(ProfileFun) ->
+    parse_options(Rest, State#mochiweb_socket_server{profile_fun=ProfileFun}).
+
 
 start_server(State=#mochiweb_socket_server{ssl=Ssl, name=Name}) ->
     case Ssl of
@@ -123,7 +135,7 @@ start_server(State=#mochiweb_socket_server{ssl=Ssl, name=Name}) ->
 ensure_int(N) when is_integer(N) ->
     N;
 ensure_int(S) when is_list(S) ->
-    integer_to_list(S).
+    list_to_integer(S).
 
 ipv6_supported() ->
     case (catch inet:getaddr("localhost", inet6)) of
@@ -157,7 +169,7 @@ init(State=#mochiweb_socket_server{ip=Ip, port=Port, backlog=Backlog, nodelay=No
         {stop, eacces} ->
             case Port < 1024 of
                 true ->
-                    case fdsrv:start() of
+                    case catch fdsrv:start() of
                         {ok, _} ->
                             case fdsrv:bind_socket(tcp, Port) of
                                 {ok, Fd} ->
@@ -203,6 +215,28 @@ do_get(port, #mochiweb_socket_server{port=Port}) ->
 do_get(active_sockets, #mochiweb_socket_server{active_sockets=ActiveSockets}) ->
     ActiveSockets.
 
+
+state_to_proplist(#mochiweb_socket_server{name=Name,
+                                          port=Port,
+                                          active_sockets=ActiveSockets}) ->
+    [{name, Name}, {port, Port}, {active_sockets, ActiveSockets}].
+
+upgrade_state(State = #mochiweb_socket_server{}) ->
+    State;
+upgrade_state({mochiweb_socket_server, Port, Loop, Name,
+             Max, IP, Listen, NoDelay, Backlog, ActiveSockets,
+             AcceptorPoolSize, SSL, SSL_opts,
+             AcceptorPool}) ->
+    #mochiweb_socket_server{port=Port, loop=Loop, name=Name, max=Max, ip=IP,
+                            listen=Listen, nodelay=NoDelay, backlog=Backlog,
+                            active_sockets=ActiveSockets,
+                            acceptor_pool_size=AcceptorPoolSize,
+                            ssl=SSL,
+                            ssl_opts=SSL_opts,
+                            acceptor_pool=AcceptorPool}.
+
+handle_call(Req, From, State) when ?is_old_state(State) ->
+    handle_call(Req, From, upgrade_state(State));
 handle_call({get, Property}, _From, State) ->
     Res = do_get(Property, State),
     {reply, Res, State};
@@ -210,13 +244,33 @@ handle_call(_Message, _From, State) ->
     Res = error,
     {reply, Res, State}.
 
-handle_cast({accepted, Pid, _Timing},
+
+handle_cast(Req, State) when ?is_old_state(State) ->
+    handle_cast(Req, upgrade_state(State));
+handle_cast({accepted, Pid, Timing},
             State=#mochiweb_socket_server{active_sockets=ActiveSockets}) ->
     State1 = State#mochiweb_socket_server{active_sockets=1 + ActiveSockets},
+    case State#mochiweb_socket_server.profile_fun of
+        undefined ->
+            undefined;
+        F when is_function(F) ->
+            catch F([{timing, Timing} | state_to_proplist(State1)])
+    end,
     {noreply, recycle_acceptor(Pid, State1)};
+handle_cast({set, profile_fun, ProfileFun}, State) ->
+    State1 = case ProfileFun of
+                 ProfileFun when is_function(ProfileFun); ProfileFun =:= undefined ->
+                     State#mochiweb_socket_server{profile_fun=ProfileFun};
+                 _ ->
+                     State
+             end,
+    {noreply, State1};
 handle_cast(stop, State) ->
     {stop, normal, State}.
 
+
+terminate(Reason, State) when ?is_old_state(State) ->
+    terminate(Reason, upgrade_state(State));
 terminate(_Reason, #mochiweb_socket_server{listen=Listen, port=Port}) ->
     mochiweb_socket:close(Listen),
     case Port < 1024 of
@@ -244,6 +298,8 @@ recycle_acceptor(Pid, State=#mochiweb_socket_server{
             State#mochiweb_socket_server{active_sockets=ActiveSockets - 1}
     end.
 
+handle_info(Msg, State) when ?is_old_state(State) ->
+    handle_info(Msg, upgrade_state(State));
 handle_info({'EXIT', Pid, normal}, State) ->
     {noreply, recycle_acceptor(Pid, State)};
 handle_info({'EXIT', Pid, Reason},
@@ -258,6 +314,20 @@ handle_info({'EXIT', Pid, Reason},
             ok
     end,
     {noreply, recycle_acceptor(Pid, State)};
+
+% this is what release_handler needs to get a list of modules,
+% since our supervisor modules list is set to 'dynamic'
+% see sasl-2.1.9.2/src/release_handler_1.erl get_dynamic_mods
+handle_info({From, Tag, get_modules}, State = #mochiweb_socket_server{name={local,Mod}}) ->
+    From ! {element(2,Tag), [Mod]},
+    {noreply, State};
+
+% If for some reason we can't get the module name, send empty list to avoid release_handler timeout:
+handle_info({From, Tag, get_modules}, State) ->
+    error_logger:info_msg("mochiweb_socket_server replying to dynamic modules request as '[]'~n",[]),
+    From ! {element(2,Tag), []},
+    {noreply, State};
+
 handle_info(Info, State) ->
     error_logger:info_report([{'INFO', Info}, {'State', State}]),
     {noreply, State}.
@@ -269,4 +339,26 @@ handle_info(Info, State) ->
 %%
 -include_lib("eunit/include/eunit.hrl").
 -ifdef(TEST).
+
+upgrade_state_test() ->
+    OldState = {mochiweb_socket_server,
+                port, loop, name,
+                max, ip, listen,
+                nodelay, backlog,
+                active_sockets,
+                acceptor_pool_size,
+                ssl, ssl_opts, acceptor_pool},
+    State = upgrade_state(OldState),
+    CmpState = #mochiweb_socket_server{port=port, loop=loop,
+                                       name=name, max=max, ip=ip,
+                                       listen=listen, nodelay=nodelay,
+                                       backlog=backlog,
+                                       active_sockets=active_sockets,
+                                       acceptor_pool_size=acceptor_pool_size,
+                                       ssl=ssl, ssl_opts=ssl_opts,
+                                       acceptor_pool=acceptor_pool,
+                                       profile_fun=undefined},
+    ?assertEqual(CmpState, State).
+
 -endif.
+

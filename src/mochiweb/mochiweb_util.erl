@@ -620,7 +620,7 @@ cmd_port_test_spool(Port, Acc) ->
             cmd_port_test_spool(Port, ["\n", Data | Acc]);
         {Port, Unknown} ->
             throw({unknown, Unknown})
-    after 100 ->
+    after 1000 ->
             throw(timeout)
     end.
 

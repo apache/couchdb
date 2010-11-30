@@ -22,7 +22,7 @@ init(Server, Listen, Loop) ->
         {error, closed} ->
             exit(normal);
         {error, timeout} ->
-            exit(normal);
+            init(Server, Listen, Loop);
         {error, esslaccept} ->
             exit(normal);
         Other ->

@@ -35,6 +35,16 @@ start() ->
     start([{ip, "127.0.0.1"},
            {loop, {?MODULE, default_body}}]).
 
+%% @spec start(Options) -> ServerRet
+%%     Options = [option()]
+%%     Option = {name, atom()} | {ip, string() | tuple()} | {backlog, integer()}
+%%              | {nodelay, boolean()} | {acceptor_pool_size, integer()}
+%%              | {ssl, boolean()} | {profile_fun, undefined | (Props) -> ok}
+%% @doc Start a mochiweb server.
+%%      profile_fun is used to profile accept timing.
+%%      After each accept, if defined, profile_fun is called with a proplist of a subset of the mochiweb_socket_server state and timing information.
+%%      The proplist is as follows: [{name, Name}, {port, Port}, {active_sockets, ActiveSockets}, {timing, Timing}].
+%% @end
 start(Options) ->
     mochiweb_socket_server:start(parse_options(Options)).
 
@@ -90,22 +100,23 @@ loop(Socket, Body) ->
     request(Socket, Body).
 
 request(Socket, Body) ->
-    case mochiweb_socket:recv(Socket, 0, ?REQUEST_RECV_TIMEOUT) of
-        {ok, {http_request, Method, Path, Version}} ->
+    mochiweb_socket:setopts(Socket, [{active, once}]),
+    receive
+        {Protocol, _, {http_request, Method, Path, Version}} when Protocol == http orelse Protocol == ssl ->
             mochiweb_socket:setopts(Socket, [{packet, httph}]),
             headers(Socket, {Method, Path, Version}, [], Body, 0);
-        {error, {http_error, "\r\n"}} ->
+        {Protocol, _, {http_error, "\r\n"}} when Protocol == http orelse Protocol == ssl ->
             request(Socket, Body);
-        {error, {http_error, "\n"}} ->
+        {Protocol, _, {http_error, "\n"}} when Protocol == http orelse Protocol == ssl ->
             request(Socket, Body);
-        {error, closed} ->
-            mochiweb_socket:close(Socket),
-            exit(normal);
-        {error, timeout} ->
+        {tcp_closed, _} ->
             mochiweb_socket:close(Socket),
             exit(normal);
         _Other ->
             handle_invalid_request(Socket)
+    after ?REQUEST_RECV_TIMEOUT ->
+        mochiweb_socket:close(Socket),
+        exit(normal)
     end.
 
 reentry(Body) ->
@@ -118,21 +129,23 @@ headers(Socket, Request, Headers, _Body, ?MAX_HEADERS) ->
     mochiweb_socket:setopts(Socket, [{packet, raw}]),
     handle_invalid_request(Socket, Request, Headers);
 headers(Socket, Request, Headers, Body, HeaderCount) ->
-    case mochiweb_socket:recv(Socket, 0, ?HEADERS_RECV_TIMEOUT) of
-        {ok, http_eoh} ->
-            mochiweb_socket:setopts(Socket, [{packet, raw}]),
-            Req = mochiweb:new_request({Socket, Request,
-                                        lists:reverse(Headers)}),
+    mochiweb_socket:setopts(Socket, [{active, once}]),
+    receive
+        {Protocol, _, http_eoh} when Protocol == http orelse Protocol == ssl ->
+            Req = new_request(Socket, Request, Headers),
             call_body(Body, Req),
             ?MODULE:after_response(Body, Req);
-        {ok, {http_header, _, Name, _, Value}} ->
+        {Protocol, _, {http_header, _, Name, _, Value}} when Protocol == http orelse Protocol == ssl ->
             headers(Socket, Request, [{Name, Value} | Headers], Body,
                     1 + HeaderCount);
-        {error, closed} ->
+        {tcp_closed, _} ->
             mochiweb_socket:close(Socket),
             exit(normal);
         _Other ->
             handle_invalid_request(Socket, Request, Headers)
+    after ?HEADERS_RECV_TIMEOUT ->
+        mochiweb_socket:close(Socket),
+        exit(normal)
     end.
 
 call_body({M, F}, Req) ->
@@ -144,12 +157,14 @@ handle_invalid_request(Socket) ->
     handle_invalid_request(Socket, {'GET', {abs_path, "/"}, {0,9}}, []).
 
 handle_invalid_request(Socket, Request, RevHeaders) ->
-    mochiweb_socket:setopts(Socket, [{packet, raw}]),
-    Req = mochiweb:new_request({Socket, Request,
-                                lists:reverse(RevHeaders)}),
+    Req = new_request(Socket, Request, RevHeaders),
     Req:respond({400, [], []}),
     mochiweb_socket:close(Socket),
     exit(normal).
+
+new_request(Socket, Request, RevHeaders) ->
+    mochiweb_socket:setopts(Socket, [{packet, raw}]),
+    mochiweb:new_request({Socket, Request, lists:reverse(RevHeaders)}).
 
 after_response(Body, Req) ->
     Socket = Req:get(socket),
@@ -162,6 +177,8 @@ after_response(Body, Req) ->
             ?MODULE:loop(Socket, Body)
     end.
 
+parse_range_request("bytes=0-") ->
+    undefined;
 parse_range_request(RawRange) when is_list(RawRange) ->
     try
         "bytes=" ++ RangeString = RawRange,

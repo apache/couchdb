@@ -21,11 +21,6 @@
 
 
 handle_proxy_req(Req, ProxyDest) ->
-
-    %% Bug in Mochiweb?
-    %% Reported here: http://github.com/mochi/mochiweb/issues/issue/16
-    erase(mochiweb_request_body_length),
-
     Method = get_method(Req),
     Url = get_url(Req, ProxyDest),
     Version = get_version(Req),
