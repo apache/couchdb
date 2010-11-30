@@ -282,7 +282,9 @@ replace_var(Key, Value, Bindings) ->
             case Key of
                 <<"key">> -> to_json(Value);
                 <<"startkey">> -> to_json(Value);
+                <<"start_key">> -> to_json(Value);
                 <<"endkey">> -> to_json(Value);
+                <<"end_key">> -> to_json(Value);
                 _ ->
                     lists:flatten(?JSON_ENCODE(Value))
             end
