@@ -30,7 +30,7 @@ BigCouch has the same dependencies as CouchDB:
 To install Spidermonkey 1.9.2 from PPA:
 
     sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 74EE6429
-    sudo bash -c 'echo "deb http://ppa.launchpad.net/commonjs/ppa/ubuntu karmic main" >> /etc/apt/sources.list'
+    sudo bash -c 'echo "deb http://ppa.launchpad.net/commonjs/ppa/ubuntu karmic main" >> /etc/apt/sources.list.d/commonjs.list'
     sudo apt-get update
     sudo apt-get install libmozjs-1.9.2 libmozjs-1.9.2-dev
     sudo ln -s /usr/lib/libmozjs-1.9.2.so /usr/lib/libmozjs.so
