@@ -1,7 +1,7 @@
 {application, mem3, [
     {description, "CouchDB Cluster Membership"},
+    {vsn, git},
     {mod, {mem3_app, []}},
-    {vsn, "1.0.1"},
     {registered, [
         mem3_cache,
         mem3_events,
