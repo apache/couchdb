@@ -60,9 +60,8 @@ handle_call(_Request, _From, St) ->
     {reply, ignored, St}.
 
 
-handle_cast({doit, From, MFA}, #st{workers=Workers} = St) ->
-    {LocalPid, Ref} = spawn_monitor(?MODULE, init_p, [From, MFA, ""]),
-    {noreply, St#st{workers = add_worker({LocalPid, Ref, From}, Workers)}};
+handle_cast({doit, From, MFA}, St) ->
+    handle_cast({doit, From, undefined, MFA}, St);
 
 handle_cast({doit, From, Nonce, MFA}, #st{workers=Workers} = St) ->
     {LocalPid, Ref} = spawn_monitor(?MODULE, init_p, [From, MFA, Nonce]),
