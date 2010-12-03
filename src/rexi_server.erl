@@ -17,7 +17,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
     code_change/3, calls/1, set_call_buffer_size/1]).
 
--export([start_link/0, init_p/3]).
+-export([start_link/0, init_p/2, init_p/3]).
 
 -include_lib("eunit/include/eunit.hrl").
 
@@ -117,6 +117,9 @@ terminate(_Reason, St) ->
 
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
+
+init_p(From, MFA) ->
+    init_p(From, MFA, undefined).
 
 %% @doc initializes a process started by rexi_server.
 -spec init_p({pid(), reference()}, {atom(), atom(), list()}, string()) -> any().
