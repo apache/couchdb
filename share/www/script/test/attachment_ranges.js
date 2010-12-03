@@ -42,15 +42,15 @@ couchTests.attachment_ranges = function(debug) {
     TEquals("bytes 0-28/29", xhr.getResponseHeader("Content-Range"));
     TEquals("29", xhr.getResponseHeader("Content-Length"));
 
-    // Fetch the whole entity without an end offset is a 206.
+    // Fetch the whole entity without an end offset is a 200.
     var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt", {
         headers: {
             "Range": "bytes=0-"
         }
     });
-    TEquals(206, xhr.status, "fetch 0-");
+    TEquals(200, xhr.status, "fetch 0-");
     TEquals("This is a base64 encoded text", xhr.responseText);
-    TEquals("bytes 0-28/29", xhr.getResponseHeader("Content-Range"));
+    TEquals(null, xhr.getResponseHeader("Content-Range"));
     TEquals("29", xhr.getResponseHeader("Content-Length"));
 
     // Badly formed range header is a 200.
