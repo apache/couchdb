@@ -15,7 +15,7 @@
 -module(rexi_server).
 -behaviour(gen_server).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
-    code_change/3, calls/1, set_call_buffer_size/1]).
+    code_change/3]).
 
 -export([start_link/0, init_p/2, init_p/3]).
 
@@ -23,10 +23,17 @@
 
 -record(st, {
     workers = ets:new(workers, [private, {keypos,2}]),
-    err_cache = queue:new(),
-    err_cache_max = 20,
-    err_cache_len = 0
+    errors = queue:new(),
+    error_limit = 20,
+    error_count = 0
+}).
 
+-record(error, {
+    timestamp,
+    reason,
+    mfa,
+    nonce,
+    stack
 }).
 
 start_link() ->
@@ -35,27 +42,25 @@ start_link() ->
 init([]) ->
     {ok, #st{}}.
 
-calls(N) ->
-    {ok, gen_server:call(?MODULE,{calls, N},infinity)}.
+handle_call(get_errors, _From, #st{errors = Errors} = St) ->
+    {reply, {ok, lists:reverse(queue:to_list(Errors))}, St};
 
-set_call_buffer_size(N) ->
-    {ok, gen_server:call(?MODULE,{cache_max, N},infinity)}.
+handle_call(get_last_error, _From, #st{errors = Errors} = St) ->
+    try
+        {reply, {ok, queue:get_r(Errors)}, St}
+    catch error:empty ->
+        {reply, {error, empty}, St}
+    end;
 
-handle_call({calls, N}, _From, #st{err_cache=Q}=St) ->
-    ErrList = lists:sublist(lists:reverse(queue:to_list(Q)),1,N),
-    {reply,ErrList,St};
+handle_call({set_error_limit, N}, _From, #st{error_count=Len, errors=Q} = St) ->
+    if N < Len ->
+        {NewQ, _} = queue:split(N, Q);
+    true ->
+        NewQ = Q
+    end,
+    NewLen = queue:len(NewQ),
+    {reply, ok, St#st{error_limit=N, error_count=NewLen, errors=NewQ}};
 
-handle_call({cache_max, N}, _From, #st{err_cache_len=Len,
-                                       err_cache_max=Max, err_cache=Q}=St) ->
-    {NewQ,NewLen} = case N < Len of
-           true ->
-               List = queue:to_list(Q),
-               {queue:from_list(lists:sublist(List,(Len-N)+1,Len)),
-                N};
-           false ->
-               {Q,Len}
-           end,
-    {reply, Max, St#st{err_cache_max=N, err_cache_len=NewLen, err_cache=NewQ}};
 handle_call(_Request, _From, St) ->
     {reply, ignored, St}.
 
@@ -81,28 +86,17 @@ handle_cast({kill, FromRef}, #st{workers=Workers} = St) ->
 handle_info({'DOWN', Ref, process, _, normal}, #st{workers=Workers} = St) ->
     {noreply, St#st{workers = remove_worker(Ref, Workers)}};
 
-handle_info({'DOWN', Ref, process, Pid, Reason}, #st{workers=Workers,
-                                                    err_cache=Q,
-                                                    err_cache_max=Max,
-                                                    err_cache_len=Len} = St) ->
+handle_info({'DOWN', Ref, process, Pid, Error}, #st{workers=Workers} = St) ->
     case find_worker(Ref, Workers) of
     {Pid, Ref, From} ->
-
-        {Error,{M,F,A},Nonce,Stack} = Reason,
-
-        {NewQ,NewLen} =
-        case Len >= Max of
-        true ->
-            Q1 = queue:drop(Q),
-            {Q1,Len};
+        case Error of #error{reason = Reason, stack = Stack} ->
+            notify_caller(From, {Reason, Stack}),
+            St1 = save_error(Error, St),
+            {noreply, St1#st{workers = remove_worker(Ref, Workers)}};
         _ ->
-            {Q,Len+1}
-        end,
-        NewQ1 = queue:in([now(),From,Nonce,M,F,A],NewQ),
-        notify_caller(From, {Error,Stack}),
-        {noreply, St#st{workers = remove_worker(Ref, Workers),
-                       err_cache=NewQ1,
-                       err_cache_len=NewLen}};
+            notify_caller(From, Error),
+            {noreply, St#st{workers = remove_worker(Ref, Workers)}}
+        end;
     false ->
         {noreply, St}
     end;
@@ -132,10 +126,21 @@ init_p(From, {M,F,A}, Nonce) ->
     try apply(M, F, A) catch exit:normal -> ok; Class:Reason ->
         Stack = clean_stack(),
         error_logger:error_report([{?MODULE, Nonce, {Class, Reason}}, Stack]),
-        exit({Reason,{M,F,A},Nonce,Stack})
+        exit(#error{
+            timestamp = now(),
+            reason = Reason,
+            mfa = {M,F,A},
+            nonce = Nonce,
+            stack = Stack
+        })
     end.
 
 %% internal
+
+save_error(E, #st{errors=Q, error_limit=L, error_count=C} = St) when C >= L ->
+    St#st{errors = queue:in(E, queue:drop(Q))};
+save_error(E, #st{errors=Q, error_count=C} = St) ->
+    St#st{errors = queue:in(E, Q), error_count = C+1}.
 
 clean_stack() ->
     lists:map(fun({M,F,A}) when is_list(A) -> {M,F,length(A)}; (X) -> X end,
