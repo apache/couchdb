@@ -114,6 +114,9 @@ terminate(_Reason, St) ->
     ets:foldl(fun({Pid, _, _}, _) -> exit(Pid,kill) end, nil, St#st.workers),
     ok.
 
+code_change(_OldVsn, {st, Workers}, _Extra) ->
+    {ok, #st{workers = Workers}};
+
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
 
