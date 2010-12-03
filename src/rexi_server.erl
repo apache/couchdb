@@ -121,7 +121,8 @@ init_p(From, MFA) ->
     init_p(From, MFA, undefined).
 
 %% @doc initializes a process started by rexi_server.
--spec init_p({pid(), reference()}, {atom(), atom(), list()}, string()) -> any().
+-spec init_p({pid(), reference()}, {atom(), atom(), list()},
+    string() | undefined) -> any().
 init_p(From, {M,F,A}, Nonce) ->
     put(rexi_from, From),
     put(initial_call, {M,F,length(A)}),
