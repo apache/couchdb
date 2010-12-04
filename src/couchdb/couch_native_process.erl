@@ -186,7 +186,14 @@ ddoc(State, {DDoc}, [FunPath, Args]) ->
 ddoc(State, {_, Fun}, [<<"validate_doc_update">>], Args) ->
     {State, (catch apply(Fun, Args))};
 ddoc(State, {_, Fun}, [<<"filters">>|_], [Docs, Req]) ->
-    Resp = lists:map(fun(Doc) -> (catch Fun(Doc, Req)) =:= true end, Docs),
+    FilterFunWrapper = fun(Doc) ->
+        case catch Fun(Doc, Req) of
+        true -> true;
+        false -> false;
+        {'EXIT', Error} -> ?LOG_ERROR("~p", [Error])
+        end
+    end,
+    Resp = lists:map(FilterFunWrapper, Docs),
     {State, [true, Resp]};
 ddoc(State, {_, Fun}, [<<"shows">>|_], Args) ->
     Resp = case (catch apply(Fun, Args)) of
