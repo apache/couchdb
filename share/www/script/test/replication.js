@@ -667,7 +667,7 @@ couchTests.replication = function(debug) {
       );
       T(false, "replication should have failed");
     } catch(x) {
-      T(x.error === "db_not_found");
+      T(x.error === "unauthorized");
     }
 
     atts_ddoc_copy = dbB.open(atts_ddoc._id);
