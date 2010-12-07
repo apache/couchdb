@@ -57,6 +57,8 @@ To install Spidermonkey 1.9.2 from PPA:
 
 `sudo` is only necessary when installing to a prefix which is not user-writeable.  In any case, the installer tries to chown the database directory and logfile to the user who configured BigCouchbigcouch.
 
+Run into any issues? Check out our wiki, https://github.com/cloudant/bigcouch/wiki/Troubleshooting
+
 #### Starting BigCouch
 
     $PREFIX/bin/bigcouch
