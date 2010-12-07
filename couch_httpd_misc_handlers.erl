@@ -101,7 +101,9 @@ handle_replicate_req(#httpd{method='POST'}=Req) ->
         end
     catch
     throw:{db_not_found, Msg} ->
-        send_json(Req, 404, {[{error, db_not_found}, {reason, Msg}]})
+        send_json(Req, 404, {[{error, db_not_found}, {reason, Msg}]});
+    throw:{unauthorized, Msg} ->
+        send_json(Req, 404, {[{error, unauthorized}, {reason, Msg}]})
     end;
 handle_replicate_req(Req) ->
     send_method_not_allowed(Req, "POST").
