@@ -103,6 +103,8 @@ db_exists(Req, CanonicalUrl, CreateDB) ->
     {ok, "303", RespHeaders, _} ->
         RedirectUrl = redirect_url(RespHeaders, Req#http_db.url),
         db_exists(Req#http_db{method = get, url = RedirectUrl}, CanonicalUrl);
+    {ok, "401", _, _} ->
+        throw({unauthorized, ?l2b(Url)});
     Error ->
         ?LOG_DEBUG("DB at ~s could not be found because ~p", [Url, Error]),
         throw({db_not_found, ?l2b(Url)})
