@@ -235,14 +235,23 @@
           // set up the promise object within a closure for this handler
           var timeout = 100, db = this, active = true,
             listeners = [],
+            xhr = null,
             promise = {
-            onChange : function(fun) {
-              listeners.push(fun);
-            },
-            stop : function() {
-              active = false;
-            }
-          };
+              onChange : function(fun) {
+                listeners.push(fun);
+              },
+              stop : function() {
+                active = false;
+                
+                if (xhr) {
+                  try {
+                    xhr.abort();
+                  } catch (e) {
+                  }
+                }
+              }
+            };
+
           // call each listener when there is a change
           function triggerListeners(resp) {
             $.each(listeners, function() {
@@ -270,7 +279,7 @@
               feed : "longpoll",
               since : since
             });
-            ajax(
+            xhr = ajax(
               {url: db.uri + "_changes"+encodeOptions(opts)},
               options,
               "Error connecting to "+db.uri+"/_changes."
@@ -597,7 +606,7 @@
     options = $.extend({successStatus: 200}, options);
     ajaxOptions = $.extend({contentType: "application/json"}, ajaxOptions);
     errorMessage = errorMessage || "Unknown error";
-    $.ajax($.extend($.extend({
+    return $.ajax($.extend($.extend({
       type: "GET", dataType: "json", cache : !$.browser.msie,
       beforeSend: function(xhr){
         if(ajaxOptions && ajaxOptions.headers){
