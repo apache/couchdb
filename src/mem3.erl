@@ -15,7 +15,7 @@
 -module(mem3).
 
 -export([start/0, stop/0, restart/0, nodes/0, shards/1, shards/2,
-    choose_shards/2, n/1]).
+    choose_shards/2, n/1, dbname/1]).
 -export([compare_nodelists/0, compare_shards/1]).
 
 -include("mem3.hrl").
@@ -119,3 +119,15 @@ choose_shards(DbName, Options) ->
         RotatedNodes = B ++ A,
         mem3_util:create_partition_map(DbName, N, Q, RotatedNodes)
     end.
+
+-spec dbname(#shard{} | iodata()) -> binary().
+dbname(#shard{dbname = DbName}) ->
+    DbName;
+dbname(<<"shards/", _:8/binary, "-", _:8/binary, "/", DbName/binary>>) ->
+    DbName;
+dbname(DbName) when is_list(DbName) ->
+    dbname(list_to_binary(DbName));
+dbname(DbName) when is_binary(DbName) ->
+    DbName;
+dbname(_) ->
+    erlang:error(badarg).
