@@ -15,7 +15,7 @@
 
 main(_) ->
     test_util:init_code_path(),
-    etap:plan(16),
+    etap:plan(14),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -89,21 +89,9 @@ test() ->
     ),
 
     etap:is(
-        {TwoChildSibs, no_conflicts},
-        couch_key_tree:merge(Stemmed1b, TwoChildSibs),
-        "Merging in the opposite direction."
-    ),
-
-    etap:is(
         {TwoChildSibs2, no_conflicts},
         couch_key_tree:merge(TwoChildSibs2, Stemmed1bb),
         "Merging a stem at a deeper level."
-    ),
-
-    etap:is(
-        {TwoChildSibs2, no_conflicts},
-        couch_key_tree:merge(Stemmed1bb, TwoChildSibs2),
-        "Merging a deeper level in opposite order."
     ),
 
     etap:is(
