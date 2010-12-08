@@ -754,7 +754,10 @@ copy_rev_tree_attachments(SrcDb, DestFd, Tree) ->
         end, Tree).
             
 
-copy_docs(Db, #db{updater_fd = DestFd} = NewDb, InfoBySeq, Retry) ->
+copy_docs(Db, #db{updater_fd = DestFd} = NewDb, InfoBySeq0, Retry) ->
+    % COUCHDB-968, make sure we prune duplicates during compaction
+    InfoBySeq = lists:usort(fun(#doc_info{id=A}, #doc_info{id=B}) -> A =< B end,
+        InfoBySeq0),
     Ids = [Id || #doc_info{id=Id} <- InfoBySeq],
     LookupResults = couch_btree:lookup(Db#db.fulldocinfo_by_id_btree, Ids),
 
