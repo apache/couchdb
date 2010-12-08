@@ -18,7 +18,7 @@
 -export([update_doc/3,update_doc/4,update_docs/4,update_docs/2,update_docs/3,delete_doc/3]).
 -export([get_doc_info/2,open_doc/2,open_doc/3,open_doc_revs/4]).
 -export([set_revs_limit/2,get_revs_limit/1]).
--export([get_missing_revs/2,name/1,doc_to_tree/1,get_update_seq/1,get_committed_update_seq/1]).
+-export([get_missing_revs/2,name/1,get_update_seq/1,get_committed_update_seq/1]).
 -export([enum_docs/4,enum_docs_since/5]).
 -export([enum_docs_since_reduce_to_count/1,enum_docs_reduce_to_count/1]).
 -export([increment_update_seq/1,get_purge_seq/1,purge_docs/2,get_last_purged/1]).
@@ -558,7 +558,7 @@ prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldI
     {ok, #full_doc_info{rev_tree=OldTree}} ->
         NewRevTree = lists:foldl(
             fun(NewDoc, AccTree) ->
-                {NewTree, _} = couch_key_tree:merge(AccTree, couch_db:doc_to_tree(NewDoc)),
+                {NewTree, _} = couch_key_tree:merge(AccTree, couch_doc:to_path(NewDoc)),
                 NewTree
             end,
             OldTree, Bucket),
@@ -1140,17 +1140,6 @@ doc_meta_info(#doc_info{high_seq=Seq,revs=[#rev_info{rev=Rev}|RestInfo]}, RevTre
 
 read_doc(#db{fd=Fd}, Pos) ->
     couch_file:pread_term(Fd, Pos).
-
-
-doc_to_tree(#doc{revs={Start, RevIds}}=Doc) ->
-    [Tree] = doc_to_tree_simple(Doc, lists:reverse(RevIds)),
-    {Start - length(RevIds) + 1, Tree}.
-
-
-doc_to_tree_simple(Doc, [RevId]) ->
-    [{RevId, Doc, []}];
-doc_to_tree_simple(Doc, [RevId | Rest]) ->
-    [{RevId, ?REV_MISSING, doc_to_tree_simple(Doc, Rest)}].
 
 
 make_doc(#db{updater_fd = Fd} = Db, Id, Deleted, Bp, RevisionPath) ->
