@@ -30,7 +30,6 @@ init({MainPid, DbName, Filepath, Fd, Options}) ->
         RootDir = couch_config:get("couchdb", "database_dir", "."),
         couch_file:delete(RootDir, Filepath ++ ".compact");
     false ->
-        ok = couch_file:upgrade_old_header(Fd, <<$g, $m, $k, 0>>), % 09 UPGRADE CODE
         case couch_file:read_header(Fd) of
         {ok, Header} ->
             ok;
@@ -298,19 +297,7 @@ btree_by_seq_join(KeySeq, {Id, RevInfos, DeletedRevInfos}) ->
             [#rev_info{rev=Rev,seq=Seq,deleted=false,body_sp = Bp} ||
                 {Rev, Seq, Bp} <- RevInfos] ++
             [#rev_info{rev=Rev,seq=Seq,deleted=true,body_sp = Bp} ||
-                {Rev, Seq, Bp} <- DeletedRevInfos]};
-btree_by_seq_join(KeySeq,{Id, Rev, Bp, Conflicts, DelConflicts, Deleted}) ->
-    % 09 UPGRADE CODE
-    % this is the 0.9.0 and earlier by_seq record. It's missing the body pointers
-    % and individual seq nums for conflicts that are currently in the index,
-    % meaning the filtered _changes api will not work except for on main docs.
-    % Simply compact a 0.9.0 database to upgrade the index.
-    #doc_info{
-        id=Id,
-        high_seq=KeySeq,
-        revs = [#rev_info{rev=Rev,seq=KeySeq,deleted=Deleted,body_sp=Bp}] ++
-            [#rev_info{rev=Rev1,seq=KeySeq,deleted=false} || Rev1 <- Conflicts] ++
-            [#rev_info{rev=Rev2,seq=KeySeq,deleted=true} || Rev2 <- DelConflicts]}.
+                {Rev, Seq, Bp} <- DeletedRevInfos]}.
 
 btree_by_id_split(#full_doc_info{id=Id, update_seq=Seq,
         deleted=Deleted, rev_tree=Tree}) ->
@@ -329,14 +316,7 @@ btree_by_id_join(Id, {HighSeq, Deleted, DiskTree}) ->
         fun(_RevId, {IsDeleted, BodyPointer, UpdateSeq}) ->
             {IsDeleted == 1, BodyPointer, UpdateSeq};
         (_RevId, ?REV_MISSING) ->
-            ?REV_MISSING;
-        (_RevId, {IsDeleted, BodyPointer}) ->
-            % 09 UPGRADE CODE
-            % this is the 0.9.0 and earlier rev info record. It's missing the seq
-            % nums, which means couchdb will sometimes reexamine unchanged
-            % documents with the _changes API.
-            % This is fixed by compacting the database.
-            {IsDeleted == 1, BodyPointer, HighSeq}
+            ?REV_MISSING
         end, DiskTree),
 
     #full_doc_info{id=Id, update_seq=HighSeq, deleted=Deleted==1, rev_tree=Tree}.
@@ -363,14 +343,16 @@ simple_upgrade_record(Old, New) when tuple_size(Old) < tuple_size(New) ->
         lists:sublist(tuple_to_list(New), OldSz + 1, tuple_size(New) - OldSz),
     list_to_tuple(tuple_to_list(Old) ++ NewValuesTail).
 
+-define(OLD_DISK_VERSION_ERROR,
+    "Database files from versions smaller than 0.10.0 are no longer supported").
 
 init_db(DbName, Filepath, Fd, ReaderFd, Header0, Options) ->
     Header1 = simple_upgrade_record(Header0, #db_header{}),
     Header =
     case element(2, Header1) of
-    1 -> Header1#db_header{unused = 0, security_ptr = nil}; % 0.9
-    2 -> Header1#db_header{unused = 0, security_ptr = nil}; % post 0.9 and pre 0.10
-    3 -> Header1#db_header{security_ptr = nil}; % post 0.9 and pre 0.10
+    1 -> throw({database_disk_version_error, ?OLD_DISK_VERSION_ERROR});
+    2 -> throw({database_disk_version_error, ?OLD_DISK_VERSION_ERROR});
+    3 -> throw({database_disk_version_error, ?OLD_DISK_VERSION_ERROR});
     4 -> Header1#db_header{security_ptr = nil}; % 0.10 and pre 0.11
     ?LATEST_DISK_VERSION -> Header1;
     _ -> throw({database_disk_version_error, "Incorrect disk header version"})
@@ -736,28 +718,11 @@ commit_data(Db, _) ->
     end.
 
 
-copy_doc_attachments(#db{updater_fd = SrcFd} = SrcDb, {Pos,_RevId},
-    SrcSp, DestFd) ->
+copy_doc_attachments(#db{updater_fd = SrcFd} = SrcDb, SrcSp, DestFd) ->
     {ok, {BodyData, BinInfos}} = couch_db:read_doc(SrcDb, SrcSp),
     % copy the bin values
     NewBinInfos = lists:map(
-        fun({Name, {Type, BinSp, AttLen}}) when is_tuple(BinSp) orelse BinSp == null ->
-            % 09 UPGRADE CODE
-            {NewBinSp, AttLen, AttLen, Md5, _IdentityMd5} =
-                couch_stream:old_copy_to_new_stream(SrcFd, BinSp, AttLen, DestFd),
-            {Name, Type, NewBinSp, AttLen, AttLen, Pos, Md5, identity};
-        ({Name, {Type, BinSp, AttLen}}) ->
-            % 09 UPGRADE CODE
-            {NewBinSp, AttLen, AttLen, Md5, _IdentityMd5} =
-                couch_stream:copy_to_new_stream(SrcFd, BinSp, DestFd),
-            {Name, Type, NewBinSp, AttLen, AttLen, Pos, Md5, identity};
-        ({Name, Type, BinSp, AttLen, _RevPos, <<>>}) when
-            is_tuple(BinSp) orelse BinSp == null ->
-            % 09 UPGRADE CODE
-            {NewBinSp, AttLen, AttLen, Md5, _IdentityMd5} =
-                couch_stream:old_copy_to_new_stream(SrcFd, BinSp, AttLen, DestFd),
-            {Name, Type, NewBinSp, AttLen, AttLen, AttLen, Md5, identity};
-        ({Name, Type, BinSp, AttLen, RevPos, Md5}) ->
+        fun({Name, Type, BinSp, AttLen, RevPos, Md5}) ->
             % 010 UPGRADE CODE
             {NewBinSp, AttLen, AttLen, Md5, _IdentityMd5} =
                 couch_stream:copy_to_new_stream(SrcFd, BinSp, DestFd),
@@ -781,8 +746,8 @@ copy_doc_attachments(#db{updater_fd = SrcFd} = SrcDb, {Pos,_RevId},
 
 copy_rev_tree_attachments(SrcDb, DestFd, Tree) ->
     couch_key_tree:map(
-        fun(Rev, {IsDel, Sp, Seq}, leaf) ->
-            DocBody = copy_doc_attachments(SrcDb, Rev, Sp, DestFd),
+        fun(_Rev, {IsDel, Sp, Seq}, leaf) ->
+            DocBody = copy_doc_attachments(SrcDb, Sp, DestFd),
             {IsDel, DocBody, Seq};
         (_, _, branch) ->
             ?REV_MISSING

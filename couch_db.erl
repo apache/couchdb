@@ -1138,9 +1138,6 @@ doc_meta_info(#doc_info{high_seq=Seq,revs=[#rev_info{rev=Rev}|RestInfo]}, RevTre
     true -> [{local_seq, Seq}]
     end.
 
-read_doc(#db{fd=Fd}, OldStreamPointer) when is_tuple(OldStreamPointer) ->
-    % 09 UPGRADE CODE
-    couch_stream:old_read_term(Fd, OldStreamPointer);
 read_doc(#db{fd=Fd}, Pos) ->
     couch_file:pread_term(Fd, Pos).
 
