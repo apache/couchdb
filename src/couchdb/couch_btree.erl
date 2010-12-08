@@ -16,16 +16,8 @@
 -export([fold/4, full_reduce/1, final_reduce/2, foldl/3, foldl/4]).
 -export([fold_reduce/4, lookup/2, get_state/1, set_options/2]).
 
+-include("couch_db.hrl").
 -define(CHUNK_THRESHOLD, 16#4ff).
-
--record(btree,
-    {fd,
-    root,
-    extract_kv = fun({Key, Value}) -> {Key, Value} end,
-    assemble_kv =  fun(Key, Value) -> {Key, Value} end,
-    less = fun(A, B) -> A < B end,
-    reduce = nil
-    }).
 
 extract(#btree{extract_kv=Extract}, Value) ->
     Extract(Value).
