@@ -158,6 +158,7 @@
     compactor_pid = nil,
     instance_start_time, % number of microsecs since jan 1 1970 as a binary string
     fd,
+    updater_fd,
     fd_ref_counter,
     header = #db_header{},
     committed_update_seq,
@@ -174,7 +175,7 @@
     waiting_delayed_commit = nil,
     revs_limit = 1000,
     fsync_options = [],
-    is_sys_db = false
+    options = []
     }).
 
 
@@ -297,3 +298,11 @@
     db_open_options = []
 }).
 
+-record(btree, {
+    fd,
+    root,
+    extract_kv = fun({_Key, _Value} = KV) -> KV end,
+    assemble_kv = fun(Key, Value) -> {Key, Value} end,
+    less = fun(A, B) -> A < B end,
+    reduce = nil
+}).
