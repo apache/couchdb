@@ -23,6 +23,8 @@ Note: This version has not been released yet.
  * Various fixes to make replicated more resilient for edge-cases.
  * Don't trigger a view update when requesting `_design/doc/_info`.
  * Fix for circular references in CommonJS requires.
+ * Fix for frequently edited documents in multi-master deployments being
+   duplicated in _changes and _all_docs.
 
 Version 1.0.1
 -------------
