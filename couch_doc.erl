@@ -18,8 +18,20 @@
 -export([validate_docid/1]).
 -export([doc_from_multi_part_stream/2]).
 -export([doc_to_multi_part_stream/5, len_doc_to_multi_part_stream/4]).
+-export([to_path/1]).
 
 -include("couch_db.hrl").
+
+-spec to_path(#doc{}) -> path().
+to_path(#doc{revs={Start, RevIds}}=Doc) ->
+    [Branch] = to_branch(Doc, lists:reverse(RevIds)),
+    {Start - length(RevIds) + 1, Branch}.
+
+-spec to_branch(#doc{}, [RevId::binary()]) -> [branch()].
+to_branch(Doc, [RevId]) ->
+    [{RevId, Doc, []}];
+to_branch(Doc, [RevId | Rest]) ->
+    [{RevId, ?REV_MISSING, to_branch(Doc, Rest)}].
 
 % helpers used by to_json_obj
 to_json_rev(0, []) ->

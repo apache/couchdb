@@ -16,12 +16,7 @@
 -export([map/2, get_all_leafs/1, count_leafs/1, remove_leafs/2,
     get_all_leafs_full/1,stem/2,map_leafs/2]).
 
-% Tree::term() is really a tree(), but we don't want to require R13B04 yet
--type branch() :: {Key::term(), Value::term(), Tree::term()}.
--type path() :: {Start::pos_integer(), branch()}.
--type tree() :: [branch()]. % sorted by key
-
-% partial trees arranged by how much they are cut off.
+-include("couch_db.hrl").
 
 -spec merge([path()], path()) -> {[path()], conflicts | no_conflicts}.
 merge(Paths, Path) ->
