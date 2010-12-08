@@ -310,9 +310,6 @@ to_doc_info_path(#full_doc_info{id=Id,rev_tree=Tree}) ->
 
 att_foldl(#att{data=Bin}, Fun, Acc) when is_binary(Bin) ->
     Fun(Bin, Acc);
-att_foldl(#att{data={Fd,Sp},att_len=Len}, Fun, Acc) when is_tuple(Sp) orelse Sp == null ->
-    % 09 UPGRADE CODE
-    couch_stream:old_foldl(Fd, Sp, Len, Fun, Acc);
 att_foldl(#att{data={Fd,Sp},md5=Md5}, Fun, Acc) ->
     couch_stream:foldl(Fd, Sp, Md5, Fun, Acc);
 att_foldl(#att{data=DataFun,att_len=Len}, Fun, Acc) when is_function(DataFun) ->

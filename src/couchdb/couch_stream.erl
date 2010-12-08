@@ -24,11 +24,14 @@
 
 -define(DEFAULT_STREAM_CHUNK, 16#00100000). % 1 meg chunks when streaming data
 
--export([open/1, open/3, close/1, write/2, foldl/4, foldl/5, range_foldl/6, foldl_decode/6,
-        old_foldl/5,old_copy_to_new_stream/4]).
--export([copy_to_new_stream/3,old_read_term/2]).
--export([init/1, terminate/2, handle_call/3]).
--export([handle_cast/2,code_change/3,handle_info/2]).
+% public API
+-export([open/1, open/3, close/1]).
+-export([foldl/4, foldl/5, foldl_decode/6, range_foldl/6]).
+-export([copy_to_new_stream/3, write/2]).
+
+% gen_server callbacks
+-export([init/1, terminate/2, code_change/3]).
+-export([handle_cast/2, handle_call/3, handle_info/2]).
 
 -include("couch_db.hrl").
 
@@ -67,23 +70,6 @@ copy_to_new_stream(Fd, PosList, DestFd) ->
             ok = write(Dest, Bin)
         end, ok),
     close(Dest).
-
-
-% 09 UPGRADE CODE
-old_copy_to_new_stream(Fd, Pos, Len, DestFd) ->
-    {ok, Dest} = open(DestFd),
-    old_foldl(Fd, Pos, Len,
-        fun(Bin, _) ->
-            ok = write(Dest, Bin)
-        end, ok),
-    close(Dest).
-
-% 09 UPGRADE CODE
-old_foldl(_Fd, null, 0, _Fun, Acc) ->
-    Acc;
-old_foldl(Fd, OldPointer, Len, Fun, Acc) when is_tuple(OldPointer)->
-    {ok, Acc2, _} = old_stream_data(Fd, OldPointer, Len, ?DEFAULT_STREAM_CHUNK, Fun, Acc),
-    Acc2.
 
 foldl(_Fd, [], _Fun, Acc) ->
     Acc;
@@ -317,41 +303,3 @@ code_change(_OldVsn, State, _Extra) ->
 
 handle_info(_Info, State) ->
     {noreply, State}.
-
-
-
-% 09 UPGRADE CODE
-old_read_term(Fd, Sp) ->
-    {ok, <<TermLen:(?STREAM_OFFSET_BITS)>>, Sp2}
-        = old_read(Fd, Sp, ?STREAM_OFFSET_BYTES),
-    {ok, Bin, _Sp3} = old_read(Fd, Sp2, TermLen),
-    {ok, binary_to_term(Bin)}.
-
-old_read(Fd, Sp, Num) ->
-    {ok, RevBin, Sp2} = old_stream_data(Fd, Sp, Num, ?HUGE_CHUNK, fun(Bin, Acc) -> [Bin | Acc] end, []),
-    Bin = list_to_binary(lists:reverse(RevBin)),
-    {ok, Bin, Sp2}.
-
-% 09 UPGRADE CODE
-old_stream_data(_Fd, Sp, 0, _MaxChunk, _Fun, Acc) ->
-    {ok, Acc, Sp};
-old_stream_data(Fd, {Pos, 0}, Num, MaxChunk, Fun, Acc) ->
-    {ok, <<NextPos:(?FILE_POINTER_BITS), NextOffset:(?STREAM_OFFSET_BITS)>>}
-        = couch_file:old_pread(Fd, Pos, ?FILE_POINTER_BYTES + ?STREAM_OFFSET_BYTES),
-    Sp = {NextPos, NextOffset},
-    % Check NextPos is past current Pos (this is always true in a stream)
-    % Guards against potential infinite loops caused by corruption.
-    case NextPos > Pos of
-        true -> ok;
-        false -> throw({error, stream_corruption})
-    end,
-    old_stream_data(Fd, Sp, Num, MaxChunk, Fun, Acc);
-old_stream_data(Fd, {Pos, Offset}, Num, MaxChunk, Fun, Acc) ->
-    ReadAmount = lists:min([MaxChunk, Num, Offset]),
-    {ok, Bin} = couch_file:old_pread(Fd, Pos, ReadAmount),
-    Sp = {Pos + ReadAmount, Offset - ReadAmount},
-    old_stream_data(Fd, Sp, Num - ReadAmount, MaxChunk, Fun, Fun(Bin, Acc)).
-
-
-% Tests moved to tests/etap/050-stream.t
-
