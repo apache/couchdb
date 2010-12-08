@@ -848,7 +848,12 @@ start_copy_compact(#db{name=Name,filepath=Filepath}=Db) ->
     {ok, Fd} ->
         couch_task_status:add_task(<<"Database Compaction">>, <<Name/binary, " retry">>, <<"Starting">>),
         Retry = true,
-        {ok, Header} = couch_file:read_header(Fd);
+        case couch_file:read_header(Fd) of
+        {ok, Header} ->
+            ok;
+        no_valid_header ->
+            ok = couch_file:write_header(Fd, Header=#db_header{})
+        end;
     {error, enoent} ->
         couch_task_status:add_task(<<"Database Compaction">>, Name, <<"Starting">>),
         {ok, Fd} = couch_file:open(CompactFile, [create]),
