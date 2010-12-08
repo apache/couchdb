@@ -484,13 +484,13 @@ send_result(Client, Id, OriginalRevs, NewResult) ->
     % used to send a result to the client
     catch(Client ! {result, self(), {{Id, OriginalRevs}, NewResult}}).
 
-merge_rev_trees(_MergeConflicts, [], [], AccNewInfos, AccRemoveSeqs, AccSeq) ->
+merge_rev_trees(_Limit, _Merge, [], [], AccNewInfos, AccRemoveSeqs, AccSeq) ->
     {ok, lists:reverse(AccNewInfos), AccRemoveSeqs, AccSeq};
-merge_rev_trees(MergeConflicts, [NewDocs|RestDocsList],
+merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
         [OldDocInfo|RestOldInfo], AccNewInfos, AccRemoveSeqs, AccSeq) ->
     #full_doc_info{id=Id,rev_tree=OldTree,deleted=OldDeleted,update_seq=OldSeq}
             = OldDocInfo,
-    NewRevTree = lists:foldl(
+    NewRevTree0 = lists:foldl(
         fun({Client, #doc{revs={Pos,[_Rev|PrevRevs]}}=NewDoc}, AccTree) ->
             if not MergeConflicts ->
                 case couch_key_tree:merge(AccTree, [couch_db:doc_to_tree(NewDoc)]) of
@@ -543,10 +543,11 @@ merge_rev_trees(MergeConflicts, [NewDocs|RestDocsList],
             end
         end,
         OldTree, NewDocs),
+    NewRevTree = couch_key_tree:stem(NewRevTree0, Limit),
     if NewRevTree == OldTree ->
         % nothing changed
-        merge_rev_trees(MergeConflicts, RestDocsList, RestOldInfo, AccNewInfos,
-                AccRemoveSeqs, AccSeq);
+        merge_rev_trees(Limit, MergeConflicts, RestDocsList, RestOldInfo,
+            AccNewInfos, AccRemoveSeqs, AccSeq);
     true ->
         % we have updated the document, give it a new seq #
         NewInfo = #full_doc_info{id=Id,update_seq=AccSeq+1,rev_tree=NewRevTree},
@@ -554,8 +555,8 @@ merge_rev_trees(MergeConflicts, [NewDocs|RestDocsList],
             0 -> AccRemoveSeqs;
             _ -> [OldSeq | AccRemoveSeqs]
         end,
-        merge_rev_trees(MergeConflicts, RestDocsList, RestOldInfo,
-                [NewInfo|AccNewInfos], RemoveSeqs, AccSeq+1)
+        merge_rev_trees(Limit, MergeConflicts, RestDocsList, RestOldInfo,
+            [NewInfo|AccNewInfos], RemoveSeqs, AccSeq+1)
     end.
 
 
@@ -578,7 +579,8 @@ update_docs_int(Db, DocsList, NonRepDocs, MergeConflicts, FullCommit) ->
     #db{
         fulldocinfo_by_id_btree = DocInfoByIdBTree,
         docinfo_by_seq_btree = DocInfoBySeqBTree,
-        update_seq = LastSeq
+        update_seq = LastSeq,
+        revs_limit = RevsLimit
         } = Db,
     Ids = [Id || [{_Client, #doc{id=Id}}|_] <- DocsList],
     % lookup up the old documents, if they exist.
@@ -591,10 +593,8 @@ update_docs_int(Db, DocsList, NonRepDocs, MergeConflicts, FullCommit) ->
         end,
         Ids, OldDocLookups),
     % Merge the new docs into the revision trees.
-    {ok, NewDocInfos0, RemoveSeqs, NewSeq} = merge_rev_trees(
+    {ok, NewFullDocInfos, RemoveSeqs, NewSeq} = merge_rev_trees(RevsLimit,
             MergeConflicts, DocsList, OldDocInfos, [], [], LastSeq),
-
-    NewFullDocInfos = stem_full_doc_infos(Db, NewDocInfos0),
 
     % All documents are now ready to write.
 
