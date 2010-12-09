@@ -24,7 +24,7 @@
 
 % Documents
 -export([open_doc/3, open_revs/4, get_missing_revs/2, update_doc/3,
-    update_docs/3, att_receiver/2]).
+    update_docs/3, purge_docs/2, att_receiver/2]).
 
 % Views
 -export([all_docs/4, changes/4, query_view/3, query_view/4, query_view/6,
@@ -169,6 +169,9 @@ update_docs(DbName, Docs, Options) ->
     catch {aborted, PreCommitFailures} ->
         {aborted, PreCommitFailures}
     end.
+
+purge_docs(_DbName, _IdsRevs) ->
+    not_implemented.
 
 %% @doc spawns a process to upload attachment data and
 %%      returns a function that shards can use to communicate
