@@ -90,29 +90,29 @@ get_level_integer() ->
 set_level_integer(Int) ->
     gen_event:call(error_logger, couch_log, {set_level_integer, Int}).
 
-handle_event({Pid, couch_error, {Format, Args}}, {Fd, _LogLevel, _Sasl}=State) ->
-    log(Fd, Pid, error, Format, Args),
+handle_event({Pid, couch_error, Id, {Format, Args}}, {Fd, _, _}=State) ->
+    log(Fd, Pid, error, Id, Format, Args),
     {ok, State};
-handle_event({Pid, couch_info, {Format, Args}}, {Fd, LogLevel, _Sasl}=State)
+handle_event({Pid, couch_info, Id, {Format, Args}}, {Fd, LogLevel, _Sasl}=State)
 when LogLevel =< ?LEVEL_INFO ->
-    log(Fd, Pid, info, Format, Args),
+    log(Fd, Pid, info, Id, Format, Args),
     {ok, State};
-handle_event({Pid, couch_debug, {Format, Args}}, {Fd, LogLevel, _Sasl}=State)
+handle_event({Pid, couch_debug, Id, {Format, Args}}, {Fd, LogLevel, _Sasl}=State)
 when LogLevel =< ?LEVEL_DEBUG ->
-    log(Fd, Pid, debug, Format, Args),
+    log(Fd, Pid, debug, Id, Format, Args),
     {ok, State};
 handle_event({error_report, _, {Pid, _, _}}=Event, {Fd, _LogLevel, Sasl}=State)
 when Sasl =/= false ->
-    log(Fd, Pid, error, "~p", [Event]),
+    log(Fd, Pid, error, undefined, "~p", [Event]),
     {ok, State};
 handle_event({error, _, {Pid, Format, Args}}, {Fd, _LogLevel, Sasl}=State)
 when Sasl =/= false ->
-    log(Fd, Pid, error, Format, Args),
+    log(Fd, Pid, error, undefined, Format, Args),
     {ok, State};
 handle_event({_, _, {Pid, _, _}}=Event, {Fd, LogLevel, _Sasl}=State)
 when LogLevel =< ?LEVEL_TMI ->
     % log every remaining event if tmi!
-    log(Fd, Pid, tmi, "~p", [Event]),
+    log(Fd, Pid, tmi, undefined, "~p", [Event]),
     {ok, State};
 handle_event(_Event, State) ->
     {ok, State}.
@@ -130,12 +130,15 @@ code_change(_OldVsn, State, _Extra) ->
 terminate(_Arg, {Fd, _LoggingLevel, _Sasl}) ->
     file:close(Fd).
 
-log(Fd, Pid, Level, Format, Args) ->
+log(Fd, Pid, Level, undefined, Format, Args) ->
+    log(Fd, Pid, Level, "--------", Format, Args);
+log(Fd, Pid, Level, Id, Format, Args) ->
     Msg = io_lib:format(Format, Args),
-    ok = io:format("[~s] [~p] ~s~n", [Level, Pid, Msg]), % dump to console too
+    ok = io:format("[~s] [~p] [~s] ~s~n", [Level, Pid, Id, Msg]),
     Msg2 = re:replace(lists:flatten(Msg),"\\r\\n|\\r|\\n", "\r\n",
         [global, {return, list}]),
-    ok = io:format(Fd, "[~s] [~s] [~p] ~s\r~n\r~n", [httpd_util:rfc1123_date(), Level, Pid, Msg2]).
+    ok = io:format(Fd, "[~s] [~s] [~p] [~s] ~s\r~n\r~n",
+        [httpd_util:rfc1123_date(), Level, Pid, Id, Msg2]).
 
 read(Bytes, Offset) ->
     LogFileName = couch_config:get("log", "file"),

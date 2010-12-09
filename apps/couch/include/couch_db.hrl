@@ -29,7 +29,7 @@
     case couch_log:debug_on() of
         true ->
             gen_event:sync_notify(error_logger,
-                {self(), couch_debug, {Format, Args}});
+                {self(), couch_debug, erlang:get(nonce), {Format, Args}});
         false -> ok
     end).
 
@@ -37,13 +37,13 @@
     case couch_log:info_on() of
         true ->
             gen_event:sync_notify(error_logger,
-                {self(), couch_info, {Format, Args}});
+                {self(), couch_info, erlang:get(nonce), {Format, Args}});
         false -> ok
     end).
 
 -define(LOG_ERROR(Format, Args),
     gen_event:sync_notify(error_logger,
-            {self(), couch_error, {Format, Args}})).
+            {self(), couch_error, erlang:get(nonce), {Format, Args}})).
 
 
 -record(rev_info,
