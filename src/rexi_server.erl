@@ -19,6 +19,7 @@
 
 -export([start_link/0, init_p/2, init_p/3]).
 
+-include("rexi.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 -record(st, {
@@ -26,14 +27,6 @@
     errors = queue:new(),
     error_limit = 20,
     error_count = 0
-}).
-
--record(error, {
-    timestamp,
-    reason,
-    mfa,
-    nonce,
-    stack
 }).
 
 start_link() ->

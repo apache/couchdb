@@ -19,6 +19,8 @@
 -export([async_server_call/2, async_server_call/3]).
 -export([get_errors/0, get_last_error/0, set_error_limit/1]).
 
+-include("rexi.hrl").
+
 -define(SERVER, rexi_server).
 
 start() ->
@@ -30,11 +32,11 @@ stop() ->
 restart() ->
     stop(), start().
 
--spec get_errors() -> {ok, list()}.
+-spec get_errors() -> {ok, [#error{}]}.
 get_errors() ->
     gen_server:call(?SERVER, get_errors).
 
--spec get_last_error() -> {ok, term()} | {error, empty}.
+-spec get_last_error() -> {ok, #error{}} | {error, empty}.
 get_last_error() ->
     gen_server:call(?SERVER, get_last_error).
 
