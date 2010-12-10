@@ -82,7 +82,7 @@ handle_info({'DOWN', Ref, process, _, normal}, #st{workers=Workers} = St) ->
 handle_info({'DOWN', Ref, process, Pid, Error}, #st{workers=Workers} = St) ->
     case find_worker(Ref, Workers) of
     {Pid, Ref, From} ->
-        case Error of #error{reason = Reason, stack = Stack} ->
+        case Error of #error{reason = {_Class, Reason}, stack = Stack} ->
             notify_caller(From, {Reason, Stack}),
             St1 = save_error(Error, St),
             {noreply, St1#st{workers = remove_worker(Ref, Workers)}};
@@ -121,7 +121,7 @@ init_p(From, {M,F,A}, Nonce) ->
         error_logger:error_report([{?MODULE, Nonce, {Class, Reason}}, Stack]),
         exit(#error{
             timestamp = now(),
-            reason = Reason,
+            reason = {Class, Reason},
             mfa = {M,F,A},
             nonce = Nonce,
             stack = Stack
