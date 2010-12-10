@@ -20,6 +20,8 @@ Storage System:
  * Fix for frequently edited documents in multi-master deployments being
    duplicated in _changes and _all_docs.  See COUCHDDB-968 for details on how
    to repair.
+ * Significantly higher read and write throughput against database and
+   view index files.
 
 Log System:
 
