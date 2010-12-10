@@ -120,7 +120,19 @@ pread_binary(Fd, Pos) ->
 
 
 pread_iolist(Fd, Pos) ->
-    gen_server:call(Fd, {pread_iolist, Pos}, infinity).
+    case gen_server:call(Fd, {pread_iolist, Pos}, infinity) of
+    {ok, IoList, <<>>} ->
+        {ok, IoList};
+    {ok, IoList, Md5} ->
+        case couch_util:md5(IoList) of
+        Md5 ->
+            {ok, IoList};
+        _ ->
+            exit({file_corruption, <<"file corruption">>})
+        end;
+    Error ->
+        Error
+    end.
 
 %%----------------------------------------------------------------------
 %% Purpose: The length of a file, in bytes.
@@ -298,15 +310,10 @@ handle_call({pread_iolist, Pos}, _From, File) ->
     <<1:1/integer,Len:31/integer>> -> % an MD5-prefixed term
         {Md5AndIoList, _} = read_raw_iolist_int(File, NextPos, Len+16),
         {Md5, IoList} = extract_md5(Md5AndIoList),
-        case couch_util:md5(IoList) of
-        Md5 ->
-            {reply, {ok, IoList}, File};
-        _ ->
-            {stop, file_corruption, {error,file_corruption}, File}
-        end;
+        {reply, {ok, IoList, Md5}, File};
     <<0:1/integer,Len:31/integer>> ->
         {Iolist, _} = read_raw_iolist_int(File, NextPos, Len),
-        {reply, {ok, Iolist}, File}
+        {reply, {ok, Iolist, <<>>}, File}
     end;
 handle_call({pread, Pos, Bytes}, _From, #file{fd=Fd,tail_append_begin=TailAppendBegin}=File) ->
     {ok, Bin} = file:pread(Fd, Pos, Bytes),
