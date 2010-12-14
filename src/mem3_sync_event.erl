@@ -43,7 +43,8 @@ handle_info({nodeup, Node}, State) ->
     true ->
         Db1 = list_to_binary(couch_config:get("mem3", "node_db", "nodes")),
         Db2 = list_to_binary(couch_config:get("mem3", "shard_db", "dbs")),
-        [mem3_sync:push(Db, Node) || Db <- [Db1, Db2]];
+        [mem3_sync:push(Db, Node) || Db <- [Db1, Db2]],
+        mem3_sync:initial_sync([Node]);
     false ->
         ok
     end,
