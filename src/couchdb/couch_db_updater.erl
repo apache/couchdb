@@ -765,16 +765,6 @@ copy_doc_attachments(#db{fd=SrcFd}=SrcDb, {Pos,_RevId}, SrcSp, DestFd) ->
         end, BinInfos),
     {BodyData, NewBinInfos}.
 
-copy_rev_tree_attachments(SrcDb, DestFd, Tree) ->
-    couch_key_tree:map(
-        fun(Rev, {IsDel, Sp, Seq}, leaf) ->
-            DocBody = copy_doc_attachments(SrcDb, Rev, Sp, DestFd),
-            {IsDel, DocBody, Seq};
-        (_, _, branch) ->
-            ?REV_MISSING
-        end, Tree).
-            
-
 copy_docs(Db, #db{fd=DestFd}=NewDb, InfoBySeq0, Retry) ->
     % COUCHDB-968, make sure we prune duplicates during compaction
     InfoBySeq = lists:usort(fun(#doc_info{id=A}, #doc_info{id=B}) -> A =< B end,
@@ -782,22 +772,17 @@ copy_docs(Db, #db{fd=DestFd}=NewDb, InfoBySeq0, Retry) ->
     Ids = [Id || #doc_info{id=Id} <- InfoBySeq],
     LookupResults = couch_btree:lookup(Db#db.fulldocinfo_by_id_btree, Ids),
 
-    % write out the attachments
-    NewFullDocInfos0 = lists:map(
-        fun({ok, #full_doc_info{rev_tree=RevTree}=Info}) ->
-            Info#full_doc_info{rev_tree=copy_rev_tree_attachments(Db, DestFd, RevTree)}
-        end, LookupResults),
-    % write out the docs
-    % we do this in 2 stages so the docs are written out contiguously, making
-    % view indexing and replication faster.
     NewFullDocInfos1 = lists:map(
-        fun(#full_doc_info{rev_tree=RevTree}=Info) ->
-            Info#full_doc_info{rev_tree=couch_key_tree:map_leafs(
-                fun(_Key, {IsDel, DocBody, Seq}) ->
+        fun({ok, #full_doc_info{rev_tree=RevTree}=Info}) ->
+            Info#full_doc_info{rev_tree=couch_key_tree:map(
+                fun(Rev, {IsDel, Sp, Seq}, leaf) ->
+                    DocBody = copy_doc_attachments(Db, Rev, Sp, DestFd),
                     {ok, Pos} = couch_file:append_term_md5(DestFd, DocBody),
-                    {IsDel, Pos, Seq}
+                    {IsDel, Pos, Seq};
+                (_, _, branch) ->
+                    ?REV_MISSING
                 end, RevTree)}
-        end, NewFullDocInfos0),
+        end, LookupResults),
 
     NewFullDocInfos = stem_full_doc_infos(Db, NewFullDocInfos1),
     NewDocInfos = [couch_doc:to_doc_info(Info) || Info <- NewFullDocInfos],
