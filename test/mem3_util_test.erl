@@ -27,11 +27,11 @@ hash_test() ->
 
 name_shard_test() ->
     Shard1 = #shard{},
-    ?assertError(function_clause, mem3_util:name_shard(Shard1)),
+    ?assertError(function_clause, mem3_util:name_shard(Shard1, ".1234")),
 
     Shard2 = #shard{dbname = <<"testdb">>, range = [0,100]},
-    #shard{name=Name2} = mem3_util:name_shard(Shard2),
-    ?assertEqual(<<"shards/00000000-00000064/testdb">>, Name2),
+    #shard{name=Name2} = mem3_util:name_shard(Shard2, ".1234"),
+    ?assertEqual(<<"shards/00000000-00000064/testdb.1234">>, Name2),
 
     ok.
 
@@ -42,9 +42,9 @@ create_partition_map_test() ->
 
     {DbName2, N2, Q2, Nodes2} = {<<"testdb2">>, 1, 1, [a,b,c,d]},
     [#shard{name=Name2,node=Node2}] = Map2 =
-        mem3_util:create_partition_map(DbName2, N2, Q2, Nodes2),
+        mem3_util:create_partition_map(DbName2, N2, Q2, Nodes2, ".1234"),
     ?assertEqual(1, length(Map2)),
-    ?assertEqual(<<"shards/00000000-ffffffff/testdb2">>, Name2),
+    ?assertEqual(<<"shards/00000000-ffffffff/testdb2.1234">>, Name2),
     ?assertEqual(a, Node2),
     ok.
 

@@ -14,10 +14,13 @@
 
 -module(mem3_util).
 
--export([hash/1, name_shard/1, create_partition_map/4, build_shards/2,
+-export([hash/1, name_shard/2, create_partition_map/5, build_shards/2,
     n_val/2, to_atom/1, to_integer/1, write_db_doc/1, delete_db_doc/1,
     load_shards_from_disk/1, load_shards_from_disk/2, shard_info/1,
     ensure_exists/1, open_db_doc/1]).
+
+-export([create_partition_map/4]).
+-deprecated({create_partition_map, 4, eventually}).
 
 -define(RINGTOP, 2 bsl 31).  % CRC32 space
 
@@ -29,16 +32,19 @@ hash(Item) when is_binary(Item) ->
 hash(Item) ->
     erlang:crc32(term_to_binary(Item)).
 
-name_shard(#shard{dbname = DbName, range=[B,E]} = Shard) ->
+name_shard(#shard{dbname = DbName, range=[B,E]} = Shard, Suffix) ->
     Name = ["shards/", couch_util:to_hex(<<B:32/integer>>), "-",
-        couch_util:to_hex(<<E:32/integer>>), "/", DbName],
+        couch_util:to_hex(<<E:32/integer>>), "/", DbName, Suffix],
     Shard#shard{name = ?l2b(Name)}.
 
 create_partition_map(DbName, N, Q, Nodes) ->
+    create_partition_map(DbName, N, Q, Nodes, "").
+
+create_partition_map(DbName, N, Q, Nodes, Suffix) ->
     UniqueShards = make_key_ranges((?RINGTOP) div Q, 0, []),
     Shards0 = lists:flatten([lists:duplicate(N, S) || S <- UniqueShards]),
     Shards1 = attach_nodes(Shards0, [], Nodes, []),
-    [name_shard(S#shard{dbname=DbName}) || S <- Shards1].
+    [name_shard(S#shard{dbname=DbName}, Suffix) || S <- Shards1].
 
 make_key_ranges(_, CurrentPos, Acc) when CurrentPos >= ?RINGTOP ->
     Acc;
@@ -110,6 +116,7 @@ delete_db_doc(Db, DocId) ->
 
 build_shards(DbName, DocProps) ->
     {ByNode} = couch_util:get_value(<<"by_node">>, DocProps, {[]}),
+    Suffix = couch_util:get_value(<<"shard_suffix">>, DocProps, ""),
     lists:flatmap(fun({Node, Ranges}) ->
         lists:map(fun(Range) ->
             [B,E] = string:tokens(?b2l(Range), "-"),
@@ -119,7 +126,7 @@ build_shards(DbName, DocProps) ->
                 dbname = DbName,
                 node = to_atom(Node),
                 range = [Beg, End]
-            })
+            }, Suffix)
         end, Ranges)
     end, ByNode).
 
