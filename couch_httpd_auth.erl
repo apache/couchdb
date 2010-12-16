@@ -184,7 +184,8 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
                 FullSecret = <<Secret/binary, UserSalt/binary>>,
                 ExpectedHash = crypto:sha_mac(FullSecret, User ++ ":" ++ TimeStr),
                 Hash = ?l2b(string:join(HashParts, ":")),
-                Timeout = to_int(couch_config:get("couch_httpd_auth", "timeout", 600)),
+                Timeout = list_to_integer(
+                    couch_config:get("couch_httpd_auth", "timeout", "600")),
                 ?LOG_DEBUG("timeout ~p", [Timeout]),
                 case (catch erlang:list_to_integer(TimeStr, 16)) of
                     TimeStamp when CurrentTime < TimeStamp + Timeout ->
@@ -340,13 +341,6 @@ maybe_value(Key, Else, Fun) ->
 auth_name(String) when is_list(String) ->
     [_,_,_,_,_,Name|_] = re:split(String, "[\\W_]", [{return, list}]),
     ?l2b(Name).
-
-to_int(Value) when is_binary(Value) ->
-    to_int(?b2l(Value));
-to_int(Value) when is_list(Value) ->
-    list_to_integer(Value);
-to_int(Value) when is_integer(Value) ->
-    Value.
 
 make_cookie_time() ->
     {NowMS, NowS, _} = erlang:now(),
