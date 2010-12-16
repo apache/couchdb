@@ -26,8 +26,16 @@
 go(DbName, Options) ->
     case re:run(DbName, ?DBNAME_REGEX, [{capture,none}]) of
     match ->
-        Shards = mem3:choose_shards(DbName, Options),
-        Doc = make_document(Shards),
+        {MegaSecs, Secs, _} = now(),
+        Suffix = "." ++ integer_to_list(MegaSecs*1000000 + Secs),
+        Shards = mem3:choose_shards(DbName, [{shard_suffix,Suffix} | Options]),
+        case mem3_util:open_db_doc(DbName) of
+        {ok, Doc} ->
+            % the DB already exists, and may have a different Suffix
+            ok;
+        {not_found, _} ->
+            Doc = make_document(Shards, Suffix)
+        end,
         Workers = fabric_util:submit_jobs(Shards, create_db, [Doc]),
         Acc0 = fabric_dict:init(Workers, nil),
         case fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
@@ -49,7 +57,7 @@ handle_message(Msg, Shard, Counters) ->
         final_answer(C1)
     end.
 
-make_document([#shard{dbname=DbName}|_] = Shards) ->
+make_document([#shard{dbname=DbName}|_] = Shards, Suffix) ->
     {RawOut, ByNodeOut, ByRangeOut} =
     lists:foldl(fun(#shard{node=N, range=[B,E]}, {Raw, ByNode, ByRange}) ->
         Range = ?l2b([couch_util:to_hex(<<B:32/integer>>), "-",
@@ -59,6 +67,7 @@ make_document([#shard{dbname=DbName}|_] = Shards) ->
             orddict:append(Range, Node, ByRange)}
     end, {[], [], []}, Shards),
     #doc{id=DbName, body = {[
+        {<<"shard_suffix">>, Suffix},
         {<<"changelog">>, lists:sort(RawOut)},
         {<<"by_node">>, {[{K,lists:sort(V)} || {K,V} <- ByNodeOut]}},
         {<<"by_range">>, {[{K,lists:sort(V)} || {K,V} <- ByRangeOut]}}
