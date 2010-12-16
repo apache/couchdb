@@ -268,8 +268,10 @@ get_db_info(Db) ->
         ],
     {ok, InfoList}.
 
-get_design_docs(#db{name = <<"shards/", _:18/binary, DbName/binary>>}) ->
-    {_, Ref} = spawn_monitor(fun() -> exit(fabric:design_docs(DbName)) end),
+get_design_docs(#db{name = <<"shards/", _/binary>> = ShardName}) ->
+    {_, Ref} = spawn_monitor(fun() ->
+        exit(fabric:design_docs(mem3:dbname(ShardName)))
+    end),
     receive {'DOWN', Ref, _, _, Response} ->
         Response
     end;

@@ -461,8 +461,8 @@ refresh_validate_doc_funs(Db) ->
             end
         end, DesignDocs),
     case Db#db.name of
-    <<"shards/", _:18/binary, DbName/binary>> ->
-        fabric:reset_validation_funs(DbName),
+    <<"shards/", _/binary>> = ShardName ->
+        fabric:reset_validation_funs(mem3:dbname(ShardName)),
         Db#db{validate_doc_funs=undefined};
     _ ->
         Db#db{validate_doc_funs=ProcessDocFuns}
