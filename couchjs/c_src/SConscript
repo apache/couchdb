@@ -11,6 +11,7 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations under
 # the License.
+import os
 
 def require_lib(name):
     if not conf.CheckLib(name):
@@ -18,6 +19,14 @@ def require_lib(name):
         Exit(1)
 
 env = Environment(CCFLAGS='-g -O2 -DXP_UNIX')
+
+if os.uname()[0] == 'FreeBSD':
+	env['CCFLAGS'] += ' -I/usr/local/include'
+	env.Append(LINKFLAGS=['-L/usr/local/lib'])
+	env['LIB_DL'] = env['LIB_RT'] = ''
+	env['LIB_COMPAT'] = 'compat'
+
+
 if not env.GetOption('clean'):
     conf = Configure(env, config_h='config.h')
 
