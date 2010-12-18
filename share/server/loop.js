@@ -122,7 +122,7 @@ var Loop = function() {
     }
   };
   while (line = readline()) {
-    cmd = eval('('+line+')');
+    cmd = JSON.parse(line);
     State.line_length = line.length;
     try {
       cmdkey = cmd.shift();
