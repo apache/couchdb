@@ -10,7 +10,7 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
-ibrowseebindir = $(localerlanglibdir)/ibrowse-2.1.0/ebin
+ibrowseebindir = $(localerlanglibdir)/ibrowse-2.1.1/ebin
 
 ibrowse_file_collection = \
 	ibrowse.app.in \
