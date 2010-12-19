@@ -13,7 +13,8 @@
 -module(chttpd).
 -include_lib("couch/include/couch_db.hrl").
 
--export([start_link/0, stop/0, handle_request/1, config_change/2,
+-export([start_link/0, start_link/1, start_link/2,
+    stop/0, handle_request/1, config_change/2,
     primary_header_value/2, header_value/2, header_value/3, qs_value/2,
     qs_value/3, qs/1, path/1, absolute_uri/2, body_length/1,
     verify_is_server_admin/1, unquote/1, quote/1, recv/2, recv_chunked/4,
@@ -41,14 +42,74 @@
 }).
 
 start_link() ->
-    Options = [
+    start_link(http).
+start_link(http) ->
+    Port = couch_config:get("chttpd", "port", "5984"),
+    start_link(?MODULE, [{port, Port}]);
+
+start_link(https) ->
+    Port = couch_config:get("chttps", "port", "6984"),
+    CertFile = couch_config:get("chttps", "cert_file", nil),
+    KeyFile = couch_config:get("chttps", "key_file", nil),
+    Options = case CertFile /= nil andalso KeyFile /= nil of
+        true ->
+            SslOpts = [{certfile, CertFile}, {keyfile, KeyFile}],
+
+            %% set password if one is needed for the cert
+            SslOpts1 = case couch_config:get("chttps", "password", nil) of
+                nil -> SslOpts;
+                Password ->
+                    SslOpts ++ [{password, Password}]
+            end,
+            % do we verify certificates ?
+            FinalSslOpts = case couch_config:get("chttps",
+                    "verify_ssl_certificates", "false") of
+                "false" -> SslOpts1;
+                "true" ->
+                    case couch_config:get("chttps",
+                            "cacert_file", nil) of
+                        nil ->
+                            io:format("Verify SSL certificate "
+                                ++"enabled but file containing "
+                                ++"PEM encoded CA certificates is "
+                                ++"missing", []),
+                            throw({error, missing_cacerts});
+                        CaCertFile ->
+                            Depth = list_to_integer(couch_config:get("chttps",
+                                    "ssl_certificate_max_depth",
+                                    "1")),
+                            FinalOpts = [
+                                {cacertfile, CaCertFile},
+                                {depth, Depth},
+                                {verify, verify_peer}],
+                            % allows custom verify fun.
+                            case couch_config:get("chttps",
+                                    "verify_fun", nil) of
+                                nil -> FinalOpts;
+                                SpecStr ->
+                                    FinalOpts
+                                    ++ [{verify_fun, couch_httpd:make_arity_3_fun(SpecStr)}]
+                            end
+                    end
+            end,
+
+            [{port, Port},
+                {ssl, true},
+                {ssl_opts, FinalSslOpts}];
+        false ->
+            io:format("SSL enabled but PEM certificates are missing.", []),
+            throw({error, missing_certs})
+    end,
+    start_link(https, Options).
+
+start_link(Name, Options) ->
+    Options1 = Options ++ [
         {loop, fun ?MODULE:handle_request/1},
-        {name, ?MODULE},
+        {name, Name},
         {ip, couch_config:get("chttpd", "bind_address", any)},
-        {port, couch_config:get("chttpd", "port", "5984")},
         {backlog, list_to_integer(couch_config:get("chttpd", "backlog", "128"))}
     ],
-    case mochiweb_http:start(Options) of
+    case mochiweb_http:start(Options1) of
     {ok, Pid} ->
         ok = couch_config:register(fun ?MODULE:config_change/2, Pid),
         {ok, Pid};
@@ -65,6 +126,7 @@ config_change("chttpd", "backlog") ->
     ?MODULE:stop().
 
 stop() ->
+    catch mochiweb_http:stop(https),
     mochiweb_http:stop(?MODULE).
 
 handle_request(MochiReq) ->
@@ -333,7 +395,13 @@ absolute_uri(#httpd{mochi_req=MochiReq}, Path) ->
             case MochiReq:get_header_value(XProto) of
                 % Restrict to "https" and "http" schemes only
                 "https" -> "https";
-                _ -> "http"
+                _ ->
+                    case MochiReq:get(scheme) of
+                        https ->
+                            "https";
+                        http ->
+                            "http"
+                    end
             end
     end,
     Scheme ++ "://" ++ Host ++ Path.
