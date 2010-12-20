@@ -36,13 +36,14 @@ go(DbName, Options) ->
         {not_found, _} ->
             Doc = make_document(Shards, Suffix)
         end,
-        Workers = fabric_util:submit_jobs(Shards, create_db, [Doc]),
+        Workers = fabric_util:submit_jobs(Shards, create_db, []),
         Acc0 = fabric_dict:init(Workers, nil),
-        case fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
-        {ok, _} ->
-            ok;
-        Else ->
-            Else
+        X = fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0),
+        case update_shard_db(Doc) of
+        {ok, true} ->
+            case X of {ok, _} -> ok; Else -> Else end;
+        {ok, false} ->
+            {error, internal_server_error}
         end;
     nomatch ->
         {error, illegal_database_name}
@@ -55,6 +56,23 @@ handle_message(Msg, Shard, Counters) ->
         {ok, C1};
     false ->
         final_answer(C1)
+    end.
+
+update_shard_db(Doc) ->
+    Shards = [#shard{node=N} || N <- mem3:nodes()],
+    Workers = fabric_util:submit_jobs(Shards, create_shard_db_doc, [Doc]),
+    Acc0 = fabric_dict:init(Workers, nil),
+    fabric_util:recv(Workers, #shard.ref, fun handle_db_update/3, Acc0).
+
+handle_db_update({ok, _}, Worker, Counters) ->
+    handle_db_update(ok, Worker, Counters);
+handle_db_update(Msg, Worker, Counters) ->
+    C1 = fabric_dict:store(Worker, Msg, Counters),
+    case fabric_dict:any(nil, C1) of
+    true ->
+        {ok, C1};
+    false ->
+        {stop, fabric_dict:any(ok, C1)}
     end.
 
 make_document([#shard{dbname=DbName}|_] = Shards, Suffix) ->
