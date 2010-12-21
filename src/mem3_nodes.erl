@@ -71,7 +71,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 initialize_nodelist() ->
     DbName = couch_config:get("mem3", "nodedb", "nodes"),
-    {ok, Db} = ensure_exists(DbName),
+    {ok, Db} = mem3_util:ensure_exists(DbName),
     {ok, _, Nodes0} = couch_btree:fold(Db#db.id_tree, fun first_fold/3, [], []),
     % add self if not already present
     case lists:member(node(), Nodes0) of
@@ -94,7 +94,7 @@ first_fold(#full_doc_info{id=Id}, _, Acc) ->
 
 listen_for_changes(Since) ->
     DbName = ?l2b(couch_config:get("mem3", "nodedb", "nodes")),
-    {ok, Db} = ensure_exists(DbName),
+    {ok, Db} = mem3_util:ensure_exists(DbName),
     Args = #changes_args{
         feed = "continuous",
         since = Since,
@@ -103,17 +103,6 @@ listen_for_changes(Since) ->
     },
     ChangesFun = couch_changes:handle_changes(Args, nil, Db),
     ChangesFun(fun changes_callback/2).
-
-ensure_exists(DbName) when is_list(DbName) ->
-    ensure_exists(list_to_binary(DbName));
-ensure_exists(DbName) ->
-    Options = [{user_ctx, #user_ctx{roles=[<<"_admin">>]}}],
-    case couch_db:open(DbName, Options) of
-    {ok, Db} ->
-        {ok, Db};
-    _ ->
-        couch_server:create(DbName, Options)
-    end.
 
 changes_callback(start, _) ->
     {ok, nil};

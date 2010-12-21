@@ -64,7 +64,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 listen_for_changes(Since) ->
     DbName = ?l2b(couch_config:get("mem3", "db", "dbs")),
-    {ok, Db} = ensure_exists(DbName),
+    {ok, Db} = mem3_util:ensure_exists(DbName),
     Args = #changes_args{
         feed = "continuous",
         since = Since,
@@ -73,15 +73,6 @@ listen_for_changes(Since) ->
     },
     ChangesFun = couch_changes:handle_changes(Args, nil, Db),
     ChangesFun(fun changes_callback/2).
-
-ensure_exists(DbName) ->
-    Options = [{user_ctx, #user_ctx{roles=[<<"_admin">>]}}],
-    case couch_db:open(DbName, Options) of
-    {ok, Db} ->
-        {ok, Db};
-    _ ->
-        couch_server:create(DbName, Options)
-    end.
 
 changes_callback(start, _) ->
     {ok, nil};
