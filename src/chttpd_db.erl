@@ -441,7 +441,7 @@ all_docs_callback(complete, {_, Resp}) ->
     send_chunk(Resp, "\r\n]}"),
     end_json_response(Resp);
 all_docs_callback({error, Reason}, {_, Resp}) ->
-    chttpd:send_chunked_error(Resp, {error, Reason}).
+    chttpd:send_chunked_error(Resp, Reason).
 
 db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
     % check for the existence of the doc to handle the 404 case.
