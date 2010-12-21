@@ -44,6 +44,8 @@ go(DbName, DDoc, View, Args, Callback, Acc0) ->
         State, infinity, 1000 * 60 * 60) of
     {ok, NewState} ->
         {ok, NewState#collector.user_acc};
+    {timeout, NewState} ->
+        Callback({error, timeout}, NewState#collector.user_acc);
     {error, Resp} ->
         {ok, Resp}
     after

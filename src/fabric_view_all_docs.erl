@@ -38,6 +38,8 @@ go(DbName, #view_query_args{keys=nil} = QueryArgs, Callback, Acc0) ->
         State, infinity, 5000) of
     {ok, NewState} ->
         {ok, NewState#collector.user_acc};
+    {timeout, NewState} ->
+        Callback({error, timeout}, NewState#collector.user_acc);
     {error, Resp} ->
         {ok, Resp}
     after

@@ -109,7 +109,9 @@ send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn) ->
     },
     %% TODO: errors need to be handled here
     try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3,
-            State, infinity, 5000)
+            State, infinity, 5000) of
+        {_, NewState} ->
+            {ok, NewState}
     after
         fabric_util:cleanup(Workers)
     end.
