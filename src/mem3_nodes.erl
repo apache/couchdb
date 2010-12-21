@@ -1,5 +1,5 @@
 % Copyright 2010 Cloudant
-% 
+%
 % Licensed under the Apache License, Version 2.0 (the "License"); you may not
 % use this file except in compliance with the License. You may obtain a copy of
 % the License at
@@ -14,7 +14,7 @@
 
 -module(mem3_nodes).
 -behaviour(gen_server).
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, 
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
     code_change/3]).
 
 -export([start_link/0, get_nodelist/0]).
@@ -111,7 +111,7 @@ ensure_exists(DbName) ->
     case couch_db:open(DbName, Options) of
     {ok, Db} ->
         {ok, Db};
-    _ -> 
+    _ ->
         couch_server:create(DbName, Options)
     end.
 
