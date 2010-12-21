@@ -70,7 +70,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% internal functions
 
 initialize_nodelist() ->
-    DbName = couch_config:get("mem3", "nodedb", "nodes"),
+    DbName = couch_config:get("mem3", "node_db", "nodes"),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     {ok, _, Nodes0} = couch_btree:fold(Db#db.id_tree, fun first_fold/3, [], []),
     % add self if not already present
@@ -93,7 +93,7 @@ first_fold(#full_doc_info{id=Id}, _, Acc) ->
     {ok, [mem3_util:to_atom(Id) | Acc]}.
 
 listen_for_changes(Since) ->
-    DbName = ?l2b(couch_config:get("mem3", "nodedb", "nodes")),
+    DbName = couch_config:get("mem3", "node_db", "nodes"),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     Args = #changes_args{
         feed = "continuous",

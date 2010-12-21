@@ -63,7 +63,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% internal functions
 
 listen_for_changes(Since) ->
-    DbName = ?l2b(couch_config:get("mem3", "db", "dbs")),
+    DbName = couch_config:get("mem3", "shard_db", "dbs"),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     Args = #changes_args{
         feed = "continuous",
