@@ -1,5 +1,5 @@
 % Copyright 2010 Cloudant
-% 
+%
 % Licensed under the Apache License, Version 2.0 (the "License"); you may not
 % use this file except in compliance with the License. You may obtain a copy of
 % the License at
@@ -43,7 +43,7 @@ size(Dict) ->
 
 any(Value, Dict) ->
     lists:keymember(Value, 2, Dict).
-    
+
 filter(Fun, Dict) ->
     orddict:filter(Fun, Dict).
 

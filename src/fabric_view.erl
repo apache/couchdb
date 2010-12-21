@@ -1,5 +1,5 @@
 % Copyright 2010 Cloudant
-% 
+%
 % Licensed under the Apache License, Version 2.0 (the "License"); you may not
 % use this file except in compliance with the License. You may obtain a copy of
 % the License at
@@ -282,7 +282,7 @@ is_progress_possible_test() ->
     ?assertEqual(is_progress_possible(mk_cnts(T4)),false),
     % outside range
     T5 = [[0,10],[11,20],[21,EndPoint]],
-    ?assertEqual(is_progress_possible(mk_cnts(T5)),false). 
+    ?assertEqual(is_progress_possible(mk_cnts(T5)),false).
 
 remove_overlapping_shards_test() ->
     EndPoint = 2 bsl 31,
@@ -293,7 +293,7 @@ remove_overlapping_shards_test() ->
               remove_overlapping_shards(#shard{name=list_to_atom("node-3"),
                                                node=list_to_atom("node-3"),
                                                range=[11,20]},
-                                        Shards)),7).    
+                                        Shards)),7).
 
 mk_cnts(Ranges) ->
     Shards = lists:map(fun(Range) ->
@@ -314,13 +314,6 @@ mk_cnts(Ranges, NoNodes) ->
 mk_shards(0,_Range,Shards) ->
     Shards;
 mk_shards(NoNodes,Range,Shards) ->
-    NodeName = list_to_atom("node-" ++ integer_to_list(NoNodes)), 
+    NodeName = list_to_atom("node-" ++ integer_to_list(NoNodes)),
     mk_shards(NoNodes-1,Range,
               [#shard{name=NodeName, node=NodeName, range=Range} | Shards]).
-                            
-                                        
-                      
-    
-    
-
-

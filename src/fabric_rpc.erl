@@ -1,5 +1,5 @@
 % Copyright 2010 Cloudant
-% 
+%
 % Licensed under the Apache License, Version 2.0 (the "License"); you may not
 % use this file except in compliance with the License. You may obtain a copy of
 % the License at
@@ -382,9 +382,9 @@ possible_ancestors(FullInfo, MissingRevs) ->
     LeafRevs = [Rev || #rev_info{rev=Rev} <- RevsInfo],
     % Find the revs that are possible parents of this rev
     lists:foldl(fun({LeafPos, LeafRevId}, Acc) ->
-        % this leaf is a "possible ancenstor" of the missing 
+        % this leaf is a "possible ancenstor" of the missing
         % revs if this LeafPos lessthan any of the missing revs
-        case lists:any(fun({MissingPos, _}) -> 
+        case lists:any(fun({MissingPos, _}) ->
                 LeafPos < MissingPos end, MissingRevs) of
         true ->
             [{LeafPos, LeafRevId} | Acc];
