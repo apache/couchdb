@@ -29,7 +29,7 @@ process_mailbox(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
 process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
     receive
     {timeout, TimeoutRef} ->
-        timeout;
+        {timeout, Acc0};
     {Ref, Msg} ->
         case lists:keyfind(Ref, Keypos, RefList) of
         false ->
@@ -49,5 +49,5 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
         io:format("rexi_DOWN ~p ~p", [ServerPid, Reason]),
         Fun(Msg, nil, Acc0)
     after PerMsgTO ->
-        timeout
+        {timeout, Acc0}
     end.
