@@ -9,6 +9,9 @@
 
 -record(acc, {revcount = 0, infos = [], seq, localid, source, target}).
 
+go(DbName, Node) when is_binary(DbName), is_atom(Node) ->
+    go(#shard{name=DbName, node=node()}, #shard{name=DbName, node=Node});
+
 go(#shard{} = Source, #shard{} = Target) ->
     LocalId = make_local_id(Source, Target),
     {ok, Db} = couch_db:open(Source#shard.name, [{user_ctx,?CTX}]),
