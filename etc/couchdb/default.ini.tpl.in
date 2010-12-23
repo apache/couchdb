@@ -135,8 +135,8 @@ compressible_types = text/*, application/javascript, application/json,  applicat
 
 [replicator]
 db = _replicator
-max_http_sessions = 10
-max_http_pipeline_size = 10
+max_http_sessions = 20
+max_http_pipeline_size = 50
 ; set to true to validate peer certificates
 verify_ssl_certificates = false
 ; file containing a list of peer trusted certificates (PEM format)
