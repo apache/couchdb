@@ -17,7 +17,7 @@
 -export([hash/1, name_shard/1, create_partition_map/4, build_shards/2,
     n_val/2, to_atom/1, to_integer/1, write_db_doc/1, delete_db_doc/1,
     load_shards_from_disk/1, load_shards_from_disk/2, shard_info/1,
-    ensure_exists/1]).
+    ensure_exists/1, open_db_doc/1]).
 
 -define(RINGTOP, 2 bsl 31).  % CRC32 space
 
@@ -57,6 +57,16 @@ attach_nodes(Shards, Acc, [], UsedNodes) ->
     attach_nodes(Shards, Acc, lists:reverse(UsedNodes), []);
 attach_nodes([S | Rest], Acc, [Node | Nodes], UsedNodes) ->
     attach_nodes(Rest, [S#shard{node=Node} | Acc], Nodes, [Node | UsedNodes]).
+
+open_db_doc(DocId) ->
+    DbName = ?l2b(couch_config:get("mem3", "shard_db", "dbs")),
+    {ok, Db} = couch_db:open(DbName, []),
+    try couch_db:open_doc(Db, DocId, []) of
+    {ok, Doc} ->
+        Doc
+    after
+        couch_db:close(Db)
+    end.
 
 write_db_doc(Doc) ->
     DbName = ?l2b(couch_config:get("mem3", "shard_db", "dbs")),
