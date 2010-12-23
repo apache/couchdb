@@ -92,6 +92,7 @@ db_exists(Req, CanonicalUrl, CreateDB) ->
     end,
     case catch ibrowse:send_req(Url, HeadersFun(head), head, [], Options) of
     {ok, "200", _, _} ->
+        config_http(CanonicalUrl),
         Req#http_db{url = CanonicalUrl};
     {ok, "301", RespHeaders, _} ->
         RedirectUrl = redirect_url(RespHeaders, Req#http_db.url),
@@ -105,6 +106,19 @@ db_exists(Req, CanonicalUrl, CreateDB) ->
         ?LOG_DEBUG("DB at ~s could not be found because ~p", [Url, Error]),
         throw({db_not_found, ?l2b(Url)})
     end.
+
+config_http(Url) ->
+    #url{host = Host, port = Port} = ibrowse_lib:parse_url(Url),
+    ok = ibrowse:set_max_sessions(Host, Port, list_to_integer(
+        couch_config:get("replicator", "max_http_sessions", "20"))),
+    ok = ibrowse:set_max_pipeline_size(Host, Port, list_to_integer(
+        couch_config:get("replicator", "max_http_pipeline_size", "50"))),
+    ok = couch_config:register(
+        fun("replicator", "max_http_sessions", MaxSessions) ->
+            ibrowse:set_max_sessions(Host, Port, list_to_integer(MaxSessions));
+        ("replicator", "max_http_pipeline_size", PipeSize) ->
+            ibrowse:set_max_pipeline_size(Host, Port, list_to_integer(PipeSize))
+        end).
 
 redirect_url(RespHeaders, OrigUrl) ->
     MochiHeaders = mochiweb_headers:make(RespHeaders),

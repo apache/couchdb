@@ -120,8 +120,8 @@ compression_level = 8 ; from 1 (lowest, fastest) to 9 (highest, slowest), 0 to d
 compressible_types = text/*, application/javascript, application/json,  application/xml
 
 [replicator]
-max_http_sessions = 10
-max_http_pipeline_size = 10
+max_http_sessions = 20
+max_http_pipeline_size = 50
 ; set to true to validate peer certificates
 verify_ssl_certificates = false
 ; file containing a list of peer trusted certificates (PEM format)
