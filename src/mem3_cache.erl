@@ -90,10 +90,29 @@ changes_callback({change, {Change}, _}, _) ->
                 ?LOG_ERROR("missing partition table for ~s: ~p", [DbName, Reason]);
             {Doc} ->
                 ets:delete(partitions, DbName),
-                ets:insert(partitions, mem3_util:build_shards(DbName, Doc))
+                Shards = mem3_util:build_shards(DbName, Doc),
+                ets:insert(partitions, Shards),
+                [create_if_missing(Name) || #shard{name=Name, node=Node}
+                    <- Shards, Node =:= node()]
             end
         end
     end,
     {ok, couch_util:get_value(<<"seq">>, Change)};
 changes_callback(timeout, _) ->
     {ok, nil}.
+
+create_if_missing(Name) ->
+    DbDir = couch_config:get("couchdb", "database_dir"),
+    Filename = filename:join(DbDir, ?b2l(Name) ++ ".couch"),
+    case filelib:is_regular(Filename) of
+    true ->
+        ok;
+    false ->
+        Options = [{user_ctx, #user_ctx{roles=[<<"_admin">>]}}],
+        case couch_server:create(Name, Options) of
+        {ok, Db} ->
+            couch_db:close(Db);
+        Error ->
+            ?LOG_ERROR("~p tried to create ~s, got ~p", [?MODULE, Name, Error])
+        end
+    end.
