@@ -143,6 +143,9 @@ builtin_sum_rows(KVs) ->
             throw({invalid_value, <<"builtin _sum function requires map values to be numbers">>})
     end, 0, KVs).
 
+builtin_stats(_, []) ->
+    {[{sum,0}, {count,0}, {min,0}, {max,0}, {sumsqr,0}]};
+
 builtin_stats(reduce, [[_,First]|Rest]) when is_number(First) ->
     Stats = lists:foldl(fun([_K,V], {S,C,Mi,Ma,Sq}) when is_number(V) ->
         {S+V, C+1, erlang:min(Mi,V), erlang:max(Ma,V), Sq+(V*V)};
