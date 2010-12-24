@@ -11,6 +11,13 @@ A very important point to make here is that BigCouch does not necessarily divide
 
 Splitting and merging partitions is an immature feature of the system, and will require attention in the near-term.  We believe we can implement both functions and perform them while the database remains online.
 
+### Getting Started
+
+Mem3 requires R13B03 or higher and can be built with [rebar][6], which comes bundled in the repository.  Rebar needs to be able to find the `couch_db.hrl` header file; one way to accomplish this is to set ERL_LIBS to point to the apps
+subdirectory of a bigcouch checkout, e.g.
+
+    ERL_LIBS="/usr/local/src/bigcouch/apps" ./rebar compile
+
 ### License
 [Apache 2.0][3]
 
@@ -23,3 +30,4 @@ Splitting and merging partitions is an immature feature of the system, and will 
 [3]: http://www.apache.org/licenses/LICENSE-2.0.html
 [4]: http://cloudant.com
 [5]: mailto:info@cloudant.com
+[6]: http://github.com/basho/rebar
