@@ -63,7 +63,7 @@ remove_ancestors([{{not_found, _}, Count} = Head | Tail], Acc) ->
 remove_ancestors([{{ok, #doc{revs = {Pos, Revs}}}, Count} = Head | Tail], Acc) ->
     Descendants = lists:dropwhile(fun
     ({{ok, #doc{revs = {Pos2, Revs2}}}, _}) ->
-        case lists:nthtail(Pos2 - Pos, Revs2) of
+        case lists:nthtail(erlang:min(Pos2 - Pos, length(Revs2)), Revs2) of
         [] ->
             % impossible to tell if Revs2 is a descendant - assume no
             true;
