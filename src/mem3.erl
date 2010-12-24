@@ -111,7 +111,7 @@ choose_shards(DbName, Options) ->
     catch error:E when E==database_does_not_exist; E==badarg ->
         Nodes = mem3:nodes(),
         NodeCount = length(Nodes),
-        Suffix = couch_util:get_value(suffix, Options, ""),
+        Suffix = couch_util:get_value(shard_suffix, Options, ""),
         N = mem3_util:n_val(couch_util:get_value(n, Options), NodeCount),
         Q = mem3_util:to_integer(couch_util:get_value(q, Options,
             couch_config:get("cluster", "q", "8"))),
