@@ -71,12 +71,7 @@ attach_nodes([S | Rest], Acc, [Node | Nodes], UsedNodes) ->
 open_db_doc(DocId) ->
     DbName = ?l2b(couch_config:get("mem3", "shard_db", "dbs")),
     {ok, Db} = couch_db:open(DbName, []),
-    try couch_db:open_doc(Db, DocId, []) of
-    {ok, Doc} ->
-        Doc
-    after
-        couch_db:close(Db)
-    end.
+    try couch_db:open_doc(Db, DocId, []) after couch_db:close(Db) end.
 
 write_db_doc(Doc) ->
     DbName = ?l2b(couch_config:get("mem3", "shard_db", "dbs")),
