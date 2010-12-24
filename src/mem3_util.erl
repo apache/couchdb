@@ -19,8 +19,9 @@
     load_shards_from_disk/1, load_shards_from_disk/2, shard_info/1,
     ensure_exists/1, open_db_doc/1]).
 
--export([create_partition_map/4]).
+-export([create_partition_map/4, name_shard/1]).
 -deprecated({create_partition_map, 4, eventually}).
+-deprecated({name_shard, 1, eventually}).
 
 -define(RINGTOP, 2 bsl 31).  % CRC32 space
 
@@ -31,6 +32,9 @@ hash(Item) when is_binary(Item) ->
     erlang:crc32(Item);
 hash(Item) ->
     erlang:crc32(term_to_binary(Item)).
+
+name_shard(Shard) ->
+    name_shard(Shard, "").
 
 name_shard(#shard{dbname = DbName, range=[B,E]} = Shard, Suffix) ->
     Name = ["shards/", couch_util:to_hex(<<B:32/integer>>), "-",
