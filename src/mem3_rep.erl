@@ -14,8 +14,18 @@ go(DbName, Node) when is_binary(DbName), is_atom(Node) ->
 
 go(#shard{} = Source, #shard{} = Target) ->
     LocalId = make_local_id(Source, Target),
-    {ok, Db} = couch_db:open(Source#shard.name, [{user_ctx,?CTX}]),
-    try go(Db, Target, LocalId) after couch_db:close(Db) end.
+    case couch_db:open(Source#shard.name, [{user_ctx,?CTX}]) of
+    {ok, Db} ->
+        try
+            go(Db, Target, LocalId)
+        catch error:{not_found, no_db_file} ->
+            {error, missing_target}
+        after
+            couch_db:close(Db)
+        end;
+    {not_found, no_db_file} ->
+        {error, missing_source}
+    end.
 
 go(#db{} = Db, #shard{} = Target, LocalId) ->
     Seq = calculate_start_seq(Db, Target, LocalId),
