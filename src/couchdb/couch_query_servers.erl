@@ -19,6 +19,7 @@
 -export([start_doc_map/3, map_docs/2, stop_doc_map/1]).
 -export([reduce/3, rereduce/3,validate_doc_update/5]).
 -export([filter_docs/5]).
+-export([filter_view/3]).
 
 -export([with_ddoc_proc/2, proc_prompt/2, ddoc_prompt/3, ddoc_proc_prompt/3, json_doc/1]).
 
@@ -229,6 +230,11 @@ json_doc(nil) -> null;
 json_doc(Doc) ->
     couch_doc:to_json_obj(Doc, [revs]).
 
+filter_view(DDoc, VName, Docs) ->
+    JsonDocs = [couch_doc:to_json_obj(Doc, [revs]) || Doc <- Docs],
+    [true, Passes] = ddoc_prompt(DDoc, [<<"views">>, VName, <<"map">>], [JsonDocs]),
+    {ok, Passes}.
+
 filter_docs(Req, Db, DDoc, FName, Docs) ->
     JsonReq = case Req of
     {json_req, JsonObj} ->
@@ -237,7 +243,8 @@ filter_docs(Req, Db, DDoc, FName, Docs) ->
         couch_httpd_external:json_req_obj(HttpReq, Db)
     end,
     JsonDocs = [couch_doc:to_json_obj(Doc, [revs]) || Doc <- Docs],
-    [true, Passes] = ddoc_prompt(DDoc, [<<"filters">>, FName], [JsonDocs, JsonReq]),
+    [true, Passes] = ddoc_prompt(DDoc, [<<"filters">>, FName],
+        [JsonDocs, JsonReq]),
     {ok, Passes}.
 
 ddoc_proc_prompt({Proc, DDocId}, FunPath, Args) ->

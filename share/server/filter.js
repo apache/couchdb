@@ -10,14 +10,36 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-var Filter = {
-  filter : function(fun, ddoc, args) {    
-    var results = [];
-    var docs = args[0];
-    var req = args[1];
-    for (var i=0; i < docs.length; i++) {
-      results.push((fun.apply(ddoc, [docs[i], req]) && true) || false);
-    };
-    respond([true, results]);
-  }
-};
+var Filter = (function() {
+
+  var view_emit = false;
+
+  return {
+      emit : function(key, value) {
+        view_emit = true;
+      },
+      filter : function(fun, ddoc, args) {
+        var results = [];
+        var docs = args[0];
+        var req = args[1];
+        for (var i=0; i < docs.length; i++) {
+          results.push((fun.apply(ddoc, [docs[i], req]) && true) || false);
+        };
+        respond([true, results]);
+      },
+      filter_view : function(fun, ddoc, args) {
+        // recompile
+        var source = fun.toSource();
+        fun = evalcx(source, filter_sandbox);
+
+        var results = [];
+        var docs = args[0];
+        for (var i=0; i < docs.length; i++) {
+          view_emit = false;
+          fun(docs[i]);
+          results.push((view_emit && true) || false);
+        };
+        respond([true, results]);
+      }
+    }
+})();

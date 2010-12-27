@@ -11,6 +11,7 @@
 // the License.
 
 var sandbox = null;
+var filter_sandbox = null;
 
 function init_sandbox() {
   try {
@@ -33,6 +34,22 @@ function init_sandbox() {
 };
 init_sandbox();
 
+function init_filter_sandbox() {
+  try {
+    filter_sandbox = evalcx('');
+    for (var p in sandbox) {
+      if (sandbox.hasOwnProperty(p)) {
+        filter_sandbox[p] = sandbox[p];
+      }
+    }
+    filter_sandbox.emit = Filter.emit;
+  } catch(e) {
+    log(e.toSource());
+  }
+};
+
+init_filter_sandbox();
+
 // Commands are in the form of json arrays:
 // ["commandname",..optional args...]\n
 //
@@ -43,6 +60,7 @@ var DDoc = (function() {
     "lists"     : Render.list,
     "shows"    : Render.show,
     "filters"   : Filter.filter,
+    "views"     : Filter.filter_view, 
     "updates"  : Render.update,
     "validate_doc_update" : Validate.validate
   };

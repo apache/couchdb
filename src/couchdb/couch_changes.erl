@@ -130,6 +130,9 @@ builtin_filter_fun("_doc_ids", Style, #httpd{method='GET'}=Req, _Db) ->
     filter_docids(DocIds, Style);
 builtin_filter_fun("_design", Style, _Req, _Db) ->
     filter_designdoc(Style);
+builtin_filter_fun("_view", Style, Req, Db) ->
+    ViewName = couch_httpd:qs_value(Req, "view", ""),
+    filter_view(ViewName, Style, Db);
 builtin_filter_fun(_FilterName, _Style, _Req, _Db) ->
     throw({bad_request, "unknown builtin filter name"}).
 
@@ -152,6 +155,40 @@ filter_designdoc(Style) ->
                 _ -> []
             end
     end.
+
+filter_view("", _Style, _Db) ->
+    throw({bad_request, "`view` filter parameter is not provided."});
+filter_view(ViewName, Style, Db) ->
+    case [list_to_binary(couch_httpd:unquote(Part))
+            || Part <- string:tokens(ViewName, "/")] of
+        [] ->
+            throw({bad_request, "Invalid `view` parameter."});
+        [DName, VName] ->
+            DesignId = <<"_design/", DName/binary>>,
+            DDoc = couch_httpd_db:couch_doc_open(Db, DesignId, nil, []),
+            % validate that the ddoc has the filter fun
+            #doc{body={Props}} = DDoc,
+            couch_util:get_nested_json_value({Props}, [<<"views">>, VName]),
+            fun(DocInfo) ->
+                DocInfos =
+                case Style of
+                main_only ->
+                    [DocInfo];
+                all_docs ->
+                    [DocInfo#doc_info{revs=[Rev]}|| Rev <- DocInfo#doc_info.revs]
+                end,
+                Docs = [Doc || {ok, Doc} <- [
+                        couch_db:open_doc(Db, DocInfo2, [deleted, conflicts])
+                            || DocInfo2 <- DocInfos]],
+
+                {ok, Passes} = couch_query_servers:filter_view(
+                    DDoc, VName, Docs
+                ),
+                [{[{<<"rev">>, couch_doc:rev_to_str({RevPos,RevId})}]}
+                    || {Pass, #doc{revs={RevPos,[RevId|_]}}}
+                    <- lists:zip(Passes, Docs), Pass == true]
+            end
+        end.
 
 builtin_results(Style, [#rev_info{rev=Rev}|_]=Revs) ->
     case Style of
