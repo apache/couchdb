@@ -28,6 +28,7 @@
     db,
     limit,
     include_docs,
+    doc_info = nil,
     offset = nil,
     total_rows,
     reduce_fun = fun couch_db:enum_docs_reduce_to_count/1,
@@ -268,10 +269,9 @@ with_db(DbName, Options, {M,F,A}) ->
 view_fold(#full_doc_info{} = FullDocInfo, OffsetReds, Acc) ->
     % matches for _all_docs and translates #full_doc_info{} -> KV pair
     case couch_doc:to_doc_info(FullDocInfo) of
-    #doc_info{revs=[#rev_info{deleted=false, rev=Rev}|_]} ->
-        Id = FullDocInfo#full_doc_info.id,
+    #doc_info{id=Id, revs=[#rev_info{deleted=false, rev=Rev}|_]} = DI ->
         Value = {[{rev,couch_doc:rev_to_str(Rev)}]},
-        view_fold({{Id,Id}, Value}, OffsetReds, Acc);
+        view_fold({{Id,Id}, Value}, OffsetReds, Acc#view_acc{doc_info=DI});
     #doc_info{revs=[#rev_info{deleted=true}|_]} ->
         {ok, Acc}
     end;
@@ -294,6 +294,7 @@ view_fold({{Key,Id}, Value}, _Offset, Acc) ->
     % the normal case
     #view_acc{
         db = Db,
+        doc_info = DocInfo,
         limit = Limit,
         include_docs = IncludeDocs
     } = Acc,
@@ -306,7 +307,8 @@ view_fold({{Key,Id}, Value}, _Offset, Acc) ->
         % we'll embed this at a higher level b/c the doc may be non-local
         Doc = undefined;
     IncludeDocs ->
-        case couch_db:open_doc(Db, Id, []) of
+        IdOrInfo = if DocInfo =/= nil -> DocInfo; true -> Id end,
+        case couch_db:open_doc(Db, IdOrInfo, []) of
         {not_found, deleted} ->
             Doc = null;
         {not_found, missing} ->
@@ -371,27 +373,26 @@ send(Key, Value, #view_acc{limit=Limit} = Acc) ->
 
 changes_enumerator(DocInfo, {Db, _Seq, Args}) ->
     #changes_args{include_docs=IncludeDocs, filter=Acc} = Args,
-    #doc_info{id=Id, high_seq=Seq, revs=[#rev_info{deleted=Del,rev=Rev}|_]}
-        = DocInfo,
+    #doc_info{high_seq=Seq, revs=[#rev_info{deleted=Del}|_]} = DocInfo,
     case [X || X <- couch_changes:filter(DocInfo, Acc), X /= null] of
     [] ->
         {ok, {Db, Seq, Args}};
     Results ->
-        ChangesRow = changes_row(Db, Seq, Id, Results, Rev, Del, IncludeDocs),
+        ChangesRow = changes_row(Db, DocInfo, Results, Del, IncludeDocs),
         Go = rexi:sync_reply(ChangesRow),
         {Go, {Db, Seq, Args}}
     end.
 
-changes_row(Db, Seq, Id, Results, Rev, Del, true) ->
-    #change{key=Seq, id=Id, value=Results, doc=doc_member(Db, Id, Rev), deleted=Del};
-changes_row(_, Seq, Id, Results, _, true, false) ->
+changes_row(Db, #doc_info{id=Id, high_seq=Seq} = DI, Results, Del, true) ->
+    #change{key=Seq, id=Id, value=Results, doc=doc_member(Db,DI), deleted=Del};
+changes_row(_, #doc_info{id=Id, high_seq=Seq}, Results, true, _) ->
     #change{key=Seq, id=Id, value=Results, deleted=true};
-changes_row(_, Seq, Id, Results, _, false, false) ->
+changes_row(_, #doc_info{id=Id, high_seq=Seq}, Results, _, _) ->
     #change{key=Seq, id=Id, value=Results}.
 
-doc_member(Shard, Id, Rev) ->
-    case couch_db:open_doc_revs(Shard, Id, [Rev], []) of
-    {ok, [{ok,Doc}]} ->
+doc_member(Shard, DocInfo) ->
+    case couch_db:open_doc(Shard, DocInfo, []) of
+    {ok, Doc} ->
         couch_doc:to_json_obj(Doc, []);
     Error ->
         Error
