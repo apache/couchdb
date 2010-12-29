@@ -618,16 +618,19 @@ update_docs_int(Db, DocsList, NonRepDocs, MergeConflicts, FullCommit) ->
 
     % Check if we just updated any design documents, and update the validation
     % funs if we did.
-    case [1 || <<"_design/",_/binary>> <- Ids] of
-    [] ->
+    case lists:any(
+        fun(<<"_design/", _/binary>>) -> true; (_) -> false end, Ids) of
+    false ->
         Db4 = Db3;
-    _ ->
+    true ->
         Db4 = refresh_validate_doc_funs(Db3)
     end,
 
     {ok, commit_data(Db4, not FullCommit)}.
 
 
+update_local_docs(Db, []) ->
+    {ok, Db};
 update_local_docs(#db{local_docs_btree=Btree}=Db, Docs) ->
     Ids = [Id || {_Client, #doc{id=Id}} <- Docs],
     OldDocLookups = couch_btree:lookup(Btree, Ids),
