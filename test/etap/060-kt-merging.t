@@ -15,7 +15,7 @@
 
 main(_) ->
     test_util:init_code_path(),
-    etap:plan(14),
+    etap:plan(12),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -42,77 +42,74 @@ test() ->
 
     etap:is(
         {[One], no_conflicts},
-        couch_key_tree:merge([], One),
+        couch_key_tree:merge([], One, 10),
         "The empty tree is the identity for merge."
     ),
 
     etap:is(
         {TwoSibs, no_conflicts},
-        couch_key_tree:merge(TwoSibs, One),
+        couch_key_tree:merge(TwoSibs, One, 10),
         "Merging a prefix of a tree with the tree yields the tree."
     ),
 
     etap:is(
         {[One], no_conflicts},
-        couch_key_tree:merge([One], One),
+        couch_key_tree:merge([One], One, 10),
         "Merging is reflexive."
     ),
 
     etap:is(
         {[TwoChild], no_conflicts},
-        couch_key_tree:merge([TwoChild], TwoChild),
+        couch_key_tree:merge([TwoChild], TwoChild, 10),
         "Merging two children is still reflexive."
     ),
 
     etap:is(
         {[TwoChildSibs], no_conflicts},
-        couch_key_tree:merge([TwoChildSibs], TwoChildSibs),
+        couch_key_tree:merge([TwoChildSibs], TwoChildSibs, 10),
         "Merging a tree to itself is itself."),
 
     etap:is(
         {[TwoChildSibs], no_conflicts},
-        couch_key_tree:merge([TwoChildSibs], Stemmed1b),
+        couch_key_tree:merge([TwoChildSibs], Stemmed1b, 10),
         "Merging a tree with a stem."
     ),
 
     etap:is(
         {[TwoChildSibs2], no_conflicts},
-        couch_key_tree:merge([TwoChildSibs2], Stemmed1bb),
+        couch_key_tree:merge([TwoChildSibs2], Stemmed1bb, 10),
         "Merging a stem at a deeper level."
     ),
 
     etap:is(
         {[TwoChild], no_conflicts},
-        couch_key_tree:merge([TwoChild], Stemmed1aa),
+        couch_key_tree:merge([TwoChild], Stemmed1aa, 10),
         "Merging a single tree with a deeper stem."
     ),
 
     etap:is(
         {[TwoChild], no_conflicts},
-        couch_key_tree:merge([TwoChild], Stemmed1a),
+        couch_key_tree:merge([TwoChild], Stemmed1a, 10),
         "Merging a larger stem."
     ),
 
     etap:is(
         {[Stemmed1a], no_conflicts},
-        couch_key_tree:merge([Stemmed1a], Stemmed1aa),
+        couch_key_tree:merge([Stemmed1a], Stemmed1aa, 10),
         "More merging."
     ),
 
     Expect1 = [OneChild, Stemmed1aa],
     etap:is(
         {Expect1, conflicts},
-        couch_key_tree:merge([OneChild], Stemmed1aa),
+        couch_key_tree:merge([OneChild], Stemmed1aa, 10),
         "Merging should create conflicts."
     ),
 
-    {MultiPaths, NoConflicts} = couch_key_tree:merge(Expect1, TwoChild),
-    etap:is(NoConflicts, no_conflicts, "Merge should have no conflicts."),
-    etap:is(length(MultiPaths), 2, "Should have two paths before stemming."),
     etap:is(
-        couch_key_tree:stem(MultiPaths, 10),
-        [TwoChild],
-        "Stemming should collapse the paths."
+        {[TwoChild], no_conflicts},
+        couch_key_tree:merge(Expect1, TwoChild, 10),
+        "Merge should have no conflicts."
     ),
 
     ok.
