@@ -15,7 +15,7 @@
 
 main(_) ->
     test_util:init_code_path(),
-    etap:plan(12),
+    etap:plan(14),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -106,10 +106,13 @@ test() ->
         "Merging should create conflicts."
     ),
 
+    {MultiPaths, NoConflicts} = couch_key_tree:merge(Expect1, TwoChild),
+    etap:is(NoConflicts, no_conflicts, "Merge should have no conflicts."),
+    etap:is(length(MultiPaths), 2, "Should have two paths before stemming."),
     etap:is(
-        {[TwoChild], no_conflicts},
-        couch_key_tree:merge(Expect1, TwoChild),
-        "Merge should have no conflicts."
+        couch_key_tree:stem(MultiPaths, 10),
+        [TwoChild],
+        "Stemming should collapse the paths."
     ),
 
     ok.
