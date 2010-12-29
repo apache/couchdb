@@ -495,10 +495,11 @@ merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
         [OldDocInfo|RestOldInfo], AccNewInfos, AccRemoveSeqs, AccSeq) ->
     #full_doc_info{id=Id,rev_tree=OldTree,deleted=OldDeleted,update_seq=OldSeq}
             = OldDocInfo,
-    NewRevTree0 = lists:foldl(
+    NewRevTree = lists:foldl(
         fun({Client, #doc{revs={Pos,[_Rev|PrevRevs]}}=NewDoc}, AccTree) ->
             if not MergeConflicts ->
-                case couch_key_tree:merge(AccTree, couch_db:doc_to_tree(NewDoc)) of
+                case couch_key_tree:merge(AccTree, couch_db:doc_to_tree(NewDoc),
+                    Limit) of
                 {_NewTree, conflicts} when (not OldDeleted) ->
                     send_result(Client, Id, {Pos-1,PrevRevs}, conflict),
                     AccTree;
@@ -529,7 +530,7 @@ merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
                                 NewDoc#doc{revs={OldPos, [OldRev]}}),
                         NewDoc2 = NewDoc#doc{revs={OldPos + 1, [NewRevId, OldRev]}},
                         {NewTree2, _} = couch_key_tree:merge(AccTree,
-                                couch_db:doc_to_tree(NewDoc2)),
+                                couch_db:doc_to_tree(NewDoc2), Limit),
                         % we changed the rev id, this tells the caller we did
                         send_result(Client, Id, {Pos-1,PrevRevs},
                                 {ok, {OldPos + 1, NewRevId}}),
@@ -543,12 +544,11 @@ merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
                 end;
             true ->
                 {NewTree, _} = couch_key_tree:merge(AccTree,
-                            couch_db:doc_to_tree(NewDoc)),
+                            couch_db:doc_to_tree(NewDoc), Limit),
                 NewTree
             end
         end,
         OldTree, NewDocs),
-    NewRevTree = couch_key_tree:stem(NewRevTree0, Limit),
     if NewRevTree == OldTree ->
         % nothing changed
         merge_rev_trees(Limit, MergeConflicts, RestDocsList, RestOldInfo,
