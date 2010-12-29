@@ -93,8 +93,8 @@ test_basic() ->
     Remote = fun(Req) ->
         'GET' = Req:get(method),
         "/" = Req:get(path),
-        undefined = Req:get(body_length),
-        undefined = Req:recv_body(),
+        0 = Req:get(body_length),
+        <<>> = Req:recv_body(),
         {ok, {200, [{"Content-Type", "text/plain"}], "ok"}}
     end,
     Local = fun({ok, "200", _, "ok"}) -> true; (_) -> false end,
