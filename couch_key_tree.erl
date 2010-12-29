@@ -38,7 +38,7 @@ merge_one([{Start, Tree}|Rest], {StartInsert, TreeInsert}, Acc, HasConflicts) ->
     case merge_at([Tree], StartInsert - Start, [TreeInsert]) of
     {ok, [Merged], Conflicts} ->
         MergedStart = lists:min([Start, StartInsert]),
-        merge_one(Rest, {MergedStart, Merged}, Acc, Conflicts or HasConflicts);
+        {ok, Rest ++ [{MergedStart, Merged} | Acc], Conflicts or HasConflicts};
     no ->
         AccOut = [{Start, Tree} | Acc],
         merge_one(Rest, {StartInsert, TreeInsert}, AccOut, HasConflicts)
