@@ -281,24 +281,26 @@ view_fold({{Key,Id}, Value}, _Offset, Acc) ->
         limit = Limit,
         include_docs = IncludeDocs
     } = Acc,
-    Doc = if not IncludeDocs -> undefined; true ->
-                  {Props} = Value,
-                  % when keys are used and an <<"_id">> is in the value
-                  % those docs are retrieved instead of row id in the view
-                  % see fabric_view:possibly_embed_doc
-                  case couch_util:get_value(<<"_id">>,Props) of
-                      undefined ->
-                          case couch_db:open_doc(Db, Id, []) of
-                              {not_found, deleted} ->
-                                  null;
-                              {not_found, missing} ->
-                                  undefined;
-                              {ok, Doc0} ->
-                                  couch_doc:to_json_obj(Doc0, [])
-                          end;
-                      _ -> undefined
-                  end
-          end,
+    case Value of {Props} ->
+        LinkedDocs = (couch_util:get_value(<<"_id">>, Props) =/= undefined);
+    _ ->
+        LinkedDocs = false
+    end,
+    if LinkedDocs ->
+        % we'll embed this at a higher level b/c the doc may be non-local
+        Doc = undefined;
+    IncludeDocs ->
+        case couch_db:open_doc(Db, Id, []) of
+        {not_found, deleted} ->
+            Doc = null;
+        {not_found, missing} ->
+            Doc = undefined;
+        {ok, Doc0} ->
+            Doc = couch_doc:to_json_obj(Doc0, [])
+        end;
+    true ->
+        Doc = undefined
+    end,
     case rexi:sync_reply(#view_row{key=Key, id=Id, value=Value, doc=Doc}) of
         ok ->
             {ok, Acc#view_acc{limit=Limit-1}};
