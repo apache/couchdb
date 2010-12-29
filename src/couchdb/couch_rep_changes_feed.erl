@@ -204,6 +204,9 @@ handle_info({ibrowse_async_response_end, Id}, #state{reqid=Id} = State) ->
 handle_info({'EXIT', From, normal}, #state{changes_loop=From} = State) ->
     handle_feed_completion(State);
 
+handle_info({'EXIT', From, normal}, #state{conn=From, complete=true} = State) ->
+    {noreply, State};
+
 handle_info({'EXIT', From, Reason}, #state{changes_loop=From} = State) ->
     ?LOG_ERROR("changes_loop died with reason ~p", [Reason]),
     {stop, changes_loop_died, State};
