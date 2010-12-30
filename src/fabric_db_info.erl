@@ -23,8 +23,7 @@ go(DbName) ->
     Shards = mem3:shards(DbName),
     Workers = fabric_util:submit_jobs(Shards, get_db_info, []),
     Acc0 = {fabric_dict:init(Workers, nil), []},
-    {ok, Res} = fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0),
-    {ok, Res ++ cluster_constants(DbName)}.
+    fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0).
 
 handle_message({ok, Info}, #shard{dbname=Name} = Shard, {Counters, Acc}) ->
     case fabric_dict:lookup_element(Shard, Counters) of
@@ -68,8 +67,3 @@ merge_results(Info) ->
         (_, _, Acc) ->
             Acc
     end, [{instance_start_time, <<"0">>}], Dict).
-
-cluster_constants(DbName) ->
-    mem3_util:shard_info(DbName) ++
-        [{r, mem3_util:to_integer(couch_config:get("cluster", "r", "2"))},
-         {w, mem3_util:to_integer(couch_config:get("cluster", "w", "2"))}].
