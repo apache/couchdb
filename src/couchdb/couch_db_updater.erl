@@ -438,7 +438,7 @@ refresh_validate_doc_funs(Db) ->
 
 flush_trees(_Db, [], AccFlushedTrees) ->
     {ok, lists:reverse(AccFlushedTrees)};
-flush_trees(#db{updater_fd = Fd, header = Header} = Db,
+flush_trees(#db{updater_fd = Fd} = Db,
         [InfoUnflushed | RestUnflushed], AccFlushed) ->
     #full_doc_info{update_seq=UpdateSeq, rev_tree=Unflushed} = InfoUnflushed,
     Flushed = couch_key_tree:map(
@@ -466,12 +466,7 @@ flush_trees(#db{updater_fd = Fd, header = Header} = Db,
                     throw(retry)
                 end,
                 {ok, NewSummaryPointer} =
-                case Header#db_header.disk_version < 4 of
-                true ->
-                    couch_file:append_term(Fd, {Doc#doc.body, DiskAtts});
-                false ->
-                    couch_file:append_term_md5(Fd, {Doc#doc.body, DiskAtts})
-                end,
+                    couch_file:append_term_md5(Fd, {Doc#doc.body, DiskAtts}),
                 {IsDeleted, NewSummaryPointer, UpdateSeq};
             _ ->
                 Value
