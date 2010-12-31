@@ -50,7 +50,8 @@ open(DbName, Options) ->
         ets:insert(couch_lru, {DbName, now()}),
         {ok, Db#db{user_ctx=Ctx, fd_monitor=erlang:monitor(process,Fd)}};
     _ ->
-        case gen_server:call(couch_server, {open, DbName, Options}, infinity) of
+        Timeout = couch_util:get_value(timeout, Options, infinity),
+        case gen_server:call(couch_server, {open, DbName, Options}, Timeout) of
         {ok, #db{fd=Fd} = Db} ->
             ets:insert(couch_lru, {DbName, now()}),
             {ok, Db#db{user_ctx=Ctx, fd_monitor=erlang:monitor(process,Fd)}};
