@@ -897,6 +897,7 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
         atts = NewAtt ++ [A || A <- Atts, A#att.name /= FileName]
     },
     {ok, UpdatedRev} = fabric:update_doc(Db, DocEdited, [{user_ctx,Ctx}]),
+    erlang:put(mochiweb_request_recv, true),
     #db{name=DbName} = Db,
 
     {Status, Headers} = case Method of
