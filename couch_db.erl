@@ -862,6 +862,24 @@ flush_att(Fd, #att{data=Fun,att_len=AttLen}=Att) when is_function(Fun) ->
         write_streamed_attachment(OutputStream, Fun, AttLen)
     end).
 
+
+compressible_att_type(MimeType) when is_binary(MimeType) ->
+    compressible_att_type(?b2l(MimeType));
+compressible_att_type(MimeType) ->
+    TypeExpList = re:split(
+        couch_config:get("attachments", "compressible_types", ""),
+        ", ?",
+        [{return, list}]
+    ),
+    lists:any(
+        fun(TypeExp) ->
+            Regexp = ["^\\s*", re:replace(TypeExp, "\\*", ".*"),
+                "(?:\\s*;.*?)?\\s*", $$],
+            re:run(MimeType, Regexp, [caseless]) =/= nomatch
+        end,
+        [T || T <- TypeExpList, T /= []]
+    ).
+
 % From RFC 2616 3.6.1 - Chunked Transfer Coding
 %
 %   In other words, the origin server is willing to accept
@@ -874,7 +892,7 @@ flush_att(Fd, #att{data=Fun,att_len=AttLen}=Att) when is_function(Fun) ->
 % pretend that no Content-MD5 exists.
 with_stream(Fd, #att{md5=InMd5,type=Type,encoding=Enc}=Att, Fun) ->
     {ok, OutputStream} = case (Enc =:= identity) andalso
-        couch_util:compressible_att_type(Type) of
+        compressible_att_type(Type) of
     true ->
         CompLevel = list_to_integer(
             couch_config:get("attachments", "compression_level", "0")
