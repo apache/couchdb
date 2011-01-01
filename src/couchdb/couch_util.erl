@@ -23,7 +23,6 @@
 -export([to_binary/1, to_integer/1, to_list/1, url_encode/1]).
 -export([json_encode/1, json_decode/1]).
 -export([verify/2,simple_call/2,shutdown_sync/1]).
--export([compressible_att_type/1]).
 -export([get_value/2, get_value/3]).
 -export([md5/1, md5_init/0, md5_update/2, md5_final/1]).
 -export([reorder_results/2]).
@@ -387,23 +386,6 @@ verify(X, Y) when is_list(X) and is_list(Y) ->
             false
     end;
 verify(_X, _Y) -> false.
-
-compressible_att_type(MimeType) when is_binary(MimeType) ->
-    compressible_att_type(?b2l(MimeType));
-compressible_att_type(MimeType) ->
-    TypeExpList = re:split(
-        couch_config:get("attachments", "compressible_types", ""),
-        ", ?",
-        [{return, list}]
-    ),
-    lists:any(
-        fun(TypeExp) ->
-            Regexp = ["^\\s*", re:replace(TypeExp, "\\*", ".*"),
-                "(?:\\s*;.*?)?\\s*", $$],
-            re:run(MimeType, Regexp, [caseless]) =/= nomatch
-        end,
-        [T || T <- TypeExpList, T /= []]
-    ).
 
 -spec md5(Data::(iolist() | binary())) -> Digest::binary().
 md5(Data) ->
