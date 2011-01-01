@@ -464,6 +464,14 @@ couchTests.replication = function(debug) {
     return true;
   }).toString();
 
+  function wait(ms) {
+    var t0 = new Date(), t1;
+    do {
+      CouchDB.request("GET", "/");
+      t1 = new Date();
+    } while ((t1 - t0) <= ms);
+  }
+
   var dbPairs = [
     {source:"test_suite_filtered_rep_db_a",
       target:"test_suite_filtered_rep_db_b"},
@@ -477,8 +485,13 @@ couchTests.replication = function(debug) {
   var sourceDb = new CouchDB("test_suite_filtered_rep_db_a");
   var targetDb = new CouchDB("test_suite_filtered_rep_db_b");
 
+
   for (var i = 0; i < dbPairs.length; i++) {
     sourceDb.deleteDb();
+    
+    // wait some time to make sure we deleted the db.
+    // fix issue COUCHDB-1002
+    wait(1000);
     sourceDb.createDb();
 
     T(sourceDb.save({_id: "foo1", value: 1}).ok);
