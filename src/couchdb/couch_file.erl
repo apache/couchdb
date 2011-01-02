@@ -18,7 +18,8 @@
 -define(SIZE_BLOCK, 4096).
 
 -record(file, {
-    fd
+    fd,
+    eof = 0
 }).
 
 % public API
@@ -269,7 +270,8 @@ init({Filepath, Options, ReturnPid, Ref}) ->
             {ok, Fd} = file:open(Filepath, OpenOptions),
             ok = file:close(Fd_Read),
             maybe_track_open_os_files(Options),
-            {ok, #file{fd=Fd}};
+            {ok, Eof} = file:position(Fd, eof),
+            {ok, #file{fd=Fd, eof=Eof}};
         Error ->
             init_status_error(ReturnPid, Ref, Error)
         end
@@ -323,20 +325,23 @@ handle_call(sync, _From, #file{fd=Fd}=File) ->
 
 handle_call({truncate, Pos}, _From, #file{fd=Fd}=File) ->
     {ok, Pos} = file:position(Fd, Pos),
-    {reply, file:truncate(Fd), File};
-
-handle_call({append_bin, Bin}, _From, #file{fd = Fd} = File) ->
-    {ok, Pos} = file:position(Fd, eof),
-    Blocks = make_blocks(Pos rem ?SIZE_BLOCK, Bin),
-    case file:write(Fd, Blocks) of
+    case file:truncate(Fd) of
     ok ->
-        {reply, {ok, Pos}, File};
+        {reply, ok, File#file{eof = Pos}};
     Error ->
         {reply, Error, File}
     end;
 
-handle_call({write_header, Bin}, _From, #file{fd = Fd} = File) ->
-    {ok, Pos} = file:position(Fd, eof),
+handle_call({append_bin, Bin}, _From, #file{fd = Fd, eof = Pos} = File) ->
+    Blocks = make_blocks(Pos rem ?SIZE_BLOCK, Bin),
+    case file:write(Fd, Blocks) of
+    ok ->
+        {reply, {ok, Pos}, File#file{eof = Pos + iolist_size(Blocks)}};
+    Error ->
+        {reply, Error, File}
+    end;
+
+handle_call({write_header, Bin}, _From, #file{fd = Fd, eof = Pos} = File) ->
     BinSize = byte_size(Bin),
     case Pos rem ?SIZE_BLOCK of
     0 ->
@@ -345,10 +350,14 @@ handle_call({write_header, Bin}, _From, #file{fd = Fd} = File) ->
         Padding = <<0:(8*(?SIZE_BLOCK-BlockOffset))>>
     end,
     FinalBin = [Padding, <<1, BinSize:32/integer>> | make_blocks(5, [Bin])],
-    {reply, file:write(Fd, FinalBin), File};
+    case file:write(Fd, FinalBin) of
+    ok ->
+        {reply, ok, File#file{eof = Pos + iolist_size(FinalBin)}};
+    Error ->
+        {reply, Error, File}
+    end;
 
-handle_call(find_header, _From, #file{fd = Fd} = File) ->
-    {ok, Pos} = file:position(Fd, eof),
+handle_call(find_header, _From, #file{fd = Fd, eof = Pos} = File) ->
     {reply, find_header(Fd, Pos div ?SIZE_BLOCK), File}.
 
 handle_cast(close, Fd) ->
