@@ -13,17 +13,6 @@
 -module(couch_stream).
 -behaviour(gen_server).
 
-
--define(FILE_POINTER_BYTES, 8).
--define(FILE_POINTER_BITS, 8*(?FILE_POINTER_BYTES)).
-
--define(STREAM_OFFSET_BYTES, 4).
--define(STREAM_OFFSET_BITS, 8*(?STREAM_OFFSET_BYTES)).
-
--define(HUGE_CHUNK, 1000000000). % Huge chuck size when reading all in one go
-
--define(DEFAULT_STREAM_CHUNK, 16#00100000). % 1 meg chunks when streaming data
-
 % public API
 -export([open/1, open/3, close/1]).
 -export([foldl/4, foldl/5, foldl_decode/6, range_foldl/6]).
