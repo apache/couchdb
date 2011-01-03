@@ -48,18 +48,22 @@ compact_group(Group, EmptyGroup) ->
     TaskName = <<DbName/binary, ShortName/binary>>,
     couch_task_status:add_task(<<"View Group Compaction">>, TaskName, <<"">>),
 
-    Fun = fun(KV, {Bt, Acc, TotalCopied}) ->
+    Fun = fun({DocId, _ViewIdKeys} = KV, {Bt, Acc, TotalCopied, LastId}) ->
+        if DocId =:= LastId -> % COUCHDB-999
+            Msg = "Duplicates of ~s detected in ~s ~s - rebuild required",
+            exit(io_lib:format(Msg, [DocId, DbName, GroupId]));
+        true -> ok end,
         if TotalCopied rem 10000 =:= 0 ->
             couch_task_status:update("Copied ~p of ~p Ids (~p%)",
                 [TotalCopied, Count, (TotalCopied*100) div Count]),
             {ok, Bt2} = couch_btree:add(Bt, lists:reverse([KV|Acc])),
-            {ok, {Bt2, [], TotalCopied+1}};
+            {ok, {Bt2, [], TotalCopied+1, DocId}};
         true ->
-            {ok, {Bt, [KV|Acc], TotalCopied+1}}
+            {ok, {Bt, [KV|Acc], TotalCopied+1, DocId}}
         end
     end,
-    {ok, _, {Bt3, Uncopied, _Total}} = couch_btree:foldl(IdBtree, Fun,
-        {EmptyIdBtree, [], 0}),
+    {ok, _, {Bt3, Uncopied, _Total, _LastId}} = couch_btree:foldl(IdBtree, Fun,
+        {EmptyIdBtree, [], 0, nil}),
     {ok, NewIdBtree} = couch_btree:add(Bt3, lists:reverse(Uncopied)),
 
     NewViews = lists:map(fun({View, EmptyView}) ->
