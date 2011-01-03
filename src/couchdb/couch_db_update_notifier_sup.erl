@@ -22,14 +22,16 @@
 
 -behaviour(supervisor).
 
--export([start_link/0, init/1, config_change/3]).
+-export([start_link/0,init/1]).
 
 start_link() ->
     supervisor:start_link({local, couch_db_update_notifier_sup},
         couch_db_update_notifier_sup, []).
 
 init([]) ->
-    ok = couch_config:register(fun ?MODULE:config_change/3),
+    ok = couch_config:register(
+        fun("update_notification", Key, Value) -> reload_config(Key, Value) end
+    ),
 
     UpdateNotifierExes = couch_config:get("update_notification"),
 
@@ -46,7 +48,7 @@ init([]) ->
 
 %% @doc when update_notification configuration changes, terminate the process
 %%      for that notifier and start a new one with the updated config
-config_change("update_notification", Id, Exe) ->
+reload_config(Id, Exe) ->
     ChildSpec = {
         Id,
         {couch_db_update_notifier, start_link, [Exe]},
