@@ -39,14 +39,21 @@ recv(Workers, Keypos, Fun, Acc0) ->
 
 
 get_db(DbName) ->
-    Shards = mem3:shards(DbName),
-    case lists:partition(fun(#shard{node = N}) -> N =:= node() end, Shards) of
-    {[#shard{name = ShardName}|_], _} ->
-        % prefer node-local DBs
-        couch_db:open(ShardName, []);
-    {[], [#shard{node = Node, name = ShardName}|_]} ->
-        % but don't require them
-        rpc:call(Node, couch_db, open, [ShardName, []])
+    % sort shards so we try the local ones first
+    {Local, Remote} = lists:partition(fun(S) -> S#shard.node =:= node() end,
+        mem3:shards(DbName)),
+    get_shard(Local ++ Remote, 100).
+
+get_shard([], _Timeout) ->
+    erlang:error({internal_server_error, "No DB shards could be opened."});
+get_shard([#shard{node = Node, name = Name} | Rest], Timeout) ->
+    case rpc:call(Node, couch_db, open, [Name, [{timeout, Timeout}]]) of
+    {ok, Db} ->
+        {ok, Db};
+    {badrpc, {'EXIT', {timeout, _}}} ->
+        get_shard(Rest, 2*Timeout);
+    _Else ->
+        get_shard(Rest, Timeout)
     end.
 
 % this presumes the incoming list is sorted, i.e. shorter revlists come first
