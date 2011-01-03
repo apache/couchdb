@@ -418,8 +418,8 @@ compressible_att_type(MimeType) ->
     ),
     lists:any(
         fun(TypeExp) ->
-            Regexp = "^\\s*" ++
-                re:replace(TypeExp, "\\*", ".*", [{return, list}]) ++ "\\s*$",
+            Regexp = ["^\\s*", re:replace(TypeExp, "\\*", ".*"),
+                "(?:\\s*;.*?)?\\s*", $$],
             case re:run(MimeType, Regexp, [caseless]) of
             {match, _} ->
                 true;

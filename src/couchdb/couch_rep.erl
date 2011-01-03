@@ -108,8 +108,12 @@ get_result(Server, PostBody, UserCtx) ->
     end.
 
 init(InitArgs) ->
-    try do_init(InitArgs)
-    catch throw:{db_not_found, DbUrl} -> {stop, {db_not_found, DbUrl}} end.
+    try
+        do_init(InitArgs)
+    catch
+    throw:Error ->
+        {stop, Error}
+    end.
 
 do_init([RepId, {PostProps}, UserCtx] = InitArgs) ->
     process_flag(trap_exit, true),
@@ -314,13 +318,19 @@ start_replication_server(Replicator) ->
             ?LOG_DEBUG("replication ~p already running at ~p", [RepId, Pid]),
             Pid;
         {error, {db_not_found, DbUrl}} ->
-            throw({db_not_found, <<"could not open ", DbUrl/binary>>})
+            throw({db_not_found, <<"could not open ", DbUrl/binary>>});
+        {error, {unauthorized, DbUrl}} ->
+            throw({unauthorized,
+                <<"unauthorized to access database ", DbUrl/binary>>})
         end;
     {error, {already_started, Pid}} ->
         ?LOG_DEBUG("replication ~p already running at ~p", [RepId, Pid]),
         Pid;
     {error, {{db_not_found, DbUrl}, _}} ->
-        throw({db_not_found, <<"could not open ", DbUrl/binary>>})
+        throw({db_not_found, <<"could not open ", DbUrl/binary>>});
+    {error, {{unauthorized, DbUrl}, _}} ->
+        throw({unauthorized,
+            <<"unauthorized to access database ", DbUrl/binary>>})
     end.
 
 compare_replication_logs(SrcDoc, TgtDoc) ->
@@ -554,25 +564,34 @@ open_db({Props}, _UserCtx, ProxyParams, CreateTarget) ->
         auth = AuthProps,
         headers = lists:ukeymerge(1, Headers, DefaultHeaders)
     },
-    Db = Db1#http_db{options = Db1#http_db.options ++ ProxyParams},
+    Db = Db1#http_db{
+        options = Db1#http_db.options ++ ProxyParams ++
+            couch_rep_httpc:ssl_options(Db1)
+    },
     couch_rep_httpc:db_exists(Db, CreateTarget);
 open_db(<<"http://",_/binary>>=Url, _, ProxyParams, CreateTarget) ->
     open_db({[{<<"url">>,Url}]}, [], ProxyParams, CreateTarget);
 open_db(<<"https://",_/binary>>=Url, _, ProxyParams, CreateTarget) ->
     open_db({[{<<"url">>,Url}]}, [], ProxyParams, CreateTarget);
 open_db(<<DbName/binary>>, UserCtx, _ProxyParams, CreateTarget) ->
-    case CreateTarget of
-    true ->
-        ok = couch_httpd:verify_is_server_admin(UserCtx),
-        couch_server:create(DbName, [{user_ctx, UserCtx}]);
-    false -> ok
-    end,
+    try
+        case CreateTarget of
+        true ->
+            ok = couch_httpd:verify_is_server_admin(UserCtx),
+            couch_server:create(DbName, [{user_ctx, UserCtx}]);
+        false ->
+            ok
+        end,
 
-    case couch_db:open(DbName, [{user_ctx, UserCtx}]) of
-    {ok, Db} ->
-        couch_db:monitor(Db),
-        Db;
-    {not_found, no_db_file} -> throw({db_not_found, DbName})
+        case couch_db:open(DbName, [{user_ctx, UserCtx}]) of
+        {ok, Db} ->
+            couch_db:monitor(Db),
+            Db;
+        {not_found, no_db_file} ->
+            throw({db_not_found, DbName})
+        end
+    catch throw:{unauthorized, _} ->
+        throw({unauthorized, DbName})
     end.
 
 schedule_checkpoint(#state{checkpoint_scheduled = nil} = State) ->

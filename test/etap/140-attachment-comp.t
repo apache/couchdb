@@ -22,7 +22,7 @@ test_db_name() ->
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(78),
+    etap:plan(86),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -74,6 +74,8 @@ test() ->
         test_text_data(),
         "compress"
     ),
+
+    test_compressible_type_with_parameters(),
 
     timer:sleep(3000), % to avoid mochiweb socket closed exceptions
     couch_server:delete(test_db_name(), []),
@@ -695,6 +697,56 @@ test_create_already_compressed_att_with_invalid_content_encoding(
         415,
         "Couldn't create an already compressed attachment using the "
         "unsupported encoding '" ++ Encoding ++ "'"
+    ),
+    ok.
+
+test_compressible_type_with_parameters() ->
+    {ok, {{_, Code, _}, _Headers, _Body}} = http:request(
+        put,
+        {db_url() ++ "/testdoc5/readme.txt", [],
+        "text/plain; charset=UTF-8", test_text_data()},
+        [],
+        [{sync, true}]),
+    etap:is(Code, 201, "Created text attachment with MIME type "
+        "'text/plain; charset=UTF-8' using the standalone api"),
+    {ok, {{_, Code2, _}, Headers2, Body}} = http:request(
+        get,
+        {db_url() ++ "/testdoc5/readme.txt", [{"Accept-Encoding", "gzip"}]},
+        [],
+        [{sync, true}]),
+    etap:is(Code2, 200, "HTTP response code is 200"),
+    Gziped = lists:member({"content-encoding", "gzip"}, Headers2),
+    etap:is(Gziped, true, "received body is gziped"),
+    Uncompressed = binary_to_list(zlib:gunzip(list_to_binary(Body))),
+    etap:is(Uncompressed, test_text_data(), "received data is gzipped"),
+    {ok, {{_, Code3, _}, _Headers3, Body3}} = http:request(
+        get,
+        {db_url() ++ "/testdoc5?att_encoding_info=true", []},
+        [],
+        [{sync, true}]),
+    etap:is(Code3, 200, "HTTP response code is 200"),
+    Json = couch_util:json_decode(Body3),
+    {TextAttJson} = couch_util:get_nested_json_value(
+        Json,
+        [<<"_attachments">>, <<"readme.txt">>]
+    ),
+    TextAttLength = couch_util:get_value(<<"length">>, TextAttJson),
+    etap:is(
+        TextAttLength,
+        length(test_text_data()),
+        "text attachment stub length matches the uncompressed length"
+    ),
+    TextAttEncoding = couch_util:get_value(<<"encoding">>, TextAttJson),
+    etap:is(
+        TextAttEncoding,
+        <<"gzip">>,
+        "text attachment stub has the encoding field set to gzip"
+    ),
+    TextAttEncLength = couch_util:get_value(<<"encoded_length">>, TextAttJson),
+    etap:is(
+        TextAttEncLength,
+        iolist_size(zlib:gzip(test_text_data())),
+        "text attachment stub encoded_length matches the compressed length"
     ),
     ok.
 

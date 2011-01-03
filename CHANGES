@@ -4,11 +4,10 @@ Apache CouchDB CHANGES
 Version 1.0.2
 -------------
 
-Note: This version has not been released yet.
-
 Futon:
 
  * Make test suite work with Safari and Chrome.
+ * Fixed animated progress spinner.
 
 Storage System:
 
@@ -17,6 +16,13 @@ Storage System:
  * Fix occasional timeout errors after successfully compacting large databases.
  * Fix ocassional error when writing to a database that has just been compacted.
  * Fix occasional timeout errors on systems with slow or heavily loaded IO.
+ * Fix for OOME when compactions include documents with many conflicts.
+ * Fix for missing attachment compression when MIME types included parameters.
+ * Fix for frequently edited documents in multi-master deployments being
+   duplicated in _changes and _all_docs.  See COUCHDDB-968 for details on how
+   to repair.
+ * Significantly higher read and write throughput against database and
+   view index files.
 
 Log System:
 
@@ -30,7 +36,9 @@ HTTP Interface:
 
 Replicator:
 
- * Updated ibrowse library to 2.1.0 fixing numerous replication issues.
+ * Updated ibrowse library to 2.1.2 fixing numerous replication issues.
+ * Make sure that the replicator respects HTTP settings defined in the config.
+ * Fix error when the ibrowse connection closes unexpectedly.
  * Fix authenticated replication (with HTTP basic auth) of design documents
    with attachments.
  * Various fixes to make replication more resilient for edge-cases.
@@ -41,6 +49,9 @@ View Server:
  * Fix for circular references in CommonJS requires.
  * Made isArray() function available to functions executed in the query server.
  * Documents are now sealed before being passed to map functions.
+ * Force view compaction failure when duplicated document data exists. When
+   this error is seen in the logs users should rebuild their views from
+   scratch to fix the issue. See COUCHDB-999 for details.
 
 Version 1.0.1
 -------------

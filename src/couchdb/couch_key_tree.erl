@@ -12,104 +12,107 @@
 
 -module(couch_key_tree).
 
--export([merge/2, find_missing/2, get_key_leafs/2, get_full_key_paths/2, get/2]).
+-export([merge/3, find_missing/2, get_key_leafs/2, get_full_key_paths/2, get/2]).
 -export([map/2, get_all_leafs/1, count_leafs/1, remove_leafs/2,
     get_all_leafs_full/1,stem/2,map_leafs/2]).
 
-% a key tree looks like this:
-% Tree -> [] or [{Key, Value, ChildTree} | SiblingTree]
-% ChildTree -> Tree
-% SiblingTree -> [] or [{SiblingKey, Value, Tree} | Tree]
-% And each Key < SiblingKey
-
+% Tree::term() is really a tree(), but we don't want to require R13B04 yet
+-type branch() :: {Key::term(), Value::term(), Tree::term()}.
+-type path() :: {Start::pos_integer(), branch()}.
+-type tree() :: [branch()]. % sorted by key
 
 % partial trees arranged by how much they are cut off.
 
-merge(A, B) ->
-    {Merged, HasConflicts} =
-    lists:foldl(
-        fun(InsertTree, {AccTrees, AccConflicts}) ->
-            {ok, Merged, Conflicts} = merge_one(AccTrees, InsertTree, [], false),
-            {Merged, Conflicts or AccConflicts}
-        end,
-        {A, false}, B),
-    if HasConflicts or
-            ((length(Merged) =/= length(A)) and (length(Merged) =/= length(B))) ->
+-spec merge([path()], path(), pos_integer()) -> {[path()],
+    conflicts | no_conflicts}.
+merge(Paths, Path, Depth) ->
+    {Merged, Conflicts} = merge(Paths, Path),
+    {stem(Merged, Depth), Conflicts}.
+
+-spec merge([path()], path()) -> {[path()], conflicts | no_conflicts}.
+merge(Paths, Path) ->
+    {ok, Merged, HasConflicts} = merge_one(Paths, Path, [], false),
+    if HasConflicts ->
+        Conflicts = conflicts;
+    (length(Merged) =/= length(Paths)) and (length(Merged) =/= 1) ->
         Conflicts = conflicts;
     true ->
         Conflicts = no_conflicts
     end,
     {lists:sort(Merged), Conflicts}.
 
+-spec merge_one(Original::[path()], Inserted::path(), [path()], bool()) ->
+    {ok, Merged::[path()], NewConflicts::bool()}.
 merge_one([], Insert, OutAcc, ConflictsAcc) ->
     {ok, [Insert | OutAcc], ConflictsAcc};
-merge_one([{Start, Tree}|Rest], {StartInsert, TreeInsert}, OutAcc, ConflictsAcc) ->
-    if Start =< StartInsert ->
-        StartA = Start,
-        StartB = StartInsert,
-        TreeA = Tree,
-        TreeB = TreeInsert;
-    true ->
-        StartB = Start,
-        StartA = StartInsert,
-        TreeB = Tree,
-        TreeA = TreeInsert
-    end,
-    case merge_at([TreeA], StartB - StartA, TreeB) of
-    {ok, [CombinedTrees], Conflicts} ->
-        merge_one(Rest, {StartA, CombinedTrees}, OutAcc, Conflicts or ConflictsAcc);
+merge_one([{Start, Tree}|Rest], {StartInsert, TreeInsert}, Acc, HasConflicts) ->
+    case merge_at([Tree], StartInsert - Start, [TreeInsert]) of
+    {ok, [Merged], Conflicts} ->
+        MergedStart = lists:min([Start, StartInsert]),
+        {ok, Rest ++ [{MergedStart, Merged} | Acc], Conflicts or HasConflicts};
     no ->
-        merge_one(Rest, {StartB, TreeB}, [{StartA, TreeA} | OutAcc], ConflictsAcc)
+        AccOut = [{Start, Tree} | Acc],
+        merge_one(Rest, {StartInsert, TreeInsert}, AccOut, HasConflicts)
     end.
 
+-spec merge_at(tree(), Place::integer(), tree()) ->
+    {ok, Merged::tree(), HasConflicts::bool()} | no.
+merge_at(_Ours, _Place, []) ->
+    no;
 merge_at([], _Place, _Insert) ->
     no;
-merge_at([{Key, Value, SubTree}|Sibs], 0, {InsertKey, InsertValue, InsertSubTree}) ->
-    if Key == InsertKey ->
-        {Merge, Conflicts} = merge_simple(SubTree, InsertSubTree),
-        {ok, [{Key, Value, Merge} | Sibs], Conflicts};
-    true ->
-        case merge_at(Sibs, 0, {InsertKey, InsertValue, InsertSubTree}) of
+merge_at([{Key, Value, SubTree}|Sibs], Place, InsertTree) when Place > 0 ->
+    % inserted starts later than committed, need to drill into committed subtree
+    case merge_at(SubTree, Place - 1, InsertTree) of
+    {ok, Merged, Conflicts} ->
+        {ok, [{Key, Value, Merged} | Sibs], Conflicts};
+    no ->
+        case merge_at(Sibs, Place, InsertTree) of
         {ok, Merged, Conflicts} ->
             {ok, [{Key, Value, SubTree} | Merged], Conflicts};
         no ->
             no
         end
     end;
-merge_at([{Key, Value, SubTree}|Sibs], Place, Insert) ->
-    case merge_at(SubTree, Place - 1,Insert) of
+merge_at(OurTree, Place, [{Key, Value, SubTree}]) when Place < 0 ->
+    % inserted starts earlier than committed, need to drill into insert subtree
+    case merge_at(OurTree, Place + 1, SubTree) of
     {ok, Merged, Conflicts} ->
-        {ok, [{Key, Value, Merged} | Sibs], Conflicts};
+        {ok, [{Key, Value, Merged}], Conflicts};
     no ->
-        case merge_at(Sibs, Place, Insert) of
-        {ok, Merged, Conflicts} ->
-            {ok, [{Key, Value, SubTree} | Merged], Conflicts};
-        no ->
-            no
-        end
+        no
+    end;
+merge_at([{Key, Value, SubTree}|Sibs], 0, [{Key, _Value, InsertSubTree}]) ->
+    {Merged, Conflicts} = merge_simple(SubTree, InsertSubTree),
+    {ok, [{Key, Value, Merged} | Sibs], Conflicts};
+merge_at([{OurKey, _, _} | _], 0, [{Key, _, _}]) when OurKey > Key ->
+    % siblings keys are ordered, no point in continuing
+    no;
+merge_at([Tree | Sibs], 0, InsertTree) ->
+    case merge_at(Sibs, 0, InsertTree) of
+    {ok, Merged, Conflicts} ->
+        {ok, [Tree | Merged], Conflicts};
+    no ->
+        no
     end.
 
 % key tree functions
+
+-spec merge_simple(tree(), tree()) -> {Merged::tree(), NewConflicts::bool()}.
 merge_simple([], B) ->
     {B, false};
 merge_simple(A, []) ->
     {A, false};
-merge_simple([ATree | ANextTree], [BTree | BNextTree]) ->
-    {AKey, AValue, ASubTree} = ATree,
-    {BKey, _BValue, BSubTree} = BTree,
-    if
-    AKey == BKey ->
-        %same key
-        {MergedSubTree, Conflict1} = merge_simple(ASubTree, BSubTree),
-        {MergedNextTree, Conflict2} = merge_simple(ANextTree, BNextTree),
-        {[{AKey, AValue, MergedSubTree} | MergedNextTree], Conflict1 or Conflict2};
-    AKey < BKey ->
-        {MTree, _} = merge_simple(ANextTree, [BTree | BNextTree]),
-        {[ATree | MTree], true};
-    true ->
-        {MTree, _} = merge_simple([ATree | ANextTree], BNextTree),
-        {[BTree | MTree], true}
-    end.
+merge_simple([{Key, Value, SubA} | NextA], [{Key, _, SubB} | NextB]) ->
+    {MergedSubTree, Conflict1} = merge_simple(SubA, SubB),
+    {MergedNextTree, Conflict2} = merge_simple(NextA, NextB),
+    {[{Key, Value, MergedSubTree} | MergedNextTree], Conflict1 or Conflict2};
+merge_simple([{A, _, _} = Tree | Next], [{B, _, _} | _] = Insert) when A < B ->
+    {Merged, _} = merge_simple(Next, Insert),
+    {[Tree | Merged], true};
+merge_simple(Ours, [Tree | Next]) ->
+    {Merged, _} = merge_simple(Ours, Next),
+    {[Tree | Merged], true}.
 
 find_missing(_Tree, []) ->
     [];
@@ -159,7 +162,7 @@ remove_leafs(Trees, Keys) ->
         fun({PathPos, Path},TreeAcc) ->
             [SingleTree] = lists:foldl(
                 fun({K,V},NewTreeAcc) -> [{K,V,NewTreeAcc}] end, [], Path),
-            {NewTrees, _} = merge(TreeAcc, [{PathPos + 1 - length(Path), SingleTree}]),
+            {NewTrees, _} = merge(TreeAcc, {PathPos + 1 - length(Path), SingleTree}),
             NewTrees
         end, [], FilteredPaths),
     {NewTree, RemovedKeys}.
@@ -321,7 +324,7 @@ stem(Trees, Limit) ->
         fun({PathPos, Path},TreeAcc) ->
             [SingleTree] = lists:foldl(
                 fun({K,V},NewTreeAcc) -> [{K,V,NewTreeAcc}] end, [], Path),
-            {NewTrees, _} = merge(TreeAcc, [{PathPos + 1 - length(Path), SingleTree}]),
+            {NewTrees, _} = merge(TreeAcc, {PathPos + 1 - length(Path), SingleTree}),
             NewTrees
         end, [], Paths2).
 

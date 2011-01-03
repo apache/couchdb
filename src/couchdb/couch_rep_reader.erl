@@ -21,11 +21,8 @@
 
 -define (BUFFER_SIZE, 1000).
 -define (MAX_CONCURRENT_REQUESTS, 100).
--define (MAX_CONNECTIONS, 20).
--define (MAX_PIPELINE_SIZE, 50).
 
 -include("couch_db.hrl").
--include("../ibrowse/ibrowse.hrl").
 
 -record (state, {
     parent,
@@ -53,11 +50,6 @@ next(Pid) ->
 
 init([Parent, Source, MissingRevs_or_DocIds, _PostProps]) ->
     process_flag(trap_exit, true),
-    if is_record(Source, http_db) ->
-        #url{host=Host, port=Port} = ibrowse_lib:parse_url(Source#http_db.url),
-        ibrowse:set_max_sessions(Host, Port, ?MAX_CONNECTIONS),
-        ibrowse:set_max_pipeline_size(Host, Port, ?MAX_PIPELINE_SIZE);
-    true -> ok end,
     Self = self(),
     ReaderLoop = spawn_link(
         fun() -> reader_loop(Self, Parent, Source, MissingRevs_or_DocIds) end
