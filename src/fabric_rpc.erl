@@ -331,7 +331,6 @@ group_rows_fun(GroupLevel) when is_integer(GroupLevel) ->
         Key1 == Key2
     end.
 
-%% TODO: handle case where group_level is specified but don't have an array
 reduce_fold(_Key, _Red, #view_acc{limit=0} = Acc) ->
     {stop, Acc};
 reduce_fold(_Key, Red, #view_acc{group_level=0} = Acc) ->
@@ -339,7 +338,10 @@ reduce_fold(_Key, Red, #view_acc{group_level=0} = Acc) ->
 reduce_fold(Key, Red, #view_acc{group_level=exact} = Acc) ->
     send(Key, Red, Acc);
 reduce_fold(K, Red, #view_acc{group_level=I} = Acc) when I > 0, is_list(K) ->
-    send(lists:sublist(K, I), Red, Acc).
+    send(lists:sublist(K, I), Red, Acc);
+reduce_fold(K, Red, #view_acc{group_level=I} = Acc) when I > 0 ->
+    send(K, Red, Acc).
+
 
 send(Key, Value, #view_acc{limit=Limit} = Acc) ->
     case rexi:sync_reply(#view_row{key=Key, value=Value}) of
