@@ -1,5 +1,4 @@
-#!/bin/bash
-
+#!/bin/sh
 # Copyright 2010 Cloudant
 # 
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
