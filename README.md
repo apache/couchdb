@@ -7,11 +7,7 @@ For example, creating a database is a straightforward task in standalone CouchDB
 Fabric is used in conjunction with 'Rexi' which is also an application within BigCouch.
 
 ### Getting Started
-Dependencies:
- * Erlang R13B-03 (or higher)
-
-Build with rebar:
-    make
+Fabric requires R13B03 or higher and can be built with [rebar][6], which comes bundled in the repository.
 
 ### License
 [Apache 2.0][3]
@@ -25,3 +21,4 @@ Build with rebar:
 [3]: http://www.apache.org/licenses/LICENSE-2.0.html
 [4]: http://cloudant.com
 [5]: mailto:info@cloudant.com
+[6]: http://github.com/basho/rebar
