@@ -476,56 +476,7 @@ start_json_response(Req, Code, Headers) ->
     couch_httpd:start_json_response(Req, Code, [reqid() | Headers]).
 
 end_json_response(Resp) ->
-    send_chunk(Resp, end_jsonp() ++ [$\r,$\n]),
-    %send_chunk(Resp, [$\n]),
-    send_chunk(Resp, []).
-
-start_jsonp(Req) ->
-    case get(jsonp) of
-        undefined -> put(jsonp, qs_value(Req, "callback", no_jsonp));
-        _ -> ok
-    end,
-    case get(jsonp) of
-        no_jsonp -> [];
-        [] -> [];
-        CallBack ->
-            try
-                validate_callback(CallBack),
-                CallBack ++ "("
-            catch
-                Error ->
-                    put(jsonp, no_jsonp),
-                    throw(Error)
-            end
-    end.
-
-end_jsonp() ->
-    Resp = case get(jsonp) of
-        no_jsonp -> [];
-        [] -> [];
-        _ -> ");"
-    end,
-    put(jsonp, undefined),
-    Resp.
-
-validate_callback(CallBack) when is_binary(CallBack) ->
-    validate_callback(binary_to_list(CallBack));
-validate_callback([]) ->
-    ok;
-validate_callback([Char | Rest]) ->
-    case Char of
-        _ when Char >= $a andalso Char =< $z -> ok;
-        _ when Char >= $A andalso Char =< $Z -> ok;
-        _ when Char >= $0 andalso Char =< $9 -> ok;
-        _ when Char == $. -> ok;
-        _ when Char == $_ -> ok;
-        _ when Char == $[ -> ok;
-        _ when Char == $] -> ok;
-        _ ->
-            throw({bad_request, invalid_callback})
-    end,
-    validate_callback(Rest).
-
+    couch_httpd:end_json_response(Resp).
 
 error_info({Error, Reason}) when is_list(Reason) ->
     error_info({Error, couch_util:to_binary(Reason)});
