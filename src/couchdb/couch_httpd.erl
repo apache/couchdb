@@ -57,8 +57,6 @@ start_link(Name, Options) ->
     % will restart us and then we will pick up the new settings.
 
     BindAddress = couch_config:get("httpd", "bind_address", any),
-    NoDelay = "true" == couch_config:get("httpd", "nodelay", "false"),
-
     DefaultSpec = "{couch_httpd_db, handle_request}",
     DefaultFun = make_arity_1_fun(
         couch_config:get("httpd", "default_handler", DefaultSpec)
@@ -82,7 +80,17 @@ start_link(Name, Options) ->
     UrlHandlers = dict:from_list(UrlHandlersList),
     DbUrlHandlers = dict:from_list(DbUrlHandlersList),
     DesignUrlHandlers = dict:from_list(DesignUrlHandlersList),
+    {ok, ServerOptions} = couch_util:parse_term(
+        couch_config:get("httpd", "server_options", "[]")),
+    {ok, SocketOptions} = couch_util:parse_term(
+        couch_config:get("httpd", "socket_options", "[]")),
     Loop = fun(Req)->
+        case SocketOptions of
+        [] ->
+            ok;
+        _ ->
+            ok = mochiweb_socket:setopts(Req:get(socket), SocketOptions)
+        end,
         apply(?MODULE, handle_request, [
             Req, DefaultFun, UrlHandlers, DbUrlHandlers, DesignUrlHandlers
         ])
@@ -90,11 +98,10 @@ start_link(Name, Options) ->
 
     % and off we go
 
-    {ok, Pid} = case mochiweb_http:start(Options ++ [
+    {ok, Pid} = case mochiweb_http:start(Options ++ ServerOptions ++ [
         {loop, Loop},
         {name, Name},
-        {ip, BindAddress},
-        {nodelay,NoDelay}
+        {ip, BindAddress}
     ]) of
     {ok, MochiPid} -> {ok, MochiPid};
     {error, Reason} ->
@@ -108,6 +115,10 @@ start_link(Name, Options) ->
         ("httpd", "port") ->
             ?MODULE:stop();
         ("httpd", "default_handler") ->
+            ?MODULE:stop();
+        ("httpd", "server_options") ->
+            ?MODULE:stop();
+        ("httpd", "socket_options") ->
             ?MODULE:stop();
         ("httpd_global_handlers", _) ->
             ?MODULE:stop();
