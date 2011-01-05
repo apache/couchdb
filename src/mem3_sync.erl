@@ -168,11 +168,13 @@ add_to_queue(State, DbName, Node) ->
     end.
 
 sync_nodes_and_dbs() ->
-    Db1 = ?l2b(couch_config:get("mem3", "node_db", "nodes")),
-    Db2 = ?l2b(couch_config:get("mem3", "shard_db", "dbs")),
+    Db1 = couch_config:get("mem3", "node_db", "nodes"),
+    Db2 = couch_config:get("mem3", "shard_db", "dbs"),
+    Db3 = couch_config:get("couch_httpd_auth", "authentication_db", "_users"),
+    Dbs = [Db1, Db2, Db3],
     Nodes = mem3:nodes(),
     Live = nodes(),
-    [[push(Db, N) || Db <- [Db1,Db2]] || N <- Nodes, lists:member(N, Live)].
+    [[push(?l2b(Db), N) || Db <- Dbs] || N <- Nodes, lists:member(N, Live)].
 
 initial_sync() ->
     sync_nodes_and_dbs(),
@@ -194,8 +196,10 @@ initial_sync(Live) ->
 start_update_notifier() ->
     Db1 = ?l2b(couch_config:get("mem3", "node_db", "nodes")),
     Db2 = ?l2b(couch_config:get("mem3", "shard_db", "dbs")),
+    Db3 = ?l2b(couch_config:get("couch_httpd_auth", "authentication_db",
+        "_users")),
     couch_db_update_notifier:start_link(fun
-    ({updated, Db}) when Db == Db1; Db == Db2 ->
+    ({updated, Db}) when Db == Db1; Db == Db2; Db == Db3 ->
         Nodes = mem3:nodes(),
         Live = nodes(),
         [?MODULE:push(Db, N) || N <- Nodes, lists:member(N, Live)];
