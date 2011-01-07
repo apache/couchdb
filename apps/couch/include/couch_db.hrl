@@ -294,3 +294,12 @@
     include_docs = false
 }).
 
+-record(proc, {
+    pid,
+    lang,
+    client = nil,
+    ddoc_keys = [],
+    prompt_fun,
+    set_timeout_fun,
+    stop_fun
+}).

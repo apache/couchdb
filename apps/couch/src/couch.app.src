@@ -9,7 +9,7 @@
         couch_httpd,
         couch_log,
         couch_primary_services,
-        couch_query_servers,
+        couch_proc_manager,
         couch_rep_sup,
         couch_secondary_services,
         couch_server,
