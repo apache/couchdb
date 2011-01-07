@@ -50,8 +50,12 @@ stop(Pid) ->
     gen_server:cast(Pid, stop).
 
 init({EventMgr, EventHandler, Args}) ->
-    ok = gen_event:add_sup_handler(EventMgr, EventHandler, Args),
-    {ok, {EventMgr, EventHandler}}.
+    case gen_event:add_sup_handler(EventMgr, EventHandler, Args) of
+    ok ->
+        {ok, {EventMgr, EventHandler}};
+    {stop, Error} ->
+        {stop, Error}
+    end.
 
 terminate(_Reason, _State) ->
     ok.
