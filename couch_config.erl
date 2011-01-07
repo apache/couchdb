@@ -112,8 +112,7 @@ handle_call(all, _From, Config) ->
     Resp = lists:sort((ets:tab2list(?MODULE))),
     {reply, Resp, Config};
 handle_call({set, Sec, Key, Val, Persist}, From, Config) ->
-    true = ets:insert(?MODULE, {{Sec, Key}, Val}),
-    case {Persist, Config#config.write_filename} of
+    Result = case {Persist, Config#config.write_filename} of
         {true, undefined} ->
             ok;
         {true, FileName} ->
@@ -121,11 +120,17 @@ handle_call({set, Sec, Key, Val, Persist}, From, Config) ->
         _ ->
             ok
     end,
-    spawn_link(fun() ->
-        [catch F(Sec, Key, Val, Persist) || {_Pid, F} <- Config#config.notify_funs],
-            gen_server:reply(From, ok)
-    end),
-    {noreply, Config};
+    case Result of
+    ok ->
+        true = ets:insert(?MODULE, {{Sec, Key}, Val}),
+        spawn_link(fun() ->
+            [catch F(Sec, Key, Val, Persist) || {_Pid, F} <- Config#config.notify_funs],
+                gen_server:reply(From, ok)
+        end),
+        {noreply, Config};
+    _Error ->
+        {reply, Result, Config}
+    end;
 handle_call({delete, Sec, Key, Persist}, From, Config) ->
     true = ets:delete(?MODULE, {Sec,Key}),
     case {Persist, Config#config.write_filename} of

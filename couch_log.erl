@@ -65,8 +65,14 @@ init([]) ->
     end,
     ets:insert(?MODULE, {level, Level}),
 
-    {ok, Fd} = file:open(Filename, [append]),
-    {ok, {Fd, Level, Sasl}}.
+    case file:open(Filename, [append]) of
+    {ok, Fd} ->
+        {ok, {Fd, Level, Sasl}};
+    {error, eacces} ->
+        {stop, {file_permission_error, Filename}};
+    Error ->
+        {stop, Error}
+    end.
 
 debug_on() ->
     get_level_integer() =< ?LEVEL_DEBUG.
