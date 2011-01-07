@@ -35,7 +35,14 @@ save_to_file({{Section, Key}, Value}, File) ->
 
     NewLines = process_file_lines(Lines, [], SectionLine, Pattern, Key, Value),
     NewFileContents = reverse_and_add_newline(strip_empty_lines(NewLines), []),
-    ok = file:write_file(File, NewFileContents).
+    case file:write_file(File, NewFileContents) of
+    ok ->
+        ok;
+    {error, eacces} ->
+        {file_permission_error, File};
+    Error ->
+        Error
+    end.
 
 
 process_file_lines([Section|Rest], SeenLines, Section, Pattern, Key, Value) ->
