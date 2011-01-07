@@ -573,20 +573,6 @@ send_redirect(Req, Path) ->
      Headers = [{"Location", chttpd:absolute_uri(Req, Path)}],
      send_response(Req, 301, Headers, <<>>).
 
-negotiate_content_type(#httpd{mochi_req=MochiReq}) ->
-    %% Determine the appropriate Content-Type header for a JSON response
-    %% depending on the Accept header in the request. A request that explicitly
-    %% lists the correct JSON MIME type will get that type, otherwise the
-    %% response will have the generic MIME type "text/plain"
-    AcceptedTypes = case MochiReq:get_header_value("Accept") of
-        undefined       -> [];
-        AcceptHeader    -> string:tokens(AcceptHeader, ", ")
-    end,
-    case lists:member("application/json", AcceptedTypes) of
-        true  -> "application/json";
-        false -> "text/plain;charset=utf-8"
-    end.
-
 server_header() ->
     couch_httpd:server_header().
 
