@@ -158,18 +158,7 @@ sync(Fd) ->
 %% Returns: ok
 %%----------------------------------------------------------------------
 close(Fd) ->
-    MRef = erlang:monitor(process, Fd),
-    try
-        catch unlink(Fd),
-        catch exit(Fd, shutdown),
-        receive
-        {'DOWN', MRef, _, _, _} ->
-            ok
-        end
-    after
-        erlang:demonitor(MRef, [flush])
-    end.
-
+    gen_server:call(Fd, close, infinity).
 
 delete(RootDir, Filepath) ->
     delete(RootDir, Filepath, true).
@@ -289,9 +278,13 @@ maybe_track_open_os_files(FileOptions) ->
         couch_stats_collector:track_process_count({couchdb, open_os_files})
     end.
 
-terminate(_Reason, _Fd) ->
-    ok.
+terminate(_Reason, #file{fd = nil}) ->
+    ok;
+terminate(_Reason, #file{fd = Fd}) ->
+    file:close(Fd).
 
+handle_call(close, _From, #file{fd=Fd}=File) ->
+    {stop, normal, file:close(Fd), File#file{fd = nil}};
 
 handle_call({pread_iolist, Pos}, _From, File) ->
     {LenIolist, NextPos} = read_raw_iolist_int(File, Pos, 4),
