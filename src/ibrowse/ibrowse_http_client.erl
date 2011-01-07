@@ -287,10 +287,14 @@ handle_sock_data(Data, #state{status = get_header}=State) ->
         {error, _Reason} ->
             shutting_down(State),
             {stop, normal, State};
-        State_1 ->
-            active_once(State_1),
-            State_2 = set_inac_timer(State_1),
-            {noreply, State_2}
+        #state{socket = Socket, status = Status, cur_req = CurReq} = State_1 ->
+            case {Status, CurReq} of
+                {get_header, #request{caller_controls_socket = true}} ->
+                    do_setopts(Socket, [{active, once}], State_1);
+                _ ->
+                    active_once(State_1)
+            end,
+            {noreply, set_inac_timer(State_1)}
     end;
 
 handle_sock_data(Data, #state{status           = get_body,
@@ -683,6 +687,7 @@ send_req_1(From,
            Headers, Method, Body, Options, Timeout,
            #state{status    = Status,
                   socket    = Socket} = State) ->
+    cancel_timer(State#state.inactivity_timer_ref, {eat_message, timeout}),
     ReqId = make_req_id(),
     Resp_format = get_value(response_format, Options, list),
     Caller_socket_options = get_value(socket_options, Options, []),
