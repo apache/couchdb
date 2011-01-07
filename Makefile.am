@@ -65,6 +65,7 @@ source_files = \
     src/couch_os_process.erl \
     src/couch_passwords.erl \
     src/couch_primary_sup.erl \
+	src/couch_proc_manager.erl \
     src/couch_query_servers.erl \
     src/couch_secondary_sup.erl \
     src/couch_server.erl \
@@ -124,6 +125,7 @@ compiled_files = \
     ebin/couch_os_process.beam \
     ebin/couch_passwords.beam \
     ebin/couch_primary_sup.beam \
+	ebin/couch_proc_manager.beam \
     ebin/couch_query_servers.beam \
     ebin/couch_secondary_sup.beam \
     ebin/couch_server.beam \

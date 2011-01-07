@@ -11,11 +11,7 @@
 % the License.
 
 -module(couch_query_servers).
--behaviour(gen_server).
 
--export([start_link/0, config_change/1]).
-
--export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2,code_change/3]).
 -export([start_doc_map/3, map_docs/2, map_docs_raw/2, stop_doc_map/1, raw_to_ejson/1]).
 -export([reduce/3, rereduce/3,validate_doc_update/5]).
 -export([filter_docs/5]).
@@ -27,28 +23,6 @@
 -export([get_os_process/1, ret_os_process/1]).
 
 -include_lib("couch/include/couch_db.hrl").
-
--record(proc, {
-    pid,
-    lang,
-    ddoc_keys = [],
-    prompt_fun,
-    prompt_many_fun,
-    set_timeout_fun,
-    stop_fun
-}).
-
--record(qserver, {
-    langs, % Keyed by language name, value is {Mod,Func,Arg}
-    pid_procs, % Keyed by PID, valus is a #proc record.
-    lang_procs, % Keyed by language name, value is a #proc record
-    lang_limits, % Keyed by language name, value is {Lang, Limit, Current}
-    waitlist = [],
-    config
-}).
-
-start_link() ->
-    gen_server:start_link({local, couch_query_servers}, couch_query_servers, [], []).
 
 start_doc_map(Lang, Functions, Lib) ->
     Proc = get_os_process(Lang),
@@ -277,243 +251,6 @@ with_ddoc_proc(#doc{id=DDocId,revs={Start, [DiskRev|_]}}=DDoc, Fun) ->
         ok = ret_os_process(Proc)
     end.
 
-init([]) ->
-    % register async to avoid deadlock on restart_child
-    Self = self(),
-    spawn(couch_config, register, [fun ?MODULE:config_change/1, Self]),
-
-    Langs = ets:new(couch_query_server_langs, [set, private]),
-    LangLimits = ets:new(couch_query_server_lang_limits, [set, private]),
-    PidProcs = ets:new(couch_query_server_pid_langs, [set, private]),
-    LangProcs = ets:new(couch_query_server_procs, [set, private]),
-
-    ProcTimeout = list_to_integer(couch_config:get(
-                        "couchdb", "os_process_timeout", "5000")),
-    ReduceLimit = list_to_atom(
-        couch_config:get("query_server_config","reduce_limit","true")),
-    OsProcLimit = list_to_integer(
-        couch_config:get("query_server_config","os_process_limit","10")),
-
-    % 'query_servers' specifies an OS command-line to execute.
-    lists:foreach(fun({Lang, Command}) ->
-        true = ets:insert(LangLimits, {?l2b(Lang), OsProcLimit, 0}),
-        true = ets:insert(Langs, {?l2b(Lang),
-                          couch_os_process, start_link, [Command]})
-    end, couch_config:get("query_servers")),
-    % 'native_query_servers' specifies a {Module, Func, Arg} tuple.
-    lists:foreach(fun({Lang, SpecStr}) ->
-        {ok, {Mod, Fun, SpecArg}} = couch_util:parse_term(SpecStr),
-        true = ets:insert(LangLimits, {?l2b(Lang), 0, 0}), % 0 means no limit
-        true = ets:insert(Langs, {?l2b(Lang),
-                          Mod, Fun, SpecArg})
-    end, couch_config:get("native_query_servers")),
-
-
-    process_flag(trap_exit, true),
-    {ok, #qserver{
-        langs = Langs, % Keyed by language name, value is {Mod,Func,Arg}
-        pid_procs = PidProcs, % Keyed by PID, valus is a #proc record.
-        lang_procs = LangProcs, % Keyed by language name, value is a #proc record
-        lang_limits = LangLimits, % Keyed by language name, value is {Lang, Limit, Current}
-        config = {[{<<"reduce_limit">>, ReduceLimit},{<<"timeout">>, ProcTimeout}]}
-    }}.
-
-terminate(_Reason, #qserver{pid_procs=PidProcs}) ->
-    [couch_util:shutdown_sync(P) || {P,_} <- ets:tab2list(PidProcs)],
-    ok.
-
-handle_call({get_proc, DDoc1, DDocKey}, From, Server) ->
-    #doc{body = {Props}} = DDoc = couch_doc:with_ejson_body(DDoc1),
-    Lang = couch_util:get_value(<<"language">>, Props, <<"javascript">>),
-    case lang_proc(Lang, Server, fun(Procs) ->
-            % find a proc in the set that has the DDoc
-            proc_with_ddoc(DDoc, DDocKey, Procs)
-        end) of
-    {ok, Proc} ->
-        {reply, {ok, Proc, Server#qserver.config}, Server};
-    wait ->
-        {noreply, add_to_waitlist({DDoc, DDocKey}, From, Server)};
-    Error ->
-        {reply, Error, Server}
-    end;
-handle_call({get_proc, Lang}, From, Server) ->
-    case lang_proc(Lang, Server, fun([P|_Procs]) ->
-            {ok, P}
-        end) of
-    {ok, Proc} ->
-        {reply, {ok, Proc, Server#qserver.config}, Server};
-    wait ->
-        {noreply, add_to_waitlist({Lang}, From, Server)};
-    Error ->
-        {reply, Error, Server}
-    end;
-handle_call({unlink_proc, Pid}, _From, Server) ->
-    unlink(Pid),
-    {reply, ok, Server};
-handle_call({ret_proc, Proc}, _From, #qserver{
-        pid_procs=PidProcs,
-        lang_procs=LangProcs}=Server) ->
-    % Along with max process limit, here we should check
-    % if we're over the limit and discard when we are.
-    case is_process_alive(Proc#proc.pid) of
-        true ->
-            add_value(PidProcs, Proc#proc.pid, Proc),
-            add_to_list(LangProcs, Proc#proc.lang, Proc),
-            link(Proc#proc.pid);
-        false ->
-            ok
-    end,
-    {reply, true, service_waitlist(Server)}.
-
-handle_cast(_Whatever, Server) ->
-    {noreply, Server}.
-
-handle_info({'EXIT', _, _}, Server) ->
-    {noreply, Server};
-handle_info({'DOWN', _, process, Pid, Status}, #qserver{
-        pid_procs=PidProcs,
-        lang_procs=LangProcs,
-        lang_limits=LangLimits}=Server) ->
-    case ets:lookup(PidProcs, Pid) of
-    [{Pid, Proc}] ->
-        case Status of
-        normal -> ok;
-        _ -> ?LOG_DEBUG("Linked process died abnormally: ~p (reason: ~p)", [Pid, Status])
-        end,
-        rem_value(PidProcs, Pid),
-        catch rem_from_list(LangProcs, Proc#proc.lang, Proc),
-        [{Lang, Lim, Current}] = ets:lookup(LangLimits, Proc#proc.lang),
-        true = ets:insert(LangLimits, {Lang, Lim, Current-1}),
-        {noreply, service_waitlist(Server)};
-    [] ->
-        case Status of
-        normal ->
-            {noreply, Server};
-        _ ->
-            {stop, Status, Server}
-        end
-    end.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
-
-config_change("query_servers") ->
-    supervisor:terminate_child(couch_secondary_services, query_servers),
-    supervisor:restart_child(couch_secondary_services, query_servers);
-config_change("native_query_servers") ->
-    supervisor:terminate_child(couch_secondary_services, query_servers),
-    supervisor:restart_child(couch_secondary_services, query_servers);
-config_change("query_server_config") ->
-    supervisor:terminate_child(couch_secondary_services, query_servers),
-    supervisor:restart_child(couch_secondary_services, query_servers).
-
-% Private API
-
-add_to_waitlist(Info, From, #qserver{waitlist=Waitlist}=Server) ->
-    Server#qserver{waitlist=[{Info, From}|Waitlist]}.
-
-service_waitlist(#qserver{waitlist=[]}=Server) ->
-    Server;
-service_waitlist(#qserver{waitlist=Waitlist}=Server) ->
-    [Oldest|RevWList] = lists:reverse(Waitlist),
-    case service_waiting(Oldest, Server) of
-    ok ->
-        Server#qserver{waitlist=lists:reverse(RevWList)};
-    wait ->
-        Server#qserver{waitlist=Waitlist}
-    end.
-
-% todo get rid of duplication
-service_waiting({{#doc{body={Props}}=DDoc, DDocKey}, From}, Server) ->
-    Lang = couch_util:get_value(<<"language">>, Props, <<"javascript">>),
-    case lang_proc(Lang, Server, fun(Procs) ->
-            % find a proc in the set that has the DDoc
-            proc_with_ddoc(DDoc, DDocKey, Procs)
-        end) of
-    {ok, Proc} ->
-        gen_server:reply(From, {ok, Proc, Server#qserver.config}),
-        ok;
-    wait -> % this should never happen
-        wait;
-    Error ->
-        gen_server:reply(From, Error),
-        ok
-    end;
-service_waiting({{Lang}, From}, Server) ->
-    case lang_proc(Lang, Server, fun([P|_Procs]) ->
-            {ok, P}
-        end) of
-    {ok, Proc} ->
-        gen_server:reply(From, {ok, Proc, Server#qserver.config}),
-        ok;
-    wait -> % this should never happen
-        wait;
-    Error ->
-        gen_server:reply(From, Error),
-        ok
-    end.
-
-lang_proc(Lang, #qserver{
-        langs=Langs,
-        pid_procs=PidProcs,
-        lang_procs=LangProcs,
-        lang_limits=LangLimits}, PickFun) ->
-    % Note to future self. Add max process limit.
-    case ets:lookup(LangProcs, Lang) of
-    [{Lang, [P|Procs]}] ->
-        {ok, Proc} = PickFun([P|Procs]),
-        rem_from_list(LangProcs, Lang, Proc),
-        {ok, Proc};
-    _ ->
-        case (catch new_process(Langs, LangLimits, Lang)) of
-        {ok, Proc} ->
-            add_value(PidProcs, Proc#proc.pid, Proc),
-            PickFun([Proc]);
-        ErrorOrWait ->
-            ErrorOrWait
-        end
-    end.
-
-new_process(Langs, LangLimits, Lang) ->
-    [{Lang, Lim, Current}] = ets:lookup(LangLimits, Lang),
-    if (Lim == 0) or (Current < Lim) -> % Lim == 0 means no limit
-        % we are below the limit for our language, make a new one
-        case ets:lookup(Langs, Lang) of
-        [{Lang, Mod, Func, Arg}] ->
-            {ok, Pid} = apply(Mod, Func, Arg),
-            erlang:monitor(process, Pid),
-            true = ets:insert(LangLimits, {Lang, Lim, Current+1}),
-            {ok, #proc{lang=Lang,
-                       pid=Pid,
-                       % Called via proc_prompt, proc_set_timeout, and proc_stop
-                       prompt_fun={Mod, prompt},
-                       prompt_many_fun={Mod, prompt_many},
-                       set_timeout_fun={Mod, set_timeout},
-                       stop_fun={Mod, stop}}};
-        _ ->
-            {unknown_query_language, Lang}
-        end;
-    true ->
-        wait
-    end.
-
-proc_with_ddoc(DDoc, DDocKey, LangProcs) ->
-    DDocProcs = lists:filter(fun(#proc{ddoc_keys=Keys}) ->
-            lists:any(fun(Key) ->
-                Key == DDocKey
-            end, Keys)
-        end, LangProcs),
-    case DDocProcs of
-        [DDocProc|_] ->
-            ?LOG_DEBUG("DDocProc found for DDocKey: ~p",[DDocKey]),
-            {ok, DDocProc};
-        [] ->
-            [TeachProc|_] = LangProcs,
-            ?LOG_DEBUG("Teach ddoc to new proc ~p with DDocKey: ~p",[TeachProc, DDocKey]),
-            {ok, SmartProc} = teach_ddoc(DDoc, DDocKey, TeachProc),
-            {ok, SmartProc}
-    end.
-
 proc_prompt(Proc, Args) ->
      case proc_prompt_raw(Proc, Args) of
      {json, Json} ->
@@ -538,27 +275,14 @@ proc_set_timeout(Proc, Timeout) ->
     {Mod, Func} = Proc#proc.set_timeout_fun,
     apply(Mod, Func, [Proc#proc.pid, Timeout]).
 
-teach_ddoc(DDoc, {DDocId, _Rev}=DDocKey, #proc{ddoc_keys=Keys}=Proc) ->
-    % send ddoc over the wire
-    % we only share the rev with the client we know to update code
-    % but it only keeps the latest copy, per each ddoc, around.
-    true = proc_prompt(Proc, [<<"ddoc">>, <<"new">>, DDocId, couch_doc:to_json_obj(DDoc, [])]),
-    % we should remove any other ddocs keys for this docid
-    % because the query server overwrites without the rev
-    Keys2 = [{D,R} || {D,R} <- Keys, D /= DDocId],
-    % add ddoc to the proc
-    {ok, Proc#proc{ddoc_keys=[DDocKey|Keys2]}}.
-
 get_ddoc_process(#doc{} = DDoc, DDocKey) ->
     % remove this case statement
-    case gen_server:call(couch_query_servers, {get_proc, DDoc, DDocKey}, infinity) of
+    case gen_server:call(couch_proc_manager, {get_proc, DDoc, DDocKey}, infinity) of
     {ok, Proc, {QueryConfig}} ->
         % process knows the ddoc
         case (catch proc_prompt(Proc, [<<"reset">>, {QueryConfig}])) of
         true ->
             proc_set_timeout(Proc, couch_util:get_value(<<"timeout">>, QueryConfig)),
-            link(Proc#proc.pid),
-            gen_server:call(couch_query_servers, {unlink_proc, Proc#proc.pid}, infinity),
             Proc;
         _ ->
             catch proc_stop(Proc),
@@ -569,13 +293,11 @@ get_ddoc_process(#doc{} = DDoc, DDocKey) ->
     end.
 
 get_os_process(Lang) ->
-    case gen_server:call(couch_query_servers, {get_proc, Lang}, infinity) of
+    case gen_server:call(couch_proc_manager, {get_proc, Lang}, infinity) of
     {ok, Proc, {QueryConfig}} ->
         case (catch proc_prompt(Proc, [<<"reset">>, {QueryConfig}])) of
         true ->
             proc_set_timeout(Proc, couch_util:get_value(<<"timeout">>, QueryConfig)),
-            link(Proc#proc.pid),
-            gen_server:call(couch_query_servers, {unlink_proc, Proc#proc.pid}, infinity),
             Proc;
         _ ->
             catch proc_stop(Proc),
@@ -586,38 +308,6 @@ get_os_process(Lang) ->
     end.
 
 ret_os_process(Proc) ->
-    true = gen_server:call(couch_query_servers, {ret_proc, Proc}, infinity),
+    true = gen_server:call(couch_proc_manager, {ret_proc, Proc}, infinity),
     catch unlink(Proc#proc.pid),
     ok.
-
-add_value(Tid, Key, Value) ->
-    true = ets:insert(Tid, {Key, Value}).
-
-rem_value(Tid, Key) ->
-    true = ets:delete(Tid, Key).
-
-add_to_list(Tid, Key, Value) ->
-    case ets:lookup(Tid, Key) of
-    [{Key, Vals}] ->
-        true = ets:insert(Tid, {Key, [Value|Vals]});
-    [] ->
-        true = ets:insert(Tid, {Key, [Value]})
-    end.
-
-rem_from_list(Tid, Key, Value) when is_record(Value, proc)->
-    Pid = Value#proc.pid,
-    case ets:lookup(Tid, Key) of
-    [{Key, Vals}] ->
-        % make a new values list that doesn't include the Value arg
-        NewValues = [Val || #proc{pid=P}=Val <- Vals, P /= Pid],
-        ets:insert(Tid, {Key, NewValues});
-    [] -> ok
-    end;
-rem_from_list(Tid, Key, Value) ->
-    case ets:lookup(Tid, Key) of
-    [{Key, Vals}] ->
-        % make a new values list that doesn't include the Value arg
-        NewValues = [Val || Val <- Vals, Val /= Value],
-        ets:insert(Tid, {Key, NewValues});
-    [] -> ok
-    end.

@@ -27,7 +27,8 @@
      port,
      writer,
      reader,
-     timeout=5000
+     timeout=5000,
+     idle
     }).
 
 start_link(Command) ->
@@ -177,11 +178,14 @@ pick_command1(_) ->
 init([Command, Options, PortOptions]) ->
     PrivDir = couch_util:priv_dir(),
     Spawnkiller = filename:join(PrivDir, "couchspawnkillable"),
+    V = couch_config:get("query_server_config", "os_process_idle_limit", "300"),
+    IdleLimit = list_to_integer(V) * 1000,
     BaseProc = #os_proc{
         command=Command,
         port=open_port({spawn, Spawnkiller ++ " " ++ Command}, PortOptions),
-        writer=fun writejson/2,
-        reader=fun readjson/1
+        writer=fun ?MODULE:writejson/2,
+        reader=fun ?MODULE:readjson/1,
+        idle=IdleLimit
     },
     KillCmd = iolist_to_binary(readline(BaseProc)),
     Pid = self(),
@@ -203,32 +207,34 @@ init([Command, Options, PortOptions]) ->
             Proc#os_proc{timeout=TimeOut}
         end
     end, BaseProc, Options),
-    {ok, OsProc}.
+    {ok, OsProc, IdleLimit}.
 
 terminate(_Reason, #os_proc{port=Port}) ->
     catch port_close(Port),
     ok.
 
-handle_call(get_os_proc, _From, OsProc) ->
-    {reply, OsProc, OsProc};
-handle_call({set_timeout, TimeOut}, _From, OsProc) ->
-    {reply, ok, OsProc#os_proc{timeout=TimeOut}};
-handle_call({prompt, Data}, _From, OsProc) ->
+handle_call(get_os_proc, _From, #os_proc{idle=Idle}=OsProc) ->
+    {reply, OsProc, OsProc, Idle};
+handle_call({set_timeout, TimeOut}, _From, #os_proc{idle=Idle}=OsProc) ->
+    {reply, ok, OsProc#os_proc{timeout=TimeOut}, Idle};
+handle_call({prompt, Data}, _From, #os_proc{idle=Idle}=OsProc) ->
     #os_proc{writer=Writer, reader=Reader} = OsProc,
     try
         Writer(OsProc, Data),
-        {reply, {ok, Reader(OsProc)}, OsProc}
+        {reply, {ok, Reader(OsProc)}, OsProc, Idle}
     catch
         throw:{error, OsError} ->
-            {reply, OsError, OsProc};
+            {reply, OsError, OsProc, Idle};
+        throw:{fatal, OsError} ->
+            {stop, normal, OsError, OsProc};
         throw:OtherError ->
             {stop, normal, OtherError, OsProc}
     end.
 
-handle_cast({send, Data}, #os_proc{writer=Writer}=OsProc) ->
+handle_cast({send, Data}, #os_proc{writer=Writer, idle=Idle}=OsProc) ->
     try
         Writer(OsProc, Data),
-        {noreply, OsProc}
+        {noreply, OsProc, Idle}
     catch
         throw:OsError ->
             ?LOG_ERROR("Failed sending data: ~p -> ~p", [Data, OsError]),
@@ -236,17 +242,35 @@ handle_cast({send, Data}, #os_proc{writer=Writer}=OsProc) ->
     end;
 handle_cast(stop, OsProc) ->
     {stop, normal, OsProc};
-handle_cast(Msg, OsProc) ->
+handle_cast(Msg, #os_proc{idle=Idle}=OsProc) ->
     ?LOG_DEBUG("OS Proc: Unknown cast: ~p", [Msg]),
-    {noreply, OsProc}.
+    {noreply, OsProc, Idle}.
 
+handle_info(timeout, #os_proc{idle=Idle}=OsProc) ->
+    gen_server:cast(couch_proc_manager, {os_proc_idle, self()}),
+    erlang:garbage_collect(),
+    {noreply, OsProc, Idle};
 handle_info({Port, {exit_status, 0}}, #os_proc{port=Port}=OsProc) ->
     ?LOG_INFO("OS Process terminated normally", []),
     {stop, normal, OsProc};
 handle_info({Port, {exit_status, Status}}, #os_proc{port=Port}=OsProc) ->
     ?LOG_ERROR("OS Process died with status: ~p", [Status]),
-    {stop, {exit_status, Status}, OsProc}.
+    {stop, {exit_status, Status}, OsProc};
+handle_info(Msg, #os_proc{idle=Idle}=OsProc) ->
+    ?LOG_DEBUG("OS Proc: Unknown info: ~p", [Msg]),
+    {noreply, OsProc, Idle}.
 
+code_change(_, {os_proc, Cmd, Port, W, R, Timeout} , _) ->
+    V = couch_config:get("query_server_config","os_process_idle_limit","300"),
+    State = #os_proc{
+        command = Cmd,
+        port = Port,
+        writer = W,
+        reader = R,
+        timeout = Timeout,
+        idle = list_to_integer(V) * 1000
+    },
+    {ok, State};
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
