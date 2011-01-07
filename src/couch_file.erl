@@ -208,7 +208,7 @@ sync(Fd) ->
 %% Returns: ok
 %%----------------------------------------------------------------------
 close(Fd) ->
-    couch_util:shutdown_sync(Fd).
+    gen_server:call(Fd, close, infinity).
 
 
 delete(RootDir, Filepath) ->
@@ -348,9 +348,13 @@ maybe_track_open_os_files(Options) ->
             ok
     end.
 
+terminate(_Reason, #file{fd = nil}) ->
+    ok;
 terminate(_Reason, #file{fd = Fd}) ->
     ok = file:close(Fd).
 
+handle_call(close, _From, #file{fd=Fd}=File) ->
+    {stop, normal, file:close(Fd), File#file{fd = nil}};
 
 handle_call({pread_iolist, Pos}, _From, File) ->
     {RawData, NextPos} = try
