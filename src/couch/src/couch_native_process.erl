@@ -103,7 +103,11 @@ handle_call({prompt, Data}, _From, State) ->
             {reply, Resp, NewState}
     end.
 
+handle_cast(garbage_collect, State) ->
+    erlang:garbage_collect(),
+    {noreply, State};
 handle_cast(foo, State) -> {noreply, State}.
+
 handle_info({'EXIT',_,normal}, State) -> {noreply, State};
 handle_info({'EXIT',_,Reason}, State) ->
     {stop, Reason, State}.
