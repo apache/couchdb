@@ -103,13 +103,33 @@ specific language governing permissions and limitations under the License.
           if ($("#continuous")[0].checked) {
             repOpts.continuous = true;
           }
+
+          if ($("#doc_ids").val()){
+            try {
+               var doc_ids = JSON.parse($("#doc_ids").val());
+               if ($.isArray(doc_ids)) {
+                  repOpts.doc_ids = doc_ids;
+               } else {
+                  $("#records tbody.footer td")
+                    .text('Invalid format! Should be: ["doc1", "doc2", ...]'); 
+                  return false;
+               }
+            } catch (e) {
+               $("#records tbody.footer td")
+                 .text('Invalid format! Should be: ["doc1", "doc2", ...]');
+               return false;
+            }
+          }
           $.couch.replicate(source, target, {
             success: function(resp) {
-              if (resp._local_id) {
+              if ( resp.history == null || resp._local_id) {
                 $("<tr><th></th></tr>")
                   .find("th").text(JSON.stringify(resp)).end()
                   .appendTo("#records tbody.content");
                 $("#records tbody tr").removeClass("odd").filter(":odd").addClass("odd");
+                $("#records tbody.footer td")
+                  .text((resp._local_id)? "Continuous replication" :
+                                          "Named document replication");
               } else {
                 $.each(resp.history, function(idx, record) {
                   $("<tr><th></th></tr>")
@@ -163,6 +183,7 @@ specific language governing permissions and limitations under the License.
           </p>
         </fieldset>
         <p class="actions">
+          <label style="float: left; padding-left: 5px">Document IDs: <input type="text" id="doc_ids" name="doc_ids" size="25" value=""></label>
           <label><input type="checkbox" name="continuous" value="continuous" id="continuous"> Continuous</label>
           <button id="replicate" type="button">Replicate</button>
         </p>
