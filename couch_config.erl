@@ -93,15 +93,19 @@ register(Fun, Pid) ->
 
 init(IniFiles) ->
     ets:new(?MODULE, [named_table, set, protected]),
-    lists:map(fun(IniFile) ->
-        {ok, ParsedIniValues} = parse_ini_file(IniFile),
-        ets:insert(?MODULE, ParsedIniValues)
-    end, IniFiles),
-    WriteFile = case IniFiles of
-        [_|_] -> lists:last(IniFiles);
-        _ -> undefined
-    end,
-    {ok, #config{write_filename=WriteFile}}.
+    try
+        lists:map(fun(IniFile) ->
+            {ok, ParsedIniValues} = parse_ini_file(IniFile),
+            ets:insert(?MODULE, ParsedIniValues)
+        end, IniFiles),
+        WriteFile = case IniFiles of
+            [_|_] -> lists:last(IniFiles);
+            _ -> undefined
+        end,
+        {ok, #config{write_filename = WriteFile}}
+    catch _Tag:Error ->
+        {stop, Error}
+    end.
 
 
 terminate(_Reason, _State) ->
@@ -183,6 +187,8 @@ parse_ini_file(IniFile) ->
     case file:read_file(IniFilename) of
         {ok, IniBin0} ->
             IniBin0;
+        {error, eacces} ->
+            throw({file_permission_error, IniFile});
         {error, enoent} ->
             Fmt = "Couldn't find server configuration file ~s.",
             Msg = ?l2b(io_lib:format(Fmt, [IniFilename])),
