@@ -57,8 +57,8 @@ handle_request(MochiReq) ->
     Begin = now(),
 
     AuthenticationFuns = [
-        fun chttpd_auth:cookie_authentication_handler/1,
-        fun chttpd_auth:default_authentication_handler/1
+        fun couch_httpd_auth:cookie_authentication_handler/1,
+        fun couch_httpd_auth:default_authentication_handler/1
     ],
 
     % for the path, use the raw path with the query string and fragment
@@ -250,7 +250,6 @@ url_handler("_uuids") ->        fun chttpd_misc:handle_uuids_req/1;
 url_handler("_log") ->          fun chttpd_misc:handle_log_req/1;
 url_handler("_sleep") ->        fun chttpd_misc:handle_sleep_req/1;
 url_handler("_session") ->      fun chttpd_auth:handle_session_req/1;
-url_handler("_user") ->         fun chttpd_auth:handle_user_req/1;
 url_handler("_oauth") ->        fun chttpd_oauth:handle_oauth_req/1;
 %% showroom_http module missing in bigcouch
 url_handler("_restart") ->      fun showroom_http:handle_restart_req/1;
@@ -296,7 +295,7 @@ primary_header_value(#httpd{mochi_req=MochiReq}, Key) ->
 
 serve_file(#httpd{mochi_req=MochiReq}=Req, RelativePath, DocumentRoot) ->
     {ok, MochiReq:serve_file(RelativePath, DocumentRoot,
-        server_header() ++ chttpd_auth:cookie_auth_header(Req, []))}.
+        server_header() ++ couch_httpd_auth:cookie_auth_header(Req, []))}.
 
 qs_value(Req, Key) ->
     qs_value(Req, Key, undefined).
@@ -422,7 +421,7 @@ verify_is_server_admin(#httpd{user_ctx=#user_ctx{roles=Roles}}) ->
 start_response_length(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Length) ->
     couch_stats_collector:increment({httpd_status_codes, Code}),
     Resp = MochiReq:start_response_length({Code, Headers ++ server_header() ++
-        chttpd_auth:cookie_auth_header(Req, Headers), Length}),
+        couch_httpd_auth:cookie_auth_header(Req, Headers), Length}),
     case MochiReq:get(method) of
     'HEAD' -> throw({http_head_abort, Resp});
     _ -> ok
@@ -436,7 +435,7 @@ send(Resp, Data) ->
 start_chunked_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers) ->
     couch_stats_collector:increment({httpd_status_codes, Code}),
     Resp = MochiReq:respond({Code, Headers ++ server_header() ++
-        chttpd_auth:cookie_auth_header(Req, Headers), chunked}),
+        couch_httpd_auth:cookie_auth_header(Req, Headers), chunked}),
     case MochiReq:get(method) of
     'HEAD' -> throw({http_head_abort, Resp});
     _ -> ok
@@ -454,7 +453,7 @@ send_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Body) ->
     true -> ok
     end,
     {ok, MochiReq:respond({Code, Headers ++ server_header() ++
-        chttpd_auth:cookie_auth_header(Req, Headers), Body})}.
+        couch_httpd_auth:cookie_auth_header(Req, Headers), Body})}.
 
 send_method_not_allowed(Req, Methods) ->
     send_error(Req, 405, [{"Allow", Methods}], <<"method_not_allowed">>,

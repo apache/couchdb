@@ -31,9 +31,9 @@ oauth_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
 % Look up the consumer key and get the roles to give the consumer
 set_user_ctx(Req, AccessToken) ->
     DbName = couch_config:get("couch_httpd_auth", "authentication_db", "users"),
-    ok = chttpd_auth:ensure_users_db_exists(?l2b(DbName)),
+    ok = couch_httpd_auth:ensure_users_db_exists(?l2b(DbName)),
     Name = ?l2b(couch_config:get("oauth_token_users", AccessToken)),
-    case chttpd_auth:get_user(Name) of
+    case couch_httpd_auth:get_user(Name) of
         nil -> Req;
         User ->
             Roles = couch_util:get_value(<<"roles">>, User, []),
