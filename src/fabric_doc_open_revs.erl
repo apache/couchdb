@@ -24,6 +24,7 @@
 -record(state, {
     dbname,
     worker_count,
+    workers,
     reply_count = 0,
     r,
     revs,
@@ -38,6 +39,7 @@ go(DbName, Id, Revs, Options) ->
     State = #state{
         dbname = DbName,
         worker_count = length(Workers),
+        workers = Workers,
         r = list_to_integer(R),
         revs = Revs,
         latest = lists:member(latest, Options),
@@ -50,15 +52,16 @@ go(DbName, Id, Revs, Options) ->
         Else
     end.
 
-handle_message({rexi_DOWN, _, _, _}, _Worker, State) ->
-    skip(State);
-handle_message({rexi_EXIT, _}, _Worker, State) ->
-    skip(State);
-handle_message({ok, RawReplies}, _Worker, #state{revs = all} = State) ->
+handle_message({rexi_DOWN, _, _, _}, Worker, #state{workers=Workers}=State) ->
+    skip(State#state{workers=lists:delete(Worker,Workers)});
+handle_message({rexi_EXIT, _}, Worker, #state{workers=Workers}=State) ->
+    skip(State#state{workers=lists:delete(Worker,Workers)});
+handle_message({ok, RawReplies}, Worker, #state{revs = all} = State) ->
     #state{
         dbname = DbName,
         reply_count = ReplyCount,
         worker_count = WorkerCount,
+        workers = Workers,
         replies = All0,
         r = R
     } = State,
@@ -74,11 +77,13 @@ handle_message({ok, RawReplies}, _Worker, #state{revs = all} = State) ->
     end,
     case maybe_reply(DbName, Reduced, Complete, Repair, R) of
     noreply ->
-        {ok, State#state{replies = All, reply_count = ReplyCount+1}};
+        {ok, State#state{replies = All, reply_count = ReplyCount+1,
+                        workers = lists:delete(Worker,Workers)}};
     {reply, FinalReply} ->
+        fabric_util:cleanup(lists:delete(Worker,Workers)),
         {stop, FinalReply}
     end;
-handle_message({ok, RawReplies0}, _Worker, State) ->
+handle_message({ok, RawReplies0}, Worker, State) ->
     % we've got an explicit revision list, but if latest=true the workers may
     % return a descendant of the requested revision.  Take advantage of the
     % fact that revisions are returned in order to keep track.
@@ -87,6 +92,7 @@ handle_message({ok, RawReplies0}, _Worker, State) ->
         dbname = DbName,
         reply_count = ReplyCount,
         worker_count = WorkerCount,
+        workers = Workers,
         replies = All0,
         r = R
     } = State,
@@ -106,8 +112,10 @@ handle_message({ok, RawReplies0}, _Worker, State) ->
     end,
     case maybe_reply(DbName, FinalReplies, Complete, Repair, R) of
     noreply ->
-        {ok, State#state{replies = All, reply_count = ReplyCount+1}};
+        {ok, State#state{replies = All, reply_count = ReplyCount+1,
+                        workers=lists:delete(Worker,Workers)}};
     {reply, FinalReply} ->
+        fabric_util:cleanup(lists:delete(Worker,Workers)),
         {stop, FinalReply}
     end.
 
@@ -177,19 +185,19 @@ unstrip_not_found_missing([Else | Rest]) ->
     [Else | unstrip_not_found_missing(Rest)].
 
 all_revs_test() ->
-    State0 = #state{worker_count = 3, r = 2, revs = all},
+    State0 = #state{worker_count = 3, workers=[nil,nil,nil], r = 2, revs = all},
     Foo1 = {ok, #doc{revs = {1, [<<"foo">>]}}},
     Foo2 = {ok, #doc{revs = {2, [<<"foo2">>, <<"foo">>]}}},
     Bar1 = {ok, #doc{revs = {1, [<<"bar">>]}}},
 
     % an empty worker response does not count as meeting quorum
     ?assertMatch(
-        {ok, #state{}},
+        {ok, #state{workers=[nil,nil]}},
         handle_message({ok, []}, nil, State0)
     ),
 
     ?assertMatch(
-        {ok, #state{}},
+        {ok, #state{workers=[nil, nil]}},
         handle_message({ok, [Foo1, Bar1]}, nil, State0)
     ),
     {ok, State1} = handle_message({ok, [Foo1, Bar1]}, nil, State0),
@@ -225,6 +233,7 @@ specific_revs_test() ->
     Revs = [{1,<<"foo">>}, {1,<<"bar">>}, {1,<<"baz">>}],
     State0 = #state{
         worker_count = 3,
+        workers = [nil, nil, nil],
         r = 2,
         revs = Revs,
         latest = false,

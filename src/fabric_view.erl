@@ -54,21 +54,25 @@ is_progress_possible(Counters) ->
 -spec remove_overlapping_shards(#shard{}, [{#shard{}, any()}]) ->
     [{#shard{}, any()}].
 remove_overlapping_shards(#shard{range=[A,B]} = Shard0, Shards) ->
-    fabric_dict:filter(fun(#shard{range=[X,Y]} = Shard, _Value) ->
+    fabric_dict:filter(fun(#shard{range=[X,Y], node=Node, ref=Ref} = Shard, _) ->
         if Shard =:= Shard0 ->
             % we can't remove ourselves
             true;
         A < B, X >= A, X < B ->
             % lower bound is inside our range
+            rexi:kill(Node, Ref),
             false;
         A < B, Y > A, Y =< B ->
             % upper bound is inside our range
+            rexi:kill(Node, Ref),
             false;
         B < A, X >= A orelse B < A, X < B ->
             % target shard wraps the key range, lower bound is inside
+            rexi:kill(Node, Ref),
             false;
         B < A, Y > A orelse B < A, Y =< B ->
             % target shard wraps the key range, upper bound is inside
+            rexi:kill(Node, Ref),
             false;
         true ->
             true

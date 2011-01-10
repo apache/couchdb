@@ -26,7 +26,7 @@ go(DbName, Id, Options) ->
     SuppressDeletedDoc = not lists:member(deleted, Options),
     R = couch_util:get_value(r, Options, couch_config:get("cluster","r","2")),
     RepairOpts = [{r, integer_to_list(mem3:n(DbName))} | Options],
-    Acc0 = {length(Workers), list_to_integer(R), []},
+    Acc0 = {Workers, list_to_integer(R), []},
     case fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
     {ok, Reply} ->
         format_reply(Reply, SuppressDeletedDoc);
@@ -55,15 +55,16 @@ format_reply({ok, #doc{deleted=true}}, true) ->
 format_reply(Else, _) ->
     Else.
 
-handle_message({rexi_DOWN, _, _, _}, _Worker, Acc0) ->
-    skip_message(Acc0);
-handle_message({rexi_EXIT, _Reason}, _Worker, Acc0) ->
-    skip_message(Acc0);
-handle_message(Reply, _Worker, {WaitingCount, R, Replies}) ->
+handle_message({rexi_DOWN, _, _, _}, Worker, Acc0) ->
+    skip_message(Worker, Acc0);
+handle_message({rexi_EXIT, _Reason}, Worker, Acc0) ->
+    skip_message(Worker, Acc0);
+handle_message(Reply, Worker, {Workers, R, Replies}) ->
     NewReplies = orddict:update_counter(Reply, 1, Replies),
     Reduced = fabric_util:remove_ancestors(NewReplies, []),
     case lists:dropwhile(fun({_, Count}) -> Count < R end, Reduced) of
     [{QuorumReply, _} | _] ->
+        fabric_util:cleanup(lists:delete(Worker,Workers)),
         if length(NewReplies) =:= 1 ->
             {stop, QuorumReply};
         true ->
@@ -71,17 +72,17 @@ handle_message(Reply, _Worker, {WaitingCount, R, Replies}) ->
             {error, needs_repair, QuorumReply}
         end;
     [] ->
-        if WaitingCount =:= 1 ->
+        if length(Workers) =:= 1 ->
             {error, needs_repair};
         true ->
-            {ok, {WaitingCount-1, R, NewReplies}}
+            {ok, {lists:delete(Worker,Workers), R, NewReplies}}
         end
     end.
 
-skip_message({1, _R, _Replies}) ->
+skip_message(_Worker, {Workers, _R, _Replies}) when length(Workers) =:= 1 ->
     {error, needs_repair};
-skip_message({WaitingCount, R, Replies}) ->
-    {ok, {WaitingCount-1, R, Replies}}.
+skip_message(Worker, {Workers, R, Replies}) ->
+    {ok, {lists:delete(Worker,Workers), R, Replies}}.
 
 
 open_doc_test() ->
@@ -90,9 +91,9 @@ open_doc_test() ->
     Bar1 = {ok, #doc{revs = {1,[<<"bar">>]}}},
     Baz1 = {ok, #doc{revs = {1,[<<"baz">>]}}},
     NF = {not_found, missing},
-    State0 = {3, 2, []},
-    State1 = {2, 2, [{Foo1,1}]},
-    State2 = {1, 2, [{Bar1,1}, {Foo1,1}]},
+    State0 = {[nil, nil, nil], 2, []},
+    State1 = {[nil, nil], 2, [{Foo1,1}]},
+    State2 = {[nil], 2, [{Bar1,1}, {Foo1,1}]},
     ?assertEqual({ok, State1}, handle_message(Foo1, nil, State0)),
 
     % normal case - quorum reached, no disagreement

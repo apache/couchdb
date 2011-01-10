@@ -25,23 +25,25 @@ go(DbName, AllIdsRevs) ->
         Shard#shard{ref=Ref}
     end, group_idrevs_by_shard(DbName, AllIdsRevs)),
     ResultDict = dict:from_list([{Id, {nil,Revs}} || {Id, Revs} <- AllIdsRevs]),
-    Acc0 = {length(Workers), ResultDict},
+    Acc0 = {length(Workers), ResultDict, Workers},
     fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0).
 
-handle_message({rexi_DOWN, _, _, _}, _Worker, Acc0) ->
-    skip_message(Acc0);
-handle_message({rexi_EXIT, _, _, _}, _Worker, Acc0) ->
-    skip_message(Acc0);
-handle_message({ok, Results}, _Worker, {1, D0}) ->
+handle_message({rexi_DOWN, _, _, _}, Worker, {W, D, Workers}) ->
+    skip_message({W,D,lists:delete(Worker, Workers)});
+handle_message({rexi_EXIT, _, _, _}, Worker, {W, D, Workers}) ->
+    skip_message({W,D,lists:delete(Worker, Workers)});
+handle_message({ok, Results}, _Worker, {1, D0, _}) ->
     D = update_dict(D0, Results),
     {stop, dict:fold(fun force_reply/3, [], D)};
-handle_message({ok, Results}, _Worker, {WaitingCount, D0}) ->
+handle_message({ok, Results}, Worker, {WaitingCount, D0, Workers}) ->
     D = update_dict(D0, Results),
     case dict:fold(fun maybe_reply/3, {stop, []}, D) of
     continue ->
         % still haven't heard about some Ids
-        {ok, {WaitingCount - 1, D}};
+        {ok, {WaitingCount - 1, D, lists:delete(Worker,Workers)}};
     {stop, FinalReply} ->
+        % finished, stop the rest of the jobs
+        fabric_util:cleanup(lists:delete(Worker,Workers)),
         {stop, FinalReply}
     end.
 
