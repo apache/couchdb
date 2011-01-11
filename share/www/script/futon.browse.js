@@ -116,7 +116,7 @@
 
       var viewName = (urlParts.length > 0) ? urlParts.join("/") : null;
       if (viewName) {
-        $.futon.storage.set("view", viewName);
+        $.futon.storage.set("view", decodeURIComponent(viewName));
       } else {
         viewName = $.futon.storage.get("view");
         if (viewName) {
@@ -128,6 +128,7 @@
       var db = $.couch.db(dbName);
 
       this.dbName = dbName;
+      viewName = decodeURIComponent(viewName);
       this.viewName = viewName;
       this.viewLanguage = "javascript";
       this.db = db;
@@ -586,7 +587,7 @@
 
       this.updateDesignDocLink = function() {
         if (viewName && /^_design/.test(viewName)) {
-          var docId = "_design/" + decodeURIComponent(viewName.split("/")[1]);
+          var docId = "_design/" + encodeURIComponent(decodeURIComponent(viewName).split("/")[1]);
           $("#designdoc-link").attr("href", "document.html?" +
             encodeURIComponent(dbName) + "/" + $.couch.encodeDocId(docId)).text(docId);
         } else {
@@ -782,8 +783,7 @@
             if (page.isDirty) {
               db.query(currentMapCode, currentReduceCode, page.viewLanguage, options);
             } else {
-              var viewParts = viewName.split('/');
-
+              var viewParts = decodeURIComponent(viewName).split('/');
               if ($.futon.storage.get("stale")) {
                  options.stale = "ok";
               }

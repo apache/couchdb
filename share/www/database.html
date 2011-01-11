@@ -40,6 +40,10 @@ specific language governing permissions and limitations under the License.
         $("h1 strong").text(page.db.name);
         var viewPath = page.viewName || "_all_docs";
         if (viewPath != "_temp_view" && viewPath != "_design_docs") {
+          viewPath = $.map(viewPath.split("/"), function (part) {
+            return encodeURIComponent(part);
+          }).join("/");
+
           $("h1 a.raw").attr("href", "/" + encodeURIComponent(page.db.name) +
             "/" + viewPath);
         }
