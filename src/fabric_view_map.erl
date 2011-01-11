@@ -58,14 +58,13 @@ handle_message({rexi_DOWN, _, _, _}, nil, State) ->
     {ok, State};
 
 handle_message({rexi_EXIT, Reason}, Worker, State) ->
-    ?LOG_ERROR("~p rexi_EXIT ~p", [?MODULE, Reason]),
     #collector{callback=Callback, counters=Counters0, user_acc=Acc} = State,
     Counters = fabric_dict:erase(Worker, Counters0),
     case fabric_view:is_progress_possible(Counters) of
     true ->
         {ok, State#collector{counters = Counters}};
     false ->
-        {ok, Resp} = Callback({error, Reason}, Acc),
+        {ok, Resp} = Callback({error, fabric_util:error_info(Reason)}, Acc),
         {error, Resp}
     end;
 

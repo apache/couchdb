@@ -79,7 +79,7 @@ handle_message({rexi_EXIT, Reason}, Worker, State) ->
     true ->
         {ok, State#collector{counters = Counters}};
     false ->
-        {ok, Resp} = Callback({error, Reason}, Acc),
+        {ok, Resp} = Callback({error, fabric_util:error_info(Reason)}, Acc),
         {error, Resp}
     end;
 

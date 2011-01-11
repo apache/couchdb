@@ -14,7 +14,8 @@
 
 -module(fabric_util).
 
--export([submit_jobs/3, cleanup/1, recv/4, get_db/1, remove_ancestors/2]).
+-export([submit_jobs/3, cleanup/1, recv/4, get_db/1, remove_ancestors/2,
+    error_info/1]).
 
 -include("fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
@@ -55,6 +56,13 @@ get_shard([#shard{node = Node, name = Name} | Rest], Timeout) ->
     _Else ->
         get_shard(Rest, Timeout)
     end.
+
+error_info({{<<"reduce_overflow_error">>, _} = Error, _Stack}) ->
+    Error;
+error_info({{timeout, _} = Error, _Stack}) ->
+    Error;
+error_info(Else) ->
+    Else.
 
 % this presumes the incoming list is sorted, i.e. shorter revlists come first
 remove_ancestors([], Acc) ->
