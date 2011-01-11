@@ -103,7 +103,7 @@ changes_callback(timeout, {Prepend, Resp}) ->
     send_chunk(Resp, "\n"),
     {ok, {Prepend, Resp}};
 changes_callback({error, Reason}, Resp) ->
-    chttpd:send_chunked_error(Resp, {error, Reason}).
+    chttpd:send_chunked_error(Resp, Reason).
 
 is_old_couch(Resp) ->
     MochiReq = Resp:get(request),

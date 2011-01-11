@@ -60,7 +60,7 @@ view_callback(complete, {_, Resp}) ->
     end_json_response(Resp),
     {ok, Resp};
 view_callback({error, Reason}, {_, Resp}) ->
-    chttpd:send_chunked_error(Resp, {error, Reason}).
+    chttpd:send_chunked_error(Resp, Reason).
 
 extract_view_type(_ViewName, [], _IsReduce) ->
     throw({not_found, missing_named_view});
