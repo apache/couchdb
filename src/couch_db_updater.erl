@@ -260,11 +260,11 @@ handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts,
         lists:foreach(fun(DDocId) ->
             couch_db_update_notifier:notify({ddoc_updated, {Db#db.name, DDocId}})
         end, UpdatedDDocIds),
-        {noreply, Db2}
+        {noreply, Db2, hibernate}
     catch
         throw: retry ->
             [catch(ClientPid ! {retry, self()}) || ClientPid <- Clients],
-            {noreply, Db}
+            {noreply, Db, hibernate}
     end;
 handle_info(delayed_commit, #db{waiting_delayed_commit=nil}=Db) ->
     %no outstanding delayed commits, ignore
