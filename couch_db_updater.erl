@@ -824,7 +824,7 @@ copy_compact(Db, NewDb0, Retry) ->
 
     commit_data(NewDb4#db{update_seq=Db#db.update_seq}).
 
-start_copy_compact(#db{name=Name,filepath=Filepath}=Db) ->
+start_copy_compact(#db{name=Name,filepath=Filepath,header=#db_header{purge_seq=PurgeSeq}}=Db) ->
     CompactFile = Filepath ++ ".compact",
     ?LOG_DEBUG("Compaction process spawned for db \"~s\"", [Name]),
     case couch_file:open(CompactFile) of
@@ -845,8 +845,16 @@ start_copy_compact(#db{name=Name,filepath=Filepath}=Db) ->
     end,
     ReaderFd = open_reader_fd(CompactFile, Db#db.options),
     NewDb = init_db(Name, CompactFile, Fd, ReaderFd, Header, Db#db.options),
+    NewDb2 = if PurgeSeq > 0 ->
+        {ok, PurgedIdsRevs} = couch_db:get_last_purged(Db),
+        {ok, Pointer} = couch_file:append_term(Fd, PurgedIdsRevs),
+        NewDb#db{header=Header#db_header{purge_seq=PurgeSeq, purged_docs=Pointer}};
+    true ->
+        NewDb
+    end,
     unlink(Fd),
-    NewDb2 = copy_compact(Db, NewDb, Retry),
-    close_db(NewDb2),
+
+    NewDb3 = copy_compact(Db, NewDb2, Retry),
+    close_db(NewDb3),
     gen_server:cast(Db#db.update_pid, {compact_done, CompactFile}).
 
