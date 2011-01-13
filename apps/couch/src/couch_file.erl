@@ -270,13 +270,8 @@ init({Filepath, Options, ReturnPid, Ref}) ->
         end
     end.
 
-maybe_track_open_os_files(FileOptions) ->
-    case lists:member(sys_db, FileOptions) of
-    true ->
-        ok;
-    false ->
-        couch_stats_collector:track_process_count({couchdb, open_os_files})
-    end.
+maybe_track_open_os_files(_FileOptions) ->
+    couch_stats_collector:track_process_count({couchdb, open_os_files}).
 
 terminate(_Reason, #file{fd = nil}) ->
     ok;
