@@ -622,9 +622,7 @@ send_json(Req, Code, Headers, Value) ->
         {"Content-Type", negotiate_content_type(Req)},
         {"Cache-Control", "must-revalidate"}
     ],
-    Body = list_to_binary(
-        [start_jsonp(Req), ?JSON_ENCODE(Value), end_jsonp(), $\n]
-    ),
+    Body = [start_jsonp(Req), ?JSON_ENCODE(Value), end_jsonp(), $\n],
     send_response(Req, Code, DefaultHeaders ++ Headers, Body).
 
 start_json_response(Req, Code) ->
