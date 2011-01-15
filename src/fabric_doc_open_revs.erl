@@ -65,15 +65,15 @@ handle_message({ok, RawReplies}, Worker, #state{revs = all} = State) ->
         replies = All0,
         r = R
     } = State,
-    All = lists:foldl(fun(Reply,D) -> orddict:update_counter(Reply,1,D) end,
+    All = lists:foldl(fun(Reply,D) -> fabric_util:update_counter(Reply,1,D) end,
         All0, RawReplies),
     Reduced = fabric_util:remove_ancestors(All, []),
     Complete = (ReplyCount =:= (WorkerCount - 1)),
-    QuorumMet = lists:all(fun({_, C}) -> C >= R end, Reduced),
+    QuorumMet = lists:all(fun({_,{_, C}}) -> C >= R end, Reduced),
     case Reduced of All when QuorumMet andalso ReplyCount =:= (R-1) ->
         Repair = false;
     _ ->
-        Repair = [D || {{ok,D}, _} <- Reduced]
+        Repair = [D || {_,{{ok,D}, _}} <- Reduced]
     end,
     case maybe_reply(DbName, Reduced, Complete, Repair, R) of
     noreply ->
@@ -98,7 +98,7 @@ handle_message({ok, RawReplies0}, Worker, State) ->
     } = State,
     All = lists:zipwith(fun({Rev, D}, Reply) ->
         if Reply =:= error -> {Rev, D}; true ->
-            {Rev, orddict:update_counter(Reply, 1, D)}
+            {Rev, fabric_util:update_counter(Reply, 1, D)}
         end
     end, All0, RawReplies),
     Reduced = [fabric_util:remove_ancestors(X, []) || {_, X} <- All],
@@ -106,7 +106,7 @@ handle_message({ok, RawReplies0}, Worker, State) ->
     Complete = (ReplyCount =:= (WorkerCount - 1)),
     case is_repair_needed(All, FinalReplies) of
     true ->
-        Repair = [D || {{ok,D}, _} <- lists:flatten(Reduced)];
+        Repair = [D || {_,{{ok,D}, _}} <- lists:flatten(Reduced)];
     false ->
         Repair = false
     end,
@@ -127,21 +127,24 @@ skip(#state{revs=Revs} = State) ->
 maybe_reply(_, [], false, _, _) ->
     noreply;
 maybe_reply(DbName, ReplyDict, IsComplete, RepairDocs, R) ->
-    case lists:all(fun({_, C}) -> C >= R end, ReplyDict) of
+    case lists:all(fun({_,{_, C}}) -> C >= R end, ReplyDict) of
     true ->
         maybe_execute_read_repair(DbName, RepairDocs),
-        {reply, unstrip_not_found_missing(orddict:fetch_keys(ReplyDict))};
+        {reply, unstrip_not_found_missing(extract_replies(ReplyDict))};
     false ->
         case IsComplete of false -> noreply; true ->
             maybe_execute_read_repair(DbName, RepairDocs),
-            {reply, unstrip_not_found_missing(orddict:fetch_keys(ReplyDict))}
+            {reply, unstrip_not_found_missing(extract_replies(ReplyDict))}
         end
     end.
 
+extract_replies(Replies) ->
+    lists:map(fun({_,{Reply,_}}) -> Reply end, Replies).
+
 choose_winner(Options, R) ->
-    case lists:dropwhile(fun({_Reply, C}) -> C < R end, Options) of
+    case lists:dropwhile(fun({_,{_Reply, C}}) -> C < R end, Options) of
     [] ->
-        case [Elem || {{ok, #doc{}}, _} = Elem <- Options] of
+        case [Elem || {_,{{ok, #doc{}}, _}} = Elem <- Options] of
         [] ->
             hd(Options);
         Docs ->

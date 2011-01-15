@@ -14,8 +14,8 @@
 
 -module(fabric_util).
 
--export([submit_jobs/3, cleanup/1, recv/4, get_db/1, remove_ancestors/2,
-    error_info/1]).
+-export([submit_jobs/3, cleanup/1, recv/4, get_db/1, error_info/1,
+        update_counter/3, remove_ancestors/2, kv/2]).
 
 -include("fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
@@ -64,20 +64,36 @@ error_info({{timeout, _} = Error, _Stack}) ->
 error_info(Else) ->
     Else.
 
+update_counter(Item, Incr, D) ->
+    orddict:update(make_key(Item), fun ({Old, Count}) -> {Old, Count + Incr} end, {Item, Incr}, D).
+
+make_key({ok, L}) when is_list(L) ->
+    make_key(L);
+make_key([]) ->
+    [];
+make_key([{ok, #doc{revs= {Pos,[RevId | _]}}} | Rest]) ->
+    [{ok, {Pos, RevId}} | make_key(Rest)];
+make_key([{{not_found, missing}, Rev} | Rest]) ->
+    [{not_found, Rev} | make_key(Rest)];
+make_key({ok, #doc{id=Id,revs=Revs}}) ->
+    {Id, Revs};
+make_key(Else) ->
+    Else.
+
 % this presumes the incoming list is sorted, i.e. shorter revlists come first
 remove_ancestors([], Acc) ->
     lists:reverse(Acc);
-remove_ancestors([{{not_found, _}, Count} = Head | Tail], Acc) ->
+remove_ancestors([{_, {{not_found, _}, Count}} = Head | Tail], Acc) ->
     % any document is a descendant
-    case lists:filter(fun({{ok, #doc{}}, _}) -> true; (_) -> false end, Tail) of
-    [{{ok, #doc{}} = Descendant, _} | _] ->
-        remove_ancestors(orddict:update_counter(Descendant, Count, Tail), Acc);
+    case lists:filter(fun({_,{{ok, #doc{}}, _}}) -> true; (_) -> false end, Tail) of
+    [{_,{{ok, #doc{}} = Descendant, _}} | _] ->
+        remove_ancestors(update_counter(Descendant, Count, Tail), Acc);
     [] ->
         remove_ancestors(Tail, [Head | Acc])
     end;
-remove_ancestors([{{ok, #doc{revs = {Pos, Revs}}}, Count} = Head | Tail], Acc) ->
+remove_ancestors([{_,{{ok, #doc{revs = {Pos, Revs}}}, Count}} = Head | Tail], Acc) ->
     Descendants = lists:dropwhile(fun
-    ({{ok, #doc{revs = {Pos2, Revs2}}}, _}) ->
+    ({_,{{ok, #doc{revs = {Pos2, Revs2}}}, _}}) ->
         case lists:nthtail(erlang:min(Pos2 - Pos, length(Revs2)), Revs2) of
         [] ->
             % impossible to tell if Revs2 is a descendant - assume no
@@ -90,8 +106,15 @@ remove_ancestors([{{ok, #doc{revs = {Pos, Revs}}}, Count} = Head | Tail], Acc) -
     case Descendants of [] ->
         remove_ancestors(Tail, [Head | Acc]);
     [{Descendant, _} | _] ->
-        remove_ancestors(orddict:update_counter(Descendant, Count, Tail), Acc)
+        remove_ancestors(update_counter(Descendant, Count, Tail), Acc)
     end.
+
+%% verify only id and rev are used in key.
+update_counter_test() ->
+    Reply = {ok, #doc{id = <<"id">>, revs = <<"rev">>,
+                    body = <<"body">>, atts = <<"atts">>}},
+    ?assertEqual([{{<<"id">>,<<"rev">>}, {Reply, 1}}],
+        update_counter(Reply, 1, [])).
 
 remove_ancestors_test() ->
     Foo1 = {ok, #doc{revs = {1, [<<"foo">>]}}},
@@ -99,14 +122,18 @@ remove_ancestors_test() ->
     Bar1 = {ok, #doc{revs = {1, [<<"bar">>]}}},
     Bar2 = {not_found, {1,<<"bar">>}},
     ?assertEqual(
-        [{Bar1,1}, {Foo1,1}],
-        remove_ancestors([{Bar1,1}, {Foo1,1}], [])
+        [kv(Bar1,1), kv(Foo1,1)],
+        remove_ancestors([kv(Bar1,1), kv(Foo1,1)], [])
     ),
     ?assertEqual(
-        [{Bar1,1}, {Foo2,2}],
-        remove_ancestors([{Bar1,1}, {Foo1,1}, {Foo2,1}], [])
+        [kv(Bar1,1), kv(Foo2,2)],
+        remove_ancestors([kv(Bar1,1), kv(Foo1,1), kv(Foo2,1)], [])
     ),
     ?assertEqual(
-        [{Bar1,2}],
-        remove_ancestors([{Bar2,1}, {Bar1,1}], [])
+        [kv(Bar1,2)],
+        remove_ancestors([kv(Bar2,1), kv(Bar1,1)], [])
     ).
+
+%% test function
+kv(Item, Count) ->
+    {make_key(Item), {Item,Count}}.
