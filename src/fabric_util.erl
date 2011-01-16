@@ -65,7 +65,8 @@ error_info(Else) ->
     Else.
 
 update_counter(Item, Incr, D) ->
-    orddict:update(make_key(Item), fun ({Old, Count}) -> {Old, Count + Incr} end, {Item, Incr}, D).
+    UpdateFun = fun ({Old, Count}) -> {Old, Count + Incr} end,
+    orddict:update(make_key(Item), UpdateFun, {Item, Incr}, D).
 
 make_key({ok, L}) when is_list(L) ->
     make_key(L);
