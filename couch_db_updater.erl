@@ -283,11 +283,14 @@ collect_updates(GroupedDocsAcc, ClientsAcc, MergeConflicts, FullCommit) ->
 
 
 btree_by_seq_split(#doc_info{id=Id, high_seq=KeySeq, revs=Revs}) ->
-    RevInfos = [{Rev, Seq, Bp} ||
-        #rev_info{rev=Rev,seq=Seq,deleted=false,body_sp=Bp} <- Revs],
-    DeletedRevInfos = [{Rev, Seq, Bp} ||
-        #rev_info{rev=Rev,seq=Seq,deleted=true,body_sp=Bp} <- Revs],
-    {KeySeq,{Id, RevInfos, DeletedRevInfos}}.
+    {RevInfos, DeletedRevInfos} = lists:foldl(
+        fun(#rev_info{deleted = false, seq = Seq} = Ri, {Acc, AccDel}) ->
+                {[{Ri#rev_info.rev, Seq, Ri#rev_info.body_sp} | Acc], AccDel};
+            (#rev_info{deleted = true, seq = Seq} = Ri, {Acc, AccDel}) ->
+                {Acc, [{Ri#rev_info.rev, Seq, Ri#rev_info.body_sp} | AccDel]}
+        end,
+        {[], []}, Revs),
+    {KeySeq, {Id, lists:reverse(RevInfos), lists:reverse(DeletedRevInfos)}}.
 
 btree_by_seq_join(KeySeq, {Id, RevInfos, DeletedRevInfos}) ->
     #doc_info{
@@ -322,12 +325,19 @@ btree_by_id_join(Id, {HighSeq, Deleted, DiskTree}) ->
     #full_doc_info{id=Id, update_seq=HighSeq, deleted=Deleted==1, rev_tree=Tree}.
 
 btree_by_id_reduce(reduce, FullDocInfos) ->
-    % count the number of not deleted documents
-    {length([1 || #full_doc_info{deleted=false} <- FullDocInfos]),
-        length([1 || #full_doc_info{deleted=true} <- FullDocInfos])};
-btree_by_id_reduce(rereduce, Reds) ->
-    {lists:sum([Count || {Count,_} <- Reds]),
-        lists:sum([DelCount || {_, DelCount} <- Reds])}.
+    lists:foldl(
+        fun(#full_doc_info{deleted = false}, {NotDeleted, Deleted}) ->
+                {NotDeleted + 1, Deleted};
+            (#full_doc_info{deleted = true}, {NotDeleted, Deleted}) ->
+                {NotDeleted, Deleted + 1}
+        end,
+        {0, 0}, FullDocInfos);
+btree_by_id_reduce(rereduce, [FirstRed | RestReds]) ->
+    lists:foldl(
+        fun({NotDeleted, Deleted}, {AccNotDeleted, AccDeleted}) ->
+            {AccNotDeleted + NotDeleted, AccDeleted + Deleted}
+        end,
+        FirstRed, RestReds).
 
 btree_by_seq_reduce(reduce, DocInfos) ->
     % count the number of documents
