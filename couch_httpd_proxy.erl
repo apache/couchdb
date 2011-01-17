@@ -145,7 +145,7 @@ stream_chunked_body({stream, MReq, 0, Buf, BRem}) ->
     {CRem, Data} = read_chunk_length(MReq),
     case CRem of
         0 ->
-            BodyData = iolist_to_binary(lists:reverse(Buf, Data)),
+            BodyData = lists:reverse(Buf, Data),
             {ok, BodyData, {trailers, MReq, [], ?PKT_SIZE}}; 
         _ ->
             stream_chunked_body(
@@ -154,7 +154,7 @@ stream_chunked_body({stream, MReq, 0, Buf, BRem}) ->
     end;
 stream_chunked_body({stream, MReq, CRem, Buf, BRem}) when BRem =< 0 ->
     % Time to empty our buffers to the upstream socket.
-    BodyData = iolist_to_binary(lists:reverse(Buf)),
+    BodyData = lists:reverse(Buf),
     {ok, BodyData, {stream, MReq, CRem, [], ?PKT_SIZE}};
 stream_chunked_body({stream, MReq, CRem, Buf, BRem}) ->
     % Buffer some more data from the client.
@@ -176,7 +176,7 @@ stream_chunked_body({stream, MReq, CRem, Buf, BRem}) ->
     stream_chunked_body(NewState);
 stream_chunked_body({trailers, MReq, Buf, BRem}) when BRem =< 0 ->
     % Empty our buffers and send data upstream.
-    BodyData = iolist_to_binary(lists:reverse(Buf)),
+    BodyData = lists:reverse(Buf),
     {ok, BodyData, {trailers, MReq, [], ?PKT_SIZE}};
 stream_chunked_body({trailers, MReq, Buf, BRem}) ->
     % Read another trailer into the buffer or stop on an
@@ -186,7 +186,7 @@ stream_chunked_body({trailers, MReq, Buf, BRem}) ->
     case mochiweb_socket:recv(Socket, 0, ?TIMEOUT) of
         {ok, <<"\r\n">>} ->
             mochiweb_socket:setopts(Socket, [{packet, raw}]),
-            BodyData = iolist_to_binary(lists:reverse(Buf, <<"\r\n">>)),
+            BodyData = lists:reverse(Buf, <<"\r\n">>),
             {ok, BodyData, eof};
         {ok, Footer} ->
             mochiweb_socket:setopts(Socket, [{packet, raw}]),
