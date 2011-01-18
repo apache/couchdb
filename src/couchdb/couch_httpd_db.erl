@@ -1020,8 +1020,10 @@ db_attachment_req(#httpd{method=Method,mochi_req=MochiReq}=Req, Db, DocId, FileN
             end
     end,
 
-    #doc{atts=Atts} = Doc,
+    #doc{atts=Atts, revs = {Pos, Revs}} = Doc,
     DocEdited = Doc#doc{
+        % prune revision list as a workaround for key tree bug (COUCHDB-902)
+        revs = {Pos, case Revs of [] -> []; [Hd|_] -> [Hd] end},
         atts = NewAtt ++ [A || A <- Atts, A#att.name /= FileName]
     },
     {ok, UpdatedRev} = couch_db:update_doc(Db, DocEdited, []),
