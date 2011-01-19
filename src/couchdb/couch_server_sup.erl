@@ -15,7 +15,6 @@
 
 
 -export([start_link/1,stop/0, couch_config_start_link_wrapper/2,
-        start_primary_services/0,start_secondary_services/0,
         restart_core_server/0, config_change/2]).
 
 -include("couch_db.hrl").
@@ -68,15 +67,6 @@ start_server(IniFiles) ->
     _ -> ok
     end,
 
-    LibDir =
-    case couch_config:get("couchdb", "util_driver_dir", null) of
-    null ->
-        filename:join(couch_util:priv_dir(), "lib");
-    LibDir0 -> LibDir0
-    end,
-
-    ok = couch_util:start_driver(LibDir),
-
     BaseChildSpecs =
     {{one_for_all, 10, 3600},
         [{couch_config,
@@ -86,17 +76,17 @@ start_server(IniFiles) ->
             worker,
             [couch_config]},
         {couch_primary_services,
-            {couch_server_sup, start_primary_services, []},
+            {couch_primary_sup, start_link, []},
             permanent,
             infinity,
             supervisor,
-            [couch_server_sup]},
+            [couch_primary_sup]},
         {couch_secondary_services,
-            {couch_server_sup, start_secondary_services, []},
+            {couch_secondary_sup, start_link, []},
             permanent,
             infinity,
             supervisor,
-            [couch_server_sup]}
+            [couch_secondary_sup]}
         ]},
 
     % ensure these applications are running
@@ -125,60 +115,6 @@ start_server(IniFiles) ->
     end,
 
     {ok, Pid}.
-
-start_primary_services() ->
-    supervisor:start_link({local, couch_primary_services}, couch_server_sup,
-        {{one_for_one, 10, 3600},
-            [{couch_log,
-                {couch_log, start_link, []},
-                permanent,
-                brutal_kill,
-                worker,
-                [couch_log]},
-            {couch_replication_supervisor,
-                {couch_rep_sup, start_link, []},
-                permanent,
-                infinity,
-                supervisor,
-                [couch_rep_sup]},
-            {couch_task_status,
-                {couch_task_status, start_link, []},
-                permanent,
-                brutal_kill,
-                worker,
-                [couch_task_status]},
-            {couch_server,
-                {couch_server, sup_start_link, []},
-                permanent,
-                1000,
-                worker,
-                [couch_server]},
-            {couch_db_update_event,
-                {gen_event, start_link, [{local, couch_db_update}]},
-                permanent,
-                brutal_kill,
-                worker,
-                dynamic}
-            ]
-        }).
-
-start_secondary_services() ->
-    DaemonChildSpecs = [
-        begin
-            {ok, {Module, Fun, Args}} = couch_util:parse_term(SpecStr),
-
-            {list_to_atom(Name),
-                {Module, Fun, Args},
-                permanent,
-                1000,
-                worker,
-                [Module]}
-        end
-        || {Name, SpecStr}
-        <- couch_config:get("daemons"), SpecStr /= ""],
-
-    supervisor:start_link({local, couch_secondary_services}, couch_server_sup,
-        {{one_for_one, 10, 3600}, DaemonChildSpecs}).
 
 stop() ->
     catch exit(whereis(couch_server_sup), normal).

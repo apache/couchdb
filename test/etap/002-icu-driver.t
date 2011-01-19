@@ -11,12 +11,15 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
+default_config() ->
+    test_util:build_file("etc/couchdb/default_dev.ini").
 
 main(_) ->
     test_util:init_code_path(),
+    couch_config:start_link([default_config()]),
     etap:plan(3),
     etap:is(
-        couch_util:start_driver("src/couchdb/priv/.libs"),
+        element(1, couch_drv:start_link()),
         ok,
         "Started couch_icu_driver."
     ),
