@@ -39,7 +39,7 @@ config_change("external", UrlName) ->
 init([]) ->
     process_flag(trap_exit, true),
     Handlers = ets:new(couch_external_manager_handlers, [set, private]),
-    couch_config:register(fun config_change/2),
+    couch_config:register(fun ?MODULE:config_change/2),
     {ok, Handlers}.
 
 terminate(_Reason, Handlers) ->
