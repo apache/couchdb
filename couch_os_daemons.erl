@@ -47,7 +47,7 @@ config_change(Section, Key) ->
 
 init(_) ->
     process_flag(trap_exit, true),
-    ok = couch_config:register(fun couch_os_daemons:config_change/2),
+    ok = couch_config:register(fun ?MODULE:config_change/2),
     Table = ets:new(?MODULE, [protected, set, {keypos, #daemon.port}]),
     reload_daemons(Table),
     {ok, Table}.
