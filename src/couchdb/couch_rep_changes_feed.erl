@@ -34,7 +34,8 @@
     count = 0,
     partial_chunk = <<>>,
     reply_to = nil,
-    rows = queue:new()
+    rows = queue:new(),
+    doc_ids = nil
 }).
 
 -import(couch_util, [
@@ -87,21 +88,38 @@ init([Parent, #http_db{headers = Headers0} = Source, Since, PostProps]) ->
     },
     {ibrowse_req_id, ReqId} = couch_rep_httpc:request(Req),
     Args = [Parent, Req, Since, PostProps],
+    State = #state{
+        conn = Pid,
+        last_seq = Since,
+        reqid = ReqId,
+        init_args = Args,
+        doc_ids = get_value(<<"doc_ids">>, PostProps, nil)
+    },
 
     receive
     {ibrowse_async_headers, ReqId, "200", _} ->
         ibrowse:stream_next(ReqId),
-        {ok, #state{conn=Pid, last_seq=Since, reqid=ReqId, init_args=Args}};
+        {ok, State};
     {ibrowse_async_headers, ReqId, Code, Hdrs}
             when Code =:= "301"; Code =:= "302"; Code =:= "303" ->
-        stop_link_worker(Pid),
-        Req2 = couch_rep_httpc:redirected_request(Code, Hdrs, Req),
-        Pid2 = couch_rep_httpc:spawn_link_worker_process(Req2),
-        Req3 = Req2#http_db{conn = Pid2},
-        {ibrowse_req_id, ReqId2} = couch_rep_httpc:request(Req3),
-        Args2 = [Parent, Req3, Since, PostProps],
-        receive {ibrowse_async_headers, ReqId2, "200", _} ->
-            {ok, #state{conn=Pid2, last_seq=Since, reqid=ReqId2, init_args=Args2}}
+        {ReqId2, Req2} = redirect_req(Req, Code, Hdrs),
+        receive
+        {ibrowse_async_headers, ReqId2, "200", _} ->
+            {ok, State#state{
+                conn = Req2#http_db.conn,
+                reqid = ReqId2,
+                init_args = [Parent, Req2, Since, PostProps]}};
+        {ibrowse_async_headers, ReqId2, "405", _} when Method =:= post ->
+            {ReqId3, Req3} = req_no_builtin_doc_ids(Req2, ReqId2),
+            receive
+            {ibrowse_async_headers, ReqId3, "200", _} ->
+                {ok, State#state{
+                    conn = Req3#http_db.conn,
+                    reqid = ReqId3,
+                    init_args = [Parent, Req3, Since, PostProps]}}
+            after 30000 ->
+                {stop, changes_timeout}
+            end
         after 30000 ->
             {stop, changes_timeout}
         end;
@@ -110,7 +128,30 @@ init([Parent, #http_db{headers = Headers0} = Source, Since, PostProps]) ->
         ?LOG_INFO("source doesn't have _changes, trying _all_docs_by_seq", []),
         Self = self(),
         BySeqPid = spawn_link(fun() -> by_seq_loop(Self, Source, Since) end),
-        {ok, #state{last_seq=Since, changes_loop=BySeqPid, init_args=Args}};
+        {ok, State#state{changes_loop = BySeqPid}};
+    {ibrowse_async_headers, ReqId, "405", _}  when Method =:= post ->
+        {ReqId2, Req2} = req_no_builtin_doc_ids(Req, ReqId),
+        receive
+        {ibrowse_async_headers, ReqId2, "200", _} ->
+            {ok, State#state{
+                conn = Req2#http_db.conn,
+                reqid = ReqId2,
+                init_args = [Parent, Req2, Since, PostProps]}};
+        {ibrowse_async_headers, ReqId, Code, Hdrs}
+            when Code =:= "301"; Code =:= "302"; Code =:= "303" ->
+            {ReqId3, Req3} = redirect_req(Req2, Code, Hdrs),
+            receive
+            {ibrowse_async_headers, ReqId3, "200", _} ->
+                {ok, State#state{
+                    conn = Req3#http_db.conn,
+                    reqid = ReqId3,
+                    init_args = [Parent, Req3, Since, PostProps]}}
+            after 30000 ->
+                {stop, changes_timeout}
+            end
+        after 30000 ->
+            {stop, changes_timeout}
+        end;
     {ibrowse_async_headers, ReqId, Code, _} ->
         {stop, {changes_error_code, list_to_integer(Code)}}
     after 10000 ->
@@ -263,12 +304,9 @@ code_change(_OldVsn, State, _Extra) ->
 %internal funs
 
 handle_add_change(Row, From, #state{reply_to=nil} = State) ->
-    #state{
-        count = Count,
-        rows = Rows
-    } = State,
-    NewState = State#state{count=Count+1, rows=queue:in(Row,Rows)},
-    if Count < ?BUFFER_SIZE ->
+    {Rows2, Count2} = queue_changes_row(Row, State),
+    NewState = State#state{count = Count2, rows = Rows2},
+    if Count2 =< ?BUFFER_SIZE ->
         {reply, ok, NewState};
     true ->
         {noreply, NewState#state{changes_from=From}}
@@ -320,21 +358,17 @@ handle_messages([<<"]">>, <<"\"last_seq\":", _/binary>>], State) ->
     handle_feed_completion(State);
 handle_messages([<<"{\"last_seq\":", _/binary>>], State) ->
     handle_feed_completion(State);
-handle_messages([Chunk|Rest], State) ->
-    #state{
-        count = Count,
-        partial_chunk = Partial,
-        rows = Rows
-    } = State,
+handle_messages([Chunk|Rest], #state{partial_chunk = Partial} = State) ->
     NewState = try
         Row = {Props} = decode_row(<<Partial/binary, Chunk/binary>>),
         case State of
         #state{reply_to=nil} ->
+            {Rows2, Count2} = queue_changes_row(Row, State),
             State#state{
-                count = Count+1,
                 last_seq = couch_util:get_value(<<"seq">>, Props),
                 partial_chunk = <<>>,
-                rows=queue:in(Row,Rows)
+                rows = Rows2,
+                count = Count2
             };
         #state{count=0, reply_to=From}->
             gen_server:reply(From, [Row]),
@@ -422,3 +456,44 @@ stop_link_worker(Conn) when is_pid(Conn) ->
     catch ibrowse:stop_worker_process(Conn);
 stop_link_worker(_) ->
     ok.
+
+redirect_req(#http_db{conn = WorkerPid} = Req, Code, Headers) ->
+    stop_link_worker(WorkerPid),
+    Req2 = couch_rep_httpc:redirected_request(Code, Headers, Req),
+    WorkerPid2 = couch_rep_httpc:spawn_link_worker_process(Req2),
+    Req3 = Req2#http_db{conn = WorkerPid2},
+    {ibrowse_req_id, ReqId} = couch_rep_httpc:request(Req3),
+    {ReqId, Req3}.
+
+req_no_builtin_doc_ids(#http_db{conn = WorkerPid, qs = QS} = Req, ReqId) ->
+    % CouchDB versions prior to 1.1.0 don't have the builtin filter _doc_ids
+    % and don't allow POSTing to /database/_changes
+    purge_req_messages(ReqId),
+    stop_link_worker(WorkerPid),
+    Req2 = Req#http_db{method = get, qs = lists:keydelete("filter", 1, QS)},
+    WorkerPid2 = couch_rep_httpc:spawn_link_worker_process(Req2),
+    Req3 = Req2#http_db{conn = WorkerPid2},
+    {ibrowse_req_id, ReqId2} = couch_rep_httpc:request(Req3),
+    {ReqId2, Req3}.
+
+purge_req_messages(ReqId) ->
+    ibrowse:stream_next(ReqId),
+    receive
+    {ibrowse_async_response, ReqId, {error, _}} ->
+        ok;
+    {ibrowse_async_response, ReqId, _Data} ->
+        purge_req_messages(ReqId);
+    {ibrowse_async_response_end, ReqId} ->
+        ok
+    end.
+
+queue_changes_row(Row, #state{doc_ids = nil, count = Count, rows = Rows}) ->
+    {queue:in(Row, Rows), Count + 1};
+queue_changes_row({RowProps} = Row,
+    #state{doc_ids = Ids, count = Count, rows = Rows}) ->
+    case lists:member(get_value(<<"id">>, RowProps), Ids) of
+    true ->
+        {queue:in(Row, Rows), Count + 1};
+    false ->
+        {Rows, Count}
+    end.
