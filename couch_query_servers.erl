@@ -13,7 +13,7 @@
 -module(couch_query_servers).
 -behaviour(gen_server).
 
--export([start_link/0]).
+-export([start_link/0, config_change/1]).
 
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2,code_change/3]).
 -export([start_doc_map/3, map_docs/2, stop_doc_map/1]).
@@ -265,26 +265,9 @@ with_ddoc_proc(#doc{id=DDocId,revs={Start, [DiskRev|_]}}=DDoc, Fun) ->
     end.
 
 init([]) ->
-    % read config and register for configuration changes
-
-    % just stop if one of the config settings change. couch_server_sup
-    % will restart us and then we will pick up the new settings.
-
-    ok = couch_config:register(
-        fun("query_servers" ++ _, _) ->
-            supervisor:terminate_child(couch_secondary_services, query_servers),
-            supervisor:restart_child(couch_secondary_services, query_servers)
-        end),
-    ok = couch_config:register(
-        fun("native_query_servers" ++ _, _) ->
-            supervisor:terminate_child(couch_secondary_services, query_servers),
-            [supervisor:restart_child(couch_secondary_services, query_servers)]
-        end),
-    ok = couch_config:register(
-        fun("query_server_config" ++ _, _) ->
-            supervisor:terminate_child(couch_secondary_services, query_servers),
-            supervisor:restart_child(couch_secondary_services, query_servers)
-        end),
+    % register async to avoid deadlock on restart_child
+    Self = self(),
+    spawn(couch_config, register, [fun ?MODULE:config_change/1, Self]),
 
     Langs = ets:new(couch_query_server_langs, [set, private]),
     LangLimits = ets:new(couch_query_server_lang_limits, [set, private]),
@@ -393,6 +376,16 @@ handle_info({'EXIT', Pid, Status}, #qserver{
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+config_change("query_servers") ->
+    supervisor:terminate_child(couch_secondary_services, query_servers),
+    supervisor:restart_child(couch_secondary_services, query_servers);
+config_change("native_query_servers") ->
+    supervisor:terminate_child(couch_secondary_services, query_servers),
+    supervisor:restart_child(couch_secondary_services, query_servers);
+config_change("query_server_config") ->
+    supervisor:terminate_child(couch_secondary_services, query_servers),
+    supervisor:restart_child(couch_secondary_services, query_servers).
 
 % Private API
 
