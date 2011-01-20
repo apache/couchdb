@@ -126,7 +126,10 @@ handle_rewrite_req(#httpd{
     case couch_util:get_value(<<"rewrites">>, Props) of
         undefined ->
             couch_httpd:send_error(Req, 404, <<"rewrite_error">>,
-                            <<"Invalid path.">>);
+                <<"Invalid path.">>);
+        Bin when is_binary(Bin) ->
+            couch_httpd:send_error(Req, 400, <<"rewrite_error">>,
+                <<"Rewrite rules are a String. They must be a JSON Array.">>);
         Rules ->
             % create dispatch list from rules
             DispatchList =  [make_rule(Rule) || {Rule} <- Rules],

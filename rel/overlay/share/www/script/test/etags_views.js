@@ -38,7 +38,7 @@ couchTests.etags_views = function(debug) {
         })
       }
     }
-  }
+  };
   T(db.save(designDoc).ok);
   var xhr;
   var docs = makeDocs(0, 10);

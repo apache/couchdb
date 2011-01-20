@@ -30,7 +30,7 @@ couchTests.stats = function(debug) {
       _id:"_design/test", // turn off couch.js id escaping?
       language: "javascript",
       views: {
-        all_docs: {map: "function(doc) {emit(doc.integer, null);}"},
+        all_docs: {map: "function(doc) {emit(doc.integer, null);}"}
       }
     };
     db.save(designDoc);
@@ -163,12 +163,12 @@ couchTests.stats = function(debug) {
       CouchDB.request("POST", "/test_suite_db", {
         headers: {"Content-Type": "application/json"},
         body: '{"a": "1"}'
-      })
+      });
     },
     test: function(before, after) {
       TEquals(before+1, after, "POST'ing new docs increments doc writes.");
     }
-  })
+  });
   
   runTest("couchdb", "database_writes", {
     setup: function(db) {db.save({"_id": "test"});},
@@ -247,7 +247,7 @@ couchTests.stats = function(debug) {
   });
   
   runTest("httpd", "temporary_view_reads", {
-    run: function(db) {db.query(function(doc) {emit(doc._id)})},
+    run: function(db) { db.query(function(doc) { emit(doc._id); }); },
     test: function(before, after) {
       TEquals(before+1, after, "Temporary views have their own counter.");
     }
@@ -261,7 +261,7 @@ couchTests.stats = function(debug) {
   });
   
   runTest("httpd", "view_reads", {
-    run: function(db) {db.query(function(doc) {emit(doc._id)});},
+    run: function(db) { db.query(function(doc) { emit(doc._id); }); },
     test: function(before, after) {
       TEquals(before, after, "Temporary views don't affect permanent views.");
     }

@@ -16,10 +16,10 @@
 
 -include("couch_db.hrl").
 
-start_link(Parent, Target, Reader, _PostProps) ->
-    {ok, spawn_link(fun() -> writer_loop(Parent, Reader, Target) end)}.
+start_link(Parent, _Target, Reader, _PostProps) ->
+    {ok, spawn_link(fun() -> writer_loop(Parent, Reader) end)}.
 
-writer_loop(Parent, Reader, Target) ->
+writer_loop(Parent, Reader) ->
     case couch_rep_reader:next(Reader) of
     {complete, nil} ->
         ok;
@@ -28,6 +28,7 @@ writer_loop(Parent, Reader, Target) ->
         ok;
     {HighSeq, Docs} ->
         DocCount = length(Docs),
+        {ok, Target} = gen_server:call(Parent, get_target_db, infinity),
         try write_docs(Target, Docs) of
         {ok, []} ->
             Parent ! {update_stats, docs_written, DocCount};
@@ -48,7 +49,7 @@ writer_loop(Parent, Reader, Target) ->
         end,
         couch_rep_att:cleanup(),
         couch_util:should_flush(),
-        writer_loop(Parent, Reader, Target)
+        writer_loop(Parent, Reader)
     end.
 
 write_docs(#http_db{} = Db, Docs) ->

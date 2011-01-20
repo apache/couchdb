@@ -41,8 +41,8 @@ function() {
     whatever : {
       stringzone : "exports.string = 'plankton';",
       commonjs : {
-        whynot : "exports.test = require('../stringzone')",
-        upper : "exports.testing = require('./whynot').test.string.toUpperCase()+module.id"
+        whynot : "exports.test = require('../stringzone'); exports.foo = require('whatever/stringzone');",
+        upper : "exports.testing = require('./whynot').test.string.toUpperCase()+module.id+require('./whynot').foo.string"
       }
     },
     views: {
@@ -58,7 +58,8 @@ function() {
     },
     shows: {
       simple: "function() {return 'ok'};",
-      requirey : "function() { var lib = require('whatever/commonjs/upper'); return lib.testing; };"
+      requirey : "function() { var lib = require('whatever/commonjs/upper'); return lib.testing; };",
+      circular : "function() { var lib = require('whatever/commonjs/upper'); return JSON.stringify(this); };"
     }
   }; 
 
@@ -86,7 +87,15 @@ function() {
   // test commonjs require
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/requirey");
   T(xhr.status == 200);
-  TEquals("PLANKTONwhatever/commonjs/upper", xhr.responseText);
+  TEquals("PLANKTONwhatever/commonjs/upperplankton", xhr.responseText);
+
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/circular");
+  T(xhr.status == 200);
+  TEquals("javascript", JSON.parse(xhr.responseText).language);
+
+  var prev_view_sig = db.designInfo("_design/test").view_index.signature;
+
+  db.bulkSave(makeDocs(1, numDocs + 1));
 
   // test that we get design doc info back
   var dinfo = db.designInfo("_design/test");
@@ -94,9 +103,27 @@ function() {
   var vinfo = dinfo.view_index;
   TEquals(51, vinfo.disk_size);
   TEquals(false, vinfo.compact_running);
-  TEquals("3f88e53b303e2342e49a66c538c30679", vinfo.signature);
+  // test that GET /db/_design/test/_info
+  // hasn't triggered an update of the views
+  TEquals(prev_view_sig, vinfo.signature, 'ddoc sig');
+  for (var loop = 0; loop < 2; loop++) {
+    T(db.view("test/all_docs_twice", {stale: "ok"}).total_rows === 0);
+    T(db.view("test/single_doc", {stale: "ok"}).total_rows === 0);
+    T(db.view("test/summate", {stale: "ok"}).rows.length === 0);
+    T(db.ensureFullCommit().ok);
+    restartServer();
+  };
 
-  db.bulkSave(makeDocs(1, numDocs + 1));
+  // test that POST /db/_view_cleanup
+  // doesn't trigger an update of the views
+  T(db.viewCleanup().ok);
+  for (var loop = 0; loop < 2; loop++) {
+    T(db.view("test/all_docs_twice", {stale: "ok"}).total_rows == 0);
+    T(db.view("test/single_doc", {stale: "ok"}).total_rows == 0);
+    T(db.view("test/summate", {stale: "ok"}).rows.length == 0);
+    T(db.ensureFullCommit().ok);
+    restartServer();
+  };
 
   // test that the _all_docs view returns correctly with keys
   var results = db.allDocs({startkey:"_design", endkey:"_design0"});
@@ -107,9 +134,9 @@ function() {
     for (var i = 0; i < numDocs; i++) {
       T(rows[2*i].key == i+1);
       T(rows[(2*i)+1].key == i+1);
-    }
-    T(db.view("test/no_docs").total_rows == 0)
-    T(db.view("test/single_doc").total_rows == 1)
+    };
+    T(db.view("test/no_docs").total_rows == 0);
+    T(db.view("test/single_doc").total_rows == 1);
     T(db.ensureFullCommit().ok);
     restartServer();
   };

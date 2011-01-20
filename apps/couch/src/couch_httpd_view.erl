@@ -365,6 +365,8 @@ validate_view_query(group_level, Value, Args) ->
     end;
 validate_view_query(inclusive_end, Value, Args) ->
     Args#view_query_args{inclusive_end=Value};
+validate_view_query(reduce, false, Args) ->
+    Args;
 validate_view_query(reduce, _, Args) ->
     case Args#view_query_args.view_type of
     map ->

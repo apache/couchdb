@@ -16,7 +16,7 @@ couchTests.reduce_builtin = function(debug) {
   db.createDb();
   if (debug) debugger;
 
-  var numDocs = 500
+  var numDocs = 500;
   var docs = makeDocs(1,numDocs + 1);
   db.bulkSave(docs);
 
@@ -28,13 +28,14 @@ couchTests.reduce_builtin = function(debug) {
       acc += i*i;
     }
     return acc;
-  }
+  };
 
   // this is the same test as the reduce.js test
   // only we'll let CouchDB run reduce in Erlang
   var map = function (doc) {
       emit(doc.integer, doc.integer);
-      emit(doc.integer, doc.integer)};
+      emit(doc.integer, doc.integer);
+  };
 
   var result = db.query(map, "_sum");
   T(result.rows[0].value == 2*summate(numDocs));
@@ -115,7 +116,7 @@ couchTests.reduce_builtin = function(debug) {
       T(db.info().doc_count == ((i - 1) * 10 * 11) + ((j + 1) * 11));
     }
 
-    map = function (doc) {emit(doc.keys, 1)};
+    map = function (doc) { emit(doc.keys, 1); };
     // with emitted values being 1, count should be the same as sum
     var builtins = ["_sum", "_count"];
 

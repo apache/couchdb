@@ -30,7 +30,7 @@ couchTests.purge = function(debug) {
       all_docs_twice: {map: "function(doc) { emit(doc.integer, null); emit(doc.integer, null) }"},
       single_doc: {map: "function(doc) { if (doc._id == \"1\") { emit(1, null) }}"}
     }
-  }
+  };
 
   T(db.save(designDoc).ok);
 
@@ -50,7 +50,7 @@ couchTests.purge = function(debug) {
 
   // purge the documents
   var xhr = CouchDB.request("POST", "/test_suite_db/_purge", {
-    body: JSON.stringify({"1":[doc1._rev], "2":[doc2._rev]}),
+    body: JSON.stringify({"1":[doc1._rev], "2":[doc2._rev]})
   });
   T(xhr.status == 200);
 
@@ -76,6 +76,14 @@ couchTests.purge = function(debug) {
   }
   T(db.view("test/single_doc").total_rows == 0);
 
+  // purge sequences are preserved after compaction (COUCHDB-1021)
+  T(db.compact().ok);
+  T(db.last_req.status == 202);
+  // compaction isn't instantaneous, loop until done
+  while (db.info().compact_running) {};
+  var compactInfo = db.info();
+  T(compactInfo.purge_seq == newInfo.purge_seq);
+
   // purge documents twice in a row without loading views
   // (causes full view rebuilds)
 
@@ -83,13 +91,13 @@ couchTests.purge = function(debug) {
   var doc4 = db.open("4");
 
   xhr = CouchDB.request("POST", "/test_suite_db/_purge", {
-    body: JSON.stringify({"3":[doc3._rev]}),
+    body: JSON.stringify({"3":[doc3._rev]})
   });
 
   T(xhr.status == 200);
 
   xhr = CouchDB.request("POST", "/test_suite_db/_purge", {
-    body: JSON.stringify({"4":[doc4._rev]}),
+    body: JSON.stringify({"4":[doc4._rev]})
   });
 
   T(xhr.status == 200);

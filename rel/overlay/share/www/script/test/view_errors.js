@@ -74,9 +74,6 @@ couchTests.view_errors = function(debug) {
           T(e.error == "query_parse_error");
       }
 
-      // reduce=false on map views doesn't work, so group=true will
-      // never throw for temp reduce views.
-
       var designDoc = {
         _id:"_design/test",
         language: "javascript",
@@ -104,6 +101,15 @@ couchTests.view_errors = function(debug) {
           db.view("test/no_reduce", {group: true});
           T(0 == 1);
       } catch(e) {
+          T(db.last_req.status == 400);
+          T(e.error == "query_parse_error");
+      }
+
+      try {
+          db.view("test/no_reduce", {group_level: 1});
+          T(0 == 1);
+      } catch(e) {
+          T(db.last_req.status == 400);
           T(e.error == "query_parse_error");
       }
 
@@ -115,10 +121,23 @@ couchTests.view_errors = function(debug) {
         T(e.error == "query_parse_error");
       }
 
+      db.view("test/no_reduce", {reduce: false});
+      TEquals(200, db.last_req.status, "reduce=false for map views (without"
+                                     + " group or group_level) is allowed");
+
       try {
           db.view("test/with_reduce", {group: true, reduce: false});
           T(0 == 1);
       } catch(e) {
+          T(db.last_req.status == 400);
+          T(e.error == "query_parse_error");
+      }
+
+      try {
+          db.view("test/with_reduce", {group_level: 1, reduce: false});
+          T(0 == 1);
+      } catch(e) {
+        T(db.last_req.status == 400);
           T(e.error == "query_parse_error");
       }
 

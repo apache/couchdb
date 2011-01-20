@@ -215,9 +215,10 @@ function $$(node) {
       recentDbs.sort();
       $.each(recentDbs, function(idx, name) {
         if (name) {
+          name = encodeURIComponent(name);
           $("#dbs").append("<li>" +
             "<button class='remove' title='Remove from list' value='" + name + "'></button>" +
-            "<a href='database.html?" + encodeURIComponent(name) + "' title='" + name + "'>" + name +
+            "<a href='database.html?" + name + "' title='" + name + "'>" + name +
             "</a></li>");
         }
       });
@@ -334,6 +335,14 @@ function $$(node) {
       return callback(decl);
     }
 
+    function windowName() {
+      try {
+        return JSON.parse(window.name || "{}");
+      } catch (e) {
+        return {};
+      }
+    }
+
     // add suffix to cookie names to be able to separate between ports
     var cookiePrefix = location.port + "_";
 
@@ -366,15 +375,15 @@ function $$(node) {
 
       "window": {
         get: function(name) {
-          return JSON.parse(window.name || "{}")[name];
+          return windowName()[name];
         },
         set: function(name, value) {
-          var obj = JSON.parse(window.name || "{}");
+          var obj = windowName();
           obj[name] = value || null;
           window.name = JSON.stringify(obj);
         },
         del: function(name) {
-          var obj = JSON.parse(window.name || "{}");
+          var obj = windowName();
           delete obj[name];
           window.name = JSON.stringify(obj);
         }

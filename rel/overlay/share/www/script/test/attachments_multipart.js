@@ -29,17 +29,17 @@ couchTests.attachments_multipart= function(debug) {
         "_attachments":{
           "foo.txt": {
             "follows":true,
-            "content_type":"text/plain",
+            "content_type":"application/test",
             "length":21
             },
           "bar.txt": {
             "follows":true,
-            "content_type":"text/plain",
+            "content_type":"application/test",
             "length":20
             },
           "baz.txt": {
             "follows":true,
-            "content_type":"text/plain",
+            "content_type":"application/test",
             "length":19
             }
           }
@@ -58,7 +58,7 @@ couchTests.attachments_multipart= function(debug) {
     
   var result = JSON.parse(xhr.responseText);
   
-  T(result.ok)
+  T(result.ok);
   
   
     
@@ -193,7 +193,7 @@ couchTests.attachments_multipart= function(debug) {
   // a certain rev).
   
   xhr = CouchDB.request("GET", "/test_suite_db/multipart?atts_since=[\"" + firstrev + "\"]",
-    {headers:{"accept": "multipart/related,*/*;"}});
+    {headers:{"accept": "multipart/related, */*"}});
   
   T(xhr.status == 200);
   

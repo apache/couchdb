@@ -135,6 +135,7 @@ handle_db_event({Event, DbName}) ->
         case Event of
         deleted -> gen_server:call(?MODULE, auth_db_deleted, infinity);
         created -> gen_server:call(?MODULE, auth_db_created, infinity);
+        compacted -> gen_server:call(?MODULE, auth_db_compacted, infinity);
         _Else   -> ok
         end;
     false ->
@@ -158,6 +159,14 @@ handle_call(auth_db_created, _From, State) ->
     true = ets:insert(?STATE, {auth_db, open_auth_db()}),
     {reply, ok, NewState};
 
+handle_call(auth_db_compacted, _From, State) ->
+    exec_if_auth_db(
+        fun(AuthDb) ->
+            true = ets:insert(?STATE, {auth_db, reopen_auth_db(AuthDb)})
+        end
+    ),
+    {reply, ok, State};
+
 handle_call({new_max_cache_size, NewSize}, _From, State) ->
     case NewSize >= State#state.cache_size of
     true ->
@@ -175,7 +184,7 @@ handle_call({new_max_cache_size, NewSize}, _From, State) ->
     end,
     NewState = State#state{
         max_cache_size = NewSize,
-        cache_size = erlang:min(NewSize, State#state.cache_size)
+        cache_size = lists:min([NewSize, State#state.cache_size])
     },
     {reply, ok, NewState};
 
@@ -338,7 +347,7 @@ cache_needs_refresh() ->
 
 
 reopen_auth_db(AuthDb) ->
-    case (catch gen_server:call(AuthDb#db.main_pid, get_db, infinity)) of
+    case (catch couch_db:reopen(AuthDb)) of
     {ok, AuthDb2} ->
         AuthDb2;
     _ ->

@@ -68,11 +68,11 @@ couchTests.attachment_views= function(debug) {
     }
 
     emit(parseInt(doc._id), count);
-  }
+  };
 
   var reduceFunction = function(key, values) {
     return sum(values);
-  }
+  };
 
   var result = db.query(mapFunction, reduceFunction);
 

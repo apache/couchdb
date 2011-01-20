@@ -28,7 +28,7 @@ couchTests.method_override = function(debug) {
   T(doc.bob == "connie");
 
   xhr = CouchDB.request("POST", "/test_suite_db/fnord?rev=" + doc._rev, {headers:{"X-HTTP-Method-Override" : "DELETE"}});
-  T(xhr.status == 200)
+  T(xhr.status == 200);
 
   xhr = CouchDB.request("GET", "/test_suite_db/fnord2", {body: JSON.stringify(doc), headers:{"X-HTTP-Method-Override" : "PUT"}});
   // Method Override is ignored when original Method isn't POST

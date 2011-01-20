@@ -74,7 +74,7 @@ start_link(InitArgs) ->
     end.
 
 % init creates a closure which spawns the appropriate view_updater.
-init({{_, DbName, _}=InitArgs, ReturnPid, Ref}) ->
+init({{_, DbName, _} = InitArgs, ReturnPid, Ref}) ->
     process_flag(trap_exit, true),
     case prepare_group(InitArgs, false) of
     {ok, #group{fd=Fd, current_seq=Seq}=Group} ->
@@ -86,12 +86,9 @@ init({{_, DbName, _}=InitArgs, ReturnPid, Ref}) ->
             ignore;
         _ ->
             try couch_db:monitor(Db) after couch_db:close(Db) end,
-            Owner = self(),
-            Pid = spawn_link(fun()-> couch_view_updater:update(Owner, Group) end),
             {ok, #group_state{
                     db_name= DbName,
                     init_args=InitArgs,
-                    updater_pid = Pid,
                     group=Group#group{dbname=DbName},
                     ref_counter=erlang:monitor(process,Fd)}}
         end;
@@ -178,6 +175,7 @@ handle_cast({compact_done, #group{fd=NewFd, current_seq=NewSeq} = NewGroup},
         group = #group{name=GroupId, fd=OldFd, sig=GroupSig},
         init_args = {RootDir, DbName, _},
         updater_pid = UpdaterPid,
+        compactor_pid = CompactorPid,
         ref_counter = RefCounter
     } = State,
 
@@ -199,6 +197,8 @@ handle_cast({compact_done, #group{fd=NewFd, current_seq=NewSeq} = NewGroup},
     end,
 
     %% cleanup old group
+    unlink(CompactorPid),
+    receive {'EXIT', CompactorPid, normal} -> ok after 0 -> ok end,
     unlink(OldFd),
     erlang:demonitor(RefCounter),
 
@@ -426,8 +426,8 @@ open_temp_group(DbName, Language, DesignOptions, MapSrc, RedSrc) ->
             def=MapSrc,
             reduce_funs= if RedSrc==[] -> []; true -> [{<<"_temp">>, RedSrc}] end,
             options=DesignOptions},
-
-        {ok, Db, set_view_sig(#group{name = <<"_temp">>, views=[View],
+        couch_db:close(Db),
+        {ok, set_view_sig(#group{name = <<"_temp">>, views=[View],
             def_lang=Language, design_options=DesignOptions})};
     Error ->
         Error

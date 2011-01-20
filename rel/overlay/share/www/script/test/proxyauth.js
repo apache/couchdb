@@ -39,7 +39,7 @@ couchTests.proxyauth = function(debug) {
     db.createDb();
     
     var benoitcUserDoc = CouchDB.prepareUserDoc({
-      name: "benoitc@apache.org", 
+      name: "benoitc@apache.org"
     }, "test");
     T(usersDb.save(benoitcUserDoc).ok);
     
@@ -56,7 +56,7 @@ couchTests.proxyauth = function(debug) {
     
     CouchDB.logout();
     
-    headers = {
+    var headers = {
       "X-Auth-CouchDB-UserName": "benoitc@apache.org",
       "X-Auth-CouchDB-Roles": "test",
       "X-Auth-CouchDB-Token": hex_hmac_sha1(secret, "benoitc@apache.org")
@@ -72,14 +72,13 @@ couchTests.proxyauth = function(debug) {
         }),
         "role": stringFun(function(doc, req) {
           return req.userCtx['roles'][0];
-        }),
+        })
       }
-      
-    }
+    };
 
     db.save(designDoc);
     
-    req = CouchDB.request("GET", "/test_suite_db/_design/test/_show/welcome",
+    var req = CouchDB.request("GET", "/test_suite_db/_design/test/_show/welcome",
                         {headers: headers});
     T(req.responseText == "Welcome benoitc@apache.org");
     
@@ -87,7 +86,7 @@ couchTests.proxyauth = function(debug) {
                         {headers: headers});
     T(req.responseText == "test");
     
-    xhr = CouchDB.request("PUT", "/_config/couch_httpd_auth/proxy_use_secret",{
+    var xhr = CouchDB.request("PUT", "/_config/couch_httpd_auth/proxy_use_secret",{
       body : JSON.stringify("true"),
       headers: {"X-Couch-Persist": "false"}
     });

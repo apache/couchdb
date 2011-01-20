@@ -43,9 +43,10 @@ next(Server) ->
     gen_server:call(Server, next_changes, infinity).
 
 stop(Server) ->
-    gen_server:call(Server, stop).
+    catch gen_server:call(Server, stop),
+    ok.
 
-init([_Parent, #http_db{}=Source, Since, PostProps] = Args) ->
+init([Parent, #http_db{}=Source, Since, PostProps]) ->
     process_flag(trap_exit, true),
     Feed = case couch_util:get_value(<<"continuous">>, PostProps, false) of
     false ->
@@ -83,27 +84,32 @@ init([_Parent, #http_db{}=Source, Since, PostProps] = Args) ->
         resource = "_changes",
         qs = QS,
         conn = Pid,
-        options = [{stream_to, {self(), once}}, {response_format, binary}],
+        options = [{stream_to, {self(), once}}] ++
+                lists:keydelete(inactivity_timeout, 1, Source#http_db.options),
         headers = Source#http_db.headers -- [{"Accept-Encoding", "gzip"}]
     },
     {ibrowse_req_id, ReqId} = couch_rep_httpc:request(Req),
+    Args = [Parent, Req, Since, PostProps],
 
     receive
     {ibrowse_async_headers, ReqId, "200", _} ->
         ibrowse:stream_next(ReqId),
         {ok, #state{conn=Pid, last_seq=Since, reqid=ReqId, init_args=Args}};
     {ibrowse_async_headers, ReqId, Code, Hdrs} when Code=="301"; Code=="302" ->
-        catch ibrowse:stop_worker_process(Pid),
-        Url2 = mochiweb_headers:get_value("Location", mochiweb_headers:make(Hdrs)),
-        %% TODO use couch_httpc:request instead of start_http_request
-        {Pid2, ReqId2} = start_http_request(Url2),
+        stop_link_worker(Pid),
+        Url2 = couch_rep_httpc:redirect_url(Hdrs, Req#http_db.url),
+        Req2 = couch_rep_httpc:redirected_request(Req, Url2),
+        Pid2 = couch_rep_httpc:spawn_link_worker_process(Req2),
+        Req3 = Req2#http_db{conn = Pid2},
+        {ibrowse_req_id, ReqId2} = couch_rep_httpc:request(Req3),
+        Args2 = [Parent, Req3, Since, PostProps],
         receive {ibrowse_async_headers, ReqId2, "200", _} ->
-            {ok, #state{conn=Pid2, last_seq=Since, reqid=ReqId2, init_args=Args}}
+            {ok, #state{conn=Pid2, last_seq=Since, reqid=ReqId2, init_args=Args2}}
         after 30000 ->
             {stop, changes_timeout}
         end;
     {ibrowse_async_headers, ReqId, "404", _} ->
-        catch ibrowse:stop_worker_process(Pid),
+        stop_link_worker(Pid),
         ?LOG_INFO("source doesn't have _changes, trying _all_docs_by_seq", []),
         Self = self(),
         BySeqPid = spawn_link(fun() -> by_seq_loop(Self, Source, Since) end),
@@ -181,7 +187,7 @@ handle_cast(_Msg, State) ->
 handle_info({ibrowse_async_headers, Id, Code, Hdrs}, #state{reqid=Id}=State) ->
     handle_headers(list_to_integer(Code), Hdrs, State);
 
-handle_info({ibrowse_async_response, Id, {error,connection_closed}},
+handle_info({ibrowse_async_response, Id, {error, sel_conn_closed}},
         #state{reqid=Id}=State) ->
     handle_retry(State);
 
@@ -198,16 +204,27 @@ handle_info({ibrowse_async_response_end, Id}, #state{reqid=Id} = State) ->
 handle_info({'EXIT', From, normal}, #state{changes_loop=From} = State) ->
     handle_feed_completion(State);
 
+handle_info({'EXIT', From, normal}, #state{conn=From, complete=true} = State) ->
+    {noreply, State};
+
 handle_info({'EXIT', From, Reason}, #state{changes_loop=From} = State) ->
     ?LOG_ERROR("changes_loop died with reason ~p", [Reason]),
     {stop, changes_loop_died, State};
 
-handle_info({'EXIT', _From, normal}, State) ->
-    {noreply, State};
+handle_info({'EXIT', From, Reason}, State) ->
+    ?LOG_ERROR("changes loop, process ~p died with reason ~p", [From, Reason]),
+    {stop, {From, Reason}, State};
 
-handle_info(Msg, State) ->
-    ?LOG_DEBUG("unexpected message at changes_feed ~p", [Msg]),
-    {noreply, State}.
+handle_info(Msg, #state{init_args = InitArgs} = State) ->
+    case Msg of
+    changes_timeout ->
+        [_, #http_db{url = Url} | _] = InitArgs,
+        ?LOG_ERROR("changes loop timeout, no data received from ~s",
+            [couch_util:url_strip_password(Url)]);
+    _ ->
+        ?LOG_ERROR("changes loop received unexpected message ~p", [Msg])
+    end,
+    {stop, Msg, State}.
 
 terminate(_Reason, State) ->
     #state{
@@ -215,8 +232,7 @@ terminate(_Reason, State) ->
         conn = Conn
     } = State,
     if is_pid(ChangesPid) -> exit(ChangesPid, stop); true -> ok end,
-    if is_pid(Conn) -> catch ibrowse:stop_worker_process(Conn); true -> ok end,
-    ok.
+    stop_link_worker(Conn).
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
@@ -257,12 +273,17 @@ handle_next_changes(_From, State) ->
 handle_headers(200, _, State) ->
     maybe_stream_next(State),
     {noreply, State};
-handle_headers(301, Hdrs, State) ->
-    catch ibrowse:stop_worker_process(State#state.conn),
-    Url = mochiweb_headers:get_value("Location", mochiweb_headers:make(Hdrs)),
-    %% TODO use couch_httpc:request instead of start_http_request
-    {Pid, ReqId} = start_http_request(Url),
-    {noreply, State#state{conn=Pid, reqid=ReqId}};
+handle_headers(Code, Hdrs, #state{init_args = InitArgs} = State)
+        when Code =:= 301 ; Code =:= 302 ->
+    stop_link_worker(State#state.conn),
+    [Parent, #http_db{url = Url1} = Source, Since, PostProps] = InitArgs,
+    Url = couch_rep_httpc:redirect_url(Hdrs, Url1),
+    Source2 = couch_rep_httpc:redirected_request(Source, Url),
+    Pid2 = couch_rep_httpc:spawn_link_worker_process(Source2),
+    Source3 = Source2#http_db{conn = Pid2},
+    {ibrowse_req_id, ReqId} = couch_rep_httpc:request(Source3),
+    InitArgs2 = [Parent, Source3, Since, PostProps],
+    {noreply, State#state{conn=Pid2, reqid=ReqId, init_args=InitArgs2}};
 handle_headers(Code, Hdrs, State) ->
     ?LOG_ERROR("replicator changes feed failed with code ~s and Headers ~n~p",
         [Code,Hdrs]),
@@ -367,20 +388,15 @@ maybe_stream_next(#state{reqid=nil}) ->
     ok;
 maybe_stream_next(#state{complete=false, count=N} = S) when N < ?BUFFER_SIZE ->
     timer:cancel(get(timeout)),
-    {ok, Timeout} = timer:exit_after(31000, changes_timeout),
+    {ok, Timeout} = timer:send_after(31000, changes_timeout),
     put(timeout, Timeout),
     ibrowse:stream_next(S#state.reqid);
 maybe_stream_next(_) ->
     timer:cancel(get(timeout)).
 
-start_http_request(RawUrl) ->
-    Url = ibrowse_lib:parse_url(RawUrl),
-    {ok, Pid} = ibrowse:spawn_link_worker_process(Url#url.host, Url#url.port),
-    Opts = [
-        {stream_to, {self(), once}},
-        {inactivity_timeout, 31000},
-        {response_format, binary}
-    ],
-    {ibrowse_req_id, Id} =
-        ibrowse:send_req_direct(Pid, RawUrl, [], get, [], Opts, infinity),
-    {Pid, Id}.
+stop_link_worker(Conn) when is_pid(Conn) ->
+    unlink(Conn),
+    receive {'EXIT', Conn, _} -> ok after 0 -> ok end,
+    catch ibrowse:stop_worker_process(Conn);
+stop_link_worker(_) ->
+    ok.

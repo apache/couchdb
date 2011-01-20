@@ -51,12 +51,12 @@ couchTests.bulk_docs = function(debug) {
   T(results.length == 5);
   T(results[0].id == "0");
   T(results[0].error == "conflict");
-  T(results[0].rev === undefined); // no rev member when a conflict
+  T(typeof results[0].rev === "undefined"); // no rev member when a conflict
 
   // but the rest are not
   for (i = 1; i < 5; i++) {
     T(results[i].id == i.toString());
-    T(results[i].rev)
+    T(results[i].rev);
     T(db.open(docs[i]._id) == null);
   }
 
@@ -64,7 +64,7 @@ couchTests.bulk_docs = function(debug) {
 
   // save doc 0, this will cause a conflict when we save docs[0]
   var doc = db.open("0");
-  docs[0] = db.open("0")
+  docs[0] = db.open("0");
   db.save(doc);
 
   docs[0].shooby = "dooby";
@@ -93,8 +93,8 @@ couchTests.bulk_docs = function(debug) {
   // Regression test for failure on update/delete
   var newdoc = {"_id": "foobar", "body": "baz"};
   T(db.save(newdoc).ok);
-  update = {"_id": newdoc._id, "_rev": newdoc._rev, "body": "blam"};
-  torem = {"_id": newdoc._id, "_rev": newdoc._rev, "_deleted": true};
+  var update = {"_id": newdoc._id, "_rev": newdoc._rev, "body": "blam"};
+  var torem = {"_id": newdoc._id, "_rev": newdoc._rev, "_deleted": true};
   results = db.bulkSave([update, torem]);
   T(results[0].error == "conflict" || results[1].error == "conflict");
 };

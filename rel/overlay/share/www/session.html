@@ -36,7 +36,7 @@ specific language governing permissions and limitations under the License.
           }
           m = qp.match(/reason=(.*)/);
           if (m) {
-            reason = decodeURIComponent(m[1]);
+            reason = $.futon.escape(decodeURIComponent(m[1]));
           }
         });
         if (reason) {

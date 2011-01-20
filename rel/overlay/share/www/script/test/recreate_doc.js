@@ -51,7 +51,7 @@ couchTests.recreate_doc = function(debug) {
         data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
       }
     }
-  }
+  };
   try {
     // same as before, but with binary
     db.save(binAttDoc);

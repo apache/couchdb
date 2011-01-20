@@ -24,7 +24,6 @@
 -record (state, {
     changes_loop,
     changes_from = nil,
-    target,
     parent,
     complete = false,
     count = 0,
@@ -44,11 +43,11 @@ next(Server) ->
 stop(Server) ->
     gen_server:call(Server, stop).
 
-init([Parent, Target, ChangesFeed, _PostProps]) ->
+init([Parent, _Target, ChangesFeed, _PostProps]) ->
     process_flag(trap_exit, true),
     Self = self(),
-    Pid = spawn_link(fun() -> changes_loop(Self, ChangesFeed, Target) end),
-    {ok, #state{changes_loop=Pid, target=Target, parent=Parent}}.
+    Pid = spawn_link(fun() -> changes_loop(Self, ChangesFeed, Parent) end),
+    {ok, #state{changes_loop=Pid, parent=Parent}}.
 
 handle_call({add_missing_revs, {HighSeq, Revs}}, From, State) ->
     State#state.parent ! {update_stats, missing_revs, length(Revs)},
@@ -133,15 +132,16 @@ handle_changes_loop_exit(normal, State) ->
 handle_changes_loop_exit(Reason, State) ->
     {stop, Reason, State#state{changes_loop=nil}}.
 
-changes_loop(OurServer, SourceChangesServer, Target) ->
+changes_loop(OurServer, SourceChangesServer, Parent) ->
     case couch_rep_changes_feed:next(SourceChangesServer) of
     complete ->
         exit(normal);
     Changes ->
+        {ok, Target} = gen_server:call(Parent, get_target_db, infinity),
         MissingRevs = get_missing_revs(Target, Changes),
         gen_server:call(OurServer, {add_missing_revs, MissingRevs}, infinity)
     end,
-    changes_loop(OurServer, SourceChangesServer, Target).
+    changes_loop(OurServer, SourceChangesServer, Parent).
 
 get_missing_revs(#http_db{}=Target, Changes) ->
     Transform = fun({Props}) ->

@@ -31,7 +31,7 @@
             throw({forbidden: 'doc.name is required'});
         }
 
-        if (!(newDoc.roles && (typeof newDoc.roles.length !== 'undefined'))) {
+        if (newDoc.roles && !isArray(newDoc.roles)) {
             throw({forbidden: 'doc.roles must be an array'});
         }
 
