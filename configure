@@ -13,9 +13,7 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-function quit {
-  exit
-}
+
 
 PREFIX="/opt/bigcouch"
 BIGCOUCH_USER=`whoami`
@@ -48,7 +46,7 @@ do
     ;;
     *)
       echo "usage: $0 [-p {prefix} -t {template} -d {data_dir} -v {view_dir} -u {user}]"
-      quit
+      exit
     ;;
   esac
 done
