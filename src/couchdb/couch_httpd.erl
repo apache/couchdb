@@ -525,11 +525,11 @@ verify_is_server_admin(#user_ctx{roles=Roles}) ->
     end.
 
 log_request(#httpd{mochi_req=MochiReq,peer=Peer}, Code) ->
-    ?LOG_INFO("~s - - ~p ~s ~B", [
+    ?LOG_INFO("~s - - ~s ~s ~B", [
         Peer,
-        couch_util:to_existing_atom(MochiReq:get(method)),
+        MochiReq:get(method),
         MochiReq:get(raw_path),
-        couch_util:to_integer(Code)
+        Code
     ]).
 
 
