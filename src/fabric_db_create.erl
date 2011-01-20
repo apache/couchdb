@@ -19,7 +19,7 @@
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
--define(DBNAME_REGEX, "^[a-z][a-z0-9\\_\\$()\\+\\-\\/\\s.]*$").
+-define(DBNAME_REGEX, "^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*$").
 
 %% @doc Create a new database, and all its partition files across the cluster
 %%      Options is proplist with user_ctx, n, q
