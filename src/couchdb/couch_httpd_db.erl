@@ -736,34 +736,34 @@ send_doc_efficiently(Req, #doc{atts=Atts}=Doc, Headers, Options) ->
             JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, 
                     [attachments, follows|Options])),
             {ContentType, Len} = couch_doc:len_doc_to_multi_part_stream(
-                    Boundary,JsonBytes, Atts,false),
+                    Boundary,JsonBytes, Atts, true),
             CType = {<<"Content-Type">>, ContentType},
             {ok, Resp} = start_response_length(Req, 200, [CType|Headers], Len),
             couch_doc:doc_to_multi_part_stream(Boundary,JsonBytes,Atts,
-                    fun(Data) -> couch_httpd:send(Resp, Data) end, false)
+                    fun(Data) -> couch_httpd:send(Resp, Data) end, true)
         end;
     false ->
         send_json(Req, 200, Headers, couch_doc:to_json_obj(Doc, Options))
     end.
 
-send_docs_multipart(Req, Results, Options) ->
+send_docs_multipart(Req, Results, Options1) ->
     OuterBoundary = couch_uuids:random(),
     InnerBoundary = couch_uuids:random(),
+    Options = [attachments, follows, att_encoding_info | Options1],
     CType = {"Content-Type", 
         "multipart/mixed; boundary=\"" ++ ?b2l(OuterBoundary) ++ "\""},
     {ok, Resp} = start_chunked_response(Req, 200, [CType]),
     couch_httpd:send_chunk(Resp, <<"--", OuterBoundary/binary>>),
     lists:foreach(
         fun({ok, #doc{atts=Atts}=Doc}) ->
-            JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, 
-                    [attachments,follows|Options])),
+            JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, Options)),
             {ContentType, _Len} = couch_doc:len_doc_to_multi_part_stream(
-                    InnerBoundary, JsonBytes, Atts, false),
+                    InnerBoundary, JsonBytes, Atts, true),
             couch_httpd:send_chunk(Resp, <<"\r\nContent-Type: ",
                     ContentType/binary, "\r\n\r\n">>),
             couch_doc:doc_to_multi_part_stream(InnerBoundary, JsonBytes, Atts,
                     fun(Data) -> couch_httpd:send_chunk(Resp, Data)
-                    end, false),
+                    end, true),
              couch_httpd:send_chunk(Resp, <<"\r\n--", OuterBoundary/binary>>);
         ({{not_found, missing}, RevId}) ->
              RevStr = couch_doc:rev_to_str(RevId),
@@ -1020,8 +1020,10 @@ db_attachment_req(#httpd{method=Method,mochi_req=MochiReq}=Req, Db, DocId, FileN
             end
     end,
 
-    #doc{atts=Atts} = Doc,
+    #doc{atts=Atts, revs = {Pos, Revs}} = Doc,
     DocEdited = Doc#doc{
+        % prune revision list as a workaround for key tree bug (COUCHDB-902)
+        revs = {Pos, case Revs of [] -> []; [Hd|_] -> [Hd] end},
         atts = NewAtt ++ [A || A <- Atts, A#att.name /= FileName]
     },
     {ok, UpdatedRev} = couch_db:update_doc(Db, DocEdited, []),

@@ -76,6 +76,14 @@ couchTests.purge = function(debug) {
   }
   T(db.view("test/single_doc").total_rows == 0);
 
+  // purge sequences are preserved after compaction (COUCHDB-1021)
+  T(db.compact().ok);
+  T(db.last_req.status == 202);
+  // compaction isn't instantaneous, loop until done
+  while (db.info().compact_running) {};
+  var compactInfo = db.info();
+  T(compactInfo.purge_seq == newInfo.purge_seq);
+
   // purge documents twice in a row without loading views
   // (causes full view rebuilds)
 

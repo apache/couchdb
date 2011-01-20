@@ -29,17 +29,17 @@ couchTests.attachments_multipart= function(debug) {
         "_attachments":{
           "foo.txt": {
             "follows":true,
-            "content_type":"text/plain",
+            "content_type":"application/test",
             "length":21
             },
           "bar.txt": {
             "follows":true,
-            "content_type":"text/plain",
+            "content_type":"application/test",
             "length":20
             },
           "baz.txt": {
             "follows":true,
-            "content_type":"text/plain",
+            "content_type":"application/test",
             "length":19
             }
           }
