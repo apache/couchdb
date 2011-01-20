@@ -132,7 +132,7 @@ samples = [0, 60, 300, 900]
 
 [attachments]
 compression_level = 8 ; from 1 (lowest, fastest) to 9 (highest, slowest), 0 to disable compression
-compressible_types = text/*, application/javascript, application/json,  application/xml
+compressible_types = text/*, application/javascript, application/json, application/xml
 
 [replicator]
 db = _replicator
