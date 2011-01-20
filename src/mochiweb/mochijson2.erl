@@ -405,8 +405,22 @@ tokenize_string(B, S=#decoder{offset=O}, Acc) ->
                 Acc1 = lists:reverse(xmerl_ucs:to_utf8(C), Acc),
                 tokenize_string(B, ?ADV_COL(S, 6), Acc1)
             end;
-        <<_:O/binary, C, _/binary>> ->
-            tokenize_string(B, ?INC_CHAR(S, C), [C | Acc])
+        <<_:O/binary, C1, _/binary>> when C1 < 128 ->
+            tokenize_string(B, ?INC_CHAR(S, C1), [C1 | Acc]);
+        <<_:O/binary, C1, C2, _/binary>> when C1 >= 194, C1 =< 223,
+                C2 >= 128, C2 =< 191 ->
+            tokenize_string(B, ?ADV_COL(S, 2), [C2, C1 | Acc]);
+        <<_:O/binary, C1, C2, C3, _/binary>> when C1 >= 224, C1 =< 239,
+                C2 >= 128, C2 =< 191,
+                C3 >= 128, C3 =< 191 ->
+            tokenize_string(B, ?ADV_COL(S, 3), [C3, C2, C1 | Acc]);
+        <<_:O/binary, C1, C2, C3, C4, _/binary>> when C1 >= 240, C1 =< 244,
+                C2 >= 128, C2 =< 191,
+                C3 >= 128, C3 =< 191,
+                C4 >= 128, C4 =< 191 ->
+            tokenize_string(B, ?ADV_COL(S, 4), [C4, C3, C2, C1 | Acc]);
+        _ ->
+            throw(invalid_utf8)
     end.
 
 tokenize_number(B, S) ->
@@ -653,7 +667,9 @@ test_input_validation() ->
         <<?Q, 16#E0, 16#80,16#7F, ?Q>>,
         <<?Q, 16#F0, 16#80, 16#80, 16#7F, ?Q>>,
         % we don't support code points > 10FFFF per RFC 3629
-        <<?Q, 16#F5, 16#80, 16#80, 16#80, ?Q>>
+        <<?Q, 16#F5, 16#80, 16#80, 16#80, ?Q>>,
+        %% escape characters trigger a different code path
+        <<?Q, $\\, $\n, 16#80, ?Q>>
     ],
     lists:foreach(fun(X) ->
         ok = try decode(X) catch invalid_utf8 -> ok end
