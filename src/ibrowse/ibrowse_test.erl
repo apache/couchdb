@@ -11,8 +11,6 @@
 	 unit_tests/0,
 	 unit_tests/1,
 	 unit_tests_1/2,
-	 drv_ue_test/0,
-	 drv_ue_test/1,
 	 ue_test/0,
 	 ue_test/1,
 	 verify_chunked_streaming/0,
@@ -21,7 +19,8 @@
 	 i_do_async_req_list/4,
 	 test_stream_once/3,
 	 test_stream_once/4,
-         test_20122010/0
+         test_20122010/0,
+         test_20122010/1
 	]).
 
 test_stream_once(Url, Method, Options) ->
@@ -413,20 +412,6 @@ execute_req(Url, Method, Options) ->
 	    io:format("~p~n", [Err])
     end.
 
-drv_ue_test() ->
-    drv_ue_test(lists:duplicate(1024, 127)).
-drv_ue_test(Data) ->
-    [{port, Port}| _] = ets:lookup(ibrowse_table, port),
-%     erl_ddll:unload_driver("ibrowse_drv"),
-%     timer:sleep(1000),
-%     erl_ddll:load_driver("../priv", "ibrowse_drv"),
-%     Port = open_port({spawn, "ibrowse_drv"}, []),
-    {Time, Res} = timer:tc(ibrowse_lib, drv_ue, [Data, Port]),
-    io:format("Time -> ~p~n", [Time]),
-    io:format("Data Length -> ~p~n", [length(Data)]),
-    io:format("Res Length -> ~p~n", [length(Res)]).
-%    io:format("Result -> ~s~n", [Res]).
-
 ue_test() ->
     ue_test(lists:duplicate(1024, $?)).
 ue_test(Data) ->
@@ -445,11 +430,14 @@ log_msg(Fmt, Args) ->
 %%------------------------------------------------------------------------------
 
 test_20122010() ->
-    {ok, Pid} = ibrowse:spawn_worker_process("http://localhost:8181"),
+    test_20122010("http://localhost:8181").
+
+test_20122010(Url) ->
+    {ok, Pid} = ibrowse:spawn_worker_process(Url),
     Expected_resp = <<"1-2-3-4-5-6-7-8-9-10-11-12-13-14-15-16-17-18-19-20-21-22-23-24-25-26-27-28-29-30-31-32-33-34-35-36-37-38-39-40-41-42-43-44-45-46-47-48-49-50-51-52-53-54-55-56-57-58-59-60-61-62-63-64-65-66-67-68-69-70-71-72-73-74-75-76-77-78-79-80-81-82-83-84-85-86-87-88-89-90-91-92-93-94-95-96-97-98-99-100">>,
     Test_parent = self(),
     Fun = fun() ->
-                  do_test_20122010(Pid, Expected_resp, Test_parent)
+                  do_test_20122010(Url, Pid, Expected_resp, Test_parent)
           end,
     Pids = [erlang:spawn_monitor(Fun) || _ <- lists:seq(1,10)],
     wait_for_workers(Pids).
@@ -458,18 +446,24 @@ wait_for_workers([{Pid, _Ref} | Pids]) ->
     receive
         {Pid, success} ->
             wait_for_workers(Pids)
-    after 5000 ->
+    after 60000 ->
             test_failed
     end;
 wait_for_workers([]) ->
     success.
 
-do_test_20122010(Pid, Expected_resp, Test_parent) ->
+do_test_20122010(Url, Pid, Expected_resp, Test_parent) ->
+    do_test_20122010(10, Url, Pid, Expected_resp, Test_parent).
+
+do_test_20122010(0, _Url, _Pid, _Expected_resp, Test_parent) ->
+    Test_parent ! {self(), success};
+do_test_20122010(Rem_count, Url, Pid, Expected_resp, Test_parent) ->
     {ibrowse_req_id, Req_id} = ibrowse:send_req_direct(
                                  Pid,
-                                 "http://localhost:8181/ibrowse_stream_once_chunk_pipeline_test",
+                                 Url ++ "/ibrowse_stream_once_chunk_pipeline_test",
                                  [], get, [],
                                  [{stream_to, {self(), once}},
+                                  {inactivity_timeout, 10000},
                                   {include_ibrowse_req_id, true}]),
     do_trace("~p -- sent request ~1000.p~n", [self(), Req_id]),
     Req_id_str = lists:flatten(io_lib:format("~1000.p",[Req_id])),
@@ -491,7 +485,7 @@ do_test_20122010(Pid, Expected_resp, Test_parent) ->
     ok = ibrowse:stream_next(Req_id),
     case do_test_20122010_1(Expected_resp, Req_id, []) of
         true ->
-            Test_parent ! {self(), success};
+            do_test_20122010(Rem_count - 1, Url, Pid, Expected_resp, Test_parent);
         false ->
             Test_parent ! {self(), failed}
     end.

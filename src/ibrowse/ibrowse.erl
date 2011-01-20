@@ -6,8 +6,8 @@
 %%% Created : 11 Oct 2003 by Chandrashekhar Mullaparthi <chandrashekhar.mullaparthi@t-mobile.co.uk>
 %%%-------------------------------------------------------------------
 %% @author Chandrashekhar Mullaparthi <chandrashekhar dot mullaparthi at gmail dot com>
-%% @copyright 2005-2010 Chandrashekhar Mullaparthi
-%% @version 2.1.2
+%% @copyright 2005-2011 Chandrashekhar Mullaparthi
+%% @version 2.1.3
 %% @doc The ibrowse application implements an HTTP 1.1 client in erlang. This
 %% module implements the API of the HTTP client. There is one named
 %% process called 'ibrowse' which assists in load balancing and maintaining configuration. There is one load balancing process per unique webserver. There is
@@ -683,16 +683,16 @@ init(_) ->
     State = #state{},
     put(my_trace_flag, State#state.trace),
     put(ibrowse_trace_token, "ibrowse"),
-    ets:new(ibrowse_lb, [named_table, public, {keypos, 2}]),
-    ets:new(ibrowse_conf, [named_table, protected, {keypos, 2}]),
-    ets:new(ibrowse_stream, [named_table, public]),
+    ibrowse_lb     = ets:new(ibrowse_lb, [named_table, public, {keypos, 2}]),
+    ibrowse_conf   = ets:new(ibrowse_conf, [named_table, protected, {keypos, 2}]),
+    ibrowse_stream = ets:new(ibrowse_stream, [named_table, public]),
     import_config(),
     {ok, #state{}}.
 
 import_config() ->
     case code:priv_dir(ibrowse) of
-        {error, _} = Err ->
-            Err;
+        {error, _} ->
+            ok;
         PrivDir ->
             Filename = filename:join(PrivDir, "ibrowse.conf"),
             import_config(Filename)
@@ -723,8 +723,8 @@ import_config(Filename) ->
                           io:format("Skipping unrecognised term: ~p~n", [X])
                   end,
             lists:foreach(Fun, Terms);
-        Err ->
-            Err
+        _Err ->
+            ok
     end.
 
 %% @doc Internal export
