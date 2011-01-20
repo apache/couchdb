@@ -188,7 +188,7 @@ handle_info({stream_next, Req_id}, #state{socket = Socket,
                                           cur_req = #request{req_id = Req_id}} = State) ->
     %% io:format("Client process set {active, once}~n", []),
     do_setopts(Socket, [{active, once}], State),
-    {noreply, State};
+    {noreply, set_inac_timer(State)};
 
 handle_info({stream_next, _Req_id}, State) ->
     _Cur_req_id = case State#state.cur_req of
@@ -216,12 +216,14 @@ handle_info({ssl_closed, _Sock}, State) ->
     handle_sock_closed(State),
     {stop, normal, State};
 
-handle_info({tcp_error, _Sock}, State) ->
-    do_trace("Error on connection to ~1000.p:~1000.p~n", [State#state.host, State#state.port]),
+handle_info({tcp_error, _Sock, Reason}, State) ->
+    do_trace("Error on connection to ~1000.p:~1000.p -> ~1000.p~n",
+             [State#state.host, State#state.port, Reason]),
     handle_sock_closed(State),
     {stop, normal, State};
-handle_info({ssl_error, _Sock}, State) ->
-    do_trace("Error on SSL connection to ~1000.p:~1000.p~n", [State#state.host, State#state.port]),
+handle_info({ssl_error, _Sock, Reason}, State) ->
+    do_trace("Error on SSL connection to ~1000.p:~1000.p -> ~1000.p~n",
+             [State#state.host, State#state.port, Reason]),
     handle_sock_closed(State),
     {stop, normal, State};
 
@@ -334,8 +336,13 @@ handle_sock_data(Data, #state{status           = get_body,
                             active_once(State_1)
                     end,
                     State_2 = State_1#state{interim_reply_sent = false},
-                    State_3 = set_inac_timer(State_2),
-                    {noreply, State_3};
+                    case Ccs of
+                    true ->
+                        cancel_timer(State_2#state.inactivity_timer_ref, {eat_message, timeout}),
+                        {noreply, State_2#state{inactivity_timer_ref = undefined}};
+                    _ ->
+                        {noreply, set_inac_timer(State_2)}
+                    end;
                 State_1 ->
                     active_once(State_1),
                     State_2 = set_inac_timer(State_1),
@@ -461,7 +468,7 @@ handle_sock_closed(#state{reply_buffer = Buf, reqs = Reqs, http_status_code = SC
                        undefined ->
                            Buf;
                        _ ->
-                           file:close(Fd),
+                           ok = file:close(Fd),
                            {file, TmpFilename}
                    end,
             Reply = case get_value(give_raw_headers, Options, false) of
@@ -470,11 +477,11 @@ handle_sock_closed(#state{reply_buffer = Buf, reqs = Reqs, http_status_code = SC
                         false ->
                             {ok, SC, Headers, Buf}
                     end,
-            do_reply(State, From, StreamTo, ReqId, Resp_format, Reply),
-            do_error_reply(State#state{reqs = Reqs_1}, connection_closed),
-            State;
+            State_1 = do_reply(State, From, StreamTo, ReqId, Resp_format, Reply),
+            ok = do_error_reply(State_1#state{reqs = Reqs_1}, connection_closed),
+            State_1;
         _ ->
-            do_error_reply(State, connection_closed),
+            ok = do_error_reply(State, connection_closed),
             State
     end.
 
@@ -482,17 +489,19 @@ do_connect(Host, Port, Options, #state{is_ssl      = true,
                                        use_proxy   = false,
                                        ssl_options = SSLOptions},
            Timeout) ->
+    ssl:connect(Host, Port, get_sock_options(Options, SSLOptions), Timeout);
+do_connect(Host, Port, Options, _State, Timeout) ->
+    gen_tcp:connect(Host, Port, get_sock_options(Options, []), Timeout).
+
+get_sock_options(Options, SSLOptions) ->
     Caller_socket_options = get_value(socket_options, Options, []),
     Other_sock_options = filter_sock_options(SSLOptions ++ Caller_socket_options),
-    ssl:connect(Host, Port,
-                [binary, {nodelay, true}, {active, false} | Other_sock_options],
-                Timeout);
-do_connect(Host, Port, Options, _State, Timeout) ->
-    Caller_socket_options = get_value(socket_options, Options, []),
-    Other_sock_options = filter_sock_options(Caller_socket_options),
-    gen_tcp:connect(Host, to_integer(Port),
-                    [binary, {nodelay, true}, {active, false} | Other_sock_options],
-                    Timeout).
+    case lists:keysearch(nodelay, 1, Other_sock_options) of
+        false ->
+            [{nodelay, true}, binary, {active, false} | Other_sock_options];
+        {value, _} ->
+            [binary, {active, false} | Other_sock_options]
+    end.
 
 %% We don't want the caller to specify certain options
 filter_sock_options(Opts) ->
@@ -547,7 +556,7 @@ do_send_body1(Source, Resp, State, TE) ->
 maybe_chunked_encode(Data, false) ->
     Data;
 maybe_chunked_encode(Data, true) ->
-    [?dec2hex(size(to_binary(Data))), "\r\n", Data, "\r\n"].
+    [?dec2hex(iolist_size(Data)), "\r\n", Data, "\r\n"].
 
 do_close(#state{socket = undefined})            ->  ok;
 do_close(#state{socket = Sock,
@@ -1269,7 +1278,7 @@ handle_response(#request{from=From, stream_to=StreamTo, req_id=ReqId,
                        reply_buffer  = RepBuf,
                        recvd_headers = RespHeaders}=State) when SaveResponseToFile /= false ->
     Body = RepBuf,
-    file:close(Fd),
+    ok = file:close(Fd),
     ResponseBody = case TmpFilename of
                        undefined ->
                            Body;
@@ -1656,8 +1665,8 @@ fail_pipelined_requests(#state{reqs = Reqs, cur_req = CurReq} = State, Reply) ->
     {_, Reqs_1} = queue:out(Reqs),
     #request{from=From, stream_to=StreamTo, req_id=ReqId,
              response_format = Resp_format} = CurReq,
-    do_reply(State, From, StreamTo, ReqId, Resp_format, Reply),
-    do_error_reply(State#state{reqs = Reqs_1}, previous_request_failed).
+    State_1 = do_reply(State, From, StreamTo, ReqId, Resp_format, Reply),
+    do_error_reply(State_1#state{reqs = Reqs_1}, previous_request_failed).
 
 split_list_at(List, N) ->
     split_list_at(List, N, []).
@@ -1701,7 +1710,8 @@ to_ascii($9) -> 9;
 to_ascii($0) -> 0.
 
 cancel_timer(undefined) -> ok;
-cancel_timer(Ref)       -> erlang:cancel_timer(Ref).
+cancel_timer(Ref)       -> _ = erlang:cancel_timer(Ref),
+                           ok.
 
 cancel_timer(Ref, {eat_message, Msg}) ->
     cancel_timer(Ref),
@@ -1813,9 +1823,6 @@ trace_request_body(Body) ->
         false ->
             ok
     end.
-
-to_integer(X) when is_list(X)    -> list_to_integer(X); 
-to_integer(X) when is_integer(X) -> X.
 
 to_binary(X) when is_list(X)   -> list_to_binary(X); 
 to_binary(X) when is_binary(X) -> X.
