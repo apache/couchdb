@@ -61,8 +61,10 @@ error_info({{<<"reduce_overflow_error">>, _} = Error, _Stack}) ->
     Error;
 error_info({{timeout, _} = Error, _Stack}) ->
     Error;
-error_info(Else) ->
-    Else.
+error_info({{Error, Reason}, Stack}) ->
+    {Error, Reason, Stack};
+error_info({Error, Stack}) ->
+    {Error, nil, Stack}.
 
 update_counter(Item, Incr, D) ->
     UpdateFun = fun ({Old, Count}) -> {Old, Count + Incr} end,
