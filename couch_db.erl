@@ -868,7 +868,7 @@ compressible_att_type(MimeType) when is_binary(MimeType) ->
 compressible_att_type(MimeType) ->
     TypeExpList = re:split(
         couch_config:get("attachments", "compressible_types", ""),
-        ", ?",
+        "\\s*,\\s*",
         [{return, list}]
     ),
     lists:any(
