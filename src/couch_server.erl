@@ -175,7 +175,10 @@ init([]) ->
     ok = couch_config:register(fun ?MODULE:config_change/4),
     ok = couch_file:init_delete_dir(RootDir),
     hash_admin_passwords(),
-    {ok, RegExp} = re:compile("^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*$"),
+    {ok, RegExp} = re:compile(
+        "^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*" % use the stock CouchDB regex
+        "(\\.[0-9]{10,})?$" % but allow an optional shard timestamp at the end
+    ),
     ets:new(couch_dbs, [set, protected, named_table, {keypos, #db.name}]),
     process_flag(trap_exit, true),
     {ok, #server{root_dir=RootDir,
@@ -205,7 +208,11 @@ all_databases(Fun, Acc0) ->
     {ok, #server{root_dir=Root}} = gen_server:call(couch_server, get_server),
     NormRoot = couch_util:normpath(Root),
     FinalAcc = try
-        filelib:fold_files(Root, "^[a-z0-9\\_\\$()\\+\\-]*[\\.]couch$", true,
+    filelib:fold_files(Root,
+        "^[a-z0-9\\_\\$()\\+\\-]*" % stock CouchDB name regex
+        "(\\.[0-9]{10,})?"         % optional shard timestamp
+        "\\.couch$",               % filename extension
+        true,
             fun(Filename, AccIn) ->
                 NormFilename = couch_util:normpath(Filename),
                 case NormFilename -- NormRoot of
