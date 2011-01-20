@@ -123,18 +123,11 @@ handle_request(MochiReq) ->
             send_error(HttpReq, Error);
         error:database_does_not_exist ->
             send_error(HttpReq, database_does_not_exist);
-        error:badarg ->
-            ?LOG_ERROR("Badarg error in HTTP request",[]),
-            ?LOG_INFO("Stacktrace: ~p",[erlang:get_stacktrace()]),
-            send_error(HttpReq, badarg);
-        error:function_clause ->
-            ?LOG_ERROR("function_clause error in HTTP request",[]),
-            ?LOG_INFO("Stacktrace: ~p",[erlang:get_stacktrace()]),
-            send_error(HttpReq, function_clause);
         Tag:Error ->
             ?LOG_ERROR("Uncaught error in HTTP request: ~p",[{Tag, Error}]),
-            ?LOG_INFO("Stacktrace: ~p",[erlang:get_stacktrace()]),
-            send_error(HttpReq, Error)
+            Stack = erlang:get_stacktrace(),
+            ?LOG_INFO("Stacktrace: ~p",[Stack]),
+            send_error(HttpReq, {Error, nil, Stack})
     end,
 
     RequestTime = timer:now_diff(now(), Begin)/1000,
@@ -520,10 +513,16 @@ error_info({missing_stub, Reason}) ->
     {412, <<"missing_stub">>, Reason};
 error_info(not_implemented) ->
     {501, <<"not_implemented">>, <<"this feature is not yet implemented">>};
+error_info({Error, null}) ->
+    {500, couch_util:to_binary(Error), null};
 error_info({Error, Reason}) ->
     {500, couch_util:to_binary(Error), couch_util:to_binary(Reason)};
+error_info({Error, nil, _Stack}) ->
+    error_info(Error);
+error_info({Error, Reason, _Stack}) ->
+    error_info({Error, Reason});
 error_info(Error) ->
-    {500, <<"unknown_error">>, couch_util:to_binary(Error)}.
+    {500, couch_util:to_binary(Error), null}.
 
 send_error(_Req, {already_sent, Resp, _Error}) ->
     {ok, Resp};
@@ -545,15 +544,19 @@ send_error(#httpd{mochi_req=MochiReq}=Req, Error) ->
     true ->
         []
     end,
-    send_error(Req, Code, Headers, ErrorStr, ReasonStr).
+    send_error(Req, Code, Headers, ErrorStr, ReasonStr, json_stack(Error)).
 
 send_error(Req, Code, ErrorStr, ReasonStr) ->
-    send_error(Req, Code, [], ErrorStr, ReasonStr).
+    send_error(Req, Code, ErrorStr, ReasonStr, []).
 
-send_error(Req, Code, Headers, ErrorStr, ReasonStr) ->
+send_error(Req, Code, ErrorStr, ReasonStr, Stack) ->
+    send_error(Req, Code, [], ErrorStr, ReasonStr, Stack).
+
+send_error(Req, Code, Headers, ErrorStr, ReasonStr, Stack) ->
     send_json(Req, Code, Headers,
         {[{<<"error">>,  ErrorStr},
-         {<<"reason">>, ReasonStr}]}).
+         {<<"reason">>, ReasonStr},
+         {stack, Stack}]}).
 
 % give the option for list functions to output html or other raw errors
 send_chunked_error(Resp, {_Error, {[{<<"body">>, Reason}]}}) ->
@@ -564,7 +567,8 @@ send_chunked_error(Resp, Error) ->
     {Code, ErrorStr, ReasonStr} = error_info(Error),
     JsonError = {[{<<"code">>, Code},
         {<<"error">>,  ErrorStr},
-        {<<"reason">>, ReasonStr}]},
+        {<<"reason">>, ReasonStr},
+        {stack, json_stack(Error)}]},
     send_chunk(Resp, ?l2b([$\n,?JSON_ENCODE(JsonError),$\n])),
     send_chunk(Resp, []).
 
@@ -577,3 +581,13 @@ server_header() ->
 
 reqid() ->
     {"X-Couch-Request-ID", get(nonce)}.
+
+json_stack({_Error, _Reason, Stack}) ->
+    lists:map(fun({M,F,A0}) ->
+        A = if is_integer(A0) -> A0; is_list(A0) -> length(A0); true -> 0 end,
+        list_to_binary(io_lib:format("~s:~s/~B", [M,F,A]));
+    (_) ->
+        <<"bad entry in stacktrace">>
+    end, Stack);
+json_stack(_) ->
+    [].
