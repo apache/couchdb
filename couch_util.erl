@@ -272,17 +272,15 @@ should_flush(MemThreshHold) ->
     true -> false end.
 
 encodeBase64Url(Url) ->
-    Url1 = iolist_to_binary(re:replace(base64:encode(Url), "=+$", "")),
-    Url2 = iolist_to_binary(re:replace(Url1, "/", "_", [global])),
-    iolist_to_binary(re:replace(Url2, "\\+", "-", [global])).
+    Url1 = re:replace(base64:encode(Url), ["=+", $$], ""),
+    Url2 = re:replace(Url1, "/", "_", [global]),
+    re:replace(Url2, "\\+", "-", [global, {return, binary}]).
 
 decodeBase64Url(Url64) ->
-    Url1 = re:replace(iolist_to_binary(Url64), "-", "+", [global]),
-    Url2 = iolist_to_binary(
-        re:replace(iolist_to_binary(Url1), "_", "/", [global])
-    ),
-    Padding = ?l2b(lists:duplicate((4 - size(Url2) rem 4) rem 4, $=)),
-    base64:decode(<<Url2/binary, Padding/binary>>).
+    Url1 = re:replace(Url64, "-", "+", [global]),
+    Url2 = re:replace(Url1, "_", "/", [global]),
+    Padding = lists:duplicate((4 - iolist_size(Url2) rem 4) rem 4, $=),
+    base64:decode(iolist_to_binary([Url2, Padding])).
 
 dict_find(Key, Dict, DefaultValue) ->
     case dict:find(Key, Dict) of
