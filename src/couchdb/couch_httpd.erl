@@ -676,13 +676,11 @@ start_jsonp(Req) ->
     end.
 
 end_jsonp() ->
-    Resp = case get(jsonp) of
+    case erlang:erase(jsonp) of
         no_jsonp -> [];
         [] -> [];
         _ -> ");"
-    end,
-    put(jsonp, undefined),
-    Resp.
+    end.
 
 validate_callback(CallBack) when is_binary(CallBack) ->
     validate_callback(binary_to_list(CallBack));
