@@ -8,6 +8,8 @@ Futon:
 
  * Make test suite work with Safari and Chrome.
  * Fixed animated progress spinner.
+ * Fix raw view document link due to overzealous URI encoding.
+ * Spell javascript correctly in loadScript(uri).
 
 Storage System:
 
@@ -18,6 +20,9 @@ Storage System:
  * Fix occasional timeout errors on systems with slow or heavily loaded IO.
  * Fix for OOME when compactions include documents with many conflicts.
  * Fix for missing attachment compression when MIME types included parameters.
+ * Preserve purge metadata during compaction to avoid spurious view rebuilds.
+ * Fix spurious conflicts introduced when uploading an attachment after
+   a doc has been in a conflict. See COUCHDB-902 for details.
  * Fix for frequently edited documents in multi-master deployments being
    duplicated in _changes and _all_docs.  See COUCHDDB-968 for details on how
    to repair.
@@ -33,6 +38,8 @@ HTTP Interface:
 
  * Allow reduce=false parameter in map-only views.
  * Fix parsing of Accept headers.
+ * Fix for multipart GET APIs when an attachment was created during a
+   local-local replication. See COUCHDB-1022 for details.
 
 Replicator:
 
