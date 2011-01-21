@@ -13,7 +13,8 @@
 -module(couch_httpd).
 -include("couch_db.hrl").
 
--export([start_link/0, start_link/1, stop/0, handle_request/5]).
+-export([start_link/0, start_link/1, stop/0, config_change/2, 
+        handle_request/5]).
 
 -export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,qs_json_value/3]).
 -export([path/1,absolute_uri/2,body_length/1]).
@@ -96,41 +97,44 @@ start_link(Name, Options) ->
         ])
     end,
 
-    % and off we go
+    % set mochiweb options
+    FinalOptions = lists:append([Options, ServerOptions, [
+            {loop, Loop},
+            {name, Name},
+            {ip, BindAddress}]]),
 
-    {ok, Pid} = case mochiweb_http:start(Options ++ ServerOptions ++ [
-        {loop, Loop},
-        {name, Name},
-        {ip, BindAddress}
-    ]) of
-    {ok, MochiPid} -> {ok, MochiPid};
-    {error, Reason} ->
-        io:format("Failure to start Mochiweb: ~s~n",[Reason]),
-        throw({error, Reason})
+    % launch mochiweb
+    {ok, Pid} = case mochiweb_http:start(FinalOptions) of
+        {ok, MochiPid} -> 
+            {ok, MochiPid};
+        {error, Reason} ->
+            io:format("Failure to start Mochiweb: ~s~n",[Reason]),
+            throw({error, Reason})
     end,
 
-    ok = couch_config:register(
-        fun("httpd", "bind_address") ->
-            ?MODULE:stop();
-        ("httpd", "port") ->
-            ?MODULE:stop();
-        ("httpd", "default_handler") ->
-            ?MODULE:stop();
-        ("httpd", "server_options") ->
-            ?MODULE:stop();
-        ("httpd", "socket_options") ->
-            ?MODULE:stop();
-        ("httpd_global_handlers", _) ->
-            ?MODULE:stop();
-        ("httpd_db_handlers", _) ->
-            ?MODULE:stop();
-        ("vhosts", _) ->
-            ?MODULE:stop();
-        ("ssl", _) ->
-            ?MODULE:stop()
-        end, Pid),
-
+    ok = couch_config:register(fun ?MODULE:config_change/2, Pid),
     {ok, Pid}.
+
+
+stop() ->
+    mochiweb_http:stop(?MODULE).
+
+config_change("httpd", "bind_addres") ->
+    ?MODULE:stop();
+config_change("httpd", "port") ->
+    ?MODULE:stop();
+config_change("httpd", "default_handler") ->
+    ?MODULE:stop();
+config_change("httpd", "socket_options") ->
+    ?MODULE:stop();
+config_change("httpd_global_handlers", _) ->
+    ?MODULE:stop();
+config_change("httpd_db_handlers", _) ->
+    ?MODULE:stop();
+config_change("vhosts", _) ->
+    ?MODULE:stop();
+config_change("ssl", _) ->
+    ?MODULE:stop().
 
 % SpecStr is a string like "{my_module, my_fun}"
 %  or "{my_module, my_fun, <<"my_arg">>}"
@@ -161,10 +165,6 @@ make_arity_3_fun(SpecStr) ->
 % SpecStr is "{my_module, my_fun}, {my_module2, my_fun2}"
 make_fun_spec_strs(SpecStr) ->
     re:split(SpecStr, "(?<=})\\s*,\\s*(?={)", [{return, list}]).
-
-stop() ->
-    mochiweb_http:stop(?MODULE).
-
 
 handle_request(MochiReq, DefaultFun, UrlHandlers, DbUrlHandlers, 
     DesignUrlHandlers) ->
