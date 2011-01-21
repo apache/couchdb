@@ -125,6 +125,8 @@ config_change("httpd", "port") ->
     ?MODULE:stop();
 config_change("httpd", "default_handler") ->
     ?MODULE:stop();
+config_change("httpd", "server_options") ->
+    ?MODULE:stop(),
 config_change("httpd", "socket_options") ->
     ?MODULE:stop();
 config_change("httpd_global_handlers", _) ->
