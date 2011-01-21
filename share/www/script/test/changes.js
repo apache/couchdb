@@ -478,5 +478,49 @@ couchTests.changes = function(debug) {
     }
   });
 
+  // COUCHDB-1037 - empty result for ?limit=1&filter=foo/bar in some cases
+  T(db.deleteDb());
+  T(db.createDb());
+
+  ddoc = {
+    _id: "_design/testdocs",
+    filters: {
+      testdocsonly: (function(doc, req) {
+        return (typeof doc.integer === "number");
+      }).toString()
+    }
+  };
+  T(db.save(ddoc));
+
+  ddoc = {
+    _id: "_design/foobar",
+    foo: "bar"
+  };
+  T(db.save(ddoc));
+
+  db.bulkSave(makeDocs(0, 5));
+
+  req = CouchDB.request("GET", "/" + db.name + "/_changes");
+  resp = JSON.parse(req.responseText);
+  TEquals(7, resp.last_seq);
+  TEquals(7, resp.results.length);
+
+  req = CouchDB.request(
+    "GET", "/"+ db.name + "/_changes?limit=1&filter=testdocs/testdocsonly");
+  resp = JSON.parse(req.responseText);
+  TEquals(3, resp.last_seq);
+  TEquals(1, resp.results.length);
+  TEquals("0", resp.results[0].id);
+
+  req = CouchDB.request(
+    "GET", "/" + db.name + "/_changes?limit=2&filter=testdocs/testdocsonly");
+  resp = JSON.parse(req.responseText);
+  TEquals(4, resp.last_seq);
+  TEquals(2, resp.results.length);
+  TEquals("0", resp.results[0].id);
+  TEquals("1", resp.results[1].id);
+
+  // cleanup
+  db.deleteDb();
 };
 

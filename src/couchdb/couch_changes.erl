@@ -322,7 +322,7 @@ changes_enumerator(DocInfo, {Db, _, Prepend, FilterFun, Callback, UserAcc,
         = DocInfo,
     Results0 = FilterFun(DocInfo),
     Results = [Result || Result <- Results0, Result /= null],
-    Go = if Limit =< 1 -> stop; true -> ok end,
+    Go = if (Limit =< 1) andalso Results =/= [] -> stop; true -> ok end,
     case Results of
     [] ->
         {Go, {Db, Seq, Prepend, FilterFun, Callback, UserAcc, ResponseType,
