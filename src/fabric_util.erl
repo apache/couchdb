@@ -48,7 +48,7 @@ get_db(DbName) ->
 get_shard([], _Timeout) ->
     erlang:error({internal_server_error, "No DB shards could be opened."});
 get_shard([#shard{node = Node, name = Name} | Rest], Timeout) ->
-    case rpc:call(Node, couch_db, open, [Name, [{timeout, Timeout}]]) of
+    case rpc:call(Node, couch_db, open_int, [Name, [{timeout, Timeout}]]) of
     {ok, Db} ->
         {ok, Db};
     {badrpc, {'EXIT', {timeout, _}}} ->
