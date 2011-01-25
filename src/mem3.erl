@@ -70,13 +70,26 @@ nodes() ->
 shards(DbName) when is_list(DbName) ->
     shards(list_to_binary(DbName));
 shards(DbName) ->
-    try ets:lookup(partitions, DbName) of
-    [] ->
-        mem3_util:load_shards_from_disk(DbName);
-    Else ->
-        Else
-    catch error:badarg ->
+    ShardDbName =
+        list_to_binary(couch_config:get("mem3", "shard_db", "dbs")),
+    case DbName of
+    ShardDbName ->
+        %% shard_db is treated as a single sharded db to support calls to db_info
+        %% and view_all_docs
+        [#shard{
+            node = node(),
+            name = ShardDbName,
+            dbname = ShardDbName,
+            range = [0, 2 bsl 31]}];
+    _ ->
+        try ets:lookup(partitions, DbName) of
+        [] ->
+            mem3_util:load_shards_from_disk(DbName);
+        Else ->
+            Else
+        catch error:badarg ->
         mem3_util:load_shards_from_disk(DbName)
+        end
     end.
 
 -spec shards(DbName::iodata(), DocId::binary()) -> [#shard{}].
