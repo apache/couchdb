@@ -36,13 +36,20 @@
 
 -include("fabric.hrl").
 
+-type dbname() :: (iodata() | #db{}).
+-type docid() :: iodata().
+-type revision() :: {integer(), binary()}.
+-type callback() :: fun((any(), any()) -> {ok | stop, any()}).
+-type json_obj() :: {[{binary() | atom(), any()}]}.
+-type option() :: atom() | {atom(), any()}.
+
 %% db operations
 %% @equiv all_dbs(<<>>)
 all_dbs() ->
     all_dbs(<<>>).
 
 %% @doc returns a list of all database names
--spec all_dbs(Prefix::binary()) -> {ok,[binary()]}.
+-spec all_dbs(Prefix::iodata()) -> {ok, [binary()]}.
 all_dbs(Prefix) when is_binary(Prefix) ->
     Length = byte_size(Prefix),
     MatchingDbs = ets:foldl(fun(#shard{dbname=DbName}, Acc) ->
@@ -62,12 +69,21 @@ all_dbs(Prefix) when is_list(Prefix) ->
 %% @doc returns a property list of interesting properties
 %%      about the database such as `doc_count', `disk_size',
 %%      etc.
--spec get_db_info(string()) -> {ok,[tuple()]}.
+-spec get_db_info(dbname()) ->
+    {ok, [
+        {instance_start_time, binary()} |
+        {doc_count, non_neg_integer()} |
+        {doc_del_count, non_neg_integer()} |
+        {purge_seq, non_neg_integer()} |
+        {compact_running, boolean()} |
+        {disk_size, non_neg_integer()} |
+        {disk_format_version, pos_integer()}
+    ]}.
 get_db_info(DbName) ->
     fabric_db_info:go(dbname(DbName)).
 
 %% @doc the number of docs in a database
--spec get_doc_count(string()) -> {ok,integer()}.
+-spec get_doc_count(dbname()) -> {ok, non_neg_integer()}.
 get_doc_count(DbName) ->
     fabric_db_doc_count:go(dbname(DbName)).
 
@@ -82,7 +98,7 @@ create_db(DbName) ->
 %% control how many shards to split a database into
 %% and how many nodes each doc is copied to respectively.
 %%
--spec create_db(string(), [tuple()]) -> ok | {error, atom()}.
+-spec create_db(dbname(), [option()]) -> ok | {error, atom()}.
 create_db(DbName, Options) ->
     fabric_db_create:go(dbname(DbName), opts(Options)).
 
@@ -91,29 +107,32 @@ delete_db(DbName) ->
     delete_db(DbName, []).
 
 %% @doc delete a database
--spec delete_db(string(), [tuple()]) -> ok.
+-spec delete_db(dbname(), [option()]) ->
+    ok |
+    no_return() | % erlang:error(database_does_not_exist)
+    {timeout, any()} |
+    {error, any()}.
 delete_db(DbName, Options) ->
     fabric_db_delete:go(dbname(DbName), opts(Options)).
 
 %% @doc provide an upper bound for the number of tracked document revisions
--spec set_revs_limit(string(), pos_integer(), [{usr_ctx,#user_ctx{}}]) -> ok.
+-spec set_revs_limit(dbname(), pos_integer(), [option()]) -> ok.
 set_revs_limit(DbName, Limit, Options) when is_integer(Limit), Limit > 0 ->
     fabric_db_meta:set_revs_limit(dbname(DbName), Limit, opts(Options)).
 
 %% @doc retrieves the maximum number of document revisions
--spec get_revs_limit(DbName::string()) -> pos_integer().
+-spec get_revs_limit(dbname()) -> pos_integer().
 get_revs_limit(DbName) ->
     {ok, Db} = fabric_util:get_db(dbname(DbName)),
     try couch_db:get_revs_limit(Db) after catch couch_db:close(Db) end.
 
 %% @doc sets the readers/writers/admin permissions for a database
--spec set_security(DbName::string(), SecObj::[tuple()],
-                   Options::[{usr_ctx,#user_ctx{}}]) -> ok.
+-spec set_security(dbname(), SecObj::json_obj(), [option()]) -> ok.
 set_security(DbName, SecObj, Options) ->
     fabric_db_meta:set_security(dbname(DbName), SecObj, opts(Options)).
 
 %% @doc retrieve the security object for a database
--spec get_security(DbName::string()) -> json_obj().
+-spec get_security(dbname()) -> json_obj().
 get_security(DbName) ->
     {ok, Db} = fabric_util:get_db(dbname(DbName)),
     try couch_db:get_security(Db) after catch couch_db:close(Db) end.
@@ -121,29 +140,35 @@ get_security(DbName) ->
 % doc operations
 
 %% @doc retrieve the doc with a given id
--spec open_doc(DbName::db_name(), Id::doc_id(),[any()]) ->
-                  {ok, #doc{}} | {not_found, atom()}.
+-spec open_doc(dbname(), docid(), [option()]) ->
+    {ok, #doc{}} |
+    {not_found, missing | deleted} |
+    {timeout, any()} |
+    {error, any()} |
+    {error, any() | any()}.
 open_doc(DbName, Id, Options) ->
     fabric_doc_open:go(dbname(DbName), docid(Id), opts(Options)).
 
 %% @doc retrieve a collection of revisions, possible all
--spec open_revs(DbName::db_name(), Id::doc_id(), Revs :: [string()] | all,
-                Options::[any()]) ->
-                   {ok, [#doc{}]} | {error, atom()} | timeout.
+-spec open_revs(dbname(), docid(), [revision()] | all, [option()]) ->
+    {ok, [{ok, #doc{}} | {{not_found,missing}, revision()}]} |
+    {timeout, any()} |
+    {error, any()} |
+    {error, any(), any()}.
 open_revs(DbName, Id, Revs, Options) ->
     fabric_doc_open_revs:go(dbname(DbName), docid(Id), Revs, opts(Options)).
 
 %% @doc retrieve missing revisions for a list of `{Id, Revs}'
--spec get_missing_revs(DbName::db_name(),IdRevs::[{doc_id(),any()}]) ->
-                          {ok, [{doc_id(),any()}]}.
+-spec get_missing_revs(dbname(),[{docid(), [revision()]}]) ->
+    {ok, [{docid(), any()}]}.
 get_missing_revs(DbName, IdsRevs) when is_list(IdsRevs) ->
     Sanitized = [idrevs(IdR) || IdR <- IdsRevs],
     fabric_doc_missing_revs:go(dbname(DbName), Sanitized).
 
 %% @doc update a single doc
 %% @equiv update_docs(DbName,[Doc],Options)
--spec update_doc(DbName::db_name(), Doc::#doc{}, Options::[tuple()]) ->
-                    {ok, any()} | any().
+-spec update_doc(dbname(), #doc{}, [option()]) ->
+    {ok, any()} | any().
 update_doc(DbName, Doc, Options) ->
     case update_docs(DbName, [Doc], opts(Options)) of
     {ok, [{ok, NewRev}]} ->
@@ -157,8 +182,8 @@ update_doc(DbName, Doc, Options) ->
     end.
 
 %% @doc update a list of docs
--spec update_docs(DbName::db_name(), [Doc::#doc{}], Options::[tuple()]) ->
-                    {ok, any()} | any().
+-spec update_docs(dbname(), [#doc{}], [option()]) ->
+    {ok, any()} | any().
 update_docs(DbName, Docs, Options) ->
     try
         fabric_doc_update:go(dbname(DbName), docs(Docs), opts(Options)) of
@@ -176,11 +201,9 @@ purge_docs(_DbName, _IdsRevs) ->
 %% @doc spawns a process to upload attachment data and
 %%      returns a function that shards can use to communicate
 %%      with the spawned middleman process
--spec att_receiver(Req::#httpd{}, Length :: undefined |
-                                               {unknown_transfer_encoding, any()} |
-                                               chunked |
-                                               pos_integer()) ->
-                      function() | binary().
+-spec att_receiver(#httpd{}, Length :: undefined | chunked | pos_integer() |
+        {unknown_transfer_encoding, any()}) ->
+    function() | binary().
 att_receiver(Req, Length) ->
     fabric_doc_attachments:receiver(Req, Length).
 
@@ -189,9 +212,8 @@ att_receiver(Req, Length) ->
 %%      also be passed to further constrain the query. See <a href=
 %%      "http://wiki.apache.org/couchdb/HTTP_Document_API#All_Documents">
 %%      all_docs</a> for details
--spec all_docs(DbName::db_name(), Callback::fun((atom() | tuple(), tuple())
-                                                    -> {ok, any()}),
-               [] | tuple(), #view_query_args{}) -> {ok, [any()]}.
+-spec all_docs(dbname(), callback(), [] | tuple(), #view_query_args{}) ->
+    {ok, [any()]}.
 all_docs(DbName, Callback, Acc0, #view_query_args{} = QueryArgs) when
         is_function(Callback, 2) ->
     fabric_view_all_docs:go(dbname(DbName), QueryArgs, Callback, Acc0);
@@ -202,9 +224,8 @@ all_docs(DbName, Callback, Acc0, QueryArgs) ->
     all_docs(DbName, Callback, Acc0, kl_to_query_args(QueryArgs)).
 
 
--spec changes(DbName::db_name(), Callback::fun((atom() | tuple(), tuple())
-                                                    -> {ok, any()}),
-              Acc0::tuple(),Options::#changes_args{}) -> {ok, any()}.
+-spec changes(dbname(), callback(), any(), #changes_args{} | [{atom(),any()}]) ->
+    {ok, any()}.
 changes(DbName, Callback, Acc0, #changes_args{}=Options) ->
     Feed = Options#changes_args.feed,
     fabric_view_changes:go(dbname(DbName), Feed, Options, Callback, Acc0);
@@ -228,11 +249,9 @@ query_view(DbName, DesignName, ViewName, QueryArgs) ->
 %%      There are many additional query args that can be passed to a view,
 %%      see <a href="http://wiki.apache.org/couchdb/HTTP_view_API#Querying_Options">
 %%      query args</a> for details.
--spec query_view(DbName::db_name(), Design::#doc{}, ViewName::string(),
-                 Callback::fun((atom() | tuple(),tuple()) ->
-                                  tuple()), Acc0::list(),
-                 QueryArgs::#view_query_args{}) ->
-                    any().
+-spec query_view(dbname(), #doc{}, iodata(), callback(), any(),
+        #view_query_args{}) ->
+    any().
 query_view(DbName, Design, ViewName, Callback, Acc0, QueryArgs) ->
     Db = dbname(DbName), View = name(ViewName),
     case is_reduce_view(Db, Design, View, QueryArgs) of
@@ -245,14 +264,18 @@ query_view(DbName, Design, ViewName, Callback, Acc0, QueryArgs) ->
 
 %% @doc retrieve info about a view group, disk size, language, whether compaction
 %%      is running and so forth
--spec get_view_group_info(Db::db_name(), DesignId::(#doc{} | list() | binary())) ->
-                             {ok, list(tuple())}.
+-spec get_view_group_info(dbname(), #doc{} | docid()) ->
+    {ok, [
+        {signature, binary()} |
+        {language, binary()} |
+        {disk_size, non_neg_integer()} |
+        {compact_running, boolean()}
+    ]}.
 get_view_group_info(DbName, DesignId) ->
     fabric_group_info:go(dbname(DbName), design_doc(DesignId)).
 
 %% @doc retrieve all the design docs from a database
--spec design_docs(DbName:: db_name()) ->
-                     {ok, [json_obj()]}.
+-spec design_docs(dbname()) -> {ok, [json_obj()]}.
 design_docs(DbName) ->
     QueryArgs = #view_query_args{start_key = <<"_design/">>, include_docs=true},
     Callback = fun({total_and_offset, _, _}, []) ->
@@ -272,8 +295,7 @@ design_docs(DbName) ->
 %% @doc forces a reload of validation functions, this is performed after
 %%      design docs are update
 %% NOTE: This function probably doesn't belong here as part fo the API
--spec reset_validation_funs(DbName::db_name()) ->
-                               [any()].
+-spec reset_validation_funs(dbname()) -> [reference()].
 reset_validation_funs(DbName) ->
     [rexi:cast(Node, {fabric_rpc, reset_validation_funs, [Name]}) ||
         #shard{node=Node, name=Name} <-  mem3:shards(DbName)].
@@ -285,7 +307,7 @@ cleanup_index_files() ->
     [cleanup_index_files(Db) || Db <- Dbs].
 
 %% @doc clean up index files for a specific db
--spec cleanup_index_files(DbName::db_name()) -> ok.
+-spec cleanup_index_files(dbname()) -> ok.
 cleanup_index_files(DbName) ->
     {ok, DesignDocs} = fabric:design_docs(DbName),
 

@@ -36,9 +36,3 @@
 
 -record(view_row, {key, id, value, doc, worker}).
 -record(change, {key, id, value, deleted=false, doc, worker}).
-
-%% types
--type json_obj() :: {[tuple()]}.
--type db_name() :: string() | binary().
--type doc_id() :: string() | binary().
--type keylist() :: [{atom(),any()}].
