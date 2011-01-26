@@ -292,7 +292,6 @@ remove_overlapping_shards_test() ->
     EndPoint = 2 bsl 31,
     T1 = [[0,10],[11,20],[21,EndPoint-1]],
     Shards = mk_cnts(T1,3),
-    ?debugFmt("there are ~p shards ~n",[orddict:size(Shards)]),
     ?assertEqual(orddict:size(
               remove_overlapping_shards(#shard{name=list_to_atom("node-3"),
                                                node=list_to_atom("node-3"),
