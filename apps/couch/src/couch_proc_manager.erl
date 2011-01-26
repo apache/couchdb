@@ -123,8 +123,6 @@ get_procs(Tab, Lang) when is_list(Lang) ->
         Procs
     end.
 
-new_proc(Lang) when is_binary(Lang) ->
-    new_proc(binary_to_list(Lang));
 new_proc(Lang) when is_list(Lang) ->
     case couch_config:get("query_servers", Lang) of
     undefined ->
