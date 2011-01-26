@@ -74,7 +74,7 @@ group_idrevs_by_shard(DbName, IdsRevs) ->
 update_dict(D0, KVs) ->
     lists:foldl(fun({K,V,_}, D1) -> dict:store(K, V, D1) end, D0, KVs).
 
-skip_message({1, Dict}) ->
+skip_message({1, Dict, _Workers}) ->
     {stop, dict:fold(fun force_reply/3, [], Dict)};
-skip_message({WaitingCount, Dict}) ->
-    {ok, {WaitingCount-1, Dict}}.
+skip_message({WaitingCount, Dict, Workers}) ->
+    {ok, {WaitingCount-1, Dict, Workers}}.
