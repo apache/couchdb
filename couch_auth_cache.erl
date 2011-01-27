@@ -110,11 +110,8 @@ init(_) ->
     ok = couch_config:register(
         fun("couch_httpd_auth", "auth_cache_size", SizeList) ->
             Size = list_to_integer(SizeList),
-            ok = gen_server:call(?MODULE, {new_max_cache_size, Size}, infinity)
-        end
-    ),
-    ok = couch_config:register(
-        fun("couch_httpd_auth", "authentication_db", DbName) ->
+            ok = gen_server:call(?MODULE, {new_max_cache_size, Size}, infinity);
+        ("couch_httpd_auth", "authentication_db", DbName) ->
             ok = gen_server:call(?MODULE, {new_auth_db, ?l2b(DbName)}, infinity)
         end
     ),
@@ -167,26 +164,21 @@ handle_call(auth_db_compacted, _From, State) ->
     ),
     {reply, ok, State};
 
+handle_call({new_max_cache_size, NewSize},
+        _From, #state{cache_size = Size} = State) when NewSize >= Size ->
+    {reply, ok, State#state{max_cache_size = NewSize}};
+
 handle_call({new_max_cache_size, NewSize}, _From, State) ->
-    case NewSize >= State#state.cache_size of
-    true ->
-        ok;
-    false ->
-        lists:foreach(
-            fun(_) ->
-                LruTime = ets:last(?BY_ATIME),
-                [{LruTime, UserName}] = ets:lookup(?BY_ATIME, LruTime),
-                true = ets:delete(?BY_ATIME, LruTime),
-                true = ets:delete(?BY_USER, UserName)
-            end,
-            lists:seq(1, State#state.cache_size - NewSize)
-        )
-    end,
-    NewState = State#state{
-        max_cache_size = NewSize,
-        cache_size = lists:min([NewSize, State#state.cache_size])
-    },
-    {reply, ok, NewState};
+    lists:foreach(
+        fun(_) ->
+            LruTime = ets:last(?BY_ATIME),
+            [{LruTime, UserName}] = ets:lookup(?BY_ATIME, LruTime),
+            true = ets:delete(?BY_ATIME, LruTime),
+            true = ets:delete(?BY_USER, UserName)
+        end,
+        lists:seq(1, State#state.cache_size - NewSize)
+    ),
+    {reply, ok, State#state{max_cache_size = NewSize, cache_size = NewSize}};
 
 handle_call({fetch, UserName}, _From, State) ->
     {Credentials, NewState} = case ets:lookup(?BY_USER, UserName) of
