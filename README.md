@@ -2,13 +2,6 @@
 
 chttpd is a cluster-aware http layer for [CouchDB][1].  It is used in [BigCouch][2] as the http front-end.
 
-### Getting Started
-Dependencies:
- * Erlang R13B-03 (or higher)
-
-Build with rebar:
-    make
-
 ### License
 [Apache 2.0][3]
 
