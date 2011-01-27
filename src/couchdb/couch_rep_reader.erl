@@ -177,9 +177,9 @@ calculate_new_high_seq(State) ->
     hd(State#state.opened_seqs).
 
 split_revlist(Rev, {[CurrentAcc|Rest], BaseLength, Length}) ->
-    case Length+size(Rev) > 8192 of
+    case Length+size(Rev)+3 > 8192 of
     false ->
-        {[[Rev|CurrentAcc] | Rest], BaseLength, Length+size(Rev)};
+        {[[Rev|CurrentAcc] | Rest], BaseLength, Length+size(Rev)+3};
     true ->
         {[[Rev],CurrentAcc|Rest], BaseLength, BaseLength}
     end.
@@ -214,7 +214,7 @@ open_doc_revs(#http_db{url = Url} = DbS, DocId, Revs) ->
     %% MochiWeb into multiple requests
     BaseQS = [{revs,true}, {latest,true}, {att_encoding_info,true}],
     BaseReq = DbS#http_db{resource=encode_doc_id(DocId), qs=BaseQS},
-    BaseLength = length(couch_rep_httpc:full_url(BaseReq)) + 11, % &open_revs=
+    BaseLength = length(couch_rep_httpc:full_url(BaseReq) ++ "&open_revs=[]"),
 
     {RevLists, _, _} = lists:foldl(fun split_revlist/2,
         {[[]], BaseLength, BaseLength}, couch_doc:revs_to_strs(Revs)),
