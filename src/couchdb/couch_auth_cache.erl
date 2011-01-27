@@ -169,15 +169,7 @@ handle_call({new_max_cache_size, NewSize},
     {reply, ok, State#state{max_cache_size = NewSize}};
 
 handle_call({new_max_cache_size, NewSize}, _From, State) ->
-    lists:foreach(
-        fun(_) ->
-            MruTime = ets:last(?BY_ATIME),
-            [{MruTime, UserName}] = ets:lookup(?BY_ATIME, MruTime),
-            true = ets:delete(?BY_ATIME, MruTime),
-            true = ets:delete(?BY_USER, UserName)
-        end,
-        lists:seq(1, State#state.cache_size - NewSize)
-    ),
+    free_mru_cache_entries(State#state.cache_size - NewSize),
     {reply, ok, State#state{max_cache_size = NewSize, cache_size = NewSize}};
 
 handle_call({fetch, UserName}, _From, State) ->
@@ -232,6 +224,8 @@ clear_cache(State) ->
     State#state{cache_size = 0}.
 
 
+add_cache_entry(_, _, _, #state{max_cache_size = 0} = State) ->
+    State;
 add_cache_entry(UserName, Credentials, ATime, State) ->
     case State#state.cache_size >= State#state.max_cache_size of
     true ->
@@ -243,16 +237,17 @@ add_cache_entry(UserName, Credentials, ATime, State) ->
     true = ets:insert(?BY_USER, {UserName, {Credentials, ATime}}),
     State#state{cache_size = couch_util:get_value(size, ets:info(?BY_USER))}.
 
+free_mru_cache_entries(0) ->
+    ok;
+free_mru_cache_entries(N) when N > 0 ->
+    free_mru_cache_entry(),
+    free_mru_cache_entries(N - 1).
 
 free_mru_cache_entry() ->
-    case ets:last(?BY_ATIME) of
-    '$end_of_table' ->
-        ok;  % empty cache
-    MruTime ->
-        [{MruTime, UserName}] = ets:lookup(?BY_ATIME, MruTime),
-        true = ets:delete(?BY_ATIME, MruTime),
-        true = ets:delete(?BY_USER, UserName)
-    end.
+    MruTime = ets:last(?BY_ATIME),
+    [{MruTime, UserName}] = ets:lookup(?BY_ATIME, MruTime),
+    true = ets:delete(?BY_ATIME, MruTime),
+    true = ets:delete(?BY_USER, UserName).
 
 
 cache_hit(UserName, Credentials, ATime) ->
