@@ -171,9 +171,9 @@ handle_call({new_max_cache_size, NewSize},
 handle_call({new_max_cache_size, NewSize}, _From, State) ->
     lists:foreach(
         fun(_) ->
-            LruTime = ets:last(?BY_ATIME),
-            [{LruTime, UserName}] = ets:lookup(?BY_ATIME, LruTime),
-            true = ets:delete(?BY_ATIME, LruTime),
+            MruTime = ets:last(?BY_ATIME),
+            [{MruTime, UserName}] = ets:lookup(?BY_ATIME, MruTime),
+            true = ets:delete(?BY_ATIME, MruTime),
             true = ets:delete(?BY_USER, UserName)
         end,
         lists:seq(1, State#state.cache_size - NewSize)
@@ -248,9 +248,9 @@ free_mru_cache_entry() ->
     case ets:last(?BY_ATIME) of
     '$end_of_table' ->
         ok;  % empty cache
-    LruTime ->
-        [{LruTime, UserName}] = ets:lookup(?BY_ATIME, LruTime),
-        true = ets:delete(?BY_ATIME, LruTime),
+    MruTime ->
+        [{MruTime, UserName}] = ets:lookup(?BY_ATIME, MruTime),
+        true = ets:delete(?BY_ATIME, MruTime),
         true = ets:delete(?BY_USER, UserName)
     end.
 
