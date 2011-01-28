@@ -17,7 +17,7 @@
 -export([rand32/0, implode/2, collate/2, collate/3]).
 -export([abs_pathname/1,abs_pathname/2, trim/1]).
 -export([encodeBase64Url/1, decodeBase64Url/1]).
--export([to_hex/1, parse_term/1, dict_find/3]).
+-export([validate_utf8/1, to_hex/1, parse_term/1, dict_find/3]).
 -export([get_nested_json_value/2, json_user_ctx/1]).
 -export([proplist_apply_field/2, json_apply_field/2]).
 -export([to_binary/1, to_integer/1, to_list/1, url_encode/1]).
@@ -94,6 +94,37 @@ simple_call(Pid, Message) ->
         end
     after
         erlang:demonitor(MRef, [flush])
+    end.
+
+validate_utf8(Data) when is_list(Data) ->
+    validate_utf8(?l2b(Data));
+validate_utf8(Bin) when is_binary(Bin) ->
+    validate_utf8_fast(Bin, 0).
+
+validate_utf8_fast(B, O) ->
+    case B of
+        <<_:O/binary>> ->
+            true;
+        <<_:O/binary, C1, _/binary>> when
+                C1 < 128 ->
+            validate_utf8_fast(B, 1 + O);
+        <<_:O/binary, C1, C2, _/binary>> when
+                C1 >= 194, C1 =< 223,
+                C2 >= 128, C2 =< 191 ->
+            validate_utf8_fast(B, 2 + O);
+        <<_:O/binary, C1, C2, C3, _/binary>> when
+                C1 >= 224, C1 =< 239,
+                C2 >= 128, C2 =< 191,
+                C3 >= 128, C3 =< 191 ->
+            validate_utf8_fast(B, 3 + O);
+        <<_:O/binary, C1, C2, C3, C4, _/binary>> when
+                C1 >= 240, C1 =< 244,
+                C2 >= 128, C2 =< 191,
+                C3 >= 128, C3 =< 191,
+                C4 >= 128, C4 =< 191 ->
+            validate_utf8_fast(B, 4 + O);
+        _ ->
+            false
     end.
 
 to_hex([]) ->

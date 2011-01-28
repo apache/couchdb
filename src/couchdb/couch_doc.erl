@@ -177,6 +177,10 @@ parse_revs([Rev | Rest]) ->
 
 
 validate_docid(Id) when is_binary(Id) ->
+    case couch_util:validate_utf8(Id) of
+        false -> throw({bad_request, <<"Document id must be valid UTF-8">>});
+        true -> ok
+    end,
     case Id of
     <<"_design/", _/binary>> -> ok;
     <<"_local/", _/binary>> -> ok;
