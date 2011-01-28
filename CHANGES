@@ -6,6 +6,13 @@ Version 1.2.0
 
 This version has not been released yet.
 
+Build System:
+
+ * cURL is no longer required to build CouchDB as it is only
+   used by the command line JS test runner. If cURL is available
+   when building CouchJS you can enable the HTTP bindings by
+   passing -H on the command line.
+
 OAuth:
 
  * Updated budled erlang_oauth library to the latest version.

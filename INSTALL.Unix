@@ -12,11 +12,17 @@ You will need the following installed:
  * ICU                        (http://icu.sourceforge.net/)
  * OpenSSL                    (http://www.openssl.org/)
  * Mozilla SpiderMonkey (1.8) (http://www.mozilla.org/js/spidermonkey/)
- * libcurl                    (http://curl.haxx.se/libcurl/)
  * GNU Make                   (http://www.gnu.org/software/make/)
  * GNU Compiler Collection    (http://gcc.gnu.org/)
 
 It is recommended that you install Erlang OTP R12B-5 or above where possible.
+ 
+Optional dependencies:
+ 
+ * libcurl                    (http://curl.haxx.se/libcurl/)
+
+This only affects the command line JavaScript test suite which
+most users do not use.
 
 Ubuntu
 ~~~~~~

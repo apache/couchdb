@@ -207,6 +207,7 @@ AC_SUBST(ICU_LOCAL_CFLAGS)
 AC_SUBST(ICU_LOCAL_LDFLAGS)
 AC_SUBST(ICU_LOCAL_BIN)
 
+use_curl=yes
 AC_ARG_WITH([win32-curl], [AC_HELP_STRING([--with-win32-curl=PATH],
     [set PATH to the Win32 native curl directory])], [
     # default build on windows is a static lib, and that's what we want too
@@ -214,7 +215,11 @@ AC_ARG_WITH([win32-curl], [AC_HELP_STRING([--with-win32-curl=PATH],
     CURL_LIBS="$withval/lib/libcurl"
     CURL_LDFLAGS="-l$CURL_LIBS -lWs2_32 -lkernel32 -luser32 -ladvapi32 -lWldap32"
 ], [
-    AC_CHECK_CURL([7.18.0])
+    AC_CHECK_CURL([7.18.0],
+        [AC_DEFINE([HAVE_CURL], [1], ["Provide HTTP support to couchjs"])], [
+        AC_MSG_WARN([You will be unable to run some JavaScript unit tests.])
+        use_curl=no
+    ])
     CURL_LDFLAGS=-lcurl
 ])
 
@@ -351,6 +356,7 @@ AM_CONDITIONAL([INIT], [test x${init_enabled} = xtrue])
 AM_CONDITIONAL([LAUNCHD], [test x${launchd_enabled} = xtrue])
 AM_CONDITIONAL([HELP2MAN], [test x${help2man_enabled} = xtrue])
 AM_CONDITIONAL([USE_NATIVE_MOCHIJSON], [test x${native_mochijson_enabled} = xyes])
+AM_CONDITIONAL([USE_CURL], [test x${use_curl} = xyes])
 
 AC_SUBST([package_author_name], ["LOCAL_PACKAGE_AUTHOR_NAME"])
 AC_SUBST([package_author_address], ["LOCAL_PACKAGE_AUTHOR_ADDRESS"])

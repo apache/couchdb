@@ -10,10 +10,27 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+#include "config.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <jsapi.h>
+
+#ifndef HAVE_CURL
+
+// Soft dependency on cURL bindings because they're
+// only used when running the JS tests from the
+// command line which is rare.
+JSObject*
+install_http(JSContext* cx, JSObject* glbl)
+{
+    fprintf(stderr, "ERROR: couchjs was not built with cURL support.\n");
+    return NULL;
+}
+
+#else
+
 #include <curl/curl.h>
 
 #include "utf8.h"
@@ -673,3 +690,5 @@ str_from_binary(JSContext* cx, char* data, size_t length)
 
     return ret;
 }
+
+#endif /* HAVE_CURL */

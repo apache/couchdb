@@ -48,6 +48,8 @@ Options:
 
   -h  display a short help message and exit
   -V  display version information and exit
+  -H  install couchjs cURL bindings (only avaiable
+      if CouchDB was built with cURL available)
 
 Report bugs at <%bug_uri%>.
 EOF
@@ -68,7 +70,7 @@ run_couchjs () {
 
 parse_script_option_list () {
     set +e
-    options=`getopt hV $@`
+    options=`getopt hVH $@`
     if test ! $? -eq 0; then
         display_error
     fi
@@ -82,11 +84,12 @@ parse_script_option_list () {
             *) break;;
         esac
     done
-    option_list=`echo $@ | sed 's/--//'`
-    if test -z "$option_list"; then
+    script_name=`echo $@ | sed -e 's/.*--[[:blank:]]*//'`
+    if test -z "$script_name"; then
         display_error "You must specify a FILE."
     fi
-    run_couchjs $option_list
+    options=`echo $@ | sed -e 's/--//'`
+    run_couchjs $options
 }
 
 parse_script_option_list $@

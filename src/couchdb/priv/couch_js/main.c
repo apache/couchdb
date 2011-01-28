@@ -272,14 +272,48 @@ static JSClass global_class = {
 };
 
 int
+usage()
+{
+    fprintf(stderr, "usage: couchjs [-H] [script_name]\n");
+    return 1;
+}
+
+int
 main(int argc, const char * argv[])
 {
     JSRuntime* rt = NULL;
     JSContext* cx = NULL;
     JSObject* global = NULL;
     JSFunctionSpec* sp = NULL;
+    char* script_name = NULL;
+    int use_http = 0;
     int i = 0;
-    
+
+    if(argc > 3)
+    {
+        fprintf(stderr, "ERROR: Too many arguments.\n");
+        return usage();
+    }
+    else if(argc == 3)
+    {
+        if(strcmp(argv[1], "-H"))
+        {
+            fprintf(stderr, "ERROR: Invalid option: %s\n", argv[1]);
+            return usage();
+        }
+        use_http = 1;
+        script_name = argv[2];
+    }
+    else if(argc == 2 && strcmp(argv[1], "-H") == 0)
+    {
+        use_http = 1;
+    }
+    else if (argc == 2)
+    {
+        script_name = argv[1];
+    }
+    // else argc == 1, use defaults
+
     rt = JS_NewRuntime(64L * 1024L * 1024L);
     if (!rt) return 1;
 
@@ -305,28 +339,13 @@ main(int argc, const char * argv[])
         }
     }
 
-    if(!install_http(cx, global))
+    if(use_http && !install_http(cx, global))
     {
-        return 1;
-    }
-    
-    JS_SetGlobalObject(cx, global);
-
-    if(argc > 2)
-    {
-        fprintf(stderr, "incorrect number of arguments\n\n");
-        fprintf(stderr, "usage: %s <scriptfile>\n", argv[0]);
         return 2;
     }
 
-    if(argc == 0)
-    {
-        execute_script(cx, global, NULL);
-    }
-    else
-    {
-        execute_script(cx, global, argv[1]);
-    }
+    JS_SetGlobalObject(cx, global);
+    execute_script(cx, global, script_name);
 
     FINISH_REQUEST(cx);
 

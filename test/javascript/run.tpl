@@ -27,4 +27,4 @@ cat $SCRIPT_DIR/json2.js \
 	$SCRIPT_DIR/test/*.js \
 	$JS_TEST_DIR/couch_http.js \
 	$JS_TEST_DIR/cli_runner.js \
-    | $COUCHJS -
+    | $COUCHJS -H -
