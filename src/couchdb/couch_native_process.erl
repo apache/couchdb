@@ -25,7 +25,7 @@
 %
 %  fun({Doc}) ->
 %    % Below, we emit a single record - the _id as key, null as value
-%    DocId = couch_util:get_value(Doc, <<"_id">>, null),
+%    DocId = couch_util:get_value(<<"_id">>, Doc, null),
 %    Emit(DocId, null)
 %  end.
 %
