@@ -64,7 +64,10 @@ final_reduce(Reduce, {KVs, Reductions}) ->
 fold_reduce(#btree{root=Root}=Bt, Fun, Acc, Options) ->
     Dir = couch_util:get_value(dir, Options, fwd),
     StartKey = couch_util:get_value(start_key, Options),
-    EndKey = couch_util:get_value(end_key, Options),
+    EndKey = case couch_util:get_value(end_key_gt, Options) of
+        undefined -> couch_util:get_value(end_key, Options);
+        LastKey -> LastKey
+    end,
     KeyGroupFun = couch_util:get_value(key_group_fun, Options, fun(_,_) -> true end),
     {StartKey2, EndKey2} =
     case Dir of
