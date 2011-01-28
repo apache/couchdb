@@ -100,6 +100,21 @@ couchTests.reduce = function(debug) {
     T(equals(results.rows[4], {key:["d","a"],value:10*i}));
     T(equals(results.rows[5], {key:["d","b"],value:10*i}));
     T(equals(results.rows[6], {key:["d","c"],value:10*i}));
+
+    // endkey test with inclusive_end=true
+    var results = db.query(map, reduce, {group_level:2,endkey:["d"],inclusive_end:true});
+    T(equals(results.rows[0], {key:["a"],value:20*i}));
+    T(equals(results.rows[1], {key:["a","b"],value:40*i}));
+    T(equals(results.rows[2], {key:["a","c"],value:10*i}));
+    T(equals(results.rows[3], {key:["d"],value:10*i}));
+    TEquals(4, results.rows.length);
+
+    // endkey test with inclusive_end=false
+    var results = db.query(map, reduce, {group_level:2,endkey:["d"],inclusive_end:false});
+    T(equals(results.rows[0], {key:["a"],value:20*i}));
+    T(equals(results.rows[1], {key:["a","b"],value:40*i}));
+    T(equals(results.rows[2], {key:["a","c"],value:10*i}));
+    TEquals(3, results.rows.length);
   }
 
   // now test out more complex reductions that need to use the combine option.
