@@ -1157,6 +1157,9 @@ parse_doc_query(Req) ->
         {"open_revs", RevsJsonStr} ->
             JsonArray = ?JSON_DECODE(RevsJsonStr),
             Args#doc_query_args{open_revs=couch_doc:parse_revs(JsonArray)};
+        {"latest", "true"} ->
+            Options = [latest | Args#doc_query_args.options],
+            Args#doc_query_args{options=Options};
         {"atts_since", RevsJsonStr} ->
             JsonArray = ?JSON_DECODE(RevsJsonStr),
             Args#doc_query_args{atts_since = couch_doc:parse_revs(JsonArray)};
