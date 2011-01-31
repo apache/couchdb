@@ -57,6 +57,12 @@ handle_favicon_req(#httpd{method='GET'}=Req, DocumentRoot) ->
 handle_favicon_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
+handle_file_req(#httpd{method='GET'}=Req, Document) ->
+    couch_httpd:serve_file(Req, filename:basename(Document), filename:dirname(Document));
+
+handle_file_req(Req, _) ->
+    send_method_not_allowed(Req, "GET,HEAD").
+
 handle_utils_dir_req(#httpd{method='GET'}=Req, DocumentRoot) ->
     "/" ++ UrlPath = couch_httpd:path(Req),
     case couch_httpd:partition(UrlPath) of
