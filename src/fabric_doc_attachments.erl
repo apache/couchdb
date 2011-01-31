@@ -15,6 +15,7 @@
 -module(fabric_doc_attachments).
 
 -include("fabric.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 %% couch api calls
 -export([receiver/2]).
@@ -31,6 +32,7 @@ receiver(Req, chunked) ->
 receiver(_Req, 0) ->
     <<"">>;
 receiver(Req, Length) when is_integer(Length) ->
+    maybe_send_continue(Req),
     Middleman = spawn(fun() -> middleman(Req, Length) end),
     fun() ->
         Middleman ! {self(), gimme_data},
@@ -42,6 +44,19 @@ receiver(_Req, Length) ->
 %%
 %% internal
 %%
+
+maybe_send_continue(#httpd{mochi_req = MochiReq} = Req) ->
+    case couch_httpd:header_value(Req, "expect") of
+    undefined ->
+        ok;
+    Expect ->
+        case string:to_lower(Expect) of
+        "100-continue" ->
+            MochiReq:start_raw_response({100, gb_trees:empty()});
+        true ->
+            ok
+        end
+    end.
 
 write_chunks(MiddleMan, ChunkFun) ->
     MiddleMan ! {self(), gimme_data},
