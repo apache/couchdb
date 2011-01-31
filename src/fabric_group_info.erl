@@ -61,6 +61,16 @@ merge_results(Info) ->
             [{disk_size, lists:sum(X)} | Acc];
         (compact_running, X, Acc) ->
             [{compact_running, lists:member(true, X)} | Acc];
+        (updater_running, X, Acc) ->
+            [{updater_running, lists:member(true, X)} | Acc];
+        (waiting_commit, X, Acc) ->
+            [{waiting_commit, lists:member(true, X)} | Acc];
+        (waiting_clients, X, Acc) ->
+            [{waiting_clients, lists:sum(X)} | Acc];
+        (update_seq, X, Acc) ->
+            [{update_seq, lists:sum(X)} | Acc];
+        (purge_seq, X, Acc) ->
+            [{purge_seq, lists:sum(X)} | Acc];
         (_, _, Acc) ->
             Acc
     end, [], Dict).

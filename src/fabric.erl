@@ -277,7 +277,12 @@ query_view(DbName, Design, ViewName, Callback, Acc0, QueryArgs) ->
         {signature, binary()} |
         {language, binary()} |
         {disk_size, non_neg_integer()} |
-        {compact_running, boolean()}
+        {compact_running, boolean()} |
+        {updater_running, boolean()} |
+        {waiting_commit, boolean()} |
+        {waiting_clients, non_neg_integer()} |
+        {update_seq, pos_integer()} |
+        {purge_seq, non_neg_integer()}
     ]}.
 get_view_group_info(DbName, DesignId) ->
     fabric_group_info:go(dbname(DbName), design_doc(DesignId)).
