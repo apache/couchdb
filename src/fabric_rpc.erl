@@ -37,6 +37,7 @@
 %%  call to with_db will supply your M:F with a #db{} and then remaining args
 
 all_docs(DbName, #view_query_args{keys=nil} = QueryArgs) ->
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Db} = couch_db:open(DbName, []),
     #view_query_args{
         start_key = StartKey,
@@ -66,6 +67,7 @@ all_docs(DbName, #view_query_args{keys=nil} = QueryArgs) ->
     final_response(Total, Acc#view_acc.offset).
 
 changes(DbName, Args, StartSeq) ->
+    erlang:put(io_priority, {interactive, DbName}),
     #changes_args{style=Style, dir=Dir} = Args,
     case couch_db:open(DbName, []) of
     {ok, Db} ->
@@ -84,6 +86,7 @@ changes(DbName, Args, StartSeq) ->
     end.
 
 map_view(DbName, DDoc, ViewName, QueryArgs) ->
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Db} = couch_db:open(DbName, []),
     #view_query_args{
         limit = Limit,
@@ -122,6 +125,7 @@ map_view(DbName, DDoc, ViewName, QueryArgs) ->
     final_response(Total, Acc#view_acc.offset).
 
 reduce_view(DbName, Group0, ViewName, QueryArgs) ->
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Db} = couch_db:open(DbName, []),
     #view_query_args{
         group_level = GroupLevel,
@@ -191,6 +195,7 @@ open_revs(DbName, Id, Revs, Options) ->
 
 get_missing_revs(DbName, IdRevsList) ->
     % reimplement here so we get [] for Ids with no missing revs in response
+    erlang:put(io_priority, {interactive, DbName}),
     rexi:reply(case couch_db:open(DbName, []) of
     {ok, Db} ->
         Ids = [Id1 || {Id1, _Revs} <- IdRevsList],
@@ -234,6 +239,7 @@ reset_validation_funs(DbName) ->
 %%
 
 with_db(DbName, Options, {M,F,A}) ->
+    erlang:put(io_priority, {interactive, DbName}),
     case couch_db:open(DbName, Options) of
     {ok, Db} ->
         rexi:reply(try
