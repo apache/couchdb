@@ -53,7 +53,7 @@ maybe_send_continue(#httpd{mochi_req = MochiReq} = Req) ->
         case string:to_lower(Expect) of
         "100-continue" ->
             MochiReq:start_raw_response({100, gb_trees:empty()});
-        true ->
+        _ ->
             ok
         end
     end.
