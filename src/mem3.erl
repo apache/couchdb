@@ -106,7 +106,7 @@ shards(DbName, DocId) ->
         range = ['$1','$2'],
         ref = '_'
     },
-    Conditions = [{'<', '$1', HashKey}, {'=<', HashKey, '$2'}],
+    Conditions = [{'=<', '$1', HashKey}, {'=<', HashKey, '$2'}],
     try ets:select(partitions, [{Head, Conditions, ['$_']}]) of
     [] ->
         mem3_util:load_shards_from_disk(DbName, DocId);
