@@ -74,7 +74,11 @@ handle_cast({kill, FromRef}, #st{workers=Workers} = St) ->
         {noreply, St#st{workers = remove_worker(KeyRef, Workers)}};
     false ->
         {noreply, St}
-    end.
+    end;
+
+handle_cast(_, St) ->
+    error_logger:error_report({?MODULE, ignored_cast}),
+    {noreply, St}.
 
 handle_info({'DOWN', Ref, process, _, normal}, #st{workers=Workers} = St) ->
     {noreply, St#st{workers = remove_worker(Ref, Workers)}};
