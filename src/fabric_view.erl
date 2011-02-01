@@ -105,9 +105,15 @@ maybe_resume_worker(Worker, State) ->
     end.
 
 maybe_send_row(#collector{limit=0} = State) ->
-    #collector{user_acc=AccIn, callback=Callback} = State,
-    {_, Acc} = Callback(complete, AccIn),
-    {stop, State#collector{user_acc=Acc}};
+    #collector{counters=Counters, user_acc=AccIn, callback=Callback} = State,
+    case fabric_dict:any(0, Counters) of
+    true ->
+        % we still need to send the total/offset header
+        {ok, State};
+    false ->
+        {_, Acc} = Callback(complete, AccIn),
+        {stop, State#collector{user_acc=Acc}}
+    end;
 maybe_send_row(State) ->
     #collector{
         callback = Callback,
