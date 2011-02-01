@@ -933,4 +933,9 @@ couchTests.replicator_db = function(debug) {
   usersDb.deleteDb();
   dbA.deleteDb();
   dbB.deleteDb();
+  (new CouchDB("test_suite_rep_db_2")).deleteDb();
+  (new CouchDB("test_suite_rep_db_c")).deleteDb();
+  (new CouchDB("test_suite_rep_db_a_copy")).deleteDb();
+  (new CouchDB("test_suite_rep_db_b_copy")).deleteDb();
+  (new CouchDB("test_suite_rep_db_c_copy")).deleteDb();
 };
