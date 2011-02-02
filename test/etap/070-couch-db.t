@@ -28,9 +28,7 @@ main(_) ->
 
 test() ->
 
-    couch_server_sup:start_link(
-        ["etc/couchdb/default_dev.ini", "etc/couchdb/local_dev.ini"]
-    ),
+    couch_server_sup:start_link(test_util:config_files()),
 
     couch_db:create(<<"etap-test-db">>, []),
     {ok, AllDbs} = couch_server:all_databases(),

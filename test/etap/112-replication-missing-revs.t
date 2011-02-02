@@ -42,7 +42,8 @@
 config_files() ->
     lists:map(fun test_util:build_file/1, [
         "etc/couchdb/default_dev.ini",
-        "etc/couchdb/local_dev.ini"
+        "etc/couchdb/local_dev.ini",
+        "test/etap/random_port.ini"
     ]).
 
 main(_) ->
@@ -185,8 +186,13 @@ start_changes_feed(local, Since, Continuous) ->
     couch_rep_changes_feed:start_link(self(), get_db(source), Since, Props);
 start_changes_feed(remote, Since, Continuous) ->
     Props = [{<<"continuous">>, Continuous}],
-    Db = #http_db{url = "http://127.0.0.1:5984/etap-test-source/"},
+    Db = #http_db{url = server() ++ "etap-test-source/"},
     couch_rep_changes_feed:start_link(self(), Db, Since, Props).
+
+server() ->
+    lists:concat([
+        "http://127.0.0.1:", mochiweb_socket_server:get(couch_httpd, port), "/"
+    ]).
 
 couch_rep_pid(Db) ->
     spawn(fun() -> couch_rep_pid_loop(Db) end).
@@ -203,6 +209,6 @@ start_missing_revs(local, Changes) ->
     MainPid = couch_rep_pid(TargetDb),
     couch_rep_missing_revs:start_link(MainPid, TargetDb, Changes, []);
 start_missing_revs(remote, Changes) ->
-    TargetDb = #http_db{url = "http://127.0.0.1:5984/etap-test-target/"},
+    TargetDb = #http_db{url = server() ++ "etap-test-target/"},
     MainPid = couch_rep_pid(TargetDb),
     couch_rep_missing_revs:start_link(MainPid, TargetDb, Changes, []).

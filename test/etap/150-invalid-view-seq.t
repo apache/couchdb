@@ -19,9 +19,6 @@
     handler
 }).
 
-default_config() ->
-    test_util:build_file("etc/couchdb/default_dev.ini").
-
 test_db_name() ->
     <<"couch_test_invalid_view_seq">>.
 
@@ -42,7 +39,7 @@ main(_) ->
 %%       a huge and ugly but harmless stack trace is sent to stderr
 %%
 test() ->
-    couch_server_sup:start_link([default_config()]),
+    couch_server_sup:start_link(test_util:config_files()),
     timer:sleep(1000),
     delete_db(),
     create_db(),
@@ -54,7 +51,7 @@ test() ->
     backup_db_file(),
 
     put(addr, couch_config:get("httpd", "bind_address", "127.0.0.1")),
-    put(port, couch_config:get("httpd", "port", "5984")),
+    put(port, integer_to_list(mochiweb_socket_server:get(couch_httpd, port))),
     application:start(inets),
 
     create_new_doc(),
@@ -168,8 +165,9 @@ restore_backup_db_file() ->
         binary_to_list(test_db_name()) ++ ".couch"),
     ok = file:delete(DbFile),
     ok = file:rename(DbFile ++ ".backup", DbFile),
-    couch_server_sup:start_link([default_config()]),
+    couch_server_sup:start_link(test_util:config_files()),
     timer:sleep(1000),
+    put(port, integer_to_list(mochiweb_socket_server:get(couch_httpd, port))),
     ok.
 
 query_view_after_restore_backup() ->
