@@ -13,9 +13,6 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-default_config() ->
-    test_util:build_file("etc/couchdb/default_dev.ini").
-
 test_db_name() ->
     <<"couch_test_atts_compression">>.
 
@@ -33,9 +30,9 @@ main(_) ->
     ok.
 
 test() ->
-    couch_server_sup:start_link([default_config()]),
+    couch_server_sup:start_link(test_util:config_files()),
     put(addr, couch_config:get("httpd", "bind_address", "127.0.0.1")),
-    put(port, couch_config:get("httpd", "port", "5984")),
+    put(port, integer_to_list(mochiweb_socket_server:get(couch_httpd, port))),
     application:start(inets),
     timer:sleep(1000),
     couch_server:delete(test_db_name(), []),

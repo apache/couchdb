@@ -13,7 +13,7 @@
 -module(test_util).
 
 -export([init_code_path/0]).
--export([source_file/1, build_file/1]).
+-export([source_file/1, build_file/1, config_files/0]).
 
 srcdir() ->
     "@abs_top_srcdir@".
@@ -33,3 +33,9 @@ source_file(Name) ->
 build_file(Name) ->
     filename:join([builddir(), Name]).
 
+config_files() ->
+    lists:map(fun build_file/1, [
+        "etc/couchdb/default_dev.ini",
+        "etc/couchdb/local_dev.ini",
+        "test/etap/random_port.ini"
+    ]).

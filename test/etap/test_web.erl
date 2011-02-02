@@ -25,7 +25,7 @@ start_link() ->
     mochiweb_http:start([
         {name, ?SERVER},
         {loop, {?MODULE, loop}},
-        {port, 5985}
+        {port, 0}
     ]).
 
 loop(Req) ->

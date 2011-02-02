@@ -38,12 +38,6 @@
     conn = nil
 }).
 
-config_files() ->
-    lists:map(fun test_util:build_file/1, [
-        "etc/couchdb/default_dev.ini",
-        "etc/couchdb/local_dev.ini"
-    ]).
-
 main(_) ->
     test_util:init_code_path(),
     
@@ -58,7 +52,7 @@ main(_) ->
     ok.
 
 test() ->
-    couch_server_sup:start_link(config_files()),
+    couch_server_sup:start_link(test_util:config_files()),
     ibrowse:start(),
     crypto:start(),
 
@@ -237,7 +231,12 @@ get_db() ->
 get_dbname(local) ->
     "etap-test-db";
 get_dbname(remote) ->
-    "http://127.0.0.1:5984/etap-test-db/".
+    server() ++ "etap-test-db/".
+
+server() ->
+    lists:concat([
+        "http://127.0.0.1:", mochiweb_socket_server:get(couch_httpd, port), "/"
+    ]).
 
 get_update_seq() ->
     Db = get_db(),
