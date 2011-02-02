@@ -13,14 +13,16 @@
 
 -record(req, {method=get, path="", headers=[], body="", opts=[]}).
 
-default_config() ->
-    [
-        test_util:build_file("etc/couchdb/default_dev.ini"),
-        test_util:source_file("test/etap/180-http-proxy.ini")
-    ].
+server() ->
+    lists:concat([
+        "http://127.0.0.1:",
+        mochiweb_socket_server:get(couch_httpd, port),
+        "/_test/"
+    ]).
 
-server() -> "http://127.0.0.1:5984/_test/".
-proxy() -> "http://127.0.0.1:5985/".
+proxy() ->
+    "http://127.0.0.1:" ++ integer_to_list(test_web:get_port()) ++ "/".
+
 external() -> "https://www.google.com/".
 
 main(_) ->
@@ -65,11 +67,28 @@ check_request(Name, Req, Remote, Local) ->
     Resp.
 
 test() ->
-    couch_server_sup:start_link(default_config()),
+    couch_server_sup:start_link(test_util:config_files()),
     ibrowse:start(),
     crypto:start(),
+
+    % start the test_web server on a random port
     test_web:start_link(),
+    Url = lists:concat([
+        "{couch_httpd_proxy, handle_proxy_req, <<\"http://127.0.0.1:",
+        test_web:get_port(),
+        "/\">>}"
+    ]),
+    couch_config:set("httpd_global_handlers", "_test", Url, false),
     
+    % 49151 is IANA Reserved, let's assume no one is listening there
+    couch_config:set("httpd_global_handlers", "_error",
+        "{couch_httpd_proxy, handle_proxy_req,<<\"http://127.0.0.1:49151/\">>}",
+        false
+    ),
+
+    % let couch_httpd restart
+    timer:sleep(100),
+
     test_basic(),
     test_alternate_status(),
     test_trailing_slash(),
@@ -320,7 +339,12 @@ test_passes_chunked_body_back() ->
 
 test_connect_error() ->
     Local = fun({ok, "500", _Headers, _Body}) -> true; (_) -> false end,
-    Req = #req{opts=[{url, "http://127.0.0.1:5984/_error"}]},
+    Url = lists:concat([
+        "http://127.0.0.1:",
+        mochiweb_socket_server:get(couch_httpd, port),
+        "/_error"
+    ]),
+    Req = #req{opts=[{url, Url}]},
     check_request("Connect error", Req, no_remote, Local).
 
 

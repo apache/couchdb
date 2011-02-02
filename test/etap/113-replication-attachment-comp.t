@@ -19,9 +19,6 @@
     handler
 }).
 
-default_config() ->
-    test_util:build_file("etc/couchdb/default_dev.ini").
-
 test_db_a_name() ->
     <<"couch_test_rep_att_comp_a">>.
 
@@ -41,9 +38,9 @@ main(_) ->
     ok.
 
 test() ->
-    couch_server_sup:start_link([default_config()]),
+    couch_server_sup:start_link(test_util:config_files()),
     put(addr, couch_config:get("httpd", "bind_address", "127.0.0.1")),
-    put(port, couch_config:get("httpd", "port", "5984")),
+    put(port, integer_to_list(mochiweb_socket_server:get(couch_httpd, port))),
     application:start(inets),
     ibrowse:start(),
     timer:sleep(1000),

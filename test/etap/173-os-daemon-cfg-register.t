@@ -24,11 +24,6 @@
     buf=[]
 }).
 
-config_files() ->
-    lists:map(fun test_util:build_file/1, [
-        "etc/couchdb/default_dev.ini"
-    ]).
-
 daemon_name() ->
     "wheee".
 
@@ -49,7 +44,7 @@ main(_) ->
     ok.
 
 test() ->
-    couch_config:start_link(config_files()),
+    couch_config:start_link(test_util:config_files()),
     couch_os_daemons:start_link(),
     
     DaemonCmd = daemon_cmd() ++ " 2> /dev/null",

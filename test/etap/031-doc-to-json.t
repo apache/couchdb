@@ -20,9 +20,6 @@
 -record(att, {name, type, att_len, disk_len, md5= <<>>, revpos=0, data,
             encoding=identity}).
 
-default_config() ->
-    test_util:build_file("etc/couchdb/default_dev.ini").
-
 main(_) ->
     test_util:init_code_path(),
     etap:plan(12),
@@ -36,7 +33,7 @@ main(_) ->
     ok.
 
 test() ->
-    couch_config:start_link([default_config()]),
+    couch_config:start_link(test_util:config_files()),
     couch_config:set("attachments", "compression_level", "0"),
     ok = test_to_json_success(),
     ok.

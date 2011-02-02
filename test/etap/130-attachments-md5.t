@@ -11,9 +11,6 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-default_config() ->
-    test_util:build_file("etc/couchdb/default_dev.ini").
-
 test_db_name() ->
     <<"etap-test-db">>.
 
@@ -41,11 +38,10 @@ main(_) ->
     ok.
 
 test() ->
-    couch_server_sup:start_link([default_config()]),
+    couch_server_sup:start_link(test_util:config_files()),
     Addr = couch_config:get("httpd", "bind_address", any),
-    Port = list_to_integer(couch_config:get("httpd", "port", "5984")),
     put(addr, Addr),
-    put(port, Port),
+    put(port, mochiweb_socket_server:get(couch_httpd, port)),
     timer:sleep(1000),
 
     couch_server:delete(test_db_name(), []),
