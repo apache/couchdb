@@ -67,7 +67,10 @@ check_request(Name, Req, Remote, Local) ->
     Resp.
 
 test() ->
-    couch_server_sup:start_link(test_util:config_files()),
+    couch_server_sup:start_link([
+        test_util:build_file("test/etap/180-http-proxy.ini") |
+        test_util:config_files()
+    ]),
     ibrowse:start(),
     crypto:start(),
 
@@ -79,12 +82,6 @@ test() ->
         "/\">>}"
     ]),
     couch_config:set("httpd_global_handlers", "_test", Url, false),
-    
-    % 49151 is IANA Reserved, let's assume no one is listening there
-    couch_config:set("httpd_global_handlers", "_error",
-        "{couch_httpd_proxy, handle_proxy_req,<<\"http://127.0.0.1:49151/\">>}",
-        false
-    ),
 
     % let couch_httpd restart
     timer:sleep(100),
