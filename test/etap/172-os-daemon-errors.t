@@ -30,16 +30,16 @@ config_files() ->
     ]).
 
 bad_perms() ->
-    test_util:source_file("test/etap/172-os-daemon-errors.1.es").
+    test_util:source_file("test/etap/172-os-daemon-errors.1.sh").
 
 die_on_boot() ->
-    test_util:source_file("test/etap/172-os-daemon-errors.2.es").
+    test_util:source_file("test/etap/172-os-daemon-errors.2.sh").
 
 die_quickly() ->
-    test_util:source_file("test/etap/172-os-daemon-errors.3.es").
+    test_util:source_file("test/etap/172-os-daemon-errors.3.sh").
 
 can_reboot() ->
-    test_util:source_file("test/etap/172-os-daemon-errors.4.es").
+    test_util:source_file("test/etap/172-os-daemon-errors.4.sh").
 
 main(_) ->
     test_util:init_code_path(),
