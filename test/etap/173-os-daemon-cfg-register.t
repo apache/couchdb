@@ -51,31 +51,54 @@ test() ->
     
     etap:diag("Booting the daemon"),
     couch_config:set("os_daemons", daemon_name(), DaemonCmd, false),
-    timer:sleep(1000),
+    wait_for_start(10),
     {ok, [D1]} = couch_os_daemons:info([table]),
     check_daemon(D1, running),
     
     etap:diag("Daemon restarts when section changes."),
     couch_config:set("s1", "k", "foo", false),
-    timer:sleep(1000),
+    wait_for_restart(10),
     {ok, [D2]} = couch_os_daemons:info([table]),
     check_daemon(D2, running),
     etap:isnt(D2#daemon.kill, D1#daemon.kill, "Kill command shows restart."),
 
     etap:diag("Daemon doesn't restart for ignored section key."),
     couch_config:set("s2", "k2", "baz", false),
-    timer:sleep(1000),
+    timer:sleep(1000), % Message travel time.
     {ok, [D3]} = couch_os_daemons:info([table]),
     etap:is(D3, D2, "Same daemon info after ignored config change."),
     
     etap:diag("Daemon restarts for specific section/key pairs."),
     couch_config:set("s2", "k", "bingo", false),
-    timer:sleep(1000),
+    wait_for_restart(10),
     {ok, [D4]} = couch_os_daemons:info([table]),
     check_daemon(D4, running),
     etap:isnt(D4#daemon.kill, D3#daemon.kill, "Kill command changed again."),
     
     ok.
+
+wait_for_start(0) ->
+    throw({error, wait_for_start});
+wait_for_start(N) ->
+    case couch_os_daemons:info([table]) of
+        {ok, []} ->
+            timer:sleep(200),
+            wait_for_start(N-1);
+        _ ->
+            timer:sleep(1000)
+    end.
+
+wait_for_restart(0) ->
+    throw({error, wait_for_restart});
+wait_for_restart(N) ->
+    {ok, [D]} = couch_os_daemons:info([table]),
+    case D#daemon.status of
+        restarting ->
+            timer:sleep(200),
+            wait_for_restart(N-1);
+        _ ->
+            timer:sleep(1000)
+    end.
 
 check_daemon(D, Status) ->
     BaseName = filename:basename(daemon_cmd()) ++ " 2> /dev/null",

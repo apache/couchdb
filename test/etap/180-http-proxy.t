@@ -67,10 +67,8 @@ check_request(Name, Req, Remote, Local) ->
     Resp.
 
 test() ->
-    couch_server_sup:start_link([
-        test_util:build_file("test/etap/180-http-proxy.ini") |
-        test_util:config_files()
-    ]),
+    ExtraConfig = [test_util:source_file("test/etap/180-http-proxy.ini")],
+    couch_server_sup:start_link(test_util:config_files() ++ ExtraConfig),
     ibrowse:start(),
     crypto:start(),
 
