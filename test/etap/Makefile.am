@@ -26,8 +26,8 @@ CLEANFILES = run *.beam
 DISTCLEANFILES = temp.*
 
 EXTRA_DIST = \
-	run.tpl \
-	test_web.erl \
+    run.tpl \
+    test_web.erl \
     random_port.ini \
     001-load.t \
     002-icu-driver.t \
@@ -70,7 +70,7 @@ EXTRA_DIST = \
     150-invalid-view-seq.t \
     160-vhosts.t \
     170-os-daemons.es \
-	170-os-daemons.t \
+    170-os-daemons.t \
     171-os-daemons-config.es \
     171-os-daemons-config.t \
     172-os-daemon-errors.1.sh \
@@ -78,7 +78,7 @@ EXTRA_DIST = \
     172-os-daemon-errors.3.sh \
     172-os-daemon-errors.4.sh \
     172-os-daemon-errors.t \
-	173-os-daemon-cfg-register.es \
-	173-os-daemon-cfg-register.t \
-	180-http-proxy.ini \
-	180-http-proxy.t
+    173-os-daemon-cfg-register.es \
+    173-os-daemon-cfg-register.t \
+    180-http-proxy.ini \
+    180-http-proxy.t
