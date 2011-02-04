@@ -15,7 +15,7 @@
 -module(mem3).
 
 -export([start/0, stop/0, restart/0, nodes/0, shards/1, shards/2,
-    choose_shards/2, n/1, dbname/1]).
+    choose_shards/2, n/1, dbname/1, ushards/1]).
 -export([compare_nodelists/0, compare_shards/1]).
 
 -include("mem3.hrl").
@@ -115,6 +115,15 @@ shards(DbName, DocId) ->
     catch error:badarg ->
         mem3_util:load_shards_from_disk(DbName, DocId)
     end.
+
+ushards(DbName) ->
+    lists:usort(fun(#shard{name=A}, #shard{name=B}) ->
+        A =< B
+    end, lists:sort(live_shards(DbName))).
+
+live_shards(DbName) ->
+    Nodes = [node()|erlang:nodes()],
+    [S || #shard{node=Node} = S <- shards(DbName), lists:member(Node, Nodes)].
 
 -spec choose_shards(DbName::iodata(), Options::list()) -> [#shard{}].
 choose_shards(DbName, Options) when is_list(DbName) ->
