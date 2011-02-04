@@ -130,9 +130,8 @@ handle_design_req(#httpd{
     }=Req, Db) ->
     case fabric:open_doc(Db, <<"_design/", Name/binary>>, []) of
     {ok, DDoc} ->
-        % TODO we'll trigger a badarity here if ddoc attachment starts with "_",
-        % or if user tries an unknown Action
-        Handler = couch_util:get_value(Action, DesignUrlHandlers, fun db_req/2),
+        Handler = couch_util:get_value(Action, DesignUrlHandlers,
+            fun bad_action_req/3),
         Handler(Req, Db, DDoc);
     Error ->
         throw(Error)
@@ -140,6 +139,9 @@ handle_design_req(#httpd{
 
 handle_design_req(Req, Db) ->
     db_req(Req, Db).
+
+bad_action_req(#httpd{path_parts=[_, _, Name|FileNameParts]}=Req, Db, _DDoc) ->
+    db_attachment_req(Req, Db, <<"_design/",Name/binary>>, FileNameParts).
 
 handle_design_info_req(#httpd{method='GET'}=Req, Db, #doc{id=Id} = DDoc) ->
     {ok, GroupInfoList} = fabric:get_view_group_info(Db, DDoc),
