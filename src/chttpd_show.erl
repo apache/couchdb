@@ -225,8 +225,12 @@ list_callback(complete, Acc) ->
     send_non_empty_chunk(Resp, Chunk),
     couch_httpd:last_chunk(Resp),
     {ok, Resp};
-list_callback({error, Reason}, {_, Resp}) ->
-    chttpd:send_chunked_error(Resp, {error, Reason}).
+list_callback({error, Reason}, #lacc{req=Req, resp=Resp}) ->
+    case Resp of nil ->
+        chttpd:send_error(Req, Reason);
+    _ ->
+        chttpd:send_chunked_error(Resp, {error, Reason})
+    end.
 
 start_list_resp(Head, Acc) ->
     #lacc{
