@@ -25,7 +25,8 @@ go(DbName, GroupId, View, Args, Callback, Acc0) when is_binary(GroupId) ->
     go(DbName, DDoc, View, Args, Callback, Acc0);
 
 go(DbName, DDoc, View, Args, Callback, Acc0) ->
-    Workers = fabric_util:submit_jobs(mem3:shards(DbName),map_view,[DDoc,View,Args]),
+    Shards = fabric_view:get_shards(DbName, Args),
+    Workers = fabric_util:submit_jobs(Shards, map_view, [DDoc, View, Args]),
     BufferSize = couch_config:get("fabric", "map_buffer_size", "2"),
     #view_query_args{limit = Limit, skip = Skip, keys = Keys} = Args,
     State = #collector{

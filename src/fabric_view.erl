@@ -16,7 +16,7 @@
 
 -export([is_progress_possible/1, remove_overlapping_shards/2, maybe_send_row/1,
     maybe_pause_worker/3, maybe_resume_worker/2, transform_row/1, keydict/1,
-    extract_view/4]).
+    extract_view/4, get_shards/2]).
 
 -include("fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
@@ -276,6 +276,11 @@ index_of(X, [X|_Rest], I) ->
     I;
 index_of(X, [_|Rest], I) ->
     index_of(X, Rest, I+1).
+
+get_shards(DbName, #view_query_args{stale=ok}) ->
+    mem3:ushards(DbName);
+get_shards(DbName, #view_query_args{stale=false}) ->
+    mem3:shards(DbName).
 
 % unit test
 is_progress_possible_test() ->

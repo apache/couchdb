@@ -32,7 +32,7 @@ go(DbName, DDoc, VName, Args, Callback, Acc0) ->
     Workers = lists:map(fun(#shard{name=Name, node=N} = Shard) ->
         Ref = rexi:cast(N, {fabric_rpc, reduce_view, [Name,Group,VName,Args]}),
         Shard#shard{ref = Ref}
-    end, mem3:shards(DbName)),
+    end, fabric_view:get_shards(DbName, Args)),
     BufferSize = couch_config:get("fabric", "reduce_buffer_size", "20"),
     #view_query_args{limit = Limit, skip = Skip} = Args,
     State = #collector{
