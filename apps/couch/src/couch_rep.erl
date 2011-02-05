@@ -532,7 +532,7 @@ open_replication_log(#http_db{}=Db, RepId) ->
     DocId = ?LOCAL_DOC_PREFIX ++ RepId,
     Req = Db#http_db{resource=couch_util:url_encode(DocId)},
     case couch_rep_httpc:request(Req) of
-    {[{<<"error">>, _}, {<<"reason">>, _} | _Rest]} ->
+    {[{<<"error">>, _}, {<<"reason">>, _}]} ->
         ?LOG_DEBUG("didn't find a replication log for ~s", [Db#http_db.url]),
         #doc{id=?l2b(DocId)};
     Doc ->
