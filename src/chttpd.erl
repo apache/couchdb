@@ -555,8 +555,9 @@ send_error(Req, Code, ErrorStr, ReasonStr, Stack) ->
 send_error(Req, Code, Headers, ErrorStr, ReasonStr, Stack) ->
     send_json(Req, Code, Headers,
         {[{<<"error">>,  ErrorStr},
-         {<<"reason">>, ReasonStr},
-         {stack, Stack}]}).
+        {<<"reason">>, ReasonStr} |
+        case Stack of [] -> []; _ -> [{stack, Stack}] end
+    ]}).
 
 % give the option for list functions to output html or other raw errors
 send_chunked_error(Resp, {_Error, {[{<<"body">>, Reason}]}}) ->
@@ -567,8 +568,9 @@ send_chunked_error(Resp, Error) ->
     {Code, ErrorStr, ReasonStr} = error_info(Error),
     JsonError = {[{<<"code">>, Code},
         {<<"error">>,  ErrorStr},
-        {<<"reason">>, ReasonStr},
-        {stack, json_stack(Error)}]},
+        {<<"reason">>, ReasonStr} |
+        case json_stack(Error) of [] -> []; Stack -> [{stack, Stack}] end
+    ]},
     send_chunk(Resp, ?l2b([$\n,?JSON_ENCODE(JsonError),$\n])),
     send_chunk(Resp, []).
 
