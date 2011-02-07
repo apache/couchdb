@@ -25,25 +25,9 @@
 
 -define(DEFAULT_ATTACHMENT_CONTENT_TYPE, <<"application/octet-stream">>).
 
--define(LOG_DEBUG(Format, Args),
-    case couch_log:debug_on() of
-        true ->
-            gen_event:sync_notify(error_logger,
-                {self(), couch_debug, {Format, Args}});
-        false -> ok
-    end).
-
--define(LOG_INFO(Format, Args),
-    case couch_log:info_on() of
-        true ->
-            gen_event:sync_notify(error_logger,
-                {self(), couch_info, {Format, Args}});
-        false -> ok
-    end).
-
--define(LOG_ERROR(Format, Args),
-    gen_event:sync_notify(error_logger,
-            {self(), couch_error, {Format, Args}})).
+-define(LOG_DEBUG(Format, Args), couch_log:debug(Format, Args)).
+-define(LOG_INFO(Format, Args), couch_log:info(Format, Args)).
+-define(LOG_ERROR(Format, Args), couch_log:error(Format, Args)).
 
 % Tree::term() is really a tree(), but we don't want to require R13B04 yet
 -type branch() :: {Key::term(), Value::term(), Tree::term()}.
