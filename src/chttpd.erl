@@ -524,27 +524,71 @@ error_info({Error, Reason, _Stack}) ->
 error_info(Error) ->
     {500, couch_util:to_binary(Error), null}.
 
+error_headers(#httpd{mochi_req=MochiReq}=Req, 401=Code, ErrorStr, ReasonStr) ->
+    % this is where the basic auth popup is triggered
+    case MochiReq:get_header_value("X-CouchDB-WWW-Authenticate") of
+    undefined ->
+        case couch_config:get("httpd", "WWW-Authenticate", nil) of
+        nil ->
+            % If the client is a browser and the basic auth popup isn't turned on
+            % redirect to the session page.
+            case ErrorStr of
+            <<"unauthorized">> ->
+                case couch_config:get("couch_httpd_auth", "authentication_redirect", nil) of
+                nil -> {Code, []};
+                AuthRedirect ->
+                    case couch_config:get("couch_httpd_auth", "require_valid_user", "false") of
+                    "true" ->
+                        % send the browser popup header no matter what if we are require_valid_user
+                        {Code, [{"WWW-Authenticate", "Basic realm=\"server\""}]};
+                    _False ->
+                        % if the accept header matches html, then do the redirect. else proceed as usual.
+                        Accepts = case MochiReq:get_header_value("Accept") of
+                        undefined ->
+                           % According to the HTTP 1.1 spec, if the Accept
+                           % header is missing, it means the client accepts
+                           % all media types.
+                           "html";
+                        Else ->
+                            Else
+                        end,
+                        case re:run(Accepts, "\\bhtml\\b",
+                                [{capture, none}, caseless]) of
+                        nomatch ->
+                            {Code, []};
+                        match ->
+                            AuthRedirectBin = ?l2b(AuthRedirect),
+                            % Redirect to the path the user requested, not
+                            % the one that is used internally.
+                            UrlReturnRaw = case MochiReq:get_header_value("x-couchdb-vhost-path") of
+                                undefined -> MochiReq:get(path);
+                                VHostPath -> VHostPath
+                            end,
+                            UrlReturn = ?l2b(couch_util:url_encode(UrlReturnRaw)),
+                            UrlReason = ?l2b(couch_util:url_encode(ReasonStr)),
+                            {302, [{"Location", couch_httpd:absolute_uri(Req, <<AuthRedirectBin/binary,"?return=",UrlReturn/binary,"&reason=",UrlReason/binary>>)}]}
+                        end
+                    end
+                end;
+            _Else ->
+                {Code, []}
+            end;
+        Type ->
+            {Code, [{"WWW-Authenticate", Type}]}
+        end;
+    Type ->
+       {Code, [{"WWW-Authenticate", Type}]}
+    end;
+error_headers(_, Code, _, _) ->
+    {Code, []}.
+
 send_error(_Req, {already_sent, Resp, _Error}) ->
     {ok, Resp};
 
-send_error(#httpd{mochi_req=MochiReq}=Req, Error) ->
+send_error(Req, Error) ->
     {Code, ErrorStr, ReasonStr} = error_info(Error),
-    Headers = if Code == 401 ->
-        case MochiReq:get_header_value("X-CouchDB-WWW-Authenticate") of
-        undefined ->
-            case couch_config:get("httpd", "WWW-Authenticate", nil) of
-            nil ->
-                [];
-            Type ->
-                [{"WWW-Authenticate", Type}]
-            end;
-        Type ->
-            [{"WWW-Authenticate", Type}]
-        end;
-    true ->
-        []
-    end,
-    send_error(Req, Code, Headers, ErrorStr, ReasonStr, json_stack(Error)).
+    {Code1, Headers} = error_headers(Req, Code, ErrorStr, ReasonStr),
+    send_error(Req, Code1, Headers, ErrorStr, ReasonStr, json_stack(Error)).
 
 send_error(Req, Code, ErrorStr, ReasonStr) ->
     send_error(Req, Code, ErrorStr, ReasonStr, []).
