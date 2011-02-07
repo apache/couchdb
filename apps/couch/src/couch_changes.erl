@@ -139,7 +139,7 @@ custom_filter(Id, Revs, {Db, JsonReq, DDoc, Filter}) ->
     Docs = [Doc || {ok, Doc} <- Results],
     {ok, Passes} = couch_query_servers:filter_docs({json_req,JsonReq}, Db,
         DDoc, Filter, Docs),
-    ?LOG_INFO("filtering ~p ~p", [Id, Passes]),
+    % ?LOG_INFO("filtering ~p ~p", [Id, Passes]),
     [{[{<<"rev">>, couch_doc:rev_to_str({RevPos,RevId})}]}
         || {Pass, #doc{revs={RevPos,[RevId|_]}}}
         <- lists:zip(Passes, Docs), Pass == true].
