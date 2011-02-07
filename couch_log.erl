@@ -15,6 +15,7 @@
 
 % public API
 -export([start_link/0, stop/0]).
+-export([debug/2, info/2, error/2]).
 -export([debug_on/0, info_on/0, get_level/0, get_level_integer/0, set_level/1]).
 -export([read/2]).
 
@@ -29,9 +30,31 @@
 -record(state, {
     fd,
     level,
-    sasl,
-    eol_re
+    sasl
 }).
+
+debug(Format, Args) ->
+    case debug_on() of
+    false ->
+        ok;
+    true ->
+        {ConsoleMsg, FileMsg} = get_log_messages(self(), debug, Format, Args),
+        gen_event:sync_notify(error_logger, {couch_debug, ConsoleMsg, FileMsg})
+    end.
+
+info(Format, Args) ->
+    case info_on() of
+    false ->
+        ok;
+    true ->
+        {ConsoleMsg, FileMsg} = get_log_messages(self(), info, Format, Args),
+        gen_event:sync_notify(error_logger, {couch_info, ConsoleMsg, FileMsg})
+    end.
+
+error(Format, Args) ->
+    {ConsoleMsg, FileMsg} = get_log_messages(self(), error, Format, Args),
+    gen_event:sync_notify(error_logger, {couch_error, ConsoleMsg, FileMsg}).
+
 
 level_integer(error)    -> ?LEVEL_ERROR;
 level_integer(info)     -> ?LEVEL_INFO;
@@ -75,8 +98,7 @@ init([]) ->
 
     case file:open(Filename, [append]) of
     {ok, Fd} ->
-        {ok, EolRe} = re:compile("\\r\\n|\\r|\\n"),
-        {ok, #state{fd = Fd, level = Level, sasl = Sasl, eol_re = EolRe}};
+        {ok, #state{fd = Fd, level = Level, sasl = Sasl}};
     {error, eacces} ->
         {stop, {file_permission_error, Filename}};
     Error ->
@@ -105,22 +127,24 @@ get_level_integer() ->
 set_level_integer(Int) ->
     gen_event:call(error_logger, couch_log, {set_level_integer, Int}).
 
-handle_event({Pid, couch_error, {Format, Args}}, State) ->
-    log(State, Pid, error, Format, Args),
+handle_event({couch_error, ConMsg, FileMsg}, State) ->
+    log(State, ConMsg, FileMsg),
     {ok, State};
-handle_event({Pid, couch_info, {Format, Args}}, #state{level = LogLevel} = St)
+handle_event({couch_info, ConMsg, FileMsg}, #state{level = LogLevel} = State)
 when LogLevel =< ?LEVEL_INFO ->
-    log(St, Pid, info, Format, Args),
-    {ok, St};
-handle_event({Pid, couch_debug, {Format, Args}}, #state{level = LogLevel} = St)
+    log(State, ConMsg, FileMsg),
+    {ok, State};
+handle_event({couch_debug, ConMsg, FileMsg}, #state{level = LogLevel} = State)
 when LogLevel =< ?LEVEL_DEBUG ->
-    log(St, Pid, debug, Format, Args),
-    {ok, St};
+    log(State, ConMsg, FileMsg),
+    {ok, State};
 handle_event({error_report, _, {Pid, _, _}}=Event, #state{sasl = true} = St) ->
-    log(St, Pid, error, "~p", [Event]),
+    {ConMsg, FileMsg} = get_log_messages(Pid, error, "~p", [Event]),
+    log(St, ConMsg, FileMsg),
     {ok, St};
 handle_event({error, _, {Pid, Format, Args}}, #state{sasl = true} = State) ->
-    log(State, Pid, error, Format, Args),
+    {ConMsg, FileMsg} = get_log_messages(Pid, error, Format, Args),
+    log(State, ConMsg, FileMsg),
     {ok, State};
 handle_event(_Event, State) ->
     {ok, State}.
@@ -138,12 +162,15 @@ code_change(_OldVsn, State, _Extra) ->
 terminate(_Arg, #state{fd = Fd}) ->
     file:close(Fd).
 
-log(#state{fd = Fd, eol_re = EolRe}, Pid, Level, Format, Args) ->
-    Msg = io_lib:format(Format, Args),
-    ok = io:format("[~s] [~p] ~s~n", [Level, Pid, Msg]), % dump to console too
-    Msg2 = re:replace(Msg, EolRe, "\r\n", [global]),
-    ok = io:format(Fd, "[~s] [~s] [~p] ~s\r~n",
-        [httpd_util:rfc1123_date(), Level, Pid, Msg2]).
+log(#state{fd = Fd}, ConsoleMsg, FileMsg) ->
+    ok = io:put_chars(ConsoleMsg),
+    ok = io:put_chars(Fd, FileMsg).
+
+get_log_messages(Pid, Level, Format, Args) ->
+    ConsoleMsg = io_lib:format(
+        "[~s] [~p] " ++ Format ++ "~n", [Level, Pid | Args]),
+    FileMsg = ["[", httpd_util:rfc1123_date(), "] ", ConsoleMsg],
+    {iolist_to_binary(ConsoleMsg), iolist_to_binary(FileMsg)}.
 
 read(Bytes, Offset) ->
     LogFileName = couch_config:get("log", "file"),
