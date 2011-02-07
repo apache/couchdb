@@ -62,8 +62,7 @@ json_req_obj(Req, Db) -> json_req_obj(Req, Db, null).
 json_req_obj(#httpd{mochi_req=Req,
                method=Method,
                path_parts=Path,
-               req_body=ReqBody,
-               user_ctx=Ctx
+               req_body=ReqBody
             }, Db, DocId) ->
     Body = case ReqBody of
         undefined -> Req:recv_body();
@@ -90,7 +89,7 @@ json_req_obj(#httpd{mochi_req=Req,
         {<<"peer">>, ?l2b(Req:get(peer))},
         {<<"form">>, to_json_terms(ParsedForm)},
         {<<"cookie">>, to_json_terms(Req:parse_cookie())},
-        {<<"userCtx">>, couch_util:json_user_ctx(#db{name=Db, user_ctx=Ctx})}]}.
+        {<<"userCtx">>, couch_util:json_user_ctx(Db)}]}.
 
 to_json_terms(Data) ->
     to_json_terms(Data, []).
