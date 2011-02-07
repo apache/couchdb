@@ -151,8 +151,8 @@ handle_replicate_req(#httpd{method='POST', user_ctx=Ctx} = Req) ->
     catch
     throw:{db_not_found, Msg} ->
         send_json(Req, 404, {[{error, db_not_found}, {reason, Msg}]});
-    throw:{node_not_connected, Msg} ->
-        send_json(Req, 404, {[{error, node_not_connected}, {reason, Msg}]})
+    throw:{unauthorized, Msg} ->
+        send_json(Req, 404, {[{error, unauthorized}, {reason, Msg}]})
     end;
 handle_replicate_req(Req) ->
     send_method_not_allowed(Req, "POST").
