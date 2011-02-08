@@ -101,7 +101,7 @@ reverse_key_default(?MAX_STR) -> ?MIN_STR;
 reverse_key_default(Key) -> Key.
 
 get_reduce_type(Req) ->
-    list_to_atom(chttpd:qs_value(Req, "reduce", "true")).
+    list_to_existing_atom(chttpd:qs_value(Req, "reduce", "true")).
 
 parse_view_params(Req, Keys, ViewType) ->
     QueryList = chttpd:qs(Req),
