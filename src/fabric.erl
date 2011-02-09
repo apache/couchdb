@@ -123,12 +123,8 @@ set_revs_limit(DbName, Limit, Options) when is_integer(Limit), Limit > 0 ->
 %% @doc retrieves the maximum number of document revisions
 -spec get_revs_limit(dbname()) -> pos_integer() | no_return().
 get_revs_limit(DbName) ->
-    case fabric_util:get_db(dbname(DbName)) of
-    {ok, Db} ->
-        try couch_db:get_revs_limit(Db) after catch couch_db:close(Db) end;
-    {not_found, no_db_file} ->
-        erlang:error(database_does_not_exist)
-    end.
+    {ok, Db} = fabric_util:get_db(dbname(DbName)),
+    try couch_db:get_revs_limit(Db) after catch couch_db:close(Db) end.
 
 %% @doc sets the readers/writers/admin permissions for a database
 -spec set_security(dbname(), SecObj::json_obj(), [option()]) -> ok.
@@ -138,12 +134,8 @@ set_security(DbName, SecObj, Options) ->
 %% @doc retrieve the security object for a database
 -spec get_security(dbname()) -> json_obj() | no_return().
 get_security(DbName) ->
-    case fabric_util:get_db(dbname(DbName)) of
-    {ok, Db} ->
-        try couch_db:get_security(Db) after catch couch_db:close(Db) end;
-    {not_found, no_db_file} ->
-        erlang:error(database_does_not_exist)
-    end.
+    {ok, Db} = fabric_util:get_db(dbname(DbName)),
+    try couch_db:get_security(Db) after catch couch_db:close(Db) end.
 
 % doc operations
 
