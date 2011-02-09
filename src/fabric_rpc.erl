@@ -100,6 +100,7 @@ map_view(DbName, DDoc, ViewName, QueryArgs) ->
     Group0 = couch_view_group:design_doc_to_view_group(DDoc),
     {ok, Pid} = gen_server:call(couch_view, {get_group_server, DbName, Group0}),
     {ok, Group} = couch_view_group:request_group(Pid, MinSeq),
+    erlang:monitor(process, Group#group.fd),
     View = fabric_view:extract_view(Pid, ViewName, Group#group.views, ViewType),
     {ok, Total} = couch_view:get_row_count(View),
     Acc0 = #view_acc{
@@ -137,8 +138,9 @@ reduce_view(DbName, Group0, ViewName, QueryArgs) ->
     GroupFun = group_rows_fun(GroupLevel),
     MinSeq = if Stale == ok -> 0; true -> couch_db:get_update_seq(Db) end,
     {ok, Pid} = gen_server:call(couch_view, {get_group_server, DbName, Group0}),
-    {ok, #group{views=Views, def_lang=Lang}} = couch_view_group:request_group(
-        Pid, MinSeq),
+    {ok, Group} = couch_view_group:request_group(Pid, MinSeq),
+    #group{views=Views, def_lang=Lang, fd=Fd} = Group,
+    erlang:monitor(process, Fd),
     {NthRed, View} = fabric_view:extract_view(Pid, ViewName, Views, reduce),
     ReduceView = {reduce, NthRed, Lang, View},
     Acc0 = #view_acc{group_level = GroupLevel, limit = Limit+Skip},
