@@ -26,10 +26,10 @@ clean:
 	@cd couchjs && python scons/scons.py --clean
 	@./rebar clean
 
-check:
+# compile is required here because of cross-dependencies between apps
+check: compile
 	@./rebar eunit
-	@ERL_FLAGS="-pa `pwd`/apps/couch/ebin `pwd`/apps/couch/test/etap" \
-		prove apps/couch/test/etap/*.t
+	@ERL_FLAGS="-pa `pwd`/apps/couch/ebin" prove apps/couch/test/etap/*.t
 
 dist: compile
 	@rm -rf rel/bigcouch

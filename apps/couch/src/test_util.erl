@@ -15,20 +15,11 @@
 -export([init_code_path/0]).
 -export([source_file/1, build_file/1]).
 
-srcdir() ->
-    "@abs_top_srcdir@".
-
-builddir() ->
-    "@abs_top_builddir@".
-
 init_code_path() ->
-    Paths = ["etap", "couch", "oauth", "ibrowse", "mochiweb"],
-    lists:foreach(fun(Name) ->
-        code:add_pathz(filename:join([builddir(), "ebin", Name]))
-    end, Paths).
+    code:load_abs("apps/couch/test/etap/etap").
 
 source_file(Name) ->
-    filename:join([srcdir(), Name]).
+    filename:join(["apps/couch", Name]).
 
 build_file(Name) ->
-    filename:join([builddir(), Name]).
+    filename:join(["apps/couch", Name]).
