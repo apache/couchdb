@@ -298,8 +298,7 @@ end_sending_changes(Callback, UserAcc, EndSeq, ResponseType) ->
 changes_enumerator(DocInfo, {Db, _, _, FilterFun, Callback, UserAcc,
     "continuous", Limit, IncludeDocs}) ->
 
-    #doc_info{id=Id, high_seq=Seq,
-            revs=[#rev_info{deleted=Del,rev=Rev}|_]} = DocInfo,
+    #doc_info{high_seq = Seq} = DocInfo,
     Results0 = FilterFun(DocInfo),
     Results = [Result || Result <- Results0, Result /= null],
     Go = if Limit =< 1 -> stop; true -> ok end,
@@ -309,7 +308,7 @@ changes_enumerator(DocInfo, {Db, _, _, FilterFun, Callback, UserAcc,
                 IncludeDocs}
         };
     _ ->
-        ChangesRow = changes_row(Db, Seq, Id, Del, Results, Rev, IncludeDocs),
+        ChangesRow = changes_row(Db, Results, DocInfo, IncludeDocs),
         UserAcc2 = Callback({change, ChangesRow, <<>>}, "continuous", UserAcc),
         {Go, {Db, Seq, nil, FilterFun, Callback, UserAcc2, "continuous",
                 Limit - 1, IncludeDocs}
@@ -318,8 +317,7 @@ changes_enumerator(DocInfo, {Db, _, _, FilterFun, Callback, UserAcc,
 changes_enumerator(DocInfo, {Db, _, Prepend, FilterFun, Callback, UserAcc,
     ResponseType, Limit, IncludeDocs}) ->
 
-    #doc_info{id=Id, high_seq=Seq, revs=[#rev_info{deleted=Del,rev=Rev}|_]}
-        = DocInfo,
+    #doc_info{high_seq = Seq} = DocInfo,
     Results0 = FilterFun(DocInfo),
     Results = [Result || Result <- Results0, Result /= null],
     Go = if (Limit =< 1) andalso Results =/= [] -> stop; true -> ok end,
@@ -329,7 +327,7 @@ changes_enumerator(DocInfo, {Db, _, Prepend, FilterFun, Callback, UserAcc,
                 Limit, IncludeDocs}
         };
     _ ->
-        ChangesRow = changes_row(Db, Seq, Id, Del, Results, Rev, IncludeDocs),
+        ChangesRow = changes_row(Db, Results, DocInfo, IncludeDocs),
         UserAcc2 = Callback({change, ChangesRow, Prepend}, ResponseType, UserAcc),
         {Go, {Db, Seq, <<",\n">>, FilterFun, Callback, UserAcc2, ResponseType,
                 Limit - 1, IncludeDocs}
@@ -337,12 +335,15 @@ changes_enumerator(DocInfo, {Db, _, Prepend, FilterFun, Callback, UserAcc,
     end.
 
 
-changes_row(Db, Seq, Id, Del, Results, Rev, true) ->
+changes_row(Db, Results, DocInfo, IncludeDoc) ->
+    #doc_info{
+        id = Id, high_seq = Seq, revs = [#rev_info{deleted = Del} | _]
+    } = DocInfo,
     {[{<<"seq">>, Seq}, {<<"id">>, Id}, {<<"changes">>, Results}] ++
-        deleted_item(Del) ++ couch_httpd_view:doc_member(Db, {Id, Rev})};
-changes_row(_, Seq, Id, Del, Results, _, false) ->
-    {[{<<"seq">>, Seq}, {<<"id">>, Id}, {<<"changes">>, Results}] ++
-        deleted_item(Del)}.
+        deleted_item(Del) ++ case IncludeDoc of
+            true -> couch_httpd_view:doc_member(Db, DocInfo);
+            false -> []
+        end}.
 
 deleted_item(true) -> [{<<"deleted">>, true}];
 deleted_item(_) -> [].
