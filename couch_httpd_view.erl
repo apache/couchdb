@@ -660,6 +660,14 @@ view_row_obj(_Db, {{Key, DocId}, Value}, _IncludeDocs) ->
 view_row_with_doc(Db, {{Key, DocId}, Value}, IdRev) ->
     {[{id, DocId}, {key, Key}, {value, Value}] ++ doc_member(Db, IdRev)}.
 
+doc_member(Db, #doc_info{id = Id, revs = [#rev_info{rev = Rev} | _]} = Info) ->
+    ?LOG_DEBUG("Include Doc: ~p ~p", [Id, Rev]),
+    case couch_db:open_doc(Db, Info, [deleted]) of
+    {ok, Doc} ->
+        [{doc, couch_doc:to_json_obj(Doc, [])}];
+    _ ->
+        [{doc, null}]
+    end;
 doc_member(Db, {DocId, Rev}) ->
     ?LOG_DEBUG("Include Doc: ~p ~p", [DocId, Rev]),
     case (catch couch_httpd_db:couch_doc_open(Db, DocId, Rev, [])) of
