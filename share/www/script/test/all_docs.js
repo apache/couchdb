@@ -86,10 +86,40 @@ couchTests.all_docs = function(debug) {
   T(changes.results[2].doc);
   T(changes.results[2].doc._deleted);
 
+  // add conflicts
+  var conflictDoc1 = {
+    _id: "3", _rev: "2-aa01552213fafa022e6167113ed01087", value: "X"
+  };
+  var conflictDoc2 = {
+    _id: "3", _rev: "2-ff01552213fafa022e6167113ed01087", value: "Z"
+  };
+  T(db.save(conflictDoc1, {new_edits: false}));
+  T(db.save(conflictDoc2, {new_edits: false}));
+
+  var winRev = db.open("3");
+
+  changes = db.changes({include_docs: true, style: "all_docs"});
+  TEquals("3", changes.results[3].id);
+  TEquals(3, changes.results[3].changes.length);
+  TEquals(winRev._rev, changes.results[3].changes[0].rev);
+  TEquals("3", changes.results[3].doc._id);
+  TEquals(winRev._rev, changes.results[3].doc._rev);
+
+  rows = db.allDocs({include_docs: true}).rows;
+  TEquals(3, rows.length);
+  TEquals("3", rows[2].key);
+  TEquals("3", rows[2].id);
+  TEquals(winRev._rev, rows[2].value.rev);
+  TEquals(winRev._rev, rows[2].doc._rev);
+  TEquals("3", rows[2].doc._id);
+
   // test the all docs collates sanely
   db.save({_id: "Z", foo: "Z"});
   db.save({_id: "a", foo: "a"});
 
   var rows = db.allDocs({startkey: "Z", endkey: "Z"}).rows;
   T(rows.length == 1);
+
+  // cleanup
+  db.deleteDb();
 };
