@@ -87,6 +87,9 @@
       options = options || {};
       $.ajax({
         type: "GET", url: this.urlPrefix + "/_session",
+        beforeSend: function(xhr) {
+            xhr.setRequestHeader('Accept', 'application/json');
+        },
         complete: function(req) {
           var resp = httpData(req, "json");
           if (req.status == 200) {
@@ -123,6 +126,9 @@
       $.ajax({
         type: "POST", url: this.urlPrefix + "/_session", dataType: "json",
         data: {name: options.name, password: options.password},
+        beforeSend: function(xhr) {
+            xhr.setRequestHeader('Accept', 'application/json');
+        },
         complete: function(req) {
           var resp = httpData(req, "json");
           if (req.status == 200) {
@@ -140,6 +146,9 @@
       $.ajax({
         type: "DELETE", url: this.urlPrefix + "/_session", dataType: "json",
         username : "_", password : "_",
+        beforeSend: function(xhr) {
+            xhr.setRequestHeader('Accept', 'application/json');
+        },
         complete: function(req) {
           var resp = httpData(req, "json");
           if (req.status == 200) {
@@ -659,6 +668,7 @@
       var commit = options.ensure_full_commit;
       delete options.ensure_full_commit;
       return function(xhr) {
+        xhr.setRequestHeader('Accept', 'application/json');
         xhr.setRequestHeader("X-Couch-Full-Commit", commit.toString());
       };
     }
