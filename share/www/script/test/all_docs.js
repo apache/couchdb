@@ -86,6 +86,13 @@ couchTests.all_docs = function(debug) {
   T(changes.results[2].doc);
   T(changes.results[2].doc._deleted);
 
+  rows = db.allDocs({include_docs: true}, ["1"]).rows;
+  TEquals(1, rows.length);
+  TEquals("1", rows[0].key);
+  TEquals("1", rows[0].id);
+  TEquals(true, rows[0].value.deleted);
+  TEquals(null, rows[0].doc);
+
   // add conflicts
   var conflictDoc1 = {
     _id: "3", _rev: "2-aa01552213fafa022e6167113ed01087", value: "X"

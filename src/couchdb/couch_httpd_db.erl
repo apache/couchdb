@@ -559,7 +559,12 @@ all_docs_send_json_view_row(Resp, Db, KV, IncludeDocs, RowFront) ->
 all_docs_view_row_obj(_Db, {{DocId, error}, Value}, _IncludeDocs) ->
     {[{key, DocId}, {error, Value}]};
 all_docs_view_row_obj(Db, {_KeyDocId, DocInfo}, true) ->
-    {all_docs_row(DocInfo) ++ couch_httpd_view:doc_member(Db, DocInfo)};
+    case DocInfo of
+    #doc_info{revs = [#rev_info{deleted = true} | _]} ->
+        {all_docs_row(DocInfo) ++ [{doc, null}]};
+    _ ->
+        {all_docs_row(DocInfo) ++ couch_httpd_view:doc_member(Db, DocInfo)}
+    end;
 all_docs_view_row_obj(_Db, {_KeyDocId, DocInfo}, _IncludeDocs) ->
     {all_docs_row(DocInfo)}.
 
