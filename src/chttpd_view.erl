@@ -22,6 +22,37 @@
     start_json_response/2, start_json_response/3, end_json_response/1,
     send_chunked_error/2]).
 
+multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
+    Group = couch_view_group:design_doc_to_view_group(DDoc),
+    IsReduce = get_reduce_type(Req),
+    ViewType = extract_view_type(ViewName, Group#group.views, IsReduce),
+    % TODO proper calculation of etag
+    % Etag = view_group_etag(ViewGroup, Db, Queries),
+    Etag = couch_uuids:new(),
+    DefaultParams = lists:flatmap(fun({K,V}) -> parse_view_param(K,V) end,
+        chttpd:qs(Req)),
+    [couch_stats_collector:increment({httpd, view_reads}) || _I <- Queries],
+    chttpd:etag_respond(Req, Etag, fun() ->
+        {ok, Resp} = chttpd:start_json_response(Req, 200, [{"Etag",Etag}]),
+        chttpd:send_chunk(Resp, "{\"results\":["),
+        lists:foldl(fun({QueryProps}, Chunk) ->
+            if Chunk =/= nil -> chttpd:send_chunk(Resp, Chunk); true -> ok end,
+            ThisQuery = lists:flatmap(fun parse_json_view_param/1, QueryProps),
+            FullParams = lists:ukeymerge(1, ThisQuery, DefaultParams),
+            fabric:query_view(
+                Db,
+                DDoc,
+                ViewName,
+                fun view_callback/2,
+                {nil, Resp},
+                parse_view_params(FullParams, nil, ViewType)
+            ),
+            ",\n"
+        end, nil, Queries),
+        chttpd:send_chunk(Resp, "]}"),
+        chttpd:end_json_response(Resp)
+    end).
+
 design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
     Group = couch_view_group:design_doc_to_view_group(DDoc),
     IsReduce = get_reduce_type(Req),
@@ -34,7 +65,8 @@ design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
     chttpd:etag_respond(Req, Etag, fun() ->
         {ok, Resp} = chttpd:start_json_response(Req, 200, [{"Etag",Etag}]),
         CB = fun view_callback/2,
-        fabric:query_view(Db, DDoc, ViewName, CB, {nil, Resp}, QueryArgs)
+        fabric:query_view(Db, DDoc, ViewName, CB, {nil, Resp}, QueryArgs),
+        chttpd:end_json_response(Resp)
     end).
 
 view_callback({total_and_offset, Total, Offset}, {nil, Resp}) ->
@@ -52,15 +84,13 @@ view_callback({row, Row}, {Prepend, Resp}) ->
     send_chunk(Resp, [Prepend, ?JSON_ENCODE(Row)]),
     {ok, {",\r\n", Resp}};
 view_callback(complete, {nil, Resp}) ->
-    send_chunk(Resp, "{\"rows\":[]}"),
-    end_json_response(Resp),
-    {ok, Resp};
+    send_chunk(Resp, "{\"rows\":[]}");
 view_callback(complete, {_, Resp}) ->
-    send_chunk(Resp, "\r\n]}"),
-    end_json_response(Resp),
-    {ok, Resp};
+    send_chunk(Resp, "\r\n]}");
 view_callback({error, Reason}, {_, Resp}) ->
-    chttpd:send_chunked_error(Resp, Reason).
+    {Code, ErrorStr, ReasonStr} = chttpd:error_info(Reason),
+    Json = {[{code,Code}, {error,ErrorStr}, {reason,ReasonStr}]},
+    send_chunk(Resp, [$\n, ?JSON_ENCODE(Json), $\n]).
 
 extract_view_type(_ViewName, [], _IsReduce) ->
     throw({not_found, missing_named_view});
@@ -82,11 +112,21 @@ handle_view_req(#httpd{method='GET',
 handle_view_req(#httpd{method='POST',
         path_parts=[_, _, _, _, ViewName]}=Req, Db, DDoc) ->
     {Fields} = chttpd:json_body_obj(Req),
-    case couch_util:get_value(<<"keys">>, Fields) of
-    Keys when is_list(Keys) ->
+    Queries = couch_util:get_value(<<"queries">>, Fields),
+    Keys = couch_util:get_value(<<"keys">>, Fields),
+    case {Queries, Keys} of
+    {[_|_], undefined} ->
+        multi_query_view(Req, Db, DDoc, ViewName, Queries);
+    {undefined, [_|_]} ->
         design_doc_view(Req, Db, DDoc, ViewName, Keys);
-    _ ->
-        throw({bad_request, "`keys` body member must be an array."})
+    {undefined, undefined} ->
+        throw({bad_request, "POST body must contain `keys` or `queries` field"});
+    {undefined, _} ->
+        throw({bad_request, "`keys` body member must be an array"});
+    {_, undefined} ->
+        throw({bad_request, "`queries` body member must be an array"});
+    {_, _} ->
+        throw({bad_request, "`keys` and `queries` are mutually exclusive"})
     end;
 
 handle_view_req(Req, _Db, _DDoc) ->
@@ -103,16 +143,12 @@ reverse_key_default(Key) -> Key.
 get_reduce_type(Req) ->
     list_to_existing_atom(chttpd:qs_value(Req, "reduce", "true")).
 
-parse_view_params(Req, Keys, ViewType) ->
-    QueryList = chttpd:qs(Req),
-    QueryParams =
-    lists:foldl(fun({K, V}, Acc) ->
-            parse_view_param(K, V) ++ Acc
-        end, [], QueryList),
-    IsMultiGet = case Keys of
-        nil -> false;
-        _ -> true
-    end,
+parse_view_params(Req, Keys, ViewType) when not is_list(Req) ->
+    QueryParams = lists:flatmap(fun({K,V}) -> parse_view_param(K,V) end,
+        chttpd:qs(Req)),
+    parse_view_params(QueryParams, Keys, ViewType);
+parse_view_params(QueryParams, Keys, ViewType) ->
+    IsMultiGet = (Keys =/= nil),
     Args = #view_query_args{
         view_type=ViewType,
         multi_get=IsMultiGet,
@@ -120,7 +156,7 @@ parse_view_params(Req, Keys, ViewType) ->
     },
     QueryArgs = lists:foldl(fun({K, V}, Args2) ->
         validate_view_query(K, V, Args2)
-    end, Args, lists:reverse(QueryParams)), % Reverse to match QS order.
+    end, Args, QueryParams),
 
     GroupLevel = QueryArgs#view_query_args.group_level,
     case {ViewType, GroupLevel, IsMultiGet} of
@@ -136,6 +172,43 @@ parse_view_params(Req, Keys, ViewType) ->
             QueryArgs
     end,
     QueryArgs.
+
+parse_json_view_param({<<"key">>, V}) ->
+    [{start_key, V}, {end_key, V}];
+parse_json_view_param({<<"startkey_docid">>, V}) ->
+    [{start_docid, V}];
+parse_json_view_param({<<"endkey_docid">>, V}) ->
+    [{end_docid, V}];
+parse_json_view_param({<<"startkey">>, V}) ->
+    [{start_key, V}];
+parse_json_view_param({<<"endkey">>, V}) ->
+    [{end_key, V}];
+parse_json_view_param({<<"limit">>, V}) when is_integer(V), V > 0 ->
+    [{limit, V}];
+parse_json_view_param({<<"stale">>, <<"ok">>}) ->
+    [{stale, ok}];
+parse_json_view_param({<<"descending">>, V}) when is_boolean(V) ->
+    [{descending, V}];
+parse_json_view_param({<<"skip">>, V}) when is_integer(V) ->
+    [{skip, V}];
+parse_json_view_param({<<"group">>, true}) ->
+    [{group_level, exact}];
+parse_json_view_param({<<"group">>, false}) ->
+    [{group_level, 0}];
+parse_json_view_param({<<"group_level">>, V}) when is_integer(V), V > 0 ->
+    [{group_level, V}];
+parse_json_view_param({<<"inclusive_end">>, V}) when is_boolean(V) ->
+    [{inclusive_end, V}];
+parse_json_view_param({<<"reduce">>, V}) when is_boolean(V) ->
+    [{reduce, V}];
+parse_json_view_param({<<"include_docs">>, V}) when is_boolean(V) ->
+    [{include_docs, V}];
+parse_json_view_param({<<"list">>, V}) ->
+    [{list, couch_util:to_binary(V)}];
+parse_json_view_param({<<"sorted">>, V}) when is_boolean(V) ->
+    [{sorted, V}];
+parse_json_view_param({K, V}) ->
+    [{extra, {K, V}}].
 
 parse_view_param("", _) ->
     [];
