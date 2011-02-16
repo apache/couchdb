@@ -244,9 +244,20 @@ handle_system_req(Req) ->
         erlang:memory([atom, code, binary, ets])]),
     Memory = [{other, Other} | erlang:memory([atom, atom_used, processes,
         processes_used, binary, code, ets])],
+    {NumberOfGCs, WordsReclaimed, _} = statistics(garbage_collection),
+    {{input, Input}, {output, Output}} = statistics(io),
     send_json(Req, {[
+        {uptime, element(1,statistics(wall_clock)) div 1000},
         {memory, {Memory}},
         {run_queue, statistics(run_queue)},
+        {ets_table_count, length(ets:all())},
+        {context_switches, element(1, statistics(context_switches))},
+        {reductions, element(1, statistics(reductions))},
+        {garbage_collection_count, NumberOfGCs},
+        {words_reclaimed, WordsReclaimed},
+        {io_input, Input},
+        {io_output, Output},
+        {os_proc_count, couch_proc_manager:get_proc_count()},
         {process_count, erlang:system_info(process_count)},
         {process_limit, erlang:system_info(process_limit)}
     ]}).
