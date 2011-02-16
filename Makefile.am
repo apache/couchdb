@@ -17,7 +17,7 @@ couchlibdir = $(localerlanglibdir)/couch-$(version)
 couchincludedir = $(couchlibdir)/include
 couchebindir = $(couchlibdir)/ebin
 
-couchinclude_DATA = couch_db.hrl couch_js_functions.hrl
+couchinclude_DATA = couch_api_wrap.hrl couch_db.hrl couch_js_functions.hrl couch_replicator.hrl
 couchebin_DATA = $(compiled_files)
 
 # dist_devdoc_DATA = $(doc_base) $(doc_modules)
@@ -28,6 +28,8 @@ CLEANFILES = $(compiled_files) $(doc_base)
 
 source_files = \
     couch.erl \
+    couch_api_wrap.erl \
+    couch_api_wrap_httpc.erl \
     couch_app.erl \
     couch_auth_cache.erl \
     couch_btree.erl \
@@ -43,6 +45,7 @@ source_files = \
     couch_external_manager.erl \
     couch_external_server.erl \
     couch_file.erl \
+    couch_httpc_pool.erl \
     couch_httpd.erl \
     couch_httpd_db.erl \
     couch_httpd_auth.erl \
@@ -52,6 +55,7 @@ source_files = \
     couch_httpd_view.erl \
     couch_httpd_misc_handlers.erl \
     couch_httpd_proxy.erl \
+    couch_httpd_replicator.erl \
     couch_httpd_rewrite.erl \
     couch_httpd_stats_handlers.erl \
     couch_httpd_vhost.erl \
@@ -63,15 +67,13 @@ source_files = \
     couch_primary_sup.erl \
     couch_query_servers.erl \
     couch_ref_counter.erl \
-    couch_rep.erl \
-    couch_rep_att.erl \
-    couch_rep_changes_feed.erl \
-    couch_rep_httpc.erl \
-    couch_rep_missing_revs.erl \
-    couch_rep_reader.erl \
-    couch_rep_sup.erl \
-    couch_rep_writer.erl \
     couch_rep_db_listener.erl \
+    couch_rep_sup.erl \
+    couch_replication_notifier.erl \
+    couch_replicator.erl \
+    couch_replicator_doc_copier.erl \
+    couch_replicator_rev_finder.erl \
+    couch_replicator_utils.erl \
     couch_secondary_sup.erl \
     couch_server.erl \
     couch_server_sup.erl \
@@ -86,13 +88,16 @@ source_files = \
     couch_view_updater.erl \
     couch_view_group.erl \
     couch_db_updater.erl \
-    couch_work_queue.erl
+    couch_work_queue.erl \
+    json_stream_parse.erl
 
-EXTRA_DIST = $(source_files) couch_db.hrl couch_js_functions.hrl
+EXTRA_DIST = $(source_files) couch_api_wrap.hrl couch_db.hrl couch_js_functions.hrl couch_replicator.hrl
 
 compiled_files = \
     couch.app \
     couch.beam \
+    couch_api_wrap.beam \
+    couch_api_wrap_httpc.beam \
     couch_app.beam \
     couch_auth_cache.beam \
     couch_btree.beam \
@@ -108,6 +113,7 @@ compiled_files = \
     couch_external_manager.beam \
     couch_external_server.beam \
     couch_file.beam \
+    couch_httpc_pool.beam \
     couch_httpd.beam \
     couch_httpd_db.beam \
     couch_httpd_auth.beam \
@@ -117,6 +123,7 @@ compiled_files = \
     couch_httpd_show.beam \
     couch_httpd_view.beam \
     couch_httpd_misc_handlers.beam \
+    couch_httpd_replicator.beam \
     couch_httpd_rewrite.beam \
     couch_httpd_stats_handlers.beam \
     couch_httpd_vhost.beam \
@@ -128,15 +135,13 @@ compiled_files = \
     couch_primary_sup.beam \
     couch_query_servers.beam \
     couch_ref_counter.beam \
-    couch_rep.beam \
-    couch_rep_att.beam \
-    couch_rep_changes_feed.beam \
-    couch_rep_httpc.beam \
-    couch_rep_missing_revs.beam \
-    couch_rep_reader.beam \
-    couch_rep_sup.beam \
-    couch_rep_writer.beam \
     couch_rep_db_listener.beam \
+    couch_rep_sup.beam \
+    couch_replication_notifier.beam \
+    couch_replicator.beam \
+    couch_replicator_doc_copier.beam \
+    couch_replicator_rev_finder.beam \
+    couch_replicator_utils.beam \
     couch_secondary_sup.beam \
     couch_server.beam \
     couch_server_sup.beam \
@@ -151,7 +156,8 @@ compiled_files = \
     couch_view_updater.beam \
     couch_view_group.beam \
     couch_db_updater.beam \
-    couch_work_queue.beam
+    couch_work_queue.beam \
+    json_stream_parse.beam
 
 # doc_base = \
 #     erlang.png \
@@ -210,6 +216,6 @@ endif
 
 # $(ERL) -noshell -run edoc_run files [\"$<\"]
 
-%.beam: %.erl couch_db.hrl couch_js_functions.hrl
+%.beam: %.erl couch_api_wrap.hrl couch_db.hrl couch_js_functions.hrl couch_replicator.hrl
 	$(ERLC) $(ERLC_FLAGS) ${TEST} $<;
 

@@ -13,7 +13,7 @@
 -module(couch_httpd_misc_handlers).
 
 -export([handle_welcome_req/2,handle_favicon_req/2,handle_utils_dir_req/2,
-    handle_all_dbs_req/1,handle_replicate_req/1,handle_restart_req/1,
+    handle_all_dbs_req/1,handle_restart_req/1,
     handle_uuids_req/1,handle_config_req/1,handle_log_req/1,
     handle_task_status_req/1]).
 
@@ -77,36 +77,6 @@ handle_task_status_req(#httpd{method='GET'}=Req) ->
     send_json(Req, [{Props} || Props <- couch_task_status:all()]);
 handle_task_status_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
-
-handle_replicate_req(#httpd{method='POST'}=Req) ->
-    couch_httpd:validate_ctype(Req, "application/json"),
-    PostBody = couch_httpd:json_body_obj(Req),
-    try couch_rep:replicate(PostBody, Req#httpd.user_ctx) of
-    {ok, {continuous, RepId}} ->
-        send_json(Req, 202, {[{ok, true}, {<<"_local_id">>, RepId}]});
-    {ok, {cancelled, RepId}} ->
-        send_json(Req, 200, {[{ok, true}, {<<"_local_id">>, RepId}]});
-    {ok, {JsonResults}} ->
-        send_json(Req, {[{ok, true} | JsonResults]});
-    {error, {Type, Details}} ->
-        send_json(Req, 500, {[{error, Type}, {reason, Details}]});
-    {error, not_found} ->
-        send_json(Req, 404, {[{error, not_found}]});
-    {error, Reason} ->
-        try
-            send_json(Req, 500, {[{error, Reason}]})
-        catch
-        exit:{json_encode, _} ->
-            send_json(Req, 500, {[{error, couch_util:to_binary(Reason)}]})
-        end
-    catch
-    throw:{db_not_found, Msg} ->
-        send_json(Req, 404, {[{error, db_not_found}, {reason, Msg}]});
-    throw:{unauthorized, Msg} ->
-        send_json(Req, 404, {[{error, unauthorized}, {reason, Msg}]})
-    end;
-handle_replicate_req(Req) ->
-    send_method_not_allowed(Req, "POST").
 
 
 handle_restart_req(#httpd{method='POST'}=Req) ->

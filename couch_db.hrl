@@ -17,6 +17,9 @@
 -define(MIN_STR, <<"">>).
 -define(MAX_STR, <<255>>). % illegal utf string
 
+% the lowest possible database sequence number
+-define(LOWEST_SEQ, 0).
+
 -define(JSON_ENCODE(V), couch_util:json_encode(V)).
 -define(JSON_DECODE(V), couch_util:json_decode(V)).
 
@@ -242,27 +245,6 @@
     id_btree_state=nil,
     view_states=nil
     }).
-
--record(http_db, {
-    url,
-    auth = [],
-    resource = "",
-    headers = [
-        {"User-Agent", "CouchDB/"++couch_server:get_version()},
-        {"Accept", "application/json"},
-        {"Accept-Encoding", "gzip"}
-    ],
-    qs = [],
-    method = get,
-    body = nil,
-    options = [
-        {response_format,binary},
-        {inactivity_timeout, 30000}
-    ],
-    retries = 10,
-    pause = 500,
-    conn = nil
-}).
 
 % small value used in revision trees to indicate the revision isn't stored
 -define(REV_MISSING, []).

@@ -19,6 +19,7 @@
 -export([doc_from_multi_part_stream/2]).
 -export([doc_to_multi_part_stream/5, len_doc_to_multi_part_stream/4]).
 -export([to_path/1]).
+-export([mp_parse_doc/2]).
 
 -include("couch_db.hrl").
 
