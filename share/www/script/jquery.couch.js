@@ -88,7 +88,7 @@
       $.ajax({
         type: "GET", url: this.urlPrefix + "/_session",
         complete: function(req) {
-          var resp = $.httpData(req, "json");
+          var resp = httpData(req, "json");
           if (req.status == 200) {
             if (options.success) options.success(resp);
           } else if (options.error) {
@@ -124,7 +124,7 @@
         type: "POST", url: this.urlPrefix + "/_session", dataType: "json",
         data: {name: options.name, password: options.password},
         complete: function(req) {
-          var resp = $.httpData(req, "json");
+          var resp = httpData(req, "json");
           if (req.status == 200) {
             if (options.success) options.success(resp);
           } else if (options.error) {
@@ -141,7 +141,7 @@
         type: "DELETE", url: this.urlPrefix + "/_session", dataType: "json",
         username : "_", password : "_",
         complete: function(req) {
-          var resp = $.httpData(req, "json");
+          var resp = httpData(req, "json");
           if (req.status == 200) {
             if (options.success) options.success(resp);
           } else if (options.error) {
@@ -385,7 +385,7 @@
             dataType: "json", data: toJSON(doc),
             beforeSend : beforeSend,
             complete: function(req) {
-              var resp = $.httpData(req, "json");
+              var resp = httpData(req, "json");
               if (req.status == 200 || req.status == 201 || req.status == 202) {
                 doc._id = resp.id;
                 doc._rev = resp.rev;
@@ -450,7 +450,7 @@
         copyDoc: function(docId, options, ajaxOptions) {
           ajaxOptions = $.extend(ajaxOptions, {
             complete: function(req) {
-              var resp = $.httpData(req, "json");
+              var resp = httpData(req, "json");
               if (req.status == 201) {
                 if (options.success) options.success(resp);
               } else if (options.error) {
@@ -593,6 +593,27 @@
     }
   });
 
+  var httpData = $.httpData || function( xhr, type, s ) { // lifted from jq1.4.4
+    var ct = xhr.getResponseHeader("content-type") || "",
+      xml = type === "xml" || !type && ct.indexOf("xml") >= 0,
+      data = xml ? xhr.responseXML : xhr.responseText;
+
+    if ( xml && data.documentElement.nodeName === "parsererror" ) {
+      $.error( "parsererror" );
+    }
+    if ( s && s.dataFilter ) {
+      data = s.dataFilter( data, type );
+    }
+    if ( typeof data === "string" ) {
+      if ( type === "json" || !type && ct.indexOf("json") >= 0 ) {
+        data = $.parseJSON( data );
+      } else if ( type === "script" || !type && ct.indexOf("javascript") >= 0 ) {
+        $.globalEval( data );
+      }
+    }
+    return data;
+  };
+
   function ajax(obj, options, errorMessage, ajaxOptions) {
     options = $.extend({successStatus: 200}, options);
     ajaxOptions = $.extend({contentType: "application/json"}, ajaxOptions);
@@ -608,7 +629,7 @@
       },
       complete: function(req) {
         try {
-          var resp = $.httpData(req, "json");
+          var resp = httpData(req, "json");
         } catch(e) {
           if (options.error) {
             options.error(req.status, req, e);
