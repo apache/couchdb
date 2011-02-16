@@ -16,8 +16,7 @@
 -export([start_link/0, stop/0, handle_request/1, config_change/2,
     primary_header_value/2, header_value/2, header_value/3, qs_value/2,
     qs_value/3, qs/1, path/1, absolute_uri/2, body_length/1,
-    verify_is_server_admin/1, validate_ctype/2,
-    unquote/1, quote/1, recv/2,recv_chunked/4,
+    verify_is_server_admin/1, unquote/1, quote/1, recv/2, recv_chunked/4,
     error_info/1, parse_form/1, json_body/1, json_body_obj/1, body/1,
     doc_etag/1, make_etag/1, etag_respond/3, partition/1, serve_file/3,
     server_header/0, start_chunked_response/3,send_chunk/2,
@@ -211,23 +210,6 @@ authenticate_request(#httpd{} = Req, []) ->
     end;
 authenticate_request(Response, _AuthFuns) ->
     Response.
-
-%%
-%% something like this needs to be called for replication
-validate_ctype(Req, Ctype) ->
-    case header_value(Req, "Content-Type") of
-    undefined ->
-        throw({bad_ctype, "Content-Type must be "++Ctype});
-    ReqCtype ->
-        % ?LOG_ERROR("Ctype ~p ReqCtype ~p",[Ctype,ReqCtype]),
-        case re:split(ReqCtype, ";", [{return, list}]) of
-        [Ctype] -> ok;
-        [Ctype, _Rest] -> ok;
-        _Else ->
-            throw({bad_ctype, "Content-Type must be "++Ctype})
-        end
-    end.
-
 
 increment_method_stats(Method) ->
     couch_stats_collector:increment({httpd_request_methods, Method}).

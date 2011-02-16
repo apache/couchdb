@@ -127,7 +127,7 @@ handle_task_status_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 handle_replicate_req(#httpd{method='POST', user_ctx=Ctx} = Req) ->
-    chttpd:validate_ctype(Req, "application/json"),
+    couch_httpd:validate_ctype(Req, "application/json"),
     %% see HACK in chttpd.erl about replication
     PostBody = get(post_body),
     try couch_rep:replicate(PostBody, Ctx) of
