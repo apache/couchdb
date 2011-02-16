@@ -71,7 +71,7 @@ _utils = {couch_httpd_misc_handlers, handle_utils_dir_req, "%localdatadir%/www"}
 _all_dbs = {couch_httpd_misc_handlers, handle_all_dbs_req}
 _active_tasks = {couch_httpd_misc_handlers, handle_task_status_req}
 _config = {couch_httpd_misc_handlers, handle_config_req}
-_replicate = {couch_httpd_misc_handlers, handle_replicate_req}
+_replicate = {couch_httpd_replicator, handle_req}
 _uuids = {couch_httpd_misc_handlers, handle_uuids_req}
 _restart = {couch_httpd_misc_handlers, handle_restart_req}
 _stats = {couch_httpd_stats_handlers, handle_stats_req}
@@ -137,8 +137,27 @@ compressible_types = text/*, application/javascript, application/json, applicati
 [replicator]
 db = _replicator
 max_replication_retry_count = 10
-max_http_sessions = 20
-max_http_pipeline_size = 50
+; More worker processes can give higher network throughput but can also
+; imply more disk and network IO.
+worker_processes = 4
+; With lower batch sizes checkpoints are done more frequently. Lower batch sizes
+; also reduce the total amount of used RAM memory.
+worker_batch_size = 1000
+; Maximum number of HTTP connections and pipeline size (for each connection)
+; per replication. These two settings have more impact on pull replications.
+http_connections = 20
+http_pipeline_size = 50
+; HTTP connection timeout per replication.
+; Even for very fast/reliable networks it might need to be increased if a remote
+; database is too busy.
+connection_timeout = 30000
+; Some socket options that might boost performance in some scenarios:
+;       {nodelay, boolean()}
+;       {sndbuf, integer()}
+;       {recbuf, integer()}
+;       {priority, integer()}
+; See the `inet` Erlang module's man page for the full list of options.
+socket_options = [{keepalive, true}, {nodelay, false}]
 ; set to true to validate peer certificates
 verify_ssl_certificates = false
 ; file containing a list of peer trusted certificates (PEM format)

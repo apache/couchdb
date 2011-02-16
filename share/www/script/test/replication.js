@@ -11,447 +11,633 @@
 // the License.
 
 couchTests.replication = function(debug) {
+
   if (debug) debugger;
+
   var host = CouchDB.host;
-  var dbPairs = [
-    {source:"test_suite_db_a",
-      target:"test_suite_db_b"},
-    {source:"test_suite_db_a",
-      target:CouchDB.protocol + host + "/test_suite_db_b"},
-    {source:CouchDB.protocol + host + "/test_suite_db_a",
-      target:"test_suite_db_b"},
-    {source:CouchDB.protocol + host + "/test_suite_db_a",
-      target:CouchDB.protocol + host + "/test_suite_db_b"}
-  ];
-  var dbA = new CouchDB("test_suite_db_a", {"X-Couch-Full-Commit":"false"});
-  var dbB = new CouchDB("test_suite_db_b", {"X-Couch-Full-Commit":"false"});
-  var numDocs = 10;
-  var xhr;
-  for (var testPair = 0; testPair < dbPairs.length; testPair++) {
-    var A = dbPairs[testPair].source;
-    var B = dbPairs[testPair].target;
-
-    dbA.deleteDb();
-    dbA.createDb();
-    dbB.deleteDb();
-    dbB.createDb();
-
-    var repTests = {
-      // copy and paste and put your code in. delete unused steps.
-      test_template: new function () {
-        this.init = function(dbA, dbB) {
-          // before anything has happened
-        };
-        this.afterAB1 = function(dbA, dbB) {
-          // called after replicating src=A  tgt=B first time.
-        };
-        this.afterBA1 = function(dbA, dbB) {
-          // called after replicating src=B  tgt=A first time.
-        };
-        this.afterAB2 = function(dbA, dbB) {
-          // called after replicating src=A  tgt=B second time.
-        };
-        this.afterBA2 = function(dbA, dbB) {
-          // etc...
-        };
-      },
-
-      simple_test: new function () {
-        this.init = function(dbA, dbB) {
-          var docs = makeDocs(0, numDocs);
-          dbA.bulkSave(docs);
-        };
-
-        this.afterAB1 = function(dbA, dbB) {
-          for (var j = 0; j < numDocs; j++) {
-            var docA = dbA.open("" + j);
-            var docB = dbB.open("" + j);
-            T(docA._rev == docB._rev);
-          }
-        };
-      },
-
-     deletes_test: new function () {
-        // make sure deletes are replicated
-        this.init = function(dbA, dbB) {
-          T(dbA.save({_id:"foo1",value:"a"}).ok);
-        };
-
-        this.afterAB1 = function(dbA, dbB) {
-          var docA = dbA.open("foo1");
-          var docB = dbB.open("foo1");
-          T(docA._rev == docB._rev);
-
-          dbA.deleteDoc(docA);
-        };
-
-        this.afterAB2 = function(dbA, dbB) {
-          T(dbA.open("foo1") == null);
-          T(dbB.open("foo1") == null);
-        };
-      },
-
-      deleted_test : new function() {
-        // docs created and deleted on a single node are also replicated
-        this.init = function(dbA, dbB) {
-          T(dbA.save({_id:"del1",value:"a"}).ok);
-          var docA = dbA.open("del1");
-          dbA.deleteDoc(docA);
-        };
-
-        this.afterAB1 = function(dbA, dbB) {
-          var rows = dbB.changes().results;
-          var rowCnt = 0;
-          for (var i=0; i < rows.length; i++) {
-            if (rows[i].id == "del1") {
-              rowCnt += 1;
-              T(rows[i].deleted == true);
-            }
-          };
-          T(rowCnt == 1);
-        };
-      },
-
-      slashes_in_ids_test: new function () {
-        // make sure docs with slashes in id replicate properly
-        this.init = function(dbA, dbB) {
-          dbA.save({ _id:"abc/def", val:"one" });
-        };
-
-        this.afterAB1 = function(dbA, dbB) {
-          var docA = dbA.open("abc/def");
-          var docB = dbB.open("abc/def");
-          T(docA._rev == docB._rev);
-        };
-      },
-
-      design_docs_test: new function() {
-        // make sure design docs replicate properly
-        this.init = function(dbA, dbB) {
-          dbA.save({ _id:"_design/test" });
-        };
-
-        this.afterAB1 = function() {
-          var docA = dbA.open("_design/test");
-          var docB = dbB.open("_design/test");
-          T(docA._rev == docB._rev);
-        };
-      },
-
-      attachments_test: new function () {
-        // Test attachments
-        this.init = function(dbA, dbB) {
-          dbA.save({
-            _id:"bin_doc",
-            _attachments:{
-              "foo+bar.txt": {
-                "type":"base64",
-                "data": "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
-              }
-            }
-          });
-          // make sure on design docs as well
-          dbA.save({
-            _id:"_design/with_bin",
-            _attachments:{
-              "foo+bar.txt": {
-                "type":"base64",
-                "data": "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
-              }
-            }
-          });
-        };
-
-        this.afterAB1 = function(dbA, dbB) {
-          var xhr = CouchDB.request("GET",
-            "/test_suite_db_a/bin_doc/foo%2Bbar.txt");
-          T(xhr.responseText == "This is a base64 encoded text");
-
-          xhr = CouchDB.request("GET",
-            "/test_suite_db_b/bin_doc/foo%2Bbar.txt");
-          T(xhr.responseText == "This is a base64 encoded text");
-
-          // and the design-doc
-          xhr = CouchDB.request("GET",
-            "/test_suite_db_a/_design/with_bin/foo%2Bbar.txt");
-          T(xhr.responseText == "This is a base64 encoded text");
-
-          xhr = CouchDB.request("GET",
-            "/test_suite_db_b/_design/with_bin/foo%2Bbar.txt");
-          T(xhr.responseText == "This is a base64 encoded text");
-        };
-      },
-
-      conflicts_test: new function () {
-        // test conflicts
-        this.init = function(dbA, dbB) {
-          dbA.save({_id:"foo",value:"a"});
-          dbB.save({_id:"foo",value:"b"});
-        };
-
-        this.afterBA1 = function(dbA, dbB) {
-          var docA = dbA.open("foo", {conflicts: true});
-          var docB = dbB.open("foo", {conflicts: true});
-
-          // make sure the same rev is in each db
-          T(docA._rev === docB._rev);
-
-          // make sure the conflicts are the same in each db
-          T(docA._conflicts[0] === docB._conflicts[0]);
-
-          // delete a conflict.
-          dbA.deleteDoc({_id:"foo", _rev:docA._conflicts[0]});
-        };
-
-        this.afterBA2 = function(dbA, dbB) {
-          // open documents and include the conflict meta data
-          var docA = dbA.open("foo", {conflicts: true, deleted_conflicts: true});
-          var docB = dbB.open("foo", {conflicts: true, deleted_conflicts: true});
-
-          // We should have no conflicts this time
-          T(typeof docA._conflicts === "undefined");
-          T(typeof docB._conflicts === "undefined");
-
-          // They show up as deleted conflicts instead
-          T(docA._deleted_conflicts[0] == docB._deleted_conflicts[0]);
-        };
-      }
-    };
-
-    var test;
-    for(test in repTests) {
-      if(repTests[test].init) {
-        repTests[test].init(dbA, dbB);
-      }
-    }
-
-    var result = CouchDB.replicate(A, B);
-
-    var seqA = result.source_last_seq;
-    T(0 == result.history[0].start_last_seq);
-    T(typeof result.history[1] === "undefined");
-
-    for(test in repTests) {
-      if(repTests[test].afterAB1) repTests[test].afterAB1(dbA, dbB);
-    }
-
-    result = CouchDB.replicate(B, A);
-
-    var seqB = result.source_last_seq;
-    T(0 == result.history[0].start_last_seq);
-    T(typeof result.history[1] === "undefined");
-
-    for(test in repTests) {
-      if(repTests[test].afterBA1) repTests[test].afterBA1(dbA, dbB);
-    }
-
-    var result2 = CouchDB.replicate(A, B);
-
-    // each successful replication produces a new session id
-    T(result2.session_id != result.session_id);
-
-    T(seqA < result2.source_last_seq);
-    T(seqA == result2.history[0].start_last_seq);
-    T(result2.history[1].end_last_seq == seqA);
-
-    seqA = result2.source_last_seq;
-
-    for(test in repTests) {
-      if(repTests[test].afterAB2) repTests[test].afterAB2(dbA, dbB);
-    }
-
-    result = CouchDB.replicate(B, A);
-
-    T(seqB < result.source_last_seq);
-    T(seqB == result.history[0].start_last_seq);
-    T(result.history[1].end_last_seq == seqB);
-
-    seqB = result.source_last_seq;
-
-    for(test in repTests) {
-      if(repTests[test].afterBA2) repTests[test].afterBA2(dbA, dbB);
-    }
-
-    // do an replication where nothing has changed
-    result2 = CouchDB.replicate(B, A);
-    T(result2.no_changes == true);
-    T(result2.session_id == result.session_id);
-  }
-
-  // test optional automatic creation of the target db
-
-  var dbA = new CouchDB("test_suite_db_a", {"X-Couch-Full-Commit":"false"});
-  var dbB = new CouchDB("test_suite_db_b", {"X-Couch-Full-Commit":"false"});
-  
-  dbA.deleteDb();
-  dbA.createDb();
-  dbB.deleteDb();
-  
-  // local
-  CouchDB.replicate(dbA.name, "test_suite_db_b", {
-    body: {"create_target": true}
-  });
-  TEquals("test_suite_db_b", dbB.info().db_name,
-    "Target database should exist");
-
-  // remote
-  dbB.deleteDb();
-  CouchDB.replicate(dbA.name, CouchDB.protocol + CouchDB.host + "/test_suite_db_b", {
-    body: {"create_target": true}
-  });
-  TEquals("test_suite_db_b", dbB.info().db_name,
-    "Target database should exist");
-
-  // continuous
-  var continuousResult = CouchDB.replicate(dbA.name, "test_suite_db_b", {
-    body: {"continuous": true}
-  });
-  T(continuousResult.ok);
-  T(continuousResult._local_id);
-
-  var cancelResult = CouchDB.replicate(dbA.name, "test_suite_db_b", {
-    body: {"cancel": true}
-  });
-  T(cancelResult.ok);
-  T(continuousResult._local_id == cancelResult._local_id);
-
-  try {
-   var cancelResult2 = CouchDB.replicate(dbA.name, "test_suite_db_b", {
-     body: {"cancel": true}
-   });
-  } catch (e) {
-    T(e.error == "not_found");
-  }
-  // test replication object option doc_ids
-
-  var dbA = new CouchDB("test_suite_rep_docs_db_a", {"X-Couch-Full-Commit":"false"});
-  var dbB = new CouchDB("test_suite_rep_docs_db_b", {"X-Couch-Full-Commit":"false"});
-
-  dbA.deleteDb();
-  dbA.createDb();
-
-  var all_docs = [
-    {
-      _id: "foo1",
-      value: "a"
-    },
-    {
-      _id: "foo2",
-      value: "b"
-    },
-    {
-      _id: "foo3",
-      value: "c"
-    },
-    {
-      _id: "slashed/foo",
-      value: "s"
-    },
-    {
-      _id: "_design/foobar",
-      language: "javascript",
-      value: "I am a design doc",
-      filters: {
-        idfilter: (function(doc, req) {
-          return doc.value == Number(req.filter_value);
-        }).toString()
-      },
-      views: {
-        countview: (function(doc) {
-          emit(doc.value, 1);
-        }).toString()
-      }
-    }
-  ];
-
-  for (var i = 0; i < all_docs.length; i++) {
-    T(dbA.save(all_docs[i]).ok);
-  }
+  var sourceDb = new CouchDB("test_suite_db_a",{"X-Couch-Full-Commit":"false"});
+  var targetDb = new CouchDB("test_suite_db_b",{"X-Couch-Full-Commit":"false"});
 
   var dbPairs = [
-    {source:"test_suite_rep_docs_db_a",
-      target:"test_suite_rep_docs_db_b"},
-    {source:"test_suite_rep_docs_db_a",
-      target:CouchDB.protocol + host + "/test_suite_rep_docs_db_b"},
-    {source:CouchDB.protocol + host + "/test_suite_rep_docs_db_a",
-      target:"test_suite_rep_docs_db_b"},
-    {source:CouchDB.protocol + host + "/test_suite_rep_docs_db_a",
-      target:CouchDB.protocol + host + "/test_suite_rep_docs_db_b"}
+    {
+      source: sourceDb.name,
+      target: targetDb.name
+    },
+    {
+      source: CouchDB.protocol + host + "/" + sourceDb.name,
+      target: targetDb.name
+    },
+    {
+      source: sourceDb.name,
+      target: CouchDB.protocol + host + "/" + targetDb.name
+    },
+    {
+      source: CouchDB.protocol + host + "/" + sourceDb.name,
+      target: CouchDB.protocol + host + "/" + targetDb.name
+    }
   ];
 
-  var target_doc_ids = [
-    ["foo1", "foo3", "foo666"],
-    ["foo1", "foo666"],
-    ["foo666", "foo2"],
-    ["foo2", "foo9999", "foo1"],
-    ["foo3", "slashed/foo"],
-    ["foo3", "slashed%2Ffoo"],
-    ["foo1", "_design/foobar"],
-    ["foo1", "foo1001", "_design%2Ffoobar"]
-  ];
+  var att1_data = CouchDB.request("GET", "/_utils/script/test/lorem.txt");
+  att1_data = att1_data.responseText;
 
-  for (var i = 0; i < dbPairs.length; i++) {
-    var src_db = dbPairs[i].source;
-    var tgt_db = dbPairs[i].target;
+  var att2_data = CouchDB.request("GET", "/_utils/script/test/lorem_b64.txt");
+  att2_data = att2_data.responseText;
 
-    for (var j = 0; j < target_doc_ids.length; j++) {
-      var doc_ids = target_doc_ids[j];
-      var valid_doc_ids = [];
-      var invalid_doc_ids = [];
+  var sourceInfo, targetInfo;
+  var docs, doc, copy;
+  var repResult;
+  var i, j, k;
 
-        for (var p = 0; p < doc_ids.length; p++) {
-            var id = doc_ids[p];
-            var found = false;
 
-            for (var k = 0; k < all_docs.length; k++) {
-                var doc = all_docs[k];
+  function makeAttData(minSize) {
+    var data = att1_data;
 
-                if (id === doc._id) {
-                    found = true;
-                    break;
-                }
-            }
+    while (data.length < minSize) {
+      data = data + att1_data;
+    }
+    return data;
+  }
 
-            if (found) {
-                valid_doc_ids.push(id);
-            } else {
-                invalid_doc_ids.push(id);
-            }
-        };
 
-      dbB.deleteDb();
-      dbB.createDb();
+  function enableAttCompression(level, types) {
+    var xhr = CouchDB.request(
+      "PUT",
+      "/_config/attachments/compression_level",
+      {
+        body: JSON.stringify(level),
+        headers: {"X-Couch-Persist": "false"}
+      }
+    );
+    T(xhr.status === 200);
+    xhr = CouchDB.request(
+      "PUT",
+      "/_config/attachments/compressible_types",
+      {
+        body: JSON.stringify(types),
+        headers: {"X-Couch-Persist": "false"}
+      }
+    );
+    T(xhr.status === 200);
+  }
 
-      var repResult = CouchDB.replicate(src_db, tgt_db, {
-        body: {"doc_ids": doc_ids}
-      });
 
-      T(repResult.ok);
-      T(repResult.docs_written === valid_doc_ids.length);
-      T(repResult.docs_read === valid_doc_ids.length);
-      T(repResult.doc_write_failures === 0);
+  function disableAttCompression() {
+    var xhr = CouchDB.request(
+      "PUT",
+      "/_config/attachments/compression_level",
+      {
+        body: JSON.stringify("0"),
+        headers: {"X-Couch-Persist": "false"}
+      }
+    );
+    T(xhr.status === 200);
+  }
 
-      for (var k = 0; k < all_docs.length; k++) {
-        var doc = all_docs[k];
-        var tgt_doc = dbB.open(doc._id);
 
-        if (doc_ids.indexOf(doc._id) >= 0) {
-          T(tgt_doc !== null);
-          T(tgt_doc.value === doc.value);
-        } else {
-          T(tgt_doc === null);
+  function populateDb(db, docs, dontRecreateDb) {
+    if (dontRecreateDb !== true) {
+      db.deleteDb();
+      db.createDb();
+    }
+    for (var i = 0; i < docs.length; i++) {
+      var doc = docs[i];
+      delete doc._rev;
+    }
+    if (docs.length > 0) {
+      db.bulkSave(docs);
+    }
+  }
+
+
+  function addAtt(db, doc, attName, attData, type) {
+    var uri = "/" + db.name + "/" + encodeURIComponent(doc._id) + "/" + attName;
+
+    if (doc._rev) {
+      uri += "?rev=" + doc._rev;
+    }
+
+    var xhr = CouchDB.request("PUT", uri, {
+      headers: {
+        "Content-Type": type
+      },
+      body: attData
+    });
+
+    T(xhr.status === 201);
+    doc._rev = JSON.parse(xhr.responseText).rev;
+  }
+
+
+  function compareObjects(o1, o2) {
+    for (var p in o1) {
+      if (o1[p] === null && o2[p] !== null) {
+        return false;
+      } else if (typeof o1[p] === "object") {
+        if ((typeof o2[p] !== "object") || o2[p] === null) {
+          return false;
+        }
+        if (!arguments.callee(o1[p], o2[p])) {
+          return false;
+        }
+      } else {
+        if (o1[p] !== o2[p]) {
+          return false;
         }
       }
-
-      for (var k = 0; k < invalid_doc_ids.length; k++) {
-        var tgt_doc = dbB.open(invalid_doc_ids[k]);
-
-        T(tgt_doc === null);
-      }
     }
+    return true;
   }
 
+
+  function waitForSeq(sourceDb, targetDb) {
+    var targetSeq,
+        sourceSeq = sourceDb.info().update_seq,
+        t0 = new Date(),
+        t1,
+        ms = 1000;
+
+    do {
+      targetSeq = targetDb.info().update_seq;
+      t1 = new Date();
+    } while (((t1 - t0) <= ms) && targetSeq < sourceSeq);
+  }
+
+
+  function wait(ms) {
+    var t0 = new Date(), t1;
+    do {
+      CouchDB.request("GET", "/");
+      t1 = new Date();
+    } while ((t1 - t0) <= ms);
+  }
+
+
+  // test simple replications (not continuous, not filtered), including
+  // conflict creation
+  docs = makeDocs(1, 21);
+  docs.push({
+    _id: "_design/foo",
+    language: "javascript",
+    value: "ddoc"
+  });
+
+  for (i = 0; i < dbPairs.length; i++) {
+    populateDb(sourceDb, docs);
+    populateDb(targetDb, []);
+
+    // add some attachments
+    for (j = 10; j < 15; j++) {
+      addAtt(sourceDb, docs[j], "readme.txt", att1_data, "text/plain");
+    }
+
+    repResult = CouchDB.replicate(dbPairs[i].source, dbPairs[i].target);
+    TEquals(true, repResult.ok);
+
+    sourceInfo = sourceDb.info();
+    targetInfo = targetDb.info();
+
+    TEquals(sourceInfo.doc_count, targetInfo.doc_count);
+
+    TEquals('string', typeof repResult.session_id);
+    TEquals(repResult.source_last_seq, sourceInfo.update_seq);
+    TEquals(true, repResult.history instanceof Array);
+    TEquals(1, repResult.history.length);
+    TEquals(repResult.history[0].session_id, repResult.session_id);
+    TEquals('string', typeof repResult.history[0].start_time);
+    TEquals('string', typeof repResult.history[0].end_time);
+    TEquals(0, repResult.history[0].start_last_seq);
+    TEquals(sourceInfo.update_seq, repResult.history[0].end_last_seq);
+    TEquals(sourceInfo.update_seq, repResult.history[0].recorded_seq);
+    TEquals(sourceInfo.doc_count, repResult.history[0].missing_checked);
+    TEquals(sourceInfo.doc_count, repResult.history[0].missing_found);
+    TEquals(sourceInfo.doc_count, repResult.history[0].docs_read);
+    TEquals(sourceInfo.doc_count, repResult.history[0].docs_written);
+    TEquals(0, repResult.history[0].doc_write_failures);
+
+    for (j = 0; j < docs.length; j++) {
+      doc = docs[j];
+      copy = targetDb.open(doc._id);
+
+      T(copy !== null);
+      TEquals(true, compareObjects(doc, copy));
+
+      if (j >= 10 && j < 15) {
+        var atts = copy._attachments;
+        TEquals('object', typeof atts);
+        TEquals('object', typeof atts["readme.txt"]);
+        TEquals(2, atts["readme.txt"].revpos);
+        TEquals(0, atts["readme.txt"].content_type.indexOf("text/plain"));
+        TEquals(true, atts["readme.txt"].stub);
+
+        var att_copy = CouchDB.request(
+          "GET", "/" + targetDb.name + "/" + copy._id + "/readme.txt"
+        ).responseText;
+        TEquals(att1_data.length, att_copy.length);
+        TEquals(att1_data, att_copy);
+      }
+    }
+
+
+    // add one more doc to source, more attachments to some existing docs
+    // and replicate again
+    var newDoc = {
+      _id: "foo666",
+      value: "d"
+    };
+    TEquals(true, sourceDb.save(newDoc).ok);
+
+    // add some more attachments
+    for (j = 10; j < 15; j++) {
+      addAtt(sourceDb, docs[j], "data.dat", att2_data, "application/binary");
+    }
+
+    repResult = CouchDB.replicate(dbPairs[i].source, dbPairs[i].target);
+    TEquals(true, repResult.ok);
+
+    sourceInfo = sourceDb.info();
+    targetInfo = targetDb.info();
+
+    TEquals(targetInfo.doc_count, sourceInfo.doc_count);
+
+    TEquals('string', typeof repResult.session_id);
+    TEquals(sourceInfo.update_seq, repResult.source_last_seq);
+    TEquals(true, repResult.history instanceof Array);
+    TEquals(2, repResult.history.length);
+    TEquals(repResult.history[0].session_id, repResult.session_id);
+    TEquals('string', typeof repResult.history[0].start_time);
+    TEquals('string', typeof repResult.history[0].end_time);
+    TEquals((sourceInfo.update_seq - 6), repResult.history[0].start_last_seq);
+    TEquals(sourceInfo.update_seq, repResult.history[0].end_last_seq);
+    TEquals(sourceInfo.update_seq, repResult.history[0].recorded_seq);
+    TEquals(6, repResult.history[0].missing_checked);
+    TEquals(6, repResult.history[0].missing_found);
+    TEquals(6, repResult.history[0].docs_read);
+    TEquals(6, repResult.history[0].docs_written);
+    TEquals(0, repResult.history[0].doc_write_failures);
+
+    copy = targetDb.open(newDoc._id);
+    T(copy !== null);
+    TEquals(newDoc._id, copy._id);
+    TEquals(newDoc.value, copy.value);
+
+    for (j = 10; j < 15; j++) {
+      doc = docs[j];
+      copy = targetDb.open(doc._id);
+
+      T(copy !== null);
+      TEquals(true, compareObjects(doc, copy));
+
+      var atts = copy._attachments;
+      TEquals('object', typeof atts);
+      TEquals('object', typeof atts["readme.txt"]);
+      TEquals(2, atts["readme.txt"].revpos);
+      TEquals(0, atts["readme.txt"].content_type.indexOf("text/plain"));
+      TEquals(true, atts["readme.txt"].stub);
+
+      var att1_copy = CouchDB.request(
+        "GET", "/" + targetDb.name + "/" + copy._id + "/readme.txt"
+      ).responseText;
+      TEquals(att1_data.length, att1_copy.length);
+      TEquals(att1_data, att1_copy);
+
+      TEquals('object', typeof atts["data.dat"]);
+      TEquals(3, atts["data.dat"].revpos);
+      TEquals(0, atts["data.dat"].content_type.indexOf("application/binary"));
+      TEquals(true, atts["data.dat"].stub);
+
+      var att2_copy = CouchDB.request(
+        "GET", "/" + targetDb.name + "/" + copy._id + "/data.dat"
+      ).responseText;
+      TEquals(att2_data.length, att2_copy.length);
+      TEquals(att2_data, att2_copy);
+    }
+
+    // test deletion is replicated
+    doc = sourceDb.open(docs[1]._id);
+    TEquals(true, sourceDb.deleteDoc(doc).ok);
+
+    repResult = CouchDB.replicate(dbPairs[i].source, dbPairs[i].target);
+    TEquals(true, repResult.ok);
+
+    sourceInfo = sourceDb.info();
+    targetInfo = targetDb.info();
+
+    TEquals(targetInfo.doc_count, sourceInfo.doc_count);
+    TEquals(targetInfo.doc_del_count, sourceInfo.doc_del_count);
+    TEquals(1, targetInfo.doc_del_count);
+
+    TEquals(true, repResult.history instanceof Array);
+    TEquals(3, repResult.history.length);
+    TEquals((sourceInfo.update_seq - 1), repResult.history[0].start_last_seq);
+    TEquals(sourceInfo.update_seq, repResult.history[0].end_last_seq);
+    TEquals(sourceInfo.update_seq, repResult.history[0].recorded_seq);
+    TEquals(1, repResult.history[0].missing_checked);
+    TEquals(1, repResult.history[0].missing_found);
+    TEquals(1, repResult.history[0].docs_read);
+    TEquals(1, repResult.history[0].docs_written);
+    TEquals(0, repResult.history[0].doc_write_failures);
+
+    copy = targetDb.open(docs[1]._id);
+    TEquals(null, copy);
+
+    var changes = targetDb.changes({since: 0});
+    var idx = changes.results.length - 1;
+    TEquals(docs[1]._id, changes.results[idx].id);
+    TEquals(true, changes.results[idx].deleted);
+
+    // test conflict
+    doc = sourceDb.open(docs[0]._id);
+    doc.value = "white";
+    TEquals(true, sourceDb.save(doc).ok);
+
+    copy = targetDb.open(docs[0]._id);
+    copy.value = "black";
+    TEquals(true, targetDb.save(copy).ok);
+
+    repResult = CouchDB.replicate(dbPairs[i].source, dbPairs[i].target);
+    TEquals(true, repResult.ok);
+
+    sourceInfo = sourceDb.info();
+    targetInfo = targetDb.info();
+
+    TEquals(sourceInfo.doc_count, targetInfo.doc_count);
+
+    TEquals(true, repResult.history instanceof Array);
+    TEquals(4, repResult.history.length);
+    TEquals((sourceInfo.update_seq - 1), repResult.history[0].start_last_seq);
+    TEquals(sourceInfo.update_seq, repResult.history[0].end_last_seq);
+    TEquals(sourceInfo.update_seq, repResult.history[0].recorded_seq);
+    TEquals(1, repResult.history[0].missing_checked);
+    TEquals(1, repResult.history[0].missing_found);
+    TEquals(1, repResult.history[0].docs_read);
+    TEquals(1, repResult.history[0].docs_written);
+    TEquals(0, repResult.history[0].doc_write_failures);
+
+    copy = targetDb.open(docs[0]._id, {conflicts: true});
+
+    TEquals(0, copy._rev.indexOf("2-"));
+    TEquals(true, copy._conflicts instanceof Array);
+    TEquals(1, copy._conflicts.length);
+    TEquals(0, copy._conflicts[0].indexOf("2-"));
+
+    // replicate again with conflict
+    doc.value = "yellow";
+    TEquals(true, sourceDb.save(doc).ok);
+
+    repResult = CouchDB.replicate(dbPairs[i].source, dbPairs[i].target);
+    TEquals(true, repResult.ok);
+
+    sourceInfo = sourceDb.info();
+    targetInfo = targetDb.info();
+
+    TEquals(sourceInfo.doc_count, targetInfo.doc_count);
+
+    TEquals(true, repResult.history instanceof Array);
+    TEquals(5, repResult.history.length);
+    TEquals((sourceInfo.update_seq - 1), repResult.history[0].start_last_seq);
+    TEquals(sourceInfo.update_seq, repResult.history[0].end_last_seq);
+    TEquals(sourceInfo.update_seq, repResult.history[0].recorded_seq);
+    TEquals(1, repResult.history[0].missing_checked);
+    TEquals(1, repResult.history[0].missing_found);
+    TEquals(1, repResult.history[0].docs_read);
+    TEquals(1, repResult.history[0].docs_written);
+    TEquals(0, repResult.history[0].doc_write_failures);
+
+    copy = targetDb.open(docs[0]._id, {conflicts: true});
+
+    TEquals(0, copy._rev.indexOf("3-"));
+    TEquals(true, copy._conflicts instanceof Array);
+    TEquals(1, copy._conflicts.length);
+    TEquals(0, copy._conflicts[0].indexOf("2-"));
+
+    // resolve the conflict
+    TEquals(true, targetDb.deleteDoc({_id: copy._id, _rev: copy._conflicts[0]}).ok);
+
+    // replicate again, check there are no more conflicts
+    doc.value = "rainbow";
+    TEquals(true, sourceDb.save(doc).ok);
+
+    repResult = CouchDB.replicate(dbPairs[i].source, dbPairs[i].target);
+    TEquals(true, repResult.ok);
+
+    sourceInfo = sourceDb.info();
+    targetInfo = targetDb.info();
+
+    TEquals(sourceInfo.doc_count, targetInfo.doc_count);
+
+    TEquals(true, repResult.history instanceof Array);
+    TEquals(6, repResult.history.length);
+    TEquals((sourceInfo.update_seq - 1), repResult.history[0].start_last_seq);
+    TEquals(sourceInfo.update_seq, repResult.history[0].end_last_seq);
+    TEquals(sourceInfo.update_seq, repResult.history[0].recorded_seq);
+    TEquals(1, repResult.history[0].missing_checked);
+    TEquals(1, repResult.history[0].missing_found);
+    TEquals(1, repResult.history[0].docs_read);
+    TEquals(1, repResult.history[0].docs_written);
+    TEquals(0, repResult.history[0].doc_write_failures);
+
+    copy = targetDb.open(docs[0]._id, {conflicts: true});
+
+    TEquals(0, copy._rev.indexOf("4-"));
+    TEquals('undefined', typeof copy._conflicts);
+
+    // test that revisions already in a target are not copied
+    TEquals(true, sourceDb.save({_id: "foo1", value: 111}).ok);
+    TEquals(true, targetDb.save({_id: "foo1", value: 111}).ok);
+    TEquals(true, sourceDb.save({_id: "foo2", value: 222}).ok);
+    TEquals(true, sourceDb.save({_id: "foo3", value: 333}).ok);
+    TEquals(true, targetDb.save({_id: "foo3", value: 333}).ok);
+
+    repResult = CouchDB.replicate(dbPairs[i].source, dbPairs[i].target);
+    TEquals(true, repResult.ok);
+
+    sourceInfo = sourceDb.info();
+    TEquals(sourceInfo.update_seq, repResult.source_last_seq);
+    TEquals(sourceInfo.update_seq - 3, repResult.history[0].start_last_seq);
+    TEquals(sourceInfo.update_seq, repResult.history[0].end_last_seq);
+    TEquals(sourceInfo.update_seq, repResult.history[0].recorded_seq);
+    TEquals(3, repResult.history[0].missing_checked);
+    TEquals(1, repResult.history[0].missing_found);
+    TEquals(1, repResult.history[0].docs_read);
+    TEquals(1, repResult.history[0].docs_written);
+    TEquals(0, repResult.history[0].doc_write_failures);
+
+    TEquals(true, sourceDb.save({_id: "foo4", value: 444}).ok);
+    TEquals(true, targetDb.save({_id: "foo4", value: 444}).ok);
+    TEquals(true, sourceDb.save({_id: "foo5", value: 555}).ok);
+    TEquals(true, targetDb.save({_id: "foo5", value: 555}).ok);
+
+    repResult = CouchDB.replicate(dbPairs[i].source, dbPairs[i].target);
+    TEquals(true, repResult.ok);
+
+    sourceInfo = sourceDb.info();
+    TEquals(sourceInfo.update_seq, repResult.source_last_seq);
+    TEquals(sourceInfo.update_seq - 2, repResult.history[0].start_last_seq);
+    TEquals(sourceInfo.update_seq, repResult.history[0].end_last_seq);
+    TEquals(sourceInfo.update_seq, repResult.history[0].recorded_seq);
+    TEquals(2, repResult.history[0].missing_checked);
+    TEquals(0, repResult.history[0].missing_found);
+    TEquals(0, repResult.history[0].docs_read);
+    TEquals(0, repResult.history[0].docs_written);
+    TEquals(0, repResult.history[0].doc_write_failures);
+
+    repResult = CouchDB.replicate(dbPairs[i].source, dbPairs[i].target);
+    TEquals(true, repResult.ok);
+    TEquals(true, repResult.no_changes);
+    sourceInfo = sourceDb.info();
+    TEquals(sourceInfo.update_seq, repResult.source_last_seq);
+  }
+
+
+  // test error when source database does not exist
+  try {
+    CouchDB.replicate("foobar", "test_suite_db");
+    T(false, "should have failed with db_not_found error");
+  } catch (x) {
+    TEquals("db_not_found", x.error);
+  }
+  try {
+    CouchDB.replicate(CouchDB.protocol + host + "/foobar", "test_suite_db");
+    T(false, "should have failed with db_not_found error");
+  } catch (x) {
+    TEquals("db_not_found", x.error);
+  }
+
+
+  // test create_target option
+  docs = makeDocs(1, 2);
+
+  for (i = 0; i < dbPairs.length; i++) {
+    populateDb(sourceDb, docs);
+    targetDb.deleteDb();
+
+    repResult = CouchDB.replicate(
+      dbPairs[i].source,
+      dbPairs[i].target,
+      {body: {create_target: true}}
+    );
+    TEquals(true, repResult.ok);
+
+    sourceInfo = sourceDb.info();
+    targetInfo = targetDb.info();
+
+    TEquals(sourceInfo.doc_count, targetInfo.doc_count);
+    TEquals(sourceInfo.update_seq, targetInfo.update_seq);
+  }
+
+
   // test filtered replication
+  docs = makeDocs(1, 31);
+  docs.push({
+    _id: "_design/mydesign",
+    language: "javascript",
+    filters: {
+      myfilter: (function(doc, req) {
+        var modulus = Number(req.query.modulus);
+        var special = req.query.special;
+        return (doc.integer % modulus === 0) || (doc.string === special);
+      }).toString()
+    }
+  });
+
+  for (i = 0; i < dbPairs.length; i++) {
+    populateDb(sourceDb, docs);
+    populateDb(targetDb, []);
+
+    repResult = CouchDB.replicate(
+      dbPairs[i].source,
+      dbPairs[i].target,
+      {
+        body: {
+          filter: "mydesign/myfilter",
+          query_params: {
+            modulus: 2,
+            special: "7"
+          }
+        }
+      }
+    );
+
+    TEquals(true, repResult.ok);
+
+    for (j = 0; j < docs.length; j++) {
+      doc = docs[j];
+      copy = targetDb.open(doc._id);
+
+      if ((doc.integer && (doc.integer % 2 === 0)) || (doc.string === "7")) {
+
+        T(copy !== null);
+        TEquals(true, compareObjects(doc, copy));
+      } else {
+        TEquals(null, copy);
+      }
+    }
+
+    TEquals(true, repResult.history instanceof Array);
+    TEquals(1, repResult.history.length);
+    // NOT 31 (31 is db seq for last doc - the ddoc, which was not replicated)
+    TEquals(30, repResult.source_last_seq);
+    TEquals(0, repResult.history[0].start_last_seq);
+    TEquals(30, repResult.history[0].end_last_seq);
+    TEquals(30, repResult.history[0].recorded_seq);
+    // 16 => 15 docs with even integer field  + 1 doc with string field "7"
+    TEquals(16, repResult.history[0].missing_checked);
+    TEquals(16, repResult.history[0].missing_found);
+    TEquals(16, repResult.history[0].docs_read);
+    TEquals(16, repResult.history[0].docs_written);
+    TEquals(0, repResult.history[0].doc_write_failures);
+
+
+    // add new docs to source and resume the same replication
+    var newDocs = makeDocs(50, 56);
+    populateDb(sourceDb, newDocs, true);
+
+    repResult = CouchDB.replicate(
+      dbPairs[i].source,
+      dbPairs[i].target,
+      {
+        body: {
+          filter: "mydesign/myfilter",
+          query_params: {
+            modulus: 2,
+            special: "7"
+          }
+        }
+      }
+    );
+
+    TEquals(true, repResult.ok);
+
+    for (j = 0; j < newDocs.length; j++) {
+      doc = newDocs[j];
+      copy = targetDb.open(doc._id);
+
+      if (doc.integer && (doc.integer % 2 === 0)) {
+
+        T(copy !== null);
+        TEquals(true, compareObjects(doc, copy));
+      } else {
+        TEquals(null, copy);
+      }
+    }
+
+    // last doc has even integer field, so last replicated seq is 36
+    TEquals(36, repResult.source_last_seq);
+    TEquals(true, repResult.history instanceof Array);
+    TEquals(2, repResult.history.length);
+    TEquals(30, repResult.history[0].start_last_seq);
+    TEquals(36, repResult.history[0].end_last_seq);
+    TEquals(36, repResult.history[0].recorded_seq);
+    TEquals(3, repResult.history[0].missing_checked);
+    TEquals(3, repResult.history[0].missing_found);
+    TEquals(3, repResult.history[0].docs_read);
+    TEquals(3, repResult.history[0].docs_written);
+    TEquals(0, repResult.history[0].doc_write_failures);
+  }
+
+
+  // test filtered replication works as expected after changing the filter's
+  // code (ticket COUCHDB-892)
   var filterFun1 = (function(doc, req) {
     if (doc.value < Number(req.query.maxvalue)) {
       return true;
@@ -464,281 +650,771 @@ couchTests.replication = function(debug) {
     return true;
   }).toString();
 
-  function wait(ms) {
-    var t0 = new Date(), t1;
-    do {
-      CouchDB.request("GET", "/");
-      t1 = new Date();
-    } while ((t1 - t0) <= ms);
-  }
+  for (i = 0; i < dbPairs.length; i++) {
+    populateDb(targetDb, []);
+    populateDb(sourceDb, []);
 
-  var dbPairs = [
-    {source:"test_suite_filtered_rep_db_a",
-      target:"test_suite_filtered_rep_db_b"},
-    {source:"test_suite_filtered_rep_db_a",
-      target:CouchDB.protocol + host + "/test_suite_filtered_rep_db_b"},
-    {source:CouchDB.protocol + host + "/test_suite_filtered_rep_db_a",
-      target:"test_suite_filtered_rep_db_b"},
-    {source:CouchDB.protocol + host + "/test_suite_filtered_rep_db_a",
-      target:CouchDB.protocol + host + "/test_suite_filtered_rep_db_b"}
-  ];
-  var sourceDb = new CouchDB("test_suite_filtered_rep_db_a");
-  var targetDb = new CouchDB("test_suite_filtered_rep_db_b");
-
-
-  for (var i = 0; i < dbPairs.length; i++) {
-    sourceDb.deleteDb();
-    
-    // wait some time to make sure we deleted the db.
-    // fix issue COUCHDB-1002
-    wait(1000);
-    sourceDb.createDb();
-
-    T(sourceDb.save({_id: "foo1", value: 1}).ok);
-    T(sourceDb.save({_id: "foo2", value: 2}).ok);
-    T(sourceDb.save({_id: "foo3", value: 3}).ok);
-    T(sourceDb.save({_id: "foo4", value: 4}).ok);
+    TEquals(true, sourceDb.save({_id: "foo1", value: 1}).ok);
+    TEquals(true, sourceDb.save({_id: "foo2", value: 2}).ok);
+    TEquals(true, sourceDb.save({_id: "foo3", value: 3}).ok);
+    TEquals(true, sourceDb.save({_id: "foo4", value: 4}).ok);
 
     var ddoc = {
       "_id": "_design/mydesign",
       "language": "javascript",
       "filters": {
         "myfilter": filterFun1
-       }
+      }
     };
 
-    T(sourceDb.save(ddoc).ok);
+    TEquals(true, sourceDb.save(ddoc).ok);
 
-    targetDb.deleteDb();
-    targetDb.createDb();
-
-    var dbA = dbPairs[i].source;
-    var dbB = dbPairs[i].target;
-
-    var repResult = CouchDB.replicate(dbA, dbB, {
-      body: {
-        "filter" : "mydesign/myfilter",
-        "query_params" : {
-          "maxvalue": "3"
+    repResult = CouchDB.replicate(
+      dbPairs[i].source,
+      dbPairs[i].target,
+      {
+        body: {
+          filter: "mydesign/myfilter",
+          query_params: {
+            maxvalue: "3"
+          }
         }
       }
-    });
+    );
 
-    T(repResult.ok);
-    T(repResult.history instanceof Array);
-    T(repResult.history.length === 1);
-    T(repResult.history[0].docs_written === 2);
-    T(repResult.history[0].docs_read === 2);
-    T(repResult.history[0].doc_write_failures === 0);
+    TEquals(true, repResult.ok);
+    TEquals(true, repResult.history instanceof Array);
+    TEquals(1, repResult.history.length);
+    TEquals(2, repResult.history[0].docs_written);
+    TEquals(2, repResult.history[0].docs_read);
+    TEquals(0, repResult.history[0].doc_write_failures);
 
     var docFoo1 = targetDb.open("foo1");
     T(docFoo1 !== null);
-    T(docFoo1.value === 1);
+    TEquals(1, docFoo1.value);
 
     var docFoo2 = targetDb.open("foo2");
     T(docFoo2 !== null);
-    T(docFoo2.value === 2);
+    TEquals(2, docFoo2.value);
 
     var docFoo3 = targetDb.open("foo3");
-    T(docFoo3 === null);
+    TEquals(null, docFoo3);
 
     var docFoo4 = targetDb.open("foo4");
-    T(docFoo4 === null);
+    TEquals(null, docFoo4);
 
     // replication should start from scratch after the filter's code changed
 
     ddoc.filters.myfilter = filterFun2;
-    T(sourceDb.save(ddoc).ok);
+    TEquals(true, sourceDb.save(ddoc).ok);
 
-    repResult = CouchDB.replicate(dbA, dbB, {
-      body: {
-        "filter" : "mydesign/myfilter",
-        "query_params" : {
-          "maxvalue": "3"
+    repResult = CouchDB.replicate(
+      dbPairs[i].source,
+      dbPairs[i].target,
+      {
+        body: {
+          filter: "mydesign/myfilter",
+          query_params : {
+            maxvalue: "3"
+          }
         }
       }
-    });
+    );
 
-    T(repResult.ok);
-    T(repResult.history instanceof Array);
-    T(repResult.history.length === 1);
-    T(repResult.history[0].docs_written === 3);
-    T(repResult.history[0].docs_read === 3);
-    T(repResult.history[0].doc_write_failures === 0);
+    TEquals(true, repResult.ok);
+    TEquals(true, repResult.history instanceof Array);
+    TEquals(1, repResult.history.length);
+    TEquals(3, repResult.history[0].docs_written);
+    TEquals(3, repResult.history[0].docs_read);
+    TEquals(0, repResult.history[0].doc_write_failures);
 
     docFoo1 = targetDb.open("foo1");
     T(docFoo1 !== null);
-    T(docFoo1.value === 1);
+    TEquals(1, docFoo1.value);
 
     docFoo2 = targetDb.open("foo2");
     T(docFoo2 !== null);
-    T(docFoo2.value === 2);
+    TEquals(2, docFoo2.value);
 
     docFoo3 = targetDb.open("foo3");
     T(docFoo3 !== null);
-    T(docFoo3.value === 3);
+    TEquals(3, docFoo3.value);
 
     docFoo4 = targetDb.open("foo4");
     T(docFoo4 !== null);
-    T(docFoo4.value === 4);
+    TEquals(4, docFoo4.value);
 
     T(targetDb.open("_design/mydesign") !== null);
   }
 
-  // test for COUCHDB-868 - design docs' attachments not getting replicated
-  // when doing a pull replication with HTTP basic auth
-  dbA = new CouchDB("test_suite_db_a");
-  dbB = new CouchDB("test_suite_db_b");
-  var usersDb = new CouchDB("test_suite_auth");
-  var lorem = CouchDB.request(
-    "GET", "/_utils/script/test/lorem.txt").responseText;
-  var lorem_b64 = CouchDB.request(
-    "GET", "/_utils/script/test/lorem_b64.txt").responseText;
 
-  usersDb.deleteDb();
-  usersDb.createDb();
-  dbA.deleteDb();
-  dbA.createDb();
-  dbB.deleteDb();
-  dbB.createDb();
+  // test replication by doc IDs
+  docs = makeDocs(1, 11);
+  docs.push({
+    _id: "_design/foo",
+    language: "javascript",
+    integer: 1
+  });
 
-  var atts_ddoc = {
-    _id: "_design/i_have_atts",
+  var target_doc_ids = [
+    { initial: ["1", "2", "10"], after: [], conflict_id: "2" },
+    { initial: ["1", "2"], after: ["7"], conflict_id: "1" },
+    { initial: ["1", "foo_666", "10"], after: ["7"], conflict_id: "10" },
+    { initial: ["_design/foo", "8"], after: ["foo_5"], conflict_id: "8" },
+    { initial: ["_design%2Ffoo", "8"], after: ["foo_5"], conflict_id: "8" },
+    { initial: [], after: ["foo_1000", "_design/foo", "1"], conflict_id: "1" }
+  ];
+  var doc_ids, after_doc_ids;
+  var id, num_inexistent_docs, after_num_inexistent_docs;
+  var total, after_total;
+
+  for (i = 0; i < dbPairs.length; i++) {
+
+    for (j = 0; j < target_doc_ids.length; j++) {
+      doc_ids = target_doc_ids[j].initial;
+      num_inexistent_docs = 0;
+
+      for (k = 0; k < doc_ids.length; k++) {
+        id = doc_ids[k];
+        if (id.indexOf("foo_") === 0) {
+          num_inexistent_docs += 1;
+        }
+      }
+
+      populateDb(sourceDb, docs);
+      populateDb(targetDb, []);
+
+      repResult = CouchDB.replicate(
+        dbPairs[i].source,
+        dbPairs[i].target,
+        {
+          body: {
+            doc_ids: doc_ids
+          }
+        }
+      );
+
+      total = doc_ids.length - num_inexistent_docs;
+      TEquals(true, repResult.ok);
+      if (total === 0) {
+        TEquals(true, repResult.no_changes);
+      } else {
+        TEquals('string', typeof repResult.start_time);
+        TEquals('string', typeof repResult.end_time);
+        TEquals(total, repResult.docs_read);
+        TEquals(total, repResult.docs_written);
+        TEquals(0, repResult.doc_write_failures);
+      }
+
+      for (k = 0; k < doc_ids.length; k++) {
+        id = decodeURIComponent(doc_ids[k]);
+        doc = sourceDb.open(id);
+        copy = targetDb.open(id);
+
+        if (id.indexOf("foo_") === 0) {
+          TEquals(null, doc);
+          TEquals(null, copy);
+        } else {
+          T(doc !== null);
+          T(copy !== null);
+          TEquals(true, compareObjects(doc, copy));
+        }
+      }
+
+      // be absolutely sure that other docs were not replicated
+      for (k = 0; k < docs.length; k++) {
+        var base_id = docs[k]._id;
+        id = encodeURIComponent(base_id);
+        doc = targetDb.open(base_id);
+
+        if ((doc_ids.indexOf(id) >= 0) || (doc_ids.indexOf(base_id) >= 0)) {
+            T(doc !== null);
+        } else {
+            TEquals(null, doc);
+        }
+      }
+
+      targetInfo = targetDb.info();
+      TEquals(total, targetInfo.doc_count);
+
+
+      // add more docs throught replication by doc IDs
+      after_doc_ids = target_doc_ids[j].after;
+      after_num_inexistent_docs = 0;
+
+      for (k = 0; k < after_doc_ids.length; k++) {
+        id = after_doc_ids[k];
+        if (id.indexOf("foo_") === 0) {
+          after_num_inexistent_docs += 1;
+        }
+      }
+
+      repResult = CouchDB.replicate(
+        dbPairs[i].source,
+        dbPairs[i].target,
+        {
+          body: {
+            doc_ids: after_doc_ids
+          }
+        }
+      );
+
+      after_total = after_doc_ids.length - after_num_inexistent_docs;
+      TEquals(true, repResult.ok);
+      if (after_total === 0) {
+        TEquals(true, repResult.no_changes);
+      } else {
+        TEquals('string', typeof repResult.start_time);
+        TEquals('string', typeof repResult.end_time);
+        TEquals(after_total, repResult.docs_read);
+        TEquals(after_total, repResult.docs_written);
+        TEquals(0, repResult.doc_write_failures);
+      }
+
+      for (k = 0; k < after_doc_ids.length; k++) {
+        id = after_doc_ids[k];
+        doc = sourceDb.open(id);
+        copy = targetDb.open(id);
+
+        if (id.indexOf("foo_") === 0) {
+          TEquals(null, doc);
+          TEquals(null, copy);
+        } else {
+          T(doc !== null);
+          T(copy !== null);
+          TEquals(true, compareObjects(doc, copy));
+        }
+      }
+
+      // be absolutely sure that other docs were not replicated
+      for (k = 0; k < docs.length; k++) {
+        var base_id = docs[k]._id;
+        id = encodeURIComponent(base_id);
+        doc = targetDb.open(base_id);
+
+        if ((doc_ids.indexOf(id) >= 0) || (after_doc_ids.indexOf(id) >= 0) ||
+            (doc_ids.indexOf(base_id) >= 0) ||
+            (after_doc_ids.indexOf(base_id) >= 0)) {
+            T(doc !== null);
+        } else {
+            TEquals(null, doc);
+        }
+      }
+
+      targetInfo = targetDb.info();
+      TEquals((total + after_total), targetInfo.doc_count);
+
+
+      // replicate again the same doc after updated on source (no conflict)
+      id = target_doc_ids[j].conflict_id;
+      doc = sourceDb.open(id);
+      T(doc !== null);
+      doc.integer = 666;
+      TEquals(true, sourceDb.save(doc).ok);
+      addAtt(sourceDb, doc, "readme.txt", att1_data, "text/plain");
+      addAtt(sourceDb, doc, "data.dat", att2_data, "application/binary");
+
+      repResult = CouchDB.replicate(
+        dbPairs[i].source,
+        dbPairs[i].target,
+        {
+          body: {
+            doc_ids: [id]
+          }
+        }
+      );
+
+      TEquals(true, repResult.ok);
+      TEquals(1, repResult.docs_read);
+      TEquals(1, repResult.docs_written);
+      TEquals(0, repResult.doc_write_failures);
+
+      copy = targetDb.open(id, {conflicts: true});
+
+      TEquals(666, copy.integer);
+      TEquals(0, copy._rev.indexOf("4-"));
+      TEquals('undefined', typeof copy._conflicts);
+
+      var atts = copy._attachments;
+      TEquals('object', typeof atts);
+      TEquals('object', typeof atts["readme.txt"]);
+      TEquals(3, atts["readme.txt"].revpos);
+      TEquals(0, atts["readme.txt"].content_type.indexOf("text/plain"));
+      TEquals(true, atts["readme.txt"].stub);
+
+      var att1_copy = CouchDB.request(
+        "GET", "/" + targetDb.name + "/" + copy._id + "/readme.txt"
+      ).responseText;
+      TEquals(att1_data.length, att1_copy.length);
+      TEquals(att1_data, att1_copy);
+
+      TEquals('object', typeof atts["data.dat"]);
+      TEquals(4, atts["data.dat"].revpos);
+      TEquals(0, atts["data.dat"].content_type.indexOf("application/binary"));
+      TEquals(true, atts["data.dat"].stub);
+
+      var att2_copy = CouchDB.request(
+        "GET", "/" + targetDb.name + "/" + copy._id + "/data.dat"
+      ).responseText;
+      TEquals(att2_data.length, att2_copy.length);
+      TEquals(att2_data, att2_copy);
+
+
+      // generate a conflict throught replication by doc IDs
+      id = target_doc_ids[j].conflict_id;
+      doc = sourceDb.open(id);
+      copy = targetDb.open(id);
+      T(doc !== null);
+      T(copy !== null);
+      doc.integer += 100;
+      copy.integer += 1;
+      TEquals(true, sourceDb.save(doc).ok);
+      TEquals(true, targetDb.save(copy).ok);
+
+      repResult = CouchDB.replicate(
+        dbPairs[i].source,
+        dbPairs[i].target,
+        {
+          body: {
+            doc_ids: [id]
+          }
+        }
+      );
+
+      TEquals(true, repResult.ok);
+      TEquals(1, repResult.docs_read);
+      TEquals(1, repResult.docs_written);
+      TEquals(0, repResult.doc_write_failures);
+
+      copy = targetDb.open(id, {conflicts: true});
+
+      TEquals(0, copy._rev.indexOf("5-"));
+      TEquals(true, copy._conflicts instanceof Array);
+      TEquals(1, copy._conflicts.length);
+      TEquals(0, copy._conflicts[0].indexOf("5-"));
+    }
+  }
+
+
+  docs = makeDocs(1, 25);
+  docs.push({
+    _id: "_design/foo",
     language: "javascript"
+  });
+
+  for (i = 0; i < dbPairs.length; i++) {
+    populateDb(sourceDb, docs);
+    populateDb(targetDb, []);
+
+    // add some attachments
+    for (j = 10; j < 15; j++) {
+      addAtt(sourceDb, docs[j], "readme.txt", att1_data, "text/plain");
+    }
+
+    repResult = CouchDB.replicate(
+      dbPairs[i].source,
+      dbPairs[i].target,
+      {
+        body: {
+          continuous: true
+        }
+      }
+    );
+    TEquals(true, repResult.ok);
+    TEquals('string', typeof repResult._local_id);
+
+    var rep_id = repResult._local_id;
+
+    waitForSeq(sourceDb, targetDb);
+
+    for (j = 0; j < docs.length; j++) {
+      doc = docs[j];
+      copy = targetDb.open(doc._id);
+
+      T(copy !== null);
+      TEquals(true, compareObjects(doc, copy));
+
+      if (j >= 10 && j < 15) {
+        var atts = copy._attachments;
+        TEquals('object', typeof atts);
+        TEquals('object', typeof atts["readme.txt"]);
+        TEquals(2, atts["readme.txt"].revpos);
+        TEquals(0, atts["readme.txt"].content_type.indexOf("text/plain"));
+        TEquals(true, atts["readme.txt"].stub);
+
+        var att_copy = CouchDB.request(
+          "GET", "/" + targetDb.name + "/" + copy._id + "/readme.txt"
+        ).responseText;
+        TEquals(att1_data.length, att_copy.length);
+        TEquals(att1_data, att_copy);
+      }
+    }
+
+    sourceInfo = sourceDb.info();
+    targetInfo = targetDb.info();
+
+    TEquals(sourceInfo.doc_count, targetInfo.doc_count);
+
+    // add attachments to docs in source
+    for (j = 10; j < 15; j++) {
+      addAtt(sourceDb, docs[j], "data.dat", att2_data, "application/binary");
+    }
+
+    var ddoc = docs[docs.length - 1]; // design doc
+    addAtt(sourceDb, ddoc, "readme.txt", att1_data, "text/plain");
+
+    waitForSeq(sourceDb, targetDb);
+
+    var modifDocs = docs.slice(10, 15).concat([ddoc]);
+    for (j = 0; j < modifDocs.length; j++) {
+      doc = modifDocs[j];
+      copy = targetDb.open(doc._id);
+
+      T(copy !== null);
+      TEquals(true, compareObjects(doc, copy));
+
+      var atts = copy._attachments;
+      TEquals('object', typeof atts);
+      TEquals('object', typeof atts["readme.txt"]);
+      TEquals(2, atts["readme.txt"].revpos);
+      TEquals(0, atts["readme.txt"].content_type.indexOf("text/plain"));
+      TEquals(true, atts["readme.txt"].stub);
+
+      var att1_copy = CouchDB.request(
+        "GET", "/" + targetDb.name + "/" + copy._id + "/readme.txt"
+      ).responseText;
+      TEquals(att1_data.length, att1_copy.length);
+      TEquals(att1_data, att1_copy);
+
+      if (doc._id.indexOf("_design/") === -1) {
+        TEquals('object', typeof atts["data.dat"]);
+        TEquals(3, atts["data.dat"].revpos);
+        TEquals(0, atts["data.dat"].content_type.indexOf("application/binary"));
+        TEquals(true, atts["data.dat"].stub);
+
+        var att2_copy = CouchDB.request(
+          "GET", "/" + targetDb.name + "/" + copy._id + "/data.dat"
+        ).responseText;
+        TEquals(att2_data.length, att2_copy.length);
+        TEquals(att2_data, att2_copy);
+      }
+    }
+
+    sourceInfo = sourceDb.info();
+    targetInfo = targetDb.info();
+
+    TEquals(sourceInfo.doc_count, targetInfo.doc_count);
+
+    // add another attachment to the ddoc on source
+    addAtt(sourceDb, ddoc, "data.dat", att2_data, "application/binary");
+
+    waitForSeq(sourceDb, targetDb);
+
+    copy = targetDb.open(ddoc._id);
+    var atts = copy._attachments;
+    TEquals('object', typeof atts);
+    TEquals('object', typeof atts["readme.txt"]);
+    TEquals(2, atts["readme.txt"].revpos);
+    TEquals(0, atts["readme.txt"].content_type.indexOf("text/plain"));
+    TEquals(true, atts["readme.txt"].stub);
+
+    var att1_copy = CouchDB.request(
+      "GET", "/" + targetDb.name + "/" + copy._id + "/readme.txt"
+    ).responseText;
+    TEquals(att1_data.length, att1_copy.length);
+    TEquals(att1_data, att1_copy);
+
+    TEquals('object', typeof atts["data.dat"]);
+    TEquals(3, atts["data.dat"].revpos);
+    TEquals(0, atts["data.dat"].content_type.indexOf("application/binary"));
+    TEquals(true, atts["data.dat"].stub);
+
+    var att2_copy = CouchDB.request(
+      "GET", "/" + targetDb.name + "/" + copy._id + "/data.dat"
+    ).responseText;
+    TEquals(att2_data.length, att2_copy.length);
+    TEquals(att2_data, att2_copy);
+
+    sourceInfo = sourceDb.info();
+    targetInfo = targetDb.info();
+
+    TEquals(sourceInfo.doc_count, targetInfo.doc_count);
+
+
+    // add more docs to source
+    var newDocs = makeDocs(25, 35);
+    populateDb(sourceDb, newDocs, true);
+
+    waitForSeq(sourceDb, targetDb);
+
+    for (j = 0; j < newDocs.length; j++) {
+      doc = newDocs[j];
+      copy = targetDb.open(doc._id);
+
+      T(copy !== null);
+      TEquals(true, compareObjects(doc, copy));
+    }
+
+    sourceInfo = sourceDb.info();
+    targetInfo = targetDb.info();
+
+    TEquals(sourceInfo.doc_count, targetInfo.doc_count);
+
+    // delete docs from source
+    TEquals(true, sourceDb.deleteDoc(newDocs[0]).ok);
+    TEquals(true, sourceDb.deleteDoc(newDocs[6]).ok);
+
+    waitForSeq(sourceDb, targetDb);
+
+    copy = targetDb.open(newDocs[0]._id);
+    TEquals(null, copy);
+    copy = targetDb.open(newDocs[6]._id);
+    TEquals(null, copy);
+
+    var changes = targetDb.changes({since: targetInfo.update_seq});
+    var line1 = changes.results[changes.results.length - 2];
+    var line2 = changes.results[changes.results.length - 1];
+    TEquals(newDocs[0]._id, line1.id);
+    TEquals(true, line1.deleted);
+    TEquals(newDocs[6]._id, line2.id);
+    TEquals(true, line2.deleted);
+
+    // cancel the replication
+    repResult = CouchDB.replicate(
+      dbPairs[i].source,
+      dbPairs[i].target,
+      {
+        body: {
+          continuous: true,
+          cancel: true
+        }
+      }
+    );
+    TEquals(true, repResult.ok);
+    TEquals(rep_id, repResult._local_id);
+
+    doc = {
+      _id: 'foobar',
+      value: 666
+    };
+    TEquals(true, sourceDb.save(doc).ok);
+
+    wait(2000);
+    copy = targetDb.open(doc._id);
+    TEquals(null, copy);
+  }
+
+
+  //
+  // test replication of compressed attachments
+  //
+  doc = {
+    _id: "foobar"
   };
-  T(dbA.save(atts_ddoc).ok);
+  var bigTextAtt = makeAttData(128 * 1024);
+  var attName = "readme.txt";
+  var xhr = CouchDB.request("GET", "/_config/attachments/compression_level");
+  var compressionLevel = JSON.parse(xhr.responseText);
+  xhr = CouchDB.request("GET", "/_config/attachments/compressible_types");
+  var compressibleTypes = JSON.parse(xhr.responseText);
 
-  var rev = atts_ddoc._rev;
-  var att_1_name = "lorem.txt";
-  var att_2_name = "lorem.dat";
-  var xhr = CouchDB.request(
-    "PUT", "/" + dbA.name + "/" + atts_ddoc._id + "/" + att_1_name + "?rev=" + rev, {
-      headers: {"Content-Type": "text/plain;charset=utf-8"},
-      body: lorem
-  });
-  rev = JSON.parse(xhr.responseText).rev;
-  T(xhr.status === 201);
-  xhr = CouchDB.request(
-    "PUT", "/" + dbA.name + "/" + atts_ddoc._id + "/" + att_2_name + "?rev=" + rev, {
-      headers: {"Content-Type": "application/data"},
-      body: lorem_b64
-  });
-  T(xhr.status === 201);
+  for (i = 0; i < dbPairs.length; i++) {
+    populateDb(sourceDb, [doc]);
+    populateDb(targetDb, []);
 
-  var fdmananaUserDoc = CouchDB.prepareUserDoc({
-    name: "fdmanana",
-    roles: ["reader"]
-  }, "qwerty");
-  T(usersDb.save(fdmananaUserDoc).ok);
+    // enable compression of text types
+    enableAttCompression("8", "text/*");
 
-  T(dbA.setSecObj({
-    admins: {
-      names: [],
-      roles: ["admin"]
-    },
-    members: {
-      names: [],
-      roles: ["reader"]
-    }
-  }).ok);
-  T(dbB.setSecObj({
-    admins: {
-      names: ["fdmanana"],
-      roles: []
-    }
-  }).ok);
+    // add text attachment to foobar doc
+    xhr = CouchDB.request(
+      "PUT",
+      "/" + sourceDb.name + "/" + doc._id + "/" + attName + "?rev=" + doc._rev,
+      {
+        body: bigTextAtt,
+        headers: {"Content-Type": "text/plain"}
+      }
+    );
+    TEquals(201, xhr.status);
 
+    // disable compression and replicate
+    disableAttCompression();
+
+    repResult = CouchDB.replicate(dbPairs[i].source, dbPairs[i].target);
+    TEquals(true, repResult.ok);
+    TEquals(true, repResult.history instanceof Array);
+    TEquals(1, repResult.history.length);
+    TEquals(1, repResult.history[0].missing_checked);
+    TEquals(1, repResult.history[0].missing_found);
+    TEquals(1, repResult.history[0].docs_read);
+    TEquals(1, repResult.history[0].docs_written);
+    TEquals(0, repResult.history[0].doc_write_failures);
+
+    copy = targetDb.open(
+      doc._id,
+      {att_encoding_info: true, bypass_cache: Math.round(Math.random() * 1000)}
+    );
+    T(copy !== null);
+    T(attName in copy._attachments);
+    TEquals("gzip", copy._attachments[attName].encoding);
+    TEquals("number", typeof copy._attachments[attName].length);
+    TEquals("number", typeof copy._attachments[attName].encoded_length);
+    T(copy._attachments[attName].encoded_length < copy._attachments[attName].length);
+  }
+
+  delete bigTextAtt;
+  // restore original settings
+  enableAttCompression(compressionLevel, compressibleTypes);
+
+
+  //
+  // test replication triggered by non admins
+  //
+
+  // case 1) user triggering the replication is not a DB admin of the target DB
+  var joeUserDoc = CouchDB.prepareUserDoc({
+    name: "joe",
+    roles: ["erlanger"]
+  }, "erly");
+  var usersDb = new CouchDB("test_suite_auth", {"X-Couch-Full-Commit":"false"});
   var server_config = [
     {
       section: "couch_httpd_auth",
       key: "authentication_db",
       value: usersDb.name
-    },
-    // to prevent admin party mode
-    {
-      section: "admins",
-      key: "joe",
-      value: "erlang"
     }
   ];
 
-  var test_fun = function() {
-    T(CouchDB.login("fdmanana", "qwerty").ok);
-    T(CouchDB.session().userCtx.name === "fdmanana");
-    T(CouchDB.session().userCtx.roles.indexOf("_admin") === -1);
+  docs = makeDocs(1, 6);
+  docs.push({
+    _id: "_design/foo",
+    language: "javascript"
+  });
 
-    var repResult = CouchDB.replicate(
-      CouchDB.protocol + "fdmanana:qwerty@" + host + "/" + dbA.name,
-      dbB.name
-    );
-    T(repResult.ok === true);
-    T(repResult.history instanceof Array);
-    T(repResult.history.length === 1);
-    T(repResult.history[0].docs_written === 1);
-    T(repResult.history[0].docs_read === 1);
-    T(repResult.history[0].doc_write_failures === 0);
-
-    var atts_ddoc_copy = dbB.open(atts_ddoc._id);
-    T(atts_ddoc_copy !== null);
-    T(typeof atts_ddoc_copy._attachments === "object");
-    T(atts_ddoc_copy._attachments !== null);
-    T(att_1_name in atts_ddoc_copy._attachments);
-    T(att_2_name in atts_ddoc_copy._attachments);
-
-    var xhr = CouchDB.request("GET", "/" + dbB.name + "/" + atts_ddoc._id + "/" + att_1_name);
-    T(xhr.status === 200);
-    T(xhr.responseText === lorem);
-
-    xhr = CouchDB.request("GET", "/" + dbB.name + "/" + atts_ddoc._id + "/" + att_2_name);
-    T(xhr.status === 200);
-    T(xhr.responseText === lorem_b64);
-
-    CouchDB.logout();
-    T(CouchDB.login("joe", "erlang").ok);
-    T(dbA.setSecObj({
-      admins: {
-        names: [],
-        roles: ["bar"]
-      },
-      members: {
-        names: [],
-        roles: ["foo"]
-      }
-    }).ok);
-    T(dbB.deleteDb().ok === true);
-    T(dbB.createDb().ok === true);
-    T(dbB.setSecObj({
-      admins: {
-        names: ["fdmanana"],
-        roles: []
-      }
-    }).ok);
-    CouchDB.logout();
-
-    T(CouchDB.login("fdmanana", "qwerty").ok);
-    T(CouchDB.session().userCtx.name === "fdmanana");
-    T(CouchDB.session().userCtx.roles.indexOf("_admin") === -1);
-    try {
-      repResult = CouchDB.replicate(
-        CouchDB.protocol + "fdmanana:qwerty@" + host + "/" + dbA.name,
-        dbB.name
-      );
-      T(false, "replication should have failed");
-    } catch(x) {
-      T(x.error === "unauthorized");
+  dbPairs = [
+    {
+      source: sourceDb.name,
+      target: targetDb.name
+    },
+    {
+      source: CouchDB.protocol + host + "/" + sourceDb.name,
+      target: targetDb.name
+    },
+    {
+      source: sourceDb.name,
+      target: CouchDB.protocol + "joe:erly@" + host + "/" + targetDb.name
+    },
+    {
+      source: CouchDB.protocol + host + "/" + sourceDb.name,
+      target: CouchDB.protocol + "joe:erly@" + host + "/" + targetDb.name
     }
+  ];
 
-    atts_ddoc_copy = dbB.open(atts_ddoc._id);
-    T(atts_ddoc_copy === null);
+  for (i = 0; i < dbPairs.length; i++) {
+    usersDb.deleteDb();
+    populateDb(sourceDb, docs);
+    populateDb(targetDb, []);
 
-    CouchDB.logout();
-    T(CouchDB.login("joe", "erlang").ok);
-  };
+    TEquals(true, targetDb.setSecObj({
+      admins: {
+        names: ["superman"],
+        roles: ["god"]
+      }
+    }).ok);
 
-  run_on_modified_server(server_config, test_fun);
+    run_on_modified_server(server_config, function() {
+      delete joeUserDoc._rev;
+      TEquals(true, usersDb.save(joeUserDoc).ok);
+
+      TEquals(true, CouchDB.login("joe", "erly").ok);
+      TEquals('joe', CouchDB.session().userCtx.name);
+
+      repResult = CouchDB.replicate(dbPairs[i].source, dbPairs[i].target);
+
+      TEquals(true, CouchDB.logout().ok);
+
+      TEquals(true, repResult.ok);
+      TEquals(docs.length, repResult.history[0].docs_read);
+      TEquals((docs.length - 1), repResult.history[0].docs_written); // 1 ddoc
+      TEquals(1, repResult.history[0].doc_write_failures);
+    });
+
+    for (j = 0; j < docs.length; j++) {
+      doc = docs[j];
+      copy = targetDb.open(doc._id);
+
+      if (doc._id.indexOf("_design/") === 0) {
+        TEquals(null, copy);
+      } else {
+        T(copy !== null);
+        TEquals(true, compareObjects(doc, copy));
+      }
+    }
+  }
+
+  // case 2) user triggering the replication is not a reader (nor admin) of the
+  //         source DB
+  dbPairs = [
+    {
+      source: sourceDb.name,
+      target: targetDb.name
+    },
+    {
+      source: CouchDB.protocol + "joe:erly@" + host + "/" + sourceDb.name,
+      target: targetDb.name
+    },
+    {
+      source: sourceDb.name,
+      target: CouchDB.protocol + host + "/" + targetDb.name
+    },
+    {
+      source: CouchDB.protocol + "joe:erly@" + host + "/" + sourceDb.name,
+      target: CouchDB.protocol + host + "/" + targetDb.name
+    }
+  ];
+
+  for (i = 0; i < dbPairs.length; i++) {
+    usersDb.deleteDb();
+    populateDb(sourceDb, docs);
+    populateDb(targetDb, []);
+
+    TEquals(true, sourceDb.setSecObj({
+      admins: {
+        names: ["superman"],
+        roles: ["god"]
+      },
+      readers: {
+        names: ["john"],
+        roles: ["secret"]
+      }
+    }).ok);
+
+    run_on_modified_server(server_config, function() {
+      delete joeUserDoc._rev;
+      TEquals(true, usersDb.save(joeUserDoc).ok);
+
+      TEquals(true, CouchDB.login("joe", "erly").ok);
+      TEquals('joe', CouchDB.session().userCtx.name);
+
+      try {
+        CouchDB.replicate(dbPairs[i].source, dbPairs[i].target);
+        T(false, "should have raised an exception");
+      } catch (x) {
+        TEquals("unauthorized", x.error);
+      }
+
+      TEquals(true, CouchDB.logout().ok);
+    });
+
+    for (j = 0; j < docs.length; j++) {
+      doc = docs[j];
+      copy = targetDb.open(doc._id);
+      TEquals(null, copy);
+    }
+  }
+
 
   // cleanup
-  dbA.deleteDb();
-  dbB.deleteDb();
   usersDb.deleteDb();
+  sourceDb.deleteDb();
+  targetDb.deleteDb();
 };

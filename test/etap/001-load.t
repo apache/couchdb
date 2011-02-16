@@ -17,7 +17,7 @@
 
 main(_) ->
     test_util:init_code_path(),
-    etap:plan(37),
+    etap:plan(40),
     Modules = [
         couch_btree,
         couch_config,
@@ -43,7 +43,10 @@ main(_) ->
         couch_os_process,
         couch_query_servers,
         couch_ref_counter,
-        couch_rep,
+        couch_replicator,
+        couch_replicator_doc_copier,
+        couch_replicator_rev_finder,
+        couch_replicator_utils,
         couch_rep_sup,
         couch_server,
         couch_server_sup,

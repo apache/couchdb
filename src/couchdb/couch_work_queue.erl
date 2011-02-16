@@ -59,8 +59,8 @@ close(Wq) ->
 
 init(Options) ->
     Q = #q{
-        max_size = couch_util:get_value(max_size, Options),
-        max_items = couch_util:get_value(max_items, Options),
+        max_size = couch_util:get_value(max_size, Options, nil),
+        max_items = couch_util:get_value(max_items, Options, nil),
         multi_workers = couch_util:get_value(multi_workers, Options, false)
     },
     {ok, Q}.
@@ -71,7 +71,7 @@ terminate(_Reason, #q{work_waiters=Workers}) ->
 
     
 handle_call({queue, Item}, From, #q{work_waiters = []} = Q0) ->
-    Q = Q0#q{size = Q0#q.size + byte_size(term_to_binary(Item)),
+    Q = Q0#q{size = increment_queue_size(Q0, Item),
                 items = Q0#q.items + 1,
                 queue = queue:in(Item, Q0#q.queue)},
     case (Q#q.size >= Q#q.max_size) orelse
@@ -153,3 +153,10 @@ code_change(_OldVsn, State, _Extra) ->
 
 handle_info(X, Q) ->
     {stop, X, Q}.
+
+increment_queue_size(#q{max_size = nil, size = Size}, _Item) ->
+    Size;
+increment_queue_size(#q{size = Size}, Item) when is_binary(Item) ->
+    Size + byte_size(Item);
+increment_queue_size(#q{size = Size}, Item) ->
+    Size + byte_size(term_to_binary(Item)).
