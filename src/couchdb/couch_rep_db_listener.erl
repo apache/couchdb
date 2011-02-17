@@ -320,13 +320,13 @@ keep_retrying(Server, Rep, Error, _Wait, 0) ->
     ok = gen_server:call(Server, {restart_failure, Rep, Error}, infinity);
 
 keep_retrying(Server, #rep{doc = {RepProps}} = Rep, Error, Wait, RetriesLeft) ->
-    ?LOG_ERROR("Error starting replication `~s`: ~p. "
-        "Retrying in ~p seconds", [pp_rep_id(Rep), Error, Wait]),
+    DocId = get_value(<<"_id">>, RepProps),
+    ?LOG_ERROR("Error starting replication `~s` (document `~s`): ~p. "
+        "Retrying in ~p seconds", [pp_rep_id(Rep), DocId, Error, Wait]),
     ok = timer:sleep(Wait * 1000),
     case (catch couch_replicator:async_replicate(Rep)) of
     {ok, _} ->
         ok = gen_server:call(Server, {triggered, Rep#rep.id}, infinity),
-        DocId = get_value(<<"_id">>, RepProps),
         [{DocId, {RepId, MaxRetries}}] = ets:lookup(?DOC_ID_TO_REP_ID, DocId),
         ?LOG_INFO("Document `~s` triggered replication `~s` after ~p attempts",
             [DocId, pp_rep_id(RepId), MaxRetries - RetriesLeft + 1]);
