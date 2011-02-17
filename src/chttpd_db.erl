@@ -240,13 +240,14 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
     couch_httpd:validate_ctype(Req, "application/json"),
     {JsonProps} = chttpd:json_body_obj(Req),
     DocsArray = couch_util:get_value(<<"docs">>, JsonProps),
+    W = couch_httpd:qs_value(Req, "w", couch_config:get("cluster", "w", "2")),
     case chttpd:header_value(Req, "X-Couch-Full-Commit") of
     "true" ->
-        Options = [full_commit, {user_ctx,Ctx}];
+        Options = [full_commit, {user_ctx,Ctx}, {w,W}];
     "false" ->
-        Options = [delay_commit, {user_ctx,Ctx}];
+        Options = [delay_commit, {user_ctx,Ctx}, {w,W}];
     _ ->
-        Options = [{user_ctx,Ctx}]
+        Options = [{user_ctx,Ctx}, {w,W}]
     end,
     case couch_util:get_value(<<"new_edits">>, JsonProps, true) of
     true ->
