@@ -57,7 +57,8 @@ go(DbName, "normal", Options, Callback, Acc0) ->
             Args,
             Callback,
             Since,
-            Acc
+            Acc,
+            5000
         ),
         Callback({stop, pack_seqs(Seqs)}, AccOut);
     Error ->
@@ -66,7 +67,7 @@ go(DbName, "normal", Options, Callback, Acc0) ->
 
 keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout) ->
     #changes_args{limit=Limit, feed=Feed, heartbeat=Heartbeat} = Args,
-    {ok, Collector} = send_changes(DbName, Args, Callback, Seqs, AccIn),
+    {ok, Collector} = send_changes(DbName, Args, Callback, Seqs, AccIn, Timeout),
     #collector{limit=Limit2, counters=NewSeqs, user_acc=AccOut} = Collector,
     LastSeq = pack_seqs(NewSeqs),
     if Limit > Limit2, Feed == "longpoll" ->
@@ -93,7 +94,7 @@ keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout) ->
         end
     end.
 
-send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn) ->
+send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn, Timeout) ->
     AllShards = mem3:shards(DbName),
     Seqs = lists:flatmap(fun({#shard{name=Name, node=N} = Shard, Seq}) ->
         case lists:member(Shard, AllShards) of
@@ -120,12 +121,21 @@ send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn) ->
         rows = Seqs % store sequence positions instead
     },
     %% TODO: errors need to be handled here
-    try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3,
-            State, infinity, 5000) of
-        {_, NewState} ->
-            {ok, NewState}
+    try
+        receive_results(Workers, State, Timeout, Callback, AccIn)
     after
         fabric_util:cleanup(Workers)
+    end.
+
+receive_results(Workers, State, Timeout, Callback, AccIn) ->
+    case rexi_utils:recv(Workers, #shard.ref, fun handle_message/3, State,
+            infinity, Timeout) of
+    {timeout, _NewState} ->
+        {ok, AccOut} = Callback(timeout, AccIn),
+        NewState = State#collector{user_acc = AccOut},
+        receive_results(Workers, NewState, Timeout, Callback, AccOut);
+    {_, NewState} ->
+        {ok, NewState}
     end.
 
 handle_message({rexi_DOWN, _, _, _}, nil, State) ->
