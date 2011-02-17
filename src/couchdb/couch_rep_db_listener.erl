@@ -318,14 +318,14 @@ keep_retrying(Server, _RepId, RepDoc, _UserCtx, Error, _Wait, 0) ->
     ok = gen_server:call(Server, {restart_failure, RepDoc, Error}, infinity);
 
 keep_retrying(Server, RepId, RepDoc, UserCtx, Error, Wait, RetriesLeft) ->
-    ?LOG_ERROR("Error starting replication `~s`: ~p. "
-        "Retrying in ~p seconds", [pp_rep_id(RepId), Error, Wait]),
+    {RepProps} = RepDoc,
+    DocId = get_value(<<"_id">>, RepProps),
+    ?LOG_ERROR("Error starting replication `~s` (document `~s`): ~p. "
+        "Retrying in ~p seconds", [pp_rep_id(RepId), DocId, Error, Wait]),
     ok = timer:sleep(Wait * 1000),
     case (catch couch_rep:start_replication(RepDoc, RepId, UserCtx)) of
     Pid when is_pid(Pid) ->
         ok = gen_server:call(Server, {triggered, RepId}, infinity),
-        {RepProps} = RepDoc,
-        DocId = get_value(<<"_id">>, RepProps),
         [{DocId, {RepId, MaxRetries}}] = ets:lookup(?DOC_ID_TO_REP_ID, DocId),
         ?LOG_INFO("Document `~s` triggered replication `~s` after ~p attempts",
             [DocId, pp_rep_id(RepId), MaxRetries - RetriesLeft + 1]),
