@@ -65,9 +65,9 @@ close_lru() ->
 
 create(DbName, Options) ->
     case gen_server:call(couch_server, {create, DbName, Options}, infinity) of
-    {ok, Db} ->
+    {ok, #db{fd=Fd} = Db} ->
         Ctx = couch_util:get_value(user_ctx, Options, #user_ctx{}),
-        {ok, Db#db{user_ctx=Ctx}};
+        {ok, Db#db{user_ctx=Ctx, fd_monitor=erlang:monitor(process,Fd)}};
     Error ->
         Error
     end.
