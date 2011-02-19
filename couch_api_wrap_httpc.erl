@@ -210,8 +210,6 @@ do_report_error(FullUrl, Method, Error) ->
         [Method, FullUrl, error_cause(Error)]).
 
 
-error_cause({throw, {error, Cause}}) ->
-    lists:flatten(io_lib:format("~p", [Cause]));
 error_cause({error, Cause}) ->
     lists:flatten(io_lib:format("~p", [Cause]));
 error_cause(Cause) ->
