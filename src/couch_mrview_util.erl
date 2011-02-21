@@ -81,7 +81,10 @@ ddoc_to_mrst(DbName, #doc{id=Id, body={Fields}}) ->
                 dict:store({MapSrc, ViewOpts}, View2, DictBySrcAcc);
             undefined ->
                 DictBySrcAcc
-        end
+        end;
+        ({Name, Else}, DictBySrcAcc) ->
+            ?LOG_ERROR("design_doc_to_view_group ~s views ~p", [Name, Else]),
+            DictBySrcAcc
     end,
     {RawViews} = couch_util:get_value(<<"views">>, Fields, {[]}),
     BySrc = lists:foldl(MakeDict, dict:new(), RawViews),
