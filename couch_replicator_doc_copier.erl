@@ -457,7 +457,7 @@ maybe_flush_docs(#db{} = Target, Batch, Doc) ->
 flush_docs(_Target, []) ->
     {0, 0};
 
-flush_docs(Target, DocList) when is_list(DocList) ->
+flush_docs(Target, DocList) ->
     {ok, Errors} = couch_api_wrap:update_docs(
         Target, DocList, [delay_commit], replicated_changes),
     DbUri = couch_api_wrap:db_uri(Target),
