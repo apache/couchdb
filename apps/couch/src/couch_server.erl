@@ -353,9 +353,7 @@ code_change(_OldVsn, State, _Extra) ->
 handle_info({'EXIT', _Pid, config_change}, Server) ->
     {stop, config_change, Server};
 handle_info({'EXIT', Pid, Reason}, #server{dbs_open=DbsOpen}=Server) ->
-    Match = erlang:make_tuple(tuple_size(#db{}), '_', [{1, db},
-        {#db.main_pid, Pid}]),
-    case ets:match_object(couch_dbs, Match) of
+    case ets:match_object(couch_dbs, #db{main_pid=Pid, _='_'}) of
     [#db{name = DbName, compactor_pid=Froms}] ->
         ?LOG_INFO("db ~s died with reason ~p", [DbName, Reason]),
         % icky hack of field values - compactor_pid used to store clients
