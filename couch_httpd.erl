@@ -85,6 +85,10 @@ start_link(Name, Options) ->
         couch_config:get("httpd", "server_options", "[]")),
     {ok, SocketOptions} = couch_util:parse_term(
         couch_config:get("httpd", "socket_options", "[]")),
+
+    % install vhosts rules
+    couch_httpd_vhost:install(),
+
     Loop = fun(Req)->
         case SocketOptions of
         [] ->
@@ -133,8 +137,6 @@ config_change("httpd_global_handlers", _) ->
     ?MODULE:stop();
 config_change("httpd_db_handlers", _) ->
     ?MODULE:stop();
-config_change("vhosts", _) ->
-    ?MODULE:stop();
 config_change("ssl", _) ->
     ?MODULE:stop().
 
@@ -171,7 +173,8 @@ make_fun_spec_strs(SpecStr) ->
 handle_request(MochiReq, DefaultFun, UrlHandlers, DbUrlHandlers, 
     DesignUrlHandlers) ->
 
-    MochiReq1 = couch_httpd_vhost:match_vhost(MochiReq),
+    MochiReq1 = couch_httpd_vhost:dispatch_host(MochiReq),
+    
     handle_request_int(MochiReq1, DefaultFun,
                 UrlHandlers, DbUrlHandlers, DesignUrlHandlers).
 
