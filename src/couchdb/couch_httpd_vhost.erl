@@ -10,27 +10,24 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-
-
 -module(couch_httpd_vhost).
 -behaviour(gen_server).
 
--export([start_link/0, init/1, handle_call/3, handle_info/2, handle_cast/2]).
--export([code_change/3, terminate/2]).
--export([match_vhost/1, urlsplit_netloc/2]).
--export([redirect_to_vhost/2]).
+-export([start_link/0, config_change/2, install/0, dispatch_host/1]).
+-export([urlsplit_netloc/2, redirect_to_vhost/2]).
+
+
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("couch_db.hrl").
 
 -define(SEPARATOR, $\/).
 -define(MATCH_ALL, {bind, '*'}).
 
--record(vhosts, {
-    vhost_globals,
-    vhosts = [],
-    vhost_fun
-}).
-
+-record(vhosts_state, {
+        vhosts,
+        vhost_globals,
+        vhosts_fun}).
 
 %% doc the vhost manager.
 %% This gen_server keep state of vhosts added to the ini and try to
@@ -80,74 +77,22 @@
 %% The function take 2 args : the mochiweb request object and the target
 %%% path. 
 
-start_link() -> 
+start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
+install() ->
+    gen_server:call(?MODULE, install).
+
+get_state() ->
+    gen_server:call(?MODULE, get_state).
 
 %% @doc Try to find a rule matching current Host heade. some rule is
 %% found it rewrite the Mochiweb Request else it return current Request.
-match_vhost(MochiReq) ->
-    {ok, MochiReq1} = gen_server:call(couch_httpd_vhost, {match_vhost,
-            MochiReq}),
-
-    MochiReq1.
-
-
-%% --------------------
-%% gen_server functions
-%% --------------------
-
-init(_) ->
-    process_flag(trap_exit, true),
-
-    % init state
-    VHosts = make_vhosts(),
-    VHostGlobals = re:split(
-        couch_config:get("httpd", "vhost_global_handlers", ""),
-        ", ?",
-        [{return, list}]
-    ),
-    
-    % Set vhost fun
-    DefaultVHostFun = "{couch_httpd_vhost, redirect_to_vhost}",
-    VHostFun = couch_httpd:make_arity_2_fun(
-        couch_config:get("httpd", "redirect_vhost_handler", DefaultVHostFun)
-    ),
-    
-
-    Self = self(),
-    % register for changes in vhosts section
-    ok = couch_config:register(
-        fun("vhosts") ->
-            ok = gen_server:call(Self, vhosts_changed, infinity)
-        end
-    ),
-    
-    % register for changes in vhost_global_handlers key
-    ok = couch_config:register(
-        fun("httpd", "vhost_global_handlers") ->
-            ok = gen_server:call(Self, vhosts_global_changed, infinity)
-        end
-    ),
-
-    ok = couch_config:register(
-        fun("httpd", "redirect_vhost_handler") ->
-            ok = gen_server:call(Self, fun_changed, infinity)
-        end
-    ),
-
-    {ok, #vhosts{
+dispatch_host(MochiReq) ->
+    #vhosts_state{
         vhost_globals = VHostGlobals,
         vhosts = VHosts,
-        vhost_fun = VHostFun}
-    }.
-
-
-handle_call({match_vhost, MochiReq}, _From, State) ->
-    #vhosts{
-        vhost_globals = VHostGlobals,
-        vhosts = VHosts,
-        vhost_fun = Fun
-    } = State,
+        vhosts_fun=Fun} = get_state(),
 
     {"/" ++ VPath, Query, Fragment} = mochiweb_util:urlsplit_path(MochiReq:get(raw_path)),
     VPathParts =  string:tokens(VPath, "/"),
@@ -180,45 +125,9 @@ handle_call({match_vhost, MochiReq}, _From, State) ->
                     Fun(MochiReq1, VhostTarget)
             end
     end,
-    {reply, {ok, FinalMochiReq}, State}; 
+    FinalMochiReq.
         
-% update vhosts
-handle_call(vhosts_changed, _From, State) ->
-    {reply, ok, State#vhosts{vhosts= make_vhosts()}};
-
-
-% update vhosts_globals
-handle_call(vhosts_global_changed, _From, State) ->
-    VHostGlobals = re:split(
-        couch_config:get("httpd", "vhost_global_handlers", ""),
-        ", ?",
-        [{return, list}]
-    ),
-    {reply, ok, State#vhosts{vhost_globals=VHostGlobals}};
-% change fun
-handle_call(fun_changed, _From, State) ->
-    DefaultVHostFun = "{couch_httpd_vhosts, redirect_to_vhost}",
-    VHostFun = couch_httpd:make_arity_2_fun(
-        couch_config:get("httpd", "redirect_vhost_handler", DefaultVHostFun)
-    ),
-    {reply, ok, State#vhosts{vhost_fun=VHostFun}}.
-
-handle_cast(_Msg, State) ->
-    {noreply, State}.
-
-handle_info(_Msg, State) ->
-    {noreply, State}.
-
-terminate(_Reason, _State) ->
-    ok.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
-
-
-
 % default redirect vhost handler 
-
 redirect_to_vhost(MochiReq, VhostTarget) ->
     Path = MochiReq:get(raw_path),
     Target = VhostTarget ++ Path,
@@ -236,7 +145,6 @@ redirect_to_vhost(MochiReq, VhostTarget) ->
                                       Headers),
     % cleanup, It force mochiweb to reparse raw uri.
     MochiReq1:cleanup(),
-
     MochiReq1.
 
 %% if so, then it will not be rewritten, but will run as a normal couchdb request.
@@ -400,3 +308,59 @@ urlsplit_netloc([C | Rest], Acc) ->
 
 make_path(Parts) ->
      "/" ++ string:join(Parts,[?SEPARATOR]).
+
+init(_) ->
+    ok = couch_config:register(fun ?MODULE:config_change/2),
+    
+    %% load configuration
+    {VHostGlobals, VHosts, Fun} = load_conf(),
+    State = #vhosts_state{
+        vhost_globals=VHostGlobals,
+        vhosts=VHosts,
+        vhosts_fun=Fun},
+    {ok, State}.
+
+handle_call(install, _From, _State) ->
+    {VHostGlobals, VHosts, Fun} = load_conf(),
+    {reply, ok, #vhosts_state{
+            vhost_globals=VHostGlobals,
+            vhosts=VHosts,
+            vhosts_fun=Fun}};
+handle_call(get_state, _From, State) ->
+    {reply, State, State};
+handle_call(_Msg, _From, State) ->
+    {noreply, State}.
+
+handle_cast(_Msg, State) ->
+    {noreply, State}.
+
+handle_info(_Info, State) ->
+    {noreply, State}.
+
+terminate(_Reason, _State) ->
+    ok.
+
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+config_change("httpd", "vhost_global_handlers") ->
+    ?MODULE:install();
+config_change("httpd", "redirect_vhost_handler") ->
+    ?MODULE:install();
+config_change("vhosts", _) ->
+    ?MODULE:install().
+
+load_conf() ->
+    %% get vhost globals
+    VHostGlobals = re:split(couch_config:get("httpd",
+            "vhost_global_handlers",""), "\\s*,\\s*",[{return, list}]),
+
+    %% build vhosts matching rules
+    VHosts = make_vhosts(),
+
+    %% build vhosts handler fun
+    DefaultVHostFun = "{couch_httpd_vhost, redirect_to_vhost}",
+    Fun = couch_httpd:make_arity_2_fun(couch_config:get("httpd",
+            "redirect_vhost_handler", DefaultVHostFun)),
+
+    {VHostGlobals, VHosts, Fun}.

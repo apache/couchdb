@@ -54,13 +54,13 @@ os_process_limit = 25
 view_manager={couch_view, start_link, []}
 external_manager={couch_external_manager, start_link, []}
 query_servers={couch_query_servers, start_link, []}
+vhosts={couch_httpd_vhost, start_link, []}
 httpd={couch_httpd, start_link, []}
 stats_aggregator={couch_stats_aggregator, start, []}
 stats_collector={couch_stats_collector, start, []}
 uuids={couch_uuids, start, []}
 auth_cache={couch_auth_cache, start_link, []}
 rep_db_changes_listener={couch_rep_db_listener, start_link, []}
-vhosts={couch_httpd_vhost, start_link, []}
 os_daemons={couch_os_daemons, start_link, []}
 
 [httpd_global_handlers]
