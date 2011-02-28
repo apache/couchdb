@@ -108,10 +108,10 @@ var Views = (function() {
       Couch.recursivelySeal(doc);
 
       var buf = [];
-      for (var i = 0, l = State.funs.length; i < l; i++) {
+      for each (fun in State.funs) {
         map_results = [];
         try {
-          State.funs[i](doc);
+          fun(doc);
           buf.push(map_results);
         } catch (err) {
           handleViewError(err, doc);
