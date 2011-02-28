@@ -85,4 +85,5 @@ cat > rel/dev$i.config << EOF
 EOF
 done
 
-./rebar get-deps && mkdir -p apps/couch/ebin && cat rel/bigcouch.config
+mkdir -p apps/couch/ebin
+./rebar get-deps && ./rebar update-deps && cat rel/bigcouch.config
