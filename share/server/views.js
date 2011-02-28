@@ -108,19 +108,19 @@ var Views = (function() {
       Couch.recursivelySeal(doc);
 
       var buf = [];
-      for (var i = 0; i < State.funs.length; i++) {
+      for (var i = 0, l = State.funs.length; i < l; i++) {
         map_results = [];
         try {
           State.funs[i](doc);
-          buf.push(Couch.toJSON(map_results));
+          buf.push(map_results);
         } catch (err) {
           handleViewError(err, doc);
           // If the error is not fatal, we treat the doc as if it
           // did not emit anything, by buffering an empty array.
-          buf.push("[]");
+          buf.push([]);
         }
       }
-      print("[" + buf.join(", ") + "]");
+      print(JSON.stringify(buf));
     }
   };
 })();
