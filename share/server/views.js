@@ -30,7 +30,7 @@ var Views = (function() {
         reductions[i] = null;
       }
     };
-    var reduce_line = Couch.toJSON(reductions);
+    var reduce_line = JSON.stringify(reductions);
     var reduce_length = reduce_line.length;
     // TODO make reduce_limit config into a number
     if (State.query_config && State.query_config.reduce_limit &&
