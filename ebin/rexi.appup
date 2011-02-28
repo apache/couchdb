@@ -1,5 +1,0 @@
-{"1.1",[{"1.0",[
-    {load_module, rexi},
-    {add_module, rexi_monitor},
-    {load_module, rexi_server}
-]}],[{"1.0",[]}]}.
