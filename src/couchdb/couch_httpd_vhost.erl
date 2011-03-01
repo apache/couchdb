@@ -13,7 +13,7 @@
 -module(couch_httpd_vhost).
 -behaviour(gen_server).
 
--export([start_link/0, config_change/2, install/0, dispatch_host/1]).
+-export([start_link/0, config_change/2, reload/0, get_state/0, dispatch_host/1]).
 -export([urlsplit_netloc/2, redirect_to_vhost/2]).
 
 
@@ -80,8 +80,9 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-install() ->
-    gen_server:call(?MODULE, install).
+%% @doc reload vhosts rules
+reload() ->
+    gen_server:call(?MODULE, reload).
 
 get_state() ->
     gen_server:call(?MODULE, get_state).
@@ -188,7 +189,7 @@ try_bind_vhost([VhostSpec|Rest], HostParts, Port, PathParts) ->
 %% doc: build new patch from bindings. bindings are query args
 %% (+ dynamic query rewritten if needed) and bindings found in
 %% bind_path step. 
-%% TODO: merge code wit rewrite. But we need to make sure we are
+%% TODO: merge code with rewrite. But we need to make sure we are
 %% in string here.
 make_target([], _Bindings, _Remaining, Acc) ->
     lists:reverse(Acc);
@@ -237,9 +238,9 @@ bind_path(_, _) ->
 
 %% create vhost list from ini
 make_vhosts() ->
-    lists:foldl(fun({Vhost, Path}, Acc) ->
-        [{parse_vhost(Vhost), split_path(Path)}|Acc]
-    end, [], couch_config:get("vhosts")).
+    lists:reverse(lists:foldl(fun({Vhost, Path}, Acc) ->
+                    [{parse_vhost(Vhost), split_path(Path)}|Acc]
+            end, [], couch_config:get("vhosts"))).
 
 
 parse_vhost(Vhost) ->
@@ -320,7 +321,7 @@ init(_) ->
         vhosts_fun=Fun},
     {ok, State}.
 
-handle_call(install, _From, _State) ->
+handle_call(reload, _From, _State) ->
     {VHostGlobals, VHosts, Fun} = load_conf(),
     {reply, ok, #vhosts_state{
             vhost_globals=VHostGlobals,

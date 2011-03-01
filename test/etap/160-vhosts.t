@@ -111,13 +111,13 @@ test() ->
     ok = couch_config:set("vhosts", ":dbname.example1.com", "/:dbname", false),
     
     ok = couch_config:set("vhosts", "*.example2.com", "/*", false),
-    ok = couch_config:set("vhosts", "*/test", "/etap-test-db", false), 
     ok = couch_config:set("vhosts", "*.example2.com/test", "/*", false),
+    ok = couch_config:set("vhosts", "*/test", "/etap-test-db", false), 
     ok = couch_config:set("vhosts", "*/test1", 
             "/etap-test-db/_design/doc1/_show/test", false), 
 
-    % let couch_httpd restart
-    timer:sleep(100),
+    %% reload rules
+    couch_httpd_vhost:reload(),
 
     test_regular_request(),
     test_vhost_request(),
