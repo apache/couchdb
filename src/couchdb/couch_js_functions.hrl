@@ -93,6 +93,15 @@
         if (newDoc.name[0] === '_') {
             throw({forbidden: 'Username may not start with underscore.'});
         }
+
+        var badUserNameChars = [':'];
+
+        for (var i = 0; i < badUserNameChars.length; i++) {
+            if (newDoc.name.indexOf(badUserNameChars[i]) >= 0) {
+                throw({forbidden: 'Character `' + badUserNameChars[i] +
+                        '` is not allowed in usernames.'});
+            }
+        }
     }
 ">>).
 

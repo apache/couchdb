@@ -111,6 +111,17 @@ couchTests.users_db = function(debug) {
       T(e.reason == "doc.roles must be an array");
     }
     jchrisUserDoc.roles = [];
+
+    // character : is not allowed in usernames
+    var joeUserDoc = CouchDB.prepareUserDoc({
+      name: "joe:erlang"
+    }, "qwerty");
+    try {
+      usersDb.save(joeUserDoc);
+      T(false, "shouldn't allow : in usernames");
+    } catch(e) {
+      TEquals("Character `:` is not allowed in usernames.", e.reason);
+    }
   };
 
   usersDb.deleteDb();
