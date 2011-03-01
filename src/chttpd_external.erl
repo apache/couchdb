@@ -69,7 +69,7 @@ json_req_obj(#httpd{mochi_req=Req,
         Else -> Else
     end,
     ParsedForm = case Req:get_primary_header_value("content-type") of
-        "application/x-www-form-urlencoded" ++ _ ->
+        "application/x-www-form-urlencoded" ++ _ when Method =:= 'POST' ->
             mochiweb_util:parse_qs(Body);
         _ ->
             []
