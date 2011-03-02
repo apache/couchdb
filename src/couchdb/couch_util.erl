@@ -327,7 +327,7 @@ to_binary(V) when is_list(V) ->
     try
         list_to_binary(V)
     catch
-        _ ->
+        _:_ ->
             list_to_binary(io_lib:format("~p", [V]))
     end;
 to_binary(V) when is_atom(V) ->
