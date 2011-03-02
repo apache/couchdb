@@ -228,6 +228,8 @@ update_doc(#httpdb{} = HttpDb, #doc{id = DocId} = Doc, Options, Type) ->
            {headers, Headers}, {body, Body}],
         fun(Code, _, {Props}) when Code =:= 200 orelse Code =:= 201 ->
                 {ok, couch_doc:parse_rev(get_value(<<"rev">>, Props))};
+            (409, _, _) ->
+                throw(conflict);
             (_, _, {Props}) ->
                 {error, get_value(<<"error">>, Props)}
         end);
