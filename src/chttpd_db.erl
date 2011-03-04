@@ -1022,10 +1022,8 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
             end
     end,
 
-    #doc{atts=Atts, revs = {Pos, Revs}} = Doc,
+    #doc{atts=Atts} = Doc,
     DocEdited = Doc#doc{
-        % prune revision list as a workaround for key tree bug (COUCHDB-902)
-        revs = {Pos, case Revs of [] -> []; [Hd|_] -> [Hd] end},
         atts = NewAtt ++ [A || A <- Atts, A#att.name /= FileName]
     },
     case fabric:update_doc(Db, DocEdited, [{user_ctx,Ctx}]) of
