@@ -281,7 +281,7 @@ maybe_start_replication(#state{max_retries = MaxRetries} = State,
         Pid = spawn_link(
             fun() -> start_replication(Server, Rep, MaxRetries) end),
         State#state{rep_start_pids = [Pid | State#state.rep_start_pids]};
-    [{BaseId, DocId}] ->
+    [{BaseId, {DocId, _}}] ->
         State;
     [{BaseId, {OtherDocId, false}}] ->
         ?LOG_INFO("The replication specified by the document `~s` was already"
