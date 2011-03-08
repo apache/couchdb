@@ -118,7 +118,7 @@ message(_Pid, crash_report, Report) ->
     proc_lib:format(Report);
 message(Pid, supervisor_report, Report) ->
     Name = lists:keyfind(supervisor, 1, Report),
-    Error = lists:keyfind(errorContext, Report),
+    Error = lists:keyfind(errorContext, 1, Report),
     Reason = lists:keyfind(reason, 1, Report),
     Offender = lists:keyfind(offender, 1, Report),
     ChildPid = lists:keyfind(pid, 1, Offender),
