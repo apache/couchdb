@@ -1,0 +1,8 @@
+{application, twig, [
+    {description, "Logger"},
+    {vsn, git},
+    {registered, []},
+    {applications, [kernel, stdlib]},
+    {mod, {twig_app, []}},
+    {env, []}
+]}.
