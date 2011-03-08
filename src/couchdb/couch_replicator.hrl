@@ -18,7 +18,7 @@
     target,
     options,
     user_ctx,
-    doc
+    doc_id
 }).
 
 -record(rep_stats, {
