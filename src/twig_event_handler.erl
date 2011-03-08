@@ -123,7 +123,12 @@ message(Pid, supervisor_report, Report) ->
     Offender = get_value(offender, Report),
     ChildPid = get_value(pid, Offender),
     ChildName = get_value(name, Offender),
-    {M,F,_} = get_value(mfa, Offender),
+    case get_value(mfa, Offender) of
+        undefined ->
+            {M,F,_} = get_value(mfargs, Offender);
+        {M,F,_} ->
+            ok
+    end,
     {"[~p] SUPERVISOR REPORT ~p ~p (~p) child: ~p [~p] ~p:~p",
         [Pid, Name, Error, Reason, ChildName, ChildPid, M, F]};
 message(Pid, progress_report, Report) ->
