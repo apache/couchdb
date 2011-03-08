@@ -150,6 +150,6 @@ get_value(Key, Props) ->
     case lists:keyfind(Key, 1, Props) of
         {Key, Value} ->
             Value;
-        undefined ->
+        false ->
             undefined
     end.
