@@ -23,7 +23,8 @@ start_link() ->
     gen_server:start_link(?MODULE, [], []).
 
 init(_) ->
-    gen_event:add_sup_handler(error_logger, twig_event_handler, []).
+    ok = gen_event:add_sup_handler(error_logger, twig_event_handler, []),
+    {ok, nil}.
 
 handle_call(_Call, _From, State) ->
     {reply, ignored, State}.
