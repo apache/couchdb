@@ -47,7 +47,7 @@ handle_event({Class, _GL, {Pid, Format, Args}}, #state{level=Max} = State) ->
         Level when Level > Max ->
             {ok, State};
         Level ->
-            write(Level, undefined, message(Pid, Format, Args), Pid, State),
+            write(Level, undefined, message(Format, Args), Pid, State),
             {ok, State}
     end;
 
@@ -102,7 +102,7 @@ write(Level, undefined, Msg, Pid, State) ->
 write(Level, MsgId, Msg, Pid, State) when is_list(Msg); is_binary(Msg) ->
     #state{facility=Facil, appid=App, hostname=Hostname, host=Host, port=Port,
         socket=Socket} = State,
-     Pre = io_lib:format("<~B>~B ~s ~s ~s ~s ~s - ", [Facil bor Level,
+     Pre = io_lib:format("<~B>~B ~s ~s ~s ~p ~s - ", [Facil bor Level,
         ?SYSLOG_VERSION, twig_util:iso8601_timestamp(), Hostname, App, Pid,
         MsgId]),
     %% TODO truncate large messages
@@ -110,16 +110,16 @@ write(Level, MsgId, Msg, Pid, State) when is_list(Msg); is_binary(Msg) ->
 write(Level, MsgId, {Format0, Args0}, Pid, State) ->
     #state{facility=Facil, appid=App, hostname=Hostname, host=Host, port=Port,
         socket=Socket} = State,
-    Format = "<~B>~B ~s ~s ~s ~s ~s - " ++ Format0 ++ "\n",
+    Format = "<~B>~B ~s ~s ~s ~p ~s - " ++ Format0 ++ "\n",
     Args = [Facil bor Level, ?SYSLOG_VERSION, twig_util:iso8601_timestamp(),
         Hostname, App, Pid, MsgId | Args0],
     %% TODO truncate large messages
     Packet = io_lib:format(Format, Args),
     gen_udp:send(Socket, Host, Port, Packet).
 
-message(_Pid, crash_report, Report) ->
+message(crash_report, Report) ->
     proc_lib:format(Report);
-message(Pid, supervisor_report, Report) ->
+message(supervisor_report, Report) ->
     Name = get_value(supervisor, Report),
     Error = get_value(errorContext, Report),
     Reason = get_value(reason, Report),
@@ -132,16 +132,20 @@ message(Pid, supervisor_report, Report) ->
         {M,F,_} ->
             ok
     end,
-    {"[~p] SUPERVISOR REPORT ~p ~p (~p) child: ~p [~p] ~p:~p",
-        [Pid, Name, Error, Reason, ChildName, ChildPid, M, F]};
-message(Pid, progress_report, Report) ->
-    {"[~p] PROGRESS REPORT~n~p", [Pid, Report]};
-message(Pid, Type, Report) when Type == std_error;
-                                Type == std_info;
-                                Type == std_warning ->
-    {"[~p] ~p: ~p", [Pid, Type, Report]};
-message(Pid, Format, Args) ->
-    {"[~p] " ++ Format, [Pid|Args]}.
+    {"SUPERVISOR ~p ~p (~p) child: ~p [~p] ~p:~p",
+        [Name, Error, Reason, ChildName, ChildPid, M, F]};
+message(progress_report, Report) ->
+    {"PROGRESS~n~p", [Report]};
+message(progress, Report) ->
+    {"PROGRESS~n~p", [Report]};
+message(Type, Report) when Type == std_error;
+                           Type == std_info;
+                           Type == std_warning ->
+    {"~p", [Report]};
+message(Format, Args) when is_list(Format) ->
+    {Format, Args};
+message(Format, Args) ->
+    {"UNKNOWN ~p ~p", [Format, Args]}.
 
 otp_event_level(error, _) ->                        ?LEVEL_ERR;
 otp_event_level(warning_msg, _) ->                  ?LEVEL_WARN;
@@ -149,6 +153,7 @@ otp_event_level(info_msg, _) ->                     ?LEVEL_INFO;
 otp_event_level(_, {_, crash_report, _}) ->         ?LEVEL_CRIT;
 otp_event_level(_, {_, supervisor_report, _}) ->    ?LEVEL_WARN;
 otp_event_level(_, {_, progress_report, _}) ->      ?LEVEL_DEBUG;
+otp_event_level(_, {_, progress, _}) ->             ?LEVEL_DEBUG;
 otp_event_level(error_report, _) ->                 ?LEVEL_ERR;
 otp_event_level(warning_report, _) ->               ?LEVEL_WARN;
 otp_event_level(info_report, _) ->                  ?LEVEL_INFO;
