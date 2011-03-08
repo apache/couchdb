@@ -117,12 +117,12 @@ write(Level, {Format0, Args0}, State) ->
 message(_Pid, crash_report, Report) ->
     proc_lib:format(Report);
 message(Pid, supervisor_report, Report) ->
-    Name = lists:keyfind(supervisor, 1, Report),
-    Error = lists:keyfind(errorContext, 1, Report),
-    Reason = lists:keyfind(reason, 1, Report),
-    Offender = lists:keyfind(offender, 1, Report),
-    ChildPid = lists:keyfind(pid, 1, Offender),
-    ChildName = lists:keyfind(name, 1, Offender),
+    {_, Name} = lists:keyfind(supervisor, 1, Report),
+    {_, Error} = lists:keyfind(errorContext, 1, Report),
+    {_, Reason} = lists:keyfind(reason, 1, Report),
+    {_, Offender} = lists:keyfind(offender, 1, Report),
+    {_, ChildPid} = lists:keyfind(pid, 1, Offender),
+    {_, ChildName} = lists:keyfind(name, 1, Offender),
     {M,F,_} = lists:keyfind(mfa, 1, Offender),
     {"[~p] SUPERVISOR REPORT ~p ~p (~p) child: ~p [~p] ~p:~p",
         [Pid, Name, Error, Reason, ChildName, ChildPid, M, F]};
