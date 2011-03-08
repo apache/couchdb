@@ -164,7 +164,7 @@ load_shards_from_db(#db{} = ShardDb, DbName) ->
         ?LOG_INFO("dbs cache miss for ~s", [DbName]),
         build_shards(DbName, Props);
     {not_found, _} ->
-        erlang:error(database_does_not_exist)
+        erlang:error(database_does_not_exist, ?b2l(DbName))
     end.
 
 load_shards_from_disk(DbName, DocId)->
