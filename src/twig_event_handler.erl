@@ -47,7 +47,8 @@ handle_event({Class, _GL, {Pid, Format, Args}}, #state{level=Max} = State) ->
         Level when Level > Max ->
             {ok, State};
         Level ->
-            write(Level, undefined, message(Format, Args), Pid, State),
+            {MsgId, Msg} = message(Format, Args),
+            write(Level, MsgId, Msg, Pid, State),
             {ok, State}
     end;
 
@@ -118,7 +119,7 @@ write(Level, MsgId, {Format0, Args0}, Pid, State) ->
     gen_udp:send(Socket, Host, Port, Packet).
 
 message(crash_report, Report) ->
-    proc_lib:format(Report);
+    {crash_report, proc_lib:format(Report)};
 message(supervisor_report, Report) ->
     Name = get_value(supervisor, Report),
     Error = get_value(errorContext, Report),
@@ -132,32 +133,31 @@ message(supervisor_report, Report) ->
         {M,F,_} ->
             ok
     end,
-    {"SUPERVISOR ~p ~p (~p) child: ~p [~p] ~p:~p",
-        [Name, Error, Reason, ChildName, ChildPid, M, F]};
-message(progress_report, Report) ->
-    {"PROGRESS~n~p", [Report]};
-message(progress, Report) ->
-    {"PROGRESS~n~p", [Report]};
+    {supervisor_report, {"~p ~p (~p) child: ~p [~p] ~p:~p",
+            [Name, Error, Reason, ChildName, ChildPid, M, F]}};
 message(Type, Report) when Type == std_error;
                            Type == std_info;
-                           Type == std_warning ->
-    {"~p", [Report]};
+                           Type == std_warning;
+                           Type == progress_report;
+                           Type == progress ->
+    {Type, {"~2048.0p", [Report]}};
 message(Format, Args) when is_list(Format) ->
-    {Format, Args};
+    {msg, {Format, Args}};
 message(Format, Args) ->
-    {"UNKNOWN ~p ~p", [Format, Args]}.
+    {unknown, {"~2048.0p ~2048.0p", [Format, Args]}}.
 
 otp_event_level(error, _) ->                        ?LEVEL_ERR;
 otp_event_level(warning_msg, _) ->                  ?LEVEL_WARN;
 otp_event_level(info_msg, _) ->                     ?LEVEL_INFO;
 otp_event_level(_, {_, crash_report, _}) ->         ?LEVEL_CRIT;
 otp_event_level(_, {_, supervisor_report, _}) ->    ?LEVEL_WARN;
+otp_event_level(_, {_, supervisor, _}) ->           ?LEVEL_WARN;
 otp_event_level(_, {_, progress_report, _}) ->      ?LEVEL_DEBUG;
 otp_event_level(_, {_, progress, _}) ->             ?LEVEL_DEBUG;
 otp_event_level(error_report, _) ->                 ?LEVEL_ERR;
 otp_event_level(warning_report, _) ->               ?LEVEL_WARN;
 otp_event_level(info_report, _) ->                  ?LEVEL_INFO;
-otp_event_level(_, _) ->                            undefined.
+otp_event_level(_, _) ->                            ?LEVEL_DEBUG.
 
 get_value(Key, Props) ->
     case lists:keyfind(Key, 1, Props) of
