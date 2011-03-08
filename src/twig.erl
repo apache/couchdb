@@ -12,50 +12,18 @@
 
 -module(twig).
 
--export([debug/1, info/1, notice/1, warn/1, err/1, crit/1, alert/1, emerg/1,
-         debug/2, info/2, notice/2, warn/2, err/2, crit/2, alert/2, emerg/2,
-         debug/3, info/3, notice/3, warn/3, err/3, crit/3, alert/3, emerg/3]).
-
--export([set_level/1]).
+-export([log/2, log/3, log/4, set_level/1]).
 
 -include("twig_int.hrl").
-
-debug(Format) ->                    log(debug, Format, [], []).
-debug(Format, Data) ->              log(debug, Format, Data, []).
-debug(Format, Data, Options) ->     log(debug, Format, Data, Options).
-
-info(Format) ->                     log(info, Format, [], []).
-info(Format, Data) ->               log(info, Format, Data, []).
-info(Format, Data, Options) ->      log(info, Format, Data, Options).
-
-notice(Format) ->                   log(notice, Format, [], []).
-notice(Format, Data) ->             log(notice, Format, Data, []).
-notice(Format, Data, Options) ->    log(notice, Format, Data, Options).
-
-warn(Format) ->                     log(warn, Format, [], []).
-warn(Format, Data) ->               log(warn, Format, Data, []).
-warn(Format, Data, Options) ->      log(warn, Format, Data, Options).
-
-err(Format) ->                      log(err, Format, [], []).
-err(Format, Data) ->                log(err, Format, Data, []).
-err(Format, Data, Options) ->       log(err, Format, Data, Options).
-
-crit(Format) ->                     log(crit, Format, [], []).
-crit(Format, Data) ->               log(crit, Format, Data, []).
-crit(Format, Data, Options) ->      log(crit, Format, Data, Options).
-
-alert(Format) ->                    log(alert, Format, [], []).
-alert(Format, Data) ->              log(alert, Format, Data, []).
-alert(Format, Data, Options) ->     log(alert, Format, Data, Options).
-
-emerg(Format) ->                    log(emerg, Format, [], []).
-emerg(Format, Data) ->              log(emerg, Format, Data, []).
-emerg(Format, Data, Options) ->     log(emerg, Format, Data, Options).
 
 set_level(LevelAtom) ->
     application:set_env(twig, {level, twig_util:level(LevelAtom)}).
 
-%% internal
+log(LevelAtom, String) ->
+    log(LevelAtom, String, [], []).
+
+log(LevelAtom, Format, Data) ->
+    log(LevelAtom, Format, Data, []).
 
 log(LevelAtom, Format, Data, _Options) ->
     %% TODO do something useful with options
@@ -68,6 +36,8 @@ log(LevelAtom, Format, Data, _Options) ->
         _ ->
             ok
     end.
+
+%% internal
 
 send_message(Level, Format, Data) ->
     gen_event:sync_notify(error_logger, format(Level, Format, Data)).
