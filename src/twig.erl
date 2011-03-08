@@ -44,5 +44,10 @@ send_message(Level, Format, Data) ->
 
 format(Level, Format, Data) ->
     %% TODO truncate large messages
-    {twig, Level, iolist_to_binary(io_lib:format(Format, Data))}.
+    #twig{
+        level = Level,
+        msg = iolist_to_binary(io_lib:format(Format, Data)),
+        msgid = erlang:get(nonce),
+        pid = self()
+    }.
 

@@ -35,8 +35,8 @@ init([]) ->
     {ok, ok, State} = handle_call(load_config, #state{socket=Socket}),
     {ok, State}.
 
-handle_event({twig, Level, Msg}, State) ->
-    write(Level, Msg, State),
+handle_event(#twig{level=Level, msgid=MsgId, msg=Msg, pid=Pid}, State) ->
+    write(Level, MsgId, Msg, Pid, State),
     {ok, State};
 
 % OTP standard events
@@ -47,7 +47,7 @@ handle_event({Class, _GL, {Pid, Format, Args}}, #state{level=Max} = State) ->
         Level when Level > Max ->
             {ok, State};
         Level ->
-            write(Level, message(Pid, Format, Args), State),
+            write(Level, undefined, message(Pid, Format, Args), Pid, State),
             {ok, State}
     end;
 
@@ -95,21 +95,24 @@ get_env(Key, Default) ->
             Default
     end.
 
-write(_, _, #state{host=undefined}) ->
+write(_, _, _, _, #state{host=undefined}) ->
     ok;
-write(Level, Msg, State) when is_list(Msg); is_binary(Msg) ->
+write(Level, undefined, Msg, Pid, State) ->
+    write(Level, "--------", Msg, Pid, State);
+write(Level, MsgId, Msg, Pid, State) when is_list(Msg); is_binary(Msg) ->
     #state{facility=Facil, appid=App, hostname=Hostname, host=Host, port=Port,
-        socket=Socket, os_pid=OsPid} = State,
-     Pre = io_lib:format("<~B>~B ~s ~s ~s ~s - - ", [Facil bor Level,
-        ?SYSLOG_VERSION, twig_util:iso8601_timestamp(), Hostname, App, OsPid]),
+        socket=Socket} = State,
+     Pre = io_lib:format("<~B>~B ~s ~s ~s ~s ~s - ", [Facil bor Level,
+        ?SYSLOG_VERSION, twig_util:iso8601_timestamp(), Hostname, App, Pid,
+        MsgId]),
     %% TODO truncate large messages
      gen_udp:send(Socket, Host, Port, [Pre, Msg, $\n]);
-write(Level, {Format0, Args0}, State) ->
+write(Level, MsgId, {Format0, Args0}, Pid, State) ->
     #state{facility=Facil, appid=App, hostname=Hostname, host=Host, port=Port,
-        socket=Socket, os_pid=OsPid} = State,
-    Format = "<~B>~B ~s ~s ~s ~s - - " ++ Format0 ++ "\n",
+        socket=Socket} = State,
+    Format = "<~B>~B ~s ~s ~s ~s ~s - " ++ Format0 ++ "\n",
     Args = [Facil bor Level, ?SYSLOG_VERSION, twig_util:iso8601_timestamp(),
-        Hostname, App, OsPid | Args0],
+        Hostname, App, Pid, MsgId | Args0],
     %% TODO truncate large messages
     Packet = io_lib:format(Format, Args),
     gen_udp:send(Socket, Host, Port, Packet).
