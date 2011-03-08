@@ -117,13 +117,13 @@ write(Level, {Format0, Args0}, State) ->
 message(_Pid, crash_report, Report) ->
     proc_lib:format(Report);
 message(Pid, supervisor_report, Report) ->
-    {_, Name} = lists:keyfind(supervisor, 1, Report),
-    {_, Error} = lists:keyfind(errorContext, 1, Report),
-    {_, Reason} = lists:keyfind(reason, 1, Report),
-    {_, Offender} = lists:keyfind(offender, 1, Report),
-    {_, ChildPid} = lists:keyfind(pid, 1, Offender),
-    {_, ChildName} = lists:keyfind(name, 1, Offender),
-    {M,F,_} = lists:keyfind(mfa, 1, Offender),
+    Name = get_value(supervisor, Report),
+    Error = get_value(errorContext, Report),
+    Reason = get_value(reason, Report),
+    Offender = get_value(offender, Report),
+    ChildPid = get_value(pid, Offender),
+    ChildName = get_value(name, Offender),
+    {M,F,_} = get_value(mfa, Offender),
     {"[~p] SUPERVISOR REPORT ~p ~p (~p) child: ~p [~p] ~p:~p",
         [Pid, Name, Error, Reason, ChildName, ChildPid, M, F]};
 message(Pid, progress_report, Report) ->
@@ -145,3 +145,11 @@ otp_event_level(error_report, _) ->                 ?LEVEL_ERR;
 otp_event_level(warning_report, _) ->               ?LEVEL_WARN;
 otp_event_level(info_report, _) ->                  ?LEVEL_INFO;
 otp_event_level(_, _) ->                            undefined.
+
+get_value(Key, Props) ->
+    case lists:keyfind(Key, 1, Props) of
+        {Key, Value} ->
+            Value;
+        undefined ->
+            undefined
+    end.
