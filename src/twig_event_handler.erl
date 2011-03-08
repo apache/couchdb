@@ -96,8 +96,6 @@ get_env(Key, Default) ->
             Default
     end.
 
-write(_, _, _, _, #state{host=undefined}) ->
-    ok;
 write(Level, undefined, Msg, Pid, State) ->
     write(Level, "--------", Msg, Pid, State);
 write(Level, MsgId, Msg, Pid, State) when is_list(Msg); is_binary(Msg) ->
@@ -107,7 +105,7 @@ write(Level, MsgId, Msg, Pid, State) when is_list(Msg); is_binary(Msg) ->
         ?SYSLOG_VERSION, twig_util:iso8601_timestamp(), Hostname, App, Pid,
         MsgId]),
     %% TODO truncate large messages
-     gen_udp:send(Socket, Host, Port, [Pre, Msg, $\n]);
+     send(Socket, Host, Port, [Pre, Msg, $\n]);
 write(Level, MsgId, {Format0, Args0}, Pid, State) ->
     #state{facility=Facil, appid=App, hostname=Hostname, host=Host, port=Port,
         socket=Socket} = State,
@@ -116,6 +114,11 @@ write(Level, MsgId, {Format0, Args0}, Pid, State) ->
         Hostname, App, Pid, MsgId | Args0],
     %% TODO truncate large messages
     Packet = io_lib:format(Format, Args),
+    send(Socket, Host, Port, Packet).
+
+send(_, undefined, _, Packet) ->
+    io:put_chars(Packet);
+send(Socket, Host, Port, Packet) ->
     gen_udp:send(Socket, Host, Port, Packet).
 
 message(crash_report, Report) ->
