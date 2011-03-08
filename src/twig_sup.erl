@@ -21,4 +21,4 @@ start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 init([]) ->
-    {ok, { {one_for_one, 5, 10}, [?CHILD(twig_monitor, gen_server)]} }.
+    {ok, { {one_for_one, 5, 10}, [?CHILD(twig_monitor, worker)]} }.
