@@ -35,7 +35,6 @@
 ]).
 
 -import(couch_replicator_utils, [
-    update_rep_doc/2,
     start_db_compaction_notifier/2,
     stop_db_compaction_notifier/1
 ]).
@@ -241,8 +240,6 @@ do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
         end,
         lists:seq(1, CopiersCount)),
 
-    maybe_set_triggered(Rep),
-
     couch_task_status:add_task(
         "Replication",
          io_lib:format("`~s`: `~s` -> `~s`",
@@ -439,10 +436,9 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 
-terminate(normal, #rep_state{rep_details = #rep{id = RepId, doc = RepDoc},
+terminate(normal, #rep_state{rep_details = #rep{id = RepId},
     checkpoint_history = CheckpointHistory} = State) ->
     terminate_cleanup(State),
-    update_rep_doc(RepDoc, [{<<"_replication_state">>, <<"completed">>}]),
     couch_replication_notifier:notify({finished, RepId, CheckpointHistory});
 
 terminate(shutdown, State) ->
@@ -453,12 +449,11 @@ terminate(Reason, State) ->
     #rep_state{
         source_name = Source,
         target_name = Target,
-        rep_details = #rep{id = {BaseId, Ext} = RepId, doc = RepDoc}
+        rep_details = #rep{id = {BaseId, Ext} = RepId}
     } = State,
     ?LOG_ERROR("Replication `~s` (`~s` -> `~s`) failed: ~s",
         [BaseId ++ Ext, Source, Target, to_binary(Reason)]),
     terminate_cleanup(State),
-    update_rep_doc(RepDoc, [{<<"_replication_state">>, <<"error">>}]),
     couch_replication_notifier:notify({error, RepId, Reason}).
 
 
@@ -809,20 +804,6 @@ sum_stats([Stats1 | RestStats]) ->
             }
         end,
         Stats1, RestStats).
-
-
-maybe_set_triggered(#rep{id = {BaseId, _}, doc = {RepProps} = RepDoc}) ->
-    case get_value(<<"_replication_state">>, RepProps) of
-    <<"triggered">> ->
-        ok;
-    _ ->
-        update_rep_doc(
-            RepDoc,
-            [
-                {<<"_replication_state">>, <<"triggered">>},
-                {<<"_replication_id">>, ?l2b(BaseId)}
-            ])
-    end.
 
 
 db_monitor(#db{} = Db) ->

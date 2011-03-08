@@ -13,8 +13,6 @@
 -module(couch_replicator_utils).
 
 -export([parse_rep_doc/2]).
--export([update_rep_doc/2]).
--export([ensure_rep_db_exists/0]).
 -export([open_db/1, close_db/1]).
 -export([start_db_compaction_notifier/2, stop_db_compaction_notifier/1]).
 -export([replication_id/2]).
@@ -22,7 +20,6 @@
 -include("couch_db.hrl").
 -include("couch_api_wrap.hrl").
 -include("couch_replicator.hrl").
--include("couch_js_functions.hrl").
 -include("../ibrowse/ibrowse.hrl").
 
 -import(couch_util, [
@@ -31,7 +28,7 @@
 ]).
 
 
-parse_rep_doc({Props} = RepObj, UserCtx) ->
+parse_rep_doc({Props}, UserCtx) ->
     ProxyParams = parse_proxy_params(get_value(<<"proxy">>, Props, <<>>)),
     Options = make_options(Props),
     Source = parse_rep_db(get_value(<<"source">>, Props), ProxyParams, Options),
@@ -41,78 +38,9 @@ parse_rep_doc({Props} = RepObj, UserCtx) ->
         target = Target,
         options = Options,
         user_ctx = UserCtx,
-        doc = RepObj
+        doc_id = get_value(<<"_id">>, Props)
     },
     {ok, Rep#rep{id = replication_id(Rep)}}.
-
-
-update_rep_doc({Props} = _RepDoc, KVs) ->
-    case get_value(<<"_id">>, Props) of
-    undefined ->
-        ok;
-    RepDocId ->
-        {ok, RepDb} = ensure_rep_db_exists(),
-        case couch_db:open_doc(RepDb, RepDocId, []) of
-        {ok, LatestRepDoc} ->
-            update_rep_doc(RepDb, LatestRepDoc, KVs);
-        _ ->
-            ok
-        end,
-        couch_db:close(RepDb)
-    end.
-
-update_rep_doc(RepDb, #doc{body = {RepDocBody}} = RepDoc, KVs) ->
-    NewRepDocBody = lists:foldl(
-        fun({<<"_replication_state">> = K, _V} = KV, Body) ->
-                Body1 = lists:keystore(K, 1, Body, KV),
-                {Mega, Secs, _} = erlang:now(),
-                UnixTime = Mega * 1000000 + Secs,
-                lists:keystore(
-                    <<"_replication_state_time">>, 1,
-                    Body1, {<<"_replication_state_time">>, UnixTime});
-            ({K, _V} = KV, Body) ->
-                lists:keystore(K, 1, Body, KV)
-        end,
-        RepDocBody,
-        KVs
-    ),
-    % might not succeed - when the replication doc is deleted right
-    % before this update (not an error)
-    couch_db:update_doc(
-        RepDb,
-        RepDoc#doc{body = {NewRepDocBody}},
-        []).
-
-
-ensure_rep_db_exists() ->
-    DbName = ?l2b(couch_config:get("replicator", "db", "_replicator")),
-    Opts = [
-        {user_ctx, #user_ctx{roles=[<<"_admin">>, <<"_replicator">>]}},
-        sys_db
-    ],
-    case couch_db:open(DbName, Opts) of
-    {ok, Db} ->
-        Db;
-    _Error ->
-        {ok, Db} = couch_db:create(DbName, Opts)
-    end,
-    ok = ensure_rep_ddoc_exists(Db, <<"_design/_replicator">>),
-    {ok, Db}.
-
-
-ensure_rep_ddoc_exists(RepDb, DDocID) ->
-    case couch_db:open_doc(RepDb, DDocID, []) of
-    {ok, _Doc} ->
-        ok;
-    _ ->
-        DDoc = couch_doc:from_json_obj({[
-            {<<"_id">>, DDocID},
-            {<<"language">>, <<"javascript">>},
-            {<<"validate_doc_update">>, ?REP_DB_DOC_VALIDATE_FUN}
-        ]}),
-        {ok, _Rev} = couch_db:update_doc(RepDb, DDoc, [])
-    end,
-    ok.
 
 
 replication_id(#rep{options = Options} = Rep) ->
