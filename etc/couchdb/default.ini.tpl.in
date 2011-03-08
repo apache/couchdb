@@ -60,7 +60,7 @@ stats_aggregator={couch_stats_aggregator, start, []}
 stats_collector={couch_stats_collector, start, []}
 uuids={couch_uuids, start, []}
 auth_cache={couch_auth_cache, start_link, []}
-rep_db_changes_listener={couch_rep_db_listener, start_link, []}
+replication_manager={couch_replication_manager, start_link, []}
 os_daemons={couch_os_daemons, start_link, []}
 
 [httpd_global_handlers]

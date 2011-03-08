@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(couch_rep_db_listener).
+-module(couch_replication_manager).
 -behaviour(gen_server).
 
 -export([start_link/0, init/1, handle_call/3, handle_info/2, handle_cast/2]).
@@ -91,20 +91,18 @@ handle_call({restart_failure, {Props} = RepDoc, Error}, _From, State) ->
     {reply, ok, State};
 
 handle_call(Msg, From, State) ->
-    ?LOG_ERROR("Replicator DB listener received unexpected call ~p from ~p",
+    ?LOG_ERROR("Replication manager received unexpected call ~p from ~p",
         [Msg, From]),
     {stop, {error, {unexpected_call, Msg}}, State}.
 
 
-handle_cast({rep_db_changed, NewName},
-        #state{rep_db_name = NewName} = State) ->
+handle_cast({rep_db_changed, NewName}, #state{rep_db_name = NewName} = State) ->
     {noreply, State};
 
 handle_cast({rep_db_changed, _NewName}, State) ->
     {noreply, restart(State)};
 
-handle_cast({rep_db_created, NewName},
-        #state{rep_db_name = NewName} = State) ->
+handle_cast({rep_db_created, NewName}, #state{rep_db_name = NewName} = State) ->
     {noreply, State};
 
 handle_cast({rep_db_created, _NewName}, State) ->
@@ -114,7 +112,7 @@ handle_cast({set_max_retries, MaxRetries}, State) ->
     {noreply, State#state{max_retries = MaxRetries}};
 
 handle_cast(Msg, State) ->
-    ?LOG_ERROR("Replicator DB listener received unexpected cast ~p", [Msg]),
+    ?LOG_ERROR("Replication manager received unexpected cast ~p", [Msg]),
     {stop, {error, {unexpected_cast, Msg}}, State}.
 
 
@@ -131,7 +129,7 @@ handle_info({'EXIT', From, normal}, #state{rep_start_pids = Pids} = State) ->
     {noreply, State#state{rep_start_pids = Pids -- [From]}};
 
 handle_info(Msg, State) ->
-    ?LOG_ERROR("Replicator DB listener received unexpected message ~p", [Msg]),
+    ?LOG_ERROR("Replication manager received unexpected message ~p", [Msg]),
     {stop, {unexpected_msg, Msg}, State}.
 
 
@@ -368,13 +366,13 @@ stop_replication(DocId) ->
 
 
 stop_all_replications() ->
-    ?LOG_INFO("Stopping all ongoing replications because the replicator DB "
-        "was deleted or changed", []),
+    ?LOG_INFO("Stopping all ongoing replications because the replicator"
+        " database was deleted or changed", []),
     ets:foldl(
-        fun({_, {RepId, _}}, _) -> couch_replicator:cancel_replication(RepId) end,
-        ok,
-        ?DOC_ID_TO_REP_ID
-    ),
+        fun({_, {RepId, _}}, _) ->
+            couch_replicator:cancel_replication(RepId)
+        end,
+        ok, ?DOC_ID_TO_REP_ID),
     true = ets:delete_all_objects(?REP_ID_TO_DOC_ID),
     true = ets:delete_all_objects(?DOC_ID_TO_REP_ID).
 

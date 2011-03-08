@@ -67,8 +67,8 @@ source_files = \
     couch_primary_sup.erl \
     couch_query_servers.erl \
     couch_ref_counter.erl \
-    couch_rep_db_listener.erl \
     couch_rep_sup.erl \
+    couch_replication_manager.erl \
     couch_replication_notifier.erl \
     couch_replicator.erl \
     couch_replicator_doc_copier.erl \
@@ -135,8 +135,8 @@ compiled_files = \
     couch_primary_sup.beam \
     couch_query_servers.beam \
     couch_ref_counter.beam \
-    couch_rep_db_listener.beam \
     couch_rep_sup.beam \
+    couch_replication_manager.beam \
     couch_replication_notifier.beam \
     couch_replicator.beam \
     couch_replicator_doc_copier.beam \
