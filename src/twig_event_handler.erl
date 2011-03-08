@@ -69,7 +69,7 @@ handle_call(load_config, State) ->
         port = get_env(port, 514),
         hostname = net_adm:localhost(),
         os_pid = os:getpid(),
-        appid = get_env(appid, "bigcouch"),
+        appid = get_env(appid, "twig"),
         facility = twig_util:facility(get_env(facility, local2)),
         level = twig_util:level(get_env(level, info))
     },
