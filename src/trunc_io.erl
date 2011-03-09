@@ -48,13 +48,13 @@ fprint(T, Max) ->
 %% 
 safe(What, Len) ->
     case catch print(What, Len) of
-	{L, Used} when list(L) -> {L, Used};
+	{L, Used} when is_list(L) -> {L, Used};
 	_ -> {"unable to print" ++ io_lib:write(What, 99)}
     end.	     
 
 %% Returns {List, Length}
 print(_, Max) when Max < 0 -> {"...", 3};
-print(Tuple, Max) when tuple(Tuple) -> 
+print(Tuple, Max) when is_tuple(Tuple) ->
     {TC, Len} = tuple_contents(Tuple, Max-2),
     {[${, TC, $}], Len + 2};
 
@@ -63,43 +63,43 @@ print(Tuple, Max) when tuple(Tuple) ->
 %% arbitrarily long bignum. Let's assume that won't happen unless someone
 %% is being malicious.
 %%
-print(Atom, _Max) when atom(Atom) ->
+print(Atom, _Max) when is_atom(Atom) ->
     L = atom_to_list(Atom),
     {L, length(L)};
 
 print(<<>>, _Max) ->
     {"<<>>", 4};
 
-print(Binary, Max) when binary(Binary) ->
+print(Binary, Max) when is_binary(Binary) ->
     B = binary_to_list(Binary, 1, lists:min([Max, size(Binary)])),
     {L, Len} = alist_start(B, Max-4),
     {["<<", L, ">>"], Len};
 
-print(Float, _Max) when float(Float) ->
+print(Float, _Max) when is_float(Float) ->
     L = float_to_list(Float),
     {L, length(L)};
 
-print(Fun, _Max) when function(Fun) ->
+print(Fun, _Max) when is_function(Fun) ->
     L = erlang:fun_to_list(Fun),
     {L, length(L)};
 
-print(Integer, _Max) when integer(Integer) ->
+print(Integer, _Max) when is_integer(Integer) ->
     L = integer_to_list(Integer),
     {L, length(L)};
 
-print(Pid, _Max) when pid(Pid) ->
+print(Pid, _Max) when is_pid(Pid) ->
     L = pid_to_list(Pid),
     {L, length(L)};
 
-print(Ref, _Max) when reference(Ref) ->
+print(Ref, _Max) when is_reference(Ref) ->
     L = erlang:ref_to_list(Ref),
     {L, length(L)};
 
-print(Port, _Max) when port(Port) ->
+print(Port, _Max) when is_port(Port) ->
     L = erlang:port_to_list(Port),
     {L, length(L)};
 
-print(List, Max) when list(List) ->
+print(List, Max) when is_list(List) ->
     alist_start(List, Max).
 
 %% Returns {List, Length}
