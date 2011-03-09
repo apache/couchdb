@@ -16,9 +16,9 @@
 -export([handle_view_req/3,handle_temp_view_req/2]).
 
 -export([parse_view_params/3]).
--export([make_view_fold_fun/7, finish_view_fold/4, finish_view_fold/5, view_row_obj/3]).
+-export([make_view_fold_fun/7, finish_view_fold/4, finish_view_fold/5, view_row_obj/4]).
 -export([view_etag/3, view_etag/4, make_reduce_fold_funs/6]).
--export([design_doc_view/5, parse_bool_param/1, doc_member/2]).
+-export([design_doc_view/5, parse_bool_param/1, doc_member/3]).
 -export([make_key_options/1, load_view/4]).
 
 -import(couch_httpd,
@@ -319,6 +319,8 @@ parse_view_param("reduce", Value) ->
     [{reduce, parse_bool_param(Value)}];
 parse_view_param("include_docs", Value) ->
     [{include_docs, parse_bool_param(Value)}];
+parse_view_param("conflicts", Value) ->
+    [{conflicts, parse_bool_param(Value)}];
 parse_view_param("list", Value) ->
     [{list, ?l2b(Value)}];
 parse_view_param("callback", _) ->
@@ -427,6 +429,15 @@ validate_view_query(include_docs, true, Args) ->
 % Use the view_query_args record's default value
 validate_view_query(include_docs, _Value, Args) ->
     Args;
+validate_view_query(conflicts, true, Args) ->
+    case Args#view_query_args.view_type of
+    reduce ->
+        Msg = <<"Query parameter `conflicts` "
+                "is invalid for reduce views.">>,
+        throw({query_parse_error, Msg});
+    _ ->
+        Args#view_query_args{conflicts = true}
+    end;
 validate_view_query(extra, _Value, Args) ->
     Args.
 
@@ -438,7 +449,8 @@ make_view_fold_fun(Req, QueryArgs, Etag, Db, UpdateSeq, TotalViewCount, HelperFu
     } = apply_default_helper_funs(HelperFuns),
 
     #view_query_args{
-        include_docs = IncludeDocs
+        include_docs = IncludeDocs,
+        conflicts = Conflicts
     } = QueryArgs,
     
     fun({{Key, DocId}, Value}, OffsetReds,
@@ -456,12 +468,12 @@ make_view_fold_fun(Req, QueryArgs, Etag, Db, UpdateSeq, TotalViewCount, HelperFu
             {ok, Resp2, RowFunAcc0} = StartRespFun(Req, Etag,
                 TotalViewCount, Offset, RowFunAcc, UpdateSeq),
             {Go, RowFunAcc2} = SendRowFun(Resp2, Db, {{Key, DocId}, Value},
-                IncludeDocs, RowFunAcc0),
+                IncludeDocs, Conflicts, RowFunAcc0),
             {Go, {AccLimit - 1, 0, Resp2, RowFunAcc2}};
         {AccLimit, _, Resp} when (AccLimit > 0) ->
             % rendering all other rows
             {Go, RowFunAcc2} = SendRowFun(Resp, Db, {{Key, DocId}, Value},
-                IncludeDocs, RowFunAcc),
+                IncludeDocs, Conflicts, RowFunAcc),
             {Go, {AccLimit - 1, 0, Resp, RowFunAcc2}}
         end
     end.
@@ -537,7 +549,7 @@ apply_default_helper_funs(
     end,
 
     SendRow2 = case SendRow of
-    undefined -> fun send_json_view_row/5;
+    undefined -> fun send_json_view_row/6;
     _ -> SendRow
     end,
 
@@ -610,8 +622,8 @@ json_view_start_resp(Req, Etag, TotalViewCount, Offset, _Acc, UpdateSeq) ->
     end,
     {ok, Resp, BeginBody}.
 
-send_json_view_row(Resp, Db, {{Key, DocId}, Value}, IncludeDocs, RowFront) ->
-    JsonObj = view_row_obj(Db, {{Key, DocId}, Value}, IncludeDocs),
+send_json_view_row(Resp, Db, Kv, IncludeDocs, Conflicts, RowFront) ->
+    JsonObj = view_row_obj(Db, Kv, IncludeDocs, Conflicts),
     send_chunk(Resp, RowFront ++  ?JSON_ENCODE(JsonObj)),
     {ok, ",\r\n"}.
 
@@ -639,10 +651,10 @@ view_etag(_Db, #group{sig=Sig}, #view{update_seq=UpdateSeq, purge_seq=PurgeSeq},
     couch_httpd:make_etag({Sig, UpdateSeq, PurgeSeq, Extra}).
 
 % the view row has an error
-view_row_obj(_Db, {{Key, error}, Value}, _IncludeDocs) ->
+view_row_obj(_Db, {{Key, error}, Value}, _IncludeDocs, _Conflicts) ->
     {[{key, Key}, {error, Value}]};
 % include docs in the view output
-view_row_obj(Db, {{Key, DocId}, {Props}}, true) ->
+view_row_obj(Db, {{Key, DocId}, {Props}}, true, Conflicts) ->
     Rev = case couch_util:get_value(<<"_rev">>, Props) of
     undefined ->
         nil;
@@ -650,27 +662,29 @@ view_row_obj(Db, {{Key, DocId}, {Props}}, true) ->
         couch_doc:parse_rev(Rev0)
     end,
     IncludeId = couch_util:get_value(<<"_id">>, Props, DocId),
-    view_row_with_doc(Db, {{Key, DocId}, {Props}}, {IncludeId, Rev});
-view_row_obj(Db, {{Key, DocId}, Value}, true) ->
-    view_row_with_doc(Db, {{Key, DocId}, Value}, {DocId, nil});
+    view_row_with_doc(Db, {{Key, DocId}, {Props}}, {IncludeId, Rev}, Conflicts);
+view_row_obj(Db, {{Key, DocId}, Value}, true, Conflicts) ->
+    view_row_with_doc(Db, {{Key, DocId}, Value}, {DocId, nil}, Conflicts);
 % the normal case for rendering a view row
-view_row_obj(_Db, {{Key, DocId}, Value}, _IncludeDocs) ->
+view_row_obj(_Db, {{Key, DocId}, Value}, _IncludeDocs, _Conflicts) ->
     {[{id, DocId}, {key, Key}, {value, Value}]}.
 
-view_row_with_doc(Db, {{Key, DocId}, Value}, IdRev) ->
-    {[{id, DocId}, {key, Key}, {value, Value}] ++ doc_member(Db, IdRev)}.
+view_row_with_doc(Db, {{Key, DocId}, Value}, IdRev, Conflicts) ->
+    {[{id, DocId}, {key, Key}, {value, Value}] ++
+        doc_member(Db, IdRev, if Conflicts -> [conflicts]; true -> [] end)}.
 
-doc_member(Db, #doc_info{id = Id, revs = [#rev_info{rev = Rev} | _]} = Info) ->
+doc_member(Db, #doc_info{id = Id, revs = [#rev_info{rev = Rev} | _]} = Info,
+        Options) ->
     ?LOG_DEBUG("Include Doc: ~p ~p", [Id, Rev]),
-    case couch_db:open_doc(Db, Info, [deleted]) of
+    case couch_db:open_doc(Db, Info, [deleted | Options]) of
     {ok, Doc} ->
         [{doc, couch_doc:to_json_obj(Doc, [])}];
     _ ->
         [{doc, null}]
     end;
-doc_member(Db, {DocId, Rev}) ->
+doc_member(Db, {DocId, Rev}, Options) ->
     ?LOG_DEBUG("Include Doc: ~p ~p", [DocId, Rev]),
-    case (catch couch_httpd_db:couch_doc_open(Db, DocId, Rev, [])) of
+    case (catch couch_httpd_db:couch_doc_open(Db, DocId, Rev, Options)) of
     #doc{} = Doc ->
         JsonDoc = couch_doc:to_json_obj(Doc, []),
         [{doc, JsonDoc}];
