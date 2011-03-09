@@ -77,7 +77,7 @@ handle_cast({kill, FromRef}, #st{workers=Workers} = St) ->
     end;
 
 handle_cast(_, St) ->
-    error_logger:error_report({?MODULE, ignored_cast}),
+    twig:log(warn, "rexi_server ignored_cast"),
     {noreply, St}.
 
 handle_info({'DOWN', Ref, process, _, normal}, #st{workers=Workers} = St) ->
@@ -122,7 +122,8 @@ init_p(From, {M,F,A}, Nonce) ->
     put(initial_call, {M,F,length(A)}),
     try apply(M, F, A) catch exit:normal -> ok; Class:Reason ->
         Stack = clean_stack(),
-        error_logger:error_report([{?MODULE, Nonce, {Class, Reason}}, Stack]),
+        erlang:put(nonce, Nonce),
+        twig:log(error, "rexi_server ~p:~p ~100p", [Class, Reason, Stack]),
         exit(#error{
             timestamp = now(),
             reason = {Class, Reason},
