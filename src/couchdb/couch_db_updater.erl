@@ -345,13 +345,13 @@ btree_by_seq_reduce(reduce, DocInfos) ->
 btree_by_seq_reduce(rereduce, Reds) ->
     lists:sum(Reds).
 
-simple_upgrade_record(Old, New) when tuple_size(Old) =:= tuple_size(New) ->
-    Old;
 simple_upgrade_record(Old, New) when tuple_size(Old) < tuple_size(New) ->
     OldSz = tuple_size(Old),
     NewValuesTail =
         lists:sublist(tuple_to_list(New), OldSz + 1, tuple_size(New) - OldSz),
-    list_to_tuple(tuple_to_list(Old) ++ NewValuesTail).
+    list_to_tuple(tuple_to_list(Old) ++ NewValuesTail);
+simple_upgrade_record(Old, _New) ->
+    Old.
 
 -define(OLD_DISK_VERSION_ERROR,
     "Database files from versions smaller than 0.10.0 are no longer supported").
