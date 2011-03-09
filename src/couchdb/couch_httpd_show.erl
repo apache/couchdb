@@ -309,18 +309,20 @@ start_list_resp(QServer, LName, Req, Db, Head, Etag) ->
     {ok, Resp, ?b2l(?l2b(Chunks))}.
 
 make_map_send_row_fun(QueryServer) ->
-    fun(Resp, Db, Row, IncludeDocs, RowFront) ->
-        send_list_row(Resp, QueryServer, Db, Row, RowFront, IncludeDocs)
+    fun(Resp, Db, Row, IncludeDocs, Conflicts, RowFront) ->
+        send_list_row(
+            Resp, QueryServer, Db, Row, RowFront, IncludeDocs, Conflicts)
     end.
 
 make_reduce_send_row_fun(QueryServer, Db) ->
     fun(Resp, Row, RowFront) ->
-        send_list_row(Resp, QueryServer, Db, Row, RowFront, false)
+        send_list_row(Resp, QueryServer, Db, Row, RowFront, false, false)
     end.
 
-send_list_row(Resp, QueryServer, Db, Row, RowFront, IncludeDoc) ->
+send_list_row(Resp, QueryServer, Db, Row, RowFront, IncludeDoc, Conflicts) ->
     try
-        [Go,Chunks] = prompt_list_row(QueryServer, Db, Row, IncludeDoc),
+        [Go,Chunks] = prompt_list_row(
+            QueryServer, Db, Row, IncludeDoc, Conflicts),
         Chunk = RowFront ++ ?b2l(?l2b(Chunks)),
         send_non_empty_chunk(Resp, Chunk),
         case Go of
@@ -336,11 +338,12 @@ send_list_row(Resp, QueryServer, Db, Row, RowFront, IncludeDoc) ->
     end.
 
 
-prompt_list_row({Proc, _DDocId}, Db, {{Key, DocId}, Value}, IncludeDoc) ->
-    JsonRow = couch_httpd_view:view_row_obj(Db, {{Key, DocId}, Value}, IncludeDoc),
+prompt_list_row({Proc, _DDocId}, Db, {{_Key, _DocId}, _} = Kv,
+                IncludeDoc, Conflicts) ->
+    JsonRow = couch_httpd_view:view_row_obj(Db, Kv, IncludeDoc, Conflicts),
     couch_query_servers:proc_prompt(Proc, [<<"list_row">>, JsonRow]);
 
-prompt_list_row({Proc, _DDocId}, _, {Key, Value}, _IncludeDoc) ->
+prompt_list_row({Proc, _DDocId}, _, {Key, Value}, _IncludeDoc, _Conflicts) ->
     JsonRow = {[{key, Key}, {value, Value}]},
     couch_query_servers:proc_prompt(Proc, [<<"list_row">>, JsonRow]).
 
