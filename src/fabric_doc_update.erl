@@ -83,7 +83,7 @@ force_reply(Doc, [FirstReply|_] = Replies, {W, Acc}) ->
     {true, Reply} ->
         {W, [{Doc,Reply} | Acc]};
     false ->
-        ?LOG_ERROR("write quorum (~p) failed, reply ~p", [W, FirstReply]),
+        twig:log(error, "write quorum (~p) failed, reply ~p", [W, FirstReply]),
         % TODO make a smarter choice than just picking the first reply
         {W, [{Doc,FirstReply} | Acc]}
     end.

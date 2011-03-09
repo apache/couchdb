@@ -249,7 +249,7 @@ with_db(DbName, Options, {M,F,A}) ->
         catch Exception ->
             Exception;
         error:Reason ->
-            ?LOG_ERROR("~p ~p ~p~n~p", [?MODULE, {M,F}, Reason,
+            twig:log(error, "~p ~p ~p~n~p", [?MODULE, {M,F}, Reason,
                 erlang:get_stacktrace()]),
             {error, Reason}
         end);

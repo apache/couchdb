@@ -247,7 +247,7 @@ sort_fun(rev) ->
     fun(A,A) -> true; (A,B) -> couch_view:less_json(B,A) end.
 
 extract_view(Pid, ViewName, [], _ViewType) ->
-    ?LOG_ERROR("missing_named_view ~p", [ViewName]),
+    twig:log(error, "missing_named_view ~p", [ViewName]),
     exit(Pid, kill),
     exit(missing_named_view);
 extract_view(Pid, ViewName, [View|Rest], ViewType) ->
