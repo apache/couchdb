@@ -15,6 +15,19 @@
 
 -export([handle_changes/3]).
 
+-record(changes_acc, {
+    db,
+    seq,
+    prepend,
+    filter,
+    callback,
+    user_acc,
+    resp_type,
+    limit,
+    include_docs,
+    conflicts
+}).
+
 %% @type Req -> #httpd{} | {json_req, JsonObj()}
 handle_changes(#changes_args{style=Style}=Args1, Req, Db) ->
     #changes_args{feed = Feed} = Args = Args1#changes_args{
@@ -59,7 +72,7 @@ handle_changes(#changes_args{style=Style}=Args1, Req, Db) ->
         fun(CallbackAcc) ->
             {Callback, UserAcc} = get_callback_acc(CallbackAcc),
             UserAcc2 = start_sending_changes(Callback, UserAcc, Feed),
-            {ok, {_, LastSeq, _Prepend, _, _, UserAcc3, _, _, _, _}} =
+            {ok, #changes_acc{seq = LastSeq, user_acc = UserAcc3}} =
                 send_changes(
                     Args#changes_args{feed="normal"},
                     Callback,
@@ -248,8 +261,18 @@ send_changes(Args, Callback, UserAcc, Db, StartSeq, Prepend) ->
         StartSeq,
         fun changes_enumerator/2,
         [{dir, Dir}],
-        {Db, StartSeq, Prepend, FilterFun, Callback, UserAcc, ResponseType,
-            Limit, IncludeDocs, Conflicts}
+        #changes_acc{
+            db = Db,
+            seq = StartSeq,
+            prepend = Prepend,
+            filter = FilterFun,
+            callback = Callback,
+            user_acc = UserAcc,
+            resp_type = ResponseType,
+            limit = Limit,
+            include_docs = IncludeDocs,
+            conflicts = Conflicts
+        }
     ).
 
 keep_sending_changes(Args, Callback, UserAcc, Db, StartSeq, Prepend, Timeout,
@@ -260,9 +283,12 @@ keep_sending_changes(Args, Callback, UserAcc, Db, StartSeq, Prepend, Timeout,
         db_open_options = DbOptions
     } = Args,
     % ?LOG_INFO("send_changes start ~p",[StartSeq]),
-    {ok, {_, EndSeq, Prepend2, _, _, UserAcc2, _, NewLimit, _, _}} = send_changes(
-        Args#changes_args{dir=fwd}, Callback, UserAcc, Db, StartSeq, Prepend
-    ),
+
+    {ok, ChangesAcc} = send_changes(
+        Args#changes_args{dir=fwd}, Callback, UserAcc, Db, StartSeq, Prepend),
+    #changes_acc{
+        seq = EndSeq, prepend = Prepend2, user_acc = UserAcc2, limit = NewLimit
+    } = ChangesAcc,
     % ?LOG_INFO("send_changes last ~p",[EndSeq]),
     couch_db:close(Db),
     if Limit > NewLimit, ResponseType == "longpoll" ->
@@ -296,52 +322,51 @@ keep_sending_changes(Args, Callback, UserAcc, Db, StartSeq, Prepend, Timeout,
 end_sending_changes(Callback, UserAcc, EndSeq, ResponseType) ->
     Callback({stop, EndSeq}, ResponseType, UserAcc).
 
-changes_enumerator(DocInfo, {Db, _, _, FilterFun, Callback, UserAcc,
-    "continuous", Limit, IncludeDocs, Conflicts}) ->
-
+changes_enumerator(DocInfo, #changes_acc{resp_type = "continuous"} = Acc) ->
+    #changes_acc{
+        filter = FilterFun, callback = Callback,
+        user_acc = UserAcc, limit = Limit
+    } = Acc,
     #doc_info{high_seq = Seq} = DocInfo,
     Results0 = FilterFun(DocInfo),
     Results = [Result || Result <- Results0, Result /= null],
     Go = if Limit =< 1 -> stop; true -> ok end,
     case Results of
     [] ->
-        {Go, {Db, Seq, nil, FilterFun, Callback, UserAcc, "continuous", Limit,
-                IncludeDocs, Conflicts}
-        };
+        {Go, Acc#changes_acc{seq = Seq}};
     _ ->
-        ChangesRow = changes_row(Db, Results, DocInfo, IncludeDocs, Conflicts),
+        ChangesRow = changes_row(Results, DocInfo, Acc),
         UserAcc2 = Callback({change, ChangesRow, <<>>}, "continuous", UserAcc),
-        {Go, {Db, Seq, nil, FilterFun, Callback, UserAcc2, "continuous",
-                Limit - 1, IncludeDocs, Conflicts}
-        }
+        {Go, Acc#changes_acc{seq = Seq, user_acc = UserAcc2, limit = Limit - 1}}
     end;
-changes_enumerator(DocInfo, {Db, _, Prepend, FilterFun, Callback, UserAcc,
-    ResponseType, Limit, IncludeDocs, Conflicts}) ->
-
+changes_enumerator(DocInfo, Acc) ->
+    #changes_acc{
+        filter = FilterFun, callback = Callback, prepend = Prepend,
+        user_acc = UserAcc, limit = Limit, resp_type = ResponseType
+    } = Acc,
     #doc_info{high_seq = Seq} = DocInfo,
     Results0 = FilterFun(DocInfo),
     Results = [Result || Result <- Results0, Result /= null],
     Go = if (Limit =< 1) andalso Results =/= [] -> stop; true -> ok end,
     case Results of
     [] ->
-        {Go, {Db, Seq, Prepend, FilterFun, Callback, UserAcc, ResponseType,
-                Limit, IncludeDocs, Conflicts}
-        };
+        {Go, Acc#changes_acc{seq = Seq}};
     _ ->
-        ChangesRow = changes_row(Db, Results, DocInfo, IncludeDocs, Conflicts),
+        ChangesRow = changes_row(Results, DocInfo, Acc),
         UserAcc2 = Callback({change, ChangesRow, Prepend}, ResponseType, UserAcc),
-        {Go, {Db, Seq, <<",\n">>, FilterFun, Callback, UserAcc2, ResponseType,
-                Limit - 1, IncludeDocs, Conflicts}
-        }
+        {Go, Acc#changes_acc{
+            seq = Seq, prepend = <<",\n">>,
+            user_acc = UserAcc2, limit = Limit - 1}}
     end.
 
 
-changes_row(Db, Results, DocInfo, IncludeDoc, Conflicts) ->
+changes_row(Results, DocInfo, Acc) ->
     #doc_info{
         id = Id, high_seq = Seq, revs = [#rev_info{deleted = Del} | _]
     } = DocInfo,
+    #changes_acc{db = Db, include_docs = IncDoc, conflicts = Conflicts} = Acc,
     {[{<<"seq">>, Seq}, {<<"id">>, Id}, {<<"changes">>, Results}] ++
-        deleted_item(Del) ++ case IncludeDoc of
+        deleted_item(Del) ++ case IncDoc of
             true ->
                 Options = if Conflicts -> [conflicts]; true -> [] end,
                 couch_httpd_view:doc_member(Db, DocInfo, Options);
