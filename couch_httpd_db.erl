@@ -506,7 +506,7 @@ all_docs_view(Req, Db, Keys) ->
             FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db, UpdateSeq,
                 TotalRowCount, #view_fold_helper_funs{
                     reduce_count = fun couch_db:enum_docs_reduce_to_count/1,
-                    send_row = fun all_docs_send_json_view_row/5
+                    send_row = fun all_docs_send_json_view_row/6
                 }),
             AdapterFun = fun(#full_doc_info{id=Id}=FullDocInfo, Offset, Acc) ->
                 case couch_doc:to_doc_info(FullDocInfo) of
@@ -524,7 +524,7 @@ all_docs_view(Req, Db, Keys) ->
             FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db, UpdateSeq,
                 TotalRowCount, #view_fold_helper_funs{
                     reduce_count = fun(Offset) -> Offset end,
-                    send_row = fun all_docs_send_json_view_row/5
+                    send_row = fun all_docs_send_json_view_row/6
                 }),
             KeyFoldFun = case Dir of
             fwd ->
@@ -551,21 +551,22 @@ all_docs_view(Req, Db, Keys) ->
         end
     end).
 
-all_docs_send_json_view_row(Resp, Db, KV, IncludeDocs, RowFront) ->
-    JsonRow = all_docs_view_row_obj(Db, KV, IncludeDocs),
+all_docs_send_json_view_row(Resp, Db, KV, IncludeDocs, Conflicts, RowFront) ->
+    JsonRow = all_docs_view_row_obj(Db, KV, IncludeDocs, Conflicts),
     send_chunk(Resp, RowFront ++ ?JSON_ENCODE(JsonRow)),
     {ok, ",\r\n"}.
 
-all_docs_view_row_obj(_Db, {{DocId, error}, Value}, _IncludeDocs) ->
+all_docs_view_row_obj(_Db, {{DocId, error}, Value}, _IncludeDocs, _Conflicts) ->
     {[{key, DocId}, {error, Value}]};
-all_docs_view_row_obj(Db, {_KeyDocId, DocInfo}, true) ->
+all_docs_view_row_obj(Db, {_KeyDocId, DocInfo}, true, Conflicts) ->
     case DocInfo of
     #doc_info{revs = [#rev_info{deleted = true} | _]} ->
         {all_docs_row(DocInfo) ++ [{doc, null}]};
     _ ->
-        {all_docs_row(DocInfo) ++ couch_httpd_view:doc_member(Db, DocInfo)}
+        {all_docs_row(DocInfo) ++ couch_httpd_view:doc_member(
+            Db, DocInfo, if Conflicts -> [conflicts]; true -> [] end)}
     end;
-all_docs_view_row_obj(_Db, {_KeyDocId, DocInfo}, _IncludeDocs) ->
+all_docs_view_row_obj(_Db, {_KeyDocId, DocInfo}, _IncludeDocs, _Conflicts) ->
     {all_docs_row(DocInfo)}.
 
 all_docs_row(#doc_info{id = Id, revs = [RevInfo | _]}) ->
@@ -1222,6 +1223,8 @@ parse_changes_query(Req) ->
             Args#changes_args{timeout=list_to_integer(Value)};
         {"include_docs", "true"} ->
             Args#changes_args{include_docs=true};
+        {"conflicts", "true"} ->
+            Args#changes_args{conflicts=true};
         {"filter", _} ->
             Args#changes_args{filter=Value};
         _Else -> % unknown key value pair, ignore.

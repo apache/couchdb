@@ -59,7 +59,7 @@ handle_changes(#changes_args{style=Style}=Args1, Req, Db) ->
         fun(CallbackAcc) ->
             {Callback, UserAcc} = get_callback_acc(CallbackAcc),
             UserAcc2 = start_sending_changes(Callback, UserAcc, Feed),
-            {ok, {_, LastSeq, _Prepend, _, _, UserAcc3, _, _, _}} =
+            {ok, {_, LastSeq, _Prepend, _, _, UserAcc3, _, _, _, _}} =
                 send_changes(
                     Args#changes_args{feed="normal"},
                     Callback,
@@ -236,6 +236,7 @@ send_changes(Args, Callback, UserAcc, Db, StartSeq, Prepend) ->
     #changes_args{
         style = Style,
         include_docs = IncludeDocs,
+        conflicts = Conflicts,
         limit = Limit,
         feed = ResponseType,
         dir = Dir,
@@ -248,7 +249,7 @@ send_changes(Args, Callback, UserAcc, Db, StartSeq, Prepend) ->
         fun changes_enumerator/2,
         [{dir, Dir}],
         {Db, StartSeq, Prepend, FilterFun, Callback, UserAcc, ResponseType,
-            Limit, IncludeDocs}
+            Limit, IncludeDocs, Conflicts}
     ).
 
 keep_sending_changes(Args, Callback, UserAcc, Db, StartSeq, Prepend, Timeout,
@@ -259,7 +260,7 @@ keep_sending_changes(Args, Callback, UserAcc, Db, StartSeq, Prepend, Timeout,
         db_open_options = DbOptions
     } = Args,
     % ?LOG_INFO("send_changes start ~p",[StartSeq]),
-    {ok, {_, EndSeq, Prepend2, _, _, UserAcc2, _, NewLimit, _}} = send_changes(
+    {ok, {_, EndSeq, Prepend2, _, _, UserAcc2, _, NewLimit, _, _}} = send_changes(
         Args#changes_args{dir=fwd}, Callback, UserAcc, Db, StartSeq, Prepend
     ),
     % ?LOG_INFO("send_changes last ~p",[EndSeq]),
@@ -296,7 +297,7 @@ end_sending_changes(Callback, UserAcc, EndSeq, ResponseType) ->
     Callback({stop, EndSeq}, ResponseType, UserAcc).
 
 changes_enumerator(DocInfo, {Db, _, _, FilterFun, Callback, UserAcc,
-    "continuous", Limit, IncludeDocs}) ->
+    "continuous", Limit, IncludeDocs, Conflicts}) ->
 
     #doc_info{high_seq = Seq} = DocInfo,
     Results0 = FilterFun(DocInfo),
@@ -305,17 +306,17 @@ changes_enumerator(DocInfo, {Db, _, _, FilterFun, Callback, UserAcc,
     case Results of
     [] ->
         {Go, {Db, Seq, nil, FilterFun, Callback, UserAcc, "continuous", Limit,
-                IncludeDocs}
+                IncludeDocs, Conflicts}
         };
     _ ->
-        ChangesRow = changes_row(Db, Results, DocInfo, IncludeDocs),
+        ChangesRow = changes_row(Db, Results, DocInfo, IncludeDocs, Conflicts),
         UserAcc2 = Callback({change, ChangesRow, <<>>}, "continuous", UserAcc),
         {Go, {Db, Seq, nil, FilterFun, Callback, UserAcc2, "continuous",
-                Limit - 1, IncludeDocs}
+                Limit - 1, IncludeDocs, Conflicts}
         }
     end;
 changes_enumerator(DocInfo, {Db, _, Prepend, FilterFun, Callback, UserAcc,
-    ResponseType, Limit, IncludeDocs}) ->
+    ResponseType, Limit, IncludeDocs, Conflicts}) ->
 
     #doc_info{high_seq = Seq} = DocInfo,
     Results0 = FilterFun(DocInfo),
@@ -324,25 +325,28 @@ changes_enumerator(DocInfo, {Db, _, Prepend, FilterFun, Callback, UserAcc,
     case Results of
     [] ->
         {Go, {Db, Seq, Prepend, FilterFun, Callback, UserAcc, ResponseType,
-                Limit, IncludeDocs}
+                Limit, IncludeDocs, Conflicts}
         };
     _ ->
-        ChangesRow = changes_row(Db, Results, DocInfo, IncludeDocs),
+        ChangesRow = changes_row(Db, Results, DocInfo, IncludeDocs, Conflicts),
         UserAcc2 = Callback({change, ChangesRow, Prepend}, ResponseType, UserAcc),
         {Go, {Db, Seq, <<",\n">>, FilterFun, Callback, UserAcc2, ResponseType,
-                Limit - 1, IncludeDocs}
+                Limit - 1, IncludeDocs, Conflicts}
         }
     end.
 
 
-changes_row(Db, Results, DocInfo, IncludeDoc) ->
+changes_row(Db, Results, DocInfo, IncludeDoc, Conflicts) ->
     #doc_info{
         id = Id, high_seq = Seq, revs = [#rev_info{deleted = Del} | _]
     } = DocInfo,
     {[{<<"seq">>, Seq}, {<<"id">>, Id}, {<<"changes">>, Results}] ++
         deleted_item(Del) ++ case IncludeDoc of
-            true -> couch_httpd_view:doc_member(Db, DocInfo);
-            false -> []
+            true ->
+                Options = if Conflicts -> [conflicts]; true -> [] end,
+                couch_httpd_view:doc_member(Db, DocInfo, Options);
+            false ->
+                []
         end}.
 
 deleted_item(true) -> [{<<"deleted">>, true}];

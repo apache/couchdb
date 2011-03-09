@@ -186,6 +186,7 @@
 
     view_type = nil,
     include_docs = false,
+    conflicts = false,
     stale = false,
     multi_get = false,
     callback = nil,
@@ -259,6 +260,7 @@
     timeout,
     filter = "",
     include_docs = false,
+    conflicts = false,
     db_open_options = []
 }).
 
