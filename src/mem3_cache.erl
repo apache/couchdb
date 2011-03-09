@@ -43,7 +43,7 @@ handle_info({'DOWN', _, _, Pid, {badarg, [{ets,delete,[partitions,_]}|_]}},
     % fatal error, somebody deleted our ets table
     {stop, ets_table_error, State};
 handle_info({'DOWN', _, _, Pid, Reason}, #state{changes_pid=Pid} = State) ->
-    ?LOG_INFO("~p changes listener died ~p", [?MODULE, Reason]),
+    twig:log(info, "~p changes listener died ~p", [?MODULE, Reason]),
     Seq = case Reason of {seq, EndSeq} -> EndSeq; _ -> 0 end,
     erlang:send_after(5000, self(), {start_listener, Seq}),
     {noreply, State};
@@ -87,7 +87,7 @@ changes_callback({change, {Change}, _}, _) ->
         false ->
             case couch_util:get_value(doc, Change) of
             {error, Reason} ->
-                ?LOG_ERROR("missing partition table for ~s: ~p", [DbName, Reason]);
+                twig:log(error, "missing partition table for ~s: ~p", [DbName, Reason]);
             {Doc} ->
                 ets:delete(partitions, DbName),
                 Shards = mem3_util:build_shards(DbName, Doc),
@@ -113,6 +113,6 @@ create_if_missing(Name) ->
         {ok, Db} ->
             couch_db:close(Db);
         Error ->
-            ?LOG_ERROR("~p tried to create ~s, got ~p", [?MODULE, Name, Error])
+            twig:log(error, "~p tried to create ~s, got ~p", [?MODULE, Name, Error])
         end
     end.

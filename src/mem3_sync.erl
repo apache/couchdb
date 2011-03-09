@@ -109,14 +109,14 @@ handle_info({'EXIT', Active, {{not_found, no_db_file}, _Stack}}, State) ->
 handle_info({'EXIT', Active, Reason}, State) ->
     case lists:keyfind(Active, 3, State#state.active) of
     {OldDbName, OldNode, _} ->
-        ?LOG_ERROR("~p replication ~s -> ~p died:~n~p", [?MODULE, OldDbName,
+        twig:log(error, "~p replication ~s -> ~p died:~n~p", [?MODULE, OldDbName,
             OldNode, Reason]),
         timer:apply_after(5000, ?MODULE, push, [OldDbName, OldNode]);
     false -> ok end,
     handle_replication_exit(State, Active);
 
 handle_info(Msg, State) ->
-    ?LOG_ERROR("unexpected msg at replication manager ~p", [Msg]),
+    twig:log(error, "unexpected msg at replication manager ~p", [Msg]),
     {noreply, State}.
 
 terminate(_Reason, State) ->
@@ -160,7 +160,7 @@ add_to_queue(State, DbName, Node) ->
     true ->
         State;
     false ->
-        ?LOG_DEBUG("adding ~s -> ~p to internal queue", [DbName, Node]),
+        twig:log(debug, "adding ~s -> ~p to internal queue", [DbName, Node]),
         State#state{
             dict = dict:store({DbName,Node}, ok, D),
             waiting = Waiting ++ [{DbName,Node}]

@@ -146,7 +146,7 @@ n_val(undefined, NodeCount) ->
 n_val(N, NodeCount) when is_list(N) ->
     n_val(list_to_integer(N), NodeCount);
 n_val(N, NodeCount) when is_integer(NodeCount), N > NodeCount ->
-    ?LOG_ERROR("Request to create N=~p DB but only ~p node(s)", [N, NodeCount]),
+    twig:log(error, "Request to create N=~p DB but only ~p node(s)", [N, NodeCount]),
     NodeCount;
 n_val(N, _) when N < 1 ->
     1;
@@ -161,7 +161,7 @@ load_shards_from_disk(DbName) when is_binary(DbName) ->
 load_shards_from_db(#db{} = ShardDb, DbName) ->
     case couch_db:open_doc(ShardDb, DbName, []) of
     {ok, #doc{body = {Props}}} ->
-        ?LOG_INFO("dbs cache miss for ~s", [DbName]),
+        twig:log(info, "dbs cache miss for ~s", [DbName]),
         build_shards(DbName, Props);
     {not_found, _} ->
         erlang:error(database_does_not_exist, ?b2l(DbName))
