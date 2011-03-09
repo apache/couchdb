@@ -7,3 +7,5 @@ Twig's behavior is controlled using the application environment:
 * facility (local2): syslog facility to be used
 * level (info): logging threshold. Messages "above" this threshold (in syslog parlance) will be discarded. Acceptable values are debug, info, notice, warn, err, crit, alert, and emerg.
 * appid ("twig"): inserted as the APPID in the syslog message
+* max_term_size (8192): raw data size below which we format normally
+* max_message_size (16000): approx. max size of truncated string
