@@ -17,6 +17,8 @@
 -export([init/1, handle_event/2, handle_call/2, handle_info/2, terminate/2,
         code_change/3]).
 
+-import(twig_util, [get_env/2]).
+
 -record(state, {
     socket,
     host,
@@ -88,33 +90,15 @@ terminate(_Reason, State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-get_env(Key, Default) ->
-    case application:get_env(twig, Key) of
-        {ok, Value} ->
-            Value;
-        undefined ->
-            Default
-    end.
-
 write(Level, undefined, Msg, Pid, State) ->
     write(Level, "--------", Msg, Pid, State);
 write(Level, MsgId, Msg, Pid, State) when is_list(Msg); is_binary(Msg) ->
     #state{facility=Facil, appid=App, hostname=Hostname, host=Host, port=Port,
         socket=Socket} = State,
-     Pre = io_lib:format("<~B>~B ~s ~s ~s ~p ~s - ", [Facil bor Level,
+    Pre = io_lib:format("<~B>~B ~s ~s ~s ~p ~s - ", [Facil bor Level,
         ?SYSLOG_VERSION, twig_util:iso8601_timestamp(), Hostname, App, Pid,
         MsgId]),
-    %% TODO truncate large messages
-     send(Socket, Host, Port, [Pre, Msg, $\n]);
-write(Level, MsgId, {Format0, Args0}, Pid, State) ->
-    #state{facility=Facil, appid=App, hostname=Hostname, host=Host, port=Port,
-        socket=Socket} = State,
-    Format = "<~B>~B ~s ~s ~s ~p ~s - " ++ Format0 ++ "\n",
-    Args = [Facil bor Level, ?SYSLOG_VERSION, twig_util:iso8601_timestamp(),
-        Hostname, App, Pid, MsgId | Args0],
-    %% TODO truncate large messages
-    Packet = io_lib:format(Format, Args),
-    send(Socket, Host, Port, Packet).
+    send(Socket, Host, Port, [Pre, Msg, $\n]).
 
 send(_, undefined, _, Packet) ->
     io:put_chars(Packet);
@@ -122,7 +106,14 @@ send(Socket, Host, Port, Packet) ->
     gen_udp:send(Socket, Host, Port, Packet).
 
 message(crash_report, Report) ->
-    {crash_report, proc_lib:format(Report)};
+    Msg = case erts_debug:flat_size(Report) > get_env(max_term_size, 8192) of
+        true ->
+            MaxString = get_env(max_message_size, 16000),
+            ["*Truncated* - ", trunc_io:print(Report, MaxString)];
+        false ->
+            proc_lib:format(Report)
+    end,
+    {crash_report, Msg};
 message(supervisor_report, Report) ->
     Name = get_value(supervisor, Report),
     Error = get_value(errorContext, Report),
@@ -136,18 +127,18 @@ message(supervisor_report, Report) ->
         {M,F,_} ->
             ok
     end,
-    {supervisor_report, {"~p ~p (~p) child: ~p [~p] ~p:~p",
-            [Name, Error, Reason, ChildName, ChildPid, M, F]}};
+    {supervisor_report, twig_util:format("~p ~p (~p) child: ~p [~p] ~p:~p",
+            [Name, Error, Reason, ChildName, ChildPid, M, F])};
 message(Type, Report) when Type == std_error;
                            Type == std_info;
                            Type == std_warning;
                            Type == progress_report;
                            Type == progress ->
-    {Type, {"~2048.0p", [Report]}};
+    {Type, twig_util:format("~2048.0p", [Report])};
 message(Format, Args) when is_list(Format) ->
-    {msg, {Format, Args}};
+    {msg, twig_util:format(Format, Args)};
 message(Format, Args) ->
-    {unknown, {"~2048.0p ~2048.0p", [Format, Args]}}.
+    {unknown, twig_util:format("~2048.0p ~2048.0p", [Format, Args])}.
 
 otp_event_level(error, _) ->                        ?LEVEL_ERR;
 otp_event_level(warning_msg, _) ->                  ?LEVEL_WARN;

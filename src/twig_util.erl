@@ -12,7 +12,7 @@
 
 -module(twig_util).
 
--export([level/1, facility/1, iso8601_timestamp/0]).
+-export([format/2, get_env/2, level/1, facility/1, iso8601_timestamp/0]).
 
 level(debug) ->     7;
 level(info) ->      6;
@@ -56,3 +56,21 @@ iso8601_timestamp() ->
     {{Year,Month,Date},{Hour,Minute,Second}} = calendar:now_to_datetime(Now),
     Format = "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~6.10.0BZ",
     io_lib:format(Format, [Year, Month, Date, Hour, Minute, Second, Micro]).
+
+format(Format, Data) ->
+    MaxTermSize = get_env(max_term_size, 8192),
+    case erts_debug:flat_size(Data) > MaxTermSize of
+        true ->
+            MaxString = get_env(max_message_size, 16000),
+            ["*Truncated* ", Format, " - ", trunc_io:print(Data, MaxString)];
+        false ->
+            io_lib:format(Format, Data)
+    end.
+
+get_env(Key, Default) ->
+    case application:get_env(twig, Key) of
+        {ok, Value} ->
+            Value;
+        undefined ->
+            Default
+    end.
