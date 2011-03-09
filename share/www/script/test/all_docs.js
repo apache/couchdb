@@ -105,20 +105,24 @@ couchTests.all_docs = function(debug) {
 
   var winRev = db.open("3");
 
-  changes = db.changes({include_docs: true, style: "all_docs"});
+  changes = db.changes({include_docs: true, conflicts: true, style: "all_docs"});
   TEquals("3", changes.results[3].id);
   TEquals(3, changes.results[3].changes.length);
   TEquals(winRev._rev, changes.results[3].changes[0].rev);
   TEquals("3", changes.results[3].doc._id);
   TEquals(winRev._rev, changes.results[3].doc._rev);
+  TEquals(true, changes.results[3].doc._conflicts instanceof Array);
+  TEquals(2, changes.results[3].doc._conflicts.length);
 
-  rows = db.allDocs({include_docs: true}).rows;
+  rows = db.allDocs({include_docs: true, conflicts: true}).rows;
   TEquals(3, rows.length);
   TEquals("3", rows[2].key);
   TEquals("3", rows[2].id);
   TEquals(winRev._rev, rows[2].value.rev);
   TEquals(winRev._rev, rows[2].doc._rev);
   TEquals("3", rows[2].doc._id);
+  TEquals(true, rows[2].doc._conflicts instanceof Array);
+  TEquals(2, rows[2].doc._conflicts.length);
 
   // test the all docs collates sanely
   db.save({_id: "Z", foo: "Z"});

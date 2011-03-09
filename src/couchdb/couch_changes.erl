@@ -56,7 +56,7 @@ handle_changes(#changes_args{style=Style}=Args1, Req, Db) ->
     true ->
         fun(Callback) ->
             start_sending_changes(Callback, Args#changes_args.feed),
-            {ok, {_, LastSeq, _Prepend, _, _, _, _, _}} =
+            {ok, {_, LastSeq, _Prepend, _, _, _, _, _, _}} =
                 send_changes(
                     Args#changes_args{feed="normal"},
                     Callback,
@@ -146,6 +146,7 @@ send_changes(Args, Callback, Db, StartSeq, Prepend) ->
     #changes_args{
         style = Style,
         include_docs = IncludeDocs,
+        conflicts = Conflicts,
         limit = Limit,
         feed = ResponseType,
         dir = Dir,
@@ -158,7 +159,7 @@ send_changes(Args, Callback, Db, StartSeq, Prepend) ->
         fun changes_enumerator/2,
         [{dir, Dir}],
         {Db, StartSeq, Prepend, FilterFun, Callback, ResponseType, Limit,
-            IncludeDocs}
+            IncludeDocs, Conflicts}
     ).
 
 keep_sending_changes(Args, Callback, Db, StartSeq, Prepend, Timeout,
@@ -168,7 +169,7 @@ keep_sending_changes(Args, Callback, Db, StartSeq, Prepend, Timeout,
         limit = Limit
     } = Args,
     % ?LOG_INFO("send_changes start ~p",[StartSeq]),
-    {ok, {_, EndSeq, Prepend2, _, _, _, NewLimit, _}} = send_changes(
+    {ok, {_, EndSeq, Prepend2, _, _, _, NewLimit, _, _}} = send_changes(
         Args#changes_args{dir=fwd}, Callback, Db, StartSeq, Prepend
     ),
     % ?LOG_INFO("send_changes last ~p",[EndSeq]),
@@ -203,7 +204,7 @@ end_sending_changes(Callback, EndSeq, ResponseType) ->
     Callback({stop, EndSeq}, ResponseType).
 
 changes_enumerator(DocInfo, {Db, _, _, FilterFun, Callback, "continuous",
-    Limit, IncludeDocs}) ->
+    Limit, IncludeDocs, Conflicts}) ->
 
     #doc_info{high_seq = Seq} = DocInfo,
     Results0 = FilterFun(DocInfo),
@@ -212,17 +213,17 @@ changes_enumerator(DocInfo, {Db, _, _, FilterFun, Callback, "continuous",
     case Results of
     [] ->
         {Go, {Db, Seq, nil, FilterFun, Callback, "continuous", Limit,
-                IncludeDocs}
+                IncludeDocs, Conflicts}
         };
     _ ->
-        ChangesRow = changes_row(Db, Results, DocInfo, IncludeDocs),
+        ChangesRow = changes_row(Db, Results, DocInfo, IncludeDocs, Conflicts),
         Callback({change, ChangesRow, <<"">>}, "continuous"),
         {Go, {Db, Seq, nil, FilterFun, Callback, "continuous",  Limit - 1,
-                IncludeDocs}
+                IncludeDocs, Conflicts}
         }
     end;
 changes_enumerator(DocInfo, {Db, _, Prepend, FilterFun, Callback, ResponseType,
-    Limit, IncludeDocs}) ->
+    Limit, IncludeDocs, Conflicts}) ->
 
     #doc_info{high_seq = Seq} = DocInfo,
     Results0 = FilterFun(DocInfo),
@@ -231,25 +232,28 @@ changes_enumerator(DocInfo, {Db, _, Prepend, FilterFun, Callback, ResponseType,
     case Results of
     [] ->
         {Go, {Db, Seq, Prepend, FilterFun, Callback, ResponseType, Limit,
-                IncludeDocs}
+                IncludeDocs, Conflicts}
         };
     _ ->
-        ChangesRow = changes_row(Db, Results, DocInfo, IncludeDocs),
+        ChangesRow = changes_row(Db, Results, DocInfo, IncludeDocs, Conflicts),
         Callback({change, ChangesRow, Prepend}, ResponseType),
         {Go, {Db, Seq, <<",\n">>, FilterFun, Callback, ResponseType, Limit - 1,
-                IncludeDocs}
+                IncludeDocs, Conflicts}
         }
     end.
 
 
-changes_row(Db, Results, DocInfo, IncludeDoc) ->
+changes_row(Db, Results, DocInfo, IncludeDoc, Conflicts) ->
     #doc_info{
         id = Id, high_seq = Seq, revs = [#rev_info{deleted = Del} | _]
     } = DocInfo,
     {[{<<"seq">>, Seq}, {<<"id">>, Id}, {<<"changes">>, Results}] ++
         deleted_item(Del) ++ case IncludeDoc of
-            true -> couch_httpd_view:doc_member(Db, DocInfo);
-            false -> []
+            true ->
+                Options = if Conflicts -> [conflicts]; true -> [] end,
+                couch_httpd_view:doc_member(Db, DocInfo, Options);
+            false ->
+                []
         end}.
 
 deleted_item(true) -> [{deleted, true}];
