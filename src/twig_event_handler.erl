@@ -142,18 +142,18 @@ message(Format, Args) when is_list(Format) ->
 message(Format, Args) ->
     {unknown, twig_util:format("~2048.0p ~2048.0p", [Format, Args])}.
 
-otp_event_level(error, _) ->                        ?LEVEL_ERR;
-otp_event_level(warning_msg, _) ->                  ?LEVEL_WARN;
-otp_event_level(info_msg, _) ->                     ?LEVEL_INFO;
-otp_event_level(_, {_, crash_report, _}) ->         ?LEVEL_CRIT;
-otp_event_level(_, {_, supervisor_report, _}) ->    ?LEVEL_WARN;
-otp_event_level(_, {_, supervisor, _}) ->           ?LEVEL_WARN;
-otp_event_level(_, {_, progress_report, _}) ->      ?LEVEL_DEBUG;
-otp_event_level(_, {_, progress, _}) ->             ?LEVEL_DEBUG;
-otp_event_level(error_report, _) ->                 ?LEVEL_ERR;
-otp_event_level(warning_report, _) ->               ?LEVEL_WARN;
-otp_event_level(info_report, _) ->                  ?LEVEL_INFO;
-otp_event_level(_, _) ->                            ?LEVEL_DEBUG.
+otp_event_level(_, crash_report) ->         ?LEVEL_CRIT;
+otp_event_level(_, supervisor_report) ->    ?LEVEL_WARN;
+otp_event_level(_, supervisor) ->           ?LEVEL_WARN;
+otp_event_level(_, progress_report) ->      ?LEVEL_DEBUG;
+otp_event_level(_, progress) ->             ?LEVEL_DEBUG;
+otp_event_level(error, _) ->                ?LEVEL_ERR;
+otp_event_level(warning_msg, _) ->          ?LEVEL_WARN;
+otp_event_level(info_msg, _) ->             ?LEVEL_NOTICE;
+otp_event_level(error_report, _) ->         ?LEVEL_ERR;
+otp_event_level(warning_report, _) ->       ?LEVEL_WARN;
+otp_event_level(info_report, _) ->          ?LEVEL_NOTICE;
+otp_event_level(_, _) ->                    ?LEVEL_DEBUG.
 
 get_value(Key, Props) ->
     case lists:keyfind(Key, 1, Props) of
