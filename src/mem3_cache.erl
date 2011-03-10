@@ -43,7 +43,7 @@ handle_info({'DOWN', _, _, Pid, {badarg, [{ets,delete,[partitions,_]}|_]}},
     % fatal error, somebody deleted our ets table
     {stop, ets_table_error, State};
 handle_info({'DOWN', _, _, Pid, Reason}, #state{changes_pid=Pid} = State) ->
-    twig:log(info, "~p changes listener died ~p", [?MODULE, Reason]),
+    twig:log(notice, "~p changes listener died ~p", [?MODULE, Reason]),
     Seq = case Reason of {seq, EndSeq} -> EndSeq; _ -> 0 end,
     erlang:send_after(5000, self(), {start_listener, Seq}),
     {noreply, State};
