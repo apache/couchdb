@@ -77,7 +77,7 @@ handle_cast({kill, FromRef}, #st{workers=Workers} = St) ->
     end;
 
 handle_cast(_, St) ->
-    twig:log(warn, "rexi_server ignored_cast"),
+    twig:log(notice, "rexi_server ignored_cast"),
     {noreply, St}.
 
 handle_info({'DOWN', Ref, process, _, normal}, #st{workers=Workers} = St) ->
