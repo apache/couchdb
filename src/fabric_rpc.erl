@@ -249,8 +249,8 @@ with_db(DbName, Options, {M,F,A}) ->
         catch Exception ->
             Exception;
         error:Reason ->
-            twig:log(error, "~p ~p ~p~n~p", [?MODULE, {M,F}, Reason,
-                erlang:get_stacktrace()]),
+            twig:log(error, "rpc ~p:~p/~p ~p ~p", [M, F, length(A)+1, Reason,
+                clean_stack()]),
             {error, Reason}
         end);
     Error ->
@@ -422,3 +422,7 @@ make_att_reader({follows, Parser}) ->
     end;
 make_att_reader(Else) ->
     Else.
+
+clean_stack() ->
+    lists:map(fun({M,F,A}) when is_list(A) -> {M,F,length(A)}; (X) -> X end,
+        erlang:get_stacktrace()).
