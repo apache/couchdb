@@ -120,9 +120,9 @@ init_p(From, MFA) ->
 init_p(From, {M,F,A}, Nonce) ->
     put(rexi_from, From),
     put(initial_call, {M,F,length(A)}),
+    put(nonce, Nonce),
     try apply(M, F, A) catch exit:normal -> ok; Class:Reason ->
         Stack = clean_stack(),
-        erlang:put(nonce, Nonce),
         twig:log(error, "rexi_server ~p:~p ~100p", [Class, Reason, Stack]),
         exit(#error{
             timestamp = now(),
