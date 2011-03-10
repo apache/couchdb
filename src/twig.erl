@@ -19,7 +19,7 @@
 -include("twig_int.hrl").
 
 set_level(LevelAtom) ->
-    application:set_env(twig, {level, twig_util:level(LevelAtom)}).
+    application:set_env(twig, level, twig_util:level(LevelAtom)).
 
 log(LevelAtom, String) ->
     log(LevelAtom, String, [], []).
