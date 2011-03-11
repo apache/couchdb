@@ -441,7 +441,12 @@ set_view_sig(#group{
 
 open_db_group(DbName, GroupId) ->
     {Pid, Ref} = spawn_monitor(fun() ->
-        exit(fabric:open_doc(mem3:dbname(DbName), GroupId, []))
+        exit(try
+            fabric:open_doc(mem3:dbname(DbName), GroupId, [])
+        catch error:database_does_not_exist ->
+            {ok, Db} = couch_db:open(DbName, []),
+            couch_db:open_doc(Db, GroupId)
+        end)
     end),
     receive {'DOWN', Ref, process, Pid, {ok, Doc}} ->
         {ok, design_doc_to_view_group(Doc)};
