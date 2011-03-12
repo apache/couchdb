@@ -105,7 +105,7 @@ async_replicate(#rep{id = {BaseId, Ext}, source = Src, target = Tgt} = Rep) ->
     ChildSpec = {
         RepChildId,
         {gen_server, start_link, [?MODULE, Rep, []]},
-        transient,
+        temporary,
         1,
         worker,
         [?MODULE]
