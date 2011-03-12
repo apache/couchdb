@@ -916,6 +916,131 @@ couchTests.replicator_db = function(debug) {
   }
 
 
+  function rep_doc_field_validation() {
+    var docs = makeDocs(1, 5);
+
+    populate_db(dbA, docs);
+    populate_db(dbB, []);
+
+    var repDoc = {
+       _id: "rep1",
+       target: dbB.name
+    };
+
+    try {
+      repDb.save(repDoc);
+      T(false, "should have failed because source field is missing");
+    } catch (x) {
+      TEquals("forbidden", x.error);
+    }
+
+    repDoc = {
+       _id: "rep1",
+       source: 123,
+       target: dbB.name
+    };
+
+    try {
+      repDb.save(repDoc);
+      T(false, "should have failed because source field is a number");
+    } catch (x) {
+      TEquals("forbidden", x.error);
+    }
+
+    repDoc = {
+       _id: "rep1",
+       source: dbA.name
+    };
+
+    try {
+      repDb.save(repDoc);
+      T(false, "should have failed because target field is missing");
+    } catch (x) {
+      TEquals("forbidden", x.error);
+    }
+
+    repDoc = {
+       _id: "rep1",
+       source: dbA.name,
+       target: null
+    };
+
+    try {
+      repDb.save(repDoc);
+      T(false, "should have failed because target field is null");
+    } catch (x) {
+      TEquals("forbidden", x.error);
+    }
+
+    repDoc = {
+       _id: "rep1",
+       source: dbA.name,
+       target: { url: 123 }
+    };
+
+    try {
+      repDb.save(repDoc);
+      T(false, "should have failed because target.url field is not a string");
+    } catch (x) {
+      TEquals("forbidden", x.error);
+    }
+
+    repDoc = {
+       _id: "rep1",
+       source: dbA.name,
+       target: { url: dbB.name, auth: null }
+    };
+
+    try {
+      repDb.save(repDoc);
+      T(false, "should have failed because target.auth field is null");
+    } catch (x) {
+      TEquals("forbidden", x.error);
+    }
+
+    repDoc = {
+       _id: "rep1",
+       source: dbA.name,
+       target: { url: dbB.name, auth: "foo:bar" }
+    };
+
+    try {
+      repDb.save(repDoc);
+      T(false, "should have failed because target.auth field is not an object");
+    } catch (x) {
+      TEquals("forbidden", x.error);
+    }
+
+    repDoc = {
+       _id: "rep1",
+       source: dbA.name,
+       target: dbB.name,
+       continuous: "true"
+    };
+
+    try {
+      repDb.save(repDoc);
+      T(false, "should have failed because continuous is not a boolean");
+    } catch (x) {
+      TEquals("forbidden", x.error);
+    }
+
+    repDoc = {
+       _id: "rep1",
+       source: dbA.name,
+       target: dbB.name,
+       filter: 123
+    };
+
+    try {
+      repDb.save(repDoc);
+      T(false, "should have failed because filter is not a string");
+    } catch (x) {
+      TEquals("forbidden", x.error);
+    }
+  }
+
+
   // run all the tests
   var server_config = [
     {
@@ -982,6 +1107,10 @@ couchTests.replicator_db = function(debug) {
   repDb.deleteDb();
   restartServer();
   run_on_modified_server(server_config, compact_rep_db);
+
+  repDb.deleteDb();
+  restartServer();
+  run_on_modified_server(server_config, rep_doc_field_validation);
 
 /*
  * Disabled, since error state would be set on the document only after
