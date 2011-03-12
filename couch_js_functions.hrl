@@ -110,8 +110,40 @@
     function(newDoc, oldDoc, userCtx) {
         function reportError(error_msg) {
             log('Error writing document `' + newDoc._id +
-                '` to replicator DB: ' + error_msg);
+                '\\' to the replicator database: ' + error_msg);
             throw({forbidden: error_msg});
+        }
+
+        function validateEndpoint(endpoint, fieldName) {
+            if ((typeof endpoint !== 'string') &&
+                ((typeof endpoint !== 'object') || (endpoint === null))) {
+
+                reportError('The `' + fieldName + '\\' property must exist' +
+                    ' and be either a string or an object.');
+            }
+
+            if (typeof endpoint === 'object') {
+                if ((typeof endpoint.url !== 'string') || !endpoint.url) {
+                    reportError('The url property must exist in the `' +
+                        fieldName + '\\' field and must be a non-empty string.');
+                }
+
+                if ((typeof endpoint.auth !== 'undefined') &&
+                    ((typeof endpoint.auth !== 'object') ||
+                        endpoint.auth === null)) {
+
+                    reportError('`' + fieldName +
+                        '.auth\\' must be a non-null object.');
+                }
+
+                if ((typeof endpoint.headers !== 'undefined') &&
+                    ((typeof endpoint.headers !== 'object') ||
+                        endpoint.headers === null)) {
+
+                    reportError('`' + fieldName +
+                        '.headers\\' must be a non-null object.');
+                }
+            }
         }
 
         var isReplicator = (userCtx.roles.indexOf('_replicator') >= 0);
@@ -119,23 +151,59 @@
             reportError('Only the replicator can edit replication documents.');
         }
 
+        if (!newDoc._deleted) {
+            validateEndpoint(newDoc.source, 'source');
+            validateEndpoint(newDoc.target, 'target');
+
+            if ((typeof newDoc.create_target !== 'undefined') &&
+                (typeof newDoc.create_target !== 'boolean')) {
+
+                reportError('The `create_target\\' field must be a boolean.');
+            }
+
+            if ((typeof newDoc.continuous !== 'undefined') &&
+                (typeof newDoc.continuous !== 'boolean')) {
+
+                reportError('The `continuous\\' field must be a boolean.');
+            }
+
+            if ((typeof newDoc.doc_ids !== 'undefined') &&
+                !isArray(newDoc.doc_ids)) {
+
+                reportError('The `doc_ids\\' field must be an array of strings.');
+            }
+
+            if ((typeof newDoc.filter !== 'undefined') &&
+                ((typeof newDoc.filter !== 'string') || !newDoc.filter)) {
+
+                reportError('The `filter\\' field must be a non-empty string.');
+            }
+
+            if ((typeof newDoc.query_params !== 'undefined') &&
+                ((typeof newDoc.query_params !== 'object') ||
+                    newDoc.query_params === null)) {
+
+                reportError('The `query_params\\' field must be an object.');
+            }
+        }
+
         if (newDoc.user_ctx) {
             var user_ctx = newDoc.user_ctx;
 
             if (typeof user_ctx !== 'object') {
-                reportError('The user_ctx property must be an object.');
+                reportError('The `user_ctx\\' property must be an object.');
             }
 
             if (!(user_ctx.name === null ||
                     (typeof user_ctx.name === 'undefined') ||
                     ((typeof user_ctx.name === 'string') &&
                         user_ctx.name.length > 0))) {
-                reportError('The name property of the user_ctx must be a ' +
+                reportError('The `user_ctx.name\\' property must be a ' +
                     'non-empty string.');
             }
 
             if (user_ctx.roles && !isArray(user_ctx.roles)) {
-                reportError('The roles property of the user_ctx must be ' +
+                reportError('The `user_ctx.roles\\' property must be ' +
                     'an array of strings.');
             }
 
