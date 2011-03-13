@@ -679,7 +679,8 @@ do_checkpoint(State) ->
         ]},
         BaseHistory = [
             {<<"session_id">>, SessionId},
-            {<<"source_last_seq">>, NewSeqNum}
+            {<<"source_last_seq">>, NewSeqNum},
+            {<<"replication_id_version">>, ?REP_ID_VERSION}
         ] ++ case couch_util:get_value(<<"doc_ids">>, RepDoc) of
         undefined ->
             [];
