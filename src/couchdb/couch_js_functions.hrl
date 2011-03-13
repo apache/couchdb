@@ -213,7 +213,7 @@
                         var role = user_ctx.roles[i];
 
                         if (typeof role !== 'string' || role.length === 0) {
-                            reportError('Roles must be a non-empty strings.');
+                            reportError('Roles must be non-empty strings.');
                         }
                         if (role[0] === '_') {
                             reportError('System roles (starting with an ' +
