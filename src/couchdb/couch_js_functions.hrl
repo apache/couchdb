@@ -185,38 +185,40 @@
 
                 reportError('The `query_params\\' field must be an object.');
             }
-        }
 
-        if (newDoc.user_ctx) {
-            var user_ctx = newDoc.user_ctx;
+            if (newDoc.user_ctx) {
+                var user_ctx = newDoc.user_ctx;
 
-            if (typeof user_ctx !== 'object') {
-                reportError('The `user_ctx\\' property must be an object.');
-            }
+                if ((typeof user_ctx !== 'object') || (user_ctx === null)) {
+                    reportError('The `user_ctx\\' property must be a ' +
+                        'non-null object.');
+                }
 
-            if (!(user_ctx.name === null ||
+                if (!(user_ctx.name === null ||
                     (typeof user_ctx.name === 'undefined') ||
                     ((typeof user_ctx.name === 'string') &&
                         user_ctx.name.length > 0))) {
-                reportError('The `user_ctx.name\\' property must be a ' +
-                    'non-empty string.');
-            }
 
-            if (user_ctx.roles && !isArray(user_ctx.roles)) {
-                reportError('The `user_ctx.roles\\' property must be ' +
-                    'an array of strings.');
-            }
+                    reportError('The `user_ctx.name\\' property must be a ' +
+                        'non-empty string or null.');
+                }
 
-            if (user_ctx.roles) {
-                for (var i = 0; i < user_ctx.roles.length; i++) {
-                    var role = user_ctx.roles[i];
+                if (user_ctx.roles && !isArray(user_ctx.roles)) {
+                    reportError('The `user_ctx.roles\\' property must be ' +
+                        'an array of strings.');
+                }
 
-                    if (typeof role !== 'string' || role.length === 0) {
-                        reportError('Each role must be a non-empty string.');
-                    }
-                    if (role[0] === '_') {
-                        reportError('System roles (starting with underscore) ' +
-                            'are not allowed.');
+                if (user_ctx.roles) {
+                    for (var i = 0; i < user_ctx.roles.length; i++) {
+                        var role = user_ctx.roles[i];
+
+                        if (typeof role !== 'string' || role.length === 0) {
+                            reportError('Roles must be a non-empty strings.');
+                        }
+                        if (role[0] === '_') {
+                            reportError('System roles (starting with an ' +
+                                'underscore) are not allowed.');
+                        }
                     }
                 }
             }
