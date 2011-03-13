@@ -627,7 +627,8 @@ do_checkpoint(State) ->
         ]},
         BaseHistory = [
             {<<"session_id">>, SessionId},
-            {<<"source_last_seq">>, NewSeq}
+            {<<"source_last_seq">>, NewSeq},
+            {<<"replication_id_version">>, ?REP_ID_VERSION}
         ] ++ case get_value(doc_ids, Options) of
         undefined ->
             [];
