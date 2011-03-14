@@ -1,8 +1,8 @@
 ### Overview
 
-BigCouch is a highly available, fault-tolerant, clustered, mostly api-compliant version of [Apache CouchDB][1].  While it appears to the end-user as one CouchDB instance, it is in fact one or more nodes in an elastic cluster, acting in concert to store and retrieve documents, index and serve views, and serve CouchApps.  BigCouch has been developed and is continually maintained by [Cloudant][2] who offer hosted CouchDB as a service.
+BigCouch is a highly available, fault-tolerant, clustered, mostly api-compliant version of [Apache CouchDB][1].  While it appears to the end-user as one CouchDB instance, it is in fact one or more BigCouch nodes in an elastic cluster, acting in concert to store and retrieve documents, index and serve views, and serve CouchApps.  BigCouch has been developed and is continually maintained by [Cloudant][2] who offer hosted CouchDB as a service.
 
-Clusters behave according to concepts outlined in [Amazon's Dynamo paper][4], namely that each node can accept requests, data is placed on partitions based on a consistent hashing algorithm, and quorum protocols are for read/write operations.
+Clusters behave according to concepts outlined in [Amazon's Dynamo paper][4], namely that each BigCouch node can accept requests, data is placed on partitions based on a consistent hashing algorithm, and quorum protocols are for read/write operations.
 
 ### Contents
 
@@ -63,7 +63,7 @@ Run into any issues? Check out our wiki, [https://github.com/cloudant/bigcouch/w
 
     $PREFIX/bin/bigcouch
 
-Now, visit http://localhost:5984/_utils in a browser to verify the CouchDB node is operational.
+Now, visit http://localhost:5984/_utils in a browser to verify the BigCouch node is operational.
 
 BigCouch listens on two ports.  Defaults and explanations:
 
