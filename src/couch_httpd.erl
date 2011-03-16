@@ -608,13 +608,8 @@ verify_is_server_admin(#user_ctx{roles=Roles}) ->
     false -> throw({unauthorized, <<"You are not a server admin.">>})
     end.
 
-log_request(#httpd{mochi_req=MochiReq,peer=Peer}, Code) ->
-    ?LOG_INFO("~s - - ~s ~s ~B", [
-        Peer,
-        MochiReq:get(method),
-        MochiReq:get(raw_path),
-        Code
-    ]).
+log_request(_, _) ->
+    noop. % we have twig
 
 
 start_response_length(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Length) ->
