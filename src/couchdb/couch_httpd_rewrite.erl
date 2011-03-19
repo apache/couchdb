@@ -106,15 +106,6 @@
 %% {"from": "/a",           /a?foo=b        /some/b             foo =:= b
 %% "to": "/some/:foo",
 %%  }}
-%% 
-%% {"from": "/a/<foo>"      /a/b            /some/b             foo =:= b
-%% "to": "/a/b",
-%% }}
-%%
-%% {"from": "/a/<foo>.blah"      /a/b            /some/b        foo =:= b
-%% "to": "/a/b",
-%% }}
-
 
 
 
@@ -336,14 +327,6 @@ bind_path([?MATCH_ALL], [Match|_RestMatch]=Rest, Bindings) ->
     {ok, Rest, [{?MATCH_ALL, Match}|Bindings]};
 bind_path(_, [], _) ->
     fail;
-bind_path([{bind, {Token, MatchRe}}|RestToken],
-        [Match|RestMatch],Bindings) ->
-    case re:run(Match, MatchRe, [{capture, all, binary}]) of
-        {match, [_, Match1]} ->
-            bind_path(RestToken, RestMatch, [{{bind, Token}, Match1}|Bindings]);
-        _ ->
-            fail 
-    end;
 bind_path([{bind, Token}|RestToken],[Match|RestMatch],Bindings) ->
     bind_path(RestToken, RestMatch, [{{bind, Token}, Match}|Bindings]);
 bind_path([Token|RestToken], [Token|RestMatch], Bindings) ->
@@ -421,18 +404,8 @@ path_to_list([<<"..">>|R], Acc, DotDotCount) ->
     path_to_list(R, [<<"..">>|Acc], DotDotCount+1);
 path_to_list([P|R], Acc, DotDotCount) ->
     P1 = case P of
-        <<"<", _Rest/binary>> ->
-            {ok, VarRe} = re:compile(<<"<([^>].*)>(.*)">>),
-            case re:run(P, VarRe, [{capture, all, binary}]) of
-                {match, [_, Var, Match]} ->
-                    {ok, MatchRe} = re:compile(<<"(.*)", Match/binary>>),
-                    {bind, {Var, MatchRe}};
-                _ -> P
-            end;
         <<":", Var/binary>> ->
             to_binding(Var);
-
-
         _ -> P
     end,
     path_to_list(R, [P1|Acc], DotDotCount).
