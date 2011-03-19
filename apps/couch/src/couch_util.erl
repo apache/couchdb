@@ -158,8 +158,8 @@ json_apply_field({Key, NewValue}, [{OtherKey, OtherVal} | Headers], Acc) ->
 json_apply_field({Key, NewValue}, [], Acc) ->
     {[{Key, NewValue}|Acc]}.
 
-json_user_ctx(#db{name=DbName, user_ctx=Ctx}) ->
-    {[{<<"db">>, DbName},
+json_user_ctx(#db{name=ShardName, user_ctx=Ctx}) ->
+    {[{<<"db">>, mem3:dbname(ShardName)},
             {<<"name">>,Ctx#user_ctx.name},
             {<<"roles">>,Ctx#user_ctx.roles}]}.
     
