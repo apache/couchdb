@@ -27,7 +27,8 @@ go(#shard{} = Source, #shard{} = Target) ->
         {error, missing_source}
     end.
 
-go(#db{} = Db, #shard{} = Target, LocalId) ->
+go(#db{name=DbName} = Db, #shard{} = Target, LocalId) ->
+    erlang:put(io_priority, {internal_repl, DbName}),
     Seq = calculate_start_seq(Db, Target, LocalId),
     Acc0 = #acc{source=Db, target=Target, seq=Seq, localid=LocalId},
     Fun = fun ?MODULE:changes_enumerator/2,
@@ -63,7 +64,8 @@ find_missing_revs(Acc) ->
     IdsRevs = lists:map(fun(#doc_info{id=Id, revs=RevInfos}) ->
         {Id, [R || #rev_info{rev=R} <- RevInfos]}
     end, Infos),
-    rexi_call(Node, {fabric_rpc, get_missing_revs, [Name, IdsRevs]}).
+    Options = [{io_priority, {internal_repl, Name}}],
+    rexi_call(Node, {fabric_rpc, get_missing_revs, [Name, IdsRevs, Options]}).
 
 open_docs(Db, Missing) ->
     lists:flatmap(fun({Id, Revs, _}) ->
@@ -72,7 +74,8 @@ open_docs(Db, Missing) ->
     end, Missing).
 
 save_on_target(Node, Name, Docs) ->
-    Options = [replicated_changes, full_commit, {user_ctx, ?CTX}],
+    Options = [replicated_changes, full_commit, {user_ctx, ?CTX},
+        {io_priority, {internal_repl, Name}}],
     rexi_call(Node, {fabric_rpc, update_docs, [Name, Docs, Options]}),
     ok.
 
@@ -84,7 +87,7 @@ update_locals(Acc) ->
         {<<"timestamp">>, list_to_binary(iso8601_timestamp())}
     ]}},
     {ok, _} = couch_db:update_doc(Db, Doc, []),
-    Options = [{user_ctx, ?CTX}],
+    Options = [{user_ctx, ?CTX}, {io_priority, {internal_repl, Name}}],
     rexi_call(Node, {fabric_rpc, update_docs, [Name, [Doc], Options]}).
 
 rexi_call(Node, MFA) ->
@@ -100,7 +103,8 @@ rexi_call(Node, MFA) ->
 calculate_start_seq(Db, #shard{node=Node, name=Name}, LocalId) ->
     case couch_db:open_doc(Db, LocalId, []) of
     {ok, #doc{body = {SProps}}} ->
-        try rexi_call(Node, {fabric_rpc, open_doc, [Name, LocalId, []]}) of
+        Opts = [{io_priority, {internal_repl, Name}}],
+        try rexi_call(Node, {fabric_rpc, open_doc, [Name, LocalId, Opts]}) of
         #doc{body = {TProps}} ->
             SourceSeq = couch_util:get_value(<<"seq">>, SProps, 0),
             TargetSeq = couch_util:get_value(<<"seq">>, TProps, 0),
