@@ -15,7 +15,8 @@
 -module(fabric_rpc).
 
 -export([get_db_info/1, get_doc_count/1, get_update_seq/1]).
--export([open_doc/3, open_revs/4, get_missing_revs/2, update_docs/3]).
+-export([open_doc/3, open_revs/4, get_missing_revs/2, get_missing_revs/3,
+    update_docs/3]).
 -export([all_docs/2, changes/3, map_view/4, reduce_view/4, group_info/2]).
 -export([create_db/1, delete_db/2, reset_validation_funs/1, set_security/3,
     set_revs_limit/3, create_shard_db_doc/2]).
@@ -196,8 +197,11 @@ open_revs(DbName, Id, Revs, Options) ->
     with_db(DbName, Options, {couch_db, open_doc_revs, [Id, Revs, Options]}).
 
 get_missing_revs(DbName, IdRevsList) ->
+    get_missing_revs(DbName, IdRevsList, []).
+
+get_missing_revs(DbName, IdRevsList, Options) ->
     % reimplement here so we get [] for Ids with no missing revs in response
-    erlang:put(io_priority, {interactive, DbName}),
+    set_io_priority(DbName, Options),
     rexi:reply(case couch_db:open(DbName, []) of
     {ok, Db} ->
         Ids = [Id1 || {Id1, _Revs} <- IdRevsList],
@@ -241,7 +245,7 @@ reset_validation_funs(DbName) ->
 %%
 
 with_db(DbName, Options, {M,F,A}) ->
-    erlang:put(io_priority, {interactive, DbName}),
+    set_io_priority(DbName, Options),
     case couch_db:open(DbName, Options) of
     {ok, Db} ->
         rexi:reply(try
@@ -426,3 +430,11 @@ make_att_reader(Else) ->
 clean_stack() ->
     lists:map(fun({M,F,A}) when is_list(A) -> {M,F,length(A)}; (X) -> X end,
         erlang:get_stacktrace()).
+
+set_io_priority(DbName, Options) ->
+    case lists:keyfind(io_priority, 1, Options) of
+    {io_priority, Pri} ->
+        erlang:put(io_priority, Pri);
+    false ->
+        erlang:put(io_priority, {interactive, DbName})
+    end.
