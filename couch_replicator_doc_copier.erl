@@ -279,19 +279,21 @@ local_process_batch([], _Source, Target, #batch{docs = Docs, size = Size},
 
 local_process_batch([{Seq, {Id, Revs, NotMissingCount, PAs}} | Rest],
     Source, Target, Batch, Stats, HighestSeqSeen) ->
-    {ok, DocList} = fetch_doc(
-        Source, {Id, Revs, PAs, Seq}, fun local_doc_handler/2, []),
+    {ok, {_, DocList, Written0, WriteFailures0}} = fetch_doc(
+        Source, {Id, Revs, PAs, Seq}, fun local_doc_handler/2,
+        {Target, [], 0, 0}),
+    Read = length(DocList) + Written0 + WriteFailures0,
     {Batch2, Written, WriteFailures} = lists:foldl(
         fun(Doc, {Batch0, W0, F0}) ->
             {Batch1, W, F} = maybe_flush_docs(Target, Batch0, Doc),
             {Batch1, W0 + W, F0 + F}
         end,
-        {Batch, 0, 0}, DocList),
+        {Batch, Written0, WriteFailures0}, DocList),
     Stats2 = Stats#rep_stats{
         missing_checked = Stats#rep_stats.missing_checked + length(Revs)
             + NotMissingCount,
         missing_found = Stats#rep_stats.missing_found + length(Revs),
-        docs_read = Stats#rep_stats.docs_read + length(DocList),
+        docs_read = Stats#rep_stats.docs_read + Read,
         docs_written = Stats#rep_stats.docs_written + Written,
         doc_write_failures = Stats#rep_stats.doc_write_failures + WriteFailures
     },
@@ -333,14 +335,33 @@ spawn_doc_reader(Source, Target, FetchParams) ->
 
 
 fetch_doc(Source, {Id, Revs, PAs, _Seq}, DocHandler, Acc) ->
-    couch_api_wrap:open_doc_revs(
-        Source, Id, Revs, [{atts_since, PAs}], DocHandler, Acc).
+    try
+        couch_api_wrap:open_doc_revs(
+            Source, Id, Revs, [{atts_since, PAs}], DocHandler, Acc)
+    catch
+    throw:{missing_stub, _} ->
+        ?LOG_ERROR("Retrying fetch and update of document `~p` due to out of "
+            "sync attachment stubs. Missing revisions are: ~s",
+            [Id, couch_doc:revs_to_strs(Revs)]),
+        couch_api_wrap:open_doc_revs(Source, Id, Revs, [], DocHandler, Acc)
+    end.
 
 
-local_doc_handler({ok, Doc}, DocList) ->
-    [Doc | DocList];
-local_doc_handler(_, DocList) ->
-    DocList.
+local_doc_handler({ok, #doc{atts = []} = Doc}, {Target, DocList, W, F}) ->
+    {Target, [Doc | DocList], W, F};
+local_doc_handler({ok, Doc}, {Target, DocList, W, F}) ->
+    ?LOG_DEBUG("Worker flushing doc with attachments", []),
+    Target2 = open_db(Target),
+    Success = (flush_doc(Target2, Doc) =:= ok),
+    close_db(Target2),
+    case Success of
+    true ->
+        {Target, DocList, W + 1, F};
+    false ->
+        {Target, DocList, W, F + 1}
+    end;
+local_doc_handler(_, Acc) ->
+    Acc.
 
 
 remote_doc_handler({ok, #doc{atts = []} = Doc}, {Parent, _} = Acc) ->
@@ -351,6 +372,7 @@ remote_doc_handler({ok, Doc}, {Parent, Target} = Acc) ->
     % source. The data property of each attachment is a function that starts
     % streaming the attachment data from the remote source, therefore it's
     % convenient to call it ASAP to avoid ibrowse inactivity timeouts.
+    ?LOG_DEBUG("Worker flushing doc with attachments", []),
     Target2 = open_db(Target),
     Success = (flush_doc(Target2, Doc) =:= ok),
     ok = gen_server:call(Parent, {doc_flushed, Success}, infinity),
@@ -418,7 +440,7 @@ maybe_flush_docs(#httpdb{} = Target,
         case flush_doc(Target, Doc) of
         ok ->
             {Batch, 1, 0};
-        error ->
+        _ ->
             {Batch, 0, 1}
         end;
     false ->
@@ -442,15 +464,6 @@ maybe_flush_docs(#db{} = Target, #batch{docs = DocAcc, size = SizeAcc},
         {#batch{}, Written, Failed};
     SizeAcc2 ->
         {#batch{docs = [Doc | DocAcc], size = SizeAcc2}, 0, 0}
-    end;
-
-maybe_flush_docs(#db{} = Target, Batch, Doc) ->
-    ?LOG_DEBUG("Worker flushing doc with attachments", []),
-    case flush_doc(Target, Doc) of
-    ok ->
-        {Batch, 1, 0};
-    error ->
-        {Batch, 0, 1}
     end.
 
 
@@ -470,14 +483,17 @@ flush_docs(Target, DocList) ->
         end, Errors),
     {length(DocList) - length(Errors), length(Errors)}.
 
-flush_doc(Target, Doc) ->
-    case couch_api_wrap:update_doc(Target, Doc, [], replicated_changes) of
+flush_doc(Target, #doc{id = Id} = Doc) ->
+    try couch_api_wrap:update_doc(Target, Doc, [], replicated_changes) of
     {ok, _} ->
         ok;
-    {error, <<"unauthorized">>} ->
+    Error ->
+        ?LOG_ERROR("Replicator: error writing document `~s` to `~s`: ~s",
+            [Id, couch_api_wrap:db_uri(Target), couch_util:to_binary(Error)]),
+        Error
+    catch
+    throw:{unauthorized, _} ->
         ?LOG_ERROR("Replicator: unauthorized to write document `~s` to `~s`",
-            [Doc#doc.id, couch_api_wrap:db_uri(Target)]),
-        error;
-    _ ->
-        error
+            [Id, couch_api_wrap:db_uri(Target)]),
+        {error, unauthorized}
     end.
