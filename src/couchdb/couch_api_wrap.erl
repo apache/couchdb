@@ -232,16 +232,18 @@ update_doc(#httpdb{} = HttpDb, #doc{id = DocId} = Doc, Options, Type) ->
                 {ok, couch_doc:parse_rev(get_value(<<"rev">>, Props))};
             (409, _, _) ->
                 throw(conflict);
-            (_, _, {Props}) ->
-                {error, get_value(<<"error">>, Props)}
+            (Code, _, {Props}) ->
+                case {Code, get_value(<<"error">>, Props)} of
+                {401, <<"unauthorized">>} ->
+                    throw({unauthorized, get_value(<<"reason">>, Props)});
+                {412, <<"missing_stub">>} ->
+                    throw({missing_stub, get_value(<<"reason">>, Props)});
+                {_, Error} ->
+                    {error, Error}
+                end
         end);
 update_doc(Db, Doc, Options, Type) ->
-    try
-        couch_db:update_doc(Db, Doc, Options, Type)
-    catch
-    throw:{unauthorized, _} ->
-        {error, <<"unauthorized">>}
-    end.
+    couch_db:update_doc(Db, Doc, Options, Type).
 
 
 update_docs(Db, DocList, Options) ->
