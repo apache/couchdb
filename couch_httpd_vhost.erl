@@ -345,11 +345,11 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 config_change("httpd", "vhost_global_handlers") ->
-    ?MODULE:install();
+    ?MODULE:reload();
 config_change("httpd", "redirect_vhost_handler") ->
-    ?MODULE:install();
+    ?MODULE:reload();
 config_change("vhosts", _) ->
-    ?MODULE:install().
+    ?MODULE:reload().
 
 load_conf() ->
     %% get vhost globals
