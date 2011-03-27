@@ -73,7 +73,7 @@ make_filter_fun(FilterName, Style, Req, Db) ->
     case [list_to_binary(couch_httpd:unquote(Part))
             || Part <- string:tokens(FilterName, "/")] of
     [] ->
-        fun(#doc_info{revs=[#rev_info{rev=Rev}|_]=Revs}) ->
+        fun(_Db2, #doc_info{revs=[#rev_info{rev=Rev}|_]=Revs}) ->
             case Style of
             main_only ->
                 [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]}];
@@ -88,7 +88,7 @@ make_filter_fun(FilterName, Style, Req, Db) ->
         % validate that the ddoc has the filter fun
         #doc{body={Props}} = DDoc,
         couch_util:get_nested_json_value({Props}, [<<"filters">>, FName]),
-        fun(DocInfo) ->
+        fun(Db2, DocInfo) ->
             DocInfos =
             case Style of
             main_only ->
@@ -97,10 +97,10 @@ make_filter_fun(FilterName, Style, Req, Db) ->
                 [DocInfo#doc_info{revs=[Rev]}|| Rev <- DocInfo#doc_info.revs]
             end,
             Docs = [Doc || {ok, Doc} <- [
-                    couch_db:open_doc(Db, DocInfo2, [deleted, conflicts])
+                    couch_db:open_doc(Db2, DocInfo2, [deleted, conflicts])
                         || DocInfo2 <- DocInfos]],
             {ok, Passes} = couch_query_servers:filter_docs(
-                Req, Db, DDoc, FName, Docs
+                Req, Db2, DDoc, FName, Docs
             ),
             [{[{<<"rev">>, couch_doc:rev_to_str({RevPos,RevId})}]}
                 || {Pass, #doc{revs={RevPos,[RevId|_]}}}
@@ -207,7 +207,7 @@ changes_enumerator(DocInfo, {Db, _, _, FilterFun, Callback, "continuous",
     Limit, IncludeDocs, Conflicts}) ->
 
     #doc_info{high_seq = Seq} = DocInfo,
-    Results0 = FilterFun(DocInfo),
+    Results0 = FilterFun(Db, DocInfo),
     Results = [Result || Result <- Results0, Result /= null],
     Go = if Limit =< 1 -> stop; true -> ok end,
     case Results of
@@ -226,7 +226,7 @@ changes_enumerator(DocInfo, {Db, _, Prepend, FilterFun, Callback, ResponseType,
     Limit, IncludeDocs, Conflicts}) ->
 
     #doc_info{high_seq = Seq} = DocInfo,
-    Results0 = FilterFun(DocInfo),
+    Results0 = FilterFun(Db, DocInfo),
     Results = [Result || Result <- Results0, Result /= null],
     Go = if (Limit =< 1) andalso Results =/= [] -> stop; true -> ok end,
     case Results of

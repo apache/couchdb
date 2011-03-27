@@ -679,6 +679,67 @@ couchTests.replication = function(debug) {
 
   run_on_modified_server(server_config, test_fun);
 
+  // COUCHDB-1093 - filtered and continuous _changes feed dies when the
+  // database is compacted
+  dbA = new CouchDB("test_suite_db_a");
+  dbB = new CouchDB("test_suite_db_b");
+
+  dbA.deleteDb();
+  dbA.createDb();
+  dbB.deleteDb();
+  dbB.createDb();
+
+  var docs = makeDocs(1, 10);
+  docs.push({
+    _id: "_design/foo",
+    language: "javascript",
+    filters: {
+      myfilter: (function(doc, req) { return true; }).toString()
+    }
+  });
+  dbA.bulkSave(docs).ok;
+
+  var repResult = CouchDB.replicate(
+    "http://" + host + "/" + dbA.name,
+    dbB.name,
+    {
+      body: {
+        continuous: true,
+        filter: "foo/myfilter"
+      }
+    }
+  );
+  TEquals(true, repResult.ok);
+  TEquals('string', typeof repResult._local_id);
+
+  var xhr = CouchDB.request("GET", "/_active_tasks");
+  var tasks = JSON.parse(xhr.responseText);
+
+  TEquals(true, dbA.compact().ok);
+  while (dbA.info().compact_running) {};
+
+  TEquals(true, dbA.save(makeDocs(30, 31)[0]).ok);
+  xhr = CouchDB.request("GET", "/_active_tasks");
+
+  var tasksAfter = JSON.parse(xhr.responseText);
+  TEquals(tasks.length, tasksAfter.length);
+  T(dbB.open("30") !== null);
+
+  repResult = CouchDB.replicate(
+    "http://" + host + "/" + dbA.name,
+    dbB.name,
+    {
+      body: {
+        continuous: true,
+        filter: "foo/myfilter",
+        cancel: true
+      }
+    }
+  );
+  TEquals(true, repResult.ok);
+  TEquals('string', typeof repResult._local_id);
+
+
   // cleanup
   dbA.deleteDb();
   dbB.deleteDb();
