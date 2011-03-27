@@ -87,7 +87,7 @@ os_filter_fun(FilterName, Style, Req, Db) ->
     case [list_to_binary(couch_httpd:unquote(Part))
             || Part <- string:tokens(FilterName, "/")] of
     [] ->
-        fun(#doc_info{revs=Revs}) ->
+        fun(_Db2, #doc_info{revs=Revs}) ->
                 builtin_results(Style, Revs)
         end;
     [DName, FName] ->
@@ -96,7 +96,7 @@ os_filter_fun(FilterName, Style, Req, Db) ->
         % validate that the ddoc has the filter fun
         #doc{body={Props}} = DDoc,
         couch_util:get_nested_json_value({Props}, [<<"filters">>, FName]),
-        fun(DocInfo) ->
+        fun(Db2, DocInfo) ->
             DocInfos =
             case Style of
             main_only ->
@@ -105,10 +105,10 @@ os_filter_fun(FilterName, Style, Req, Db) ->
                 [DocInfo#doc_info{revs=[Rev]}|| Rev <- DocInfo#doc_info.revs]
             end,
             Docs = [Doc || {ok, Doc} <- [
-                    couch_db:open_doc(Db, DocInfo2, [deleted, conflicts])
+                    couch_db:open_doc(Db2, DocInfo2, [deleted, conflicts])
                         || DocInfo2 <- DocInfos]],
             {ok, Passes} = couch_query_servers:filter_docs(
-                Req, Db, DDoc, FName, Docs
+                Req, Db2, DDoc, FName, Docs
             ),
             [{[{<<"rev">>, couch_doc:rev_to_str({RevPos,RevId})}]}
                 || {Pass, #doc{revs={RevPos,[RevId|_]}}}
@@ -134,7 +134,7 @@ builtin_filter_fun(_FilterName, _Style, _Req, _Db) ->
     throw({bad_request, "unknown builtin filter name"}).
 
 filter_docids(DocIds, Style) when is_list(DocIds)->
-    fun(#doc_info{id=DocId, revs=Revs}) ->
+    fun(_Db, #doc_info{id=DocId, revs=Revs}) ->
             case lists:member(DocId, DocIds) of
                 true ->
                     builtin_results(Style, Revs);
@@ -145,7 +145,7 @@ filter_docids(_, _) ->
     throw({bad_request, "`doc_ids` filter parameter is not a list."}).
 
 filter_designdoc(Style) ->
-    fun(#doc_info{id=DocId, revs=Revs}) ->
+    fun(_Db, #doc_info{id=DocId, revs=Revs}) ->
             case DocId of
             <<"_design", _/binary>> ->
                     builtin_results(Style, Revs);
@@ -263,7 +263,7 @@ changes_enumerator(DocInfo, {Db, _, _, FilterFun, Callback, UserAcc,
     "continuous", Limit, IncludeDocs, Conflicts}) ->
 
     #doc_info{high_seq = Seq} = DocInfo,
-    Results0 = FilterFun(DocInfo),
+    Results0 = FilterFun(Db, DocInfo),
     Results = [Result || Result <- Results0, Result /= null],
     Go = if Limit =< 1 -> stop; true -> ok end,
     case Results of
@@ -282,7 +282,7 @@ changes_enumerator(DocInfo, {Db, _, Prepend, FilterFun, Callback, UserAcc,
     ResponseType, Limit, IncludeDocs, Conflicts}) ->
 
     #doc_info{high_seq = Seq} = DocInfo,
-    Results0 = FilterFun(DocInfo),
+    Results0 = FilterFun(Db, DocInfo),
     Results = [Result || Result <- Results0, Result /= null],
     Go = if (Limit =< 1) andalso Results =/= [] -> stop; true -> ok end,
     case Results of
