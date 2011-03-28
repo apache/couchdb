@@ -118,8 +118,9 @@ handle_call({purge_docs, IdRevs}, _From, Db) ->
 
     {DocInfoToUpdate, NewSeq} = lists:mapfoldl(
         fun(#full_doc_info{rev_tree=Tree}=FullInfo, SeqAcc) ->
-            Tree2 = couch_key_tree:map_leafs( fun(RevInfo) ->
-                    RevInfo#rev_info{seq=SeqAcc + 1}
+            Tree2 = couch_key_tree:map_leafs(
+                fun(_RevId, {IsDeleted, BodyPointer, _UpdateSeq}) ->
+                    {IsDeleted, BodyPointer, SeqAcc + 1}
                 end, Tree),
             {couch_doc:to_doc_info(FullInfo#full_doc_info{rev_tree=Tree2}),
                 SeqAcc + 1}
