@@ -136,6 +136,13 @@ async_replicate(#rep{id = {BaseId, Ext}, source = Src, target = Tgt} = Rep) ->
             ?LOG_INFO("replication `~s` already running at ~p (`~s` -> `~s`)",
                 [RepChildId, Pid, Source, Target]),
             {ok, Pid};
+        {error, {'EXIT', {badarg,
+            [{erlang, apply, [gen_server, start_link, undefined]} | _]}}} ->
+            % Clause to deal with a change in the supervisor module introduced
+            % in R14B02. For more details consult the thread at:
+            %     http://erlang.org/pipermail/erlang-bugs/2011-March/002273.html
+            _ = supervisor:delete_child(couch_rep_sup, RepChildId),
+            async_replicate(Rep);
         {error, _} = Error ->
             Error
         end;
