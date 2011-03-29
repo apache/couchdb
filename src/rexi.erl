@@ -59,7 +59,15 @@ cast(Node, MFA) ->
 -spec cast(node(), pid(), {atom(), atom(), list()}) -> reference().
 cast(Node, Caller, MFA) ->
     Ref = make_ref(),
-    ok = gen_server:cast({?SERVER, Node}, {doit, {Caller,Ref}, get(nonce), MFA}),
+    Msg = {'$gen_cast', {doit, {Caller, Ref}, get(nonce), MFA}},
+    case erlang:send({?SERVER, Node}, Msg, [noconnect, nosuspend]) of
+        noconnect ->
+            spawn(erlang, send, [{?SERVER, Node}, Msg]);
+        nosuspend ->
+            spawn(erlang, send, [{?SERVER, Node}, Msg]);
+        _ ->
+            ok
+    end,
     Ref.
 
 %% @doc Sends an async kill signal to the remote process associated with Ref.
