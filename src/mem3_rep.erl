@@ -84,6 +84,7 @@ update_locals(Acc) ->
     #shard{name=Name, node=Node} = Target,
     Doc = #doc{id = Id, body = {[
         {<<"seq">>, Seq},
+        {<<"node">>, list_to_binary(atom_to_list(Node))},
         {<<"timestamp">>, list_to_binary(iso8601_timestamp())}
     ]}},
     {ok, _} = couch_db:update_doc(Db, Doc, []),
