@@ -38,7 +38,6 @@
 %%  call to with_db will supply your M:F with a #db{} and then remaining args
 
 all_docs(DbName, #view_query_args{keys=nil} = QueryArgs) ->
-    erlang:put(io_priority, {interactive, DbName}),
     {ok, Db} = couch_db:open(DbName, []),
     #view_query_args{
         start_key = StartKey,
@@ -49,8 +48,10 @@ all_docs(DbName, #view_query_args{keys=nil} = QueryArgs) ->
         skip = Skip,
         include_docs = IncludeDocs,
         direction = Dir,
-        inclusive_end = Inclusive
+        inclusive_end = Inclusive,
+        extra = Options
     } = QueryArgs,
+    set_io_priority(DbName, Options),
     {ok, Total} = couch_db:get_doc_count(Db),
     Acc0 = #view_acc{
         db = Db,
@@ -87,7 +88,6 @@ changes(DbName, Args, StartSeq) ->
     end.
 
 map_view(DbName, DDoc, ViewName, QueryArgs) ->
-    erlang:put(io_priority, {interactive, DbName}),
     {ok, Db} = couch_db:open(DbName, []),
     #view_query_args{
         limit = Limit,
@@ -95,8 +95,10 @@ map_view(DbName, DDoc, ViewName, QueryArgs) ->
         keys = Keys,
         include_docs = IncludeDocs,
         stale = Stale,
-        view_type = ViewType
+        view_type = ViewType,
+        extra = Options
     } = QueryArgs,
+    set_io_priority(DbName, Options),
     MinSeq = if Stale == ok -> 0; true -> couch_db:get_update_seq(Db) end,
     Group0 = couch_view_group:design_doc_to_view_group(DDoc),
     {ok, Pid} = gen_server:call(couch_view, {get_group_server, DbName, Group0}),
@@ -134,8 +136,10 @@ reduce_view(DbName, Group0, ViewName, QueryArgs) ->
         limit = Limit,
         skip = Skip,
         keys = Keys,
-        stale = Stale
+        stale = Stale,
+        extra = Options
     } = QueryArgs,
+    set_io_priority(DbName, Options),
     GroupFun = group_rows_fun(GroupLevel),
     MinSeq = if Stale == ok -> 0; true -> couch_db:get_update_seq(Db) end,
     {ok, Pid} = gen_server:call(couch_view, {get_group_server, DbName, Group0}),
