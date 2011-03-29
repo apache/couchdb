@@ -92,6 +92,11 @@ var DDoc = (function() {
           for (var i=0; i < funPath.length; i++) {
             if (i+1 == funPath.length) {
               var fun = point[funPath[i]];
+              if (!fun) {
+                throw(["error","not_found",
+                       "missing " + funPath[0] + " function " + funPath[i] +
+                       " on design doc " + ddocId]);
+              }
               if (typeof fun != "function") {
                 fun = Couch.compileFunction(fun, ddoc);
                 // cache the compiled fun on the ddoc
