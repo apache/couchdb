@@ -49,9 +49,9 @@ all_docs(DbName, #view_query_args{keys=nil} = QueryArgs) ->
         include_docs = IncludeDocs,
         direction = Dir,
         inclusive_end = Inclusive,
-        extra = Options
+        extra = Extra
     } = QueryArgs,
-    set_io_priority(DbName, Options),
+    set_io_priority(DbName, Extra),
     {ok, Total} = couch_db:get_doc_count(Db),
     Acc0 = #view_acc{
         db = Db,
@@ -96,9 +96,9 @@ map_view(DbName, DDoc, ViewName, QueryArgs) ->
         include_docs = IncludeDocs,
         stale = Stale,
         view_type = ViewType,
-        extra = Options
+        extra = Extra
     } = QueryArgs,
-    set_io_priority(DbName, Options),
+    set_io_priority(DbName, Extra),
     MinSeq = if Stale == ok -> 0; true -> couch_db:get_update_seq(Db) end,
     Group0 = couch_view_group:design_doc_to_view_group(DDoc),
     {ok, Pid} = gen_server:call(couch_view, {get_group_server, DbName, Group0}),
@@ -137,9 +137,9 @@ reduce_view(DbName, Group0, ViewName, QueryArgs) ->
         skip = Skip,
         keys = Keys,
         stale = Stale,
-        extra = Options
+        extra = Extra
     } = QueryArgs,
-    set_io_priority(DbName, Options),
+    set_io_priority(DbName, Extra),
     GroupFun = group_rows_fun(GroupLevel),
     MinSeq = if Stale == ok -> 0; true -> couch_db:get_update_seq(Db) end,
     {ok, Pid} = gen_server:call(couch_view, {get_group_server, DbName, Group0}),
