@@ -99,12 +99,21 @@ couchTests.attachments= function(debug) {
   T(xhr.responseText == bin_data);
   TEqualsIgnoreCase("text/plain;charset=utf-8", xhr.getResponseHeader("Content-Type"));
 
+  // without rev
   var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc3/attachment.txt", {
     headers:{"Content-Type":"text/plain;charset=utf-8"},
     body:bin_data
   });
   T(xhr.status == 409);
 
+  // with nonexistent rev
+  var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc3/attachment.txt"  + "?rev=1-adae8575ecea588919bd08eb020c708e", {
+    headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body:bin_data
+  });
+  T(xhr.status == 409);
+
+  // with current rev
   var xhr = CouchDB.request("PUT", "/test_suite_db/bin_doc3/attachment.txt?rev=" + rev, {
     headers:{"Content-Type":"text/plain;charset=utf-8"},
     body:bin_data

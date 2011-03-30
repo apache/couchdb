@@ -1081,8 +1081,9 @@ db_attachment_req(#httpd{method=Method,mochi_req=MochiReq}=Req, Db, DocId, FileN
             #doc{id=DocId};
         Rev ->
             case couch_db:open_doc_revs(Db, DocId, [Rev], []) of
-            {ok, [{ok, Doc0}]}  -> Doc0;
-            {ok, [Error]}       -> throw(Error)
+                {ok, [{ok, Doc0}]} -> Doc0;
+                {ok, [{{not_found, missing}, Rev}]} -> throw(conflict);
+                {ok, [Error]} -> throw(Error)
             end
     end,
 
