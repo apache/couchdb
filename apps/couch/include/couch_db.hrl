@@ -198,7 +198,8 @@
     callback = nil,
     list = nil,
     keys = nil,
-    sorted = true
+    sorted = true,
+    extra = []
 }).
 
 -record(view_fold_helper_funs, {
