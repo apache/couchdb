@@ -84,5 +84,5 @@ encode([], Encoded) ->
 encode([C|Etc], Encoded) when ?is_unreserved(C) ->
   encode(Etc, [C|Encoded]);
 encode([C|Etc], Encoded) ->
-  Value = io_lib:format("%~2.1.0s", [erlang:integer_to_list(C, 16)]),
+  Value = io_lib:format("%~2.2.0s", [erlang:integer_to_list(C, 16)]),
   encode(Etc, [Value|Encoded]).
