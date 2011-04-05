@@ -105,11 +105,11 @@ json_query_keys({Json}) ->
 json_query_keys([], Acc) ->
     {lists:reverse(Acc)};
 json_query_keys([{<<"startkey">>, Value} | Rest], Acc) ->
-    json_query_keys(Rest, [{<<"startkey">>, couch_util:json_decode(Value)}|Acc]);
+    json_query_keys(Rest, [{<<"startkey">>, ?JSON_DECODE(Value)}|Acc]);
 json_query_keys([{<<"endkey">>, Value} | Rest], Acc) ->
-    json_query_keys(Rest, [{<<"endkey">>, couch_util:json_decode(Value)}|Acc]);
+    json_query_keys(Rest, [{<<"endkey">>, ?JSON_DECODE(Value)}|Acc]);
 json_query_keys([{<<"key">>, Value} | Rest], Acc) ->
-    json_query_keys(Rest, [{<<"key">>, couch_util:json_decode(Value)}|Acc]);
+    json_query_keys(Rest, [{<<"key">>, ?JSON_DECODE(Value)}|Acc]);
 json_query_keys([Term | Rest], Acc) ->
     json_query_keys(Rest, [Term|Acc]).
 
