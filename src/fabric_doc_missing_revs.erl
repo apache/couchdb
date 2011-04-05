@@ -14,14 +14,18 @@
 
 -module(fabric_doc_missing_revs).
 
--export([go/2]).
+-export([go/2, go/3]).
 
 -include("fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
 go(DbName, AllIdsRevs) ->
+    go(DbName, AllIdsRevs, []).
+
+go(DbName, AllIdsRevs, Options) ->
     Workers = lists:map(fun({#shard{name=Name, node=Node} = Shard, IdsRevs}) ->
-        Ref = rexi:cast(Node, {fabric_rpc, get_missing_revs, [Name, IdsRevs]}),
+        Ref = rexi:cast(Node, {fabric_rpc, get_missing_revs, [Name, IdsRevs,
+            Options]}),
         Shard#shard{ref=Ref}
     end, group_idrevs_by_shard(DbName, AllIdsRevs)),
     ResultDict = dict:from_list([{Id, {nil,Revs}} || {Id, Revs} <- AllIdsRevs]),

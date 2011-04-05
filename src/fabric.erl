@@ -23,8 +23,8 @@
     set_security/3, get_revs_limit/1, get_security/1]).
 
 % Documents
--export([open_doc/3, open_revs/4, get_missing_revs/2, update_doc/3,
-    update_docs/3, purge_docs/2, att_receiver/2]).
+-export([open_doc/3, open_revs/4, get_missing_revs/2, get_missing_revs/3,
+    update_doc/3, update_docs/3, purge_docs/2, att_receiver/2]).
 
 % Views
 -export([all_docs/4, changes/4, query_view/3, query_view/4, query_view/6,
@@ -158,12 +158,16 @@ open_doc(DbName, Id, Options) ->
 open_revs(DbName, Id, Revs, Options) ->
     fabric_doc_open_revs:go(dbname(DbName), docid(Id), Revs, opts(Options)).
 
+%% @equiv get_missing_revs(DbName, IdsRevs, [])
+get_missing_revs(DbName, IdsRevs) ->
+    get_missing_revs(DbName, IdsRevs, []).
+
 %% @doc retrieve missing revisions for a list of `{Id, Revs}'
--spec get_missing_revs(dbname(),[{docid(), [revision()]}]) ->
+-spec get_missing_revs(dbname(),[{docid(), [revision()]}], [option()]) ->
     {ok, [{docid(), any()}]}.
-get_missing_revs(DbName, IdsRevs) when is_list(IdsRevs) ->
+get_missing_revs(DbName, IdsRevs, Options) when is_list(IdsRevs) ->
     Sanitized = [idrevs(IdR) || IdR <- IdsRevs],
-    fabric_doc_missing_revs:go(dbname(DbName), Sanitized).
+    fabric_doc_missing_revs:go(dbname(DbName), Sanitized, opts(Options)).
 
 %% @doc update a single doc
 %% @equiv update_docs(DbName,[Doc],Options)
