@@ -102,7 +102,7 @@ send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn) ->
     State = #collector{
         query_args = ChangesArgs,
         callback = Callback,
-        counters = fabric_dict:init(Workers, 0),
+        counters = orddict:from_list(Seqs),
         user_acc = AccIn,
         limit = ChangesArgs#changes_args.limit,
         rows = Seqs % store sequence positions instead
