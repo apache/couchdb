@@ -13,13 +13,22 @@
 ejsonebindir = $(localerlanglibdir)/ejson-0.1.0/ebin
 ejsonprivdir = $(localerlanglibdir)/ejson-0.1.0/priv
 
+EXTRA_DIST =  \
+    erl_nif_compat.h \
+    yajl/yajl_alloc.h \
+    yajl/yajl_buf.h \
+    yajl/yajl_bytestack.h \
+    yajl/yajl_common.h \
+    yajl/yajl_encode.h \
+    yajl/yajl_gen.h \
+    yajl/yajl_lex.h \
+    yajl/yajl_parse.h \
+    yajl/yajl_parser.h
+
 CLEANFILES = \
     $(ejsonebin_make_generated_file_list) \
-    $(ejsonpriv_make_generated_file_list)
-
-if USE_OTP_NIFS
-ejsonpriv_LTLIBRARIES = ejson.la
-endif
+    $(ejsonpriv_make_generated_file_list) \
+    priv/ejson.so
 
 EJSON_C_SRCS = \
 	ejson.c \
@@ -32,15 +41,6 @@ EJSON_C_SRCS = \
 	yajl/yajl_gen.c \
 	yajl/yajl_lex.c \
 	yajl/yajl_parser.c
-
-if USE_OTP_NIFS
-ejson_la_SOURCES = $(EJSON_C_SRCS)
-ejson_la_LDFLAGS = -module -avoid-version
-
-if WINDOWS
-ejson_la_LDFLAGS += -no-undefined
-endif
-endif
 
 ejson_file_collection = \
     ejson.app.in \
@@ -58,23 +58,19 @@ ejsonebin_make_generated_file_list = \
 ejsonebin_DATA = \
     $(ejsonebin_make_generated_file_list)
 
-EXTRA_DIST =  \
-    $(ejson_file_collection) \
-    erl_nif_compat.h \
-    yajl/yajl_alloc.h \
-    yajl/yajl_buf.h \
-    yajl/yajl_bytestack.h \
-    yajl/yajl_common.h \
-    yajl/yajl_encode.h \
-    yajl/yajl_gen.h \
-    yajl/yajl_lex.h \
-    yajl/yajl_parse.h \
-    yajl/yajl_parser.h \
-    priv
-
 if USE_OTP_NIFS
-priv/ejson.so: .libs/ejson.so
-	$(LN_S) .libs priv
+ejsonpriv_LTLIBRARIES = ejson.la
+
+ejson_la_SOURCES = $(EJSON_C_SRCS)
+ejson_la_LDFLAGS = -module -avoid-version
+
+if WINDOWS
+ejson_la_LDFLAGS += -no-undefined
+endif
+
+priv/ejson.so: ejson.la
+	@mkdir -p ./priv
+	cp .libs/ejson.so $@
 
 all: priv/ejson.so
 endif

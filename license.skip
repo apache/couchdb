@@ -83,6 +83,7 @@
 ^src/couchdb/priv/couchspawnkillable
 ^src/couchdb/priv/stat_descriptions.cfg
 ^src/erlang-oauth/*
+^src/ejson/*
 ^src/etap/*
 ^src/ibrowse/*
 ^src/mochiweb/*
