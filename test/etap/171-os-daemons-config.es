@@ -20,11 +20,11 @@ read() ->
         eof ->
             stop;
         Data ->
-            couch_util:json_decode(Data)
+            ejson:decode(Data)
     end.
 
 write(Mesg) ->
-    Data = iolist_to_binary(couch_util:json_encode(Mesg)),
+    Data = iolist_to_binary(ejson:encode(Mesg)),
     io:format(binary_to_list(Data) ++ "\n", []).
 
 get_cfg(Section) ->
@@ -80,4 +80,6 @@ loop({error, _Reason}) ->
 
 main([]) ->
     test_util:init_code_path(),
+    couch_config:start_link(test_util:config_files()),
+    couch_drv:start_link(),
     do_tests().

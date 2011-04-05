@@ -229,7 +229,7 @@ do_request(Request) ->
     [Header, Body] = re:split(R, "\r\n\r\n", [{return, binary}]),
     {ok, {http_response, _, Code, _}, _} =
         erlang:decode_packet(http, Header, []),
-    Json = couch_util:json_decode(Body),
+    Json = ejson:decode(Body),
     {Code, Json}.
 
 get_json(Json, Path) ->

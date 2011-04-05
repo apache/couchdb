@@ -64,6 +64,10 @@ src/couchdb/priv/couchspawnkillable
 src/couchdb/priv/stat_descriptions.cfg
 src/erlang-oauth/oauth.app
 src/ibrowse/ibrowse.app
+src/ejson/ejson.app
+src/ejson/.deps/
+src/ejson/.libs/
+src/ejson/priv
 src/mochiweb/mochiweb.app
 test/local.ini
 test/etap/run

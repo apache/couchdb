@@ -13,8 +13,7 @@
 % the License.
 
 write(Mesg) ->
-    Data = iolist_to_binary(couch_util:json_encode(Mesg)),
-    io:format(binary_to_list(Data) ++ "\n", []).
+    io:format(binary_to_list(ejson:encode(Mesg)) ++ "\n", []).
 
 cfg_register(Section) ->
     write([<<"register">>, Section]).

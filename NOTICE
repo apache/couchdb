@@ -49,3 +49,13 @@ This product also includes the following third-party components:
  * jspec.js (http://visionmedia.github.com/jspec/)
 
   Copyright 2010 TJ Holowaychuk <tj@vision-media.ca>
+
+ * yajl (http://lloyd.github.com/yajl/)
+
+  Copyright 2010, Lloyd Hilaiel
+
+ * ejson
+
+  Based on Paul Davis' eep0018 implementation (https://github.com/davisp/eep0018/),
+  with some modifications from Damien Katz, Filipe Manana and Benoît Chesneau.
+  This application uses yajl.

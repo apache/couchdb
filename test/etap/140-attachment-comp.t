@@ -116,7 +116,7 @@ create_2nd_text_att() ->
     {ok, {{_, Code, _}, _Headers, _Body}} = http:request(
         put,
         {db_url() ++ "/testdoc3", [],
-        "application/json", list_to_binary(couch_util:json_encode(DocJson))},
+        "application/json", ejson:encode(DocJson)},
         [],
         [{sync, true}]),
     etap:is(Code, 201, "Created text attachment using the non-standalone api"),
@@ -135,7 +135,7 @@ create_2nd_png_att() ->
     {ok, {{_, Code, _}, _Headers, _Body}} = http:request(
         put,
         {db_url() ++ "/testdoc4", [],
-        "application/json", list_to_binary(couch_util:json_encode(DocJson))},
+        "application/json", ejson:encode(DocJson)},
         [],
         [{sync, true}]),
     etap:is(Code, 201, "Created png attachment using the non-standalone api"),
@@ -305,7 +305,7 @@ test_get_doc_with_1st_text_att() ->
         [],
         [{sync, true}]),
     etap:is(Code, 200, "HTTP response code is 200"),
-    Json = couch_util:json_decode(Body),
+    Json = ejson:decode(Body),
     TextAttJson = couch_util:get_nested_json_value(
         Json,
         [<<"_attachments">>, <<"readme.txt">>]
@@ -339,7 +339,7 @@ test_1st_text_att_stub() ->
         [],
         [{sync, true}]),
     etap:is(Code, 200, "HTTP response code is 200"),
-    Json = couch_util:json_decode(Body),
+    Json = ejson:decode(Body),
     {TextAttJson} = couch_util:get_nested_json_value(
         Json,
         [<<"_attachments">>, <<"readme.txt">>]
@@ -372,7 +372,7 @@ test_get_doc_with_1st_png_att() ->
         [],
         [{sync, true}]),
     etap:is(Code, 200, "HTTP response code is 200"),
-    Json = couch_util:json_decode(Body),
+    Json = ejson:decode(Body),
     PngAttJson = couch_util:get_nested_json_value(
         Json,
         [<<"_attachments">>, <<"icon.png">>]
@@ -400,7 +400,7 @@ test_1st_png_att_stub() ->
         [],
         [{sync, true}]),
     etap:is(Code, 200, "HTTP response code is 200"),
-    Json = couch_util:json_decode(Body),
+    Json = ejson:decode(Body),
     {PngAttJson} = couch_util:get_nested_json_value(
         Json,
         [<<"_attachments">>, <<"icon.png">>]
@@ -498,7 +498,7 @@ test_get_doc_with_2nd_text_att() ->
         [],
         [{sync, true}]),
     etap:is(Code, 200, "HTTP response code is 200"),
-    Json = couch_util:json_decode(Body),
+    Json = ejson:decode(Body),
     TextAttJson = couch_util:get_nested_json_value(
         Json,
         [<<"_attachments">>, <<"readme.txt">>]
@@ -528,7 +528,7 @@ test_2nd_text_att_stub() ->
         [],
         [{sync, true}]),
     etap:is(Code, 200, "HTTP response code is 200"),
-    Json = couch_util:json_decode(Body),
+    Json = ejson:decode(Body),
     {TextAttJson} = couch_util:get_nested_json_value(
         Json,
         [<<"_attachments">>, <<"readme.txt">>]
@@ -561,7 +561,7 @@ test_get_doc_with_2nd_png_att() ->
         [],
         [{sync, true}]),
     etap:is(Code, 200, "HTTP response code is 200"),
-    Json = couch_util:json_decode(Body),
+    Json = ejson:decode(Body),
     PngAttJson = couch_util:get_nested_json_value(
         Json,
         [<<"_attachments">>, <<"icon.png">>]
@@ -589,7 +589,7 @@ test_2nd_png_att_stub() ->
         [],
         [{sync, true}]),
     etap:is(Code, 200, "HTTP response code is 200"),
-    Json = couch_util:json_decode(Body),
+    Json = ejson:decode(Body),
     {PngAttJson} = couch_util:get_nested_json_value(
         Json,
         [<<"_attachments">>, <<"icon.png">>]
@@ -658,7 +658,7 @@ test_get_already_compressed_att_stub(DocUri, AttName) ->
         [],
         [{sync, true}]),
     etap:is(Code, 200, "HTTP response code is 200"),
-    Json = couch_util:json_decode(Body),
+    Json = ejson:decode(Body),
     {AttJson} = couch_util:get_nested_json_value(
         Json,
         [<<"_attachments">>, iolist_to_binary(AttName)]
@@ -726,7 +726,7 @@ test_compressible_type_with_parameters() ->
         [],
         [{sync, true}]),
     etap:is(Code3, 200, "HTTP response code is 200"),
-    Json = couch_util:json_decode(Body3),
+    Json = ejson:decode(Body3),
     {TextAttJson} = couch_util:get_nested_json_value(
         Json,
         [<<"_attachments">>, <<"readme.txt">>]
