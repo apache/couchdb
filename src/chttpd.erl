@@ -180,11 +180,10 @@ is_http(_) ->
 make_uri(Req, Raw) ->
     Url = list_to_binary(["http://", couch_config:get("httpd", "bind_address"),
                          ":", couch_config:get("chttpd", "port"), "/", Raw]),
-    case chttpd:header_value(Req, "authorization") of
-        undefined ->
-            Headers = [];
-        AuthHeader ->
-            Headers = [{<<"authorization">>, AuthHeader}]
+    Headers = [
+        {<<"authorization">>, ?l2b(header_value(Req,"authorization",""))},
+        {<<"cookie">>, ?l2b(header_value(Req,"cookie",""))}
+    ],
     end,
     {[{<<"url">>,Url}, {<<"headers">>,{Headers}}]}.
 %%% end hack
