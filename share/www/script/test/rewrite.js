@@ -114,14 +114,6 @@ couchTests.rewrite = function(debug) {
               }
             },
             {
-              "from": "simpleForm/basicViewPath/:start/:end",
-              "to": "_list/simpleForm/basicView",
-              "query": {
-                "startkey": ":start",
-                "endkey": ":end"
-              }
-            },
-            {
               "from": "simpleForm/complexView",
               "to": "_list/simpleForm/complexView",
               "query": {
@@ -344,13 +336,6 @@ couchTests.rewrite = function(debug) {
         
         // get with query params
         xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/simpleForm/basicViewFixed?startkey=4");
-        T(xhr.status == 200, "with query params");
-        T(!(/Key: 1/.test(xhr.responseText)));
-        T(/FirstKey: 3/.test(xhr.responseText));
-        T(/LastKey: 8/.test(xhr.responseText));
-        
-        // get with query params
-        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/simpleForm/basicViewPath/3/8");
         T(xhr.status == 200, "with query params");
         T(!(/Key: 1/.test(xhr.responseText)));
         T(/FirstKey: 3/.test(xhr.responseText));

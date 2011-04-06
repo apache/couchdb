@@ -117,8 +117,7 @@ handle_rewrite_req(#httpd{
     % we are in a design handler
     DesignId = <<"_design/", DesignName/binary>>,
     Prefix = <<"/", DbName/binary, "/", DesignId/binary>>,
-    QueryList = couch_httpd:qs(Req),
-    QueryList1 = [{to_binding(K), V} || {K, V} <- QueryList],
+    QueryList = lists:map(fun decode_query_value/1, couch_httpd:qs(Req)),
 
     #doc{body={Props}} = DDoc,
 
@@ -133,10 +132,11 @@ handle_rewrite_req(#httpd{
         Rules ->
             % create dispatch list from rules
             DispatchList =  [make_rule(Rule) || {Rule} <- Rules],
+            Method1 = couch_util:to_binary(Method),
 
             %% get raw path by matching url to a rule.
-            RawPath = case try_bind_path(DispatchList, couch_util:to_binary(Method), PathParts,
-                                    QueryList1) of
+            RawPath = case try_bind_path(DispatchList, Method1, 
+                    PathParts, QueryList) of
                 no_dispatch_path ->
                     throw(not_found);
                 {NewPathParts, Bindings} ->
@@ -144,12 +144,13 @@ handle_rewrite_req(#httpd{
 
                     % build new path, reencode query args, eventually convert
                     % them to json
-                    Path = lists:append(
-                        string:join(Parts, [?SEPARATOR]),
-                        case Bindings of
-                            [] -> [];
-                            _ -> [$?, encode_query(Bindings)]
-                        end),
+                    Bindings1 = maybe_encode_bindings(Bindings),
+                    Path = binary_to_list(
+                        iolist_to_binary([
+                                string:join(Parts, [?SEPARATOR]),
+                                [["?", mochiweb_util:urlencode(Bindings1)] 
+                                    || Bindings1 =/= [] ]
+                            ])),
                     
                     % if path is relative detect it and rewrite path
                     case mochiweb_util:safe_relative_path(Path) of
@@ -233,58 +234,46 @@ try_bind_path([Dispatch|Rest], Method, PathParts, QueryList) ->
 make_query_list([], _Bindings, Acc) ->
     Acc;
 make_query_list([{Key, {Value}}|Rest], Bindings, Acc) ->
-    Value1 = to_json({Value}),
+    Value1 = {Value},
     make_query_list(Rest, Bindings, [{to_binding(Key), Value1}|Acc]);
 make_query_list([{Key, Value}|Rest], Bindings, Acc) when is_binary(Value) ->
-    Value1 = replace_var(Key, Value, Bindings),
+    Value1 = replace_var(Value, Bindings),
     make_query_list(Rest, Bindings, [{to_binding(Key), Value1}|Acc]);
 make_query_list([{Key, Value}|Rest], Bindings, Acc) when is_list(Value) ->
-    Value1 = replace_var(Key, Value, Bindings),
+    Value1 = replace_var(Value, Bindings),
     make_query_list(Rest, Bindings, [{to_binding(Key), Value1}|Acc]);
 make_query_list([{Key, Value}|Rest], Bindings, Acc) ->
     make_query_list(Rest, Bindings, [{to_binding(Key), Value}|Acc]).
 
-replace_var(Key, Value, Bindings) ->
-    case Value of
-        <<":", Var/binary>> ->
-            get_var(Var, Bindings, Value);
-        <<"*">> ->
-            get_var(Value, Bindings, Value);
-        _ when is_list(Value) ->
-            Value1 = lists:foldr(fun(V, Acc) ->
-                V1 = case V of
-                    <<":", VName/binary>> ->
-                        case get_var(VName, Bindings, V) of
-                            V2 when is_list(V2) ->
-                                iolist_to_binary(V2);
-                            V2 -> V2
-                        end;
-                    <<"*">> ->
-                        get_var(V, Bindings, V);
-                    _ ->
-                        V
-                end,
-                [V1|Acc]
-            end, [], Value),
-            to_json(Value1);
-        _ when is_binary(Value) ->
-            Value;
-        _ ->
-            case Key of
-                <<"key">> -> to_json(Value);
-                <<"startkey">> -> to_json(Value);
-                <<"start_key">> -> to_json(Value);
-                <<"endkey">> -> to_json(Value);
-                <<"end_key">> -> to_json(Value);
-                _ ->
-                    lists:flatten(?JSON_ENCODE(Value))
-            end
+replace_var(<<"*">>=Value, Bindings) ->
+    get_var(Value, Bindings, Value);
+replace_var(<<":", Var/binary>> = Value, Bindings) ->
+    get_var(Var, Bindings, Value);
+replace_var(Value, _Bindings) when is_binary(Value) ->
+    Value;
+replace_var(Value, Bindings) when is_list(Value) ->
+    lists:reverse(lists:foldl(fun
+                (<<":", Var/binary>>=Value1, Acc) ->
+                    [get_var(Var, Bindings, Value1)|Acc];
+                (Value1, Acc) ->
+                    [Value1|Acc]
+            end, [], Value));
+replace_var(Value, _Bindings) ->
+    Value.
+                    
+maybe_json(Key, Value) ->
+    case lists:member(Key, [<<"key">>, <<"startkey">>, <<"start_key">>,
+                <<"endkey">>, <<"end_key">>, <<"keys">>]) of
+        true ->
+            ?JSON_ENCODE(Value);
+        false ->
+            Value
     end.
-
 
 get_var(VarName, Props, Default) ->
     VarName1 = to_binding(VarName),
-    couch_util:get_value(VarName1, Props, Default).
+    Val = couch_util:get_value(VarName1, Props, Default),
+    Val.
 
 %% doc: build new patch from bindings. bindings are query args
 %% (+ dynamic query rewritten if needed) and bindings found in
@@ -300,7 +289,8 @@ make_new_path([?MATCH_ALL|_Rest], _Bindings, Remaining, Acc) ->
 make_new_path([{bind, P}|Rest], Bindings, Remaining, Acc) ->
     P2 = case couch_util:get_value({bind, P}, Bindings) of
         undefined -> << "undefined">>;
-        P1 -> P1
+        P1 -> 
+            iolist_to_binary(P1)
     end,
     make_new_path(Rest, Bindings, Remaining, [P2|Acc]);
 make_new_path([P|Rest], Bindings, Remaining, Acc) ->
@@ -410,21 +400,25 @@ path_to_list([P|R], Acc, DotDotCount) ->
     end,
     path_to_list(R, [P1|Acc], DotDotCount).
 
-encode_query(Props) -> 
-    Props1 = lists:foldl(fun ({{bind, K}, V}, Acc) ->
-        case K of
-            <<"*">> -> Acc;
-            _ ->
-                V1 = case is_list(V) orelse is_binary(V) of
-                    true -> V;
-                    false ->
-                        % probably it's a number
-                        quote_plus(V)
-                end,
-                [{K, V1} | Acc]
-        end
-    end, [], Props),
-    lists:flatten(mochiweb_util:urlencode(Props1)).
+maybe_encode_bindings([]) ->
+    [];
+maybe_encode_bindings(Props) -> 
+    lists:foldl(fun 
+            ({{bind, <<"*">>}, V}, Acc) ->
+                Acc;
+            ({{bind, K}, V}, Acc) ->
+                V1 = iolist_to_binary(maybe_json(K, V)),
+                [{K, V1}|Acc]
+        end, [], Props).
+                
+decode_query_value({K,V}) ->
+    case lists:member(K, ["key", "startkey", "start_key",
+                "endkey", "end_key", "keys"]) of
+        true ->
+            {to_binding(K), ?JSON_DECODE(V)};
+        false ->
+            {to_binding(K), ?l2b(V)}
+    end.
 
 to_binding({bind, V}) ->
     {bind, V};
@@ -432,6 +426,3 @@ to_binding(V) when is_list(V) ->
     to_binding(?l2b(V));
 to_binding(V) ->
     {bind, V}.
-
-to_json(V) ->
-    iolist_to_binary(?JSON_ENCODE(V)).
