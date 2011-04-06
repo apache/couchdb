@@ -184,7 +184,6 @@ make_uri(Req, Raw) ->
         {<<"authorization">>, ?l2b(header_value(Req,"authorization",""))},
         {<<"cookie">>, ?l2b(header_value(Req,"cookie",""))}
     ],
-    end,
     {[{<<"url">>,Url}, {<<"headers">>,{Headers}}]}.
 %%% end hack
 
