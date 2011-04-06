@@ -197,7 +197,7 @@ quote_plus(X) ->
 try_bind_path([], _Method, _PathParts, _QueryList) ->
     no_dispatch_path;
 try_bind_path([Dispatch|Rest], Method, PathParts, QueryList) ->
-    [{PathParts1, Method1}, RedirectPath, QueryArgs] = Dispatch,
+    [{PathParts1, Method1}, RedirectPath, QueryArgs, Formats] = Dispatch,
     case bind_method(Method1, Method) of
         true ->
             case bind_path(PathParts1, PathParts, []) of
@@ -205,7 +205,8 @@ try_bind_path([Dispatch|Rest], Method, PathParts, QueryList) ->
                     Bindings1 = Bindings ++ QueryList,
                     % we parse query args from the rule and fill
                     % it eventually with bindings vars
-                    QueryArgs1 = make_query_list(QueryArgs, Bindings1, []),
+                    QueryArgs1 = make_query_list(QueryArgs, Bindings1,
+                        Formats, []),
                     % remove params in QueryLists1 that are already in
                     % QueryArgs1
                     Bindings2 = lists:foldl(fun({K, V}, Acc) ->
@@ -231,34 +232,34 @@ try_bind_path([Dispatch|Rest], Method, PathParts, QueryList) ->
 %% rewriting dynamically the quey list given as query member in
 %% rewrites. Each value is replaced by one binding or an argument
 %% passed in url.
-make_query_list([], _Bindings, Acc) ->
+make_query_list([], _Bindings, _Formats, Acc) ->
     Acc;
-make_query_list([{Key, {Value}}|Rest], Bindings, Acc) ->
+make_query_list([{Key, {Value}}|Rest], Bindings, Formats, Acc) ->
     Value1 = {Value},
-    make_query_list(Rest, Bindings, [{to_binding(Key), Value1}|Acc]);
-make_query_list([{Key, Value}|Rest], Bindings, Acc) when is_binary(Value) ->
-    Value1 = replace_var(Value, Bindings),
-    make_query_list(Rest, Bindings, [{to_binding(Key), Value1}|Acc]);
-make_query_list([{Key, Value}|Rest], Bindings, Acc) when is_list(Value) ->
-    Value1 = replace_var(Value, Bindings),
-    make_query_list(Rest, Bindings, [{to_binding(Key), Value1}|Acc]);
-make_query_list([{Key, Value}|Rest], Bindings, Acc) ->
-    make_query_list(Rest, Bindings, [{to_binding(Key), Value}|Acc]).
+    make_query_list(Rest, Bindings, Formats, [{to_binding(Key), Value1}|Acc]);
+make_query_list([{Key, Value}|Rest], Bindings, Formats, Acc) when is_binary(Value) ->
+    Value1 = replace_var(Value, Bindings, Formats),
+    make_query_list(Rest, Bindings, Formats, [{to_binding(Key), Value1}|Acc]);
+make_query_list([{Key, Value}|Rest], Bindings, Formats, Acc) when is_list(Value) ->
+    Value1 = replace_var(Value, Bindings, Formats),
+    make_query_list(Rest, Bindings, Formats, [{to_binding(Key), Value1}|Acc]);
+make_query_list([{Key, Value}|Rest], Bindings, Formats, Acc) ->
+    make_query_list(Rest, Bindings, Formats, [{to_binding(Key), Value}|Acc]).
 
-replace_var(<<"*">>=Value, Bindings) ->
-    get_var(Value, Bindings, Value);
-replace_var(<<":", Var/binary>> = Value, Bindings) ->
-    get_var(Var, Bindings, Value);
-replace_var(Value, _Bindings) when is_binary(Value) ->
+replace_var(<<"*">>=Value, Bindings, Formats) ->
+    get_var(Value, Bindings, Value, Formats);
+replace_var(<<":", Var/binary>> = Value, Bindings, Formats) ->
+    get_var(Var, Bindings, Value, Formats);
+replace_var(Value, _Bindings, _Formats) when is_binary(Value) ->
     Value;
-replace_var(Value, Bindings) when is_list(Value) ->
+replace_var(Value, Bindings, Formats) when is_list(Value) ->
     lists:reverse(lists:foldl(fun
                 (<<":", Var/binary>>=Value1, Acc) ->
-                    [get_var(Var, Bindings, Value1)|Acc];
+                    [get_var(Var, Bindings, Value1, Formats)|Acc];
                 (Value1, Acc) ->
                     [Value1|Acc]
             end, [], Value));
-replace_var(Value, _Bindings) ->
+replace_var(Value, _Bindings, _Formats) ->
     Value.
                     
 maybe_json(Key, Value) ->
@@ -270,10 +271,40 @@ maybe_json(Key, Value) ->
             Value
     end.
 
-get_var(VarName, Props, Default) ->
+get_var(VarName, Props, Default, Formats) ->
     VarName1 = to_binding(VarName),
     Val = couch_util:get_value(VarName1, Props, Default),
-    Val.
+    maybe_format(VarName, Val, Formats).
+
+maybe_format(VarName, Value, Formats) ->
+    case couch_util:get_value(VarName, Formats) of
+        undefined ->
+             Value;
+        Format ->
+            format(Format, Value)
+    end.
+
+format(<<"int">>, Value) when is_integer(Value) ->
+    Value;
+format(<<"int">>, Value) when is_binary(Value) ->
+    format(<<"int">>, ?b2l(Value));
+format(<<"int">>, Value) when is_list(Value) ->
+    case (catch list_to_integer(Value)) of
+        IntVal when is_integer(IntVal) ->
+            IntVal;
+        _ ->
+            Value
+    end;
+format(<<"bool">>, Value) when is_binary(Value) ->
+    format(<<"bool">>, ?b2l(Value));
+format(<<"bool">>, Value) when is_list(Value) ->
+    case string:to_lower(Value) of
+        "true" -> true;
+        "false" -> false;
+        _ -> Value
+    end;
+format(_Format, Value) ->
+   Value. 
 
 %% doc: build new patch from bindings. bindings are query args
 %% (+ dynamic query rewritten if needed) and bindings found in
@@ -367,7 +398,11 @@ make_rule(Rule) ->
         To ->
             parse_path(To)
         end,
-    [{FromParts, Method}, ToParts, QueryArgs].
+    Formats = case couch_util:get_value(<<"formats">>, Rule) of
+        undefined -> [];
+        {Fmts} -> Fmts
+    end,
+    [{FromParts, Method}, ToParts, QueryArgs, Formats].
 
 parse_path(Path) ->
     {ok, SlashRE} = re:compile(<<"\\/">>),
@@ -404,7 +439,7 @@ maybe_encode_bindings([]) ->
     [];
 maybe_encode_bindings(Props) -> 
     lists:foldl(fun 
-            ({{bind, <<"*">>}, V}, Acc) ->
+            ({{bind, <<"*">>}, _V}, Acc) ->
                 Acc;
             ({{bind, K}, V}, Acc) ->
                 V1 = iolist_to_binary(maybe_json(K, V)),
