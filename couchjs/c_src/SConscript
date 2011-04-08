@@ -20,6 +20,11 @@ def require_lib(name):
 
 env = Environment(CCFLAGS='-g -O2 -DXP_UNIX')
 
+if os.uname()[0] == 'SunOS':
+   env['CC'] = '/usr/sfw/bin/gcc'
+   env['CCFLAGS'] += ' -I/opt/local/include'
+   env.Append(LINKFLAGS=['-L/opt/local/lib'])
+
 if os.uname()[0] == 'FreeBSD':
 	env['CCFLAGS'] += ' -I/usr/local/include'
 	env.Append(LINKFLAGS=['-L/usr/local/lib'])
