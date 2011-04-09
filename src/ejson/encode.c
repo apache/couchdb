@@ -18,6 +18,13 @@
 #include "erl_nif_compat.h"
 #include "yajl/yajl_encode.h"
 
+#if defined(_WIN32) || defined(WIN32) || defined(__WIN32__)
+#include <float.h>
+#define isnan _isnan
+#define isinf !_finite
+#define snprintf _snprintf
+#endif
+
 #define SUCCESS 0
 #define NOMEM 1
 #define BADARG 2
