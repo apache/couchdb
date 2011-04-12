@@ -278,6 +278,8 @@ do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
     ?LOG_DEBUG("Missing rev finder pids are: ~p", [MissingRevFinders]),
     ?LOG_DEBUG("Worker pids are: ~p", [Workers]),
 
+    couch_replication_manager:replication_started(Rep),
+
     {ok, State#rep_state{
             missing_revs_queue = MissingRevsQueue,
             changes_queue = ChangesQueue,
@@ -443,10 +445,11 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 
-terminate(normal, #rep_state{rep_details = #rep{id = RepId},
+terminate(normal, #rep_state{rep_details = #rep{id = RepId} = Rep,
     checkpoint_history = CheckpointHistory} = State) ->
     terminate_cleanup(State),
-    couch_replication_notifier:notify({finished, RepId, CheckpointHistory});
+    couch_replication_notifier:notify({finished, RepId, CheckpointHistory}),
+    couch_replication_manager:replication_completed(Rep);
 
 terminate(shutdown, State) ->
     % cancelled replication throught ?MODULE:cancel_replication/1
@@ -456,12 +459,13 @@ terminate(Reason, State) ->
     #rep_state{
         source_name = Source,
         target_name = Target,
-        rep_details = #rep{id = {BaseId, Ext} = RepId}
+        rep_details = #rep{id = {BaseId, Ext} = RepId} = Rep
     } = State,
     ?LOG_ERROR("Replication `~s` (`~s` -> `~s`) failed: ~s",
         [BaseId ++ Ext, Source, Target, to_binary(Reason)]),
     terminate_cleanup(State),
-    couch_replication_notifier:notify({error, RepId, Reason}).
+    couch_replication_notifier:notify({error, RepId, Reason}),
+    couch_replication_manager:replication_error(Rep, Reason).
 
 
 terminate_cleanup(State) ->
