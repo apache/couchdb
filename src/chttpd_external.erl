@@ -111,6 +111,8 @@ json_query_keys([{<<"endkey">>, Value} | Rest], Acc) ->
     json_query_keys(Rest, [{<<"endkey">>, ?JSON_DECODE(Value)}|Acc]);
 json_query_keys([{<<"key">>, Value} | Rest], Acc) ->
     json_query_keys(Rest, [{<<"key">>, ?JSON_DECODE(Value)}|Acc]);
+json_query_keys([{<<"descending">>, Value} | Rest], Acc) ->
+    json_query_keys(Rest, [{<<"descending">>, ?JSON_DECODE(Value)}|Acc]);
 json_query_keys([Term | Rest], Acc) ->
     json_query_keys(Rest, [Term|Acc]).
 
