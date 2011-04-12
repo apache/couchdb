@@ -40,7 +40,7 @@ couchTests.replicator_db = function(debug) {
     var newRep,
         t0 = new Date(),
         t1,
-        ms = 1000;
+        ms = 3000;
 
     do {
       newRep = repDb.open(repDoc._id);
@@ -53,12 +53,29 @@ couchTests.replicator_db = function(debug) {
         sourceSeq = sourceDb.info().update_seq,
         t0 = new Date(),
         t1,
-        ms = 1000;
+        ms = 3000;
 
     do {
       targetSeq = targetDb.info().update_seq;
       t1 = new Date();
     } while (((t1 - t0) <= ms) && targetSeq < sourceSeq);
+  }
+
+  function waitForDocPos(db, docId, pos) {
+    var doc, curPos, t0, t1,
+        maxWait = 3000;
+
+    doc = db.open(docId);
+    curPos = Number(doc._rev.split("-", 1));
+    t0 = t1 = new Date();
+
+    while ((curPos < pos) && ((t1 - t0) <= maxWait)) {
+       doc = db.open(docId);
+       curPos = Number(doc._rev.split("-", 1));
+       t1 = new Date();
+    }
+
+    return doc;
   }
 
   function wait(ms) {
@@ -628,7 +645,7 @@ couchTests.replicator_db = function(debug) {
     T(copy !== null);
     T(copy.value === 1001);
 
-    repDoc = repDb.open("foo_cont_rep_survives_doc");
+    repDoc = waitForDocPos(repDb, "foo_cont_rep_survives_doc", 3);
     T(repDoc !== null);
     T(repDoc.continuous === true);
 
