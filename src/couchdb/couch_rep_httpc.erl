@@ -128,7 +128,7 @@ redirect_url(RespHeaders, OrigUrl) ->
     MochiHeaders = mochiweb_headers:make(RespHeaders),
     RedUrl = mochiweb_headers:get_value("Location", MochiHeaders),
     #url{
-        host = Host, port = Port,
+        host = Host, host_type = HostType, port = Port,
         path = Path, protocol = Proto
     } = ibrowse_lib:parse_url(RedUrl),
     #url{username = User, password = Passwd} = ibrowse_lib:parse_url(OrigUrl),
@@ -138,7 +138,13 @@ redirect_url(RespHeaders, OrigUrl) ->
     false ->
         []
     end,
-    atom_to_list(Proto) ++ "://" ++ Creds ++ Host ++ ":" ++
+    HostPart = case HostType of
+    ipv6_address ->
+        "[" ++ Host ++ "]";
+    _ ->
+        Host
+    end,
+    atom_to_list(Proto) ++ "://" ++ Creds ++ HostPart ++ ":" ++
         integer_to_list(Port) ++ Path.
 
 full_url(#http_db{url=Url} = Req) when is_binary(Url) ->
