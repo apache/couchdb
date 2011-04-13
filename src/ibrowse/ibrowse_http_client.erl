@@ -35,6 +35,7 @@
         ]).
 
 -include("ibrowse.hrl").
+-include_lib("kernel/include/inet.hrl").
 
 -record(state, {host, port, connect_timeout,
                 inactivity_timer_ref,
@@ -489,18 +490,39 @@ do_connect(Host, Port, Options, #state{is_ssl      = true,
                                        use_proxy   = false,
                                        ssl_options = SSLOptions},
            Timeout) ->
-    ssl:connect(Host, Port, get_sock_options(Options, SSLOptions), Timeout);
+    ssl:connect(Host, Port, get_sock_options(Host, Options, SSLOptions), Timeout);
 do_connect(Host, Port, Options, _State, Timeout) ->
-    gen_tcp:connect(Host, Port, get_sock_options(Options, []), Timeout).
+    gen_tcp:connect(Host, Port, get_sock_options(Host, Options, []), Timeout).
 
-get_sock_options(Options, SSLOptions) ->
+get_sock_options(Host, Options, SSLOptions) ->
     Caller_socket_options = get_value(socket_options, Options, []),
-    Other_sock_options = filter_sock_options(SSLOptions ++ Caller_socket_options),
+    Ipv6Options = case is_ipv6_host(Host) of
+        true ->
+            [inet6];
+        false ->
+            []
+    end,
+    Other_sock_options = filter_sock_options(SSLOptions ++ Caller_socket_options ++ Ipv6Options),
     case lists:keysearch(nodelay, 1, Other_sock_options) of
         false ->
             [{nodelay, true}, binary, {active, false} | Other_sock_options];
         {value, _} ->
             [binary, {active, false} | Other_sock_options]
+    end.
+
+is_ipv6_host(Host) ->
+    case inet_parse:address(Host) of
+        {ok, {_, _, _, _, _, _, _, _}} ->
+            true;
+        {ok, {_, _, _, _}} ->
+            false;
+        _  ->
+            case inet:gethostbyname(Host) of
+                {ok, #hostent{h_addrtype = inet6}} ->
+                    true;
+                _ ->
+                    false
+            end
     end.
 
 %% We don't want the caller to specify certain options
@@ -1278,7 +1300,12 @@ handle_response(#request{from=From, stream_to=StreamTo, req_id=ReqId,
                        reply_buffer  = RepBuf,
                        recvd_headers = RespHeaders}=State) when SaveResponseToFile /= false ->
     Body = RepBuf,
-    ok = file:close(Fd),
+    case Fd of
+        undefined -> 
+            ok;
+        _ -> 
+            ok = file:close(Fd)
+    end,
     ResponseBody = case TmpFilename of
                        undefined ->
                            Body;

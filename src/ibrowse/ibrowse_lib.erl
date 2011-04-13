@@ -180,7 +180,19 @@ get_value(Tag, TVL) ->
     V.
 
 parse_url(Url) ->
-    parse_url(Url, get_protocol, #url{abspath=Url}, []).
+    case parse_url(Url, get_protocol, #url{abspath=Url}, []) of
+        #url{host_type = undefined, host = Host} = UrlRec ->
+            case inet_parse:address(Host) of
+                {ok, {_, _, _, _, _, _, _, _}} ->
+                    UrlRec#url{host_type = ipv6_address};
+                {ok, {_, _, _, _}} ->
+                    UrlRec#url{host_type = ipv4_address};
+                _ ->
+                    UrlRec#url{host_type = hostname}
+            end;
+        Else ->
+            Else
+    end.
 
 parse_url([$:, $/, $/ | _], get_protocol, Url, []) ->
     {invalid_uri_1, Url};
@@ -215,6 +227,21 @@ parse_url([$@ | T], get_username, Url, TmpAcc) ->
               Url#url{username = lists:reverse(TmpAcc),
                       password = ""},
               []);
+parse_url([$[ | T], get_username, Url, []) ->
+    % IPv6 address literals are enclosed by square brackets:
+    %     http://www.ietf.org/rfc/rfc2732.txt
+    parse_url(T, get_ipv6_address, Url#url{host_type = ipv6_address}, []);
+parse_url([$[ | T], get_username, _Url, TmpAcc) ->
+    {error, {invalid_username_or_host, lists:reverse(TmpAcc) ++ "[" ++ T}};
+parse_url([$[ | _], get_password, _Url, []) ->
+    {error, missing_password};
+parse_url([$[ | T], get_password, Url, TmpAcc) ->
+    % IPv6 address literals are enclosed by square brackets:
+    %     http://www.ietf.org/rfc/rfc2732.txt
+    parse_url(T, get_ipv6_address,
+              Url#url{host_type = ipv6_address,
+                      password = lists:reverse(TmpAcc)},
+              []);
 parse_url([$@ | T], get_password, Url, TmpAcc) ->
     parse_url(T, get_host, 
               Url#url{password = lists:reverse(TmpAcc)},
@@ -236,6 +263,28 @@ parse_url([H | T], get_password, Url, TmpAcc) when H == $/;
             username = undefined,
             password = undefined,
            path = Path};
+parse_url([$] | T], get_ipv6_address, #url{protocol = Prot} = Url, TmpAcc) ->
+    Addr = lists:reverse(TmpAcc),
+    case inet_parse:address(Addr) of
+        {ok, {_, _, _, _, _, _, _, _}} ->
+            Url2 = Url#url{host = Addr, port = default_port(Prot)},
+            case T of
+                [$: | T2] ->
+                    parse_url(T2, get_port, Url2, []);
+                [$/ | T2] ->
+                    Url2#url{path = [$/ | T2]};
+                [$? | T2] ->
+                    Url2#url{path = [$/, $? | T2]};
+                [] ->
+                    Url2#url{path = "/"};
+                _ ->
+                    {error, {invalid_host, "[" ++ Addr ++ "]" ++ T}}
+            end;
+        _ ->
+            {error, {invalid_ipv6_address, Addr}}
+    end;
+parse_url([$[ | T], get_host, #url{} = Url, []) ->
+    parse_url(T, get_ipv6_address, Url#url{host_type = ipv6_address}, []);
 parse_url([$: | T], get_host, #url{} = Url, TmpAcc) ->
     parse_url(T, get_port, 
               Url#url{host = lists:reverse(TmpAcc)},
