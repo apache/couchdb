@@ -278,7 +278,8 @@ redirect_url(RespHeaders, OrigUrl) ->
     MochiHeaders = mochiweb_headers:make(RespHeaders),
     RedUrl = mochiweb_headers:get_value("Location", MochiHeaders),
     #url{
-        host = Base,
+        host = Host,
+        host_type = HostType,
         port = Port,
         path = Path,  % includes query string
         protocol = Proto
@@ -293,7 +294,13 @@ redirect_url(RespHeaders, OrigUrl) ->
     false ->
         []
     end,
-    atom_to_list(Proto) ++ "://" ++ Creds ++ Base ++ ":" ++
+    HostPart = case HostType of
+    ipv6_address ->
+        "[" ++ Host ++ "]";
+    _ ->
+        Host
+    end,
+    atom_to_list(Proto) ++ "://" ++ Creds ++ HostPart ++ ":" ++
         integer_to_list(Port) ++ Path.
 
 after_redirect(RedirectUrl, 303, HttpDb, Params) ->
