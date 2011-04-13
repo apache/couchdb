@@ -1,7 +1,16 @@
 -ifndef(IBROWSE_HRL).
 -define(IBROWSE_HRL, "ibrowse.hrl").
 
--record(url, {abspath, host, port, username, password, path, protocol}).
+-record(url, {
+          abspath,
+          host,
+          port,
+          username,
+          password,
+          path,
+          protocol,
+          host_type  % 'hostname', 'ipv4_address' or 'ipv6_address'
+}).
 
 -record(lb_pid, {host_port, pid}).
 
