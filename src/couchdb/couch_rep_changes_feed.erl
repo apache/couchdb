@@ -191,6 +191,10 @@ handle_info({ibrowse_async_response, Id, {error, sel_conn_closed}},
         #state{reqid=Id}=State) ->
     handle_retry(State);
 
+handle_info({ibrowse_async_response, Id, {error, connection_closed}},
+        #state{reqid=Id}=State) ->
+    handle_retry(State);
+
 handle_info({ibrowse_async_response, Id, {error,E}}, #state{reqid=Id}=State) ->
     {stop, {error, E}, State};
 
