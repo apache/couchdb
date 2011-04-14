@@ -28,7 +28,7 @@
 -export([set_security/2,get_security/1]).
 -export([changes_since/4,changes_since/5,read_doc/2,new_revid/1]).
 -export([check_is_admin/1, check_is_member/1, get_doc_count/1]).
--export([reopen/1, is_system_db/1, compression/1]).
+-export([reopen/1, is_system_db/1, compression/1, make_doc/5]).
 -export([load_validation_funs/1]).
 
 -include_lib("couch/include/couch_db.hrl").
