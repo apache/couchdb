@@ -1,0 +1,130 @@
+/* Baseline rhythm */
+body {
+   font-size: 16px;
+   font-family: Helvetica, sans-serif;
+   margin: 8px;
+}
+
+p {
+   font-size: 1em; /* 16px */
+   line-height: 1.5em; /* 24px */
+   margin: 0 0 1.5em 0;
+}
+
+h1 {
+   font-size: 1.5em; /* 24px */
+   line-height: 1em; /* 24px */
+   margin-top: 1em;
+   margin-bottom: 0em;
+}
+
+h2 {
+   font-size: 1.375em; /* 22px */
+   line-height: 1.0909em; /* 24px */
+   margin-top: 1.0909em;
+   margin-bottom: 0em;
+}
+
+h3 {
+   font-size: 1.25em; /* 20px */
+   line-height: 1.2em; /* 24px */
+   margin-top: 1.2em;
+   margin-bottom: 0em;
+}
+
+h4 {
+   font-size: 1.125em; /* 18px */
+   line-height: 1.3333em; /* 24px */
+   margin-top: 1.3333em;
+   margin-bottom: 0em;
+}
+
+.class-for-16px {
+   font-size: 1em; /* 16px */
+   line-height: 1.5em; /* 24px */
+   margin-top: 1.5em;
+   margin-bottom: 0em;
+}
+
+.class-for-14px {
+   font-size: 0.875em; /* 14px */
+   line-height: 1.7143em; /* 24px */
+   margin-top: 1.7143em;
+   margin-bottom: 0em;
+}
+
+ul {
+   margin: 0 0 1.5em 0;
+}
+
+/* Customizations */
+body {
+   color: #333;
+}
+
+tt, code, pre {
+   font-family: "Andale Mono", "Inconsolata", "Monaco", "DejaVu Sans Mono", monospaced;
+}
+
+tt, code { font-size: 0.875em }
+
+pre {
+   font-size: 0.875em; /* 14px */
+   line-height: 1.7143em; /* 24px */
+   margin: 0 1em 1.7143em;
+   padding: 0 1em;
+   background: #eee;
+}
+
+.navbar img, hr { display: none }
+
+table {
+   border-collapse: collapse;
+}
+
+h1 {
+   border-left: 0.5em solid #fa0;
+   padding-left: 0.5em;
+}
+
+h2.indextitle {
+   font-size: 1.25em; /* 20px */
+   line-height: 1.2em; /* 24px */
+   margin: -8px -8px 0.6em;
+   background-color: #fa0;
+   color: white;
+   padding: 0.3em;
+}
+
+ul.index {
+   list-style: none;
+   margin-left: 0em;
+   padding-left: 0;
+}
+
+ul.index li {
+   display: inline;
+   padding-right: 0.75em
+}
+
+div.spec p {
+   margin-bottom: 0;
+   padding-left: 1.25em;
+   background-color: #eee;
+}
+
+h3.function {
+   border-left: 0.5em solid #fa0;
+   padding-left: 0.5em;
+   background: #fc9;
+}
+a, a:visited, a:hover, a:active { color: #C60 }
+h2 a, h3 a { color: #333 }
+
+i {
+   font-size: 0.875em; /* 14px */
+   line-height: 1.7143em; /* 24px */
+   margin-top: 1.7143em;
+   margin-bottom: 0em;
+   font-style: normal;
+}

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="stylesheet"
+          href="http://twitter.github.com/bootstrap/1.4.0/bootstrap.min.css">
+    <title>Riaknostic</title>
+    <style type="text/css">
+      body { padding-top: 40px; }
+    </style>
+  </head>
+  <body>
+    <a href="https://github.com/basho/riaknostic" style="border:0;position:absolute;top:0;left:0"><img src="ForkMe_Blk.png"></a>
+    <div class="container">
+      <header class="page-header row">
+          <h1 class="span13">Riaknostic
+            <small>diagnostic tools for Riak</small>
+          </h1>
+          <div class="span3">
+            <a class="btn primary large"
+               href="https://github.com/basho/riaknostic/downloads/riaknostic-1.0.1.tar.gz">Download v1.0.1 &raquo;</a>
+          </div>
+      </header>
+        <article>
+          <div class="row">
+            <section id="overview" class="span12">
+              <h2>Overview</h2>
+              <p>Sometimes, things go wrong in Riak. How can you know what's
+                wrong? <strong>Riaknostic</strong> is here to help.</p>
+              <pre><strong>$ riak-admin diag</strong>
+15:34:52.736 [warning] Riak crashed at Wed, 07 Dec 2011 21:47:50 GMT, leaving crash dump in /srv/riak/log/erl_crash.dump. Please inspect or remove the file.
+15:34:52.736 [notice] Data directory /srv/riak/data/bitcask is not mounted with 'noatime'. Please remount its disk with the 'noatime' flag to improve performance.</pre>
+              <p>Riaknostic, which is invoked via the above command, is a
+                small suite of diagnostic checks that can be run against
+                your Riak node to discover common problems and recommend how
+                to resolve them. These checks are derived from the experience
+                of the Basho Client Services Team as well as numerous
+                public discussions on the mailing list, IRC room, and other
+                online media.</p>
+            </section>
+            <div class="span4" style="text-align: center"><img src="doctorbasho.jpg"></div>
+          </div>
+          <section id="installation">
+            <h2>Installation</h2>
+            <p>After downloading the package, expand it in the directory below according to
+            your platform:</p>
+            <table class="bordered-table zebra-striped">
+              <thead>
+                <tr><th>Platform</th><th>Directory</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Linux (Redhat, CentOS, Debian, Ubuntu)</td>
+                  <td><code>/usr/lib/riak/lib</code></td>
+                </tr>
+                <tr>
+                  <td>Linux (Fedora)</td>
+                  <td><code>/usr/lib64/riak/lib</code></td>
+                </tr>
+                <tr>
+                  <td>Solaris, OpenSolaris</td>
+                  <td><code>/opt/riak/lib</code></td>
+                </tr>
+                <tr>
+                  <td>Mac OS/X or Self-built</td>
+                  <td><code>$RIAK/lib</code>
+                (where <code>$RIAK=rel/riak</code> for source installs,
+                or the directory where you unpacked the package)</td>
+                </tr>
+              </tbody>
+            </table>
+            <p>For example, on Linux, I might do this:</p>
+            <pre>$ wget https://github.com/basho/riaknostic/downloads/riaknostic-1.0.1.tar.gz -P /tmp
+$ cd /usr/lib/riak/lib
+$ sudo tar xzvf /tmp/riaknostic-1.0.1.tar.gz</pre>
+            <p>The package will expand to a <code>riaknostic/</code>
+              directory which contains the <code>riaknostic</code> script,
+              source code in the <code>src/</code> directory and
+              documentation. <strong>Now try it out!</strong></p>
+          </section>
+          <section id="usage">
+            <h2>Usage</h2>
+            <p>For most cases, you can just run the <code>riak-admin
+                diag</code> command as given at the top of the
+              page. However, sometimes you might want to know some extra
+              detail or run only specific checks. For that, there are
+              command-line options. Add <code>--help</code> to get the options:</p>
+            <pre><strong>$ riak-admin diag --help</strong>
+Usage: riak-admin diag [-d &lt;level&gt;] [-l] [-h] [check_name ...]
+
+  -d, --level		Minimum message severity level (default: notice)
+  -l, --list		Describe available diagnostic tasks
+  -h, --help		Display help/usage
+  check_name		A specific check to run</pre>
+            <p>To get an idea of what checks will be run, use
+              the <code>--list</code> option:</p>
+            <pre><strong>$ riak-admin diag --list</strong>
+Available diagnostic checks:
+
+  disk                 Data directory permissions and atime
+  dumps                Find crash dumps
+  memory_use           Measure memory usage
+  nodes_connected      Cluster node liveness
+  ring_membership      Cluster membership validity
+  ring_size            Ring size valid</pre>
+            <p>If you want all the gory details about what Riaknostic is
+              doing, you can run the checks at a more verbose logging
+              level with the <code>--level</code> option:</p>
+            <pre><strong>$ riak-admin diag --level debug</strong>
+18:34:19.708 [debug] Lager installed handler lager_console_backend into lager_event
+18:34:19.720 [debug] Lager installed handler error_logger_lager_h into error_logger
+18:34:19.720 [info] Application lager started on node nonode@nohost
+18:34:20.736 [debug] Not connected to the local Riak node, trying to connect. alive:false connect_failed:undefined
+18:34:20.737 [debug] Starting distributed Erlang.
+18:34:20.740 [debug] Supervisor net_sup started erl_epmd:start_link() at pid <0.42.0>
+18:34:20.742 [debug] Supervisor net_sup started auth:start_link() at pid <0.43.0>
+18:34:20.771 [debug] Supervisor net_sup started net_kernel:start_link(['riak_diag87813@127.0.0.1',longnames]) at pid <0.44.0>
+18:34:20.771 [debug] Supervisor kernel_sup started erl_distribution:start_link(['riak_diag87813@127.0.0.1',longnames]) at pid <0.41.0>
+18:34:20.781 [debug] Supervisor inet_gethost_native_sup started undefined at pid <0.49.0>
+18:34:20.782 [debug] Supervisor kernel_safe_sup started inet_gethost_native:start_link() at pid <0.48.0>
+18:34:20.834 [debug] Connected to local Riak node 'riak@127.0.0.1'.
+18:34:20.939 [debug] Local RPC: os:getpid([]) [5000]
+18:34:20.939 [debug] Running shell command: ps -o pmem,rss,command -p 83144
+18:34:20.946 [debug] Shell command output: 
+%MEM    RSS COMMAND
+ 0.4  31004 /srv/riak/erts-5.8.4/bin/beam.smp -K true -A 64 -W w -- -root /srv/riak/rel/riak -progname riak -- -home /Users/sean -- -boot /srv/riak/releases/1.0.2/riak -embedded -config /srv/riak/etc/app.config -name riak@127.0.0.1 -setcookie riak -- console
+
+18:34:20.960 [warning] Riak crashed at Wed, 07 Dec 2011 21:47:50 GMT, leaving crash dump in /srv/riak/log/erl_crash.dump. Please inspect or remove the file.
+18:34:20.961 [notice] Data directory /srv/riak/data/bitcask is not mounted with 'noatime'. Please remount its disk with the 'noatime' flag to improve performance.
+18:34:20.961 [info] Riak process is using 0.4% of available RAM, totalling 31004 KB of real memory.</pre>
+            <p>Most times you'll want to use the defaults, but any
+              Syslog severity name will do (from most to least
+              verbose): <code>debug, info, notice, warning, error,
+                critical, alert, emergency</code>.</p>
+            <p>Finally, if you want to run just a single diagnostic or a list
+              of specific ones, you can pass their name(s):</p>
+            <pre><strong>$ riak-admin diag dumps</strong>
+18:41:24.083 [warning] Riak crashed at Wed, 07 Dec 2011 21:47:50 GMT, leaving crash dump in /srv/riak/log/erl_crash.dump. Please inspect or remove the file.
+</pre>
+          </section>
+          <section id="contributing">
+            <h2>Contributing</h2>
+            <p>Have an idea for a diagnostic? Want to improve the way
+              Riaknostic works? Fork
+              the <a href="https://github.com/basho/riaknostic">github
+              repository</a> and send us a pull-request with your
+              changes!  The code is documented with <code>edoc</code>,
+              so give the <a href="edoc/index.html">API Docs</a> a
+              read before you contribute.</p>
+            <p>If you want to run the <code>riaknostic</code> script
+              while developing and you don't have it hooked up to your
+              local Riak, you can invoke it directly like so:</p>
+            <pre>$ ./riaknostic --etc ~/code/riak/rel/riak/etc --base ~/code/riak/rel/riak --user `whoami` [other options]</pre>
+            <p>Those extra options are usually assigned by
+              the <code>riak-admin</code> script for you, but here's
+              how to set them:</p>
+            <table class="zebra-striped">
+              <tr>
+                <td class="span2"><code>--etc</code></td>
+                <td>Where your Riak configuration directory is, in the
+                  example above it's in the generated directory of a
+                  source checkout of Riak.</td>
+              </tr>
+              <tr>
+                <td><code>--base</code></td>
+                <td>The "base" directory of Riak, usually the root of
+                  the generated directory
+                  or <code>/usr/lib/riak</code> on Linux, for
+                  example. Scan the <code>riak-admin</code> script for
+                  how the <code>RUNNER_BASE_DIR</code> variable is
+                  assigned on your platform.</td>
+              </tr>
+              <tr>
+                <td><code>--user</code></td>
+                <td>What user/UID the Riak node runs as. In a source
+                  checkout, it's the current user, on most systems,
+                  it's <code>riak</code>.</td>
+              </tr>
+            </table>
+          </section>
+        </article>
+    </div>
+  </body>
+</html>
