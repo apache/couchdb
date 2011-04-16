@@ -99,7 +99,7 @@ function CouchDB(name, httpHeaders) {
         newCount++;
       }
     }
-    var newUuids = CouchDB.newUuids(docs.length);
+    var newUuids = CouchDB.newUuids(newCount);
     var newCount = 0;
     for (var i=0; i<docs.length; i++) {
       if (docs[i]._id == undefined) {
