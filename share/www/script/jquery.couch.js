@@ -183,7 +183,7 @@
     signup: function(user_doc, password, options) {      
       options = options || {};
       // prepare user doc based on name and password
-      user_doc = prepareUserDoc(user_doc, password);
+      user_doc = this.prepareUserDoc(user_doc, password);
       $.couch.userDb(function(db) {
         db.saveDoc(user_doc, options);
       });
