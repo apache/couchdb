@@ -119,7 +119,7 @@
         user_doc.roles = [];
       }
       return user_doc;
-    }
+    },
 
     login: function(options) {
       options = options || {};
