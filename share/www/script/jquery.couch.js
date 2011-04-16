@@ -211,7 +211,7 @@
         user_doc.roles = [];
       }
       return user_doc;
-    }
+    },
 
     /**
      * Authenticate against CouchDB, the <code>options</code> parameter is
