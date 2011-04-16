@@ -821,10 +821,12 @@
          * docs for /db/_design/design-doc/_list/l1/v1</a>
          * @param {String} list Listname in the form of ddoc/listname
          * @param {String} view View to run list against
+         * @param {options} CouchDB <a href="http://wiki.apache.org/couchdb/
+         * HTTP_view_API">View Options</a>
          * @param {ajaxSettings} options <a href="http://api.jquery.com/
          * jQuery.ajax/#jQuery-ajax-settings">jQuery ajax settings</a>
          */
-        list: function(list, view, options) {
+        list: function(list, view, options, ajaxOptions) {
           var list = list.split('/');
           var options = options || {};
           var type = 'GET';
@@ -841,7 +843,7 @@
               url: this.uri + '_design/' + list[0] +
                    '/_list/' + list[1] + '/' + view + encodeOptions(options)
               },
-              options, 'An error occured accessing the list'
+              ajaxOptions, 'An error occured accessing the list'
           );
         },
 
