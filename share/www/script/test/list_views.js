@@ -439,8 +439,6 @@ couchTests.list_views = function(debug) {
     }
   };
 
-  
-
   run_on_modified_server([{
     section: "native_query_servers",
     key: "erlang",
