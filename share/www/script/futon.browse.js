@@ -690,10 +690,12 @@
               key = $.futon.formatJSON(row.key, {indent: 0, linesep: ""});
             }
             if (row.id) {
-              $("<td class='key'><a href='document.html?" + encodeURIComponent(db.name) +
-                "/" + $.couch.encodeDocId(row.id) + "'><strong></strong><br>" +
-                "<span class='docid'>ID:&nbsp;" + $.futon.escape(row.id) + "</span></a></td>")
-                .find("strong").text(key).end()
+              key = key.replace(/\\"/, '"');
+              var rowlink = encodeURIComponent(db.name) +
+                "/" + $.couch.encodeDocId(row.id);
+              $("<td class='key'><a href=\"document.html?" + rowlink + "\"><strong>"
+                 + $.futon.escape(key) + "</strong><br>"
+                 + "<span class='docid'>ID:&nbsp;" + $.futon.escape(row.id) + "</span></a></td>")
                 .appendTo(tr);
             } else {
               $("<td class='key'><strong></strong></td>")
