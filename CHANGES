@@ -13,6 +13,10 @@ Build System:
    when building CouchJS you can enable the HTTP bindings by
    passing -H on the command line.
 
+HTTP Interface:
+
+ * Added a native JSON parser.
+
 OAuth:
 
  * Updated budled erlang_oauth library to the latest version.
