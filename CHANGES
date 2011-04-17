@@ -22,6 +22,7 @@ HTTP Interface:
  * Added support for recognizing "Q values" and media parameters in
    HTTP Accept headers.
  * Validate doc ids that come from a PUT to a URL.
+ * Added a "change password"-feature to Futon.
 
 Externals:
 
