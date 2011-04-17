@@ -72,7 +72,7 @@ var Mime = (function() {
     Mime.responseContentType = null;  
   };
 
-  function runProvides(req) {
+  function runProvides(req, ddoc) {
     var supportedMimes = [], bestFun, bestKey = null, accept = req.headers["Accept"];
     if (req.query && req.query.format) {
       bestKey = req.query.format;
@@ -103,7 +103,7 @@ var Mime = (function() {
     };
 
     if (bestFun) {
-      return bestFun();
+      return bestFun.call(ddoc);
     } else {
       var supportedTypes = mimeFuns.map(function(mf) {
         return mimesByKey[mf[0]].join(', ') || mf[0];
@@ -234,7 +234,7 @@ var Render = (function() {
       }
 
       if (Mime.providesUsed) {
-        resp = Mime.runProvides(args[1]);
+        resp = Mime.runProvides(args[1], ddoc);
         resp = applyContentType(maybeWrapResponse(resp), Mime.responseContentType);
       }
 
@@ -288,7 +288,7 @@ var Render = (function() {
       var tail = listFun.apply(ddoc, args);
 
       if (Mime.providesUsed) {
-        tail = Mime.runProvides(req);
+        tail = Mime.runProvides(req, ddoc);
       }    
       if (!gotRow) getRow();
       if (typeof tail != "undefined") {
