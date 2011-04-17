@@ -22,7 +22,6 @@ HTTP Interface:
  * Added support for recognizing "Q values" and media parameters in
    HTTP Accept headers.
  * Validate doc ids that come from a PUT to a URL.
- * Added a "change password"-feature to Futon.
 
 Externals:
 
@@ -32,7 +31,7 @@ Externals:
 Replicator:
 
  * Added `_replicator` database to manage replications.
- * Fixed issues when an endpoint is a remote database acessible via SSL.
+ * Fixed issues when an endpoint is a remote database accessible via SSL.
  * Added support for continuous by-doc-IDs replication.
 
 Storage System:
@@ -48,6 +47,11 @@ View Server:
  * Built-in reduce function `_sum` now accepts lists of integers as input.
  * Added view query aliases start_key, end_key, start_key_doc_id and
    end_key_doc_id.
+
+Futon:
+
+ * Added a "change password"-feature to Futon.
+
 
 Version 1.0.1
 -------------
