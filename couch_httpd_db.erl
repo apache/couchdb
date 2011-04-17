@@ -23,7 +23,7 @@
     send_response/4,start_json_response/2,start_json_response/3,
     send_chunk/2,last_chunk/1,end_json_response/1,
     start_chunked_response/3, absolute_uri/2, send/2,
-    start_response_length/4]).
+    start_response_length/4, send_error/4]).
 
 -record(doc_query_args, {
     options = [],
@@ -283,61 +283,65 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
     couch_stats_collector:increment({httpd, bulk_requests}),
     couch_httpd:validate_ctype(Req, "application/json"),
     {JsonProps} = couch_httpd:json_body_obj(Req),
-    DocsArray = couch_util:get_value(<<"docs">>, JsonProps),
-    case couch_httpd:header_value(Req, "X-Couch-Full-Commit") of
-    "true" ->
-        Options = [full_commit];
-    "false" ->
-        Options = [delay_commit];
-    _ ->
-        Options = []
-    end,
-    case couch_util:get_value(<<"new_edits">>, JsonProps, true) of
-    true ->
-        Docs = lists:map(
-            fun({ObjProps} = JsonObj) ->
-                Doc = couch_doc:from_json_obj(JsonObj),
-                validate_attachment_names(Doc),
-                Id = case Doc#doc.id of
-                    <<>> -> couch_uuids:new();
-                    Id0 -> Id0
-                end,
-                case couch_util:get_value(<<"_rev">>, ObjProps) of
-                undefined ->
-                    Revs = {0, []};
-                Rev  ->
-                    {Pos, RevId} = couch_doc:parse_rev(Rev),
-                    Revs = {Pos, [RevId]}
-                end,
-                Doc#doc{id=Id,revs=Revs}
-            end,
-            DocsArray),
-        Options2 =
-        case couch_util:get_value(<<"all_or_nothing">>, JsonProps) of
-        true  -> [all_or_nothing|Options];
-        _ -> Options
+    case couch_util:get_value(<<"docs">>, JsonProps) of
+    undefined ->
+        send_error(Req, 400, <<"bad_request">>, <<"Missing JSON list of 'docs'">>);
+    DocsArray ->
+        case couch_httpd:header_value(Req, "X-Couch-Full-Commit") of
+        "true" ->
+            Options = [full_commit];
+        "false" ->
+            Options = [delay_commit];
+        _ ->
+            Options = []
         end,
-        case couch_db:update_docs(Db, Docs, Options2) of
-        {ok, Results} ->
-            % output the results
-            DocResults = lists:zipwith(fun update_doc_result_to_json/2,
-                Docs, Results),
-            send_json(Req, 201, DocResults);
-        {aborted, Errors} ->
+        case couch_util:get_value(<<"new_edits">>, JsonProps, true) of
+        true ->
+            Docs = lists:map(
+                fun({ObjProps} = JsonObj) ->
+                    Doc = couch_doc:from_json_obj(JsonObj),
+                    validate_attachment_names(Doc),
+                    Id = case Doc#doc.id of
+                        <<>> -> couch_uuids:new();
+                        Id0 -> Id0
+                    end,
+                    case couch_util:get_value(<<"_rev">>, ObjProps) of
+                    undefined ->
+                       Revs = {0, []};
+                    Rev  ->
+                        {Pos, RevId} = couch_doc:parse_rev(Rev),
+                        Revs = {Pos, [RevId]}
+                    end,
+                    Doc#doc{id=Id,revs=Revs}
+                end,
+                DocsArray),
+            Options2 =
+            case couch_util:get_value(<<"all_or_nothing">>, JsonProps) of
+            true  -> [all_or_nothing|Options];
+            _ -> Options
+            end,
+            case couch_db:update_docs(Db, Docs, Options2) of
+            {ok, Results} ->
+                % output the results
+                DocResults = lists:zipwith(fun update_doc_result_to_json/2,
+                    Docs, Results),
+                send_json(Req, 201, DocResults);
+            {aborted, Errors} ->
+                ErrorsJson =
+                    lists:map(fun update_doc_result_to_json/1, Errors),
+                send_json(Req, 417, ErrorsJson)
+            end;
+        false ->
+            Docs = lists:map(fun(JsonObj) ->
+                    Doc = couch_doc:from_json_obj(JsonObj),
+                    validate_attachment_names(Doc),
+                    Doc
+                end, DocsArray),
+            {ok, Errors} = couch_db:update_docs(Db, Docs, Options, replicated_changes),
             ErrorsJson =
                 lists:map(fun update_doc_result_to_json/1, Errors),
-            send_json(Req, 417, ErrorsJson)
-        end;
-    false ->
-        Docs = lists:map(fun(JsonObj) ->
-                Doc = couch_doc:from_json_obj(JsonObj),
-                validate_attachment_names(Doc),
-                Doc
-            end, DocsArray),
-        {ok, Errors} = couch_db:update_docs(Db, Docs, Options, replicated_changes),
-        ErrorsJson =
-            lists:map(fun update_doc_result_to_json/1, Errors),
-        send_json(Req, 201, ErrorsJson)
+            send_json(Req, 201, ErrorsJson)
+        end
     end;
 db_req(#httpd{path_parts=[_,<<"_bulk_docs">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
