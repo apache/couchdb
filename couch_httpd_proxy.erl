@@ -378,7 +378,7 @@ join_url_path(Src, Dst) ->
     Src2 ++ "/" ++ Dst2.
 
 
-url_to_url(#url{host=Host, port=Port, path=Path, protocol=Proto}) ->
+url_to_url(#url{host=Host, port=Port, path=Path, protocol=Proto} = Url) ->
     LPort = case {Proto, Port} of
         {http, 80} -> "";
         {https, 443} -> "";
@@ -388,7 +388,13 @@ url_to_url(#url{host=Host, port=Port, path=Path, protocol=Proto}) ->
         "/" ++ _RestPath -> Path;
         _ -> "/" ++ Path
     end,
-    atom_to_list(Proto) ++ "://" ++ Host ++ LPort ++ LPath.
+    HostPart = case Url#url.host_type of
+        ipv6_address ->
+            "[" ++ Host ++ "]";
+        _ ->
+            Host
+    end,
+    atom_to_list(Proto) ++ "://" ++ HostPart ++ LPort ++ LPath.
 
 
 body_length(Headers) ->
