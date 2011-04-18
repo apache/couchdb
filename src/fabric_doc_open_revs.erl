@@ -126,16 +126,13 @@ skip(#state{revs=Revs} = State) ->
 
 maybe_reply(_, [], false, _, _) ->
     noreply;
-maybe_reply(DbName, ReplyDict, IsComplete, RepairDocs, R) ->
-    case lists:all(fun({_,{_, C}}) -> C >= R end, ReplyDict) of
+maybe_reply(DbName, ReplyDict, Complete, RepairDocs, R) ->
+    case Complete orelse lists:all(fun({_,{_, C}}) -> C >= R end, ReplyDict) of
     true ->
         maybe_execute_read_repair(DbName, RepairDocs),
         {reply, unstrip_not_found_missing(extract_replies(ReplyDict))};
     false ->
-        case IsComplete of false -> noreply; true ->
-            maybe_execute_read_repair(DbName, RepairDocs),
-            {reply, unstrip_not_found_missing(extract_replies(ReplyDict))}
-        end
+        noreply
     end.
 
 extract_replies(Replies) ->
