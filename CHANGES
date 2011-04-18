@@ -20,7 +20,7 @@ Replicator:
  * Enabled replication over IPv6.
  * Fixed for crashes in continuous and filtered changes feeds.
  * Fixed error when restarting replications in OTP R14B02.
- * Upgrade ibrowse to version 2.1.3.
+ * Upgrade ibrowse to version 2.2.0.
 
 Security:
 

@@ -18,7 +18,7 @@ Note: This version has not been released yet.
  * Enabled replication over IPv6.
  * Fixed for crashes in continuous and filtered changes feeds.
  * Fixed error when restarting replications in OTP R14B02.
- * Upgrade ibrowse to version 2.1.3.
+ * Upgrade ibrowse to version 2.2.0.
  * Fixed OAuth signature computation in OTP R14B02.
  * Handle passwords with : in them
  * Made compatible with jQuery 1.5.x.
