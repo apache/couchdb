@@ -18,6 +18,7 @@
 -export([replicate/2, checkpoint/1]).
 
 -include("couch_db.hrl").
+-include("../ibrowse/ibrowse.hrl").
 
 -record(state, {
     changes_feed,
@@ -794,9 +795,13 @@ parse_proxy_params(ProxyUrl) when is_binary(ProxyUrl) ->
 parse_proxy_params([]) ->
     [];
 parse_proxy_params(ProxyUrl) ->
-    {url, _, Base, Port, User, Passwd, _Path, _Proto} =
-        ibrowse_lib:parse_url(ProxyUrl),
-    [{proxy_host, Base}, {proxy_port, Port}] ++
+    #url{
+        host = Host,
+        port = Port,
+        username = User,
+        password = Passwd
+    } = ibrowse_lib:parse_url(ProxyUrl),
+    [{proxy_host, Host}, {proxy_port, Port}] ++
         case is_list(User) andalso is_list(Passwd) of
         false ->
             [];
