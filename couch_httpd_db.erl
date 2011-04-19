@@ -960,7 +960,9 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
             {"Cache-Control", "must-revalidate"},
             {"Content-Type", binary_to_list(Type)}
         ] ++ case ReqAcceptsAttEnc of
-        true ->
+        true when Enc =/= identity ->
+            % RFC 2616 says that the 'identify' encoding should not be used in
+            % the Content-Encoding header
             [{"Content-Encoding", atom_to_list(Enc)}];
         _ ->
             []
