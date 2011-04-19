@@ -95,7 +95,7 @@ reopen(#db{main_pid = Pid, fd_ref_counter = OldRefCntr, user_ctx = UserCtx}) ->
         ok;
     false ->
         couch_ref_counter:add(NewRefCntr),
-        couch_ref_counter:drop(OldRefCntr)
+        catch couch_ref_counter:drop(OldRefCntr)
     end,
     {ok, NewDb#db{user_ctx = UserCtx}}.
 
