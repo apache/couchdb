@@ -19,7 +19,7 @@ test_db_name() ->
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(86),
+    etap:plan(85),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -254,8 +254,8 @@ test_get_1st_png_att_without_accept_encoding_header() ->
         [],
         [{sync, true}]),
     etap:is(Code, 200, "HTTP response code is 200"),
-    Gziped = lists:member({"content-encoding", "gzip"}, Headers),
-    etap:is(Gziped, false, "received body is not gziped"),
+    Encoding = couch_util:get_value("content-encoding", Headers),
+    etap:is(Encoding, undefined, "received body is not gziped"),
     etap:is(
         Body,
         test_png_data(),
@@ -270,8 +270,8 @@ test_get_1st_png_att_with_accept_encoding_gzip() ->
         [],
         [{sync, true}]),
     etap:is(Code, 200, "HTTP response code is 200"),
-    Gziped = lists:member({"content-encoding", "gzip"}, Headers),
-    etap:is(Gziped, false, "received body is not gziped"),
+    Encoding = couch_util:get_value("content-encoding", Headers),
+    etap:is(Encoding, undefined, "received body is not gziped"),
     etap:is(
         Body,
         test_png_data(),
@@ -286,10 +286,8 @@ test_get_1st_png_att_with_accept_encoding_deflate() ->
         [],
         [{sync, true}]),
     etap:is(Code, 200, "HTTP response code is 200"),
-    Deflated = lists:member({"content-encoding", "deflate"}, Headers),
-    etap:is(Deflated, false, "received body is not deflated"),
-    Gziped = lists:member({"content-encoding", "gzip"}, Headers),
-    etap:is(Gziped, false, "received body is not gziped"),
+    Encoding = couch_util:get_value("content-encoding", Headers),
+    etap:is(Encoding, undefined, "received body is in identity form"),
     etap:is(
         Body,
         test_png_data(),
