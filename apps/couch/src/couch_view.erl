@@ -18,7 +18,7 @@
     code_change/3,get_reduce_view/4,get_temp_reduce_view/5,get_temp_map_view/4,
     get_map_view/4,get_row_count/1,reduce_to_count/1,fold_reduce/4,
     extract_map_view/1,get_group_server/2,get_group_info/2,
-    cleanup_index_files/1,config_change/2]).
+    cleanup_index_files/1,config_change/2, data_size/2]).
 
 -include("couch_db.hrl").
 
@@ -102,7 +102,7 @@ list_index_files(Db) ->
 
 
 get_row_count(#view{btree=Bt}) ->
-    {ok, {Count, _Reds}} = couch_btree:full_reduce(Bt),
+    {ok, {Count, _, _}} = couch_btree:full_reduce(Bt),
     {ok, Count}.
 
 get_temp_reduce_view(Db, Language, DesignOptions, MapSrc, RedSrc) ->
@@ -149,6 +149,13 @@ expand_dups([{Key, {dups, Vals}} | Rest], Acc) ->
     expand_dups(Rest, Expanded ++ Acc);
 expand_dups([KV | Rest], Acc) ->
     expand_dups(Rest, [KV | Acc]).
+
+data_size(KVList, Reduction) ->
+    lists:foldl(fun([[Key, _], Value], Acc) ->
+                    size(term_to_binary(Key)) +
+                        size(term_to_binary(Value)) +
+                        Acc
+                end,size(term_to_binary(Reduction)),KVList).
 
 fold_reduce({temp_reduce, #view{btree=Bt}}, Fun, Acc, Options) ->
     WrapperFun = fun({GroupedKey, _}, PartialReds, Acc0) ->

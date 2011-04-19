@@ -466,6 +466,7 @@ get_group_info(State) ->
         fd = Fd,
         sig = GroupSig,
         def_lang = Lang,
+        views = Views,
         current_seq=CurrentSeq,
         purge_seq=PurgeSeq
     } = Group,
@@ -474,6 +475,7 @@ get_group_info(State) ->
         {signature, ?l2b(hex_sig(GroupSig))},
         {language, Lang},
         {disk_size, Size},
+        {data_size, compute_data_size(Views)},
         {updater_running, UpdaterPid /= nil},
         {compact_running, CompactorPid /= nil},
         {waiting_commit, WaitingCommit},
@@ -481,6 +483,13 @@ get_group_info(State) ->
         {update_seq, CurrentSeq},
         {purge_seq, PurgeSeq}
     ].
+
+compute_data_size(ViewList) ->
+    lists:foldl(fun(#view{btree=Btree}, Acc) ->
+        {ok, {_, _, Size}} = couch_btree:full_reduce(Btree),
+        Size + Acc
+    end, 0, ViewList).
+
 
 % maybe move to another module
 design_doc_to_view_group(#doc{id=Id,body={Fields}}) ->
@@ -563,13 +572,14 @@ init_group(Fd, #group{def_lang=Lang,views=Views}=Group, IndexHeader) ->
                     KVs3 = couch_view:detuple_kvs(KVs2,[]),
                     {ok, Reduced} = couch_query_servers:reduce(Lang, FunSrcs,
                         KVs3),
-                    {length(KVs3), Reduced};
+                    {length(KVs3), Reduced, couch_view:data_size(KVs3, Reduced)};
                 (rereduce, Reds) ->
-                    Count = lists:sum([Count0 || {Count0, _} <- Reds]),
-                    UserReds = [UserRedsList || {_, UserRedsList} <- Reds],
+                    Count = lists:sum(extract(Reds, counts)),
+                    DataSize = lists:sum(extract(Reds, data_size)),
+                    UserReds = extract(Reds, user_reds),
                     {ok, Reduced} = couch_query_servers:rereduce(Lang, FunSrcs,
                         UserReds),
-                    {Count, Reduced}
+                    {Count, Reduced, DataSize}
                 end,
             
             case couch_util:get_value(<<"collation">>, Options, <<"default">>) of
@@ -585,3 +595,10 @@ init_group(Fd, #group{def_lang=Lang,views=Views}=Group, IndexHeader) ->
         ViewStates, Views),
     Group#group{fd=Fd, current_seq=Seq, purge_seq=PurgeSeq, id_btree=IdBtree,
         views=Views2}.
+
+extract(Reds, counts) ->
+    [element(1, R) || R <- Reds];
+extract(Reds, user_reds) ->
+    [element(2, R) || R <- Reds];
+extract(Reds, data_size) ->
+    lists:map(fun({_, _}) -> 0; ({_, _, Size}) -> Size end, Reds).

@@ -47,7 +47,7 @@ compact_group(Group, EmptyGroup) ->
 
     {ok, Db} = couch_db:open(DbName, []),
 
-    {ok, {Count, _}} = couch_btree:full_reduce(Db#db.id_tree),
+    {ok, Count} = couch_db:get_doc_count(Db),
 
     <<"_design", ShortName/binary>> = GroupId,
     TaskName = <<DbName/binary, ShortName/binary>>,

@@ -12,9 +12,12 @@
 
 -module(couch_key_tree).
 
--export([merge/3, find_missing/2, get_key_leafs/2, get_full_key_paths/2, get/2]).
+-export([merge/3, find_missing/2, get_key_leafs/2,
+         get_full_key_paths/2, get/2, compute_data_size/1]).
 -export([map/2, get_all_leafs/1, count_leafs/1, remove_leafs/2,
     get_all_leafs_full/1,stem/2,map_leafs/2]).
+
+-include("couch_db.hrl").
 
 % Tree::term() is really a tree(), but we don't want to require R13B04 yet
 -type branch() :: {Key::term(), Value::term(), Tree::term()}.
@@ -277,6 +280,53 @@ count_leafs_simple([{_Key, _Value, []} | RestTree]) ->
 count_leafs_simple([{_Key, _Value, SubTree} | RestTree]) ->
     count_leafs_simple(SubTree) + count_leafs_simple(RestTree).
 
+compute_data_size(Tree) ->
+    {TotBodySizes,TotAttSizes} =
+        tree_fold(fun({_Pos, _Key, _Value},branch,Acc) ->
+                  {ok,Acc};
+                 ({_Pos, _Key, Value},leaf,Acc) ->
+                  {ok, sum_up_sizes(Value, Acc)}
+              end,{0,[]},Tree),
+    SumTotAttSizes = lists:foldl(fun({_K,V},Acc) ->
+                                     V + Acc
+                                 end,0,TotAttSizes),
+    TotBodySizes + SumTotAttSizes.
+
+sum_up_sizes(#leaf{deleted=true}, Acc) ->
+    Acc;
+sum_up_sizes(#leaf{deleted=false, size=DocBodySize, atts=AttSizes},Acc) ->
+    {TotBodySizes,TotalAttSizes} = Acc,
+    {TotBodySizes + DocBodySize, add_att_sizes(TotalAttSizes, AttSizes)}.
+
+add_att_sizes(TotalAttSizes,AttSizes) ->
+    lists:umerge(TotalAttSizes, lists:sort(AttSizes)).
+
+tree_fold(_Fun, Acc, []) ->
+    Acc;
+
+tree_fold(Fun, Acc, [{Pos, Branch} | Rest]) ->
+    Acc1 = tree_fold_simple(Fun, Pos, [Branch], Acc),
+    tree_fold(Fun, Acc1, Rest).
+
+tree_fold_simple(_Fun, _Pos, [], Acc) ->
+    Acc;
+
+tree_fold_simple(Fun, Pos, [{Key, Value, []} | RestTree], Acc) ->
+    case Fun({Pos, Key, Value}, leaf, Acc) of
+    {ok, Acc1} ->
+        tree_fold_simple(Fun, Pos, RestTree, Acc1);
+    {stop, Acc1} ->
+        Acc1
+    end;
+
+tree_fold_simple(Fun, Pos, [{Key, Value, SubTree} | RestTree], Acc) ->
+    Acc1 = tree_fold_simple(Fun, Pos + 1, SubTree, Acc),
+    case Fun({Pos, Key, Value}, branch, Acc1) of
+    {ok, Acc2} ->
+        tree_fold_simple(Fun, Pos, RestTree, Acc2);
+    {stop, Acc2} ->
+        Acc2
+    end.
 
 foldl(_Fun, Acc, []) ->
     Acc;

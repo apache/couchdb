@@ -282,7 +282,7 @@ max_seq([#rev_info{seq=Seq}|Rest], Max) ->
 to_doc_info_path(#full_doc_info{id=Id,rev_tree=Tree}) ->
     RevInfosAndPath =
         [{#rev_info{deleted=Del,body_sp=Bp,seq=Seq,rev={Pos,RevId}}, Path} ||
-            {{Del, Bp, Seq},{Pos, [RevId|_]}=Path} <-
+            {#leaf{deleted=Del, ptr=Bp, seq=Seq},{Pos, [RevId|_]}=Path} <-
             couch_key_tree:get_all_leafs(Tree)],
     SortedRevInfosAndPath = lists:sort(
             fun({#rev_info{deleted=DeletedA,rev=RevA}, _PathA},

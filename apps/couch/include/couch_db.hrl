@@ -65,6 +65,7 @@
     {id = <<"">>,
     update_seq = 0,
     deleted = false,
+    data_size = 0,
     rev_tree = []
     }).
 
@@ -297,4 +298,12 @@
     prompt_fun,
     set_timeout_fun,
     stop_fun
+}).
+
+-record(leaf, {
+    deleted,
+    ptr,
+    seq,
+    size = 0,
+    atts = []
 }).

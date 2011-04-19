@@ -303,17 +303,19 @@ collect_updates(GroupedDocsAcc, ClientsAcc, MergeConflicts, FullCommit) ->
 
 
 rev_tree(DiskTree) ->
-    couch_key_tree:map(fun(_RevId, {IsDeleted, BodyPointer, UpdateSeq}) ->
-        {IsDeleted == 1, BodyPointer, UpdateSeq};
+    couch_key_tree:map(fun(_RevId, {Del, Ptr, Seq}) ->
+        #leaf{deleted=(Del==1), ptr=Ptr, seq=Seq};
+    (_RevId, {Del, Ptr, Seq, Size, Atts}) ->
+        #leaf{deleted=(Del==1), ptr=Ptr, seq=Seq, size=Size, atts=Atts};
     (_RevId, ?REV_MISSING) ->
         ?REV_MISSING
     end, DiskTree).
 
 disk_tree(RevTree) ->
-    couch_key_tree:map(fun(_RevId, {IsDeleted, BodyPointer, UpdateSeq}) ->
-        {if IsDeleted -> 1; true -> 0 end, BodyPointer, UpdateSeq};
-    (_RevId, ?REV_MISSING) ->
-        ?REV_MISSING
+    couch_key_tree:map(fun(_RevId, ?REV_MISSING) ->
+        ?REV_MISSING;
+    (_RevId, #leaf{deleted=Del, ptr=Ptr, seq=Seq, size=Size, atts=Atts}) ->
+        {if Del -> 1; true -> 0 end, Ptr, Seq, Size, Atts}
     end, RevTree).
 
 btree_by_seq_split(#full_doc_info{id=Id, update_seq=Seq, deleted=Del, rev_tree=T}) ->
@@ -345,34 +347,37 @@ btree_by_seq_join(KeySeq,{Id, Rev, Bp, Conflicts, DelConflicts, Deleted}) ->
             [#rev_info{rev=Rev2,seq=KeySeq,deleted=true} || Rev2 <- DelConflicts]}.
 
 btree_by_id_split(#full_doc_info{id=Id, update_seq=Seq,
-        deleted=Deleted, rev_tree=Tree}) ->
-    {Id, {Seq, if Deleted -> 1; true -> 0 end, disk_tree(Tree)}}.
+        data_size=Size, deleted=Deleted, rev_tree=Tree}) ->
+    {Id, {Seq, if Deleted -> 1; true -> 0 end, Size, disk_tree(Tree)}}.
 
+%% handle old formats before `data_size` added
 btree_by_id_join(Id, {HighSeq, Deleted, DiskTree}) ->
-    Tree =
-    couch_key_tree:map(
-        fun(_RevId, {IsDeleted, BodyPointer, UpdateSeq}) ->
-            {IsDeleted == 1, BodyPointer, UpdateSeq};
-        (_RevId, ?REV_MISSING) ->
-            ?REV_MISSING;
-        (_RevId, {IsDeleted, BodyPointer}) ->
-            % 09 UPGRADE CODE
-            % this is the 0.9.0 and earlier rev info record. It's missing the seq
-            % nums, which means couchdb will sometimes reexamine unchanged
-            % documents with the _changes API.
-            % This is fixed by compacting the database.
-            {IsDeleted == 1, BodyPointer, HighSeq}
-        end, DiskTree),
+    btree_by_id_join(Id, {HighSeq, Deleted, 0, DiskTree});
 
-    #full_doc_info{id=Id, update_seq=HighSeq, deleted=Deleted==1, rev_tree=Tree}.
+btree_by_id_join(Id, {HighSeq, Deleted, Size, DiskTree}) ->
+    #full_doc_info{id=Id, update_seq=HighSeq,
+                   deleted=Deleted==1, data_size=Size,
+                   rev_tree=rev_tree(DiskTree)}.
 
 btree_by_id_reduce(reduce, FullDocInfos) ->
-    % count the number of not deleted documents
-    {length([1 || #full_doc_info{deleted=false} <- FullDocInfos]),
-        length([1 || #full_doc_info{deleted=true} <- FullDocInfos])};
-btree_by_id_reduce(rereduce, Reds) ->
-    {lists:sum([Count || {Count,_} <- Reds]),
-        lists:sum([DelCount || {_, DelCount} <- Reds])}.
+    lists:foldl(
+        fun(#full_doc_info{deleted = false, data_size=Size},
+            {NotDeleted, Deleted, DocSize}) ->
+                {NotDeleted + 1, Deleted, DocSize + Size};
+           (#full_doc_info{deleted = true, data_size=Size},
+            {NotDeleted, Deleted, DocSize}) ->
+                {NotDeleted, Deleted + 1, DocSize + Size}
+        end,
+        {0, 0, 0}, FullDocInfos);
+
+btree_by_id_reduce(rereduce, Reductions) ->
+    lists:foldl(
+        fun({NotDeleted, Deleted}, {AccNotDeleted, AccDeleted, AccDocSizes}) ->
+            {AccNotDeleted + NotDeleted, AccDeleted + Deleted, AccDocSizes};
+           ({NotDeleted, Deleted, DocSizes}, {AccNotDeleted, AccDeleted, AccDocSizes}) ->
+            {AccNotDeleted + NotDeleted, AccDeleted + Deleted, DocSizes + AccDocSizes}
+        end,
+        {0, 0, 0}, Reductions).
 
 btree_by_seq_reduce(reduce, DocInfos) ->
     % count the number of documents
@@ -486,14 +491,17 @@ flush_trees(#db{fd=Fd,header=Header}=Db,
                 % make sure the Fd in the written bins is the same Fd we are
                 % and convert bins, removing the FD.
                 % All bins should have been written to disk already.
-                DiskAtts =
+                {DiskAtts, SizeInfo} =
                 case Atts of
-                [] -> [];
+                [] -> {[],[]};
                 [#att{data={BinFd, _Sp}} | _ ] when BinFd == Fd ->
-                    [{N,T,P,AL,DL,R,M,E}
+                    {[{N,T,P,AL,DL,R,M,E}
                         || #att{name=N,type=T,data={_,P},md5=M,revpos=R,
                                att_len=AL,disk_len=DL,encoding=E}
-                        <- Atts];
+                        <- Atts],
+                     [{P1,AL1}
+                        || #att{data={_,P1},att_len=AL1}
+                        <- Atts]};
                 _ ->
                     % BinFd must not equal our Fd. This can happen when a database
                     % is being switched out during a compaction
@@ -508,7 +516,13 @@ flush_trees(#db{fd=Fd,header=Header}=Db,
                 false ->
                     couch_file:append_term_md5(Fd, {Doc#doc.body, DiskAtts})
                 end,
-                {IsDeleted, NewSummaryPointer, UpdateSeq};
+                #leaf{
+                    deleted = IsDeleted,
+                    ptr = NewSummaryPointer,
+                    seq = UpdateSeq,
+                    size = size(term_to_binary(Doc#doc.body)),
+                    atts = SizeInfo
+                };
             _ ->
                 Value
             end
@@ -636,9 +650,9 @@ update_docs_int(Db, DocsList, NonRepDocs, MergeConflicts, FullCommit) ->
     % Write out the document summaries (the bodies are stored in the nodes of
     % the trees, the attachments are already written to disk)
     {ok, FlushedFullDocInfos} = flush_trees(Db2, NewFullDocInfos, []),
-
-    IndexInfos = new_index_entries(FlushedFullDocInfos, []),
-
+    IndexInfos =
+        new_index_entries(compute_data_sizes(FlushedFullDocInfos, []),
+                          []),
     % and the indexes
     {ok, DocInfoByIdBTree2} = couch_btree:add_remove(DocInfoByIdBTree,
         IndexInfos, []),
@@ -660,6 +674,18 @@ update_docs_int(Db, DocsList, NonRepDocs, MergeConflicts, FullCommit) ->
     end,
 
     {ok, commit_data(Db4, not FullCommit)}.
+
+compute_data_sizes([], Acc) ->
+    lists:reverse(Acc);
+
+compute_data_sizes([FullDocInfo | RestDocInfos], Acc) ->
+    #full_doc_info{rev_tree=Tree} = FullDocInfo,
+    Size = couch_key_tree:compute_data_size(Tree),
+    compute_data_sizes(RestDocInfos,
+                       [FullDocInfo#full_doc_info{data_size=Size}
+                        | Acc]).
+
+
 
 
 update_local_docs(#db{local_tree=Btree}=Db, Docs) ->
@@ -815,15 +841,21 @@ copy_docs(Db, #db{fd=DestFd}=NewDb, MixedInfos, Retry) ->
     end, merge_lookups(MixedInfos, LookupResults)),
 
     NewInfos1 = [Info#full_doc_info{rev_tree=couch_key_tree:map(
-        fun(Rev, {IsDel, Sp, Seq}, leaf) ->
-            DocBody = copy_doc_attachments(Db, Rev, Sp, DestFd),
-            {ok, Pos} = couch_file:append_term_md5(DestFd, DocBody),
-            {IsDel, Pos, Seq};
+        fun(Rev, #leaf{ptr=Sp, size=Size0}=Leaf, leaf) ->
+            {Body, AttInfos} = copy_doc_attachments(Db, Rev, Sp, DestFd),
+            {ok, Pos} = couch_file:append_term_md5(DestFd, {Body, AttInfos}),
+            if Size0 > 0 ->
+                Leaf#leaf{ptr=Pos};
+            true ->
+                DocSize = byte_size(term_to_binary(Body)),
+                AttSizes = [{element(3,A), element(4,A)} || A <- AttInfos],
+                Leaf#leaf{ptr=Pos, size=DocSize, atts=AttSizes}
+            end;
         (_, _, branch) ->
             ?REV_MISSING
         end, RevTree)} || #full_doc_info{rev_tree=RevTree}=Info <- Infos],
 
-    NewInfos = stem_full_doc_infos(Db, NewInfos1),
+    NewInfos = stem_full_doc_infos(Db, compute_data_sizes(NewInfos1, [])),
     RemoveSeqs =
     case Retry of
     false ->

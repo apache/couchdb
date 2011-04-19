@@ -65,8 +65,8 @@ final_reduce(#btree{reduce=Reduce}, Val) ->
     final_reduce(Reduce, Val);
 final_reduce(Reduce, {[], []}) ->
     Reduce(reduce, []);
-final_reduce(_Bt, {[], [Red]}) ->
-    Red;
+final_reduce(Reduce, {[], [Red]}) ->
+    Reduce(rereduce, [Red]);
 final_reduce(Reduce, {[], Reductions}) ->
     Reduce(rereduce, Reductions);
 final_reduce(Reduce, {KVs, Reductions}) ->
@@ -104,8 +104,8 @@ fold_reduce(#btree{root=Root}=Bt, Fun, Acc, Options) ->
 
 full_reduce(#btree{root=nil,reduce=Reduce}) ->
     {ok, Reduce(reduce, [])};
-full_reduce(#btree{root={_P, Red}}) ->
-    {ok, Red}.
+full_reduce(#btree{root={_P, Red}, reduce=Reduce}) ->
+    {ok, Reduce(rereduce, [Red])}.
 
 % wraps a 2 arity function with the proper 3 arity function
 convert_fun_arity(Fun) when is_function(Fun, 2) ->
