@@ -154,7 +154,7 @@ couchTests.replication = function(debug) {
         sourceSeq = sourceDb.info().update_seq,
         t0 = new Date(),
         t1,
-        ms = 1000;
+        ms = 3000;
 
     do {
       targetSeq = targetDb.info().update_seq;
