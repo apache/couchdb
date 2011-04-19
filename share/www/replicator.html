@@ -18,14 +18,18 @@ specific language governing permissions and limitations under the License.
     <title>Replicator</title>
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
     <link rel="stylesheet" href="style/layout.css?0.11.0" type="text/css">
+    <link rel="stylesheet" href="style/jquery-ui-1.8.11.custom.css" type="text/css">
     <script src="script/json2.js"></script>
     <script src="script/sha1.js"></script>
     <script src="script/jquery.js?1.4.2"></script>
     <script src="script/jquery.couch.js?0.11.0"></script>
     <script src="script/jquery.dialog.js?0.11.0"></script>
     <script src="script/futon.js?0.11.0"></script>
+    <script src="script/jquery-ui-1.8.11.custom.min.js"></script>
     <script>
       $(document).ready(function() {
+        var allDatabases;
+
         $("fieldset input[type=radio]").click(function() {
           var radio = this;
           var fieldset = $(this).parents("fieldset").get(0);
@@ -33,24 +37,30 @@ specific language governing permissions and limitations under the License.
             this.disabled = radio.value == "local";
             if (!this.disabled) this.focus();
           });
-          $("select", fieldset).each(function() {
+          $('.local', fieldset).each(function() {
             this.disabled = radio.value == "remote";
             if (!this.disabled) this.focus();
           });
         });
 
-        $.couch.allDbs({
-          success: function(dbs) {
-            dbs.sort();
-            $("fieldset select").each(function() {
-              var select = this;
-              $.each(dbs, function(idx, dbName) {
-                $("<option></option>").text(dbName).appendTo(select);
+        var getDatabases = function() {
+          $.couch.allDbs({
+            success: function(dbs) {
+              allDatabases = dbs.sort();
+
+              $("fieldset select").each(function() {
+                var select = this;
+                $.each(dbs, function(idx, dbName) {
+                  $("<option></option>").text(dbName).appendTo(select);
+                });
+                select.selectedIndex = 0;
               });
-              select.selectedIndex = 0;
-            });
-          }
-        });
+
+              $('#to_name').autocomplete({ source: dbs });
+            }
+          });
+        };
+        getDatabases();
 
         $("button#swap").click(function() {
           var fromName = $("#source select").val();
@@ -76,9 +86,20 @@ specific language governing permissions and limitations under the License.
 
         $("button#replicate").click(function() {
           $("#records tbody.content").empty();
+          var targetIsLocal = $('#to_local:checked').length > 0;
           var source = $("#from_local")[0].checked ? $("#from_name").val() : $("#from_url").val();
-          var target = $("#to_local")[0].checked ? $("#to_name").val() : $("#to_url").val();
+          var target = targetIsLocal ? $("#to_name").val() : $("#to_url").val();
           var repOpts = {};
+
+          if (targetIsLocal && $.inArray(target, allDatabases) < 0) {
+            if(!confirm('This will create a database named '+target+'. Ok?')) {
+              return;
+            }
+            else {
+              repOpts.create_target = true;
+            }
+          }
+
           if ($("#continuous")[0].checked) {
             repOpts.continuous = true;
           }
@@ -97,6 +118,10 @@ specific language governing permissions and limitations under the License.
                 });
                 $("#records tbody tr").removeClass("odd").filter(":odd").addClass("odd");
                 $("#records tbody.footer td").text("Replication session " + resp.session_id);
+
+                if (repOpts.create_target) {
+                  getDatabases();
+                }
               }
             }
           }, repOpts);
@@ -117,7 +142,7 @@ specific language governing permissions and limitations under the License.
           <p>
             <input type="radio" id="from_local" name="from_type" value="local" checked> 
             <label for="from_local">Local Database: </label>
-            <select id="from_name" name="from_name"></select>
+            <select id="from_name" name="from_name" class="local"></select>
           </p><p>
             <input type="radio" id="from_to_remote" name="from_type" value="remote"> 
             <label for="from_to_remote">Remote database: </label>
@@ -130,7 +155,7 @@ specific language governing permissions and limitations under the License.
           <p>
             <input type="radio" id="to_local" name="to_type" value="local" checked> 
             <label for="to_local">Local database: </label>
-            <select id="to_name" name="to_name"></select>
+            <input type="text" id="to_name" name="to_name" class="local"></select>
           </p><p>
             <input type="radio" id="to_remote" name="to_type" value="remote"> 
             <label for="to_remote">Remote database: </label>
