@@ -60,21 +60,20 @@ handle_changes_req(#httpd{method='GET'}=Req, Db) ->
         DeltaT = timer:now_diff(now(), T0) / 1000,
         couch_stats_collector:record({couchdb, dbinfo}, DeltaT),
         chttpd:etag_respond(Req, Etag, fun() ->
-            {ok, Resp} = chttpd:start_json_response(Req, 200, [{"Etag",Etag}]),
-            fabric:changes(Db, fun changes_callback/2, {"normal", Resp},
+            fabric:changes(Db, fun changes_callback/2, {"normal", {"Etag",Etag}, Req},
                 ChangesArgs)
         end);
     Feed ->
         % "longpoll" or "continuous"
-        {ok, Resp} = chttpd:start_json_response(Req, 200),
-        fabric:changes(Db, fun changes_callback/2, {Feed, Resp}, ChangesArgs)
+        fabric:changes(Db, fun changes_callback/2, {Feed, Req}, ChangesArgs)
     end;
 handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 % callbacks for continuous feed (newline-delimited JSON Objects)
-changes_callback(start, {"continuous", _} = Acc) ->
-    {ok, Acc};
+changes_callback(start, {"continuous", Req}) ->
+    {ok, Resp} = chttpd:start_json_response(Req, 200),
+    {ok, {"continuous", Resp}};
 changes_callback({change, Change}, {"continuous", Resp} = Acc) ->
     send_chunk(Resp, [?JSON_ENCODE(Change) | "\n"]),
     {ok, Acc};
@@ -84,7 +83,12 @@ changes_callback({stop, EndSeq0}, {"continuous", Resp}) ->
     end_json_response(Resp);
 
 % callbacks for longpoll and normal (single JSON Object)
-changes_callback(start, {_, Resp}) ->
+changes_callback(start, {"normal", {"Etag", Etag}, Req}) ->
+    {ok, Resp} = chttpd:start_json_response(Req, 200, [{"Etag",Etag}]),
+    send_chunk(Resp, "{\"results\":[\n"),
+    {ok, {"", Resp}};
+changes_callback(start, {_, Req}) ->
+    {ok, Resp} = chttpd:start_json_response(Req, 200),
     send_chunk(Resp, "{\"results\":[\n"),
     {ok, {"", Resp}};
 changes_callback({change, Change}, {Prepend, Resp}) ->
@@ -103,7 +107,13 @@ changes_callback(timeout, {Prepend, Resp}) ->
     send_chunk(Resp, "\n"),
     {ok, {Prepend, Resp}};
 changes_callback({error, Reason}, Resp) ->
-    chttpd:send_chunked_error(Resp, Reason).
+    case Resp of
+    {"normal", _, Req} ->
+        Request = Req;
+    {_, Req} ->
+        Request = Req
+    end,
+    chttpd:send_error(Request, Reason).
 
 is_old_couch(Resp) ->
     MochiReq = Resp:get(request),
