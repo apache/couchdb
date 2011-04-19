@@ -23,34 +23,46 @@
 go(DbName, Feed, Options, Callback, Acc0) when Feed == "continuous" orelse
         Feed == "longpoll" ->
     Args = make_changes_args(Options),
-    {ok, Acc} = Callback(start, Acc0),
-    Notifiers = start_update_notifiers(DbName),
-    {Timeout, _} = couch_changes:get_changes_timeout(Args, Callback),
-    try
-        keep_sending_changes(
-            DbName,
-            Args,
-            Callback,
-            get_start_seq(DbName, Args),
-            Acc,
-            Timeout
-        )
-    after
-        stop_update_notifiers(Notifiers),
-        couch_changes:get_rest_db_updated()
+    Since = get_start_seq(DbName, Args),
+    case validate_start_seq(DbName, Since) of
+    ok ->
+        {ok, Acc} = Callback(start, Acc0),
+        Notifiers = start_update_notifiers(DbName),
+        {Timeout, _} = couch_changes:get_changes_timeout(Args, Callback),
+        try
+            keep_sending_changes(
+                DbName,
+                Args,
+                Callback,
+                Since,
+                Acc,
+                Timeout
+            )
+        after
+            stop_update_notifiers(Notifiers),
+            couch_changes:get_rest_db_updated()
+        end;
+    Error ->
+        Callback(Error, Acc0)
     end;
 
 go(DbName, "normal", Options, Callback, Acc0) ->
     Args = make_changes_args(Options),
-    {ok, Acc} = Callback(start, Acc0),
-    {ok, #collector{counters=Seqs, user_acc=AccOut}} = send_changes(
-        DbName,
-        Args,
-        Callback,
-        get_start_seq(DbName, Args),
-        Acc
-    ),
-    Callback({stop, pack_seqs(Seqs)}, AccOut).
+    Since = get_start_seq(DbName, Args),
+    case validate_start_seq(DbName, Since) of
+    ok ->
+        {ok, Acc} = Callback(start, Acc0),
+        {ok, #collector{counters=Seqs, user_acc=AccOut}} = send_changes(
+            DbName,
+            Args,
+            Callback,
+            Since,
+            Acc
+        ),
+        Callback({stop, pack_seqs(Seqs)}, AccOut);
+    Error ->
+        Callback(Error, Acc0)
+    end.
 
 keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout) ->
     #changes_args{limit=Limit, feed=Feed, heartbeat=Heartbeat} = Args,
@@ -276,3 +288,11 @@ find_replacement_shards(#shard{range=Range}, AllShards) ->
 wait_db_updated(Timeout) ->
     receive db_updated -> couch_changes:get_rest_db_updated()
     after Timeout -> timeout end.
+
+validate_start_seq(DbName, Seq) ->
+    try unpack_seqs(Seq, DbName) of _Any ->
+        ok
+    catch _:_ ->
+        Reason = <<"Malformed sequence supplied in 'since' parameter.">>,
+        {error, {bad_request, Reason}}
+    end.
