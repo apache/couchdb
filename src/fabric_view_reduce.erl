@@ -97,5 +97,18 @@ handle_message(#view_row{key=Key} = Row, {Worker, From}, State) ->
     end;
 
 handle_message(complete, Worker, State) ->
-    Counters = fabric_dict:update_counter(Worker, 1, State#collector.counters),
-    fabric_view:maybe_send_row(State#collector{counters = Counters}).
+    C1 = fabric_dict:update_counter(Worker, 1, State#collector.counters),
+    C2 = fabric_view:remove_overlapping_shards(Worker, C1),
+    fabric_view:maybe_send_row(State#collector{counters = C2}).
+
+complete_worker_test() ->
+    Shards =
+        mem3_util:create_partition_map("foo",3,3,[node(),node(),node()]),
+    Workers = lists:map(fun(#shard{} = Shard) ->
+                            Ref = make_ref(),
+                            Shard#shard{ref = Ref}
+                        end,
+                        Shards),
+    State = #collector{counters=fabric_dict:init(Workers,0)},
+    {ok, NewState} = handle_message(complete, lists:nth(2,Workers), State),
+    ?assertEqual(orddict:size(NewState#collector.counters),length(Workers) - 2).
