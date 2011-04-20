@@ -801,7 +801,8 @@ couchTests.replicator_db = function(debug) {
 
     TEquals(true, dbA.save(new_doc).ok);
     TEquals(true, dbB.save(new_doc).ok);
-    wait(1000);
+    waitForSeq(dbA, dbA_copy);
+    waitForSeq(dbB, dbB_copy);
 
     TEquals(true, repDb2.save(repDoc3).ok);
     waitForSeq(dbC, dbC_copy);
