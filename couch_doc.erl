@@ -308,10 +308,15 @@ max_seq([#rev_info{seq=Seq}|Rest], Max) ->
     max_seq(Rest, if Max > Seq -> Max; true -> Seq end).
 
 to_doc_info_path(#full_doc_info{id=Id,rev_tree=Tree}) ->
-    RevInfosAndPath =
-        [{#rev_info{deleted=Del,body_sp=Bp,seq=Seq,rev={Pos,RevId}}, Path} ||
-            {{Del, Bp, Seq},{Pos, [RevId|_]}=Path} <-
-            couch_key_tree:get_all_leafs(Tree)],
+    RevInfosAndPath = [
+        {#rev_info{
+            deleted = element(1, LeafVal),
+            body_sp = element(2, LeafVal),
+            seq = element(3, LeafVal),
+            rev = {Pos, RevId}
+        }, Path} || {LeafVal, {Pos, [RevId | _]} = Path} <-
+            couch_key_tree:get_all_leafs(Tree)
+    ],
     SortedRevInfosAndPath = lists:sort(
             fun({#rev_info{deleted=DeletedA,rev=RevA}, _PathA},
                 {#rev_info{deleted=DeletedB,rev=RevB}, _PathB}) ->

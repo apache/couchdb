@@ -70,8 +70,9 @@ open(Filepath, Options) ->
 %%----------------------------------------------------------------------
 %% Purpose: To append an Erlang term to the end of the file.
 %% Args:    Erlang term to serialize and append to the file.
-%% Returns: {ok, Pos} where Pos is the file offset to the beginning the
-%%  serialized  term. Use pread_term to read the term back.
+%% Returns: {ok, Pos, NumBytesWritten} where Pos is the file offset to
+%%  the beginning the serialized  term. Use pread_term to read the term
+%%  back.
 %%  or {error, Reason}.
 %%----------------------------------------------------------------------
 
@@ -85,8 +86,8 @@ append_term_md5(Fd, Term) ->
 %%----------------------------------------------------------------------
 %% Purpose: To append an Erlang binary to the end of the file.
 %% Args:    Erlang term to serialize and append to the file.
-%% Returns: {ok, Pos} where Pos is the file offset to the beginning the
-%%  serialized  term. Use pread_term to read the term back.
+%% Returns: {ok, Pos, NumBytesWritten} where Pos is the file offset to the
+%%  beginning the serialized term. Use pread_term to read the term back.
 %%  or {error, Reason}.
 %%----------------------------------------------------------------------
 
@@ -337,9 +338,10 @@ handle_call({truncate, Pos}, _From, #file{fd=Fd}=File) ->
 
 handle_call({append_bin, Bin}, _From, #file{fd = Fd, eof = Pos} = File) ->
     Blocks = make_blocks(Pos rem ?SIZE_BLOCK, Bin),
+    Size = iolist_size(Blocks),
     case file:write(Fd, Blocks) of
     ok ->
-        {reply, {ok, Pos}, File#file{eof = Pos + iolist_size(Blocks)}};
+        {reply, {ok, Pos, Size}, File#file{eof = Pos + Size}};
     Error ->
         {reply, Error, File}
     end;

@@ -48,8 +48,8 @@
 -module(couch_key_tree).
 
 -export([merge/3, find_missing/2, get_key_leafs/2, get_full_key_paths/2, get/2]).
--export([map/2, get_all_leafs/1, count_leafs/1, remove_leafs/2,
-    get_all_leafs_full/1,stem/2,map_leafs/2]).
+-export([get_all_leafs/1, count_leafs/1, remove_leafs/2, get_all_leafs_full/1, stem/2]).
+-export([map/2, mapfold/3, map_leafs/2]).
 
 -include("couch_db.hrl").
 
@@ -332,6 +332,23 @@ map_simple(Fun, Pos, [{Key, Value, SubTree} | RestTree]) ->
     Value2 = Fun({Pos, Key}, Value,
             if SubTree == [] -> leaf; true -> branch end),
     [{Key, Value2, map_simple(Fun, Pos + 1, SubTree)} | map_simple(Fun, Pos, RestTree)].
+
+
+mapfold(_Fun, Acc, []) ->
+    {[], Acc};
+mapfold(Fun, Acc, [{Pos, Tree} | Rest]) ->
+    {[NewTree], Acc2} = mapfold_simple(Fun, Acc, Pos, [Tree]),
+    {Rest2, Acc3} = mapfold(Fun, Acc2, Rest),
+    {[{Pos, NewTree} | Rest2], Acc3}.
+
+mapfold_simple(_Fun, Acc, _Pos, []) ->
+    {[], Acc};
+mapfold_simple(Fun, Acc, Pos, [{Key, Value, SubTree} | RestTree]) ->
+    {Value2, Acc2} = Fun({Pos, Key}, Value,
+            if SubTree == [] -> leaf; true -> branch end, Acc),
+    {SubTree2, Acc3} = mapfold_simple(Fun, Acc2, Pos + 1, SubTree),
+    {RestTree2, Acc4} = mapfold_simple(Fun, Acc3, Pos, RestTree),
+    {[{Key, Value2, SubTree2} | RestTree2], Acc4}.
 
 
 map_leafs(_Fun, []) ->
