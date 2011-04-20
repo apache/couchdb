@@ -39,7 +39,7 @@ h1 :link.raw, h1 :visited.raw {
   right: 20px; width: 35px; height: 100%; padding: 0; margin: 0;
 }
 body.loading h1 strong {
-  background: url(../image/spinner.gif) right center no-repeat;
+  background: url(../image/spinner_33.gif) right center no-repeat;
 }
 
 hr { border: 1px solid #999; border-width: 1px 0 0; }
@@ -268,7 +268,7 @@ body.fullwidth #wrap { margin-right: 0; }
   font-size: 110%; font-weight: bold; margin: 0 -1em; padding: .35em 1em;
 }
 body.loading #dialog h2 {
-  background-image: url(../image/spinner.gif);
+  background-image: url(../image/spinner_6b.gif);
 }
 #dialog h3 { color: #ccc; font-size: 100%; font-weight: bold; margin: 0 -2em;
   padding: .35em 2em 0;
