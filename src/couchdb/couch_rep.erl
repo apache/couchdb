@@ -392,7 +392,7 @@ dbname(#db{name = Name}) ->
 
 dbinfo(#http_db{} = Db) ->
     {DbProps} = couch_rep_httpc:request(Db),
-    [{list_to_existing_atom(?b2l(K)), V} || {K,V} <- DbProps];
+    [{couch_util:to_existing_atom(K), V} || {K,V} <- DbProps];
 dbinfo(Db) ->
     {ok, Info} = couch_db:get_db_info(Db),
     Info.
