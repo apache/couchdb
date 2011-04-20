@@ -140,6 +140,6 @@ write_random_data(Fd, 0) ->
 write_random_data(Fd, N) ->
     Choices = [foo, bar, <<"bizzingle">>, "bank", ["rough", stuff]],
     Term = lists:nth(random:uniform(4) + 1, Choices),
-    {ok, _} = couch_file:append_term(Fd, Term),
+    {ok, _, _} = couch_file:append_term(Fd, Term),
     write_random_data(Fd, N-1).
 

@@ -237,7 +237,7 @@ handle_call({write, Bin}, _From, Stream) ->
             Md5_2 = Md5,
             Written2 = Written;
         WriteBin2 ->
-            {ok, Pos} = couch_file:append_binary(Fd, WriteBin2),
+            {ok, Pos, _} = couch_file:append_binary(Fd, WriteBin2),
             WrittenLen2 = WrittenLen + iolist_size(WriteBin2),
             Md5_2 = couch_util:md5_update(Md5, WriteBin2),
             Written2 = [{Pos, iolist_size(WriteBin2)}|Written]
@@ -277,7 +277,7 @@ handle_call(close, _From, Stream) ->
     [] ->
         {lists:reverse(Written), WrittenLen, IdenLen, Md5Final, IdenMd5Final};
     _ ->
-        {ok, Pos} = couch_file:append_binary(Fd, WriteBin2),
+        {ok, Pos, _} = couch_file:append_binary(Fd, WriteBin2),
         StreamInfo = lists:reverse(Written, [{Pos, iolist_size(WriteBin2)}]),
         StreamLen = WrittenLen + iolist_size(WriteBin2),
         {StreamInfo, StreamLen, IdenLen, Md5Final, IdenMd5Final}

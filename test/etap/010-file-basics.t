@@ -12,6 +12,11 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
+-define(etap_match(Got, Expected, Desc),
+        etap:fun_is(fun(XXXXXX) ->
+            case XXXXXX of Expected -> true; _ -> false end
+        end, Got, Desc)).
+
 filename() -> test_util:build_file("test/etap/temp.010").
 
 main(_) ->
@@ -43,14 +48,14 @@ test() ->
     etap:is({ok, 0}, couch_file:bytes(Fd),
         "Newly created files have 0 bytes."),
 
-    etap:is({ok, 0}, couch_file:append_term(Fd, foo),
+    ?etap_match(couch_file:append_term(Fd, foo), {ok, 0, _},
         "Appending a term returns the previous end of file position."),
 
     {ok, Size} = couch_file:bytes(Fd),
     etap:is_greater(Size, 0,
         "Writing a term increased the file size."),
 
-    etap:is({ok, Size}, couch_file:append_binary(Fd, <<"fancy!">>),
+    ?etap_match(couch_file:append_binary(Fd, <<"fancy!">>), {ok, Size, _},
         "Appending a binary returns the current file size."),
 
     etap:is({ok, foo}, couch_file:pread_term(Fd, 0),
@@ -64,12 +69,12 @@ test() ->
         "Reading a binary at a term position returns the term as binary."
     ),
 
-    {ok, BinPos} = couch_file:append_binary(Fd, <<131,100,0,3,102,111,111>>),
+    {ok, BinPos, _} = couch_file:append_binary(Fd, <<131,100,0,3,102,111,111>>),
     etap:is({ok, foo}, couch_file:pread_term(Fd, BinPos),
         "Reading a term from a written binary term representation succeeds."),
         
     BigBin = list_to_binary(lists:duplicate(100000, 0)),
-    {ok, BigBinPos} = couch_file:append_binary(Fd, BigBin),
+    {ok, BigBinPos, _} = couch_file:append_binary(Fd, BigBin),
     etap:is({ok, BigBin}, couch_file:pread_binary(Fd, BigBinPos),
         "Reading a large term from a written representation succeeds."),
     
@@ -77,13 +82,13 @@ test() ->
     etap:is({ok, hello}, couch_file:read_header(Fd),
         "Reading a header succeeds."),
         
-    {ok, BigBinPos2} = couch_file:append_binary(Fd, BigBin),
+    {ok, BigBinPos2, _} = couch_file:append_binary(Fd, BigBin),
     etap:is({ok, BigBin}, couch_file:pread_binary(Fd, BigBinPos2),
         "Reading a large term from a written representation succeeds 2."),
 
     % append_binary == append_iolist?
     % Possible bug in pread_iolist or iolist() -> append_binary
-    {ok, IOLPos} = couch_file:append_binary(Fd, ["foo", $m, <<"bam">>]),
+    {ok, IOLPos, _} = couch_file:append_binary(Fd, ["foo", $m, <<"bam">>]),
     {ok, IoList} = couch_file:pread_iolist(Fd, IOLPos),
     etap:is(<<"foombam">>, iolist_to_binary(IoList),
         "Reading an results in a binary form of the written iolist()"),

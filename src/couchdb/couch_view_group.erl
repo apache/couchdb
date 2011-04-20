@@ -533,15 +533,18 @@ get_group_info(State) ->
     #group{
         fd = Fd,
         sig = GroupSig,
+        id_btree = Btree,
         def_lang = Lang,
         current_seq=CurrentSeq,
-        purge_seq=PurgeSeq
+        purge_seq=PurgeSeq,
+        views = Views
     } = Group,
     {ok, Size} = couch_file:bytes(Fd),
     [
         {signature, ?l2b(hex_sig(GroupSig))},
         {language, Lang},
         {disk_size, Size},
+        {data_size, view_group_data_size(Btree, Views)},
         {updater_running, UpdaterPid /= nil},
         {compact_running, CompactorPid /= nil},
         {waiting_commit, WaitingCommit},
@@ -549,6 +552,21 @@ get_group_info(State) ->
         {update_seq, CurrentSeq},
         {purge_seq, PurgeSeq}
     ].
+
+view_group_data_size(MainBtree, Views) ->
+    lists:foldl(
+        fun(#view{btree = Btree}, Acc) ->
+            sum_btree_sizes(Acc, couch_btree:size(Btree))
+        end,
+        couch_btree:size(MainBtree),
+        Views).
+
+sum_btree_sizes(nil, _) ->
+    null;
+sum_btree_sizes(_, nil) ->
+    null;
+sum_btree_sizes(Size1, Size2) ->
+    Size1 + Size2.
 
 % maybe move to another module
 design_doc_to_view_group(#doc{id=Id,body={Fields}}) ->

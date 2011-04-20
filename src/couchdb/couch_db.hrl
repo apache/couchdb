@@ -56,7 +56,8 @@
     {id = <<"">>,
     update_seq = 0,
     deleted = false,
-    rev_tree = []
+    rev_tree = [],
+    leafs_size = 0
     }).
 
 -record(httpd,
@@ -128,7 +129,7 @@
 % if the disk revision is incremented, then new upgrade logic will need to be
 % added to couch_db_updater:init_db.
 
--define(LATEST_DISK_VERSION, 5).
+-define(LATEST_DISK_VERSION, 6).
 
 -record(db_header,
     {disk_version = ?LATEST_DISK_VERSION,
