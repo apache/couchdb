@@ -120,7 +120,7 @@ start_link(Name, Options) ->
 stop() ->
     mochiweb_http:stop(?MODULE).
 
-config_change("httpd", "bind_addres") ->
+config_change("httpd", "bind_address") ->
     ?MODULE:stop();
 config_change("httpd", "port") ->
     ?MODULE:stop();
