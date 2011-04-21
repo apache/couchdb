@@ -121,8 +121,8 @@ calculate_start_seq(Db, #shard{node=Node, name=Name}, LocalId) ->
 
 open_doc_revs(Db, #full_doc_info{id=Id, rev_tree=RevTree}, Revs) ->
     {FoundRevs, _} = couch_key_tree:get_key_leafs(RevTree, Revs),
-    lists:map(fun({{IsDel, SummaryPtr, _Seq}, FoundRevPath}) ->
-        couch_db:make_doc(Db, Id, IsDel, SummaryPtr, FoundRevPath)
+    lists:map(fun({#leaf{deleted=IsDel, ptr=SummaryPtr}, FoundRevPath}) ->
+                  couch_db:make_doc(Db, Id, IsDel, SummaryPtr, FoundRevPath)
     end, FoundRevs).
 
 iso8601_timestamp() ->
