@@ -36,6 +36,6 @@ build_file(Name) ->
 config_files() ->
     [
         build_file("etc/couchdb/default_dev.ini"),
-        build_file("etc/couchdb/local_dev.ini"),
-        source_file("test/etap/random_port.ini")
+        source_file("test/etap/random_port.ini"),
+        build_file("etc/couchdb/local_dev.ini")
     ].
