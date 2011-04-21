@@ -36,7 +36,7 @@ start_link(http) ->
     Port = couch_config:get("httpd", "port", "5984"),
     start_link(?MODULE, [{port, Port}]);
 start_link(https) ->
-    Port = couch_config:get("ssl", "port", "5984"),
+    Port = couch_config:get("ssl", "port", "6984"),
     CertFile = couch_config:get("ssl", "cert_file", nil),
     KeyFile = couch_config:get("ssl", "key_file", nil),
     Options = case CertFile /= nil andalso KeyFile /= nil of
