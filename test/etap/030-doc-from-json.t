@@ -34,7 +34,7 @@ main(_) ->
 
 test() ->
     couch_config:start_link(test_util:config_files()),
-    couch_config:set("attachments", "compression_level", "0"),
+    couch_config:set("attachments", "compression_level", "0", false),
     ok = test_from_json_success(),
     ok = test_from_json_errors(),
     ok.

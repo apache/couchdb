@@ -148,7 +148,7 @@ test() ->
         ),
 
         etap:is(
-            couch_config:set("httpd", "port", "8080"),
+            couch_config:set("httpd", "port", "8080", false),
             ok,
             "Writing {httpd, port} is kosher."
         ),

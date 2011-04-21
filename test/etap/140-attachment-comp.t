@@ -38,8 +38,8 @@ test() ->
     couch_server:delete(test_db_name(), []),
     couch_db:create(test_db_name(), []),
 
-    couch_config:set("attachments", "compression_level", "8"),
-    couch_config:set("attachments", "compressible_types", "text/*"),
+    couch_config:set("attachments", "compression_level", "8", false),
+    couch_config:set("attachments", "compressible_types", "text/*", false),
 
     create_1st_text_att(),
     create_1st_png_att(),
