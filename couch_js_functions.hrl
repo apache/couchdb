@@ -147,6 +147,8 @@
         }
 
         var isReplicator = (userCtx.roles.indexOf('_replicator') >= 0);
+        var isAdmin = (userCtx.roles.indexOf('_admin') >= 0);
+
         if (oldDoc && !newDoc._deleted && !isReplicator) {
             reportError('Only the replicator can edit replication documents.');
         }
@@ -187,6 +189,12 @@
             }
 
             if (newDoc.user_ctx) {
+                if (!isAdmin) {
+                    reportError('Delegated replications (use of the ' +
+                        '`user_ctx\\' property) can only be triggered by ' +
+                        'administrators.');
+                }
+
                 var user_ctx = newDoc.user_ctx;
 
                 if ((typeof user_ctx !== 'object') || (user_ctx === null)) {
