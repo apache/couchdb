@@ -13,18 +13,6 @@
 ejsonebindir = $(localerlanglibdir)/ejson-0.1.0/ebin
 ejsonprivdir = $(localerlanglibdir)/ejson-0.1.0/priv
 
-EXTRA_DIST =  \
-    erl_nif_compat.h \
-    yajl/yajl_alloc.h \
-    yajl/yajl_buf.h \
-    yajl/yajl_bytestack.h \
-    yajl/yajl_common.h \
-    yajl/yajl_encode.h \
-    yajl/yajl_gen.h \
-    yajl/yajl_lex.h \
-    yajl/yajl_parse.h \
-    yajl/yajl_parser.h
-
 CLEANFILES = \
     $(ejsonebin_make_generated_file_list) \
     $(ejsonpriv_make_generated_file_list) \
@@ -42,18 +30,33 @@ EJSON_C_SRCS = \
 	yajl/yajl_lex.c \
 	yajl/yajl_parser.c
 
+EJSON_C_HDRS = \
+    erl_nif_compat.h \
+    yajl/yajl_alloc.h \
+    yajl/yajl_buf.h \
+    yajl/yajl_bytestack.h \
+    yajl/yajl_common.h \
+    yajl/yajl_encode.h \
+    yajl/yajl_gen.h \
+    yajl/yajl_lex.h \
+    yajl/yajl_parse.h \
+    yajl/yajl_parser.h
+
 ejson_file_collection = \
     ejson.app.in \
     ejson.erl \
     mochijson2.erl \
-    mochinum.erl \
-    $(JSON_C_SRCS)
+    mochinum.erl
 
 ejsonebin_make_generated_file_list = \
     ejson.app \
     ejson.beam \
     mochijson2.beam \
     mochinum.beam
+
+EXTRA_DIST = \
+	$(EJSON_C_HDRS) \
+	$(ejson_file_collection)
 
 ejsonebin_DATA = \
     $(ejsonebin_make_generated_file_list)
