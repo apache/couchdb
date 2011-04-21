@@ -281,6 +281,8 @@ db_data_size(_, nil, _) ->
 db_data_size(_, _, {_Count, _DelCount}) ->
     % pre 1.2 format, upgraded on compaction
     null;
+db_data_size(_, _, {_Count, _DelCount, nil}) ->
+    null;
 db_data_size(SeqBtreeSize, IdBtreeSize, {_Count, _DelCount, DocAndAttsSize}) ->
     SeqBtreeSize + IdBtreeSize + DocAndAttsSize.
 
