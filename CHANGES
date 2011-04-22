@@ -32,7 +32,7 @@ Replicator:
 Security:
 
  * Fixed OAuth signature computation in OTP R14B02.
- * Handle passwords with : in them
+ * Handle passwords with : in them.
 
 Futon:
 

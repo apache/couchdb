@@ -20,7 +20,7 @@ Note: This version has not been released yet.
  * Fixed error when restarting replications in OTP R14B02.
  * Upgrade ibrowse to version 2.2.0.
  * Fixed OAuth signature computation in OTP R14B02.
- * Handle passwords with : in them
+ * Handle passwords with : in them.
  * Made compatible with jQuery 1.5.x.
 
 Version 1.0.2
