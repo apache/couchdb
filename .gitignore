@@ -70,7 +70,9 @@ src/ejson/.libs/
 src/ejson/priv
 src/mochiweb/mochiweb.app
 test/local.ini
+test/etap/.deps/
 test/etap/run
+test/etap/test_cfg_register
 test/etap/test_util.erl
 test/javascript/run
 share/server/main.js

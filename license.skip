@@ -94,6 +94,9 @@
 ^test/bench/Makefile
 ^test/bench/Makefile.in
 ^test/etap/.*beam
+^test/etap/.*\.o
+^test/etap/.deps/*
+^test/etap/test_cfg_register
 ^test/etap/Makefile
 ^test/etap/Makefile.in
 ^test/etap/temp.*
