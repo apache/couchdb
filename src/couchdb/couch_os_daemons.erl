@@ -86,12 +86,12 @@ handle_info({'EXIT', Port, Reason}, Table) ->
             ?LOG_INFO("Port ~p exited after stopping: ~p~n", [Port, Reason]);
         [#daemon{status=stopping}] ->
             true = ets:delete(Table, Port);
-        [#daemon{name=Name, status=restarting, errors=Errs}=D] ->
+        [#daemon{name=Name, status=restarting}=D] ->
             ?LOG_INFO("Daemon ~P restarting after config change.", [Name]),
             true = ets:delete(Table, Port),
             {ok, Port2} = start_port(D#daemon.cmd),
             true = ets:insert(Table, D#daemon{
-                port=Port2, status=running, kill=undefined, errors=Errs, buf=[]
+                port=Port2, status=running, kill=undefined, buf=[]
             });
         [#daemon{name=Name, status=halted}] ->
             ?LOG_ERROR("Halted daemon process: ~p", [Name]);
@@ -106,12 +106,12 @@ handle_info({Port, {exit_status, Status}}, Table) ->
         [] ->
             ?LOG_ERROR("Unknown port ~p exiting ~p", [Port, Status]),
             {stop, {error, unknown_port_died, Status}, Table};
-        [#daemon{name=Name, status=restarting, errors=Errors}=D] ->
+        [#daemon{name=Name, status=restarting}=D] ->
             ?LOG_INFO("Daemon ~P restarting after config change.", [Name]),
             true = ets:delete(Table, Port),
             {ok, Port2} = start_port(D#daemon.cmd),
             true = ets:insert(Table, D#daemon{
-                port=Port2, kill=undefined, errors=Errors, buf=[]
+                port=Port2, status=running, kill=undefined, buf=[]
             }),
             {noreply, Table};
         [#daemon{status=stopping}=D] ->
@@ -140,7 +140,8 @@ handle_info({Port, {exit_status, Status}}, Table) ->
                     true = ets:delete(Table, Port),
                     {ok, Port2} = start_port(D#daemon.cmd),
                     true = ets:insert(Table, D#daemon{
-                        port=Port2, kill=undefined, errors=Errors, buf=[]
+                        port=Port2, status=running, kill=undefined,
+                                                errors=Errors, buf=[]
                     }),
                     {noreply, Table}
             end;

@@ -28,7 +28,7 @@ daemon_name() ->
     "wheee".
 
 daemon_cmd() ->
-    test_util:source_file("test/etap/173-os-daemon-cfg-register.es").
+    test_util:build_file("test/etap/test_cfg_register").
 
 main(_) ->
     test_util:init_code_path(),

@@ -65,7 +65,9 @@ src/erlang-oauth/oauth.app
 src/ibrowse/ibrowse.app
 src/mochiweb/mochiweb.app
 test/local.ini
+test/etap/.deps/
 test/etap/run
+test/etap/test_cfg_register
 test/etap/test_util.erl
 test/javascript/run
 share/server/main.js

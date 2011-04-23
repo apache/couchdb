@@ -13,6 +13,10 @@
 noinst_SCRIPTS = run
 noinst_DATA = test_util.beam test_web.beam
 
+noinst_PROGRAMS = test_cfg_register
+test_cfg_register_SOURCES = test_cfg_register.c
+test_cfg_register_CFLAGS = -D_BSD_SOURCE
+
 %.beam: %.erl
 	$(ERLC) $<
 
@@ -78,7 +82,7 @@ EXTRA_DIST = \
     172-os-daemon-errors.3.es \
     172-os-daemon-errors.4.es \
     172-os-daemon-errors.t \
-	173-os-daemon-cfg-register.es \
 	173-os-daemon-cfg-register.t \
 	180-http-proxy.ini \
-	180-http-proxy.t
+	180-http-proxy.t \
+    190-json-stream-parse.t
