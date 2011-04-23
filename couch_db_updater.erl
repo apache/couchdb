@@ -329,9 +329,11 @@ btree_by_id_split(#full_doc_info{id=Id, update_seq=Seq,
 btree_by_id_join(Id, {HighSeq, Deleted, DiskTree}) ->
     {Tree, LeafsSize} =
     couch_key_tree:mapfold(
-        fun(_RevId, {IsDeleted, BodyPointer, UpdateSeq}, _Type, _Acc) ->
+        fun(_RevId, {IsDeleted, BodyPointer, UpdateSeq}, leaf, _Acc) ->
             % pre 1.2 format, will be upgraded on compaction
             {{IsDeleted == 1, BodyPointer, UpdateSeq, nil}, nil};
+        (_RevId, {IsDeleted, BodyPointer, UpdateSeq}, branch, Acc) ->
+            {{IsDeleted == 1, BodyPointer, UpdateSeq, nil}, Acc};
         (_RevId, {IsDeleted, BodyPointer, UpdateSeq, Size}, leaf, Acc) ->
             Acc2 = sum_leaf_sizes(Acc, Size),
             {{IsDeleted == 1, BodyPointer, UpdateSeq, Size}, Acc2};
