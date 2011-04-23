@@ -526,7 +526,7 @@ flush_trees(#db{updater_fd = Fd} = Db,
                 branch ->
                     {NewValue, Acc}
                 end;
-             {_, _, _, LeafSize} when Type =:= leaf ->
+             {_, _, _, LeafSize} when Type =:= leaf, LeafSize =/= nil ->
                 {Value, Acc + LeafSize};
              _ ->
                 {Value, Acc}
