@@ -12,7 +12,7 @@ Version 1.2.0
 
 This version has not been released yet.
 
- * Updated budled erlang_oauth library to the latest version.
+ * Updated bundled erlang_oauth library to the latest version.
  * cURL is no longer required to build CouchDB as it is only
    required by the command line JS test runner.
  * Added a native JSON parser.
