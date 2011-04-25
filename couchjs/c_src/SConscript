@@ -12,6 +12,7 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 import os
+import commands
 
 def require_lib(name):
     if not conf.CheckLib(name):
@@ -31,6 +32,9 @@ if os.uname()[0] == 'FreeBSD':
 	env['LIB_DL'] = env['LIB_RT'] = ''
 	env['LIB_COMPAT'] = 'compat'
 
+if os.path.exists('/usr/bin/pkg-config'):
+   env['CCFLAGS'] += commands.getoutput("/usr/bin/pkg-config mozilla-js --cflags")
+   env.Append(LINKFLAGS=commands.getoutput("/usr/bin/pkg-config mozilla-js --libs-only-L"))
 
 if not env.GetOption('clean'):
     conf = Configure(env, config_h='config.h')
