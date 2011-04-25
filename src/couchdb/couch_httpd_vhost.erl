@@ -210,6 +210,7 @@ make_target([P|Rest], Bindings, Remaining, Acc) ->
 
 %% bind port
 bind_port(Port, Port) -> ok;
+bind_port('*', _) -> ok;
 bind_port(_,_) -> fail.
 
 %% bind bhost
@@ -238,15 +239,17 @@ bind_path(_, _) ->
 
 %% create vhost list from ini
 make_vhosts() ->
-    lists:reverse(lists:foldl(fun({Vhost, Path}, Acc) ->
+    Vhosts = lists:foldl(fun({Vhost, Path}, Acc) ->
                     [{parse_vhost(Vhost), split_path(Path)}|Acc]
-            end, [], couch_config:get("vhosts"))).
+            end, [], couch_config:get("vhosts")),
+
+    lists:reverse(lists:usort(Vhosts)).
 
 
 parse_vhost(Vhost) ->
     case urlsplit_netloc(Vhost, []) of
         {[], Path} ->
-            {make_spec("*", []), 80, Path};
+            {make_spec("*", []), '*', Path};
         {HostPort, []} ->
             {H, P} = split_host_port(HostPort),
             H1 = make_spec(H, []),
@@ -261,13 +264,13 @@ parse_vhost(Vhost) ->
 split_host_port(HostAsString) ->
     case string:rchr(HostAsString, $:) of
         0 ->
-            {split_host(HostAsString), 80};
+            {split_host(HostAsString), '*'};
         N ->
             HostPart = string:substr(HostAsString, 1, N-1), 
             case (catch erlang:list_to_integer(string:substr(HostAsString, 
                             N+1, length(HostAsString)))) of
                 {'EXIT', _} ->
-                    {split_host(HostAsString), 80};
+                    {split_host(HostAsString), '*'};
                 Port ->
                     {split_host(HostPart), Port}
             end
