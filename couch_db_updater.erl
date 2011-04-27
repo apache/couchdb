@@ -820,6 +820,11 @@ copy_docs(Db, #db{updater_fd = DestFd} = NewDb, InfoBySeq0, Retry) ->
             Info#full_doc_info{rev_tree=couch_key_tree:map(
                 fun(_, _, branch) ->
                     ?REV_MISSING;
+		(_Rev, LeafVal, leaf) when element(1, LeafVal) ->
+                    Seq = element(3, LeafVal),
+                    {ok, Pos, SummarySize} =
+                        couch_file:append_term_md5(DestFd, {{[]}, []}),
+                    {true, Pos, Seq, SummarySize};
                 (_Rev, LeafVal, leaf) ->
                     IsDel = element(1, LeafVal),
                     Sp = element(2, LeafVal),
