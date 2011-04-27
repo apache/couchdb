@@ -143,10 +143,15 @@ to_json_obj(#doc{id=Id,deleted=Del,body=Body,revs={Start, RevIds},
     }.
 
 from_json_obj({Props}) ->
-    transfer_fields(Props, #doc{body=[]});
+    clean_if_deleted(transfer_fields(Props, #doc{body=[]}));
 
 from_json_obj(_Other) ->
     throw({bad_request, "Document must be a JSON object"}).
+
+clean_if_deleted(#doc{deleted=true}=Doc) ->
+    Doc#doc{atts=[], body={[]}};
+clean_if_deleted(Doc) ->
+    Doc.
 
 parse_revid(RevId) when size(RevId) =:= 32 ->
     RevInt = erlang:list_to_integer(?b2l(RevId), 16),
