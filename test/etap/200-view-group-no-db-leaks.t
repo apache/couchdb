@@ -66,7 +66,7 @@ ddoc_name() -> <<"foo">>.
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(13),
+    etap:plan(11),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -135,7 +135,7 @@ compact_db() ->
     wait_db_compact_done(10).
 
 wait_db_compact_done(0) ->
-    etap:is(true, false, "DB compaction didn't finish");
+    etap:bail("DB compaction failed to finish.");
 wait_db_compact_done(N) ->
     {ok, Db} = couch_db:open_int(test_db_name(), []),
     ok = couch_db:close(Db),
@@ -152,14 +152,17 @@ compact_view_group() ->
     wait_view_compact_done(10).
 
 wait_view_compact_done(0) ->
-    etap:is(true, false, "view group compaction didn't finish");
+    etap:bail("View group compaction failed to finish.");
 wait_view_compact_done(N) ->
     {ok, {{_, Code, _}, _Headers, Body}} = http:request(
         get,
         {db_url() ++ "/_design/" ++ binary_to_list(ddoc_name()) ++ "/_info", []},
         [],
         [{sync, true}]),
-    etap:is(Code, 200, "got view group info"),
+    case Code of
+        200 -> ok;
+        _ -> etap:bail("Invalid view group info.")
+    end,
     {Info} = ejson:decode(Body),
     {IndexInfo} = couch_util:get_value(<<"view_index">>, Info),
     CompactRunning = couch_util:get_value(<<"compact_running">>, IndexInfo),
