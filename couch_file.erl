@@ -390,7 +390,7 @@ find_header(Fd, Block) ->
 load_header(Fd, Block) ->
     {ok, <<1, HeaderLen:32/integer, RestBlock/binary>>} =
         file:pread(Fd, Block * ?SIZE_BLOCK, ?SIZE_BLOCK),
-    TotalBytes = calculate_total_read_len(1, HeaderLen),
+    TotalBytes = calculate_total_read_len(5, HeaderLen),
     case TotalBytes > byte_size(RestBlock) of
     false ->
         <<RawBin:TotalBytes/binary, _/binary>> = RestBlock;
