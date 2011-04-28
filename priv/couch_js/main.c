@@ -285,7 +285,7 @@ main(int argc, const char * argv[])
     JSContext* cx = NULL;
     JSObject* global = NULL;
     JSFunctionSpec* sp = NULL;
-    char* script_name = NULL;
+    const char* script_name = NULL;
     int use_http = 0;
     int i = 0;
 
