@@ -5,8 +5,6 @@ Apache CouchDB CHANGES
 Version 1.0.3
 -------------
 
-Note: This version has not been released yet.
-
 General:
 
  * Fixed compatibility issues with Erlang R14B02.
