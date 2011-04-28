@@ -254,7 +254,8 @@ get_db_info(Db) ->
         instance_start_time=StartTime,
         committed_update_seq=CommittedUpdateSeq,
         fulldocinfo_by_id_btree = IdBtree,
-        docinfo_by_seq_btree = SeqBtree
+        docinfo_by_seq_btree = SeqBtree,
+        local_docs_btree = LocalBtree
     } = Db,
     {ok, Size} = couch_file:bytes(Fd),
     {ok, DbReduction} = couch_btree:full_reduce(by_id_btree(Db)),
@@ -266,25 +267,30 @@ get_db_info(Db) ->
         {purge_seq, couch_db:get_purge_seq(Db)},
         {compact_running, Compactor/=nil},
         {disk_size, Size},
-        {data_size, db_data_size(
-            couch_btree:size(SeqBtree), couch_btree:size(IdBtree), DbReduction)},
+        {data_size, db_data_size(DbReduction, [SeqBtree, IdBtree, LocalBtree])},
         {instance_start_time, StartTime},
         {disk_format_version, DiskVersion},
         {committed_update_seq, CommittedUpdateSeq}
         ],
     {ok, InfoList}.
 
-db_data_size(nil, _, _) ->
-    null;
-db_data_size(_, nil, _) ->
-    null;
-db_data_size(_, _, {_Count, _DelCount}) ->
+db_data_size({_Count, _DelCount}, _Trees) ->
     % pre 1.2 format, upgraded on compaction
     null;
-db_data_size(_, _, {_Count, _DelCount, nil}) ->
+db_data_size({_Count, _DelCount, nil}, _Trees) ->
     null;
-db_data_size(SeqBtreeSize, IdBtreeSize, {_Count, _DelCount, DocAndAttsSize}) ->
-    SeqBtreeSize + IdBtreeSize + DocAndAttsSize.
+db_data_size({_Count, _DelCount, DocAndAttsSize}, Trees) ->
+    sum_tree_sizes(DocAndAttsSize, Trees).
+
+sum_tree_sizes(Acc, []) ->
+    Acc;
+sum_tree_sizes(Acc, [T | Rest]) ->
+    case couch_btree:size(T) of
+    nil ->
+        null;
+    Sz ->
+        sum_tree_sizes(Acc + Sz, Rest)
+    end.
 
 get_design_docs(Db) ->
     {ok,_, Docs} = couch_btree:fold(by_id_btree(Db),
