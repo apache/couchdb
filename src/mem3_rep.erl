@@ -66,7 +66,7 @@ find_missing_revs(Acc) ->
         #doc_info{id=Id, revs=RevInfos} = couch_doc:to_doc_info(FDI),
         {Id, [R || #rev_info{rev=R} <- RevInfos]}
     end, Infos),
-    Options = [{io_priority, {internal_repl, Name}}],
+    Options = [{io_priority, {internal_repl, Name}}, {user_ctx, ?CTX}],
     rexi_call(Node, {fabric_rpc, get_missing_revs, [Name, IdsRevs, Options]}).
 
 open_docs(#acc{source=Source, infos=Infos}, Missing) ->
