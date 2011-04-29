@@ -207,7 +207,7 @@ get_missing_revs(DbName, IdRevsList) ->
 get_missing_revs(DbName, IdRevsList, Options) ->
     % reimplement here so we get [] for Ids with no missing revs in response
     set_io_priority(DbName, Options),
-    rexi:reply(case couch_db:open(DbName, []) of
+    rexi:reply(case couch_db:open(DbName, Options) of
     {ok, Db} ->
         Ids = [Id1 || {Id1, _Revs} <- IdRevsList],
         {ok, lists:zipwith(fun({Id, Revs}, FullDocInfoResult) ->
