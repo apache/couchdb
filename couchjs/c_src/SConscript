@@ -33,8 +33,12 @@ if os.uname()[0] == 'FreeBSD':
 	env['LIB_COMPAT'] = 'compat'
 
 if os.path.exists('/usr/bin/pkg-config'):
-   env['CCFLAGS'] += commands.getoutput("/usr/bin/pkg-config mozilla-js --cflags")
-   env.Append(LINKFLAGS=commands.getoutput("/usr/bin/pkg-config mozilla-js --libs-only-L"))
+    (status, output) = commands.getstatusoutput("/usr/bin/pkg-config mozilla-js --cflags")
+    if status == 0:
+        env['CCFLAGS'] += output
+    (status, output) = commands.getstatusoutput("/usr/bin/pkg-config mozilla-js --libs-only-L")
+    if status == 0:
+        env.Append(LINKFLAGS=output)
 
 if not env.GetOption('clean'):
     conf = Configure(env, config_h='config.h')
