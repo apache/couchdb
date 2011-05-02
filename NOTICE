@@ -57,3 +57,11 @@ This product also includes the following third-party components:
  * yajl (http://lloyd.github.com/yajl/)
 
   Copyright 2010, Lloyd Hilaiel
+
+ * snappy (http://code.google.com/p/snappy/)
+
+  Copyright 2005 and onwards Google Inc.
+
+ * snappy-erlang-nif (https://github.com/fdmanana/snappy-erlang-nif)
+
+  Copyright 2011, Filipe David Manana <fdmanana@apache.org>

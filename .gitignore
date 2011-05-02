@@ -69,6 +69,13 @@ src/ejson/.deps/
 src/ejson/.libs/
 src/ejson/priv
 src/mochiweb/mochiweb.app
+src/snappy/.deps/
+src/snappy/.libs/
+src/snappy/priv
+src/snappy/snappy.app
+src/snappy/google-snappy/snappy-stubs-public.h
+src/snappy/google-snappy/stamp-h2
+src/snappy/google-snappy/.deps/
 test/local.ini
 test/etap/.deps/
 test/etap/run

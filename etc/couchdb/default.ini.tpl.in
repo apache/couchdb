@@ -11,6 +11,14 @@ os_process_timeout = 5000 ; 5 seconds. for view and external servers.
 max_dbs_open = 100
 delayed_commits = true ; set this to false to ensure an fsync before 201 Created is returned
 uri_file = %localstaterundir%/couch.uri
+; Method used to compress everything that is appended to database and view index files, except
+; for attachments (see the attachments section). Available methods are:
+;
+; none         - no compression
+; snappy       - use google snappy, a very fast compressor/decompressor
+; deflate_[N]  - use zlib's deflate, N is the compression level which ranges from 1 (fastest,
+;                lowest compression ratio) to 9 (slowest, highest compression ratio)
+file_compression = snappy
 
 [httpd]
 port = 5984

@@ -41,7 +41,9 @@ set_options(Bt, [{join, Assemble}|Rest]) ->
 set_options(Bt, [{less, Less}|Rest]) ->
     set_options(Bt#btree{less=Less}, Rest);
 set_options(Bt, [{reduce, Reduce}|Rest]) ->
-    set_options(Bt#btree{reduce=Reduce}, Rest).
+    set_options(Bt#btree{reduce=Reduce}, Rest);
+set_options(Bt, [{compression, Comp}|Rest]) ->
+    set_options(Bt#btree{compression=Comp}, Rest).
 
 open(State, Fd, Options) ->
     {ok, set_options(#btree{root=State, fd=Fd}, Options)}.
@@ -274,26 +276,26 @@ complete_root(Bt, KPs) ->
 % written. Plus with the "case byte_size(term_to_binary(InList)) of" code
 % it's probably really inefficient.
 
-chunkify(InList) ->
-    case byte_size(term_to_binary(InList)) of
+chunkify(#btree{compression = Comp} = Bt, InList) ->
+    case byte_size(couch_compress:compress(InList, Comp)) of
     Size when Size > ?CHUNK_THRESHOLD ->
         NumberOfChunksLikely = ((Size div ?CHUNK_THRESHOLD) + 1),
         ChunkThreshold = Size div NumberOfChunksLikely,
-        chunkify(InList, ChunkThreshold, [], 0, []);
+        chunkify(Bt, InList, ChunkThreshold, [], 0, []);
     _Else ->
         [InList]
     end.
 
-chunkify([], _ChunkThreshold, [], 0, OutputChunks) ->
+chunkify(_Bt, [], _ChunkThreshold, [], 0, OutputChunks) ->
     lists:reverse(OutputChunks);
-chunkify([], _ChunkThreshold, OutList, _OutListSize, OutputChunks) ->
+chunkify(_Bt, [], _ChunkThreshold, OutList, _OutListSize, OutputChunks) ->
     lists:reverse([lists:reverse(OutList) | OutputChunks]);
-chunkify([InElement | RestInList], ChunkThreshold, OutList, OutListSize, OutputChunks) ->
-    case byte_size(term_to_binary(InElement)) of
+chunkify(Bt, [InElement | RestInList], ChunkThreshold, OutList, OutListSize, OutputChunks) ->
+    case byte_size(couch_compress:compress(InElement, Bt#btree.compression)) of
     Size when (Size + OutListSize) > ChunkThreshold andalso OutList /= [] ->
-        chunkify(RestInList, ChunkThreshold, [], 0, [lists:reverse([InElement | OutList]) | OutputChunks]);
+        chunkify(Bt, RestInList, ChunkThreshold, [], 0, [lists:reverse([InElement | OutList]) | OutputChunks]);
     Size ->
-        chunkify(RestInList, ChunkThreshold, [InElement | OutList], OutListSize + Size, OutputChunks)
+        chunkify(Bt, RestInList, ChunkThreshold, [InElement | OutList], OutListSize + Size, OutputChunks)
     end.
 
 modify_node(Bt, RootPointerInfo, Actions, QueryOutput) ->
@@ -346,13 +348,14 @@ get_node(#btree{fd = Fd}, NodePos) ->
     {ok, {NodeType, NodeList}} = couch_file:pread_term(Fd, NodePos),
     {NodeType, NodeList}.
 
-write_node(Bt, NodeType, NodeList) ->
+write_node(#btree{fd = Fd, compression = Comp} = Bt, NodeType, NodeList) ->
     % split up nodes into smaller sizes
-    NodeListList = chunkify(NodeList),
+    NodeListList = chunkify(Bt, NodeList),
     % now write out each chunk and return the KeyPointer pairs for those nodes
     ResultList = [
         begin
-            {ok, Pointer, Size} = couch_file:append_term(Bt#btree.fd, {NodeType, ANodeList}),
+            {ok, Pointer, Size} = couch_file:append_term(
+                Fd, {NodeType, ANodeList}, [{compression, Comp}]),
             {LastKey, _} = lists:last(ANodeList),
             SubTreeSize = reduce_tree_size(NodeType, Size, ANodeList),
             {LastKey, {Pointer, reduce_node(Bt, NodeType, ANodeList), SubTreeSize}}

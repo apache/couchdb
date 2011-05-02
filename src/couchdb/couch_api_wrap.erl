@@ -420,6 +420,8 @@ options_to_query_args(HttpDb, Path, Options) ->
 
 options_to_query_args([], Acc) ->
     lists:reverse(Acc);
+options_to_query_args([ejson_body | Rest], Acc) ->
+    options_to_query_args(Rest, Acc);
 options_to_query_args([delay_commit | Rest], Acc) ->
     options_to_query_args(Rest, Acc);
 options_to_query_args([revs | Rest], Acc) ->

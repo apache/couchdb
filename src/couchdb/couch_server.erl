@@ -380,6 +380,29 @@ code_change(_OldVsn, State, _Extra) ->
     
 handle_info({'EXIT', _Pid, config_change}, Server) ->
     {noreply, shutdown, Server};
+handle_info({'EXIT', Pid, snappy_nif_not_loaded}, Server) ->
+    Server2 = case ets:lookup(couch_dbs_by_pid, Pid) of
+    [{Pid, Db}] ->
+        [{Db, {opening, Pid, Froms}}] = ets:lookup(couch_dbs_by_name, Db),
+        Msg = io_lib:format("To open the database `~s`, Apache CouchDB "
+            "must be built with Erlang OTP R13B04 or higher.", [Db]),
+        ?LOG_ERROR(Msg, []),
+        lists:foreach(
+            fun(F) -> gen_server:reply(F, {bad_otp_release, Msg}) end,
+            Froms),
+        true = ets:delete(couch_dbs_by_name, Db),
+        true = ets:delete(couch_dbs_by_pid, Pid),
+        case ets:lookup(couch_sys_dbs, Db) of
+        [{Db, _}] ->
+            true = ets:delete(couch_sys_dbs, Db),
+            Server;
+        [] ->
+            Server#server{dbs_open = Server#server.dbs_open - 1}
+        end;
+    _ ->
+        Server
+    end,
+    {noreply, Server2};
 handle_info(Error, _Server) ->
     ?LOG_ERROR("Unexpected message, restarting couch_server: ~p", [Error]),
     exit(kill).

@@ -28,7 +28,8 @@ run: ../bin/couchdb.tpl
 			-pa $(abs_top_builddir)\/src\/ejson \
 			-pa $(abs_top_builddir)\/src\/erlang-oauth \
 			-pa $(abs_top_builddir)\/src\/ibrowse \
-			-pa $(abs_top_builddir)\/src\/mochiweb|g" \
+			-pa $(abs_top_builddir)\/src\/mochiweb \
+			-pa $(abs_top_builddir)\/src\/snappy|g" \
 	    -e "s|%localconfdir%|$(abs_top_builddir)/etc/couchdb|g" \
 	    -e "s|%localstatelogdir%|$(abs_top_builddir)/tmp/log|g" \
 	    -e "s|%localstatelibdir%|$(abs_top_builddir)/tmp/lib|g" \

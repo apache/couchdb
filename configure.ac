@@ -19,6 +19,7 @@ AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
 
 AM_CONFIG_HEADER([config.h])
+AC_CONFIG_HEADERS([src/snappy/google-snappy/config.h])
 
 AM_INIT_AUTOMAKE([1.6.3 foreign])
 
@@ -29,6 +30,67 @@ AC_DISABLE_STATIC
 AC_PROG_CC
 AC_PROG_LIBTOOL
 AC_PROG_LN_S
+
+dnl Config for google snappy
+m4_define([snappy_major], [1])
+m4_define([snappy_minor], [0])
+m4_define([snappy_patchlevel], [1])
+
+AC_PROG_CXX
+AC_LANG([C++])
+AC_C_BIGENDIAN
+AC_CHECK_HEADERS([stdint.h stddef.h sys/mman.h sys/resource.h])
+AC_CHECK_FUNC([mmap])
+
+AC_MSG_CHECKING([if the compiler supports __builtin_expect])
+
+AC_TRY_COMPILE(, [
+    return __builtin_expect(1, 1) ? 1 : 0
+], [
+    snappy_have_builtin_expect=yes
+    AC_MSG_RESULT([yes])
+], [
+    snappy_have_builtin_expect=no
+    AC_MSG_RESULT([no])
+])
+if test x$snappy_have_builtin_expect = xyes ; then
+    AC_DEFINE([HAVE_BUILTIN_EXPECT], [1], [Define to 1 if the compiler supports __builtin_expect.])
+fi
+
+AC_MSG_CHECKING([if the compiler supports __builtin_ctzll])
+
+AC_TRY_COMPILE(, [
+    return (__builtin_ctzll(0x100000000LL) == 32) ? 1 : 0
+], [
+    snappy_have_builtin_ctz=yes
+    AC_MSG_RESULT([yes])
+], [
+    snappy_have_builtin_ctz=no
+    AC_MSG_RESULT([no])
+])
+if test x$snappy_have_builtin_ctz = xyes ; then
+    AC_DEFINE([HAVE_BUILTIN_CTZ], [1], [Define to 1 if the compiler supports __builtin_ctz and friends.])
+fi
+
+if test "$ac_cv_header_stdint_h" = "yes"; then
+    AC_SUBST([ac_cv_have_stdint_h], [1])
+else
+    AC_SUBST([ac_cv_have_stdint_h], [0])
+fi
+if test "$ac_cv_header_stddef_h" = "yes"; then
+    AC_SUBST([ac_cv_have_stddef_h], [1])
+else
+    AC_SUBST([ac_cv_have_stddef_h], [0])
+fi
+
+SNAPPY_MAJOR="snappy_major"
+SNAPPY_MINOR="snappy_minor"
+SNAPPY_PATCHLEVEL="snappy_patchlevel"
+
+AC_SUBST([SNAPPY_MAJOR])
+AC_SUBST([SNAPPY_MINOR])
+AC_SUBST([SNAPPY_PATCHLEVEL])
+dnl End of google snappy specific config
 
 AC_MSG_CHECKING([for pthread_create in -lpthread])
 
@@ -423,6 +485,8 @@ AC_CONFIG_FILES([src/erlang-oauth/Makefile])
 AC_CONFIG_FILES([src/etap/Makefile])
 AC_CONFIG_FILES([src/ibrowse/Makefile])
 AC_CONFIG_FILES([src/mochiweb/Makefile])
+AC_CONFIG_FILES([src/snappy/Makefile])
+AC_CONFIG_FILES([src/snappy/google-snappy/snappy-stubs-public.h])
 AC_CONFIG_FILES([src/ejson/Makefile])
 AC_CONFIG_FILES([test/Makefile])
 AC_CONFIG_FILES([test/bench/Makefile])
