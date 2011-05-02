@@ -16,8 +16,7 @@
 -module(snappy).
 
 -export([compress/1, decompress/1]).
--export([get_uncompressed_length/1]).
--export([is_valid_compressed_buffer/1]).
+-export([uncompressed_length/1, is_valid/1]).
 
 -on_load(init/0).
 
@@ -49,9 +48,9 @@ decompress(_IoList) ->
     exit(snappy_nif_not_loaded).
 
 
-get_uncompressed_length(_IoList) ->
+uncompressed_length(_IoList) ->
     exit(snappy_nif_not_loaded).
 
 
-is_valid_compressed_buffer(_IoList) ->
+is_valid(_IoList) ->
     exit(snappy_nif_not_loaded).
