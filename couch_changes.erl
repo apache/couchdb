@@ -105,7 +105,7 @@ os_filter_fun(FilterName, Style, Req, Db) ->
         end;
     [DName, FName] ->
         DesignId = <<"_design/", DName/binary>>,
-        DDoc = couch_httpd_db:couch_doc_open(Db, DesignId, nil, []),
+        DDoc = couch_httpd_db:couch_doc_open(Db, DesignId, nil, [ejson_body]),
         % validate that the ddoc has the filter fun
         #doc{body={Props}} = DDoc,
         couch_util:get_nested_json_value({Props}, [<<"filters">>, FName]),
@@ -178,7 +178,7 @@ filter_view(ViewName, Style, Db) ->
             throw({bad_request, "Invalid `view` parameter."});
         [DName, VName] ->
             DesignId = <<"_design/", DName/binary>>,
-            DDoc = couch_httpd_db:couch_doc_open(Db, DesignId, nil, []),
+            DDoc = couch_httpd_db:couch_doc_open(Db, DesignId, nil, [ejson_body]),
             % validate that the ddoc has the filter fun
             #doc{body={Props}} = DDoc,
             couch_util:get_nested_json_value({Props}, [<<"views">>, VName]),

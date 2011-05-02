@@ -26,7 +26,8 @@
 -export([open/1, open/2, close/1, bytes/1, sync/1, truncate/2]).
 -export([pread_term/2, pread_iolist/2, pread_binary/2]).
 -export([append_binary/2, append_binary_md5/2]).
--export([append_term/2, append_term_md5/2]).
+-export([append_raw_chunk/2, assemble_file_chunk/1, assemble_file_chunk/2]).
+-export([append_term/2, append_term/3, append_term_md5/2, append_term_md5/3]).
 -export([write_header/2, read_header/1]).
 -export([delete/2, delete/3, init_delete_dir/1]).
 
@@ -77,11 +78,18 @@ open(Filepath, Options) ->
 %%----------------------------------------------------------------------
 
 append_term(Fd, Term) ->
-    append_binary(Fd, term_to_binary(Term)).
-    
-append_term_md5(Fd, Term) ->
-    append_binary_md5(Fd, term_to_binary(Term)).
+    append_term(Fd, Term, []).
 
+append_term(Fd, Term, Options) ->
+    Comp = couch_util:get_value(compression, Options, ?DEFAULT_COMPRESSION),
+    append_binary(Fd, couch_compress:compress(Term, Comp)).
+
+append_term_md5(Fd, Term) ->
+    append_term_md5(Fd, Term, []).
+
+append_term_md5(Fd, Term, Options) ->
+    Comp = couch_util:get_value(compression, Options, ?DEFAULT_COMPRESSION),
+    append_binary_md5(Fd, couch_compress:compress(Term, Comp)).
 
 %%----------------------------------------------------------------------
 %% Purpose: To append an Erlang binary to the end of the file.
@@ -92,15 +100,21 @@ append_term_md5(Fd, Term) ->
 %%----------------------------------------------------------------------
 
 append_binary(Fd, Bin) ->
-    Size = iolist_size(Bin),
-    gen_server:call(Fd, {append_bin,
-            [<<0:1/integer,Size:31/integer>>, Bin]}, infinity).
+    gen_server:call(Fd, {append_bin, assemble_file_chunk(Bin)}, infinity).
     
 append_binary_md5(Fd, Bin) ->
-    Size = iolist_size(Bin),
-    gen_server:call(Fd, {append_bin,
-            [<<1:1/integer,Size:31/integer>>, couch_util:md5(Bin), Bin]}, infinity).
+    gen_server:call(Fd,
+        {append_bin, assemble_file_chunk(Bin, couch_util:md5(Bin))}, infinity).
 
+append_raw_chunk(Fd, Chunk) ->
+    gen_server:call(Fd, {append_bin, Chunk}, infinity).
+
+
+assemble_file_chunk(Bin) ->
+    [<<0:1/integer, (iolist_size(Bin)):31/integer>>, Bin].
+
+assemble_file_chunk(Bin, Md5) ->
+    [<<1:1/integer, (iolist_size(Bin)):31/integer>>, Md5, Bin].
 
 %%----------------------------------------------------------------------
 %% Purpose: Reads a term from a file that was written with append_term
@@ -112,7 +126,7 @@ append_binary_md5(Fd, Bin) ->
 
 pread_term(Fd, Pos) ->
     {ok, Bin} = pread_binary(Fd, Pos),
-    {ok, binary_to_term(Bin)}.
+    {ok, couch_compress:decompress(Bin)}.
 
 
 %%----------------------------------------------------------------------

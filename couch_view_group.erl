@@ -497,7 +497,7 @@ sort_lib([{LName, LCode}|Rest], LAcc) ->
 open_db_group(DbName, GroupId) ->
     case couch_db:open_int(DbName, []) of
     {ok, Db} ->
-        case couch_db:open_doc(Db, GroupId) of
+        case couch_db:open_doc(Db, GroupId, [ejson_body]) of
         {ok, Doc} ->
             couch_db:close(Db),
             {ok, design_doc_to_view_group(Doc)};
@@ -618,7 +618,8 @@ init_group(Db, Fd, #group{def_lang=Lang,views=Views}=
         (State) -> {State, 0, 0}
     end,
     ViewStates2 = lists:map(StateUpdate, ViewStates),
-    {ok, IdBtree} = couch_btree:open(IdBtreeState, Fd),
+    {ok, IdBtree} = couch_btree:open(
+        IdBtreeState, Fd, [{compression, Db#db.compression}]),
     Views2 = lists:zipwith(
         fun({BTState, USeq, PSeq}, #view{reduce_funs=RedFuns,options=Options}=View) ->
             FunSrcs = [FunSrc || {_Name, FunSrc} <- RedFuns],
@@ -644,7 +645,8 @@ init_group(Db, Fd, #group{def_lang=Lang,views=Views}=
                 Less = fun(A,B) -> A < B end
             end,
             {ok, Btree} = couch_btree:open(BTState, Fd,
-                    [{less, Less}, {reduce, ReduceFun}]
+                    [{less, Less}, {reduce, ReduceFun},
+                        {compression, Db#db.compression}]
             ),
             View#view{btree=Btree, update_seq=USeq, purge_seq=PSeq}
         end,

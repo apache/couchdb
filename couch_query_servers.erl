@@ -309,7 +309,8 @@ terminate(_Reason, #qserver{pid_procs=PidProcs}) ->
     [couch_util:shutdown_sync(P) || {P,_} <- ets:tab2list(PidProcs)],
     ok.
 
-handle_call({get_proc, #doc{body={Props}}=DDoc, DDocKey}, From, Server) ->
+handle_call({get_proc, DDoc1, DDocKey}, From, Server) ->
+    #doc{body = {Props}} = DDoc = couch_doc:with_ejson_body(DDoc1),
     Lang = couch_util:get_value(<<"language">>, Props, <<"javascript">>),
     case lang_proc(Lang, Server, fun(Procs) ->
             % find a proc in the set that has the DDoc

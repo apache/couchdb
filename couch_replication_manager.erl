@@ -445,7 +445,7 @@ stop_all_replications() ->
 update_rep_doc(RepDocId, KVs) ->
     {ok, RepDb} = ensure_rep_db_exists(),
     try
-        case couch_db:open_doc(RepDb, RepDocId, []) of
+        case couch_db:open_doc(RepDb, RepDocId, [ejson_body]) of
         {ok, LatestRepDoc} ->
             update_rep_doc(RepDb, LatestRepDoc, KVs);
         _ ->

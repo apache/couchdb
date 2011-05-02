@@ -13,6 +13,7 @@
 -define(LOCAL_DOC_PREFIX, "_local/").
 -define(DESIGN_DOC_PREFIX0, "_design").
 -define(DESIGN_DOC_PREFIX, "_design/").
+-define(DEFAULT_COMPRESSION, snappy).
 
 -define(MIN_STR, <<"">>).
 -define(MAX_STR, <<255>>). % illegal utf string
@@ -25,6 +26,7 @@
 
 -define(b2l(V), binary_to_list(V)).
 -define(l2b(V), list_to_binary(V)).
+-define(term_to_bin(T), term_to_binary(T, [{minor_version, 1}])).
 
 -define(DEFAULT_ATTACHMENT_CONTENT_TYPE, <<"application/octet-stream">>).
 
@@ -167,7 +169,8 @@
     waiting_delayed_commit = nil,
     revs_limit = 1000,
     fsync_options = [],
-    options = []
+    options = [],
+    compression
     }).
 
 
@@ -271,5 +274,6 @@
     extract_kv = fun({_Key, _Value} = KV) -> KV end,
     assemble_kv = fun(Key, Value) -> {Key, Value} end,
     less = fun(A, B) -> A < B end,
-    reduce = nil
+    reduce = nil,
+    compression = ?DEFAULT_COMPRESSION
 }).

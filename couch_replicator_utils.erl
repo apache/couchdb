@@ -89,8 +89,8 @@ filter_code(Filter, Source, UserCtx) ->
         re:run(Filter, "(.*?)/(.*)", [{capture, [1, 2], binary}]),
     {ok, Db} = couch_api_wrap:db_open(Source, [{user_ctx, UserCtx}]),
     try
-        {ok, #doc{body = Body}} =
-            couch_api_wrap:open_doc(Db, <<"_design/", DDocName/binary>>, []),
+        {ok, #doc{body = Body}} = couch_api_wrap:open_doc(
+            Db, <<"_design/", DDocName/binary>>, [ejson_body]),
         Code = couch_util:get_nested_json_value(
             Body, [<<"filters">>, FilterName]),
         re:replace(Code, [$^, "\s*(.*?)\s*", $$], "\\1", [{return, binary}])
