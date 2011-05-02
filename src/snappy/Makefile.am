@@ -32,6 +32,7 @@ SNAPPY_CXX_HDRS = \
 	erl_nif_compat.h \
 	google-snappy/snappy.h \
 	google-snappy/snappy-internal.h \
+	google-snappy/snappy-sinksource.h \
 	google-snappy/snappy-stubs-internal.h \
 	google-snappy/snappy-stubs-public.h
 
@@ -53,7 +54,7 @@ snappyebin_make_generated_file_list = \
     snappy.beam
 
 EXTRA_DIST = \
-	$(SNAPPY_CXX_HDRS)
+	$(SNAPPY_CXX_HDRS) \
 	$(snappy_file_collection)
 
 snappyebin_DATA = \
