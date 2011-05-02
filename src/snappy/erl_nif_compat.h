@@ -53,6 +53,9 @@ extern "C" {
 #define enif_priv_data_compat enif_get_data
 #define enif_make_uint_compat enif_make_ulong
 
+#define enif_make_existing_atom_compat(E, N, R, Enc) \
+    enif_make_existing_atom(E, N, R)
+
 #define enif_make_string_compat(E, B, Enc) \
     enif_make_string(E, B)
 
@@ -73,6 +76,10 @@ extern "C" {
 #define enif_priv_data_compat enif_priv_data
 #define enif_make_string_compat enif_make_string
 #define enif_make_uint_compat enif_make_uint
+
+#define enif_make_existing_atom_compat(E, N, R, Enc) \
+    enif_make_existing_atom(E, N, R)
+
 
 #endif /* R13B04 */
 
@@ -109,6 +116,7 @@ extern "C" {
 
 #define enif_priv_data_compat enif_priv_data
 #define enif_make_string_compat enif_make_string
+#define enif_make_existing_atom_compat enif_make_existing_atom
 #define enif_make_uint_compat enif_make_uint
 
 #endif  /* R14 and future releases */
