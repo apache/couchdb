@@ -173,7 +173,7 @@ fold_reduce({reduce, NthRed, Lang, #view{btree=Bt, reduce_funs=RedFuns}}, Fun, A
             {ok, Reduced} = couch_query_servers:reduce(Lang, [FunSrc], detuple_kvs(expand_dups(KVs, []),[])),
             {0, PreResultPadding ++ Reduced ++ PostResultPadding};
         (rereduce, Reds) ->
-            UserReds = [[lists:nth(NthRed, UserRedsList)] || {_, UserRedsList} <- Reds],
+            UserReds = [[lists:nth(NthRed, element(2, R))] || R <- Reds],
             {ok, Reduced} = couch_query_servers:rereduce(Lang, [FunSrc], UserReds),
             {0, PreResultPadding ++ Reduced ++ PostResultPadding}
         end,
