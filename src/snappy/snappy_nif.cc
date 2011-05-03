@@ -107,7 +107,7 @@ SnappyNifSink::getBin()
 BEGIN_C
 
 
-ERL_NIF_TERM
+static inline ERL_NIF_TERM
 make_atom(ErlNifEnv* env, const char* name)
 {
     ERL_NIF_TERM ret;
@@ -118,7 +118,7 @@ make_atom(ErlNifEnv* env, const char* name)
 }
 
 
-ERL_NIF_TERM
+static inline ERL_NIF_TERM
 make_ok(ErlNifEnv* env, ERL_NIF_TERM mesg)
 {
     ERL_NIF_TERM ok = make_atom(env, "ok");
@@ -126,7 +126,7 @@ make_ok(ErlNifEnv* env, ERL_NIF_TERM mesg)
 }
 
 
-ERL_NIF_TERM
+static inline ERL_NIF_TERM
 make_error(ErlNifEnv* env, const char* mesg)
 {
     ERL_NIF_TERM error = make_atom(env, "error");
