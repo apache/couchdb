@@ -13,37 +13,19 @@
 snappyebindir = $(localerlanglibdir)/snappy-1.0.1/ebin
 snappyprivdir = $(localerlanglibdir)/snappy-1.0.1/priv
 
-CLEANFILES = \
-	$(snappyebin_make_generated_file_list) \
-	$(snappypriv_make_generated_file_list) \
-	priv/snappy_nif.so
-
-if USE_OTP_NIFS
-snappypriv_LTLIBRARIES = snappy_nif.la
-endif
-
-SNAPPY_CXX_SRCS = \
+snappy_cxx_srcs = \
 	snappy_nif.cc \
 	google-snappy/snappy.cc \
 	google-snappy/snappy-sinksource.cc \
 	google-snappy/snappy-stubs-internal.cc
 
-SNAPPY_CXX_HDRS = \
+snappy_cxx_hdrs = \
 	erl_nif_compat.h \
 	google-snappy/snappy.h \
 	google-snappy/snappy-internal.h \
 	google-snappy/snappy-sinksource.h \
 	google-snappy/snappy-stubs-internal.h \
 	google-snappy/snappy-stubs-public.h
-
-if USE_OTP_NIFS
-snappy_nif_la_SOURCES = $(SNAPPY_CXX_SRCS)
-snappy_nif_la_LDFLAGS = -module -avoid-version
-
-if WINDOWS
-snappy_nif_la_LDFLAGS += -no-undefined
-endif
-endif
 
 snappy_file_collection = \
     snappy.app.in \
@@ -54,13 +36,25 @@ snappyebin_make_generated_file_list = \
     snappy.beam
 
 EXTRA_DIST = \
-	$(SNAPPY_CXX_HDRS) \
-	$(snappy_file_collection)
+	$(snappy_cxx_hdrs) \
+    $(snappy_file_collection)
+
+CLEANFILES = \
+    $(snappyebin_make_generated_file_list) \
+	priv/snappy_nif.so
 
 snappyebin_DATA = \
     $(snappyebin_make_generated_file_list)
 
 if USE_OTP_NIFS
+snappypriv_LTLIBRARIES = snappy_nif.la
+snappy_nif_la_SOURCES = $(snappy_cxx_srcs)
+snappy_nif_la_LDFLAGS = -module -avoid-version
+
+if WINDOWS
+snappy_nif_la_LDFLAGS += -no-undefined
+endif
+
 priv/snappy_nif.so: snappy_nif.la
 	@mkdir -p ./priv
 	cp .libs/snappy_nif.so $@
