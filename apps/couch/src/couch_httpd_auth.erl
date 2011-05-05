@@ -53,8 +53,8 @@ basic_name_pw(Req) ->
             nil;
         [User, Pass] ->
             {User, Pass};
-        [User] ->
-            {User, ""};
+        [User | Pass] ->
+            {User, string:join(Pass, ":")};
         _ ->
             nil
         end;
