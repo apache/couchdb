@@ -1282,34 +1282,8 @@ validate_attachment_name(Name) when is_list(Name) ->
 validate_attachment_name(<<"_",_/binary>>) ->
     throw({bad_request, <<"Attachment name can't start with '_'">>});
 validate_attachment_name(Name) ->
-    case is_valid_utf8(Name) of
+    case couch_util:validate_utf8(Name) of
         true -> Name;
         false -> throw({bad_request, <<"Attachment name is not UTF-8 encoded">>})
     end.
 
-%% borrowed from mochijson2:json_bin_is_safe()
-is_valid_utf8(<<>>) ->
-    true;
-is_valid_utf8(<<C, Rest/binary>>) ->
-    case C of
-        $\" ->
-            false;
-        $\\ ->
-            false;
-        $\b ->
-            false;
-        $\f ->
-            false;
-        $\n ->
-            false;
-        $\r ->
-            false;
-        $\t ->
-            false;
-        C when C >= 0, C < $\s; C >= 16#7f, C =< 16#10FFFF ->
-            false;
-        C when C < 16#7f ->
-            is_valid_utf8(Rest);
-        _ ->
-            false
-    end.
