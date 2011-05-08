@@ -238,7 +238,8 @@ do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
     % MissingRevsQueue and copy them from the source to the target database.
     MaxHttpConns = get_value(http_connections, Options),
     HttpPipeSize = get_value(http_pipeline_size, Options),
-    MaxParallelConns = (MaxHttpConns * HttpPipeSize) div CopiersCount,
+    MaxParallelConns = lists:max(
+        [(MaxHttpConns * HttpPipeSize) div CopiersCount, 1]),
     Workers = lists:map(
         fun(_) ->
             {ok, Pid} = couch_replicator_doc_copier:start_link(
