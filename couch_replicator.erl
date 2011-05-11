@@ -578,15 +578,28 @@ fold_replication_logs([Db | Rest] = Dbs, Vsn, LogId, NewId, Rep, Acc) ->
     end.
 
 
-spawn_changes_reader(StartSeq, Source, ChangesQueue, Options) ->
-    spawn_link(
-        fun()->
-            couch_api_wrap:changes_since(Source, all_docs, StartSeq,
-                fun(DocInfo) ->
-                    ok = couch_work_queue:queue(ChangesQueue, DocInfo)
-                end, Options),
-            couch_work_queue:close(ChangesQueue)
-        end).
+spawn_changes_reader(StartSeq, #httpdb{} = Db, ChangesQueue, Options) ->
+    spawn_link(fun() ->
+        put(last_seq, StartSeq),
+        read_changes(StartSeq, Db#httpdb{retries = 0}, ChangesQueue, Options)
+    end);
+spawn_changes_reader(StartSeq, Db, ChangesQueue, Options) ->
+    spawn_link(fun() -> read_changes(StartSeq, Db, ChangesQueue, Options) end).
+
+read_changes(StartSeq, Db, ChangesQueue, Options) ->
+    try
+        couch_api_wrap:changes_since(Db, all_docs, StartSeq,
+            fun(#doc_info{high_seq = Seq} = DocInfo) ->
+                ok = couch_work_queue:queue(ChangesQueue, DocInfo),
+                put(last_seq, Seq)
+            end, Options),
+        couch_work_queue:close(ChangesQueue)
+    catch exit:{http_request_failed, _, _, _} ->
+        Url = couch_util:url_strip_password(couch_api_wrap_httpc:full_url(Db, [])),
+        ?LOG_INFO("Retrying _changes request to source database ~s with since=~p",
+            [Url, get(last_seq)]),
+        read_changes(get(last_seq), Db, ChangesQueue, Options)
+    end.
 
 
 checkpoint_interval(_State) ->
