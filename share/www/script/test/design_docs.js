@@ -49,7 +49,48 @@ couchTests.design_docs = function(debug) {
           whynot : "exports.test = require('../stringzone'); " +
             "exports.foo = require('whatever/stringzone');",
           upper : "exports.testing = require('./whynot').test.string.toUpperCase()+" +
-            "module.id+require('./whynot').foo.string"
+            "module.id+require('./whynot').foo.string",
+          circular_one: "require('./circular_two'); exports.name = 'One';",
+          circular_two: "require('./circular_one'); exports.name = 'Two';"
+        },
+        // paths relative to parent
+        idtest1: {
+          a: {
+            b: {d: "module.exports = require('../c/e').id;"},
+            c: {e: "exports.id = module.id;"}
+          }
+        },
+        // multiple paths relative to parent
+        idtest2: {
+          a: {
+            b: {d: "module.exports = require('../../a/c/e').id;"},
+            c: {e: "exports.id = module.id;"}
+          }
+        },
+        // paths relative to module
+        idtest3: {
+          a: {
+            b: "module.exports = require('./c/d').id;",
+            c: {
+              d: "module.exports = require('./e');",
+              e: "exports.id = module.id;"
+            }
+          }
+        },
+        // paths relative to module and parent
+        idtest4: {
+          a: {
+            b: "module.exports = require('../a/./c/d').id;",
+            c: {
+              d: "module.exports = require('./e');",
+              e: "exports.id = module.id;"
+            }
+          }
+        },
+        // paths relative to root
+        idtest5: {
+          a: "module.exports = require('whatever/idtest5/b').id;",
+          b: "exports.id = module.id;"
         }
       },
       views: {
@@ -134,6 +175,25 @@ couchTests.design_docs = function(debug) {
           (function() {
             var lib = require('whatever/commonjs/upper');
             return JSON.stringify(this);
+          }).toString(),
+        circular_require:
+          (function() {
+            return require('whatever/commonjs/circular_one').name;
+          }).toString(),
+        idtest1: (function() {
+            return require('whatever/idtest1/a/b/d');
+          }).toString(),
+        idtest2: (function() {
+            return require('whatever/idtest2/a/b/d');
+          }).toString(),
+        idtest3: (function() {
+            return require('whatever/idtest3/a/b');
+          }).toString(),
+        idtest4: (function() {
+            return require('whatever/idtest4/a/b');
+          }).toString(),
+        idtest5: (function() {
+            return require('whatever/idtest5/a');
           }).toString()
       }
     }; // designDoc
@@ -173,6 +233,52 @@ couchTests.design_docs = function(debug) {
     xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/circular");
     T(xhr.status == 200);
     TEquals("javascript", JSON.parse(xhr.responseText).language);
+
+    // test circular commonjs dependencies
+    xhr = CouchDB.request(
+      "GET",
+      "/test_suite_db/_design/test/_show/circular_require"
+    );
+    TEquals(200, xhr.status);
+    TEquals("One", xhr.responseText);
+
+    // Test that changes to the design doc properly invalidate cached modules:
+
+    // update the designDoc and replace
+    designDoc.whatever.commonjs.circular_one = "exports.name = 'Updated';"
+    T(db.save(designDoc).ok);
+
+    // request circular_require show function again and check the response has
+    // changed
+    xhr = CouchDB.request(
+      "GET",
+      "/test_suite_db/_design/test/_show/circular_require"
+    );
+    TEquals(200, xhr.status);
+    TEquals("Updated", xhr.responseText);
+
+
+    // test module id values are as expected:
+    xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/idtest1");
+    TEquals(200, xhr.status);
+    TEquals("whatever/idtest1/a/c/e", xhr.responseText);
+
+    xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/idtest2");
+    TEquals(200, xhr.status);
+    TEquals("whatever/idtest2/a/c/e", xhr.responseText);
+
+    xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/idtest3");
+    TEquals(200, xhr.status);
+    TEquals("whatever/idtest3/a/c/e", xhr.responseText);
+
+    xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/idtest4");
+    TEquals(200, xhr.status);
+    TEquals("whatever/idtest4/a/c/e", xhr.responseText);
+
+    xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_show/idtest5");
+    TEquals(200, xhr.status);
+    TEquals("whatever/idtest5/b", xhr.responseText);
+
 
     var prev_view_sig = db.designInfo("_design/test").view_index.signature;
     var prev_view_size = db.designInfo("_design/test").view_index.disk_size;
