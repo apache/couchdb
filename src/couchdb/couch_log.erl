@@ -167,10 +167,10 @@ log(#state{fd = Fd}, ConsoleMsg, FileMsg) ->
     ok = io:put_chars(Fd, FileMsg).
 
 get_log_messages(Pid, Level, Format, Args) ->
-    ConsoleMsg = io_lib:format(
-        "[~s] [~p] " ++ Format ++ "~n", [Level, Pid | Args]),
+    ConsoleMsg = unicode:characters_to_binary(io_lib:format(
+        "[~s] [~p] " ++ Format ++ "~n", [Level, Pid | Args])),
     FileMsg = ["[", httpd_util:rfc1123_date(), "] ", ConsoleMsg],
-    {iolist_to_binary(ConsoleMsg), iolist_to_binary(FileMsg)}.
+    {ConsoleMsg, iolist_to_binary(FileMsg)}.
 
 read(Bytes, Offset) ->
     LogFileName = couch_config:get("log", "file"),
