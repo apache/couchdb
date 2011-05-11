@@ -112,10 +112,10 @@ calculate_start_seq(Db, #shard{node=Node, name=Name}, LocalId) ->
             SourceSeq = couch_util:get_value(<<"seq">>, SProps, 0),
             TargetSeq = couch_util:get_value(<<"seq">>, TProps, 0),
             erlang:min(SourceSeq, TargetSeq)
-        catch error:_ ->
+        catch error:{not_found, _} ->
             0
         end;
-    _ ->
+    {not_found, _} ->
         0
     end.
 
