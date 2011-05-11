@@ -67,7 +67,7 @@ ddoc_name() -> <<"foo">>.
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(11),
+    etap:plan(18),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -89,12 +89,20 @@ test() ->
 
     create_docs(),
     create_design_doc(),
+
+    ViewGroup = couch_view:get_group_server(
+        test_db_name(), <<"_design/", (ddoc_name())/binary>>),
+    etap:is(is_pid(ViewGroup), true, "got view group pid"),
+    etap:is(is_process_alive(ViewGroup), true, "view group pid is alive"),
+
     query_view(),
     check_db_ref_count(),
+    etap:is(is_process_alive(ViewGroup), true, "view group pid is alive"),
 
     create_new_doc(<<"doc1000">>),
     query_view(),
     check_db_ref_count(),
+    etap:is(is_process_alive(ViewGroup), true, "view group pid is alive"),
 
     Ref1 = get_db_ref_counter(),
     compact_db(),
@@ -102,15 +110,27 @@ test() ->
     Ref2 = get_db_ref_counter(),
     etap:isnt(Ref1, Ref2,  "DB ref counter changed"),
     etap:is(false, is_process_alive(Ref1), "old DB ref counter is not alive"),
+    etap:is(is_process_alive(ViewGroup), true, "view group pid is alive"),
 
     compact_view_group(),
     check_db_ref_count(),
     Ref3 = get_db_ref_counter(),
     etap:is(Ref3, Ref2,  "DB ref counter didn't change"),
+    etap:is(is_process_alive(ViewGroup), true, "view group pid is alive"),
 
     create_new_doc(<<"doc1001">>),
     query_view(),
     check_db_ref_count(),
+    etap:is(is_process_alive(ViewGroup), true, "view group pid is alive"),
+
+    MonRef = erlang:monitor(process, ViewGroup),
+    ok = couch_server:delete(test_db_name(), []),
+    receive
+    {'DOWN', MonRef, _, _, _} ->
+        etap:diag("view group is dead after DB deletion")
+    after 5000 ->
+        etap:bail("view group did not die after DB deletion")
+    end,
 
     ok = timer:sleep(1000),
     delete_db(),
