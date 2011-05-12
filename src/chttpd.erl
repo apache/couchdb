@@ -66,8 +66,9 @@ handle_request(MochiReq) ->
     {"/" ++ Path, _, _} = mochiweb_util:urlsplit_path(RawUri),
     {HandlerKey, _, _} = mochiweb_util:partition(Path, "/"),
 
+    Peer = MochiReq:get(peer),
     LogForClosedSocket = io_lib:format("mochiweb_recv_error for ~s - ~p ~s", [
-        MochiReq:get(peer),
+        Peer,
         MochiReq:get(method),
         RawUri
     ]),
@@ -130,7 +131,6 @@ handle_request(MochiReq) ->
     end,
 
     RequestTime = timer:now_diff(now(), Begin)/1000,
-    Peer = MochiReq:get(peer),
     Code = Resp:get(code),
     Host = MochiReq:get_header_value("Host"),
     ?LOG_INFO("~s ~s ~s ~s ~B ~B", [Peer, Host,
