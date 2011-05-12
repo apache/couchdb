@@ -44,13 +44,10 @@ go(DbName, AllDocs, Opts) ->
 handle_message({rexi_DOWN, _, _, _}, _Worker, Acc0) ->
     skip_message(Acc0);
 handle_message({rexi_EXIT, _}, _Worker, Acc0) ->
-    {WaitingCount, _, W, _, DocReplyDict} = Acc0,
-    if WaitingCount =:= 1 ->
-        {W, Reply} = dict:fold(fun force_reply/3, {W,[]}, DocReplyDict),
-        {stop, Reply};
-    true ->
-        {ok, setelement(1, Acc0, WaitingCount-1)}
-    end;
+    skip_message(Acc0);
+handle_message(internal_server_error, _Worker, Acc0) ->
+    % happens when we fail to load validation functions in an RPC worker
+    skip_message(Acc0);
 handle_message({ok, Replies}, Worker, Acc0) ->
     {WaitingCount, DocCount, W, GroupedDocs, DocReplyDict0} = Acc0,
     Docs = couch_util:get_value(Worker, GroupedDocs),
@@ -126,9 +123,13 @@ append_update_replies([Doc|Rest1], [Reply|Rest2], Dict0) ->
     % TODO what if the same document shows up twice in one update_docs call?
     append_update_replies(Rest1, Rest2, dict:append(Doc, Reply, Dict0)).
 
-skip_message(Acc0) ->
-    % TODO fix this
-    {ok, Acc0}.
+skip_message({WaitingCount, _, W, _, DocReplyDict} = Acc0) ->
+    if WaitingCount =:= 1 ->
+        {W, Reply} = dict:fold(fun force_reply/3, {W,[]}, DocReplyDict),
+        {stop, Reply};
+    true ->
+        {ok, setelement(1, Acc0, WaitingCount-1)}
+    end.
 
 validate_atomic_update(_, _, false) ->
     ok;
