@@ -326,7 +326,7 @@ cleanup_index_files(DbName) ->
     end, [couch_doc:from_json_obj(DD) || DD <- DesignDocs]),
 
     FileList = filelib:wildcard([couch_config:get("couchdb", "view_index_dir"),
-        "/.shards/*/", couch_util:to_list(dbname(DbName)), "_design/*"]),
+        "/.shards/*/", couch_util:to_list(dbname(DbName)), ".[0-9]*_design/*"]),
 
     DeleteFiles = if ActiveSigs =:= [] -> FileList; true ->
         {ok, RegExp} = re:compile([$(, string:join(ActiveSigs, "|"), $)]),
