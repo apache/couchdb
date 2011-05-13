@@ -84,6 +84,7 @@ init({{_, DbName, _} = InitArgs, ReturnPid, Ref}) ->
             ReturnPid ! {Ref, self(), {error, invalid_view_seq}},
             ignore;
         _ ->
+            couch_db:monitor(Db),
             couch_db:close(Db),
             {ok, RefCounter} = couch_ref_counter:start([Fd]),
             {ok, #group_state{
@@ -339,7 +340,11 @@ handle_info({'EXIT', FromPid, {{nocatch, Reason}, _Trace}}, State) ->
 
 handle_info({'EXIT', FromPid, Reason}, State) ->
     ?LOG_DEBUG("Exit from linked pid: ~p", [{FromPid, Reason}]),
-    {stop, Reason, State}.
+    {stop, Reason, State};
+
+handle_info({'DOWN',_,_,_,_}, State) ->
+    ?LOG_INFO("Shutting down view group server, monitored db is closing.", []),
+    {stop, normal, reply_all(State, shutdown)}.
 
 
 terminate(Reason, #group_state{updater_pid=Update, compactor_pid=Compact}=S) ->
