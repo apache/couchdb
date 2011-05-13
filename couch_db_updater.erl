@@ -878,32 +878,48 @@ copy_compact(Db, NewDb0, Retry) ->
     FsyncOptions = [Op || Op <- NewDb0#db.fsync_options, Op == before_header],
     NewDb = NewDb0#db{fsync_options=FsyncOptions},
     TotalChanges = couch_db:count_changes_since(Db, NewDb#db.update_seq),
+    BufferSize = list_to_integer(
+        couch_config:get("database_compaction", "doc_buffer_size", "524288")),
+    CheckpointAfter = couch_util:to_integer(
+        couch_config:get("database_compaction", "checkpoint_after",
+            BufferSize * 10)),
+
     EnumBySeqFun =
-    fun(#doc_info{high_seq=Seq}=DocInfo, _Offset, {AccNewDb, AccUncopied, TotalCopied}) ->
-        couch_task_status:update("Copied ~p of ~p changes (~p%)",
-                [TotalCopied, TotalChanges, (TotalCopied*100) div TotalChanges]),
-        if TotalCopied rem 1000 =:= 0 ->
-            NewDb2 = copy_docs(Db, AccNewDb, lists:reverse([DocInfo | AccUncopied]), Retry),
-            if TotalCopied rem 10000 =:= 0 ->
-                {ok, {commit_data(NewDb2#db{update_seq=Seq}), [], TotalCopied + 1}};
+    fun(#doc_info{high_seq=Seq}=DocInfo, _Offset,
+        {AccNewDb, AccUncopied, AccUncopiedSize, AccCopiedSize, TotalCopied}) ->
+
+        AccUncopiedSize2 = AccUncopiedSize + byte_size(?term_to_bin(DocInfo)),
+        if AccUncopiedSize2 >= BufferSize ->
+            NewDb2 = copy_docs(
+                Db, AccNewDb, lists:reverse([DocInfo | AccUncopied]), Retry),
+            TotalCopied2 = TotalCopied + 1 + length(AccUncopied),
+            couch_task_status:update("Copied ~p of ~p changes (~p%)",
+                [TotalCopied2, TotalChanges, (TotalCopied2 * 100) div TotalChanges]),
+            AccCopiedSize2 = AccCopiedSize + AccUncopiedSize2,
+            if AccCopiedSize2 >= CheckpointAfter ->
+                {ok, {commit_data(NewDb2#db{update_seq = Seq}), [],
+                    0, 0, TotalCopied2}};
             true ->
-                {ok, {NewDb2#db{update_seq=Seq}, [], TotalCopied + 1}}
+                {ok, {NewDb2#db{update_seq = Seq}, [],
+                    0, AccCopiedSize2, TotalCopied2}}
             end;
         true ->
-            {ok, {AccNewDb, [DocInfo | AccUncopied], TotalCopied + 1}}
+            {ok, {AccNewDb, [DocInfo | AccUncopied], AccUncopiedSize2,
+                AccCopiedSize, TotalCopied}}
         end
     end,
 
     couch_task_status:set_update_frequency(500),
 
-    {ok, _, {NewDb2, Uncopied, TotalChanges}} =
+    {ok, _, {NewDb2, Uncopied, _, _, ChangesDone}} =
         couch_btree:foldl(Db#db.docinfo_by_seq_btree, EnumBySeqFun,
-            {NewDb, [], 0},
+            {NewDb, [], 0, 0, 0},
             [{start_key, NewDb#db.update_seq + 1}]),
 
     couch_task_status:update("Flushing"),
 
     NewDb3 = copy_docs(Db, NewDb2, lists:reverse(Uncopied), Retry),
+    TotalChanges = ChangesDone + length(Uncopied),
 
     % copy misc header values
     if NewDb3#db.security /= Db#db.security ->
