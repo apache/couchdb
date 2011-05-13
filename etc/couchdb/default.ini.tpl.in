@@ -20,6 +20,15 @@ uri_file = %localstaterundir%/couch.uri
 ;                lowest compression ratio) to 9 (slowest, highest compression ratio)
 file_compression = snappy
 
+[database_compaction]
+; larger buffer sizes can originate smaller files
+doc_buffer_size = 524288 ; value in bytes
+checkpoint_after = 5242880 ; checkpoint after every N bytes were written
+
+[view_compaction]
+; larger buffer sizes can originate smaller files
+keyvalue_buffer_size = 2097152 ; value in bytes
+
 [httpd]
 port = 5984
 bind_address = 127.0.0.1
