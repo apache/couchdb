@@ -838,6 +838,12 @@ couchTests.replication = function(debug) {
   T(copy !== null);
   TEquals("undefined", typeof copy._conflicts);
   TEquals("undefined", typeof copy._deleted_conflicts);
+  TEquals("text/plain", copy._attachments["hello.txt"]["content_type"]);
+  TEquals("aGVsbG8gd29ybGQ=", copy._attachments["hello.txt"]["data"]);
+  TEquals("gzip", copy._attachments["hello.txt"]["encoding"]);
+  TEquals("not/compressible", copy._attachments["foo.dat"]["content_type"]);
+  TEquals("aSBhbSBub3QgZ3ppcGVk", copy._attachments["foo.dat"]["data"]);
+  TEquals("undefined", typeof copy._attachments["foo.dat"]["encoding"]);
   // end of test for COUCHDB-885
 
 
