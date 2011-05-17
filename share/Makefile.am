@@ -44,6 +44,7 @@ nobase_dist_localdata_DATA = \
     www/database.html \
     www/session.html \
     www/dialog/_admin_party.html \
+    www/dialog/_change_password.html \
     www/dialog/_compact_cleanup.html \
     www/dialog/_create_admin.html \
     www/dialog/_login.html \
