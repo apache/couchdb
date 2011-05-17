@@ -17,6 +17,31 @@ This version has not been released yet.
    required by the command line JS test runner.
  * Added a native JSON parser.
 
+Version 1.1.0
+-------------
+
+All NEWS for 1.0.2 also apply to 1.1.0.
+
+This release contains backwards incompatible changes.
+
+ * Native SSL support.
+ * Added support for HTTP range requests for attachments.
+ * Added built-in filters for `_changes`: `_doc_ids` and `_design`.
+ * Added configuration option for TCP_NODELAY aka "Nagle".
+ * Allow wildcards in vhosts definitions.
+ * More granular ETag support for views.
+ * More flexible URL rewriter.
+ * Added OS Process module to manage daemons outside of CouchDB.
+ * Added HTTP Proxy handler for more scalable externals.
+ * Added `_replicator` database to manage replications.
+ * Multiple micro-optimizations when reading data.
+ * Added CommonJS support to map functions.
+ * Added `stale=update_after` query option that triggers a view update after
+   returning a `stale=ok` response.
+ * More explicit error messages when it's not possible to access a file due
+   to lack of permissions.
+ * Added a "change password"-feature to Futon.
+
 Version 1.0.1
 -------------
 

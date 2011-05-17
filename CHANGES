@@ -21,6 +21,55 @@ OAuth:
 
  * Updated budled erlang_oauth library to the latest version.
 
+Version 1.1.0
+-------------
+
+All CHANGES for 1.0.2 and 1.0.3 also apply to 1.1.0.
+
+HTTP Interface:
+
+ * Native SSL support.
+ * Added support for HTTP range requests for attachments.
+ * Added built-in filters for `_changes`: `_doc_ids` and `_design`.
+ * Added configuration option for TCP_NODELAY aka "Nagle".
+ * Allow POSTing arguments to `_changes`.
+ * Allow `keys` parameter for GET requests to views.
+ * Allow wildcards in vhosts definitions.
+ * More granular ETag support for views.
+ * More flexible URL rewriter.
+ * Added support for recognizing "Q values" and media parameters in
+   HTTP Accept headers.
+ * Validate doc ids that come from a PUT to a URL.
+
+Externals:
+
+ * Added OS Process module to manage daemons outside of CouchDB.
+ * Added HTTP Proxy handler for more scalable externals.
+
+Replicator:
+
+ * Added `_replicator` database to manage replications.
+ * Fixed issues when an endpoint is a remote database accessible via SSL.
+ * Added support for continuous by-doc-IDs replication.
+
+Storage System:
+
+ * Multiple micro-optimizations when reading data.
+
+View Server:
+
+ * Added CommonJS support to map functions.
+ * Added `stale=update_after` query option that triggers a view update after
+   returning a `stale=ok` response.
+ * Warn about empty result caused by `startkey` and `endkey` limiting.
+ * Built-in reduce function `_sum` now accepts lists of integers as input.
+ * Added view query aliases start_key, end_key, start_key_doc_id and
+   end_key_doc_id.
+
+Futon:
+
+ * Added a "change password"-feature to Futon.
+
 Version 1.0.1
 -------------
 
