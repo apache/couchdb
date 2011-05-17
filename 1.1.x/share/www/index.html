@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<!--
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+
+-->
+<html lang="en">
+  <head>
+    <title>Overview</title>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <link rel="stylesheet" href="style/layout.css?0.11.0" type="text/css">
+    <script src="script/json2.js"></script>
+    <script src="script/sha1.js"></script>
+    <script src="script/jquery.js?1.4.2"></script>
+    <script src="script/jquery.couch.js?0.11.0"></script>
+    <script src="script/jquery.dialog.js?0.11.0"></script>
+    <script src="script/futon.js?0.11.0"></script>
+    <script src="script/futon.browse.js?0.11.0"></script>
+    <script src="script/futon.format.js?0.11.0"></script>
+    <script>
+      var page = new $.futon.CouchIndexPage();
+      $(document).ready(function() {
+        if (!/index\.html$/.test(location.pathname)) {
+          $.futon.navigation.ready(function() {
+            this.updateSelection(location.pathname + "index.html");
+          });
+        }
+        var dbsPerPage = parseInt($.futon.storage.get("per_page"));
+        if (dbsPerPage) $("#perpage").val(dbsPerPage);
+        $("#perpage").change(function() {
+          page.updateDatabaseListing();
+          $.futon.storage.set("per_page", this.value);
+        });
+
+        page.updateDatabaseListing();
+
+        $("#toolbar button.add").click(function() {
+          page.addDatabase();
+        });
+      });
+    </script>
+  </head>
+  <body>
+    <div id="wrap">
+      <h1><strong>Overview</strong></h1>
+      <div id="content">
+        <ul id="toolbar">
+          <li><button class="add">Create Database …</button></li>
+        </ul>
+
+        <table class="listing" id="databases" cellspacing="0">
+          <caption>Databases</caption>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th class="size">Size</th>
+              <th class="count">Number of Documents</th>
+              <th class="seq">Update Seq</th>
+            </tr>
+          </thead>
+          <tbody class="content">
+          </tbody>
+          <tbody class="footer">
+            <tr>
+              <td colspan="5">
+                <div id="paging">
+                  <a class="prev">← Previous Page</a> |
+                  <label>Rows per page: <select id="perpage">
+                    <option selected>10</option>
+                    <option>25</option>
+                    <option>50</option>
+                    <option>100</option>
+                  </select></label> |
+                  <a class="next">Next Page →</a>
+                </div>
+                <span></span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </body>
+</html>

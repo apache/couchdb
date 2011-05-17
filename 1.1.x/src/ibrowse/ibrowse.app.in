@@ -1,0 +1,13 @@
+{application, ibrowse,
+        [{description, "HTTP client application"},
+         {vsn, "2.2.0"},
+         {modules, [ ibrowse, 
+		     ibrowse_http_client, 
+		     ibrowse_app, 
+		     ibrowse_sup, 
+		     ibrowse_lib,
+		     ibrowse_lb ]},
+         {registered, []},
+         {applications, [kernel,stdlib,sasl]},
+	 {env, []},
+	 {mod, {ibrowse_app, []}}]}.

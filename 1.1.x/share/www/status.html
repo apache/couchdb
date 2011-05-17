@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<!--
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+
+-->
+<html lang="en">
+  <head>
+    <title>Status</title>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <link rel="stylesheet" href="style/layout.css?0.11.0" type="text/css">
+    <script src="script/json2.js"></script>
+    <script src="script/sha1.js"></script>
+    <script src="script/jquery.js?1.4.2"></script>
+    <script src="script/jquery.couch.js?0.11.0"></script>
+    <script src="script/jquery.dialog.js?0.11.0"></script>
+    <script src="script/futon.js?0.11.0"></script>
+  </head>
+  <body><div id="wrap">
+    <h1>
+      <a href="index.html">Overview</a>
+      <strong>Status</strong>
+    </h1>
+    <div id="content">
+      <div id="interval">
+        <label>Poll interval:
+          <input type="range" min="1" max="30" value="5" size="3">
+          <span class="secs">5</span> second(s)
+        </label>
+      </div>
+      <table id="status" class="listing" cellspacing="0">
+        <caption>Active Tasks</caption>
+        <thead><tr>
+          <th>Type</th>
+          <th>Object</th>
+          <th>PID</th>
+          <th>Status</th>
+        </tr></thead>
+        <tbody class="content"></tbody>
+      </table>
+
+    </div>
+  </div></body>
+  <script>
+    var refreshTimeout = null;
+
+    $.futon.storage.declare("poll_interval", {defaultValue: 5});
+
+    function refresh() {
+      $.couch.activeTasks({
+        success: function(tasks) {
+          clearTimeout(refreshTimeout);
+          $("#status tbody.content").empty();
+          if (!tasks.length) {
+            $("<tr class='none'><th colspan='4'>No tasks running</th></tr>")
+              .appendTo("#status tbody.content");
+          } else {
+            $.each(tasks, function(idx, task) {
+              $("<tr><th></th><td class='object'></td><td class='pid'></td><td class='status'></td></tr>")
+                .find("th").text(task.type).end()
+                .find("td.object").text(task.task).end()
+                .find("td.pid").text(task.pid).end()
+                .find("td.status").text(task.status).end()
+                .appendTo("#status tbody.content");
+            });
+          }
+          refreshTimeout = setTimeout(refresh,
+            parseInt($("#interval input").val(), 10) * 1000);
+        }
+      });
+    }
+
+    function updateInterval(value) {
+      if (isNaN(value)) {
+        value = 5;
+        $("#interval input").val(value);
+      }
+      $("#interval .secs").text(value);
+      refresh();
+      $.futon.storage.set("poll_interval", value);
+    }
+
+    $(function() {
+      var slider = $("#interval input");
+      slider.val(parseInt($.futon.storage.get("poll_interval")));
+      if (slider[0].type == "range") {
+        slider.bind("input", function() {
+          updateInterval(this.value);
+        });
+        $("#interval .secs").text($("#interval input").val());
+      } else {
+        slider.bind("change", function() {
+          updateInterval(this.value);
+        });
+        $("#interval .secs").hide();
+      }
+      refresh();
+    });
+  </script>
+</html>

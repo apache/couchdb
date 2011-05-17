@@ -1,0 +1,59 @@
+<!--
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+
+-->
+<div id="sidebar">
+  <a id="sidebar-toggle" href="#" title="Hide Sidebar"></a>
+  <a href="index.html">
+    <img id="logo" src="image/logo.png" width="175" height="150" alt="Apache CouchDB: Relax">
+  </a>
+  <ul id="nav">
+    <li><span>Tools</span><ul>
+      <li><a href="index.html">Overview</a></li>
+      <li><a href="config.html">Configuration</a></li>
+      <li><a href="replicator.html">Replicator</a></li>
+      <li><a href="status.html">Status</a></li>
+      <li><a href="couch_tests.html?script/couch_tests.js">Test Suite</a></li>
+    </ul></li>
+    <li><span>Recent Databases</span>
+      <ul id="dbs"></ul>
+    </li>
+  </ul>
+  <div id="footer">
+    <span id="userCtx">
+      <span class="loggedout">
+        <a href="#" class="signup">Signup</a> or <a href="#" class="login">Login</a>
+      </span>
+      <span class="loggedin">
+        Welcome <a class="name">?</a>!
+        <br/>
+        <span class="loggedinadmin">
+          <a href="#" class="createadmin">Setup more admins</a> or
+          <br/>
+        </span>
+        <a href="#" class="changepass">Change password</a> or
+        <a href="#" class="logout">Logout</a>
+      </span>
+      <span class="adminparty">
+        Welcome to Admin Party! 
+        <br/>
+        Everyone is admin. <a href="#" class="createadmin">Fix this</a>
+      </span>
+    </span>
+    <hr/>
+    <span class="couch">
+      Futon on <a href="http://couchdb.apache.org/">Apache CouchDB</a>
+      <span id="version">?</span>
+    </span>
+  </div>
+</div>

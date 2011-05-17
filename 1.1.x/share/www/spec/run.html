@@ -1,0 +1,46 @@
+<!--
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this file except in compliance with the License. You may obtain a copy of
+the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations under
+the License.
+-->
+<html>
+  <head>
+    <link type="text/css" rel="stylesheet" href="../script/jspec/jspec.css" />
+    <script src="../script/jquery.js"></script>
+    <script src="../script/sha1.js"></script>
+    <script src="../script/jspec/jspec.js"></script>
+    <script src="../script/jspec/jspec.jquery.js"></script>
+    <script src="../script/jspec/jspec.xhr.js"></script>
+    <script src="./custom_helpers.js"></script>
+    <script src="../script/couch.js"></script>
+    <script src="../script/jquery.couch.js"></script>
+    <script>
+      function runSuites() {
+        JSpec
+        .exec('couch_js_class_methods_spec.js')
+        .exec('couch_js_instance_methods_1_spec.js')
+        .exec('couch_js_instance_methods_2_spec.js')
+        .exec('couch_js_instance_methods_3_spec.js')
+        .exec('jquery_couch_js_class_methods_spec.js')
+        .exec('jquery_couch_js_instance_methods_1_spec.js')
+        .exec('jquery_couch_js_instance_methods_2_spec.js')
+        .exec('jquery_couch_js_instance_methods_3_spec.js')
+        .run({failuresOnly: true})
+        .report()
+      }
+    </script>
+  </head>
+  <body class="jspec" onLoad="runSuites();">
+    <div id="jspec-top"><h2 id="jspec-title">JSpec <em><script>document.write(JSpec.version)</script></em></h2></div>
+    <div id="jspec"></div>
+    <div id="jspec-bottom"></div>
+  </body>
+</html>

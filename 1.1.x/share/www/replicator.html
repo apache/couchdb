@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<!--
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+
+-->
+<html lang="en">
+  <head>
+    <title>Replicator</title>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <link rel="stylesheet" href="style/layout.css?0.11.0" type="text/css">
+    <link rel="stylesheet" href="style/jquery-ui-1.8.11.custom.css" type="text/css">
+    <script src="script/json2.js"></script>
+    <script src="script/sha1.js"></script>
+    <script src="script/jquery.js?1.4.2"></script>
+    <script src="script/jquery.couch.js?0.11.0"></script>
+    <script src="script/jquery.dialog.js?0.11.0"></script>
+    <script src="script/futon.js?0.11.0"></script>
+    <script src="script/jquery-ui-1.8.11.custom.min.js"></script>
+    <script>
+      $(document).ready(function() {
+        var allDatabases;
+
+        $("fieldset input[type=radio]").click(function() {
+          var radio = this;
+          var fieldset = $(this).parents("fieldset").get(0);
+          $("input[type=text]", fieldset).each(function() {
+            this.disabled = radio.value == "local";
+            if (!this.disabled) this.focus();
+          });
+          $('.local', fieldset).each(function() {
+            this.disabled = radio.value == "remote";
+            if (!this.disabled) this.focus();
+          });
+        });
+
+        var getDatabases = function() {
+          $.couch.allDbs({
+            success: function(dbs) {
+              allDatabases = dbs.sort();
+
+              $("fieldset select").each(function() {
+                var select = this;
+                $.each(dbs, function(idx, dbName) {
+                  $("<option></option>").text(dbName).appendTo(select);
+                });
+                select.selectedIndex = 0;
+              });
+
+              $('#to_name').autocomplete({ source: dbs });
+            }
+          });
+        };
+        getDatabases();
+
+        $("button#swap").click(function() {
+          var fromName = $("#source select").val();
+          $("#source select").val($("#target select").val());
+          $("#target select").val(fromName);
+
+          var fromUrl = $("#source input[type=text]").val();
+          $("#source input[type=text]").val($("#target input[type=text]").val());
+          $("#target input[type=text]").val(fromUrl);
+
+          var fromType = $("#source input[type=radio]").filter(function() {
+            return this.checked;
+          }).val();
+          var toType = $("#target input[type=radio]").filter(function() {
+            return this.checked;
+          }).val();
+          $("#source input[value=" + toType + "]").click();
+          $("#target input[value=" + fromType + "]").click();
+
+          $("#replicate").get(0).focus();
+          return false;
+        });
+
+        $("button#replicate").click(function() {
+          $("#records tbody.content").empty();
+          var targetIsLocal = $('#to_local:checked').length > 0;
+          var source = $("#from_local")[0].checked ? $("#from_name").val() : $("#from_url").val();
+          var target = targetIsLocal ? $("#to_name").val() : $("#to_url").val();
+          var repOpts = {};
+
+          if (targetIsLocal && $.inArray(target, allDatabases) < 0) {
+            if(!confirm('This will create a database named '+target+'. Ok?')) {
+              return;
+            }
+            else {
+              repOpts.create_target = true;
+            }
+          }
+
+          if ($("#continuous")[0].checked) {
+            repOpts.continuous = true;
+          }
+          $.couch.replicate(source, target, {
+            success: function(resp) {
+              if (resp._local_id) {
+                $("<tr><th></th></tr>")
+                  .find("th").text(JSON.stringify(resp)).end()
+                  .appendTo("#records tbody.content");
+                $("#records tbody tr").removeClass("odd").filter(":odd").addClass("odd");
+              } else {
+                $.each(resp.history, function(idx, record) {
+                  $("<tr><th></th></tr>")
+                    .find("th").text(JSON.stringify(record)).end()
+                    .appendTo("#records tbody.content");
+                });
+                $("#records tbody tr").removeClass("odd").filter(":odd").addClass("odd");
+                $("#records tbody.footer td").text("Replication session " + resp.session_id);
+
+                if (repOpts.create_target) {
+                  getDatabases();
+                }
+              }
+            }
+          }, repOpts);
+        });
+      });
+    </script>
+  </head>
+  <body><div id="wrap">
+    <h1>
+      <a href="index.html">Overview</a>
+      <strong>Replicator</strong>
+    </h1>
+    <div id="content">
+
+      <form id="replicator">
+        <fieldset id="source">
+          <legend>Replicate changes from:</legend>
+          <p>
+            <input type="radio" id="from_local" name="from_type" value="local" checked> 
+            <label for="from_local">Local Database: </label>
+            <select id="from_name" name="from_name" class="local"></select>
+          </p><p>
+            <input type="radio" id="from_to_remote" name="from_type" value="remote"> 
+            <label for="from_to_remote">Remote database: </label>
+            <input type="text" id="from_url" name="from_url" size="30" value="http://" disabled>
+          </p>
+        </fieldset>
+        <p class="swap"><button id="swap" tabindex="99">⇄</button></p>
+        <fieldset id="target">
+          <legend>to:</legend>
+          <p>
+            <input type="radio" id="to_local" name="to_type" value="local" checked> 
+            <label for="to_local">Local database: </label>
+            <input type="text" id="to_name" name="to_name" class="local"></select>
+          </p><p>
+            <input type="radio" id="to_remote" name="to_type" value="remote"> 
+            <label for="to_remote">Remote database: </label>
+            <input type="text" id="to_url" name="to_url" size="30" value="http://" disabled>
+          </p>
+        </fieldset>
+        <p class="actions">
+          <label><input type="checkbox" name="continuous" value="continuous" id="continuous"> Continuous</label>
+          <button id="replicate" type="button">Replicate</button>
+        </p>
+      </form>
+
+      <table id="records" class="listing" cellspacing="0">
+        <caption>Replication History</caption>
+        <thead><tr>
+          <th>Event</th>
+        </tr></thead>
+        <tbody class="content"></tbody>
+        <tbody class="footer"><tr>
+          <td colspan="4">No replication</td>
+        </tr></tbody>
+      </table>
+
+    </div>
+  </div></body>
+</html>

@@ -1,0 +1,51 @@
+<!--
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+
+-->
+<form action="" method="post">
+  <h2>Compact &amp; Cleanup</h2>
+  <fieldset class="radiogroup">
+    <label>
+      <input type="radio" name="action" value="compact_database" checked>
+      Compact Database
+    </label>
+    <p class="help">
+      Compacting a database removes deleted documents and previous revisions.
+      It is an <strong>irreversible operation</strong> and may take
+      a while to complete for large databases.
+    </p>
+    <hr>
+    <label>
+      <input type="radio" name="action" value="compact_views">
+      Compact Views
+    </label>
+    <p class="help">
+      View compaction will affect all views in this design document. This
+      operation may take some time to complete. Your views will still operate
+      normally during compaction.
+    </p>
+    <hr>
+    <label>
+      <input type="radio" name="action" value="view_cleanup">
+      Cleanup Views
+    </label>
+    <p class="help">
+      Cleaning up views in a database removes old view files still stored
+      on the filesystem. It is an <strong>irreversible operation</strong>.
+    </p>
+  </fieldset>
+  <div class="buttons">
+    <button type="submit">Run</button>
+    <button type="button" class="cancel">Cancel</button>
+  </div>
+</form>

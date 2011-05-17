@@ -1,0 +1,7 @@
+# Sourced by init script for configuration.
+
+COUCHDB_USER=couchdb
+COUCHDB_STDOUT_FILE=/dev/null
+COUCHDB_STDERR_FILE=/dev/null
+COUCHDB_RESPAWN_TIMEOUT=5
+COUCHDB_OPTIONS=
