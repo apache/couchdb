@@ -24,14 +24,14 @@ drop(RefCounterPid) ->
     drop(RefCounterPid, self()).
 
 drop(RefCounterPid, Pid) ->
-    gen_server:call(RefCounterPid, {drop, Pid}).
+    gen_server:call(RefCounterPid, {drop, Pid}, infinity).
 
 
 add(RefCounterPid) ->
     add(RefCounterPid, self()).
 
 add(RefCounterPid, Pid) ->
-    gen_server:call(RefCounterPid, {add, Pid}).
+    gen_server:call(RefCounterPid, {add, Pid}, infinity).
 
 count(RefCounterPid) ->
     gen_server:call(RefCounterPid, count).
