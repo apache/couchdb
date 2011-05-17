@@ -77,10 +77,10 @@ EXTRA_DIST = \
 	170-os-daemons.t \
     171-os-daemons-config.es \
     171-os-daemons-config.t \
-    172-os-daemon-errors.1.es \
-    172-os-daemon-errors.2.es \
-    172-os-daemon-errors.3.es \
-    172-os-daemon-errors.4.es \
+    172-os-daemon-errors.1.sh \
+    172-os-daemon-errors.2.sh \
+    172-os-daemon-errors.3.sh \
+    172-os-daemon-errors.4.sh \
     172-os-daemon-errors.t \
 	173-os-daemon-cfg-register.t \
 	180-http-proxy.ini \
