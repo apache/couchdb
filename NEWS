@@ -10,8 +10,6 @@ Each release section notes when backwards incompatible changes have been made.
 Version 1.1.0
 -------------
 
-This version has not been released yet.
-
 All NEWS for 1.0.2 also apply to 1.1.0.
 
  * Native SSL support.
