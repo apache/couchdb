@@ -154,7 +154,7 @@ Version 0.10.1
 Version 0.10.0
 --------------
 
-This release contains backwards incompatible changes, please see above for help.
+This release contains backwards incompatible changes
 
  * General performance improvements.
  * View index generation speedups.
@@ -186,7 +186,7 @@ Version 0.9.1
 Version 0.9.0
 -------------
 
-This release contains backwards incompatible changes, please see above for help.
+This release contains backwards incompatible changes.
 
  * Modular configuration.
  * Performance enhancements for document and view access.
@@ -210,7 +210,7 @@ Version 0.8.1-incubating
 Version 0.8.0-incubating
 ------------------------
 
-This release contains backwards incompatible changes, please see above for help.
+This release contains backwards incompatible changes.
 
  * Changed core licensing to the Apache Software License 2.0.
  * Refactoring of the core view and storage engines.
