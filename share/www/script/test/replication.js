@@ -834,7 +834,9 @@ couchTests.replication = function(debug) {
   TEquals(1, repResult.history[0].docs_read);
   TEquals(0, repResult.history[0].doc_write_failures);
 
-  var copy = dbB.open(doc._id, {conflicts: true, deleted_conflicts: true});
+  var copy = dbB.open(doc._id, {
+    conflicts: true, deleted_conflicts: true, attachments: true,
+    att_encoding_info: true});
   T(copy !== null);
   TEquals("undefined", typeof copy._conflicts);
   TEquals("undefined", typeof copy._deleted_conflicts);
