@@ -1,9 +1,0 @@
-%% This is generated from src/mochiweb.app.src
-{application, mochiweb,
- [{description, "MochiMedia Web Server"},
-  {vsn, "7c2bc2"},
-  {modules, []},
-  {registered, []},
-  {mod, {mochiweb_app, []}},
-  {env, []},
-  {applications, [kernel, stdlib, crypto, inets]}]}.
