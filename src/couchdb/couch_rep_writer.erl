@@ -71,7 +71,7 @@ write_bulk_docs(_Db, []) ->
     [];
 write_bulk_docs(#http_db{headers = Headers} = Db, Docs) ->
     JsonDocs = [
-        couch_doc:to_json_obj(Doc, [revs, att_gzip_length]) || Doc <- Docs
+        couch_doc:to_json_obj(Doc, [revs]) || Doc <- Docs
     ],
     Request = Db#http_db{
         resource = "_bulk_docs",
@@ -91,7 +91,7 @@ write_multi_part_doc(#http_db{headers=Headers} = Db, #doc{atts=Atts} = Doc) ->
     JsonBytes = ?JSON_ENCODE(
         couch_doc:to_json_obj(
             Doc,
-            [follows, att_encoding_info, attachments]
+            [follows, att_encoding_info, attachments, revs]
         )
     ),
     Boundary = couch_uuids:random(),
