@@ -89,6 +89,7 @@ mochiwebebin_DATA = \
 
 EXTRA_DIST =  \
     $(mochiweb_file_collection) \
+    mochiweb.app.src \
     internal.hrl
 
 CLEANFILES = \
@@ -98,5 +99,4 @@ CLEANFILES = \
 	cp $< $@
 
 %.beam: %.erl
-
 	$(ERLC) $(ERLC_FLAGS) $<
