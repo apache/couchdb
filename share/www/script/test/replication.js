@@ -12,6 +12,20 @@
 
 couchTests.replication = function(debug) {
   if (debug) debugger;
+
+  function waitForSeq(sourceDb, targetDb) {
+    var targetSeq,
+        sourceSeq = sourceDb.info().update_seq,
+        t0 = new Date(),
+        t1,
+        ms = 3000;
+
+    do {
+      targetSeq = targetDb.info().update_seq;
+      t1 = new Date();
+    } while (((t1 - t0) <= ms) && targetSeq < sourceSeq);
+  }
+
   var host = CouchDB.host;
   var dbPairs = [
     {source:"test_suite_db_a",
@@ -723,6 +737,7 @@ couchTests.replication = function(debug) {
 
   var tasksAfter = JSON.parse(xhr.responseText);
   TEquals(tasks.length, tasksAfter.length);
+  waitForSeq(dbA, dbB);
   T(dbB.open("30") !== null);
 
   repResult = CouchDB.replicate(
