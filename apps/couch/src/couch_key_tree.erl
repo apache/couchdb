@@ -328,33 +328,6 @@ tree_fold_simple(Fun, Pos, [{Key, Value, SubTree} | RestTree], Acc) ->
         Acc2
     end.
 
-foldl(_Fun, Acc, []) ->
-    Acc;
-
-foldl(Fun, Acc, [{Pos, Branch} | Rest]) ->
-    Acc1 = foldl_simple(Fun, Pos, [Branch], Acc),
-    foldl(Fun, Acc1, Rest).
-
-foldl_simple(_Fun, _Pos, [], Acc) ->
-    Acc;
-
-foldl_simple(Fun, Pos, [{Key, Value, []} | RestTree], Acc) ->
-    case Fun({Pos, Key, Value}, leaf, Acc) of
-    {ok, Acc1} ->
-        foldl_simple(Fun, Pos, RestTree, Acc1);
-    {stop, Acc1} ->
-        Acc1
-    end;
-
-foldl_simple(Fun, Pos, [{Key, Value, SubTree} | RestTree], Acc) ->
-    Acc1 = foldl_simple(Fun, Pos + 1, SubTree, Acc),
-    case Fun({Pos, Key, Value}, branch, Acc1) of
-    {ok, Acc2} ->
-        foldl_simple(Fun, Pos, RestTree, Acc2);
-    {stop, Acc2} ->
-        Acc2
-    end.
-
 map(_Fun, []) ->
     [];
 map(Fun, [{Pos, Tree}|Rest]) ->
