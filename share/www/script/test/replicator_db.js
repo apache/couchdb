@@ -676,7 +676,8 @@ couchTests.replicator_db = function(debug) {
       var repDoc = {
         _id: "foo_rep_doc",
         source: dbA.name,
-        target: dbB.name
+        target: dbB.name,
+        continuous: true
       };
 
       T(CouchDB.login("fdmanana", "qwerty").ok);
