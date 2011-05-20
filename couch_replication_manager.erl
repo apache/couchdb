@@ -468,13 +468,18 @@ update_rep_doc(RepDocId, KVs) ->
 
 update_rep_doc(RepDb, #doc{body = {RepDocBody}} = RepDoc, KVs) ->
     NewRepDocBody = lists:foldl(
-        fun({<<"_replication_state">> = K, _V} = KV, Body) ->
-                Body1 = lists:keystore(K, 1, Body, KV),
-                {Mega, Secs, _} = erlang:now(),
-                UnixTime = Mega * 1000000 + Secs,
-                lists:keystore(
-                    <<"_replication_state_time">>, 1, Body1,
-                    {<<"_replication_state_time">>, UnixTime});
+        fun({<<"_replication_state">> = K, State} = KV, Body) ->
+                case get_value(K, Body) of
+                State ->
+                    Body;
+                _ ->
+                    Body1 = lists:keystore(K, 1, Body, KV),
+                    {Mega, Secs, _} = erlang:now(),
+                    UnixTime = Mega * 1000000 + Secs,
+                    lists:keystore(
+                        <<"_replication_state_time">>, 1, Body1,
+                        {<<"_replication_state_time">>, UnixTime})
+                end;
             ({K, _V} = KV, Body) ->
                 lists:keystore(K, 1, Body, KV)
         end,
