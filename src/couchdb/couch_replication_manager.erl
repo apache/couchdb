@@ -26,13 +26,15 @@
 
 -define(DOC_TO_REP, couch_rep_doc_id_to_rep_id).
 -define(REP_TO_STATE, couch_rep_id_to_rep_state).
--define(INITIAL_WAIT, 5).
+-define(INITIAL_WAIT, 2.5). % seconds
+-define(MAX_WAIT, 600).     % seconds
 
 -record(rep_state, {
     rep,
     starting,
     retries_left,
-    max_retries
+    max_retries,
+    wait = ?INITIAL_WAIT
 }).
 
 -import(couch_replicator_utils, [
@@ -102,9 +104,8 @@ init(_) ->
     ok = couch_config:register(
         fun("replicator", "db", NewName) ->
             ok = gen_server:cast(Server, {rep_db_changed, ?l2b(NewName)});
-        ("replicator", "max_replication_retry_count", NewMaxRetries1) ->
-            NewMaxRetries = list_to_integer(NewMaxRetries1),
-            ok = gen_server:cast(Server, {set_max_retries, NewMaxRetries})
+        ("replicator", "max_replication_retry_count", V) ->
+            ok = gen_server:cast(Server, {set_max_retries, retries_value(V)})
         end
     ),
     {Loop, RepDbName} = changes_feed_loop(),
@@ -112,7 +113,7 @@ init(_) ->
         changes_feed_loop = Loop,
         rep_db_name = RepDbName,
         db_notifier = db_update_notifier(),
-        max_retries = list_to_integer(
+        max_retries = retries_value(
             couch_config:get("replicator", "max_replication_retry_count", "10"))
     }}.
 
@@ -125,8 +126,13 @@ handle_call({rep_started, RepId}, _From, State) ->
     nil ->
         ok;
     RepState ->
-        true = ets:insert(
-            ?REP_TO_STATE, {RepId, RepState#rep_state{starting = false}})
+        NewRepState = RepState#rep_state{
+            starting = false,
+            retries_left = State#state.max_retries,
+            max_retries = State#state.max_retries,
+            wait = ?INITIAL_WAIT
+        },
+        true = ets:insert(?REP_TO_STATE, {RepId, NewRepState})
     end,
     {reply, ok, State};
 
@@ -416,12 +422,10 @@ maybe_retry_replication(#rep_state{retries_left = 0} = RepState, Error, State) -
 
 maybe_retry_replication(RepState, Error, State) ->
     #rep_state{
-        rep = #rep{id = RepId, doc_id = DocId} = Rep,
-        retries_left = RetriesLeft
+        rep = #rep{id = RepId, doc_id = DocId} = Rep
     } = RepState,
-    NewRepState = RepState#rep_state{retries_left = RetriesLeft - 1},
+    #rep_state{wait = Wait} = NewRepState = state_after_error(RepState),
     true = ets:insert(?REP_TO_STATE, {RepId, NewRepState}),
-    Wait = wait_period(NewRepState),
     ?LOG_ERROR("Error in replication `~s` (triggered by document `~s`): ~s"
         "~nRestarting replication in ~p seconds.",
         [pp_rep_id(RepId), DocId, to_binary(error_reason(Error)), Wait]),
@@ -529,10 +533,17 @@ error_reason(Reason) ->
     Reason.
 
 
-wait_period(#rep_state{max_retries = Max, retries_left = Left}) ->
-    wait_period(Max - Left, ?INITIAL_WAIT).
+retries_value("infinity") ->
+    infinity;
+retries_value(Value) ->
+    list_to_integer(Value).
 
-wait_period(1, T) ->
-    T;
-wait_period(N, T) when N > 1 ->
-    wait_period(N - 1, 2 * T).
+
+state_after_error(#rep_state{retries_left = Left, wait = Wait} = State) ->
+    Wait2 = erlang:min(trunc(Wait * 2), ?MAX_WAIT),
+    case Left of
+    infinity ->
+        State#rep_state{wait = Wait2};
+    _ ->
+        State#rep_state{retries_left = Left - 1, wait = Wait2}
+    end.
