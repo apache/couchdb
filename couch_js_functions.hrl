@@ -149,8 +149,10 @@
         var isReplicator = (userCtx.roles.indexOf('_replicator') >= 0);
         var isAdmin = (userCtx.roles.indexOf('_admin') >= 0);
 
-        if (oldDoc && !newDoc._deleted && !isReplicator) {
-            reportError('Only the replicator can edit replication documents.');
+        if (oldDoc && !newDoc._deleted && !isReplicator &&
+            (oldDoc._replication_state === 'triggered')) {
+            reportError('Only the replicator can edit replication documents ' +
+                'that are in the triggered state.');
         }
 
         if (!newDoc._deleted) {
