@@ -121,7 +121,7 @@ couchTests.replicator_db = function(debug) {
     T(repDoc1.source === repDoc.source);
     T(repDoc1.target === repDoc.target);
     T(repDoc1._replication_state === "completed", "simple");
-    T(typeof repDoc1._replication_state_time === "number");
+    T(typeof repDoc1._replication_state_time === "string");
     T(typeof repDoc1._replication_id  === "string");
   }
 
@@ -173,7 +173,7 @@ couchTests.replicator_db = function(debug) {
     T(repDoc1.source === repDoc.source);
     T(repDoc1.target === repDoc.target);
     T(repDoc1._replication_state === "completed", "filtered");
-    T(typeof repDoc1._replication_state_time === "number");
+    T(typeof repDoc1._replication_state_time === "string");
     T(typeof repDoc1._replication_id  === "string");
   }
 
@@ -217,7 +217,7 @@ couchTests.replicator_db = function(debug) {
     T(repDoc1.source === repDoc.source);
     T(repDoc1.target === repDoc.target);
     T(repDoc1._replication_state === "triggered");
-    T(typeof repDoc1._replication_state_time === "number");
+    T(typeof repDoc1._replication_state_time === "string");
     T(typeof repDoc1._replication_id  === "string");
 
     // add a design doc to source, it will be replicated to target
@@ -332,7 +332,7 @@ couchTests.replicator_db = function(debug) {
     T(repDoc1_copy.source === repDoc1.source);
     T(repDoc1_copy.target === repDoc1.target);
     T(repDoc1_copy._replication_state === "completed");
-    T(typeof repDoc1_copy._replication_state_time === "number");
+    T(typeof repDoc1_copy._replication_state_time === "string");
     T(typeof repDoc1_copy._replication_id  === "string");
 
     var newDoc = {
@@ -363,7 +363,7 @@ couchTests.replicator_db = function(debug) {
     T(repDoc2_copy.source === repDoc1.source);
     T(repDoc2_copy.target === repDoc1.target);
     T(repDoc2_copy._replication_state === "completed");
-    T(typeof repDoc2_copy._replication_state_time === "number");
+    T(typeof repDoc2_copy._replication_state_time === "string");
     T(typeof repDoc2_copy._replication_id === "string");
     T(repDoc2_copy._replication_id === repDoc1_copy._replication_id);
   }
@@ -400,7 +400,7 @@ couchTests.replicator_db = function(debug) {
     repDoc1 = repDb.open("foo_dup_rep_doc_1");
     T(repDoc1 !== null);
     T(repDoc1._replication_state === "completed", "identical");
-    T(typeof repDoc1._replication_state_time === "number");
+    T(typeof repDoc1._replication_state_time === "string");
     T(typeof repDoc1._replication_id  === "string");
 
     repDoc2 = repDb.open("foo_dup_rep_doc_2");
@@ -444,7 +444,7 @@ couchTests.replicator_db = function(debug) {
     repDoc1 = repDb.open("foo_dup_cont_rep_doc_1");
     T(repDoc1 !== null);
     T(repDoc1._replication_state === "triggered");
-    T(typeof repDoc1._replication_state_time === "number");
+    T(typeof repDoc1._replication_state_time === "string");
     T(typeof repDoc1._replication_id  === "string");
 
     repDoc2 = repDb.open("foo_dup_cont_rep_doc_2");
@@ -470,7 +470,7 @@ couchTests.replicator_db = function(debug) {
     repDoc1 = repDb.open("foo_dup_cont_rep_doc_1");
     T(repDoc1 !== null);
     T(repDoc1._replication_state === "triggered");
-    T(typeof repDoc1._replication_state_time === "number");
+    T(typeof repDoc1._replication_state_time === "string");
 
     var newDoc2 = {
         _id: "foo5000",
@@ -739,7 +739,7 @@ couchTests.replicator_db = function(debug) {
     T(repDoc1.target === repDoc.target);
     T(repDoc1._replication_state === "completed",
       "replication document with bad replication id failed");
-    T(typeof repDoc1._replication_state_time === "number");
+    T(typeof repDoc1._replication_state_time === "string");
     T(typeof repDoc1._replication_id  === "string");
     T(repDoc1._replication_id !== "1234abc");
   }
@@ -930,7 +930,7 @@ couchTests.replicator_db = function(debug) {
     var repDoc1 = repDb.open(repDoc._id);
     T(repDoc1 !== null);
     T(repDoc1._replication_state === "error");
-    T(typeof repDoc1._replication_state_time === "number");
+    T(typeof repDoc1._replication_state_time === "string");
     T(typeof repDoc1._replication_id  === "string");
   }
 
