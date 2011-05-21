@@ -367,7 +367,7 @@ start_replication(Server, #rep{id = RepId} = Rep, Wait) ->
     {ok, _} ->
         ok = gen_server:call(Server, {rep_started, RepId}, infinity);
     Error ->
-        ok = gen_server:call(Server, {rep_error, RepId, Error}, infinity)
+        replication_error(Rep, Error)
     end.
 
 
