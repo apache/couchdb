@@ -216,7 +216,7 @@ error_cause(Cause) ->
     lists:flatten(io_lib:format("~p", [Cause])).
 
 
-stream_data_self(HttpDb, Params, Worker, ReqId, Cb) ->
+stream_data_self(#httpdb{timeout = T} = HttpDb, Params, Worker, ReqId, Cb) ->
     receive
     {ibrowse_async_response, ReqId, {error, Error}} ->
         throw({maybe_retry_req, Error});
@@ -228,6 +228,11 @@ stream_data_self(HttpDb, Params, Worker, ReqId, Cb) ->
         {Data, fun() -> stream_data_self(HttpDb, Params, Worker, ReqId, Cb) end};
     {ibrowse_async_response_end, ReqId} ->
         {<<>>, fun() -> throw({maybe_retry_req, more_data_expected}) end}
+    after T + 500 ->
+        % Note: ibrowse should always reply with timeouts, but this doesn't
+        % seem to be always true when there's a very high rate of requests
+        % and many open connections.
+        throw({maybe_retry_req, timeout})
     end.
 
 
