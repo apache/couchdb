@@ -480,16 +480,17 @@ atts_to_mp([Att | RestAtts], Boundary, WriteFun,
 
 
 doc_from_multi_part_stream(ContentType, DataFun) ->
-    Self = self(),
+    Parent = self(),
     Parser = spawn_link(fun() ->
-        couch_httpd:parse_multipart_request(ContentType, DataFun,
-                fun(Next)-> mp_parse_doc(Next, []) end),
-        unlink(Self)
+        {<<"--">>, _, _} = couch_httpd:parse_multipart_request(
+            ContentType, DataFun,
+            fun(Next) -> mp_parse_doc(Next, []) end),
+        unlink(Parent),
+        Parent ! {self(), finished}
         end),
     Parser ! {get_doc_bytes, self()},
     receive 
     {doc_bytes, DocBytes} ->
-        erlang:put(mochiweb_request_recv, true),
         Doc = from_json_obj(?JSON_DECODE(DocBytes)),
         % go through the attachments looking for 'follows' in the data,
         % replace with function that reads the data from MIME stream.
@@ -503,7 +504,11 @@ doc_from_multi_part_stream(ContentType, DataFun) ->
             (A) ->
                 A
             end, Doc#doc.atts),
-        {ok, Doc#doc{atts=Atts2}}
+        WaitFun = fun() ->
+            receive {Parser, finished} -> ok end,
+            erlang:put(mochiweb_request_recv, true)
+        end,
+        {ok, Doc#doc{atts=Atts2}, WaitFun}
     end.
 
 mp_parse_doc({headers, H}, []) ->
