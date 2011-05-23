@@ -347,18 +347,21 @@ fetch_doc(Source, {Id, Revs, PAs, _Seq}, DocHandler, Acc) ->
     end.
 
 
-local_doc_handler({ok, #doc{atts = []} = Doc}, {Target, DocList, W, F}) ->
-    {Target, [Doc | DocList], W, F};
 local_doc_handler({ok, Doc}, {Target, DocList, W, F}) ->
-    ?LOG_DEBUG("Worker flushing doc with attachments", []),
-    Target2 = open_db(Target),
-    Success = (flush_doc(Target2, Doc) =:= ok),
-    close_db(Target2),
-    case Success of
+    case batch_doc(Doc) of
     true ->
-        {Target, DocList, W + 1, F};
+        {Target, [Doc | DocList], W, F};
     false ->
-        {Target, DocList, W, F + 1}
+        ?LOG_DEBUG("Worker flushing doc with attachments", []),
+        Target2 = open_db(Target),
+        Success = (flush_doc(Target2, Doc) =:= ok),
+        close_db(Target2),
+        case Success of
+        true ->
+            {Target, DocList, W + 1, F};
+        false ->
+            {Target, DocList, W, F + 1}
+        end
     end;
 local_doc_handler(_, Acc) ->
     Acc.
@@ -431,11 +434,9 @@ maybe_flush_docs(Doc, #state{target = Target, batch = Batch,
 
 
 maybe_flush_docs(#httpdb{} = Target,
-    #batch{docs = DocAcc, size = SizeAcc} = Batch, #doc{atts = Atts} = Doc) ->
-    case (length(Atts) > ?MAX_BULK_ATTS_PER_DOC) orelse
-        lists:any(
-            fun(A) -> A#att.disk_len > ?MAX_BULK_ATT_SIZE end, Atts) of
-    true ->
+    #batch{docs = DocAcc, size = SizeAcc} = Batch, Doc) ->
+    case batch_doc(Doc) of
+    false ->
         ?LOG_DEBUG("Worker flushing doc with attachments", []),
         case flush_doc(Target, Doc) of
         ok ->
@@ -443,7 +444,7 @@ maybe_flush_docs(#httpdb{} = Target,
         _ ->
             {Batch, 0, 1}
         end;
-    false ->
+    true ->
         JsonDoc = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, [revs, attachments])),
         case SizeAcc + iolist_size(JsonDoc) of
         SizeAcc2 when SizeAcc2 > ?DOC_BUFFER_BYTE_SIZE ->
@@ -455,8 +456,7 @@ maybe_flush_docs(#httpdb{} = Target,
         end
     end;
 
-maybe_flush_docs(#db{} = Target, #batch{docs = DocAcc, size = SizeAcc},
-    #doc{atts = []} = Doc) ->
+maybe_flush_docs(#db{} = Target, #batch{docs = DocAcc, size = SizeAcc}, Doc) ->
     case SizeAcc + 1 of
     SizeAcc2 when SizeAcc2 >= ?DOC_BUFFER_LEN ->
         ?LOG_DEBUG("Worker flushing doc batch of ~p docs", [SizeAcc2]),
@@ -465,6 +465,16 @@ maybe_flush_docs(#db{} = Target, #batch{docs = DocAcc, size = SizeAcc},
     SizeAcc2 ->
         {#batch{docs = [Doc | DocAcc], size = SizeAcc2}, 0, 0}
     end.
+
+
+batch_doc(#doc{atts = []}) ->
+    true;
+batch_doc(#doc{atts = Atts}) ->
+    (length(Atts) =< ?MAX_BULK_ATTS_PER_DOC) andalso
+        lists:all(
+            fun(#att{disk_len = L, data = Data}) ->
+                (L =< ?MAX_BULK_ATT_SIZE) andalso (Data =/= stub)
+            end, Atts).
 
 
 flush_docs(_Target, []) ->
