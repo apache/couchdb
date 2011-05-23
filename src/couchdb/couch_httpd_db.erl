@@ -691,10 +691,12 @@ db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
     RespHeaders = [{"Location", Loc}],
     case couch_util:to_list(couch_httpd:header_value(Req, "Content-Type")) of
     ("multipart/related;" ++ _) = ContentType ->
-        {ok, Doc0} = couch_doc:doc_from_multi_part_stream(ContentType,
-                fun() -> receive_request_data(Req) end),
+        {ok, Doc0, WaitFun} = couch_doc:doc_from_multi_part_stream(
+            ContentType, fun() -> receive_request_data(Req) end),
         Doc = couch_doc_from_req(Req, DocId, Doc0),
-        update_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType);
+        Result = update_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType),
+        WaitFun(),
+        Result;
     _Else ->
         case couch_httpd:qs_value(Req, "batch") of
         "ok" ->
@@ -829,7 +831,14 @@ send_ranges_multipart(Req, ContentType, Len, Att, Ranges) ->
     {ok, Resp}.
 
 receive_request_data(Req) ->
-    {couch_httpd:recv(Req, 0), fun() -> receive_request_data(Req) end}.
+    receive_request_data(Req, couch_httpd:body_length(Req)).
+
+receive_request_data(Req, LenLeft) when LenLeft > 0 ->
+    Len = erlang:min(4096, LenLeft),
+    Data = couch_httpd:recv(Req, Len),
+    {Data, fun() -> receive_request_data(Req, LenLeft - iolist_size(Data)) end};
+receive_request_data(_Req, _) ->
+    throw(<<"expected more data">>).
     
 make_content_range(From, To, Len) ->
     ?l2b(io_lib:format("bytes ~B-~B/~B", [From, To, Len])).
