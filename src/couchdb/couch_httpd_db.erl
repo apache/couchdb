@@ -1008,7 +1008,13 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
                         {identity, Ranges} when is_list(Ranges) ->
                             send_ranges_multipart(Req, Type, Len, Att, Ranges);
                         _ ->
-                            {ok, Resp} = start_response_length(Req, 200, Headers, Len),
+                            Headers1 = Headers ++
+                                if Enc =:= identity orelse ReqAcceptsAttEnc =:= true ->
+                                    [{"Content-MD5", base64:encode(Att#att.md5)}];
+                                true ->
+                                    []
+                            end,
+                            {ok, Resp} = start_response_length(Req, 200, Headers1, Len),
                             AttFun(Att, fun(Seg, _) -> send(Resp, Seg) end, {ok, Resp})
                     end
                 end
