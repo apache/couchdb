@@ -998,7 +998,7 @@ with_stream(Fd, #att{md5=InMd5,type=Type,encoding=Enc}=Att, Fun) ->
 write_streamed_attachment(_Stream, _F, 0) ->
     ok;
 write_streamed_attachment(Stream, F, LenLeft) when LenLeft > 0 ->
-    Bin = F(),
+    Bin = F(lists:min([LenLeft, 16#2000])),
     ok = couch_stream:write(Stream, Bin),
     write_streamed_attachment(Stream, F, LenLeft - size(Bin)).
 
