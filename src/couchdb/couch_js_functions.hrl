@@ -191,12 +191,6 @@
             }
 
             if (newDoc.user_ctx) {
-                if (!isAdmin) {
-                    reportError('Delegated replications (use of the ' +
-                        '`user_ctx\\' property) can only be triggered by ' +
-                        'administrators.');
-                }
-
                 var user_ctx = newDoc.user_ctx;
 
                 if ((typeof user_ctx !== 'object') || (user_ctx === null)) {
@@ -213,23 +207,39 @@
                         'non-empty string or null.');
                 }
 
+                if (!isAdmin && (user_ctx.name !== userCtx.name)) {
+                    reportError('The given `user_ctx.name\\' is not valid');
+                }
+
                 if (user_ctx.roles && !isArray(user_ctx.roles)) {
                     reportError('The `user_ctx.roles\\' property must be ' +
                         'an array of strings.');
                 }
 
-                if (user_ctx.roles) {
+                if (!isAdmin && user_ctx.roles) {
                     for (var i = 0; i < user_ctx.roles.length; i++) {
                         var role = user_ctx.roles[i];
 
                         if (typeof role !== 'string' || role.length === 0) {
                             reportError('Roles must be non-empty strings.');
                         }
-                        if (role[0] === '_') {
-                            reportError('System roles (starting with an ' +
-                                'underscore) are not allowed.');
+                        if (userCtx.roles.indexOf(role) === -1) {
+                            reportError('Invalid role (`' + role +
+                                '\\') in the `user_ctx\\'');
                         }
                     }
+                }
+            } else {
+                if (!isAdmin) {
+                    reportError('The `user_ctx\\' property is missing (it is ' +
+                       'optional for admins only).');
+                }
+            }
+        } else {
+            if (!isAdmin) {
+                if (!oldDoc.user_ctx || (oldDoc.user_ctx.name !== userCtx.name)) {
+                    reportError('Replication documents can only be deleted by ' +
+                        'admins or by the users who created them.');
                 }
             }
         }

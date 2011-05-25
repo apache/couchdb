@@ -85,13 +85,15 @@ replication_completed(#rep{id = RepId}) ->
     end.
 
 
-replication_error(#rep{id = RepId}, Error) ->
+replication_error(#rep{id = {BaseId, _} = RepId}, Error) ->
     case rep_state(RepId) of
     nil ->
         ok;
     #rep_state{rep = #rep{doc_id = DocId}} ->
         % TODO: maybe add error reason to replication document
-        update_rep_doc(DocId, [{<<"_replication_state">>, <<"error">>}]),
+        update_rep_doc(DocId, [
+            {<<"_replication_state">>, <<"error">>},
+            {<<"_replication_id">>, ?l2b(BaseId)}]),
         ok = gen_server:call(?MODULE, {rep_error, RepId, Error}, infinity)
     end.
 
@@ -310,7 +312,7 @@ process_update(State, {Change}) ->
 rep_user_ctx({RepDoc}) ->
     case get_value(<<"user_ctx">>, RepDoc) of
     undefined ->
-        #user_ctx{roles = [<<"_admin">>]};
+        #user_ctx{};
     {UserCtx} ->
         #user_ctx{
             name = get_value(<<"name">>, UserCtx, null),
@@ -482,9 +484,14 @@ update_rep_doc(RepDb, #doc{body = {RepDocBody}} = RepDoc, KVs) ->
                 lists:keystore(K, 1, Body, KV)
         end,
         RepDocBody, KVs),
-    % Might not succeed - when the replication doc is deleted right
-    % before this update (not an error, ignore).
-    couch_db:update_doc(RepDb, RepDoc#doc{body = {NewRepDocBody}}, []).
+    case NewRepDocBody of
+    RepDocBody ->
+        ok;
+    _ ->
+        % Might not succeed - when the replication doc is deleted right
+        % before this update (not an error, ignore).
+        couch_db:update_doc(RepDb, RepDoc#doc{body = {NewRepDocBody}}, [])
+    end.
 
 
 % RFC3339 timestamps.
