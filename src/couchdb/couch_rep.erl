@@ -899,13 +899,14 @@ update_rep_doc(RepDb, #doc{body = {RepDocBody}} = RepDoc, KVs) ->
         RepDocBody,
         KVs
     ),
-    % might not succeed - when the replication doc is deleted right
-    % before this update (not an error)
-    couch_db:update_doc(
-        RepDb,
-        RepDoc#doc{body = {NewRepDocBody}},
-        []
-    ).
+    case NewRepDocBody of
+    RepDocBody ->
+        ok;
+    _ ->
+       % might not succeed - when the replication doc is deleted right
+       % before this update (not an error)
+        couch_db:update_doc(RepDb, RepDoc#doc{body = {NewRepDocBody}}, [])
+    end.
 
 % RFC3339 timestamps.
 % Note: doesn't include the time seconds fraction (RFC3339 says it's optional).

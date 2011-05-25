@@ -186,7 +186,10 @@ couchTests.replicator_db = function(debug) {
       _id: "foo_cont_rep_doc",
       source: "http://" + host + "/" + dbA.name,
       target: dbB.name,
-      continuous: true
+      continuous: true,
+      user_ctx: {
+        roles: ["_admin"]
+      }
     };
 
     T(repDb.save(repDoc).ok);
@@ -220,10 +223,8 @@ couchTests.replicator_db = function(debug) {
     T(typeof repDoc1._replication_state_time === "string");
     T(typeof repDoc1._replication_id  === "string");
 
-    // add a design doc to source, it will be replicated to target
-    // when the "user_ctx" property is not defined in the replication doc,
-    // the replication will be done under an _admin context, therefore
-    // design docs will be replicated
+    // Design documents are only replicated to local targets if the respective
+    // replication document has a user_ctx filed with the "_admin" role in it.
     var ddoc = {
       _id: "_design/foobar",
       language: "javascript"
@@ -303,8 +304,7 @@ couchTests.replicator_db = function(debug) {
     T(copy === null);
 
     copy = dbB.open("_design/mydesign");
-    T(copy !== null);
-    T(copy.language === "javascript");
+    T(copy === null);
   }
 
 
@@ -713,6 +713,225 @@ couchTests.replicator_db = function(debug) {
   }
 
 
+  function test_user_ctx_validation() {
+    populate_db(dbA, docs1);
+    populate_db(dbB, []);
+    populate_db(usersDb, []);
+
+    var joeUserDoc = CouchDB.prepareUserDoc({
+      name: "joe",
+      roles: ["erlanger", "bar"]
+    }, "erly");
+    var fdmananaUserDoc = CouchDB.prepareUserDoc({
+      name: "fdmanana",
+      roles: ["a", "b", "c"]
+    }, "qwerty");
+
+    TEquals(true, usersDb.save(joeUserDoc).ok);
+    TEquals(true, usersDb.save(fdmananaUserDoc).ok);
+
+    T(dbB.setSecObj({
+      admins: {
+        names: [],
+        roles: ["god"]
+      },
+      readers: {
+        names: [],
+        roles: ["foo"]
+      }
+    }).ok);
+
+    TEquals(true, CouchDB.login("joe", "erly").ok);
+    TEquals("joe", CouchDB.session().userCtx.name);
+    TEquals(-1, CouchDB.session().userCtx.roles.indexOf("_admin"));
+
+    var repDoc = {
+      _id: "foo_rep",
+      source: CouchDB.protocol + host + "/" + dbA.name,
+      target: dbB.name
+    };
+
+    try {
+      repDb.save(repDoc);
+      T(false, "Should have failed, user_ctx missing.");
+    } catch (x) {
+      TEquals("forbidden", x.error);
+    }
+
+    repDoc.user_ctx = {
+      name: "john",
+      roles: ["erlanger"]
+    };
+
+    try {
+      repDb.save(repDoc);
+      T(false, "Should have failed, wrong user_ctx.name.");
+    } catch (x) {
+      TEquals("forbidden", x.error);
+    }
+
+    repDoc.user_ctx = {
+      name: "joe",
+      roles: ["bar", "god", "erlanger"]
+    };
+
+    try {
+      repDb.save(repDoc);
+      T(false, "Should have failed, a bad role in user_ctx.roles.");
+    } catch (x) {
+      TEquals("forbidden", x.error);
+    }
+
+    // user_ctx.roles might contain only a subset of the user's roles
+    repDoc.user_ctx = {
+      name: "joe",
+      roles: ["erlanger"]
+    };
+
+    TEquals(true, repDb.save(repDoc).ok);
+    CouchDB.logout();
+
+    waitForRep(repDb, repDoc, "error");
+    var repDoc1 = repDb.open(repDoc._id);
+    T(repDoc1 !== null);
+    TEquals(repDoc.source, repDoc1.source);
+    TEquals(repDoc.target, repDoc1.target);
+    TEquals("error", repDoc1._replication_state);
+    TEquals("string", typeof repDoc1._replication_id);
+    TEquals("string", typeof repDoc1._replication_state_time);
+
+    TEquals(true, CouchDB.login("fdmanana", "qwerty").ok);
+    TEquals("fdmanana", CouchDB.session().userCtx.name);
+    TEquals(-1, CouchDB.session().userCtx.roles.indexOf("_admin"));
+
+    try {
+      T(repDb.deleteDoc(repDoc1).ok);
+      T(false, "Shouldn't be able to delete replication document.");
+    } catch (x) {
+      TEquals("forbidden", x.error);
+    }
+
+    CouchDB.logout();
+    TEquals(true, CouchDB.login("joe", "erly").ok);
+    TEquals("joe", CouchDB.session().userCtx.name);
+    TEquals(-1, CouchDB.session().userCtx.roles.indexOf("_admin"));
+
+    T(repDb.deleteDoc(repDoc1).ok);
+    CouchDB.logout();
+
+    for (var i = 0; i < docs1.length; i++) {
+      var doc = docs1[i];
+      var copy = dbB.open(doc._id);
+
+      TEquals(null, copy);
+    }
+
+    T(dbB.setSecObj({
+      admins: {
+        names: [],
+        roles: ["god", "erlanger"]
+      },
+      readers: {
+        names: [],
+        roles: ["foo"]
+      }
+    }).ok);
+
+    TEquals(true, CouchDB.login("joe", "erly").ok);
+    TEquals("joe", CouchDB.session().userCtx.name);
+    TEquals(-1, CouchDB.session().userCtx.roles.indexOf("_admin"));
+
+    repDoc = {
+      _id: "foo_rep_2",
+      source: CouchDB.protocol + host + "/" + dbA.name,
+      target: dbB.name,
+      user_ctx: {
+        name: "joe",
+        roles: ["erlanger"]
+      }
+    };
+
+    TEquals(true, repDb.save(repDoc).ok);
+    CouchDB.logout();
+
+    waitForRep(repDb, repDoc, "complete");
+    repDoc1 = repDb.open(repDoc._id);
+    T(repDoc1 !== null);
+    TEquals(repDoc.source, repDoc1.source);
+    TEquals(repDoc.target, repDoc1.target);
+    TEquals("completed", repDoc1._replication_state);
+    TEquals("string", typeof repDoc1._replication_id);
+    TEquals("string", typeof repDoc1._replication_state_time);
+
+    for (var i = 0; i < docs1.length; i++) {
+      var doc = docs1[i];
+      var copy = dbB.open(doc._id);
+
+      T(copy !== null);
+      TEquals(doc.value, copy.value);
+    }
+
+    // Admins don't need to supply a user_ctx property in replication docs.
+    // If they do not, the implicit user_ctx "user_ctx": {name: null, roles: []}
+    // is used, meaning that design documents will not be replicated into
+    // local targets
+    T(dbB.setSecObj({
+      admins: {
+        names: [],
+        roles: []
+      },
+      readers: {
+        names: [],
+        roles: []
+      }
+    }).ok);
+
+    var ddoc = { _id: "_design/foo" };
+    TEquals(true, dbA.save(ddoc).ok);
+
+    repDoc = {
+      _id: "foo_rep_3",
+      source: CouchDB.protocol + host + "/" + dbA.name,
+      target: dbB.name
+    };
+
+    TEquals(true, repDb.save(repDoc).ok);
+    waitForRep(repDb, repDoc, "complete");
+    repDoc1 = repDb.open(repDoc._id);
+    T(repDoc1 !== null);
+    TEquals(repDoc.source, repDoc1.source);
+    TEquals(repDoc.target, repDoc1.target);
+    TEquals("completed", repDoc1._replication_state);
+    TEquals("string", typeof repDoc1._replication_id);
+    TEquals("string", typeof repDoc1._replication_state_time);
+
+    var ddoc_copy = dbB.open(ddoc._id);
+    T(ddoc_copy === null);
+
+    repDoc = {
+      _id: "foo_rep_4",
+      source: CouchDB.protocol + host + "/" + dbA.name,
+      target: dbB.name,
+      user_ctx: {
+        roles: ["_admin"]
+      }
+    };
+
+    TEquals(true, repDb.save(repDoc).ok);
+    waitForRep(repDb, repDoc, "complete");
+    repDoc1 = repDb.open(repDoc._id);
+    T(repDoc1 !== null);
+    TEquals(repDoc.source, repDoc1.source);
+    TEquals(repDoc.target, repDoc1.target);
+    TEquals("completed", repDoc1._replication_state);
+    TEquals("string", typeof repDoc1._replication_id);
+    TEquals("string", typeof repDoc1._replication_state_time);
+
+    ddoc_copy = dbB.open(ddoc._id);
+    T(ddoc_copy !== null);
+  }
+
+
   function rep_doc_with_bad_rep_id() {
     populate_db(dbA, docs1);
     populate_db(dbB, []);
@@ -1111,6 +1330,11 @@ couchTests.replicator_db = function(debug) {
       value: usersDb.name
     }
   ]);
+
+  repDb.deleteDb();
+  restartServer();
+  run_on_modified_server(server_config_2, test_user_ctx_validation);
+
   repDb.deleteDb();
   restartServer();
   run_on_modified_server(server_config_2, test_replication_credentials_delegation);
