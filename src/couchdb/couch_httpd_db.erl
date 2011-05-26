@@ -928,6 +928,11 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
             [{"Content-Encoding", atom_to_list(Enc)}];
         _ ->
             []
+        end ++ if
+            Enc =:= identity orelse ReqAcceptsAttEnc =:= true ->
+                [{"Content-MD5", base64:encode(Att#att.md5)}];
+            true ->
+                []
         end,
         Len = case {Enc, ReqAcceptsAttEnc} of
         {identity, _} ->
