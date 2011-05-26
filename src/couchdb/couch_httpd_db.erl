@@ -1025,7 +1025,7 @@ db_attachment_req(#httpd{method=Method,mochi_req=MochiReq}=Req, Db, DocId, FileN
                         end,
                         
                         
-                        fun() -> couch_httpd:recv(Req, 0) end;
+                        fun(Size) -> couch_httpd:recv(Req, Size) end;
                     Length ->
                         exit({length_not_integer, Length})
                     end,
