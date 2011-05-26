@@ -733,6 +733,8 @@ update_docs(Db, Docs, Options, interactive_edit) ->
 % for the doc.
 make_first_doc_on_disk(_Db, _Id, _Pos, []) ->
     nil;
+make_first_doc_on_disk(Db, Id, Pos, [{_Rev, #doc{}} | RestPath]) ->
+    make_first_doc_on_disk(Db, Id, Pos-1, RestPath);
 make_first_doc_on_disk(Db, Id, Pos, [{_Rev, ?REV_MISSING}|RestPath]) ->
     make_first_doc_on_disk(Db, Id, Pos - 1, RestPath);
 make_first_doc_on_disk(Db, Id, Pos, [{_Rev, {IsDel, Sp, _Seq}} |_]=DocPath) ->
