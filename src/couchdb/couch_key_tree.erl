@@ -16,6 +16,8 @@
 -export([map/2, get_all_leafs/1, count_leafs/1, remove_leafs/2,
     get_all_leafs_full/1,stem/2,map_leafs/2]).
 
+-include("couch_db.hrl").
+
 % Tree::term() is really a tree(), but we don't want to require R13B04 yet
 -type branch() :: {Key::term(), Value::term(), Tree::term()}.
 -type path() :: {Start::pos_integer(), branch()}.
@@ -82,9 +84,9 @@ merge_at(OurTree, Place, [{Key, Value, SubTree}]) when Place < 0 ->
     no ->
         no
     end;
-merge_at([{Key, Value, SubTree}|Sibs], 0, [{Key, _Value, InsertSubTree}]) ->
+merge_at([{Key, V1, SubTree}|Sibs], 0, [{Key, V2, InsertSubTree}]) ->
     {Merged, Conflicts} = merge_simple(SubTree, InsertSubTree),
-    {ok, [{Key, Value, Merged} | Sibs], Conflicts};
+    {ok, [{Key, value_pref(V1, V2), Merged} | Sibs], Conflicts};
 merge_at([{OurKey, _, _} | _], 0, [{Key, _, _}]) when OurKey > Key ->
     % siblings keys are ordered, no point in continuing
     no;
@@ -103,9 +105,10 @@ merge_simple([], B) ->
     {B, false};
 merge_simple(A, []) ->
     {A, false};
-merge_simple([{Key, Value, SubA} | NextA], [{Key, _, SubB} | NextB]) ->
+merge_simple([{Key, V1, SubA} | NextA], [{Key, V2, SubB} | NextB]) ->
     {MergedSubTree, Conflict1} = merge_simple(SubA, SubB),
     {MergedNextTree, Conflict2} = merge_simple(NextA, NextB),
+    Value = value_pref(V1, V2),
     {[{Key, Value, MergedSubTree} | MergedNextTree], Conflict1 or Conflict2};
 merge_simple([{A, _, _} = Tree | Next], [{B, _, _} | _] = Insert) when A < B ->
     {Merged, _} = merge_simple(Next, Insert),
@@ -157,14 +160,18 @@ remove_leafs(Trees, Keys) ->
     % filter out any that are in the keys list.
     {FilteredPaths, RemovedKeys} = filter_leafs(Paths, Keys, [], []),
 
+    SortedPaths = lists:sort(
+        [{Pos + 1 - length(Path), Path} || {Pos, Path} <- FilteredPaths]
+    ),
+
     % convert paths back to trees
     NewTree = lists:foldl(
-        fun({PathPos, Path},TreeAcc) ->
+        fun({StartPos, Path},TreeAcc) ->
             [SingleTree] = lists:foldl(
                 fun({K,V},NewTreeAcc) -> [{K,V,NewTreeAcc}] end, [], Path),
-            {NewTrees, _} = merge(TreeAcc, {PathPos + 1 - length(Path), SingleTree}),
+            {NewTrees, _} = merge(TreeAcc, {StartPos, SingleTree}),
             NewTrees
-        end, [], FilteredPaths),
+        end, [], SortedPaths),
     {NewTree, RemovedKeys}.
 
 
@@ -314,19 +321,35 @@ map_leafs_simple(Fun, Pos, [{Key, Value, SubTree} | RestTree]) ->
 
 
 stem(Trees, Limit) ->
-    % flatten each branch in a tree into a tree path
-    Paths = get_all_leafs_full(Trees),
-
-    Paths2 = [{Pos, lists:sublist(Path, Limit)} || {Pos, Path} <- Paths],
+    % flatten each branch in a tree into a tree path, sort by starting rev #
+    Paths = lists:sort(lists:map(fun({Pos, Path}) ->
+        StemmedPath = lists:sublist(Path, Limit),
+        {Pos + 1 - length(StemmedPath), StemmedPath}
+    end, get_all_leafs_full(Trees))),
 
     % convert paths back to trees
     lists:foldl(
-        fun({PathPos, Path},TreeAcc) ->
+        fun({StartPos, Path},TreeAcc) ->
             [SingleTree] = lists:foldl(
                 fun({K,V},NewTreeAcc) -> [{K,V,NewTreeAcc}] end, [], Path),
-            {NewTrees, _} = merge(TreeAcc, {PathPos + 1 - length(Path), SingleTree}),
+            {NewTrees, _} = merge(TreeAcc, {StartPos, SingleTree}),
             NewTrees
-        end, [], Paths2).
+        end, [], Paths).
+
+
+value_pref(Tuple, _) when is_tuple(Tuple),
+        (tuple_size(Tuple) == 3 orelse tuple_size(Tuple) == 4) ->
+    Tuple;
+value_pref(_, Tuple) when is_tuple(Tuple),
+        (tuple_size(Tuple) == 3 orelse tuple_size(Tuple) == 4) ->
+    Tuple;
+value_pref(?REV_MISSING, Other) ->
+    Other;
+value_pref(Other, ?REV_MISSING) ->
+    Other;
+value_pref(Last, _) ->
+    Last.
+
 
 % Tests moved to test/etap/06?-*.t
 
