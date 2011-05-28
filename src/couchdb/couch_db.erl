@@ -733,6 +733,8 @@ update_docs(Db, Docs, Options, interactive_edit) ->
 % for the doc.
 make_first_doc_on_disk(_Db, _Id, _Pos, []) ->
     nil;
+make_first_doc_on_disk(Db, Id, Pos, [{_Rev, #doc{}} | RestPath]) ->
+    make_first_doc_on_disk(Db, Id, Pos-1, RestPath);
 make_first_doc_on_disk(Db, Id, Pos, [{_Rev, ?REV_MISSING}|RestPath]) ->
     make_first_doc_on_disk(Db, Id, Pos - 1, RestPath);
 make_first_doc_on_disk(Db, Id, Pos, [{_Rev, {IsDel, Sp, _Seq}} |_]=DocPath) ->
@@ -810,7 +812,7 @@ doc_flush_atts(Doc, Fd) ->
     Doc#doc{atts=[flush_att(Fd, Att) || Att <- Doc#doc.atts]}.
 
 check_md5(_NewSig, <<>>) -> ok;
-check_md5(Sig1, Sig2) when Sig1 == Sig2 -> ok;
+check_md5(Sig, Sig) -> ok;
 check_md5(_, _) -> throw(md5_mismatch).
 
 flush_att(Fd, #att{data={Fd0, _}}=Att) when Fd0 == Fd ->
@@ -921,9 +923,14 @@ with_stream(Fd, #att{md5=InMd5,type=Type,encoding=Enc}=Att, Fun) ->
 write_streamed_attachment(_Stream, _F, 0) ->
     ok;
 write_streamed_attachment(Stream, F, LenLeft) when LenLeft > 0 ->
-    Bin = F(),
+    Bin = read_next_chunk(F, LenLeft),
     ok = couch_stream:write(Stream, Bin),
     write_streamed_attachment(Stream, F, LenLeft - size(Bin)).
+
+read_next_chunk(F, _) when is_function(F, 0) ->
+    F();
+read_next_chunk(F, LenLeft) when is_function(F, 1) ->
+    F(lists:min([LenLeft, 16#2000])).
 
 enum_docs_since_reduce_to_count(Reds) ->
     couch_btree:final_reduce(

@@ -624,8 +624,14 @@
   };
 
   function ajax(obj, options, errorMessage, ajaxOptions) {
+
+    var defaultAjaxOpts = {
+      contentType: "application/json",
+      headers:{"Accept": "application/json"}
+    };
+
     options = $.extend({successStatus: 200}, options);
-    ajaxOptions = $.extend({contentType: "application/json"}, ajaxOptions);
+    ajaxOptions = $.extend(defaultAjaxOpts, ajaxOptions);
     errorMessage = errorMessage || "Unknown error";
     $.ajax($.extend($.extend({
       type: "GET", dataType: "json", cache : !$.browser.msie,

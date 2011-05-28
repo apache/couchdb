@@ -253,7 +253,7 @@ process_update(State, {Change}) ->
 rep_user_ctx({RepDoc}) ->
     case get_value(<<"user_ctx">>, RepDoc) of
     undefined ->
-        #user_ctx{roles = [<<"_admin">>]};
+        #user_ctx{};
     {UserCtx} ->
         #user_ctx{
             name = get_value(<<"name">>, UserCtx, null),
@@ -307,6 +307,10 @@ start_replication(Server, {RepProps} = RepDoc, RepId, UserCtx, MaxRetries) ->
         ok = gen_server:call(Server, {triggered, RepId}, infinity),
         couch_rep:get_result(Pid, RepId, RepDoc, UserCtx);
     Error ->
+        couch_rep:update_rep_doc(
+            RepDoc,
+            [{<<"_replication_state">>, <<"error">>},
+                {<<"_replication_id">>, ?l2b(element(1, RepId))}]),
         keep_retrying(
             Server, RepId, RepDoc, UserCtx, Error, ?INITIAL_WAIT, MaxRetries)
     end.

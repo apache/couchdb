@@ -114,11 +114,16 @@ handle_changes_req1(Req, Db) ->
             FeedChangesFun(MakeCallback(Resp))
         end
     end,
-    couch_stats_collector:track_process_count(
+    couch_stats_collector:increment(
         {httpd, clients_requesting_changes}
     ),
-    WrapperFun(ChangesFun).
-
+    try
+        WrapperFun(ChangesFun)
+    after
+    couch_stats_collector:decrement(
+        {httpd, clients_requesting_changes}
+    )
+    end.
 
 handle_compact_req(#httpd{method='POST',path_parts=[DbName,_,Id|_]}=Req, Db) ->
     ok = couch_db:check_is_admin(Db),
@@ -687,10 +692,12 @@ db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
     RespHeaders = [{"Location", Loc}],
     case couch_util:to_list(couch_httpd:header_value(Req, "Content-Type")) of
     ("multipart/related;" ++ _) = ContentType ->
-        {ok, Doc0} = couch_doc:doc_from_multi_part_stream(ContentType,
-                fun() -> receive_request_data(Req) end),
+        {ok, Doc0, WaitFun} = couch_doc:doc_from_multi_part_stream(
+            ContentType, fun() -> receive_request_data(Req) end),
         Doc = couch_doc_from_req(Req, DocId, Doc0),
-        update_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType);
+        Result = update_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType),
+        WaitFun(),
+        Result;
     _Else ->
         case couch_httpd:qs_value(Req, "batch") of
         "ok" ->
@@ -762,7 +769,7 @@ send_doc_efficiently(#httpd{mochi_req = MochiReq} = Req,
         true ->
             Boundary = couch_uuids:random(),
             JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, 
-                    [attachments, follows|Options])),
+                    [attachments, follows, att_encoding_info | Options])),
             {ContentType, Len} = couch_doc:len_doc_to_multi_part_stream(
                     Boundary,JsonBytes, Atts, true),
             CType = {<<"Content-Type">>, ContentType},
@@ -825,7 +832,14 @@ send_ranges_multipart(Req, ContentType, Len, Att, Ranges) ->
     {ok, Resp}.
 
 receive_request_data(Req) ->
-    {couch_httpd:recv(Req, 0), fun() -> receive_request_data(Req) end}.
+    receive_request_data(Req, couch_httpd:body_length(Req)).
+
+receive_request_data(Req, LenLeft) when LenLeft > 0 ->
+    Len = erlang:min(4096, LenLeft),
+    Data = couch_httpd:recv(Req, Len),
+    {Data, fun() -> receive_request_data(Req, LenLeft - iolist_size(Data)) end};
+receive_request_data(_Req, _) ->
+    throw(<<"expected more data">>).
     
 make_content_range(From, To, Len) ->
     ?l2b(io_lib:format("bytes ~B-~B/~B", [From, To, Len])).
@@ -995,7 +1009,13 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
                         {identity, Ranges} when is_list(Ranges) ->
                             send_ranges_multipart(Req, Type, Len, Att, Ranges);
                         _ ->
-                            {ok, Resp} = start_response_length(Req, 200, Headers, Len),
+                            Headers1 = Headers ++
+                                if Enc =:= identity orelse ReqAcceptsAttEnc =:= true ->
+                                    [{"Content-MD5", base64:encode(Att#att.md5)}];
+                                true ->
+                                    []
+                            end,
+                            {ok, Resp} = start_response_length(Req, 200, Headers1, Len),
                             AttFun(Att, fun(Seg, _) -> send(Resp, Seg) end, {ok, Resp})
                     end
                 end
@@ -1052,7 +1072,7 @@ db_attachment_req(#httpd{method=Method,mochi_req=MochiReq}=Req, Db, DocId, FileN
                         end,
                         
                         
-                        fun() -> couch_httpd:recv(Req, 0) end
+                        fun(Size) -> couch_httpd:recv(Req, Size) end
                     end,
                 att_len = case couch_httpd:header_value(Req,"Content-Length") of
                     undefined ->

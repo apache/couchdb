@@ -39,7 +39,7 @@ couchTests.attachments_multipart= function(debug) {
             },
           "baz.txt": {
             "follows":true,
-            "content_type":"application/test",
+            "content_type":"text/plain",
             "length":19
             }
           }
@@ -78,15 +78,19 @@ couchTests.attachments_multipart= function(debug) {
   
   // now edit an attachment
   
-  var doc = db.open("multipart");
+  var doc = db.open("multipart", {att_encoding_info: true});
   var firstrev = doc._rev;
   
   T(doc._attachments["foo.txt"].stub == true);
   T(doc._attachments["bar.txt"].stub == true);
   T(doc._attachments["baz.txt"].stub == true);
+  TEquals("undefined", typeof doc._attachments["foo.txt"].encoding);
+  TEquals("undefined", typeof doc._attachments["bar.txt"].encoding);
+  TEquals("gzip", doc._attachments["baz.txt"].encoding);
   
   //lets change attachment bar
   delete doc._attachments["bar.txt"].stub; // remove stub member (or could set to false)
+  delete doc._attachments["bar.txt"].digest; // remove the digest (it's for the gzip form)
   doc._attachments["bar.txt"].length = 18;
   doc._attachments["bar.txt"].follows = true;
   //lets delete attachment baz:
@@ -104,6 +108,7 @@ couchTests.attachments_multipart= function(debug) {
       "this is 18 chars l" +
       "\r\n--abc123--"
     });
+  TEquals(201, xhr.status);
   
   xhr = CouchDB.request("GET", "/test_suite_db/multipart/bar.txt");
   

@@ -883,26 +883,50 @@ update_rep_doc({Props} = _RepDoc, KVs) ->
 
 update_rep_doc(RepDb, #doc{body = {RepDocBody}} = RepDoc, KVs) ->
     NewRepDocBody = lists:foldl(
-        fun({<<"_replication_state">> = K, _V} = KV, Body) ->
-                Body1 = lists:keystore(K, 1, Body, KV),
-                {Mega, Secs, _} = erlang:now(),
-                UnixTime = Mega * 1000000 + Secs,
-                lists:keystore(
-                    <<"_replication_state_time">>, 1,
-                    Body1, {<<"_replication_state_time">>, UnixTime});
+        fun({<<"_replication_state">> = K, State} = KV, Body) ->
+                case couch_util:get_value(K, Body) of
+                State ->
+                    Body;
+                _ ->
+                    Body1 = lists:keystore(K, 1, Body, KV),
+                    lists:keystore(
+                        <<"_replication_state_time">>, 1,
+                        Body1, {<<"_replication_state_time">>, timestamp()})
+                end;
             ({K, _V} = KV, Body) ->
                 lists:keystore(K, 1, Body, KV)
         end,
         RepDocBody,
         KVs
     ),
-    % might not succeed - when the replication doc is deleted right
-    % before this update (not an error)
-    couch_db:update_doc(
-        RepDb,
-        RepDoc#doc{body = {NewRepDocBody}},
-        []
-    ).
+    case NewRepDocBody of
+    RepDocBody ->
+        ok;
+    _ ->
+       % might not succeed - when the replication doc is deleted right
+       % before this update (not an error)
+        couch_db:update_doc(RepDb, RepDoc#doc{body = {NewRepDocBody}}, [])
+    end.
+
+% RFC3339 timestamps.
+% Note: doesn't include the time seconds fraction (RFC3339 says it's optional).
+timestamp() ->
+    {{Year, Month, Day}, {Hour, Min, Sec}} = calendar:now_to_local_time(now()),
+    UTime = erlang:universaltime(),
+    LocalTime = calendar:universal_time_to_local_time(UTime),
+    DiffSecs = calendar:datetime_to_gregorian_seconds(LocalTime) -
+        calendar:datetime_to_gregorian_seconds(UTime),
+    zone(DiffSecs div 3600, (DiffSecs rem 3600) div 60),
+    iolist_to_binary(
+        io_lib:format("~4..0w-~2..0w-~2..0wT~2..0w:~2..0w:~2..0w~s",
+            [Year, Month, Day, Hour, Min, Sec,
+                zone(DiffSecs div 3600, (DiffSecs rem 3600) div 60)])).
+
+zone(Hr, Min) when Hr >= 0, Min >= 0 ->
+    io_lib:format("+~2..0w:~2..0w", [Hr, Min]);
+zone(Hr, Min) ->
+    io_lib:format("-~2..0w:~2..0w", [abs(Hr), abs(Min)]).
+
 
 maybe_set_triggered({RepProps} = RepDoc, RepId) ->
     case couch_util:get_value(<<"_replication_state">>, RepProps) of

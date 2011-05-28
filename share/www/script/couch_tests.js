@@ -76,6 +76,7 @@ loadTest("reduce.js");
 loadTest("reduce_builtin.js");
 loadTest("reduce_false.js");
 loadTest("reduce_false_temp.js");
+loadTest("regression.js");
 loadTest("replication.js");
 loadTest("replicator_db.js");
 loadTest("rev_stemming.js");
