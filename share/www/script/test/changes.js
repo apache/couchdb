@@ -520,6 +520,10 @@ couchTests.changes = function(debug) {
   TEquals("0", resp.results[0].id);
   TEquals("1", resp.results[1].id);
 
+  TEquals(0, CouchDB.requestStats('httpd', 'clients_requesting_changes').current);
+  CouchDB.request("GET", "/" + db.name + "/_changes");
+  TEquals(0, CouchDB.requestStats('httpd', 'clients_requesting_changes').current);
+
   // cleanup
   db.deleteDb();
 };
