@@ -871,7 +871,7 @@ doc_flush_atts(Doc, Fd) ->
     Doc#doc{atts=[flush_att(Fd, Att) || Att <- Doc#doc.atts]}.
 
 check_md5(_NewSig, <<>>) -> ok;
-check_md5(Sig1, Sig2) when Sig1 == Sig2 -> ok;
+check_md5(Sig, Sig) -> ok;
 check_md5(_, _) -> throw(md5_mismatch).
 
 flush_att(Fd, #att{data={Fd0, _}}=Att) when Fd0 == Fd ->

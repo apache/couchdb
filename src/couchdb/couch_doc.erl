@@ -101,8 +101,14 @@ to_json_attachments(Atts, OutputData, DataToFollow, ShowEncInfo) ->
         fun(#att{disk_len=DiskLen, att_len=AttLen, encoding=Enc}=Att) ->
             {Att#att.name, {[
                 {<<"content_type">>, Att#att.type},
-                {<<"revpos">>, Att#att.revpos}
-                ] ++
+                {<<"revpos">>, Att#att.revpos}] ++
+                case Att#att.md5 of
+                    <<>> ->
+                        [];
+                    Md5 ->
+                        EncodedMd5 = base64:encode(Md5),
+                        [{<<"digest">>, <<"md5-",EncodedMd5/binary>>}]
+                end ++
                 if not OutputData orelse Att#att.data == stub ->
                     [{<<"length">>, DiskLen}, {<<"stub">>, true}];
                 true ->
@@ -216,6 +222,12 @@ transfer_fields([{<<"_rev">>, _Rev} | Rest], Doc) ->
 
 transfer_fields([{<<"_attachments">>, {JsonBins}} | Rest], Doc) ->
     Atts = lists:map(fun({Name, {BinProps}}) ->
+        Md5 = case couch_util:get_value(<<"digest">>, BinProps) of
+            <<"md5-",EncodedMd5/binary>> ->
+                base64:decode(EncodedMd5);
+            _ ->
+               <<>>
+        end,
         case couch_util:get_value(<<"stub">>, BinProps) of
         true ->
             Type = couch_util:get_value(<<"content_type">>, BinProps),
@@ -223,7 +235,7 @@ transfer_fields([{<<"_attachments">>, {JsonBins}} | Rest], Doc) ->
             DiskLen = couch_util:get_value(<<"length">>, BinProps),
             {Enc, EncLen} = att_encoding_info(BinProps),
             #att{name=Name, data=stub, type=Type, att_len=EncLen,
-                disk_len=DiskLen, encoding=Enc, revpos=RevPos};
+                disk_len=DiskLen, encoding=Enc, revpos=RevPos, md5=Md5};
         _ ->
             Type = couch_util:get_value(<<"content_type">>, BinProps,
                     ?DEFAULT_ATTACHMENT_CONTENT_TYPE),
@@ -233,7 +245,7 @@ transfer_fields([{<<"_attachments">>, {JsonBins}} | Rest], Doc) ->
                 DiskLen = couch_util:get_value(<<"length">>, BinProps),
                 {Enc, EncLen} = att_encoding_info(BinProps),
                 #att{name=Name, data=follows, type=Type, encoding=Enc,
-                    att_len=EncLen, disk_len=DiskLen, revpos=RevPos};
+                    att_len=EncLen, disk_len=DiskLen, revpos=RevPos, md5=Md5};
             _ ->
                 Value = couch_util:get_value(<<"data">>, BinProps),
                 Bin = base64:decode(Value),
