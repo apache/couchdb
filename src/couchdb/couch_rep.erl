@@ -84,8 +84,14 @@ end_replication({BaseId, Extension}) ->
     {error, not_found} = R ->
         R;
     ok ->
-        ok = supervisor:delete_child(couch_rep_sup, RepId),
-        {ok, {cancelled, ?l2b(BaseId)}}
+        case supervisor:delete_child(couch_rep_sup, RepId) of
+            ok ->
+                {ok, {cancelled, ?l2b(BaseId)}};
+            {error, not_found} ->
+                {ok, {cancelled, ?l2b(BaseId)}};
+            {error, _} = Error ->
+                Error
+        end
     end.
 
 start_replication(RepDoc, {BaseId, Extension}, UserCtx) ->
