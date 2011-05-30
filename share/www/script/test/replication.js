@@ -324,14 +324,14 @@ couchTests.replication = function(debug) {
   T(continuousResult._local_id);
 
   var cancelResult = CouchDB.replicate(dbA.name, "test_suite_db_b", {
-    body: {"cancel": true}
+    body: {"continuous":true, "cancel": true}
   });
   T(cancelResult.ok);
   T(continuousResult._local_id == cancelResult._local_id);
 
   try {
    var cancelResult2 = CouchDB.replicate(dbA.name, "test_suite_db_b", {
-     body: {"cancel": true}
+     body: {"continuous":true, "cancel": true}
    });
   } catch (e) {
     T(e.error == "not_found");
