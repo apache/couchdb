@@ -78,8 +78,14 @@ replicate({Props}=PostBody, UserCtx) ->
         {error, not_found} ->
      {error, not_found};
         ok ->
-     ok = supervisor:delete_child(couch_rep_sup, BaseId ++ Extension),
-            {ok, {cancelled, ?l2b(BaseId)}}
+     case supervisor:delete_child(couch_rep_sup, BaseId ++ Extension) of
+         ok ->
+             {ok, {cancelled, ?l2b(BaseId)}};
+         {error, not_found} ->
+             {ok, {cancelled, ?l2b(BaseId)}};
+         {error, _} = Error ->
+             Error
+     end
  end;
     false ->
         Server = start_replication_server(Replicator),
