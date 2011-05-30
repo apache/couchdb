@@ -178,8 +178,14 @@ cancel_replication({BaseId, Extension}) ->
     FullRepId = BaseId ++ Extension,
     case supervisor:terminate_child(couch_rep_sup, FullRepId) of
     ok ->
-        ok = supervisor:delete_child(couch_rep_sup, FullRepId),
-        {ok, {cancelled, ?l2b(BaseId)}};
+        case supervisor:delete_child(couch_rep_sup, FullRepId) of
+            ok ->
+                {ok, {cancelled, ?l2b(BaseId)}};
+            {error, not_found} ->
+                {ok, {cancelled, ?l2b(BaseId)}};
+            Error ->
+                Error
+        end;
     Error ->
         Error
     end.
