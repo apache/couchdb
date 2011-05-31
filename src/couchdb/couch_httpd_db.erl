@@ -696,12 +696,18 @@ db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
     RespHeaders = [{"Location", Loc}],
     case couch_util:to_list(couch_httpd:header_value(Req, "Content-Type")) of
     ("multipart/related;" ++ _) = ContentType ->
-        {ok, Doc0, WaitFun} = couch_doc:doc_from_multi_part_stream(
+        {ok, Doc0, WaitFun, Parser} = couch_doc:doc_from_multi_part_stream(
             ContentType, fun() -> receive_request_data(Req) end),
         Doc = couch_doc_from_req(Req, DocId, Doc0),
-        Result = update_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType),
-        WaitFun(),
-        Result;
+        try
+            Result = update_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType),
+            WaitFun(),
+            Result
+        catch throw:Err ->
+            % Document rejected by a validate_doc_update function.
+            couch_doc:abort_multi_part_stream(Parser),
+            throw(Err)
+        end;
     _Else ->
         case couch_httpd:qs_value(Req, "batch") of
         "ok" ->

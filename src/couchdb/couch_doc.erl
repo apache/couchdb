@@ -18,6 +18,7 @@
 -export([validate_docid/1]).
 -export([doc_from_multi_part_stream/2]).
 -export([doc_to_multi_part_stream/5, len_doc_to_multi_part_stream/4]).
+-export([abort_multi_part_stream/1]).
 -export([to_path/1]).
 -export([mp_parse_doc/2]).
 -export([with_ejson_body/1, with_bin_body/1]).
@@ -520,7 +521,7 @@ doc_from_multi_part_stream(ContentType, DataFun) ->
             receive {Parser, finished} -> ok end,
             erlang:put(mochiweb_request_recv, true)
         end,
-        {ok, Doc#doc{atts=Atts2}, WaitFun}
+        {ok, Doc#doc{atts=Atts2}, WaitFun, Parser}
     end.
 
 mp_parse_doc({headers, H}, []) ->
@@ -551,6 +552,24 @@ mp_parse_atts({body, Bytes}) ->
     fun mp_parse_atts/1;
 mp_parse_atts(body_end) ->
     fun mp_parse_atts/1.
+
+
+abort_multi_part_stream(Parser) ->
+    abort_multi_part_stream(Parser, erlang:monitor(process, Parser)).
+
+abort_multi_part_stream(Parser, MonRef) ->
+    case is_process_alive(Parser) of
+    true ->
+        Parser ! {get_bytes, self()},
+        receive
+        {bytes, _Bytes} ->
+             abort_multi_part_stream(Parser, MonRef);
+        {'DOWN', MonRef, _, _, _} ->
+             ok
+        end;
+    false ->
+        erlang:demonitor(MonRef, [flush])
+    end.
 
 
 with_bin_body(#doc{body = Json} = Doc) when is_binary(Json) ->
