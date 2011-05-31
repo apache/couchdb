@@ -179,7 +179,7 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
     end;
 open_doc_revs(Db, Id, Revs, Options, Fun, Acc) ->
     {ok, Results} = couch_db:open_doc_revs(Db, Id, Revs, Options),
-    {ok, lists:foldl(Fun, Acc, Results)}.
+    {ok, lists:foldl(fun(R, A) -> {_, A2} = Fun(R, A), A2 end, Acc, Results)}.
 
 
 open_doc(#httpdb{} = Db, Id, Options) ->
@@ -475,24 +475,47 @@ receive_docs(Streamer, UserFun, UserAcc) ->
         {"multipart/related", _} = ContentType ->
             case doc_from_multi_part_stream(
                 ContentType, fun() -> receive_doc_data(Streamer) end) of
-            {ok, Doc} ->
-                UserAcc2 = UserFun({ok, Doc}, UserAcc),
+            {ok, Doc, Parser} ->
+                case UserFun({ok, Doc}, UserAcc) of
+                {ok, UserAcc2} ->
+                    ok;
+                {skip, UserAcc2} ->
+                    skip_multipart_atts(Parser)
+                end,
                 receive_docs(Streamer, UserFun, UserAcc2)
             end;
         {"application/json", []} ->
             Doc = couch_doc:from_json_obj(
                     ?JSON_DECODE(receive_all(Streamer, []))),
-            UserAcc2 = UserFun({ok, Doc}, UserAcc),
+            {_, UserAcc2} = UserFun({ok, Doc}, UserAcc),
             receive_docs(Streamer, UserFun, UserAcc2);
         {"application/json", [{"error","true"}]} ->
             {ErrorProps} = ?JSON_DECODE(receive_all(Streamer, [])),
             Rev = get_value(<<"missing">>, ErrorProps),
             Result = {{not_found, missing}, couch_doc:parse_rev(Rev)},
-            UserAcc2 = UserFun(Result, UserAcc),
+            {_, UserAcc2} = UserFun(Result, UserAcc),
             receive_docs(Streamer, UserFun, UserAcc2)
         end;
     done ->
         {ok, UserAcc}
+    end.
+
+
+skip_multipart_atts(Parser) ->
+    skip_multipart_atts(Parser, erlang:monitor(process, Parser)).
+
+skip_multipart_atts(Parser, MonRef) ->
+    case is_process_alive(Parser) of
+    true ->
+        Parser ! {get_bytes, self()},
+        receive
+        {bytes, Bytes} ->
+             skip_multipart_atts(Parser, MonRef);
+        {'DOWN', MonRef, _, _, _} ->
+             ok
+        end;
+    false ->
+        erlang:demonitor(MonRef, [flush])
     end.
 
 
@@ -601,7 +624,7 @@ doc_from_multi_part_stream(ContentType, DataFun) ->
             (A) ->
                 A
             end, Doc#doc.atts),
-        {ok, Doc#doc{atts = Atts2}}
+        {ok, Doc#doc{atts = Atts2}, Parser}
     end.
 
 

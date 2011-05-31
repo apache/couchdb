@@ -350,7 +350,7 @@ fetch_doc(Source, {Id, Revs, PAs, _Seq}, DocHandler, Acc) ->
 local_doc_handler({ok, Doc}, {Target, DocList, W, F}) ->
     case batch_doc(Doc) of
     true ->
-        {Target, [Doc | DocList], W, F};
+        {ok, {Target, [Doc | DocList], W, F}};
     false ->
         ?LOG_DEBUG("Worker flushing doc with attachments", []),
         Target2 = open_db(Target),
@@ -358,18 +358,18 @@ local_doc_handler({ok, Doc}, {Target, DocList, W, F}) ->
         close_db(Target2),
         case Success of
         true ->
-            {Target, DocList, W + 1, F};
+            {ok, {Target, DocList, W + 1, F}};
         false ->
-            {Target, DocList, W, F + 1}
+            {ok, {Target, DocList, W, F + 1}}
         end
     end;
 local_doc_handler(_, Acc) ->
-    Acc.
+    {ok, Acc}.
 
 
 remote_doc_handler({ok, #doc{atts = []} = Doc}, {Parent, _} = Acc) ->
     ok = gen_server:call(Parent, {batch_doc, Doc}, infinity),
-    Acc;
+    {ok, Acc};
 remote_doc_handler({ok, Doc}, {Parent, Target} = Acc) ->
     % Immediately flush documents with attachments received from a remote
     % source. The data property of each attachment is a function that starts
@@ -380,9 +380,14 @@ remote_doc_handler({ok, Doc}, {Parent, Target} = Acc) ->
     Success = (flush_doc(Target2, Doc) =:= ok),
     ok = gen_server:call(Parent, {doc_flushed, Success}, infinity),
     close_db(Target2),
-    Acc;
+    case Success of
+    true ->
+        {ok, Acc};
+    false ->
+        {skip, Acc}
+    end;
 remote_doc_handler(_, Acc) ->
-    Acc.
+    {ok, Acc}.
 
 
 spawn_writer(Target, #batch{docs = DocList, size = Size}) ->
