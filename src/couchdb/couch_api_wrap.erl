@@ -236,6 +236,8 @@ update_doc(#httpdb{} = HttpDb, #doc{id = DocId} = Doc, Options, Type) ->
                 case {Code, get_value(<<"error">>, Props)} of
                 {401, <<"unauthorized">>} ->
                     throw({unauthorized, get_value(<<"reason">>, Props)});
+                {403, <<"forbidden">>} ->
+                    throw({forbidden, get_value(<<"reason">>, Props)});
                 {412, <<"missing_stub">>} ->
                     throw({missing_stub, get_value(<<"reason">>, Props)});
                 {_, Error} ->
@@ -665,9 +667,10 @@ bulk_results_to_errors(Docs, {ok, Results}, interactive_edit) ->
     lists:reverse(lists:foldl(
         fun({_, {ok, _}}, Acc) ->
             Acc;
-        ({#doc{id = Id}, Error}, Acc) ->
-            {_, Error, _Reason} = couch_httpd:error_info(Error),
-            [ {[{<<"id">>, Id}, {<<"error">>, Error}]} | Acc ]
+        ({#doc{id = Id, revs = {Pos, [RevId | _]}}, Error}, Acc) ->
+            {_, Error, Reason} = couch_httpd:error_info(Error),
+            [ {[{id, Id}, {rev, rev_to_str({Pos, RevId})},
+                {error, Error}, {reason, Reason}]} | Acc ]
         end,
         [], lists:zip(Docs, Results)));
 
@@ -676,9 +679,9 @@ bulk_results_to_errors(Docs, {ok, Results}, replicated_changes) ->
 
 bulk_results_to_errors(_Docs, {aborted, Results}, interactive_edit) ->
     lists:map(
-        fun({{Id, _Rev}, Err}) ->
-            {_, Error, _Reason} = couch_httpd:error_info(Err),
-            {[{<<"id">>, Id}, {<<"error">>, Error}]}
+        fun({{Id, Rev}, Err}) ->
+            {_, Error, Reason} = couch_httpd:error_info(Err),
+            {[{id, Id}, {rev, rev_to_str(Rev)}, {error, Error}, {reason, Reason}]}
         end,
         Results);
 
@@ -690,10 +693,19 @@ bulk_results_to_errors(_Docs, Results, remote) ->
                 Acc;
             Error ->
                 Id = get_value(<<"id">>, Props, get_value(id, Props)),
-                [ {[{<<"id">>, Id}, {<<"error">>, Error}]} | Acc ]
+                Rev = get_value(<<"rev">>, Props, get_value(rev, Props)),
+                Reason = get_value(<<"reason">>, Props, get_value(reason, Props)),
+                [ {[{id, Id}, {rev, rev_to_str(Rev)},
+                    {error, Error}, {reason, Reason}]} | Acc ]
             end
         end,
         [], Results)).
+
+
+rev_to_str({_Pos, _Id} = Rev) ->
+    couch_doc:rev_to_str(Rev);
+rev_to_str(Rev) ->
+    Rev.
 
 
 stream_doc({JsonBytes, Atts, Boundary, Len}) ->

@@ -504,6 +504,53 @@ couchTests.replication = function(debug) {
   }
 
 
+  // test errors due to doc validate_doc_update functions in the target endpoint
+  docs = makeDocs(1, 8);
+  docs[2]["_attachments"] = {
+    "hello.txt": {
+      "content_type": "text/plain",
+      "data": "aGVsbG8gd29ybGQ="  // base64:encode("hello world")
+    }
+  };
+  var ddoc = {
+    _id: "_design/test",
+    language: "javascript",
+    validate_doc_update: (function(newDoc, oldDoc, userCtx, secObj) {
+      if ((newDoc.integer % 2) !== 0) {
+        throw {forbidden: "I only like multiples of 2."};
+      }
+    }).toString()
+  };
+
+  for (i = 0; i < dbPairs.length; i++) {
+    populateDb(sourceDb, docs);
+    populateDb(targetDb, [ddoc]);
+
+    repResult = CouchDB.replicate(
+      dbPairs[i].source,
+      dbPairs[i].target
+    );
+    TEquals(true, repResult.ok);
+    TEquals(7, repResult.history[0].missing_checked);
+    TEquals(7, repResult.history[0].missing_found);
+    TEquals(7, repResult.history[0].docs_read);
+    TEquals(3, repResult.history[0].docs_written);
+    TEquals(4, repResult.history[0].doc_write_failures);
+
+    for (j = 0; j < docs.length; j++) {
+      doc = docs[j];
+      copy = targetDb.open(doc._id);
+
+      if (doc.integer % 2 === 0) {
+        T(copy !== null);
+        TEquals(copy.integer, doc.integer);
+      } else {
+        T(copy === null);
+      }
+    }
+  }
+
+
   // test create_target option
   docs = makeDocs(1, 2);
 
