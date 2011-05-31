@@ -106,7 +106,7 @@ rexi_call(Node, MFA) ->
 calculate_start_seq(Db, #shard{node=Node, name=Name}, LocalId) ->
     case couch_db:open_doc(Db, LocalId, []) of
     {ok, #doc{body = {SProps}}} ->
-        Opts = [{io_priority, {internal_repl, Name}}],
+        Opts = [{user_ctx, ?CTX}, {io_priority, {internal_repl, Name}}],
         try rexi_call(Node, {fabric_rpc, open_doc, [Name, LocalId, Opts]}) of
         #doc{body = {TProps}} ->
             SourceSeq = couch_util:get_value(<<"seq">>, SProps, 0),
