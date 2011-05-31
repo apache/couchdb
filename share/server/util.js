@@ -63,6 +63,17 @@ var Couch = {
   },
   compileFunction : function(source, ddoc) {    
     if (!source) throw(["error","not_found","missing function"]);
+
+    var evaluate_function_source = function(source, evalFunction, sandbox) {
+      sandbox = sandbox || {};
+      if(typeof CoffeeScript === "undefined") {
+        return evalFunction(source, sandbox);
+      } else {
+        coffee = CoffeeScript.compile(source, {bare: true});
+        return evalFunction(coffee, sandbox);
+      }
+    }
+
     try {
       if (sandbox) {
         if (ddoc) {
@@ -91,9 +102,9 @@ var Couch = {
           };
           sandbox.require = require;
         }
-        var functionObject = evalcx(source, sandbox);
+        var functionObject = evaluate_function_source(source, evalcx, sandbox);
       } else {
-        var functionObject = eval(source);
+        var functionObject = evaluate_function_source(source, eval);
       }
     } catch (err) {
       throw(["error", "compilation_error", err.toSource() + " (" + source + ")"]);

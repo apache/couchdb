@@ -59,6 +59,8 @@ auth_cache_size = 50 ; size is number of cache entries
 
 [query_servers]
 javascript = %bindir%/%couchjs_command_name% %localbuilddatadir%/server/main.js
+coffeescript = %bindir%/%couchjs_command_name% %localbuilddatadir%/server/main-coffee.js
+
 
 ; Changing reduce_limit to false will disable reduce_limit.
 ; If you think you're hitting reduce_limit with a "good" reduce function,

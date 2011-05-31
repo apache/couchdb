@@ -58,6 +58,7 @@
 ^share/Makefile.in
 ^share/server/json2.js
 ^share/server/mimeparse.js
+^share/server/coffee-script.js
 ^share/www/favicon.ico
 ^share/www/image/*
 ^share/www/script/jquery.*

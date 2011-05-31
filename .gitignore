@@ -83,6 +83,7 @@ test/etap/test_cfg_register
 test/etap/test_util.erl
 test/javascript/run
 share/server/main.js
+share/server/main-coffee.js
 
 # for make dev
 

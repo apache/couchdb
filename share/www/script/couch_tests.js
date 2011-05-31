@@ -42,6 +42,7 @@ loadTest("auth_cache.js");
 loadTest("batch_save.js");
 loadTest("bulk_docs.js");
 loadTest("changes.js");
+loadTest("coffee.js");
 loadTest("compact.js");
 loadTest("config.js");
 loadTest("conflicts.js");

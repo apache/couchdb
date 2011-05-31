@@ -65,3 +65,7 @@ This product also includes the following third-party components:
  * snappy-erlang-nif (https://github.com/fdmanana/snappy-erlang-nif)
 
   Copyright 2011, Filipe David Manana <fdmanana@apache.org>
+
+ * CoffeeScript (http://coffeescript.org/)
+
+  Copyright 2011, Jeremy Ashkenas
