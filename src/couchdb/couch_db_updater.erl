@@ -888,7 +888,7 @@ copy_compact(Db, NewDb0, Retry) ->
     fun(#doc_info{high_seq=Seq}=DocInfo, _Offset,
         {AccNewDb, AccUncopied, AccUncopiedSize, AccCopiedSize, TotalCopied}) ->
 
-        AccUncopiedSize2 = AccUncopiedSize + byte_size(?term_to_bin(DocInfo)),
+        AccUncopiedSize2 = AccUncopiedSize + ?term_size(DocInfo),
         if AccUncopiedSize2 >= BufferSize ->
             NewDb2 = copy_docs(
                 Db, AccNewDb, lists:reverse([DocInfo | AccUncopied]), Retry),
