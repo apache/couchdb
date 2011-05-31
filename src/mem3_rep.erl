@@ -99,7 +99,7 @@ rexi_call(Node, MFA) ->
         Reply;
     {Ref, Error} ->
         erlang:error(Error)
-    after 60000 ->
+    after 600000 ->
         erlang:error(timeout)
     end.
 
