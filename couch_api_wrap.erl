@@ -480,7 +480,7 @@ receive_docs(Streamer, UserFun, UserAcc) ->
                 {ok, UserAcc2} ->
                     ok;
                 {skip, UserAcc2} ->
-                    skip_multipart_atts(Parser)
+                    couch_doc:abort_multi_part_stream(Parser)
                 end,
                 receive_docs(Streamer, UserFun, UserAcc2)
             end;
@@ -498,24 +498,6 @@ receive_docs(Streamer, UserFun, UserAcc) ->
         end;
     done ->
         {ok, UserAcc}
-    end.
-
-
-skip_multipart_atts(Parser) ->
-    skip_multipart_atts(Parser, erlang:monitor(process, Parser)).
-
-skip_multipart_atts(Parser, MonRef) ->
-    case is_process_alive(Parser) of
-    true ->
-        Parser ! {get_bytes, self()},
-        receive
-        {bytes, Bytes} ->
-             skip_multipart_atts(Parser, MonRef);
-        {'DOWN', MonRef, _, _, _} ->
-             ok
-        end;
-    false ->
-        erlang:demonitor(MonRef, [flush])
     end.
 
 
