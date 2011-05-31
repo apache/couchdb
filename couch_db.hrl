@@ -27,6 +27,12 @@
 -define(b2l(V), binary_to_list(V)).
 -define(l2b(V), list_to_binary(V)).
 -define(term_to_bin(T), term_to_binary(T, [{minor_version, 1}])).
+-define(term_size(T),
+    try
+        erlang:external_size(T)
+    catch _:_ ->
+        byte_size(?term_to_bin(T))
+    end).
 
 -define(DEFAULT_ATTACHMENT_CONTENT_TYPE, <<"application/octet-stream">>).
 

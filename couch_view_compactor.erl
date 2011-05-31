@@ -57,7 +57,7 @@ compact_group(Group, EmptyGroup) ->
             Msg = "Duplicates of ~s detected in ~s ~s - rebuild required",
             exit(io_lib:format(Msg, [DocId, DbName, GroupId]));
         true -> ok end,
-        AccSize2 = AccSize + byte_size(?term_to_bin(KV)),
+        AccSize2 = AccSize + ?term_size(KV),
         if AccSize2 >= BufferSize ->
             {ok, Bt2} = couch_btree:add(Bt, lists:reverse([KV|Acc])),
             couch_task_status:update("Copied ~p of ~p Ids (~p%)",
@@ -90,7 +90,7 @@ compact_view(View, EmptyView, BufferSize) ->
 
     %% Key is {Key,DocId}
     Fun = fun(KV, {Bt, Acc, AccSize, TotalCopied}) ->
-        AccSize2 = AccSize + byte_size(?term_to_bin(KV)),
+        AccSize2 = AccSize + ?term_size(KV),
         if AccSize2 >= BufferSize ->
             {ok, Bt2} = couch_btree:add(Bt, lists:reverse([KV|Acc])),
             couch_task_status:update("View #~p: copied ~p of ~p KVs (~p%)",

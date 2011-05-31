@@ -42,7 +42,7 @@ new(Options) ->
 queue(Wq, Item) when is_binary(Item) ->
     gen_server:call(Wq, {queue, Item, byte_size(Item)}, infinity);
 queue(Wq, Item) ->
-    gen_server:call(Wq, {queue, Item, byte_size(?term_to_bin(Item))}, infinity).
+    gen_server:call(Wq, {queue, Item, ?term_size(Item)}, infinity).
 
 
 dequeue(Wq) ->
