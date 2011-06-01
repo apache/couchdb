@@ -22,10 +22,13 @@
 -define(DBNAME_REGEX, "^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*$").
 
 %% @doc Create a new database, and all its partition files across the cluster
-%%      Options is proplist with user_ctx, n, q
+%%      Options is proplist with user_ctx, n, q, validate_name
 go(DbName, Options) ->
-    case re:run(DbName, ?DBNAME_REGEX, [{capture,none}]) of
-    match ->
+    CheckName = couch_util:get_value(validate_name, Options, true),
+    case CheckName andalso re:run(DbName, ?DBNAME_REGEX, [{capture,none}]) of
+    nomatch ->
+        {error, illegal_database_name};
+    _ -> % CheckName =:= false orelse regex matched
         {MegaSecs, Secs, _} = now(),
         Suffix = "." ++ integer_to_list(MegaSecs*1000000 + Secs),
         Shards = mem3:choose_shards(DbName, [{shard_suffix,Suffix} | Options]),
@@ -44,9 +47,7 @@ go(DbName, Options) ->
             case X of {ok, _} -> ok; Else -> Else end;
         {ok, false} ->
             {error, internal_server_error}
-        end;
-    nomatch ->
-        {error, illegal_database_name}
+        end
     end.
 
 handle_message(Msg, Shard, Counters) ->
