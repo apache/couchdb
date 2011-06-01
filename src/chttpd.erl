@@ -559,7 +559,7 @@ send_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Body) ->
 
 send_method_not_allowed(Req, Methods) ->
     send_error(Req, 405, [{"Allow", Methods}], <<"method_not_allowed">>,
-        ?l2b("Only " ++ Methods ++ " allowed")).
+        ?l2b("Only " ++ Methods ++ " allowed"), []).
 
 send_json(Req, Value) ->
     send_json(Req, 200, Value).
