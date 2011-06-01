@@ -14,7 +14,7 @@
 
 -module(fabric_util).
 
--export([submit_jobs/3, cleanup/1, recv/4, get_db/1, error_info/1,
+-export([submit_jobs/3, cleanup/1, recv/4, get_db/1, get_db/2, error_info/1,
         update_counter/3, remove_ancestors/2, kv/2]).
 
 -include("fabric.hrl").
@@ -40,21 +40,30 @@ recv(Workers, Keypos, Fun, Acc0) ->
 
 
 get_db(DbName) ->
-    % sort shards so we try the local ones first
+    get_db(DbName, []).
+
+get_db(DbName, Options) ->
+    % prefer local shards
     {Local, Remote} = lists:partition(fun(S) -> S#shard.node =:= node() end,
         mem3:shards(DbName)),
-    get_shard(Local ++ Remote, 100).
+    % suppress shards from down nodes
+    Nodes = erlang:nodes(),
+    Live = [S || #shard{node = N} = S <- Remote, lists:member(N, Nodes)],
+    % sort the live remote shards so that we don't repeatedly try the same node
+    get_shard(Local ++ lists:keysort(#shard.name, Live), Options, 100).
 
-get_shard([], _Timeout) ->
+get_shard([], _Opts, _Timeout) ->
     erlang:error({internal_server_error, "No DB shards could be opened."});
-get_shard([#shard{node = Node, name = Name} | Rest], Timeout) ->
-    case rpc:call(Node, couch_db, open_int, [Name, [{timeout, Timeout}]]) of
+get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout) ->
+    case rpc:call(Node, couch_db, open, [Name, [{timeout, Timeout} | Opts]]) of
     {ok, Db} ->
         {ok, Db};
+    {unauthorized, _} = Error ->
+        throw(Error);
     {badrpc, {'EXIT', {timeout, _}}} ->
-        get_shard(Rest, 2*Timeout);
+        get_shard(Rest, Opts, 2*Timeout);
     _Else ->
-        get_shard(Rest, Timeout)
+        get_shard(Rest, Opts, Timeout)
     end.
 
 error_info({{<<"reduce_overflow_error">>, _} = Error, _Stack}) ->
