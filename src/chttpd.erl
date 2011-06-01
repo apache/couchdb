@@ -696,9 +696,9 @@ error_info({bad_ctype, Reason}) ->
 error_info(requested_range_not_satisfiable) ->
     {416, <<"requested_range_not_satisfiable">>, <<"Requested range not satisfiable">>};
 error_info({error, illegal_database_name}) ->
-    {400, <<"illegal_database_name">>, <<"Only lowercase characters (a-z), "
-        "digits (0-9), and any of the characters _, $, (, ), +, -, and / "
-        "are allowed">>};
+    {400, <<"illegal_database_name">>, <<"Only lowercase letters (a-z), "
+        "digits (0-9), and any of the characters _, $, (, ), +, -, and / are "
+        "allowed. Moreover, the database name must begin with a letter.">>};
 error_info({missing_stub, Reason}) ->
     {412, <<"missing_stub">>, Reason};
 error_info(not_implemented) ->
