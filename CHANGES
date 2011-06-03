@@ -81,6 +81,65 @@ URL Rewriter & Vhosts:
 
  * Fix for variable substituion
 
+Version 1.0.2
+-------------
+
+Futon:
+
+ * Make test suite work with Safari and Chrome.
+ * Fixed animated progress spinner.
+ * Fix raw view document link due to overzealous URI encoding.
+ * Spell javascript correctly in loadScript(uri).
+
+Storage System:
+
+ * Fix leaking file handles after compacting databases and views.
+ * Fix databases forgetting their validation function after compaction.
+ * Fix occasional timeout errors after successfully compacting large databases.
+ * Fix ocassional error when writing to a database that has just been compacted.
+ * Fix occasional timeout errors on systems with slow or heavily loaded IO.
+ * Fix for OOME when compactions include documents with many conflicts.
+ * Fix for missing attachment compression when MIME types included parameters.
+ * Preserve purge metadata during compaction to avoid spurious view rebuilds.
+ * Fix spurious conflicts introduced when uploading an attachment after
+   a doc has been in a conflict. See COUCHDB-902 for details.
+ * Fix for frequently edited documents in multi-master deployments being
+   duplicated in _changes and _all_docs.  See COUCHDDB-968 for details on how
+   to repair.
+ * Significantly higher read and write throughput against database and
+   view index files.
+
+Log System:
+
+ * Reduce lengthy stack traces.
+ * Allow logging of native <xml> types.
+
+HTTP Interface:
+
+ * Allow reduce=false parameter in map-only views.
+ * Fix parsing of Accept headers.
+ * Fix for multipart GET APIs when an attachment was created during a
+   local-local replication. See COUCHDB-1022 for details.
+
+Replicator:
+
+ * Updated ibrowse library to 2.1.2 fixing numerous replication issues.
+ * Make sure that the replicator respects HTTP settings defined in the config.
+ * Fix error when the ibrowse connection closes unexpectedly.
+ * Fix authenticated replication (with HTTP basic auth) of design documents
+   with attachments.
+ * Various fixes to make replication more resilient for edge-cases.
+
+View Server:
+
+ * Don't trigger view updates when requesting `_design/doc/_info`.
+ * Fix for circular references in CommonJS requires.
+ * Made isArray() function available to functions executed in the query server.
+ * Documents are now sealed before being passed to map functions.
+ * Force view compaction failure when duplicated document data exists. When
+   this error is seen in the logs users should rebuild their views from
+   scratch to fix the issue. See COUCHDB-999 for details.
+
 Version 1.0.1
 -------------
 

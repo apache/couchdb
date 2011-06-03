@@ -47,6 +47,28 @@ This release contains backwards incompatible changes.
    to lack of permissions.
  * Added a "change password"-feature to Futon.
 
+Version 1.0.2
+-------------
+
+ * Make test suite work with Safari and Chrome.
+ * Fix leaking file handles after compacting databases and views.
+ * Fix databases forgetting their validation function after compaction.
+ * Fix occasional timeout errors.
+ * Reduce lengthy stack traces.
+ * Allow logging of native <xml> types.
+ * Updated ibrowse library to 2.1.2 fixing numerous replication issues.
+ * Fix authenticated replication of design documents with attachments.
+ * Fix multipart GET APIs by always sending attachments in compressed
+   form when the source attachment is compressed on disk. Fixes a possible
+   edge case when an attachment underwent local-local replication.
+ * Various fixes to make replicated more resilient for edge-cases.
+ * Don't trigger a view update when requesting `_design/doc/_info`.
+ * Fix for circular references in CommonJS requires.
+ * Fix for frequently edited documents in multi-master deployments being
+   duplicated in _changes and _all_docs.
+ * Fix spurious conflict generation during attachment uploads.
+ * Fix for various bugs in Futon.
+
 Version 1.0.1
 -------------
 
