@@ -513,6 +513,8 @@ flush_doc(Target, #doc{id = Id, revs = {Pos, [RevId | _]}} = Doc) ->
             [Id, couch_api_wrap:db_uri(Target), couch_util:to_binary(Error)]),
         Error
     catch
+    throw:{missing_stub, _} = MissingStub ->
+        throw(MissingStub);
     throw:{Error, Reason} ->
         ?LOG_ERROR("Replicator: couldn't write document `~s`, revision `~s`,"
             " to target database `~s`. Error: `~s`, reason: `~s`.",
