@@ -391,7 +391,7 @@ changes_row(_, #doc_info{id=Id, high_seq=Seq}, Results, _, _) ->
     #change{key=Seq, id=Id, value=Results}.
 
 doc_member(Shard, DocInfo) ->
-    case couch_db:open_doc(Shard, DocInfo, []) of
+    case couch_db:open_doc(Shard, DocInfo, [deleted]) of
     {ok, Doc} ->
         couch_doc:to_json_obj(Doc, []);
     Error ->
