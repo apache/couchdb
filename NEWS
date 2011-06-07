@@ -16,6 +16,13 @@ This version has not been released yet.
  * cURL is no longer required to build CouchDB as it is only
    required by the command line JS test runner.
  * Added a native JSON parser.
+ * Optional file compression (database and view index files).
+ * Several performance improvements, especially regarding database
+   writes and view indexing.
+ * Added a `data_size` property to database and view group
+   information URIs.
+ * A new replicator implementation that offers more performance
+   and configuration options.
 
 Version 1.1.1
 -------------
