@@ -119,6 +119,7 @@ AC_ARG_WITH([erlang], [AC_HELP_STRING([--with-erlang=PATH],
     ERLANG_FLAGS="$ERLANG_FLAGS -I/usr/local/lib/erlang/usr/include"
     ERLANG_FLAGS="$ERLANG_FLAGS -I/opt/local/lib/erlang/usr/include"
 ])
+AC_SUBST(ERLANG_FLAGS)
 
 PKG_CHECK_MODULES([JS], [mozilla-js >= 1.7], [
     JS_LIB_DIR="$(${PKG_CONFIG} --variable=sdkdir mozilla-js)/lib"
@@ -145,36 +146,36 @@ AC_ARG_WITH([js-lib], [AC_HELP_STRING([--with-js-lib=PATH],
     JS_LIB_DIR=$withval
     JS_LIBS="-L$withval"
 ], [])
-AC_SUBST(JS_LIB_DIR)
 
 AC_ARG_VAR([ERLC_FLAGS], [general flags to prepend to ERLC_FLAGS])
 AC_ARG_VAR([FLAGS], [general flags to prepend to LDFLAGS and CPPFLAGS])
+CPPFLAGS="$FLAGS $CPPFLAGS"
+LDFLAGS="$FLAGS $LDFLAGS"
 
-LIB_FLAGS="$JS_LIBS -L/usr/local/lib -L/opt/local/lib"
+# The erlang cc.sh/ld.sh scripts will convert a -O option
+# into the same optimization flags erlang itself uses.
+CFLAGS="-O2 $CFLAGS"
+
+LIB_FLAGS="-L/usr/local/lib -L/opt/local/lib"
 LIBS="$LIB_FLAGS $LIBS"
 
 case "$(uname -s)" in
   CYGWIN*)
-    FLAGS="$LIB_FLAGS $ERLANG_FLAGS $JS_CFLAGS -DXP_WIN $FLAGS"
-    CPPFLAGS="$FLAGS $CPPFLAGS"
-    LDFLAGS="$FLAGS $LDFLAGS"
+    JS_CFLAGS="-DXP_WIN $JS_CFLAGS"
     IS_WINDOWS="TRUE"
-    # The erlang cc.sh/ld.sh scripts will convert a -O option
-    # into the same optimization flags erlang itself uses.
-    CFLAGS="-O2"
-    LTCFLAGS="$CFLAGS"
     ;;
   *)
     # XP_UNIX required for jsapi.h and has been tested to work on Linux and Darwin.
-    FLAGS="$LIB_FLAGS $ERLANG_FLAGS $JS_CFLAGS -DXP_UNIX $FLAGS"
-    CPPFLAGS="$FLAGS $CPPFLAGS"
+    JS_CLAGS="-DXP_UNIX $JS_CFLAGS"
     # manually linking libm is requred for FreeBSD 7.0
-    LDFLAGS="$FLAGS -lm $LDFLAGS"
+    LDFLAGS="-lm $LDFLAGS"
     ;;
 esac
 
 AM_CONDITIONAL([WINDOWS], [test x$IS_WINDOWS = xTRUE])
 
+OLD_LIBS="$LIBS"
+LIBS="$JS_LIBS $LIBS"
 AC_CHECK_LIB([mozjs], [JS_NewContext], [JS_LIB_BASE=mozjs], [
     AC_CHECK_LIB([js], [JS_NewContext], [JS_LIB_BASE=js], [
         AC_CHECK_LIB([js3250], [JS_NewContext], [JS_LIB_BASE=js3250], [
@@ -182,6 +183,7 @@ AC_CHECK_LIB([mozjs], [JS_NewContext], [JS_LIB_BASE=mozjs], [
                 AC_MSG_ERROR([Could not find the js library.
 
 Is the Mozilla SpiderMonkey library installed?])])])])])
+LIBS="$OLD_LIBS"
 
 
 if test x${IS_WINDOWS} = xTRUE; then
@@ -230,6 +232,8 @@ fi
 JS_LIBS="-l$JS_LIB_BASE $JS_LIBS"
 AC_SUBST(JS_LIBS)
 
+OLD_CPPFLAGS="$CPPFLAGS"
+CPPFLAGS="$JS_CFLAGS $CPPFLAGS"
 AC_CHECK_HEADER([jsapi.h], [], [
     AC_CHECK_HEADER([js/jsapi.h],
         [
@@ -240,10 +244,11 @@ AC_CHECK_HEADER([jsapi.h], [], [
 
 Are the Mozilla SpiderMonkey headers installed?])
         ])])
+CPPFLAGS="$OLD_CPPFLAGS"
 
 AC_LANG_PUSH(C)
-OLD_CFLAGS="$CFLAGS"
-CFLAGS="-Werror-implicit-function-declaration"
+OLDCFLAGS="$CFLAGS"
+CFLAGS="-Werror-implicit-function-declaration $CFLAGS"
 AC_COMPILE_IFELSE(
     [AC_LANG_PROGRAM(
         [[#include <jsapi.h>]],
@@ -343,11 +348,14 @@ if test x${ERLC} = x; then
     AC_MSG_ERROR([Could not find the `erlc' executable. Is Erlang installed?])
 fi
 
+OLD_CPPFLAGS="$CPPFLAGS"
+CPPFLAGS="$ERLANG_FLAGS $CPPFLAGS"
 AC_CHECK_HEADER([erl_driver.h], [], [
     AC_MSG_ERROR([Could not find the `erl_driver.h' header.
 
 Are the Erlang headers installed? Use the `--with-erlang' option to specify the
 path to the Erlang include directory.])])
+CPPFLAGS="$OLD_CPPFLAGS"
 
 AC_PATH_PROG([HELP2MAN_EXECUTABLE], [help2man])
 if test x${HELP2MAN_EXECUTABLE} = x; then
