@@ -31,6 +31,8 @@ AC_PROG_CC
 AC_PROG_LIBTOOL
 AC_PROG_LN_S
 
+PKG_PROG_PKG_CONFIG
+
 dnl Config for google snappy
 m4_define([snappy_major], [1])
 m4_define([snappy_minor], [0])
