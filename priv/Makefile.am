@@ -29,8 +29,8 @@ endif
 
 couchprivlib_LTLIBRARIES = couch_icu_driver.la
 couch_icu_driver_la_SOURCES = icu_driver/couch_icu_driver.c
-couch_icu_driver_la_LDFLAGS = -module -avoid-version $(ICU_LOCAL_FLAGS)
-couch_icu_driver_la_CFLAGS = $(ICU_LOCAL_FLAGS)
+couch_icu_driver_la_LDFLAGS = -module -avoid-version
+couch_icu_driver_la_CFLAGS = $(ICU_LOCAL_FLAGS) $(ERLANG_FLAGS)
 couch_icu_driver_la_LIBADD = $(ICU_LOCAL_LIBS)
 
 if WINDOWS
@@ -46,7 +46,7 @@ COUCHJS_SRCS = \
 
 locallibbin_PROGRAMS = couchjs
 couchjs_SOURCES = $(COUCHJS_SRCS)
-couchjs_CFLAGS = -D_BSD_SOURCE $(CURL_CFLAGS)
+couchjs_CFLAGS = -D_BSD_SOURCE $(CURL_CFLAGS) $(JS_CFLAGS)
 couchjs_LDADD = $(CURL_LIBS) $(JS_LIBS)
 
 couchpriv_DATA = stat_descriptions.cfg
