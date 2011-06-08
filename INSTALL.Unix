@@ -8,7 +8,7 @@ Dependencies
 
 You will need the following installed:
 
- * Erlang OTP (>=R12B5)       (http://erlang.org/)
+ * Erlang OTP (>=R13B2)       (http://erlang.org/)
  * ICU                        (http://icu.sourceforge.net/)
  * OpenSSL                    (http://www.openssl.org/)
  * Mozilla SpiderMonkey (1.8) (http://www.mozilla.org/js/spidermonkey/)

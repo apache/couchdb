@@ -241,7 +241,7 @@ if test x${ERL} = x; then
     AC_MSG_ERROR([Could not find the `erl' executable. Is Erlang installed?])
 fi
 
-erlang_version_error="The installed Erlang version is less than 5.6.5 (R12B05)."
+erlang_version_error="The installed Erlang version is less than erts-5.7.3 (R13B02)."
 
 version="`${ERL} -version 2>&1 | ${SED} "s/[[^0-9]]/ /g"`"
 
@@ -249,12 +249,12 @@ if test `echo $version | ${AWK} "{print \\$1}"` -lt 5; then
     AC_MSG_ERROR([$erlang_version_error])
 fi
 
-if test `echo $version | ${AWK} "{print \\$2}"` -lt 6; then
+if test `echo $version | ${AWK} "{print \\$2}"` -lt 7; then
     AC_MSG_ERROR([$erlang_version_error])
 fi
 
-if test `echo $version | ${AWK} "{print \\$2}"` -eq 6; then
-    if test `echo $version | ${AWK} "{print \\$3}"` -lt 5; then
+if test `echo $version | ${AWK} "{print \\$2}"` -eq 7; then
+    if test `echo $version | ${AWK} "{print \\$3}"` -lt 3; then
         AC_MSG_ERROR([$erlang_version_error])
     fi
 fi
