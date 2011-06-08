@@ -49,6 +49,7 @@ snappyebin_DATA = \
 if USE_OTP_NIFS
 snappypriv_LTLIBRARIES = snappy_nif.la
 snappy_nif_la_SOURCES = $(snappy_cxx_srcs)
+snappy_nif_la_CFLAGS = $(ERLANG_FLAGS)
 snappy_nif_la_LDFLAGS = -module -avoid-version
 
 if WINDOWS
