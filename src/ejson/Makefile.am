@@ -65,6 +65,7 @@ if USE_OTP_NIFS
 ejsonpriv_LTLIBRARIES = ejson.la
 
 ejson_la_SOURCES = $(EJSON_C_SRCS)
+ejson_la_CFLAGS = $(ERLANG_FLAGS)
 ejson_la_LDFLAGS = -module -avoid-version
 
 if WINDOWS
