@@ -92,13 +92,18 @@ cleanup_index_files(Db) ->
 
     FileList = list_index_files(Db),
 
-    % regex that matches all ddocs
-    RegExp = "("++ string:join(Sigs, "|") ++")",
+    DeleteFiles =
+    if length(Sigs) =:= 0 ->
+        FileList;
+    true ->
+        % regex that matches all ddocs
+        RegExp = "("++ string:join(Sigs, "|") ++")",
 
-    % filter out the ones in use
-    DeleteFiles = [FilePath
-           || FilePath <- FileList,
-              re:run(FilePath, RegExp, [{capture, none}]) =:= nomatch],
+        % filter out the ones in use
+        [FilePath || FilePath <- FileList,
+            re:run(FilePath, RegExp, [{capture, none}]) =:= nomatch]
+    end,
+
     % delete unused files
     ?LOG_DEBUG("deleting unused view index files: ~p",[DeleteFiles]),
     RootDir = couch_config:get("couchdb", "view_index_dir"),
