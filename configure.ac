@@ -120,39 +120,42 @@ AC_ARG_WITH([erlang], [AC_HELP_STRING([--with-erlang=PATH],
     ERLANG_FLAGS="$ERLANG_FLAGS -I/opt/local/lib/erlang/usr/include"
 ])
 
+PKG_CHECK_MODULES([JS], [mozilla-js >= 1.7], [
+    JS_LIB_DIR="$(${PKG_CONFIG} --variable=sdkdir mozilla-js)/lib"
+    ], [
+    JS_LIB_DIR="${libdir}"
+    JS_CFLAGS="-I/usr/include"
+    JS_CFLAGS="$JS_CFLAGS -I/usr/include/js"
+    JS_CFLAGS="$JS_CFLAGS -I/usr/include/mozjs"
+    JS_CFLAGS="$JS_CFLAGS -I/usr/local/include"
+    JS_CFLAGS="$JS_CFLAGS -I/opt/local/include"
+    JS_CFLAGS="$JS_CFLAGS -I/usr/local/include/js"
+    JS_CFLAGS="$JS_CFLAGS -I/opt/local/include/js"
+])
+
 AC_ARG_WITH([js-include], [AC_HELP_STRING([--with-js-include=PATH],
     [set PATH to the SpiderMonkey include directory])], [
     JS_INCLUDE="$withval"
-    JS_FLAGS="-I$JS_INCLUDE"
-], [
-    JS_FLAGS="-I/usr/include"
-    JS_FLAGS="$JS_FLAGS -I/usr/include/js"
-    JS_FLAGS="$JS_FLAGS -I/usr/include/mozjs"
-    JS_FLAGS="$JS_FLAGS -I/usr/local/include"
-    JS_FLAGS="$JS_FLAGS -I/opt/local/include"
-    JS_FLAGS="$JS_FLAGS -I/usr/local/include/js"
-    JS_FLAGS="$JS_FLAGS -I/opt/local/include/js"
-])
+    JS_CFLAGS="-I$JS_INCLUDE"
+], [])
 
 AC_ARG_WITH([js-lib], [AC_HELP_STRING([--with-js-lib=PATH],
     [set PATH to the SpiderMonkey library directory])],
     [
     JS_LIB_DIR=$withval
-    JS_LIB_FLAGS="-L$withval"
-], [
-    JS_LIB_DIR=
-])
+    JS_LIBS="-L$withval"
+], [])
 AC_SUBST(JS_LIB_DIR)
 
 AC_ARG_VAR([ERLC_FLAGS], [general flags to prepend to ERLC_FLAGS])
 AC_ARG_VAR([FLAGS], [general flags to prepend to LDFLAGS and CPPFLAGS])
 
-LIB_FLAGS="$JS_LIB_FLAGS -L/usr/local/lib -L/opt/local/lib"
+LIB_FLAGS="$JS_LIBS -L/usr/local/lib -L/opt/local/lib"
 LIBS="$LIB_FLAGS $LIBS"
 
 case "$(uname -s)" in
   CYGWIN*)
-    FLAGS="$LIB_FLAGS $ERLANG_FLAGS $JS_FLAGS -DXP_WIN $FLAGS"
+    FLAGS="$LIB_FLAGS $ERLANG_FLAGS $JS_CFLAGS -DXP_WIN $FLAGS"
     CPPFLAGS="$FLAGS $CPPFLAGS"
     LDFLAGS="$FLAGS $LDFLAGS"
     IS_WINDOWS="TRUE"
@@ -163,7 +166,7 @@ case "$(uname -s)" in
     ;;
   *)
     # XP_UNIX required for jsapi.h and has been tested to work on Linux and Darwin.
-    FLAGS="$LIB_FLAGS $ERLANG_FLAGS $JS_FLAGS -DXP_UNIX $FLAGS"
+    FLAGS="$LIB_FLAGS $ERLANG_FLAGS $JS_CFLAGS -DXP_UNIX $FLAGS"
     CPPFLAGS="$FLAGS $CPPFLAGS"
     # manually linking libm is requred for FreeBSD 7.0
     LDFLAGS="$FLAGS -lm $LDFLAGS"
@@ -180,7 +183,6 @@ AC_CHECK_LIB([mozjs], [JS_NewContext], [JS_LIB_BASE=mozjs], [
 
 Is the Mozilla SpiderMonkey library installed?])])])])])
 
-AC_SUBST(JS_LIB_BASE)
 
 if test x${IS_WINDOWS} = xTRUE; then
     if test -f "$JS_LIB_DIR/$JS_LIB_BASE.dll"; then
@@ -225,7 +227,8 @@ if test x${IS_WINDOWS} = xTRUE; then
     fi
 fi
 
-JSLIB=-l$JS_LIB_BASE
+JS_LIBS="-l$JS_LIB_BASE $JS_LIBS"
+AC_SUBST(JS_LIBS)
 
 AC_CHECK_HEADER([jsapi.h], [], [
     AC_CHECK_HEADER([js/jsapi.h],
@@ -237,8 +240,6 @@ AC_CHECK_HEADER([jsapi.h], [], [
 
 Are the Mozilla SpiderMonkey headers installed?])
         ])])
-
-AC_SUBST(JSLIB)
 
 AC_LANG_PUSH(C)
 OLD_CFLAGS="$CFLAGS"
