@@ -13,9 +13,10 @@ specific language governing permissions and limitations under the License.
 
 */
 
-// This file is the C port driver for Erlang. It provides a low overhead
-// means of calling into C code, however coding errors in this module can
-// crash the entire Erlang server.
+/* This file is the C port driver for Erlang. It provides a low overhead
+ * means of calling into C code, however coding errors in this module can
+ * crash the entire Erlang server.
+ */
 
 #ifdef DARWIN
 #define U_HIDE_DRAFT_API 1
@@ -26,7 +27,7 @@ specific language governing permissions and limitations under the License.
 #include "unicode/ucol.h"
 #include "unicode/ucasemap.h"
 #ifndef WIN32
-#include <string.h> // for memcpy
+#include <string.h> /* for memcpy */
 #endif
 
 typedef struct {
@@ -96,8 +97,8 @@ static int couch_drv_control(ErlDrvData drv_data, unsigned int command, char *pB
 
     couch_drv_data* pData = (couch_drv_data*)drv_data;
     switch(command) {
-    case 0: // COLLATE
-    case 1: // COLLATE_NO_CASE:
+    case 0: /* COLLATE */
+    case 1: /* COLLATE_NO_CASE: */
         {
         UErrorCode status = U_ZERO_ERROR;
         int collResult;
@@ -106,37 +107,38 @@ static int couch_drv_control(ErlDrvData drv_data, unsigned int command, char *pB
         UCharIterator iterB;
         int32_t length;
 
-        // 2 strings are in the buffer, consecutively
-        // The strings begin first with a 32 bit integer byte length, then the actual
-        // string bytes follow.
+        /* 2 strings are in the buffer, consecutively
+         * The strings begin first with a 32 bit integer byte length, then the actual
+         * string bytes follow.
+         */
 
-        // first 32bits are the length
+        /* first 32bits are the length */
         memcpy(&length, pBuf, sizeof(length));
         pBuf += sizeof(length);
 
-        // point the iterator at it.
+        /* point the iterator at it. */
         uiter_setUTF8(&iterA, pBuf, length);
 
-        pBuf += length; // now on to string b
+        pBuf += length; /* now on to string b */
 
-        // first 32bits are the length
+        /* first 32bits are the length */
         memcpy(&length, pBuf, sizeof(length));
         pBuf += sizeof(length);
 
-        // point the iterator at it.
+        /* point the iterator at it. */
         uiter_setUTF8(&iterB, pBuf, length);
 
-        if (command == 0) // COLLATE
+        if (command == 0) /* COLLATE */
           collResult = ucol_strcollIter(pData->coll, &iterA, &iterB, &status);
-        else              // COLLATE_NO_CASE
+        else              /* COLLATE_NO_CASE */
           collResult = ucol_strcollIter(pData->collNoCase, &iterA, &iterB, &status);
 
         if (collResult < 0)
-          response = 0; //lt
+          response = 0; /*lt*/
         else if (collResult > 0)
-          response = 2; //gt
+          response = 2; /*gt*/
         else
-          response = 1; //eq
+          response = 1; /*eq*/
 
         return return_control_result(&response, sizeof(response), rbuf, rlen);
         }
