@@ -20,18 +20,11 @@ EXTRA_DIST = \
 
 CLEANFILES = stat_descriptions.cfg
 
-ICU_LOCAL_FLAGS = $(ICU_LOCAL_CFLAGS) $(ICU_LOCAL_LDFLAGS)
-if WINDOWS
-ICU_LOCAL_LIBS=-licuuc -licudt -licuin
-else
-ICU_LOCAL_LIBS=-licuuc -licudata -licui18n
-endif
-
 couchprivlib_LTLIBRARIES = couch_icu_driver.la
 couch_icu_driver_la_SOURCES = icu_driver/couch_icu_driver.c
 couch_icu_driver_la_LDFLAGS = -module -avoid-version
-couch_icu_driver_la_CFLAGS = $(ICU_LOCAL_FLAGS) $(ERLANG_FLAGS)
-couch_icu_driver_la_LIBADD = $(ICU_LOCAL_LIBS)
+couch_icu_driver_la_CFLAGS = $(ICU_CFLAGS) $(ERLANG_FLAGS)
+couch_icu_driver_la_LIBADD = $(ICU_LIBS)
 
 if WINDOWS
 couch_icu_driver_la_LDFLAGS += -no-undefined
@@ -78,9 +71,9 @@ install-data-hook:
 	        $(LN_S) couch_icu_driver couch_icu_driver.so; \
 	fi
 if WINDOWS
-	$(INSTALL) $(ICU_LOCAL_BIN)/icuuc42.dll $(bindir)
-	$(INSTALL) $(ICU_LOCAL_BIN)/icudt42.dll $(bindir)
-	$(INSTALL) $(ICU_LOCAL_BIN)/icuin42.dll $(bindir)
+	$(INSTALL) $(ICU_BIN)/icuuc42.dll $(bindir)
+	$(INSTALL) $(ICU_BIN)/icudt42.dll $(bindir)
+	$(INSTALL) $(ICU_BIN)/icuin42.dll $(bindir)
 	$(INSTALL) $(JS_LIB_BINARY) $(bindir)
 	$(INSTALL) .libs/couchspawnkillable.exe \
 		"$(DESTDIR)$(couchprivdir)/couchspawnkillable.exe"

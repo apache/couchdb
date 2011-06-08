@@ -167,8 +167,6 @@ case "$(uname -s)" in
   *)
     # XP_UNIX required for jsapi.h and has been tested to work on Linux and Darwin.
     JS_CLAGS="-DXP_UNIX $JS_CFLAGS"
-    # manually linking libm is requred for FreeBSD 7.0
-    LDFLAGS="-lm $LDFLAGS"
     ;;
 esac
 
@@ -261,21 +259,17 @@ AC_LANG_POP(C)
 
 AC_ARG_WITH([win32-icu-binaries], [AC_HELP_STRING([--with-win32-icu-binaries=PATH],
     [set PATH to the Win32 native ICU binaries directory])], [
-    ICU_CONFIG="" # supposed to be a command to query options...
-    ICU_LOCAL_CFLAGS="-I$withval/include"
-    ICU_LOCAL_LDFLAGS="-L$withval/lib"
-    ICU_LOCAL_BIN=$withval/bin
+    ICU_CFLAGS="-I$withval/include"
+    ICU_LIBS="-L$withval/lib -licuuc -licudt -licuin"
+    ICU_BIN=$withval/bin
 ], [
     AC_CHECK_ICU([3.4.1])
-    ICU_LOCAL_CFLAGS=`$ICU_CONFIG --cppflags-searchpath`
-    ICU_LOCAL_LDFLAGS=`$ICU_CONFIG --ldflags-searchpath`
-    ICU_LOCAL_BIN=
+    ICU_BIN=
 ])
 
-AC_SUBST(ICU_CONFIG)
-AC_SUBST(ICU_LOCAL_CFLAGS)
-AC_SUBST(ICU_LOCAL_LDFLAGS)
-AC_SUBST(ICU_LOCAL_BIN)
+AC_SUBST(ICU_CFLAGS)
+AC_SUBST(ICU_LIBS)
+AC_SUBST(ICU_BIN)
 
 use_curl=yes
 AC_ARG_WITH([win32-curl], [AC_HELP_STRING([--with-win32-curl=PATH],
