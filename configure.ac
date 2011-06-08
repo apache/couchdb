@@ -166,7 +166,7 @@ case "$(uname -s)" in
     ;;
   *)
     # XP_UNIX required for jsapi.h and has been tested to work on Linux and Darwin.
-    JS_CLAGS="-DXP_UNIX $JS_CFLAGS"
+    JS_CFLAGS="-DXP_UNIX $JS_CFLAGS"
     ;;
 esac
 
