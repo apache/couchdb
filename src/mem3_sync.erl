@@ -17,8 +17,8 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
     code_change/3]).
 
--export([start_link/0, get_active/0, get_queue/0, push/2, remove_node/1,
-         initial_sync/1]).
+-export([start_link/0, get_active/0, get_queue/0, push/1, push/2,
+    remove_node/1, initial_sync/1]).
 
 -include("mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
@@ -31,6 +31,8 @@
     waiting = [],
     update_notifier
 }).
+
+-record(job, {name, node, count=nil, pid=nil}).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -46,7 +48,10 @@ push(#shard{name = Name}, Target) ->
 push(Name, #shard{node=Node}) ->
     push(Name, Node);
 push(Name, Node) ->
-    gen_server:cast(?MODULE, {push, Name, Node}).
+    push(#job{name = Name, node = Node}).
+
+push(Job) ->
+    gen_server:cast(?MODULE, {push, Job}).
 
 remove_node(Node) ->
     gen_server:cast(?MODULE, {remove_node, Node}).
@@ -63,32 +68,43 @@ handle_call(get_active, _From, State) ->
     {reply, State#state.active, State};
 
 handle_call(get_queue, _From, State) ->
-    {reply, State#state.waiting, State}.
+    {reply, State#state.waiting, State};
 
-handle_cast({push, DbName, Node}, #state{count=Count, limit=Limit} = State)
-        when Count >= Limit ->
-    {noreply, add_to_queue(State, DbName, Node)};
+handle_call(get_backlog, _From, #state{active=A, waiting=W} = State) ->
+    CA = lists:sum([C || #job{count=C} <- A, is_integer(C)]),
+    CW = lists:sum([C || #job{count=C} <- W, is_integer(C)]),
+    {reply, CA+CW, State}.
 
 handle_cast({push, DbName, Node}, State) ->
+    handle_cast({push, #job{name = DbName, node = Node}}, State);
+
+handle_cast({push, Job}, #state{count=Count, limit=Limit} = State)
+        when Count >= Limit ->
+    {noreply, add_to_queue(State, Job)};
+
+handle_cast({push, Job}, State) ->
     #state{active = L, count = C} = State,
+    #job{name = DbName, node = Node} = Job,
     case is_running(DbName, Node, L) of
     true ->
-        {noreply, add_to_queue(State, DbName, Node)};
+        {noreply, add_to_queue(State, Job)};
     false ->
-        Pid = start_push_replication(DbName, Node),
-        {noreply, State#state{active=[{DbName, Node, Pid}|L], count=C+1}}
+        Pid = start_push_replication(Job),
+        {noreply, State#state{active=[Job#job{pid=Pid}|L], count=C+1}}
     end;
 
 handle_cast({remove_node, Node}, #state{waiting = W0} = State) ->
-    {Alive, Dead} = lists:partition(fun({_,N}) -> N =/= Node end, W0),
+    {Alive, Dead} = lists:partition(fun(#job{node=N}) -> N =/= Node end, W0),
     Dict = remove_entries(State#state.dict, Dead),
-    [exit(Pid, die_now) || {_,N,Pid} <- State#state.active, N =:= Node],
+    [exit(Pid, die_now) || #job{node=N, pid=Pid} <- State#state.active,
+        N =:= Node],
     {noreply, State#state{dict = Dict, waiting = Alive}};
 
 handle_cast({remove_shard, Shard}, #state{waiting = W0} = State) ->
-    {Alive, Dead} = lists:partition(fun({S,_}) -> S =/= Shard end, W0),
+    {Alive, Dead} = lists:partition(fun(#job{name=S}) -> S =/= Shard end, W0),
     Dict = remove_entries(State#state.dict, Dead),
-    [exit(Pid, die_now) || {S,_,Pid} <- State#state.active, S =:= Shard],
+    [exit(Pid, die_now) || #job{name=S, pid=Pid} <- State#state.active,
+        S =:= Shard],
     {noreply, State#state{dict = Dict, waiting = Alive}}.
 
 handle_info({'EXIT', Pid, _}, #state{update_notifier=Pid} = State) ->
@@ -107,11 +123,15 @@ handle_info({'EXIT', Active, {{not_found, no_db_file}, _Stack}}, State) ->
     handle_replication_exit(State, Active);
 
 handle_info({'EXIT', Active, Reason}, State) ->
-    case lists:keyfind(Active, 3, State#state.active) of
-    {OldDbName, OldNode, _} ->
-        twig:log(warn, "~p ~s -> ~p died: ~p", [?MODULE, OldDbName, OldNode,
+    case lists:keyfind(Active, #job.pid, State#state.active) of
+        #job{name=OldDbName, node=OldNode} = Job ->
+        twig:log(warn, "~p ~s -> ~p ~p", [?MODULE, OldDbName, OldNode,
             Reason]),
-        timer:apply_after(5000, ?MODULE, push, [OldDbName, OldNode]);
+        case Reason of {pending_changes, Count} ->
+            push(Job#job{pid = nil, count = Count});
+        _ ->
+            timer:apply_after(5000, ?MODULE, push, [Job#job{pid=nil}])
+        end;
     false -> ok end,
     handle_replication_exit(State, Active);
 
@@ -120,27 +140,32 @@ handle_info(Msg, State) ->
     {noreply, State}.
 
 terminate(_Reason, State) ->
-    [exit(Pid, shutdown) || {_,_,Pid} <- State#state.active],
+    [exit(Pid, shutdown) || #job{pid=Pid} <- State#state.active],
     ok.
 
-code_change(_OldVsn, State, _Extra) ->
+code_change(_, #state{waiting = [{_,_}|_] = W, active=A} = State, _) ->
+    Waiting = [#job{name=Name, node=Node} || {Name,Node} <- W],
+    Active = [#job{name=Name, node=Node, pid=Pid} || {Name,Node,Pid} <- A],
+    {ok, State#state{active = Active, waiting = Waiting}};
+
+code_change(_, State, _) ->
     {ok, State}.
 
 handle_replication_exit(#state{waiting=[]} = State, Pid) ->
-    NewActive = lists:keydelete(Pid, 3, State#state.active),
+    NewActive = lists:keydelete(Pid, #job.pid, State#state.active),
     {noreply, State#state{active=NewActive, count=length(NewActive)}};
 handle_replication_exit(State, Pid) ->
     #state{active=Active, limit=Limit, dict=D, waiting=Waiting} = State,
-    Active1 = lists:keydelete(Pid, 3, Active),
+    Active1 = lists:keydelete(Pid, #job.pid, Active),
     Count = length(Active1),
     NewState = if Count < Limit ->
         case next_replication(Active1, Waiting) of
         nil -> % all waiting replications are also active
             State#state{active = Active1, count = Count};
-        {DbName, Node, StillWaiting} ->
-            NewPid = start_push_replication(DbName, Node),
+        {#job{name=DbName, node=Node} = Job, StillWaiting} ->
+            NewPid = start_push_replication(Job),
             State#state{
-                active = [{DbName, Node, NewPid} | Active1],
+                active = [Job#job{pid = NewPid} | Active1],
                 count = Count+1,
                 dict = dict:erase({DbName,Node}, D),
                 waiting = StillWaiting
@@ -151,10 +176,10 @@ handle_replication_exit(State, Pid) ->
     end,
     {noreply, NewState}.
 
-start_push_replication(Name, Node) ->
+start_push_replication(#job{name=Name, node=Node}) ->
     spawn_link(mem3_rep, go, [Name, Node]).
 
-add_to_queue(State, DbName, Node) ->
+add_to_queue(State, #job{name=DbName, node=Node} = Job) ->
     #state{dict=D, waiting=Waiting} = State,
     case dict:is_key({DbName, Node}, D) of
     true ->
@@ -163,7 +188,7 @@ add_to_queue(State, DbName, Node) ->
         twig:log(debug, "adding ~s -> ~p to mem3_sync queue", [DbName, Node]),
         State#state{
             dict = dict:store({DbName,Node}, ok, D),
-            waiting = Waiting ++ [{DbName,Node}]
+            waiting = Waiting ++ [Job]
         }
     end.
 
@@ -219,15 +244,16 @@ start_update_notifier() ->
 %% which does not correspond to an already running replication
 -spec next_replication(list(), list()) -> {binary(),node(),list()} | nil.
 next_replication(Active, Waiting) ->
-    case lists:splitwith(fun({S,N}) -> is_running(S,N,Active) end, Waiting) of
+    Fun = fun(#job{name=S, node=N}) -> is_running(S,N,Active) end,
+    case lists:splitwith(Fun, Waiting) of
     {_, []} ->
         nil;
-    {Running, [{DbName,Node}|Rest]} ->
-        {DbName, Node, Running ++ Rest}
+    {Running, [Job|Rest]} ->
+        {Job, Running ++ Rest}
     end.
 
 is_running(DbName, Node, ActiveList) ->
-    [] =/= [true || {S,N,_} <- ActiveList, S=:=DbName, N=:=Node].
+    [] =/= [true || #job{name=S, node=N} <- ActiveList, S=:=DbName, N=:=Node].
 
 remove_entries(Dict, Entries) ->
     lists:foldl(fun(Entry, D) -> dict:erase(Entry, D) end, Dict, Entries).
