@@ -32,9 +32,14 @@ go(#db{name = DbName, seq_tree = Bt} = Db, #shard{} = Target, LocalId) ->
     Seq = calculate_start_seq(Db, Target, LocalId),
     Acc0 = #acc{source=Db, target=Target, seq=Seq, localid=LocalId},
     Fun = fun ?MODULE:changes_enumerator/3,
-    {ok, _LastReduction, AccOut} = couch_btree:fold(Bt, Fun, Acc0,
-        [{start_key, Seq + 1}]),
-    {ok, _} = replicate_batch(AccOut).
+    {ok, _, AccOut} = couch_btree:fold(Bt, Fun, Acc0, [{start_key, Seq + 1}]),
+    {ok, #acc{seq = LastSeq}} = replicate_batch(AccOut),
+    case couch_db:count_changes_since(Db, LastSeq) of
+    0 ->
+        ok;
+    N ->
+        exit({pending_changes, N})
+    end.
 
 make_local_id(#shard{node=SourceNode}, #shard{node=TargetNode}) ->
     S = couch_util:encodeBase64Url(couch_util:md5(term_to_binary(SourceNode))),
@@ -43,7 +48,7 @@ make_local_id(#shard{node=SourceNode}, #shard{node=TargetNode}) ->
 
 changes_enumerator(FullDocInfo, _, #acc{revcount = C} = Acc) when C >= 99 ->
     #doc_info{high_seq = Seq} = couch_doc:to_doc_info(FullDocInfo),
-    replicate_batch(Acc#acc{seq = Seq, infos = [FullDocInfo | Acc#acc.infos]});
+    {stop, Acc#acc{seq = Seq, infos = [FullDocInfo | Acc#acc.infos]}};
 
 changes_enumerator(FullDocInfo, _, #acc{revcount = C, infos = Infos} = Acc) ->
     #doc_info{high_seq = Seq, revs = Revs} = couch_doc:to_doc_info(FullDocInfo),
