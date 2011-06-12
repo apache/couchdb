@@ -18,6 +18,7 @@
 -export([validate_docid/1]).
 -export([doc_from_multi_part_stream/2]).
 -export([doc_to_multi_part_stream/5, len_doc_to_multi_part_stream/4]).
+-export([abort_multi_part_stream/1]).
 
 -include("couch_db.hrl").
 
@@ -501,7 +502,7 @@ doc_from_multi_part_stream(ContentType, DataFun) ->
             receive {Parser, finished} -> ok end,
             erlang:put(mochiweb_request_recv, true)
         end,
-        {ok, Doc#doc{atts=Atts2}, WaitFun}
+        {ok, Doc#doc{atts=Atts2}, WaitFun, Parser}
     end.
 
 mp_parse_doc({headers, H}, []) ->
@@ -542,3 +543,19 @@ mp_parse_atts(body_end) ->
     end.
 
 
+abort_multi_part_stream(Parser) ->
+    abort_multi_part_stream(Parser, erlang:monitor(process, Parser)).
+
+abort_multi_part_stream(Parser, MonRef) ->
+    case is_process_alive(Parser) of
+    true ->
+        Parser ! {get_bytes, self()},
+        receive
+        {bytes, _Bytes} ->
+             abort_multi_part_stream(Parser, MonRef);
+        {'DOWN', MonRef, _, _, _} ->
+             ok
+        end;
+    false ->
+        erlang:demonitor(MonRef, [flush])
+    end.
