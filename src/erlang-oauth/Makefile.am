@@ -28,7 +28,7 @@ oauthebin_make_generated_file_list = \
     oauth_hmac_sha1.beam \
     oauth_http.beam \
     oauth_plaintext.beam \
-    oauth_rsa_sha1.erl \
+    oauth_rsa_sha1.beam \
     oauth_unix.beam \
     oauth_uri.beam
 
