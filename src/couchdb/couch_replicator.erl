@@ -475,7 +475,9 @@ terminate(Reason, State) ->
 terminate_cleanup(State) ->
     couch_task_status:update("Finishing"),
     stop_db_compaction_notifier(State#rep_state.source_db_compaction_notifier),
-    stop_db_compaction_notifier(State#rep_state.target_db_compaction_notifier).
+    stop_db_compaction_notifier(State#rep_state.target_db_compaction_notifier),
+    couch_api_wrap:db_close(State#rep_state.source),
+    couch_api_wrap:db_close(State#rep_state.target).
 
 
 do_last_checkpoint(#rep_state{seqs_in_progress = [],
