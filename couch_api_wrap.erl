@@ -104,7 +104,7 @@ db_close(#httpdb{httpc_pool = Pool}) ->
     unlink(Pool),
     ok = couch_httpc_pool:stop(Pool);
 db_close(DbName) ->
-    couch_db:close(DbName).
+    catch couch_db:close(DbName).
 
 
 get_db_info(#httpdb{} = Db) ->
