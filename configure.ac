@@ -128,8 +128,6 @@ PKG_CHECK_MODULES([JS], [mozilla-js >= 1.7], [
     JS_CFLAGS="-I/usr/include"
     JS_CFLAGS="$JS_CFLAGS -I/usr/include/js"
     JS_CFLAGS="$JS_CFLAGS -I/usr/include/mozjs"
-    JS_CFLAGS="$JS_CFLAGS -I/usr/local/include"
-    JS_CFLAGS="$JS_CFLAGS -I/opt/local/include"
     JS_CFLAGS="$JS_CFLAGS -I/usr/local/include/js"
     JS_CFLAGS="$JS_CFLAGS -I/opt/local/include/js"
 ])
@@ -149,6 +147,9 @@ AC_ARG_WITH([js-lib], [AC_HELP_STRING([--with-js-lib=PATH],
 
 AC_ARG_VAR([ERLC_FLAGS], [general flags to prepend to ERLC_FLAGS])
 AC_ARG_VAR([FLAGS], [general flags to prepend to LDFLAGS and CPPFLAGS])
+CPPFLAGS="-I/usr/include $CPPFLAGS"
+CPPFLAGS="-I/usr/local/include $CPPFLAGS"
+CPPFLAGS="-I/opt/local/include $CPPFLAGS"
 CPPFLAGS="$FLAGS $CPPFLAGS"
 LDFLAGS="$FLAGS $LDFLAGS"
 
