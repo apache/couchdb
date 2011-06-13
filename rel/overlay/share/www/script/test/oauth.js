@@ -71,7 +71,7 @@ couchTests.oauth = function(debug) {
   var host = CouchDB.host;
   var dbPair = {
     source: {
-      url: "http://" + host + "/test_suite_db_a",
+      url: CouchDB.protocol + host + "/test_suite_db_a",
       auth: {
         oauth: {
           consumer_key: "key",
@@ -82,7 +82,7 @@ couchTests.oauth = function(debug) {
       }
     },
     target: {
-      url: "http://" + host + "/test_suite_db_b",
+      url: CouchDB.protocol + host + "/test_suite_db_b",
       headers: {"Authorization": adminBasicAuthHeaderValue()}
     }
   };
@@ -90,7 +90,7 @@ couchTests.oauth = function(debug) {
   // this function will be called on the modified server
   var testFun = function () {
     try {
-      CouchDB.request("PUT", "http://" + host + "/_config/admins/testadmin", {
+      CouchDB.request("PUT", CouchDB.protocol + host + "/_config/admins/testadmin", {
         headers: {"X-Couch-Persist": "false"},
         body: JSON.stringify(testadminPassword)
       });
@@ -98,7 +98,7 @@ couchTests.oauth = function(debug) {
       waitForSuccess(function() {
         //loop until the couch server has processed the password
         i += 1;
-        var xhr = CouchDB.request("GET", "http://" + host + "/_config/admins/testadmin?foo="+i,{
+        var xhr = CouchDB.request("GET", CouchDB.protocol + host + "/_config/admins/testadmin?foo="+i,{
             headers: {
               "Authorization": adminBasicAuthHeaderValue()
             }});
@@ -109,7 +109,7 @@ couchTests.oauth = function(debug) {
 
       CouchDB.newUuids(2); // so we have one to make the salt
 
-      CouchDB.request("PUT", "http://" + host + "/_config/couch_httpd_auth/require_valid_user", {
+      CouchDB.request("PUT", CouchDB.protocol + host + "/_config/couch_httpd_auth/require_valid_user", {
         headers: {
           "X-Couch-Persist": "false",
           "Authorization": adminBasicAuthHeaderValue()
@@ -157,11 +157,11 @@ couchTests.oauth = function(debug) {
           };
 
           // Get request token via Authorization header
-          xhr = oauthRequest("GET", "http://" + host + "/_oauth/request_token", message, accessor);
+          xhr = oauthRequest("GET", CouchDB.protocol + host + "/_oauth/request_token", message, accessor);
           T(xhr.status == expectedCode);
 
           // GET request token via query parameters
-          xhr = oauthRequest("GET", "http://" + host + "/_oauth/request_token", message, accessor);
+          xhr = oauthRequest("GET", CouchDB.protocol + host + "/_oauth/request_token", message, accessor);
           T(xhr.status == expectedCode);
 
           responseMessage = OAuth.decodeForm(xhr.responseText);
@@ -171,7 +171,7 @@ couchTests.oauth = function(debug) {
           //xhr = CouchDB.request("GET", authorization_url + '?oauth_token=' + responseMessage.oauth_token);
           //T(xhr.status == expectedCode);
 
-          xhr = oauthRequest("GET", "http://" + host + "/_session", message, accessor);
+          xhr = oauthRequest("GET", CouchDB.protocol + host + "/_session", message, accessor);
           T(xhr.status == expectedCode);
           if (xhr.status == expectedCode == 200) {
             data = JSON.parse(xhr.responseText);
@@ -179,11 +179,11 @@ couchTests.oauth = function(debug) {
             T(data.roles[0] == "test");
           }
 
-          xhr = oauthRequest("GET", "http://" + host + "/_session?foo=bar", message, accessor);
+          xhr = oauthRequest("GET", CouchDB.protocol + host + "/_session?foo=bar", message, accessor);
           T(xhr.status == expectedCode);
 
           // Test HEAD method
-          xhr = oauthRequest("HEAD", "http://" + host + "/_session?foo=bar", message, accessor);
+          xhr = oauthRequest("HEAD", CouchDB.protocol + host + "/_session?foo=bar", message, accessor);
           T(xhr.status == expectedCode);
 
           // Replication
@@ -207,7 +207,7 @@ couchTests.oauth = function(debug) {
               oauth_version: "1.0"
             }
           };
-          xhr = oauthRequest("GET", "http://" + host + "/_session?foo=bar", message, adminAccessor);
+          xhr = oauthRequest("GET", CouchDB.protocol + host + "/_session?foo=bar", message, adminAccessor);
           if (xhr.status == expectedCode == 200) {
             data = JSON.parse(xhr.responseText);
             T(data.name == "testadmin");
@@ -216,13 +216,13 @@ couchTests.oauth = function(debug) {
 
           // Test when the user's token doesn't exist.
           message.parameters.oauth_token = "not a token!";
-          xhr = oauthRequest("GET", "http://" + host + "/_session?foo=bar",
+          xhr = oauthRequest("GET", CouchDB.protocol + host + "/_session?foo=bar",
                   message, adminAccessor);
           T(xhr.status == 400, "Request should be invalid.");
         }
       }
     } finally {
-      var xhr = CouchDB.request("PUT", "http://" + host + "/_config/couch_httpd_auth/require_valid_user", {
+      var xhr = CouchDB.request("PUT", CouchDB.protocol + host + "/_config/couch_httpd_auth/require_valid_user", {
         headers: {
           "Authorization": adminBasicAuthHeaderValue(),
           "X-Couch-Persist": "false"
@@ -231,7 +231,7 @@ couchTests.oauth = function(debug) {
       });
       T(xhr.status == 200);
 
-      var xhr = CouchDB.request("DELETE", "http://" + host + "/_config/admins/testadmin", {
+      var xhr = CouchDB.request("DELETE", CouchDB.protocol + host + "/_config/admins/testadmin", {
         headers: {
           "Authorization": adminBasicAuthHeaderValue(),
           "X-Couch-Persist": "false"

@@ -13,35 +13,50 @@
 -module(couch_httpd).
 -include("couch_db.hrl").
 
--export([start_link/0, stop/0, handle_request/7]).
+-export([start_link/0, start_link/1, stop/0, handle_request/5]).
 
--export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,path/1,absolute_uri/2,body_length/1]).
+-export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,qs_json_value/3]).
+-export([path/1,absolute_uri/2,body_length/1]).
 -export([verify_is_server_admin/1,unquote/1,quote/1,recv/2,recv_chunked/4,error_info/1]).
--export([make_fun_spec_strs/1, make_arity_1_fun/1]).
+-export([make_fun_spec_strs/1]).
+-export([make_arity_1_fun/1, make_arity_2_fun/1, make_arity_3_fun/1]).
 -export([parse_form/1,json_body/1,json_body_obj/1,body/1,doc_etag/1, make_etag/1, etag_respond/3]).
 -export([primary_header_value/2,partition/1,serve_file/3,serve_file/4, server_header/0]).
 -export([start_chunked_response/3,send_chunk/2,log_request/2]).
--export([start_response_length/4, send/2]).
+-export([start_response_length/4, start_response/3, send/2]).
 -export([start_json_response/2, start_json_response/3, end_json_response/1]).
 -export([send_response/4,send_method_not_allowed/2,send_error/4, send_redirect/2,send_chunked_error/2]).
 -export([send_json/2,send_json/3,send_json/4,last_chunk/1,parse_multipart_request/3]).
 -export([accepted_encodings/1,handle_request_int/5,validate_referer/1,validate_ctype/2]).
 
 start_link() ->
+    start_link(http).
+start_link(http) ->
+    Port = couch_config:get("httpd", "port", "5984"),
+    start_link(?MODULE, [{port, Port}]);
+start_link(https) ->
+    Port = couch_config:get("ssl", "port", "6984"),
+    CertFile = couch_config:get("ssl", "cert_file", nil),
+    KeyFile = couch_config:get("ssl", "key_file", nil),
+    Options = case CertFile /= nil andalso KeyFile /= nil of
+                  true ->
+                      [{port, Port},
+                       {ssl, true},
+                       {ssl_opts, [
+                             {certfile, CertFile},
+                             {keyfile, KeyFile}]}];
+                  false ->
+                      io:format("SSL enabled but PEM certificates are missing.", []),
+                      throw({error, missing_certs})
+              end,
+    start_link(https, Options).
+start_link(Name, Options) ->
     % read config and register for configuration changes
 
     % just stop if one of the config settings change. couch_server_sup
     % will restart us and then we will pick up the new settings.
 
     BindAddress = couch_config:get("httpd", "bind_address", any),
-    Port = couch_config:get("httpd", "port", "5984"),
-    MaxConnections = couch_config:get("httpd", "max_connections", "2048"),
-    VirtualHosts = couch_config:get("vhosts"),
-    VhostGlobals = re:split(
-        couch_config:get("httpd", "vhost_global_handlers", ""),
-        ", ?",
-        [{return, list}]
-    ),
     DefaultSpec = "{couch_httpd_db, handle_request}",
     DefaultFun = make_arity_1_fun(
         couch_config:get("httpd", "default_handler", DefaultSpec)
@@ -65,21 +80,28 @@ start_link() ->
     UrlHandlers = dict:from_list(UrlHandlersList),
     DbUrlHandlers = dict:from_list(DbUrlHandlersList),
     DesignUrlHandlers = dict:from_list(DesignUrlHandlersList),
+    {ok, ServerOptions} = couch_util:parse_term(
+        couch_config:get("httpd", "server_options", "[]")),
+    {ok, SocketOptions} = couch_util:parse_term(
+        couch_config:get("httpd", "socket_options", "[]")),
     Loop = fun(Req)->
+        case SocketOptions of
+        [] ->
+            ok;
+        _ ->
+            ok = mochiweb_socket:setopts(Req:get(socket), SocketOptions)
+        end,
         apply(?MODULE, handle_request, [
-            Req, DefaultFun, UrlHandlers, DbUrlHandlers, DesignUrlHandlers,
-                VirtualHosts, VhostGlobals
+            Req, DefaultFun, UrlHandlers, DbUrlHandlers, DesignUrlHandlers
         ])
     end,
 
     % and off we go
 
-    {ok, Pid} = case mochiweb_http:start([
+    {ok, Pid} = case mochiweb_http:start(Options ++ ServerOptions ++ [
         {loop, Loop},
-        {name, ?MODULE},
-        {ip, BindAddress},
-        {port, Port},
-        {max, MaxConnections}
+        {name, Name},
+        {ip, BindAddress}
     ]) of
     {ok, MochiPid} -> {ok, MochiPid};
     {error, Reason} ->
@@ -92,15 +114,19 @@ start_link() ->
             ?MODULE:stop();
         ("httpd", "port") ->
             ?MODULE:stop();
-        ("httpd", "max_connections") ->
-            ?MODULE:stop();
         ("httpd", "default_handler") ->
+            ?MODULE:stop();
+        ("httpd", "server_options") ->
+            ?MODULE:stop();
+        ("httpd", "socket_options") ->
             ?MODULE:stop();
         ("httpd_global_handlers", _) ->
             ?MODULE:stop();
         ("httpd_db_handlers", _) ->
             ?MODULE:stop();
         ("vhosts", _) ->
+            ?MODULE:stop();
+        ("ssl", _) ->
             ?MODULE:stop()
         end, Pid),
 
@@ -139,50 +165,13 @@ make_fun_spec_strs(SpecStr) ->
 stop() ->
     mochiweb_http:stop(?MODULE).
 
-%%
 
-% if there's a vhost definition that matches the request, redirect internally
-redirect_to_vhost(MochiReq, DefaultFun,
-    UrlHandlers, DbUrlHandlers, DesignUrlHandlers, VhostTarget) ->
+handle_request(MochiReq, DefaultFun, UrlHandlers, DbUrlHandlers, 
+    DesignUrlHandlers) ->
 
-    Path = MochiReq:get(raw_path),
-    Target = VhostTarget ++ Path,
-    ?LOG_DEBUG("Vhost Target: '~p'~n", [Target]),
-    % build a new mochiweb request
-    MochiReq1 = mochiweb_request:new(MochiReq:get(socket),
-                                      MochiReq:get(method),
-                                      Target,
-                                      MochiReq:get(version),
-                                      MochiReq:get(headers)),
-    % cleanup, It force mochiweb to reparse raw uri.
-    MochiReq1:cleanup(),
-
+    MochiReq1 = couch_httpd_vhost:match_vhost(MochiReq),
     handle_request_int(MochiReq1, DefaultFun,
-        UrlHandlers, DbUrlHandlers, DesignUrlHandlers).
-
-handle_request(MochiReq, DefaultFun,
-    UrlHandlers, DbUrlHandlers, DesignUrlHandlers, VirtualHosts, VhostGlobals) ->
-
-    % grab Host from Req
-    Vhost = MochiReq:get_header_value("Host"),
-
-    % find Vhost in config
-    case couch_util:get_value(Vhost, VirtualHosts) of
-    undefined -> % business as usual
-        handle_request_int(MochiReq, DefaultFun,
-            UrlHandlers, DbUrlHandlers, DesignUrlHandlers);
-    VhostTarget ->
-        case vhost_global(VhostGlobals, MochiReq) of
-        true ->% global handler for vhosts
-            handle_request_int(MochiReq, DefaultFun,
-                UrlHandlers, DbUrlHandlers, DesignUrlHandlers);
-        _Else ->
-            % do rewrite
-            redirect_to_vhost(MochiReq, DefaultFun,
-                UrlHandlers, DbUrlHandlers, DesignUrlHandlers, VhostTarget)
-        end
-    end.
-
+                UrlHandlers, DbUrlHandlers, DesignUrlHandlers).
 
 handle_request_int(MochiReq, DefaultFun,
             UrlHandlers, DbUrlHandlers, DesignUrlHandlers) ->
@@ -194,6 +183,14 @@ handle_request_int(MochiReq, DefaultFun,
     RawUri = MochiReq:get(raw_path),
     {"/" ++ Path, _, _} = mochiweb_util:urlsplit_path(RawUri),
 
+    Headers = MochiReq:get(headers), 
+
+    % get requested path
+    RequestedPath = case MochiReq:get_header_value("x-couchdb-vhost-path") of
+        undefined -> RawUri;
+        P -> P
+    end,
+    
     HandlerKey =
     case mochiweb_util:partition(Path, "/") of
     {"", "", ""} ->
@@ -201,10 +198,11 @@ handle_request_int(MochiReq, DefaultFun,
     {FirstPart, _, _} ->
         list_to_binary(FirstPart)
     end,
-    ?LOG_DEBUG("~p ~s ~p~nHeaders: ~p", [
+    ?LOG_DEBUG("~p ~s ~p from ~p~nHeaders: ~p", [
         MochiReq:get(method),
         RawUri,
         MochiReq:get(version),
+        MochiReq:get(peer),
         mochiweb_headers:to_list(MochiReq:get(headers))
     ]),
     
@@ -245,6 +243,8 @@ handle_request_int(MochiReq, DefaultFun,
         mochi_req = MochiReq,
         peer = MochiReq:get(peer),
         method = Method,
+        requested_path_parts = [list_to_binary(couch_httpd:unquote(Part))
+                || Part <- string:tokens(RequestedPath, "/")],
         path_parts = [list_to_binary(couch_httpd:unquote(Part))
                 || Part <- string:tokens(Path, "/")],
         db_url_handlers = DbUrlHandlers,
@@ -269,7 +269,7 @@ handle_request_int(MochiReq, DefaultFun,
         throw:{invalid_json, S} ->
             ?LOG_ERROR("attempted upload of invalid JSON (set log_level to debug to log it)", []),
             ?LOG_DEBUG("Invalid JSON: ~p",[S]),
-            send_error(HttpReq, {bad_request, "invalid UTF-8 JSON"});
+            send_error(HttpReq, {bad_request, io_lib:format("invalid UTF-8 JSON: ~p",[S])});
         throw:unacceptable_encoding ->
             ?LOG_ERROR("unsupported encoding method for the response", []),
             send_error(HttpReq, {not_acceptable, "unsupported encoding"});
@@ -325,18 +325,6 @@ authenticate_request(Response, _AuthSrcs) ->
 
 increment_method_stats(Method) ->
     couch_stats_collector:increment({httpd_request_methods, Method}).
-
-% if so, then it will not be rewritten, but will run as a normal couchdb request.
-% normally you'd use this for _uuids _utils and a few of the others you want to keep available on vhosts. You can also use it to make databases 'global'.
-vhost_global(VhostGlobals, MochiReq) ->
-    "/" ++ Path = MochiReq:get(path),
-    Front = case partition(Path) of
-    {"", "", ""} ->
-        "/"; % Special case the root url handler
-    {FirstPart, _, _} ->
-        FirstPart
-    end,
-    [true] == [true||V <- VhostGlobals, V == Front].
 
 validate_referer(Req) ->
     Host = host_for_request(Req),
@@ -406,6 +394,14 @@ qs_value(Req, Key) ->
 qs_value(Req, Key, Default) ->
     couch_util:get_value(Key, qs(Req), Default).
 
+qs_json_value(Req, Key, Default) ->
+    case qs_value(Req, Key, Default) of
+    Default ->
+        Default;
+    Result ->
+        ?JSON_DECODE(Result)
+    end.
+
 qs(#httpd{mochi_req=MochiReq}) ->
     MochiReq:parse_qs().
 
@@ -430,15 +426,18 @@ absolute_uri(#httpd{mochi_req=MochiReq}=Req, Path) ->
     Host = host_for_request(Req),
     XSsl = couch_config:get("httpd", "x_forwarded_ssl", "X-Forwarded-Ssl"),
     Scheme = case MochiReq:get_header_value(XSsl) of
-        "on" -> "https";
-        _ ->
-            XProto = couch_config:get("httpd", "x_forwarded_proto", "X-Forwarded-Proto"),
-            case MochiReq:get_header_value(XProto) of
-                % Restrict to "https" and "http" schemes only
-                "https" -> "https";
-                _ -> "http"
-            end
-    end,
+                 "on" -> "https";
+                 _ ->
+                     XProto = couch_config:get("httpd", "x_forwarded_proto", "X-Forwarded-Proto"),
+                     case MochiReq:get_header_value(XProto) of
+                         %% Restrict to "https" and "http" schemes only
+                         "https" -> "https";
+                         _ -> case MochiReq:get(scheme) of
+                                  https -> "https";
+                                  http -> "http"
+                              end
+                     end
+             end,
     Scheme ++ "://" ++ Host ++ Path.
 
 unquote(UrlEncodedString) ->
@@ -545,6 +544,18 @@ start_response_length(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Length) ->
     end,
     {ok, Resp}.
 
+start_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers) ->
+    log_request(Req, Code),
+    couch_stats_collector:increment({httpd_status_cdes, Code}),
+    CookieHeader = couch_httpd_auth:cookie_auth_header(Req, Headers),
+    Headers2 = Headers ++ server_header() ++ CookieHeader,
+    Resp = MochiReq:start_response({Code, Headers2}),
+    case MochiReq:get(method) of
+        'HEAD' -> throw({http_head_abort, Resp});
+        _ -> ok
+    end,
+    {ok, Resp}.
+
 send(Resp, Data) ->
     Resp:send(Data),
     {ok, Resp}.
@@ -612,9 +623,7 @@ send_json(Req, Code, Headers, Value) ->
         {"Content-Type", negotiate_content_type(Req)},
         {"Cache-Control", "must-revalidate"}
     ],
-    Body = list_to_binary(
-        [start_jsonp(Req), ?JSON_ENCODE(Value), end_jsonp(), $\n]
-    ),
+    Body = [start_jsonp(Req), ?JSON_ENCODE(Value), end_jsonp(), $\n],
     send_response(Req, Code, DefaultHeaders ++ Headers, Body).
 
 start_json_response(Req, Code) ->
@@ -723,6 +732,8 @@ error_info(file_exists) ->
         "created, the file already exists.">>};
 error_info({bad_ctype, Reason}) ->
     {415, <<"bad_content_type">>, Reason};
+error_info(requested_range_not_satisfiable) ->
+    {416, <<"requested_range_not_satisfiable">>, <<"Requested range not satisfiable">>};
 error_info({error, illegal_database_name}) ->
     {400, <<"illegal_database_name">>, <<"Only lowercase characters (a-z), "
         "digits (0-9), and any of the characters _, $, (, ), +, -, and / "
@@ -753,31 +764,29 @@ error_headers(#httpd{mochi_req=MochiReq}=Req, Code, ErrorStr, ReasonStr) ->
                             % send the browser popup header no matter what if we are require_valid_user
                             {Code, [{"WWW-Authenticate", "Basic realm=\"server\""}]};
                         _False ->
-                            % if the accept header matches html, then do the redirect. else proceed as usual.
-                            Accepts = case MochiReq:get_header_value("Accept") of
-                            undefined ->
-                               % According to the HTTP 1.1 spec, if the Accept
-                               % header is missing, it means the client accepts
-                               % all media types.
-                               "html";
-                            Else ->
-                                Else
-                            end,
-                            case re:run(Accepts, "\\bhtml\\b",
-                                    [{capture, none}, caseless]) of
-                            nomatch ->
+                            case MochiReq:accepts_content_type("application/json") of
+                            true ->
                                 {Code, []};
-                            match ->
-                                AuthRedirectBin = ?l2b(AuthRedirect),
-                                % Redirect to the path the user requested, not
-                                % the one that is used internally.
-                                UrlReturnRaw = case MochiReq:get_header_value("x-couchdb-vhost-path") of
-                                    undefined -> MochiReq:get(path);
-                                    VHostPath -> VHostPath
-                                end,
-                                UrlReturn = ?l2b(couch_util:url_encode(UrlReturnRaw)),
-                                UrlReason = ?l2b(couch_util:url_encode(ReasonStr)),
-                                {302, [{"Location", couch_httpd:absolute_uri(Req, <<AuthRedirectBin/binary,"?return=",UrlReturn/binary,"&reason=",UrlReason/binary>>)}]}
+                            false ->
+                                case MochiReq:accepts_content_type("text/html") of
+                                true ->
+                                    % Redirect to the path the user requested, not
+                                    % the one that is used internally.
+                                    UrlReturnRaw = case MochiReq:get_header_value("x-couchdb-vhost-path") of
+                                    undefined ->
+                                        MochiReq:get(path);
+                                    VHostPath ->
+                                        VHostPath
+                                    end,
+                                    RedirectLocation = lists:flatten([
+                                        AuthRedirect,
+                                        "?return=", couch_util:url_encode(UrlReturnRaw),
+                                        "&reason=", couch_util:url_encode(ReasonStr)
+                                    ]),
+                                    {302, [{"Location", absolute_uri(Req, RedirectLocation)}]};
+                                false ->
+                                    {Code, []}
+                                end
                             end
                         end
                     end;
@@ -842,9 +851,8 @@ negotiate_content_type(#httpd{mochi_req=MochiReq}) ->
     end.
 
 server_header() ->
-    OTPVersion = "R" ++ integer_to_list(erlang:system_info(compat_rel)) ++ "B",
     [{"Server", "CouchDB/" ++ couch:version() ++
-                " (Erlang OTP/" ++ OTPVersion ++ ")"}].
+                " (Erlang OTP/" ++ erlang:system_info(otp_release) ++ ")"}].
 
 
 -record(mp, {boundary, buffer, data_fun, callback}).

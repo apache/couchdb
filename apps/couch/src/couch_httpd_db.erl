@@ -20,7 +20,7 @@
 
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
-    start_json_response/2,start_json_response/3,
+    send_response/4,start_json_response/2,start_json_response/3,
     send_chunk/2,last_chunk/1,end_json_response/1,
     start_chunked_response/3, absolute_uri/2, send/2,
     start_response_length/4]).
@@ -55,7 +55,15 @@ handle_request(#httpd{path_parts=[DbName|RestParts],method=Method,
         do_db_req(Req, Handler)
     end.
 
+handle_changes_req(#httpd{method='POST'}=Req, Db) ->
+    couch_httpd:validate_ctype(Req, "application/json"),
+    handle_changes_req1(Req, Db);
 handle_changes_req(#httpd{method='GET'}=Req, Db) ->
+    handle_changes_req1(Req, Db);
+handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
+    send_method_not_allowed(Req, "GET,HEAD,POST").
+
+handle_changes_req1(Req, Db) ->
     MakeCallback = fun(Resp) ->
         fun({change, Change, _}, "continuous") ->
             send_chunk(Resp, [?JSON_ENCODE(Change) | "\n"]);
@@ -106,13 +114,16 @@ handle_changes_req(#httpd{method='GET'}=Req, Db) ->
             FeedChangesFun(MakeCallback(Resp))
         end
     end,
-    couch_stats_collector:track_process_count(
+    couch_stats_collector:increment(
         {httpd, clients_requesting_changes}
     ),
-    WrapperFun(ChangesFun);
-
-handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
-    send_method_not_allowed(Req, "GET,HEAD").
+    try
+        WrapperFun(ChangesFun)
+    after
+    couch_stats_collector:decrement(
+        {httpd, clients_requesting_changes}
+    )
+    end.
 
 handle_compact_req(#httpd{method='POST',path_parts=[DbName,_,Id|_]}=Req, Db) ->
     ok = couch_db:check_is_admin(Db),
@@ -353,9 +364,11 @@ db_req(#httpd{path_parts=[_,<<"_purge">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 
 db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs">>]}=Req, Db) ->
-    all_docs_view(Req, Db, nil);
+    Keys = couch_httpd:qs_json_value(Req, "keys", nil),
+    all_docs_view(Req, Db, Keys);
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_all_docs">>]}=Req, Db) ->
+    couch_httpd:validate_ctype(Req, "application/json"),
     {Fields} = couch_httpd:json_body_obj(Req),
     case couch_util:get_value(<<"keys">>, Fields, nil) of
     nil ->
@@ -497,12 +510,13 @@ all_docs_view(Req, Db, Keys) ->
         nil ->
             FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db, UpdateSeq,
                 TotalRowCount, #view_fold_helper_funs{
-                    reduce_count = fun couch_db:enum_docs_reduce_to_count/1
+                    reduce_count = fun couch_db:enum_docs_reduce_to_count/1,
+                    send_row = fun all_docs_send_json_view_row/6
                 }),
             AdapterFun = fun(#full_doc_info{id=Id}=FullDocInfo, Offset, Acc) ->
                 case couch_doc:to_doc_info(FullDocInfo) of
-                #doc_info{revs=[#rev_info{deleted=false, rev=Rev}|_]} ->
-                    FoldlFun({{Id, Id}, {[{rev, couch_doc:rev_to_str(Rev)}]}}, Offset, Acc);
+                #doc_info{revs=[#rev_info{deleted=false}|_]} = DocInfo ->
+                    FoldlFun({{Id, Id}, DocInfo}, Offset, Acc);
                 #doc_info{revs=[#rev_info{deleted=true}|_]} ->
                     {ok, Acc}
                 end
@@ -514,7 +528,8 @@ all_docs_view(Req, Db, Keys) ->
         _ ->
             FoldlFun = couch_httpd_view:make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db, UpdateSeq,
                 TotalRowCount, #view_fold_helper_funs{
-                    reduce_count = fun(Offset) -> Offset end
+                    reduce_count = fun(Offset) -> Offset end,
+                    send_row = fun all_docs_send_json_view_row/6
                 }),
             KeyFoldFun = case Dir of
             fwd ->
@@ -526,10 +541,8 @@ all_docs_view(Req, Db, Keys) ->
                 fun(Key, FoldAcc) ->
                     DocInfo = (catch couch_db:get_doc_info(Db, Key)),
                     Doc = case DocInfo of
-                    {ok, #doc_info{id=Id, revs=[#rev_info{deleted=false, rev=Rev}|_]}} ->
-                        {{Id, Id}, {[{rev, couch_doc:rev_to_str(Rev)}]}};
-                    {ok, #doc_info{id=Id, revs=[#rev_info{deleted=true, rev=Rev}|_]}} ->
-                        {{Id, Id}, {[{rev, couch_doc:rev_to_str(Rev)}, {deleted, true}]}};
+                    {ok, #doc_info{id = Id} = Di} ->
+                        {{Id, Id}, Di};
                     not_found ->
                         {{Key, error}, not_found};
                     _ ->
@@ -542,6 +555,33 @@ all_docs_view(Req, Db, Keys) ->
             couch_httpd_view:finish_view_fold(Req, TotalRowCount, 0, FoldResult, JsonParams)
         end
     end).
+
+all_docs_send_json_view_row(Resp, Db, KV, IncludeDocs, Conflicts, RowFront) ->
+    JsonRow = all_docs_view_row_obj(Db, KV, IncludeDocs, Conflicts),
+    send_chunk(Resp, RowFront ++ ?JSON_ENCODE(JsonRow)),
+    {ok, ",\r\n"}.
+
+all_docs_view_row_obj(_Db, {{DocId, error}, Value}, _IncludeDocs, _Conflicts) ->
+    {[{key, DocId}, {error, Value}]};
+all_docs_view_row_obj(Db, {_KeyDocId, DocInfo}, true, Conflicts) ->
+    case DocInfo of
+    #doc_info{revs = [#rev_info{deleted = true} | _]} ->
+        {all_docs_row(DocInfo) ++ [{doc, null}]};
+    _ ->
+        {all_docs_row(DocInfo) ++ couch_httpd_view:doc_member(
+            Db, DocInfo, if Conflicts -> [conflicts]; true -> [] end)}
+    end;
+all_docs_view_row_obj(_Db, {_KeyDocId, DocInfo}, _IncludeDocs, _Conflicts) ->
+    {all_docs_row(DocInfo)}.
+
+all_docs_row(#doc_info{id = Id, revs = [RevInfo | _]}) ->
+    #rev_info{rev = Rev, deleted = Del} = RevInfo,
+    [ {id, Id}, {key, Id},
+        {value, {[{rev, couch_doc:rev_to_str(Rev)}] ++ case Del of
+            true -> [{deleted, true}];
+            false -> []
+            end}} ].
+
 
 db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
     % check for the existence of the doc to handle the 404 case.
@@ -556,29 +596,26 @@ db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
                     {[{<<"_rev">>, ?l2b(Rev)},{<<"_deleted">>,true}]}))
     end;
 
-db_doc_req(#httpd{method='GET'}=Req, Db, DocId) ->
+db_doc_req(#httpd{method = 'GET', mochi_req = MochiReq} = Req, Db, DocId) ->
     #doc_query_args{
         rev = Rev,
         open_revs = Revs,
-        options = Options,
+        options = Options1,
         atts_since = AttsSince
     } = parse_doc_query(Req),
+    Options = case AttsSince of
+    nil ->
+        Options1;
+    RevList when is_list(RevList) ->
+        [{atts_since, RevList}, attachments | Options1]
+    end,
     case Revs of
     [] ->
-        Options2 =
-        if AttsSince /= nil ->
-            [{atts_since, AttsSince}, attachments | Options];
-        true -> Options
-        end,
-        Doc = couch_doc_open(Db, DocId, Rev, Options2),
-        send_doc(Req, Doc, Options2);
+        Doc = couch_doc_open(Db, DocId, Rev, Options),
+        send_doc(Req, Doc, Options);
     _ ->
         {ok, Results} = couch_db:open_doc_revs(Db, DocId, Revs, Options),
-        AcceptedTypes = case couch_httpd:header_value(Req, "Accept") of
-            undefined       -> [];
-            AcceptHeader    -> string:tokens(AcceptHeader, ", ")
-        end,
-        case lists:member("multipart/mixed", AcceptedTypes) of
+        case MochiReq:accepts_content_type("multipart/mixed") of
         false ->
             {ok, Resp} = start_json_response(Req, 200),
             send_chunk(Resp, "["),
@@ -612,13 +649,12 @@ db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
     couch_doc:validate_docid(DocId),
     couch_httpd:validate_ctype(Req, "multipart/form-data"),
     Form = couch_httpd:parse_form(Req),
-    case proplists:is_defined("_doc", Form) of
-    true ->
-        Json = ?JSON_DECODE(couch_util:get_value("_doc", Form)),
-        Doc = couch_doc_from_req(Req, DocId, Json);
-    false ->
-        Rev = couch_doc:parse_rev(list_to_binary(couch_util:get_value("_rev", Form))),
-        {ok, [{ok, Doc}]} = couch_db:open_doc_revs(Db, DocId, [Rev], [])
+    case couch_util:get_value("_doc", Form) of
+    undefined ->
+        Rev = couch_doc:parse_rev(couch_util:get_value("_rev", Form)),
+        {ok, [{ok, Doc}]} = couch_db:open_doc_revs(Db, DocId, [Rev], []);
+    Json ->
+        Doc = couch_doc_from_req(Req, DocId, ?JSON_DECODE(Json))
     end,
     UpdatedAtts = [
         #att{name=validate_attachment_name(Name),
@@ -656,10 +692,12 @@ db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
     RespHeaders = [{"Location", Loc}],
     case couch_util:to_list(couch_httpd:header_value(Req, "Content-Type")) of
     ("multipart/related;" ++ _) = ContentType ->
-        {ok, Doc0} = couch_doc:doc_from_multi_part_stream(ContentType,
-                fun() -> receive_request_data(Req) end),
+        {ok, Doc0, WaitFun} = couch_doc:doc_from_multi_part_stream(
+            ContentType, fun() -> receive_request_data(Req) end),
         Doc = couch_doc_from_req(Req, DocId, Doc0),
-        update_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType);
+        Result = update_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType),
+        WaitFun(),
+        Result;
     _Else ->
         case couch_httpd:qs_value(Req, "batch") of
         "ok" ->
@@ -721,20 +759,17 @@ send_doc(Req, Doc, Options) ->
 
 send_doc_efficiently(Req, #doc{atts=[]}=Doc, Headers, Options) ->
         send_json(Req, 200, Headers, couch_doc:to_json_obj(Doc, Options));
-send_doc_efficiently(Req, #doc{atts=Atts}=Doc, Headers, Options) ->
+send_doc_efficiently(#httpd{mochi_req = MochiReq} = Req,
+    #doc{atts = Atts} = Doc, Headers, Options) ->
     case lists:member(attachments, Options) of
     true ->
-        AcceptedTypes = case couch_httpd:header_value(Req, "Accept") of
-            undefined       -> [];
-            AcceptHeader    -> string:tokens(AcceptHeader, ", ")
-        end,
-        case lists:member("multipart/related", AcceptedTypes) of
+        case MochiReq:accepts_content_type("multipart/related") of
         false ->
             send_json(Req, 200, Headers, couch_doc:to_json_obj(Doc, Options));
         true ->
             Boundary = couch_uuids:random(),
             JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, 
-                    [attachments, follows|Options])),
+                    [attachments, follows, att_encoding_info | Options])),
             {ContentType, Len} = couch_doc:len_doc_to_multi_part_stream(
                     Boundary,JsonBytes, Atts, true),
             CType = {<<"Content-Type">>, ContentType},
@@ -776,9 +811,39 @@ send_docs_multipart(Req, Results, Options1) ->
     couch_httpd:send_chunk(Resp, <<"--">>),
     couch_httpd:last_chunk(Resp).
 
+send_ranges_multipart(Req, ContentType, Len, Att, Ranges) ->
+    Boundary = couch_uuids:random(),
+    CType = {"Content-Type",
+        "multipart/byteranges; boundary=\"" ++ ?b2l(Boundary) ++ "\""},
+    {ok, Resp} = start_chunked_response(Req, 206, [CType]),
+    couch_httpd:send_chunk(Resp, <<"--", Boundary/binary>>),
+    lists:foreach(fun({From, To}) ->
+        ContentRange = make_content_range(From, To, Len),
+        couch_httpd:send_chunk(Resp,
+            <<"\r\nContent-Type: ", ContentType/binary, "\r\n",
+            "Content-Range: ", ContentRange/binary, "\r\n",
+           "\r\n">>),
+        couch_doc:range_att_foldl(Att, From, To + 1,
+            fun(Seg, _) -> send_chunk(Resp, Seg) end, {ok, Resp}),
+        couch_httpd:send_chunk(Resp, <<"\r\n--", Boundary/binary>>)
+    end, Ranges),
+    couch_httpd:send_chunk(Resp, <<"--">>),
+    couch_httpd:last_chunk(Resp),
+    {ok, Resp}.
+
 receive_request_data(Req) ->
-    {couch_httpd:recv(Req, 0), fun() -> receive_request_data(Req) end}.
+    receive_request_data(Req, couch_httpd:body_length(Req)).
+
+receive_request_data(Req, LenLeft) when LenLeft > 0 ->
+    Len = erlang:min(4096, LenLeft),
+    Data = couch_httpd:recv(Req, Len),
+    {Data, fun() -> receive_request_data(Req, LenLeft - iolist_size(Data)) end};
+receive_request_data(_Req, _) ->
+    throw(<<"expected more data">>).
     
+make_content_range(From, To, Len) ->
+    ?l2b(io_lib:format("bytes ~B-~B/~B", [From, To, Len])).
+
 update_doc_result_to_json({{Id, Rev}, Error}) ->
         {_Code, Err, Msg} = couch_httpd:error_info(Error),
         {[{id, Id}, {rev, couch_doc:rev_to_str(Rev)},
@@ -863,7 +928,7 @@ couch_doc_open(Db, DocId, Rev, Options) ->
 
 % Attachment request handlers
 
-db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
+db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNameParts) ->
     FileName = list_to_binary(mochiweb_util:join(lists:map(fun binary_to_list/1, FileNameParts),"/")),
     #doc_query_args{
         rev=Rev,
@@ -881,16 +946,6 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
            atom_to_list(Enc),
            couch_httpd:accepted_encodings(Req)
         ),
-        Headers = [
-            {"ETag", Etag},
-            {"Cache-Control", "must-revalidate"},
-            {"Content-Type", binary_to_list(Type)}
-        ] ++ case ReqAcceptsAttEnc of
-        true ->
-            [{"Content-Encoding", atom_to_list(Enc)}];
-        _ ->
-            []
-        end,
         Len = case {Enc, ReqAcceptsAttEnc} of
         {identity, _} ->
             % stored and served in identity form
@@ -910,6 +965,23 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
             % header we'll fall back to a chunked response.
             undefined
         end,
+        Headers = [
+            {"ETag", Etag},
+            {"Cache-Control", "must-revalidate"},
+            {"Content-Type", binary_to_list(Type)}
+        ] ++ case ReqAcceptsAttEnc of
+        true when Enc =/= identity ->
+            % RFC 2616 says that the 'identify' encoding should not be used in
+            % the Content-Encoding header
+            [{"Content-Encoding", atom_to_list(Enc)}];
+        _ ->
+            []
+        end ++ case Enc of
+            identity ->
+                [{"Accept-Ranges", "bytes"}];
+            _ ->
+                [{"Accept-Ranges", "none"}]
+        end,
         AttFun = case ReqAcceptsAttEnc of
         false ->
             fun couch_doc:att_foldl_decode/3;
@@ -923,11 +995,29 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
                 case Len of
                 undefined ->
                     {ok, Resp} = start_chunked_response(Req, 200, Headers),
-                    AttFun(Att, fun(Seg, _) -> send_chunk(Resp, Seg) end, ok),
+                    AttFun(Att, fun(Seg, _) -> send_chunk(Resp, Seg) end, {ok, Resp}),
                     last_chunk(Resp);
                 _ ->
-                    {ok, Resp} = start_response_length(Req, 200, Headers, Len),
-                    AttFun(Att, fun(Seg, _) -> send(Resp, Seg) end, ok)
+                    Ranges = parse_ranges(MochiReq:get(range), Len),
+                    case {Enc, Ranges} of
+                        {identity, [{From, To}]} ->
+                            Headers1 = [{<<"Content-Range">>, make_content_range(From, To, Len)}]
+                                ++ Headers,
+                            {ok, Resp} = start_response_length(Req, 206, Headers1, To - From + 1),
+                            couch_doc:range_att_foldl(Att, From, To + 1,
+                                fun(Seg, _) -> send(Resp, Seg) end, {ok, Resp});
+                        {identity, Ranges} when is_list(Ranges) ->
+                            send_ranges_multipart(Req, Type, Len, Att, Ranges);
+                        _ ->
+                            Headers1 = Headers ++
+                                if Enc =:= identity orelse ReqAcceptsAttEnc =:= true ->
+                                    [{"Content-MD5", base64:encode(Att#att.md5)}];
+                                true ->
+                                    []
+                            end,
+                            {ok, Resp} = start_response_length(Req, 200, Headers1, Len),
+                            AttFun(Att, fun(Seg, _) -> send(Resp, Seg) end, {ok, Resp})
+                    end
                 end
             end
         )
@@ -982,9 +1072,7 @@ db_attachment_req(#httpd{method=Method,mochi_req=MochiReq}=Req, Db, DocId, FileN
                         end,
                         
                         
-                        fun() -> couch_httpd:recv(Req, 0) end;
-                    Length ->
-                        exit({length_not_integer, Length})
+                        fun(Size) -> couch_httpd:recv(Req, Size) end
                     end,
                 att_len = case couch_httpd:header_value(Req,"Content-Length") of
                     undefined ->
@@ -1049,6 +1137,25 @@ db_attachment_req(#httpd{method=Method,mochi_req=MochiReq}=Req, Db, DocId, FileN
 db_attachment_req(Req, _Db, _DocId, _FileNameParts) ->
     send_method_not_allowed(Req, "DELETE,GET,HEAD,PUT").
 
+parse_ranges(undefined, _Len) ->
+    undefined;
+parse_ranges(fail, _Len) ->
+    undefined;
+parse_ranges(Ranges, Len) ->
+    parse_ranges(Ranges, Len, []).
+
+parse_ranges([], _Len, Acc) ->
+    lists:reverse(Acc);
+parse_ranges([{From, To}|_], _Len, _Acc) when is_integer(From) andalso is_integer(To) andalso To < From ->
+    throw(requested_range_not_satisfiable);
+parse_ranges([{From, To}|Rest], Len, Acc) when is_integer(To) andalso To >= Len ->
+    parse_ranges([{From, Len-1}] ++ Rest, Len, Acc);
+parse_ranges([{none, To}|Rest], Len, Acc) ->
+    parse_ranges([{Len - To, Len - 1}] ++ Rest, Len, Acc);
+parse_ranges([{From, none}|Rest], Len, Acc) ->
+    parse_ranges([{From, Len - 1}] ++ Rest, Len, Acc);
+parse_ranges([{From,To}|Rest], Len, Acc) ->
+    parse_ranges(Rest, Len, [{From, To}] ++ Acc).
 
 get_md5_header(Req) ->
     ContentMD5 = couch_httpd:header_value(Req, "Content-MD5"),
@@ -1137,6 +1244,8 @@ parse_changes_query(Req) ->
             Args#changes_args{timeout=list_to_integer(Value)};
         {"include_docs", "true"} ->
             Args#changes_args{include_docs=true};
+        {"conflicts", "true"} ->
+            Args#changes_args{conflicts=true};
         {"filter", _} ->
             Args#changes_args{filter=Value};
         _Else -> % unknown key value pair, ignore.
@@ -1162,15 +1271,19 @@ extract_header_rev(Req, ExplicitRev) ->
 
 
 parse_copy_destination_header(Req) ->
-    Destination = couch_httpd:header_value(Req, "Destination"),
-    case re:run(Destination, "\\?", [{capture, none}]) of
-    nomatch ->
-        {list_to_binary(Destination), {0, []}};
-    match ->
-        [DocId, RevQs] = re:split(Destination, "\\?", [{return, list}]),
-        [_RevQueryKey, Rev] = re:split(RevQs, "=", [{return, list}]),
-        {Pos, RevId} = couch_doc:parse_rev(Rev),
-        {list_to_binary(DocId), {Pos, [RevId]}}
+    case couch_httpd:header_value(Req, "Destination") of
+        undefined ->
+            throw({bad_request, "Destination header in mandatory for COPY."});
+        Destination ->
+            case re:run(Destination, "\\?", [{capture, none}]) of
+                nomatch ->
+                    {list_to_binary(Destination), {0, []}};
+                match ->
+                    [DocId, RevQs] = re:split(Destination, "\\?", [{return, list}]),
+                    [_RevQueryKey, Rev] = re:split(RevQs, "=", [{return, list}]),
+                    {Pos, RevId} = couch_doc:parse_rev(Rev),
+                    {list_to_binary(DocId), {Pos, [RevId]}}
+            end
     end.
 
 validate_attachment_names(Doc) ->
@@ -1183,34 +1296,8 @@ validate_attachment_name(Name) when is_list(Name) ->
 validate_attachment_name(<<"_",_/binary>>) ->
     throw({bad_request, <<"Attachment name can't start with '_'">>});
 validate_attachment_name(Name) ->
-    case is_valid_utf8(Name) of
+    case couch_util:validate_utf8(Name) of
         true -> Name;
         false -> throw({bad_request, <<"Attachment name is not UTF-8 encoded">>})
     end.
 
-%% borrowed from mochijson2:json_bin_is_safe()
-is_valid_utf8(<<>>) ->
-    true;
-is_valid_utf8(<<C, Rest/binary>>) ->
-    case C of
-        $\" ->
-            false;
-        $\\ ->
-            false;
-        $\b ->
-            false;
-        $\f ->
-            false;
-        $\n ->
-            false;
-        $\r ->
-            false;
-        $\t ->
-            false;
-        C when C >= 0, C < $\s; C >= 16#7f, C =< 16#10FFFF ->
-            false;
-        C when C < 16#7f ->
-            is_valid_utf8(Rest);
-        _ ->
-            false
-    end.

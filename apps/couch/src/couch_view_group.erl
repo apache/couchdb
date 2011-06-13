@@ -87,7 +87,7 @@ init({{_, DbName, _} = InitArgs, ReturnPid, Ref}) ->
         _ ->
             try couch_db:monitor(Db) after couch_db:close(Db) end,
             {ok, #group_state{
-                    db_name= DbName,
+                    db_name=DbName,
                     init_args=InitArgs,
                     group=Group#group{dbname=DbName},
                     ref_counter=erlang:monitor(process,Fd)}}
@@ -382,11 +382,15 @@ prepare_group({RootDir, DbName, #group{sig=Sig}=Group}, ForceReset)->
 
 get_index_header_data(#group{current_seq=Seq, purge_seq=PurgeSeq,
             id_btree=IdBtree,views=Views}) ->
-    ViewStates = [couch_btree:get_state(Btree) || #view{btree=Btree} <- Views],
-    #index_header{seq=Seq,
-            purge_seq=PurgeSeq,
-            id_btree_state=couch_btree:get_state(IdBtree),
-            view_states=ViewStates}.
+    ViewStates = [
+        {couch_btree:get_state(V#view.btree), V#view.update_seq, V#view.purge_seq} || V <- Views
+    ],
+    #index_header{
+        seq=Seq,
+        purge_seq=PurgeSeq,
+        id_btree_state=couch_btree:get_state(IdBtree),
+        view_states=ViewStates
+    }.
 
 hex_sig(GroupSig) ->
     couch_util:to_hex(?b2l(GroupSig)).
@@ -427,7 +431,7 @@ open_temp_group(DbName, Language, DesignOptions, MapSrc, RedSrc) ->
             reduce_funs= if RedSrc==[] -> []; true -> [{<<"_temp">>, RedSrc}] end,
             options=DesignOptions},
         couch_db:close(Db),
-        {ok, set_view_sig(#group{name = <<"_temp">>, views=[View],
+        {ok, set_view_sig(#group{name = <<"_temp">>,lib={[]}, views=[View],
             def_lang=Language, design_options=DesignOptions})};
     Error ->
         Error
@@ -435,9 +439,40 @@ open_temp_group(DbName, Language, DesignOptions, MapSrc, RedSrc) ->
 
 set_view_sig(#group{
             views=Views,
+            lib={[]},
             def_lang=Language,
             design_options=DesignOptions}=G) ->
-    G#group{sig=couch_util:md5(term_to_binary({Views, Language, DesignOptions}))}.
+    ViewInfo = [old_view_format(V) || V <- Views],
+    G#group{sig=couch_util:md5(term_to_binary({ViewInfo, Language, DesignOptions}))};
+set_view_sig(#group{
+            views=Views,
+            lib=Lib,
+            def_lang=Language,
+            design_options=DesignOptions}=G) ->
+    ViewInfo = [old_view_format(V) || V <- Views],
+    G#group{sig=couch_util:md5(term_to_binary({ViewInfo, Language, DesignOptions, sort_lib(Lib)}))}.
+
+% Use the old view record format so group sig's don't change
+old_view_format(View) ->
+    {
+        view,
+        View#view.id_num,
+        View#view.map_names,
+        View#view.def,
+        View#view.btree,
+        View#view.reduce_funs,
+        View#view.options
+    }.
+
+sort_lib({Lib}) ->
+    sort_lib(Lib, []).
+sort_lib([], LAcc) ->
+    lists:keysort(1, LAcc);
+sort_lib([{LName, {LObj}}|Rest], LAcc) ->
+    LSorted = sort_lib(LObj, []), % descend into nested object
+    sort_lib(Rest, [{LName, LSorted}|LAcc]);
+sort_lib([{LName, LCode}|Rest], LAcc) ->
+    sort_lib(Rest, [{LName, LCode}|LAcc]).
 
 open_db_group(DbName, GroupId) ->
     {Pid, Ref} = spawn_monitor(fun() ->
@@ -496,52 +531,44 @@ design_doc_to_view_group(#doc{id=Id,body={Fields}}) ->
     Language = couch_util:get_value(<<"language">>, Fields, <<"javascript">>),
     {DesignOptions} = couch_util:get_value(<<"options">>, Fields, {[]}),
     {RawViews} = couch_util:get_value(<<"views">>, Fields, {[]}),
+    Lib = couch_util:get_value(<<"lib">>, RawViews, {[]}),
     % add the views to a dictionary object, with the map source as the key
     DictBySrc =
     lists:foldl(
         fun({Name, {MRFuns}}, DictBySrcAcc) ->
-            MapSrc = couch_util:get_value(<<"map">>, MRFuns),
-            RedSrc = couch_util:get_value(<<"reduce">>, MRFuns, null),
-            {ViewOptions} = couch_util:get_value(<<"options">>, MRFuns, {[]}),
-            View =
-            case dict:find({MapSrc, ViewOptions}, DictBySrcAcc) of
-                {ok, View0} -> View0;
-                error -> #view{def=MapSrc, options=ViewOptions} % create new view object
-            end,
-            View2 =
-            if RedSrc == null ->
-                View#view{map_names=[Name|View#view.map_names]};
-            true ->
-                View#view{reduce_funs=[{Name,RedSrc}|View#view.reduce_funs]}
-            end,
-            dict:store({MapSrc, ViewOptions}, View2, DictBySrcAcc)
+            case couch_util:get_value(<<"map">>, MRFuns) of
+            undefined -> DictBySrcAcc;
+            MapSrc ->
+                RedSrc = couch_util:get_value(<<"reduce">>, MRFuns, null),
+                {ViewOptions} = couch_util:get_value(<<"options">>, MRFuns, {[]}),
+                View =
+                case dict:find({MapSrc, ViewOptions}, DictBySrcAcc) of
+                    {ok, View0} -> View0;
+                    error -> #view{def=MapSrc, options=ViewOptions} % create new view object
+                end,
+                View2 =
+                if RedSrc == null ->
+                    View#view{map_names=[Name|View#view.map_names]};
+                true ->
+                    View#view{reduce_funs=[{Name,RedSrc}|View#view.reduce_funs]}
+                end,
+                dict:store({MapSrc, ViewOptions}, View2, DictBySrcAcc)
+            end
         end, dict:new(), RawViews),
     % number the views
     {Views, _N} = lists:mapfoldl(
         fun({_Src, View}, N) ->
             {View#view{id_num=N},N+1}
         end, 0, lists:sort(dict:to_list(DictBySrc))),
-
-    #group{
-        name = Id,
-        views = Views,
-        def_lang = Language,
-        design_options = DesignOptions,
-        sig = couch_util:md5(term_to_binary({Views, Language, DesignOptions}))
-    }.
+    set_view_sig(#group{name=Id, lib=Lib, views=Views, def_lang=Language, design_options=DesignOptions}).
 
 reset_group(DbName, #group{views=Views}=Group) ->
-    Group#group{
-        fd = nil,
-        dbname = DbName,
-        query_server = nil,
-        current_seq = 0,
-        id_btree = nil,
-        views = [View#view{btree=nil} || View <- Views]
-    }.
+    Views2 = [View#view{btree=nil} || View <- Views],
+    Group#group{dbname=DbName,fd=nil,query_server=nil,current_seq=0,
+            id_btree=nil,views=Views2}.
 
 reset_file(Fd, DbName, #group{sig=Sig,name=Name} = Group) ->
-    ?LOG_INFO("Resetting group index \"~s\" in db ~s", [Name, DbName]),
+    ?LOG_DEBUG("Resetting group index \"~s\" in db ~s", [Name, DbName]),
     ok = couch_file:truncate(Fd, 0),
     ok = couch_file:write_header(Fd, {Sig, nil}),
     init_group(Fd, reset_group(DbName, Group), nil).
@@ -553,7 +580,7 @@ init_group(Fd, #group{dbname=DbName, views=Views}=Group, nil) ->
     case couch_db:open(DbName, []) of
     {ok, Db} ->
         PurgeSeq = try couch_db:get_purge_seq(Db) after couch_db:close(Db) end,
-        Header = #index_header{purge_seq=PurgeSeq, view_states=[nil || _ <- Views]},
+        Header = #index_header{purge_seq=PurgeSeq, view_states=[{nil, 0, 0} || _ <- Views]},
         init_group(Fd, Group, Header);
     {not_found, no_db_file} ->
         ?LOG_ERROR("~p no_db_file ~p", [?MODULE, DbName]),
@@ -562,9 +589,14 @@ init_group(Fd, #group{dbname=DbName, views=Views}=Group, nil) ->
 init_group(Fd, #group{def_lang=Lang,views=Views}=Group, IndexHeader) ->
      #index_header{seq=Seq, purge_seq=PurgeSeq,
             id_btree_state=IdBtreeState, view_states=ViewStates} = IndexHeader,
+    StateUpdate = fun
+        ({_, _, _}=State) -> State;
+        (State) -> {State, 0, 0}
+    end,
+    ViewStates2 = lists:map(StateUpdate, ViewStates),
     {ok, IdBtree} = couch_btree:open(IdBtreeState, Fd),
     Views2 = lists:zipwith(
-        fun(BtreeState, #view{reduce_funs=RedFuns,options=Options}=View) ->
+        fun({BTState, USeq, PSeq}, #view{reduce_funs=RedFuns,options=Options}=View) ->
             FunSrcs = [FunSrc || {_Name, FunSrc} <- RedFuns],
             ReduceFun =
                 fun(reduce, KVs) ->
@@ -588,11 +620,12 @@ init_group(Fd, #group{def_lang=Lang,views=Views}=Group, IndexHeader) ->
             <<"raw">> ->
                 Less = fun(A,B) -> A < B end
             end,
-            {ok, Btree} = couch_btree:open(BtreeState, Fd, [{less, Less},
-                {reduce, ReduceFun}]),
-            View#view{btree=Btree}
+            {ok, Btree} = couch_btree:open(BTState, Fd,
+                    [{less, Less}, {reduce, ReduceFun}]
+            ),
+            View#view{btree=Btree, update_seq=USeq, purge_seq=PSeq}
         end,
-        ViewStates, Views),
+        ViewStates2, Views),
     Group#group{fd=Fd, current_seq=Seq, purge_seq=PurgeSeq, id_btree=IdBtree,
         views=Views2}.
 

@@ -93,6 +93,7 @@ couchTests.attachments= function(debug) {
   });
   T(xhr.status == 201);
   var rev = JSON.parse(xhr.responseText).rev;
+  TEquals('"' + rev + '"', xhr.getResponseHeader("Etag"));
 
   var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc3/attachment.txt");
   T(xhr.responseText == bin_data);
@@ -110,6 +111,7 @@ couchTests.attachments= function(debug) {
   });
   T(xhr.status == 201);
   var rev = JSON.parse(xhr.responseText).rev;
+  TEquals('"' + rev + '"', xhr.getResponseHeader("Etag"));
 
   var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc3/attachment.txt");
   T(xhr.responseText == bin_data);

@@ -13,7 +13,7 @@
 -module(test_util).
 
 -export([init_code_path/0]).
--export([source_file/1, build_file/1]).
+-export([source_file/1, build_file/1, config_files/0]).
 
 init_code_path() ->
     code:load_abs("apps/couch/test/etap/etap").
@@ -22,4 +22,12 @@ source_file(Name) ->
     filename:join(["apps/couch", Name]).
 
 build_file(Name) ->
-    filename:join(["apps/couch", Name]).
+    filename:join(["rel/overlay", Name]).
+
+config_files() ->
+    [
+        build_file("etc/default.ini"),
+        build_file("etc/local.ini"),
+        source_file("test/etap/random_port.ini")
+    ].
+

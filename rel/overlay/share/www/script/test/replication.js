@@ -12,16 +12,30 @@
 
 couchTests.replication = function(debug) {
   if (debug) debugger;
+
+  function waitForSeq(sourceDb, targetDb) {
+    var targetSeq,
+        sourceSeq = sourceDb.info().update_seq,
+        t0 = new Date(),
+        t1,
+        ms = 3000;
+
+    do {
+      targetSeq = targetDb.info().update_seq;
+      t1 = new Date();
+    } while (((t1 - t0) <= ms) && targetSeq < sourceSeq);
+  }
+
   var host = CouchDB.host;
   var dbPairs = [
     {source:"test_suite_db_a",
       target:"test_suite_db_b"},
     {source:"test_suite_db_a",
-      target:"http://" + host + "/test_suite_db_b"},
-    {source:"http://" + host + "/test_suite_db_a",
+      target:CouchDB.protocol + host + "/test_suite_db_b"},
+    {source:CouchDB.protocol + host + "/test_suite_db_a",
       target:"test_suite_db_b"},
-    {source:"http://" + host + "/test_suite_db_a",
-      target:"http://" + host + "/test_suite_db_b"}
+    {source:CouchDB.protocol + host + "/test_suite_db_a",
+      target:CouchDB.protocol + host + "/test_suite_db_b"}
   ];
   var dbA = new CouchDB("test_suite_db_a", {"X-Couch-Full-Commit":"false"});
   var dbB = new CouchDB("test_suite_db_b", {"X-Couch-Full-Commit":"false"});
@@ -296,7 +310,7 @@ couchTests.replication = function(debug) {
 
   // remote
   dbB.deleteDb();
-  CouchDB.replicate(dbA.name, "http://" + CouchDB.host + "/test_suite_db_b", {
+  CouchDB.replicate(dbA.name, CouchDB.protocol + CouchDB.host + "/test_suite_db_b", {
     body: {"create_target": true}
   });
   TEquals("test_suite_db_b", dbB.info().db_name,
@@ -310,14 +324,14 @@ couchTests.replication = function(debug) {
   T(continuousResult._local_id);
 
   var cancelResult = CouchDB.replicate(dbA.name, "test_suite_db_b", {
-    body: {"cancel": true}
+    body: {"continuous":true, "cancel": true}
   });
   T(cancelResult.ok);
   T(continuousResult._local_id == cancelResult._local_id);
 
   try {
    var cancelResult2 = CouchDB.replicate(dbA.name, "test_suite_db_b", {
-     body: {"cancel": true}
+     body: {"continuous":true, "cancel": true}
    });
   } catch (e) {
     T(e.error == "not_found");
@@ -372,11 +386,11 @@ couchTests.replication = function(debug) {
     {source:"test_suite_rep_docs_db_a",
       target:"test_suite_rep_docs_db_b"},
     {source:"test_suite_rep_docs_db_a",
-      target:"http://" + host + "/test_suite_rep_docs_db_b"},
-    {source:"http://" + host + "/test_suite_rep_docs_db_a",
+      target:CouchDB.protocol + host + "/test_suite_rep_docs_db_b"},
+    {source:CouchDB.protocol + host + "/test_suite_rep_docs_db_a",
       target:"test_suite_rep_docs_db_b"},
-    {source:"http://" + host + "/test_suite_rep_docs_db_a",
-      target:"http://" + host + "/test_suite_rep_docs_db_b"}
+    {source:CouchDB.protocol + host + "/test_suite_rep_docs_db_a",
+      target:CouchDB.protocol + host + "/test_suite_rep_docs_db_b"}
   ];
 
   var target_doc_ids = [
@@ -399,24 +413,25 @@ couchTests.replication = function(debug) {
       var valid_doc_ids = [];
       var invalid_doc_ids = [];
 
-      $.each(doc_ids, function(index, id) {
-        var found = false;
+        for (var p = 0; p < doc_ids.length; p++) {
+            var id = doc_ids[p];
+            var found = false;
 
-        for (var k = 0; k < all_docs.length; k++) {
-          var doc = all_docs[k];
+            for (var k = 0; k < all_docs.length; k++) {
+                var doc = all_docs[k];
 
-          if (id === doc._id) {
-            found = true;
-            break;
-          }
-        }
+                if (id === doc._id) {
+                    found = true;
+                    break;
+                }
+            }
 
-        if (found) {
-          valid_doc_ids.push(id);
-        } else {
-          invalid_doc_ids.push(id);
-        }
-      });
+            if (found) {
+                valid_doc_ids.push(id);
+            } else {
+                invalid_doc_ids.push(id);
+            }
+        };
 
       dbB.deleteDb();
       dbB.createDb();
@@ -434,7 +449,7 @@ couchTests.replication = function(debug) {
         var doc = all_docs[k];
         var tgt_doc = dbB.open(doc._id);
 
-        if ($.inArray(doc._id, doc_ids) >= 0) {
+        if (doc_ids.indexOf(doc._id) >= 0) {
           T(tgt_doc !== null);
           T(tgt_doc.value === doc.value);
         } else {
@@ -451,45 +466,50 @@ couchTests.replication = function(debug) {
   }
 
   // test filtered replication
-
-  var sourceDb = new CouchDB(
-    "test_suite_filtered_rep_db_a", {"X-Couch-Full-Commit":"false"}
-  );
-
-  sourceDb.deleteDb();
-  sourceDb.createDb();
-
-  T(sourceDb.save({_id:"foo1",value:1}).ok);
-  T(sourceDb.save({_id:"foo2",value:2}).ok);
-  T(sourceDb.save({_id:"foo3",value:3}).ok);
-  T(sourceDb.save({_id:"foo4",value:4}).ok);
-  T(sourceDb.save({
-    "_id": "_design/mydesign",
-    "language" : "javascript",
-    "filters" : {
-      "myfilter" : (function(doc, req) {
-        if (doc.value < Number(req.query.maxvalue)) {
-          return true;
-        } else {
-          return false;
-        }
-      }).toString()
+  var filterFun1 = (function(doc, req) {
+    if (doc.value < Number(req.query.maxvalue)) {
+      return true;
+    } else {
+      return false;
     }
-  }).ok);
+  }).toString();
+
+  var filterFun2 = (function(doc, req) {
+    return true;
+  }).toString();
 
   var dbPairs = [
     {source:"test_suite_filtered_rep_db_a",
       target:"test_suite_filtered_rep_db_b"},
     {source:"test_suite_filtered_rep_db_a",
-      target:"http://" + host + "/test_suite_filtered_rep_db_b"},
-    {source:"http://" + host + "/test_suite_filtered_rep_db_a",
+      target:CouchDB.protocol + host + "/test_suite_filtered_rep_db_b"},
+    {source:CouchDB.protocol + host + "/test_suite_filtered_rep_db_a",
       target:"test_suite_filtered_rep_db_b"},
-    {source:"http://" + host + "/test_suite_filtered_rep_db_a",
-      target:"http://" + host + "/test_suite_filtered_rep_db_b"}
+    {source:CouchDB.protocol + host + "/test_suite_filtered_rep_db_a",
+      target:CouchDB.protocol + host + "/test_suite_filtered_rep_db_b"}
   ];
+  var sourceDb = new CouchDB("test_suite_filtered_rep_db_a");
+  var targetDb = new CouchDB("test_suite_filtered_rep_db_b");
 
   for (var i = 0; i < dbPairs.length; i++) {
-    var targetDb = new CouchDB("test_suite_filtered_rep_db_b");
+    sourceDb.deleteDb();
+    sourceDb.createDb();
+
+    T(sourceDb.save({_id: "foo1", value: 1}).ok);
+    T(sourceDb.save({_id: "foo2", value: 2}).ok);
+    T(sourceDb.save({_id: "foo3", value: 3}).ok);
+    T(sourceDb.save({_id: "foo4", value: 4}).ok);
+
+    var ddoc = {
+      "_id": "_design/mydesign",
+      "language": "javascript",
+      "filters": {
+        "myfilter": filterFun1
+       }
+    };
+
+    T(sourceDb.save(ddoc).ok);
+
     targetDb.deleteDb();
     targetDb.createDb();
 
@@ -506,7 +526,7 @@ couchTests.replication = function(debug) {
     });
 
     T(repResult.ok);
-    T($.isArray(repResult.history));
+    T(repResult.history instanceof Array);
     T(repResult.history.length === 1);
     T(repResult.history[0].docs_written === 2);
     T(repResult.history[0].docs_read === 2);
@@ -525,6 +545,45 @@ couchTests.replication = function(debug) {
 
     var docFoo4 = targetDb.open("foo4");
     T(docFoo4 === null);
+
+    // replication should start from scratch after the filter's code changed
+
+    ddoc.filters.myfilter = filterFun2;
+    T(sourceDb.save(ddoc).ok);
+
+    repResult = CouchDB.replicate(dbA, dbB, {
+      body: {
+        "filter" : "mydesign/myfilter",
+        "query_params" : {
+          "maxvalue": "3"
+        }
+      }
+    });
+
+    T(repResult.ok);
+    T(repResult.history instanceof Array);
+    T(repResult.history.length === 1);
+    T(repResult.history[0].docs_written === 3);
+    T(repResult.history[0].docs_read === 3);
+    T(repResult.history[0].doc_write_failures === 0);
+
+    docFoo1 = targetDb.open("foo1");
+    T(docFoo1 !== null);
+    T(docFoo1.value === 1);
+
+    docFoo2 = targetDb.open("foo2");
+    T(docFoo2 !== null);
+    T(docFoo2.value === 2);
+
+    docFoo3 = targetDb.open("foo3");
+    T(docFoo3 !== null);
+    T(docFoo3.value === 3);
+
+    docFoo4 = targetDb.open("foo4");
+    T(docFoo4 !== null);
+    T(docFoo4.value === 4);
+
+    T(targetDb.open("_design/mydesign") !== null);
   }
 
   // test for COUCHDB-868 - design docs' attachments not getting replicated
@@ -610,7 +669,7 @@ couchTests.replication = function(debug) {
     T(CouchDB.session().userCtx.roles.indexOf("_admin") === -1);
 
     var repResult = CouchDB.replicate(
-      "http://fdmanana:qwerty@" + host + "/" + dbA.name,
+      CouchDB.protocol + "fdmanana:qwerty@" + host + "/" + dbA.name,
       dbB.name
     );
     T(repResult.ok === true);
@@ -662,7 +721,7 @@ couchTests.replication = function(debug) {
     T(CouchDB.session().userCtx.roles.indexOf("_admin") === -1);
     try {
       repResult = CouchDB.replicate(
-        "http://fdmanana:qwerty@" + host + "/" + dbA.name,
+        CouchDB.protocol + "fdmanana:qwerty@" + host + "/" + dbA.name,
         dbB.name
       );
       T(false, "replication should have failed");
@@ -678,6 +737,132 @@ couchTests.replication = function(debug) {
   };
 
   run_on_modified_server(server_config, test_fun);
+
+  // COUCHDB-1093 - filtered and continuous _changes feed dies when the
+  // database is compacted
+  dbA = new CouchDB("test_suite_db_a");
+  dbB = new CouchDB("test_suite_db_b");
+
+  dbA.deleteDb();
+  dbA.createDb();
+  dbB.deleteDb();
+  dbB.createDb();
+
+  var docs = makeDocs(1, 10);
+  docs.push({
+    _id: "_design/foo",
+    language: "javascript",
+    filters: {
+      myfilter: (function(doc, req) { return true; }).toString()
+    }
+  });
+  dbA.bulkSave(docs).ok;
+
+  var repResult = CouchDB.replicate(
+    CouchDB.protocol + host + "/" + dbA.name,
+    dbB.name,
+    {
+      body: {
+        continuous: true,
+        filter: "foo/myfilter"
+      }
+    }
+  );
+  TEquals(true, repResult.ok);
+  TEquals('string', typeof repResult._local_id);
+
+  var xhr = CouchDB.request("GET", "/_active_tasks");
+  var tasks = JSON.parse(xhr.responseText);
+
+  TEquals(true, dbA.compact().ok);
+  while (dbA.info().compact_running) {};
+
+  TEquals(true, dbA.save(makeDocs(30, 31)[0]).ok);
+  xhr = CouchDB.request("GET", "/_active_tasks");
+
+  var tasksAfter = JSON.parse(xhr.responseText);
+  TEquals(tasks.length, tasksAfter.length);
+  waitForSeq(dbA, dbB);
+  T(dbB.open("30") !== null);
+
+  repResult = CouchDB.replicate(
+    CouchDB.protocol + host + "/" + dbA.name,
+    dbB.name,
+    {
+      body: {
+        continuous: true,
+        filter: "foo/myfilter",
+        cancel: true
+      }
+    }
+  );
+  TEquals(true, repResult.ok);
+  TEquals('string', typeof repResult._local_id);
+
+
+  // COUCHDB-885 - push replication of a doc with attachment causes a
+ //  conflict in the target.
+  dbA = new CouchDB("test_suite_db_a");
+  dbB = new CouchDB("test_suite_db_b");
+
+  dbA.deleteDb();
+  dbA.createDb();
+  dbB.deleteDb();
+  dbB.createDb();
+
+  var doc = {
+    _id: "doc1"
+  };
+  TEquals(true, dbA.save(doc).ok);
+
+  repResult = CouchDB.replicate(
+    dbA.name,
+    CouchDB.protocol + host + "/" + dbB.name
+  );
+  TEquals(true, repResult.ok);
+  TEquals(true, repResult.history instanceof Array);
+  TEquals(1, repResult.history.length);
+  TEquals(1, repResult.history[0].docs_written);
+  TEquals(1, repResult.history[0].docs_read);
+  TEquals(0, repResult.history[0].doc_write_failures);
+
+  doc["_attachments"] = {
+    "hello.txt": {
+      "content_type": "text/plain",
+      "data": "aGVsbG8gd29ybGQ="  // base64:encode("hello world")
+    },
+    "foo.dat": {
+      "content_type": "not/compressible",
+      "data": "aSBhbSBub3QgZ3ppcGVk"  // base64:encode("i am not gziped")
+    }
+  };
+
+  TEquals(true, dbA.save(doc).ok);
+  repResult = CouchDB.replicate(
+    dbA.name,
+    CouchDB.protocol + host + "/" + dbB.name
+  );
+  TEquals(true, repResult.ok);
+  TEquals(true, repResult.history instanceof Array);
+  TEquals(2, repResult.history.length);
+  TEquals(1, repResult.history[0].docs_written);
+  TEquals(1, repResult.history[0].docs_read);
+  TEquals(0, repResult.history[0].doc_write_failures);
+
+  var copy = dbB.open(doc._id, {
+    conflicts: true, deleted_conflicts: true, attachments: true,
+    att_encoding_info: true});
+  T(copy !== null);
+  TEquals("undefined", typeof copy._conflicts);
+  TEquals("undefined", typeof copy._deleted_conflicts);
+  TEquals("text/plain", copy._attachments["hello.txt"]["content_type"]);
+  TEquals("aGVsbG8gd29ybGQ=", copy._attachments["hello.txt"]["data"]);
+  TEquals("gzip", copy._attachments["hello.txt"]["encoding"]);
+  TEquals("not/compressible", copy._attachments["foo.dat"]["content_type"]);
+  TEquals("aSBhbSBub3QgZ3ppcGVk", copy._attachments["foo.dat"]["data"]);
+  TEquals("undefined", typeof copy._attachments["foo.dat"]["encoding"]);
+  // end of test for COUCHDB-885
+
 
   // cleanup
   dbA.deleteDb();

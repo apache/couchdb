@@ -110,4 +110,36 @@ couchTests.purge = function(debug) {
     T(rows[(2*(i-4))+1].key == i+1);
   }
   T(db.view("test/single_doc").total_rows == 0);
+
+  // COUCHDB-1065
+  var dbA = new CouchDB("test_suite_db_a");
+  var dbB = new CouchDB("test_suite_db_b");
+  dbA.deleteDb();
+  dbA.createDb();
+  dbB.deleteDb();
+  dbB.createDb();
+  var docA = {_id:"test", a:1};
+  var docB = {_id:"test", a:2};
+  dbA.save(docA);
+  dbB.save(docB);
+  CouchDB.replicate(dbA.name, dbB.name);
+  var xhr = CouchDB.request("POST", "/" + dbB.name + "/_purge", {
+    body: JSON.stringify({"test":[docA._rev]})
+  });
+  TEquals(200, xhr.status, "single rev purge after replication succeeds");
+
+  var xhr = CouchDB.request("GET", "/" + dbB.name + "/test?rev=" + docA._rev);
+  TEquals(404, xhr.status, "single rev purge removes revision");
+
+  var xhr = CouchDB.request("POST", "/" + dbB.name + "/_purge", {
+    body: JSON.stringify({"test":[docB._rev]})
+  });
+  TEquals(200, xhr.status, "single rev purge after replication succeeds");
+  var xhr = CouchDB.request("GET", "/" + dbB.name + "/test?rev=" + docB._rev);
+  TEquals(404, xhr.status, "single rev purge removes revision");
+
+  var xhr = CouchDB.request("POST", "/" + dbB.name + "/_purge", {
+    body: JSON.stringify({"test":[docA._rev, docB._rev]})
+  });
+  TEquals(200, xhr.status, "all rev purge after replication succeeds");
 };

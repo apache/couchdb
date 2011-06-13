@@ -10,23 +10,21 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-var State = {
-  reset : function(config) {
-    // clear the globals and run gc
-    State.funs = [];
-    State.lib = null;
-    State.query_config = config || {};
-    init_sandbox();
-    gc();
-    print("true"); // indicates success
-  },
-  addFun : function(newFun) {
-    // Compile to a function and add it to funs array
-    State.funs.push(Couch.compileFunction(newFun, {views : {lib : State.lib}}));
-    print("true");
-  },
-  addLib : function(lib) {
-    State.lib = lib;
-    print("true");
-  }
+#include <stdio.h>
+
+int
+main(int argc, const char * argv[])
+{
+    char c = '\0';
+    size_t num = 1;
+    
+    fprintf(stdout, "[\"register\", \"s1\"]\n");
+    fprintf(stdout, "[\"register\", \"s2\", \"k\"]\n");
+    fflush(stdout);
+    
+    while(c != '\n' && num > 0) {
+        num = fread(&c, 1, 1, stdin);
+    }
+    
+    exit(0);
 }

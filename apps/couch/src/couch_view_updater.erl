@@ -39,8 +39,10 @@ update(Owner, Group) ->
         couch_task_status:update(<<"Resetting view index due to lost purge entries.">>),
         exit(reset)
     end,
-    {ok, MapQueue} = couch_work_queue:new(100000, 500),
-    {ok, WriteQueue} = couch_work_queue:new(100000, 500),
+    {ok, MapQueue} = couch_work_queue:new(
+        [{max_size, 100000}, {max_items, 500}]),
+    {ok, WriteQueue} = couch_work_queue:new(
+        [{max_size, 100000}, {max_items, 500}]),
     Self = self(),
     ViewEmptyKVs = [{View, []} || View <- Group2#group.views],
     spawn_link(?MODULE, do_maps, [Group, MapQueue, WriteQueue, ViewEmptyKVs]),
@@ -92,19 +94,25 @@ purge_index(Db, #group{views=Views, id_btree=IdBtree}=Group) ->
         end, dict:new(), Lookups),
 
     % Now remove the values from the btrees
+    PurgeSeq = couch_db:get_purge_seq(Db),
     Views2 = lists:map(
         fun(#view{id_num=Num,btree=Btree}=View) ->
             case dict:find(Num, ViewKeysToRemoveDict) of
             {ok, RemoveKeys} ->
-                {ok, Btree2} = couch_btree:add_remove(Btree, [], RemoveKeys),
-                View#view{btree=Btree2};
+                {ok, ViewBtree2} = couch_btree:add_remove(Btree, [], RemoveKeys),
+                case ViewBtree2 =/= Btree of
+                    true ->
+                        View#view{btree=ViewBtree2, purge_seq=PurgeSeq};
+                    _ ->
+                        View#view{btree=ViewBtree2}
+                end;
             error -> % no keys to remove in this view
                 View
             end
         end, Views),
     Group#group{id_btree=IdBtree2,
             views=Views2,
-            purge_seq=couch_db:get_purge_seq(Db)}.
+            purge_seq=PurgeSeq}.
 
 -spec load_doc(#db{}, #doc_info{}, pid(), [atom()], boolean()) -> ok.
 load_doc(Db, DI, MapQueue, DocOpts, IncludeDesign) ->
@@ -227,12 +235,12 @@ view_insert_doc_query_results(#doc{id=DocId}=Doc, [ResultKVs|RestResults], [{Vie
 -spec view_compute(#group{}, [#doc{}]) -> {#group{}, any()}.
 view_compute(Group, []) ->
     {Group, []};
-view_compute(#group{def_lang=DefLang, query_server=QueryServerIn}=Group, Docs) ->
+view_compute(#group{def_lang=DefLang, lib=Lib, query_server=QueryServerIn}=Group, Docs) ->
     {ok, QueryServer} =
     case QueryServerIn of
     nil -> % doc map not started
         Definitions = [View#view.def || View <- Group#group.views],
-        couch_query_servers:start_doc_map(DefLang, Definitions);
+        couch_query_servers:start_doc_map(DefLang, Definitions, Lib);
     _ ->
         {ok, QueryServerIn}
     end,
@@ -270,7 +278,12 @@ write_changes(Group, ViewKeyValuesToAdd, DocIdViewIdKeys, NewSeq, InitialBuild) 
     Views2 = lists:zipwith(fun(View, {_View, AddKeyValues}) ->
             KeysToRemove = couch_util:dict_find(View#view.id_num, KeysToRemoveByView, []),
             {ok, ViewBtree2} = couch_btree:add_remove(View#view.btree, AddKeyValues, KeysToRemove),
-            View#view{btree = ViewBtree2}
+            case ViewBtree2 =/= View#view.btree of
+                true ->
+                    View#view{btree=ViewBtree2, update_seq=NewSeq};
+                _ ->
+                    View#view{btree=ViewBtree2}
+            end
         end,    Group#group.views, ViewKeyValuesToAdd),
     Group#group{views=Views2, current_seq=NewSeq, id_btree=IdBtree2}.
 

@@ -46,7 +46,7 @@ test() ->
         "Created a new non-persisted k/v pair."
     ),
 
-    ok = couch_config:set("httpd", "bind_address", "127.0.0.1"),
+    ok = couch_config:set("httpd", "bind_address", "127.0.0.1", false),
     etap:is(
         couch_config:get("httpd", "bind_address"),
         "127.0.0.1",

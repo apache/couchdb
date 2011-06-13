@@ -66,6 +66,7 @@
 ^share/www/script/sha1.js
 ^share/www/script/base64.js
 ^share/www/script/test/lorem*
+^share/www/style/jquery-ui-1.8.11.custom.css
 ^src/Makefile
 ^src/Makefile.in
 ^src/couchdb/.*beam
@@ -92,6 +93,9 @@
 ^test/bench/Makefile
 ^test/bench/Makefile.in
 ^test/etap/.*beam
+^test/etap/.*\.o
+^test/etap/.deps/*
+^test/etap/test_cfg_register
 ^test/etap/Makefile
 ^test/etap/Makefile.in
 ^test/etap/temp.*

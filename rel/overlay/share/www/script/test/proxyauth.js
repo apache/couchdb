@@ -127,4 +127,4 @@ couchTests.proxyauth = function(debug) {
     TestFun
   );
   
-}
+};

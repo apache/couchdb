@@ -15,10 +15,10 @@
 -export([priv_dir/0, start_driver/1, normpath/1]).
 -export([should_flush/0, should_flush/1, to_existing_atom/1]).
 -export([rand32/0, implode/2, collate/2, collate/3]).
--export([abs_pathname/1,abs_pathname/2, trim/1, ascii_lower/1]).
+-export([abs_pathname/1,abs_pathname/2, trim/1]).
 -export([encodeBase64Url/1, decodeBase64Url/1]).
--export([to_hex/1, parse_term/1, dict_find/3]).
--export([file_read_size/1, get_nested_json_value/2, json_user_ctx/1]).
+-export([validate_utf8/1, to_hex/1, parse_term/1, dict_find/3]).
+-export([get_nested_json_value/2, json_user_ctx/1]).
 -export([proplist_apply_field/2, json_apply_field/2]).
 -export([to_binary/1, to_integer/1, to_list/1, url_encode/1]).
 -export([json_encode/1, json_decode/1]).
@@ -28,9 +28,9 @@
 -export([md5/1, md5_init/0, md5_update/2, md5_final/1]).
 -export([reorder_results/2]).
 -export([url_strip_password/1]).
+-export([encode_doc_id/1]).
 
 -include("couch_db.hrl").
--include_lib("kernel/include/file.hrl").
 
 % arbitrarily chosen amount of memory to use before flushing to disk
 -define(FLUSH_MAX_MEM, 10000000).
@@ -105,6 +105,37 @@ simple_call(Pid, Message) ->
         end
     after
         erlang:demonitor(MRef, [flush])
+    end.
+
+validate_utf8(Data) when is_list(Data) ->
+    validate_utf8(?l2b(Data));
+validate_utf8(Bin) when is_binary(Bin) ->
+    validate_utf8_fast(Bin, 0).
+
+validate_utf8_fast(B, O) ->
+    case B of
+        <<_:O/binary>> ->
+            true;
+        <<_:O/binary, C1, _/binary>> when
+                C1 < 128 ->
+            validate_utf8_fast(B, 1 + O);
+        <<_:O/binary, C1, C2, _/binary>> when
+                C1 >= 194, C1 =< 223,
+                C2 >= 128, C2 =< 191 ->
+            validate_utf8_fast(B, 2 + O);
+        <<_:O/binary, C1, C2, C3, _/binary>> when
+                C1 >= 224, C1 =< 239,
+                C2 >= 128, C2 =< 191,
+                C3 >= 128, C3 =< 191 ->
+            validate_utf8_fast(B, 3 + O);
+        <<_:O/binary, C1, C2, C3, C4, _/binary>> when
+                C1 >= 240, C1 =< 244,
+                C2 >= 128, C2 =< 191,
+                C3 >= 128, C3 =< 191,
+                C4 >= 128, C4 =< 191 ->
+            validate_utf8_fast(B, 4 + O);
+        _ ->
+            false
     end.
 
 to_hex([]) ->
@@ -203,18 +234,6 @@ separate_cmd_args(" " ++ Rest, CmdAcc) ->
     {lists:reverse(CmdAcc), " " ++ Rest};
 separate_cmd_args([Char|Rest], CmdAcc) ->
     separate_cmd_args(Rest, [Char | CmdAcc]).
-
-% lowercases string bytes that are the ascii characters A-Z.
-% All other characters/bytes are ignored.
-ascii_lower(String) ->
-    ascii_lower(String, []).
-
-ascii_lower([], Acc) ->
-    lists:reverse(Acc);
-ascii_lower([Char | RestString], Acc) when Char >= $A, Char =< $B ->
-    ascii_lower(RestString, [Char + ($a-$A) | Acc]);
-ascii_lower([Char | RestString], Acc) ->
-    ascii_lower(RestString, [Char | Acc]).
 
 % Is a character whitespace?
 is_whitespace($\s) -> true;
@@ -315,14 +334,6 @@ dict_find(Key, Dict, DefaultValue) ->
         DefaultValue
     end.
 
-
-file_read_size(FileName) ->
-    case file:read_file_info(FileName) of
-        {ok, FileInfo} ->
-            FileInfo#file_info.size;
-        Error -> Error
-    end.
-
 to_binary(V) when is_binary(V) ->
     V;
 to_binary(V) when is_list(V) ->
@@ -413,19 +424,14 @@ compressible_att_type(MimeType) when is_binary(MimeType) ->
 compressible_att_type(MimeType) ->
     TypeExpList = re:split(
         couch_config:get("attachments", "compressible_types", ""),
-        ", ?",
+        "\\s*,\\s*",
         [{return, list}]
     ),
     lists:any(
         fun(TypeExp) ->
             Regexp = ["^\\s*", re:replace(TypeExp, "\\*", ".*"),
                 "(?:\\s*;.*?)?\\s*", $$],
-            case re:run(MimeType, Regexp, [caseless]) of
-            {match, _} ->
-                true;
-            _ ->
-                false
-            end
+            re:run(MimeType, Regexp, [caseless]) =/= nomatch
         end,
         [T || T <- TypeExpList, T /= []]
     ).
@@ -459,3 +465,14 @@ url_strip_password(Url) ->
         "http(s)?://([^:]+):[^@]+@(.*)$",
         "http\\1://\\2:*****@\\3",
         [{return, list}]).
+
+encode_doc_id(#doc{id = Id}) ->
+    encode_doc_id(Id);
+encode_doc_id(Id) when is_list(Id) ->
+    encode_doc_id(?l2b(Id));
+encode_doc_id(<<"_design/", Rest/binary>>) ->
+    "_design/" ++ url_encode(Rest);
+encode_doc_id(<<"_local/", Rest/binary>>) ->
+    "_local/" ++ url_encode(Rest);
+encode_doc_id(Id) ->
+    url_encode(Id).

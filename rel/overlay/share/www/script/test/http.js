@@ -25,7 +25,7 @@ couchTests.http = function(debug) {
   var xhr = CouchDB.request("PUT", "/test_suite_db/test", {body: "{}"});
   var host = CouchDB.host;
 
-  TEquals("http://" + host + "/test_suite_db/test", 
+  TEquals(CouchDB.protocol + host + "/test_suite_db/test", 
     xhr.getResponseHeader("Location"),
     "should include ip address");
 
@@ -34,7 +34,7 @@ couchTests.http = function(debug) {
     headers: {"X-Forwarded-Host": "mysite.com"}
   });
 
-  TEquals("http://mysite.com/test_suite_db/test2",
+  TEquals(CouchDB.protocol + "mysite.com/test_suite_db/test2",
     xhr.getResponseHeader("Location"),
     "should include X-Forwarded-Host");
 
@@ -47,7 +47,7 @@ couchTests.http = function(debug) {
         body: "{}",
         headers: {"X-Host": "mysite2.com"}
       });
-      TEquals("http://mysite2.com/test_suite_db/test3",
+      TEquals(CouchDB.protocol + "mysite2.com/test_suite_db/test3",
         xhr.getResponseHeader("Location"),
         "should include X-Host");
     });

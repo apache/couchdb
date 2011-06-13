@@ -135,4 +135,58 @@ couchTests.view_include_docs = function(debug) {
   T(!resp.rows[0].doc);
   T(resp.rows[0].doc == null);
   T(resp.rows[1].doc.integer == 23);
+
+  // COUCHDB-549 - include_docs=true with conflicts=true
+
+  var dbA = new CouchDB("test_suite_db_a", {"X-Couch-Full-Commit":"false"});
+  var dbB = new CouchDB("test_suite_db_b", {"X-Couch-Full-Commit":"false"});
+
+  dbA.deleteDb();
+  dbA.createDb();
+  dbB.deleteDb();
+  dbB.createDb();
+
+  var ddoc = {
+    _id: "_design/mydesign",
+    language : "javascript",
+    views : {
+      myview : {
+        map: (function(doc) {
+          emit(doc.value, 1);
+        }).toString()
+      }
+    }
+  };
+  TEquals(true, dbA.save(ddoc).ok);
+
+  var doc1a = {_id: "foo", value: 1, str: "1"};
+  TEquals(true, dbA.save(doc1a).ok);
+
+  var doc1b = {_id: "foo", value: 1, str: "666"};
+  TEquals(true, dbB.save(doc1b).ok);
+
+  var doc2 = {_id: "bar", value: 2, str: "2"};
+  TEquals(true, dbA.save(doc2).ok);
+
+  TEquals(true, CouchDB.replicate(dbA.name, dbB.name).ok);
+
+  doc1b = dbB.open("foo", {conflicts: true});
+  TEquals(true, doc1b._conflicts instanceof Array);
+  TEquals(1, doc1b._conflicts.length);
+  var conflictRev = doc1b._conflicts[0];
+
+  doc2 = dbB.open("bar", {conflicts: true});
+  TEquals("undefined", typeof doc2._conflicts);
+
+  resp = dbB.view("mydesign/myview", {include_docs: true, conflicts: true});
+
+  TEquals(2, resp.rows.length);
+  TEquals(true, resp.rows[0].doc._conflicts instanceof Array);
+  TEquals(1, resp.rows[0].doc._conflicts.length);
+  TEquals(conflictRev, resp.rows[0].doc._conflicts[0]);
+  TEquals("undefined", typeof resp.rows[1].doc._conflicts);
+
+  // cleanup
+  dbA.deleteDb();
+  dbB.deleteDb();
 };

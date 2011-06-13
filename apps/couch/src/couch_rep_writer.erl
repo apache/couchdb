@@ -21,8 +21,6 @@ start_link(Parent, _Target, Reader, _PostProps) ->
 
 writer_loop(Parent, Reader) ->
     case couch_rep_reader:next(Reader) of
-    {complete, nil} ->
-        ok;
     {complete, FinalSeq} ->
         Parent ! {writer_checkpoint, FinalSeq},
         ok;
@@ -41,12 +39,7 @@ writer_loop(Parent, Reader) ->
             ?LOG_DEBUG("writer failed to write an attachment ~p", [Err]),
             exit({attachment_request_failed, Err, Docs})
         end,
-        case HighSeq of
-        nil ->
-            ok;
-        _SeqNumber ->
-            Parent ! {writer_checkpoint, HighSeq}
-        end,
+        Parent ! {writer_checkpoint, HighSeq},
         couch_rep_att:cleanup(),
         couch_util:should_flush(),
         writer_loop(Parent, Reader)
@@ -71,7 +64,7 @@ write_bulk_docs(_Db, []) ->
     [];
 write_bulk_docs(#http_db{headers = Headers} = Db, Docs) ->
     JsonDocs = [
-        couch_doc:to_json_obj(Doc, [revs, att_gzip_length]) || Doc <- Docs
+        couch_doc:to_json_obj(Doc, [revs]) || Doc <- Docs
     ],
     Request = Db#http_db{
         resource = "_bulk_docs",
@@ -91,7 +84,7 @@ write_multi_part_doc(#http_db{headers=Headers} = Db, #doc{atts=Atts} = Doc) ->
     JsonBytes = ?JSON_ENCODE(
         couch_doc:to_json_obj(
             Doc,
-            [follows, att_encoding_info, attachments]
+            [follows, att_encoding_info, attachments, revs]
         )
     ),
     Boundary = couch_uuids:random(),
@@ -120,7 +113,7 @@ write_multi_part_doc(#http_db{headers=Headers} = Db, #doc{atts=Atts} = Doc) ->
         end
     end,
     Request = Db#http_db{
-        resource = couch_util:url_encode(Doc#doc.id),
+        resource = couch_util:encode_doc_id(Doc),
         method = put,
         qs = [{new_edits, false}],
         body = {BodyFun, nil},
@@ -148,7 +141,8 @@ streamer_fun(Boundary, JsonBytes, Atts) ->
     {start, From} ->
         % better use a brand new queue, to ensure there's no garbage from
         % a previous (failed) iteration
-        {ok, DataQueue} = couch_work_queue:new(1024 * 1024, 1000),
+        {ok, DataQueue} = couch_work_queue:new(
+            [{max_size, 1024 * 1024}, {max_items, 1000}]),
         From ! {queue, DataQueue},
         couch_doc:doc_to_multi_part_stream(
             Boundary,

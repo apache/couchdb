@@ -8,7 +8,7 @@ Dependencies
 
 You will need the following installed:
 
- * Erlang OTP (>=R12B5)       (http://erlang.org/)
+ * Erlang OTP (=14B01)        (http://erlang.org/)
  * ICU                        (http://icu.sourceforge.net/)
  * OpenSSL                    (http://www.openssl.org/)
  * Mozilla SpiderMonkey (1.8) (http://www.mozilla.org/js/spidermonkey/)
@@ -50,12 +50,17 @@ You must check that:
 
     * The `which cl` command points to the Microsoft compiler.
 
-If you do not do this, the ones found in `/usr/bin` may be used instead.
+    * The `which mc` command points to the Microsoft message compiler.
+
+    * The `which mt` command points to the Microsoft manifest tool.
+
+If you do not do this, the build may fail due to Cygwin ones found in `/usr/bin`
+being used instead.
 
 Building Erlang
 ---------------
 
-You must include OpenSSL.
+You must include Win32 OpenSSL.
 
 However, you can skip the GUI tools by running:
 
@@ -89,7 +94,7 @@ Remember to use `/cygdrive/c/` instead of `c:/` as the directory prefix.
 
 To set up your path, run:
 
-    export PATH=$ERL_TOP/release/win32/erts-5.7.2/bin:$PATH
+    export PATH=$ERL_TOP/release/win32/erts-5.8.2/bin:$PATH
 
 If everything was successful, you should be ready to build CouchDB.
 
@@ -101,8 +106,8 @@ Building CouchDB
 Once you have satisfied the dependencies you should run:
 
     ./configure \
-        --with-js-include=/cygdrive/c/path_to_seamonkey_include \
-        --with-js-lib=/cygdrive/c/path_to_seamonkey_lib \
+        --with-js-include=/cygdrive/c/path_to_spidermonkey_include \
+        --with-js-lib=/cygdrive/c/path_to_spidermonkey_lib \
         --with-win32-icu-binaries=/cygdrive/c/path_to_icu_binaries_root \
         --with-erlang=$ERL_TOP/release/win32/usr/include \
         --with-win32-curl=/cygdrive/c/path/to/curl/root/directory \
@@ -145,4 +150,4 @@ To check that everything has worked, point your web browser to:
 
     http://127.0.0.1:5984/_utils/index.html
 
-From here you should run the test suite.
+From here you should run the test suite in either Firefox 3.6+ or Safari 4+.

@@ -80,6 +80,7 @@ check_dbname(#server{dbname_regexp=RegExp}, DbName) ->
     nomatch ->
         case DbName of
             "_users" -> ok;
+            "_replicator" -> ok;
             _Else ->
                 {error, illegal_database_name}
             end;
@@ -173,7 +174,7 @@ all_databases(Prefix) ->
             end,
             [list_to_binary(filename:rootname(RelativeFilename, ".couch")) | AccIn]
         end, []),
-    {ok, Filenames}.
+    {ok, lists:usort(Filenames)}.
 
 
 maybe_close_lru_db(#server{dbs_open=NumOpen, max_dbs_open=MaxOpen}=Server)

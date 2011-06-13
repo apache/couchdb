@@ -272,7 +272,7 @@ function CouchDB(name, httpHeaders) {
       for (var name in options) {
         if (!options.hasOwnProperty(name)) { continue; };
         var value = options[name];
-        if (name == "key" || name == "startkey" || name == "endkey") {
+        if (name == "key" || name == "keys" || name == "startkey" || name == "endkey") {
           value = toJSON(value);
         }
         buf.push(encodeURIComponent(name) + "=" + encodeURIComponent(value));
@@ -402,7 +402,7 @@ CouchDB.request = function(method, uri, options) {
   options.headers["Content-Type"] = options.headers["Content-Type"] || options.headers["content-type"] || "application/json";
   options.headers["Accept"] = options.headers["Accept"] || options.headers["accept"] || "application/json";
   var req = CouchDB.newXhr();
-  if(uri.substr(0, "http://".length) != "http://") {
+  if(uri.substr(0, CouchDB.protocol.length) != CouchDB.protocol) {
     uri = CouchDB.urlPrefix + uri;
   }
   req.open(method, uri, false);

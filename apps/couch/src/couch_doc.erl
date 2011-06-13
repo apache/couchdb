@@ -13,7 +13,7 @@
 -module(couch_doc).
 
 -export([to_doc_info/1,to_doc_info_path/1,parse_rev/1,parse_revs/1,rev_to_str/1,revs_to_strs/1]).
--export([att_foldl/3,att_foldl_decode/3,get_validate_doc_fun/1]).
+-export([att_foldl/3,range_att_foldl/5,att_foldl_decode/3,get_validate_doc_fun/1]).
 -export([from_json_obj/1,to_json_obj/2,has_stubs/1, merge_stubs/2]).
 -export([validate_docid/1]).
 -export([doc_from_multi_part_stream/2]).
@@ -87,8 +87,14 @@ to_json_attachments(Atts, OutputData, DataToFollow, ShowEncInfo) ->
         fun(#att{disk_len=DiskLen, att_len=AttLen, encoding=Enc}=Att) ->
             {Att#att.name, {[
                 {<<"content_type">>, Att#att.type},
-                {<<"revpos">>, Att#att.revpos}
-                ] ++
+                {<<"revpos">>, Att#att.revpos}] ++
+                case Att#att.md5 of
+                    <<>> ->
+                        [];
+                    Md5 ->
+                        EncodedMd5 = base64:encode(Md5),
+                        [{<<"digest">>, <<"md5-",EncodedMd5/binary>>}]
+                end ++
                 if not OutputData orelse Att#att.data == stub ->
                     [{<<"length">>, DiskLen}, {<<"stub">>, true}];
                 true ->
@@ -165,6 +171,10 @@ parse_revs([Rev | Rest]) ->
 
 
 validate_docid(Id) when is_binary(Id) ->
+    case couch_util:validate_utf8(Id) of
+        false -> throw({bad_request, <<"Document id must be valid UTF-8">>});
+        true -> ok
+    end,
     case Id of
     <<"_design/", _/binary>> -> ok;
     <<"_local/", _/binary>> -> ok;
@@ -195,6 +205,12 @@ transfer_fields([{<<"_rev">>, _Rev} | Rest], Doc) ->
 
 transfer_fields([{<<"_attachments">>, {JsonBins}} | Rest], Doc) ->
     Atts = lists:map(fun({Name, {BinProps}}) ->
+        Md5 = case couch_util:get_value(<<"digest">>, BinProps) of
+            <<"md5-",EncodedMd5/binary>> ->
+                base64:decode(EncodedMd5);
+            _ ->
+               <<>>
+        end,
         case couch_util:get_value(<<"stub">>, BinProps) of
         true ->
             Type = couch_util:get_value(<<"content_type">>, BinProps),
@@ -202,7 +218,7 @@ transfer_fields([{<<"_attachments">>, {JsonBins}} | Rest], Doc) ->
             DiskLen = couch_util:get_value(<<"length">>, BinProps),
             {Enc, EncLen} = att_encoding_info(BinProps),
             #att{name=Name, data=stub, type=Type, att_len=EncLen,
-                disk_len=DiskLen, encoding=Enc, revpos=RevPos};
+                disk_len=DiskLen, encoding=Enc, revpos=RevPos, md5=Md5};
         _ ->
             Type = couch_util:get_value(<<"content_type">>, BinProps,
                     ?DEFAULT_ATTACHMENT_CONTENT_TYPE),
@@ -212,7 +228,7 @@ transfer_fields([{<<"_attachments">>, {JsonBins}} | Rest], Doc) ->
                 DiskLen = couch_util:get_value(<<"length">>, BinProps),
                 {Enc, EncLen} = att_encoding_info(BinProps),
                 #att{name=Name, data=follows, type=Type, encoding=Enc,
-                    att_len=EncLen, disk_len=DiskLen, revpos=RevPos};
+                    att_len=EncLen, disk_len=DiskLen, revpos=RevPos, md5=Md5};
             _ ->
                 Value = couch_util:get_value(<<"data">>, BinProps),
                 Bin = base64:decode(Value),
@@ -251,6 +267,17 @@ transfer_fields([{<<"_conflicts">>, _} | Rest], Doc) ->
     transfer_fields(Rest, Doc);
 transfer_fields([{<<"_deleted_conflicts">>, _} | Rest], Doc) ->
     transfer_fields(Rest, Doc);
+
+% special fields for replication documents
+transfer_fields([{<<"_replication_state">>, _} = Field | Rest],
+    #doc{body=Fields} = Doc) ->
+    transfer_fields(Rest, Doc#doc{body=[Field|Fields]});
+transfer_fields([{<<"_replication_state_time">>, _} = Field | Rest],
+    #doc{body=Fields} = Doc) ->
+    transfer_fields(Rest, Doc#doc{body=[Field|Fields]});
+transfer_fields([{<<"_replication_id">>, _} = Field | Rest],
+    #doc{body=Fields} = Doc) ->
+    transfer_fields(Rest, Doc#doc{body=[Field|Fields]});
 
 % unknown special field
 transfer_fields([{<<"_",Name/binary>>, _} | _], _) ->
@@ -306,6 +333,9 @@ att_foldl(#att{data={Fd,Sp},md5=Md5}, Fun, Acc) ->
     couch_stream:foldl(Fd, Sp, Md5, Fun, Acc);
 att_foldl(#att{data=DataFun,att_len=Len}, Fun, Acc) when is_function(DataFun) ->
    fold_streamed_data(DataFun, Len, Fun, Acc).
+
+range_att_foldl(#att{data={Fd,Sp}}, From, To, Fun, Acc) ->
+   couch_stream:range_foldl(Fd, Sp, From, To, Fun, Acc).
 
 att_foldl_decode(#att{data={Fd,Sp},md5=Md5,encoding=Enc}, Fun, Acc) ->
     couch_stream:foldl_decode(Fd, Sp, Md5, Enc, Fun, Acc);
@@ -445,11 +475,13 @@ atts_to_mp([Att | RestAtts], Boundary, WriteFun,
 
 
 doc_from_multi_part_stream(ContentType, DataFun) ->
-    Self = self(),
+    Parent = self(),
     Parser = spawn_link(fun() ->
-        couch_httpd:parse_multipart_request(ContentType, DataFun,
-                fun(Next)-> mp_parse_doc(Next, []) end),
-        unlink(Self)
+        {<<"--">>, _, _} = couch_httpd:parse_multipart_request(
+            ContentType, DataFun,
+            fun(Next) -> mp_parse_doc(Next, []) end),
+        unlink(Parent),
+        Parent ! {self(), finished}
         end),
     Parser ! {get_doc_bytes, self()},
     receive
@@ -463,7 +495,11 @@ doc_from_multi_part_stream(ContentType, DataFun) ->
             (A) ->
                 A
             end, Doc#doc.atts),
-        {ok, Doc#doc{atts=Atts2}}
+        WaitFun = fun() ->
+            receive {Parser, finished} -> ok end,
+            erlang:put(mochiweb_request_recv, true)
+        end,
+        {ok, Doc#doc{atts=Atts2}, WaitFun}
     end.
 
 mp_parse_doc({headers, H}, []) ->

@@ -2,6 +2,9 @@
 *.so
 *.Tpo
 *.beam
+*~
+*.orig
+*.rej
 erl_crash.dump
 
 # building

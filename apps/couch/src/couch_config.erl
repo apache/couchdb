@@ -93,15 +93,19 @@ register(Fun, Pid) ->
 
 init(IniFiles) ->
     ets:new(?MODULE, [named_table, set, protected]),
-    lists:map(fun(IniFile) ->
-        {ok, ParsedIniValues} = parse_ini_file(IniFile),
-        ets:insert(?MODULE, ParsedIniValues)
-    end, IniFiles),
-    WriteFile = case IniFiles of
-        [_|_] -> lists:last(IniFiles);
-        _ -> undefined
-    end,
-    {ok, #config{write_filename=WriteFile}}.
+    try
+        lists:map(fun(IniFile) ->
+            {ok, ParsedIniValues} = parse_ini_file(IniFile),
+            ets:insert(?MODULE, ParsedIniValues)
+        end, IniFiles),
+        WriteFile = case IniFiles of
+            [_|_] -> lists:last(IniFiles);
+            _ -> undefined
+        end,
+        {ok, #config{write_filename = WriteFile}}
+    catch _Tag:Error ->
+        {stop, Error}
+    end.
 
 
 terminate(_Reason, _State) ->
@@ -112,8 +116,7 @@ handle_call(all, _From, Config) ->
     Resp = lists:sort((ets:tab2list(?MODULE))),
     {reply, Resp, Config};
 handle_call({set, Sec, Key, Val, Persist}, _From, Config) ->
-    true = ets:insert(?MODULE, {{Sec, Key}, Val}),
-    case {Persist, Config#config.write_filename} of
+    Result = case {Persist, Config#config.write_filename} of
         {true, undefined} ->
             ok;
         {true, FileName} ->
@@ -121,9 +124,15 @@ handle_call({set, Sec, Key, Val, Persist}, _From, Config) ->
         _ ->
             ok
     end,
-    Event = {config_change, Sec, Key, Val, Persist},
-    gen_event:sync_notify(couch_config_event, Event),
-    {reply, ok, Config};
+    case Result of
+    ok ->
+        true = ets:insert(?MODULE, {{Sec, Key}, Val}),
+        Event = {config_change, Sec, Key, Val, Persist},
+        gen_event:sync_notify(couch_config_event, Event),
+        {reply, ok, Config};
+    _Error ->
+        {reply, Result, Config}
+    end;
 handle_call({delete, Sec, Key, Persist}, _From, Config) ->
     true = ets:delete(?MODULE, {Sec,Key}),
     case {Persist, Config#config.write_filename} of
@@ -158,6 +167,8 @@ parse_ini_file(IniFile) ->
     case file:read_file(IniFilename) of
         {ok, IniBin0} ->
             IniBin0;
+        {error, eacces} ->
+            throw({file_permission_error, IniFile});
         {error, enoent} ->
             Fmt = "Couldn't find server configuration file ~s.",
             Msg = ?l2b(io_lib:format(Fmt, [IniFilename])),

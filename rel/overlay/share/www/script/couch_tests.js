@@ -13,10 +13,12 @@
 // Used by replication test
 if (typeof window == 'undefined' || !window) {
   CouchDB.host = "127.0.0.1:5984";
+  CouchDB.protocol = "http://";
   CouchDB.inBrowser = false;
 } else {
   CouchDB.host = window.location.host;
   CouchDB.inBrowser = true;
+  CouchDB.protocol = window.location.protocol + "//";
 }
 
 CouchDB.urlPrefix = "..";
@@ -35,6 +37,7 @@ loadTest("attachments_multipart.js");
 loadTest("attachment_conflicts.js");
 loadTest("attachment_names.js");
 loadTest("attachment_paths.js");
+loadTest("attachment_ranges.js");
 loadTest("attachment_views.js");
 loadTest("auth_cache.js");
 loadTest("batch_save.js");
@@ -74,6 +77,7 @@ loadTest("reduce_builtin.js");
 loadTest("reduce_false.js");
 loadTest("reduce_false_temp.js");
 loadTest("replication.js");
+loadTest("replicator_db.js");
 loadTest("rev_stemming.js");
 loadTest("rewrite.js");
 loadTest("security_validation.js");

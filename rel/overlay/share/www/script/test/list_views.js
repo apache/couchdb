@@ -156,6 +156,9 @@ couchTests.list_views = function(debug) {
         var row = getRow();
         send(row.doc.integer);
         return "tail";
+      }),
+      secObj: stringFun(function(head, req) {
+        return toJSON(req.secObj);
       })
     }
   };
@@ -200,6 +203,7 @@ couchTests.list_views = function(debug) {
   var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/basicBasic/basicView");
   T(xhr.status == 200, "standard get should be 200");
   T(/head0123456789tail/.test(xhr.responseText));
+
 
   // test that etags are available
   var etag = xhr.getResponseHeader("etag");
@@ -323,6 +327,16 @@ couchTests.list_views = function(debug) {
   T(/FirstKey: 2/.test(xhr.responseText));
   T(/LastKey: 7/.test(xhr.responseText));
 
+  // multi-key fetch with GET
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/basicView" +
+    "?keys=[2,4,5,7]");
+
+  T(xhr.status == 200, "multi key");
+  T(!(/Key: 1 /.test(xhr.responseText)));
+  T(/Key: 2/.test(xhr.responseText));
+  T(/FirstKey: 2/.test(xhr.responseText));
+  T(/LastKey: 7/.test(xhr.responseText));
+
   // no multi-key fetch allowed when group=false
   xhr = CouchDB.request("POST", "/test_suite_db/_design/lists/_list/simpleForm/withReduce?group=false", {
     body: '{"keys":[2,4,5,7]}'
@@ -405,6 +419,12 @@ couchTests.list_views = function(debug) {
   T(/FirstKey: -2/.test(xhr.responseText));
   T(/LastKey: -7/.test(xhr.responseText));
 
+    // Test if secObj is available
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/secObj/basicView");
+  T(xhr.status == 200, "standard get should be 200");
+  var resp = JSON.parse(xhr.responseText);
+  T(typeof(resp) == "object");
+
   var erlViewTest = function() {
     T(db.save(erlListDoc).ok);
     var url = "/test_suite_db/_design/erlang/_list/simple/views/basicView" +
@@ -419,10 +439,37 @@ couchTests.list_views = function(debug) {
     }
   };
 
+  
+
   run_on_modified_server([{
     section: "native_query_servers",
     key: "erlang",
     value: "{couch_native_process, start_link, []}"
   }], erlViewTest);
 
+  // COUCHDB-1113
+  var ddoc = {
+    _id: "_design/test",
+    views: {
+      me: {
+        map: (function(doc) { emit(null,null)}).toString()
+      }
+    },
+    lists: {
+      you: (function(head, req) {
+        var row;
+        while(row = getRow()) {
+          send(row);
+        }
+      }).toString()
+    }
+  };
+  db.save(ddoc);
+
+  var resp = CouchDB.request("GET", "/" + db.name + "/_design/test/_list/you/me", {
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded"
+    }
+  });
+  TEquals(200, resp.status, "should return a 200 response");
 };

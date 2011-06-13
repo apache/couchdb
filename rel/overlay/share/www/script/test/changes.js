@@ -12,7 +12,7 @@
 
 function jsonp(obj) {
   T(jsonp_flag == 0);
-  T(obj.results.length == 1 && obj.last_seq==1, "jsonp")
+  T(obj.results.length == 1 && obj.last_seq == 1, "jsonp");
   jsonp_flag = 1;
 }
 
@@ -25,7 +25,7 @@ couchTests.changes = function(debug) {
   var req = CouchDB.request("GET", "/test_suite_db/_changes");
   var resp = JSON.parse(req.responseText);
 
-  T(resp.results.length == 0 && resp.last_seq==0, "empty db")
+  T(resp.results.length == 0 && resp.last_seq == 0, "empty db");
   var docFoo = {_id:"foo", bar:1};
   T(db.save(docFoo).ok);
   T(db.ensureFullCommit().ok);
@@ -35,8 +35,8 @@ couchTests.changes = function(debug) {
   var resp = JSON.parse(req.responseText);
 
   T(resp.last_seq == 1);
-  T(resp.results.length == 1, "one doc db")
-  T(resp.results[0].changes[0].rev == docFoo._rev)
+  T(resp.results.length == 1, "one doc db");
+  T(resp.results[0].changes[0].rev == docFoo._rev);
 
   // test with callback
   
@@ -90,16 +90,16 @@ couchTests.changes = function(debug) {
       change1 = JSON.parse(lines[0]);
       change2 = JSON.parse(lines[1]);
       if (change2.seq != 2) {
-          throw "bad seq, try again"
+          throw "bad seq, try again";
       }
     }, "bar-only");
 
-    T(change1.seq == 1)
-    T(change1.id == "foo")
+    T(change1.seq == 1);
+    T(change1.id == "foo");
     
-    T(change2.seq == 2)
-    T(change2.id == "bar")
-    T(change2.changes[0].rev == docBar._rev)
+    T(change2.seq == 2);
+    T(change2.id == "bar");
+    T(change2.changes[0].rev == docBar._rev);
     
     
     var docBaz = {_id:"baz", baz:1};
@@ -110,7 +110,7 @@ couchTests.changes = function(debug) {
       lines = xhr.responseText.split("\n");
       change3 = JSON.parse(lines[2]);
       if (change3.seq != 3) {
-        throw "bad seq, try again"
+        throw "bad seq, try again";
       }
     });
     
@@ -133,8 +133,8 @@ couchTests.changes = function(debug) {
       }
     }, "heartbeat");
 
-    T(str.charAt(str.length - 1) == "\n")
-    T(str.charAt(str.length - 2) == "\n")
+    T(str.charAt(str.length - 1) == "\n");
+    T(str.charAt(str.length - 2) == "\n");
 
     // otherwise we'll continue to receive heartbeats forever
     xhr.abort();
@@ -164,10 +164,10 @@ couchTests.changes = function(debug) {
       if (line.charAt(line.length-1) == ",") {
         var linetrimmed = line.substring(0, line.length-1);
       } else {
-        var linetrimmed = line
+        var linetrimmed = line;
       }
       return JSON.parse(linetrimmed);
-    }
+    };
     
     waitForSuccess(function() {
       lines = xhr.responseText.split("\n");
@@ -181,6 +181,8 @@ couchTests.changes = function(debug) {
     T(change.id == "barz");
     T(change.changes[0].rev == docBarz._rev);
     T(lines[3]=='"last_seq":4}');
+
+
   }
   
   // test the filtered changes
@@ -195,7 +197,7 @@ couchTests.changes = function(debug) {
       "userCtx" : stringFun(function(doc, req) {
         return doc.user && (doc.user == req.userCtx.name);
       }),
-      "conflicted" : "function(doc, req) { return (doc._conflicts);}",
+      "conflicted" : "function(doc, req) { return (doc._conflicts);}"
     },
     options : {
       local_seq : true
@@ -205,7 +207,7 @@ couchTests.changes = function(debug) {
         map : "function(doc) {emit(doc._local_seq, null)}"
       }
     }
-  }
+  };
 
   db.save(ddoc);
 
@@ -251,8 +253,8 @@ couchTests.changes = function(debug) {
     T(resp.results && resp.results.length > 0 && resp.results[0]["id"] == "bingo", "filter the correct update");
     xhr.abort();
     
-    timeout = 500;
-    last_seq = 10
+    var timeout = 500;
+    var last_seq = 10;
     while (true) {
 
       // filter with continuous
@@ -267,15 +269,15 @@ couchTests.changes = function(debug) {
 
       waitForSuccess(function() { // throws an error after 5 seconds
         if (xhr.readyState != 4) {
-          throw("still waiting")
+          throw("still waiting");
         }
       }, "continuous-rusty");
       lines = xhr.responseText.split("\n");
+      var good = false;
       try {
-        JSON.parse(lines[3])
+        JSON.parse(lines[3]);
         good = true;
       } catch(e) {
-        good = false;
       }
       if (good) {
         T(JSON.parse(lines[1]).id == "bingo", lines[1]);
@@ -350,7 +352,7 @@ couchTests.changes = function(debug) {
 
   req = CouchDB.request("GET", "/test_suite_db/_changes?limit=1");
   resp = JSON.parse(req.responseText);
-  TEquals(1, resp.results.length)
+  TEquals(1, resp.results.length);
 
   //filter includes _conflicts
   var id = db.save({'food' : 'pizza'}).id;
@@ -396,7 +398,116 @@ couchTests.changes = function(debug) {
     T(resp.results.length === 2);
     T(resp.results[0].id === "doc2");
     T(resp.results[1].id === "doc4");
+
+    // test filtering on docids
+    //
+
+    var options = {
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({"doc_ids": ["something", "anotherthing", "andmore"]})         
+    };
+
+    var req = CouchDB.request("POST", "/test_suite_db/_changes?filter=_doc_ids", options);
+    var resp = JSON.parse(req.responseText);
+    T(resp.results.length === 0);
+
+    T(db.save({"_id":"something", "bop" : "plankton"}).ok);
+    var req = CouchDB.request("POST", "/test_suite_db/_changes?filter=_doc_ids", options);
+    var resp = JSON.parse(req.responseText);
+    T(resp.results.length === 1);
+    T(resp.results[0].id === "something");
+
+    T(db.save({"_id":"anotherthing", "bop" : "plankton"}).ok);
+    var req = CouchDB.request("POST", "/test_suite_db/_changes?filter=_doc_ids", options);
+    var resp = JSON.parse(req.responseText);
+    T(resp.results.length === 2);
+    T(resp.results[0].id === "something");
+    T(resp.results[1].id === "anotherthing");
+    
+    var docids = JSON.stringify(["something", "anotherthing", "andmore"]),
+        req = CouchDB.request("GET", "/test_suite_db/_changes?filter=_doc_ids&doc_ids="+docids, options);
+    var resp = JSON.parse(req.responseText);
+    T(resp.results.length === 2);
+    T(resp.results[0].id === "something");
+    T(resp.results[1].id === "anotherthing");
+
+    var req = CouchDB.request("GET", "/test_suite_db/_changes?filter=_design");
+    var resp = JSON.parse(req.responseText);
+    T(resp.results.length === 1);
+    T(resp.results[0].id === "_design/erlang");
+
+
+    if (!is_safari && xhr) {
+        // filter docids with continuous
+        xhr = CouchDB.newXhr();
+        xhr.open("POST", "/test_suite_db/_changes?feed=continuous&timeout=500&since=7&filter=_doc_ids", true);
+        xhr.setRequestHeader("Content-Type", "application/json");
+        
+        xhr.send(options.body);
+        
+        T(db.save({"_id":"andmore", "bop" : "plankton"}).ok);
+
+        
+        waitForSuccess(function() {
+            if (xhr.readyState != 4) {
+              throw("still waiting");
+            }
+        }, "andmore-only");
+
+        var line = JSON.parse(xhr.responseText.split("\n")[0]);
+        T(line.seq == 8);
+        T(line.id == "andmore");
+    }
+    
   });
 
+  // COUCHDB-1037 - empty result for ?limit=1&filter=foo/bar in some cases
+  T(db.deleteDb());
+  T(db.createDb());
+
+  ddoc = {
+    _id: "_design/testdocs",
+    filters: {
+      testdocsonly: (function(doc, req) {
+        return (typeof doc.integer === "number");
+      }).toString()
+    }
+  };
+  T(db.save(ddoc));
+
+  ddoc = {
+    _id: "_design/foobar",
+    foo: "bar"
+  };
+  T(db.save(ddoc));
+
+  db.bulkSave(makeDocs(0, 5));
+
+  req = CouchDB.request("GET", "/" + db.name + "/_changes");
+  resp = JSON.parse(req.responseText);
+  TEquals(7, resp.last_seq);
+  TEquals(7, resp.results.length);
+
+  req = CouchDB.request(
+    "GET", "/"+ db.name + "/_changes?limit=1&filter=testdocs/testdocsonly");
+  resp = JSON.parse(req.responseText);
+  TEquals(3, resp.last_seq);
+  TEquals(1, resp.results.length);
+  TEquals("0", resp.results[0].id);
+
+  req = CouchDB.request(
+    "GET", "/" + db.name + "/_changes?limit=2&filter=testdocs/testdocsonly");
+  resp = JSON.parse(req.responseText);
+  TEquals(4, resp.last_seq);
+  TEquals(2, resp.results.length);
+  TEquals("0", resp.results[0].id);
+  TEquals("1", resp.results[1].id);
+
+  TEquals(0, CouchDB.requestStats('httpd', 'clients_requesting_changes').current);
+  CouchDB.request("GET", "/" + db.name + "/_changes");
+  TEquals(0, CouchDB.requestStats('httpd', 'clients_requesting_changes').current);
+
+  // cleanup
+  db.deleteDb();
 };
 

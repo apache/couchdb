@@ -65,7 +65,7 @@ couchTests.jsonp = function(debug) {
       views: {
         all_docs: {map: "function(doc) {if(doc.a) emit(null, doc.a);}"}
       }
-    }
+    };
     T(db.save(designDoc).ok);
 
     var url = "/test_suite_db/_design/test/_view/all_docs?callback=jsonp_chunk";

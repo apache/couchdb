@@ -153,12 +153,14 @@ send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
 % view-list request with view and list from same design doc.
 handle_view_list_req(#httpd{method='GET',
         path_parts=[_, _, DesignName, _, ListName, ViewName]}=Req, Db, DDoc) ->
-    handle_view_list(Req, Db, DDoc, ListName, {DesignName, ViewName}, nil);
+    Keys = couch_httpd:qs_json_value(Req, "keys", nil),
+    handle_view_list(Req, Db, DDoc, ListName, {DesignName, ViewName}, Keys);
 
 % view-list request with view and list from different design docs.
 handle_view_list_req(#httpd{method='GET',
         path_parts=[_, _, _, _, ListName, ViewDesignName, ViewName]}=Req, Db, DDoc) ->
-    handle_view_list(Req, Db, DDoc, ListName, {ViewDesignName, ViewName}, nil);
+    Keys = couch_httpd:qs_json_value(Req, "keys", nil),
+    handle_view_list(Req, Db, DDoc, ListName, {ViewDesignName, ViewName}, Keys);
 
 handle_view_list_req(#httpd{method='GET'}=Req, _Db, _DDoc) ->
     send_error(Req, 404, <<"list_error">>, <<"Invalid path.">>);
@@ -188,14 +190,14 @@ handle_view_list_req(Req, _Db, _DDoc) ->
 handle_view_list(Req, Db, DDoc, LName, {ViewDesignName, ViewName}, Keys) ->
     ViewDesignId = <<"_design/", ViewDesignName/binary>>,
     {ViewType, View, Group, QueryArgs} = couch_httpd_view:load_view(Req, Db, {ViewDesignId, ViewName}, Keys),
-    Etag = list_etag(Req, Db, Group, {couch_httpd:doc_etag(DDoc), Keys}),
+    Etag = list_etag(Req, Db, Group, View, {couch_httpd:doc_etag(DDoc), Keys}),
     couch_httpd:etag_respond(Req, Etag, fun() ->
             output_list(ViewType, Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys, Group)
         end).
 
-list_etag(#httpd{user_ctx=UserCtx}=Req, Db, Group, More) ->
+list_etag(#httpd{user_ctx=UserCtx}=Req, Db, Group, View, More) ->
     Accept = couch_httpd:header_value(Req, "Accept"),
-    couch_httpd_view:view_group_etag(Group, Db, {More, Accept, UserCtx#user_ctx.roles}).
+    couch_httpd_view:view_etag(Db, Group, View, {More, Accept, UserCtx#user_ctx.roles}).
 
 output_list(map, Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys, Group) ->
     output_map_list(Req, Db, DDoc, LName, View, QueryArgs, Etag, Keys, Group);
@@ -307,18 +309,20 @@ start_list_resp(QServer, LName, Req, Db, Head, Etag) ->
     {ok, Resp, ?b2l(?l2b(Chunks))}.
 
 make_map_send_row_fun(QueryServer) ->
-    fun(Resp, Db, Row, IncludeDocs, RowFront) ->
-        send_list_row(Resp, QueryServer, Db, Row, RowFront, IncludeDocs)
+    fun(Resp, Db, Row, IncludeDocs, Conflicts, RowFront) ->
+        send_list_row(
+            Resp, QueryServer, Db, Row, RowFront, IncludeDocs, Conflicts)
     end.
 
 make_reduce_send_row_fun(QueryServer, Db) ->
     fun(Resp, Row, RowFront) ->
-        send_list_row(Resp, QueryServer, Db, Row, RowFront, false)
+        send_list_row(Resp, QueryServer, Db, Row, RowFront, false, false)
     end.
 
-send_list_row(Resp, QueryServer, Db, Row, RowFront, IncludeDoc) ->
+send_list_row(Resp, QueryServer, Db, Row, RowFront, IncludeDoc, Conflicts) ->
     try
-        [Go,Chunks] = prompt_list_row(QueryServer, Db, Row, IncludeDoc),
+        [Go,Chunks] = prompt_list_row(
+            QueryServer, Db, Row, IncludeDoc, Conflicts),
         Chunk = RowFront ++ ?b2l(?l2b(Chunks)),
         send_non_empty_chunk(Resp, Chunk),
         case Go of
@@ -334,11 +338,12 @@ send_list_row(Resp, QueryServer, Db, Row, RowFront, IncludeDoc) ->
     end.
 
 
-prompt_list_row({Proc, _DDocId}, Db, {{Key, DocId}, Value}, IncludeDoc) ->
-    JsonRow = couch_httpd_view:view_row_obj(Db, {{Key, DocId}, Value}, IncludeDoc),
+prompt_list_row({Proc, _DDocId}, Db, {{_Key, _DocId}, _} = Kv,
+                IncludeDoc, Conflicts) ->
+    JsonRow = couch_httpd_view:view_row_obj(Db, Kv, IncludeDoc, Conflicts),
     couch_query_servers:proc_prompt(Proc, [<<"list_row">>, JsonRow]);
 
-prompt_list_row({Proc, _DDocId}, _, {Key, Value}, _IncludeDoc) ->
+prompt_list_row({Proc, _DDocId}, _, {Key, Value}, _IncludeDoc, _Conflicts) ->
     JsonRow = {[{key, Key}, {value, Value}]},
     couch_query_servers:proc_prompt(Proc, [<<"list_row">>, JsonRow]).
 

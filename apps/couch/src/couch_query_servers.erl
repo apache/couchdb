@@ -12,7 +12,7 @@
 
 -module(couch_query_servers).
 
--export([start_doc_map/2, map_docs/2, stop_doc_map/1]).
+-export([start_doc_map/3, map_docs/2, stop_doc_map/1]).
 -export([reduce/3, rereduce/3,validate_doc_update/5]).
 -export([filter_docs/5]).
 
@@ -23,8 +23,13 @@
 
 -include("couch_db.hrl").
 
-start_doc_map(Lang, Functions) ->
+start_doc_map(Lang, Functions, Lib) ->
     Proc = get_os_process(Lang),
+    case Lib of
+    {[]} -> ok;
+    Lib ->
+        true = proc_prompt(Proc, [<<"add_lib">>, Lib])
+    end,
     lists:foreach(fun(FunctionSource) ->
         true = proc_prompt(Proc, [<<"add_fun">>, FunctionSource])
     end, Functions),
@@ -137,18 +142,35 @@ builtin_reduce(Re, [<<"_stats",_/binary>>|BuiltinReds], KVs, Acc) ->
 
 builtin_sum_rows(KVs) ->
     lists:foldl(fun
-        ([_Key, Value], Acc) when is_number(Value) ->
+        ([_Key, Value], Acc) when is_number(Value), is_number(Acc) ->
             Acc + Value;
+        ([_Key, Value], Acc) when is_list(Value), is_list(Acc) ->
+            sum_terms(Acc, Value);
+        ([_Key, Value], Acc) when is_number(Value), is_list(Acc) ->
+            sum_terms(Acc, [Value]);
+        ([_Key, Value], Acc) when is_list(Value), is_number(Acc) ->
+            sum_terms([Acc], Value);
         (_Else, _Acc) ->
-            throw({invalid_value, <<"builtin _sum function requires map values to be numbers">>})
+            throw({invalid_value, <<"builtin _sum function requires map values to be numbers or lists of numbers">>})
     end, 0, KVs).
+
+sum_terms([], []) ->
+    [];
+sum_terms([_|_]=Xs, []) ->
+    Xs;
+sum_terms([], [_|_]=Ys) ->
+    Ys;
+sum_terms([X|Xs], [Y|Ys]) when is_number(X), is_number(Y) ->
+    [X+Y | sum_terms(Xs,Ys)];
+sum_terms(_, _) ->
+    throw({invalid_value, <<"builtin _sum function requires map values to be numbers or lists of numbers">>}).
 
 builtin_stats(_, []) ->
     {[{sum,0}, {count,0}, {min,0}, {max,0}, {sumsqr,0}]};
 
 builtin_stats(reduce, [[_,First]|Rest]) when is_number(First) ->
     Stats = lists:foldl(fun([_K,V], {S,C,Mi,Ma,Sq}) when is_number(V) ->
-        {S+V, C+1, erlang:min(Mi,V), erlang:max(Ma,V), Sq+(V*V)};
+        {S+V, C+1, lists:min([Mi, V]), lists:max([Ma, V]), Sq+(V*V)};
     (_, _) ->
         throw({invalid_value,
             <<"builtin _stats function requires map values to be numbers">>})
@@ -160,7 +182,7 @@ builtin_stats(rereduce, [[_,First]|Rest]) ->
     {[{sum,Sum0}, {count,Cnt0}, {min,Min0}, {max,Max0}, {sumsqr,Sqr0}]} = First,
     Stats = lists:foldl(fun([_K,Red], {S,C,Mi,Ma,Sq}) ->
         {[{sum,Sum}, {count,Cnt}, {min,Min}, {max,Max}, {sumsqr,Sqr}]} = Red,
-        {Sum+S, Cnt+C, erlang:min(Min,Mi), erlang:max(Max,Ma), Sqr+Sq}
+        {Sum+S, Cnt+C, lists:min([Min, Mi]), lists:max([Max, Ma]), Sqr+Sq}
     end, {Sum0,Cnt0,Min0,Max0,Sqr0}, Rest),
     {Sum, Cnt, Min, Max, Sqr} = Stats,
     {[{sum,Sum}, {count,Cnt}, {min,Min}, {max,Max}, {sumsqr,Sqr}]}.

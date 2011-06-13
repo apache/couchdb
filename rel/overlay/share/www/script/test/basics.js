@@ -37,9 +37,8 @@ couchTests.basics = function(debug) {
     TEquals(dbname,
       xhr.getResponseHeader("Location").substr(-dbname.length),
       "should return Location header to newly created document");
-
-    TEquals("http://",
-      xhr.getResponseHeader("Location").substr(0, 7),
+    TEquals(CouchDB.protocol,
+      xhr.getResponseHeader("Location").substr(0, CouchDB.protocol.length),
       "should return absolute Location header to newly created document");
   });
 
@@ -160,8 +159,8 @@ couchTests.basics = function(debug) {
   var loc = xhr.getResponseHeader("Location");
   T(loc, "should have a Location header");
   var locs = loc.split('/');
-  T(locs[4] == resp.id);
-  T(locs[3] == "test_suite_db");
+  T(locs[locs.length-1] == resp.id);
+  T(locs[locs.length-2] == "test_suite_db");
 
   // test that that POST's with an _id aren't overriden with a UUID.
   var xhr = CouchDB.request("POST", "/test_suite_db", {
@@ -181,9 +180,8 @@ couchTests.basics = function(debug) {
   TEquals("/test_suite_db/newdoc",
     xhr.getResponseHeader("Location").substr(-21),
     "should return Location header to newly created document");
-
-  TEquals("http://",
-    xhr.getResponseHeader("Location").substr(0, 7),
+  TEquals(CouchDB.protocol,
+    xhr.getResponseHeader("Location").substr(0, CouchDB.protocol.length),
     "should return absolute Location header to newly created document");
 
   // deleting a non-existent doc should be 404

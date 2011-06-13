@@ -56,6 +56,7 @@ process_external_req(HttpReq, Db, Name) ->
 json_req_obj(Req, Db) -> json_req_obj(Req, Db, null).
 json_req_obj(#httpd{mochi_req=Req,
                method=Method,
+               requested_path_parts=RequestedPath,
                path_parts=Path,
                req_body=ReqBody
             }, Db, DocId) ->
@@ -65,18 +66,23 @@ json_req_obj(#httpd{mochi_req=Req,
     end,
     ParsedForm = case Req:get_primary_header_value("content-type") of
         "application/x-www-form-urlencoded" ++ _ ->
-            mochiweb_util:parse_qs(Body);
+            case Body of
+            undefined -> [];
+            _ -> mochiweb_util:parse_qs(Body)
+            end;
         _ ->
             []
     end,
     Headers = Req:get(headers),
     Hlist = mochiweb_headers:to_list(Headers),
     {ok, Info} = couch_db:get_db_info(Db),
-    % add headers...
+    
+% add headers...
     {[{<<"info">>, {Info}},
         {<<"id">>, DocId},
         {<<"uuid">>, couch_uuids:new()},
         {<<"method">>, Method},
+        {<<"requested_path">>, RequestedPath},
         {<<"path">>, Path},
         {<<"query">>, json_query_keys(to_json_terms(Req:parse_qs()))},
         {<<"headers">>, to_json_terms(Hlist)},
@@ -84,7 +90,8 @@ json_req_obj(#httpd{mochi_req=Req,
         {<<"peer">>, ?l2b(Req:get(peer))},
         {<<"form">>, to_json_terms(ParsedForm)},
         {<<"cookie">>, to_json_terms(Req:parse_cookie())},
-        {<<"userCtx">>, couch_util:json_user_ctx(Db)}]}.
+        {<<"userCtx">>, couch_util:json_user_ctx(Db)},
+        {<<"secObj">>, couch_db:get_security(Db)}]}.
 
 to_json_terms(Data) ->
     to_json_terms(Data, []).

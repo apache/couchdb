@@ -36,6 +36,9 @@ couchTests.copy_doc = function(debug) {
   });
   T(xhr.status == 409); // conflict
 
+  var xhr = CouchDB.request("COPY", "/test_suite_db/doc_to_be_copied2");
+  T(xhr.status == 400); // bad request (no Destination header)
+
   var rev = db.open("doc_to_be_overwritten")._rev;
   var xhr = CouchDB.request("COPY", "/test_suite_db/doc_to_be_copied2", {
     headers: {"Destination":"doc_to_be_overwritten?rev=" + rev}

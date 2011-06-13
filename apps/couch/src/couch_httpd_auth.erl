@@ -173,7 +173,7 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
         CurrentTime = make_cookie_time(),
         case couch_config:get("couch_httpd_auth", "secret", nil) of
         nil ->
-            ?LOG_ERROR("cookie auth secret is not set",[]),
+            ?LOG_DEBUG("cookie auth secret is not set",[]),
             Req;
         SecretStr ->
             Secret = ?l2b(SecretStr),
@@ -207,7 +207,7 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
     end.
 
 cookie_auth_header(#httpd{user_ctx=#user_ctx{name=null}}, _Headers) -> [];
-cookie_auth_header(#httpd{user_ctx=#user_ctx{name=User}, auth={Secret, true}}, Headers) ->
+cookie_auth_header(#httpd{user_ctx=#user_ctx{name=User}, auth={Secret, true}}=Req, Headers) ->
     % Note: we only set the AuthSession cookie if:
     %  * a valid AuthSession cookie has been received
     %  * we are outside a 10% timeout window
@@ -220,18 +220,18 @@ cookie_auth_header(#httpd{user_ctx=#user_ctx{name=User}, auth={Secret, true}}, H
     AuthSession = couch_util:get_value("AuthSession", Cookies),
     if AuthSession == undefined ->
         TimeStamp = make_cookie_time(),
-        [cookie_auth_cookie(?b2l(User), Secret, TimeStamp)];
+        [cookie_auth_cookie(Req, ?b2l(User), Secret, TimeStamp)];
     true ->
         []
     end;
 cookie_auth_header(_Req, _Headers) -> [].
 
-cookie_auth_cookie(User, Secret, TimeStamp) ->
+cookie_auth_cookie(Req, User, Secret, TimeStamp) ->
     SessionData = User ++ ":" ++ erlang:integer_to_list(TimeStamp, 16),
     Hash = crypto:sha_mac(Secret, SessionData),
     mochiweb_cookies:cookie("AuthSession",
         couch_util:encodeBase64Url(SessionData ++ ":" ++ ?b2l(Hash)),
-        [{path, "/"}, {http_only, true}]). % TODO add {secure, true} when SSL is detected
+        [{path, "/"}] ++ cookie_scheme(Req)).
 
 hash_password(Password, Salt) ->
     ?l2b(couch_util:to_hex(crypto:sha(<<Password/binary, Salt/binary>>))).
@@ -247,13 +247,17 @@ ensure_cookie_auth_secret() ->
 
 % session handlers
 % Login handler with user db
-% TODO this should also allow a JSON POST
 handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req) ->
     ReqBody = MochiReq:recv_body(),
     Form = case MochiReq:get_primary_header_value("content-type") of
         % content type should be json
         "application/x-www-form-urlencoded" ++ _ ->
             mochiweb_util:parse_qs(ReqBody);
+        "application/json" ++ _ ->
+            {Pairs} = ?JSON_DECODE(ReqBody),
+            lists:map(fun({Key, Value}) ->
+              {?b2l(Key), ?b2l(Value)}
+            end, Pairs);
         _ ->
             []
     end,
@@ -272,7 +276,7 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req) ->
             % setup the session cookie
             Secret = ?l2b(ensure_cookie_auth_secret()),
             CurrentTime = make_cookie_time(),
-            Cookie = cookie_auth_cookie(?b2l(UserName), <<Secret/binary, UserSalt/binary>>, CurrentTime),
+            Cookie = cookie_auth_cookie(Req, ?b2l(UserName), <<Secret/binary, UserSalt/binary>>, CurrentTime),
             % TODO document the "next" feature in Futon
             {Code, Headers} = case couch_httpd:qs_value(Req, "next", nil) of
                 nil ->
@@ -288,7 +292,7 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req) ->
                 ]});
         _Else ->
             % clear the session
-            Cookie = mochiweb_cookies:cookie("AuthSession", "", [{path, "/"}, {http_only, true}]),
+            Cookie = mochiweb_cookies:cookie("AuthSession", "", [{path, "/"}] ++ cookie_scheme(Req)),
             send_json(Req, 401, [Cookie], {[{error, <<"unauthorized">>},{reason, <<"Name or password is incorrect.">>}]})
     end;
 % get user info
@@ -318,7 +322,7 @@ handle_session_req(#httpd{method='GET', user_ctx=UserCtx}=Req) ->
     end;
 % logout by deleting the session
 handle_session_req(#httpd{method='DELETE'}=Req) ->
-    Cookie = mochiweb_cookies:cookie("AuthSession", "", [{path, "/"}, {http_only, true}]),
+    Cookie = mochiweb_cookies:cookie("AuthSession", "", [{path, "/"}] ++ cookie_scheme(Req)),
     {Code, Headers} = case couch_httpd:qs_value(Req, "next", nil) of
         nil ->
             {200, [Cookie]};
@@ -347,3 +351,10 @@ to_int(Value) when is_integer(Value) ->
 make_cookie_time() ->
     {NowMS, NowS, _} = erlang:now(),
     NowMS * 1000000 + NowS.
+
+cookie_scheme(#httpd{mochi_req=MochiReq}) ->
+    [{http_only, true}] ++
+    case MochiReq:get(scheme) of
+        http -> [];
+        https -> [{secure, true}]
+    end.

@@ -87,7 +87,7 @@
        */
       
       Server : function(results, options) {
-        var uri = options.uri || 'http://' + window.location.host + '/results'
+        var uri = options.uri || window.location.protocol + "//" + window.location.host + '/results'
         JSpec.post(uri, {
           stats: JSpec.stats,
           options: options,

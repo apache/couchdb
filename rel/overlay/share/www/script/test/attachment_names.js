@@ -16,6 +16,24 @@ couchTests.attachment_names = function(debug) {
   db.createDb();
   if (debug) debugger;
 
+  var goodDoc = {
+    _id: "good_doc",
+    _attachments: {
+      "Колян.txt": {
+       content_type:"text/plain",
+       data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+      }
+    }
+  };
+
+  var save_response = db.save(goodDoc);
+  T(save_response.ok);
+
+  var xhr = CouchDB.request("GET", "/test_suite_db/good_doc/Колян.txt");
+  T(xhr.responseText == "This is a base64 encoded text");
+  T(xhr.getResponseHeader("Content-Type") == "text/plain");
+  T(xhr.getResponseHeader("Etag") == '"' + save_response.rev + '"');
+
   var binAttDoc = {
     _id: "bin_doc",
     _attachments:{
@@ -27,17 +45,13 @@ couchTests.attachment_names = function(debug) {
   };
 
   // inline attachments
-  try {
-    db.save(binAttDoc);
-    TEquals(1, 2, "Attachment name with non UTF-8 encoding saved. Should never show!");
-  } catch (e) {
-    TEquals("bad_request", e.error, "attachment_name: inline attachments");
-    TEquals("Attachment name is not UTF-8 encoded", e.reason, "attachment_name: inline attachments");
-  }
+  resp = db.save(binAttDoc);
+  TEquals(true, resp.ok, "attachment_name: inline attachment");
 
 
   // standalone docs
   var bin_data = "JHAPDO*AU£PN ){(3u[d 93DQ9¡€])}    ææøo'∂ƒæ≤çæππ•¥∫¶®#†π¶®¥π€ª®˙π8np";
+
 
   var xhr = (CouchDB.request("PUT", "/test_suite_db/bin_doc3/attachment\x80txt", {
     headers:{"Content-Type":"text/plain;charset=utf-8"},
@@ -45,10 +59,9 @@ couchTests.attachment_names = function(debug) {
   }));
 
   var resp = JSON.parse(xhr.responseText);
-  TEquals(400, xhr.status, "attachment_name: standalone API");
-  TEquals("bad_request", resp.error, "attachment_name: standalone API");
-  TEquals("Attachment name is not UTF-8 encoded", resp.reason, "attachment_name: standalone API");
-
+  TEquals(201, xhr.status, "attachment_name: standalone API");
+  TEquals("Created",  xhr.statusText, "attachment_name: standalone API");
+  TEquals(true, resp.ok, "attachment_name: standalone API");
 
   // bulk docs
   var docs = { docs: [binAttDoc] };
@@ -57,10 +70,8 @@ couchTests.attachment_names = function(debug) {
     body: JSON.stringify(docs)
   });
 
-  var resp = JSON.parse(xhr.responseText);
-  TEquals(400, xhr.status, "attachment_name: bulk docs");
-  TEquals("bad_request", resp.error, "attachment_name: bulk docs");
-  TEquals("Attachment name is not UTF-8 encoded", resp.reason, "attachment_name: bulk docs");
+  TEquals(201, xhr.status, "attachment_name: bulk docs");
+  TEquals("Created", xhr.statusText, "attachment_name: bulk docs");
 
 
   // leading underscores

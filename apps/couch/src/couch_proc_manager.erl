@@ -150,7 +150,7 @@ make_proc(Pid, Lang, Mod) ->
     {ok, Proc}.
 
 get_query_server_config() ->
-    Limit = couch_config:get("query_server_config", "reduce_limit", "true"),
+    Limit = couch_config:get("query_server_config", <<"reduce_limit">>, "true"),
     {[{<<"reduce_limit">>, list_to_atom(Limit)}]}.
 
 proc_with_ddoc(DDoc, DDocKey, Procs) ->

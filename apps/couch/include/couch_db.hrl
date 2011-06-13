@@ -25,26 +25,9 @@
 
 -define(DEFAULT_ATTACHMENT_CONTENT_TYPE, <<"application/octet-stream">>).
 
--define(LOG_DEBUG(Format, Args),
-    case couch_log:debug_on() of
-        true ->
-            gen_event:sync_notify(error_logger,
-                {self(), couch_debug, erlang:get(nonce), {Format, Args}});
-        false -> ok
-    end).
-
--define(LOG_INFO(Format, Args),
-    case couch_log:info_on() of
-        true ->
-            gen_event:sync_notify(error_logger,
-                {self(), couch_info, erlang:get(nonce), {Format, Args}});
-        false -> ok
-    end).
-
--define(LOG_ERROR(Format, Args),
-    gen_event:sync_notify(error_logger,
-            {self(), couch_error, erlang:get(nonce), {Format, Args}})).
-
+-define(LOG_DEBUG(Format, Args), couch_log:debug(Format, Args)).
+-define(LOG_INFO(Format, Args), couch_log:info(Format, Args)).
+-define(LOG_ERROR(Format, Args), couch_log:error(Format, Args)).
 
 -record(rev_info,
     {
@@ -73,6 +56,7 @@
     {mochi_req,
     peer,
     method,
+    requested_path_parts,
     path_parts,
     db_url_handlers,
     user_ctx,
@@ -194,6 +178,7 @@
 
     view_type = nil,
     include_docs = false,
+    conflicts = false,
     stale = false,
     multi_get = false,
     callback = nil,
@@ -231,6 +216,7 @@
     def_lang,
     design_options=[],
     views,
+    lib,
     id_btree=nil,
     current_seq=0,
     purge_seq=0,
@@ -240,6 +226,8 @@
 
 -record(view,
     {id_num,
+    update_seq=0,
+    purge_seq=0,
     map_names=[],
     def,
     btree=nil,
@@ -287,7 +275,9 @@
     heartbeat,
     timeout,
     filter = "",
-    include_docs = false
+    include_docs = false,
+    conflicts = false,
+    db_open_options = []
 }).
 
 -record(proc, {
