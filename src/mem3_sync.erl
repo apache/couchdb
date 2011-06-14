@@ -123,17 +123,18 @@ handle_info({'EXIT', Active, {{not_found, no_db_file}, _Stack}}, State) ->
     handle_replication_exit(State, Active);
 
 handle_info({'EXIT', Active, Reason}, State) ->
-    case lists:keyfind(Active, #job.pid, State#state.active) of
+    NewState = case lists:keyfind(Active, #job.pid, State#state.active) of
         #job{name=OldDbName, node=OldNode} = Job ->
         twig:log(warn, "~p ~s -> ~p ~p", [?MODULE, OldDbName, OldNode,
             Reason]),
         case Reason of {pending_changes, Count} ->
-            push(Job#job{pid = nil, count = Count});
+            add_to_queue(State, Job#job{pid = nil, count = Count});
         _ ->
-            timer:apply_after(5000, ?MODULE, push, [Job#job{pid=nil}])
+            timer:apply_after(5000, ?MODULE, push, [Job#job{pid=nil}]),
+            State
         end;
-    false -> ok end,
-    handle_replication_exit(State, Active);
+    false -> State end,
+    handle_replication_exit(NewState, Active);
 
 handle_info(Msg, State) ->
     twig:log(notice, "unexpected msg at replication manager ~p", [Msg]),
