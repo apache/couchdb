@@ -106,10 +106,16 @@ handle_changes_req(#httpd{method='GET'}=Req, Db) ->
             FeedChangesFun(MakeCallback(Resp))
         end
     end,
-    couch_stats_collector:track_process_count(
+    couch_stats_collector:increment(
         {httpd, clients_requesting_changes}
     ),
-    WrapperFun(ChangesFun);
+    try
+        WrapperFun(ChangesFun)
+    after
+    couch_stats_collector:decrement(
+        {httpd, clients_requesting_changes}
+    )
+    end;
 
 handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "GET,HEAD").
