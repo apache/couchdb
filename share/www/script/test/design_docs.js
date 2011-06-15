@@ -104,20 +104,6 @@ couchTests.design_docs = function(debug) {
             (function(keys, values) {
               return makebigstring(16);
             }).toString()
-        },
-        lib : {
-          baz : "exports.baz = 'bam';",
-          foo : {
-            foo : "exports.foo = 'bar';",
-            boom : "exports.boom = 'ok';",
-            zoom : "exports.zoom = 'yeah';"
-          }
-        },
-        commonjs : {
-          map :
-            (function(doc) {
-              emit(null, require('views/lib/foo/boom').boom);
-            }).toString()
         }
       },
       shows: {
@@ -231,10 +217,6 @@ couchTests.design_docs = function(debug) {
       // and the views stay uninitialized (they should!)
       len1 = len2 = len3 = 0;
     };
-
-    // test commonjs in map functions
-    resp = db.view("test/commonjs", {limit:1});
-    T(resp.rows[0].value == 'ok');
 
     // test that the _all_docs view returns correctly with keys
     var results = db.allDocs({startkey:"_design", endkey:"_design0"});
