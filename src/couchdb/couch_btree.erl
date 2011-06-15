@@ -192,9 +192,9 @@ query_modify(Bt, LookupKeys, InsertValues, RemoveKeys) ->
             end
         end,
     Actions = lists:sort(SortFun, lists:append([InsertActions, RemoveActions, FetchActions])),
-    {ok, KeyPointers, QueryResults, Bt2} = modify_node(Bt, Root, Actions, []),
-    {ok, NewRoot, Bt3} = complete_root(Bt2, KeyPointers),
-    {ok, QueryResults, Bt3#btree{root=NewRoot}}.
+    {ok, KeyPointers, QueryResults} = modify_node(Bt, Root, Actions, []),
+    {ok, NewRoot} = complete_root(Bt, KeyPointers),
+    {ok, QueryResults, Bt#btree{root=NewRoot}}.
 
 % for ordering different operations with the same key.
 % fetch < remove < insert
@@ -263,13 +263,13 @@ lookup_kvnode(Bt, NodeTuple, LowerBound, [LookupKey | RestLookupKeys], Output) -
     end.
 
 
-complete_root(Bt, []) ->
-    {ok, nil, Bt};
-complete_root(Bt, [{_Key, PointerInfo}])->
-    {ok, PointerInfo, Bt};
+complete_root(_Bt, []) ->
+    {ok, nil};
+complete_root(_Bt, [{_Key, PointerInfo}])->
+    {ok, PointerInfo};
 complete_root(Bt, KPs) ->
-    {ok, ResultKeyPointers, Bt2} = write_node(Bt, kp_node, KPs),
-    complete_root(Bt2, ResultKeyPointers).
+    {ok, ResultKeyPointers} = write_node(Bt, kp_node, KPs),
+    complete_root(Bt, ResultKeyPointers).
 
 %%%%%%%%%%%%% The chunkify function sucks! %%%%%%%%%%%%%
 % It is inaccurate as it does not account for compression when blocks are
@@ -309,20 +309,20 @@ modify_node(Bt, RootPointerInfo, Actions, QueryOutput) ->
     end,
     NodeTuple = list_to_tuple(NodeList),
 
-    {ok, NewNodeList, QueryOutput2, Bt2} =
+    {ok, NewNodeList, QueryOutput2} =
     case NodeType of
     kp_node -> modify_kpnode(Bt, NodeTuple, 1, Actions, [], QueryOutput);
     kv_node -> modify_kvnode(Bt, NodeTuple, 1, Actions, [], QueryOutput)
     end,
     case NewNodeList of
     [] ->  % no nodes remain
-        {ok, [], QueryOutput2, Bt2};
+        {ok, [], QueryOutput2};
     NodeList ->  % nothing changed
         {LastKey, _LastValue} = element(tuple_size(NodeTuple), NodeTuple),
-        {ok, [{LastKey, RootPointerInfo}], QueryOutput2, Bt2};
+        {ok, [{LastKey, RootPointerInfo}], QueryOutput2};
     _Else2 ->
-        {ok, ResultList, Bt3} = write_node(Bt2, NodeType, NewNodeList),
-        {ok, ResultList, QueryOutput2, Bt3}
+        {ok, ResultList} = write_node(Bt, NodeType, NewNodeList),
+        {ok, ResultList, QueryOutput2}
     end.
 
 reduce_node(#btree{reduce=nil}, _NodeType, _NodeList) ->
@@ -363,13 +363,13 @@ write_node(#btree{fd = Fd, compression = Comp} = Bt, NodeType, NodeList) ->
     ||
         ANodeList <- NodeListList
     ],
-    {ok, ResultList, Bt}.
+    {ok, ResultList}.
 
 modify_kpnode(Bt, {}, _LowerBound, Actions, [], QueryOutput) ->
     modify_node(Bt, nil, Actions, QueryOutput);
-modify_kpnode(Bt, NodeTuple, LowerBound, [], ResultNode, QueryOutput) ->
+modify_kpnode(_Bt, NodeTuple, LowerBound, [], ResultNode, QueryOutput) ->
     {ok, lists:reverse(ResultNode, bounded_tuple_to_list(NodeTuple, LowerBound,
-            tuple_size(NodeTuple), [])), QueryOutput, Bt};
+            tuple_size(NodeTuple), [])), QueryOutput};
 modify_kpnode(Bt, NodeTuple, LowerBound,
         [{_, FirstActionKey, _}|_]=Actions, ResultNode, QueryOutput) ->
     Sz = tuple_size(NodeTuple),
@@ -378,22 +378,22 @@ modify_kpnode(Bt, NodeTuple, LowerBound,
     true  ->
         % perform remaining actions on last node
         {_, PointerInfo} = element(Sz, NodeTuple),
-        {ok, ChildKPs, QueryOutput2, Bt2} =
+        {ok, ChildKPs, QueryOutput2} =
             modify_node(Bt, PointerInfo, Actions, QueryOutput),
         NodeList = lists:reverse(ResultNode, bounded_tuple_to_list(NodeTuple, LowerBound,
             Sz - 1, ChildKPs)),
-        {ok, NodeList, QueryOutput2, Bt2};
+        {ok, NodeList, QueryOutput2};
     false ->
         {NodeKey, PointerInfo} = element(N, NodeTuple),
         SplitFun = fun({_ActionType, ActionKey, _ActionValue}) ->
                 not less(Bt, NodeKey, ActionKey)
             end,
         {LessEqQueries, GreaterQueries} = lists:splitwith(SplitFun, Actions),
-        {ok, ChildKPs, QueryOutput2, Bt2} =
+        {ok, ChildKPs, QueryOutput2} =
                 modify_node(Bt, PointerInfo, LessEqQueries, QueryOutput),
         ResultNode2 = lists:reverse(ChildKPs, bounded_tuple_to_revlist(NodeTuple,
                 LowerBound, N - 1, ResultNode)),
-        modify_kpnode(Bt2, NodeTuple, N+1, GreaterQueries, ResultNode2, QueryOutput2)
+        modify_kpnode(Bt, NodeTuple, N+1, GreaterQueries, ResultNode2, QueryOutput2)
     end.
 
 bounded_tuple_to_revlist(_Tuple, Start, End, Tail) when Start > End ->
@@ -421,8 +421,8 @@ find_first_gteq(Bt, Tuple, Start, End, Key) ->
         find_first_gteq(Bt, Tuple, Start, Mid, Key)
     end.
 
-modify_kvnode(Bt, NodeTuple, LowerBound, [], ResultNode, QueryOutput) ->
-    {ok, lists:reverse(ResultNode, bounded_tuple_to_list(NodeTuple, LowerBound, tuple_size(NodeTuple), [])), QueryOutput, Bt};
+modify_kvnode(_Bt, NodeTuple, LowerBound, [], ResultNode, QueryOutput) ->
+    {ok, lists:reverse(ResultNode, bounded_tuple_to_list(NodeTuple, LowerBound, tuple_size(NodeTuple), [])), QueryOutput};
 modify_kvnode(Bt, NodeTuple, LowerBound, [{ActionType, ActionKey, ActionValue} | RestActions], ResultNode, QueryOutput) when LowerBound > tuple_size(NodeTuple) ->
     case ActionType of
     insert ->
