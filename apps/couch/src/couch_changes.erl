@@ -177,6 +177,17 @@ configure_filter(Filter, Style, Req, Db) when is_list(Filter) ->
         #doc{body={Props}} = DDoc,
         couch_util:get_nested_json_value({Props}, [<<"filters">>, FName]),
         {custom, Style, {Db, JsonReq, DDoc, FName}};
+    [<<"_doc_ids">>] ->
+        DocIds = ?JSON_DECODE(couch_httpd:qs_value(Req, "doc_ids", "null")),
+        case is_list(DocIds) of
+            true -> ok;
+            false -> throw({bad_request, "`doc_ids` filter parameter is not a list."})
+        end,
+        {builtin, Style, {doc_ids, DocIds}};
+    [<<"_design">>] ->
+        {builtin, Style, design};
+    [<<"_", _/binary>>] ->
+        throw({bad_request, "unknown builtin filter name"});
     _Else ->
         throw({bad_request,
             "filter parameter must be of the form `designname/filtername`"})
@@ -191,7 +202,11 @@ filter(#doc_info{revs=Revs}, all_docs) ->
 filter(#doc_info{id=Id, revs=RevInfos}, {custom, main_only, Acc}) ->
     custom_filter(Id, [(hd(RevInfos))#rev_info.rev], Acc);
 filter(#doc_info{id=Id, revs=RevInfos}, {custom, all_docs, Acc}) ->
-    custom_filter(Id, [R || #rev_info{rev=R} <- RevInfos], Acc).
+    custom_filter(Id, [R || #rev_info{rev=R} <- RevInfos], Acc);
+filter(#doc_info{id=Id, revs=RevInfos}, {builtin, main_only, Acc}) ->
+    builtin_filter(Id, [(hd(RevInfos))#rev_info.rev], Acc);
+filter(#doc_info{id=Id, revs=RevInfos}, {builtin, all_docs, Acc}) ->
+    builtin_filter(Id, [R || #rev_info{rev=R} <- RevInfos], Acc).
 
 custom_filter(Id, Revs, {Db, JsonReq, DDoc, Filter}) ->
     {ok, Results} = fabric:open_revs(Db, Id, Revs, [deleted, conflicts]),
@@ -202,6 +217,21 @@ custom_filter(Id, Revs, {Db, JsonReq, DDoc, Filter}) ->
     [{[{<<"rev">>, couch_doc:rev_to_str({RevPos,RevId})}]}
         || {Pass, #doc{revs={RevPos,[RevId|_]}}}
         <- lists:zip(Passes, Docs), Pass == true].
+
+builtin_filter(Id, Revs, design) ->
+    case Id of
+        <<"_design", _/binary>> ->
+            [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]} || Rev <- Revs];
+        _ ->
+            []
+    end;
+builtin_filter(Id, Revs, {doc_ids, DocIds}) ->
+    case lists:member(Id, DocIds) of
+        true ->
+            [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]} || Rev <- Revs];
+        false ->
+            []
+    end.
 
 get_changes_timeout(Args, Callback) ->
     #changes_args{
