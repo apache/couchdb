@@ -10,8 +10,8 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
-snappyebindir = $(localerlanglibdir)/snappy-1.0.1/ebin
-snappyprivdir = $(localerlanglibdir)/snappy-1.0.1/priv
+snappyebindir = $(localerlanglibdir)/snappy-1.0.3/ebin
+snappyprivdir = $(localerlanglibdir)/snappy-1.0.3/priv
 
 snappy_cxx_srcs = \
 	snappy_nif.cc \

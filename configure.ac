@@ -36,7 +36,7 @@ PKG_PROG_PKG_CONFIG
 dnl Config for google snappy
 m4_define([snappy_major], [1])
 m4_define([snappy_minor], [0])
-m4_define([snappy_patchlevel], [1])
+m4_define([snappy_patchlevel], [3])
 
 AC_PROG_CXX
 AC_LANG([C++])

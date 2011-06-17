@@ -653,44 +653,50 @@ class SnappyDecompressor {
   // Process the next item found in the input.
   // Returns true if successful, false on error or end of input.
   template <class Writer>
-  bool Step(Writer* writer) {
+  void DecompressAllTags(Writer* writer) {
     const char* ip = ip_;
-    if (ip_limit_ - ip < 5) {
-      if (!RefillTag()) return false;
-      ip = ip_;
-    }
-
-    const unsigned char c = *(reinterpret_cast<const unsigned char*>(ip++));
-    const uint32 entry = char_table[c];
-    const uint32 trailer = LittleEndian::Load32(ip) & wordmask[entry >> 11];
-    ip += entry >> 11;
-    const uint32 length = entry & 0xff;
-
-    if ((c & 0x3) == LITERAL) {
-      uint32 literal_length = length + trailer;
-      uint32 avail = ip_limit_ - ip;
-      while (avail < literal_length) {
-        bool allow_fast_path = (avail >= 16);
-        if (!writer->Append(ip, avail, allow_fast_path)) return false;
-        literal_length -= avail;
-        reader_->Skip(peeked_);
-        size_t n;
-        ip = reader_->Peek(&n);
-        avail = n;
-        peeked_ = avail;
-        if (avail == 0) return false;  // Premature end of input
-        ip_limit_ = ip + avail;
+    for ( ;; ) {
+      if (ip_limit_ - ip < 5) {
+        ip_ = ip;
+        if (!RefillTag()) return;
+        ip = ip_;
       }
-      ip_ = ip + literal_length;
-      bool allow_fast_path = (avail >= 16);
-      return writer->Append(ip, literal_length, allow_fast_path);
-    } else {
-      ip_ = ip;
-      // copy_offset/256 is encoded in bits 8..10.  By just fetching
-      // those bits, we get copy_offset (since the bit-field starts at
-      // bit 8).
-      const uint32 copy_offset = entry & 0x700;
-      return writer->AppendFromSelf(copy_offset + trailer, length);
+
+      const unsigned char c = *(reinterpret_cast<const unsigned char*>(ip++));
+      const uint32 entry = char_table[c];
+      const uint32 trailer = LittleEndian::Load32(ip) & wordmask[entry >> 11];
+      ip += entry >> 11;
+      const uint32 length = entry & 0xff;
+
+      if ((c & 0x3) == LITERAL) {
+        uint32 literal_length = length + trailer;
+        uint32 avail = ip_limit_ - ip;
+        while (avail < literal_length) {
+          bool allow_fast_path = (avail >= 16);
+          if (!writer->Append(ip, avail, allow_fast_path)) return;
+          literal_length -= avail;
+          reader_->Skip(peeked_);
+          size_t n;
+          ip = reader_->Peek(&n);
+          avail = n;
+          peeked_ = avail;
+          if (avail == 0) return;  // Premature end of input
+          ip_limit_ = ip + avail;
+        }
+        bool allow_fast_path = (avail >= 16);
+        if (!writer->Append(ip, literal_length, allow_fast_path)) {
+          return;
+        }
+        ip += literal_length;
+      } else {
+        // copy_offset/256 is encoded in bits 8..10.  By just fetching
+        // those bits, we get copy_offset (since the bit-field starts at
+        // bit 8).
+        const uint32 copy_offset = entry & 0x700;
+        if (!writer->AppendFromSelf(copy_offset + trailer, length)) {
+          return;
+        }
+      }
     }
   }
 };
@@ -770,7 +776,7 @@ static bool InternalUncompress(Source* r,
   writer->SetExpectedLength(uncompressed_len);
 
   // Process the entire input
-  while (decompressor.Step(writer)) { }
+  decompressor.DecompressAllTags(writer);
   return (decompressor.eof() && writer->CheckLength());
 }
 
@@ -866,7 +872,7 @@ size_t Compress(Source* reader, Sink* writer) {
 
 // A type that writes to a flat array.
 // Note that this is not a "ByteSink", but a type that matches the
-// Writer template argument to SnappyDecompressor::Step().
+// Writer template argument to SnappyDecompressor::DecompressAllTags().
 class SnappyArrayWriter {
  private:
   char* base_;

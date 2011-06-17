@@ -1,7 +1,7 @@
 {application, snappy,
  [
   {description, "snappy compressor/decompressor Erlang NIF wrapper"},
-  {vsn, "1.0.1"},
+  {vsn, "1.0.3"},
   {registered, []},
   {applications, [
                   kernel,
