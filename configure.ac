@@ -121,15 +121,19 @@ AC_ARG_WITH([erlang], [AC_HELP_STRING([--with-erlang=PATH],
 ])
 AC_SUBST(ERLANG_FLAGS)
 
-PKG_CHECK_MODULES([JS], [mozilla-js >= 1.7], [
-    JS_LIB_DIR="$(${PKG_CONFIG} --variable=sdkdir mozilla-js)/lib"
+PKG_CHECK_MODULES([JS], [mozjs185], [
+    JS_LIB_DIR="$(${PKG_CONFIG} --variable=libdir mozjs185)"
+], [
+    PKG_CHECK_MODULES([JS], [mozilla-js >= 1.7], [
+        JS_LIB_DIR="$(${PKG_CONFIG} --variable=sdkdir mozilla-js)/lib"
     ], [
-    JS_LIB_DIR="${libdir}"
-    JS_CFLAGS="-I/usr/include"
-    JS_CFLAGS="$JS_CFLAGS -I/usr/include/js"
-    JS_CFLAGS="$JS_CFLAGS -I/usr/include/mozjs"
-    JS_CFLAGS="$JS_CFLAGS -I/usr/local/include/js"
-    JS_CFLAGS="$JS_CFLAGS -I/opt/local/include/js"
+        JS_LIB_DIR="${libdir}"
+        JS_CFLAGS="-I/usr/include"
+        JS_CFLAGS="$JS_CFLAGS -I/usr/include/js"
+        JS_CFLAGS="$JS_CFLAGS -I/usr/include/mozjs"
+        JS_CFLAGS="$JS_CFLAGS -I/usr/local/include/js"
+        JS_CFLAGS="$JS_CFLAGS -I/opt/local/include/js"
+    ])
 ])
 
 AC_ARG_WITH([js-include], [AC_HELP_STRING([--with-js-include=PATH],
@@ -175,15 +179,39 @@ AM_CONDITIONAL([WINDOWS], [test x$IS_WINDOWS = xTRUE])
 
 OLD_LIBS="$LIBS"
 LIBS="$JS_LIBS $LIBS"
-AC_CHECK_LIB([mozjs], [JS_NewContext], [JS_LIB_BASE=mozjs], [
-    AC_CHECK_LIB([js], [JS_NewContext], [JS_LIB_BASE=js], [
-        AC_CHECK_LIB([js3250], [JS_NewContext], [JS_LIB_BASE=js3250], [
-            AC_CHECK_LIB([js32], [JS_NewContext], [JS_LIB_BASE=js32], [
-                AC_MSG_ERROR([Could not find the js library.
+AC_CHECK_LIB([mozjs185], [JS_NewContext], [JS_LIB_BASE=mozjs185], [
+    AC_CHECK_LIB([mozjs], [JS_NewContext], [JS_LIB_BASE=mozjs], [
+        AC_CHECK_LIB([js], [JS_NewContext], [JS_LIB_BASE=js], [
+            AC_CHECK_LIB([js3250], [JS_NewContext], [JS_LIB_BASE=js3250], [
+                AC_CHECK_LIB([js32], [JS_NewContext], [JS_LIB_BASE=js32], [
+                    AC_MSG_ERROR([Could not find the js library.
 
-Is the Mozilla SpiderMonkey library installed?])])])])])
+Is the Mozilla SpiderMonkey library installed?])])])])])])
+
+AC_CHECK_LIB([$JS_LIB_BASE], [JS_FreezeObject],
+    AC_DEFINE([HAVE_JS_FREEZE_OBJECT], [1],
+        [Define whether we have JS_FreezeObject]))
+
+AC_CHECK_LIB([$JS_LIB_BASE], [JS_NewGlobalObject],
+    AC_DEFINE([HAVE_JS_NEW_GLOBAL_OBJECT], [1],
+        [Define whether we have JS_NewGlobalObject]))
+
+AC_CHECK_LIB([$JS_LIB_BASE], [JS_GetStringCharsAndLength],
+    AC_DEFINE([HAVE_JS_GET_STRING_CHARS_AND_LENGTH], [1],
+        [Define whether we have JS_GetStringCharsAndLength]))
+
+AC_CHECK_LIB([$JS_LIB_BASE], [JS_NewCompartmentAndGlobalObject],
+    AC_DEFINE([HAVE_COMPARTMENTS], [1],
+        [Define whether we have JS_NewCompartmentAndGlobalObject]))
+
+AC_CHECK_LIB([$JS_LIB_BASE], [JS_StrictPropertyStub],
+    AC_DEFINE([HAVE_JS_STRICT_PROPERTY_STUB], [1],
+        [Define whether we have JS_StrictPropertyStub]))
+
+AC_CHECK_LIB([$JS_LIB_BASE], [JS_DestroyScript],
+    AC_DEFINE([HAVE_SCRIPT_TYPE], [1],
+        [Define whether scripts have a special JSScript type]))
 LIBS="$OLD_LIBS"
-
 
 if test x${IS_WINDOWS} = xTRUE; then
     if test -f "$JS_LIB_DIR/$JS_LIB_BASE.dll"; then
@@ -247,13 +275,33 @@ CPPFLAGS="$OLD_CPPFLAGS"
 
 AC_LANG_PUSH(C)
 OLDCFLAGS="$CFLAGS"
-CFLAGS="-Werror-implicit-function-declaration $CFLAGS"
+CFLAGS="-Werror-implicit-function-declaration $JS_CFLAGS $OLDCFLAGS"
 AC_COMPILE_IFELSE(
     [AC_LANG_PROGRAM(
         [[#include <jsapi.h>]],
         [[JS_SetOperationCallback(0, 0);]]
     )],
     AC_DEFINE([USE_JS_SETOPCB], [], [Use new JS_SetOperationCallback])
+)
+CFLAGS="$JS_CFLAGS $OLDCFLAGS"
+AC_COMPILE_IFELSE(
+    [AC_LANG_PROGRAM(
+        [[#include <jsapi.h>]],
+        [[static JSFunctionSpec fs;
+          fs.extra = 0;]]
+    )],
+    AC_DEFINE([JS_FS_HAS_EXTRA], [1], [JSFunctionSpec has an extra member])
+)
+CFLAGS="$JS_CFLAGS $OLDCFLAGS -Werror"
+AC_COMPILE_IFELSE(
+    [AC_LANG_PROGRAM(
+        [[#include <jsapi.h>
+          static JSBool op(JSContext* cx, JSObject* obj, jsid id, jsval* vp) {}]],
+        [[static JSPropertySpec spec;
+          spec.getter = op;]]
+    )],
+    AC_DEFINE([JS_PROPERTY_OP_HAS_ID_AS_JSID], [1],
+        [The type of "id" in the prototype for JSPropertyOp is a jsid])
 )
 CFLAGS="$OLD_CFLAGS"
 AC_LANG_POP(C)
