@@ -54,7 +54,17 @@ replication_id(#rep{options = Options} = Rep) ->
 
 replication_id(#rep{user_ctx = UserCtx} = Rep, 2) ->
     {ok, HostName} = inet:gethostname(),
-    Port = mochiweb_socket_server:get(couch_httpd, port),
+    Port = case (catch mochiweb_socket_server:get(couch_httpd, port)) of
+    P when is_number(P) ->
+        P;
+    _ ->
+        % On restart we might be called before the couch_httpd process is
+        % started.
+        % TODO: we might be under an SSL socket server only, or both under
+        % SSL and a non-SSL socket.
+        % ... mochiweb_socket_server:get(https, port)
+        list_to_integer(couch_config:get("httpd", "port", "5984"))
+    end,
     Src = get_rep_endpoint(UserCtx, Rep#rep.source),
     Tgt = get_rep_endpoint(UserCtx, Rep#rep.target),
     maybe_append_filters([HostName, Port, Src, Tgt], Rep);
@@ -85,12 +95,33 @@ maybe_append_filters(Base,
 
 
 filter_code(Filter, Source, UserCtx) ->
-    {match, [DDocName, FilterName]} =
-        re:run(Filter, "(.*?)/(.*)", [{capture, [1, 2], binary}]),
-    {ok, Db} = couch_api_wrap:db_open(Source, [{user_ctx, UserCtx}]),
+    {DDocName, FilterName} =
+    case re:run(Filter, "(.*?)/(.*)", [{capture, [1, 2], binary}]) of
+    {match, [DDocName0, FilterName0]} ->
+        {DDocName0, FilterName0};
+    _ ->
+        throw({error, <<"Invalid filter. Must match `ddocname/filtername`.">>})
+    end,
+    Db = case (catch couch_api_wrap:db_open(Source, [{user_ctx, UserCtx}])) of
+    {ok, Db0} ->
+        Db0;
+    DbError ->
+        DbErrorMsg = io_lib:format("Could not open source database `~s`: ~s",
+           [couch_api_wrap:db_uri(Source), couch_util:to_binary(DbError)]),
+        throw({error, iolist_to_binary(DbErrorMsg)})
+    end,
     try
-        {ok, #doc{body = Body}} = couch_api_wrap:open_doc(
-            Db, <<"_design/", DDocName/binary>>, [ejson_body]),
+        Body = case (catch couch_api_wrap:open_doc(
+            Db, <<"_design/", DDocName/binary>>, [ejson_body])) of
+        {ok, #doc{body = Body0}} ->
+            Body0;
+        DocError ->
+            DocErrorMsg = io_lib:format(
+                "Couldn't open document `_design/~s` from source "
+                "database `~s`: ~s", [couch_api_wrap:db_uri(Source),
+                    DDocName, couch_util:to_binary(DocError)]),
+            throw({error, iolist_to_binary(DocErrorMsg)})
+        end,
         Code = couch_util:get_nested_json_value(
             Body, [<<"filters">>, FilterName]),
         re:replace(Code, [$^, "\s*(.*?)\s*", $$], "\\1", [{return, binary}])
