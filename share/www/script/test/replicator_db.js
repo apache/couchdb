@@ -1279,6 +1279,68 @@ couchTests.replicator_db = function(debug) {
   }
 
 
+  function test_invalid_filter() {
+    // COUCHDB-1199 - replication document with a filter field that was invalid
+    // crashed the CouchDB server.
+    var repDoc1 = {
+       _id: "rep1",
+       source: "couch_foo_test_db",
+       target: "couch_bar_test_db",
+       filter: "test/foofilter"
+    };
+
+    TEquals(true, repDb.save(repDoc1).ok);
+
+    waitForRep(repDb, repDoc1, "error");
+    repDoc1 = repDb.open(repDoc1._id);
+    TEquals("undefined", typeof repDoc1._replication_id);
+    TEquals("error", repDoc1._replication_state);
+
+    populate_db(dbA, docs1);
+    populate_db(dbB, []);
+
+    var repDoc2 = {
+       _id: "rep2",
+       source: dbA.name,
+       target: dbB.name,
+       filter: "test/foofilter"
+    };
+
+    TEquals(true, repDb.save(repDoc2).ok);
+
+    waitForRep(repDb, repDoc2, "error");
+    repDoc2 = repDb.open(repDoc2._id);
+    TEquals("undefined", typeof repDoc2._replication_id);
+    TEquals("error", repDoc2._replication_state);
+
+    var ddoc = {
+      _id: "_design/mydesign",
+      language : "javascript",
+      filters : {
+        myfilter : (function(doc, req) {
+          return true;
+        }).toString()
+      }
+    };
+
+    TEquals(true, dbA.save(ddoc).ok);
+
+    var repDoc3 = {
+       _id: "rep3",
+       source: dbA.name,
+       target: dbB.name,
+       filter: "mydesign/myfilter"
+    };
+
+    TEquals(true, repDb.save(repDoc3).ok);
+
+    waitForRep(repDb, repDoc3, "completed");
+    repDoc3 = repDb.open(repDoc3._id);
+    TEquals("string", typeof repDoc3._replication_id);
+    TEquals("completed", repDoc3._replication_state);
+  }
+
+
   // run all the tests
   var server_config = [
     {
@@ -1354,6 +1416,11 @@ couchTests.replicator_db = function(debug) {
   repDb.deleteDb();
   restartServer();
   run_on_modified_server(server_config, rep_doc_field_validation);
+
+
+  repDb.deleteDb();
+  restartServer();
+  run_on_modified_server(server_config, test_invalid_filter);
 
 /*
  * Disabled, since error state would be set on the document only after
