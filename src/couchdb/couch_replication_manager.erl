@@ -37,9 +37,6 @@
     wait = ?INITIAL_WAIT
 }).
 
--import(couch_replicator_utils, [
-    parse_rep_doc/2
-]).
 -import(couch_util, [
     get_value/2,
     get_value/3,
@@ -120,8 +117,18 @@ init(_) ->
     }}.
 
 
-handle_call({rep_db_update, Change}, _From, State) ->
-    {reply, ok, process_update(State, Change)};
+handle_call({rep_db_update, {ChangeProps} = Change}, _From, State) ->
+    NewState = try
+        process_update(State, Change)
+    catch
+    _Tag:Error ->
+        {RepProps} = get_value(doc, ChangeProps),
+        DocId = get_value(<<"_id">>, RepProps),
+        rep_db_update_error(Error, DocId),
+        State
+    end,
+    {reply, ok, NewState};
+
 
 handle_call({rep_started, RepId}, _From, State) ->
     case rep_state(RepId) of
@@ -309,6 +316,18 @@ process_update(State, {Change}) ->
     end.
 
 
+rep_db_update_error(Error, DocId) ->
+    case Error of
+    {bad_rep_doc, Reason} ->
+        ok;
+    _ ->
+        Reason = to_binary(Error)
+    end,
+    ?LOG_ERROR("Replication manager, error processing document `~s`: ~s",
+        [DocId, Reason]),
+    update_rep_doc(DocId, [{<<"_replication_state">>, <<"error">>}]).
+
+
 rep_user_ctx({RepDoc}) ->
     case get_value(<<"user_ctx">>, RepDoc) of
     undefined ->
@@ -322,8 +341,7 @@ rep_user_ctx({RepDoc}) ->
 
 
 maybe_start_replication(State, DocId, RepDoc) ->
-    {ok, #rep{id = {BaseId, _} = RepId} = Rep} = parse_rep_doc(
-        RepDoc, rep_user_ctx(RepDoc)),
+    #rep{id = {BaseId, _} = RepId} = Rep = parse_rep_doc(RepDoc),
     case rep_state(RepId) of
     nil ->
         RepState = #rep_state{
@@ -352,6 +370,18 @@ maybe_start_replication(State, DocId, RepDoc) ->
         maybe_tag_rep_doc(DocId, RepDoc, ?l2b(BaseId)),
         State
     end.
+
+
+parse_rep_doc(RepDoc) ->
+    {ok, Rep} = try
+        couch_replicator_utils:parse_rep_doc(RepDoc, rep_user_ctx(RepDoc))
+    catch
+    throw:{error, Reason} ->
+        throw({bad_rep_doc, Reason});
+    Tag:Err ->
+        throw({bad_rep_doc, to_binary({Tag, Err})})
+    end,
+    Rep.
 
 
 maybe_tag_rep_doc(DocId, {RepProps}, RepId) ->
