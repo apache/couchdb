@@ -106,10 +106,16 @@ handle_changes_req(#httpd{method='GET'}=Req, Db) ->
             FeedChangesFun(MakeCallback(Resp))
         end
     end,
-    couch_stats_collector:track_process_count(
+    couch_stats_collector:increment(
         {httpd, clients_requesting_changes}
     ),
-    WrapperFun(ChangesFun);
+    try
+        WrapperFun(ChangesFun)
+    after
+    couch_stats_collector:decrement(
+        {httpd, clients_requesting_changes}
+    )
+    end;
 
 handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "GET,HEAD").
@@ -683,10 +689,12 @@ db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
     RespHeaders = [{"Location", Loc}],
     case couch_util:to_list(couch_httpd:header_value(Req, "Content-Type")) of
     ("multipart/related;" ++ _) = ContentType ->
-        {ok, Doc0} = couch_doc:doc_from_multi_part_stream(ContentType,
-                fun() -> receive_request_data(Req) end),
+        {ok, Doc0, WaitFun} = couch_doc:doc_from_multi_part_stream(
+            ContentType, fun() -> receive_request_data(Req) end),
         Doc = couch_doc_from_req(Req, DocId, Doc0),
-        update_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType);
+        Result = update_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType),
+        WaitFun(),
+        Result;
     _Else ->
         case couch_httpd:qs_value(Req, "batch") of
         "ok" ->
@@ -761,7 +769,7 @@ send_doc_efficiently(Req, #doc{atts=Atts}=Doc, Headers, Options) ->
         true ->
             Boundary = couch_uuids:random(),
             JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, 
-                    [attachments, follows|Options])),
+                    [attachments, follows, att_encoding_info | Options])),
             {ContentType, Len} = couch_doc:len_doc_to_multi_part_stream(
                     Boundary,JsonBytes, Atts, true),
             CType = {<<"Content-Type">>, ContentType},
@@ -804,7 +812,14 @@ send_docs_multipart(Req, Results, Options1) ->
     couch_httpd:last_chunk(Resp).
 
 receive_request_data(Req) ->
-    {couch_httpd:recv(Req, 0), fun() -> receive_request_data(Req) end}.
+    receive_request_data(Req, couch_httpd:body_length(Req)).
+
+receive_request_data(Req, LenLeft) when LenLeft > 0 ->
+    Len = erlang:min(4096, LenLeft),
+    Data = couch_httpd:recv(Req, Len),
+    {Data, fun() -> receive_request_data(Req, LenLeft - iolist_size(Data)) end};
+receive_request_data(_Req, _) ->
+    throw(<<"expected more data">>).
     
 update_doc_result_to_json({{Id, Rev}, Error}) ->
         {_Code, Err, Msg} = couch_httpd:error_info(Error),
@@ -919,6 +934,11 @@ db_attachment_req(#httpd{method='GET'}=Req, Db, DocId, FileNameParts) ->
             [{"Content-Encoding", atom_to_list(Enc)}];
         _ ->
             []
+        end ++ if
+            Enc =:= identity orelse ReqAcceptsAttEnc =:= true ->
+                [{"Content-MD5", base64:encode(Att#att.md5)}];
+            true ->
+                []
         end,
         Len = case {Enc, ReqAcceptsAttEnc} of
         {identity, _} ->
@@ -1011,7 +1031,7 @@ db_attachment_req(#httpd{method=Method,mochi_req=MochiReq}=Req, Db, DocId, FileN
                         end,
                         
                         
-                        fun() -> couch_httpd:recv(Req, 0) end;
+                        fun(Size) -> couch_httpd:recv(Req, Size) end;
                     Length ->
                         exit({length_not_integer, Length})
                     end,
@@ -1214,34 +1234,7 @@ validate_attachment_name(Name) when is_list(Name) ->
 validate_attachment_name(<<"_",_/binary>>) ->
     throw({bad_request, <<"Attachment name can't start with '_'">>});
 validate_attachment_name(Name) ->
-    case is_valid_utf8(Name) of
+    case couch_util:validate_utf8(Name) of
         true -> Name;
         false -> throw({bad_request, <<"Attachment name is not UTF-8 encoded">>})
-    end.
-
-%% borrowed from mochijson2:json_bin_is_safe()
-is_valid_utf8(<<>>) ->
-    true;
-is_valid_utf8(<<C, Rest/binary>>) ->
-    case C of
-        $\" ->
-            false;
-        $\\ ->
-            false;
-        $\b ->
-            false;
-        $\f ->
-            false;
-        $\n ->
-            false;
-        $\r ->
-            false;
-        $\t ->
-            false;
-        C when C >= 0, C < $\s; C >= 16#7f, C =< 16#10FFFF ->
-            false;
-        C when C < 16#7f ->
-            is_valid_utf8(Rest);
-        _ ->
-            false
     end.

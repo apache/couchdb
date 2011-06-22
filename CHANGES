@@ -43,6 +43,11 @@ Etap Test Suite:
  * Etap tests no longer require use of port 5984. They now use a randomly
    selected port so they won't clash with a running CouchDB.
 
+Windows:
+
+ * Windows builds now require ICU >= 4.4.0 and Erlang >= R14B03. See
+   COUCHDB-1152, and COUCHDB-963 + OTP-9139 for more information.
+
 Version 1.0.2
 -------------
 

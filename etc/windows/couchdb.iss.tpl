@@ -74,11 +74,14 @@ Filename: "{app}\Install.exe"; Parameters: "-s"; Flags: runhidden
 ; Commands for a service
 ; First attempt to nuke an existing service of this name, incase they are
 ; reinstalling without uninstalling
-Filename: "{app}\erts-%erts_version%\bin\erlsrv.exe"; Parameters: "remove ""%package_name%"""; Tasks: service
-; add a new one
-Filename: "{app}\erts-%erts_version%\bin\erlsrv.exe"; Parameters: "add ""%package_name%"" -w ""{app}\bin"" -ar ""-sasl errlog_type error -s couch"" -c ""%package_name% %version%"""; Tasks: service
+Filename: "{app}\erts-%erts_version%\bin\erlsrv.exe"; Parameters: "remove ""%package_name%"""; Flags: runhidden; Tasks: service
+; add a new service, including automatic restart by default on failure
+Filename: "{app}\erts-%erts_version%\bin\erlsrv.exe"; Parameters: "add ""%package_name%"" -workdir ""{app}\bin"" -onfail restart_always -args ""-sasl errlog_type error -s couch +A 4 +W w"" -comment ""%package_name% %version%"""; Flags: runhidden; Tasks: service
 ; and start it if requested
-Filename: "{app}\erts-%erts_version%\bin\erlsrv.exe"; Parameters: "start ""%package_name%"""; Tasks: service\start
+Filename: "{app}\erts-%erts_version%\bin\erlsrv.exe"; Parameters: "start ""%package_name%"""; Flags: runhidden; Tasks: service\start
 
 [UninstallRun]
-Filename: "{app}\erts-%erts_version%\bin\erlsrv.exe"; Parameters: "remove ""%package_name%"""; Tasks: service
+; erlsrv stops services prior to removing them
+Filename: "{app}\erts-%erts_version%\bin\erlsrv.exe"; Parameters: "remove ""%package_name%"""; Flags: runhidden; Tasks: service
+; kill epmd.exe if running to ensure uninstaller is not prevented from removing all binaries
+Filename: "{app}\erts-%erts_version%\bin\epmd.exe"; Parameters: "-kill"; Flags: runhidden

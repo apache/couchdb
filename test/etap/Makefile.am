@@ -68,4 +68,5 @@ EXTRA_DIST = \
     140-attachment-comp.t \
     150-invalid-view-seq.t \
     160-vhosts.t \
+    190-oauth.t \
     200-view-group-no-db-leaks.t

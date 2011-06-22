@@ -10,25 +10,64 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
+%% @doc Data structure used to represent document edit histories.
+
+%% A key tree is used to represent the edit history of a document. Each node of
+%% the tree represents a particular version. Relations between nodes represent
+%% the order that these edits were applied. For instance, a set of three edits
+%% would produce a tree of versions A->B->C indicating that edit C was based on
+%% version B which was in turn based on A. In a world without replication (and
+%% no ability to disable MVCC checks), all histories would be forced to be
+%% linear lists of edits due to constraints imposed by MVCC (ie, new edits must
+%% be based on the current version). However, we have replication, so we must
+%% deal with not so easy cases, which lead to trees.
+%%
+%% Consider a document in state A. This doc is replicated to a second node. We
+%% then edit the document on each node leaving it in two different states, B
+%% and C. We now have two key trees, A->B and A->C. When we go to replicate a
+%% second time, the key tree must combine these two trees which gives us
+%% A->(B|C). This is how conflicts are introduced. In terms of the key tree, we
+%% say that we have two leaves (B and C) that are not deleted. The presense of
+%% the multiple leaves indicate conflict. To remove a conflict, one of the
+%% edits (B or C) can be deleted, which results in, A->(B|C->D) where D is an
+%% edit that is specially marked with the a deleted=true flag.
+%%
+%% What makes this a bit more complicated is that there is a limit to the
+%% number of revisions kept, specified in couch_db.hrl (default is 1000). When
+%% this limit is exceeded only the last 1000 are kept. This comes in to play
+%% when branches are merged. The comparison has to begin at the same place in
+%% the branches. A revision id is of the form N-XXXXXXX where N is the current
+%% revision. So each path will have a start number, calculated in
+%% couch_doc:to_path using the formula N - length(RevIds) + 1 So, .eg. if a doc
+%% was edit 1003 times this start number would be 4, indicating that 3
+%% revisions were truncated.
+%%
+%% This comes into play in @see merge_at/3 which recursively walks down one
+%% tree or the other until they begin at the same revision.
+
 -module(couch_key_tree).
 
 -export([merge/3, find_missing/2, get_key_leafs/2, get_full_key_paths/2, get/2]).
 -export([map/2, get_all_leafs/1, count_leafs/1, remove_leafs/2,
     get_all_leafs_full/1,stem/2,map_leafs/2]).
 
+-include("couch_db.hrl").
+
 % Tree::term() is really a tree(), but we don't want to require R13B04 yet
 -type branch() :: {Key::term(), Value::term(), Tree::term()}.
 -type path() :: {Start::pos_integer(), branch()}.
 -type tree() :: [branch()]. % sorted by key
 
-% partial trees arranged by how much they are cut off.
-
+%% @doc Merge a path with a list of paths and stem to the given length.
 -spec merge([path()], path(), pos_integer()) -> {[path()],
     conflicts | no_conflicts}.
 merge(Paths, Path, Depth) ->
     {Merged, Conflicts} = merge(Paths, Path),
     {stem(Merged, Depth), Conflicts}.
 
+%% @doc Merge a path with an existing list of paths, returning a new list of
+%% paths. A return of conflicts indicates a new conflict was discovered in this
+%% merge. Conflicts may already exist in the original list of paths.
 -spec merge([path()], path()) -> {[path()], conflicts | no_conflicts}.
 merge(Paths, Path) ->
     {ok, Merged, HasConflicts} = merge_one(Paths, Path, [], false),
@@ -67,6 +106,7 @@ merge_at([{Key, Value, SubTree}|Sibs], Place, InsertTree) when Place > 0 ->
     {ok, Merged, Conflicts} ->
         {ok, [{Key, Value, Merged} | Sibs], Conflicts};
     no ->
+        % first branch didn't merge, move to next branch
         case merge_at(Sibs, Place, InsertTree) of
         {ok, Merged, Conflicts} ->
             {ok, [{Key, Value, SubTree} | Merged], Conflicts};
@@ -82,9 +122,9 @@ merge_at(OurTree, Place, [{Key, Value, SubTree}]) when Place < 0 ->
     no ->
         no
     end;
-merge_at([{Key, Value, SubTree}|Sibs], 0, [{Key, _Value, InsertSubTree}]) ->
+merge_at([{Key, V1, SubTree}|Sibs], 0, [{Key, V2, InsertSubTree}]) ->
     {Merged, Conflicts} = merge_simple(SubTree, InsertSubTree),
-    {ok, [{Key, Value, Merged} | Sibs], Conflicts};
+    {ok, [{Key, value_pref(V1, V2), Merged} | Sibs], Conflicts};
 merge_at([{OurKey, _, _} | _], 0, [{Key, _, _}]) when OurKey > Key ->
     % siblings keys are ordered, no point in continuing
     no;
@@ -103,16 +143,18 @@ merge_simple([], B) ->
     {B, false};
 merge_simple(A, []) ->
     {A, false};
-merge_simple([{Key, Value, SubA} | NextA], [{Key, _, SubB} | NextB]) ->
+merge_simple([{Key, V1, SubA} | NextA], [{Key, V2, SubB} | NextB]) ->
     {MergedSubTree, Conflict1} = merge_simple(SubA, SubB),
     {MergedNextTree, Conflict2} = merge_simple(NextA, NextB),
+    Value = value_pref(V1, V2),
     {[{Key, Value, MergedSubTree} | MergedNextTree], Conflict1 or Conflict2};
 merge_simple([{A, _, _} = Tree | Next], [{B, _, _} | _] = Insert) when A < B ->
-    {Merged, _} = merge_simple(Next, Insert),
-    {[Tree | Merged], true};
+    {Merged, Conflict} = merge_simple(Next, Insert),
+    % if Merged has more branches than the input we added a new conflict
+    {[Tree | Merged], Conflict orelse (length(Merged) > length(Next))};
 merge_simple(Ours, [Tree | Next]) ->
-    {Merged, _} = merge_simple(Ours, Next),
-    {[Tree | Merged], true}.
+    {Merged, Conflict} = merge_simple(Ours, Next),
+    {[Tree | Merged], Conflict orelse (length(Merged) > length(Next))}.
 
 find_missing(_Tree, []) ->
     [];
@@ -157,14 +199,18 @@ remove_leafs(Trees, Keys) ->
     % filter out any that are in the keys list.
     {FilteredPaths, RemovedKeys} = filter_leafs(Paths, Keys, [], []),
 
+    SortedPaths = lists:sort(
+        [{Pos + 1 - length(Path), Path} || {Pos, Path} <- FilteredPaths]
+    ),
+
     % convert paths back to trees
     NewTree = lists:foldl(
-        fun({PathPos, Path},TreeAcc) ->
+        fun({StartPos, Path},TreeAcc) ->
             [SingleTree] = lists:foldl(
                 fun({K,V},NewTreeAcc) -> [{K,V,NewTreeAcc}] end, [], Path),
-            {NewTrees, _} = merge(TreeAcc, {PathPos + 1 - length(Path), SingleTree}),
+            {NewTrees, _} = merge(TreeAcc, {StartPos, SingleTree}),
             NewTrees
-        end, [], FilteredPaths),
+        end, [], SortedPaths),
     {NewTree, RemovedKeys}.
 
 
@@ -314,19 +360,35 @@ map_leafs_simple(Fun, Pos, [{Key, Value, SubTree} | RestTree]) ->
 
 
 stem(Trees, Limit) ->
-    % flatten each branch in a tree into a tree path
-    Paths = get_all_leafs_full(Trees),
-
-    Paths2 = [{Pos, lists:sublist(Path, Limit)} || {Pos, Path} <- Paths],
+    % flatten each branch in a tree into a tree path, sort by starting rev #
+    Paths = lists:sort(lists:map(fun({Pos, Path}) ->
+        StemmedPath = lists:sublist(Path, Limit),
+        {Pos + 1 - length(StemmedPath), StemmedPath}
+    end, get_all_leafs_full(Trees))),
 
     % convert paths back to trees
     lists:foldl(
-        fun({PathPos, Path},TreeAcc) ->
+        fun({StartPos, Path},TreeAcc) ->
             [SingleTree] = lists:foldl(
                 fun({K,V},NewTreeAcc) -> [{K,V,NewTreeAcc}] end, [], Path),
-            {NewTrees, _} = merge(TreeAcc, {PathPos + 1 - length(Path), SingleTree}),
+            {NewTrees, _} = merge(TreeAcc, {StartPos, SingleTree}),
             NewTrees
-        end, [], Paths2).
+        end, [], Paths).
+
+
+value_pref(Tuple, _) when is_tuple(Tuple),
+        (tuple_size(Tuple) == 3 orelse tuple_size(Tuple) == 4) ->
+    Tuple;
+value_pref(_, Tuple) when is_tuple(Tuple),
+        (tuple_size(Tuple) == 3 orelse tuple_size(Tuple) == 4) ->
+    Tuple;
+value_pref(?REV_MISSING, Other) ->
+    Other;
+value_pref(Other, ?REV_MISSING) ->
+    Other;
+value_pref(Last, _) ->
+    Last.
+
 
 % Tests moved to test/etap/06?-*.t
 
