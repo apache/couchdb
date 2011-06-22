@@ -97,8 +97,8 @@ cleanup_index_files(Db) ->
     if length(Sigs) =:= 0 ->
         FileList;
     true ->
-    % regex that matches all ddocs
-    RegExp = "("++ string:join(Sigs, "|") ++")",
+        % regex that matches all ddocs
+        RegExp = "("++ string:join(Sigs, "|") ++")",
 
     % filter out the ones in use
         [FilePath || FilePath <- FileList,

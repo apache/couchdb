@@ -486,7 +486,17 @@ make_replication_id(RepProps, UserCtx) ->
 % add a new clause and increase ?REP_ID_VERSION at the top
 make_replication_id({Props}, UserCtx, 2) ->
     {ok, HostName} = inet:gethostname(),
-    Port = mochiweb_socket_server:get(couch_httpd, port),
+    Port = case (catch mochiweb_socket_server:get(couch_httpd, port)) of
+    P when is_number(P) ->
+        P;
+    _ ->
+        % On restart we might be called before the couch_httpd process is
+        % started.
+        % TODO: we might be under an SSL socket server only, or both under
+        % SSL and a non-SSL socket.
+        % ... mochiweb_socket_server:get(https, port)
+        list_to_integer(couch_config:get("httpd", "port", "5984"))
+    end,
     Src = get_rep_endpoint(UserCtx, couch_util:get_value(<<"source">>, Props)),
     Tgt = get_rep_endpoint(UserCtx, couch_util:get_value(<<"target">>, Props)),
     maybe_append_filters({Props}, [HostName, Port, Src, Tgt], UserCtx);
@@ -513,16 +523,37 @@ maybe_append_filters({Props}, Base, UserCtx) ->
     couch_util:to_hex(couch_util:md5(term_to_binary(Base2))).
 
 filter_code(Filter, Props, UserCtx) ->
-    {match, [DDocName, FilterName]} =
-        re:run(Filter, "(.*?)/(.*)", [{capture, [1, 2], binary}]),
+    {DDocName, FilterName} =
+    case re:run(Filter, "(.*?)/(.*)", [{capture, [1, 2], binary}]) of
+    {match, [DDocName0, FilterName0]} ->
+        {DDocName0, FilterName0};
+    _ ->
+        throw({error, <<"Invalid filter. Must match `ddocname/filtername`.">>})
+    end,
     ProxyParams = parse_proxy_params(
         couch_util:get_value(<<"proxy">>, Props, [])),
-    Source = open_db(
-        couch_util:get_value(<<"source">>, Props), UserCtx, ProxyParams),
+    DbName = couch_util:get_value(<<"source">>, Props),
+    Source = try
+        open_db(DbName, UserCtx, ProxyParams)
+    catch
+    _Tag:DbError ->
+        DbErrorMsg = io_lib:format("Could not open source database `~s`: ~s",
+           [couch_util:url_strip_password(DbName), couch_util:to_binary(DbError)]),
+        throw({error, iolist_to_binary(DbErrorMsg)})
+    end,
     try
-        {ok, DDoc} = open_doc(Source, <<"_design/", DDocName/binary>>),
+        Body = case (catch open_doc(Source, <<"_design/", DDocName/binary>>)) of
+        {ok, #doc{body = Body0}} ->
+            Body0;
+        DocError ->
+            DocErrorMsg = io_lib:format(
+                "Couldn't open document `_design/~s` from source "
+                "database `~s`: ~s",
+                [dbname(Source), DDocName, couch_util:to_binary(DocError)]),
+            throw({error, iolist_to_binary(DocErrorMsg)})
+        end,
         Code = couch_util:get_nested_json_value(
-            DDoc#doc.body, [<<"filters">>, FilterName]),
+            Body, [<<"filters">>, FilterName]),
         re:replace(Code, "^\s*(.*?)\s*$", "\\1", [{return, binary}])
     after
         close_db(Source)

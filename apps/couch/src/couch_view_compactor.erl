@@ -55,8 +55,10 @@ compact_group(Group, EmptyGroup) ->
 
     Fun = fun({DocId, _ViewIdKeys} = KV, {Bt, Acc, TotalCopied, LastId}) ->
         if DocId =:= LastId -> % COUCHDB-999
-            Msg = "Duplicates of ~s detected in ~s ~s - rebuild required",
-            exit(io_lib:format(Msg, [DocId, DbName, GroupId]));
+            ?LOG_ERROR("Duplicates of document `~s` detected in view group `~s`"
+                ", database `~s` - view rebuild, from scratch, is required",
+                [DocId, GroupId, DbName]),
+            exit({view_duplicated_id, DocId});
         true -> ok end,
         if TotalCopied rem 10000 =:= 0 ->
             couch_task_status:update("Copied ~p of ~p Ids (~p%)",
