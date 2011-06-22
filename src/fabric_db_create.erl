@@ -24,11 +24,8 @@
 %% @doc Create a new database, and all its partition files across the cluster
 %%      Options is proplist with user_ctx, n, q, validate_name
 go(DbName, Options) ->
-    CheckName = couch_util:get_value(validate_name, Options, true),
-    case CheckName andalso re:run(DbName, ?DBNAME_REGEX, [{capture,none}]) of
-    nomatch ->
-        {error, illegal_database_name};
-    _ -> % CheckName =:= false orelse regex matched
+    case validate_dbname(DbName, Options) of
+    ok ->
         {MegaSecs, Secs, _} = now(),
         Suffix = "." ++ integer_to_list(MegaSecs*1000000 + Secs),
         Shards = mem3:choose_shards(DbName, [{shard_suffix,Suffix} | Options]),
@@ -47,6 +44,25 @@ go(DbName, Options) ->
             case X of {ok, _} -> ok; Else -> Else end;
         {ok, false} ->
             {error, internal_server_error}
+        end;
+    Error ->
+        Error
+    end.
+
+validate_dbname(DbName, Options) ->
+    case couch_util:get_value(validate_name, Options, true) of
+    false ->
+        ok;
+    true ->
+        case re:run(DbName, ?DBNAME_REGEX, [{capture,none}]) of
+        match ->
+            ok;
+        nomatch when DbName =:= <<"_users">> ->
+            ok;
+        nomatch when DbName =:= <<"_replicator">> ->
+            ok;
+        nomatch ->
+            {error, illegal_database_name}
         end
     end.
 
