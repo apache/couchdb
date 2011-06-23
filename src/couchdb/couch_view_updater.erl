@@ -12,30 +12,31 @@
 
 -module(couch_view_updater).
 
--export([update/2]).
+-export([update/3]).
 
 -include("couch_db.hrl").
 
--spec update(_, #group{}) -> no_return().
+-spec update(_, #group{}, Dbname::binary()) -> no_return().
 
-update(Owner, Group) ->
+update(Owner, Group, DbName) ->
     #group{
-        db = #db{name=DbName} = Db,
         name = GroupName,
         current_seq = Seq,
         purge_seq = PurgeSeq
     } = Group,
     couch_task_status:add_task(<<"View Group Indexer">>, <<DbName/binary," ",GroupName/binary>>, <<"Starting index update">>),
 
+    {ok, Db} = couch_db:open_int(DbName, []),
     DbPurgeSeq = couch_db:get_purge_seq(Db),
     Group2 =
     if DbPurgeSeq == PurgeSeq ->
         Group;
     DbPurgeSeq == PurgeSeq + 1 ->
         couch_task_status:update(<<"Removing purged entries from view index.">>),
-        purge_index(Group);
+        purge_index(Group, Db);
     true ->
         couch_task_status:update(<<"Resetting view index due to lost purge entries.">>),
+        couch_db:close(Db),
         exit(reset)
     end,
     {ok, MapQueue} = couch_work_queue:new(
@@ -73,13 +74,14 @@ update(Owner, Group) ->
     couch_task_status:set_update_frequency(0),
     couch_task_status:update("Finishing."),
     couch_work_queue:close(MapQueue),
+    couch_db:close(Db),
     receive {new_group, NewGroup} ->
         exit({new_group,
                 NewGroup#group{current_seq=couch_db:get_update_seq(Db)}})
     end.
 
 
-purge_index(#group{db=Db, views=Views, id_btree=IdBtree}=Group) ->
+purge_index(#group{views=Views, id_btree=IdBtree}=Group, Db) ->
     {ok, PurgedIdsRevs} = couch_db:get_last_purged(Db),
     Ids = [Id || {Id, _Revs} <- PurgedIdsRevs],
     {ok, Lookups, IdBtree2} = couch_btree:query_modify(IdBtree, Ids, [], Ids),
