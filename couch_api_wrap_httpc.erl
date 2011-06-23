@@ -155,6 +155,11 @@ process_stream_response(ReqId, Worker, HttpDb, Params, Callback) ->
         end;
     {ibrowse_async_response, ReqId, {error, _} = Error} ->
         maybe_retry(Error, Worker, HttpDb, Params, Callback)
+    after HttpDb#httpdb.timeout + 500 ->
+        % Note: ibrowse should always reply with timeouts, but this doesn't
+        % seem to be always true when there's a very high rate of requests
+        % and many open connections.
+        maybe_retry(timeout, Worker, HttpDb, Params, Callback)
     end.
 
 
