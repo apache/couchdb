@@ -257,7 +257,13 @@ do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
     couch_task_status:add_task(
         "Replication",
          io_lib:format("`~s`: `~s` -> `~s`",
-            [BaseId ++ Ext, SourceName, TargetName]), "Starting"),
+            [BaseId ++ Ext, SourceName, TargetName]),
+        "Starting" ++ case StartSeq of
+            ?LOWEST_SEQ ->
+                "";
+            _ ->
+                " (from source sequence " ++ integer_to_list(StartSeq) ++ ")"
+            end),
 
     % Until OTP R14B03:
     %
@@ -274,10 +280,16 @@ do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
         "~ca worker batch size of ~p~n"
         "~c~p HTTP connections, each with a pipeline size of ~p~n"
         "~ca connection timeout of ~p milliseconds~n"
-        "~csocket options are: ~s",
+        "~csocket options are: ~s~s",
         [BaseId ++ Ext, $\t, CopiersCount, $\t, BatchSize, $\t, MaxHttpConns,
             HttpPipeSize, $\t, get_value(connection_timeout, Options),
-            $\t, io_lib:format("~p", [get_value(socket_options, Options)])]),
+            $\t, io_lib:format("~p", [get_value(socket_options, Options)]),
+            case StartSeq of
+            ?LOWEST_SEQ ->
+                "";
+            _ ->
+                io_lib:format("~n~csource start sequence ~p", [$\t, StartSeq])
+            end]),
 
     ?LOG_DEBUG("Missing rev finder pids are: ~p", [MissingRevFinders]),
     ?LOG_DEBUG("Worker pids are: ~p", [Workers]),
