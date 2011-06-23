@@ -20,14 +20,14 @@
 %% @doc Compacts the views.  GroupId must not include the _design/ prefix
 start_compact(DbName, GroupId) ->
     Pid = couch_view:get_group_server(DbName, <<"_design/",GroupId/binary>>),
-    gen_server:cast(Pid, {start_compact, fun compact_group/2}).
+    gen_server:cast(Pid, {start_compact, fun compact_group/3}).
 
 %%=============================================================================
 %% internal functions
 %%=============================================================================
 
 %% @spec compact_group(Group, NewGroup) -> ok
-compact_group(Group, EmptyGroup) ->
+compact_group(Group, EmptyGroup, DbName) ->
     #group{
         current_seq = Seq,
         id_btree = IdBtree,
@@ -36,16 +36,16 @@ compact_group(Group, EmptyGroup) ->
     } = Group,
 
     #group{
-        db = Db,
         id_btree = EmptyIdBtree,
         views = EmptyViews
     } = EmptyGroup,
 
+    {ok, Db} = couch_db:open_int(DbName, []),
     {ok, DbReduce} = couch_btree:full_reduce(Db#db.fulldocinfo_by_id_btree),
+    couch_db:close(Db),
     Count = element(1, DbReduce),
 
     <<"_design", ShortName/binary>> = GroupId,
-    DbName = couch_db:name(Db),
     TaskName = <<DbName/binary, ShortName/binary>>,
     couch_task_status:add_task(<<"View Group Compaction">>, TaskName, <<"">>),
     BufferSize = list_to_integer(
