@@ -211,9 +211,9 @@ maybe_add_trailing_slash(Url) ->
 make_options(Props) ->
     Options = lists:ukeysort(1, convert_options(Props)),
     DefWorkers = couch_config:get("replicator", "worker_processes", "4"),
-    DefBatchSize = couch_config:get("replicator", "worker_batch_size", "1000"),
+    DefBatchSize = couch_config:get("replicator", "worker_batch_size", "500"),
     DefConns = couch_config:get("replicator", "http_connections", "20"),
-    DefPipeSize = couch_config:get("replicator", "http_pipeline_size", "50"),
+    DefPipeSize = couch_config:get("replicator", "http_pipeline_size", "1"),
     DefTimeout = couch_config:get("replicator", "connection_timeout", "30000"),
     {ok, DefSocketOptions} = couch_util:parse_term(
         couch_config:get("replicator", "socket_options",
