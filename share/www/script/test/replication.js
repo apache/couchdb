@@ -504,6 +504,47 @@ couchTests.replication = function(debug) {
   }
 
 
+  // test since_seq parameter
+  docs = makeDocs(1, 6);
+
+  for (i = 0; i < dbPairs.length; i++) {
+    var since_seq = 3;
+    populateDb(sourceDb, docs);
+    populateDb(targetDb, []);
+
+    var expected_ids = [];
+    var changes = sourceDb.changes({since: since_seq});
+    for (j = 0; j < changes.results.length; j++) {
+      expected_ids.push(changes.results[j].id);
+    }
+    TEquals(2, expected_ids.length, "2 documents since since_seq");
+
+    repResult = CouchDB.replicate(
+      dbPairs[i].source,
+      dbPairs[i].target,
+      {body: {since_seq: since_seq}}
+    );
+    TEquals(true, repResult.ok);
+    TEquals(2, repResult.history[0].missing_checked);
+    TEquals(2, repResult.history[0].missing_found);
+    TEquals(2, repResult.history[0].docs_read);
+    TEquals(2, repResult.history[0].docs_written);
+    TEquals(0, repResult.history[0].doc_write_failures);
+
+    for (j = 0; j < docs.length; j++) {
+      doc = docs[j];
+      copy = targetDb.open(doc._id);
+
+      if (expected_ids.indexOf(doc._id) === -1) {
+        T(copy === null);
+      } else {
+        T(copy !== null);
+        TEquals(true, compareObjects(doc, copy));
+      }
+    }
+  }
+
+
   // test errors due to doc validate_doc_update functions in the target endpoint
   docs = makeDocs(1, 8);
   docs[2]["_attachments"] = {
