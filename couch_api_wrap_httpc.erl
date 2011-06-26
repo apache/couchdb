@@ -25,7 +25,6 @@
     get_value/3
 ]).
 
--define(RETRY_LATER_WAIT, 50).
 -define(replace(L, K, V), lists:keystore(K, 1, L, {K, V})).
 
 
@@ -87,18 +86,22 @@ send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb, Params) ->
     {Worker, Response}.
 
 
+wait_retry() ->
+    ok = timer:sleep(random:uniform(40) + 10).
+
+
 get_piped_worker(#httpdb{httpc_pool = Pool} = HttpDb) ->
     case couch_httpc_pool:get_piped_worker(Pool) of
     {ok, Worker} ->
         Worker;
     retry_later ->
-        ok = timer:sleep(?RETRY_LATER_WAIT),
+        wait_retry(),
         get_piped_worker(HttpDb)
     end.
 
 
 process_response({error, sel_conn_closed}, _Worker, HttpDb, Params, Callback) ->
-    ok = timer:sleep(?RETRY_LATER_WAIT),
+    wait_retry(),
     send_req(HttpDb, Params, Callback);
 
 process_response({error, {'EXIT', {normal, _}}}, _Worker, HttpDb, Params, Cb) ->
