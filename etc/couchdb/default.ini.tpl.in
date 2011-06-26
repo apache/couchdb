@@ -162,11 +162,11 @@ max_replication_retry_count = 10
 worker_processes = 4
 ; With lower batch sizes checkpoints are done more frequently. Lower batch sizes
 ; also reduce the total amount of used RAM memory.
-worker_batch_size = 1000
+worker_batch_size = 500
 ; Maximum number of HTTP connections and pipeline size (for each connection)
 ; per replication. These two settings have more impact on pull replications.
 http_connections = 20
-http_pipeline_size = 50
+http_pipeline_size = 1
 ; HTTP connection timeout per replication.
 ; Even for very fast/reliable networks it might need to be increased if a remote
 ; database is too busy.
