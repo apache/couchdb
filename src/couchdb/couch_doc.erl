@@ -21,7 +21,7 @@
 -export([abort_multi_part_stream/1]).
 -export([to_path/1]).
 -export([mp_parse_doc/2]).
--export([with_ejson_body/1, with_bin_body/1]).
+-export([with_ejson_body/1]).
 
 -include("couch_db.hrl").
 
@@ -571,12 +571,6 @@ abort_multi_part_stream(Parser, MonRef) ->
     false ->
         erlang:demonitor(MonRef, [flush])
     end.
-
-
-with_bin_body(#doc{body = Json} = Doc) when is_binary(Json) ->
-    Doc;
-with_bin_body(#doc{body = EJson} = Doc) ->
-    Doc#doc{body = couch_compress:compress(EJson)}.
 
 
 with_ejson_body(#doc{body = Body} = Doc) when is_binary(Body) ->
