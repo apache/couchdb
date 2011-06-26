@@ -537,7 +537,8 @@ init_state(Rep) ->
 
     [SourceLog, TargetLog] = find_replication_logs([Source, Target], Rep),
 
-    {StartSeq, History} = compare_replication_logs(SourceLog, TargetLog),
+    {StartSeq0, History} = compare_replication_logs(SourceLog, TargetLog),
+    StartSeq = get_value(since_seq, Options, StartSeq0),
     #doc{body={CheckpointHistory}} = SourceLog,
     State = #rep_state{
         rep_details = Rep,

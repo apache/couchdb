@@ -258,6 +258,8 @@ convert_options([{<<"connection_timeout">>, V} | R]) ->
 convert_options([{<<"socket_options">>, V} | R]) ->
     {ok, SocketOptions} = couch_util:parse_term(V),
     [{socket_options, SocketOptions} | convert_options(R)];
+convert_options([{<<"since_seq">>, V} | R]) ->
+    [{since_seq, V} | convert_options(R)];
 convert_options([_ | R]) -> % skip unknown option
     convert_options(R).
 
