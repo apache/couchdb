@@ -247,7 +247,7 @@ do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
     MaxHttpConns = get_value(http_connections, Options),
     HttpPipeSize = get_value(http_pipeline_size, Options),
     MaxParallelConns = lists:max(
-        [(MaxHttpConns * HttpPipeSize) div CopiersCount, 1]),
+        [((MaxHttpConns * HttpPipeSize) div CopiersCount) - 1, 1]),
     Workers = lists:map(
         fun(_) ->
             {ok, Pid} = couch_replicator_doc_copier:start_link(
