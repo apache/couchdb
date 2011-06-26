@@ -476,16 +476,24 @@ body_length(Req) ->
         Unknown -> {unknown_transfer_encoding, Unknown}
     end.
 
-body(#httpd{mochi_req=MochiReq, req_body=ReqBody}) ->
-    case ReqBody of
+body(#httpd{mochi_req=MochiReq, req_body=undefined} = Req) ->
+    case body_length(Req) of
         undefined ->
-            % Maximum size of document PUT request body (4GB)
             MaxSize = list_to_integer(
                 couch_config:get("couchdb", "max_document_size", "4294967296")),
             MochiReq:recv_body(MaxSize);
-        _Else ->
-            ReqBody
-    end.
+        chunked ->
+            ChunkFun = fun({0, _Footers}, Acc) ->
+                lists:reverse(Acc);
+            ({_Len, Chunk}, Acc) ->
+                [Chunk | Acc]
+            end,
+            recv_chunked(Req, 8192, ChunkFun, []);
+        Len ->
+            MochiReq:recv_body(Len)
+    end;
+body(#httpd{req_body=ReqBody}) ->
+    ReqBody.
 
 json_body(Httpd) ->
     ?JSON_DECODE(body(Httpd)).
