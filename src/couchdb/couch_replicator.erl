@@ -68,7 +68,8 @@
     source_db_compaction_notifier = nil,
     target_db_compaction_notifier = nil,
     source_monitor = nil,
-    target_monitor = nil
+    target_monitor = nil,
+    source_seq = nil
 }).
 
 
@@ -212,7 +213,8 @@ do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
         target = Target,
         source_name = SourceName,
         target_name = TargetName,
-        start_seq = StartSeq
+        start_seq = StartSeq,
+        source_seq = SourceCurSeq
     } = State = init_state(Rep),
 
     CopiersCount = get_value(worker_processes, Options),
@@ -258,12 +260,7 @@ do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
         "Replication",
          io_lib:format("`~s`: `~s` -> `~s`",
             [BaseId ++ Ext, SourceName, TargetName]),
-        "Starting" ++ case StartSeq of
-            ?LOWEST_SEQ ->
-                "";
-            _ ->
-                " (from source sequence " ++ integer_to_list(StartSeq) ++ ")"
-            end),
+         io_lib:format("Processed ~p / ~p changes", [StartSeq, SourceCurSeq])),
 
     % Until OTP R14B03:
     %
@@ -435,17 +432,15 @@ handle_cast({report_seq_done, Seq, StatsInc},
         "Seqs in progress were: ~p~nSeqs in progress are now: ~p",
         [Seq, ThroughSeq, NewThroughSeq, HighestDone,
             NewHighestDone, SeqsInProgress, NewSeqsInProgress]),
-    case NewThroughSeq of
-    ThroughSeq ->
-        ok;
-    _ ->
-        couch_task_status:update("Processed source seq ~p", [NewThroughSeq])
-    end,
+    SourceCurSeq = source_cur_seq(State),
+    couch_task_status:update(
+        "Processed ~p / ~p changes", [NewThroughSeq, SourceCurSeq]),
     NewState = State#rep_state{
         stats = sum_stats([Stats, StatsInc]),
         current_through_seq = NewThroughSeq,
         seqs_in_progress = NewSeqsInProgress,
-        highest_seq_done = NewHighestDone
+        highest_seq_done = NewHighestDone,
+        source_seq = SourceCurSeq
     },
     {noreply, NewState};
 
@@ -562,7 +557,8 @@ init_state(Rep) ->
         target_db_compaction_notifier =
             start_db_compaction_notifier(Target, self()),
         source_monitor = db_monitor(Source),
-        target_monitor = db_monitor(Target)
+        target_monitor = db_monitor(Target),
+        source_seq = get_value(<<"update_seq">>, SourceInfo, ?LOWEST_SEQ)
     },
     State#rep_state{timer = start_timer(State)}.
 
@@ -869,3 +865,15 @@ db_monitor(#db{} = Db) ->
     couch_db:monitor(Db);
 db_monitor(_HttpDb) ->
     nil.
+
+
+source_cur_seq(#rep_state{source = #httpdb{} = Db, source_seq = Seq}) ->
+    case (catch couch_api_wrap:get_db_info(Db#httpdb{retries = 3})) of
+    {ok, Info} ->
+        get_value(<<"update_seq">>, Info, Seq);
+    _ ->
+        Seq
+    end;
+source_cur_seq(#rep_state{source = Db, source_seq = Seq}) ->
+    {ok, Info} = couch_api_wrap:get_db_info(Db),
+    get_value(<<"update_seq">>, Info, Seq).
