@@ -521,10 +521,10 @@ flush_doc(Target, #doc{id = Id, revs = {Pos, [RevId | _]}} = Doc) ->
             [Id, couch_doc:rev_to_str({Pos, RevId}),
                 couch_api_wrap:db_uri(Target), to_binary(Error), to_binary(Reason)]),
         {error, Error};
-    Tag:Err ->
+    throw:Err ->
         ?LOG_ERROR("Replicator: couldn't write document `~s`, revision `~s`,"
             " to target database `~s`. Error: `~s`.",
             [Id, couch_doc:rev_to_str({Pos, RevId}),
-                couch_api_wrap:db_uri(Target), to_binary({Tag, Err})]),
+                couch_api_wrap:db_uri(Target), to_binary(Err)]),
         {error, Err}
     end.

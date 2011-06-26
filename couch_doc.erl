@@ -501,15 +501,16 @@ doc_from_multi_part_stream(ContentType, DataFun) ->
         unlink(Parent),
         Parent ! {self(), finished}
         end),
-    Parser ! {get_doc_bytes, self()},
+    Ref = make_ref(),
+    Parser ! {get_doc_bytes, Ref, self()},
     receive 
-    {doc_bytes, DocBytes} ->
+    {doc_bytes, Ref, DocBytes} ->
         Doc = from_json_obj(?JSON_DECODE(DocBytes)),
         % go through the attachments looking for 'follows' in the data,
         % replace with function that reads the data from MIME stream.
         ReadAttachmentDataFun = fun() ->
-            Parser ! {get_bytes, self()},
-            receive {bytes, Bytes} -> Bytes end
+            Parser ! {get_bytes, Ref, self()},
+            receive {bytes, Ref, Bytes} -> Bytes end
         end,
         Atts2 = lists:map(
             fun(#att{data=follows}=A) ->
@@ -536,8 +537,8 @@ mp_parse_doc({body, Bytes}, AccBytes) ->
         mp_parse_doc(Next, [Bytes | AccBytes])
     end;
 mp_parse_doc(body_end, AccBytes) ->
-    receive {get_doc_bytes, From} ->
-        From ! {doc_bytes, lists:reverse(AccBytes)}
+    receive {get_doc_bytes, Ref, From} ->
+        From ! {doc_bytes, Ref, lists:reverse(AccBytes)}
     end,
     fun mp_parse_atts/1.
 
@@ -546,8 +547,8 @@ mp_parse_atts(eof) ->
 mp_parse_atts({headers, _H}) ->
     fun mp_parse_atts/1;
 mp_parse_atts({body, Bytes}) ->
-    receive {get_bytes, From} ->
-        From ! {bytes, Bytes}
+    receive {get_bytes, Ref, From} ->
+        From ! {bytes, Ref, Bytes}
     end,
     fun mp_parse_atts/1;
 mp_parse_atts(body_end) ->
@@ -560,9 +561,9 @@ abort_multi_part_stream(Parser) ->
 abort_multi_part_stream(Parser, MonRef) ->
     case is_process_alive(Parser) of
     true ->
-        Parser ! {get_bytes, self()},
+        Parser ! {get_bytes, nil, self()},
         receive
-        {bytes, _Bytes} ->
+        {bytes, nil, _Bytes} ->
              abort_multi_part_stream(Parser, MonRef);
         {'DOWN', MonRef, _, _, _} ->
              ok
