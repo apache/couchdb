@@ -25,7 +25,8 @@
 -record(job, {
     client::reference(),
     worker::reference(),
-    pid::pid()
+    client_pid::pid(),
+    worker_pid::pid()
 }).
 
 -record(st, {
@@ -68,15 +69,20 @@ handle_call(_Request, _From, St) ->
 handle_cast({doit, From, MFA}, St) ->
     handle_cast({doit, From, undefined, MFA}, St);
 
-handle_cast({doit, From, Nonce, MFA}, State) ->
+handle_cast({doit, {ClientPid, ClientRef} = From, Nonce, MFA}, State) ->
     {LocalPid, Ref} = spawn_monitor(?MODULE, init_p, [From, MFA, Nonce]),
-    Job = #job{client = element(2, From), worker = Ref, pid = LocalPid},
+    Job = #job{
+        client = ClientRef,
+        worker = Ref,
+        client_pid = ClientPid,
+        worker_pid = LocalPid
+    },
     {noreply, add_job(Job, State)};
 
 
 handle_cast({kill, FromRef}, #st{clients = Clients} = St) ->
     case find_worker(FromRef, Clients) of
-    #job{worker = KeyRef, pid = Pid} = Job ->
+    #job{worker = KeyRef, worker_pid = Pid} = Job ->
         erlang:demonitor(KeyRef),
         exit(Pid, kill),
         {noreply, remove_job(Job, St)};
@@ -98,13 +104,13 @@ handle_info({'DOWN', Ref, process, _, normal}, #st{workers=Workers} = St) ->
 
 handle_info({'DOWN', Ref, process, Pid, Error}, #st{workers=Workers} = St) ->
     case find_worker(Ref, Workers) of
-    #job{pid=Pid, worker=Ref, client=From} = Job ->
+    #job{worker_pid=Pid, worker=Ref, client_pid=CPid, client=CRef} =Job ->
         case Error of #error{reason = {_Class, Reason}, stack = Stack} ->
-            notify_caller(From, {Reason, Stack}),
+            notify_caller({CPid, CRef}, {Reason, Stack}),
             St1 = save_error(Error, St),
             {noreply, remove_job(Job, St1)};
         _ ->
-            notify_caller(From, Error),
+            notify_caller({CPid, CRef}, Error),
             {noreply, remove_job(Job, St)}
         end;
     false ->
@@ -115,15 +121,16 @@ handle_info(_Info, St) ->
     {noreply, St}.
 
 terminate(_Reason, St) ->
-    ets:foldl(fun(#job{pid=Pid},_) -> exit(Pid,kill) end, nil, St#st.workers),
+    ets:foldl(fun(#job{worker_pid=Pid},_) -> exit(Pid,kill) end, nil,
+        St#st.workers),
     ok.
 
 code_change(_OldVsn, {st, Workers}, _Extra) ->
     {ok, #st{workers = Workers}};
 
 code_change(_OldVsn, {st, Workers0, Errors, Limit, Count}, _Extra) ->
-    Jobs = [#job{pid=A, worker=B, client=C} || {A, B, {_, C}}
-        <- ets:tab2list(Workers0)],
+    Jobs = [#job{worker_pid=A, worker=B, client_pid=C, client=D}
+        || {A, B, {C, D}} <- ets:tab2list(Workers0)],
     ets:delete(Workers0),
     State = #st{errors = Errors, error_limit = Limit, error_count = Count},
     ets:insert(State#st.workers, Jobs),
