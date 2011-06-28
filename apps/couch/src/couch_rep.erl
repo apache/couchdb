@@ -322,7 +322,7 @@ start_replication_server(Replicator) ->
             throw({db_not_found, <<"could not open ", DbUrl/binary>>});
         {error, {unauthorized, DbUrl}} ->
             throw({unauthorized,
-                <<"unauthorized to access database ", DbUrl/binary>>});
+                <<"unauthorized to access or create database ", DbUrl/binary>>});
         {error, {'EXIT', {badarg,
             [{erlang, apply, [gen_server, start_link, undefined]} | _]}}} ->
             % Clause to deal with a change in the supervisor module introduced
@@ -338,7 +338,7 @@ start_replication_server(Replicator) ->
         throw({db_not_found, <<"could not open ", DbUrl/binary>>});
     {error, {{unauthorized, DbUrl}, _}} ->
         throw({unauthorized,
-            <<"unauthorized to access database ", DbUrl/binary>>})
+            <<"unauthorized to access or create database ", DbUrl/binary>>})
     end.
 
 compare_replication_logs(SrcDoc, TgtDoc) ->
