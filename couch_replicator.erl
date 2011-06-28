@@ -740,7 +740,7 @@ update_checkpoint(Db, Doc, DbType) ->
                 " checkpoint document: ", (to_binary(Reason))/binary>>})
     end.
 
-update_checkpoint(Db, Doc) ->
+update_checkpoint(Db, #doc{id = LogId, body = LogBody} = Doc) ->
     try
         case couch_api_wrap:update_doc(Db, Doc, [delay_commit]) of
         {ok, PosRevId} ->
@@ -749,7 +749,19 @@ update_checkpoint(Db, Doc) ->
             throw({checkpoint_commit_failure, Reason})
         end
     catch throw:conflict ->
-        throw({checkpoint_commit_failure, conflict})
+        case (catch couch_api_wrap:open_doc(Db, LogId, [ejson_body])) of
+        {ok, #doc{body = LogBody, revs = {Pos, [RevId | _]}}} ->
+            % This means that we were able to update successfully the
+            % checkpoint doc in a previous attempt but we got a connection
+            % error (timeout for e.g.) before receiving the success response.
+            % Therefore the request was retried and we got a conflict, as the
+            % revision we sent is not the current one.
+            % We confirm this by verifying the doc body we just got is the same
+            % that we have just sent.
+            {Pos, RevId};
+        _ ->
+            throw({checkpoint_commit_failure, conflict})
+        end
     end.
 
 
