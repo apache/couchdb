@@ -198,7 +198,7 @@ init(InitArgs) ->
     catch
     throw:{unauthorized, DbUri} ->
         {stop, {unauthorized,
-            <<"unauthorized to access database ", DbUri/binary>>}};
+            <<"unauthorized to access or create database ", DbUri/binary>>}};
     throw:{db_not_found, DbUri} ->
         {stop, {db_not_found, <<"could not open ", DbUri/binary>>}};
     throw:Error ->
