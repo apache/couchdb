@@ -17,7 +17,7 @@
 
 -export([parse_view_params/3]).
 -export([make_view_fold_fun/7, finish_view_fold/4, finish_view_fold/5, view_row_obj/4]).
--export([view_etag/3, view_etag/4, make_reduce_fold_funs/6]).
+-export([view_etag/5, make_reduce_fold_funs/6]).
 -export([design_doc_view/5, parse_bool_param/1, doc_member/3]).
 -export([make_key_options/1, load_view/4]).
 
@@ -114,7 +114,7 @@ output_map_view(Req, View, Group, Db, QueryArgs, nil) ->
         limit = Limit,
         skip = SkipCount
     } = QueryArgs,
-    CurrentEtag = view_etag(Db, Group, View),
+    CurrentEtag = view_etag(Db, Group, View, QueryArgs),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         {ok, RowCount} = couch_view:get_row_count(View),
         FoldlFun = make_view_fold_fun(Req, QueryArgs, CurrentEtag, Db, Group#group.current_seq, RowCount, #view_fold_helper_funs{reduce_count=fun couch_view:reduce_to_count/1}),
@@ -130,7 +130,7 @@ output_map_view(Req, View, Group, Db, QueryArgs, Keys) ->
         limit = Limit,
         skip = SkipCount
     } = QueryArgs,
-    CurrentEtag = view_etag(Db, Group, View, Keys),
+    CurrentEtag = view_etag(Db, Group, View, QueryArgs, Keys),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         {ok, RowCount} = couch_view:get_row_count(View),
         FoldAccInit = {Limit, SkipCount, undefined, []},
@@ -155,7 +155,7 @@ output_reduce_view(Req, Db, View, Group, QueryArgs, nil) ->
         skip = Skip,
         group_level = GroupLevel
     } = QueryArgs,
-    CurrentEtag = view_etag(Db, Group, View),
+    CurrentEtag = view_etag(Db, Group, View, QueryArgs),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         {ok, GroupRowsFun, RespFun} = make_reduce_fold_funs(Req, GroupLevel,
                 QueryArgs, CurrentEtag, Group#group.current_seq,
@@ -173,7 +173,7 @@ output_reduce_view(Req, Db, View, Group, QueryArgs, Keys) ->
         skip = Skip,
         group_level = GroupLevel
     } = QueryArgs,
-    CurrentEtag = view_etag(Db, Group, View, Keys),
+    CurrentEtag = view_etag(Db, Group, View, QueryArgs, Keys),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         {ok, GroupRowsFun, RespFun} = make_reduce_fold_funs(Req, GroupLevel,
                 QueryArgs, CurrentEtag, Group#group.current_seq,
@@ -640,14 +640,16 @@ send_json_reduce_row(Resp, {Key, Value}, RowFront) ->
     send_chunk(Resp, RowFront ++ ?JSON_ENCODE({[{key, Key}, {value, Value}]})),
     {ok, ",\r\n"}.
 
-view_etag(Db, Group, View) ->
-    view_etag(Db, Group, View, nil).
+view_etag(Db, Group, View, QueryArgs) ->
+    view_etag(Db, Group, View, QueryArgs, nil).
 
-view_etag(Db, Group, {reduce, _, _, View}, Extra) ->
-    view_etag(Db, Group, View, Extra);
-view_etag(Db, Group, {temp_reduce, View}, Extra) ->
-    view_etag(Db, Group, View, Extra);
-view_etag(_Db, #group{sig=Sig}, #view{update_seq=UpdateSeq, purge_seq=PurgeSeq}, Extra) ->
+view_etag(Db, Group, {reduce, _, _, View}, QueryArgs, Extra) ->
+    view_etag(Db, Group, View, QueryArgs, Extra);
+view_etag(Db, Group, {temp_reduce, View}, QueryArgs, Extra) ->
+    view_etag(Db, Group, View, QueryArgs, Extra);
+view_etag(_Db, #group{sig=Sig, current_seq=CurrentSeq}, _View, #view_query_args{include_docs=true}, Extra) ->
+    couch_httpd:make_etag({Sig, CurrentSeq, Extra});
+view_etag(_Db, #group{sig=Sig}, #view{update_seq=UpdateSeq, purge_seq=PurgeSeq}, _QueryArgs, Extra) ->
     couch_httpd:make_etag({Sig, UpdateSeq, PurgeSeq, Extra}).
 
 % the view row has an error
