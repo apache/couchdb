@@ -29,6 +29,8 @@ Version 1.1.1
 
 This version has not been released yet.
 
+* ETags for views include current sequence if include_docs=true.
+
 Version 1.1.0
 -------------
 
