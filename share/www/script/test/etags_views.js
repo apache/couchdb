@@ -70,6 +70,14 @@ couchTests.etags_views = function(debug) {
   xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/basicView");
   var etag1 = xhr.getResponseHeader("etag");
   T(etag1 == etag);
+
+  // verify ETag always changes for include_docs=true on update
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/basicView?include_docs=true");
+  var etag1 = xhr.getResponseHeader("etag");
+  T(db.save({"_id":"doc2", "foo":"bar"}).ok);
+  xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/basicView?include_docs=true");
+  var etag2 = xhr.getResponseHeader("etag");
+  T(etag1 != etag2);
  
   // Verify that purges affect etags
   xhr = CouchDB.request("GET", "/test_suite_db/_design/etags/_view/fooView");
