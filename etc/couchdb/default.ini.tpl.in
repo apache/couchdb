@@ -137,6 +137,7 @@ compressible_types = text/*, application/javascript, application/json, applicati
 
 [replicator]
 db = _replicator
+; Maximum replicaton retry count can be a non-negative integer or "infinity".
 max_replication_retry_count = 10
 max_http_sessions = 20
 max_http_pipeline_size = 50
