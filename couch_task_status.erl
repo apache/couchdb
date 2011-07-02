@@ -29,6 +29,14 @@
 
 -include("couch_db.hrl").
 
+-record(task_status, {
+    type,
+    name,
+    start_ts,
+    update_ts,
+    status
+}).
+
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -44,11 +52,16 @@ all() ->
 
 add_task(Type, TaskName, StatusText) ->
     put(task_status_update, {{0, 0, 0}, 0}),
+    Ts = now_ts(),
     Msg = {
         add_task,
-        to_binary(Type),
-        to_binary(TaskName),
-        to_binary(StatusText)
+        #task_status{
+            type = to_binary(Type),
+            name = to_binary(TaskName),
+            status = to_binary(StatusText),
+            start_ts = Ts,
+            update_ts = Ts
+        }
     },
     gen_server:call(?MODULE, Msg).
 
@@ -82,10 +95,10 @@ terminate(_Reason,_State) ->
     ok.
 
 
-handle_call({add_task, Type, TaskName, StatusText}, {From, _}, Server) ->
+handle_call({add_task, TaskStatus}, {From, _}, Server) ->
     case ets:lookup(?MODULE, From) of
     [] ->
-        true = ets:insert(?MODULE, {From, {Type, TaskName, StatusText}}),
+        true = ets:insert(?MODULE, {From, TaskStatus}),
         erlang:monitor(process, From),
         {reply, ok, Server};
     [_] ->
@@ -94,21 +107,24 @@ handle_call({add_task, Type, TaskName, StatusText}, {From, _}, Server) ->
 handle_call(all, _, Server) ->
     All = [
         [
-            {type, Type},
-            {task, Task},
-            {status, Status},
+            {type, Task#task_status.type},
+            {task, Task#task_status.name},
+            {started_on, Task#task_status.start_ts},
+            {updated_on, Task#task_status.update_ts},
+            {status, Task#task_status.status},
             {pid, ?l2b(pid_to_list(Pid))}
         ]
         ||
-        {Pid, {Type, Task, Status}} <- ets:tab2list(?MODULE)
+        {Pid, Task} <- ets:tab2list(?MODULE)
     ],
     {reply, All, Server}.
 
 
 handle_cast({update_status, Pid, StatusText}, Server) ->
-    [{Pid, {Type, TaskName, _StatusText}}] = ets:lookup(?MODULE, Pid),
+    [{Pid, #task_status{name = TaskName} = Task}] = ets:lookup(?MODULE, Pid),
     ?LOG_DEBUG("New task status for ~s: ~s",[TaskName, StatusText]),
-    true = ets:insert(?MODULE, {Pid, {Type, TaskName, StatusText}}),
+    NewTaskStatus = Task#task_status{status = StatusText, update_ts = now_ts()},
+    true = ets:insert(?MODULE, {Pid, NewTaskStatus}),
     {noreply, Server};
 handle_cast(stop, State) ->
     {stop, normal, State}.
@@ -122,3 +138,7 @@ handle_info({'DOWN', _MonitorRef, _Type, Pid, _Info}, Server) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+
+now_ts() ->
+    {Mega, Secs, _} = erlang:now(),
+    Mega * 1000000 + Secs.
