@@ -314,8 +314,13 @@ process_update(State, {Change}) ->
         <<"completed">> ->
             replication_complete(DocId),
             State;
-        _ ->
-            State
+        <<"error">> ->
+            case ets:lookup(?DOC_TO_REP, DocId) of
+            [] ->
+                maybe_start_replication(State, DocId, JsonRepDoc);
+            _ ->
+                State
+            end
         end
     end.
 
