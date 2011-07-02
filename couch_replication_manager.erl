@@ -190,6 +190,10 @@ handle_info({'EXIT', From, normal}, #state{rep_start_pids = Pids} = State) ->
     % one of the replication start processes terminated successfully
     {noreply, State#state{rep_start_pids = Pids -- [From]}};
 
+handle_info({'DOWN', _Ref, _, _, _}, State) ->
+    % From a db monitor created by a replication process. Ignore.
+    {noreply, State};
+
 handle_info(Msg, State) ->
     ?LOG_ERROR("Replication manager received unexpected message ~p", [Msg]),
     {stop, {unexpected_msg, Msg}, State}.
