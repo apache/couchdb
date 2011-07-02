@@ -42,6 +42,8 @@ specific language governing permissions and limitations under the License.
         <thead><tr>
           <th>Type</th>
           <th>Object</th>
+          <th>Started on</th>
+          <th>Last updated on</th>
           <th>PID</th>
           <th>Status</th>
         </tr></thead>
@@ -51,6 +53,15 @@ specific language governing permissions and limitations under the License.
     </div>
   </div></body>
   <script>
+    function toTaskDate(timestamp) {
+      var d = new Date(timestamp * 1000);
+      var hours = d.getHours(), min = d.getMinutes(), secs = d.getSeconds();
+      var year = d.getFullYear(), month = d.getMonth(), day = d.getDate();
+
+      return String(year) + "-" + (month < 10 ? "0" + month : month) + "-" +
+        day + " " + (hours < 10 ? "0" + hours : hours) + ":" +
+        (min < 10 ? "0" + min : min) + ":" + (secs < 10 ? "0" + secs : secs);
+    }
     var refreshTimeout = null;
 
     $.futon.storage.declare("poll_interval", {defaultValue: 5});
@@ -61,13 +72,17 @@ specific language governing permissions and limitations under the License.
           clearTimeout(refreshTimeout);
           $("#status tbody.content").empty();
           if (!tasks.length) {
-            $("<tr class='none'><th colspan='4'>No tasks running</th></tr>")
+            $("<tr class='none'><th colspan='6'>No tasks running</th></tr>")
               .appendTo("#status tbody.content");
           } else {
             $.each(tasks, function(idx, task) {
-              $("<tr><th></th><td class='object'></td><td class='pid'></td><td class='status'></td></tr>")
+              $("<tr><th></th><td class='object'></td><td class='started'>" +
+                "</td><td class='updated'></td><td class='pid'></td>" +
+                "<td class='status'></td></tr>")
                 .find("th").text(task.type).end()
                 .find("td.object").text(task.task).end()
+                .find("td.started").text(toTaskDate(task.started_on)).end()
+                .find("td.updated").text(toTaskDate(task.updated_on)).end()
                 .find("td.pid").text(task.pid).end()
                 .find("td.status").text(task.status).end()
                 .appendTo("#status tbody.content");
