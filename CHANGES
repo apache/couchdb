@@ -39,6 +39,11 @@ OAuth:
 
  * Updated budled erlang_oauth library to the latest version.
 
+Futon:
+
+ * The `Status` screen (active tasks) now displays two new task status
+   fields: `Started on` and `Updated on`.
+
 Version 1.1.1
 -------------
 
