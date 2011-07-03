@@ -75,7 +75,7 @@ replication_completed(RepId) ->
     case rep_state(RepId) of
     nil ->
         ok;
-    #rep_state{doc_id = DocId} = St ->
+    #rep_state{doc_id = DocId} ->
         update_rep_doc(DocId, [{<<"_replication_state">>, <<"completed">>}]),
         ok = gen_server:call(?MODULE, {rep_complete, RepId}, infinity),
         ?LOG_INFO("Replication `~s` finished (triggered by document `~s`)",
