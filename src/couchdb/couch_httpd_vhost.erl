@@ -127,11 +127,16 @@ dispatch_host(MochiReq) ->
             end
     end,
     FinalMochiReq.
-        
+
+append_path("/"=_Target, "/"=_Path) ->
+    "/";
+append_path(Target, Path) ->
+    Target ++ Path.
+
 % default redirect vhost handler 
 redirect_to_vhost(MochiReq, VhostTarget) ->
     Path = MochiReq:get(raw_path),
-    Target = VhostTarget ++ Path,
+    Target = append_path(VhostTarget, Path),
 
     ?LOG_DEBUG("Vhost Target: '~p'~n", [Target]),
 

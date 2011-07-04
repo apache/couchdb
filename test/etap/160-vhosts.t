@@ -52,7 +52,7 @@ admin_user_ctx() -> {user_ctx, #user_ctx{roles=[<<"_admin">>]}}.
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(14),
+    etap:plan(15),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -115,6 +115,7 @@ test() ->
     ok = couch_config:set("vhosts", "*/test", "/etap-test-db", false), 
     ok = couch_config:set("vhosts", "*/test1", 
             "/etap-test-db/_design/doc1/_show/test", false), 
+    ok = couch_config:set("vhosts", "example3.com", "/", false),
 
     %% reload rules
     couch_httpd_vhost:reload(),
@@ -133,6 +134,7 @@ test() ->
     test_vhost_request_path1(),
     test_vhost_request_path2(),
     test_vhost_request_path3(),
+    test_vhost_request_to_root(),
 
     %% restart boilerplate
     couch_db:close(Db),
@@ -287,5 +289,15 @@ test_vhost_request_path3() ->
                 <<"/etap-test-db/_design/doc1/_show/test">> -> true;
                 _ -> false
             end, true, <<"path in req ok">>);
+        _Else -> etap:is(false, true, <<"ibrowse fail">>)
+    end.
+
+test_vhost_request_to_root() ->
+    Uri = server(),
+    case ibrowse:send_req(Uri, [], get, [], []) of
+        {ok, _, _, Body} ->
+            {JsonBody} = ejson:decode(Body),
+            HasCouchDBWelcome = proplists:is_defined(<<"couchdb">>, JsonBody),
+            etap:is(HasCouchDBWelcome, true, "should allow redirect to /");
         _Else -> etap:is(false, true, <<"ibrowse fail">>)
     end.
