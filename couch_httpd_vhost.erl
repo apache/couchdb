@@ -134,7 +134,7 @@ redirect_to_vhost(MochiReq, VhostTarget) ->
     Target = VhostTarget ++ Path,
 
     ?LOG_DEBUG("Vhost Target: '~p'~n", [Target]),
-    
+
     Headers = mochiweb_headers:enter("x-couchdb-vhost-path", Path, 
         MochiReq:get(headers)),
 
