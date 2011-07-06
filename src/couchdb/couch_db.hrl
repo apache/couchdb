@@ -25,8 +25,20 @@
 
 -define(DEFAULT_ATTACHMENT_CONTENT_TYPE, <<"application/octet-stream">>).
 
--define(LOG_DEBUG(Format, Args), couch_log:debug(Format, Args)).
--define(LOG_INFO(Format, Args), couch_log:info(Format, Args)).
+-define(LOG_DEBUG(Format, Args),
+    case couch_log:debug_on() of
+        true ->
+            couch_log:debug(Format, Args);
+        false -> ok
+    end).
+
+-define(LOG_INFO(Format, Args),
+    case couch_log:info_on() of
+        true ->
+            couch_log:info(Format, Args);
+        false -> ok
+    end).
+
 -define(LOG_ERROR(Format, Args), couch_log:error(Format, Args)).
 
 -record(rev_info,
