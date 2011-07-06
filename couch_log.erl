@@ -34,22 +34,12 @@
 }).
 
 debug(Format, Args) ->
-    case debug_on() of
-    false ->
-        ok;
-    true ->
-        {ConsoleMsg, FileMsg} = get_log_messages(self(), debug, Format, Args),
-        gen_event:sync_notify(error_logger, {couch_debug, ConsoleMsg, FileMsg})
-    end.
+    {ConsoleMsg, FileMsg} = get_log_messages(self(), debug, Format, Args),
+    gen_event:sync_notify(error_logger, {couch_debug, ConsoleMsg, FileMsg}).
 
 info(Format, Args) ->
-    case info_on() of
-    false ->
-        ok;
-    true ->
-        {ConsoleMsg, FileMsg} = get_log_messages(self(), info, Format, Args),
-        gen_event:sync_notify(error_logger, {couch_info, ConsoleMsg, FileMsg})
-    end.
+    {ConsoleMsg, FileMsg} = get_log_messages(self(), info, Format, Args),
+    gen_event:sync_notify(error_logger, {couch_info, ConsoleMsg, FileMsg}).
 
 error(Format, Args) ->
     {ConsoleMsg, FileMsg} = get_log_messages(self(), error, Format, Args),
