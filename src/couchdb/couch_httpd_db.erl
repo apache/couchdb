@@ -1285,16 +1285,22 @@ extract_header_rev(Req, ExplicitRev) ->
 parse_copy_destination_header(Req) ->
     case couch_httpd:header_value(Req, "Destination") of
         undefined ->
-            throw({bad_request, "Destination header in mandatory for COPY."});
+            throw({bad_request, "Destination header is mandatory for COPY."});
         Destination ->
-            case re:run(Destination, "\\?", [{capture, none}]) of
-                nomatch ->
-                    {list_to_binary(Destination), {0, []}};
-                match ->
-                    [DocId, RevQs] = re:split(Destination, "\\?", [{return, list}]),
-                    [_RevQueryKey, Rev] = re:split(RevQs, "=", [{return, list}]),
-                    {Pos, RevId} = couch_doc:parse_rev(Rev),
-                    {list_to_binary(DocId), {Pos, [RevId]}}
+            case Destination of
+                "http://" ++ _Rest ->
+                    throw({bad_request, "Destination URL must be relative."});
+                _Else ->
+                % see if ?rev=revid got appended to the Destination header
+                case re:run(Destination, "\\?", [{capture, none}]) of
+                    nomatch ->
+                        {list_to_binary(Destination), {0, []}};
+                    match ->
+                        [DocId, RevQs] = re:split(Destination, "\\?", [{return, list}]),
+                        [_RevQueryKey, Rev] = re:split(RevQs, "=", [{return, list}]),
+                        {Pos, RevId} = couch_doc:parse_rev(Rev),
+                        {list_to_binary(DocId), {Pos, [RevId]}}
+                end
             end
     end.
 

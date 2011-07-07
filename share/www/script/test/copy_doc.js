@@ -40,6 +40,16 @@ couchTests.copy_doc = function(debug) {
 
   var xhr = CouchDB.request("COPY", "/test_suite_db/doc_to_be_copied2");
   T(xhr.status == 400); // bad request (no Destination header)
+  TEquals("Destination header is mandatory for COPY.", JSON.parse(xhr.responseText).reason,
+    "should report missing destination header");
+
+  var xhr = CouchDB.request("COPY", "/test_suite_db/doc_to_be_copied2", {
+    headers: {
+      "Destination": "http://localhost:5984/test_suite_db/doc_to_be_written"
+  }});
+  TEquals(400, xhr.status, "should throw a 400 error"); // bad request (invalid destination header)
+  TEquals("Destination URL must be relative.", JSON.parse(xhr.responseText).reason,
+    "should report invalid destination header");
 
   var rev = db.open("doc_to_be_overwritten")._rev;
   var xhr = CouchDB.request("COPY", "/test_suite_db/doc_to_be_copied2", {
