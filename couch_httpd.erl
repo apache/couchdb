@@ -40,16 +40,54 @@ start_link(https) ->
     CertFile = couch_config:get("ssl", "cert_file", nil),
     KeyFile = couch_config:get("ssl", "key_file", nil),
     Options = case CertFile /= nil andalso KeyFile /= nil of
-                  true ->
-                      [{port, Port},
-                       {ssl, true},
-                       {ssl_opts, [
-                             {certfile, CertFile},
-                             {keyfile, KeyFile}]}];
-                  false ->
-                      io:format("SSL enabled but PEM certificates are missing.", []),
-                      throw({error, missing_certs})
-              end,
+        true ->
+            SslOpts = [{certfile, CertFile}, {keyfile, KeyFile}],
+
+            %% set password if one is needed for the cert
+            SslOpts1 = case couch_config:get("ssl", "password", nil) of
+                nil -> SslOpts;
+                Password ->
+                    SslOpts ++ [{password, Password}]
+            end,
+            % do we verify certificates ?
+            FinalSslOpts = case couch_config:get("ssl",
+                    "verify_ssl_certificates", false) of
+                false -> SslOpts1;
+                _ ->
+                    case couch_config:get("ssl",
+                            "cacert_file", nil) of
+                        nil ->
+                            io:format("Verify SSL certificate "
+                                ++"enabled but file containing "
+                                ++"PEM encoded CA certificates is "
+                                ++"missing", []),
+                            throw({error, missing_cacerts});
+                        CaCertFile ->
+                            Depth = list_to_integer(couch_config:get("ssl",
+                                    "ssl_certificate_max_depth",
+                                    "1")),
+                            FinalOpts = [
+                                {cacertfile, CaCertFile},
+                                {depth, Depth},
+                                {verify, verify_peer}],
+                            % allows custom verify fun.
+                            case couch_config:get("ssl",
+                                    "verify_fun", nil) of
+                                nil -> FinalOpts;
+                                SpecStr ->
+                                    FinalOpts 
+                                    ++ [{verify_fun, make_arity_3_fun(SpecStr)}]
+                            end
+                    end
+            end,
+            
+            [{port, Port},
+                {ssl, true},
+                {ssl_opts, FinalSslOpts}];
+        false ->
+            io:format("SSL enabled but PEM certificates are missing.", []),
+            throw({error, missing_certs})
+    end,
     start_link(https, Options).
 start_link(Name, Options) ->
     % read config and register for configuration changes
