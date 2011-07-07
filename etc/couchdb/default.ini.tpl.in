@@ -179,6 +179,13 @@ connection_timeout = 30000
 ; See the `inet` Erlang module's man page for the full list of options.
 socket_options = [{keepalive, true}, {nodelay, false}]
 ; set to true to validate peer certificates
+; Path to a file containing the user's certificate.
+;cert_file = /full/path/to/server_cert.pem
+; Path to file containing user's private PEM encoded key.
+;key_file = /full/path/to/server_key.pem
+; String containing the user's password. Only used if the private keyfile is password protected. 
+;password = somepassword
+; set to true to validate peer certificates
 verify_ssl_certificates = false
 ; file containing a list of peer trusted certificates (PEM format)
 ; ssl_trusted_certificates_file = /etc/ssl/certs/ca-certificates.crt

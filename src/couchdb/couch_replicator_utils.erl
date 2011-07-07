@@ -291,8 +291,22 @@ ssl_params(Url) ->
             couch_config:get("replicator", "ssl_certificate_max_depth", "3")
         ),
         VerifyCerts = couch_config:get("replicator", "verify_ssl_certificates"),
+        CertFile = couch_config:get("replicator", "cert_file", nil),
+        KeyFile = couch_config:get("replicator", "key_file", nil),
+        Password = couch_config:get("replicator", "password", nil),
         SslOpts = [{depth, Depth} | ssl_verify_options(VerifyCerts =:= "true")],
-        [{is_ssl, true}, {ssl_options, SslOpts}];
+        SslOpts1 = case CertFile /= nil andalso KeyFile /= nil of
+            true ->
+                case Password of
+                    nil -> 
+                        [{certfile, CertFile}, {keyfile, KeyFile}] ++ SslOpts;
+                    _ -> 
+                        [{certfile, CertFile}, {keyfile, KeyFile},
+                            {password, Password}] ++ SslOpts
+                end;
+            false -> SslOpts
+        end,
+        [{is_ssl, true}, {ssl_options, SslOpts1}];
     #url{protocol = http} ->
         []
     end.
