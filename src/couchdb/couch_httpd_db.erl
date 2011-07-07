@@ -1287,10 +1287,10 @@ parse_copy_destination_header(Req) ->
         undefined ->
             throw({bad_request, "Destination header is mandatory for COPY."});
         Destination ->
-            case Destination of
-                "http://" ++ _Rest ->
+            case re:run(Destination, "^https?://", [{capture, none}]) of
+                match ->
                     throw({bad_request, "Destination URL must be relative."});
-                _Else ->
+                nomatch ->
                 % see if ?rev=revid got appended to the Destination header
                 case re:run(Destination, "\\?", [{capture, none}]) of
                     nomatch ->
