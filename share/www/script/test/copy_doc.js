@@ -22,7 +22,7 @@ couchTests.copy_doc = function(debug) {
     headers: {"Destination":"doc_that_was_copied"}
   });
 
-    T(JSON.parse(xhr.responseText).ok);
+  T(JSON.parse(xhr.responseText).ok);
 
   T(xhr.status == 201);
   T(db.open("doc_that_was_copied").v == 1);
