@@ -35,23 +35,24 @@ missing_revs_finder_loop(Cp, Target, ChangesQueue, RevsQueue, BatchSize) ->
     closed ->
         ok;
     {ok, DocInfos} ->
-        #doc_info{high_seq = ReportSeq} = lists:last(DocInfos),
+        {Ts, #doc_info{high_seq = Seq}} = lists:last(DocInfos),
+        ReportSeq = {Ts, Seq},
         ok = gen_server:cast(Cp, {report_seq, ReportSeq}),
         ?LOG_DEBUG("Missing revs finder defined report seq ~p", [ReportSeq]),
         IdRevs = [{Id, [Rev || #rev_info{rev = Rev} <- RevsInfo]} ||
-                    #doc_info{id = Id, revs = RevsInfo} <- DocInfos],
+                    {_, #doc_info{id = Id, revs = RevsInfo}} <- DocInfos],
         Target2 = open_db(Target),
         {ok, Missing} = couch_api_wrap:get_missing_revs(Target2, IdRevs),
         close_db(Target2),
-        queue_missing_revs(Missing, DocInfos, RevsQueue),
+        queue_missing_revs(Missing, DocInfos, ReportSeq, RevsQueue),
         missing_revs_finder_loop(Cp, Target2, ChangesQueue, RevsQueue, BatchSize)
     end.
 
 
-queue_missing_revs(Missing, DocInfos, Queue) ->
+queue_missing_revs(Missing, DocInfos, ReportSeq, Queue) ->
     IdRevsSeqDict = dict:from_list(
         [{Id, {[Rev || #rev_info{rev = Rev} <- RevsInfo], Seq}} ||
-            #doc_info{id = Id, revs = RevsInfo, high_seq = Seq} <- DocInfos]),
+            {_, #doc_info{id = Id, revs = RevsInfo, high_seq = Seq}} <- DocInfos]),
     AllDict = lists:foldl(
         fun({Id, MissingRevs, PAs}, Acc) ->
             {_, Seq} = dict:fetch(Id, IdRevsSeqDict),
@@ -71,7 +72,7 @@ queue_missing_revs(Missing, DocInfos, Queue) ->
         AllDict, non_missing(IdRevsSeqDict, Missing)),
     ?LOG_DEBUG("Missing revs finder adding batch of ~p IdRevs to work queue",
         [dict:size(AllDict2)]),
-    ok = couch_work_queue:queue(Queue, dict:to_list(AllDict2)).
+    ok = couch_work_queue:queue(Queue, {ReportSeq, dict:to_list(AllDict2)}).
 
 
 non_missing(NonMissingDict, []) ->
