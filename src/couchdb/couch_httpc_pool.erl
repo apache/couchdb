@@ -10,23 +10,11 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-% This module is similar to Ibrowse's ibrowse_lb.erl (load balancer) module.
-% The main differences are:
-%
-% 1) Several HTTP connection pools can be spawned. This is important for
-%    replications, as each replication can have its own pool which allows
-%    for better error isolation - connections (and their pipelines) are not
-%    shared between different replications;
-%
-% 2) The caller can request both pipelined connections and non-pipelined
-%    connections.
-%
 -module(couch_httpc_pool).
 -behaviour(gen_server).
 
 % public API
 -export([start_link/2, stop/1]).
--export([get_piped_worker/1]).
 -export([get_worker/1, release_worker/2]).
 
 % gen_server API
@@ -34,7 +22,6 @@
 -export([code_change/3, terminate/2]).
 
 -include("couch_db.hrl").
--include("../ibrowse/ibrowse.hrl").
 
 -import(couch_util, [
     get_value/2,
@@ -43,117 +30,88 @@
 
 -record(state, {
     url,
-    ssl_options,
-    max_piped_workers,
-    pipeline_size,
-    piped_workers,
-    used_piped_workers = 0,
-    free_workers = [],  % free workers (connections) without pipeline
-    busy_workers = []   % busy workers (connections) without pipeline
+    limit,                  % max # of workers allowed
+    free = [],              % free workers (connections)
+    busy = [],              % busy workers (connections)
+    waiting = queue:new()   % blocked clients waiting for a worker
 }).
 
 
-start_link(BaseUrl, Options) ->
-    gen_server:start_link(?MODULE, {BaseUrl, Options}, []).
+start_link(Url, Options) ->
+    gen_server:start_link(?MODULE, {Url, Options}, []).
 
 
 stop(Pool) ->
     ok = gen_server:call(Pool, stop, infinity).
 
 
-get_piped_worker(Pool) ->
-    gen_server:call(Pool, get_piped_worker, infinity).
-
-
 get_worker(Pool) ->
-    gen_server:call(Pool, get_worker, infinity).
+    {ok, _Worker} = gen_server:call(Pool, get_worker, infinity).
 
 
-% Only workers without a pipeline need to be released.
 release_worker(Pool, Worker) ->
-    ok = gen_server:call(Pool, {release_worker, Worker}, infinity).
+    ok = gen_server:cast(Pool, {release_worker, Worker}).
 
 
-init({BaseUrl, Options}) ->
+init({Url, Options}) ->
     process_flag(trap_exit, true),
     State = #state{
-        url = BaseUrl,
-        ssl_options = get_value(ssl_options, Options, []),
-        pipeline_size = get_value(pipeline_size, Options),
-        max_piped_workers = get_value(max_piped_connections, Options),
-        piped_workers = ets:new(httpc_pool, [ordered_set, public])
+        url = Url,
+        limit = get_value(max_connections, Options)
     },
     {ok, State}.
 
 
-handle_call(get_piped_worker, _From,
-    #state{piped_workers = WorkersEts, max_piped_workers = Max,
-        used_piped_workers = Used, url = Url,
-        ssl_options = SslOptions} = State) when Used < Max ->
-    {ok, Worker} = ibrowse_http_client:start_link({WorkersEts, Url,
-        {SslOptions, SslOptions =/= []}}),
-    true = ets:insert(WorkersEts, {{1, Worker}, []}),
-    {reply, {ok, Worker}, State#state{used_piped_workers = Used + 1}};
-
-handle_call(get_piped_worker, _From,
-    #state{piped_workers = WorkersEts, pipeline_size = PipeSize} = State) ->
-    case ets:first(WorkersEts) of
-	{NumSessions, Worker} when NumSessions < PipeSize ->
-	    true = ets:delete(WorkersEts, {NumSessions, Worker}),
-	    true = ets:insert(WorkersEts, {{NumSessions + 1, Worker}, []}),
-        {reply, {ok, Worker}, State};
-	_ ->
-	    {reply, retry_later, State}
+handle_call(get_worker, From, #state{waiting = Waiting} = State) ->
+    #state{url = Url, limit = Limit, busy = Busy, free = Free} = State,
+    case length(Busy) >= Limit of
+    true ->
+        {noreply, State#state{waiting = queue:in(From, Waiting)}};
+    false ->
+        case Free of
+        [] ->
+           {ok, Worker} = ibrowse:spawn_link_worker_process(Url),
+           Free2 = Free;
+        [Worker | Free2] ->
+           ok
+        end,
+        NewState = State#state{free = Free2, busy = [Worker | Busy]},
+        {reply, {ok, Worker}, NewState}
     end;
 
-handle_call(get_worker, _From, #state{
-        free_workers = [], busy_workers = Busy,
-        url = #url{host = Host, port = Port}} = State) ->
-    {ok, Worker} = ibrowse_http_client:start_link({Host, Port}),
-    {reply, {ok, Worker}, State#state{busy_workers = [Worker | Busy]}};
-
-handle_call(get_worker, _From, #state{
-        free_workers = [Worker | RestFree], busy_workers = Busy} = State) ->
-    {reply, {ok, Worker}, State#state{
-        busy_workers = [Worker | Busy], free_workers = RestFree}};
-
-handle_call({release_worker, Worker}, _From, #state{
-        free_workers = Free, busy_workers = Busy} = State) ->
-    case Busy -- [Worker] of
-    Busy ->
-        {reply, ok, State};
-    Busy2 ->
-        {reply, ok, State#state{
-            busy_workers = Busy2, free_workers = [Worker | Free]}}
-    end;
-
-handle_call(stop, _From, #state{piped_workers = WorkersEts,
-        free_workers = Free, busy_workers = Busy} = State) ->
-    ets:foldl(
-        fun({{_, W}, _}, _) -> ibrowse_http_client:stop(W) end, ok, WorkersEts),
-    lists:foreach(fun ibrowse_http_client:stop/1, Free),
-    lists:foreach(fun ibrowse_http_client:stop/1, Busy),
+handle_call(stop, _From, State) ->
     {stop, normal, ok, State}.
 
 
-handle_cast(Msg, State) ->
-    {stop, {unexpected_cast, Msg}, State}.
+handle_cast({release_worker, Worker}, #state{waiting = Waiting} = State) ->
+    case queue:out(Waiting) of
+    {empty, Waiting2} ->
+        Busy2 = State#state.busy -- [Worker],
+        Free2 = [Worker | State#state.free];
+    {{value, From}, Waiting2} ->
+        gen_server:reply(From, {ok, Worker}),
+        Busy2 = State#state.busy,
+        Free2 = State#state.free
+    end,
+    NewState = State#state{
+        busy = Busy2,
+        free = Free2,
+        waiting = Waiting2
+    },
+    {noreply, NewState}.
 
 
-handle_info({'EXIT', Pid, _Reason}, #state{
-        piped_workers = WorkersEts, used_piped_workers = Used,
-        busy_workers = Busy, free_workers = Free} = State) ->
+handle_info({'EXIT', Pid, _Reason}, #state{busy = Busy, free = Free} = State) ->
     case Free -- [Pid] of
     Free ->
         case Busy -- [Pid] of
         Busy ->
-            true = ets:match_delete(WorkersEts, {{'_', Pid}, '_'}),
-            {noreply, State#state{used_piped_workers = Used - 1}};
+            {noreply, State};
         Busy2 ->
-            {noreply, State#state{busy_workers = Busy2}}
+            {noreply, State#state{busy = Busy2}}
         end;
     Free2 ->
-        {noreply, State#state{free_workers = Free2}}
+        {noreply, State#state{free = Free2}}
     end.
 
 
@@ -161,5 +119,7 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 
-terminate(_Reason, _State) ->
-    ok.
+terminate(_Reason, State) ->
+    lists:foreach(fun ibrowse_http_client:stop/1, State#state.free),
+    lists:foreach(fun ibrowse_http_client:stop/1, State#state.busy).
+

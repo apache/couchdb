@@ -244,14 +244,11 @@ do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
         lists:seq(1, RevFindersCount)),
     % This starts the doc copy processes. They fetch documents from the
     % MissingRevsQueue and copy them from the source to the target database.
-    MaxHttpConns = get_value(http_connections, Options),
-    HttpPipeSize = get_value(http_pipeline_size, Options),
-    MaxParallelConns = lists:max(
-        [((MaxHttpConns * HttpPipeSize) div CopiersCount) - 1, 1]),
+    MaxConns = get_value(http_connections, Options),
     Workers = lists:map(
         fun(_) ->
             {ok, Pid} = couch_replicator_doc_copier:start_link(
-                self(), Source, Target, MissingRevsQueue, MaxParallelConns),
+                self(), Source, Target, MissingRevsQueue, MaxConns),
             Pid
         end,
         lists:seq(1, CopiersCount)),
@@ -275,11 +272,11 @@ do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
     ?LOG_INFO("Replication `~p` is using:~n"
         "~c~p worker processes~n"
         "~ca worker batch size of ~p~n"
-        "~c~p HTTP connections, each with a pipeline size of ~p~n"
+        "~c~p HTTP connections~n"
         "~ca connection timeout of ~p milliseconds~n"
         "~csocket options are: ~s~s",
-        [BaseId ++ Ext, $\t, CopiersCount, $\t, BatchSize, $\t, MaxHttpConns,
-            HttpPipeSize, $\t, get_value(connection_timeout, Options),
+        [BaseId ++ Ext, $\t, CopiersCount, $\t, BatchSize, $\t,
+            MaxConns, $\t, get_value(connection_timeout, Options),
             $\t, io_lib:format("~p", [get_value(socket_options, Options)]),
             case StartSeq of
             ?LOWEST_SEQ ->

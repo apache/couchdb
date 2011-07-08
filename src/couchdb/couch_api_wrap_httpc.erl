@@ -28,15 +28,8 @@
 -define(replace(L, K, V), lists:keystore(K, 1, L, {K, V})).
 
 
-setup(#httpdb{httpc_pool = nil, url = Url, ibrowse_options = IbrowseOptions,
-    http_connections = MaxConns, http_pipeline_size = PipeSize} = Db) ->
-    HttpcPoolOptions = [
-        {ssl_options, get_value(ssl_options, IbrowseOptions, [])},
-        {max_piped_connections, MaxConns},
-        {pipeline_size, PipeSize}
-    ],
-    {ok, Pid} = couch_httpc_pool:start_link(
-        ibrowse_lib:parse_url(Url), HttpcPoolOptions),
+setup(#httpdb{httpc_pool = nil, url = Url, http_connections = MaxConns} = Db) ->
+    {ok, Pid} = couch_httpc_pool:start_link(Url, [{max_connections, MaxConns}]),
     {ok, Db#httpdb{httpc_pool = Pid}}.
 
 
@@ -56,25 +49,11 @@ send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb, Params) ->
     Headers2 = oauth_header(HttpDb, Params) ++ Headers1,
     Url = full_url(HttpDb, Params),
     Body = get_value(body, Params, []),
-    {_Type, WorkerPid} = Worker =
     case get_value(path, Params) of
     "_changes" ->
-        {ok, Pid} = ibrowse:spawn_link_worker_process(Url),
-        {ibrowse_direct, Pid};
+        {ok, Worker} = ibrowse:spawn_link_worker_process(Url);
     _ ->
-        % Direct means no usage of HTTP pipeline. As section 8.1.2.2 of
-        % RFC 2616 says, clients should not pipeline non-idempotent requests.
-        % Let the caller explicitly say which requests are not idempotent.
-        % For e.g. POSTs against "/some_db/_revs_diff" are idempotent
-        % (despite the verb not being GET).
-        case get_value(direct, Params, false) of
-        true ->
-            {ok, Pid} = couch_httpc_pool:get_worker(HttpDb#httpdb.httpc_pool),
-            {direct, Pid};
-        false ->
-            Pid = get_piped_worker(HttpDb),
-            {piped, Pid}
-        end
+        {ok, Worker} = couch_httpc_pool:get_worker(HttpDb#httpdb.httpc_pool)
     end,
     IbrowseOptions = [
         {response_format, binary}, {inactivity_timeout, HttpDb#httpdb.timeout} |
@@ -82,26 +61,11 @@ send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb, Params) ->
             HttpDb#httpdb.ibrowse_options)
     ],
     Response = ibrowse:send_req_direct(
-        WorkerPid, Url, Headers2, Method, Body, IbrowseOptions, infinity),
+        Worker, Url, Headers2, Method, Body, IbrowseOptions, infinity),
     {Worker, Response}.
 
 
-wait_retry() ->
-    ok = timer:sleep(random:uniform(40) + 10).
-
-
-get_piped_worker(#httpdb{httpc_pool = Pool} = HttpDb) ->
-    case couch_httpc_pool:get_piped_worker(Pool) of
-    {ok, Worker} ->
-        Worker;
-    retry_later ->
-        wait_retry(),
-        get_piped_worker(HttpDb)
-    end.
-
-
 process_response({error, sel_conn_closed}, _Worker, HttpDb, Params, Callback) ->
-    wait_retry(),
     send_req(HttpDb, Params, Callback);
 
 process_response({error, {'EXIT', {normal, _}}}, _Worker, HttpDb, Params, Cb) ->
@@ -113,7 +77,7 @@ process_response({ibrowse_req_id, ReqId}, Worker, HttpDb, Params, Callback) ->
     process_stream_response(ReqId, Worker, HttpDb, Params, Callback);
 
 process_response({ok, Code, Headers, Body}, Worker, HttpDb, Params, Callback) ->
-    stop_worker(Worker, HttpDb),
+    release_worker(Worker, HttpDb),
     case list_to_integer(Code) of
     Ok when Ok =:= 200 ; Ok =:= 201 ; (Ok >= 400 andalso Ok < 500) ->
         EJson = case Body of
@@ -144,7 +108,7 @@ process_stream_response(ReqId, Worker, HttpDb, Params, Callback) ->
             ibrowse:stream_next(ReqId),
             try
                 Ret = Callback(Ok, Headers, StreamDataFun),
-                stop_worker(Worker, HttpDb),
+                release_worker(Worker, HttpDb),
                 clean_mailbox_req(ReqId),
                 Ret
             catch throw:{maybe_retry_req, Err} ->
@@ -177,14 +141,8 @@ clean_mailbox_req(ReqId) ->
     end.
 
 
-stop_worker({ibrowse_direct, Worker}, _HttpDb) ->
-    unlink(Worker),
-    receive {'EXIT', Worker, _} -> ok after 0 -> ok end,
-    catch ibrowse:stop_worker_process(Worker);
-stop_worker({direct, Worker}, #httpdb{httpc_pool = Pool}) ->
-    ok = couch_httpc_pool:release_worker(Pool, Worker);
-stop_worker({piped, _Worker}, _HttpDb) ->
-    ok.
+release_worker(Worker, #httpdb{httpc_pool = Pool}) ->
+    ok = couch_httpc_pool:release_worker(Pool, Worker).
 
 
 maybe_retry(Error, Worker, #httpdb{retries = 0} = HttpDb, Params, _Cb) ->
@@ -192,7 +150,7 @@ maybe_retry(Error, Worker, #httpdb{retries = 0} = HttpDb, Params, _Cb) ->
 
 maybe_retry(Error, Worker, #httpdb{retries = Retries, wait = Wait} = HttpDb,
     Params, Cb) ->
-    stop_worker(Worker, HttpDb),
+    release_worker(Worker, HttpDb),
     Method = string:to_upper(atom_to_list(get_value(method, Params, get))),
     Url = couch_util:url_strip_password(full_url(HttpDb, Params)),
     ?LOG_INFO("Retrying ~s request to ~s in ~p seconds due to error ~s",
@@ -205,7 +163,7 @@ report_error(Worker, HttpDb, Params, Error) ->
     Method = string:to_upper(atom_to_list(get_value(method, Params, get))),
     Url = couch_util:url_strip_password(full_url(HttpDb, Params)),
     do_report_error(Url, Method, Error),
-    stop_worker(Worker, HttpDb),
+    release_worker(Worker, HttpDb),
     exit({http_request_failed, Method, Url, Error}).
 
 
@@ -281,7 +239,7 @@ oauth_header(#httpdb{url = BaseUrl, oauth = OAuth}, ConnParams) ->
 
 
 do_redirect(Worker, Code, Headers, #httpdb{url = Url} = HttpDb, Params, Cb) ->
-    stop_worker(Worker, HttpDb),
+    release_worker(Worker, HttpDb),
     RedirectUrl = redirect_url(Headers, Url),
     {HttpDb2, Params2} = after_redirect(RedirectUrl, Code, HttpDb, Params),
     send_req(HttpDb2, Params2, Cb).
