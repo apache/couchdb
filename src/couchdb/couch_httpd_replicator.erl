@@ -36,6 +36,9 @@ handle_req(#httpd{method = 'POST', user_ctx = UserCtx} = Req) ->
         send_json(
             Req, 404,
             {[{error, to_binary(Error)}, {reason, to_binary(Reason)}]});
+    {error, not_found} ->
+        % Tried to cancel a replication that didn't exist.
+        send_json(Req, 404, {[{error, <<"not found">>}]});
     {error, Reason} ->
         send_json(Req, 500, {[{error, to_binary(Reason)}]});
     {ok, {cancelled, RepId}} ->

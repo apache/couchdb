@@ -523,11 +523,16 @@ couchTests.replication = function(debug) {
     // after the child terminates, so cancel the replication to delete the
     // child spec in those OTP releases, otherwise since_seq will have no
     // effect.
-    CouchDB.replicate(
-      dbPairs[i].source,
-      dbPairs[i].target,
-      {body: {cancel: true}}
-    );
+    try {
+      CouchDB.replicate(
+        dbPairs[i].source,
+        dbPairs[i].target,
+        {body: {cancel: true}}
+      );
+    } catch (x) {
+      // OTP R14B03 onwards
+      TEquals("not found", x.error);
+    }
     repResult = CouchDB.replicate(
       dbPairs[i].source,
       dbPairs[i].target,
@@ -536,11 +541,16 @@ couchTests.replication = function(debug) {
     // Same reason as before. But here we don't want since_seq to affect
     // subsequent replications, so we need to delete the child spec from the
     // supervisor (since_seq is not used to calculate the replication ID).
-    CouchDB.replicate(
-      dbPairs[i].source,
-      dbPairs[i].target,
-      {body: {cancel: true}}
-    );
+    try {
+      CouchDB.replicate(
+        dbPairs[i].source,
+        dbPairs[i].target,
+        {body: {cancel: true}}
+      );
+    } catch (x) {
+      // OTP R14B03 onwards
+      TEquals("not found", x.error);
+    }
     TEquals(true, repResult.ok);
     TEquals(2, repResult.history[0].missing_checked);
     TEquals(2, repResult.history[0].missing_found);
