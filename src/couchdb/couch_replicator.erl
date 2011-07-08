@@ -105,7 +105,7 @@ async_replicate(#rep{id = {BaseId, Ext}, source = Src, target = Tgt} = Rep) ->
     Target = couch_api_wrap:db_uri(Tgt),
     ChildSpec = {
         RepChildId,
-        {gen_server, start_link, [?MODULE, Rep, []]},
+        {gen_server, start_link, [?MODULE, Rep, [{timeout, 20000}]]},
         temporary,
         1,
         worker,
