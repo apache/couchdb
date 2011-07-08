@@ -50,7 +50,6 @@
 
 -record(state, {
     loop,
-    cp,
     max_parallel_conns,
     source,
     target,
@@ -58,7 +57,6 @@
     writer = nil,
     pending_fetch = nil,
     flush_waiter = nil,
-    highest_seq_seen = ?LOWEST_SEQ,
     stats = #rep_stats{},
     source_db_compaction_notifier = nil,
     target_db_compaction_notifier = nil,
@@ -69,7 +67,7 @@
 
 start_link(Cp, #db{} = Source, Target, MissingRevsQueue, _MaxConns) ->
     Pid = spawn_link(
-        fun() -> queue_fetch_loop(Source, Target, Cp, MissingRevsQueue) end),
+        fun() -> queue_fetch_loop(Source, Target, Cp, Cp, MissingRevsQueue) end),
     {ok, Pid};
 
 start_link(Cp, Source, Target, MissingRevsQueue, MaxConns) ->
@@ -81,10 +79,9 @@ init({Cp, Source, Target, MissingRevsQueue, MaxConns}) ->
     process_flag(trap_exit, true),
     Parent = self(),
     LoopPid = spawn_link(
-        fun() -> queue_fetch_loop(Source, Target, Parent, MissingRevsQueue) end
+        fun() -> queue_fetch_loop(Source, Target, Parent, Cp, MissingRevsQueue) end
     ),
     State = #state{
-        cp = Cp,
         max_parallel_conns = MaxConns,
         loop = LoopPid,
         source = open_db(Source),
@@ -97,19 +94,18 @@ init({Cp, Source, Target, MissingRevsQueue, MaxConns}) ->
     {ok, State}.
 
 
-handle_call({seq_done, Seq, RevCount}, {Pid, _},
-    #state{loop = Pid, highest_seq_seen = HighSeq, stats = Stats} = State) ->
+handle_call({seq_done, _Seq, RevCount}, {Pid, _},
+    #state{loop = Pid, stats = Stats} = State) ->
     NewState = State#state{
-        highest_seq_seen = lists:max([Seq, HighSeq]),
         stats = Stats#rep_stats{
             missing_checked = Stats#rep_stats.missing_checked + RevCount
         }
     },
     {reply, ok, NewState};
 
-handle_call({fetch_doc, {_Id, Revs, _PAs, Seq} = Params}, {Pid, _} = From,
+handle_call({fetch_doc, {_Id, Revs, _PAs, _Seq} = Params}, {Pid, _} = From,
     #state{loop = Pid, readers = Readers, pending_fetch = nil,
-        highest_seq_seen = HighSeq, stats = Stats, source = Src, target = Tgt,
+        stats = Stats, source = Src, target = Tgt,
         max_parallel_conns = MaxConns} = State) ->
     Stats2 = Stats#rep_stats{
         missing_checked = Stats#rep_stats.missing_checked + length(Revs),
@@ -119,14 +115,12 @@ handle_call({fetch_doc, {_Id, Revs, _PAs, Seq} = Params}, {Pid, _} = From,
     Size when Size < MaxConns ->
         Reader = spawn_doc_reader(Src, Tgt, Params),
         NewState = State#state{
-            highest_seq_seen = lists:max([Seq, HighSeq]),
             stats = Stats2,
             readers = [Reader | Readers]
         },
         {reply, ok, NewState};
     _ ->
         NewState = State#state{
-            highest_seq_seen = lists:max([Seq, HighSeq]),
             stats = Stats2,
             pending_fetch = {From, Params}
         },
@@ -243,33 +237,33 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 
-queue_fetch_loop(Source, Target, Parent, MissingRevsQueue) ->
+queue_fetch_loop(Source, Target, Parent, Cp, MissingRevsQueue) ->
     case couch_work_queue:dequeue(MissingRevsQueue, 1) of
     closed ->
         ok;
-    {ok, [IdRevs]} ->
+    {ok, [{ReportSeq, IdRevs}]} ->
         case Source of
         #db{} ->
             Source2 = open_db(Source),
             Target2 = open_db(Target),
-            {Stats, HighSeqDone} = local_process_batch(
-                IdRevs, Source2, Target2, #batch{}, #rep_stats{}, ?LOWEST_SEQ),
+            Stats = local_process_batch(
+                IdRevs, Source2, Target2, #batch{}, #rep_stats{}),
             close_db(Source2),
-            close_db(Target2),
-            ok = gen_server:cast(Parent, {report_seq_done, HighSeqDone, Stats}),
-            ?LOG_DEBUG("Worker reported completion of seq ~p", [HighSeqDone]);
+            close_db(Target2);
         #httpdb{} ->
-            remote_process_batch(IdRevs, Parent)
+            remote_process_batch(IdRevs, Parent),
+            {ok, Stats} = gen_server:call(Parent, flush, infinity)
         end,
-        queue_fetch_loop(Source, Target, Parent, MissingRevsQueue)
+        ok = gen_server:cast(Cp, {report_seq_done, ReportSeq, Stats}),
+        ?LOG_DEBUG("Worker reported completion of seq ~p", [ReportSeq]),
+        queue_fetch_loop(Source, Target, Parent, Cp, MissingRevsQueue)
     end.
 
 
-local_process_batch([], _Src, _Tgt, #batch{docs = []}, Stats, HighestSeqDone) ->
-    {Stats, HighestSeqDone};
+local_process_batch([], _Src, _Tgt, #batch{docs = []}, Stats) ->
+    Stats;
 
-local_process_batch([], _Source, Target, #batch{docs = Docs, size = Size},
-    Stats, HighestSeqDone) ->
+local_process_batch([], _Source, Target, #batch{docs = Docs, size = Size}, Stats) ->
     case Target of
     #httpdb{} ->
         ?LOG_DEBUG("Worker flushing doc batch of size ~p bytes", [Size]);
@@ -277,14 +271,13 @@ local_process_batch([], _Source, Target, #batch{docs = Docs, size = Size},
         ?LOG_DEBUG("Worker flushing doc batch of ~p docs", [Size])
     end,
     {Written, WriteFailures} = flush_docs(Target, Docs),
-    Stats2 = Stats#rep_stats{
+    Stats#rep_stats{
         docs_written = Stats#rep_stats.docs_written + Written,
         doc_write_failures = Stats#rep_stats.doc_write_failures + WriteFailures
-    },
-    {Stats2, HighestSeqDone};
+    };
 
 local_process_batch([{Seq, {Id, Revs, NotMissingCount, PAs}} | Rest],
-    Source, Target, Batch, Stats, HighestSeqSeen) ->
+    Source, Target, Batch, Stats) ->
     {ok, {_, DocList, Written0, WriteFailures0}} = fetch_doc(
         Source, {Id, Revs, PAs, Seq}, fun local_doc_handler/2,
         {Target, [], 0, 0}),
@@ -303,12 +296,11 @@ local_process_batch([{Seq, {Id, Revs, NotMissingCount, PAs}} | Rest],
         docs_written = Stats#rep_stats.docs_written + Written,
         doc_write_failures = Stats#rep_stats.doc_write_failures + WriteFailures
     },
-    local_process_batch(
-        Rest, Source, Target, Batch2, Stats2, lists:max([Seq, HighestSeqSeen])).
+    local_process_batch(Rest, Source, Target, Batch2, Stats2).
 
 
-remote_process_batch([], Parent) ->
-    ok = gen_server:call(Parent, flush, infinity);
+remote_process_batch([], _Parent) ->
+    ok;
 
 remote_process_batch([{Seq, {Id, Revs, NotMissing, PAs}} | Rest], Parent) ->
     case NotMissing > 0 of
@@ -416,17 +408,13 @@ spawn_writer(Target, #batch{docs = DocList, size = Size}) ->
         end).
 
 
-after_full_flush(#state{cp = Cp, stats = Stats, flush_waiter = Waiter,
-        highest_seq_seen = HighSeqDone} = State) ->
-    ok = gen_server:cast(Cp, {report_seq_done, HighSeqDone, Stats}),
-    ?LOG_DEBUG("Worker reported completion of seq ~p", [HighSeqDone]),
-    gen_server:reply(Waiter, ok),
+after_full_flush(#state{stats = Stats, flush_waiter = Waiter} = State) ->
+    gen_server:reply(Waiter, {ok, Stats}),
     State#state{
         stats = #rep_stats{},
         flush_waiter = nil,
         writer = nil,
-        batch = #batch{},
-        highest_seq_seen = ?LOWEST_SEQ
+        batch = #batch{}
     }.
 
 
