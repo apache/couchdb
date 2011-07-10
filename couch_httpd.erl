@@ -389,8 +389,7 @@ validate_ctype(Req, Ctype) ->
     undefined ->
         throw({bad_ctype, "Content-Type must be "++Ctype});
     ReqCtype ->
-        % ?LOG_ERROR("Ctype ~p ReqCtype ~p",[Ctype,ReqCtype]),
-        case re:split(ReqCtype, ";", [{return, list}]) of
+        case string:tokens(ReqCtype, ";") of
         [Ctype] -> ok;
         [Ctype, _Rest] -> ok;
         _Else ->
