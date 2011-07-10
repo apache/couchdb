@@ -124,6 +124,8 @@ start_link(Name, Options) ->
     {ok, SocketOptions} = couch_util:parse_term(
         couch_config:get("httpd", "socket_options", "[]")),
 
+    set_auth_handlers(),
+
     Loop = fun(Req)->
         case SocketOptions of
         [] ->
@@ -168,12 +170,21 @@ config_change("httpd", "server_options") ->
     ?MODULE:stop();
 config_change("httpd", "socket_options") ->
     ?MODULE:stop();
+config_change("httpd", "authentication_handlers") ->
+    set_auth_handlers();
 config_change("httpd_global_handlers", _) ->
     ?MODULE:stop();
 config_change("httpd_db_handlers", _) ->
     ?MODULE:stop();
 config_change("ssl", _) ->
     ?MODULE:stop().
+
+set_auth_handlers() ->
+    AuthenticationSrcs = make_fun_spec_strs(
+        couch_config:get("httpd", "authentication_handlers", "")),
+    AuthHandlers = lists:map(
+        fun(A) -> {make_arity_1_fun(A), ?l2b(A)} end, AuthenticationSrcs),
+    ok = application:set_env(couch, auth_handlers, AuthHandlers).
 
 % SpecStr is a string like "{my_module, my_fun}"
 %  or "{my_module, my_fun, <<"my_arg">>}"
@@ -216,8 +227,6 @@ handle_request(MochiReq, DefaultFun, UrlHandlers, DbUrlHandlers,
 handle_request_int(MochiReq, DefaultFun,
             UrlHandlers, DbUrlHandlers, DesignUrlHandlers) ->
     Begin = now(),
-    AuthenticationSrcs = make_fun_spec_strs(
-            couch_config:get("httpd", "authentication_handlers")),
     % for the path, use the raw path with the query string and fragment
     % removed, but URL quoting left intact
     RawUri = MochiReq:get(raw_path),
@@ -293,10 +302,11 @@ handle_request_int(MochiReq, DefaultFun,
     },
 
     HandlerFun = couch_util:dict_find(HandlerKey, UrlHandlers, DefaultFun),
+    {ok, AuthHandlers} = application:get_env(couch, auth_handlers),
 
     {ok, Resp} =
     try
-        case authenticate_request(HttpReq, AuthenticationSrcs) of
+        case authenticate_request(HttpReq, AuthHandlers) of
         #httpd{} = Req ->
             HandlerFun(Req);
         Response ->
@@ -347,7 +357,7 @@ handle_request_int(MochiReq, DefaultFun,
 % Try authentication handlers in order until one sets a user_ctx
 % the auth funs also have the option of returning a response
 % move this to couch_httpd_auth?
-authenticate_request(#httpd{user_ctx=#user_ctx{}} = Req, _AuthSrcs) ->
+authenticate_request(#httpd{user_ctx=#user_ctx{}} = Req, _AuthHandlers) ->
     Req;
 authenticate_request(#httpd{} = Req, []) ->
     case couch_config:get("couch_httpd_auth", "require_valid_user", "false") of
@@ -356,14 +366,13 @@ authenticate_request(#httpd{} = Req, []) ->
     "false" ->
         Req#httpd{user_ctx=#user_ctx{}}
     end;
-authenticate_request(#httpd{} = Req, [AuthSrc|Rest]) ->
-    AuthFun = make_arity_1_fun(AuthSrc),
+authenticate_request(#httpd{} = Req, [{AuthFun, AuthSrc} | RestAuthHandlers]) ->
     R = case AuthFun(Req) of
         #httpd{user_ctx=#user_ctx{}=UserCtx}=Req2 ->
-            Req2#httpd{user_ctx=UserCtx#user_ctx{handler=?l2b(AuthSrc)}};
+            Req2#httpd{user_ctx=UserCtx#user_ctx{handler=AuthSrc}};
         Else -> Else
     end,
-    authenticate_request(R, Rest);
+    authenticate_request(R, RestAuthHandlers);
 authenticate_request(Response, _AuthSrcs) ->
     Response.
 
