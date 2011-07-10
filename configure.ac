@@ -378,6 +378,7 @@ fi
 otp_release="`${ERL} -noshell -eval 'io:put_chars(erlang:system_info(otp_release)).' -s erlang halt`"
 AC_SUBST(otp_release)
 AM_CONDITIONAL([USE_OTP_NIFS], [test x$otp_release \> xR13B03])
+AM_CONDITIONAL([USE_EJSON_COMPARE_NIF], [test x$otp_release \> xR13B04])
 
 has_crypto=`${ERL} -eval "case application:load(crypto) of ok -> ok; _ -> exit(no_crypto) end." -noshell -s init stop`
 

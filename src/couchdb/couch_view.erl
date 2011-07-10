@@ -399,7 +399,7 @@ nuke_dir(RootDelDir, Dir) ->
 
 % keys come back in the language of btree - tuples.
 less_json_ids({JsonA, IdA}, {JsonB, IdB}) ->
-    case less_json0(JsonA, JsonB) of
+    case couch_ejson_compare:less(JsonA, JsonB) of
     0 ->
         IdA < IdB;
     Result ->
@@ -407,59 +407,4 @@ less_json_ids({JsonA, IdA}, {JsonB, IdB}) ->
     end.
 
 less_json(A,B) ->
-    less_json0(A,B) < 0.
-
-less_json0(A,A)                                 -> 0;
-
-less_json0(A,B) when is_atom(A), is_atom(B)     -> atom_sort(A) - atom_sort(B);
-less_json0(A,_) when is_atom(A)                 -> -1;
-less_json0(_,B) when is_atom(B)                 -> 1;
-
-less_json0(A,B) when is_number(A), is_number(B) -> A - B;
-less_json0(A,_) when is_number(A)               -> -1;
-less_json0(_,B) when is_number(B)               -> 1;
-
-less_json0(A,B) when is_binary(A), is_binary(B) -> couch_util:collate(A,B);
-less_json0(A,_) when is_binary(A)               -> -1;
-less_json0(_,B) when is_binary(B)               -> 1;
-
-less_json0(A,B) when is_list(A), is_list(B)     -> less_list(A,B);
-less_json0(A,_) when is_list(A)                 -> -1;
-less_json0(_,B) when is_list(B)                 -> 1;
-
-less_json0({A},{B}) when is_list(A), is_list(B) -> less_props(A,B);
-less_json0({A},_) when is_list(A)               -> -1;
-less_json0(_,{B}) when is_list(B)               -> 1.
-
-atom_sort(null) -> 1;
-atom_sort(false) -> 2;
-atom_sort(true) -> 3.
-
-less_props([], [_|_]) ->
-    -1;
-less_props(_, []) ->
-    1;
-less_props([{AKey, AValue}|RestA], [{BKey, BValue}|RestB]) ->
-    case couch_util:collate(AKey, BKey) of
-    0 ->
-        case less_json0(AValue, BValue) of
-        0 ->
-            less_props(RestA, RestB);
-        Result ->
-            Result
-        end;
-    Result ->
-        Result
-    end.
-
-less_list([], [_|_]) ->
-    -1;
-less_list(_, []) ->
-    1;
-less_list([A|RestA], [B|RestB]) ->
-    case less_json0(A,B) of
-    0 ->
-        less_list(RestA, RestB);
-    Result ->
-        Result
-    end.
+    couch_ejson_compare:less(A, B) < 0.
