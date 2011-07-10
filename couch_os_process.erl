@@ -85,21 +85,50 @@ writejson(OsProc, Data) when is_record(OsProc, os_proc) ->
     true = writeline(OsProc, JsonData).
 
 readjson(OsProc) when is_record(OsProc, os_proc) ->
-    Line = readline(OsProc),
+    Line = iolist_to_binary(readline(OsProc)),
     ?LOG_DEBUG("OS Process ~p Output :: ~s", [OsProc#os_proc.port, Line]),
-    case ?JSON_DECODE(Line) of
-    [<<"log">>, Msg] when is_binary(Msg) ->
-        % we got a message to log. Log it and continue
-        ?LOG_INFO("OS Process ~p Log :: ~s", [OsProc#os_proc.port, Msg]),
-        readjson(OsProc);
-    [<<"error">>, Id, Reason] ->
-        throw({error, {couch_util:to_existing_atom(Id),Reason}});
-    [<<"fatal">>, Id, Reason] ->
-        ?LOG_INFO("OS Process ~p Fatal Error :: ~s ~p",[OsProc#os_proc.port, Id, Reason]),
-        throw({couch_util:to_existing_atom(Id),Reason});
-    Result ->
-        Result
+    try
+        % Don't actually parse the whole JSON. Just try to see if it's
+        % a command or a doc map/reduce/filter/show/list/update output.
+        % If it's a command then parse the whole JSON and execute the
+        % command, otherwise return the raw JSON line to the caller.
+        pick_command(Line)
+    catch
+    throw:abort ->
+        {json, Line};
+    throw:{cmd, _Cmd} ->
+        case ?JSON_DECODE(Line) of
+        [<<"log">>, Msg] when is_binary(Msg) ->
+            % we got a message to log. Log it and continue
+            ?LOG_INFO("OS Process ~p Log :: ~s", [OsProc#os_proc.port, Msg]),
+            readjson(OsProc);
+        [<<"error">>, Id, Reason] ->
+            throw({error, {couch_util:to_existing_atom(Id),Reason}});
+        [<<"fatal">>, Id, Reason] ->
+            ?LOG_INFO("OS Process ~p Fatal Error :: ~s ~p",
+                [OsProc#os_proc.port, Id, Reason]),
+            throw({couch_util:to_existing_atom(Id),Reason});
+        _Result ->
+            {json, Line}
+        end
     end.
+
+pick_command(Line) ->
+    json_stream_parse:events(Line, fun pick_command0/1).
+
+pick_command0(array_start) ->
+    fun pick_command1/1;
+pick_command0(_) ->
+    throw(abort).
+
+pick_command1(<<"log">> = Cmd) ->
+    throw({cmd, Cmd});
+pick_command1(<<"error">> = Cmd) ->
+    throw({cmd, Cmd});
+pick_command1(<<"fatal">> = Cmd) ->
+    throw({cmd, Cmd});
+pick_command1(_) ->
+    throw(abort).
 
 
 % gen_server API

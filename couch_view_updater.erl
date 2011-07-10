@@ -24,19 +24,14 @@ update(Owner, Group, DbName) ->
         current_seq = Seq,
         purge_seq = PurgeSeq
     } = Group,
-    couch_task_status:add_task(<<"View Group Indexer">>, <<DbName/binary," ",GroupName/binary>>, <<"Starting index update">>),
 
     {ok, Db} = couch_db:open_int(DbName, []),
     DbPurgeSeq = couch_db:get_purge_seq(Db),
-    Group2 =
     if DbPurgeSeq == PurgeSeq ->
-        Group;
+        ok;
     DbPurgeSeq == PurgeSeq + 1 ->
-        couch_task_status:update(<<"Removing purged entries from view index.">>),
-        purge_index(Group, Db);
+        ok;
     true ->
-        couch_task_status:update(<<"Resetting view index due to lost purge entries.">>),
-        couch_db:close(Db),
         exit(reset)
     end,
     {ok, MapQueue} = couch_work_queue:new(
@@ -44,13 +39,30 @@ update(Owner, Group, DbName) ->
     {ok, WriteQueue} = couch_work_queue:new(
         [{max_size, 100000}, {max_items, 500}]),
     Self = self(),
-    ViewEmptyKVs = [{View, []} || View <- Group2#group.views],
-    spawn_link(fun() -> do_maps(Group, MapQueue, WriteQueue, ViewEmptyKVs) end),
-    spawn_link(fun() -> do_writes(Self, Owner, Group2, WriteQueue, Seq == 0) end),
-    % compute on all docs modified since we last computed.
+    spawn_link(fun() ->
+        do_maps(add_query_server(Group), MapQueue, WriteQueue)
+    end),
     TotalChanges = couch_db:count_changes_since(Db, Seq),
-    % update status every half second
-    couch_task_status:set_update_frequency(500),
+    spawn_link(fun() ->
+        couch_task_status:add_task(
+            <<"View Group Indexer">>,
+            <<DbName/binary, " ", GroupName/binary>>,
+            <<"Starting index update">>),
+        couch_task_status:set_update_frequency(500),
+        Group2 =
+        if DbPurgeSeq == PurgeSeq + 1 ->
+            couch_task_status:update(<<"Removing purged entries from view index.">>),
+            purge_index(Group, Db);
+        true ->
+            Group
+        end,
+        ViewEmptyKVs = [{View, []} || View <- Group2#group.views],
+        do_writes(Self, Owner, Group2, WriteQueue,
+            Seq == 0, ViewEmptyKVs, 0, TotalChanges),
+        couch_task_status:set_update_frequency(0),
+        couch_task_status:update("Finishing.")
+    end),
+    % compute on all docs modified since we last computed.
     #group{ design_options = DesignOptions } = Group,
     IncludeDesign = couch_util:get_value(<<"include_design">>,
         DesignOptions, false),
@@ -64,21 +76,27 @@ update(Owner, Group, DbName) ->
         = couch_db:enum_docs_since(
             Db,
             Seq,
-            fun(DocInfo, _, ChangesProcessed) ->
-                couch_task_status:update("Processed ~p of ~p changes (~p%)",
-                        [ChangesProcessed, TotalChanges, (ChangesProcessed*100) div TotalChanges]),
+            fun(DocInfo, _, Acc) ->
                 load_doc(Db, DocInfo, MapQueue, DocOpts, IncludeDesign),
-                {ok, ChangesProcessed+1}
+                {ok, Acc}
             end,
-            0, []),
-    couch_task_status:set_update_frequency(0),
-    couch_task_status:update("Finishing."),
+            ok, []),
     couch_work_queue:close(MapQueue),
     couch_db:close(Db),
     receive {new_group, NewGroup} ->
         exit({new_group,
                 NewGroup#group{current_seq=couch_db:get_update_seq(Db)}})
     end.
+
+
+add_query_server(#group{query_server = nil} = Group) ->
+    {ok, Qs} = couch_query_servers:start_doc_map(
+        Group#group.def_lang,
+        [View#view.def || View <- Group#group.views],
+        Group#group.lib),
+    Group#group{query_server = Qs};
+add_query_server(Group) ->
+    Group.
 
 
 purge_index(#group{views=Views, id_btree=IdBtree}=Group, Db) ->
@@ -133,96 +151,83 @@ load_doc(Db, DocInfo, MapQueue, DocOpts, IncludeDesign) ->
         end
     end.
     
-do_maps(Group, MapQueue, WriteQueue, ViewEmptyKVs) ->
+do_maps(#group{query_server = Qs} = Group, MapQueue, WriteQueue) ->
     case couch_work_queue:dequeue(MapQueue) of
     closed ->
         couch_work_queue:close(WriteQueue),
         couch_query_servers:stop_doc_map(Group#group.query_server);
     {ok, Queue} ->
-        Docs = [Doc || {_,#doc{deleted=false}=Doc} <- Queue],
-        DelKVs = [{Id, []} || {_, #doc{deleted=true,id=Id}} <- Queue],
-        LastSeq = lists:max([Seq || {Seq, _Doc} <- Queue]),
-        {Group1, Results} = view_compute(Group, Docs),
-        {ViewKVs, DocIdViewIdKeys} = view_insert_query_results(Docs,
-                    Results, ViewEmptyKVs, DelKVs),
-        couch_work_queue:queue(WriteQueue, {LastSeq, ViewKVs, DocIdViewIdKeys}),
-        do_maps(Group1, MapQueue, WriteQueue, ViewEmptyKVs)
+        lists:foreach(
+            fun({Seq, #doc{id = Id, deleted = true}}) ->
+                Item = {Seq, Id, []},
+                ok = couch_work_queue:queue(WriteQueue, Item);
+            ({Seq, #doc{id = Id, deleted = false} = Doc}) ->
+                {ok, Result} = couch_query_servers:map_doc_raw(Qs, Doc),
+                Item = {Seq, Id, Result},
+                ok = couch_work_queue:queue(WriteQueue, Item)
+            end,
+            Queue),
+        do_maps(Group, MapQueue, WriteQueue)
     end.
 
-do_writes(Parent, Owner, Group, WriteQueue, InitialBuild) ->
+do_writes(Parent, Owner, Group, WriteQueue, InitialBuild, ViewEmptyKVs,
+        ChangesDone, TotalChanges) ->
     case couch_work_queue:dequeue(WriteQueue) of
     closed ->
         Parent ! {new_group, Group};
     {ok, Queue} ->
-        {NewSeq, ViewKeyValues, DocIdViewIdKeys} = lists:foldl(
-            fun({Seq, ViewKVs, DocIdViewIdKeys}, nil) ->
-                {Seq, ViewKVs, DocIdViewIdKeys};
-            ({Seq, ViewKVs, DocIdViewIdKeys}, Acc) ->
-                {Seq2, AccViewKVs, AccDocIdViewIdKeys} = Acc,
-                AccViewKVs2 = lists:zipwith(
-                    fun({View, KVsIn}, {_View, KVsAcc}) ->
-                        {View, KVsIn ++ KVsAcc}
-                    end, ViewKVs, AccViewKVs),
-                {lists:max([Seq, Seq2]),
-                        AccViewKVs2, DocIdViewIdKeys ++ AccDocIdViewIdKeys}
-            end, nil, Queue),
-        Group2 = write_changes(Group, ViewKeyValues, DocIdViewIdKeys, NewSeq,
-                InitialBuild),
+        {ViewKVs, DocIdViewIdKeys} = lists:foldr(
+            fun({_Seq, Id, []}, {ViewKVsAcc, DocIdViewIdKeysAcc}) ->
+                {ViewKVsAcc, [{Id, []} | DocIdViewIdKeysAcc]};
+            ({_Seq, Id, RawQueryResults}, {ViewKVsAcc, DocIdViewIdKeysAcc}) ->
+                QueryResults = [
+                    [list_to_tuple(FunResult) || FunResult <- FunRs] || FunRs <-
+                        couch_query_servers:raw_to_ejson(RawQueryResults)
+                ],
+                {NewViewKVs, NewViewIdKeys} = view_insert_doc_query_results(
+                        Id, QueryResults, ViewKVsAcc, [], []),
+                {NewViewKVs, [{Id, NewViewIdKeys} | DocIdViewIdKeysAcc]}
+            end,
+            {ViewEmptyKVs, []}, Queue),
+        {NewSeq, _, _} = lists:last(Queue),
+        Group2 = write_changes(
+            Group, ViewKVs, DocIdViewIdKeys, NewSeq, InitialBuild),
         case Owner of
-        nil -> ok;
-        _ -> ok = gen_server:cast(Owner, {partial_update, Parent, Group2})
+        nil ->
+            ok;
+        _ ->
+            ok = gen_server:cast(Owner, {partial_update, Parent, Group2})
         end,
-        do_writes(Parent, Owner, Group2, WriteQueue, InitialBuild)
+        ChangesDone2 = ChangesDone + length(Queue),
+        couch_task_status:update("Processed ~p of ~p changes (~p%)",
+              [ChangesDone2, TotalChanges, (ChangesDone2 * 100) div TotalChanges]),
+        do_writes(Parent, Owner, Group2, WriteQueue, InitialBuild, ViewEmptyKVs,
+            ChangesDone2, TotalChanges)
     end.
 
-view_insert_query_results([], [], ViewKVs, DocIdViewIdKeysAcc) ->
-    {ViewKVs, DocIdViewIdKeysAcc};
-view_insert_query_results([Doc|RestDocs], [QueryResults | RestResults], ViewKVs, DocIdViewIdKeysAcc) ->
-    {NewViewKVs, NewViewIdKeys} = view_insert_doc_query_results(Doc, QueryResults, ViewKVs, [], []),
-    NewDocIdViewIdKeys = [{Doc#doc.id, NewViewIdKeys} | DocIdViewIdKeysAcc],
-    view_insert_query_results(RestDocs, RestResults, NewViewKVs, NewDocIdViewIdKeys).
 
-
-view_insert_doc_query_results(_Doc, [], [], ViewKVsAcc, ViewIdKeysAcc) ->
+view_insert_doc_query_results(_DocId, [], [], ViewKVsAcc, ViewIdKeysAcc) ->
     {lists:reverse(ViewKVsAcc), lists:reverse(ViewIdKeysAcc)};
-view_insert_doc_query_results(#doc{id=DocId}=Doc, [ResultKVs|RestResults], [{View, KVs}|RestViewKVs], ViewKVsAcc, ViewIdKeysAcc) ->
+view_insert_doc_query_results(DocId, [ResultKVs | RestResults],
+        [{View, KVs} | RestViewKVs], ViewKVsAcc, ViewIdKeysAcc) ->
     % Take any identical keys and combine the values
-    ResultKVs2 = lists:foldl(
-        fun({Key,Value}, [{PrevKey,PrevVal}|AccRest]) ->
-            case Key == PrevKey of
-            true ->
-                case PrevVal of
-                {dups, Dups} ->
-                    [{PrevKey, {dups, [Value|Dups]}} | AccRest];
-                _ ->
-                    [{PrevKey, {dups, [Value,PrevVal]}} | AccRest]
-                end;
-            false ->
-                [{Key,Value},{PrevKey,PrevVal}|AccRest]
-            end;
-        (KV, []) ->
-           [KV]
-        end, [], lists:sort(ResultKVs)),
-    NewKVs = [{{Key, DocId}, Value} || {Key, Value} <- ResultKVs2],
+    {NewKVs, NewViewIdKeys} = lists:foldl(
+        fun({Key, Val}, {[{{Key, _DocId} = Kd, PrevVal} | AccRest], AccVid}) ->
+            AccKv2 = case PrevVal of
+            {dups, Dups} ->
+                [{Kd, {dups, [Val | Dups]}} | AccRest];
+            _ ->
+                [{Kd, {dups, [Val, PrevVal]}} | AccRest]
+            end,
+            {AccKv2, [{View#view.id_num, Key} | AccVid]};
+        ({Key, Val}, {AccKv, AccVid}) ->
+            {[{{Key, DocId}, Val} | AccKv], [{View#view.id_num, Key} | AccVid]}
+        end,
+        {[], []}, lists:sort(ResultKVs)),
     NewViewKVsAcc = [{View, NewKVs ++ KVs} | ViewKVsAcc],
-    NewViewIdKeys = [{View#view.id_num, Key} || {Key, _Value} <- ResultKVs2],
     NewViewIdKeysAcc = NewViewIdKeys ++ ViewIdKeysAcc,
-    view_insert_doc_query_results(Doc, RestResults, RestViewKVs, NewViewKVsAcc, NewViewIdKeysAcc).
-
-view_compute(Group, []) ->
-    {Group, []};
-view_compute(#group{def_lang=DefLang, lib=Lib, query_server=QueryServerIn}=Group, Docs) ->
-    {ok, QueryServer} =
-    case QueryServerIn of
-    nil -> % doc map not started
-        Definitions = [View#view.def || View <- Group#group.views],
-        couch_query_servers:start_doc_map(DefLang, Definitions, Lib);
-    _ ->
-        {ok, QueryServerIn}
-    end,
-    {ok, Results} = couch_query_servers:map_docs(QueryServer, Docs),
-    {Group#group{query_server=QueryServer}, Results}.
-
+    view_insert_doc_query_results(
+        DocId, RestResults, RestViewKVs, NewViewKVsAcc, NewViewIdKeysAcc).
 
 
 write_changes(Group, ViewKeyValuesToAdd, DocIdViewIdKeys, NewSeq, InitialBuild) ->
