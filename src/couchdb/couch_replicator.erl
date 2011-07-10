@@ -51,7 +51,7 @@
     committed_seq,
     current_through_seq,
     seqs_in_progress = [],
-    highest_seq_done = ?LOWEST_SEQ,
+    highest_seq_done = {0, ?LOWEST_SEQ},
     source_log,
     target_log,
     rep_starttime,
@@ -213,7 +213,7 @@ do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
         target = Target,
         source_name = SourceName,
         target_name = TargetName,
-        start_seq = StartSeq,
+        start_seq = {_Ts, StartSeq},
         source_seq = SourceCurSeq
     } = State = init_state(Rep),
 
@@ -431,7 +431,7 @@ handle_cast({report_seq_done, Seq, StatsInc},
             NewHighestDone, SeqsInProgress, NewSeqsInProgress]),
     SourceCurSeq = source_cur_seq(State),
     couch_task_status:update(
-        "Processed ~p / ~p changes", [NewThroughSeq, SourceCurSeq]),
+        "Processed ~p / ~p changes", [element(2, NewThroughSeq), SourceCurSeq]),
     NewState = State#rep_state{
         stats = sum_stats([Stats, StatsInc]),
         current_through_seq = NewThroughSeq,
@@ -485,7 +485,7 @@ terminate_cleanup(State) ->
 
 
 do_last_checkpoint(#rep_state{seqs_in_progress = [],
-    highest_seq_done = ?LOWEST_SEQ} = State) ->
+    highest_seq_done = {_Ts, ?LOWEST_SEQ}} = State) ->
     {stop, normal, cancel_timer(State)};
 do_last_checkpoint(#rep_state{seqs_in_progress = [],
     highest_seq_done = Seq} = State) ->
@@ -530,7 +530,8 @@ init_state(Rep) ->
     [SourceLog, TargetLog] = find_replication_logs([Source, Target], Rep),
 
     {StartSeq0, History} = compare_replication_logs(SourceLog, TargetLog),
-    StartSeq = get_value(since_seq, Options, StartSeq0),
+    StartSeq1 = get_value(since_seq, Options, StartSeq0),
+    StartSeq = {0, StartSeq1},
     #doc{body={CheckpointHistory}} = SourceLog,
     State = #rep_state{
         rep_details = Rep,
@@ -646,7 +647,7 @@ do_checkpoint(State) ->
         source = Source,
         target = Target,
         history = OldHistory,
-        start_seq = StartSeq,
+        start_seq = {_, StartSeq},
         current_through_seq = {_Ts, NewSeq} = NewTsSeq,
         source_log = SourceLog,
         target_log = TargetLog,
