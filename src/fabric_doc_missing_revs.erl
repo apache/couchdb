@@ -53,11 +53,11 @@ handle_message({ok, Results}, Worker, {WaitingCount, D0, Workers}) ->
 
 force_reply(Id, {nil,Revs}, Acc) ->
     % never heard about this ID, assume it's missing
-    [{Id, Revs, []} | Acc];
+    [{Id, Revs} | Acc];
 force_reply(_, [], Acc) ->
     Acc;
 force_reply(Id, Revs, Acc) ->
-    [{Id, Revs, []} | Acc].
+    [{Id, Revs} | Acc].
 
 maybe_reply(_, _, continue) ->
     continue;
@@ -66,7 +66,7 @@ maybe_reply(_, {nil, _}, _) ->
 maybe_reply(_, [], {stop, Acc}) ->
     {stop, Acc};
 maybe_reply(Id, Revs, {stop, Acc}) ->
-    {stop, [{Id, Revs, []} | Acc]}.
+    {stop, [{Id, Revs} | Acc]}.
 
 group_idrevs_by_shard(DbName, IdsRevs) ->
     dict:to_list(lists:foldl(fun({Id, Revs}, D0) ->
