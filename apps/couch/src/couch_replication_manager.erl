@@ -27,6 +27,7 @@
 -define(REP_TO_STATE, couch_rep_id_to_rep_state).
 -define(INITIAL_WAIT, 2.5). % seconds
 -define(MAX_WAIT, 600).     % seconds
+-define(REPLICATOR_CONTEXT, {user_ctx, #user_ctx{roles=[<<"_admin">>, <<"_replicator">>]}}).
 
 -record(state, {
     changes_feed_loop = nil,
@@ -51,7 +52,6 @@
     get_value/3,
     to_binary/1
 ]).
-
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -222,41 +222,37 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 changes_feed_loop() ->
-    {ok, RepDb} = ensure_rep_db_exists(),
+    {ok, DbName} = ensure_rep_db_exists(),
     Server = self(),
     Pid = spawn_link(
         fun() ->
-            ChangesFeedFun = couch_changes:handle_changes(
-                #changes_args{
-                    include_docs = true,
-                    feed = "continuous",
-                    timeout = infinity,
-                    db_open_options = [sys_db]
-                },
-                {json_req, null},
-                RepDb
-            ),
-            ChangesFeedFun(
-                fun({change, Change, _}, _) ->
-                    case has_valid_rep_id(Change) of
-                    true ->
-                        ok = gen_server:call(
-                            Server, {rep_db_update, Change}, infinity);
-                    false ->
-                        ok
-                    end;
-                (_, _) ->
+            fabric:changes(DbName, fun
+            ({change, Change}, Acc) ->
+                case has_valid_rep_id(Change) of
+                true ->
+                    ok = gen_server:call(
+                        Server, {rep_db_update, Change}, infinity);
+                false ->
                     ok
-                end
+                end,
+                {ok, Acc};
+            (_, Acc) ->
+                {ok, Acc}
+            end,
+            nil,
+            #changes_args{
+                include_docs = true,
+                feed = "continuous",
+                filter = main_only,
+                timeout = infinity,
+                db_open_options = [sys_db]
+                }
             )
-        end
-    ),
-    couch_db:close(RepDb),
-    {Pid, couch_db:name(RepDb)}.
-
+        end),
+    {Pid, DbName}.
 
 has_valid_rep_id({Change}) ->
-    has_valid_rep_id(get_value(<<"id">>, Change));
+    has_valid_rep_id(get_value(id, Change));
 has_valid_rep_id(<<?DESIGN_DOC_PREFIX, _Rest/binary>>) ->
     false;
 has_valid_rep_id(_Else) ->
@@ -497,13 +493,13 @@ stop_all_replications() ->
 
 
 update_rep_doc(RepDocId, KVs) ->
-    {ok, RepDb} = ensure_rep_db_exists(),
+    {ok, DbName} = ensure_rep_db_exists(),
     try
-        case couch_db:open_doc(RepDb, RepDocId, []) of
-        {ok, LatestRepDoc} ->
-            update_rep_doc(RepDb, LatestRepDoc, KVs);
-        _ ->
-            ok
+        case do_async(fabric, open_doc, [mem3:dbname(DbName), RepDocId, []]) of
+            {ok, LatestRepDoc} ->
+                update_rep_doc(DbName, LatestRepDoc, KVs);
+            _ ->
+                ok
         end
     catch throw:conflict ->
         % Shouldn't happen, as by default only the role _replicator can
@@ -512,11 +508,9 @@ update_rep_doc(RepDocId, KVs) ->
             " Retrying.", [RepDocId]),
         ok = timer:sleep(5),
         update_rep_doc(RepDocId, KVs)
-    after
-        couch_db:close(RepDb)
     end.
 
-update_rep_doc(RepDb, #doc{body = {RepDocBody}} = RepDoc, KVs) ->
+update_rep_doc(RepDbName, #doc{body = {RepDocBody}} = RepDoc, KVs) ->
     NewRepDocBody = lists:foldl(
         fun({<<"_replication_state">> = K, State} = KV, Body) ->
                 case get_value(K, Body) of
@@ -538,7 +532,7 @@ update_rep_doc(RepDb, #doc{body = {RepDocBody}} = RepDoc, KVs) ->
     _ ->
         % Might not succeed - when the replication doc is deleted right
         % before this update (not an error, ignore).
-        couch_db:update_doc(RepDb, RepDoc#doc{body = {NewRepDocBody}}, [])
+        do_async(fabric, update_doc, [RepDbName, RepDoc#doc{body = {NewRepDocBody}}, [?REPLICATOR_CONTEXT]])
     end.
 
 
@@ -565,33 +559,31 @@ zone(Hr, Min) ->
 ensure_rep_db_exists() ->
     DbName = ?l2b(couch_config:get("replicator", "db", "_replicator")),
     Opts = [
-        {user_ctx, #user_ctx{roles=[<<"_admin">>, <<"_replicator">>]}},
+        ?REPLICATOR_CONTEXT,
         sys_db
     ],
-    case couch_db:open(DbName, Opts) of
-    {ok, Db} ->
-        Db;
-    _Error ->
-        {ok, Db} = couch_db:create(DbName, Opts)
+    case do_async(fabric, create_db, [DbName, [{n,3}, {q,8}, {z,3} | Opts]]) of
+        ok -> ok;
+        {error, file_exists} -> ok;
+        Error -> throw(Error)
     end,
-    ok = ensure_rep_ddoc_exists(Db, <<"_design/_replicator">>),
-    {ok, Db}.
+    ok = ensure_rep_ddoc_exists(DbName, <<"_design/_replicator">>),
+    {ok, DbName}.
 
 
 ensure_rep_ddoc_exists(RepDb, DDocID) ->
-    case couch_db:open_doc(RepDb, DDocID, []) of
-    {ok, _Doc} ->
-        ok;
-    _ ->
-        DDoc = couch_doc:from_json_obj({[
-            {<<"_id">>, DDocID},
-            {<<"language">>, <<"javascript">>},
-            {<<"validate_doc_update">>, ?REP_DB_DOC_VALIDATE_FUN}
-        ]}),
-        {ok, _Rev} = couch_db:update_doc(RepDb, DDoc, [])
+    case do_async(fabric, open_doc, [mem3:dbname(RepDb), DDocID, []]) of
+        {ok, _Doc} ->
+            ok;
+        {not_found, missing} ->
+            DDoc = couch_doc:from_json_obj({[
+                {<<"_id">>, DDocID},
+                {<<"language">>, <<"javascript">>},
+                {<<"validate_doc_update">>, ?REP_DB_DOC_VALIDATE_FUN}
+            ]}),
+            {ok, _Rev} = do_async(fabric, update_doc, [RepDb, DDoc, [?REPLICATOR_CONTEXT]])
     end,
     ok.
-
 
 % pretty-print replication id
 pp_rep_id({Base, Extension}) ->
@@ -626,4 +618,13 @@ state_after_error(#rep_state{retries_left = Left, wait = Wait} = State) ->
         State#rep_state{wait = Wait2};
     _ ->
         State#rep_state{retries_left = Left - 1, wait = Wait2}
+    end.
+
+do_async(M, F, A) ->
+    {Pid, Ref} = spawn_monitor(fun() ->
+        exit(erlang:apply(M, F, A))
+    end),
+    receive
+        {'DOWN', Ref, process, Pid, Result} ->
+            Result
     end.
