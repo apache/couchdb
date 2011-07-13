@@ -9,5 +9,5 @@
         mem3_sync,
         mem3_sup
     ]},
-    {applications, [kernel, stdlib, sasl, crypto, mochiweb, couch]}
+    {applications, [kernel, stdlib, sasl, crypto, mochiweb, couch, twig]}
 ]}.
