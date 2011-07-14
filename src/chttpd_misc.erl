@@ -130,7 +130,7 @@ handle_replicate_req(#httpd{method='POST', user_ctx=Ctx} = Req) ->
     couch_httpd:validate_ctype(Req, "application/json"),
     %% see HACK in chttpd.erl about replication
     PostBody = get(post_body),
-    try couch_rep:replicate(PostBody, Ctx) of
+    try couch_rep:replicate(PostBody, Ctx, mem3_rep_manager) of
     {ok, {continuous, RepId}} ->
         send_json(Req, 202, {[{ok, true}, {<<"_local_id">>, RepId}]});
     {ok, {cancelled, RepId}} ->
