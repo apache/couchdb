@@ -54,13 +54,17 @@ snappy_nif_la_LDFLAGS = -module -avoid-version
 
 if WINDOWS
 snappy_nif_la_LDFLAGS += -no-undefined
+snappy_nif_la_CXXFLAGS += -EHsc
+SNAPPY_SO_NAME = snappy_nif.dll
+else
+SNAPPY_SO_NAME = snappy_nif.so
 endif
 
-priv/snappy_nif.so: snappy_nif.la
+priv/$(SNAPPY_SO_NAME): snappy_nif.la
 	@mkdir -p ./priv
-	cp .libs/snappy_nif.so $@
+	cp .libs/$(SNAPPY_SO_NAME) $@
 
-all: priv/snappy_nif.so
+all: priv/$(SNAPPY_SO_NAME)
 endif
 
 %.app: %.app.in

@@ -70,13 +70,16 @@ ejson_la_LDFLAGS = -module -avoid-version
 
 if WINDOWS
 ejson_la_LDFLAGS += -no-undefined
+EJSON_SO_NAME = ejson.dll
+else
+EJSON_SO_NAME = ejson.so
 endif
 
-priv/ejson.so: ejson.la
+priv/$(EJSON_SO_NAME): ejson.la
 	@mkdir -p ./priv
-	cp .libs/ejson.so $@
+	cp .libs/$(EJSON_SO_NAME) $@
 
-all: priv/ejson.so
+all: priv/$(EJSON_SO_NAME)
 endif
 
 %.app: %.app.in
