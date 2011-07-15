@@ -60,9 +60,30 @@ if test -r $LSB_LIBRARY; then
     . $LSB_LIBRARY
 fi
 
+run_command () {
+    command="$1"
+    if test -n "$COUCHDB_OPTIONS"; then
+        command="$command $COUCHDB_OPTIONS"
+    fi
+    if test -n "$COUCHDB_USER"; then
+        if su $COUCHDB_USER -c "$command"; then
+            return $SCRIPT_OK
+        else
+            return $SCRIPT_ERROR
+        fi
+    else
+        if $command; then
+            return $SCRIPT_OK
+        else
+            return $SCRIPT_ERROR
+        fi
+    fi
+}
+
 start_couchdb () {
     # Start Apache CouchDB as a background process.
 
+    mkdir -p "$RUN_DIR"
     command="$COUCHDB -b"
     if test -n "$COUCHDB_STDOUT_FILE"; then
         command="$command -o $COUCHDB_STDOUT_FILE"
@@ -73,52 +94,19 @@ start_couchdb () {
     if test -n "$COUCHDB_RESPAWN_TIMEOUT"; then
         command="$command -r $COUCHDB_RESPAWN_TIMEOUT"
     fi
-    if test -n "$COUCHDB_OPTIONS"; then
-        command="$command $COUCHDB_OPTIONS"
-    fi
-    mkdir -p "$RUN_DIR"
-    if test -n "$COUCHDB_USER"; then
-        chown $COUCHDB_USER "$RUN_DIR"
-        if su $COUCHDB_USER -c "$command" > /dev/null; then
-            return $SCRIPT_OK
-        else
-            return $SCRIPT_ERROR
-        fi
-    else
-        if $command > /dev/null; then
-            return $SCRIPT_OK
-        else
-            return $SCRIPT_ERROR
-        fi
-    fi
+    run_command "$command" > /dev/null
 }
 
 stop_couchdb () {
     # Stop the running Apache CouchDB process.
 
-    command="$COUCHDB -d"
-    if test -n "$COUCHDB_OPTIONS"; then
-        command="$command $COUCHDB_OPTIONS"
-    fi
-    if test -n "$COUCHDB_USER"; then
-        if su $COUCHDB_USER -c "$command" > /dev/null; then
-            return $SCRIPT_OK
-        else
-            return $SCRIPT_ERROR
-        fi
-    else
-        if $command > /dev/null; then
-            return $SCRIPT_OK
-        else
-            return $SCRIPT_ERROR
-        fi
-    fi
+    run_command "$COUCHDB -d" > /dev/null
 }
 
 display_status () {
     # Display the status of the running Apache CouchDB process.
 
-    $COUCHDB -s
+    run_command "$COUCHDB -s"
 }
 
 parse_script_option_list () {
