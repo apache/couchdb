@@ -88,9 +88,9 @@ install-data-hook:
 	        $(LN_S) couch_ejson_compare_nif couch_ejson_compare_nif.so; \
 	fi
 if WINDOWS
-	$(INSTALL) $(ICU_BIN)/icuuc42.dll $(bindir)
-	$(INSTALL) $(ICU_BIN)/icudt42.dll $(bindir)
-	$(INSTALL) $(ICU_BIN)/icuin42.dll $(bindir)
+	$(INSTALL) $(ICU_BIN)/icuuc44.dll $(bindir)
+	$(INSTALL) $(ICU_BIN)/icudt44.dll $(bindir)
+	$(INSTALL) $(ICU_BIN)/icuin44.dll $(bindir)
 	$(INSTALL) $(JS_LIB_BINARY) $(bindir)
 	$(INSTALL) .libs/couchspawnkillable.exe \
 		"$(DESTDIR)$(couchprivdir)/couchspawnkillable.exe"
