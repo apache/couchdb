@@ -151,29 +151,33 @@ AC_ARG_WITH([js-lib], [AC_HELP_STRING([--with-js-lib=PATH],
 
 AC_ARG_VAR([ERLC_FLAGS], [general flags to prepend to ERLC_FLAGS])
 AC_ARG_VAR([FLAGS], [general flags to prepend to LDFLAGS and CPPFLAGS])
-CPPFLAGS="-I/usr/include $CPPFLAGS"
-CPPFLAGS="-I/usr/local/include $CPPFLAGS"
-CPPFLAGS="-I/opt/local/include $CPPFLAGS"
-CPPFLAGS="$FLAGS $CPPFLAGS"
-LDFLAGS="$FLAGS $LDFLAGS"
+AS_CASE([$(uname -s)],
+    [CYGWIN*], [] ,
+    [*], [
+    CPPFLAGS="$CPPFLAGS -I/opt/local/include"
+    CPPFLAGS="$CPPFLAGS -I/usr/local/include"
+    CPPFLAGS="$CPPFLAGS -I/usr/include"
+    LDFLAGS="$LDFLAGS -L/opt/local/lib"
+    LDFLAGS="$LDFLAGS -L/usr/local/lib"
+])
+CPPFLAGS="$CPPFLAGS $FLAGS"
+LDFLAGS="$LDFLAGS $FLAGS"
 
 # The erlang cc.sh/ld.sh scripts will convert a -O option
 # into the same optimization flags erlang itself uses.
 CFLAGS="-O2 $CFLAGS"
 
-LIB_FLAGS="-L/usr/local/lib -L/opt/local/lib"
-LIBS="$LIB_FLAGS $LIBS"
+LIBS="$LIBS $LDFLAGS"
 
-case "$(uname -s)" in
-  CYGWIN*)
-    JS_CFLAGS="-DXP_WIN $JS_CFLAGS"
-    IS_WINDOWS="TRUE"
-    ;;
-  *)
-    # XP_UNIX required for jsapi.h and has been tested to work on Linux and Darwin.
-    JS_CFLAGS="-DXP_UNIX $JS_CFLAGS"
-    ;;
-esac
+AS_CASE([$(uname -s)],
+    [CYGWIN*], [
+        JS_CFLAGS="-DXP_WIN $JS_CFLAGS"
+        IS_WINDOWS="TRUE"
+    ] ,
+    [*], [
+        # XP_UNIX required for jsapi.h and has been tested to work on Linux and Darwin.
+        JS_CFLAGS="-DXP_UNIX $JS_CFLAGS"
+])
 
 AM_CONDITIONAL([WINDOWS], [test x$IS_WINDOWS = xTRUE])
 
@@ -325,7 +329,9 @@ AC_ARG_WITH([win32-curl], [AC_HELP_STRING([--with-win32-curl=PATH],
     [set PATH to the Win32 native curl directory])], [
     # default build on windows is a static lib, and that's what we want too
     CURL_CFLAGS="-I$withval/include -DCURL_STATICLIB"
-    CURL_LIBS="-L$withval/lib -lcurl -lWs2_32 -lkernel32 -luser32 -ladvapi32 -lWldap32"
+    CURL_LIBS="-L$withval/lib -llibcurl -lWs2_32 -lkernel32 -luser32 -ladvapi32 -lWldap32"
+    # OpenSSL libraries may be pulled in via libcurl if it was built with SSL
+    # these are libeay32 ssleay32 instead of crypto ssl on unix
 ], [
     AC_CHECK_CURL([7.18.0],
         [AC_DEFINE([HAVE_CURL], [1], ["Provide HTTP support to couchjs"])], [
