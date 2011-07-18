@@ -10,16 +10,6 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-// Used by replication test
-if (typeof window == 'undefined' || !window) {
-  CouchDB.host = "127.0.0.1:5984";
-  CouchDB.protocol = "http://";
-  CouchDB.inBrowser = false;
-} else {
-  CouchDB.host = window.location.host;
-  CouchDB.inBrowser = true;
-  CouchDB.protocol = window.location.protocol + "//";
-}
 
 CouchDB.urlPrefix = "..";
 var couchTests = {};
