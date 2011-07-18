@@ -17,47 +17,49 @@ couchTests.copy_doc = function(debug) {
   if (debug) debugger;
 
   // copy a doc
-  T(db.save({_id:"doc_to_be_copied",v:1}).ok);
+  var ok = db.save({_id:"doc_to_be_copied",v:1}).ok;
+  TEquals(true, ok, "Should return ok:true");
   var xhr = CouchDB.request("COPY", "/test_suite_db/doc_to_be_copied", {
     headers: {"Destination":"doc_that_was_copied"}
   });
 
-  T(JSON.parse(xhr.responseText).ok);
+  TEquals(true, JSON.parse(xhr.responseText).ok, "Should return ok:true");
 
-  T(xhr.status == 201);
-  T(db.open("doc_that_was_copied").v == 1);
+  TEquals(201, xhr.status, "Should return 201 status");
+  TEquals(1, db.open("doc_that_was_copied").v, "Should have value 1");
 
   // COPY with existing target
-  T(db.save({_id:"doc_to_be_copied2",v:1}).ok);
+  var ok = db.save({_id:"doc_to_be_copied2",v:1}).ok;
+  TEquals(true, ok, "Should return ok:true");
   var doc = db.save({_id:"doc_to_be_overwritten",v:2});
-  T(doc.ok);
+  TEquals(true, doc.ok, "Should return ok:true");
 
   // error condition
   var xhr = CouchDB.request("COPY", "/test_suite_db/doc_to_be_copied2", {
       headers: {"Destination":"doc_to_be_overwritten"}
   });
-  T(xhr.status == 409); // conflict
+  TEquals(409, xhr.status, "Should return 409 status"); // conflict
 
   var xhr = CouchDB.request("COPY", "/test_suite_db/doc_to_be_copied2");
-  T(xhr.status == 400); // bad request (no Destination header)
+  TEquals(400, xhr.status, "Should return 400 status");
   TEquals("Destination header is mandatory for COPY.", JSON.parse(xhr.responseText).reason,
-    "should report missing destination header");
+    "Should report missing destination header");
 
   var xhr = CouchDB.request("COPY", "/test_suite_db/doc_to_be_copied2", {
     headers: {
       "Destination": "http://localhost:5984/test_suite_db/doc_to_be_written"
   }});
-  TEquals(400, xhr.status, "should throw a 400 error"); // bad request (invalid destination header)
+  TEquals(400, xhr.status, "Should return 400 status");
   TEquals("Destination URL must be relative.", JSON.parse(xhr.responseText).reason,
-    "should report invalid destination header");
+    "Should report invalid destination header");
 
   var rev = db.open("doc_to_be_overwritten")._rev;
   var xhr = CouchDB.request("COPY", "/test_suite_db/doc_to_be_copied2", {
     headers: {"Destination":"doc_to_be_overwritten?rev=" + rev}
   });
-  T(xhr.status == 201);
+  TEquals(201, xhr.status, "Should return 201 status");
 
   var over = db.open("doc_to_be_overwritten");
   T(rev != over._rev);
-  T(over.v == 1);
+  TEquals(1, over.v, "Should be value 1");
 };
