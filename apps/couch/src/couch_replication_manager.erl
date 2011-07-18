@@ -408,7 +408,7 @@ maybe_tag_rep_doc(DocId, {RepProps}, RepId) ->
 
 start_replication(Server, RepDoc, RepId, UserCtx, Wait) ->
     ok = timer:sleep(Wait * 1000),
-    case (catch couch_rep:start_replication(RepDoc, RepId, UserCtx)) of
+    case (catch couch_rep:start_replication(RepDoc, RepId, UserCtx, ?MODULE)) of
     Pid when is_pid(Pid) ->
         ok = gen_server:call(Server, {rep_started, RepId}, infinity),
         couch_rep:get_result(Pid, RepId, RepDoc, UserCtx);
