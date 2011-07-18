@@ -163,7 +163,7 @@ check_status () {
             return $SCRIPT_OK
         else
             echo >&2 << EOF
-Apache CouchDB is not running but a stale PID file exists: $PID_FILE"
+Apache CouchDB is not running but a stale PID file exists: $PID_FILE
 EOF
         fi
     else
