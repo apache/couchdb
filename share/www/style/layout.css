@@ -562,6 +562,10 @@ body.loading #dialog h2 {
   background-image: url(../image/test_failure.gif) no-repeat; color: #c00;
 }
 
+#result {
+  color: #060;
+}
+
 /* Configuration */
 
 #config tbody th { background: #e6e6e6; border-right: none;
