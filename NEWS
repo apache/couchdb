@@ -22,7 +22,7 @@ Version 1.0.3
  * Fixed OAuth signature computation in OTP R14B02.
  * Handle passwords with : in them.
  * Made compatible with jQuery 1.5.x.
- * Added support for inclusive_end wiht reduce views.
+ * Added support for inclusive_end with reduce views.
  * Etap tests no longer require use of port 5984.
  * Windows builds now require ICU >= 4.4.0 and Erlang >= R14B03.
 
