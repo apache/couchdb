@@ -25,9 +25,9 @@
 
 -define(DEFAULT_ATTACHMENT_CONTENT_TYPE, <<"application/octet-stream">>).
 
--define(LOG_DEBUG(Format, Args), couch_log:debug(Format, Args)).
--define(LOG_INFO(Format, Args), couch_log:info(Format, Args)).
--define(LOG_ERROR(Format, Args), couch_log:error(Format, Args)).
+-define(LOG_DEBUG(Format, Args), twig:log(debug, Format, Args)).
+-define(LOG_INFO(Format, Args), twig:log(info, Format, Args)).
+-define(LOG_ERROR(Format, Args), twig:log(error, Format, Args)).
 
 -record(rev_info,
     {
