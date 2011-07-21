@@ -28,7 +28,7 @@ go(DbName, AllIdsRevs, Options) ->
             Options]}),
         Shard#shard{ref=Ref}
     end, group_idrevs_by_shard(DbName, AllIdsRevs)),
-    ResultDict = dict:from_list([{Id, {nil,Revs}} || {Id, Revs} <- AllIdsRevs]),
+    ResultDict = dict:from_list([{Id, {{nil,Revs},[]}} || {Id, Revs} <- AllIdsRevs]),
     Acc0 = {length(Workers), ResultDict, Workers},
     fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0).
 
@@ -51,22 +51,22 @@ handle_message({ok, Results}, Worker, {WaitingCount, D0, Workers}) ->
         {stop, FinalReply}
     end.
 
-force_reply(Id, {nil,Revs}, Acc) ->
+force_reply(Id, {{nil,Revs}, Anc}, Acc) ->
     % never heard about this ID, assume it's missing
-    [{Id, Revs} | Acc];
-force_reply(_, [], Acc) ->
+    [{Id, Revs, Anc} | Acc];
+force_reply(_, {[], _}, Acc) ->
     Acc;
-force_reply(Id, Revs, Acc) ->
-    [{Id, Revs} | Acc].
+force_reply(Id, {Revs, Anc}, Acc) ->
+    [{Id, Revs, Anc} | Acc].
 
 maybe_reply(_, _, continue) ->
     continue;
-maybe_reply(_, {nil, _}, _) ->
+maybe_reply(_, {{nil, _}, _}, _) ->
     continue;
-maybe_reply(_, [], {stop, Acc}) ->
+maybe_reply(_, {[], _}, {stop, Acc}) ->
     {stop, Acc};
-maybe_reply(Id, Revs, {stop, Acc}) ->
-    {stop, [{Id, Revs} | Acc]}.
+maybe_reply(Id, {Revs, Anc}, {stop, Acc}) ->
+    {stop, [{Id, Revs, Anc} | Acc]}.
 
 group_idrevs_by_shard(DbName, IdsRevs) ->
     dict:to_list(lists:foldl(fun({Id, Revs}, D0) ->
@@ -76,7 +76,7 @@ group_idrevs_by_shard(DbName, IdsRevs) ->
     end, dict:new(), IdsRevs)).
 
 update_dict(D0, KVs) ->
-    lists:foldl(fun({K,V,_}, D1) -> dict:store(K, V, D1) end, D0, KVs).
+    lists:foldl(fun({K,V,A}, D1) -> dict:store(K, {V,A}, D1) end, D0, KVs).
 
 skip_message({1, Dict, _Workers}) ->
     {stop, dict:fold(fun force_reply/3, [], Dict)};

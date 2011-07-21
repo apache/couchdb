@@ -169,7 +169,7 @@ get_missing_revs(DbName, IdsRevs) ->
 
 %% @doc retrieve missing revisions for a list of `{Id, Revs}'
 -spec get_missing_revs(dbname(),[{docid(), [revision()]}], [option()]) ->
-    {ok, [{docid(), any()}]}.
+    {ok, [{docid(), any(), [any()]}]}.
 get_missing_revs(DbName, IdsRevs, Options) when is_list(IdsRevs) ->
     Sanitized = [idrevs(IdR) || IdR <- IdsRevs],
     fabric_doc_missing_revs:go(dbname(DbName), Sanitized, opts(Options)).
