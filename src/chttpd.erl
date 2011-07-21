@@ -25,6 +25,9 @@
     send_method_not_allowed/2, send_error/2, send_error/4, send_redirect/2,
     send_chunked_error/2, send_json/2,send_json/3,send_json/4]).
 
+-export([start_delayed_json_response/3, start_delayed_json_response/4,
+    send_delayed_chunk/2, send_delayed_error/2, end_delayed_json_response/1]).
+
 start_link() ->
     Options = [
         {loop, fun ?MODULE:handle_request/1},
@@ -113,6 +116,9 @@ handle_request(MochiReq) ->
     catch
         throw:{http_head_abort, Resp0} ->
             {ok, Resp0};
+        throw:{http_abort, Reason} ->
+            ?LOG_ERROR("Response abnormally terminated: ~p", [Reason]),
+            exit(normal);
         throw:{invalid_json, S} ->
             ?LOG_ERROR("attempted upload of invalid JSON ~s", [S]),
             send_error(HttpReq, {bad_request, "invalid UTF-8 JSON"});
@@ -449,6 +455,38 @@ start_json_response(Req, Code, Headers) ->
 
 end_json_response(Resp) ->
     couch_httpd:end_json_response(Resp).
+
+start_delayed_json_response(Req, Code, Headers) ->
+    start_delayed_json_response(Req, Code, Headers, "").
+
+start_delayed_json_response(Req, Code, Headers, FirstChunk) ->
+    {ok, {delayed_resp, Req, Code, Headers, FirstChunk}}.
+
+send_delayed_chunk({delayed_resp, Req, Code, Headers, FirstChunk}, Chunk) ->
+    {ok, Resp1} = start_json_response(Req, Code, Headers),
+    {ok, Resp2} = case FirstChunk of
+        "" -> {ok, Resp1};
+        _ -> send_delayed_chunk(Resp1, FirstChunk)
+    end,
+    send_delayed_chunk(Resp2, Chunk);
+send_delayed_chunk(Resp, Chunk) ->
+    send_chunk(Resp, Chunk).
+
+send_delayed_error({delayed_resp, Req, _, _, _}, Reason) ->
+    {Code, ErrorStr, ReasonStr} = error_info(Reason),
+    send_error(Req, Code, ErrorStr, ReasonStr);
+send_delayed_error(_Resp, Reason) ->
+    throw({http_abort, Reason}).
+
+end_delayed_json_response({delayed_resp, Req, Code, Headers, FirstChunk}) ->
+    {ok, Resp1} = start_json_response(Req, Code, Headers),
+    {ok, Resp2} = case FirstChunk of
+        "" -> {ok, Resp1};
+        _ -> send_delayed_chunk(Resp1, FirstChunk)
+    end,
+    end_delayed_json_response(Resp2);
+end_delayed_json_response(Resp) ->
+    end_json_response(Resp).
 
 error_info({Error, Reason}) when is_list(Reason) ->
     error_info({Error, couch_util:to_binary(Reason)});

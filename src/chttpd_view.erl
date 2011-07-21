@@ -29,24 +29,24 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
         chttpd:qs(Req)),
     [couch_stats_collector:increment({httpd, view_reads}) || _I <- Queries],
     chttpd:etag_respond(Req, Etag, fun() ->
-        {ok, Resp} = chttpd:start_json_response(Req, 200, [{"Etag",Etag}]),
-        chttpd:send_chunk(Resp, "{\"results\":["),
-        lists:foldl(fun({QueryProps}, Chunk) ->
-            if Chunk =/= nil -> chttpd:send_chunk(Resp, Chunk); true -> ok end,
+        FirstChunk = "{\"results\":[",
+        {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [{"Etag",Etag}], FirstChunk),
+        {_, Resp1} = lists:foldl(fun({QueryProps}, {Chunk, RespAcc}) ->
+            if Chunk =/= nil -> chttpd:send_delayed_chunk(Resp, Chunk); true -> ok end,
             ThisQuery = lists:flatmap(fun parse_json_view_param/1, QueryProps),
             FullParams = lists:ukeymerge(1, ThisQuery, DefaultParams),
-            fabric:query_view(
+            {ok, RespAcc1} = fabric:query_view(
                 Db,
                 DDoc,
                 ViewName,
                 fun view_callback/2,
-                {nil, Resp},
+                {nil, RespAcc},
                 parse_view_params(FullParams, nil, ViewType)
             ),
-            ",\n"
-        end, nil, Queries),
-        chttpd:send_chunk(Resp, "]}"),
-        chttpd:end_json_response(Resp)
+            {",\n", RespAcc1}
+        end, {nil,Resp}, Queries),
+        chttpd:send_delayed_chunk(Resp1, "]}"),
+        chttpd:end_delayed_json_response(Resp1)
     end).
 
 design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
@@ -59,34 +59,32 @@ design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
     Etag = couch_uuids:new(),
     couch_stats_collector:increment({httpd, view_reads}),
     chttpd:etag_respond(Req, Etag, fun() ->
-        {ok, Resp} = chttpd:start_json_response(Req, 200, [{"Etag",Etag}]),
+        {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [{"Etag",Etag}]),
         CB = fun view_callback/2,
-        fabric:query_view(Db, DDoc, ViewName, CB, {nil, Resp}, QueryArgs),
-        chttpd:end_json_response(Resp)
+        {ok, Resp1} = fabric:query_view(Db, DDoc, ViewName, CB, {nil, Resp}, QueryArgs),
+        chttpd:end_delayed_json_response(Resp1)
     end).
 
 view_callback({total_and_offset, Total, Offset}, {nil, Resp}) ->
     Chunk = "{\"total_rows\":~p,\"offset\":~p,\"rows\":[\r\n",
-    chttpd:send_chunk(Resp, io_lib:format(Chunk, [Total, Offset])),
-    {ok, {"", Resp}};
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, io_lib:format(Chunk, [Total, Offset])),
+    {ok, {"", Resp1}};
 view_callback({total_and_offset, _, _}, Acc) ->
     % a sorted=false view where the message came in late.  Ignore.
     {ok, Acc};
 view_callback({row, Row}, {nil, Resp}) ->
     % first row of a reduce view, or a sorted=false view
-    chttpd:send_chunk(Resp, ["{\"rows\":[\r\n", ?JSON_ENCODE(Row)]),
-    {ok, {",\r\n", Resp}};
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, ["{\"rows\":[\r\n", ?JSON_ENCODE(Row)]),
+    {ok, {",\r\n", Resp1}};
 view_callback({row, Row}, {Prepend, Resp}) ->
-    chttpd:send_chunk(Resp, [Prepend, ?JSON_ENCODE(Row)]),
-    {ok, {",\r\n", Resp}};
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, [Prepend, ?JSON_ENCODE(Row)]),
+    {ok, {",\r\n", Resp1}};
 view_callback(complete, {nil, Resp}) ->
-    chttpd:send_chunk(Resp, "{\"rows\":[]}");
+    chttpd:send_delayed_chunk(Resp, "{\"rows\":[]}");
 view_callback(complete, {_, Resp}) ->
-    chttpd:send_chunk(Resp, "\r\n]}");
+    chttpd:send_delayed_chunk(Resp, "\r\n]}");
 view_callback({error, Reason}, {_, Resp}) ->
-    {Code, ErrorStr, ReasonStr} = chttpd:error_info(Reason),
-    Json = {[{code,Code}, {error,ErrorStr}, {reason,ReasonStr}]},
-    chttpd:send_chunk(Resp, [$\n, ?JSON_ENCODE(Json), $\n]).
+    chttpd:send_delayed_error(Resp, Reason).
 
 extract_view_type(_ViewName, [], _IsReduce) ->
     throw({not_found, missing_named_view});

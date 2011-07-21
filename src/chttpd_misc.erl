@@ -94,7 +94,7 @@ handle_all_dbs_req(#httpd{method='GET'}=Req) ->
     {ok, Info} = fabric:get_db_info(ShardDbName),
     Etag = couch_httpd:make_etag({Info}),
     chttpd:etag_respond(Req, Etag, fun() ->
-        {ok, Resp} = chttpd:start_json_response(Req, 200, [{"Etag",Etag}]),
+        {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [{"Etag",Etag}]),
         fabric:all_docs(ShardDbName, fun all_dbs_callback/2,
             {nil, Resp}, #view_query_args{})
     end);
@@ -102,20 +102,20 @@ handle_all_dbs_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 all_dbs_callback({total_and_offset, _Total, _Offset}, {_, Resp}) ->
-    send_chunk(Resp, "["),
-    {ok, {"", Resp}};
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, "["),
+    {ok, {"", Resp1}};
 all_dbs_callback({row, {Row}}, {Prepend, Resp}) ->
     case couch_util:get_value(id, Row) of <<"_design", _/binary>> ->
         {ok, {Prepend, Resp}};
     DbName ->
-        send_chunk(Resp, [Prepend, ?JSON_ENCODE(DbName)]),
-        {ok, {",", Resp}}
+        {ok, Resp1} = chttpd:send_delayed_chunk(Resp, [Prepend, ?JSON_ENCODE(DbName)]),
+        {ok, {",", Resp1}}
     end;
 all_dbs_callback(complete, {_, Resp}) ->
-    send_chunk(Resp, "]"),
-    end_json_response(Resp);
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, "]"),
+    chttpd:end_delayed_json_response(Resp1);
 all_dbs_callback({error, Reason}, {_, Resp}) ->
-    chttpd:send_chunked_error(Resp, {error, Reason}).
+    chttpd:send_delayed_error(Resp, Reason).
 
 handle_task_status_req(#httpd{method='GET'}=Req) ->
     {Replies, _BadNodes} = gen_server:multi_call(couch_task_status, all),

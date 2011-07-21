@@ -79,48 +79,45 @@ handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
 
 % callbacks for continuous feed (newline-delimited JSON Objects)
 changes_callback(start, {"continuous", Req}) ->
-    {ok, Resp} = chttpd:start_json_response(Req, 200),
+    {ok, Resp} = chttpd:start_delayed_json_response(Req, 200),
     {ok, {"continuous", Resp}};
-changes_callback({change, Change}, {"continuous", Resp} = Acc) ->
-    send_chunk(Resp, [?JSON_ENCODE(Change) | "\n"]),
-    {ok, Acc};
+changes_callback({change, Change}, {"continuous", Resp}) ->
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, [?JSON_ENCODE(Change) | "\n"]),
+    {ok, {"continuous", Resp1}};
 changes_callback({stop, EndSeq0}, {"continuous", Resp}) ->
     EndSeq = case is_old_couch(Resp) of true -> 0; false -> EndSeq0 end,
-    send_chunk(Resp, [?JSON_ENCODE({[{<<"last_seq">>, EndSeq}]}) | "\n"]),
-    end_json_response(Resp);
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp,
+        [?JSON_ENCODE({[{<<"last_seq">>, EndSeq}]}) | "\n"]),
+    chttpd:end_delayed_json_response(Resp1);
 
 % callbacks for longpoll and normal (single JSON Object)
 changes_callback(start, {"normal", {"Etag", Etag}, Req}) ->
-    {ok, Resp} = chttpd:start_json_response(Req, 200, [{"Etag",Etag}]),
-    send_chunk(Resp, "{\"results\":[\n"),
+    FirstChunk = "{\"results\":[\n",
+    {ok, Resp} = chttpd:start_delayed_json_response(Req, 200,
+        [{"Etag",Etag}], FirstChunk),
     {ok, {"", Resp}};
 changes_callback(start, {_, Req}) ->
-    {ok, Resp} = chttpd:start_json_response(Req, 200),
-    send_chunk(Resp, "{\"results\":[\n"),
+    FirstChunk = "{\"results\":[\n",
+    {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [], FirstChunk),
     {ok, {"", Resp}};
 changes_callback({change, Change}, {Prepend, Resp}) ->
-    send_chunk(Resp, [Prepend, ?JSON_ENCODE(Change)]),
-    {ok, {",\r\n", Resp}};
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, [Prepend, ?JSON_ENCODE(Change)]),
+    {ok, {",\r\n", Resp1}};
 changes_callback({stop, EndSeq}, {_, Resp}) ->
-    case is_old_couch(Resp) of
+    {ok, Resp1} = case is_old_couch(Resp) of
     true ->
-        send_chunk(Resp, "\n],\n\"last_seq\":0}\n");
+        chttpd:send_delayed_chunk(Resp, "\n],\n\"last_seq\":0}\n");
     false ->
-        send_chunk(Resp, io_lib:format("\n],\n\"last_seq\":\"~s\"}\n",[EndSeq]))
+        chttpd:send_delayed_chunk(Resp,
+            io_lib:format("\n],\n\"last_seq\":\"~s\"}\n",[EndSeq]))
     end,
-    end_json_response(Resp);
+    chttpd:end_delayed_json_response(Resp1);
 
 changes_callback(timeout, {Prepend, Resp}) ->
-    send_chunk(Resp, "\n"),
-    {ok, {Prepend, Resp}};
-changes_callback({error, Reason}, Resp) ->
-    case Resp of
-    {"normal", _, Req} ->
-        Request = Req;
-    {_, Req} ->
-        Request = Req
-    end,
-    chttpd:send_error(Request, Reason).
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, "\n"),
+    {ok, {Prepend, Resp1}};
+changes_callback({error, Reason}, {_, Resp}) ->
+    chttpd:send_delayed_error(Resp, Reason).
 
 is_old_couch(Resp) ->
     MochiReq = Resp:get(request),
@@ -446,22 +443,22 @@ all_docs_view(Req, Db, Keys) ->
     couch_stats_collector:record({couchdb, dbinfo}, DeltaT),
     QueryArgs = chttpd_view:parse_view_params(Req, Keys, map),
     chttpd:etag_respond(Req, Etag, fun() ->
-        {ok, Resp} = chttpd:start_json_response(Req, 200, [{"Etag",Etag}]),
+        {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [{"Etag",Etag}]),
         fabric:all_docs(Db, fun all_docs_callback/2, {nil, Resp}, QueryArgs)
     end).
 
 all_docs_callback({total_and_offset, Total, Offset}, {_, Resp}) ->
     Chunk = "{\"total_rows\":~p,\"offset\":~p,\"rows\":[\r\n",
-    send_chunk(Resp, io_lib:format(Chunk, [Total, Offset])),
-    {ok, {"", Resp}};
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, io_lib:format(Chunk, [Total, Offset])),
+    {ok, {"", Resp1}};
 all_docs_callback({row, Row}, {Prepend, Resp}) ->
-    send_chunk(Resp, [Prepend, ?JSON_ENCODE(Row)]),
-    {ok, {",\r\n", Resp}};
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, [Prepend, ?JSON_ENCODE(Row)]),
+    {ok, {",\r\n", Resp1}};
 all_docs_callback(complete, {_, Resp}) ->
-    send_chunk(Resp, "\r\n]}"),
-    end_json_response(Resp);
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, "\r\n]}"),
+    chttpd:end_delayed_json_response(Resp1);
 all_docs_callback({error, Reason}, {_, Resp}) ->
-    chttpd:send_chunked_error(Resp, Reason).
+    chttpd:send_delayed_error(Resp, Reason).
 
 db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
     % check for the existence of the doc to handle the 404 case.
