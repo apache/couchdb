@@ -120,4 +120,38 @@ couchTests.view_collation_raw = function(debug) {
     endkey : "b", endkey_docid: "11",
     inclusive_end:false}).rows;
   T(rows[rows.length-1].key == "aa");
+
+  // result empty warning behaves different on raw collation
+  // COUCHDB-1228
+  var docs = [
+    {"x":"A"},
+    {"x":"C"},
+    {"x":"b"}
+  ];
+
+  db.bulkSave(docs);
+
+  var ddoc = {
+    _id: "_design/t",
+    views: {
+      foo: {
+        options: {
+          collation: "raw"
+        },
+        map: stringFun(function(doc) { emit(doc.x);})
+      }
+    }
+  };
+
+  db.save(ddoc);
+
+  var res = db.view("t/foo");
+  TEquals("A", res.rows[0].key);
+  TEquals("C", res.rows[1].key);
+  TEquals("b", res.rows[2].key);
+
+  var res = db.view("t/foo", {startkey: "B", endkey: "a"});
+  TEquals("C", res.rows[0].key, "Should return 'C'");
+  // 1228 end
+
 };
