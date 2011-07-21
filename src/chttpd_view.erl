@@ -17,10 +17,6 @@
     parse_view_params/3, view_group_etag/2, view_group_etag/3,
     parse_bool_param/1, extract_view_type/3]).
 
--import(chttpd,
-    [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,send_chunk/2,
-    start_json_response/2, start_json_response/3, end_json_response/1,
-    send_chunked_error/2]).
 
 multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
     Group = couch_view_group:design_doc_to_view_group(DDoc),
@@ -71,26 +67,26 @@ design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
 
 view_callback({total_and_offset, Total, Offset}, {nil, Resp}) ->
     Chunk = "{\"total_rows\":~p,\"offset\":~p,\"rows\":[\r\n",
-    send_chunk(Resp, io_lib:format(Chunk, [Total, Offset])),
+    chttpd:send_chunk(Resp, io_lib:format(Chunk, [Total, Offset])),
     {ok, {"", Resp}};
 view_callback({total_and_offset, _, _}, Acc) ->
     % a sorted=false view where the message came in late.  Ignore.
     {ok, Acc};
 view_callback({row, Row}, {nil, Resp}) ->
     % first row of a reduce view, or a sorted=false view
-    send_chunk(Resp, ["{\"rows\":[\r\n", ?JSON_ENCODE(Row)]),
+    chttpd:send_chunk(Resp, ["{\"rows\":[\r\n", ?JSON_ENCODE(Row)]),
     {ok, {",\r\n", Resp}};
 view_callback({row, Row}, {Prepend, Resp}) ->
-    send_chunk(Resp, [Prepend, ?JSON_ENCODE(Row)]),
+    chttpd:send_chunk(Resp, [Prepend, ?JSON_ENCODE(Row)]),
     {ok, {",\r\n", Resp}};
 view_callback(complete, {nil, Resp}) ->
-    send_chunk(Resp, "{\"rows\":[]}");
+    chttpd:send_chunk(Resp, "{\"rows\":[]}");
 view_callback(complete, {_, Resp}) ->
-    send_chunk(Resp, "\r\n]}");
+    chttpd:send_chunk(Resp, "\r\n]}");
 view_callback({error, Reason}, {_, Resp}) ->
     {Code, ErrorStr, ReasonStr} = chttpd:error_info(Reason),
     Json = {[{code,Code}, {error,ErrorStr}, {reason,ReasonStr}]},
-    send_chunk(Resp, [$\n, ?JSON_ENCODE(Json), $\n]).
+    chttpd:send_chunk(Resp, [$\n, ?JSON_ENCODE(Json), $\n]).
 
 extract_view_type(_ViewName, [], _IsReduce) ->
     throw({not_found, missing_named_view});
@@ -130,7 +126,7 @@ handle_view_req(#httpd{method='POST',
     end;
 
 handle_view_req(Req, _Db, _DDoc) ->
-    send_method_not_allowed(Req, "GET,POST,HEAD").
+    chttpd:send_method_not_allowed(Req, "GET,POST,HEAD").
 
 handle_temp_view_req(Req, _Db) ->
     Msg = <<"Temporary views are not supported in BigCouch">>,
