@@ -115,9 +115,9 @@ handle_view_req(#httpd{method='POST',
     Queries = couch_util:get_value(<<"queries">>, Fields),
     Keys = couch_util:get_value(<<"keys">>, Fields),
     case {Queries, Keys} of
-    {[_|_], undefined} ->
+    {Queries, undefined} when is_list(Queries) ->
         multi_query_view(Req, Db, DDoc, ViewName, Queries);
-    {undefined, [_|_]} ->
+    {undefined, Keys} when is_list(Keys) ->
         design_doc_view(Req, Db, DDoc, ViewName, Keys);
     {undefined, undefined} ->
         throw({bad_request, "POST body must contain `keys` or `queries` field"});
