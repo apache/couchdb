@@ -345,7 +345,7 @@ db_req(#httpd{path_parts=[_,<<"_all_docs">>]}=Req, _Db) ->
 db_req(#httpd{method='POST',path_parts=[_,<<"_missing_revs">>]}=Req, Db) ->
     {JsonDocIdRevs} = couch_httpd:json_body_obj(Req),
     {ok, Results} = fabric:get_missing_revs(Db, JsonDocIdRevs),
-    Results2 = [{Id, couch_doc:revs_to_strs(Revs)} || {Id, Revs} <- Results],
+    Results2 = [{Id, couch_doc:revs_to_strs(Revs)} || {Id, Revs, _} <- Results],
     send_json(Req, {[
         {missing_revs, {Results2}}
     ]});
