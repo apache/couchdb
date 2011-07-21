@@ -13,10 +13,10 @@
 -module(couch_view).
 -behaviour(gen_server).
 
--export([start_link/0,fold/4,less_json/2,less_json_ids/2,less_raw/2,expand_dups/2,
+-export([start_link/0,fold/4,less_json/2,less_json_ids/2,expand_dups/2,
     detuple_kvs/2,init/1,terminate/2,handle_call/3,handle_cast/2,handle_info/2,
     code_change/3,get_reduce_view/4,get_temp_reduce_view/5,get_temp_map_view/4,
-    get_map_view/4,get_row_count/1,reduce_to_count/1,fold_reduce/4,get_less_fun/1,
+    get_map_view/4,get_row_count/1,reduce_to_count/1,fold_reduce/4,
     extract_map_view/1,get_group_server/2,get_group_info/2,cleanup_index_files/1]).
 
 -include("couch_db.hrl").
@@ -408,13 +408,3 @@ less_json_ids({JsonA, IdA}, {JsonB, IdB}) ->
 
 less_json(A,B) ->
     couch_ejson_compare:less(A, B) < 0.
-
-less_raw(A,B) -> A < B.
-
-get_less_fun(ViewOptions) ->
-    case couch_util:get_value(<<"collation">>, ViewOptions, <<"default">>) of
-    <<"default">> ->
-        fun couch_view:less_json_ids/2;
-    <<"raw">> ->
-        fun couch_view:less_raw/2
-    end.

@@ -15,7 +15,7 @@
 
 -export([handle_view_req/3,handle_temp_view_req/2]).
 
--export([parse_view_params/4]).
+-export([parse_view_params/3]).
 -export([make_view_fold_fun/7, finish_view_fold/4, finish_view_fold/5, view_row_obj/4]).
 -export([view_etag/5, make_reduce_fold_funs/6]).
 -export([design_doc_view/5, parse_bool_param/1, doc_member/3]).
@@ -34,18 +34,18 @@ design_doc_view(Req, Db, DName, ViewName, Keys) ->
     Reduce = get_reduce_type(Req),
     Result = case couch_view:get_map_view(Db, DesignId, ViewName, Stale) of
     {ok, View, Group} ->
-        QueryArgs = parse_view_params(Req, View, Keys, map),
+        QueryArgs = parse_view_params(Req, Keys, map),
         output_map_view(Req, View, Group, Db, QueryArgs, Keys);
     {not_found, Reason} ->
         case couch_view:get_reduce_view(Db, DesignId, ViewName, Stale) of
         {ok, ReduceView, Group} ->
             case Reduce of
             false ->
+                QueryArgs = parse_view_params(Req, Keys, red_map),
                 MapView = couch_view:extract_map_view(ReduceView),
-                QueryArgs = parse_view_params(Req, MapView, Keys, red_map),
                 output_map_view(Req, MapView, Group, Db, QueryArgs, Keys);
             _ ->
-                QueryArgs = parse_view_params(Req, ReduceView, Keys, reduce),
+                QueryArgs = parse_view_params(Req, Keys, reduce),
                 output_reduce_view(Req, Db, ReduceView, Group, QueryArgs, Keys)
             end;
         _ ->
@@ -90,19 +90,19 @@ handle_temp_view_req(#httpd{method='POST'}=Req, Db) ->
     Reduce = get_reduce_type(Req),
     case couch_util:get_value(<<"reduce">>, Props, null) of
     null ->
+        QueryArgs = parse_view_params(Req, Keys, map),
         {ok, View, Group} = couch_view:get_temp_map_view(Db, Language,
             DesignOptions, MapSrc),
-        QueryArgs = parse_view_params(Req, View, Keys, map),
         output_map_view(Req, View, Group, Db, QueryArgs, Keys);
     _ when Reduce =:= false ->
+        QueryArgs = parse_view_params(Req, Keys, red_map),
         {ok, View, Group} = couch_view:get_temp_map_view(Db, Language,
             DesignOptions, MapSrc),
-        QueryArgs = parse_view_params(Req, View, Keys, red_map),
         output_map_view(Req, View, Group, Db, QueryArgs, Keys);
     RedSrc ->
+        QueryArgs = parse_view_params(Req, Keys, reduce),
         {ok, View, Group} = couch_view:get_temp_reduce_view(Db, Language,
             DesignOptions, MapSrc, RedSrc),
-        QueryArgs = parse_view_params(Req, View, Keys, reduce),
         output_reduce_view(Req, Db, View, Group, QueryArgs, Keys)
     end;
 
@@ -209,18 +209,18 @@ load_view(Req, Db, {ViewDesignId, ViewName}, Keys) ->
     Reduce = get_reduce_type(Req),
     case couch_view:get_map_view(Db, ViewDesignId, ViewName, Stale) of
     {ok, View, Group} ->
-        QueryArgs = parse_view_params(Req, View, Keys, map),
+        QueryArgs = parse_view_params(Req, Keys, map),
         {map, View, Group, QueryArgs};
     {not_found, _Reason} ->
         case couch_view:get_reduce_view(Db, ViewDesignId, ViewName, Stale) of
         {ok, ReduceView, Group} ->
             case Reduce of
             false ->
+                QueryArgs = parse_view_params(Req, Keys, map_red),
                 MapView = couch_view:extract_map_view(ReduceView),
-                QueryArgs = parse_view_params(Req, MapView, Keys, map_red),
                 {map, MapView, Group, QueryArgs};
             _ ->
-                QueryArgs = parse_view_params(Req, ReduceView, Keys, reduce),
+                QueryArgs = parse_view_params(Req, Keys, reduce),
                 {reduce, ReduceView, Group, QueryArgs}
             end;
         {not_found, Reason} ->
@@ -233,7 +233,7 @@ load_view(Req, Db, {ViewDesignId, ViewName}, Keys) ->
 % I'm not sure what to do about the error handling, but
 % it might simplify things to have a parse_view_params function
 % that doesn't throw().
-parse_view_params(Req, View, Keys, ViewType) ->
+parse_view_params(Req, Keys, ViewType) ->
     QueryList = couch_httpd:qs(Req),
     QueryParams =
     lists:foldl(fun({K, V}, Acc) ->
@@ -247,7 +247,7 @@ parse_view_params(Req, View, Keys, ViewType) ->
     QueryArgs = lists:foldl(fun({K, V}, Args2) ->
         validate_view_query(K, V, Args2)
     end, Args, lists:reverse(QueryParams)), % Reverse to match QS order.
-    warn_on_empty_key_range(QueryArgs, View),
+    warn_on_empty_key_range(QueryArgs),
     GroupLevel = QueryArgs#view_query_args.group_level,
     case {ViewType, GroupLevel, IsMultiGet} of
     {reduce, exact, true} ->
@@ -328,16 +328,15 @@ parse_view_param("callback", _) ->
 parse_view_param(Key, Value) ->
     [{extra, {Key, Value}}].
 
-warn_on_empty_key_range(#view_query_args{start_key=undefined}, _View) ->
+warn_on_empty_key_range(#view_query_args{start_key=undefined}) ->
     ok;
-warn_on_empty_key_range(#view_query_args{end_key=undefined}, _View) ->
+warn_on_empty_key_range(#view_query_args{end_key=undefined}) ->
     ok;
-warn_on_empty_key_range(#view_query_args{start_key=A, end_key=A}, _View) ->
+warn_on_empty_key_range(#view_query_args{start_key=A, end_key=A}) ->
     ok;
 warn_on_empty_key_range(#view_query_args{
-    start_key=StartKey, end_key=EndKey, direction=Dir}, #view{options=Options}) ->
-    Less = couch_view:get_less_fun(Options),
-    case {Dir, Less(StartKey, EndKey)} of
+    start_key=StartKey, end_key=EndKey, direction=Dir}) ->
+    case {Dir, couch_view:less_json(StartKey, EndKey)} of
         {fwd, false} ->
             throw({query_parse_error,
             <<"No rows can match your key range, reverse your ",
