@@ -630,13 +630,8 @@ init_group(Db, Fd, #group{def_lang=Lang,views=Views}=
                         UserReds),
                     {Count, Reduced}
                 end,
-            
-            case couch_util:get_value(<<"collation">>, Options, <<"default">>) of
-            <<"default">> ->
-                Less = fun couch_view:less_json_ids/2;
-            <<"raw">> ->
-                Less = fun(A,B) -> A < B end
-            end,
+
+            Less = couch_view:get_less_fun(Options),
             {ok, Btree} = couch_btree:open(BTState, Fd,
                     [{less, Less}, {reduce, ReduceFun},
                         {compression, Db#db.compression}]
