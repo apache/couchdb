@@ -58,10 +58,9 @@
     src_starttime,
     tgt_starttime,
     timer, % checkpoint timer
-    missing_revs_queue,
     changes_queue,
+    changes_manager,
     changes_reader,
-    missing_rev_finders,
     workers,
     stats = #rep_stats{},
     session_id,
@@ -217,41 +216,28 @@ do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
         source_seq = SourceCurSeq
     } = State = init_state(Rep),
 
-    CopiersCount = get_value(worker_processes, Options),
-    RevFindersCount = CopiersCount,
+    NumWorkers = get_value(worker_processes, Options),
     BatchSize = get_value(worker_batch_size, Options),
-    {ok, MissingRevsQueue} = couch_work_queue:new([
-        {multi_workers, true},
-        {max_items, trunc(CopiersCount * 2.0)}
-    ]),
     {ok, ChangesQueue} = couch_work_queue:new([
-        {multi_workers, true},
-        {max_items, trunc(BatchSize * RevFindersCount * 2.0)}
+        {max_items, trunc(BatchSize * NumWorkers * 2.0)}
     ]),
     % This starts the _changes reader process. It adds the changes from
     % the source db to the ChangesQueue.
-    ChangesReader = spawn_changes_reader(
-        StartSeq, Source, ChangesQueue, Options),
-    % This starts the missing rev finders. They check the target for changes
-    % in the ChangesQueue to see if they exist on the target or not. If not,
-    % adds them to MissingRevsQueue.
-    MissingRevFinders = lists:map(
-        fun(_) ->
-            {ok, Pid} = couch_replicator_rev_finder:start_link(
-                self(), Target, ChangesQueue, MissingRevsQueue, BatchSize),
-            Pid
-        end,
-        lists:seq(1, RevFindersCount)),
-    % This starts the doc copy processes. They fetch documents from the
-    % MissingRevsQueue and copy them from the source to the target database.
+    ChangesReader = spawn_changes_reader(StartSeq, Source, ChangesQueue, Options),
+    % Changes manager - responsible for dequeing batches from the changes queue
+    % and deliver them to the worker processes.
+    ChangesManager = spawn_changes_manager(self(), ChangesQueue, BatchSize),
+    % This starts the worker processes. They ask the changes queue manager for a
+    % a batch of _changes rows to process -> check which revs are missing in the
+    % target, and for the missing ones, it copies them from the source to the target.
     MaxConns = get_value(http_connections, Options),
     Workers = lists:map(
         fun(_) ->
-            {ok, Pid} = couch_replicator_doc_copier:start_link(
-                self(), Source, Target, MissingRevsQueue, MaxConns),
+            {ok, Pid} = couch_replicator_worker:start_link(
+                self(), Source, Target, ChangesManager, MaxConns),
             Pid
         end,
-        lists:seq(1, CopiersCount)),
+        lists:seq(1, NumWorkers)),
 
     couch_task_status:add_task(
         "Replication",
@@ -275,7 +261,7 @@ do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
         "~c~p HTTP connections~n"
         "~ca connection timeout of ~p milliseconds~n"
         "~csocket options are: ~s~s",
-        [BaseId ++ Ext, $\t, CopiersCount, $\t, BatchSize, $\t,
+        [BaseId ++ Ext, $\t, NumWorkers, $\t, BatchSize, $\t,
             MaxConns, $\t, get_value(connection_timeout, Options),
             $\t, io_lib:format("~p", [get_value(socket_options, Options)]),
             case StartSeq of
@@ -285,16 +271,14 @@ do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
                 io_lib:format("~n~csource start sequence ~p", [$\t, StartSeq])
             end]),
 
-    ?LOG_DEBUG("Missing rev finder pids are: ~p", [MissingRevFinders]),
     ?LOG_DEBUG("Worker pids are: ~p", [Workers]),
 
     couch_replication_manager:replication_started(Rep),
 
     {ok, State#rep_state{
-            missing_revs_queue = MissingRevsQueue,
             changes_queue = ChangesQueue,
+            changes_manager = ChangesManager,
             changes_reader = ChangesReader,
-            missing_rev_finders = MissingRevFinders,
             workers = Workers
         }
     }.
@@ -315,12 +299,12 @@ handle_info({'EXIT', Pid, Reason}, #rep_state{changes_reader=Pid} = State) ->
     ?LOG_ERROR("ChangesReader process died with reason: ~p", [Reason]),
     {stop, changes_reader_died, cancel_timer(State)};
 
-handle_info({'EXIT', Pid, normal}, #rep_state{missing_revs_queue=Pid} = St) ->
-    {noreply, St};
+handle_info({'EXIT', Pid, normal}, #rep_state{changes_manager = Pid} = State) ->
+    {noreply, State};
 
-handle_info({'EXIT', Pid, Reason}, #rep_state{missing_revs_queue=Pid} = St) ->
-    ?LOG_ERROR("MissingRevsQueue process died with reason: ~p", [Reason]),
-    {stop, missing_revs_queue_died, cancel_timer(St)};
+handle_info({'EXIT', Pid, Reason}, #rep_state{changes_manager = Pid} = State) ->
+    ?LOG_ERROR("ChangesManager process died with reason: ~p", [Reason]),
+    {stop, changes_manager_died, cancel_timer(State)};
 
 handle_info({'EXIT', Pid, normal}, #rep_state{changes_queue=Pid} = State) ->
     {noreply, State};
@@ -329,53 +313,26 @@ handle_info({'EXIT', Pid, Reason}, #rep_state{changes_queue=Pid} = State) ->
     ?LOG_ERROR("ChangesQueue process died with reason: ~p", [Reason]),
     {stop, changes_queue_died, cancel_timer(State)};
 
-handle_info({'EXIT', Pid, normal}, State) ->
-    #rep_state{
-        workers = Workers,
-        missing_rev_finders = RevFinders,
-        missing_revs_queue = RevsQueue
-    } = State,
-    case lists:member(Pid, RevFinders) of
-    false ->
-        case lists:member(Pid, Workers) of
-        false ->
-            {stop, {unknown_process_died, Pid, normal}, State};
-        true ->
-            case Workers -- [Pid] of
-            [] ->
-                do_last_checkpoint(State);
-            Workers2 ->
-                {noreply, State#rep_state{workers = Workers2}}
-            end
-        end;
-    true ->
-        case RevFinders -- [Pid] of
-        [] ->
-            couch_work_queue:close(RevsQueue),
-            {noreply, State#rep_state{missing_rev_finders = []}};
-        RevFinders2 ->
-            {noreply, State#rep_state{missing_rev_finders = RevFinders2}}
-        end
+handle_info({'EXIT', Pid, normal}, #rep_state{workers = Workers} = State) ->
+    case Workers -- [Pid] of
+    Workers ->
+        {stop, {unknown_process_died, Pid, normal}, State};
+    [] ->
+        catch unlink(State#rep_state.changes_manager),
+        catch exit(State#rep_state.changes_manager, kill),
+        do_last_checkpoint(State);
+    Workers2 ->
+        {noreply, State#rep_state{workers = Workers2}}
     end;
 
-handle_info({'EXIT', Pid, Reason}, State) ->
-    #rep_state{
-        workers = Workers,
-        missing_rev_finders = RevFinders
-    } = State,
+handle_info({'EXIT', Pid, Reason}, #rep_state{workers = Workers} = State) ->
     State2 = cancel_timer(State),
     case lists:member(Pid, Workers) of
     false ->
-        case lists:member(Pid, RevFinders) of
-        false ->
-            {stop, {unknown_process_died, Pid, Reason}, State2};
-        true ->
-            ?LOG_ERROR("RevsFinder ~p died with reason: ~p", [Pid, Reason]),
-            {stop, {revs_finder_died, Pid, Reason}, State2}
-        end;
+        {stop, {unknown_process_died, Pid, Reason}, State2};
     true ->
-        ?LOG_ERROR("DocCopier ~p died with reason: ~p", [Pid, Reason]),
-        {stop, {doc_copier_died, Pid, Reason}, State2}
+        ?LOG_ERROR("Worker ~p died with reason: ~p", [Pid, Reason]),
+        {stop, {worker_died, Pid, Reason}, State2}
     end.
 
 
@@ -592,12 +549,10 @@ spawn_changes_reader(StartSeq, #httpdb{} = Db, ChangesQueue, Options) ->
     spawn_link(fun() ->
         put(last_seq, StartSeq),
         put(retries_left, Db#httpdb.retries),
-        put(row_ts, 1),
         read_changes(StartSeq, Db#httpdb{retries = 0}, ChangesQueue, Options)
     end);
 spawn_changes_reader(StartSeq, Db, ChangesQueue, Options) ->
     spawn_link(fun() ->
-        put(row_ts, 1),
         read_changes(StartSeq, Db, ChangesQueue, Options)
     end).
 
@@ -605,9 +560,7 @@ read_changes(StartSeq, Db, ChangesQueue, Options) ->
     try
         couch_api_wrap:changes_since(Db, all_docs, StartSeq,
             fun(#doc_info{high_seq = Seq} = DocInfo) ->
-                Ts = get(row_ts),
-                ok = couch_work_queue:queue(ChangesQueue, {Ts, DocInfo}),
-                put(row_ts, Ts + 1),
+                ok = couch_work_queue:queue(ChangesQueue, DocInfo),
                 put(last_seq, Seq)
             end, Options),
         couch_work_queue:close(ChangesQueue)
@@ -632,6 +585,27 @@ read_changes(StartSeq, Db, ChangesQueue, Options) ->
         _ ->
             exit(Error)
         end
+    end.
+
+
+spawn_changes_manager(Parent, ChangesQueue, BatchSize) ->
+    spawn_link(fun() ->
+        changes_manager_loop_open(Parent, ChangesQueue, BatchSize, 1)
+    end).
+
+changes_manager_loop_open(Parent, ChangesQueue, BatchSize, Ts) ->
+    receive
+    {get_changes, From} ->
+        case couch_work_queue:dequeue(ChangesQueue, BatchSize) of
+        closed ->
+            From ! {closed, self()};
+        {ok, Changes} ->
+            #doc_info{high_seq = Seq} = lists:last(Changes),
+            ReportSeq = {Ts, Seq},
+            ok = gen_server:cast(Parent, {report_seq, ReportSeq}),
+            From ! {changes, self(), Changes, ReportSeq}
+        end,
+        changes_manager_loop_open(Parent, ChangesQueue, BatchSize, Ts + 1)
     end.
 
 
