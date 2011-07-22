@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(couch_replicator_doc_copier).
+-module(couch_replicator_worker).
 -behaviour(gen_server).
 
 % public API
@@ -65,22 +65,23 @@
 
 
 
-start_link(Cp, #db{} = Source, Target, MissingRevsQueue, _MaxConns) ->
-    Pid = spawn_link(
-        fun() -> queue_fetch_loop(Source, Target, Cp, Cp, MissingRevsQueue) end),
+start_link(Cp, #db{} = Source, Target, ChangesManager, _MaxConns) ->
+    Pid = spawn_link(fun() ->
+        queue_fetch_loop(Source, Target, Cp, Cp, ChangesManager)
+    end),
     {ok, Pid};
 
-start_link(Cp, Source, Target, MissingRevsQueue, MaxConns) ->
+start_link(Cp, Source, Target, ChangesManager, MaxConns) ->
     gen_server:start_link(
-        ?MODULE, {Cp, Source, Target, MissingRevsQueue, MaxConns}, []).
+        ?MODULE, {Cp, Source, Target, ChangesManager, MaxConns}, []).
 
 
-init({Cp, Source, Target, MissingRevsQueue, MaxConns}) ->
+init({Cp, Source, Target, ChangesManager, MaxConns}) ->
     process_flag(trap_exit, true),
     Parent = self(),
-    LoopPid = spawn_link(
-        fun() -> queue_fetch_loop(Source, Target, Parent, Cp, MissingRevsQueue) end
-    ),
+    LoopPid = spawn_link(fun() ->
+        queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager)
+    end),
     State = #state{
         max_parallel_conns = MaxConns,
         loop = LoopPid,
@@ -94,16 +95,7 @@ init({Cp, Source, Target, MissingRevsQueue, MaxConns}) ->
     {ok, State}.
 
 
-handle_call({seq_done, _Seq, RevCount}, {Pid, _},
-    #state{loop = Pid, stats = Stats} = State) ->
-    NewState = State#state{
-        stats = Stats#rep_stats{
-            missing_checked = Stats#rep_stats.missing_checked + RevCount
-        }
-    },
-    {reply, ok, NewState};
-
-handle_call({fetch_doc, {_Id, Revs, _PAs, _Seq} = Params}, {Pid, _} = From,
+handle_call({fetch_doc, {_Id, Revs, _PAs} = Params}, {Pid, _} = From,
     #state{loop = Pid, readers = Readers, pending_fetch = nil,
         stats = Stats, source = Src, target = Tgt,
         max_parallel_conns = MaxConns} = State) ->
@@ -237,26 +229,32 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 
-queue_fetch_loop(Source, Target, Parent, Cp, MissingRevsQueue) ->
-    case couch_work_queue:dequeue(MissingRevsQueue, 1) of
-    closed ->
+queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager) ->
+    ChangesManager ! {get_changes, self()},
+    receive
+    {closed, ChangesManager} ->
         ok;
-    {ok, [{ReportSeq, IdRevs}]} ->
+    {changes, ChangesManager, Changes, ReportSeq} ->
+        Target2 = open_db(Target),
+        {IdRevs, NotMissingCount} = find_missing(Changes, Target2),
+        ok = gen_server:cast(Cp, {report_seq, ReportSeq}),
         case Source of
         #db{} ->
             Source2 = open_db(Source),
-            Target2 = open_db(Target),
             Stats = local_process_batch(
                 IdRevs, Source2, Target2, #batch{}, #rep_stats{}),
-            close_db(Source2),
-            close_db(Target2);
+            close_db(Source2);
         #httpdb{} ->
             remote_process_batch(IdRevs, Parent),
             {ok, Stats} = gen_server:call(Parent, flush, infinity)
         end,
-        ok = gen_server:cast(Cp, {report_seq_done, ReportSeq, Stats}),
+        close_db(Target2),
+        Stats2 = Stats#rep_stats{
+            missing_checked = Stats#rep_stats.missing_checked + NotMissingCount
+        },
+        ok = gen_server:cast(Cp, {report_seq_done, ReportSeq, Stats2}),
         ?LOG_DEBUG("Worker reported completion of seq ~p", [ReportSeq]),
-        queue_fetch_loop(Source, Target, Parent, Cp, MissingRevsQueue)
+        queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager)
     end.
 
 
@@ -276,11 +274,10 @@ local_process_batch([], _Source, Target, #batch{docs = Docs, size = Size}, Stats
         doc_write_failures = Stats#rep_stats.doc_write_failures + WriteFailures
     };
 
-local_process_batch([{Seq, {Id, Revs, NotMissingCount, PAs}} | Rest],
-    Source, Target, Batch, Stats) ->
+local_process_batch([IdRevs | Rest], Source, Target, Batch, Stats) ->
+    {_Id, Revs, _PAs} = IdRevs,
     {ok, {_, DocList, Written0, WriteFailures0}} = fetch_doc(
-        Source, {Id, Revs, PAs, Seq}, fun local_doc_handler/2,
-        {Target, [], 0, 0}),
+        Source, IdRevs, fun local_doc_handler/2, {Target, [], 0, 0}),
     Read = length(DocList) + Written0 + WriteFailures0,
     {Batch2, Written, WriteFailures} = lists:foldl(
         fun(Doc, {Batch0, W0, F0}) ->
@@ -289,8 +286,7 @@ local_process_batch([{Seq, {Id, Revs, NotMissingCount, PAs}} | Rest],
         end,
         {Batch, Written0, WriteFailures0}, DocList),
     Stats2 = Stats#rep_stats{
-        missing_checked = Stats#rep_stats.missing_checked + length(Revs)
-            + NotMissingCount,
+        missing_checked = Stats#rep_stats.missing_checked + length(Revs),
         missing_found = Stats#rep_stats.missing_found + length(Revs),
         docs_read = Stats#rep_stats.docs_read + Read,
         docs_written = Stats#rep_stats.docs_written + Written,
@@ -302,21 +298,14 @@ local_process_batch([{Seq, {Id, Revs, NotMissingCount, PAs}} | Rest],
 remote_process_batch([], _Parent) ->
     ok;
 
-remote_process_batch([{Seq, {Id, Revs, NotMissing, PAs}} | Rest], Parent) ->
-    case NotMissing > 0 of
-    true ->
-        ok = gen_server:call(Parent, {seq_done, Seq, NotMissing}, infinity);
-    false ->
-        ok
-    end,
+remote_process_batch([{Id, Revs, PAs} | Rest], Parent) ->
     % When the source is a remote database, we fetch a single document revision
     % per HTTP request. This is mostly to facilitate retrying of HTTP requests
     % due to network transient failures. It also helps not exceeding the maximum
     % URL length allowed by proxies and Mochiweb.
     lists:foreach(
         fun(Rev) ->
-            ok = gen_server:call(
-                Parent, {fetch_doc, {Id, [Rev], PAs, Seq}}, infinity)
+            ok = gen_server:call(Parent, {fetch_doc, {Id, [Rev], PAs}}, infinity)
         end,
         Revs),
     remote_process_batch(Rest, Parent).
@@ -332,7 +321,7 @@ spawn_doc_reader(Source, Target, FetchParams) ->
     end).
 
 
-fetch_doc(Source, {Id, Revs, PAs, _Seq}, DocHandler, Acc) ->
+fetch_doc(Source, {Id, Revs, PAs}, DocHandler, Acc) ->
     try
         couch_api_wrap:open_doc_revs(
             Source, Id, Revs, [{atts_since, PAs}], DocHandler, Acc)
@@ -516,3 +505,17 @@ flush_doc(Target, #doc{id = Id, revs = {Pos, [RevId | _]}} = Doc) ->
                 couch_api_wrap:db_uri(Target), to_binary(Err)]),
         {error, Err}
     end.
+
+
+find_missing(DocInfos, Target) ->
+    {IdRevs, AllRevsCount} = lists:foldr(
+        fun(#doc_info{id = Id, revs = RevsInfo}, {IdRevAcc, CountAcc}) ->
+            Revs = [Rev || #rev_info{rev = Rev} <- RevsInfo],
+            {[{Id, Revs} | IdRevAcc], CountAcc + length(Revs)}
+        end,
+        {[], 0}, DocInfos),
+    {ok, Missing} = couch_api_wrap:get_missing_revs(Target, IdRevs),
+    MissingRevsCount = lists:foldl(
+        fun({_Id, MissingRevs, _PAs}, Acc) -> Acc + length(MissingRevs) end,
+        0, Missing),
+    {Missing, AllRevsCount - MissingRevsCount}.

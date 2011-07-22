@@ -73,8 +73,7 @@ source_files = \
     couch_replication_manager.erl \
     couch_replication_notifier.erl \
     couch_replicator.erl \
-    couch_replicator_doc_copier.erl \
-    couch_replicator_rev_finder.erl \
+    couch_replicator_worker.erl \
     couch_replicator_utils.erl \
     couch_secondary_sup.erl \
     couch_server.erl \
@@ -143,8 +142,7 @@ compiled_files = \
     couch_replication_manager.beam \
     couch_replication_notifier.beam \
     couch_replicator.beam \
-    couch_replicator_doc_copier.beam \
-    couch_replicator_rev_finder.beam \
+    couch_replicator_worker.beam \
     couch_replicator_utils.beam \
     couch_secondary_sup.beam \
     couch_server.beam \
