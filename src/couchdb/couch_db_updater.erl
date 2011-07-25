@@ -49,7 +49,7 @@ init({MainPid, DbName, Filepath, Fd, Options}) ->
 
 
 terminate(_Reason, Db) ->
-    couch_file:close(Db#db.fd),
+    ok = couch_file:close(Db#db.fd),
     couch_util:shutdown_sync(Db#db.compactor_pid),
     couch_util:shutdown_sync(Db#db.fd_ref_counter),
     ok.
@@ -474,9 +474,9 @@ flush_trees(#db{fd=Fd,header=Header}=Db,
                 {ok, NewSummaryPointer} =
                 case Header#db_header.disk_version < 4 of
                 true ->
-                    couch_file:append_term(Fd, {Doc#doc.body, DiskAtts});
+                    {ok, _} = couch_file:append_term(Fd, {Doc#doc.body, DiskAtts});
                 false ->
-                    couch_file:append_term_md5(Fd, {Doc#doc.body, DiskAtts})
+                    {ok, _} = couch_file:append_term_md5(Fd, {Doc#doc.body, DiskAtts})
                 end,
                 {IsDeleted, NewSummaryPointer, UpdateSeq};
             _ ->

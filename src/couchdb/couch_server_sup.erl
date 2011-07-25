@@ -127,7 +127,7 @@ start_server(IniFiles) ->
     null -> ok;
     UriFile ->
         Line = io_lib:format("http://~s:~w/~n", [Ip, Port]),
-        file:write_file(UriFile, Line)
+        ok = file:write_file(UriFile, Line)
     end,
 
     {ok, Pid}.
