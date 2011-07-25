@@ -119,7 +119,7 @@ start_server(IniFiles) ->
             undefined -> [];
             Uri -> io_lib:format("~s~n", [Uri])
             end end || Uri <- Uris],
-        file:write_file(UriFile, Lines)
+        ok = file:write_file(UriFile, Lines)
     end,
 
     {ok, Pid}.

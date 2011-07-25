@@ -49,8 +49,8 @@ init({MainPid, DbName, Filepath, Fd, Options}) ->
 
 
 terminate(_Reason, Db) ->
-    couch_file:close(Db#db.updater_fd),
-    couch_file:close(Db#db.fd),
+    ok = couch_file:close(Db#db.updater_fd),
+    ok = couch_file:close(Db#db.fd),
     couch_util:shutdown_sync(Db#db.compactor_pid),
     couch_util:shutdown_sync(Db#db.fd_ref_counter),
     ok.
