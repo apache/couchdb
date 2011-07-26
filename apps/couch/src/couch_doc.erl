@@ -183,7 +183,7 @@ validate_docid(Id) when is_binary(Id) ->
         throw({bad_request, <<"Only reserved document ids may start with underscore.">>});
     _Else -> ok
     end;
-validate_docid(Id) ->
+validate_docid(_Id) ->
     throw({bad_request, <<"Document id must be a string">>}).
 
 transfer_fields([], #doc{body=Fields}=Doc) ->
