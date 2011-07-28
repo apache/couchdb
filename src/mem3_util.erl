@@ -15,7 +15,7 @@
 -module(mem3_util).
 
 -export([hash/1, name_shard/2, create_partition_map/5, build_shards/2,
-    n_val/2, to_atom/1, to_integer/1, write_db_doc/1, delete_db_doc/1,
+    n_val/2, z_val/3, to_atom/1, to_integer/1, write_db_doc/1, delete_db_doc/1,
     load_shards_from_disk/1, load_shards_from_disk/2, shard_info/1,
     ensure_exists/1, open_db_doc/1]).
 
@@ -151,6 +151,19 @@ n_val(N, NodeCount) when is_integer(NodeCount), N > NodeCount ->
 n_val(N, _) when N < 1 ->
     1;
 n_val(N, _) ->
+    N.
+
+z_val(undefined, NodeCount, ZoneCount) ->
+    z_val(couch_config:get("cluster", "z", "3"), NodeCount, ZoneCount);
+z_val(N, NodeCount, ZoneCount) when is_list(N) ->
+    z_val(list_to_integer(N), NodeCount, ZoneCount);
+z_val(N, NodeCount, ZoneCount) when N > NodeCount orelse N > ZoneCount ->
+    twig:log(error, "Request to create Z=~p DB but only ~p nodes(s) and ~p zone(s)",
+            [N, NodeCount, ZoneCount]),
+    erlang:min(NodeCount, ZoneCount);
+z_val(N, _, _) when N < 1 ->
+    1;
+z_val(N, _, _) ->
     N.
 
 load_shards_from_disk(DbName) when is_binary(DbName) ->
