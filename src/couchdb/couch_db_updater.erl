@@ -484,9 +484,9 @@ flush_trees(#db{fd=Fd,header=Header}=Db,
                 {ok, NewSummaryPointer} =
                 case Header#db_header.disk_version < 4 of
                 true ->
-                    {ok, _} = couch_file:append_term(Fd, {Doc#doc.body, DiskAtts});
+                    couch_file:append_term(Fd, {Doc#doc.body, DiskAtts});
                 false ->
-                    {ok, _} = couch_file:append_term_md5(Fd, {Doc#doc.body, DiskAtts})
+                    couch_file:append_term_md5(Fd, {Doc#doc.body, DiskAtts})
                 end,
                 {IsDeleted, NewSummaryPointer, UpdateSeq};
             _ ->
