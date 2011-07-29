@@ -39,7 +39,14 @@ handle_request(#httpd{path_parts=[DbName|RestParts],method=Method,
     {'PUT', []} ->
         create_db_req(Req, DbName);
     {'DELETE', []} ->
-        delete_db_req(Req, DbName);
+         % if we get ?rev=... the user is using a faulty script where the
+         % document id is empty by accident. Let them recover safely.
+         case couch_httpd:qs_value(Req, "rev", false) of
+             false -> delete_db_req(Req, DbName);
+             _Rev -> throw({bad_request,
+                 "You tried to DELETE a database with a ?=rev parameter. "
+                 ++ "Did you mean to DELETE a document instead?"})
+         end;
     {_, []} ->
         do_db_req(Req, fun db_req/2);
     {_, [SecondPart|_]} ->
