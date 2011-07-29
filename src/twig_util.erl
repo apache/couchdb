@@ -67,7 +67,8 @@ format(Format, Data) ->
     case erts_debug:flat_size(Data) > MaxTermSize of
         true ->
             MaxString = get_env(max_message_size, 16000),
-            ["*Truncated* ", Format, " - ", trunc_io:print(Data, MaxString)];
+            {Truncated, _} = trunc_io:print(Data, MaxString),
+            ["*Truncated* ", Format, " - ", Truncated];
         false ->
             io_lib:format(Format, Data)
     end.
