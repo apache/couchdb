@@ -271,7 +271,8 @@ get_db_info(Db) ->
     {ok, InfoList}.
 
 get_design_docs(#db{fulldocinfo_by_id_btree=Btree}=Db) ->
-    {ok,_, Docs} = couch_btree:fold(Btree,
+    {ok, _, Docs} = couch_view:fold(
+        #view{btree=Btree},
         fun(#full_doc_info{id= <<"_design/",_/binary>>}=FullDocInfo, _Reds, AccDocs) ->
             {ok, Doc} = couch_db:open_doc_int(Db, FullDocInfo, []),
             {ok, [Doc | AccDocs]};
@@ -976,7 +977,8 @@ enum_docs_since(Db, SinceSeq, InFun, Acc, Options) ->
     {ok, enum_docs_since_reduce_to_count(LastReduction), AccOut}.
 
 enum_docs(Db, InFun, InAcc, Options) ->
-    {ok, LastReduce, OutAcc} = couch_btree:fold(Db#db.fulldocinfo_by_id_btree, InFun, InAcc, Options),
+    {ok, LastReduce, OutAcc} = couch_view:fold(
+        #view{btree=Db#db.fulldocinfo_by_id_btree}, InFun, InAcc, Options),
     {ok, enum_docs_reduce_to_count(LastReduce), OutAcc}.
 
 % server functions
