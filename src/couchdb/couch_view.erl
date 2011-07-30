@@ -252,8 +252,16 @@ fold_fun(Fun, [KV|Rest], {KVReds, Reds}, Acc) ->
 
 fold(#view{btree=Btree}, Fun, Acc, Options) ->
     WrapperFun =
-        fun(KV, Reds, Acc2) ->
-            fold_fun(Fun, expand_dups([KV],[]), Reds, Acc2)
+        fun(visit, KV, Reds, Acc2) ->
+            fold_fun(Fun, expand_dups([KV],[]), Reds, Acc2);
+           (traverse, LK, Red, Acc2)
+              when is_function(Fun, 4) ->
+                Fun(traverse, LK, Red, Acc2);
+           (traverse, _LK, Red, {_, Skip, _, _} = Acc2)
+              when Skip >= element(1, Red) ->
+                {skip, setelement(2, Acc2, Skip - element(1, Red))};
+           (traverse, _, _, Acc2) ->
+                {ok, Acc2}
         end,
     {ok, _LastReduce, _AccResult} = couch_btree:fold(Btree, WrapperFun, Acc, Options).
 

@@ -295,7 +295,8 @@ sum_tree_sizes(Acc, [T | Rest]) ->
     end.
 
 get_design_docs(Db) ->
-    {ok,_, Docs} = couch_btree:fold(by_id_btree(Db),
+    {ok, _, Docs} = couch_view:fold(
+        #view{btree=by_id_btree(Db)},
         fun(#full_doc_info{id= <<"_design/",_/binary>>}=FullDocInfo, _Reds, AccDocs) ->
             {ok, Doc} = open_doc_int(Db, FullDocInfo, [ejson_body]),
             {ok, [Doc | AccDocs]};
@@ -1055,8 +1056,8 @@ enum_docs_since(Db, SinceSeq, InFun, Acc, Options) ->
     {ok, enum_docs_since_reduce_to_count(LastReduction), AccOut}.
 
 enum_docs(Db, InFun, InAcc, Options) ->
-    {ok, LastReduce, OutAcc} = couch_btree:fold(
-        by_id_btree(Db), InFun, InAcc, Options),
+    {ok, LastReduce, OutAcc} = couch_view:fold(
+        #view{btree=by_id_btree(Db)}, InFun, InAcc, Options),
     {ok, enum_docs_reduce_to_count(LastReduce), OutAcc}.
 
 % server functions
