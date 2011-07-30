@@ -174,6 +174,7 @@ test_btree(Btree, KeyValues) ->
     ok = test_key_access(Btree, KeyValues),
     ok = test_lookup_access(Btree, KeyValues),
     ok = test_final_reductions(Btree, KeyValues),
+    ok = test_traversal_callbacks(Btree, KeyValues),
     true.
 
 test_add_remove(Btree, OutKeyValues, RemainingKeyValues) ->
@@ -232,6 +233,18 @@ test_final_reductions(Btree, KeyValues) ->
     {ok, _, FoldLRed} = couch_btree:foldl(Btree, FoldLFun, 0, [{start_key, LStartKey}]),
     {ok, _, FoldRRed} = couch_btree:fold(Btree, FoldRFun, 0, [{dir, rev}, {start_key, RStartKey}]),
     KVLen = FoldLRed + FoldRRed,
+    ok.
+
+test_traversal_callbacks(Btree, KeyValues) ->
+    FoldFun =
+    fun
+        (visit, GroupedKey, Unreduced, Acc) ->
+            {ok, Acc andalso false};
+        (traverse, _LK, _Red, Acc) ->
+            {skip, Acc andalso true}
+    end,
+    % With 250 items the root is a kp. Always skipping should reduce to true.
+    {ok, _, true} = couch_btree:fold(Btree, FoldFun, true, [{dir, fwd}]),
     ok.
 
 shuffle(List) ->
