@@ -81,7 +81,7 @@ handle_task_status_req(Req) ->
 handle_replicate_req(#httpd{method='POST'}=Req) ->
     couch_httpd:validate_ctype(Req, "application/json"),
     PostBody = couch_httpd:json_body_obj(Req),
-    try couch_rep:replicate(PostBody, Req#httpd.user_ctx) of
+    try couch_rep:replicate(PostBody, Req#httpd.user_ctx, couch_replication_manager) of
     {ok, {continuous, RepId}} ->
         send_json(Req, 202, {[{ok, true}, {<<"_local_id">>, RepId}]});
     {ok, {cancelled, RepId}} ->
