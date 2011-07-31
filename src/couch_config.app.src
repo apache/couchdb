@@ -1,0 +1,12 @@
+{application, couch_config,
+ [
+  {description, ""},
+  {vsn, git},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { couch_config_app, []}},
+  {env, []}
+ ]}.
