@@ -66,7 +66,7 @@ replicate(Source, Target) when is_binary(Source), is_binary(Target) ->
 
 %% function handling POST to _replicate
 replicate(PostBody, UserCtx) ->
-    replicate(PostBody, UserCtx, ?MODULE).
+    replicate(PostBody, UserCtx, couch_replication_manager).
 
 replicate({Props}=PostBody, UserCtx, Module) ->
     RepId = make_replication_id(PostBody, UserCtx),
