@@ -43,7 +43,9 @@ handle_info({nodeup, Node}, State) ->
     true ->
         Db1 = list_to_binary(couch_config:get("mem3", "node_db", "nodes")),
         Db2 = list_to_binary(couch_config:get("mem3", "shard_db", "dbs")),
-        [mem3_sync:push(Db, Node) || Db <- [Db1, Db2]],
+        Db3 = list_to_binary(couch_config:get("couch_httpd_auth",
+                                              "authentication_db", "_users")),
+        [mem3_sync:push(Db, Node) || Db <- [Db1, Db2, Db3]],
         mem3_sync:initial_sync([Node]);
     false ->
         ok
