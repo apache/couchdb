@@ -44,7 +44,7 @@ handle_req(#httpd{method = 'POST', user_ctx = UserCtx} = Req) ->
     {ok, {cancelled, RepId}} ->
         send_json(Req, 200, {[{ok, true}, {<<"_local_id">>, RepId}]});
     {ok, {continuous, RepId}} ->
-        send_json(Req, 200, {[{ok, true}, {<<"_local_id">>, RepId}]});
+        send_json(Req, 202, {[{ok, true}, {<<"_local_id">>, RepId}]});
     {ok, {HistoryResults}} ->
         send_json(Req, {[{ok, true} | HistoryResults]})
     end;
