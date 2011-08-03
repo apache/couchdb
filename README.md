@@ -15,7 +15,7 @@ Clusters behave according to concepts outlined in [Amazon's Dynamo paper][4], na
 
 BigCouch has the same dependencies as CouchDB:
 
- * Erlang (R13B03 or higher)
+ * Erlang (R13B03 or higher) (R14B01 or higher to build a release)
  * ICU (4.2 is preferable)
  * Spidermonkey (1.9.2 preferable, [https://launchpad.net/~commonjs/+archive/ppa/][6])
  * LibCurl (7.18 or higher)
