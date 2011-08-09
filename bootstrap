@@ -49,16 +49,42 @@ gunzip -c m4/ac_check_icu.m4.gz > m4/ac_check_icu.m4
 gunzip -c m4/ac_check_curl.m4.gz > m4/ac_check_curl.m4
 gunzip -c m4/pkg.m4.gz > m4/pkg.m4
 
-if test -x "`which glibtoolize 2> /dev/null || true`"; then
-    glibtoolize -f -c --automake
-else
-    libtoolize -f -c --automake
-fi
+# Seach a list of names for the first occurence of a program.
+# Some systems may use aclocal-1.10, others may have aclocal etc.
+#
+# Exit with status code 0 if the program exists (and print the
+# path to stdout), exit with status code 1 if it can't be
+# located
+find_program() {
+  set +e
+  for f in "$@"
+  do
+    file=`which ${f} 2>/dev/null | grep -v '^no '`
+    if test -n "x${file}" -a -x "${file}"
+    then
+      echo ${file}
+      set -e
+      exit 0
+    fi
+  done
 
-aclocal -I m4
-autoheader -f
-automake -f -a 2>&1 | sed -e "/install/d"
-autoconf -f
+  echo "Failed to locate required program:" 1>&2
+  echo "\t$@" 1>&2
+  set -e
+  exit 1
+}
+
+LIBTOOLIZE=`find_program glibtoolize libtoolize`
+ACLOCAL=`find_program aclocal-1.11 aclocal-1.10 aclocal-1.9 aclocal`
+AUTOHEADER=`find_program autoheader`
+AUTOMAKE=`find_program automake-1.11 automake-1.10 automake-1.9 automake`
+AUTOCONF=`find_program autoconf`
+
+${LIBTOOLIZE} -f -c --automake
+${ACLOCAL} -I m4
+${AUTOHEADER} -f
+${AUTOMAKE} -f -a 2>&1 | sed -e "/install/d"
+${AUTOCONF} -f
 
 ln -f -s "`dirname \`readlink build-aux/missing\``/INSTALL"
 
