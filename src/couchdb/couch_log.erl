@@ -180,4 +180,5 @@ read(Bytes, Offset) ->
     % TODO: make streaming
 
     {ok, Chunk} = file:pread(Fd, Start, LogFileSize),
+    ok = file:close(Fd),
     Chunk.
