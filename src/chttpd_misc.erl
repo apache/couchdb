@@ -246,6 +246,8 @@ handle_system_req(Req) ->
         processes_used, binary, code, ets])],
     {NumberOfGCs, WordsReclaimed, _} = statistics(garbage_collection),
     {{input, Input}, {output, Output}} = statistics(io),
+    {message_queue_len, MessageQueueLen} = process_info(whereis(couch_server),
+        message_queue_len),
     send_json(Req, {[
         {uptime, element(1,statistics(wall_clock)) div 1000},
         {memory, {Memory}},
@@ -259,5 +261,6 @@ handle_system_req(Req) ->
         {io_output, Output},
         {os_proc_count, couch_proc_manager:get_proc_count()},
         {process_count, erlang:system_info(process_count)},
-        {process_limit, erlang:system_info(process_limit)}
+        {process_limit, erlang:system_info(process_limit)},
+        {message_queue_len, MessageQueueLen}
     ]}).
