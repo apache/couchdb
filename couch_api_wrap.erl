@@ -298,14 +298,20 @@ update_docs(Db, DocList, Options, UpdateType) ->
 
 changes_since(#httpdb{headers = Headers1} = HttpDb, Style, StartSeq,
     UserFun, Options) ->
-    BaseQArgs = [
+    BaseQArgs = case get_value(continuous, Options, false) of
+    false ->
+        [{"feed", "normal"}];
+    true ->
+        [{"feed", "continuous"}, {"heartbeat", "10000"}]
+    end ++ [
         {"style", atom_to_list(Style)}, {"since", couch_util:to_list(StartSeq)}
     ],
-    {QArgs, Method, Body, Headers} = case get_value(doc_ids, Options) of
+    DocIds = get_value(doc_ids, Options),
+    {QArgs, Method, Body, Headers} = case DocIds of
     undefined ->
         QArgs1 = maybe_add_changes_filter_q_args(BaseQArgs, Options),
         {QArgs1, get, [], Headers1};
-    DocIds ->
+    _ when is_list(DocIds) ->
         Headers2 = [{"Content-Type", "application/json"} | Headers1],
         JsonDocIds = ?JSON_ENCODE({[{<<"doc_ids">>, DocIds}]}),
         {[{"filter", "_doc_ids"} | BaseQArgs], post, JsonDocIds, Headers2}
@@ -316,15 +322,24 @@ changes_since(#httpdb{headers = Headers1} = HttpDb, Style, StartSeq,
             {headers, Headers}, {body, Body},
             {ibrowse_options, [{stream_to, {self(), once}}]}],
         fun(200, _, DataStreamFun) ->
-            case couch_util:get_value(continuous, Options, false) of
-            true ->
-                continuous_changes(DataStreamFun, UserFun);
-            false ->
-                EventFun = fun(Ev) ->
-                    changes_ev1(Ev, fun(DocInfo, _) -> UserFun(DocInfo) end, [])
-                end,
-                json_stream_parse:events(DataStreamFun, EventFun)
-            end
+                parse_changes_feed(Options, UserFun, DataStreamFun);
+            (405, _, _) when is_list(DocIds) ->
+                % CouchDB versions < 1.1.0 don't have the builtin _changes feed
+                % filter "_doc_ids" neither support POST
+                send_req(HttpDb, [{method, get}, {path, "_changes"},
+                    {qs, BaseQArgs}, {headers, Headers1},
+                    {ibrowse_options, [{stream_to, {self(), once}}]}],
+                    fun(200, _, DataStreamFun2) ->
+                        UserFun2 = fun(#doc_info{id = Id} = DocInfo) ->
+                            case lists:member(Id, DocIds) of
+                            true ->
+                                UserFun(DocInfo);
+                            false ->
+                                ok
+                            end
+                        end,
+                        parse_changes_feed(Options, UserFun2, DataStreamFun2)
+                    end)
         end);
 changes_since(Db, Style, StartSeq, UserFun, Options) ->
     Filter = case get_value(doc_ids, Options) of
@@ -374,12 +389,17 @@ maybe_add_changes_filter_q_args(BaseQS, Options) ->
                 end
             end,
             BaseQS, Params)]
-    end ++
+    end.
+
+parse_changes_feed(Options, UserFun, DataStreamFun) ->
     case get_value(continuous, Options, false) of
-    false ->
-        [{"feed", "normal"}];
     true ->
-        [{"feed", "continuous"}, {"heartbeat", "10000"}]
+        continuous_changes(DataStreamFun, UserFun);
+    false ->
+        EventFun = fun(Ev) ->
+            changes_ev1(Ev, fun(DocInfo, _) -> UserFun(DocInfo) end, [])
+        end,
+        json_stream_parse:events(DataStreamFun, EventFun)
     end.
 
 changes_json_req(_Db, "", _QueryParams, _Options) ->
