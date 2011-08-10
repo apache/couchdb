@@ -182,6 +182,8 @@ update_doc(DbName, Doc, Options) ->
     case update_docs(DbName, [Doc], opts(Options)) of
     {ok, [{ok, NewRev}]} ->
         {ok, NewRev};
+    {ok, [{{_Id, _Rev}, Error}]} ->
+        throw(Error);
     {ok, [Error]} ->
         throw(Error);
     {ok, []} ->
