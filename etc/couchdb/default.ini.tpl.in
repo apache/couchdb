@@ -22,6 +22,7 @@ default_handler = {couch_httpd_db, handle_request}
 secure_rewrites = true
 vhost_global_handlers = _utils, _uuids, _session, _oauth, _users
 allow_jsonp = false
+log_max_chunk_size = 1000000
 
 [log]
 file = %localstatelogdir%/couch.log
