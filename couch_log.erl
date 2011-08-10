@@ -165,6 +165,15 @@ get_log_messages(Pid, Level, Format, Args) ->
 read(Bytes, Offset) ->
     LogFileName = couch_config:get("log", "file"),
     LogFileSize = filelib:file_size(LogFileName),
+    MaxChunkSize = list_to_integer(
+        couch_config:get("httpd", "log_max_chunk_size", "1000000")),
+    case Bytes > MaxChunkSize of
+    true ->
+        throw({bad_request, "'bytes' cannot exceed " ++
+            integer_to_list(MaxChunkSize)});
+    false ->
+        ok
+    end,
 
     {ok, Fd} = file:open(LogFileName, [read]),
     Start = lists:max([LogFileSize - Bytes, 0]) + Offset,
