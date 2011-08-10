@@ -246,4 +246,23 @@ couchTests.basics = function(debug) {
   result = JSON.parse(xhr.responseText);
   TEquals("bad_request", result.error);
   TEquals("You tried to DELETE a database with a ?=rev parameter. Did you mean to DELETE a document instead?", result.reason);
+
+  // On restart, a request for creating a database that already exists can
+  // not override the existing database file
+  db = new CouchDB("test_suite_foobar");
+  db.deleteDb();
+  xhr = CouchDB.request("PUT", "/" + db.name);
+  TEquals(201, xhr.status);
+
+  TEquals(true, db.save({"_id": "doc1"}).ok);
+  TEquals(true, db.ensureFullCommit().ok);
+
+  TEquals(1, db.info().doc_count);
+
+  restartServer();
+
+  xhr = CouchDB.request("PUT", "/" + db.name);
+  TEquals(412, xhr.status);
+
+  TEquals(1, db.info().doc_count);
 };
