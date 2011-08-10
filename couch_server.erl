@@ -316,11 +316,13 @@ handle_call({open, DbName, Options}, {FromPid,_}=From, Server) ->
         {reply, couch_db:open_ref_counted(MainPid, FromPid), Server}
     end;
 handle_call({create, DbName, Options}, From, Server) ->
-    case ets:lookup(couch_dbs_by_name, DbName) of
-    [] ->
-        open_db(DbName, Server, [create | Options], From);
-    [_AlreadyRunningDb] ->
-        {reply, file_exists, Server}
+    FileName = get_full_filename(Server, ?b2l(DbName)),
+    case file:open(FileName, [read]) of
+    {ok, Fd} ->
+        ok = file:close(Fd),
+        {reply, file_exists, Server};
+    Error ->
+        open_db(DbName, Server, [create | Options], From)
     end;
 handle_call({delete, DbName, _Options}, _From, Server) ->
     DbNameList = binary_to_list(DbName),
