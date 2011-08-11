@@ -41,6 +41,12 @@ couchTests.all_docs = function(debug) {
   var all = db.allDocs({startkey:"2"});
   T(all.offset == 2);
 
+  // Confirm that queries may assume raw collation.
+  var raw = db.allDocs({ startkey: "org.couchdb.user:"
+                       , endkey  : "org.couchdb.user;"
+                       });
+  TEquals(0, raw.rows.length);
+
   // check that the docs show up in the seq view in the order they were created
   var changes = db.changes();
   var ids = ["0","3","1","2"];
