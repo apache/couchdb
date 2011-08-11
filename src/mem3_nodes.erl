@@ -17,7 +17,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
     code_change/3]).
 
--export([start_link/0, get_nodelist/0]).
+-export([start_link/0, get_nodelist/0, get_node_info/2]).
 
 -include("mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
@@ -30,19 +30,29 @@ start_link() ->
 get_nodelist() ->
     gen_server:call(?MODULE, get_nodelist).
 
+get_node_info(Node, Key) ->
+    gen_server:call(?MODULE, {get_node_info, Node, Key}).
+
 init([]) ->
     {Nodes, UpdateSeq} = initialize_nodelist(),
     {Pid, _} = spawn_monitor(fun() -> listen_for_changes(UpdateSeq) end),
     {ok, #state{changes_pid = Pid, update_seq = UpdateSeq, nodes = Nodes}}.
 
 handle_call(get_nodelist, _From, State) ->
-    {reply, State#state.nodes, State};
-handle_call({add_node, Node}, _From, #state{nodes=Nodes} = State) ->
+    {reply, lists:sort(dict:fetch_keys(State#state.nodes)), State};
+handle_call({get_node_info, Node, Key}, _From, State) ->
+    case dict:find(Node, State#state.nodes) of
+        {ok, NodeInfo} ->
+            {reply, couch_util:get_value(Key, NodeInfo), State};
+        error ->
+            {reply, error, State}
+    end;
+handle_call({add_node, Node, NodeInfo}, _From, #state{nodes=Nodes} = State) ->
     gen_event:notify(mem3_events, {add_node, Node}),
-    {reply, ok, State#state{nodes = lists:umerge([Node], Nodes)}};
+    {reply, ok, State#state{nodes = dict:store(Node, NodeInfo, Nodes)}};
 handle_call({remove_node, Node}, _From, #state{nodes=Nodes} = State) ->
     gen_event:notify(mem3_events, {remove_node, Node}),
-    {reply, ok, State#state{nodes = lists:delete(Node, Nodes)}};
+    {reply, ok, State#state{nodes = dict:erase(Node, Nodes)}};
 handle_call(_Call, _From, State) ->
     {noreply, State}.
 
@@ -72,25 +82,27 @@ code_change(_OldVsn, State, _Extra) ->
 initialize_nodelist() ->
     DbName = couch_config:get("mem3", "node_db", "nodes"),
     {ok, Db} = mem3_util:ensure_exists(DbName),
-    {ok, _, Nodes0} = couch_btree:fold(Db#db.id_tree, fun first_fold/3, [], []),
+    {ok, _, {_, Nodes0}} = couch_btree:fold(Db#db.id_tree, fun first_fold/3,
+                                       {Db, dict:new()}, []),
     % add self if not already present
-    case lists:member(node(), Nodes0) of
-    true ->
+    case dict:find(node(), Nodes0) of
+    {ok, _} ->
         Nodes = Nodes0;
-    false ->
+    error ->
         Doc = #doc{id = couch_util:to_binary(node())},
         {ok, _} = couch_db:update_doc(Db, Doc, []),
-        Nodes = [node() | Nodes0]
+        Nodes = dict:store(node(), [], Nodes0)
     end,
     couch_db:close(Db),
-    {lists:sort(Nodes), Db#db.update_seq}.
+    {Nodes, Db#db.update_seq}.
 
-first_fold(#full_doc_info{id = <<"_design/", _/binary>>}, _, Acc) ->
-    {ok, Acc};
-first_fold(#full_doc_info{deleted=true}, _, Acc) ->
-    {ok, Acc};
-first_fold(#full_doc_info{id=Id}, _, Acc) ->
-    {ok, [mem3_util:to_atom(Id) | Acc]}.
+first_fold(#full_doc_info{id = <<"_design/", _/binary>>}, _, {_Db, Dict}) ->
+    {ok, Dict};
+first_fold(#full_doc_info{deleted=true}, _, {_Db, Dict}) ->
+    {ok, Dict};
+first_fold(#full_doc_info{id=Id}=DocInfo, _, {Db, Dict}) ->
+    {ok, #doc{body={Props}}} = couch_db:open_doc(Db, DocInfo),
+    {ok, {Db, dict:store(mem3_util:to_atom(Id), Props, Dict)}}.
 
 listen_for_changes(Since) ->
     DbName = couch_config:get("mem3", "node_db", "nodes"),
@@ -113,7 +125,8 @@ changes_callback({change, {Change}, _}, _) ->
     case Node of <<"_design/", _/binary>> -> ok; _ ->
         case couch_util:get_value(deleted, Change, false) of
         false ->
-            gen_server:call(?MODULE, {add_node, mem3_util:to_atom(Node)});
+            {Props} = couch_util:get_value(doc, Change),
+            gen_server:call(?MODULE, {add_node, mem3_util:to_atom(Node), Props});
         true ->
             gen_server:call(?MODULE, {remove_node, mem3_util:to_atom(Node)})
         end

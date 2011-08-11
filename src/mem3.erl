@@ -14,7 +14,7 @@
 
 -module(mem3).
 
--export([start/0, stop/0, restart/0, nodes/0, shards/1, shards/2,
+-export([start/0, stop/0, restart/0, nodes/0, node_info/2, shards/1, shards/2,
     choose_shards/2, n/1, dbname/1, ushards/1]).
 -export([compare_nodelists/0, compare_shards/1]).
 
@@ -65,6 +65,9 @@ n(DbName) ->
 -spec nodes() -> [node()].
 nodes() ->
     mem3_nodes:get_nodelist().
+
+node_info(Node, Key) ->
+    mem3_nodes:get_node_info(Node, Key).
 
 -spec shards(DbName::iodata()) -> [#shard{}].
 shards(DbName) when is_list(DbName) ->
@@ -133,14 +136,23 @@ choose_shards(DbName, Options) ->
     catch error:E when E==database_does_not_exist; E==badarg ->
         Nodes = mem3:nodes(),
         NodeCount = length(Nodes),
-        Suffix = couch_util:get_value(shard_suffix, Options, ""),
+        Zones = zones(Nodes),
+        ZoneCount = length(Zones),
         N = mem3_util:n_val(couch_util:get_value(n, Options), NodeCount),
         Q = mem3_util:to_integer(couch_util:get_value(q, Options,
             couch_config:get("cluster", "q", "8"))),
-        % rotate to a random entry in the nodelist for even distribution
-        {A, B} = lists:split(crypto:rand_uniform(1,length(Nodes)+1), Nodes),
-        RotatedNodes = B ++ A,
-        mem3_util:create_partition_map(DbName, N, Q, RotatedNodes, Suffix)
+        Z = mem3_util:z_val(couch_util:get_value(z, Options), NodeCount, ZoneCount),
+        Suffix = couch_util:get_value(shard_suffix, Options, ""),
+        ChosenZones = lists:sublist(shuffle(Zones), Z),
+        lists:flatmap(
+            fun({Zone, N1}) ->
+                Nodes1 = nodes_in_zone(Nodes, Zone),
+                {A, B} = lists:split(crypto:rand_uniform(1,length(Nodes1)+1), Nodes1),
+                RotatedNodes = B ++ A,
+                mem3_util:create_partition_map(DbName, erlang:min(N1,length(Nodes1)),
+                    Q, RotatedNodes, Suffix)
+            end,
+            lists:zip(ChosenZones, apportion(N, Z)))
     end.
 
 -spec dbname(#shard{} | iodata()) -> binary().
@@ -154,3 +166,35 @@ dbname(DbName) when is_binary(DbName) ->
     DbName;
 dbname(_) ->
     erlang:error(badarg).
+
+
+zones(Nodes) ->
+    lists:usort([mem3:node_info(Node, <<"zone">>) || Node <- Nodes]).
+
+nodes_in_zone(Nodes, Zone) ->
+    [Node || Node <- Nodes, Zone == mem3:node_info(Node, <<"zone">>)].
+
+shuffle(List) ->
+    %% Determine the log n portion then randomize the list.
+    randomize(round(math:log(length(List)) + 0.5), List).
+
+randomize(1, List) ->
+    randomize(List);
+randomize(T, List) ->
+    lists:foldl(fun(_E, Acc) -> randomize(Acc) end,
+                randomize(List), lists:seq(1, (T - 1))).
+
+randomize(List) ->
+    D = lists:map(fun(A) -> {random:uniform(), A} end, List),
+    {_, D1} = lists:unzip(lists:keysort(1, D)),
+    D1.
+
+apportion(Shares, Ways) ->
+    apportion(Shares, lists:duplicate(Ways, 0), Shares).
+
+apportion(_Shares, Acc, 0) ->
+    Acc;
+apportion(Shares, Acc, Remaining) ->
+    N = Remaining rem length(Acc),
+    [H|T] = lists:nthtail(N, Acc),
+    apportion(Shares, lists:sublist(Acc, N) ++ [H+1|T], Remaining - 1).
