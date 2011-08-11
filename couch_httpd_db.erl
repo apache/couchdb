@@ -481,6 +481,7 @@ db_req(#httpd{path_parts=[_, DocId | FileNameParts]}=Req, Db) ->
     db_attachment_req(Req, Db, DocId, FileNameParts).
 
 all_docs_view(Req, Db, Keys) ->
+    RawCollator = fun(A, B) -> A < B end,
     #view_query_args{
         start_key = StartKey,
         start_docid = StartDocId,
@@ -490,7 +491,8 @@ all_docs_view(Req, Db, Keys) ->
         skip = SkipCount,
         direction = Dir,
         inclusive_end = Inclusive
-    } = QueryArgs = couch_httpd_view:parse_view_params(Req, Keys, map),
+    } = QueryArgs
+      = couch_httpd_view:parse_view_params(Req, Keys, map, RawCollator),
     {ok, Info} = couch_db:get_db_info(Db),
     CurrentEtag = couch_httpd:make_etag(Info),
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
