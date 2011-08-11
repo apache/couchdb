@@ -42,8 +42,8 @@ couchTests.all_docs = function(debug) {
   T(all.offset == 2);
 
   // Confirm that queries may assume raw collation.
-  var raw = db.allDocs({ startkey: "org.couchdb.user:"
-                       , endkey  : "org.couchdb.user;"
+  var raw = db.allDocs({ startkey: "org.couchdb.user:",
+                         endkey  : "org.couchdb.user;"
                        });
   TEquals(0, raw.rows.length);
 
