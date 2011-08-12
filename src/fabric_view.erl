@@ -164,11 +164,14 @@ possibly_embed_doc(#collector{db_name=DbName, query_args=Args},
             % to not interfere with current call
             {Pid, Ref} = spawn_monitor(fun() ->
                                   exit(fabric:open_doc(DbName, IncId, [])) end),
-            {ok, NewDoc} =
-                receive {'DOWN',Ref,process,Pid, Resp} ->
+            case receive {'DOWN',Ref,process,Pid, Resp} ->
                         Resp
-                end,
-            Row#view_row{doc=couch_doc:to_json_obj(NewDoc,[])}
+                end of
+            {ok, NewDoc} ->
+                Row#view_row{doc=couch_doc:to_json_obj(NewDoc,[])};
+            {not_found, missing} ->
+                Row#view_row{doc=null}
+            end
         end;
         _ -> Row
     end.
