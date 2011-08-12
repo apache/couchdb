@@ -29,7 +29,8 @@
 
 handle_req(#httpd{method = 'POST', user_ctx = UserCtx} = Req) ->
     couch_httpd:validate_ctype(Req, "application/json"),
-    RepDoc = couch_httpd:json_body_obj(Req),
+    RepDoc = {Props} = couch_httpd:json_body_obj(Req),
+    validate_rep_props(Props),
     {ok, Rep} = couch_replicator_utils:parse_rep_doc(RepDoc, UserCtx),
     case couch_replicator:replicate(Rep) of
     {error, {Error, Reason}} ->
@@ -51,3 +52,15 @@ handle_req(#httpd{method = 'POST', user_ctx = UserCtx} = Req) ->
 
 handle_req(Req) ->
     send_method_not_allowed(Req, "POST").
+
+validate_rep_props([]) ->
+    ok;
+validate_rep_props([{<<"query_params">>, {Params}}|Rest]) ->
+    lists:foreach(fun
+        ({_,V}) when is_binary(V) -> ok;
+        ({K,_}) -> throw({bad_request,
+            <<K/binary," value must be a string.">>})
+        end, Params),
+    validate_rep_props(Rest);
+validate_rep_props([_|Rest]) ->
+    validate_rep_props(Rest).
