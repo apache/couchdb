@@ -6,6 +6,12 @@ Version 1.2.0
 
 This version has not been released yet.
 
+Replicator:
+
+ * Passing non-string values to query_params is now a 400 bad
+   request. This is to reduce the surprise that all parameters
+   are converted to strings internally.
+
 Build System:
 
  * cURL is no longer required to build CouchDB as it is only

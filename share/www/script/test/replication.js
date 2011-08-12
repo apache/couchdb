@@ -666,7 +666,7 @@ couchTests.replication = function(debug) {
         body: {
           filter: "mydesign/myfilter",
           query_params: {
-            modulus: 2,
+            modulus: "2",
             special: "7"
           }
         }
@@ -714,7 +714,7 @@ couchTests.replication = function(debug) {
         body: {
           filter: "mydesign/myfilter",
           query_params: {
-            modulus: 2,
+            modulus: "2",
             special: "7"
           }
         }
@@ -1649,6 +1649,19 @@ couchTests.replication = function(debug) {
   TEquals("undefined", typeof copy._attachments["foo.dat"]["encoding"]);
   // end of test for COUCHDB-885
 
+  // Test for COUCHDB-1242 (reject non-string query_params)
+  try {
+    CouchDB.replicate(sourceDb, targetDb, {
+      body: {
+        filter : "mydesign/myfilter",
+        query_params : {
+          "maxvalue": 4
+        }
+      }
+    });
+  } catch (e) {
+    TEquals("bad_request", e.error);
+  }
 
   // cleanup
   usersDb.deleteDb();
