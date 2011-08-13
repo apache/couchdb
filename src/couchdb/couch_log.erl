@@ -27,23 +27,29 @@
 -define(LEVEL_INFO, 2).
 -define(LEVEL_DEBUG, 1).
 
+-define(DISK_LOGGER, couch_disk_logger).
+
 -record(state, {
-    fd,
     level,
     sasl
 }).
 
 debug(Format, Args) ->
     {ConsoleMsg, FileMsg} = get_log_messages(self(), debug, Format, Args),
-    gen_event:sync_notify(error_logger, {couch_debug, ConsoleMsg, FileMsg}).
+    ok = disk_log:balog(?DISK_LOGGER, FileMsg),
+    gen_event:sync_notify(error_logger, {couch_debug, ConsoleMsg}).
 
 info(Format, Args) ->
     {ConsoleMsg, FileMsg} = get_log_messages(self(), info, Format, Args),
-    gen_event:sync_notify(error_logger, {couch_info, ConsoleMsg, FileMsg}).
+    ok = disk_log:balog(?DISK_LOGGER, FileMsg),
+    gen_event:sync_notify(error_logger, {couch_info, ConsoleMsg}).
 
 error(Format, Args) ->
     {ConsoleMsg, FileMsg} = get_log_messages(self(), error, Format, Args),
-    gen_event:sync_notify(error_logger, {couch_error, ConsoleMsg, FileMsg}).
+    % Synchronous logging for error messages only. We want to reduce the
+    % chances of missing any if server is killed.
+    ok = disk_log:blog(?DISK_LOGGER, FileMsg),
+    gen_event:sync_notify(error_logger, {couch_error, ConsoleMsg}).
 
 
 level_integer(error)    -> ?LEVEL_ERROR;
@@ -86,11 +92,13 @@ init([]) ->
     end,
     ets:insert(?MODULE, {level, Level}),
 
-    case file:open(Filename, [append]) of
-    {ok, Fd} ->
-        {ok, #state{fd = Fd, level = Level, sasl = Sasl}};
-    {error, eacces} ->
-        {stop, {file_permission_error, Filename}};
+    DiskLogOptions = [
+        {file, Filename}, {name, ?DISK_LOGGER},
+        {format, external}, {type, halt}, {notify, true}
+    ],
+    case disk_log:open(DiskLogOptions) of
+    {ok, ?DISK_LOGGER} ->
+        {ok, #state{level = Level, sasl = Sasl}};
     Error ->
         {stop, Error}
     end.
@@ -117,24 +125,26 @@ get_level_integer() ->
 set_level_integer(Int) ->
     gen_event:call(error_logger, couch_log, {set_level_integer, Int}).
 
-handle_event({couch_error, ConMsg, FileMsg}, State) ->
-    log(State, ConMsg, FileMsg),
+handle_event({couch_error, ConMsg}, State) ->
+    ok = io:put_chars(ConMsg),
     {ok, State};
-handle_event({couch_info, ConMsg, FileMsg}, #state{level = LogLevel} = State)
+handle_event({couch_info, ConMsg}, #state{level = LogLevel} = State)
 when LogLevel =< ?LEVEL_INFO ->
-    log(State, ConMsg, FileMsg),
+    ok = io:put_chars(ConMsg),
     {ok, State};
-handle_event({couch_debug, ConMsg, FileMsg}, #state{level = LogLevel} = State)
+handle_event({couch_debug, ConMsg}, #state{level = LogLevel} = State)
 when LogLevel =< ?LEVEL_DEBUG ->
-    log(State, ConMsg, FileMsg),
+    ok = io:put_chars(ConMsg),
     {ok, State};
 handle_event({error_report, _, {Pid, _, _}}=Event, #state{sasl = true} = St) ->
     {ConMsg, FileMsg} = get_log_messages(Pid, error, "~p", [Event]),
-    log(St, ConMsg, FileMsg),
+    ok = disk_log:blog(?DISK_LOGGER, FileMsg),
+    ok = io:put_chars(ConMsg),
     {ok, St};
 handle_event({error, _, {Pid, Format, Args}}, #state{sasl = true} = State) ->
     {ConMsg, FileMsg} = get_log_messages(Pid, error, Format, Args),
-    log(State, ConMsg, FileMsg),
+    ok = disk_log:blog(?DISK_LOGGER, FileMsg),
+    ok = io:put_chars(ConMsg),
     {ok, State};
 handle_event(_Event, State) ->
     {ok, State}.
@@ -143,18 +153,18 @@ handle_call({set_level_integer, NewLevel}, State) ->
     ets:insert(?MODULE, {level, NewLevel}),
     {ok, ok, State#state{level = NewLevel}}.
 
+handle_info({disk_log, _Node, _Log, {error_status, Status}}, _State) ->
+    io:format("Disk logger error: ~p~n", [Status]),
+    % couch_event_sup will restart us.
+    remove_handler;
 handle_info(_Info, State) ->
     {ok, State}.
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-terminate(_Arg, #state{fd = Fd}) ->
-    file:close(Fd).
-
-log(#state{fd = Fd}, ConsoleMsg, FileMsg) ->
-    ok = io:put_chars(ConsoleMsg),
-    ok = io:put_chars(Fd, FileMsg).
+terminate(_Arg, _State) ->
+    ok = disk_log:close(?DISK_LOGGER).
 
 get_log_messages(Pid, Level, Format, Args) ->
     ConsoleMsg = unicode:characters_to_binary(io_lib:format(
