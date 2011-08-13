@@ -297,7 +297,9 @@ sum_tree_sizes(Acc, [T | Rest]) ->
 get_design_docs(Db) ->
     {ok, _, Docs} = couch_view:fold(
         #view{btree=by_id_btree(Db)},
-        fun(#full_doc_info{id= <<"_design/",_/binary>>}=FullDocInfo, _Reds, AccDocs) ->
+        fun(#full_doc_info{deleted = true}, _Reds, AccDocs) ->
+            {ok, AccDocs};
+        (#full_doc_info{id= <<"_design/",_/binary>>}=FullDocInfo, _Reds, AccDocs) ->
             {ok, Doc} = open_doc_int(Db, FullDocInfo, [ejson_body]),
             {ok, [Doc | AccDocs]};
         (_, _Reds, AccDocs) ->
