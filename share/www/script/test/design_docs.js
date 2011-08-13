@@ -421,6 +421,45 @@ couchTests.design_docs = function(debug) {
 
   run_on_modified_server(server_config, testFun);
 
+  // COUCHDB-1227 - if a design document is deleted, by adding a "_deleted"
+  // field with the boolean value true, its validate_doc_update functions
+  // should no longer have effect.
+  db.deleteDb();
+  db.createDb();
+  var ddoc = {
+    _id: "_design/test",
+    language: "javascript",
+    validate_doc_update: (function(newDoc, oldDoc, userCtx, secObj) {
+       if (newDoc.value % 2 == 0) {
+          throw({forbidden: "dont like even numbers"});
+       }
+       return true;
+    }).toString()
+  };
+
+  TEquals(true, db.save(ddoc).ok);
+  try {
+    db.save({_id: "doc1", value: 4});
+    T(false, "doc insertion should have failed");
+  } catch (x) {
+    TEquals("forbidden", x.error);
+  }
+
+  var doc = db.open("doc1");
+  TEquals(null, doc);
+  ddoc._deleted = true;
+  TEquals(true, db.save(ddoc).ok);
+
+  try {
+    TEquals(true, db.save({_id: "doc1", value: 4}).ok);
+  } catch (x) {
+    T(false, "doc insertion should have succeeded");
+  }
+
+  doc = db.open("doc1");
+  TEquals(true, doc !== null, "doc was not persisted");
+  TEquals(4, doc.value);
+
   // cleanup
   db.deleteDb();
   db2.deleteDb();
