@@ -273,7 +273,9 @@ get_db_info(Db) ->
 get_design_docs(#db{fulldocinfo_by_id_btree=Btree}=Db) ->
     {ok, _, Docs} = couch_view:fold(
         #view{btree=Btree},
-        fun(#full_doc_info{id= <<"_design/",_/binary>>}=FullDocInfo, _Reds, AccDocs) ->
+        fun(#full_doc_info{deleted = true}, _Reds, AccDocs) ->
+            {ok, AccDocs};
+        (#full_doc_info{id= <<"_design/",_/binary>>}=FullDocInfo, _Reds, AccDocs) ->
             {ok, Doc} = couch_db:open_doc_int(Db, FullDocInfo, []),
             {ok, [Doc | AccDocs]};
         (_, _Reds, AccDocs) ->
