@@ -76,12 +76,19 @@ couchTests.view_collation_raw = function(debug) {
     }
   }
   T(db.save(designDoc).ok);
+
+  // Confirm that everything collates correctly.
   var rows = db.view("test/test").rows;
   for (i=0; i<values.length; i++) {
     T(equals(rows[i].key, values[i]));
   }
 
-  // everything has collated correctly. Now to check the descending output
+  // Confirm that couch allows raw semantics in key ranges.
+  rows = db.view("test/test", {startkey:"Z", endkey:"a"}).rows;
+  TEquals(1, rows.length);
+  TEquals("a", rows[0].key);
+
+  // Check the descending output.
   rows = db.view("test/test", {descending: true}).rows;
   for (i=0; i<values.length; i++) {
     T(equals(rows[i].key, values[values.length - 1 -i]));
