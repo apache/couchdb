@@ -45,7 +45,7 @@ static void couch_drv_stop(ErlDrvData data)
     if (pData->collNoCase) {
         ucol_close(pData->collNoCase);
     }
-    driver_free((char*)pData);
+    driver_free((void*)pData);
 }
 
 static ErlDrvData couch_drv_start(ErlDrvPort port, char *buff)
