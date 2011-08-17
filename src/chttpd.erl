@@ -106,7 +106,7 @@ handle_request(MochiReq) ->
     % put small token on heap to keep requests synced to backend calls
     erlang:put(nonce, couch_util:to_hex(crypto:rand_bytes(4))),
 
-    {ok, Resp} =
+    Result =
     try
         case authenticate_request(HttpReq, AuthenticationFuns) of
         #httpd{} = Req ->
@@ -118,9 +118,8 @@ handle_request(MochiReq) ->
     catch
         throw:{http_head_abort, Resp0} ->
             {ok, Resp0};
-        throw:{http_abort, Reason} ->
-            ?LOG_ERROR("Response abnormally terminated: ~p", [Reason]),
-            exit(normal);
+        throw:{http_abort, Resp0, Reason0} ->
+            {aborted, Resp0, Reason0};
         throw:{invalid_json, S} ->
             ?LOG_ERROR("attempted upload of invalid JSON ~s", [S]),
             send_error(HttpReq, {bad_request, "invalid UTF-8 JSON"});
@@ -139,13 +138,25 @@ handle_request(MochiReq) ->
     end,
 
     RequestTime = timer:now_diff(now(), Begin)/1000,
-    Code = Resp:get(code),
+    {Status, Code} = case Result of
+    {ok, Resp} ->
+        {ok, Resp:get(code)};
+    {aborted, Resp, _} ->
+        {aborted, Resp:get(code)}
+    end,
     Host = MochiReq:get_header_value("Host"),
-    ?LOG_INFO("~s ~s ~s ~s ~B ~B", [Peer, Host,
-        atom_to_list(Method1), RawUri, Code, round(RequestTime)]),
+    ?LOG_INFO("~s ~s ~s ~s ~B ~p ~B", [Peer, Host,
+        atom_to_list(Method1), RawUri, Code, Status, round(RequestTime)]),
     couch_stats_collector:record({couchdb, request_time}, RequestTime),
-    couch_stats_collector:increment({httpd, requests}),
-    {ok, Resp}.
+    case Result of
+    {ok, _} ->
+        couch_stats_collector:increment({httpd, requests}),
+        {ok, Resp};
+    {aborted, _, Reason} ->
+        couch_stats_collector:increment({httpd, aborted_requests}),
+        ?LOG_ERROR("Response abnormally terminated: ~p", [Reason]),
+        exit(normal)
+    end.
 
 %% HACK: replication currently handles two forms of input, #db{} style
 %% and #http_db style. We need a third that makes use of fabric. #db{}
@@ -484,8 +495,8 @@ send_delayed_last_chunk(Req) ->
 send_delayed_error({delayed_resp, _, Req, _, _, _}, Reason) ->
     {Code, ErrorStr, ReasonStr} = error_info(Reason),
     send_error(Req, Code, ErrorStr, ReasonStr);
-send_delayed_error(_Resp, Reason) ->
-    throw({http_abort, Reason}).
+send_delayed_error(Resp, Reason) ->
+    throw({http_abort, Resp, Reason}).
 
 end_delayed_json_response({delayed_resp, StartFun, Req, Code, Headers, FirstChunk}) ->
     {ok, Resp1} = StartFun(Req, Code, Headers),
