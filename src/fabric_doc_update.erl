@@ -35,8 +35,11 @@ go(DbName, AllDocs, Opts) ->
         dict:from_list([{Doc,[]} || Doc <- AllDocs])},
     case fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
     {ok, Results} ->
-        Reordered = couch_util:reorder_results(AllDocs, Results),
-        {ok, [R || R <- Reordered, R =/= noreply]};
+        {ok, [R || R <- couch_util:reorder_results(AllDocs, Results), R =/= noreply]};
+    {timeout, Acc} ->
+        {_, _, W1, _, DocReplDict} = Acc,
+        {_, Resp} = dict:fold(fun force_reply/3, {W1,[]}, DocReplDict),
+        {accepted, [R || R <- couch_util:reorder_results(AllDocs, Resp), R =/= noreply]};
     Else ->
         Else
     end.
