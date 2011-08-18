@@ -15,7 +15,7 @@
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(19),
+    etap:plan(21),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -52,6 +52,7 @@ test_pool_full() ->
     Proc3 = get_client_proc(Client3, "3"),
     etap:isnt(Proc1, Proc2, "Clients 1 and 2 got different procs."),
     etap:isnt(Proc2, Proc3, "Clients 2 and 3 got different procs."),
+    etap:isnt(Proc1, Proc3, "Clients 1 and 3 got different procs."),
 
     etap:diag("Check that client 4 blocks waiting for a process."),
     Client4 = spawn_client(),
@@ -84,6 +85,7 @@ test_client_unexpected_exit() ->
     Proc3 = get_client_proc(Client3, "3"),
     etap:isnt(Proc1, Proc2, "Clients 1 and 2 got different procs."),
     etap:isnt(Proc2, Proc3, "Clients 2 and 3 got different procs."),
+    etap:isnt(Proc1, Proc3, "Clients 1 and 3 got different procs."),
 
     etap:diag("Check that killing a client frees an os_process."),
     etap:is(kill_client(Client1), ok, "Client 1 died all right."),
