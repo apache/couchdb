@@ -23,7 +23,8 @@
 
 -export([with_ddoc_proc/2, proc_prompt/2, ddoc_prompt/3, ddoc_proc_prompt/3, json_doc/1]).
 
-% -export([test/0]).
+% For 210-os-proc-pool.t
+-export([get_os_process/1, ret_os_process/1]).
 
 -include("couch_db.hrl").
 
@@ -338,8 +339,7 @@ handle_call({get_proc, Lang}, From, Server) ->
     Error ->
         {reply, Error, Server}
     end;
-handle_call({unlink_proc, Pid}, _From, #qserver{pid_procs=PidProcs}=Server) ->
-    rem_value(PidProcs, Pid),
+handle_call({unlink_proc, Pid}, _From, Server) ->
     unlink(Pid),
     {reply, ok, Server};
 handle_call({ret_proc, Proc}, _From, #qserver{
@@ -347,15 +347,22 @@ handle_call({ret_proc, Proc}, _From, #qserver{
         lang_procs=LangProcs}=Server) ->
     % Along with max process limit, here we should check
     % if we're over the limit and discard when we are.
-    add_value(PidProcs, Proc#proc.pid, Proc),
-    add_to_list(LangProcs, Proc#proc.lang, Proc),
-    link(Proc#proc.pid),
+    case is_process_alive(Proc#proc.pid) of
+        true ->
+            add_value(PidProcs, Proc#proc.pid, Proc),
+            add_to_list(LangProcs, Proc#proc.lang, Proc),
+            link(Proc#proc.pid);
+        false ->
+            ok
+    end,
     {reply, true, service_waitlist(Server)}.
 
 handle_cast(_Whatever, Server) ->
     {noreply, Server}.
 
-handle_info({'EXIT', Pid, Status}, #qserver{
+handle_info({'EXIT', _, _}, Server) ->
+    {noreply, Server};
+handle_info({'DOWN', _, process, Pid, Status}, #qserver{
         pid_procs=PidProcs,
         lang_procs=LangProcs,
         lang_limits=LangLimits}=Server) ->
@@ -466,6 +473,7 @@ new_process(Langs, LangLimits, Lang) ->
         case ets:lookup(Langs, Lang) of
         [{Lang, Mod, Func, Arg}] ->
             {ok, Pid} = apply(Mod, Func, Arg),
+            erlang:monitor(process, Pid),
             true = ets:insert(LangLimits, {Lang, Lim, Current+1}),
             {ok, #proc{lang=Lang,
                        pid=Pid,
