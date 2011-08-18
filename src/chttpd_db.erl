@@ -220,6 +220,7 @@ db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
         spawn(fun() ->
                 case catch(fabric:update_doc(Db, Doc2, [{user_ctx, Ctx}])) of
                 {ok, _} -> ok;
+                {accepted, _} -> ok;
                 Error ->
                     ?LOG_INFO("Batch doc error (~s): ~p",[DocId, Error])
                 end
@@ -231,9 +232,14 @@ db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
         ]});
     _Normal ->
         % normal
-        {ok, NewRev} = fabric:update_doc(Db, Doc2, [{user_ctx, Ctx}]),
         DocUrl = absolute_uri(Req, [$/, DbName, $/, DocId]),
-        send_json(Req, 201, [{"Location", DocUrl}], {[
+        case fabric:update_doc(Db, Doc2, [{user_ctx, Ctx}]) of
+        {ok, NewRev} ->
+            HttpCode = 201;
+        {accepted, NewRev} ->
+            HttpCode = 202
+        end,
+        send_json(Req, HttpCode, [{"Location", DocUrl}], {[
             {ok, true},
             {id, DocId},
             {rev, couch_doc:rev_to_str(NewRev)}
@@ -297,6 +303,11 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
             DocResults = lists:zipwith(fun update_doc_result_to_json/2,
                 Docs, Results),
             send_json(Req, 201, DocResults);
+        {accepted, Results} ->
+            % output the results
+            DocResults = lists:zipwith(fun update_doc_result_to_json/2,
+                Docs, Results),
+            send_json(Req, 202, DocResults);
         {aborted, Errors} ->
             ErrorsJson =
                 lists:map(fun update_doc_result_to_json/1, Errors),
@@ -305,9 +316,14 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
     false ->
         Docs = [couch_doc:from_json_obj(JsonObj) || JsonObj <- DocsArray],
         [validate_attachment_names(D) || D <- Docs],
-        {ok, Errors} = fabric:update_docs(Db, Docs, [replicated_changes|Options]),
-        ErrorsJson = lists:map(fun update_doc_result_to_json/1, Errors),
-        send_json(Req, 201, ErrorsJson)
+        case fabric:update_docs(Db, Docs, [replicated_changes|Options]) of
+        {ok, Errors} ->
+            ErrorsJson = lists:map(fun update_doc_result_to_json/1, Errors),
+            send_json(Req, 201, ErrorsJson);
+        {accepted, Errors} ->
+            ErrorsJson = lists:map(fun update_doc_result_to_json/1, Errors),
+            send_json(Req, 202, ErrorsJson)
+        end
     end;
 
 db_req(#httpd{path_parts=[_,<<"_bulk_docs">>]}=Req, _Db) ->
@@ -555,9 +571,13 @@ db_doc_req(#httpd{method='POST', user_ctx=Ctx}=Req, Db, DocId) ->
     NewDoc = Doc#doc{
         atts = UpdatedAtts ++ OldAtts2
     },
-    {ok, NewRev} = fabric:update_doc(Db, NewDoc, [{user_ctx,Ctx}]),
-
-    send_json(Req, 201, [{"Etag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewRev)) ++ "\""}], {[
+    case fabric:update_doc(Db, NewDoc, [{user_ctx,Ctx}]) of
+    {ok, NewRev} ->
+        HttpCode = 201;
+    {accepted, NewRev} ->
+        HttpCode = 202
+    end,
+    send_json(Req, HttpCode, [{"Etag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewRev)) ++ "\""}], {[
         {ok, true},
         {id, DocId},
         {rev, couch_doc:rev_to_str(NewRev)}
@@ -597,6 +617,7 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
             spawn(fun() ->
                     case catch(fabric:update_doc(Db, Doc, Options)) of
                     {ok, _} -> ok;
+                    {accepted, _} -> ok;
                     Error ->
                         ?LOG_INFO("Batch doc error (~s): ~p",[DocId, Error])
                     end
@@ -623,11 +644,16 @@ db_doc_req(#httpd{method='COPY', user_ctx=Ctx}=Req, Db, SourceDocId) ->
     % open old doc
     Doc = couch_doc_open(Db, SourceDocId, SourceRev, []),
     % save new doc
-    {ok, NewTargetRev} = fabric:update_doc(Db,
-        Doc#doc{id=TargetDocId, revs=TargetRevs}, [{user_ctx,Ctx}]),
+    case fabric:update_doc(Db,
+        Doc#doc{id=TargetDocId, revs=TargetRevs}, [{user_ctx,Ctx}]) of
+    {ok, NewTargetRev} ->
+        HttpCode = 201;
+    {accepted, NewTargetRev} ->
+        HttpCode = 202
+    end,
     % respond
     {PartRes} = update_doc_result_to_json(TargetDocId, {ok, NewTargetRev}),
-    send_json(Req, 201,
+    send_json(Req, HttpCode,
         [{"Etag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewTargetRev)) ++ "\""}],
         {[{ok, true}] ++ PartRes});
 
@@ -737,10 +763,23 @@ update_doc(#httpd{user_ctx=Ctx} = Req, Db, DocId, #doc{deleted=Deleted}=Doc,
     _ ->
         Options = [UpdateType, {user_ctx,Ctx}, {w,W}]
     end,
-    {ok, NewRev} = fabric:update_doc(Db, Doc, Options),
+    case fabric:update_doc(Db, Doc, Options) of
+    {ok, NewRev} ->
+        Accepted = false;
+    {accepted, NewRev} ->
+        Accepted = true
+    end,
     NewRevStr = couch_doc:rev_to_str(NewRev),
     ResponseHeaders = [{"Etag", <<"\"", NewRevStr/binary, "\"">>} | Headers],
-    send_json(Req, if Deleted -> 200; true -> 201 end, ResponseHeaders, {[
+    case {Accepted, Deleted} of
+    {true, _} ->
+        HttpCode = 202;
+    {false, true} ->
+        HttpCode = 200;
+    {false, false} ->
+        HttpCode = 201
+    end,
+    send_json(Req, HttpCode, ResponseHeaders, {[
         {ok, true},
         {id, DocId},
         {rev, NewRevStr}
@@ -951,7 +990,12 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
         revs = {Pos, case Revs of [] -> []; [Hd|_] -> [Hd] end},
         atts = NewAtt ++ [A || A <- Atts, A#att.name /= FileName]
     },
-    {ok, UpdatedRev} = fabric:update_doc(Db, DocEdited, [{user_ctx,Ctx}]),
+    case fabric:update_doc(Db, DocEdited, [{user_ctx,Ctx}]) of
+    {ok, UpdatedRev} ->
+        HttpCode = 201;
+    {accepted, UpdatedRev} ->
+        HttpCode = 202
+    end,
     erlang:put(mochiweb_request_recv, true),
     #db{name=DbName} = Db,
 
@@ -959,7 +1003,7 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
         'DELETE' ->
             {200, []};
         _ ->
-            {201, [{"Location", absolute_uri(Req, [$/, DbName, $/, DocId, $/,
+            {HttpCode, [{"Location", absolute_uri(Req, [$/, DbName, $/, DocId, $/,
                 FileName])}]}
         end,
     send_json(Req,Status, Headers, {[
