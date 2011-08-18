@@ -16,11 +16,6 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
--import(chttpd,
-    [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
-    start_json_response/2,send_chunk/2,last_chunk/1,send_chunked_error/2,
-    start_chunked_response/3, send_error/4]).
-
 -record(lacc, {
     req,
     resp = nil,
@@ -75,7 +70,7 @@ handle_doc_show_req(#httpd{
     handle_doc_show(Req, Db, DDoc, ShowName, nil);
 
 handle_doc_show_req(Req, _Db, _DDoc) ->
-    send_error(Req, 404, <<"show_error">>, <<"Invalid path.">>).
+    chttpd:send_error(Req, 404, <<"show_error">>, <<"Invalid path.">>).
 
 handle_doc_show(Req, Db, DDoc, ShowName, Doc) ->
     handle_doc_show(Req, Db, DDoc, ShowName, Doc, null).
@@ -121,7 +116,7 @@ handle_doc_update_req(#httpd{
     send_doc_update_response(Req, Db, DDoc, UpdateName, nil, null);
 
 handle_doc_update_req(Req, _Db, _DDoc) ->
-    send_error(Req, 404, <<"update_error">>, <<"Invalid path.">>).
+    chttpd:send_error(Req, 404, <<"update_error">>, <<"Invalid path.">>).
 
 send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
     JsonReq = chttpd_external:json_req_obj(Req, Db, DocId),
@@ -157,7 +152,7 @@ handle_view_list_req(#httpd{method='GET',
     handle_view_list(Req, Db, DDoc, ListName, {DesignName, ViewName}, nil);
 
 handle_view_list_req(#httpd{method='GET'}=Req, _Db, _DDoc) ->
-    send_error(Req, 404, <<"list_error">>, <<"Invalid path.">>);
+    chttpd:send_error(Req, 404, <<"list_error">>, <<"Invalid path.">>);
 
 handle_view_list_req(#httpd{method='POST',
         path_parts=[_, _, DesignName, _, ListName, ViewName]}=Req, Db, DDoc) ->
@@ -176,10 +171,10 @@ handle_view_list_req(#httpd{method='POST',
         {DesignName, ViewName}, Keys);
 
 handle_view_list_req(#httpd{method='POST'}=Req, _Db, _DDoc) ->
-    send_error(Req, 404, <<"list_error">>, <<"Invalid path.">>);
+    chttpd:send_error(Req, 404, <<"list_error">>, <<"Invalid path.">>);
 
 handle_view_list_req(Req, _Db, _DDoc) ->
-    send_method_not_allowed(Req, "GET,POST,HEAD").
+    chttpd:send_method_not_allowed(Req, "GET,POST,HEAD").
 
 handle_view_list(Req, Db, DDoc, LName, {ViewDesignName, ViewName}, Keys) ->
     {ok, VDoc} = fabric:open_doc(Db, <<"_design/", ViewDesignName/binary>>, []),
@@ -221,16 +216,16 @@ list_callback(complete, Acc) ->
     true ->
         Resp = Resp0
     end,
-    [<<"end">>, Chunk] = couch_query_servers:proc_prompt(Proc, [<<"list_end">>]),            
-    send_non_empty_chunk(Resp, Chunk),
-    couch_httpd:last_chunk(Resp),
-    {ok, Resp};
-list_callback({error, Reason}, #lacc{req=Req, resp=Resp}) ->
-    case Resp of nil ->
-        chttpd:send_error(Req, Reason);
-    _ ->
-        chttpd:send_chunked_error(Resp, {error, Reason})
-    end.
+    try couch_query_servers:proc_prompt(Proc, [<<"list_end">>]) of
+    [<<"end">>, Chunk] ->
+        {ok, Resp1} = send_non_empty_chunk(Resp, Chunk),
+        chttpd:send_delayed_last_chunk(Resp1)
+    catch Error ->
+        {ok, Resp1} = chttpd:send_delayed_error(Resp, Error),
+        {stop, Resp1}
+    end;
+list_callback({error, Reason}, #lacc{resp=Resp}) ->
+    chttpd:send_delayed_error(Resp, Reason).
 
 start_list_resp(Head, Acc) ->
     #lacc{
@@ -255,28 +250,28 @@ start_list_resp(Head, Acc) ->
         headers = ExtHeaders
     } = couch_httpd_external:parse_external_response(JsonResp2),
     JsonHeaders = couch_httpd_external:default_or_content_type(CType, ExtHeaders),
-    {ok, Resp} = start_chunked_response(Req, Code, JsonHeaders),
-    send_non_empty_chunk(Resp, Chunk),
+    {ok, Resp} = chttpd:start_delayed_chunked_response(Req, Code,
+        JsonHeaders, Chunk),
     {ok, Acc#lacc{resp=Resp}}.
 
 send_list_row(Row, #lacc{qserver = {Proc, _}, resp = Resp} = Acc) ->
     try couch_query_servers:proc_prompt(Proc, [<<"list_row">>, Row]) of
     [<<"chunks">>, Chunk] ->
-        send_non_empty_chunk(Resp, Chunk),
-        {ok, Acc};
+        {ok, Resp1} = send_non_empty_chunk(Resp, Chunk),
+        {ok, Acc#lacc{resp=Resp1}};
     [<<"end">>, Chunk] ->
-        send_non_empty_chunk(Resp, Chunk),
-        couch_httpd:last_chunk(Resp),
-        {stop, Resp}
+        {ok, Resp1} = send_non_empty_chunk(Resp, Chunk),
+        {ok, Resp2} = chttpd:send_delayed_last_chunk(Resp1),
+        {stop, Resp2}
     catch Error ->
-        chttpd:send_chunked_error(Resp, Error),
-        {stop, Resp}
+        {ok, Resp1} = chttpd:send_delayed_error(Resp, Error),
+        {stop, Resp1}
     end.
 
-send_non_empty_chunk(_, []) ->
-    ok;
+send_non_empty_chunk(Resp, []) ->
+    {ok, Resp};
 send_non_empty_chunk(Resp, Chunk) ->
-    send_chunk(Resp, Chunk).
+    chttpd:send_delayed_chunk(Resp, Chunk).
 
 % Maybe this is in the proplists API
 % todo move to couch_util

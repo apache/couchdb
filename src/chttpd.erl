@@ -26,7 +26,9 @@
     send_chunked_error/2, send_json/2,send_json/3,send_json/4]).
 
 -export([start_delayed_json_response/3, start_delayed_json_response/4,
-    send_delayed_chunk/2, send_delayed_error/2, end_delayed_json_response/1]).
+    start_delayed_chunked_response/3, start_delayed_chunked_response/4,
+    send_delayed_chunk/2, send_delayed_last_chunk/1,
+    send_delayed_error/2, end_delayed_json_response/1]).
 
 start_link() ->
     Options = [
@@ -460,26 +462,33 @@ start_delayed_json_response(Req, Code, Headers) ->
     start_delayed_json_response(Req, Code, Headers, "").
 
 start_delayed_json_response(Req, Code, Headers, FirstChunk) ->
-    {ok, {delayed_resp, Req, Code, Headers, FirstChunk}}.
+    {ok, {delayed_resp, fun start_json_response/3,
+        Req, Code, Headers, FirstChunk}}.
 
-send_delayed_chunk({delayed_resp, Req, Code, Headers, FirstChunk}, Chunk) ->
-    {ok, Resp1} = start_json_response(Req, Code, Headers),
-    {ok, Resp2} = case FirstChunk of
-        "" -> {ok, Resp1};
-        _ -> send_delayed_chunk(Resp1, FirstChunk)
-    end,
-    send_delayed_chunk(Resp2, Chunk);
+start_delayed_chunked_response(Req, Code, Headers) ->
+    start_delayed_chunked_response(Req, Code, Headers, "").
+
+start_delayed_chunked_response(Req, Code, Headers, FirstChunk) ->
+    {ok, {delayed_resp, fun start_chunked_response/3,
+        Req, Code, Headers, FirstChunk}}.
+
+send_delayed_chunk({delayed_resp, StartFun, Req, Code, Headers, FirstChunk}, Chunk) ->
+    {ok, Resp1} = StartFun(Req, Code, Headers),
+    send_delayed_chunk(Resp1, [FirstChunk, Chunk]);
 send_delayed_chunk(Resp, Chunk) ->
     send_chunk(Resp, Chunk).
 
-send_delayed_error({delayed_resp, Req, _, _, _}, Reason) ->
+send_delayed_last_chunk(Req) ->
+    send_delayed_chunk(Req, []).
+
+send_delayed_error({delayed_resp, _, Req, _, _, _}, Reason) ->
     {Code, ErrorStr, ReasonStr} = error_info(Reason),
     send_error(Req, Code, ErrorStr, ReasonStr);
 send_delayed_error(_Resp, Reason) ->
     throw({http_abort, Reason}).
 
-end_delayed_json_response({delayed_resp, Req, Code, Headers, FirstChunk}) ->
-    {ok, Resp1} = start_json_response(Req, Code, Headers),
+end_delayed_json_response({delayed_resp, StartFun, Req, Code, Headers, FirstChunk}) ->
+    {ok, Resp1} = StartFun(Req, Code, Headers),
     {ok, Resp2} = case FirstChunk of
         "" -> {ok, Resp1};
         _ -> send_delayed_chunk(Resp1, FirstChunk)
