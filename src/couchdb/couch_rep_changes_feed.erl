@@ -154,7 +154,7 @@ init([Parent, #http_db{headers = Headers0} = Source, Since, PostProps]) ->
         end;
     {ibrowse_async_headers, ReqId, Code, _} ->
         {stop, {changes_error_code, list_to_integer(Code)}}
-    after 10000 ->
+    after 30000 ->
         {stop, changes_timeout}
     end;
 
