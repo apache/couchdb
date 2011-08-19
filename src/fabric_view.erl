@@ -157,20 +157,33 @@ possibly_embed_doc(#collector{db_name=DbName, query_args=Args},
     case IncludeDocs andalso is_tuple(Value) of
     true ->
         {Props} = Value,
+        Rev0 = couch_util:get_value(<<"_rev">>, Props),
         case couch_util:get_value(<<"_id">>,Props) of
         undefined -> Row;
         IncId ->
             % use separate process to call fabric:open_doc
             % to not interfere with current call
             {Pid, Ref} = spawn_monitor(fun() ->
-                                  exit(fabric:open_doc(DbName, IncId, [])) end),
-            case receive {'DOWN',Ref,process,Pid, Resp} ->
+                exit(
+                case Rev0 of
+                undefined ->
+                    case fabric:open_doc(DbName, IncId, []) of
+                    {ok, NewDoc} ->
+                        Row#view_row{doc=couch_doc:to_json_obj(NewDoc,[])};
+                    {not_found, missing} ->
+                        Row#view_row{doc=null}
+                    end;
+                Rev0 ->
+                    Rev = couch_doc:parse_rev(Rev0),
+                    case fabric:open_revs(DbName, IncId, [Rev], []) of
+                    {ok, [{ok, NewDoc}]} ->
+                        Row#view_row{doc=couch_doc:to_json_obj(NewDoc,[])};
+                    {ok, [{{not_found, missing}, Rev}]} ->
+                        Row#view_row{doc=null}
+                    end
+                end) end),
+            receive {'DOWN',Ref,process,Pid, Resp} ->
                         Resp
-                end of
-            {ok, NewDoc} ->
-                Row#view_row{doc=couch_doc:to_json_obj(NewDoc,[])};
-            {not_found, missing} ->
-                Row#view_row{doc=null}
             end
         end;
         _ -> Row
