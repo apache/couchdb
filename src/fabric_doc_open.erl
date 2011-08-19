@@ -27,7 +27,7 @@ go(DbName, Id, Options) ->
     N = mem3:n(DbName),
     R = couch_util:get_value(r, Options, couch_config:get("cluster","r","2")),
     RepairOpts = [{r, integer_to_list(N)} | Options],
-    Acc0 = {Workers, min(N, list_to_integer(R)), []},
+    Acc0 = {Workers, erlang:min(N, list_to_integer(R)), []},
     case fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
     {ok, Reply} ->
         format_reply(Reply, SuppressDeletedDoc);
