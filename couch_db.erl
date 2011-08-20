@@ -13,7 +13,8 @@
 -module(couch_db).
 -behaviour(gen_server).
 
--export([open/2,open_int/2,close/1,create/2,start_compact/1,get_db_info/1,get_design_docs/1]).
+-export([open/2,open_int/2,close/1,create/2,get_db_info/1,get_design_docs/1]).
+-export([start_compact/1, cancel_compact/1]).
 -export([open_ref_counted/2,is_idle/1,monitor/1,count_changes_since/2]).
 -export([update_doc/3,update_doc/4,update_docs/4,update_docs/2,update_docs/3,delete_doc/3]).
 -export([get_doc_info/2,open_doc/2,open_doc/3,open_doc_revs/4]).
@@ -117,6 +118,9 @@ monitor(#db{main_pid=MainPid}) ->
 
 start_compact(#db{update_pid=Pid}) ->
     gen_server:call(Pid, start_compact).
+
+cancel_compact(#db{update_pid=Pid}) ->
+    gen_server:call(Pid, cancel_compact).
 
 delete_doc(Db, Id, Revisions) ->
     DeletedDocs = [#doc{id=Id, revs=[Rev], deleted=true} || Rev <- Revisions],

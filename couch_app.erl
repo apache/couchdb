@@ -20,7 +20,7 @@
 
 start(_Type, DefaultIniFiles) ->
     IniFiles = get_ini_files(DefaultIniFiles),
-    case start_apps([crypto, public_key, sasl, inets, oauth, ssl, ibrowse, mochiweb]) of
+    case start_apps([crypto, public_key, sasl, inets, oauth, ssl, ibrowse, mochiweb, os_mon]) of
     ok ->
         couch_server_sup:start_link(IniFiles);
     {error, Reason} ->

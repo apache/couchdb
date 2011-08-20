@@ -76,9 +76,10 @@ get_temp_group(Db, Language, DesignOptions, MapSrc, RedSrc) ->
         get_temp_updater(couch_db:name(Db), Language, DesignOptions, MapSrc, RedSrc),
         couch_db:get_update_seq(Db)).
 
-get_group_info(Db, GroupId) ->
-    couch_view_group:request_group_info(
-        get_group_server(couch_db:name(Db), GroupId)).
+get_group_info(#db{name = DbName}, GroupId) ->
+    get_group_info(DbName, GroupId);
+get_group_info(DbName, GroupId) ->
+    couch_view_group:request_group_info(get_group_server(DbName, GroupId)).
 
 cleanup_index_files(Db) ->
     % load all ddocs
