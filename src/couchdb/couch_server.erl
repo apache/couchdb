@@ -13,7 +13,8 @@
 -module(couch_server).
 -behaviour(gen_server).
 
--export([open/2,create/2,delete/2,all_databases/0,get_version/0]).
+-export([open/2,create/2,delete/2,get_version/0]).
+-export([all_databases/0, all_databases/2]).
 -export([init/1, handle_call/3,sup_start_link/0]).
 -export([handle_cast/2,code_change/3,handle_info/2,terminate/2]).
 -export([dev_start/0,is_admin/2,has_admins/0,get_stats/0]).
@@ -158,19 +159,30 @@ terminate(_Reason, _Srv) ->
         ets:tab2list(couch_dbs_by_name)).
 
 all_databases() ->
+    {ok, DbList} = all_databases(
+        fun(DbName, Acc) -> {ok, [DbName | Acc]} end, []),
+    {ok, lists:usort(DbList)}.
+
+all_databases(Fun, Acc0) ->
     {ok, #server{root_dir=Root}} = gen_server:call(couch_server, get_server),
     NormRoot = couch_util:normpath(Root),
-    Filenames =
-    filelib:fold_files(Root, "^[a-z0-9\\_\\$()\\+\\-]*[\\.]couch$", true,
-        fun(Filename, AccIn) ->
-            NormFilename = couch_util:normpath(Filename),
-            case NormFilename -- NormRoot of
-            [$/ | RelativeFilename] -> ok;
-            RelativeFilename -> ok
-            end,
-            [list_to_binary(filename:rootname(RelativeFilename, ".couch")) | AccIn]
-        end, []),
-    {ok, lists:usort(Filenames)}.
+    FinalAcc = try
+        filelib:fold_files(Root, "^[a-z0-9\\_\\$()\\+\\-]*[\\.]couch$", true,
+            fun(Filename, AccIn) ->
+                NormFilename = couch_util:normpath(Filename),
+                case NormFilename -- NormRoot of
+                [$/ | RelativeFilename] -> ok;
+                RelativeFilename -> ok
+                end,
+                case Fun(?l2b(filename:rootname(RelativeFilename, ".couch")), AccIn) of
+                {ok, NewAcc} -> NewAcc;
+                {stop, NewAcc} -> throw({stop, Fun, NewAcc})
+                end
+            end, Acc0)
+    catch throw:{stop, Fun, Acc1} ->
+         Acc1
+    end,
+    {ok, FinalAcc}.
 
 
 maybe_close_lru_db(#server{dbs_open=NumOpen, max_dbs_open=MaxOpen}=Server)

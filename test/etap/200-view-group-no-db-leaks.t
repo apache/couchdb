@@ -151,7 +151,7 @@ delete_db() ->
 
 compact_db() ->
     {ok, Db} = couch_db:open_int(test_db_name(), []),
-    ok = couch_db:start_compact(Db),
+    {ok, _} = couch_db:start_compact(Db),
     ok = couch_db:close(Db),
     wait_db_compact_done(10).
 
@@ -169,7 +169,7 @@ wait_db_compact_done(N) ->
     end.
 
 compact_view_group() ->
-    ok = couch_view_compactor:start_compact(test_db_name(), ddoc_name()),
+    {ok, _} = couch_view_compactor:start_compact(test_db_name(), ddoc_name()),
     wait_view_compact_done(10).
 
 wait_view_compact_done(0) ->

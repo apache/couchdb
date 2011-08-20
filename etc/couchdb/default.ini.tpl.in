@@ -82,6 +82,7 @@ uuids={couch_uuids, start, []}
 auth_cache={couch_auth_cache, start_link, []}
 replication_manager={couch_replication_manager, start_link, []}
 os_daemons={couch_os_daemons, start_link, []}
+compaction_daemon={couch_compaction_daemon, start_link, []}
 
 [httpd_global_handlers]
 / = {couch_httpd_misc_handlers, handle_welcome_req, <<"Welcome">>}
@@ -190,3 +191,91 @@ verify_ssl_certificates = false
 ; ssl_trusted_certificates_file = /etc/ssl/certs/ca-certificates.crt
 ; maximum peer certificate depth (must be set even if certificate validation is off)
 ssl_certificate_max_depth = 3
+
+[compaction_daemon]
+; The delay, in seconds, between each check for which database and view indexes
+; need to be compacted.
+check_interval = 300
+; If a database or view index file is smaller then this value (in bytes),
+; compaction will not happen. Very small files always have a very high
+; fragmentation therefore it's not worth to compact them.
+min_file_size = 131072
+
+[compactions]
+; List of compaction rules for the compaction daemon.
+; The daemon compacts databases and their respective view groups when all the
+; condition parameters are satisfied. Configuration can be per database or
+; global, and it has the following format:
+;
+; database_name = [ {ParamName, ParamValue}, {ParamName, ParamValue}, ... ]
+; _default = [ {ParamName, ParamValue}, {ParamName, ParamValue}, ... ]
+;
+; Possible parameters:
+;
+; * db_fragmentation - If the ratio (as an integer percentage), of the amount
+;                      of old data (and its supporting metadata) over the database
+;                      file size is equal to or greater then this value, this
+;                      database compaction condition is satisfied.
+;                      This value is computed as:
+;
+;                           (file_size - data_size) / file_size * 100
+;
+;                      The data_size and file_size values can be obtained when
+;                      querying a database's information URI (GET /dbname/).
+;
+; * view_fragmentation - If the ratio (as an integer percentage), of the amount
+;                        of old data (and its supporting metadata) over the view
+;                        index (view group) file size is equal to or greater then
+;                        this value, then this view index compaction condition is
+;                        satisfied. This value is computed as:
+;
+;                            (file_size - data_size) / file_size * 100
+;
+;                        The data_size and file_size values can be obtained when
+;                        querying a view group's information URI
+;                        (GET /dbname/_design/groupname/_info).
+;
+; * from _and_ to - The period for which a database (and its view groups) compaction
+;                   is allowed. The value for these parameters must obey the format:
+;
+;                   HH:MM - HH:MM  (HH in [0..23], MM in [0..59])
+;
+; * strict_window - If a compaction is still running after the end of the allowed
+;                   period, it will be canceled if this parameter is set to 'true'.
+;                   It defaults to 'false' and it's meaningful only if the *period*
+;                   parameter is also specified.
+;
+; * parallel_view_compaction - If set to 'true', the database and its views are
+;                              compacted in parallel. This is only useful on
+;                              certain setups, like for example when the database
+;                              and view index directories point to different
+;                              disks. It defaults to 'false'.
+;
+; Before a compaction is triggered, an estimation of how much free disk space is
+; needed is computed. This estimation corresponds to 2 times the data size of
+; the database or view index. When there's not enough free disk space to compact
+; a particular database or view index, a warning message is logged.
+;
+; Examples:
+;
+; 1) [{db_fragmentation, "70%"}, {view_fragmentation, "60%"}]
+;    The `foo` database is compacted if its fragmentation is 70% or more.
+;    Any view index of this database is compacted only if its fragmentation
+;    is 60% or more.
+;
+; 2) [{db_fragmentation, "70%"}, {view_fragmentation, "60%"}, {from, "00:00"}, {to, "04:00"}]
+;    Similar to the preceding example but a compaction (database or view index)
+;    is only triggered if the current time is between midnight and 4 AM.
+;
+; 3) [{db_fragmentation, "70%"}, {view_fragmentation, "60%"}, {from, "00:00"}, {to, "04:00"}, {strict_window, true}]
+;    Similar to the preceding example - a compaction (database or view index)
+;    is only triggered if the current time is between midnight and 4 AM. If at
+;    4 AM the database or one of its views is still compacting, the compaction
+;    process will be canceled.
+;
+; 4) [{db_fragmentation, "70%"}, {view_fragmentation, "60%"}, {from, "00:00"}, {to, "04:00"}, {strict_window, true}, {parallel_view_compaction, true}]
+;    Similar to the preceding example, but a database and its views can be
+;    compacted in parallel.
+;
+;_default = [{db_fragmentation, "70%"}, {view_fragmentation, "60%"}, {from, "23:00"}, {to, "04:00"}]
+

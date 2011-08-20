@@ -84,4 +84,5 @@ EXTRA_DIST = \
     180-http-proxy.t \
     190-json-stream-parse.t \
     200-view-group-no-db-leaks.t \
-    210-os-proc-pool.t
+    210-os-proc-pool.t \
+    220-compaction-daemon.t

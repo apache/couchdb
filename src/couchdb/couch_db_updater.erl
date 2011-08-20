@@ -158,15 +158,22 @@ handle_call(start_compact, _From, Db) ->
         Pid = spawn_link(fun() -> start_copy_compact(Db) end),
         Db2 = Db#db{compactor_pid=Pid},
         ok = gen_server:call(Db#db.main_pid, {db_updated, Db2}),
-        {reply, ok, Db2};
+        {reply, {ok, Pid}, Db2};
     _ ->
         % compact currently running, this is a no-op
-        {reply, ok, Db}
-    end.
+        {reply, {ok, Db#db.compactor_pid}, Db}
+    end;
+handle_call(cancel_compact, _From, #db{compactor_pid = nil} = Db) ->
+    {reply, ok, Db};
+handle_call(cancel_compact, _From, #db{compactor_pid = Pid} = Db) ->
+    unlink(Pid),
+    exit(Pid, kill),
+    RootDir = couch_config:get("couchdb", "database_dir", "."),
+    ok = couch_file:delete(RootDir, Db#db.filepath ++ ".compact"),
+    {reply, ok, Db#db{compactor_pid = nil}};
 
 
-
-handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
+handle_call({compact_done, CompactFilepath}, _From, #db{filepath=Filepath}=Db) ->
     {ok, NewFd} = couch_file:open(CompactFilepath),
     ReaderFd = open_reader_fd(CompactFilepath, Db#db.options),
     {ok, NewHeader} = couch_file:read_header(NewFd),
@@ -198,16 +205,19 @@ handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
         ok = gen_server:call(Db#db.main_pid, {db_updated, NewDb3}, infinity),
         couch_db_update_notifier:notify({compacted, NewDb3#db.name}),
         ?LOG_INFO("Compaction for db \"~s\" completed.", [Db#db.name]),
-        {noreply, NewDb3#db{compactor_pid=nil}};
+        {reply, ok, NewDb3#db{compactor_pid=nil}};
     false ->
         ?LOG_INFO("Compaction file still behind main file "
             "(update seq=~p. compact update seq=~p). Retrying.",
             [Db#db.update_seq, NewSeq]),
         close_db(NewDb),
-        Pid = spawn_link(fun() -> start_copy_compact(Db) end),
-        Db2 = Db#db{compactor_pid=Pid},
-        {noreply, Db2}
+        {reply, {retry, Db}, Db}
     end.
+
+
+handle_cast(Msg, #db{name = Name} = Db) ->
+    ?LOG_ERROR("Database `~s` updater received unexpected cast: ~p", [Name, Msg]),
+    {stop, Msg, Db}.
 
 
 handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts,
@@ -966,7 +976,13 @@ start_copy_compact(#db{name=Name,filepath=Filepath,header=#db_header{purge_seq=P
 
     NewDb3 = copy_compact(Db, NewDb2, Retry),
     close_db(NewDb3),
-    gen_server:cast(Db#db.update_pid, {compact_done, CompactFile}).
+    case gen_server:call(
+        Db#db.update_pid, {compact_done, CompactFile}, infinity) of
+    ok ->
+        ok;
+    {retry, CurrentDb} ->
+        start_copy_compact(CurrentDb)
+    end.
 
 make_doc_summary(#db{compression = Comp}, {Body0, Atts0}) ->
     Body = case couch_compress:is_compressed(Body0) of
