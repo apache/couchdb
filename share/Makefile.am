@@ -209,4 +209,5 @@ nobase_dist_localdata_DATA = \
     www/status.html \
     www/style/jquery-ui-1.8.11.custom.css \
 	www/style/layout.css \
+    www/verify_install.html \
     www/_sidebar.html
