@@ -55,6 +55,7 @@ Source: "%openssl_bin_dir%\libeay32.dll"; DestDir: "{app}\bin"; Flags: ignorever
 [Dirs]
 Name: "{app}\var\lib\couchdb"; Permissions: authusers-modify
 Name: "{app}\var\log\couchdb"; Permissions: authusers-modify
+Name: "{app}\var\run\couchdb"; Permissions: authusers-modify
 Name: "{app}\etc\couchdb"; Permissions: authusers-modify
 
 [Icons]
