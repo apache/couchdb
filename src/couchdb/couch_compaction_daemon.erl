@@ -144,6 +144,7 @@ maybe_compact_db(DbName, Config) ->
                 end),
                 ViewsMonRef = erlang:monitor(process, ViewsCompactPid);
             false ->
+                ViewsCompactPid = nil,
                 ViewsMonRef = nil
             end,
             DbMonRef = erlang:monitor(process, DbCompactPid),
@@ -175,6 +176,12 @@ maybe_compact_db(DbName, Config) ->
                 receive
                 {'DOWN', ViewsMonRef, process, _, _Reason} ->
                     ok
+                after TimeLeft + 1000 ->
+                    % Under normal circunstances, the view compaction process
+                    % should have finished already.
+                    erlang:demonitor(ViewsMonRef, [flush]),
+                    unlink(ViewsCompactPid),
+                    exit(ViewsCompactPid, kill)
                 end
             end;
         false ->
