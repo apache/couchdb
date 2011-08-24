@@ -282,8 +282,15 @@ handle_system_req(Req) ->
         {os_proc_count, couch_proc_manager:get_proc_count()},
         {process_count, erlang:system_info(process_count)},
         {process_limit, erlang:system_info(process_limit)},
-        {message_queue_len, MessageQueueLen}
+        {message_queue_len, MessageQueueLen},
+        {distribution, {get_distribution_stats()}}
     ]}).
+
+get_distribution_stats() ->
+    lists:map(fun({Node, Socket}) ->
+        {ok, Stats} = inet:getstat(Socket),
+        {Node, {Stats}}
+    end, erlang:system_info(dist_ctrl)).
 
 handle_up_req(#httpd{method='GET'} = Req) ->
     case config:get("couchdb", "maintenance_mode") of
