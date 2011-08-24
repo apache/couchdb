@@ -254,7 +254,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
     couch_httpd:validate_ctype(Req, "application/json"),
     {JsonProps} = chttpd:json_body_obj(Req),
     DocsArray = couch_util:get_value(<<"docs">>, JsonProps),
-    W = couch_httpd:qs_value(Req, "w", couch_config:get("cluster", "w", "2")),
+    W = couch_httpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     case chttpd:header_value(Req, "X-Couch-Full-Commit") of
     "true" ->
         Options = [full_commit, {user_ctx,Ctx}, {w,W}];
@@ -566,7 +566,7 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
     } = parse_doc_query(Req),
     couch_doc:validate_docid(DocId),
 
-    W = couch_httpd:qs_value(Req, "w", couch_config:get("cluster", "w", "2")),
+    W = couch_httpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     Options = [{user_ctx,Ctx}, {w,W}],
 
     Loc = absolute_uri(Req, [$/, Db#db.name, $/, DocId]),
@@ -725,7 +725,7 @@ update_doc(Req, Db, DocId, Doc, Headers) ->
 
 update_doc(#httpd{user_ctx=Ctx} = Req, Db, DocId, #doc{deleted=Deleted}=Doc,
         Headers, UpdateType) ->
-    W = couch_httpd:qs_value(Req, "w", couch_config:get("cluster", "w", "2")),
+    W = couch_httpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     case couch_httpd:header_value(Req, "X-Couch-Full-Commit") of
     "true" ->
         Options = [full_commit, UpdateType, {user_ctx,Ctx}, {w,W}];
