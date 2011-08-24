@@ -20,6 +20,7 @@
 -export([quorum/1]).
 
 -include("mem3.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 start() ->
     application:start(mem3).
