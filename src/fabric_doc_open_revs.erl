@@ -35,7 +35,7 @@
 go(DbName, Id, Revs, Options) ->
     Workers = fabric_util:submit_jobs(mem3:shards(DbName,Id), open_revs,
         [Id, Revs, Options]),
-    R = couch_util:get_value(r, Options, couch_config:get("cluster","r","2")),
+    R = couch_util:get_value(r, Options, integer_to_list(mem3:quorum(DbName))),
     State = #state{
         dbname = DbName,
         worker_count = length(Workers),

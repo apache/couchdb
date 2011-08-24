@@ -30,7 +30,7 @@ go(DbName, AllDocs, Opts) ->
         {Shard#shard{ref=Ref}, Docs}
     end, group_docs_by_shard(DbName, AllDocs)),
     {Workers, _} = lists:unzip(GroupedDocs),
-    W = couch_util:get_value(w, Options, couch_config:get("cluster","w","2")),
+    W = couch_util:get_value(w, Options, integer_to_list(mem3:quorum(DbName))),
     Acc0 = {length(Workers), length(AllDocs), list_to_integer(W), GroupedDocs,
         dict:from_list([{Doc,[]} || Doc <- AllDocs])},
     case fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
