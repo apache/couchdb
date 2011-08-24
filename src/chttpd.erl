@@ -131,8 +131,8 @@ handle_request(MochiReq) ->
         error:database_does_not_exist ->
             send_error(HttpReq, database_does_not_exist);
         Tag:Error ->
-            ?LOG_ERROR("Uncaught error in HTTP request: ~p",[{Tag, Error}]),
             Stack = erlang:get_stacktrace(),
+            ?LOG_ERROR("Uncaught error in HTTP request: ~p",[{Tag, Error}]),
             ?LOG_INFO("Stacktrace: ~p",[Stack]),
             send_error(HttpReq, {Error, nil, Stack})
     end,
