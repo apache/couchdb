@@ -108,7 +108,12 @@ compact_loop(Parent) ->
                 nil ->
                     ok;
                 {ok, Config} ->
-                    maybe_compact_db(DbName, Config)
+                    case check_period(Config) of
+                    true ->
+                        maybe_compact_db(DbName, Config);
+                    false ->
+                        ok
+                    end
                 end,
                 {ok, Acc}
             end
@@ -183,10 +188,15 @@ maybe_compact_db(DbName, Config) ->
 maybe_compact_views(_DbName, [], _Config) ->
     ok;
 maybe_compact_views(DbName, [DDocName | Rest], Config) ->
-    case maybe_compact_view(DbName, DDocName, Config) of
-    ok ->
-        maybe_compact_views(DbName, Rest, Config);
-    timeout ->
+    case check_period(Config) of
+    true ->
+        case maybe_compact_view(DbName, DDocName, Config) of
+        ok ->
+            maybe_compact_views(DbName, Rest, Config);
+        timeout ->
+            ok
+        end;
+    false ->
         ok
     end.
 
