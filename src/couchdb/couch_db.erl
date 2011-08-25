@@ -25,7 +25,7 @@
 -export([start_link/3,open_doc_int/3,ensure_full_commit/1]).
 -export([set_security/2,get_security/1]).
 -export([init/1,terminate/2,handle_call/3,handle_cast/2,code_change/3,handle_info/2]).
--export([changes_since/5,changes_since/6,read_doc/2,new_revid/1]).
+-export([changes_since/4,changes_since/5,read_doc/2,new_revid/1]).
 -export([check_is_admin/1, check_is_reader/1]).
 -export([reopen/1]).
 
@@ -944,10 +944,10 @@ enum_docs_reduce_to_count(Reds) ->
             fun couch_db_updater:btree_by_id_reduce/2, Reds),
     Count.
 
-changes_since(Db, Style, StartSeq, Fun, Acc) ->
-    changes_since(Db, Style, StartSeq, Fun, [], Acc).
+changes_since(Db, StartSeq, Fun, Acc) ->
+    changes_since(Db, StartSeq, Fun, [], Acc).
     
-changes_since(Db, _Style, StartSeq, Fun, Options, Acc) ->
+changes_since(Db, StartSeq, Fun, Options, Acc) ->
     Wrapper = fun(DocInfo, _Offset, Acc2) -> Fun(DocInfo, Acc2) end,
     {ok, _LastReduction, AccOut} = couch_btree:fold(Db#db.docinfo_by_seq_btree,
         Wrapper, Acc, [{start_key, StartSeq + 1}] ++ Options),
