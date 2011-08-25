@@ -122,13 +122,42 @@ shards(DbName, DocId) ->
     end.
 
 ushards(DbName) ->
-    lists:usort(fun(#shard{name=A}, #shard{name=B}) ->
-        A =< B
-    end, lists:sort(live_shards(DbName))).
+    Shards = mem3:shards(DbName),
+    Nodes = rotate_nodes(DbName, live_nodes()),
+    Buckets = bucket_by_range(Shards),
+    choose_ushards(Buckets, Nodes).
 
-live_shards(DbName) ->
-    Nodes = [node()|erlang:nodes()],
-    [S || #shard{node=Node} = S <- shards(DbName), lists:member(Node, Nodes)].
+rotate_nodes(DbName, Nodes) ->
+    {H, T} = lists:split(erlang:crc32(DbName) rem length(Nodes), Nodes),
+    T ++ H.
+
+live_nodes() ->
+    lists:sort([node()|erlang:nodes()]).
+
+bucket_by_range(Shards) ->
+    Buckets0 = lists:foldl(fun(#shard{range=Range}=Shard, Dict) ->
+        orddict:append(Range, Shard, Dict) end, orddict:new(), Shards),
+    {_, Buckets} = lists:unzip(Buckets0),
+    Buckets.
+
+choose_ushards(Buckets, Nodes) ->
+    choose_ushards(Buckets, Nodes, []).
+
+choose_ushards([], _, Acc) ->
+    lists:reverse(Acc);
+choose_ushards([Bucket|RestBuckets], Nodes, Acc) ->
+    #shard{node=Node} = Shard = first_match(Bucket, Bucket, Nodes),
+    choose_ushards(RestBuckets, lists:delete(Node, Nodes) ++ [Node],
+        [Shard | Acc]).
+
+first_match([], [#shard{range=Range}|_], []) ->
+    throw({range_not_available, Range});
+first_match([#shard{node=Node}=Shard|_], _, [Node|_]) ->
+    Shard;
+first_match([], Shards, [_|RestNodes]) ->
+    first_match(Shards, Shards, RestNodes);
+first_match([_|RestShards], Shards, Nodes) ->
+    first_match(RestShards, Shards, Nodes).
 
 -spec choose_shards(DbName::iodata(), Options::list()) -> [#shard{}].
 choose_shards(DbName, Options) when is_list(DbName) ->
