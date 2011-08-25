@@ -507,6 +507,32 @@ couchTests.changes = function(debug) {
   CouchDB.request("GET", "/" + db.name + "/_changes");
   TEquals(0, CouchDB.requestStats('httpd', 'clients_requesting_changes').current);
 
+  // COUCHDB-1256
+  T(db.deleteDb());
+  T(db.createDb());
+
+  T(db.save({"_id":"foo", "a" : 123}).ok);
+  T(db.save({"_id":"bar", "a" : 456}).ok);
+
+  options = {
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({"_rev":"1-cc609831f0ca66e8cd3d4c1e0d98108a", "a":456})
+  };
+  req = CouchDB.request("PUT", "/" + db.name + "/foo?new_edits=false", options);
+
+  req = CouchDB.request("GET", "/" + db.name + "/_changes?style=all_docs");
+  resp = JSON.parse(req.responseText);
+
+  TEquals(3, resp.last_seq);
+  TEquals(2, resp.results.length);
+
+  req = CouchDB.request("GET", "/" + db.name + "/_changes?style=all_docs&since=2");
+  resp = JSON.parse(req.responseText);
+
+  TEquals(3, resp.last_seq);
+  TEquals(1, resp.results.length);
+  TEquals(2, resp.results[0].changes.length);
+
   // cleanup
   db.deleteDb();
 };

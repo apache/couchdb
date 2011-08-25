@@ -947,20 +947,8 @@ enum_docs_reduce_to_count(Reds) ->
 changes_since(Db, Style, StartSeq, Fun, Acc) ->
     changes_since(Db, Style, StartSeq, Fun, [], Acc).
     
-changes_since(Db, Style, StartSeq, Fun, Options, Acc) ->
-    Wrapper = fun(DocInfo, _Offset, Acc2) ->
-            #doc_info{revs=Revs} = DocInfo,
-            DocInfo2 =
-            case Style of
-            main_only ->
-                DocInfo;
-            all_docs ->
-                % remove revs before the seq
-                DocInfo#doc_info{revs=[RevInfo ||
-                    #rev_info{seq=RevSeq}=RevInfo <- Revs, StartSeq < RevSeq]}
-            end,
-            Fun(DocInfo2, Acc2)
-        end,
+changes_since(Db, _Style, StartSeq, Fun, Options, Acc) ->
+    Wrapper = fun(DocInfo, _Offset, Acc2) -> Fun(DocInfo, Acc2) end,
     {ok, _LastReduction, AccOut} = couch_btree:fold(Db#db.docinfo_by_seq_btree,
         Wrapper, Acc, [{start_key, StartSeq + 1}] ++ Options),
     {ok, AccOut}.
