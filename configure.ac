@@ -523,6 +523,7 @@ AC_SUBST(abs_top_builddir)
 AC_REVISION([LOCAL_VERSION])
 
 AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([bin/couch-config.tpl])
 AC_CONFIG_FILES([bin/couchjs.tpl])
 AC_CONFIG_FILES([bin/couchdb.tpl])
 AC_CONFIG_FILES([bin/couchdb.bat.tpl])

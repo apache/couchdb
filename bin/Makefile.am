@@ -13,10 +13,10 @@
 if WINDOWS
 bin_SCRIPTS = couchdb.bat
 else
-bin_SCRIPTS = couchdb couchjs
+bin_SCRIPTS = couchdb couchjs couch-config
 endif
 
-noinst_SCRIPTS = couchjs_dev
+noinst_SCRIPTS = couchjs_dev couch-config_dev
 
 if HELP2MAN
 dist_man1_MANS = couchdb.1 couchjs.1
@@ -74,6 +74,54 @@ couchdb.bat: couchdb.bat.tpl
 	sed -e "s|%ICU_CONFIG%|$(ICU_CONFIG)|g" \
 	    -e "s|%version%|@version@|g" \
 	$< > $@
+
+couch-config: couch-config.tpl
+	sed -e "s|%ERL%|$(ERL)|g" \
+	    -e "s|%bindir%|@bindir@|g" \
+	    -e "s|%localerlanglibdir%|@localerlanglibdir@|g" \
+	    -e "s|%localconfdir%|@localconfdir@|g" \
+		-e "s|%localdatadir%|$(localdatadir)|g" \
+		-e "s|%localbuilddatadir%|$(localdatadir)|g" \
+	    -e "s|%localstatelogdir%|@localstatelogdir@|g" \
+	    -e "s|%localstatelibdir%|@localstatelibdir@|g" \
+	    -e "s|%localstatedir%|@localstatedir@|g" \
+	    -e "s|%localstaterundir%|@localstaterundir@|g" \
+		-e "s|%couchlibdir%|@localerlanglibdir@/couch-%version%|g"\
+		-e "s|%couchincludedir%|@localerlanglibdir@/include|g"\
+		-e "s|%couchebindir%|@localerlanglibdir@/ebin|g"\
+		-e "s|%couchprivlibdir%|@localerlanglibdir@/couch-%version%/priv/lib|g"\
+	    -e "s|%bug_uri%|@bug_uri@|g" \
+	    -e "s|%package_author_address%|@package_author_address@|g" \
+	    -e "s|%package_author_name%|@package_author_name@|g" \
+	    -e "s|%package_name%|@package_name@|g" \
+	    -e "s|%version%|@version@|g" \
+	    -e "s|%couchdb_command_name%|$(couchdb_command_name)|g" > \
+	$@ < $<
+	chmod +x $@
+
+couch-config_dev: couch-config.tpl
+	sed -e "s|%ERL%|$(ERL)|g" \
+	    -e "s|%bindir%|$(abs_top_builddir)/bin|g" \
+	    -e "s|%localerlanglibdir%|$(abs_top_builddir)\/src\/couchdb|g" \
+		-e "s|%couchlibdir%|$(abs_top_builddir)\/src\/couchdb|g"\
+		-e "s|%couchincludedir%|$(abs_top_builddir)\/src\/couchdb|g"\
+		-e "s|%couchebindir%|$(abs_top_builddir)\/src\/couchdb|g"\
+		-e "s|%couchprivlibdir%|$(abs_top_builddir)/src/couchdb/priv/.libs|g"\
+		-e "s|%localdatadir%|$(abs_top_srcdir)/share|g" \
+		-e "s|%localbuilddatadir%|$(abs_top_builddir)/share|g" \
+	    -e "s|%localstatelibdir%|$(abs_top_builddir)/tmp/lib|g" \
+	    -e "s|%localstatelogdir%|$(abs_top_builddir)/tmp/log|g" \
+		-e "s|%localstatedir%|$(abs_top_builddir)/tmp|g" \
+	    -e "s|%localstaterundir%|$(abs_top_builddir)/tmp/run|g" \
+		-e "s|%bug_uri%|@bug_uri@|g" \
+	    -e "s|%package_author_address%|@package_author_address@|g" \
+	    -e "s|%package_author_name%|@package_author_name@|g" \
+	    -e "s|%package_name%|@package_name@|g" \
+	    -e "s|%version%|@version@|g" \
+	    -e "s|%couchdb_command_name%|$(abs_top_builddir)/utils/run|g" > \
+	$@ < $<
+	chmod +x $@
+
 
 HELP2MAN_OPTION=--no-info --help-option="-h" --version-option="-V"
 
