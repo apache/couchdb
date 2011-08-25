@@ -246,7 +246,6 @@ start_sending_changes(Callback, UserAcc, ResponseType) ->
 
 send_changes(Args, Callback, UserAcc, Db, StartSeq, Prepend) ->
     #changes_args{
-        style = Style,
         include_docs = IncludeDocs,
         conflicts = Conflicts,
         limit = Limit,
@@ -256,7 +255,6 @@ send_changes(Args, Callback, UserAcc, Db, StartSeq, Prepend) ->
     } = Args,
     couch_db:changes_since(
         Db,
-        Style,
         StartSeq,
         fun changes_enumerator/2,
         [{dir, Dir}],
