@@ -235,9 +235,10 @@ get_key_leafs_simple(Pos, [{Key, _Value, SubTree}=Tree | RestTree], KeysToGet, K
         {LeafsFound ++ RestLeafsFound, KeysRemaining};
     KeysToGet2 ->
         LeafsFound = get_all_leafs_simple(Pos, [Tree], KeyPathAcc),
-        LeafKeysFound = [LeafKeyFound || {LeafKeyFound, _} <- LeafsFound],
-        KeysToGet2 = KeysToGet2 -- LeafKeysFound,
-        {RestLeafsFound, KeysRemaining} = get_key_leafs_simple(Pos, RestTree, KeysToGet2, KeyPathAcc),
+        LeafKeysFound = [{LeafPos, LeafRev} || {_, {LeafPos, [LeafRev|_]}}
+            <- LeafsFound],
+        KeysToGet3 = KeysToGet2 -- LeafKeysFound,
+        {RestLeafsFound, KeysRemaining} = get_key_leafs_simple(Pos, RestTree, KeysToGet3, KeyPathAcc),
         {LeafsFound ++ RestLeafsFound, KeysRemaining}
     end.
 
