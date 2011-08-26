@@ -272,7 +272,7 @@ function CouchDB(name, httpHeaders) {
       for (var name in options) {
         if (!options.hasOwnProperty(name)) { continue; };
         var value = options[name];
-        if (name == "key" || name == "keys" || name == "startkey" || name == "endkey") {
+        if (name == "key" || name == "keys" || name == "startkey" || name == "endkey" || (name == "open_revs" && value !== "all")) {
           value = toJSON(value);
         }
         buf.push(encodeURIComponent(name) + "=" + encodeURIComponent(value));
