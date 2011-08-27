@@ -255,9 +255,8 @@ reader_loop(ReaderServer, Parent, Source, MissingRevsServer) ->
                 infinity) || {Id,Seq,Revs} <- SortedIdsRevs],
             reader_loop(ReaderServer, Parent, Source, MissingRevsServer);
         _Local ->
-            {ok, Source1} = gen_server:call(Parent, get_source_db, infinity),
             {ok, Source2} = couch_db:open(
-                Source1#db.name, [{user_ctx, Source1#db.user_ctx}]),
+                Source#db.name, [{user_ctx, Source#db.user_ctx}]),
             lists:foreach(fun({Id,Seq,Revs}) ->
                 {ok, Docs} = couch_db:open_doc_revs(Source2, Id, Revs, [latest]),
                 JustTheDocs = [Doc || {ok, Doc} <- Docs],
