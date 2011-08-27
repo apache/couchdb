@@ -26,7 +26,8 @@ writer_loop(Parent, Reader) ->
         ok;
     {HighSeq, Docs} ->
         DocCount = length(Docs),
-        {ok, Target} = gen_server:call(Parent, get_target_db, infinity),
+        {ok, Target0} = gen_server:call(Parent, get_target_db, infinity),
+        Target = open_db(Target0),
         try write_docs(Target, Docs) of
         {ok, []} ->
             Parent ! {update_stats, docs_written, DocCount};
@@ -38,6 +39,8 @@ writer_loop(Parent, Reader) ->
         {attachment_request_failed, Err} ->
             ?LOG_DEBUG("writer failed to write an attachment ~p", [Err]),
             exit({attachment_request_failed, Err, Docs})
+        after
+            close_db(Target)
         end,
         Parent ! {writer_checkpoint, HighSeq},
         couch_rep_att:cleanup(),
@@ -163,3 +166,14 @@ write_docs_1({Props}) ->
     ErrId = couch_util:to_existing_atom(couch_util:get_value(<<"error">>, Props)),
     Reason = couch_util:get_value(<<"reason">>, Props),
     {{Id, Rev}, {ErrId, Reason}}.
+
+open_db(#db{name = Name, user_ctx = UserCtx}) ->
+    {ok, Db} = couch_db:open(Name, [{user_ctx, UserCtx}]),
+    Db;
+open_db(HttpDb) ->
+    HttpDb.
+
+close_db(#db{} = Db) ->
+    couch_db:close(Db);
+close_db(_HttpDb) ->
+    ok.

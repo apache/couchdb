@@ -244,7 +244,7 @@ reader_loop(ReaderServer, Parent, Source, MissingRevsServer) ->
     case couch_rep_missing_revs:next(MissingRevsServer) of
     complete ->
         exit(complete);
-    {HighSeq, IdsRevs} ->
+    {_HighSeq, IdsRevs} ->
         % to be safe, make sure Results are sorted by source_seq
         SortedIdsRevs = lists:keysort(2, IdsRevs),
         RequestSeqs = [S || {_,S,_} <- SortedIdsRevs],
@@ -256,7 +256,8 @@ reader_loop(ReaderServer, Parent, Source, MissingRevsServer) ->
             reader_loop(ReaderServer, Parent, Source, MissingRevsServer);
         _Local ->
             {ok, Source1} = gen_server:call(Parent, get_source_db, infinity),
-            Source2 = maybe_reopen_db(Source1, HighSeq),
+            {ok, Source2} = couch_db:open(
+                Source1#db.name, [{user_ctx, Source1#db.user_ctx}]),
             lists:foreach(fun({Id,Seq,Revs}) ->
                 {ok, Docs} = couch_db:open_doc_revs(Source2, Id, Revs, [latest]),
                 JustTheDocs = [Doc || {ok, Doc} <- Docs],
@@ -267,12 +268,6 @@ reader_loop(ReaderServer, Parent, Source, MissingRevsServer) ->
             reader_loop(ReaderServer, Parent, Source2, MissingRevsServer)
         end
     end.
-
-maybe_reopen_db(#db{update_seq=OldSeq} = Db, HighSeq) when HighSeq > OldSeq ->
-    {ok, NewDb} = couch_db:open(Db#db.name, [{user_ctx, Db#db.user_ctx}]),
-    NewDb;
-maybe_reopen_db(Db, _HighSeq) ->
-    Db.
 
 spawn_document_request(Source, Id, Seq, Revs) ->
     Server = self(),
