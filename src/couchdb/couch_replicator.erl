@@ -368,11 +368,7 @@ handle_call({report_seq_done, Seq, StatsInc}, _From,
         highest_seq_done = NewHighestDone,
         source_seq = SourceCurSeq
     },
-    {reply, ok, NewState};
-
-handle_call(Msg, _From, State) ->
-    ?LOG_ERROR("Replicator received an unexpected synchronous call: ~p", [Msg]),
-    {stop, unexpected_sync_message, State}.
+    {reply, ok, NewState}.
 
 
 handle_cast({db_compacted, DbName},
@@ -396,14 +392,7 @@ handle_cast(checkpoint, State) ->
 handle_cast({report_seq, Seq},
     #rep_state{seqs_in_progress = SeqsInProgress} = State) ->
     NewSeqsInProgress = ordsets:add_element(Seq, SeqsInProgress),
-    {noreply, State#rep_state{seqs_in_progress = NewSeqsInProgress}};
-
-handle_cast({add_stats, StatsInc}, #rep_state{stats = Stats} = State) ->
-    {noreply, State#rep_state{stats = sum_stats([Stats, StatsInc])}};
-
-handle_cast(Msg, State) ->
-    ?LOG_ERROR("Replicator received an unexpected asynchronous call: ~p", [Msg]),
-    {stop, unexpected_async_message, State}.
+    {noreply, State#rep_state{seqs_in_progress = NewSeqsInProgress}}.
 
 
 code_change(_OldVsn, State, _Extra) ->
