@@ -237,7 +237,6 @@ queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager) ->
     {changes, ChangesManager, Changes, ReportSeq} ->
         Target2 = open_db(Target),
         {IdRevs, NotMissingCount} = find_missing(Changes, Target2),
-        ok = gen_server:cast(Cp, {report_seq, ReportSeq}),
         case Source of
         #db{} ->
             Source2 = open_db(Source),
