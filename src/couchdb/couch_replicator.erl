@@ -336,35 +336,7 @@ handle_info({'EXIT', Pid, Reason}, #rep_state{workers = Workers} = State) ->
     end.
 
 
-handle_call(Msg, _From, State) ->
-    ?LOG_ERROR("Replicator received an unexpected synchronous call: ~p", [Msg]),
-    {stop, unexpected_sync_message, State}.
-
-
-handle_cast({db_compacted, DbName},
-    #rep_state{source = #db{name = DbName} = Source} = State) ->
-    {ok, NewSource} = couch_db:reopen(Source),
-    {noreply, State#rep_state{source = NewSource}};
-
-handle_cast({db_compacted, DbName},
-    #rep_state{target = #db{name = DbName} = Target} = State) ->
-    {ok, NewTarget} = couch_db:reopen(Target),
-    {noreply, State#rep_state{target = NewTarget}};
-
-handle_cast(checkpoint, State) ->
-    case do_checkpoint(State) of
-    {ok, NewState} ->
-        {noreply, NewState#rep_state{timer = start_timer(State)}};
-    Error ->
-        {stop, Error, State}
-    end;
-
-handle_cast({report_seq, Seq},
-    #rep_state{seqs_in_progress = SeqsInProgress} = State) ->
-    NewSeqsInProgress = ordsets:add_element(Seq, SeqsInProgress),
-    {noreply, State#rep_state{seqs_in_progress = NewSeqsInProgress}};
-
-handle_cast({report_seq_done, Seq, StatsInc},
+handle_call({report_seq_done, Seq, StatsInc}, _From,
     #rep_state{seqs_in_progress = SeqsInProgress, highest_seq_done = HighestDone,
         current_through_seq = ThroughSeq, stats = Stats} = State) ->
     {NewThroughSeq0, NewSeqsInProgress} = case SeqsInProgress of
@@ -396,7 +368,35 @@ handle_cast({report_seq_done, Seq, StatsInc},
         highest_seq_done = NewHighestDone,
         source_seq = SourceCurSeq
     },
-    {noreply, NewState};
+    {reply, ok, NewState};
+
+handle_call(Msg, _From, State) ->
+    ?LOG_ERROR("Replicator received an unexpected synchronous call: ~p", [Msg]),
+    {stop, unexpected_sync_message, State}.
+
+
+handle_cast({db_compacted, DbName},
+    #rep_state{source = #db{name = DbName} = Source} = State) ->
+    {ok, NewSource} = couch_db:reopen(Source),
+    {noreply, State#rep_state{source = NewSource}};
+
+handle_cast({db_compacted, DbName},
+    #rep_state{target = #db{name = DbName} = Target} = State) ->
+    {ok, NewTarget} = couch_db:reopen(Target),
+    {noreply, State#rep_state{target = NewTarget}};
+
+handle_cast(checkpoint, State) ->
+    case do_checkpoint(State) of
+    {ok, NewState} ->
+        {noreply, NewState#rep_state{timer = start_timer(State)}};
+    Error ->
+        {stop, Error, State}
+    end;
+
+handle_cast({report_seq, Seq},
+    #rep_state{seqs_in_progress = SeqsInProgress} = State) ->
+    NewSeqsInProgress = ordsets:add_element(Seq, SeqsInProgress),
+    {noreply, State#rep_state{seqs_in_progress = NewSeqsInProgress}};
 
 handle_cast({add_stats, StatsInc}, #rep_state{stats = Stats} = State) ->
     {noreply, State#rep_state{stats = sum_stats([Stats, StatsInc])}};
