@@ -219,7 +219,8 @@ do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
     NumWorkers = get_value(worker_processes, Options),
     BatchSize = get_value(worker_batch_size, Options),
     {ok, ChangesQueue} = couch_work_queue:new([
-        {max_items, trunc(BatchSize * NumWorkers * 2.0)}
+        {max_items, BatchSize * NumWorkers * 2},
+        {max_size, 100 * 1024 * NumWorkers}
     ]),
     % This starts the _changes reader process. It adds the changes from
     % the source db to the ChangesQueue.
