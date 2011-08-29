@@ -62,15 +62,19 @@ handle_message({rexi_EXIT, _Reason}, Worker, Acc0) ->
     skip_message(Worker, Acc0);
 handle_message(Reply, Worker, {Workers, R, Replies}) ->
     NewReplies = fabric_util:update_counter(Reply, 1, Replies),
-    Reduced = fabric_util:remove_ancestors(NewReplies, []),
-    case lists:dropwhile(fun({_,{_, Count}}) -> Count < R end, Reduced) of
+    case lists:dropwhile(fun({_,{_, Count}}) -> Count < R end, NewReplies) of
     [{_,{QuorumReply, _}} | _] ->
         fabric_util:cleanup(lists:delete(Worker,Workers)),
-        if length(NewReplies) =:= 1 ->
+        case {NewReplies, fabric_util:remove_ancestors(NewReplies, [])} of
+        {[_], [_]} ->
+            % complete agreement amongst all copies
             {stop, QuorumReply};
-        true ->
-            % we had some disagreement amongst the workers, so repair is useful
-            {error, needs_repair, QuorumReply}
+        {[_|_], [_]} ->
+            % any divergent replies are ancestors of the QuorumReply
+            {error, needs_repair, QuorumReply};
+        _Else ->
+            % real disagreement amongst the workers, block for the repair
+            {error, needs_repair}
         end;
     [] ->
         if length(Workers) =:= 1 ->
