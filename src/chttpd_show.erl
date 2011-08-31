@@ -131,8 +131,12 @@ send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
             Options = [{user_ctx, Req#httpd.user_ctx}]
         end,
         NewDoc = couch_doc:from_json_obj({NewJsonDoc}),
-        Code = 201,
-        {ok, _NewRev} = fabric:update_doc(Db, NewDoc, Options);
+        case fabric:update_doc(Db, NewDoc, Options) of
+        {ok, _} ->
+            Code = 201;
+        {accepted, _} ->
+            Code = 202
+        end;
     [<<"up">>, _Other, JsonResp] ->
         Code = 200
     end,
