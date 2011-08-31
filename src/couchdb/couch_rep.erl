@@ -542,7 +542,7 @@ filter_code(Filter, Props, UserCtx) ->
             DocErrorMsg = io_lib:format(
                 "Couldn't open document `_design/~s` from source "
                 "database `~s`: ~s",
-                [dbname(Source), DDocName, couch_util:to_binary(DocError)]),
+                [DDocName, dbname(Source), couch_util:to_binary(DocError)]),
             throw({error, iolist_to_binary(DocErrorMsg)})
         end,
         Code = couch_util:get_nested_json_value(
