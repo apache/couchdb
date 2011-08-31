@@ -118,8 +118,8 @@ filter_code(Filter, Source, UserCtx) ->
         DocError ->
             DocErrorMsg = io_lib:format(
                 "Couldn't open document `_design/~s` from source "
-                "database `~s`: ~s", [couch_api_wrap:db_uri(Source),
-                    DDocName, couch_util:to_binary(DocError)]),
+                "database `~s`: ~s", [DDocName, couch_api_wrap:db_uri(Source),
+                    couch_util:to_binary(DocError)]),
             throw({error, iolist_to_binary(DocErrorMsg)})
         end,
         Code = couch_util:get_nested_json_value(
