@@ -28,7 +28,8 @@
 -export([start_delayed_json_response/3, start_delayed_json_response/4,
     start_delayed_chunked_response/3, start_delayed_chunked_response/4,
     send_delayed_chunk/2, send_delayed_last_chunk/1,
-    send_delayed_error/2, end_delayed_json_response/1]).
+    send_delayed_error/2, end_delayed_json_response/1,
+    get_delayed_req/1]).
 
 start_link() ->
     Options = [
@@ -507,6 +508,11 @@ end_delayed_json_response({delayed_resp, StartFun, Req, Code, Headers, FirstChun
     end_delayed_json_response(Resp2);
 end_delayed_json_response(Resp) ->
     end_json_response(Resp).
+
+get_delayed_req({delayed_resp, _, #httpd{mochi_req=MochiReq}, _, _, _}) ->
+    MochiReq;
+get_delayed_req(Resp) ->
+    Resp:get(request).
 
 error_info({Error, Reason}) when is_list(Reason) ->
     error_info({Error, couch_util:to_binary(Reason)});
