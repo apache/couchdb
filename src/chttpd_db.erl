@@ -120,7 +120,7 @@ changes_callback({error, Reason}, {_, Resp}) ->
     chttpd:send_delayed_error(Resp, Reason).
 
 is_old_couch(Resp) ->
-    MochiReq = Resp:get(request),
+    MochiReq = chttpd:get_delayed_req(Resp),
     case MochiReq:get_header_value("user-agent") of
     undefined ->
         false;
