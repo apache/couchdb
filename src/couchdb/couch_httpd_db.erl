@@ -101,7 +101,7 @@ handle_changes_req1(Req, Db) ->
                 CurrentEtag,
                 fun() ->
                     {ok, Resp} = couch_httpd:start_json_response(
-                         Req, 200, [{"Etag", CurrentEtag}]
+                         Req, 200, [{"ETag", CurrentEtag}]
                     ),
                     FeedChangesFun(MakeCallback(Resp))
                 end
@@ -682,7 +682,7 @@ db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
     },
     {ok, NewRev} = couch_db:update_doc(Db, NewDoc, []),
 
-    send_json(Req, 201, [{"Etag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewRev)) ++ "\""}], {[
+    send_json(Req, 201, [{"ETag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewRev)) ++ "\""}], {[
         {ok, true},
         {id, DocId},
         {rev, couch_doc:rev_to_str(NewRev)}
@@ -749,7 +749,7 @@ db_doc_req(#httpd{method='COPY'}=Req, Db, SourceDocId) ->
         Doc#doc{id=TargetDocId, revs=TargetRevs}, []),
     % respond
     send_json(Req, 201,
-        [{"Etag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewTargetRev)) ++ "\""}],
+        [{"ETag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewTargetRev)) ++ "\""}],
         update_doc_result_to_json(TargetDocId, {ok, NewTargetRev}));
 
 db_doc_req(Req, _Db, _DocId) ->
@@ -762,7 +762,7 @@ send_doc(Req, Doc, Options) ->
         DiskEtag = couch_httpd:doc_etag(Doc),
         % output etag only when we have no meta
         couch_httpd:etag_respond(Req, DiskEtag, fun() ->
-            send_doc_efficiently(Req, Doc, [{"Etag", DiskEtag}], Options)
+            send_doc_efficiently(Req, Doc, [{"ETag", DiskEtag}], Options)
         end);
     _ ->
         send_doc_efficiently(Req, Doc, [], Options)
@@ -887,7 +887,7 @@ update_doc(Req, Db, DocId, #doc{deleted=Deleted}=Doc, Headers, UpdateType) ->
     end,
     {ok, NewRev} = couch_db:update_doc(Db, Doc, Options, UpdateType),
     NewRevStr = couch_doc:rev_to_str(NewRev),
-    ResponseHeaders = [{"Etag", <<"\"", NewRevStr/binary, "\"">>}] ++ Headers,
+    ResponseHeaders = [{"ETag", <<"\"", NewRevStr/binary, "\"">>}] ++ Headers,
     send_json(Req, if Deleted -> 200; true -> 201 end,
         ResponseHeaders, {[
             {ok, true},
@@ -1132,7 +1132,7 @@ db_attachment_req(#httpd{method=Method,mochi_req=MochiReq}=Req, Db, DocId, FileN
         'DELETE' ->
             {200, []};
         _ ->
-            {201, [{"Etag", "\"" ++ ?b2l(couch_doc:rev_to_str(UpdatedRev)) ++ "\""},
+            {201, [{"ETag", "\"" ++ ?b2l(couch_doc:rev_to_str(UpdatedRev)) ++ "\""},
                {"Location", absolute_uri(Req, "/" ++
                 binary_to_list(DbName) ++ "/" ++
                 binary_to_list(DocId) ++ "/" ++
