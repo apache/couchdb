@@ -628,7 +628,7 @@ make_end_key_option(
     [{end_key_gt, {EndKey,reverse_key_default(EndDocId)}}].
 
 json_view_start_resp(Req, Etag, TotalViewCount, Offset, _Acc, UpdateSeq) ->
-    {ok, Resp} = start_json_response(Req, 200, [{"Etag", Etag}]),
+    {ok, Resp} = start_json_response(Req, 200, [{"ETag", Etag}]),
     BeginBody = case couch_httpd:qs_value(Req, "update_seq") of
     "true" ->
         io_lib:format(
@@ -648,7 +648,7 @@ send_json_view_row(Resp, Db, Kv, IncludeDocs, Conflicts, RowFront) ->
     {ok, ",\r\n"}.
 
 json_reduce_start_resp(Req, Etag, _Acc0, UpdateSeq) ->
-    {ok, Resp} = start_json_response(Req, 200, [{"Etag", Etag}]),
+    {ok, Resp} = start_json_response(Req, 200, [{"ETag", Etag}]),
     case couch_httpd:qs_value(Req, "update_seq") of
     "true" ->
         {ok, Resp, io_lib:format("{\"update_seq\":~w,\"rows\":[\r\n",[UpdateSeq])};

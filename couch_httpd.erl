@@ -572,7 +572,7 @@ etag_respond(Req, CurrentEtag, RespFun) ->
     case etag_match(Req, CurrentEtag) of
     true ->
         % the client has this in their cache.
-        send_response(Req, 304, [{"Etag", CurrentEtag}], <<>>);
+        send_response(Req, 304, [{"ETag", CurrentEtag}], <<>>);
     false ->
         % Run the function.
         RespFun()
