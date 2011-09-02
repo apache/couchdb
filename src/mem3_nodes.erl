@@ -96,10 +96,10 @@ initialize_nodelist() ->
     couch_db:close(Db),
     {Nodes, Db#db.update_seq}.
 
-first_fold(#full_doc_info{id = <<"_design/", _/binary>>}, _, {_Db, Dict}) ->
-    {ok, Dict};
-first_fold(#full_doc_info{deleted=true}, _, {_Db, Dict}) ->
-    {ok, Dict};
+first_fold(#full_doc_info{id = <<"_design/", _/binary>>}, _, Acc) ->
+    {ok, Acc};
+first_fold(#full_doc_info{deleted=true}, _, Acc) ->
+    {ok, Acc};
 first_fold(#full_doc_info{id=Id}=DocInfo, _, {Db, Dict}) ->
     {ok, #doc{body={Props}}} = couch_db:open_doc(Db, DocInfo),
     {ok, {Db, dict:store(mem3_util:to_atom(Id), Props, Dict)}}.
