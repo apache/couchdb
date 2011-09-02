@@ -171,10 +171,12 @@ create_db_req(#httpd{}=Req, DbName) ->
     couch_httpd:verify_is_server_admin(Req),
     N = couch_httpd:qs_value(Req, "n", couch_config:get("cluster", "n", "3")),
     Q = couch_httpd:qs_value(Req, "q", couch_config:get("cluster", "q", "8")),
+    DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
     case fabric:create_db(DbName, [{n,N}, {q,Q}]) of
     ok ->
-        DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
         send_json(Req, 201, [{"Location", DocUrl}], {[{ok, true}]});
+    accepted ->
+        send_json(Req, 202, [{"Location", DocUrl}], {[{ok, true}]});
     {error, file_exists} ->
         chttpd:send_error(Req, file_exists);
     Error ->
@@ -186,6 +188,8 @@ delete_db_req(#httpd{}=Req, DbName) ->
     case fabric:delete_db(DbName, []) of
     ok ->
         send_json(Req, 200, {[{ok, true}]});
+    accepted ->
+        send_json(Req, 202, {[{ok, true}]});
     Error ->
         throw(Error)
     end.
