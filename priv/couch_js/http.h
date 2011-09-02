@@ -13,6 +13,12 @@
 #ifndef COUCH_JS_HTTP_H
 #define COUCH_JS_HTTP_H
 
-JSObject* install_http(JSContext* cx, JSObject* global);
+void http_check_enabled();
+JSBool http_ctor(JSContext* cx, JSObject* req);
+void http_dtor(JSContext* cx, JSObject* req);
+JSBool http_open(JSContext* cx, JSObject* req, jsval mth, jsval url, jsval snc);
+JSBool http_set_hdr(JSContext* cx, JSObject* req, jsval name, jsval val);
+JSBool http_send(JSContext* cx, JSObject* req, jsval body);
+int http_status(JSContext* cx, JSObject* req);
 
 #endif
