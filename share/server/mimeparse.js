@@ -97,7 +97,7 @@ var Mimeparse = (function() {
         if ((type == targetType || type == "*" || targetType == "*") &&
           (subtype == targetSubtype || subtype == "*" || targetSubtype == "*")) {
           var matchCount = 0;
-          for (param in targetParams) {
+          for (var param in targetParams) {
             if (param != 'q' && params[param] && params[param] == targetParams[param]) {
               matchCount += 1;
             }

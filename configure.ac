@@ -185,37 +185,31 @@ AM_CONDITIONAL([WINDOWS], [test x$IS_WINDOWS = xTRUE])
 OLD_LIBS="$LIBS"
 LIBS="$JS_LIBS $LIBS"
 AC_CHECK_LIB([mozjs185], [JS_NewContext], [JS_LIB_BASE=mozjs185], [
-    AC_CHECK_LIB([mozjs], [JS_NewContext], [JS_LIB_BASE=mozjs], [
-        AC_CHECK_LIB([js], [JS_NewContext], [JS_LIB_BASE=js], [
-            AC_CHECK_LIB([js3250], [JS_NewContext], [JS_LIB_BASE=js3250], [
-                AC_CHECK_LIB([js32], [JS_NewContext], [JS_LIB_BASE=js32], [
-                    AC_MSG_ERROR([Could not find the js library.
+    AC_CHECK_LIB([mozjs185-1.0], [JS_NewContext], [JS_LIB_BASE=mozjs185-1.0], [
+        AC_CHECK_LIB([mozjs], [JS_NewContext], [JS_LIB_BASE=mozjs], [
+            AC_CHECK_LIB([js], [JS_NewContext], [JS_LIB_BASE=js], [
+                AC_CHECK_LIB([js3250], [JS_NewContext], [JS_LIB_BASE=js3250], [
+                    AC_CHECK_LIB([js32], [JS_NewContext], [JS_LIB_BASE=js32], [
+                        AC_MSG_ERROR([Could not find the js library.
 
-Is the Mozilla SpiderMonkey library installed?])])])])])])
+Is the Mozilla SpiderMonkey library installed?])])])])])])])
 
-AC_CHECK_LIB([$JS_LIB_BASE], [JS_FreezeObject],
-    AC_DEFINE([HAVE_JS_FREEZE_OBJECT], [1],
-        [Define whether we have JS_FreezeObject]))
+# Figure out what version of SpiderMonkey to use
 
-AC_CHECK_LIB([$JS_LIB_BASE], [JS_NewGlobalObject],
-    AC_DEFINE([HAVE_JS_NEW_GLOBAL_OBJECT], [1],
-        [Define whether we have JS_NewGlobalObject]))
+AC_CHECK_LIB([$JS_LIB_BASE], [JS_NewCompartmentAndGlobalObject],
+    AC_DEFINE([SM185], [1],
+        [Use SpiderMonkey 1.8.5]))
+
+AC_CHECK_LIB([$JS_LIB_BASE], [JS_ThrowStopIteration],
+    AC_DEFINE([SM180], [1],
+        [Use SpiderMonkey 1.8.0]))
 
 AC_CHECK_LIB([$JS_LIB_BASE], [JS_GetStringCharsAndLength],
     AC_DEFINE([HAVE_JS_GET_STRING_CHARS_AND_LENGTH], [1],
-        [Define whether we have JS_GetStringCharsAndLength]))
+        [Use newer JS_GetCharsAndLength function.]))
 
-AC_CHECK_LIB([$JS_LIB_BASE], [JS_NewCompartmentAndGlobalObject],
-    AC_DEFINE([HAVE_COMPARTMENTS], [1],
-        [Define whether we have JS_NewCompartmentAndGlobalObject]))
 
-AC_CHECK_LIB([$JS_LIB_BASE], [JS_StrictPropertyStub],
-    AC_DEFINE([HAVE_JS_STRICT_PROPERTY_STUB], [1],
-        [Define whether we have JS_StrictPropertyStub]))
-
-AC_CHECK_LIB([$JS_LIB_BASE], [JS_DestroyScript],
-    AC_DEFINE([HAVE_SCRIPT_TYPE], [1],
-        [Define whether scripts have a special JSScript type]))
+# Else, hope that 1.7.0 works
 LIBS="$OLD_LIBS"
 
 if test x${IS_WINDOWS} = xTRUE; then
@@ -261,7 +255,7 @@ if test x${IS_WINDOWS} = xTRUE; then
     fi
 fi
 
-JS_LIBS="-l$JS_LIB_BASE $JS_LIBS"
+JS_LIBS="-l$JS_LIB_BASE -lm $JS_LIBS"
 AC_SUBST(JS_LIBS)
 
 OLD_CPPFLAGS="$CPPFLAGS"
@@ -278,38 +272,6 @@ Are the Mozilla SpiderMonkey headers installed?])
         ])])
 CPPFLAGS="$OLD_CPPFLAGS"
 
-AC_LANG_PUSH(C)
-OLDCFLAGS="$CFLAGS"
-CFLAGS="-Werror-implicit-function-declaration $JS_CFLAGS $OLDCFLAGS"
-AC_COMPILE_IFELSE(
-    [AC_LANG_PROGRAM(
-        [[#include <jsapi.h>]],
-        [[JS_SetOperationCallback(0, 0);]]
-    )],
-    AC_DEFINE([USE_JS_SETOPCB], [], [Use new JS_SetOperationCallback])
-)
-CFLAGS="$JS_CFLAGS $OLDCFLAGS"
-AC_COMPILE_IFELSE(
-    [AC_LANG_PROGRAM(
-        [[#include <jsapi.h>]],
-        [[static JSFunctionSpec fs;
-          fs.extra = 0;]]
-    )],
-    AC_DEFINE([JS_FS_HAS_EXTRA], [1], [JSFunctionSpec has an extra member])
-)
-CFLAGS="$JS_CFLAGS $OLDCFLAGS -Werror"
-AC_COMPILE_IFELSE(
-    [AC_LANG_PROGRAM(
-        [[#include <jsapi.h>
-          static JSBool op(JSContext* cx, JSObject* obj, jsid id, jsval* vp) {}]],
-        [[static JSPropertySpec spec;
-          spec.getter = op;]]
-    )],
-    AC_DEFINE([JS_PROPERTY_OP_HAS_ID_AS_JSID], [1],
-        [The type of "id" in the prototype for JSPropertyOp is a jsid])
-)
-CFLAGS="$OLD_CFLAGS"
-AC_LANG_POP(C)
 
 AC_ARG_WITH([win32-icu-binaries], [AC_HELP_STRING([--with-win32-icu-binaries=PATH],
     [set PATH to the Win32 native ICU binaries directory])], [

@@ -414,9 +414,22 @@ function waitForSuccess(fun, tag) {
 
 function waitForRestart() {
   var waiting = true;
-  while (waiting) {
+  // Wait for the server to go down but don't
+  // wait too long because we might miss the
+  // the unavailable period.
+  var count = 25;
+  while (waiting && count > 0) {
+    count--;
     try {
       CouchDB.request("GET", "/");
+    } catch(e) {
+      waiting = false;
+    }
+  }
+  // Wait for it to come back up
+  waiting = true;
+  while (waiting) {
+    try {
       CouchDB.request("GET", "/");
       waiting = false;
     } catch(e) {

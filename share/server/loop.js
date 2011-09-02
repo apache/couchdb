@@ -29,7 +29,7 @@ function init_sandbox() {
     sandbox.getRow = Render.getRow;
     sandbox.isArray = isArray;
   } catch (e) {
-    log(e.toSource());
+    //log(e.toSource());
   }
 };
 init_sandbox();

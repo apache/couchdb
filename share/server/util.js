@@ -69,7 +69,7 @@ var Couch = {
       if(typeof CoffeeScript === "undefined") {
         return evalFunction(source, sandbox);
       } else {
-        coffee = CoffeeScript.compile(source, {bare: true});
+        var coffee = CoffeeScript.compile(source, {bare: true});
         return evalFunction(coffee, sandbox);
       }
     }
