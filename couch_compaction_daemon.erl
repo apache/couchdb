@@ -185,6 +185,7 @@ maybe_compact_db(DbName, Config) ->
                 end
             end;
         false ->
+            couch_db:close(Db),
             maybe_compact_views(DbName, DDocNames, Config)
         end;
     _ ->

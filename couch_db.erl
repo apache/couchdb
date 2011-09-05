@@ -110,6 +110,8 @@ close(#db{fd_ref_counter=RefCntr}) ->
 open_ref_counted(MainPid, OpenedPid) ->
     gen_server:call(MainPid, {open_ref_count, OpenedPid}).
 
+is_idle(#db{main_pid = MainPid}) ->
+    is_idle(MainPid);
 is_idle(MainPid) ->
     gen_server:call(MainPid, is_idle).
 
