@@ -25,7 +25,7 @@ test_db_name() ->
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(8),
+    etap:plan(10),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -76,6 +76,7 @@ test() ->
 
     disable_compact_daemon(),
     ok = timer:sleep(6000), % 2 times check_interval
+    etap:is(couch_db:is_idle(Db), true, "Database is idle"),
     populate(70, 70, 200 * 1024),
     {_, DbFileSize3} = get_db_frag(),
     {_, ViewFileSize3} = get_view_frag(),
@@ -97,6 +98,9 @@ test() ->
     etap:is(true, (ViewFrag4 < 70), "View fragmentation is < 70% after compaction"),
     etap:is(true, (DbFileSize4 < DbFileSize3), "Database file size decreased again"),
     etap:is(true, (ViewFileSize4 < ViewFileSize3), "View file size decreased again"),
+
+    ok = timer:sleep(6000), % 2 times check_interval
+    etap:is(couch_db:is_idle(Db), true, "Database is idle"),
 
     delete_db(),
     couch_server_sup:stop(),
