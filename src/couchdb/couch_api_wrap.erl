@@ -69,7 +69,7 @@ db_open(#httpdb{} = Db1, _Options, Create) ->
     false ->
         ok;
     true ->
-        send_req(Db, [{method, put}, {direct, true}], fun(_, _, _) -> ok end)
+        send_req(Db, [{method, put}], fun(_, _, _) -> ok end)
     end,
     send_req(Db, [{method, head}],
         fun(200, _, _) ->
@@ -120,7 +120,7 @@ get_db_info(Db) ->
 ensure_full_commit(#httpdb{} = Db) ->
     send_req(
         Db,
-        [{method, post}, {path, "_ensure_full_commit"}, {direct, true},
+        [{method, post}, {path, "_ensure_full_commit"},
             {headers, [{"Content-Type", "application/json"}]}],
         fun(201, _, {Props}) ->
             {ok, get_value(<<"instance_start_time">>, Props)};
@@ -226,8 +226,7 @@ update_doc(#httpdb{} = HttpDb, #doc{id = DocId} = Doc, Options, Type) ->
     send_req(
         HttpDb,
         [{method, put}, {path, encode_doc_id(DocId)},
-           {direct, Type =:= interactive_edit}, {qs, QArgs},
-           {headers, Headers}, {body, Body}],
+            {qs, QArgs}, {headers, Headers}, {body, Body}],
         fun(Code, _, {Props}) when Code =:= 200 orelse Code =:= 201 ->
                 {ok, couch_doc:parse_rev(get_value(<<"rev">>, Props))};
             (409, _, _) ->
