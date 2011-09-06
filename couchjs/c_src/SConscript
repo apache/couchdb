@@ -19,7 +19,10 @@ def require_lib(name):
         print 'Could not find required library', name
         Exit(1)
 
-env = Environment(CCFLAGS='-g -O2 -DXP_UNIX')
+def runcmd(cmd):
+    return commands.getstatusoutput(cmd)
+
+env = Environment(CC="c++", CCFLAGS='-g -O2 -DXP_UNIX')
 
 if os.uname()[0] == 'SunOS':
    env['CC'] = '/usr/sfw/bin/gcc'
@@ -33,12 +36,15 @@ if os.uname()[0] == 'FreeBSD':
 	env['LIB_COMPAT'] = 'compat'
 
 if os.path.exists('/usr/bin/pkg-config'):
-    (status, output) = commands.getstatusoutput("/usr/bin/pkg-config mozilla-js --cflags")
-    if status == 0:
-        env['CCFLAGS'] += output
-    (status, output) = commands.getstatusoutput("/usr/bin/pkg-config mozilla-js --libs-only-L")
-    if status == 0:
-        env.Append(LINKFLAGS=output)
+    for pkg in ["mozilla-js-185", "mozilla-js"]:
+        (s1, output) = runcmd("/usr/bin/pkg-config %s --cflags" % pkg)
+        if s1 == 0:
+            env.Append(CCFLAGS=" " + output)
+        (s2, output) = runcmd("/usr/bin/pkg-config %s --libs-only-L" % pkg)
+        if s2 == 0:
+            env.Append(LINKFLAGS=output)
+        if s1 == 0 or s2 == 0:
+            break
 
 if not env.GetOption('clean'):
     conf = Configure(env, config_h='config.h')
@@ -46,12 +52,13 @@ if not env.GetOption('clean'):
     require_lib('m')
     require_lib('pthread')
     require_lib('curl')
+    require_lib('nspr4')
 
     ## check for SpiderMonkey development header
-    if conf.CheckHeader('js/jsapi.h'):
-        jsapi = 'js/jsapi.h'
-    elif conf.CheckHeader('mozjs/jsapi.h'):
+    if conf.CheckHeader('mozjs/jsapi.h'):
         jsapi = 'mozjs/jsapi.h'
+    elif conf.CheckHeader('js/jsapi.h'):
+        jsapi = 'js/jsapi.h'
     elif conf.CheckHeader('jsapi.h'):
         jsapi = 'jsapi.h'
     else:
@@ -60,16 +67,25 @@ if not env.GetOption('clean'):
         Exit(1)
 
     ## check for SpiderMonkey library as libjs or libmozjs
-    if not conf.CheckLibWithHeader('mozjs', jsapi, 'c', autoadd=1):
-        if not conf.CheckLibWithHeader('js', jsapi, 'c', autoadd=1):
-            print 'Could not find JS library.', \
-                'Is Mozilla SpiderMonkey installed?'
-            Exit(1)
+    if not conf.CheckLibWithHeader('mozjs185-1.0', jsapi, 'c', autoadd=1):
+        if not conf.CheckLibWithHeader('mozjs', jsapi, 'c', autoadd=1):
+            if not conf.CheckLibWithHeader('js', jsapi, 'c', autoadd=1):
+                print 'Could not find JS library.', \
+                    'Is Mozilla SpiderMonkey installed?'
+                Exit(1)
 
-    ## SpiderMonkey 1.8 has this callback we use for memory management
-    if conf.CheckDeclaration('JS_SetOperationCallback', '#include <%s>' % jsapi):
-        conf.Define('USE_JS_SETOPCB')
+    ## Detect the version of SpiderMonkey we're using
+    jsheader = "#include <%s>" % jsapi
+    versions = [
+        ("JS_NewCompartmentAndGlobalObject", "SM185"),
+        ("JS_ThrowStopIteration", "SM180"),
+        ("JS_GetStringCharsAndLength", "SM170")
+    ]
+    for func, vsn in versions:
+        if conf.CheckDeclaration(func, jsheader):
+            conf.Define(vsn)
+            break
 
     env = conf.Finish()
 
-env.Program('couchjs', ['main.c', 'http.c', 'utf8.c'])
+env.Program('couchjs', ['main.c', 'http.c', 'utf8.c', 'util.c'])

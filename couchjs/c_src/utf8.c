@@ -11,13 +11,7 @@
 // the License.
 
 #include "config.h"
-#ifdef HAVE_JS_JSAPI_H
-#include <js/jsapi.h>
-#elif HAVE_MOZJS_JSAPI_H
-#include <mozjs/jsapi.h>
-#else
-#include <jsapi.h>
-#endif
+#include "sm.h"
 
 static int
 enc_char(uint8 *utf8Buffer, uint32 ucs4Char)
@@ -128,7 +122,7 @@ char*
 enc_string(JSContext* cx, jsval arg, size_t* buflen)
 {
     JSString* str = NULL;
-    jschar* src = NULL;
+    const jschar* src = NULL;
     char* bytes = NULL;
     size_t srclen = 0;
     size_t byteslen = 0;
@@ -136,12 +130,16 @@ enc_string(JSContext* cx, jsval arg, size_t* buflen)
     str = JS_ValueToString(cx, arg);
     if(!str) goto error;
 
+#ifdef SM185
+    src = JS_GetStringCharsAndLength(cx, str, &srclen);
+#else
     src = JS_GetStringChars(str);
     srclen = JS_GetStringLength(str);
+#endif
 
     if(!enc_charbuf(src, srclen, NULL, &byteslen)) goto error;
 
-    bytes = JS_malloc(cx, (byteslen) + 1);
+    bytes = (char*) JS_malloc(cx, (byteslen) + 1);
     bytes[byteslen] = 0;
 
     if(!enc_charbuf(src, srclen, bytes, &byteslen)) goto error;
@@ -273,7 +271,7 @@ dec_string(JSContext* cx, const char* bytes, size_t byteslen)
 
     if(!dec_charbuf(bytes, byteslen, NULL, &charslen)) goto error;
 
-    chars = JS_malloc(cx, (charslen + 1) * sizeof(jschar));
+    chars = (jschar*) JS_malloc(cx, (charslen + 1) * sizeof(jschar));
     if(!chars) return NULL;
     chars[charslen] = 0;
 

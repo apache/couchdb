@@ -91,9 +91,9 @@ var Couch = {
           }
           sandbox.require = require;
         }
-        var functionObject = evalcx(source, sandbox);
+        var functionObject = evalcx("(" + source + ")", sandbox);
       } else {
-        var functionObject = eval(source);
+        var functionObject = eval("(" + source + ")");
       }
     } catch (err) {
       throw(["error", "compilation_error", err.toSource() + " (" + source + ")"]);
