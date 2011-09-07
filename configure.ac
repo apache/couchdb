@@ -532,10 +532,12 @@ AC_OUTPUT
 # PLEASE, someone help put this out of its misery!!
 # This hackery is being tracked via COUCHDB-440.
 if test x${IS_WINDOWS} = xTRUE; then
-    sed -e 's,libname_spec="lib\\$name",libname_spec="\\\$name",' \
+    mv libtool libtool.dist
+    sed -E -e 's,libname_spec="lib\\$name",libname_spec="\\\$name",' \
         -e 's,-link,,' \
-        < libtool > libtool.tmp
-    mv libtool.tmp libtool
+        -e 's/-Xlinker --out-implib -Xlinker \\\$lib//' \
+        -e 's/(-shared -nostdlib)/-dll \1/' \
+        < libtool.dist > libtool
     # probably would chmod +x if we weren't on windows...
 fi
 
