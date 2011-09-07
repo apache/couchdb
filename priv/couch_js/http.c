@@ -27,7 +27,6 @@ http_check_enabled()
 {
     fprintf(stderr, "HTTP API was disabled at compile time.\n");
     exit(3);
-    return JS_FALSE;
 }
 
 
