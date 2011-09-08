@@ -220,10 +220,10 @@ var Render = (function() {
       resetList();
       Mime.resetProvides();
       var resp = fun.apply(ddoc, args) || {};
+      resp = maybeWrapResponse(resp);
 
       // handle list() style API
       if (chunks.length && chunks.length > 0) {
-        resp = maybeWrapResponse(resp);
         resp.headers = resp.headers || {};
         for(var header in startResp) {
           resp.headers[header] = startResp[header]
@@ -233,8 +233,12 @@ var Render = (function() {
       }
 
       if (Mime.providesUsed) {
-        resp = Mime.runProvides(args[1], ddoc);
-        resp = applyContentType(maybeWrapResponse(resp), Mime.responseContentType);
+        var provided_resp = Mime.runProvides(args[1], ddoc) || {};
+        provided_resp = maybeWrapResponse(provided_resp);
+        resp.body = (resp.body || "") + chunks.join("");
+        resp.body += provided_resp.body || "";
+        resp = applyContentType(resp, Mime.responseContentType);
+        resetList();
       }
 
       var type = typeOf(resp);
