@@ -25,7 +25,8 @@
     send_method_not_allowed/2, send_error/2, send_error/4, send_redirect/2,
     send_chunked_error/2, send_json/2,send_json/3,send_json/4]).
 
--export([start_delayed_json_response/3, start_delayed_json_response/4,
+-export([start_delayed_json_response/2, start_delayed_json_response/3,
+    start_delayed_json_response/4,
     start_delayed_chunked_response/3, start_delayed_chunked_response/4,
     send_delayed_chunk/2, send_delayed_last_chunk/1,
     send_delayed_error/2, end_delayed_json_response/1,
@@ -477,6 +478,9 @@ start_json_response(Req, Code, Headers) ->
 
 end_json_response(Resp) ->
     couch_httpd:end_json_response(Resp).
+
+start_delayed_json_response(Req, Code) ->
+    start_delayed_json_response(Req, Code, []).
 
 start_delayed_json_response(Req, Code, Headers) ->
     start_delayed_json_response(Req, Code, Headers, "").
