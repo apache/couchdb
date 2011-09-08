@@ -680,25 +680,25 @@ send_json(Req, Code, Value) ->
     send_json(Req, Code, [], Value).
 
 send_json(Req, Code, Headers, Value) ->
+    initialize_jsonp(Req),
     DefaultHeaders = [
         {"Content-Type", negotiate_content_type(Req)},
         {"Cache-Control", "must-revalidate"}
     ],
-    Body = [start_jsonp(Req), ?JSON_ENCODE(Value), end_jsonp(), $\n],
+    Body = [start_jsonp(), ?JSON_ENCODE(Value), end_jsonp(), $\n],
     send_response(Req, Code, DefaultHeaders ++ Headers, Body).
 
 start_json_response(Req, Code) ->
     start_json_response(Req, Code, []).
 
 start_json_response(Req, Code, Headers) ->
+    initialize_jsonp(Req),
     DefaultHeaders = [
         {"Content-Type", negotiate_content_type(Req)},
         {"Cache-Control", "must-revalidate"}
     ],
-    start_jsonp(Req), % Validate before starting chunked.
-    %start_chunked_response(Req, Code, DefaultHeaders ++ Headers).
     {ok, Resp} = start_chunked_response(Req, Code, DefaultHeaders ++ Headers),
-    case start_jsonp(Req) of
+    case start_jsonp() of
         [] -> ok;
         Start -> send_chunk(Resp, Start)
     end,
@@ -708,7 +708,7 @@ end_json_response(Resp) ->
     send_chunk(Resp, end_jsonp() ++ [$\n]),
     last_chunk(Resp).
 
-start_jsonp(Req) ->
+initialize_jsonp(Req) ->
     case get(jsonp) of
         undefined -> put(jsonp, qs_value(Req, "callback", no_jsonp));
         _ -> ok
@@ -721,20 +721,22 @@ start_jsonp(Req) ->
                 % make sure jsonp is configured on (default off)
                 case couch_config:get("httpd", "allow_jsonp", "false") of
                 "true" ->
-                    validate_callback(CallBack),
-                    CallBack ++ "(";
+                    validate_callback(CallBack);
                 _Else ->
-                    % this could throw an error message, but instead we just ignore the
-                    % jsonp parameter
-                    % throw({bad_request, <<"JSONP must be configured before using.">>})
-                    put(jsonp, no_jsonp),
-                    []
+                    put(jsonp, no_jsonp)
                 end
             catch
                 Error ->
                     put(jsonp, no_jsonp),
                     throw(Error)
             end
+    end.
+
+start_jsonp() ->
+    case get(jsonp) of
+        no_jsonp -> [];
+        [] -> [];
+        CallBack -> CallBack ++ "("
     end.
 
 end_jsonp() ->
@@ -894,7 +896,14 @@ send_chunked_error(Resp, Error) ->
 send_redirect(Req, Path) ->
      send_response(Req, 301, [{"Location", absolute_uri(Req, Path)}], <<>>).
 
-negotiate_content_type(#httpd{mochi_req=MochiReq}) ->
+negotiate_content_type(Req) ->
+    case get(jsonp) of
+        no_jsonp -> negotiate_content_type1(Req);
+        [] -> negotiate_content_type1(Req);
+        _Callback -> "text/javascript"
+    end.
+
+negotiate_content_type1(#httpd{mochi_req=MochiReq}) ->
     %% Determine the appropriate Content-Type header for a JSON response
     %% depending on the Accept header in the request. A request that explicitly
     %% lists the correct JSON MIME type will get that type, otherwise the

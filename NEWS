@@ -25,6 +25,7 @@ This version has not been released yet.
    and configuration options.
  * Futon's `Status` screen (active tasks) now displays two new task
    status fields: `Started on` and `Updated on`.
+ * JSONP responses now send "text/javascript" for Content-Type.
 
 Version 1.1.1
 -------------

@@ -16,6 +16,7 @@ Build System:
 HTTP Interface:
 
  * Added a native JSON parser.
+ * JSONP responses now send "text/javascript" for Content-Type.
 
 Replicator:
 
