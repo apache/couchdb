@@ -25,7 +25,7 @@ LANGUAGE = ENV["QS_LANG"] || "js"
 
 puts "Running query server specs for #{LANGUAGE} query server"
 
-require 'spec'
+require 'rspec'
 require 'json'
 
 class OSProcessRunner
