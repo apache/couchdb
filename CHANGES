@@ -16,7 +16,6 @@ Build System:
 HTTP Interface:
 
  * Added a native JSON parser.
- * JSONP responses now send "text/javascript" for Content-Type.
 
 Replicator:
 
@@ -54,6 +53,7 @@ Version 1.1.1
 This version has not been released yet.
 
 * ETags for views include current sequence if include_docs=true.
+* JSONP responses now send "text/javascript" for Content-Type.
 
 Version 1.1.0
 -------------
