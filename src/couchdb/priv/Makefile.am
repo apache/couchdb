@@ -16,7 +16,10 @@ couchprivlibdir = $(couchlibdir)/priv/lib
 
 EXTRA_DIST = \
 	spawnkillable/couchspawnkillable.sh \
-	stat_descriptions.cfg.in
+	stat_descriptions.cfg.in \
+	couch_js/sm170.c \
+	couch_js/sm180.c \
+	couch_js/sm185.c
 
 CLEANFILES = stat_descriptions.cfg
 
@@ -42,12 +45,14 @@ COUCHJS_SRCS = \
 	couch_js/http.h \
 	couch_js/main.c \
 	couch_js/utf8.c \
-	couch_js/utf8.h
+	couch_js/utf8.h \
+	couch_js/util.h \
+	couch_js/util.c
 
 locallibbin_PROGRAMS = couchjs
 couchjs_SOURCES = $(COUCHJS_SRCS)
 couchjs_LDFLAGS = $(CURL_LDFLAGS)
-couchjs_CFLAGS = -D_BSD_SOURCE $(CURL_CFLAGS)
+couchjs_CFLAGS = -g -Wall -Werror -D_BSD_SOURCE $(CURL_CFLAGS)
 couchjs_LDADD = $(CURL_LDFLAGS) @JSLIB@
 
 couchpriv_DATA = stat_descriptions.cfg
