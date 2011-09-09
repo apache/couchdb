@@ -203,7 +203,7 @@ db_req(#httpd{method='GET',path_parts=[_DbName]}=Req, Db) ->
     {ok, DbInfo} = couch_db:get_db_info(Db),
     send_json(Req, {DbInfo});
 
-db_req(#httpd{method='POST',path_parts=[DbName]}=Req, Db) ->
+db_req(#httpd{method='POST',path_parts=[_DbName]}=Req, Db) ->
     couch_httpd:validate_ctype(Req, "application/json"),
     Doc = couch_doc:from_json_obj(couch_httpd:json_body(Req)),
     validate_attachment_names(Doc),
@@ -214,33 +214,7 @@ db_req(#httpd{method='POST',path_parts=[DbName]}=Req, Db) ->
             Doc
     end,
     DocId = Doc2#doc.id,
-    case couch_httpd:qs_value(Req, "batch") of
-    "ok" ->
-        % async_batching
-        spawn(fun() ->
-                case catch(couch_db:update_doc(Db, Doc2, [])) of
-                {ok, _} -> ok;
-                Error ->
-                    ?LOG_INFO("Batch doc error (~s): ~p",[DocId, Error])
-                end
-            end),
-            
-        send_json(Req, 202, [], {[
-            {ok, true},
-            {id, DocId}
-        ]});
-    _Normal ->
-        % normal
-        {ok, NewRev} = couch_db:update_doc(Db, Doc2, []),
-        DocUrl = absolute_uri(
-            Req, binary_to_list(<<"/",DbName/binary,"/", DocId/binary>>)),
-        send_json(Req, 201, [{"Location", DocUrl}], {[
-            {ok, true},
-            {id, DocId},
-            {rev, couch_doc:rev_to_str(NewRev)}
-        ]})
-    end;
-
+    update_doc(Req, Db, DocId, Doc2);
 
 db_req(#httpd{path_parts=[_DbName]}=Req, _Db) ->
     send_method_not_allowed(Req, "DELETE,GET,HEAD,POST");
@@ -673,29 +647,18 @@ db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
     NewDoc = Doc#doc{
         atts = UpdatedAtts ++ OldAtts2
     },
-    {ok, NewRev} = couch_db:update_doc(Db, NewDoc, []),
-
-    send_json(Req, 201, [{"ETag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewRev)) ++ "\""}], {[
-        {ok, true},
-        {id, DocId},
-        {rev, couch_doc:rev_to_str(NewRev)}
-    ]});
+    update_doc(Req, Db, DocId, NewDoc);
 
 db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
-    #doc_query_args{
-        update_type = UpdateType
-    } = parse_doc_query(Req),
     couch_doc:validate_docid(DocId),
     
-    Loc = absolute_uri(Req, "/" ++ ?b2l(Db#db.name) ++ "/" ++ ?b2l(DocId)),
-    RespHeaders = [{"Location", Loc}],
     case couch_util:to_list(couch_httpd:header_value(Req, "Content-Type")) of
     ("multipart/related;" ++ _) = ContentType ->
         {ok, Doc0, WaitFun, Parser} = couch_doc:doc_from_multi_part_stream(
             ContentType, fun() -> receive_request_data(Req) end),
         Doc = couch_doc_from_req(Req, DocId, Doc0),
         try
-            Result = update_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType),
+            Result = update_doc(Req, Db, DocId, Doc),
             WaitFun(),
             Result
         catch throw:Err ->
@@ -704,28 +667,9 @@ db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
             throw(Err)
         end;
     _Else ->
-        case couch_httpd:qs_value(Req, "batch") of
-        "ok" ->
-            % batch
-            Doc = couch_doc_from_req(Req, DocId, couch_httpd:json_body(Req)),
-        
-            spawn(fun() ->
-                    case catch(couch_db:update_doc(Db, Doc, [])) of
-                    {ok, _} -> ok;
-                    Error ->
-                        ?LOG_INFO("Batch doc error (~s): ~p",[DocId, Error])
-                    end
-                end),
-            send_json(Req, 202, [], {[
-                {ok, true},
-                {id, DocId}
-            ]});
-        _Normal ->
-            % normal
-            Body = couch_httpd:json_body(Req),
-            Doc = couch_doc_from_req(Req, DocId, Body),
-            update_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType)
-        end
+        Body = couch_httpd:json_body(Req),
+        Doc = couch_doc_from_req(Req, DocId, Body),
+        update_doc(Req, Db, DocId, Doc)
     end;
 
 db_doc_req(#httpd{method='COPY'}=Req, Db, SourceDocId) ->
@@ -738,12 +682,7 @@ db_doc_req(#httpd{method='COPY'}=Req, Db, SourceDocId) ->
     % open old doc
     Doc = couch_doc_open(Db, SourceDocId, SourceRev, []),
     % save new doc
-    {ok, NewTargetRev} = couch_db:update_doc(Db,
-        Doc#doc{id=TargetDocId, revs=TargetRevs}, []),
-    % respond
-    send_json(Req, 201,
-        [{"ETag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewTargetRev)) ++ "\""}],
-        update_doc_result_to_json(TargetDocId, {ok, NewTargetRev}));
+    update_doc(Req, Db, TargetDocId, Doc#doc{id=TargetDocId, revs=TargetRevs});
 
 db_doc_req(Req, _Db, _DocId) ->
     send_method_not_allowed(Req, "DELETE,GET,HEAD,POST,PUT,COPY").
@@ -863,11 +802,17 @@ update_doc_result_to_json(DocId, Error) ->
     {[{id, DocId}, {error, ErrorStr}, {reason, Reason}]}.
 
 
+update_doc(Req, Db, DocId, #doc{deleted=false}=Doc) ->
+    Loc = absolute_uri(Req, "/" ++ ?b2l(Db#db.name) ++ "/" ++ ?b2l(DocId)),
+    update_doc(Req, Db, DocId, Doc, [{"Location", Loc}]);
 update_doc(Req, Db, DocId, Doc) ->
     update_doc(Req, Db, DocId, Doc, []).
 
 update_doc(Req, Db, DocId, Doc, Headers) ->
-    update_doc(Req, Db, DocId, Doc, Headers, interactive_edit).
+    #doc_query_args{
+        update_type = UpdateType
+    } = parse_doc_query(Req),
+    update_doc(Req, Db, DocId, Doc, Headers, UpdateType).
 
 update_doc(Req, Db, DocId, #doc{deleted=Deleted}=Doc, Headers, UpdateType) ->
     case couch_httpd:header_value(Req, "X-Couch-Full-Commit") of
@@ -878,14 +823,33 @@ update_doc(Req, Db, DocId, #doc{deleted=Deleted}=Doc, Headers, UpdateType) ->
     _ ->
         Options = []
     end,
-    {ok, NewRev} = couch_db:update_doc(Db, Doc, Options, UpdateType),
-    NewRevStr = couch_doc:rev_to_str(NewRev),
-    ResponseHeaders = [{"ETag", <<"\"", NewRevStr/binary, "\"">>}] ++ Headers,
-    send_json(Req, if Deleted -> 200; true -> 201 end,
-        ResponseHeaders, {[
+    case couch_httpd:qs_value(Req, "batch") of
+    "ok" ->
+        % async batching
+        spawn(fun() ->
+                case catch(couch_db:update_doc(Db, Doc, Options, UpdateType)) of
+                {ok, _} -> ok;
+                Error ->
+                    ?LOG_INFO("Batch doc error (~s): ~p",[DocId, Error])
+                end
+            end),
+        send_json(Req, 202, Headers, {[
             {ok, true},
-            {id, DocId},
-            {rev, NewRevStr}]}).
+            {id, DocId}
+        ]});
+    _Normal ->
+        % normal
+        {ok, NewRev} = couch_db:update_doc(Db, Doc, Options, UpdateType),
+        NewRevStr = couch_doc:rev_to_str(NewRev),
+        ResponseHeaders = [{"ETag", <<"\"", NewRevStr/binary, "\"">>}] ++ Headers,
+        send_json(Req,
+            if Deleted orelse Req#httpd.method == 'DELETE' -> 200;
+            true -> 201 end,
+            ResponseHeaders, {[
+                {ok, true},
+                {id, DocId},
+                {rev, NewRevStr}]})
+    end.
 
 couch_doc_from_req(Req, DocId, #doc{revs=Revs}=Doc) ->
     validate_attachment_names(Doc),
@@ -916,7 +880,6 @@ couch_doc_from_req(Req, DocId, #doc{revs=Revs}=Doc) ->
     Doc#doc{id=DocId, revs=Revs2};
 couch_doc_from_req(Req, DocId, Json) ->
     couch_doc_from_req(Req, DocId, couch_doc:from_json_obj(Json)).
-
 
 % Useful for debugging
 % couch_doc_open(Db, DocId) ->
@@ -1132,25 +1095,18 @@ db_attachment_req(#httpd{method=Method,mochi_req=MochiReq}=Req, Db, DocId, FileN
     DocEdited = Doc#doc{
         atts = NewAtt ++ [A || A <- Atts, A#att.name /= FileName]
     },
-    {ok, UpdatedRev} = couch_db:update_doc(Db, DocEdited, []),
-    #db{name=DbName} = Db,
 
-    {Status, Headers} = case Method of
-        'DELETE' ->
-            {200, []};
-        _ ->
-            {201, [{"ETag", "\"" ++ ?b2l(couch_doc:rev_to_str(UpdatedRev)) ++ "\""},
-               {"Location", absolute_uri(Req, "/" ++
-                binary_to_list(DbName) ++ "/" ++
-                binary_to_list(DocId) ++ "/" ++
-                binary_to_list(FileName)
-            )}]}
-        end,
-    send_json(Req,Status, Headers, {[
-        {ok, true},
-        {id, DocId},
-        {rev, couch_doc:rev_to_str(UpdatedRev)}
-    ]});
+    Headers = case Method of
+    'DELETE' ->
+        [];
+    _ ->
+        [{"Location", absolute_uri(Req, "/" ++
+            ?b2l(Db#db.name) ++ "/" ++
+            ?b2l(DocId) ++ "/" ++
+            ?b2l(FileName)
+        )}]
+    end,
+    update_doc(Req, Db, DocId, DocEdited, Headers);
 
 db_attachment_req(Req, _Db, _DocId, _FileNameParts) ->
     send_method_not_allowed(Req, "DELETE,GET,HEAD,PUT").
