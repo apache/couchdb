@@ -900,18 +900,29 @@ update_doc(#httpd{user_ctx=Ctx} = Req, Db, DocId, #doc{deleted=Deleted}=Doc,
 
 couch_doc_from_req(Req, DocId, #doc{revs=Revs} = Doc) ->
     validate_attachment_names(Doc),
-    ExplicitDocRev =
-    case Revs of
-        {Start,[RevId|_]} -> {Start, RevId};
-        _ -> undefined
+    Rev = case couch_httpd:qs_value(Req, "rev") of
+    undefined ->
+        undefined;
+    QSRev ->
+        couch_doc:parse_rev(QSRev)
     end,
-    case extract_header_rev(Req, ExplicitDocRev) of
-    missing_rev ->
-        Revs2 = {0, []};
-    ExplicitDocRev ->
-        Revs2 = Revs;
-    {Pos, Rev} ->
-        Revs2 = {Pos, [Rev]}
+    Revs2 =
+    case Revs of
+    {Start, [RevId|_]} ->
+        if Rev /= undefined andalso Rev /= {Start, RevId} ->
+            throw({bad_request, "Document rev from request body and query "
+                   "string have different values"});
+        true ->
+            case extract_header_rev(Req, {Start, RevId}) of
+            missing_rev -> {0, []};
+            _ -> Revs
+            end
+        end;
+    _ ->
+        case extract_header_rev(Req, Rev) of
+        missing_rev -> {0, []};
+        {Pos, RevId2} -> {Pos, [RevId2]}
+        end
     end,
     Doc#doc{id=DocId, revs=Revs2};
 couch_doc_from_req(Req, DocId, Json) ->
