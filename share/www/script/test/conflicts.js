@@ -56,6 +56,36 @@ couchTests.conflicts = function(debug) {
     T(e.error == "conflict");
   }
 
+  // Make a few bad requests, specifying conflicting revs
+  // ?rev doesn't match body
+  var xhr = CouchDB.request("PUT", "/test_suite_db/foo?rev=1-foobar", {
+    body : JSON.stringify(doc)
+  });
+  T(xhr.status == 400);
+
+  // If-Match doesn't match body
+  xhr = CouchDB.request("PUT", "/test_suite_db/foo", {
+    headers: {"If-Match": "1-foobar"},
+    body: JSON.stringify(doc)
+  });
+  T(xhr.status == 400);
+
+  // ?rev= doesn't match If-Match
+  xhr = CouchDB.request("PUT", "/test_suite_db/foo?rev=1-boobaz", {
+    headers: {"If-Match": "1-foobar"},
+    body: JSON.stringify(doc2)
+  });
+  T(xhr.status == 400);
+
+  // Now update the document using ?rev=
+  xhr = CouchDB.request("PUT", "/test_suite_db/foo?rev=" + doc._rev, {
+    body: JSON.stringify(doc)
+  });
+  T(xhr.status == 201);
+
+  // reopen
+  var doc = db.open(doc._id);
+
   // Now delete the document from the database
   T(db.deleteDoc(doc).ok);
 
