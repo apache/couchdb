@@ -84,21 +84,27 @@ handle_call(stop, _From, State) ->
 
 
 handle_cast({release_worker, Worker}, #state{waiting = Waiting} = State) ->
-    case queue:out(Waiting) of
-    {empty, Waiting2} ->
-        Busy2 = State#state.busy -- [Worker],
-        Free2 = [Worker | State#state.free];
-    {{value, From}, Waiting2} ->
-        gen_server:reply(From, {ok, Worker}),
-        Busy2 = State#state.busy,
-        Free2 = State#state.free
-    end,
-    NewState = State#state{
-        busy = Busy2,
-        free = Free2,
-        waiting = Waiting2
-    },
-    {noreply, NewState}.
+    case is_process_alive(Worker) andalso
+        lists:member(Worker, State#state.busy) of
+    true ->
+        case queue:out(Waiting) of
+        {empty, Waiting2} ->
+            Busy2 = State#state.busy -- [Worker],
+            Free2 = [Worker | State#state.free];
+        {{value, From}, Waiting2} ->
+            gen_server:reply(From, {ok, Worker}),
+            Busy2 = State#state.busy,
+            Free2 = State#state.free
+        end,
+        NewState = State#state{
+           busy = Busy2,
+           free = Free2,
+           waiting = Waiting2
+        },
+        {noreply, NewState};
+   false ->
+        {noreply, State}
+   end.
 
 
 handle_info({'EXIT', Pid, _Reason}, #state{busy = Busy, free = Free} = State) ->
@@ -108,7 +114,14 @@ handle_info({'EXIT', Pid, _Reason}, #state{busy = Busy, free = Free} = State) ->
         Busy ->
             {noreply, State};
         Busy2 ->
-            {noreply, State#state{busy = Busy2}}
+            case queue:out(State#state.waiting) of
+            {empty, _} ->
+                {noreply, State#state{busy = Busy2}};
+            {{value, From}, Waiting2} ->
+                {ok, Worker} = ibrowse:spawn_link_worker_process(State#state.url),
+                gen_server:reply(From, {ok, Worker}),
+                {noreply, State#state{busy = [Worker | Busy2], waiting = Waiting2}}
+            end
         end;
     Free2 ->
         {noreply, State#state{free = Free2}}
