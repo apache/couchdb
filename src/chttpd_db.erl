@@ -991,7 +991,7 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
                             {ok, Resp} = start_response_length(Req, 206, Headers1, To - From + 1),
                             couch_doc:range_att_foldl(Att, From, To + 1,
                                 fun(Seg, _) -> send(Resp, Seg) end, {ok, Resp});
-                        {identity, Ranges} when is_list(Ranges) ->
+                        {identity, Ranges} when is_list(Ranges) andalso length(Ranges) < 10 ->
                             send_ranges_multipart(Req, Type, Len, Att, Ranges);
                         _ ->
                             Headers1 = Headers ++
@@ -1126,8 +1126,9 @@ parse_ranges(Ranges, Len) ->
 
 parse_ranges([], _Len, Acc) ->
     lists:reverse(Acc);
-parse_ranges([{From, To}|_], _Len, _Acc)
-  when is_integer(From) andalso is_integer(To) andalso To < From ->
+parse_ranges([{0, none}|_], _Len, _Acc) ->
+    undefined;
+parse_ranges([{From, To}|_], _Len, _Acc) when is_integer(From) andalso is_integer(To) andalso To < From ->
     throw(requested_range_not_satisfiable);
 parse_ranges([{From, To}|Rest], Len, Acc)
   when is_integer(To) andalso To >= Len ->
