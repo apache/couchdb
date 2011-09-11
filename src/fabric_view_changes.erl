@@ -248,9 +248,15 @@ unpack_seqs(0, DbName) ->
 unpack_seqs("0", DbName) ->
     fabric_dict:init(mem3:shards(DbName), 0);
 
+unpack_seqs([_SeqNum, Opaque], DbName) ->
+    do_unpack_seqs(Opaque, DbName);
+
 unpack_seqs(Packed, DbName) ->
     {match, [Opaque]} = re:run(Packed, "(?<opaque>[a-zA-Z0-9-_]+)([\"\\]])*$",
         [{capture, [opaque], binary}]),
+    do_unpack_seqs(Opaque, DbName).
+
+do_unpack_seqs(Opaque, DbName) ->
     % TODO relies on internal structure of fabric_dict as keylist
     lists:map(fun({Node, [A,B], Seq}) ->
         Match = #shard{node=Node, range=[A,B], dbname=DbName, _ = '_'},
