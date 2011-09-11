@@ -32,7 +32,7 @@ couchTests.attachment_ranges = function(debug) {
     T(save_response.ok);
 
     // Fetching the whole entity is a 206.
-    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt", {
+    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt?bar=0", {
         headers: {
             "Range": "bytes=0-28"
         }
@@ -43,7 +43,7 @@ couchTests.attachment_ranges = function(debug) {
     TEquals("29", xhr.getResponseHeader("Content-Length"));
 
     // Fetch the whole entity without an end offset is a 200.
-    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt", {
+    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt?bar=1", {
         headers: {
             "Range": "bytes=0-"
         }
@@ -52,6 +52,14 @@ couchTests.attachment_ranges = function(debug) {
     TEquals("This is a base64 encoded text", xhr.responseText);
     TEquals(null, xhr.getResponseHeader("Content-Range"));
     TEquals("29", xhr.getResponseHeader("Content-Length"));
+
+    // Even if you ask multiple times.
+    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt", {
+        headers: {
+            "Range": "bytes=0-,0-,0-"
+        }
+    });
+    TEquals(200, xhr.status, "multiple 0-'s");
 
     // Badly formed range header is a 200.
     var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt", {
@@ -130,5 +138,13 @@ couchTests.attachment_ranges = function(debug) {
         }
     });
     TEquals(416, xhr.status, "fetch 300-310");
+
+    // We ignore a Range header with too many ranges
+    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt", {
+        headers: {
+            "Range": "bytes=0-1,0-1,0-1,0-1,0-1,0-1,0-1,0-1,0-1,0-1"
+        }
+    });
+    TEquals(200, xhr.status, "too many ranges");
 
 };
