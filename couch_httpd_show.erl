@@ -99,7 +99,7 @@ get_fun_key(DDoc, Type, Name) ->
     Src = couch_util:get_nested_json_value({Props}, [Type, Name]),
     {Lang, Src}.
 
-% /db/_design/foo/update/bar/docid
+% /db/_design/foo/_update/bar/docid
 % updates a doc based on a request
 % handle_doc_update_req(#httpd{method = 'GET'}=Req, _Db, _DDoc) ->
 %     % anything but GET
