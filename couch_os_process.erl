@@ -66,8 +66,16 @@ readline(#os_proc{} = OsProc) ->
     readline(OsProc, []).
 readline(#os_proc{port = Port} = OsProc, Acc) ->
     receive
+    {Port, {data, {noeol, Data}}} when is_binary(Acc) ->
+        readline(OsProc, <<Acc/binary,Data/binary>>);
+    {Port, {data, {noeol, Data}}} when is_binary(Data) ->
+        readline(OsProc, Data);
     {Port, {data, {noeol, Data}}} ->
         readline(OsProc, [Data|Acc]);
+    {Port, {data, {eol, <<Data/binary>>}}} when is_binary(Acc) ->
+        [<<Acc/binary,Data/binary>>];
+    {Port, {data, {eol, Data}}} when is_binary(Data) ->
+        [Data];
     {Port, {data, {eol, Data}}} ->
         lists:reverse(Acc, Data);
     {Port, Err} ->
