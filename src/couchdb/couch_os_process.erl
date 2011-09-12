@@ -20,7 +20,7 @@
 
 -include("couch_db.hrl").
 
--define(PORT_OPTIONS, [stream, {line, 1024}, binary, exit_status, hide]).
+-define(PORT_OPTIONS, [stream, {line, 4096}, binary, exit_status, hide]).
 
 -record(os_proc,
     {command,
