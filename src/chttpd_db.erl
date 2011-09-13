@@ -208,6 +208,10 @@ db_req(#httpd{method='GET',path_parts=[DbName]}=Req, _Db) ->
 
 db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
     couch_httpd:validate_ctype(Req, "application/json"),
+
+    W = couch_httpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
+    Options = [{user_ctx,Ctx}, {w,W}],
+
     Doc = couch_doc:from_json_obj(couch_httpd:json_body(Req)),
     Doc2 = case Doc#doc.id of
         <<"">> ->
@@ -220,7 +224,7 @@ db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
     "ok" ->
         % async_batching
         spawn(fun() ->
-                case catch(fabric:update_doc(Db, Doc2, [{user_ctx, Ctx}])) of
+                case catch(fabric:update_doc(Db, Doc2, Options)) of
                 {ok, _} -> ok;
                 {accepted, _} -> ok;
                 Error ->
@@ -235,7 +239,7 @@ db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
     _Normal ->
         % normal
         DocUrl = absolute_uri(Req, [$/, DbName, $/, DocId]),
-        case fabric:update_doc(Db, Doc2, [{user_ctx, Ctx}]) of
+        case fabric:update_doc(Db, Doc2, Options) of
         {ok, NewRev} ->
             HttpCode = 201;
         {accepted, NewRev} ->
@@ -546,6 +550,10 @@ db_doc_req(#httpd{method='POST', user_ctx=Ctx}=Req, Db, DocId) ->
     couch_httpd:validate_referer(Req),
     couch_doc:validate_docid(DocId),
     couch_httpd:validate_ctype(Req, "multipart/form-data"),
+
+    W = couch_httpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
+    Options = [{user_ctx,Ctx}, {w,W}],
+
     Form = couch_httpd:parse_form(Req),
     case proplists:is_defined("_doc", Form) of
     true ->
@@ -573,7 +581,7 @@ db_doc_req(#httpd{method='POST', user_ctx=Ctx}=Req, Db, DocId) ->
     NewDoc = Doc#doc{
         atts = UpdatedAtts ++ OldAtts2
     },
-    case fabric:update_doc(Db, NewDoc, [{user_ctx,Ctx}]) of
+    case fabric:update_doc(Db, NewDoc, Options) of
     {ok, NewRev} ->
         HttpCode = 201;
     {accepted, NewRev} ->
