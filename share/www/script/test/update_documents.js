@@ -165,4 +165,18 @@ couchTests.update_documents = function(debug) {
   T(xhr.status == 200);
   T(xhr.responseText.length == 32);
 
+  // COUCHDB-1229 - allow slashes in doc ids for update handlers
+  // /db/_design/doc/_update/handler/doc/id
+
+  var doc = {
+      _id:"with/slash",
+      counter:1
+  };
+  db.save(doc);
+  xhr = CouchDB.request("PUT", "/test_suite_db/_design/update/_update/bump-counter/with/slash");
+  TEquals(201, xhr.status, "should return a 200 status");
+  TEquals("<h1>bumped it!</h1>", xhr.responseText, "should report bumping");
+
+  var doc = db.open("with/slash");
+  TEquals(2, doc.counter, "counter should be 2");
 };

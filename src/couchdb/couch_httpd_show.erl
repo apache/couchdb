@@ -106,13 +106,15 @@ get_fun_key(DDoc, Type, Name) ->
 %     send_method_not_allowed(Req, "POST,PUT,DELETE,ETC");
     
 handle_doc_update_req(#httpd{
-        path_parts=[_, _, _, _, UpdateName, DocId]
+        path_parts=[_, _, _, _, UpdateName, DocId|Rest]
     }=Req, Db, DDoc) ->
-    Doc = try couch_httpd_db:couch_doc_open(Db, DocId, nil, [conflicts])
+    DocParts = [DocId|Rest],
+    DocId1 = ?l2b(string:join([?b2l(P)|| P <- DocParts], "/")),
+    Doc = try couch_httpd_db:couch_doc_open(Db, DocId1, nil, [conflicts])
     catch
       _ -> nil
     end,
-    send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId);
+    send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId1);
 
 handle_doc_update_req(#httpd{
         path_parts=[_, _, _, _, UpdateName]
