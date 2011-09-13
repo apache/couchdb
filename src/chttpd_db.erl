@@ -109,7 +109,7 @@ changes_callback({stop, EndSeq}, {_, Resp}) ->
         chttpd:send_delayed_chunk(Resp, "\n],\n\"last_seq\":0}\n");
     false ->
         chttpd:send_delayed_chunk(Resp,
-            io_lib:format("\n],\n\"last_seq\":\"~s\"}\n",[EndSeq]))
+            ["\n],\n\"last_seq\":", ?JSON_ENCODE(EndSeq), "}\n"])
     end,
     chttpd:end_delayed_json_response(Resp1);
 
