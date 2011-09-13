@@ -406,8 +406,9 @@ terminate(normal, #rep_state{rep_details = #rep{id = RepId} = Rep,
     couch_replication_notifier:notify({finished, RepId, CheckpointHistory}),
     couch_replication_manager:replication_completed(Rep);
 
-terminate(shutdown, State) ->
+terminate(shutdown, #rep_state{rep_details = #rep{id = RepId}} = State) ->
     % cancelled replication throught ?MODULE:cancel_replication/1
+    couch_replication_notifier:notify({error, RepId, <<"cancelled">>}),
     terminate_cleanup(State);
 
 terminate(Reason, State) ->
