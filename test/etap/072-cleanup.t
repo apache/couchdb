@@ -125,6 +125,6 @@ view_cleanup() ->
 
 count_index_files() ->
     % call server to fetch the index files
-    RootDir = couch_config:get("couchdb", "view_index_dir"),
+    RootDir = couch_config:get("couchdb", "index_dir"),
     length(filelib:wildcard(RootDir ++ "/." ++
-        binary_to_list(?TEST_DB) ++ "_design"++"/*")).
+        binary_to_list(?TEST_DB) ++ "_design"++"/mrview/*")).

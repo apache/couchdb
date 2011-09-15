@@ -73,6 +73,9 @@
 ^src/couch_index/Makefile
 ^src/couch_index/Makefile.in
 ^src/couch_index/ebin/.*beam
+^src/couch_mrview/Makefile
+^src/couch_mrview/Makefile.in
+^src/couch_mrview/ebin/.*beam
 ^src/couchdb/.*beam
 ^src/couchdb/.deps/*
 ^src/couchdb/Makefile

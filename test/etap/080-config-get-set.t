@@ -50,7 +50,7 @@ test() ->
 
     etap:is(
         couch_config:get("httpd_design_handlers", "_view"),
-        "{couch_httpd_view, handle_view_req}",
+        "{couch_mrview_http, handle_view_req}",
         "The {httpd_design_handlers, view} is the expected default."
     ),
 

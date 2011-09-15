@@ -52,6 +52,7 @@ bin/couch-config_dev
 etc/couchdb/default.ini
 etc/launchd/org.apache.couchdb.plist
 etc/logrotate.d/couchdb
+src/couch_mrview/ebin/
 src/couchdb/.libs/*
 src/couchdb/couch.app
 src/couchdb/couchjs

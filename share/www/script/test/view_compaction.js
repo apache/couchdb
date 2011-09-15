@@ -87,7 +87,7 @@ couchTests.view_compaction = function(debug) {
   T(data_size_before_compact < disk_size_before_compact, "data size < file size");
 
   // compact view group
-  var xhr = CouchDB.request("POST", "/" + db.name + "/_compact" + "/foo");
+  var xhr = CouchDB.request("POST", "/" + db.name + "/_design/foo/_compact");
   T(JSON.parse(xhr.responseText).ok === true);
 
   resp = db.designInfo("_design/foo");

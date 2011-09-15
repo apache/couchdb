@@ -4,7 +4,6 @@
 
 [couchdb]
 database_dir = %localstatelibdir%
-view_index_dir = %localstatelibdir%
 index_dir = %localstatelibdir%
 util_driver_dir = %couchprivlibdir%
 max_document_size = 4294967296 ; 4 GB
@@ -72,7 +71,6 @@ reduce_limit = true
 os_process_limit = 25
 
 [daemons]
-view_manager={couch_view, start_link, []}
 index_server={couch_index_server, start_link, []}
 external_manager={couch_external_manager, start_link, []}
 query_servers={couch_query_servers, start_link, []}
@@ -103,11 +101,12 @@ _session = {couch_httpd_auth, handle_session_req}
 _oauth = {couch_httpd_oauth, handle_oauth_req}
 
 [httpd_db_handlers]
-_view_cleanup = {couch_httpd_db, handle_view_cleanup_req}
+_all_docs = {couch_mrview_http, handle_all_docs_req}
+_changes = {couch_httpd_db, handle_changes_req}
 _compact = {couch_httpd_db, handle_compact_req}
 _design = {couch_httpd_db, handle_design_req}
-_temp_view = {couch_httpd_view, handle_temp_view_req}
-_changes = {couch_httpd_db, handle_changes_req}
+_temp_view = {couch_mrview_http, handle_temp_view_req}
+_view_cleanup = {couch_mrview_http, handle_cleanup_req}
 
 ; The external module takes an optional argument allowing you to narrow it to a
 ; single script. Otherwise the script name is inferred from the first path section
@@ -116,12 +115,13 @@ _changes = {couch_httpd_db, handle_changes_req}
 ; _external = {couch_httpd_external, handle_external_req}
 
 [httpd_design_handlers]
-_view = {couch_httpd_view, handle_view_req}
-_show = {couch_httpd_show, handle_doc_show_req}
-_list = {couch_httpd_show, handle_view_list_req}
-_info = {couch_httpd_db,   handle_design_info_req}
+_compact = {couch_mrview_http, handle_compact_req}
+_info = {couch_mrview_http, handle_info_req}
+_list = {couch_mrview_show, handle_view_list_req}
 _rewrite = {couch_httpd_rewrite, handle_rewrite_req}
-_update = {couch_httpd_show, handle_doc_update_req}
+_show = {couch_mrview_show, handle_doc_show_req}
+_update = {couch_mrview_show, handle_doc_update_req}
+_view = {couch_mrview_http, handle_view_req}
 
 ; enable external as an httpd handler, then link it with commands here.
 ; note, this api is still under consideration.

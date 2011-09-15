@@ -90,10 +90,11 @@ test() ->
     create_docs(),
     create_design_doc(),
 
-    ViewGroup = couch_view:get_group_server(
-        test_db_name(), <<"_design/", (ddoc_name())/binary>>),
-    etap:is(is_pid(ViewGroup), true, "got view group pid"),
-    etap:is(is_process_alive(ViewGroup), true, "view group pid is alive"),
+    {ok, IndexerPid} = couch_index_server:get_index(
+        couch_mrview_index, test_db_name(), <<"_design/", (ddoc_name())/binary>>
+    ),
+    etap:is(is_pid(IndexerPid), true, "got view group pid"),
+    etap:is(is_process_alive(IndexerPid), true, "view group pid is alive"),
 
     query_view(),
     check_db_ref_count(),
@@ -169,7 +170,8 @@ wait_db_compact_done(N) ->
     end.
 
 compact_view_group() ->
-    {ok, _} = couch_view_compactor:start_compact(test_db_name(), ddoc_name()),
+    DDoc = list_to_binary("_design/" ++ binary_to_list(ddoc_name())),
+    ok = couch_mrview:compact(test_db_name(), DDoc),
     wait_view_compact_done(10).
 
 wait_view_compact_done(0) ->
