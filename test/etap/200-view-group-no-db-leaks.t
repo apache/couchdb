@@ -98,12 +98,12 @@ test() ->
 
     query_view(),
     check_db_ref_count(),
-    etap:is(is_process_alive(ViewGroup), true, "view group pid is alive"),
+    etap:is(is_process_alive(IndexerPid), true, "view group pid is alive"),
 
     create_new_doc(<<"doc1000">>),
     query_view(),
     check_db_ref_count(),
-    etap:is(is_process_alive(ViewGroup), true, "view group pid is alive"),
+    etap:is(is_process_alive(IndexerPid), true, "view group pid is alive"),
 
     Ref1 = get_db_ref_counter(),
     compact_db(),
@@ -111,20 +111,20 @@ test() ->
     Ref2 = get_db_ref_counter(),
     etap:isnt(Ref1, Ref2,  "DB ref counter changed"),
     etap:is(false, is_process_alive(Ref1), "old DB ref counter is not alive"),
-    etap:is(is_process_alive(ViewGroup), true, "view group pid is alive"),
+    etap:is(is_process_alive(IndexerPid), true, "view group pid is alive"),
 
     compact_view_group(),
     check_db_ref_count(),
     Ref3 = get_db_ref_counter(),
     etap:is(Ref3, Ref2,  "DB ref counter didn't change"),
-    etap:is(is_process_alive(ViewGroup), true, "view group pid is alive"),
+    etap:is(is_process_alive(IndexerPid), true, "view group pid is alive"),
 
     create_new_doc(<<"doc1001">>),
     query_view(),
     check_db_ref_count(),
-    etap:is(is_process_alive(ViewGroup), true, "view group pid is alive"),
+    etap:is(is_process_alive(IndexerPid), true, "view group pid is alive"),
 
-    MonRef = erlang:monitor(process, ViewGroup),
+    MonRef = erlang:monitor(process, IndexerPid),
     ok = couch_server:delete(test_db_name(), []),
     receive
     {'DOWN', MonRef, _, _, _} ->

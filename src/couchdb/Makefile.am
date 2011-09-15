@@ -54,8 +54,6 @@ source_files = \
     couch_httpd_auth.erl \
     couch_httpd_oauth.erl \
     couch_httpd_external.erl \
-    couch_httpd_show.erl \
-    couch_httpd_view.erl \
     couch_httpd_misc_handlers.erl \
     couch_httpd_proxy.erl \
     couch_httpd_replicator.erl \
@@ -85,10 +83,6 @@ source_files = \
     couch_task_status.erl \
     couch_util.erl \
     couch_uuids.erl \
-    couch_view.erl \
-    couch_view_compactor.erl \
-    couch_view_updater.erl \
-    couch_view_group.erl \
     couch_db_updater.erl \
     couch_work_queue.erl \
     json_stream_parse.erl
@@ -125,8 +119,6 @@ compiled_files = \
     couch_httpd_oauth.beam \
     couch_httpd_proxy.beam \
     couch_httpd_external.beam \
-    couch_httpd_show.beam \
-    couch_httpd_view.beam \
     couch_httpd_misc_handlers.beam \
     couch_httpd_replicator.beam \
     couch_httpd_rewrite.beam \
@@ -155,10 +147,6 @@ compiled_files = \
     couch_task_status.beam \
     couch_util.beam \
     couch_uuids.beam \
-    couch_view.beam \
-    couch_view_compactor.beam \
-    couch_view_updater.beam \
-    couch_view_group.beam \
     couch_db_updater.beam \
     couch_work_queue.beam \
     json_stream_parse.beam
@@ -190,8 +178,7 @@ compiled_files = \
 #     couch_server.html \
 #     couch_server_sup.html \
 #     couch_stream.html \
-#     couch_util.html \
-#     couch_view.html
+#     couch_util.html
 
 if WINDOWS
 couch.app: couch.app.tpl

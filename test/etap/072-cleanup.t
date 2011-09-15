@@ -120,7 +120,7 @@ query_view(DDoc, View) ->
 
 view_cleanup() ->
     {ok, Db} = couch_db:open(?TEST_DB, [{user_ctx, ?ADMIN_USER}]),
-    couch_view:cleanup_index_files(Db),
+    couch_mrview:cleanup(Db),
     couch_db:close(Db).
 
 count_index_files() ->

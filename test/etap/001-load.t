@@ -17,7 +17,6 @@
 
 main(_) ->
     test_util:init_code_path(),
-    etap:plan(50),
     Modules = [
         couch_auth_cache,
         couch_api_wrap,
@@ -44,9 +43,7 @@ main(_) ->
         couch_httpd_misc_handlers,
         couch_httpd_replicator,
         couch_httpd_rewrite,
-        couch_httpd_show,
         couch_httpd_stats_handlers,
-        couch_httpd_view,
         couch_key_tree,
         couch_log,
         couch_os_process,
@@ -65,14 +62,11 @@ main(_) ->
         couch_stream,
         couch_task_status,
         couch_util,
-        couch_view,
-        couch_view_compactor,
-        couch_view_group,
-        couch_view_updater,
         couch_work_queue,
         json_stream_parse
     ],
 
+    etap:plan(length(Modules)),
     lists:foreach(
         fun(Module) ->
             etap_can:loaded_ok(

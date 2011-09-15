@@ -163,14 +163,12 @@ populate(DbFrag, ViewFrag, MinFileSize, _, _, _) ->
 
 update() ->
     {ok, Db} = couch_db:open_int(test_db_name(), []),
-    Docs = lists:map(
-        fun(_) ->
-            Doc = couch_doc:from_json_obj({[{<<"_id">>, couch_uuids:new()}]}),
-            {ok, _} = couch_db:update_docs(Db, [Doc])
-        end,
-        lists:seq(1, 100)),
-    couch_db:close(Db),
-    query_view().
+    lists:foreach(fun(_) ->
+        Doc = couch_doc:from_json_obj({[{<<"_id">>, couch_uuids:new()}]}),
+        {ok, _} = couch_db:update_docs(Db, [Doc]),
+        query_view()
+    end, lists:seq(1, 100)),
+    couch_db:close(Db).
 
 db_url() ->
     "http://" ++ get(addr) ++ ":" ++ get(port) ++ "/" ++
@@ -199,7 +197,7 @@ get_db_frag() ->
 
 get_view_frag() ->
     {ok, Db} = couch_db:open_int(test_db_name(), []),
-    {ok, Info} = couch_view:get_group_info(Db, <<"_design/foo">>),
+    {ok, Info} = couch_mrview:get_info(Db, <<"_design/foo">>),
     couch_db:close(Db),
     FileSize = couch_util:get_value(disk_size, Info),
     DataSize = couch_util:get_value(data_size, Info),
@@ -219,7 +217,7 @@ wait_compaction_finished() ->
 wait_loop(Parent) ->
     {ok, Db} = couch_db:open_int(test_db_name(), []),
     {ok, DbInfo} = couch_db:get_db_info(Db),
-    {ok, ViewInfo} = couch_view:get_group_info(Db, <<"_design/foo">>),
+    {ok, ViewInfo} = couch_mrview:get_info(Db, <<"_design/foo">>),
     couch_db:close(Db),
     case (couch_util:get_value(compact_running, ViewInfo) =:= true) orelse
         (couch_util:get_value(compact_running, DbInfo) =:= true) of

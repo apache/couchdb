@@ -224,7 +224,7 @@ db_ddoc_names(Db) ->
 
 maybe_compact_view(DbName, GroupId, Config) ->
     DDocId = <<"_design/", GroupId/binary>>,
-    case (catch couch_view:get_group_info(DbName, DDocId)) of
+    case (catch couch_mrview:get_info(DbName, DDocId)) of
     {ok, GroupInfo} ->
         case can_view_compact(Config, DbName, GroupId, GroupInfo) of
         true ->

@@ -301,17 +301,17 @@ sum_tree_sizes(Acc, [T | Rest]) ->
     end.
 
 get_design_docs(Db) ->
-    {ok, _, Docs} = couch_view:fold(
-        #view{btree=by_id_btree(Db)},
-        fun(#full_doc_info{deleted = true}, _Reds, AccDocs) ->
-            {ok, AccDocs};
-        (#full_doc_info{id= <<"_design/",_/binary>>}=FullDocInfo, _Reds, AccDocs) ->
+    FoldFun = skip_deleted(fun
+        (#full_doc_info{deleted = true}, _Reds, Acc) ->
+            {ok, Acc};
+        (#full_doc_info{id= <<"_design/",_/binary>>}=FullDocInfo, _Reds, Acc) ->
             {ok, Doc} = open_doc_int(Db, FullDocInfo, [ejson_body]),
-            {ok, [Doc | AccDocs]};
-        (_, _Reds, AccDocs) ->
-            {stop, AccDocs}
-        end,
-        [], [{start_key, <<"_design/">>}, {end_key_gt, <<"_design0">>}]),
+            {ok, [Doc | Acc]};
+        (_, _Reds, Acc) ->
+            {stop, Acc}
+    end),
+    KeyOpts = [{start_key, <<"_design/">>}, {end_key_gt, <<"_design0">>}],
+    {ok, _, Docs} = couch_btree:fold(by_id_btree(Db), FoldFun, [], KeyOpts),
     {ok, Docs}.
 
 check_is_admin(#db{user_ctx=#user_ctx{name=Name,roles=Roles}}=Db) ->
@@ -1052,8 +1052,9 @@ enum_docs_since(Db, SinceSeq, InFun, Acc, Options) ->
     {ok, enum_docs_since_reduce_to_count(LastReduction), AccOut}.
 
 enum_docs(Db, InFun, InAcc, Options) ->
-    {ok, LastReduce, OutAcc} = couch_view:fold(
-        #view{btree=by_id_btree(Db)}, InFun, InAcc, Options),
+    FoldFun = skip_deleted(InFun),
+    {ok, LastReduce, OutAcc} = couch_btree:fold(
+        by_id_btree(Db), FoldFun, InAcc, Options),
     {ok, enum_docs_reduce_to_count(LastReduce), OutAcc}.
 
 % server functions
@@ -1305,3 +1306,13 @@ by_seq_btree(#db{docinfo_by_seq_btree = BTree, fd = ReaderFd}) ->
 
 by_id_btree(#db{fulldocinfo_by_id_btree = BTree, fd = ReaderFd}) ->
     BTree#btree{fd = ReaderFd}.
+
+skip_deleted(FoldFun) ->
+    fun
+        (visit, KV, Reds, Acc) ->
+            FoldFun(KV, Reds, Acc);
+        (traverse, _LK, {Undeleted, _Del, _Size}, Acc) when Undeleted == 0 ->
+            {skip, Acc};
+        (traverse, _, _, Acc) ->
+            {ok, Acc}
+    end.

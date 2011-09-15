@@ -366,7 +366,7 @@ changes_row(Results, DocInfo, Acc) ->
         deleted_item(Del) ++ case IncDoc of
             true ->
                 Options = if Conflicts -> [conflicts]; true -> [] end,
-                couch_httpd_view:doc_member(Db, DocInfo, Options);
+                couch_util:doc_member(Db, DocInfo, Options);
             false ->
                 []
         end}.
