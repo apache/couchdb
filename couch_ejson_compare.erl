@@ -12,7 +12,7 @@
 
 -module(couch_ejson_compare).
 
--export([less/2]).
+-export([less/2, less_json_ids/2, less_json/2]).
 
 -on_load(init/0).
 
@@ -40,6 +40,17 @@ less(A, B) ->
         % Maybe the EJSON structure is too deep, fallback to Erlang land.
         less_erl(A, B)
     end.
+
+less_json_ids({JsonA, IdA}, {JsonB, IdB}) ->
+    case less(JsonA, JsonB) of
+    0 ->
+        IdA < IdB;
+    Result ->
+        Result < 0
+    end.
+
+less_json(A,B) ->
+    less(A, B) < 0.
 
 
 less_nif(A, B) ->

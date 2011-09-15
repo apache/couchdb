@@ -27,6 +27,8 @@
 -export([reorder_results/2]).
 -export([url_strip_password/1]).
 -export([encode_doc_id/1]).
+-export([with_db/2]).
+-export([doc_member/3]).
 
 -include("couch_db.hrl").
 
@@ -429,3 +431,39 @@ encode_doc_id(<<"_local/", Rest/binary>>) ->
     "_local/" ++ url_encode(Rest);
 encode_doc_id(Id) ->
     url_encode(Id).
+
+
+with_db(Db, Fun) when is_record(Db, db) ->
+    Fun(Db);
+with_db(DbName, Fun) ->
+    case couch_db:open_int(DbName, []) of
+        {ok, Db} ->
+            try
+                Fun(Db)
+            after
+                catch couch_db:close(Db)
+            end;
+        Else ->
+            throw(Else)
+    end.
+
+
+% Rescued from couch_httpd_view.erl, this should really go
+% somewhere else but I can't decide where.
+doc_member(Db, #doc_info{id=Id, revs=[#rev_info{rev=Rev} | _]} = Info, Opts) ->
+    ?LOG_DEBUG("Include Doc: ~p ~p", [Id, Rev]),
+    case couch_db:open_doc(Db, Info, [deleted | Opts]) of
+    {ok, Doc} ->
+        [{doc, couch_doc:to_json_obj(Doc, [])}];
+    _ ->
+        [{doc, null}]
+    end;
+doc_member(Db, {DocId, Rev}, Opts) ->
+    ?LOG_DEBUG("Include Doc: ~p ~p", [DocId, Rev]),
+    case (catch couch_httpd_db:couch_doc_open(Db, DocId, Rev, Opts)) of
+    #doc{} = Doc ->
+        JsonDoc = couch_doc:to_json_obj(Doc, []),
+        [{doc, JsonDoc}];
+    _Else ->
+        [{doc, null}]
+    end.
