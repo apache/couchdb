@@ -34,6 +34,7 @@ go(DbName, #view_query_args{keys=nil} = QueryArgs, Callback, Acc0) ->
         limit = Limit,
         user_acc = Acc0
     },
+    RexiMon = fabric_util:create_monitors(Workers),
     try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3,
         State, infinity, 5000) of
     {ok, NewState} ->
@@ -43,6 +44,7 @@ go(DbName, #view_query_args{keys=nil} = QueryArgs, Callback, Acc0) ->
     {error, Resp} ->
         {ok, Resp}
     after
+        rexi_monitor:stop(RexiMon),
         fabric_util:cleanup(Workers)
     end;
 
@@ -67,10 +69,8 @@ go(DbName, QueryArgs, Callback, Acc0) ->
         Callback(timeout, Acc0)
     end.
 
-handle_message({rexi_DOWN, _, _, _}, nil, State) ->
-    % TODO see if progress can be made here, possibly by removing all shards
-    % from that node and checking is_progress_possible
-    {ok, State};
+handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _, State) ->
+    fabric_view:remove_down_shards(State, NodeRef);
 
 handle_message({rexi_EXIT, Reason}, Worker, State) ->
     #collector{callback=Callback, counters=Counters0, user_acc=Acc} = State,

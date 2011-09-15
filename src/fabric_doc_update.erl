@@ -30,27 +30,37 @@ go(DbName, AllDocs, Opts) ->
         {Shard#shard{ref=Ref}, Docs}
     end, group_docs_by_shard(DbName, AllDocs)),
     {Workers, _} = lists:unzip(GroupedDocs),
+    RexiMon = fabric_util:create_monitors(Workers),
     W = couch_util:get_value(w, Options, integer_to_list(mem3:quorum(DbName))),
     Acc0 = {length(Workers), length(AllDocs), list_to_integer(W), GroupedDocs,
         dict:from_list([{Doc,[]} || Doc <- AllDocs])},
-    case fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
+    try fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
     {ok, Results} ->
         Reordered = couch_util:reorder_results(AllDocs, Results),
         {ok, [R || R <- Reordered, R =/= noreply]};
     Else ->
         Else
+    after
+        rexi_monitor:stop(RexiMon)
     end.
 
-handle_message({rexi_DOWN, _, _, _}, _Worker, Acc0) ->
-    skip_message(Acc0);
-handle_message({rexi_EXIT, _}, _Worker, Acc0) ->
-    skip_message(Acc0);
-handle_message(internal_server_error, _Worker, Acc0) ->
+handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Worker, Acc0) ->
+    {_, LenDocs, W, GroupedDocs, DocReplyDict} = Acc0,
+    NewGrpDocs = [X || {#shard{node=N}, _} = X <- GroupedDocs, N =/= NodeRef],
+    skip_message({length(NewGrpDocs), LenDocs, W, NewGrpDocs, DocReplyDict});
+
+handle_message({rexi_EXIT, _}, Worker, Acc0) ->
+    {WC,LenDocs,W,GrpDocs,DocReplyDict} = Acc0,
+    NewGrpDocs = lists:keydelete(Worker,1,GrpDocs),
+    skip_message({WC-1,LenDocs,W,NewGrpDocs,DocReplyDict});
+handle_message(internal_server_error, Worker, Acc0) ->
     % happens when we fail to load validation functions in an RPC worker
-    skip_message(Acc0);
+    {WC,LenDocs,W,GrpDocs,DocReplyDict} = Acc0,
+    NewGrpDocs = lists:keydelete(Worker,1,GrpDocs),
+    skip_message({WC-1,LenDocs,W,NewGrpDocs,DocReplyDict});
 handle_message({ok, Replies}, Worker, Acc0) ->
     {WaitingCount, DocCount, W, GroupedDocs, DocReplyDict0} = Acc0,
-    Docs = couch_util:get_value(Worker, GroupedDocs),
+    {value, {_, Docs}, NewGrpDocs} = lists:keytake(Worker, 1, GroupedDocs),
     DocReplyDict = append_update_replies(Docs, Replies, DocReplyDict0),
     case {WaitingCount, dict:size(DocReplyDict)} of
     {1, _} ->
@@ -61,7 +71,7 @@ handle_message({ok, Replies}, Worker, Acc0) ->
         % we've got at least one reply for each document, let's take a look
         case dict:fold(fun maybe_reply/3, {stop,W,[]}, DocReplyDict) of
         continue ->
-            {ok, {WaitingCount - 1, DocCount, W, GroupedDocs, DocReplyDict}};
+            {ok, {WaitingCount - 1, DocCount, W, NewGrpDocs, DocReplyDict}};
         {stop, W, FinalReplies} ->
             {stop, FinalReplies}
         end
@@ -123,13 +133,11 @@ append_update_replies([Doc|Rest1], [Reply|Rest2], Dict0) ->
     % TODO what if the same document shows up twice in one update_docs call?
     append_update_replies(Rest1, Rest2, dict:append(Doc, Reply, Dict0)).
 
-skip_message({WaitingCount, _, W, _, DocReplyDict} = Acc0) ->
-    if WaitingCount =:= 1 ->
-        {W, Reply} = dict:fold(fun force_reply/3, {W,[]}, DocReplyDict),
-        {stop, Reply};
-    true ->
-        {ok, setelement(1, Acc0, WaitingCount-1)}
-    end.
+skip_message({0, _, W, _, DocReplyDict}) ->
+    {W, Reply} = dict:fold(fun force_reply/3, {W, []}, DocReplyDict),
+    {stop, Reply};
+skip_message(Acc0) ->
+    {ok, Acc0}.
 
 validate_atomic_update(_, _, false) ->
     ok;

@@ -28,7 +28,8 @@ go(DbName, Id, Options) ->
     R = couch_util:get_value(r, Options, integer_to_list(mem3:quorum(DbName))),
     RepairOpts = [{r, integer_to_list(N)} | Options],
     Acc0 = {Workers, erlang:min(N, list_to_integer(R)), []},
-    case fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
+    RexiMon = fabric_util:create_monitors(Workers),
+    try fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
     {ok, Reply} ->
         format_reply(Reply, SuppressDeletedDoc);
     {error, needs_repair, Reply} ->
@@ -49,6 +50,8 @@ go(DbName, Id, Options) ->
         end;
     Error ->
         Error
+    after
+        rexi_monitor:stop(RexiMon)
     end.
 
 format_reply({ok, #doc{deleted=true}}, true) ->
@@ -56,8 +59,14 @@ format_reply({ok, #doc{deleted=true}}, true) ->
 format_reply(Else, _) ->
     Else.
 
-handle_message({rexi_DOWN, _, _, _}, Worker, Acc0) ->
-    skip_message(Worker, Acc0);
+handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Worker, {Workers, R, Replies}) ->
+    NewWorkers = lists:keydelete(NodeRef, #shard.node, Workers),
+    case NewWorkers of
+    [] ->
+        {error, needs_repair};
+    _ ->
+        {ok, {NewWorkers, R, Replies}}
+    end;
 handle_message({rexi_EXIT, _Reason}, Worker, Acc0) ->
     skip_message(Worker, Acc0);
 handle_message(Reply, Worker, {Workers, R, Replies}) ->
@@ -117,10 +126,4 @@ open_doc_test() ->
     ?assertEqual({error, needs_repair, Foo1}, handle_message(NF, nil, State1)),
 
     % 3 distinct edit branches result in quorum failure
-    ?assertEqual({error, needs_repair}, handle_message(Baz1, nil, State2)),
-
-    % bad node concludes voting w/o success, run sync repair to get the result
-    ?assertEqual(
-        {error, needs_repair},
-        handle_message({rexi_DOWN, 1, 2, 3}, nil, State2)
-    ).
+    ?assertEqual({error, needs_repair}, handle_message(Baz1, nil, State2)).

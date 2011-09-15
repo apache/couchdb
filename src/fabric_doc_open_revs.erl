@@ -45,15 +45,19 @@ go(DbName, Id, Revs, Options) ->
         latest = lists:member(latest, Options),
         replies = case Revs of all -> []; Revs -> [{Rev,[]} || Rev <- Revs] end
     },
-    case fabric_util:recv(Workers, #shard.ref, fun handle_message/3, State) of
+    RexiMon = fabric_util:create_monitors(Workers),
+    try fabric_util:recv(Workers, #shard.ref, fun handle_message/3, State) of
     {ok, {ok, Reply}} ->
         {ok, Reply};
     Else ->
         Else
+    after
+        rexi_monitor:stop(RexiMon)
     end.
 
-handle_message({rexi_DOWN, _, _, _}, Worker, #state{workers=Workers}=State) ->
-    skip(State#state{workers=lists:delete(Worker,Workers)});
+handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Worker, #state{workers=Workers}=State) ->
+    NewWorkers = lists:keydelete(NodeRef, #shard.node, Workers),
+    skip(State#state{workers=NewWorkers});
 handle_message({rexi_EXIT, _}, Worker, #state{workers=Workers}=State) ->
     skip(State#state{workers=lists:delete(Worker,Workers)});
 handle_message({ok, RawReplies}, Worker, #state{revs = all} = State) ->
@@ -183,6 +187,7 @@ unstrip_not_found_missing([Else | Rest]) ->
     [Else | unstrip_not_found_missing(Rest)].
 
 all_revs_test() ->
+    couch_config:start_link([]),
     State0 = #state{worker_count = 3, workers=[nil,nil,nil], r = 2, revs = all},
     Foo1 = {ok, #doc{revs = {1, [<<"foo">>]}}},
     Foo2 = {ok, #doc{revs = {2, [<<"foo2">>, <<"foo">>]}}},
@@ -225,9 +230,11 @@ all_revs_test() ->
     ?assertEqual(
         {stop, [Bar1, Foo1]},
         handle_message({ok, [Bar1]}, nil, State2)
-    ).
+      ),
+    couch_config:stop().
 
 specific_revs_test() ->
+    couch_config:start_link([]),
     Revs = [{1,<<"foo">>}, {1,<<"bar">>}, {1,<<"baz">>}],
     State0 = #state{
         worker_count = 3,
@@ -288,4 +295,5 @@ specific_revs_test() ->
     ?assertEqual(
         {stop, [Foo2, Bar1, Baz2]},
         handle_message({ok, [Foo2, Bar1, Baz2]}, nil, State2L)
-    ).
+      ),
+    couch_config:stop().

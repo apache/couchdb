@@ -16,11 +16,24 @@
 
 -export([is_progress_possible/1, remove_overlapping_shards/2, maybe_send_row/1,
     maybe_pause_worker/3, maybe_resume_worker/2, transform_row/1, keydict/1,
-    extract_view/4, get_shards/2]).
+    extract_view/4, get_shards/2, remove_down_shards/2]).
 
 -include("fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
+
+-spec remove_down_shards(#collector{}, node()) ->
+    {ok, #collector{}} | {error, any()}.
+remove_down_shards(Collector, BadNode) ->
+    #collector{callback=Callback, counters=Counters, user_acc=Acc} = Collector,
+    case fabric_util:remove_down_workers(Counters, BadNode) of
+    {ok, NewCounters} ->
+        {ok, Collector#collector{counters = NewCounters}};
+    error ->
+        Reason = {nodedown, <<"progress not possible">>},
+        {ok, Resp} = Callback({error, Reason}, Acc),
+        {error, Resp}
+    end.
 
 %% @doc looks for a fully covered keyrange in the list of counters
 -spec is_progress_possible([{#shard{}, term()}]) -> boolean().

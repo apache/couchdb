@@ -29,13 +29,22 @@ go(DbName, AllIdsRevs, Options) ->
         Shard#shard{ref=Ref}
     end, group_idrevs_by_shard(DbName, AllIdsRevs)),
     ResultDict = dict:from_list([{Id, {{nil,Revs},[]}} || {Id, Revs} <- AllIdsRevs]),
+    RexiMon = fabric_util:create_monitors(Workers),
     Acc0 = {length(Workers), ResultDict, Workers},
-    fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0).
+    try
+        fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0)
+    after
+        rexi_monitor:stop(RexiMon)
+    end.
 
-handle_message({rexi_DOWN, _, _, _}, Worker, {W, D, Workers}) ->
-    skip_message({W,D,lists:delete(Worker, Workers)});
-handle_message({rexi_EXIT, _, _, _}, Worker, {W, D, Workers}) ->
-    skip_message({W,D,lists:delete(Worker, Workers)});
+handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Shard, {_WorkerLen, ResultDict, Workers}) ->
+    NewWorkers =
+        fabric_dict:filter(fun(#shard{node=Node}, _) ->
+                                Node =/= NodeRef
+                       end, Workers),
+    skip_message({fabric_dict:size(NewWorkers), ResultDict, NewWorkers});
+handle_message({rexi_EXIT, _}, Worker, {W, D, Workers}) ->
+    skip_message({W-1,D,lists:delete(Worker, Workers)});
 handle_message({ok, Results}, _Worker, {1, D0, _}) ->
     D = update_dict(D0, Results),
     {stop, dict:fold(fun force_reply/3, [], D)};
@@ -78,7 +87,7 @@ group_idrevs_by_shard(DbName, IdsRevs) ->
 update_dict(D0, KVs) ->
     lists:foldl(fun({K,V,A}, D1) -> dict:store(K, {V,A}, D1) end, D0, KVs).
 
-skip_message({1, Dict, _Workers}) ->
+skip_message({0, Dict, _Workers}) ->
     {stop, dict:fold(fun force_reply/3, [], Dict)};
-skip_message({WaitingCount, Dict, Workers}) ->
-    {ok, {WaitingCount-1, Dict, Workers}}.
+skip_message(Acc) ->
+    {ok, Acc}.
