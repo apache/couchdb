@@ -13,15 +13,20 @@
 # the License.
 
 SRCDIR="%abs_top_srcdir%"
-BUILDIR="%abs_top_builddir%"
+BUILDDIR="%abs_top_builddir%"
+export ERL_LIBS="$BUILDDIR/src/:$ERL_LIBS"
+export ERL_FLAGS="$ERL_FLAGS -pa $BUILDDIR/test/etap/"
 
-export ERL_FLAGS="$ERL_FLAGS -pa $BUILDIR/test/etap/"
-
-if test $# -gt 0; then
-    while [ $# -gt 0 ]; do
-        $1
-        shift
-    done
+if test $# -eq 1; then
+    OPTS=""
+    TGT=$1
 else
-    prove $SRCDIR/test/etap/*.t
+    OPTS=$1
+    TGT=$2
+fi
+
+if test -f $TGT; then
+    prove $OPTS $TGT
+else
+    prove $OPTS $TGT/*.t
 fi

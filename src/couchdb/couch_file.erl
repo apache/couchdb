@@ -29,7 +29,7 @@
 -export([append_raw_chunk/2, assemble_file_chunk/1, assemble_file_chunk/2]).
 -export([append_term/2, append_term/3, append_term_md5/2, append_term_md5/3]).
 -export([write_header/2, read_header/1]).
--export([delete/2, delete/3, init_delete_dir/1]).
+-export([delete/2, delete/3, nuke_dir/2, init_delete_dir/1]).
 
 % gen_server callbacks
 -export([init/1, terminate/2, code_change/3]).
@@ -211,6 +211,24 @@ delete(RootDir, Filepath, Async) ->
         end;
     Error ->
         Error
+    end.
+
+
+nuke_dir(RootDelDir, Dir) ->
+    FoldFun = fun(File) ->
+        Path = Dir ++ "/" ++ File,
+        case delete(RootDelDir, Path, false) of
+            {error, eperm} -> ok = nuke_dir(RootDelDir, Path);
+            {error, enoent} -> ok;
+            ok -> ok
+        end
+    end,
+    case file:list_dir(Dir) of
+        {ok, Files} ->
+            lists:foreach(FoldFun, Files),
+            ok = file:del_dir(Dir);
+        {error, enoent} ->
+            ok
     end.
 
 

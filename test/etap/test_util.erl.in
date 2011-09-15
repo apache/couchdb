@@ -14,6 +14,7 @@
 
 -export([init_code_path/0]).
 -export([source_file/1, build_file/1, config_files/0]).
+-export([run/2]).
 
 srcdir() ->
     "@abs_top_srcdir@".
@@ -22,8 +23,15 @@ builddir() ->
     "@abs_top_builddir@".
 
 init_code_path() ->
-    Paths = ["etap", "couchdb", "ejson", "erlang-oauth", "ibrowse", "mochiweb",
-             "snappy"],
+    Paths = [
+        "etap",
+        "couchdb",
+        "ejson",
+        "erlang-oauth",
+        "ibrowse",
+        "mochiweb",
+        "snappy"
+    ],
     lists:foreach(fun(Name) ->
         code:add_patha(filename:join([builddir(), "src", Name]))
     end, Paths).
@@ -40,3 +48,17 @@ config_files() ->
         source_file("test/etap/random_port.ini"),
         build_file("etc/couchdb/local_dev.ini")
     ].
+
+
+run(Plan, Fun) ->
+    test_util:init_code_path(),
+    etap:plan(Plan),
+    case (catch Fun()) of
+        ok ->
+            etap:end_tests();
+        Other ->
+            etap:diag(io_lib:format("Test died abnormally:~n~p", [Other])),
+            timer:sleep(500),
+            etap:bail(Other)
+    end,
+    ok.
