@@ -11,6 +11,7 @@
 ## the License.
 
 SUBDIRS = \
+    couch_index \
     couchdb \
     ejson \
     erlang-oauth \
