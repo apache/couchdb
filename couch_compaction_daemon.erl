@@ -228,13 +228,13 @@ maybe_compact_view(DbName, GroupId, Config) ->
     {ok, GroupInfo} ->
         case can_view_compact(Config, DbName, GroupId, GroupInfo) of
         true ->
-            {ok, CompactPid} = couch_view_compactor:start_compact(DbName, GroupId),
+            ok = couch_mrview:compact(DbName, DDocId),
+            {ok, MonRef} = couch_mrview:monitor_compaction(DbName, DDocId),
             TimeLeft = compact_time_left(Config),
-            MonRef = erlang:monitor(process, CompactPid),
             receive
-            {'DOWN', MonRef, process, CompactPid, normal} ->
+            {'DOWN', MonRef, process, _, normal} ->
                 ok;
-            {'DOWN', MonRef, process, CompactPid, Reason} ->
+            {'DOWN', MonRef, process, _, Reason} ->
                 ?LOG_ERROR("Compaction daemon - an error ocurred while compacting"
                     " the view group `~s` from database `~s`: ~p",
                     [GroupId, DbName, Reason]),
@@ -244,7 +244,7 @@ maybe_compact_view(DbName, GroupId, Config) ->
                     "view group `~s` of the database `~s` because it's exceeding"
                     " the allowed period.", [GroupId, DbName]),
                 erlang:demonitor(MonRef, [flush]),
-                ok = couch_view_compactor:cancel_compact(DbName, GroupId),
+                ok = couch_mrview:cancel_compaction(DbName, DDocId),
                 timeout
             end;
         false ->
@@ -329,7 +329,7 @@ can_view_compact(Config, DbName, GroupId, GroupInfo) ->
             false ->
                 false;
             true ->
-                Free = free_space(couch_config:get("couchdb", "view_index_dir")),
+                Free = free_space(couch_index_util:root_dir()),
                 case Free >= SpaceRequired of
                 true ->
                     true;
