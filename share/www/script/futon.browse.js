@@ -1283,8 +1283,7 @@
           return false;
         }).prependTo($("a", li));
       }
-    },
-
+    }
   });
 
   function encodeAttachment(name) {
