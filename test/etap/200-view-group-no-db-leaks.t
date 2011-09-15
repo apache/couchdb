@@ -165,7 +165,7 @@ wait_db_compact_done(N) ->
     end.
 
 compact_view_group() ->
-    ok = couch_view_compactor:start_compact(test_db_name(), ddoc_name()),
+    {ok, _} = couch_view_compactor:start_compact(test_db_name(), ddoc_name()),
     wait_view_compact_done(10).
 
 wait_view_compact_done(0) ->

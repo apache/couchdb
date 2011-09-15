@@ -128,7 +128,7 @@ handle_changes_req1(Req, Db) ->
 handle_compact_req(#httpd{method='POST',path_parts=[DbName,_,Id|_]}=Req, Db) ->
     ok = couch_db:check_is_admin(Db),
     couch_httpd:validate_ctype(Req, "application/json"),
-    ok = couch_view_compactor:start_compact(DbName, Id),
+    {ok, _} = couch_view_compactor:start_compact(DbName, Id),
     send_json(Req, 202, {[{ok, true}]});
 
 handle_compact_req(#httpd{method='POST'}=Req, Db) ->

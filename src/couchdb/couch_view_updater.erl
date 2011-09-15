@@ -18,7 +18,15 @@
 
 -spec update(_, #group{}, Dbname::binary()) -> no_return().
 
-update(Owner, Group, DbName) ->
+update(Owner, Group, DbName) when is_binary(DbName) ->
+    {ok, Db} = couch_db:open_int(DbName, []),
+    try
+        update(Owner, Group, Db)
+    after
+        couch_db:close(Db)
+    end;
+
+update(Owner, Group, #db{name = DbName} = Db) ->
     #group{
         name = GroupName,
         current_seq = Seq,
@@ -26,7 +34,6 @@ update(Owner, Group, DbName) ->
     } = Group,
     couch_task_status:add_task(<<"View Group Indexer">>, <<DbName/binary," ",GroupName/binary>>, <<"Starting index update">>),
 
-    {ok, Db} = couch_db:open_int(DbName, []),
     DbPurgeSeq = couch_db:get_purge_seq(Db),
     Group2 =
     if DbPurgeSeq == PurgeSeq ->
@@ -36,7 +43,6 @@ update(Owner, Group, DbName) ->
         purge_index(Group, Db);
     true ->
         couch_task_status:update(<<"Resetting view index due to lost purge entries.">>),
-        couch_db:close(Db),
         exit(reset)
     end,
     {ok, MapQueue} = couch_work_queue:new(
@@ -74,7 +80,6 @@ update(Owner, Group, DbName) ->
     couch_task_status:set_update_frequency(0),
     couch_task_status:update("Finishing."),
     couch_work_queue:close(MapQueue),
-    couch_db:close(Db),
     receive {new_group, NewGroup} ->
         exit({new_group,
                 NewGroup#group{current_seq=couch_db:get_update_seq(Db)}})

@@ -88,5 +88,6 @@ EXTRA_DIST = \
 	180-http-proxy.t \
   190-oauth.t \
 	200-view-group-no-db-leaks.t \
+	201-view-group-shutdown.t \
 	210-os-proc-pool.t
 
