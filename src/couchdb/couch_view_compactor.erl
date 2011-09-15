@@ -46,7 +46,6 @@ compact_group(Group, EmptyGroup, DbName) ->
 
     {ok, Db} = couch_db:open_int(DbName, []),
     {ok, DbReduce} = couch_btree:full_reduce(Db#db.fulldocinfo_by_id_btree),
-    couch_db:close(Db),
     Count = element(1, DbReduce),
 
     <<"_design", ShortName/binary>> = GroupId,
@@ -86,20 +85,21 @@ compact_group(Group, EmptyGroup, DbName) ->
         views=NewViews,
         current_seq=Seq
     },
-    maybe_retry_compact(DbName, GroupId, NewGroup).
+    maybe_retry_compact(Db, GroupId, NewGroup).
 
-maybe_retry_compact(DbName, GroupId, NewGroup) ->
+maybe_retry_compact(#db{name = DbName} = Db, GroupId, NewGroup) ->
     Pid = couch_view:get_group_server(DbName, GroupId),
     case gen_server:call(Pid, {compact_done, NewGroup}) of
     ok ->
-        ok;
+        couch_db:close(Db);
     update ->
+        {ok, Db2} = couch_db:reopen(Db),
         {_, Ref} = erlang:spawn_monitor(fun() ->
-            couch_view_updater:update(nil, NewGroup, DbName)
+            couch_view_updater:update(nil, NewGroup, Db2)
         end),
         receive
         {'DOWN', Ref, _, _, {new_group, NewGroup2}} ->
-            maybe_retry_compact(DbName, GroupId, NewGroup2)
+            maybe_retry_compact(Db2, GroupId, NewGroup2)
         end
     end.
 
