@@ -16,7 +16,7 @@
 -export([handle_request/1, handle_compact_req/2, handle_design_req/2,
     db_req/2, couch_doc_open/4,handle_changes_req/2,
     update_doc_result_to_json/1, update_doc_result_to_json/2,
-    handle_design_info_req/3, handle_view_cleanup_req/2]).
+    handle_design_info_req/3]).
 
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
@@ -125,29 +125,22 @@ handle_changes_req1(Req, Db) ->
     )
     end.
 
-handle_compact_req(#httpd{method='POST',path_parts=[DbName,_,Id|_]}=Req, Db) ->
-    ok = couch_db:check_is_admin(Db),
-    couch_httpd:validate_ctype(Req, "application/json"),
-    {ok, _} = couch_view_compactor:start_compact(DbName, Id),
-    send_json(Req, 202, {[{ok, true}]});
-
 handle_compact_req(#httpd{method='POST'}=Req, Db) ->
-    ok = couch_db:check_is_admin(Db),
-    couch_httpd:validate_ctype(Req, "application/json"),
-    {ok, _} = couch_db:start_compact(Db),
-    send_json(Req, 202, {[{ok, true}]});
+    case Req#httpd.path_parts of
+        [_DbName, <<"_compact">>] ->
+            ok = couch_db:check_is_admin(Db),
+            couch_httpd:validate_ctype(Req, "application/json"),
+            {ok, _} = couch_db:start_compact(Db),
+            send_json(Req, 202, {[{ok, true}]});
+        [_DbName, <<"_compact">>, DesignName | _] ->
+            DesignId = <<"_design/", DesignName/binary>>,
+            DDoc = couch_httpd_db:couch_doc_open(
+                Db, DesignId, nil, [ejson_body]
+            ),
+            couch_mrview_http:handle_compact_req(Req, Db, DDoc)
+    end;
 
 handle_compact_req(Req, _Db) ->
-    send_method_not_allowed(Req, "POST").
-
-handle_view_cleanup_req(#httpd{method='POST'}=Req, Db) ->
-    % delete unreferenced index files
-    ok = couch_db:check_is_admin(Db),
-    couch_httpd:validate_ctype(Req, "application/json"),
-    ok = couch_view:cleanup_index_files(Db),
-    send_json(Req, 202, {[{ok, true}]});
-
-handle_view_cleanup_req(Req, _Db) ->
     send_method_not_allowed(Req, "POST").
 
 
@@ -171,14 +164,8 @@ handle_design_info_req(#httpd{
             path_parts=[_DbName, _Design, DesignName, _]
         }=Req, Db, _DDoc) ->
     DesignId = <<"_design/", DesignName/binary>>,
-    {ok, GroupInfoList} = couch_view:get_group_info(Db, DesignId),
-    send_json(Req, 200, {[
-        {name, DesignName},
-        {view_index, {GroupInfoList}}
-    ]});
-
-handle_design_info_req(Req, _Db, _DDoc) ->
-    send_method_not_allowed(Req, "GET").
+    DDoc = couch_httpd_db:couch_doc_open(Db, DesignId, nil, [ejson_body]),
+    couch_mrview_http:handle_info_req(Req, Db, DDoc).
 
 create_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
     ok = couch_httpd:verify_is_server_admin(Req),
@@ -574,7 +561,7 @@ all_docs_view_row_obj(Db, {_KeyDocId, DocInfo}, true, Conflicts) ->
     #doc_info{revs = [#rev_info{deleted = true} | _]} ->
         {all_docs_row(DocInfo) ++ [{doc, null}]};
     _ ->
-        {all_docs_row(DocInfo) ++ couch_httpd_view:doc_member(
+        {all_docs_row(DocInfo) ++ couch_util:doc_member(
             Db, DocInfo, if Conflicts -> [conflicts]; true -> [] end)}
     end;
 all_docs_view_row_obj(_Db, {_KeyDocId, DocInfo}, _IncludeDocs, _Conflicts) ->
