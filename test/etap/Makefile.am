@@ -45,6 +45,7 @@ EXTRA_DIST = \
     041-uuid-gen-seq.ini \
     041-uuid-gen-utc.ini \
     041-uuid-gen.t \
+    042-work-queue.t \
     050-stream.t \
     060-kt-merging.t \
     061-kt-missing-leaves.t \

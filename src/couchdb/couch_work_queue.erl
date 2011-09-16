@@ -16,7 +16,7 @@
 -include("couch_db.hrl").
 
 % public API
--export([new/1, queue/2, dequeue/1, dequeue/2, close/1]).
+-export([new/1, queue/2, dequeue/1, dequeue/2, close/1, item_count/1, size/1]).
 
 % gen_server callbacks
 -export([init/1, terminate/2]).
@@ -52,6 +52,22 @@ dequeue(Wq) ->
 dequeue(Wq, MaxItems) ->
     try
         gen_server:call(Wq, {dequeue, MaxItems}, infinity)
+    catch
+        _:_ -> closed
+    end.
+
+
+item_count(Wq) ->
+    try
+        gen_server:call(Wq, item_count, infinity)
+    catch
+        _:_ -> closed
+    end.
+
+
+size(Wq) ->
+    try
+        gen_server:call(Wq, size, infinity)
     catch
         _:_ -> closed
     end.
@@ -104,7 +120,13 @@ handle_call({dequeue, Max}, From, Q) ->
         C when C > 0 ->
             deliver_queue_items(Max, Q)
         end
-    end.
+    end;
+
+handle_call(item_count, _From, Q) ->
+    {reply, Q#q.items, Q};
+
+handle_call(size, _From, Q) ->
+    {reply, Q#q.size, Q}.
 
 
 deliver_queue_items(Max, Q) ->
