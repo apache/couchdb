@@ -99,7 +99,6 @@ recompact(State) ->
         update_seq=UpdateSeq
     } = State,
     link(State#mrst.fd),
-    ?LOG_INFO("Recompacting index ~s ~s at ~p", [DbName, IdxName, UpdateSeq]),
     {_Pid, Ref} = erlang:spawn_monitor(fun() ->
         couch_index_updater:update(couch_mrview_index, State)
     end),
@@ -139,7 +138,6 @@ swap_compacted(OldState, NewState) ->
         db_name=DbName,
         idx_name=IdxName
     } = NewState,
-    ?LOG_INFO("View index compaction complete for ~s ~s", [DbName, IdxName]),
 
     link(NewState#mrst.fd),
 
