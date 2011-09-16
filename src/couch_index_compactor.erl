@@ -22,6 +22,9 @@
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
 
+-include("couch_db.hrl").
+
+
 -record(st, {
     idx,
     mod,
@@ -103,8 +106,14 @@ compact(Parent, Mod, IdxState) ->
     compact(Parent, Mod, IdxState, []).
 
 compact(Idx, Mod, IdxState, Opts) ->
+    Args = [Mod:get(db_name, IdxState), Mod:get(idx_name, IdxState)],
+    ?LOG_INFO("Compaction started for db: ~s idx: ~s", Args),
     {ok, NewIdxState} = Mod:compact(IdxState, Opts),
     case gen_server:call(Idx, {compacted, NewIdxState}) of
-        recompact -> compact(Idx, Mod, NewIdxState, [recompact]);
-        _ -> ok
+        recompact ->
+            ?LOG_INFO("Compaction restarting for db: ~s idx: ~s", Args),
+            compact(Idx, Mod, NewIdxState, [recompact]);
+        _ ->
+            ?LOG_INFO("Compaction finished for db: ~s idx: ~s", Args),
+            ok
     end.

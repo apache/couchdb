@@ -24,6 +24,9 @@
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
 
+-include("couch_db.hrl").
+
+
 -record(st, {
     mod,
     idx_state,
@@ -88,6 +91,12 @@ init({Mod, IdxState}) ->
                 compactor=CPid,
                 commit_delay=MsDelay
             },
+            Args = [
+                Mod:get(db_name, IdxState),
+                Mod:get(idx_name, IdxState),
+                Mod:get(signature, IdxState)
+            ],
+            ?LOG_INFO("Opening index for db: ~s idx: ~s~n    sig: ~p", Args),
             proc_lib:init_ack({ok, self()}),
             gen_server:enter_loop(?MODULE, [], State);
         Other ->
@@ -183,6 +192,12 @@ handle_cast({updated, NewIdxState}, State) ->
 handle_cast({new_state, NewIdxState}, State) ->
     #st{mod=Mod, commit_delay=Delay} = State,
     CurrSeq = Mod:get(update_seq, NewIdxState),
+    Args = [
+        Mod:get(db_name, NewIdxState),
+        Mod:get(idx_name, NewIdxState),
+        CurrSeq
+    ],
+    ?LOG_DEBUG("Updated index for db: ~s idx: ~s seq: ~B", Args),
     Rest = send_replies(State#st.waiters, CurrSeq, NewIdxState),
     case State#st.committed of
         true -> erlang:send_after(Delay, self(), commit);
@@ -228,7 +243,9 @@ handle_info(commit, State) ->
             erlang:send_after(Delay, self(), commit),
             {noreply, State}
     end;
-handle_info({'DOWN', _, _, _Pid, _}, State) ->
+handle_info({'DOWN', _, _, _Pid, _}, #st{mod=Mod, idx_state=IdxState}=State) ->
+    Args = [Mod:get(db_name, IdxState), Mod:get(idx_name, IdxState)],
+    ?LOG_INFO("Index shutdown by monitor notice for db: ~s idx: ~s", Args),
     catch send_all(State#st.waiters, shutdown),
     {stop, normal, State#st{waiters=[]}}.
 
