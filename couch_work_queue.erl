@@ -91,7 +91,7 @@ terminate(_Reason, #q{work_waiters=Workers}) ->
 
     
 handle_call({queue, Item, Size}, From, #q{work_waiters = []} = Q0) ->
-    Q = Q0#q{size = Q0#q.size + Size, % increment_queue_size(Q0, Item),
+    Q = Q0#q{size = Q0#q.size + Size,
                 items = Q0#q.items + 1,
                 queue = queue:in({Item, Size}, Q0#q.queue)},
     case (Q#q.size >= Q#q.max_size) orelse
