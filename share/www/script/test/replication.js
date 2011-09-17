@@ -1663,6 +1663,114 @@ couchTests.replication = function(debug) {
     TEquals("bad_request", e.error);
   }
 
+
+  // Test that we can cancel a replication just by POSTing an object
+  // like  {"replication_id": Id, "cancel": true}. The replication ID
+  // can be obtained from a continuous replication request response
+  // (_local_id field), from _active_tasks or from the log
+  populateDb(sourceDb, makeDocs(1, 6));
+  populateDb(targetDb, []);
+
+  repResult = CouchDB.replicate(
+    CouchDB.protocol + host + "/" + sourceDb.name,
+    targetDb.name,
+    {
+      body: {
+        continuous: true,
+        create_target: true
+      }
+    }
+  );
+  TEquals(true, repResult.ok);
+  TEquals('string', typeof repResult._local_id);
+
+  xhr = CouchDB.request("GET", "/_active_tasks");
+  tasks = JSON.parse(xhr.responseText);
+
+  var repId;
+  for (j = 0; j < tasks.length; j++) {
+    if (tasks[j].replication_id === repResult._local_id) {
+      repId = tasks[j].replication_id;
+    }
+  }
+
+  TEquals(repResult._local_id, repId, "Replication found in _active_tasks");
+  xhr = CouchDB.request(
+    "POST", "/_replicate", {
+      body: JSON.stringify({"replication_id": repId, "cancel": true}),
+      headers: {"Content-Type": "application/json"}
+  });
+  TEquals(200, xhr.status, "Replication cancel request success");
+
+  xhr = CouchDB.request("GET", "/_active_tasks");
+  tasks = JSON.parse(xhr.responseText);
+  repId = null;
+  for (j = 0; j < tasks.length; j++) {
+    if (tasks[j].replication_id === repResult._local_id) {
+      repId = tasks[j].replication_id;
+    }
+  }
+  TEquals(null, repId, "Replication was canceled");
+
+  xhr = CouchDB.request(
+    "POST", "/_replicate", {
+      body: JSON.stringify({"replication_id": repResult._local_id, "cancel": true}),
+      headers: {"Content-Type": "application/json"}
+  });
+  TEquals(404, xhr.status, "2nd replication cancel failed");
+
+  // Non-admin user can not cancel replications triggered by other users
+  var userDoc = CouchDB.prepareUserDoc({
+    name: "tony",
+    roles: ["mafia"]
+  }, "soprano");
+  usersDb = new CouchDB("test_suite_auth", {"X-Couch-Full-Commit":"false"});
+  server_config = [
+    {
+      section: "couch_httpd_auth",
+      key: "authentication_db",
+      value: usersDb.name
+    }
+  ];
+
+  run_on_modified_server(server_config, function() {
+    populateDb(sourceDb, makeDocs(1, 6));
+    populateDb(targetDb, []);
+    TEquals(true, usersDb.save(userDoc).ok);
+
+    repResult = CouchDB.replicate(
+      CouchDB.protocol + host + "/" + sourceDb.name,
+      targetDb.name,
+      {
+        body: {
+          continuous: true
+        }
+      }
+    );
+    TEquals(true, repResult.ok);
+    TEquals('string', typeof repResult._local_id);
+
+    TEquals(true, CouchDB.login("tony", "soprano").ok);
+    TEquals('tony', CouchDB.session().userCtx.name);
+
+    xhr = CouchDB.request(
+      "POST", "/_replicate", {
+        body: JSON.stringify({"replication_id": repResult._local_id, "cancel": true}),
+        headers: {"Content-Type": "application/json"}
+    });
+    TEquals(401, xhr.status, "Unauthorized to cancel replication");
+    TEquals("unauthorized", JSON.parse(xhr.responseText).error);
+
+    TEquals(true, CouchDB.logout().ok);
+
+    xhr = CouchDB.request(
+      "POST", "/_replicate", {
+        body: JSON.stringify({"replication_id": repResult._local_id, "cancel": true}),
+        headers: {"Content-Type": "application/json"}
+    });
+    TEquals(200, xhr.status, "Authorized to cancel replication");
+  });
+
   // cleanup
   usersDb.deleteDb();
   sourceDb.deleteDb();

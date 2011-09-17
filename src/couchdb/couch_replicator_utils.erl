@@ -31,16 +31,22 @@
 parse_rep_doc({Props}, UserCtx) ->
     ProxyParams = parse_proxy_params(get_value(<<"proxy">>, Props, <<>>)),
     Options = make_options(Props),
-    Source = parse_rep_db(get_value(<<"source">>, Props), ProxyParams, Options),
-    Target = parse_rep_db(get_value(<<"target">>, Props), ProxyParams, Options),
-    Rep = #rep{
-        source = Source,
-        target = Target,
-        options = Options,
-        user_ctx = UserCtx,
-        doc_id = get_value(<<"_id">>, Props)
-    },
-    {ok, Rep#rep{id = replication_id(Rep)}}.
+    case get_value(cancel, Options, false) andalso
+        (get_value(id, Options, nil) =/= nil) of
+    true ->
+        {ok, #rep{options = Options, user_ctx = UserCtx}};
+    false ->
+        Source = parse_rep_db(get_value(<<"source">>, Props), ProxyParams, Options),
+        Target = parse_rep_db(get_value(<<"target">>, Props), ProxyParams, Options),
+        Rep = #rep{
+            source = Source,
+            target = Target,
+            options = Options,
+            user_ctx = UserCtx,
+            doc_id = get_value(<<"_id">>, Props)
+        },
+        {ok, Rep#rep{id = replication_id(Rep)}}
+    end.
 
 
 replication_id(#rep{options = Options} = Rep) ->
@@ -229,6 +235,10 @@ convert_options([])->
     [];
 convert_options([{<<"cancel">>, V} | R]) ->
     [{cancel, V} | convert_options(R)];
+convert_options([{IdOpt, V} | R]) when IdOpt =:= <<"_local_id">>;
+        IdOpt =:= <<"replication_id">>; IdOpt =:= <<"id">> ->
+    Id = lists:splitwith(fun(X) -> X =/= $+ end, ?b2l(V)),
+    [{id, Id} | convert_options(R)];
 convert_options([{<<"create_target">>, V} | R]) ->
     [{create_target, V} | convert_options(R)];
 convert_options([{<<"continuous">>, V} | R]) ->
