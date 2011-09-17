@@ -13,29 +13,26 @@
 -module(couch_task_status).
 -behaviour(gen_server).
 
-% This module allows is used to track the status of long running tasks.
-% Long running tasks register (add_task/3) then update their status (update/1)
-% and the task and status is added to tasks list. When the tracked task dies
-% it will be automatically removed the tracking. To get the tasks list, use the
-% all/0 function
+% This module is used to track the status of long running tasks.
+% Long running tasks register themselves, via a call to add_task/1, and then
+% update their status properties via update/1. The status of a task is a
+% list of properties. Each property is a tuple, with the first element being
+% either an atom or a binary and the second element must be an EJSON value. When
+% a task updates its status, it can override some or all of its properties.
+% The properties {started_on, UnitTimestamp}, {updated_on, UnixTimestamp} and
+% {pid, ErlangPid} are automatically added by this module.
+% When a tracked task dies, its status will be automatically removed from
+% memory. To get the tasks list, call the all/0 function.
 
 -export([start_link/0, stop/0]).
--export([all/0, add_task/3, update/1, update/2, set_update_frequency/1]).
+-export([all/0, add_task/1, update/1, get/1, set_update_frequency/1]).
 
 -export([init/1, terminate/2, code_change/3]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
--import(couch_util, [to_binary/1]).
-
 -include("couch_db.hrl").
 
--record(task_status, {
-    type,
-    name,
-    start_ts,
-    update_ts,
-    status
-}).
+-define(set(L, K, V), lists:keystore(K, 1, L, {K, V})).
 
 
 start_link() ->
@@ -50,36 +47,41 @@ all() ->
     gen_server:call(?MODULE, all).
 
 
-add_task(Type, TaskName, StatusText) ->
+add_task(Props) ->
     put(task_status_update, {{0, 0, 0}, 0}),
-    Ts = now_ts(),
-    Msg = {
-        add_task,
-        #task_status{
-            type = to_binary(Type),
-            name = to_binary(TaskName),
-            status = to_binary(StatusText),
-            start_ts = Ts,
-            update_ts = Ts
-        }
-    },
-    gen_server:call(?MODULE, Msg).
+    Ts = timestamp(),
+    TaskProps = lists:ukeysort(
+        1, [{started_on, Ts}, {updated_on, Ts} | Props]),
+    put(task_status_props, TaskProps),
+    gen_server:call(?MODULE, {add_task, TaskProps}).
 
 
 set_update_frequency(Msecs) ->
     put(task_status_update, {{0, 0, 0}, Msecs * 1000}).
 
 
-update(StatusText) ->
-    update("~s", [StatusText]).
+update(Props) ->
+    MergeProps = lists:ukeysort(1, Props),
+    TaskProps = lists:ukeymerge(1, MergeProps, erlang:get(task_status_props)),
+    put(task_status_props, TaskProps),
+    maybe_persist(TaskProps).
 
-update(Format, Data) ->
-    {LastUpdateTime, Frequency} = get(task_status_update),
+
+get(Props) when is_list(Props) ->
+    TaskProps = erlang:get(task_status_props),
+    [couch_util:get_value(P, TaskProps) || P <- Props];
+get(Prop) ->
+    TaskProps = erlang:get(task_status_props),
+    couch_util:get_value(Prop, TaskProps).
+
+
+maybe_persist(TaskProps0) ->
+    {LastUpdateTime, Frequency} = erlang:get(task_status_update),
     case timer:now_diff(Now = now(), LastUpdateTime) >= Frequency of
     true ->
         put(task_status_update, {Now, Frequency}),
-        Msg = ?l2b(io_lib:format(Format, Data)),
-        gen_server:cast(?MODULE, {update_status, self(), Msg});
+        TaskProps = ?set(TaskProps0, updated_on, timestamp(Now)),
+        gen_server:cast(?MODULE, {update_status, self(), TaskProps});
     false ->
         ok
     end.
@@ -95,10 +97,10 @@ terminate(_Reason,_State) ->
     ok.
 
 
-handle_call({add_task, TaskStatus}, {From, _}, Server) ->
+handle_call({add_task, TaskProps}, {From, _}, Server) ->
     case ets:lookup(?MODULE, From) of
     [] ->
-        true = ets:insert(?MODULE, {From, TaskStatus}),
+        true = ets:insert(?MODULE, {From, TaskProps}),
         erlang:monitor(process, From),
         {reply, ok, Server};
     [_] ->
@@ -106,25 +108,23 @@ handle_call({add_task, TaskStatus}, {From, _}, Server) ->
     end;
 handle_call(all, _, Server) ->
     All = [
-        [
-            {type, Task#task_status.type},
-            {task, Task#task_status.name},
-            {started_on, Task#task_status.start_ts},
-            {updated_on, Task#task_status.update_ts},
-            {status, Task#task_status.status},
-            {pid, ?l2b(pid_to_list(Pid))}
-        ]
+        [{pid, ?l2b(pid_to_list(Pid))} | TaskProps]
         ||
-        {Pid, Task} <- ets:tab2list(?MODULE)
+        {Pid, TaskProps} <- ets:tab2list(?MODULE)
     ],
     {reply, All, Server}.
 
 
-handle_cast({update_status, Pid, StatusText}, Server) ->
-    [{Pid, #task_status{name = TaskName} = Task}] = ets:lookup(?MODULE, Pid),
-    ?LOG_DEBUG("New task status for ~s: ~s",[TaskName, StatusText]),
-    NewTaskStatus = Task#task_status{status = StatusText, update_ts = now_ts()},
-    true = ets:insert(?MODULE, {Pid, NewTaskStatus}),
+handle_cast({update_status, Pid, NewProps}, Server) ->
+    case ets:lookup(?MODULE, Pid) of
+    [{Pid, _CurProps}] ->
+        ?LOG_DEBUG("New task status for ~p: ~p", [Pid, NewProps]),
+        true = ets:insert(?MODULE, {Pid, NewProps});
+    _ ->
+        % Task finished/died in the meanwhile and we must have received
+        % a monitor message before this call - ignore.
+        ok
+    end,
     {noreply, Server};
 handle_cast(stop, State) ->
     {stop, normal, State}.
@@ -139,6 +139,8 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 
-now_ts() ->
-    {Mega, Secs, _} = erlang:now(),
+timestamp() ->
+    timestamp(now()).
+
+timestamp({Mega, Secs, _}) ->
     Mega * 1000000 + Secs.

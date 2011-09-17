@@ -879,6 +879,7 @@ copy_docs(Db, #db{updater_fd = DestFd} = NewDb, InfoBySeq0, Retry) ->
             NewDb#db.docinfo_by_seq_btree, NewDocInfos, RemoveSeqs),
     {ok, FullDocInfoBTree} = couch_btree:add_remove(
             NewDb#db.fulldocinfo_by_id_btree, NewFullDocInfos, []),
+    update_compact_task(length(NewFullDocInfos)),
     NewDb#db{ fulldocinfo_by_id_btree=FullDocInfoBTree,
               docinfo_by_seq_btree=DocInfoBTree}.
 
@@ -896,40 +897,46 @@ copy_compact(Db, NewDb0, Retry) ->
 
     EnumBySeqFun =
     fun(#doc_info{high_seq=Seq}=DocInfo, _Offset,
-        {AccNewDb, AccUncopied, AccUncopiedSize, AccCopiedSize, TotalCopied}) ->
+        {AccNewDb, AccUncopied, AccUncopiedSize, AccCopiedSize}) ->
 
         AccUncopiedSize2 = AccUncopiedSize + ?term_size(DocInfo),
         if AccUncopiedSize2 >= BufferSize ->
             NewDb2 = copy_docs(
                 Db, AccNewDb, lists:reverse([DocInfo | AccUncopied]), Retry),
-            TotalCopied2 = TotalCopied + 1 + length(AccUncopied),
-            couch_task_status:update("Copied ~p of ~p changes (~p%)",
-                [TotalCopied2, TotalChanges, (TotalCopied2 * 100) div TotalChanges]),
             AccCopiedSize2 = AccCopiedSize + AccUncopiedSize2,
             if AccCopiedSize2 >= CheckpointAfter ->
-                {ok, {commit_data(NewDb2#db{update_seq = Seq}), [],
-                    0, 0, TotalCopied2}};
+                {ok, {commit_data(NewDb2#db{update_seq = Seq}), [], 0, 0}};
             true ->
-                {ok, {NewDb2#db{update_seq = Seq}, [],
-                    0, AccCopiedSize2, TotalCopied2}}
+                {ok, {NewDb2#db{update_seq = Seq}, [], 0, AccCopiedSize2}}
             end;
         true ->
             {ok, {AccNewDb, [DocInfo | AccUncopied], AccUncopiedSize2,
-                AccCopiedSize, TotalCopied}}
+                AccCopiedSize}}
         end
     end,
 
-    couch_task_status:set_update_frequency(500),
+    TaskProps0 = [
+        {type, database_compaction},
+        {database, Db#db.name},
+        {progress, 0},
+        {changes_done, 0},
+        {total_changes, TotalChanges}
+    ],
+    case Retry of
+    true ->
+        couch_task_status:update([{retry, true}]);
+    false ->
+        couch_task_status:add_task(TaskProps0),
+        couch_task_status:set_update_frequency(500)
+    end,
 
-    {ok, _, {NewDb2, Uncopied, _, _, ChangesDone}} =
+    {ok, _, {NewDb2, Uncopied, _, _}} =
         couch_btree:foldl(Db#db.docinfo_by_seq_btree, EnumBySeqFun,
-            {NewDb, [], 0, 0, 0},
+            {NewDb, [], 0, 0},
             [{start_key, NewDb#db.update_seq + 1}]),
 
-    couch_task_status:update("Flushing"),
-
     NewDb3 = copy_docs(Db, NewDb2, lists:reverse(Uncopied), Retry),
-    TotalChanges = ChangesDone + length(Uncopied),
+    TotalChanges = (couch_task_status:get(changes_done) - NewDb#db.update_seq),
 
     % copy misc header values
     if NewDb3#db.security /= Db#db.security ->
@@ -948,7 +955,6 @@ start_copy_compact(#db{name=Name,filepath=Filepath,header=#db_header{purge_seq=P
     ?LOG_DEBUG("Compaction process spawned for db \"~s\"", [Name]),
     case couch_file:open(CompactFile) of
     {ok, Fd} ->
-        couch_task_status:add_task(<<"Database Compaction">>, <<Name/binary, " retry">>, <<"Starting">>),
         Retry = true,
         case couch_file:read_header(Fd) of
         {ok, Header} ->
@@ -957,7 +963,6 @@ start_copy_compact(#db{name=Name,filepath=Filepath,header=#db_header{purge_seq=P
             ok = couch_file:write_header(Fd, Header=#db_header{})
         end;
     {error, enoent} ->
-        couch_task_status:add_task(<<"Database Compaction">>, Name, <<"Starting">>),
         {ok, Fd} = couch_file:open(CompactFile, [create]),
         Retry = false,
         ok = couch_file:write_header(Fd, Header=#db_header{})
@@ -983,6 +988,17 @@ start_copy_compact(#db{name=Name,filepath=Filepath,header=#db_header{purge_seq=P
     {retry, CurrentDb} ->
         start_copy_compact(CurrentDb)
     end.
+
+update_compact_task(NumChanges) ->
+    [Changes, Total] = couch_task_status:get([changes_done, total_changes]),
+    Changes2 = Changes + NumChanges,
+    Progress = case Total of
+    0 ->
+        0;
+    _ ->
+        (Changes2 * 100) div Total
+    end,
+    couch_task_status:update([{changes_done, Changes2}, {progress, Progress}]).
 
 make_doc_summary(#db{compression = Comp}, {Body0, Atts0}) ->
     Body = case couch_compress:is_compressed(Body0) of
