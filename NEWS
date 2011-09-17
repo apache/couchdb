@@ -21,8 +21,14 @@ This version has not been released yet.
    writes and view indexing.
  * Added a `data_size` property to database and view group
    information URIs.
+ * Added support for automatic compaction. This feature is disabled
+   by default, but it can be enabled via the .ini configuration.
  * A new replicator implementation that offers more performance
    and configuration options.
+ * Added optional field `since_seq` to replication ojects/documents.
+ * Simpler replication cancelation.
+ * The _active_tasks API now exposes more granular fields for each
+   task type.
  * Futon's `Status` screen (active tasks) now displays two new task
    status fields: `Started on` and `Updated on`.
 
