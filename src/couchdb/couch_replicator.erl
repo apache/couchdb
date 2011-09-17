@@ -72,10 +72,15 @@
 }).
 
 
-replicate(#rep{id = RepId, options = Options} = Rep) ->
+replicate(#rep{id = RepId, options = Options, user_ctx = UserCtx} = Rep) ->
     case get_value(cancel, Options, false) of
     true ->
-        cancel_replication(RepId);
+        case get_value(id, Options, nil) of
+        nil ->
+            cancel_replication(RepId);
+        RepId2 ->
+            cancel_replication(RepId2, UserCtx)
+        end;
     false ->
         {ok, Listener} = rep_result_listener(RepId),
         Result = do_replication_loop(Rep),
@@ -84,12 +89,12 @@ replicate(#rep{id = RepId, options = Options} = Rep) ->
     end.
 
 
-do_replication_loop(#rep{id = {BaseId,_} = Id, options = Options} = Rep) ->
+do_replication_loop(#rep{id = {BaseId, Ext} = Id, options = Options} = Rep) ->
     case async_replicate(Rep) of
     {ok, _Pid} ->
         case get_value(continuous, Options, false) of
         true ->
-            {ok, {continuous, ?l2b(BaseId)}};
+            {ok, {continuous, ?l2b(BaseId ++ Ext)}};
         false ->
             wait_for_result(Id)
         end;
@@ -176,20 +181,47 @@ wait_for_result(RepId) ->
 
 cancel_replication({BaseId, Extension}) ->
     FullRepId = BaseId ++ Extension,
+    ?LOG_INFO("Canceling replication `~s`...", [FullRepId]),
     case supervisor:terminate_child(couch_rep_sup, FullRepId) of
     ok ->
+        ?LOG_INFO("Replication `~s` canceled.", [FullRepId]),
         case supervisor:delete_child(couch_rep_sup, FullRepId) of
             ok ->
-                {ok, {cancelled, ?l2b(BaseId)}};
+                {ok, {cancelled, ?l2b(FullRepId)}};
             {error, not_found} ->
-                {ok, {cancelled, ?l2b(BaseId)}};
+                {ok, {cancelled, ?l2b(FullRepId)}};
             Error ->
                 Error
         end;
     Error ->
+        ?LOG_ERROR("Error canceling replication `~s`: ~p", [FullRepId, Error]),
         Error
     end.
 
+cancel_replication(RepId, #user_ctx{name = Name, roles = Roles}) ->
+    case lists:member(<<"_admin">>, Roles) of
+    true ->
+        cancel_replication(RepId);
+    false ->
+        {BaseId, Ext} = RepId,
+        case lists:keysearch(
+            BaseId ++ Ext, 1, supervisor:which_children(couch_rep_sup)) of
+        {value, {_, Pid, _, _}} when is_pid(Pid) ->
+            case (catch gen_server:call(Pid, get_details, infinity)) of
+            {ok, #rep{user_ctx = #user_ctx{name = Name}}} ->
+                cancel_replication(RepId);
+            {ok, _} ->
+                throw({unauthorized,
+                    <<"Can't cancel a replication triggered by another user">>});
+            {'EXIT', {noproc, {gen_server, call, _}}} ->
+                {error, not_found};
+            Error ->
+                throw(Error)
+            end;
+        _ ->
+            {error, not_found}
+        end
+    end.
 
 init(InitArgs) ->
     try
@@ -243,6 +275,7 @@ do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
 
     couch_task_status:add_task([
         {type, replication},
+        {replication_id, ?l2b(BaseId ++ Ext)},
         {source, ?l2b(SourceName)},
         {target, ?l2b(TargetName)},
         {continuous, get_value(continuous, Options, false)},
@@ -347,6 +380,9 @@ handle_info({'EXIT', Pid, Reason}, #rep_state{workers = Workers} = State) ->
         {stop, {worker_died, Pid, Reason}, State2}
     end.
 
+
+handle_call(get_details, _From, #rep_state{rep_details = Rep} = State) ->
+    {reply, {ok, Rep}, State};
 
 handle_call({report_seq_done, Seq, StatsInc}, From,
     #rep_state{seqs_in_progress = SeqsInProgress, highest_seq_done = HighestDone,
