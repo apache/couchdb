@@ -29,7 +29,7 @@ reset(State) ->
     ok.
 
 
-start_update(State) ->
+start_update(State, PurgedState, NumChanges) ->
     {ok, State}.
 
 purge(PurgedIdRevs, State) ->
