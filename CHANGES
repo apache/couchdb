@@ -16,6 +16,8 @@ Build System:
 HTTP Interface:
 
  * Added a native JSON parser.
+ * The _active_tasks API now offers more granular fields. Each
+   task type is now able to expose different properties.
 
 Replicator:
 
@@ -24,6 +26,12 @@ Replicator:
  * Passing non-string values to query_params is now a 400 bad
    request. This is to reduce the surprise that all parameters
    are converted to strings internally.
+ * Added optional field `since_seq` to replication objects/documents.
+   It allows to bootstrap a replication from a specific source sequence
+   number.
+ * Simpler replication cancelation. In addition to the current method,
+   replications can now be canceled by specifying the replication ID
+   instead of the original replication object/document.
 
 Storage System:
 
@@ -37,6 +45,8 @@ Storage System:
    view group information URIs.
  * The size of the buffers used for database and view compaction is now
    configurable.
+ * Added support for automatic database and view compaction. This feature
+   is disabled by default, but it can be enabled via the .ini configuration.
 
 OAuth:
 
