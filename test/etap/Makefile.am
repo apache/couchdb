@@ -88,4 +88,5 @@ EXTRA_DIST = \
     210-os-proc-pool.t \
     220-compaction-daemon.t \
     230-httpc-pool.t \
-    240-replication-compact.t
+    240-replication-compact.t \
+    241-replication-large-atts.t
