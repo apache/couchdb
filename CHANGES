@@ -50,7 +50,7 @@ Storage System:
 
 OAuth:
 
- * Updated budled erlang_oauth library to the latest version.
+ * Updated bundled erlang_oauth library to the latest version.
 
 Futon:
 
