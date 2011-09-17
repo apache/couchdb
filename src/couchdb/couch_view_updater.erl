@@ -51,23 +51,23 @@ update(Owner, Group, #db{name = DbName} = Db) ->
     end),
     TotalChanges = couch_db:count_changes_since(Db, Seq),
     spawn_link(fun() ->
-        couch_task_status:add_task(
-            <<"View Group Indexer">>,
-            <<DbName/binary, " ", GroupName/binary>>,
-            <<"Starting index update">>),
+        couch_task_status:add_task([
+            {type, indexer},
+            {database, DbName},
+            {design_document, GroupName},
+            {progress, 0},
+            {changes_done, 0},
+            {total_changes, TotalChanges}
+        ]),
         couch_task_status:set_update_frequency(500),
         Group2 =
         if DbPurgeSeq == PurgeSeq + 1 ->
-            couch_task_status:update(<<"Removing purged entries from view index.">>),
             purge_index(Group, Db);
         true ->
             Group
         end,
         ViewEmptyKVs = [{View, []} || View <- Group2#group.views],
-        do_writes(Self, Owner, Group2, WriteQueue,
-            Seq == 0, ViewEmptyKVs, 0, TotalChanges),
-        couch_task_status:set_update_frequency(0),
-        couch_task_status:update("Finishing.")
+        do_writes(Self, Owner, Group2, WriteQueue, Seq == 0, ViewEmptyKVs)
     end),
     % compute on all docs modified since we last computed.
     #group{ design_options = DesignOptions } = Group,
@@ -176,8 +176,7 @@ do_maps(#group{query_server = Qs} = Group, MapQueue, WriteQueue) ->
         do_maps(Group, MapQueue, WriteQueue)
     end.
 
-do_writes(Parent, Owner, Group, WriteQueue, InitialBuild, ViewEmptyKVs,
-        ChangesDone, TotalChanges) ->
+do_writes(Parent, Owner, Group, WriteQueue, InitialBuild, ViewEmptyKVs) ->
     case couch_work_queue:dequeue(WriteQueue) of
     closed ->
         Parent ! {new_group, Group};
@@ -204,11 +203,8 @@ do_writes(Parent, Owner, Group, WriteQueue, InitialBuild, ViewEmptyKVs,
         _ ->
             ok = gen_server:cast(Owner, {partial_update, Parent, Group2})
         end,
-        ChangesDone2 = ChangesDone + length(Queue),
-        couch_task_status:update("Processed ~p of ~p changes (~p%)",
-              [ChangesDone2, TotalChanges, (ChangesDone2 * 100) div TotalChanges]),
-        do_writes(Parent, Owner, Group2, WriteQueue, InitialBuild, ViewEmptyKVs,
-            ChangesDone2, TotalChanges)
+        update_task(length(Queue)),
+        do_writes(Parent, Owner, Group2, WriteQueue, InitialBuild, ViewEmptyKVs)
     end.
 
 
@@ -275,4 +271,8 @@ write_changes(Group, ViewKeyValuesToAdd, DocIdViewIdKeys, NewSeq, InitialBuild) 
         end,    Group#group.views, ViewKeyValuesToAdd),
     Group#group{views=Views2, current_seq=NewSeq, id_btree=IdBtree2}.
 
-
+update_task(NumChanges) ->
+    [Changes, Total] = couch_task_status:get([changes_done, total_changes]),
+    Changes2 = Changes + NumChanges,
+    Progress = (Changes2 * 100) div Total,
+    couch_task_status:update([{progress, Progress}, {changes_done, Changes2}]).
