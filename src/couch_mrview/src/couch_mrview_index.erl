@@ -15,7 +15,7 @@
 
 -export([get/2]).
 -export([init/2, open/2, close/1, reset/1, delete/1]).
--export([start_update/2, purge/4, process_doc/3, finish_update/1, commit/1]).
+-export([start_update/3, purge/4, process_doc/3, finish_update/1, commit/1]).
 -export([compact/2, swap_compacted/2]).
 
 
@@ -106,8 +106,8 @@ reset(State) ->
     end).
 
 
-start_update(PartialDest, State) ->
-    couch_mrview_updater:start_update(PartialDest, State).
+start_update(PartialDest, State, NumChanges) ->
+    couch_mrview_updater:start_update(PartialDest, State, NumChanges).
 
 
 purge(Db, PurgeSeq, PurgedIdRevs, State) ->

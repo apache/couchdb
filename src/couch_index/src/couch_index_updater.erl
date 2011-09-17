@@ -121,10 +121,6 @@ update(Idx, Mod, IdxState) ->
         _ -> [conflicts, deleted_conflicts]
     end,
 
-    TaskType = <<"Indexer">>,
-    Starting = <<"Starting index update.">>,
-    couch_task_status:add_task(TaskType, Mod:get(idx_name, IdxState), Starting),
-
     couch_util:with_db(DbName, fun(Db) ->
         DbUpdateSeq = couch_db:get_update_seq(Db),
         DbCommittedSeq = couch_db:get_committed_update_seq(Db),
@@ -134,7 +130,6 @@ update(Idx, Mod, IdxState) ->
             reset -> exit(reset)
         end,
 
-        couch_task_status:set_update_frequency(500),
         NumChanges = couch_db:count_changes_since(Db, CurrSeq),
 
         LoadDoc = fun(DocInfo) ->
@@ -155,23 +150,22 @@ update(Idx, Mod, IdxState) ->
             end
         end,
 
-        Proc = fun(DocInfo, _, {IdxStateAcc, Count, _}) ->
+        Proc = fun(DocInfo, _, {IdxStateAcc, _}) ->
             HighSeq = DocInfo#doc_info.high_seq,
             case CommittedOnly and (HighSeq > DbCommittedSeq) of
                 true ->
-                    {stop, {IdxStateAcc, Count, false}};
+                    {stop, {IdxStateAcc, false}};
                 false ->
-                    update_task_status(NumChanges, Count),
                     {Doc, Seq} = LoadDoc(DocInfo),
                     {ok, NewSt} = Mod:process_doc(Doc, Seq, IdxStateAcc),
-                    {ok, {NewSt, Count+1, true}}
+                    {ok, {NewSt, true}}
             end
         end,
 
-        {ok, InitIdxState} = Mod:start_update(Idx, PurgedIdxState),
-        Acc0 = {InitIdxState, 0, true},
+        {ok, InitIdxState} = Mod:start_update(Idx, PurgedIdxState, NumChanges),
+        Acc0 = {InitIdxState, true},
         {ok, _, Acc} = couch_db:enum_docs_since(Db, CurrSeq, Proc, Acc0, []),
-        {ProcIdxSt, _, SendLast} = Acc,
+        {ProcIdxSt, SendLast} = Acc,
 
         % If we didn't bail due to hitting the last committed seq we need
         % to send our last update_seq through.
@@ -181,9 +175,6 @@ update(Idx, Mod, IdxState) ->
             _ ->
                 {ok, ProcIdxSt}
         end,
-
-        couch_task_status:set_update_frequency(0),
-        couch_task_status:update("Waiting for index writer to finish."),
 
         {ok, FinalIdxState} = Mod:finish_update(LastIdxSt),
         exit({updated, FinalIdxState})
@@ -197,16 +188,8 @@ purge_index(Db, Mod, IdxState) ->
         DbPurgeSeq == IdxPurgeSeq ->
             {ok, IdxState};
         DbPurgeSeq == IdxPurgeSeq + 1 ->
-            couch_task_status:update(<<"Purging index entries.">>),
             {ok, PurgedIdRevs} = couch_db:get_last_purged(Db),
             Mod:purge(Db, DbPurgeSeq, PurgedIdRevs, IdxState);
         true ->
-            couch_task_status:update(<<"Resetting index due to purge state.">>),
             reset
     end.
-
-
-update_task_status(Total, Count) ->
-    PercDone = (Count * 100) div Total,
-    Mesg = "Processed ~p of ~p changes (~p%)",
-    couch_task_status:update(Mesg, [Count, Total, PercDone]).

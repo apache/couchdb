@@ -76,15 +76,43 @@ specific language governing permissions and limitations under the License.
               .appendTo("#status tbody.content");
           } else {
             $.each(tasks, function(idx, task) {
+              var status, type, object;
+
+              switch (task.type) {
+              case "database_compaction":
+                type = "Database compaction";
+                object = task.database + (task.retry ? " retry" : "");
+                status = "Copied " + task.changes_done + " of " +
+                  task.total_changes + " changes (" + task.progress + "%)";
+                break;
+              case "view_compaction":
+                type = "View compaction";
+                object = task.database + ", " + task.design_document;
+                status = "Progress " + task.progress + "%";
+                break;
+              case "indexer":
+                type = "Indexer";
+                object = task.database + ", " + task.design_document;
+                status = "Processed " + task.changes_done + " of " +
+                  task.total_changes + " changes (" + task.progress + "%)";
+                break;
+              case "replication":
+                type = "Replication";
+                object = task.source + " to " + task.target;
+                status = "Checkpointed source sequence " +
+                  task.checkpointed_source_seq + ", current source sequence " +
+                  task.source_seq + ", progress " + task.progress + "%";
+              }
+
               $("<tr><th></th><td class='object'></td><td class='started'>" +
                 "</td><td class='updated'></td><td class='pid'></td>" +
                 "<td class='status'></td></tr>")
-                .find("th").text(task.type).end()
-                .find("td.object").text(task.task).end()
+                .find("th").text(type).end()
+                .find("td.object").text(object).end()
                 .find("td.started").text(toTaskDate(task.started_on)).end()
                 .find("td.updated").text(toTaskDate(task.updated_on)).end()
                 .find("td.pid").text(task.pid).end()
-                .find("td.status").text(task.status).end()
+                .find("td.status").text(status).end()
                 .appendTo("#status tbody.content");
             });
           }

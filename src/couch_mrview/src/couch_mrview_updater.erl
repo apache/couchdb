@@ -12,13 +12,13 @@
 
 -module(couch_mrview_updater).
 
--export([start_update/2, purge/4, process_doc/3, finish_update/1]).
+-export([start_update/3, purge/4, process_doc/3, finish_update/1]).
 
 -include("couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
 
-start_update(Partial, State) ->
+start_update(Partial, State, NumChanges) ->
     QueueOpts = [{max_size, 100000}, {max_items, 500}],
     {ok, DocQueue} = couch_work_queue:new(QueueOpts),
     {ok, WriteQueue} = couch_work_queue:new(QueueOpts),
@@ -32,7 +32,18 @@ start_update(Partial, State) ->
     },
 
     Self = self(),
-    MapFun = fun() -> map_docs(Self, InitState) end,
+    MapFun = fun() ->
+        couch_task_status:add_task([
+            {type, indexer},
+            {database, State#mrst.db_name},
+            {design_document, State#mrst.idx_name},
+            {progress, 0},
+            {changes_done, 0},
+            {total_changes, NumChanges}
+        ]),
+        couch_task_status:set_update_frequency(500),
+        map_docs(Self, InitState)
+    end,
     WriteFun = fun() -> write_results(Self, InitState) end,
 
     spawn_link(MapFun),
@@ -136,6 +147,7 @@ map_docs(Parent, State0) ->
                     {erlang:max(Seq, SeqAcc), [{Id, Res} | Results]}
             end,
             FoldFun = fun(Docs, Acc) ->
+                update_task(length(Docs)),
                 lists:foldl(DocFun, Acc, Docs)
             end,
             Results = lists:foldl(FoldFun, {0, []}, Dequeued),
@@ -255,3 +267,16 @@ send_partial(Pid, State) when is_pid(Pid) ->
     gen_server:cast(Pid, {new_state, State});
 send_partial(_, _) ->
     ok.
+
+
+update_task(NumChanges) ->
+    [Changes, Total] = couch_task_status:get([changes_done, total_changes]),
+    Changes2 = Changes + NumChanges,
+    Progress = case Total of
+        0 ->
+            % updater restart after compaction finishes
+            0;
+        _ ->
+            (Changes2 * 100) div Total
+    end,
+    couch_task_status:update([{progress, Progress}, {changes_done, Changes2}]).

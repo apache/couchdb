@@ -17,6 +17,15 @@
 
 -export([compact/2, swap_compacted/2]).
 
+-record(acc, {
+   btree = nil,
+   last_id = nil,
+   kvs = [],
+   kvs_size = 0,
+   changes = 0,
+   total_changes
+}).
+
 
 compact(State, Opts) ->
     case lists:member(recompact, Opts) of
@@ -46,15 +55,26 @@ compact(State) ->
     } = EmptyState,
 
     {ok, Count} = couch_btree:full_reduce(IdBtree),
-    TaskName = <<DbName/binary, ":", IdxName/binary>>,
-    couch_task_status:add_task(<<"View Group Compaction">>, TaskName, <<"">>),
+    TotalChanges = lists:foldl(
+        fun(View, Acc) ->
+            {ok, Kvs} = couch_mrview_util:get_row_count(View),
+            Acc + Kvs
+        end,
+        Count, Views),
+    couch_task_status:add_task([
+        {type, view_compaction},
+        {database, DbName},
+        {design_document, IdxName},
+        {progress, 0}
+    ]),
 
     BufferSize0 = couch_config:get(
         "view_compaction", "keyvalue_buffer_size", "2097152"
     ),
     BufferSize = list_to_integer(BufferSize0),
 
-    FoldFun = fun({DocId, _} = KV, {Bt, Acc, AccSize, Copied, LastId}) ->
+    FoldFun = fun({DocId, _} = KV, Acc) ->
+        #acc{btree = Bt, kvs = Kvs, kvs_size = KvsSize, last_id = LastId} = Acc,
         if DocId =:= LastId ->
             % COUCHDB-999 regression test
             ?LOG_ERROR("Duplicate docid `~s` detected in view group `~s`"
@@ -63,26 +83,28 @@ compact(State) ->
             ),
             exit({view_duplicate_id, DocId});
         true -> ok end,
-        AccSize2 = AccSize + ?term_size(KV),
-        case AccSize2 >= BufferSize of
+        KvsSize2 = KvsSize + ?term_size(KV),
+        case KvsSize2 >= BufferSize of
             true ->
-                {ok, Bt2} = couch_btree:add(Bt, lists:reverse([KV|Acc])),
-                couch_task_status:update("Copied ~p of ~p Ids (~p%)",
-                    [Copied, Count, (Copied * 100) div Count]),
-                {ok, {Bt2, [], 0, Copied+1+length(Acc), DocId}};
+                {ok, Bt2} = couch_btree:add(Bt, lists:reverse([KV | Kvs])),
+                Acc2 = update_task(Acc, 1 + length(Kvs)),
+                {ok, Acc2#acc{
+                    btree = Bt2, kvs = [], kvs_size = 0, last_id = DocId}};
             _ ->
-                {ok, {Bt, [KV | Acc], AccSize2, Copied, DocId}}
+                {ok, Acc#acc{
+                    kvs = [KV | Kvs], kvs_size = KvsSize2, last_id = DocId}}
         end
     end,
 
-    InitAcc = {EmptyIdBtree, [], 0, 0, nil},
+    InitAcc = #acc{total_changes = TotalChanges, btree = EmptyIdBtree},
     {ok, _, FinalAcc} = couch_btree:foldl(IdBtree, FoldFun, InitAcc),
-    {Bt3, Uncopied, _, _, _} = FinalAcc,
+    #acc{btree = Bt3, kvs = Uncopied} = FinalAcc,
     {ok, NewIdBtree} = couch_btree:add(Bt3, lists:reverse(Uncopied)),
+    FinalAcc2 = update_task(FinalAcc, length(Uncopied)),
 
-    NewViews = lists:map(fun({View, EmptyView}) ->
-        compact_view(View, EmptyView, BufferSize)
-    end, lists:zip(Views, EmptyViews)),
+    {NewViews, _} = lists:mapfoldl(fun({View, EmptyView}, Acc) ->
+        compact_view(View, EmptyView, BufferSize, Acc)
+    end, FinalAcc2, lists:zip(Views, EmptyViews)),
 
     unlink(EmptyState#mrst.fd),
     {ok, EmptyState#mrst{
@@ -109,27 +131,31 @@ recompact(State) ->
     end.
 
 
-%% @spec compact_view(View, EmptyView, Retry) -> CompactView
-compact_view(View, EmptyView, BufferSize) ->
-    {ok, Count} = couch_mrview_util:get_row_count(View),
-    Fun = fun(KV, {Bt, Acc, AccSize, Copied}) ->
-        AccSize2 = AccSize + ?term_size(KV),
-        if AccSize2 >= BufferSize ->
-            {ok, Bt2} = couch_btree:add(Bt, lists:reverse([KV|Acc])),
-            couch_task_status:update("View #~p: copied ~p of ~p KVs (~p%)",
-                [View#mrview.id_num, Copied, Count, (Copied*100) div Count]),
-            {ok, {Bt2, [], 0, Copied + 1 + length(Acc)}};
+%% @spec compact_view(View, EmptyView, Retry, Acc) -> {CompactView, NewAcc}
+compact_view(View, EmptyView, BufferSize, Acc0) ->
+    Fun = fun(KV, #acc{btree = Bt, kvs = Kvs, kvs_size = KvsSize} = Acc) ->
+        KvsSize2 = KvsSize + ?term_size(KV),
+        if KvsSize2 >= BufferSize ->
+            {ok, Bt2} = couch_btree:add(Bt, lists:reverse([KV | Kvs])),
+            Acc2 = update_task(Acc, 1 + length(Kvs)),
+            {ok, Acc2#acc{btree = Bt2, kvs = [], kvs_size = 0}};
         true ->
-            {ok, {Bt, [KV|Acc], AccSize2, Copied}}
+            {ok, Acc#acc{kvs = [KV | Kvs], kvs_size = KvsSize2}}
         end
     end,
 
-    InitAcc = {EmptyView#mrview.btree, [], 0, 0},
+    InitAcc = Acc0#acc{kvs = [], kvs_size = 0, btree = EmptyView#mrview.btree},
     {ok, _, FinalAcc} = couch_btree:foldl(View#mrview.btree, Fun, InitAcc),
-    {Bt3, Uncopied, _, _} = FinalAcc,
+    #acc{btree = Bt3, kvs = Uncopied} = FinalAcc,
     {ok, NewBt} = couch_btree:add(Bt3, lists:reverse(Uncopied)),
+    FinalAcc2 = update_task(FinalAcc, length(Uncopied)),
+    {EmptyView#mrview{btree=NewBt}, FinalAcc2}.
 
-    EmptyView#mrview{btree=NewBt}.
+
+update_task(#acc{changes = Changes, total_changes = Total} = Acc, ChangesInc) ->
+    Changes2 = Changes + ChangesInc,
+    couch_task_status:update([{progress, (Changes2 * 100) div Total}]),
+    Acc#acc{changes = Changes2}.
 
 
 swap_compacted(OldState, NewState) ->
