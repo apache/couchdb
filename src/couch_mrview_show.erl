@@ -108,7 +108,7 @@ show_etag(#httpd{user_ctx=UserCtx}=Req, Doc, DDoc, More) ->
 %     send_method_not_allowed(Req, "POST,PUT,DELETE,ETC");
 
 handle_doc_update_req(#httpd{
-        path_parts=[_, _, _, _, UpdateName, DocIdParts]
+        path_parts=[_, _, _, _, UpdateName | DocIdParts]
     }=Req, Db, DDoc) ->
     DocId = ?l2b(string:join([?b2l(P) || P <- DocIdParts], "/")),
     Doc = maybe_open_doc(Db, DocId),
