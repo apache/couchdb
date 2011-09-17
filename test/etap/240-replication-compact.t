@@ -68,7 +68,7 @@ target_db_name() -> <<"couch_test_rep_db_b">>.
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(264),
+    etap:plan(360),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -101,10 +101,12 @@ test() ->
                 "Target database is idle before starting replication"),
 
             {ok, RepPid, RepId} = replicate(Source, Target),
+            check_active_tasks(RepPid, RepId, Source, Target),
             {ok, DocsWritten} = populate_and_compact_test(
                 RepPid, SourceDb, TargetDb),
 
             wait_target_in_sync(DocsWritten, TargetDb),
+            check_active_tasks(RepPid, RepId, Source, Target),
             cancel_replication(RepId, RepPid),
             compare_dbs(SourceDb, TargetDb),
 
@@ -265,6 +267,48 @@ compare_dbs(#db{name = SourceName}, #db{name = TargetName}) ->
     etap:diag("Target database has the same documents as the source database"),
     ok = couch_db:close(SourceDb),
     ok = couch_db:close(TargetDb).
+
+
+check_active_tasks(RepPid, {BaseId, Ext} = _RepId, Src, Tgt) ->
+    Source = case Src of
+    {remote, NameSrc} ->
+        <<(db_url(NameSrc))/binary, $/>>;
+    _ ->
+        Src
+    end,
+    Target = case Tgt of
+    {remote, NameTgt} ->
+        <<(db_url(NameTgt))/binary, $/>>;
+    _ ->
+        Tgt
+    end,
+    FullRepId = list_to_binary(BaseId ++ Ext),
+    Pid = list_to_binary(pid_to_list(RepPid)),
+    [RepTask] = couch_task_status:all(),
+    etap:is(couch_util:get_value(pid, RepTask), Pid,
+        "_active_tasks entry has correct pid property"),
+    etap:is(couch_util:get_value(replication_id, RepTask), FullRepId,
+        "_active_tasks entry has right replication id"),
+    etap:is(couch_util:get_value(continuous, RepTask), true,
+        "_active_tasks entry has continuous property set to true"),
+    etap:is(couch_util:get_value(source, RepTask), Source,
+        "_active_tasks entry has correct source property"),
+    etap:is(couch_util:get_value(target, RepTask), Target,
+        "_active_tasks entry has correct target property"),
+    etap:is(is_integer(couch_util:get_value(docs_read, RepTask)), true,
+        "_active_tasks entry has integer docs_read property"),
+    etap:is(is_integer(couch_util:get_value(docs_written, RepTask)), true,
+        "_active_tasks entry has integer docs_written property"),
+    etap:is(is_integer(couch_util:get_value(doc_write_failures, RepTask)), true,
+        "_active_tasks entry has integer doc_write_failures property"),
+    etap:is(is_integer(couch_util:get_value(revisions_checked, RepTask)), true,
+        "_active_tasks entry has integer revisions_checked property"),
+    etap:is(is_integer(couch_util:get_value(missing_revisions_found, RepTask)), true,
+        "_active_tasks entry has integer missing_revisions_found property"),
+    etap:is(is_integer(couch_util:get_value(checkpointed_source_seq, RepTask)), true,
+        "_active_tasks entry has integer checkpointed_source_seq property"),
+    etap:is(is_integer(couch_util:get_value(source_seq, RepTask)), true,
+        "_active_tasks entry has integer source_seq property").
 
 
 wait_writer(Pid, NumDocs) ->
