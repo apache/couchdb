@@ -174,14 +174,17 @@ handle_call({compacted, NewIdxState}, _From, State) ->
     case NewSeq >= OldSeq of
         true ->
             {ok, NewIdxState1} = Mod:swap_compacted(OldIdxState, NewIdxState),
-            ok = couch_index_updater:restart(Updater, NewIdxState1),
+            % Restart the indexer if it's running.
+            case couch_index_updater:is_running(Updater) of
+                true -> ok = couch_index_updater:restart(Updater, NewIdxState1);
+                false -> ok
+            end,
             case State#st.committed of
                 true -> erlang:send_after(Delay, self(), commit);
                 false -> ok
             end,
             {reply, ok, State#st{
                 idx_state=NewIdxState1,
-                updater=Updater,
                 committed=false
             }};
         _ ->
