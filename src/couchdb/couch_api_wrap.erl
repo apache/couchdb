@@ -250,41 +250,49 @@ update_doc(Db, Doc, Options, Type) ->
 update_docs(Db, DocList, Options) ->
     update_docs(Db, DocList, Options, interactive_edit).
 
+update_docs(_Db, [], _Options, _UpdateType) ->
+    {ok, []};
 update_docs(#httpdb{} = HttpDb, DocList, Options, UpdateType) ->
     FullCommit = atom_to_list(not lists:member(delay_commit, Options)),
-    Prefix1 = case UpdateType of
+    Prefix = case UpdateType of
     replicated_changes ->
-        {prefix, <<"{\"new_edits\":false,\"docs\":[">>};
+        <<"{\"new_edits\":false,\"docs\":[">>;
     interactive_edit ->
-        {prefix, <<"{\"docs\":[">>}
+        <<"{\"docs\":[">>
     end,
+    Suffix = <<"]}">>,
+    % Note: nginx and other servers don't like PUT/POST requests without
+    % a Content-Length header, so we can't do a chunked transfer encoding
+    % and JSON encode each doc only before sending it through the socket.
+    {Docs, Len} = lists:mapfoldl(
+        fun(#doc{} = Doc, Acc) ->
+            Json = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, [revs, attachments])),
+            {Json, Acc + iolist_size(Json)};
+        (Doc, Acc) ->
+            {Doc, Acc + iolist_size(Doc)}
+        end,
+        byte_size(Prefix) + byte_size(Suffix) + length(DocList) - 1,
+        DocList),
     BodyFun = fun(eof) ->
             eof;
         ([]) ->
-            {ok, <<"]}">>, eof};
-        ([{prefix, Prefix} | Rest]) ->
+            {ok, Suffix, eof};
+        ([prefix | Rest]) ->
             {ok, Prefix, Rest};
-        ([Doc]) when is_record(Doc, doc) ->
-            DocJson = couch_doc:to_json_obj(Doc, [revs, attachments]),
-            {ok, ?JSON_ENCODE(DocJson), []};
-        ([Doc | RestDocs]) when is_record(Doc, doc) ->
-            DocJson = couch_doc:to_json_obj(Doc, [revs, attachments]),
-            {ok, [?JSON_ENCODE(DocJson), ","], RestDocs};
         ([Doc]) ->
-            % IO list
             {ok, Doc, []};
         ([Doc | RestDocs]) ->
-            % IO list
             {ok, [Doc, ","], RestDocs}
     end,
+    Headers = [
+        {"Content-Length", Len},
+        {"Content-Type", "application/json"},
+        {"X-Couch-Full-Commit", FullCommit}
+    ],
     send_req(
         HttpDb,
         [{method, post}, {path, "_bulk_docs"},
-            {body, {BodyFun, [Prefix1 | DocList]}},
-            {ibrowse_options, [{transfer_encoding, chunked}]},
-            {headers, [
-                {"X-Couch-Full-Commit", FullCommit},
-                {"Content-Type", "application/json"} ]}],
+            {body, {BodyFun, [prefix | Docs]}}, {headers, Headers}],
         fun(201, _, Results) when is_list(Results) ->
                 {ok, bulk_results_to_errors(DocList, Results, remote)};
            (417, _, Results) when is_list(Results) ->
