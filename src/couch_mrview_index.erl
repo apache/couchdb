@@ -80,9 +80,13 @@ open(Db, State) ->
             case (catch couch_file:read_header(Fd)) of
                 {ok, {Sig, Header}} ->
                     % Matching view signatures.
-                    {ok, couch_mrview_util:init_state(Db, Fd, State, Header)};
+                    NewSt = couch_mrview_util:init_state(Db, Fd, State, Header),
+                    {ok, RefCounter} = couch_ref_counter:start([Fd]),
+                    {ok, NewSt#mrst{refc=RefCounter}};
                 _ ->
-                    {ok, couch_mrview_util:reset_index(Db, Fd, State)}
+                    NewSt = couch_mrview_util:reset_index(Db, Fd, State),
+                    {ok, RefCounter} = couch_ref_counter:start([Fd]),
+                    {ok, NewSt#mrst{refc=RefCounter}}
             end;
         Error ->
             (catch couch_mrview_util:delete_files(DbName, Sig)),
