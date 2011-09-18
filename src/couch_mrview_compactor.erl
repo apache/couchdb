@@ -115,11 +115,6 @@ compact(State) ->
 
 
 recompact(State) ->
-    #mrst{
-        db_name=DbName,
-        idx_name=IdxName,
-        update_seq=UpdateSeq
-    } = State,
     link(State#mrst.fd),
     {_Pid, Ref} = erlang:spawn_monitor(fun() ->
         couch_index_updater:update(couch_mrview_index, State)
