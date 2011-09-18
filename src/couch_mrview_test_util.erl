@@ -19,8 +19,12 @@
 
 
 init_db(Name, Type) ->
+    init_db(Name, Type, 10).
+
+
+init_db(Name, Type, Count) ->
     {ok, Db} = new_db(Name, Type),
-    Docs = make_docs(10),
+    Docs = make_docs(Count),
     save_docs(Db, Docs).
 
 

@@ -38,7 +38,8 @@ test_files = \
     test/03-red-views.t \
     test/04-index-info.t \
     test/05-collation.t \
-    test/06-all-docs.t
+    test/06-all-docs.t \
+	test/07-compact-swap.t
 
 compiled_files = \
     ebin/couch_mrview.app \
