@@ -101,12 +101,20 @@ show_etag(#httpd{user_ctx=UserCtx}=Req, Doc, DDoc, More) ->
     couch_httpd:make_etag({couch_httpd:doc_etag(DDoc), DocPart, Accept,
         UserCtx#user_ctx.roles, More}).
 
-% /db/_design/foo/_update/bar/docid
 % updates a doc based on a request
 % handle_doc_update_req(#httpd{method = 'GET'}=Req, _Db, _DDoc) ->
 %     % anything but GET
 %     send_method_not_allowed(Req, "POST,PUT,DELETE,ETC");
 
+% This call is creating a new doc using an _update function to
+% modify the provided request body.
+% /db/_design/foo/_update/bar
+handle_doc_update_req(#httpd{
+        path_parts=[_, _, _, _, UpdateName]
+    }=Req, Db, DDoc) ->
+    send_doc_update_response(Req, Db, DDoc, UpdateName, nil, null);
+
+% /db/_design/foo/_update/bar/docid
 handle_doc_update_req(#httpd{
         path_parts=[_, _, _, _, UpdateName | DocIdParts]
     }=Req, Db, DDoc) ->
@@ -114,10 +122,6 @@ handle_doc_update_req(#httpd{
     Doc = maybe_open_doc(Db, DocId),
     send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId);
 
-handle_doc_update_req(#httpd{
-        path_parts=[_, _, _, _, UpdateName]
-    }=Req, Db, DDoc) ->
-    send_doc_update_response(Req, Db, DDoc, UpdateName, nil, null);
 
 handle_doc_update_req(Req, _Db, _DDoc) ->
     couch_httpd:send_error(Req, 404, <<"update_error">>, <<"Invalid path.">>).
