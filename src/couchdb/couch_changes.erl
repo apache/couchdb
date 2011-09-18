@@ -365,8 +365,15 @@ changes_row(Results, DocInfo, Acc) ->
     {[{<<"seq">>, Seq}, {<<"id">>, Id}, {<<"changes">>, Results}] ++
         deleted_item(Del) ++ case IncDoc of
             true ->
-                Options = if Conflicts -> [conflicts]; true -> [] end,
-                couch_util:doc_member(Db, DocInfo, Options);
+                Opts = case Conflicts of
+                    true -> [deleted, conflicts];
+                    false -> [deleted]
+                end,
+                Doc = couch_index_util:load_doc(Db, DocInfo, Opts),
+                case Doc of
+                    null -> [{doc, null}];
+                    _ ->  [{doc, couch_doc:to_json_obj(Doc, [])}]
+                end;
             false ->
                 []
         end}.

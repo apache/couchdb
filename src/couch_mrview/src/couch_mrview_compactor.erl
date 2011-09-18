@@ -161,8 +161,7 @@ update_task(#acc{changes = Changes, total_changes = Total} = Acc, ChangesInc) ->
 swap_compacted(OldState, NewState) ->
     #mrst{
         sig=Sig,
-        db_name=DbName,
-        idx_name=IdxName
+        db_name=DbName
     } = NewState,
 
     link(NewState#mrst.fd),

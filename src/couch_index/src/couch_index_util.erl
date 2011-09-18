@@ -13,7 +13,7 @@
 -module(couch_index_util).
 
 -export([root_dir/0, index_dir/2, index_file/3]).
--export([load_doc/4, sort_lib/1, hexsig/1]).
+-export([load_doc/3, sort_lib/1, hexsig/1]).
 
 -include("couch_db.hrl").
 
@@ -36,32 +36,34 @@ index_file(Module, DbName, FileName) ->
     filename:join(index_dir(Module, DbName), FileName).
 
 
-load_doc(Db, Id, {Props}, Opts) ->
-    DocId = couch_util:get_value(<<"_id">>, Props, Id),
-    Rev = case couch_util:get_value(<<"_rev">>, Props, undefined) of
-        Rev0 when is_binary(Rev0) -> couch_doc:parse_rev(Rev0);
-        _ -> nil
-    end,
-    load_doc_int(Db, DocId, Rev, Opts);
-load_doc(Db, Id, _Value, Opts) ->
-    load_doc_int(Db, Id, nil, Opts).
+load_doc(Db, #doc_info{}=DI, Opts) ->
+    Deleted = lists:member(deleted, Opts),
+    case (catch couch_db:open_doc(Db, DI, Opts)) of
+        {ok, #doc{deleted=false}=Doc} -> Doc;
+        {ok, #doc{deleted=true}=Doc} when Deleted -> Doc;
+        _Else -> null
+    end;
+load_doc(Db, {DocId, Rev}, Opts) ->
+    case (catch load_doc(Db, DocId, Rev, Opts)) of
+        #doc{deleted=false} = Doc -> Doc;
+        _ -> null
+    end.
 
 
-load_doc_int(Db, DocId, Rev, Options) ->
-    JsonDoc = case Rev of
+load_doc(Db, DocId, Rev, Options) ->
+    case Rev of
         nil -> % open most recent rev
-            case couch_db:open_doc(Db, DocId, Options) of
-                {ok, Doc} -> couch_doc:to_json_obj(Doc, Options);
+            case (catch couch_db:open_doc(Db, DocId, Options)) of
+                {ok, Doc} -> Doc;
                 _Error -> null
             end;
         _ -> % open a specific rev (deletions come back as stubs)
-            case couch_db:open_doc_revs(Db, DocId, [Rev], Options) of
-                {ok, [{ok, Doc}]} -> couch_doc:to_json_obj(Doc, Options);
+            case (catch couch_db:open_doc_revs(Db, DocId, [Rev], Options)) of
+                {ok, [{ok, Doc}]} -> Doc;
                 {ok, [{{not_found, missing}, Rev}]} -> null;
                 {ok, [_Else]} -> null
             end
-    end,
-    {doc, JsonDoc}.
+    end.
 
 
 sort_lib({Lib}) ->
