@@ -15,7 +15,7 @@
 -export([query_all_docs/2, query_all_docs/4]).
 -export([query_view/3, query_view/4, query_view/6]).
 -export([get_info/2]).
--export([compact/2, monitor_compaction/2, cancel_compaction/2]).
+-export([compact/2, compact/3, cancel_compaction/2]).
 -export([cleanup/1]).
 
 -include("couch_db.hrl").
@@ -93,14 +93,12 @@ get_info(Db, DDoc) ->
 
 
 compact(Db, DDoc) ->
+    compact(Db, DDoc, []).
+
+
+compact(Db, DDoc, Opts) ->
     {ok, Pid} = couch_index_server:get_index(couch_mrview_index, Db, DDoc),
-    couch_index:compact(Pid).
-
-
-monitor_compaction(Db, DDoc) ->
-    {ok, IPid} = couch_index_server:get_index(couch_mrview_index, Db, DDoc),
-    {ok, CPid} = couch_index:get_compactor_pid(IPid),
-    couch_index_compactor:monitor(CPid).
+    couch_index:compact(Pid, Opts).
 
 
 cancel_compaction(Db, DDoc) ->

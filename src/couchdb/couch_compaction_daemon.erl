@@ -228,8 +228,7 @@ maybe_compact_view(DbName, GroupId, Config) ->
     {ok, GroupInfo} ->
         case can_view_compact(Config, DbName, GroupId, GroupInfo) of
         true ->
-            ok = couch_mrview:compact(DbName, DDocId),
-            {ok, MonRef} = couch_mrview:monitor_compaction(DbName, DDocId),
+            {ok, MonRef} = couch_mrview:compact(DbName, DDocId, [monitor]),
             TimeLeft = compact_time_left(Config),
             receive
             {'DOWN', MonRef, process, _, normal} ->
