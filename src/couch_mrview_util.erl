@@ -23,7 +23,7 @@
 -export([temp_view_to_ddoc/1]).
 -export([calculate_data_size/2]).
 -export([validate_args/1]).
--export([maybe_load_doc/4]).
+-export([maybe_load_doc/3, maybe_load_doc/4]).
 
 -define(MOD, couch_mrview_index).
 
@@ -659,12 +659,37 @@ expand_dups([KV | Rest], Acc) ->
     expand_dups(Rest, [KV | Acc]).
 
 
+maybe_load_doc(_Db, _DI, #mrargs{include_docs=false}) ->
+    [];
+maybe_load_doc(Db, #doc_info{}=DI, #mrargs{conflicts=true}) ->
+    doc_row(couch_index_util:load_doc(Db, DI, [conflicts]));
+maybe_load_doc(Db, #doc_info{}=DI, _Args) ->
+    doc_row(couch_index_util:load_doc(Db, DI, [])).
+
+
 maybe_load_doc(_Db, _Id, _Val, #mrargs{include_docs=false}) ->
     [];
 maybe_load_doc(Db, Id, Val, #mrargs{conflicts=true}) ->
-    [couch_index_util:load_doc(Db, Id, Val, [conflicts])];
+    doc_row(couch_index_util:load_doc(Db, docid_rev(Id, Val), [conflicts]));
 maybe_load_doc(Db, Id, Val, _Args) ->
-    [couch_index_util:load_doc(Db, Id, Val, [])].
+    doc_row(couch_index_util:load_doc(Db, docid_rev(Id, Val), [])).
+
+
+doc_row(null) ->
+    [{doc, null}];
+doc_row(Doc) ->
+    [{doc, couch_doc:to_json_obj(Doc, [])}].
+
+
+docid_rev(Id, {Props}) ->
+    DocId = couch_util:get_value(<<"_id">>, Props, Id),
+    Rev = case couch_util:get_value(<<"_rev">>, Props, nil) of
+        nil -> nil;
+        Rev0 -> couch_doc:parse_rev(Rev0)
+    end,
+    {DocId, Rev};
+docid_rev(Id, _) ->
+    {Id, nil}.
 
 
 index_of(Key, List) ->

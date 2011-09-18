@@ -29,6 +29,7 @@
     limit,
     skip,
     group_level,
+    doc_info,
     callback,
     user_acc,
     last_go=ok,
@@ -117,7 +118,7 @@ cleanup(Db) ->
     couch_mrview_cleanup:run(Db).
 
 
-all_docs_fold(Db, Args, Callback, UAcc) ->
+all_docs_fold(Db, #mrargs{keys=undefined}=Args, Callback, UAcc) ->
     {ok, Info} = couch_db:get_db_info(Db),
     Total = couch_util:get_value(doc_count, Info),
     UpdateSeq = couch_db:get_update_seq(Db),
@@ -132,38 +133,47 @@ all_docs_fold(Db, Args, Callback, UAcc) ->
         update_seq=UpdateSeq,
         args=Args
     },
-    {Reds, FinalAcc} = case Args#mrargs.keys of
-        Keys when is_list(Keys) ->
-            KeyFoldFun = case Args#mrargs.direction of
-                fwd -> fun lists:foldl/3;
-                rev -> fun lists:foldr/3
-            end,
-            FoldFun = fun(Key, Acc0) ->
-                DocInfo = (catch couch_db:get_doc_info(Db, Key)),
-                Doc = case DocInfo of
-                    {ok, #doc_info{id=Id, revs=[RevInfo | _RestRevs]}} ->
-                        Rev = couch_doc:rev_to_str(RevInfo#rev_info.rev),
-                        Props = [{rev, Rev}] ++ case RevInfo#rev_info.deleted of
-                            true -> [{deleted, true}];
-                            false -> []
-                        end,
-                        {{Id, Id}, {Props}};
-                    not_found ->
-                        {{Key, error}, not_found}
+    [Opts] = couch_mrview_util:all_docs_key_opts(Args),
+    {ok, Offset, FinalAcc} = couch_db:enum_docs(Db, fun map_fold/3, Acc, Opts),
+    finish_fold(FinalAcc, [{total, Total}, {offset, Offset}]);
+all_docs_fold(Db, #mrargs{direction=Dir, keys=Keys0}=Args, Callback, UAcc) ->
+    {ok, Info} = couch_db:get_db_info(Db),
+    Total = couch_util:get_value(doc_count, Info),
+    UpdateSeq = couch_db:get_update_seq(Db),
+    Acc = #mracc{
+        db=Db,
+        total_rows=Total,
+        limit=Args#mrargs.limit,
+        skip=Args#mrargs.skip,
+        callback=Callback,
+        user_acc=UAcc,
+        reduce_fun=fun couch_mrview_util:all_docs_reduce_to_count/1,
+        update_seq=UpdateSeq,
+        args=Args
+    },
+    % Backwards compatibility hack. The old _all_docs iterates keys
+    % in reverse if descending=true was passed. Here we'll just
+    % reverse the list instead.
+    Keys = if Dir =:= fwd -> Keys0; true -> lists:reverse(Keys0) end,
+
+    FoldFun = fun(Key, Acc0) ->
+        DocInfo = (catch couch_db:get_doc_info(Db, Key)),
+        {Doc, Acc1} = case DocInfo of
+            {ok, #doc_info{id=Id, revs=[RevInfo | _RestRevs]}=DI} ->
+                Rev = couch_doc:rev_to_str(RevInfo#rev_info.rev),
+                Props = [{rev, Rev}] ++ case RevInfo#rev_info.deleted of
+                    true -> [{deleted, true}];
+                    false -> []
                 end,
-                {_, Acc1} = map_fold(Doc, {[], [{0, 0, 0}]}, Acc0),
-                Acc1
-            end,
-            KeyAcc = KeyFoldFun(FoldFun, Acc, Keys),
-            {{[], [{0, 0, 0}]}, KeyAcc};
-        _ ->
-            [Opts] = couch_mrview_util:all_docs_key_opts(Args),
-            Bt = Db#db.fulldocinfo_by_id_btree,
-            {ok, R, A} = couch_btree:fold(Bt, fun map_fold/3, Acc, Opts),
-            {R, A}
+                {{{Id, Id}, {Props}}, Acc0#mracc{doc_info=DI}};
+            not_found ->
+                {{{Key, error}, not_found}, Acc0}
+        end,
+        {_, Acc2} = map_fold(Doc, {[], [{0, 0, 0}]}, Acc1),
+        Acc2
     end,
-    Offset = couch_mrview_util:all_docs_reduce_to_count(Reds),
-    finish_fold(FinalAcc, [{total, Total}, {offset, Offset}]).
+    FinalAcc = lists:foldl(FoldFun, Acc, Keys),
+    finish_fold(FinalAcc, [{total, Total}]).
 
 
 map_fold(Db, View, Args, Callback, UAcc) ->
@@ -191,9 +201,9 @@ map_fold(Db, View, Args, Callback, UAcc) ->
 map_fold(#full_doc_info{} = FullDocInfo, OffsetReds, Acc) ->
     % matches for _all_docs and translates #full_doc_info{} -> KV pair
     case couch_doc:to_doc_info(FullDocInfo) of
-        #doc_info{id=Id, revs=[#rev_info{deleted=false, rev=Rev}|_]} ->
+        #doc_info{id=Id, revs=[#rev_info{deleted=false, rev=Rev}|_]} = DI ->
             Value = {[{rev, couch_doc:rev_to_str(Rev)}]},
-            map_fold({{Id, Id}, Value}, OffsetReds, Acc);
+            map_fold({{Id, Id}, Value}, OffsetReds, Acc#mracc{doc_info=DI});
         #doc_info{revs=[#rev_info{deleted=true}|_]} ->
             {ok, Acc}
     end;
@@ -222,14 +232,23 @@ map_fold({{Key, Id}, Val}, _Offset, Acc) ->
     #mracc{
         db=Db,
         limit=Limit,
+        doc_info=DI,
         callback=Callback,
         user_acc=UAcc0,
         args=Args
     } = Acc,
-    Doc = couch_mrview_util:maybe_load_doc(Db, Id, Val, Args),
+    Doc = case DI of
+        #doc_info{} -> couch_mrview_util:maybe_load_doc(Db, DI, Args);
+        _ -> couch_mrview_util:maybe_load_doc(Db, Id, Val, Args)
+    end,
     Row = [{id, Id}, {key, Key}, {val, Val}] ++ Doc,
     {Go, UAcc1} = Callback({row, Row}, UAcc0),
-    {Go, Acc#mracc{limit=Limit-1, user_acc=UAcc1, last_go=Go}}.
+    {Go, Acc#mracc{
+        limit=Limit-1,
+        doc_info=undefined,
+        user_acc=UAcc1,
+        last_go=Go
+    }}.
 
 
 red_fold(Db, {_Nth, _Lang, View}=RedView, Args, Callback, UAcc) ->
