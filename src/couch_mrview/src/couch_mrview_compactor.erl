@@ -164,12 +164,11 @@ swap_compacted(OldState, NewState) ->
     RootDir = couch_index_util:root_dir(),
     IndexFName = couch_mrview_util:index_file(DbName, Sig),
     CompactFName = couch_mrview_util:compaction_file(DbName, Sig),
-    couch_file:close(OldState#mrst.fd),
     ok = couch_file:delete(RootDir, IndexFName),
     ok = file:rename(CompactFName, IndexFName),
 
     unlink(OldState#mrst.fd),
+    couch_ref_counter:drop(OldState#mrst.refc),
+    {ok, NewRefCounter} = couch_ref_counter:start([NewState#mrst.fd]),
     
-    {ok, NewState}.
-
-
+    {ok, NewState#mrst{refc=NewRefCounter}}.

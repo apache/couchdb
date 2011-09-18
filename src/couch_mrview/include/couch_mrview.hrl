@@ -13,6 +13,7 @@
 -record(mrst, {
     sig=nil,
     fd=nil,
+    refc,
     db_name,
     idx_name,
     language,
