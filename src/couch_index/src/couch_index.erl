@@ -94,9 +94,9 @@ init({Mod, IdxState}) ->
             Args = [
                 Mod:get(db_name, IdxState),
                 Mod:get(idx_name, IdxState),
-                Mod:get(signature, IdxState)
+                couch_index_util:hexsig(Mod:get(signature, IdxState))
             ],
-            ?LOG_INFO("Opening index for db: ~s idx: ~s~n    sig: ~p", Args),
+            ?LOG_INFO("Opening index for db: ~s idx: ~s sig: ~p", Args),
             proc_lib:init_ack({ok, self()}),
             gen_server:enter_loop(?MODULE, [], State);
         Other ->
@@ -110,6 +110,13 @@ terminate(Reason, State) ->
     send_all(State#st.waiters, Reason),
     couch_util:shutdown_sync(State#st.updater),
     couch_util:shutdown_sync(State#st.compactor),
+    Args = [
+        Mod:get(db_name, IdxState),
+        Mod:get(idx_name, IdxState),
+        couch_index_util:hexsig(Mod:get(signature, IdxState)),
+        Reason
+    ],
+    ?LOG_INFO("Closing index for db: ~s idx: ~s sig: ~p~nreason: ~p", Args),
     ok.
 
 
