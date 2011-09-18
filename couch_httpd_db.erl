@@ -561,7 +561,7 @@ all_docs_view_row_obj(Db, {_KeyDocId, DocInfo}, true, Conflicts) ->
     #doc_info{revs = [#rev_info{deleted = true} | _]} ->
         {all_docs_row(DocInfo) ++ [{doc, null}]};
     _ ->
-        {all_docs_row(DocInfo) ++ couch_util:doc_member(
+        {all_docs_row(DocInfo) ++ couch_index_util:load_doc(
             Db, DocInfo, if Conflicts -> [conflicts]; true -> [] end)}
     end;
 all_docs_view_row_obj(_Db, {_KeyDocId, DocInfo}, _IncludeDocs, _Conflicts) ->
