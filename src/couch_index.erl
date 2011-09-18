@@ -16,7 +16,7 @@
 
 %% API
 -export([start_link/1, stop/1, get_state/2, get_info/1]).
--export([compact/1, get_compactor_pid/1]).
+-export([compact/1, compact/2]).
 -export([config_change/3]).
 
 %% gen_server callbacks
@@ -55,11 +55,15 @@ get_info(Pid) ->
 
 
 compact(Pid) ->
-    gen_server:call(Pid, compact).
+    compact(Pid, []).
 
 
-get_compactor_pid(Pid) ->
-    gen_server:call(Pid, get_compactor_pid).
+compact(Pid, Options) ->
+    {ok, CPid} = gen_server:call(Pid, compact),
+    case lists:member(monitor, Options) of
+        true -> {ok, erlang:monitor(process, CPid)};
+        false -> ok
+    end.
 
 
 config_change("query_server_config", "commit_freq", NewValue) ->
@@ -155,8 +159,8 @@ handle_call(reset, _From, State) ->
     {ok, NewIdxState} = Mod:reset(IdxState),
     {reply, {ok, NewIdxState}, State#st{idx_state=NewIdxState}};
 handle_call(compact, _From, State) ->
-    couch_index_compactor:run(State#st.compactor, State#st.idx_state),
-    {reply, ok, State};
+    Resp = couch_index_compactor:run(State#st.compactor, State#st.idx_state),
+    {reply, Resp, State};
 handle_call(get_compactor_pid, _From, State) ->
     {reply, {ok, State#st.compactor}, State};
 handle_call({compacted, NewIdxState}, _From, State) ->

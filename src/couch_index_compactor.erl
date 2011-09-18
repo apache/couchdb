@@ -15,7 +15,7 @@
 
 
 %% API
--export([start_link/2, run/2, monitor/1, cancel/1, is_running/1]).
+-export([start_link/2, run/2, cancel/1, is_running/1]).
 
 %% gen_server callbacks
 -export([init/1, terminate/2, code_change/3]).
@@ -40,13 +40,6 @@ run(Pid, IdxState) ->
     gen_server:call(Pid, {compact, IdxState}).
 
 
-monitor(Pid) ->
-    case gen_server:call(Pid, get_pid) of
-        {ok, undefined} -> {error, compaction_not_running};
-        {ok, CPid} -> {ok, erlang:monitor(process, CPid)}
-    end.
-
-
 cancel(Pid) ->
     gen_server:call(Pid, cancel).
 
@@ -66,12 +59,10 @@ terminate(_Reason, State) ->
 
 
 handle_call({compact, _}, _From, #st{pid=Pid}=State) when is_pid(Pid) ->
-    {reply, ok, State};
+    {reply, {ok, Pid}, State};
 handle_call({compact, IdxState}, _From, #st{idx=Idx}=State) ->
     Pid = spawn_link(fun() -> compact(Idx, State#st.mod, IdxState) end),
-    {reply, ok, State#st{pid=Pid}};
-handle_call(get_pid, _From, State) ->
-    {reply, {ok, State#st.pid}, State};
+    {reply, {ok, Pid}, State#st{pid=Pid}};
 handle_call(cancel, _From, #st{pid=undefined}=State) ->
     {reply, ok, State};
 handle_call(cancel, _From, #st{pid=Pid}=State) ->
