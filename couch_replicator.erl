@@ -651,7 +651,10 @@ checkpoint_interval(_State) ->
     5000.
 
 do_checkpoint(#rep_state{current_through_seq=Seq, committed_seq=Seq} = State) ->
-    {ok, State};
+    SourceCurSeq = source_cur_seq(State),
+    NewState = State#rep_state{source_seq = SourceCurSeq},
+    update_task(NewState),
+    {ok, NewState};
 do_checkpoint(State) ->
     #rep_state{
         source_name=SourceName,
@@ -725,7 +728,9 @@ do_checkpoint(State) ->
                 Source, SourceLog#doc{body = NewRepHistory}, source),
             {TgtRevPos, TgtRevId} = update_checkpoint(
                 Target, TargetLog#doc{body = NewRepHistory}, target),
+            SourceCurSeq = source_cur_seq(State),
             NewState = State#rep_state{
+                source_seq = SourceCurSeq,
                 checkpoint_history = NewRepHistory,
                 committed_seq = NewTsSeq,
                 source_log = SourceLog#doc{revs={SrcRevPos, [SrcRevId]}},
