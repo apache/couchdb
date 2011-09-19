@@ -112,8 +112,10 @@ get_db_info(#httpdb{} = Db) ->
         fun(200, _, {Props}) ->
             {ok, Props}
         end);
-get_db_info(Db) ->
+get_db_info(#db{name = DbName, user_ctx = UserCtx}) ->
+    {ok, Db} = couch_db:open(DbName, [{user_ctx, UserCtx}]),
     {ok, Info} = couch_db:get_db_info(Db),
+    couch_db:close(Db),
     {ok, [{couch_util:to_binary(K), V} || {K, V} <- Info]}.
 
 
