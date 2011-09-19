@@ -68,7 +68,7 @@ target_db_name() -> <<"couch_test_rep_db_b">>.
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(368),
+    etap:plan(376),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -101,12 +101,12 @@ test() ->
                 "Target database is idle before starting replication"),
 
             {ok, RepPid, RepId} = replicate(Source, Target),
-            check_active_tasks(RepPid, RepId, Source, Target, false),
+            check_active_tasks(RepPid, RepId, Source, Target),
             {ok, DocsWritten} = populate_and_compact_test(
                 RepPid, SourceDb, TargetDb),
 
             wait_target_in_sync(DocsWritten, TargetDb),
-            check_active_tasks(RepPid, RepId, Source, Target, true),
+            check_active_tasks(RepPid, RepId, Source, Target),
             cancel_replication(RepId, RepPid),
             compare_dbs(SourceDb, TargetDb),
 
@@ -269,7 +269,7 @@ compare_dbs(#db{name = SourceName}, #db{name = TargetName}) ->
     ok = couch_db:close(TargetDb).
 
 
-check_active_tasks(RepPid, {BaseId, Ext} = _RepId, Src, Tgt, AtEnd) ->
+check_active_tasks(RepPid, {BaseId, Ext} = _RepId, Src, Tgt) ->
     Source = case Src of
     {remote, NameSrc} ->
         <<(db_url(NameSrc))/binary, $/>>;
@@ -284,13 +284,6 @@ check_active_tasks(RepPid, {BaseId, Ext} = _RepId, Src, Tgt, AtEnd) ->
     end,
     FullRepId = list_to_binary(BaseId ++ Ext),
     Pid = list_to_binary(pid_to_list(RepPid)),
-    case AtEnd of
-    true ->
-        % wait for checkpoint to make sure we get a progress of 100% reported
-        ok = timer:sleep(5000);
-    false ->
-        ok
-    end,
     [RepTask] = couch_task_status:all(),
     etap:is(couch_util:get_value(pid, RepTask), Pid,
         "_active_tasks entry has correct pid property"),
@@ -315,15 +308,11 @@ check_active_tasks(RepPid, {BaseId, Ext} = _RepId, Src, Tgt, AtEnd) ->
     etap:is(is_integer(couch_util:get_value(checkpointed_source_seq, RepTask)), true,
         "_active_tasks entry has integer checkpointed_source_seq property"),
     etap:is(is_integer(couch_util:get_value(source_seq, RepTask)), true,
-            "_active_tasks entry has integer source_seq property"),
-    case AtEnd of
-    true ->
-        etap:is(couch_util:get_value(progress, RepTask), 100,
-            "_active_tasks entry has a progress of 100%");
-    false ->
-        etap:is(is_integer(couch_util:get_value(progress, RepTask)), true,
-            "_active_tasks entry has an integer progress property")
-    end.
+        "_active_tasks entry has integer source_seq property"),
+    Progress = couch_util:get_value(progress, RepTask),
+    etap:is(is_integer(Progress), true,
+        "_active_tasks entry has an integer progress property"),
+    etap:is(Progress =< 100, true, "Progress is not greater than 100%").
 
 
 wait_writer(Pid, NumDocs) ->
