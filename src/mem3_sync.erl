@@ -243,7 +243,7 @@ start_update_notifier() ->
 
 %% @doc Finds the next {DbName,Node} pair in the list of waiting replications
 %% which does not correspond to an already running replication
--spec next_replication(list(), list()) -> {binary(),node(),list()} | nil.
+-spec next_replication([#job{}], [#job{}]) -> {#job{}, [#job{}]} | nil.
 next_replication(Active, Waiting) ->
     Fun = fun(#job{name=S, node=N}) -> is_running(S,N,Active) end,
     case lists:splitwith(Fun, Waiting) of
