@@ -15,6 +15,10 @@
 
 -export([handle_changes/3]).
 
+% For the builtin filter _docs_ids, this is the maximum number
+% of documents for which we trigger the optimized code path.
+-define(MAX_DOC_IDS, 100).
+
 -record(changes_acc, {
     db,
     seq,
@@ -29,15 +33,21 @@
 }).
 
 %% @type Req -> #httpd{} | {json_req, JsonObj()}
-handle_changes(#changes_args{style=Style}=Args1, Req, Db) ->
-    #changes_args{feed = Feed} = Args = Args1#changes_args{
-        filter = make_filter_fun(Args1#changes_args.filter, Style, Req, Db)
-    },
-    StartSeq = case Args#changes_args.dir of
+handle_changes(Args1, Req, Db) ->
+    #changes_args{
+        style = Style,
+        filter = FilterName,
+        feed = Feed,
+        dir = Dir,
+        since = Since
+    } = Args1,
+    {FilterFun, FilterArgs} = make_filter_fun(FilterName, Style, Req, Db),
+    Args = Args1#changes_args{filter_fun = FilterFun, filter_args = FilterArgs},
+    StartSeq = case Dir of
     rev ->
         couch_db:get_update_seq(Db);
     fwd ->
-        Args#changes_args.since
+        Since
     end,
     if Feed == "continuous" orelse Feed == "longpoll" ->
         fun(CallbackAcc) ->
@@ -61,8 +71,8 @@ handle_changes(#changes_args{style=Style}=Args1, Req, Db) ->
                     StartSeq,
                     <<"">>,
                     Timeout,
-                    TimeoutFun
-                )
+                    TimeoutFun,
+                    true)
             after
                 couch_db_update_notifier:stop(Notify),
                 get_rest_db_updated(ok) % clean out any remaining update messages
@@ -79,8 +89,8 @@ handle_changes(#changes_args{style=Style}=Args1, Req, Db) ->
                     UserAcc2,
                     Db,
                     StartSeq,
-                    <<>>
-                ),
+                    <<>>,
+                    true),
             end_sending_changes(Callback, UserAcc3, LastSeq, Feed)
         end
     end.
@@ -94,7 +104,7 @@ get_callback_acc(Callback) when is_function(Callback, 2) ->
 make_filter_fun([$_ | _] = FilterName, Style, Req, Db) ->
     builtin_filter_fun(FilterName, Style, Req, Db);
 make_filter_fun(FilterName, Style, Req, Db) ->
-    os_filter_fun(FilterName, Style, Req, Db).
+    {os_filter_fun(FilterName, Style, Req, Db), []}.
 
 os_filter_fun(FilterName, Style, Req, Db) ->
     case [list_to_binary(couch_httpd:unquote(Part))
@@ -133,19 +143,20 @@ os_filter_fun(FilterName, Style, Req, Db) ->
     end.
 
 builtin_filter_fun("_doc_ids", Style, {json_req, {Props}}, _Db) ->
-    filter_docids(couch_util:get_value(<<"doc_ids">>, Props), Style);
+    DocIds = couch_util:get_value(<<"doc_ids">>, Props),
+    {filter_docids(DocIds, Style), DocIds};
 builtin_filter_fun("_doc_ids", Style, #httpd{method='POST'}=Req, _Db) ->
     {Props} = couch_httpd:json_body_obj(Req),
     DocIds =  couch_util:get_value(<<"doc_ids">>, Props, nil),
-    filter_docids(DocIds, Style);
+    {filter_docids(DocIds, Style), DocIds};
 builtin_filter_fun("_doc_ids", Style, #httpd{method='GET'}=Req, _Db) ->
     DocIds = ?JSON_DECODE(couch_httpd:qs_value(Req, "doc_ids", "null")),
-    filter_docids(DocIds, Style);
+    {filter_docids(DocIds, Style), DocIds};
 builtin_filter_fun("_design", Style, _Req, _Db) ->
-    filter_designdoc(Style);
+    {filter_designdoc(Style), []};
 builtin_filter_fun("_view", Style, Req, Db) ->
     ViewName = couch_httpd:qs_value(Req, "view", ""),
-    filter_view(ViewName, Style, Db);
+    {filter_view(ViewName, Style, Db), []};
 builtin_filter_fun(_FilterName, _Style, _Req, _Db) ->
     throw({bad_request, "unknown builtin filter name"}).
 
@@ -244,49 +255,122 @@ start_sending_changes(_Callback, UserAcc, "continuous") ->
 start_sending_changes(Callback, UserAcc, ResponseType) ->
     Callback(start, ResponseType, UserAcc).
 
-send_changes(Args, Callback, UserAcc, Db, StartSeq, Prepend) ->
+send_changes(Args, Callback, UserAcc, Db, StartSeq, Prepend, FirstRound) ->
     #changes_args{
         include_docs = IncludeDocs,
         conflicts = Conflicts,
         limit = Limit,
         feed = ResponseType,
         dir = Dir,
-        filter = FilterFun
+        filter = FilterName,
+        filter_args = FilterArgs,
+        filter_fun = FilterFun
     } = Args,
-    couch_db:changes_since(
-        Db,
-        StartSeq,
-        fun changes_enumerator/2,
-        [{dir, Dir}],
-        #changes_acc{
-            db = Db,
-            seq = StartSeq,
-            prepend = Prepend,
-            filter = FilterFun,
-            callback = Callback,
-            user_acc = UserAcc,
-            resp_type = ResponseType,
-            limit = Limit,
-            include_docs = IncludeDocs,
-            conflicts = Conflicts
-        }
-    ).
+    Acc0 = #changes_acc{
+        db = Db,
+        seq = StartSeq,
+        prepend = Prepend,
+        filter = FilterFun,
+        callback = Callback,
+        user_acc = UserAcc,
+        resp_type = ResponseType,
+        limit = Limit,
+        include_docs = IncludeDocs,
+        conflicts = Conflicts
+    },
+    case FirstRound of
+    true ->
+        case FilterName of
+        "_doc_ids" when length(FilterArgs) =< ?MAX_DOC_IDS ->
+            send_changes_doc_ids(
+                FilterArgs, Db, StartSeq, fun changes_enumerator/2, Acc0);
+        "_design" ->
+            send_changes_design_docs(
+                Db, StartSeq, fun changes_enumerator/2, Acc0);
+        _ ->
+            couch_db:changes_since(
+                Db, StartSeq, fun changes_enumerator/2, [{dir, Dir}], Acc0)
+        end;
+    false ->
+        couch_db:changes_since(
+            Db, StartSeq, fun changes_enumerator/2, [{dir, Dir}], Acc0)
+    end.
+
+
+send_changes_doc_ids(DocIds, Db, StartSeq, Fun, Acc0) ->
+    Lookups = couch_btree:lookup(Db#db.fulldocinfo_by_id_btree, DocIds),
+    DocInfos = lists:foldl(
+        fun({ok, FDI}, Acc) ->
+            DocInfo = couch_doc:to_doc_info(FDI),
+            case DocInfo#doc_info.high_seq >= StartSeq of
+            true ->
+                [DocInfo | Acc];
+            false ->
+                Acc
+            end;
+        (not_found, Acc) ->
+            Acc
+        end,
+        [], Lookups),
+    send_lookup_changes(DocInfos, Db, Fun, Acc0).
+
+
+send_changes_design_docs(Db, StartSeq, Fun, Acc0) ->
+    FoldFun = fun(FullDocInfo, _, Acc) ->
+        DocInfo = couch_doc:to_doc_info(FullDocInfo),
+        case DocInfo#doc_info.high_seq >= StartSeq of
+        true ->
+            {ok, [DocInfo | Acc]};
+        false ->
+            {ok, Acc}
+        end
+    end,
+    KeyOpts = [{start_key, <<"_design/">>}, {end_key_gt, <<"_design0">>}],
+    {ok, _, DocInfos} = couch_btree:fold(
+        Db#db.fulldocinfo_by_id_btree, FoldFun, [], KeyOpts),
+    send_lookup_changes(DocInfos, Db, Fun, Acc0).
+
+
+send_lookup_changes(DocInfos, Db, Fun, Acc0) ->
+    SortedDocInfos = lists:keysort(#doc_info.high_seq, DocInfos),
+    FinalAcc = try
+        lists:foldl(
+            fun(DocInfo, Acc) ->
+                case Fun(DocInfo, Acc) of
+                {ok, NewAcc} ->
+                    NewAcc;
+                {stop, NewAcc} ->
+                    throw({stop, NewAcc})
+                end
+            end,
+            Acc0, SortedDocInfos)
+    catch
+    throw:{stop, Acc} ->
+        Acc
+    end,
+    {ok, FinalAcc#changes_acc{seq = couch_db:get_update_seq(Db)}}.
+
 
 keep_sending_changes(Args, Callback, UserAcc, Db, StartSeq, Prepend, Timeout,
-    TimeoutFun) ->
+    TimeoutFun, FirstRound) ->
     #changes_args{
         feed = ResponseType,
         limit = Limit,
         db_open_options = DbOptions
     } = Args,
-    % ?LOG_INFO("send_changes start ~p",[StartSeq]),
 
     {ok, ChangesAcc} = send_changes(
-        Args#changes_args{dir=fwd}, Callback, UserAcc, Db, StartSeq, Prepend),
+        Args#changes_args{dir=fwd},
+        Callback,
+        UserAcc,
+        Db,
+        StartSeq,
+        Prepend,
+        FirstRound),
     #changes_acc{
         seq = EndSeq, prepend = Prepend2, user_acc = UserAcc2, limit = NewLimit
     } = ChangesAcc,
-    % ?LOG_INFO("send_changes last ~p",[EndSeq]),
+
     couch_db:close(Db),
     if Limit > NewLimit, ResponseType == "longpoll" ->
         end_sending_changes(Callback, UserAcc2, EndSeq, ResponseType);
@@ -305,7 +389,8 @@ keep_sending_changes(Args, Callback, UserAcc, Db, StartSeq, Prepend, Timeout,
                     EndSeq,
                     Prepend2,
                     Timeout,
-                    TimeoutFun
+                    TimeoutFun,
+                    false
                 );
             _Else ->
                 end_sending_changes(Callback, UserAcc2, EndSeq, ResponseType)
