@@ -79,7 +79,15 @@ write_db_doc(Doc) ->
     try
         update_db_doc(Db, Doc)
     catch conflict ->
-        ok % assume this is a race with another shard on this node
+        % one more check to detect a real conflict
+        #doc{id=Id, body=Body} = Doc,
+        case couch_db:open_doc(Db, Id, []) of
+        {ok, #doc{body=Body}} ->
+            % assume this is a race with a replication
+            ok;
+        {ok, _} ->
+            conflict
+        end
     after
         couch_db:close(Db)
     end.
@@ -87,11 +95,14 @@ write_db_doc(Doc) ->
 update_db_doc(Db, #doc{id=Id, body=Body} = Doc) ->
     case couch_db:open_doc(Db, Id, []) of
     {not_found, _} ->
-        {ok, _} = couch_db:update_doc(Db, Doc, []);
+        {ok, _} = couch_db:update_doc(Db, Doc, []),
+        ok;
+    % harmless race condition
     {ok, #doc{body=Body}} ->
         ok;
-    {ok, OldDoc} ->
-        {ok, _} = couch_db:update_doc(Db, OldDoc#doc{body=Body}, [])
+    % real conflict
+    {ok, _} ->
+        conflict
     end.
 
 delete_db_doc(DocId) ->
