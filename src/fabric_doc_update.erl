@@ -86,9 +86,14 @@ force_reply(Doc, [FirstReply|_] = Replies, {Health, W, Acc}) ->
         {Health, W, [{Doc,Reply} | Acc]};
     false ->
         twig:log(warn, "write quorum (~p) failed for ~s", [W, Doc#doc.id]),
-        % TODO make a smarter choice than just picking the first reply
-        NewHealth = case Health of ok -> accepted; _ -> Health end,
-        {NewHealth, W, [{Doc,FirstReply} | Acc]}
+        case [Reply || {ok, Reply} <- Replies] of
+        [] ->
+            % we didn't update any copy, just pick the first error
+            {error, W, [{Doc, FirstReply} | Acc]};
+        [AcceptedRev | _] ->
+            NewHealth = case Health of ok -> accepted; _ -> Health end,
+            {NewHealth, W, [{Doc, {accepted,AcceptedRev}} | Acc]}
+        end
     end.
 
 maybe_reply(_, _, continue) ->
