@@ -55,6 +55,7 @@ EXTRA_DIST = \
     065-kt-stemming.t \
     070-couch-db.t \
     072-cleanup.t \
+    073-changes.t \
     080-config-get-set.t \
     081-config-override.1.ini \
     081-config-override.2.ini \
