@@ -34,12 +34,13 @@ go(DbName, AllDocs, Opts) ->
     Acc0 = {length(Workers), length(AllDocs), list_to_integer(W), GroupedDocs,
         dict:from_list([{Doc,[]} || Doc <- AllDocs])},
     case fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
-    {ok, Results} ->
-        {ok, [R || R <- couch_util:reorder_results(AllDocs, Results), R =/= noreply]};
+    {ok, {Health, Results}} when Health =:= ok; Health =:= accepted ->
+        {Health, [R || R <- couch_util:reorder_results(AllDocs, Results), R =/= noreply]};
     {timeout, Acc} ->
         {_, _, W1, _, DocReplDict} = Acc,
-        {_, Resp} = dict:fold(fun force_reply/3, {W1,[]}, DocReplDict),
-        {accepted, [R || R <- couch_util:reorder_results(AllDocs, Resp), R =/= noreply]};
+        {Health, _, Resp} = dict:fold(fun force_reply/3, {ok, W1, []},
+            DocReplDict),
+        {Health, [R || R <- couch_util:reorder_results(AllDocs, Resp), R =/= noreply]};
     Else ->
         Else
     end.
@@ -58,15 +59,16 @@ handle_message({ok, Replies}, Worker, Acc0) ->
     case {WaitingCount, dict:size(DocReplyDict)} of
     {1, _} ->
         % last message has arrived, we need to conclude things
-        {W, Reply} = dict:fold(fun force_reply/3, {W,[]}, DocReplyDict),
-        {stop, Reply};
+        {Health, W, Reply} = dict:fold(fun force_reply/3, {ok, W, []},
+           DocReplyDict),
+        {stop, {Health, Reply}};
     {_, DocCount} ->
         % we've got at least one reply for each document, let's take a look
         case dict:fold(fun maybe_reply/3, {stop,W,[]}, DocReplyDict) of
         continue ->
             {ok, {WaitingCount - 1, DocCount, W, GroupedDocs, DocReplyDict}};
         {stop, W, FinalReplies} ->
-            {stop, FinalReplies}
+            {stop, {ok, FinalReplies}}
         end
     end;
 handle_message({missing_stub, Stub}, _, _) ->
@@ -76,16 +78,17 @@ handle_message({not_found, no_db_file} = X, Worker, Acc0) ->
     Docs = couch_util:get_value(Worker, GroupedDocs),
     handle_message({ok, [X || _D <- Docs]}, Worker, Acc0).
 
-force_reply(Doc, [], {W, Acc}) ->
-    {W, [{Doc, {error, internal_server_error}} | Acc]};
-force_reply(Doc, [FirstReply|_] = Replies, {W, Acc}) ->
+force_reply(Doc, [], {_, W, Acc}) ->
+    {error, W, [{Doc, {error, internal_server_error}} | Acc]};
+force_reply(Doc, [FirstReply|_] = Replies, {Health, W, Acc}) ->
     case update_quorum_met(W, Replies) of
     {true, Reply} ->
-        {W, [{Doc,Reply} | Acc]};
+        {Health, W, [{Doc,Reply} | Acc]};
     false ->
         twig:log(warn, "write quorum (~p) failed for ~s", [W, Doc#doc.id]),
         % TODO make a smarter choice than just picking the first reply
-        {W, [{Doc,FirstReply} | Acc]}
+        NewHealth = case Health of ok -> accepted; _ -> Health end,
+        {NewHealth, W, [{Doc,FirstReply} | Acc]}
     end.
 
 maybe_reply(_, _, continue) ->
@@ -128,8 +131,9 @@ append_update_replies([Doc|Rest1], [Reply|Rest2], Dict0) ->
 
 skip_message({WaitingCount, _, W, _, DocReplyDict} = Acc0) ->
     if WaitingCount =:= 1 ->
-        {W, Reply} = dict:fold(fun force_reply/3, {W,[]}, DocReplyDict),
-        {stop, Reply};
+        {Health, W, Reply} = dict:fold(fun force_reply/3, {ok, W, []},
+            DocReplyDict),
+        {stop, {Health, Reply}};
     true ->
         {ok, setelement(1, Acc0, WaitingCount-1)}
     end.
