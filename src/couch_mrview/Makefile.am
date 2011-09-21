@@ -57,7 +57,7 @@ EXTRA_DIST = $(include_files) $(source_files) $(test_files)
 CLEANFILES = $(compiled_files)
 
 check:
-	$(abs_top_builddir)/test/etap/run -v $(abs_top_srcdir)/src/couch_mrview/test
+	$(abs_top_builddir)/test/etap/run $(abs_top_srcdir)/src/couch_mrview/test
 
 ebin/%.app: src/%.app.src
 	@mkdir -p ebin/
