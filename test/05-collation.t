@@ -49,7 +49,7 @@ test_range_collation(Db) ->
         Id = list_to_binary(integer_to_list(Count)),
         Expect = [
             {meta, [{total, 26}, {offset, Count}]},
-            {row, [{id, Id}, {key, V}, {val, 0}]}
+            {row, [{id, Id}, {key, V}, {value, 0}]}
         ],
         case Results == Expect of
             true -> {Count+1, Error};
@@ -63,12 +63,12 @@ test_inclusive_end(Db) ->
     Opts = [{end_key, <<"b">>}, {inclusive_end, true}],
     {ok, Rows0} = run_query(Db, Opts),
     LastRow0 = lists:last(Rows0),
-    Expect0 = {row, [{id,<<"10">>}, {key,<<"b">>}, {val,0}]},
+    Expect0 = {row, [{id,<<"10">>}, {key,<<"b">>}, {value,0}]},
     etap:is(LastRow0, Expect0, "Inclusive end is correct."),
 
     {ok, Rows1} = run_query(Db, Opts ++ [{direction, rev}]),
     LastRow1 = lists:last(Rows1),
-    Expect1 = {row, [{id,<<"10">>}, {key,<<"b">>}, {val,0}]},
+    Expect1 = {row, [{id,<<"10">>}, {key,<<"b">>}, {value,0}]},
     etap:is(LastRow1, Expect1,
             "Inclusive end is correct with descending=true").
 
@@ -76,12 +76,12 @@ test_uninclusive_end(Db) ->
     Opts = [{end_key, <<"b">>}, {inclusive_end, false}],
     {ok, Rows0} = run_query(Db, Opts),
     LastRow0 = lists:last(Rows0),
-    Expect0 = {row, [{id,<<"9">>}, {key,<<"aa">>}, {val,0}]},
+    Expect0 = {row, [{id,<<"9">>}, {key,<<"aa">>}, {value,0}]},
     etap:is(LastRow0, Expect0, "Uninclusive end is correct."),
 
     {ok, Rows1} = run_query(Db, Opts ++ [{direction, rev}]),
     LastRow1 = lists:last(Rows1),
-    Expect1 = {row, [{id,<<"11">>}, {key,<<"B">>}, {val,0}]},
+    Expect1 = {row, [{id,<<"11">>}, {key,<<"B">>}, {value,0}]},
     etap:is(LastRow1, Expect1,
             "Uninclusive end is correct with descending=true").
 
@@ -92,7 +92,7 @@ test_with_endkey_docid(Db) ->
         {inclusive_end, false}
     ]),
     Result0 = lists:last(Rows0),
-    Expect0 = {row, [{id,<<"9">>}, {key,<<"aa">>}, {val,0}]},
+    Expect0 = {row, [{id,<<"9">>}, {key,<<"aa">>}, {value,0}]},
     etap:is(Result0, Expect0, "Uninclsuive end with endkey_docid set is ok."),
 
     {ok, Rows1} = run_query(Db, [
@@ -100,7 +100,7 @@ test_with_endkey_docid(Db) ->
         {inclusive_end, false}
     ]),
     Result1 = lists:last(Rows1),
-    Expect1 = {row, [{id,<<"10">>}, {key,<<"b">>}, {val,0}]},
+    Expect1 = {row, [{id,<<"10">>}, {key,<<"b">>}, {value,0}]},
     etap:is(Result1, Expect1, "Uninclsuive end with endkey_docid set is ok.").
 
 
@@ -122,7 +122,7 @@ docs() ->
 rows() ->
     {Rows, _} = lists:foldl(fun(V, {Rows0, Count}) ->
         Id = list_to_binary(integer_to_list(Count)),
-        Row = {row, [{id, Id}, {key, V}, {val, 0}]},
+        Row = {row, [{id, Id}, {key, V}, {value, 0}]},
         {[Row | Rows0], Count+1}
     end, {[], 0}, vals()),
     lists:reverse(Rows).
