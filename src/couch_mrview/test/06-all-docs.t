@@ -106,7 +106,7 @@ test_include_docs(Db) ->
     Val = {[{rev, <<"1-55b9a29311341e07ec0a7ca13bc1b59f">>}]},
     Expect = {ok, [
         {meta, [{total, 11}, {offset, 8}]},
-        {row, [{id, <<"8">>}, {key, <<"8">>}, {val, Val}, {doc, Doc}]}
+        {row, [{id, <<"8">>}, {key, <<"8">>}, {value, Val}, {doc, Doc}]}
     ]},
     etap:is(Result, Expect, "Query with include docs works.").
 
@@ -120,7 +120,7 @@ test_empty_view(Db) ->
 
 
 mk_row(Id, Rev) ->
-    {row, [{id, Id}, {key, Id}, {val, {[{rev, Rev}]}}]}.
+    {row, [{id, Id}, {key, Id}, {value, {[{rev, Rev}]}}]}.
 
 
 run_query(Db, Opts) ->

@@ -33,7 +33,7 @@ test_basic(Db) ->
     Result = run_query(Db, []),
     Expect = {ok, [
         {meta, []},
-        {row, [{key, null}, {val, 55}]}
+        {row, [{key, null}, {value, 55}]}
     ]},
     etap:is(Result, Expect, "Simple reduce view works.").
 
@@ -42,7 +42,7 @@ test_key_range(Db) ->
     Result = run_query(Db, [{start_key, [0, 2]}, {end_key, [0, 4]}]),
     Expect = {ok, [
         {meta, []},
-        {row, [{key, null}, {val, 6}]}
+        {row, [{key, null}, {value, 6}]}
     ]},
     etap:is(Result, Expect, "Reduce with key range works.").
 
@@ -51,8 +51,8 @@ test_group_level(Db) ->
     Result = run_query(Db, [{group_level, 1}]),
     Expect = {ok, [
         {meta, []},
-        {row, [{key, [0]}, {val, 30}]},
-        {row, [{key, [1]}, {val, 25}]}
+        {row, [{key, [0]}, {value, 30}]},
+        {row, [{key, [1]}, {value, 25}]}
     ]},
     etap:is(Result, Expect, "Group level works.").
 
@@ -60,16 +60,16 @@ test_group_exact(Db) ->
     Result = run_query(Db, [{group_level, exact}]),
     Expect = {ok, [
         {meta, []},
-        {row, [{key, [0, 2]}, {val, 2}]},
-        {row, [{key, [0, 4]}, {val, 4}]},
-        {row, [{key, [0, 6]}, {val, 6}]},
-        {row, [{key, [0, 8]}, {val, 8}]},
-        {row, [{key, [0, 10]}, {val, 10}]},
-        {row, [{key, [1, 1]}, {val, 1}]},
-        {row, [{key, [1, 3]}, {val, 3}]},
-        {row, [{key, [1, 5]}, {val, 5}]},
-        {row, [{key, [1, 7]}, {val, 7}]},
-        {row, [{key, [1, 9]}, {val, 9}]}
+        {row, [{key, [0, 2]}, {value, 2}]},
+        {row, [{key, [0, 4]}, {value, 4}]},
+        {row, [{key, [0, 6]}, {value, 6}]},
+        {row, [{key, [0, 8]}, {value, 8}]},
+        {row, [{key, [0, 10]}, {value, 10}]},
+        {row, [{key, [1, 1]}, {value, 1}]},
+        {row, [{key, [1, 3]}, {value, 3}]},
+        {row, [{key, [1, 5]}, {value, 5}]},
+        {row, [{key, [1, 7]}, {value, 7}]},
+        {row, [{key, [1, 9]}, {value, 9}]}
     ]},
     etap:is(Result, Expect, "Group exact works.").
 

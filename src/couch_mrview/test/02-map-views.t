@@ -46,16 +46,16 @@ test_basic(Db) ->
     Result = run_query(Db, []),
     Expect = {ok, [
         {meta, [{total, 10}, {offset, 0}]},
-        {row, [{id, <<"1">>}, {key, 1}, {val, 1}]},
-        {row, [{id, <<"2">>}, {key, 2}, {val, 2}]},
-        {row, [{id, <<"3">>}, {key, 3}, {val, 3}]},
-        {row, [{id, <<"4">>}, {key, 4}, {val, 4}]},
-        {row, [{id, <<"5">>}, {key, 5}, {val, 5}]},
-        {row, [{id, <<"6">>}, {key, 6}, {val, 6}]},
-        {row, [{id, <<"7">>}, {key, 7}, {val, 7}]},
-        {row, [{id, <<"8">>}, {key, 8}, {val, 8}]},
-        {row, [{id, <<"9">>}, {key, 9}, {val, 9}]},
-        {row, [{id, <<"10">>}, {key, 10}, {val, 10}]}
+        {row, [{id, <<"1">>}, {key, 1}, {value, 1}]},
+        {row, [{id, <<"2">>}, {key, 2}, {value, 2}]},
+        {row, [{id, <<"3">>}, {key, 3}, {value, 3}]},
+        {row, [{id, <<"4">>}, {key, 4}, {value, 4}]},
+        {row, [{id, <<"5">>}, {key, 5}, {value, 5}]},
+        {row, [{id, <<"6">>}, {key, 6}, {value, 6}]},
+        {row, [{id, <<"7">>}, {key, 7}, {value, 7}]},
+        {row, [{id, <<"8">>}, {key, 8}, {value, 8}]},
+        {row, [{id, <<"9">>}, {key, 9}, {value, 9}]},
+        {row, [{id, <<"10">>}, {key, 10}, {value, 10}]}
     ]},
     etap:is(Result, Expect, "Simple view query worked.").
 
@@ -64,9 +64,9 @@ test_range(Db) ->
     Result = run_query(Db, [{start_key, 3}, {end_key, 5}]),
     Expect = {ok, [
         {meta, [{total, 10}, {offset, 2}]},
-        {row, [{id, <<"3">>}, {key, 3}, {val, 3}]},
-        {row, [{id, <<"4">>}, {key, 4}, {val, 4}]},
-        {row, [{id, <<"5">>}, {key, 5}, {val, 5}]}
+        {row, [{id, <<"3">>}, {key, 3}, {value, 3}]},
+        {row, [{id, <<"4">>}, {key, 4}, {value, 4}]},
+        {row, [{id, <<"5">>}, {key, 5}, {value, 5}]}
     ]},
     etap:is(Result, Expect, "Query with range works.").
 
@@ -79,9 +79,9 @@ test_rev_range(Db) ->
     ]),
     Expect = {ok, [
         {meta, [{total, 10}, {offset, 5}]},
-        {row, [{id, <<"5">>}, {key, 5}, {val, 5}]},
-        {row, [{id, <<"4">>}, {key, 4}, {val, 4}]},
-        {row, [{id, <<"3">>}, {key, 3}, {val, 3}]}
+        {row, [{id, <<"5">>}, {key, 5}, {value, 5}]},
+        {row, [{id, <<"4">>}, {key, 4}, {value, 4}]},
+        {row, [{id, <<"3">>}, {key, 3}, {value, 3}]}
     ]},
     etap:is(Result, Expect, "Query with reversed range works.").
 
@@ -94,9 +94,9 @@ test_limit_and_skip(Db) ->
     ]),
     Expect = {ok, [
         {meta, [{total, 10}, {offset, 4}]},
-        {row, [{id, <<"5">>}, {key, 5}, {val, 5}]},
-        {row, [{id, <<"6">>}, {key, 6}, {val, 6}]},
-        {row, [{id, <<"7">>}, {key, 7}, {val, 7}]}
+        {row, [{id, <<"5">>}, {key, 5}, {value, 5}]},
+        {row, [{id, <<"6">>}, {key, 6}, {value, 6}]},
+        {row, [{id, <<"7">>}, {key, 7}, {value, 7}]}
     ]},
     etap:is(Result, Expect, "Query with limit and skip works.").
 
@@ -114,7 +114,7 @@ test_include_docs(Db) ->
     ]},
     Expect = {ok, [
         {meta, [{total, 10}, {offset, 7}]},
-        {row, [{id, <<"8">>}, {key, 8}, {val, 8}, {doc, Doc}]}
+        {row, [{id, <<"8">>}, {key, 8}, {value, 8}, {doc, Doc}]}
     ]},
     etap:is(Result, Expect, "Query with include docs works.").
 

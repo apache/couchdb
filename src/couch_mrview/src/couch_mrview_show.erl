@@ -260,7 +260,7 @@ send_list_row(Row, #lacc{qserver = {Proc, _}, resp = Resp} = Acc) ->
     end ++ case couch_util:get_value(key, Row) of
         undefined -> [];
         Key -> [{key, Key}]
-    end ++ case couch_util:get_value(val, Row) of
+    end ++ case couch_util:get_value(value, Row) of
         undefined -> [];
         Val -> [{value, Val}]
     end ++ case couch_util:get_value(doc, Row) of

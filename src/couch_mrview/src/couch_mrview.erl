@@ -239,7 +239,7 @@ map_fold({{Key, Id}, Val}, _Offset, Acc) ->
         #doc_info{} -> couch_mrview_util:maybe_load_doc(Db, DI, Args);
         _ -> couch_mrview_util:maybe_load_doc(Db, Id, Val, Args)
     end,
-    Row = [{id, Id}, {key, Key}, {val, Val}] ++ Doc,
+    Row = [{id, Id}, {key, Key}, {value, Val}] ++ Doc,
     {Go, UAcc1} = Callback({row, Row}, UAcc0),
     {Go, Acc#mracc{
         limit=Limit-1,
@@ -294,7 +294,7 @@ red_fold(_Key, Red, #mracc{group_level=0} = Acc) ->
         callback=Callback,
         user_acc=UAcc0
     } = Acc,
-    Row = [{key, null}, {val, Red}],
+    Row = [{key, null}, {value, Red}],
     {Go, UAcc1} = Callback({row, Row}, UAcc0),
     {Go, Acc#mracc{user_acc=UAcc1, limit=Limit-1, last_go=Go}};
 red_fold(Key, Red, #mracc{group_level=exact} = Acc) ->
@@ -303,7 +303,7 @@ red_fold(Key, Red, #mracc{group_level=exact} = Acc) ->
         callback=Callback,
         user_acc=UAcc0
     } = Acc,
-    Row = [{key, Key}, {val, Red}],
+    Row = [{key, Key}, {value, Red}],
     {Go, UAcc1} = Callback({row, Row}, UAcc0),
     {Go, Acc#mracc{user_acc=UAcc1, limit=Limit-1, last_go=Go}};
 red_fold(K, Red, #mracc{group_level=I} = Acc) when I > 0, is_list(K) ->
@@ -312,7 +312,7 @@ red_fold(K, Red, #mracc{group_level=I} = Acc) when I > 0, is_list(K) ->
         callback=Callback,
         user_acc=UAcc0
     } = Acc,
-    Row = [{key, lists:sublist(K, I)}, {val, Red}],
+    Row = [{key, lists:sublist(K, I)}, {value, Red}],
     {Go, UAcc1} = Callback({row, Row}, UAcc0),
     {Go, Acc#mracc{user_acc=UAcc1, limit=Limit-1, last_go=Go}};
 red_fold(K, Red, #mracc{group_level=I} = Acc) when I > 0 ->
@@ -321,7 +321,7 @@ red_fold(K, Red, #mracc{group_level=I} = Acc) when I > 0 ->
         callback=Callback,
         user_acc=UAcc0
     } = Acc,
-    Row = [{key, K}, {val, Red}],
+    Row = [{key, K}, {value, Red}],
     {Go, UAcc1} = Callback({row, Row}, UAcc0),
     {Go, Acc#mracc{user_acc=UAcc1, limit=Limit-1, last_go=Go}}.
 

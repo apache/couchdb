@@ -186,7 +186,7 @@ row_to_json(error, Row) ->
     % Special case for _all_docs request with KEYS to
     % match prior behavior.
     Key = couch_util:get_value(key, Row),
-    Val = couch_util:get_value(val, Row),
+    Val = couch_util:get_value(value, Row),
     Obj = {[{key, Key}, {error, Val}]},
     ?JSON_ENCODE(Obj);
 row_to_json(Id0, Row) ->
@@ -195,7 +195,7 @@ row_to_json(Id0, Row) ->
         Id0 -> [{id, Id0}]
     end,
     Key = couch_util:get_value(key, Row, null),
-    Val = couch_util:get_value(val, Row),
+    Val = couch_util:get_value(value, Row),
     Doc = case couch_util:get_value(doc, Row) of
         undefined -> [];
         Doc0 -> [{doc, Doc0}]
