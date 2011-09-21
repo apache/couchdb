@@ -35,9 +35,13 @@ go(DbName, AllDocs, Opts) ->
     Acc0 = {length(Workers), length(AllDocs), list_to_integer(W), GroupedDocs,
         dict:from_list([{Doc,[]} || Doc <- AllDocs])},
     try fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
-    {ok, Results} ->
-        Reordered = couch_util:reorder_results(AllDocs, Results),
-        {ok, [R || R <- Reordered, R =/= noreply]};
+    {ok, {Health, Results}} when Health =:= ok; Health =:= accepted ->
+        {Health, [R || R <- couch_util:reorder_results(AllDocs, Results), R =/= noreply]};
+    {timeout, Acc} ->
+        {_, _, W1, _, DocReplDict} = Acc,
+        {Health, _, Resp} = dict:fold(fun force_reply/3, {ok, W1, []},
+            DocReplDict),
+        {Health, [R || R <- couch_util:reorder_results(AllDocs, Resp), R =/= noreply]};
     Else ->
         Else
     after
@@ -65,15 +69,16 @@ handle_message({ok, Replies}, Worker, Acc0) ->
     case {WaitingCount, dict:size(DocReplyDict)} of
     {1, _} ->
         % last message has arrived, we need to conclude things
-        {W, Reply} = dict:fold(fun force_reply/3, {W,[]}, DocReplyDict),
-        {stop, Reply};
+        {Health, W, Reply} = dict:fold(fun force_reply/3, {ok, W, []},
+           DocReplyDict),
+        {stop, {Health, Reply}};
     {_, DocCount} ->
         % we've got at least one reply for each document, let's take a look
         case dict:fold(fun maybe_reply/3, {stop,W,[]}, DocReplyDict) of
         continue ->
             {ok, {WaitingCount - 1, DocCount, W, NewGrpDocs, DocReplyDict}};
         {stop, W, FinalReplies} ->
-            {stop, FinalReplies}
+            {stop, {ok, FinalReplies}}
         end
     end;
 handle_message({missing_stub, Stub}, _, _) ->
@@ -83,16 +88,22 @@ handle_message({not_found, no_db_file} = X, Worker, Acc0) ->
     Docs = couch_util:get_value(Worker, GroupedDocs),
     handle_message({ok, [X || _D <- Docs]}, Worker, Acc0).
 
-force_reply(Doc, [], {W, Acc}) ->
-    {W, [{Doc, {error, internal_server_error}} | Acc]};
-force_reply(Doc, [FirstReply|_] = Replies, {W, Acc}) ->
+force_reply(Doc, [], {_, W, Acc}) ->
+    {error, W, [{Doc, {error, internal_server_error}} | Acc]};
+force_reply(Doc, [FirstReply|_] = Replies, {Health, W, Acc}) ->
     case update_quorum_met(W, Replies) of
     {true, Reply} ->
-        {W, [{Doc,Reply} | Acc]};
+        {Health, W, [{Doc,Reply} | Acc]};
     false ->
         twig:log(warn, "write quorum (~p) failed for ~s", [W, Doc#doc.id]),
-        % TODO make a smarter choice than just picking the first reply
-        {W, [{Doc,FirstReply} | Acc]}
+        case [Reply || {ok, Reply} <- Replies] of
+        [] ->
+            % we didn't update any copy, just pick the first error
+            {error, W, [{Doc, FirstReply} | Acc]};
+        [AcceptedRev | _] ->
+            NewHealth = case Health of ok -> accepted; _ -> Health end,
+            {NewHealth, W, [{Doc, {accepted,AcceptedRev}} | Acc]}
+        end
     end.
 
 maybe_reply(_, _, continue) ->
@@ -134,8 +145,8 @@ append_update_replies([Doc|Rest1], [Reply|Rest2], Dict0) ->
     append_update_replies(Rest1, Rest2, dict:append(Doc, Reply, Dict0)).
 
 skip_message({0, _, W, _, DocReplyDict}) ->
-    {W, Reply} = dict:fold(fun force_reply/3, {W, []}, DocReplyDict),
-    {stop, Reply};
+    {Health, W, Reply} = dict:fold(fun force_reply/3, {ok, W, []}, DocReplyDict),
+    {stop, {Health, Reply}};
 skip_message(Acc0) ->
     {ok, Acc0}.
 
@@ -175,7 +186,7 @@ doc_update1_test() ->
     ?assertEqual(WaitingCountW2_1,2),
     {stop, FinalReplyW2 } =
         handle_message({ok, [{ok, Doc1}]},lists:nth(2,Shards),AccW2_1),
-    ?assertEqual([{Doc1, {ok,Doc1}}],FinalReplyW2),
+    ?assertEqual({ok, [{Doc1, {ok,Doc1}}]},FinalReplyW2),
 
     % test for W = 3
     AccW3 = {length(Shards), length(Docs), list_to_integer("3"), GroupedDocs,
@@ -191,7 +202,7 @@ doc_update1_test() ->
 
     {stop, FinalReplyW3 } =
         handle_message({ok, [{ok, Doc1}]},lists:nth(3,Shards),AccW3_2),
-    ?assertEqual([{Doc1, {ok,Doc1}}],FinalReplyW3),
+    ?assertEqual({ok, [{Doc1, {ok,Doc1}}]},FinalReplyW3),
 
     % test w quorum > # shards, which should fail immediately
 
@@ -208,23 +219,21 @@ doc_update1_test() ->
     end,
     ?assertEqual(Bool,true),
 
-    % two docs with exit messages
-    GroupedDocs3 = group_docs_by_shard_hack(<<"foo">>,Shards,Docs2),
-    AccW5 = {length(Shards), length(Docs2), list_to_integer("2"), GroupedDocs3,
-        Dict2},
-
-    {ok,{WaitingCountW5_1,_,_,_,_}=AccW5_1} =
-        handle_message({ok, [{ok, Doc1}]},hd(Shards),AccW5),
-    ?assertEqual(WaitingCountW5_1,2),
-
-    {ok,{WaitingCountW5_2,_,_,_,_}=AccW5_2} =
-        handle_message({rexi_EXIT, 1},lists:nth(2,Shards),AccW5_1),
-    ?assertEqual(WaitingCountW5_2,1),
-
-    {stop, ReplyW5} =
-        handle_message({rexi_EXIT, 1},lists:nth(3,Shards),AccW5_2),
-
-    ?assertEqual([{Doc1, noreply},{Doc2, {ok,Doc1}}],ReplyW5).
+    % Docs with no replies should end up as {error, internal_server_error}
+    SA1 = #shard{node=a, range=1},
+    SB1 = #shard{node=b, range=1},
+    SA2 = #shard{node=a, range=2},
+    SB2 = #shard{node=b, range=2},
+    GroupedDocs3 = [{SA1,[Doc1]}, {SB1,[Doc1]}, {SA2,[Doc2]}, {SB2,[Doc2]}],
+    StW5_0 = {length(GroupedDocs3), length(Docs2), 2, GroupedDocs3, Dict2},
+    {ok, StW5_1} = handle_message({ok, [{ok, "A"}]}, SA1, StW5_0),
+    {ok, StW5_2} = handle_message({rexi_EXIT, nil}, SB1, StW5_1),
+    {ok, StW5_3} = handle_message({rexi_EXIT, nil}, SA2, StW5_2),
+    {stop, ReplyW5} = handle_message({rexi_EXIT, nil}, SB2, StW5_3),
+    ?assertEqual(
+        {error, [{Doc1,{accepted,"A"}},{Doc2,{error,internal_server_error}}]},
+        ReplyW5
+    ).
 
 
 doc_update2_test() ->
@@ -248,7 +257,8 @@ doc_update2_test() ->
     {stop, Reply} =
         handle_message({rexi_EXIT, 1},lists:nth(3,Shards),Acc2),
 
-    ?assertEqual([{Doc1, {ok, Doc2}},{Doc2, {ok,Doc1}}],Reply).
+    ?assertEqual({accepted, [{Doc1,{accepted,Doc2}}, {Doc2,{accepted,Doc1}}]},
+        Reply).
 
 doc_update3_test() ->
     Doc1 = #doc{revs = {1,[<<"foo">>]}},
@@ -271,7 +281,7 @@ doc_update3_test() ->
     {stop, Reply} =
         handle_message({ok, [{ok, Doc1},{ok, Doc2}]},lists:nth(3,Shards),Acc2),
 
-    ?assertEqual([{Doc1, {ok, Doc2}},{Doc2, {ok,Doc1}}],Reply).
+    ?assertEqual({ok, [{Doc1, {ok, Doc2}},{Doc2, {ok,Doc1}}]},Reply).
 
 % needed for testing to avoid having to start the mem3 application
 group_docs_by_shard_hack(_DbName, Shards, Docs) ->
