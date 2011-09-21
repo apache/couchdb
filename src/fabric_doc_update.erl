@@ -179,7 +179,7 @@ doc_update1_test() ->
     ?assertEqual(WaitingCountW2_1,2),
     {stop, FinalReplyW2 } =
         handle_message({ok, [{ok, Doc1}]},lists:nth(2,Shards),AccW2_1),
-    ?assertEqual([{Doc1, {ok,Doc1}}],FinalReplyW2),
+    ?assertEqual({ok, [{Doc1, {ok,Doc1}}]},FinalReplyW2),
 
     % test for W = 3
     AccW3 = {length(Shards), length(Docs), list_to_integer("3"), GroupedDocs,
@@ -195,7 +195,7 @@ doc_update1_test() ->
 
     {stop, FinalReplyW3 } =
         handle_message({ok, [{ok, Doc1}]},lists:nth(3,Shards),AccW3_2),
-    ?assertEqual([{Doc1, {ok,Doc1}}],FinalReplyW3),
+    ?assertEqual({ok, [{Doc1, {ok,Doc1}}]},FinalReplyW3),
 
     % test w quorum > # shards, which should fail immediately
 
@@ -212,23 +212,21 @@ doc_update1_test() ->
     end,
     ?assertEqual(Bool,true),
 
-    % two docs with exit messages
-    GroupedDocs3 = group_docs_by_shard_hack(<<"foo">>,Shards,Docs2),
-    AccW5 = {length(Shards), length(Docs2), list_to_integer("2"), GroupedDocs3,
-        Dict2},
-
-    {ok,{WaitingCountW5_1,_,_,_,_}=AccW5_1} =
-        handle_message({ok, [{ok, Doc1}]},hd(Shards),AccW5),
-    ?assertEqual(WaitingCountW5_1,2),
-
-    {ok,{WaitingCountW5_2,_,_,_,_}=AccW5_2} =
-        handle_message({rexi_EXIT, 1},lists:nth(2,Shards),AccW5_1),
-    ?assertEqual(WaitingCountW5_2,1),
-
-    {stop, ReplyW5} =
-        handle_message({rexi_EXIT, 1},lists:nth(3,Shards),AccW5_2),
-
-    ?assertEqual([{Doc1, noreply},{Doc2, {ok,Doc1}}],ReplyW5).
+    % Docs with no replies should end up as {error, internal_server_error}
+    SA1 = #shard{node=a, range=1},
+    SB1 = #shard{node=b, range=1},
+    SA2 = #shard{node=a, range=2},
+    SB2 = #shard{node=b, range=2},
+    GroupedDocs3 = [{SA1,[Doc1]}, {SB1,[Doc1]}, {SA2,[Doc2]}, {SB2,[Doc2]}],
+    StW5_0 = {length(GroupedDocs3), length(Docs2), 2, GroupedDocs3, Dict2},
+    {ok, StW5_1} = handle_message({ok, [{ok, "A"}]}, SA1, StW5_0),
+    {ok, StW5_2} = handle_message({rexi_EXIT, nil}, SB1, StW5_1),
+    {ok, StW5_3} = handle_message({rexi_EXIT, nil}, SA2, StW5_2),
+    {stop, ReplyW5} = handle_message({rexi_EXIT, nil}, SB2, StW5_3),
+    ?assertEqual(
+        {error, [{Doc1,{accepted,"A"}},{Doc2,{error,internal_server_error}}]},
+        ReplyW5
+    ).
 
 
 doc_update2_test() ->
@@ -252,7 +250,8 @@ doc_update2_test() ->
     {stop, Reply} =
         handle_message({rexi_EXIT, 1},lists:nth(3,Shards),Acc2),
 
-    ?assertEqual([{Doc1, {ok, Doc2}},{Doc2, {ok,Doc1}}],Reply).
+    ?assertEqual({accepted, [{Doc1,{accepted,Doc2}}, {Doc2,{accepted,Doc1}}]},
+        Reply).
 
 doc_update3_test() ->
     Doc1 = #doc{revs = {1,[<<"foo">>]}},
@@ -275,7 +274,7 @@ doc_update3_test() ->
     {stop, Reply} =
         handle_message({ok, [{ok, Doc1},{ok, Doc2}]},lists:nth(3,Shards),Acc2),
 
-    ?assertEqual([{Doc1, {ok, Doc2}},{Doc2, {ok,Doc1}}],Reply).
+    ?assertEqual({ok, [{Doc1, {ok, Doc2}},{Doc2, {ok,Doc1}}]},Reply).
 
 % needed for testing to avoid having to start the mem3 application
 group_docs_by_shard_hack(_DbName, Shards, Docs) ->
