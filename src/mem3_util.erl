@@ -75,52 +75,53 @@ open_db_doc(DocId) ->
 
 write_db_doc(Doc) ->
     DbName = ?l2b(couch_config:get("mem3", "shard_db", "dbs")),
+    write_db_doc(DbName, Doc, true).
+
+write_db_doc(DbName, #doc{id=Id, body=Body} = Doc, ShouldMutate) ->
     {ok, Db} = couch_db:open(DbName, []),
-    try
-        update_db_doc(Db, Doc)
-    catch conflict ->
-        % one more check to detect a real conflict
-        #doc{id=Id, body=Body} = Doc,
-        case couch_db:open_doc(Db, Id, []) of
-        {ok, #doc{body=Body}} ->
-            % assume this is a race with a replication
-            ok;
+    try couch_db:open_doc(Db, Id, []) of
+    {ok, #doc{body = Body}} ->
+        % the doc is already in the desired state, we're done here
+        ok;
+    {not_found, _} when ShouldMutate ->
+        try couch_db:update_doc(Db, Doc, []) of
         {ok, _} ->
-            conflict
-        end
+            ok
+        catch conflict ->
+            % check to see if this was a replication race or a different edit
+            write_db_doc(DbName, Doc, false)
+        end;
+    _ ->
+        % the doc already exists in a different state
+        conflict
     after
         couch_db:close(Db)
-    end.
-
-update_db_doc(Db, #doc{id=Id, body=Body} = Doc) ->
-    case couch_db:open_doc(Db, Id, []) of
-    {not_found, _} ->
-        {ok, _} = couch_db:update_doc(Db, Doc, []),
-        ok;
-    % harmless race condition
-    {ok, #doc{body=Body}} ->
-        ok;
-    % real conflict
-    {ok, _} ->
-        conflict
     end.
 
 delete_db_doc(DocId) ->
     DbName = ?l2b(couch_config:get("mem3", "shard_db", "dbs")),
+    delete_db_doc(DbName, DocId, true).
+
+delete_db_doc(DbName, DocId, ShouldMutate) ->
     {ok, Db} = couch_db:open(DbName, []),
-    try
-        delete_db_doc(Db, DocId)
-    catch conflict ->
-        ok
+    {ok, Revs} = couch_db:open_doc_revs(Db, DocId, all, []),
+    try [Doc#doc{deleted=true} || {ok, #doc{deleted=false}=Doc} <- Revs] of
+    [] ->
+        ok;
+    Docs when ShouldMutate ->
+        try couch_db:update_docs(Db, Docs, []) of
+        {ok, _} ->
+            ok
+        catch conflict ->
+            % check to see if this was a replication race or if leafs survived
+            delete_db_doc(DbName, DocId, false)
+        end;
+    _ ->
+        % we have live leafs that we aren't allowed to delete. let's bail
+        conflict
     after
         couch_db:close(Db)
     end.
-
-delete_db_doc(Db, DocId) ->
-    {ok, Revs} = couch_db:open_doc_revs(Db, DocId, all, []),
-    Docs = [Doc#doc{deleted=true} || {ok, #doc{deleted=false}=Doc} <- Revs],
-    couch_db:update_docs(Db, Docs, []),
-    ok.
 
 build_shards(DbName, DocProps) ->
     {ByNode} = couch_util:get_value(<<"by_node">>, DocProps, {[]}),
