@@ -108,6 +108,7 @@ open_doc_test() ->
     State0 = {[nil, nil, nil], 2, []},
     State1 = {[nil, nil], 2, [fabric_util:kv(Foo1,1)]},
     State2 = {[nil], 2, [fabric_util:kv(Bar1,1), fabric_util:kv(Foo1,1)]},
+    State3 = {[nil], 2, [fabric_util:kv(Foo1,1), fabric_util:kv(Foo2,1)]},
     ?assertEqual({ok, State1}, handle_message(Foo1, nil, State0)),
 
     % normal case - quorum reached, no disagreement
@@ -117,13 +118,22 @@ open_doc_test() ->
     ?assertEqual({ok, State2}, handle_message(Bar1, nil, State1)),
 
     % 3rd worker resolves voting, but repair is needed
-    ?assertEqual({error, needs_repair, Foo1}, handle_message(Foo1, nil, State2)),
+    ?assertEqual({error, needs_repair}, handle_message(Foo1, nil, State2)),
 
-    % 2nd worker comes up with descendant of Foo1, voting resolved, run repair
-    ?assertEqual({error, needs_repair, Foo2}, handle_message(Foo2, nil, State1)),
+    % 2nd worker comes up with descendant of Foo1, voting continues
+    ?assertEqual({ok, State3}, handle_message(Foo2, nil, State1)),
+
+    % 3rd worker is also a descendant so run repair async
+    ?assertEqual({error, needs_repair, Foo2}, handle_message(Foo2, nil,
+        State3)),
+
+    % We only run async repair when every revision is part of the same branch
+    ?assertEqual({error, needs_repair}, handle_message(Bar1, nil, State3)),
 
     % not_found is considered to be an ancestor of everybody
-    ?assertEqual({error, needs_repair, Foo1}, handle_message(NF, nil, State1)),
+    {ok, State4} = handle_message(NF, nil, State1),
+    ?assertEqual({error, needs_repair, Foo1}, handle_message(Foo1, nil,
+        State4)),
 
     % 3 distinct edit branches result in quorum failure
     ?assertEqual({error, needs_repair}, handle_message(Baz1, nil, State2)).
