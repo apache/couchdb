@@ -107,7 +107,7 @@ delete_db_doc(DbName, DocId, ShouldMutate) ->
     {ok, Revs} = couch_db:open_doc_revs(Db, DocId, all, []),
     try [Doc#doc{deleted=true} || {ok, #doc{deleted=false}=Doc} <- Revs] of
     [] ->
-        ok;
+        not_found;
     Docs when ShouldMutate ->
         try couch_db:update_docs(Db, Docs, []) of
         {ok, _} ->
