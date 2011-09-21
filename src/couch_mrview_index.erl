@@ -16,7 +16,7 @@
 -export([get/2]).
 -export([init/2, open/2, close/1, reset/1, delete/1]).
 -export([start_update/3, purge/4, process_doc/3, finish_update/1, commit/1]).
--export([compact/2, swap_compacted/2]).
+-export([compact/3, swap_compacted/2]).
 
 
 -include_lib("couch_mrview/include/couch_mrview.hrl").
@@ -131,8 +131,8 @@ commit(State) ->
     couch_file:write_header(State#mrst.fd, Header).
 
 
-compact(State, Opts) ->
-    couch_mrview_compactor:compact(State, Opts).
+compact(Db, State, Opts) ->
+    couch_mrview_compactor:compact(Db, State, Opts).
 
 
 swap_compacted(OldState, NewState) ->
