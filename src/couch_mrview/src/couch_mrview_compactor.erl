@@ -15,7 +15,7 @@
 -include("couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
--export([compact/2, swap_compacted/2]).
+-export([compact/3, swap_compacted/2]).
 
 -record(acc, {
    btree = nil,
@@ -27,7 +27,7 @@
 }).
 
 
-compact(State, Opts) ->
+compact(_Db, State, Opts) ->
     case lists:member(recompact, Opts) of
         false -> compact(State);
         true -> recompact(State)
