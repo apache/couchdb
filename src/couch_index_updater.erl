@@ -15,7 +15,7 @@
 
 
 %% API
--export([start_link/2, run/2, is_running/1, update/3, restart/2]).
+-export([start_link/2, run/2, is_running/1, update/2, restart/2]).
 
 %% gen_server callbacks
 -export([init/1, terminate/2, code_change/3]).
@@ -40,6 +40,10 @@ run(Pid, IdxState) ->
 
 is_running(Pid) ->
     gen_server:call(Pid, is_running).
+
+
+update(Mod, State) ->
+    update(nil, Mod, State).
 
 
 restart(Pid, IdxState) ->
