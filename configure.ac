@@ -112,14 +112,28 @@ else
     AC_MSG_RESULT([no])
 fi
 
+AC_PATH_PROG([ERL], [erl])
+AS_IF([test x${ERL} = x], [
+    AC_MSG_ERROR([Could not find the `erl' executable. Is Erlang installed?])
+    ])
+
 AC_ARG_WITH([erlang], [AC_HELP_STRING([--with-erlang=PATH],
     [set PATH to the Erlang include directory])], [
     ERLANG_FLAGS="-I$withval"
 ], [
-    ERLANG_FLAGS="-I${libdir}/erlang/usr/include"
-    ERLANG_FLAGS="$ERLANG_FLAGS -I/usr/lib/erlang/usr/include"
-    ERLANG_FLAGS="$ERLANG_FLAGS -I/usr/local/lib/erlang/usr/include"
-    ERLANG_FLAGS="$ERLANG_FLAGS -I/opt/local/lib/erlang/usr/include"
+    realerl=`readlink -f $ERL 2>/dev/null`
+    AS_IF([test $? -eq 0], [
+           erlbase=`dirname $realerl`
+           erlbase=`dirname $erlbase`
+           ERLANG_FLAGS="-I${erlbase}/usr/include"
+          ], [
+           # Failed to figure out where erl is installed..
+           # try to add some default directories to search
+           ERLANG_FLAGS="-I${libdir}/erlang/usr/include"
+           ERLANG_FLAGS="$ERLANG_FLAGS -I/usr/lib/erlang/usr/include"
+           ERLANG_FLAGS="$ERLANG_FLAGS -I/usr/local/lib/erlang/usr/include"
+           ERLANG_FLAGS="$ERLANG_FLAGS -I/opt/local/lib/erlang/usr/include"
+          ])
 ])
 AC_SUBST(ERLANG_FLAGS)
 
@@ -356,11 +370,6 @@ case "$(uname -s)" in
   ;;
 esac
 
-AC_PATH_PROG([ERL], [erl])
-
-if test x${ERL} = x; then
-    AC_MSG_ERROR([Could not find the `erl' executable. Is Erlang installed?])
-fi
 
 erlang_version_error="The installed Erlang version is less than 5.6.5 (R12B05)."
 
