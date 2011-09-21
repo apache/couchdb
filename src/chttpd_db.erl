@@ -751,6 +751,8 @@ update_doc_result_to_json(#doc{id=DocId}, Result) ->
     update_doc_result_to_json(DocId, Result);
 update_doc_result_to_json(DocId, {ok, NewRev}) ->
     {[{id, DocId}, {rev, couch_doc:rev_to_str(NewRev)}]};
+update_doc_result_to_json(DocId, {accepted, NewRev}) ->
+    {[{id, DocId}, {rev, couch_doc:rev_to_str(NewRev)}, {accepted, true}]};
 update_doc_result_to_json(DocId, Error) ->
     {_Code, ErrorStr, Reason} = chttpd:error_info(Error),
     {[{id, DocId}, {error, ErrorStr}, {reason, Reason}]}.
