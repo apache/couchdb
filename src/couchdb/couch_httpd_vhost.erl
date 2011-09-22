@@ -360,8 +360,8 @@ split_host_port(HostAsString) ->
             {split_host(HostAsString), '*'};
         N ->
             HostPart = string:substr(HostAsString, 1, N-1), 
-            case (catch erlang:list_to_integer(HostAsString, N+1,
-                        length(HostAsString))) of
+            case (catch erlang:list_to_integer(string:substr(HostAsString,
+                            N+1, length(HostAsString)))) of
                 {'EXIT', _} ->
                     {split_host(HostAsString), '*'};
                 Port ->
