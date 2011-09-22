@@ -18,8 +18,8 @@
 -export([open_doc/3, open_revs/4, get_missing_revs/2, get_missing_revs/3,
     update_docs/3]).
 -export([all_docs/2, changes/3, map_view/4, reduce_view/4, group_info/2]).
--export([create_db/1, delete_db/2, reset_validation_funs/1, set_security/3,
-    set_revs_limit/3, create_shard_db_doc/2]).
+-export([create_db/1, delete_db/1, reset_validation_funs/1, set_security/3,
+    set_revs_limit/3, create_shard_db_doc/2, delete_shard_db_doc/2]).
 
 -include("fabric.hrl").
 -include_lib("couch/include/couch_db.hrl").
@@ -176,9 +176,11 @@ create_db(DbName) ->
 create_shard_db_doc(_, Doc) ->
     rexi:reply(mem3_util:write_db_doc(Doc)).
 
-delete_db(DbName, DocId) ->
-    mem3_util:delete_db_doc(DocId),
-    rexi:reply(couch_server:delete(DbName, [])).
+delete_db(DbName) ->
+    couch_server:delete(DbName, []).
+
+delete_shard_db_doc(_, DocId) ->
+    rexi:reply(mem3_util:delete_db_doc(DocId)).
 
 get_db_info(DbName) ->
     with_db(DbName, [], {couch_db, get_db_info, []}).
