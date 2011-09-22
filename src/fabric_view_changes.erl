@@ -73,24 +73,19 @@ keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout) ->
     if Limit > Limit2, Feed == "longpoll" ->
         Callback({stop, LastSeq}, AccOut);
     true ->
-        case wait_db_updated(Timeout) of
-        updated ->
+        case {Heartbeat, wait_db_updated(Timeout)} of
+        {undefined, timeout} ->
+            Callback({stop, LastSeq}, AccOut);
+        _ ->
+            {ok, AccTimeout} = Callback(timeout, AccOut),
             keep_sending_changes(
                 DbName,
                 Args#changes_args{limit=Limit2},
                 Callback,
                 LastSeq,
-                AccOut,
+                AccTimeout,
                 Timeout
-            );
-        timeout ->
-            case Heartbeat of undefined ->
-                Callback({stop, LastSeq}, AccOut);
-            _ ->
-                {ok, AccTimeout} = Callback(timeout, AccOut),
-                keep_sending_changes(DbName, Args#changes_args{limit=Limit2},
-                    Callback, LastSeq, AccTimeout, Timeout)
-            end
+            )
         end
     end.
 
