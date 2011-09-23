@@ -37,6 +37,8 @@ compact_group(Group, EmptyGroup) ->
 
     #group{
         db = Db,
+        sig = Sig,
+        fd = NewFd,
         id_btree = EmptyIdBtree,
         views = EmptyViews
     } = EmptyGroup,
@@ -76,6 +78,8 @@ compact_group(Group, EmptyGroup) ->
         current_seq=Seq
     },
 
+    Header = {Sig, couch_view_group:get_index_header_data(NewGroup)},
+    ok = couch_file:write_header(NewFd, Header),
     Pid = couch_view:get_group_server(DbName, GroupId),
     gen_server:cast(Pid, {compact_done, NewGroup}).
 
