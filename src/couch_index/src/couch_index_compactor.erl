@@ -103,6 +103,7 @@ compact(Idx, Mod, IdxState, Opts) ->
     {ok, NewIdxState} = couch_util:with_db(DbName, fun(Db) ->
         Mod:compact(Db, IdxState, Opts)
     end),
+    ok = Mod:commit(NewIdxState),
     case gen_server:call(Idx, {compacted, NewIdxState}) of
         recompact ->
             ?LOG_INFO("Compaction restarting for db: ~s idx: ~s", Args),
