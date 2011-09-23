@@ -17,6 +17,9 @@
 -export([start_link/1, request_group/2, request_group_info/1]).
 -export([open_db_group/2, open_temp_group/5, design_doc_to_view_group/1,design_root/2]).
 
+%% Exports for the compactor
+-export([get_index_header_data/1]).
+
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
