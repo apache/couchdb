@@ -79,6 +79,9 @@ compact_group(Group, EmptyGroup, DbName) ->
     maybe_retry_compact(Db, GroupId, NewGroup).
 
 maybe_retry_compact(#db{name = DbName} = Db, GroupId, NewGroup) ->
+    #group{sig = Sig, fd = NewFd} = NewGroup,
+    Header = {Sig, couch_view_group:get_index_header_data(NewGroup)},
+    ok = couch_file:write_header(NewFd, Header),
     Pid = couch_view:get_group_server(DbName, GroupId),
     case gen_server:call(Pid, {compact_done, NewGroup}) of
     ok ->
