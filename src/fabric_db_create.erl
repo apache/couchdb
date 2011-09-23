@@ -85,7 +85,7 @@ handle_message(file_exists, _, _) ->
     {error, file_exists};
 
 handle_message({rexi_DOWN, _, {_, Node}, _}, _, Workers) ->
-    case lists:filter(fun(S, _) -> S#shard.node =/= Node end, Workers) of
+    case lists:filter(fun(S) -> S#shard.node =/= Node end, Workers) of
     [] ->
         {stop, ok};
     RemainingWorkers ->
