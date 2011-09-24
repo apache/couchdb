@@ -924,7 +924,12 @@ copy_compact(Db, NewDb0, Retry) ->
     ],
     case Retry of
     true ->
-        couch_task_status:update([{retry, true}]);
+        couch_task_status:update([
+            {retry, true},
+            {progress, 0},
+            {changes_done, 0},
+            {total_changes, TotalChanges}
+        ]);
     false ->
         couch_task_status:add_task(TaskProps0),
         couch_task_status:set_update_frequency(500)
@@ -936,7 +941,7 @@ copy_compact(Db, NewDb0, Retry) ->
             [{start_key, NewDb#db.update_seq + 1}]),
 
     NewDb3 = copy_docs(Db, NewDb2, lists:reverse(Uncopied), Retry),
-    TotalChanges = (couch_task_status:get(changes_done) - NewDb#db.update_seq),
+    TotalChanges = couch_task_status:get(changes_done),
 
     % copy misc header values
     if NewDb3#db.security /= Db#db.security ->
