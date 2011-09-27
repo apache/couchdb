@@ -20,6 +20,18 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
+-record(comp_header, {
+    db_header,
+    meta_state
+}).
+
+-record(merge_st, {
+    id_tree,
+    seq_tree,
+    curr,
+    rem_seqs,
+    infos
+}).
 
 init({DbName, Filepath, Fd, Options}) ->
     case lists:member(create, Options) of
@@ -29,7 +41,9 @@ init({DbName, Filepath, Fd, Options}) ->
         ok = couch_file:write_header(Fd, Header),
         % delete any old compaction files that might be hanging around
         RootDir = couch_config:get("couchdb", "database_dir", "."),
-        couch_file:delete(RootDir, Filepath ++ ".compact");
+        couch_file:delete(RootDir, Filepath ++ ".compact"),
+        couch_file:delete(RootDir, Filepath ++ ".compact.data"),
+        couch_file:delete(RootDir, Filepath ++ ".compact.meta");
     false ->
         case couch_file:read_header(Fd) of
         {ok, Header} ->
@@ -39,7 +53,9 @@ init({DbName, Filepath, Fd, Options}) ->
             Header =  #db_header{},
             ok = couch_file:write_header(Fd, Header),
             % delete any old compaction files that might be hanging around
-            file:delete(Filepath ++ ".compact")
+            file:delete(Filepath ++ ".compact"),
+            file:delete(Filepath ++ ".compact.data"),
+            file:delete(Filepath ++ ".compact.meta")
         end
     end,
     Db = init_db(DbName, Filepath, Fd, Header, Options),
@@ -211,9 +227,13 @@ handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
 
         ?LOG_DEBUG("CouchDB swapping files ~s and ~s.",
                 [Filepath, CompactFilepath]),
+        ok = file:rename(CompactFilepath, Filepath ++ ".compact"),
         RootDir = couch_config:get("couchdb", "database_dir", "."),
         couch_file:delete(RootDir, Filepath),
-        ok = file:rename(CompactFilepath, Filepath),
+        ok = file:rename(Filepath ++ ".compact", Filepath),
+        % Delete the old meta compaction file after promoting
+        % the compaction file.
+        couch_file:delete(RootDir, Filepath ++ ".compact.meta"),
         close_db(Db),
         NewDb3 = refresh_validate_doc_funs(NewDb2),
         ok = gen_server:call(couch_server, {db_updated, NewDb3}, infinity),
@@ -773,10 +793,6 @@ update_local_docs(#db{local_tree=Btree}=Db, Docs) ->
 
     {ok, Db#db{local_tree = Btree2}}.
 
-
-commit_data(Db) ->
-    commit_data(Db, false).
-
 db_to_header(Db, Header) ->
     Header#db_header{
         update_seq = Db#db.update_seq,
@@ -786,40 +802,49 @@ db_to_header(Db, Header) ->
         security_ptr = Db#db.security_ptr,
         revs_limit = Db#db.revs_limit}.
 
+commit_data(Db) ->
+    commit_data(Db, false).
+
 commit_data(#db{waiting_delayed_commit=nil} = Db, true) ->
-    Db#db{waiting_delayed_commit=erlang:send_after(1000,self(),delayed_commit)};
+    TRef = erlang:send_after(1000,self(),delayed_commit),
+    Db#db{waiting_delayed_commit=TRef};
 commit_data(Db, true) ->
     Db;
 commit_data(Db, _) ->
     #db{
-        fd = Fd,
-        filepath = Filepath,
         header = OldHeader,
-        fsync_options = FsyncOptions,
         waiting_delayed_commit = Timer
     } = Db,
     if is_reference(Timer) -> erlang:cancel_timer(Timer); true -> ok end,
     case db_to_header(Db, OldHeader) of
-    OldHeader ->
-        Db#db{waiting_delayed_commit=nil};
-    Header ->
-        case lists:member(before_header, FsyncOptions) of
-        true -> ok = couch_file:sync(Filepath);
-        _    -> ok
-        end,
-
-        ok = couch_file:write_header(Fd, Header),
-
-        case lists:member(after_header, FsyncOptions) of
-        true -> ok = couch_file:sync(Filepath);
-        _    -> ok
-        end,
-
-        Db#db{waiting_delayed_commit=nil,
-            header=Header,
-            committed_update_seq=Db#db.update_seq}
+        OldHeader -> Db#db{waiting_delayed_commit=nil};
+        NewHeader -> sync_header(Db, NewHeader)
     end.
 
+sync_header(Db, NewHeader) ->
+    #db{
+        fd = Fd,
+        filepath = FilePath,
+        fsync_options = FsyncOptions,
+        waiting_delayed_commit = Timer
+    } = Db,
+
+    if is_reference(Timer) -> erlang:cancel_timer(Timer); true -> ok end,
+
+    Before = lists:member(before_header, FsyncOptions),
+    After = lists:member(after_header, FsyncOptions),
+
+    if Before -> couch_file:sync(FilePath); true -> ok end,
+    ok = couch_file:write_header(Fd, NewHeader),
+    if After -> couch_file:sync(FilePath); true -> ok end,
+
+    Db2 = Db#db{
+        header=NewHeader,
+        committed_update_seq=Db#db.update_seq,
+        waiting_delayed_commit=nil
+    },
+    tally:update(Db2),
+    Db2.
 
 copy_doc_attachments(#db{fd = SrcFd} = SrcDb, SrcSp, DestFd) ->
     {ok, {BodyData, BinInfos0}} = couch_db:read_doc(SrcDb, SrcSp),
@@ -899,29 +924,32 @@ copy_docs(Db, #db{fd = DestFd} = NewDb, MixedInfos, Retry) ->
     NewInfos = stem_full_doc_infos(Db, NewInfos1),
     RemoveSeqs =
     case Retry of
-    false ->
+    nil ->
         [];
-    true ->
-        % We are retrying a compaction, meaning the documents we are copying may
-        % already exist in our file and must be removed from the by_seq index.
+    OldDocIdTree ->
+        % Compaction is being rerun to catch up to writes during the
+        % first pass. This means we may have docs that already exist
+        % in the seq_tree in the .data file. Here we lookup any old
+        % update_seqs so that they can be removed.
         Ids = [Id || #full_doc_info{id=Id} <- NewInfos],
-        Existing = couch_btree:lookup(NewDb#db.id_tree, Ids),
+        Existing = couch_btree:lookup(OldDocIdTree, Ids),
         [Seq || {ok, #full_doc_info{update_seq=Seq}} <- Existing]
     end,
 
     {ok, SeqTree} = couch_btree:add_remove(
             NewDb#db.seq_tree, NewInfos, RemoveSeqs),
-    {ok, IdTree} = couch_btree:add_remove(
-            NewDb#db.id_tree, NewInfos, []),
-    update_compact_task(length(NewInfos)),
-    NewDb#db{id_tree=IdTree, seq_tree=SeqTree}.
 
+    FDIKVs = lists:map(fun(#full_doc_info{id=Id, update_seq=Seq}=FDI) ->
+        {{Id, Seq}, FDI}
+    end, NewInfos),
+    {ok, IdEms} = couch_emsort:add(NewDb#db.id_tree, FDIKVs),
+    update_compact_task(length(NewInfos)),
+    NewDb#db{id_tree=IdEms, seq_tree=SeqTree}.
 
 
 copy_compact(Db, NewDb0, Retry) ->
-    FsyncOptions = [Op || Op <- NewDb0#db.fsync_options, Op == before_header],
     Compression = couch_compress:get_compression_method(),
-    NewDb = NewDb0#db{fsync_options=FsyncOptions, compression=Compression},
+    NewDb = NewDb0#db{compression=Compression},
     TotalChanges = couch_db:count_changes_since(Db, NewDb#db.update_seq),
     BufferSize = list_to_integer(
         couch_config:get("database_compaction", "doc_buffer_size", "524288")),
@@ -944,7 +972,8 @@ copy_compact(Db, NewDb0, Retry) ->
                 Db, AccNewDb, lists:reverse([DocInfo | AccUncopied]), Retry),
             AccCopiedSize2 = AccCopiedSize + AccUncopiedSize2,
             if AccCopiedSize2 >= CheckpointAfter ->
-                {ok, {commit_data(NewDb2#db{update_seq = Seq}), [], 0, 0}};
+                CommNewDb2 = commit_compaction_data(NewDb2#db{update_seq=Seq}),
+                {ok, {CommNewDb2, [], 0, 0}};
             true ->
                 {ok, {NewDb2#db{update_seq = Seq}, [], 0, AccCopiedSize2}}
             end;
@@ -961,7 +990,7 @@ copy_compact(Db, NewDb0, Retry) ->
         {changes_done, 0},
         {total_changes, TotalChanges}
     ],
-    case Retry and couch_task_status:is_task_added() of
+    case (Retry =/= nil) and couch_task_status:is_task_added() of
     true ->
         couch_task_status:update([
             {retry, true},
@@ -991,39 +1020,226 @@ copy_compact(Db, NewDb0, Retry) ->
         NewDb4 = NewDb3
     end,
 
-    commit_data(NewDb4#db{update_seq=Db#db.update_seq}).
+    commit_compaction_data(NewDb4#db{update_seq=Db#db.update_seq}).
 
-start_copy_compact(#db{name=Name,filepath=Filepath,header=#db_header{purge_seq=PurgeSeq}}=Db) ->
-    CompactFile = Filepath ++ ".compact",
+
+start_copy_compact(#db{}=Db) ->
+    #db{name=Name, filepath=Filepath, options=Options} = Db,
     ?LOG_DEBUG("Compaction process spawned for db \"~s\"", [Name]),
-    case couch_file:open(CompactFile) of
-    {ok, Fd} ->
-        Retry = true,
-        case couch_file:read_header(Fd) of
-        {ok, Header} ->
-            ok;
-        no_valid_header ->
-            ok = couch_file:write_header(Fd, Header=#db_header{})
-        end;
-    {error, enoent} ->
-        {ok, Fd} = couch_file:open(CompactFile, [create]),
-        Retry = false,
-        ok = couch_file:write_header(Fd, Header=#db_header{})
-    end,
-    NewDb = init_db(Name, CompactFile, Fd, Header, Db#db.options),
-    NewDb2 = if PurgeSeq > 0 ->
-        {ok, PurgedIdsRevs} = couch_db:get_last_purged(Db),
-        {ok, Pointer, _} = couch_file:append_term(
-            Fd, PurgedIdsRevs, [{compression, NewDb#db.compression}]),
-        NewDb#db{header=Header#db_header{purge_seq=PurgeSeq, purged_docs=Pointer}};
+
+    {ok, NewDb, DName, DFd, MFd, Retry} =
+        open_compaction_files(Name, Filepath, Options),
+    erlang:monitor(process, MFd),
+
+    % This is a bit worrisome. init_db/4 will monitor the data fd
+    % but it doesn't know about the meta fd. For now I'll maintain
+    % that the data fd is the old normal fd and meta fd is special
+    % and hope everything works out for the best.
+    unlink(DFd),
+
+    NewDb1 = copy_purge_info(Db, NewDb),
+    NewDb2 = copy_compact(Db, NewDb1, Retry),
+    NewDb3 = sort_meta_data(NewDb2),
+    NewDb4 = commit_compaction_data(NewDb3),
+    NewDb5 = copy_meta_data(NewDb4),
+    NewDb6 = sync_header(NewDb5, db_to_header(NewDb5, NewDb5#db.header)),
+    close_db(NewDb6),
+
+    ok = couch_file:close(MFd),
+    gen_server:cast(Db#db.main_pid, {compact_done, DName}).
+
+
+open_compaction_files(DbName, DbFilePath, Options) ->
+    DataFile = DbFilePath ++ ".compact.data",
+    MetaFile = DbFilePath ++ ".compact.meta",
+    {ok, DataFd, DataHdr} = open_compaction_file(DataFile),
+    {ok, MetaFd, MetaHdr} = open_compaction_file(MetaFile),
+    case {DataHdr, MetaHdr} of
+        {#comp_header{}=A, #comp_header{}=A} ->
+            DbHeader = A#comp_header.db_header,
+            Db0 = init_db(DbName, DataFile, DataFd, DbHeader, Options),
+            Db1 = bind_emsort(Db0, MetaFd, A#comp_header.meta_state),
+            {ok, Db1, DataFile, DataFd, MetaFd, Db0#db.id_tree};
+        {#db_header{}, _} ->
+            ok = reset_compaction_file(MetaFd, #db_header{}),
+            Db0 = init_db(DbName, DataFile, DataFd, DataHdr, Options),
+            Db1 = bind_emsort(Db0, MetaFd, nil),
+            {ok, Db1, DataFile, DataFd, MetaFd, Db0#db.id_tree};
+        _ ->
+            Header = #db_header{},
+            ok = reset_compaction_file(DataFd, Header),
+            ok = reset_compaction_file(MetaFd, Header),
+            Db0 = init_db(DbName, DataFile, DataFd, Header, Options),
+            Db1 = bind_emsort(Db0, MetaFd, nil),
+            {ok, Db1, DataFile, DataFd, MetaFd, nil}
+    end.
+
+
+open_compaction_file(FilePath) ->
+    case couch_file:open(FilePath) of
+        {ok, Fd} ->
+            case couch_file:read_header(Fd) of
+                {ok, Header} -> {ok, Fd, Header};
+                no_valid_header -> {ok, Fd, nil}
+            end;
+        {error, enoent} ->
+            {ok, Fd} = couch_file:open(FilePath, [create]),
+            {ok, Fd, nil}
+    end.
+
+
+reset_compaction_file(Fd, Header) ->
+    ok = couch_file:truncate(Fd, 0),
+    ok = couch_file:write_header(Fd, Header).
+
+
+copy_purge_info(OldDb, NewDb) ->
+    OldHdr = OldDb#db.header,
+    NewHdr = NewDb#db.header,
+    if OldHdr#db_header.purge_seq > 0 ->
+        {ok, PurgedIdsRevs} = couch_db:get_last_purged(OldDb),
+        Opts = [{compression, NewDb#db.compression}],
+        {ok, Ptr, _} = couch_file:append_term(NewDb#db.fd, PurgedIdsRevs, Opts),
+        NewDb#db{
+            header=NewHdr#db_header{
+                purge_seq=OldHdr#db_header.purge_seq,
+                purged_docs=Ptr
+            }
+        };
     true ->
         NewDb
-    end,
-    unlink(Fd),
+    end.
 
-    NewDb3 = copy_compact(Db, NewDb2, Retry),
-    close_db(NewDb3),
-    gen_server:cast(Db#db.main_pid, {compact_done, CompactFile}).
+
+commit_compaction_data(#db{}=Db) ->
+    % Compaction needs to write headers to both the data file
+    % and the meta file so if we need to restart we can pick
+    % back up from where we left off.
+    commit_compaction_data(Db, couch_emsort:get_fd(Db#db.id_tree)),
+    commit_compaction_data(Db, Db#db.fd).
+
+
+commit_compaction_data(#db{header=OldHeader}=Db0, Fd) ->
+    % Mostly copied from commit_data/2 but I have to
+    % replace the logic to commit and fsync to a specific
+    % fd instead of the Filepath stuff that commit_data/2
+    % does.
+    DataState = OldHeader#db_header.id_tree_state,
+    MetaFd = couch_emsort:get_fd(Db0#db.id_tree),
+    MetaState = couch_emsort:get_state(Db0#db.id_tree),
+    Db1 = bind_id_tree(Db0, Db0#db.fd, DataState),
+    Header = db_to_header(Db1, OldHeader),
+    CompHeader = #comp_header{
+        db_header = Header,
+        meta_state = MetaState
+    },
+    ok = couch_file:sync(Fd),
+    ok = couch_file:write_header(Fd, CompHeader),
+    Db2 = Db1#db{
+        waiting_delayed_commit=nil,
+        header=Header,
+        committed_update_seq=Db1#db.update_seq
+    },
+    bind_emsort(Db2, MetaFd, MetaState).
+
+
+bind_emsort(Db, Fd, nil) ->
+    {ok, Ems} = couch_emsort:open(Fd),
+    Db#db{id_tree=Ems};
+bind_emsort(Db, Fd, State) ->
+    {ok, Ems} = couch_emsort:open(Fd, [{root, State}]),
+    Db#db{id_tree=Ems}.
+
+
+bind_id_tree(Db, Fd, State) ->
+    {ok, IdBtree} = couch_btree:open(State, Fd, [
+        {split, fun ?MODULE:btree_by_id_split/1},
+        {join, fun ?MODULE:btree_by_id_join/2},
+        {reduce, fun ?MODULE:btree_by_id_reduce/2}
+    ]),
+    Db#db{id_tree=IdBtree}.
+
+
+sort_meta_data(Db0) ->
+    {ok, Ems} = couch_emsort:merge(Db0#db.id_tree),
+    Db0#db{id_tree=Ems}.
+
+
+copy_meta_data(#db{fd=Fd, header=Header}=Db) ->
+    Src = Db#db.id_tree,
+    DstState = Header#db_header.id_tree_state,
+    {ok, IdTree0} = couch_btree:open(DstState, Fd, [
+        {split, fun ?MODULE:btree_by_id_split/1},
+        {join, fun ?MODULE:btree_by_id_join/2},
+        {reduce, fun ?MODULE:btree_by_id_reduce/2}
+    ]),
+    {ok, Iter} = couch_emsort:iter(Src),
+    Acc0 = #merge_st{
+        id_tree=IdTree0,
+        seq_tree=Db#db.seq_tree,
+        rem_seqs=[],
+        infos=[]
+    },
+    Acc = merge_docids(Iter, Acc0),
+    {ok, IdTree} = couch_btree:add(Acc#merge_st.id_tree, Acc#merge_st.infos),
+    {ok, SeqTree} = couch_btree:add_remove(
+        Acc#merge_st.seq_tree, [], Acc#merge_st.rem_seqs
+    ),
+    Db#db{id_tree=IdTree, seq_tree=SeqTree}.
+
+
+merge_docids(Iter, #merge_st{infos=Infos}=Acc) when length(Infos) > 1000 ->
+    #merge_st{
+        id_tree=IdTree0,
+        seq_tree=SeqTree0,
+        rem_seqs=RemSeqs
+    } = Acc,
+    {ok, IdTree1} = couch_btree:add(IdTree0, Infos),
+    {ok, SeqTree1} = couch_btree:add_remove(SeqTree0, [], RemSeqs),
+    Acc1 = Acc#merge_st{
+        id_tree=IdTree1,
+        seq_tree=SeqTree1,
+        rem_seqs=[],
+        infos=[]
+    },
+    merge_docids(Iter, Acc1);
+merge_docids(Iter, #merge_st{curr=Curr}=Acc) ->
+    case next_info(Iter, Curr, []) of
+        {NextIter, NewCurr, FDI, Seqs} ->
+            Acc1 = Acc#merge_st{
+                infos = [FDI | Acc#merge_st.infos],
+                rem_seqs = Seqs ++ Acc#merge_st.rem_seqs,
+                curr = NewCurr
+            },
+            merge_docids(NextIter, Acc1);
+        {finished, FDI, Seqs} ->
+            Acc#merge_st{
+                infos = [FDI | Acc#merge_st.infos],
+                rem_seqs = Seqs ++ Acc#merge_st.rem_seqs,
+                curr = undefined
+            };
+        empty ->
+            Acc
+    end.
+
+
+next_info(Iter, undefined, []) ->
+    case couch_emsort:next(Iter) of
+        {ok, {{Id, Seq}, FDI}, NextIter} ->
+            next_info(NextIter, {Id, Seq, FDI}, []);
+        finished ->
+            empty
+    end;
+next_info(Iter, {Id, Seq, FDI}, Seqs) ->
+    case couch_emsort:next(Iter) of
+        {ok, {{Id, NSeq}, NFDI}, NextIter} ->
+            next_info(NextIter, {Id, NSeq, NFDI}, [Seq | Seqs]);
+        {ok, {{NId, NSeq}, NFDI}, NextIter} ->
+            {NextIter, {NId, NSeq, NFDI}, FDI, Seqs};
+        finished ->
+            {finished, FDI, Seqs}
+    end.
+
 
 update_compact_task(NumChanges) ->
     [Changes, Total] = couch_task_status:get([changes_done, total_changes]),
@@ -1035,6 +1251,7 @@ update_compact_task(NumChanges) ->
         (Changes2 * 100) div Total
     end,
     couch_task_status:update([{changes_done, Changes2}, {progress, Progress}]).
+
 
 make_doc_summary(#db{compression = Comp}, {Body0, Atts0}) ->
     Body = case couch_compress:is_compressed(Body0, Comp) of
