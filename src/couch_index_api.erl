@@ -10,11 +10,13 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-
+-module(couch_index_api).
 
 get(Field, State) ->
     ok.
 
+init(Db, Ddoc) ->
+    ok.
 
 open(Db, State) ->
     ok.
@@ -32,10 +34,10 @@ reset(State) ->
 start_update(State, PurgedState, NumChanges) ->
     {ok, State}.
 
-purge(PurgedIdRevs, State) ->
+purge(Db, PurgeSeq, PurgedIdRevs, State) ->
     ok.
 
-process_doc(Doc, State) ->
+process_doc(Doc, Seq, State) ->
     ok.
 
 finish_update(State) ->
