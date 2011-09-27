@@ -8,8 +8,8 @@ Dependencies
 
 You will need the following installed:
 
- * Erlang OTP (=14B01)        (http://erlang.org/)
- * ICU                        (http://icu.sourceforge.net/)
+ * Erlang OTP (>=14B03)       (http://erlang.org/)
+ * ICU        (=4.4.*)         (http://icu.sourceforge.net/)
  * OpenSSL                    (http://www.openssl.org/)
  * Mozilla SpiderMonkey (1.8) (http://www.mozilla.org/js/spidermonkey/)
  * libcurl                    (http://curl.haxx.se/libcurl/)
@@ -21,7 +21,7 @@ General Notes
 
  * When installing Erlang, you must build it from source.
 
-   The CouchDB build makes use of a number of the Erlang build scripts.
+The CouchDB build requires a number of the Erlang build scripts.
 
  * When installing ICU, select the binaries built with Visual Studio 2008.
 

@@ -84,9 +84,9 @@ install-data-hook:
 	        $(LN_S) couch_icu_driver couch_icu_driver.so; \
 	fi
 if WINDOWS
-	$(INSTALL) $(ICU_LOCAL_BIN)/icuuc42.dll $(bindir)
-	$(INSTALL) $(ICU_LOCAL_BIN)/icudt42.dll $(bindir)
-	$(INSTALL) $(ICU_LOCAL_BIN)/icuin42.dll $(bindir)
+	$(INSTALL) $(ICU_LOCAL_BIN)/icuuc44.dll $(bindir)
+	$(INSTALL) $(ICU_LOCAL_BIN)/icudt44.dll $(bindir)
+	$(INSTALL) $(ICU_LOCAL_BIN)/icuin44.dll $(bindir)
 	$(INSTALL) $(JS_LIB_BINARY) $(bindir)
 	$(INSTALL) .libs/couchspawnkillable.exe \
 		"$(DESTDIR)$(couchprivdir)/couchspawnkillable.exe"
