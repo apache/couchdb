@@ -149,7 +149,7 @@ init([Command, Options, PortOptions]) ->
         writer=fun writejson/2,
         reader=fun readjson/1
     },
-    KillCmd = readline(BaseProc),
+    KillCmd = iolist_to_binary(readline(BaseProc)),
     Pid = self(),
     ?LOG_DEBUG("OS Process Start :: ~p", [BaseProc#os_proc.port]),
     spawn(fun() ->
