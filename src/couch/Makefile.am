@@ -42,6 +42,7 @@ source_files = \
     src/couch_doc.erl \
     src/couch_drv.erl \
     src/couch_ejson_compare.erl \
+    src/couch_emsort.erl \
     src/couch_event_sup.erl \
     src/couch_external_manager.erl \
     src/couch_external_server.erl \
@@ -102,6 +103,7 @@ compiled_files = \
     ebin/couch_doc.beam \
     ebin/couch_drv.beam \
     ebin/couch_ejson_compare.beam \
+    ebin/couch_emsort.beam \
     ebin/couch_event_sup.beam \
     ebin/couch_external_manager.beam \
     ebin/couch_external_server.beam \

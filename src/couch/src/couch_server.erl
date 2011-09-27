@@ -397,8 +397,12 @@ handle_call({delete, DbName, _Options}, _From, Server) ->
             db_closed(Server, Db#db.options)
         end,
 
-        %% Delete any leftover .compact files.  If we don't do this a subsequent
-        %% request for this DB will try to open the .compact file and use it.
+        %% Delete any leftover compaction files. If we don't do this a
+        %% subsequent request for this DB will try to open them to use
+        %% as a recovery.
+        lists:foreach(fun(Ext) ->
+            couch_file:delete(Server#server.root_dir, FullFilepath ++ Ext)
+        end, [".compact", ".compact.data", ".compact.meta"]),
         couch_file:delete(Server#server.root_dir, FullFilepath ++ ".compact"),
 
         case couch_file:delete(Server#server.root_dir, FullFilepath) of
