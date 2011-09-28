@@ -71,7 +71,7 @@ all_docs(DbName, #view_query_args{keys=nil} = QueryArgs) ->
 
 changes(DbName, Args, StartSeq) ->
     erlang:put(io_priority, {interactive, DbName}),
-    #changes_args{style=Style, dir=Dir} = Args,
+    #changes_args{dir=Dir} = Args,
     case get_or_create_db(DbName, []) of
     {ok, Db} ->
         Enum = fun changes_enumerator/2,
@@ -79,7 +79,7 @@ changes(DbName, Args, StartSeq) ->
         Acc0 = {Db, StartSeq, Args},
         try
             {ok, {_, LastSeq, _}} =
-                couch_db:changes_since(Db, Style, StartSeq, Enum, Opts, Acc0),
+                couch_db:changes_since(Db, StartSeq, Enum, Opts, Acc0),
             rexi:reply({complete, LastSeq})
         after
             couch_db:close(Db)
