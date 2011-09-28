@@ -81,41 +81,65 @@ couchTests.recreate_doc = function(debug) {
   db.deleteDb();
   db.createDb();
 
-  // COUCHDB-1265
-  // Resuscitate an unavailable old revision and make sure that it
-  // doesn't introduce duplicates into the _changes feed.
-  
-  var doc = {_id: "bar", count: 0};
-  T(db.save(doc).ok);
-  var ghost = {_id: "bar", _rev: doc._rev, count: doc.count};
-  for(var i = 0; i < 2; i++) {
-    doc.count += 1;
-    T(db.save(doc).ok);
+  // Helper function to create a doc with multiple revisions
+  // that are compacted away to ?REV_MISSING.
+
+  var createDoc = function(docid) {
+    var ret = [{_id: docid, count: 0}];
+    T(db.save(ret[0]).ok);
+    for(var i = 0; i < 2; i++) {
+      ret[ret.length] = {
+        _id: docid,
+        _rev: ret[ret.length-1]._rev,
+        count: ret[ret.length-1].count+1
+      };
+      T(db.save(ret[ret.length-1]).ok);
+    }
+    db.compact();
+    while(db.info().compact_running) {}
+    return ret;
   }
 
-  // Compact so that the old revision to be resuscitated will be
-  // in the rev_tree as ?REV_MISSING
+  // Helper function to check that there are no duplicates
+  // in the changes feed and that it has proper update
+  // sequence ordering.
+
+  var checkChanges = function() {
+    // Assert that there are no duplicates in _changes.
+    var req = CouchDB.request("GET", "/test_suite_db/_changes");
+    var resp = JSON.parse(req.responseText);
+    var docids = {};
+    var prev_seq = -1;
+    for(var i = 0; i < resp.results.length; i++) {
+      row = resp.results[i];
+      T(row.seq > prev_seq, "Unordered _changes feed.");
+      T(docids[row.id] === undefined, "Duplicates in _changes feed.");
+      prev_seq = row.seq;
+      docids[row.id] = true;
+    }
+  };
+
+  // COUCHDB-1265 - Check that the changes feed remains proper
+  // after we try and break the update_seq tree.
+
+  // This first case is the one originally reported and "fixed"
+  // in COUCHDB-1265. Reinserting an old revision into the
+  // revision tree causes duplicates in the update_seq tree.
+
+  var revs = createDoc("a");
+  T(db.save(revs[1], {new_edits: false}).ok);
+  T(db.save(revs[revs.length-1]).ok);
+  checkChanges();
+
+  // The original fix for COUCHDB-1265 is not entirely correct
+  // as it didn't consider the possibility that a compaction
+  // might run after the original tree screw up.
+
+  revs = createDoc("b");
+  T(db.save(revs[1], {new_edits: false}).ok);
   db.compact();
   while(db.info().compact_running) {}
+  T(db.save(revs[revs.length-1]).ok);
+  checkChanges();
 
-  // Saving the ghost here puts it back in the rev_tree in such
-  // a way as to create a new update_seq but without changing a
-  // leaf revision. This would cause the #full_doc_info{} and
-  // #doc_info{} records to diverge in their idea of what the
-  // doc's update_seq is and end up introducing a duplicate in
-  // the _changes feed the next time this doc is updated.
-  T(db.save(ghost, {new_edits: false}).ok);
-
-  // The duplicate would have been introduce here becuase the #doc_info{}
-  // would not have been removed correctly.
-  T(db.save(doc).ok);
-
-  // And finally assert that there are no duplicates in _changes.
-  var req = CouchDB.request("GET", "/test_suite_db/_changes");
-  var resp = JSON.parse(req.responseText);
-  var docids = {};
-  for(var i = 0; i < resp.results.length; i++) {
-    T(docids[resp.results[i].id] === undefined, "Duplicates in _changes feed.");
-    docids[resp.results[i].id] = true;
-  }
 };
