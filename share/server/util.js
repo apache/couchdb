@@ -46,7 +46,7 @@ var resolveModule = function(names, mod, root) {
   } else if (root) {
     mod = {current : root};
   }
-  if (!mod.current[n]) {
+  if (mod.current[n] === undefined) {
     throw ["error", "invalid_require_path", 'Object has no property "'+n+'". '+JSON.stringify(mod.current)];
   }
   return resolveModule(names, {
