@@ -923,7 +923,7 @@ negotiate_content_type1(#httpd{mochi_req=MochiReq}) ->
     end,
     case lists:member("application/json", AcceptedTypes) of
         true  -> "application/json";
-        false -> "text/plain;charset=utf-8"
+        false -> "text/plain; charset=utf-8"
     end.
 
 server_header() ->
