@@ -19,21 +19,6 @@
     handler
 }).
 
--define(LATEST_DISK_VERSION, 5).
-
--record(db_header,
-    {disk_version = ?LATEST_DISK_VERSION,
-     update_seq = 0,
-     unused = 0,
-     fulldocinfo_by_id_btree_state = nil,
-     docinfo_by_seq_btree_state = nil,
-     local_docs_btree_state = nil,
-     purge_seq = 0,
-     purged_docs = nil,
-     security_ptr = nil,
-     revs_limit = 1000
-}).
-
 -record(db, {
     main_pid = nil,
     update_pid = nil,
@@ -41,7 +26,7 @@
     instance_start_time, % number of microsecs since jan 1 1970 as a binary string
     fd,
     fd_ref_counter,
-    header = #db_header{},
+    header = nil,
     committed_update_seq,
     fulldocinfo_by_id_btree,
     docinfo_by_seq_btree,
@@ -80,7 +65,6 @@ test() ->
     timer:sleep(1000),
     put(addr, couch_config:get("httpd", "bind_address", "127.0.0.1")),
     put(port, integer_to_list(mochiweb_socket_server:get(couch_httpd, port))),
-    application:start(inets),
 
     delete_db(),
     create_db(),
@@ -171,11 +155,10 @@ compact_view_group() ->
 wait_view_compact_done(0) ->
     etap:bail("View group compaction failed to finish.");
 wait_view_compact_done(N) ->
-    {ok, {{_, Code, _}, _Headers, Body}} = http:request(
-        get,
-        {db_url() ++ "/_design/" ++ binary_to_list(ddoc_name()) ++ "/_info", []},
+    {ok, Code, _Headers, Body} = test_util:request(
+        db_url() ++ "/_design/" ++ binary_to_list(ddoc_name()) ++ "/_info",
         [],
-        [{sync, true}]),
+        get),
     case Code of
         200 -> ok;
         _ -> etap:bail("Invalid view group info.")
@@ -252,11 +235,9 @@ db_url() ->
     binary_to_list(test_db_name()).
 
 query_view() ->
-    {ok, {{_, Code, _}, _Headers, _Body}} = http:request(
-        get,
-        {db_url() ++ "/_design/" ++ binary_to_list(ddoc_name()) ++
-             "/_view/bar", []},
+    {ok, Code, _Headers, _Body} = test_util:request(
+        db_url() ++ "/_design/" ++ binary_to_list(ddoc_name()) ++ "/_view/bar",
         [],
-        [{sync, true}]),
+        get),
     etap:is(Code, 200, "got view response"),
     ok.

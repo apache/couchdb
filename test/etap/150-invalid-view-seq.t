@@ -52,7 +52,6 @@ test() ->
 
     put(addr, couch_config:get("httpd", "bind_address", "127.0.0.1")),
     put(port, integer_to_list(mochiweb_socket_server:get(couch_httpd, port))),
-    application:start(inets),
 
     create_new_doc(),
     query_view_before_restore_backup(),
@@ -133,11 +132,10 @@ db_url() ->
     binary_to_list(test_db_name()).
 
 query_view_before_restore_backup() ->
-    {ok, {{_, Code, _}, _Headers, Body}} = http:request(
-        get,
-        {db_url() ++ "/_design/foo/_view/bar", []},
+    {ok, Code, _Headers, Body} = test_util:request(
+        db_url() ++ "/_design/foo/_view/bar",
         [],
-        [{sync, true}]),
+        get),
     etap:is(Code, 200, "Got view response before restoring backup."),
     ViewJson = couch_util:json_decode(Body),
     Rows = couch_util:get_nested_json_value(ViewJson, [<<"rows">>]),
@@ -171,11 +169,10 @@ restore_backup_db_file() ->
     ok.
 
 query_view_after_restore_backup() ->
-    {ok, {{_, Code, _}, _Headers, Body}} = http:request(
-        get,
-        {db_url() ++ "/_design/foo/_view/bar", []},
+    {ok, Code, _Headers, Body} = test_util:request(
+        db_url() ++ "/_design/foo/_view/bar",
         [],
-        [{sync, true}]),
+        get),
     etap:is(Code, 200, "Got view response after restoring backup."),
     ViewJson = couch_util:json_decode(Body),
     Rows = couch_util:get_nested_json_value(ViewJson, [<<"rows">>]),
