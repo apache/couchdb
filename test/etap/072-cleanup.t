@@ -41,7 +41,6 @@ main(_) ->
 test() ->
 
     {ok, _} = couch_server_sup:start_link(test_util:config_files()),
-    ok = application:start(inets),
     couch_server:delete(?TEST_DB, []),
     timer:sleep(1000),
 
@@ -110,11 +109,8 @@ db_url() ->
         binary_to_list(?TEST_DB).
 
 query_view(DDoc, View) ->
-    {ok, {{_, Code, _}, _Headers, _Body}} = http:request(
-        get,
-        {db_url() ++ "/_design/" ++ DDoc ++ "/_view/" ++ View, []},
-        [],
-        [{sync, true}]),
+    {ok, Code, _Headers, _Body} = test_util:request(
+        db_url() ++ "/_design/" ++ DDoc ++ "/_view/" ++ View, [], get),
     etap:is(Code, 200, "Built view index for " ++ DDoc ++ "."),
     ok.
 
