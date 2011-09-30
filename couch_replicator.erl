@@ -597,8 +597,18 @@ spawn_changes_reader(StartSeq, Db, ChangesQueue, Options) ->
 read_changes(StartSeq, Db, ChangesQueue, Options) ->
     try
         couch_api_wrap:changes_since(Db, all_docs, StartSeq,
-            fun(#doc_info{high_seq = Seq} = DocInfo) ->
-                ok = couch_work_queue:queue(ChangesQueue, DocInfo),
+            fun(#doc_info{high_seq = Seq, id = Id} = DocInfo) ->
+                case Id of
+                <<>> ->
+                    % Previous CouchDB releases had a bug which allowed a doc
+                    % with an empty ID to be inserted into databases. Such doc
+                    % is impossible to GET.
+                    ?LOG_ERROR("Replicator: ignoring document with empty ID in "
+                        "source database `~s` (_changes sequence ~p)",
+                        [couch_api_wrap:db_uri(Db), Seq]);
+                _ ->
+                    ok = couch_work_queue:queue(ChangesQueue, DocInfo)
+                end,
                 put(last_seq, Seq)
             end, Options),
         couch_work_queue:close(ChangesQueue)
