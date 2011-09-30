@@ -491,13 +491,30 @@ purge_req_messages(ReqId) ->
         ok
     end.
 
-queue_changes_row(Row, #state{doc_ids = nil, count = Count, rows = Rows}) ->
-    {queue:in(Row, Rows), Count + 1};
+queue_changes_row(Row, #state{doc_ids = nil} = State) ->
+    maybe_queue_row(Row, State);
 queue_changes_row({RowProps} = Row,
-    #state{doc_ids = Ids, count = Count, rows = Rows}) ->
+    #state{doc_ids = Ids, count = Count, rows = Rows} = State) ->
     case lists:member(get_value(<<"id">>, RowProps), Ids) of
     true ->
-        {queue:in(Row, Rows), Count + 1};
+        maybe_queue_row(Row, State);
     false ->
         {Rows, Count}
     end.
+
+maybe_queue_row({Props} = Row, #state{count = Count, rows = Rows} = State) ->
+    case get_value(<<"id">>, Props) of
+    <<>> ->
+        [_, Db | _] = State#state.init_args,
+        ?LOG_ERROR("Replicator: ignoring document with empty ID in source "
+            "database `~s` (_changes sequence ~p)",
+            [dbname(Db), couch_util:get_value(<<"seq">>, Props)]),
+        {Rows, Count};
+    _ ->
+        {queue:in(Row, Rows), Count + 1}
+    end.
+
+dbname(#http_db{url = Url}) ->
+    couch_util:url_strip_password(Url);
+dbname(#db{name = Name}) ->
+    Name.
