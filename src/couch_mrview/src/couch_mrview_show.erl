@@ -131,7 +131,7 @@ send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
     JsonDoc = couch_query_servers:json_doc(Doc),
     Cmd = [<<"updates">>, UpdateName],
     UpdateResp = couch_query_servers:ddoc_prompt(DDoc, Cmd, [JsonDoc, JsonReq]),
-    {Code, JsonResp} = case UpdateResp of
+    JsonResp = case UpdateResp of
         [<<"up">>, {NewJsonDoc}, {JsonResp0}] ->
             case couch_httpd:header_value(
                     Req, "X-Couch-Full-Commit", "false") of
@@ -143,15 +143,15 @@ send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
             NewDoc = couch_doc:from_json_obj({NewJsonDoc}),
             {ok, NewRev} = couch_db:update_doc(Db, NewDoc, Options),
             NewRevStr = couch_doc:rev_to_str(NewRev),
-            JsonHeaders = {[{<<"X-Couch-Update-NewRev">>, NewRevStr}]},
-            JsonRespWithRev = {[{<<"headers">>, JsonHeaders} | JsonResp0]},
-            {201, JsonRespWithRev};
-        [<<"up">>, _Other, JsonResp0] ->
-            {200, JsonResp0}
+            {[
+                {<<"code">>, 201},
+                {<<"headers">>, {[{<<"X-Couch-Update-NewRev">>, NewRevStr}]}}
+                | JsonResp0]};
+        [<<"up">>, _Other, {JsonResp0}] ->
+            {[{<<"code">>, 200} | JsonResp0]}
     end,
-    JsonResp2 = json_apply_field({<<"code">>, Code}, JsonResp),
     % todo set location field
-    couch_httpd_external:send_external_response(Req, JsonResp2).
+    couch_httpd_external:send_external_response(Req, JsonResp).
 
 
 handle_view_list_req(#httpd{method='GET'}=Req, Db, DDoc) ->
