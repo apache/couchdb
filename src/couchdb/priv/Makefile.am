@@ -14,6 +14,10 @@ couchlibdir = $(localerlanglibdir)/couch-$(version)
 couchprivdir = $(couchlibdir)/priv
 couchprivlibdir = $(couchlibdir)/priv/lib
 
+if HELP2MAN
+dist_man1_MANS = couchjs.1
+endif
+
 EXTRA_DIST = \
 	spawnkillable/couchspawnkillable.sh \
 	stat_descriptions.cfg.in \
@@ -21,7 +25,7 @@ EXTRA_DIST = \
 	couch_js/sm180.c \
 	couch_js/sm185.c
 
-CLEANFILES = stat_descriptions.cfg
+CLEANFILES = $(dist_man1_MANS) stat_descriptions.cfg
 
 ICU_LOCAL_FLAGS = $(ICU_LOCAL_CFLAGS) $(ICU_LOCAL_LDFLAGS)
 if WINDOWS
@@ -58,10 +62,6 @@ couchjs_LDADD = $(CURL_LDFLAGS) @JSLIB@
 
 couchpriv_DATA = stat_descriptions.cfg
 couchpriv_PROGRAMS = couchspawnkillable
-
-if HELP2MAN
-dist_man1_MANS = couchjs.1
-endif
 
 HELP2MAN_OPTION=--no-info --help-option="-h" --version-option="-V"
 
