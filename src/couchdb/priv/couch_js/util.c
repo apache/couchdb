@@ -80,27 +80,16 @@ couch_parse_args(int argc, const char* argv[])
     args->stack_size = 8L * 1024L;
 
     while(i < argc) {
-        if(strcmp("-h", argv[i]) == 0 ||
-           strcmp("--help", argv[i]) == 0) {
+        if(strcmp("-h", argv[i]) == 0) {
             DISPLAY_USAGE;
             exit(0);
-        } else if(strcmp("-V", argv[i]) == 0 ||
-                  strcmp("--version", argv[i]) == 0) {
+        } else if(strcmp("-V", argv[i]) == 0) {
             DISPLAY_VERSION;
             exit(0);
-        } else if(strcmp("-H", argv[i]) == 0 ||
-                  strcmp("--http", argv[i]) == 0) {
+        } else if(strcmp("-H", argv[i]) == 0) {
             args->use_http = 1;
-        } else if(strncmp("--stack-size", argv[i], 12) == 0) {
-            if(argv[i][12] == '\0') {
-                args->stack_size = atoi(argv[++i]);
-            } else if(argv[i][12] == '=') {
-                args->stack_size = atoi(argv[i]+13);
-            } else {
-                DISPLAY_USAGE;
-                exit(2);
-            }
-
+        } else if(strcmp("-S", argv[i]) == 0) {
+            args->stack_size = atoi(argv[++i]);
             if(args->stack_size <= 0) {
                 fprintf(stderr, "Invalid stack size.\n");
                 exit(2);
