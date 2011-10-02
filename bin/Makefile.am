@@ -13,13 +13,13 @@
 if WINDOWS
 bin_SCRIPTS = couchdb.bat
 else
-bin_SCRIPTS = couchdb couchjs
+bin_SCRIPTS = couchdb
 endif
 
 noinst_SCRIPTS = couchjs_dev
 
 if HELP2MAN
-dist_man1_MANS = couchdb.1 couchjs.1
+dist_man1_MANS = couchdb.1
 endif
 
 CLEANFILES = $(bin_SCRIPTS) $(dist_man1_MANS) $(noinst_SCRIPTS)
@@ -48,27 +48,12 @@ couchdb: couchdb.tpl
 	$@ < $<
 	chmod +x $@
 
-couchjs: couchjs.tpl
-	sed -e "s|%locallibbindir%|@locallibbindir@|g" \
-	    -e "s|%bug_uri%|@bug_uri@|g" \
-	    -e "s|%package_author_address%|@package_author_address@|g" \
-	    -e "s|%package_author_name%|@package_author_name@|g" \
-	    -e "s|%package_name%|@package_name@|g" \
-	    -e "s|%version%|@version@|g" \
-	    -e "s|%couchjs_command_name%|$(couchjs_command_name)|g" > \
-	$@ < $<
-	chmod +x $@
+install-exec-hook:
+	$(LN_S) -f "$(locallibbindir)/$(couchjs_command_name)" \
+		"$(DESTDIR)$(bindir)/$(couchjs_command_name)"
 
-couchjs_dev: couchjs.tpl
-	sed -e "s|%locallibbindir%|$(abs_top_builddir)/src/couchdb/priv|g" \
-	    -e "s|%bug_uri%|@bug_uri@|g" \
-	    -e "s|%package_author_address%|@package_author_address@|g" \
-	    -e "s|%package_author_name%|@package_author_name@|g" \
-	    -e "s|%package_name%|@package_name@|g" \
-	    -e "s|%version%|@version@|g" \
-	    -e "s|%couchjs_command_name%|$(couchjs_command_name)|g" > \
-	$@ < $<
-	chmod +x $@
+couchjs_dev:
+	$(LN_S) -f "$(abs_top_builddir)/src/couchdb/priv/couchjs" "$@"
 
 couchdb.bat: couchdb.bat.tpl
 	sed -e "s|%ICU_CONFIG%|$(ICU_CONFIG)|g" \
@@ -87,12 +72,4 @@ couchdb.1: couchdb.tpl.in
 	    $(MAKE) -f Makefile couchdb; \
 	    $(HELP2MAN_EXECUTABLE) $(HELP2MAN_OPTION) \
 	        --name="Apache CouchDB database server" ./couchdb --output $@; \
-	fi
-
-couchjs.1: couchjs.tpl.in
-	touch $@
-	if test -x "$(HELP2MAN_EXECUTABLE)"; then \
-	    $(MAKE) -f Makefile couchjs; \
-	    $(HELP2MAN_EXECUTABLE) $(HELP2MAN_OPTION) \
-	        --name="Apache CouchDB JavaScript interpreter" ./couchjs --output $@; \
 	fi
