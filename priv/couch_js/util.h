@@ -22,7 +22,6 @@ typedef struct {
     char*       script;
 } couch_args;
 
-void couch_usage();
 couch_args* couch_parse_args(int argc, const char* argv[]);
 int couch_fgets(char* buf, int size, FILE* fp);
 JSString* couch_readline(JSContext* cx, FILE* fp);
