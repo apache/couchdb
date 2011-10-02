@@ -46,12 +46,12 @@ static const char USAGE_TEMPLATE[] =
     "\n"
     "Options:\n"
     "\n"
-    "  -h, --help          display a short help message and exit\n"
-    "  -V, --version       display version information and exit\n"
-    "  -H, --http          install %s cURL bindings (only avaiable\n"
-    "                      if package was built with cURL available)\n"
-    "  --stack-size=SIZE   specify that the interpreter should set the\n"
-    "                      the stack quota for JS contexts to SIZE bytes\n"
+    "  -h          display a short help message and exit\n"
+    "  -V          display version information and exit\n"
+    "  -H          enable %s cURL bindings (only avaiable\n"
+    "              if package was built with cURL available)\n"
+    "  -S SIZE     specify that the interpreter should set the\n"
+    "              the stack quota for JS contexts to SIZE bytes\n"
     "\n"
     "Report bugs at <%s>.\n";
 
