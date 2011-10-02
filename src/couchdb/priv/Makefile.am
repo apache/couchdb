@@ -45,6 +45,7 @@ couch_icu_driver_la_LDFLAGS += -no-undefined
 endif
 
 COUCHJS_SRCS = \
+	couch_js/help.h \
 	couch_js/http.c \
 	couch_js/http.h \
 	couch_js/main.c \
@@ -60,6 +61,19 @@ couchjs_LDADD = $(CURL_LIBS) $(JS_LIBS)
 
 couchpriv_DATA = stat_descriptions.cfg
 couchpriv_PROGRAMS = couchspawnkillable
+
+if HELP2MAN
+dist_man1_MANS = couchjs.1
+endif
+
+HELP2MAN_OPTION=--no-info --help-option="-h" --version-option="-V"
+
+couchjs.1: couchjs
+	touch $@
+	if test -x "$(HELP2MAN_EXECUTABLE)"; then \
+	    $(HELP2MAN_EXECUTABLE) $(HELP2MAN_OPTION) \
+	        --name="$(package_name) JavaScript interpreter" ./couchjs --output $@; \
+	fi
 
 %.cfg: %.cfg.in
 	cp $< $@

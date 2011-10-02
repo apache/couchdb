@@ -10,7 +10,8 @@ dnl WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 dnl License for the specific language governing permissions and limitations
 dnl under the License.
 
-AC_INIT([LOCAL_PACKAGE_NAME], [LOCAL_VERSION], [], [LOCAL_PACKAGE_TARNAME])
+AC_INIT([LOCAL_PACKAGE_NAME], [LOCAL_VERSION], [LOCAL_BUG_URI],
+    [LOCAL_PACKAGE_TARNAME])
 
 AC_PREREQ([2.59])
 
@@ -433,7 +434,7 @@ AC_ARG_VAR([HELP2MAN_EXECUTABLE], [path to the `help2man' program])
 if test -n "$HELP2MAN_EXECUTABLE"; then
     help2man_enabled=true
 else
-    if test -f "$srcdir/bin/couchdb.1" -a -f "$srcdir/bin/couchjs.1"; then
+    if test -f "$srcdir/bin/couchdb.1" -a -f "$srcdir/src/couchdb/priv/couchjs.1"; then
         help2man_enabled=true
     else
         help2man_enabled=false
@@ -486,7 +487,6 @@ AC_REVISION([LOCAL_VERSION])
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([bin/couch-config.tpl])
-AC_CONFIG_FILES([bin/couchjs.tpl])
 AC_CONFIG_FILES([bin/couchdb.tpl])
 AC_CONFIG_FILES([bin/couchdb.bat.tpl])
 AC_CONFIG_FILES([bin/Makefile])
