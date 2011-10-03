@@ -16,6 +16,7 @@
 -export([open_db/1, close_db/1]).
 -export([start_db_compaction_notifier/2, stop_db_compaction_notifier/1]).
 -export([replication_id/2]).
+-export([sum_stats/2]).
 
 -include("couch_db.hrl").
 -include("couch_api_wrap.hrl").
@@ -360,3 +361,15 @@ stop_db_compaction_notifier(nil) ->
     ok;
 stop_db_compaction_notifier(Notifier) ->
     couch_db_update_notifier:stop(Notifier).
+
+
+sum_stats(#rep_stats{} = S1, #rep_stats{} = S2) ->
+    #rep_stats{
+        missing_checked =
+            S1#rep_stats.missing_checked + S2#rep_stats.missing_checked,
+        missing_found = S1#rep_stats.missing_found + S2#rep_stats.missing_found,
+        docs_read = S1#rep_stats.docs_read + S2#rep_stats.docs_read,
+        docs_written = S1#rep_stats.docs_written + S2#rep_stats.docs_written,
+        doc_write_failures =
+            S1#rep_stats.doc_write_failures + S2#rep_stats.doc_write_failures
+    }.
