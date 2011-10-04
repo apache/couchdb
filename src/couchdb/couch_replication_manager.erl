@@ -363,8 +363,7 @@ maybe_start_replication(State, DocId, RepDoc) ->
         true = ets:insert(?DOC_TO_REP, {DocId, RepId}),
         ?LOG_INFO("Attempting to start replication `~s` (document `~s`).",
             [pp_rep_id(RepId), DocId]),
-        Server = self(),
-        Pid = spawn_link(fun() -> start_replication(Server, Rep, 0) end),
+        Pid = spawn_link(fun() -> start_replication(Rep, 0) end),
         State#state{rep_start_pids = [Pid | State#state.rep_start_pids]};
     #rep_state{rep = #rep{doc_id = DocId}} ->
         State;
@@ -402,11 +401,11 @@ maybe_tag_rep_doc(DocId, {RepProps}, RepId) ->
     end.
 
 
-start_replication(Server, #rep{id = RepId} = Rep, Wait) ->
+start_replication(Rep, Wait) ->
     ok = timer:sleep(Wait * 1000),
     case (catch couch_replicator:async_replicate(Rep)) of
     {ok, _} ->
-        ok = gen_server:call(Server, {rep_started, RepId}, infinity);
+        ok;
     Error ->
         replication_error(Rep, Error)
     end.
@@ -470,8 +469,7 @@ maybe_retry_replication(RepState, Error, State) ->
     ?LOG_ERROR("Error in replication `~s` (triggered by document `~s`): ~s"
         "~nRestarting replication in ~p seconds.",
         [pp_rep_id(RepId), DocId, to_binary(error_reason(Error)), Wait]),
-    Server = self(),
-    Pid = spawn_link(fun() -> start_replication(Server, Rep, Wait) end),
+    Pid = spawn_link(fun() -> start_replication(Rep, Wait) end),
     State#state{rep_start_pids = [Pid | State#state.rep_start_pids]}.
 
 
