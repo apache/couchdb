@@ -173,6 +173,8 @@ http_connections = 20
 ; Even for very fast/reliable networks it might need to be increased if a remote
 ; database is too busy.
 connection_timeout = 30000
+; If a request fails, the replicator will retry it up to N times.
+retries_per_request = 10
 ; Some socket options that might boost performance in some scenarios:
 ;       {nodelay, boolean()}
 ;       {sndbuf, integer()}

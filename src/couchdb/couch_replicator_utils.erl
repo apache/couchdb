@@ -193,7 +193,8 @@ parse_rep_db({Props}, ProxyParams, Options) ->
             [{socket_options, get_value(socket_options, Options)} |
                 ProxyParams ++ ssl_params(Url)]),
         timeout = get_value(connection_timeout, Options),
-        http_connections = get_value(http_connections, Options)
+        http_connections = get_value(http_connections, Options),
+        retries = get_value(retries, Options)
     };
 parse_rep_db(<<"http://", _/binary>> = Url, ProxyParams, Options) ->
     parse_rep_db({[{<<"url">>, Url}]}, ProxyParams, Options);
@@ -220,16 +221,18 @@ make_options(Props) ->
     DefBatchSize = couch_config:get("replicator", "worker_batch_size", "500"),
     DefConns = couch_config:get("replicator", "http_connections", "20"),
     DefTimeout = couch_config:get("replicator", "connection_timeout", "30000"),
+    DefRetries = couch_config:get("replicator", "retries_per_request", "10"),
     {ok, DefSocketOptions} = couch_util:parse_term(
         couch_config:get("replicator", "socket_options",
             "[{keepalive, true}, {nodelay, false}]")),
-    lists:ukeymerge(1, Options, [
+    lists:ukeymerge(1, Options, lists:keysort(1, [
         {connection_timeout, list_to_integer(DefTimeout)},
+        {retries, list_to_integer(DefRetries)},
         {http_connections, list_to_integer(DefConns)},
         {socket_options, DefSocketOptions},
         {worker_batch_size, list_to_integer(DefBatchSize)},
         {worker_processes, list_to_integer(DefWorkers)}
-    ]).
+    ])).
 
 
 convert_options([])->
@@ -261,6 +264,8 @@ convert_options([{<<"http_connections">>, V} | R]) ->
     [{http_connections, couch_util:to_integer(V)} | convert_options(R)];
 convert_options([{<<"connection_timeout">>, V} | R]) ->
     [{connection_timeout, couch_util:to_integer(V)} | convert_options(R)];
+convert_options([{<<"retries_per_request">>, V} | R]) ->
+    [{retries, couch_util:to_integer(V)} | convert_options(R)];
 convert_options([{<<"socket_options">>, V} | R]) ->
     {ok, SocketOptions} = couch_util:parse_term(V),
     [{socket_options, SocketOptions} | convert_options(R)];
