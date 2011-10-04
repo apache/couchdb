@@ -306,9 +306,11 @@ do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
         "~ca worker batch size of ~p~n"
         "~c~p HTTP connections~n"
         "~ca connection timeout of ~p milliseconds~n"
+        "~c~p retries per request~n"
         "~csocket options are: ~s~s",
         [BaseId ++ Ext, $\t, NumWorkers, $\t, BatchSize, $\t,
             MaxConns, $\t, get_value(connection_timeout, Options),
+            $\t, get_value(retries, Options),
             $\t, io_lib:format("~p", [get_value(socket_options, Options)]),
             case StartSeq of
             ?LOWEST_SEQ ->

@@ -26,6 +26,7 @@
 ]).
 
 -define(replace(L, K, V), lists:keystore(K, 1, L, {K, V})).
+-define(MAX_WAIT, 5 * 60 * 1000).
 
 
 setup(#httpdb{httpc_pool = nil, url = Url, http_connections = MaxConns} = Db) ->
@@ -156,7 +157,8 @@ maybe_retry(Error, Worker, #httpdb{retries = Retries, wait = Wait} = HttpDb,
     ?LOG_INFO("Retrying ~s request to ~s in ~p seconds due to error ~s",
         [Method, Url, Wait / 1000, error_cause(Error)]),
     ok = timer:sleep(Wait),
-    send_req(HttpDb#httpdb{retries = Retries - 1, wait = Wait * 2}, Params, Cb).
+    Wait2 = erlang:min(Wait * 2, ?MAX_WAIT),
+    send_req(HttpDb#httpdb{retries = Retries - 1, wait = Wait2}, Params, Cb).
 
 
 report_error(Worker, HttpDb, Params, Error) ->
