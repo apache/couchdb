@@ -33,7 +33,13 @@ handle_welcome_req(#httpd{method='GET'}=Req, WelcomeMessage) ->
     send_json(Req, {[
         {couchdb, WelcomeMessage},
         {version, list_to_binary(couch_server:get_version())}
-    ]});
+        ] ++ case couch_config:get("vendor") of
+        [] ->
+            [];
+        Properties ->
+            [{vendor, {[{?l2b(K), ?l2b(V)} || {K, V} <- Properties]}}]
+        end
+    });
 handle_welcome_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
 

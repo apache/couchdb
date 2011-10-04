@@ -1,6 +1,9 @@
 ; @configure_input@
 
 ; Upgrading CouchDB will overwrite this file.
+[vendor]
+name = %package_author_name%
+version = %version%
 
 [couchdb]
 database_dir = %localstatelibdir%

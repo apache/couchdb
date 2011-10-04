@@ -35,6 +35,8 @@ default.ini: default.ini.tpl
 	    -e "s|%localstaterundir%|../var/run/couchdb|g" \
 	    -e "s|%couchprivlibdir%|../lib/couch-$(version)/priv/lib|g" \
 	    -e "s|%couchjs_command_name%|couchjs.exe|g" \
+	    -e "s|%package_author_name%|$(package_author_name)|g" \
+	    -e "s|%version%|$(version)|g" \
 	< $< > $@
 else
 default.ini: default.ini.tpl
@@ -47,6 +49,8 @@ default.ini: default.ini.tpl
 	    -e "s|%localstaterundir%|$(localstaterundir)|g" \
 	    -e "s|%couchprivlibdir%|$(couchprivlibdir)|g" \
 	    -e "s|%couchjs_command_name%|$(couchjs_command_name)|g" \
+	    -e "s|%package_author_name%|$(package_author_name)|g" \
+	    -e "s|%version%|$(version)|g" \
 	< $< > $@
 endif
 
@@ -60,6 +64,8 @@ default_dev.ini: default.ini.tpl
 	    -e "s|%localstaterundir%|$(abs_top_builddir)/tmp/run|g" \
 	    -e "s|%couchprivlibdir%|$(devcouchprivlibdir)|g" \
 	    -e "s|%couchjs_command_name%|$(couchjs_dev_command_name)|g" \
+	    -e "s|%package_author_name%|$(package_author_name)|g" \
+	    -e "s|%version%|$(version)|g" \
 	< $< > $@
 
 # Noah said to not specify local.ini but it borks
