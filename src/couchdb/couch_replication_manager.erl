@@ -223,9 +223,12 @@ code_change(_OldVsn, State, _Extra) ->
 
 changes_feed_loop() ->
     {ok, RepDb} = ensure_rep_db_exists(),
+    RepDbName = couch_db:name(RepDb),
+    couch_db:close(RepDb),
     Server = self(),
     Pid = spawn_link(
         fun() ->
+            {ok, Db} = couch_db:open_int(RepDbName, [sys_db]),
             ChangesFeedFun = couch_changes:handle_changes(
                 #changes_args{
                     include_docs = true,
@@ -234,7 +237,7 @@ changes_feed_loop() ->
                     db_open_options = [sys_db]
                 },
                 {json_req, null},
-                RepDb
+                Db
             ),
             ChangesFeedFun(
                 fun({change, Change, _}, _) ->
@@ -248,11 +251,11 @@ changes_feed_loop() ->
                 (_, _) ->
                     ok
                 end
-            )
+            ),
+            couch_db:close(Db)
         end
     ),
-    couch_db:close(RepDb),
-    {Pid, couch_db:name(RepDb)}.
+    {Pid, RepDbName}.
 
 
 has_valid_rep_id({Change}) ->
