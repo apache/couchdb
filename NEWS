@@ -44,8 +44,26 @@ Version 1.1.1
 
 This version has not been released yet.
 
+* Add configurable maximum to the number of bytes returned by _log.
+* Allow CommonJS modules to be an empty string.
+* Bump minimum Erlang version to R13B02.
+* Do not run deleted validate_doc_update functions.
 * ETags for views include current sequence if include_docs=true.
+* Fix bug where duplicates can appear in _changes feed.
+* Fix bug where update handlers break after conflict resolution.
+* Fix bug with _replicator where include "filter" could crash couch.
+* Fix crashes when compacting large views.
+* Fix file descriptor leak in _log
+* Fix missing revisions in _changes?style=all_docs.
+* Improve handling of compaction at max_dbs_open limit.
 * JSONP responses now send "text/javascript" for Content-Type.
+* Link to ICU 4.2 on Windows.
+* Permit forward slashes in path to update functions.
+* Reap couchjs processes that hit reduce_overflow error.
+* Status code can be specified in update handlers.
+* Support provides() in show functions.
+* _view_cleanup when ddoc has no views now removes all index files.
+* max_replication_retry_count now supports "infinity".
 
 Version 1.1.0
 -------------
