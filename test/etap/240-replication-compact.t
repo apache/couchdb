@@ -411,7 +411,7 @@ writer_loop(#db{name = DbName}, Parent, Counter) ->
     {stop, Ref} ->
         Parent ! {stopped, Ref, Counter + 1}
     after 0 ->
-        ok = timer:sleep(50),
+        ok = timer:sleep(500),
         writer_loop(Db, Parent, Counter + 1)
     end.
 
