@@ -91,6 +91,9 @@ This version has not been released yet.
 * Support provides() in show functions.
 * _view_cleanup when ddoc has no views now removes all index files.
 * max_replication_retry_count now supports "infinity".
+* Fix replication crash when source database has a document with empty ID.
+* Fix deadlock when assigning couchjs processes to serve requests.
+* Fixes to the document multipart PUT API.
 
 Version 1.1.0
 -------------
