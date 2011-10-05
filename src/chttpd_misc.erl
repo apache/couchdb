@@ -130,7 +130,7 @@ handle_replicate_req(#httpd{method='POST', user_ctx=Ctx} = Req) ->
     couch_httpd:validate_ctype(Req, "application/json"),
     %% see HACK in chttpd.erl about replication
     PostBody = get(post_body),
-    try couch_rep:replicate(PostBody, Ctx, mem3_rep_manager) of
+    try replicate(PostBody, Ctx, mem3_rep_manager) of
     {ok, {continuous, RepId}} ->
         send_json(Req, 202, {[{ok, true}, {<<"_local_id">>, RepId}]});
     {ok, {cancelled, RepId}} ->
@@ -157,6 +157,24 @@ handle_replicate_req(#httpd{method='POST', user_ctx=Ctx} = Req) ->
 handle_replicate_req(Req) ->
     send_method_not_allowed(Req, "POST").
 
+replicate({Props} = PostBody, Ctx, Module) ->
+    Node = choose_node([
+        couch_util:get_value(<<"source">>, Props),
+        couch_util:get_value(<<"target">>, Props)
+    ]),
+    case rpc:call(Node, couch_rep, replicate, [PostBody, Ctx, Module]) of
+    {badrpc, Reason} ->
+        erlang:error(Reason);
+    Res ->
+        Res
+    end.
+
+choose_node(Key) when is_binary(Key) ->
+    Checksum = erlang:crc32(Key),
+    Nodes = lists:sort([node()|erlang:nodes()]),
+    lists:nth(1 + Checksum rem length(Nodes), Nodes);
+choose_node(Key) ->
+    choose_node(term_to_binary(Key)).
 
 handle_restart_req(#httpd{method='POST'}=Req) ->
     couch_server_sup:restart_core_server(),
