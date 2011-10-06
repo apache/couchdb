@@ -11,7 +11,6 @@
 // the License.
 
 #include <jsapi.h>
-#include "config.h"
 
 static int
 enc_char(uint8 *utf8Buffer, uint32 ucs4Char)
@@ -122,7 +121,7 @@ char*
 enc_string(JSContext* cx, jsval arg, size_t* buflen)
 {
     JSString* str = NULL;
-    const jschar* src = NULL;
+    jschar* src = NULL;
     char* bytes = NULL;
     size_t srclen = 0;
     size_t byteslen = 0;
@@ -130,12 +129,8 @@ enc_string(JSContext* cx, jsval arg, size_t* buflen)
     str = JS_ValueToString(cx, arg);
     if(!str) goto error;
 
-#ifdef HAVE_JS_GET_STRING_CHARS_AND_LENGTH
-    src = JS_GetStringCharsAndLength(cx, str, &srclen);
-#else
     src = JS_GetStringChars(str);
     srclen = JS_GetStringLength(str);
-#endif
 
     if(!enc_charbuf(src, srclen, NULL, &byteslen)) goto error;
     

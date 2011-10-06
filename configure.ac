@@ -109,15 +109,13 @@ esac
 
 AM_CONDITIONAL([WINDOWS], [test x$IS_WINDOWS = xTRUE])
 
-AC_CHECK_LIB([mozjs185], [JS_NewContext], [JS_LIB_BASE=mozjs185], [
-    AC_CHECK_LIB([mozjs185-1.0], [JS_NewContext], [JS_LIB_BASE=mozjs185-1.0], [
-        AC_CHECK_LIB([mozjs], [JS_NewContext], [JS_LIB_BASE=mozjs], [
-            AC_CHECK_LIB([js], [JS_NewContext], [JS_LIB_BASE=js], [
-                AC_CHECK_LIB([js3250], [JS_NewContext], [JS_LIB_BASE=js3250], [
-                    AC_CHECK_LIB([js32], [JS_NewContext], [JS_LIB_BASE=js32], [
-                        AC_MSG_ERROR([Could not find the js library.
+AC_CHECK_LIB([mozjs], [JS_NewContext], [JS_LIB_BASE=mozjs], [
+    AC_CHECK_LIB([js], [JS_NewContext], [JS_LIB_BASE=js], [
+        AC_CHECK_LIB([js3250], [JS_NewContext], [JS_LIB_BASE=js3250], [
+            AC_CHECK_LIB([js32], [JS_NewContext], [JS_LIB_BASE=js32], [
+                AC_MSG_ERROR([Could not find the js library.
 
-Is the Mozilla SpiderMonkey library installed?])])])])])])])
+Is the Mozilla SpiderMonkey library installed?])])])])])
 
 AC_SUBST(JS_LIB_BASE)
 
@@ -180,19 +178,16 @@ Are the Mozilla SpiderMonkey headers installed?])
 AC_SUBST(JSLIB)
 
 AC_LANG_PUSH(C)
-
-AC_CHECK_LIB([$JS_LIB_BASE], [JS_NewCompartmentAndGlobalObject],
-    AC_DEFINE([SM185], [1],
-        [Use SpiderMonkey 1.8.5]))
-
-AC_CHECK_LIB([$JS_LIB_BASE], [JS_ThrowStopIteration],
-    AC_DEFINE([SM180], [1],
-        [Use SpiderMonkey 1.8.0]))
-
-AC_CHECK_LIB([$JS_LIB_BASE], [JS_GetStringCharsAndLength],
-    AC_DEFINE([HAVE_JS_GET_STRING_CHARS_AND_LENGTH], [1],
-        [Use newer JS_GetCharsAndLength function.]))
-
+OLD_CFLAGS="$CFLAGS"
+CFLAGS="-Werror-implicit-function-declaration"
+AC_COMPILE_IFELSE(
+    [AC_LANG_PROGRAM(
+        [[#include <jsapi.h>]],
+        [[JS_SetOperationCallback(0, 0);]]
+    )],
+    AC_DEFINE([USE_JS_SETOPCB], [], [Use new JS_SetOperationCallback])
+)
+CFLAGS="$OLD_CFLAGS"
 AC_LANG_POP(C)
 
 AC_ARG_WITH([win32-icu-binaries], [AC_HELP_STRING([--with-win32-icu-binaries=PATH],
@@ -234,10 +229,10 @@ case "$(uname -s)" in
     CPPFLAGS="-D_XOPEN_SOURCE $CPPFLAGS"
     ;;
   FreeBSD)
-    LIBS="$LIBS -lm -lcrypt"
+    LIBS="$LIBS -lcrypt"
     ;;
   OpenBSD)
-    LIBS="$LIBS -lm -lcrypto"
+    LIBS="$LIBS -lcrypto"
   ;;
 esac
 
