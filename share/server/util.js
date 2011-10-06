@@ -63,11 +63,6 @@ var Couch = {
   },
   compileFunction : function(source, ddoc) {    
     if (!source) throw(["error","not_found","missing function"]);
-    // Some newer SpiderMonkey's appear to not like evaluating
-    // an anonymous function at global scope. Simple fix just
-    // wraps the source with parens so the function object is
-    // returned correctly.
-    source = "(" + source + ")";
     try {
       if (sandbox) {
         if (ddoc) {
