@@ -55,9 +55,11 @@ You can install the build tools by running:
 
 You can install the other dependencies by running:
 
-    sudo port install icu erlang spidermonkey curl
+    brew install erlang icu4c spidermonkey curl
 
-You will need MacPorts installed to use the `port` command.
+You will need Homebrew installed to use the `brew` command.
+
+Learn more about Homebrew at http://mxcl.github.com/homebrew/
 
 Installing
 ----------
