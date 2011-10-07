@@ -231,12 +231,16 @@ start_update_notifier() ->
         [?MODULE:push(Db, N) || N <- Nodes, lists:member(N, Live)];
     ({updated, <<"shards/", _/binary>> = ShardName}) ->
         % TODO deal with split/merged partitions by comparing keyranges
-        Shards = mem3:shards(mem3:dbname(ShardName)),
-        Targets = [S || #shard{node=N, name=Name} = S <- Shards, N =/= node(),
-            Name =:= ShardName],
-        Live = nodes(),
-        [?MODULE:push(ShardName,N) || #shard{node=N} <- Targets,
-            lists:member(N, Live)];
+        try mem3:shards(mem3:dbname(ShardName)) of
+        Shards ->
+            Targets = [S || #shard{node=N, name=Name} = S <- Shards,
+                N =/= node(), Name =:= ShardName],
+            Live = nodes(),
+            [?MODULE:push(ShardName,N) || #shard{node=N} <- Targets,
+                lists:member(N, Live)]
+        catch error:database_does_not_exist ->
+            ok
+        end;
     ({deleted, <<"shards/", _:18/binary, _/binary>> = ShardName}) ->
         gen_server:cast(?MODULE, {remove_shard, ShardName});
     (_) -> ok end).
