@@ -130,7 +130,9 @@ remove_ancestors([{_,{{ok, #doc{revs = {Pos, Revs}}}, Count}} = Head | Tail], Ac
         remove_ancestors(Tail, [Head | Acc]);
     [{Descendant, _} | _] ->
         remove_ancestors(update_counter(Descendant, Count, Tail), Acc)
-    end.
+    end;
+remove_ancestors([Error | Tail], Acc) ->
+    remove_ancestors(Tail, [Error | Acc]).
 
 create_monitors(Shards) ->
     MonRefs = lists:usort([{rexi_server, N} || #shard{node=N} <- Shards]),
