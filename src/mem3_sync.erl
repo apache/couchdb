@@ -203,6 +203,7 @@ sync_nodes_and_dbs() ->
     [[push(?l2b(Db), N) || Db <- Dbs] || N <- Nodes, lists:member(N, Live)].
 
 initial_sync() ->
+    [net_kernel:connect_node(Node) || Node <- mem3:nodes()],
     sync_nodes_and_dbs(),
     initial_sync(nodes()).
 
