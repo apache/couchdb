@@ -127,9 +127,9 @@ send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn, Timeout) ->
 receive_results(Workers, State, Timeout, Callback, AccIn) ->
     case rexi_utils:recv(Workers, #shard.ref, fun handle_message/3, State,
             infinity, Timeout) of
-    {timeout, _NewState} ->
+    {timeout, NewState0} ->
         {ok, AccOut} = Callback(timeout, AccIn),
-        NewState = State#collector{user_acc = AccOut},
+        NewState = NewState0#collector{user_acc = AccOut},
         receive_results(Workers, NewState, Timeout, Callback, AccOut);
     {_, NewState} ->
         {ok, NewState}
