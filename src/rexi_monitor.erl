@@ -23,8 +23,12 @@
 -spec start([pid() | atom() | {atom(),node()}]) -> pid().
 start(Procs) ->
     Parent = self(),
+    Nodes = [node() | nodes()],
+    {Mon, Skip} = lists:partition(fun(P) -> should_monitor(P, Nodes) end,
+        Procs),
     spawn_link(fun() ->
-        [erlang:monitor(process, P) || P <- Procs],
+        [erlang:send(Parent, {rexi_DOWN, self(), P, noconnect}) || P <- Skip],
+        [erlang:monitor(process, P) || P <- Mon],
         wait_monitors(Parent)
     end).
 
@@ -36,6 +40,11 @@ stop(MonitoringPid) ->
     flush_down_messages().
 
 %% internal functions %%
+
+should_monitor(Pid, Nodes) when is_pid(Pid) ->
+    lists:member(node(Pid), Nodes);
+should_monitor({_, Node}, Nodes) ->
+    lists:member(Node, Nodes).
 
 wait_monitors(Parent) ->
     receive
