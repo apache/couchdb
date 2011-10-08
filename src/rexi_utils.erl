@@ -46,7 +46,6 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
             Fun(Msg, {Worker, From}, Acc0)
         end;
     {rexi_DOWN, _RexiMonPid, ServerPid, Reason} = Msg ->
-        io:format("rexi_DOWN ~p ~p", [ServerPid, Reason]),
         Fun(Msg, nil, Acc0)
     after PerMsgTO ->
         {timeout, Acc0}
