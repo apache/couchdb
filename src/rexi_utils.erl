@@ -45,7 +45,7 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
         Worker ->
             Fun(Msg, {Worker, From}, Acc0)
         end;
-    {rexi_DOWN, _RexiMonPid, ServerPid, Reason} = Msg ->
+    {rexi_DOWN, _, _, _} = Msg ->
         Fun(Msg, nil, Acc0)
     after PerMsgTO ->
         {timeout, Acc0}
