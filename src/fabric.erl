@@ -100,7 +100,7 @@ create_db(DbName) ->
 %% control how many shards to split a database into
 %% and how many nodes each doc is copied to respectively.
 %%
--spec create_db(dbname(), [option()]) -> ok | {error, atom()}.
+-spec create_db(dbname(), [option()]) -> ok | accepted | {error, atom()}.
 create_db(DbName, Options) ->
     fabric_db_create:go(dbname(DbName), opts(Options)).
 
@@ -109,11 +109,7 @@ delete_db(DbName) ->
     delete_db(DbName, []).
 
 %% @doc delete a database
--spec delete_db(dbname(), [option()]) ->
-    ok |
-    no_return() | % erlang:error(database_does_not_exist)
-    {timeout, any()} |
-    {error, any()}.
+-spec delete_db(dbname(), [option()]) -> ok | accepted | {error, atom()}.
 delete_db(DbName, Options) ->
     fabric_db_delete:go(dbname(DbName), opts(Options)).
 
@@ -264,7 +260,7 @@ query_view(DbName, DesignName, ViewName, QueryArgs) ->
 %%      There are many additional query args that can be passed to a view,
 %%      see <a href="http://wiki.apache.org/couchdb/HTTP_view_API#Querying_Options">
 %%      query args</a> for details.
--spec query_view(dbname(), #doc{}, iodata(), callback(), any(),
+-spec query_view(dbname(), #doc{} | binary(), iodata(), callback(), any(),
         #view_query_args{}) ->
     any().
 query_view(DbName, Design, ViewName, Callback, Acc0, QueryArgs) ->
