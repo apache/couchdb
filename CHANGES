@@ -4,8 +4,6 @@ Apache CouchDB CHANGES
 Version 1.1.1
 -------------
 
-This version has not been released yet.
-
 * Add configurable maximum to the number of bytes returned by _log.
 * Allow CommonJS modules to be an empty string.
 * Bump minimum Erlang version to R13B02.
