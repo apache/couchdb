@@ -99,13 +99,20 @@ update_locals(Acc) ->
     rexi_call(Node, {fabric_rpc, update_docs, [Name, [Doc], Options]}).
 
 rexi_call(Node, MFA) ->
+    Mon = rexi_monitor:start([{rexi_server, Node}]),
     Ref = rexi:cast(Node, MFA),
-    receive {Ref, {ok, Reply}} ->
-        Reply;
-    {Ref, Error} ->
-        erlang:error(Error)
-    after 600000 ->
-        erlang:error(timeout)
+    try
+        receive {Ref, {ok, Reply}} ->
+            Reply;
+        {Ref, Error} ->
+            erlang:error(Error);
+        {rexi_DOWN, Mon, _, Reason} ->
+            erlang:error({rexi_DOWN, Reason})
+        after 600000 ->
+            erlang:error(timeout)
+        end
+    after
+        rexi_monitor:stop(Mon)
     end.
 
 calculate_start_seq(Db, #shard{node=Node, name=Name}, LocalId) ->
