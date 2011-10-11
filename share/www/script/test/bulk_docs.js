@@ -108,4 +108,17 @@ couchTests.bulk_docs = function(debug) {
   result = JSON.parse(req.responseText);
   T(result.error == "bad_request");
   T(result.reason == "Missing JSON list of 'docs'");
+
+  // jira-911
+  db.deleteDb();
+  db.createDb();
+  docs = [];
+  docs.push({"_id":"0", "a" : 0});
+  docs.push({"_id":"1", "a" : 1});
+  docs.push({"_id":"1", "a" : 2});
+  docs.push({"_id":"3", "a" : 3});
+  results = db.bulkSave(docs);
+  T(results[1].id == "1");
+  T(results[1].error == undefined);
+  T(results[2].error == "conflict");
 };
