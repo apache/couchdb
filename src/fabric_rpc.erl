@@ -406,26 +406,32 @@ send(Key, Value, #view_acc{limit=Limit} = Acc) ->
     end.
 
 changes_enumerator(DocInfo, {Db, _Seq, Args}) ->
-    #changes_args{include_docs=IncludeDocs, filter=Acc} = Args,
+    #changes_args{
+        include_docs = IncludeDocs,
+        filter = Acc,
+        conflicts = Conflicts
+    } = Args,
     #doc_info{high_seq=Seq, revs=[#rev_info{deleted=Del}|_]} = DocInfo,
     case [X || X <- couch_changes:filter(DocInfo, Acc), X /= null] of
     [] ->
         {ok, {Db, Seq, Args}};
     Results ->
-        ChangesRow = changes_row(Db, DocInfo, Results, Del, IncludeDocs),
+        Opts = if Conflicts -> [conflicts]; true -> [] end,
+        ChangesRow = changes_row(Db, DocInfo, Results, Del, IncludeDocs, Opts),
         Go = rexi:sync_reply(ChangesRow),
         {Go, {Db, Seq, Args}}
     end.
 
-changes_row(Db, #doc_info{id=Id, high_seq=Seq} = DI, Results, Del, true) ->
-    #change{key=Seq, id=Id, value=Results, doc=doc_member(Db,DI), deleted=Del};
-changes_row(_, #doc_info{id=Id, high_seq=Seq}, Results, true, _) ->
+changes_row(Db, #doc_info{id=Id, high_seq=Seq}=DI, Results, Del, true, Opts) ->
+    Doc = doc_member(Db, DI, Opts),
+    #change{key=Seq, id=Id, value=Results, doc=Doc, deleted=Del};
+changes_row(_, #doc_info{id=Id, high_seq=Seq}, Results, true, _, _) ->
     #change{key=Seq, id=Id, value=Results, deleted=true};
-changes_row(_, #doc_info{id=Id, high_seq=Seq}, Results, _, _) ->
+changes_row(_, #doc_info{id=Id, high_seq=Seq}, Results, _, _, _) ->
     #change{key=Seq, id=Id, value=Results}.
 
-doc_member(Shard, DocInfo) ->
-    case couch_db:open_doc(Shard, DocInfo, [deleted]) of
+doc_member(Shard, DocInfo, Opts) ->
+    case couch_db:open_doc(Shard, DocInfo, [deleted | Opts]) of
     {ok, Doc} ->
         couch_doc:to_json_obj(Doc, []);
     Error ->
