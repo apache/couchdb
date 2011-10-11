@@ -527,6 +527,9 @@ function $$(node) {
       $.couch.info({
         success: function(info, status) {
           $("#version").text(info.version);
+        },
+        error: function() { // probably a vhost
+          $("#version").text("");
         }
       });
     });
