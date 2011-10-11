@@ -50,8 +50,10 @@ push(Name, #shard{node=Node}) ->
 push(Name, Node) ->
     push(#job{name = Name, node = Node}).
 
-push(Job) ->
-    gen_server:cast(?MODULE, {push, Job}).
+push(#job{node = Node} = Job) when Node =/= node() ->
+    gen_server:cast(?MODULE, {push, Job});
+push(_) ->
+    ok.
 
 remove_node(Node) ->
     gen_server:cast(?MODULE, {remove_node, Node}).
