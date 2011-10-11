@@ -151,7 +151,7 @@ apply_open_options({ok, Doc},Options) ->
     apply_open_options2(Doc,Options);
 apply_open_options(Else,_Options) ->
     Else.
-    
+
 apply_open_options2(Doc,[]) ->
     {ok, Doc};
 apply_open_options2(#doc{atts=Atts,revs=Revs}=Doc,
@@ -612,11 +612,11 @@ prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldI
                 {ok, {Start, Path}} ->
                     % our unflushed doc is a leaf node. Go back on the path
                     % to find the previous rev that's on disk.
-                    
+
                     LoadPrevRevFun = fun() ->
                                 make_first_doc_on_disk(Db,Id,Start-1, tl(Path))
                             end,
-                    
+
                     case couch_doc:has_stubs(Doc) of
                     true ->
                         DiskDoc = LoadPrevRevFun(),
@@ -626,7 +626,7 @@ prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldI
                         Doc2 = Doc,
                         GetDiskDocFun = LoadPrevRevFun
                     end,
-                    
+
                     case validate_doc_update(Db, Doc2, GetDiskDocFun) of
                     ok ->
                         {[Doc2 | AccValidated], AccErrors2};
@@ -721,7 +721,7 @@ update_docs(Db, Docs, Options, interactive_edit) ->
                 {[Doc | DocsAcc], NonRepDocsAcc}
             end
         end, {[], []}, Docs),
-        
+
     DocBuckets = group_alike_docs(Docs2),
 
     case (Db#db.validate_doc_funs /= []) orelse
@@ -761,9 +761,9 @@ update_docs(Db, Docs, Options, interactive_edit) ->
                         check_dup_atts(Doc)), Db#db.updater_fd)
                 || Doc <- B] || B <- DocBuckets2],
         {DocBuckets4, IdRevs} = new_revs(DocBuckets3, [], []),
-        
+
         {ok, CommitResults} = write_and_commit(Db, DocBuckets4, NonRepDocs, Options2),
-        
+
         ResultsDict = dict:from_list(IdRevs ++ CommitResults ++ PreCommitFailures),
         {ok, lists:map(
             fun(#doc{id=Id,revs={Pos, RevIds}}) ->
@@ -874,7 +874,7 @@ set_new_att_revpos(#doc{revs={RevPos,_Revs},atts=Atts}=Doc) ->
         (Att) ->
             Att#att{revpos=RevPos+1}
         end, Atts)}.
-        
+
 
 doc_flush_atts(Doc, Fd) ->
     Doc#doc{atts=[flush_att(Fd, Att) || Att <- Doc#doc.atts]}.
@@ -1034,7 +1034,7 @@ enum_docs_reduce_to_count(Reds) ->
 
 changes_since(Db, StartSeq, Fun, Acc) ->
     changes_since(Db, StartSeq, Fun, [], Acc).
-    
+
 changes_since(Db, StartSeq, Fun, Options, Acc) ->
     Wrapper = fun(DocInfo, _Offset, Acc2) -> Fun(DocInfo, Acc2) end,
     {ok, _LastReduction, AccOut} = couch_btree:fold(by_seq_btree(Db),
@@ -1108,7 +1108,7 @@ handle_cast(Msg, Db) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-    
+
 handle_info({'EXIT', _Pid, normal}, Db) ->
     {noreply, Db};
 handle_info({'EXIT', _Pid, Reason}, Server) ->
