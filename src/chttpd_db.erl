@@ -1165,6 +1165,8 @@ parse_changes_query(Req) ->
             Args#changes_args{timeout=list_to_integer(Value)};
         {"include_docs", "true"} ->
             Args#changes_args{include_docs=true};
+        {"conflicts", "true"} ->
+            Args#changes_args{conflicts=true};
         {"filter", _} ->
             Args#changes_args{filter=Value};
         _Else -> % unknown key value pair, ignore.

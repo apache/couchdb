@@ -199,6 +199,8 @@ parse_json_view_param({<<"reduce">>, V}) when is_boolean(V) ->
     [{reduce, V}];
 parse_json_view_param({<<"include_docs">>, V}) when is_boolean(V) ->
     [{include_docs, V}];
+parse_json_view_param({<<"conflicts">>, V}) when is_boolean(V) ->
+    [{conflicts, V}];
 parse_json_view_param({<<"list">>, V}) ->
     [{list, couch_util:to_binary(V)}];
 parse_json_view_param({<<"sorted">>, V}) when is_boolean(V) ->
@@ -249,6 +251,8 @@ parse_view_param("reduce", Value) ->
     [{reduce, parse_bool_param(Value)}];
 parse_view_param("include_docs", Value) ->
     [{include_docs, parse_bool_param(Value)}];
+parse_view_param("conflicts", Value) ->
+    [{conflicts, parse_bool_param(Value)}];
 parse_view_param("list", Value) ->
     [{list, ?l2b(Value)}];
 parse_view_param("callback", _) ->
@@ -333,6 +337,17 @@ validate_view_query(include_docs, true, Args) ->
             Args#view_query_args{include_docs=true}
     end;
 validate_view_query(include_docs, _Value, Args) ->
+    Args;
+validate_view_query(conflicts, true, Args) ->
+    case Args#view_query_args.view_type of
+    reduce ->
+        Msg = <<"Query parameter `conflicts` "
+                "is invalid for reduce views.">>,
+        throw({query_parse_error, Msg});
+    _ ->
+        Args#view_query_args{conflicts = true}
+    end;
+validate_view_query(conflicts, _Value, Args) ->
     Args;
 validate_view_query(sorted, false, Args) ->
     Args#view_query_args{sorted=false};
