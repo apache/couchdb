@@ -51,7 +51,7 @@ static const char USAGE_TEMPLATE[] =
     "  -H          enable %s cURL bindings (only avaiable\n"
     "              if package was built with cURL available)\n"
     "  -S SIZE     specify that the interpreter should set the\n"
-    "              the stack quota for JS contexts to SIZE bytes\n"
+    "              stack quota for JS contexts to SIZE bytes\n"
     "\n"
     "Report bugs at <%s>.\n";
 
