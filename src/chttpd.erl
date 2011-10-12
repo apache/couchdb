@@ -106,8 +106,7 @@ start_link(Name, Options) ->
     Options1 = Options ++ [
         {loop, fun ?MODULE:handle_request/1},
         {name, Name},
-        {ip, couch_config:get("chttpd", "bind_address", any)},
-        {backlog, list_to_integer(couch_config:get("chttpd", "backlog", "128"))}
+        {ip, couch_config:get("chttpd", "bind_address", any)}
     ],
     ServerOptsCfg = couch_config:get("chttpd", "server_options", "[]"),
     {ok, ServerOpts} = couch_util:parse_term(ServerOptsCfg),
