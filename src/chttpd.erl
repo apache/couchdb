@@ -106,10 +106,12 @@ start_link(Name, Options) ->
     Options1 = Options ++ [
         {loop, fun ?MODULE:handle_request/1},
         {name, Name},
-        {ip, couch_config:get("chttpd", "bind_address", any)},
-        {backlog, list_to_integer(couch_config:get("chttpd", "backlog", "128"))}
+        {ip, couch_config:get("chttpd", "bind_address", any)}
     ],
-    case mochiweb_http:start(Options1) of
+    ServerOptsCfg = couch_config:get("chttpd", "server_options", "[]"),
+    {ok, ServerOpts} = couch_util:parse_term(ServerOptsCfg),
+    Options2 = lists:keymerge(1, lists:sort(Options1), lists:sort(ServerOpts)),
+    case mochiweb_http:start(Options2) of
     {ok, Pid} ->
         ok = couch_config:register(fun ?MODULE:config_change/2, Pid),
         {ok, Pid};
@@ -123,6 +125,8 @@ config_change("chttpd", "bind_address") ->
 config_change("chttpd", "port") ->
     ?MODULE:stop();
 config_change("chttpd", "backlog") ->
+    ?MODULE:stop();
+config_change("chttpd", "server_options") ->
     ?MODULE:stop().
 
 stop() ->
@@ -131,6 +135,14 @@ stop() ->
 
 handle_request(MochiReq) ->
     Begin = now(),
+
+    case couch_config:get("chttpd", "socket_options") of
+    undefined ->
+        ok;
+    SocketOptsCfg ->
+        {ok, SocketOpts} = couch_util:parse_term(SocketOptsCfg),
+        ok = mochiweb_socket:setopts(MochiReq:get(socket), SocketOpts)
+    end,
 
     AuthenticationFuns = [
         fun couch_httpd_auth:cookie_authentication_handler/1,
