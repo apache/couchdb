@@ -169,6 +169,7 @@ choose_shards(DbName, Options) ->
         NodeCount = length(Nodes),
         Zones = zones(Nodes),
         ZoneCount = length(Zones),
+        if ZoneCount =:= 0 -> erlang:error(no_available_zones); true -> ok end,
         N = mem3_util:n_val(couch_util:get_value(n, Options), NodeCount),
         Q = mem3_util:to_integer(couch_util:get_value(q, Options,
             couch_config:get("cluster", "q", "8"))),
@@ -200,7 +201,11 @@ dbname(_) ->
 
 
 zones(Nodes) ->
-    lists:usort([mem3:node_info(Node, <<"zone">>) || Node <- Nodes]).
+    BlacklistStr = couch_config:get("mem3", "blacklisted_zones", "[]"),
+    {ok, Blacklist0} = couch_util:parse_term(BlacklistStr),
+    Blacklist = [list_to_binary(Z) || Z <- Blacklist0],
+    lists:usort([mem3:node_info(Node, <<"zone">>) || Node <- Nodes]) --
+        Blacklist.
 
 nodes_in_zone(Nodes, Zone) ->
     [Node || Node <- Nodes, Zone == mem3:node_info(Node, <<"zone">>)].
