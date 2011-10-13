@@ -8,4 +8,4 @@ signature(BaseString, CS, TS) ->
   base64:encode_to_string(crypto:sha_mac(Key, BaseString)).
 
 verify(Signature, BaseString, CS, TS) ->
-  Signature =:= signature(BaseString, CS, TS).
+  couch_util:verify(Signature, signature(BaseString, CS, TS)).
