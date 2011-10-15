@@ -13,28 +13,6 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-%% XXX: Figure out how to -include("couch_rep.hrl")
--record(http_db, {
-    url,
-    auth = [],
-    resource = "",
-    headers = [
-        {"User-Agent", "CouchDB/"++couch_server:get_version()},
-        {"Accept", "application/json"},
-        {"Accept-Encoding", "gzip"}
-    ],
-    qs = [],
-    method = get,
-    body = nil,
-    options = [
-        {response_format,binary},
-        {inactivity_timeout, 30000}
-    ],
-    retries = 10,
-    pause = 1,
-    conn = nil
-}).
-
 -record(user_ctx, {
     name = null,
     roles = [],
@@ -52,7 +30,7 @@ admin_user_ctx() -> {user_ctx, #user_ctx{roles=[<<"_admin">>]}}.
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(15),
+    etap:plan(17),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -144,14 +122,17 @@ test() ->
     ok.
 
 test_regular_request() ->
-    Result = case ibrowse:send_req(server(), [], get, []) of
+    case ibrowse:send_req(server(), [], get, []) of
         {ok, _, _, Body} ->
-            {[{<<"couchdb">>, <<"Welcome">>},
-              {<<"version">>,_}
-            ]} = ejson:decode(Body),
-            etap:is(true, true, "should return server info");
+            {Props} = ejson:decode(Body),
+            Couchdb = couch_util:get_value(<<"couchdb">>, Props),
+            Version = couch_util:get_value(<<"version">>, Props),
+            Vendor = couch_util:get_value(<<"vendor">>, Props),
+            etap:isnt(Couchdb, undefined, "Found couchdb property"),
+            etap:isnt(Version, undefined, "Found version property"),
+            etap:isnt(Vendor, undefined, "Found vendor property");
         _Else ->
-            etap:is(false, true, <<"ibrowse fail">>)
+            etap:bail("http GET / request failed")
     end.
 
 test_vhost_request() ->
