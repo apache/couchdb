@@ -181,7 +181,7 @@ http_open(JSContext* cx, JSObject* req, jsval mth, jsval url, jsval snc)
         goto done;
     }
 
-    if(mth == JSVAL_VOID) {
+    if(JSVAL_IS_VOID(mth)) {
         JS_ReportError(cx, "You must specify a method.");
         goto done;
     }
@@ -203,7 +203,7 @@ http_open(JSContext* cx, JSObject* req, jsval mth, jsval url, jsval snc)
 
     http->method = methid;
 
-    if(url == JSVAL_VOID) {
+    if(JSVAL_IS_VOID(url)) {
         JS_ReportError(cx, "You must specify a URL.");
         goto done;
     }
@@ -219,7 +219,7 @@ http_open(JSContext* cx, JSObject* req, jsval mth, jsval url, jsval snc)
         goto done;
     }
     
-    if(snc != JSVAL_FALSE) {
+    if(JSVAL_IS_BOOLEAN(snc) && !JSVAL_TO_BOOLEAN(snc)) {
         JS_ReportError(cx, "Synchronous flag must be false.");
         goto done;
     }
@@ -255,7 +255,7 @@ http_set_hdr(JSContext* cx, JSObject* req, jsval name, jsval val)
         goto done;
     }
 
-    if(name == JSVAL_VOID)
+    if(JSVAL_IS_VOID(name))
     {
         JS_ReportError(cx, "You must speciy a header name.");
         goto done;
@@ -268,7 +268,7 @@ http_set_hdr(JSContext* cx, JSObject* req, jsval name, jsval val)
         goto done;
     }
     
-    if(val == JSVAL_VOID)
+    if(JSVAL_IS_VOID(val))
     {
         JS_ReportError(cx, "You must specify a header value.");
         goto done;
@@ -313,7 +313,7 @@ http_send(JSContext* cx, JSObject* req, jsval body)
         goto done;
     }
 
-    if(body != JSVAL_VOID && body != JS_GetEmptyStringValue(cx)) {
+    if(!JSVAL_IS_VOID(body)) {
         bodystr = enc_string(cx, body, &bodylen);
         if(!bodystr) {
             JS_ReportError(cx, "Failed to encode body.");
