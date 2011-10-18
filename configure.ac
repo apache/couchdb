@@ -293,6 +293,14 @@ If you wish to ignore this error pass --enable-js-trunk to ./configure.])],
     [[#include <jsapi.h>]])
 fi
 
+# Deal with JSScript -> JSObject -> JSScript switcheroo
+
+AC_CHECK_TYPE([JSScript*],
+    [AC_DEFINE([JSSCRIPT_TYPE], [JSScript*], [Use JSObject* for scripts])],
+    [AC_DEFINE([JSSCRIPT_TYPE], [JSObject*], [Use JSScript* for scripts])],
+    [[#include <jsapi.h>]]
+)
+
 CPPFLAGS="$OLD_CPPFLAGS"
 
 
