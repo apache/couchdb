@@ -50,7 +50,7 @@ test_db_name() -> <<"couch_test_changes">>.
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(20),
+    etap:plan(28),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -85,6 +85,7 @@ test_by_doc_ids() ->
     {ok, _Rev7} = save_doc(Db, {[{<<"_id">>, <<"doc7">>}]}),
     {ok, _Rev8} = save_doc(Db, {[{<<"_id">>, <<"doc8">>}]}),
 
+    etap:diag("Folding changes in ascending order with _doc_ids filter"),
     ChangesArgs = #changes_args{
         filter = "_doc_ids"
     },
@@ -92,8 +93,12 @@ test_by_doc_ids() ->
     Req = {json_req, {[{<<"doc_ids">>, DocIds}]}},
     Consumer = spawn_consumer(test_db_name(), ChangesArgs, Req),
 
-    Rows = wait_finished(Consumer),
+    {Rows, LastSeq} = wait_finished(Consumer),
+    {ok, Db2} = couch_db:open_int(test_db_name(), []),
+    UpSeq = couch_db:get_update_seq(Db2),
+    couch_db:close(Db2),
     etap:is(length(Rows), 2, "Received 2 changes rows"),
+    etap:is(LastSeq, UpSeq, "LastSeq is same as database update seq number"),
     [#row{seq = Seq1, id = Id1}, #row{seq = Seq2, id = Id2}] = Rows,
     etap:is(Id1, <<"doc4">>, "First row is for doc doc4"),
     etap:is(Seq1, 4, "First row has seq 4"),
@@ -101,6 +106,23 @@ test_by_doc_ids() ->
     etap:is(Seq2, 6, "Second row has seq 6"),
 
     stop(Consumer),
+    etap:diag("Folding changes in descending order with _doc_ids filter"),
+    ChangesArgs2 = #changes_args{
+        filter = "_doc_ids",
+        dir = rev
+    },
+    Consumer2 = spawn_consumer(test_db_name(), ChangesArgs2, Req),
+
+    {Rows2, LastSeq2} = wait_finished(Consumer2),
+    etap:is(length(Rows2), 2, "Received 2 changes rows"),
+    etap:is(LastSeq2, 4, "LastSeq is 4"),
+    [#row{seq = Seq1_2, id = Id1_2}, #row{seq = Seq2_2, id = Id2_2}] = Rows2,
+    etap:is(Id1_2, <<"doc3">>, "First row is for doc doc3"),
+    etap:is(Seq1_2, 6, "First row has seq 4"),
+    etap:is(Id2_2, <<"doc4">>, "Second row is for doc doc4"),
+    etap:is(Seq2_2, 4, "Second row has seq 6"),
+
+    stop(Consumer2),
     delete_db(Db).
 
 
@@ -125,7 +147,11 @@ test_by_doc_ids_with_since() ->
     Req = {json_req, {[{<<"doc_ids">>, DocIds}]}},
     Consumer = spawn_consumer(test_db_name(), ChangesArgs, Req),
 
-    Rows = wait_finished(Consumer),
+    {Rows, LastSeq} = wait_finished(Consumer),
+    {ok, Db2} = couch_db:open_int(test_db_name(), []),
+    UpSeq = couch_db:get_update_seq(Db2),
+    couch_db:close(Db2),
+    etap:is(LastSeq, UpSeq, "LastSeq is same as database update seq number"),
     etap:is(length(Rows), 1, "Received 1 changes rows"),
     [#row{seq = Seq1, id = Id1}] = Rows,
     etap:is(Id1, <<"doc3">>, "First row is for doc doc3"),
@@ -264,8 +290,8 @@ unpause(Consumer) ->
 
 wait_finished(_Consumer) ->
     receive
-    {consumer_finished, Rows} ->
-        Rows
+    {consumer_finished, Rows, LastSeq} ->
+        {Rows, LastSeq}
     after 30000 ->
         etap:bail("Timeout waiting for consumer to finish")
     end.
@@ -278,8 +304,8 @@ spawn_consumer(DbName, ChangesArgs0, Req) ->
             Id = couch_util:get_value(<<"id">>, Change),
             Seq = couch_util:get_value(<<"seq">>, Change),
             [#row{id = Id, seq = Seq} | Acc];
-        ({stop, _}, _, Acc) ->
-            Parent ! {consumer_finished, lists:reverse(Acc)},
+        ({stop, LastSeq}, _, Acc) ->
+            Parent ! {consumer_finished, lists:reverse(Acc), LastSeq},
             stop_loop(Parent, Acc);
         (_, _, Acc) ->
             maybe_pause(Parent, Acc)
