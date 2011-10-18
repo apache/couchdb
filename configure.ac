@@ -214,6 +214,14 @@ AC_CHECK_LIB([$JS_LIB_BASE], [JS_GetStringCharsAndLength],
     AC_DEFINE([HAVE_JS_GET_STRING_CHARS_AND_LENGTH], [1],
         [Use newer JS_GetCharsAndLength function.]))
 
+# Deal with JSScript -> JSObject -> JSScript switcheroo
+
+AC_CHECK_TYPE([JSScript*],
+    [AC_DEFINE([JSSCRIPT_TYPE], [JSScript*], [Use JSObject* for scripts])],
+    [AC_DEFINE([JSSCRIPT_TYPE], [JSObject*], [Use JSScript* for scripts])],
+    [[#include <jsapi.h>]]
+)
+
 AC_LANG_POP(C)
 
 AC_ARG_WITH([win32-icu-binaries], [AC_HELP_STRING([--with-win32-icu-binaries=PATH],

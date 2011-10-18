@@ -310,7 +310,7 @@ main(int argc, const char* argv[])
     JSObject* global = NULL;
     JSCrossCompartmentCall *call = NULL;
     JSObject* klass = NULL;
-    JSObject* script;
+    JSSCRIPT_TYPE script;
     JSString* scriptsrc;
     const jschar* schars;
     size_t slen;
