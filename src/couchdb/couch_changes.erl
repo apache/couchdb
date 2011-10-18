@@ -283,10 +283,10 @@ send_changes(Args, Callback, UserAcc, Db, StartSeq, Prepend, FirstRound) ->
         case FilterName of
         "_doc_ids" when length(FilterArgs) =< ?MAX_DOC_IDS ->
             send_changes_doc_ids(
-                FilterArgs, Db, StartSeq, fun changes_enumerator/2, Acc0);
+                FilterArgs, Db, StartSeq, Dir, fun changes_enumerator/2, Acc0);
         "_design" ->
             send_changes_design_docs(
-                Db, StartSeq, fun changes_enumerator/2, Acc0);
+                Db, StartSeq, Dir, fun changes_enumerator/2, Acc0);
         _ ->
             couch_db:changes_since(
                 Db, StartSeq, fun changes_enumerator/2, [{dir, Dir}], Acc0)
@@ -297,44 +297,55 @@ send_changes(Args, Callback, UserAcc, Db, StartSeq, Prepend, FirstRound) ->
     end.
 
 
-send_changes_doc_ids(DocIds, Db, StartSeq, Fun, Acc0) ->
+send_changes_doc_ids(DocIds, Db, StartSeq, Dir, Fun, Acc0) ->
     Lookups = couch_btree:lookup(Db#db.fulldocinfo_by_id_btree, DocIds),
-    DocInfos = lists:foldl(
+    FullDocInfos = lists:foldl(
         fun({ok, FDI}, Acc) ->
-            DocInfo = couch_doc:to_doc_info(FDI),
-            case DocInfo#doc_info.high_seq >= StartSeq of
-            true ->
-                [DocInfo | Acc];
-            false ->
-                Acc
-            end;
+            [FDI | Acc];
         (not_found, Acc) ->
             Acc
         end,
         [], Lookups),
-    send_lookup_changes(DocInfos, Db, Fun, Acc0).
+    send_lookup_changes(FullDocInfos, StartSeq, Dir, Db, Fun, Acc0).
 
 
-send_changes_design_docs(Db, StartSeq, Fun, Acc0) ->
+send_changes_design_docs(Db, StartSeq, Dir, Fun, Acc0) ->
     FoldFun = fun(FullDocInfo, _, Acc) ->
-        DocInfo = couch_doc:to_doc_info(FullDocInfo),
-        case DocInfo#doc_info.high_seq >= StartSeq of
-        true ->
-            {ok, [DocInfo | Acc]};
-        false ->
-            {ok, Acc}
-        end
+        {ok, [FullDocInfo | Acc]}
     end,
     KeyOpts = [{start_key, <<"_design/">>}, {end_key_gt, <<"_design0">>}],
-    {ok, _, DocInfos} = couch_btree:fold(
+    {ok, _, FullDocInfos} = couch_btree:fold(
         Db#db.fulldocinfo_by_id_btree, FoldFun, [], KeyOpts),
-    send_lookup_changes(DocInfos, Db, Fun, Acc0).
+    send_lookup_changes(FullDocInfos, StartSeq, Dir, Db, Fun, Acc0).
 
 
-send_lookup_changes(DocInfos, Db, Fun, Acc0) ->
+send_lookup_changes(FullDocInfos, StartSeq, Dir, Db, Fun, Acc0) ->
+    FoldFun = case Dir of
+    fwd ->
+        fun lists:foldl/3;
+    rev ->
+        fun lists:foldr/3
+    end,
+    GreaterFun = case Dir of
+    fwd ->
+        fun(A, B) -> A >= B end;
+    rev ->
+        fun(A, B) -> A =< B end
+    end,
+    DocInfos = lists:foldl(
+        fun(FDI, Acc) ->
+            DI = couch_doc:to_doc_info(FDI),
+            case GreaterFun(DI#doc_info.high_seq, StartSeq) of
+            true ->
+                [DI | Acc];
+            false ->
+                Acc
+            end
+        end,
+        [], FullDocInfos),
     SortedDocInfos = lists:keysort(#doc_info.high_seq, DocInfos),
     FinalAcc = try
-        lists:foldl(
+        FoldFun(
             fun(DocInfo, Acc) ->
                 case Fun(DocInfo, Acc) of
                 {ok, NewAcc} ->
@@ -348,7 +359,12 @@ send_lookup_changes(DocInfos, Db, Fun, Acc0) ->
     throw:{stop, Acc} ->
         Acc
     end,
-    {ok, FinalAcc#changes_acc{seq = couch_db:get_update_seq(Db)}}.
+    case Dir of
+    fwd ->
+        {ok, FinalAcc#changes_acc{seq = couch_db:get_update_seq(Db)}};
+    rev ->
+        {ok, FinalAcc}
+    end.
 
 
 keep_sending_changes(Args, Callback, UserAcc, Db, StartSeq, Prepend, Timeout,
