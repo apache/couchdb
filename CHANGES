@@ -4,6 +4,7 @@ Apache CouchDB CHANGES
 Version 1.1.1
 -------------
 
+* Support SpiderMonkey 1.8.5
 * Add configurable maximum to the number of bytes returned by _log.
 * Allow CommonJS modules to be an empty string.
 * Bump minimum Erlang version to R13B02.
