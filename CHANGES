@@ -28,6 +28,7 @@ Version 1.1.1
 * Fix replication crash when source database has a document with empty ID.
 * Fix deadlock when assigning couchjs processes to serve requests.
 * Fixes to the document multipart PUT API.
+* Fixes regarding file descriptor leaks for databases with views.
 
 Version 1.1.0
 -------------
