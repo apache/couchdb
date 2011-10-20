@@ -164,7 +164,7 @@ http_open(JSContext* cx, JSObject* req, jsval mth, jsval url, jsval snc)
         goto done;
     }
     
-    if(JSVAL_IS_BOOLEAN(snc) && !JSVAL_TO_BOOLEAN(snc)) {
+    if(JSVAL_IS_BOOLEAN(snc) && JSVAL_TO_BOOLEAN(snc)) {
         JS_ReportError(cx, "Synchronous flag must be false.");
         goto done;
     }
