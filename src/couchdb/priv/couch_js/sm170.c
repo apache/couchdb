@@ -217,7 +217,7 @@ seal(JSContext* cx, JSObject* obj, uintN argc, jsval* argv, jsval* rval)
         return JS_TRUE;
     }
 
-    if(JS_SealObject(cx, obj, deep) != JS_TRUE)
+    if(JS_SealObject(cx, target, deep) != JS_TRUE)
         return JS_FALSE;
 
     *rval = JSVAL_VOID;
