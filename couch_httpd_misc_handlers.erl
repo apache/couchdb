@@ -61,7 +61,9 @@ handle_utils_dir_req(#httpd{method='GET'}=Req, DocumentRoot) ->
     case couch_httpd:partition(UrlPath) of
     {_ActionKey, "/", RelativePath} ->
         % GET /_utils/path or GET /_utils/
-        couch_httpd:serve_file(Req, RelativePath, DocumentRoot);
+        CachingHeaders =
+                [{"Cache-Control", "private, must-revalidate"}],
+        couch_httpd:serve_file(Req, RelativePath, DocumentRoot, CachingHeaders);
     {_ActionKey, "", _RelativePath} ->
         % GET /_utils
         RedirectPath = couch_httpd:path(Req) ++ "/",
