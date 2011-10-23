@@ -127,7 +127,12 @@ Is the Mozilla SpiderMonkey library installed?])])])])])])])
 
 AC_SUBST(JS_LIB_BASE)
 
+AC_DEFINE([COUCHJS_NAME], ["couchjs"], ["CouchJS executable name."])
+
 if test x${IS_WINDOWS} = xTRUE; then
+
+    AC_DEFINE([COUCHJS_NAME], ["couchjs.exe"], ["CouchJS executable name."])
+
     if test -f "$JS_LIB_DIR/$JS_LIB_BASE.dll"; then
         # seamonkey 1.7- build layout on Windows
         JS_LIB_BINARY="$JS_LIB_DIR/$JS_LIB_BASE.dll"
