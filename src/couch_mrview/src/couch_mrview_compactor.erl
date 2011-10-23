@@ -73,26 +73,25 @@ compact(State) ->
     ),
     BufferSize = list_to_integer(BufferSize0),
 
-    FoldFun = fun({DocId, _} = KV, Acc) ->
-        #acc{btree = Bt, kvs = Kvs, kvs_size = KvsSize, last_id = LastId} = Acc,
-        if DocId =:= LastId ->
-            % COUCHDB-999 regression test
-            ?LOG_ERROR("Duplicate docid `~s` detected in view group `~s`"
-                ++ ", database `~s` - This view needs to be rebuilt.",
-                [DocId, IdxName, DbName]
-            ),
-            exit({view_duplicate_id, DocId});
-        true -> ok end,
+    FoldFun = fun({DocId, ViewIdKeys} = KV, Acc) ->
+        #acc{btree = Bt, kvs = Kvs, kvs_size = KvsSize} = Acc,
+        NewKvs = case Kvs of
+            [{DocId, OldViewIdKeys} | Rest] ->
+                ?LOG_ERROR("Dupes of ~s in ~s ~s", [DocId, DbName, IdxName]),
+                [{DocId, ViewIdKeys ++ OldViewIdKeys} | Rest];
+            _ ->
+                [KV | Kvs]
+        end,
         KvsSize2 = KvsSize + ?term_size(KV),
         case KvsSize2 >= BufferSize of
             true ->
-                {ok, Bt2} = couch_btree:add(Bt, lists:reverse([KV | Kvs])),
-                Acc2 = update_task(Acc, 1 + length(Kvs)),
+                {ok, Bt2} = couch_btree:add(Bt, lists:reverse(NewKvs)),
+                Acc2 = update_task(Acc, length(NewKvs)),
                 {ok, Acc2#acc{
                     btree = Bt2, kvs = [], kvs_size = 0, last_id = DocId}};
             _ ->
                 {ok, Acc#acc{
-                    kvs = [KV | Kvs], kvs_size = KvsSize2, last_id = DocId}}
+                    kvs = NewKvs, kvs_size = KvsSize2, last_id = DocId}}
         end
     end,
 
