@@ -13,8 +13,6 @@
 #ifndef COUCHJS_HELP_H
 #define COUCHJS_HELP_H
 
-#include <libgen.h>
-
 #include "config.h"
 
 static const char VERSION_TEMPLATE[] =
@@ -55,7 +53,7 @@ static const char USAGE_TEMPLATE[] =
     "\n"
     "Report bugs at <%s>.\n";
 
-#define BASENAME basename((char*)argv[0])
+#define BASENAME COUCHJS_NAME
 
 #define couch_version(basename)  \
     fprintf(                     \
