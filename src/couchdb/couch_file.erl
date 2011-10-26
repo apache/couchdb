@@ -433,7 +433,7 @@ load_header(Fd, Block) ->
         RawBin = <<RestBlock/binary, Missing/binary>>
     end,
     <<Md5Sig:16/binary, HeaderBin/binary>> =
-        iolist_to_binary(remove_block_prefixes(1, RawBin)),
+        iolist_to_binary(remove_block_prefixes(5, RawBin)),
     Md5Sig = couch_util:md5(HeaderBin),
     {ok, HeaderBin}.
 
