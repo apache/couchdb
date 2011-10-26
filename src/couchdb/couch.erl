@@ -15,7 +15,7 @@
 -compile(export_all).
 
 start() ->
-    application:start(couch).
+    ok = application:start(couch).
 
 stop() ->
     application:stop(couch).
