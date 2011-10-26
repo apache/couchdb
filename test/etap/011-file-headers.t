@@ -22,7 +22,7 @@ main(_) ->
     {S1, S2, S3} = now(),
     random:seed(S1, S2, S3),
 
-    etap:plan(17),
+    etap:plan(18),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -67,6 +67,13 @@ test() ->
     couch_file:write_header(Fd, [foo, <<"more">>]),
     etap:is({ok, Size2}, couch_file:bytes(Fd),
         "Rewriting the same second header returns the same second size."),
+
+    couch_file:write_header(Fd, erlang:make_tuple(5000, <<"CouchDB">>)),
+    etap:is(
+        couch_file:read_header(Fd),
+        {ok, erlang:make_tuple(5000, <<"CouchDB">>)},
+        "Headers larger than the block size can be saved (COUCHDB-1319)"
+    ),
 
     ok = couch_file:close(Fd),
 
