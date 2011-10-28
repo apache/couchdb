@@ -173,6 +173,7 @@ update(Idx, Mod, IdxState) ->
                 false ->
                     {Doc, Seq} = LoadDoc(DocInfo),
                     {ok, NewSt} = Mod:process_doc(Doc, Seq, IdxStateAcc),
+                    garbage_collect(),
                     {ok, {NewSt, true}}
             end
         end,
