@@ -229,6 +229,8 @@ handle_call({prompt, Data}, _From, #os_proc{idle=Idle}=OsProc) ->
             {stop, normal, OsError, OsProc};
         throw:OtherError ->
             {stop, normal, OtherError, OsProc}
+    after
+        garbage_collect()
     end.
 
 handle_cast({send, Data}, #os_proc{writer=Writer, idle=Idle}=OsProc) ->

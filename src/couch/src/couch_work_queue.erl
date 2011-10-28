@@ -83,7 +83,7 @@ init(Options) ->
         max_items = couch_util:get_value(max_items, Options, nil),
         multi_workers = couch_util:get_value(multi_workers, Options, false)
     },
-    {ok, Q}.
+    {ok, Q, hibernate}.
 
 
 terminate(_Reason, #q{work_waiters=Workers}) ->
@@ -97,14 +97,14 @@ handle_call({queue, Item, Size}, From, #q{work_waiters = []} = Q0) ->
     case (Q#q.size >= Q#q.max_size) orelse
             (Q#q.items >= Q#q.max_items) of
     true ->
-        {noreply, Q#q{blocked = [From | Q#q.blocked]}};
+        {noreply, Q#q{blocked = [From | Q#q.blocked]}, hibernate};
     false ->
-        {reply, ok, Q}
+        {reply, ok, Q, hibernate}
     end;
 
 handle_call({queue, Item, _}, _From, #q{work_waiters = [{W, _Max} | Rest]} = Q) ->
     gen_server:reply(W, {ok, [Item]}),
-    {reply, ok, Q#q{work_waiters = Rest}};
+    {reply, ok, Q#q{work_waiters = Rest}, hibernate};
 
 handle_call({dequeue, Max}, From, Q) ->
     #q{work_waiters = Workers, multi_workers = Multi, items = Count} = Q,
