@@ -14,7 +14,7 @@
 -behaviour(gen_server).
 
 -export([start_link/1, start_link/2, start_link/3, stop/1]).
--export([set_timeout/2, prompt/2, prompt_many/2]).
+-export([set_timeout/2, prompt/2, prompt_many/2, killer/1]).
 -export([send/2, writeline/2, readline/1, writejson/2, readjson/1]).
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2, code_change/3]).
 
@@ -194,7 +194,7 @@ init([Command, Options, PortOptions]) ->
             % this ensure the real os process is killed when this process dies.
             erlang:monitor(process, Pid),
             receive _ -> ok end,
-            os:cmd(?b2l(iolist_to_binary(KillCmd)))
+            killer(?b2l(KillCmd))
         end),
     OsProc =
     lists:foldl(fun(Opt, Proc) ->
@@ -273,4 +273,11 @@ code_change(_, {os_proc, Cmd, Port, W, R, Timeout} , _) ->
     {ok, State};
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+killer(KillCmd) ->
+    receive _ ->
+        os:cmd(KillCmd)
+    after 1000 ->
+        ?MODULE:killer(KillCmd)
+    end.
 
