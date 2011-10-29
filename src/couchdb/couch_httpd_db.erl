@@ -206,6 +206,7 @@ db_req(#httpd{method='GET',path_parts=[_DbName]}=Req, Db) ->
 db_req(#httpd{method='POST',path_parts=[DbName]}=Req, Db) ->
     couch_httpd:validate_ctype(Req, "application/json"),
     Doc = couch_doc:from_json_obj(couch_httpd:json_body(Req)),
+    validate_attachment_names(Doc),
     Doc2 = case Doc#doc.id of
         <<"">> ->
             Doc#doc{id=couch_uuids:new(), revs={0, []}};
