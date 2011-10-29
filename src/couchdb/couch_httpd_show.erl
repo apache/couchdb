@@ -151,18 +151,21 @@ send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
 
 
 % view-list request with view and list from same design doc.
-handle_view_list_req(#httpd{method='GET',
-        path_parts=[_, _, DesignName, _, ListName, ViewName]}=Req, Db, DDoc) ->
+handle_view_list_req(#httpd{method=Method,
+        path_parts=[_, _, DesignName, _, ListName, ViewName]}=Req, Db, DDoc)
+  when Method =:= 'GET' orelse Method =:= 'OPTIONS' ->
     Keys = couch_httpd:qs_json_value(Req, "keys", nil),
     handle_view_list(Req, Db, DDoc, ListName, {DesignName, ViewName}, Keys);
 
 % view-list request with view and list from different design docs.
-handle_view_list_req(#httpd{method='GET',
-        path_parts=[_, _, _, _, ListName, ViewDesignName, ViewName]}=Req, Db, DDoc) ->
+handle_view_list_req(#httpd{method=Method,
+        path_parts=[_, _, _, _, ListName, ViewDesignName, ViewName]}=Req, Db, DDoc)
+  when Method =:= 'GET' orelse Method =:= 'OPTIONS' ->
     Keys = couch_httpd:qs_json_value(Req, "keys", nil),
     handle_view_list(Req, Db, DDoc, ListName, {ViewDesignName, ViewName}, Keys);
 
-handle_view_list_req(#httpd{method='GET'}=Req, _Db, _DDoc) ->
+handle_view_list_req(#httpd{method=Method}=Req, _Db, _DDoc)
+    when Method =:= 'GET' orelse Method =:= 'OPTIONS' ->
     send_error(Req, 404, <<"list_error">>, <<"Invalid path.">>);
 
 handle_view_list_req(#httpd{method='POST',
