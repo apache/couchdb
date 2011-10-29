@@ -23,6 +23,14 @@ couchTests.rev_stemming = function(debug) {
 
   T(db.getDbProperty("_revs_limit") == 1000);
 
+  // Make an invalid request to _revs_limit
+  // Should return 400
+  var xhr = CouchDB.request("PUT", "/test_suite_db/_revs_limit", {body:"\"foo\""});
+  T(xhr.status == 400);
+  var result = JSON.parse(xhr.responseText);
+  T(result.error == "bad_request");
+  T(result.reason == "Rev limit has to be an integer");
+
   var doc = {_id:"foo",foo:0}
   for( var i=0; i < newLimit + 1; i++) {
     doc.foo++;
