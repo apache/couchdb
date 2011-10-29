@@ -422,8 +422,13 @@ db_req(#httpd{path_parts=[_,<<"_security">>]}=Req, _Db) ->
 db_req(#httpd{method='PUT',path_parts=[_,<<"_revs_limit">>]}=Req,
         Db) ->
     Limit = couch_httpd:json_body(Req),
-    ok = couch_db:set_revs_limit(Db, Limit),
-    send_json(Req, {[{<<"ok">>, true}]});
+   case is_integer(Limit) of
+   true ->
+       ok = couch_db:set_revs_limit(Db, Limit),
+       send_json(Req, {[{<<"ok">>, true}]});
+   false ->
+       throw({bad_request, <<"Rev limit has to be an integer">>})
+   end;
 
 db_req(#httpd{method='GET',path_parts=[_,<<"_revs_limit">>]}=Req, Db) ->
     send_json(Req, couch_db:get_revs_limit(Db));
