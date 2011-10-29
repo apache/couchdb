@@ -3,6 +3,23 @@ Apache CouchDB README.Windows
 
 For a high-level guide to Microsoft Windows.
 
+Troubleshooting
+---------------
+
+There is a troubleshooting guide:
+
+    http://wiki.apache.org/couchdb/Troubleshooting
+
+There is a wiki for general documentation:
+
+    http://wiki.apache.org/couchdb/
+
+There are collection of friendly mailing lists:
+
+    http://couchdb.apache.org/community/lists.html
+
+Please work through these in order if you experience any problems.
+
 Dependencies
 ------------
 
@@ -150,4 +167,4 @@ To check that everything has worked, point your web browser to:
 
     http://127.0.0.1:5984/_utils/index.html
 
-From here you should run the test suite in either Firefox 3.6+ or Safari 4+.
+From here you should run the test suite in Firefox.
