@@ -204,6 +204,10 @@ couchTests.list_views = function(debug) {
   T(xhr.status == 200, "standard get should be 200");
   T(/head0123456789tail/.test(xhr.responseText));
 
+  // standard options
+  var xhr = CouchDB.request("OPTIONS", "/test_suite_db/_design/lists/_list/basicBasic/basicView");
+  T(xhr.status == 200, "standard get should be 200");
+  T(/head0123456789tail/.test(xhr.responseText));
 
   // test that etags are available
   var etag = xhr.getResponseHeader("etag");

@@ -154,7 +154,8 @@ send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
     couch_httpd_external:send_external_response(Req, JsonResp).
 
 
-handle_view_list_req(#httpd{method='GET'}=Req, Db, DDoc) ->
+handle_view_list_req(#httpd{method=Method}=Req, Db, DDoc)
+    when Method =:= 'GET' orelse Method =:= 'OPTIONS' ->
     case Req#httpd.path_parts of
         [_, _, _DName, _, LName, VName] ->
             % Same design doc for view and list
