@@ -136,21 +136,24 @@ couchTests.cookie_auth = function(debug) {
        // a failed login attempt should log you out
        T(CouchDB.session().userCtx.name != 'Jason Davies');
 
-       // test redirect
+       // test redirect on success
        xhr = CouchDB.request("POST", "/_session?next=/", {
          headers: {"Content-Type": "application/x-www-form-urlencoded"},
          body: "name=Jason%20Davies&password="+encodeURIComponent(password)
        });
-       // should this be a redirect code instead of 200?
-       // The cURL adapter is returning the expected 302 here.
-       // I imagine this has to do with whether the client is willing
-       // to follow the redirect, ie, the browser follows and does a
-       // GET on the returned Location
+       // the browser should transparently follow the redirect and GET the server root (/)
+       // see http://dev.w3.org/2006/webapi/XMLHttpRequest/#infrastructure-for-the-send-method
+       if (xhr.status == 200) {
+         T(/Welcome/.test(xhr.responseText))
+       }
+
+       // test redirect on fail
+       xhr = CouchDB.request("POST", "/_session?fail=/", {
+         headers: {"Content-Type": "application/x-www-form-urlencoded"},
+         body: "name=Jason%20Davies&password=foobar"
+       });
        if (xhr.status == 200) {
          T(/Welcome/.test(xhr.responseText));
-       } else {
-         T(xhr.status == 302);
-         T(xhr.getResponseHeader("Location"));
        }
 
       // test users db validations

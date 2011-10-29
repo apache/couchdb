@@ -294,7 +294,13 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req) ->
         _Else ->
             % clear the session
             Cookie = mochiweb_cookies:cookie("AuthSession", "", [{path, "/"}] ++ cookie_scheme(Req)),
-            send_json(Req, 401, [Cookie], {[{error, <<"unauthorized">>},{reason, <<"Name or password is incorrect.">>}]})
+            {Code, Headers} = case couch_httpd:qs_value(Req, "fail", nil) of
+                nil ->
+                    {401, [Cookie]};
+                Redirect ->
+                    {302, [Cookie, {"Location", couch_httpd:absolute_uri(Req, Redirect)}]}
+            end,
+            send_json(Req, Code, Headers, {[{error, <<"unauthorized">>},{reason, <<"Name or password is incorrect.">>}]})
     end;
 % get user info
 % GET /_session
