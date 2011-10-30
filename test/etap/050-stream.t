@@ -67,7 +67,7 @@ test() ->
 
     % Stream more the 4K chunk size.
     {ok, ExpPtr2} = couch_file:bytes(Fd),
-    {ok, Stream3} = couch_stream:open(Fd),
+    {ok, Stream3} = couch_stream:open(Fd, [{buffer_size, 4096}]),
     Acc2 = lists:foldl(fun(_, Acc) ->
         Data = <<"a1b2c">>,
         couch_stream:write(Stream3, Data),
