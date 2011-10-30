@@ -254,7 +254,22 @@ handle_log_req(#httpd{method='GET'}=Req) ->
     ]),
     send_chunk(Resp, Chunk),
     last_chunk(Resp);
+handle_log_req(#httpd{method='POST'}=Req) ->
+    {PostBody} = couch_httpd:json_body_obj(Req),
+    Level = couch_util:get_value(<<"level">>, PostBody),
+    Message = ?b2l(couch_util:get_value(<<"message">>, PostBody)),
+    case Level of
+    <<"debug">> ->
+        ?LOG_DEBUG(Message, []),
+        send_json(Req, 200, {[{ok, true}]});
+    <<"info">> ->
+        ?LOG_INFO(Message, []),
+        send_json(Req, 200, {[{ok, true}]});
+    <<"error">> ->
+        ?LOG_ERROR(Message, []),
+        send_json(Req, 200, {[{ok, true}]});
+    _ ->
+        send_json(Req, 400, {[{error, ?l2b(io_lib:format("Unrecognized log level '~s'", [Level]))}]})
+    end;
 handle_log_req(Req) ->
-    send_method_not_allowed(Req, "GET").
-
-
+    send_method_not_allowed(Req, "GET,POST").
