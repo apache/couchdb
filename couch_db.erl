@@ -900,10 +900,12 @@ flush_att(Fd, #att{data=Data}=Att) when is_binary(Data) ->
     end);
 
 flush_att(Fd, #att{data=Fun,att_len=undefined}=Att) when is_function(Fun) ->
+    MaxChunkSize = list_to_integer(
+        couch_config:get("couchdb", "attachment_stream_buffer_size", "4096")),
     with_stream(Fd, Att, fun(OutputStream) ->
         % Fun(MaxChunkSize, WriterFun) must call WriterFun
         % once for each chunk of the attachment,
-        Fun(4096,
+        Fun(MaxChunkSize,
             % WriterFun({Length, Binary}, State)
             % WriterFun({0, _Footers}, State)
             % Called with Length == 0 on the last time.
@@ -955,15 +957,18 @@ compressible_att_type(MimeType) ->
 % trailer, we're free to ignore this inconsistency and
 % pretend that no Content-MD5 exists.
 with_stream(Fd, #att{md5=InMd5,type=Type,encoding=Enc}=Att, Fun) ->
+    BufferSize = list_to_integer(
+        couch_config:get("couchdb", "attachment_stream_buffer_size", "4096")),
     {ok, OutputStream} = case (Enc =:= identity) andalso
         compressible_att_type(Type) of
     true ->
         CompLevel = list_to_integer(
             couch_config:get("attachments", "compression_level", "0")
         ),
-        couch_stream:open(Fd, gzip, [{compression_level, CompLevel}]);
+        couch_stream:open(Fd, [{buffer_size, BufferSize},
+            {encoding, gzip}, {compression_level, CompLevel}]);
     _ ->
-        couch_stream:open(Fd)
+        couch_stream:open(Fd, [{buffer_size, BufferSize}])
     end,
     ReqMd5 = case Fun(OutputStream) of
         {md5, FooterMd5} ->

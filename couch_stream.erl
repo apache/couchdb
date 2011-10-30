@@ -14,7 +14,7 @@
 -behaviour(gen_server).
 
 % public API
--export([open/1, open/3, close/1]).
+-export([open/1, open/2, close/1]).
 -export([foldl/4, foldl/5, foldl_decode/6, range_foldl/6]).
 -export([copy_to_new_stream/3, write/2]).
 
@@ -24,12 +24,14 @@
 
 -include("couch_db.hrl").
 
+-define(DEFAULT_BUFFER_SIZE, 4096).
+
 -record(stream,
     {fd = 0,
     written_pointers=[],
     buffer_list = [],
     buffer_len = 0,
-    max_buffer = 4096,
+    max_buffer,
     written_len = 0,
     md5,
     % md5 of the content without any transformation applied (e.g. compression)
@@ -44,10 +46,10 @@
 %%% Interface functions %%%
 
 open(Fd) ->
-    open(Fd, identity, []).
+    open(Fd, []).
 
-open(Fd, Encoding, Options) ->
-    gen_server:start_link(couch_stream, {Fd, Encoding, Options}, []).
+open(Fd, Options) ->
+    gen_server:start_link(couch_stream, {Fd, Options}, []).
 
 close(Pid) ->
     gen_server:call(Pid, close, infinity).
@@ -194,8 +196,9 @@ write(Pid, Bin) ->
     gen_server:call(Pid, {write, Bin}, infinity).
 
 
-init({Fd, Encoding, Options}) ->
-    {EncodingFun, EndEncodingFun} = case Encoding of
+init({Fd, Options}) ->
+    {EncodingFun, EndEncodingFun} =
+    case couch_util:get_value(encoding, Options, identity) of
     identity ->
         identity_enc_dec_funs();
     gzip ->
@@ -206,7 +209,9 @@ init({Fd, Encoding, Options}) ->
             md5=couch_util:md5_init(),
             identity_md5=couch_util:md5_init(),
             encoding_fun=EncodingFun,
-            end_encoding_fun=EndEncodingFun
+            end_encoding_fun=EndEncodingFun,
+            max_buffer=couch_util:get_value(
+                buffer_size, Options, ?DEFAULT_BUFFER_SIZE)
         }
     }.
 
