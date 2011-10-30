@@ -252,6 +252,8 @@ couchTests.list_views = function(debug) {
   T(resp.req.headers.Host);
   T(resp.req.headers["User-Agent"]);
   T(resp.req.cookie);
+  TEquals("/test_suite_db/_design/lists/_list/basicJSON/basicView?update_seq=true",
+    resp.req.raw_path, "should include raw path");
 
   // get with query params
   xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/simpleForm/basicView?startkey=3&endkey=8");
