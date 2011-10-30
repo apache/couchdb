@@ -83,6 +83,7 @@ THANKS.gz: $(top_srcdir)/THANKS
 
 check: dev
 	$(top_builddir)/test/etap/run $(top_srcdir)/test/etap
+	$(top_builddir)/test/javascript/run
 
 cover: dev
 	rm -f cover/*.coverdata

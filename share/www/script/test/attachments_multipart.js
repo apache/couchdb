@@ -120,11 +120,7 @@ couchTests.attachments_multipart= function(debug) {
   // now test receiving multipart docs
   
   function getBoundary(xhr) {
-    if (xhr instanceof XMLHttpRequest) {
-      var ctype = xhr.getResponseHeader("Content-Type");
-    } else {
-      var ctype = xhr.headers['Content-Type'];
-    }
+    var ctype = CouchDB.xhrheader(xhr, "Content-Type");
     var ctypeArgs = ctype.split("; ").slice(1);
     var boundary = null;
     for(var i=0; i<ctypeArgs.length; i++) {
@@ -142,11 +138,7 @@ couchTests.attachments_multipart= function(debug) {
   
   function parseMultipart(xhr) {
     var boundary = getBoundary(xhr);
-    if (xhr instanceof XMLHttpRequest) {
-      var mimetext = xhr.responseText;
-    } else {
-      var mimetext = xhr.body;
-    }
+    var mimetext = CouchDB.xhrbody(xhr);
     // strip off leading boundary
     var leading = "--" + boundary + "\r\n";
     var last = "\r\n--" + boundary + "--";

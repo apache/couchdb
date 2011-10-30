@@ -16,7 +16,6 @@ couchTests.form_submit = function(debug) {
     db.deleteDb();
     db.createDb();
 
-    // PUT on existing DB should return 412 instead of 500
     var json = "{}";
     var xhr = CouchDB.request("POST", "/test_suite_db/baz", {body: json});
     T(xhr.status == 415);

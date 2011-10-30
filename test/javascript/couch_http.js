@@ -60,3 +60,15 @@ CouchDB.urlPrefix = "";
 CouchDB.newXhr = function() {
   return new CouchHTTP();
 };
+
+CouchDB.xhrheader = function(xhr, header) {
+  if(typeof(xhr) == "CouchHTTP") {
+    return xhr.getResponseHeader(header);
+  } else {
+    return xhr.headers[header];
+  }
+}
+
+CouchDB.xhrbody = function(xhr) {
+  return xhr.responseText || xhr.body;
+}

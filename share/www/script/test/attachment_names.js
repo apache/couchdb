@@ -60,7 +60,6 @@ couchTests.attachment_names = function(debug) {
 
   var resp = JSON.parse(xhr.responseText);
   TEquals(201, xhr.status, "attachment_name: standalone API");
-  TEquals("Created",  xhr.statusText, "attachment_name: standalone API");
   TEquals(true, resp.ok, "attachment_name: standalone API");
 
   // bulk docs
@@ -71,7 +70,6 @@ couchTests.attachment_names = function(debug) {
   });
 
   TEquals(201, xhr.status, "attachment_name: bulk docs");
-  TEquals("Created", xhr.statusText, "attachment_name: bulk docs");
 
 
   // leading underscores

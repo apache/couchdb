@@ -396,6 +396,26 @@ CouchDB.newXhr = function() {
   }
 };
 
+CouchDB.xhrbody = function(xhr) {
+  if (xhr.responseText) {
+    return xhr.responseText;
+  } else if (xhr.body) {
+    return xhr.body
+  } else {
+    throw new Error("No XMLHTTPRequest support detected");
+  }
+}
+
+CouchDB.xhrheader = function(xhr, header) {
+  if(xhr.getResponseHeader) {
+    return xhr.getResponseHeader(header);
+  } else if(xhr.headers) {
+    return xhr.headers[header] || null;
+  } else {
+    throw new Error("No XMLHTTPRequest support detected");
+  }
+}
+
 CouchDB.request = function(method, uri, options) {
   options = typeof(options) == 'object' ? options : {};
   options.headers = typeof(options.headers) == 'object' ? options.headers : {};

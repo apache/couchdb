@@ -102,7 +102,7 @@ typedef struct {
 } HTTPData;
 
 
-char* METHODS[] = {"GET", "HEAD", "POST", "PUT", "DELETE", "COPY", NULL};
+char* METHODS[] = {"GET", "HEAD", "POST", "PUT", "DELETE", "COPY", "OPTIONS", NULL};
 
 
 #define GET     0
@@ -111,6 +111,7 @@ char* METHODS[] = {"GET", "HEAD", "POST", "PUT", "DELETE", "COPY", NULL};
 #define PUT     3
 #define DELETE  4
 #define COPY    5
+#define OPTIONS 6
 
 
 static JSBool
@@ -196,7 +197,7 @@ http_open(JSContext* cx, JSObject* req, jsval mth, jsval url, jsval snc)
         if(strcasecmp(METHODS[methid], method) == 0) break;
     }
     
-    if(methid > COPY) {
+    if(methid > OPTIONS) {
         JS_ReportError(cx, "Invalid method specified.");
         goto done;
     }
@@ -399,6 +400,7 @@ go(JSContext* cx, JSObject* obj, HTTPData* http, char* body, size_t bodylen)
         curl_easy_setopt(HTTP_HANDLE, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
         curl_easy_setopt(HTTP_HANDLE, CURLOPT_ERRORBUFFER, ERRBUF);
         curl_easy_setopt(HTTP_HANDLE, CURLOPT_COOKIEFILE, "");
+        curl_easy_setopt(HTTP_HANDLE, CURLOPT_REFERER, "http://127.0.0.1:5984/");
         curl_easy_setopt(HTTP_HANDLE, CURLOPT_USERAGENT,
                                             "CouchHTTP Client - Relax");
     }
@@ -408,7 +410,7 @@ go(JSContext* cx, JSObject* obj, HTTPData* http, char* body, size_t bodylen)
         goto done;
     }
 
-    if(http->method < 0 || http->method > COPY) {
+    if(http->method < 0 || http->method > OPTIONS) {
         JS_ReportError(cx, "INTERNAL: Unknown method.");
         goto done;
     }
