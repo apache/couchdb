@@ -69,7 +69,7 @@ couchTests.security_validation = function(debug) {
       var designDoc = {
         _id:"_design/test",
         language: "javascript",
-        validate_doc_update: "(" + (function (newDoc, oldDoc, userCtx, secObj) {
+        validate_doc_update: stringFun(function (newDoc, oldDoc, userCtx, secObj) {
           if (secObj.admin_override) {
             if (userCtx.roles.indexOf('_admin') != -1) {
               // user is admin, they can do anything
@@ -85,7 +85,7 @@ couchTests.security_validation = function(debug) {
               throw {unauthorized:
                   "You are not the author of this document. You jerk."};
           }
-        }).toString() + ")"
+        })
       }
 
       // Save a document normally

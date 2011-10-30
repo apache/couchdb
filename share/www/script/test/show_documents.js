@@ -318,11 +318,11 @@ couchTests.show_documents = function(debug) {
   T(xhr.status != 304, "changed ddoc");
 
   // update design doc function
-  designDoc.shows["just-name"] = (function(doc, req) {
+  designDoc.shows["just-name"] = stringFun(function(doc, req) {
    return {
      body : "Just old " + doc.name
    };
-  }).toString();
+  });
   T(db.save(designDoc).ok);
 
   xhr = CouchDB.request("GET", "/test_suite_db/_design/template/_show/just-name/"+docid, {
