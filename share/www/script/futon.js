@@ -134,6 +134,30 @@ function $$(node) {
     };
 
     function changePassword () {
+      var updateUserDoc = function(resp, data) {
+        // regular users get their _users doc updated
+        $.couch.db(resp.info.authentication_db).openDoc("org.couchdb.user:"+resp.userCtx.name, {
+          error: function () {
+            // ignore 404
+            location.reload();
+          },
+          success: function (user) {
+            $.couch.db(resp.info.authentication_db).saveDoc($.couch.prepareUserDoc(user, data.password), {
+              success: function() {
+                doLogin(user.name, data.password, function(errors) {
+                    if(!$.isEmptyObject(errors)) {
+                      callback(errors);
+                      return;
+                    } else {
+                      location.reload();
+                    }
+                  });
+                }
+              });
+            }
+        });
+      }
+
       $.showDialog("dialog/_change_password.html", {
         submit: function(data, callback) {
           if (validatePassword(data, callback)) {
@@ -145,36 +169,30 @@ function $$(node) {
             return false;
           }
           $.couch.session({success: function (resp) {
-            if (resp.userCtx.roles.indexOf("_admin") > -1) {
+            // admin users may have a config entry, change the password
+            // there first. Update their user doc later, if it exists
+            if (resp.userCtx.roles.indexOf("_admin") > -1) { // user is admin
+              // check whether we have a config entry
               $.couch.config({
-                success : function () {
-                  doLogin(resp.userCtx.name, data.password, function(errors) {
-                    if(!$.isEmptyObject(errors)) {
-                      callback(errors);
-                      return;
-                    } else {
-                      location.reload();
-                    }
-                  });
-                }
-              }, "admins", resp.userCtx.name, data.password);
-            } else {
-              $.couch.db(resp.info.authentication_db).openDoc("org.couchdb.user:"+resp.userCtx.name, {
-                success: function (user) {
-                    $.couch.db(resp.info.authentication_db).saveDoc($.couch.prepareUserDoc(user, data.password), {
-                      success: function() {
-                          doLogin(user.name, data.password, function(errors) {
-                              if(!$.isEmptyObject(errors)) {
-                                callback(errors);
-                                return;
-                              } else {
-                                location.reload();
-                              }
-                            });
+                success : function (response) { // er do have a config entry
+                  $.couch.config({
+                    success : function () {
+                      window.setTimeout(function() {
+                        doLogin(resp.userCtx.name, data.password, function(errors) {
+                          if(!$.isEmptyObject(errors)) {
+                            callback(errors);
+                            return;
+                          } else {
+                            updateUserDoc(resp, data);
                           }
-                      });
-                  }
-              });
+                        });
+                      } , 1000);
+                    }
+                  }, "admins", resp.userCtx.name, data.password);
+                }
+              }, "admins", resp.userCtx.name);
+            } else { // non-admin users, update their user doc
+              updateUserDoc(resp, data);
             }
           }});
         }
