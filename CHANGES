@@ -66,11 +66,15 @@ Futon:
  * The `Status` screen (active tasks) now displays two new task status
    fields: `Started on` and `Updated on`.
 
-Version 1.1.1
+Version 1.1.2
 -------------
 
 This version has not been released yet.
 
+Version 1.1.1
+-------------
+
+* Support SpiderMonkey 1.8.5
 * Add configurable maximum to the number of bytes returned by _log.
 * Allow CommonJS modules to be an empty string.
 * Bump minimum Erlang version to R13B02.
@@ -94,6 +98,7 @@ This version has not been released yet.
 * Fix replication crash when source database has a document with empty ID.
 * Fix deadlock when assigning couchjs processes to serve requests.
 * Fixes to the document multipart PUT API.
+* Fixes regarding file descriptor leaks for databases with views.
 
 Version 1.1.0
 -------------
