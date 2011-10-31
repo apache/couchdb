@@ -35,6 +35,11 @@ else
     fi
 fi
 
+make dev
+# start CouchDB
+./utils/run -b -r 1
+sleep 1 # give it a sec
+
 cat $SCRIPT_DIR/json2.js \
 	$SCRIPT_DIR/sha1.js \
 	$SCRIPT_DIR/oauth.js \
@@ -45,3 +50,6 @@ cat $SCRIPT_DIR/json2.js \
 	$JS_TEST_DIR/couch_http.js \
 	$JS_TEST_DIR/cli_runner.js \
     | $COUCHJS -H -
+
+# stop CouchDB
+./utils/run -d
