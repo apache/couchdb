@@ -172,6 +172,23 @@ get_log_messages(Pid, Level, Format, Args) ->
     FileMsg = ["[", httpd_util:rfc1123_date(), "] ", ConsoleMsg],
     {ConsoleMsg, iolist_to_binary(FileMsg)}.
 
+
+% Read Bytes bytes from the end of log file, jumping Offset bytes towards
+% the beginning of the file first.
+%
+%  Log File    FilePos
+%  ----------
+% |          |  10
+% |          |  20
+% |          |  30
+% |          |  40
+% |          |  50
+% |          |  60
+% |          |  70 -- Bytes = 20  --
+% |          |  80                 | Chunk
+% |          |  90 -- Offset = 10 --
+% |__________| 100
+
 read(Bytes, Offset) ->
     LogFileName = couch_config:get("log", "file"),
     LogFileSize = filelib:file_size(LogFileName),
@@ -186,11 +203,11 @@ read(Bytes, Offset) ->
     end,
 
     {ok, Fd} = file:open(LogFileName, [read]),
-    Start = lists:max([LogFileSize - Bytes, 0]) + Offset,
+    Start = lists:max([LogFileSize - Bytes - Offset, 0]),
 
     % TODO: truncate chopped first line
     % TODO: make streaming
 
-    {ok, Chunk} = file:pread(Fd, Start, LogFileSize),
+    {ok, Chunk} = file:pread(Fd, Start, Bytes),
     ok = file:close(Fd),
     Chunk.
