@@ -52,9 +52,9 @@ start_link(https) ->
             end,
             % do we verify certificates ?
             FinalSslOpts = case couch_config:get("ssl",
-                    "verify_ssl_certificates", false) of
-                false -> SslOpts1;
-                _ ->
+                    "verify_ssl_certificates", "false") of
+                "false" -> SslOpts1;
+                "true" ->
                     case couch_config:get("ssl",
                             "cacert_file", nil) of
                         nil ->
