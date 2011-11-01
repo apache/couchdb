@@ -119,7 +119,15 @@ start_server(IniFiles) ->
             undefined -> [];
             Uri -> io_lib:format("~s~n", [Uri])
             end end || Uri <- Uris],
-        ok = file:write_file(UriFile, Lines)
+        case file:write_file(UriFile, Lines) of
+        ok -> ok;
+        {error, eacces} ->
+            ?LOG_ERROR("Permission error when writing to URI file ~s", [UriFile]),
+            throw({file_permission_error, UriFile});
+        Error2 ->
+            ?LOG_ERROR("Failed to write to URI file ~s: ~p~n", [UriFile, Error2]),
+            throw(Error2)
+        end
     end,
 
     {ok, Pid}.
