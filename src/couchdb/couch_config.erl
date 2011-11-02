@@ -210,7 +210,7 @@ parse_ini_file(IniFile) ->
             ";" ++ _Comment ->
                 {AccSectionName, AccValues};
             Line2 ->
-                case re:split(Line2, "\s?=\s?", [{return, list}]) of
+                case re:split(Line2, "\s*=\s*", [{return, list}]) of
                 [Value] ->
                     MultiLineValuePart = case re:run(Line, "^ \\S", []) of
                     {match, _} ->
