@@ -56,7 +56,7 @@ specific language governing permissions and limitations under the License.
     function toTaskDate(timestamp) {
       var d = new Date(timestamp * 1000);
       var hours = d.getHours(), min = d.getMinutes(), secs = d.getSeconds();
-      var year = d.getFullYear(), month = d.getMonth(), day = d.getDate();
+      var year = d.getFullYear(), month = d.getMonth() + 1, day = d.getDate();
 
       return String(year) + "-" + (month < 10 ? "0" + month : month) + "-" +
         day + " " + (hours < 10 ? "0" + hours : hours) + ":" +
