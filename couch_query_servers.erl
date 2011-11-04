@@ -542,14 +542,14 @@ teach_ddoc(DDoc, {DDocId, _Rev}=DDocKey, #proc{ddoc_keys=Keys}=Proc) ->
 
 get_ddoc_process(#doc{} = DDoc, DDocKey) ->
     % remove this case statement
-    case gen_server:call(couch_query_servers, {get_proc, DDoc, DDocKey}) of
+    case gen_server:call(couch_query_servers, {get_proc, DDoc, DDocKey}, infinity) of
     {ok, Proc, {QueryConfig}} ->
         % process knows the ddoc
         case (catch proc_prompt(Proc, [<<"reset">>, {QueryConfig}])) of
         true ->
             proc_set_timeout(Proc, couch_util:get_value(<<"timeout">>, QueryConfig)),
             link(Proc#proc.pid),
-            gen_server:call(couch_query_servers, {unlink_proc, Proc#proc.pid}),
+            gen_server:call(couch_query_servers, {unlink_proc, Proc#proc.pid}, infinity),
             Proc;
         _ ->
             catch proc_stop(Proc),
@@ -560,13 +560,13 @@ get_ddoc_process(#doc{} = DDoc, DDocKey) ->
     end.
 
 get_os_process(Lang) ->
-    case gen_server:call(couch_query_servers, {get_proc, Lang}) of
+    case gen_server:call(couch_query_servers, {get_proc, Lang}, infinity) of
     {ok, Proc, {QueryConfig}} ->
         case (catch proc_prompt(Proc, [<<"reset">>, {QueryConfig}])) of
         true ->
             proc_set_timeout(Proc, couch_util:get_value(<<"timeout">>, QueryConfig)),
             link(Proc#proc.pid),
-            gen_server:call(couch_query_servers, {unlink_proc, Proc#proc.pid}),
+            gen_server:call(couch_query_servers, {unlink_proc, Proc#proc.pid}, infinity),
             Proc;
         _ ->
             catch proc_stop(Proc),
@@ -577,7 +577,7 @@ get_os_process(Lang) ->
     end.
 
 ret_os_process(Proc) ->
-    true = gen_server:call(couch_query_servers, {ret_proc, Proc}),
+    true = gen_server:call(couch_query_servers, {ret_proc, Proc}, infinity),
     catch unlink(Proc#proc.pid),
     ok.
 

@@ -42,7 +42,7 @@ stop(Pid) ->
 
 % Read/Write API
 set_timeout(Pid, TimeOut) when is_integer(TimeOut) ->
-    ok = gen_server:call(Pid, {set_timeout, TimeOut}).
+    ok = gen_server:call(Pid, {set_timeout, TimeOut}, infinity).
 
 % Used by couch_db_update_notifier.erl
 send(Pid, Data) ->
