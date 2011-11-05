@@ -156,7 +156,7 @@ init([Command, Options, PortOptions]) ->
             % this ensure the real os process is killed when this process dies.
             erlang:monitor(process, Pid),
             receive _ -> ok end,
-            os:cmd(?b2l(KillCmd))
+            os:cmd(iolist_to_binary(KillCmd))
         end),
     OsProc =
     lists:foldl(fun(Opt, Proc) ->
