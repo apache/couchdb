@@ -13,6 +13,7 @@ Version 1.3.0
 This version has not been released yet.
 
  * The source code repository was migrated from SVN to Git.
+ * Added view request duration to Futon.
 
 Version 1.2.0
 -------------

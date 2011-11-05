@@ -10,6 +10,10 @@ Source Repository:
 
  * The source repository was migrated from SVN to Git.
 
+Futon:
+
+ * Added view request duration to Futon.
+
 Version 1.2.0
 -------------
 
