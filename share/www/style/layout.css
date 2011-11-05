@@ -387,6 +387,8 @@ body.loading #dialog h2 {
 
 #tempwarn { display: none; font-size: 90%; margin: 0 2em 1.5em; }
 #grouptruenotice { display: none; font-size: 90%; margin: 1ex 2em 1.5em; }
+#viewrequestduration { display: none; font-size: 90%; margin: 1ex 2em 1.5em; }
+#viewrequestduration .timestamp { margin-left: 0.25em; }
 
 /* Database table */
 

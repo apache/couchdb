@@ -11,6 +11,38 @@
 // the License.
 
 (function($) {
+
+  $.toTimeString = function(milliseconds) {
+    var ms, sec, min, h, timeString;
+
+    sec = Math.floor(milliseconds / 1000.0);
+    min = Math.floor(sec / 60.0);
+    sec = (sec % 60.0).toString();
+    if (sec.length < 2) {
+       sec = "0" + sec;
+    }
+
+    h = (Math.floor(min / 60.0)).toString();
+    if (h.length < 2) {
+      h = "0" + h;
+    }
+
+    min = (min % 60.0).toString();
+    if (min.length < 2) {
+      min = "0" + min;
+    }
+
+    timeString = h + ":" + min + ":" + sec;
+
+    ms = (milliseconds % 1000.0).toString();
+    while (ms.length < 3) {
+      ms = "0" + ms;
+    }
+    timeString += "." + ms;
+
+    return timeString;
+  };
+
   $.futon = $.futon || {};
   $.extend($.futon, {
 
@@ -624,7 +656,7 @@
         $("#documents").find("tbody.content").empty().end().show();
         page.updateDesignDocLink();
 
-        options.success = function(resp) {
+        options.success = function(resp, requestDuration) {
           if (resp.offset === undefined) {
             resp.offset = 0;
           }
@@ -734,6 +766,11 @@
             "Showing " + firstNum + "-" + lastNum + " of " + totalNum +
             " row" + (firstNum != lastNum || totalNum == "unknown" ? "s" : ""));
           $("#documents tbody tr:odd").addClass("odd");
+
+          if (viewName && viewName !== "_all_docs" && viewName !== "_design_docs") {
+            $("#viewrequestduration").show();
+            $("#viewrequestduration .timestamp").text($.toTimeString(requestDuration));
+          }
         }
         options.error = function(status, error, reason) {
           alert("Error: " + error + "\n\n" + reason);
