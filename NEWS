@@ -39,6 +39,7 @@ This version has not been released yet.
    task type.
  * Futon's `Status` screen (active tasks) now displays two new task
    status fields: `Started on` and `Updated on`.
+ * Added built-in changes feed filter `_view`.
 
 Version 1.1.2
 -------------

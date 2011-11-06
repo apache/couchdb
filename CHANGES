@@ -31,6 +31,7 @@ HTTP Interface:
  * Added a native JSON parser.
  * The _active_tasks API now offers more granular fields. Each
    task type is now able to expose different properties.
+ * Added built-in changes feed filter `_view`.
 
 Replicator:
 
