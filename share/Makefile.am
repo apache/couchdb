@@ -138,6 +138,7 @@ nobase_dist_localdata_DATA = \
     www/script/test/batch_save.js \
     www/script/test/bulk_docs.js \
     www/script/test/changes.js \
+    www/script/test/coffee.js \
     www/script/test/compact.js \
     www/script/test/config.js \
     www/script/test/conflicts.js \
