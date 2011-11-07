@@ -970,7 +970,10 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
     [] ->
         throw({not_found, "Document is missing attachment"});
     [#att{type=Type, encoding=Enc, disk_len=DiskLen, att_len=AttLen}=Att] ->
-        Etag = couch_httpd:doc_etag(Doc),
+        Etag = case Att#att.md5 of
+            <<>> -> couch_httpd:doc_etag(Doc);
+            Md5 -> "\"" ++ ?b2l(base64:encode(Md5)) ++ "\""
+        end,
         ReqAcceptsAttEnc = lists:member(
            atom_to_list(Enc),
            couch_httpd:accepted_encodings(Req)

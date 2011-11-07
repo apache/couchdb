@@ -32,7 +32,7 @@ couchTests.attachment_names = function(debug) {
   var xhr = CouchDB.request("GET", "/test_suite_db/good_doc/Колян.txt");
   T(xhr.responseText == "This is a base64 encoded text");
   T(xhr.getResponseHeader("Content-Type") == "text/plain");
-  T(xhr.getResponseHeader("Etag") == '"' + save_response.rev + '"');
+  TEquals("\"qUUYqS41RhwF0TrCsTAxFg==\"", xhr.getResponseHeader("Etag"));
 
   var binAttDoc = {
     _id: "bin_doc",
