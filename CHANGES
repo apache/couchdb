@@ -76,6 +76,9 @@ Version 1.1.2
 
 This version has not been released yet.
 
+* ETag of attachment changes only when the attachment changes, not
+ the document.
+
 Version 1.1.1
 -------------
 
