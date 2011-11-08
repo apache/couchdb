@@ -46,7 +46,6 @@ var/Makefile
 bin/couchdb
 bin/couchdb.1
 bin/couchjs
-bin/couchjs.1
 bin/couch-config
 bin/couch-config_dev
 etc/couchdb/default.ini
@@ -63,6 +62,7 @@ src/couchdb/priv/.deps/
 src/couchdb/priv/.libs/
 src/couchdb/priv/couch_icu_driver.la
 src/couchdb/priv/couchjs
+src/couchdb/priv/couchjs.1
 src/couchdb/priv/couchspawnkillable
 src/couchdb/priv/stat_descriptions.cfg
 src/erlang-oauth/oauth.app
