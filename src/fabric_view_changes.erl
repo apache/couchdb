@@ -19,6 +19,7 @@
 -include("fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("eunit/include/eunit.hrl").
 
 go(DbName, Feed, Options, Callback, Acc0) when Feed == "continuous" orelse
         Feed == "longpoll" ->
@@ -247,8 +248,16 @@ unpack_seqs([_SeqNum, Opaque], DbName) ->
     do_unpack_seqs(Opaque, DbName);
 
 unpack_seqs(Packed, DbName) ->
-    {match, [Opaque]} = re:run(Packed, "(?<opaque>[a-zA-Z0-9-_]+)([\"\\]])*$",
-        [{capture, [opaque], binary}]),
+    NewPattern = "^\\[[0-9]+,\"(?<opaque>.*)\"\\]$",
+    OldPattern = "^([0-9]+-)?(?<opaque>.*)$",
+    Options = [{capture, [opaque], binary}],
+    Opaque = case re:run(Packed, NewPattern, Options) of
+    {match, Match} ->
+        Match;
+    nomatch ->
+        {match, Match} = re:run(Packed, OldPattern, Options),
+        Match
+    end,
     do_unpack_seqs(Opaque, DbName).
 
 do_unpack_seqs(Opaque, DbName) ->
@@ -307,3 +316,34 @@ validate_start_seq(DbName, Seq) ->
         Reason = <<"Malformed sequence supplied in 'since' parameter.">>,
         {error, {bad_request, Reason}}
     end.
+
+unpack_seqs_test() ->
+    ets:new(partitions, [named_table]),
+
+    % BigCouch 0.3 style.
+    assert_shards("23423-g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
+    "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
+    "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA"),
+
+    % BigCouch 0.4 style.
+    assert_shards([23423,<<"g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
+    "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
+    "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA">>]),
+
+    % BigCouch 0.4 style (as string).
+    assert_shards("[23423,\"g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
+    "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
+    "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA\"]"),
+
+    % with internal hypen
+    assert_shards("651-g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwNDLXMwBCwxygOFMiQ"
+    "5L8____sxJTcalIUgCSSfZgReE4FTmAFMWDFYXgVJQAUlQPVuSKS1EeC5BkaABSQHXz8"
+    "VgJUbgAonB_VqIPfoUHIArvE7T6AUQh0I1-WQAzp1XB"),
+    assert_shards([651,"g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwNDLXMwBCwxygOFMiQ"
+    "5L8____sxJTcalIUgCSSfZgReE4FTmAFMWDFYXgVJQAUlQPVuSKS1EeC5BkaABSQHXz8"
+    "VgJUbgAonB_VqIPfoUHIArvE7T6AUQh0I1-WQAzp1XB"]),
+
+    ets:delete(partitions).
+
+assert_shards(Packed) ->
+    ?assertMatch([{#shard{},_}|_], unpack_seqs(Packed, <<"foo">>)).
