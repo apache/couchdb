@@ -328,7 +328,7 @@ send_lookup_changes(FullDocInfos, StartSeq, Dir, Db, Fun, Acc0) ->
     end,
     GreaterFun = case Dir of
     fwd ->
-        fun(A, B) -> A >= B end;
+        fun(A, B) -> A > B end;
     rev ->
         fun(A, B) -> A =< B end
     end,
