@@ -496,9 +496,11 @@ close_db(#db{fd_ref_counter = RefCntr}) ->
 
 
 refresh_validate_doc_funs(Db) ->
-    {ok, DesignDocs} = couch_db:get_design_docs(Db),
+    DesignDocs = couch_db:get_design_docs(Db),
     ProcessDocFuns = lists:flatmap(
-        fun(DesignDoc) ->
+        fun(DesignDocInfo) ->
+            {ok, DesignDoc} = couch_db:open_doc_int(
+                Db, DesignDocInfo, [ejson_body]),
             case couch_doc:get_validate_doc_fun(DesignDoc) of
             nil -> [];
             Fun -> [Fun]

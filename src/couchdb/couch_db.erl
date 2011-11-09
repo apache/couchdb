@@ -306,14 +306,13 @@ get_design_docs(Db) ->
         (#full_doc_info{deleted = true}, _Reds, Acc) ->
             {ok, Acc};
         (#full_doc_info{id= <<"_design/",_/binary>>}=FullDocInfo, _Reds, Acc) ->
-            {ok, Doc} = open_doc_int(Db, FullDocInfo, [ejson_body]),
-            {ok, [Doc | Acc]};
+            {ok, [FullDocInfo | Acc]};
         (_, _Reds, Acc) ->
             {stop, Acc}
     end),
     KeyOpts = [{start_key, <<"_design/">>}, {end_key_gt, <<"_design0">>}],
     {ok, _, Docs} = couch_btree:fold(by_id_btree(Db), FoldFun, [], KeyOpts),
-    {ok, Docs}.
+    Docs.
 
 check_is_admin(#db{user_ctx=#user_ctx{name=Name,roles=Roles}}=Db) ->
     {Admins} = get_admins(Db),
