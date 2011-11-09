@@ -17,7 +17,8 @@
 -export([start_compact/1, cancel_compact/1]).
 -export([open_ref_counted/2,is_idle/1,monitor/1,count_changes_since/2]).
 -export([update_doc/3,update_doc/4,update_docs/4,update_docs/2,update_docs/3,delete_doc/3]).
--export([get_doc_info/2,open_doc/2,open_doc/3,open_doc_revs/4]).
+-export([get_doc_info/2,get_full_doc_info/2,get_full_doc_infos/2]).
+-export([open_doc/2,open_doc/3,open_doc_revs/4]).
 -export([set_revs_limit/2,get_revs_limit/1]).
 -export([get_missing_revs/2,name/1,get_update_seq/1,get_committed_update_seq/1]).
 -export([enum_docs/4,enum_docs_since/5]).
