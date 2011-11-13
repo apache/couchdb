@@ -70,10 +70,10 @@ get_index(Module, IdxState) ->
 init([]) ->
     process_flag(trap_exit, true),
     couch_config:register(fun ?MODULE:config_change/2),
-    couch_db_update_notifier:start_link(fun ?MODULE:update_notify/1),
     ets:new(?BY_SIG, [protected, set, named_table]),
     ets:new(?BY_PID, [private, set, named_table]),
-    ets:new(?BY_DB, [private, bag, named_table]),
+    ets:new(?BY_DB, [protected, bag, named_table]),
+    couch_db_update_notifier:start_link(fun ?MODULE:update_notify/1),
     RootDir = couch_index_util:root_dir(),
     % Deprecation warning if it wasn't index_dir
     case couch_config:get("couchdb", "index_dir") of
@@ -104,13 +104,13 @@ handle_call({get_index, {_Mod, _IdxState, DbName, Sig}=Args}, From, State) ->
         [{_, Pid}] when is_pid(Pid) ->
             {reply, {ok, Pid}, State}
     end;
-handle_call({async_open, {DbName, Sig}, {ok, Pid}}, _From, State) ->
+handle_call({async_open, {DbName, DDocId, Sig}, {ok, Pid}}, _From, State) ->
     [{_, Waiters}] = ets:lookup(?BY_SIG, {DbName, Sig}),
     [gen_server:reply(From, {ok, Pid}) || From <- Waiters],
     link(Pid),
-    add_to_ets(DbName, Sig, Pid),
+    add_to_ets(DbName, Sig, DDocId, Pid),
     {reply, ok, State};
-handle_call({async_error, {DbName, Sig}, Error}, _From, State) ->
+handle_call({async_error, {DbName, _DDocId, Sig}, Error}, _From, State) ->
     [{_, Waiters}] = ets:lookup(?BY_SIG, {DbName, Sig}),
     [gen_server:reply(From, Error) || From <- Waiters],
     ets:delete(?BY_SIG, {DbName, Sig}),
@@ -128,7 +128,9 @@ handle_cast({reset_indexes, DbName}, State) ->
 handle_info({'EXIT', Pid, Reason}, Server) ->
     case ets:lookup(?BY_PID, Pid) of
         [{Pid, DbName, Sig}] ->
-            rem_from_ets(DbName, Sig, Pid);
+            [{DbName, {DDocId, Sig}}] =
+                ets:match_object(?BY_DB, {DbName, {'$1', Sig}}),
+            rem_from_ets(DbName, Sig, DDocId, Pid);
         [] when Reason /= normal ->
             exit(Reason);
         _Else ->
@@ -142,37 +144,40 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 new_index({Mod, IdxState, DbName, Sig}) ->
+    DDocId = Mod:get(idx_name, IdxState),
     case couch_index:start_link({Mod, IdxState}) of
         {ok, Pid} ->
-            gen_server:call(?MODULE, {async_open, {DbName, Sig}, {ok, Pid}}),
+            ok = gen_server:call(
+                ?MODULE, {async_open, {DbName, DDocId, Sig}, {ok, Pid}}),
             unlink(Pid);
         Error ->
-            gen_server:call(?MODULE, {async_error, {DbName, Sig}, Error})
+            ok = gen_server:call(
+                ?MODULE, {async_error, {DbName, DDocId, Sig}, Error})
     end.
 
 
 reset_indexes(DbName, Root) ->
     % shutdown all the updaters and clear the files, the db got changed
-    Fun = fun({_, Sig}) ->
+    Fun = fun({_, {DDocId, Sig}}) ->
         [{_, Pid}] = ets:lookup(?BY_SIG, {DbName, Sig}),
         couch_util:shutdown_sync(Pid),
-        rem_from_ets(DbName, Sig, Pid)
+        rem_from_ets(DbName, Sig, DDocId, Pid)
     end,
     lists:foreach(Fun, ets:lookup(?BY_DB, DbName)),
     Path = Root ++ "/." ++ binary_to_list(DbName) ++ "_design",
     couch_file:nuke_dir(Root, Path).
 
 
-add_to_ets(DbName, Sig, Pid) ->
+add_to_ets(DbName, Sig, DDocId, Pid) ->
     ets:insert(?BY_SIG, {{DbName, Sig}, Pid}),
     ets:insert(?BY_PID, {Pid, {DbName, Sig}}),
-    ets:insert(?BY_DB, {DbName, Sig}).
+    ets:insert(?BY_DB, {DbName, {DDocId, Sig}}).
 
 
-rem_from_ets(DbName, Sig, Pid) ->
+rem_from_ets(DbName, Sig, DDocId, Pid) ->
     ets:delete(?BY_SIG, {DbName, Sig}),
     ets:delete(?BY_PID, Pid),
-    ets:delete_object(?BY_DB, {DbName, Sig}).
+    ets:delete_object(?BY_DB, {DbName, {DDocId, Sig}}).
 
 
 config_change("couchdb", "view_index_dir") ->
@@ -185,6 +190,18 @@ update_notify({deleted, DbName}) ->
     gen_server:cast(?MODULE, {reset_indexes, DbName});
 update_notify({created, DbName}) ->
     gen_server:cast(?MODULE, {reset_indexes, DbName});
+update_notify({ddoc_updated, {DbName, DDocId}}) ->
+    case ets:match_object(?BY_DB, {DbName, {DDocId, '$1'}}) of
+        [] ->
+            ok;
+        [{DbName, {DDocId, Sig}}] ->
+            case ets:lookup(?BY_SIG, {DbName, Sig}) of
+                [{_, IndexPid}] ->
+                    (catch gen_server:cast(IndexPid, ddoc_updated));
+                [] ->
+                    ok
+            end
+    end;
 update_notify(_) ->
     ok.
 

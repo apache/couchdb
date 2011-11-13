@@ -34,7 +34,8 @@
     compactor,
     waiters=[],
     commit_delay,
-    committed=true
+    committed=true,
+    shutdown=false
 }).
 
 
@@ -201,8 +202,13 @@ handle_cast({config_change, NewDelay}, State) ->
     {noreply, State#st{commit_delay=MsDelay}};
 handle_cast({updated, NewIdxState}, State) ->
     {noreply, NewState} = handle_cast({new_state, NewIdxState}, State),
-    maybe_restart_updater(NewState),
-    {noreply, NewState};
+    case NewState#st.shutdown andalso (NewState#st.waiters =:= []) of
+        true ->
+            {stop, normal, NewState};
+        false ->
+            maybe_restart_updater(NewState),
+            {noreply, NewState}
+    end;
 handle_cast({new_state, NewIdxState}, State) ->
     #st{mod=Mod, commit_delay=Delay} = State,
     CurrSeq = Mod:get(update_seq, NewIdxState),
@@ -231,6 +237,30 @@ handle_cast(delete, State) ->
     #st{mod=Mod, idx_state=IdxState} = State,
     ok = Mod:delete(IdxState),
     {stop, normal, State};
+handle_cast(ddoc_updated, State) ->
+    #st{mod = Mod, idx_state = IdxState, waiters = Waiters} = State,
+    DbName = Mod:get(db_name, IdxState),
+    DDocId = Mod:get(idx_name, IdxState),
+    Shutdown = couch_util:with_db(DbName, fun(Db) ->
+        case couch_db:open_doc(Db, DDocId, [ejson_body]) of
+            {not_found, deleted} ->
+                true;
+            {ok, DDoc} ->
+                {ok, NewIdxState} = Mod:init(Db, DDoc),
+                Mod:get(signature, NewIdxState) =/= Mod:get(signature, IdxState)
+        end
+    end),
+    case Shutdown of
+        true ->
+            case Waiters of
+                [] ->
+                    {stop, normal, State};
+                _ ->
+                    {noreply, State#st{shutdown = true}}
+            end;
+        false ->
+            {noreply, State#st{shutdown = false}}
+    end;
 handle_cast(_Mesg, State) ->
     {stop, unhandled_cast, State}.
 
