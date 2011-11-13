@@ -276,17 +276,30 @@ init([]) ->
             exit(Self, config_change)
         end),
 
+    ets:new(couch_groups_by_db, [bag, protected, named_table]),
+    ets:new(group_servers_by_sig, [set, protected, named_table]),
+    ets:new(couch_groups_by_updater, [set, private, named_table]),
+
     couch_db_update_notifier:start_link(
         fun({deleted, DbName}) ->
             gen_server:cast(couch_view, {reset_indexes, DbName});
         ({created, DbName}) ->
             gen_server:cast(couch_view, {reset_indexes, DbName});
+        ({ddoc_updated, {DbName, DDocId}}) ->
+            case ets:match_object(couch_groups_by_db, {DbName, {DDocId, '$1'}}) of
+            [] ->
+                ok;
+            [{DbName, {DDocId, Sig}}] ->
+                case ets:lookup(group_servers_by_sig, {DbName, Sig}) of
+                [{_, GroupPid}] ->
+                    (catch gen_server:cast(GroupPid, ddoc_updated));
+                [] ->
+                    ok
+                end
+            end;
         (_Else) ->
             ok
         end),
-    ets:new(couch_groups_by_db, [bag, private, named_table]),
-    ets:new(group_servers_by_sig, [set, protected, named_table]),
-    ets:new(couch_groups_by_updater, [set, private, named_table]),
     process_flag(trap_exit, true),
     ok = couch_file:init_delete_dir(RootDir),
     {ok, #server{root_dir=RootDir}}.
@@ -326,23 +339,23 @@ new_group(Root, DbName, #group{name=GroupId, sig=Sig} = Group) ->
     case (catch couch_view_group:start_link({Root, DbName, Group})) of
     {ok, NewPid} ->
         unlink(NewPid),
-        exit({DbName, Sig, {ok, NewPid}});
+        exit({DbName, GroupId, Sig, {ok, NewPid}});
     {error, invalid_view_seq} ->
         ok = gen_server:call(couch_view, {reset_indexes, DbName}),
         new_group(Root, DbName, Group);
     Error ->
-        exit({DbName, Sig, Error})
+        exit({DbName, GroupId, Sig, Error})
     end.
 
 do_reset_indexes(DbName, Root) ->
     % shutdown all the updaters and clear the files, the db got changed
     Names = ets:lookup(couch_groups_by_db, DbName),
     lists:foreach(
-        fun({_DbName, Sig}) ->
+        fun({_DbName, {DDocId, Sig}}) ->
             ?LOG_DEBUG("Killing update process for view group ~s. in database ~s.", [Sig, DbName]),
             [{_, Pid}] = ets:lookup(group_servers_by_sig, {DbName, Sig}),
             couch_util:shutdown_sync(Pid),
-            delete_from_ets(Pid, DbName, Sig)
+            delete_from_ets(Pid, DbName, DDocId, Sig)
         end, Names),
     delete_index_dir(Root, DbName),
     RootDelDir = couch_config:get("couchdb", "view_index_dir"),
@@ -357,29 +370,31 @@ handle_info({'EXIT', FromPid, Reason}, Server) ->
             exit(Reason);
         true -> ok
         end;
-    [{_, {DbName, GroupId}}] ->
-        delete_from_ets(FromPid, DbName, GroupId)
+    [{_, {DbName, Sig}}] ->
+        [{DbName, {DDocId, Sig}}] = ets:match_object(
+            couch_groups_by_db, {DbName, {'$1', Sig}}),
+        delete_from_ets(FromPid, DbName, DDocId, Sig)
     end,
     {noreply, Server};
 
-handle_info({'DOWN', _, _, _, {DbName, Sig, Reply}}, Server) ->
+handle_info({'DOWN', _, _, _, {DbName, DDocId, Sig, Reply}}, Server) ->
     [{_, WaitList}] = ets:lookup(group_servers_by_sig, {DbName, Sig}),
     [gen_server:reply(From, Reply) || From <- WaitList],
     case Reply of {ok, NewPid} ->
         link(NewPid),
-        add_to_ets(NewPid, DbName, Sig);
+        add_to_ets(NewPid, DbName, DDocId, Sig);
      _ -> ok end,
     {noreply, Server}.
 
-add_to_ets(Pid, DbName, Sig) ->
+add_to_ets(Pid, DbName, DDocId, Sig) ->
     true = ets:insert(couch_groups_by_updater, {Pid, {DbName, Sig}}),
     true = ets:insert(group_servers_by_sig, {{DbName, Sig}, Pid}),
-    true = ets:insert(couch_groups_by_db, {DbName, Sig}).
+    true = ets:insert(couch_groups_by_db, {DbName, {DDocId, Sig}}).
 
-delete_from_ets(Pid, DbName, Sig) ->
+delete_from_ets(Pid, DbName, DDocId, Sig) ->
     true = ets:delete(couch_groups_by_updater, Pid),
     true = ets:delete(group_servers_by_sig, {DbName, Sig}),
-    true = ets:delete_object(couch_groups_by_db, {DbName, Sig}).
+    true = ets:delete_object(couch_groups_by_db, {DbName, {DDocId, Sig}}).
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.

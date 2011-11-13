@@ -35,7 +35,8 @@
     compactor_pid=nil,
     waiting_commit=false,
     waiting_list=[],
-    ref_counter=nil
+    ref_counter=nil,
+    shutdown=false
 }).
 
 % api methods
@@ -260,7 +261,33 @@ handle_cast({partial_update, Pid, NewGroup}, #group_state{updater_pid=Pid}
     end;
 handle_cast({partial_update, _, _}, State) ->
     %% message from an old (probably pre-compaction) updater; ignore
-    {noreply, State}.
+    {noreply, State};
+handle_cast(ddoc_updated, State) ->
+    #group_state{
+        db_name = DbName,
+        waiting_list = Waiters,
+        group = #group{name = DDocId, sig = CurSig}
+    } = State,
+    {ok, Db} = couch_db:open_int(DbName, []),
+    case couch_db:open_doc(Db, DDocId, [ejson_body]) of
+    {not_found, deleted} ->
+        NewSig = nil;
+    {ok, DDoc} ->
+        #group{sig = NewSig} = design_doc_to_view_group(DDoc)
+    end,
+    couch_db:close(Db),
+    case NewSig of
+    CurSig ->
+        {noreply, State#group_state{shutdown = false}};
+    _ ->
+        case Waiters of
+        [] ->
+            {stop, normal, State};
+        _ ->
+            {noreply, State#group_state{shutdown = true}}
+        end
+    end.
+
 
 handle_info(delayed_commit, #group_state{db_name=DbName,group=Group}=State) ->
     {ok, Db} = couch_db:open_int(DbName, []),
@@ -286,6 +313,7 @@ handle_info({'EXIT', FromPid, {new_group, Group}},
             updater_pid=UpPid,
             ref_counter=RefCounter,
             waiting_list=WaitList,
+            shutdown=Shutdown,
             waiting_commit=WaitingCommit}=State) when UpPid == FromPid ->
     if not WaitingCommit ->
         erlang:send_after(1000, self(), delayed_commit);
@@ -293,8 +321,13 @@ handle_info({'EXIT', FromPid, {new_group, Group}},
     end,
     case reply_with_group(Group, WaitList, [], RefCounter) of
     [] ->
-        {noreply, State#group_state{waiting_commit=true, waiting_list=[],
-                group=Group, updater_pid=nil}};
+        case Shutdown of
+        true ->
+            {stop, normal, State};
+        false ->
+            {noreply, State#group_state{waiting_commit=true, waiting_list=[],
+                group=Group, updater_pid=nil}}
+        end;
     StillWaiting ->
         % we still have some waiters, reopen the database and reupdate the index
         Owner = self(),
