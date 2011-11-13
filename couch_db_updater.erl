@@ -234,13 +234,16 @@ handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts,
     NonRepDocs2 = [{Client, NRDoc} || NRDoc <- NonRepDocs],
     try update_docs_int(Db, GroupedDocs3, NonRepDocs2, MergeConflicts,
                 FullCommit2) of
-    {ok, Db2} ->
+    {ok, Db2, UpdatedDDocIds} ->
         ok = gen_server:call(Db#db.main_pid, {db_updated, Db2}),
         if Db2#db.update_seq /= Db#db.update_seq ->
             couch_db_update_notifier:notify({updated, Db2#db.name});
         true -> ok
         end,
         [catch(ClientPid ! {done, self()}) || ClientPid <- Clients],
+        lists:foreach(fun(DDocId) ->
+            couch_db_update_notifier:notify({ddoc_updated, {Db#db.name, DDocId}})
+        end, UpdatedDDocIds),
         {noreply, Db2}
     catch
         throw: retry ->
@@ -643,14 +646,21 @@ merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
 
 
 
-new_index_entries([], AccById, AccBySeq) ->
-    {AccById, AccBySeq};
-new_index_entries([FullDocInfo|RestInfos], AccById, AccBySeq) ->
-    #doc_info{revs=[#rev_info{deleted=Deleted}|_]} = DocInfo =
+new_index_entries([], AccById, AccBySeq, AccDDocIds) ->
+    {AccById, AccBySeq, AccDDocIds};
+new_index_entries([FullDocInfo|RestInfos], AccById, AccBySeq, AccDDocIds) ->
+    #doc_info{revs=[#rev_info{deleted=Deleted}|_], id=Id} = DocInfo =
             couch_doc:to_doc_info(FullDocInfo),
+    AccDDocIds2 = case Id of
+    <<?DESIGN_DOC_PREFIX, _/binary>> ->
+        [Id | AccDDocIds];
+    _ ->
+        AccDDocIds
+    end,
     new_index_entries(RestInfos,
         [FullDocInfo#full_doc_info{deleted=Deleted}|AccById],
-        [DocInfo|AccBySeq]).
+        [DocInfo|AccBySeq],
+        AccDDocIds2).
 
 
 stem_full_doc_infos(#db{revs_limit=Limit}, DocInfos) ->
@@ -686,8 +696,8 @@ update_docs_int(Db, DocsList, NonRepDocs, MergeConflicts, FullCommit) ->
     % the trees, the attachments are already written to disk)
     {ok, FlushedFullDocInfos} = flush_trees(Db2, NewFullDocInfos, []),
 
-    {IndexFullDocInfos, IndexDocInfos} =
-            new_index_entries(FlushedFullDocInfos, [], []),
+    {IndexFullDocInfos, IndexDocInfos, UpdatedDDocIds} =
+            new_index_entries(FlushedFullDocInfos, [], [], []),
 
     % and the indexes
     {ok, DocInfoByIdBTree2} = couch_btree:add_remove(DocInfoByIdBTree, IndexFullDocInfos, []),
@@ -700,16 +710,14 @@ update_docs_int(Db, DocsList, NonRepDocs, MergeConflicts, FullCommit) ->
 
     % Check if we just updated any design documents, and update the validation
     % funs if we did.
-    case lists:any(
-        fun(<<"_design/", _/binary>>) -> true; (_) -> false end, Ids) of
-    false ->
-        Db4 = Db3;
-    true ->
-        Db4 = refresh_validate_doc_funs(Db3)
+    Db4 = case UpdatedDDocIds of
+    [] ->
+        Db3;
+    _ ->
+        refresh_validate_doc_funs(Db3)
     end,
 
-    {ok, commit_data(Db4, not FullCommit)}.
-
+    {ok, commit_data(Db4, not FullCommit), UpdatedDDocIds}.
 
 update_local_docs(Db, []) ->
     {ok, Db};
