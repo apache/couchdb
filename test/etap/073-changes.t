@@ -40,7 +40,8 @@
 
 -record(row, {
     id,
-    seq
+    seq,
+    deleted = false
 }).
 
 
@@ -50,7 +51,7 @@ test_db_name() -> <<"couch_test_changes">>.
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(28),
+    etap:plan(39),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -67,6 +68,7 @@ test() ->
     test_by_doc_ids(),
     test_by_doc_ids_with_since(),
     test_by_doc_ids_continuous(),
+    test_design_docs_only(),
 
     couch_server_sup:stop(),
     ok.
@@ -134,7 +136,7 @@ test_by_doc_ids_with_since() ->
     {ok, Rev3} = save_doc(Db, {[{<<"_id">>, <<"doc3">>}]}),
     {ok, _Rev4} = save_doc(Db, {[{<<"_id">>, <<"doc4">>}]}),
     {ok, _Rev5} = save_doc(Db, {[{<<"_id">>, <<"doc5">>}]}),
-    {ok, _Rev3_2} = save_doc(Db, {[{<<"_id">>, <<"doc3">>}, {<<"_rev">>, Rev3}]}),
+    {ok, Rev3_2} = save_doc(Db, {[{<<"_id">>, <<"doc3">>}, {<<"_rev">>, Rev3}]}),
     {ok, _Rev6} = save_doc(Db, {[{<<"_id">>, <<"doc6">>}]}),
     {ok, _Rev7} = save_doc(Db, {[{<<"_id">>, <<"doc7">>}]}),
     {ok, _Rev8} = save_doc(Db, {[{<<"_id">>, <<"doc8">>}]}),
@@ -158,6 +160,45 @@ test_by_doc_ids_with_since() ->
     etap:is(Seq1, 6, "First row has seq 6"),
 
     stop(Consumer),
+
+    ChangesArgs2 = #changes_args{
+        filter = "_doc_ids",
+        since = 6
+    },
+    Consumer2 = spawn_consumer(test_db_name(), ChangesArgs2, Req),
+
+    {Rows2, LastSeq2} = wait_finished(Consumer2),
+    {ok, Db3} = couch_db:open_int(test_db_name(), []),
+    UpSeq2 = couch_db:get_update_seq(Db3),
+    couch_db:close(Db3),
+    etap:is(LastSeq2, UpSeq2, "LastSeq is same as database update seq number"),
+    etap:is(length(Rows2), 0, "Received 0 change rows"),
+
+    stop(Consumer2),
+
+    {ok, _Rev3_3} = save_doc(
+        Db,
+        {[{<<"_id">>, <<"doc3">>}, {<<"_deleted">>, true}, {<<"_rev">>, Rev3_2}]}),
+
+    ChangesArgs3 = #changes_args{
+        filter = "_doc_ids",
+        since = 9
+    },
+    Consumer3 = spawn_consumer(test_db_name(), ChangesArgs3, Req),
+
+    {Rows3, LastSeq3} = wait_finished(Consumer3),
+    {ok, Db4} = couch_db:open_int(test_db_name(), []),
+    UpSeq3 = couch_db:get_update_seq(Db4),
+    couch_db:close(Db4),
+    etap:is(LastSeq3, UpSeq3, "LastSeq is same as database update seq number"),
+    etap:is(length(Rows3), 1, "Received 1 changes rows"),
+    etap:is(
+        [#row{seq = LastSeq3, id = <<"doc3">>, deleted = true}],
+        Rows3,
+        "Received row with doc3 deleted"),
+
+    stop(Consumer3),
+
     delete_db(Db).
 
 
@@ -224,6 +265,53 @@ test_by_doc_ids_continuous() ->
 
     unpause(Consumer),
     stop(Consumer),
+    delete_db(Db).
+
+
+test_design_docs_only() ->
+    {ok, Db} = create_db(test_db_name()),
+
+    {ok, _Rev1} = save_doc(Db, {[{<<"_id">>, <<"doc1">>}]}),
+    {ok, _Rev2} = save_doc(Db, {[{<<"_id">>, <<"doc2">>}]}),
+    {ok, Rev3} = save_doc(Db, {[{<<"_id">>, <<"_design/foo">>}]}),
+
+    ChangesArgs = #changes_args{
+        filter = "_design"
+    },
+    Consumer = spawn_consumer(test_db_name(), ChangesArgs, {json, null}),
+
+    {Rows, LastSeq} = wait_finished(Consumer),
+    {ok, Db2} = couch_db:open_int(test_db_name(), []),
+    UpSeq = couch_db:get_update_seq(Db2),
+    couch_db:close(Db2),
+
+    etap:is(LastSeq, UpSeq, "LastSeq is same as database update seq number"),
+    etap:is(length(Rows), 1, "Received 1 changes rows"),
+    etap:is(Rows, [#row{seq = 3, id = <<"_design/foo">>}], "Received row with ddoc"),
+
+    stop(Consumer),
+
+    {ok, Db3} = couch_db:open_int(
+        test_db_name(), [{user_ctx, #user_ctx{roles = [<<"_admin">>]}}]),
+    {ok, _Rev3_2} = save_doc(
+        Db3,
+        {[{<<"_id">>, <<"_design/foo">>}, {<<"_rev">>, Rev3},
+            {<<"_deleted">>, true}]}),
+
+    Consumer2 = spawn_consumer(test_db_name(), ChangesArgs, {json, null}),
+
+    {Rows2, LastSeq2} = wait_finished(Consumer2),
+    UpSeq2 = UpSeq + 1,
+    couch_db:close(Db3),
+
+    etap:is(LastSeq2, UpSeq2, "LastSeq is same as database update seq number"),
+    etap:is(length(Rows2), 1, "Received 1 changes rows"),
+    etap:is(
+        Rows2,
+        [#row{seq = 4, id = <<"_design/foo">>, deleted = true}],
+        "Received row with deleted ddoc"),
+
+    stop(Consumer2),
     delete_db(Db).
 
 
@@ -303,7 +391,8 @@ spawn_consumer(DbName, ChangesArgs0, Req) ->
         Callback = fun({change, {Change}, _}, _, Acc) ->
             Id = couch_util:get_value(<<"id">>, Change),
             Seq = couch_util:get_value(<<"seq">>, Change),
-            [#row{id = Id, seq = Seq} | Acc];
+            Del = couch_util:get_value(<<"deleted">>, Change, false),
+            [#row{id = Id, seq = Seq, deleted = Del} | Acc];
         ({stop, LastSeq}, _, Acc) ->
             Parent ! {consumer_finished, lists:reverse(Acc), LastSeq},
             stop_loop(Parent, Acc);
@@ -335,7 +424,7 @@ maybe_pause(Parent, Acc) ->
         pause_loop(Parent, Acc);
     {stop, Ref} ->
         Parent ! {ok, Ref},
-        Acc
+        throw({stop, Acc})
     after 0 ->
         Acc
     end.
