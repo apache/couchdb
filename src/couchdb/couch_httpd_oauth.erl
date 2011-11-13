@@ -130,7 +130,16 @@ serve_oauth(#httpd{mochi_req=MochiReq}=Req, Fun, FailSilently) ->
     end,
     HeaderParams = oauth_uri:params_from_header_string(AuthHeader),
     %Realm = couch_util:get_value("realm", HeaderParams),
-    Params = proplists:delete("realm", HeaderParams) ++ MochiReq:parse_qs(),
+
+    % get requested path
+    RequestedPath = case MochiReq:get_header_value("x-couchdb-requested-path") of
+        undefined -> MochiReq:get(raw_path);
+        RequestedPath0 -> RequestedPath0
+    end,
+    {_, QueryString, _} = mochiweb_util:urlsplit_path(RequestedPath),
+
+    Params = proplists:delete("realm", HeaderParams) ++ mochiweb_util:parse_qs(QueryString),
+
     ?LOG_DEBUG("OAuth Params: ~p", [Params]),
     case couch_util:get_value("oauth_version", Params, "1.0") of
         "1.0" ->
@@ -147,7 +156,7 @@ serve_oauth(#httpd{mochi_req=MochiReq}=Req, Fun, FailSilently) ->
                             couch_httpd:send_error(Req, 400, <<"invalid_consumer">>, <<"Invalid consumer (key or signature method).">>);
                         Consumer ->
                             Signature = couch_util:get_value("oauth_signature", Params),
-                            URL = couch_httpd:absolute_uri(Req, MochiReq:get(raw_path)),
+                            URL = couch_httpd:absolute_uri(Req, RequestedPath),
                             Fun(URL, proplists:delete("oauth_signature", Params),
                                 Consumer, Signature)
                     end
