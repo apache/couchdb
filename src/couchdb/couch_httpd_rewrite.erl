@@ -165,6 +165,12 @@ handle_rewrite_req(#httpd{
             % normalize final path (fix levels "." and "..")
             RawPath1 = ?b2l(iolist_to_binary(normalize_path(RawPath))),
 
+            % in order to do OAuth correctly,
+            % we have to save the requested path
+            Headers = mochiweb_headers:enter("x-couchdb-requested-path",
+                                             MochiReq:get(raw_path),
+                                             MochiReq:get(headers)),
+
             ?LOG_DEBUG("rewrite to ~p ~n", [RawPath1]),
 
             % build a new mochiweb request
@@ -172,7 +178,7 @@ handle_rewrite_req(#httpd{
                                              MochiReq:get(method),
                                              RawPath1,
                                              MochiReq:get(version),
-                                             MochiReq:get(headers)),
+                                             Headers),
 
             % cleanup, It force mochiweb to reparse raw uri.
             MochiReq1:cleanup(),
