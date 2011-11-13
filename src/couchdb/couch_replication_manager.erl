@@ -416,10 +416,15 @@ start_replication(Rep, Wait) ->
 
 replication_complete(DocId) ->
     case ets:lookup(?DOC_TO_REP, DocId) of
-    [{DocId, RepId}] ->
+    [{DocId, {BaseId, Ext} = RepId}] ->
         case rep_state(RepId) of
         nil ->
-            couch_replicator:cancel_replication(RepId);
+            % Prior to OTP R14B02, temporary child specs remain in
+            % in the supervisor after a worker finishes - remove them.
+            % We want to be able to start the same replication but with
+            % eventually different values for parameters that don't
+            % contribute to its ID calculation.
+            _ = supervisor:delete_child(couch_rep_sup, BaseId ++ Ext);
         #rep_state{} ->
             ok
         end,
