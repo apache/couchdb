@@ -52,7 +52,7 @@ ddoc_name() -> <<"foo">>.
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(18),
+    etap:plan(28),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -72,7 +72,7 @@ test() ->
     create_db(),
 
     create_docs(),
-    create_design_doc(),
+    {ok, DDocRev} = create_design_doc(),
 
     {ok, IndexerPid} = couch_index_server:get_index(
         couch_mrview_index, test_db_name(), <<"_design/", (ddoc_name())/binary>>
@@ -80,12 +80,12 @@ test() ->
     etap:is(is_pid(IndexerPid), true, "got view group pid"),
     etap:is(is_process_alive(IndexerPid), true, "view group pid is alive"),
 
-    query_view(),
+    query_view(3, null, false),
     check_db_ref_count(),
     etap:is(is_process_alive(IndexerPid), true, "view group pid is alive"),
 
     create_new_doc(<<"doc1000">>),
-    query_view(),
+    query_view(4, null, false),
     check_db_ref_count(),
     etap:is(is_process_alive(IndexerPid), true, "view group pid is alive"),
 
@@ -104,17 +104,39 @@ test() ->
     etap:is(is_process_alive(IndexerPid), true, "view group pid is alive"),
 
     create_new_doc(<<"doc1001">>),
-    query_view(),
+    query_view(5, null, false),
     check_db_ref_count(),
     etap:is(is_process_alive(IndexerPid), true, "view group pid is alive"),
 
+    etap:diag("updating the design document with a new view definition"),
+    {ok, _NewDDocRev} = update_ddoc_view(DDocRev),
+
+    {ok, NewIndexerPid} = couch_index_server:get_index(
+        couch_mrview_index, test_db_name(), <<"_design/", (ddoc_name())/binary>>
+    ),
+    etap:is(is_pid(NewIndexerPid), true, "got new view group pid"),
+    etap:is(is_process_alive(NewIndexerPid), true, "new view group pid is alive"),
+    etap:isnt(NewIndexerPid, IndexerPid, "new view group has a different pid"),
+    etap:diag("querying view with ?stale=ok, must return empty row set"),
+    query_view(0, foo, ok),
+    etap:diag("querying view (without stale), must return 5 rows with value 1"),
+    query_view(5, 1, false),
     MonRef = erlang:monitor(process, IndexerPid),
-    ok = couch_server:delete(test_db_name(), []),
     receive
     {'DOWN', MonRef, _, _, _} ->
-        etap:diag("view group is dead after DB deletion")
+        etap:diag("old view group is dead after ddoc update")
     after 5000 ->
-        etap:bail("view group did not die after DB deletion")
+        etap:bail("old view group is not dead after ddoc update")
+    end,
+
+    etap:diag("deleting database"),
+    MonRef2 = erlang:monitor(process, NewIndexerPid),
+    ok = couch_server:delete(test_db_name(), []),
+    receive
+    {'DOWN', MonRef2, _, _, _} ->
+        etap:diag("new view group is dead after DB deletion")
+    after 5000 ->
+        etap:bail("new view group did not die after DB deletion")
     end,
 
     ok = timer:sleep(1000),
@@ -222,9 +244,27 @@ create_design_doc() ->
             ]}}
         ]}}
     ]}),
-    {ok, _} = couch_db:update_docs(Db, [DDoc]),
+    {ok, Rev} = couch_db:update_doc(Db, DDoc, []),
     couch_db:ensure_full_commit(Db),
-    couch_db:close(Db).
+    couch_db:close(Db),
+    {ok, Rev}.
+
+update_ddoc_view(DDocRev) ->
+    {ok, Db} = couch_db:open(test_db_name(), [admin_user_ctx()]),
+    DDoc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/", (ddoc_name())/binary>>},
+        {<<"_rev">>, couch_doc:rev_to_str(DDocRev)},
+        {<<"language">>, <<"javascript">>},
+        {<<"views">>, {[
+            {<<"bar">>, {[
+                {<<"map">>, <<"function(doc) { emit(doc._id, 1); }">>}
+            ]}}
+        ]}}
+    ]}),
+    {ok, NewRev} = couch_db:update_doc(Db, DDoc, []),
+    couch_db:ensure_full_commit(Db),
+    couch_db:close(Db),
+    {ok, NewRev}.
 
 create_new_doc(Id) ->
     {ok, Db} = couch_db:open(test_db_name(), [admin_user_ctx()]),
@@ -240,10 +280,26 @@ db_url() ->
     "http://" ++ get(addr) ++ ":" ++ get(port) ++ "/" ++
     binary_to_list(test_db_name()).
 
-query_view() ->
-    {ok, Code, _Headers, _Body} = test_util:request(
-        db_url() ++ "/_design/" ++ binary_to_list(ddoc_name()) ++ "/_view/bar",
+query_view(ExpectedRowCount, ExpectedRowValue, Stale) ->
+    {ok, Code, _Headers, Body} = test_util:request(
+        db_url() ++ "/_design/" ++ binary_to_list(ddoc_name()) ++ "/_view/bar"
+          ++ case Stale of
+                 false -> [];
+                 _ -> "?stale=" ++ atom_to_list(Stale)
+             end,
         [],
         get),
     etap:is(Code, 200, "got view response"),
-    ok.
+    {Props} = ejson:decode(Body),
+    Rows = couch_util:get_value(<<"rows">>, Props, []),
+    etap:is(length(Rows), ExpectedRowCount, "result set has correct # of rows"),
+    lists:foreach(
+        fun({Row}) ->
+            case couch_util:get_value(<<"value">>, Row) of
+            ExpectedRowValue ->
+                ok;
+            _ ->
+                etap:bail("row has incorrect value")
+            end
+        end,
+        Rows).
