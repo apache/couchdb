@@ -183,7 +183,7 @@ possibly_embed_doc(#collector{db_name=DbName, query_args=Args},
                     case fabric:open_doc(DbName, IncId, []) of
                     {ok, NewDoc} ->
                         Row#view_row{doc=couch_doc:to_json_obj(NewDoc,[])};
-                    {not_found, missing} ->
+                    {not_found, _} ->
                         Row#view_row{doc=null}
                     end;
                 Rev0 ->
@@ -191,7 +191,7 @@ possibly_embed_doc(#collector{db_name=DbName, query_args=Args},
                     case fabric:open_revs(DbName, IncId, [Rev], []) of
                     {ok, [{ok, NewDoc}]} ->
                         Row#view_row{doc=couch_doc:to_json_obj(NewDoc,[])};
-                    {ok, [{{not_found, missing}, Rev}]} ->
+                    {ok, [{{not_found, _}, Rev}]} ->
                         Row#view_row{doc=null}
                     end
                 end) end),
