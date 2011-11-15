@@ -62,6 +62,10 @@ Storage System:
  * Added support for automatic database and view compaction. This feature
    is disabled by default, but it can be enabled via the .ini configuration.
 
+View Server:
+
+ * Fixed old index file descriptor leaks after a view cleanup.
+
 OAuth:
 
  * Updated bundled erlang_oauth library to the latest version.
