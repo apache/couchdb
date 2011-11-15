@@ -583,6 +583,9 @@ send_delayed_chunk(Resp, Chunk) ->
 send_delayed_last_chunk(Req) ->
     send_delayed_chunk(Req, []).
 
+send_delayed_error(#httpd{}=Req, Reason) ->
+    {Code, ErrorStr, ReasonStr} = error_info(Reason),
+    send_error(Req, Code, ErrorStr, ReasonStr);
 send_delayed_error(#delayed_resp{req=Req}, Reason) ->
     {Code, ErrorStr, ReasonStr} = error_info(Reason),
     send_error(Req, Code, ErrorStr, ReasonStr);
