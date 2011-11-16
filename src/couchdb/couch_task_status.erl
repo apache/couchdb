@@ -26,6 +26,7 @@
 
 -export([start_link/0, stop/0]).
 -export([all/0, add_task/1, update/1, get/1, set_update_frequency/1]).
+-export([is_task_added/0]).
 
 -export([init/1, terminate/2, code_change/3]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
@@ -54,6 +55,10 @@ add_task(Props) ->
         1, [{started_on, Ts}, {updated_on, Ts} | Props]),
     put(task_status_props, TaskProps),
     gen_server:call(?MODULE, {add_task, TaskProps}).
+
+
+is_task_added() ->
+    is_list(erlang:get(task_status_props)).
 
 
 set_update_frequency(Msecs) ->
