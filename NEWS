@@ -14,6 +14,7 @@ This version has not been released yet.
 
  * The source code repository was migrated from SVN to Git.
  * Added view request duration to Futon.
+ * Speedup in the communication with external view servers.
 
 Version 1.2.0
 -------------

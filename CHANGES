@@ -10,6 +10,10 @@ Source Repository:
 
  * The source repository was migrated from SVN to Git.
 
+View Server:
+
+ * Speedup in the communication with external view servers.
+
 Futon:
 
  * Added view request duration to Futon.
