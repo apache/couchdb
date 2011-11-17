@@ -91,4 +91,5 @@ EXTRA_DIST = \
     220-compaction-daemon.t \
     230-httpc-pool.t \
     240-replication-compact.t \
-    241-replication-large-atts.t
+    241-replication-large-atts.t \
+    242-replication-many-leaves.t
