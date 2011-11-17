@@ -466,7 +466,7 @@ options_to_query_args([{open_revs, Revs} | Rest], Acc) ->
     options_to_query_args(Rest, [{"open_revs", JsonRevs} | Acc]).
 
 
--define(MAX_URL_LEN, 8192).
+-define(MAX_URL_LEN, 7000).
 
 atts_since_arg(_UrlLen, [], Acc) ->
     lists:reverse(Acc);
