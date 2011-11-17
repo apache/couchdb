@@ -156,7 +156,7 @@ load_doc(Db, DocInfo, MapQueue, DocOpts, IncludeDesign) ->
             couch_work_queue:queue(MapQueue, {Seq, Doc})
         end
     end.
-    
+
 do_maps(#group{query_server = Qs} = Group, MapQueue, WriteQueue) ->
     case couch_work_queue:dequeue(MapQueue) of
     closed ->
