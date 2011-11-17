@@ -177,7 +177,7 @@ calculate_new_high_seq(State) ->
     hd(State#state.opened_seqs).
 
 split_revlist(Rev, {[CurrentAcc|Rest], BaseLength, Length}) ->
-    case Length+size(Rev)+3 >= 8192 of
+    case Length+size(Rev)+3 >= 7000 of
     false ->
         {[[Rev|CurrentAcc] | Rest], BaseLength, Length+size(Rev)+3};
     true ->
