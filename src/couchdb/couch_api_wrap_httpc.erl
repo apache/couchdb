@@ -215,7 +215,7 @@ query_args_to_string([], []) ->
 query_args_to_string([], Acc) ->
     "?" ++ string:join(lists:reverse(Acc), "&");
 query_args_to_string([{K, V} | Rest], Acc) ->
-    query_args_to_string(Rest, [K ++ "=" ++ V | Acc]).
+    query_args_to_string(Rest, [K ++ "=" ++ couch_httpd:quote(V) | Acc]).
 
 
 oauth_header(#httpdb{oauth = nil}, _ConnParams) ->
