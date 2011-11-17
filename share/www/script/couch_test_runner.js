@@ -141,7 +141,7 @@ function setupAdminParty(fun) {
           success : function() {
             removeAdmins(confs, doneFun);
           }
-        }, "admins", remove[0], null);        
+        }, "admins", remove[0], null);
       } else {
         doneFun();
       }
@@ -238,13 +238,13 @@ function saveTestReport(report) {
       report.db = db_info;
       $.couch.info({success : function(node_info) {
         report.node = node_info;
-        db.saveDoc(report);        
+        db.saveDoc(report);
       }});
     };
     var createDb = function() {
       db.create({success: function() {
-        db.info({success:saveReport});        
-      }});    
+        db.info({success:saveReport});
+      }});
     };
     db.info({error: createDb, success:saveReport});
   }
