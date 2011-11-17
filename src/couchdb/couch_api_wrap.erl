@@ -444,7 +444,8 @@ options_to_query_args(HttpDb, Path, Options) ->
         FullUrl = couch_api_wrap_httpc:full_url(
             HttpDb, [{path, Path}, {qs, QueryArgs1}]),
         RevList = atts_since_arg(
-            length(FullUrl) + length("&atts_since=[]"), PAs, []),
+            length("GET " ++ FullUrl ++ " HTTP/1.1\r\n") +
+            length("&atts_since=[]"), PAs, []),
         [{"atts_since", ?JSON_ENCODE(RevList)} | QueryArgs1]
     end.
 
@@ -476,7 +477,7 @@ atts_since_arg(UrlLen, [PA | Rest], Acc) ->
     _ ->
         UrlLen + size(RevStr) + 3   % plus 2 double quotes and a comma
     end,
-    case NewUrlLen > ?MAX_URL_LEN of
+    case NewUrlLen >= ?MAX_URL_LEN of
     true ->
         lists:reverse(Acc);
     false ->
