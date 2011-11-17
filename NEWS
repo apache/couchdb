@@ -50,6 +50,7 @@ This version has not been released yet.
 
 * ETag of attachment changes only when the attachment changes, not
  the document.
+* Fix pull replication of documents with many revisions.
 
 Version 1.1.1
 -------------
