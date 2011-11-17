@@ -445,7 +445,8 @@ options_to_query_args(HttpDb, Path, Options) ->
             HttpDb, [{path, Path}, {qs, QueryArgs1}]),
         RevList = atts_since_arg(
             length("GET " ++ FullUrl ++ " HTTP/1.1\r\n") +
-            length("&atts_since=[]"), PAs, []),
+            length("&atts_since=") + 6,  % +6 = % encoded [ and ]
+            PAs, []),
         [{"atts_since", ?JSON_ENCODE(RevList)} | QueryArgs1]
     end.
 
@@ -473,9 +474,11 @@ atts_since_arg(UrlLen, [PA | Rest], Acc) ->
     RevStr = couch_doc:rev_to_str(PA),
     NewUrlLen = case Rest of
     [] ->
-        UrlLen + size(RevStr) + 2;  % plus 2 double quotes
+        % plus 2 double quotes (% encoded)
+        UrlLen + size(RevStr) + 6;
     _ ->
-        UrlLen + size(RevStr) + 3   % plus 2 double quotes and a comma
+        % plus 2 double quotes and a comma (% encoded)
+        UrlLen + size(RevStr) + 9
     end,
     case NewUrlLen >= ?MAX_URL_LEN of
     true ->
