@@ -42,6 +42,8 @@ This version has not been released yet.
    status fields: `Started on` and `Updated on`.
  * Added built-in changes feed filter `_view`.
  * Fixed old index file descriptor leaks after a view cleanup.
+ * Performance improvements for the built-in changes feed filters
+   `_doc_ids` and `_design`.
 
 Version 1.1.2
 -------------
