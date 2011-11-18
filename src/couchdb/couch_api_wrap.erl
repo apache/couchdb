@@ -39,7 +39,6 @@
     ]).
 
 -import(couch_api_wrap_httpc, [
-    httpdb_setup/1,
     send_req/3
     ]).
 
