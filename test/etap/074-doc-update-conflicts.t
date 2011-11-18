@@ -12,10 +12,6 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-% Verify that compacting databases that are being used as the source or
-% target of a replication doesn't affect the replication and that the
-% replication doesn't hold their reference counters forever.
-
 -record(user_ctx, {
     name = null,
     roles = [],
