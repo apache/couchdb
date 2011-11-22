@@ -26,7 +26,7 @@ test_db_name() -> <<"couch_test_update_conflicts">>.
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(10),
+    etap:plan(15),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -39,6 +39,7 @@ main(_) ->
 
 test() ->
     couch_server_sup:start_link(test_util:config_files()),
+    couch_config:set("couchdb", "delayed_commits", "true", false),
 
     lists:foreach(
         fun(NumClients) -> test_concurrent_doc_update(NumClients) end,
@@ -103,6 +104,7 @@ test_concurrent_doc_update(NumClients) ->
         NumConflicts,
         NumClients - 1,
         "Got " ++ ?i2l(NumClients - 1) ++ " client conflicts"),
+
     {ok, Db2} = couch_db:open_int(test_db_name(), []),
     {ok, Doc2} = couch_db:open_doc(Db2, <<"foobar">>, []),
     ok = couch_db:close(Db2),
@@ -112,7 +114,18 @@ test_concurrent_doc_update(NumClients) ->
         SavedValue,
         "Persisted doc has the right value"),
 
-    delete_db(Db).
+    ok = timer:sleep(1000),
+    etap:diag("Restarting the server"),
+    couch_server_sup:stop(),
+    ok = timer:sleep(1000),
+    couch_server_sup:start_link(test_util:config_files()),
+
+    {ok, Db3} = couch_db:open_int(test_db_name(), []),
+    {ok, Doc3} = couch_db:open_doc(Db3, <<"foobar">>, []),
+    ok = couch_db:close(Db3),
+    etap:is(Doc3, Doc2, "Got same document after server restart"),
+
+    delete_db(Db3).
 
 
 spawn_client(Doc) ->
