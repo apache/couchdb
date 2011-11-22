@@ -334,20 +334,24 @@ handle_request_int(MochiReq, DefaultFun,
             ?LOG_ERROR("~s", [ErrorReason]),
             send_error(HttpReq, {bad_otp_release, ErrorReason});
         throw:Error ->
+            Stack = erlang:get_stacktrace(),
             ?LOG_DEBUG("Minor error in HTTP request: ~p",[Error]),
-            ?LOG_DEBUG("Stacktrace: ~p",[erlang:get_stacktrace()]),
+            ?LOG_DEBUG("Stacktrace: ~p",[Stack]),
             send_error(HttpReq, Error);
         error:badarg ->
+            Stack = erlang:get_stacktrace(),
             ?LOG_ERROR("Badarg error in HTTP request",[]),
-            ?LOG_INFO("Stacktrace: ~p",[erlang:get_stacktrace()]),
+            ?LOG_INFO("Stacktrace: ~p",[Stack]),
             send_error(HttpReq, badarg);
         error:function_clause ->
+            Stack = erlang:get_stacktrace(),
             ?LOG_ERROR("function_clause error in HTTP request",[]),
-            ?LOG_INFO("Stacktrace: ~p",[erlang:get_stacktrace()]),
+            ?LOG_INFO("Stacktrace: ~p",[Stack]),
             send_error(HttpReq, function_clause);
         Tag:Error ->
+            Stack = erlang:get_stacktrace(),
             ?LOG_ERROR("Uncaught error in HTTP request: ~p",[{Tag, Error}]),
-            ?LOG_INFO("Stacktrace: ~p",[erlang:get_stacktrace()]),
+            ?LOG_INFO("Stacktrace: ~p",[Stack]),
             send_error(HttpReq, Error)
     end,
     RequestTime = round(timer:now_diff(now(), Begin)/1000),
