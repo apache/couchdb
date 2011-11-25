@@ -30,7 +30,7 @@ admin_user_ctx() -> {user_ctx, #user_ctx{roles=[<<"_admin">>]}}.
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(17),
+    etap:plan(20),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -113,9 +113,11 @@ test() ->
     test_vhost_request_path2(),
     test_vhost_request_path3(),
     test_vhost_request_to_root(),
+    test_vhost_request_with_oauth(Db),
 
     %% restart boilerplate
     couch_db:close(Db),
+    ok = couch_server:delete(couch_db:name(Db), [admin_user_ctx()]),
     timer:sleep(3000),
     couch_server_sup:stop(),
 
@@ -282,3 +284,88 @@ test_vhost_request_to_root() ->
             etap:is(HasCouchDBWelcome, true, "should allow redirect to /");
         _Else -> etap:is(false, true, <<"ibrowse fail">>)
     end.
+
+test_vhost_request_with_oauth(Db) ->
+    {ok, AuthDb} = couch_db:create(
+        <<"tap_test_sec_db">>, [admin_user_ctx(), overwrite]),
+    PrevAuthDbName = couch_config:get("couch_httpd_auth", "authentication_db"),
+    couch_config:set("couch_httpd_auth", "authentication_db", "tap_test_sec_db", false),
+    couch_config:set("oauth_token_users", "otoksec1", "joe", false),
+    couch_config:set("oauth_consumer_secrets", "consec1", "foo", false),
+    couch_config:set("oauth_token_secrets", "otoksec1", "foobar", false),
+    couch_config:set("couch_httpd_auth", "require_valid_user", "true", false),
+
+    DDoc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/test">>},
+        {<<"language">>, <<"javascript">>},
+        {<<"rewrites">>, [
+            {[
+                {<<"from">>, <<"foobar">>},
+                {<<"to">>, <<"_info">>}
+            ]}
+        ]}
+    ]}),
+    {ok, _} = couch_db:update_doc(Db, DDoc, []),
+
+    RewritePath = "/etap-test-db/_design/test/_rewrite/foobar",
+    ok = couch_config:set("vhosts", "oauth-example.com", RewritePath, false),
+    couch_httpd_vhost:reload(),
+
+    case ibrowse:send_req(server(), [], get, [], [{host_header, "oauth-example.com"}]) of
+        {ok, "401", _, Body} ->
+            {JsonBody} = ejson:decode(Body),
+            etap:is(
+                couch_util:get_value(<<"error">>, JsonBody),
+                <<"unauthorized">>,
+                "Request without OAuth credentials failed");
+        Error ->
+           etap:bail("Request without OAuth credentials did not fail: " ++
+               couch_util:to_list(Error))
+    end,
+
+    JoeDoc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"org.couchdb.user:joe">>},
+        {<<"type">>, <<"user">>},
+        {<<"name">>, <<"joe">>},
+        {<<"roles">>, []},
+        {<<"password_sha">>, <<"fe95df1ca59a9b567bdca5cbaf8412abd6e06121">>},
+        {<<"salt">>, <<"4e170ffeb6f34daecfd814dfb4001a73">>}
+    ]}),
+    {ok, _} = couch_db:update_doc(AuthDb, JoeDoc, []),
+
+    Url = "http://oauth-example.com/",
+    Consumer = {"consec1", "foo", hmac_sha1},
+    SignedParams = oauth:signed_params(
+        "GET", Url, [], Consumer, "otoksec1", "foobar"),
+    OAuthUrl = oauth:uri(server(), SignedParams),
+
+    case ibrowse:send_req(OAuthUrl, [], get, [], [{host_header, "oauth-example.com"}]) of
+        {ok, "200", _, Body2} ->
+            {JsonBody2} = ejson:decode(Body2),
+            etap:is(couch_util:get_value(<<"name">>, JsonBody2), <<"test">>,
+                "should return ddoc info with OAuth credentials");
+        Error2 ->
+           etap:bail("Failed to access vhost with OAuth credentials: " ++
+               couch_util:to_list(Error2))
+    end,
+
+    Consumer2 = {"consec1", "bad_secret", hmac_sha1},
+    SignedParams2 = oauth:signed_params(
+        "GET", Url, [], Consumer2, "otoksec1", "foobar"),
+    OAuthUrl2 = oauth:uri(server(), SignedParams2),
+
+    case ibrowse:send_req(OAuthUrl2, [], get, [], [{host_header, "oauth-example.com"}]) of
+        {ok, "401", _, Body3} ->
+            {JsonBody3} = ejson:decode(Body3),
+            etap:is(
+                couch_util:get_value(<<"error">>, JsonBody3),
+                <<"unauthorized">>,
+                "Request with bad OAuth credentials failed");
+        Error3 ->
+           etap:bail("Failed to access vhost with bad OAuth credentials: " ++
+               couch_util:to_list(Error3))
+    end,
+
+    couch_config:set("couch_httpd_auth", "authentication_db", PrevAuthDbName, false),
+    couch_config:set("couch_httpd_auth", "require_valid_user", "false", false),
+    ok = couch_server:delete(couch_db:name(AuthDb), [admin_user_ctx()]).
