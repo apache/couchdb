@@ -133,8 +133,15 @@ serve_oauth(#httpd{mochi_req=MochiReq}=Req, Fun, FailSilently) ->
 
     % get requested path
     RequestedPath = case MochiReq:get_header_value("x-couchdb-requested-path") of
-        undefined -> MochiReq:get(raw_path);
-        RequestedPath0 -> RequestedPath0
+        undefined ->
+            case MochiReq:get_header_value("x-couchdb-vhost-path") of
+                undefined ->
+                    MochiReq:get(raw_path);
+                VHostPath ->
+                    VHostPath
+            end;
+        RequestedPath0 ->
+           RequestedPath0
     end,
     {_, QueryString, _} = mochiweb_util:urlsplit_path(RequestedPath),
 
