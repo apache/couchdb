@@ -30,6 +30,10 @@ specific language governing permissions and limitations under the License.
 #include <string.h> /* for memcpy */
 #endif
 
+#define DRIVER_NAME "couch_icu_driver"
+
+DRIVER_INIT(DRIVER_NAME); /* prototype for erl_driver entry point */
+
 typedef struct {
     ErlDrvPort port;
     UCollator* collNoCase;
@@ -155,7 +159,7 @@ ErlDrvEntry couch_driver_entry = {
         NULL,               /* F_PTR output, called when erlang has sent */
         NULL,               /* F_PTR ready_input, called when input descriptor ready */
         NULL,               /* F_PTR ready_output, called when output descriptor ready */
-        "couch_icu_driver", /* char *driver_name, the argument to open_port */
+        (char*)DRIVER_NAME, /* char *driver_name, the argument to open_port */
         NULL,               /* F_PTR finish, called when unloaded */
         NULL,               /* Not used */
         couch_drv_control,  /* F_PTR control, port_command callback */
@@ -173,7 +177,7 @@ ErlDrvEntry couch_driver_entry = {
         NULL,               /* F_PTR process_exit */
 };
 
-DRIVER_INIT(couch_icu_driver) /* must match name in driver_entry */
+DRIVER_INIT(DRIVER_NAME) /* must match name in driver_entry */
 {
         return &couch_driver_entry;
 }
