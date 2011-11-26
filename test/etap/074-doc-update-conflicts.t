@@ -26,7 +26,7 @@ test_db_name() -> <<"couch_test_update_conflicts">>.
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(15),
+    etap:plan(25),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -106,8 +106,10 @@ test_concurrent_doc_update(NumClients) ->
         "Got " ++ ?i2l(NumClients - 1) ++ " client conflicts"),
 
     {ok, Db2} = couch_db:open_int(test_db_name(), []),
-    {ok, Doc2} = couch_db:open_doc(Db2, <<"foobar">>, []),
+    {ok, Leaves} = couch_db:open_doc_revs(Db2, <<"foobar">>, all, []),
     ok = couch_db:close(Db2),
+    etap:is(length(Leaves), 1, "Only one document revision was persisted"),
+    [{ok, Doc2}] = Leaves,
     {JsonDoc} = couch_doc:to_json_obj(Doc2, []),
     etap:is(
         couch_util:get_value(<<"value">>, JsonDoc),
@@ -121,8 +123,10 @@ test_concurrent_doc_update(NumClients) ->
     couch_server_sup:start_link(test_util:config_files()),
 
     {ok, Db3} = couch_db:open_int(test_db_name(), []),
-    {ok, Doc3} = couch_db:open_doc(Db3, <<"foobar">>, []),
+    {ok, Leaves2} = couch_db:open_doc_revs(Db3, <<"foobar">>, all, []),
     ok = couch_db:close(Db3),
+    etap:is(length(Leaves2), 1, "Only one document revision was persisted"),
+    [{ok, Doc3}] = Leaves,
     etap:is(Doc3, Doc2, "Got same document after server restart"),
 
     delete_db(Db3).
