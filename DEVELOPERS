@@ -60,6 +60,10 @@ Please report any problems to the developer's mailing list.
 Releasing
 ---------
 
+The release procedure is documented in the project wiki:
+
+    https://wiki.apache.org/couchdb/Release_procedure
+
 Unix-like Systems
 ~~~~~~~~~~~~~~~~~
 
