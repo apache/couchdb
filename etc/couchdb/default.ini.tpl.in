@@ -195,11 +195,11 @@ socket_options = [{keepalive, true}, {nodelay, false}]
 ;key_file = /full/path/to/server_key.pem
 ; String containing the user's password. Only used if the private keyfile is password protected. 
 ;password = somepassword
-; set to true to validate peer certificates
+; Set to true to validate peer certificates.
 verify_ssl_certificates = false
-; file containing a list of peer trusted certificates (PEM format)
-; ssl_trusted_certificates_file = /etc/ssl/certs/ca-certificates.crt
-; maximum peer certificate depth (must be set even if certificate validation is off)
+; File containing a list of peer trusted certificates (in the PEM format).
+;ssl_trusted_certificates_file = /etc/ssl/certs/ca-certificates.crt
+; Maximum peer certificate depth (must be set even if certificate validation is off).
 ssl_certificate_max_depth = 3
 
 [compaction_daemon]
