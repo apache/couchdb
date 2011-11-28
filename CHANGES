@@ -36,6 +36,9 @@ HTTP Interface:
  * The _active_tasks API now offers more granular fields. Each
    task type is now able to expose different properties.
  * Added built-in changes feed filter `_view`.
+ * Fixes to the `_changes` feed heartbeat option which caused
+   heartbeats to be missed when used with a filter. This caused
+   timeouts of continuous pull replications with a filter.
 
 Replicator:
 
