@@ -534,12 +534,12 @@ reset_heartbeat() ->
     put(last_changes_heartbeat,now()).
 
 maybe_heartbeat(Timeout, TimeoutFun, Acc) ->
-    Now = now(),
     Before = get(last_changes_heartbeat),
     case Before of
     undefined ->
         {ok, Acc};
     _ ->
+        Now = now(),
         case timer:now_diff(Now, Before) div 1000 >= Timeout of
         true ->
             Acc2 = TimeoutFun(Acc),
