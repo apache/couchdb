@@ -531,7 +531,12 @@ get_rest_db_updated(UserAcc) ->
     end.
 
 reset_heartbeat() ->
-    put(last_changes_heartbeat,now()).
+    case get(last_changes_heartbeat) of
+    undefined ->
+        ok;
+    _ ->
+        put(last_changes_heartbeat, now())
+    end.
 
 maybe_heartbeat(Timeout, TimeoutFun, Acc) ->
     Before = get(last_changes_heartbeat),
