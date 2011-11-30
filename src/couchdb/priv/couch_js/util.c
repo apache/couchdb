@@ -20,11 +20,12 @@
 #include "utf8.h"
 
 
-char*
-slurp_file(char* buf, const char* file)
+size_t
+slurp_file(const char* file, char** outbuf_p)
 {
     FILE* fp;
     char fbuf[16384];
+    char *buf = NULL;
     char* tmp;
     size_t nread = 0;
     size_t buflen = 0;
@@ -41,16 +42,13 @@ slurp_file(char* buf, const char* file)
 
     while((nread = fread(fbuf, 1, 16384, fp)) > 0) {
         if(buf == NULL) {
-            buflen = nread;
             buf = (char*) malloc(nread + 1);
             if(buf == NULL) {
                 fprintf(stderr, "Out of memory.\n");
                 exit(3);
             }
-            memcpy(buf, fbuf, buflen);
-            buf[buflen] = '\0';
+            memcpy(buf, fbuf, nread);
         } else {
-            buflen = strlen(buf);
             tmp = (char*) malloc(buflen + nread + 1);
             if(tmp == NULL) {
                 fprintf(stderr, "Out of memory.\n");
@@ -58,12 +56,14 @@ slurp_file(char* buf, const char* file)
             }
             memcpy(tmp, buf, buflen);
             memcpy(tmp+buflen, fbuf, nread);
-            tmp[buflen+nread] = '\0';
             free(buf);
             buf = tmp;
         }
+        buflen += nread;
+        buf[buflen] = '\0';
     }
-    return buf;
+    *outbuf_p = buf;
+    return buflen + 1;
 }
 
 couch_args*
@@ -104,7 +104,7 @@ couch_parse_args(int argc, const char* argv[])
     }
 
     while(i < argc) {
-        args->script = slurp_file(args->script, argv[i]);
+        slurp_file(argv[i], &args->script);
         if(args->script_name == NULL) {
             if(strcmp(argv[i], "-") == 0) {
                 args->script_name = "<stdin>";
