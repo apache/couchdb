@@ -304,6 +304,7 @@ main(int argc, const char* argv[])
     size_t slen;
     jsval sroot;
     jsval result;
+    int i;
 
     couch_args* args = couch_parse_args(argc, argv);
     
@@ -351,32 +352,35 @@ main(int argc, const char* argv[])
         }
     } 
 
-    // Convert script source to jschars.
-    scriptsrc = dec_string(cx, args->script, strlen(args->script));
-    if(!scriptsrc)
-        return 1;
+    for (i = 0 ; args->scripts[i] ; i++) {
+        // Convert script source to jschars.
+        scriptsrc = couch_readfile(cx, args->scripts[i]);
+        if(!scriptsrc)
+            return 1;
 
-    schars = JS_GetStringChars(scriptsrc);
-    slen = JS_GetStringLength(scriptsrc);
-    
-    // Root it so GC doesn't collect it.
-    sroot = STRING_TO_JSVAL(scriptsrc); 
-    if(JS_AddRoot(cx, &sroot) != JS_TRUE) {
-        fprintf(stderr, "Internal root error.\n");
-        return 1;
+        schars = JS_GetStringChars(scriptsrc);
+        slen = JS_GetStringLength(scriptsrc);
+
+        // Root it so GC doesn't collect it.
+        sroot = STRING_TO_JSVAL(scriptsrc);
+        if(JS_AddRoot(cx, &sroot) != JS_TRUE) {
+            fprintf(stderr, "Internal root error.\n");
+            return 1;
+        }
+
+        // Compile and run
+        script = JS_CompileUCScript(cx, global, schars, slen,
+                                    args->scripts[i], 1);
+        if(!script) {
+            fprintf(stderr, "Failed to compile script.\n");
+            return 1;
+        }
+
+        JS_ExecuteScript(cx, global, script, &result);
+
+        // Warning message if we don't remove it.
+        JS_RemoveRoot(cx, &sroot);
     }
-
-    // Compile and run
-    script = JS_CompileUCScript(cx, global, schars, slen, args->script_name, 1);
-    if(!script) {
-        fprintf(stderr, "Failed to compile script.\n");
-        return 1;
-    }
-    
-    JS_ExecuteScript(cx, global, script, &result);
-
-    // Warning message if we don't remove it.
-    JS_RemoveRoot(cx, &sroot);
 
     FINISH_REQUEST(cx);
     JS_DestroyContext(cx);
