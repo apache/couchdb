@@ -36,10 +36,19 @@ else
 fi
 
 make dev
+
+# stop CouchDB on exit from various signals
+abort() {
+	trap - 0
+	./utils/run -d
+	exit 2
+}
+
 # start CouchDB
 if [ -z $COUCHDB_NO_START ]; then
-  ./utils/run -b -r 1
-  sleep 1 # give it a sec
+	trap 'abort' 0 1 2 3 4 6 8 15
+	./utils/run -b -r 1
+	sleep 1 # give it a sec
 fi
 
 cat $SCRIPT_DIR/json2.js \
@@ -56,4 +65,5 @@ cat $SCRIPT_DIR/json2.js \
 if [ -z $COUCHDB_NO_START ]; then
 	# stop CouchDB
 	./utils/run -d
+	trap - 0
 fi
