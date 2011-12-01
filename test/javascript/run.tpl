@@ -52,7 +52,8 @@ if [ -z $COUCHDB_NO_START ]; then
 	sleep 1 # give it a sec
 fi
 
-cat $SCRIPT_DIR/json2.js \
+$COUCHJS -H \
+	$SCRIPT_DIR/json2.js \
 	$SCRIPT_DIR/sha1.js \
 	$SCRIPT_DIR/oauth.js \
 	$SCRIPT_DIR/couch.js \
@@ -60,8 +61,7 @@ cat $SCRIPT_DIR/json2.js \
 	$SCRIPT_DIR/couch_tests.js \
 	$TEST_SRC \
 	$JS_TEST_DIR/couch_http.js \
-	$JS_TEST_DIR/cli_runner.js \
-    | $COUCHJS -H -
+	$JS_TEST_DIR/cli_runner.js
 
 if [ -z $COUCHDB_NO_START ]; then
 	# stop CouchDB

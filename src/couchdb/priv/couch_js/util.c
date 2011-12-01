@@ -103,24 +103,11 @@ couch_parse_args(int argc, const char* argv[])
         i++;
     }
 
-    while(i < argc) {
-        slurp_file(argv[i], &args->script);
-        if(args->script_name == NULL) {
-            if(strcmp(argv[i], "-") == 0) {
-                args->script_name = "<stdin>";
-            } else {
-                args->script_name = argv[i];
-            }
-        } else {
-            args->script_name = "<multiple_files>";
-        }
-        i++;
-    }
-
-    if(args->script_name == NULL || args->script == NULL) {
+    if(i >= argc) {
         DISPLAY_USAGE;
         exit(3);
     }
+    args->scripts = argv + i;
 
     return args;
 }

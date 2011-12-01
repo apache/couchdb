@@ -16,10 +16,9 @@
 #include <jsapi.h>
 
 typedef struct {
-    int         use_http;
-    int         stack_size;
-    const char* script_name;
-    char*       script;
+    int          use_http;
+    int          stack_size;
+    const char** scripts;
 } couch_args;
 
 couch_args* couch_parse_args(int argc, const char* argv[]);
