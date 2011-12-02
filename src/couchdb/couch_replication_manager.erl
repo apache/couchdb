@@ -228,7 +228,8 @@ changes_feed_loop() ->
     Server = self(),
     Pid = spawn_link(
         fun() ->
-            {ok, Db} = couch_db:open_int(RepDbName, [sys_db]),
+            DbOpenOptions = [{user_ctx, RepDb#db.user_ctx}, sys_db],
+            {ok, Db} = couch_db:open_int(RepDbName, DbOpenOptions),
             ChangesFeedFun = couch_changes:handle_changes(
                 #changes_args{
                     include_docs = true,
