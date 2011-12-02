@@ -166,6 +166,8 @@ pread_iolist(Fd, Pos) ->
         Md5 ->
             {ok, IoList};
         _ ->
+            twig:log(emerg, "File corruption in ~p at position ~B",
+                     [Fd, Pos]),
             exit({file_corruption, <<"file corruption">>})
         end;
     Error ->
