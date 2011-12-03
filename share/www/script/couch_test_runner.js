@@ -453,3 +453,20 @@ function restartServer() {
   waitForRestart();
 }
 
+// legacy functions for CouchDB < 1.2.0
+// we keep them to make sure we keep BC
+CouchDB.user_prefix = "org.couchdb.user:";
+
+CouchDB.prepareUserDoc = function(user_doc, new_password) {
+  user_doc._id = user_doc._id || CouchDB.user_prefix + user_doc.name;
+  if (new_password) {
+    // handle the password crypto
+    user_doc.salt = CouchDB.newUuids(1)[0];
+    user_doc.password_sha = hex_sha1(new_password + user_doc.salt);
+  }
+  user_doc.type = "user";
+  if (!user_doc.roles) {
+    user_doc.roles = [];
+  }
+  return user_doc;
+};

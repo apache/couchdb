@@ -46,7 +46,7 @@ before_doc_update(Doc, #db{user_ctx = UserCtx} = Db) ->
         throw(not_found)
     end.
 
-% If newDoc.password == null:
+% If newDoc.password == null || newDoc.password == undefined:
 %   ->
 %   noop
 % Else -> // calculate password hash server side
@@ -55,6 +55,8 @@ before_doc_update(Doc, #db{user_ctx = UserCtx} = Db) ->
 %    newDoc.password = null
 save_doc(#doc{body={Body}} = Doc) ->
     case couch_util:get_value(?PASSWORD, Body) of
+    null -> % server admins don't have a user-db password entry
+        Doc;
     undefined ->
         Doc;
     ClearPassword ->
