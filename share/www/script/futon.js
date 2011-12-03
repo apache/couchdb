@@ -142,9 +142,10 @@ function $$(node) {
             location.reload();
           },
           success: function (user) {
-            $.couch.db(resp.info.authentication_db).saveDoc($.couch.prepareUserDoc(user, data.password), {
+            user.password = data.password;
+            $.couch.db(resp.info.authentication_db).saveDoc(user, {
               success: function() {
-                doLogin(user.name, data.password, function(errors) {
+                doLogin(user.name, user.password, function(errors) {
                     if(!$.isEmptyObject(errors)) {
                       callback(errors);
                       return;
@@ -183,10 +184,10 @@ function $$(node) {
                             callback(errors);
                             return;
                           } else {
-                            updateUserDoc(resp, data);
+                            location.reload();
                           }
                         });
-                      } , 1000);
+                      }, 1000);
                     }
                   }, "admins", resp.userCtx.name, data.password);
                 }

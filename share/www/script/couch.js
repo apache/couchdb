@@ -335,22 +335,6 @@ CouchDB.session = function(options) {
   return JSON.parse(CouchDB.last_req.responseText);
 };
 
-CouchDB.user_prefix = "org.couchdb.user:";
-
-CouchDB.prepareUserDoc = function(user_doc, new_password) {
-  user_doc._id = user_doc._id || CouchDB.user_prefix + user_doc.name;
-  if (new_password) {
-    // handle the password crypto
-    user_doc.salt = CouchDB.newUuids(1)[0];
-    user_doc.password_sha = hex_sha1(new_password + user_doc.salt);
-  }
-  user_doc.type = "user";
-  if (!user_doc.roles) {
-    user_doc.roles = [];
-  }
-  return user_doc;
-};
-
 CouchDB.allDbs = function() {
   CouchDB.last_req = CouchDB.request("GET", "/_all_dbs");
   CouchDB.maybeThrowError(CouchDB.last_req);

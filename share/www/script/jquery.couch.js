@@ -182,35 +182,15 @@
      */
     signup: function(user_doc, password, options) {      
       options = options || {};
-      // prepare user doc based on name and password
-      user_doc = this.prepareUserDoc(user_doc, password);
+      user_doc.password = password;
+      user_doc.roles =  user_doc.roles || [];
+      user_doc.type =  user_doc.type = "user" || [];
+      var user_prefix = "org.couchdb.user:";
+      user_doc._id = user_doc._id || user_prefix + user_doc.name;
+
       $.couch.userDb(function(db) {
         db.saveDoc(user_doc, options);
       });
-    },
-
-    /**
-     * Populates a user doc with a new password.
-     * @param {Object} user_doc User details
-     * @param {String} new_password New Password
-     */
-    prepareUserDoc: function(user_doc, new_password) {
-      if (typeof hex_sha1 == "undefined") {
-        alert("creating a user doc requires sha1.js to be loaded in the page");
-        return;
-      }
-      var user_prefix = "org.couchdb.user:";
-      user_doc._id = user_doc._id || user_prefix + user_doc.name;
-      if (new_password) {
-        // handle the password crypto
-        user_doc.salt = $.couch.newUUID();
-        user_doc.password_sha = hex_sha1(new_password + user_doc.salt);
-      }
-      user_doc.type = "user";
-      if (!user_doc.roles) {
-        user_doc.roles = [];
-      }
-      return user_doc;
     },
 
     /**
