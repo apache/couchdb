@@ -25,7 +25,7 @@
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
 -include("couch_db.hrl").
--include("couch_api_wrap.hrl").
+-include("couch_replicator_api_wrap.hrl").
 -include("couch_replicator.hrl").
 
 -import(couch_util, [
@@ -84,7 +84,7 @@ replicate(#rep{id = RepId, options = Options, user_ctx = UserCtx} = Rep) ->
     false ->
         {ok, Listener} = rep_result_listener(RepId),
         Result = do_replication_loop(Rep),
-        couch_replication_notifier:stop(Listener),
+        couch_replicator_notifier:stop(Listener),
         Result
     end.
 
@@ -105,8 +105,8 @@ do_replication_loop(#rep{id = {BaseId, Ext} = Id, options = Options} = Rep) ->
 
 async_replicate(#rep{id = {BaseId, Ext}, source = Src, target = Tgt} = Rep) ->
     RepChildId = BaseId ++ Ext,
-    Source = couch_api_wrap:db_uri(Src),
-    Target = couch_api_wrap:db_uri(Tgt),
+    Source = couch_replicator_api_wrap:db_uri(Src),
+    Target = couch_replicator_api_wrap:db_uri(Tgt),
     Timeout = get_value(connection_timeout, Rep#rep.options),
     ChildSpec = {
         RepChildId,
@@ -122,13 +122,13 @@ async_replicate(#rep{id = {BaseId, Ext}, source = Src, target = Tgt} = Rep) ->
     %
     % http://erlang.2086793.n4.nabble.com/PATCH-supervisor-atomically-delete-child-spec-when-child-terminates-td3226098.html
     %
-    case supervisor:start_child(couch_rep_sup, ChildSpec) of
+    case supervisor:start_child(couch_replicator_job_sup, ChildSpec) of
     {ok, Pid} ->
         ?LOG_INFO("starting new replication `~s` at ~p (`~s` -> `~s`)",
             [RepChildId, Pid, Source, Target]),
         {ok, Pid};
     {error, already_present} ->
-        case supervisor:restart_child(couch_rep_sup, RepChildId) of
+        case supervisor:restart_child(couch_replicator_job_sup, RepChildId) of
         {ok, Pid} ->
             ?LOG_INFO("restarting replication `~s` at ~p (`~s` -> `~s`)",
                 [RepChildId, Pid, Source, Target]),
@@ -138,7 +138,7 @@ async_replicate(#rep{id = {BaseId, Ext}, source = Src, target = Tgt} = Rep) ->
             %% each other to start and somebody else won. Just grab
             %% the Pid by calling start_child again.
             {error, {already_started, Pid}} =
-                supervisor:start_child(couch_rep_sup, ChildSpec),
+                supervisor:start_child(couch_replicator_job_sup, ChildSpec),
             ?LOG_INFO("replication `~s` already running at ~p (`~s` -> `~s`)",
                 [RepChildId, Pid, Source, Target]),
             {ok, Pid};
@@ -147,7 +147,7 @@ async_replicate(#rep{id = {BaseId, Ext}, source = Src, target = Tgt} = Rep) ->
             % Clause to deal with a change in the supervisor module introduced
             % in R14B02. For more details consult the thread at:
             %     http://erlang.org/pipermail/erlang-bugs/2011-March/002273.html
-            _ = supervisor:delete_child(couch_rep_sup, RepChildId),
+            _ = supervisor:delete_child(couch_replicator_job_sup, RepChildId),
             async_replicate(Rep);
         {error, _} = Error ->
             Error
@@ -163,7 +163,7 @@ async_replicate(#rep{id = {BaseId, Ext}, source = Src, target = Tgt} = Rep) ->
 
 rep_result_listener(RepId) ->
     ReplyTo = self(),
-    {ok, _Listener} = couch_replication_notifier:start_link(
+    {ok, _Listener} = couch_replicator_notifier:start_link(
         fun({_, RepId2, _} = Ev) when RepId2 =:= RepId ->
                 ReplyTo ! Ev;
             (_) ->
@@ -183,10 +183,10 @@ wait_for_result(RepId) ->
 cancel_replication({BaseId, Extension}) ->
     FullRepId = BaseId ++ Extension,
     ?LOG_INFO("Canceling replication `~s`...", [FullRepId]),
-    case supervisor:terminate_child(couch_rep_sup, FullRepId) of
+    case supervisor:terminate_child(couch_replicator_job_sup, FullRepId) of
     ok ->
         ?LOG_INFO("Replication `~s` canceled.", [FullRepId]),
-        case supervisor:delete_child(couch_rep_sup, FullRepId) of
+        case supervisor:delete_child(couch_replicator_job_sup, FullRepId) of
             ok ->
                 {ok, {cancelled, ?l2b(FullRepId)}};
             {error, not_found} ->
@@ -206,7 +206,7 @@ cancel_replication(RepId, #user_ctx{name = Name, roles = Roles}) ->
     false ->
         {BaseId, Ext} = RepId,
         case lists:keysearch(
-            BaseId ++ Ext, 1, supervisor:which_children(couch_rep_sup)) of
+            BaseId ++ Ext, 1, supervisor:which_children(couch_replicator_job_sup)) of
         {value, {_, Pid, _, _}} when is_pid(Pid) ->
             case (catch gen_server:call(Pid, get_details, infinity)) of
             {ok, #rep{user_ctx = #user_ctx{name = Name}}} ->
@@ -321,7 +321,7 @@ do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
 
     ?LOG_DEBUG("Worker pids are: ~p", [Workers]),
 
-    couch_replication_manager:replication_started(Rep),
+    couch_replicator_manager:replication_started(Rep),
 
     {ok, State#rep_state{
             changes_queue = ChangesQueue,
@@ -458,12 +458,12 @@ code_change(_OldVsn, State, _Extra) ->
 terminate(normal, #rep_state{rep_details = #rep{id = RepId} = Rep,
     checkpoint_history = CheckpointHistory} = State) ->
     terminate_cleanup(State),
-    couch_replication_notifier:notify({finished, RepId, CheckpointHistory}),
-    couch_replication_manager:replication_completed(Rep);
+    couch_replicator_notifier:notify({finished, RepId, CheckpointHistory}),
+    couch_replicator_manager:replication_completed(Rep);
 
 terminate(shutdown, #rep_state{rep_details = #rep{id = RepId}} = State) ->
     % cancelled replication throught ?MODULE:cancel_replication/1
-    couch_replication_notifier:notify({error, RepId, <<"cancelled">>}),
+    couch_replicator_notifier:notify({error, RepId, <<"cancelled">>}),
     terminate_cleanup(State);
 
 terminate(Reason, State) ->
@@ -475,16 +475,16 @@ terminate(Reason, State) ->
     ?LOG_ERROR("Replication `~s` (`~s` -> `~s`) failed: ~s",
         [BaseId ++ Ext, Source, Target, to_binary(Reason)]),
     terminate_cleanup(State),
-    couch_replication_notifier:notify({error, RepId, Reason}),
-    couch_replication_manager:replication_error(Rep, Reason).
+    couch_replicator_notifier:notify({error, RepId, Reason}),
+    couch_replicator_manager:replication_error(Rep, Reason).
 
 
 terminate_cleanup(State) ->
     update_task(State),
     stop_db_compaction_notifier(State#rep_state.source_db_compaction_notifier),
     stop_db_compaction_notifier(State#rep_state.target_db_compaction_notifier),
-    couch_api_wrap:db_close(State#rep_state.source),
-    couch_api_wrap:db_close(State#rep_state.target).
+    couch_replicator_api_wrap:db_close(State#rep_state.source),
+    couch_replicator_api_wrap:db_close(State#rep_state.target).
 
 
 do_last_checkpoint(#rep_state{seqs_in_progress = [],
@@ -523,12 +523,12 @@ init_state(Rep) ->
         source = Src, target = Tgt,
         options = Options, user_ctx = UserCtx
     } = Rep,
-    {ok, Source} = couch_api_wrap:db_open(Src, [{user_ctx, UserCtx}]),
-    {ok, Target} = couch_api_wrap:db_open(Tgt, [{user_ctx, UserCtx}],
+    {ok, Source} = couch_replicator_api_wrap:db_open(Src, [{user_ctx, UserCtx}]),
+    {ok, Target} = couch_replicator_api_wrap:db_open(Tgt, [{user_ctx, UserCtx}],
         get_value(create_target, Options, false)),
 
-    {ok, SourceInfo} = couch_api_wrap:get_db_info(Source),
-    {ok, TargetInfo} = couch_api_wrap:get_db_info(Target),
+    {ok, SourceInfo} = couch_replicator_api_wrap:get_db_info(Source),
+    {ok, TargetInfo} = couch_replicator_api_wrap:get_db_info(Target),
 
     [SourceLog, TargetLog] = find_replication_logs([Source, Target], Rep),
 
@@ -538,8 +538,8 @@ init_state(Rep) ->
     #doc{body={CheckpointHistory}} = SourceLog,
     State = #rep_state{
         rep_details = Rep,
-        source_name = couch_api_wrap:db_uri(Source),
-        target_name = couch_api_wrap:db_uri(Target),
+        source_name = couch_replicator_api_wrap:db_uri(Source),
+        target_name = couch_replicator_api_wrap:db_uri(Target),
         source = Source,
         target = Target,
         history = History,
@@ -573,7 +573,7 @@ fold_replication_logs([], _Vsn, _LogId, _NewId, _Rep, Acc) ->
     lists:reverse(Acc);
 
 fold_replication_logs([Db | Rest] = Dbs, Vsn, LogId, NewId, Rep, Acc) ->
-    case couch_api_wrap:open_doc(Db, LogId, [ejson_body]) of
+    case couch_replicator_api_wrap:open_doc(Db, LogId, [ejson_body]) of
     {error, <<"not_found">>} when Vsn > 1 ->
         OldRepId = couch_replicator_utils:replication_id(Rep, Vsn - 1),
         fold_replication_logs(Dbs, Vsn - 1,
@@ -604,7 +604,7 @@ spawn_changes_reader(StartSeq, Db, ChangesQueue, Options) ->
 
 read_changes(StartSeq, Db, ChangesQueue, Options) ->
     try
-        couch_api_wrap:changes_since(Db, all_docs, StartSeq,
+        couch_replicator_api_wrap:changes_since(Db, all_docs, StartSeq,
             fun(#doc_info{high_seq = Seq, id = Id} = DocInfo) ->
                 case Id of
                 <<>> ->
@@ -613,7 +613,7 @@ read_changes(StartSeq, Db, ChangesQueue, Options) ->
                     % is impossible to GET.
                     ?LOG_ERROR("Replicator: ignoring document with empty ID in "
                         "source database `~s` (_changes sequence ~p)",
-                        [couch_api_wrap:db_uri(Db), Seq]);
+                        [couch_replicator_api_wrap:db_uri(Db), Seq]);
                 _ ->
                     ok = couch_work_queue:queue(ChangesQueue, DocInfo)
                 end,
@@ -629,12 +629,12 @@ read_changes(StartSeq, Db, ChangesQueue, Options) ->
             StartSeq ->
                 ?LOG_INFO("Retrying _changes request to source database ~s"
                     " with since=~p in ~p seconds",
-                    [couch_api_wrap:db_uri(Db), LastSeq, Db#httpdb.wait / 1000]),
+                    [couch_replicator_api_wrap:db_uri(Db), LastSeq, Db#httpdb.wait / 1000]),
                 ok = timer:sleep(Db#httpdb.wait),
                 Db#httpdb{wait = 2 * Db#httpdb.wait};
             _ ->
                 ?LOG_INFO("Retrying _changes request to source database ~s"
-                    " with since=~p", [couch_api_wrap:db_uri(Db), LastSeq]),
+                    " with since=~p", [couch_replicator_api_wrap:db_uri(Db), LastSeq]),
                 Db
             end,
             read_changes(LastSeq, Db2, ChangesQueue, Options);
@@ -782,14 +782,14 @@ update_checkpoint(Db, Doc, DbType) ->
 
 update_checkpoint(Db, #doc{id = LogId, body = LogBody} = Doc) ->
     try
-        case couch_api_wrap:update_doc(Db, Doc, [delay_commit]) of
+        case couch_replicator_api_wrap:update_doc(Db, Doc, [delay_commit]) of
         {ok, PosRevId} ->
             PosRevId;
         {error, Reason} ->
             throw({checkpoint_commit_failure, Reason})
         end
     catch throw:conflict ->
-        case (catch couch_api_wrap:open_doc(Db, LogId, [ejson_body])) of
+        case (catch couch_replicator_api_wrap:open_doc(Db, LogId, [ejson_body])) of
         {ok, #doc{body = LogBody, revs = {Pos, [RevId | _]}}} ->
             % This means that we were able to update successfully the
             % checkpoint doc in a previous attempt but we got a connection
@@ -810,12 +810,12 @@ commit_to_both(Source, Target) ->
     ParentPid = self(),
     SrcCommitPid = spawn_link(
         fun() ->
-            Result = (catch couch_api_wrap:ensure_full_commit(Source)),
+            Result = (catch couch_replicator_api_wrap:ensure_full_commit(Source)),
             ParentPid ! {self(), Result}
         end),
 
     % commit tgt sync
-    TargetResult = (catch couch_api_wrap:ensure_full_commit(Target)),
+    TargetResult = (catch couch_replicator_api_wrap:ensure_full_commit(Target)),
 
     SourceResult = receive
     {SrcCommitPid, Result} ->
@@ -902,14 +902,14 @@ db_monitor(_HttpDb) ->
 
 
 source_cur_seq(#rep_state{source = #httpdb{} = Db, source_seq = Seq}) ->
-    case (catch couch_api_wrap:get_db_info(Db#httpdb{retries = 3})) of
+    case (catch couch_replicator_api_wrap:get_db_info(Db#httpdb{retries = 3})) of
     {ok, Info} ->
         get_value(<<"update_seq">>, Info, Seq);
     _ ->
         Seq
     end;
 source_cur_seq(#rep_state{source = Db, source_seq = Seq}) ->
-    {ok, Info} = couch_api_wrap:get_db_info(Db),
+    {ok, Info} = couch_replicator_api_wrap:get_db_info(Db),
     get_value(<<"update_seq">>, Info, Seq).
 
 

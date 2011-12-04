@@ -177,7 +177,7 @@ spawn_client(Pool) ->
     Parent = self(),
     Ref = make_ref(),
     Pid = spawn(fun() ->
-        {ok, Worker} = couch_httpc_pool:get_worker(Pool),
+        {ok, Worker} = couch_replicator_httpc_pool:get_worker(Pool),
         loop(Parent, Ref, Worker, Pool)
     end),
     {Pid, Ref}.
@@ -233,7 +233,7 @@ loop(Parent, Ref, Worker, Pool) ->
             Parent ! {worker, Ref, Worker},
             loop(Parent, Ref, Worker, Pool);
         stop ->
-            couch_httpc_pool:release_worker(Pool, Worker),
+            couch_replicator_httpc_pool:release_worker(Pool, Worker),
             Parent ! {stop, Ref}
     end.
 
@@ -241,10 +241,10 @@ loop(Parent, Ref, Worker, Pool) ->
 spawn_pool() ->
     Host = couch_config:get("httpd", "bind_address", "127.0.0.1"),
     Port = couch_config:get("httpd", "port", "5984"),
-    {ok, Pool} = couch_httpc_pool:start_link(
+    {ok, Pool} = couch_replicator_httpc_pool:start_link(
         "http://" ++ Host ++ ":5984", [{max_connections, 3}]),
     Pool.
 
 
 stop_pool(Pool) ->
-    ok = couch_httpc_pool:stop(Pool).
+    ok = couch_replicator_httpc_pool:stop(Pool).

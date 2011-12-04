@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(couch_replication_notifier).
+-module(couch_replicator_notifier).
 
 -behaviour(gen_event).
 
@@ -25,7 +25,7 @@
 
 start_link(FunAcc) ->
     couch_event_sup:start_link(couch_replication,
-        {couch_replication_notifier, make_ref()}, FunAcc).
+        {couch_replicator_notifier, make_ref()}, FunAcc).
 
 notify(Event) ->
     gen_event:notify(couch_replication, Event).

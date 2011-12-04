@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(couch_replication_manager).
+-module(couch_replicator_manager).
 -behaviour(gen_server).
 
 % public API
@@ -425,7 +425,7 @@ replication_complete(DocId) ->
             % We want to be able to start the same replication but with
             % eventually different values for parameters that don't
             % contribute to its ID calculation.
-            _ = supervisor:delete_child(couch_rep_sup, BaseId ++ Ext);
+            _ = supervisor:delete_child(couch_replicator_job_sup, BaseId ++ Ext);
         #rep_state{} ->
             ok
         end,

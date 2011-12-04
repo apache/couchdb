@@ -19,7 +19,7 @@
 -export([sum_stats/2]).
 
 -include("couch_db.hrl").
--include("couch_api_wrap.hrl").
+-include("couch_replicator_api_wrap.hrl").
 -include("couch_replicator.hrl").
 -include("../ibrowse/ibrowse.hrl").
 
@@ -109,23 +109,23 @@ filter_code(Filter, Source, UserCtx) ->
     _ ->
         throw({error, <<"Invalid filter. Must match `ddocname/filtername`.">>})
     end,
-    Db = case (catch couch_api_wrap:db_open(Source, [{user_ctx, UserCtx}])) of
+    Db = case (catch couch_replicator_api_wrap:db_open(Source, [{user_ctx, UserCtx}])) of
     {ok, Db0} ->
         Db0;
     DbError ->
         DbErrorMsg = io_lib:format("Could not open source database `~s`: ~s",
-           [couch_api_wrap:db_uri(Source), couch_util:to_binary(DbError)]),
+           [couch_replicator_api_wrap:db_uri(Source), couch_util:to_binary(DbError)]),
         throw({error, iolist_to_binary(DbErrorMsg)})
     end,
     try
-        Body = case (catch couch_api_wrap:open_doc(
+        Body = case (catch couch_replicator_api_wrap:open_doc(
             Db, <<"_design/", DDocName/binary>>, [ejson_body])) of
         {ok, #doc{body = Body0}} ->
             Body0;
         DocError ->
             DocErrorMsg = io_lib:format(
                 "Couldn't open document `_design/~s` from source "
-                "database `~s`: ~s", [DDocName, couch_api_wrap:db_uri(Source),
+                "database `~s`: ~s", [DDocName, couch_replicator_api_wrap:db_uri(Source),
                     couch_util:to_binary(DocError)]),
             throw({error, iolist_to_binary(DocErrorMsg)})
         end,
@@ -133,7 +133,7 @@ filter_code(Filter, Source, UserCtx) ->
             Body, [<<"filters">>, FilterName]),
         re:replace(Code, [$^, "\s*(.*?)\s*", $$], "\\1", [{return, binary}])
     after
-        couch_api_wrap:db_close(Db)
+        couch_replicator_api_wrap:db_close(Db)
     end.
 
 

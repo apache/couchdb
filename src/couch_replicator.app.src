@@ -13,20 +13,20 @@
 {application, couch_replicator, [
     {description, "CouchDB replicator"},
     {vsn, "@version@"},
-    {modules, [
-        couch_api_wrap_httpc,
-	    couch_api_wrap,
-        couch_api_httpc_pool,
-	    couch_httpd_replicator,
-	    couch_rep_sup,
-	    couch_replication_manager,
-	    couch_replication_notifier,
+    {modules, [  
+        couch_replicator_api_wrap,
+        couch_replicator_httpc,
+        couch_replicator_httpd,
+        couch_replicator_job_sup,
+        couch_replicator_notifier,
+        couch_replicator_manager,
+        couch_replicator_httpc_pool,
         couch_replicator_utils,
-	    couch_replicator_worker,
-	    couch_replicator
+        couch_replicator_worker,
+        couch_replicator
     ]},
     {registered, [
-        couch_rep_sup
+        couch_replicator_job_sup
     ]},
     {applications, [kernel, stdlib]}
 ]}.
