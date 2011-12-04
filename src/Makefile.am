@@ -13,6 +13,7 @@
 SUBDIRS = \
     couch_index \
     couch_mrview \
+    couch_replicator \
     couchdb \
     ejson \
     erlang-oauth \

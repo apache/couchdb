@@ -9,6 +9,7 @@
 *~
 *.orig
 *.rej
+*.sw*
 erl_crash.dump
 configure
 autom4te.cache
@@ -52,6 +53,7 @@ etc/couchdb/default.ini
 etc/launchd/org.apache.couchdb.plist
 etc/logrotate.d/couchdb
 src/couch_mrview/ebin/
+src/couch_replicator/ebin/
 src/couchdb/.libs/*
 src/couchdb/couch.app
 src/couchdb/couchjs

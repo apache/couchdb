@@ -89,8 +89,4 @@ EXTRA_DIST = \
     200-view-group-no-db-leaks.t \
     201-view-group-shutdown.t \
     210-os-proc-pool.t \
-    220-compaction-daemon.t \
-    230-httpc-pool.t \
-    240-replication-compact.t \
-    241-replication-large-atts.t \
-    242-replication-many-leaves.t
+    220-compaction-daemon.t
