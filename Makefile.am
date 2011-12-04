@@ -1,0 +1,73 @@
+## Licensed under the Apache License, Version 2.0 (the "License"); you may not
+## use this file except in compliance with the License. You may obtain a copy of
+## the License at
+##
+##   http://www.apache.org/licenses/LICENSE-2.0
+##
+## Unless required by applicable law or agreed to in writing, software
+## distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+## WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+## License for the specific language governing permissions and limitations under
+## the License.
+
+couch_replicatorlibdir = $(localerlanglibdir)/couch_replicator-0.1
+couch_replicatorincludedir = $(couch_replicatorlibdir)/include
+couch_replicatorebindir = $(couch_replicatorlibdir)/ebin
+
+couch_replicatorinclude_DATA = $(include_files)
+couch_replicatorebin_DATA = $(compiled_files)
+
+include_files = \
+	src/couch_api_wrap.hrl \
+    src/couch_replicator.hrl \
+	src/couch_replicator_js_functions.hrl
+
+source_files = \
+	src/couch_api_wrap_httpc.erl \
+	src/couch_api_wrap.erl \
+	src/couch_httpc_pool.erl \
+	src/couch_httpd_replicator.erl \
+	src/couch_rep_sup.erl \
+	src/couch_replication_manager.erl \
+	src/couch_replication_notifier.erl \
+	src/couch_replicator_utils.erl \
+	src/couch_replicator_worker.erl \
+	src/couch_replicator.app.src \
+	src/couch_replicator.erl
+
+test_files = \
+	test/001-httpc-pool.t \
+	test/002-replication-compact.t \
+	test/003-replication-large-atts.t \
+	test/004-replication-many-leaves.t
+
+compiled_files = \
+	ebin/couch_api_wrap_httpc.beam \
+	ebin/couch_api_wrap.beam \
+	ebin/couch_httpc_pool.beam \
+	ebin/couch_httpd_replicator.beam \
+	ebin/couch_rep_sup.beam \
+	ebin/couch_replication_manager.beam \
+	ebin/couch_replication_notifier.beam \
+	ebin/couch_replicator_utils.beam \
+	ebin/couch_replicator_worker.beam \
+	ebin/couch_replicator.app \
+	ebin/couch_replicator.beam
+
+EXTRA_DIST = $(include_files) $(source_files) $(test_files)
+CLEANFILES = $(compiled_files)
+
+check:
+	$(abs_top_builddir)/test/etap/run $(abs_top_srcdir)/src/couch_replicator/test
+
+ebin/%.app: src/%.app.src
+	@mkdir -p ebin/
+	sed -e "s|%version%|@version@|g" \
+	< $< > $@
+
+ebin/%.beam: src/%.erl $(include_files)
+	@mkdir -p ebin/
+	$(ERLC) -Wall -I$(top_srcdir)/src -I$(top_srcdir)/src/couchdb \
+        -o ebin/ $(ERLC_FLAGS) ${TEST} $<;
+
+
