@@ -21,7 +21,7 @@
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
 -include("couch_db.hrl").
--include("couch_api_wrap.hrl").
+-include("couch_replicator_api_wrap.hrl").
 -include("couch_replicator.hrl").
 
 % TODO: maybe make both buffer max sizes configurable
@@ -295,14 +295,14 @@ spawn_doc_reader(Source, Target, FetchParams) ->
 
 fetch_doc(Source, {Id, Revs, PAs}, DocHandler, Acc) ->
     try
-        couch_api_wrap:open_doc_revs(
+        couch_replicator_api_wrap:open_doc_revs(
             Source, Id, Revs, [{atts_since, PAs}], DocHandler, Acc)
     catch
     throw:{missing_stub, _} ->
         ?LOG_ERROR("Retrying fetch and update of document `~p` due to out of "
             "sync attachment stubs. Missing revisions are: ~s",
             [Id, couch_doc:revs_to_strs(Revs)]),
-        couch_api_wrap:open_doc_revs(Source, Id, Revs, [], DocHandler, Acc)
+        couch_replicator_api_wrap:open_doc_revs(Source, Id, Revs, [], DocHandler, Acc)
     end.
 
 
@@ -444,9 +444,9 @@ flush_docs(_Target, []) ->
     #rep_stats{};
 
 flush_docs(Target, DocList) ->
-    {ok, Errors} = couch_api_wrap:update_docs(
+    {ok, Errors} = couch_replicator_api_wrap:update_docs(
         Target, DocList, [delay_commit], replicated_changes),
-    DbUri = couch_api_wrap:db_uri(Target),
+    DbUri = couch_replicator_api_wrap:db_uri(Target),
     lists:foreach(
         fun({Props}) ->
             ?LOG_ERROR("Replicator: couldn't write document `~s`, revision `~s`,"
@@ -460,12 +460,12 @@ flush_docs(Target, DocList) ->
     }.
 
 flush_doc(Target, #doc{id = Id, revs = {Pos, [RevId | _]}} = Doc) ->
-    try couch_api_wrap:update_doc(Target, Doc, [], replicated_changes) of
+    try couch_replicator_api_wrap:update_doc(Target, Doc, [], replicated_changes) of
     {ok, _} ->
         ok;
     Error ->
         ?LOG_ERROR("Replicator: error writing document `~s` to `~s`: ~s",
-            [Id, couch_api_wrap:db_uri(Target), couch_util:to_binary(Error)]),
+            [Id, couch_replicator_api_wrap:db_uri(Target), couch_util:to_binary(Error)]),
         Error
     catch
     throw:{missing_stub, _} = MissingStub ->
@@ -474,13 +474,13 @@ flush_doc(Target, #doc{id = Id, revs = {Pos, [RevId | _]}} = Doc) ->
         ?LOG_ERROR("Replicator: couldn't write document `~s`, revision `~s`,"
             " to target database `~s`. Error: `~s`, reason: `~s`.",
             [Id, couch_doc:rev_to_str({Pos, RevId}),
-                couch_api_wrap:db_uri(Target), to_binary(Error), to_binary(Reason)]),
+                couch_replicator_api_wrap:db_uri(Target), to_binary(Error), to_binary(Reason)]),
         {error, Error};
     throw:Err ->
         ?LOG_ERROR("Replicator: couldn't write document `~s`, revision `~s`,"
             " to target database `~s`. Error: `~s`.",
             [Id, couch_doc:rev_to_str({Pos, RevId}),
-                couch_api_wrap:db_uri(Target), to_binary(Err)]),
+                couch_replicator_api_wrap:db_uri(Target), to_binary(Err)]),
         {error, Err}
     end.
 
@@ -492,7 +492,7 @@ find_missing(DocInfos, Target) ->
             {[{Id, Revs} | IdRevAcc], CountAcc + length(Revs)}
         end,
         {[], 0}, DocInfos),
-    {ok, Missing} = couch_api_wrap:get_missing_revs(Target, IdRevs),
+    {ok, Missing} = couch_replicator_api_wrap:get_missing_revs(Target, IdRevs),
     MissingRevsCount = lists:foldl(
         fun({_Id, MissingRevs, _PAs}, Acc) -> Acc + length(MissingRevs) end,
         0, Missing),

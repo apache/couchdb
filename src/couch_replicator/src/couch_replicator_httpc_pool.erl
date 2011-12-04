@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(couch_httpc_pool).
+-module(couch_replicator_httpc_pool).
 -behaviour(gen_server).
 
 % public API

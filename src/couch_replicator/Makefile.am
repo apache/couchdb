@@ -18,18 +18,18 @@ couch_replicatorinclude_DATA = $(include_files)
 couch_replicatorebin_DATA = $(compiled_files)
 
 include_files = \
-	src/couch_api_wrap.hrl \
-    src/couch_replicator.hrl \
+	src/couch_replicator_api_wrap.hrl \
+	src/couch_replicator.hrl \
 	src/couch_replicator_js_functions.hrl
 
 source_files = \
-	src/couch_api_wrap_httpc.erl \
-	src/couch_api_wrap.erl \
-	src/couch_httpc_pool.erl \
-	src/couch_httpd_replicator.erl \
-	src/couch_rep_sup.erl \
-	src/couch_replication_manager.erl \
-	src/couch_replication_notifier.erl \
+	src/couch_replicator_api_wrap.erl \
+	src/couch_replicator_httpc_pool.erl \
+	src/couch_replicator_httpc.erl \
+	src/couch_replicator_httpd.erl \
+	src/couch_replicator_jon_sup.erl \
+	src/couch_replicator_notifier.erl \
+	src/couch_replicator_manager.erl \
 	src/couch_replicator_utils.erl \
 	src/couch_replicator_worker.erl \
 	src/couch_replicator.app.src \
@@ -42,13 +42,13 @@ test_files = \
 	test/004-replication-many-leaves.t
 
 compiled_files = \
-	ebin/couch_api_wrap_httpc.beam \
-	ebin/couch_api_wrap.beam \
-	ebin/couch_httpc_pool.beam \
-	ebin/couch_httpd_replicator.beam \
-	ebin/couch_rep_sup.beam \
-	ebin/couch_replication_manager.beam \
-	ebin/couch_replication_notifier.beam \
+	ebin/couch_replicator_api_wrap.beam \
+	ebin/couch_replicator_httpc_pool.beam \
+	ebin/couch_replicator_httpc.beam \
+	ebin/couch_replicator_httpd.beam \
+	ebin/couch_replicator_job_sup.beam \
+	ebin/couch_replicator_notifier.beam \
+	ebin/couch_replicator_manager.beam \
 	ebin/couch_replicator_utils.beam \
 	ebin/couch_replicator_worker.beam \
 	ebin/couch_replicator.app \

@@ -87,7 +87,7 @@ stats_aggregator={couch_stats_aggregator, start, []}
 stats_collector={couch_stats_collector, start, []}
 uuids={couch_uuids, start, []}
 auth_cache={couch_auth_cache, start_link, []}
-replication_manager={couch_replication_manager, start_link, []}
+replicator_manager={couch_replicator_manager, start_link, []}
 os_daemons={couch_os_daemons, start_link, []}
 compaction_daemon={couch_compaction_daemon, start_link, []}
 
@@ -99,7 +99,7 @@ _utils = {couch_httpd_misc_handlers, handle_utils_dir_req, "%localdatadir%/www"}
 _all_dbs = {couch_httpd_misc_handlers, handle_all_dbs_req}
 _active_tasks = {couch_httpd_misc_handlers, handle_task_status_req}
 _config = {couch_httpd_misc_handlers, handle_config_req}
-_replicate = {couch_httpd_replicator, handle_req}
+_replicate = {couch_replicator_httpd, handle_req}
 _uuids = {couch_httpd_misc_handlers, handle_uuids_req}
 _restart = {couch_httpd_misc_handlers, handle_restart_req}
 _stats = {couch_httpd_stats_handlers, handle_stats_req}

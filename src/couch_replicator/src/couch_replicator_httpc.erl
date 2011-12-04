@@ -10,10 +10,10 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(couch_api_wrap_httpc).
+-module(couch_replicator_httpc).
 
 -include("couch_db.hrl").
--include("couch_api_wrap.hrl").
+-include("couch_replicator_api_wrap.hrl").
 -include("../ibrowse/ibrowse.hrl").
 
 -export([setup/1]).
@@ -30,7 +30,7 @@
 
 
 setup(#httpdb{httpc_pool = nil, url = Url, http_connections = MaxConns} = Db) ->
-    {ok, Pid} = couch_httpc_pool:start_link(Url, [{max_connections, MaxConns}]),
+    {ok, Pid} = couch_replicator_httpc_pool:start_link(Url, [{max_connections, MaxConns}]),
     {ok, Db#httpdb{httpc_pool = Pid}}.
 
 
@@ -54,7 +54,7 @@ send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb, Params) ->
     "_changes" ->
         {ok, Worker} = ibrowse:spawn_link_worker_process(Url);
     _ ->
-        {ok, Worker} = couch_httpc_pool:get_worker(HttpDb#httpdb.httpc_pool)
+        {ok, Worker} = couch_replicator_httpc_pool:get_worker(HttpDb#httpdb.httpc_pool)
     end,
     IbrowseOptions = [
         {response_format, binary}, {inactivity_timeout, HttpDb#httpdb.timeout} |
@@ -143,7 +143,7 @@ clean_mailbox_req(ReqId) ->
 
 
 release_worker(Worker, #httpdb{httpc_pool = Pool}) ->
-    ok = couch_httpc_pool:release_worker(Pool, Worker).
+    ok = couch_replicator_httpc_pool:release_worker(Pool, Worker).
 
 
 maybe_retry(Error, Worker, #httpdb{retries = 0} = HttpDb, Params, _Cb) ->
