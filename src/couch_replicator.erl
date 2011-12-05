@@ -277,6 +277,7 @@ do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
     couch_task_status:add_task([
         {type, replication},
         {replication_id, ?l2b(BaseId ++ Ext)},
+        {doc_id, Rep#rep.doc_id},
         {source, ?l2b(SourceName)},
         {target, ?l2b(TargetName)},
         {continuous, get_value(continuous, Options, false)},
