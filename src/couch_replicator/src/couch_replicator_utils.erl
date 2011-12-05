@@ -44,7 +44,7 @@ parse_rep_doc({Props}, UserCtx) ->
             target = Target,
             options = Options,
             user_ctx = UserCtx,
-            doc_id = get_value(<<"_id">>, Props)
+            doc_id = get_value(<<"_id">>, Props, null)
         },
         {ok, Rep#rep{id = replication_id(Rep)}}
     end.
