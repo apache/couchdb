@@ -459,7 +459,7 @@ terminate(normal, #rep_state{rep_details = #rep{id = RepId} = Rep,
     checkpoint_history = CheckpointHistory} = State) ->
     terminate_cleanup(State),
     couch_replicator_notifier:notify({finished, RepId, CheckpointHistory}),
-    couch_replicator_manager:replication_completed(Rep);
+    couch_replicator_manager:replication_completed(Rep, rep_stats(State));
 
 terminate(shutdown, #rep_state{rep_details = #rep{id = RepId}} = State) ->
     % cancelled replication throught ?MODULE:cancel_replication/1
@@ -916,18 +916,11 @@ source_cur_seq(#rep_state{source = Db, source_seq = Seq}) ->
 update_task(State) ->
     #rep_state{
         current_through_seq = {_, CurSeq},
-        committed_seq = {_, CommittedSeq},
-        source_seq = SourceCurSeq,
-        stats = Stats
+        source_seq = SourceCurSeq
     } = State,
-    couch_task_status:update([
-        {revisions_checked, Stats#rep_stats.missing_checked},
-        {missing_revisions_found, Stats#rep_stats.missing_found},
-        {docs_read, Stats#rep_stats.docs_read},
-        {docs_written, Stats#rep_stats.docs_written},
-        {doc_write_failures, Stats#rep_stats.doc_write_failures},
+    couch_task_status:update(
+        rep_stats(State) ++ [
         {source_seq, SourceCurSeq},
-        {checkpointed_source_seq, CommittedSeq},
         case is_number(CurSeq) andalso is_number(SourceCurSeq) of
         true ->
             case SourceCurSeq of
@@ -940,3 +933,19 @@ update_task(State) ->
             {progress, null}
         end
     ]).
+
+
+rep_stats(State) ->
+    #rep_state{
+        committed_seq = {_, CommittedSeq},
+        stats = Stats
+    } = State,
+    [
+        {revisions_checked, Stats#rep_stats.missing_checked},
+        {missing_revisions_found, Stats#rep_stats.missing_found},
+        {docs_read, Stats#rep_stats.docs_read},
+        {docs_written, Stats#rep_stats.docs_written},
+        {doc_write_failures, Stats#rep_stats.doc_write_failures},
+        {checkpointed_source_seq, CommittedSeq}
+    ].
+

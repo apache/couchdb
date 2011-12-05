@@ -14,7 +14,7 @@
 -behaviour(gen_server).
 
 % public API
--export([replication_started/1, replication_completed/1, replication_error/2]).
+-export([replication_started/1, replication_completed/2, replication_error/2]).
 
 % gen_server callbacks
 -export([start_link/0, init/1, handle_call/3, handle_info/2, handle_cast/2]).
@@ -63,19 +63,22 @@ replication_started(#rep{id = {BaseId, _} = RepId}) ->
     #rep_state{rep = #rep{doc_id = DocId}} ->
         update_rep_doc(DocId, [
             {<<"_replication_state">>, <<"triggered">>},
-            {<<"_replication_id">>, ?l2b(BaseId)}]),
+            {<<"_replication_id">>, ?l2b(BaseId)},
+            {<<"_replication_stats">>, undefined}]),
         ok = gen_server:call(?MODULE, {rep_started, RepId}, infinity),
         ?LOG_INFO("Document `~s` triggered replication `~s`",
             [DocId, pp_rep_id(RepId)])
     end.
 
 
-replication_completed(#rep{id = RepId}) ->
+replication_completed(#rep{id = RepId}, Stats) ->
     case rep_state(RepId) of
     nil ->
         ok;
     #rep_state{rep = #rep{doc_id = DocId}} ->
-        update_rep_doc(DocId, [{<<"_replication_state">>, <<"completed">>}]),
+        update_rep_doc(DocId, [
+            {<<"_replication_state">>, <<"completed">>},
+            {<<"_replication_stats">>, {Stats}}]),
         ok = gen_server:call(?MODULE, {rep_complete, RepId}, infinity),
         ?LOG_INFO("Replication `~s` finished (triggered by document `~s`)",
             [pp_rep_id(RepId), DocId])
@@ -516,7 +519,9 @@ update_rep_doc(RepDocId, KVs) ->
 
 update_rep_doc(RepDb, #doc{body = {RepDocBody}} = RepDoc, KVs) ->
     NewRepDocBody = lists:foldl(
-        fun({<<"_replication_state">> = K, State} = KV, Body) ->
+        fun({K, undefined}, Body) ->
+                lists:keydelete(K, 1, Body);
+            ({<<"_replication_state">> = K, State} = KV, Body) ->
                 case get_value(K, Body) of
                 State ->
                     Body;
