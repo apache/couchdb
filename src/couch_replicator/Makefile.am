@@ -27,7 +27,7 @@ source_files = \
 	src/couch_replicator_httpc_pool.erl \
 	src/couch_replicator_httpc.erl \
 	src/couch_replicator_httpd.erl \
-	src/couch_replicator_jon_sup.erl \
+	src/couch_replicator_job_sup.erl \
 	src/couch_replicator_notifier.erl \
 	src/couch_replicator_manager.erl \
 	src/couch_replicator_utils.erl \
