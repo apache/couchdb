@@ -36,10 +36,11 @@ source_files = \
 	src/couch_replicator.erl
 
 test_files = \
-	test/001-httpc-pool.t \
-	test/002-replication-compact.t \
-	test/003-replication-large-atts.t \
-	test/004-replication-many-leaves.t
+	test/01-load.t \
+	test/02-httpc-pool.t \
+	test/03-replication-compact.t \
+	test/04-replication-large-atts.t \
+	test/05-replication-many-leaves.t
 
 compiled_files = \
 	ebin/couch_replicator_api_wrap.beam \
