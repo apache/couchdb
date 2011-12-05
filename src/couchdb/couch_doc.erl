@@ -296,6 +296,9 @@ transfer_fields([{<<"_replication_state_time">>, _} = Field | Rest],
 transfer_fields([{<<"_replication_id">>, _} = Field | Rest],
     #doc{body=Fields} = Doc) ->
     transfer_fields(Rest, Doc#doc{body=[Field|Fields]});
+transfer_fields([{<<"_replication_stats">>, _} = Field | Rest],
+    #doc{body=Fields} = Doc) ->
+    transfer_fields(Rest, Doc#doc{body=[Field|Fields]});
 
 % unknown special field
 transfer_fields([{<<"_",Name/binary>>, _} | _], _) ->

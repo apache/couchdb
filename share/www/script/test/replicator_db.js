@@ -123,6 +123,17 @@ couchTests.replicator_db = function(debug) {
     T(repDoc1._replication_state === "completed", "simple");
     T(typeof repDoc1._replication_state_time === "string");
     T(typeof repDoc1._replication_id  === "string");
+    T(typeof repDoc1._replication_stats === "object", "doc has stats");
+    var stats = repDoc1._replication_stats;
+    TEquals(docs1.length, stats.revisions_checked,
+       "right # of revisions_checked");
+    TEquals(docs1.length, stats.missing_revisions_found,
+      "right # of missing_revisions_found");
+    TEquals(docs1.length, stats.docs_read, "right # of docs_read");
+    TEquals(docs1.length, stats.docs_written, "right # of docs_written");
+    TEquals(0, stats.doc_write_failures, "right # of doc_write_failures");
+    TEquals(dbA.info().update_seq, stats.checkpointed_source_seq,
+      "right checkpointed_source_seq");
   }
 
 
@@ -175,6 +186,15 @@ couchTests.replicator_db = function(debug) {
     T(repDoc1._replication_state === "completed", "filtered");
     T(typeof repDoc1._replication_state_time === "string");
     T(typeof repDoc1._replication_id  === "string");
+    T(typeof repDoc1._replication_stats === "object", "doc has stats");
+    var stats = repDoc1._replication_stats;
+    TEquals(2, stats.revisions_checked, "right # of revisions_checked");
+    TEquals(2, stats.missing_revisions_found, "right # of missing_revisions_found");
+    TEquals(2, stats.docs_read, "right # of docs_read");
+    TEquals(1, stats.docs_written, "right # of docs_written");
+    TEquals(1, stats.doc_write_failures, "right # of doc_write_failures");
+    TEquals(dbA.info().update_seq, stats.checkpointed_source_seq,
+      "right checkpointed_source_seq");
   }
 
 
@@ -305,6 +325,17 @@ couchTests.replicator_db = function(debug) {
 
     copy = dbB.open("_design/mydesign");
     T(copy === null);
+
+    repDoc = repDb.open(repDoc._id);
+    T(typeof repDoc._replication_stats === "object", "doc has stats");
+    var stats = repDoc._replication_stats;
+    TEquals(3, stats.revisions_checked, "right # of revisions_checked");
+    TEquals(3, stats.missing_revisions_found, "right # of missing_revisions_found");
+    TEquals(3, stats.docs_read, "right # of docs_read");
+    TEquals(2, stats.docs_written, "right # of docs_written");
+    TEquals(1, stats.doc_write_failures, "right # of doc_write_failures");
+    TEquals(dbA.info().update_seq, stats.checkpointed_source_seq,
+      "right checkpointed_source_seq");
   }
 
 
@@ -334,6 +365,17 @@ couchTests.replicator_db = function(debug) {
     T(repDoc1_copy._replication_state === "completed");
     T(typeof repDoc1_copy._replication_state_time === "string");
     T(typeof repDoc1_copy._replication_id  === "string");
+    T(typeof repDoc1_copy._replication_stats === "object", "doc has stats");
+    var stats = repDoc1_copy._replication_stats;
+    TEquals(docs1.length, stats.revisions_checked,
+      "right # of revisions_checked");
+    TEquals(docs1.length, stats.missing_revisions_found,
+      "right # of missing_revisions_found");
+    TEquals(docs1.length, stats.docs_read, "right # of docs_read");
+    TEquals(docs1.length, stats.docs_written, "right # of docs_written");
+    TEquals(0, stats.doc_write_failures, "right # of doc_write_failures");
+    TEquals(dbA.info().update_seq, stats.checkpointed_source_seq,
+      "right checkpointed_source_seq");
 
     var newDoc = {
       _id: "doc666",
@@ -366,6 +408,16 @@ couchTests.replicator_db = function(debug) {
     T(typeof repDoc2_copy._replication_state_time === "string");
     T(typeof repDoc2_copy._replication_id === "string");
     T(repDoc2_copy._replication_id === repDoc1_copy._replication_id);
+    T(typeof repDoc2_copy._replication_stats === "object", "doc has stats");
+    stats = repDoc2_copy._replication_stats;
+    TEquals(1, stats.revisions_checked, "right # of revisions_checked");
+    TEquals(1, stats.missing_revisions_found,
+      "right # of missing_revisions_found");
+    TEquals(1, stats.docs_read, "right # of docs_read");
+    TEquals(1, stats.docs_written, "right # of docs_written");
+    TEquals(0, stats.doc_write_failures, "right # of doc_write_failures");
+    TEquals(dbA.info().update_seq, stats.checkpointed_source_seq,
+      "right checkpointed_source_seq");
   }
 
 
