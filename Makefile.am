@@ -113,8 +113,8 @@ distclean-local:
 	rm -fr $(top_builddir)/etc/couchdb/default.d
 	rm -fr $(top_builddir)/etc/couchdb/local.d
 	rm -fr $(top_builddir)/tmp
-	rm -f couchdb.stdout
-	rm -f couchdb.stderr
+	rm -f  $(top_builddir)/couchdb.stdout
+	rm -f  $(top_builddir)/couchdb.stderr
 
 .PHONY: local-clean
 local-clean: maintainer-clean
