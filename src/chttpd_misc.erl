@@ -23,8 +23,7 @@
 
 -import(chttpd,
     [send_json/2,send_json/3,send_method_not_allowed/2,
-    send_chunk/2,end_json_response/1,
-    start_chunked_response/3]).
+    send_chunk/2,start_chunked_response/3]).
 
 % httpd global handlers
 
