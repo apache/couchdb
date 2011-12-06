@@ -125,7 +125,6 @@ couchTests.oauth = function(debug) {
         "Authorization": adminBasicAuthHeaderValue()
       });
       usersDb.deleteDb();
-      usersDb.createDb();
         
       // Create a user
       var jasonUserDoc = CouchDB.prepareUserDoc({

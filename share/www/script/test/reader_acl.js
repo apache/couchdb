@@ -18,7 +18,6 @@ couchTests.reader_acl = function(debug) {
   function testFun() {
     try {
       usersDb.deleteDb();
-      usersDb.createDb();
       secretDb.deleteDb();
       secretDb.createDb();
 
