@@ -15,6 +15,8 @@ configure
 autom4te.cache
 build-aux
 *.diff
+!.gitignore
+.*
 
 # ./configure
 
