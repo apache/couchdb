@@ -70,7 +70,7 @@ start_server(IniFiles) ->
     end,
 
     BaseChildSpecs =
-    {{one_for_all, 10, 3600},
+    {{one_for_one, 10, 60},
         [{couch_config,
             {couch_server_sup, couch_config_start_link_wrapper, [IniFiles, ConfigPid]},
             permanent,
