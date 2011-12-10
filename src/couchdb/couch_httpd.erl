@@ -298,7 +298,8 @@ handle_request_int(MochiReq, DefaultFun,
         db_url_handlers = DbUrlHandlers,
         design_url_handlers = DesignUrlHandlers,
         default_fun = DefaultFun,
-        url_handlers = UrlHandlers
+        url_handlers = UrlHandlers,
+        user_ctx = erlang:erase(pre_rewrite_user_ctx)
     },
 
     HandlerFun = couch_util:dict_find(HandlerKey, UrlHandlers, DefaultFun),
