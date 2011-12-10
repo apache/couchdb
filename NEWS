@@ -46,6 +46,7 @@ This version has not been released yet.
    `_doc_ids` and `_design`.
  * Fixes to the `_changes` feed heartbeat option when combined with
    a filter. It affected continuous pull replications with a filter.
+ * Fix use of OAuth with VHosts and URL rewriting.
 
 Version 1.1.2
 -------------

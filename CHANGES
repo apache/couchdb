@@ -23,6 +23,10 @@ Version 1.2.0
 
 This version has not been released yet.
 
+Authentication:
+
+ * Fix use of OAuth with VHosts and URL rewriting.
+
 Build System:
 
  * cURL is no longer required to build CouchDB as it is only
