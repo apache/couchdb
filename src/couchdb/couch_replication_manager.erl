@@ -255,8 +255,7 @@ changes_feed_loop() ->
                 (_, _) ->
                     ok
                 end
-            ),
-            couch_db:close(Db)
+            )
         end
     ),
     {Pid, RepDbName}.
