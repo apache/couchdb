@@ -30,10 +30,10 @@ couchTests.config = function(debug) {
   var server_port = CouchDB.host.split(':');
   if(server_port.length == 1 && CouchDB.inBrowser) {
     if(CouchDB.protocol == "http://") {
-      port = 80;
+      port = "80";
     }
     if(CouchDB.protocol == "https://") {
-      port = 443;
+      port = "443";
     }
   } else {
     port = server_port.pop();
