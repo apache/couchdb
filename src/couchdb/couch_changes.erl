@@ -19,23 +19,28 @@
 handle_changes(#changes_args{style=Style}=Args1, Req, Db) ->
     Args = Args1#changes_args{filter=
             make_filter_fun(Args1#changes_args.filter, Style, Req, Db)},
-    StartSeq = case Args#changes_args.dir of
-    rev ->
-        couch_db:get_update_seq(Db);
-    fwd ->
-        Args#changes_args.since
+    Start = fun() ->
+        {ok, Db} = couch_db:reopen(Db0),
+        StartSeq = case Dir of
+        rev ->
+            couch_db:get_update_seq(Db);
+        fwd ->
+            Since
+        end,
+        {Db, StartSeq}
     end,
     if Args#changes_args.feed == "continuous" orelse
         Args#changes_args.feed == "longpoll" ->
         fun(Callback) ->
             Self = self(),
             {ok, Notify} = couch_db_update_notifier:start_link(
-                fun({_, DbName}) when DbName == Db#db.name ->
+                fun({_, DbName}) when  Db0#db.name == DbName ->
                     Self ! db_updated;
                 (_) ->
                     ok
                 end
             ),
+            {Db, StartSeq} = Start(),
             start_sending_changes(Callback, Args#changes_args.feed),
             {Timeout, TimeoutFun} = get_changes_timeout(Args, Callback),
             try
@@ -55,6 +60,7 @@ handle_changes(#changes_args{style=Style}=Args1, Req, Db) ->
         end;
     true ->
         fun(Callback) ->
+            {Db, StartSeq} = Start(),
             start_sending_changes(Callback, Args#changes_args.feed),
             {ok, {_, LastSeq, _Prepend, _, _, _, _, _, _}} =
                 send_changes(
