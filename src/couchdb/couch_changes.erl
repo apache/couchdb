@@ -35,7 +35,7 @@
 }).
 
 %% @type Req -> #httpd{} | {json_req, JsonObj()}
-handle_changes(Args1, Req, Db) ->
+handle_changes(Args1, Req, Db0) ->
     #changes_args{
         style = Style,
         filter = FilterName,
@@ -43,13 +43,17 @@ handle_changes(Args1, Req, Db) ->
         dir = Dir,
         since = Since
     } = Args1,
-    {FilterFun, FilterArgs} = make_filter_fun(FilterName, Style, Req, Db),
+    {FilterFun, FilterArgs} = make_filter_fun(FilterName, Style, Req, Db0),
     Args = Args1#changes_args{filter_fun = FilterFun, filter_args = FilterArgs},
-    StartSeq = case Dir of
-    rev ->
-        couch_db:get_update_seq(Db);
-    fwd ->
-        Since
+    Start = fun() ->
+        {ok, Db} = couch_db:reopen(Db0),
+        StartSeq = case Dir of
+        rev ->
+            couch_db:get_update_seq(Db);
+        fwd ->
+            Since
+        end,
+        {Db, StartSeq}
     end,
     % begin timer to deal with heartbeat when filter function fails
     case Args#changes_args.heartbeat of
@@ -64,12 +68,13 @@ handle_changes(Args1, Req, Db) ->
             {Callback, UserAcc} = get_callback_acc(CallbackAcc),
             Self = self(),
             {ok, Notify} = couch_db_update_notifier:start_link(
-                fun({_, DbName}) when DbName == Db#db.name ->
+                fun({_, DbName}) when  Db0#db.name == DbName ->
                     Self ! db_updated;
                 (_) ->
                     ok
                 end
             ),
+            {Db, StartSeq} = Start(),
             UserAcc2 = start_sending_changes(Callback, UserAcc, Feed),
             {Timeout, TimeoutFun} = get_changes_timeout(Args, Callback),
             Acc0 = build_acc(Args, Callback, UserAcc2, Db, StartSeq,
@@ -89,6 +94,7 @@ handle_changes(Args1, Req, Db) ->
             {Callback, UserAcc} = get_callback_acc(CallbackAcc),
             UserAcc2 = start_sending_changes(Callback, UserAcc, Feed),
             {Timeout, TimeoutFun} = get_changes_timeout(Args, Callback),
+            {Db, StartSeq} = Start(),
             Acc0 = build_acc(Args#changes_args{feed="normal"}, Callback,
                              UserAcc2, Db, StartSeq, <<>>, Timeout, TimeoutFun),
             {ok, #changes_acc{seq = LastSeq, user_acc = UserAcc3}} =
