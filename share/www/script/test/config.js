@@ -46,7 +46,7 @@ couchTests.config = function(debug) {
     config_port = config.ssl.port;
   }
 
-  if(port) {
+  if(port && config_port != "0") {
     TEquals(config_port, port, "ports should match");
   }
 

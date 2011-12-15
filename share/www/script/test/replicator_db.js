@@ -15,7 +15,6 @@ couchTests.replicator_db = function(debug) {
   if (debug) debugger;
 
   var wait_rep_doc = 500; // number of millisecs to wait after saving a Rep Doc
-  var host = CouchDB.host;
   var dbA = new CouchDB("test_suite_rep_db_a", {"X-Couch-Full-Commit":"false"});
   var dbB = new CouchDB("test_suite_rep_db_b", {"X-Couch-Full-Commit":"false"});
   var repDb = new CouchDB("test_suite_rep_db", {"X-Couch-Full-Commit":"false"});
@@ -157,7 +156,7 @@ couchTests.replicator_db = function(debug) {
 
     var repDoc = {
       _id: "foo_filt_rep_doc",
-      source: "http://" + host + "/" + dbA.name,
+      source: "http://" + CouchDB.host + "/" + dbA.name,
       target: dbB.name,
       filter: "mydesign/myfilter",
       query_params: {
@@ -206,7 +205,7 @@ couchTests.replicator_db = function(debug) {
 
     var repDoc = {
       _id: "foo_cont_rep_doc",
-      source: "http://" + host + "/" + dbA.name,
+      source: "http://" + CouchDB.host + "/" + dbA.name,
       target: dbB.name,
       continuous: true,
       user_ctx: {
@@ -305,7 +304,7 @@ couchTests.replicator_db = function(debug) {
 
     var repDoc = {
       _id: "foo_cont_rep_doc",
-      source: "http://" + host + "/" + dbA.name,
+      source: "http://" + CouchDB.host + "/" + dbA.name,
       target: dbB.name,
       doc_ids: ["foo666", "foo3", "_design/mydesign", "foo999", "foo1"]
     };
@@ -435,12 +434,12 @@ couchTests.replicator_db = function(debug) {
 
     var repDoc1 = {
       _id: "foo_dup_rep_doc_1",
-      source: "http://" + host + "/" + dbA.name,
+      source: "http://" + CouchDB.host + "/" + dbA.name,
       target: dbB.name
     };
     var repDoc2 = {
       _id: "foo_dup_rep_doc_2",
-      source: "http://" + host + "/" + dbA.name,
+      source: "http://" + CouchDB.host + "/" + dbA.name,
       target: dbB.name
     };
 
@@ -477,13 +476,13 @@ couchTests.replicator_db = function(debug) {
 
     var repDoc1 = {
       _id: "foo_dup_cont_rep_doc_1",
-      source: "http://" + host + "/" + dbA.name,
+      source: "http://" + CouchDB.host + "/" + dbA.name,
       target: dbB.name,
       continuous: true
     };
     var repDoc2 = {
       _id: "foo_dup_cont_rep_doc_2",
-      source: "http://" + host + "/" + dbA.name,
+      source: "http://" + CouchDB.host + "/" + dbA.name,
       target: dbB.name,
       continuous: true
     };
@@ -663,7 +662,7 @@ couchTests.replicator_db = function(debug) {
 
     var repDoc = {
       _id: "foo_cont_rep_survives_doc",
-      source: "http://" + host + "/" + dbA.name,
+      source: dbA.name,
       target: dbB.name,
       continuous: true
     };
@@ -805,7 +804,7 @@ couchTests.replicator_db = function(debug) {
 
     var repDoc = {
       _id: "foo_rep",
-      source: CouchDB.protocol + host + "/" + dbA.name,
+      source: CouchDB.protocol + CouchDB.host + "/" + dbA.name,
       target: dbB.name
     };
 
@@ -901,7 +900,7 @@ couchTests.replicator_db = function(debug) {
 
     repDoc = {
       _id: "foo_rep_2",
-      source: CouchDB.protocol + host + "/" + dbA.name,
+      source: CouchDB.protocol + CouchDB.host + "/" + dbA.name,
       target: dbB.name,
       user_ctx: {
         name: "joe",
@@ -949,7 +948,7 @@ couchTests.replicator_db = function(debug) {
 
     repDoc = {
       _id: "foo_rep_3",
-      source: CouchDB.protocol + host + "/" + dbA.name,
+      source: CouchDB.protocol + CouchDB.host + "/" + dbA.name,
       target: dbB.name
     };
 
@@ -968,7 +967,7 @@ couchTests.replicator_db = function(debug) {
 
     repDoc = {
       _id: "foo_rep_4",
-      source: CouchDB.protocol + host + "/" + dbA.name,
+      source: CouchDB.protocol + CouchDB.host + "/" + dbA.name,
       target: dbB.name,
       user_ctx: {
         roles: ["_admin"]
@@ -1043,19 +1042,19 @@ couchTests.replicator_db = function(debug) {
 
     repDoc1 = {
       _id: "rep1",
-      source: CouchDB.protocol + host + "/" + dbA.name,
+      source: CouchDB.protocol + CouchDB.host + "/" + dbA.name,
       target: dbA_copy.name,
       continuous: true
     };
     repDoc2 = {
       _id: "rep2",
-      source: CouchDB.protocol + host + "/" + dbB.name,
+      source: CouchDB.protocol + CouchDB.host + "/" + dbB.name,
       target: dbB_copy.name,
       continuous: true
     };
     repDoc3 = {
       _id: "rep3",
-      source: CouchDB.protocol + host + "/" + dbC.name,
+      source: CouchDB.protocol + CouchDB.host + "/" + dbC.name,
       target: dbC_copy.name,
       continuous: true
     };
@@ -1144,13 +1143,13 @@ couchTests.replicator_db = function(debug) {
 
     repDoc1 = {
       _id: "rep1",
-      source: CouchDB.protocol + host + "/" + dbA.name,
+      source: CouchDB.protocol + CouchDB.host + "/" + dbA.name,
       target: dbA_copy.name,
       continuous: true
     };
     repDoc2 = {
       _id: "rep2",
-      source: CouchDB.protocol + host + "/" + dbB.name,
+      source: CouchDB.protocol + CouchDB.host + "/" + dbB.name,
       target: dbB_copy.name,
       continuous: true
     };
@@ -1413,12 +1412,12 @@ couchTests.replicator_db = function(debug) {
 
     repDoc1 = {
       _id: "rep1",
-      source: CouchDB.protocol + host + "/" + dbA.name,
+      source: CouchDB.protocol + CouchDB.host + "/" + dbA.name,
       target: dbA_copy.name
     };
     repDoc2 = {
       _id: "rep2",
-      source: CouchDB.protocol + host + "/" + dbB.name,
+      source: CouchDB.protocol + CouchDB.host + "/" + dbB.name,
       target: dbB_copy.name
     };
 

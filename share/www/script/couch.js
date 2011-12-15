@@ -478,7 +478,18 @@ CouchDB.params = function(options) {
 };
 // Used by replication test
 if (typeof window == 'undefined' || !window) {
-  CouchDB.host = "127.0.0.1:5984";
+  var hostRE = RegExp("https?://([^\/]+)");
+  var getter = function () {
+    return (new CouchHTTP).base_url.match(hostRE)[1];
+  };
+  if(Object.defineProperty) {
+    Object.defineProperty(CouchDB, "host", {
+      get : getter,
+      enumerable : true
+    });
+  } else {
+    CouchDB.__defineGetter__("host", getter);
+  }
   CouchDB.protocol = "http://";
   CouchDB.inBrowser = false;
 } else {
