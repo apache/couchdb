@@ -416,6 +416,8 @@ has_stubs([#att{data=stub}|_]) ->
 has_stubs([_Att|Rest]) ->
     has_stubs(Rest).
 
+merge_stubs(#doc{id = Id}, nil) ->
+    throw({missing_stub, <<"Previous revision missing for document ", Id/binary>>});
 merge_stubs(#doc{id=Id,atts=MemBins}=StubsDoc, #doc{atts=DiskBins}) ->
     BinDict = dict:from_list([{Name, Att} || #att{name=Name}=Att <- DiskBins]),
     MergedBins = lists:map(
