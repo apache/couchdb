@@ -40,7 +40,8 @@ test_files = \
 	test/02-httpc-pool.t \
 	test/03-replication-compact.t \
 	test/04-replication-large-atts.t \
-	test/05-replication-many-leaves.t
+	test/05-replication-many-leaves.t \
+	test/06-doc-missing-stubs.t
 
 compiled_files = \
 	ebin/couch_replicator_api_wrap.beam \
