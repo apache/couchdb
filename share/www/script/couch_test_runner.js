@@ -412,7 +412,9 @@ function waitForSuccess(fun, tag) {
         break;
       } catch (e) {}
       // sync http req allow async req to happen
-      CouchDB.request("GET", "/test_suite_db/?tag="+encodeURIComponent(tag));
+      try {
+        CouchDB.request("GET", "/test_suite_db/?tag="+encodeURIComponent(tag));
+      } catch (e) {}
     }
   }
 }

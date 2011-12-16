@@ -46,6 +46,7 @@ function runAllTestsConsole() {
 };
 
 try {
+  waitForSuccess(CouchDB.getVersion);
   runAllTestsConsole();
 } catch (e) {
   p("# " + e.toString());
