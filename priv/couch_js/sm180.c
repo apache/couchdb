@@ -116,6 +116,7 @@ req_status(JSContext* cx, JSObject* obj, jsval idval, jsval* vp)
 
 
 static JSBool
+base_url(JSContext *cx, JSObject* obj, jsid pid, jsval* vp)
 evalcx(JSContext *cx, uintN argc, jsval* vp)
 {
     jsval* argv = JS_ARGV(cx, vp);
@@ -253,6 +254,7 @@ JSClass CouchHTTPClass = {
 
 JSPropertySpec CouchHTTPProperties[] = {
     {"status", 0, JSPROP_READONLY, req_status, NULL},
+    {"base_url", 0, JSPROP_READONLY | JSPROP_SHARED, base_url, NULL},
     {0, 0, 0, 0, 0}
 };
 
