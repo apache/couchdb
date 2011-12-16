@@ -462,7 +462,8 @@ CouchDB.maybeThrowError = function(req) {
     } catch (ParseError) {
       var result = {error:"unknown", reason:req.responseText};
     }
-    throw result;
+
+    throw (new CouchError(result));
   }
 }
 
@@ -485,3 +486,13 @@ if (typeof window == 'undefined' || !window) {
   CouchDB.inBrowser = true;
   CouchDB.protocol = window.location.protocol + "//";
 }
+
+// Turns an {error: ..., reason: ...} response into an Error instance
+function CouchError(error) {
+  var inst = new Error(error.reason);
+  inst.name = 'CouchError';
+  inst.error = error.error;
+  inst.reason = error.reason;
+  return inst;
+}
+CouchError.prototype.constructor = CouchError;

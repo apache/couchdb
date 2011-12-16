@@ -14,8 +14,11 @@ var Validate = {
   validate : function(fun, ddoc, args) {
     try {
       fun.apply(ddoc, args);
-      print("1");
+      respond(1);
     } catch (error) {
+      if (error.name && error.stack) {
+        throw error;
+      }
       respond(error);
     }
   }

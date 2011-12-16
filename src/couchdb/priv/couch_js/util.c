@@ -227,9 +227,52 @@ couch_print(JSContext* cx, uintN argc, jsval* argv)
 void
 couch_error(JSContext* cx, const char* mesg, JSErrorReport* report)
 {
+    jsval v, replace;
+    char* bytes;
+    JSObject* regexp, *stack;
+    jsval re_args[2];
+
     if(!report || !JSREPORT_IS_WARNING(report->flags))
     {
-        fprintf(stderr, "[couchjs] %s\n", mesg);
+        fprintf(stderr, "%s\n", mesg);
+
+        // Print a stack trace, if available.
+        if (JSREPORT_IS_EXCEPTION(report->flags) &&
+            JS_GetPendingException(cx, &v))
+        {
+            // Clear the exception before an JS method calls or the result is
+            // infinite, recursive error report generation.
+            JS_ClearPendingException(cx);
+
+            // Use JS regexp to indent the stack trace.
+            // If the regexp can't be created, don't JS_ReportError since it is
+            // probably not productive to wind up here again.
+#ifdef SM185
+            if(JS_GetProperty(cx, JSVAL_TO_OBJECT(v), "stack", &v) &&
+               (regexp = JS_NewRegExpObjectNoStatics(
+                   cx, "^(?=.)", 6, JSREG_GLOB | JSREG_MULTILINE)))
+#else
+            if(JS_GetProperty(cx, JSVAL_TO_OBJECT(v), "stack", &v) &&
+               (regexp = JS_NewRegExpObject(
+                   cx, "^(?=.)", 6, JSREG_GLOB | JSREG_MULTILINE)))
+#endif
+            {
+                // Set up the arguments to ``String.replace()``
+                re_args[0] = OBJECT_TO_JSVAL(regexp);
+                re_args[1] = STRING_TO_JSVAL(JS_InternString(cx, "\t"));
+
+                // Perform the replacement
+                if(JS_ValueToObject(cx, v, &stack) &&
+                   JS_GetProperty(cx, stack, "replace", &replace) &&
+                   JS_CallFunctionValue(cx, stack, replace, 2, re_args, &v))
+                {
+                    // Print the result
+                    bytes = enc_string(cx, v, NULL);
+                    fprintf(stderr, "Stacktrace:\n%s", bytes);
+                    JS_free(cx, bytes);
+                }
+            }
+        }
     }
 }
 
