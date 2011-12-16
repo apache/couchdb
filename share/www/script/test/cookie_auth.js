@@ -34,7 +34,6 @@ couchTests.cookie_auth = function(debug) {
       // try using an invalid cookie
       var usersDb = new CouchDB("test_suite_users", {"X-Couch-Full-Commit":"false"});
       usersDb.deleteDb();
-      usersDb.createDb();
       
       // test that the users db is born with the auth ddoc
       var ddoc = usersDb.open("_design/_auth");

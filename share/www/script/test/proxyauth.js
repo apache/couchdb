@@ -34,7 +34,6 @@ couchTests.proxyauth = function(debug) {
   
   function TestFun() {
     usersDb.deleteDb();
-    usersDb.createDb();
     db.deleteDb();
     db.createDb();
     

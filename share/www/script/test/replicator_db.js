@@ -88,8 +88,10 @@ couchTests.replicator_db = function(debug) {
 
 
   function populate_db(db, docs) {
-    db.deleteDb();
-    db.createDb();
+    if (db.name !== usersDb.name) {
+      db.deleteDb();
+      db.createDb();
+    }
     for (var i = 0; i < docs.length; i++) {
       var d = docs[i];
       delete d._rev;
@@ -1486,10 +1488,12 @@ couchTests.replicator_db = function(debug) {
   ]);
 
   repDb.deleteDb();
+  usersDb.deleteDb();
   restartServer();
   run_on_modified_server(server_config_2, test_user_ctx_validation);
 
   repDb.deleteDb();
+  usersDb.deleteDb();
   restartServer();
   run_on_modified_server(server_config_2, test_replication_credentials_delegation);
 
