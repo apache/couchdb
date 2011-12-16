@@ -114,7 +114,9 @@ cleanup_index_files(Db) ->
 list_index_files(Db) ->
     % call server to fetch the index files
     RootDir = couch_config:get("couchdb", "view_index_dir"),
-    filelib:wildcard(RootDir ++ "/." ++ ?b2l(couch_db:name(Db)) ++ "_design"++"/*").
+    filelib:wildcard(
+        RootDir ++ "/." ++ ?b2l(couch_db:name(Db)) ++ "_design"++"/*.view"
+    ).
 
 
 get_row_count(#view{btree=Bt}) ->
