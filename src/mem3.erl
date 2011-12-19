@@ -16,6 +16,7 @@
 
 -export([start/0, stop/0, restart/0, nodes/0, node_info/2, shards/1, shards/2,
     choose_shards/2, n/1, dbname/1, ushards/1]).
+-export([sync_security/0, sync_security/1]).
 -export([compare_nodelists/0, compare_shards/1]).
 
 -include("mem3.hrl").
@@ -127,6 +128,12 @@ ushards(DbName) ->
 live_shards(DbName) ->
     Nodes = [node()|erlang:nodes()],
     [S || #shard{node=Node} = S <- shards(DbName), lists:member(Node, Nodes)].
+
+sync_security() ->
+    mem3_sync_security:go().
+
+sync_security(Db) ->
+    mem3_sync_security:go(dbname(Db)).
 
 -spec choose_shards(DbName::iodata(), Options::list()) -> [#shard{}].
 choose_shards(DbName, Options) when is_list(DbName) ->
