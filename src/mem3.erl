@@ -16,6 +16,7 @@
 
 -export([start/0, stop/0, restart/0, nodes/0, node_info/2, shards/1, shards/2,
     choose_shards/2, n/1, dbname/1, ushards/1]).
+-export([sync_security/0, sync_security/1]).
 -export([compare_nodelists/0, compare_shards/1]).
 -export([quorum/1]).
 
@@ -126,6 +127,12 @@ ushards(DbName) ->
     Nodes = rotate_nodes(DbName, live_nodes()),
     Buckets = bucket_by_range(Shards),
     choose_ushards(Buckets, Nodes).
+
+sync_security() ->
+    mem3_sync_security:go().
+
+sync_security(Db) ->
+    mem3_sync_security:go(dbname(Db)).
 
 rotate_nodes(DbName, Nodes) ->
     {H, T} = lists:split(erlang:crc32(DbName) rem length(Nodes), Nodes),
