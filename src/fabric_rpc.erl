@@ -19,7 +19,7 @@
     update_docs/3]).
 -export([all_docs/2, changes/3, map_view/4, reduce_view/4, group_info/2]).
 -export([create_db/1, delete_db/2, reset_validation_funs/1, set_security/3,
-    set_revs_limit/3, create_shard_db_doc/2]).
+    get_all_security/2, set_revs_limit/3, create_shard_db_doc/2]).
 
 -include("fabric.hrl").
 -include_lib("couch/include/couch_db.hrl").
@@ -207,6 +207,9 @@ get_update_seq(DbName) ->
 
 set_security(DbName, SecObj, Options) ->
     with_db(DbName, Options, {couch_db, set_security, [SecObj]}).
+
+get_all_security(DbName, Options) ->
+    with_db(DbName, Options, {couch_db, get_security, []}).
 
 set_revs_limit(DbName, Limit, Options) ->
     with_db(DbName, Options, {couch_db, set_revs_limit, [Limit]}).

@@ -22,7 +22,8 @@
 % DBs
 -export([all_dbs/0, all_dbs/1, create_db/1, create_db/2, delete_db/1,
     delete_db/2, get_db_info/1, get_doc_count/1, set_revs_limit/3,
-    set_security/3, get_revs_limit/1, get_security/1, get_security/2]).
+    set_security/2, set_security/3, get_revs_limit/1, get_security/1,
+    get_security/2, get_all_security/1, get_all_security/2]).
 
 % Documents
 -export([open_doc/3, open_revs/4, get_missing_revs/2, get_missing_revs/3,
@@ -129,6 +130,11 @@ get_revs_limit(DbName) ->
     try couch_db:get_revs_limit(Db) after catch couch_db:close(Db) end.
 
 %% @doc sets the readers/writers/admin permissions for a database
+-spec set_security(dbname(), SecObj::json_obj()) -> ok.
+set_security(DbName, SecObj) ->
+    fabric_db_meta:set_security(dbname(DbName), SecObj, [?ADMIN_CTX]).
+
+%% @doc sets the readers/writers/admin permissions for a database
 -spec set_security(dbname(), SecObj::json_obj(), [option()]) -> ok.
 set_security(DbName, SecObj, Options) ->
     fabric_db_meta:set_security(dbname(DbName), SecObj, opts(Options)).
@@ -141,6 +147,16 @@ get_security(DbName) ->
 get_security(DbName, Options) ->
     {ok, Db} = fabric_util:get_db(dbname(DbName), opts(Options)),
     try couch_db:get_security(Db) after catch couch_db:close(Db) end.
+
+%% @doc retrieve the security object for all shards of a database
+-spec get_all_security(dbname()) -> json_obj() | no_return().
+get_all_security(DbName) ->
+    get_all_security(DbName, [?ADMIN_CTX]).
+
+%% @doc retrieve the security object for all shards of a database
+-spec get_all_security(dbname(), [option()]) -> json_obj() | no_return().
+get_all_security(DbName, Options) ->
+    fabric_db_meta:get_all_security(dbname(DbName), opts(Options)).
 
 % doc operations
 
