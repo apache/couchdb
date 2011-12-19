@@ -34,7 +34,7 @@ This version has not been released yet.
    by default, but it can be enabled via the .ini configuration.
  * A new replicator implementation that offers more performance
    and configuration options.
- * Added optional field `since_seq` to replication ojects/documents.
+ * Added optional field `since_seq` to replication objects/documents.
  * Simpler replication cancelation.
  * The _active_tasks API now exposes more granular fields for each
    task type.
