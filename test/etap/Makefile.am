@@ -93,4 +93,5 @@ EXTRA_DIST = \
     230-httpc-pool.t \
     240-replication-compact.t \
     241-replication-large-atts.t \
-    242-replication-many-leaves.t
+    242-replication-many-leaves.t \
+    243-doc-missing-stubs.t
