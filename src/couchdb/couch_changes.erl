@@ -16,17 +16,17 @@
 -export([handle_changes/3]).
 
 %% @type Req -> #httpd{} | {json_req, JsonObj()}
-handle_changes(#changes_args{style=Style}=Args1, Req, Db) ->
+handle_changes(#changes_args{style=Style}=Args1, Req, Db0) ->
     #changes_args{feed = Feed} = Args = Args1#changes_args{
-        filter = make_filter_fun(Args1#changes_args.filter, Style, Req, Db)
+        filter = make_filter_fun(Args1#changes_args.filter, Style, Req, Db0)
     },
     Start = fun() ->
         {ok, Db} = couch_db:reopen(Db0),
-        StartSeq = case Dir of
+        StartSeq = case Args#changes_args.dir of
         rev ->
             couch_db:get_update_seq(Db);
         fwd ->
-            Since
+            Args#changes_args.since
         end,
         {Db, StartSeq}
     end,
