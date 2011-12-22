@@ -313,6 +313,11 @@ function T(arg1, arg2, testName) {
   }
 }
 
+function TIsnull(actual, testName) {
+  T(actual === null, "expected 'null', got '"
+    + repr(actual) + "'", testName);
+}
+
 function TEquals(expected, actual, testName) {
   T(equals(expected, actual), "expected '" + repr(expected) +
     "', got '" + repr(actual) + "'", testName);
