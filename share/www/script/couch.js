@@ -45,14 +45,14 @@ function CouchDB(name, httpHeaders) {
   };
 
   // Save a document to the database
-  this.save = function(doc, options) {
+  this.save = function(doc, options, http_headers) {
     if (doc._id == undefined) {
       doc._id = CouchDB.newUuids(1)[0];
     }
-
+    http_headers = http_headers || {};
     this.last_req = this.request("PUT", this.uri  +
         encodeURIComponent(doc._id) + encodeOptions(options),
-        {body: JSON.stringify(doc)});
+        {body: JSON.stringify(doc), headers: http_headers});
     CouchDB.maybeThrowError(this.last_req);
     var result = JSON.parse(this.last_req.responseText);
     doc._rev = result.rev;
@@ -60,9 +60,9 @@ function CouchDB(name, httpHeaders) {
   };
 
   // Open a document from the database
-  this.open = function(docId, options) {
+  this.open = function(docId, url_params, http_headers) {
     this.last_req = this.request("GET", this.uri + encodeURIComponent(docId)
-      + encodeOptions(options));
+      + encodeOptions(url_params), {headers:http_headers});
     if (this.last_req.status == 404) {
       return null;
     }
@@ -218,7 +218,7 @@ function CouchDB(name, httpHeaders) {
   };
 
   this.changes = function(options) {
-    this.last_req = this.request("GET", this.uri + "_changes" 
+    this.last_req = this.request("GET", this.uri + "_changes"
       + encodeOptions(options));
     CouchDB.maybeThrowError(this.last_req);
     return JSON.parse(this.last_req.responseText);
