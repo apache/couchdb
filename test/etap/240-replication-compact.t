@@ -48,7 +48,9 @@
     revs_limit = 1000,
     fsync_options = [],
     options = [],
-    compression
+    compression,
+    before_doc_update,
+    after_doc_read
 }).
 
 -record(rep, {
