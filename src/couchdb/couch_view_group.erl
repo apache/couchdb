@@ -527,7 +527,7 @@ sort_lib([{LName, LCode}|Rest], LAcc) ->
     sort_lib(Rest, [{LName, LCode}|LAcc]).
 
 open_db_group(DbName, GroupId) ->
-    case couch_db:open_int(DbName, []) of
+    case couch_db:open_int(DbName, [{user_ctx, #user_ctx{roles=[<<"_admin">>]}}]) of
     {ok, Db} ->
         case couch_db:open_doc(Db, GroupId, [ejson_body]) of
         {ok, Doc} ->

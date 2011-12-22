@@ -19,7 +19,10 @@
 -spec update(_, #group{}, Dbname::binary()) -> no_return().
 
 update(Owner, Group, DbName) when is_binary(DbName) ->
-    {ok, Db} = couch_db:open_int(DbName, []),
+    {ok, Db} = couch_db:open_int(DbName, [
+        % allow reading docs from system dbs
+        {user_ctx, #user_ctx{roles=[<<"_admin">>]}
+    }]),
     try
         update(Owner, Group, Db)
     after

@@ -481,7 +481,9 @@ init_db(DbName, Filepath, Fd, ReaderFd, Header0, Options) ->
         revs_limit = Header#db_header.revs_limit,
         fsync_options = FsyncOptions,
         options = Options,
-        compression = Compression
+        compression = Compression,
+        before_doc_update = couch_util:get_value(before_doc_update, Options, nil),
+        after_doc_read = couch_util:get_value(after_doc_read, Options, nil)
         }.
 
 open_reader_fd(Filepath, Options) ->
@@ -499,7 +501,8 @@ close_db(#db{fd_ref_counter = RefCntr}) ->
 
 
 refresh_validate_doc_funs(Db) ->
-    {ok, DesignDocs} = couch_db:get_design_docs(Db),
+    {ok, DesignDocs} = couch_db:get_design_docs(
+        Db#db{user_ctx = #user_ctx{roles=[<<"_admin">>]}}),
     ProcessDocFuns = lists:flatmap(
         fun(DesignDoc) ->
             case couch_doc:get_validate_doc_fun(DesignDoc) of
