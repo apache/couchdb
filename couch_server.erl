@@ -51,7 +51,8 @@ get_stats() ->
 sup_start_link() ->
     gen_server:start_link({local, couch_server}, couch_server, [], []).
 
-open(DbName, Options) ->
+open(DbName, Options0) ->
+    Options = maybe_add_sys_db_callbacks(DbName, Options0),
     case gen_server:call(couch_server, {open, DbName, Options}, infinity) of
     {ok, Db} ->
         Ctx = couch_util:get_value(user_ctx, Options, #user_ctx{}),
@@ -60,7 +61,8 @@ open(DbName, Options) ->
         Error
     end.
 
-create(DbName, Options) ->
+create(DbName, Options0) ->
+    Options = maybe_add_sys_db_callbacks(DbName, Options0),
     case gen_server:call(couch_server, {create, DbName, Options}, infinity) of
     {ok, Db} ->
         Ctx = couch_util:get_value(user_ctx, Options, #user_ctx{}),
@@ -71,6 +73,29 @@ create(DbName, Options) ->
 
 delete(DbName, Options) ->
     gen_server:call(couch_server, {delete, DbName, Options}, infinity).
+
+maybe_add_sys_db_callbacks(DbName, Options) when is_binary(DbName) ->
+    maybe_add_sys_db_callbacks(?b2l(DbName), Options);
+maybe_add_sys_db_callbacks(DbName, Options) ->
+    case couch_config:get("replicator", "db", "_replicator") of
+    DbName ->
+        [
+            {before_doc_update, fun couch_replicator_manager:before_doc_update/2},
+            {after_doc_read, fun couch_replicator_manager:after_doc_read/2},
+            sys_db | Options
+        ];
+    _ ->
+        case couch_config:get("couch_httpd_auth", "authentication_db", "_users") of
+        DbName ->
+        [
+            {before_doc_update, fun couch_users_db:before_doc_update/2},
+            {after_doc_read, fun couch_users_db:after_doc_read/2},
+            sys_db | Options
+        ];
+        _ ->
+            Options
+        end
+    end.
 
 check_dbname(#server{dbname_regexp=RegExp}, DbName) ->
     case re:run(DbName, RegExp, [{capture, none}]) of

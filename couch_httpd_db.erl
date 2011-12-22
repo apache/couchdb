@@ -148,12 +148,23 @@ handle_design_req(#httpd{
         path_parts=[_DbName, _Design, DesignName, <<"_",_/binary>> = Action | _Rest],
         design_url_handlers = DesignUrlHandlers
     }=Req, Db) ->
+    case couch_db:is_system_db(Db) of
+    true ->
+        case (catch couch_db:check_is_admin(Db)) of
+        ok -> ok;
+        _ ->
+            throw({forbidden, <<"Only admins can access design document",
+                " actions for system databases.">>})
+        end;
+    false -> ok
+    end,
+
     % load ddoc
     DesignId = <<"_design/", DesignName/binary>>,
     DDoc = couch_httpd_db:couch_doc_open(Db, DesignId, nil, [ejson_body]),
     Handler = couch_util:dict_find(Action, DesignUrlHandlers, fun(_, _, _) ->
-            throw({not_found, <<"missing handler: ", Action/binary>>})
-        end),
+        throw({not_found, <<"missing handler: ", Action/binary>>})
+    end),
     Handler(Req, Db, DDoc);
 
 handle_design_req(Req, Db) ->
@@ -448,6 +459,20 @@ db_req(#httpd{path_parts=[_, DocId | FileNameParts]}=Req, Db) ->
     db_attachment_req(Req, Db, DocId, FileNameParts).
 
 all_docs_view(Req, Db, Keys) ->
+    case couch_db:is_system_db(Db) of
+    true ->
+        case (catch couch_db:check_is_admin(Db)) of
+        ok ->
+            do_all_docs_view(Req, Db, Keys);
+        _ ->
+            throw({forbidden, <<"Only admins can access _all_docs",
+                " of system databases.">>})
+        end;
+    false ->
+        do_all_docs_view(Req, Db, Keys)
+    end.
+
+do_all_docs_view(Req, Db, Keys) ->
     RawCollator = fun(A, B) -> A < B end,
     #view_query_args{
         start_key = StartKey,

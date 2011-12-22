@@ -481,7 +481,9 @@ init_db(DbName, Filepath, Fd, ReaderFd, Header0, Options) ->
         revs_limit = Header#db_header.revs_limit,
         fsync_options = FsyncOptions,
         options = Options,
-        compression = Compression
+        compression = Compression,
+        before_doc_update = couch_util:get_value(before_doc_update, Options, nil),
+        after_doc_read = couch_util:get_value(after_doc_read, Options, nil)
         }.
 
 open_reader_fd(Filepath, Options) ->
@@ -498,7 +500,8 @@ close_db(#db{fd_ref_counter = RefCntr}) ->
     couch_ref_counter:drop(RefCntr).
 
 
-refresh_validate_doc_funs(Db) ->
+refresh_validate_doc_funs(Db0) ->
+    Db = Db0#db{user_ctx = #user_ctx{roles=[<<"_admin">>]}},
     DesignDocs = couch_db:get_design_docs(Db),
     ProcessDocFuns = lists:flatmap(
         fun(DesignDocInfo) ->
@@ -509,7 +512,7 @@ refresh_validate_doc_funs(Db) ->
             Fun -> [Fun]
             end
         end, DesignDocs),
-    Db#db{validate_doc_funs=ProcessDocFuns}.
+    Db0#db{validate_doc_funs=ProcessDocFuns}.
 
 % rev tree functions
 
