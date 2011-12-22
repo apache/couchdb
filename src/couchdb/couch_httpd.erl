@@ -13,7 +13,7 @@
 -module(couch_httpd).
 -include("couch_db.hrl").
 
--export([start_link/0, start_link/1, stop/0, config_change/2, 
+-export([start_link/0, start_link/1, stop/0, config_change/2,
         handle_request/5]).
 
 -export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,qs_json_value/3]).
@@ -76,12 +76,12 @@ start_link(https) ->
                                     "verify_fun", nil) of
                                 nil -> FinalOpts;
                                 SpecStr ->
-                                    FinalOpts 
+                                    FinalOpts
                                     ++ [{verify_fun, make_arity_3_fun(SpecStr)}]
                             end
                     end
             end,
-            
+
             [{port, Port},
                 {ssl, true},
                 {ssl_opts, FinalSslOpts}];
@@ -147,7 +147,7 @@ start_link(Name, Options) ->
 
     % launch mochiweb
     {ok, Pid} = case mochiweb_http:start(FinalOptions) of
-        {ok, MochiPid} -> 
+        {ok, MochiPid} ->
             {ok, MochiPid};
         {error, Reason} ->
             io:format("Failure to start Mochiweb: ~s~n",[Reason]),
@@ -217,11 +217,11 @@ make_arity_3_fun(SpecStr) ->
 make_fun_spec_strs(SpecStr) ->
     re:split(SpecStr, "(?<=})\\s*,\\s*(?={)", [{return, list}]).
 
-handle_request(MochiReq, DefaultFun, UrlHandlers, DbUrlHandlers, 
+handle_request(MochiReq, DefaultFun, UrlHandlers, DbUrlHandlers,
     DesignUrlHandlers) ->
 
     MochiReq1 = couch_httpd_vhost:dispatch_host(MochiReq),
-    
+
     handle_request_int(MochiReq1, DefaultFun,
                 UrlHandlers, DbUrlHandlers, DesignUrlHandlers).
 
@@ -233,14 +233,14 @@ handle_request_int(MochiReq, DefaultFun,
     RawUri = MochiReq:get(raw_path),
     {"/" ++ Path, _, _} = mochiweb_util:urlsplit_path(RawUri),
 
-    Headers = MochiReq:get(headers), 
+    Headers = MochiReq:get(headers),
 
     % get requested path
     RequestedPath = case MochiReq:get_header_value("x-couchdb-vhost-path") of
         undefined -> RawUri;
         P -> P
     end,
-    
+
     HandlerKey =
     case mochiweb_util:partition(Path, "/") of
     {"", "", ""} ->
@@ -255,7 +255,7 @@ handle_request_int(MochiReq, DefaultFun,
         MochiReq:get(peer),
         mochiweb_headers:to_list(MochiReq:get(headers))
     ]),
-    
+
     Method1 =
     case MochiReq:get(method) of
         % already an atom
@@ -270,11 +270,11 @@ handle_request_int(MochiReq, DefaultFun,
     % allow broken HTTP clients to fake a full method vocabulary with an X-HTTP-METHOD-OVERRIDE header
     MethodOverride = MochiReq:get_primary_header_value("X-HTTP-Method-Override"),
     Method2 = case lists:member(MethodOverride, ["GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT", "COPY"]) of
-    true -> 
+    true ->
         ?LOG_INFO("MethodOverride: ~s (real method was ~s)", [MethodOverride, Method1]),
         case Method1 of
         'POST' -> couch_util:to_existing_atom(MethodOverride);
-        _ -> 
+        _ ->
             % Ignore X-HTTP-Method-Override when the original verb isn't POST.
             % I'd like to send a 406 error to the client, but that'd require a nasty refactor.
             % throw({not_acceptable, <<"X-HTTP-Method-Override may only be used with POST requests.">>})
@@ -516,7 +516,7 @@ recv_chunked(#httpd{mochi_req=MochiReq}, MaxChunkSize, ChunkFun, InitState) ->
     % Fun({Length, Binary}, State)
     % called with Length == 0 on the last time.
     MochiReq:stream_body(MaxChunkSize, ChunkFun, InitState).
-    
+
 body_length(Req) ->
     case header_value(Req, "Transfer-Encoding") of
         undefined ->
@@ -963,7 +963,7 @@ get_boundary({"multipart/" ++ _, Opts}) ->
 get_boundary(ContentType) ->
     {"multipart/" ++ _ , Opts} = mochiweb_util:parse_header(ContentType),
     get_boundary({"multipart/", Opts}).
-    
+
 
 
 split_header(<<>>) ->
@@ -1009,7 +1009,7 @@ parse_part_header(#mp{callback=UserCallBack}=Mp) ->
     {Mp2, AccCallback} = read_until(Mp, <<"\r\n\r\n">>,
             fun(Next) -> acc_callback(Next, []) end),
     HeaderData = AccCallback(get_data),
-    
+
     Headers =
     lists:foldl(fun(Line, Acc) ->
             split_header(Line) ++ Acc
