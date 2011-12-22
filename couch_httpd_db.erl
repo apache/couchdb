@@ -651,7 +651,7 @@ db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
 
 db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
     couch_doc:validate_docid(DocId),
-    
+
     case couch_util:to_list(couch_httpd:header_value(Req, "Content-Type")) of
     ("multipart/related;" ++ _) = ContentType ->
         {ok, Doc0, WaitFun, Parser} = couch_doc:doc_from_multi_part_stream(
@@ -712,7 +712,7 @@ send_doc_efficiently(#httpd{mochi_req = MochiReq} = Req,
             send_json(Req, 200, Headers, couch_doc:to_json_obj(Doc, Options));
         true ->
             Boundary = couch_uuids:random(),
-            JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, 
+            JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc,
                     [attachments, follows, att_encoding_info | Options])),
             {ContentType, Len} = couch_doc:len_doc_to_multi_part_stream(
                     Boundary,JsonBytes, Atts, true),
@@ -729,7 +729,7 @@ send_docs_multipart(Req, Results, Options1) ->
     OuterBoundary = couch_uuids:random(),
     InnerBoundary = couch_uuids:random(),
     Options = [attachments, follows, att_encoding_info | Options1],
-    CType = {"Content-Type", 
+    CType = {"Content-Type",
         "multipart/mixed; boundary=\"" ++ ?b2l(OuterBoundary) ++ "\""},
     {ok, Resp} = start_chunked_response(Req, 200, [CType]),
     couch_httpd:send_chunk(Resp, <<"--", OuterBoundary/binary>>),
@@ -747,8 +747,8 @@ send_docs_multipart(Req, Results, Options1) ->
         ({{not_found, missing}, RevId}) ->
              RevStr = couch_doc:rev_to_str(RevId),
              Json = ?JSON_ENCODE({[{"missing", RevStr}]}),
-             couch_httpd:send_chunk(Resp, 
-                [<<"\r\nContent-Type: application/json; error=\"true\"\r\n\r\n">>, 
+             couch_httpd:send_chunk(Resp,
+                [<<"\r\nContent-Type: application/json; error=\"true\"\r\n\r\n">>,
                 Json,
                 <<"\r\n--", OuterBoundary/binary>>])
          end, Results),
@@ -784,7 +784,7 @@ receive_request_data(Req, LenLeft) when LenLeft > 0 ->
     {Data, fun() -> receive_request_data(Req, LenLeft - iolist_size(Data)) end};
 receive_request_data(_Req, _) ->
     throw(<<"expected more data">>).
-    
+
 make_content_range(From, To, Len) ->
     ?l2b(io_lib:format("bytes ~B-~B/~B", [From, To, Len])).
 
@@ -1052,8 +1052,8 @@ db_attachment_req(#httpd{method=Method,mochi_req=MochiReq}=Req, Db, DocId, FileN
                             _Else ->
                                 ok
                         end,
-                        
-                        
+
+
                         fun(Size) -> couch_httpd:recv(Req, Size) end
                     end,
                 att_len = case couch_httpd:header_value(Req,"Content-Length") of
