@@ -71,6 +71,7 @@ source_files = \
     couch_stats_collector.erl \
     couch_stream.erl \
     couch_task_status.erl \
+    couch_users_db.erl \
     couch_util.erl \
     couch_uuids.erl \
     couch_db_updater.erl \
@@ -125,6 +126,7 @@ compiled_files = \
     couch_stats_collector.beam \
     couch_stream.beam \
     couch_task_status.beam \
+    couch_users_db.beam \
     couch_util.beam \
     couch_uuids.beam \
     couch_db_updater.beam \

@@ -80,7 +80,7 @@ shutdown_sync(Pid) ->
     after
         erlang:demonitor(MRef, [flush])
     end.
-    
+
 
 simple_call(Pid, Message) ->
     MRef = erlang:monitor(process, Pid),
@@ -182,7 +182,7 @@ json_user_ctx(#db{name=DbName, user_ctx=Ctx}) ->
     {[{<<"db">>, DbName},
             {<<"name">>,Ctx#user_ctx.name},
             {<<"roles">>,Ctx#user_ctx.roles}]}.
-    
+
 
 % returns a random integer
 rand32() ->
@@ -435,7 +435,7 @@ encode_doc_id(Id) ->
 with_db(Db, Fun) when is_record(Db, db) ->
     Fun(Db);
 with_db(DbName, Fun) ->
-    case couch_db:open_int(DbName, []) of
+    case couch_db:open_int(DbName, [{user_ctx, #user_ctx{roles=[<<"_admin">>]}}]) of
         {ok, Db} ->
             try
                 Fun(Db)

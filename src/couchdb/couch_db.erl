@@ -29,7 +29,7 @@
 -export([init/1,terminate/2,handle_call/3,handle_cast/2,code_change/3,handle_info/2]).
 -export([changes_since/4,changes_since/5,read_doc/2,new_revid/1]).
 -export([check_is_admin/1, check_is_member/1]).
--export([reopen/1]).
+-export([reopen/1, is_system_db/1]).
 
 -include("couch_db.hrl").
 
@@ -100,6 +100,9 @@ reopen(#db{main_pid = Pid, fd_ref_counter = OldRefCntr, user_ctx = UserCtx}) ->
         catch couch_ref_counter:drop(OldRefCntr)
     end,
     {ok, NewDb#db{user_ctx = UserCtx}}.
+
+is_system_db(#db{options = Options}) ->
+    lists:member(sys_db, Options).
 
 ensure_full_commit(#db{update_pid=UpdatePid,instance_start_time=StartTime}) ->
     ok = gen_server:call(UpdatePid, full_commit, infinity),
@@ -683,7 +686,7 @@ update_docs(Db, Docs, Options, replicated_changes) ->
     increment_stat(Db, {couchdb, database_writes}),
     % associate reference with each doc in order to track duplicates
     Docs2 = lists:map(fun(Doc) -> {Doc, make_ref()} end, Docs),
-    DocBuckets = group_alike_docs(Docs2),
+    DocBuckets = before_docs_update(Db, group_alike_docs(Docs2)),
     case (Db#db.validate_doc_funs /= []) orelse
         lists:any(
             fun({#doc{id= <<?DESIGN_DOC_PREFIX, _/binary>>}, _Ref}) -> true;
@@ -724,7 +727,7 @@ update_docs(Db, Docs, Options, interactive_edit) ->
             end
         end, {[], []}, Docs2),
 
-    DocBuckets = group_alike_docs(Docs3),
+    DocBuckets = before_docs_update(Db, group_alike_docs(Docs3)),
 
     case (Db#db.validate_doc_funs /= []) orelse
         lists:any(
@@ -869,6 +872,17 @@ prepare_doc_summaries(Db, BucketList) ->
             end,
             SummaryChunk = couch_db_updater:make_doc_summary(Db, {Body, DiskAtts}),
             {Doc#doc{body = {summary, SummaryChunk, AttsFd}}, Ref}
+        end,
+        Bucket) || Bucket <- BucketList].
+
+
+before_docs_update(#db{before_doc_update = nil}, BucketList) ->
+    BucketList;
+before_docs_update(#db{before_doc_update = Fun} = Db, BucketList) ->
+    [lists:map(
+        fun({Doc, Ref}) ->
+            NewDoc = Fun(couch_doc:with_ejson_body(Doc), Db),
+            {NewDoc, Ref}
         end,
         Bucket) || Bucket <- BucketList].
 
@@ -1292,13 +1306,20 @@ make_doc(#db{updater_fd = Fd} = Db, Id, Deleted, Bp, RevisionPath) ->
                         data={Fd,Sp}}
                 end, Atts0)}
     end,
-    #doc{
+    Doc = #doc{
         id = Id,
         revs = RevisionPath,
         body = BodyData,
         atts = Atts,
         deleted = Deleted
-        }.
+    },
+    after_doc_read(Db, Doc).
+
+
+after_doc_read(#db{after_doc_read = nil}, Doc) ->
+    Doc;
+after_doc_read(#db{after_doc_read = Fun} = Db, Doc) ->
+    Fun(couch_doc:with_ejson_body(Doc), Db).
 
 
 increment_stat(#db{options = Options}, Stat) ->
