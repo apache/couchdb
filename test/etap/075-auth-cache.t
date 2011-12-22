@@ -42,7 +42,9 @@
     revs_limit = 1000,
     fsync_options = [],
     options = [],
-    compression
+    compression,
+    before_doc_update = nil, % nil | fun(Doc, Db) -> NewDoc
+    after_doc_read = nil     % nil | fun(Doc, Db) -> NewDoc
 }).
 
 auth_db_name() -> <<"couch_test_auth_db">>.
