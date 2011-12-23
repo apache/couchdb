@@ -115,6 +115,10 @@ esac
 
 AM_CONDITIONAL([WINDOWS], [test x$IS_WINDOWS = xTRUE])
 
+OLD_LIBS="$LIBS"
+LIBS="$JS_LIBS $LIBS"
+OLD_CPPFLAGS="$CPPFLAGS"
+CPPFLAGS="$JS_CFLAGS $CPPFLAGS"
 AC_CHECK_LIB([mozjs185], [JS_NewContext], [JS_LIB_BASE=mozjs185], [
     AC_CHECK_LIB([mozjs185-1.0], [JS_NewContext], [JS_LIB_BASE=mozjs185-1.0], [
         AC_CHECK_LIB([mozjs], [JS_NewContext], [JS_LIB_BASE=mozjs], [
@@ -125,7 +129,35 @@ AC_CHECK_LIB([mozjs185], [JS_NewContext], [JS_LIB_BASE=mozjs185], [
 
 Is the Mozilla SpiderMonkey library installed?])])])])])])])
 
-AC_SUBST(JS_LIB_BASE)
+# Figure out what version of SpiderMonkey to use
+
+AC_CHECK_LIB([$JS_LIB_BASE], [JS_NewCompartmentAndGlobalObject],
+    # Prevent people from accidentally using SpiderMonkey's that are too new
+
+    if test "$use_js_trunk" = "no"; then
+        AC_CHECK_DECL([JSOPTION_ANONFUNFIX], [], [
+            AC_MSG_ERROR([Your SpiderMonkey library is too new.
+
+Versions of SpiderMonkey after the js185-1.0.0 release remove the optional
+enforcement of preventing anonymous functions in a statement context. This
+will most likely break your existing JavaScript code as well as render all
+example code invalid.
+
+If you wish to ignore this error pass --enable-js-trunk to ./configure.])],
+        [[#include <jsapi.h>]])
+    fi
+    AC_DEFINE([SM185], [1],
+        [Use SpiderMonkey 1.8.5]))
+
+AC_CHECK_LIB([$JS_LIB_BASE], [JS_ThrowStopIteration],
+    AC_DEFINE([SM180], [1],
+        [Use SpiderMonkey 1.8.0]))
+
+AC_CHECK_LIB([$JS_LIB_BASE], [JS_GetStringCharsAndLength],
+    AC_DEFINE([HAVE_JS_GET_STRING_CHARS_AND_LENGTH], [1],
+        [Use newer JS_GetCharsAndLength function.]))
+
+# Else, hope that 1.7.0 works
 
 AC_DEFINE([COUCHJS_NAME], ["couchjs"], ["CouchJS executable name."])
 
@@ -176,6 +208,7 @@ if test x${IS_WINDOWS} = xTRUE; then
 fi
 
 JSLIB=-l$JS_LIB_BASE
+AC_SUBST(JSLIB)
 
 AC_CHECK_HEADER([jsapi.h], [], [
     AC_CHECK_HEADER([js/jsapi.h],
@@ -188,37 +221,6 @@ AC_CHECK_HEADER([jsapi.h], [], [
 Are the Mozilla SpiderMonkey headers installed?])
         ])])
 
-# Prevent people from accidentally using SpiderMonkey's that are too new
-
-if test "$use_js_trunk" = "no"; then
-AC_CHECK_DECL([JSOPTION_ANONFUNFIX], [], [
-    AC_MSG_ERROR([Your SpiderMonkey library is too new.
-
-Versions of SpiderMonkey after the js185-1.0.0 release remove the optional
-enforcement of preventing anonymous functions in a statement context. This
-will most likely break your existing JavaScript code as well as render all
-example code invalid.
-
-If you wish to ignore this error pass --enable-js-trunk to ./configure.])],
-    [[#include <jsapi.h>]])
-fi
-
-AC_SUBST(JSLIB)
-
-AC_LANG_PUSH(C)
-
-AC_CHECK_LIB([$JS_LIB_BASE], [JS_NewCompartmentAndGlobalObject],
-    AC_DEFINE([SM185], [1],
-        [Use SpiderMonkey 1.8.5]))
-
-AC_CHECK_LIB([$JS_LIB_BASE], [JS_ThrowStopIteration],
-    AC_DEFINE([SM180], [1],
-        [Use SpiderMonkey 1.8.0]))
-
-AC_CHECK_LIB([$JS_LIB_BASE], [JS_GetStringCharsAndLength],
-    AC_DEFINE([HAVE_JS_GET_STRING_CHARS_AND_LENGTH], [1],
-        [Use newer JS_GetCharsAndLength function.]))
-
 # Deal with JSScript -> JSObject -> JSScript switcheroo
 
 AC_CHECK_TYPE([JSScript*],
@@ -227,7 +229,9 @@ AC_CHECK_TYPE([JSScript*],
     [[#include <jsapi.h>]]
 )
 
-AC_LANG_POP(C)
+LIBS="$OLD_LIBS"
+CPPFLAGS="$OLD_CPPFLAGS"
+
 
 AC_ARG_WITH([win32-icu-binaries], [AC_HELP_STRING([--with-win32-icu-binaries=PATH],
     [set PATH to the Win32 native ICU binaries directory])], [
