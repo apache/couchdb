@@ -28,7 +28,7 @@ You will need the following installed:
  * Erlang OTP (=14B01)        (http://erlang.org/)
  * ICU        (=4.4.*)         (http://icu.sourceforge.net/)
  * OpenSSL                    (http://www.openssl.org/)
- * Mozilla SpiderMonkey (1.8) (http://www.mozilla.org/js/spidermonkey/)
+ * Mozilla SpiderMonkey (1.7) (http://www.mozilla.org/js/spidermonkey/)
  * libcurl                    (http://curl.haxx.se/libcurl/)
  * Cygwin                     (http://www.cygwin.com/)
  * Visual Studio 2008         (http://msdn.microsoft.com/en-gb/vstudio/default.aspx)
