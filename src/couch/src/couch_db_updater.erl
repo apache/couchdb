@@ -526,6 +526,9 @@ close_db(#db{fd_monitor = Ref}) ->
     erlang:demonitor(Ref).
 
 
+refresh_validate_doc_funs(#db{name = <<"shards/", _/binary>> = Name} = Db) ->
+    spawn(fabric, reset_validation_funs, [mem3:dbname(Name)]),
+    Db#db{validate_doc_funs = undefined};
 refresh_validate_doc_funs(Db0) ->
     Db = Db0#db{user_ctx = #user_ctx{roles=[<<"_admin">>]}},
     {ok, DesignDocs} = couch_db:get_design_docs(Db),
@@ -538,13 +541,7 @@ refresh_validate_doc_funs(Db0) ->
             Fun -> [Fun]
             end
         end, DesignDocs),
-    case Db#db.name of
-        <<"shards/", _:18/binary, DbName/binary>> ->
-            fabric:reset_validation_funs(DbName),
-            Db#db{validate_doc_funs=undefined};
-        _ ->
-            Db0#db{validate_doc_funs=ProcessDocFuns}
-    end.
+    Db#db{validate_doc_funs=ProcessDocFuns}.
 
 % rev tree functions
 
