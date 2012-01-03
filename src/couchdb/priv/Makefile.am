@@ -32,7 +32,7 @@ couchprivlib_LTLIBRARIES = couch_icu_driver.la
 if USE_EJSON_COMPARE_NIF
 couchprivlib_LTLIBRARIES += couch_ejson_compare.la
 couch_ejson_compare_la_SOURCES = couch_ejson_compare/couch_ejson_compare.c
-couch_ejson_compare_la_CFLAGS = -D_BSD_SOURCE $(ICU_CFLAGS) $(ERLANG_FLAGS)
+couch_ejson_compare_la_CPPFLAGS = -D_BSD_SOURCE $(ICU_CPPFLAGS) $(ERLANG_FLAGS)
 couch_ejson_compare_la_LDFLAGS = -module -avoid-version
 couch_ejson_compare_la_LIBADD = $(ICU_LIBS)
 if WINDOWS
@@ -41,7 +41,7 @@ endif
 endif
 couch_icu_driver_la_SOURCES = icu_driver/couch_icu_driver.c
 couch_icu_driver_la_LDFLAGS = -module -avoid-version
-couch_icu_driver_la_CFLAGS = $(ICU_CFLAGS) $(ERLANG_FLAGS)
+couch_icu_driver_la_CPPFLAGS = $(ICU_CPPFLAGS) $(ERLANG_FLAGS)
 couch_icu_driver_la_LIBADD = $(ICU_LIBS)
 
 if WINDOWS

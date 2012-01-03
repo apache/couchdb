@@ -323,7 +323,7 @@ CPPFLAGS="$OLD_CPPFLAGS"
 
 AC_ARG_WITH([win32-icu-binaries], [AC_HELP_STRING([--with-win32-icu-binaries=PATH],
     [set PATH to the Win32 native ICU binaries directory])], [
-    ICU_CFLAGS="-I$withval/include"
+    ICU_CPPFLAGS="-I$withval/include"
     ICU_LIBS="-L$withval/lib -licuuc -licudt -licuin"
     ICU_BIN=$withval/bin
 ], [
@@ -336,6 +336,7 @@ AC_ARG_WITH([win32-icu-binaries], [AC_HELP_STRING([--with-win32-icu-binaries=PAT
 ])
 
 AC_SUBST(ICU_CFLAGS)
+AC_SUBST(ICU_CPPFLAGS)
 AC_SUBST(ICU_LIBS)
 AC_SUBST(ICU_BIN)
 
