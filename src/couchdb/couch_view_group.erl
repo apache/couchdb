@@ -247,7 +247,9 @@ handle_cast({partial_update, Pid, NewGroup}, #group_state{updater_pid=Pid}
         group = Group
     } = State,
     NewSeq = NewGroup#group.current_seq,
-    case NewSeq > Group#group.current_seq of
+    CheckpointInterval = list_to_integer(
+        couch_config:get("couchdb","view_checkpoint_interval","100")),
+    case NewSeq > CheckpointInterval + Group#group.current_seq of
     true ->
         ?LOG_INFO("checkpointing view update at seq ~p for ~s ~s", [NewSeq,
             DbName, NewGroup#group.name]),
