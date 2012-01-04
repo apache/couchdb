@@ -56,23 +56,15 @@ get_all_security(DbName) ->
         Error
     end.
 
-is_ok(SecObjs) when length(SecObjs) == 1 ->
+is_ok([_]) ->
     ok;
-is_ok(SecObjs) when length(SecObjs) > 2 ->
-    broken;
-is_ok(SecObjs0) ->
-    EmptyCount = proplists:get_value({[]}, SecObjs0, undefined),
-    SecObjs = proplists:delete({[]}, SecObjs0),
-    case length(SecObjs) == 1 of
-    true ->
-        [{SecObj, Count}] = SecObjs,
-        case Count > EmptyCount of
-        true ->
-            {fixable, SecObj};
-        false ->
-            broken
-        end;
-    false ->
+is_ok([_, _] = SecObjs0) ->
+    case lists:keytake({[]}, 1, SecObjs0) of
+    {value, {_, EmptyCount}, [{SecObj, Count}]} when Count > EmptyCount ->
+        {fixable, SecObj};
+    _ ->
         broken
-    end.
+    end;
+is_ok(_) ->
+    broken.
 
