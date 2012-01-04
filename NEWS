@@ -47,6 +47,7 @@ This version has not been released yet.
  * Fixes to the `_changes` feed heartbeat option when combined with
    a filter. It affected continuous pull replications with a filter.
  * Fix use of OAuth with VHosts and URL rewriting.
+ * OAuth secrets can now be stored in the users system database.
 
 Version 1.1.2
 -------------

@@ -26,6 +26,11 @@ This version has not been released yet.
 Authentication:
 
  * Fix use of OAuth with VHosts and URL rewriting.
+ * OAuth secrets can now be stored in the users system database
+   as an alternative to key value pairs in the .ini configuration.
+   By default this is disabled (secrets are stored in the .ini)
+   but can be enabled via the .ini configuration key `use_users_db`
+   in the `couch_httpd_oauth` section.
 
 Build System:
 
