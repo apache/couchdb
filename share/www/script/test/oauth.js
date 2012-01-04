@@ -283,7 +283,9 @@ couchTests.oauth = function(debug) {
      {section: "oauth_token_secrets",
       key: "bar", value: admintokenSecret},
      {section: "couch_httpd_oauth",
-      key: "authorization_url", value: authorization_url}
+      key: "authorization_url", value: authorization_url},
+     {section: "couch_httpd_oauth",
+      key: "use_users_db", value: "false"}
     ],
     testFun
   );
