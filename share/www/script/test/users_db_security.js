@@ -25,7 +25,6 @@ couchTests.users_db_security = function(debug) {
     };
     var username1 = username.replace(/[0-9]$/, "");
     var password = pws[username];
-    //console.log("Logging in '" + username1 + "' with password '" + password + "'");
     T(CouchDB.login(username1, pws[username]).ok);
   };
 
@@ -80,7 +79,6 @@ couchTests.users_db_security = function(debug) {
     // jan's gonna be admin as he's the first user
     TEquals(true, usersDb.save(userDoc).ok, "should save document");
     userDoc = usersDb.open("org.couchdb.user:jchris");
-    console.log(userDoc);
     TEquals(undefined, userDoc.password, "password field should be null 1");
     TEquals(40, userDoc.password_sha.length, "password_sha should exist");
     TEquals(32, userDoc.salt.length, "salt should exist");
@@ -191,13 +189,11 @@ couchTests.users_db_security = function(debug) {
         TEquals("forbidden", e.error, "non-admins can't read design docs");
       }
 
-      console.log(fdmananaDoc);
       // admin should be able to read and edit any user doc
       fdmananaDoc.password = "mobile";
       var result = save_as(usersDb, fdmananaDoc, "jan");
       TEquals(true, result.ok, "admin should be able to update any user doc");
 
-      console.log(fdmananaDoc);
       // admin should be able to read and edit any user doc
       fdmananaDoc.password = "mobile1";
       var result = save_as(usersDb, fdmananaDoc, "benoitc");
