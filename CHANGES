@@ -10,6 +10,11 @@ Source Repository:
 
  * The source repository was migrated from SVN to Git.
 
+Storage System:
+
+ * Fixed unnecessary conflict when deleting and creating a
+   document in the same batch.
+
 View Server:
 
  * Speedup in the communication with external view servers.
