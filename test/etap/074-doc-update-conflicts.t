@@ -26,7 +26,7 @@ test_db_name() -> <<"couch_test_update_conflicts">>.
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(25),
+    etap:plan(35),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -44,6 +44,8 @@ test() ->
     lists:foreach(
         fun(NumClients) -> test_concurrent_doc_update(NumClients) end,
         [100, 500, 1000, 2000, 5000]),
+
+    test_bulk_delete_create(),
 
     couch_server_sup:stop(),
     ok.
@@ -130,6 +132,64 @@ test_concurrent_doc_update(NumClients) ->
     etap:is(Doc3, Doc2, "Got same document after server restart"),
 
     delete_db(Db3).
+
+
+% COUCHDB-188
+test_bulk_delete_create() ->
+    {ok, Db} = create_db(test_db_name()),
+    Doc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"foobar">>},
+        {<<"value">>, 0}
+    ]}),
+    {ok, Rev} = couch_db:update_doc(Db, Doc, []),
+
+    DeletedDoc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"foobar">>},
+        {<<"_rev">>, couch_doc:rev_to_str(Rev)},
+        {<<"_deleted">>, true}
+    ]}),
+    NewDoc = couch_doc:from_json_obj({[
+        {<<"_id">>, <<"foobar">>},
+        {<<"value">>, 666}
+    ]}),
+
+    {ok, Results} = couch_db:update_docs(Db, [DeletedDoc, NewDoc], []),
+    ok = couch_db:close(Db),
+
+    etap:is(length([ok || {ok, _} <- Results]), 2,
+        "Deleted and non-deleted versions got an ok reply"),
+
+    [{ok, Rev1}, {ok, Rev2}] = Results,
+    {ok, Db2} = couch_db:open_int(test_db_name(), []),
+
+    {ok, [{ok, Doc1}]} = couch_db:open_doc_revs(
+        Db2, <<"foobar">>, [Rev1], [conflicts, deleted_conflicts]),
+    {ok, [{ok, Doc2}]} = couch_db:open_doc_revs(
+        Db2, <<"foobar">>, [Rev2], [conflicts, deleted_conflicts]),
+    ok = couch_db:close(Db2),
+
+    {Doc1Props} = couch_doc:to_json_obj(Doc1, []),
+    {Doc2Props} = couch_doc:to_json_obj(Doc2, []),
+
+    etap:is(couch_util:get_value(<<"_deleted">>, Doc1Props), true,
+        "Document was deleted"),
+    etap:is(couch_util:get_value(<<"_deleted">>, Doc2Props), undefined,
+        "New document not flagged as deleted"),
+    etap:is(couch_util:get_value(<<"value">>, Doc2Props), 666,
+        "New leaf revision has the right value"),
+    etap:is(couch_util:get_value(<<"_conflicts">>, Doc1Props), undefined,
+        "Deleted document has no conflicts"),
+    etap:is(couch_util:get_value(<<"_deleted_conflicts">>, Doc1Props), undefined,
+        "Deleted document has no deleted conflicts"),
+    etap:is(couch_util:get_value(<<"_conflicts">>, Doc2Props), undefined,
+        "New leaf revision doesn't have conflicts"),
+    etap:is(couch_util:get_value(<<"_deleted_conflicts">>, Doc2Props), undefined,
+        "New leaf revision doesn't have deleted conflicts"),
+
+    etap:is(element(1, Rev1), 2, "Deleted revision has position 2"),
+    etap:is(element(1, Rev2), 1, "New leaf revision has position 1"),
+
+    delete_db(Db2).
 
 
 spawn_client(Doc) ->
