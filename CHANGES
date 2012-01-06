@@ -14,7 +14,7 @@ Authentication:
    By default this is disabled (secrets are stored in the .ini)
    but can be enabled via the .ini configuration key `use_users_db`
    in the `couch_httpd_oauth` section.
- * Documents in the _users database are no longer publically
+ * Documents in the _users database are no longer publicly
    readable.
  * Confidential information in the _replication database is no
    longer publicly readable.
