@@ -78,7 +78,7 @@ handle_message(Reply, Worker, {Workers, R, Replies}) ->
         {[_], [_]} ->
             % complete agreement amongst all copies
             {stop, QuorumReply};
-        {[_|_], [_]} ->
+        {[_|_], [{_, {QuorumReply, _}}]} ->
             % any divergent replies are ancestors of the QuorumReply
             {error, needs_repair, QuorumReply};
         _Else ->
