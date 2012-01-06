@@ -576,16 +576,16 @@ merge_rev_trees(_Limit, _Merge, [], [], AccNewInfos, AccRemoveSeqs, AccSeq) ->
     {ok, lists:reverse(AccNewInfos), AccRemoveSeqs, AccSeq};
 merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
         [OldDocInfo|RestOldInfo], AccNewInfos, AccRemoveSeqs, AccSeq) ->
-    #full_doc_info{id=Id,rev_tree=OldTree,deleted=OldDeleted,update_seq=OldSeq}
+    #full_doc_info{id=Id,rev_tree=OldTree,deleted=OldDeleted0,update_seq=OldSeq}
             = OldDocInfo,
-    NewRevTree = lists:foldl(
-        fun({Client, {#doc{revs={Pos,[_Rev|PrevRevs]}}=NewDoc, Ref}}, AccTree) ->
+    {NewRevTree, _} = lists:foldl(
+        fun({Client, {#doc{revs={Pos,[_Rev|PrevRevs]}}=NewDoc, Ref}}, {AccTree, OldDeleted}) ->
             if not MergeConflicts ->
                 case couch_key_tree:merge(AccTree, couch_doc:to_path(NewDoc),
                     Limit) of
                 {_NewTree, conflicts} when (not OldDeleted) ->
                     send_result(Client, Ref, conflict),
-                    AccTree;
+                    {AccTree, OldDeleted};
                 {NewTree, conflicts} when PrevRevs /= [] ->
                     % Check to be sure if prev revision was specified, it's
                     % a leaf node in the tree
@@ -594,10 +594,10 @@ merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
                             {LeafPos, LeafRevId} == {Pos-1, hd(PrevRevs)}
                         end, Leafs),
                     if IsPrevLeaf ->
-                        NewTree;
+                        {NewTree, OldDeleted};
                     true ->
                         send_result(Client, Ref, conflict),
-                        AccTree
+                        {NewTree, OldDeleted}
                     end;
                 {NewTree, no_conflicts} when  AccTree == NewTree ->
                     % the tree didn't change at all
@@ -616,21 +616,21 @@ merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
                                 couch_doc:to_path(NewDoc2), Limit),
                         % we changed the rev id, this tells the caller we did
                         send_result(Client, Ref, {ok, {OldPos + 1, NewRevId}}),
-                        NewTree2;
+                        {NewTree2, OldDeleted};
                     true ->
                         send_result(Client, Ref, conflict),
-                        AccTree
+                        {NewTree, OldDeleted}
                     end;
                 {NewTree, _} ->
-                    NewTree
+                    {NewTree, NewDoc#doc.deleted}
                 end;
             true ->
                 {NewTree, _} = couch_key_tree:merge(AccTree,
                             couch_doc:to_path(NewDoc), Limit),
-                NewTree
+                {NewTree, OldDeleted}
             end
         end,
-        OldTree, NewDocs),
+        {OldTree, OldDeleted0}, NewDocs),
     if NewRevTree == OldTree ->
         % nothing changed
         merge_rev_trees(Limit, MergeConflicts, RestDocsList, RestOldInfo,
