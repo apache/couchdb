@@ -48,9 +48,11 @@ couchdb: couchdb.tpl
 	$@ < $<
 	chmod +x $@
 
+if !WINDOWS
 install-exec-hook:
 	$(LN_S) -f "$(locallibbindir)/$(couchjs_command_name)" \
 		"$(DESTDIR)$(bindir)/$(couchjs_command_name)"
+endif
 
 couchjs_dev:
 	$(LN_S) -f "$(abs_top_builddir)/src/couchdb/priv/couchjs" "$@"
