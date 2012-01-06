@@ -17,7 +17,7 @@ Authentication:
  * Documents in the _users database are no longer publically
    readable.
  * Confidential information in the _replication database is no
-   longer publically readable.
+   longer publicly readable.
  * Password hashes are now calculated by CouchDB. Clients are no
    longer required to do this manually.
 
