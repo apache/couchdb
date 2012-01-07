@@ -43,7 +43,8 @@ couchTests.attachment_ranges = function(debug) {
     TEquals("29", xhr.getResponseHeader("Content-Length"));
 
     // Fetch the whole entity without an end offset is a 200.
-    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt?bar=1", {
+    var rand = "&foo=" + Math.random(10000000);
+    var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt?bar=1" + rand, {
         headers: {
             "Range": "bytes=0-"
         }
