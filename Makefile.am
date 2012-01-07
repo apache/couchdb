@@ -81,8 +81,10 @@ README.gz: $(top_srcdir)/README
 THANKS.gz: $(top_srcdir)/THANKS
 	-gzip -9 < $< > $@
 
-check: dev
+check: dev check-js
 	$(top_builddir)/test/etap/run $(top_srcdir)/test/etap
+
+check-js: dev
 if USE_CURL
 	$(top_builddir)/test/javascript/run
 endif
