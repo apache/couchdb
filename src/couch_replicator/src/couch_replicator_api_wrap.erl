@@ -306,13 +306,15 @@ update_docs(Db, DocList, Options, UpdateType) ->
 
 changes_since(#httpdb{headers = Headers1} = HttpDb, Style, StartSeq,
     UserFun, Options) ->
+    HeartBeat = erlang:max(1000, HttpDb#httpdb.timeout div 3),
     BaseQArgs = case get_value(continuous, Options, false) of
     false ->
         [{"feed", "normal"}];
     true ->
-        [{"feed", "continuous"}, {"heartbeat", "10000"}]
+        [{"feed", "continuous"}]
     end ++ [
-        {"style", atom_to_list(Style)}, {"since", couch_util:to_list(StartSeq)}
+        {"style", atom_to_list(Style)}, {"since", couch_util:to_list(StartSeq)},
+        {"heartbeat", integer_to_list(HeartBeat)}
     ],
     DocIds = get_value(doc_ids, Options),
     {QArgs, Method, Body, Headers} = case DocIds of
