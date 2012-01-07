@@ -90,9 +90,9 @@ endif
 
 # libtool and automake have defeated markh.  For each of our executables
 # we end up with 2 copies - one directly in the 'target' folder (eg, 'priv')
-# and another - the correct one - in .libs.  The former doesn't work but is 
+# and another - the correct one - in .libs.  The former doesn't work but is
 # what gets installed for 'couchspawnkillable' - but the correct one for
-# couchjs.exe *does* get copied.  *shrug*  So just clobber it with the 
+# couchjs.exe *does* get copied.  *shrug*  So just clobber it with the
 # correct one as the last step. See bug COUCHDB-439
 install-data-hook:
 	if test -f "$(DESTDIR)$(couchprivlibdir)/couch_icu_driver"; then \
@@ -106,9 +106,9 @@ install-data-hook:
 	        $(LN_S) couch_ejson_compare_nif couch_ejson_compare_nif.so; \
 	fi
 if WINDOWS
-	$(INSTALL) $(ICU_BIN)/icuuc44.dll $(bindir)
-	$(INSTALL) $(ICU_BIN)/icudt44.dll $(bindir)
-	$(INSTALL) $(ICU_BIN)/icuin44.dll $(bindir)
+	$(INSTALL) $(ICU_BIN)/icuuc*.dll $(bindir)
+	$(INSTALL) $(ICU_BIN)/icudt*.dll $(bindir)
+	$(INSTALL) $(ICU_BIN)/icuin*.dll $(bindir)
 	$(INSTALL) $(JS_LIB_BINARY) $(bindir)
 	$(INSTALL) .libs/couchspawnkillable.exe \
 		"$(DESTDIR)$(couchprivdir)/couchspawnkillable.exe"
