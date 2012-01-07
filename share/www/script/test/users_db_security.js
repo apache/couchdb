@@ -135,7 +135,7 @@ couchTests.users_db_security = function(debug) {
         "should not_found opening another user's user doc");
 
 
-      // save a db amin 
+      // save a db admin
       var benoitcDoc = {
         _id: "org.couchdb.user:benoitc",
         type: "user",
