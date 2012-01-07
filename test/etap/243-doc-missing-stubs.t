@@ -163,18 +163,20 @@ compare_dbs(Source, Target) ->
     {ok, TargetDb} = couch_db:open_int(couch_db:name(Target), []),
 
     Fun = fun(FullDocInfo, _, Acc) ->
-        {ok, DocSource} = couch_db:open_doc(SourceDb, FullDocInfo),
+        {ok, DocSource} = couch_db:open_doc(
+            SourceDb, FullDocInfo, [conflicts, deleted_conflicts]),
         Id = DocSource#doc.id,
 
         etap:diag("Verifying document " ++ ?b2l(Id)),
 
-        {ok, DocTarget} = couch_db:open_doc(TargetDb, Id),
+        {ok, DocTarget} = couch_db:open_doc(
+            TargetDb, Id, [conflicts, deleted_conflicts]),
         etap:is(DocTarget#doc.body, DocSource#doc.body,
             "Same body in source and target databases"),
 
         etap:is(
-            couch_doc:to_json_obj(DocTarget, [conflicts, deleted_conflicts]),
-            couch_doc:to_json_obj(DocSource, [conflicts, deleted_conflicts]),
+            couch_doc:to_json_obj(DocTarget, []),
+            couch_doc:to_json_obj(DocSource, []),
             "Same doc body in source and target databases"),
 
         #doc{atts = SourceAtts} = DocSource,
