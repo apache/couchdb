@@ -170,13 +170,13 @@ verify_target(SourceDb, TargetDb, [{DocId, RevList} | Rest]) ->
         TargetDb,
         DocId,
         RevList,
-        []),
+        [conflicts, deleted_conflicts]),
     Docs = [Doc || {ok, Doc} <- Lookups],
     {ok, SourceLookups} = couch_db:open_doc_revs(
         SourceDb,
         DocId,
         RevList,
-        []),
+        [conflicts, deleted_conflicts]),
     SourceDocs = [Doc || {ok, Doc} <- SourceLookups],
     Total = doc_num_conflicts(DocId) + 1,
     etap:is(
@@ -186,8 +186,8 @@ verify_target(SourceDb, TargetDb, [{DocId, RevList} | Rest]) ->
     etap:diag("Verifying all revisions of document " ++ ?b2l(DocId)),
     lists:foreach(
         fun({#doc{id = Id, revs = Revs} = TgtDoc, #doc{id = Id, revs = Revs} = SrcDoc}) ->
-            SourceJson = couch_doc:to_json_obj(SrcDoc, [attachments, conflicts]),
-            TargetJson = couch_doc:to_json_obj(TgtDoc, [attachments, conflicts]),
+            SourceJson = couch_doc:to_json_obj(SrcDoc, [attachments]),
+            TargetJson = couch_doc:to_json_obj(TgtDoc, [attachments]),
             case TargetJson of
             SourceJson ->
                 ok;
