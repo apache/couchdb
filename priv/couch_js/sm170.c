@@ -114,6 +114,13 @@ req_status(JSContext* cx, JSObject* obj, jsval idval, jsval* rval)
 
 static JSBool
 base_url(JSContext *cx, JSObject* obj, jsval idval, jsval* rval)
+{
+    couch_args *args = (couch_args*)JS_GetContextPrivate(cx);
+    return http_uri(cx, obj, args, rval);
+}
+
+
+static JSBool
 evalcx(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
     JSString *str;
@@ -317,6 +324,7 @@ main(int argc, const char* argv[])
 
     JS_SetErrorReporter(cx, couch_error);
     JS_ToggleOptions(cx, JSOPTION_XML);
+    JS_SetContextPrivate(cx, args);
     
     SETUP_REQUEST(cx);
 

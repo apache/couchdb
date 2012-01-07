@@ -94,6 +94,8 @@ couch_parse_args(int argc, const char* argv[])
                 fprintf(stderr, "Invalid stack size.\n");
                 exit(2);
             }
+        } else if(strcmp("-u", argv[i]) == 0) {
+            args->uri_file = argv[++i];
         } else if(strcmp("--", argv[i]) == 0) {
             i++;
             break;
@@ -290,4 +292,3 @@ couch_load_funcs(JSContext* cx, JSObject* obj, JSFunctionSpec* funcs)
     }
     return JS_TRUE;
 }
-
