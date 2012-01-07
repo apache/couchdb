@@ -17,6 +17,7 @@
     oauth = nil,
     headers = [
         {"Accept", "application/json"},
+        {"Content-Type", "application/json"},
         {"User-Agent", "CouchDB/" ++ couch_server:get_version()}
     ],
     timeout,            % milliseconds
