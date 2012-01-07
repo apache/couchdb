@@ -121,7 +121,8 @@ get_db_info(#db{name = DbName, user_ctx = UserCtx}) ->
 ensure_full_commit(#httpdb{} = Db) ->
     send_req(
         Db,
-        [{method, post}, {path, "_ensure_full_commit"}],
+        [{method, post}, {path, "_ensure_full_commit"},
+            {headers, [{"Content-Type", "application/json"}]}],
         fun(201, _, {Props}) ->
             {ok, get_value(<<"instance_start_time">>, Props)};
         (_, _, {Props}) ->
@@ -135,7 +136,8 @@ get_missing_revs(#httpdb{} = Db, IdRevs) ->
     JsonBody = {[{Id, couch_doc:revs_to_strs(Revs)} || {Id, Revs} <- IdRevs]},
     send_req(
         Db,
-        [{method, post}, {path, "_revs_diff"}, {body, ?JSON_ENCODE(JsonBody)}],
+        [{method, post}, {path, "_revs_diff"}, {body, ?JSON_ENCODE(JsonBody)},
+            {headers, [{"Content-Type", "application/json"}]}],
         fun(200, _, {Props}) ->
             ConvertToNativeFun = fun({Id, {Result}}) ->
                 MissingRevs = couch_doc:parse_revs(
@@ -286,6 +288,7 @@ update_docs(#httpdb{} = HttpDb, DocList, Options, UpdateType) ->
     end,
     Headers = [
         {"Content-Length", Len},
+        {"Content-Type", "application/json"},
         {"X-Couch-Full-Commit", FullCommit}
     ],
     send_req(
@@ -320,8 +323,9 @@ changes_since(#httpdb{headers = Headers1} = HttpDb, Style, StartSeq,
         QArgs1 = maybe_add_changes_filter_q_args(BaseQArgs, Options),
         {QArgs1, get, [], Headers1};
     _ when is_list(DocIds) ->
+        Headers2 = [{"Content-Type", "application/json"} | Headers1],
         JsonDocIds = ?JSON_ENCODE({[{<<"doc_ids">>, DocIds}]}),
-        {[{"filter", "_doc_ids"} | BaseQArgs], post, JsonDocIds, Headers1}
+        {[{"filter", "_doc_ids"} | BaseQArgs], post, JsonDocIds, Headers2}
     end,
     send_req(
         HttpDb,
