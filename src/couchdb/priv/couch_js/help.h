@@ -50,6 +50,8 @@ static const char USAGE_TEMPLATE[] =
     "              if package was built with cURL available)\n"
     "  -S SIZE     specify that the interpreter should set the\n"
     "              stack quota for JS contexts to SIZE bytes\n"
+    "  -u FILE     path to a .uri file containing the address\n"
+    "              (or addresses) of one or more servers\n"
     "\n"
     "Report bugs at <%s>.\n";
 

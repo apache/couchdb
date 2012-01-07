@@ -19,6 +19,8 @@ typedef struct {
     int          use_http;
     int          stack_size;
     const char** scripts;
+    const char*  uri_file;
+    JSString*    uri;
 } couch_args;
 
 couch_args* couch_parse_args(int argc, const char* argv[]);

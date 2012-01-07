@@ -11,4 +11,5 @@
 ## the License.
 
 SUBDIRS = bench etap javascript view_server
+EXTRA_DIST = random_port.ini
 

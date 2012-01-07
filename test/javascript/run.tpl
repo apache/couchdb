@@ -17,6 +17,7 @@ SCRIPT_DIR=$SRC_DIR/share/www/script
 JS_TEST_DIR=$SRC_DIR/test/javascript
 
 COUCHJS=%abs_top_builddir%/src/couchdb/priv/couchjs
+COUCH_URI_FILE=%localstaterundir%/couch.uri
 
 if [ "$#" -eq 0 ];
 then
@@ -48,11 +49,15 @@ abort() {
 if [ -z $COUCHDB_NO_START ]; then
         make dev
 	trap 'abort' 0 1 2 3 4 6 8 15
-	./utils/run -b -r 1
+	./utils/run -b -r 1 -n \
+		-a $SRC_DIR/etc/couchdb/default_dev.ini \
+		-a $SRC_DIR/test/random_port.ini \
+		-a $SRC_DIR/etc/couchdb/local_dev.ini
 	sleep 1 # give it a sec
 fi
 
-$COUCHJS -H \
+# start the tests
+$COUCHJS -H -u $COUCH_URI_FILE \
 	$SCRIPT_DIR/json2.js \
 	$SCRIPT_DIR/sha1.js \
 	$SCRIPT_DIR/oauth.js \

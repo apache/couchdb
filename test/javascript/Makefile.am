@@ -21,5 +21,6 @@ CLEANFILES = run
 run: run.tpl
 	sed -e "s|%abs_top_srcdir%|$(abs_top_srcdir)|" \
 		-e "s|%abs_top_builddir%|$(abs_top_builddir)|" \
+		-e "s|%localstaterundir%|$(abs_top_builddir)/tmp/run|g" \
 	< $< > $@
 	chmod +x $@

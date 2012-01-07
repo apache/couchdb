@@ -11,15 +11,14 @@
 // the License.
 
 (function() {
-  CouchHTTP.prototype.base_url = "http://127.0.0.1:5984"
-
   if(typeof(CouchHTTP) != "undefined") {
     CouchHTTP.prototype.open = function(method, url, async) {
       if(!/^\s*http:\/\//.test(url)) {
-        if(/^[^\/]/.test(url)) {
-          url = this.base_url + "/" + url;
+        if(/^\//.test(url)) {
+          // The couch.uri file (base_url) has a trailing slash
+          url = this.base_url + url.slice(1);
         } else {
-         url = this.base_url + url;
+          url = this.base_url + url;
         }
       }
       

@@ -13,9 +13,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <jsapi.h>
 #include "config.h"
 #include "utf8.h"
+#include "util.h"
 
 // Soft dependency on cURL bindings because they're
 // only used when running the JS tests from the
@@ -69,6 +73,12 @@ int
 http_status(JSContext* cx, JSObject* req, jsval body)
 {
     return -1;
+}
+
+JSBool
+http_uri(JSContext* cx, JSObject* req, couch_args* args, jsval* uri_val)
+{
+    return JS_FALSE;
 }
 
 
@@ -342,6 +352,42 @@ http_status(JSContext* cx, JSObject* req)
     return http->last_status;
 }
 
+JSBool
+http_uri(JSContext* cx, JSObject* req, couch_args* args, jsval* uri_val)
+{
+    FILE* uri_fp = NULL;
+    JSString* uri_str;
+
+    // Default is http://localhost:5984/ when no uri file is specified
+    if (!args->uri_file) {
+        uri_str = JS_InternString(cx, "http://localhost:5984/");
+        *uri_val = STRING_TO_JSVAL(uri_str);
+        return JS_TRUE;
+    }
+
+    // Else check to see if the base url is cached in a reserved slot
+    if (JS_GetReservedSlot(cx, req, 0, uri_val) && !JSVAL_IS_VOID(*uri_val)) {
+        return JS_TRUE;
+    }
+
+    // Read the first line of the couch.uri file.
+    if(!((uri_fp = fopen(args->uri_file, "r")) &&
+         (uri_str = couch_readline(cx, uri_fp)))) {
+        JS_ReportError(cx, "Failed to read couch.uri file.");
+        goto error;
+    }
+
+    fclose(uri_fp);
+    *uri_val = STRING_TO_JSVAL(uri_str);
+    JS_SetReservedSlot(cx, req, 0, *uri_val);
+    return JS_TRUE;
+
+error:
+    if(uri_fp) fclose(uri_fp);
+    return JS_FALSE;
+}
+
+
 // Curl Helpers
 
 typedef struct {
@@ -373,6 +419,7 @@ static JSBool
 go(JSContext* cx, JSObject* obj, HTTPData* http, char* body, size_t bodylen)
 {
     CurlState state;
+    char* referer;
     JSString* jsbody;
     JSBool ret = JS_FALSE;
     jsval tmp;
@@ -400,7 +447,6 @@ go(JSContext* cx, JSObject* obj, HTTPData* http, char* body, size_t bodylen)
         curl_easy_setopt(HTTP_HANDLE, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
         curl_easy_setopt(HTTP_HANDLE, CURLOPT_ERRORBUFFER, ERRBUF);
         curl_easy_setopt(HTTP_HANDLE, CURLOPT_COOKIEFILE, "");
-        curl_easy_setopt(HTTP_HANDLE, CURLOPT_REFERER, "http://127.0.0.1:5984/");
         curl_easy_setopt(HTTP_HANDLE, CURLOPT_USERAGENT,
                                             "CouchHTTP Client - Relax");
     }
@@ -409,6 +455,18 @@ go(JSContext* cx, JSObject* obj, HTTPData* http, char* body, size_t bodylen)
         JS_ReportError(cx, "Failed to initialize cURL handle.");
         goto done;
     }
+
+    if(!JS_GetReservedSlot(cx, obj, 0, &tmp)) {
+      JS_ReportError(cx, "Failed to readreserved slot.");
+      goto done;
+    }
+
+    if(!(referer = enc_string(cx, tmp, NULL))) {
+      JS_ReportError(cx, "Failed to encode referer.");
+      goto done;
+    }
+    curl_easy_setopt(HTTP_HANDLE, CURLOPT_REFERER, referer);
+    free(referer);
 
     if(http->method < 0 || http->method > OPTIONS) {
         JS_ReportError(cx, "INTERNAL: Unknown method.");

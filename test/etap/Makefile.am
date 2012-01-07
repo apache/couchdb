@@ -32,7 +32,6 @@ DISTCLEANFILES = temp.*
 EXTRA_DIST = \
     run.tpl \
     test_web.erl \
-    random_port.ini \
     001-load.t \
     002-icu-driver.t \
     010-file-basics.t \
