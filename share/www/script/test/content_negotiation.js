@@ -30,7 +30,7 @@ couchTests.content_negotiation = function(debug) {
   xhr = CouchDB.request("GET", "/test_suite_db/", {
     headers: {"Accept": "text/html;text/plain;*/*"}
   });
-  TEquals("text/plain;charset=utf-8", xhr.getResponseHeader("Content-Type"));
+  TEquals("text/plain; charset=utf-8", xhr.getResponseHeader("Content-Type"));
 
   xhr = CouchDB.request("GET", "/test_suite_db/", {
     headers: {"Accept": "application/json"}
