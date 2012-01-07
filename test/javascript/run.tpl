@@ -37,8 +37,10 @@ fi
 
 make dev
 # start CouchDB
-./utils/run -b -r 1
-sleep 1 # give it a sec
+if [ -z $COUCHDB_NO_START ]; then
+  ./utils/run -b -r 1
+  sleep 1 # give it a sec
+fi
 
 cat $SCRIPT_DIR/json2.js \
 	$SCRIPT_DIR/sha1.js \
@@ -51,5 +53,7 @@ cat $SCRIPT_DIR/json2.js \
 	$JS_TEST_DIR/cli_runner.js \
     | $COUCHJS -H -
 
-# stop CouchDB
-./utils/run -d
+if [ -z $COUCHDB_NO_START ]; then
+	# stop CouchDB
+	./utils/run -d
+fi
