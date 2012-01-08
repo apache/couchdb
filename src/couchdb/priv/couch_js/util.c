@@ -200,9 +200,19 @@ couch_readline(JSContext* cx, FILE* fp)
 }
 
 
-JSObject*
-couch_readfile(JSContext* cx, FILE* fp)
+JSString*
+couch_readfile(JSContext* cx, const char* filename)
 {
+    JSString *string;
+    size_t byteslen;
+    char *bytes;
+
+    if((byteslen = slurp_file(filename, &bytes))) {
+        string = dec_string(cx, bytes, byteslen);
+
+        free(bytes);
+        return string;
+    }
     return NULL;    
 }
 
