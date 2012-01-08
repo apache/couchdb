@@ -25,6 +25,7 @@ typedef struct {
 couch_args* couch_parse_args(int argc, const char* argv[]);
 int couch_fgets(char* buf, int size, FILE* fp);
 JSString* couch_readline(JSContext* cx, FILE* fp);
+JSString* couch_readfile(JSContext* cx, const char* filename);
 void couch_print(JSContext* cx, uintN argc, jsval* argv);
 void couch_error(JSContext* cx, const char* mesg, JSErrorReport* report);
 JSBool couch_load_funcs(JSContext* cx, JSObject* obj, JSFunctionSpec* funcs);
