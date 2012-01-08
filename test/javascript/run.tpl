@@ -35,7 +35,7 @@ else
     fi
 fi
 
-make dev
+
 
 # stop CouchDB on exit from various signals
 abort() {
@@ -46,6 +46,7 @@ abort() {
 
 # start CouchDB
 if [ -z $COUCHDB_NO_START ]; then
+        make dev
 	trap 'abort' 0 1 2 3 4 6 8 15
 	./utils/run -b -r 1
 	sleep 1 # give it a sec
