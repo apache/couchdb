@@ -20,6 +20,17 @@
 
 #define MAX_DEPTH 10
 
+#if (ERL_NIF_MAJOR_VERSION > 2) || \
+    (ERL_NIF_MAJOR_VERSION == 2 && ERL_NIF_MINOR_VERSION >= 3)
+/* OTP R15B or higher */
+#define term_is_number(env, t) enif_is_number(env, t)
+#else
+#define term_is_number(env, t)  \
+    (!enif_is_binary(env, t) && \
+     !enif_is_list(env, t) &&   \
+     !enif_is_tuple(env, t))
+#endif
+
 static ERL_NIF_TERM ATOM_TRUE;
 static ERL_NIF_TERM ATOM_FALSE;
 static ERL_NIF_TERM ATOM_NULL;
@@ -43,7 +54,6 @@ static __inline int atom_sort_order(ErlNifEnv*, ERL_NIF_TERM);
 static __inline int compare_strings(ctx_t*, ErlNifBinary, ErlNifBinary);
 static __inline int compare_lists(int, ctx_t*, ERL_NIF_TERM, ERL_NIF_TERM);
 static __inline int compare_props(int, ctx_t*, ERL_NIF_TERM, ERL_NIF_TERM);
-static __inline int term_is_number(ErlNifEnv*, ERL_NIF_TERM);
 static __inline void reserve_coll(ctx_t*);
 static __inline void release_coll(ctx_t*);
 
@@ -233,15 +243,6 @@ atom_sort_order(ErlNifEnv* env, ERL_NIF_TERM a)
     }
 
     return -1;
-}
-
-
-int
-term_is_number(ErlNifEnv* env, ERL_NIF_TERM t)
-{
-    /* Determination by exclusion of parts. To be used only inside less_json! */
-    return !enif_is_binary(env, t) && !enif_is_list(env, t) &&
-        !enif_is_tuple(env, t);
 }
 
 
