@@ -37,6 +37,8 @@ go(DbName, AllDocs, Opts) ->
     try fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
     {ok, {Health, Results}} when Health =:= ok; Health =:= accepted ->
         {Health, [R || R <- couch_util:reorder_results(AllDocs, Results), R =/= noreply]};
+    {ok, {error, Results}} ->
+        {ok, [R || R <- couch_util:reorder_results(AllDocs, Results), R =/= noreply]};
     {timeout, Acc} ->
         {_, _, W1, _, DocReplDict} = Acc,
         {Health, _, Resp} = dict:fold(fun force_reply/3, {ok, W1, []},
