@@ -473,7 +473,10 @@ host_for_request(#httpd{mochi_req=MochiReq}) ->
         undefined ->
             case MochiReq:get_header_value("Host") of
                 undefined ->
-                    {ok, {Address, Port}} = inet:sockname(MochiReq:get(socket)),
+                    {ok, {Address, Port}} = case MochiReq:get(socket) of
+                        {ssl, SslSocket} -> ssl:sockname(SslSocket);
+                        Socket -> inet:sockname(Socket)
+                    end,
                     inet_parse:ntoa(Address) ++ ":" ++ integer_to_list(Port);
                 Value1 ->
                     Value1
