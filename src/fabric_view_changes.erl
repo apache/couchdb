@@ -129,7 +129,7 @@ receive_results(Workers, State, Timeout, Callback, AccIn) ->
     case rexi_utils:recv(Workers, #shard.ref, fun handle_message/3, State,
             infinity, Timeout) of
     {timeout, NewState0} ->
-        {ok, AccOut} = Callback(timeout, AccIn),
+        {ok, AccOut} = Callback(timeout, NewState0#collector.user_acc),
         NewState = NewState0#collector{user_acc = AccOut},
         receive_results(Workers, NewState, Timeout, Callback, AccOut);
     {_, NewState} ->
