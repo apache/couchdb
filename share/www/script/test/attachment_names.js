@@ -20,7 +20,7 @@ couchTests.attachment_names = function(debug) {
     _id: "good_doc",
     _attachments: {
       "Колян.txt": {
-       content_type:"text/plain",
+       content_type:"application/octet-stream",
        data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
       }
     }
@@ -31,8 +31,8 @@ couchTests.attachment_names = function(debug) {
 
   var xhr = CouchDB.request("GET", "/test_suite_db/good_doc/Колян.txt");
   T(xhr.responseText == "This is a base64 encoded text");
-  T(xhr.getResponseHeader("Content-Type") == "text/plain");
-  TEquals("\"qUUYqS41RhwF0TrCsTAxFg==\"", xhr.getResponseHeader("Etag"));
+  T(xhr.getResponseHeader("Content-Type") == "application/octet-stream");
+  TEquals("\"aEI7pOYCRBLTRQvvqYrrJQ==\"", xhr.getResponseHeader("Etag"));
 
   var binAttDoc = {
     _id: "bin_doc",
