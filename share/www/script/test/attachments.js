@@ -16,11 +16,15 @@ couchTests.attachments= function(debug) {
   db.createDb();
   if (debug) debugger;
 
+
+  // MD5 Digests of compressible attachments and therefore Etags
+  // will vary depending on platform gzip implementation.
+  // These MIME types are defined in [attachments] compressible_types
   var binAttDoc = {
     _id: "bin_doc",
     _attachments:{
       "foo.txt": {
-        content_type:"text/plain",
+        content_type:"application/octet-stream",
         data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
       }
     }
@@ -31,8 +35,8 @@ couchTests.attachments= function(debug) {
 
   var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc/foo.txt");
   T(xhr.responseText == "This is a base64 encoded text");
-  T(xhr.getResponseHeader("Content-Type") == "text/plain");
-  TEquals("\"qUUYqS41RhwF0TrCsTAxFg==\"", xhr.getResponseHeader("Etag"));
+  T(xhr.getResponseHeader("Content-Type") == "application/octet-stream");
+  TEquals("\"aEI7pOYCRBLTRQvvqYrrJQ==\"", xhr.getResponseHeader("Etag"));
 
   // empty attachment
   var binAttDoc2 = {
