@@ -13,7 +13,22 @@
 -module(couch_cors_policy).
 -export([global_config/0, check/2, check/3]).
 
+% For the test suite.
+-export([origins_config/3]).
+
 -include("couch_db.hrl").
+
+-define(DEFAULT_CORS_POLICY,
+        [ {<<"allow_credentials">>, false}
+        , {<<"max_age">>, 4 * 60 * 60}
+        , {<<"allow_methods">>, <<"GET, HEAD, POST">>}
+        , {<<"allow_headers">>,
+            <<"Content-Length, If-Match, Destination"
+            , ", X-HTTP-Method-Override"
+            , ", X-Requested-With" % For jQuery v1.5.1
+            >>}
+        ]).
+
 
 check(DbConfig, #httpd{}=Req) ->
     check(global_config(), DbConfig, Req).
@@ -27,6 +42,57 @@ check(Global, Local, #httpd{}=Req)
         _ -> false
     end.
 
+
+origins_config(Global, Local, Req) ->
+    % Identify the "origins" configuration object which applies to this
+    % request. The local (i.e.  _security object) config takes precidence.
+    {Httpd} = couch_util:get_value(<<"httpd">>, Global, {[]}),
+    XHost = couch_util:get_value(<<"x_forwarded_host">>, Httpd,
+                                 "X-Forwarded-Host"),
+    VHost = case couch_httpd:header_value(Req, XHost) of
+        undefined ->
+            case couch_httpd:header_value(Req, "Host") of
+                undefined -> "";
+                HostValue -> ?l2b(HostValue)
+            end;
+        ForwardedValue -> ?l2b(ForwardedValue)
+    end,
+
+    {GlobalHosts} = couch_util:get_value(<<"origins">>, Global, {[]}),
+    {LocalHosts} = couch_util:get_value(<<"origins">>, Local, {[]}),
+    Origins = case couch_util:get_value(VHost, LocalHosts) of
+        {LocalObj} ->
+            ?LOG_DEBUG("Local origin list: ~s", [VHost]),
+            LocalObj;
+        _ ->
+            ?LOG_DEBUG("No local origin list: ~s", [VHost]),
+            case couch_util:get_value(VHost, GlobalHosts) of
+                {GlobalObj} ->
+                    ?LOG_DEBUG("Global origin list: ~s", [VHost]),
+                    GlobalObj;
+                _ ->
+                    ?LOG_DEBUG("No global origin list: ~s", [VHost]),
+                    []
+            end
+    end,
+
+    origins_config(Origins).
+
+origins_config(BaseOrigins) ->
+    % Normalize the config object for origins, apply defaults, etc. If no
+    % origins are specified, provide a default wildcard entry.
+    Defaulted = fun(Policy) ->
+        lists:foldl(fun({Key, Val}, State) ->
+            lists:keyreplace(Key, 1, State, {Key, Val})
+        end, ?DEFAULT_CORS_POLICY, Policy)
+    end,
+
+    Origins = case BaseOrigins of
+        [] -> [ {<<"*">>, {[]}} ];
+        _ -> BaseOrigins
+    end,
+
+    [ {Key, {Defaulted(Policy)}} || {Key, {Policy}} <- Origins ].
 
 global_config() ->
     % Return the globally-configured CORS settings in a format identical

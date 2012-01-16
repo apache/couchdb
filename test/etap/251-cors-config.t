@@ -32,7 +32,7 @@ default_config() ->
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(14),
+    etap:plan(18),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -47,6 +47,7 @@ test() ->
     couch_config:start_link([default_config()]),
     test_api_calls(),
     test_policy_structure(),
+    test_defaults(),
     ok.
 
 test_api_calls() ->
@@ -101,6 +102,24 @@ test_policy_structure() ->
     etap:ok(is_list(Origin2), "CORS origin config: http://origin.com"),
 
     ok.
+
+test_defaults() ->
+    Headers = mochiweb_headers:make([]),
+    MochiReq = mochiweb_request:new(nil, 'GET', "/", {1,1}, Headers),
+    Req = #httpd{mochi_req=MochiReq},
+
+    Hosts = couch_cors_policy:origins_config([], [], Req),
+    {Config} = couch_util:get_value(<<"*">>, Hosts),
+
+    etap:ok(is_list(Config), "Default CORS origin is *"),
+    etap:is(couch_util:get_value(<<"allow_credentials">>, Config),
+            false, "CORS default: allow_credentials"),
+    etap:is(couch_util:get_value(<<"max_age">>, Config),
+            14400, "CORS default: max_age"),
+    etap:is(couch_util:get_value(<<"allow_methods">>, Config),
+            <<"GET, HEAD, POST">>, "CORS default: allow_methods"),
+    ok.
+
 %
 % Utilities
 %
