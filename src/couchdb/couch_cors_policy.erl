@@ -20,7 +20,12 @@ check(DbConfig, #httpd{}=Req) ->
 
 check(Global, Local, #httpd{}=Req)
         when is_list(Global) andalso is_list(Local) ->
-    ok.
+    {Httpd} = couch_util:get_value(<<"httpd">>, Global, {[]}),
+    Enabled = couch_util:get_value(<<"cors_enabled">>, Httpd, false),
+    case Enabled of
+        true -> [];
+        _ -> false
+    end.
 
 
 global_config() ->

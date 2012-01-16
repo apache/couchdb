@@ -32,7 +32,7 @@
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(7),
+    etap:plan(18),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -45,6 +45,9 @@ main(_) ->
 test() ->
     test_bad_api_calls(),
     test_good_api_calls(),
+    test_disabling(),
+    test_enabled(),
+    test_duels(),
     ok.
 
 test_bad_api_calls() ->
@@ -76,6 +79,41 @@ test_good_api_calls() ->
                false, "Policy check with three valid parameters"),
     etap_threw(fun() -> check(config(), config(), req()) end,
                false, "Policy check with noop configs"),
+    ok.
+
+test_disabling() ->
+    Default = config(),
+    Enabled = config([enabled]), % Enabled only, nothing else.
+    Config = config([enabled, {"example.com", "origin.com"}]),
+    Deactivated = config([{"example.com", "origin.com"}]),
+
+    etap:is(check(Default, Default, req()),
+            false, "By default, CORS is disabled"),
+    etap:is(check(Default, Config, req()),
+            false, "By default, CORS is disabled, despite _security"),
+    etap:is(check(Deactivated, Default, req()),
+            false, "Globally disabling CORS overrides everything else"),
+    etap:is(check(Deactivated, Config, req()),
+            false, "Deactivated CORS still overrides _security"),
+
+    etap:isnt(check(Enabled, Config, req()),
+              false, "Globally enabled CORS, config in _security: passes"),
+    etap:isnt(check(Config, Default, req()),
+              false, "Global CORS config, nothing in _security: passes"),
+    ok.
+
+test_enabled() ->
+    Enabled = config([enabled]),
+    Config = config([enabled, {"example.com","origin.com"}]),
+    etap:ok(is_list(check(Enabled, Config, req())),
+            "Good CORS from _security returns a list"),
+    etap:ok(is_list(check(Config, [], req())),
+            "Good CORS from _config returns a list"),
+    ok.
+
+test_duels() ->
+    % Configs from _security and _config have a duel!
+    %TODO
     ok.
 
 %
