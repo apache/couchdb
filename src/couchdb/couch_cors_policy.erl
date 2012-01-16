@@ -11,11 +11,43 @@
 % the License.
 
 -module(couch_cors_policy).
--export([check/3]).
+-export([global_config/0, check/2, check/3]).
 
 -include("couch_db.hrl").
 
+check(DbConfig, #httpd{}=Req) ->
+    check(global_config(), DbConfig, Req).
 
 check(Global, Local, #httpd{}=Req)
         when is_list(Global) andalso is_list(Local) ->
     ok.
+
+
+global_config() ->
+    % Return the globally-configured CORS settings in a format identical
+    % to that in the _security object.
+    Enabled = couch_util:to_existing_atom(
+                couch_config:get("httpd", "cors_enabled", "false")),
+    DomainsToOrigins = binary_section("origins"),
+    Global = [ {<<"httpd">>, {[ {<<"cors_enabled">>, Enabled} ]}}
+             , {<<"origins">>, {DomainsToOrigins}}
+             ],
+
+    AllOrigins = lists:flatten([ re:split(Line, ",\\s*")
+                               || {_Vhost, Line} <- DomainsToOrigins]),
+
+    lists:foldl(fun(OriginName, Config) ->
+        Stanza = {OriginName, binary_section(OriginName)},
+        lists:keystore(OriginName, 1, Config, Stanza)
+    end, Global, AllOrigins).
+
+binary_section(Section) ->
+    % Return a config section, with all strings converted to binaries.
+    SectionStr = couch_config:get(Section),
+    BoolOrBinary = fun("true") -> true;
+                      ("false") -> false;
+                      (Val) -> ?l2b(Val)
+    end,
+    [ {?l2b(Key), BoolOrBinary(Val)} || {Key, Val} <- SectionStr ].
+
+% vim: sts=4 sw=4 et
