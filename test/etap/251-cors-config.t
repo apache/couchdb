@@ -32,7 +32,7 @@ default_config() ->
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(12),
+    etap:plan(14),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -75,7 +75,7 @@ test_policy_structure() ->
     etap:ok(is_boolean(Enabled), "Boolean global CORS enabled flag"),
 
     XHost = couch_util:get_value(<<"x_forwarded_host">>, Httpd),
-    etap:is(XHost, "X-Forwarded-Host",
+    etap:is(XHost, <<"X-Forwarded-Host">>,
             "CORS config has X-Forwarded-Host setting"),
 
     OriginsObj = couch_util:get_value(<<"origins">>, Config),
@@ -84,15 +84,21 @@ test_policy_structure() ->
     {Origins} = OriginsObj,
     etap:ok(is_list(Origins), "Global CORS origins section looks good"),
 
-    Example = couch_util:get_value(<<"example.com">>, Origins),
-    etap:is(Example, <<"http://origin.com, https://origin.com:6984">>,
-            "Global CORS origin: example.com"),
+    ExampleObj = couch_util:get_value(<<"example.com">>, Origins),
+    etap:ok(is_tuple(ExampleObj), "Configured origins object: example.com"),
 
-    Origin1 = couch_util:get_value(<<"http://origin.com">>, Config),
-    etap:ok(is_list(Origin1), "CORS origin stanza: http://origin.com"),
+    Nope1 = couch_util:get_value(<<"http://origin.com">>, Config, false),
+    etap:not_ok(Nope1, "No top-level config: http://origin.com"),
 
-    Origin2 = couch_util:get_value(<<"https://origin.com:6984">>, Config),
-    etap:ok(is_list(Origin2), "CORS origin stanza: https://origin.com:6984"),
+    Nope2 = couch_util:get_value(<<"http://origin.com">>, Config, false),
+    etap:not_ok(Nope2, "No top-level config: https://origin.com:6984"),
+
+    {Example} = ExampleObj,
+    {Origin1} = couch_util:get_value(<<"http://origin.com">>, Example),
+    etap:ok(is_list(Origin1), "CORS origin config: http://origin.com"),
+
+    {Origin2} = couch_util:get_value(<<"http://origin.com">>, Example),
+    etap:ok(is_list(Origin2), "CORS origin config: http://origin.com"),
 
     ok.
 %

@@ -31,23 +31,41 @@ check(Global, Local, #httpd{}=Req)
 global_config() ->
     % Return the globally-configured CORS settings in a format identical
     % to that in the _security object.
-    Enabled = couch_util:to_existing_atom(
-                couch_config:get("httpd", "cors_enabled", "false")),
+    %
+    % E.g., example.com allows origins http://origin.com and https://origin.com
+    % { "origins":
+    %   { "example.com":
+    %     { "http://origin.com": {"max_age":1234, "allow_methods":"GET"}
+    %     , "https://origin.com": {"allow_methods": "PUT, POST"}
+    %     }
+    %   }
+    % }
     XHost = couch_config:get("httpd", "x_forwarded_host", "X-Forwarded-Host"),
-    DomainsToOrigins = binary_section("origins"),
-    Global = [ {<<"httpd">>, {[ {<<"cors_enabled">>, Enabled}
-                              , {<<"x_forwarded_host">>, XHost}
-                             ]}}
-             , {<<"origins">>, {DomainsToOrigins}}
-             ],
+    Enabled = couch_config:get("httpd", "cors_enabled", "false"),
+    Origins = global_config(origins),
 
-    AllOrigins = lists:flatten([ re:split(Line, ",\\s*")
-                               || {_Vhost, Line} <- DomainsToOrigins]),
+    [ {<<"httpd">>,
+        {[ {<<"cors_enabled">>, couch_util:to_existing_atom(Enabled)}
+         , {<<"x_forwarded_host">>, ?l2b(XHost)}
+        ]} }
+    , {<<"origins">>, {Origins}}
+    ].
 
-    lists:foldl(fun(OriginName, Config) ->
-        Stanza = {OriginName, binary_section(OriginName)},
-        lists:keystore(OriginName, 1, Config, Stanza)
-    end, Global, AllOrigins).
+global_config(origins) ->
+    % Return the .origins object of the config.  Map each domain (vhost) to the
+    % origins it supports. Each supported origin is itself an object indicating
+    % allowed headers, max age, etc.
+    OriginsSection = couch_config:get("origins"),
+    lists:foldl(fun({Key, Val}, State) ->
+        Domain = ?l2b(Key),
+        Origins = re:split(Val, ",\\s*"),
+        DomainObj = lists:foldl(fun(Origin, DomainState) ->
+            Policy = binary_section(Origin),
+            lists:keystore(Origin, 1, DomainState, {Origin, {Policy}})
+        end, [], Origins),
+        lists:keystore(Domain, 1, State, {Domain, {DomainObj}})
+    end, [], OriginsSection).
+
 
 binary_section(Section) ->
     % Return a config section, with all strings converted to binaries.
