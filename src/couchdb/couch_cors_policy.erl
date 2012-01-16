@@ -38,10 +38,120 @@ check(Global, Local, #httpd{}=Req)
     {Httpd} = couch_util:get_value(<<"httpd">>, Global, {[]}),
     Enabled = couch_util:get_value(<<"cors_enabled">>, Httpd, false),
     case Enabled of
-        true -> [];
+        true ->
+            case couch_httpd:header_value(Req, "Origin") of
+                undefined ->
+                    % s. 5.1(1) and s. 5.2(1) If the Origin header is not
+                    % present terminate this set of steps. The request is
+                    % outside the scope of this specification.
+                    ?LOG_DEBUG("Not a CORS request", []),
+                    false;
+                Origin ->
+                    headers(Global, Local, Req, Origin)
+            end;
         _ -> false
     end.
 
+
+headers(Global, Local, Req, OriginValue) ->
+    Policies = origins_config(Global, Local, Req),
+
+    % s. 5 ...each resource is bound to the following:
+    % * A list of origins consisting of zero or more origins that are allowed
+    %   to access this resource.
+    % * A list of methods consisting of zero or more methods that are
+    %   supported by the resource.
+    % * A list of headers consisting of zero or more header field names that
+    %   are supported by the resource.
+    % * A supports credentials flag that indicates whether the resource
+    %   supports user credentials in the request. [true/false]
+    Origins = list_of_origins(Policies, Req),
+    Methods = list_of_methods(Policies, Req),
+    Headers = list_of_headers(Policies, Req),
+    Creds = supports_credentials(Policies, Req),
+
+    case Req#httpd.method of
+        'OPTIONS' ->
+            % s. 5.2. Preflight Request; also s. 6.1.5(1)
+            preflight(OriginValue, Origins, Methods, Headers, Creds, Req);
+        _ ->
+            % s. 5.1. Simple X-O Request, Actual Request, and Redirects.
+            actual(OriginValue, Origins, Methods, Headers, Creds, Req)
+    end.
+
+preflight(OriginVal, OkOrigins, OkMethods, OkHeaders, OkCreds, Req) ->
+    % Note that s. 5.1(2) (actual requests) requires splitting the Origin
+    % header, and AFAICT all tokens must match the list of origins. But
+    % s. 5.2.2 (preflight requests) implies that the Origin header will contain
+    % only one token.  Assume that the "source origin" (s. 6.1) is the first in
+    % the list?
+    SourceOrigin = lists:nth(1, string:tokens(OriginVal, " ")),
+    false.
+
+actual(OriginVal, OkOrigins, _OkMethods, _OkHeaders, OkCreds, _Req) ->
+    % s. 5.1(2) Split the value of the Origin header on the U+0020 SPACE
+    % character and if any of the resulting tokens is not a case-sensitive
+    % match for any of the values in [OkOrigins] do not set any additional
+    % headers and terminate...
+    Origins = [ ?l2b(O) || O <- string:tokens(OriginVal, " ") ],
+    GoodOrigin = fun(Origin) ->
+        lists:any(fun(OkOrigin) ->
+            OkOrigin == <<"*">> orelse OkOrigin == Origin
+        end, OkOrigins)
+    end,
+
+    case lists:all(GoodOrigin, Origins) of
+        false ->
+            ?LOG_DEBUG("Origin ~p not allowed: ~p", [Origins, OkOrigins]),
+            false;
+        true ->
+            % s. 5.1(3) If the resource supports credentials add a single
+            % A-C-A-Origin header, with the value of the origin header as
+            % value, and add a single A-C-A-Credentials header with the literal
+            % string "true" as value.
+            %
+            % Otherwise, add a single A-C-A-Origin header with either the value
+            % of the Origin header or the literal string "*" as value.
+            Allow = case OkCreds of
+                true -> [ {"Access-Control-Allow-Origin", OriginVal}
+                        , {"Access-Control-Allow-Credentials", "true"}
+                        ];
+                false -> [ {"Access-Control-Allow-Origin", OriginVal} ]
+            end,
+
+            % s. 5.1(4) If the resource wants to expose more than just simple
+            % response headers to the API of the CORS API specification add one
+            % or more Access-Control-Expose-Headers headers, with as values the
+            % filed names of the additional headers to expose.
+            CouchHeaders = [ "Server", "Date"
+                           , "Content-Length"
+                           , "ETag", "Age"
+                           , "Connection" % ?
+                           % Any others?
+                           ],
+
+            % TODO: Merged with the configured expose_headers?
+            Expose = [{"Access-Control-Expose-Headers",
+                      string:join(CouchHeaders, ",")}],
+
+            % Interestingly, the spec does not confirm policy for actual
+            % requests. This function ignores methods, headers, and the request
+            % object.  Of course, disabling CORS on CouchDB, or removing an
+            % origin from the config would have immediate effect. Perhaps a
+            % future feature could detect minor changes to the CORS policy and
+            % purge the cache as mentioned in the 5.1(4) note.
+            Allow ++ Expose
+    end.
+
+list_of_origins(Config, _Req) ->
+    Keys = [ Key || {Key, _Val} <- Config ].
+
+list_of_methods(Config, Req) ->
+    [].
+list_of_headers(Config, Req) ->
+    [].
+supports_credentials(Config, Req) ->
+    false.
 
 origins_config(Global, Local, Req) ->
     % Identify the "origins" configuration object which applies to this

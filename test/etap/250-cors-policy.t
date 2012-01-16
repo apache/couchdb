@@ -32,7 +32,7 @@
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(18),
+    etap:plan(26),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -47,6 +47,7 @@ test() ->
     test_good_api_calls(),
     test_disabling(),
     test_enabled(),
+    test_default_policy(),
     test_duels(),
     ok.
 
@@ -84,8 +85,8 @@ test_good_api_calls() ->
 test_disabling() ->
     Default = config(),
     Enabled = config([enabled]), % Enabled only, nothing else.
-    Config = config([enabled, {"example.com", "origin.com"}]),
-    Deactivated = config([{"example.com", "origin.com"}]),
+    Config = config([enabled, {"example.com", "http://origin.com"}]),
+    Deactivated = config([{"example.com", "http://origin.com"}]),
 
     etap:is(check(Default, Default, req()),
             false, "By default, CORS is disabled"),
@@ -96,6 +97,11 @@ test_disabling() ->
     etap:is(check(Deactivated, Config, req()),
             false, "Deactivated CORS still overrides _security"),
 
+    etap:is(check(Config, [], httpd()),
+            false, "CORS fail for request with no Origin header"),
+    etap:is(check(Enabled, Config, httpd()),
+            false, "CORS fail from _security for request with no Origin"),
+
     etap:isnt(check(Enabled, Config, req()),
               false, "Globally enabled CORS, config in _security: passes"),
     etap:isnt(check(Config, Default, req()),
@@ -104,11 +110,43 @@ test_disabling() ->
 
 test_enabled() ->
     Enabled = config([enabled]),
-    Config = config([enabled, {"example.com","origin.com"}]),
+    Config = config([enabled, {"example.com","http://origin.com"}]),
     etap:ok(is_list(check(Enabled, Config, req())),
             "Good CORS from _security returns a list"),
     etap:ok(is_list(check(Config, [], req())),
             "Good CORS from _config returns a list"),
+    ok.
+
+
+test_default_policy() ->
+    Enabled = config([enabled]),
+    Config = config([enabled, {"example.com","http://origin.com"}]),
+
+    HeaderIs = fun(Global, Local, Req, Suffix, Expected, Description) ->
+        Result = couch_cors_policy:check(Global, Local, Req),
+        etap:ok(is_list(Result), "List returned: " ++ Description),
+
+        % Protect against crashing in case the result was not a list.
+        case is_list(Result) of
+            false ->
+                etap:ok(false, "No headers either: " ++ Description);
+            true ->
+                Key = "Access-Control-" ++ Suffix,
+                Value = case lists:keyfind(Key, 1, Result) of
+                    {Key, Val} -> Val;
+                    _ -> undefined
+                end,
+                etap:is(Value, Expected, Description)
+        end
+    end,
+
+    HeaderIs(Enabled, [], req(), "Allow-Origin",
+             "http://origin.com", "Default CORS policy echoes the header"),
+    HeaderIs(Enabled, Config, req(), "Allow-Origin",
+             "http://origin.com", "Satisfied CORS policy echoes the header"),
+
+    HeaderIs(Enabled, [], req(), "Allow-Methods",
+             undefined, "Actual response does not send preflight headers"),
     ok.
 
 test_duels() ->
@@ -141,7 +179,13 @@ httpd(Path) ->
 
 httpd(Method, Path) ->
     Parts = [ list_to_binary(Part) || Part <- string:tokens(Path, "/") ],
-    #httpd{method=Method, requested_path_parts=Parts, path_parts=Parts}.
+    Headers = mochiweb_headers:make([{"Stuff","I am stuff"}]),
+    MochiReq = mochiweb_request:new(nil, Method, Path, {1,1}, Headers),
+    #httpd{ method = Method
+          , mochi_req = MochiReq
+          , path_parts = Parts
+          , requested_path_parts = Parts
+          }.
 
 req() ->
     req(httpd()).
@@ -154,14 +198,14 @@ req(#httpd{method=Method, path_parts=Parts}=Req, Origin) ->
     Method = Req#httpd.method,
     Path = filename:join(Parts),
     Version = {1,1},
-    Headers = mochiweb_headers:make([{"Origin", Origin}]),
+    Headers = mochiweb_headers:make([{"Origin", Origin}, {"Host","example.com"}]),
     MochiReq = mochiweb_request:new(nil, Method, Path, Version, Headers),
     Req#httpd{ mochi_req=MochiReq }.
 
 % Example, CORS enabled, mydomain.com allows http://origin.com with a max-age:
 % config([enabled,
 %        {"mydomain.com","http://origin.com"},
-%        ["http://origin.com", {"max-age",3600}]])
+%        {"mydomain.com","https://origin.com", [{"allow_credentials",true}]} ])
 config() ->
     config([]).
 config(Opts) ->
@@ -175,29 +219,26 @@ config([enabled | Opts], Config) ->
     config(Opts, Config1);
 
 config([ {Dom, Orig} | Opts ], Config) ->
+    config([ {Dom, Orig, []} | Opts ], Config);
+
+config([ {Dom, Orig, Policy} | Opts ], Config) ->
     Domain = list_to_binary(Dom),
     Origin = list_to_binary(Orig),
-    {Origins} = case lists:keyfind(<<"origins">>, 1, Config) of
-        {<<"origins">>, FoundOrigins} -> FoundOrigins;
+
+    {Domains} = case lists:keyfind(<<"origins">>, 1, Config) of
+        {<<"origins">>, FoundDomains} -> FoundDomains;
         false -> {[]}
     end,
-    Origins1 = lists:keystore(Domain, 1, Origins, {Domain, Origin}),
-    Config1 = lists:keystore(<<"origins">>, 1, Config, {<<"origins">>, {Origins1}}),
-    config(Opts, Config1);
+    {Origins} = case lists:keyfind(Domain, 1, Domains) of
+        {Domain, FoundOrigins} -> FoundOrigins;
+        false -> {[]}
+    end,
 
-config([ [Orig|KVs] | Opts ], Config) ->
-    Origin = list_to_binary(Orig),
-    Configs = lists:foldl(fun({KeyStr, ValStr}, OriginCfg) ->
-        Key = list_to_binary(KeyStr),
-        Val = case ValStr of
-            "true" -> true;
-            "false" -> false;
-            Num when is_number(Num) -> Num;
-            _ -> list_to_binary(ValStr)
-        end,
-        lists:keystore(Key, 1, OriginCfg, {Key, Val})
-    end, [], KVs),
-    Config1 = lists:keystore(Origin, 1, Config, {Origin, {Configs}}),
+    Policy1 = [{list_to_binary(Key), Val} || {Key, Val} <- Policy],
+    Origins1 = lists:keystore(Origin, 1, Origins, {Origin, {Policy1}}),
+    Domains1 = lists:keystore(Domain, 1, Domains, {Domain, {Origins1}}),
+    Config1 = lists:keystore(<<"origins">>, 1, Config,
+                             {<<"origins">>, {Domains1}}),
     config(Opts, Config1).
 
 % vim: sts=4 sw=4 et
