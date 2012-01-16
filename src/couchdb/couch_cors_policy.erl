@@ -33,8 +33,11 @@ global_config() ->
     % to that in the _security object.
     Enabled = couch_util:to_existing_atom(
                 couch_config:get("httpd", "cors_enabled", "false")),
+    XHost = couch_config:get("httpd", "x_forwarded_host", "X-Forwarded-Host"),
     DomainsToOrigins = binary_section("origins"),
-    Global = [ {<<"httpd">>, {[ {<<"cors_enabled">>, Enabled} ]}}
+    Global = [ {<<"httpd">>, {[ {<<"cors_enabled">>, Enabled}
+                              , {<<"x_forwarded_host">>, XHost}
+                             ]}}
              , {<<"origins">>, {DomainsToOrigins}}
              ],
 

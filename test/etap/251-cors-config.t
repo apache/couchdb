@@ -32,7 +32,7 @@ default_config() ->
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(11),
+    etap:plan(12),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -73,6 +73,10 @@ test_policy_structure() ->
 
     Enabled = couch_util:get_value(<<"cors_enabled">>, Httpd),
     etap:ok(is_boolean(Enabled), "Boolean global CORS enabled flag"),
+
+    XHost = couch_util:get_value(<<"x_forwarded_host">>, Httpd),
+    etap:is(XHost, "X-Forwarded-Host",
+            "CORS config has X-Forwarded-Host setting"),
 
     OriginsObj = couch_util:get_value(<<"origins">>, Config),
     etap:ok(is_tuple(OriginsObj), "Global CORS config: origins section"),
