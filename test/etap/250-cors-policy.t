@@ -66,11 +66,24 @@ test_bad_api_calls() ->
 test_good_api_calls() ->
     etap_threw(fun() -> couch_cors_policy:check([], [], #httpd{}) end,
                false, "Policy check with three valid parameters"),
+
+    etap_threw(fun() ->
+        couch_cors_policy:check(config(), config(), #httpd{})
+    end, false, "Policy check with noop configs"),
+
+    % And the shortcut function.
+    etap_threw(fun() -> check([], [], req()) end,
+               false, "Policy check with three valid parameters"),
+    etap_threw(fun() -> check(config(), config(), req()) end,
+               false, "Policy check with noop configs"),
     ok.
 
 %
 % Utilities
 %
+
+check(A, B, C) ->
+    couch_cors_policy:check(A, B, C).
 
 etap_threw(Function, Expected, Description) ->
     Result = try Function() of
@@ -78,5 +91,75 @@ etap_threw(Function, Expected, Description) ->
         catch _:_ -> true
     end,
     etap:is(Result, Expected, Description).
+
+httpd() ->
+    httpd('GET').
+
+httpd(Method) when is_atom(Method) ->
+    httpd(Method, "/db/doc");
+
+httpd(Path) ->
+    httpd('GET', Path).
+
+httpd(Method, Path) ->
+    Parts = [ list_to_binary(Part) || Part <- string:tokens(Path, "/") ],
+    #httpd{method=Method, requested_path_parts=Parts, path_parts=Parts}.
+
+req() ->
+    req(httpd()).
+req(Origin) when is_list(Origin) ->
+    req(httpd(), Origin);
+req(Httpd) ->
+    req(Httpd, "http://origin.com").
+req(#httpd{method=Method, path_parts=Parts}=Req, Origin) ->
+    % Give this request the Origin.
+    Method = Req#httpd.method,
+    Path = filename:join(Parts),
+    Version = {1,1},
+    Headers = mochiweb_headers:make([{"Origin", Origin}]),
+    MochiReq = mochiweb_request:new(nil, Method, Path, Version, Headers),
+    Req#httpd{ mochi_req=MochiReq }.
+
+% Example, CORS enabled, mydomain.com allows http://origin.com with a max-age:
+% config([enabled,
+%        {"mydomain.com","http://origin.com"},
+%        ["http://origin.com", {"max-age",3600}]])
+config() ->
+    config([]).
+config(Opts) ->
+    config(Opts, []).
+config([], Config) ->
+    Config;
+
+config([enabled | Opts], Config) ->
+    Config1 = lists:keystore(<<"httpd">>, 1, Config,
+        {<<"httpd">>, {[ {<<"cors_enabled">>,true} ]}}),
+    config(Opts, Config1);
+
+config([ {Dom, Orig} | Opts ], Config) ->
+    Domain = list_to_binary(Dom),
+    Origin = list_to_binary(Orig),
+    {Origins} = case lists:keyfind(<<"origins">>, 1, Config) of
+        {<<"origins">>, FoundOrigins} -> FoundOrigins;
+        false -> {[]}
+    end,
+    Origins1 = lists:keystore(Domain, 1, Origins, {Domain, Origin}),
+    Config1 = lists:keystore(<<"origins">>, 1, Config, {<<"origins">>, {Origins1}}),
+    config(Opts, Config1);
+
+config([ [Orig|KVs] | Opts ], Config) ->
+    Origin = list_to_binary(Orig),
+    Configs = lists:foldl(fun({KeyStr, ValStr}, OriginCfg) ->
+        Key = list_to_binary(KeyStr),
+        Val = case ValStr of
+            "true" -> true;
+            "false" -> false;
+            Num when is_number(Num) -> Num;
+            _ -> list_to_binary(ValStr)
+        end,
+        lists:keystore(Key, 1, OriginCfg, {Key, Val})
+    end, [], KVs),
+    Config1 = lists:keystore(Origin, 1, Config, {Origin, {Configs}}),
+    config(Opts, Config1).
 
 % vim: sts=4 sw=4 et
