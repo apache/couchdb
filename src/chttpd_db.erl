@@ -782,7 +782,9 @@ update_doc(#httpd{user_ctx=Ctx} = Req, Db, DocId, #doc{deleted=Deleted}=Doc,
     _ ->
         Options = [UpdateType, {user_ctx,Ctx}, {w,W}]
     end,
-    case fabric:update_doc(Db, Doc, Options) of
+    {_, Ref} = spawn_monitor(fun() -> exit(fabric:update_doc(Db, Doc, Options)) end),
+    receive {'DOWN', Ref, _, _, Result} -> ok end,
+    case Result of
     {ok, NewRev} ->
         Accepted = false;
     {accepted, NewRev} ->
