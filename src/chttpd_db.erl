@@ -740,7 +740,14 @@ send_docs_multipart(Req, Results, Options1) ->
     couch_httpd:last_chunk(Resp).
 
 receive_request_data(Req) ->
-    {couch_httpd:recv(Req, 0), fun() -> receive_request_data(Req) end}.
+    receive_request_data(Req, chttpd:body_length(Req)).
+
+receive_request_data(Req, LenLeft) when LenLeft > 0 ->
+    Len = erlang:min(4096, LenLeft),
+    Data = chttpd:recv(Req, Len),
+    {Data, fun() -> receive_request_data(Req, LenLeft - iolist_size(Data)) end};
+receive_request_data(_Req, _) ->
+    throw(<<"expected more data">>).
 
 update_doc_result_to_json({{Id, Rev}, Error}) ->
         {_Code, Err, Msg} = chttpd:error_info(Error),
@@ -775,7 +782,9 @@ update_doc(#httpd{user_ctx=Ctx} = Req, Db, DocId, #doc{deleted=Deleted}=Doc,
     _ ->
         Options = [UpdateType, {user_ctx,Ctx}, {w,W}]
     end,
-    case fabric:update_doc(Db, Doc, Options) of
+    {_, Ref} = spawn_monitor(fun() -> exit(fabric:update_doc(Db, Doc, Options)) end),
+    receive {'DOWN', Ref, _, _, Result} -> ok end,
+    case Result of
     {ok, NewRev} ->
         Accepted = false;
     {accepted, NewRev} ->
