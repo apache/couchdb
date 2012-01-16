@@ -740,7 +740,14 @@ send_docs_multipart(Req, Results, Options1) ->
     couch_httpd:last_chunk(Resp).
 
 receive_request_data(Req) ->
-    {couch_httpd:recv(Req, 0), fun() -> receive_request_data(Req) end}.
+    receive_request_data(Req, chttpd:body_length(Req)).
+
+receive_request_data(Req, LenLeft) when LenLeft > 0 ->
+    Len = erlang:min(4096, LenLeft),
+    Data = chttpd:recv(Req, Len),
+    {Data, fun() -> receive_request_data(Req, LenLeft - iolist_size(Data)) end};
+receive_request_data(_Req, _) ->
+    throw(<<"expected more data">>).
 
 update_doc_result_to_json({{Id, Rev}, Error}) ->
         {_Code, Err, Msg} = chttpd:error_info(Error),
