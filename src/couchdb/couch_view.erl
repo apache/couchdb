@@ -288,17 +288,16 @@ init([]) ->
         ({created, DbName}) ->
             gen_server:cast(couch_view, {reset_indexes, DbName});
         ({ddoc_updated, {DbName, DDocId}}) ->
-            case ets:match_object(couch_groups_by_db, {DbName, {DDocId, '$1'}}) of
-            [] ->
-                ok;
-            [{DbName, {DDocId, Sig}}] ->
-                case ets:lookup(group_servers_by_sig, {DbName, Sig}) of
-                [{_, GroupPid}] ->
-                    (catch gen_server:cast(GroupPid, ddoc_updated));
-                [] ->
-                    ok
-                end
-            end;
+            lists:foreach(
+                fun({_DbName, {_DDocId, Sig}}) ->
+                    case ets:lookup(group_servers_by_sig, {DbName, Sig}) of
+                    [{_, GroupPid}] ->
+                        (catch gen_server:cast(GroupPid, ddoc_updated));
+                    [] ->
+                        ok
+                    end
+                end,
+                ets:match_object(couch_groups_by_db, {DbName, {DDocId, '$1'}}));
         (_Else) ->
             ok
         end),
