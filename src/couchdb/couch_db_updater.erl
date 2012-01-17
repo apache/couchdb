@@ -597,7 +597,7 @@ merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
                         {NewTree, OldDeleted};
                     true ->
                         send_result(Client, Ref, conflict),
-                        {NewTree, OldDeleted}
+                        {AccTree, OldDeleted}
                     end;
                 {NewTree, no_conflicts} when  AccTree == NewTree ->
                     % the tree didn't change at all
@@ -619,7 +619,7 @@ merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
                         {NewTree2, OldDeleted};
                     true ->
                         send_result(Client, Ref, conflict),
-                        {NewTree, OldDeleted}
+                        {AccTree, OldDeleted}
                     end;
                 {NewTree, _} ->
                     {NewTree, NewDoc#doc.deleted}
