@@ -127,6 +127,7 @@ evalcx(JSContext *cx, uintN argc, jsval* vp)
     size_t srclen;
     jsval rval;
     JSBool ret = JS_FALSE;
+    char *name = NULL;
 
     sandbox = NULL;
     if(!JS_ConvertArguments(cx, argc, argv, "S / o", &str, &sandbox)) {
@@ -151,16 +152,21 @@ evalcx(JSContext *cx, uintN argc, jsval* vp)
         }
     }
 
+    if(argc > 2) {
+      name = enc_string(cx, argv[2], NULL);
+    }
+
     if(srclen == 0) {
         JS_SET_RVAL(cx, vp, OBJECT_TO_JSVAL(sandbox));
     } else {
-        JS_EvaluateUCScript(subcx, sandbox, src, srclen, NULL, 0, &rval);
+        JS_EvaluateUCScript(subcx, sandbox, src, srclen, name, 1, &rval);
         JS_SET_RVAL(cx, vp, rval);
     }
     
     ret = JS_TRUE;
 
 done:
+    if(name) JS_free(cx, name);
     FINISH_REQUEST(subcx);
     JS_DestroyContext(subcx);
     return ret;
