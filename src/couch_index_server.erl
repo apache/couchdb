@@ -191,17 +191,16 @@ update_notify({deleted, DbName}) ->
 update_notify({created, DbName}) ->
     gen_server:cast(?MODULE, {reset_indexes, DbName});
 update_notify({ddoc_updated, {DbName, DDocId}}) ->
-    case ets:match_object(?BY_DB, {DbName, {DDocId, '$1'}}) of
-        [] ->
-            ok;
-        [{DbName, {DDocId, Sig}}] ->
+    lists:foreach(
+        fun({_DbName, {_DDocId, Sig}}) ->
             case ets:lookup(?BY_SIG, {DbName, Sig}) of
                 [{_, IndexPid}] ->
                     (catch gen_server:cast(IndexPid, ddoc_updated));
                 [] ->
                     ok
             end
-    end;
+        end,
+        ets:match_object(?BY_DB, {DbName, {DDocId, '$1'}}));
 update_notify(_) ->
     ok.
 
