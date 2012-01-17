@@ -56,7 +56,6 @@ main(_) ->
 
 test() ->
     couch_config:start_link(config_files()),
-    couch_log:start_link(),
     couch_os_daemons:start_link(),
 
     etap:diag("Daemon not executable."),
