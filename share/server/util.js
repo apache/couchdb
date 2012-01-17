@@ -61,16 +61,16 @@ var Couch = {
   toJSON : function (val) {
     return JSON.stringify(val);
   },
-  compileFunction : function(source, ddoc) {    
+  compileFunction : function(source, ddoc, name) {
     if (!source) throw(["error","not_found","missing function"]);
 
     var evaluate_function_source = function(source, evalFunction, sandbox) {
       sandbox = sandbox || {};
       if(typeof CoffeeScript === "undefined") {
-        return evalFunction(source, sandbox);
+        return evalFunction(source, sandbox, name);
       } else {
         var coffee = CoffeeScript.compile(source, {bare: true});
-        return evalFunction(coffee, sandbox);
+        return evalFunction(coffee, sandbox, name);
       }
     }
 
@@ -89,7 +89,7 @@ var Couch = {
               ddoc._module_cache[newModule.id] = {};
               var s = "function (module, exports, require) { " + newModule.current + " }";
               try {
-                var func = sandbox ? evalcx(s, sandbox) : eval(s);
+                var func = sandbox ? evalcx(s, sandbox, newModule.id) : eval(s);
                 func.apply(sandbox, [newModule, newModule.exports, function(name) {
                   return require(name, newModule);
                 }]);

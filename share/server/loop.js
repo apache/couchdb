@@ -98,7 +98,7 @@ var DDoc = (function() {
                        " on design doc " + ddocId]);
               }
               if (typeof fun != "function") {
-                fun = Couch.compileFunction(fun, ddoc);
+                fun = Couch.compileFunction(fun, ddoc, funPath.join('.'));
                 // cache the compiled fun on the ddoc
                 point[funPath[i]] = fun;
               };
