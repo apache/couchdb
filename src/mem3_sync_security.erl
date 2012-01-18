@@ -57,8 +57,13 @@ get_all_security(DbName) ->
     end.
 
 is_ok([_]) ->
+    % One security object is the happy case
     ok;
 is_ok([_, _] = SecObjs0) ->
+    % This is the strict heuristic where there is one version of
+    % the security object that out numbers empty security objects.
+    % If so, just overwrite the empty objects with the non-empty
+    % version.
     case lists:keytake({[]}, 1, SecObjs0) of
     {value, {_, EmptyCount}, [{SecObj, Count}]} when Count > EmptyCount ->
         {fixable, SecObj};
@@ -66,5 +71,6 @@ is_ok([_, _] = SecObjs0) ->
         broken
     end;
 is_ok(_) ->
+    % Anything else requires human intervention
     broken.
 
