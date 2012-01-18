@@ -609,6 +609,7 @@
             db.saveDoc(doc, {
               success: function(resp) {
                 page.isDirty = false;
+                page.storedViewCode = viewDef;
                 $("#viewcode button.revert, #viewcode button.save")
                   .attr("disabled", "disabled");
               }
