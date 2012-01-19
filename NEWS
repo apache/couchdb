@@ -44,6 +44,7 @@ This version has not been released yet.
    be read by everyone.
  * Password hashes are now calculated by CouchDB instead of the
    client.
+ * Allow persistent authentication cookies.
 
 Version 1.1.2
 -------------

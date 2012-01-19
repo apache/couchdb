@@ -20,6 +20,9 @@ Authentication:
    longer publicly readable.
  * Password hashes are now calculated by CouchDB. Clients are no
    longer required to do this manually.
+ * Cookies used for authentication can be made persistent by enabling
+   the .ini configuration key `allow_persistent_cookies' in the
+   `couch_httpd_auth` section.
 
 Build System:
 
