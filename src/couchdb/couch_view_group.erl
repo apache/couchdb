@@ -168,7 +168,12 @@ handle_call({start_compact, CompactFun}, _From, #group_state{compactor_pid=nil}
     {ok, Fd} = open_index_file(compact, RootDir, DbName, GroupSig),
     NewGroup = reset_file(Db, Fd, DbName, Group),
     couch_db:close(Db),
-    Pid = spawn_link(fun() -> CompactFun(Group, NewGroup, DbName) end),
+    unlink(Fd),
+    Pid = spawn_link(fun() ->
+        link(Fd),
+        CompactFun(Group, NewGroup, DbName),
+        unlink(Fd)
+    end),
     {reply, {ok, Pid}, State#group_state{compactor_pid = Pid}};
 handle_call({start_compact, _}, _From, State) ->
     %% compact already running, this is a no-op
