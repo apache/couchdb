@@ -207,20 +207,21 @@ couch_readfile(JSContext* cx, const char* filename)
 void
 couch_print(JSContext* cx, uintN argc, jsval* argv)
 {
-    char *bytes;
-    uintN i;
+    char *bytes = NULL;
+    FILE *stream = stdout;
 
-    for(i = 0; i < argc; i++)
-    {
-        bytes = enc_string(cx, argv[i], NULL);
+    if (argc) {
+        if (argc > 1 && argv[1] == JSVAL_TRUE) {
+          stream = stderr;
+        }
+        bytes = enc_string(cx, argv[0], NULL);
         if(!bytes) return;
-
-        fprintf(stdout, "%s%s", i ? " " : "", bytes);
+        fprintf(stream, "%s", bytes);
         JS_free(cx, bytes);
     }
 
-    fputc('\n', stdout);
-    fflush(stdout);
+    fputc('\n', stream);
+    fflush(stream);
 }
 
 

@@ -13,7 +13,7 @@
 var console = {
   log: function(arg) {
     var msg = (arg.toString()).replace(/\n/g, "\n    ");
-    print("# " + msg);
+    print(msg, true);
   }
 };
 
@@ -30,9 +30,9 @@ function runTestConsole(num, name, func) {
     print("ok " + num + " " + name);
   } catch(e) {
     print("not ok " + num + " " + name);
-    print("# " + e.toSource());
+    console.log(e.toSource());
     if (e.stack) {
-      print("# Stacktrace:\n" + e.stack.replace(/^/gm, "\t"));
+      console.log("Stacktrace:\n" + e.stack.replace(/^/gm, "\t"));
     }
   }
 }
