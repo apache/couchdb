@@ -232,7 +232,7 @@ cookie_auth_cookie(Req, User, Secret, TimeStamp) ->
     Hash = crypto:sha_mac(Secret, SessionData),
     mochiweb_cookies:cookie("AuthSession",
         couch_util:encodeBase64Url(SessionData ++ ":" ++ ?b2l(Hash)),
-        [{path, "/"}] ++ cookie_scheme(Req)).
+        [{path, "/"}] ++ cookie_scheme(Req) ++ max_age()).
 
 hash_password(Password, Salt) ->
     ?l2b(couch_util:to_hex(crypto:sha(<<Password/binary, Salt/binary>>))).
@@ -357,4 +357,14 @@ cookie_scheme(#httpd{mochi_req=MochiReq}) ->
     case MochiReq:get(scheme) of
         http -> [];
         https -> [{secure, true}]
+    end.
+
+max_age() ->
+    case couch_config:get("couch_httpd_auth", "allow_persistent_cookies", "false") of
+        "false" ->
+            [];
+        "true" ->
+            Timeout = list_to_integer(
+                couch_config:get("couch_httpd_auth", "timeout", "600")),
+            [{max_age, Timeout}]
     end.
