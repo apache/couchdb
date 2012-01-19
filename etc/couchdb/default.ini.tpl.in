@@ -64,6 +64,7 @@ authentication_redirect = /_utils/session.html
 require_valid_user = false
 timeout = 600 ; number of seconds before automatic logout
 auth_cache_size = 50 ; size is number of cache entries
+allow_persistent_cookies = false ; set to true to allow persistent cookies
 
 [couch_httpd_oauth]
 ; If set to 'true', oauth token and consumer secrets will be looked up

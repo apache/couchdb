@@ -36,6 +36,9 @@ Authentication:
    By default this is disabled (secrets are stored in the .ini)
    but can be enabled via the .ini configuration key `use_users_db`
    in the `couch_httpd_oauth` section.
+ * Cookies used for authentication can be made persistent by enabling
+   the .ini configuration key `allow_persistent_cookies' in the
+   `couch_httpd_auth` section.
 
 Build System:
 
