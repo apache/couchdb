@@ -29,7 +29,7 @@ else
             TEST_SRC="$SCRIPT_DIR/test/$1.js"
             if [ ! -f $TEST_SRC ]; then
                 echo "file $1 does not exist"
-                exit
+                exit 1
             fi
         fi
     fi
@@ -62,9 +62,12 @@ $COUCHJS -H \
 	$TEST_SRC \
 	$JS_TEST_DIR/couch_http.js \
 	$JS_TEST_DIR/cli_runner.js
+RESULT=$?
 
 if [ -z $COUCHDB_NO_START ]; then
 	# stop CouchDB
 	./utils/run -d
 	trap - 0
 fi
+
+exit $RESULT
