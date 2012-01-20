@@ -809,8 +809,7 @@ update_doc(#httpd{user_ctx=Ctx} = Req, Db, DocId, #doc{deleted=Deleted}=Doc,
     {false, false} ->
         HttpCode = 201
     end,
-    send_json(Req, HttpCode, ResponseHeaders,
-    {[
+    send_json(Req, HttpCode, ResponseHeaders, {[
         {ok, true},
         {id, DocId},
         {rev, NewRevStr}
