@@ -98,8 +98,13 @@ force_reply(Doc, [FirstReply|_] = Replies, {Health, W, Acc}) ->
         twig:log(warn, "write quorum (~p) failed for ~s", [W, Doc#doc.id]),
         case [Reply || {ok, Reply} <- Replies] of
         [] ->
-            % we didn't update any copy, just pick the first error
-            {error, W, [{Doc, FirstReply} | Acc]};
+            % check if all errors are identical, if so inherit health
+            case lists:all(fun(E) -> E =:= FirstReply end, Replies) of
+            true ->
+                {Health, W, [{Doc, FirstReply} | Acc]};
+            false ->
+                {error, W, [{Doc, FirstReply} | Acc]}
+            end;
         [AcceptedRev | _] ->
             NewHealth = case Health of ok -> accepted; _ -> Health end,
             {NewHealth, W, [{Doc, {accepted,AcceptedRev}} | Acc]}
