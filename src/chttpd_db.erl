@@ -774,16 +774,25 @@ update_doc(Req, Db, DocId, Doc, Headers) ->
 update_doc(#httpd{user_ctx=Ctx} = Req, Db, DocId, #doc{deleted=Deleted}=Doc,
         Headers, UpdateType) ->
     W = couch_httpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
-    case couch_httpd:header_value(Req, "X-Couch-Full-Commit") of
-    "true" ->
-        Options = [full_commit, UpdateType, {user_ctx,Ctx}, {w,W}];
-    "false" ->
-        Options = [delay_commit, UpdateType, {user_ctx,Ctx}, {w,W}];
-    _ ->
-        Options = [UpdateType, {user_ctx,Ctx}, {w,W}]
-    end,
+    Options =
+        case couch_httpd:header_value(Req, "X-Couch-Full-Commit") of
+        "true" ->
+            [full_commit, UpdateType, {user_ctx,Ctx}, {w,W}];
+        "false" ->
+            [delay_commit, UpdateType, {user_ctx,Ctx}, {w,W}];
+        _ ->
+            [UpdateType, {user_ctx,Ctx}, {w,W}]
+        end,
     {_, Ref} = spawn_monitor(fun() -> exit(fabric:update_doc(Db, Doc, Options)) end),
-    receive {'DOWN', Ref, _, _, Result} -> ok end,
+    Result = receive {'DOWN', Ref, _, _, Res} -> Res end,
+    case Result of
+    {{nocatch, Exception}, _Reason} ->
+        % Exceptions from spawned processes are swallowed and returned, rethrow
+        throw(Exception);
+    _ ->
+        ok
+    end,
+
     case Result of
     {ok, NewRev} ->
         Accepted = false;
