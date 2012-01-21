@@ -177,8 +177,11 @@ AS_CASE([$(uname -s)],
     [CYGWIN*], [] ,
     [*], [
     CPPFLAGS="$CPPFLAGS -I/opt/local/include"
+    CPPFLAGS="$CPPFLAGS -I/opt/local/include/js"
     CPPFLAGS="$CPPFLAGS -I/usr/local/include"
+    CPPFLAGS="$CPPFLAGS -I/usr/local/include/js"
     CPPFLAGS="$CPPFLAGS -I/usr/include"
+    CPPFLAGS="$CPPFLAGS -I/usr/include/js"
     LDFLAGS="$LDFLAGS -L/opt/local/lib"
     LDFLAGS="$LDFLAGS -L/usr/local/lib"
 ])
@@ -202,6 +205,17 @@ AS_CASE([$(uname -s)],
 ])
 
 AM_CONDITIONAL([WINDOWS], [test x$IS_WINDOWS = xTRUE])
+
+AC_CHECK_HEADER([jsapi.h], [], [
+    AC_CHECK_HEADER([js/jsapi.h],
+        [
+        CPPFLAGS="$CPPFLAGS -I$JS_INCLUDE/js"
+        ],
+        [
+            AC_MSG_ERROR([Could not find the jsapi header.
+
+Are the Mozilla SpiderMonkey headers installed?])
+        ])])
 
 OLD_LIBS="$LIBS"
 LIBS="$JS_LIBS $LIBS"
@@ -246,6 +260,14 @@ AC_CHECK_LIB([$JS_LIB_BASE], [JS_GetStringCharsAndLength],
         [Use newer JS_GetCharsAndLength function.]))
 
 # Else, hope that 1.7.0 works
+
+# Deal with JSScript -> JSObject -> JSScript switcheroo
+
+AC_CHECK_TYPE([JSScript*],
+    [AC_DEFINE([JSSCRIPT_TYPE], [JSScript*], [Use JSObject* for scripts])],
+    [AC_DEFINE([JSSCRIPT_TYPE], [JSObject*], [Use JSScript* for scripts])],
+    [[#include <jsapi.h>]]
+)
 
 AC_DEFINE([COUCHJS_NAME], ["couchjs"], ["CouchJS executable name."])
 
@@ -297,25 +319,6 @@ fi
 
 JS_LIBS="-l$JS_LIB_BASE -lm $JS_LIBS"
 AC_SUBST(JS_LIBS)
-
-AC_CHECK_HEADER([jsapi.h], [], [
-    AC_CHECK_HEADER([js/jsapi.h],
-        [
-        CPPFLAGS="$CPPFLAGS -I$JS_INCLUDE/js"
-        ],
-        [
-            AC_MSG_ERROR([Could not find the jsapi header.
-
-Are the Mozilla SpiderMonkey headers installed?])
-        ])])
-
-# Deal with JSScript -> JSObject -> JSScript switcheroo
-
-AC_CHECK_TYPE([JSScript*],
-    [AC_DEFINE([JSSCRIPT_TYPE], [JSScript*], [Use JSObject* for scripts])],
-    [AC_DEFINE([JSSCRIPT_TYPE], [JSObject*], [Use JSScript* for scripts])],
-    [[#include <jsapi.h>]]
-)
 
 LIBS="$OLD_LIBS"
 CPPFLAGS="$OLD_CPPFLAGS"
