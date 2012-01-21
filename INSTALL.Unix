@@ -71,6 +71,14 @@ You can install the other dependencies by running:
 
     brew install erlang icu4c spidermonkey curl
 
+You may want to link ICU so that CouchDB can find the header files automatically:
+
+    brew link icu4c
+
+The same is true for recent versions of Erlang:
+
+    brew link erlang
+
 You will need Homebrew installed to use the `brew` command.
 
 Learn more about Homebrew at:
