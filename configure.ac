@@ -115,6 +115,11 @@ esac
 
 AM_CONDITIONAL([WINDOWS], [test x$IS_WINDOWS = xTRUE])
 
+OLD_LIBS="$LIBS"
+LIBS="$JS_LIBS $LIBS"
+OLD_CPPFLAGS="$CPPFLAGS"
+CPPFLAGS="$JS_CFLAGS $CPPFLAGS"
+
 AC_CHECK_HEADER([jsapi.h], [], [
     AC_CHECK_HEADER([js/jsapi.h],
         [
@@ -126,10 +131,6 @@ AC_CHECK_HEADER([jsapi.h], [], [
 Are the Mozilla SpiderMonkey headers installed?])
         ])])
 
-OLD_LIBS="$LIBS"
-LIBS="$JS_LIBS $LIBS"
-OLD_CPPFLAGS="$CPPFLAGS"
-CPPFLAGS="$JS_CFLAGS $CPPFLAGS"
 AC_CHECK_LIB([mozjs185], [JS_NewContext], [JS_LIB_BASE=mozjs185], [
     AC_CHECK_LIB([mozjs185-1.0], [JS_NewContext], [JS_LIB_BASE=mozjs185-1.0], [
         AC_CHECK_LIB([mozjs], [JS_NewContext], [JS_LIB_BASE=mozjs], [
