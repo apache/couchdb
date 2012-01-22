@@ -236,7 +236,11 @@ handle_request_int(MochiReq, DefaultFun,
 
     % get requested path
     RequestedPath = case MochiReq:get_header_value("x-couchdb-vhost-path") of
-        undefined -> RawUri;
+        undefined ->
+            case MochiReq:get_header_value("x-couchdb-requested-path") of
+                undefined -> RawUri;
+                R -> R
+            end;
         P -> P
     end,
     
