@@ -158,7 +158,8 @@ start_link(Name, Options) ->
 
 
 stop() ->
-    mochiweb_http:stop(?MODULE).
+    mochiweb_http:stop(couch_httpd),
+    mochiweb_http:stop(https).
 
 config_change("httpd", "bind_address") ->
     ?MODULE:stop();
