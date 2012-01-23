@@ -56,7 +56,8 @@ doc_ids() ->
 
 doc_num_conflicts(<<"doc1">>) -> 10;
 doc_num_conflicts(<<"doc2">>) -> 100;
-doc_num_conflicts(<<"doc3">>) -> 286.
+% a number > MaxURLlength (7000) / length(DocRevisionString)
+doc_num_conflicts(<<"doc3">>) -> 210.
 
 
 main(_) ->
@@ -77,6 +78,7 @@ test() ->
     couch_server_sup:start_link(test_util:config_files()),
     ibrowse:start(),
     crypto:start(),
+    couch_config:set("replicator", "connection_timeout", "90000", false),
 
     Pairs = [
         {source_db_name(), target_db_name()},
@@ -287,6 +289,6 @@ replicate(Source, Target) ->
     receive
     {'DOWN', MonRef, process, Pid, Reason} ->
         etap:is(Reason, normal, "Replication finished successfully")
-    after 300000 ->
+    after 900000 ->
         etap:bail("Timeout waiting for replication to finish")
     end.
