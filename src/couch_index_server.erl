@@ -164,7 +164,7 @@ reset_indexes(DbName, Root) ->
         rem_from_ets(DbName, Sig, DDocId, Pid)
     end,
     lists:foreach(Fun, ets:lookup(?BY_DB, DbName)),
-    Path = Root ++ "/." ++ binary_to_list(DbName) ++ "_design",
+    Path = couch_index_util:index_dir("", DbName),
     couch_file:nuke_dir(Root, Path).
 
 
