@@ -51,6 +51,8 @@ This version has not been released yet.
  * Fix use of OAuth with VHosts and URL rewriting.
  * OAuth secrets can now be stored in the users system database.
  * Allow persistent authentication cookies.
+ * The requested_path property of query server request objects now has
+   the path requested by clients before VHosts and rewriting.
 
 Version 1.1.2
 -------------
