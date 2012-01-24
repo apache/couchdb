@@ -45,6 +45,8 @@ This version has not been released yet.
  * Password hashes are now calculated by CouchDB instead of the
    client.
  * Allow persistent authentication cookies.
+ * The requested_path property of query server request objects now has
+   the path requested by clients before VHosts and rewriting.
 
 Version 1.1.2
 -------------

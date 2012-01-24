@@ -40,6 +40,7 @@ HTTP Interface:
  * Fixes to the `_changes` feed heartbeat option which caused
    heartbeats to be missed when used with a filter. This caused
    timeouts of continuous pull replications with a filter.
+ * Properly restart the SSL socket on configuration changes.
 
 Replicator:
 
@@ -77,6 +78,8 @@ View Server:
  * Add CoffeeScript (http://coffeescript.org/) as a first class view server
    language.
  * Fixed old index file descriptor leaks after a view cleanup.
+ * The requested_path property keeps the pre-rewrite path even when no VHost
+   configuration is matched.
 
 OAuth:
 
@@ -86,6 +89,8 @@ Futon:
 
  * The `Status` screen (active tasks) now displays two new task status
    fields: `Started on` and `Updated on`.
+ * Futon remembers view code every time it is saved, allowing to save an
+   edit that amounts to a revert.
 
 Version 1.1.2
 -------------
