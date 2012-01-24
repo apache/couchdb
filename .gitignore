@@ -45,7 +45,6 @@ var/Makefile
 
 bin/couchdb
 bin/couchdb.1
-bin/couchjs
 bin/couch-config
 bin/couch-config_dev
 etc/couchdb/default.ini
