@@ -136,6 +136,8 @@ handle_replicate_req(#httpd{method='POST', user_ctx=Ctx} = Req) ->
         send_json(Req, 200, {[{ok, true}, {<<"_local_id">>, RepId}]});
     {ok, {JsonResults}} ->
         send_json(Req, {[{ok, true} | JsonResults]});
+    {ok, stopped} ->
+        send_json(Req, 200, {[{ok, stopped}]});
     {error, {Type, Details}} ->
         send_json(Req, 500, {[{error, Type}, {reason, Details}]});
     {error, not_found} ->
