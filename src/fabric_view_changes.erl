@@ -119,19 +119,19 @@ send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn, Timeout) ->
     },
     %% TODO: errors need to be handled here
     try
-        receive_results(Workers, State, Timeout, Callback, AccIn)
+        receive_results(Workers, State, Timeout, Callback)
     after
         rexi_monitor:stop(RexiMon),
         fabric_util:cleanup(Workers)
     end.
 
-receive_results(Workers, State, Timeout, Callback, AccIn) ->
+receive_results(Workers, State, Timeout, Callback) ->
     case rexi_utils:recv(Workers, #shard.ref, fun handle_message/3, State,
             infinity, Timeout) of
     {timeout, NewState0} ->
         {ok, AccOut} = Callback(timeout, NewState0#collector.user_acc),
         NewState = NewState0#collector{user_acc = AccOut},
-        receive_results(Workers, NewState, Timeout, Callback, AccOut);
+        receive_results(Workers, NewState, Timeout, Callback);
     {_, NewState} ->
         {ok, NewState}
     end.
