@@ -899,7 +899,8 @@ copy_docs(Db, #db{updater_fd = DestFd} = NewDb, InfoBySeq0, Retry) ->
 
 copy_compact(Db, NewDb0, Retry) ->
     FsyncOptions = [Op || Op <- NewDb0#db.fsync_options, Op == before_header],
-    NewDb = NewDb0#db{fsync_options=FsyncOptions},
+    Compression = couch_compress:get_compression_method(),
+    NewDb = NewDb0#db{fsync_options=FsyncOptions, compression=Compression},
     TotalChanges = couch_db:count_changes_since(Db, NewDb#db.update_seq),
     BufferSize = list_to_integer(
         couch_config:get("database_compaction", "doc_buffer_size", "524288")),
@@ -1018,14 +1019,14 @@ update_compact_task(NumChanges) ->
     couch_task_status:update([{changes_done, Changes2}, {progress, Progress}]).
 
 make_doc_summary(#db{compression = Comp}, {Body0, Atts0}) ->
-    Body = case couch_compress:is_compressed(Body0) of
+    Body = case couch_compress:is_compressed(Body0, Comp) of
     true ->
         Body0;
     false ->
         % pre 1.2 database file format
         couch_compress:compress(Body0, Comp)
     end,
-    Atts = case couch_compress:is_compressed(Atts0) of
+    Atts = case couch_compress:is_compressed(Atts0, Comp) of
     true ->
         Atts0;
     false ->
