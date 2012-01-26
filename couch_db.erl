@@ -29,7 +29,7 @@
 -export([init/1,terminate/2,handle_call/3,handle_cast/2,code_change/3,handle_info/2]).
 -export([changes_since/4,changes_since/5,read_doc/2,new_revid/1]).
 -export([check_is_admin/1, check_is_member/1]).
--export([reopen/1, is_system_db/1]).
+-export([reopen/1, is_system_db/1, compression/1]).
 
 -include("couch_db.hrl").
 
@@ -415,6 +415,9 @@ set_revs_limit(_Db, _Limit) ->
 
 name(#db{name=Name}) ->
     Name.
+
+compression(#db{compression=Compression}) ->
+    Compression.
 
 update_doc(Db, Doc, Options) ->
     update_doc(Db, Doc, Options, interactive_edit).
