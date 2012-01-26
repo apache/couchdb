@@ -57,6 +57,7 @@ EXTRA_DIST = \
     072-cleanup.t \
     073-changes.t \
     075-auth-cache.t \
+    076-file-compression.t \
     080-config-get-set.t \
     081-config-override.1.ini \
     081-config-override.2.ini \

@@ -12,16 +12,17 @@
 
 -module(couch_compress).
 
--export([compress/2, decompress/1, is_compressed/1]).
+-export([compress/2, decompress/1, is_compressed/2]).
 -export([get_compression_method/0]).
 
 -include("couch_db.hrl").
 
 % binaries compressed with snappy have their first byte set to this value
 -define(SNAPPY_PREFIX, 1).
-% binaries that are a result of an erlang:term_to_binary/1,2 call have this
-% value as their first byte
+% Term prefixes documented at:
+%      http://www.erlang.org/doc/apps/erts/erl_ext_dist.html
 -define(TERM_PREFIX, 131).
+-define(COMPRESSED_TERM_PREFIX, 131, 80).
 
 
 get_compression_method() ->
@@ -38,6 +39,12 @@ get_compression_method() ->
     end.
 
 
+compress(<<?SNAPPY_PREFIX, _/binary>> = Bin, snappy) ->
+    Bin;
+compress(<<?SNAPPY_PREFIX, _/binary>> = Bin, Method) ->
+    compress(decompress(Bin), Method);
+compress(<<?TERM_PREFIX, _/binary>> = Bin, Method) ->
+    compress(decompress(Bin), Method);
 compress(Term, none) ->
     ?term_to_bin(Term);
 compress(Term, {deflate, Level}) ->
@@ -64,10 +71,14 @@ decompress(<<?TERM_PREFIX, _/binary>> = Bin) ->
     binary_to_term(Bin).
 
 
-is_compressed(<<?SNAPPY_PREFIX, _/binary>>) ->
+is_compressed(<<?SNAPPY_PREFIX, _/binary>>, Method) ->
+    Method =:= snappy;
+is_compressed(<<?COMPRESSED_TERM_PREFIX, _/binary>>, {deflate, _Level}) ->
     true;
-is_compressed(<<?TERM_PREFIX, _/binary>>) ->
-    true;
-is_compressed(Term) when not is_binary(Term) ->
+is_compressed(<<?COMPRESSED_TERM_PREFIX, _/binary>>, _Method) ->
+    false;
+is_compressed(<<?TERM_PREFIX, _/binary>>, Method) ->
+    Method =:= none;
+is_compressed(Term, _Method) when not is_binary(Term) ->
     false.
 
