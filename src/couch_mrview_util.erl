@@ -188,8 +188,7 @@ init_state(Db, Fd, State, Header) ->
         (rereduce, Reds) -> lists:sum(Reds)
     end,
 
-    %IdBtOpts = [{compression, couch_db:compression(Db)}],
-    IdBtOpts = [{reduce, IdReduce}],
+    IdBtOpts = [{reduce, IdReduce}, {compression, couch_db:compression(Db)}],
     {ok, IdBtree} = couch_btree:open(IdBtreeState, Fd, IdBtOpts),
 
     OpenViewFun = fun(St, View) -> open_view(Db, Fd, Lang, St, View) end,
@@ -204,7 +203,7 @@ init_state(Db, Fd, State, Header) ->
     }.
 
 
-open_view(_Db, Fd, Lang, {BTState, USeq, PSeq}, View) ->
+open_view(Db, Fd, Lang, {BTState, USeq, PSeq}, View) ->
     FunSrcs = [FunSrc || {_Name, FunSrc} <- View#mrview.reduce_funs],
     ReduceFun =
         fun(reduce, KVs) ->
@@ -225,8 +224,8 @@ open_view(_Db, Fd, Lang, {BTState, USeq, PSeq}, View) ->
 
     ViewBtOpts = [
         {less, Less},
-        {reduce, ReduceFun}
-        %{compression, couch_db:compression(Db)}
+        {reduce, ReduceFun},
+        {compression, couch_db:compression(Db)}
     ],
     {ok, Btree} = couch_btree:open(BTState, Fd, ViewBtOpts),
     View#mrview{btree=Btree, update_seq=USeq, purge_seq=PSeq}.
