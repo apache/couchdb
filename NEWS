@@ -50,6 +50,11 @@ This version has not been released yet.
    a filter. It affected continuous pull replications with a filter.
  * Fix use of OAuth with VHosts and URL rewriting.
  * OAuth secrets can now be stored in the users system database.
+ * Documents in the _users database can no longer be read by everyone.
+ * Confidential information in the _replication database can no longer
+   be read by everyone.
+ * Password hashes are now calculated by CouchDB instead of the
+   client.
  * Allow persistent authentication cookies.
  * The requested_path property of query server request objects now has
    the path requested by clients before VHosts and rewriting.
