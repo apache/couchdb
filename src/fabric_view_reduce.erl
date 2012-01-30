@@ -33,6 +33,7 @@ go(DbName, DDoc, VName, Args, Callback, Acc0) ->
         Ref = rexi:cast(N, {fabric_rpc, reduce_view, [Name,Group,VName,Args]}),
         Shard#shard{ref = Ref}
     end, fabric_view:get_shards(DbName, Args)),
+    RexiMon = fabric_util:create_monitors(Workers),
     BufferSize = couch_config:get("fabric", "reduce_buffer_size", "20"),
     #view_query_args{limit = Limit, skip = Skip} = Args,
     State = #collector{
@@ -59,14 +60,13 @@ go(DbName, DDoc, VName, Args, Callback, Acc0) ->
     {error, Resp} ->
         {ok, Resp}
     after
+        rexi_monitor:stop(RexiMon),
         fabric_util:cleanup(Workers),
         catch couch_query_servers:ret_os_process(State#collector.os_proc)
     end.
 
-handle_message({rexi_DOWN, _, _, _}, nil, State) ->
-    % TODO see if progress can be made here, possibly by removing all shards
-    % from that node and checking is_progress_possible
-    {ok, State};
+handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _, State) ->
+    fabric_view:remove_down_shards(State, NodeRef);
 
 handle_message({rexi_EXIT, Reason}, Worker, State) ->
     #collector{callback=Callback, counters=Counters0, user_acc=Acc} = State,
