@@ -126,13 +126,18 @@ write_multi_part_doc(#http_db{headers=Headers} = Db, #doc{atts=Atts} = Doc) ->
             {"Content-Length", Len} | Headers
         ]
     },
-    Result = case couch_rep_httpc:request(Request) of
-    {[{<<"error">>, Error}, {<<"reason">>, Reason}]} ->
-        {Pos, [RevId | _]} = Doc#doc.revs,
-        ErrId = couch_util:to_existing_atom(Error),
-        [{Doc#doc.id, couch_doc:rev_to_str({Pos, RevId})}, {ErrId, Reason}];
-    _ ->
-        []
+    Conn = couch_rep_httpc:spawn_link_worker_process(Request),
+    Result = try
+        case couch_rep_httpc:request(Request#http_db{conn=Conn}) of
+        {[{<<"error">>, Error}, {<<"reason">>, Reason}]} ->
+            {Pos, [RevId | _]} = Doc#doc.revs,
+            ErrId = couch_util:to_existing_atom(Error),
+            [{Doc#doc.id, couch_doc:rev_to_str({Pos, RevId})}, {ErrId, Reason}];
+        _ ->
+            []
+        end
+    after
+        ibrowse:stop_worker_process(Conn)
     end,
     StreamerPid ! stop,
     Result.
