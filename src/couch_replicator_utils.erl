@@ -311,9 +311,9 @@ ssl_params(Url) ->
         SslOpts1 = case CertFile /= nil andalso KeyFile /= nil of
             true ->
                 case Password of
-                    nil -> 
+                    nil ->
                         [{certfile, CertFile}, {keyfile, KeyFile}] ++ SslOpts;
-                    _ -> 
+                    _ ->
                         [{certfile, CertFile}, {keyfile, KeyFile},
                             {password, Password}] ++ SslOpts
                 end;
