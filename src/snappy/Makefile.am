@@ -25,7 +25,7 @@ snappy_cxx_hdrs = \
 	google-snappy/snappy-internal.h \
 	google-snappy/snappy-sinksource.h \
 	google-snappy/snappy-stubs-internal.h \
-	google-snappy/snappy-stubs-public.h
+	google-snappy/snappy-stubs-public.h.in
 
 snappy_file_collection = \
     snappy.app.in \
@@ -36,6 +36,8 @@ snappyebin_make_generated_file_list = \
     snappy.beam
 
 EXTRA_DIST = \
+    google-snappy/AUTHORS \
+    google-snappy/COPYING \
 	$(snappy_cxx_hdrs) \
     $(snappy_file_collection)
 

@@ -30,6 +30,7 @@ mochiweb_file_collection = \
 	mochitemp.erl \
 	mochiutf8.erl \
 	mochiweb.app.in \
+	mochiweb.app.src \
 	mochiweb.erl \
 	mochiweb_acceptor.erl \
 	mochiweb_app.erl \
@@ -44,6 +45,7 @@ mochiweb_file_collection = \
 	mochiweb_mime.erl \
 	mochiweb_multipart.erl \
 	mochiweb_request.erl \
+	mochiweb_request_tests.erl \
 	mochiweb_response.erl \
 	mochiweb_skel.erl \
 	mochiweb_socket.erl \
