@@ -15,12 +15,23 @@
 -module(fabric_util).
 
 -export([submit_jobs/3, cleanup/1, recv/4, get_db/1, get_db/2, error_info/1,
-        update_counter/3, remove_ancestors/2, kv/2]).
+        update_counter/3, remove_ancestors/2, create_monitors/1, kv/2,
+        remove_down_workers/2]).
 
 -include("fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("eunit/include/eunit.hrl").
+
+remove_down_workers(Workers, BadNode) ->
+    Filter = fun(#shard{node = Node}, _) -> Node =/= BadNode end,
+    NewWorkers = fabric_dict:filter(Filter, Workers),
+    case fabric_view:is_progress_possible(NewWorkers) of
+    true ->
+        {ok, NewWorkers};
+    false ->
+        error
+    end.
 
 submit_jobs(Shards, EndPoint, ExtraArgs) ->
     lists:map(fun(#shard{node=Node, name=ShardName} = Shard) ->
@@ -119,7 +130,13 @@ remove_ancestors([{_,{{ok, #doc{revs = {Pos, Revs}}}, Count}} = Head | Tail], Ac
         remove_ancestors(Tail, [Head | Acc]);
     [{Descendant, _} | _] ->
         remove_ancestors(update_counter(Descendant, Count, Tail), Acc)
-    end.
+    end;
+remove_ancestors([Error | Tail], Acc) ->
+    remove_ancestors(Tail, [Error | Acc]).
+
+create_monitors(Shards) ->
+    MonRefs = lists:usort([{rexi_server, N} || #shard{node=N} <- Shards]),
+    rexi_monitor:start(MonRefs).
 
 %% verify only id and rev are used in key.
 update_counter_test() ->

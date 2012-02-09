@@ -107,6 +107,7 @@ send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn, Timeout) ->
         end
     end, unpack_seqs(PackedSeqs, DbName)),
     {Workers, _} = lists:unzip(Seqs),
+    RexiMon = fabric_util:create_monitors(Workers),
     State = #collector{
         query_args = ChangesArgs,
         callback = Callback,
@@ -119,6 +120,7 @@ send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn, Timeout) ->
     try
         receive_results(Workers, State, Timeout, Callback, AccIn)
     after
+        rexi_monitor:stop(RexiMon),
         fabric_util:cleanup(Workers)
     end.
 
@@ -133,10 +135,8 @@ receive_results(Workers, State, Timeout, Callback, AccIn) ->
         {ok, NewState}
     end.
 
-handle_message({rexi_DOWN, _, _, _}, nil, State) ->
-    % TODO see if progress can be made here, possibly by removing all shards
-    % from that node and checking is_progress_possible
-    {ok, State};
+handle_message({rexi_DOWN, _, {_, NodeRef}, _}, nil, State) ->
+    fabric_view:remove_down_shards(State, NodeRef);
 
 handle_message({rexi_EXIT, Reason}, Worker, State) ->
     #collector{

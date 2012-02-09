@@ -100,10 +100,11 @@ map_view(DbName, DDoc, ViewName, QueryArgs) ->
         extra = Extra
     } = QueryArgs,
     set_io_priority(DbName, Extra),
-    MinSeq = if Stale == ok -> 0; true -> couch_db:get_update_seq(Db) end,
+    {LastSeq, MinSeq} = calculate_seqs(Db, Stale),
     Group0 = couch_view_group:design_doc_to_view_group(DDoc),
     {ok, Pid} = gen_server:call(couch_view, {get_group_server, DbName, Group0}),
     {ok, Group} = couch_view_group:request_group(Pid, MinSeq),
+    maybe_update_view_group(Pid, LastSeq, Stale),
     erlang:monitor(process, Group#group.fd),
     View = fabric_view:extract_view(Pid, ViewName, Group#group.views, ViewType),
     {ok, Total} = couch_view:get_row_count(View),
@@ -142,9 +143,10 @@ reduce_view(DbName, Group0, ViewName, QueryArgs) ->
     } = QueryArgs,
     set_io_priority(DbName, Extra),
     GroupFun = group_rows_fun(GroupLevel),
-    MinSeq = if Stale == ok -> 0; true -> couch_db:get_update_seq(Db) end,
+    {LastSeq, MinSeq} = calculate_seqs(Db, Stale),
     {ok, Pid} = gen_server:call(couch_view, {get_group_server, DbName, Group0}),
     {ok, Group} = couch_view_group:request_group(Pid, MinSeq),
+    maybe_update_view_group(Pid, LastSeq, Stale),
     #group{views=Views, def_lang=Lang, fd=Fd} = Group,
     erlang:monitor(process, Fd),
     {NthRed, View} = fabric_view:extract_view(Pid, ViewName, Views, reduce),
@@ -164,6 +166,20 @@ reduce_view(DbName, Group0, ViewName, QueryArgs) ->
         end, Keys)
     end,
     rexi:reply(complete).
+
+calculate_seqs(Db, Stale) ->
+    LastSeq = couch_db:get_update_seq(Db),
+    if
+        Stale == ok orelse Stale == update_after ->
+            {LastSeq, 0};
+        true ->
+            {LastSeq, LastSeq}
+    end.
+
+maybe_update_view_group(GroupPid, LastSeq, update_after) ->
+    couch_view_group:trigger_group_update(GroupPid, LastSeq);
+maybe_update_view_group(_, _, _) ->
+    ok.
 
 create_db(DbName) ->
     rexi:reply(case couch_server:create(DbName, []) of

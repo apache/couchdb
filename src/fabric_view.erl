@@ -16,11 +16,23 @@
 
 -export([is_progress_possible/1, remove_overlapping_shards/2, maybe_send_row/1,
     maybe_pause_worker/3, maybe_resume_worker/2, transform_row/1, keydict/1,
-    extract_view/4, get_shards/2]).
+    extract_view/4, get_shards/2, remove_down_shards/2]).
 
 -include("fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
+
+-spec remove_down_shards(#collector{}, node()) ->
+    {ok, #collector{}} | {error, any()}.
+remove_down_shards(Collector, BadNode) ->
+    #collector{callback=Callback, counters=Counters, user_acc=Acc} = Collector,
+    case fabric_util:remove_down_workers(Counters, BadNode) of
+    {ok, NewCounters} ->
+        {ok, Collector#collector{counters = NewCounters}};
+    error ->
+        Reason = {nodedown, <<"progress not possible">>},
+        Callback({error, Reason}, Acc)
+    end.
 
 %% @doc looks for a fully covered keyrange in the list of counters
 -spec is_progress_possible([{#shard{}, term()}]) -> boolean().
@@ -157,18 +169,34 @@ possibly_embed_doc(#collector{db_name=DbName, query_args=Args},
     case IncludeDocs andalso is_tuple(Value) of
     true ->
         {Props} = Value,
+        Rev0 = couch_util:get_value(<<"_rev">>, Props),
         case couch_util:get_value(<<"_id">>,Props) of
         undefined -> Row;
         IncId ->
             % use separate process to call fabric:open_doc
             % to not interfere with current call
             {Pid, Ref} = spawn_monitor(fun() ->
-                                  exit(fabric:open_doc(DbName, IncId, [])) end),
-            {ok, NewDoc} =
-                receive {'DOWN',Ref,process,Pid, Resp} ->
+                exit(
+                case Rev0 of
+                undefined ->
+                    case fabric:open_doc(DbName, IncId, []) of
+                    {ok, NewDoc} ->
+                        Row#view_row{doc=couch_doc:to_json_obj(NewDoc,[])};
+                    {not_found, _} ->
+                        Row#view_row{doc=null}
+                    end;
+                Rev0 ->
+                    Rev = couch_doc:parse_rev(Rev0),
+                    case fabric:open_revs(DbName, IncId, [Rev], []) of
+                    {ok, [{ok, NewDoc}]} ->
+                        Row#view_row{doc=couch_doc:to_json_obj(NewDoc,[])};
+                    {ok, [{{not_found, _}, Rev}]} ->
+                        Row#view_row{doc=null}
+                    end
+                end) end),
+            receive {'DOWN',Ref,process,Pid, Resp} ->
                         Resp
-                end,
-            Row#view_row{doc=couch_doc:to_json_obj(NewDoc,[])}
+            end
         end;
         _ -> Row
     end.
@@ -277,7 +305,8 @@ index_of(X, [X|_Rest], I) ->
 index_of(X, [_|Rest], I) ->
     index_of(X, Rest, I+1).
 
-get_shards(DbName, #view_query_args{stale=ok}) ->
+get_shards(DbName, #view_query_args{stale=Stale})
+  when Stale == ok orelse Stale == update_after ->
     mem3:ushards(DbName);
 get_shards(DbName, #view_query_args{stale=false}) ->
     mem3:shards(DbName).

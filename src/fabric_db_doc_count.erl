@@ -23,8 +23,30 @@
 go(DbName) ->
     Shards = mem3:shards(DbName),
     Workers = fabric_util:submit_jobs(Shards, get_doc_count, []),
+    RexiMon = fabric_util:create_monitors(Shards),
     Acc0 = {fabric_dict:init(Workers, nil), 0},
-    fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0).
+    try
+        fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0)
+    after
+        rexi_monitor:stop(RexiMon)
+    end.
+
+handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Shard, {Counters, Acc}) ->
+    case fabric_util:remove_down_workers(Counters, NodeRef) of
+    {ok, NewCounters} ->
+        {ok, {NewCounters, Acc}};
+    error ->
+        {error, {nodedown, <<"progress not possible">>}}
+    end;
+
+handle_message({rexi_EXIT, Reason}, Shard, {Counters, Acc}) ->
+    NewCounters = lists:keydelete(Shard, #shard.ref, Counters),
+    case fabric_view:is_progress_possible(NewCounters) of
+    true ->
+        {ok, {NewCounters, Acc}};
+    false ->
+        {error, Reason}
+    end;
 
 handle_message({ok, Count}, Shard, {Counters, Acc}) ->
     case fabric_dict:lookup_element(Shard, Counters) of
