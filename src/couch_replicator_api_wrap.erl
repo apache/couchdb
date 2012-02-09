@@ -314,7 +314,7 @@ changes_since(#httpdb{headers = Headers1} = HttpDb, Style, StartSeq,
     true ->
         [{"feed", "continuous"}]
     end ++ [
-        {"style", atom_to_list(Style)}, {"since", couch_util:to_list(StartSeq)},
+        {"style", atom_to_list(Style)}, {"since", ?JSON_ENCODE(StartSeq)},
         {"heartbeat", integer_to_list(HeartBeat)}
     ],
     DocIds = get_value(doc_ids, Options),
