@@ -45,8 +45,8 @@ handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Shard, {Counters, Acc}) ->
     end;
 
 handle_message({rexi_EXIT, Reason}, Shard, {Counters, Acc}) ->
-    NewCounters = lists:keydelete(Shard,1,Counters),
-    case fabric_view:is_progress_possible(Counters) of
+    NewCounters = lists:keydelete(Shard, #shard.ref, Counters),
+    case fabric_view:is_progress_possible(NewCounters) of
     true ->
         {ok, {NewCounters, Acc}};
     false ->
