@@ -85,19 +85,21 @@ function $$(node) {
           if (!validateUsernameAndPassword(data, callback)) return;
           $.couch.config({
             success : function() {
-              doLogin(data.name, data.password, function(errors) {
-                if(!$.isEmptyObject(errors)) {
-                  callback(errors);
-                  return;
-                }
-                doSignup(data.name, null, function(errors) {
-                  if (errors && errors.name && errors.name.indexOf && errors.name.indexOf("taken") == -1) {
+              setTimeout(function() {
+                doLogin(data.name, data.password, function(errors) {
+                  if(!$.isEmptyObject(errors)) {
                     callback(errors);
-                  } else {
-                    callback();
+                    return;
                   }
-                  }, false);
-                });
+                  doSignup(data.name, null, function(errors) {
+                    if (errors && errors.name && errors.name.indexOf && errors.name.indexOf("taken") == -1) {
+                      callback(errors);
+                    } else {
+                      callback();
+                    }
+                    }, false);
+                  });
+              }, 200);
             }
           }, "admins", data.name, data.password);
         }
