@@ -213,13 +213,11 @@ couchTests.users_db_security = function(debug) {
         TEquals("forbidden", e.error, "non-admins can't read design docs");
       }
 
-      console.log(fdmananaDoc);
       // admin should be able to read and edit any user doc
       fdmananaDoc.password = "mobile";
       var result = save_as(usersDb, fdmananaDoc, "jan");
       TEquals(true, result.ok, "admin should be able to update any user doc");
 
-      console.log(fdmananaDoc);
       // admin should be able to read and edit any user doc
       fdmananaDoc.password = "mobile1";
       var result = save_as(usersDb, fdmananaDoc, "benoitc");
