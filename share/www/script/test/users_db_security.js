@@ -58,6 +58,18 @@ couchTests.users_db_security = function(debug) {
     }
   };
 
+  var changes_as = function(db, username)
+  {
+    loginUser(username);
+    try {
+      return db.changes();
+    } catch(ex) {
+      return ex;
+    } finally {
+      CouchDB.logout();
+    }
+  };
+
   var testFun = function()
   {
     usersDb.deleteDb();
@@ -96,9 +108,21 @@ couchTests.users_db_security = function(debug) {
       var res = usersDb.open("org.couchdb.user:jchris");
       TEquals(null, res, "anonymous user doc read should be not found");
 
+      // anonymous should not be able to read /_users/_changes
+      try {
+        var ch = usersDb.changes();
+        T(false, "anonymous can read _changes");
+      } catch(e) {
+        TEquals("unauthorized", e.error, "anoymous can't read _changes");
+      }
+
       // user should be able to read their own document
       var jchrisDoc = open_as(usersDb, "org.couchdb.user:jchris", "jchris");
       TEquals("org.couchdb.user:jchris", jchrisDoc._id);
+
+      // user should not be able to read /_users/_changes
+      var changes = changes_as(usersDb, "jchris");
+      TEquals("unauthorized", changes.error, "user can't read _changes");
 
       // new 'password' fields should trigger new hashing routine
       jchrisDoc.password = "couch";
