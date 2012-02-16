@@ -97,11 +97,9 @@ couchTests.users_db_security = function(debug) {
       TEquals(null, res, "anonymous user doc read should be not found");
 
       // user should be able to read their own document
-
       var jchrisDoc = open_as(usersDb, "org.couchdb.user:jchris", "jchris");
       TEquals("org.couchdb.user:jchris", jchrisDoc._id);
 
-      // user should bt able to update their own document
       // new 'password' fields should trigger new hashing routine
       jchrisDoc.password = "couch";
 
@@ -223,7 +221,7 @@ couchTests.users_db_security = function(debug) {
     });
   };
 
-  usersDb.deleteDb(); 
+  usersDb.deleteDb();
   run_on_modified_server(
     [{section: "couch_httpd_auth",
       key: "authentication_db", value: usersDb.name}],
