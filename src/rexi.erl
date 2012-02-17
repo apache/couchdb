@@ -59,14 +59,15 @@ cast(Node, MFA) ->
 -spec cast(node(), pid(), {atom(), atom(), list()}) -> reference().
 cast(Node, Caller, MFA) ->
     Ref = make_ref(),
-    do_send({?SERVER, Node}, cast_msg({doit, {Caller, Ref}, get(nonce), MFA})),
+    Msg = cast_msg({doit, {Caller, Ref}, get(nonce), MFA}),
+    rexi_utils:send({?SERVER, Node}, Msg),
     Ref.
 
 %% @doc Sends an async kill signal to the remote process associated with Ref.
 %% No rexi_EXIT message will be sent.
 -spec kill(node(), reference()) -> ok.
 kill(Node, Ref) ->
-    do_send({?SERVER, Node}, cast_msg({kill, Ref})),
+    rexi_utils:send({?SERVER, Node}, cast_msg({kill, Ref})),
     ok.
 
 %% @equiv async_server_call(Server, self(), Request)
@@ -82,7 +83,7 @@ async_server_call(Server, Request) ->
 -spec async_server_call(pid() | {atom(),node()}, pid(), any()) -> reference().
 async_server_call(Server, Caller, Request) ->
     Ref = make_ref(),
-    do_send(Server, {'$gen_call', {Caller,Ref}, Request}),
+    rexi_utils:send(Server, {'$gen_call', {Caller,Ref}, Request}),
     Ref.
 
 %% @doc convenience function to reply to the original rexi Caller.
@@ -112,14 +113,3 @@ sync_reply(Reply, Timeout) ->
 %% internal functions %%
 
 cast_msg(Msg) -> {'$gen_cast', Msg}.
-
-% send a message as quickly as possible
-do_send(Dest, Msg) ->
-    case erlang:send(Dest, Msg, [noconnect, nosuspend]) of
-    noconnect ->
-        spawn(erlang, send, [Dest, Msg]);
-    nosuspend ->
-        spawn(erlang, send, [Dest, Msg]);
-    ok ->
-        ok
-    end.

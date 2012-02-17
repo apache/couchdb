@@ -187,4 +187,4 @@ find_worker(Ref, Tab) ->
     case ets:lookup(Tab, Ref) of [] -> false; [Worker] -> Worker end.
 
 notify_caller({Caller, Ref}, Reason) ->
-    Caller ! {Ref, {rexi_EXIT, Reason}}.
+    rexi_utils:send(Caller, {Ref, {rexi_EXIT, Reason}}).
