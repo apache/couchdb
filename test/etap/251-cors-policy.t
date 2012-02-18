@@ -17,7 +17,7 @@
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(27),
+    etap:plan(29),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -98,10 +98,15 @@ test_disabling() ->
 test_enabled() ->
     Enabled = config([enabled]),
     Config = config([enabled, {"example.com","http://origin.com"}]),
-    etap:ok(is_list(check(Enabled, Config, req())),
-            "Good CORS from _security returns a list"),
-    etap:ok(is_list(check(Config, [], req())),
-            "Good CORS from _config returns a list"),
+
+    FromSecurity = check(Enabled, Config, req()),
+    etap:ok(is_list(FromSecurity), "Header list from _security"),
+    etap:isnt(FromSecurity, [], "Header list from _security is non-empty"),
+
+    FromConfig = check(Config, [], req()),
+    etap:ok(is_list(FromConfig), "Header list from _config"),
+    etap:isnt(FromConfig, [], "Header list from _config is non-empty"),
+
     ok.
 
 
