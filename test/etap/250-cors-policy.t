@@ -89,23 +89,23 @@ test_disabling() ->
     Deactivated = config([{"example.com", "http://origin.com"}]),
 
     etap:is(check(Default, Default, req()),
-            false, "By default, CORS is disabled"),
+            [], "By default, CORS is disabled"),
     etap:is(check(Default, Config, req()),
-            false, "By default, CORS is disabled, despite _security"),
+            [], "By default, CORS is disabled, despite _security"),
     etap:is(check(Deactivated, Default, req()),
-            false, "Globally disabling CORS overrides everything else"),
+            [], "Globally disabling CORS overrides everything else"),
     etap:is(check(Deactivated, Config, req()),
-            false, "Deactivated CORS still overrides _security"),
+            [], "Deactivated CORS still overrides _security"),
 
     etap:is(check(Config, [], httpd()),
-            false, "CORS fail for request with no Origin header"),
+            [], "CORS fail for request with no Origin header"),
     etap:is(check(Enabled, Config, httpd()),
-            false, "CORS fail from _security for request with no Origin"),
+            [], "CORS fail from _security for request with no Origin"),
 
     etap:isnt(check(Enabled, Config, req()),
-              false, "Globally enabled CORS, config in _security: passes"),
+              [], "Globally enabled CORS, config in _security: passes"),
     etap:isnt(check(Config, Default, req()),
-              false, "Global CORS config, nothing in _security: passes"),
+              [], "Global CORS config, nothing in _security: passes"),
     ok.
 
 test_enabled() ->

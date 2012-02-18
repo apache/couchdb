@@ -45,11 +45,12 @@ check(Global, Local, #httpd{}=Req)
                     % present terminate this set of steps. The request is
                     % outside the scope of this specification.
                     ?LOG_DEBUG("Not a CORS request", []),
-                    false;
+                    [];
                 Origin ->
                     headers(Global, Local, Req, Origin)
             end;
-        _ -> false
+        _ ->
+            []
     end.
 
 
@@ -86,7 +87,7 @@ preflight(OriginVal, OkOrigins, OkMethods, OkHeaders, OkCreds, Req) ->
     % only one token.  Assume that the "source origin" (s. 6.1) is the first in
     % the list?
     SourceOrigin = lists:nth(1, string:tokens(OriginVal, " ")),
-    false.
+    [].
 
 actual(OriginVal, OkOrigins, _OkMethods, _OkHeaders, OkCreds, _Req) ->
     % s. 5.1(2) Split the value of the Origin header on the U+0020 SPACE
@@ -103,7 +104,7 @@ actual(OriginVal, OkOrigins, _OkMethods, _OkHeaders, OkCreds, _Req) ->
     case lists:all(GoodOrigin, Origins) of
         false ->
             ?LOG_DEBUG("Origin ~p not allowed: ~p", [Origins, OkOrigins]),
-            false;
+            [];
         true ->
             % s. 5.1(3) If the resource supports credentials add a single
             % A-C-A-Origin header, with the value of the origin header as
