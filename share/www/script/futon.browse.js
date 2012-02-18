@@ -569,6 +569,9 @@
                     location.href = "database.html?" + encodeURIComponent(dbName) +
                       "/" + $.couch.encodeDocId(doc._id) +
                       "/_view/" + encodeURIComponent(data.name);
+                  },
+                  error: function(status, e, reason) {
+                    alert(reason);
                   }
                 });
               }
@@ -612,6 +615,9 @@
                 page.storedViewCode = viewDef;
                 $("#viewcode button.revert, #viewcode button.save")
                   .attr("disabled", "disabled");
+              },
+              error: function(status, e, reason) {
+                alert(reason);
               }
             });
           }

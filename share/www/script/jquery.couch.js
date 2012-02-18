@@ -151,7 +151,7 @@
           } else if (options.error) {
             options.error(req.status, resp.error, resp.reason);
           } else {
-            alert("An error occurred getting session info: " + resp.reason);
+            throw "An error occurred getting session info: " + resp.reason;
           }
         }
       });
@@ -215,7 +215,7 @@
           } else if (options.error) {
             options.error(req.status, resp.error, resp.reason);
           } else {
-            alert("An error occurred logging in: " + resp.reason);
+            throw 'An error occurred logging in: ' + resp.reason;
           }
         }
       });
@@ -243,7 +243,7 @@
           } else if (options.error) {
             options.error(req.status, resp.error, resp.reason);
           } else {
-            alert("An error occurred logging out: " + resp.reason);
+            throw 'An error occurred logging out: ' + resp.reason;
           }
         }
       });
@@ -268,9 +268,7 @@
             rawDocs[doc._id].rev == doc._rev) {
           // todo: can we use commonjs require here?
           if (typeof Base64 == "undefined") {
-            alert("please include /_utils/script/base64.js in the page for " +
-                  "base64 support");
-            return false;
+            throw 'Base64 support not found.';
           } else {
             doc._attachments = doc._attachments || {};
             doc._attachments["rev-"+doc._rev.split("-")[0]] = {
@@ -556,7 +554,7 @@
               }
             });
           } else {
-            alert("Please provide an eachApp function for allApps()");
+            throw 'Please provide an eachApp function for allApps()';
           }
         },
 
@@ -650,7 +648,7 @@
               } else if (options.error) {
                 options.error(req.status, resp.error, resp.reason);
               } else {
-                alert("The document could not be saved: " + resp.reason);
+                throw "The document could not be saved: " + resp.reason;
               }
             }
           });
@@ -748,7 +746,7 @@
               } else if (options.error) {
                 options.error(req.status, resp.error, resp.reason);
               } else {
-                alert("The document could not be copied: " + resp.reason);
+                throw "The document could not be copied: " + resp.reason;
               }
             }
           });
@@ -1012,7 +1010,7 @@
           if (options.error) {
             options.error(req.status, req, e);
           } else {
-            alert(errorMessage + ": " + e);
+            throw errorMessage + ': ' + e;
           }
           return;
         }
@@ -1027,7 +1025,7 @@
                         errorMessage, resp && resp.reason || "no response",
                         reqDuration);
         } else {
-          alert(errorMessage + ": " + resp.reason);
+          throw errorMessage + ": " + resp.reason;
         }
       }
     }, obj), ajaxOptions));
