@@ -30,23 +30,24 @@
         ]).
 
 
-check(DbConfig, #httpd{}=Req) ->
+check(DbConfig, Req) ->
     check(global_config(), DbConfig, Req).
 
-check(Global, Local, #httpd{}=Req)
-        when is_list(Global) andalso is_list(Local) ->
+check(Global, Local, {Method, Headers}=Req)
+        when is_list(Global) andalso is_list(Local) andalso is_list(Headers)
+        andalso (is_atom(Method) orelse is_binary(Method)) ->
     {Httpd} = couch_util:get_value(<<"httpd">>, Global, {[]}),
     Enabled = couch_util:get_value(<<"cors_enabled">>, Httpd, false),
     case Enabled of
         true ->
-            case couch_httpd:header_value(Req, "Origin") of
-                undefined ->
+            case lists:keyfind("Origin", 1, Headers) of
+                false ->
                     % s. 5.1(1) and s. 5.2(1) If the Origin header is not
                     % present terminate this set of steps. The request is
                     % outside the scope of this specification.
                     ?LOG_DEBUG("Not a CORS request", []),
                     [];
-                Origin ->
+                {"Origin", Origin} ->
                     headers(Global, Local, Req, Origin)
             end;
         _ ->
@@ -54,7 +55,7 @@ check(Global, Local, #httpd{}=Req)
     end.
 
 
-headers(Global, Local, Req, OriginValue) ->
+headers(Global, Local, {ReqMethod, _ReqHeaders}=Req, OriginValue) ->
     Policies = origins_config(Global, Local, Req),
 
     % s. 5 ...each resource is bound to the following:
@@ -71,7 +72,7 @@ headers(Global, Local, Req, OriginValue) ->
     Headers = list_of_headers(Policies, Req),
     Creds = supports_credentials(Policies, Req),
 
-    case Req#httpd.method of
+    case ReqMethod of
         'OPTIONS' ->
             % s. 5.2. Preflight Request; also s. 6.1.5(1)
             preflight(OriginValue, Origins, Methods, Headers, Creds, Req);
@@ -154,19 +155,19 @@ list_of_headers(Config, Req) ->
 supports_credentials(Config, Req) ->
     false.
 
-origins_config(Global, Local, Req) ->
+origins_config(Global, Local, {Method, Headers}) ->
     % Identify the "origins" configuration object which applies to this
     % request. The local (i.e.  _security object) config takes precidence.
     {Httpd} = couch_util:get_value(<<"httpd">>, Global, {[]}),
     XHost = couch_util:get_value(<<"x_forwarded_host">>, Httpd,
                                  "X-Forwarded-Host"),
-    VHost = case couch_httpd:header_value(Req, XHost) of
-        undefined ->
-            case couch_httpd:header_value(Req, "Host") of
-                undefined -> "";
-                HostValue -> ?l2b(HostValue)
+    VHost = case lists:keyfind(XHost, 1, Headers) of
+        false ->
+            case lists:keyfind("Host", 1, Headers) of
+                false -> "";
+                {"Host", HostValue} -> ?l2b(HostValue)
             end;
-        ForwardedValue -> ?l2b(ForwardedValue)
+        {XHost, ForwardedValue} -> ?l2b(ForwardedValue)
     end,
 
     {GlobalHosts} = couch_util:get_value(<<"origins">>, Global, {[]}),

@@ -14,25 +14,10 @@
 % Test only the policy decisions of couch_cors_policy:check/3--no servers
 % or other couch_* stuff.
 
--record(httpd,
-    {mochi_req,
-    peer,
-    method,
-    requested_path_parts,
-    path_parts,
-    db_url_handlers,
-    user_ctx,
-    req_body = undefined,
-    design_url_handlers,
-    auth,
-    default_fun,
-    url_handlers
-    }).
-
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(26),
+    etap:plan(27),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -59,20 +44,22 @@ test_bad_api_calls() ->
     etap_threw(fun() -> couch_cors_policy:check([], []) end,
             true, "Policy check with two parameters"),
 
-    etap_threw(fun() -> couch_cors_policy:check(notList, [], #httpd{}) end,
+    etap_threw(fun() -> couch_cors_policy:check(notList, [], {'GET', []}) end,
             true, "Policy check with non-list first parameter"),
-    etap_threw(fun() -> couch_cors_policy:check([], notList, #httpd{}) end,
+    etap_threw(fun() -> couch_cors_policy:check([], notList, {'GET', []}) end,
             true, "Policy check with non-list second parameter"),
-    etap_threw(fun() -> couch_cors_policy:check([], [], {not_httpd}) end,
-            true, "Policy check with non-#httpd{} third parameter"),
+    etap_threw(fun() -> couch_cors_policy:check([], [], {{not_method}, []}) end,
+            true, "Policy check with non-method third parameter"),
+    etap_threw(fun() -> couch_cors_policy:check([], [], {'GET', not_list}) end,
+            true, "Policy check with non-list fourth parameter"),
     ok.
 
 test_good_api_calls() ->
-    etap_threw(fun() -> couch_cors_policy:check([], [], #httpd{}) end,
+    etap_threw(fun() -> couch_cors_policy:check([], [], {'GET', []}) end,
                false, "Policy check with three valid parameters"),
 
     etap_threw(fun() ->
-        couch_cors_policy:check(config(), config(), #httpd{})
+        couch_cors_policy:check(config(), config(), {'GET', []})
     end, false, "Policy check with noop configs"),
 
     % And the shortcut function.
@@ -178,14 +165,8 @@ httpd(Path) ->
     httpd('GET', Path).
 
 httpd(Method, Path) ->
-    Parts = [ list_to_binary(Part) || Part <- string:tokens(Path, "/") ],
-    Headers = mochiweb_headers:make([{"Stuff","I am stuff"}]),
-    MochiReq = mochiweb_request:new(nil, Method, Path, {1,1}, Headers),
-    #httpd{ method = Method
-          , mochi_req = MochiReq
-          , path_parts = Parts
-          , requested_path_parts = Parts
-          }.
+    Headers = [{"Stuff","I am stuff"}],
+    {Method, Headers}.
 
 req() ->
     req(httpd()).
@@ -193,14 +174,11 @@ req(Origin) when is_list(Origin) ->
     req(httpd(), Origin);
 req(Httpd) ->
     req(Httpd, "http://origin.com").
-req(#httpd{method=Method, path_parts=Parts}=Req, Origin) ->
+req({Method, Headers}, Origin) ->
     % Give this request the Origin.
-    Method = Req#httpd.method,
-    Path = filename:join(Parts),
-    Version = {1,1},
-    Headers = mochiweb_headers:make([{"Origin", Origin}, {"Host","example.com"}]),
-    MochiReq = mochiweb_request:new(nil, Method, Path, Version, Headers),
-    Req#httpd{ mochi_req=MochiReq }.
+    OriginHeaders = lists:keystore("Origin", 1, Headers, {"Origin", Origin}),
+    HostHeaders = lists:keystore("Host", 1, OriginHeaders, {"Host", "example.com"}),
+    {Method, HostHeaders}.
 
 % Example, CORS enabled, mydomain.com allows http://origin.com with a max-age:
 % config([enabled,

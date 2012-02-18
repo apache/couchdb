@@ -11,21 +11,6 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--record(httpd,
-    {mochi_req,
-    peer,
-    method,
-    requested_path_parts,
-    path_parts,
-    db_url_handlers,
-    user_ctx,
-    req_body = undefined,
-    design_url_handlers,
-    auth,
-    default_fun,
-    url_handlers
-    }).
-
 default_config() ->
     test_util:build_file("etc/couchdb/default_dev.ini").
 
@@ -55,7 +40,7 @@ test_api_calls() ->
             false, "No problem building global CORS policy"),
 
     % Test the "shortcut" policy check call, which requires couch_config.
-    etap:not_ok(threw(fun() -> couch_cors_policy:check([], #httpd{}) end),
+    etap:not_ok(threw(fun() -> couch_cors_policy:check([], {'GET', []}) end),
             "Policy check with two valid parameters"),
     ok.
 
@@ -104,9 +89,8 @@ test_policy_structure() ->
     ok.
 
 test_defaults() ->
-    Headers = mochiweb_headers:make([]),
-    MochiReq = mochiweb_request:new(nil, 'GET', "/", {1,1}, Headers),
-    Req = #httpd{mochi_req=MochiReq},
+    Headers = [],
+    Req = {'GET', Headers},
 
     Hosts = couch_cors_policy:origins_config([], [], Req),
     {Config} = couch_util:get_value(<<"*">>, Hosts),
