@@ -40,8 +40,11 @@ test_api_calls() ->
             false, "No problem building global CORS policy"),
 
     % Test the "shortcut" policy check call, which requires couch_config.
-    etap:not_ok(threw(fun() -> couch_cors_policy:headers([], {'GET', []}) end),
-            "Policy check with two valid parameters"),
+    Req = {'GET', []},
+    etap:not_ok(threw(fun() -> couch_cors_policy:headers(Req) end),
+                "Policy check with one valid parameter"),
+    etap:not_ok(threw(fun() -> couch_cors_policy:headers([], Req) end),
+                "Policy check with two valid parameters"),
     ok.
 
 test_policy_structure() ->

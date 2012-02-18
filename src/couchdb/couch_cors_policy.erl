@@ -11,7 +11,7 @@
 % the License.
 
 -module(couch_cors_policy).
--export([global_config/0, headers/2, headers/3]).
+-export([global_config/0, headers/1, headers/2, headers/3]).
 
 % For the test suite.
 -export([origins_config/3]).
@@ -30,7 +30,10 @@
         ]).
 
 
-headers(DbConfig, Req) ->
+headers({_Method, _Headers}=Req) ->
+    headers([], Req).
+
+headers(DbConfig, {_Method, _Headers}=Req) ->
     headers(global_config(), DbConfig, Req).
 
 headers(Global, Local, {Method, Headers}=Req)
