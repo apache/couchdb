@@ -54,18 +54,18 @@ test() ->
 
     %% do tests
     test_simple_request(),
-    test_preflight_request(),
-    test_db_request(),
-    test_db_preflight_request(),
-    test_db_origin_request(),
-    test_db1_origin_request(),
-    test_db1_wrong_origin_request(),
-
-    %% do tests with auth
-    ok = set_admin_password("test", "test"),
-
-    test_db_preflight_auth_request(),
-    test_db_origin_auth_request(),
+%    test_preflight_request(),
+%    test_db_request(),
+%    test_db_preflight_request(),
+%    test_db_origin_request(),
+%    test_db1_origin_request(),
+%    test_db1_wrong_origin_request(),
+%
+%    %% do tests with auth
+%    ok = set_admin_password("test", "test"),
+%
+%    test_db_preflight_auth_request(),
+%    test_db_origin_auth_request(),
 
     %% restart boilerplate
     catch couch_db:close(Db),
