@@ -67,19 +67,11 @@ final_reduce(Reduce, {KVs, Reductions}) ->
 fold_reduce(#btree{root=Root}=Bt, Fun, Acc, Options) ->
     Dir = couch_util:get_value(dir, Options, fwd),
     StartKey = couch_util:get_value(start_key, Options),
-    EndKey = case couch_util:get_value(end_key_gt, Options) of
-        undefined -> couch_util:get_value(end_key, Options);
-        LastKey -> LastKey
-    end,
+    InEndRangeFun = make_key_in_end_range_function(Bt, Dir, Options),
     KeyGroupFun = couch_util:get_value(key_group_fun, Options, fun(_,_) -> true end),
-    {StartKey2, EndKey2} =
-    case Dir of
-        rev -> {EndKey, StartKey};
-        fwd -> {StartKey, EndKey}
-    end,
     try
         {ok, Acc2, GroupedRedsAcc2, GroupedKVsAcc2, GroupedKey2} =
-            reduce_stream_node(Bt, Dir, Root, StartKey2, EndKey2, undefined, [], [],
+            reduce_stream_node(Bt, Dir, Root, StartKey, InEndRangeFun, undefined, [], [],
             KeyGroupFun, Fun, Acc),
         if GroupedKey2 == undefined ->
             {ok, Acc2};
@@ -480,22 +472,24 @@ modify_kvnode(Bt, NodeTuple, LowerBound, [{ActionType, ActionKey, ActionValue} |
     end.
 
 
-reduce_stream_node(_Bt, _Dir, nil, _KeyStart, _KeyEnd, GroupedKey, GroupedKVsAcc,
+reduce_stream_node(_Bt, _Dir, nil, _KeyStart, _InEndRangeFun, GroupedKey, GroupedKVsAcc,
         GroupedRedsAcc, _KeyGroupFun, _Fun, Acc) ->
     {ok, Acc, GroupedRedsAcc, GroupedKVsAcc, GroupedKey};
-reduce_stream_node(Bt, Dir, Node, KeyStart, KeyEnd, GroupedKey, GroupedKVsAcc,
+reduce_stream_node(Bt, Dir, Node, KeyStart, InEndRangeFun, GroupedKey, GroupedKVsAcc,
         GroupedRedsAcc, KeyGroupFun, Fun, Acc) ->
     P = element(1, Node),
     case get_node(Bt, P) of
     {kp_node, NodeList} ->
-        reduce_stream_kp_node(Bt, Dir, NodeList, KeyStart, KeyEnd, GroupedKey,
+        NodeList2 = adjust_dir(Dir, NodeList),
+        reduce_stream_kp_node(Bt, Dir, NodeList2, KeyStart, InEndRangeFun, GroupedKey,
                 GroupedKVsAcc, GroupedRedsAcc, KeyGroupFun, Fun, Acc);
     {kv_node, KVs} ->
-        reduce_stream_kv_node(Bt, Dir, KVs, KeyStart, KeyEnd, GroupedKey,
+        KVs2 = adjust_dir(Dir, KVs),
+        reduce_stream_kv_node(Bt, Dir, KVs2, KeyStart, InEndRangeFun, GroupedKey,
                 GroupedKVsAcc, GroupedRedsAcc, KeyGroupFun, Fun, Acc)
     end.
 
-reduce_stream_kv_node(Bt, Dir, KVs, KeyStart, KeyEnd,
+reduce_stream_kv_node(Bt, Dir, KVs, KeyStart, InEndRangeFun,
                         GroupedKey, GroupedKVsAcc, GroupedRedsAcc,
                         KeyGroupFun, Fun, Acc) ->
 
@@ -504,19 +498,17 @@ reduce_stream_kv_node(Bt, Dir, KVs, KeyStart, KeyEnd,
     undefined ->
         KVs;
     _ ->
-        lists:dropwhile(fun({Key,_}) -> less(Bt, Key, KeyStart) end, KVs)
+        DropFun = case Dir of
+        fwd ->
+            fun({Key, _}) -> less(Bt, Key, KeyStart) end;
+        rev ->
+            fun({Key, _}) -> less(Bt, KeyStart, Key) end
+        end,
+        lists:dropwhile(DropFun, KVs)
     end,
-    KVs2 =
-    case KeyEnd of
-    undefined ->
-        GTEKeyStartKVs;
-    _ ->
-        lists:takewhile(
-            fun({Key,_}) ->
-                not less(Bt, KeyEnd, Key)
-            end, GTEKeyStartKVs)
-    end,
-    reduce_stream_kv_node2(Bt, adjust_dir(Dir, KVs2), GroupedKey, GroupedKVsAcc, GroupedRedsAcc,
+    KVs2 = lists:takewhile(
+        fun({Key, _}) -> InEndRangeFun(Key) end, GTEKeyStartKVs),
+    reduce_stream_kv_node2(Bt, KVs2, GroupedKey, GroupedKVsAcc, GroupedRedsAcc,
                         KeyGroupFun, Fun, Acc).
 
 
@@ -547,7 +539,7 @@ reduce_stream_kv_node2(Bt, [{Key, Value}| RestKVs], GroupedKey, GroupedKVsAcc,
         end
     end.
 
-reduce_stream_kp_node(Bt, Dir, NodeList, KeyStart, KeyEnd,
+reduce_stream_kp_node(Bt, Dir, NodeList, KeyStart, InEndRangeFun,
                         GroupedKey, GroupedKVsAcc, GroupedRedsAcc,
                         KeyGroupFun, Fun, Acc) ->
     Nodes =
@@ -555,34 +547,39 @@ reduce_stream_kp_node(Bt, Dir, NodeList, KeyStart, KeyEnd,
     undefined ->
         NodeList;
     _ ->
-        lists:dropwhile(
-            fun({Key,_}) ->
-                less(Bt, Key, KeyStart)
-            end, NodeList)
+        case Dir of
+        fwd ->
+            lists:dropwhile(fun({Key, _}) -> less(Bt, Key, KeyStart) end, NodeList);
+        rev ->
+            RevKPs = lists:reverse(NodeList),
+            case lists:splitwith(fun({Key, _}) -> less(Bt, Key, KeyStart) end, RevKPs) of
+            {_Before, []} ->
+                NodeList;
+            {Before, [FirstAfter | _]} ->
+                [FirstAfter | lists:reverse(Before)]
+            end
+        end
     end,
-    NodesInRange =
-    case KeyEnd of
-    undefined ->
-        Nodes;
+    {InRange, MaybeInRange} = lists:splitwith(
+        fun({Key, _}) -> InEndRangeFun(Key) end, Nodes),
+    NodesInRange = case MaybeInRange of
+    [FirstMaybeInRange | _] when Dir =:= fwd ->
+        InRange ++ [FirstMaybeInRange];
     _ ->
-        {InRange, MaybeInRange} = lists:splitwith(
-            fun({Key,_}) ->
-                less(Bt, Key, KeyEnd)
-            end, Nodes),
-        InRange ++ case MaybeInRange of [] -> []; [FirstMaybe|_] -> [FirstMaybe] end
+        InRange
     end,
-    reduce_stream_kp_node2(Bt, Dir, adjust_dir(Dir, NodesInRange), KeyStart, KeyEnd,
+    reduce_stream_kp_node2(Bt, Dir, NodesInRange, KeyStart, InEndRangeFun,
         GroupedKey, GroupedKVsAcc, GroupedRedsAcc, KeyGroupFun, Fun, Acc).
 
 
-reduce_stream_kp_node2(Bt, Dir, [{_Key, NodeInfo} | RestNodeList], KeyStart, KeyEnd,
+reduce_stream_kp_node2(Bt, Dir, [{_Key, NodeInfo} | RestNodeList], KeyStart, InEndRangeFun,
                         undefined, [], [], KeyGroupFun, Fun, Acc) ->
     {ok, Acc2, GroupedRedsAcc2, GroupedKVsAcc2, GroupedKey2} =
-            reduce_stream_node(Bt, Dir, NodeInfo, KeyStart, KeyEnd, undefined,
+            reduce_stream_node(Bt, Dir, NodeInfo, KeyStart, InEndRangeFun, undefined,
                 [], [], KeyGroupFun, Fun, Acc),
-    reduce_stream_kp_node2(Bt, Dir, RestNodeList, KeyStart, KeyEnd, GroupedKey2,
+    reduce_stream_kp_node2(Bt, Dir, RestNodeList, KeyStart, InEndRangeFun, GroupedKey2,
             GroupedKVsAcc2, GroupedRedsAcc2, KeyGroupFun, Fun, Acc2);
-reduce_stream_kp_node2(Bt, Dir, NodeList, KeyStart, KeyEnd,
+reduce_stream_kp_node2(Bt, Dir, NodeList, KeyStart, InEndRangeFun,
         GroupedKey, GroupedKVsAcc, GroupedRedsAcc, KeyGroupFun, Fun, Acc) ->
     {Grouped0, Ungrouped0} = lists:splitwith(fun({Key,_}) ->
         KeyGroupFun(GroupedKey, Key) end, NodeList),
@@ -598,9 +595,9 @@ reduce_stream_kp_node2(Bt, Dir, NodeList, KeyStart, KeyEnd,
     case UngroupedNodes of
     [{_Key, NodeInfo}|RestNodes] ->
         {ok, Acc2, GroupedRedsAcc2, GroupedKVsAcc2, GroupedKey2} =
-            reduce_stream_node(Bt, Dir, NodeInfo, KeyStart, KeyEnd, GroupedKey,
+            reduce_stream_node(Bt, Dir, NodeInfo, KeyStart, InEndRangeFun, GroupedKey,
                 GroupedKVsAcc, GroupedReds ++ GroupedRedsAcc, KeyGroupFun, Fun, Acc),
-        reduce_stream_kp_node2(Bt, Dir, RestNodes, KeyStart, KeyEnd, GroupedKey2,
+        reduce_stream_kp_node2(Bt, Dir, RestNodes, KeyStart, InEndRangeFun, GroupedKey2,
                 GroupedKVsAcc2, GroupedRedsAcc2, KeyGroupFun, Fun, Acc2);
     [] ->
         {ok, Acc, GroupedReds ++ GroupedRedsAcc, GroupedKVsAcc, GroupedKey}
