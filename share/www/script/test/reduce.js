@@ -182,4 +182,233 @@ couchTests.reduce = function(debug) {
   // account for floating point rounding error
   T(Math.abs(difference) < 0.0000000001);
 
+  function testReducePagination() {
+    var ddoc = {
+      "_id": "_design/test",
+      "language": "javascript",
+      "views": {
+        "view1": {
+          "map": "function(doc) {" +
+             "emit(doc.int, doc._id);" +
+             "emit(doc.int + 1, doc._id);" +
+             "emit(doc.int + 2, doc._id);" +
+          "}",
+          "reduce": "_count"
+        }
+      }
+    };
+    var result, docs = [];
+
+    function randVal() {
+        return Math.random() * 100000000;
+    }
+
+    db.deleteDb();
+    db.createDb();
+
+    for (var i = 0; i < 1123; i++) {
+      docs.push({"_id": String(i), "int": i});
+    }
+    db.bulkSave(docs.concat([ddoc]));
+
+    // ?group=false tests
+    result = db.view('test/view1', {startkey: 400, endkey: 402, foobar: randVal()});
+    TEquals(9, result.rows[0].value);
+    result = db.view('test/view1', {startkey: 402, endkey: 400, descending: true,
+      foobar: randVal()});
+    TEquals(9, result.rows[0].value);
+
+    result = db.view('test/view1', {startkey: 400, endkey: 402, inclusive_end: false,
+      foobar: randVal()});
+    TEquals(6, result.rows[0].value);
+    result = db.view('test/view1', {startkey: 402, endkey: 400, inclusive_end: false,
+      descending: true, foobar: randVal()});
+    TEquals(6, result.rows[0].value);
+
+    result = db.view('test/view1', {startkey: 400, endkey: 402, endkey_docid: "400",
+      foobar: randVal()});
+    TEquals(7, result.rows[0].value);
+    result = db.view('test/view1', {startkey: 400, endkey: 402, endkey_docid: "400",
+      inclusive_end: false, foobar: randVal()});
+    TEquals(6, result.rows[0].value);
+
+    result = db.view('test/view1', {startkey: 400, endkey: 402, endkey_docid: "401",
+      foobar: randVal()});
+    TEquals(8, result.rows[0].value);
+    result = db.view('test/view1', {startkey: 400, endkey: 402, endkey_docid: "401",
+      inclusive_end: false, foobar: randVal()});
+    TEquals(7, result.rows[0].value);
+
+    result = db.view('test/view1', {startkey: 400, endkey: 402, endkey_docid: "402",
+      foobar: randVal()});
+    TEquals(9, result.rows[0].value);
+    result = db.view('test/view1', {startkey: 400, endkey: 402, endkey_docid: "402",
+      inclusive_end: false, foobar: randVal()});
+    TEquals(8, result.rows[0].value);
+
+    result = db.view('test/view1', {startkey: 402, endkey: 400, endkey_docid: "398",
+      descending: true, foobar: randVal()});
+    TEquals(9, result.rows[0].value);
+    result = db.view('test/view1', {startkey: 402, endkey: 400, endkey_docid: "398",
+      descending: true, inclusive_end: false, foobar: randVal()}),
+    TEquals(8, result.rows[0].value);
+
+    result = db.view('test/view1', {startkey: 402, endkey: 400, endkey_docid: "399",
+      descending: true, foobar: randVal()});
+    TEquals(8, result.rows[0].value);
+    result = db.view('test/view1', {startkey: 402, endkey: 400, endkey_docid: "399",
+      descending: true, inclusive_end: false, foobar: randVal()}),
+    TEquals(7, result.rows[0].value);
+
+    result = db.view('test/view1', {startkey: 402, endkey: 400, endkey_docid: "400",
+      descending: true, foobar: randVal()}),
+    TEquals(7, result.rows[0].value);
+    result = db.view('test/view1', {startkey: 402, endkey: 400, endkey_docid: "400",
+      descending: true, inclusive_end: false, foobar: randVal()}),
+    TEquals(6, result.rows[0].value);
+
+    result = db.view('test/view1', {startkey: 402, startkey_docid: "400", endkey: 400,
+      descending: true, foobar: randVal()});
+    TEquals(7, result.rows[0].value);
+
+    result = db.view('test/view1', {startkey: 402, startkey_docid: "401", endkey: 400,
+      descending: true, inclusive_end: false, foobar: randVal()});
+    TEquals(5, result.rows[0].value);
+
+    // ?group=true tests
+    result = db.view('test/view1', {group: true, startkey: 400, endkey: 402,
+      foobar: randVal()});
+    TEquals(3, result.rows.length);
+    TEquals(400, result.rows[0].key);
+    TEquals(3, result.rows[0].value);
+    TEquals(401, result.rows[1].key);
+    TEquals(3, result.rows[1].value);
+    TEquals(402, result.rows[2].key);
+    TEquals(3, result.rows[2].value);
+
+    result = db.view('test/view1', {group: true, startkey: 402, endkey: 400,
+      descending: true, foobar: randVal()});
+    TEquals(3, result.rows.length);
+    TEquals(402, result.rows[0].key);
+    TEquals(3, result.rows[0].value);
+    TEquals(401, result.rows[1].key);
+    TEquals(3, result.rows[1].value);
+    TEquals(400, result.rows[2].key);
+    TEquals(3, result.rows[2].value);
+
+    result = db.view('test/view1', {group: true, startkey: 400, endkey: 402,
+      inclusive_end: false, foobar: randVal()});
+    TEquals(2, result.rows.length);
+    TEquals(400, result.rows[0].key);
+    TEquals(3, result.rows[0].value);
+    TEquals(401, result.rows[1].key);
+    TEquals(3, result.rows[1].value);
+
+    result = db.view('test/view1', {group: true, startkey: 402, endkey: 400,
+      descending: true, inclusive_end: false, foobar: randVal()});
+    TEquals(2, result.rows.length);
+    TEquals(402, result.rows[0].key);
+    TEquals(3, result.rows[0].value);
+    TEquals(401, result.rows[1].key);
+    TEquals(3, result.rows[1].value);
+
+    result = db.view('test/view1', {group: true, startkey: 400, endkey: 402,
+      endkey_docid: "401", foobar: randVal()});
+    TEquals(3, result.rows.length);
+    TEquals(400, result.rows[0].key);
+    TEquals(3, result.rows[0].value);
+    TEquals(401, result.rows[1].key);
+    TEquals(3, result.rows[1].value);
+    TEquals(402, result.rows[2].key);
+    TEquals(2, result.rows[2].value);
+
+    result = db.view('test/view1', {group: true, startkey: 400, endkey: 402,
+      endkey_docid: "400", foobar: randVal()});
+    TEquals(3, result.rows.length);
+    TEquals(400, result.rows[0].key);
+    TEquals(3, result.rows[0].value);
+    TEquals(401, result.rows[1].key);
+    TEquals(3, result.rows[1].value);
+    TEquals(402, result.rows[2].key);
+    TEquals(1, result.rows[2].value);
+
+    result = db.view('test/view1', {group: true, startkey: 402, startkey_docid: "401",
+      endkey: 400, descending: true, foobar: randVal()});
+    TEquals(3, result.rows.length);
+    TEquals(402, result.rows[0].key);
+    TEquals(2, result.rows[0].value);
+    TEquals(401, result.rows[1].key);
+    TEquals(3, result.rows[1].value);
+    TEquals(400, result.rows[2].key);
+    TEquals(3, result.rows[2].value);
+
+    result = db.view('test/view1', {group: true, startkey: 402, startkey_docid: "400",
+      endkey: 400, descending: true, foobar: randVal()});
+    TEquals(3, result.rows.length);
+    TEquals(402, result.rows[0].key);
+    TEquals(1, result.rows[0].value);
+    TEquals(401, result.rows[1].key);
+    TEquals(3, result.rows[1].value);
+    TEquals(400, result.rows[2].key);
+    TEquals(3, result.rows[2].value);
+
+    result = db.view('test/view1', {group: true, startkey: 402, startkey_docid: "401",
+      endkey: 400, descending: true, inclusive_end: false, foobar: randVal()});
+    TEquals(2, result.rows.length);
+    TEquals(402, result.rows[0].key);
+    TEquals(2, result.rows[0].value);
+    TEquals(401, result.rows[1].key);
+    TEquals(3, result.rows[1].value);
+
+    result = db.view('test/view1', {group: true, startkey: 402, startkey_docid: "400",
+      endkey: 400, descending: true, inclusive_end: false, foobar: randVal()});
+    TEquals(2, result.rows.length);
+    TEquals(402, result.rows[0].key);
+    TEquals(1, result.rows[0].value);
+    TEquals(401, result.rows[1].key);
+    TEquals(3, result.rows[1].value);
+
+    result = db.view('test/view1', {group: true, startkey: 402, endkey: 400,
+      endkey_docid: "398", descending: true, inclusive_end: true, foobar: randVal()});
+    TEquals(3, result.rows.length);
+    TEquals(402, result.rows[0].key);
+    TEquals(3, result.rows[0].value);
+    TEquals(401, result.rows[1].key);
+    TEquals(3, result.rows[1].value);
+    TEquals(400, result.rows[2].key);
+    TEquals(3, result.rows[2].value);
+
+    result = db.view('test/view1', {group: true, startkey: 402, endkey: 400,
+      endkey_docid: "399", descending: true, inclusive_end: true, foobar: randVal()});
+    TEquals(3, result.rows.length);
+    TEquals(402, result.rows[0].key);
+    TEquals(3, result.rows[0].value);
+    TEquals(401, result.rows[1].key);
+    TEquals(3, result.rows[1].value);
+    TEquals(400, result.rows[2].key);
+    TEquals(2, result.rows[2].value);
+
+    result = db.view('test/view1', {group: true, startkey: 402, endkey: 400,
+      endkey_docid: "399", descending: true, inclusive_end: false, foobar: randVal()});
+    TEquals(3, result.rows.length);
+    TEquals(402, result.rows[0].key);
+    TEquals(3, result.rows[0].value);
+    TEquals(401, result.rows[1].key);
+    TEquals(3, result.rows[1].value);
+    TEquals(400, result.rows[2].key);
+    TEquals(1, result.rows[2].value);
+
+    result = db.view('test/view1', {group: true, startkey: 402, endkey: 400,
+      endkey_docid: "400", descending: true, inclusive_end: false, foobar: randVal()});
+    TEquals(2, result.rows.length);
+    TEquals(402, result.rows[0].key);
+    TEquals(3, result.rows[0].value);
+    TEquals(401, result.rows[1].key);
+    TEquals(3, result.rows[1].value);
+
+    db.deleteDb();
+  }
+
+  testReducePagination();
+
 };
