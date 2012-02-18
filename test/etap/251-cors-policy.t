@@ -11,7 +11,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-% Test only the policy decisions of couch_cors_policy:check/3--no servers
+% Test only the policy decisions of couch_cors_policy:headers/3--no servers
 % or other couch_* stuff.
 
 main(_) ->
@@ -37,29 +37,29 @@ test() ->
     ok.
 
 test_bad_api_calls() ->
-    etap_threw(fun() -> couch_cors_policy:check() end,
+    etap_threw(fun() -> couch_cors_policy:headers() end,
             true, "Policy check with zero parameters"),
-    etap_threw(fun() -> couch_cors_policy:check([]) end,
+    etap_threw(fun() -> couch_cors_policy:headers([]) end,
             true, "Policy check with one parameter"),
-    etap_threw(fun() -> couch_cors_policy:check([], []) end,
+    etap_threw(fun() -> couch_cors_policy:headers([], []) end,
             true, "Policy check with two parameters"),
 
-    etap_threw(fun() -> couch_cors_policy:check(notList, [], {'GET', []}) end,
+    etap_threw(fun() -> couch_cors_policy:headers(notList, [], {'GET', []}) end,
             true, "Policy check with non-list first parameter"),
-    etap_threw(fun() -> couch_cors_policy:check([], notList, {'GET', []}) end,
+    etap_threw(fun() -> couch_cors_policy:headers([], notList, {'GET', []}) end,
             true, "Policy check with non-list second parameter"),
-    etap_threw(fun() -> couch_cors_policy:check([], [], {{not_method}, []}) end,
+    etap_threw(fun() -> couch_cors_policy:headers([], [], {{not_method}, []}) end,
             true, "Policy check with non-method third parameter"),
-    etap_threw(fun() -> couch_cors_policy:check([], [], {'GET', not_list}) end,
+    etap_threw(fun() -> couch_cors_policy:headers([], [], {'GET', not_list}) end,
             true, "Policy check with non-list fourth parameter"),
     ok.
 
 test_good_api_calls() ->
-    etap_threw(fun() -> couch_cors_policy:check([], [], {'GET', []}) end,
+    etap_threw(fun() -> couch_cors_policy:headers([], [], {'GET', []}) end,
                false, "Policy check with three valid parameters"),
 
     etap_threw(fun() ->
-        couch_cors_policy:check(config(), config(), {'GET', []})
+        couch_cors_policy:headers(config(), config(), {'GET', []})
     end, false, "Policy check with noop configs"),
 
     % And the shortcut function.
@@ -115,7 +115,7 @@ test_default_policy() ->
     Config = config([enabled, {"example.com","http://origin.com"}]),
 
     HeaderIs = fun(Global, Local, Req, Suffix, Expected, Description) ->
-        Result = couch_cors_policy:check(Global, Local, Req),
+        Result = couch_cors_policy:headers(Global, Local, Req),
         etap:ok(is_list(Result), "List returned: " ++ Description),
 
         % Protect against crashing in case the result was not a list.
@@ -151,7 +151,7 @@ test_duels() ->
 %
 
 check(A, B, C) ->
-    couch_cors_policy:check(A, B, C).
+    couch_cors_policy:headers(A, B, C).
 
 etap_threw(Function, Expected, Description) ->
     Result = try Function() of

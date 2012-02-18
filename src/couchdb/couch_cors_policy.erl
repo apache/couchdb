@@ -11,7 +11,7 @@
 % the License.
 
 -module(couch_cors_policy).
--export([global_config/0, check/2, check/3]).
+-export([global_config/0, headers/2, headers/3]).
 
 % For the test suite.
 -export([origins_config/3]).
@@ -30,10 +30,10 @@
         ]).
 
 
-check(DbConfig, Req) ->
-    check(global_config(), DbConfig, Req).
+headers(DbConfig, Req) ->
+    headers(global_config(), DbConfig, Req).
 
-check(Global, Local, {Method, Headers}=Req)
+headers(Global, Local, {Method, Headers}=Req)
         when is_list(Global) andalso is_list(Local) andalso is_list(Headers)
         andalso (is_atom(Method) orelse is_binary(Method)) ->
     {Httpd} = couch_util:get_value(<<"httpd">>, Global, {[]}),
