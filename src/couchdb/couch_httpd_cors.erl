@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-%% the cors utilities 
+%% the cors utilities
 %%
 %% CORS processing is done by adding CORS headers to the cors_headers
 %% variable in the process registry. Then headers are added to the final
@@ -24,7 +24,7 @@
 %%    preflight headers. At this steps CORS headers can be [] (capability not
 %%    handled) or the list of preflight headers like the spec require.
 %%    preflight headers are set in preflight_headers method.
-%% 3. on database request , we check origin header in a list of origin. 
+%% 3. on database request , we check origin header in a list of origin.
 %%    Eventually we reset cors headers to [] if the origin isn't
 %%    supported. Db origins are added to teh "origin" member of the
 %%    security object. db_check_origin function is used to check them.
@@ -35,19 +35,19 @@
 
 -define(SUPPORTED_HEADERS, [
             %% simple headers
-            "Accept", 
-            "Accept-Language", 
+            "Accept",
+            "Accept-Language",
             "Content-Type",
-            "Expires", 
-            "Last-Modified", 
-            "Pragma", 
+            "Expires",
+            "Last-Modified",
+            "Pragma",
             "Origin",
             %% couchdb headers
-            "Content-Length", 
-            "If-Match", 
+            "Content-Length",
+            "If-Match",
             "Destination",
-            "X-Requested-With", 
-            "X-Http-Method-Override", 
+            "X-Requested-With",
+            "X-Http-Method-Override",
             "Content-Range"]).
 
 -export([set_default_headers/1, headers/0,
@@ -56,7 +56,7 @@
 
 set_default_headers(MochiReq) ->
     case MochiReq:get_header_value("Origin") of
-    undefined -> 
+    undefined ->
         erlang:put(cors_headers, []);
     Origin ->
         DefaultHeaders = [{"Access-Control-Allow-Origin", Origin},
@@ -87,7 +87,7 @@ preflight_headers(MochiReq, AcceptedOrigins) ->
     %% build list of headers to test
     AllSupportedHeaders = ?SUPPORTED_HEADERS ++ CustomHeaders,
     SupportedHeaders = [string:to_lower(H) || H <- AllSupportedHeaders],
-    
+
     %% get max age
     MaxAge = list_to_integer(
         couch_config:get("cors", "max_age", "1000")
@@ -103,7 +103,7 @@ preflight_headers(MochiReq, AcceptedOrigins) ->
         case check_origin(AcceptedOrigins, split_origin(Origin)) of
         error -> ok; %% don't set any preflight header
         _Origin1 ->
-            ?LOG_DEBUG("check preflight cors request", []), 
+            ?LOG_DEBUG("check preflight cors request", []),
 
             PreflightHeaders0 = [
                 {"Access-Control-Allow-Origin", Origin},
@@ -126,7 +126,7 @@ preflight_headers(MochiReq, AcceptedOrigins) ->
                         Headers ->
                             %% transform header list in something we
                             %% could check. make sure everything is a
-                            %% list 
+                            %% list
 
                             RH = [string:to_lower(H) || H <- re:split(Headers, ",\\s*",
                                 [{return,list},trim])],
@@ -136,7 +136,7 @@ preflight_headers(MochiReq, AcceptedOrigins) ->
                     %% check if headers are supported
                     case ReqHeaders -- SupportedHeaders of
                     [] ->
-                        PreflightHeaders = PreflightHeaders0 ++ 
+                        PreflightHeaders = PreflightHeaders0 ++
                             [{"Access-Control-Allow-Headers", FinalReqHeaders}],
                         erlang:put(cors_headers, PreflightHeaders);
                     _ -> ok
@@ -154,7 +154,7 @@ check_origin([<<"*">>|_], _SO) ->
 check_origin([A0|R], SO) ->
     A = couch_util:to_list(A0),
     SA = split_origin(A),
-    
+
     if SO == SA -> A;
         true ->check_origin(R, SO)
     end.
