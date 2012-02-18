@@ -19,7 +19,7 @@ rows() -> 1000.
 
 main(_) ->
     test_util:init_code_path(),
-    etap:plan(8),
+    etap:plan(20),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -137,5 +137,101 @@ test()->
         couch_btree:fold_reduce(Btree2, FoldFun, [], [{dir, rev}, {key_group_fun, GroupFun}, {start_key, EK2}, {end_key, SK1}]),
         "Reducing in reverse results in reversed accumulator."
     ),
+
+    etap:is(
+        couch_btree:fold_reduce(Btree2, FoldFun, [], [
+            {dir, fwd}, {key_group_fun, GroupFun},
+            {start_key, {"even", 0}}, {end_key, {"odd", rows() + 1}}
+        ]),
+        {ok, [{{"odd", 1}, 500}, {{"even", 2}, 500}]},
+        "Right fold reduce value for whole range with inclusive end key"),
+
+    etap:is(
+        couch_btree:fold_reduce(Btree2, FoldFun, [], [
+            {dir, fwd}, {key_group_fun, GroupFun},
+            {start_key, {"even", 0}}, {end_key_gt, {"odd", 999}}
+        ]),
+        {ok, [{{"odd", 1}, 499}, {{"even", 2}, 500}]},
+        "Right fold reduce value for whole range without inclusive end key"),
+
+    etap:is(
+        couch_btree:fold_reduce(Btree2, FoldFun, [], [
+            {dir, rev}, {key_group_fun, GroupFun},
+            {start_key, {"odd", 999}}, {end_key, {"even", 2}}
+        ]),
+        {ok, [{{"even", 1000}, 500}, {{"odd", 999}, 500}]},
+        "Right fold reduce value for whole reversed range with inclusive end key"),
+
+    etap:is(
+        couch_btree:fold_reduce(Btree2, FoldFun, [], [
+            {dir, rev}, {key_group_fun, GroupFun},
+            {start_key, {"odd", 999}}, {end_key_gt, {"even", 2}}
+        ]),
+        {ok, [{{"even", 1000}, 499}, {{"odd", 999}, 500}]},
+        "Right fold reduce value for whole reversed range without inclusive end key"),
+
+    etap:is(
+        couch_btree:fold_reduce(Btree2, FoldFun, [], [
+            {dir, fwd}, {key_group_fun, GroupFun},
+            {start_key, {"even", 0}}, {end_key, {"odd", 499}}
+        ]),
+        {ok, [{{"odd", 1}, 250}, {{"even", 2}, 500}]},
+        "Right fold reduce value for first half with inclusive end key"),
+
+    etap:is(
+        couch_btree:fold_reduce(Btree2, FoldFun, [], [
+            {dir, fwd}, {key_group_fun, GroupFun},
+            {start_key, {"even", 0}}, {end_key_gt, {"odd", 499}}
+        ]),
+        {ok, [{{"odd", 1}, 249}, {{"even", 2}, 500}]},
+        "Right fold reduce value for first half without inclusive end key"),
+
+    etap:is(
+        couch_btree:fold_reduce(Btree2, FoldFun, [], [
+            {dir, rev}, {key_group_fun, GroupFun},
+            {start_key, {"odd", 999}}, {end_key, {"even", 500}}
+        ]),
+        {ok, [{{"even", 1000}, 251}, {{"odd", 999}, 500}]},
+        "Right fold reduce value for first half reversed with inclusive end key"),
+
+    etap:is(
+        couch_btree:fold_reduce(Btree2, FoldFun, [], [
+            {dir, rev}, {key_group_fun, GroupFun},
+            {start_key, {"odd", 999}}, {end_key_gt, {"even", 500}}
+        ]),
+        {ok, [{{"even", 1000}, 250}, {{"odd", 999}, 500}]},
+        "Right fold reduce value for first half reversed without inclusive end key"),
+
+    etap:is(
+        couch_btree:fold_reduce(Btree2, FoldFun, [], [
+            {dir, fwd}, {key_group_fun, GroupFun},
+            {start_key, {"even", 500}}, {end_key, {"odd", 999}}
+        ]),
+        {ok, [{{"odd", 1}, 500}, {{"even", 500}, 251}]},
+        "Right fold reduce value for second half with inclusive end key"),
+
+    etap:is(
+        couch_btree:fold_reduce(Btree2, FoldFun, [], [
+            {dir, fwd}, {key_group_fun, GroupFun},
+            {start_key, {"even", 500}}, {end_key_gt, {"odd", 999}}
+        ]),
+        {ok, [{{"odd", 1}, 499}, {{"even", 500}, 251}]},
+        "Right fold reduce value for second half without inclusive end key"),
+
+    etap:is(
+        couch_btree:fold_reduce(Btree2, FoldFun, [], [
+            {dir, rev}, {key_group_fun, GroupFun},
+            {start_key, {"odd", 501}}, {end_key, {"even", 2}}
+        ]),
+        {ok, [{{"even", 1000}, 500}, {{"odd", 501}, 251}]},
+        "Right fold reduce value for second half reversed with inclusive end key"),
+
+    etap:is(
+        couch_btree:fold_reduce(Btree2, FoldFun, [], [
+            {dir, rev}, {key_group_fun, GroupFun},
+            {start_key, {"odd", 501}}, {end_key_gt, {"even", 2}}
+        ]),
+        {ok, [{{"even", 1000}, 499}, {{"odd", 501}, 251}]},
+        "Right fold reduce value for second half reversed without inclusive end key"),
 
     couch_file:close(Fd).
