@@ -121,6 +121,9 @@ function $$(node) {
       $.couch.logout({
         success : function(resp) {
           $.futon.session.sidebar();
+        },
+        error: function(status, e, reason) {
+          alert('An error occurred logging out: ' + reason);
         }
       })
     };
@@ -171,33 +174,41 @@ function $$(node) {
           } else {
             return false;
           }
-          $.couch.session({success: function (resp) {
-            // admin users may have a config entry, change the password
-            // there first. Update their user doc later, if it exists
-            if (resp.userCtx.roles.indexOf("_admin") > -1) { // user is admin
-              // check whether we have a config entry
-              $.couch.config({
-                success : function (response) { // er do have a config entry
-                  $.couch.config({
-                    success : function () {
-                      window.setTimeout(function() {
-                        doLogin(resp.userCtx.name, data.password, function(errors) {
-                          if(!$.isEmptyObject(errors)) {
-                            callback(errors);
-                            return;
-                          } else {
-                            location.reload();
-                          }
-                        });
-                      }, 1000);
-                    }
-                  }, "admins", resp.userCtx.name, data.password);
-                }
-              }, "admins", resp.userCtx.name);
-            } else { // non-admin users, update their user doc
-              updateUserDoc(resp, data);
+          $.couch.session({
+            error: function(status, e, reason) {
+              alert('Could not get your session info: ' + reason);
+            },
+            success: function (resp) {
+              // admin users may have a config entry, change the password
+              // there first. Update their user doc later, if it exists
+              if (resp.userCtx.roles.indexOf("_admin") > -1) { // user is admin
+                // check whether we have a config entry
+                $.couch.config({
+                  success : function (response) { // er do have a config entry
+                    $.couch.config({
+                      success : function () {
+                        window.setTimeout(function() {
+                          doLogin(resp.userCtx.name, data.password, function(errors) {
+                            if(!$.isEmptyObject(errors)) {
+                              callback(errors);
+                              return;
+                            } else {
+                              location.reload();
+                            }
+                          });
+                        }, 1000);
+                      },
+                      error: function(status, e, reason) {
+                        callback('Could not persist the new password: ' + reason);
+                      }
+                    }, "admins", resp.userCtx.name, data.password);
+                  }
+                }, "admins", resp.userCtx.name);
+              } else { // non-admin users, update their user doc
+                updateUserDoc(resp, data);
+              }
             }
-          }});
+          });
         }
       });
       return false;
