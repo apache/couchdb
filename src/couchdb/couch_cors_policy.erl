@@ -36,13 +36,16 @@ headers({_Method, _Headers}=Req) ->
 headers(DbConfig, {_Method, _Headers}=Req) ->
     headers(global_config(), DbConfig, Req).
 
-headers(Global, Local, {Method, Headers}=Req)
+headers(Global, Local, {Method, Headers})
         when is_list(Global) andalso is_list(Local) andalso is_list(Headers)
         andalso (is_atom(Method) orelse is_binary(Method)) ->
     {Httpd} = couch_util:get_value(<<"httpd">>, Global, {[]}),
     Enabled = couch_util:get_value(<<"cors_enabled">>, Httpd, false),
     Result = case Enabled of
         true ->
+            % Normalize the headers to always use string key names.
+            StrHeaders = [ {couch_util:to_list(Key), Val} || {Key, Val} <- Headers ],
+            Req = {Method, StrHeaders},
             case lists:keyfind("Origin", 1, Headers) of
                 false ->
                     % s. 5.1(1) and s. 5.2(1) If the Origin header is not
