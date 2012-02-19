@@ -41,7 +41,7 @@ headers(Global, Local, {Method, Headers}=Req)
         andalso (is_atom(Method) orelse is_binary(Method)) ->
     {Httpd} = couch_util:get_value(<<"httpd">>, Global, {[]}),
     Enabled = couch_util:get_value(<<"cors_enabled">>, Httpd, false),
-    case Enabled of
+    Result = case Enabled of
         true ->
             case lists:keyfind("Origin", 1, Headers) of
                 false ->
@@ -55,7 +55,10 @@ headers(Global, Local, {Method, Headers}=Req)
             end;
         _ ->
             []
-    end.
+    end,
+
+    ?LOG_DEBUG("CORS headers: ~p", [Result]),
+    Result.
 
 
 headers(Global, Local, {ReqMethod, _ReqHeaders}=Req, OriginValue) ->
