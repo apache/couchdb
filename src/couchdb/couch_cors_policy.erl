@@ -14,7 +14,7 @@
 -export([global_config/0, headers/1, headers/2, headers/3]).
 
 % For the test suite.
--export([origins_config/3]).
+-export([origins_config/3, policy_for_request/2]).
 
 -include("couch_db.hrl").
 
@@ -42,73 +42,57 @@ headers(Global, Local, {Method, Headers})
         andalso (is_atom(Method) orelse is_binary(Method)) ->
     {Httpd} = couch_util:get_value(<<"httpd">>, Global, {[]}),
     Enabled = couch_util:get_value(<<"cors_enabled">>, Httpd, false),
+
     Result = case Enabled of
-        true ->
-            % Normalize the headers to always use string key names.
-            StrHeaders = [ {couch_util:to_list(Key), Val} || {Key, Val} <- Headers ],
-            Req = {Method, StrHeaders},
-            case lists:keyfind("Origin", 1, Headers) of
-                false ->
-                    % s. 5.1(1) and s. 5.2(1) If the Origin header is not
-                    % present terminate this set of steps. The request is
-                    % outside the scope of this specification.
-                    ?LOG_DEBUG("Not a CORS request", []),
-                    [];
-                {"Origin", Origin} ->
-                    headers(Global, Local, Req, Origin)
-            end;
-        _ ->
-            []
+    _No when _No =/= true ->
+        [];
+    true ->
+        case request_origin(Headers) of
+        undefined ->
+            % s. 5.1(1) and s. 5.2(1) If the Origin header is not present
+            % terminate this set of steps. The request is outside the scope of
+            % this specification.
+            %?LOG_DEBUG("Not a CORS request", []),
+            [];
+        Origins ->
+            headers(Global, Local, {Method, Headers}, Origins)
+        end
     end,
 
     ?LOG_DEBUG("CORS headers: ~p", [Result]),
     Result.
 
 
-headers(Global, Local, {ReqMethod, _ReqHeaders}=Req, OriginValue) ->
-    % s. 5 ...each resource is bound to the following:
-    % * A list of origins consisting of zero or more origins that are allowed
-    %   to access this resource.
-    % * A list of methods consisting of zero or more methods that are
-    %   supported by the resource.
-    % * A list of headers consisting of zero or more header field names that
-    %   are supported by the resource.
-    % * A supports credentials flag that indicates whether the resource
-    %   supports user credentials in the request. [true/false]
-    Policy = origins_config(Global, Local, Req),
-    Origins = list_of_origins(Policy),
-    Methods = list_of_methods(Policy),
-    Headers = list_of_headers(Policy),
-    Creds = supports_credentials(Policy),
+headers(Global, Local, {ReqMethod, _ReqHeaders}=Req, Origins) ->
+    Policies = origins_config(Global, Local, Req),
+    Policy = policy_for_request(Policies, Req),
 
     case ReqMethod of
         'OPTIONS' ->
             % s. 5.2. Preflight Request; also s. 6.1.5(1)
-            preflight(OriginValue, Origins, Methods, Headers, Creds, Req);
+            preflight(Policy, Req);
         _ ->
             % s. 5.1. Simple X-O Request, Actual Request, and Redirects.
-            actual(OriginValue, Origins, Methods, Headers, Creds, Req)
+            actual(Policy, Req)
     end.
 
-preflight(OriginVal, OkOrigins, OkMethods, OkHeaders, OkCreds, Req) ->
+preflight(Policy, {_Method, ReqHeaders}) ->
     ACRMethod = "Access-Control-Request-Method",
     ACRHeaders = "Access-Control-Request-Headers",
+    {OkOrigins, OkMethods, OkHeaders, OkCreds} = Policy,
 
     % XXX: s. 5.1(2) (actual requests) requires splitting the Origin
     % header, and AFAICT all tokens must match the list of origins. But
     % s. 5.2.2 (preflight requests) implies that the Origin header will contain
     % only one token. So is the "source origin" (s. 6.1) the first in
     % the list, or the whole header value?
-    SourceOrigin = OriginVal,
+    SourceOrigin = request_origin(ReqHeaders),
 
     % s. 5.2(2) If the value of the Origin header is not a case-sensitive match
     % for any of the values in [OkOrigins] do not set any additional headers
     % and terminate this set of steps.
-    GoodOrigin = lists:any(fun(Origin) ->
-        Origin == <<"*">> orelse Origin == SourceOrigin
-    end, OkOrigins),
-
-    case GoodOrigin of
+    IsThisOrigin = fun(OkOrigin) -> OkOrigin =:= SourceOrigin end,
+    case lists:any(IsThisOrigin, OkOrigins) of
     false ->
         ?LOG_DEBUG("Bad preflight origin: ~p vs. (~p)",
                    [SourceOrigin, OkOrigins]),
@@ -118,24 +102,23 @@ preflight(OriginVal, OkOrigins, OkMethods, OkHeaders, OkCreds, Req) ->
         % A-C-R-Method header.  If there is no A-C-R-Method header or if parsing
         % failed, do not set any additional headers and terminate this set of
         % steps.
-        {_Method, ReqHeaders} = Req,
-        case lists:keyfind(ACRMethod, 1, ReqHeaders) of
-        false ->
+        case couch_util:get_value(ACRMethod, ReqHeaders) of
+        undefined ->
             ?LOG_DEBUG("No method for preflight: ~p", SourceOrigin),
             [];
-        {ACRMethod, RequestedMethodStr} ->
+        RequestedMethodStr ->
             RequestedMethod = couch_util:to_binary(RequestedMethodStr),
 
             % s. 5.2(4) Let [RequestedHeaders] be the values as result of
             % parsing the A-C-R-Headers headers.  If there are no A-C-R-Headers
             % headers let [RequestedHeaders] be the empty list.
-            RequestedHeaders = case lists:keyfind(ACRHeaders, 1, ReqHeaders) of
-                false -> [];
-                {ACRHeaders, HeaderList} ->
-                    comma_split(string:to_lower(HeaderList))
-            end,
+            RequestedHeaders =
+                case couch_util:get_value(ACRHeaders, ReqHeaders) of
+                    undefined -> [];
+                    HeaderList -> comma_split(string:to_lower(HeaderList))
+                end,
 
-            ?LOG_DEBUG("Origin ~p requests ~s: ~p", [SourceOrigin,
+            ?LOG_DEBUG("Origin ~s requests ~s with ~s", [SourceOrigin,
                     RequestedMethod, comma_join(RequestedHeaders)]),
 
             preflight(SourceOrigin, OkCreds, {RequestedMethod, OkMethods},
@@ -204,18 +187,20 @@ preflight(Origin, OkCreds, {Method, OkMethods}, {Headers, OkHeaders}) ->
                 HeadersHeaders = [{"Access-Control-Allow-Headers",
                                    comma_join(OkHeaders)}],
 
-                ?LOG_DEBUG("Good preflight ~s: ~p", [Method, Origin]),
+                ?LOG_DEBUG("Good preflight ~s: ~s", [Method, Origin]),
                 CredsHeaders ++ MaxAgeHeaders ++ MethodHeaders
                              ++ HeadersHeaders
         end
     end.
 
-actual(OriginVal, OkOrigins, _OkMethods, _OkHeaders, OkCreds, _Req) ->
+actual(Policy, Req) ->
+    {OkOrigins, OkMethods, OkHeaders, OkCreds} = Policy,
+
     % s. 5.1(2) Split the value of the Origin header on the U+0020 SPACE
     % character and if any of the resulting tokens is not a case-sensitive
     % match for any of the values in [OkOrigins] do not set any additional
     % headers and terminate...
-    Origins = [ ?l2b(O) || O <- string:tokens(OriginVal, " ") ],
+    Origins = request_origins(Req),
     GoodOrigin = fun(Origin) ->
         lists:any(fun(OkOrigin) ->
             OkOrigin == <<"*">> orelse OkOrigin == Origin
@@ -223,67 +208,103 @@ actual(OriginVal, OkOrigins, _OkMethods, _OkHeaders, OkCreds, _Req) ->
     end,
 
     case lists:all(GoodOrigin, Origins) of
-        false ->
-            ?LOG_DEBUG("Origin ~p not allowed: ~p", [Origins, OkOrigins]),
-            [];
-        true ->
-            % s. 5.1(3) If the resource supports credentials add a single
-            % A-C-A-Origin header, with the value of the origin header as
-            % value, and add a single A-C-A-Credentials header with the literal
-            % string "true" as value.
-            %
-            % Otherwise, add a single A-C-A-Origin header with either the value
-            % of the Origin header or the literal string "*" as value.
-            Allow = case OkCreds of
-                true -> [ {"Access-Control-Allow-Origin", OriginVal}
-                        , {"Access-Control-Allow-Credentials", "true"}
-                        ];
-                false -> [ {"Access-Control-Allow-Origin", OriginVal} ]
-            end,
+    false ->
+        ?LOG_DEBUG("Origin not allowed: ~s", [comma_join(Origins)]),
+        [];
+    true ->
+        % s. 5.1(3) If the resource supports credentials add a single
+        % A-C-A-Origin header, with the value of the origin header as value,
+        % and add a single A-C-A-Credentials header with the literal string
+        % "true" as value.
+        %
+        % Otherwise, add a single A-C-A-Origin header with either the value of
+        % the Origin header or the literal string "*" as value.
+        OriginVal = request_origin(Req),
+        Allow = case OkCreds of
+            true -> [ {"Access-Control-Allow-Origin", OriginVal}
+                    , {"Access-Control-Allow-Credentials", "true"}
+                    ];
+            false -> [ {"Access-Control-Allow-Origin", OriginVal} ]
+        end,
 
-            % s. 5.1(4) If the resource wants to expose more than just simple
-            % response headers to the API of the CORS API specification add one
-            % or more Access-Control-Expose-Headers headers, with as values the
-            % filed names of the additional headers to expose.
-            CouchHeaders = [ "Server", "Date"
-                           , "Content-Length"
-                           , "ETag", "Age"
-                           , "Connection" % ?
-                           % Any others?
-                           ],
+        % s. 5.1(4) If the resource wants to expose more than just simple
+        % response headers to the API of the CORS API specification add one or
+        % more Access-Control-Expose-Headers headers, with as values the filed
+        % names of the additional headers to expose.
+        CouchHeaders = [ "Server", "Date"
+                       , "Content-Length"
+                       , "ETag", "Age"
+                       , "Connection" % ?
+                       % Any others?
+                       ],
 
-            % TODO: Merged with the configured expose_headers?
-            Expose = [{"Access-Control-Expose-Headers",
-                      comma_join(CouchHeaders)}],
+        % TODO: Merged with the configured expose_headers?
+        Expose = [{"Access-Control-Expose-Headers", comma_join(CouchHeaders)}],
 
-            % Interestingly, the spec does not confirm policy for actual
-            % requests. This function ignores methods, headers, and the request
-            % object.  Of course, disabling CORS on CouchDB, or removing an
-            % origin from the config would have immediate effect. Perhaps a
-            % future feature could detect minor changes to the CORS policy and
-            % purge the cache as mentioned in the 5.1(4) note.
-            Allow ++ Expose
+        % Interestingly, the spec does not confirm policy for actual requests.
+        % This function ignores methods, headers, and the request object.  Of
+        % course, disabling CORS on CouchDB, or removing an origin from the
+        % config would have immediate effect. Perhaps a future feature could
+        % detect minor changes to the CORS policy and purge the cache as
+        % mentioned in the 5.1(4) note.
+        Allow ++ Expose
     end.
 
-% Note, the list_of_* functions should receive only one key/val which was built
-% by origins_config.
-list_of_origins([{Origin, {_Policy}}]) ->
-    [ Origin ].
+policy_for_request(Policies, {_Method, ReqHeaders}) ->
+    % s. 5 ...each resource is bound to the following:
+    % * A list of origins consisting of zero or more origins that are allowed
+    %   to access this resource.
+    % * A list of methods consisting of zero or more methods that are
+    %   supported by the resource.
+    % * A list of headers consisting of zero or more header field names that
+    %   are supported by the resource.
+    % * A supports credentials flag that indicates whether the resource
+    %   supports user credentials in the request. [true/false]
+    %
+    % The spec indicates that each resources has one static policy. However
+    % CouchDB allows a per-origin policy. This function merges each origin's
+    % policy into one single policy appropriate to the request.
+    ReqOrigins = request_origins(ReqHeaders),
 
-list_of_methods([{_Origin, {Policy}}]) ->
-    {<<"allow_methods">>, Methods} = lists:keyfind(<<"allow_methods">>,
-                                                   1, Policy),
-    comma_split(Methods).
+    % Check() (passed to foldl) looks up the policy for a given origin and
+    % mixes it in to the final policy.
+    Check = fun(ReqOrigin, {OkOrigins, OkMethods, OkHeaders, OkCreds}=State) ->
+        {Policy} = case couch_util:get_value(ReqOrigin, Policies) of
+            undefined -> couch_util:get_value(<<"*">>, Policies);
+            MatchedPolicy -> MatchedPolicy
+        end,
 
-list_of_headers([{_Origin, {Policy}}]) ->
-    {<<"allow_headers">>, Headers} = lists:keyfind(<<"allow_headers">>,
-                                                   1, Policy),
-    comma_split(Headers).
+        Origins1 = sets:add_element(ReqOrigin, OkOrigins),
 
-supports_credentials([{_Origin, {Policy}}]) ->
-    {<<"allow_credentials">>, Allowed} =
-        lists:keyfind(<<"allow_credentials">>, 1, Policy),
-    Allowed.
+        CredsPol = couch_util:get_value(<<"allow_credentials">>, Policy),
+        Creds1 = OkCreds andalso CredsPol,
+
+        MethodPol = sets:from_list(comma_split(
+                couch_util:get_value(<<"allow_methods">>, Policy))),
+        Methods1 = case sets:size(OkMethods) of
+            0 -> MethodPol;
+            _ -> sets:intersection(OkMethods, MethodPol)
+        end,
+
+        HeaderPol = sets:from_list(comma_split(
+                couch_util:get_value(<<"allow_headers">>, Policy))),
+        Headers1 = case sets:size(OkHeaders) of
+            0 -> HeaderPol;
+            _ -> sets:intersection(OkHeaders, HeaderPol)
+        end,
+
+        {Origins1, Methods1, Headers1, Creds1}
+    end,
+
+    %         origins   , methods   , headers   , allow_credentials
+    State0 = {sets:new(), sets:new(), sets:new(), false},
+    {OkOrigins, OkMethods, OkHeaders, OkCreds} =
+        lists:foldl(Check, State0, ReqOrigins),
+
+    {sets:to_list(OkOrigins),
+     sets:to_list(OkMethods),
+     sets:to_list(OkHeaders),
+     OkCreds}.
 
 origins_config(Global, Local, {_Method, Headers}) ->
     % Identify the "origins" configuration object which applies to this
@@ -307,7 +328,6 @@ origins_config(Global, Local, {_Method, Headers}) ->
             ?LOG_DEBUG("Local origin list: ~s", [VHost]),
             LocalObj;
         _ ->
-            ?LOG_DEBUG("No local origin list: ~s", [VHost]),
             case couch_util:get_value(VHost, GlobalHosts) of
                 {GlobalObj} ->
                     ?LOG_DEBUG("Global origin list: ~s", [VHost]),
@@ -390,6 +410,25 @@ binary_section(Section) ->
                       (Val) -> ?l2b(Val)
     end,
     [ {?l2b(Key), BoolOrBinary(Val)} || {Key, Val} <- SectionStr ].
+
+
+
+% Return the "Origin" header value.
+request_origin({_Method, Headers}) ->
+    request_origin(Headers);
+request_origin([]) ->
+    undefined;
+request_origin([{Key, Val} | Rest]) ->
+    case couch_util:to_list(Key) of
+        "Origin" -> couch_util:to_binary(Val);
+        _ -> request_origin(Rest)
+    end.
+
+request_origins(Req) ->
+    case request_origin(Req) of
+        undefined -> undefined;
+        Origins -> re:split(Origins, "\s+")
+    end.
 
 comma_split(Str) ->
     re:split(Str, ",\\s*").
