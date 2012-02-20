@@ -706,16 +706,14 @@ last_chunk(Resp) ->
 send_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Body) ->
     log_request(Req, Code),
     couch_stats_collector:increment({httpd_status_codes, Code}),
-    ReqHeaders = mochiweb_headers:to_list(MochiReq:get(headers)),
-    CorsHeaders = couch_cors_policy:headers({Req#httpd.method, ReqHeaders}),
     Headers2 = http_1_0_keep_alive(MochiReq, Headers),
     if Code >= 400 ->
         ?LOG_DEBUG("httpd ~p error response:~n ~s", [Code, Body]);
     true -> ok
     end,
     {ok, MochiReq:respond({Code, Headers2 ++ server_header() ++
-                couch_httpd_auth:cookie_auth_header(Req, Headers2) ++
-                CorsHeaders, Body})}.
+                couch_httpd_auth:cookie_auth_header(Req, Headers2),
+                Body})}.
 
 send_method_not_allowed(Req, Methods) ->
     send_error(Req, 405, [{"Allow", Methods}], <<"method_not_allowed">>, ?l2b("Only " ++ Methods ++ " allowed")).

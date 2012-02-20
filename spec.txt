@@ -6,6 +6,13 @@ TODO
 * w3c spec S 5.1.4. Make sure that couch never exposes non-simple headers that are not in AC-Expose-Headers.
 * Different tests for simple (s5.1) vs. preflight (s5.2)
 
+Tests:
+
+* Create DB
+* Delete DB
+* Situations when something is thrown (in do_db_req, etc.)
+* IN the config, confirm that headers are always converted to lower case
+
 guidelines :
 ----------
 
