@@ -50,8 +50,10 @@ push(Name, #shard{node=Node}) ->
 push(Name, Node) ->
     push(#job{name = Name, node = Node}).
 
-push(Job) ->
-    gen_server:cast(?MODULE, {push, Job}).
+push(#job{node = Node} = Job) when Node =/= node() ->
+    gen_server:cast(?MODULE, {push, Job});
+push(_) ->
+    ok.
 
 remove_node(Node) ->
     gen_server:cast(?MODULE, {remove_node, Node}).
@@ -203,6 +205,7 @@ sync_nodes_and_dbs() ->
     [[push(?l2b(Db), N) || Db <- Dbs] || N <- Nodes, lists:member(N, Live)].
 
 initial_sync() ->
+    [net_kernel:connect_node(Node) || Node <- mem3:nodes()],
     sync_nodes_and_dbs(),
     initial_sync(nodes()).
 
@@ -231,19 +234,23 @@ start_update_notifier() ->
         [?MODULE:push(Db, N) || N <- Nodes, lists:member(N, Live)];
     ({updated, <<"shards/", _/binary>> = ShardName}) ->
         % TODO deal with split/merged partitions by comparing keyranges
-        Shards = mem3:shards(mem3:dbname(ShardName)),
-        Targets = [S || #shard{node=N, name=Name} = S <- Shards, N =/= node(),
-            Name =:= ShardName],
-        Live = nodes(),
-        [?MODULE:push(ShardName,N) || #shard{node=N} <- Targets,
-            lists:member(N, Live)];
+        try mem3:shards(mem3:dbname(ShardName)) of
+        Shards ->
+            Targets = [S || #shard{node=N, name=Name} = S <- Shards,
+                N =/= node(), Name =:= ShardName],
+            Live = nodes(),
+            [?MODULE:push(ShardName,N) || #shard{node=N} <- Targets,
+                lists:member(N, Live)]
+        catch error:database_does_not_exist ->
+            ok
+        end;
     ({deleted, <<"shards/", _:18/binary, _/binary>> = ShardName}) ->
         gen_server:cast(?MODULE, {remove_shard, ShardName});
     (_) -> ok end).
 
 %% @doc Finds the next {DbName,Node} pair in the list of waiting replications
 %% which does not correspond to an already running replication
--spec next_replication(list(), list()) -> {binary(),node(),list()} | nil.
+-spec next_replication([#job{}], [#job{}]) -> {#job{}, [#job{}]} | nil.
 next_replication(Active, Waiting) ->
     Fun = fun(#job{name=S, node=N}) -> is_running(S,N,Active) end,
     case lists:splitwith(Fun, Waiting) of
