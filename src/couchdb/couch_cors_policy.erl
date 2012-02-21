@@ -177,6 +177,12 @@ preflight(Origin, OkCreds, {Method, OkMethods}, {Headers, OkHeaders}) ->
             % TODO
             MaxAgeHeaders = [],
 
+            % Send all approved methods and headers, not just those requested.
+            % The browser might want to make subsequent (allowed) requests for
+            % this resource but with different approved headers. To prevent
+            % another preflight request, just send a list of all approved
+            % headers.
+
             % s. 5.2(9) Add one or more Access-Control-Allow-Methods
             % headers consisting of (a subset of) the list of methods.
             MethodHeaders = [{"Access-Control-Allow-Methods",
