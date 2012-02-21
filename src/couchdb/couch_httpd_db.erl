@@ -63,8 +63,19 @@ handle_changes_req(#httpd{method='GET'}=Req, Db) ->
 handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "GET,HEAD,POST").
 
-handle_changes_req1(Req, Db) ->
-    ok = couch_db:check_is_admin(Db),
+handle_changes_req1(Req, #db{name=DbName}=Db) ->
+    AuthDbName = ?l2b(couch_config:get("couch_httpd_auth", "authentication_db")),
+    case AuthDbName of
+    DbName ->
+        % in the authentication database, _changes is admin-only.
+        ok = couch_db:check_is_admin(Db);
+    _Else ->
+        % on other databases, _changes is free for all.
+        ok
+    end,
+    handle_changes_req2(Req, Db).
+
+handle_changes_req2(Req, Db) ->
     MakeCallback = fun(Resp) ->
         fun({change, Change, _}, "continuous") ->
             send_chunk(Resp, [?JSON_ENCODE(Change) | "\n"]);
