@@ -150,46 +150,46 @@ preflight(Origin, OkCreds, {Method, OkMethods}, {Headers, OkHeaders}) ->
         end, [], Headers),
 
         case BadHeaders of
-            [ _ | _Rest ] ->
-                ?LOG_DEBUG("Bad preflight headers (~p): ~s",
-                           [Origin, comma_join(BadHeaders)]),
-                [];
-            [] ->
-                % s. 5.2(7) If the resource supports credentials add a
-                % single A-C-A-Origin header, with the value of the Origin
-                % header as value, and add a single A-C-A-Credentials
-                % header with the case-sensitive string "true" as value.
-                % Otherwise, add a single A-C-A-Origin header, with either
-                % the value of the Origin header or the string "*" as
-                % value.
-                CredsHeaders = case OkCreds of
-                true ->
-                    [{"Access-Control-Allow-Origin", Origin},
-                     {"Access-Control-Allow-Credentials", "true"}];
-                false ->
-                    [{"Access-Control-Allow-Origin", Origin}]
-                end,
+        [ _ | _Rest ] ->
+            ?LOG_DEBUG("Bad preflight headers (~p): ~s",
+                       [Origin, comma_join(BadHeaders)]),
+            [];
+        [] ->
+            % s. 5.2(7) If the resource supports credentials add a
+            % single A-C-A-Origin header, with the value of the Origin
+            % header as value, and add a single A-C-A-Credentials
+            % header with the case-sensitive string "true" as value.
+            % Otherwise, add a single A-C-A-Origin header, with either
+            % the value of the Origin header or the string "*" as
+            % value.
+            CredsHeaders = case OkCreds of
+            true ->
+                [{"Access-Control-Allow-Origin", Origin},
+                 {"Access-Control-Allow-Credentials", "true"}];
+            false ->
+                [{"Access-Control-Allow-Origin", Origin}]
+            end,
 
-                % s. 5.2(8) Optionally add a single A-C-Max-Age header with as
-                % value the amount of seconds the user agent is allowed to
-                % cache the result of the request.
-                %
-                % TODO
-                MaxAgeHeaders = [],
+            % s. 5.2(8) Optionally add a single A-C-Max-Age header with as
+            % value the amount of seconds the user agent is allowed to
+            % cache the result of the request.
+            %
+            % TODO
+            MaxAgeHeaders = [],
 
-                % s. 5.2(9) Add one or more Access-Control-Allow-Methods
-                % headers consisting of (a subset of) the list of methods.
-                MethodHeaders = [{"Access-Control-Allow-Methods",
-                                  comma_join(OkMethods)}],
+            % s. 5.2(9) Add one or more Access-Control-Allow-Methods
+            % headers consisting of (a subset of) the list of methods.
+            MethodHeaders = [{"Access-Control-Allow-Methods",
+                              comma_join(OkMethods)}],
 
-                % s. 5.2(10) Add one or more A-C-A-Headers headers consisting
-                % of (a subset of) the list of headers.
-                HeadersHeaders = [{"Access-Control-Allow-Headers",
-                                   comma_join(OkHeaders)}],
+            % s. 5.2(10) Add one or more A-C-A-Headers headers consisting
+            % of (a subset of) the list of headers.
+            HeadersHeaders = [{"Access-Control-Allow-Headers",
+                               comma_join(OkHeaders)}],
 
-                ?LOG_DEBUG("Good preflight ~s: ~s", [Method, Origin]),
-                CredsHeaders ++ MaxAgeHeaders ++ MethodHeaders
-                             ++ HeadersHeaders
+            ?LOG_DEBUG("Good preflight ~s: ~s", [Method, Origin]),
+            CredsHeaders ++ MaxAgeHeaders ++ MethodHeaders
+                         ++ HeadersHeaders
         end
     end.
 
