@@ -17,7 +17,7 @@ default_config() ->
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(18),
+    etap:plan(20),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -32,6 +32,7 @@ test() ->
     couch_config:start_link([default_config()]),
     test_api_calls(),
     test_policy_structure(),
+    test_lowercase_headers(),
     test_defaults(),
     ok.
 
@@ -89,6 +90,21 @@ test_policy_structure() ->
     {Origin2} = couch_util:get_value(<<"http://origin.com">>, Example),
     etap:ok(is_list(Origin2), "CORS origin config: http://origin.com"),
 
+    ok.
+
+test_lowercase_headers() ->
+    couch_config:set("origins", "example.com",
+                     "http://origin.com, https://origin.com:6984", false),
+    couch_config:set("http://origin.com", "allow_headers",
+                     "X-Some-Header", false),
+
+    FauxReq = {'GET', [{"Host", "example.com"}]},
+    Config = couch_cors_policy:global_config(),
+    NormalConfig = couch_cors_policy:origins_config(Config, [], FauxReq),
+    {Policy} = couch_util:get_value(<<"http://origin.com">>, NormalConfig),
+    Headers = couch_util:get_value(<<"allow_headers">>, Policy),
+    etap:is(Headers, <<"x-some-header">>,
+            "CORS config lower-cases the allowed headers"),
     ok.
 
 test_defaults() ->

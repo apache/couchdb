@@ -11,7 +11,6 @@ Tests:
 * Create DB
 * Delete DB
 * Situations when something is thrown (in do_db_req, etc.)
-* IN the config, confirm that headers are always converted to lower case
 * Only one config is ever sent back
 
 guidelines :
