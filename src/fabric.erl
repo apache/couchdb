@@ -101,7 +101,7 @@ create_db(DbName) ->
 %% control how many shards to split a database into
 %% and how many nodes each doc is copied to respectively.
 %%
--spec create_db(dbname(), [option()]) -> ok | {error, atom()}.
+-spec create_db(dbname(), [option()]) -> ok | accepted | {error, atom()}.
 create_db(DbName, Options) ->
     fabric_db_create:go(dbname(DbName), opts(Options)).
 
@@ -110,11 +110,7 @@ delete_db(DbName) ->
     delete_db(DbName, []).
 
 %% @doc delete a database
--spec delete_db(dbname(), [option()]) ->
-    ok |
-    no_return() | % erlang:error(database_does_not_exist)
-    {timeout, any()} |
-    {error, any()}.
+-spec delete_db(dbname(), [option()]) -> ok | accepted | {error, atom()}.
 delete_db(DbName, Options) ->
     fabric_db_delete:go(dbname(DbName), opts(Options)).
 

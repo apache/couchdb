@@ -18,8 +18,8 @@
 -export([open_doc/3, open_revs/4, get_missing_revs/2, get_missing_revs/3,
     update_docs/3]).
 -export([all_docs/2, changes/3, map_view/4, reduce_view/4, group_info/2]).
--export([create_db/1, delete_db/2, reset_validation_funs/1, set_security/3,
-    get_all_security/2, set_revs_limit/3, create_shard_db_doc/2]).
+-export([create_db/1, delete_db/1, reset_validation_funs/1, set_security/3,
+    set_revs_limit/3, create_shard_db_doc/2, delete_shard_db_doc/2]).
 
 -include("fabric.hrl").
 -include_lib("couch/include/couch_db.hrl").
@@ -39,7 +39,7 @@
 %%  call to with_db will supply your M:F with a #db{} and then remaining args
 
 all_docs(DbName, #view_query_args{keys=nil} = QueryArgs) ->
-    {ok, Db} = couch_db:open_int(DbName, []),
+    {ok, Db} = get_or_create_db(DbName, []),
     #view_query_args{
         start_key = StartKey,
         start_docid = StartDocId,
@@ -72,7 +72,7 @@ all_docs(DbName, #view_query_args{keys=nil} = QueryArgs) ->
 changes(DbName, Args, StartSeq) ->
     erlang:put(io_priority, {interactive, DbName}),
     #changes_args{style=Style, dir=Dir} = Args,
-    case couch_db:open_int(DbName, []) of
+    case get_or_create_db(DbName, []) of
     {ok, Db} ->
         Enum = fun changes_enumerator/2,
         Opts = [{dir,Dir}],
@@ -89,7 +89,7 @@ changes(DbName, Args, StartSeq) ->
     end.
 
 map_view(DbName, DDoc, ViewName, QueryArgs) ->
-    {ok, Db} = couch_db:open_int(DbName, []),
+    {ok, Db} = get_or_create_db(DbName, []),
     #view_query_args{
         limit = Limit,
         skip = Skip,
@@ -132,7 +132,7 @@ map_view(DbName, DDoc, ViewName, QueryArgs) ->
 
 reduce_view(DbName, Group0, ViewName, QueryArgs) ->
     erlang:put(io_priority, {interactive, DbName}),
-    {ok, Db} = couch_db:open_int(DbName, []),
+    {ok, Db} = get_or_create_db(DbName, []),
     #view_query_args{
         group_level = GroupLevel,
         limit = Limit,
@@ -192,9 +192,11 @@ create_db(DbName) ->
 create_shard_db_doc(_, Doc) ->
     rexi:reply(mem3_util:write_db_doc(Doc)).
 
-delete_db(DbName, DocId) ->
-    mem3_util:delete_db_doc(DocId),
-    rexi:reply(couch_server:delete(DbName, [])).
+delete_db(DbName) ->
+    couch_server:delete(DbName, []).
+
+delete_shard_db_doc(_, DocId) ->
+    rexi:reply(mem3_util:delete_db_doc(DocId)).
 
 get_db_info(DbName) ->
     with_db(DbName, [], {couch_db, get_db_info, []}).
@@ -226,7 +228,7 @@ get_missing_revs(DbName, IdRevsList) ->
 get_missing_revs(DbName, IdRevsList, Options) ->
     % reimplement here so we get [] for Ids with no missing revs in response
     set_io_priority(DbName, Options),
-    rexi:reply(case couch_db:open_int(DbName, Options) of
+    rexi:reply(case get_or_create_db(DbName, Options) of
     {ok, Db} ->
         Ids = [Id1 || {Id1, _Revs} <- IdRevsList],
         {ok, lists:zipwith(fun({Id, Revs}, FullDocInfoResult) ->
@@ -257,7 +259,7 @@ group_info(DbName, Group0) ->
     rexi:reply(couch_view_group:request_group_info(Pid)).
 
 reset_validation_funs(DbName) ->
-    case couch_db:open_int(DbName, []) of
+    case get_or_create_db(DbName, []) of
     {ok, #db{main_pid = Pid}} ->
         gen_server:cast(Pid, {load_validation_funs, undefined});
     _ ->
@@ -270,7 +272,7 @@ reset_validation_funs(DbName) ->
 
 with_db(DbName, Options, {M,F,A}) ->
     set_io_priority(DbName, Options),
-    case couch_db:open_int(DbName, Options) of
+    case get_or_create_db(DbName, Options) of
     {ok, Db} ->
         rexi:reply(try
             apply(M, F, [Db | A])
@@ -283,6 +285,15 @@ with_db(DbName, Options, {M,F,A}) ->
         end);
     Error ->
         rexi:reply(Error)
+    end.
+
+get_or_create_db(DbName, Options) ->
+    case couch_db:open_int(DbName, Options) of
+    {not_found, no_db_file} ->
+        twig:log(warn, "~p creating ~s", [?MODULE, DbName]),
+        couch_server:create(DbName, Options);
+    Else ->
+        Else
     end.
 
 view_fold(#full_doc_info{} = FullDocInfo, OffsetReds, Acc) ->
