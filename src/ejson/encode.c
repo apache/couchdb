@@ -97,6 +97,9 @@ final_encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     ERL_NIF_TERM term;
     double number;
     encode_ctx ctx;
+    char* start;
+    size_t len;
+    size_t i;
 
     ctx.env = env;
     ctx.fill_offset = 0;
@@ -145,10 +148,24 @@ final_encode(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                     goto done;
                 }
                 // write the string into the buffer
-                snprintf((char*)ctx.bin.data+ctx.fill_offset, 32,
-                        "%.16g", number);
+                start = (char*) (ctx.bin.data + ctx.fill_offset);
+                snprintf(start, 32, "%0.20g", number);
+                len = strlen(start);
+                for(i = 0; i < len; i++) {
+                    if(start[i] == '.' || start[i] == 'e' || start[i] == 'E') {
+                        break;
+                    }
+                }
+                if(i == len) {
+                    if(i > 29) {
+                        ctx.error = BADARG;
+                        goto done;
+                    }
+                    start[len++] = '.';
+                    start[len++] = '0';
+                }
                 // increment the length
-                ctx.fill_offset += strlen((char*)ctx.bin.data+ctx.fill_offset);
+                ctx.fill_offset += len;
             }
         } else if (enif_inspect_binary(env, term, &termbin)) {
             // this is a regular binary, copy the contents into the buffer
