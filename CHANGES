@@ -26,8 +26,6 @@ Futon:
 Version 1.2.0
 -------------
 
-This version has not been released yet.
-
 Authentication:
 
  * Fix use of OAuth with VHosts and URL rewriting.
