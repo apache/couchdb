@@ -47,6 +47,7 @@ This version has not been released yet.
  * Allow persistent authentication cookies.
  * The requested_path property of query server request objects now has
    the path requested by clients before VHosts and rewriting.
+ * Fixed incorrect reduce query results when using pagination parameters.
 
 Version 1.1.2
 -------------
