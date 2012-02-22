@@ -10,8 +10,6 @@ Each release section notes when backwards incompatible changes have been made.
 Version 1.2.0
 -------------
 
-This version has not been released yet.
-
  * Updated bundled erlang_oauth library to the latest version.
  * cURL is no longer required to build CouchDB as it is only
    required by the command line JS test runner.
@@ -48,15 +46,6 @@ This version has not been released yet.
  * The requested_path property of query server request objects now has
    the path requested by clients before VHosts and rewriting.
  * Fixed incorrect reduce query results when using pagination parameters.
-
-Version 1.1.2
--------------
-
-This version has not been released yet.
-
-* ETag of attachment changes only when the attachment changes, not
- the document.
-* Fix pull replication of documents with many revisions.
 
 Version 1.1.1
 -------------
