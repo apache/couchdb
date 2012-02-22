@@ -123,6 +123,24 @@ This release contains backwards incompatible changes.
    to lack of permissions.
  * Added a "change password"-feature to Futon.
 
+Version 1.0.3
+-------------
+
+ * Fixed compatibility issues with Erlang R14B02.
+ * Fix bug that allows invalid UTF-8 after valid escapes.
+ * Enabled replication over IPv6.
+ * Fixed for crashes in continuous and filtered changes feeds.
+ * Changes feeds now honor conflicts=true parameter.
+ * Fixed error when restarting replications in OTP R14B02.
+ * Fixed error with filter replication with a limit of 1.
+ * Upgrade ibrowse to version 2.2.0.
+ * Fixed OAuth signature computation in OTP R14B02.
+ * Handle passwords with : in them.
+ * Made compatible with jQuery 1.5.x.
+ * Added support for inclusive_end wiht reduce views.
+ * Etap tests no longer require use of port 5984.
+ * Windows builds now require ICU >= 4.4.0 and Erlang >= R14B03.
+
 Version 1.0.2
 -------------
 
