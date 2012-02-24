@@ -308,20 +308,16 @@ handle_info({'DOWN', Ref, _, _, Reason}, #db{fd_monitor=Ref, name=Name} = Db) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-
-merge_updates([], RestB, AccOutGroups) ->
-    lists:reverse(AccOutGroups, RestB);
-merge_updates(RestA, [], AccOutGroups) ->
-    lists:reverse(AccOutGroups, RestA);
-merge_updates([[{_, {#doc{id=IdA}, _}}|_]=GroupA | RestA],
-        [[{_, {#doc{id=IdB}, _}}|_]=GroupB | RestB], AccOutGroups) ->
-    if IdA == IdB ->
-        merge_updates(RestA, RestB, [GroupA ++ GroupB | AccOutGroups]);
-    IdA < IdB ->
-        merge_updates(RestA, [GroupB | RestB], [GroupA | AccOutGroups]);
-    true ->
-        merge_updates([GroupA | RestA], RestB, [GroupB | AccOutGroups])
-    end.
+merge_updates([[{_,#doc{id=X}}|_]=A|RestA], [[{_,#doc{id=X}}|_]=B|RestB]) ->
+    [A++B | merge_updates(RestA, RestB)];
+merge_updates([[{_,#doc{id=X}}|_]|_]=A, [[{_,#doc{id=Y}}|_]|_]=B) when X < Y ->
+    [hd(A) | merge_updates(tl(A), B)];
+merge_updates([[{_,#doc{id=X}}|_]|_]=A, [[{_,#doc{id=Y}}|_]|_]=B) when X > Y ->
+    [hd(B) | merge_updates(A, tl(B))];
+merge_updates([], RestB) ->
+    RestB;
+merge_updates(RestA, []) ->
+    RestA.
 
 collect_updates(GroupedDocsAcc, ClientsAcc, MergeConflicts, FullCommit) ->
     receive
@@ -333,7 +329,7 @@ collect_updates(GroupedDocsAcc, ClientsAcc, MergeConflicts, FullCommit) ->
             GroupedDocs2 = [[{Client, Doc} || Doc <- DocGroup]
                     || DocGroup <- GroupedDocs],
             GroupedDocsAcc2 =
-                merge_updates(GroupedDocsAcc, GroupedDocs2, []),
+                merge_updates(GroupedDocsAcc, GroupedDocs2),
             collect_updates(GroupedDocsAcc2, [Client | ClientsAcc],
                     MergeConflicts, (FullCommit or FullCommit2))
     after 0 ->
