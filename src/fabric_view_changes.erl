@@ -249,7 +249,7 @@ unpack_seqs([_SeqNum, Opaque], DbName) ->
 
 unpack_seqs(Packed, DbName) ->
     NewPattern = "^\\[[0-9]+,\"(?<opaque>.*)\"\\]$",
-    OldPattern = "^([0-9]+-)?(?<opaque>.*)$",
+    OldPattern = "^\"?([0-9]+-)?(?<opaque>.*?)\"?$",
     Options = [{capture, [opaque], binary}],
     Opaque = case re:run(Packed, NewPattern, Options) of
     {match, Match} ->
@@ -342,6 +342,11 @@ unpack_seqs_test() ->
     assert_shards([651,"g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwNDLXMwBCwxygOFMiQ"
     "5L8____sxJTcalIUgCSSfZgReE4FTmAFMWDFYXgVJQAUlQPVuSKS1EeC5BkaABSQHXz8"
     "VgJUbgAonB_VqIPfoUHIArvE7T6AUQh0I1-WQAzp1XB"]),
+
+    % CouchDB 1.2 style
+    assert_shards("\"23423-g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
+    "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
+    "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA\""),
 
     ets:delete(partitions).
 
