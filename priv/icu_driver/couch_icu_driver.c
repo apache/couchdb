@@ -30,6 +30,12 @@ specific language governing permissions and limitations under the License.
 #include <string.h> /* for memcpy */
 #endif
 
+#if ERL_DRV_EXTENDED_MAJOR_VERSION < 2
+typedef int COUCH_SSIZET;
+#else
+typedef ErlDrvSSizeT COUCH_SSIZET;
+#endif
+
 typedef struct {
     ErlDrvPort port;
     UCollator* collNoCase;
@@ -79,7 +85,9 @@ static ErlDrvData couch_drv_start(ErlDrvPort port, char *buff)
     return (ErlDrvData)pData;
 }
 
-static int return_control_result(void* pLocalResult, int localLen, char **ppRetBuf, int returnLen)
+COUCH_SSIZET
+return_control_result(void* pLocalResult, int localLen,
+            char **ppRetBuf, COUCH_SSIZET returnLen)
 {
     if (*ppRetBuf == NULL || localLen > returnLen) {
         *ppRetBuf = (char*)driver_alloc_binary(localLen);
@@ -91,8 +99,10 @@ static int return_control_result(void* pLocalResult, int localLen, char **ppRetB
     return localLen;
 }
 
-static int couch_drv_control(ErlDrvData drv_data, unsigned int command, char *pBuf,
-             int bufLen, char **rbuf, int rlen)
+static COUCH_SSIZET
+couch_drv_control(ErlDrvData drv_data, unsigned int command,
+        char *pBuf, COUCH_SSIZET bufLen,
+        char **rbuf, COUCH_SSIZET rlen)
 {
 
     couch_drv_data* pData = (couch_drv_data*)drv_data;
