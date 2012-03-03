@@ -46,6 +46,7 @@ Version 1.2.0
  * The requested_path property of query server request objects now has
    the path requested by clients before VHosts and rewriting.
  * Fixed incorrect reduce query results when using pagination parameters.
+ * Made icu_driver work with Erlang R15B and later.
 
 Version 1.1.1
 -------------
