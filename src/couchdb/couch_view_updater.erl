@@ -166,16 +166,17 @@ do_maps(#group{query_server = Qs} = Group, MapQueue, WriteQueue) ->
         couch_work_queue:close(WriteQueue),
         couch_query_servers:stop_doc_map(Group#group.query_server);
     {ok, Queue} ->
-        lists:foreach(
-            fun({Seq, #doc{id = Id, deleted = true}}) ->
+        Items = lists:foldl(
+            fun({Seq, #doc{id = Id, deleted = true}}, Acc) ->
                 Item = {Seq, Id, []},
-                ok = couch_work_queue:queue(WriteQueue, Item);
-            ({Seq, #doc{id = Id, deleted = false} = Doc}) ->
+                [Item | Acc];
+            ({Seq, #doc{id = Id, deleted = false} = Doc}, Acc) ->
                 {ok, Result} = couch_query_servers:map_doc_raw(Qs, Doc),
                 Item = {Seq, Id, Result},
-                ok = couch_work_queue:queue(WriteQueue, Item)
+                [Item | Acc]
             end,
-            Queue),
+            [], Queue),
+        ok = couch_work_queue:queue(WriteQueue, Items),
         do_maps(Group, MapQueue, WriteQueue)
     end.
 
@@ -183,7 +184,8 @@ do_writes(Parent, Owner, Group, WriteQueue, InitialBuild, ViewEmptyKVs) ->
     case couch_work_queue:dequeue(WriteQueue) of
     closed ->
         Parent ! {new_group, Group};
-    {ok, Queue} ->
+    {ok, Queue0} ->
+        Queue = lists:flatten(Queue0),
         {ViewKVs, DocIdViewIdKeys} = lists:foldr(
             fun({_Seq, Id, []}, {ViewKVsAcc, DocIdViewIdKeysAcc}) ->
                 {ViewKVsAcc, [{Id, []} | DocIdViewIdKeysAcc]};
