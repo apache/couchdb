@@ -1,5 +1,5 @@
 %% Copyright (c) 2008-2009 Nick Gerakines <nick@gerakines.net>
-%% 
+%%
 %% Permission is hereby granted, free of charge, to any person
 %% obtaining a copy of this software and associated documentation
 %% files (the "Software"), to deal in the Software without
@@ -8,10 +8,10 @@
 %% copies of the Software, and to permit persons to whom the
 %% Software is furnished to do so, subject to the following
 %% conditions:
-%% 
+%%
 %% The above copyright notice and this permission notice shall be
 %% included in all copies or substantial portions of the Software.
-%% 
+%%
 %% THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 %% EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 %% OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -20,7 +20,7 @@
 %% WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 %% FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 %% OTHER DEALINGS IN THE SOFTWARE.
-%% 
+%%
 %% @author Nick Gerakines <nick@gerakines.net> [http://socklabs.com/]
 %% @author Jeremy Wall <jeremy@marzhillstudios.com>
 %% @version 0.3.4
@@ -32,14 +32,14 @@
 %% @todo Explain in documentation why we use a process to handle test input.
 %% @doc etap is a TAP testing module for Erlang components and applications.
 %% This module allows developers to test their software using the TAP method.
-%% 
+%%
 %% <blockquote cite="http://en.wikipedia.org/wiki/Test_Anything_Protocol"><p>
 %% TAP, the Test Anything Protocol, is a simple text-based interface between
 %% testing modules in a test harness. TAP started life as part of the test
 %% harness for Perl but now has implementations in C/C++, Python, PHP, Perl
 %% and probably others by the time you read this.
 %% </p></blockquote>
-%% 
+%%
 %% The testing process begins by defining a plan using etap:plan/1, running
 %% a number of etap tests and then calling eta:end_tests/0. Please refer to
 %% the Erlang modules in the t directory of this project for example tests.
@@ -244,7 +244,7 @@ skip(TestFun, Reason) when is_function(TestFun), is_list(Reason) ->
     ok.
 
 %% @spec skip(Q, TestFun, Reason) -> ok
-%%       Q = true | false | function() 
+%%       Q = true | false | function()
 %%       TestFun = function()
 %%       Reason = string()
 %% @doc Skips a test conditionally. The first argument to this function can
@@ -355,7 +355,7 @@ test_server(State) ->
                 count = State#test_state.count + 1,
                 pass = State#test_state.pass + 1
             };
-            
+
         {_From, fail, Desc} ->
             FullMessage = skip_diag(
                 " - " ++ Desc,
@@ -391,11 +391,11 @@ mk_tap(Result, Desc) ->
     case [IsSkip, Result] of
         [_, true] ->
             etap_server ! {self(), pass, Desc},
-            true;                        
-        [1, _] ->                        
+            true;
+        [1, _] ->
             etap_server ! {self(), pass, Desc},
-            true;                        
-        _ ->                             
+            true;
+        _ ->
             etap_server ! {self(), fail, Desc},
             false
     end.
