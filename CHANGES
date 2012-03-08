@@ -72,14 +72,16 @@ Replicator:
  * Added optional field `since_seq` to replication objects/documents.
    It allows to bootstrap a replication from a specific source sequence
    number.
- * Simpler replication cancelation. In addition to the current method,
+ * Simpler replication cancellation. In addition to the current method,
    replications can now be canceled by specifying the replication ID
    instead of the original replication object/document.
 
 Storage System:
 
  * Added optional database and view index file compression (using Google's
-   snappy or zlib's deflate).
+   snappy or zlib's deflate). This feature is enabled by default, but it
+   can be disabled by adapting local.ini accordingly. The on-disk format
+   is upgraded on compaction and new DB/view creation to support this.
  * Several performance improvements, most notably regarding database writes
    and view indexing.
  * Computation of the size of the latest MVCC snapshot data and all its
