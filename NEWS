@@ -10,6 +10,8 @@ Each release section notes when backwards incompatible changes have been made.
 Version 1.2.0
 -------------
 
+This release contains backwards incompatible changes.
+
  * Updated bundled erlang_oauth library to the latest version.
  * cURL is no longer required to build CouchDB as it is only
    required by the command line JS test runner.
@@ -48,6 +50,7 @@ Version 1.2.0
    the path requested by clients before VHosts and rewriting.
  * Fixed incorrect reduce query results when using pagination parameters.
  * Made icu_driver work with Erlang R15B and later.
+ * Improvements to the build system and etap test suite.
 
 Version 1.1.1
 -------------

@@ -28,6 +28,8 @@ Build System:
    used by the command line JS test runner. If cURL is available
    when building CouchJS you can enable the HTTP bindings by
    passing -H on the command line.
+ * Temporarily made `make check` pass with R15B. A more thorough
+   fix is in the works (COUCHDB-1424).
 
 HTTP Interface:
 
