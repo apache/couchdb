@@ -46,7 +46,7 @@ Run the testsuite for couch.js and jquery.couch.js by browsing here:
 
     http://127.0.0.1:5984/_utils/spec/run.html
 
-It should work in at least Firefox >= 3.6 and Safari >= 4.0.4.
+It should work in at least Firefox >= 3.6 with Private Browsing mode enabled.
 
 Read more about JSpec here:
 
