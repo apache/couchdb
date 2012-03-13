@@ -166,7 +166,7 @@ do_maps(#group{query_server = Qs} = Group, MapQueue, WriteQueue) ->
         couch_work_queue:close(WriteQueue),
         couch_query_servers:stop_doc_map(Group#group.query_server);
     {ok, Queue} ->
-        Items = lists:foldl(
+        Items = lists:foldr(
             fun({Seq, #doc{id = Id, deleted = true}}, Acc) ->
                 Item = {Seq, Id, []},
                 [Item | Acc];
