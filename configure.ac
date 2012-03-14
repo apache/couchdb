@@ -112,6 +112,20 @@ else
     AC_MSG_RESULT([no])
 fi
 
+AC_ARG_VAR([ERLC_FLAGS], [general flags to prepend to ERLC_FLAGS])
+AC_ARG_VAR([FLAGS], [general flags to prepend to LDFLAGS and CPPFLAGS])
+AS_CASE([$(uname -s)],
+    [CYGWIN*], [] ,
+    [*], [
+    CPPFLAGS="$CPPFLAGS -I/opt/local/include"
+    CPPFLAGS="$CPPFLAGS -I/usr/local/include"
+    CPPFLAGS="$CPPFLAGS -I/usr/include"
+    LDFLAGS="$LDFLAGS -L/opt/local/lib"
+    LDFLAGS="$LDFLAGS -L/usr/local/lib"
+])
+CPPFLAGS="$CPPFLAGS $FLAGS"
+LDFLAGS="$LDFLAGS $FLAGS"
+
 AC_PATH_PROG([ERL], [erl])
 AS_IF([test x${ERL} = x], [
     AC_MSG_ERROR([Could not find the `erl' executable. Is Erlang installed?])
@@ -137,56 +151,65 @@ AC_ARG_WITH([erlang], [AC_HELP_STRING([--with-erlang=PATH],
 ])
 AC_SUBST(ERLANG_FLAGS)
 
-PKG_CHECK_MODULES([JS], [mozjs185], [
-    JS_LIB_DIR="$(${PKG_CONFIG} --variable=libdir mozjs185)"
+PKG_CHECK_EXISTS([mozjs185], [
+    PKG_CHECK_EXISTS([nspr], [], [
+        AC_MSG_WARN([
+
+You have the pkg-config file for mozjs185 isntalled but no pkg-config
+file for NSPR. More than likely configure will fail. If it does it most
+likely means you need to find on install the pkg-config file for NSPR.
+This most commonly occurs on Mac OS X with older versions of Homebrew.
+
+You can correct this by removing SpiderMonkey and NSPR, updating
+Homebrew and reinstalling.
+
+])])])
+
+AC_ARG_WITH([js-lib], [AC_HELP_STRING([--with-js-lib=PATH],
+            [set PATH to the SpiderMonkey library directory])],
+    [
+    JS_LIB_DIR=$withval
 ], [
-    PKG_CHECK_MODULES([JS], [mozilla-js >= 1.7], [
-        JS_LIB_DIR="$(${PKG_CONFIG} --variable=sdkdir mozilla-js)/lib"
+    PKG_CHECK_MODULES([JS185], [mozjs185], [
+    JS_LIB_DIR="$(${PKG_CONFIG} --variable=libdir mozjs185)"
     ], [
-        JS_LIB_DIR="${libdir}"
-        JS_CFLAGS="-I/usr/include"
-        JS_CFLAGS="$JS_CFLAGS -I/usr/include/js"
-        JS_CFLAGS="$JS_CFLAGS -I/usr/include/mozjs"
-        JS_CFLAGS="$JS_CFLAGS -I/usr/local/include/js"
-        JS_CFLAGS="$JS_CFLAGS -I/opt/local/include/js"
+        PKG_CHECK_MODULES([JS], [mozilla-js >= 1.7], [
+            JS_LIB_DIR="$(${PKG_CONFIG} --variable=sdkdir mozilla-js)/lib"
+        ], [
+            JS_LIB_DIR="${libdir}"
+        ])
     ])
 ])
+JS_LDFLAGS="-L$JS_LIB_DIR $LDFLAGS"
+
 
 AC_ARG_WITH([js-include], [AC_HELP_STRING([--with-js-include=PATH],
     [set PATH to the SpiderMonkey include directory])], [
     JS_INCLUDE="$withval"
     JS_CFLAGS="-I$JS_INCLUDE"
-], [])
-
-AC_ARG_WITH([js-lib], [AC_HELP_STRING([--with-js-lib=PATH],
-    [set PATH to the SpiderMonkey library directory])],
-    [
-    JS_LIB_DIR=$withval
-    JS_LIBS="-L$withval"
-], [])
+    JS_CFLAGS="$JS_CFLAGS -I$JS_INCLUDE/js"
+    JS_CFLAGS="$JS_CFLAGS -I$JS_INCLUDE/mozjs"
+], [
+    PKG_CHECK_MODULES([JS185], [mozjs185], [
+        JS_CFLAGS="$(${PKG_CONFIG} --cflags mozjs185)"
+    ], [
+        PKG_CHECK_MODULES([JS], [mozilla-js >= 1.7], [
+            JS_CFLAGS="$(${PKG_CONFIG} --cflags mozilla-js)"
+        ], [
+            JS_CFLAGS="-I/usr/include"
+            JS_CFLAGS="$JS_CFLAGS -I/usr/include/js"
+            JS_CFLAGS="$JS_CFLAGS -I/usr/include/mozjs"
+            JS_CFLAGS="$JS_CFLAGS -I/usr/local/include/js"
+            JS_CFLAGS="$JS_CFLAGS -I/opt/local/include/js"
+        ])
+    ])
+])
 
 use_js_trunk=no
 AC_ARG_ENABLE([js-trunk], [AC_HELP_STRING([--enable-js-trunk],
     [allow use of SpiderMonkey versions newer than js185-1.0.0])], [
     use_js_trunk=$enableval
 ], [])
-
-AC_ARG_VAR([ERLC_FLAGS], [general flags to prepend to ERLC_FLAGS])
-AC_ARG_VAR([FLAGS], [general flags to prepend to LDFLAGS and CPPFLAGS])
-AS_CASE([$(uname -s)],
-    [CYGWIN*], [] ,
-    [*], [
-    CPPFLAGS="$CPPFLAGS -I/opt/local/include"
-    CPPFLAGS="$CPPFLAGS -I/opt/local/include/js"
-    CPPFLAGS="$CPPFLAGS -I/usr/local/include"
-    CPPFLAGS="$CPPFLAGS -I/usr/local/include/js"
-    CPPFLAGS="$CPPFLAGS -I/usr/include"
-    CPPFLAGS="$CPPFLAGS -I/usr/include/js"
-    LDFLAGS="$LDFLAGS -L/opt/local/lib"
-    LDFLAGS="$LDFLAGS -L/usr/local/lib"
-])
-CPPFLAGS="$CPPFLAGS $FLAGS"
-LDFLAGS="$LDFLAGS $FLAGS"
 
 # The erlang cc.sh/ld.sh scripts will convert a -O option
 # into the same optimization flags erlang itself uses.
@@ -206,10 +229,12 @@ AS_CASE([$(uname -s)],
 
 AM_CONDITIONAL([WINDOWS], [test x$IS_WINDOWS = xTRUE])
 
-OLD_LIBS="$LIBS"
-LIBS="$JS_LIBS $LIBS"
 OLD_CPPFLAGS="$CPPFLAGS"
+OLD_LDFLAGS="$LDFLAGS"
+OLD_LIBS="$LIBS"
 CPPFLAGS="$JS_CFLAGS $CPPFLAGS"
+LDFLAGS="$JS_LDFLAGS"
+LIBS="$JS_LIBS $LIBS"
 
 AC_CHECK_HEADER([jsapi.h], [], [
     AC_CHECK_HEADER([js/jsapi.h],
@@ -222,15 +247,24 @@ AC_CHECK_HEADER([jsapi.h], [], [
 Are the Mozilla SpiderMonkey headers installed?])
         ])])
 
-AC_CHECK_LIB([mozjs185], [JS_NewContext], [JS_LIB_BASE=mozjs185], [
-    AC_CHECK_LIB([mozjs185-1.0], [JS_NewContext], [JS_LIB_BASE=mozjs185-1.0], [
-        AC_CHECK_LIB([mozjs], [JS_NewContext], [JS_LIB_BASE=mozjs], [
-            AC_CHECK_LIB([js], [JS_NewContext], [JS_LIB_BASE=js], [
-                AC_CHECK_LIB([js3250], [JS_NewContext], [JS_LIB_BASE=js3250], [
-                    AC_CHECK_LIB([js32], [JS_NewContext], [JS_LIB_BASE=js32], [
-                        AC_MSG_ERROR([Could not find the js library.
+AC_ARG_WITH([js-lib-name], [AC_HELP_STRING([--with-js-lib-name=NAME],
+    [set Spidermonkey library NAME])], [
+    JS_LIB_BASE="$withval"
+    AC_CHECK_LIB([$JS_LIB_BASE], JS_NewObject, [], [
+        AC_MSG_ERROR([Could not find the Spidermonkey library.
+
+Did you specify the correct library name?])])
+    ], [
+    AC_CHECK_LIB(mozjs, [JS_NewObject], [JS_LIB_BASE=mozjs], [
+        AC_CHECK_LIB(js, [JS_NewObject], [JS_LIB_BASE=js], [
+            AC_CHECK_LIB([js3250], [JS_NewObject], [JS_LIB_BASE=js3250], [
+                AC_CHECK_LIB([js32], [JS_NewObject], [JS_LIB_BASE=js32], [
+                    AC_CHECK_LIB([mozjs185-1.0], [JS_NewObject], [JS_LIB_BASE=mozjs185-1.0], [
+                        AC_CHECK_LIB(mozjs185, [JS_NewObject], [JS_LIB_BASE=mozjs185], [
+                            AC_MSG_ERROR([Could not find the js library.
 
 Is the Mozilla SpiderMonkey library installed?])])])])])])])
+])
 
 # Figure out what version of SpiderMonkey to use
 
@@ -240,6 +274,8 @@ AC_CHECK_LIB([$JS_LIB_BASE], [JS_NewCompartmentAndGlobalObject],
     if test "$use_js_trunk" = "no"; then
         AC_CHECK_DECL([JSOPTION_ANONFUNFIX], [], [
             AC_MSG_ERROR([Your SpiderMonkey library is too new.
+
+NOTE: Check above for an error about NSPR
 
 Versions of SpiderMonkey after the js185-1.0.0 release remove the optional
 enforcement of preventing anonymous functions in a statement context. This
@@ -318,12 +354,16 @@ if test x${IS_WINDOWS} = xTRUE; then
     fi
 fi
 
-JS_LIBS="-l$JS_LIB_BASE -lm $JS_LIBS"
-AC_SUBST(JS_LIBS)
-
-LIBS="$OLD_LIBS"
+JS_CFLAGS="$CPPFLAGS"
+JS_LDFLAGS="$LDFLAGS"
+JS_LIBS="-l$JS_LIB_BASE -lm $LIBS"
 CPPFLAGS="$OLD_CPPFLAGS"
+LDFLAGS="$OLD_LDFLAGS"
+LIBS="$OLD_LIBS"
 
+AC_SUBST(JS_CFLAGS)
+AC_SUBST(JS_LDFLAGS)
+AC_SUBST(JS_LIBS)
 
 AC_ARG_WITH([win32-icu-binaries], [AC_HELP_STRING([--with-win32-icu-binaries=PATH],
     [set PATH to the Win32 native ICU binaries directory])], [

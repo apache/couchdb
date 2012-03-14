@@ -79,6 +79,16 @@ The same is true for recent versions of Erlang:
 
     brew link erlang
 
+If you are upgrading your version of CouchDB and have an older nspr and
+Spidermonkey installed you may encounter an error during the ./configure step
+below. This is generally due to nspr being installed without its pkg-config
+description. To fix the issue:
+
+    brew remove --force spidermonkey
+    brew remove --force nspr
+    brew update
+    brew install spidermonkey
+
 You will need Homebrew installed to use the `brew` command.
 
 Learn more about Homebrew at:
