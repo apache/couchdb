@@ -15,7 +15,8 @@
 
 %% API
 -export([start_link/1, request_group/2, request_group_info/1]).
--export([open_db_group/2, open_temp_group/5, design_doc_to_view_group/1,design_root/2]).
+-export([open_db_group/2, open_temp_group/5, design_doc_to_view_group/1]).
+-export([design_root/2, index_file_name/3]).
 
 %% Exports for the compactor
 -export([get_index_header_data/1]).
@@ -382,8 +383,11 @@ prepare_group({RootDir, DbName, #group{sig=Sig}=Group}, ForceReset)->
                     {ok, Db, reset_file(Db, Fd, DbName, Group)}
                 end
             end;
-        Error ->
-            catch delete_index_file(RootDir, DbName, Sig),
+        {error, Reason} = Error ->
+            ?LOG_ERROR("Failed to open view file '~s': ~s", [
+                index_file_name(RootDir, DbName, Sig),
+                file:format_error(Reason)
+            ]),
             Error
         end;
     Else ->
@@ -408,6 +412,10 @@ hex_sig(GroupSig) ->
 design_root(RootDir, DbName) ->
     RootDir ++ "/." ++ ?b2l(DbName) ++ "_design/".
 
+index_file_name(RootDir, DBName, Pid) when is_pid(Pid) ->
+    {ok, GroupInfo} = request_group_info(Pid),
+    GroupSig = couch_util:from_hex(couch_util:get_value(signature, GroupInfo)),
+    index_file_name(RootDir, DBName, GroupSig);
 index_file_name(RootDir, DbName, GroupSig) ->
     design_root(RootDir, DbName) ++ hex_sig(GroupSig) ++".view".
 
@@ -573,9 +581,6 @@ reset_file(Db, Fd, DbName, #group{sig=Sig,name=Name} = Group) ->
     ok = couch_file:truncate(Fd, 0),
     ok = couch_file:write_header(Fd, {Sig, nil}),
     init_group(Db, Fd, reset_group(Group), nil).
-
-delete_index_file(RootDir, DbName, GroupSig) ->
-    couch_file:delete(RootDir, index_file_name(RootDir, DbName, GroupSig)).
 
 init_group(Db, Fd, #group{views=Views}=Group, nil) ->
     init_group(Db, Fd, Group,
