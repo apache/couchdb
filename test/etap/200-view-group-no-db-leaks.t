@@ -54,7 +54,7 @@ ddoc_name() -> <<"foo">>.
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(28),
+    etap:plan(33),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -129,8 +129,39 @@ test() ->
         etap:bail("old view group is not dead after ddoc update")
     end,
 
+    NewViewGroup = couch_view:get_group_server(
+        test_db_name(), <<"_design/", (ddoc_name())/binary>>),
+    etap:is(is_pid(NewViewGroup), true, "got new view group pid"),
+    etap:is(is_process_alive(NewViewGroup), true, "new view group pid is alive"),
+
+    RootDir = couch_config:get("couchdb", "view_index_dir"),
+    IndexFileName = couch_view_group:index_file_name(
+        RootDir, test_db_name(), NewViewGroup),
+    ok = file:change_mode(IndexFileName, 8#00200),
+
+    MonRef1 = erlang:monitor(process, NewViewGroup),
+    exit(NewViewGroup, shutdown),
+    receive
+    {'DOWN', MonRef1, _, _, _} ->
+        etap:diag("new view group is dead after explicit shutdown")
+    after 5000 ->
+        etap:bail("old view group is not dead after explicit shutdown")
+    end,
+
+    ReadError = (catch couch_view:get_group_server(
+        test_db_name(), <<"_design/", (ddoc_name())/binary>>)),
+    etap:is(ReadError, {error, eacces},
+        "opening a view group requires file read access"),
+    etap:diag("checking that a view group is not deleted when open fails"),
+    ok = file:change_mode(IndexFileName, 8#00600),
+
+    NewViewGroup2 = couch_view:get_group_server(
+        test_db_name(), <<"_design/", (ddoc_name())/binary>>),
+    etap:is(is_pid(NewViewGroup2), true, "got new view group pid"),
+    etap:is(is_process_alive(NewViewGroup2), true, "new view group pid is alive"),
+
     etap:diag("deleting database"),
-    MonRef2 = erlang:monitor(process, NewViewGroup),
+    MonRef2 = erlang:monitor(process, NewViewGroup2),
     ok = couch_server:delete(test_db_name(), []),
     receive
     {'DOWN', MonRef2, _, _, _} ->
