@@ -18,7 +18,7 @@
 -export([start_update/3, purge/4, process_doc/3, finish_update/1, commit/1]).
 -export([compact/3, swap_compacted/2]).
 
-
+-include("couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
 
@@ -88,8 +88,9 @@ open(Db, State) ->
                     {ok, RefCounter} = couch_ref_counter:start([Fd]),
                     {ok, NewSt#mrst{refc=RefCounter}}
             end;
-        Error ->
-            (catch couch_mrview_util:delete_files(DbName, Sig)),
+        {error, Reason} = Error ->
+            ?LOG_ERROR("Failed to open view file '~s': ~s",
+                       [IndexFName, file:format_error(Reason)]),
             Error
     end.
 
