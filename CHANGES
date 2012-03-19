@@ -84,6 +84,7 @@ View Server:
    configuration is matched.
  * Fixed incorrect reduce query results when using pagination parameters.
  * Made icu_driver work with Erlang R15B and later.
+ * Avoid invalidating view indexes when running out of file descriptors.
 
 OAuth:
 
