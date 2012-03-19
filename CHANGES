@@ -16,6 +16,10 @@ Replicator:
 * Fix pull replication of documents with many revisions.
 * Fix replication from an HTTP source to an HTTP target.
 
+View Server:
+
+* Avoid invalidating view indexes when running out of file descriptors.
+
 Version 1.1.1
 -------------
 

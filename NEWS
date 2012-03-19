@@ -16,6 +16,7 @@ This version has not been released yet.
  the document.
 * Fix pull replication of documents with many revisions.
 * Fix replication with an HTTP source and target
+* Avoid invalidating view indexes when running out of file descriptors.
 
 Version 1.1.1
 -------------
