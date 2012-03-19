@@ -46,7 +46,9 @@ start_server(IniFiles) ->
     {ok, [PidFile]} ->
         case file:write_file(PidFile, os:getpid()) of
         ok -> ok;
-        Error -> io:format("Failed to write PID file ~s, error: ~p", [PidFile, Error])
+        {error, Reason} ->
+            io:format("Failed to write PID file ~s: ~s",
+                [PidFile, file:format_error(Reason)])
         end;
     _ -> ok
     end,
@@ -121,12 +123,10 @@ start_server(IniFiles) ->
             end end || Uri <- Uris],
         case file:write_file(UriFile, Lines) of
         ok -> ok;
-        {error, eacces} ->
-            ?LOG_ERROR("Permission error when writing to URI file ~s", [UriFile]),
-            throw({file_permission_error, UriFile});
-        Error2 ->
-            ?LOG_ERROR("Failed to write to URI file ~s: ~p~n", [UriFile, Error2]),
-            throw(Error2)
+        {error, Reason2} = Error ->
+            ?LOG_ERROR("Failed to write to URI file ~s: ~s",
+                [UriFile, file:format_error(Reason2)]),
+            throw(Error)
         end
     end,
 
