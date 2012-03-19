@@ -53,17 +53,19 @@ open(Filepath, Options) ->
     ignore ->
         % get the error
         receive
-        {Ref, Pid, Error} ->
+        {Ref, Pid, {error, Reason} = Error} ->
             case process_info(self(), trap_exit) of
             {trap_exit, true} -> receive {'EXIT', Pid, _} -> ok end;
             {trap_exit, false} -> ok
             end,
-            case Error of
-            {error, eacces} -> {file_permission_error, Filepath};
-            _ -> Error
-            end
+            ?LOG_DEBUG("Could not open file ~s: ~s",
+                [Filepath, file:format_error(Reason)]),
+            Error
         end;
     Error ->
+        % We can't say much here, because it could be any kind of error.
+        % Just let it bubble and an encapsulating subcomponent can perhaps
+        % be more informative. It will likely appear in the SASL log, anyway.
         Error
     end.
 
@@ -290,7 +292,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                     {ok, #file{fd=Fd}};
                 false ->
                     ok = file:close(Fd),
-                    init_status_error(ReturnPid, Ref, file_exists)
+                    init_status_error(ReturnPid, Ref, {error, eexist})
                 end;
             false ->
                 maybe_track_open_os_files(Options),
