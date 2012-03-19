@@ -89,10 +89,10 @@ init([]) ->
     case file:open(Filename, [append]) of
     {ok, Fd} ->
         {ok, #state{fd = Fd, level = Level, sasl = Sasl}};
-    {error, eacces} ->
-        {stop, {file_permission_error, Filename}};
-    Error ->
-        {stop, Error}
+    {error, Reason} ->
+        ReasonStr = file:format_error(Reason),
+        io:format("Error opening log file ~s: ~s", [Filename, ReasonStr]),
+        {stop, {error, ReasonStr, Filename}}
     end.
 
 debug_on() ->

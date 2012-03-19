@@ -187,13 +187,10 @@ parse_ini_file(IniFile) ->
     case file:read_file(IniFilename) of
         {ok, IniBin0} ->
             IniBin0;
-        {error, eacces} ->
-            throw({file_permission_error, IniFile});
-        {error, enoent} ->
-            Fmt = "Couldn't find server configuration file ~s.",
-            Msg = ?l2b(io_lib:format(Fmt, [IniFilename])),
-            ?LOG_ERROR("~s~n", [Msg]),
-            throw({startup_error, Msg})
+        {error, Reason} = Error ->
+            ?LOG_ERROR("Could not read server configuration file ~s: ~s",
+                [IniFilename, file:format_error(Reason)]),
+            throw(Error)
     end,
 
     Lines = re:split(IniBin, "\r\n|\n|\r|\032", [{return, list}]),
