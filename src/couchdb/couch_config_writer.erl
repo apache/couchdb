@@ -22,6 +22,8 @@
 
 -export([save_to_file/2]).
 
+-include("couch_db.hrl").
+
 %% @spec save_to_file(
 %%           Config::{{Section::string(), Option::string()}, Value::string()},
 %%           File::filename()) -> ok
@@ -38,9 +40,9 @@ save_to_file({{Section, Key}, Value}, File) ->
     case file:write_file(File, NewFileContents) of
     ok ->
         ok;
-    {error, eacces} ->
-        {file_permission_error, File};
-    Error ->
+    {error, Reason} = Error ->
+        ?LOG_ERROR("Couldn't write config file ~s: ~s",
+            [File, file:format_error(Reason)]),
         Error
     end.
 

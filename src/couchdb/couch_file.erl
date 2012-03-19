@@ -53,10 +53,7 @@ open(Filepath, Options) ->
             {trap_exit, true} -> receive {'EXIT', Pid, _} -> ok end;
             {trap_exit, false} -> ok
             end,
-            case Error of
-            {error, eacces} -> {file_permission_error, Filepath};
-            _ -> Error
-            end
+            Error
         end;
     Error ->
         Error
