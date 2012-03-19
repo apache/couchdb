@@ -369,7 +369,9 @@ handle_info({'DOWN', _, _, _, {DbName, Sig, Reply}}, Server) ->
     case Reply of {ok, NewPid} ->
         link(NewPid),
         add_to_ets(NewPid, DbName, Sig);
-     _ -> ok end,
+     _ ->
+        ets:delete(group_servers_by_sig, {DbName, Sig})
+    end,
     {noreply, Server}.
 
 add_to_ets(Pid, DbName, Sig) ->
