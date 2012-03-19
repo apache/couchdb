@@ -97,6 +97,10 @@ Futon:
  * Futon remembers view code every time it is saved, allowing to save an
    edit that amounts to a revert.
 
+Log System:
+
+ * Log correct stacktrace in all cases.
+
 Version 1.1.1
 -------------
 

@@ -52,7 +52,7 @@ This release contains backwards incompatible changes.
  * Made icu_driver work with Erlang R15B and later.
  * Improvements to the build system and etap test suite.
  * Avoid invalidating view indexes when running out of file descriptors.
-
+ * Log correct stacktrace in all cases.
 
 Version 1.1.1
 -------------
