@@ -26,7 +26,6 @@ This release contains backwards incompatible changes.
  * Updated bundled erlang_oauth library to the latest version.
  * cURL is no longer required to build CouchDB as it is only
    required by the command line JS test runner.
- * Fixed problems building against some SpiderMonkey installations.
  * Added a native JSON parser.
  * Optional file compression (database and view index files). This feature
    is enabled by default.
