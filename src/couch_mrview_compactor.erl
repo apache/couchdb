@@ -168,7 +168,6 @@ swap_compacted(OldState, NewState) ->
     ok = file:rename(CompactFName, IndexFName),
 
     unlink(OldState#mrst.fd),
-    couch_ref_counter:drop(OldState#mrst.refc),
-    {ok, NewRefCounter} = couch_ref_counter:start([NewState#mrst.fd]),
+    erlang:demonitor(OldState#mrst.fd_monitor, [flush]),
     
-    {ok, NewState#mrst{refc=NewRefCounter}}.
+    {ok, NewState}.

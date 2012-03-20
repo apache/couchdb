@@ -47,7 +47,7 @@ get_view(Db, DDoc, ViewName, Args0) ->
         {ok, _} = Resp -> Resp;
         Error -> throw(Error)
     end,
-    couch_ref_counter:add(State#mrst.refc),
+    Ref = erlang:monitor(process, State#mrst.fd),
     if Args2#mrargs.stale == update_after ->
         spawn(fun() -> catch couch_index:get_state(Pid, DbUpdateSeq) end);
         true -> ok
@@ -56,7 +56,7 @@ get_view(Db, DDoc, ViewName, Args0) ->
     {Type, View, Args3} = extract_view(Lang, Args2, ViewName, Views),
     check_range(Args3, view_cmp(View)),
     Sig = view_sig(Db, State, View, Args3),
-    {ok, {Type, View}, Sig, Args3}.
+    {ok, {Type, View, Ref}, Sig, Args3}.
 
 
 ddoc_to_mrst(DbName, #doc{id=Id, body={Fields}}) ->
@@ -196,6 +196,7 @@ init_state(Db, Fd, State, Header) ->
 
     State#mrst{
         fd=Fd,
+        fd_monitor=erlang:monitor(process, Fd),
         update_seq=Seq,
         purge_seq=PurgeSeq,
         id_btree=IdBtree,

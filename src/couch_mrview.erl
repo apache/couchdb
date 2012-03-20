@@ -80,10 +80,14 @@ query_view(Db, DDoc, VName, Args0, Callback, Acc0) ->
     query_view(Db, VInfo, Args, Callback, Acc1).
 
 
-query_view(Db, {Type, View}, Args, Callback, Acc) ->
-    case Type of
-        map -> map_fold(Db, View, Args, Callback, Acc);
-        red -> red_fold(Db, View, Args, Callback, Acc)
+query_view(Db, {Type, View, Ref}, Args, Callback, Acc) ->
+    try
+        case Type of
+            map -> map_fold(Db, View, Args, Callback, Acc);
+            red -> red_fold(Db, View, Args, Callback, Acc)
+        end
+    after
+        erlang:demonitor(Ref, [flush])
     end.
 
 
