@@ -15,15 +15,20 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
--define(SIZE_BLOCK, 4096).
+
+-define(INITIAL_WAIT, 60000).
+-define(MONITOR_CHECK, 10000).
+-define(SIZE_BLOCK, 16#1000). % 4 KiB
+
 
 -record(file, {
     fd,
-    eof = 0
+    eof = 0,
+    db_pid
 }).
 
 % public API
--export([open/1, open/2, close/1, bytes/1, sync/1, truncate/2]).
+-export([open/1, open/2, close/1, bytes/1, sync/1, truncate/2, set_db_pid/2]).
 -export([pread_term/2, pread_iolist/2, pread_binary/2]).
 -export([append_binary/2, append_binary_md5/2]).
 -export([append_raw_chunk/2, assemble_file_chunk/1, assemble_file_chunk/2]).
@@ -34,6 +39,7 @@
 % gen_server callbacks
 -export([init/1, terminate/2, code_change/3]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
+
 
 %%----------------------------------------------------------------------
 %% Args:   Valid Options are [create] and [create,overwrite].
@@ -72,6 +78,10 @@ open(Filepath, Options) ->
         % be more informative. It will likely appear in the SASL log, anyway.
         Error
     end.
+
+
+set_db_pid(Fd, Pid) ->
+    gen_server:call(Fd, {set_db_pid, Pid}).
 
 
 %%----------------------------------------------------------------------
@@ -267,8 +277,6 @@ write_header(Fd, Data) ->
     gen_server:call(Fd, {write_header, FinalBin}, infinity).
 
 
-
-
 init_status_error(ReturnPid, Ref, Error) ->
     ReturnPid ! {Ref, self(), Error},
     ignore.
@@ -295,6 +303,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                     ok = file:truncate(Fd),
                     ok = file:sync(Fd),
                     maybe_track_open_os_files(Options),
+                    erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
                     {ok, #file{fd=Fd}};
                 false ->
                     ok = file:close(Fd),
@@ -302,6 +311,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                 end;
             false ->
                 maybe_track_open_os_files(Options),
+                erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
                 {ok, #file{fd=Fd}}
             end;
         Error ->
@@ -315,6 +325,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
             ok = file:close(Fd_Read),
             maybe_track_open_os_files(Options),
             {ok, Eof} = file:position(Fd, eof),
+            erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
             {ok, #file{fd=Fd, eof=Eof}};
         Error ->
             init_status_error(ReturnPid, Ref, Error)
@@ -364,6 +375,14 @@ handle_call({pread_iolist, Pos}, _From, File) ->
 handle_call(bytes, _From, #file{fd = Fd} = File) ->
     {reply, file:position(Fd, eof), File};
 
+handle_call({set_db_pid, Pid}, _From, #file{db_pid=OldPid}=File) ->
+    case is_pid(OldPid) of
+        true -> unlink(OldPid);
+        false -> ok
+    end,
+    link(Pid),
+    {reply, ok, File#file{db_pid=Pid}, 0};
+
 handle_call(sync, _From, #file{fd=Fd}=File) ->
     {reply, file:sync(Fd), File};
 
@@ -410,6 +429,21 @@ handle_cast(close, Fd) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+handle_info(maybe_close, File) ->
+    case is_idle() of
+        true ->
+            {stop, normal, File};
+        false ->
+            erlang:send_after(?MONITOR_CHECK, self(), maybe_close),
+            {noreply, File}
+    end;
+
+handle_info({'EXIT', Pid, _}, #file{db_pid=Pid}=File) ->
+    case is_idle() of
+        true -> {stop, normal, File};
+        false -> {noreply, File}
+    end;
 
 handle_info({'EXIT', _, normal}, Fd) ->
     {noreply, Fd};
@@ -530,3 +564,11 @@ split_iolist([Sublist| Rest], SplitAt, BeginAcc) when is_list(Sublist) ->
     end;
 split_iolist([Byte | Rest], SplitAt, BeginAcc) when is_integer(Byte) ->
     split_iolist(Rest, SplitAt - 1, [Byte | BeginAcc]).
+
+
+is_idle() ->
+    case process_info(self(), monitored_by) of
+        {monitored_by, []} -> true;
+        {monitored_by, [_]} -> true;
+        _ -> false
+    end.

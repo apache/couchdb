@@ -85,21 +85,14 @@ track_process_count(Stat) ->
     track_process_count(self(), Stat).
 
 track_process_count(Pid, Stat) ->
-    MonitorFun = fun() ->
-        Ref = erlang:monitor(process, Pid),
-        receive {'DOWN', Ref, _, _, _} -> ok end,
-        couch_stats_collector:decrement(Stat)
-    end,
-    case (catch couch_stats_collector:increment(Stat)) of
-        ok -> spawn(MonitorFun);
-        _ -> ok
-    end.
+    ok = couch_stats_collector:increment(Stat),
+    gen_server:cast(?MODULE, {track_process_count, Pid, Stat}).
 
 
 init(_) ->
     ets:new(?HIT_TABLE, [named_table, set, public]),
     ets:new(?ABS_TABLE, [named_table, duplicate_bag, public]),
-    {ok, nil}.
+    {ok, []}.
 
 terminate(_Reason, _State) ->
     ok.
@@ -107,11 +100,14 @@ terminate(_Reason, _State) ->
 handle_call(stop, _, State) ->
     {stop, normal, stopped, State}.
 
-handle_cast(foo, State) ->
-    {noreply, State}.
+handle_cast({track_process_count, Pid, Stat}, State) ->
+    Ref = erlang:monitor(process, Pid),
+    {noreply, [{Ref, Stat} | State]}.
 
-handle_info(_Info, State) ->
-    {noreply, State}.
+handle_info({'DOWN', Ref, _, _, _}, State) ->
+    {Ref, Stat} = lists:keyfind(Ref, 1, State),
+    ok = couch_stats_collector:decrement(Stat),
+    {noreply, lists:keydelete(Ref, 1, State)}.
 
 code_change(_OldVersion, State, _Extra) ->
     {ok, State}.

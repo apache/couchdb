@@ -153,7 +153,6 @@ handle_db_event({Event, DbName}) ->
 
 
 handle_call(reinit_cache, _From, State) ->
-    catch erlang:demonitor(State#state.db_mon_ref, [flush]),
     exec_if_auth_db(fun(AuthDb) -> catch couch_db:close(AuthDb) end),
     {reply, ok, reinit_cache(State)};
 
@@ -231,7 +230,7 @@ reinit_cache(State) ->
     true = ets:insert(?STATE, {auth_db_name, AuthDbName}),
     AuthDb = open_auth_db(),
     true = ets:insert(?STATE, {auth_db, AuthDb}),
-    NewState#state{db_mon_ref = couch_db:monitor(AuthDb)}.
+    NewState#state{db_mon_ref = AuthDb#db.fd_monitor}.
 
 
 add_cache_entry(_, _, _, #state{max_cache_size = 0} = State) ->

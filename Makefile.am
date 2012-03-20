@@ -65,7 +65,6 @@ source_files = \
     src/couch_passwords.erl \
     src/couch_primary_sup.erl \
     src/couch_query_servers.erl \
-    src/couch_ref_counter.erl \
     src/couch_secondary_sup.erl \
     src/couch_server.erl \
     src/couch_server_sup.erl \
@@ -124,7 +123,6 @@ compiled_files = \
     ebin/couch_passwords.beam \
     ebin/couch_primary_sup.beam \
     ebin/couch_query_servers.beam \
-    ebin/couch_ref_counter.beam \
     ebin/couch_secondary_sup.beam \
     ebin/couch_server.beam \
     ebin/couch_server_sup.beam \
