@@ -15,6 +15,7 @@ This release contains backwards incompatible changes.
  * Updated bundled erlang_oauth library to the latest version.
  * cURL is no longer required to build CouchDB as it is only
    required by the command line JS test runner.
+ * Fixed problems building against some SpiderMonkey installations.
  * Added a native JSON parser.
  * Optional file compression (database and view index files). This feature
    is enabled by default.
@@ -43,8 +44,7 @@ This release contains backwards incompatible changes.
  * Documents in the _users database can no longer be read by everyone.
  * Confidential information in the _replication database can no longer
    be read by everyone.
- * Password hashes are now calculated by CouchDB instead of the
-   client.
+ * Password hashes are now calculated by CouchDB instead of the client.
  * Allow persistent authentication cookies.
  * The requested_path property of query server request objects now has
    the path requested by clients before VHosts and rewriting.

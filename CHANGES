@@ -30,6 +30,8 @@ Build System:
    passing -H on the command line.
  * Temporarily made `make check` pass with R15B. A more thorough
    fix is in the works (COUCHDB-1424).
+ * Fixed --with-js-include and --with-js-lib options.
+ * Added --with-js-lib-name option.
 
 HTTP Interface:
 
