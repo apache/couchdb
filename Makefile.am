@@ -59,6 +59,7 @@ source_files = \
     src/couch_httpd_vhost.erl \
     src/couch_key_tree.erl \
     src/couch_log.erl \
+	src/couch_lru.erl \
     src/couch_native_process.erl \
     src/couch_os_daemons.erl \
     src/couch_os_process.erl \
@@ -117,6 +118,7 @@ compiled_files = \
     ebin/couch_httpd_vhost.beam \
     ebin/couch_key_tree.beam \
     ebin/couch_log.beam \
+	ebin/couch_lru.beam \
     ebin/couch_native_process.beam \
     ebin/couch_os_daemons.beam \
     ebin/couch_os_process.beam \
