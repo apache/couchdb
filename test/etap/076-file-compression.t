@@ -141,15 +141,10 @@ refresh_index() ->
 
 compact_db() ->
     {ok, Db} = couch_db:open_int(test_db_name(), []),
-    {ok, CompactPid} = couch_db:start_compact(Db),
-    MonRef = erlang:monitor(process, CompactPid),
-    receive
-    {'DOWN', MonRef, process, CompactPid, normal} ->
-        ok;
-    {'DOWN', MonRef, process, CompactPid, Reason} ->
-        etap:bail("Error compacting database: " ++ couch_util:to_list(Reason))
-    after 120000 ->
-        etap:bail("Timeout waiting for database compaction")
+    {ok, CPid} = couch_db:start_compact(Db),
+    case couch_db:wait_for_compaction(Db, 120000) of
+        timeout -> etap:bail("Timeout waiting for database compaction");
+        ok -> ok
     end,
     ok = couch_db:close(Db).
 

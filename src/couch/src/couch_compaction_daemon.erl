@@ -130,12 +130,14 @@ compact_loop(Parent) ->
 
 
 maybe_compact_db(DbName, Config) ->
+    etap:diag("~n~n~n~n################~nCOMPACTING: ~p~n#############~n~n",
+        [DbName]),
     case (catch couch_db:open_int(DbName, [{user_ctx, #user_ctx{roles=[<<"_admin">>]}}])) of
     {ok, Db} ->
         DDocNames = db_ddoc_names(Db),
         case can_db_compact(Config, Db) of
         true ->
-            {ok, DbCompactPid} = couch_db:start_compact(Db),
+            {ok, _} = couch_db:start_compact(Db),
             TimeLeft = compact_time_left(Config),
             case Config#config.parallel_view_compact of
             true ->
@@ -147,27 +149,23 @@ maybe_compact_db(DbName, Config) ->
                 ViewsCompactPid = nil,
                 ViewsMonRef = nil
             end,
-            DbMonRef = erlang:monitor(process, DbCompactPid),
-            receive
-            {'DOWN', DbMonRef, process, _, normal} ->
-                couch_db:close(Db),
-                case Config#config.parallel_view_compact of
-                true ->
-                    ok;
-                false ->
-                    maybe_compact_views(DbName, DDocNames, Config)
-                end;
-            {'DOWN', DbMonRef, process, _, Reason} ->
-                couch_db:close(Db),
-                ?LOG_ERROR("Compaction daemon - an error ocurred while"
-                    " compacting the database `~s`: ~p", [DbName, Reason])
-            after TimeLeft ->
-                ?LOG_INFO("Compaction daemon - canceling compaction for database"
-                    " `~s` because it's exceeding the allowed period.",
-                    [DbName]),
-                erlang:demonitor(DbMonRef, [flush]),
-                ok = couch_db:cancel_compact(Db),
-                couch_db:close(Db)
+            case couch_db:wait_for_compaction(Db, TimeLeft) of
+                ok ->
+                    couch_db:close(Db),
+                    case Config#config.parallel_view_compact of
+                        true -> ok;
+                        false -> maybe_compact_views(DbName, DDocNames, Config)
+                    end;
+                {error, timeout} ->
+                    ?LOG_INFO("Compaction daemon - canceling compaction "
+                        "for databaes `~s` because exceeded the allowed time.",
+                        [DbName]),
+                    ok = couch_db:cancel_compact(Db),
+                    couch_db:close(Db);
+                {error, Reason} ->
+                    couch_db:close(Db),
+                    ?LOG_ERROR("Compaction daemon - an error ocurred while"
+                        " compacting the database `~s`: ~p", [DbName, Reason])
             end,
             case ViewsMonRef of
             nil ->

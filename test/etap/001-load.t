@@ -45,7 +45,6 @@ main(_) ->
         couch_log,
         couch_os_process,
         couch_query_servers,
-        couch_ref_counter,
         couch_server,
         couch_server_sup,
         couch_stats_aggregator,

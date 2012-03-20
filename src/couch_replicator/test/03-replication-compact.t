@@ -26,11 +26,10 @@
 
 -record(db, {
     main_pid = nil,
-    update_pid = nil,
     compactor_pid = nil,
     instance_start_time, % number of microsecs since jan 1 1970 as a binary string
     fd,
-    fd_ref_counter,
+    fd_monitor,
     header = nil,
     committed_update_seq,
     fulldocinfo_by_id_btree,
@@ -138,13 +137,13 @@ populate_and_compact_test(RepPid, SourceDb0, TargetDb0) ->
             etap:is(is_process_alive(RepPid), true,
                 "Replication process is alive after source database compaction"),
             check_db_alive("source", SourceDb),
-            check_ref_counter("source", SourceDb),
+            check_fd("source", SourceDb),
 
             compact_db("target", TargetDb),
             etap:is(is_process_alive(RepPid), true,
                 "Replication process is alive after target database compaction"),
             check_db_alive("target", TargetDb),
-            check_ref_counter("target", TargetDb),
+            check_fd("target", TargetDb),
 
             {ok, SourceDb2} = reopen_db(SourceDb),
             {ok, TargetDb2} = reopen_db(TargetDb),
@@ -157,7 +156,7 @@ populate_and_compact_test(RepPid, SourceDb0, TargetDb0) ->
                 "Replication process is alive after source database compaction"),
             check_db_alive("source", SourceDb2),
             pause_writer(Writer),
-            check_ref_counter("source", SourceDb2),
+            check_fd("source", SourceDb2),
             resume_writer(Writer),
 
             compact_db("target", TargetDb2),
@@ -165,7 +164,7 @@ populate_and_compact_test(RepPid, SourceDb0, TargetDb0) ->
                 "Replication process is alive after target database compaction"),
             check_db_alive("target", TargetDb2),
             pause_writer(Writer),
-            check_ref_counter("target", TargetDb2),
+            check_fd("target", TargetDb2),
             resume_writer(Writer),
 
             {ok, SourceDb3} = reopen_db(SourceDb2),
@@ -200,18 +199,32 @@ compact_db(Type, #db{name = Name}) ->
     ok = couch_db:close(Db).
 
 
-check_ref_counter(Type, #db{name = Name, fd_ref_counter = OldRefCounter}) ->
-    MonRef = erlang:monitor(process, OldRefCounter),
-    receive
-    {'DOWN', MonRef, process, OldRefCounter, _} ->
-        etap:diag("Old " ++ Type ++ " database ref counter terminated")
+check_fd(Type, #db{name = Name, fd = Fd, fd_monitor=OldMonRef}) ->
+    {_, MonRef} = spawn_monitor(fun() ->
+        MC = fun(F) ->
+            % Speed up the close after the switch
+            Fd ! maybe_close,
+            {ok, Db} = couch_db:open_int(Name, []),
+            couch_db:close(Db),
+            case Db#db.fd of
+                Fd ->
+                    receive _ -> ok after 1000 -> ok end,
+                    F(F);
+                _ ->
+                    ok
+            end
+        end,
+        MC(MC)
+    end),
+    receive {'DOWN', MonRef, process, _, _} ->
+        etap:diag("Old " ++ Type ++ " database fd terminated")
     after 30000 ->
-        etap:bail("Old " ++ Type ++ " database ref counter didn't terminate")
+        etap:bail("Old " ++ Type ++ " database fd didn't terminate")
     end,
-    {ok, #db{fd_ref_counter = NewRefCounter} = Db} = couch_db:open_int(Name, []),
+    {ok, #db{fd_monitor = NewMonRef} = Db} = couch_db:open_int(Name, []),
     ok = couch_db:close(Db),
     etap:isnt(
-        NewRefCounter, OldRefCounter, Type ++ " database has new ref counter").
+        NewMonRef, OldMonRef, Type ++ " database has new fd monitor").
 
 
 reopen_db(#db{name = Name}) ->

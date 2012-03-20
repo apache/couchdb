@@ -327,6 +327,13 @@ handle_call({open_result, DbName, {ok, OpenedDbPid}, Options}, _From, Server) ->
     false ->
         ok
     end,
+    case lists:member(sys_db, Options) of
+    false ->
+        Stat = {couchdb, open_databases},
+        couch_stats_collector:track_process_count(OpenedDbPid, Stat);
+    true ->
+        ok
+    end,
     {reply, ok, Server};
 handle_call({open_result, DbName, {error, eexist}, Options}, From, Server) ->
     handle_call({open_result, DbName, file_exists, Options}, From, Server);
