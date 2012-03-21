@@ -264,7 +264,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                     {ok, #file{fd=Fd}};
                 false ->
                     ok = file:close(Fd),
-                    init_status_error(ReturnPid, Ref, file_exists)
+                    init_status_error(ReturnPid, Ref, {error, eexist})
                 end;
             false ->
                 maybe_track_open_os_files(Options),
