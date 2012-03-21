@@ -53,14 +53,14 @@ open(Filepath, Options) ->
     ignore ->
         % get the error
         receive
-        {Ref, Pid, Reason} ->
+        {Ref, Pid, {error, Reason} = Error} ->
             case process_info(self(), trap_exit) of
             {trap_exit, true} -> receive {'EXIT', Pid, _} -> ok end;
             {trap_exit, false} -> ok
             end,
             ?LOG_ERROR("Error opening file ~s: ~s",
                 [Filepath, file:format_error(Reason)]),
-            Reason
+            Error
         end;
     Error ->
         % We can't say much here, because it could be any kind of error.
