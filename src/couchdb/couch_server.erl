@@ -323,6 +323,8 @@ handle_call({open_result, DbName, {ok, OpenedDbPid}, Options}, _From, Server) ->
         ok
     end,
     {reply, ok, Server};
+handle_call({open_result, DbName, {error, eexist}, Options}, From, Server) ->
+    handle_call({open_result, DbName, file_exists, Options}, From, Server);
 handle_call({open_result, DbName, Error, Options}, _From, Server) ->
     [{DbName, {opening,Opener,Froms}}] = ets:lookup(couch_dbs_by_name, DbName),
     lists:foreach(fun(From) ->
