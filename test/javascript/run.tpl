@@ -36,23 +36,15 @@ else
     fi
 fi
 
-
-
-# stop CouchDB on exit from various signals
-abort() {
-	trap - 0
-	./utils/run -d
-	exit 2
-}
-
 # start CouchDB
 if [ -z $COUCHDB_NO_START ]; then
         make dev
-	trap 'abort' 0 1 2 3 4 6 8 15
 	./utils/run -b -r 1 -n \
 		-a $SRC_DIR/etc/couchdb/default_dev.ini \
 		-a $SRC_DIR/test/random_port.ini \
 		-a $SRC_DIR/etc/couchdb/local_dev.ini
+    RUN_PID=$!
+    trap "./utils/run -d || kill $RUN_PID || exit 2" EXIT
 	sleep 1 # give it a sec
 fi
 
@@ -67,12 +59,5 @@ $COUCHJS -H -u $COUCH_URI_FILE \
 	$TEST_SRC \
 	$JS_TEST_DIR/couch_http.js \
 	$JS_TEST_DIR/cli_runner.js
-RESULT=$?
 
-if [ -z $COUCHDB_NO_START ]; then
-	# stop CouchDB
-	./utils/run -d
-	trap - 0
-fi
-
-exit $RESULT
+exit $?

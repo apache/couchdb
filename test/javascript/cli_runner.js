@@ -17,6 +17,29 @@ var console = {
   }
 };
 
+var fmtStack = function(stack) {
+  if(!stack) {
+    console.log("No stack information");
+    return;
+  }
+  console.log("Trace back (most recent call first):\n");
+  var re = new RegExp("(.*?)@([^:]*):(.*)$");
+  var lines = stack.split("\n");
+  for(var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+    if(!line.length) continue;
+    var match = re.exec(line);
+    if(!match) continue
+    var source = match[1].substr(0, 70);
+    var file = match[2];
+    var lnum = match[3];
+    while(lnum.length < 3) lnum = " " + lnum;
+    console.log(" " + lnum + ": " + file);
+    console.log("      " + source);
+  }
+}
+
+
 function T(arg1, arg2) {
   if(!arg1) {
     var result = (arg2 ? arg2 : arg1);
@@ -32,10 +55,8 @@ function runTestConsole(num, name, func) {
     print("ok " + num + " " + name);
   } catch(e) {
     print("not ok " + num + " " + name);
-    console.log(e.toSource());
-    if (e.stack) {
-      console.log("Stacktrace:\n" + e.stack.replace(/^/gm, "\t"));
-    }
+    console.log("Reason: " + e.message);
+    fmtStack(e.stack);
   }
   return passed;
 }
@@ -52,7 +73,12 @@ function runAllTestsConsole() {
       numPassed++;
     }
   }
-  T(numPassed == numTests, "All JS CLI tests should pass.");
+  if(numPassed != numTests) {
+    console.log("Test failures: " + (numTests - numPassed));
+    quit(1);
+  } else {
+    console.log("All tests passed");
+  }
 };
 
 waitForSuccess(CouchDB.getVersion);
