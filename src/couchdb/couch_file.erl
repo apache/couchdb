@@ -58,8 +58,12 @@ open(Filepath, Options) ->
             {trap_exit, true} -> receive {'EXIT', Pid, _} -> ok end;
             {trap_exit, false} -> ok
             end,
-            ?LOG_DEBUG("Could not open file ~s: ~s",
-                [Filepath, file:format_error(Reason)]),
+            case {lists:member(nologifmissing, Options), Reason} of
+            {true, enoent} -> ok;
+            _ ->
+            ?LOG_ERROR("Could not open file ~s: ~s",
+                [Filepath, file:format_error(Reason)])
+            end,
             Error
         end;
     Error ->
