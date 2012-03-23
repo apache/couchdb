@@ -437,4 +437,24 @@ couchTests.rewrite = function(debug) {
   var res = CouchDB.request("GET", "/test_suite_db/_design/invalid/_rewrite/foo");
   TEquals(400, res.status, "should return 400");
 
+  var ddoc_requested_path = {
+    _id: "_design/requested_path",
+    rewrites:[
+        {"from": "show", "to": "_show/origin/0"},
+        {"from": "show_rewritten", "to": "_rewrite/show"}
+    ],
+    shows: {
+        origin: stringFun(function(doc, req) {
+            return req.headers["x-couchdb-requested-path"];
+    })}
+  };
+
+  db.save(ddoc_requested_path);
+  var url = "/test_suite_db/_design/requested_path/_rewrite/show";
+  var res = CouchDB.request("GET", url);
+  TEquals(url, res.responseText, "should return the original url");
+
+  var url = "/test_suite_db/_design/requested_path/_rewrite/show_rewritten";
+  var res = CouchDB.request("GET", url);
+  TEquals(url, res.responseText, "returned the original url");
 }

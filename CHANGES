@@ -10,6 +10,11 @@ Source Repository:
 
  * The source repository was migrated from SVN to Git.
 
+HTTP Interface:
+
+ * No longer rewrites the X-CouchDB-Requested-Path during recursive
+   calls to the rewriter.
+
 Storage System:
 
  * Fixed unnecessary conflict when deleting and creating a
