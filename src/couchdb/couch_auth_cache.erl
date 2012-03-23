@@ -386,7 +386,7 @@ get_user_props_from_db(UserName) ->
     ).
 
 ensure_users_db_exists(DbName, Options) ->
-    Options1 = [{user_ctx, #user_ctx{roles=[<<"_admin">>]}} | Options],
+    Options1 = [{user_ctx, #user_ctx{roles=[<<"_admin">>]}}, nologifmissing | Options],
     case couch_db:open(DbName, Options1) of
     {ok, Db} ->
         ensure_auth_ddoc_exists(Db, <<"_design/_auth">>),

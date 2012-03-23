@@ -51,7 +51,7 @@ open_db_file(Filepath, Options) ->
     {error, enoent} ->
         % couldn't find file. is there a compact version? This can happen if
         % crashed during the file switch.
-        case couch_file:open(Filepath ++ ".compact") of
+        case couch_file:open(Filepath ++ ".compact", [nologifmissing]) of
         {ok, Fd} ->
             ?LOG_INFO("Found ~s~s compaction file, using as primary storage.", [Filepath, ".compact"]),
             ok = file:rename(Filepath ++ ".compact", Filepath),

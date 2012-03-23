@@ -579,7 +579,7 @@ zone(Hr, Min) ->
 ensure_rep_db_exists() ->
     DbName = ?l2b(couch_config:get("replicator", "db", "_replicator")),
     UserCtx = #user_ctx{roles = [<<"_admin">>, <<"_replicator">>]},
-    case couch_db:open_int(DbName, [sys_db, {user_ctx, UserCtx}]) of
+    case couch_db:open_int(DbName, [sys_db, {user_ctx, UserCtx}, nologifmissing]) of
     {ok, Db} ->
         Db;
     _Error ->
