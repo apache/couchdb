@@ -812,8 +812,10 @@ error_info({error, illegal_database_name}) ->
 error_info({missing_stub, Reason}) ->
     {412, <<"missing_stub">>, Reason};
 error_info({Error, Reason}) ->
+    ?LOG_ERROR("Uncaught server error: ~p", [{Error, Reason}]),
     {500, couch_util:to_binary(Error), couch_util:to_binary(Reason)};
 error_info(Error) ->
+    ?LOG_ERROR("Uncaught server error: ~p", [Error]),
     {500, <<"unknown_error">>, couch_util:to_binary(Error)}.
 
 error_headers(#httpd{mochi_req=MochiReq}=Req, Code, ErrorStr, ReasonStr) ->
