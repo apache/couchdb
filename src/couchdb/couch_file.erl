@@ -53,7 +53,7 @@ open(Filepath, Options) ->
             {trap_exit, true} -> receive {'EXIT', Pid, _} -> ok end;
             {trap_exit, false} -> ok
             end,
-            ?LOG_ERROR("Error opening file ~s: ~s",
+            ?LOG_DEBUG("Could not open file ~s: ~s",
                 [Filepath, file:format_error(Reason)]),
             Error
         end;
