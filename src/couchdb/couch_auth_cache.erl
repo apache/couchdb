@@ -367,7 +367,7 @@ exec_if_auth_db(Fun, DefRes) ->
 
 open_auth_db() ->
     [{auth_db_name, DbName}] = ets:lookup(?STATE, auth_db_name),
-    {ok, AuthDb} = ensure_users_db_exists(DbName),
+    {ok, AuthDb} = ensure_users_db_exists(DbName, [sys_db]),
     AuthDb.
 
 
@@ -388,15 +388,17 @@ get_user_props_from_db(UserName) ->
         nil
     ).
 
-ensure_users_db_exists(DbName) ->
-    Options1 = [
-        create,
-        {user_ctx, #user_ctx{roles=[<<"_admin">>]}},
-        sys_db
-    ],
-    {ok, Db} = couch_db:open(DbName, Options1),
-    ok = ensure_auth_ddoc_exists(Db, <<"_design/_auth">>),
-    {ok, Db}.
+ensure_users_db_exists(DbName, Options) ->
+    Options1 = [{user_ctx, #user_ctx{roles=[<<"_admin">>]}} | Options],
+    case couch_db:open(DbName, Options1) of
+    {ok, Db} ->
+        ensure_auth_ddoc_exists(Db, <<"_design/_auth">>),
+        {ok, Db};
+    _Error ->
+        {ok, Db} = couch_db:create(DbName, Options1),
+        ok = ensure_auth_ddoc_exists(Db, <<"_design/_auth">>),
+        {ok, Db}
+    end.
 
 ensure_auth_ddoc_exists(Db, DDocId) ->
     case couch_db:open_doc(Db, DDocId) of

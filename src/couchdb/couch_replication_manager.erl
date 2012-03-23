@@ -565,11 +565,15 @@ zone(Hr, Min) ->
 ensure_rep_db_exists() ->
     DbName = ?l2b(couch_config:get("replicator", "db", "_replicator")),
     Opts = [
-        create,
         {user_ctx, #user_ctx{roles=[<<"_admin">>, <<"_replicator">>]}},
         sys_db
     ],
-    {ok, Db} = couch_db:open(DbName, Opts),
+    case couch_db:open(DbName, Opts) of
+    {ok, Db} ->
+        Db;
+    _Error ->
+        {ok, Db} = couch_db:create(DbName, Opts)
+    end,
     ok = ensure_rep_ddoc_exists(Db, <<"_design/_replicator">>),
     {ok, Db}.
 
