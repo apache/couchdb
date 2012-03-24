@@ -2,7 +2,7 @@ before_install:
    - sudo apt-get update
    - sudo apt-get install libicu-dev libmozjs-dev
 before_script: ./bootstrap && ./configure
-script: make check
+script: make distcheck
 language: erlang
 otp_release:
    - R14B04
