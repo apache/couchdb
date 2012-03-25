@@ -1280,6 +1280,7 @@ couchTests.replication = function(debug) {
 
     // delete docs from source
     TEquals(true, sourceDb.deleteDoc(newDocs[0]).ok);
+    wait(1000);
     TEquals(true, sourceDb.deleteDoc(newDocs[6]).ok);
 
     waitForSeq(sourceDb, targetDb);
