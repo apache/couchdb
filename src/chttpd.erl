@@ -172,8 +172,25 @@ handle_request(MochiReq) ->
         Meth -> couch_util:to_existing_atom(Meth)
     end,
     increment_method_stats(Method1),
+
+    % allow broken HTTP clients to fake a full method vocabulary with an X-HTTP-METHOD-OVERRIDE header
+    MethodOverride = MochiReq:get_primary_header_value("X-HTTP-Method-Override"),
+    Method2 = case lists:member(MethodOverride, ["GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT", "COPY"]) of
+    true ->
+        ?LOG_INFO("MethodOverride: ~s (real method was ~s)", [MethodOverride, Method1]),
+        case Method1 of
+        'POST' -> couch_util:to_existing_atom(MethodOverride);
+        _ ->
+            % Ignore X-HTTP-Method-Override when the original verb isn't POST.
+            % I'd like to send a 406 error to the client, but that'd require a nasty refactor.
+            % throw({not_acceptable, <<"X-HTTP-Method-Override may only be used with POST requests.">>})
+            Method1
+        end;
+    _ -> Method1
+    end,
+
     % alias HEAD to GET as mochiweb takes care of stripping the body
-    Method = case Method1 of
+    Method = case Method2 of
         'HEAD' -> 'GET';
         Other -> Other
     end,
