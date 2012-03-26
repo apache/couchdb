@@ -18,7 +18,10 @@
 
 -define(NAME, <<"name">>).
 -define(PASSWORD, <<"password">>).
--define(PASSWORD_SHA, <<"password_sha">>).
+-define(DERIVED_KEY, <<"derived_key">>).
+-define(PASSWORD_SCHEME, <<"password_scheme">>).
+-define(PBKDF2, <<"pbkdf2">>).
+-define(ITERATIONS, <<"iterations">>).
 -define(SALT, <<"salt">>).
 -define(replace(L, K, V), lists:keystore(K, 1, L, {K, V})).
 
@@ -60,10 +63,12 @@ save_doc(#doc{body={Body}} = Doc) ->
     undefined ->
         Doc;
     ClearPassword ->
-        Salt = ?b2l(couch_uuids:random()),
-        PasswordSha = couch_util:to_hex(crypto:sha(?b2l(ClearPassword) ++ Salt)),
-        Body1 = ?replace(Body, ?PASSWORD_SHA, ?l2b(PasswordSha)),
-        Body2 = ?replace(Body1, ?SALT, ?l2b(Salt)),
+        Iterations = list_to_integer(couch_config:get("couch_httpd_auth", "iterations", "1000")),
+        Salt = couch_uuids:random(),
+        DerivedKey = couch_passwords:pbkdf2(ClearPassword, Salt, Iterations),
+        Body0 = [{?PASSWORD_SCHEME, ?PBKDF2}, {?ITERATIONS, Iterations}|Body],
+        Body1 = ?replace(Body0, ?DERIVED_KEY, DerivedKey),
+        Body2 = ?replace(Body1, ?SALT, Salt),
         Body3 = proplists:delete(?PASSWORD, Body2),
         Doc#doc{body={Body3}}
     end.

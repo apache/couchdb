@@ -17,6 +17,7 @@ This version has not been released yet.
  * Speedup in the communication with external view servers.
  * Fixed unnecessary conflict when deleting and creating a
    document in the same batch.
+ * New and updated passwords are hashed using PBKDF2.
 
 Version 1.2.0
 -------------

@@ -23,6 +23,11 @@ Futon:
 
  * Added view request duration to Futon.
 
+Security:
+
+  * Passwords are now hashed using the PBKDF2 algorithm with a
+    configurable work factor.
+
 Version 1.2.0
 -------------
 
