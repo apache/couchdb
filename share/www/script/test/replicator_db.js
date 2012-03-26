@@ -1076,6 +1076,10 @@ couchTests.replicator_db = function(debug) {
     });
     TEquals(200, xhr.status);
 
+    // Temporary band-aid, give the replicator db some
+    // time to make the switch
+    wait(500);
+
     new_doc = {
       _id: "foo666",
       value: 666

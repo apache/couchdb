@@ -112,7 +112,7 @@ async_replicate(#rep{id = {BaseId, Ext}, source = Src, target = Tgt} = Rep) ->
         RepChildId,
         {gen_server, start_link, [?MODULE, Rep, [{timeout, Timeout}]]},
         temporary,
-        1,
+        250,
         worker,
         [?MODULE]
     },
@@ -332,6 +332,9 @@ do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
         }
     }.
 
+
+handle_info(shutdown, St) ->
+    {stop, shutdown, St};
 
 handle_info({'DOWN', Ref, _, _, Why}, #rep_state{source_monitor = Ref} = St) ->
     ?LOG_ERROR("Source database is down. Reason: ~p", [Why]),
