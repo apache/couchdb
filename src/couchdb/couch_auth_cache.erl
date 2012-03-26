@@ -51,7 +51,7 @@ get_user_creds(UserName) ->
         nil ->
             make_admin_doc(HashedPwd, Salt, [<<"_admin">>]);
         UserProps when is_list(UserProps) ->
-            make_admin_doc(HashedPwd, Salt, couch_util:get_value(<<"roles">>, UserProps))
+            make_admin_doc(HashedPwd, Salt, [<<"_admin">>|couch_util:get_value(<<"roles">>, UserProps)])
         end;
     "-pbkdf2-" ++ HashedPwdSaltAndIterations ->
         [HashedPwd, Salt, Iterations] = string:tokens(HashedPwdSaltAndIterations, ","),
