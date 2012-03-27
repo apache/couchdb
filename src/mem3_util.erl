@@ -16,8 +16,7 @@
 
 -export([hash/1, name_shard/2, create_partition_map/5, build_shards/2,
     n_val/2, z_val/3, to_atom/1, to_integer/1, write_db_doc/1, delete_db_doc/1,
-    load_shards_from_disk/1, load_shards_from_disk/2, shard_info/1,
-    ensure_exists/1, open_db_doc/1]).
+    shard_info/1, ensure_exists/1, open_db_doc/1]).
 
 -export([create_partition_map/4, name_shard/1]).
 -deprecated({create_partition_map, 4, eventually}).
@@ -99,6 +98,7 @@ write_db_doc(DbName, #doc{id=Id, body=Body} = Doc, ShouldMutate) ->
     end.
 
 delete_db_doc(DocId) ->
+    gen_server:cast(mem3_shards, {cache_remove, DocId}),
     DbName = ?l2b(couch_config:get("mem3", "shard_db", "dbs")),
     delete_db_doc(DbName, DocId, true).
 
@@ -175,25 +175,6 @@ z_val(N, _, _) when N < 1 ->
     1;
 z_val(N, _, _) ->
     N.
-
-load_shards_from_disk(DbName) when is_binary(DbName) ->
-    X = ?l2b(couch_config:get("mem3", "shard_db", "dbs")),
-    {ok, Db} = couch_db:open(X, []),
-    try load_shards_from_db(Db, DbName) after couch_db:close(Db) end.
-
-load_shards_from_db(#db{} = ShardDb, DbName) ->
-    case couch_db:open_doc(ShardDb, DbName, []) of
-    {ok, #doc{body = {Props}}} ->
-        twig:log(notice, "dbs cache miss for ~s", [DbName]),
-        build_shards(DbName, Props);
-    {not_found, _} ->
-        erlang:error(database_does_not_exist, ?b2l(DbName))
-    end.
-
-load_shards_from_disk(DbName, DocId)->
-    Shards = load_shards_from_disk(DbName),
-    HashKey = hash(DocId),
-    [S || #shard{range = [B,E]} = S <- Shards, B < HashKey, HashKey =< E].
 
 shard_info(DbName) ->
     [{n, mem3:n(DbName)},
