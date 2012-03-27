@@ -262,12 +262,12 @@ unpack_seqs(Packed, DbName) ->
 do_unpack_seqs(Opaque, DbName) ->
     % TODO relies on internal structure of fabric_dict as keylist
     lists:map(fun({Node, [A,B], Seq}) ->
-        Match = #shard{node=Node, range=[A,B], dbname=DbName, _ = '_'},
-        case ets:match_object(partitions, Match) of
-        [Shard] ->
+        case mem3:get_shard(DbName, Node, [A,B]) of
+        {ok, Shard} ->
             {Shard, Seq};
-        [] ->
-            {Match, Seq} % will be replaced in find_replacement_shards
+        {error, not_found} ->
+            PlaceHolder = #shard{node=Node, range=[A,B], dbname=DbName, _='_'},
+            {PlaceHolder, Seq} % will be replaced in find_replacement_shards
         end
     end, binary_to_term(couch_util:decodeBase64Url(Opaque))).
 

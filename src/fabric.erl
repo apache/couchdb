@@ -55,14 +55,14 @@ all_dbs() ->
 -spec all_dbs(Prefix::iodata()) -> {ok, [binary()]}.
 all_dbs(Prefix) when is_binary(Prefix) ->
     Length = byte_size(Prefix),
-    MatchingDbs = ets:foldl(fun(#shard{dbname=DbName}, Acc) ->
+    MatchingDbs = mem3:fold_shards(fun(#shard{dbname=DbName}, Acc) ->
         case DbName of
         <<Prefix:Length/binary, _/binary>> ->
             [DbName | Acc];
         _ ->
             Acc
         end
-    end, [], partitions),
+    end, []),
     {ok, lists:usort(MatchingDbs)};
 
 %% @equiv all_dbs(list_to_binary(Prefix))
