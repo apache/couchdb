@@ -457,4 +457,20 @@ couchTests.rewrite = function(debug) {
   var url = "/test_suite_db/_design/requested_path/_rewrite/show_rewritten";
   var res = CouchDB.request("GET", url);
   TEquals(url, res.responseText, "returned the original url");
+
+  var ddoc_loop = {
+    _id: "_design/loop",
+    rewrites: [{ "from": "loop",  "to": "_rewrite/loop"}]
+  };
+  db.save(ddoc_loop);
+
+  run_on_modified_server(
+    [{section: "httpd",
+      key: "rewrite_limit",
+      value: "2"}],
+      function(){
+        var url = "/test_suite_db/_design/loop/_rewrite/loop";
+        var xhr = CouchDB.request("GET", url);
+        T(xhr.status = 400);
+  });
 }

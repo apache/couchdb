@@ -14,6 +14,8 @@ HTTP Interface:
 
  * No longer rewrites the X-CouchDB-Requested-Path during recursive
    calls to the rewriter.
+ * Limit recursion depth in the URL rewriter. Defaults to a maximum
+   of 100 invocations but is configurable.
 
 Storage System:
 
