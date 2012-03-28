@@ -954,7 +954,6 @@ copy_compact(Db, NewDb0, Retry) ->
             [{start_key, NewDb#db.update_seq + 1}]),
 
     NewDb3 = copy_docs(Db, NewDb2, lists:reverse(Uncopied), Retry),
-    TotalChanges = couch_task_status:get(changes_done),
 
     % copy misc header values
     if NewDb3#db.security /= Db#db.security ->
