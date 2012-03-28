@@ -119,10 +119,11 @@ handle_rewrite_req(#httpd{
     Prefix = <<"/", DbName/binary, "/", DesignId/binary>>,
     QueryList = lists:map(fun decode_query_value/1, couch_httpd:qs(Req)),
     
+    MaxRewrites = list_to_integer(couch_config:get("httpd","rewrite_limit", "100")),
     NRewrites = case get('rewrite-count') of
         undefined -> 1;
-        Number when (Number > 100) ->
-            throw({bad_request, <<"Rewrite nesting exceded 100 rewrites">>});
+        Number when (Number > MaxRewrites) ->
+            throw({bad_request, <<"Rewrite nesting exceded rewrite limit">>});
         Number -> Number + 1
     end,
     put('rewrite-count', NRewrites),
