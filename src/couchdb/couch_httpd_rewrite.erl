@@ -118,7 +118,14 @@ handle_rewrite_req(#httpd{
     DesignId = <<"_design/", DesignName/binary>>,
     Prefix = <<"/", DbName/binary, "/", DesignId/binary>>,
     QueryList = lists:map(fun decode_query_value/1, couch_httpd:qs(Req)),
-
+    
+    NRewrites = case get('rewrite-count') of
+        undefined -> 1;
+        Number when (Number > 100) ->
+            throw({bad_request, <<"Rewrite nesting exceded 100 rewrites">>});
+        Number -> Number + 1
+    end,
+    put('rewrite-count', NRewrites),
     #doc{body={Props}} = DDoc,
 
     % get rules from ddoc
