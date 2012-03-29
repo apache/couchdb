@@ -118,7 +118,15 @@ handle_rewrite_req(#httpd{
     DesignId = <<"_design/", DesignName/binary>>,
     Prefix = <<"/", DbName/binary, "/", DesignId/binary>>,
     QueryList = lists:map(fun decode_query_value/1, couch_httpd:qs(Req)),
-
+    
+    MaxRewrites = list_to_integer(couch_config:get("httpd","rewrite_limit", "100")),
+    NRewrites = case get('rewrite-count') of
+        undefined -> 1;
+        Number when (Number > MaxRewrites) ->
+            throw({bad_request, <<"Rewrite nesting exceded rewrite limit">>});
+        Number -> Number + 1
+    end,
+    put('rewrite-count', NRewrites),
     #doc{body={Props}} = DDoc,
 
     % get rules from ddoc
@@ -167,7 +175,9 @@ handle_rewrite_req(#httpd{
 
             % in order to do OAuth correctly,
             % we have to save the requested path
-            Headers = mochiweb_headers:enter("x-couchdb-requested-path",
+            % we use default so chained rewriting
+            % wont replace the header
+            Headers = mochiweb_headers:default("x-couchdb-requested-path",
                                              MochiReq:get(raw_path),
                                              MochiReq:get(headers)),
 
