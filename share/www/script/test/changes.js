@@ -209,7 +209,7 @@ couchTests.changes = function(debug) {
       blah: {
         map : 'function(doc) {' +
               '  if (doc._id == "blah") {' +
-              '    emit(doc._id, null);' +
+              '    emit(null, null);' +
               '  }' +
               '}'
       }
