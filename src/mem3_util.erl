@@ -17,7 +17,7 @@
 -export([hash/1, name_shard/2, create_partition_map/5, build_shards/2,
     n_val/2, z_val/3, to_atom/1, to_integer/1, write_db_doc/1, delete_db_doc/1,
     load_shards_from_disk/1, load_shards_from_disk/2, shard_info/1,
-    ensure_exists/1, open_db_doc/1]).
+    ensure_exists/1, open_db_doc/1, owner/2]).
 
 -export([create_partition_map/4, name_shard/1]).
 -deprecated({create_partition_map, 4, eventually}).
@@ -209,3 +209,12 @@ ensure_exists(DbName) ->
     _ ->
         couch_server:create(DbName, Options)
     end.
+
+
+owner(DbName, DocId) ->
+    Shards = mem3:shards(DbName, DocId),
+    Nodes = [node()|nodes()],
+    LiveShards = [S || #shard{node=Node} = S <- Shards, lists:member(Node, Nodes)],
+    [#shard{node=Node}] = lists:usort(fun(#shard{name=A}, #shard{name=B}) ->
+                                              A =< B  end, LiveShards),
+    node() =:= Node.

@@ -24,8 +24,7 @@ init(_Args) ->
         child(mem3_events),
         child(mem3_cache),
         child(mem3_nodes),
-        child(mem3_sync),
-        child(mem3_rep_manager)
+        child(mem3_sync)
     ],
     {ok, {{one_for_one,10,1}, Children}}.
 
