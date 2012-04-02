@@ -1,4 +1,4 @@
-% Copyright 2010 Cloudant
+% Copyright 2012 Cloudant
 %
 % Licensed under the Apache License, Version 2.0 (the "License"); you may not
 % use this file except in compliance with the License. You may obtain a copy of
@@ -14,12 +14,14 @@
 
 -module(fabric_view_changes).
 
--export([go/5, start_update_notifier/1, pack_seqs/1]).
+-export([go/5, pack_seqs/1]).
 
 -include("fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("eunit/include/eunit.hrl").
+
+-import(fabric_db_update_listener, [wait_db_updated/1, stop/1]).
 
 go(DbName, Feed, Options, Callback, Acc0) when Feed == "continuous" orelse
         Feed == "longpoll" ->
@@ -28,8 +30,12 @@ go(DbName, Feed, Options, Callback, Acc0) when Feed == "continuous" orelse
     case validate_start_seq(DbName, Since) of
     ok ->
         {ok, Acc} = Callback(start, Acc0),
-        Notifiers = start_update_notifiers(DbName),
         {Timeout, _} = couch_changes:get_changes_timeout(Args, Callback),
+        Ref = make_ref(),
+        Parent = self(),
+        UpdateListener = {spawn_link(fabric_db_update_listener, go,
+                                     [Parent, Ref, DbName, Timeout]),
+                          Ref},
         try
             keep_sending_changes(
                 DbName,
@@ -37,11 +43,11 @@ go(DbName, Feed, Options, Callback, Acc0) when Feed == "continuous" orelse
                 Callback,
                 Since,
                 Acc,
-                Timeout
+                Timeout,
+                UpdateListener
             )
         after
-            stop_update_notifiers(Notifiers),
-            couch_changes:get_rest_db_updated()
+            stop(UpdateListener)
         end;
     Error ->
         Callback(Error, Acc0)
@@ -66,7 +72,7 @@ go(DbName, "normal", Options, Callback, Acc0) ->
         Callback(Error, Acc0)
     end.
 
-keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout) ->
+keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout, UpListen) ->
     #changes_args{limit=Limit, feed=Feed, heartbeat=Heartbeat} = Args,
     {ok, Collector} = send_changes(DbName, Args, Callback, Seqs, AccIn, Timeout),
     #collector{limit=Limit2, counters=NewSeqs, user_acc=AccOut} = Collector,
@@ -74,7 +80,7 @@ keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout) ->
     if Limit > Limit2, Feed == "longpoll" ->
         Callback({stop, LastSeq}, AccOut);
     true ->
-        case {Heartbeat, wait_db_updated(Timeout)} of
+        case {Heartbeat, wait_db_updated(UpListen)} of
         {undefined, timeout} ->
             Callback({stop, LastSeq}, AccOut);
         _ ->
@@ -85,7 +91,8 @@ keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout) ->
                 Callback,
                 LastSeq,
                 AccTimeout,
-                Timeout
+                Timeout,
+                UpListen
             )
         end
     end.
@@ -272,24 +279,6 @@ do_unpack_seqs(Opaque, DbName) ->
         end
     end, binary_to_term(couch_util:decodeBase64Url(Opaque))).
 
-start_update_notifiers(DbName) ->
-    lists:map(fun(#shard{node=Node, name=Name}) ->
-        {Node, rexi:cast(Node, {?MODULE, start_update_notifier, [Name]})}
-    end, mem3:shards(DbName)).
-
-% rexi endpoint
-start_update_notifier(DbName) ->
-    {Caller, _} = get(rexi_from),
-    Fun = fun({_, X}) when X == DbName -> Caller ! db_updated; (_) -> ok end,
-    Id = {couch_db_update_notifier, make_ref()},
-    ok = gen_event:add_sup_handler(couch_db_update, Id, Fun),
-    receive {gen_event_EXIT, Id, Reason} ->
-        rexi:reply({gen_event_EXIT, DbName, Reason})
-    end.
-
-stop_update_notifiers(Notifiers) ->
-    [rexi:kill(Node, Ref) || {Node, Ref} <- Notifiers].
-
 changes_row(#change{key=Seq, id=Id, value=Value, deleted=true, doc=Doc}, true) ->
     {change, {[{seq,Seq}, {id,Id}, {changes,Value}, {deleted, true}, {doc, Doc}]}};
 changes_row(#change{key=Seq, id=Id, value=Value, deleted=true}, false) ->
@@ -304,10 +293,6 @@ changes_row(#change{key=Seq, id=Id, value=Value}, false) ->
 find_replacement_shards(#shard{range=Range}, AllShards) ->
     % TODO make this moar betta -- we might have split or merged the partition
     [Shard || Shard <- AllShards, Shard#shard.range =:= Range].
-
-wait_db_updated(Timeout) ->
-    receive db_updated -> couch_changes:get_rest_db_updated()
-    after Timeout -> timeout end.
 
 validate_start_seq(DbName, Seq) ->
     try unpack_seqs(Seq, DbName) of _Any ->
