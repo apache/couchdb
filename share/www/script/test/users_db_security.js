@@ -75,9 +75,9 @@ couchTests.users_db_security = function(debug) {
     usersDb.deleteDb();
 
     // _users db
-    // a doc with a field 'password' should be hashed to 'password_sha'
+    // a doc with a field 'password' should be hashed to 'derived_key'
     //  with salt and salt stored in 'salt', 'password' is set to null.
-    //  Exising 'password_sha' and 'salt' fields are overwritten with new values
+    //  Exising 'derived_key' and 'salt' fields are overwritten with new values
     //  when a non-null 'password' field exists.
     // anonymous should be able to create a user document
     var userDoc = {
@@ -92,11 +92,16 @@ couchTests.users_db_security = function(debug) {
     TEquals(true, usersDb.save(userDoc).ok, "should save document");
     userDoc = usersDb.open("org.couchdb.user:jchris");
     TEquals(undefined, userDoc.password, "password field should be null 1");
-    TEquals(40, userDoc.password_sha.length, "password_sha should exist");
+    TEquals(40, userDoc.derived_key.length, "derived_key should exist");
     TEquals(32, userDoc.salt.length, "salt should exist");
 
     // create server admin
     run_on_modified_server([
+        {
+          section: "couch_httpd_auth",
+          key: "iterations",
+          value: "1"
+        },
         {
           section: "admins",
           key: "jan",
@@ -131,12 +136,12 @@ couchTests.users_db_security = function(debug) {
       var jchrisDoc = open_as(usersDb, "org.couchdb.user:jchris", "jchris1");
 
       TEquals(undefined, jchrisDoc.password, "password field should be null 2");
-      TEquals(40, jchrisDoc.password_sha.length, "password_sha should exist");
+      TEquals(40, jchrisDoc.derived_key.length, "derived_key should exist");
       TEquals(32, jchrisDoc.salt.length, "salt should exist");
 
       TEquals(true, userDoc.salt != jchrisDoc.salt, "should have new salt");
-      TEquals(true, userDoc.password_sha != jchrisDoc.password_sha,
-        "should have new password_sha");
+      TEquals(true, userDoc.derived_key != jchrisDoc.derived_key,
+        "should have new derived_key");
 
       // user should not be able to read another user's user document
       var fdmananaDoc = {
@@ -248,6 +253,8 @@ couchTests.users_db_security = function(debug) {
   usersDb.deleteDb();
   run_on_modified_server(
     [{section: "couch_httpd_auth",
+      key: "iterations", value: "1"},
+     {section: "couch_httpd_auth",
       key: "authentication_db", value: usersDb.name}],
     testFun
   );

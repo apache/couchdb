@@ -579,6 +579,11 @@ couchTests.replicator_db = function(debug) {
 
     var server_admins_config = [
       {
+        section: "couch_httpd_auth",
+        key: "iterations",
+        value: "1"
+      },
+      {
         section: "admins",
         key: "fdmanana",
         value: "qwerty"
@@ -1436,6 +1441,11 @@ couchTests.replicator_db = function(debug) {
 
   // run all the tests
   var server_config = [
+    {
+      section: "couch_httpd_auth",
+      key: "iterations",
+      value: "1"
+    },
     {
       section: "replicator",
       key: "db",

@@ -278,6 +278,8 @@ couchTests.cookie_auth = function(debug) {
     [
      {section: "couch_httpd_auth",
       key: "authentication_db", value: "test_suite_users"},
+     {section: "couch_httpd_auth",
+      key: "iterations", value: "1"},
      {section: "admins",
        key: "jan", value: "apple"}
     ],
