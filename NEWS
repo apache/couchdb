@@ -19,6 +19,11 @@ This version has not been released yet.
    document in the same batch.
  * New and updated passwords are hashed using PBKDF2.
 
+Version 1.2.1
+-------------
+
+This version has not been released yet.
+
 Version 1.2.0
 -------------
 
