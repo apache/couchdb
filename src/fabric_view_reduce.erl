@@ -96,10 +96,15 @@ handle_message(#view_row{key=Key} = Row, {Worker, From}, State) ->
         fabric_view:maybe_send_row(State2)
     end;
 
-handle_message(complete, Worker, State) ->
-    C1 = fabric_dict:update_counter(Worker, 1, State#collector.counters),
-    C2 = fabric_view:remove_overlapping_shards(Worker, C1),
-    fabric_view:maybe_send_row(State#collector{counters = C2}).
+handle_message(complete, Worker, #collector{counters = Counters0} = State) ->
+    case fabric_dict:lookup_element(Worker, Counters0) of
+    undefined ->
+        {ok, State};
+    _ ->
+        C1 = fabric_dict:update_counter(Worker, 1, Counters0),
+        C2 = fabric_view:remove_overlapping_shards(Worker, C1),
+        fabric_view:maybe_send_row(State#collector{counters = C2})
+    end.
 
 complete_worker_test() ->
     Shards =
