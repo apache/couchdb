@@ -431,7 +431,14 @@ replication_complete(DocId) ->
             % We want to be able to start the same replication but with
             % eventually different values for parameters that don't
             % contribute to its ID calculation.
-            _ = supervisor:delete_child(couch_rep_sup, BaseId ++ Ext);
+            case erlang:system_info(otp_release) < "R14B02" of
+            true ->
+                spawn(fun() ->
+                    _ = supervisor:delete_child(couch_rep_sup, BaseId ++ Ext)
+                end);
+            false ->
+                ok
+            end;
         #rep_state{} ->
             ok
         end,
