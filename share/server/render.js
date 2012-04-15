@@ -133,6 +133,7 @@ var Mime = (function() {
 ////
 
 var Render = (function() {
+  var new_header = false;
   var chunks = [];
   
   
@@ -140,6 +141,7 @@ var Render = (function() {
   var startResp = {};
   function start(resp) {
     startResp = resp || {};
+    new_header = true;
   };
 
   function sendStart() {
@@ -147,6 +149,7 @@ var Render = (function() {
     respond(["start", chunks, startResp]);
     chunks = [];
     startResp = {};
+    new_header = false;
   }
 
   function applyContentType(resp, responseContentType) {
@@ -162,7 +165,13 @@ var Render = (function() {
   };
 
   function blowChunks(label) {
-    respond([label||"chunks", chunks]);
+    if (new_header) {
+      respond([label||"chunks", chunks, startResp]);
+      new_header = false;
+    }
+    else {
+      respond([label||"chunks", chunks]);
+    }
     chunks = [];
   };
 
@@ -281,6 +290,7 @@ var Render = (function() {
     lastRow = false;
     chunks = [];
     startResp = {};
+    new_header = false;
   };
 
   function runList(listFun, ddoc, args) {
