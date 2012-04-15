@@ -27,7 +27,9 @@
     resp,
     qserver,
     lname,
-    etag
+    etag,
+    code,
+    headers
 }).
 
 % /db/_design/foo/_show/bar/docid
@@ -208,7 +210,7 @@ handle_view_list(Req, Db, DDoc, LName, VDDoc, VName, Keys) ->
     end).
 
 
-list_cb({meta, Meta}, #lacc{resp=undefined} = Acc) ->
+list_cb({meta, Meta}, #lacc{code=undefined} = Acc) ->
     MetaProps = case couch_util:get_value(total, Meta) of
         undefined -> [];
         Total -> [{total_rows, Total}]
@@ -220,7 +222,7 @@ list_cb({meta, Meta}, #lacc{resp=undefined} = Acc) ->
         UpdateSeq -> [{update_seq, UpdateSeq}]
     end,
     start_list_resp({MetaProps}, Acc);
-list_cb({row, Row}, #lacc{resp=undefined} = Acc) ->
+list_cb({row, Row}, #lacc{code=undefined} = Acc) ->
     {ok, NewAcc} = start_list_resp({[]}, Acc),
     send_list_row(Row, NewAcc);
 list_cb({row, Row}, Acc) ->
@@ -232,10 +234,15 @@ list_cb(complete, Acc) ->
     true ->
         Resp = Resp0
     end,
-    [<<"end">>, Data] = couch_query_servers:proc_prompt(Proc, [<<"list_end">>]),
-    send_non_empty_chunk(Resp, Data),
-    couch_httpd:last_chunk(Resp),
-    {ok, Resp}.
+    case couch_query_servers:proc_prompt(Proc, [<<"list_end">>]) of
+        [<<"end">>, Data, Headers] ->
+            Acc2 = fixup_headers(Headers, Acc#lacc{resp=Resp}),
+            #lacc{resp = Resp2} = send_non_empty_chunk(Acc2, Data);
+        [<<"end">>, Data] ->
+            #lacc{resp = Resp2} = send_non_empty_chunk(Acc#lacc{resp=Resp}, Data)
+    end,
+    couch_httpd:last_chunk(Resp2),
+    {ok, Resp2}.
 
 start_list_resp(Head, Acc) ->
     #lacc{db=Db, req=Req, qserver=QServer, lname=LName, etag=ETag} = Acc,
@@ -243,16 +250,18 @@ start_list_resp(Head, Acc) ->
 
     [<<"start">>,Chunk,JsonResp] = couch_query_servers:ddoc_proc_prompt(QServer,
         [<<"lists">>, LName], [Head, JsonReq]),
-    JsonResp2 = apply_etag(JsonResp, ETag),
+    Acc2 = send_non_empty_chunk(fixup_headers(JsonResp, Acc), Chunk),
+    {ok, Acc2}.
+
+fixup_headers(Headers, #lacc{etag=ETag} = Acc) ->
+    Headers2 = apply_etag(Headers, ETag),
     #extern_resp_args{
         code = Code,
         ctype = CType,
         headers = ExtHeaders
-    } = couch_httpd_external:parse_external_response(JsonResp2),
-    JsonHeaders = couch_httpd_external:default_or_content_type(CType, ExtHeaders),
-    {ok, Resp} = couch_httpd:start_chunked_response(Req, Code, JsonHeaders),
-    send_non_empty_chunk(Resp, Chunk),
-    {ok, Acc#lacc{resp=Resp}}.
+    } = couch_httpd_external:parse_external_response(Headers2),
+    Headers3 = couch_httpd_external:default_or_content_type(CType, ExtHeaders),
+    Acc#lacc{code=Code, headers=Headers3}.
 
 send_list_row(Row, #lacc{qserver = {Proc, _}, resp = Resp} = Acc) ->
     RowObj = case couch_util:get_value(id, Row) of
@@ -269,22 +278,44 @@ send_list_row(Row, #lacc{qserver = {Proc, _}, resp = Resp} = Acc) ->
         Doc -> [{doc, Doc}]
     end,
     try couch_query_servers:proc_prompt(Proc, [<<"list_row">>, {RowObj}]) of
+    [<<"chunks">>, Chunk, Headers] ->
+        Acc2 = send_non_empty_chunk(fixup_headers(Headers, Acc), Chunk),
+        {ok, Acc2};
     [<<"chunks">>, Chunk] ->
-        send_non_empty_chunk(Resp, Chunk),
-        {ok, Acc};
+        Acc2 = send_non_empty_chunk(Acc, Chunk),
+        {ok, Acc2};
+    [<<"end">>, Chunk, Headers] ->
+        Acc2 = send_non_empty_chunk(fixup_headers(Headers, Acc), Chunk),
+        #lacc{resp = Resp2} = Acc2,
+        couch_httpd:last_chunk(Resp2),
+        {stop, Acc2};
     [<<"end">>, Chunk] ->
-        send_non_empty_chunk(Resp, Chunk),
-        couch_httpd:last_chunk(Resp),
-        {stop, Acc}
+        Acc2 = send_non_empty_chunk(Acc, Chunk),
+        #lacc{resp = Resp2} = Acc2,
+        couch_httpd:last_chunk(Resp2),
+        {stop, Acc2}
     catch Error ->
-        couch_httpd:send_chunked_error(Resp, Error),
-        {stop, Acc}
+        case Resp of
+            undefined ->
+                {Code, _, _} = couch_httpd:error_info(Error),
+                #lacc{req=Req, headers=Headers} = Acc,
+                {ok, Resp2} = couch_httpd:start_chunked_response(Req, Code, Headers),
+                Acc2 = Acc#lacc{resp=Resp2, code=Code};
+            _ -> Resp2 = Resp, Acc2 = Acc
+        end,
+        couch_httpd:send_chunked_error(Resp2, Error),
+        {stop, Acc2}
     end.
 
-send_non_empty_chunk(_, []) ->
-    ok;
-send_non_empty_chunk(Resp, Chunk) ->
-    couch_httpd:send_chunk(Resp, Chunk).
+send_non_empty_chunk(Acc, []) ->
+    Acc;
+send_non_empty_chunk(#lacc{resp=undefined} = Acc, Chunk) ->
+    #lacc{req=Req, code=Code, headers=Headers} = Acc,
+    {ok, Resp} = couch_httpd:start_chunked_response(Req, Code, Headers),
+    send_non_empty_chunk(Acc#lacc{resp = Resp}, Chunk);
+send_non_empty_chunk(#lacc{resp=Resp} = Acc, Chunk) ->
+    couch_httpd:send_chunk(Resp, Chunk),
+    Acc.
 
 
 apply_etag({ExternalResponse}, CurrentEtag) ->
