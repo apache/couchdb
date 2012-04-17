@@ -14,7 +14,7 @@
 
 -module(rexi).
 -export([start/0, stop/0, restart/0]).
--export([cast/2, cast/3, kill/2]).
+-export([cast/2, cast/3, cast/4, kill/2]).
 -export([reply/1, sync_reply/1, sync_reply/2]).
 -export([async_server_call/2, async_server_call/3]).
 -export([get_errors/0, get_last_error/0, set_error_limit/1]).
@@ -62,6 +62,23 @@ cast(Node, Caller, MFA) ->
     Msg = cast_msg({doit, {Caller, Ref}, get(nonce), MFA}),
     rexi_utils:send({?SERVER, Node}, Msg),
     Ref.
+
+%% @doc Executes apply(M, F, A) on Node.
+%% This version accepts a sync option which uses the erlang:send/2 call
+%% directly in process instead of deferring to a spawned process if
+%% erlang:send/2 were to block. If the sync option is omitted this call
+%% is identical to cast/3.
+-spec cast(node(), pid(), {atom(), atom(), list()}, [atom()]) -> reference().
+cast(Node, Caller, MFA, Options) ->
+    case lists:member(sync, Options) of
+        true ->
+            Ref = make_ref(),
+            Msg = cast_msg({doit, {Caller, Ref}, get(nonce), MFA}),
+            erlang:send({?SERVER, Node}, Msg),
+            Ref;
+        false ->
+            cast(Node, Caller, MFA)
+    end.
 
 %% @doc Sends an async kill signal to the remote process associated with Ref.
 %% No rexi_EXIT message will be sent.
