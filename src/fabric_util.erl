@@ -54,14 +54,13 @@ get_db(DbName) ->
     get_db(DbName, []).
 
 get_db(DbName, Options) ->
-    % prefer local shards
-    {Local, Remote} = lists:partition(fun(S) -> S#shard.node =:= node() end,
-        mem3:shards(DbName)),
-    % suppress shards from down nodes
-    Nodes = erlang:nodes(),
-    Live = [S || #shard{node = N} = S <- Remote, lists:member(N, Nodes)],
+    {Local, SameZone, DifferentZone} = mem3:group_by_proximity(mem3:shards(DbName)),
     % sort the live remote shards so that we don't repeatedly try the same node
-    get_shard(Local ++ lists:keysort(#shard.name, Live), Options, 100).
+    Shards = Local ++ lists:keysort(#shard.name, SameZone) ++ lists:keysort(#shard.name, DifferentZone),
+    % suppress shards from down nodes
+    Nodes = [node()|erlang:nodes()],
+    Live = [S || #shard{node = N} = S <- Shards, lists:member(N, Nodes)],
+    get_shard(Live, Options, 100).
 
 get_shard([], _Opts, _Timeout) ->
     erlang:error({internal_server_error, "No DB shards could be opened."});
