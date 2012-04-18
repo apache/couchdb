@@ -123,9 +123,13 @@ shards(DbName, DocId) ->
 
 ushards(DbName) ->
     {L,S,D} = group_by_proximity(live_shards(DbName)),
+    % Prefer shards in the local zone over shards in a different zone,
+    % but sort each group separately to ensure a consistent choice between
+    % nodes in the same zone.
+    Shards = lists:sort(L ++ S) ++ lists:sort(D),
     lists:usort(fun(#shard{name=A}, #shard{name=B}) ->
         A =< B
-    end, lists:sort(L ++ S) ++ lists:sort(D)).
+    end, Shards).
 
 live_shards(DbName) ->
     Nodes = [node()|erlang:nodes()],
