@@ -18,6 +18,7 @@
     choose_shards/2, n/1, dbname/1, ushards/1]).
 -export([sync_security/0, sync_security/1]).
 -export([compare_nodelists/0, compare_shards/1]).
+-export([group_by_proximity/1]).
 
 -include("mem3.hrl").
 
@@ -121,13 +122,26 @@ shards(DbName, DocId) ->
     end.
 
 ushards(DbName) ->
+    {L,S,D} = group_by_proximity(live_shards(DbName)),
+    % Prefer shards in the local zone over shards in a different zone,
+    % but sort each group separately to ensure a consistent choice between
+    % nodes in the same zone.
+    Shards = lists:sort(L ++ S) ++ lists:sort(D),
     lists:usort(fun(#shard{name=A}, #shard{name=B}) ->
         A =< B
-    end, lists:sort(live_shards(DbName))).
+    end, Shards).
 
 live_shards(DbName) ->
     Nodes = [node()|erlang:nodes()],
     [S || #shard{node=Node} = S <- shards(DbName), lists:member(Node, Nodes)].
+
+group_by_proximity(Shards) ->
+    {Local, Remote} = lists:partition(fun(S) -> S#shard.node =:= node() end,
+        Shards),
+    LocalZone = mem3:node_info(node(), <<"zone">>),
+    Fun = fun(S) -> mem3:node_info(S#shard.node, <<"zone">>) =:= LocalZone end,
+    {SameZone, DifferentZone} = lists:partition(Fun, Remote),
+    {Local, SameZone, DifferentZone}.
 
 sync_security() ->
     mem3_sync_security:go().
