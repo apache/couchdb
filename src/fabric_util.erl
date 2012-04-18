@@ -55,7 +55,8 @@ get_db(DbName) ->
 
 get_db(DbName, Options) ->
     {Local, SameZone, DifferentZone} = mem3:group_by_proximity(mem3:shards(DbName)),
-    % sort the live remote shards so that we don't repeatedly try the same node
+    % Prefer shards on the same node over other nodes, prefer shards in the same zone over
+    % over zones and sort each remote list by name so that we don't repeatedly try the same node.
     Shards = Local ++ lists:keysort(#shard.name, SameZone) ++ lists:keysort(#shard.name, DifferentZone),
     % suppress shards from down nodes
     Nodes = [node()|erlang:nodes()],
