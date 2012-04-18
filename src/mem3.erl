@@ -122,9 +122,10 @@ shards(DbName, DocId) ->
     end.
 
 ushards(DbName) ->
+    {L,S,D} = group_by_proximity(live_shards(DbName)),
     lists:usort(fun(#shard{name=A}, #shard{name=B}) ->
         A =< B
-    end, begin {L,S,D} = group_by_proximity(live_shards(DbName)), L ++ S ++ D end).
+    end, lists:sort(L ++ S) ++ lists:sort(D)).
 
 live_shards(DbName) ->
     Nodes = [node()|erlang:nodes()],
