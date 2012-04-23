@@ -67,6 +67,8 @@ write_chunks(MiddleMan, ChunkFun) ->
     {MiddleMan, ChunkRecord} ->
         ChunkFun(ChunkRecord, ok),
         write_chunks(MiddleMan, ChunkFun)
+    after 600000 ->
+        exit(timeout)
     end.
 
 receive_unchunked_attachment(_Req, 0) ->
