@@ -105,9 +105,9 @@ handle_cast({track_process_count, Pid, Stat}, State) ->
     {noreply, [{Ref, Stat} | State]}.
 
 handle_info({'DOWN', Ref, _, _, _}, State) ->
-    {Ref, Stat} = lists:keyfind(Ref, 1, State),
+    {value, {Ref, Stat}, NewState} = lists:keytake(Ref, 1, State),
     ok = couch_stats_collector:decrement(Stat),
-    {noreply, lists:keydelete(Ref, 1, State)}.
+    {noreply, NewState}.
 
 code_change(_OldVersion, State, _Extra) ->
     {ok, State}.
