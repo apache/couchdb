@@ -37,7 +37,7 @@ receiver(Req, Length) when is_integer(Length) ->
     fun() ->
         Middleman ! {self(), gimme_data},
         receive
-            {Middleman, Data} -> Data
+            {Middleman, Data} -> iolist_to_binary(Data)
         after 600000 ->
             exit(timeout)
         end
@@ -65,15 +65,22 @@ maybe_send_continue(#httpd{mochi_req = MochiReq} = Req) ->
 write_chunks(MiddleMan, ChunkFun) ->
     MiddleMan ! {self(), gimme_data},
     receive
-    {MiddleMan, {0, _Footers}} ->
-        % MiddleMan ! {self(), done},
-        ok;
-    {MiddleMan, ChunkRecord} ->
-        ChunkFun(ChunkRecord, ok),
-        write_chunks(MiddleMan, ChunkFun)
+    {MiddleMan, ChunkRecordList} ->
+        case flush_chunks(ChunkRecordList, ChunkFun) of
+        continue -> write_chunks(MiddleMan, ChunkFun);
+        done -> ok
+        end
     after 600000 ->
         exit(timeout)
     end.
+
+flush_chunks([], _ChunkFun) ->
+    continue;
+flush_chunks([{0, _}], _ChunkFun) ->
+    done;
+flush_chunks([Chunk | Rest], ChunkFun) ->
+    ChunkFun(Chunk, ok),
+    flush_chunks(Rest, ChunkFun).
 
 receive_unchunked_attachment(_Req, 0) ->
     ok;
@@ -93,45 +100,51 @@ middleman(Req, chunked) ->
 
     % take requests from the DB writers and get data from the receiver
     N = erlang:list_to_integer(couch_config:get("cluster","n")),
-    middleman_loop(Receiver, N, dict:new(), 0, []);
+    middleman_loop(Receiver, N, [], []);
 
 middleman(Req, Length) ->
     Receiver = spawn(fun() -> receive_unchunked_attachment(Req, Length) end),
     N = erlang:list_to_integer(couch_config:get("cluster","n")),
-    middleman_loop(Receiver, N, dict:new(), 0, []).
+    middleman_loop(Receiver, N, [], []).
 
-middleman_loop(Receiver, N, Counters, Offset, ChunkList) ->
+middleman_loop(Receiver, N, Counters0, ChunkList0) ->
     receive {From, gimme_data} ->
-        % figure out how far along this writer (From) is in the list
-        {NewCounters, WhichChunk} = case dict:find(From, Counters) of
-        {ok, I} ->
-            {dict:update_counter(From, 1, Counters), I};
-        error ->
-            {dict:store(From, 2, Counters), 1}
+        % Figure out how far along this writer (From) is in the list
+        ListIndex = case fabric_dict:lookup_element(From, Counters0) of
+        undefined -> 0;
+        I -> I
         end,
-        ListIndex = WhichChunk - Offset,
 
-        % talk to the receiver to get another chunk if necessary
-        ChunkList1 = if ListIndex > length(ChunkList) ->
+        % Talk to the receiver to get another chunk if necessary
+        ChunkList1 = if ListIndex == length(ChunkList0) ->
             Receiver ! {self(), go},
-            receive {Receiver, ChunkRecord} -> ChunkList ++ [ChunkRecord] end;
-        true -> ChunkList end,
+            receive
+                {Receiver, ChunkRecord} ->
+                    ChunkList0 ++ [ChunkRecord]
+            end;
+        true -> ChunkList0 end,
 
         % reply to the writer
-        From ! {self(), lists:nth(ListIndex, ChunkList1)},
+        Reply = lists:nthtail(ListIndex, ChunkList1),
+        From ! {self(), Reply},
 
-        % check if we can drop a chunk from the head of the list
-        SmallestIndex = dict:fold(fun(_, Val, Acc) -> lists:min([Val,Acc]) end,
-            WhichChunk+1, NewCounters),
-        Size = dict:size(NewCounters),
+        % Update the counter for this writer
+        Counters1 = fabric_dict:update_counter(From, length(Reply), Counters0),
 
-        {NewChunkList, NewOffset} =
-        if Size == N andalso (SmallestIndex - Offset) == 2 ->
-            {tl(ChunkList1), Offset+1};
+        % Drop any chunks that have been sent to all writers
+        Size = fabric_dict:size(Counters1),
+        NumToDrop = lists:min([I || {_, I} <- Counters1]),
+
+        {ChunkList3, Counters3} =
+        if Size == N andalso NumToDrop > 0 ->
+            ChunkList2 = lists:nthtail(NumToDrop, ChunkList1),
+            Counters2 = [{F, I-NumToDrop} || {F, I} <- Counters1],
+            {ChunkList2, Counters2};
         true ->
-            {ChunkList1, Offset}
+            {ChunkList1, Counters1}
         end,
-        middleman_loop(Receiver, N, NewCounters, NewOffset, NewChunkList)
+
+        middleman_loop(Receiver, N, Counters3, ChunkList3)
     after 10000 ->
         ok
     end.
