@@ -20,7 +20,7 @@
 -export([start_link/0, get_active/0, get_queue/0, push/1, push/2,
     remove_node/1, initial_sync/1]).
 
--import(queue, [in/2, to_list/1, from_list/1, is_empty/1]).
+-import(queue, [in/2, out/1, to_list/1, join/2, from_list/1, is_empty/1]).
 
 -include("mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
@@ -164,7 +164,7 @@ handle_replication_exit(State, Pid) ->
     _ ->
         Count = length(Active1),
         NewState = if Count < Limit ->
-            case next_replication(Active1, Waiting) of
+            case next_replication(Active1, Waiting, queue:new()) of
             nil -> % all waiting replications are also active
                 State#state{active = Active1, count = Count};
             {#job{name=DbName, node=Node} = Job, StillWaiting} ->
@@ -253,14 +253,19 @@ start_update_notifier() ->
 
 %% @doc Finds the next {DbName,Node} pair in the list of waiting replications
 %% which does not correspond to an already running replication
--spec next_replication([#job{}], [#job{}]) -> {#job{}, [#job{}]} | nil.
-next_replication(Active, Waiting) ->
-    Fun = fun(#job{name=S, node=N}) -> is_running(S,N,Active) end,
-    case lists:splitwith(Fun, to_list(Waiting)) of
-    {_, []} ->
+-spec next_replication([#job{}], [#job{}], [#job{}]) -> {#job{}, [#job{}]} | nil.
+next_replication(Active, Waiting, WaitingAndRunning) ->
+    case is_empty(Waiting) of
+    true ->
         nil;
-    {Running, [Job|Rest]} ->
-        {Job, from_list(Running ++ Rest)}
+    false ->
+        {{value, #job{name=S, node=N} = Job}, RemQ} = out(Waiting),
+        case is_running(S,N,Active) of
+        true ->
+            next_replication(Active, RemQ, in(Job, WaitingAndRunning));
+        false ->
+            {Job, join(Waiting, WaitingAndRunning)}
+        end
     end.
 
 is_running(DbName, Node, ActiveList) ->
