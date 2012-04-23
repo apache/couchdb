@@ -20,6 +20,8 @@
 -export([start_link/0, get_active/0, get_queue/0, push/1, push/2,
     remove_node/1, initial_sync/1]).
 
+-import(queue, [in/2, out/1, to_list/1, join/2, from_list/1, is_empty/1]).
+
 -include("mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
@@ -28,7 +30,7 @@
     count = 0,
     limit,
     dict = dict:new(),
-    waiting = [],
+    waiting = queue:new(),
     update_notifier
 }).
 
@@ -70,11 +72,11 @@ handle_call(get_active, _From, State) ->
     {reply, State#state.active, State};
 
 handle_call(get_queue, _From, State) ->
-    {reply, State#state.waiting, State};
+    {reply, to_list(State#state.waiting), State};
 
-handle_call(get_backlog, _From, #state{active=A, waiting=W} = State) ->
+handle_call(get_backlog, _From, #state{active=A, waiting=WQ} = State) ->
     CA = lists:sum([C || #job{count=C} <- A, is_integer(C)]),
-    CW = lists:sum([C || #job{count=C} <- W, is_integer(C)]),
+    CW = lists:sum([C || #job{count=C} <- to_list(WQ), is_integer(C)]),
     {reply, CA+CW, State}.
 
 handle_cast({push, DbName, Node}, State) ->
@@ -96,18 +98,19 @@ handle_cast({push, Job}, State) ->
     end;
 
 handle_cast({remove_node, Node}, #state{waiting = W0} = State) ->
-    {Alive, Dead} = lists:partition(fun(#job{node=N}) -> N =/= Node end, W0),
+    {Alive, Dead} = lists:partition(fun(#job{node=N}) -> N =/= Node end, to_list(W0)),
     Dict = remove_entries(State#state.dict, Dead),
     [exit(Pid, die_now) || #job{node=N, pid=Pid} <- State#state.active,
         N =:= Node],
-    {noreply, State#state{dict = Dict, waiting = Alive}};
+    {noreply, State#state{dict = Dict, waiting = from_list(Alive)}};
 
 handle_cast({remove_shard, Shard}, #state{waiting = W0} = State) ->
-    {Alive, Dead} = lists:partition(fun(#job{name=S}) -> S =/= Shard end, W0),
+    {Alive, Dead} = lists:partition(fun(#job{name=S}) ->
+                                        S =/= Shard end, to_list(W0)),
     Dict = remove_entries(State#state.dict, Dead),
     [exit(Pid, die_now) || #job{name=S, pid=Pid} <- State#state.active,
         S =:= Shard],
-    {noreply, State#state{dict = Dict, waiting = Alive}}.
+    {noreply, State#state{dict = Dict, waiting = from_list(Alive)}}.
 
 handle_info({'EXIT', Pid, _}, #state{update_notifier=Pid} = State) ->
     {ok, NewPid} = start_update_notifier(),
@@ -146,44 +149,44 @@ terminate(_Reason, State) ->
     [exit(Pid, shutdown) || #job{pid=Pid} <- State#state.active],
     ok.
 
-code_change(_, #state{waiting = [{_,_}|_] = W, active=A} = State, _) ->
-    Waiting = [#job{name=Name, node=Node} || {Name,Node} <- W],
-    Active = [#job{name=Name, node=Node, pid=Pid} || {Name,Node,Pid} <- A],
-    {ok, State#state{active = Active, waiting = Waiting}};
+code_change(_, #state{waiting = WaitingList} = State, _) ->
+    {ok, State#state{waiting = from_list(WaitingList)}};
 
 code_change(_, State, _) ->
     {ok, State}.
 
-handle_replication_exit(#state{waiting=[]} = State, Pid) ->
-    NewActive = lists:keydelete(Pid, #job.pid, State#state.active),
-    {noreply, State#state{active=NewActive, count=length(NewActive)}};
 handle_replication_exit(State, Pid) ->
     #state{active=Active, limit=Limit, dict=D, waiting=Waiting} = State,
     Active1 = lists:keydelete(Pid, #job.pid, Active),
-    Count = length(Active1),
-    NewState = if Count < Limit ->
-        case next_replication(Active1, Waiting) of
-        nil -> % all waiting replications are also active
-            State#state{active = Active1, count = Count};
-        {#job{name=DbName, node=Node} = Job, StillWaiting} ->
-            NewPid = start_push_replication(Job),
-            State#state{
-                active = [Job#job{pid = NewPid} | Active1],
-                count = Count+1,
-                dict = dict:erase({DbName,Node}, D),
-                waiting = StillWaiting
-            }
-        end;
+    case is_empty(Waiting) of
     true ->
-        State#state{active = Active1, count=Count}
-    end,
-    {noreply, NewState}.
+        {noreply, State#state{active=Active1, count=length(Active1)}};
+    _ ->
+        Count = length(Active1),
+        NewState = if Count < Limit ->
+            case next_replication(Active1, Waiting, queue:new()) of
+            nil -> % all waiting replications are also active
+                State#state{active = Active1, count = Count};
+            {#job{name=DbName, node=Node} = Job, StillWaiting} ->
+                NewPid = start_push_replication(Job),
+                State#state{
+                  active = [Job#job{pid = NewPid} | Active1],
+                  count = Count+1,
+                  dict = dict:erase({DbName,Node}, D),
+                  waiting = StillWaiting
+                 }
+            end;
+        true ->
+            State#state{active = Active1, count=Count}
+        end,
+        {noreply, NewState}
+    end.
 
 start_push_replication(#job{name=Name, node=Node}) ->
     spawn_link(mem3_rep, go, [Name, Node]).
 
 add_to_queue(State, #job{name=DbName, node=Node} = Job) ->
-    #state{dict=D, waiting=Waiting} = State,
+    #state{dict=D, waiting=WQ} = State,
     case dict:is_key({DbName, Node}, D) of
     true ->
         State;
@@ -191,7 +194,7 @@ add_to_queue(State, #job{name=DbName, node=Node} = Job) ->
         twig:log(debug, "adding ~s -> ~p to mem3_sync queue", [DbName, Node]),
         State#state{
             dict = dict:store({DbName,Node}, ok, D),
-            waiting = Waiting ++ [Job]
+            waiting = in(Job, WQ)
         }
     end.
 
@@ -250,14 +253,19 @@ start_update_notifier() ->
 
 %% @doc Finds the next {DbName,Node} pair in the list of waiting replications
 %% which does not correspond to an already running replication
--spec next_replication([#job{}], [#job{}]) -> {#job{}, [#job{}]} | nil.
-next_replication(Active, Waiting) ->
-    Fun = fun(#job{name=S, node=N}) -> is_running(S,N,Active) end,
-    case lists:splitwith(Fun, Waiting) of
-    {_, []} ->
+-spec next_replication([#job{}], [#job{}], [#job{}]) -> {#job{}, [#job{}]} | nil.
+next_replication(Active, Waiting, WaitingAndRunning) ->
+    case is_empty(Waiting) of
+    true ->
         nil;
-    {Running, [Job|Rest]} ->
-        {Job, Running ++ Rest}
+    false ->
+        {{value, #job{name=S, node=N} = Job}, RemQ} = out(Waiting),
+        case is_running(S,N,Active) of
+        true ->
+            next_replication(Active, RemQ, in(Job, WaitingAndRunning));
+        false ->
+            {Job, join(Waiting, WaitingAndRunning)}
+        end
     end.
 
 is_running(DbName, Node, ActiveList) ->
