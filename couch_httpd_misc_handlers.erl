@@ -212,7 +212,12 @@ handle_config_req(Req) ->
 % PUT /_config/Section/Key
 % "value"
 handle_approved_config_req(#httpd{method='PUT', path_parts=[_, Section, Key]}=Req, Persist) ->
-    Value = couch_httpd:json_body(Req),
+    Value = case Section of
+    <<"admins">> ->
+        couch_passwords:hash_admin_password(couch_httpd:json_body(Req));
+    _ ->
+        couch_httpd:json_body(Req)
+    end,
     OldValue = couch_config:get(Section, Key, ""),
     case couch_config:set(Section, Key, ?b2l(Value), Persist) of
     ok ->

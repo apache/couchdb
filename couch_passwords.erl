@@ -13,6 +13,8 @@
 -module(couch_passwords).
 
 -export([simple/2, pbkdf2/3, pbkdf2/4, verify/2]).
+-export([hash_admin_password/1, get_unhashed_admins/0]).
+
 -include("couch_db.hrl").
 
 -define(MAX_DERIVED_KEY_LENGTH, (1 bsl 32 - 1)).
@@ -22,6 +24,29 @@
 -spec simple(binary(), binary()) -> binary().
 simple(Password, Salt) ->
     ?l2b(couch_util:to_hex(crypto:sha(<<Password/binary, Salt/binary>>))).
+
+%% CouchDB utility functions
+-spec hash_admin_password(binary()) -> binary().
+hash_admin_password(ClearPassword) ->
+    Iterations = couch_config:get("couch_httpd_auth", "iterations", "10000"),
+    Salt = couch_uuids:random(),
+    DerivedKey = couch_passwords:pbkdf2(?b2l(ClearPassword), Salt,
+        list_to_integer(Iterations)),
+    ?l2b("-pbkdf2-" ++ ?b2l(DerivedKey) ++ ","
+        ++ ?b2l(Salt) ++ ","
+        ++ Iterations).
+
+-spec get_unhashed_admins() -> list().
+get_unhashed_admins() ->
+    lists:filter(
+        fun({_User, "-hashed-" ++ _}) ->
+            false; % already hashed
+        ({_User, "-pbkdf2-" ++ _}) ->
+            false; % already hashed
+        ({_User, _ClearPassword}) ->
+            true
+        end,
+    couch_config:get("admins")).
 
 %% Current scheme, much stronger.
 -spec pbkdf2(binary(), binary(), integer()) -> string().

@@ -129,20 +129,11 @@ hash_admin_passwords() ->
     hash_admin_passwords(true).
 
 hash_admin_passwords(Persist) ->
-    Iterations = couch_config:get("couch_httpd_auth", "iterations", "10000"),
     lists:foreach(
-        fun({_User, "-hashed-" ++ _}) ->
-            ok; % already hashed
-        ({_User, "-pbkdf2-" ++ _}) ->
-            ok; % already hashed
-        ({User, ClearPassword}) ->
-            Salt = couch_uuids:random(),
-            DerivedKey = couch_passwords:pbkdf2(ClearPassword, Salt,
-                list_to_integer(Iterations)),
-            couch_config:set("admins",
-                User, "-pbkdf2-" ++ ?b2l(DerivedKey) ++ "," ++ ?b2l(Salt) ++
-                                 "," ++ Iterations, Persist)
-        end, couch_config:get("admins")).
+        fun({User, ClearPassword}) ->
+            HashedPassword = couch_passwords:hash_admin_password(ClearPassword),
+            couch_config:set("admins", User, ?b2l(HashedPassword), Persist)
+        end, couch_passwords:get_unhashed_admins()).
 
 init([]) ->
     % read config and register for configuration changes
