@@ -15,7 +15,7 @@
 -module(mem3).
 
 -export([start/0, stop/0, restart/0, nodes/0, node_info/2, shards/1, shards/2,
-    choose_shards/2, n/1, dbname/1, ushards/1]).
+    choose_shards/2, n/1, dbname/1, ushards/1, ushards/2]).
 -export([sync_security/0, sync_security/1]).
 -export([compare_nodelists/0, compare_shards/1]).
 -export([quorum/1, group_by_proximity/1]).
@@ -124,7 +124,12 @@ shards(DbName, DocId) ->
 
 -spec ushards(DbName::iodata()) -> [#shard{}].
 ushards(DbName) ->
-    {L,S,D} = group_by_proximity(live_shards(DbName)),
+    Nodes = [node()|erlang:nodes()],
+    ZoneMap = zone_map(Nodes),
+    ushards(live_shards(DbName, Nodes), ZoneMap).
+
+ushards(Shards0, ZoneMap) ->
+    {L,S,D} = group_by_proximity(Shards0, ZoneMap),
     % Prefer shards in the local zone over shards in a different zone,
     % but sort each zone separately to ensure a consistent choice between
     % nodes in the same zone.
@@ -213,15 +218,21 @@ apportion(Shares, Acc, Remaining) ->
     [H|T] = lists:nthtail(N, Acc),
     apportion(Shares, lists:sublist(Acc, N) ++ [H+1|T], Remaining - 1).
 
-live_shards(DbName) ->
-    Nodes = [node()|erlang:nodes()],
+live_shards(DbName, Nodes) ->
     [S || #shard{node=Node} = S <- shards(DbName), lists:member(Node, Nodes)].
 
+zone_map(Nodes) ->
+    [{Node, node_info(Node, <<"zone">>)} || Node <- Nodes].
+
 group_by_proximity(Shards) ->
+    Nodes = [N || #shard{node=N} <- lists:ukeysort(#shard.node, Shards)],
+    group_by_proximity(Shards, zone_map(Nodes)).
+
+group_by_proximity(Shards, ZoneMap) ->
     {Local, Remote} = lists:partition(fun(S) -> S#shard.node =:= node() end,
         Shards),
-    LocalZone = mem3:node_info(node(), <<"zone">>),
-    Fun = fun(S) -> mem3:node_info(S#shard.node, <<"zone">>) =:= LocalZone end,
+    LocalZone = proplists:get_value(node(), ZoneMap),
+    Fun = fun(S) -> proplists:get_value(S#shard.node, ZoneMap) =:= LocalZone end,
     {SameZone, DifferentZone} = lists:partition(Fun, Remote),
     {Local, SameZone, DifferentZone}.
 
