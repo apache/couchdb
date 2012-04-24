@@ -100,7 +100,7 @@ update_locals(Acc) ->
 
 rexi_call(Node, MFA) ->
     Mon = rexi_monitor:start([{rexi_server, Node}]),
-    Ref = rexi:cast(Node, MFA),
+    Ref = rexi:cast(Node, self(), MFA, [sync]),
     try
         receive {Ref, {ok, Reply}} ->
             Reply;
