@@ -167,7 +167,9 @@ handle_rewrite_req(#httpd{
 
             % in order to do OAuth correctly,
             % we have to save the requested path
-            Headers = mochiweb_headers:enter("x-couchdb-requested-path",
+            % we use default so chained rewriting
+            % wont replace the header
+            Headers = mochiweb_headers:default("x-couchdb-requested-path",
                                              MochiReq:get(raw_path),
                                              MochiReq:get(headers)),
 
