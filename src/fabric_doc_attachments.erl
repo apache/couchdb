@@ -36,7 +36,11 @@ receiver(Req, Length) when is_integer(Length) ->
     Middleman = spawn(fun() -> middleman(Req, Length) end),
     fun() ->
         Middleman ! {self(), gimme_data},
-        receive {Middleman, Data} -> Data end
+        receive
+            {Middleman, Data} -> Data
+        after 600000 ->
+            exit(timeout)
+        end
     end;
 receiver(_Req, Length) ->
     exit({length_not_integer, Length}).
