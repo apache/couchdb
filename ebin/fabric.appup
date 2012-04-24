@@ -1,0 +1,10 @@
+{"1.6.11",
+    [{"1.6.10", [
+                {load_module, fabric, [mem3]},
+                {load_module, fabric_doc_attachments},
+                {load_module, fabric_util, [mem3]},
+                {load_module, fabric_view_changes, [mem3]},
+                {load_module, fabric_view_reduce}
+            ]}],
+    [{"1.6.10", []}]}.
+
