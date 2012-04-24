@@ -1,5 +1,6 @@
 {"1.3.4", [
         {"1.3.3", [
+                {load_module, mem3_rep, [rexi]},
                 {add_module, mem3_shards},
                 {update, mem3_sup, supervisor},
                 {apply, {supervisor, restart_child, [mem3_sup, mem3_shards]}},
