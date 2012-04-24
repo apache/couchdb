@@ -2,7 +2,7 @@
 
 Fabric is a collection of proxy functions for [CouchDB][1] operations in a cluster.  These functions are used in [BigCouch][2] as the remote procedure endpoints on each of the cluster nodes.
 
-For example, creating a database is a straightforward task in standalone CouchDB, but for BigCouch, each node that will store a shard/partition for the database needs to receive and execute a fabric function.  The node handling the request also needs to compile the results from each of the nodes and respond accordingly to the client.
+For example, creating a database is a straightforward task in standalone CouchDB, but for BigCouch, each node that will store a shard for the database needs to receive and execute a fabric function.  The node handling the request also needs to compile the results from each of the nodes and respond accordingly to the client.
 
 Fabric is used in conjunction with 'Rexi' which is also an application within BigCouch.
 
