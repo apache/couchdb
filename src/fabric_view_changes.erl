@@ -317,7 +317,8 @@ validate_start_seq(DbName, Seq) ->
     end.
 
 unpack_seqs_test() ->
-    ets:new(partitions, [named_table]),
+    meck:new(mem3),
+    meck:expect(mem3, get_shard, fun(_, _, _) -> {ok, #shard{}} end),
 
     % BigCouch 0.3 style.
     assert_shards("23423-g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
@@ -347,7 +348,7 @@ unpack_seqs_test() ->
     "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
     "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA\""),
 
-    ets:delete(partitions).
+    meck:unload(mem3).
 
 assert_shards(Packed) ->
     ?assertMatch([{#shard{},_}|_], unpack_seqs(Packed, <<"foo">>)).
