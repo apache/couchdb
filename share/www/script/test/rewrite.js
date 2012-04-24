@@ -437,4 +437,21 @@ couchTests.rewrite = function(debug) {
   var res = CouchDB.request("GET", "/test_suite_db/_design/invalid/_rewrite/foo");
   TEquals(400, res.status, "should return 400");
 
+
+
+  var ddoc_loop = {
+    _id: "_design/loop",
+    rewrites: [{ "from": "loop",  "to": "_rewrite/loop"}]
+  };
+  db.save(ddoc_loop);
+
+  run_on_modified_server(
+    [{section: "httpd",
+      key: "rewrite_limit",
+      value: "2"}],
+      function(){
+        var xhr = CouchDB.request("GET", "/test_suite_db/_design/loop/_rewrite/loop");
+        T(xhr.status = 400);
+  });
+
 }
