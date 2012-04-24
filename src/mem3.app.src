@@ -3,9 +3,9 @@
     {vsn, git},
     {mod, {mem3_app, []}},
     {registered, [
-        mem3_cache,
         mem3_events,
         mem3_nodes,
+        mem3_shards,
         mem3_sync,
         mem3_sup
     ]},
