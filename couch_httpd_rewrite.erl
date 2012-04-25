@@ -121,7 +121,7 @@ handle_rewrite_req(#httpd{
 
     MaxRewritesList = couch_config:get("httpd", "rewrite_limit", "100"),
     MaxRewrites = list_to_integer(MaxRewritesList),
-    NRewrites = case get(couch_rewrite_count) of
+    case get(couch_rewrite_count) of
         undefined ->
             put(couch_rewrite_count, 1);
         NumRewrites when NumRewrites < MaxRewrites ->
