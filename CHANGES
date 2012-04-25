@@ -35,6 +35,11 @@ Security:
   * Passwords are now hashed using the PBKDF2 algorithm with a
     configurable work factor.
 
+Test Suite:
+
+  * Improved tracebacks printed by the JS CLI tests
+  * Improved the reliability of a number of tests
+
 Version 1.2.1
 -------------
 
