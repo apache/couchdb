@@ -13,6 +13,7 @@
 # the License.
 
 SRC_DIR=%abs_top_srcdir%
+BUILD_DIR=%abs_top_builddir%
 SCRIPT_DIR=$SRC_DIR/share/www/script
 JS_TEST_DIR=$SRC_DIR/test/javascript
 
@@ -40,9 +41,9 @@ fi
 if [ -z $COUCHDB_NO_START ]; then
         make dev
 	./utils/run -b -r 1 -n \
-		-a $SRC_DIR/etc/couchdb/default_dev.ini \
+		-a $BUILD_DIR/etc/couchdb/default_dev.ini \
 		-a $SRC_DIR/test/random_port.ini \
-		-a $SRC_DIR/etc/couchdb/local_dev.ini
+		-a $BUILD_DIR/etc/couchdb/local_dev.ini
     RUN_PID=$!
     trap "./utils/run -d || kill $RUN_PID || exit 2" EXIT
 	sleep 1 # give it a sec
