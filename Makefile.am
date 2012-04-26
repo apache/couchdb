@@ -89,6 +89,9 @@ if USE_CURL
 	$(top_builddir)/test/javascript/run
 endif
 
+check-etap: dev
+	$(top_builddir)/test/etap/run $(top_srcdir)/test/etap
+
 cover: dev
 	rm -f cover/*.coverdata
 	COVER=1 COVER_BIN=./src/couchdb/ $(top_builddir)/test/etap/run

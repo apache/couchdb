@@ -13,26 +13,10 @@
 etapebindir = $(localerlanglibdir)/etap/ebin
 
 etap_file_collection = \
-    etap.erl \
-   	etap_application.erl \
-    etap_can.erl \
-    etap_exception.erl \
-    etap_process.erl \
-	etap_report.erl \
-	etap_request.erl \
-	etap_string.erl \
-   	etap_web.erl
+    etap.erl
 
 etapebin_make_generated_file_list = \
-    etap.beam \
-   	etap_application.beam \
-    etap_can.beam \
-    etap_exception.beam \
-    etap_process.beam \
-	etap_report.beam \
-	etap_request.beam \
-	etap_string.beam \
-   	etap_web.beam
+    etap.beam
 
 etapebin_DATA = $(etapebin_make_generated_file_list)
 

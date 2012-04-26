@@ -44,22 +44,66 @@
 %% a number of etap tests and then calling eta:end_tests/0. Please refer to
 %% the Erlang modules in the t directory of this project for example tests.
 -module(etap).
--export([
-    ensure_test_server/0, start_etap_server/0, test_server/1,
-    diag/1, diag/2, plan/1, end_tests/0, not_ok/2, ok/2, is/3, isnt/3,
-    any/3, none/3, fun_is/3, is_greater/3, skip/1, skip/2,
-    ensure_coverage_starts/0, ensure_coverage_ends/0, coverage_report/0,
-    datetime/1, skip/3, bail/0, bail/1
-]).
--record(test_state, {planned = 0, count = 0, pass = 0, fail = 0, skip = 0, skip_reason = ""}).
 -vsn("0.3.4").
+
+-export([
+    ensure_test_server/0,
+    start_etap_server/0,
+    test_server/1,
+    msg/1, msg/2,
+    diag/1, diag/2,
+    expectation_mismatch_message/3,
+    plan/1,
+    end_tests/0,
+    not_ok/2, ok/2, is_ok/2, is/3, isnt/3, any/3, none/3,
+    fun_is/3, expect_fun/3, expect_fun/4,
+    is_greater/3,
+    skip/1, skip/2,
+    datetime/1,
+    skip/3,
+    bail/0, bail/1,
+    test_state/0, failure_count/0
+]).
+
+-export([
+    contains_ok/3,
+    is_before/4
+]).
+
+-export([
+    is_pid/2,
+    is_alive/2,
+    is_mfa/3
+]).
+
+-export([
+    loaded_ok/2,
+    can_ok/2, can_ok/3,
+    has_attrib/2, is_attrib/3,
+    is_behaviour/2
+]).
+
+-export([
+    dies_ok/2,
+    lives_ok/2,
+    throws_ok/3
+]).
+
+
+-record(test_state, {
+    planned = 0,
+    count = 0,
+    pass = 0,
+    fail = 0,
+    skip = 0,
+    skip_reason = ""
+}).
 
 %% @spec plan(N) -> Result
 %%       N = unknown | skip | {skip, string()} | integer()
 %%       Result = ok
 %% @doc Create a test plan and boot strap the test server.
 plan(unknown) ->
-    ensure_coverage_starts(),
     ensure_test_server(),
     etap_server ! {self(), plan, unknown},
     ok;
@@ -68,7 +112,6 @@ plan(skip) ->
 plan({skip, Reason}) ->
     io:format("1..0 # skip ~s~n", [Reason]);
 plan(N) when is_integer(N), N > 0 ->
-    ensure_coverage_starts(),
     ensure_test_server(),
     etap_server ! {self(), plan, N},
     ok.
@@ -78,8 +121,10 @@ plan(N) when is_integer(N), N > 0 ->
 %% @todo This should probably be done in the test_server process.
 end_tests() ->
     timer:sleep(100),
-    ensure_coverage_ends(),
-    etap_server ! {self(), state},
+    case whereis(etap_server) of
+        undefined -> self() ! true;
+        _ -> etap_server ! {self(), state}
+    end,
     State = receive X -> X end,
     if
         State#test_state.planned == -1 ->
@@ -92,58 +137,52 @@ end_tests() ->
         _ -> etap_server ! done, ok
     end.
 
-%% @private
-ensure_coverage_starts() ->
-    case os:getenv("COVER") of
-        false -> ok;
-        _ ->
-            BeamDir = case os:getenv("COVER_BIN") of false -> "ebin"; X -> X end,
-            cover:compile_beam_directory(BeamDir)
-    end.
-
-%% @private
-%% @doc Attempts to write out any collected coverage data to the cover/
-%% directory. This function should not be called externally, but it could be.
-ensure_coverage_ends() ->
-    case os:getenv("COVER") of
-        false -> ok;
-        _ ->
-            filelib:ensure_dir("cover/"),
-            Name = lists:flatten([
-                io_lib:format("~.16b", [X]) || X <- binary_to_list(erlang:md5(
-                     term_to_binary({make_ref(), now()})
-                ))
-            ]),
-            cover:export("cover/" ++ Name ++ ".coverdata")
-    end.
-
-%% @spec coverage_report() -> ok
-%% @doc Use the cover module's covreage report builder to create code coverage
-%% reports from recently created coverdata files.
-coverage_report() ->
-    [cover:import(File) || File <- filelib:wildcard("cover/*.coverdata")],
-    lists:foreach(
-        fun(Mod) ->
-            cover:analyse_to_file(Mod, atom_to_list(Mod) ++ "_coverage.txt", [])
-        end,
-        cover:imported_modules()
-    ),
-    ok.
-
 bail() ->
     bail("").
 
 bail(Reason) ->
     etap_server ! {self(), diag, "Bail out! " ++ Reason},
-    ensure_coverage_ends(),
     etap_server ! done, ok,
     ok.
 
+%% @spec test_state() -> Return
+%%       Return = test_state_record() | {error, string()}
+%% @doc Return the current test state
+test_state() ->
+    etap_server ! {self(), state},
+    receive
+	X when is_record(X, test_state) -> X
+    after
+	1000 -> {error, "Timed out waiting for etap server reply.~n"}
+    end.
+
+%% @spec failure_count() -> Return
+%%       Return = integer() | {error, string()}
+%% @doc Return the current failure count
+failure_count() ->
+    case test_state() of
+        #test_state{fail=FailureCount} -> FailureCount;
+        X -> X
+    end.
+
+%% @spec msg(S) -> ok
+%%       S = string()
+%% @doc Print a message in the test output.
+msg(S) -> etap_server ! {self(), diag, S}, ok.
+
+%% @spec msg(Format, Data) -> ok
+%%      Format = atom() | string() | binary()
+%%      Data = [term()]
+%%      UnicodeList = [Unicode]
+%%      Unicode = int()
+%% @doc Print a message in the test output.
+%% Function arguments are passed through io_lib:format/2.
+msg(Format, Data) -> msg(io_lib:format(Format, Data)).
 
 %% @spec diag(S) -> ok
 %%       S = string()
 %% @doc Print a debug/status message related to the test suite.
-diag(S) -> etap_server ! {self(), diag, "# " ++ S}, ok.
+diag(S) -> msg("# " ++ S).
 
 %% @spec diag(Format, Data) -> ok
 %%      Format = atom() | string() | binary()
@@ -154,19 +193,56 @@ diag(S) -> etap_server ! {self(), diag, "# " ++ S}, ok.
 %% Function arguments are passed through io_lib:format/2.
 diag(Format, Data) -> diag(io_lib:format(Format, Data)).
 
+%% @spec expectation_mismatch_message(Got, Expected, Desc) -> ok
+%%       Got = any()
+%%       Expected = any()
+%%       Desc = string()
+%% @doc Print an expectation mismatch message in the test output.
+expectation_mismatch_message(Got, Expected, Desc) ->
+    msg("    ---"),
+    msg("    description: ~p", [Desc]),
+    msg("    found:       ~p", [Got]),
+    msg("    wanted:      ~p", [Expected]),
+    msg("    ..."),
+    ok.
+
+% @spec evaluate(Pass, Got, Expected, Desc) -> Result
+%%       Pass = true | false
+%%       Got = any()
+%%       Expected = any()
+%%       Desc = string()
+%%       Result = true | false
+%% @doc Evaluate a test statement, printing an expectation mismatch message
+%%       if the test failed.
+evaluate(Pass, Got, Expected, Desc) ->
+    case mk_tap(Pass, Desc) of
+        false ->
+            expectation_mismatch_message(Got, Expected, Desc),
+            false;
+        true ->
+            true
+    end.
+
 %% @spec ok(Expr, Desc) -> Result
 %%       Expr = true | false
 %%       Desc = string()
 %%       Result = true | false
 %% @doc Assert that a statement is true.
-ok(Expr, Desc) -> mk_tap(Expr == true, Desc).
+ok(Expr, Desc) -> evaluate(Expr == true, Expr, true, Desc).
 
 %% @spec not_ok(Expr, Desc) -> Result
 %%       Expr = true | false
 %%       Desc = string()
 %%       Result = true | false
 %% @doc Assert that a statement is false.
-not_ok(Expr, Desc) -> mk_tap(Expr == false, Desc).
+not_ok(Expr, Desc) -> evaluate(Expr == false, Expr, false, Desc).
+
+%% @spec is_ok(Expr, Desc) -> Result
+%%       Expr = any()
+%%       Desc = string()
+%%       Result = true | false
+%% @doc Assert that two values are the same.
+is_ok(Expr, Desc) -> evaluate(Expr == ok, Expr, ok, Desc).
 
 %% @spec is(Got, Expected, Desc) -> Result
 %%       Got = any()
@@ -174,17 +250,7 @@ not_ok(Expr, Desc) -> mk_tap(Expr == false, Desc).
 %%       Desc = string()
 %%       Result = true | false
 %% @doc Assert that two values are the same.
-is(Got, Expected, Desc) ->
-    case mk_tap(Got == Expected, Desc) of
-        false ->
-            etap_server ! {self(), diag, "    ---"},
-            etap_server ! {self(), diag, io_lib:format("    description: ~p", [Desc])},
-            etap_server ! {self(), diag, io_lib:format("    found:       ~p", [Got])},
-            etap_server ! {self(), diag, io_lib:format("    wanted:      ~p", [Expected])},
-            etap_server ! {self(), diag, "    ..."},
-            false;
-        true -> true
-    end.
+is(Got, Expected, Desc) -> evaluate(Got == Expected, Got, Expected, Desc).
 
 %% @spec isnt(Got, Expected, Desc) -> Result
 %%       Got = any()
@@ -192,7 +258,7 @@ is(Got, Expected, Desc) ->
 %%       Desc = string()
 %%       Result = true | false
 %% @doc Assert that two values are not the same.
-isnt(Got, Expected, Desc) -> mk_tap(Got /= Expected, Desc).
+isnt(Got, Expected, Desc) -> evaluate(Got /= Expected, Got, Expected, Desc).
 
 %% @spec is_greater(ValueA, ValueB, Desc) -> Result
 %%       ValueA = number()
@@ -209,6 +275,8 @@ is_greater(ValueA, ValueB, Desc) when is_integer(ValueA), is_integer(ValueB) ->
 %%       Desc = string()
 %%       Result = true | false
 %% @doc Assert that an item is in a list.
+any(Got, Items, Desc) when is_function(Got) ->
+    is(lists:any(Got, Items), true, Desc);
 any(Got, Items, Desc) ->
     is(lists:member(Got, Items), true, Desc).
 
@@ -218,6 +286,8 @@ any(Got, Items, Desc) ->
 %%       Desc = string()
 %%       Result = true | false
 %% @doc Assert that an item is not in a list.
+none(Got, Items, Desc) when is_function(Got) ->
+    is(lists:any(Got, Items), false, Desc);
 none(Got, Items, Desc) ->
     is(lists:member(Got, Items), false, Desc).
 
@@ -229,6 +299,27 @@ none(Got, Items, Desc) ->
 %% @doc Use an anonymous function to assert a pattern match.
 fun_is(Fun, Expected, Desc) when is_function(Fun) ->
     is(Fun(Expected), true, Desc).
+
+%% @spec expect_fun(ExpectFun, Got, Desc) -> Result
+%%       ExpectFun = function()
+%%       Got = any()
+%%       Desc = string()
+%%       Result = true | false
+%% @doc Use an anonymous function to assert a pattern match, using actual
+%%       value as the argument to the function.
+expect_fun(ExpectFun, Got, Desc) ->
+    evaluate(ExpectFun(Got), Got, ExpectFun, Desc).
+
+%% @spec expect_fun(ExpectFun, Got, Desc, ExpectStr) -> Result
+%%       ExpectFun = function()
+%%       Got = any()
+%%       Desc = string()
+%%       ExpectStr = string()
+%%       Result = true | false
+%% @doc Use an anonymous function to assert a pattern match, using actual
+%%       value as the argument to the function.
+expect_fun(ExpectFun, Got, Desc, ExpectStr) ->
+    evaluate(ExpectFun(Got), Got, ExpectStr, Desc).
 
 %% @equiv skip(TestFun, "")
 skip(TestFun) when is_function(TestFun) ->
@@ -276,8 +367,113 @@ begin_skip(Reason) ->
 end_skip() ->
     etap_server ! {self(), end_skip}.
 
-% ---
-% Internal / Private functions
+%% @spec contains_ok(string(), string(), string()) -> true | false
+%% @doc Assert that a string is contained in another string.
+contains_ok(Source, String, Desc) ->
+    etap:isnt(
+        string:str(Source, String),
+        0,
+        Desc
+    ).
+
+%% @spec is_before(string(), string(), string(), string()) -> true | false
+%% @doc Assert that a string comes before another string within a larger body.
+is_before(Source, StringA, StringB, Desc) ->
+    etap:is_greater(
+        string:str(Source, StringB),
+        string:str(Source, StringA),
+        Desc
+    ).
+
+%% @doc Assert that a given variable is a pid.
+is_pid(Pid, Desc) when is_pid(Pid) -> etap:ok(true, Desc);
+is_pid(_, Desc) -> etap:ok(false, Desc).
+
+%% @doc Assert that a given process/pid is alive.
+is_alive(Pid, Desc) ->
+    etap:ok(erlang:is_process_alive(Pid), Desc).
+
+%% @doc Assert that the current function of a pid is a given {M, F, A} tuple.
+is_mfa(Pid, MFA, Desc) ->
+    etap:is({current_function, MFA}, erlang:process_info(Pid, current_function), Desc).
+
+%% @spec loaded_ok(atom(), string()) -> true | false
+%% @doc Assert that a module has been loaded successfully.
+loaded_ok(M, Desc) when is_atom(M) ->
+    etap:fun_is(fun({module, _}) -> true; (_) -> false end, code:load_file(M), Desc).
+
+%% @spec can_ok(atom(), atom()) -> true | false
+%% @doc Assert that a module exports a given function.
+can_ok(M, F) when is_atom(M), is_atom(F) ->
+    Matches = [X || {X, _} <- M:module_info(exports), X == F],
+    etap:ok(Matches > 0, lists:concat([M, " can ", F])).
+
+%% @spec can_ok(atom(), atom(), integer()) -> true | false
+%% @doc Assert that a module exports a given function with a given arity.
+can_ok(M, F, A) when is_atom(M); is_atom(F), is_number(A) ->
+    Matches = [X || X <- M:module_info(exports), X == {F, A}],
+    etap:ok(Matches > 0, lists:concat([M, " can ", F, "/", A])).
+
+%% @spec has_attrib(M, A) -> true | false
+%%       M = atom()
+%%       A = atom()
+%% @doc Asserts that a module has a given attribute.
+has_attrib(M, A) when is_atom(M), is_atom(A) ->
+    etap:isnt(
+        proplists:get_value(A, M:module_info(attributes), 'asdlkjasdlkads'),
+        'asdlkjasdlkads',
+        lists:concat([M, " has attribute ", A])
+    ).
+
+%% @spec has_attrib(M, A. V) -> true | false
+%%       M = atom()
+%%       A = atom()
+%%       V = any()
+%% @doc Asserts that a module has a given attribute with a given value.
+is_attrib(M, A, V) when is_atom(M) andalso is_atom(A) ->
+    etap:is(
+        proplists:get_value(A, M:module_info(attributes)),
+        [V],
+        lists:concat([M, "'s ", A, " is ", V])
+    ).
+
+%% @spec is_behavior(M, B) -> true | false
+%%       M = atom()
+%%       B = atom()
+%% @doc Asserts that a given module has a specific behavior.
+is_behaviour(M, B) when is_atom(M) andalso is_atom(B) ->
+    is_attrib(M, behaviour, B).
+
+%% @doc Assert that an exception is raised when running a given function.
+dies_ok(F, Desc) ->
+    case (catch F()) of
+        {'EXIT', _} -> etap:ok(true, Desc);
+        _ -> etap:ok(false, Desc)
+    end.
+
+%% @doc Assert that an exception is not raised when running a given function.
+lives_ok(F, Desc) ->
+    etap:is(try_this(F), success, Desc).
+
+%% @doc Assert that the exception thrown by a function matches the given exception.
+throws_ok(F, Exception, Desc) ->
+    try F() of
+        _ -> etap:ok(nok, Desc)
+    catch
+        _:E ->
+            etap:is(E, Exception, Desc)
+    end.
+
+%% @private
+%% @doc Run a function and catch any exceptions.
+try_this(F) when is_function(F, 0) ->
+    try F() of
+        _ -> success
+    catch
+        throw:E -> {throw, E};
+        error:E -> {error, E};
+        exit:E -> {exit, E}
+    end.
 
 %% @private
 %% @doc Start the etap_server process if it is not running already.

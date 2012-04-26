@@ -46,9 +46,6 @@ get_task_prop(Pid, Prop) ->
         Value
     end.
 
-now_ts() ->
-    {Mega, Secs, _} = erlang:now(),
-    Mega * 1000000 + Secs.
 
 loop() ->
     receive

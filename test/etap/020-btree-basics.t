@@ -235,10 +235,10 @@ test_final_reductions(Btree, KeyValues) ->
     KVLen = FoldLRed + FoldRRed,
     ok.
 
-test_traversal_callbacks(Btree, KeyValues) ->
+test_traversal_callbacks(Btree, _KeyValues) ->
     FoldFun =
     fun
-        (visit, GroupedKey, Unreduced, Acc) ->
+        (visit, _GroupedKey, _Unreduced, Acc) ->
             {ok, Acc andalso false};
         (traverse, _LK, _Red, Acc) ->
             {skip, Acc andalso true}
