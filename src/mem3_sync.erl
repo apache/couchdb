@@ -213,17 +213,26 @@ initial_sync() ->
     initial_sync(nodes()).
 
 initial_sync(Live) ->
-    Self = node(),
-    {ok, AllDbs} = fabric:all_dbs(),
-    lists:foreach(fun(Db) ->
-        LocalShards = [S || #shard{node=N} = S <- mem3:shards(Db), N =:= Self],
-        lists:foreach(fun(#shard{name=ShardName}) ->
-            Targets = [S || #shard{node=N, name=Name} = S <- mem3:shards(Db),
-                N =/= Self, Name =:= ShardName],
-            [?MODULE:push(ShardName, N) || #shard{node=N} <- Targets,
-                lists:member(N, Live)]
-        end, LocalShards)
-    end, AllDbs).
+    Acc = {node(), Live, []},
+    {_, _, Shards} = mem3_shards:fold(fun initial_sync_fold/2, Acc),
+    submit_replication_tasks(node(), Live, Shards).
+
+initial_sync_fold(#shard{dbname = Db} = Shard, {LocalNode, Live, AccShards}) ->
+    case AccShards of
+    [#shard{dbname = AccDb} | _] when Db =/= AccDb ->
+        submit_replication_tasks(LocalNode, Live, AccShards),
+        {LocalNode, Live, [Shard]};
+    _ ->
+        {LocalNode, Live, [Shard|AccShards]}
+    end.
+
+submit_replication_tasks(LocalNode, Live, Shards) ->
+    SplitFun = fun(#shard{node = Node}) -> Node =:= LocalNode end,
+    {Local, Remote} = lists:partition(SplitFun, Shards),
+    lists:foreach(fun(#shard{name = ShardName}) ->
+        [?MODULE:push(ShardName, N) || #shard{node=N, name=Name} <- Remote,
+            Name =:= ShardName, lists:member(N, Live)]
+    end, Local).
 
 start_update_notifier() ->
     Db1 = ?l2b(couch_config:get("mem3", "node_db", "nodes")),
