@@ -66,6 +66,9 @@ init([]) ->
     spawn(fun initial_sync/0),
     {ok, #state{limit = list_to_integer(Concurrency), update_notifier=Pid}}.
 
+handle_call({push, Job}, From, State) ->
+    {noreply, handle_cast({push, Job#job{pid = From}}, State)};
+
 handle_call(get_active, _From, State) ->
     {reply, State#state.active, State};
 
@@ -184,7 +187,8 @@ handle_replication_exit(State, Pid) ->
     end,
     {noreply, NewState}.
 
-start_push_replication(#job{name=Name, node=Node}) ->
+start_push_replication(#job{name=Name, node=Node, pid=From}) ->
+    if From =/= nil -> gen_server:reply(From, ok); true -> ok end,
     spawn_link(mem3_rep, go, [Name, Node]).
 
 add_to_queue(State, #job{name=DbName, node=Node} = Job) ->
@@ -230,9 +234,12 @@ submit_replication_tasks(LocalNode, Live, Shards) ->
     SplitFun = fun(#shard{node = Node}) -> Node =:= LocalNode end,
     {Local, Remote} = lists:partition(SplitFun, Shards),
     lists:foreach(fun(#shard{name = ShardName}) ->
-        [?MODULE:push(ShardName, N) || #shard{node=N, name=Name} <- Remote,
+        [sync_push(ShardName, N) || #shard{node=N, name=Name} <- Remote,
             Name =:= ShardName, lists:member(N, Live)]
     end, Local).
+
+sync_push(ShardName, N) ->
+    gen_server:call(mem3_sync, {push, #job{name=ShardName, node=N}}, infinity).
 
 start_update_notifier() ->
     Db1 = ?l2b(couch_config:get("mem3", "node_db", "nodes")),
