@@ -73,6 +73,7 @@ default_dev.ini: default.ini.tpl
 local_dev.ini: local.ini
 	if test ! -f "$@"; then \
 	    cp $< $@; \
+		chmod +w $@; \
 	fi
 
 install-data-hook:
