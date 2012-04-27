@@ -23,11 +23,8 @@ init(_) ->
     {ok, nil}.
 
 handle_event({add_node, Node}, State) when Node =/= node() ->
-    Db1 = list_to_binary(couch_config:get("mem3", "node_db", "nodes")),
-    Db2 = list_to_binary(couch_config:get("mem3", "shard_db", "dbs")),
-    Db3 = list_to_binary(couch_config:get("couch_httpd_auth",
-                                          "authentication_db", "_users")),
-    [mem3_sync:push(Db, Node) || Db <- [Db1, Db2, Db3]],
+    net_kernel:connect_node(Node),
+    mem3_sync:initial_sync([Node]),
     {ok, State};
 
 handle_event({remove_node, Node}, State)  ->
@@ -43,11 +40,6 @@ handle_call(_Request, State) ->
 handle_info({nodeup, Node}, State) ->
     case lists:member(Node, mem3:nodes()) of
     true ->
-        Db1 = list_to_binary(couch_config:get("mem3", "node_db", "nodes")),
-        Db2 = list_to_binary(couch_config:get("mem3", "shard_db", "dbs")),
-        Db3 = list_to_binary(couch_config:get("couch_httpd_auth",
-                                              "authentication_db", "_users")),
-        [mem3_sync:push(Db, Node) || Db <- [Db1, Db2, Db3]],
         mem3_sync:initial_sync([Node]);
     false ->
         ok
