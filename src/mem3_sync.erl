@@ -212,10 +212,10 @@ sync_nodes_and_dbs() ->
 
 initial_sync() ->
     [net_kernel:connect_node(Node) || Node <- mem3:nodes()],
-    sync_nodes_and_dbs(),
     initial_sync(nodes()).
 
 initial_sync(Live) ->
+    sync_nodes_and_dbs(),
     Acc = {node(), Live, []},
     {_, _, Shards} = mem3_shards:fold(fun initial_sync_fold/2, Acc),
     submit_replication_tasks(node(), Live, Shards).
