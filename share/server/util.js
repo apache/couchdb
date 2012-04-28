@@ -87,7 +87,7 @@ var Couch = {
               // create empty exports object before executing the module,
               // stops circular requires from filling the stack
               ddoc._module_cache[newModule.id] = {};
-              var s = "function (module, exports, require) { " + newModule.current + " }";
+              var s = "function (module, exports, require) { " + newModule.current + "\n }";
               try {
                 var func = sandbox ? evalcx(s, sandbox, newModule.id) : eval(s);
                 func.apply(sandbox, [newModule, newModule.exports, function(name) {
