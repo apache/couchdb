@@ -204,7 +204,14 @@ handle_replication_exit(State, Pid) ->
 
 start_push_replication(#job{name=Name, node=Node, pid=From}) ->
     if From =/= nil -> gen_server:reply(From, ok); true -> ok end,
-    spawn_link(mem3_rep, go, [Name, Node]).
+    spawn_link(fun() ->
+        case mem3_rep:go(Name, Node) of
+            {ok, Pending} when Pending > 0 ->
+                exit({pending_changes, Pending});
+            _ ->
+                ok
+        end
+    end).
 
 add_to_queue(State, #job{name=DbName, node=Node, pid=From} = Job) ->
     #state{dict=D, waiting=WQ} = State,
