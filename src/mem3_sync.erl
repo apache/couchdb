@@ -68,6 +68,9 @@ init([]) ->
     spawn(fun initial_sync/0),
     {ok, #state{limit = list_to_integer(Concurrency), update_notifier=Pid}}.
 
+handle_call({push, Job}, From, State) ->
+    {noreply, handle_cast({push, Job#job{pid = From}}, State)};
+
 handle_call(get_active, _From, State) ->
     {reply, State#state.active, State};
 
@@ -135,7 +138,12 @@ handle_info({'EXIT', Active, Reason}, State) ->
         case Reason of {pending_changes, Count} ->
             add_to_queue(State, Job#job{pid = nil, count = Count});
         _ ->
-            timer:apply_after(5000, ?MODULE, push, [Job#job{pid=nil}]),
+            try mem3:shards(mem3:dbname(Job#job.name)) of _ ->
+                timer:apply_after(5000, ?MODULE, push, [Job#job{pid=nil}])
+            catch error:database_does_not_exist ->
+                % no need to retry
+                ok
+            end,
             State
         end;
     false -> State end,
@@ -182,7 +190,8 @@ handle_replication_exit(State, Pid) ->
         {noreply, NewState}
     end.
 
-start_push_replication(#job{name=Name, node=Node}) ->
+start_push_replication(#job{name=Name, node=Node, pid=From}) ->
+    if From =/= nil -> gen_server:reply(From, ok); true -> ok end,
     spawn_link(mem3_rep, go, [Name, Node]).
 
 add_to_queue(State, #job{name=DbName, node=Node} = Job) ->
@@ -202,28 +211,38 @@ sync_nodes_and_dbs() ->
     Db1 = couch_config:get("mem3", "node_db", "nodes"),
     Db2 = couch_config:get("mem3", "shard_db", "dbs"),
     Db3 = couch_config:get("couch_httpd_auth", "authentication_db", "_users"),
-    Dbs = [Db1, Db2, Db3],
-    Nodes = mem3:nodes(),
-    Live = nodes(),
-    [[push(?l2b(Db), N) || Db <- Dbs] || N <- Nodes, lists:member(N, Live)].
+    Node = find_next_node(),
+    [push(?l2b(Db), Node) || Db <- [Db1, Db2, Db3]].
 
 initial_sync() ->
     [net_kernel:connect_node(Node) || Node <- mem3:nodes()],
-    sync_nodes_and_dbs(),
     initial_sync(nodes()).
 
 initial_sync(Live) ->
-    Self = node(),
-    {ok, AllDbs} = fabric:all_dbs(),
-    lists:foreach(fun(Db) ->
-        LocalShards = [S || #shard{node=N} = S <- mem3:shards(Db), N =:= Self],
-        lists:foreach(fun(#shard{name=ShardName}) ->
-            Targets = [S || #shard{node=N, name=Name} = S <- mem3:shards(Db),
-                N =/= Self, Name =:= ShardName],
-            [?MODULE:push(ShardName, N) || #shard{node=N} <- Targets,
-                lists:member(N, Live)]
-        end, LocalShards)
-    end, AllDbs).
+    sync_nodes_and_dbs(),
+    Acc = {node(), Live, []},
+    {_, _, Shards} = mem3_shards:fold(fun initial_sync_fold/2, Acc),
+    submit_replication_tasks(node(), Live, Shards).
+
+initial_sync_fold(#shard{dbname = Db} = Shard, {LocalNode, Live, AccShards}) ->
+    case AccShards of
+    [#shard{dbname = AccDb} | _] when Db =/= AccDb ->
+        submit_replication_tasks(LocalNode, Live, AccShards),
+        {LocalNode, Live, [Shard]};
+    _ ->
+        {LocalNode, Live, [Shard|AccShards]}
+    end.
+
+submit_replication_tasks(LocalNode, Live, Shards) ->
+    SplitFun = fun(#shard{node = Node}) -> Node =:= LocalNode end,
+    {Local, Remote} = lists:partition(SplitFun, Shards),
+    lists:foreach(fun(#shard{name = ShardName}) ->
+        [sync_push(ShardName, N) || #shard{node=N, name=Name} <- Remote,
+            Name =:= ShardName, lists:member(N, Live)]
+    end, Local).
+
+sync_push(ShardName, N) ->
+    gen_server:call(mem3_sync, {push, #job{name=ShardName, node=N}}, infinity).
 
 start_update_notifier() ->
     Db1 = ?l2b(couch_config:get("mem3", "node_db", "nodes")),
@@ -231,10 +250,12 @@ start_update_notifier() ->
     Db3 = ?l2b(couch_config:get("couch_httpd_auth", "authentication_db",
         "_users")),
     couch_db_update_notifier:start_link(fun
-    ({updated, Db}) when Db == Db1; Db == Db2; Db == Db3 ->
+    ({updated, Db}) when Db == Db1 ->
         Nodes = mem3:nodes(),
         Live = nodes(),
-        [?MODULE:push(Db, N) || N <- Nodes, lists:member(N, Live)];
+        [?MODULE:push(Db1, N) || N <- Nodes, lists:member(N, Live)];
+    ({updated, Db}) when Db == Db2; Db == Db3 ->
+        ?MODULE:push(Db, find_next_node());
     ({updated, <<"shards/", _/binary>> = ShardName}) ->
         % TODO deal with split/merged partitions by comparing keyranges
         try mem3:shards(mem3:dbname(ShardName)) of
@@ -250,6 +271,14 @@ start_update_notifier() ->
     ({deleted, <<"shards/", _:18/binary, _/binary>> = ShardName}) ->
         gen_server:cast(?MODULE, {remove_shard, ShardName});
     (_) -> ok end).
+
+find_next_node() ->
+    LiveNodes = [node()|nodes()],
+    AllNodes0 = lists:sort(mem3:nodes()),
+    AllNodes1 = [X || X <- AllNodes0, lists:member(X, LiveNodes)],
+    AllNodes = AllNodes1 ++ [hd(AllNodes1)],
+    [_Self, Next| _] = lists:dropwhile(fun(N) -> N =/= node() end, AllNodes),
+    Next.
 
 %% @doc Finds the next {DbName,Node} pair in the list of waiting replications
 %% which does not correspond to an already running replication
