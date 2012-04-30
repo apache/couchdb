@@ -157,7 +157,7 @@ terminate(_Reason, State) ->
     [exit(Pid, shutdown) || #job{pid=Pid} <- State#state.active],
     ok.
 
-code_change(_, #state{waiting = WaitingList} = State, _) ->
+code_change(_, #state{waiting = WaitingList} = State, _) when is_list(WaitingList) ->
     {ok, State#state{waiting = from_list(WaitingList)}};
 
 code_change(_, State, _) ->
