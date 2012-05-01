@@ -84,6 +84,7 @@ start_couchdb () {
     # Start Apache CouchDB as a background process.
 
     mkdir -p "$RUN_DIR"
+    chown $COUCHDB_USER $RUN_DIR
     command="$COUCHDB -b"
     if test -n "$COUCHDB_STDOUT_FILE"; then
         command="$command -o $COUCHDB_STDOUT_FILE"
