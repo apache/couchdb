@@ -69,7 +69,7 @@ init([]) ->
     {ok, #state{limit = list_to_integer(Concurrency), update_notifier=Pid}}.
 
 handle_call({push, Job}, From, State) ->
-    {noreply, handle_cast({push, Job#job{pid = From}}, State)};
+    handle_cast({push, Job#job{pid = From}}, State);
 
 handle_call(get_active, _From, State) ->
     {reply, State#state.active, State};
