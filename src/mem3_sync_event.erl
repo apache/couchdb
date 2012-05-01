@@ -24,7 +24,7 @@ init(_) ->
 
 handle_event({add_node, Node}, State) when Node =/= node() ->
     net_kernel:connect_node(Node),
-    mem3_sync:initial_sync([Node]),
+    mem3_sync_nodes:add([Node]),
     {ok, State};
 
 handle_event({remove_node, Node}, State)  ->
@@ -40,7 +40,7 @@ handle_call(_Request, State) ->
 handle_info({nodeup, Node}, State) ->
     case lists:member(Node, mem3:nodes()) of
     true ->
-        mem3_sync:initial_sync([Node]);
+        mem3_sync_nodes:add([Node]);
     false ->
         ok
     end,

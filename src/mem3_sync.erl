@@ -65,7 +65,7 @@ init([]) ->
     Concurrency = couch_config:get("mem3", "sync_concurrency", "10"),
     gen_event:add_handler(mem3_events, mem3_sync_event, []),
     {ok, Pid} = start_update_notifier(),
-    spawn(fun initial_sync/0),
+    initial_sync(),
     {ok, #state{limit = list_to_integer(Concurrency), update_notifier=Pid}}.
 
 handle_call({push, Job}, From, State) ->
@@ -216,7 +216,7 @@ sync_nodes_and_dbs() ->
 
 initial_sync() ->
     [net_kernel:connect_node(Node) || Node <- mem3:nodes()],
-    initial_sync(nodes()).
+    mem3_sync_nodes:add(nodes()).
 
 initial_sync(Live) ->
     sync_nodes_and_dbs(),
