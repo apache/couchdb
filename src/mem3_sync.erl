@@ -293,7 +293,7 @@ next_replication(Active, Waiting, WaitingAndRunning) ->
         true ->
             next_replication(Active, RemQ, in(Job, WaitingAndRunning));
         false ->
-            {Job, join(Waiting, WaitingAndRunning)}
+            {Job, join(RemQ, WaitingAndRunning)}
         end
     end.
 
