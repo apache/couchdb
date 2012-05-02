@@ -194,10 +194,11 @@ start_push_replication(#job{name=Name, node=Node, pid=From}) ->
     if From =/= nil -> gen_server:reply(From, ok); true -> ok end,
     spawn_link(mem3_rep, go, [Name, Node]).
 
-add_to_queue(State, #job{name=DbName, node=Node} = Job) ->
+add_to_queue(State, #job{name=DbName, node=Node, pid=From} = Job) ->
     #state{dict=D, waiting=WQ} = State,
     case dict:is_key({DbName, Node}, D) of
     true ->
+        if From =/= nil -> gen_server:reply(From, ok); true -> ok end,
         State;
     false ->
         twig:log(debug, "adding ~s -> ~p to mem3_sync queue", [DbName, Node]),
