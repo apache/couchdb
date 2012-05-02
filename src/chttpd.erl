@@ -789,11 +789,20 @@ reqid() ->
     {"X-Couch-Request-ID", get(nonce)}.
 
 json_stack({_Error, _Reason, Stack}) ->
-    lists:map(fun({M,F,A0}) ->
-        A = if is_integer(A0) -> A0; is_list(A0) -> length(A0); true -> 0 end,
-        list_to_binary(io_lib:format("~s:~s/~B", [M,F,A]));
-    (_) ->
-        <<"bad entry in stacktrace">>
-    end, Stack);
+    lists:map(fun json_stack_item/1, Stack);
 json_stack(_) ->
     [].
+
+json_stack_item({M,F,A}) ->
+    list_to_binary(io_lib:format("~s:~s/~B", [M, F, json_stack_arity(A)]));
+json_stack_item({M,F,A,L}) ->
+    case proplists:get_value(line, L) of
+    undefined -> json_stack_item({M,F,A});
+    Line -> list_to_binary(io_lib:format("~s:~s/~B L~B",
+        [M, F, json_stack_arity(A), Line]))
+    end;
+json_stack_item(_) ->
+    <<"bad entry in stacktrace">>.
+
+json_stack_arity(A) ->
+    if is_integer(A) -> A; is_list(A) -> length(A); true -> 0 end.
