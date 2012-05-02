@@ -22,6 +22,25 @@ couchTests.changes = function(debug) {
   db.createDb();
   if (debug) debugger;
 
+  var hasEventSource = !!window.EventSource,
+      eventSourceOk = true;
+
+  if (hasEventSource) {
+    var es = new EventSource("/test_suite_db/_changes?feed=eventsource");
+    eventSourceOk = false;
+
+    es.addEventListener('message', function(e) {
+      var data = JSON.parse(e.data);
+      if (typeof data.seq !== 'number') {
+        throw TypeError('Incorrect EventSource message');
+      }
+
+      if (data.seq > 2) {
+        es.close();
+      }
+    }, false);
+  }
+
   var req = CouchDB.request("GET", "/test_suite_db/_changes");
   var resp = JSON.parse(req.responseText);
 

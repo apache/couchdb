@@ -63,7 +63,8 @@ handle_changes(Args1, Req, Db0) ->
         put(last_changes_heartbeat, now())
     end,
 
-    if Feed == "continuous" orelse Feed == "longpoll" ->
+    if Feed == "continuous" orelse Feed == "longpoll" orelse
+       Feed == "eventsource" ->
         fun(CallbackAcc) ->
             {Callback, UserAcc} = get_callback_acc(CallbackAcc),
             Self = self(),
@@ -263,6 +264,8 @@ get_changes_timeout(Args, Callback) ->
 
 start_sending_changes(_Callback, UserAcc, "continuous") ->
     UserAcc;
+start_sending_changes(_Callback, UserAcc, "eventsource") ->
+    UserAcc;
 start_sending_changes(Callback, UserAcc, ResponseType) ->
     Callback(start, ResponseType, UserAcc).
 
@@ -434,7 +437,7 @@ keep_sending_changes(Args, Acc0, FirstRound) ->
 end_sending_changes(Callback, UserAcc, EndSeq, ResponseType) ->
     Callback({stop, EndSeq}, ResponseType, UserAcc).
 
-changes_enumerator(DocInfo, #changes_acc{resp_type = "continuous"} = Acc) ->
+changes_enumerator(DocInfo, Acc, ResponseType) ->
     #changes_acc{
         filter = FilterFun, callback = Callback,
         user_acc = UserAcc, limit = Limit, db = Db,
@@ -456,10 +459,15 @@ changes_enumerator(DocInfo, #changes_acc{resp_type = "continuous"} = Acc) ->
         end;
     _ ->
         ChangesRow = changes_row(Results, DocInfo, Acc),
-        UserAcc2 = Callback({change, ChangesRow, <<>>}, "continuous", UserAcc),
+        UserAcc2 = Callback({change, ChangesRow, <<>>}, ResponseType, UserAcc),
         reset_heartbeat(),
         {Go, Acc#changes_acc{seq = Seq, user_acc = UserAcc2, limit = Limit - 1}}
-    end;
+    end.
+
+changes_enumerator(DocInfo, #changes_acc{resp_type = "continuous"} = Acc) ->
+    changes_enumerator(DocInfo, Acc, "continuous");
+changes_enumerator(DocInfo, #changes_acc{resp_type = "eventsource"} = Acc) ->
+    changes_enumerator(DocInfo, Acc, "eventsource");
 changes_enumerator(DocInfo, Acc) ->
     #changes_acc{
         filter = FilterFun, callback = Callback, prepend = Prepend,

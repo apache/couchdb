@@ -27,6 +27,7 @@
 -export([start_chunked_response/3,send_chunk/2,log_request/2]).
 -export([start_response_length/4, start_response/3, send/2]).
 -export([start_json_response/2, start_json_response/3, end_json_response/1]).
+-export([start_eventsource_response/2, start_eventsource_response/3, end_eventsource_response/1]).
 -export([send_response/4,send_method_not_allowed/2,send_error/4, send_redirect/2,send_chunked_error/2]).
 -export([send_json/2,send_json/3,send_json/4,last_chunk/1,parse_multipart_request/3]).
 -export([accepted_encodings/1,handle_request_int/5,validate_referer/1,validate_ctype/2]).
@@ -728,6 +729,21 @@ start_json_response(Req, Code, Headers) ->
 
 end_json_response(Resp) ->
     send_chunk(Resp, end_jsonp() ++ [$\n]),
+    last_chunk(Resp).
+
+start_eventsource_response(Req, Code) ->
+    start_eventsource_response(Req, Code, []).
+
+start_eventsource_response(Req, Code, Headers) ->
+    initialize_jsonp(Req),
+    DefaultHeaders = [
+        {"Content-Type", "text/event-stream"},
+        {"Cache-Control", "no-cache"}
+    ],
+    start_chunked_response(Req, Code, DefaultHeaders ++ Headers).
+
+end_eventsource_response(Resp) ->
+    send_chunk(Resp, [$\n]),
     last_chunk(Resp).
 
 initialize_jsonp(Req) ->
