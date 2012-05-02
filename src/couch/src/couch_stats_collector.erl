@@ -92,7 +92,7 @@ track_process_count(Pid, Stat) ->
 init(_) ->
     ets:new(?HIT_TABLE, [named_table, set, public]),
     ets:new(?ABS_TABLE, [named_table, duplicate_bag, public]),
-    {ok, []}.
+    {ok, dict:new()}.
 
 terminate(_Reason, _State) ->
     ok.
@@ -102,13 +102,15 @@ handle_call(stop, _, State) ->
 
 handle_cast({track_process_count, Pid, Stat}, State) ->
     Ref = erlang:monitor(process, Pid),
-    {noreply, [{Ref, Stat} | State]}.
+    {noreply, dict:store(Ref, Stat, State)}.
 
 handle_info({'DOWN', Ref, _, _, _}, State) ->
-    {value, {Ref, Stat}, NewState} = lists:keytake(Ref, 1, State),
+    Stat = dict:fetch(Ref, State),
     ok = couch_stats_collector:decrement(Stat),
-    {noreply, NewState}.
+    {noreply, dict:erase(Ref, State)}.
 
+code_change(_OldVersion, State, _Extra) when is_list(State) ->
+    {ok, dict:from_list(State)};
 code_change(_OldVersion, State, _Extra) ->
     {ok, State}.
 
