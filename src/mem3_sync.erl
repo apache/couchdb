@@ -136,7 +136,7 @@ handle_info({'EXIT', Active, Reason}, State) ->
         twig:log(warn, "~p ~s -> ~p ~p", [?MODULE, OldDbName, OldNode,
             Reason]),
         case Reason of {pending_changes, Count} ->
-            add_to_queue(State, Job#job{pid = nil, count = Count});
+            maybe_resubmit(State, Job#job{pid = nil, count = Count});
         _ ->
             try mem3:shards(mem3:dbname(Job#job.name)) of _ ->
                 timer:apply_after(5000, ?MODULE, push, [Job#job{pid=nil}])
@@ -162,6 +162,22 @@ code_change(_, #state{waiting = WaitingList} = State, _) when is_list(WaitingLis
 
 code_change(_, State, _) ->
     {ok, State}.
+
+maybe_resubmit(State, #job{name=DbName, node=Node} = Job) ->
+    Db1 = couch_config:get("mem3", "node_db", "nodes"),
+    Db2 = couch_config:get("mem3", "shard_db", "dbs"),
+    Db3 = couch_config:get("couch_httpd_auth", "authentication_db", "_users"),
+    case lists:member(DbName, [?l2b(Db) || Db <- [Db1,Db2,Db3]]) of
+    true ->
+        case find_next_node() of
+        Node ->
+            add_to_queue(State, Job);
+        _ ->
+            State % don't resubmit b/c we have a new replication target
+        end;
+    false ->
+        add_to_queue(State, Job)
+    end.
 
 handle_replication_exit(State, Pid) ->
     #state{active=Active, limit=Limit, dict=D, waiting=Waiting} = State,
