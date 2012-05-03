@@ -133,8 +133,7 @@ handle_info({'EXIT', Active, {{not_found, no_db_file}, _Stack}}, State) ->
 handle_info({'EXIT', Active, Reason}, State) ->
     NewState = case lists:keyfind(Active, #job.pid, State#state.active) of
         #job{name=OldDbName, node=OldNode} = Job ->
-        twig:log(warn, "~p ~s -> ~p ~p", [?MODULE, OldDbName, OldNode,
-            Reason]),
+        twig:log(warn, "~s ~s ~s ~w", [?MODULE, OldDbName, OldNode, Reason]),
         case Reason of {pending_changes, Count} ->
             maybe_resubmit(State, Job#job{pid = nil, count = Count});
         _ ->
