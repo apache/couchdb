@@ -91,9 +91,12 @@ keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout) ->
     end.
 
 send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn, Timeout) ->
-    AllShards = mem3:shards(DbName),
+    LiveNodes = [node() | nodes()],
+    %% This can be replaced by mem3:live_shards when we upgrade mem3
+    AllLiveShards =
+        [S || #shard{node=Node} = S <- mem3:shards(DbName), lists:member(Node, LiveNodes)],
     Seqs = lists:flatmap(fun({#shard{name=Name, node=N} = Shard, Seq}) ->
-        case lists:member(Shard, AllShards) of
+        case lists:member(Shard, AllLiveShards) of
         true ->
             Ref = rexi:cast(N, {fabric_rpc, changes, [Name,ChangesArgs,Seq]}),
             [{Shard#shard{ref = Ref}, Seq}];
@@ -104,7 +107,7 @@ send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn, Timeout) ->
             lists:map(fun(#shard{name=Name2, node=N2} = NewShard) ->
                 Ref = rexi:cast(N2, {fabric_rpc, changes, [Name2,ChangesArgs,0]}),
                 {NewShard#shard{ref = Ref}, 0}
-            end, find_replacement_shards(Shard, AllShards))
+            end, find_replacement_shards(Shard, AllLiveShards))
         end
     end, unpack_seqs(PackedSeqs, DbName)),
     {Workers, _} = lists:unzip(Seqs),
