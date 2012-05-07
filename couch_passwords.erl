@@ -30,8 +30,8 @@ simple(Password, Salt) ->
 hash_admin_password(ClearPassword) ->
     Iterations = couch_config:get("couch_httpd_auth", "iterations", "10000"),
     Salt = couch_uuids:random(),
-    DerivedKey = couch_passwords:pbkdf2(?b2l(ClearPassword), Salt,
-        list_to_integer(Iterations)),
+    DerivedKey = couch_passwords:pbkdf2(couch_util:to_binary(ClearPassword),
+                                        Salt ,list_to_integer(Iterations)),
     ?l2b("-pbkdf2-" ++ ?b2l(DerivedKey) ++ ","
         ++ ?b2l(Salt) ++ ","
         ++ Iterations).
