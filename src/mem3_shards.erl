@@ -172,11 +172,15 @@ fold_fun(#full_doc_info{}=FDI, _, Acc) ->
     DI = couch_doc:to_doc_info(FDI),
     fold_fun(DI, nil, Acc);
 fold_fun(#doc_info{}=DI, _, {Db, UFun, UAcc}) ->
-    {ok, Doc} = couch_db:open_doc(Db, DI, [conflicts, deleted]),
-    {Props} = Doc#doc.body,
-    Shards = mem3_util:build_shards(Doc#doc.id, Props),
-    NewUAcc = lists:foldl(UFun, UAcc, Shards),
-    {ok, {Db, UFun, NewUAcc}}.
+    case couch_db:open_doc(Db, DI, [conflicts]) of
+        {ok, Doc} ->
+            {Props} = Doc#doc.body,
+            Shards = mem3_util:build_shards(Doc#doc.id, Props),
+            NewUAcc = lists:foldl(UFun, UAcc, Shards),
+            {ok, {Db, UFun, NewUAcc}};
+        _ ->
+            {ok, {Db, UFun, UAcc}}
+    end.
 
 get_update_seq() ->
     DbName = couch_config:get("mem3", "shards_db", "dbs"),
