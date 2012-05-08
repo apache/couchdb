@@ -21,6 +21,7 @@
 -import(couch_httpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
     start_json_response/2,send_chunk/2,last_chunk/1,end_json_response/1,
+    start_eventsource_response/2,end_eventsource_response/1,
     start_chunked_response/3, absolute_uri/2, send/2,
     start_response_length/4, send_error/4]).
 
@@ -78,9 +79,15 @@ handle_changes_req2(Req, Db) ->
     MakeCallback = fun(Resp) ->
         fun({change, Change, _}, "continuous") ->
             send_chunk(Resp, [?JSON_ENCODE(Change) | "\n"]);
+        ({change, {ChangeProp} = Change, _}, "eventsource") ->
+            Seq = proplists:get_value(<<"seq">>, ChangeProp),
+            send_chunk(Resp, ["data:", ?JSON_ENCODE(Change), "\n",
+                              "id:", ?JSON_ENCODE(Seq), "\n\n"]);
         ({change, Change, Prepend}, _) ->
             send_chunk(Resp, [Prepend, ?JSON_ENCODE(Change)]);
         (start, "continuous") ->
+            ok;
+        (start, "eventsource") ->
             ok;
         (start, _) ->
             send_chunk(Resp, "{\"results\":[\n");
@@ -90,6 +97,8 @@ handle_changes_req2(Req, Db) ->
                 [?JSON_ENCODE({[{<<"last_seq">>, EndSeq}]}) | "\n"]
             ),
             end_json_response(Resp);
+        ({stop, _}, "eventsource") ->
+            end_eventsource_response(Resp);
         ({stop, EndSeq}, _) ->
             send_chunk(
                 Resp,
@@ -100,8 +109,20 @@ handle_changes_req2(Req, Db) ->
             send_chunk(Resp, "\n")
         end
     end,
+    % Use `Last-Event-ID` header as `since` argument for eventsource feeds
     ChangesArgs = parse_changes_query(Req),
-    ChangesFun = couch_changes:handle_changes(ChangesArgs, Req, Db),
+    ChangesArgs1 = case ChangesArgs#changes_args.feed of
+        "eventsource" ->
+            ChangesArgs#changes_args{
+              since = list_to_integer(
+                couch_httpd:header_value(Req,
+                                         "Last-Event-ID",
+                                         integer_to_list(
+                                             ChangesArgs#changes_args.since)))};
+        _ ->
+            ChangesArgs
+    end,
+    ChangesFun = couch_changes:handle_changes(ChangesArgs1, Req, Db),
     WrapperFun = case ChangesArgs#changes_args.feed of
     "normal" ->
         {ok, Info} = couch_db:get_db_info(Db),
@@ -117,6 +138,11 @@ handle_changes_req2(Req, Db) ->
                     FeedChangesFun(MakeCallback(Resp))
                 end
             )
+        end;
+    "eventsource" ->
+        {ok, Resp} = couch_httpd:start_eventsource_response(Req, 200),
+        fun(FeedChangesFun) ->
+            FeedChangesFun(MakeCallback(Resp))
         end;
     _ ->
         % "longpoll" or "continuous"
