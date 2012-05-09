@@ -234,6 +234,8 @@ body.fullwidth #wrap { margin-right: 0; }
   color: #666; margin: 0; padding: 2px 1em 2px 22px; cursor: pointer;
   font-size: 95%; line-height: 16px;
 }
+#toolbar button[disabled] { opacity: .50; }
+#toolbar button[disabled]:hover { background-position: 2px 2px; cursor: default; color: #666 }
 #toolbar button:hover { background-position: 2px -30px; color: #000; }
 #toolbar button:active { background-position: 2px -62px; color: #000; }
 #toolbar button.add { background-image: url(../image/add.png); }
