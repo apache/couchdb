@@ -250,7 +250,7 @@ load_shards_from_db(#db{} = ShardDb, DbName) ->
 load_shards_from_disk(DbName, DocId)->
     Shards = load_shards_from_disk(DbName),
     HashKey = mem3_util:hash(DocId),
-    [S || #shard{range = [B,E]} = S <- Shards, B < HashKey, HashKey =< E].
+    [S || #shard{range = [B,E]} = S <- Shards, B =< HashKey, HashKey =< E].
 
 create_if_missing(Name) ->
     DbDir = couch_config:get("couchdb", "database_dir"),
