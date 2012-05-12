@@ -314,9 +314,12 @@ wait_db_updated(Timeout) ->
 validate_start_seq(DbName, Seq) ->
     try unpack_seqs(Seq, DbName) of _Any ->
         ok
-    catch _:_ ->
-        Reason = <<"Malformed sequence supplied in 'since' parameter.">>,
-        {error, {bad_request, Reason}}
+    catch
+        error:database_does_not_exist ->
+            {error, database_does_not_exist};
+        _:_ ->
+            Reason = <<"Malformed sequence supplied in 'since' parameter.">>,
+            {error, {bad_request, Reason}}
     end.
 
 unpack_seqs_test() ->
