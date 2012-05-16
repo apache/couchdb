@@ -140,7 +140,7 @@ couchTests.changes = function(debug) {
     xhr.abort();
 
     // test Server Sent Event (eventsource)
-    if (window.EventSource) {
+    if (!!window.EventSource) {
       var source = new EventSource(
               "/test_suite_db/_changes?feed=eventsource");
       var results = [];
