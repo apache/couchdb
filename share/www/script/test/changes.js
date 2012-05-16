@@ -139,6 +139,34 @@ couchTests.changes = function(debug) {
     // otherwise we'll continue to receive heartbeats forever
     xhr.abort();
 
+    // test Server Sent Event (eventsource)
+    if (window.EventSource) {
+      var source = new EventSource(
+              "/test_suite_db/_changes?feed=eventsource");
+      var results = [];
+      var sourceListener = function(e) {
+        var data = JSON.parse(e.data);
+        results.push(data);
+
+      };
+
+      source.addEventListener('message', sourceListener , false);
+      
+      waitForSuccess(function() {
+        if (results.length != 3) 
+          throw "bad seq, try again";
+      });
+      
+      source.removeEventListener('message', sourceListener, false);
+
+      T(results[0].seq == 1);
+      T(results[0].id == "foo");
+    
+      T(results[1].seq == 2);
+      T(results[1].id == "bar");
+      T(results[1].changes[0].rev == docBar._rev);
+    }
+
     // test longpolling
     xhr = CouchDB.newXhr();
 

@@ -63,7 +63,8 @@ handle_changes(Args1, Req, Db0) ->
         put(last_changes_heartbeat, now())
     end,
 
-    if Feed == "continuous" orelse Feed == "longpoll" ->
+    case lists:member(Feed, ["continuous", "longpoll", "eventsource"]) of
+    true ->
         fun(CallbackAcc) ->
             {Callback, UserAcc} = get_callback_acc(CallbackAcc),
             Self = self(),
@@ -89,7 +90,7 @@ handle_changes(Args1, Req, Db0) ->
                 get_rest_db_updated(ok) % clean out any remaining update messages
             end
         end;
-    true ->
+    false ->
         fun(CallbackAcc) ->
             {Callback, UserAcc} = get_callback_acc(CallbackAcc),
             UserAcc2 = start_sending_changes(Callback, UserAcc, Feed),
@@ -261,7 +262,9 @@ get_changes_timeout(Args, Callback) ->
             fun(UserAcc) -> {ok, Callback(timeout, ResponseType, UserAcc)} end}
     end.
 
-start_sending_changes(_Callback, UserAcc, "continuous") ->
+start_sending_changes(_Callback, UserAcc, ResponseType)
+        when ResponseType =:= "continuous"
+        orelse ResponseType =:= "eventsource" ->
     UserAcc;
 start_sending_changes(Callback, UserAcc, ResponseType) ->
     Callback(start, ResponseType, UserAcc).
@@ -434,7 +437,9 @@ keep_sending_changes(Args, Acc0, FirstRound) ->
 end_sending_changes(Callback, UserAcc, EndSeq, ResponseType) ->
     Callback({stop, EndSeq}, ResponseType, UserAcc).
 
-changes_enumerator(DocInfo, #changes_acc{resp_type = "continuous"} = Acc) ->
+changes_enumerator(DocInfo, #changes_acc{resp_type = ResponseType} = Acc)
+        when ResponseType =:= "continuous"
+        orelse ResponseType =:= "eventsource" ->
     #changes_acc{
         filter = FilterFun, callback = Callback,
         user_acc = UserAcc, limit = Limit, db = Db,
@@ -456,7 +461,7 @@ changes_enumerator(DocInfo, #changes_acc{resp_type = "continuous"} = Acc) ->
         end;
     _ ->
         ChangesRow = changes_row(Results, DocInfo, Acc),
-        UserAcc2 = Callback({change, ChangesRow, <<>>}, "continuous", UserAcc),
+        UserAcc2 = Callback({change, ChangesRow, <<>>}, ResponseType, UserAcc),
         reset_heartbeat(),
         {Go, Acc#changes_acc{seq = Seq, user_acc = UserAcc2, limit = Limit - 1}}
     end;
