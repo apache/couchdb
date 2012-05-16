@@ -30,7 +30,7 @@ couchTests.changes = function(debug) {
   T(db.save(docFoo).ok);
   T(db.ensureFullCommit().ok);
   T(db.open(docFoo._id)._id == docFoo._id);
-  
+
   req = CouchDB.request("GET", "/test_suite_db/_changes");
   var resp = JSON.parse(req.responseText);
 
@@ -39,7 +39,7 @@ couchTests.changes = function(debug) {
   T(resp.results[0].changes[0].rev == docFoo._rev);
 
   // test with callback
-  
+
   run_on_modified_server(
     [{section: "httpd",
       key: "allow_jsonp",
@@ -83,7 +83,7 @@ couchTests.changes = function(debug) {
 
     var docBar = {_id:"bar", bar:1};
     db.save(docBar);
-    
+
     var lines, change1, change2;
     waitForSuccess(function() {
       lines = xhr.responseText.split("\n");
@@ -96,12 +96,12 @@ couchTests.changes = function(debug) {
 
     T(change1.seq == 1);
     T(change1.id == "foo");
-    
+
     T(change2.seq == 2);
     T(change2.id == "bar");
     T(change2.changes[0].rev == docBar._rev);
-    
-    
+
+
     var docBaz = {_id:"baz", baz:1};
     db.save(docBaz);
 
@@ -113,7 +113,7 @@ couchTests.changes = function(debug) {
         throw "bad seq, try again";
       }
     });
-    
+
     T(change3.seq == 3);
     T(change3.id == "baz");
     T(change3.changes[0].rev == docBaz._rev);
@@ -124,7 +124,7 @@ couchTests.changes = function(debug) {
     //verify the hearbeat newlines are sent
     xhr.open("GET", "/test_suite_db/_changes?feed=continuous&heartbeat=10&timeout=500", true);
     xhr.send("");
-    
+
     var str;
     waitForSuccess(function() {
       str = xhr.responseText;
@@ -147,21 +147,20 @@ couchTests.changes = function(debug) {
       var sourceListener = function(e) {
         var data = JSON.parse(e.data);
         results.push(data);
-
       };
 
       source.addEventListener('message', sourceListener , false);
-      
+
       waitForSuccess(function() {
-        if (results.length != 3) 
+        if (results.length != 3)
           throw "bad seq, try again";
       });
-      
+
       source.removeEventListener('message', sourceListener, false);
 
       T(results[0].seq == 1);
       T(results[0].id == "foo");
-    
+
       T(results[1].seq == 2);
       T(results[1].id == "bar");
       T(results[1].changes[0].rev == docBar._rev);
@@ -172,14 +171,14 @@ couchTests.changes = function(debug) {
 
     xhr.open("GET", "/test_suite_db/_changes?feed=longpoll", true);
     xhr.send("");
-    
+
     waitForSuccess(function() {
       lines = xhr.responseText.split("\n");
       if (lines[5] != '"last_seq":3}') {
         throw("still waiting");
       }
     }, "last_seq");
-    
+
     xhr = CouchDB.newXhr();
 
     xhr.open("GET", "/test_suite_db/_changes?feed=longpoll&since=3", true);
@@ -187,7 +186,7 @@ couchTests.changes = function(debug) {
 
     var docBarz = {_id:"barz", bar:1};
     db.save(docBarz);
-    
+
     var parse_changes_line = function(line) {
       if (line.charAt(line.length-1) == ",") {
         var linetrimmed = line.substring(0, line.length-1);
@@ -196,14 +195,14 @@ couchTests.changes = function(debug) {
       }
       return JSON.parse(linetrimmed);
     };
-    
+
     waitForSuccess(function() {
       lines = xhr.responseText.split("\n");
       if (lines[3] != '"last_seq":4}') {
         throw("still waiting");
       }
     }, "change_lines");
-    
+
     var change = parse_changes_line(lines[1]);
     T(change.seq == 4);
     T(change.id == "barz");
@@ -212,7 +211,7 @@ couchTests.changes = function(debug) {
 
 
   }
-  
+
   // test the filtered changes
   var ddoc = {
     _id : "_design/changes_filter",
@@ -252,15 +251,15 @@ couchTests.changes = function(debug) {
 
   db.save({"bop" : "foom"});
   db.save({"bop" : false});
-  
+
   var req = CouchDB.request("GET", "/test_suite_db/_changes?filter=changes_filter/bop");
   var resp = JSON.parse(req.responseText);
   T(resp.results.length == 1, "filtered/bop");
-    
+
   req = CouchDB.request("GET", "/test_suite_db/_changes?filter=changes_filter/dynamic&field=woox");
   resp = JSON.parse(req.responseText);
   T(resp.results.length == 0);
-  
+
   req = CouchDB.request("GET", "/test_suite_db/_changes?filter=changes_filter/dynamic&field=bop");
   resp = JSON.parse(req.responseText);
   T(resp.results.length == 1, "changes_filter/dynamic&field=bop");
@@ -279,15 +278,15 @@ couchTests.changes = function(debug) {
     xhr.send("");
     db.save({"_id":"falsy", "bop" : ""}); // empty string is falsy
     db.save({"_id":"bingo","bop" : "bingo"});
-    
+
     waitForSuccess(function() {
       resp = JSON.parse(xhr.responseText);
     }, "longpoll-since");
-    
+
     T(resp.last_seq == 9);
     T(resp.results && resp.results.length > 0 && resp.results[0]["id"] == "bingo", "filter the correct update");
     xhr.abort();
-    
+
     var timeout = 500;
     var last_seq = 10;
     while (true) {
@@ -330,31 +329,31 @@ couchTests.changes = function(debug) {
   // error conditions
 
   // non-existing design doc
-  var req = CouchDB.request("GET", 
+  var req = CouchDB.request("GET",
     "/test_suite_db/_changes?filter=nothingtosee/bop");
   TEquals(404, req.status, "should return 404 for non existant design doc");
 
-  // non-existing filter 
-  var req = CouchDB.request("GET", 
+  // non-existing filter
+  var req = CouchDB.request("GET",
     "/test_suite_db/_changes?filter=changes_filter/movealong");
   TEquals(404, req.status, "should return 404 for non existant filter fun");
 
   // both
-  var req = CouchDB.request("GET", 
+  var req = CouchDB.request("GET",
     "/test_suite_db/_changes?filter=nothingtosee/movealong");
-  TEquals(404, req.status, 
+  TEquals(404, req.status,
     "should return 404 for non existant design doc and filter fun");
 
   // changes get all_docs style with deleted docs
   var doc = {a:1};
   db.save(doc);
   db.deleteDoc(doc);
-  var req = CouchDB.request("GET", 
+  var req = CouchDB.request("GET",
     "/test_suite_db/_changes?filter=changes_filter/bop&style=all_docs");
   var resp = JSON.parse(req.responseText);
   var expect = (!is_safari && xhr) ? 3: 1;
   TEquals(expect, resp.results.length, "should return matching rows");
- 
+
   // test filter on view function (map)
   //
   T(db.save({"_id":"blah", "bop" : "plankton"}).ok);
@@ -378,7 +377,7 @@ couchTests.changes = function(debug) {
 
       var req = CouchDB.request("GET", "/_session", authOpts);
       var resp = JSON.parse(req.responseText);
-      
+
       T(db.save({"user" : "Noah Slater"}).ok);
       var req = CouchDB.request("GET", "/test_suite_db/_changes?filter=changes_filter/userCtx", authOpts);
       var resp = JSON.parse(req.responseText);
@@ -470,7 +469,7 @@ couchTests.changes = function(debug) {
     T(resp.results.length === 2);
     T(resp.results[0].id === "something");
     T(resp.results[1].id === "anotherthing");
-    
+
     var docids = JSON.stringify(["something", "anotherthing", "andmore"]),
         req = CouchDB.request("GET", "/test_suite_db/_changes?filter=_doc_ids&doc_ids="+docids, options);
     var resp = JSON.parse(req.responseText);
@@ -489,9 +488,9 @@ couchTests.changes = function(debug) {
         xhr = CouchDB.newXhr();
         xhr.open("POST", "/test_suite_db/_changes?feed=continuous&timeout=500&since=7&filter=_doc_ids", true);
         xhr.setRequestHeader("Content-Type", "application/json");
-        
+
         xhr.send(options.body);
-        
+
         T(db.save({"_id":"andmore", "bop" : "plankton"}).ok);
 
         waitForSuccess(function() {
