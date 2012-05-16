@@ -132,7 +132,7 @@ handle_changes_req2(Req, Db) ->
             {"Content-Type", "text/event-stream"},
             {"Cache-Control", "no-cache"}
         ],
-        {ok, Resp} = couch_httpd:start_json_response(Req, 200, Headers),
+        {ok, Resp} = couch_httpd:start_chunked_response(Req, 200, Headers),
         fun(FeedChangesFun) ->
             FeedChangesFun(MakeCallback(Resp))
         end;
