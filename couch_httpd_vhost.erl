@@ -244,7 +244,10 @@ bind_path(_, _) ->
 
 %% create vhost list from ini
 make_vhosts() ->
-    Vhosts = lists:foldl(fun({Vhost, Path}, Acc) ->
+    Vhosts = lists:foldl(fun
+                ({_, ""}, Acc) ->
+                    Acc;
+                ({Vhost, Path}, Acc) ->
                     [{parse_vhost(Vhost), split_path(Path)}|Acc]
             end, [], couch_config:get("vhosts")),
 
