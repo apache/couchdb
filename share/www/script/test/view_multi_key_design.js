@@ -61,6 +61,10 @@ couchTests.view_multi_key_design = function(debug) {
     T(rows[i].key == rows[i].value);
   }
 
+  // with empty keys
+  rows = db.view("test/all_docs",{keys:[]},null).rows;
+  T(rows.length == 0);
+
   var reduce = db.view("test/summate",{group:true},keys).rows;
   T(reduce.length == keys.length);
   for(var i=0; i<reduce.length; i++) {

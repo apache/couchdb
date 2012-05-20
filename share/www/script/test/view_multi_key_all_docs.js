@@ -88,4 +88,8 @@ couchTests.view_multi_key_all_docs = function(debug) {
   T(rows[1].error == "not_found");
   T(!rows[1].id);
   T(rows[2].id == rows[2].key && rows[2].key == "0");
+
+  // empty keys
+  rows = db.allDocs({keys: []}, null).rows;
+  T(rows.length == 0);
 };
