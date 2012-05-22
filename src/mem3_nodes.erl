@@ -22,37 +22,48 @@
 -include("mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
--record(state, {changes_pid, update_seq, nodes}).
+-record(state, {changes_pid, update_seq}).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 get_nodelist() ->
-    gen_server:call(?MODULE, get_nodelist).
+    try
+        lists:sort([N || {N,_} <- ets:tab2list(?MODULE)])
+    catch error:badarg ->
+        gen_server:call(?MODULE, get_nodelist)
+    end.
 
 get_node_info(Node, Key) ->
-    gen_server:call(?MODULE, {get_node_info, Node, Key}).
+    try
+        couch_util:get_value(Key, ets:lookup_element(?MODULE, Node, 2))
+    catch error:badarg ->
+        gen_server:call(?MODULE, {get_node_info, Node, Key})
+    end.
 
 init([]) ->
-    {Nodes, UpdateSeq} = initialize_nodelist(),
+    ets:new(?MODULE, [named_table, {read_concurrency, true}]),
+    UpdateSeq = initialize_nodelist(),
     {Pid, _} = spawn_monitor(fun() -> listen_for_changes(UpdateSeq) end),
-    {ok, #state{changes_pid = Pid, update_seq = UpdateSeq, nodes = Nodes}}.
+    {ok, #state{changes_pid = Pid, update_seq = UpdateSeq}}.
 
 handle_call(get_nodelist, _From, State) ->
-    {reply, lists:sort(dict:fetch_keys(State#state.nodes)), State};
+    {reply, lists:sort([N || {N,_} <- ets:tab2list(?MODULE)]), State};
 handle_call({get_node_info, Node, Key}, _From, State) ->
-    case dict:find(Node, State#state.nodes) of
-        {ok, NodeInfo} ->
-            {reply, couch_util:get_value(Key, NodeInfo), State};
-        error ->
-            {reply, error, State}
-    end;
+    Resp = try
+        couch_util:get_value(Key, ets:lookup_element(?MODULE, Node, 2))
+    catch error:badarg ->
+        error
+    end,
+    {reply, Resp, State};
 handle_call({add_node, Node, NodeInfo}, _From, #state{nodes=Nodes} = State) ->
     gen_event:notify(mem3_events, {add_node, Node}),
-    {reply, ok, State#state{nodes = dict:store(Node, NodeInfo, Nodes)}};
+    ets:insert(?MODULE, Node, NodeInfo),
+    {reply, ok, State};
 handle_call({remove_node, Node}, _From, #state{nodes=Nodes} = State) ->
     gen_event:notify(mem3_events, {remove_node, Node}),
-    {reply, ok, State#state{nodes = dict:erase(Node, Nodes)}};
+    ets:delete(?MODULE, Node),
+    {reply, ok, State};
 handle_call(_Call, _From, State) ->
     {noreply, State}.
 
@@ -74,6 +85,10 @@ handle_info(_Info, State) ->
 terminate(_Reason, _State) ->
     ok.
 
+code_change(_OldVsn, {state, ChangesPid, UpdateSeq, _}, _Extra) ->
+    ets:new(?MODULE, [named_table, {read_concurrency, true}]),
+    initialize_nodelist(),
+    {ok, #state{changes_pid = ChangesPid, update_seq = UpdateSeq}};
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
@@ -82,27 +97,27 @@ code_change(_OldVsn, State, _Extra) ->
 initialize_nodelist() ->
     DbName = couch_config:get("mem3", "node_db", "nodes"),
     {ok, Db} = mem3_util:ensure_exists(DbName),
-    {ok, _, {_, Nodes0}} = couch_btree:fold(Db#db.id_tree, fun first_fold/3,
-                                       {Db, dict:new()}, []),
+    {ok, _, Db} = couch_btree:fold(Db#db.id_tree, fun first_fold/3, Db, []),
     % add self if not already present
-    case dict:find(node(), Nodes0) of
-    {ok, _} ->
-        Nodes = Nodes0;
-    error ->
+    case ets:lookup(?MODULE, node()) of
+    [_] ->
+        ok;
+    [] ->
+        ets:insert(?MODULE, {node(), []}),
         Doc = #doc{id = couch_util:to_binary(node())},
-        {ok, _} = couch_db:update_doc(Db, Doc, []),
-        Nodes = dict:store(node(), [], Nodes0)
+        {ok, _} = couch_db:update_doc(Db, Doc, [])
     end,
     couch_db:close(Db),
-    {Nodes, Db#db.update_seq}.
+    Db#db.update_seq.
 
 first_fold(#full_doc_info{id = <<"_design/", _/binary>>}, _, Acc) ->
     {ok, Acc};
 first_fold(#full_doc_info{deleted=true}, _, Acc) ->
     {ok, Acc};
-first_fold(#full_doc_info{id=Id}=DocInfo, _, {Db, Dict}) ->
+first_fold(#full_doc_info{id=Id}=DocInfo, _, Db) ->
     {ok, #doc{body={Props}}} = couch_db:open_doc(Db, DocInfo),
-    {ok, {Db, dict:store(mem3_util:to_atom(Id), Props, Dict)}}.
+    ets:insert(?MODULE, {mem3_util:to_atom(Id), Props}),
+    {ok, Db}.
 
 listen_for_changes(Since) ->
     DbName = couch_config:get("mem3", "node_db", "nodes"),
