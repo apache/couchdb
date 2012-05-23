@@ -56,7 +56,7 @@ snappy_nif_la_LDFLAGS = -module -avoid-version
 
 if WINDOWS
 snappy_nif_la_LDFLAGS += -no-undefined
-snappy_nif_la_CXXFLAGS += -EHsc
+snappy_nif_la_CXXFLAGS += -EHsc -Ox
 SNAPPY_SO_NAME = snappy_nif.dll
 else
 SNAPPY_SO_NAME = snappy_nif.so
