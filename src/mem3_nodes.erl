@@ -56,11 +56,11 @@ handle_call({get_node_info, Node, Key}, _From, State) ->
         error
     end,
     {reply, Resp, State};
-handle_call({add_node, Node, NodeInfo}, _From, #state{nodes=Nodes} = State) ->
+handle_call({add_node, Node, NodeInfo}, _From, State) ->
     gen_event:notify(mem3_events, {add_node, Node}),
     ets:insert(?MODULE, Node, NodeInfo),
     {reply, ok, State};
-handle_call({remove_node, Node}, _From, #state{nodes=Nodes} = State) ->
+handle_call({remove_node, Node}, _From, State) ->
     gen_event:notify(mem3_events, {remove_node, Node}),
     ets:delete(?MODULE, Node),
     {reply, ok, State};
