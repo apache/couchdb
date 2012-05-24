@@ -225,20 +225,50 @@ function $$(node) {
     this.sidebar = function() {
       // get users db info?
       $("#userCtx span").hide();
+      $(".serverAdmin").attr('disabled', 'disabled');
+
       $.couch.session({
         success : function(r) {
           var userCtx = r.userCtx;
+
+          var urlParts = location.search.substr(1).split("/");
+          var dbName = decodeURIComponent(urlParts.shift());
+          var dbNameRegExp = new RegExp("[^a-z0-9\_\$\(\)\+\/\-]", "g");
+          dbName = dbName.replace(dbNameRegExp, "");
+
           $$("#userCtx").userCtx = userCtx;
           if (userCtx.name) {
             $("#userCtx .name").text(userCtx.name).attr({href : $.couch.urlPrefix + "/_utils/document.html?"+encodeURIComponent(r.info.authentication_db)+"/org.couchdb.user%3A"+encodeURIComponent(userCtx.name)});
+
             if (userCtx.roles.indexOf("_admin") != -1) {
               $("#userCtx .loggedin").show();
               $("#userCtx .loggedinadmin").show();
+              $(".serverAdmin").removeAttr('disabled'); // user is a server admin
             } else {
               $("#userCtx .loggedin").show();
+
+              if (dbName != "") {
+                $.couch.db(dbName).getDbProperty("_security", { // check security roles for user admins
+                  success: function(resp) {
+                    var adminRoles = resp.admins.roles;
+
+                    if ($.inArray(userCtx.name, resp.admins.names)>=0) { // user is admin
+                      $(".userAdmin").removeAttr('disabled');
+                    }
+                    else {
+                      for (var i=0; i<userCtx.roles.length; i++) { 
+                        if ($.inArray(userCtx.roles[i], resp.admins.roles)>=0) { // user has role that is an admin
+                          $(".userAdmin").removeAttr('disabled');
+                        }
+                      }
+                    }
+                  } 
+                }); 
+              }
             }
           } else if (userCtx.roles.indexOf("_admin") != -1) {
             $("#userCtx .adminparty").show();
+            $(".serverAdmin").removeAttr('disabled');
           } else {
             $("#userCtx .loggedout").show();
           };
