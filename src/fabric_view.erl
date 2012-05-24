@@ -171,6 +171,7 @@ possibly_embed_doc(#collector{db_name=DbName, query_args=Args},
         {Props} = Value,
         Rev0 = couch_util:get_value(<<"_rev">>, Props),
         case couch_util:get_value(<<"_id">>,Props) of
+        null -> Row#view_row{doc=null};
         undefined -> Row;
         IncId ->
             % use separate process to call fabric:open_doc
