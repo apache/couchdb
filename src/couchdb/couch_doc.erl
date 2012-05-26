@@ -188,6 +188,8 @@ parse_revs([Rev | Rest]) ->
     [parse_rev(Rev) | parse_revs(Rest)].
 
 
+validate_docid(<<"">>) ->
+    throw({bad_request, <<"Document id must not be empty">>});
 validate_docid(Id) when is_binary(Id) ->
     case couch_util:validate_utf8(Id) of
         false -> throw({bad_request, <<"Document id must be valid UTF-8">>});
