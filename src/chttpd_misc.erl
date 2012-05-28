@@ -280,7 +280,7 @@ handle_system_req(Req) ->
         {os_proc_count, couch_proc_manager:get_proc_count()},
         {process_count, erlang:system_info(process_count)},
         {process_limit, erlang:system_info(process_limit)},
-        {message_queues, message_queues([couch_server, rexi_server])},
+        {message_queues, message_queues(registered())},
         {distribution, {get_distribution_stats()}}
     ]}).
 
