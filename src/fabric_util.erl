@@ -14,7 +14,7 @@
 
 -module(fabric_util).
 
--export([submit_jobs/3, cleanup/1, recv/4, get_db/1, get_db/2, error_info/1,
+-export([submit_jobs/3, submit_jobs/4, cleanup/1, recv/4, get_db/1, get_db/2, error_info/1,
         update_counter/3, remove_ancestors/2, create_monitors/1, kv/2,
         remove_down_workers/2]).
 
@@ -34,8 +34,11 @@ remove_down_workers(Workers, BadNode) ->
     end.
 
 submit_jobs(Shards, EndPoint, ExtraArgs) ->
+    submit_jobs(Shards, fabric_rpc, EndPoint, ExtraArgs).
+
+submit_jobs(Shards, Module, EndPoint, ExtraArgs) ->
     lists:map(fun(#shard{node=Node, name=ShardName} = Shard) ->
-        Ref = rexi:cast(Node, {fabric_rpc, EndPoint, [ShardName | ExtraArgs]}),
+        Ref = rexi:cast(Node, {Module, EndPoint, [ShardName | ExtraArgs]}),
         Shard#shard{ref = Ref}
     end, Shards).
 

@@ -14,7 +14,7 @@
 
 -module(fabric_db_meta).
 
--export([set_revs_limit/3, set_security/3]).
+-export([set_revs_limit/3, set_security/3, get_all_security/2]).
 
 -include("fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
@@ -22,8 +22,9 @@
 set_revs_limit(DbName, Limit, Options) ->
     Shards = mem3:shards(DbName),
     Workers = fabric_util:submit_jobs(Shards, set_revs_limit, [Limit, Options]),
+    Handler = fun handle_set_message/3,
     Waiting = length(Workers) - 1,
-    case fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Waiting) of
+    case fabric_util:recv(Workers, #shard.ref, Handler, Waiting) of
     {ok, ok} ->
         ok;
     Error ->
@@ -33,17 +34,37 @@ set_revs_limit(DbName, Limit, Options) ->
 set_security(DbName, SecObj, Options) ->
     Shards = mem3:shards(DbName),
     Workers = fabric_util:submit_jobs(Shards, set_security, [SecObj, Options]),
+    Handler = fun handle_set_message/3,
     Waiting = length(Workers) - 1,
-    case fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Waiting) of
+    case fabric_util:recv(Workers, #shard.ref, Handler, Waiting) of
     {ok, ok} ->
         ok;
     Error ->
         Error
     end.
 
-handle_message(ok, _, 0) ->
+handle_set_message(ok, _, 0) ->
     {stop, ok};
-handle_message(ok, _, Waiting) ->
+handle_set_message(ok, _, Waiting) ->
     {ok, Waiting - 1};
-handle_message(Error, _, _Waiting) ->
+handle_set_message(Error, _, _Waiting) ->
+    {error, Error}.
+
+get_all_security(DbName, Options) ->
+    Shards = mem3:shards(DbName),
+    Workers = fabric_util:submit_jobs(Shards, get_all_security, [Options]),
+    Handler = fun handle_get_message/3,
+    Acc = {[], length(Workers) - 1},
+    case fabric_util:recv(Workers, #shard.ref, Handler, Acc) of
+    {ok, {SecObjs, _}} ->
+        {ok, SecObjs};
+    Error ->
+        Error
+    end.
+
+handle_get_message(SecObj, Worker, {SecObjs, 0}) ->
+    {stop, {[{Worker, SecObj} | SecObjs], 0}};
+handle_get_message(SecObj, Worker, {SecObjs, Waiting}) ->
+    {ok, {[{Worker, SecObj} | SecObjs], Waiting - 1}};
+handle_get_message(Error, _, _Waiting) ->
     {error, Error}.

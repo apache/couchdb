@@ -266,12 +266,12 @@ unpack_seqs(Packed, DbName) ->
 do_unpack_seqs(Opaque, DbName) ->
     % TODO relies on internal structure of fabric_dict as keylist
     lists:map(fun({Node, [A,B], Seq}) ->
-        Match = #shard{node=Node, range=[A,B], dbname=DbName, _ = '_'},
-        case ets:match_object(partitions, Match) of
-        [Shard] ->
+        case mem3:get_shard(DbName, Node, [A,B]) of
+        {ok, Shard} ->
             {Shard, Seq};
-        [] ->
-            {Match, Seq} % will be replaced in find_replacement_shards
+        {error, not_found} ->
+            PlaceHolder = #shard{node=Node, range=[A,B], dbname=DbName, _='_'},
+            {PlaceHolder, Seq} % will be replaced in find_replacement_shards
         end
     end, binary_to_term(couch_util:decodeBase64Url(Opaque))).
 
@@ -315,13 +315,17 @@ wait_db_updated(Timeout) ->
 validate_start_seq(DbName, Seq) ->
     try unpack_seqs(Seq, DbName) of _Any ->
         ok
-    catch _:_ ->
-        Reason = <<"Malformed sequence supplied in 'since' parameter.">>,
-        {error, {bad_request, Reason}}
+    catch
+        error:database_does_not_exist ->
+            {error, database_does_not_exist};
+        _:_ ->
+            Reason = <<"Malformed sequence supplied in 'since' parameter.">>,
+            {error, {bad_request, Reason}}
     end.
 
 unpack_seqs_test() ->
-    ets:new(partitions, [named_table]),
+    meck:new(mem3),
+    meck:expect(mem3, get_shard, fun(_, _, _) -> {ok, #shard{}} end),
 
     % BigCouch 0.3 style.
     assert_shards("23423-g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
@@ -360,7 +364,7 @@ unpack_seqs_test() ->
     "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
     "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA\""),
 
-    ets:delete(partitions).
+    meck:unload(mem3).
 
 assert_shards(Packed) ->
     ?assertMatch([{#shard{},_}|_], unpack_seqs(Packed, <<"foo">>)).
