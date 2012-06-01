@@ -16,6 +16,7 @@
 
 -export([start/0, stop/0, restart/0, nodes/0, node_info/2, shards/1, shards/2,
     choose_shards/2, n/1, dbname/1, ushards/1, ushards/2]).
+-export([get_shard/3, local_shards/1, fold_shards/2]).
 -export([sync_security/0, sync_security/1]).
 -export([compare_nodelists/0, compare_shards/1]).
 -export([quorum/1, group_by_proximity/1]).
@@ -88,14 +89,7 @@ shards(DbName) ->
             dbname = ShardDbName,
             range = [0, 2 bsl 31]}];
     _ ->
-        try ets:lookup(partitions, DbName) of
-        [] ->
-            mem3_util:load_shards_from_disk(DbName);
-        Else ->
-            Else
-        catch error:badarg ->
-        mem3_util:load_shards_from_disk(DbName)
-        end
+        mem3_shards:for_db(DbName)
     end.
 
 -spec shards(DbName::iodata(), DocId::binary()) -> [#shard{}].
@@ -104,23 +98,7 @@ shards(DbName, DocId) when is_list(DbName) ->
 shards(DbName, DocId) when is_list(DocId) ->
     shards(DbName, list_to_binary(DocId));
 shards(DbName, DocId) ->
-    HashKey = mem3_util:hash(DocId),
-    Head = #shard{
-        name = '_',
-        node = '_',
-        dbname = DbName,
-        range = ['$1','$2'],
-        ref = '_'
-    },
-    Conditions = [{'=<', '$1', HashKey}, {'=<', HashKey, '$2'}],
-    try ets:select(partitions, [{Head, Conditions, ['$_']}]) of
-    [] ->
-        mem3_util:load_shards_from_disk(DbName, DocId);
-    Shards ->
-        Shards
-    catch error:badarg ->
-        mem3_util:load_shards_from_disk(DbName, DocId)
-    end.
+    mem3_shards:for_docid(DbName, DocId).
 
 -spec ushards(DbName::iodata()) -> [#shard{}].
 ushards(DbName) ->
@@ -135,6 +113,15 @@ ushards(Shards0, ZoneMap) ->
     % nodes in the same zone.
     Shards = choose_ushards(L ++ S) ++ choose_ushards(D),
     lists:ukeysort(#shard.range, Shards).
+
+get_shard(DbName, Node, Range) ->
+    mem3_shards:get(DbName, Node, Range).
+
+local_shards(DbName) ->
+    mem3_shards:local(DbName).
+
+fold_shards(Fun, Acc) ->
+    mem3_shards:fold(Fun, Acc).
 
 sync_security() ->
     mem3_sync_security:go().

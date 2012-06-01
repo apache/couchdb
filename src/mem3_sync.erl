@@ -65,11 +65,11 @@ init([]) ->
     Concurrency = couch_config:get("mem3", "sync_concurrency", "10"),
     gen_event:add_handler(mem3_events, mem3_sync_event, []),
     {ok, Pid} = start_update_notifier(),
-    spawn(fun initial_sync/0),
+    initial_sync(),
     {ok, #state{limit = list_to_integer(Concurrency), update_notifier=Pid}}.
 
 handle_call({push, Job}, From, State) ->
-    {noreply, handle_cast({push, Job#job{pid = From}}, State)};
+    handle_cast({push, Job#job{pid = From}}, State);
 
 handle_call(get_active, _From, State) ->
     {reply, State#state.active, State};
@@ -133,10 +133,9 @@ handle_info({'EXIT', Active, {{not_found, no_db_file}, _Stack}}, State) ->
 handle_info({'EXIT', Active, Reason}, State) ->
     NewState = case lists:keyfind(Active, #job.pid, State#state.active) of
         #job{name=OldDbName, node=OldNode} = Job ->
-        twig:log(warn, "~p ~s -> ~p ~p", [?MODULE, OldDbName, OldNode,
-            Reason]),
+        twig:log(warn, "~s ~s ~s ~w", [?MODULE, OldDbName, OldNode, Reason]),
         case Reason of {pending_changes, Count} ->
-            add_to_queue(State, Job#job{pid = nil, count = Count});
+            maybe_resubmit(State, Job#job{pid = nil, count = Count});
         _ ->
             try mem3:shards(mem3:dbname(Job#job.name)) of _ ->
                 timer:apply_after(5000, ?MODULE, push, [Job#job{pid=nil}])
@@ -157,11 +156,24 @@ terminate(_Reason, State) ->
     [exit(Pid, shutdown) || #job{pid=Pid} <- State#state.active],
     ok.
 
-code_change(_, #state{waiting = WaitingList} = State, _) ->
+code_change(_, #state{waiting = WaitingList} = State, _) when is_list(WaitingList) ->
     {ok, State#state{waiting = from_list(WaitingList)}};
 
 code_change(_, State, _) ->
     {ok, State}.
+
+maybe_resubmit(State, #job{name=DbName, node=Node} = Job) ->
+    case lists:member(DbName, local_dbs()) of
+    true ->
+        case find_next_node() of
+        Node ->
+            add_to_queue(State, Job);
+        _ ->
+            State % don't resubmit b/c we have a new replication target
+        end;
+    false ->
+        add_to_queue(State, Job)
+    end.
 
 handle_replication_exit(State, Pid) ->
     #state{active=Active, limit=Limit, dict=D, waiting=Waiting} = State,
@@ -192,12 +204,20 @@ handle_replication_exit(State, Pid) ->
 
 start_push_replication(#job{name=Name, node=Node, pid=From}) ->
     if From =/= nil -> gen_server:reply(From, ok); true -> ok end,
-    spawn_link(mem3_rep, go, [Name, Node]).
+    spawn_link(fun() ->
+        case mem3_rep:go(Name, Node) of
+            {ok, Pending} when Pending > 0 ->
+                exit({pending_changes, Pending});
+            _ ->
+                ok
+        end
+    end).
 
-add_to_queue(State, #job{name=DbName, node=Node} = Job) ->
+add_to_queue(State, #job{name=DbName, node=Node, pid=From} = Job) ->
     #state{dict=D, waiting=WQ} = State,
     case dict:is_key({DbName, Node}, D) of
     true ->
+        if From =/= nil -> gen_server:reply(From, ok); true -> ok end,
         State;
     false ->
         twig:log(debug, "adding ~s -> ~p to mem3_sync queue", [DbName, Node]),
@@ -208,15 +228,12 @@ add_to_queue(State, #job{name=DbName, node=Node} = Job) ->
     end.
 
 sync_nodes_and_dbs() ->
-    Db1 = couch_config:get("mem3", "node_db", "nodes"),
-    Db2 = couch_config:get("mem3", "shard_db", "dbs"),
-    Db3 = couch_config:get("couch_httpd_auth", "authentication_db", "_users"),
     Node = find_next_node(),
-    [push(?l2b(Db), Node) || Db <- [Db1, Db2, Db3]].
+    [push(Db, Node) || Db <- local_dbs()].
 
 initial_sync() ->
     [net_kernel:connect_node(Node) || Node <- mem3:nodes()],
-    initial_sync(nodes()).
+    mem3_sync_nodes:add(nodes()).
 
 initial_sync(Live) ->
     sync_nodes_and_dbs(),
@@ -245,10 +262,9 @@ sync_push(ShardName, N) ->
     gen_server:call(mem3_sync, {push, #job{name=ShardName, node=N}}, infinity).
 
 start_update_notifier() ->
-    Db1 = ?l2b(couch_config:get("mem3", "node_db", "nodes")),
-    Db2 = ?l2b(couch_config:get("mem3", "shard_db", "dbs")),
-    Db3 = ?l2b(couch_config:get("couch_httpd_auth", "authentication_db",
-        "_users")),
+    Db1 = nodes_db(),
+    Db2 = shards_db(),
+    Db3 = users_db(),
     couch_db_update_notifier:start_link(fun
     ({updated, Db}) when Db == Db1 ->
         Nodes = mem3:nodes(),
@@ -293,7 +309,7 @@ next_replication(Active, Waiting, WaitingAndRunning) ->
         true ->
             next_replication(Active, RemQ, in(Job, WaitingAndRunning));
         false ->
-            {Job, join(Waiting, WaitingAndRunning)}
+            {Job, join(RemQ, WaitingAndRunning)}
         end
     end.
 
@@ -302,3 +318,15 @@ is_running(DbName, Node, ActiveList) ->
 
 remove_entries(Dict, Entries) ->
     lists:foldl(fun(Entry, D) -> dict:erase(Entry, D) end, Dict, Entries).
+
+local_dbs() ->
+    [nodes_db(), shards_db(), users_db()].
+
+nodes_db() ->
+    ?l2b(couch_config:get("mem3", "node_db", "nodes")).
+
+shards_db() ->
+    ?l2b(couch_config:get("mem3", "shard_db", "dbs")).
+
+users_db() ->
+    ?l2b(couch_config:get("couch_httpd_auth", "authentication_db", "_users")).

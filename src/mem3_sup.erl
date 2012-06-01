@@ -22,9 +22,10 @@ start_link() ->
 init(_Args) ->
     Children = [
         child(mem3_events),
-        child(mem3_cache),
         child(mem3_nodes),
+        child(mem3_sync_nodes), % Order important?
         child(mem3_sync),
+        child(mem3_shards),
         child(mem3_rep_manager)
     ],
     {ok, {{one_for_one,10,1}, Children}}.
