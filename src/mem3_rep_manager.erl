@@ -22,7 +22,6 @@
 
 -include("mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
--include_lib("couch/include/couch_js_functions.hrl").
 
 -define(DOC_TO_REP, mem3_rep_doc_id_to_rep_id).
 -define(REP_TO_STATE, mem3_rep_id_to_rep_state).
