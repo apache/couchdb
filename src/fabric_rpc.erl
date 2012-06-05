@@ -50,7 +50,6 @@ all_docs(DbName, #view_query_args{keys=nil} = QueryArgs) ->
         limit = Limit,
         skip = Skip,
         include_docs = IncludeDocs,
-        conflicts = Conflicts,
         direction = Dir,
         inclusive_end = Inclusive,
         extra = Extra
@@ -60,7 +59,7 @@ all_docs(DbName, #view_query_args{keys=nil} = QueryArgs) ->
     Acc0 = #view_acc{
         db = Db,
         include_docs = IncludeDocs,
-        conflicts = Conflicts,
+        conflicts = proplists:get_value(conflicts, Extra, false),
         limit = Limit+Skip,
         total_rows = Total
     },
@@ -99,7 +98,6 @@ map_view(DbName, DDoc, ViewName, QueryArgs) ->
         skip = Skip,
         keys = Keys,
         include_docs = IncludeDocs,
-        conflicts = Conflicts,
         stale = Stale,
         view_type = ViewType,
         extra = Extra
@@ -116,7 +114,7 @@ map_view(DbName, DDoc, ViewName, QueryArgs) ->
     Acc0 = #view_acc{
         db = Db,
         include_docs = IncludeDocs,
-        conflicts = Conflicts,
+        conflicts = proplists:get_value(conflicts, Extra, false),
         limit = Limit+Skip,
         total_rows = Total,
         reduce_fun = fun couch_view:reduce_to_count/1
