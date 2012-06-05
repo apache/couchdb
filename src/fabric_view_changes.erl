@@ -92,9 +92,7 @@ keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout) ->
 
 send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn, Timeout) ->
     LiveNodes = [node() | nodes()],
-    %% This can be replaced by mem3:live_shards when we upgrade mem3
-    AllLiveShards =
-        [S || #shard{node=Node} = S <- mem3:shards(DbName), lists:member(Node, LiveNodes)],
+    AllLiveShards = mem3:live_shards(DbName, LiveNodes),
     Seqs = lists:flatmap(fun({#shard{name=Name, node=N} = Shard, Seq}) ->
         case lists:member(Shard, AllLiveShards) of
         true ->
