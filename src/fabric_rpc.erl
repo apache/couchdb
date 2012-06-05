@@ -72,16 +72,18 @@ all_docs(DbName, #view_query_args{keys=nil} = QueryArgs) ->
     {ok, _, Acc} = couch_db:enum_docs(Db, fun view_fold/3, Acc0, Options),
     final_response(Total, Acc#view_acc.offset).
 
-changes(DbName, Args, StartSeq) ->
+changes(DbName, #changes_args{} = Args, StartSeq) ->
+    changes(DbName, [Args], StartSeq);
+changes(DbName, Options, StartSeq) ->
     erlang:put(io_priority, {interactive, DbName}),
-    #changes_args{dir=Dir} = Args,
+    #changes_args{dir=Dir} = Args = lists:keyfind(changes_args, 1, Options),
     case get_or_create_db(DbName, []) of
     {ok, Db} ->
         Enum = fun changes_enumerator/2,
         Opts = [{dir,Dir}],
-        Acc0 = {Db, StartSeq, Args},
+        Acc0 = {Db, StartSeq, Args, Options},
         try
-            {ok, {_, LastSeq, _}} =
+            {ok, {_, LastSeq, _, _}} =
                 couch_db:changes_since(Db, StartSeq, Enum, Opts, Acc0),
             rexi:reply({complete, LastSeq})
         after
@@ -407,21 +409,21 @@ send(Key, Value, #view_acc{limit=Limit} = Acc) ->
         exit(timeout)
     end.
 
-changes_enumerator(DocInfo, {Db, _Seq, Args}) ->
+changes_enumerator(DocInfo, {Db, _Seq, Args, Options}) ->
     #changes_args{
         include_docs = IncludeDocs,
-        filter = Acc,
-        conflicts = Conflicts
+        filter = Acc
     } = Args,
+    Conflicts = proplists:get_value(conflicts, Options, false),
     #doc_info{high_seq=Seq, revs=[#rev_info{deleted=Del}|_]} = DocInfo,
     case [X || X <- couch_changes:filter(DocInfo, Acc), X /= null] of
     [] ->
-        {ok, {Db, Seq, Args}};
+        {ok, {Db, Seq, Args, Options}};
     Results ->
         Opts = if Conflicts -> [conflicts]; true -> [] end,
         ChangesRow = changes_row(Db, DocInfo, Results, Del, IncludeDocs, Opts),
         Go = rexi:sync_reply(ChangesRow),
-        {Go, {Db, Seq, Args}}
+        {Go, {Db, Seq, Args, Options}}
     end.
 
 changes_row(Db, #doc_info{id=Id, high_seq=Seq}=DI, Results, Del, true, Opts) ->
