@@ -353,7 +353,7 @@ validate_view_query(conflicts, true, Args) ->
                 "is invalid for reduce views.">>,
         throw({query_parse_error, Msg});
     _ ->
-        Args#view_query_args{conflicts = true}
+        Args#view_query_args{extra = [conflicts|Args#view_query_args.extra]}
     end;
 validate_view_query(conflicts, _Value, Args) ->
     Args;
