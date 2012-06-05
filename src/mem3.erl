@@ -20,6 +20,7 @@
 -export([sync_security/0, sync_security/1]).
 -export([compare_nodelists/0, compare_shards/1]).
 -export([quorum/1, group_by_proximity/1]).
+-export([live_shards/2]).
 
 -include("mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
