@@ -24,8 +24,7 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -import(couch_util, [
-    get_value/2,
-    get_value/3
+    get_value/2
 ]).
 
 -record(state, {

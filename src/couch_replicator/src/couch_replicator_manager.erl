@@ -16,7 +16,6 @@
 % public API
 -export([replication_started/1, replication_completed/2, replication_error/2]).
 
--export([before_doc_update/2, after_doc_read/2]).
 
 % gen_server callbacks
 -export([start_link/0, init/1, handle_call/3, handle_info/2, handle_cast/2]).
@@ -32,9 +31,13 @@
 -define(MAX_WAIT, 600).     % seconds
 -define(OWNER, <<"owner">>).
 
+-define(DB_TO_SEQ, db_to_seq).
+-define(CTX, {user_ctx, #user_ctx{roles=[<<"_admin">>, <<"_replicator">>]}}).
+
 -define(replace(L, K, V), lists:keystore(K, 1, L, {K, V})).
 
 -record(rep_state, {
+    dbname,
     rep,
     starting,
     retries_left,
@@ -49,13 +52,11 @@
 ]).
 
 -record(state, {
-    changes_feed_loop = nil,
     db_notifier = nil,
-    rep_db_name = nil,
+    scan_pid = nil,
     rep_start_pids = [],
     max_retries
 }).
-
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -65,13 +66,13 @@ replication_started(#rep{id = {BaseId, _} = RepId}) ->
     case rep_state(RepId) of
     nil ->
         ok;
-    #rep_state{rep = #rep{doc_id = DocId}} ->
-        update_rep_doc(DocId, [
+    #rep_state{dbname = DbName, rep = #rep{doc_id = DocId}} ->
+        update_rep_doc(DbName, DocId, [
             {<<"_replication_state">>, <<"triggered">>},
             {<<"_replication_id">>, ?l2b(BaseId)},
             {<<"_replication_stats">>, undefined}]),
         ok = gen_server:call(?MODULE, {rep_started, RepId}, infinity),
-        ?LOG_INFO("Document `~s` triggered replication `~s`",
+        twig:log(notice, "Document `~s` triggered replication `~s`",
             [DocId, pp_rep_id(RepId)])
     end.
 
@@ -80,12 +81,12 @@ replication_completed(#rep{id = RepId}, Stats) ->
     case rep_state(RepId) of
     nil ->
         ok;
-    #rep_state{rep = #rep{doc_id = DocId}} ->
-        update_rep_doc(DocId, [
+    #rep_state{dbname = DbName, rep = #rep{doc_id = DocId}} ->
+        update_rep_doc(DbName, DocId, [
             {<<"_replication_state">>, <<"completed">>},
             {<<"_replication_stats">>, {Stats}}]),
         ok = gen_server:call(?MODULE, {rep_complete, RepId}, infinity),
-        ?LOG_INFO("Replication `~s` finished (triggered by document `~s`)",
+        twig:log(notice, "Replication `~s` finished (triggered by document `~s`)",
             [pp_rep_id(RepId), DocId])
     end.
 
@@ -94,9 +95,9 @@ replication_error(#rep{id = {BaseId, _} = RepId}, Error) ->
     case rep_state(RepId) of
     nil ->
         ok;
-    #rep_state{rep = #rep{doc_id = DocId}} ->
+    #rep_state{dbname = DbName, rep = #rep{doc_id = DocId}} ->
         % TODO: maybe add error reason to replication document
-        update_rep_doc(DocId, [
+        update_rep_doc(DbName, DocId, [
             {<<"_replication_state">>, <<"error">>},
             {<<"_replication_id">>, ?l2b(BaseId)}]),
         ok = gen_server:call(?MODULE, {rep_error, RepId, Error}, infinity)
@@ -107,32 +108,30 @@ init(_) ->
     process_flag(trap_exit, true),
     ?DOC_TO_REP = ets:new(?DOC_TO_REP, [named_table, set, protected]),
     ?REP_TO_STATE = ets:new(?REP_TO_STATE, [named_table, set, protected]),
+    ?DB_TO_SEQ = ets:new(?DB_TO_SEQ, [named_table, set, protected]),
     Server = self(),
     ok = couch_config:register(
-        fun("replicator", "db", NewName) ->
-            ok = gen_server:cast(Server, {rep_db_changed, ?l2b(NewName)});
-        ("replicator", "max_replication_retry_count", V) ->
+        fun("replicator", "max_replication_retry_count", V) ->
             ok = gen_server:cast(Server, {set_max_retries, retries_value(V)})
         end
     ),
-    {Loop, RepDbName} = changes_feed_loop(),
+    ScanPid = spawn_link(fun() -> scan_all_dbs(Server) end),
     {ok, #state{
-        changes_feed_loop = Loop,
-        rep_db_name = RepDbName,
         db_notifier = db_update_notifier(),
+        scan_pid = ScanPid,
         max_retries = retries_value(
             couch_config:get("replicator", "max_replication_retry_count", "10"))
     }}.
 
 
-handle_call({rep_db_update, {ChangeProps} = Change}, _From, State) ->
+handle_call({rep_db_update, DbName, {ChangeProps} = Change}, _From, State) ->
     NewState = try
-        process_update(State, Change)
+        process_update(State, DbName, Change)
     catch
     _Tag:Error ->
         {RepProps} = get_value(doc, ChangeProps),
         DocId = get_value(<<"_id">>, RepProps),
-        rep_db_update_error(Error, DocId),
+        rep_db_update_error(Error, DbName, DocId),
         State
     end,
     {reply, ok, NewState};
@@ -160,38 +159,47 @@ handle_call({rep_complete, RepId}, _From, State) ->
 handle_call({rep_error, RepId, Error}, _From, State) ->
     {reply, ok, replication_error(State, RepId, Error)};
 
+handle_call({resume_scan, DbName}, _From, State) ->
+    Since = case ets:lookup(?DB_TO_SEQ, DbName) of
+        [] -> 0;
+        [{DbName, EndSeq}] -> EndSeq
+    end,
+    Pid = changes_feed_loop(DbName, Since),
+    twig:log(debug, "Scanning ~s from update_seq ~p", [DbName, Since]),
+    {reply, ok, State#state{rep_start_pids = [Pid | State#state.rep_start_pids]}};
+
+handle_call({rep_db_checkpoint, DbName, EndSeq}, _From, State) ->
+    true = ets:insert(?DB_TO_SEQ, {DbName, EndSeq}),
+    {reply, ok, State};
+
 handle_call(Msg, From, State) ->
-    ?LOG_ERROR("Replication manager received unexpected call ~p from ~p",
+    twig:log(error, "Replication manager received unexpected call ~p from ~p",
         [Msg, From]),
     {stop, {error, {unexpected_call, Msg}}, State}.
-
-
-handle_cast({rep_db_changed, NewName}, #state{rep_db_name = NewName} = State) ->
-    {noreply, State};
-
-handle_cast({rep_db_changed, _NewName}, State) ->
-    {noreply, restart(State)};
-
-handle_cast({rep_db_created, NewName}, #state{rep_db_name = NewName} = State) ->
-    {noreply, State};
-
-handle_cast({rep_db_created, _NewName}, State) ->
-    {noreply, restart(State)};
 
 handle_cast({set_max_retries, MaxRetries}, State) ->
     {noreply, State#state{max_retries = MaxRetries}};
 
 handle_cast(Msg, State) ->
-    ?LOG_ERROR("Replication manager received unexpected cast ~p", [Msg]),
+    twig:log(error, "Replication manager received unexpected cast ~p", [Msg]),
     {stop, {error, {unexpected_cast, Msg}}, State}.
 
+handle_info({nodeup, _Node}, State) ->
+    {noreply, rescan(State)};
 
-handle_info({'EXIT', From, normal}, #state{changes_feed_loop = From} = State) ->
-    % replicator DB deleted
-    {noreply, State#state{changes_feed_loop = nil, rep_db_name = nil}};
+handle_info({nodedown, _Node}, State) ->
+    {noreply, rescan(State)};
+
+handle_info({'EXIT', From, normal}, #state{scan_pid = From} = State) ->
+    twig:log(debug, "Background scan has completed.", []),
+    {noreply, State#state{scan_pid=nil}};
+
+handle_info({'EXIT', From, Reason}, #state{scan_pid = From} = State) ->
+    twig:log(error, "Background scanner died. Reason: ~p", [Reason]),
+    {stop, {scanner_died, Reason}, State};
 
 handle_info({'EXIT', From, Reason}, #state{db_notifier = From} = State) ->
-    ?LOG_ERROR("Database update notifier died. Reason: ~p", [Reason]),
+    twig:log(error, "Database update notifier died. Reason: ~p", [Reason]),
     {stop, {db_update_notifier_died, Reason}, State};
 
 handle_info({'EXIT', From, normal}, #state{rep_start_pids = Pids} = State) ->
@@ -203,14 +211,14 @@ handle_info({'DOWN', _Ref, _, _, _}, State) ->
     {noreply, State};
 
 handle_info(Msg, State) ->
-    ?LOG_ERROR("Replication manager received unexpected message ~p", [Msg]),
+    twig:log(error,"Replication manager received unexpected message ~p", [Msg]),
     {stop, {unexpected_msg, Msg}, State}.
 
 
 terminate(_Reason, State) ->
     #state{
+        scan_pid = ScanPid,
         rep_start_pids = StartPids,
-        changes_feed_loop = Loop,
         db_notifier = DbNotifier
     } = State,
     stop_all_replications(),
@@ -219,50 +227,48 @@ terminate(_Reason, State) ->
             catch unlink(Pid),
             catch exit(Pid, stop)
         end,
-        [Loop | StartPids]),
+        [ScanPid | StartPids]),
     true = ets:delete(?REP_TO_STATE),
     true = ets:delete(?DOC_TO_REP),
+    true = ets:delete(?DB_TO_SEQ),
     couch_db_update_notifier:stop(DbNotifier).
 
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-
-changes_feed_loop() ->
-    {ok, RepDb} = ensure_rep_db_exists(),
-    RepDbName = couch_db:name(RepDb),
-    couch_db:close(RepDb),
+changes_feed_loop(DbName, Since) ->
     Server = self(),
     Pid = spawn_link(
         fun() ->
-            DbOpenOptions = [{user_ctx, RepDb#db.user_ctx}, sys_db],
-            {ok, Db} = couch_db:open_int(RepDbName, DbOpenOptions),
-            ChangesFeedFun = couch_changes:handle_changes(
-                #changes_args{
-                    include_docs = true,
-                    feed = "continuous",
-                    timeout = infinity
-                },
-                {json_req, null},
-                Db
-            ),
-            ChangesFeedFun(
-                fun({change, Change, _}, _) ->
-                    case has_valid_rep_id(Change) of
-                    true ->
-                        ok = gen_server:call(
-                            Server, {rep_db_update, Change}, infinity);
-                    false ->
-                        ok
-                    end;
-                (_, _) ->
+            fabric:changes(DbName, fun
+            ({change, Change}, Acc) ->
+                case has_valid_rep_id(Change) of
+                true ->
+                    ok = gen_server:call(
+                        Server, {rep_db_update, DbName, Change}, infinity);
+                false ->
                     ok
-                end
+                end,
+                {ok, Acc};
+            ({stop, EndSeq}, Acc) ->
+                ok = gen_server:call(Server, {rep_db_checkpoint, DbName, EndSeq}),
+                {ok, Acc};
+            (_, Acc) ->
+                {ok, Acc}
+            end,
+            nil,
+            #changes_args{
+                include_docs = true,
+                feed = "normal",
+                since = Since,
+                filter = main_only,
+                timeout = infinity,
+                db_open_options = [sys_db]
+                }
             )
-        end
-    ),
-    {Pid, RepDbName}.
+        end),
+    Pid.
 
 
 has_valid_rep_id({Change}) ->
@@ -272,79 +278,72 @@ has_valid_rep_id(<<?DESIGN_DOC_PREFIX, _Rest/binary>>) ->
 has_valid_rep_id(_Else) ->
     true.
 
-
 db_update_notifier() ->
     Server = self(),
+    IsReplicatorDbFun = is_replicator_db_fun(),
     {ok, Notifier} = couch_db_update_notifier:start_link(
-        fun({created, DbName}) ->
-            case ?l2b(couch_config:get("replicator", "db", "_replicator")) of
-            DbName ->
-                ok = gen_server:cast(Server, {rep_db_created, DbName});
+        fun({updated, DbName}) ->
+            case IsReplicatorDbFun(DbName) of
+            true ->
+                ok = gen_server:call(Server, {resume_scan, mem3:dbname(DbName)});
             _ ->
                 ok
             end;
-        (_) ->
-            % no need to handle the 'deleted' event - the changes feed loop
-            % dies when the database is deleted
+           (_) ->
             ok
         end
     ),
     Notifier.
 
+rescan(#state{scan_pid = nil} = State) ->
+    true = ets:delete_all_objects(?DB_TO_SEQ),
+    Server = self(),
+    NewScanPid = spawn_link(fun() -> scan_all_dbs(Server) end),
+    State#state{scan_pid = NewScanPid};
+rescan(#state{scan_pid = ScanPid} = State) ->
+    unlink(ScanPid),
+    exit(ScanPid, exit),
+    rescan(State#state{scan_pid = nil}).
 
-restart(#state{changes_feed_loop = Loop, rep_start_pids = StartPids} = State) ->
-    stop_all_replications(),
-    lists:foreach(
-        fun(Pid) ->
-            catch unlink(Pid),
-            catch exit(Pid, rep_db_changed)
-        end,
-        [Loop | StartPids]),
-    {NewLoop, NewRepDbName} = changes_feed_loop(),
-    State#state{
-        changes_feed_loop = NewLoop,
-        rep_db_name = NewRepDbName,
-        rep_start_pids = []
-    }.
-
-
-process_update(State, {Change}) ->
+process_update(State, DbName, {Change}) ->
     {RepProps} = JsonRepDoc = get_value(doc, Change),
     DocId = get_value(<<"_id">>, RepProps),
-    case get_value(<<"deleted">>, Change, false) of
-    true ->
+    case {mem3_util:owner(DbName, DocId), get_value(deleted, Change, false)} of
+    {false, _} ->
+        replication_complete(DocId),
+        State;
+    {true, true} ->
         rep_doc_deleted(DocId),
         State;
-    false ->
+    {true, false} ->
         case get_value(<<"_replication_state">>, RepProps) of
         undefined ->
-            maybe_start_replication(State, DocId, JsonRepDoc);
+            maybe_start_replication(State, DbName, DocId, JsonRepDoc);
         <<"triggered">> ->
-            maybe_start_replication(State, DocId, JsonRepDoc);
+            maybe_start_replication(State, DbName, DocId, JsonRepDoc);
         <<"completed">> ->
             replication_complete(DocId),
             State;
         <<"error">> ->
             case ets:lookup(?DOC_TO_REP, DocId) of
             [] ->
-                maybe_start_replication(State, DocId, JsonRepDoc);
+                maybe_start_replication(State, DbName, DocId, JsonRepDoc);
             _ ->
                 State
             end
         end
     end.
 
-
-rep_db_update_error(Error, DocId) ->
+rep_db_update_error(Error, DbName, DocId) ->
     case Error of
     {bad_rep_doc, Reason} ->
         ok;
     _ ->
         Reason = to_binary(Error)
     end,
-    ?LOG_ERROR("Replication manager, error processing document `~s`: ~s",
+    twig:log(error,"Replication manager, error processing document `~s`: ~s",
         [DocId, Reason]),
-    update_rep_doc(DocId, [{<<"_replication_state">>, <<"error">>}]).
+    update_rep_doc(DbName, DocId, [{<<"_replication_state">>, <<"error">>}]).
 
 
 rep_user_ctx({RepDoc}) ->
@@ -359,11 +358,13 @@ rep_user_ctx({RepDoc}) ->
     end.
 
 
-maybe_start_replication(State, DocId, RepDoc) ->
+maybe_start_replication(State, DbName, DocId, RepDoc) ->
+    io:format("should I start a repl here for ~p ~n",[DocId]),
     #rep{id = {BaseId, _} = RepId} = Rep = parse_rep_doc(RepDoc),
     case rep_state(RepId) of
     nil ->
         RepState = #rep_state{
+            dbname = DbName,
             rep = Rep,
             starting = true,
             retries_left = State#state.max_retries,
@@ -371,21 +372,21 @@ maybe_start_replication(State, DocId, RepDoc) ->
         },
         true = ets:insert(?REP_TO_STATE, {RepId, RepState}),
         true = ets:insert(?DOC_TO_REP, {DocId, RepId}),
-        ?LOG_INFO("Attempting to start replication `~s` (document `~s`).",
+        twig:log(notice,"Attempting to start replication `~s` (document `~s`).",
             [pp_rep_id(RepId), DocId]),
         Pid = spawn_link(fun() -> start_replication(Rep, 0) end),
         State#state{rep_start_pids = [Pid | State#state.rep_start_pids]};
     #rep_state{rep = #rep{doc_id = DocId}} ->
         State;
-    #rep_state{starting = false, rep = #rep{doc_id = OtherDocId}} ->
-        ?LOG_INFO("The replication specified by the document `~s` was already"
+    #rep_state{starting = false, dbname = DbName, rep = #rep{doc_id = OtherDocId}} ->
+        twig:log(notice, "The replication specified by the document `~s` was already"
             " triggered by the document `~s`", [DocId, OtherDocId]),
-        maybe_tag_rep_doc(DocId, RepDoc, ?l2b(BaseId)),
+        maybe_tag_rep_doc(DbName, DocId, RepDoc, ?l2b(BaseId)),
         State;
-    #rep_state{starting = true, rep = #rep{doc_id = OtherDocId}} ->
-        ?LOG_INFO("The replication specified by the document `~s` is already"
+    #rep_state{starting = true, dbname = DbName, rep = #rep{doc_id = OtherDocId}} ->
+        twig:log(notice, "The replication specified by the document `~s` is already"
             " being triggered by the document `~s`", [DocId, OtherDocId]),
-        maybe_tag_rep_doc(DocId, RepDoc, ?l2b(BaseId)),
+        maybe_tag_rep_doc(DbName, DocId, RepDoc, ?l2b(BaseId)),
         State
     end.
 
@@ -402,15 +403,15 @@ parse_rep_doc(RepDoc) ->
     Rep.
 
 
-maybe_tag_rep_doc(DocId, {RepProps}, RepId) ->
+maybe_tag_rep_doc(DbName, DocId, {RepProps}, RepId) ->
     case get_value(<<"_replication_id">>, RepProps) of
     RepId ->
         ok;
     _ ->
-        update_rep_doc(DocId, [{<<"_replication_id">>, RepId}])
+        update_rep_doc(DbName, DocId, [{<<"_replication_id">>, RepId}])
     end.
 
-
+%% note to self: this is markedly diff from mem3_rep_manager
 start_replication(Rep, Wait) ->
     ok = timer:sleep(Wait * 1000),
     case (catch couch_replicator:async_replicate(Rep)) of
@@ -419,7 +420,6 @@ start_replication(Rep, Wait) ->
     Error ->
         replication_error(Rep, Error)
     end.
-
 
 replication_complete(DocId) ->
     case ets:lookup(?DOC_TO_REP, DocId) of
@@ -454,7 +454,7 @@ rep_doc_deleted(DocId) ->
         couch_replicator:cancel_replication(RepId),
         true = ets:delete(?REP_TO_STATE, RepId),
         true = ets:delete(?DOC_TO_REP, DocId),
-        ?LOG_INFO("Stopped replication `~s` because replication document `~s`"
+        twig:log(notice, "Stopped replication `~s` because replication document `~s`"
             " was deleted", [pp_rep_id(RepId), DocId]);
     [] ->
         ok
@@ -477,7 +477,7 @@ maybe_retry_replication(#rep_state{retries_left = 0} = RepState, Error, State) -
     couch_replicator:cancel_replication(RepId),
     true = ets:delete(?REP_TO_STATE, RepId),
     true = ets:delete(?DOC_TO_REP, DocId),
-    ?LOG_ERROR("Error in replication `~s` (triggered by document `~s`): ~s"
+    twig:log(error, "Error in replication `~s` (triggered by document `~s`): ~s"
         "~nReached maximum retry attempts (~p).",
         [pp_rep_id(RepId), DocId, to_binary(error_reason(Error)), MaxRetries]),
     State;
@@ -488,7 +488,7 @@ maybe_retry_replication(RepState, Error, State) ->
     } = RepState,
     #rep_state{wait = Wait} = NewRepState = state_after_error(RepState),
     true = ets:insert(?REP_TO_STATE, {RepId, NewRepState}),
-    ?LOG_ERROR("Error in replication `~s` (triggered by document `~s`): ~s"
+    twig:log(error, "Error in replication `~s` (triggered by document `~s`): ~s"
         "~nRestarting replication in ~p seconds.",
         [pp_rep_id(RepId), DocId, to_binary(error_reason(Error)), Wait]),
     Pid = spawn_link(fun() -> start_replication(Rep, Wait) end),
@@ -496,7 +496,7 @@ maybe_retry_replication(RepState, Error, State) ->
 
 
 stop_all_replications() ->
-    ?LOG_INFO("Stopping all ongoing replications because the replicator"
+    twig:log(notice, "Stopping all ongoing replications because the replicator"
         " database was deleted or changed", []),
     ets:foldl(
         fun({_, RepId}, _) ->
@@ -504,34 +504,32 @@ stop_all_replications() ->
         end,
         ok, ?DOC_TO_REP),
     true = ets:delete_all_objects(?REP_TO_STATE),
-    true = ets:delete_all_objects(?DOC_TO_REP).
+    true = ets:delete_all_objects(?DOC_TO_REP),
+    true = ets:delete_all_objects(?DB_TO_SEQ).
 
 
-update_rep_doc(RepDocId, KVs) ->
-    {ok, RepDb} = ensure_rep_db_exists(),
-    try
-        case couch_db:open_doc(RepDb, RepDocId, [ejson_body]) of
-        {ok, LatestRepDoc} ->
-            update_rep_doc(RepDb, LatestRepDoc, KVs);
-        _ ->
-            ok
+update_rep_doc(RepDbName, RepDocId, KVs) when is_binary(RepDocId) ->
+    spawn_link(fun() ->
+        try
+            case fabric:open_doc(mem3:dbname(RepDbName), RepDocId, []) of
+                {ok, LatestRepDoc} ->
+                    update_rep_doc(RepDbName, LatestRepDoc, KVs);
+                _ ->
+                    ok
+            end
+        catch throw:conflict ->
+            % Shouldn't happen, as by default only the role _replicator can
+            % update replication documents.
+            twig:log(error, "Conflict error when updating replication document `~s`."
+                " Retrying.", [RepDocId]),
+            ok = timer:sleep(5),
+            update_rep_doc(RepDbName, RepDocId, KVs)
         end
-    catch throw:conflict ->
-        % Shouldn't happen, as by default only the role _replicator can
-        % update replication documents.
-        ?LOG_ERROR("Conflict error when updating replication document `~s`."
-            " Retrying.", [RepDocId]),
-        ok = timer:sleep(5),
-        update_rep_doc(RepDocId, KVs)
-    after
-        couch_db:close(RepDb)
-    end.
+    end);
 
-update_rep_doc(RepDb, #doc{body = {RepDocBody}} = RepDoc, KVs) ->
+update_rep_doc(RepDbName, #doc{body = {RepDocBody}} = RepDoc, KVs) ->
     NewRepDocBody = lists:foldl(
-        fun({K, undefined}, Body) ->
-                lists:keydelete(K, 1, Body);
-            ({<<"_replication_state">> = K, State} = KV, Body) ->
+        fun({<<"_replication_state">> = K, State} = KV, Body) ->
                 case get_value(K, Body) of
                 State ->
                     Body;
@@ -551,9 +549,10 @@ update_rep_doc(RepDb, #doc{body = {RepDocBody}} = RepDoc, KVs) ->
     _ ->
         % Might not succeed - when the replication doc is deleted right
         % before this update (not an error, ignore).
-        couch_db:update_doc(RepDb, RepDoc#doc{body = {NewRepDocBody}}, [])
+        spawn_link(fun() ->
+            fabric:update_doc(RepDbName, RepDoc#doc{body = {NewRepDocBody}}, [?CTX])
+        end)
     end.
-
 
 % RFC3339 timestamps.
 % Note: doesn't include the time seconds fraction (RFC3339 says it's optional).
@@ -573,7 +572,6 @@ zone(Hr, Min) when Hr >= 0, Min >= 0 ->
     io_lib:format("+~2..0w:~2..0w", [Hr, Min]);
 zone(Hr, Min) ->
     io_lib:format("-~2..0w:~2..0w", [abs(Hr), abs(Min)]).
-
 
 
 ensure_rep_db_exists() ->
@@ -640,62 +638,28 @@ state_after_error(#rep_state{retries_left = Left, wait = Wait} = State) ->
         State#rep_state{retries_left = Left - 1, wait = Wait2}
     end.
 
-
-before_doc_update(#doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc, _Db) ->
-    Doc;
-before_doc_update(#doc{body = {Body}} = Doc, #db{user_ctx=UserCtx} = Db) ->
-    #user_ctx{roles = Roles, name = Name} = UserCtx,
-    case lists:member(<<"_replicator">>, Roles) of
-    true ->
-        Doc;
-    false ->
-        case couch_util:get_value(?OWNER, Body) of
-        undefined ->
-            Doc#doc{body = {?replace(Body, ?OWNER, Name)}};
-        Name ->
-            Doc;
-        Other ->
-            case (catch couch_db:check_is_admin(Db)) of
-            ok when Other =:= null ->
-                Doc#doc{body = {?replace(Body, ?OWNER, Name)}};
-            ok ->
-                Doc;
-            _ ->
-                throw({forbidden, <<"Can't update replication documents",
-                    " from other users.">>})
+scan_all_dbs(Server) when is_pid(Server) ->
+    {ok, Db} = mem3_util:ensure_exists(
+        couch_config:get("mem3", "shard_db", "dbs")),
+    ChangesFun = couch_changes:handle_changes(#changes_args{}, nil, Db),
+    IsReplicatorDbFun = is_replicator_db_fun(),
+    ChangesFun(fun({change, {Change}, _}, _) ->
+        DbName = couch_util:get_value(<<"id">>, Change),
+        case DbName of <<"_design/", _/binary>> -> ok; _Else ->
+            case couch_util:get_value(<<"deleted">>, Change, false) of
+            true ->
+                ok;
+            false ->
+                IsReplicatorDbFun(DbName) andalso
+                gen_server:call(Server, {resume_scan, DbName})
             end
-        end
+        end;
+        (_, _) -> ok
+    end),
+    couch_db:close(Db).
+
+is_replicator_db_fun() ->
+    {ok, RegExp} = re:compile("^([a-z][a-z0-9\\_\\$()\\+\\-\\/]*/)?_replicator$"),
+    fun(DbName) ->
+        match =:= re:run(mem3:dbname(DbName), RegExp, [{capture,none}])
     end.
-
-
-after_doc_read(#doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc, _Db) ->
-    Doc;
-after_doc_read(#doc{body = {Body}} = Doc, #db{user_ctx=UserCtx} = Db) ->
-    #user_ctx{name = Name} = UserCtx,
-    case (catch couch_db:check_is_admin(Db)) of
-    ok ->
-        Doc;
-    _ ->
-        case couch_util:get_value(?OWNER, Body) of
-        Name ->
-            Doc;
-        _Other ->
-            Source = strip_credentials(couch_util:get_value(<<"source">>, Body)),
-            Target = strip_credentials(couch_util:get_value(<<"target">>, Body)),
-            NewBody0 = ?replace(Body, <<"source">>, Source),
-            NewBody = ?replace(NewBody0, <<"target">>, Target),
-            #doc{revs = {Pos, [_ | Revs]}} = Doc,
-            NewDoc = Doc#doc{body = {NewBody}, revs = {Pos - 1, Revs}},
-            NewRevId = couch_db:new_revid(NewDoc),
-            NewDoc#doc{revs = {Pos, [NewRevId | Revs]}}
-        end
-    end.
-
-
-strip_credentials(Url) when is_binary(Url) ->
-    re:replace(Url,
-        "http(s)?://(?:[^:]+):[^@]+@(.*)$",
-        "http\\1://\\2",
-        [{return, binary}]);
-strip_credentials({Props}) ->
-    {lists:keydelete(<<"oauth">>, 1, Props)}.
