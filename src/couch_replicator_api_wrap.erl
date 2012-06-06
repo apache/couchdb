@@ -231,7 +231,7 @@ update_doc(#httpdb{} = HttpDb, #doc{id = DocId} = Doc, Options, Type) ->
         HttpDb,
         [{method, put}, {path, encode_doc_id(DocId)},
             {qs, QArgs}, {headers, Headers}, {body, Body}],
-        fun(Code, _, {Props}) when Code =:= 200 orelse Code =:= 201 ->
+        fun(Code, _, {Props}) when Code =:= 200 orelse Code =:= 201 orelse Code =:= 202 ->
                 {ok, couch_doc:parse_rev(get_value(<<"rev">>, Props))};
             (409, _, _) ->
                 throw(conflict);
@@ -619,7 +619,7 @@ doc_from_multi_part_stream(ContentType, DataFun, Ref) ->
     Parser = spawn_link(fun() ->
         {<<"--">>, _, _} = couch_httpd:parse_multipart_request(
             ContentType, DataFun,
-            fun(Next) -> couch_doc:mp_parse_doc(Next, []) end),
+            fun(Next) -> couch_doc:mp_parse_doc1(Next, []) end),
         unlink(Self)
         end),
     Parser ! {get_doc_bytes, Ref, self()},
