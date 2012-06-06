@@ -25,8 +25,7 @@ init(_Args) ->
         child(mem3_nodes),
         child(mem3_sync_nodes), % Order important?
         child(mem3_sync),
-        child(mem3_shards),
-        child(mem3_rep_manager)
+        child(mem3_shards)
     ],
     {ok, {{one_for_one,10,1}, Children}}.
 
