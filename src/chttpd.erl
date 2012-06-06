@@ -771,9 +771,6 @@ send_error(Req, Error) ->
 send_error(Req, Code, ErrorStr, ReasonStr) ->
     send_error(Req, Code, [], ErrorStr, ReasonStr, []).
 
-send_error(Req, Code, Headers, ErrorStr, ReasonStr) ->
-    send_error(Req, Code, Headers, ErrorStr, ReasonStr, []).
-
 send_error(Req, Code, Headers, ErrorStr, ReasonStr, Stack) ->
     send_json(Req, Code, Headers,
         {[{<<"error">>,  ErrorStr},
