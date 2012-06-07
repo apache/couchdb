@@ -139,7 +139,7 @@
      */
     session: function(options) {
       options = options || {};
-      $.ajax({
+      ajax({
         type: "GET", url: this.urlPrefix + "/_session",
         beforeSend: function(xhr) {
             xhr.setRequestHeader('Accept', 'application/json');
