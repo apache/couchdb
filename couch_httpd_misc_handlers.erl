@@ -90,8 +90,9 @@ handle_task_status_req(Req) ->
 handle_restart_req(#httpd{method='POST'}=Req) ->
     couch_httpd:validate_ctype(Req, "application/json"),
     ok = couch_httpd:verify_is_server_admin(Req),
+    Result = send_json(Req, 202, {[{ok, true}]}),
     couch_server_sup:restart_core_server(),
-    send_json(Req, 200, {[{ok, true}]});
+    Result;
 handle_restart_req(Req) ->
     send_method_not_allowed(Req, "POST").
 
