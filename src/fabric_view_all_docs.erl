@@ -23,12 +23,10 @@
 
 go(DbName, #view_query_args{keys=nil} = QueryArgs, Callback, Acc0) ->
     Workers = fabric_util:submit_jobs(mem3:shards(DbName),all_docs,[QueryArgs]),
-    BufferSize = couch_config:get("fabric", "map_buffer_size", "2"),
     #view_query_args{limit = Limit, skip = Skip} = QueryArgs,
     State = #collector{
         query_args = QueryArgs,
         callback = Callback,
-        buffer_size = list_to_integer(BufferSize),
         counters = fabric_dict:init(Workers, 0),
         skip = Skip,
         limit = Limit,
@@ -124,11 +122,10 @@ handle_message({total_and_offset, Tot, Off}, {Worker, From}, State) ->
 handle_message(#view_row{} = Row, {Worker, From}, State) ->
     #collector{query_args = Args, counters = Counters0, rows = Rows0} = State,
     Dir = Args#view_query_args.direction,
-    Rows = merge_row(Dir, Row#view_row{worker=Worker}, Rows0),
+    Rows = merge_row(Dir, Row#view_row{worker={Worker, From}}, Rows0),
     Counters1 = fabric_dict:update_counter(Worker, 1, Counters0),
     State1 = State#collector{rows=Rows, counters=Counters1},
-    State2 = fabric_view:maybe_pause_worker(Worker, From, State1),
-    fabric_view:maybe_send_row(State2);
+    fabric_view:maybe_send_row(State1);
 
 handle_message(complete, Worker, State) ->
     Counters = fabric_dict:update_counter(Worker, 1, State#collector.counters),

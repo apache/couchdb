@@ -27,13 +27,11 @@ go(DbName, GroupId, View, Args, Callback, Acc0) when is_binary(GroupId) ->
 go(DbName, DDoc, View, Args, Callback, Acc0) ->
     Shards = fabric_view:get_shards(DbName, Args),
     Workers = fabric_util:submit_jobs(Shards, map_view, [DDoc, View, Args]),
-    BufferSize = couch_config:get("fabric", "map_buffer_size", "2"),
     #view_query_args{limit = Limit, skip = Skip, keys = Keys} = Args,
     State = #collector{
         db_name=DbName,
         query_args = Args,
         callback = Callback,
-        buffer_size = list_to_integer(BufferSize),
         counters = fabric_dict:init(Workers, 0),
         skip = Skip,
         limit = Limit,
@@ -115,7 +113,7 @@ handle_message(#view_row{}, {_, _}, #collector{limit=0} = State) ->
 handle_message(#view_row{} = Row, {_,From}, #collector{sorted=false} = St) ->
     #collector{callback=Callback, user_acc=AccIn, limit=Limit} = St,
     {Go, Acc} = Callback(fabric_view:transform_row(Row), AccIn),
-    gen_server:reply(From, ok),
+    rexi:stream_ack(From),
     {Go, St#collector{user_acc=Acc, limit=Limit-1}};
 
 handle_message(#view_row{} = Row, {Worker, From}, State) ->
@@ -125,11 +123,10 @@ handle_message(#view_row{} = Row, {Worker, From}, State) ->
         rows = Rows0,
         keys = KeyDict
     } = State,
-    Rows = merge_row(Dir, KeyDict, Row#view_row{worker=Worker}, Rows0),
+    Rows = merge_row(Dir, KeyDict, Row#view_row{worker={Worker, From}}, Rows0),
     Counters1 = fabric_dict:update_counter(Worker, 1, Counters0),
     State1 = State#collector{rows=Rows, counters=Counters1},
-    State2 = fabric_view:maybe_pause_worker(Worker, From, State1),
-    fabric_view:maybe_send_row(State2);
+    fabric_view:maybe_send_row(State1);
 
 handle_message(complete, Worker, State) ->
     Counters = fabric_dict:update_counter(Worker, 1, State#collector.counters),
