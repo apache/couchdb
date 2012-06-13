@@ -38,10 +38,7 @@ go(DbName, AllIdsRevs, Options) ->
     end.
 
 handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Shard, {_WorkerLen, ResultDict, Workers}) ->
-    NewWorkers =
-        fabric_dict:filter(fun(#shard{node=Node}, _) ->
-                                Node =/= NodeRef
-                       end, Workers),
+    NewWorkers = [W || #shard{node=Node} = W <- Workers, Node =/= NodeRef],
     skip_message({fabric_dict:size(NewWorkers), ResultDict, NewWorkers});
 handle_message({rexi_EXIT, _}, Worker, {W, D, Workers}) ->
     skip_message({W-1,D,lists:delete(Worker, Workers)});
