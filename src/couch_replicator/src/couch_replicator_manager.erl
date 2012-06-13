@@ -263,8 +263,7 @@ changes_feed_loop(DbName, Since) ->
                 feed = "normal",
                 since = Since,
                 filter = main_only,
-                timeout = infinity,
-                db_open_options = [sys_db]
+                timeout = infinity
                 }
             )
         end),
