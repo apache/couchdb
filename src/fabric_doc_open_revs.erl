@@ -106,7 +106,7 @@ handle_message({ok, RawReplies0}, Worker, State) ->
         end
     end, All0, RawReplies),
     Reduced = [fabric_util:remove_ancestors(X, []) || {_, X} <- All],
-    FinalReplies = [choose_winner(X, R) || X <- Reduced],
+    FinalReplies = [choose_winner(X, R) || X <- Reduced, X =/= []],
     Complete = (ReplyCount =:= (WorkerCount - 1)),
     case is_repair_needed(All, FinalReplies) of
     true ->
