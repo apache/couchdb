@@ -619,7 +619,7 @@ doc_from_multi_part_stream(ContentType, DataFun, Ref) ->
     Parser = spawn_link(fun() ->
         {<<"--">>, _, _} = couch_httpd:parse_multipart_request(
             ContentType, DataFun,
-            fun(Next) -> couch_doc:mp_parse_doc1(Next, []) end),
+            fun(Next) -> couch_replicator_utils:mp_parse_doc(Next, []) end),
         unlink(Self)
         end),
     Parser ! {get_doc_bytes, Ref, self()},
