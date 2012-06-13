@@ -28,6 +28,8 @@
 -include("couch_replicator_api_wrap.hrl").
 -include("couch_replicator.hrl").
 
+-define(LOWEST_SEQ, 0).
+
 -import(couch_util, [
     get_value/2,
     get_value/3,
