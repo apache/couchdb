@@ -355,7 +355,14 @@ db_req(#httpd{path_parts=[_,<<"_purge">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 
 db_req(#httpd{method='GET',path_parts=[_,<<"_all_docs">>]}=Req, Db) ->
-    all_docs_view(Req, Db, nil);
+    case chttpd:qs_json_value(Req, "keys", nil) of
+    Keys when is_list(Keys) ->
+        all_docs_view(Req, Db, Keys);
+    nil ->
+        all_docs_view(Req, Db, nil);
+    _ ->
+        throw({bad_request, "`keys` parameter must be an array."})
+    end;
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_all_docs">>]}=Req, Db) ->
     {Fields} = chttpd:json_body_obj(Req),

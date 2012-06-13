@@ -148,12 +148,14 @@ send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
 % view-list request with view and list from same design doc.
 handle_view_list_req(#httpd{method='GET',
         path_parts=[_, _, DesignName, _, ListName, ViewName]}=Req, Db, DDoc) ->
-    handle_view_list(Req, Db, DDoc, ListName, {DesignName, ViewName}, nil);
+    Keys = chttpd:qs_json_value(Req, "keys", nil),
+    handle_view_list(Req, Db, DDoc, ListName, {DesignName, ViewName}, Keys);
 
 % view-list request with view and list from different design docs.
 handle_view_list_req(#httpd{method='GET',
         path_parts=[_, _, _, _, ListName, DesignName, ViewName]}=Req, Db, DDoc) ->
-    handle_view_list(Req, Db, DDoc, ListName, {DesignName, ViewName}, nil);
+    Keys = chttpd:qs_json_value(Req, "keys", nil),
+    handle_view_list(Req, Db, DDoc, ListName, {DesignName, ViewName}, Keys);
 
 handle_view_list_req(#httpd{method='GET'}=Req, _Db, _DDoc) ->
     chttpd:send_error(Req, 404, <<"list_error">>, <<"Invalid path.">>);
