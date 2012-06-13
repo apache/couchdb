@@ -18,9 +18,6 @@
 -define(MIN_STR, <<"">>).
 -define(MAX_STR, <<255>>). % illegal utf string
 
-% the lowest possible database sequence number
--define(LOWEST_SEQ, 0).
-
 -define(JSON_ENCODE(V), ejson:encode(V)).
 -define(JSON_DECODE(V), ejson:decode(V)).
 
