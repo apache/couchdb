@@ -58,22 +58,17 @@ stop({Pid, Ref}) ->
 wait_db_updated({Pid, Ref}) ->
     erlang:send(Pid, {Ref, get_state}),
     receive
-    Any ->
-        Any
+        {state, Pid, State} -> State
     end.
 
 receive_results(Workers, State, Timeout) ->
     case rexi_utils:recv(Workers, 2, fun handle_message/3, State,
             infinity, Timeout) of
-    {timeout, {NewWorkers, Parent, State1}} ->
-        erlang:send(Parent, timeout),
-        State2 =
-            case State1 of
-            waiting ->
-                unset;
-            Any -> Any
-            end,
-        receive_results(NewWorkers, {NewWorkers, Parent, State2}, Timeout);
+    {timeout, {NewWorkers, Parent, waiting}} ->
+        erlang:send(Parent, {state, self(), timeout}),
+        receive_results(NewWorkers, {NewWorkers, Parent, unset}, Timeout);
+    {timeout, {NewWorkers, Parent, _State}} ->
+        receive_results(NewWorkers, {NewWorkers, Parent, timeout}, Timeout);
     {_, NewState} ->
         {ok, NewState}
     end.
@@ -97,15 +92,14 @@ handle_message({rexi_EXIT, Reason}, Worker, {Workers, Parent, State}) ->
     end;
 handle_message(db_updated, {_Worker, _From}, {Workers, Parent, waiting}) ->
     % propagate message to calling controller
-    erlang:send(Parent, updated),
+    erlang:send(Parent, {state, self(), updated}),
     {ok, {Workers, Parent, unset}};
-handle_message(db_updated, _Worker, {Workers, Parent, State})
-  when State == unset orelse State == updated ->
+handle_message(db_updated, _Worker, {Workers, Parent, _State}) ->
     {ok, {Workers, Parent, updated}};
 handle_message(get_state, {_Worker, _From}, {Workers, Parent, unset}) ->
     {ok, {Workers, Parent, waiting}};
 handle_message(get_state, {_Worker, _From}, {Workers, Parent, State}) ->
-    erlang:send(Parent, State),
+    erlang:send(Parent, {state, self(), State}),
     {ok, {Workers, Parent, unset}};
 handle_message(done, _, _) ->
     {stop, ok}.
