@@ -21,7 +21,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
--import(fabric_db_update_listener, [wait_db_updated/1, stop/1]).
+-import(fabric_db_update_listener, [wait_db_updated/1]).
 
 go(DbName, Feed, Options, Callback, Acc0) when Feed == "continuous" orelse
         Feed == "longpoll" ->
@@ -47,7 +47,7 @@ go(DbName, Feed, Options, Callback, Acc0) when Feed == "continuous" orelse
                 UpdateListener
             )
         after
-            stop(UpdateListener)
+            fabric_db_update_listener:stop(UpdateListener)
         end;
     Error ->
         Callback(Error, Acc0)
