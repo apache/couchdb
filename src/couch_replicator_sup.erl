@@ -32,7 +32,7 @@ init(_Args) ->
             permanent,
             brutal_kill,
             worker,
-            dynamic},
+            [couch_replicator_manager]},
         {couch_replicator_job_sup,
             {couch_replicator_job_sup, start_link, []},
             permanent,
