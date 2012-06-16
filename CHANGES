@@ -16,6 +16,10 @@ HTTP Interface:
    calls to the rewriter.
  * Limit recursion depth in the URL rewriter. Defaults to a maximum
    of 100 invocations but is configurable.
+ * Fix _session for IE7.
+ * Added Server-Sent Events protocol to db changes API.
+   See http://www.w3.org/TR/eventsource/ for details.
+ * Make password hashing synchronous when using the /_config/admins API.
 
 Storage System:
 
@@ -29,6 +33,7 @@ View Server:
 Futon:
 
  * Added view request duration to Futon.
+ * Disable buttons for actions that the user doesn't have permissions to.
 
 Security:
 
@@ -37,6 +42,7 @@ Security:
 
 Test Suite:
 
+  * Moved the JS test suite to the CLI
   * Improved tracebacks printed by the JS CLI tests
   * Improved the reliability of a number of tests
 

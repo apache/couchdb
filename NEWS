@@ -20,6 +20,8 @@ This version has not been released yet.
  * New and updated passwords are hashed using PBKDF2.
  * Fix various bugs in the URL rewriter when recursion is involved.
  * Added Server-Sent Events protocol to db changes API.
+ * Moved the JS test suite to the CLI
+ * Make password hashing synchronous when using the /_config/admins API.
 
 Version 1.2.1
 -------------
