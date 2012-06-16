@@ -629,7 +629,7 @@ start_response_length(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Length) ->
 
 start_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers) ->
     log_request(Req, Code),
-    couch_stats_collector:increment({httpd_status_cdes, Code}),
+    couch_stats_collector:increment({httpd_status_codes, Code}),
     CookieHeader = couch_httpd_auth:cookie_auth_header(Req, Headers),
     Headers2 = Headers ++ server_header() ++ CookieHeader,
     Resp = MochiReq:start_response({Code, Headers2}),
