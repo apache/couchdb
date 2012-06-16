@@ -34,4 +34,7 @@ couchTests.view_multi_key_temp = function(debug) {
     T(keys.indexOf(reduce[i].key) != -1);
     T(reduce[i].key == reduce[i].value);
   }
+
+  rows = db.query(queryFun, null, {}, []).rows;
+  T(rows.length == 0);
 };

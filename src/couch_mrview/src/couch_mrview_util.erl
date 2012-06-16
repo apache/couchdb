@@ -260,7 +260,8 @@ all_docs_reduce_to_count(Reductions) ->
     {Count, _, _} = couch_btree:final_reduce(Reduce, Reductions),
     Count.
 
-
+reduce_to_count(nil) ->
+    0;
 reduce_to_count(Reductions) ->
     Reduce = fun
         (reduce, KVs) ->
@@ -592,10 +593,7 @@ ad_ekey_opts(#mrargs{end_key_docid=EKeyDocId}=Args) ->
 key_opts(Args) ->
     key_opts(Args, []).
 
-
-key_opts(#mrargs{keys=undefined}=Args, Extra) ->
-    key_opts(Args#mrargs{keys=[]}, Extra);
-key_opts(#mrargs{keys=[], direction=Dir}=Args, Extra) ->
+key_opts(#mrargs{keys=undefined, direction=Dir}=Args, Extra) ->
     [[{dir, Dir}] ++ skey_opts(Args) ++ ekey_opts(Args) ++ Extra];
 key_opts(#mrargs{keys=Keys, direction=Dir}=Args, Extra) ->
     lists:map(fun(K) ->
