@@ -133,9 +133,9 @@ test_default_policy() ->
     end,
 
     HeaderIs(Enabled, [], req(), "Allow-Origin",
-             "http://origin.com", "Default CORS policy echoes the header"),
+             <<"http://origin.com">>, "Default CORS policy echoes the header"),
     HeaderIs(Enabled, Config, req(), "Allow-Origin",
-             "http://origin.com", "Satisfied CORS policy echoes the header"),
+             <<"http://origin.com">>, "Satisfied CORS policy echoes the header"),
 
     HeaderIs(Enabled, [], req(), "Allow-Methods",
              undefined, "Actual response does not send preflight headers"),
