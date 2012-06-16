@@ -47,26 +47,6 @@ handle_request(#httpd{path_parts=[DbName|RestParts],method=Method,
                 "You tried to DELETE a database with a ?=rev parameter. "
                 ++ "Did you mean to DELETE a document instead?"})
         end;
-    {'OPTIONS', _} ->
-        SecObj = case couch_db:open_int(DbName, []) of
-        {ok, Db} ->
-            try
-                {SecProps} = couch_db:get_security(Db),
-                SecProps
-                %Origins = couch_util:get_value(<<"origins">>, SecProps,
-                %    [<<"*">>]),
-                %couch_httpd_cors:preflight_headers(Req, Origins)
-            after
-                catch couch_db:close(Db)
-            end;
-        _Error ->
-            []
-        end,
-
-        MochiReq = Req#httpd.mochi_req,
-        ReqHeaders = mochiweb_headers:to_list(MochiReq:get(headers)),
-        CorsHeaders = couch_cors_policy:headers(SecObj, {Method, ReqHeaders}),
-        couch_httpd:send_json(Req, 200, CorsHeaders, {[{ok, true}]});
     {_, []} ->
         do_db_req(Req, fun db_req/2);
     {_, [SecondPart|_]} ->
@@ -247,7 +227,7 @@ delete_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
         throw(Error)
     end.
 
-do_db_req(#httpd{user_ctx=UserCtx, path_parts=[DbName|_]}=Req, Fun) ->
+do_db_req(#httpd{user_ctx=UserCtx,path_parts=[DbName|_]}=Req, Fun) ->
     case couch_db:open(DbName, [{user_ctx, UserCtx}]) of
     {ok, Db} ->
         try
@@ -1218,4 +1198,3 @@ validate_attachment_name(Name) ->
         true -> Name;
         false -> throw({bad_request, <<"Attachment name is not UTF-8 encoded">>})
     end.
-
