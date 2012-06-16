@@ -1198,4 +1198,3 @@ validate_attachment_name(Name) ->
         true -> Name;
         false -> throw({bad_request, <<"Attachment name is not UTF-8 encoded">>})
     end.
-

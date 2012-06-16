@@ -44,6 +44,7 @@ default_handler = {couch_httpd_db, handle_request}
 secure_rewrites = true
 vhost_global_handlers = _utils, _uuids, _session, _oauth, _users
 allow_jsonp = false
+cors_enabled = false
 ; Options for the MochiWeb HTTP server.
 ;server_options = [{backlog, 128}, {acceptor_pool_size, 16}]
 ; For more socket options, consult Erlang's module 'inet' man page.

@@ -1,0 +1,83 @@
+TODO
+====
+
+* Interaction of _security and global config
+* Multiple origins, the spec says "list of origins"
+* w3c spec S 5.1.4. Make sure that couch never exposes non-simple headers that are not in AC-Expose-Headers.
+* Different tests for simple (s5.1) vs. preflight (s5.2)
+
+Tests:
+
+* Create DB
+* Delete DB
+* Situations when something is thrown (in do_db_req, etc.)
+* Only one config is ever sent back
+
+guidelines :
+----------
+
+- rules should be based on host
+- rules depending on the resource :
+  - server : rules defined in .ini
+  - db : rules defined in .db
+
+- default cors policy (open for discussion)
+    - allows credential = false
+    - cors enabled
+- cors can be disabled globally
+
+
+rules definiton :
+
+global wide
+
+[httpd]
+cors_enabled = true
+
+[origins]
+domain.tld = http://origin.tld, https://origin.tld
+
+[http://origin.tld]
+allow_methods = GET, POST
+allow_headers = x-couchdb-...
+allow_credentials = false
+
+
+[https://origin.tld]
+allow_methods = GET, PUT, POST, DELETE
+allow_headers = x-couchdb-...
+allow_credentials = true
+allow_server_admins = true
+max-age = 36000
+
+
+on the db _security object :
+{
+    "origins": {
+        "domain.tld": [
+            {"http://origin.tld": { "allow_methods": "GET, POST",
+...}
+        ]
+    }
+}
+
+
+work flow (run for request handling, and again after any rewrite):
+
+for /db resources, including system dbs, use the db _security object
+for all other resources (e.g. /_uuids), or when there is no _security object, use the ini configuration
+is the 'origins' section empty or non-existant ?
+yes -> is admin party set ?
+  yes -> return "*" , credentials false (with a good caching policy)
+  no -> stop
+no ->
+  run the following steps [apply cors steps]
+    is Host in 'origins' ?
+    yes ->
+      is Origin in 'origins[Host]' ?
+      yes ->
+        set the cors headers based on 'origins[Host]'
+      no -> fail
+    no ->
+      <bikeshed defaults>
+

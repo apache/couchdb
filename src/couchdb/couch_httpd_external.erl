@@ -79,7 +79,7 @@ json_req_obj(#httpd{mochi_req=Req,
     Headers = Req:get(headers),
     Hlist = mochiweb_headers:to_list(Headers),
     {ok, Info} = couch_db:get_db_info(Db),
-    
+
 % add headers...
     {[{<<"info">>, {Info}},
         {<<"id">>, DocId},
@@ -129,7 +129,8 @@ send_external_response(#httpd{mochi_req=MochiReq}=Req, Response) ->
     } = parse_external_response(Response),
     couch_httpd:log_request(Req, Code),
     Resp = MochiReq:respond({Code,
-        default_or_content_type(CType, Headers ++ couch_httpd:server_header()), Data}),
+        default_or_content_type(CType, Headers ++
+            couch_httpd:server_header()), Data}),
     {ok, Resp}.
 
 parse_external_response({Response}) ->
