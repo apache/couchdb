@@ -79,7 +79,15 @@ README.gz: $(top_srcdir)/README
 	-gzip -9 < $< > $@
 
 THANKS.gz: $(top_srcdir)/THANKS
-	-gzip -9 < $< > $@
+	sed -e 's/^#.*//' $< > $<.tmp # strip comments
+	sed -e '/^$$/d' $<.tmp > $<.tmp2  # strip empty lines
+	git shortlog -se 6c976bd..HEAD \
+	 | grep -v @apache.org \
+	 | sed -E 's/^[[:blank:]]{5}[[:digit:]]+[[:blank:]]/ * /' \
+	 >> $<.tmp2 # inject git authors
+	echo '\nFor a list of authors see the `AUTHORS` file.\n' >> $<.tmp2
+	-gzip -9 < $<.tmp2 > $@ # zip
+	rm $<.tmp $<.tmp2 # cleanup
 
 check: dev check-js
 	$(top_builddir)/test/etap/run $(top_srcdir)/test/etap
