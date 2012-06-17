@@ -78,6 +78,7 @@ NOTICE.gz: $(top_srcdir)/NOTICE
 README.gz: $(top_srcdir)/README
 	-gzip -9 < $< > $@
 
+.PHONY: THANKS.gz
 THANKS.gz: $(top_srcdir)/THANKS
 	@sed -e '/^#.*/d' $< > $(top_builddir)/THANKS.tmp
 	@git shortlog -se 6c976bd..HEAD \
