@@ -79,17 +79,15 @@ README.gz: $(top_srcdir)/README
 	-gzip -9 < $< > $@
 
 THANKS.gz: $(top_srcdir)/THANKS
-	TMP1=`mktemp -t THANKS`
-	TMP2=`mktemp -t THANKS`
-	sed -e 's/^#.*//' $< > $TMP1 # strip comments
-	sed -e '/^$$/d' $TMP1 > $TMP2  # strip empty lines
-	git shortlog -se 6c976bd..HEAD \
-	 | grep -v @apache.org \
-	 | sed -E 's/^[[:blank:]]{5}[[:digit:]]+[[:blank:]]/ * /' \
-	 >> $TMP2 # inject git authors
-	echo '\nFor a list of authors see the `AUTHORS` file.\n' >> $TMP2
-	-gzip -9 < $TMP2 > $@ # zip
-	rm $TMP1 $TMP2 # cleanup
+	@sed -e '/^#.*/d' $< > $(top_builddir)/AUTHORS.tmp
+	@git shortlog -se 6c976bd..HEAD \
+		| grep -v @apache.org \
+		| sed -E 's/^[[:blank:]]{5}[[:digit:]]+[[:blank:]]/ * /' \
+		>> $(top_builddir)/AUTHORS.tmp
+	@echo '\nFor a list of authors see the `AUTHORS` file.\n' \
+		>> $(top_builddir)/AUTHORS.tmp
+	-gzip -9 < $(top_builddir)/AUTHORS.tmp > $@
+	@rm $(top_builddir)/AUTHORS.tmp
 
 check: dev check-js
 	$(top_builddir)/test/etap/run $(top_srcdir)/test/etap
