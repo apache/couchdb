@@ -79,15 +79,15 @@ README.gz: $(top_srcdir)/README
 	-gzip -9 < $< > $@
 
 THANKS.gz: $(top_srcdir)/THANKS
-	@sed -e '/^#.*/d' $< > $(top_builddir)/AUTHORS.tmp
+	@sed -e '/^#.*/d' $< > $(top_builddir)/THANKS.tmp
 	@git shortlog -se 6c976bd..HEAD \
 		| grep -v @apache.org \
 		| sed -E 's/^[[:blank:]]{5}[[:digit:]]+[[:blank:]]/ * /' \
-		>> $(top_builddir)/AUTHORS.tmp
+		>> $(top_builddir)/THANKS.tmp
 	@echo '\nFor a list of authors see the `AUTHORS` file.\n' \
-		>> $(top_builddir)/AUTHORS.tmp
-	-gzip -9 < $(top_builddir)/AUTHORS.tmp > $@
-	@rm $(top_builddir)/AUTHORS.tmp
+		>> $(top_builddir)/THANKS.tmp
+	-gzip -9 < $(top_builddir)/THANKS.tmp > $@
+	@rm $(top_builddir)/THANKS.tmp
 
 check: dev check-js
 	$(top_builddir)/test/etap/run $(top_srcdir)/test/etap
