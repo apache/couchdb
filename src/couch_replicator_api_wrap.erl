@@ -466,7 +466,7 @@ options_to_query_args([revs | Rest], Acc) ->
 options_to_query_args([{open_revs, all} | Rest], Acc) ->
     options_to_query_args(Rest, [{"open_revs", "all"} | Acc]);
 options_to_query_args([{open_revs, Revs} | Rest], Acc) ->
-    JsonRevs = ?b2l(?JSON_ENCODE(couch_doc:revs_to_strs(Revs))),
+    JsonRevs = ?b2l(iolist_to_binary(?JSON_ENCODE(couch_doc:revs_to_strs(Revs)))),
     options_to_query_args(Rest, [{"open_revs", JsonRevs} | Acc]).
 
 
