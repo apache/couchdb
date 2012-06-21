@@ -91,6 +91,7 @@ suggesting improvements or submitting changes. Some of these people are:
  * Simon Leblanc <sim.leblanc+apache@gmail.com>
  * Rogutės Sparnuotos <rogutes@googlemail.com>
  * Gavin McDonald <gmcdonald@apache.org>
+ * Fedor Indutny <fedor@indutny.com>
 # Dear committer who merges a commit from a non-committer:
 # You don't have to manually maintain the THANKS file anymore (yay!).
 # Non-committer authors get automatically appended to THANKS and
