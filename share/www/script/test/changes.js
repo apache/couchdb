@@ -210,6 +210,38 @@ couchTests.changes = function(debug) {
     T(lines[3]=='"last_seq":4}');
 
 
+    // test since=now
+    xhr = CouchDB.newXhr();
+
+    xhr.open("GET", "/test_suite_db/_changes?feed=longpoll&since=now", true);
+    xhr.send("");
+
+    var docBarz = {_id:"barzzzz", bar:1};
+    db.save(docBarz);
+
+    var parse_changes_line = function(line) {
+      if (line.charAt(line.length-1) == ",") {
+        var linetrimmed = line.substring(0, line.length-1);
+      } else {
+        var linetrimmed = line;
+      }
+      return JSON.parse(linetrimmed);
+    };
+
+    waitForSuccess(function() {
+      lines = xhr.responseText.split("\n");
+      if (lines[3] != '"last_seq":5}') {
+        throw("still waiting");
+      }
+    }, "change_lines");
+
+    var change = parse_changes_line(lines[1]);
+    T(change.seq == 5);
+    T(change.id == "barzzzz");
+    T(change.changes[0].rev == docBarz._rev);
+    T(lines[3]=='"last_seq":5}');
+
+
   }
 
   // test the filtered changes
@@ -271,10 +303,10 @@ couchTests.changes = function(debug) {
     xhr.open("GET", "/test_suite_db/_changes?feed=longpoll&filter=changes_filter/bop", false);
     xhr.send("");
     var resp = JSON.parse(xhr.responseText);
-    T(resp.last_seq == 7);
+    T(resp.last_seq == 8);
     // longpoll waits until a matching change before returning
     xhr = CouchDB.newXhr();
-    xhr.open("GET", "/test_suite_db/_changes?feed=longpoll&since=7&filter=changes_filter/bop", true);
+    xhr.open("GET", "/test_suite_db/_changes?feed=longpoll&since=8&filter=changes_filter/bop", true);
     xhr.send("");
     db.save({"_id":"falsy", "bop" : ""}); // empty string is falsy
     db.save({"_id":"bingo","bop" : "bingo"});
@@ -283,12 +315,12 @@ couchTests.changes = function(debug) {
       resp = JSON.parse(xhr.responseText);
     }, "longpoll-since");
 
-    T(resp.last_seq == 9);
+    T(resp.last_seq == 10);
     T(resp.results && resp.results.length > 0 && resp.results[0]["id"] == "bingo", "filter the correct update");
     xhr.abort();
 
     var timeout = 500;
-    var last_seq = 10;
+    var last_seq = 11;
     while (true) {
 
       // filter with continuous
