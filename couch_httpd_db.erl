@@ -109,7 +109,7 @@ handle_changes_req2(Req, Db) ->
             send_chunk(Resp, "\n")
         end
     end,
-    ChangesArgs = parse_changes_query(Req),
+    ChangesArgs = parse_changes_query(Req, Db),
     ChangesFun = couch_changes:handle_changes(ChangesArgs, Req, Db),
     WrapperFun = case ChangesArgs#changes_args.feed of
     "normal" ->
@@ -1113,13 +1113,18 @@ parse_doc_query(Req) ->
         end
     end, #doc_query_args{}, couch_httpd:qs(Req)).
 
-parse_changes_query(Req) ->
+parse_changes_query(Req, Db) ->
     lists:foldl(fun({Key, Value}, Args) ->
         case {string:to_lower(Key), Value} of
         {"feed", _} ->
             Args#changes_args{feed=Value};
         {"descending", "true"} ->
             Args#changes_args{dir=rev};
+        {"since", "now"} ->
+            UpdateSeq = couch_util:with_db(Db#db.name, fun(WDb) ->
+                                        couch_db:get_update_seq(WDb)
+                                end),
+            Args#changes_args{since=UpdateSeq};
         {"since", _} ->
             Args#changes_args{since=list_to_integer(Value)};
         {"last-event-id", _} ->
