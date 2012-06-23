@@ -104,5 +104,7 @@ after_doc_read(Doc, #db{user_ctx = UserCtx} = Db) ->
         throw(not_found)
     end.
 
-get_doc_name(#doc{body={Body}}) ->
-    couch_util:get_value(?NAME, Body).
+get_doc_name(#doc{id= <<"org.couchdb.user:", Name/binary>>}) ->
+    Name;
+get_doc_name(_) ->
+    undefined.
