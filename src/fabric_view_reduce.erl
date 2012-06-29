@@ -36,6 +36,10 @@ go(DbName, DDoc, VName, Args, Callback, Acc0) ->
     RexiMon = fabric_util:create_monitors(Workers),
     BufferSize = couch_config:get("fabric", "reduce_buffer_size", "20"),
     #view_query_args{limit = Limit, skip = Skip} = Args,
+    OsProc = case os_proc_needed(RedSrc) of
+        true -> couch_query_servers:get_os_process(Lang);
+        _ -> nil
+    end,
     State = #collector{
         db_name = DbName,
         query_args = Args,
@@ -46,7 +50,7 @@ go(DbName, DDoc, VName, Args, Callback, Acc0) ->
         skip = Skip,
         limit = Limit,
         lang = Group#group.def_lang,
-        os_proc = couch_query_servers:get_os_process(Lang),
+        os_proc = OsProc,
         reducer = RedSrc,
         rows = dict:new(),
         user_acc = Acc0
@@ -62,7 +66,10 @@ go(DbName, DDoc, VName, Args, Callback, Acc0) ->
     after
         rexi_monitor:stop(RexiMon),
         fabric_util:cleanup(Workers),
-        catch couch_query_servers:ret_os_process(State#collector.os_proc)
+        case State#collector.os_proc of
+            nil -> ok;
+            OsProc -> catch couch_query_servers:ret_os_process(OsProc)
+        end
     end.
 
 handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _, State) ->
@@ -117,3 +124,7 @@ complete_worker_test() ->
     State = #collector{counters=fabric_dict:init(Workers,0)},
     {ok, NewState} = handle_message(complete, lists:nth(2,Workers), State),
     ?assertEqual(orddict:size(NewState#collector.counters),length(Workers) - 2).
+
+os_proc_needed(<<"_", _/binary>>) -> false;
+os_proc_needed(_) -> true.
+
