@@ -31,8 +31,7 @@ handle_req(#httpd{method = 'POST', user_ctx = UserCtx} = Req) ->
     couch_httpd:validate_ctype(Req, "application/json"),
     RepDoc = {Props} = couch_httpd:json_body_obj(Req),
     validate_rep_props(Props),
-    {ok, Rep} = couch_replicator_utils:parse_rep_doc(RepDoc, UserCtx),
-    case couch_replicator:replicate(Rep) of
+    case couch_replicator:replicate(RepDoc, UserCtx) of
     {error, {Error, Reason}} ->
         send_json(
             Req, 404,
