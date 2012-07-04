@@ -53,8 +53,8 @@ handle_event(Event, Fun) when is_function(Fun, 1) ->
 handle_event(Event, {Fun, FunAcc}) ->
     FunAcc2 = Fun(Event, FunAcc),
     {ok, {Fun, FunAcc2}};
-handle_event({EventAtom, DbName}, Pid) ->
-    Obj = {[{type, list_to_binary(atom_to_list(EventAtom))}, {db, DbName}]},
+handle_event({EventType, EventDesc}, Pid) ->
+    Obj = encode_event(EventType, EventDesc),
     ok = couch_os_process:send(Pid, Obj),
     {ok, Pid}.
 
@@ -71,3 +71,12 @@ handle_info({'EXIT', _, _}, Pid) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+encode_event(EventType, EventDesc) when is_atom(EventType) ->
+    encode_event(atom_to_list(EventType), EventDesc);
+encode_event(EventType, EventDesc) when is_list(EventType) ->
+    encode_event(?l2b(EventType), EventDesc);
+encode_event(EventType, {DbName, DocId}) ->
+    {[{type, EventType}, {db, DbName}, {id, DocId}]};
+encode_event(EventType, DbName) ->
+    {[{type, EventType}, {db, DbName}]}.
