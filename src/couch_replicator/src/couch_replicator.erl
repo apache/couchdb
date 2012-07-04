@@ -14,7 +14,7 @@
 -behaviour(gen_server).
 
 % public API
--export([replicate/1]).
+-export([replicate/2]).
 
 % meant to be used only by the replicator database listener
 -export([async_replicate/1]).
@@ -74,7 +74,9 @@
 }).
 
 
-replicate(#rep{id = RepId, options = Options, user_ctx = UserCtx} = Rep) ->
+replicate(PostBody, Ctx) ->
+    {ok, #rep{id = RepId, options = Options, user_ctx = UserCtx} = Rep} =
+        couch_replicator_utils:parse_rep_doc(PostBody, Ctx),
     case get_value(cancel, Options, false) of
     true ->
         case get_value(id, Options, nil) of
