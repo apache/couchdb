@@ -693,7 +693,7 @@ json_to_doc_info({Props}) ->
     RevsInfo = lists:map(
         fun({Change}) ->
             Rev = couch_doc:parse_rev(get_value(<<"rev">>, Change)),
-            Del = (true =:= get_value(<<"deleted">>, Change)),
+            Del = couch_replicator_utils:is_deleted(Change),
             #rev_info{rev=Rev, deleted=Del}
         end, get_value(<<"changes">>, Props)),
     #doc_info{

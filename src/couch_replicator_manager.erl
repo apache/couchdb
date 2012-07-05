@@ -645,7 +645,7 @@ scan_all_dbs(Server) when is_pid(Server) ->
     ChangesFun(fun({change, {Change}, _}, _) ->
         DbName = couch_util:get_value(<<"id">>, Change),
         case DbName of <<"_design/", _/binary>> -> ok; _Else ->
-            case couch_util:get_value(<<"deleted">>, Change, false) of
+            case couch_replicator_utils:is_deleted(Change) of
             true ->
                 ok;
             false ->
