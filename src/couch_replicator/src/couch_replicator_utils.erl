@@ -16,7 +16,7 @@
 -export([open_db/1, close_db/1]).
 -export([start_db_compaction_notifier/2, stop_db_compaction_notifier/1]).
 -export([replication_id/2]).
--export([sum_stats/2]).
+-export([sum_stats/2, is_deleted/1]).
 -export([mp_parse_doc/2]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -417,3 +417,12 @@ mp_parse_atts({body, Bytes}) ->
     fun mp_parse_atts/1;
 mp_parse_atts(body_end) ->
     fun mp_parse_atts/1.
+
+is_deleted(Change) ->
+    case couch_util:get_value(<<"deleted">>, Change) of
+    undefined ->
+        % keep backwards compatibility for a while
+        couch_util:get_value(deleted, Change, false);
+    Else ->
+        Else
+    end.
