@@ -12,7 +12,7 @@
 
 % Reads CouchDB's ini file and gets queried for configuration parameters.
 % This module is initialized with a list of ini files that it consecutively
-% reads Key/Value pairs from and saves them in an ets table. If more an one
+% reads Key/Value pairs from and saves them in an ets table. If more than one
 % ini file is specified, the last one is used to write changes that are made
 % with store/2 back to that ini file.
 
