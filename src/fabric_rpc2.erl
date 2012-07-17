@@ -12,7 +12,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(fabric_rpc).
+-module(fabric_rpc2).
 
 -export([get_db_info/1, get_doc_count/1, get_update_seq/1]).
 -export([open_doc/3, open_revs/4, get_missing_revs/2, get_missing_revs/3,
