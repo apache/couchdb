@@ -32,13 +32,13 @@
     limit,                  % max # of workers allowed
     free = [],              % free workers (connections)
     busy = [],              % busy workers (connections)
-    waiting = queue:new()   % blocked clients waiting for a worker
+    waiting = queue:new(),   % blocked clients waiting for a worker
+    callers = ets:new(callers,[set]) % clients who've been given a worker
 }).
 
 
 start_link(Url, Options) ->
     gen_server:start_link(?MODULE, {Url, Options}, []).
-
 
 stop(Pool) ->
     ok = gen_server:call(Pool, stop, infinity).
@@ -61,7 +61,7 @@ init({Url, Options}) ->
     {ok, State}.
 
 
-handle_call(get_worker, From, #state{waiting = Waiting} = State) ->
+handle_call(get_worker, {FromPid, _} = From, #state{waiting = Waiting, callers = Callers} = State) ->
     #state{url = Url, limit = Limit, busy = Busy, free = Free} = State,
     case length(Busy) >= Limit of
     true ->
@@ -74,6 +74,7 @@ handle_call(get_worker, From, #state{waiting = Waiting} = State) ->
         [Worker | Free2] ->
            ok
         end,
+        monitor_use(FromPid, Worker, Callers),
         NewState = State#state{free = Free2, busy = [Worker | Busy]},
         {reply, {ok, Worker}, NewState}
     end;
@@ -82,7 +83,8 @@ handle_call(stop, _From, State) ->
     {stop, normal, ok, State}.
 
 
-handle_cast({release_worker, Worker}, #state{waiting = Waiting} = State) ->
+handle_cast({release_worker, Worker}, #state{waiting = Waiting, callers = Callers} = State) ->
+    demonitor_worker(Callers,Worker),
     case is_process_alive(Worker) andalso
         lists:member(Worker, State#state.busy) of
     true ->
@@ -90,7 +92,8 @@ handle_cast({release_worker, Worker}, #state{waiting = Waiting} = State) ->
         {empty, Waiting2} ->
             Busy2 = State#state.busy -- [Worker],
             Free2 = [Worker | State#state.free];
-        {{value, From}, Waiting2} ->
+        {{value, {Pid, _} = From}, Waiting2} ->
+            monitor_use(Pid, Worker, Callers),
             gen_server:reply(From, {ok, Worker}),
             Busy2 = State#state.busy,
             Free2 = State#state.free
@@ -105,33 +108,53 @@ handle_cast({release_worker, Worker}, #state{waiting = Waiting} = State) ->
         {noreply, State}
    end.
 
-
-handle_info({'EXIT', Pid, _Reason}, #state{busy = Busy, free = Free} = State) ->
+handle_info({'EXIT', Pid, _Reason}, #state{busy = Busy, free = Free, waiting = Waiting, callers = Callers} = State) ->
+    demonitor_worker(Callers,Pid),
     case Free -- [Pid] of
     Free ->
         case Busy -- [Pid] of
         Busy ->
             {noreply, State};
         Busy2 ->
-            case queue:out(State#state.waiting) of
+            case queue:out(Waiting) of
             {empty, _} ->
                 {noreply, State#state{busy = Busy2}};
-            {{value, From}, Waiting2} ->
+            {{value, {FromPid, _Ref} = From}, Waiting2} ->
                 {ok, Worker} = ibrowse:spawn_link_worker_process(State#state.url),
+                monitor_use(FromPid, Worker, Callers),
                 gen_server:reply(From, {ok, Worker}),
                 {noreply, State#state{busy = [Worker | Busy2], waiting = Waiting2}}
             end
         end;
     Free2 ->
         {noreply, State#state{free = Free2}}
+    end;
+
+handle_info({'DOWN', MonitorRef, process, _Pid, _Info},
+            #state{callers = Callers} = State) ->
+    case ets:match(Callers,{'$1',MonitorRef}) of
+    [] ->
+        {noreply, State};
+    [[Worker]] ->
+        handle_cast({release_worker, Worker}, State)
     end.
 
-
 code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
+    {ok, State#state{callers = ets:new(callers,[set])}}.
 
 
 terminate(_Reason, State) ->
     lists:foreach(fun ibrowse_http_client:stop/1, State#state.free),
     lists:foreach(fun ibrowse_http_client:stop/1, State#state.busy).
 
+monitor_use(Pid, Worker, Callers) ->
+    MonitorRef = erlang:monitor(process, Pid),
+    ets:insert(Callers, {Worker, MonitorRef}).
+
+demonitor_worker(Callers, Worker) ->
+    case ets:lookup(Callers,Worker) of
+    [] -> ok;
+    [{Worker, MonRef}] ->
+        ets:delete(Callers,Worker),
+        erlang:demonitor(MonRef)
+    end.
