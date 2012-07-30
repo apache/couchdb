@@ -112,6 +112,16 @@ couchTests.users_db = function(debug) {
     }
     jchrisUserDoc.roles = [];
 
+    // "roles" must exist
+    delete jchrisUserDoc.roles;
+    try {
+      usersDb.save(jchrisUserDoc);
+      T(false && "should only allow us to save doc when roles exists");
+    } catch(e) {
+      T(e.reason == "doc.roles must exist");
+    }
+    jchrisUserDoc.roles = [];
+
     // character : is not allowed in usernames
     var joeUserDoc = CouchDB.prepareUserDoc({
       name: "joe:erlang"
