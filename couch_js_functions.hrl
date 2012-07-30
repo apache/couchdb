@@ -31,7 +31,11 @@
             throw({forbidden: 'doc.name is required'});
         }
 
-        if (newDoc.roles && !isArray(newDoc.roles)) {
+        if (!newDoc.roles) {
+            throw({forbidden: 'doc.roles must exist'});
+        }
+
+        if (!isArray(newDoc.roles)) {
             throw({forbidden: 'doc.roles must be an array'});
         }
 
