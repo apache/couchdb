@@ -97,6 +97,7 @@ start_link(Name, Options) ->
     % will restart us and then we will pick up the new settings.
 
     BindAddress = couch_config:get("httpd", "bind_address", any),
+    validate_bind_address(BindAddress),
     DefaultSpec = "{couch_httpd_db, handle_request}",
     DefaultFun = make_arity_1_fun(
         couch_config:get("httpd", "default_handler", DefaultSpec)
@@ -1088,4 +1089,8 @@ partial_find(B, D, N, K) ->
             partial_find(B, D, 1 + N, K - 1)
     end.
 
-
+validate_bind_address(Address) ->
+    case inet_parse:address(Address) of
+        {ok, _} -> ok;
+        _ -> throw({error, invalid_bind_address})
+    end.
