@@ -23,6 +23,7 @@ go(Parent, ParentRef, DbName, Timeout) ->
     Notifiers = start_update_notifiers(DbName),
     MonRefs = lists:usort([{rexi_server, Node} || {Node, _Ref} <- Notifiers]),
     RexiMon = rexi_monitor:start(MonRefs),
+    MonPid = start_cleanup_monitor(self(), Notifiers),
     %% Add calling controller node as rexi end point as this controller will
     %% receive messages from it
     Workers = [{Parent, ParentRef} | Notifiers],
@@ -30,7 +31,7 @@ go(Parent, ParentRef, DbName, Timeout) ->
         receive_results(Workers, {Workers, Parent, unset}, Timeout)
     after
         rexi_monitor:stop(RexiMon),
-        stop_update_notifiers(Notifiers)
+        stop_cleanup_monitor(MonPid)
     end.
 
 start_update_notifiers(DbName) ->
@@ -47,6 +48,27 @@ start_update_notifier(DbName) ->
     ok = gen_event:add_sup_handler(couch_db_update, Id, Fun),
     receive {gen_event_EXIT, Id, Reason} ->
         rexi:reply({gen_event_EXIT, DbName, Reason})
+    end.
+
+start_cleanup_monitor(Parent, Notifiers) ->
+    spawn(fun() ->
+        Ref = erlang:monitor(process, Parent),
+        cleanup_monitor(Parent, Ref, Notifiers)
+    end).
+
+stop_cleanup_monitor(MonPid) ->
+    MonPid ! {self(), stop}.
+
+cleanup_monitor(Parent, Ref, Notifiers) ->
+    receive
+        {'DOWN', Ref, _, _, _} ->
+            stop_update_notifiers(Notifiers);
+        {Parent, stop} ->
+            stop_update_notifiers(Notifiers);
+        Else ->
+            twig:log(error, "Unkown message in ~w :: ~w", [?MODULE, Else]),
+            stop_update_notifiers(Notifiers),
+            exit(Parent, {unknown_message, Else})
     end.
 
 stop_update_notifiers(Notifiers) ->
