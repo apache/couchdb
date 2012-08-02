@@ -226,17 +226,7 @@ cancel_replication(RepId, #user_ctx{name = Name, roles = Roles}) ->
     end.
 
 init(InitArgs) ->
-    try
-        do_init(InitArgs)
-    catch
-    throw:{unauthorized, DbUri} ->
-        {stop, {unauthorized,
-            <<"unauthorized to access or create database ", DbUri/binary>>}};
-    throw:{db_not_found, DbUri} ->
-        {stop, {db_not_found, <<"could not open ", DbUri/binary>>}};
-    throw:Error ->
-        {stop, Error}
-    end.
+    {ok, InitArgs, 0}.
 
 do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
     process_flag(trap_exit, true),
@@ -389,8 +379,15 @@ handle_info({'EXIT', Pid, Reason}, #rep_state{workers = Workers} = State) ->
     true ->
         twig:log(error,"Worker ~p died with reason: ~p", [Pid, Reason]),
         {stop, {worker_died, Pid, Reason}, State2}
-    end.
+    end;
 
+handle_info(timeout, InitArgs) ->
+    try do_init(InitArgs) of {ok, State} ->
+        {noreply, State}
+    catch Class:Error ->
+        Stack = erlang:get_stacktrace(),
+        {stop, shutdown, {error, Class, Error, Stack, InitArgs}}
+    end.
 
 handle_call(get_details, _From, #rep_state{rep_details = Rep} = State) ->
     {reply, {ok, Rep}, State};
@@ -474,7 +471,7 @@ terminate(shutdown, #rep_state{rep_details = #rep{id = RepId}} = State) ->
     couch_replicator_notifier:notify({error, RepId, <<"cancelled">>}),
     terminate_cleanup(State);
 
-terminate(Reason, State) ->
+terminate(Reason, #rep_state{} = State) ->
     #rep_state{
         source_name = Source,
         target_name = Target,
@@ -484,8 +481,11 @@ terminate(Reason, State) ->
         [BaseId ++ Ext, Source, Target, to_binary(Reason)]),
     terminate_cleanup(State),
     couch_replicator_notifier:notify({error, RepId, Reason}),
-    couch_replicator_manager:replication_error(Rep, Reason).
+    couch_replicator_manager:replication_error(Rep, Reason);
 
+terminate(shutdown, {error, Class, Error, Stack, InitArgs}) ->
+    twig:log("~p:~p: Replication failed to start for args ~p: ~p",
+        [Class, Error, InitArgs, Stack]).
 
 terminate_cleanup(State) ->
     update_task(State),
