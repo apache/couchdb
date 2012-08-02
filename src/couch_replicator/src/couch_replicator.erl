@@ -141,11 +141,8 @@ async_replicate(#rep{id = {BaseId, Ext}, source = Src, target = Tgt} = Rep) ->
             %% this error occurs if multiple replicators are racing
             %% each other to start and somebody else won. Just grab
             %% the Pid by calling start_child again.
-            {error, {already_started, Pid}} =
-                supervisor:start_child(couch_replicator_job_sup, ChildSpec),
-            twig:log(notice,"replication `~s` already running at ~p (`~s` -> `~s`)",
-                [RepChildId, Pid, Source, Target]),
-            {ok, Pid};
+            timer:sleep(50 + random:uniform(100)),
+            async_replicate(Rep);
         {error, {'EXIT', {badarg,
             [{erlang, apply, [gen_server, start_link, undefined]} | _]}}} ->
             % Clause to deal with a change in the supervisor module introduced
