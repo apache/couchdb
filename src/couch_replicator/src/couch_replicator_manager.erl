@@ -358,7 +358,6 @@ rep_user_ctx({RepDoc}) ->
 
 
 maybe_start_replication(State, DbName, DocId, RepDoc) ->
-    io:format("should I start a repl here for ~p ~n",[DocId]),
     #rep{id = {BaseId, _} = RepId} = Rep = parse_rep_doc(RepDoc),
     case rep_state(RepId) of
     nil ->
