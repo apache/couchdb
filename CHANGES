@@ -46,6 +46,10 @@ Test Suite:
   * Improved tracebacks printed by the JS CLI tests
   * Improved the reliability of a number of tests
 
+UUID Algorithms:
+
+  * Added the utc_id_suffix algorithm.
+
 Version 1.2.1
 -------------
 
