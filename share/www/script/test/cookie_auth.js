@@ -80,7 +80,7 @@ couchTests.cookie_auth = function(debug) {
       T(usersDb.save(jasonUserDoc).ok);
 
       var checkDoc = open_as(usersDb, jasonUserDoc._id, "jan");
-      T(checkDoc.name == "Jason Davies");
+      TEquals("Jason Davies", checkDoc.name);
 
       var jchrisUserDoc = CouchDB.prepareUserDoc({
         name: "jchris@apache.org"
@@ -96,8 +96,8 @@ couchTests.cookie_auth = function(debug) {
         usersDb.save(duplicateJchrisDoc);
         T(false && "Can't create duplicate user names. Should have thrown an error.");
       } catch (e) {
-        T(e.error == "conflict");
-        T(usersDb.last_req.status == 409);
+        TEquals("conflict", e.error);
+        TEquals(409, usersDb.last_req.status);
       }
 
       // we can't create _names
@@ -109,8 +109,8 @@ couchTests.cookie_auth = function(debug) {
         usersDb.save(underscoreUserDoc);
         T(false && "Can't create underscore user names. Should have thrown an error.");
       } catch (e) {
-        T(e.error == "forbidden");
-        T(usersDb.last_req.status == 403);
+        TEquals("forbidden", e.error);
+        TEquals(403, usersDb.last_req.status);
       }
 
       // we can't create docs with malformed ids
@@ -124,13 +124,13 @@ couchTests.cookie_auth = function(debug) {
         usersDb.save(badIdDoc);
         T(false && "Can't create malformed docids. Should have thrown an error.");
       } catch (e) {
-        T(e.error == "forbidden");
-        T(usersDb.last_req.status == 403);
+        TEquals("forbidden", e.error);
+        TEquals(403, usersDb.last_req.status);
       }
 
       // login works
       T(CouchDB.login('Jason Davies', password).ok);
-      T(CouchDB.session().userCtx.name == 'Jason Davies');
+      TEquals('Jason Davies', CouchDB.session().userCtx.name);
 
       // JSON login works
       var xhr = CouchDB.request("POST", "/_session", {
@@ -142,7 +142,7 @@ couchTests.cookie_auth = function(debug) {
       });
 
       T(JSON.parse(xhr.responseText).ok);
-      T(CouchDB.session().userCtx.name == 'Jason Davies');
+      TEquals('Jason Davies', CouchDB.session().userCtx.name);
 
       // update one's own credentials document
       jasonUserDoc.foo=2;
@@ -153,8 +153,8 @@ couchTests.cookie_auth = function(debug) {
         usersDb.deleteDoc(jchrisUserDoc);
         T(false && "Can't delete other users docs. Should have thrown an error.");
       } catch (e) {
-        T(e.error == "forbidden");
-        T(usersDb.last_req.status == 403);
+        TEquals("forbidden", e.error);
+        TEquals(403, usersDb.last_req.status);
       }
 
       // TODO should login() throw an exception here?

@@ -66,7 +66,6 @@ suggesting improvements or submitting changes. Some of these people are:
  * Lim Yue Chuan <shasderias@gmail.com>
  * David Davis <xantus@xantus.org>
  * Klaus Trainer <klaus.trainer@web.de>
- * Dale Harvey <dale@arandomurl.com>
  * Juuso Väänänen <juuso@vaananen.org>
  * Jeff Zellner <jeff.zellner@gmail.com>
  * Benjamin Young <byoung@bigbluehat.com>
@@ -92,5 +91,9 @@ suggesting improvements or submitting changes. Some of these people are:
  * Simon Leblanc <sim.leblanc+apache@gmail.com>
  * Rogutės Sparnuotos <rogutes@googlemail.com>
  * Gavin McDonald <gmcdonald@apache.org>
-
-For a list of authors see the `AUTHORS` file.
+ * Fedor Indutny <fedor@indutny.com>
+# Dear committer who merges a commit from a non-committer:
+# You don't have to manually maintain the THANKS file anymore (yay!).
+# Non-committer authors get automatically appended to THANKS and
+# moved into THANKS.gz by `make`. This note will be stripped as well.
+# Authors from commit 6c976bd and onwards are auto-inserted.

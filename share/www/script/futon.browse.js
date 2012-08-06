@@ -570,15 +570,15 @@
                       "/" + $.couch.encodeDocId(doc._id) +
                       "/_view/" + encodeURIComponent(data.name);
                   },
-                  error: function(status, e, reason) {
-                    alert(reason);
+                  error: function(status, error, reason) {
+                    alert("Error: " + error + "\n\n" + reason);
                   }
                 });
               }
               db.openDoc(docId, {
                 error: function(status, error, reason) {
                   if (status == 404) save(null);
-                  else alert(reason);
+                  else alert("Error: " + error + "\n\n" + reason);
                 },
                 success: function(doc) {
                   save(doc);
@@ -616,8 +616,8 @@
                 $("#viewcode button.revert, #viewcode button.save")
                   .attr("disabled", "disabled");
               },
-              error: function(status, e, reason) {
-                alert(reason);
+              error: function(status, error, reason) {
+                alert("Error: " + error + "\n\n" + reason);
               }
             });
           }
@@ -1009,6 +1009,9 @@
 
         if (!page.isNew) {
           db.openDoc(docId, {revs_info: true,
+            error: function(status, error, reason) {
+              alert("Error: " + error + "\n\n" + reason);
+            },
             success: function(doc) {
               var revs = doc._revs_info || [];
               delete doc._revs_info;

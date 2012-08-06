@@ -318,7 +318,7 @@ test_design_docs_only() ->
 test_heartbeat() ->
     {ok, Db} = create_db(test_db_name()),
 
-    {ok, Rev3} = save_doc(Db, {[
+    {ok, _} = save_doc(Db, {[
         {<<"_id">>, <<"_design/foo">>},
         {<<"language">>, <<"javascript">>},
             {<<"filters">>, {[

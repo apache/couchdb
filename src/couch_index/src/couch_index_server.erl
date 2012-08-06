@@ -127,7 +127,7 @@ handle_cast({reset_indexes, DbName}, State) ->
 
 handle_info({'EXIT', Pid, Reason}, Server) ->
     case ets:lookup(?BY_PID, Pid) of
-        [{Pid, DbName, Sig}] ->
+        [{Pid, {DbName, Sig}}] ->
             [{DbName, {DDocId, Sig}}] =
                 ets:match_object(?BY_DB, {DbName, {'$1', Sig}}),
             rem_from_ets(DbName, Sig, DDocId, Pid);

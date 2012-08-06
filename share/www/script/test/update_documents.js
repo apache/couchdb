@@ -95,7 +95,10 @@ couchTests.update_documents = function(debug) {
            "base64" : "aGVsbG8gd29ybGQh" // "hello world!" encoded
          };
          return [doc, resp];
-       })
+       }),
+      "empty" : stringFun(function(doc, req) {
+        return [{}, 'oops'];
+      })
     }
   };
   T(db.save(designDoc).ok);
@@ -221,4 +224,10 @@ couchTests.update_documents = function(debug) {
   T(xhr.status == 201);
   T(xhr.responseText == "hello world!");
   T(/application\/octet-stream/.test(xhr.getResponseHeader("Content-Type")));
+
+  // Insert doc with empty id
+  xhr = CouchDB.request("PUT", "/test_suite_db/_design/update/_update/empty/foo");
+  TEquals(400, xhr.status);
+  TEquals("Document id must not be empty", JSON.parse(xhr.responseText).reason);
+
 };

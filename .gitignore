@@ -17,6 +17,7 @@ build-aux
 *.diff
 !.gitignore
 .*
+!.mailmap
 
 # ./configure
 

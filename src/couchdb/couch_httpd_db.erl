@@ -76,14 +76,23 @@ handle_changes_req1(Req, #db{name=DbName}=Db) ->
 
 handle_changes_req2(Req, Db) ->
     MakeCallback = fun(Resp) ->
-        fun({change, Change, _}, "continuous") ->
+        fun({change, {ChangeProp}=Change, _}, "eventsource") ->
+            Seq = proplists:get_value(<<"seq">>, ChangeProp),
+            send_chunk(Resp, ["data: ", ?JSON_ENCODE(Change),
+                              "\n", "id: ", ?JSON_ENCODE(Seq),
+                              "\n\n"]);
+        ({change, Change, _}, "continuous") ->
             send_chunk(Resp, [?JSON_ENCODE(Change) | "\n"]);
         ({change, Change, Prepend}, _) ->
             send_chunk(Resp, [Prepend, ?JSON_ENCODE(Change)]);
+        (start, "eventsource") ->
+            ok;
         (start, "continuous") ->
             ok;
         (start, _) ->
             send_chunk(Resp, "{\"results\":[\n");
+        ({stop, _EndSeq}, "eventsource") ->
+            end_json_response(Resp);
         ({stop, EndSeq}, "continuous") ->
             send_chunk(
                 Resp,
@@ -100,7 +109,7 @@ handle_changes_req2(Req, Db) ->
             send_chunk(Resp, "\n")
         end
     end,
-    ChangesArgs = parse_changes_query(Req),
+    ChangesArgs = parse_changes_query(Req, Db),
     ChangesFun = couch_changes:handle_changes(ChangesArgs, Req, Db),
     WrapperFun = case ChangesArgs#changes_args.feed of
     "normal" ->
@@ -117,6 +126,15 @@ handle_changes_req2(Req, Db) ->
                     FeedChangesFun(MakeCallback(Resp))
                 end
             )
+        end;
+    "eventsource" ->
+        Headers = [
+            {"Content-Type", "text/event-stream"},
+            {"Cache-Control", "no-cache"}
+        ],
+        {ok, Resp} = couch_httpd:start_chunked_response(Req, 200, Headers),
+        fun(FeedChangesFun) ->
+            FeedChangesFun(MakeCallback(Resp))
         end;
     _ ->
         % "longpoll" or "continuous"
@@ -1095,14 +1113,21 @@ parse_doc_query(Req) ->
         end
     end, #doc_query_args{}, couch_httpd:qs(Req)).
 
-parse_changes_query(Req) ->
+parse_changes_query(Req, Db) ->
     lists:foldl(fun({Key, Value}, Args) ->
-        case {Key, Value} of
+        case {string:to_lower(Key), Value} of
         {"feed", _} ->
             Args#changes_args{feed=Value};
         {"descending", "true"} ->
             Args#changes_args{dir=rev};
+        {"since", "now"} ->
+            UpdateSeq = couch_util:with_db(Db#db.name, fun(WDb) ->
+                                        couch_db:get_update_seq(WDb)
+                                end),
+            Args#changes_args{since=UpdateSeq};
         {"since", _} ->
+            Args#changes_args{since=list_to_integer(Value)};
+        {"last-event-id", _} ->
             Args#changes_args{since=list_to_integer(Value)};
         {"limit", _} ->
             Args#changes_args{limit=list_to_integer(Value)};

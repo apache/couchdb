@@ -53,8 +53,8 @@ test() ->
     etap:ok(not couch_util:should_flush(),
         "Not using enough memory to flush."),
     AcquireMem = fun() ->
-        IntsToAGazillion = lists:seq(1, 200000),
-        LotsOfData = lists:map(
+        _IntsToAGazillion = lists:seq(1, 200000),
+        _LotsOfData = lists:map(
             fun(Int) -> {Int, <<"foobar">>} end,
         lists:seq(1, 500000)),
         etap:ok(couch_util:should_flush(),

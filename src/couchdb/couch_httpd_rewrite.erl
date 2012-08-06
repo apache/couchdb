@@ -119,6 +119,17 @@ handle_rewrite_req(#httpd{
     Prefix = <<"/", DbName/binary, "/", DesignId/binary>>,
     QueryList = lists:map(fun decode_query_value/1, couch_httpd:qs(Req)),
 
+    MaxRewritesList = couch_config:get("httpd", "rewrite_limit", "100"),
+    MaxRewrites = list_to_integer(MaxRewritesList),
+    case get(couch_rewrite_count) of
+        undefined ->
+            put(couch_rewrite_count, 1);
+        NumRewrites when NumRewrites < MaxRewrites ->
+            put(couch_rewrite_count, NumRewrites + 1);
+        _ ->
+            throw({bad_request, <<"Exceeded rewrite recursion limit">>})
+    end,
+
     #doc{body={Props}} = DDoc,
 
     % get rules from ddoc
@@ -165,9 +176,10 @@ handle_rewrite_req(#httpd{
             % normalize final path (fix levels "." and "..")
             RawPath1 = ?b2l(iolist_to_binary(normalize_path(RawPath))),
 
-            % in order to do OAuth correctly,
-            % we have to save the requested path
-            Headers = mochiweb_headers:enter("x-couchdb-requested-path",
+            % In order to do OAuth correctly, we have to save the
+            % requested path. We use default so chained rewriting
+            % wont replace the original header.
+            Headers = mochiweb_headers:default("x-couchdb-requested-path",
                                              MochiReq:get(raw_path),
                                              MochiReq:get(headers)),
 
