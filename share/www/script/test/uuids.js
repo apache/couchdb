@@ -118,14 +118,14 @@ couchTests.uuids = function(debug) {
   );
 
   // Test utc_id_suffix uuids
-  var id_suffix = "frog";
+  var utc_id_suffix = "frog";
   var suffix_testfun = function() {
     xhr = CouchDB.request("GET", "/_uuids?count=10");
     T(xhr.status == 200);
     result = JSON.parse(xhr.responseText);
     for(var i = 1; i < result.uuids.length; i++) {
-      T(result.uuids[i].length == 14 + id_suffix.length);
-      T(result.uuids[i].substring(14) == id_suffix);
+      T(result.uuids[i].length == 14 + utc_id_suffix.length);
+      T(result.uuids[i].substring(14) == utc_id_suffix);
       T(result.uuids[i-1] < result.uuids[i], "utc_id_suffix uuids are ordered.");
     }
   };
@@ -136,8 +136,8 @@ couchTests.uuids = function(debug) {
       "value": "utc_id_suffix"
     }, {
       "section": "uuids",
-      "key": "id_suffix",
-      "value": id_suffix
+      "key": "utc_id_suffix",
+      "value": utc_id_suffix
     }],
     suffix_testfun
   );

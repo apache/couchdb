@@ -56,8 +56,8 @@ handle_call(create, _From, random) ->
     {reply, random(), random};
 handle_call(create, _From, utc_random) ->
     {reply, utc_random(), utc_random};
-handle_call(create, _From, {utc_id_suffix, IdSuffix}) ->
-    {reply, utc_suffix(IdSuffix), {utc_id_suffix, IdSuffix}};
+handle_call(create, _From, {utc_id_suffix, UtcIdSuffix}) ->
+    {reply, utc_suffix(UtcIdSuffix), {utc_id_suffix, UtcIdSuffix}};
 handle_call(create, _From, {sequential, Pref, Seq}) ->
     Result = ?l2b(Pref ++ io_lib:format("~6.16.0b", [Seq])),
     case Seq >= 16#fff000 of
@@ -88,14 +88,14 @@ inc() ->
 
 state() ->
     AlgoStr = couch_config:get("uuids", "algorithm", "random"),
-    IdSuffix = couch_config:get("uuids", "id_suffix", ""),
+    UtcIdSuffix = couch_config:get("uuids", "utc_id_suffix", ""),
     case couch_util:to_existing_atom(AlgoStr) of
         random ->
             random;
         utc_random ->
             utc_random;
         utc_id_suffix ->
-            {utc_id_suffix, IdSuffix};
+            {utc_id_suffix, UtcIdSuffix};
         sequential ->
             {sequential, new_prefix(), inc()};
         Unknown ->
