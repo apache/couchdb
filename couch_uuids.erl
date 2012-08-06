@@ -33,12 +33,15 @@ random() ->
     list_to_binary(couch_util:to_hex(crypto:rand_bytes(16))).
 
 utc_random() ->
+    utc_suffix(couch_util:to_hex(crypto:rand_bytes(9))).
+
+utc_suffix(Suffix) ->
     Now = {_, _, Micro} = now(),
     Nowish = calendar:now_to_universal_time(Now),
     Nowsecs = calendar:datetime_to_gregorian_seconds(Nowish),
     Then = calendar:datetime_to_gregorian_seconds({{1970, 1, 1}, {0, 0, 0}}),
     Prefix = io_lib:format("~14.16.0b", [(Nowsecs - Then) * 1000000 + Micro]),
-    list_to_binary(Prefix ++ couch_util:to_hex(crypto:rand_bytes(9))).
+    list_to_binary(Prefix ++ Suffix).
 
 init([]) ->
     ok = couch_config:register(
@@ -53,6 +56,8 @@ handle_call(create, _From, random) ->
     {reply, random(), random};
 handle_call(create, _From, utc_random) ->
     {reply, utc_random(), utc_random};
+handle_call(create, _From, {utc_id, UtcIdSuffix}) ->
+    {reply, utc_suffix(UtcIdSuffix), {utc_id, UtcIdSuffix}};
 handle_call(create, _From, {sequential, Pref, Seq}) ->
     Result = ?l2b(Pref ++ io_lib:format("~6.16.0b", [Seq])),
     case Seq >= 16#fff000 of
@@ -88,6 +93,9 @@ state() ->
             random;
         utc_random ->
             utc_random;
+        utc_id ->
+            UtcIdSuffix = couch_config:get("uuids", "utc_id_suffix", ""),
+            {utc_id, UtcIdSuffix};
         sequential ->
             {sequential, new_prefix(), inc()};
         Unknown ->
