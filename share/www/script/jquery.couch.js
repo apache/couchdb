@@ -237,6 +237,9 @@
           } else {
             alert("An error occurred logging in: " + resp.reason);
           }
+          if (typeof options.complete === "function") {
+              options.complete();
+          }
         }
       });
     },
