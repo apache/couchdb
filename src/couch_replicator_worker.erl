@@ -295,13 +295,13 @@ spawn_doc_reader(Source, Target, FetchParams) ->
 fetch_doc(Source, {Id, Revs, PAs}, DocHandler, Acc) ->
     try
         couch_replicator_api_wrap:open_doc_revs(
-            Source, Id, Revs, [{atts_since, PAs}], DocHandler, Acc)
+            Source, Id, Revs, [{atts_since, PAs}, latest], DocHandler, Acc)
     catch
     throw:{missing_stub, _} ->
         twig:log(error,"Retrying fetch and update of document `~s` due to out of "
             "sync attachment stubs. Missing revisions are: ~s",
             [Id, couch_doc:revs_to_strs(Revs)]),
-        couch_replicator_api_wrap:open_doc_revs(Source, Id, Revs, [], DocHandler, Acc)
+        couch_replicator_api_wrap:open_doc_revs(Source, Id, Revs, [latest], DocHandler, Acc)
     end.
 
 
