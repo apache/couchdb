@@ -171,6 +171,7 @@ handle_call({compacted, NewIdxState}, _From, State) ->
         updater=Updater,
         commit_delay=Delay
     } = State,
+    assert_signature_match(Mod, OldIdxState, NewIdxState),
     NewSeq = Mod:get(update_seq, NewIdxState),
     OldSeq = Mod:get(update_seq, OldIdxState),
     % For indices that require swapping files, we have to make sure we're
@@ -210,7 +211,12 @@ handle_cast({updated, NewIdxState}, State) ->
             {noreply, NewState}
     end;
 handle_cast({new_state, NewIdxState}, State) ->
-    #st{mod=Mod, commit_delay=Delay} = State,
+    #st{
+        mod=Mod,
+        idx_state=OldIdxState,
+        commit_delay=Delay
+    } = State,
+    assert_signature_match(Mod, OldIdxState, NewIdxState),
     CurrSeq = Mod:get(update_seq, NewIdxState),
     Args = [
         Mod:get(db_name, NewIdxState),
@@ -323,3 +329,9 @@ send_replies(Waiters, UpdateSeq, IdxState) ->
     {ToSend, Remaining} = lists:partition(Pred, Waiters),
     [gen_server:reply(From, {ok, IdxState}) || {From, _} <- ToSend],
     Remaining.
+
+assert_signature_match(Mod, OldIdxState, NewIdxState) ->
+    case {Mod:get(signature, OldIdxState), Mod:get(signature, NewIdxState)} of
+        {Sig, Sig} -> ok;
+        _ -> erlang:error(signature_mismatch)
+    end.
