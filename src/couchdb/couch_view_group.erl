@@ -180,11 +180,11 @@ handle_call({start_compact, _}, _From, State) ->
     %% compact already running, this is a no-op
     {reply, {ok, State#group_state.compactor_pid}, State};
 
-handle_call({compact_done, #group{current_seq=NewSeq} = NewGroup}, _From,
-        #group_state{group = #group{current_seq=OldSeq}} = State)
+handle_call({compact_done, #group{sig=GroupSig, current_seq=NewSeq} = NewGroup}, _From,
+        #group_state{group = #group{sig=GroupSig, current_seq=OldSeq}} = State)
         when NewSeq >= OldSeq ->
     #group_state{
-        group = #group{name=GroupId, fd=OldFd, sig=GroupSig},
+        group = #group{name=GroupId, fd=OldFd},
         init_args = {RootDir, DbName, _},
         updater_pid = UpdaterPid,
         compactor_pid = CompactorPid,
@@ -222,7 +222,8 @@ handle_call({compact_done, #group{current_seq=NewSeq} = NewGroup}, _From,
         compactor_pid=nil,
         updater_pid=NewUpdaterPid
     }};
-handle_call({compact_done, NewGroup}, _From, State) ->
+handle_call({compact_done, #group{sig=GroupSig} = NewGroup}, _From,
+            #group_state{group = #group{sig=GroupSig}} = State) ->
     #group_state{
         group = #group{name = GroupId, current_seq = CurrentSeq},
         init_args={_RootDir, DbName, _}
@@ -245,8 +246,8 @@ handle_call(cancel_compact, _From, #group_state{compactor_pid = Pid} = State) ->
     {reply, ok, State#group_state{compactor_pid = nil}}.
 
 
-handle_cast({partial_update, Pid, NewGroup}, #group_state{updater_pid=Pid}
-        = State) ->
+handle_cast({partial_update, Pid, #group{sig=GroupSig}=NewGroup}, #group_state{updater_pid=Pid}
+        = #group_state{group = #group{sig=GroupSig}}=State) ->
     #group_state{
         db_name = DbName,
         waiting_commit = WaitingCommit,
@@ -316,8 +317,9 @@ handle_info(delayed_commit, #group_state{db_name=DbName,group=Group}=State) ->
         {noreply, State#group_state{waiting_commit=true}}
     end;
 
-handle_info({'EXIT', FromPid, {new_group, Group}},
+handle_info({'EXIT', FromPid, {new_group, #group{sig=GroupSig} = Group}},
         #group_state{db_name=DbName,
+            group=#group{sig=GroupSig},
             updater_pid=UpPid,
             ref_counter=RefCounter,
             waiting_list=WaitList,
