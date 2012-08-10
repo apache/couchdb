@@ -271,6 +271,37 @@ handle_cast({partial_update, Pid, #group{sig=GroupSig}=NewGroup}, #group_state{u
 handle_cast({partial_update, _, _}, State) ->
     %% message from an old (probably pre-compaction) updater; ignore
     {noreply, State};
+handle_cast({FromPid, new_group, #group{sig=GroupSig} = Group},
+        #group_state{db_name=DbName,
+            group=#group{sig=GroupSig},
+            updater_pid=UpPid,
+            ref_counter=RefCounter,
+            waiting_list=WaitList,
+            shutdown=Shutdown,
+            waiting_commit=WaitingCommit}=State) when UpPid == FromPid ->
+    if not WaitingCommit ->
+        erlang:send_after(1000, self(), delayed_commit);
+    true -> ok
+    end,
+    case reply_with_group(Group, WaitList, [], RefCounter) of
+    [] ->
+        case Shutdown of
+        true ->
+            {stop, normal, State};
+        false ->
+            {noreply, State#group_state{waiting_commit=true, waiting_list=[],
+                group=Group, updater_pid=nil}}
+        end;
+    StillWaiting ->
+        % we still have some waiters, reopen the database and reupdate the index
+        Owner = self(),
+        Pid = spawn_link(fun() -> couch_view_updater:update(Owner, Group, DbName) end),
+        {noreply, State#group_state{waiting_commit=true,
+                waiting_list=StillWaiting, updater_pid=Pid}}
+    end;
+handle_cast({_, new_group, _}, State) ->
+    %% message from an old (probably pre-compaction) updater; ignore
+    {noreply, State};
 handle_cast(ddoc_updated, State) ->
     #group_state{
         db_name = DbName,
@@ -316,38 +347,6 @@ handle_info(delayed_commit, #group_state{db_name=DbName,group=Group}=State) ->
         erlang:send_after(1000, self(), delayed_commit),
         {noreply, State#group_state{waiting_commit=true}}
     end;
-
-handle_info({'EXIT', FromPid, {new_group, #group{sig=GroupSig} = Group}},
-        #group_state{db_name=DbName,
-            group=#group{sig=GroupSig},
-            updater_pid=UpPid,
-            ref_counter=RefCounter,
-            waiting_list=WaitList,
-            shutdown=Shutdown,
-            waiting_commit=WaitingCommit}=State) when UpPid == FromPid ->
-    if not WaitingCommit ->
-        erlang:send_after(1000, self(), delayed_commit);
-    true -> ok
-    end,
-    case reply_with_group(Group, WaitList, [], RefCounter) of
-    [] ->
-        case Shutdown of
-        true ->
-            {stop, normal, State};
-        false ->
-            {noreply, State#group_state{waiting_commit=true, waiting_list=[],
-                group=Group, updater_pid=nil}}
-        end;
-    StillWaiting ->
-        % we still have some waiters, reopen the database and reupdate the index
-        Owner = self(),
-        Pid = spawn_link(fun() -> couch_view_updater:update(Owner, Group, DbName) end),
-        {noreply, State#group_state{waiting_commit=true,
-                waiting_list=StillWaiting, updater_pid=Pid}}
-    end;
-handle_info({'EXIT', _, {new_group, _}}, State) ->
-    %% message from an old (probably pre-compaction) updater; ignore
-    {noreply, State};
 
 handle_info({'EXIT', UpPid, reset},
         #group_state{init_args=InitArgs, updater_pid=UpPid} = State) ->

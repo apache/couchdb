@@ -117,13 +117,27 @@ maybe_retry_compact(#db{name = DbName} = Db, GroupId, NewGroup) ->
         couch_db:close(Db);
     update ->
         {ok, Db2} = couch_db:reopen(Db),
-        {_, Ref} = erlang:spawn_monitor(fun() ->
-            couch_view_updater:update(nil, NewGroup, Db2)
+        Self = self(),
+        {MPid, MRef} = erlang:spawn_monitor(fun() ->
+            couch_view_updater:update(Self, NewGroup, Db2)
         end),
-        receive
-        {'DOWN', Ref, _, _, {new_group, NewGroup2}} ->
-            maybe_retry_compact(Db2, GroupId, NewGroup2)
-        end
+        NewGroup1 = get_new_group(MPid, MRef),
+        erlang:demonitor(MRef, [flush]),
+        maybe_retry_compact(Db2, GroupId, NewGroup1)
+    end.
+
+get_new_group(Pid, Ref) ->
+    receive
+        {'DOWN', Ref, _, _, {new_group, NewGroup}} ->
+            NewGroup;
+        {'DOWN', Ref, _, _, Reason} ->
+            erlang:error({view_compaction_error, Reason});
+        {'$gen_cast', {Pid, new_group, NewGroup}} ->
+            NewGroup;
+        {'$gen_cast', {partial_update, _, _}} ->
+            get_new_group(Pid, Ref);
+        Else ->
+            erlang:error({view_compaction_error, Else})
     end.
 
 %% @spec compact_view(View, EmptyView, Retry, Acc) -> {CompactView, NewAcc}
