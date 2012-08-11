@@ -340,6 +340,8 @@ handle_request_int(MochiReq, DefaultFun,
                 " must be built with Erlang OTP R13B04 or higher.",
             ?LOG_ERROR("~s", [ErrorReason]),
             send_error(HttpReq, {bad_otp_release, ErrorReason});
+        exit:{body_too_large, _} ->
+            send_error(HttpReq, request_entity_too_large);
         throw:Error ->
             Stack = erlang:get_stacktrace(),
             ?LOG_DEBUG("Minor error in HTTP request: ~p",[Error]),
@@ -526,33 +528,13 @@ recv_chunked(#httpd{mochi_req=MochiReq}, MaxChunkSize, ChunkFun, InitState) ->
     % called with Length == 0 on the last time.
     MochiReq:stream_body(MaxChunkSize, ChunkFun, InitState).
 
-body_length(Req) ->
-    case header_value(Req, "Transfer-Encoding") of
-        undefined ->
-            case header_value(Req, "Content-Length") of
-                undefined -> undefined;
-                Length -> list_to_integer(Length)
-            end;
-        "chunked" -> chunked;
-        Unknown -> {unknown_transfer_encoding, Unknown}
-    end.
+body_length(#httpd{mochi_req=MochiReq}) ->
+    MochiReq:get(body_length).
 
-body(#httpd{mochi_req=MochiReq, req_body=undefined} = Req) ->
-    case body_length(Req) of
-        undefined ->
-            MaxSize = list_to_integer(
-                couch_config:get("couchdb", "max_document_size", "4294967296")),
-            MochiReq:recv_body(MaxSize);
-        chunked ->
-            ChunkFun = fun({0, _Footers}, Acc) ->
-                lists:reverse(Acc);
-            ({_Len, Chunk}, Acc) ->
-                [Chunk | Acc]
-            end,
-            recv_chunked(Req, 8192, ChunkFun, []);
-        Len ->
-            MochiReq:recv_body(Len)
-    end;
+body(#httpd{mochi_req=MochiReq, req_body=undefined}) ->
+    MaxSize = list_to_integer(
+        couch_config:get("couchdb", "max_document_size", "4294967296")),
+    MochiReq:recv_body(MaxSize);
 body(#httpd{req_body=ReqBody}) ->
     ReqBody.
 
@@ -814,6 +796,8 @@ error_info({unauthorized, Msg}) ->
 error_info(file_exists) ->
     {412, <<"file_exists">>, <<"The database could not be "
         "created, the file already exists.">>};
+error_info(request_entity_too_large) ->
+    {413, <<"too_large">>, <<"the request entity is too large">>};
 error_info({bad_ctype, Reason}) ->
     {415, <<"bad_content_type">>, Reason};
 error_info(requested_range_not_satisfiable) ->
