@@ -228,15 +228,24 @@ sum_terms([X|Xs], [Y|Ys]) when is_number(X), is_number(Y) ->
 sum_terms(_, _) ->
     throw({invalid_value, <<"builtin _sum function requires map values to be numbers or lists of numbers">>}).
 
-builtin_stats(reduce, []) ->
-    {[]};
-builtin_stats(reduce, [[_,First]|Rest]) when is_number(First) ->
-    Stats = lists:foldl(fun([_K,V], {S,C,Mi,Ma,Sq}) when is_number(V) ->
-        {S+V, C+1, lists:min([Mi, V]), lists:max([Ma, V]), Sq+(V*V)};
-    (_, _) ->
-        throw({invalid_value,
-            <<"builtin _stats function requires map values to be numbers">>})
-    end, {First,1,First,First,First*First}, Rest),
+
+builtin_stats(reduce, [[_,First]|Rest]) ->
+    Acc0 = build_initial_accumulator(First),
+    Stats = lists:foldl(fun
+        ([_K,V], {S,C,Mi,Ma,Sq}) when is_number(V) ->
+            {S+V, C+1, erlang:min(Mi,V), erlang:max(Ma,V), Sq+(V*V)};
+        ([_K,{PreRed}], {S,C,Mi,Ma,Sq}) when is_list(PreRed) ->
+            {
+                S + get_number(sum, PreRed),
+                C + get_number(count, PreRed),
+                erlang:min(get_number(min, PreRed), Mi),
+                erlang:max(get_number(max, PreRed), Ma),
+                Sq + get_number(sumsqr, PreRed)
+            };
+        ([_K,V], _) ->
+            Msg = io_lib:format("non-numeric _stats input: ~w", [V]),
+            throw({invalid_value, iolist_to_binary(Msg)})
+    end, Acc0, Rest),
     {Sum, Cnt, Min, Max, Sqr} = Stats,
     {[{sum,Sum}, {count,Cnt}, {min,Min}, {max,Max}, {sumsqr,Sqr}]};
 
@@ -248,6 +257,34 @@ builtin_stats(rereduce, [[_,First]|Rest]) ->
     end, {Sum0,Cnt0,Min0,Max0,Sqr0}, Rest),
     {Sum, Cnt, Min, Max, Sqr} = Stats,
     {[{sum,Sum}, {count,Cnt}, {min,Min}, {max,Max}, {sumsqr,Sqr}]}.
+
+build_initial_accumulator(X) when is_number(X) ->
+    {X, 1, X, X, X*X};
+build_initial_accumulator({Props}) ->
+    {
+        get_number(sum, Props),
+        get_number(count, Props),
+        get_number(min, Props),
+        get_number(max, Props),
+        get_number(sumsqr, Props)
+    };
+build_initial_accumulator(Else) ->
+    Msg = io_lib:format("non-numeric _stats input: ~w", [Else]),
+    throw({invalid_value, iolist_to_binary(Msg)}).
+
+get_number(Key, Props) ->
+    case couch_util:get_value(Key, Props) of
+    X when is_number(X) ->
+        X;
+    undefined ->
+        Msg = io_lib:format("user _stats input missing required field ~s",
+            [Key]),
+        throw({invalid_value, iolist_to_binary(Msg)});
+    Else ->
+        Msg = io_lib:format("non-numeric _stats input received for ~s: ~w",
+            [Key, Else]),
+        throw({invalid_value, iolist_to_binary(Msg)})
+    end.
 
 % use the function stored in ddoc.validate_doc_update to test an update.
 validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj) ->
