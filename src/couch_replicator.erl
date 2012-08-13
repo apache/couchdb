@@ -484,8 +484,18 @@ terminate(Reason, #rep_state{} = State) ->
     couch_replicator_manager:replication_error(Rep, Reason);
 
 terminate(shutdown, {error, Class, Error, Stack, InitArgs}) ->
-    twig:log("~p:~p: Replication failed to start for args ~p: ~p",
-        [Class, Error, InitArgs, Stack]).
+    #rep{id=RepId} = InitArgs,
+    twig:log(error,"~p:~p: Replication failed to start for args ~p: ~p",
+             [Class, Error, InitArgs, Stack]),
+    case Error of
+    {unauthorized, DbUri} ->
+        NotifyError = {unauthorized, <<"unauthorized to access or create database ", DbUri/binary>>};
+    {db_not_found, DbUri} ->
+        NotifyError = {db_not_found, <<"could not open ", DbUri/binary>>};
+    _ ->
+        NotifyError = Error
+    end,
+    couch_replicator_notifier:notify({error, RepId, NotifyError}).
 
 terminate_cleanup(State) ->
     update_task(State),
