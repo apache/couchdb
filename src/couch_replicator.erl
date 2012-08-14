@@ -495,7 +495,8 @@ terminate(shutdown, {error, Class, Error, Stack, InitArgs}) ->
     _ ->
         NotifyError = Error
     end,
-    couch_replicator_notifier:notify({error, RepId, NotifyError}).
+    couch_replicator_notifier:notify({error, RepId, NotifyError}),
+    couch_replicator_manager:replication_error(InitArgs, NotifyError).
 
 terminate_cleanup(State) ->
     update_task(State),
