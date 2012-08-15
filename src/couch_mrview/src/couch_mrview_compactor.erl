@@ -115,25 +115,14 @@ compact(State) ->
 
 
 recompact(State) ->
-    Self = self(),
     link(State#mrst.fd),
-    {Pid, Ref} = erlang:spawn_monitor(fun() ->
-        couch_index_updater:update(Self, couch_mrview_index, State)
+    {_Pid, Ref} = erlang:spawn_monitor(fun() ->
+        couch_index_updater:update(couch_mrview_index, State)
     end),
-    State2 = wait_for_recompact(Pid, Ref),
-    erlang:demonitor(Ref, [flush]),
-    unlink(State#mrst.fd),
-    {ok, State2}.
-
-
-wait_for_recompact(Pid, Ref) ->
     receive
-        {'$gen_cast', {Pid, updated, State}} ->
-            State;
-        {'$gen_cast', {new_state, _}} ->
-            wait_for_recompact(Pid, Ref);
-        {'DOWN', Ref, _, _, Reason} ->
-            erlang:error({couch_mrview_compact_error, Reason})
+        {'DOWN', Ref, _, _, {updated, State2}} ->
+            unlink(State#mrst.fd),
+            {ok, State2}
     end.
 
 
