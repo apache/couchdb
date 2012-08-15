@@ -159,7 +159,7 @@ log(#state{fd = Fd}, ConsoleMsg, FileMsg) ->
 get_log_messages(Pid, Level, Format, Args) ->
     ConsoleMsg = unicode:characters_to_binary(io_lib:format(
         "[~s] [~p] " ++ Format ++ "~n", [Level, Pid | Args])),
-    FileMsg = ["[", httpd_util:rfc1123_date(), "] ", ConsoleMsg],
+    FileMsg = ["[", couch_util:rfc1123_date(), "] ", ConsoleMsg],
     {ConsoleMsg, iolist_to_binary(FileMsg)}.
 
 
