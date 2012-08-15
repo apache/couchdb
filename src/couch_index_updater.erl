@@ -86,12 +86,13 @@ handle_cast(_Mesg, State) ->
     {stop, unknown_cast, State}.
 
 
-handle_info({'EXIT', Pid, {updated, IdxState}}, #st{mod=Mod, pid=Pid}=State) ->
+handle_info({'EXIT', _, {updated, Pid, IdxState}}, #st{pid=Pid}=State) ->
+    Mod = State#st.mod,
     Args = [Mod:get(db_name, IdxState), Mod:get(idx_name, IdxState)],
     ?LOG_INFO("Index update finished for db: ~s idx: ~s", Args),
     ok = gen_server:cast(State#st.idx, {updated, IdxState}),
     {noreply, State#st{pid=undefined}};
-handle_info({'EXIT', Pid, reset}, #st{idx=Idx, pid=Pid}=State) ->
+handle_info({'EXIT', _, {reset, Pid}}, #st{idx=Idx, pid=Pid}=State) ->
     {ok, NewIdxState} = gen_server:call(State#st.idx, reset),
     Pid2 = spawn_link(fun() -> update(Idx, State#st.mod, NewIdxState) end),
     {noreply, State#st{pid=Pid2}};
@@ -131,7 +132,7 @@ update(Idx, Mod, IdxState) ->
 
         PurgedIdxState = case purge_index(Db, Mod, IdxState) of
             {ok, IdxState0} -> IdxState0;
-            reset -> exit(reset)
+            reset -> exit({reset, self()})
         end,
 
         NumChanges = couch_db:count_changes_since(Db, CurrSeq),
@@ -181,7 +182,7 @@ update(Idx, Mod, IdxState) ->
         end,
 
         {ok, FinalIdxState} = Mod:finish_update(LastIdxSt),
-        exit({updated, FinalIdxState})
+        exit({updated, self(), FinalIdxState})
     end).
 
 
