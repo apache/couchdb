@@ -44,12 +44,12 @@ handle_welcome_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 handle_favicon_req(#httpd{method='GET'}=Req, DocumentRoot) ->
-    {{Year,Month,Day},Time} = erlang:localtime(),
+    {{Year,Month,Day},Time} = erlang:universatime(),
     OneYearFromNow = {{Year+1,Month,Day},Time},
     CachingHeaders = [
         %favicon should expire a year from now
         {"Cache-Control", "public, max-age=31536000"},
-        {"Expires", httpd_util:rfc1123_date(OneYearFromNow)}
+        {"Expires", couch_util:rfc1123_date(OneYearFromNow)}
     ],
     couch_httpd:serve_file(Req, "favicon.ico", DocumentRoot, CachingHeaders);
 
@@ -103,7 +103,7 @@ handle_uuids_req(#httpd{method='GET'}=Req) ->
     Etag = couch_httpd:make_etag(UUIDs),
     couch_httpd:etag_respond(Req, Etag, fun() ->
         CacheBustingHeaders = [
-            {"Date", httpd_util:rfc1123_date()},
+            {"Date", couch_util:rfc1123_date()},
             {"Cache-Control", "no-cache"},
             % Past date, ON PURPOSE!
             {"Expires", "Fri, 01 Jan 1990 00:00:00 GMT"},

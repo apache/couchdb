@@ -170,7 +170,7 @@ init([]) ->
     {ok, #server{root_dir=RootDir,
                 dbname_regexp=RegExp,
                 max_dbs_open=MaxDbsOpen,
-                start_time=httpd_util:rfc1123_date()}}.
+                start_time=couch_util:rfc1123_date()}}.
 
 terminate(_Reason, _Srv) ->
     lists:foreach(
