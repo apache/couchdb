@@ -61,8 +61,15 @@ init({Url, Options}) ->
     {ok, State}.
 
 
-handle_call(get_worker, From, #state{waiting = Waiting, callers = Callers} = State) ->
-    #state{url = Url, limit = Limit, busy = Busy, free = Free} = State,
+handle_call(get_worker, From, State) ->
+    #state{
+        waiting = Waiting,
+        callers = Callers,
+        url = Url,
+        limit = Limit,
+        busy = Busy,
+        free = Free
+    } = State,
     case length(Busy) >= Limit of
     true ->
         {noreply, State#state{waiting = queue:in(From, Waiting)}};
@@ -83,7 +90,8 @@ handle_call(stop, _From, State) ->
     {stop, normal, ok, State}.
 
 
-handle_cast({release_worker, Worker}, #state{waiting = Waiting, callers = Callers} = State) ->
+handle_cast({release_worker, Worker}, State) ->
+    #state{waiting = Waiting, callers = Callers} = State,
     demonitor_client(Callers, Worker),
     case is_process_alive(Worker) andalso
         lists:member(Worker, State#state.busy) of
@@ -108,7 +116,14 @@ handle_cast({release_worker, Worker}, #state{waiting = Waiting, callers = Caller
         {noreply, State}
    end.
 
-handle_info({'EXIT', Pid, _Reason}, #state{busy = Busy, free = Free, waiting = Waiting, callers = Callers} = State) ->
+handle_info({'EXIT', Pid, _Reason}, State) ->
+    #state{
+        url = Url,
+        busy = Busy,
+        free = Free,
+        waiting = Waiting,
+        callers = Callers
+    } = State,
     demonitor_client(Callers, Pid),
     case Free -- [Pid] of
     Free ->
@@ -120,7 +135,7 @@ handle_info({'EXIT', Pid, _Reason}, #state{busy = Busy, free = Free, waiting = W
             {empty, _} ->
                 {noreply, State#state{busy = Busy2}};
             {{value, From}, Waiting2} ->
-                {ok, Worker} = ibrowse:spawn_link_worker_process(State#state.url),
+                {ok, Worker} = ibrowse:spawn_link_worker_process(Url),
                 monitor_client(Callers, Worker, From),
                 gen_server:reply(From, {ok, Worker}),
                 {noreply, State#state{busy = [Worker | Busy2], waiting = Waiting2}}
@@ -130,9 +145,8 @@ handle_info({'EXIT', Pid, _Reason}, #state{busy = Busy, free = Free, waiting = W
         {noreply, State#state{free = Free2}}
     end;
 
-handle_info({'DOWN', MonitorRef, process, _Pid, _Info},
-            #state{callers = Callers} = State) ->
-    case ets:match(Callers,{'$1',MonitorRef}) of
+handle_info({'DOWN', Ref, process, _, _}, #state{callers = Callers} = State) ->
+    case ets:match(Callers, {'$1', Ref}) of
     [] ->
         {noreply, State};
     [[Worker]] ->
