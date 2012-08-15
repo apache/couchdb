@@ -116,11 +116,11 @@ compact(State) ->
 
 recompact(State) ->
     link(State#mrst.fd),
-    {_Pid, Ref} = erlang:spawn_monitor(fun() ->
+    {Pid, Ref} = erlang:spawn_monitor(fun() ->
         couch_index_updater:update(couch_mrview_index, State)
     end),
     receive
-        {'DOWN', Ref, _, _, {updated, State2}} ->
+        {'DOWN', Ref, _, _, {updated, Pid, State2}} ->
             unlink(State#mrst.fd),
             {ok, State2}
     end.
