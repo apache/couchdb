@@ -153,8 +153,10 @@ handle_info({'DOWN', Ref, process, _, _}, #state{callers = Callers} = State) ->
         handle_cast({release_worker, Worker}, State)
     end.
 
+code_change(_OldVsn, OldState, _Extra) when tuple_size(OldState) =:= 6 ->
+    {ok, erlang:append_element(OldState, ets:new(callers))};
 code_change(_OldVsn, State, _Extra) ->
-    {ok, State#state{callers = ets:new(callers,[set])}}.
+    {ok, State}.
 
 
 terminate(_Reason, State) ->
