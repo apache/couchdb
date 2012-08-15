@@ -171,5 +171,5 @@ demonitor_client(Tab, Worker) ->
     [] -> ok;
     [{Worker, MonRef}] ->
         ets:delete(Tab, Worker),
-        erlang:demonitor(MonRef)
+        erlang:demonitor(MonRef, [flush])
     end.
