@@ -15,7 +15,7 @@
 
 
 %% API
--export([start_link/2, run/2, is_running/1, update/3, restart/2]).
+-export([start_link/2, run/2, is_running/1, update/2, restart/2]).
 
 %% gen_server callbacks
 -export([init/1, terminate/2, code_change/3]).
@@ -42,8 +42,8 @@ is_running(Pid) ->
     gen_server:call(Pid, is_running).
 
 
-update(Parent, Mod, State) ->
-    update(Parent, nil, Mod, State).
+update(Mod, State) ->
+    update(nil, Mod, State).
 
 
 restart(Pid, IdxState) ->
@@ -65,8 +65,7 @@ handle_call({update, _IdxState}, _From, #st{pid=Pid}=State) when is_pid(Pid) ->
 handle_call({update, IdxState}, _From, #st{idx=Idx, mod=Mod}=State) ->
     Args = [Mod:get(db_name, IdxState), Mod:get(idx_name, IdxState)],
     ?LOG_INFO("Starting index update for db: ~s idx: ~s", Args),
-    Self = self(),
-    Pid = spawn_link(fun() -> update(Self, Idx, Mod, IdxState) end),
+    Pid = spawn_link(fun() -> update(Idx, Mod, IdxState) end),
     {reply, ok, State#st{pid=Pid}};
 handle_call({restart, IdxState}, _From, #st{idx=Idx, mod=Mod}=State) ->
     Args = [Mod:get(db_name, IdxState), Mod:get(idx_name, IdxState)],
@@ -75,8 +74,7 @@ handle_call({restart, IdxState}, _From, #st{idx=Idx, mod=Mod}=State) ->
         true -> couch_util:shutdown_sync(State#st.pid);
         _ -> ok
     end,
-    Self = self(),
-    Pid = spawn_link(fun() -> update(Self, Idx, State#st.mod, IdxState) end),
+    Pid = spawn_link(fun() -> update(Idx, State#st.mod, IdxState) end),
     {reply, ok, State#st{pid=Pid}};
 handle_call(is_running, _From, #st{pid=Pid}=State) when is_pid(Pid) ->
     {reply, true, State};
@@ -84,20 +82,18 @@ handle_call(is_running, _From, State) ->
     {reply, false, State}.
 
 
-handle_cast({Pid, updated, IdxState}, #st{mod=Mod, pid=Pid}=State) ->
-    Args = [Mod:get(db_name, IdxState), Mod:get(idx_name, IdxState)],
-    ?LOG_INFO("Index update finished for db: ~s idx: ~s", Args),
-    ok = gen_server:cast(State#st.idx, {updated, IdxState}),
-    {noreply, State#st{pid=undefined}};
 handle_cast(_Mesg, State) ->
     {stop, unknown_cast, State}.
 
 
+handle_info({'EXIT', Pid, {updated, IdxState}}, #st{mod=Mod, pid=Pid}=State) ->
+    Args = [Mod:get(db_name, IdxState), Mod:get(idx_name, IdxState)],
+    ?LOG_INFO("Index update finished for db: ~s idx: ~s", Args),
+    ok = gen_server:cast(State#st.idx, {updated, IdxState}),
+    {noreply, State#st{pid=undefined}};
 handle_info({'EXIT', Pid, reset}, #st{idx=Idx, pid=Pid}=State) ->
     {ok, NewIdxState} = gen_server:call(State#st.idx, reset),
-    Self = self(),
-    Fun = fun() -> update(Self, Idx, State#st.mod, NewIdxState) end,
-    Pid2 = spawn_link(Fun),
+    Pid2 = spawn_link(fun() -> update(Idx, State#st.mod, NewIdxState) end),
     {noreply, State#st{pid=Pid2}};
 handle_info({'EXIT', Pid, normal}, #st{pid=Pid}=State) ->
     {noreply, State#st{pid=undefined}};
@@ -118,7 +114,7 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 
-update(Parent, Idx, Mod, IdxState) ->
+update(Idx, Mod, IdxState) ->
     DbName = Mod:get(db_name, IdxState),
     CurrSeq = Mod:get(update_seq, IdxState),
     UpdateOpts = Mod:get(update_options, IdxState),
@@ -185,7 +181,7 @@ update(Parent, Idx, Mod, IdxState) ->
         end,
 
         {ok, FinalIdxState} = Mod:finish_update(LastIdxSt),
-        gen_server:cast(Parent, {self(), updated, FinalIdxState})
+        exit({updated, FinalIdxState})
     end).
 
 
