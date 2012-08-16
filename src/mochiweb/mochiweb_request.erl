@@ -641,7 +641,7 @@ read_file_info(File) ->
     end.
 
 to_universal(LocalTime) ->
-    calendar:local_time_to_universal_time(LocalTime).
+    calendar:local_time_to_universal_time_dst(LocalTime).
 
 server_headers() ->
     [{"Server", "MochiWeb/1.0 (" ++ ?QUIP ++ ")"},
