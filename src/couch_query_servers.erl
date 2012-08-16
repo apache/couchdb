@@ -236,11 +236,11 @@ builtin_stats(reduce, [[_,First]|Rest]) ->
             {S+V, C+1, erlang:min(Mi,V), erlang:max(Ma,V), Sq+(V*V)};
         ([_K,{PreRed}], {S,C,Mi,Ma,Sq}) when is_list(PreRed) ->
             {
-                S + get_number(sum, PreRed),
-                C + get_number(count, PreRed),
-                erlang:min(get_number(min, PreRed), Mi),
-                erlang:max(get_number(max, PreRed), Ma),
-                Sq + get_number(sumsqr, PreRed)
+                S + get_number(<<"sum">>, PreRed),
+                C + get_number(<<"count">>, PreRed),
+                erlang:min(get_number(<<"min">>, PreRed), Mi),
+                erlang:max(get_number(<<"max">>, PreRed), Ma),
+                Sq + get_number(<<"sumsqr">>, PreRed)
             };
         ([_K,V], _) ->
             Msg = io_lib:format("non-numeric _stats input: ~w", [V]),
@@ -262,11 +262,11 @@ build_initial_accumulator(X) when is_number(X) ->
     {X, 1, X, X, X*X};
 build_initial_accumulator({Props}) ->
     {
-        get_number(sum, Props),
-        get_number(count, Props),
-        get_number(min, Props),
-        get_number(max, Props),
-        get_number(sumsqr, Props)
+        get_number(<<"sum">>, Props),
+        get_number(<<"count">>, Props),
+        get_number(<<"min">>, Props),
+        get_number(<<"max">>, Props),
+        get_number(<<"sumsqr">>, Props)
     };
 build_initial_accumulator(Else) ->
     Msg = io_lib:format("non-numeric _stats input: ~w", [Else]),
