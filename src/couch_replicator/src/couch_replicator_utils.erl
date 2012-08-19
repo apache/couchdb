@@ -228,6 +228,7 @@ make_options(Props) ->
     DefConns = couch_config:get("replicator", "http_connections", "20"),
     DefTimeout = couch_config:get("replicator", "connection_timeout", "30000"),
     DefRetries = couch_config:get("replicator", "retries_per_request", "10"),
+    UseCheckpoints = couch_config:get("replicator", "use_checkpoints", "true"),
     {ok, DefSocketOptions} = couch_util:parse_term(
         couch_config:get("replicator", "socket_options",
             "[{keepalive, true}, {nodelay, false}]")),
@@ -237,7 +238,8 @@ make_options(Props) ->
         {http_connections, list_to_integer(DefConns)},
         {socket_options, DefSocketOptions},
         {worker_batch_size, list_to_integer(DefBatchSize)},
-        {worker_processes, list_to_integer(DefWorkers)}
+        {worker_processes, list_to_integer(DefWorkers)},
+        {use_checkpoints, list_to_existing_atom(UseCheckpoints)}
     ])).
 
 
@@ -279,6 +281,8 @@ convert_options([{<<"socket_options">>, V} | R]) ->
     [{socket_options, SocketOptions} | convert_options(R)];
 convert_options([{<<"since_seq">>, V} | R]) ->
     [{since_seq, V} | convert_options(R)];
+convert_options([{<<"use_checkpoints">>, V} | R]) ->
+    [{use_checkpoints, V} | convert_options(R)];
 convert_options([_ | R]) -> % skip unknown option
     convert_options(R).
 
