@@ -68,7 +68,8 @@
     target_db_compaction_notifier = nil,
     source_monitor = nil,
     target_monitor = nil,
-    source_seq = nil
+    source_seq = nil,
+    use_checkpoints = true
 }).
 
 
@@ -563,7 +564,8 @@ init_state(Rep) ->
             start_db_compaction_notifier(Target, self()),
         source_monitor = db_monitor(Source),
         target_monitor = db_monitor(Target),
-        source_seq = get_value(<<"update_seq">>, SourceInfo, ?LOWEST_SEQ)
+        source_seq = get_value(<<"update_seq">>, SourceInfo, ?LOWEST_SEQ),
+        use_checkpoints = get_value(use_checkpoints, Options, true)
     },
     State#rep_state{timer = start_timer(State)}.
 
@@ -672,6 +674,9 @@ changes_manager_loop_open(Parent, ChangesQueue, BatchSize, Ts) ->
 checkpoint_interval(_State) ->
     5000.
 
+do_checkpoint(#rep_state{use_checkpoints=false} = State) ->
+    NewState = State#rep_state{checkpoint_history = {[{<<"use_checkpoints">>, false}]} },
+    {ok, NewState};
 do_checkpoint(#rep_state{current_through_seq=Seq, committed_seq=Seq} = State) ->
     SourceCurSeq = source_cur_seq(State),
     NewState = State#rep_state{source_seq = SourceCurSeq},
