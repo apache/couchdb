@@ -101,7 +101,7 @@ extract_view_type(ViewName, [View|Rest], IsReduce) ->
 
 handle_view_req(#httpd{method='GET',
         path_parts=[_, _, _, _, ViewName]}=Req, Db, DDoc) ->
-    Keys = couch_httpd:qs_json_value(Req, "keys", nil),
+    Keys = chttpd:qs_json_value(Req, "keys", nil),
     design_doc_view(Req, Db, DDoc, ViewName, Keys);
 
 handle_view_req(#httpd{method='POST',
