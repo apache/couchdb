@@ -205,7 +205,7 @@ handle_replication_exit(State, Pid) ->
 start_push_replication(#job{name=Name, node=Node, pid=From}) ->
     if From =/= nil -> gen_server:reply(From, ok); true -> ok end,
     spawn_link(fun() ->
-        case mem3_rep:go(Name, Node) of
+        case mem3_rep:go(Name, maybe_redirect(Node)) of
             {ok, Pending} when Pending > 0 ->
                 exit({pending_changes, Pending});
             _ ->
@@ -330,3 +330,12 @@ shards_db() ->
 
 users_db() ->
     ?l2b(couch_config:get("couch_httpd_auth", "authentication_db", "_users")).
+
+maybe_redirect(Node) ->
+    case couch_config:get("mem3.redirects", atom_to_list(Node)) of
+        undefined ->
+            Node;
+        Redirect ->
+            twig:log(debug, "Redirecting push from ~p to ~p", [Node, Redirect]),
+            list_to_existing_atom(Redirect)
+    end.
