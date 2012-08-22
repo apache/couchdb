@@ -288,6 +288,13 @@ db_update_notifier() ->
             _ ->
                 ok
             end;
+           ({deleted, DbName}) ->
+            case IsReplicatorDbFun(DbName) of
+            true ->
+                ets:delete(?DB_TO_SEQ,DbName);
+            _ ->
+                ok
+            end;
            (_) ->
             ok
         end
