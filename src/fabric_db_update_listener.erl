@@ -47,20 +47,27 @@ go(Parent, ParentRef, DbName, Timeout) ->
     end.
 
 start_update_notifiers(DbName) ->
-    lists:map(fun(#shard{node=Node, name=Name}) ->
-        Ref = rexi:cast(Node, {?MODULE, start_update_notifier, [Name]}),
+    EndPointDict = lists:foldl(fun(#shard{node=Node, name=Name}, Acc) ->
+        dict:append(Node, Name, Acc)
+    end, dict:new(), mem3:shards(DbName)),
+    lists:map(fun({Node, DbNames}) ->
+        Ref = rexi:cast(Node, {?MODULE, start_update_notifier, [DbNames]}),
         #worker{ref=Ref, node=Node}
-    end, mem3:shards(DbName)).
+    end, dict:to_list(EndPointDict)).
 
 % rexi endpoint
-start_update_notifier(DbName) ->
+start_update_notifier(DbNames) ->
     {Caller, Ref} = get(rexi_from),
-    Fun = fun({_, X}) when X == DbName ->
-              erlang:send(Caller, {Ref, db_updated}); (_) -> ok end,
+    Fun = fun({_, X}) ->
+        case lists:member(X, DbNames) of
+            true -> erlang:send(Caller, {Ref, db_updated});
+            false -> ok
+        end
+    end,
     Id = {couch_db_update_notifier, make_ref()},
     ok = gen_event:add_sup_handler(couch_db_update, Id, Fun),
     receive {gen_event_EXIT, Id, Reason} ->
-        rexi:reply({gen_event_EXIT, DbName, Reason})
+        rexi:reply({gen_event_EXIT, node(), Reason})
     end.
 
 start_cleanup_monitor(Parent, Notifiers) ->
@@ -115,8 +122,8 @@ handle_message({rexi_DOWN, _, {_, Node}, _}, _Worker, _Acc) ->
     {error, {nodedown, Node}};
 handle_message({rexi_EXIT, _Reason}, Worker, _Acc) ->
     {error, {worker_exit, Worker}};
-handle_message({gen_event_EXIT, DbName, Reason}, _Worker, _Acc) ->
-    {error, {gen_event_exit, DbName, Reason}};
+handle_message({gen_event_EXIT, Node, Reason}, _Worker, _Acc) ->
+    {error, {gen_event_exit, Node, Reason}};
 handle_message(db_updated, _Worker, #acc{state=waiting}=Acc) ->
     % propagate message to calling controller
     erlang:send(Acc#acc.parent, {state, self(), updated}),
