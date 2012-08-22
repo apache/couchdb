@@ -260,7 +260,7 @@ changes_feed_loop(DbName, Since) ->
             nil,
             #changes_args{
                 include_docs = true,
-                feed = "normal",
+                feed = "longpoll",
                 since = Since,
                 filter = main_only,
                 timeout = infinity
