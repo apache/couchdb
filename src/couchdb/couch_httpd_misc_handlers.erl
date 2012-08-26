@@ -44,7 +44,7 @@ handle_welcome_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 handle_favicon_req(#httpd{method='GET'}=Req, DocumentRoot) ->
-    {{Year,Month,Day},Time} = erlang:universatime(),
+    {{Year,Month,Day},Time} = erlang:universaltime(),
     OneYearFromNow = {{Year+1,Month,Day},Time},
     CachingHeaders = [
         %favicon should expire a year from now
