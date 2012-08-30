@@ -228,7 +228,7 @@ cancel_replication(RepId, #user_ctx{name = Name, roles = Roles}) ->
 init(InitArgs) ->
     {ok, InitArgs, 0}.
 
-do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
+do_init(#rep{options = Options, id = {BaseId, Ext}, user_ctx=UserCtx} = Rep) ->
     process_flag(trap_exit, true),
 
     #rep_state{
@@ -267,6 +267,7 @@ do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
 
     couch_task_status:add_task([
         {type, replication},
+        {user, UserCtx#user_ctx.name},
         {replication_id, ?l2b(BaseId ++ Ext)},
         {doc_id, Rep#rep.doc_id},
         {source, ?l2b(SourceName)},
