@@ -13,33 +13,33 @@
  
  
 couchTests.rewrite = function(debug) {
-  // this test _rewrite handler
-  
-  
-  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
-  db.deleteDb();
-  db.createDb();
-  
-  
   if (debug) debugger;
-  run_on_modified_server(
-    [{section: "httpd",
-      key: "authentication_handlers",
-      value: "{couch_httpd_auth, special_test_authentication_handler}"},
-     {section:"httpd",
-      key: "WWW-Authenticate",
-      value: "X-Couch-Test-Auth"}],
+  var dbNames = ["test_suite_db", "test_suite_db/with_slashes"];
+  for (var i=0; i < dbNames.length; i++) {
+    var db = new CouchDB(dbNames[i]);
+    var dbName = encodeURIComponent(dbNames[i]);
+    db.deleteDb();
+    db.createDb();
+  
+    
+    run_on_modified_server(
+      [{section: "httpd",
+        key: "authentication_handlers",
+        value: "{couch_httpd_auth, special_test_authentication_handler}"},
+       {section:"httpd",
+        key: "WWW-Authenticate",
+        value: "X-Couch-Test-Auth"}],
       
       function(){
         var designDoc = {
           _id:"_design/test",
           language: "javascript",
-           _attachments:{
-              "foo.txt": {
-                content_type:"text/plain",
-                data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
-              }
-            },
+          _attachments:{
+            "foo.txt": {
+              content_type:"text/plain",
+              data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+            }
+          },
           rewrites: [
             {
               "from": "foo",
@@ -84,18 +84,18 @@ couchTests.rewrite = function(debug) {
               "method": "GET"
             },
             {
-             "from": "/welcome4/*",
-             "to" : "_show/welcome3",
-             "query": {
-               "name": "*"
-             }
+              "from": "/welcome4/*",
+              "to" : "_show/welcome3",
+              "query": {
+                "name": "*"
+              }
             },
             {
-             "from": "/welcome5/*",
-             "to" : "_show/*",
-             "query": {
-               "name": "*"
-             }
+              "from": "/welcome5/*",
+              "to" : "_show/*",
+              "query": {
+                "name": "*"
+              }
             },
             {
               "from": "basicView",
@@ -194,8 +194,8 @@ couchTests.rewrite = function(debug) {
                 if (!firstKey) firstKey = row.key;
                 prevKey = row.key;
                 send('\n<li>Key: '+row.key
-                +' Value: '+row.value
-                +' LineNo: '+row_number+'</li>');
+                     +' Value: '+row.value
+                     +' LineNo: '+row_number+'</li>');
               }
               return '</ul><p>FirstKey: '+ firstKey + ' LastKey: '+ prevKey+'</p>';
             }),
@@ -270,7 +270,7 @@ couchTests.rewrite = function(debug) {
             }
           }
         }
- 
+        
         db.save(designDoc);
         
         var docs = makeDocs(0, 10);
@@ -287,16 +287,16 @@ couchTests.rewrite = function(debug) {
         db.bulkSave(docs2);
 
         // test simple rewriting
- 
-        req = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/foo");
+        
+        req = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/foo");
         T(req.responseText == "This is a base64 encoded text");
         T(req.getResponseHeader("Content-Type") == "text/plain");
         
-        req = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/foo2");
+        req = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/foo2");
         T(req.responseText == "This is a base64 encoded text");
         T(req.getResponseHeader("Content-Type") == "text/plain");
         
-       
+        
         // test POST
         // hello update world
         
@@ -305,111 +305,111 @@ couchTests.rewrite = function(debug) {
         T(resp.ok);
         var docid = resp.id;
         
-        xhr = CouchDB.request("PUT", "/test_suite_db/_design/test/_rewrite/hello/"+docid);
+        xhr = CouchDB.request("PUT", "/"+dbName+"/_design/test/_rewrite/hello/"+docid);
         T(xhr.status == 201);
         T(xhr.responseText == "hello doc");
         T(/charset=utf-8/.test(xhr.getResponseHeader("Content-Type")))
- 
+        
         doc = db.open(docid);
         T(doc.world == "hello");
         
-        req = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/welcome?name=user");
+        req = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/welcome?name=user");
         T(req.responseText == "Welcome user");
         
-        req = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/welcome/user");
+        req = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/welcome/user");
         T(req.responseText == "Welcome user");
         
-        req = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/welcome2");
+        req = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/welcome2");
         T(req.responseText == "Welcome user");
         
-        xhr = CouchDB.request("PUT", "/test_suite_db/_design/test/_rewrite/welcome3/test");
+        xhr = CouchDB.request("PUT", "/"+dbName+"/_design/test/_rewrite/welcome3/test");
         T(xhr.status == 201);
         T(xhr.responseText == "New World");
         T(/charset=utf-8/.test(xhr.getResponseHeader("Content-Type")));
         
-        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/welcome3/test");
+        xhr = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/welcome3/test");
         T(xhr.responseText == "Welcome test");
 
-        req = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/welcome4/user");
+        req = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/welcome4/user");
         T(req.responseText == "Welcome user");
 
-        req = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/welcome5/welcome3");
+        req = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/welcome5/welcome3");
         T(req.responseText == "Welcome welcome3");
-       
-        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/basicView");
+        
+        xhr = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/basicView");
         T(xhr.status == 200, "view call");
         T(/{"total_rows":9/.test(xhr.responseText)); 
 
-        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/");
+        xhr = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/");
         T(xhr.status == 200, "view call");
         T(/{"total_rows":9/.test(xhr.responseText)); 
 
         
         // get with query params
-        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/simpleForm/basicView?startkey=3&endkey=8");
+        xhr = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/simpleForm/basicView?startkey=3&endkey=8");
         T(xhr.status == 200, "with query params");
         T(!(/Key: 1/.test(xhr.responseText)));
         T(/FirstKey: 3/.test(xhr.responseText));
         T(/LastKey: 8/.test(xhr.responseText));
         
-        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/simpleForm/basicViewFixed");
+        xhr = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/simpleForm/basicViewFixed");
         T(xhr.status == 200, "with query params");
         T(!(/Key: 1/.test(xhr.responseText)));
         T(/FirstKey: 3/.test(xhr.responseText));
         T(/LastKey: 8/.test(xhr.responseText));
         
         // get with query params
-        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/simpleForm/basicViewFixed?startkey=4");
+        xhr = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/simpleForm/basicViewFixed?startkey=4");
         T(xhr.status == 200, "with query params");
         T(!(/Key: 1/.test(xhr.responseText)));
         T(/FirstKey: 3/.test(xhr.responseText));
         T(/LastKey: 8/.test(xhr.responseText));
-       
+        
         // get with query params
-        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/simpleForm/basicViewPath/3/8");
+        xhr = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/simpleForm/basicViewPath/3/8");
         T(xhr.status == 200, "with query params");
         T(!(/Key: 1/.test(xhr.responseText)));
         T(/FirstKey: 3/.test(xhr.responseText));
         T(/LastKey: 8/.test(xhr.responseText));
 
         // get with query params        
-        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/simpleForm/complexView");
+        xhr = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/simpleForm/complexView");
         T(xhr.status == 200, "with query params");
         T(/FirstKey: [1, 2]/.test(xhr.responseText));
         
-        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/simpleForm/complexView2");
+        xhr = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/simpleForm/complexView2");
         T(xhr.status == 200, "with query params");
         T(/Value: doc 3/.test(xhr.responseText));
         
-        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/simpleForm/complexView3");
+        xhr = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/simpleForm/complexView3");
         T(xhr.status == 200, "with query params");
         T(/Value: doc 4/.test(xhr.responseText));
         
-        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/simpleForm/complexView4");
+        xhr = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/simpleForm/complexView4");
         T(xhr.status == 200, "with query params");
         T(/Value: doc 5/.test(xhr.responseText));
         
-        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/simpleForm/complexView5/test/essai");
+        xhr = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/simpleForm/complexView5/test/essai");
         T(xhr.status == 200, "with query params");
         T(/Value: doc 4/.test(xhr.responseText));
         
-        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/simpleForm/complexView6?a=test&b=essai");
+        xhr = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/simpleForm/complexView6?a=test&b=essai");
         T(xhr.status == 200, "with query params");
         T(/Value: doc 4/.test(xhr.responseText));
 
-        xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/simpleForm/complexView7/test/essai?doc=true");
+        xhr = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/simpleForm/complexView7/test/essai?doc=true");
         T(xhr.status == 200, "with query params");
         var result = JSON.parse(xhr.responseText);
         T(typeof(result.rows[0].doc) === "object");
         
         // test path relative to server
         designDoc.rewrites.push({
-           "from": "uuids",
-           "to": "../../../_uuids"
+          "from": "uuids",
+          "to": "../../../_uuids"
         });
         T(db.save(designDoc).ok);
         
-        var xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/uuids");
+        var xhr = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/uuids");
         T(xhr.status == 500);
         var result = JSON.parse(xhr.responseText);
         T(result.error == "insecure_rewrite_rule");
@@ -418,59 +418,60 @@ couchTests.rewrite = function(debug) {
           [{section: "httpd",
             key: "secure_rewrites",
             value: "false"}],
-            function() {
-              var xhr = CouchDB.request("GET", "/test_suite_db/_design/test/_rewrite/uuids?cache=bust");
-              T(xhr.status == 200);
-              var result = JSON.parse(xhr.responseText);
-              T(result.uuids.length == 1);
-              var first = result.uuids[0];
-        });
-  });
+          function() {
+            var xhr = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/uuids?cache=bust");
+            T(xhr.status == 200);
+            var result = JSON.parse(xhr.responseText);
+            T(result.uuids.length == 1);
+            var first = result.uuids[0];
+          });
+      });
 
-  // test invalid rewrites
-  // string
-  var ddoc = {
-    _id: "_design/invalid",
-    rewrites: "[{\"from\":\"foo\",\"to\":\"bar\"}]"
-  }
-  db.save(ddoc);
-  var res = CouchDB.request("GET", "/test_suite_db/_design/invalid/_rewrite/foo");
-  TEquals(400, res.status, "should return 400");
+    // test invalid rewrites
+    // string
+    var ddoc = {
+      _id: "_design/invalid",
+      rewrites: "[{\"from\":\"foo\",\"to\":\"bar\"}]"
+    }
+    db.save(ddoc);
+    var res = CouchDB.request("GET", "/"+dbName+"/_design/invalid/_rewrite/foo");
+    TEquals(400, res.status, "should return 400");
 
-  var ddoc_requested_path = {
-    _id: "_design/requested_path",
-    rewrites:[
+    var ddoc_requested_path = {
+      _id: "_design/requested_path",
+      rewrites:[
         {"from": "show", "to": "_show/origin/0"},
         {"from": "show_rewritten", "to": "_rewrite/show"}
-    ],
-    shows: {
+      ],
+      shows: {
         origin: stringFun(function(doc, req) {
-            return req.headers["x-couchdb-requested-path"];
-    })}
-  };
+          return req.headers["x-couchdb-requested-path"];
+        })}
+    };
 
-  db.save(ddoc_requested_path);
-  var url = "/test_suite_db/_design/requested_path/_rewrite/show";
-  var res = CouchDB.request("GET", url);
-  TEquals(url, res.responseText, "should return the original url");
+    db.save(ddoc_requested_path);
+    var url = "/"+dbName+"/_design/requested_path/_rewrite/show";
+    var res = CouchDB.request("GET", url);
+    TEquals(url, res.responseText, "should return the original url");
 
-  var url = "/test_suite_db/_design/requested_path/_rewrite/show_rewritten";
-  var res = CouchDB.request("GET", url);
-  TEquals(url, res.responseText, "returned the original url");
+    var url = "/"+dbName+"/_design/requested_path/_rewrite/show_rewritten";
+    var res = CouchDB.request("GET", url);
+    TEquals(url, res.responseText, "returned the original url");
 
-  var ddoc_loop = {
-    _id: "_design/loop",
-    rewrites: [{ "from": "loop",  "to": "_rewrite/loop"}]
-  };
-  db.save(ddoc_loop);
+    var ddoc_loop = {
+      _id: "_design/loop",
+      rewrites: [{ "from": "loop",  "to": "_rewrite/loop"}]
+    };
+    db.save(ddoc_loop);
 
-  run_on_modified_server(
-    [{section: "httpd",
-      key: "rewrite_limit",
-      value: "2"}],
+    run_on_modified_server(
+      [{section: "httpd",
+        key: "rewrite_limit",
+        value: "2"}],
       function(){
-        var url = "/test_suite_db/_design/loop/_rewrite/loop";
+        var url = "/"+dbName+"/_design/loop/_rewrite/loop";
         var xhr = CouchDB.request("GET", url);
         T(xhr.status = 400);
-  });
+      });
+  }
 }

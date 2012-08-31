@@ -50,6 +50,10 @@ UUID Algorithms:
 
   * Added the utc_id algorithm.
 
+URL Rewriter & Vhosts:
+
+  * database name is encoded during rewriting (allowing embedded /'s, etc)
+
 Version 1.2.1
 -------------
 

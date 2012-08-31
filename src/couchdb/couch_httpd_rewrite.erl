@@ -116,7 +116,7 @@ handle_rewrite_req(#httpd{
 
     % we are in a design handler
     DesignId = <<"_design/", DesignName/binary>>,
-    Prefix = <<"/", DbName/binary, "/", DesignId/binary>>,
+    Prefix = <<"/", (?l2b(couch_util:url_encode(DbName)))/binary, "/", DesignId/binary>>,
     QueryList = lists:map(fun decode_query_value/1, couch_httpd:qs(Req)),
 
     MaxRewritesList = couch_config:get("httpd", "rewrite_limit", "100"),
