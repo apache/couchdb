@@ -33,6 +33,8 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
+-define(VALID_DB_NAME, "^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*$").
+
 start_link(DbName, Filepath, Options) ->
     case open_db_file(Filepath, Options) of
     {ok, Fd} ->
