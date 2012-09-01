@@ -31,6 +31,18 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
+get_index(Module, <<"shards/", _/binary>>=DbName, DDoc) ->
+    {Pid, Ref} = spawn_monitor(fun() ->
+        exit(fabric:open_doc(mem3:dbname(DbName), DDoc, []))
+    end),
+    receive {'DOWN', Ref, process, Pid, {ok, Doc}} ->
+        get_index(Module, DbName, Doc, nil);
+    {'DOWN', Ref, process, Pid, Error} ->
+        Error
+    after 61000 ->
+        erlang:demonitor(Ref, [flush]),
+        {error, timeout}
+    end;
 
 get_index(Module, DbName, DDoc) ->
     get_index(Module, DbName, DDoc, nil).
