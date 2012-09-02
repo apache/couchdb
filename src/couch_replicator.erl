@@ -941,16 +941,11 @@ update_task(State) ->
     couch_task_status:update(
         rep_stats(State) ++ [
         {source_seq, SourceCurSeq},
-        case is_number(CurSeq) andalso is_number(SourceCurSeq) of
-        true ->
-            case SourceCurSeq of
-            0 ->
+        case {unpack_seq(CurSeq), unpack_seq(SourceCurSeq)} of
+            {0, _} ->
                 {progress, 0};
-            _ ->
-                {progress, (CurSeq * 100) div SourceCurSeq}
-            end;
-        false ->
-            {progress, null}
+            {CurSeq1, SourceCurSeq1} ->
+                {progress, (CurSeq1 * 100) div SourceCurSeq1}
         end
     ]).
 
@@ -969,3 +964,12 @@ rep_stats(State) ->
         {checkpointed_source_seq, CommittedSeq}
     ].
 
+unpack_seq(Seq) when is_number(Seq) ->
+    Seq;
+unpack_seq([SeqNum, _]) ->
+    SeqNum;
+unpack_seq(Seq) when is_binary(Seq) ->
+    Pattern = "^[\\[?]?(?<seqnum>[0-9]+)",
+    Options = [{capture, [seqnum], list}],
+    {match, [SeqNum]} = re:run(Seq, Pattern, Options),
+    list_to_integer(SeqNum).
