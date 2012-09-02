@@ -942,7 +942,7 @@ update_task(State) ->
         rep_stats(State) ++ [
         {source_seq, SourceCurSeq},
         case {unpack_seq(CurSeq), unpack_seq(SourceCurSeq)} of
-            {0, _} ->
+            {_, 0} ->
                 {progress, 0};
             {CurSeq1, SourceCurSeq1} ->
                 {progress, (CurSeq1 * 100) div SourceCurSeq1}
