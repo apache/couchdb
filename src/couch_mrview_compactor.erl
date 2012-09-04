@@ -148,7 +148,11 @@ compact_view(View, EmptyView, BufferSize, Acc0) ->
 
 update_task(#acc{changes = Changes, total_changes = Total} = Acc, ChangesInc) ->
     Changes2 = Changes + ChangesInc,
-    couch_task_status:update([{progress, (Changes2 * 100) div Total}]),
+    couch_task_status:update([
+        {changes_done, Changes2},
+        {total_changes, Total},
+        {progress, (Changes2 * 100) div Total}
+    ]),
     Acc#acc{changes = Changes2}.
 
 
