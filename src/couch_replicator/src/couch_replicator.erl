@@ -969,7 +969,7 @@ unpack_seq(Seq) when is_number(Seq) ->
 unpack_seq([SeqNum, _]) ->
     SeqNum;
 unpack_seq(Seq) when is_binary(Seq) ->
-    Pattern = "^[\\[?]?(?<seqnum>[0-9]+)",
+    Pattern = "^\\[?(?<seqnum>[0-9]+)",
     Options = [{capture, [seqnum], list}],
     {match, [SeqNum]} = re:run(Seq, Pattern, Options),
     list_to_integer(SeqNum).
