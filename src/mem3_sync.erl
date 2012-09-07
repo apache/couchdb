@@ -317,7 +317,9 @@ is_running(DbName, Node, ActiveList) ->
     [] =/= [true || #job{name=S, node=N} <- ActiveList, S=:=DbName, N=:=Node].
 
 remove_entries(Dict, Entries) ->
-    lists:foldl(fun(Entry, D) -> dict:erase(Entry, D) end, Dict, Entries).
+    lists:foldl(fun(#job{name=S, node=N}, D) ->
+        dict:erase({S, N}, D)
+    end, Dict, Entries).
 
 local_dbs() ->
     [nodes_db(), shards_db(), users_db()].
