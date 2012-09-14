@@ -38,7 +38,8 @@
     req,
     code,
     headers,
-    first_chunk
+    first_chunk,
+    resp=nil
 }).
 
 start_link() ->
@@ -601,40 +602,47 @@ start_delayed_chunked_response(Req, Code, Headers, FirstChunk) ->
         headers = Headers,
         first_chunk = FirstChunk}}.
 
-send_delayed_chunk(Resp, Chunk) ->
-    {ok, Resp1} = start_delayed_response(Resp),
-    send_chunk(Resp1, Chunk).
+send_delayed_chunk(#delayed_resp{}=DelayedResp, Chunk) ->
+    {ok, #delayed_resp{resp=Resp}=DelayedResp1} =
+        start_delayed_response(DelayedResp),
+    {ok, Resp} = send_chunk(Resp, Chunk),
+    {ok, DelayedResp1}.
 
 send_delayed_last_chunk(Req) ->
     send_delayed_chunk(Req, []).
 
-send_delayed_error(#httpd{}=Req, Reason) ->
+send_delayed_error(#delayed_resp{req=Req,resp=nil}, Reason) ->
     {Code, ErrorStr, ReasonStr} = error_info(Reason),
     send_error(Req, Code, ErrorStr, ReasonStr);
-send_delayed_error(#delayed_resp{req=Req}, Reason) ->
-    {Code, ErrorStr, ReasonStr} = error_info(Reason),
-    send_error(Req, Code, ErrorStr, ReasonStr);
-send_delayed_error(Resp, Reason) ->
+send_delayed_error(#delayed_resp{resp=Resp}, Reason) ->
     throw({http_abort, Resp, Reason}).
 
-end_delayed_json_response(Resp) ->
-    {ok, Resp1} = start_delayed_response(Resp),
-    end_json_response(Resp1).
+end_delayed_json_response(#delayed_resp{}=DelayedResp) ->
+    {ok, #delayed_resp{resp=Resp}=DelayedResp1} =
+        start_delayed_response(DelayedResp),
+    end_json_response(Resp).
 
 get_delayed_req(#delayed_resp{req=#httpd{mochi_req=MochiReq}}) ->
     MochiReq;
 get_delayed_req(Resp) ->
     Resp:get(request).
 
-start_delayed_response(#delayed_resp{start_fun=StartFun, req=Req, code=Code,
-    headers=Headers, first_chunk=FirstChunk}) ->
+start_delayed_response(#delayed_resp{resp=nil}=DelayedResp) ->
+    #delayed_resp{
+        start_fun=StartFun,
+        req=Req,
+        code=Code,
+        headers=Headers,
+        first_chunk=FirstChunk
+    }=DelayedResp,
     {ok, Resp} = StartFun(Req, Code, Headers),
     case FirstChunk of
-        "" -> {ok, Resp};
-        _ -> send_chunk(Resp, FirstChunk)
-    end;
-start_delayed_response(Resp) ->
-    {ok, Resp}.
+        "" -> ok;
+        _ -> {ok, Resp} = send_chunk(Resp, FirstChunk)
+    end,
+    {ok, DelayedResp#delayed_resp{resp=Resp}};
+start_delayed_response(#delayed_resp{}=DelayedResp) ->
+    {ok, DelayedResp}.
 
 error_info({Error, Reason}) when is_list(Reason) ->
     error_info({Error, couch_util:to_binary(Reason)});
