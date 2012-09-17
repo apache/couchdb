@@ -136,7 +136,14 @@ reverse_key_default(?MAX_STR) -> ?MIN_STR;
 reverse_key_default(Key) -> Key.
 
 get_reduce_type(Req) ->
-    list_to_existing_atom(chttpd:qs_value(Req, "reduce", "true")).
+    case chttpd:qs_value(Req, "reduce", "true") of
+    "true" ->
+        true;
+    "false" ->
+        false;
+    Error ->
+        throw({bad_request, "`reduce` qs param must be `true` or `false`"})
+    end.
 
 parse_view_params(Req, Keys, ViewType) when not is_list(Req) ->
     QueryParams = lists:flatmap(fun({K,V}) -> parse_view_param(K,V) end,
