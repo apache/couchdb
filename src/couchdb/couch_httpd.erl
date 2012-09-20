@@ -690,8 +690,19 @@ send_json(Req, Code, Headers, Value) ->
         {"Content-Type", negotiate_content_type(Req)},
         {"Cache-Control", "must-revalidate"}
     ],
+    IdAndRevHeaders = case Value of
+                      {Props} when is_list(Props) ->
+                          case {lists:keyfind(id, 1, Props), lists:keyfind(rev, 1, Props)} of
+                          {{_, Id}, {_, Rev}} ->
+                              [{"X-Couch-Id", Id}, {"X-Couch-Rev", Rev}];
+                          _ ->
+                              []
+                          end;
+                      _ ->
+                          []
+                      end,
     Body = [start_jsonp(), ?JSON_ENCODE(Value), end_jsonp(), $\n],
-    send_response(Req, Code, DefaultHeaders ++ Headers, Body).
+    send_response(Req, Code, DefaultHeaders ++ IdAndRevHeaders ++ Headers, Body).
 
 start_json_response(Req, Code) ->
     start_json_response(Req, Code, []).
