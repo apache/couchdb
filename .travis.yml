@@ -5,6 +5,7 @@ before_script: ./bootstrap && ./configure
 script: make distcheck
 language: erlang
 otp_release:
+   - R15B02
    - R15B01
    - R15B
    - R14B04
