@@ -213,12 +213,58 @@ delete(RootDir, Filepath, Async) ->
         Error
     end.
 
+%%----------------------------------------------------------------------
+%% Purpose: Recursively delete a directory
+%%
+%% The directory may contain open files. The directory is renamed synchronously and
+%% deleted asynchronously.
+%%
+%% Returns: ok
+%%----------------------------------------------------------------------
+nuke_dir(RootDir, Dir) ->
+    % Create a folder to move all files into
+    DelDir = filename:join([RootDir, ".delete", ?b2l(couch_uuids:random())]),
+    ok = file:make_dir(DelDir),
 
-nuke_dir(RootDelDir, Dir) ->
+    % Move all files contained within Filepath into the delete folder. This is because on windows we
+    % can not move a directory containing open file handles but can move the files individually.
+    ok = nuke_dir_rename_files(DelDir, Dir),
+
+    % Now move the root path
+    case file:rename(Dir, filename:join([DelDir, filename:basename(Dir)])) of
+    ok -> ok;
+    {error, enoent} -> ok
+    end,
+
+    % Finally spawn a process to remove the delete folder. Sleep 5 secs to give the process a chance
+    % to close open file handles.
+    NukeAsync = fun() ->
+        timer:sleep(5000),
+        nuke_dir_sync(DelDir, true)
+    end,
+    spawn(NukeAsync),
+    ok.
+
+nuke_dir_rename_files(DelDir, Filepath) ->
+    FoldFun = fun(File) ->
+        Path = filename:join([Filepath, File]),
+        ok = nuke_dir_rename_files(DelDir, Path)
+    end,
+    case file:list_dir(Filepath) of
+    {ok, Files} ->
+        lists:foreach(FoldFun, Files);
+    {error, enotdir} ->
+        DelFile = filename:join([DelDir, filename:basename(Filepath)]),
+        ok = file:rename(Filepath, DelFile);
+    {error, enoent} ->
+        ok
+    end.
+
+nuke_dir_sync(Dir, IsDeleteFolder) ->
     FoldFun = fun(File) ->
         Path = Dir ++ "/" ++ File,
-        case delete(RootDelDir, Path, false) of
-            {error, eperm} -> ok = nuke_dir(RootDelDir, Path);
+        case file:delete(Path) of
+            {error, eperm} -> ok = nuke_dir_sync(Path, true);
             {error, enoent} -> ok;
             ok -> ok
         end
@@ -226,7 +272,12 @@ nuke_dir(RootDelDir, Dir) ->
     case file:list_dir(Dir) of
         {ok, Files} ->
             lists:foreach(FoldFun, Files),
-            ok = file:del_dir(Dir);
+            case IsDeleteFolder of
+            true ->
+                ok = file:del_dir(Dir);
+            false ->
+                ok
+            end;
         {error, enoent} ->
             ok
     end.
@@ -237,11 +288,7 @@ init_delete_dir(RootDir) ->
     % note: ensure_dir requires an actual filename companent, which is the
     % reason for "foo".
     filelib:ensure_dir(filename:join(Dir,"foo")),
-    filelib:fold_files(Dir, ".*", true,
-        fun(Filename, _) ->
-            ok = file:delete(Filename)
-        end, ok).
-
+    ok = nuke_dir_sync(Dir, false).
 
 read_header(Fd) ->
     case gen_server:call(Fd, find_header, infinity) of
