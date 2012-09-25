@@ -24,9 +24,10 @@ go(DbName) when is_binary(DbName) ->
     handle_db(DbName).
 
 handle_db(DbName) ->
+    ShardCount = length(mem3:shards(DbName)),
     case get_all_security(DbName) of
     {ok, SecObjs} ->
-        case is_ok(SecObjs) of
+        case is_ok(SecObjs, ShardCount) of
         ok ->
             ok;
         {fixable, SecObj} ->
@@ -56,21 +57,19 @@ get_all_security(DbName) ->
         Error
     end.
 
-is_ok([_]) ->
+is_ok([_], _) ->
     % One security object is the happy case
     ok;
-is_ok([_, _] = SecObjs0) ->
-    % This is the strict heuristic where there is one version of
-    % the security object that out numbers empty security objects.
-    % If so, just overwrite the empty objects with the non-empty
-    % version.
-    case lists:keytake({[]}, 1, SecObjs0) of
-    {value, {_, EmptyCount}, [{SecObj, Count}]} when Count > EmptyCount ->
-        {fixable, SecObj};
-    _ ->
-        broken
+is_ok([_, _] = SecObjs0, ShardCount) ->
+    % Figure out if we have a simple majority of security objects
+    % and if so, use that as the correct value. Otherwise we abort
+    % and rely on human intervention.
+    {Count, SecObj} =  lists:max([{C, O} || {O, C} <- SecObjs0]),
+    case Count >= ((ShardCount div 2) + 1) of
+        true -> {fixable, SecObj};
+        false -> broken
     end;
-is_ok(_) ->
+is_ok(_, _) ->
     % Anything else requires human intervention
     broken.
 
