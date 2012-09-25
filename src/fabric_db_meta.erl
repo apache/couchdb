@@ -18,6 +18,7 @@
 
 -include("fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 set_revs_limit(DbName, Limit, Options) ->
     Shards = mem3:shards(DbName),
@@ -51,8 +52,12 @@ handle_set_message(Error, _, _Waiting) ->
     {error, Error}.
 
 get_all_security(DbName, Options) ->
-    Shards = mem3:shards(DbName),
-    Workers = fabric_util:submit_jobs(Shards, get_all_security, [Options]),
+    Shards = case proplists:get_value(shards, Options) of
+        Shards0 when is_list(Shards0) -> Shards0;
+        _ -> mem3:shards(DbName)
+    end,
+    Admin = [{user_ctx, #user_ctx{roles = [<<"_admin">>]}}],
+    Workers = fabric_util:submit_jobs(Shards, get_all_security, [Admin]),
     Handler = fun handle_get_message/3,
     Acc = {[], length(Workers) - 1},
     case fabric_util:recv(Workers, #shard.ref, Handler, Acc) of

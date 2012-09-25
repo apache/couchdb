@@ -147,7 +147,7 @@ get_security(DbName, Options) ->
 %% @doc retrieve the security object for all shards of a database
 -spec get_all_security(dbname()) -> json_obj() | no_return().
 get_all_security(DbName) ->
-    get_all_security(DbName, [?ADMIN_CTX]).
+    get_all_security(DbName, []).
 
 %% @doc retrieve the security object for all shards of a database
 -spec get_all_security(dbname(), [option()]) -> json_obj() | no_return().
