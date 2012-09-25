@@ -14,7 +14,33 @@
 
 -module(mem3_sync_security).
 
+-export([maybe_sync/2, maybe_sync_int/2]).
 -export([go/0, go/1]).
+
+-include("mem3.hrl").
+
+
+maybe_sync(#shard{}=Src, #shard{}=Dst) ->
+    case is_local(Src#shard.name) of
+        false ->
+            erlang:spawn(?MODULE, maybe_sync_int, [Src, Dst]);
+        true ->
+            ok
+    end.
+
+maybe_sync_int(#shard{name=Name}=Src, Dst) ->
+    DbName = mem3:dbname(Name),
+    case fabric:get_all_security(DbName, [{shards, [Src, Dst]}]) of
+        {ok, WorkerObjs} ->
+            Objs = [Obj || {_Worker, Obj} <- WorkerObjs],
+            case length(lists:usort(Objs)) of
+                1 -> ok;
+                2 -> go(DbName)
+            end;
+        Else ->
+            Args = [DbName, Else],
+            twig:log(err, "Error checking security objects for ~s :: ~p", Args)
+    end.
 
 go() ->
     {ok, Dbs} = fabric:all_dbs(),
@@ -72,4 +98,10 @@ is_ok([_, _] = SecObjs0, ShardCount) ->
 is_ok(_, _) ->
     % Anything else requires human intervention
     broken.
+
+
+is_local(<<"shards/", _/binary>>) ->
+    false;
+is_local(_) ->
+    true.
 

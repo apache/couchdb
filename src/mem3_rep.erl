@@ -26,6 +26,7 @@ go(DbName, Node, Opts) when is_binary(DbName), is_atom(Node) ->
     go(#shard{name=DbName, node=node()}, #shard{name=DbName, node=Node}, Opts);
 
 go(#shard{} = Source, #shard{} = Target, Opts) ->
+    mem3_sync_security:maybe_sync(Source, Target),
     BatchSize = case proplists:get_value(batch_size, Opts) of
         BS when is_integer(BS), BS > 0 -> BS;
         _ -> 100
