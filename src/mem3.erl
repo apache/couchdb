@@ -137,26 +137,52 @@ choose_shards(DbName, Options) ->
     try shards(DbName)
     catch error:E when E==database_does_not_exist; E==badarg ->
         Nodes = mem3:nodes(),
-        NodeCount = length(Nodes),
-        Zones = zones(Nodes),
-        ZoneCount = length(Zones),
-        if ZoneCount =:= 0 -> erlang:error(no_available_zones); true -> ok end,
-        N = mem3_util:n_val(couch_util:get_value(n, Options), NodeCount),
-        Q = mem3_util:to_integer(couch_util:get_value(q, Options,
-            couch_config:get("cluster", "q", "8"))),
-        Z = mem3_util:z_val(couch_util:get_value(z, Options), NodeCount, ZoneCount),
-        Suffix = couch_util:get_value(shard_suffix, Options, ""),
-        ChosenZones = lists:sublist(shuffle(Zones), Z),
-        lists:flatmap(
-            fun({Zone, N1}) ->
-                Nodes1 = nodes_in_zone(Nodes, Zone),
-                {A, B} = lists:split(crypto:rand_uniform(1,length(Nodes1)+1), Nodes1),
-                RotatedNodes = B ++ A,
-                mem3_util:create_partition_map(DbName, erlang:min(N1,length(Nodes1)),
-                    Q, RotatedNodes, Suffix)
-            end,
-            lists:zip(ChosenZones, apportion(N, Z)))
+        case get_placement(Options) of
+            undefined ->
+                choose_shards(DbName, Nodes, Options);
+            Placement ->
+                lists:flatmap(fun({Zone, N}) ->
+                    NodesInZone = nodes_in_zone(Nodes, Zone),
+                    Options1 = lists:keymerge(1, [{n,N}], Options),
+                    choose_shards(DbName, NodesInZone, Options1)
+                end, Placement)
+        end
     end.
+
+choose_shards(DbName, Nodes, Options) ->
+    NodeCount = length(Nodes),
+    Suffix = couch_util:get_value(shard_suffix, Options, ""),
+    N = mem3_util:n_val(couch_util:get_value(n, Options), NodeCount),
+    if N =:= 0 -> erlang:error(no_nodes_in_zone);
+       true -> ok
+    end,
+    Q = mem3_util:to_integer(couch_util:get_value(q, Options,
+        couch_config:get("cluster", "q", "8"))),
+    %% rotate to a random entry in the nodelist for even distribution
+    {A, B} = lists:split(crypto:rand_uniform(1,length(Nodes)+1), Nodes),
+    RotatedNodes = B ++ A,
+    mem3_util:create_partition_map(DbName, N, Q, RotatedNodes, Suffix).
+
+%% either directly as [{term(), non_neg_integer()}] or
+%% a config setting as "a:2,b:1"
+get_placement(Options) ->
+    case couch_util:get_value(placement, Options) of
+        undefined ->
+            case couch_config:get("cluster", "placement") of
+                undefined ->
+                    undefined;
+                PlacementStr ->
+                    decode_placement_string(PlacementStr)
+            end;
+        Placement ->
+            Placement
+    end.
+
+decode_placement_string(PlacementStr) ->
+    [begin
+         [Zone, N] = string:tokens(Rule, ":"),
+         {list_to_binary(Zone), list_to_integer(N)}
+     end || Rule <- string:tokens(PlacementStr, ",")].
 
 -spec dbname(#shard{} | iodata()) -> binary().
 dbname(#shard{dbname = DbName}) ->
