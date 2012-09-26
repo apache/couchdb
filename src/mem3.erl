@@ -196,32 +196,8 @@ dbname(DbName) when is_binary(DbName) ->
 dbname(_) ->
     erlang:error(badarg).
 
-
-zones(Nodes) ->
-    BlacklistStr = couch_config:get("mem3", "blacklisted_zones", "[]"),
-    {ok, Blacklist0} = couch_util:parse_term(BlacklistStr),
-    Blacklist = [list_to_binary(Z) || Z <- Blacklist0],
-    lists:usort([mem3:node_info(Node, <<"zone">>) || Node <- Nodes]) --
-        Blacklist.
-
 nodes_in_zone(Nodes, Zone) ->
     [Node || Node <- Nodes, Zone == mem3:node_info(Node, <<"zone">>)].
-
-shuffle(List) ->
-    List1 = [{crypto:rand_uniform(1, 1000), Item} || Item <- List],
-    List2 = lists:sort(List1),
-    {_, Result} = lists:unzip(List2),
-    Result.
-
-apportion(Shares, Ways) ->
-    apportion(Shares, lists:duplicate(Ways, 0), Shares).
-
-apportion(_Shares, Acc, 0) ->
-    Acc;
-apportion(Shares, Acc, Remaining) ->
-    N = Remaining rem length(Acc),
-    [H|T] = lists:nthtail(N, Acc),
-    apportion(Shares, lists:sublist(Acc, N) ++ [H+1|T], Remaining - 1).
 
 live_shards(DbName, Nodes) ->
     [S || #shard{node=Node} = S <- shards(DbName), lists:member(Node, Nodes)].
