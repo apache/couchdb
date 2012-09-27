@@ -163,8 +163,6 @@ choose_shards(DbName, Nodes, Options) ->
     RotatedNodes = B ++ A,
     mem3_util:create_partition_map(DbName, N, Q, RotatedNodes, Suffix).
 
-%% either directly as [{term(), non_neg_integer()}] or
-%% a config setting as "a:2,b:1"
 get_placement(Options) ->
     case couch_util:get_value(placement, Options) of
         undefined ->
@@ -174,8 +172,8 @@ get_placement(Options) ->
                 PlacementStr ->
                     decode_placement_string(PlacementStr)
             end;
-        Placement ->
-            Placement
+        PlacementStr ->
+            decode_placement_string(PlacementStr)
     end.
 
 decode_placement_string(PlacementStr) ->
