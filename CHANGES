@@ -20,6 +20,7 @@ HTTP Interface:
  * Added Server-Sent Events protocol to db changes API.
    See http://www.w3.org/TR/eventsource/ for details.
  * Make password hashing synchronous when using the /_config/admins API.
+ * Include user name in show/list ETags.
 
 Storage System:
 
