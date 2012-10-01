@@ -18,11 +18,19 @@
 
 -include("fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
+-include_lib("couch/include/couch_db.hrl").
+
+-record(acc, {
+    workers,
+    finished,
+    num_workers
+}).
+
 
 set_revs_limit(DbName, Limit, Options) ->
     Shards = mem3:shards(DbName),
     Workers = fabric_util:submit_jobs(Shards, set_revs_limit, [Limit, Options]),
-    Handler = fun handle_set_message/3,
+    Handler = fun handle_revs_message/3,
     Waiting = length(Workers) - 1,
     case fabric_util:recv(Workers, #shard.ref, Handler, Waiting) of
     {ok, ok} ->
@@ -30,41 +38,122 @@ set_revs_limit(DbName, Limit, Options) ->
     Error ->
         Error
     end.
+
+handle_revs_message(ok, _, 0) ->
+    {stop, ok};
+handle_revs_message(ok, _, Waiting) ->
+    {ok, Waiting - 1};
+handle_revs_message(Error, _, _Waiting) ->
+    {error, Error}.
+
 
 set_security(DbName, SecObj, Options) ->
     Shards = mem3:shards(DbName),
+    RexiMon = fabric_util:create_monitors(Shards),
     Workers = fabric_util:submit_jobs(Shards, set_security, [SecObj, Options]),
     Handler = fun handle_set_message/3,
-    Waiting = length(Workers) - 1,
-    case fabric_util:recv(Workers, #shard.ref, Handler, Waiting) of
-    {ok, ok} ->
-        ok;
+    Acc = #acc{
+        workers=Workers,
+        finished=[],
+        num_workers=length(Workers)
+    },
+    try fabric_util:recv(Workers, #shard.ref, Handler, Acc) of
+    {ok, #acc{finished=Finished}} ->
+        case check_sec_set(length(Workers), Finished) of
+            ok -> ok;
+            Error -> Error
+        end;
     Error ->
         Error
+    after
+        rexi_monitor:stop(RexiMon)
     end.
 
-handle_set_message(ok, _, 0) ->
-    {stop, ok};
-handle_set_message(ok, _, Waiting) ->
-    {ok, Waiting - 1};
-handle_set_message(Error, _, _Waiting) ->
-    {error, Error}.
+handle_set_message({rexi_DOWN, _, {_, Node}, _}, _, #acc{workers=Wrkrs}=Acc) ->
+    RemWorkers = lists:filter(fun(S) -> S#shard.node =/= Node end, Wrkrs),
+    maybe_finish_set(Acc#acc{workers=RemWorkers});
+handle_set_message(ok, W, Acc) ->
+    NewAcc = Acc#acc{
+        workers = (Acc#acc.workers -- [W]),
+        finished = [W | Acc#acc.finished]
+    },
+    maybe_finish_set(NewAcc);
+handle_set_message(Error, W, Acc) ->
+    Dst = {W#shard.node, W#shard.name},
+    twig:log(err, "Failed to set security object on ~p :: ~p", [Dst, Error]),
+    NewAcc = Acc#acc{workers = (Acc#acc.workers -- [W])},
+    maybe_finish_set(NewAcc).
+
+maybe_finish_set(#acc{workers=[]}=Acc) ->
+    {stop, Acc};
+maybe_finish_set(#acc{finished=Finished, num_workers=NumWorkers}=Acc) ->
+    case check_sec_set(NumWorkers, Finished) of
+        ok -> {stop, Acc};
+        _ -> {ok, Acc}
+    end.
+
+check_sec_set(NumWorkers, SetWorkers) ->
+    try
+        check_sec_set_int(NumWorkers, SetWorkers)
+    catch throw:Reason ->
+        {error, Reason}
+    end.
+
+check_sec_set_int(NumWorkers, SetWorkers) ->
+    case length(SetWorkers) < ((NumWorkers div 2) + 1) of
+        true -> throw(no_majority);
+        false -> ok
+    end,
+    % Hack to reuse fabric_view:is_progress_possible/1
+    FakeCounters = [{S, 0} || S <- SetWorkers],
+    case fabric_view:is_progress_possible(FakeCounters) of
+        false -> throw(no_ring);
+        true -> ok
+    end,
+    ok.
+
 
 get_all_security(DbName, Options) ->
-    Shards = mem3:shards(DbName),
-    Workers = fabric_util:submit_jobs(Shards, get_all_security, [Options]),
+    Shards = case proplists:get_value(shards, Options) of
+        Shards0 when is_list(Shards0) -> Shards0;
+        _ -> mem3:shards(DbName)
+    end,
+    Admin = [{user_ctx, #user_ctx{roles = [<<"_admin">>]}}],
+    RexiMon = fabric_util:create_monitors(Shards),
+    Workers = fabric_util:submit_jobs(Shards, get_all_security, [Admin]),
     Handler = fun handle_get_message/3,
-    Acc = {[], length(Workers) - 1},
-    case fabric_util:recv(Workers, #shard.ref, Handler, Acc) of
-    {ok, {SecObjs, _}} ->
+    Acc = #acc{
+        workers=Workers,
+        finished=[],
+        num_workers=length(Workers)
+    },
+    try fabric_util:recv(Workers, #shard.ref, Handler, Acc) of
+    {ok, #acc{finished=SecObjs}} when length(SecObjs) > length(Workers) / 2 ->
         {ok, SecObjs};
+    {ok, _} ->
+        {error, no_majority};
     Error ->
         Error
+    after
+        rexi_monitor:stop(RexiMon)
     end.
 
-handle_get_message(SecObj, Worker, {SecObjs, 0}) ->
-    {stop, {[{Worker, SecObj} | SecObjs], 0}};
-handle_get_message(SecObj, Worker, {SecObjs, Waiting}) ->
-    {ok, {[{Worker, SecObj} | SecObjs], Waiting - 1}};
-handle_get_message(Error, _, _Waiting) ->
-    {error, Error}.
+handle_get_message({rexi_DOWN, _, {_, Node}, _}, _, #acc{workers=Wrkrs}=Acc) ->
+    RemWorkers = lists:filter(fun(S) -> S#shard.node =/= Node end, Wrkrs),
+    maybe_finish_get(Acc#acc{workers=RemWorkers});
+handle_get_message({Props}=SecObj, W, Acc) when is_list(Props) ->
+    NewAcc = Acc#acc{
+        workers = (Acc#acc.workers -- [W]),
+        finished = [{W, SecObj} | Acc#acc.finished]
+    },
+    maybe_finish_get(NewAcc);
+handle_get_message(Error, W, Acc) ->
+    Dst = {W#shard.node, W#shard.name},
+    twig:log(err, "Failed to get security object on ~p :: ~p", [Dst, Error]),
+    NewAcc = Acc#acc{workers = (Acc#acc.workers -- [W])},
+    maybe_finish_set(NewAcc).
+
+maybe_finish_get(#acc{workers=[]}=Acc) ->
+    {stop, Acc};
+maybe_finish_get(Acc) ->
+    {ok, Acc}.
