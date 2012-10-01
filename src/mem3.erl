@@ -137,26 +137,50 @@ choose_shards(DbName, Options) ->
     try shards(DbName)
     catch error:E when E==database_does_not_exist; E==badarg ->
         Nodes = mem3:nodes(),
-        NodeCount = length(Nodes),
-        Zones = zones(Nodes),
-        ZoneCount = length(Zones),
-        if ZoneCount =:= 0 -> erlang:error(no_available_zones); true -> ok end,
-        N = mem3_util:n_val(couch_util:get_value(n, Options), NodeCount),
-        Q = mem3_util:to_integer(couch_util:get_value(q, Options,
-            couch_config:get("cluster", "q", "8"))),
-        Z = mem3_util:z_val(couch_util:get_value(z, Options), NodeCount, ZoneCount),
-        Suffix = couch_util:get_value(shard_suffix, Options, ""),
-        ChosenZones = lists:sublist(shuffle(Zones), Z),
-        lists:flatmap(
-            fun({Zone, N1}) ->
-                Nodes1 = nodes_in_zone(Nodes, Zone),
-                {A, B} = lists:split(crypto:rand_uniform(1,length(Nodes1)+1), Nodes1),
-                RotatedNodes = B ++ A,
-                mem3_util:create_partition_map(DbName, erlang:min(N1,length(Nodes1)),
-                    Q, RotatedNodes, Suffix)
-            end,
-            lists:zip(ChosenZones, apportion(N, Z)))
+        case get_placement(Options) of
+            undefined ->
+                choose_shards(DbName, Nodes, Options);
+            Placement ->
+                lists:flatmap(fun({Zone, N}) ->
+                    NodesInZone = nodes_in_zone(Nodes, Zone),
+                    Options1 = lists:keymerge(1, [{n,N}], Options),
+                    choose_shards(DbName, NodesInZone, Options1)
+                end, Placement)
+        end
     end.
+
+choose_shards(DbName, Nodes, Options) ->
+    NodeCount = length(Nodes),
+    Suffix = couch_util:get_value(shard_suffix, Options, ""),
+    N = mem3_util:n_val(couch_util:get_value(n, Options), NodeCount),
+    if N =:= 0 -> erlang:error(no_nodes_in_zone);
+       true -> ok
+    end,
+    Q = mem3_util:to_integer(couch_util:get_value(q, Options,
+        couch_config:get("cluster", "q", "8"))),
+    %% rotate to a random entry in the nodelist for even distribution
+    {A, B} = lists:split(crypto:rand_uniform(1,length(Nodes)+1), Nodes),
+    RotatedNodes = B ++ A,
+    mem3_util:create_partition_map(DbName, N, Q, RotatedNodes, Suffix).
+
+get_placement(Options) ->
+    case couch_util:get_value(placement, Options) of
+        undefined ->
+            case couch_config:get("cluster", "placement") of
+                undefined ->
+                    undefined;
+                PlacementStr ->
+                    decode_placement_string(PlacementStr)
+            end;
+        PlacementStr ->
+            decode_placement_string(PlacementStr)
+    end.
+
+decode_placement_string(PlacementStr) ->
+    [begin
+         [Zone, N] = string:tokens(Rule, ":"),
+         {list_to_binary(Zone), list_to_integer(N)}
+     end || Rule <- string:tokens(PlacementStr, ",")].
 
 -spec dbname(#shard{} | iodata()) -> binary().
 dbname(#shard{dbname = DbName}) ->
@@ -170,32 +194,8 @@ dbname(DbName) when is_binary(DbName) ->
 dbname(_) ->
     erlang:error(badarg).
 
-
-zones(Nodes) ->
-    BlacklistStr = couch_config:get("mem3", "blacklisted_zones", "[]"),
-    {ok, Blacklist0} = couch_util:parse_term(BlacklistStr),
-    Blacklist = [list_to_binary(Z) || Z <- Blacklist0],
-    lists:usort([mem3:node_info(Node, <<"zone">>) || Node <- Nodes]) --
-        Blacklist.
-
 nodes_in_zone(Nodes, Zone) ->
     [Node || Node <- Nodes, Zone == mem3:node_info(Node, <<"zone">>)].
-
-shuffle(List) ->
-    List1 = [{crypto:rand_uniform(1, 1000), Item} || Item <- List],
-    List2 = lists:sort(List1),
-    {_, Result} = lists:unzip(List2),
-    Result.
-
-apportion(Shares, Ways) ->
-    apportion(Shares, lists:duplicate(Ways, 0), Shares).
-
-apportion(_Shares, Acc, 0) ->
-    Acc;
-apportion(Shares, Acc, Remaining) ->
-    N = Remaining rem length(Acc),
-    [H|T] = lists:nthtail(N, Acc),
-    apportion(Shares, lists:sublist(Acc, N) ++ [H+1|T], Remaining - 1).
 
 live_shards(DbName, Nodes) ->
     [S || #shard{node=Node} = S <- shards(DbName), lists:member(Node, Nodes)].
