@@ -104,13 +104,7 @@ force_reply(Doc, [FirstReply|_] = Replies, {Health, W, Acc}) ->
         _ ->
             case [Reply || {ok, Reply} <- Replies] of
             [] ->
-                % check if all errors are identical, if so inherit health
-                case lists:all(fun(E) -> E =:= FirstReply end, Replies) of
-                true ->
-                    {Health, W, [{Doc, FirstReply} | Acc]};
-                false ->
-                    {error, W, [{Doc, FirstReply} | Acc]}
-                end;
+                {error, W, [{Doc, FirstReply} | Acc]};
             [AcceptedRev | _] ->
                 NewHealth = case Health of ok -> accepted; _ -> Health end,
                 {NewHealth, W, [{Doc, {accepted,AcceptedRev}} | Acc]}
