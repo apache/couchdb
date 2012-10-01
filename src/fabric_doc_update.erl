@@ -91,23 +91,24 @@ handle_message({not_found, no_db_file} = X, Worker, Acc0) ->
 force_reply(Doc, [], {_, W, Acc}) ->
     {error, W, [{Doc, {error, internal_server_error}} | Acc]};
 force_reply(Doc, [FirstReply|_] = Replies, {Health, W, Acc}) ->
-    case update_quorum_met(W, Replies) of
-    {true, Reply} ->
-        {Health, W, [{Doc,Reply} | Acc]};
+    %% if all replies agree, that's the reply
+    %% if we got a quorum of ok's, that's the reply
+    %% everything else is accepted
+    case lists:all(fun(E) -> E =:= FirstReply end, Replies) of
+    true ->
+        {Health, W, [{Doc, FirstReply} | Acc]};
     false ->
-        twig:log(warn, "write quorum (~p) failed for ~s", [W, Doc#doc.id]),
-        case [Reply || {ok, Reply} <- Replies] of
-        [] ->
-            % check if all errors are identical, if so inherit health
-            case lists:all(fun(E) -> E =:= FirstReply end, Replies) of
-            true ->
-                {Health, W, [{Doc, FirstReply} | Acc]};
-            false ->
-                {error, W, [{Doc, FirstReply} | Acc]}
-            end;
-        [AcceptedRev | _] ->
-            NewHealth = case Health of ok -> accepted; _ -> Health end,
-            {NewHealth, W, [{Doc, {accepted,AcceptedRev}} | Acc]}
+        case update_quorum_met(W, Replies) of
+        {true, {ok, _}=Reply} ->
+            {Health, W, [{Doc,Reply} | Acc]};
+        _ ->
+            case [Reply || {ok, Reply} <- Replies] of
+            [] ->
+                {error, W, [{Doc, FirstReply} | Acc]};
+            [AcceptedRev | _] ->
+                NewHealth = case Health of ok -> accepted; _ -> Health end,
+                {NewHealth, W, [{Doc, {accepted,AcceptedRev}} | Acc]}
+            end
         end
     end.
 
