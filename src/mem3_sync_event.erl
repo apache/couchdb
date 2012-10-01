@@ -38,12 +38,9 @@ handle_call(_Request, State) ->
     {ok, ok, State}.
 
 handle_info({nodeup, Node}, State) ->
-    case lists:member(Node, mem3:nodes()) of
-    true ->
-        mem3_sync_nodes:add([Node]);
-    false ->
-        ok
-    end,
+    Nodes0 = lists:usort(drain_nodeups([Node])),
+    Nodes = lists:filter(fun(N) -> lists:member(N, mem3:nodes()) end, Nodes0),
+    wait_for_rexi(Nodes, 5),
     {ok, State};
 
 handle_info({nodedown, Node}, State) ->
@@ -58,3 +55,33 @@ terminate(_Reason, _State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+drain_nodeups(Acc) ->
+    receive
+        {nodeup, Node} ->
+            drain_nodeups([Node | Acc])
+    after 0 ->
+        Acc
+    end.
+
+wait_for_rexi([], _Retries) ->
+    ok;
+wait_for_rexi(Waiting, Retries) ->
+    % Hack around rpc:multicall/4 so that we can
+    % be sure which nodes gave which response
+    Msg = {call, erlang, whereis, [rexi_server], group_leader()},
+    {Resp, _Bad} = gen_server:multi_call(Waiting, rex, Msg, 1000),
+    Up = [N || {N, P} <- Resp, is_pid(P)],
+    NotUp = Waiting -- Up,
+    case length(Up) > 0 of
+        true ->
+            mem3_sync_nodes:add(Up);
+        false -> ok
+    end,
+    case length(NotUp) > 0 andalso Retries > 0 of
+        true ->
+            timer:sleep(1000),
+            wait_for_rexi(NotUp, Retries-1);
+        false ->
+            ok
+    end.

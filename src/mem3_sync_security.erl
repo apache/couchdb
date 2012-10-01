@@ -14,7 +14,33 @@
 
 -module(mem3_sync_security).
 
+-export([maybe_sync/2, maybe_sync_int/2]).
 -export([go/0, go/1]).
+
+-include("mem3.hrl").
+
+
+maybe_sync(#shard{}=Src, #shard{}=Dst) ->
+    case is_local(Src#shard.name) of
+        false ->
+            erlang:spawn(?MODULE, maybe_sync_int, [Src, Dst]);
+        true ->
+            ok
+    end.
+
+maybe_sync_int(#shard{name=Name}=Src, Dst) ->
+    DbName = mem3:dbname(Name),
+    case fabric:get_all_security(DbName, [{shards, [Src, Dst]}]) of
+        {ok, WorkerObjs} ->
+            Objs = [Obj || {_Worker, Obj} <- WorkerObjs],
+            case length(lists:usort(Objs)) of
+                1 -> ok;
+                2 -> go(DbName)
+            end;
+        Else ->
+            Args = [DbName, Else],
+            twig:log(err, "Error checking security objects for ~s :: ~p", Args)
+    end.
 
 go() ->
     {ok, Dbs} = fabric:all_dbs(),
@@ -24,9 +50,10 @@ go(DbName) when is_binary(DbName) ->
     handle_db(DbName).
 
 handle_db(DbName) ->
+    ShardCount = length(mem3:shards(DbName)),
     case get_all_security(DbName) of
     {ok, SecObjs} ->
-        case is_ok(SecObjs) of
+        case is_ok(SecObjs, ShardCount) of
         ok ->
             ok;
         {fixable, SecObj} ->
@@ -56,21 +83,25 @@ get_all_security(DbName) ->
         Error
     end.
 
-is_ok([_]) ->
+is_ok([_], _) ->
     % One security object is the happy case
     ok;
-is_ok([_, _] = SecObjs0) ->
-    % This is the strict heuristic where there is one version of
-    % the security object that out numbers empty security objects.
-    % If so, just overwrite the empty objects with the non-empty
-    % version.
-    case lists:keytake({[]}, 1, SecObjs0) of
-    {value, {_, EmptyCount}, [{SecObj, Count}]} when Count > EmptyCount ->
-        {fixable, SecObj};
-    _ ->
-        broken
+is_ok([_, _] = SecObjs0, ShardCount) ->
+    % Figure out if we have a simple majority of security objects
+    % and if so, use that as the correct value. Otherwise we abort
+    % and rely on human intervention.
+    {Count, SecObj} =  lists:max([{C, O} || {O, C} <- SecObjs0]),
+    case Count >= ((ShardCount div 2) + 1) of
+        true -> {fixable, SecObj};
+        false -> broken
     end;
-is_ok(_) ->
+is_ok(_, _) ->
     % Anything else requires human intervention
     broken.
+
+
+is_local(<<"shards/", _/binary>>) ->
+    false;
+is_local(_) ->
+    true.
 
