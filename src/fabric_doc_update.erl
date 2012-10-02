@@ -125,7 +125,8 @@ maybe_reply(Doc, Replies, {stop, W, Acc}) ->
 update_quorum_met(W, Replies) ->
     Counters = lists:foldl(fun(R,D) -> orddict:update_counter(R,1,D) end,
         orddict:new(), Replies),
-    case lists:dropwhile(fun({_, Count}) -> Count < W end, Counters) of
+    GoodReplies = [{R,C} || {{ok, _} = R, C} <- Counters],
+    case lists:dropwhile(fun({_, Count}) -> Count < W end, GoodReplies) of
     [] ->
         false;
     [{FinalReply, _} | _] ->
