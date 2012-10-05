@@ -241,6 +241,8 @@ handle_request(MochiReq) ->
 
     RequestTime = timer:now_diff(now(), Begin)/1000,
     {Status, Code} = case Result of
+    {ok, #delayed_resp{resp=Resp}} ->
+        {ok, Resp:get(code)};
     {ok, Resp} ->
         {ok, Resp:get(code)};
     {aborted, Resp, _} ->
