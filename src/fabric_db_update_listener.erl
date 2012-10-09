@@ -19,35 +19,55 @@
 -include("fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
+-record(worker, {
+    ref,
+    node,
+    pid
+}).
+
+-record(acc, {
+    parent,
+    state
+}).
+
 go(Parent, ParentRef, DbName, Timeout) ->
     Notifiers = start_update_notifiers(DbName),
     MonRefs = lists:usort([{rexi_server, Node} || {Node, _Ref} <- Notifiers]),
     RexiMon = rexi_monitor:start(MonRefs),
     MonPid = start_cleanup_monitor(self(), Notifiers),
-    %% Add calling controller node as rexi end point as this controller will
-    %% receive messages from it
-    Workers = [{Parent, ParentRef} | Notifiers],
+    %% This is not a common pattern for rexi but to enable the calling
+    %% process to communicate via handle_message/3 we "fake" it as a
+    %% a spawned worker.
+    Workers = [#worker{ref=ParentRef, pid=Parent} | Notifiers],
     try
-        receive_results(Workers, {Workers, Parent, unset}, Timeout)
+        receive_results(Workers, #acc{parent=Parent, state=unset}, Timeout)
     after
         rexi_monitor:stop(RexiMon),
         stop_cleanup_monitor(MonPid)
     end.
 
 start_update_notifiers(DbName) ->
-    lists:map(fun(#shard{node=Node, name=Name}) ->
-        {Node, rexi:cast(Node, {?MODULE, start_update_notifier, [Name]})}
-    end, mem3:shards(DbName)).
+    EndPointDict = lists:foldl(fun(#shard{node=Node, name=Name}, Acc) ->
+        dict:append(Node, Name, Acc)
+    end, dict:new(), mem3:shards(DbName)),
+    lists:map(fun({Node, DbNames}) ->
+        Ref = rexi:cast(Node, {?MODULE, start_update_notifier, [DbNames]}),
+        #worker{ref=Ref, node=Node}
+    end, dict:to_list(EndPointDict)).
 
 % rexi endpoint
-start_update_notifier(DbName) ->
+start_update_notifier(DbNames) ->
     {Caller, Ref} = get(rexi_from),
-    Fun = fun({_, X}) when X == DbName ->
-              erlang:send(Caller, {Ref, db_updated}); (_) -> ok end,
+    Fun = fun({_, X}) ->
+        case lists:member(X, DbNames) of
+            true -> erlang:send(Caller, {Ref, db_updated});
+            false -> ok
+        end
+    end,
     Id = {couch_db_update_notifier, make_ref()},
     ok = gen_event:add_sup_handler(couch_db_update, Id, Fun),
     receive {gen_event_EXIT, Id, Reason} ->
-        rexi:reply({gen_event_EXIT, DbName, Reason})
+        rexi:reply({gen_event_EXIT, node(), Reason})
     end.
 
 start_cleanup_monitor(Parent, Notifiers) ->
@@ -72,7 +92,7 @@ cleanup_monitor(Parent, Ref, Notifiers) ->
     end.
 
 stop_update_notifiers(Notifiers) ->
-    [rexi:kill(Node, Ref) || {Node, Ref} <- Notifiers].
+    [rexi:kill(Node, Ref) || #worker{node=Node, ref=Ref} <- Notifiers].
 
 stop({Pid, Ref}) ->
     erlang:send(Pid, {Ref, done}).
@@ -83,46 +103,38 @@ wait_db_updated({Pid, Ref}) ->
         {state, Pid, State} -> State
     end.
 
-receive_results(Workers, State, Timeout) ->
-    case rexi_utils:recv(Workers, 2, fun handle_message/3, State,
-            infinity, Timeout) of
-    {timeout, {NewWorkers, Parent, waiting}} ->
-        erlang:send(Parent, {state, self(), timeout}),
-        receive_results(NewWorkers, {NewWorkers, Parent, unset}, Timeout);
-    {timeout, {NewWorkers, Parent, _State}} ->
-        receive_results(NewWorkers, {NewWorkers, Parent, timeout}, Timeout);
-    {_, NewState} ->
-        {ok, NewState}
+receive_results(Workers, Acc0, Timeout) ->
+    Fun = fun handle_message/3,
+    case rexi_utils:recv(Workers, #worker.ref, Fun, Acc0, infinity, Timeout) of
+    {timeout, #acc{state=updated}=Acc} ->
+        receive_results(Workers, Acc, Timeout);
+    {timeout, #acc{state=waiting}=Acc} ->
+        erlang:send(Acc#acc.parent, {state, self(), timeout}),
+        receive_results(Workers, Acc#acc{state=unset}, Timeout);
+    {timeout, Acc} ->
+        receive_results(Workers, Acc#acc{state=timeout}, Timeout);
+    {_, Acc} ->
+        {ok, Acc}
     end.
 
 
-handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Worker, {Workers, Parent, State}) ->
-    NewWorkers = lists:filter(fun({_Node, Ref}) -> NodeRef =/= Ref end, Workers),
-    case NewWorkers of
-    [] ->
-        {error, {nodedown, <<"progress not possible">>}};
-    _ ->
-        {ok, {NewWorkers, Parent, State}}
-    end;
-handle_message({rexi_EXIT, Reason}, Worker, {Workers, Parent, State}) ->
-    NewWorkers = lists:delete(Worker,Workers),
-    case NewWorkers of
-    [] ->
-        {error, Reason};
-    _ ->
-        {ok, {NewWorkers, Parent, State}}
-    end;
-handle_message(db_updated, {_Worker, _From}, {Workers, Parent, waiting}) ->
+handle_message({rexi_DOWN, _, {_, Node}, _}, _Worker, _Acc) ->
+    {error, {nodedown, Node}};
+handle_message({rexi_EXIT, _Reason}, Worker, _Acc) ->
+    {error, {worker_exit, Worker}};
+handle_message({gen_event_EXIT, Node, Reason}, _Worker, _Acc) ->
+    {error, {gen_event_exit, Node, Reason}};
+handle_message(db_updated, _Worker, #acc{state=waiting}=Acc) ->
     % propagate message to calling controller
-    erlang:send(Parent, {state, self(), updated}),
-    {ok, {Workers, Parent, unset}};
-handle_message(db_updated, _Worker, {Workers, Parent, _State}) ->
-    {ok, {Workers, Parent, updated}};
-handle_message(get_state, {_Worker, _From}, {Workers, Parent, unset}) ->
-    {ok, {Workers, Parent, waiting}};
-handle_message(get_state, {_Worker, _From}, {Workers, Parent, State}) ->
-    erlang:send(Parent, {state, self(), State}),
-    {ok, {Workers, Parent, unset}};
+    erlang:send(Acc#acc.parent, {state, self(), updated}),
+    {ok, Acc#acc{state=unset}};
+handle_message(db_updated, _Worker, Acc) ->
+    {ok, Acc#acc{state=updated}};
+handle_message(get_state, _Worker, #acc{state=unset}=Acc) ->
+    {ok, Acc#acc{state=waiting}};
+handle_message(get_state, _Worker, Acc) ->
+    erlang:send(Acc#acc.parent, {state, self(), Acc#acc.state}),
+    {ok, Acc#acc{state=unset}};
 handle_message(done, _, _) ->
     {stop, ok}.
 
