@@ -41,6 +41,7 @@ EXTRA_DIST = \
     030-doc-from-json.t \
     031-doc-to-json.t \
     040-util.t \
+    041-uuid-gen-id.ini \
     041-uuid-gen-seq.ini \
     041-uuid-gen-utc.ini \
     041-uuid-gen.t \
