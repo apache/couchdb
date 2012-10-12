@@ -72,7 +72,7 @@
      */
     activeTasks: function(options) {
       return ajax(
-        {url: this.urlPrefix + "/_active_tasks"},
+        {url:  "/_active_tasks"},
         options,
         "Active task status could not be retrieved"
       );
@@ -88,7 +88,7 @@
      */
     allDbs: function(options) {
       return ajax(
-        {url: this.urlPrefix + "/_all_dbs"},
+        {url:  "/_all_dbs"},
         options,
         "An error occurred retrieving the list of all databases"
       );
@@ -110,7 +110,7 @@
      * @param {String} [value] value to be set
      */
     config: function(options, section, option, value) {
-      var req = {url: this.urlPrefix + "/_config/"};
+      var req = {url:  "/_config/"};
       if (section) {
         req.url += encodeURIComponent(section) + "/";
         if (option) {
@@ -212,7 +212,7 @@
     login: function(options) {
       options = options || {};
       return $.ajax({
-        type: "POST", url: this.urlPrefix + "/_session", dataType: "json",
+        type: "POST", url:  "/_session", dataType: "json",
         data: {name: options.name, password: options.password},
         beforeSend: function(xhr) {
             xhr.setRequestHeader('Accept', 'application/json');
@@ -240,7 +240,7 @@
     logout: function(options) {
       options = options || {};
       return $.ajax({
-        type: "DELETE", url: this.urlPrefix + "/_session", dataType: "json",
+        type: "DELETE", url:  "/_session", dataType: "json",
         username : "_", password : "_",
         beforeSend: function(xhr) {
             xhr.setRequestHeader('Accept', 'application/json');
@@ -290,7 +290,7 @@
       };
       return /** @lends $.couch.db */{
         name: name,
-        uri: this.urlPrefix + "/" + encodeURIComponent(name) + "/",
+        uri:  "/" + encodeURIComponent(name) + "/",
 
         /**
          * Request compaction of the specified database.
@@ -931,7 +931,7 @@
      */
     info: function(options) {
       return ajax(
-        {url: this.urlPrefix + "/"},
+        {url:  "/"},
         options,
         "Server information could not be retrieved"
       );
@@ -954,7 +954,7 @@
         ajaxOptions.successStatus = 202;
       }
       return ajax({
-          type: "POST", url: this.urlPrefix + "/_replicate",
+          type: "POST", url:  "/_replicate",
           data: JSON.stringify(repOpts),
           contentType: "application/json"
         },
@@ -975,7 +975,7 @@
         cacheNum = 1;
       }
       if (!uuidCache.length) {
-        ajax({url: this.urlPrefix + "/_uuids", data: {count: cacheNum}, async:
+        ajax({url:  "/_uuids", data: {count: cacheNum}, async:
               false}, {
                 success: function(resp) {
                   uuidCache = resp.uuids;
