@@ -104,7 +104,7 @@ check_dbname(#server{dbname_regexp=RegExp}, DbName) ->
             "_users" -> ok;
             "_replicator" -> ok;
             _Else ->
-                {error, illegal_database_name}
+                {error, illegal_database_name, DbName}
             end;
     match ->
         ok
