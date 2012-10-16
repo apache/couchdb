@@ -139,8 +139,9 @@
      */
     session: function(options) {
       options = options || {};
+      var url = options.url ? options.url + "/_session" : "/_session";
       return $.ajax({
-        type: "GET", url:"/_session",
+        type: "GET", url:url,
         beforeSend: function(xhr) {
             xhr.setRequestHeader('Accept', 'application/json');
         },
@@ -211,8 +212,9 @@
      */
     login: function(options) {
       options = options || {};
+      var url = options.url ? options.url + "/_session" : "/_session";
       return $.ajax({
-        type: "POST", url:  "/_session", dataType: "json",
+        type: "POST", url: url, dataType: "json",
         data: {name: options.name, password: options.password},
         beforeSend: function(xhr) {
             xhr.setRequestHeader('Accept', 'application/json');
@@ -239,8 +241,9 @@
      */
     logout: function(options) {
       options = options || {};
+      var url = options.url ? options.url + "/_session" : "/_session";
       return $.ajax({
-        type: "DELETE", url:  "/_session", dataType: "json",
+        type: "DELETE", url: url, dataType: "json",
         username : "_", password : "_",
         beforeSend: function(xhr) {
             xhr.setRequestHeader('Accept', 'application/json');
