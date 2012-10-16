@@ -72,7 +72,7 @@
      */
     activeTasks: function(options) {
       return ajax(
-        {url:  this.url+"/_active_tasks"},
+        {url:  $.couch.url+"/_active_tasks"},
         options,
         "Active task status could not be retrieved"
       );
@@ -88,7 +88,7 @@
      */
     allDbs: function(options) {
       return ajax(
-        {url:  this.url+"/_all_dbs"},
+        {url:  $.couch.url+"/_all_dbs"},
         options,
         "An error occurred retrieving the list of all databases"
       );
@@ -110,7 +110,7 @@
      * @param {String} [value] value to be set
      */
     config: function(options, section, option, value) {
-      var req = {url:  this.url+"/_config/"};
+      var req = {url:  $.couch.url+"/_config/"};
       if (section) {
         req.url += encodeURIComponent(section) + "/";
         if (option) {
@@ -140,7 +140,7 @@
     session: function(options) {
       options = options || {};
       return $.ajax({
-        type: "GET", url:this.url+"/_session",
+        type: "GET", url:$.couch.url+"/_session",
         beforeSend: function(xhr) {
             xhr.setRequestHeader('Accept', 'application/json');
         },
@@ -212,7 +212,7 @@
     login: function(options) {
       options = options || {};
       return $.ajax({
-        type: "POST", url:  this.url+"/_session", dataType: "json",
+        type: "POST", url:  $.couch.url+"/_session", dataType: "json",
         data: {name: options.name, password: options.password},
         beforeSend: function(xhr) {
             xhr.setRequestHeader('Accept', 'application/json');
@@ -240,7 +240,7 @@
     logout: function(options) {
       options = options || {};
       return $.ajax({
-        type: "DELETE", url:  this.url+"/_session", dataType: "json",
+        type: "DELETE", url:  $.couch.url+"/_session", dataType: "json",
         username : "_", password : "_",
         beforeSend: function(xhr) {
             xhr.setRequestHeader('Accept', 'application/json');
@@ -270,7 +270,6 @@
      * </code></pre>
      */
     db: function(name, db_opts) {
-      this.url = $.couch.url;
       db_opts = db_opts || {};
       var rawDocs = {};
       function maybeApplyVersion(doc) {
@@ -305,7 +304,7 @@
         compact: function(options) {
           $.extend(options, {successStatus: 202});
           return ajax({
-              type: "POST", url: this.url + this.uri + "_compact",
+              type: "POST", url: $.couch.url + this.uri + "_compact",
               data: "", processData: false
             },
             options,
@@ -324,7 +323,7 @@
         viewCleanup: function(options) {
           $.extend(options, {successStatus: 202});
           ajax({
-              type: "POST", url: this.url + this.uri + "_view_cleanup",
+              type: "POST", url: $.couch.url + this.uri + "_view_cleanup",
               data: "", processData: false
             },
             options,
@@ -366,7 +365,7 @@
         create: function(options) {
           $.extend(options, {successStatus: 201});
           return ajax({
-              type: "PUT", url: this.url + this.uri, contentType: "application/json",
+              type: "PUT", url: $.couch.url + this.uri, contentType: "application/json",
               data: "", processData: false
             },
             options,
@@ -385,7 +384,7 @@
          */
         drop: function(options) {
           return ajax(
-            {type: "DELETE", url: this.url + this.uri},
+            {type: "DELETE", url: $.couch.url + this.uri},
             options,
             "The database could not be deleted"
           );
@@ -401,7 +400,7 @@
          */
         info: function(options) {
           return ajax(
-            {url: this.url + this.uri},
+            {url: $.couch.url + this.uri},
             options,
             "Database information could not be retrieved"
           );
@@ -472,7 +471,7 @@
               since : since
             });
             return ajax(
-              {url: this.url + db.uri + "_changes"+encodeOptions(opts)},
+              {url: $.couch.url + db.uri + "_changes"+encodeOptions(opts)},
               options,
               "Error connecting to "+db.uri+"/_changes."
             );
@@ -514,7 +513,7 @@
           return ajax({
               type: type,
               data: data,
-              url: this.url + this.uri + "_all_docs" + encodeOptions(options)
+              url: $.couch.url + this.uri + "_all_docs" + encodeOptions(options)
             },
             options,
             "An error occurred retrieving a list of all documents"
@@ -602,7 +601,7 @@
               }
             });
           }
-          return ajax({url: this.url + this.uri + encodeDocId(docId) + encodeOptions(options)},
+          return ajax({url: $.couch.url + this.uri + encodeDocId(docId) + encodeOptions(options)},
             options,
             "The document could not be retrieved",
             ajaxOptions
@@ -635,7 +634,7 @@
           }
           var versioned = maybeApplyVersion(doc);
           return $.ajax({
-            type: method, url: this.url + uri + encodeOptions(options),
+            type: method, url: $.couch.url + uri + encodeOptions(options),
             contentType: "application/json",
             dataType: "json", data: toJSON(doc),
             beforeSend : beforeSend,
@@ -678,7 +677,7 @@
           $.extend(options, {successStatus: 201, beforeSend : beforeSend});
           return ajax({
               type: "POST",
-              url: this.url + this.uri + "_bulk_docs" + encodeOptions(options),
+              url: $.couch.url + this.uri + "_bulk_docs" + encodeOptions(options),
               contentType: "application/json", data: toJSON(docs)
             },
             options,
@@ -700,7 +699,7 @@
         removeDoc: function(doc, options) {
           return ajax({
               type: "DELETE",
-              url: this.url +this.uri +
+              url: $.couch.url +this.uri +
                    encodeDocId(doc._id) +
                    encodeOptions({rev: doc._rev})
             },
@@ -727,7 +726,7 @@
           $.extend(options, {successStatus: 201});
           return ajax({
               type: "POST",
-              url: this.url + this.uri + "_bulk_docs" + encodeOptions(options),
+              url: $.couch.url + this.uri + "_bulk_docs" + encodeOptions(options),
               data: toJSON(docs)
             },
             options,
@@ -762,7 +761,7 @@
           });
           return ajax({
               type: "COPY",
-              url:this.url + this.uri + encodeDocId(docId)
+              url:$.couch.url + this.uri + encodeDocId(docId)
             },
             options,
             "The document could not be copied",
@@ -798,7 +797,7 @@
           }
           return ajax({
               type: "POST",
-              url: this.url +this.uri + "_temp_view" + encodeOptions(options),
+              url: $.couch.url +this.uri + "_temp_view" + encodeOptions(options),
               contentType: "application/json", data: toJSON(body)
             },
             options,
@@ -834,7 +833,7 @@
           return ajax({
               type: type,
               data: data,
-              url:this.url + this.uri + '_design/' + list[0] +
+              url:$.couch.url + this.uri + '_design/' + list[0] +
                    '/_list/' + list[1] + '/' + view + encodeOptions(options)
               },
               ajaxOptions, 'An error occured accessing the list'
@@ -867,7 +866,7 @@
           return ajax({
               type: type,
               data: data,
-              url: this.url +this.uri + "_design/" + name[0] +
+              url: $.couch.url +this.uri + "_design/" + name[0] +
                    "/_view/" + name[1] + encodeOptions(options)
             },
             options, "An error occurred accessing the view"
@@ -885,7 +884,7 @@
          * jQuery.ajax/#jQuery-ajax-settings">jQuery ajax settings</a>
          */
         getDbProperty: function(propName, options, ajaxOptions) {
-          return ajax({url: this.url + this.uri + propName + encodeOptions(options)},
+          return ajax({url: $.couch.url + this.uri + propName + encodeOptions(options)},
             options,
             "The property could not be retrieved",
             ajaxOptions
@@ -906,7 +905,7 @@
         setDbProperty: function(propName, propValue, options, ajaxOptions) {
           return ajax({
             type: "PUT", 
-            url: this.url + this.uri + propName + encodeOptions(options),
+            url: $.couch.url + this.uri + propName + encodeOptions(options),
             data : JSON.stringify(propValue)
           },
             options,
@@ -932,7 +931,7 @@
      */
     info: function(options) {
       return ajax(
-        {url: this.url + "/"},
+        {url: $.couch.url + "/"},
         options,
         "Server information could not be retrieved"
       );
@@ -955,7 +954,7 @@
         ajaxOptions.successStatus = 202;
       }
       return ajax({
-          type: "POST", url: this.url + "/_replicate",
+          type: "POST", url: $.couch.url + "/_replicate",
           data: JSON.stringify(repOpts),
           contentType: "application/json"
         },
@@ -976,7 +975,7 @@
         cacheNum = 1;
       }
       if (!uuidCache.length) {
-        ajax({url:  this.url + "/_uuids", data: {count: cacheNum}, async:
+        ajax({url:  $.couch.url + "/_uuids", data: {count: cacheNum}, async:
               false}, {
                 success: function(resp) {
                   uuidCache = resp.uuids;
