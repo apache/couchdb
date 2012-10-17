@@ -106,6 +106,7 @@ replication_error(#rep{id = {BaseId, _} = RepId}, Error) ->
 
 init(_) ->
     process_flag(trap_exit, true),
+    net_kernel:monitor_nodes(true),
     ?DOC_TO_REP = ets:new(?DOC_TO_REP, [named_table, set, protected]),
     ?REP_TO_STATE = ets:new(?REP_TO_STATE, [named_table, set, protected]),
     ?DB_TO_SEQ = ets:new(?DB_TO_SEQ, [named_table, set, protected]),
