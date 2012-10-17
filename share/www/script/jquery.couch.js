@@ -164,7 +164,10 @@
       function userDB_promise(){
         return $.couch.session()
           .pipe(function(resp){
-            return $.couch.db(resp.info.authentication_db);
+            if(toString.call(obj) == '[object String]'){
+              resp = JSON.parse(resp);
+            };
+            return $.couch.db(resp.info.authentication_db)
           })
       }
       if(!callback){
