@@ -164,7 +164,7 @@
       function userDB_promise(){
         return $.couch.session()
           .pipe(function(resp){
-            if(toString.call(obj) == '[object String]'){
+            if(toString.call(resp) == '[object String]'){
               resp = JSON.parse(resp);
             };
             return $.couch.db(resp.info.authentication_db)
