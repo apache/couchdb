@@ -46,7 +46,7 @@
                 reqs=queue:new(), cur_req, status=idle, http_status_code,
                 reply_buffer = <<>>, rep_buf_size=0, streamed_size = 0,
                 recvd_headers=[],
-                status_line, raw_headers, 
+                status_line, raw_headers,
                 is_closing, send_timer, content_length,
                 deleted_crlf = false, transfer_encoding,
                 chunk_size, chunk_size_buffer = <<>>,
@@ -55,11 +55,11 @@
                }).
 
 -record(request, {url, method, options, from,
-                  stream_to, caller_controls_socket = false, 
+                  stream_to, caller_controls_socket = false,
                   caller_socket_options = [],
                   req_id,
                   stream_chunk_size,
-                  save_response_to_file = false, 
+                  save_response_to_file = false,
                   tmp_file_name, tmp_file_fd, preserve_chunked_encoding,
                   response_format}).
 
@@ -208,7 +208,7 @@ handle_info({stream_close, _Req_id}, State) ->
     do_error_reply(State, closing_on_request),
     {stop, normal, State};
 
-handle_info({tcp_closed, _Sock}, State) ->    
+handle_info({tcp_closed, _Sock}, State) ->
     do_trace("TCP connection closed by peer!~n", []),
     handle_sock_closed(State),
     {stop, normal, State};
@@ -405,7 +405,7 @@ accumulate_response(Data, #state{reply_buffer      = RepBuf,
             State#state{reply_buffer = RepBuf_1};
         _ when Caller_controls_socket == true ->
             do_interim_reply(StreamTo, Response_format, ReqId, RepBuf_1),
-            State#state{reply_buffer = <<>>, 
+            State#state{reply_buffer = <<>>,
                         interim_reply_sent = true,
                         streamed_size = Streamed_size + size(RepBuf_1)};
         _ when New_data_size >= Stream_chunk_size ->
@@ -703,7 +703,7 @@ send_req_1(From,
             {stop, normal, State_1}
     end;
 
-send_req_1(From, Url, Headers, Method, Body, Options, Timeout, 
+send_req_1(From, Url, Headers, Method, Body, Options, Timeout,
            #state{proxy_tunnel_setup = in_progress,
                   tunnel_setup_queue = Q} = State) ->
     do_trace("Queued SSL request awaiting tunnel setup: ~n"
@@ -727,7 +727,7 @@ send_req_1(From,
             {Caller, once} when is_pid(Caller) or
                                 is_atom(Caller) ->
                 Async_pid_rec = {{req_id_pid, ReqId}, self()},
-                true = ets:insert(ibrowse_stream, Async_pid_rec), 
+                true = ets:insert(ibrowse_stream, Async_pid_rec),
                 {Caller, true};
             undefined ->
                 {undefined, false};
@@ -916,7 +916,7 @@ is_chunked_encoding_specified(Options) ->
     case get_value(transfer_encoding, Options, false) of
         false ->
             false;
-        {chunked, _} -> 
+        {chunked, _} ->
             true;
         chunked ->
             true
@@ -1027,7 +1027,7 @@ parse_response(Data, #state{reply_buffer = Acc, reqs = Reqs,
             put(conn_close, ConnClose),
             TransferEncoding = to_lower(get_value("transfer-encoding", LCHeaders, "false")),
             case get_value("content-length", LCHeaders, undefined) of
-                _ when Method == connect, 
+                _ when Method == connect,
                        hd(StatCode) == $2 ->
                     cancel_timer(State#state.send_timer),
                     {_, Reqs_1} = queue:out(Reqs),
@@ -1125,7 +1125,7 @@ parse_response(Data, #state{reply_buffer = Acc, reqs = Reqs,
             {error, max_headers_size_exceeded}
     end.
 
-upgrade_to_ssl(#state{socket = Socket, 
+upgrade_to_ssl(#state{socket = Socket,
                       connect_timeout = Conn_timeout,
                       ssl_options = Ssl_options,
                       tunnel_setup_queue = Q} = State) ->
@@ -1165,7 +1165,7 @@ is_connection_closing(_, _)                -> false.
 
 %% This clause determines the chunk size when given data from the beginning of the chunk
 parse_11_response(DataRecvd,
-                  #state{transfer_encoding = chunked, 
+                  #state{transfer_encoding = chunked,
                          chunk_size        = chunk_start,
                          chunk_size_buffer = Chunk_sz_buf
                         } = State) ->
@@ -1193,7 +1193,7 @@ parse_11_response(DataRecvd,
 %% This clause is to remove the CRLF between two chunks
 %%
 parse_11_response(DataRecvd,
-                  #state{transfer_encoding = chunked, 
+                  #state{transfer_encoding = chunked,
                          chunk_size = tbd,
                          chunk_size_buffer = Buf
                         } = State) ->
@@ -1212,7 +1212,7 @@ parse_11_response(DataRecvd,
 %% not support Trailers in the Chunked Transfer encoding. Any trailer
 %% received is silently discarded.
 parse_11_response(DataRecvd,
-                  #state{transfer_encoding = chunked, chunk_size = 0, 
+                  #state{transfer_encoding = chunked, chunk_size = 0,
                          cur_req           = CurReq,
                          deleted_crlf      = DelCrlf,
                          chunk_size_buffer = Trailer,
@@ -1301,9 +1301,9 @@ handle_response(#request{from=From, stream_to=StreamTo, req_id=ReqId,
                        recvd_headers = RespHeaders}=State) when SaveResponseToFile /= false ->
     Body = RepBuf,
     case Fd of
-        undefined -> 
+        undefined ->
             ok;
-        _ -> 
+        _ ->
             ok = file:close(Fd)
     end,
     ResponseBody = case TmpFilename of
@@ -1595,8 +1595,8 @@ is_whitespace(_)   -> false.
 
 send_async_headers(_ReqId, undefined, _, _State) ->
     ok;
-send_async_headers(ReqId, StreamTo, Give_raw_headers, 
-                   #state{status_line = Status_line, raw_headers = Raw_headers, 
+send_async_headers(ReqId, StreamTo, Give_raw_headers,
+                   #state{status_line = Status_line, raw_headers = Raw_headers,
                           recvd_headers = Headers, http_status_code = StatCode,
                           cur_req = #request{options = Opts}
                          }) ->
@@ -1808,7 +1808,7 @@ set_inac_timer(State, Timeout) when is_integer(Timeout) ->
 set_inac_timer(State, _) ->
     State.
 
-get_inac_timeout(#state{cur_req = #request{options = Opts}}) -> 
+get_inac_timeout(#state{cur_req = #request{options = Opts}}) ->
     get_value(inactivity_timeout, Opts, infinity);
 get_inac_timeout(#state{cur_req = undefined}) ->
     case ibrowse:get_config_value(inactivity_timeout, undefined) of
@@ -1851,5 +1851,5 @@ trace_request_body(Body) ->
             ok
     end.
 
-to_binary(X) when is_list(X)   -> list_to_binary(X); 
+to_binary(X) when is_list(X)   -> list_to_binary(X);
 to_binary(X) when is_binary(X) -> X.
