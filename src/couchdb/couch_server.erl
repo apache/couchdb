@@ -13,7 +13,7 @@
 -module(couch_server).
 -behaviour(gen_server).
 
--export([open/2,create/2,delete/2,get_version/0]).
+-export([open/2,create/2,delete/2,get_version/0,get_uuid/0]).
 -export([all_databases/0, all_databases/2]).
 -export([init/1, handle_call/3,sup_start_link/0]).
 -export([handle_cast/2,code_change/3,handle_info/2,terminate/2]).
@@ -41,6 +41,15 @@ get_version() ->
         Vsn;
     false ->
         "0.0.0"
+    end.
+
+get_uuid() ->
+    case couch_config:get("couchdb", "uuid", nil) of
+        nil ->
+            UUID = couch_uuids:random(),
+            couch_config:set("couchdb", "uuid", ?b2l(UUID)),
+            UUID;
+        UUID -> ?l2b(UUID)
     end.
 
 get_stats() ->
