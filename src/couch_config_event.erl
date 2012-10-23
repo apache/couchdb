@@ -5,8 +5,6 @@
 
 -export([start_link/0, register/2]).
 
--include("couch_db.hrl").
-
 start_link() ->
     gen_event:start_link({local, ?MODULE}).
 
@@ -39,7 +37,6 @@ handle_info(_Info, St) ->
     {ok, St}.
 
 terminate(Reason, St) ->
-    ?LOG_INFO("config_event handler ~p terminating with ~p", [St, Reason]),
     ok.
 
 code_change(_OldVsn, St, _Extra) ->
