@@ -1045,34 +1045,33 @@ check_for_last(#mp{buffer=Buffer, data_fun=DataFun}=Mp) ->
                 data_fun = DataFun2})
     end.
 
-find_in_binary(B, Data) when size(B) > 0 ->
-    case size(Data) - size(B) of
-        Last when Last < 0 ->
-            partial_find(B, Data, 0, size(Data));
-        Last ->
-            find_in_binary(B, size(B), Data, 0, Last)
-    end.
-
-find_in_binary(B, BS, D, N, Last) when N =< Last->
-    case D of
-        <<_:N/binary, B:BS/binary, _/binary>> ->
-            {exact, N};
-        _ ->
-            find_in_binary(B, BS, D, 1 + N, Last)
-    end;
-find_in_binary(B, BS, D, N, Last) when N =:= 1 + Last ->
-    partial_find(B, D, N, BS - 1).
-
-partial_find(_B, _D, _N, 0) ->
+find_in_binary(_B, <<>>) ->
     not_found;
-partial_find(B, D, N, K) ->
-    <<B1:K/binary, _/binary>> = B,
-    case D of
-        <<_Skip:N/binary, B1/binary>> ->
-            {partial, N};
-        _ ->
-            partial_find(B, D, 1 + N, K - 1)
+
+find_in_binary(B, Data) ->
+    case binary:match(Data, [B], []) of
+    nomatch ->
+        partial_find(binary:part(B, {0, byte_size(B) - 1}),
+                     binary:part(Data, {byte_size(Data), -byte_size(Data) + 1}), 1);
+    {Pos, _Len} ->
+        {exact, Pos}
     end.
+
+partial_find(<<>>, _Data, _Pos) ->
+    not_found;
+
+partial_find(B, Data, N) when byte_size(Data) > 0 ->
+    case binary:match(Data, [B], []) of
+    nomatch ->
+        partial_find(binary:part(B, {0, byte_size(B) - 1}),
+                     binary:part(Data, {byte_size(Data), -byte_size(Data) + 1}), N + 1);
+    {Pos, _Len} ->
+        {partial, N + Pos}
+    end;
+
+partial_find(_B, _Data, _N) ->
+    not_found.
+
 
 validate_bind_address(Address) ->
     case inet_parse:address(Address) of
