@@ -12,14 +12,26 @@
 
 -module(couch_config_sup).
 -behaviour(supervisor).
+
+%% API
+-export([start_link/0]).
+
+%% Supervisor callbacks
 -export([init/1]).
 
--export([start_link/1]).
+%% Helper macro for declaring children of supervisor
+-define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
 
-start_link(Args) ->
-    supervisor:start_link({local,?MODULE}, ?MODULE, Args).
+%% ===================================================================
+%% API functions
+%% ===================================================================
+
+start_link() ->
+    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+
+%% ===================================================================
+%% Supervisor callbacks
+%% ===================================================================
 
 init([]) ->
-    Mod = chttpd,
-    Spec = {Mod, {Mod,start_link,[]}, permanent, 100, worker, [Mod]},
-    {ok, {{one_for_one, 3, 10}, [Spec]}}.
+    {ok, { {one_for_one, 5, 10}, []} }.
