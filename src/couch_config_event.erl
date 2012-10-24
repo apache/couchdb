@@ -48,7 +48,7 @@ handle_info({'DOWN', Ref, _, _, _}, {_, Ref}) ->
 handle_info(_Info, St) ->
     {ok, St}.
 
-terminate(Reason, St) ->
+terminate(_Reason, _St) ->
     ok.
 
 code_change(_OldVsn, St, _Extra) ->
