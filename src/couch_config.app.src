@@ -1,12 +1,10 @@
-{application, couch_config,
- [
-  {description, ""},
-  {vsn, git},
-  {registered, []},
-  {applications, [
-                  kernel,
-                  stdlib
-                 ]},
-  {mod, { couch_config_app, []}},
-  {env, []}
- ]}.
+{application, couch_config, [
+    {description, "INI file configuration system for Apache CouchDB"},
+    {vsn, git},
+    {registered, [
+        couch_config,
+        couch_config_event
+    ]},
+    {applications, [kernel, stdlib]},
+    {mod, {couch_config_app, []}}
+]}.
