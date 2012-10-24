@@ -78,7 +78,7 @@ couchTests.changes = function(debug) {
     // WebKit (last checked on nightly #47686) does fail on processing
     // the async-request properly while javascript is executed.
 
-    xhr.open("GET", "/test_suite_db/_changes?feed=continuous&timeout=500", true);
+    xhr.open("GET", CouchDB.proxyUrl("/test_suite_db/_changes?feed=continuous&timeout=500"), true);
     xhr.send("");
 
     var docBar = {_id:"bar", bar:1};
@@ -122,7 +122,7 @@ couchTests.changes = function(debug) {
     xhr = CouchDB.newXhr();
 
     //verify the hearbeat newlines are sent
-    xhr.open("GET", "/test_suite_db/_changes?feed=continuous&heartbeat=10&timeout=500", true);
+    xhr.open("GET", CouchDB.proxyUrl("/test_suite_db/_changes?feed=continuous&heartbeat=10&timeout=500"), true);
     xhr.send("");
 
     var str;
@@ -169,7 +169,7 @@ couchTests.changes = function(debug) {
     // test longpolling
     xhr = CouchDB.newXhr();
 
-    xhr.open("GET", "/test_suite_db/_changes?feed=longpoll", true);
+    xhr.open("GET", CouchDB.proxyUrl("/test_suite_db/_changes?feed=longpoll"), true);
     xhr.send("");
 
     waitForSuccess(function() {
@@ -181,7 +181,7 @@ couchTests.changes = function(debug) {
 
     xhr = CouchDB.newXhr();
 
-    xhr.open("GET", "/test_suite_db/_changes?feed=longpoll&since=3", true);
+    xhr.open("GET", CouchDB.proxyUrl("/test_suite_db/_changes?feed=longpoll&since=3"), true);
     xhr.send("");
 
     var docBarz = {_id:"barz", bar:1};
@@ -300,13 +300,13 @@ couchTests.changes = function(debug) {
     // filter with longpoll
     // longpoll filters full history when run without a since seq
     xhr = CouchDB.newXhr();
-    xhr.open("GET", "/test_suite_db/_changes?feed=longpoll&filter=changes_filter/bop", false);
+    xhr.open("GET", CouchDB.proxyUrl("/test_suite_db/_changes?feed=longpoll&filter=changes_filter/bop"), false);
     xhr.send("");
     var resp = JSON.parse(xhr.responseText);
     T(resp.last_seq == 8);
     // longpoll waits until a matching change before returning
     xhr = CouchDB.newXhr();
-    xhr.open("GET", "/test_suite_db/_changes?feed=longpoll&since=8&filter=changes_filter/bop", true);
+    xhr.open("GET", CouchDB.proxyUrl("/test_suite_db/_changes?feed=longpoll&since=7&filter=changes_filter/bop"), true);
     xhr.send("");
     db.save({"_id":"falsy", "bop" : ""}); // empty string is falsy
     db.save({"_id":"bingo","bop" : "bingo"});
@@ -325,7 +325,7 @@ couchTests.changes = function(debug) {
 
       // filter with continuous
       xhr = CouchDB.newXhr();
-      xhr.open("GET", "/test_suite_db/_changes?feed=continuous&filter=changes_filter/bop&timeout="+timeout, true);
+      xhr.open("GET", CouchDB.proxyUrl("/test_suite_db/_changes?feed=continuous&filter=changes_filter/bop&timeout="+timeout), true);
       xhr.send("");
 
       db.save({"_id":"rusty", "bop" : "plankton"});
@@ -518,7 +518,7 @@ couchTests.changes = function(debug) {
     if (!is_safari && xhr) {
         // filter docids with continuous
         xhr = CouchDB.newXhr();
-        xhr.open("POST", "/test_suite_db/_changes?feed=continuous&timeout=500&since=7&filter=_doc_ids", true);
+        xhr.open("POST", CouchDB.proxyUrl("/test_suite_db/_changes?feed=continuous&timeout=500&since=7&filter=_doc_ids"), true);
         xhr.setRequestHeader("Content-Type", "application/json");
 
         xhr.send(options.body);
@@ -612,4 +612,3 @@ couchTests.changes = function(debug) {
   // cleanup
   db.deleteDb();
 };
-

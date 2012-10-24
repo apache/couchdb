@@ -19,7 +19,7 @@ couchTests.content_negotiation = function(debug) {
 
   // with no accept header
   var req = CouchDB.newXhr();
-  req.open("GET", "/test_suite_db/", false);
+  req.open("GET", CouchDB.proxyUrl("/test_suite_db/"), false);
   req.send("");
   TEquals("text/plain; charset=utf-8", req.getResponseHeader("Content-Type"));
 
