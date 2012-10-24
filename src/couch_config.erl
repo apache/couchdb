@@ -150,7 +150,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 parse_ini_file(IniFile) ->
-    IniFilename = couch_util:abs_pathname(IniFile),
+    IniFilename = couch_config_util:abs_pathname(IniFile),
     IniBin =
     case file:read_file(IniFilename) of
         {ok, IniBin0} ->
@@ -202,7 +202,7 @@ parse_ini_file(IniFile) ->
                 [""|_LineValues] -> % line begins with "=", ignore
                     {AccSectionName, AccValues};
                 [ValueName|LineValues] -> % yeehaw, got a line!
-                    RemainingLine = couch_util:implode(LineValues, "="),
+                    RemainingLine = couch_config_util:implode(LineValues, "="),
                     % removes comments
                     case re:split(RemainingLine, " ;|\t;", [{return, list}]) of
                     [[]] ->
@@ -217,4 +217,3 @@ parse_ini_file(IniFile) ->
             end
         end, {"", []}, Lines),
     {ok, ParsedIniValues}.
-
