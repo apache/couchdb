@@ -1458,7 +1458,7 @@ parse_header([], _) ->
     invalid.
 
 scan_header(Bin) ->
-    case get_crlf_crlf_pos(Bin, 0) of
+    case get_crlf_crlf_pos(Bin) of
         {yes, Pos} ->
             {Headers, <<_:4/binary, Body/binary>>} = split_binary(Bin, Pos),
             {yes, Headers, Body};
@@ -1474,7 +1474,7 @@ scan_header(Bin1, Bin2) ->
     Bin1_already_scanned_size = size(Bin1) - 4,
     <<Headers_prefix:Bin1_already_scanned_size/binary, Rest/binary>> = Bin1,
     Bin_to_scan = <<Rest/binary, Bin2/binary>>,
-    case get_crlf_crlf_pos(Bin_to_scan, 0) of
+    case get_crlf_crlf_pos(Bin_to_scan) of
         {yes, Pos} ->
             {Headers_suffix, <<_:4/binary, Body/binary>>} = split_binary(Bin_to_scan, Pos),
             {yes, <<Headers_prefix/binary, Headers_suffix/binary>>, Body};
@@ -1482,9 +1482,16 @@ scan_header(Bin1, Bin2) ->
             {no, <<Bin1/binary, Bin2/binary>>}
     end.
 
-get_crlf_crlf_pos(<<$\r, $\n, $\r, $\n, _/binary>>, Pos) -> {yes, Pos};
-get_crlf_crlf_pos(<<_, Rest/binary>>, Pos)               -> get_crlf_crlf_pos(Rest, Pos + 1);
-get_crlf_crlf_pos(<<>>, _)                               -> no.
+get_crlf_crlf_pos(Data) ->
+    binary_bif_match(Data, <<$\r, $\n, $\r, $\n>>).
+
+binary_bif_match(Data, Binary) ->
+    case binary:match(Data, Binary) of
+    {Pos, _Len} ->
+        {yes, Pos};
+    _ -> no
+    end.
+
 
 scan_crlf(Bin) ->
     case get_crlf_pos(Bin) of
@@ -1513,12 +1520,9 @@ scan_crlf_1(Bin1_head_size, Bin1, Bin2) ->
             {no, list_to_binary([Bin1, Bin2])}
     end.
 
-get_crlf_pos(Bin) ->
-    get_crlf_pos(Bin, 0).
+get_crlf_pos(Data) ->
+    binary_bif_match(Data, <<$\r, $\n>>).
 
-get_crlf_pos(<<$\r, $\n, _/binary>>, Pos) -> {yes, Pos};
-get_crlf_pos(<<_, Rest/binary>>, Pos)     -> get_crlf_pos(Rest, Pos + 1);
-get_crlf_pos(<<>>, _)                     -> no.
 
 fmt_val(L) when is_list(L)    -> L;
 fmt_val(I) when is_integer(I) -> integer_to_list(I);
