@@ -278,10 +278,10 @@ var Render = (function() {
 
   function runRewrite(fun, ddoc, args) {
     try {
-      log(JSON.stringify(args, null, 4));
+      // log(JSON.stringify(args, null, 4));
       var req = args[0];
       var reqPath = req.path.slice(req.path.indexOf("_rewrite") + 1).join("/");
-      log("Path is " + reqPath);
+      // log("Path is " + reqPath);
       var result = fun.apply(ddoc, [req, reqPath]);
       if (!result) {
         throw(["error", "rewrite_error", "rewrite function could not produce mapping"]);

@@ -438,8 +438,19 @@ couchTests.rewrite = function(debug) {
       
       function(){
         var func_rewrite = function (req, path) {
-          if (path === "foo") {
-            return "foo.txt";
+          if (path === "foo") return "foo.txt";
+          if (/^simple\//.test(path)) {
+            return "_show/simple?value=" + path.replace(/\//g, "-");
+          }
+          if (path === "echo-method") return "_show/methodic";
+          if (/^change-method=/.test(path)) {
+            var parts = path.split("=")
+            ,   meth = parts[1]
+            ;
+            return { path: "_show/methodic", method: meth };
+          }
+          if (path === "always-get") {
+            return { path: "_show/methodic", method: "GET" };
           }
           return false;
         };
@@ -452,6 +463,14 @@ couchTests.rewrite = function(debug) {
               data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
             }
           },
+          shows: {
+            simple: stringFun(function (doc, req) {
+              return "Value=" + req.query["value"];
+            }),
+            methodic: stringFun(function (doc, req) {
+              return "method=" + req.method;
+            }),
+          },
         };
         T(db.save(ddoc_func).ok);
 
@@ -463,6 +482,24 @@ couchTests.rewrite = function(debug) {
         // rewrite that doesn't exist
         req = CouchDB.request("GET", "/" + dbName + "/_design/funcrew/_rewrite/does/not/exist");
         TEquals(500, req.status, "should return 500");
+
+        // show with simple computation
+        req = CouchDB.request("GET", "/" + dbName + "/_design/funcrew/_rewrite/simple/with/value");
+        T(req.responseText == "Value=simple-with-value");
+
+        var meths = "GET POST PUT DELETE".split(" ");
+        meths.forEach(function (m) {
+          req = CouchDB.request(m, "/" + dbName + "/_design/funcrew/_rewrite/echo-method");
+          T(req.responseText == "method=" + m);
+        });
+        meths.forEach(function (m) {
+          req = CouchDB.request("GET", "/" + dbName + "/_design/funcrew/_rewrite/change-method=" + m);
+          T(req.responseText == "method=" + m);
+        });
+        meths.forEach(function (m) {
+          req = CouchDB.request(m, "/" + dbName + "/_design/funcrew/_rewrite/always-get");
+          T(req.responseText == "method=GET");
+        });
       }
     );
 
