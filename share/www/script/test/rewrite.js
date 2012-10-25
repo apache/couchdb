@@ -435,7 +435,7 @@ couchTests.rewrite = function(debug) {
     }
     db.save(ddoc);
     var res = CouchDB.request("GET", "/"+dbName+"/_design/invalid/_rewrite/foo");
-    TEquals(400, res.status, "should return 400");
+    TEquals(500, res.status, "should return 500");
 
     var ddoc_requested_path = {
       _id: "_design/requested_path",
