@@ -106,6 +106,32 @@
 %% {"from": "/a",           /a?foo=b        /some/b             foo =:= b
 %% "to": "/some/:foo",
 %%  }}
+%% 
+%% Alternatively, the rewriting can be performed by a function. It is specified
+%% as follows:
+%% 
+%%  {
+%%      ....
+%%      "rewrites": "function (req, path) {
+%%          // process the request, and return the rewrite
+%%      }"
+%%  }
+%%
+%% The function is called with the request object and a path string. The latter
+%% contains whatever path is left after removing everything up to _rewrite/.
+%% 
+%% Which rewrite takes place depends on what the function returns, which can be
+%% one of three things:
+%% 
+%%   - false, or a falsy value: indicates that the rewrite could not be 
+%%     performed. This translates to a 500 error.
+%%   - "a/path": causes the rewrite to that path to take place, with the
+%%     original method being kept.
+%%   - { path: "a/path", method: "FOO" }: rewrites to that path and changes
+%%     the method to the one provided.
+%%
+%% Rewrite functions are meant to be devoid of side-effects and one should
+%% write under the assumption that they are being cached.
 
 
 
