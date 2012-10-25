@@ -139,7 +139,6 @@ handle_rewrite_req(#httpd{
                 <<"Invalid path.">>);
         Bin when is_binary(Bin) ->
             %% XXX TODO
-            %   - this still needs to be refactored, too much code is duplicated with next
             %   - needs more tests
             %   - needs some docs
             %   - the rewrite function gets the request — maybe it should get the post-_rewrite path?
@@ -157,35 +156,7 @@ handle_rewrite_req(#httpd{
                                 <<"Rewrite result must specify a path.">>);
                         P -> binary_to_list(P)
                     end,
-                    % then fire off the mochi request
-                    % most of this code is duplicated -- test with it, but try to refactor later
-                    RewPath1 = case mochiweb_util:safe_relative_path(RewPath) of
-                        undefined ->
-                            ?b2l(Prefix) ++ "/" ++ RewPath;
-                        P1 ->
-                            ?b2l(Prefix) ++ "/" ++ P1
-                    end,
-                    RewPath2 = ?b2l(iolist_to_binary(normalize_path(RewPath1))),
-                    Headers = mochiweb_headers:default("x-couchdb-requested-path",
-                                                        MochiReq:get(raw_path),
-                                                        MochiReq:get(headers)),
-                    ?LOG_DEBUG("rewrite to ~p with method ~p ~n", [RewPath2, RewMethod]),
-                    MochiReq1 = mochiweb_request:new(MochiReq:get(socket),
-                                                     RewMethod,
-                                                     RewPath2,
-                                                     MochiReq:get(version),
-                                                     Headers),
-                    MochiReq1:cleanup(),
-                    #httpd{
-                        db_url_handlers = DbUrlHandlers,
-                        design_url_handlers = DesignUrlHandlers,
-                        default_fun = DefaultFun,
-                        url_handlers = UrlHandlers,
-                        user_ctx = UserCtx
-                    } = Req,
-                    erlang:put(pre_rewrite_user_ctx, UserCtx),
-                    couch_httpd:handle_request_int(MochiReq1, DefaultFun,
-                            UrlHandlers, DbUrlHandlers, DesignUrlHandlers)
+                    perform_rewrite(Req, MochiReq, Prefix, RewPath, RewMethod)
             end;
         Rules ->
             % create dispatch list from rules
@@ -203,56 +174,44 @@ handle_rewrite_req(#httpd{
                     % build new path, reencode query args, eventually convert
                     % them to json
                     Bindings1 = maybe_encode_bindings(Bindings),
-                    Path = binary_to_list(
+                    binary_to_list(
                         iolist_to_binary([
                                 string:join(Parts, [?SEPARATOR]),
                                 [["?", mochiweb_util:urlencode(Bindings1)] 
                                     || Bindings1 =/= [] ]
-                            ])),
-                    
-                    % if path is relative detect it and rewrite path
-                    case mochiweb_util:safe_relative_path(Path) of
-                        undefined ->
-                            ?b2l(Prefix) ++ "/" ++ Path;
-                        P1 ->
-                            ?b2l(Prefix) ++ "/" ++ P1
-                    end
-
+                            ]))
                 end,
-
-            % normalize final path (fix levels "." and "..")
-            RawPath1 = ?b2l(iolist_to_binary(normalize_path(RawPath))),
-
-            % In order to do OAuth correctly, we have to save the
-            % requested path. We use default so chained rewriting
-            % wont replace the original header.
-            Headers = mochiweb_headers:default("x-couchdb-requested-path",
-                                             MochiReq:get(raw_path),
-                                             MochiReq:get(headers)),
-
-            ?LOG_DEBUG("rewrite to ~p ~n", [RawPath1]),
-
-            % build a new mochiweb request
-            MochiReq1 = mochiweb_request:new(MochiReq:get(socket),
-                                             MochiReq:get(method),
-                                             RawPath1,
-                                             MochiReq:get(version),
-                                             Headers),
-
-            % cleanup, It force mochiweb to reparse raw uri.
-            MochiReq1:cleanup(),
-
-            #httpd{
-                db_url_handlers = DbUrlHandlers,
-                design_url_handlers = DesignUrlHandlers,
-                default_fun = DefaultFun,
-                url_handlers = UrlHandlers,
-                user_ctx = UserCtx
-            } = Req,
-            erlang:put(pre_rewrite_user_ctx, UserCtx),
-            couch_httpd:handle_request_int(MochiReq1, DefaultFun,
-                    UrlHandlers, DbUrlHandlers, DesignUrlHandlers)
+            perform_rewrite(Req, MochiReq, Prefix, RawPath, Method1)
         end.
+
+perform_rewrite(Req, MochiReq, Prefix, RewPath, RewMethod) ->
+    RewPath1 = case mochiweb_util:safe_relative_path(RewPath) of
+        undefined ->
+            ?b2l(Prefix) ++ "/" ++ RewPath;
+        P1 ->
+            ?b2l(Prefix) ++ "/" ++ P1
+    end,
+    RewPath2 = ?b2l(iolist_to_binary(normalize_path(RewPath1))),
+    Headers = mochiweb_headers:default("x-couchdb-requested-path",
+                                        MochiReq:get(raw_path),
+                                        MochiReq:get(headers)),
+    ?LOG_DEBUG("rewrite to ~p with method ~p ~n", [RewPath2, RewMethod]),
+    MochiReq1 = mochiweb_request:new(MochiReq:get(socket),
+                                     RewMethod,
+                                     RewPath2,
+                                     MochiReq:get(version),
+                                     Headers),
+    MochiReq1:cleanup(),
+    #httpd{
+        db_url_handlers = DbUrlHandlers,
+        design_url_handlers = DesignUrlHandlers,
+        default_fun = DefaultFun,
+        url_handlers = UrlHandlers,
+        user_ctx = UserCtx
+    } = Req,
+    erlang:put(pre_rewrite_user_ctx, UserCtx),
+    couch_httpd:handle_request_int(MochiReq1, DefaultFun,
+            UrlHandlers, DbUrlHandlers, DesignUrlHandlers).
 
 quote_plus({bind, X}) ->
     mochiweb_util:quote_plus(X);

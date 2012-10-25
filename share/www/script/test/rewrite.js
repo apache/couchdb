@@ -455,7 +455,6 @@ couchTests.rewrite = function(debug) {
 
         // very basic rewrite
         req = CouchDB.request("GET", "/" + dbName + "/_design/funcrew/_rewrite/foo");
-        console.log(req.responseText);
         T(req.responseText == "This is a base64 encoded text");
         T(req.getResponseHeader("Content-Type") == "text/plain");
       }
