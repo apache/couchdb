@@ -669,7 +669,9 @@ send_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Body) ->
     log_request(Req, Code),
     couch_stats_collector:increment({httpd_status_codes, Code}),
     Headers2 = http_1_0_keep_alive(MochiReq, Headers),
-    if Code >= 400 ->
+    if Code >= 500 ->
+        ?LOG_ERROR("httpd ~p error response:~n ~s", [Code, Body]);
+    Code >= 400 ->
         ?LOG_DEBUG("httpd ~p error response:~n ~s", [Code, Body]);
     true -> ok
     end,
