@@ -138,8 +138,54 @@ handle_rewrite_req(#httpd{
             couch_httpd:send_error(Req, 404, <<"rewrite_error">>,
                 <<"Invalid path.">>);
         Bin when is_binary(Bin) ->
-            couch_httpd:send_error(Req, 400, <<"rewrite_error">>,
-                <<"Rewrite rules are a String. They must be a JSON Array.">>);
+            case couch_query_servers:rewrite(Req, _Db, DDoc) of
+                undefined ->
+                    couch_httpd:send_error(Req, 404, <<"rewrite_error">>,
+                        <<"Invalid path.">>);
+                Rewrite ->
+                    % first figure out the method (extract or default)
+                    RewMethod = case couch_util:get_value(<<"method">>, Rewrite) of
+                        undefined ->
+                            couch_util:to_binary(Method);
+                        M -> M
+                    end,
+                    % then get the path (blow up if absent)
+                    RewPath = case couch_util:get_value(<<"path">>, Rewrite) of
+                        undefined ->
+                            couch_httpd:send_error(Req, 400, <<"rewrite_error">>,
+                                <<"Rewrite result must specify a path.">>);
+                        P -> binary_to_list(P)
+                    end,
+                    % then fire off the mochi request
+                    % most of this code is duplicated -- test with it, but try to refactor later
+                    RewPath1 = case mochiweb_util:safe_relative_path(RewPath) of
+                        undefined ->
+                            ?b2l(Prefix) ++ "/" ++ RewPath;
+                        P1 ->
+                            ?b2l(Prefix) ++ "/" ++ P1
+                    end,
+                    RewPath2 = ?b2l(iolist_to_binary(normalize_path(RewPath1))),
+                    Headers = mochiweb_headers:default("x-couchdb-requested-path",
+                                                        MochiReq:get(raw_path),
+                                                        MochiReq:get(headers)),
+                    ?LOG_DEBUG("rewrite to ~p ~n", [RewPath2]),
+                    MochiReq1 = mochiweb_request:new(MochiReq:get(socket),
+                                                     RewMethod,
+                                                     RewPath2,
+                                                     MochiReq:get(version),
+                                                     Headers),
+                    MochiReq1:cleanup(),
+                    #httpd{
+                        db_url_handlers = DbUrlHandlers,
+                        design_url_handlers = DesignUrlHandlers,
+                        default_fun = DefaultFun,
+                        url_handlers = UrlHandlers,
+                        user_ctx = UserCtx
+                    } = Req,
+                    erlang:put(pre_rewrite_user_ctx, UserCtx),
+                    couch_httpd:handle_request_int(MochiReq1, DefaultFun,
+                            UrlHandlers, DbUrlHandlers, DesignUrlHandlers)
+            end;
         Rules ->
             % create dispatch list from rules
             DispatchList =  [make_rule(Rule) || {Rule} <- Rules],

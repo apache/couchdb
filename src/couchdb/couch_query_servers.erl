@@ -20,6 +20,7 @@
 -export([reduce/3, rereduce/3,validate_doc_update/5]).
 -export([filter_docs/5]).
 -export([filter_view/3]).
+-export([rewrite/3]).
 
 -export([with_ddoc_proc/2, proc_prompt/2, ddoc_prompt/3, ddoc_proc_prompt/3, json_doc/1]).
 
@@ -237,6 +238,15 @@ validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj) ->
             throw({forbidden, Message});
         {[{<<"unauthorized">>, Message}]} ->
             throw({unauthorized, Message})
+    end.
+
+rewrite(Req, Db, DDoc) ->
+    JsonReq = couch_httpd_external:json_req_obj(Req, Db),
+    case ddoc_prompt(DDoc, [<<"rewrites">>], [JsonReq]) of
+        [<<"error">>] ->
+            undefined;
+        [<<"rew">>, Rewrite] ->
+            Rewrite
     end.
 
 json_doc(nil) -> null;

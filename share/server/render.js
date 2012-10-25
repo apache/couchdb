@@ -276,6 +276,25 @@ var Render = (function() {
     }
   };
 
+  function runRewrite(fun, ddoc, args) {
+    try {
+      var result = fun.apply(ddoc, args);
+      if (!result) {
+        throw(["error", "rewrite_error", "rewrite function could not produce mapping"]);
+      }
+      if (typeof result === "string") {
+        result = { path: result };
+      }
+      if (typeof result !== "object") {
+        throw(["error", "rewrite_error", "incomprehensible response from rewrite function"]);
+      }
+      if (!result.method) result.method = args[0].method;
+      respond(["rew", doc, result]);
+    } catch(e) {
+      renderError(e, fun.toSource());
+    }
+  };
+
   function resetList() {
     gotRow = false;
     lastRow = false;
@@ -335,6 +354,9 @@ var Render = (function() {
     },
     list : function(fun, ddoc, args) {
       runList(fun, ddoc, args);
+    },
+    rewrite : function(fun, ddoc, args) {
+      runRewrite(fun, ddoc, args);
     }
   };
 })();
