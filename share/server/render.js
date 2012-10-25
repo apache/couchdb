@@ -289,7 +289,7 @@ var Render = (function() {
         throw(["error", "rewrite_error", "incomprehensible response from rewrite function"]);
       }
       if (!result.method) result.method = args[0].method;
-      respond(["rew", doc, result]);
+      respond(["rew", result]);
     } catch(e) {
       renderError(e, fun.toSource());
     }

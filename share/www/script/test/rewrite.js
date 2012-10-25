@@ -427,6 +427,40 @@ couchTests.rewrite = function(debug) {
           });
       });
 
+    // test function rewrites
+    run_on_modified_server(
+      [{section: "httpd",
+        key: "authentication_handlers",
+        value: "{couch_httpd_auth, special_test_authentication_handler}"},
+       {section:"httpd",
+        key: "WWW-Authenticate",
+        value: "X-Couch-Test-Auth"}],
+      
+      function(){
+        var func_rewrite = function (req) {
+          // console.log(req);
+          return "foo.txt";
+        };
+        var ddoc_func = {
+          _id:        "_design/funcrew",
+          rewrites:   stringFun(func_rewrite),
+          _attachments:{
+            "foo.txt": {
+              content_type:"text/plain",
+              data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+            }
+          },
+        };
+        T(db.save(ddoc_func).ok);
+
+        // very basic rewrite
+        req = CouchDB.request("GET", "/" + dbName + "/_design/funcrew/_rewrite/foo");
+        console.log(req.responseText);
+        T(req.responseText == "This is a base64 encoded text");
+        T(req.getResponseHeader("Content-Type") == "text/plain");
+      }
+    );
+
     // test invalid rewrites
     // string
     var ddoc = {

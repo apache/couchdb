@@ -138,17 +138,18 @@ handle_rewrite_req(#httpd{
             couch_httpd:send_error(Req, 404, <<"rewrite_error">>,
                 <<"Invalid path.">>);
         Bin when is_binary(Bin) ->
+            %% XXX TODO
+            %   - this still needs to be refactored, too much code is duplicated with next
+            %   - needs more tests
+            %   - needs some docs
+            %   - the rewrite function gets the request — maybe it should get the post-_rewrite path?
             case couch_query_servers:rewrite(Req, _Db, DDoc) of
                 undefined ->
                     couch_httpd:send_error(Req, 404, <<"rewrite_error">>,
                         <<"Invalid path.">>);
-                Rewrite ->
+                {Rewrite} ->
                     % first figure out the method (extract or default)
-                    RewMethod = case couch_util:get_value(<<"method">>, Rewrite) of
-                        undefined ->
-                            couch_util:to_binary(Method);
-                        M -> M
-                    end,
+                    RewMethod = couch_util:get_value(<<"method">>, Rewrite, couch_util:to_binary(Method)),
                     % then get the path (blow up if absent)
                     RewPath = case couch_util:get_value(<<"path">>, Rewrite) of
                         undefined ->
@@ -168,7 +169,7 @@ handle_rewrite_req(#httpd{
                     Headers = mochiweb_headers:default("x-couchdb-requested-path",
                                                         MochiReq:get(raw_path),
                                                         MochiReq:get(headers)),
-                    ?LOG_DEBUG("rewrite to ~p ~n", [RewPath2]),
+                    ?LOG_DEBUG("rewrite to ~p with method ~p ~n", [RewPath2, RewMethod]),
                     MochiReq1 = mochiweb_request:new(MochiReq:get(socket),
                                                      RewMethod,
                                                      RewPath2,
