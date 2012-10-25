@@ -512,6 +512,14 @@ validate_doc_update(#db{validate_doc_funs=[]}, _Doc, _GetDiskDocFun) ->
 validate_doc_update(_Db, #doc{id= <<"_local/",_/binary>>}, _GetDiskDocFun) ->
     ok;
 validate_doc_update(Db, Doc, GetDiskDocFun) ->
+    case get(io_priority) of
+        {internal_repl, _} ->
+            ok;
+        _ ->
+            validate_doc_update_int(Db, Doc, GetDiskDocFun)
+    end.
+
+validate_doc_update_int(Db, Doc, GetDiskDocFun) ->
     DiskDoc = GetDiskDocFun(),
     JsonCtx = couch_util:json_user_ctx(Db),
     SecObj = get_security(Db),
