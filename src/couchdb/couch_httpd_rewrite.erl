@@ -138,9 +138,6 @@ handle_rewrite_req(#httpd{
             couch_httpd:send_error(Req, 404, <<"rewrite_error">>,
                 <<"Invalid path.">>);
         Bin when is_binary(Bin) ->
-            %% XXX TODO
-            %   - needs more tests
-            %   - needs some docs
             case couch_query_servers:rewrite(Req, _Db, DDoc) of
                 undefined ->
                     couch_httpd:send_error(Req, 404, <<"rewrite_error">>,
