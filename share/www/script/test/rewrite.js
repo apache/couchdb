@@ -437,9 +437,11 @@ couchTests.rewrite = function(debug) {
         value: "X-Couch-Test-Auth"}],
       
       function(){
-        var func_rewrite = function (req) {
-          // console.log(req);
-          return "foo.txt";
+        var func_rewrite = function (req, path) {
+          if (path === "foo") {
+            return "foo.txt";
+          }
+          return false;
         };
         var ddoc_func = {
           _id:        "_design/funcrew",

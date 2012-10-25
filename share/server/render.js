@@ -278,7 +278,10 @@ var Render = (function() {
 
   function runRewrite(fun, ddoc, args) {
     try {
-      var result = fun.apply(ddoc, args);
+      log(JSON.stringify(args, null, 4));
+      var req = args[0];
+      var reqPath = req.path.slice(req.path.indexOf("_rewrite") + 1).join("/");
+      var result = fun.apply(ddoc, [req, reqPath]);
       if (!result) {
         throw(["error", "rewrite_error", "rewrite function could not produce mapping"]);
       }
@@ -288,7 +291,7 @@ var Render = (function() {
       if (typeof result !== "object") {
         throw(["error", "rewrite_error", "incomprehensible response from rewrite function"]);
       }
-      if (!result.method) result.method = args[0].method;
+      if (!result.method) result.method = req.method;
       respond(["rew", result]);
     } catch(e) {
       renderError(e, fun.toSource());

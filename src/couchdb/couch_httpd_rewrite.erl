@@ -141,7 +141,6 @@ handle_rewrite_req(#httpd{
             %% XXX TODO
             %   - needs more tests
             %   - needs some docs
-            %   - the rewrite function gets the request — maybe it should get the post-_rewrite path?
             case couch_query_servers:rewrite(Req, _Db, DDoc) of
                 undefined ->
                     couch_httpd:send_error(Req, 404, <<"rewrite_error">>,
