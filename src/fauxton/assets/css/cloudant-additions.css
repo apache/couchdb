@@ -1,0 +1,8 @@
+pre.view-code-error {
+    color: red;
+}
+
+.CodeMirror-scroll {
+    height: auto;
+    overflow-y: visible;
+}

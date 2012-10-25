@@ -1,0 +1,6 @@
+<td>
+  <a href="/database/<%= doc.collection.database.id %>/<%= doc.get('key') %>">
+    <%= doc.get("key") %>
+  </a>
+</td>
+<td><%= JSON.stringify(doc.get("value")) %></td>
