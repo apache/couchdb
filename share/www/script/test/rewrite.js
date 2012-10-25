@@ -459,6 +459,10 @@ couchTests.rewrite = function(debug) {
         req = CouchDB.request("GET", "/" + dbName + "/_design/funcrew/_rewrite/foo");
         T(req.responseText == "This is a base64 encoded text");
         T(req.getResponseHeader("Content-Type") == "text/plain");
+        
+        // rewrite that doesn't exist
+        req = CouchDB.request("GET", "/" + dbName + "/_design/funcrew/_rewrite/does/not/exist");
+        TEquals(500, req.status, "should return 500");
       }
     );
 
