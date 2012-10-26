@@ -19,7 +19,19 @@ Some recentish version of node.js and npm is required for the local
 development and build tools. You will will also need backbone boiler
 plate which will install the other dependencies needed.
 
-    npm install -g bbb grunt-contrib-copy grunt-couchapp grunt-templater underscore
-    bbb server
+    git clone https://github.com/cloudant-labs/couchdb/ couchdb-fauxton
+    cd couchdb-fauxton
+    git checkout fauxton
+    ./bootstrap && ./configure && make dev
+    cd src/fauxton
+    npm install -g bbb
+    npm install grunt-contrib-copy grunt-couchapp grunt-templater underscore
+    bbb couchdb **or** bbb couchdebug
+    ../../utils/run &
+    open http://localhost:5984/_utils/fauxton/index.html
 
-Now visit [http://localhost:8000](http://localhost:8000)
+Install [phantomjs][http://phantomjs.org/] for tests.
+
+For developing standalone run bbb dev. This will start a node server with your
+code running at [http://localhost:8000](http://localhost:8000) (standard bbb
+practice) . **TODO:** proxy to CouchDB in this environment

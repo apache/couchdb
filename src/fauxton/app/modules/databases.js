@@ -51,6 +51,7 @@ function(app, Backbone, Views) {
     model: Databases.Model,
 
     url: function() {
+      console.log('all dbs databases.js');
       return app.host + "/_all_dbs";
     },
 

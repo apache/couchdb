@@ -11,11 +11,11 @@ function(app, Router) {
   // Define your master router on the application namespace and trigger all
   // navigation from this instance.
   app.router = new Router();
-
+  console.log('main.js: router initialized');
   // Trigger the initial route and enable HTML5 History API support, set the
   // root folder to '/' by default.  Change in app.js.
   Backbone.history.start({ pushState: true, root: app.root });
-
+  console.log('main.js: history initialized');
   // All navigation that is relative should be passed through the navigate
   // method, to be processed by the router. If the link has a `data-bypass`
   // attribute, bypass the delegation completely.
@@ -37,5 +37,5 @@ function(app, Router) {
       Backbone.history.navigate(href.attr, true);
     }
   });
-
+  console.log('main.js: complete');
 });

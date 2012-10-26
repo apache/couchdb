@@ -60,7 +60,17 @@ module.exports = function(grunt) {
         dest: '../../share/www/fauxton/index.html',
         variables: {
           assets_root: '/_utils/fauxton/',
-          requirejs: 'require.min.js'
+          requirejs: 'require.min.js',
+          base: '/_utils/fauxton/'
+        }
+      },
+      couchdebug:{
+        src: 'assets/index.underscore',
+        dest: '../../share/www/fauxton/index.html',
+        variables: {
+          assets_root: '/_utils/fauxton/',
+          requirejs: 'require.js',
+          base: '/_utils/fauxton/'
         }
       },
       release: {
@@ -68,7 +78,8 @@ module.exports = function(grunt) {
         dest: 'dist/release/index.html',
         variables: {
           assets_root: '/',
-          requirejs: 'require.min.js'
+          requirejs: 'require.min.js',
+          base: '/'
         }
       },
       debug: {
@@ -76,7 +87,8 @@ module.exports = function(grunt) {
         dest: 'dist/debug/index.html',
         variables: {
           assets_root: '/',
-          requirejs: 'require.js'
+          requirejs: 'require.js',
+          base: '/'
         }
       }
     },
@@ -190,7 +202,7 @@ module.exports = function(grunt) {
     // Copy build artifacts and library code into the distribution
 
     copy: {
-      dist: {
+      couchdb: {
         files: {
           // this gets built in the template task
           //"../../share/www/fauxton/index.html": "dist/release/index.html",
@@ -200,10 +212,30 @@ module.exports = function(grunt) {
           "../../share/www/fauxton/css/": "dist/release/css/**"
         }
       },
-      debug:{
+      couchdebug: {
+        files: {
+          // this gets built in the template task
+          //"../../share/www/fauxton/index.html": "dist/release/index.html",
+          "../../share/www/fauxton/js/": "dist/debug/js/**",
+          // no images... yet
+          //"../../share/www/fauxton/img/": "dist/release/img/**",
+          "../../share/www/fauxton/css/": "dist/debug/css/**",
+          // Must be possible to improve this...
+          "../../share/www/fauxton/app/": "dist/debug/**"
+        }
+      },
+      dist:{
         files:{
           "dist/release/js/": "assets/js/**",
-          "dist/release/img": "assets/img/**"
+          //"dist/release/css/**": "assets/css/**"
+          //"dist/release/img/": "assets/img/**"
+        }
+      },
+      debug:{
+        files:{
+          "dist/debug/js/": "assets/js/**",
+          //"dist/debug/css/": "dist/release/css/**"
+          //"dist/release/img/": "assets/img/**"
         }
       }
     }
@@ -229,10 +261,12 @@ module.exports = function(grunt) {
   grunt.registerTask("minify", "min mincss");
   // deafult task - push to CouchDB
   grunt.registerTask("default", "test build release install");
+  grunt.registerTask("dev", "debug server:debug");
   // make a debug install
-  grunt.registerTask("debug", "test build template:debug copy:debug install");
+  grunt.registerTask("debug", "test build template:debug copy:debug");
   // make an install that is server by mochiweb under _utils
-  grunt.registerTask("couchdb", "test build minify template:couchdb copy:dist");
+  grunt.registerTask("couchdebug", "debug template:couchdebug copy:couchdebug");
+  grunt.registerTask("couchdb", "test build minify template:couchdb copy:couchdb");
   // build a release
   grunt.registerTask("release", "minify template:release copy:dist");
   // copy build artifacts into release dir, upload into server

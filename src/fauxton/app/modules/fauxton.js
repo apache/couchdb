@@ -42,7 +42,9 @@ function(app, Backbone) {
     ],
 
     initialize: function() {
+      console.log('initialize NavBar wat');
       this.on("link:add", this.render, this);
+      console.log('initialize NavBar ftw');
     },
 
     serialize: function() {

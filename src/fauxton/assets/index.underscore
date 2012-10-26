@@ -15,6 +15,7 @@
     padding-bottom: 40px;
     }
   </style>
+  <base href="<%= base %>"></base>
 </head>
 
 <body id="home">

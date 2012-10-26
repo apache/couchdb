@@ -89,7 +89,7 @@ function(app, Initialize, Fauxton, Databases, API, Plugin) {
           "#primary-navbar": this.navBar
         }
       });
-      
+
       $("#app-container").html(dashboard.$el);
 
       database.allDocs.fetch().done(function(resp) {
@@ -98,6 +98,7 @@ function(app, Initialize, Fauxton, Databases, API, Plugin) {
     },
 
     index: function() {
+      console.log('index router.js ftw');
       var databases = app.databases = new Databases.List();
 
       var dashboard = new Backbone.Layout({
@@ -111,7 +112,7 @@ function(app, Initialize, Fauxton, Databases, API, Plugin) {
           "#primary-navbar": this.navBar
         }
       });
-      
+
       window.dashboard = dashboard;
 
       $("#app-container").html(dashboard.$el);
