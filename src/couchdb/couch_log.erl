@@ -17,6 +17,7 @@
 -export([start_link/0, stop/0]).
 -export([debug/2, info/2, error/2]).
 -export([debug_on/0, info_on/0, get_level/0, get_level_integer/0, set_level/1]).
+-export([debug_on/1, info_on/1, get_level/1, get_level_integer/1, set_level/2]).
 -export([read/2]).
 
 % gen_event callbacks
@@ -73,18 +74,26 @@ init([]) ->
         ("log", "level") ->
             ?MODULE:stop();
         ("log", "include_sasl") ->
+            ?MODULE:stop();
+        ("log_level_by_module", _) ->
             ?MODULE:stop()
         end),
 
     Filename = couch_config:get("log", "file", "couchdb.log"),
     Level = level_integer(list_to_atom(couch_config:get("log", "level", "info"))),
     Sasl = couch_config:get("log", "include_sasl", "true") =:= "true",
+    LevelByModule = couch_config:get("log_level_by_module"),
 
     case ets:info(?MODULE) of
     undefined -> ets:new(?MODULE, [named_table]);
     _ -> ok
     end,
     ets:insert(?MODULE, {level, Level}),
+    lists:foreach(fun({Module, ModuleLevel}) ->
+        ModuleLevelInteger = level_integer(list_to_atom(ModuleLevel)),
+        ets:insert(?MODULE, {Module, ModuleLevelInteger})
+    end, LevelByModule),
+
 
     case file:open(Filename, [append]) of
     {ok, Fd} ->
@@ -101,11 +110,23 @@ debug_on() ->
 info_on() ->
     get_level_integer() =< ?LEVEL_INFO.
 
+debug_on(Module) ->
+    get_level_integer(Module) =< ?LEVEL_DEBUG.
+
+info_on(Module) ->
+    get_level_integer(Module) =< ?LEVEL_INFO.
+
 set_level(LevelAtom) ->
     set_level_integer(level_integer(LevelAtom)).
 
+set_level(Module, LevelAtom) ->
+    set_level_integer(Module, level_integer(LevelAtom)).
+
 get_level() ->
     level_atom(get_level_integer()).
+
+get_level(Module) ->
+    level_atom(get_level_integer(Module)).
 
 get_level_integer() ->
     try
@@ -114,18 +135,28 @@ get_level_integer() ->
         ?LEVEL_ERROR
     end.
 
+get_level_integer(Module0) ->
+    Module = atom_to_list(Module0),
+    try
+        [{_Module, Level}] = ets:lookup(?MODULE, Module),
+        Level
+    catch error:_ ->
+        get_level_integer()
+    end.
+
 set_level_integer(Int) ->
     gen_event:call(error_logger, couch_log, {set_level_integer, Int}).
+
+set_level_integer(Module, Int) ->
+    gen_event:call(error_logger, couch_log, {set_level_integer, Module, Int}).
 
 handle_event({couch_error, ConMsg, FileMsg}, State) ->
     log(State, ConMsg, FileMsg),
     {ok, State};
-handle_event({couch_info, ConMsg, FileMsg}, #state{level = LogLevel} = State)
-when LogLevel =< ?LEVEL_INFO ->
+handle_event({couch_info, ConMsg, FileMsg}, #state{level = LogLevel} = State) ->
     log(State, ConMsg, FileMsg),
     {ok, State};
-handle_event({couch_debug, ConMsg, FileMsg}, #state{level = LogLevel} = State)
-when LogLevel =< ?LEVEL_DEBUG ->
+handle_event({couch_debug, ConMsg, FileMsg}, #state{level = LogLevel} = State) ->
     log(State, ConMsg, FileMsg),
     {ok, State};
 handle_event({error_report, _, {Pid, _, _}}=Event, #state{sasl = true} = St) ->
@@ -141,6 +172,10 @@ handle_event(_Event, State) ->
 
 handle_call({set_level_integer, NewLevel}, State) ->
     ets:insert(?MODULE, {level, NewLevel}),
+    {ok, ok, State#state{level = NewLevel}};
+
+handle_call({set_level_integer, Module, NewLevel}, State) ->
+    ets:insert(?MODULE, {Module, NewLevel}),
     {ok, ok, State#state{level = NewLevel}}.
 
 handle_info(_Info, State) ->
