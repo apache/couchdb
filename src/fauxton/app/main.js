@@ -14,7 +14,7 @@ function(app, Router) {
   console.log('main.js: router initialized');
   // Trigger the initial route and enable HTML5 History API support, set the
   // root folder to '/' by default.  Change in app.js.
-  Backbone.history.start({ pushState: true, root: app.root });
+  Backbone.history.start({ pushState: false, root: app.root });
   console.log('main.js: history initialized');
   // All navigation that is relative should be passed through the navigate
   // method, to be processed by the router. If the link has a `data-bypass`
