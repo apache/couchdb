@@ -1,7 +1,7 @@
 <td>
   <i class="icon-info-sign database-info"></i>
   &nbsp;
-  <a href="/database/<%= database.get("name") %>/_all_docs?limit=100"><%= database.get("name") %></a>
+  <a href="#/database/<%= database.get("name") %>/_all_docs?limit=100"><%= database.get("name") %></a>
 </td>
 <td><%= database.status.get("disk_size")  %></td>
 <td><%= database.status.get("doc_count")  %></td>

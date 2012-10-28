@@ -13,7 +13,7 @@ function(app, _, Bootstrap) {
   // creation.
   _.extend(app, {
     // The root path to run the application through.
-    root: "/",
+    root: "/_utils/fauxton/",
     host: "http://localhost:5984",
 
     renderView: function(baseView, selector, view, options, callback) {
@@ -25,10 +25,9 @@ function(app, _, Bootstrap) {
       if (typeof queryString !== "undefined") {
         if (queryString.substring(0,1) === "?")
           queryString = queryString.substring(1);
-      } else {
-        queryString = window.location.search.substring(1);
       }
-      queryString = queryString || window.location.search.substring(1);
+      var hash = window.location.hash.split('?')[1];
+      queryString = queryString || hash || window.location.search.substring(1);
       var match,
       urlParams = {},
       pl     = /\+/g,  // Regex for replacing addition symbol with a space
@@ -36,8 +35,11 @@ function(app, _, Bootstrap) {
       decode = function (s) { return decodeURIComponent(s.replace(pl, " ")); },
       query  = queryString;
 
-      while (match == search.exec(query))
-        urlParams[decode(match[1])] = decode(match[2]);
+      if (queryString) {
+        while (match == search.exec(query)) {
+          urlParams[decode(match[1])] = decode(match[2]);
+        }
+      }
 
       return urlParams;
     }

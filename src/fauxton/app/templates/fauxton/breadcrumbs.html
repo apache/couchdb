@@ -1,7 +1,7 @@
 <ul class="breadcrumb">
   <% _.each(crumbs, function(crumb) { %>
     <li>
-      <a href="<%= crumb.link %>"><%= crumb.name %></a>
+      <a href="#<%= crumb.link %>"><%= crumb.name %></a>
       <span class="divider"> / </span>
     </li>
   <% }); %>

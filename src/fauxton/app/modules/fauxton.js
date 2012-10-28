@@ -35,10 +35,10 @@ function(app, Backbone) {
     template: "fauxton/nav_bar",
 
     navLinks: [
-      {href:"/", title:"Home"},
-      {href:"/_all_dbs", title:"Databases"},
-      {href:"/_status", title:"Status"},
-      {href:"/_stats", title:"Stats"}
+      {href:"#/", title:"Home"},
+      {href:"#/_all_dbs", title:"Databases"},
+      {href:"#/_status", title:"Status"},
+      {href:"#/_stats", title:"Stats"}
     ],
 
     initialize: function() {

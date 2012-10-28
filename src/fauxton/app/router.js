@@ -18,6 +18,7 @@ function(app, Initialize, Fauxton, Databases, API, Plugin) {
   var Router = app.router = Backbone.Router.extend({
     routes: {
       "": "index",
+      "index.html": "index",
       "_all_dbs": "index",
       "database/:database/_:handler": "database_handler",
       "database/:database/:doc": "database_doc"
