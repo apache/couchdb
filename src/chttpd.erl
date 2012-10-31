@@ -136,7 +136,7 @@ stop() ->
     mochiweb_http:stop(?MODULE).
 
 handle_request(MochiReq) ->
-    Begin = now(),
+    Begin = os:timestamp(),
 
     case config:get("chttpd", "socket_options") of
     undefined ->
@@ -239,7 +239,7 @@ handle_request(MochiReq) ->
             send_error(HttpReq, {Error, nil, Stack})
     end,
 
-    RequestTime = timer:now_diff(now(), Begin)/1000,
+    RequestTime = timer:now_diff(os:timestamp(), Begin)/1000,
     {Status, Code} = case Result of
     {ok, #delayed_resp{resp=Resp}} ->
         {ok, Resp:get(code)};

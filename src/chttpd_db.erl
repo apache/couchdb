@@ -61,10 +61,10 @@ handle_changes_req(#httpd{method='GET'}=Req, Db) ->
     },
     case ChangesArgs#changes_args.feed of
     "normal" ->
-        T0 = now(),
+        T0 = os:timestamp(),
         {ok, Info} = fabric:get_db_info(Db),
         Etag = chttpd:make_etag(Info),
-        DeltaT = timer:now_diff(now(), T0) / 1000,
+        DeltaT = timer:now_diff(os:timestamp(), T0) / 1000,
         couch_stats_collector:record({couchdb, dbinfo}, DeltaT),
         chttpd:etag_respond(Req, Etag, fun() ->
             fabric:changes(Db, fun changes_callback/2, {"normal", {"Etag",Etag}, Req},
@@ -205,9 +205,9 @@ do_db_req(#httpd{path_parts=[DbName|_], user_ctx=Ctx}=Req, Fun) ->
 
 db_req(#httpd{method='GET',path_parts=[DbName]}=Req, _Db) ->
     % measure the time required to generate the etag, see if it's worth it
-    T0 = now(),
+    T0 = os:timestamp(),
     {ok, DbInfo} = fabric:get_db_info(DbName),
-    DeltaT = timer:now_diff(now(), T0) / 1000,
+    DeltaT = timer:now_diff(os:timestamp(), T0) / 1000,
     couch_stats_collector:record({couchdb, dbinfo}, DeltaT),
     send_json(Req, {DbInfo});
 
@@ -473,10 +473,10 @@ db_req(#httpd{path_parts=[_, DocId | FileNameParts]}=Req, Db) ->
 
 all_docs_view(Req, Db, Keys) ->
     % measure the time required to generate the etag, see if it's worth it
-    T0 = now(),
+    T0 = os:timestamp(),
     {ok, Info} = fabric:get_db_info(Db),
     Etag = couch_httpd:make_etag(Info),
-    DeltaT = timer:now_diff(now(), T0) / 1000,
+    DeltaT = timer:now_diff(os:timestamp(), T0) / 1000,
     couch_stats_collector:record({couchdb, dbinfo}, DeltaT),
     QueryArgs = chttpd_view:parse_view_params(Req, Keys, map),
     chttpd:etag_respond(Req, Etag, fun() ->
