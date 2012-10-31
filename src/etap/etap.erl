@@ -120,14 +120,14 @@ plan(N) when is_integer(N), N > 0 ->
 %% @doc End the current test plan and output test results.
 %% @todo This should probably be done in the test_server process.
 end_tests() ->
-    timer:sleep(100),
+    Ref = make_ref(),
     case whereis(etap_server) of
-        undefined -> self() ! true;
-        _ -> etap_server ! {self(), state}
+        undefined -> self() ! {Ref, true};
+        _ -> etap_server ! {self(), state, Ref}
     end,
-    State = receive X -> X end,
+    State = receive {Ref, X} -> X end,
     if
-        State#test_state.planned == -1 ->
+        is_record(State, test_state) andalso State#test_state.planned == -1 ->
             io:format("1..~p~n", [State#test_state.count]);
         true ->
             ok
@@ -564,8 +564,8 @@ test_server(State) ->
                 count = State#test_state.count + 1,
                 fail = State#test_state.fail + 1
             };
-        {From, state} ->
-            From ! State,
+        {From, state, Ref} ->
+            From ! {Ref, State},
             State;
         {_From, diag, Message} ->
             io:format("~s~n", [Message]),
@@ -573,8 +573,8 @@ test_server(State) ->
         {From, count} ->
             From ! State#test_state.count,
             State;
-        {From, is_skip} ->
-            From ! State#test_state.skip,
+        {From, is_skip, Ref} ->
+            From ! {Ref, State#test_state.skip},
             State;
         done ->
             exit(normal)
@@ -584,7 +584,8 @@ test_server(State) ->
 %% @private
 %% @doc Process the result of a test and send it to the etap_server process.
 mk_tap(Result, Desc) ->
-    IsSkip = lib:sendw(etap_server, is_skip),
+    etap_server ! {self(), is_skip, Ref = make_ref()} ,
+    receive {Ref, IsSkip} -> ok end,
     case [IsSkip, Result] of
         [_, true] ->
             etap_server ! {self(), pass, Desc},
