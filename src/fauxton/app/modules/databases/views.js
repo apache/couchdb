@@ -110,6 +110,14 @@ function(app, Backbone, Codemirror, JSHint) {
   Views.Doc = Backbone.View.extend({
     template: "databases/doc",
 
+    events: {
+      "click button.save-doc": "saveDoc"
+    },
+
+    saveDoc: function(event) {
+      alert("Save functionality coming soon.");
+    },
+
     runJSHint: function() {
       var json = this.editor.getValue();
       var output = JSHint(json);

@@ -111,7 +111,8 @@ module.exports = function(grunt) {
     // only want to load one stylesheet in index.html.
     mincss: {
       "dist/release/css/index.css": [
-        "dist/debug/css/index.css", 'assets/css/codemirror.css'
+        "dist/debug/css/index.css", 'assets/css/codemirror.css',
+        'assets/css/cloudant-additions.css'
       ]
     },
 
