@@ -265,7 +265,7 @@ handle_request(MochiReq) ->
 %% aren't sharded. So for now when a local db is specified as the source or
 %% the target, it's hacked to make it a full url and treated as a remote.
 possibly_hack(#httpd{path_parts=[<<"_replicate">>]}=Req) ->
-    {Props0} = couch_httpd:json_body_obj(Req),
+    {Props0} = chttpd:json_body_obj(Req),
     Props1 = fix_uri(Req, Props0, <<"source">>),
     Props2 = fix_uri(Req, Props1, <<"target">>),
     put(post_body, {Props2}),

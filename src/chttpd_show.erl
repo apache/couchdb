@@ -162,7 +162,7 @@ handle_view_list_req(#httpd{method='GET'}=Req, _Db, _DDoc) ->
 
 handle_view_list_req(#httpd{method='POST',
         path_parts=[_, _, DesignName, _, ListName, ViewName]}=Req, Db, DDoc) ->
-    ReqBody = couch_httpd:body(Req),
+    ReqBody = chttpd:body(Req),
     {Props2} = ?JSON_DECODE(ReqBody),
     Keys = proplists:get_value(<<"keys">>, Props2, nil),
     handle_view_list(Req#httpd{req_body=ReqBody}, Db, DDoc, ListName,
@@ -170,7 +170,7 @@ handle_view_list_req(#httpd{method='POST',
 
 handle_view_list_req(#httpd{method='POST',
         path_parts=[_, _, _, _, ListName, DesignName, ViewName]}=Req, Db, DDoc) ->
-    ReqBody = couch_httpd:body(Req),
+    ReqBody = chttpd:body(Req),
     {Props2} = ?JSON_DECODE(ReqBody),
     Keys = proplists:get_value(<<"keys">>, Props2, nil),
     handle_view_list(Req#httpd{req_body=ReqBody}, Db, DDoc, ListName,

@@ -218,7 +218,7 @@ db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
     W = couch_httpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     Options = [{user_ctx,Ctx}, {w,W}],
 
-    Doc = couch_doc:from_json_obj(couch_httpd:json_body(Req)),
+    Doc = couch_doc:from_json_obj(chttpd:json_body(Req)),
     Doc2 = case Doc#doc.id of
         <<"">> ->
             Doc#doc{id=couch_uuids:new(), revs={0, []}};
@@ -385,7 +385,7 @@ db_req(#httpd{path_parts=[_,<<"_all_docs">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "GET,HEAD,POST");
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_missing_revs">>]}=Req, Db) ->
-    {JsonDocIdRevs} = couch_httpd:json_body_obj(Req),
+    {JsonDocIdRevs} = chttpd:json_body_obj(Req),
     {ok, Results} = fabric:get_missing_revs(Db, JsonDocIdRevs),
     Results2 = [{Id, couch_doc:revs_to_strs(Revs)} || {Id, Revs, _} <- Results],
     send_json(Req, {[
@@ -396,7 +396,7 @@ db_req(#httpd{path_parts=[_,<<"_missing_revs">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_revs_diff">>]}=Req, Db) ->
-    {JsonDocIdRevs} = couch_httpd:json_body_obj(Req),
+    {JsonDocIdRevs} = chttpd:json_body_obj(Req),
     {ok, Results} = fabric:get_missing_revs(Db, JsonDocIdRevs),
     Results2 =
     lists:map(fun({Id, MissingRevs, PossibleAncestors}) ->
@@ -416,9 +416,13 @@ db_req(#httpd{path_parts=[_,<<"_revs_diff">>]}=Req, _Db) ->
 
 db_req(#httpd{method='PUT',path_parts=[_,<<"_security">>],user_ctx=Ctx}=Req,
         Db) ->
-    SecObj = couch_httpd:json_body(Req),
-    ok = fabric:set_security(Db, SecObj, [{user_ctx,Ctx}]),
-    send_json(Req, {[{<<"ok">>, true}]});
+    SecObj = chttpd:json_body(Req),
+    case fabric:set_security(Db, SecObj, [{user_ctx, Ctx}]) of
+        ok ->
+            send_json(Req, {[{<<"ok">>, true}]});
+        Else ->
+            throw(Else)
+    end;
 
 db_req(#httpd{method='GET',path_parts=[_,<<"_security">>],user_ctx=Ctx}=Req, Db) ->
     send_json(Req, fabric:get_security(Db, [{user_ctx,Ctx}]));
@@ -635,7 +639,7 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
         case couch_httpd:qs_value(Req, "batch") of
         "ok" ->
             % batch
-            Doc = couch_doc_from_req(Req, DocId, couch_httpd:json_body(Req)),
+            Doc = couch_doc_from_req(Req, DocId, chttpd:json_body(Req)),
 
             spawn(fun() ->
                     case catch(fabric:update_doc(Db, Doc, Options)) of
@@ -651,7 +655,7 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
             ]});
         _Normal ->
             % normal
-            Body = couch_httpd:json_body(Req),
+            Body = chttpd:json_body(Req),
             Doc = couch_doc_from_req(Req, DocId, Body),
             update_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType)
         end
