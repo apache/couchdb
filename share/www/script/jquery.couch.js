@@ -182,6 +182,56 @@
     },
 
     /**
+     * @private
+     */
+    ajaxJson: function (ajaxOptions) {
+      // TODO: have jsonSettings.beforeSend wrap any ajaxOptions.beforeSend
+      // instead of overwriting one another
+      var jsonSettings = {
+            dataType: "json",
+            beforeSend: function(xhr) {
+              xhr.setRequestHeader('Accept', 'application/json');
+            }
+          },
+          merged = $.extend(true, {}, jsonSettings, ajaxOptions);
+
+      return $.ajax(merged);
+    },
+
+    /**
+     * @private
+     */
+    ajaxJsonInternalPromise: function (ajaxOptions) {
+      var deferred = new $.Deferred(),
+          jqXHR = $.couch.ajaxJson(ajaxOptions)
+            .done(function(data, textStatus, jqXHR) {
+              deferred.resolve(data);
+            })
+            .fail(function(jqXHR, textStatus, errorThrown) {
+              deferred.reject(jqXHR.status, jqXHR.error, jqXHR.reason)
+            });
+
+      return deferred.promise();
+    },
+
+    /**
+     * @private
+     */
+    ajaxJsonUsingSuccessAndErrorFromOptions: function(ajaxOptions, options) {
+      var promise = $.couch.ajaxJsonInternalPromise(ajaxOptions);
+
+      if (options.success) {
+        promise.done(options.success);
+      }
+
+      if (options.error) {
+        promise.fail(options.error);
+      }
+
+      return promise;
+    },
+
+    /**
      * Create a new user on the CouchDB server, <code>user_doc</code> is an
      * object with a <code>name</code> field and other information you want
      * to store relating to that user, for example
@@ -214,23 +264,21 @@
      */
     login: function(options) {
       options = options || {};
-      return $.ajax({
-        type: "POST", url:  $.couch.url+"/_session", dataType: "json",
-        data: {name: options.name, password: options.password},
-        beforeSend: function(xhr) {
-          xhr.setRequestHeader('Accept', 'application/json');
-        },
-        complete: function(req) {
-          var resp = $.parseJSON(req.responseText);
-          if (req.status == 200) {
-            if (options.success) options.success(resp);
-          } else if (options.error) {
-            options.error(req.status, resp.error, resp.reason);
-          } else {
-            throw 'An error occurred logging in: ' + resp.reason;
-          }
+
+      var ajaxOptions = {
+        type: "POST",
+        url: $.couch.url + "/_session",
+        data: {
+          name: options.name,
+          password: options.password
         }
-      });
+      };
+
+      // TODO: are people relying on thrown exceptions in their code, instead of
+      // using the error handler? Does it need to be in here, if there's no option.error?
+      //throw 'An error occurred logging out: ' + resp.reason;
+      //throw 'An error occurred logging in: ' + resp.reason;
+      return $.couch.ajaxJsonUsingSuccessAndErrorFromOptions(ajaxOptions, options);
     },
 
 
@@ -242,23 +290,18 @@
      */
     logout: function(options) {
       options = options || {};
-      return $.ajax({
-        type: "DELETE", url:  $.couch.url+"/_session", dataType: "json",
-        username : "_", password : "_",
-        beforeSend: function(xhr) {
-          xhr.setRequestHeader('Accept', 'application/json');
-        },
-        complete: function(req) {
-          var resp = $.parseJSON(req.responseText);
-          if (req.status == 200) {
-            if (options.success) options.success(resp);
-          } else if (options.error) {
-            options.error(req.status, resp.error, resp.reason);
-          } else {
-            throw 'An error occurred logging out: ' + resp.reason;
-          }
-        }
-      });
+
+      var ajaxOptions = {
+        type: "DELETE",
+        url: $.couch.url + "/_session",
+        username: "_",
+        password: "_"
+      };
+
+      // TODO: are people relying on thrown exceptions in their code, instead of
+      // using the error handler? Does it need to be in here, if there's no option.error?
+      //throw 'An error occurred logging out: ' + resp.reason;
+      return $.couch.ajaxJsonUsingSuccessAndErrorFromOptions(ajaxOptions, options);
     },
 
     /**
