@@ -839,7 +839,8 @@
          * uploads/all/documentation/couchbase-api-design.html#couchbase-api-
          * design_db-design-designdoc-view-viewname_get">docs for /db/
          * _design/design-doc/_list/l1/v1</a>
-         * @param {String} name View to run list against
+         * @param {String} name View to run list against (string should have 
+         * the design-doc name followed by a slash and the view name)
          * @param {ajaxSettings} options <a href="http://api.jquery.com/
          * jQuery.ajax/#jQuery-ajax-settings">jQuery ajax settings</a>
          */
