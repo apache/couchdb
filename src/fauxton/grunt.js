@@ -2,6 +2,16 @@
 // configuration file, which you can learn more about here:
 // https://github.com/cowboy/grunt/blob/master/docs/configuring.md
 module.exports = function(grunt) {
+  
+  var couch_config = {
+    fauxton: {
+              db: 'http://localhost:5984/fauxton',
+              app: './couchapp.js',
+              options: {
+                okay_if_missing: true
+              }
+            }
+  }
 
   grunt.initConfig({
 
@@ -89,6 +99,15 @@ module.exports = function(grunt) {
           assets_root: '/',
           requirejs: 'require.js',
           base: '/'
+        }
+      },
+      couchapp: {
+        src: 'assets/index.underscore',
+        dest: 'dist/debug/index.html',
+        variables: {
+          assets_root: '/fauxton/_design/fauxton/',
+          requirejs: 'require.js',
+          base: '/fauxton/_design/fauxton/index.html'
         }
       }
     },
@@ -239,7 +258,10 @@ module.exports = function(grunt) {
           //"dist/release/img/": "assets/img/**"
         }
       }
-    }
+    },
+    mkcouchdb: couch_config,
+    rmcouchdb: couch_config,
+    couchapp: couch_config,
 
   });
 
@@ -267,9 +289,13 @@ module.exports = function(grunt) {
   grunt.registerTask("debug", "test build template:debug copy:debug");
   // make an install that is server by mochiweb under _utils
   grunt.registerTask("couchdebug", "debug template:couchdebug copy:couchdebug");
+  // make an install that can be deployed as a couchapp
+  grunt.registerTask("couchapp_setup", "debug template:couchapp");
   grunt.registerTask("couchdb", "test build minify template:couchdb copy:couchdb");
   // build a release
   grunt.registerTask("release", "minify template:release copy:dist");
   // copy build artifacts into release dir, upload into server
   grunt.registerTask('install', 'release mkcouchdb couchapp');
+  // install fauxton as couchapp
+  grunt.registerTask('couchapp_install', 'rmcouchdb:fauxton mkcouchdb:fauxton couchapp:fauxton');
 };
