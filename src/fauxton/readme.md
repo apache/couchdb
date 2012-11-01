@@ -30,7 +30,17 @@ plate which will install the other dependencies needed.
     ../../utils/run &
     open http://localhost:5984/_utils/fauxton/index.html
 
-Install [phantomjs][http://phantomjs.org/] for tests.
+### Install as a Couchapp
+    git clone https://github.com/cloudant-labs/couchdb/ couchdb-fauxton
+    cd couchdb-fauxton
+    git checkout fauxton
+    ./bootstrap && ./configure && make dev
+    cd src/fauxton
+    npm install -g bbb
+    npm install grunt-contrib-copy grunt-couchapp underscore
+    bbb couchapp_setup && grunt couchapp_install
+
+Install [phantomjs](http://phantomjs.org/) for tests.
 
 For developing standalone run bbb dev. This will start a node server with your
 code running at [http://localhost:8000](http://localhost:8000) (standard bbb
