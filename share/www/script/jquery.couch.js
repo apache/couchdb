@@ -139,22 +139,16 @@
      */
     session: function(options) {
       options = options || {};
-      return $.ajax({
-        type: "GET", url:$.couch.url+"/_session",
-        beforeSend: function(xhr) {
-          xhr.setRequestHeader('Accept', 'application/json');
-        },
-        complete: function(req) {
-          var resp = $.parseJSON(req.responseText);
-          if (req.status == 200) {
-            if (options.success) options.success(resp);
-          } else if (options.error) {
-            options.error(req.status, resp.error, resp.reason);
-          } else {
-            throw "An error occurred getting session info: " + resp.reason;
-          }
-        }
-      });
+
+      var ajaxOptions = {
+        type: "GET",
+        url: $.couch.url + "/_session"
+      };
+
+      // TODO: are people relying on thrown exceptions in their code, instead of
+      // using the error handler? Does it need to be in here, if there's no option.error?
+      //throw "An error occurred getting session info: " + resp.reason;
+      return $.couch.ajaxJsonUsingSuccessAndErrorFromOptions(ajaxOptions, options);
     },
 
     /**
@@ -186,7 +180,7 @@
      */
     ajaxJson: function (ajaxOptions) {
       // TODO: have jsonSettings.beforeSend wrap any ajaxOptions.beforeSend
-      // instead of overwriting one another
+      // instead of overwriting one another - or just set the accept header as an option
       var jsonSettings = {
             dataType: "json",
             beforeSend: function(xhr) {
@@ -276,7 +270,6 @@
 
       // TODO: are people relying on thrown exceptions in their code, instead of
       // using the error handler? Does it need to be in here, if there's no option.error?
-      //throw 'An error occurred logging out: ' + resp.reason;
       //throw 'An error occurred logging in: ' + resp.reason;
       return $.couch.ajaxJsonUsingSuccessAndErrorFromOptions(ajaxOptions, options);
     },
