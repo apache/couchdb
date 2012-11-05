@@ -117,4 +117,29 @@ couchTests.uuids = function(debug) {
     utc_testfun
   );
 
-};
+  // Test utc_id uuids
+  var utc_id_suffix = "frog";
+  var suffix_testfun = function() {
+    xhr = CouchDB.request("GET", "/_uuids?count=10");
+    T(xhr.status == 200);
+    result = JSON.parse(xhr.responseText);
+    for(var i = 1; i < result.uuids.length; i++) {
+      T(result.uuids[i].length == 14 + utc_id_suffix.length);
+      T(result.uuids[i].substring(14) == utc_id_suffix);
+      T(result.uuids[i-1] < result.uuids[i], "utc_id_suffix uuids are ordered.");
+    }
+  };
+
+  run_on_modified_server([{
+      "section": "uuids",
+      "key": "algorithm",
+      "value": "utc_id"
+    }, {
+      "section": "uuids",
+      "key": "utc_id_suffix",
+      "value": utc_id_suffix
+    }],
+    suffix_testfun
+  );
+
+ };

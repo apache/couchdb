@@ -33,7 +33,7 @@ If you're getting a cryptic error message, see:
 
 For general help, see:
 
-     http://couchdb.apache.org/community/lists.html
+     http://couchdb.apache.org/#mailing-list
 
 The mailing lists provide a wealth of support and knowledge for you to tap into.
 Feel free to drop by with your questions or discussion. See the official CouchDB
@@ -50,10 +50,10 @@ It should work in at least Firefox >= 3.6 with Private Browsing mode enabled.
 
 Read more about JSpec here:
 
-    http://jspec.info/
+    https://github.com/liblime/jspec
 
 When you change the specs, but your changes have no effect, manually reload
-the changed spec file in the browser. When the spec that tests erlang views
+the changed spec file in the browser. When the spec that tests Erlang views
 fails, make sure you have enabled Erlang views as described here:
    
        http://wiki.apache.org/couchdb/EnableErlangViews

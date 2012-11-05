@@ -104,7 +104,7 @@ check_dbname(#server{dbname_regexp=RegExp}, DbName) ->
             "_users" -> ok;
             "_replicator" -> ok;
             _Else ->
-                {error, illegal_database_name}
+                {error, illegal_database_name, DbName}
             end;
     match ->
         ok
@@ -129,20 +129,11 @@ hash_admin_passwords() ->
     hash_admin_passwords(true).
 
 hash_admin_passwords(Persist) ->
-    Iterations = couch_config:get("couch_httpd_auth", "iterations", "10000"),
     lists:foreach(
-        fun({_User, "-hashed-" ++ _}) ->
-            ok; % already hashed
-        ({_User, "-pbkdf2-" ++ _}) ->
-            ok; % already hashed
-        ({User, ClearPassword}) ->
-            Salt = couch_uuids:random(),
-            DerivedKey = couch_passwords:pbkdf2(ClearPassword, Salt,
-                list_to_integer(Iterations)),
-            couch_config:set("admins",
-                User, "-pbkdf2-" ++ ?b2l(DerivedKey) ++ "," ++ ?b2l(Salt) ++
-                                 "," ++ Iterations, Persist)
-        end, couch_config:get("admins")).
+        fun({User, ClearPassword}) ->
+            HashedPassword = couch_passwords:hash_admin_password(ClearPassword),
+            couch_config:set("admins", User, ?b2l(HashedPassword), Persist)
+        end, couch_passwords:get_unhashed_admins()).
 
 init([]) ->
     % read config and register for configuration changes
@@ -179,7 +170,7 @@ init([]) ->
     {ok, #server{root_dir=RootDir,
                 dbname_regexp=RegExp,
                 max_dbs_open=MaxDbsOpen,
-                start_time=httpd_util:rfc1123_date()}}.
+                start_time=couch_util:rfc1123_date()}}.
 
 terminate(_Reason, _Srv) ->
     lists:foreach(
@@ -328,6 +319,8 @@ handle_call({open_result, DbName, {ok, OpenedDbPid}, Options}, _From, Server) ->
         ok
     end,
     {reply, ok, Server};
+handle_call({open_result, DbName, {error, eexist}, Options}, From, Server) ->
+    handle_call({open_result, DbName, file_exists, Options}, From, Server);
 handle_call({open_result, DbName, Error, Options}, _From, Server) ->
     [{DbName, {opening,Opener,Froms}}] = ets:lookup(couch_dbs_by_name, DbName),
     lists:foreach(fun(From) ->

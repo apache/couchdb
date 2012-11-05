@@ -101,7 +101,7 @@ show_etag(#httpd{user_ctx=UserCtx}=Req, Doc, DDoc, More) ->
         Doc -> couch_httpd:doc_etag(Doc)
     end,
     couch_httpd:make_etag({couch_httpd:doc_etag(DDoc), DocPart, Accept,
-        UserCtx#user_ctx.roles, More}).
+        {UserCtx#user_ctx.name, UserCtx#user_ctx.roles}, More}).
 
 % updates a doc based on a request
 % handle_doc_update_req(#httpd{method = 'GET'}=Req, _Db, _DDoc) ->
@@ -143,11 +143,24 @@ send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
                     Options = [{user_ctx, Req#httpd.user_ctx}]
             end,
             NewDoc = couch_doc:from_json_obj({NewJsonDoc}),
+            couch_doc:validate_docid(NewDoc#doc.id),
             {ok, NewRev} = couch_db:update_doc(Db, NewDoc, Options),
             NewRevStr = couch_doc:rev_to_str(NewRev),
+            DocIdHeader = case DocId of
+                              null -> 
+                                  [{<<"json">>, {Props}}] = JsonResp0,
+                                  case lists:keyfind(<<"id">>, 1, Props) of
+                                      {_, NewDocId} -> 
+                                          [{<<"X-Couch-Id">>, NewDocId}];
+                                      false ->
+                                          []
+                                  end;
+                              DocId -> 
+                                  [{<<"X-Couch-Id">>, DocId}]
+                          end,    
             {[
                 {<<"code">>, 201},
-                {<<"headers">>, {[{<<"X-Couch-Update-NewRev">>, NewRevStr}]}}
+                {<<"headers">>, {[{<<"X-Couch-Update-NewRev">>, NewRevStr}] ++ DocIdHeader}}
                 | JsonResp0]};
         [<<"up">>, _Other, {JsonResp0}] ->
             {[{<<"code">>, 200} | JsonResp0]}
@@ -192,9 +205,10 @@ handle_view_list(Req, Db, DDoc, LName, VDDoc, VName, Keys) ->
     Args0 = couch_mrview_http:parse_qs(Req, Keys),
     ETagFun = fun(BaseSig, Acc0) ->
         UserCtx = Req#httpd.user_ctx,
+        Name = UserCtx#user_ctx.name,
         Roles = UserCtx#user_ctx.roles,
         Accept = couch_httpd:header_value(Req, "Accept"),
-        Parts = {couch_httpd:doc_etag(DDoc), Accept, Roles},
+        Parts = {couch_httpd:doc_etag(DDoc), Accept, {Name, Roles}},
         ETag = couch_httpd:make_etag({BaseSig, Parts}),
         case couch_httpd:etag_match(Req, ETag) of
             true -> throw({etag_match, ETag});

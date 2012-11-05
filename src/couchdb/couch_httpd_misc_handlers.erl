@@ -44,12 +44,12 @@ handle_welcome_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 handle_favicon_req(#httpd{method='GET'}=Req, DocumentRoot) ->
-    {{Year,Month,Day},Time} = erlang:localtime(),
+    {{Year,Month,Day},Time} = erlang:universaltime(),
     OneYearFromNow = {{Year+1,Month,Day},Time},
     CachingHeaders = [
         %favicon should expire a year from now
         {"Cache-Control", "public, max-age=31536000"},
-        {"Expires", httpd_util:rfc1123_date(OneYearFromNow)}
+        {"Expires", couch_util:rfc1123_date(OneYearFromNow)}
     ],
     couch_httpd:serve_file(Req, "favicon.ico", DocumentRoot, CachingHeaders);
 
@@ -90,8 +90,9 @@ handle_task_status_req(Req) ->
 handle_restart_req(#httpd{method='POST'}=Req) ->
     couch_httpd:validate_ctype(Req, "application/json"),
     ok = couch_httpd:verify_is_server_admin(Req),
+    Result = send_json(Req, 202, {[{ok, true}]}),
     couch_server_sup:restart_core_server(),
-    send_json(Req, 200, {[{ok, true}]});
+    Result;
 handle_restart_req(Req) ->
     send_method_not_allowed(Req, "POST").
 
@@ -102,7 +103,7 @@ handle_uuids_req(#httpd{method='GET'}=Req) ->
     Etag = couch_httpd:make_etag(UUIDs),
     couch_httpd:etag_respond(Req, Etag, fun() ->
         CacheBustingHeaders = [
-            {"Date", httpd_util:rfc1123_date()},
+            {"Date", couch_util:rfc1123_date()},
             {"Cache-Control", "no-cache"},
             % Past date, ON PURPOSE!
             {"Expires", "Fri, 01 Jan 1990 00:00:00 GMT"},
@@ -212,7 +213,12 @@ handle_config_req(Req) ->
 % PUT /_config/Section/Key
 % "value"
 handle_approved_config_req(#httpd{method='PUT', path_parts=[_, Section, Key]}=Req, Persist) ->
-    Value = couch_httpd:json_body(Req),
+    Value = case Section of
+    <<"admins">> ->
+        couch_passwords:hash_admin_password(couch_httpd:json_body(Req));
+    _ ->
+        couch_httpd:json_body(Req)
+    end,
     OldValue = couch_config:get(Section, Key, ""),
     case couch_config:set(Section, Key, ?b2l(Value), Persist) of
     ok ->

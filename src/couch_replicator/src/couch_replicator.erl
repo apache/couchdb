@@ -112,7 +112,7 @@ async_replicate(#rep{id = {BaseId, Ext}, source = Src, target = Tgt} = Rep) ->
         RepChildId,
         {gen_server, start_link, [?MODULE, Rep, [{timeout, Timeout}]]},
         temporary,
-        1,
+        250,
         worker,
         [?MODULE]
     },
@@ -333,6 +333,9 @@ do_init(#rep{options = Options, id = {BaseId, Ext}} = Rep) ->
     }.
 
 
+handle_info(shutdown, St) ->
+    {stop, shutdown, St};
+
 handle_info({'DOWN', Ref, _, _, Why}, #rep_state{source_monitor = Ref} = St) ->
     ?LOG_ERROR("Source database is down. Reason: ~p", [Why]),
     {stop, source_db_down, St};
@@ -550,7 +553,7 @@ init_state(Rep) ->
         committed_seq = StartSeq,
         source_log = SourceLog,
         target_log = TargetLog,
-        rep_starttime = httpd_util:rfc1123_date(),
+        rep_starttime = couch_util:rfc1123_date(),
         src_starttime = get_value(<<"instance_start_time">>, SourceInfo),
         tgt_starttime = get_value(<<"instance_start_time">>, TargetInfo),
         session_id = couch_uuids:random(),
@@ -703,7 +706,7 @@ do_checkpoint(State) ->
         ?LOG_INFO("recording a checkpoint for `~s` -> `~s` at source update_seq ~p",
             [SourceName, TargetName, NewSeq]),
         StartTime = ?l2b(ReplicationStartTime),
-        EndTime = ?l2b(httpd_util:rfc1123_date()),
+        EndTime = ?l2b(couch_util:rfc1123_date()),
         NewHistoryEntry = {[
             {<<"session_id">>, SessionId},
             {<<"start_time">>, StartTime},

@@ -400,15 +400,20 @@ CouchDB.xhrheader = function(xhr, header) {
   }
 }
 
+CouchDB.proxyUrl = function(uri) {
+  if(uri.substr(0, CouchDB.protocol.length) != CouchDB.protocol) {
+    uri = CouchDB.urlPrefix + uri;
+  }
+  return uri;
+}
+
 CouchDB.request = function(method, uri, options) {
   options = typeof(options) == 'object' ? options : {};
   options.headers = typeof(options.headers) == 'object' ? options.headers : {};
   options.headers["Content-Type"] = options.headers["Content-Type"] || options.headers["content-type"] || "application/json";
   options.headers["Accept"] = options.headers["Accept"] || options.headers["accept"] || "application/json";
   var req = CouchDB.newXhr();
-  if(uri.substr(0, CouchDB.protocol.length) != CouchDB.protocol) {
-    uri = CouchDB.urlPrefix + uri;
-  }
+  uri = CouchDB.proxyUrl(uri);
   req.open(method, uri, false);
   if (options.headers) {
     var headers = options.headers;

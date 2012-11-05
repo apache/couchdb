@@ -10,6 +10,18 @@ Source Repository:
 
  * The source repository was migrated from SVN to Git.
 
+HTTP Interface:
+
+ * No longer rewrites the X-CouchDB-Requested-Path during recursive
+   calls to the rewriter.
+ * Limit recursion depth in the URL rewriter. Defaults to a maximum
+   of 100 invocations but is configurable.
+ * Fix _session for IE7.
+ * Added Server-Sent Events protocol to db changes API.
+   See http://www.w3.org/TR/eventsource/ for details.
+ * Make password hashing synchronous when using the /_config/admins API.
+ * Include user name in show/list ETags.
+
 Storage System:
 
  * Fixed unnecessary conflict when deleting and creating a
@@ -22,11 +34,26 @@ View Server:
 Futon:
 
  * Added view request duration to Futon.
+ * Disable buttons for actions that the user doesn't have permissions to.
 
 Security:
 
   * Passwords are now hashed using the PBKDF2 algorithm with a
     configurable work factor.
+
+Test Suite:
+
+  * Moved the JS test suite to the CLI
+  * Improved tracebacks printed by the JS CLI tests
+  * Improved the reliability of a number of tests
+
+UUID Algorithms:
+
+  * Added the utc_id algorithm.
+
+URL Rewriter & Vhosts:
+
+  * database name is encoded during rewriting (allowing embedded /'s, etc)
 
 Version 1.2.1
 -------------
@@ -118,6 +145,8 @@ View Server:
    configuration is matched.
  * Fixed incorrect reduce query results when using pagination parameters.
  * Made icu_driver work with Erlang R15B and later.
+ * Avoid invalidating view indexes when running out of file descriptors
+   (COUCHDB-1445).
 
 OAuth:
 
@@ -129,6 +158,11 @@ Futon:
    fields: `Started on` and `Updated on`.
  * Futon remembers view code every time it is saved, allowing to save an
    edit that amounts to a revert.
+
+Log System:
+
+  * Log correct stacktrace in all cases.
+  * Improvements to log messages for file-related errors.
 
 Version 1.1.2
 -------------

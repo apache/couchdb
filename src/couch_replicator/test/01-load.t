@@ -32,6 +32,6 @@ main(_) ->
     etap:plan(length(Modules)),
     lists:foreach(
         fun(Module) ->
-            etap_can:loaded_ok(Module, lists:concat(["Loaded: ", Module]))
+            etap:loaded_ok(Module, lists:concat(["Loaded: ", Module]))
         end, Modules),
     etap:end_tests().

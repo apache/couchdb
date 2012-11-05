@@ -16,6 +16,7 @@
 function loadScript(url) {
   // disallow loading remote URLs
   if((url.substr(0, 7) == "http://")
+    || (url.substr(0, 8) == "https://")
     || (url.substr(0, 2) == "//")
     || (url.substr(0, 5) == "data:")
     || (url.substr(0, 11) == "javascript:")) {

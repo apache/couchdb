@@ -97,6 +97,7 @@ start_link(Name, Options) ->
     % will restart us and then we will pick up the new settings.
 
     BindAddress = couch_config:get("httpd", "bind_address", any),
+    validate_bind_address(BindAddress),
     DefaultSpec = "{couch_httpd_db, handle_request}",
     DefaultFun = make_arity_1_fun(
         couch_config:get("httpd", "default_handler", DefaultSpec)
@@ -339,6 +340,8 @@ handle_request_int(MochiReq, DefaultFun,
                 " must be built with Erlang OTP R13B04 or higher.",
             ?LOG_ERROR("~s", [ErrorReason]),
             send_error(HttpReq, {bad_otp_release, ErrorReason});
+        exit:{body_too_large, _} ->
+            send_error(HttpReq, request_entity_too_large);
         throw:Error ->
             Stack = erlang:get_stacktrace(),
             ?LOG_DEBUG("Minor error in HTTP request: ~p",[Error]),
@@ -525,33 +528,13 @@ recv_chunked(#httpd{mochi_req=MochiReq}, MaxChunkSize, ChunkFun, InitState) ->
     % called with Length == 0 on the last time.
     MochiReq:stream_body(MaxChunkSize, ChunkFun, InitState).
 
-body_length(Req) ->
-    case header_value(Req, "Transfer-Encoding") of
-        undefined ->
-            case header_value(Req, "Content-Length") of
-                undefined -> undefined;
-                Length -> list_to_integer(Length)
-            end;
-        "chunked" -> chunked;
-        Unknown -> {unknown_transfer_encoding, Unknown}
-    end.
+body_length(#httpd{mochi_req=MochiReq}) ->
+    MochiReq:get(body_length).
 
-body(#httpd{mochi_req=MochiReq, req_body=undefined} = Req) ->
-    case body_length(Req) of
-        undefined ->
-            MaxSize = list_to_integer(
-                couch_config:get("couchdb", "max_document_size", "4294967296")),
-            MochiReq:recv_body(MaxSize);
-        chunked ->
-            ChunkFun = fun({0, _Footers}, Acc) ->
-                lists:reverse(Acc);
-            ({_Len, Chunk}, Acc) ->
-                [Chunk | Acc]
-            end,
-            recv_chunked(Req, 8192, ChunkFun, []);
-        Len ->
-            MochiReq:recv_body(Len)
-    end;
+body(#httpd{mochi_req=MochiReq, req_body=undefined}) ->
+    MaxSize = list_to_integer(
+        couch_config:get("couchdb", "max_document_size", "4294967296")),
+    MochiReq:recv_body(MaxSize);
 body(#httpd{req_body=ReqBody}) ->
     ReqBody.
 
@@ -629,7 +612,7 @@ start_response_length(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Length) ->
 
 start_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers) ->
     log_request(Req, Code),
-    couch_stats_collector:increment({httpd_status_cdes, Code}),
+    couch_stats_collector:increment({httpd_status_codes, Code}),
     CookieHeader = couch_httpd_auth:cookie_auth_header(Req, Headers),
     Headers2 = Headers ++ server_header() ++ CookieHeader,
     Resp = MochiReq:start_response({Code, Headers2}),
@@ -686,7 +669,9 @@ send_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Body) ->
     log_request(Req, Code),
     couch_stats_collector:increment({httpd_status_codes, Code}),
     Headers2 = http_1_0_keep_alive(MochiReq, Headers),
-    if Code >= 400 ->
+    if Code >= 500 ->
+        ?LOG_ERROR("httpd ~p error response:~n ~s", [Code, Body]);
+    Code >= 400 ->
         ?LOG_DEBUG("httpd ~p error response:~n ~s", [Code, Body]);
     true -> ok
     end,
@@ -707,8 +692,19 @@ send_json(Req, Code, Headers, Value) ->
         {"Content-Type", negotiate_content_type(Req)},
         {"Cache-Control", "must-revalidate"}
     ],
+    IdHeader = case Value of
+                   {Props} when is_list(Props) ->
+                       case lists:keyfind(id, 1, Props) of
+                           {_, Id} ->
+                               [{"X-Couch-Id", Id}];
+                           _ ->
+                               []
+                       end;
+                   _ ->
+                       []
+               end,
     Body = [start_jsonp(), ?JSON_ENCODE(Value), end_jsonp(), $\n],
-    send_response(Req, Code, DefaultHeaders ++ Headers, Body).
+    send_response(Req, Code, DefaultHeaders ++ IdHeader ++ Headers, Body).
 
 start_json_response(Req, Code) ->
     start_json_response(Req, Code, []).
@@ -813,14 +809,17 @@ error_info({unauthorized, Msg}) ->
 error_info(file_exists) ->
     {412, <<"file_exists">>, <<"The database could not be "
         "created, the file already exists.">>};
+error_info(request_entity_too_large) ->
+    {413, <<"too_large">>, <<"the request entity is too large">>};
 error_info({bad_ctype, Reason}) ->
     {415, <<"bad_content_type">>, Reason};
 error_info(requested_range_not_satisfiable) ->
     {416, <<"requested_range_not_satisfiable">>, <<"Requested range not satisfiable">>};
-error_info({error, illegal_database_name}) ->
-    {400, <<"illegal_database_name">>, <<"Only lowercase characters (a-z), "
-        "digits (0-9), and any of the characters _, $, (, ), +, -, and / "
-        "are allowed. Must begin with a letter.">>};
+error_info({error, illegal_database_name, Name}) ->
+    Message = "Name: '" ++ Name ++ "'. Only lowercase characters (a-z), "
+        ++ "digits (0-9), and any of the characters _, $, (, ), +, -, and / "
+        ++ "are allowed. Must begin with a letter.",
+    {400, <<"illegal_database_name">>, couch_util:to_binary(Message)};
 error_info({missing_stub, Reason}) ->
     {412, <<"missing_stub">>, Reason};
 error_info({Error, Reason}) ->
@@ -1059,33 +1058,36 @@ check_for_last(#mp{buffer=Buffer, data_fun=DataFun}=Mp) ->
                 data_fun = DataFun2})
     end.
 
-find_in_binary(B, Data) when size(B) > 0 ->
-    case size(Data) - size(B) of
-        Last when Last < 0 ->
-            partial_find(B, Data, 0, size(Data));
-        Last ->
-            find_in_binary(B, size(B), Data, 0, Last)
-    end.
-
-find_in_binary(B, BS, D, N, Last) when N =< Last->
-    case D of
-        <<_:N/binary, B:BS/binary, _/binary>> ->
-            {exact, N};
-        _ ->
-            find_in_binary(B, BS, D, 1 + N, Last)
-    end;
-find_in_binary(B, BS, D, N, Last) when N =:= 1 + Last ->
-    partial_find(B, D, N, BS - 1).
-
-partial_find(_B, _D, _N, 0) ->
+find_in_binary(_B, <<>>) ->
     not_found;
-partial_find(B, D, N, K) ->
-    <<B1:K/binary, _/binary>> = B,
-    case D of
-        <<_Skip:N/binary, B1/binary>> ->
-            {partial, N};
-        _ ->
-            partial_find(B, D, 1 + N, K - 1)
+
+find_in_binary(B, Data) ->
+    case binary:match(Data, [B], []) of
+    nomatch ->
+        partial_find(binary:part(B, {0, byte_size(B) - 1}),
+                     binary:part(Data, {byte_size(Data), -byte_size(Data) + 1}), 1);
+    {Pos, _Len} ->
+        {exact, Pos}
     end.
 
+partial_find(<<>>, _Data, _Pos) ->
+    not_found;
 
+partial_find(B, Data, N) when byte_size(Data) > 0 ->
+    case binary:match(Data, [B], []) of
+    nomatch ->
+        partial_find(binary:part(B, {0, byte_size(B) - 1}),
+                     binary:part(Data, {byte_size(Data), -byte_size(Data) + 1}), N + 1);
+    {Pos, _Len} ->
+        {partial, N + Pos}
+    end;
+
+partial_find(_B, _Data, _N) ->
+    not_found.
+
+
+validate_bind_address(Address) ->
+    case inet_parse:address(Address) of
+        {ok, _} -> ok;
+        _ -> throw({error, invalid_bind_address})
+    end.

@@ -45,6 +45,7 @@ specific language governing permissions and limitations under the License.
     }
 
     function tests() {
+      CouchDB.urlPrefix = "..";
       var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
 
       // cleanup, ignore the 404

@@ -18,6 +18,13 @@ This version has not been released yet.
  * Fixed unnecessary conflict when deleting and creating a
    document in the same batch.
  * New and updated passwords are hashed using PBKDF2.
+ * Fix various bugs in the URL rewriter when recursion is involved.
+ * Added Server-Sent Events protocol to db changes API.
+ * Moved the JS test suite to the CLI
+ * Make password hashing synchronous when using the /_config/admins API.
+ * Added utc_id UUID algorithm.
+ * encode database name during URL rewriting.
+ * Include user name in show/list ETags.
 
 Version 1.2.1
 -------------
@@ -67,6 +74,7 @@ This release contains backwards incompatible changes.
  * Fixed incorrect reduce query results when using pagination parameters.
  * Made icu_driver work with Erlang R15B and later.
  * Improvements to the build system and etap test suite.
+ * Improvements to log messages for file-related errors.
 
 Version 1.1.2
 -------------

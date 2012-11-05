@@ -185,22 +185,33 @@ error_cause(Cause) ->
 
 
 stream_data_self(#httpdb{timeout = T} = HttpDb, Params, Worker, ReqId, Cb) ->
+    case accumulate_messages(ReqId, [], T + 500) of
+    {Data, ibrowse_async_response} ->
+        ibrowse:stream_next(ReqId),
+        {Data, fun() -> stream_data_self(HttpDb, Params, Worker, ReqId, Cb) end};
+    {Data, ibrowse_async_response_end} ->
+        {Data, fun() -> throw({maybe_retry_req, more_data_expected}) end}
+    end.
+
+accumulate_messages(ReqId, Acc, Timeout) ->
     receive
     {ibrowse_async_response, ReqId, {error, Error}} ->
         throw({maybe_retry_req, Error});
     {ibrowse_async_response, ReqId, <<>>} ->
-        ibrowse:stream_next(ReqId),
-        stream_data_self(HttpDb, Params, Worker, ReqId, Cb);
+        accumulate_messages(ReqId, Acc, Timeout);
     {ibrowse_async_response, ReqId, Data} ->
-        ibrowse:stream_next(ReqId),
-        {Data, fun() -> stream_data_self(HttpDb, Params, Worker, ReqId, Cb) end};
+        accumulate_messages(ReqId, [Data | Acc], 0);
     {ibrowse_async_response_end, ReqId} ->
-        {<<>>, fun() -> throw({maybe_retry_req, more_data_expected}) end}
-    after T + 500 ->
+        {iolist_to_binary(lists:reverse(Acc)), ibrowse_async_response_end}
+    after Timeout ->
         % Note: ibrowse should always reply with timeouts, but this doesn't
         % seem to be always true when there's a very high rate of requests
         % and many open connections.
-        throw({maybe_retry_req, timeout})
+        if Acc =:= [] ->
+            throw({maybe_retry_req, timeout});
+        true ->
+            {iolist_to_binary(lists:reverse(Acc)), ibrowse_async_response}
+        end
     end.
 
 

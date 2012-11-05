@@ -12,7 +12,7 @@
 
 % Reads CouchDB's ini file and gets queried for configuration parameters.
 % This module is initialized with a list of ini files that it consecutively
-% reads Key/Value pairs from and saves them in an ets table. If more an one
+% reads Key/Value pairs from and saves them in an ets table. If more than one
 % ini file is specified, the last one is used to write changes that are made
 % with store/2 back to that ini file.
 
@@ -187,13 +187,10 @@ parse_ini_file(IniFile) ->
     case file:read_file(IniFilename) of
         {ok, IniBin0} ->
             IniBin0;
-        {error, eacces} ->
-            throw({file_permission_error, IniFile});
-        {error, enoent} ->
-            Fmt = "Couldn't find server configuration file ~s.",
-            Msg = ?l2b(io_lib:format(Fmt, [IniFilename])),
-            ?LOG_ERROR("~s~n", [Msg]),
-            throw({startup_error, Msg})
+        {error, Reason} = Error ->
+            ?LOG_ERROR("Could not read server configuration file ~s: ~s",
+                [IniFilename, file:format_error(Reason)]),
+            throw(Error)
     end,
 
     Lines = re:split(IniBin, "\r\n|\n|\r|\032", [{return, list}]),

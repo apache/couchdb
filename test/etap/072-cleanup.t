@@ -55,7 +55,7 @@ test() ->
     BoozRev = create_design_doc(<<"_design/booz">>, <<"baz">>),
     query_view("booz", "baz"),
 
-    {ok, Db} = couch_db:open(?TEST_DB, [{user_ctx, ?ADMIN_USER}]),
+    {ok, _Db} = couch_db:open(?TEST_DB, [{user_ctx, ?ADMIN_USER}]),
     view_cleanup(),
     etap:is(count_index_files(), 2,
         "Two index files before any deletions."),
