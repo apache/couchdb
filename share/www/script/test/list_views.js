@@ -159,7 +159,17 @@ couchTests.list_views = function(debug) {
       }),
       secObj: stringFun(function(head, req) {
         return toJSON(req.secObj);
-      })
+      }),
+      setHeaderAfterGotRow: stringFun(function(head, req) {
+        getRow();
+        start({
+          code: 400,
+          headers: {
+            "X-My-Header": "MyHeader"
+          }
+        });
+        send("bad request");
+      }),
     }
   };
   var viewOnlyDesignDoc = {
@@ -476,4 +486,10 @@ couchTests.list_views = function(debug) {
     }
   });
   TEquals(200, resp.status, "should return a 200 response");
+
+  // TEST HTTP header response set after getRow() called in _list function.
+  var xhr = CouchDB.request("GET", "/test_suite_db/_design/lists/_list/setHeaderAfterGotRow/basicView");
+  T(xhr.status == 400);
+  T(xhr.getResponseHeader("X-My-Header") == "MyHeader");
+  T(xhr.responseText.match(/^bad request$/));
 };
