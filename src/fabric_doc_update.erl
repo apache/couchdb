@@ -125,13 +125,20 @@ maybe_reply(Doc, Replies, {stop, W, Acc}) ->
 update_quorum_met(W, Replies) ->
     Counters = lists:foldl(fun(R,D) -> orddict:update_counter(R,1,D) end,
         orddict:new(), Replies),
-    GoodReplies = [{R,C} || {{ok, _} = R, C} <- Counters],
+    GoodReplies = lists:filter(fun good_reply/1, Counters),
     case lists:dropwhile(fun({_, Count}) -> Count < W end, GoodReplies) of
     [] ->
         false;
     [{FinalReply, _} | _] ->
         {true, FinalReply}
     end.
+
+good_reply({{ok, _}, _}) ->
+    true;
+good_reply({noreply, _}) ->
+    true;
+good_reply(_) ->
+    false.
 
 -spec group_docs_by_shard(binary(), [#doc{}]) -> [{#shard{}, [#doc{}]}].
 group_docs_by_shard(DbName, Docs) ->
