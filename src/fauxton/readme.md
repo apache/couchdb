@@ -38,7 +38,7 @@ plate which will install the other dependencies needed.
     cd src/fauxton
     npm install -g bbb
     npm install grunt-contrib-copy grunt-couchapp underscore
-    bbb couchapp_setup && grunt couchapp_install
+    bbb couchapp_setup couchapp_install
 
 Install [phantomjs](http://phantomjs.org/) for tests.
 

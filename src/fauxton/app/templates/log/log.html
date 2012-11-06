@@ -1,0 +1,28 @@
+ <h2> Couchdb Logs </h2>
+  <table class="table table-bordered" >
+  <thead>
+    <tr>
+      <th class="Date">Date</th>
+      <th class="Log Level">Log Value</th>
+      <th class="Pid">Pid</th>
+      <th class="Args">Url</th>
+    </tr>
+  </thead>
+
+  <% _.each(logs, function (log) { %>
+  <tr class="<%= log.log_level %>">
+    <td>
+      <%= log.date %> 
+    </td>
+    <td>
+      <%= log.log_level %>
+    </td>
+    <td>
+      <%= log.pid %>
+    </td>
+    <td>
+      <%= log.args %>
+    </td>
+  </tr>
+  <% }); %>
+</table>
