@@ -126,12 +126,12 @@ recompact(State) ->
 
 
 %% @spec compact_view(View, EmptyView, Retry, Acc) -> {CompactView, NewAcc}
-compact_view(View, EmptyView, BufferSize, Acc0) ->
+compact_view(#mrview{id_num=VID}=View, EmptyView, BufferSize, Acc0) ->
     Fun = fun(KV, #acc{btree = Bt, kvs = Kvs, kvs_size = KvsSize} = Acc) ->
         KvsSize2 = KvsSize + ?term_size(KV),
         if KvsSize2 >= BufferSize ->
             {ok, Bt2} = couch_btree:add(Bt, lists:reverse([KV | Kvs])),
-            Acc2 = update_task(Acc, 1 + length(Kvs)),
+            Acc2 = update_task(VID, Acc, 1 + length(Kvs)),
             {ok, Acc2#acc{btree = Bt2, kvs = [], kvs_size = 0}};
         true ->
             {ok, Acc#acc{kvs = [KV | Kvs], kvs_size = KvsSize2}}
@@ -142,13 +142,18 @@ compact_view(View, EmptyView, BufferSize, Acc0) ->
     {ok, _, FinalAcc} = couch_btree:foldl(View#mrview.btree, Fun, InitAcc),
     #acc{btree = Bt3, kvs = Uncopied} = FinalAcc,
     {ok, NewBt} = couch_btree:add(Bt3, lists:reverse(Uncopied)),
-    FinalAcc2 = update_task(FinalAcc, length(Uncopied)),
+    FinalAcc2 = update_task(VID, FinalAcc, length(Uncopied)),
     {EmptyView#mrview{btree=NewBt}, FinalAcc2}.
 
 
-update_task(#acc{changes = Changes, total_changes = Total} = Acc, ChangesInc) ->
+update_task(Acc, ChangesInc) ->
+    update_task(null, Acc, ChangesInc).
+
+
+update_task(VID, #acc{changes=Changes, total_changes=Total}=Acc, ChangesInc) ->
     Changes2 = Changes + ChangesInc,
     couch_task_status:update([
+        {view, VID},
         {changes_done, Changes2},
         {total_changes, Total},
         {progress, (Changes2 * 100) div Total}
