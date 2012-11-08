@@ -255,13 +255,18 @@ handle_log_req(#httpd{method='GET'}=Req) ->
     Bytes = list_to_integer(couch_httpd:qs_value(Req, "bytes", "1000")),
     Offset = list_to_integer(couch_httpd:qs_value(Req, "offset", "0")),
     Chunk = couch_log:read(Bytes, Offset),
-    {ok, Resp} = start_chunked_response(Req, 200, [
-        % send a plaintext response
-        {"Content-Type", "text/plain; charset=utf-8"},
-        {"Content-Length", integer_to_list(length(Chunk))}
-    ]),
-    send_chunk(Resp, Chunk),
-    last_chunk(Resp);
+    case couch_httpd:qs_value(Req, "format", "text") of 
+    "json" ->
+        send_json(Req, 200, parse_to_json(list_to_binary(Chunk)));
+    _ ->
+        {ok, Resp} = start_chunked_response(Req, 200, [
+            % send a plaintext response
+            {"Content-Type", "text/plain; charset=utf-8"},
+            {"Content-Length", integer_to_list(length(Chunk))}
+        ]),
+        send_chunk(Resp, Chunk),
+        last_chunk(Resp)
+    end;
 handle_log_req(#httpd{method='POST'}=Req) ->
     {PostBody} = couch_httpd:json_body_obj(Req),
     Level = couch_util:get_value(<<"level">>, PostBody),
@@ -281,3 +286,21 @@ handle_log_req(#httpd{method='POST'}=Req) ->
     end;
 handle_log_req(Req) ->
     send_method_not_allowed(Req, "GET,POST").
+
+parse_to_json(Input) ->
+  LogLines = binary:split(Input,<<"\n">>, [global]),
+  GroupedLines = lists:foldl(fun split_log_parts/2, [], LogLines),
+  lists:foldr(fun format_for_json/2, [], GroupedLines).
+
+split_log_parts(Line, Acc) ->
+  CleanedLine = binary:replace(Line, [<<" [">>,<<"[">>], <<"">>,[global]),
+  [ binary:split(CleanedLine, <<"]">>, [global]) | Acc].
+
+format_for_json(LogLine, Acc) when length(LogLine) == 4 ->
+  [Date, LogLevel, Pid, Text] = LogLine,
+  [ {[ {date, Date}, {loglevel, LogLevel}, {pid, Pid}, {text, Text} ]} | Acc ];
+% Ignore lines that were not fully fetched from logfile
+format_for_json(_LogLine, Acc) ->
+  Acc.
+
+
