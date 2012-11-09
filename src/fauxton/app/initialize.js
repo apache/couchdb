@@ -36,7 +36,7 @@ function(app, _, Bootstrap) {
       query  = queryString;
 
       if (queryString) {
-        while (match == search.exec(query)) {
+        while ((match = search.exec(query))) {
           urlParams[decode(match[1])] = decode(match[2]);
         }
       }
