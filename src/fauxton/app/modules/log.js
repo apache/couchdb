@@ -36,27 +36,23 @@ function (app, backbone, Fauxton) {
     },
 
     parse: function (resp) {
-      var logs = [],
-          lines =  resp.split(/\n/);
+      var lines =  resp.split(/\n/);
 
-      _.each(lines, function (log) {
-        raw_items = log.split("]");
+      return _.foldr(lines, function (acc, logLine) {
+        var match = logLine.match(/^\[(.*?)\]\s\[(.*?)\]\s\[(.*?)\]\s(.*)/);
 
-        if (raw_items.length < 4) { return; }
+        if (!match) { return acc;}
 
-        var log_row = {
-                        date: raw_items[0].replace("["," "),
-                        log_level: raw_items[1].replace("["," "),
-                        pid: raw_items[2].replace("["," "),
-                        args: raw_items[3].replace("["," ")
-                      };
+        acc.push({
+                  date: match[1],
+                  log_level: match[2],
+                  pid: match[3],
+                  args: match[4]
+                 });
 
-        logs.push(log_row);
-      });
-
-      return logs.reverse();
+        return acc;
+      }, []);
     }
-
   });
 
   Log.View = Backbone.View.extend({

@@ -117,11 +117,16 @@ module.exports = function(grunt) {
     // dist/debug/require.js, because we want to only load one script file in
     // index.html.
     concat: {
-      "dist/debug/js/require.js": [
-        "assets/js/libs/almond.js",
-        "dist/debug/templates.js",
-        "dist/debug/require.js"
-      ]
+      requirejs: {
+        src: ["assets/js/libs/almond.js", "dist/debug/templates.js", "dist/debug/require.js"],
+        dest: "dist/debug/js/require.js" 
+      },
+
+      debug: {
+        src: ["dist/debug/css/index.css", 'assets/css/codemirror.css', 'assets/css/cloudant-additions.css'],
+        dest: 'dist/debug/css/index.css'
+      }
+      
     },
 
     // This task uses the MinCSS Node.js project to take all your CSS files in
@@ -255,7 +260,7 @@ module.exports = function(grunt) {
         files:{
           "dist/debug/js/": "assets/js/**",
           //"dist/debug/css/": "dist/release/css/**"
-          //"dist/release/img/": "assets/img/**"
+          "dist/debug/img/": "assets/img/**"
         }
       }
     },
@@ -279,14 +284,14 @@ module.exports = function(grunt) {
   // clean out previous build artefacts, lint and unit test
   grunt.registerTask('test', 'clean lint qunit');
   // build templates, js and css
-  grunt.registerTask('build', 'jst requirejs concat less')
+  grunt.registerTask('build', 'jst requirejs concat:requirejs less')
   // minify code and css, ready for release.
   grunt.registerTask("minify", "min mincss");
   // deafult task - push to CouchDB
   grunt.registerTask("default", "test build release install");
   grunt.registerTask("dev", "debug server:debug");
   // make a debug install
-  grunt.registerTask("debug", "test build template:debug copy:debug");
+  grunt.registerTask("debug", "test build template:debug copy:debug concat:debug");
   // make an install that is server by mochiweb under _utils
   grunt.registerTask("couchdebug", "debug template:couchdebug copy:couchdebug");
   // make an install that can be deployed as a couchapp
