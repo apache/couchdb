@@ -33,6 +33,8 @@ init() ->
     end.
 
 
+decode(undefined) ->
+    throw({invalid_json, undefined});
 decode(IoList) ->
     try
         nif_decode(IoList)
