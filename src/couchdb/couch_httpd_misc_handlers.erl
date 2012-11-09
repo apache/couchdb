@@ -291,7 +291,3 @@ handle_log_req(#httpd{method='POST'}=Req) ->
     end;
 handle_log_req(Req) ->
     send_method_not_allowed(Req, "GET,POST").
-
-
-
-

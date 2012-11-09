@@ -207,7 +207,7 @@ parse_to_json(Input) ->
     lists:foldl(fun format_line_for_json/2,[], LogLines).
 
 format_line_for_json(Line, Acc) ->
-      case re:run(Line, "^\\[(.*?)\\]\s\\[(.*?)\\]\s\\[(.*?)\\]\s(.*)") of
+      case re:run(Line, "^\\[([^\\]]+)\\]\s\\[([^\\]]+)\]\s\\[([^\\]]+)\\]\s(.*)$") of
         nomatch -> Acc;
         {match, [_, DatePos, LogLevelPos, PidPos, TextPos ]} -> 
           [  {[ {date, binary:part(Line, DatePos)}, 
