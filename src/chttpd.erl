@@ -620,7 +620,7 @@ send_delayed_error(#delayed_resp{resp=Resp}, Reason) ->
     throw({http_abort, Resp, Reason}).
 
 end_delayed_json_response(#delayed_resp{}=DelayedResp) ->
-    {ok, #delayed_resp{resp=Resp}=DelayedResp1} =
+    {ok, #delayed_resp{resp=Resp}} =
         start_delayed_response(DelayedResp),
     end_json_response(Resp).
 

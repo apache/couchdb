@@ -141,7 +141,7 @@ get_reduce_type(Req) ->
         true;
     "false" ->
         false;
-    Error ->
+    _Error ->
         throw({bad_request, "`reduce` qs param must be `true` or `false`"})
     end.
 
