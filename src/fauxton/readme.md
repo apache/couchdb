@@ -34,11 +34,10 @@ plate which will install the other dependencies needed.
     git clone https://github.com/cloudant-labs/couchdb/ couchdb-fauxton
     cd couchdb-fauxton
     git checkout fauxton
-    ./bootstrap && ./configure && make dev
     cd src/fauxton
-    npm install -g bbb
-    npm install grunt-contrib-copy grunt-couchapp underscore
-    bbb couchapp_setup couchapp_install
+    npm install bbb couchapp grunt-contrib-copy grunt-couchapp underscore
+    node_modules/bbb/bin/bbb couchapp_setup couchapp_install
+    open http://localhost:5984/_utils/fauxton/index.html
 
 Install [phantomjs](http://phantomjs.org/) for tests.
 
