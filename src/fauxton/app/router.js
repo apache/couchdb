@@ -30,11 +30,41 @@ function(app, Initialize, Fauxton, Databases, API, Plugin, Log) {
 
     initialize: function() {
       this.navBar = app.navBar = new Fauxton.NavBar();
+
+      window.dashboard = this.dashboard = new Backbone.Layout({
+        template: "layouts/dashboard"
+      });
+      this.setDashboardDom();
+    },
+
+    setDashboardContent: function(view) {
+      if (this.dashboardContent) this.dashboardContent.remove();
+
+      this.dashboardContent = this.dashboard.insertView("#dashboard-content", view);
+      this.setDashboardDom();
+    },
+
+    setBreadcrumbs: function(view) {
+      if (this.breadcrumbs) this.breadcrumbs.remove();
+
+      this.breadcrumbs = this.dashboard.insertView("#breadcrumbs", view);
+      this.setDashboardDom();
+    },
+
+    // TODO:: this function seems hacky
+    // Should layout manager auto update the html node? do we need to
+    // specify the destination element in the layout?
+    // Re-setting the navbar seems wrong, isn't the whole point of
+    // insertView as opposed to setView to keep the existing reference
+    // nodes in place? Unfortunately insertView won't persist through
+    // new pages. Need to look into this more
+    setDashboardDom: function() {
+      this.dashboard.setView("#primary-navbar", this.navBar);
+      $("#app-container").html(this.dashboard.$el);
     },
 
     database_doc: function(databaseName, docID) {
-      this.remove_current_dashboard();
-
+      var dashboard = this.dashboard;
       var database = new Databases.Model({id:databaseName});
       var doc = new Databases.Doc({
         "_id": docID
@@ -47,23 +77,12 @@ function(app, Initialize, Fauxton, Databases, API, Plugin, Log) {
         {"name": docID, "link": "#"}
       ];
 
-      var dashboard = this.current_dashboard  = new Backbone.Layout({
-        template: "dashboard",
-
-        views: {
-          "#dashboard-content": new Databases.Views.Doc({
-            model: doc
-          }),
-
-          "#breadcrumbs": new Fauxton.Breadcrumbs({
-            crumbs: crumbs
-          }),
-
-          "#primary-navbar": this.navBar
-        }
-      });
-
-      $("#app-container").html(dashboard.$el);
+      this.setDashboardContent(new Databases.Views.Doc({
+        model: doc
+      }));
+      this.setBreadcrumbs(new Fauxton.Breadcrumbs({
+        crumbs: crumbs
+      }));
 
       doc.fetch().done(function(resp) {
         dashboard.render();
@@ -71,36 +90,22 @@ function(app, Initialize, Fauxton, Databases, API, Plugin, Log) {
     },
 
     database_handler: function(databaseName, page) {
-      this.remove_current_dashboard();
-
-      //var database = app.databases.get(databaseName);
+      var dashbaard = this.dashboard;
       var database = new Databases.Model({id:databaseName});
       var options = app.getParams();
       database.buildAllDocs(options);
-
 
       var crumbs = [
         {"name": "Home","link": app.root},
         {"name": database.id, "link": Databases.databaseUrl(database)}
       ];
 
-      var dashboard = this.current_dashboard = new Backbone.Layout({
-        template: "dashboard",
-
-        views: {
-          "#dashboard-content": new Databases.Views.AllDocsList({
-            model: database
-          }),
-
-          "#breadcrumbs": new Fauxton.Breadcrumbs({
-            crumbs: crumbs
-          }),
-
-          "#primary-navbar": this.navBar
-        }
-      });
-
-      $("#app-container").html(dashboard.$el);
+      this.setDashboardContent(new Databases.Views.AllDocsList({
+        model: database
+      }));
+      this.setBreadcrumbs(new Fauxton.Breadcrumbs({
+        crumbs: crumbs
+      }));
 
       database.allDocs.fetch().done(function(resp) {
         dashboard.render();
@@ -108,61 +113,32 @@ function(app, Initialize, Fauxton, Databases, API, Plugin, Log) {
     },
 
     log: function() {
+      var dashboard = this.dashboard;
       var logs = new Log.Collection();
-
-      this.remove_current_dashboard();
-
       var crumbs = [
         {"name": "Home","link": app.root},
         {"name": "Logs","link": app.root}
       ];
 
-      var dashboard = this.current_dashboard = new Backbone.Layout({
-        template: "dashboard",
-
-        views: {
-          "#dashboard-content": new Log.View({
-            collection: logs
-          }),
-
-          "#breadcrumbs": new Fauxton.Breadcrumbs({
-            crumbs: crumbs
-          }),
-
-          "#primary-navbar": this.navBar
-        }
-      });
-
-
-      $("#app-container").html(dashboard.$el);
+      this.setDashboardContent(new Log.View({
+        collection: logs
+      }));
+      this.setBreadcrumbs(new Fauxton.Breadcrumbs({
+        crumbs: crumbs
+      }));
 
       logs.fetch().done(function (resp) {
         dashboard.render();
       });
-
     },
 
     index: function() {
-      this.remove_current_dashboard();
-
-      console.log('index router.js ftw');
+      var dashbard = this.dashboard;
       var databases = app.databases = new Databases.List();
 
-      var dashboard = this.current_dashboard = new Backbone.Layout({
-        template: "dashboard",
-
-        views: {
-          "#dashboard-content": new Databases.Views.List({
-            collection: databases
-          }),
-
-          "#primary-navbar": this.navBar
-        }
-      });
-
-      window.dashboard = dashboard;
-
-      $("#app-container").html(dashboard.$el);
+      this.setDashboardContent(new Databases.Views.List({
+        collection: databases
+      }));
 
       databases.fetch().done(function(resp) {
         $.when.apply(null, databases.map(function(database) {
@@ -171,12 +147,6 @@ function(app, Initialize, Fauxton, Databases, API, Plugin, Log) {
           dashboard.render();
         });
       });
-    },
-
-    remove_current_dashboard: function () {
-      if (!this.current_dashboard) return;
-
-      this.current_dashboard.remove();
     }
   });
 

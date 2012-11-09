@@ -11,7 +11,7 @@ define([
 
 function (app, backbone, Fauxton) {
 
-  var Log = app.module(); 
+  var Log = app.module();
 
   Log.Model = Backbone.Model.extend({ });
 
@@ -60,8 +60,6 @@ function (app, backbone, Fauxton) {
 
     initialize: function (options) {
       this.refreshTime = options.refreshTime || 5000;
-
-      this.collection.on('reset', this.render, this);
     },
 
     serialize: function () {
@@ -69,6 +67,7 @@ function (app, backbone, Fauxton) {
     },
 
     afterRender: function () {
+      this.collection.on('reset', this.render, this);
       this.startRefreshInterval();
     },
 
@@ -78,8 +77,8 @@ function (app, backbone, Fauxton) {
 
     startRefreshInterval: function () {
       var self = this;
-      
-      // Interval already set 
+
+      // Interval already set
       if (self.intervalId) { return ; }
 
       self.intervalId = setInterval(function () {
