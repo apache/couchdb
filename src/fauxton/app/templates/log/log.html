@@ -9,20 +9,22 @@
     </tr>
   </thead>
 
-  <% _.each(logs, function (log) { %>
-  <tr class="<%= log.log_level %>">
-    <td>
-      <%= log.date %> 
-    </td>
-    <td>
-      <%= log.log_level %>
-    </td>
-    <td>
-      <%= log.pid %>
-    </td>
-    <td>
-      <%= log.args %>
-    </td>
-  </tr>
-  <% }); %>
+  <tbody>
+    <% _.each(logs, function (log) { %>
+    <tr class="<%= log.log_level %>">
+      <td>
+        <%= log.date %> 
+      </td>
+      <td>
+        <%= log.log_level %>
+      </td>
+      <td>
+        <%= log.pid %>
+      </td>
+      <td>
+        <%= log.args %>
+      </td>
+    </tr>
+    <% }); %>
+  </tbody>
 </table>
