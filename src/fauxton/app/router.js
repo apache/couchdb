@@ -34,33 +34,29 @@ function(app, Initialize, Fauxton, Databases, API, Plugin, Log) {
       window.dashboard = this.dashboard = new Backbone.Layout({
         template: "layouts/dashboard"
       });
-      this.setDashboardDom();
+      this.initializeDashboardDom();
     },
 
+    // I'm not sure if this method is required. We can just set the dashboard in the router method.
+    // I also dont think we need to keep the dashboardContent any more either.
     setDashboardContent: function(view) {
-      if (this.dashboardContent) this.dashboardContent.remove();
-
-      this.dashboardContent = this.dashboard.insertView("#dashboard-content", view);
-      this.setDashboardDom();
+      this.dashboardContent = this.dashboard.setView("#dashboard-content", view).render();
     },
 
     setBreadcrumbs: function(view) {
-      if (this.breadcrumbs) this.breadcrumbs.remove();
+      //if (this.breadcrumbs) this.breadcrumbs.remove();
 
-      this.breadcrumbs = this.dashboard.insertView("#breadcrumbs", view);
-      this.setDashboardDom();
+      this.breadcrumbs = this.dashboard.setView("#breadcrumbs", view).render();
+      //this.setDashboardDom();
     },
 
     // TODO:: this function seems hacky
-    // Should layout manager auto update the html node? do we need to
-    // specify the destination element in the layout?
-    // Re-setting the navbar seems wrong, isn't the whole point of
-    // insertView as opposed to setView to keep the existing reference
-    // nodes in place? Unfortunately insertView won't persist through
-    // new pages. Need to look into this more
-    setDashboardDom: function() {
+    // Garren - FIXED!!!
+    initializeDashboardDom: function() {
+      $("#app-container").html(this.dashboard.el);
       this.dashboard.setView("#primary-navbar", this.navBar);
-      $("#app-container").html(this.dashboard.$el);
+      // this should be called once and the rest of the time only update the views inside the manager that require refreshing
+      this.dashboard.render();
     },
 
     database_doc: function(databaseName, docID) {
@@ -85,6 +81,9 @@ function(app, Initialize, Fauxton, Databases, API, Plugin, Log) {
       }));
 
       doc.fetch().done(function(resp) {
+        // Instead of re-rendering the whole dashboard, we should rather 
+        // wire up the view to the model.on('change') and render just the
+        // required view. This should stop the whole page from flickering
         dashboard.render();
       });
     },
