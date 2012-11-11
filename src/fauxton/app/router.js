@@ -32,30 +32,36 @@ function(app, Initialize, Fauxton, Databases, API, Plugin, Log) {
       this.navBar = app.navBar = new Fauxton.NavBar();
 
       window.dashboard = this.dashboard = new Backbone.Layout({
-        template: "layouts/dashboard"
+        template: "layouts/dashboard",
+
+        views: {
+          "#primary-navbar": this.navBar
+        }
       });
-      this.initializeDashboardDom();
-    },
 
-    // I'm not sure if this method is required. We can just set the dashboard in the router method.
-    // I also dont think we need to keep the dashboardContent any more either.
-    setDashboardContent: function(view) {
-      this.dashboardContent = this.dashboard.setView("#dashboard-content", view).render();
-    },
+      var dashboardHelpers = {
 
-    setBreadcrumbs: function(view) {
-      //if (this.breadcrumbs) this.breadcrumbs.remove();
+        setBreadcrumbs: function(view) {
+          this.breadcrumbs = this.setView("#breadcrumbs", view);
+          this.breadcrumbs.render();
+        },
 
-      this.breadcrumbs = this.dashboard.setView("#breadcrumbs", view).render();
-      //this.setDashboardDom();
-    },
+        clearBreadcrumbs: function () {
+          if (!this.breadcrumbs) {return ;}
 
-    // TODO:: this function seems hacky
-    // Garren - FIXED!!!
-    initializeDashboardDom: function() {
+          this.breadcrumbs.remove();
+        },
+
+        setDashboardContent: function (view) {
+          this.dashboardContent = this.setView("#dashboard-content", view);
+          this.dashboardContent.render();
+        }
+
+      };
+
+      _.extend(this.dashboard, dashboardHelpers);
+
       $("#app-container").html(this.dashboard.el);
-      this.dashboard.setView("#primary-navbar", this.navBar);
-      // this should be called once and the rest of the time only update the views inside the manager that require refreshing
       this.dashboard.render();
     },
 
@@ -73,23 +79,21 @@ function(app, Initialize, Fauxton, Databases, API, Plugin, Log) {
         {"name": docID, "link": "#"}
       ];
 
-      this.setDashboardContent(new Databases.Views.Doc({
+      dashboard.setDashboardContent(new Databases.Views.Doc({
         model: doc
       }));
-      this.setBreadcrumbs(new Fauxton.Breadcrumbs({
+      dashboard.setBreadcrumbs(new Fauxton.Breadcrumbs({
         crumbs: crumbs
       }));
 
       doc.fetch().done(function(resp) {
-        // Instead of re-rendering the whole dashboard, we should rather 
-        // wire up the view to the model.on('change') and render just the
-        // required view. This should stop the whole page from flickering
-        dashboard.render();
+        // Render only the part of the dashboard that needs to be re-rendered
+        dashboard.dashboardContent.render();
       });
     },
 
     database_handler: function(databaseName, page) {
-      var dashbaard = this.dashboard;
+      var dashboard = this.dashboard;
       var database = new Databases.Model({id:databaseName});
       var options = app.getParams();
       database.buildAllDocs(options);
@@ -99,15 +103,15 @@ function(app, Initialize, Fauxton, Databases, API, Plugin, Log) {
         {"name": database.id, "link": Databases.databaseUrl(database)}
       ];
 
-      this.setDashboardContent(new Databases.Views.AllDocsList({
+      dashboard.setDashboardContent(new Databases.Views.AllDocsList({
         model: database
       }));
-      this.setBreadcrumbs(new Fauxton.Breadcrumbs({
+      dashboard.setBreadcrumbs(new Fauxton.Breadcrumbs({
         crumbs: crumbs
       }));
 
       database.allDocs.fetch().done(function(resp) {
-        dashboard.render();
+        dashboard.dashboardContent.render();
       });
     },
 
@@ -119,23 +123,27 @@ function(app, Initialize, Fauxton, Databases, API, Plugin, Log) {
         {"name": "Logs","link": app.root}
       ];
 
-      this.setDashboardContent(new Log.View({
+      dashboard.setDashboardContent(new Log.View({
         collection: logs
       }));
-      this.setBreadcrumbs(new Fauxton.Breadcrumbs({
+
+      dashboard.setBreadcrumbs(new Fauxton.Breadcrumbs({
         crumbs: crumbs
       }));
 
       logs.fetch().done(function (resp) {
-        dashboard.render();
+        dashboard.dashboardContent.render();
       });
     },
 
     index: function() {
-      var dashbard = this.dashboard;
+      var dashboard = this.dashboard;
       var databases = app.databases = new Databases.List();
+       
+      console.log(this.dashboard); 
+      this.dashboard.clearBreadcrumbs();
 
-      this.setDashboardContent(new Databases.Views.List({
+      dashboard.setDashboardContent(new Databases.Views.List({
         collection: databases
       }));
 
@@ -143,7 +151,7 @@ function(app, Initialize, Fauxton, Databases, API, Plugin, Log) {
         $.when.apply(null, databases.map(function(database) {
           return database.status.fetch();
         })).done(function(resp) {
-          dashboard.render();
+          dashboard.dashboardContent.render();
         });
       });
     }
