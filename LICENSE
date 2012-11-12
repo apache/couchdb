@@ -318,7 +318,8 @@ For the share/doc/static/rtd.css components:
 
 For the share/www/script/jquery.js component:
 
-  Copyright (c) 2009 John Resig, http://jquery.com/
+  Copyright 2012 jQuery Foundation and other contributors
+  http://jquery.com/
 
   Permission is hereby granted, free of charge, to any person obtaining
   a copy of this software and associated documentation files (the

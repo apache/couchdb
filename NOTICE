@@ -6,9 +6,21 @@ The Apache Software Foundation (http://www.apache.org/).
 
 This product also includes the following third-party components:
 
- * jQuery (http://jquery.com/)
+ * ac_check_icu.m4 (http://autoconf-archive.cryp.to/ac_check_icu.html)
 
-   Copyright 2011, John Resig
+   Copyright 2008, Akos Maroy <darkeye@tyrell.hu>
+
+ * ac_check_curl.m4 (http://autoconf-archive.cryp.to/ac_check_curl.html)
+
+   Copyright 2008, Akos Maroy <darkeye@tyrell.hu>
+
+ * pkg.m4 (http://http://pkg-config.freedesktop.org/wiki/)
+
+   Copyright 2004, Scott James Remnant <scott@netsplit.com>
+
+ * jQuery (http://jquery.org/)
+
+   Copyright 2012 jQuery Foundation and other contributors
  
  * jQuery UI (http://jqueryui.com)
 
