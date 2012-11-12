@@ -202,8 +202,8 @@ read(Bytes, Offset) ->
     ok = file:close(Fd),
     Chunk.
 
-parse_to_json(Input) ->
-    LogLines = binary:split(Input,<<"\n">>, [global]),
+parse_to_json(Chunk) ->
+    LogLines = binary:split(Chunk,<<"\n">>, [global]),
     lists:foldl(fun format_line_for_json/2,[], LogLines).
 
 format_line_for_json(Line, Acc) ->
