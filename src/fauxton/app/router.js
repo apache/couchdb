@@ -7,6 +7,7 @@ define([
 
   // Modules
   "modules/fauxton",
+  "modules/dashboard",
   "modules/databases",
   "modules/api",
   "modules/fauxton_plugin",
@@ -15,7 +16,7 @@ define([
   "modules/log"
 ],
 
-function(app, Initialize, Fauxton, Databases, API, Plugin, Log) {
+function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log) {
 
   // Defining the application router, you can attach sub routers here.
   var Router = app.router = Backbone.Router.extend({
@@ -31,35 +32,7 @@ function(app, Initialize, Fauxton, Databases, API, Plugin, Log) {
     initialize: function() {
       this.navBar = app.navBar = new Fauxton.NavBar();
 
-      window.dashboard = this.dashboard = new Backbone.Layout({
-        template: "layouts/dashboard",
-
-        views: {
-          "#primary-navbar": this.navBar
-        }
-      });
-
-      var dashboardHelpers = {
-
-        setBreadcrumbs: function(view) {
-          this.breadcrumbs = this.setView("#breadcrumbs", view);
-          this.breadcrumbs.render();
-        },
-
-        clearBreadcrumbs: function () {
-          if (!this.breadcrumbs) {return ;}
-
-          this.breadcrumbs.remove();
-        },
-
-        setDashboardContent: function (view) {
-          this.dashboardContent = this.setView("#dashboard-content", view);
-          this.dashboardContent.render();
-        }
-
-      };
-
-      _.extend(this.dashboard, dashboardHelpers);
+      app.dashboard = this.dashboard = new Dashboard(this.navBar);
 
       $("#app-container").html(this.dashboard.el);
       this.dashboard.render();
@@ -139,8 +112,7 @@ function(app, Initialize, Fauxton, Databases, API, Plugin, Log) {
     index: function() {
       var dashboard = this.dashboard;
       var databases = app.databases = new Databases.List();
-       
-      console.log(this.dashboard); 
+
       this.dashboard.clearBreadcrumbs();
 
       dashboard.setDashboardContent(new Databases.Views.List({
