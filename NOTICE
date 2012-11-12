@@ -38,9 +38,9 @@ This product also includes the following third-party components:
 
    Copyright 2009, Chandrashekhar Mullaparthi
 
- * Erlang OAuth (http://github.com/tim/erlang-oauth/tree/master)
+ * Erlang OAuth (http://github.com/tim/erlang-oauth)
 
-   Copyright 2009, Tim Fletcher <http://tfletcher.com/>
+   Copyright 2012, the authors and contributors
 
  * ETap (http://github.com/ngerakines/etap/)
 

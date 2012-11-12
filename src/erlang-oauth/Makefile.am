@@ -14,25 +14,14 @@ oauthebindir = $(localerlanglibdir)/erlang-oauth/ebin
 
 oauth_file_collection = \
 	oauth.app.in \
-    oauth.erl \
-    oauth_hmac_sha1.erl \
-    oauth_http.erl \
-    oauth_plaintext.erl \
-    oauth_rsa_sha1.erl \
-    oauth_unix.erl \
-    oauth_uri.erl
+    oauth.erl
 
 # Removed oauth_rsa_sha1.beam until we require R12B5 or
 # we add a ./configure option to enable it.
 
 oauthebin_make_generated_file_list = \
 	oauth.app \
-    oauth.beam \
-    oauth_hmac_sha1.beam \
-    oauth_http.beam \
-    oauth_plaintext.beam \
-    oauth_unix.beam \
-    oauth_uri.beam
+    oauth.beam
 
 oauthebin_DATA = \
 	$(oauthebin_make_generated_file_list)

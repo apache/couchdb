@@ -244,11 +244,11 @@ oauth_header(#httpdb{url = BaseUrl, oauth = OAuth}, ConnParams) ->
     head -> "HEAD"
     end,
     QSL = get_value(qs, ConnParams, []),
-    OAuthParams = oauth:signed_params(Method,
+    OAuthParams = oauth:sign(Method,
         BaseUrl ++ get_value(path, ConnParams, []),
         QSL, Consumer, OAuth#oauth.token, OAuth#oauth.token_secret) -- QSL,
     [{"Authorization",
-        "OAuth " ++ oauth_uri:params_to_header_string(OAuthParams)}].
+        "OAuth " ++ oauth:header_params_encode(OAuthParams)}].
 
 
 do_redirect(Worker, Code, Headers, #httpdb{url = Url} = HttpDb, Params, Cb) ->

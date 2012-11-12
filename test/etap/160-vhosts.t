@@ -335,7 +335,7 @@ test_vhost_request_with_oauth(Db) ->
 
     Url = "http://oauth-example.com/",
     Consumer = {"consec1", "foo", hmac_sha1},
-    SignedParams = oauth:signed_params(
+    SignedParams = oauth:sign(
         "GET", Url, [], Consumer, "otoksec1", "foobar"),
     OAuthUrl = oauth:uri(server(), SignedParams),
 
@@ -350,7 +350,7 @@ test_vhost_request_with_oauth(Db) ->
     end,
 
     Consumer2 = {"consec1", "bad_secret", hmac_sha1},
-    SignedParams2 = oauth:signed_params(
+    SignedParams2 = oauth:sign(
         "GET", Url, [], Consumer2, "otoksec1", "foobar"),
     OAuthUrl2 = oauth:uri(server(), SignedParams2),
 
