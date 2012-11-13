@@ -250,18 +250,26 @@ increment_update_seq_req(Req, _Db) ->
 
 % httpd log handlers
 
-handle_log_req(#httpd{method='GET'}=Req) ->
+handle_log_req(#httpd{method='GET', mochi_req = MochiReq}=Req) ->
     ok = couch_httpd:verify_is_server_admin(Req),
     Bytes = list_to_integer(couch_httpd:qs_value(Req, "bytes", "1000")),
     Offset = list_to_integer(couch_httpd:qs_value(Req, "offset", "0")),
     Chunk = couch_log:read(Bytes, Offset),
-    {ok, Resp} = start_chunked_response(Req, 200, [
-        % send a plaintext response
-        {"Content-Type", "text/plain; charset=utf-8"},
-        {"Content-Length", integer_to_list(length(Chunk))}
-    ]),
-    send_chunk(Resp, Chunk),
-    last_chunk(Resp);
+    AcceptsJson = MochiReq:accepts_content_type("application/json"),
+    JsonFormat = couch_httpd:qs_value(Req, "format", "text"),
+
+    if
+      JsonFormat == "json"; AcceptsJson == true -> 
+        send_json(Req, 200, couch_log:parse_to_json(list_to_binary(Chunk)));
+      true -> 
+        {ok, Resp} = start_chunked_response(Req, 200, [
+            % send a plaintext response
+            {"Content-Type", "text/plain; charset=utf-8"},
+            {"Content-Length", integer_to_list(length(Chunk))}
+        ]),
+        send_chunk(Resp, Chunk),
+        last_chunk(Resp)
+    end;
 handle_log_req(#httpd{method='POST'}=Req) ->
     {PostBody} = couch_httpd:json_body_obj(Req),
     Level = couch_util:get_value(<<"level">>, PostBody),

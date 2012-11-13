@@ -17,7 +17,7 @@
 -export([start_link/0, stop/0]).
 -export([debug/2, info/2, error/2]).
 -export([debug_on/0, info_on/0, get_level/0, get_level_integer/0, set_level/1]).
--export([read/2]).
+-export([read/2, parse_to_json/1]).
 
 % gen_event callbacks
 -export([init/1, handle_event/2, terminate/2, code_change/3]).
@@ -201,3 +201,17 @@ read(Bytes, Offset) ->
     {ok, Chunk} = file:pread(Fd, Start, Bytes),
     ok = file:close(Fd),
     Chunk.
+
+parse_to_json(Chunk) ->
+    LogLines = binary:split(Chunk,<<"\n">>, [global]),
+    lists:foldr(fun format_line_for_json/2,[], LogLines).
+
+format_line_for_json(Line, Acc) ->
+      case re:run(Line, "^\\[([^\\]]+)\\]\s\\[([^\\]]+)\]\s\\[([^\\]]+)\\]\s(.*)$") of
+        nomatch -> Acc;
+        {match, [_, DatePos, LogLevelPos, PidPos, TextPos ]} -> 
+          [  {[ {date, binary:part(Line, DatePos)}, 
+                {loglevel, binary:part(Line, LogLevelPos)}, 
+                {pid, binary:part(Line, PidPos)}, 
+                {text, binary:part(Line, TextPos)} ]}  | Acc]
+      end.
