@@ -97,6 +97,7 @@ couchTests.replication = function(debug) {
   function populateDb(db, docs, dontRecreateDb) {
     if (dontRecreateDb !== true) {
       db.deleteDb();
+      wait(100);
       db.createDb();
     }
     for (var i = 0; i < docs.length; i++) {
