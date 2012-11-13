@@ -682,6 +682,8 @@ prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldI
             {[], AccErrors}, Bucket),
         prep_and_validate_replicated_updates(Db, RestBuckets, RestOldInfo, [ValidatedBucket | AccPrepped], AccErrors3);
     {ok, #full_doc_info{rev_tree=OldTree}} ->
+        OldLeafs = couch_key_tree:get_all_leafs_full(OldTree),
+        OldLeafsLU = [{Start, RevId} || {Start, [{RevId, _}|_]} <- OldLeafs],
         NewRevTree = lists:foldl(
             fun({NewDoc, _Ref}, AccTree) ->
                 {NewTree, _} = couch_key_tree:merge(AccTree,
@@ -694,8 +696,9 @@ prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldI
         {ValidatedBucket, AccErrors3} =
         lists:foldl(
             fun({#doc{id=Id,revs={Pos, [RevId|_]}}=Doc, Ref}, {AccValidated, AccErrors2}) ->
+                IsOldLeaf = lists:member({Pos, RevId}, OldLeafsLU),
                 case dict:find({Pos, RevId}, LeafRevsFullDict) of
-                {ok, {Start, Path}} ->
+                {ok, {Start, Path}} when not IsOldLeaf ->
                     % our unflushed doc is a leaf node. Go back on the path
                     % to find the previous rev that's on disk.
 
