@@ -14,6 +14,13 @@ couchTests.users_db_security = function(debug) {
   var usersDb = new CouchDB("test_suite_users", {"X-Couch-Full-Commit":"false"});
   if (debug) debugger;
 
+  function wait(ms) {
+    var t0 = new Date(), t1;
+    do {
+      CouchDB.request("GET", "/");
+      t1 = new Date();
+    } while ((t1 - t0) <= ms);
+  }
 
   var loginUser = function(username) {
     var pws = {
@@ -133,6 +140,7 @@ couchTests.users_db_security = function(debug) {
       jchrisDoc.password = "couch";
 
       TEquals(true, save_as(usersDb, jchrisDoc, "jchris").ok);
+      wait(100);
       var jchrisDoc = open_as(usersDb, "org.couchdb.user:jchris", "jchris1");
 
       TEquals(undefined, jchrisDoc.password, "password field should be null 2");
