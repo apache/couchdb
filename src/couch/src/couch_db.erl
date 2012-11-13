@@ -708,7 +708,13 @@ prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldI
 
                     case couch_doc:has_stubs(Doc) of
                     true ->
-                        DiskDoc = LoadPrevRevFun(),
+                        DiskDoc = case LoadPrevRevFun() of
+                            #doc{} = DiskDoc0 ->
+                                DiskDoc0;
+                            _ ->
+                                % Force a missing_stub exception
+                                couch_doc:merge_stubs(Doc, #doc{})
+                        end,
                         Doc2 = couch_doc:merge_stubs(Doc, DiskDoc),
                         GetDiskDocFun = fun() -> DiskDoc end;
                     false ->
