@@ -204,7 +204,7 @@ read(Bytes, Offset) ->
 
 parse_to_json(Chunk) ->
     LogLines = binary:split(Chunk,<<"\n">>, [global]),
-    lists:foldl(fun format_line_for_json/2,[], LogLines).
+    lists:foldr(fun format_line_for_json/2,[], LogLines).
 
 format_line_for_json(Line, Acc) ->
       case re:run(Line, "^\\[([^\\]]+)\\]\s\\[([^\\]]+)\]\s\\[([^\\]]+)\\]\s(.*)$") of
