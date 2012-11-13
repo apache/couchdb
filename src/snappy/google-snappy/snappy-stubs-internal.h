@@ -42,7 +42,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef HAVE_SYS_MMAN
+#ifdef HAVE_SYS_MMAN_H
 #include <sys/mman.h>
 #endif
 
@@ -86,10 +86,9 @@ using namespace std;
 // version (anyone who wants to regenerate it can just do the call
 // themselves within main()).
 #define DEFINE_bool(flag_name, default_value, description) \
-  bool FLAGS_ ## flag_name = default_value;
+  bool FLAGS_ ## flag_name = default_value
 #define DECLARE_bool(flag_name) \
-  extern bool FLAGS_ ## flag_name;
-#define REGISTER_MODULE_INITIALIZER(name, code)
+  extern bool FLAGS_ ## flag_name
 
 namespace snappy {
 
@@ -179,6 +178,8 @@ class LogMessageVoidify {
 
 // Potentially unaligned loads and stores.
 
+// x86 and PowerPC can simply do these loads and stores native.
+
 #if defined(__i386__) || defined(__x86_64__) || defined(__powerpc__)
 
 #define UNALIGNED_LOAD16(_p) (*reinterpret_cast<const uint16 *>(_p))
@@ -188,6 +189,47 @@ class LogMessageVoidify {
 #define UNALIGNED_STORE16(_p, _val) (*reinterpret_cast<uint16 *>(_p) = (_val))
 #define UNALIGNED_STORE32(_p, _val) (*reinterpret_cast<uint32 *>(_p) = (_val))
 #define UNALIGNED_STORE64(_p, _val) (*reinterpret_cast<uint64 *>(_p) = (_val))
+
+// ARMv7 and newer support native unaligned accesses, but only of 16-bit
+// and 32-bit values (not 64-bit); older versions either raise a fatal signal,
+// do an unaligned read and rotate the words around a bit, or do the reads very
+// slowly (trip through kernel mode). There's no simple #define that says just
+// “ARMv7 or higher”, so we have to filter away all ARMv5 and ARMv6
+// sub-architectures.
+//
+// This is a mess, but there's not much we can do about it.
+
+#elif defined(__arm__) && \
+      !defined(__ARM_ARCH_5__) && \
+      !defined(__ARM_ARCH_5T__) && \
+      !defined(__ARM_ARCH_5TE__) && \
+      !defined(__ARM_ARCH_5TEJ__) && \
+      !defined(__ARM_ARCH_6__) && \
+      !defined(__ARM_ARCH_6J__) && \
+      !defined(__ARM_ARCH_6K__) && \
+      !defined(__ARM_ARCH_6Z__) && \
+      !defined(__ARM_ARCH_6ZK__) && \
+      !defined(__ARM_ARCH_6T2__)
+
+#define UNALIGNED_LOAD16(_p) (*reinterpret_cast<const uint16 *>(_p))
+#define UNALIGNED_LOAD32(_p) (*reinterpret_cast<const uint32 *>(_p))
+
+#define UNALIGNED_STORE16(_p, _val) (*reinterpret_cast<uint16 *>(_p) = (_val))
+#define UNALIGNED_STORE32(_p, _val) (*reinterpret_cast<uint32 *>(_p) = (_val))
+
+// TODO(user): NEON supports unaligned 64-bit loads and stores.
+// See if that would be more efficient on platforms supporting it,
+// at least for copies.
+
+inline uint64 UNALIGNED_LOAD64(const void *p) {
+  uint64 t;
+  memcpy(&t, p, sizeof t);
+  return t;
+}
+
+inline void UNALIGNED_STORE64(void *p, uint64 v) {
+  memcpy(p, &v, sizeof v);
+}
 
 #else
 
@@ -226,8 +268,30 @@ inline void UNALIGNED_STORE64(void *p, uint64 v) {
 
 #endif
 
+// This can be more efficient than UNALIGNED_LOAD64 + UNALIGNED_STORE64
+// on some platforms, in particular ARM.
+inline void UnalignedCopy64(const void *src, void *dst) {
+  if (sizeof(void *) == 8) {
+    UNALIGNED_STORE64(dst, UNALIGNED_LOAD64(src));
+  } else {
+    const char *src_char = reinterpret_cast<const char *>(src);
+    char *dst_char = reinterpret_cast<char *>(dst);
+
+    UNALIGNED_STORE32(dst_char, UNALIGNED_LOAD32(src_char));
+    UNALIGNED_STORE32(dst_char + 4, UNALIGNED_LOAD32(src_char + 4));
+  }
+}
+
 // The following guarantees declaration of the byte swap functions.
 #ifdef WORDS_BIGENDIAN
+
+#ifdef HAVE_SYS_BYTEORDER_H
+#include <sys/byteorder.h>
+#endif
+
+#ifdef HAVE_SYS_ENDIAN_H
+#include <sys/endian.h>
+#endif
 
 #ifdef _MSC_VER
 #include <stdlib.h>
@@ -242,8 +306,38 @@ inline void UNALIGNED_STORE64(void *p, uint64 v) {
 #define bswap_32(x) OSSwapInt32(x)
 #define bswap_64(x) OSSwapInt64(x)
 
-#else
+#elif defined(HAVE_BYTESWAP_H)
 #include <byteswap.h>
+
+#elif defined(bswap32)
+// FreeBSD defines bswap{16,32,64} in <sys/endian.h> (already #included).
+#define bswap_16(x) bswap16(x)
+#define bswap_32(x) bswap32(x)
+#define bswap_64(x) bswap64(x)
+
+#elif defined(BSWAP_64)
+// Solaris 10 defines BSWAP_{16,32,64} in <sys/byteorder.h> (already #included).
+#define bswap_16(x) BSWAP_16(x)
+#define bswap_32(x) BSWAP_32(x)
+#define bswap_64(x) BSWAP_64(x)
+
+#else
+
+inline uint16 bswap_16(uint16 x) {
+  return (x << 8) | (x >> 8);
+}
+
+inline uint32 bswap_32(uint32 x) {
+  x = ((x & 0xff00ff00UL) >> 8) | ((x & 0x00ff00ffUL) << 8);
+  return (x >> 16) | (x << 16);
+}
+
+inline uint64 bswap_64(uint64 x) {
+  x = ((x & 0xff00ff00ff00ff00ULL) >> 8) | ((x & 0x00ff00ff00ff00ffULL) << 8);
+  x = ((x & 0xffff0000ffff0000ULL) >> 16) | ((x & 0x0000ffff0000ffffULL) << 16);
+  return (x >> 32) | (x << 32);
+}
+
 #endif
 
 #endif  // WORDS_BIGENDIAN
