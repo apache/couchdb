@@ -53,7 +53,12 @@ UUID Algorithms:
 
 URL Rewriter & Vhosts:
 
-  * database name is encoded during rewriting (allowing embedded /'s, etc)
+  * Database name is encoded during rewriting (allowing embedded /'s, etc)
+
+Log System:
+
+  * Allow per-module configuration of log levels.
+
 
 Version 1.2.1
 -------------

@@ -23,8 +23,9 @@ This version has not been released yet.
  * Moved the JS test suite to the CLI
  * Make password hashing synchronous when using the /_config/admins API.
  * Added utc_id UUID algorithm.
- * encode database name during URL rewriting.
+ * Encode database name during URL rewriting.
  * Include user name in show/list ETags.
+ * Per module log levels.
 
 Version 1.2.1
 -------------
