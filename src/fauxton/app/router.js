@@ -30,7 +30,10 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log) {
     },
 
     initialize: function() {
-      app.dashboard = this.dashboard = new Dashboard(this.navBar);
+      this.navBar = app.navBar = new Fauxton.NavBar();
+      this.apiBar = app.apiBar = new Fauxton.ApiBar();
+
+      app.dashboard = this.dashboard = new Dashboard(this.navBar, this.apiBar);
 
       $("#app-container").html(this.dashboard.el);
       this.dashboard.render();
@@ -45,7 +48,7 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log) {
       doc.collection = database;
 
       var crumbs = [
-        {"name": "Home","link": app.root},
+        {"name": "Dashboard", "link": app.root},
         {"name": database.id, "link": Databases.databaseUrl(database)},
         {"name": docID, "link": "#"}
       ];
@@ -53,14 +56,21 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log) {
       dashboard.setDashboardContent(new Databases.Views.Doc({
         model: doc
       }));
+
+      dashboard.setSidebarContent(new Databases.Views.Sidebar());
+
       dashboard.setBreadcrumbs(new Fauxton.Breadcrumbs({
         crumbs: crumbs
       }));
+
+      $("#app-container").html(dashboard.$el);
 
       doc.fetch().done(function(resp) {
         // Render only the part of the dashboard that needs to be re-rendered
         dashboard.dashboardContent.render();
       });
+
+      this.apiBar.update(doc.url());
     },
 
     database_handler: function(databaseName, page) {
@@ -70,27 +80,36 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log) {
       database.buildAllDocs(options);
 
       var crumbs = [
-        {"name": "Home","link": app.root},
+        {"name": "Dashboard", "link": app.root},
         {"name": database.id, "link": Databases.databaseUrl(database)}
       ];
 
       dashboard.setDashboardContent(new Databases.Views.AllDocsList({
         model: database
       }));
+
+      dashboard.setSidebarContent(new Databases.Views.Sidebar());
+
       dashboard.setBreadcrumbs(new Fauxton.Breadcrumbs({
         crumbs: crumbs
       }));
 
+      $("#app-container").html(dashboard.$el);
+
       database.allDocs.fetch().done(function(resp) {
         dashboard.dashboardContent.render();
       });
+
+      this.apiBar.update(database.allDocs.url());
     },
 
     log: function() {
       var dashboard = this.dashboard;
       var logs = new Log.Collection();
+
+
       var crumbs = [
-        {"name": "Home","link": app.root},
+        {"name": "Dashboard", "link": app.root},
         {"name": "Logs","link": app.root}
       ];
 
@@ -98,13 +117,19 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log) {
         collection: logs
       }));
 
+      dashboard.setSidebarContent(new Databases.Views.Sidebar());
+
       dashboard.setBreadcrumbs(new Fauxton.Breadcrumbs({
         crumbs: crumbs
       }));
 
+      $("#app-container").html(dashboard.$el);
+
       logs.fetch().done(function (resp) {
         dashboard.dashboardContent.render();
       });
+
+      this.apiBar.update(logs.url());
     },
 
     index: function() {
@@ -117,6 +142,8 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log) {
         collection: databases
       }));
 
+      dashboard.setSidebarContent(new Databases.Views.Sidebar());
+
       databases.fetch().done(function(resp) {
         $.when.apply(null, databases.map(function(database) {
           return database.status.fetch();
@@ -124,6 +151,8 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log) {
           dashboard.dashboardContent.render();
         });
       });
+
+      this.apiBar.update(databases.url());
     }
   });
 

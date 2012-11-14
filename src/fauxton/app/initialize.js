@@ -13,8 +13,10 @@ function(app, _, Bootstrap) {
   // creation.
   _.extend(app, {
     // The root path to run the application through.
+    // TODO: pick this up wither at build time or from the browser
     root: "/_utils/fauxton/",
-    host: "http://localhost:5984",
+    // Is this sufficient?
+    host: window.location.origin,
 
     renderView: function(baseView, selector, view, options, callback) {
       baseView.setView(selector, new view(options)).render().then(callback);

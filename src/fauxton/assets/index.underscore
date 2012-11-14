@@ -24,8 +24,6 @@
     <div id="app-container"></div>
     <hr>
 
-    <div id="curl-commands"></div>
-
     <footer>
       <p>&copy; Project Fauxton 2012</p>
     </footer>

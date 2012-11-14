@@ -35,7 +35,7 @@ function(app, Backbone, Logs) {
     template: "fauxton/nav_bar",
 
     navLinks: [
-      {href:"#/", title:"Home"},
+      {href:"#/", title:"Dashboard"},
       {href:"#/_all_dbs", title:"Databases"},
       {href:"#/_status", title:"Status"},
       {href:"#/_stats", title:"Stats"},
@@ -43,9 +43,7 @@ function(app, Backbone, Logs) {
     ],
 
     initialize: function() {
-      console.log('initialize NavBar wat');
       this.on("link:add", this.render, this);
-      console.log('initialize NavBar ftw');
     },
 
     serialize: function() {
@@ -53,14 +51,31 @@ function(app, Backbone, Logs) {
     },
 
     addLink: function(link) {
-      console.log("ADDING HEADER LINK");
-      console.log(link);
       this.navLinks.push(link);
       this.trigger("link:add");
       this.render();
     }
 
     // TODO: ADD ACTIVE CLASS
+  });
+
+  Fauxton.ApiBar = Backbone.View.extend({
+    template: "fauxton/api_bar",
+    endpoint: '_all_docs',
+
+    serialize: function() {
+      return {endpoint: this.endpoint};
+    },
+
+    update: function(endpoint) {
+      // Take endpoint and write it into the api bar.
+      console.log('ApiBar being updated: ' + endpoint);
+      this.endpoint = endpoint;
+      console.log('ApiBar updated: ');
+      console.log(this.serialize());
+      this.render();
+    }
+
   });
 
   return Fauxton;

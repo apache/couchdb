@@ -163,6 +163,20 @@ function(app, Backbone, Codemirror, JSHint) {
     }
   });
 
+  Views.Sidebar = Backbone.View.extend({
+    template: "databases/sidebar",
+    events: {
+      "click a#owned": "showMine",
+      "click a#shared": "showShared"
+    },
+    showMine: function(){
+      console.log('will show users databases and hide shared');
+    },
+    showShared: function(){
+      console.log('will show shared databases and hide the users');
+      alert('Support for shared databases coming soon');
+    }
+  });
 
   return Views;
 });

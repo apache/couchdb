@@ -35,12 +35,14 @@ plate which will install the other dependencies needed.
     cd couchdb-fauxton
     git checkout fauxton
     cd src/fauxton
-    npm install bbb couchapp grunt-contrib-copy grunt-couchapp underscore
+    npm install -g bbb # install bbb globally
+    npm install grunt-contrib-copy grunt-couchapp underscore couchapp
+    bbb couchapp_setup couchapp_install
+
+If you don't want bbb installed globally you can install it as a node module in
+the CWD:
+
+    npm install bbb grunt-contrib-copy grunt-couchapp underscore couchapp
     node_modules/bbb/bin/bbb couchapp_setup couchapp_install
-    open http://localhost:5984/_utils/fauxton/index.html
 
 Install [phantomjs](http://phantomjs.org/) for tests.
-
-For developing standalone run bbb dev. This will start a node server with your
-code running at [http://localhost:8000](http://localhost:8000) (standard bbb
-practice) . **TODO:** proxy to CouchDB in this environment

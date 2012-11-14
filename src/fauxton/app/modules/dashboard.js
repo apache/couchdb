@@ -13,15 +13,17 @@ function(app, Fauxton) {
   //    navBar -> the top navigation bar
   //    dashboardContent -> Main display view
   //    breadcrumbs -> Breadcrumbs navigation section
-  var Dashboard = function (navBar) {
-    this.navBar = new Fauxton.NavBar();
+  var Dashboard = function (navBar, apiBar) {
+    this.navBar = navBar;
+    this.apiBar = apiBar;
 
 
     this.layout = new Backbone.Layout({
       template: "layouts/dashboard",
 
       views: {
-        "#primary-navbar": this.navBar
+        "#primary-navbar": this.navBar,
+        "#api-navbar": this.apiBar
       }
     });
 
@@ -49,6 +51,11 @@ function(app, Fauxton) {
     setDashboardContent: function (view) {
       this.dashboardContent = this.layout.setView("#dashboard-content", view);
       this.dashboardContent.render();
+    },
+
+    setSidebarContent: function (view) {
+      this.sidebarContent = this.layout.setView("#sidebar-content", view);
+      this.sidebarContent.render();
     },
 
     clearDasboadContent: function () {

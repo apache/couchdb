@@ -2,7 +2,7 @@
 // configuration file, which you can learn more about here:
 // https://github.com/cowboy/grunt/blob/master/docs/configuring.md
 module.exports = function(grunt) {
-  
+
   var couch_config = {
     fauxton: {
               db: 'http://localhost:5984/fauxton',
@@ -119,14 +119,14 @@ module.exports = function(grunt) {
     concat: {
       requirejs: {
         src: ["assets/js/libs/almond.js", "dist/debug/templates.js", "dist/debug/require.js"],
-        dest: "dist/debug/js/require.js" 
+        dest: "dist/debug/js/require.js"
       },
 
       debug: {
         src: ["dist/debug/css/index.css", 'assets/css/codemirror.css', 'assets/css/cloudant-additions.css'],
         dest: 'dist/debug/css/index.css'
       }
-      
+
     },
 
     // This task uses the MinCSS Node.js project to take all your CSS files in
@@ -264,9 +264,10 @@ module.exports = function(grunt) {
         }
       }
     },
+
     mkcouchdb: couch_config,
     rmcouchdb: couch_config,
-    couchapp: couch_config,
+    couchapp: couch_config
 
   });
 
@@ -299,8 +300,6 @@ module.exports = function(grunt) {
   grunt.registerTask("couchdb", "test build minify template:couchdb copy:couchdb");
   // build a release
   grunt.registerTask("release", "minify template:release copy:dist");
-  // copy build artifacts into release dir, upload into server
-  grunt.registerTask('install', 'release mkcouchdb couchapp');
   // install fauxton as couchapp
   grunt.registerTask('couchapp_install', 'rmcouchdb:fauxton mkcouchdb:fauxton couchapp:fauxton');
 };

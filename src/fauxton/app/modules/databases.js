@@ -17,7 +17,7 @@ function(app, Backbone, Views) {
   Databases.databaseUrl = function(database) {
     var name = _.isObject(database) ? database.id : database;
 
-    return ["/database/", name, "/_all_docs?limit=100"].join('');
+    return ["/database/", name, "/_all_docs?limit=10"].join('');
   };
 
   Databases.Model = Backbone.Model.extend({
@@ -47,6 +47,7 @@ function(app, Backbone, Views) {
     }
   });
 
+  // TODO: shared databases - read from the user doc
   Databases.List = Backbone.Collection.extend({
     model: Databases.Model,
 
@@ -56,9 +57,10 @@ function(app, Backbone, Views) {
     },
 
     parse: function(resp) {
-      return _.map(resp, function(database) {
+      // TODO: pagination!
+      return _.map(_.first(resp, 10), function(database) {
         return {
-          id: database,
+          id: encodeURIComponent(database),
           name: database
         };
       });
@@ -100,6 +102,8 @@ function(app, Backbone, Views) {
       });
     }
   });
+
+
 
   Databases.Views = Views;
 
