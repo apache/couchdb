@@ -194,6 +194,7 @@ read(Bytes, Offset) ->
 
     {ok, Fd} = file:open(LogFileName, [read]),
     Start = lists:max([LogFileSize - Bytes - Offset, 0]),
+    io:format("info ~p ~n",[[Start, Bytes]]),
 
     % TODO: truncate chopped first line
     % TODO: make streaming
@@ -203,15 +204,15 @@ read(Bytes, Offset) ->
     Chunk.
 
 parse_to_json(Chunk) ->
-    LogLines = binary:split(Chunk,<<"\n">>, [global]),
-    lists:foldr(fun format_line_for_json/2,[], LogLines).
+  LogLines = re:split(Chunk,<<"(?<!,)\n(?=\\[)">>),
+  lists:foldr(fun format_line_for_json/2,[], LogLines).
 
 format_line_for_json(Line, Acc) ->
-      case re:run(Line, "^\\[([^\\]]+)\\]\s\\[([^\\]]+)\]\s\\[([^\\]]+)\\]\s(.*)$") of
+    case re:run(Line, "^\\[([^\\]]+)\\]\s\\[([^\\]]+)\]\s\\[([^\\]]+)\\]\s(.*)",[dotall]) of
         nomatch -> Acc;
         {match, [_, DatePos, LogLevelPos, PidPos, TextPos ]} -> 
           [  {[ {date, binary:part(Line, DatePos)}, 
                 {loglevel, binary:part(Line, LogLevelPos)}, 
                 {pid, binary:part(Line, PidPos)}, 
                 {text, binary:part(Line, TextPos)} ]}  | Acc]
-      end.
+    end.

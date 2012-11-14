@@ -1,0 +1,31 @@
+[Tue, 13 Nov 2012 14:22:43 GMT] [debug] [<0.113.0>] Include Doc: <<"_design/_replicator">> {1,
+                                                            <<91,250,44,153,
+                                                              238,254,43,46,
+                                                              180,150,45,181,
+                                                              10,163,207,212>>}
+[Tue, 13 Nov 2012 14:22:43 GMT] [info] [<0.31.0>] Apache CouchDB has started on http://127.0.0.1:5984/
+[Tue, 13 Nov 2012 14:22:58 GMT] [debug] [<0.124.0>] 'GET' /_utils/couch_tests.html?script/couch_tests.js {1,1} from "127.0.0.1"
+Headers: [{'Accept',"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"},
+          {'Accept-Encoding',"gzip, deflate"},
+          {'Accept-Language',"en-US,en;q=0.5"},
+          {'Connection',"keep-alive"},
+          {'Cookie',"AuthSession=amFuOjUwQTI1MjM0Ol899Tg8MVYsmnB6ruczSIFpjfhd"},
+          {'Host',"localhost:5984"},
+          {'Referer',"http://localhost:5984/_utils/config.html"},
+          {'User-Agent',"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.8; rv:16.0) Gecko/20100101 Firefox/16.0"}]
+[Tue, 13 Nov 2012 14:22:58 GMT] [debug] [<0.124.0>] OAuth Params: [{"script/couch_tests.js",[]}]
+[Tue, 13 Nov 2012 14:22:58 GMT] [info] [<0.124.0>] 127.0.0.1 - - GET /_utils/couch_tests.html?script/couch_tests.js 200
+[Tue, 13 Nov 2012 14:22:58 GMT] [debug] [<0.136.0>] 'GET' /_utils/script/jquery.dialog.js?0.11.0 {1,1} from "127.0.0.1"
+[Tue, 13 Nov 2012 14:23:02 GMT] [debug] [<0.138.0>] Stacktrace: [{couch_httpd_db,create_db_req,2,
+                                     [{file,"couch_httpd_db.erl"},{line,214}]},
+                                 {couch_httpd,handle_request_int,5,
+                                     [{file,"couch_httpd.erl"},{line,317}]},
+                                 {mochiweb_http,headers,5,
+                                     [{file,"mochiweb_http.erl"},{line,136}]},
+                                 {proc_lib,init_p_do_apply,3,
+                                     [{file,"proc_lib.erl"},{line,227}]}]
+[Tue, 13 Nov 2012 14:23:02 GMT] [info] [<0.138.0>] 127.0.0.1 - - PUT /test_suite_db/ 412
+[Tue, 13 Nov 2012 14:23:02 GMT] [debug] [<0.138.0>] httpd 412 error response:
+ {"error":"file_exists","reason":"The database could not be created, the file already exists."}
+
+[Tue, 13 Nov 2012 14:23:02 GMT] [debug] [<0.138.0>] 'DELETE' /test_suite_db {1,1} from "127.0.0.1"
