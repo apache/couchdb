@@ -1,16 +1,11 @@
 define([
   "app",
 
-  // Libs
-  "lodash",
-  "backbone"
-
-  // Views
-
-  // Plugins
+  // Modules
+  "modules/fauxton"
 ],
 
-function(app, _, Backbone) {
+function(app, Fauxton) {
 
   // A dashboard wrapper of the main Backbone.layoutmanager
   // Allows that dashboard to be changed by any plugin.
@@ -19,7 +14,8 @@ function(app, _, Backbone) {
   //    dashboardContent -> Main display view
   //    breadcrumbs -> Breadcrumbs navigation section
   var Dashboard = function (navBar) {
-    this.navBar = navBar;
+    this.navBar = new Fauxton.NavBar();
+
 
     this.layout = new Backbone.Layout({
       template: "layouts/dashboard",
@@ -38,7 +34,7 @@ function(app, _, Backbone) {
     render: function () {
       return this.layout.render();
     },
- 
+
     setBreadcrumbs: function(view) {
       this.breadcrumbs = this.layout.setView("#breadcrumbs", view);
       this.breadcrumbs.render();

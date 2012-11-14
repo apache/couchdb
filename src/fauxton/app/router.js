@@ -30,8 +30,6 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log) {
     },
 
     initialize: function() {
-      this.navBar = app.navBar = new Fauxton.NavBar();
-
       app.dashboard = this.dashboard = new Dashboard(this.navBar);
 
       $("#app-container").html(this.dashboard.el);

@@ -1,10 +1,8 @@
 define([
   "app",
 
-  // Libs
-  "backbone"
-
   // Modules
+  "modules/dashboard"
 
   // Views
 
@@ -15,7 +13,7 @@ function(app, Backbone) {
   var Plugin = app.module();
 
   Plugin.addHeaderLink = function(link) {
-    app.navBar.addLink(link);
+    app.dashboard.navBar.addLink(link);
   };
 
   Plugin.addRoute = function(route) {
