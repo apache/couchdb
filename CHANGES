@@ -22,6 +22,11 @@ HTTP Interface:
  * Make password hashing synchronous when using the /_config/admins API.
  * Include user name in show/list ETags.
 
+Replicator:
+
+ * The replicator will use a new server-wide UUID in checkpoint ids to
+ * improve the chances of an efficient resume.
+
 Storage System:
 
  * Fixed unnecessary conflict when deleting and creating a

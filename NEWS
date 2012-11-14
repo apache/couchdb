@@ -26,6 +26,7 @@ This version has not been released yet.
  * Encode database name during URL rewriting.
  * Include user name in show/list ETags.
  * Per module log levels.
+ * server-wide UUID in some replication ids.
 
 Version 1.2.1
 -------------
