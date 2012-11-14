@@ -445,7 +445,15 @@ fold_streamed_data(RcvFun, LenLeft, Fun, Acc) when LenLeft > 0->
     fold_streamed_data(RcvFun, LenLeft - size(Bin), Fun, ResultAcc).
 
 len_doc_to_multi_part_stream(Boundary, JsonBytes, Atts, SendEncodedAtts) ->
-    AttsSize = lists:foldl(fun(#att{data=Data} = Att, AccAttsSize) ->
+    AttsSize = lists:foldl(fun(Att, AccAttsSize) ->
+            #att{
+                data=Data,
+                name=Name,
+                att_len=AttLen,
+                disk_len=DiskLen,
+                type=Type,
+                encoding=Encoding
+            } = Att,
             case Data of
             stub ->
                 AccAttsSize;
@@ -453,13 +461,32 @@ len_doc_to_multi_part_stream(Boundary, JsonBytes, Atts, SendEncodedAtts) ->
                 AccAttsSize +
                 4 + % "\r\n\r\n"
                 case SendEncodedAtts of
-                true ->
-                    Att#att.att_len;
+                false ->
+                    % header
+                    length(integer_to_list(DiskLen)) +
+                    DiskLen;
                 _ ->
-                    Att#att.disk_len
+                    % header
+                    length(integer_to_list(AttLen)) +
+                    AttLen
                 end +
                 4 + % "\r\n--"
-                size(Boundary)
+                size(Boundary) +
+
+                % attachment headers
+                % (the length of the Content-Length has already been set)
+                size(Name) +
+                size(Type) +
+                length("\r\nContent-Disposition: attachment; filename=\"\"") +
+                length("\r\nContent-Type: ") +
+                length("\r\nContent-Length: ") +
+                case Encoding of
+                identity ->
+                    0;
+                 _ ->
+                    length(atom_to_list(Encoding)) +
+                    length("\r\nContent-Encoding: ")
+                end
             end
         end, 0, Atts),
     if AttsSize == 0 ->
@@ -482,7 +509,7 @@ doc_to_multi_part_stream(Boundary, JsonBytes, Atts, WriteFun,
     case lists:any(fun(#att{data=Data})-> Data /= stub end, Atts) of
     true ->
         WriteFun([<<"--", Boundary/binary,
-                "\r\ncontent-type: application/json\r\n\r\n">>,
+                "\r\nContent-Type: application/json\r\n\r\n">>,
                 JsonBytes, <<"\r\n--", Boundary/binary>>]),
         atts_to_mp(Atts, Boundary, WriteFun, SendEncodedAtts);
     false ->
@@ -496,6 +523,31 @@ atts_to_mp([#att{data=stub} | RestAtts], Boundary, WriteFun,
     atts_to_mp(RestAtts, Boundary, WriteFun, SendEncodedAtts);
 atts_to_mp([Att | RestAtts], Boundary, WriteFun,
         SendEncodedAtts)  ->
+    #att{
+        name=Name,
+        att_len=AttLen,
+        disk_len=DiskLen,
+        type=Type,
+        encoding=Encoding
+    } = Att,
+
+    % write headers
+    LengthBin = case SendEncodedAtts of
+    true -> list_to_binary(integer_to_list(DiskLen));
+    false -> list_to_binary(integer_to_list(AttLen))
+    end,
+    WriteFun(<<"\r\nContent-Disposition: attachment; filename=\"", Name/binary, "\"">>),
+    WriteFun(<<"\r\nContent-Type: ", Type/binary>>),
+    WriteFun(<<"\r\nContent-Length: ", LengthBin/binary>>),
+    case Encoding of
+    identity ->
+        ok;
+    _ ->
+        EncodingBin = atom_to_binary(Encoding, latin1),
+        WriteFun(<<"\r\nContent-Encoding: ", EncodingBin/binary>>)
+    end,
+
+    % write data
     WriteFun(<<"\r\n\r\n">>),
     AttFun = case SendEncodedAtts of
     false ->

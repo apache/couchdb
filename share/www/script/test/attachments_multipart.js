@@ -18,7 +18,7 @@ couchTests.attachments_multipart= function(debug) {
   
   // mime multipart
             
-  xhr = CouchDB.request("PUT", "/test_suite_db/multipart", {
+  var xhr = CouchDB.request("PUT", "/test_suite_db/multipart", {
     headers: {"Content-Type": "multipart/related;boundary=\"abc123\""},
     body:
       "--abc123\r\n" +
@@ -175,23 +175,36 @@ couchTests.attachments_multipart= function(debug) {
   T(xhr.status == 200);
   
   // parse out the multipart
-  
   var sections = parseMultipart(xhr);
-  
+  TEquals("790", xhr.getResponseHeader("Content-Length"),
+    "Content-Length should be correct");
   T(sections.length == 3);
-  
-  // The first section is the json doc. Check it's content-type. It contains
-  // the metadata for all the following attachments
-  
-  T(sections[0].headers['content-type'] == "application/json");
-  
+  // The first section is the json doc. Check it's content-type.
+  // Each part carries their own meta data.
+  TEquals("application/json", sections[0].headers['Content-Type'],
+    "Content-Type should be application/json for section[0]");
+  TEquals("application/test", sections[1].headers['Content-Type'],
+    "Content-Type should be application/test for section[1]");
+  TEquals("application/test", sections[2].headers['Content-Type'],
+    "Content-Type should be application/test for section[2]");
+
+  TEquals("21", sections[1].headers['Content-Length'],
+    "Content-Length should be 21 section[1]");
+  TEquals("18", sections[2].headers['Content-Length'],
+    "Content-Length should be 18 section[2]");
+
+  TEquals('attachment; filename="foo.txt"', sections[1].headers['Content-Disposition'],
+    "Content-Disposition should be foo.txt section[1]");
+  TEquals('attachment; filename="bar.txt"', sections[2].headers['Content-Disposition'],
+    "Content-Disposition should be bar.txt section[2]");
+
   var doc = JSON.parse(sections[0].body);
   
   T(doc._attachments['foo.txt'].follows == true);
   T(doc._attachments['bar.txt'].follows == true);
   
   T(sections[1].body == "this is 21 chars long");
-  T(sections[2].body == "this is 18 chars l");
+  TEquals("this is 18 chars l", sections[2].body, "should be 18 chars long");
   
   // now get attachments incrementally (only the attachments changes since
   // a certain rev).
@@ -210,7 +223,7 @@ couchTests.attachments_multipart= function(debug) {
   T(doc._attachments['foo.txt'].stub == true);
   T(doc._attachments['bar.txt'].follows == true);
   
-  T(sections[1].body == "this is 18 chars l");
+  TEquals("this is 18 chars l", sections[1].body, "should be 18 chars long 2");
 
   // try the atts_since parameter together with the open_revs parameter
   xhr = CouchDB.request(
@@ -230,7 +243,7 @@ couchTests.attachments_multipart= function(debug) {
   var innerSections = parseMultipart(sections[0]);
   // 2 inner sections: a document body section plus an attachment data section
   T(innerSections.length === 2);
-  T(innerSections[0].headers['content-type'] === 'application/json');
+  T(innerSections[0].headers['Content-Type'] === 'application/json');
 
   doc = JSON.parse(innerSections[0].body);
 
@@ -256,8 +269,7 @@ couchTests.attachments_multipart= function(debug) {
   T(doc._attachments['bar.txt'].follows == true);
   
   T(sections[1].body == "this is 21 chars long");
-  T(sections[2].body == "this is 18 chars l");
-  
+  TEquals("this is 18 chars l", sections[2].body, "should be 18 chars long 3");
   // try it with a rev that doesn't exist, and one that does
   
   xhr = CouchDB.request("GET", "/test_suite_db/multipart?atts_since=[\"1-2897589\",\"" + firstrev + "\"]",
@@ -274,8 +286,7 @@ couchTests.attachments_multipart= function(debug) {
   T(doc._attachments['foo.txt'].stub == true);
   T(doc._attachments['bar.txt'].follows == true);
   
-  T(sections[1].body == "this is 18 chars l");
-
+  TEquals("this is 18 chars l", sections[1].body, "should be 18 chars long 4");
 
   // check that with the document multipart/mixed API it's possible to receive
   // attachments in compressed form (if they're stored in compressed form)
@@ -346,7 +357,7 @@ couchTests.attachments_multipart= function(debug) {
     var innerSections = parseMultipart(sections[0]);
     // 3 inner sections: a document body section plus 2 attachment data sections
     TEquals(3, innerSections.length);
-    TEquals('application/json', innerSections[0].headers['content-type']);
+    TEquals('application/json', innerSections[0].headers['Content-Type']);
 
     doc = JSON.parse(innerSections[0].body);
 
@@ -387,7 +398,7 @@ couchTests.attachments_multipart= function(debug) {
     innerSections = parseMultipart(sections[0]);
     // 2 inner sections: a document body section plus 1 attachment data section
     TEquals(2, innerSections.length);
-    TEquals('application/json', innerSections[0].headers['content-type']);
+    TEquals('application/json', innerSections[0].headers['Content-Type']);
 
     doc = JSON.parse(innerSections[0].body);
 
