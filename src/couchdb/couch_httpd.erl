@@ -128,6 +128,10 @@ start_link(Name, Options) ->
 
     set_auth_handlers(),
 
+    % ensure uuid is set so that concurrent replications
+    % get the same value.
+    couch_server:get_uuid(),
+
     Loop = fun(Req)->
         case SocketOptions of
         [] ->
