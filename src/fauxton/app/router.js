@@ -7,6 +7,7 @@ define([
 
   // Modules
   "modules/fauxton",
+  "modules/dashboard",
   "modules/databases",
   "modules/api",
   "modules/fauxton_plugin",
@@ -15,7 +16,7 @@ define([
   "modules/log"
 ],
 
-function(app, Initialize, Fauxton, Databases, API, Plugin, Log) {
+function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log) {
 
   // Defining the application router, you can attach sub routers here.
   var Router = app.router = Backbone.Router.extend({
@@ -31,36 +32,10 @@ function(app, Initialize, Fauxton, Databases, API, Plugin, Log) {
     initialize: function() {
       this.navBar = app.navBar = new Fauxton.NavBar();
 
-      window.dashboard = this.dashboard = new Backbone.Layout({
-        template: "layouts/dashboard"
-      });
-      this.setDashboardDom();
-    },
+      app.dashboard = this.dashboard = new Dashboard(this.navBar);
 
-    setDashboardContent: function(view) {
-      if (this.dashboardContent) this.dashboardContent.remove();
-
-      this.dashboardContent = this.dashboard.insertView("#dashboard-content", view);
-      this.setDashboardDom();
-    },
-
-    setBreadcrumbs: function(view) {
-      if (this.breadcrumbs) this.breadcrumbs.remove();
-
-      this.breadcrumbs = this.dashboard.insertView("#breadcrumbs", view);
-      this.setDashboardDom();
-    },
-
-    // TODO:: this function seems hacky
-    // Should layout manager auto update the html node? do we need to
-    // specify the destination element in the layout?
-    // Re-setting the navbar seems wrong, isn't the whole point of
-    // insertView as opposed to setView to keep the existing reference
-    // nodes in place? Unfortunately insertView won't persist through
-    // new pages. Need to look into this more
-    setDashboardDom: function() {
-      this.dashboard.setView("#primary-navbar", this.navBar);
-      $("#app-container").html(this.dashboard.$el);
+      $("#app-container").html(this.dashboard.el);
+      this.dashboard.render();
     },
 
     database_doc: function(databaseName, docID) {
@@ -77,20 +52,21 @@ function(app, Initialize, Fauxton, Databases, API, Plugin, Log) {
         {"name": docID, "link": "#"}
       ];
 
-      this.setDashboardContent(new Databases.Views.Doc({
+      dashboard.setDashboardContent(new Databases.Views.Doc({
         model: doc
       }));
-      this.setBreadcrumbs(new Fauxton.Breadcrumbs({
+      dashboard.setBreadcrumbs(new Fauxton.Breadcrumbs({
         crumbs: crumbs
       }));
 
       doc.fetch().done(function(resp) {
-        dashboard.render();
+        // Render only the part of the dashboard that needs to be re-rendered
+        dashboard.dashboardContent.render();
       });
     },
 
     database_handler: function(databaseName, page) {
-      var dashbaard = this.dashboard;
+      var dashboard = this.dashboard;
       var database = new Databases.Model({id:databaseName});
       var options = app.getParams();
       database.buildAllDocs(options);
@@ -100,15 +76,15 @@ function(app, Initialize, Fauxton, Databases, API, Plugin, Log) {
         {"name": database.id, "link": Databases.databaseUrl(database)}
       ];
 
-      this.setDashboardContent(new Databases.Views.AllDocsList({
+      dashboard.setDashboardContent(new Databases.Views.AllDocsList({
         model: database
       }));
-      this.setBreadcrumbs(new Fauxton.Breadcrumbs({
+      dashboard.setBreadcrumbs(new Fauxton.Breadcrumbs({
         crumbs: crumbs
       }));
 
       database.allDocs.fetch().done(function(resp) {
-        dashboard.render();
+        dashboard.dashboardContent.render();
       });
     },
 
@@ -120,23 +96,26 @@ function(app, Initialize, Fauxton, Databases, API, Plugin, Log) {
         {"name": "Logs","link": app.root}
       ];
 
-      this.setDashboardContent(new Log.View({
+      dashboard.setDashboardContent(new Log.View({
         collection: logs
       }));
-      this.setBreadcrumbs(new Fauxton.Breadcrumbs({
+
+      dashboard.setBreadcrumbs(new Fauxton.Breadcrumbs({
         crumbs: crumbs
       }));
 
       logs.fetch().done(function (resp) {
-        dashboard.render();
+        dashboard.dashboardContent.render();
       });
     },
 
     index: function() {
-      var dashbard = this.dashboard;
+      var dashboard = this.dashboard;
       var databases = app.databases = new Databases.List();
 
-      this.setDashboardContent(new Databases.Views.List({
+      this.dashboard.clearBreadcrumbs();
+
+      dashboard.setDashboardContent(new Databases.Views.List({
         collection: databases
       }));
 
@@ -144,7 +123,7 @@ function(app, Initialize, Fauxton, Databases, API, Plugin, Log) {
         $.when.apply(null, databases.map(function(database) {
           return database.status.fetch();
         })).done(function(resp) {
-          dashboard.render();
+          dashboard.dashboardContent.render();
         });
       });
     }

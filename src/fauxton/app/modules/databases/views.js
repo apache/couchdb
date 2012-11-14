@@ -48,7 +48,7 @@ function(app, Backbone, Codemirror, JSHint) {
       app.renderView(this, "FAKEITEM", Views.Popover, {model:view.model}, function(popoverEle) {
         view.$el.find("i.database-info").popover({
           title: view.model.id + " info",
-          content: popoverEle.innerHTML
+          content: popoverEle.el
         });
       });
     },
