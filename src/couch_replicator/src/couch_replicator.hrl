@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--define(REP_ID_VERSION, 2).
+-define(REP_ID_VERSION, 3).
 
 -record(rep, {
     id,
