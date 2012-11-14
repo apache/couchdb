@@ -12,6 +12,10 @@
 
 -include("ibrowse.hrl").
 
+-ifdef(EUNIT).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
 -export([
          get_trace_status/2,
          do_trace/2,
@@ -180,18 +184,24 @@ get_value(Tag, TVL) ->
     V.
 
 parse_url(Url) ->
-    case parse_url(Url, get_protocol, #url{abspath=Url}, []) of
-        #url{host_type = undefined, host = Host} = UrlRec ->
-            case inet_parse:address(Host) of
-                {ok, {_, _, _, _, _, _, _, _}} ->
-                    UrlRec#url{host_type = ipv6_address};
-                {ok, {_, _, _, _}} ->
-                    UrlRec#url{host_type = ipv4_address};
-                _ ->
-                    UrlRec#url{host_type = hostname}
-            end;
-        Else ->
-            Else
+    try
+        case parse_url(Url, get_protocol, #url{abspath=Url}, []) of
+            #url{host_type = undefined, host = Host} = UrlRec ->
+                case inet_parse:address(Host) of
+                    {ok, {_, _, _, _, _, _, _, _}} ->
+                        UrlRec#url{host_type = ipv6_address};
+                    {ok, {_, _, _, _}} ->
+                        UrlRec#url{host_type = ipv4_address};
+                    _ ->
+                        UrlRec#url{host_type = hostname}
+                end;
+            #url{} = UrlRec ->
+                UrlRec;
+            _ ->
+                {error, invalid_uri}
+        end
+    catch _:_ ->
+            {error, invalid_uri}
     end.
 
 parse_url([$:, $/, $/ | _], get_protocol, Url, []) ->
@@ -388,4 +398,44 @@ do_trace(true, Fmt, Args) ->
                get(ibrowse_trace_token) | Args]);
 do_trace(_, _, _) ->
     ok.
+-endif.
+
+-ifdef(EUNIT).
+
+parse_url_test() ->
+    Urls = [{"http://[FEDC:BA98:7654:3210:FEDC:BA98:7654:3210]:80/index.html",
+             #url{abspath = "http://[FEDC:BA98:7654:3210:FEDC:BA98:7654:3210]:80/index.html",
+                  host = "FEDC:BA98:7654:3210:FEDC:BA98:7654:3210",
+                  port = 80, protocol = http, path = "/index.html",
+                  host_type = ipv6_address}},
+            {"http://[1080:0:0:0:8:800:200C:417A]/index.html",
+             #url{abspath = "http://[1080:0:0:0:8:800:200C:417A]/index.html",
+                  host_type = ipv6_address, port = 80, protocol = http,
+                  host = "1080:0:0:0:8:800:200C:417A", path = "/index.html"}},
+            {"http://[3ffe:2a00:100:7031::1]",
+             #url{abspath = "http://[3ffe:2a00:100:7031::1]",
+                  host_type = ipv6_address, port = 80, protocol = http,
+                  host = "3ffe:2a00:100:7031::1", path = "/"}},
+            {"http://[1080::8:800:200C:417A]/foo",
+             #url{abspath = "http://[1080::8:800:200C:417A]/foo",
+                  host_type = ipv6_address, port = 80, protocol = http,
+                  host = "1080::8:800:200C:417A", path = "/foo"}},
+            {"http://[::192.9.5.5]/ipng",
+             #url{abspath = "http://[::192.9.5.5]/ipng",
+                  host_type = ipv6_address, port = 80, protocol = http,
+                  host = "::192.9.5.5", path = "/ipng"}},
+            {"http://[::FFFF:129.144.52.38]:80/index.html",
+             #url{abspath = "http://[::FFFF:129.144.52.38]:80/index.html",
+                  host_type = ipv6_address, port = 80, protocol = http,
+                  host = "::FFFF:129.144.52.38", path = "/index.html"}},
+            {"http://[2010:836B:4179::836B:4179]",
+             #url{abspath = "http://[2010:836B:4179::836B:4179]",
+                  host_type = ipv6_address, port = 80, protocol = http,
+                  host = "2010:836B:4179::836B:4179", path = "/"}}
+           ],
+    lists:foreach(
+      fun({Url, Expected_result}) ->
+              ?assertMatch(Expected_result, parse_url(Url))
+      end, Urls).
+
 -endif.

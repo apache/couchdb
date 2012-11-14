@@ -47,7 +47,7 @@
                 reply_buffer = <<>>, rep_buf_size=0, streamed_size = 0,
                 recvd_headers=[],
                 status_line, raw_headers,
-                is_closing, send_timer, content_length,
+                is_closing, content_length,
                 deleted_crlf = false, transfer_encoding,
                 chunk_size, chunk_size_buffer = <<>>,
                 recvd_chunk_size, interim_reply_sent = false,
@@ -61,7 +61,7 @@
                   stream_chunk_size,
                   save_response_to_file = false,
                   tmp_file_name, tmp_file_fd, preserve_chunked_encoding,
-                  response_format}).
+                  response_format, timer_ref}).
 
 -import(ibrowse_lib, [
                       get_value/2,
@@ -118,7 +118,7 @@ init({Lb_Tid, #url{host = Host, port = Port}, {SSLOptions, Is_ssl}}) ->
                    lb_ets_tid = Lb_Tid},
     put(ibrowse_trace_token, [Host, $:, integer_to_list(Port)]),
     put(my_trace_flag, ibrowse_lib:get_trace_status(Host, Port)),
-    {ok, State};
+    {ok, set_inac_timer(State)};
 init(Url) when is_list(Url) ->
     case catch ibrowse_lib:parse_url(Url) of
         #url{protocol = Protocol} = Url_rec ->
@@ -131,7 +131,7 @@ init({Host, Port}) ->
                    port = Port},
     put(ibrowse_trace_token, [Host, $:, integer_to_list(Port)]),
     put(my_trace_flag, ibrowse_lib:get_trace_status(Host, Port)),
-    {ok, State}.
+    {ok, set_inac_timer(State)}.
 
 %%--------------------------------------------------------------------
 %% Function: handle_call/3
@@ -179,7 +179,6 @@ handle_cast(_Msg, State) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
 handle_info({tcp, _Sock, Data}, #state{status = Status} = State) ->
-%%    io:format("Recvd data: ~p~n", [Data]),
     do_trace("Data recvd in state: ~p. Size: ~p. ~p~n~n", [Status, size(Data), Data]),
     handle_sock_data(Data, State);
 handle_info({ssl, _Sock, Data}, State) ->
@@ -187,7 +186,6 @@ handle_info({ssl, _Sock, Data}, State) ->
 
 handle_info({stream_next, Req_id}, #state{socket = Socket,
                                           cur_req = #request{req_id = Req_id}} = State) ->
-    %% io:format("Client process set {active, once}~n", []),
     do_setopts(Socket, [{active, once}], State),
     {noreply, set_inac_timer(State)};
 
@@ -198,8 +196,6 @@ handle_info({stream_next, _Req_id}, State) ->
                      _ ->
                          undefined
                  end,
-%%     io:format("Ignoring stream_next as ~1000.p is not cur req (~1000.p)~n",
-%%               [_Req_id, _Cur_req_id]),
     {noreply, State};
 
 handle_info({stream_close, _Req_id}, State) ->
@@ -234,7 +230,7 @@ handle_info({req_timedout, From}, State) ->
             {noreply, State};
         true ->
             shutting_down(State),
-            do_error_reply(State, req_timedout),
+%%            do_error_reply(State, req_timedout),
             {stop, normal, State}
     end;
 
@@ -357,7 +353,8 @@ accumulate_response(Data,
                                          tmp_file_fd = undefined} = CurReq,
                       http_status_code=[$2 | _]}=State) when Srtf /= false ->
     TmpFilename = make_tmp_filename(Srtf),
-    case file:open(TmpFilename, [write, delayed_write, raw]) of
+    Mode = file_mode(Srtf),
+    case file:open(TmpFilename, [Mode, delayed_write, raw]) of
         {ok, Fd} ->
             accumulate_response(Data, State#state{
                                         cur_req = CurReq#request{
@@ -434,7 +431,12 @@ make_tmp_filename(true) ->
                    integer_to_list(B) ++
                    integer_to_list(C)]);
 make_tmp_filename(File) when is_list(File) ->
+    File;
+make_tmp_filename({append, File}) when is_list(File) ->
     File.
+
+file_mode({append, _File}) -> append;
+file_mode(_Srtf) -> write.
 
 
 %%--------------------------------------------------------------------
@@ -560,9 +562,13 @@ do_send_body(Body, State, _TE) ->
 
 do_send_body1(Source, Resp, State, TE) ->
     case Resp of
+                {ok, Data} when Data == []; Data == <<>> ->
+                        do_send_body({Source}, State, TE);
         {ok, Data} ->
             do_send(maybe_chunked_encode(Data, TE), State),
             do_send_body({Source}, State, TE);
+                {ok, Data, New_source_state} when Data == []; Data == <<>> ->
+                        do_send_body({Source, New_source_state}, State, TE);
         {ok, Data, New_source_state} ->
             do_send(maybe_chunked_encode(Data, TE), State),
             do_send_body({Source, New_source_state}, State, TE);
@@ -658,10 +664,17 @@ send_req_1(From,
                   proxy_tunnel_setup = false,
                   use_proxy = true,
                   is_ssl    = true} = State) ->
+    Ref = case Timeout of
+              infinity ->
+                  undefined;
+              _ ->
+                  erlang:send_after(Timeout, self(), {req_timedout, From})
+          end,
     NewReq = #request{
       method                    = connect,
       preserve_chunked_encoding = get_value(preserve_chunked_encoding, Options, false),
-      options                   = Options
+      options                   = Options,
+      timer_ref                 = Ref
      },
     State_1 = State#state{reqs=queue:in(NewReq, State#state.reqs)},
     Pxy_auth_headers = maybe_modify_headers(Url, Method, Options, [], State_1),
@@ -677,17 +690,11 @@ send_req_1(From,
                 ok ->
                     trace_request_body(Body_1),
                     active_once(State_1),
-                    Ref = case Timeout of
-                              infinity ->
-                                  undefined;
-                              _ ->
-                                  erlang:send_after(Timeout, self(), {req_timedout, From})
-                          end,
-                    State_2 = State_1#state{status     = get_header,
-                                            cur_req    = NewReq,
-                                            send_timer = Ref,
-                                            proxy_tunnel_setup = in_progress,
-                                            tunnel_setup_queue = [{From, Url, Headers, Method, Body, Options, Timeout}]},
+                    State_1_1 = inc_pipeline_counter(State_1),
+                    State_2 = State_1_1#state{status     = get_header,
+                                              cur_req    = NewReq,
+                                              proxy_tunnel_setup = in_progress,
+                                              tunnel_setup_queue = [{From, Url, Headers, Method, Body, Options, Timeout}]},
                     State_3 = set_inac_timer(State_2),
                     {noreply, State_3};
                 Err ->
@@ -738,6 +745,12 @@ send_req_1(From,
                 exit({invalid_option, {stream_to, Stream_to_inv}})
         end,
     SaveResponseToFile = get_value(save_response_to_file, Options, false),
+    Ref = case Timeout of
+              infinity ->
+                  undefined;
+              _ ->
+                  erlang:send_after(Timeout, self(), {req_timedout, From})
+          end,
     NewReq = #request{url                    = Url,
                       method                 = Method,
                       stream_to              = StreamTo,
@@ -749,7 +762,8 @@ send_req_1(From,
                       stream_chunk_size      = get_stream_chunk_size(Options),
                       response_format        = Resp_format,
                       from                   = From,
-                      preserve_chunked_encoding = get_value(preserve_chunked_encoding, Options, false)
+                      preserve_chunked_encoding = get_value(preserve_chunked_encoding, Options, false),
+                      timer_ref              = Ref
                      },
     State_1 = State#state{reqs=queue:in(NewReq, State#state.reqs)},
     Headers_1 = maybe_modify_headers(Url, Method, Options, Headers, State_1),
@@ -767,19 +781,12 @@ send_req_1(From,
                     trace_request_body(Body_1),
                     State_2 = inc_pipeline_counter(State_1),
                     active_once(State_2),
-                    Ref = case Timeout of
-                              infinity ->
-                                  undefined;
-                              _ ->
-                                  erlang:send_after(Timeout, self(), {req_timedout, From})
-                          end,
                     State_3 = case Status of
                                   idle ->
                                       State_2#state{status     = get_header,
-                                                    cur_req    = NewReq,
-                                                    send_timer = Ref};
+                                                    cur_req    = NewReq};
                                   _ ->
-                                      State_2#state{send_timer = Ref}
+                                      State_2
                               end,
                     case StreamTo of
                         undefined ->
@@ -987,13 +994,17 @@ chunk_request_body(Body, _ChunkSize, Acc) when is_list(Body) ->
     lists:reverse(["\r\n", LastChunk, Chunk | Acc]).
 
 
-parse_response(_Data, #state{cur_req = undefined}=State) ->
+parse_response(<<>>, #state{cur_req = undefined}=State) ->
     State#state{status = idle};
+parse_response(Data, #state{cur_req = undefined}) ->
+    do_trace("Data left to process when no pending request. ~1000.p~n", [Data]),
+    {error, data_in_status_idle};
+
 parse_response(Data, #state{reply_buffer = Acc, reqs = Reqs,
                             cur_req = CurReq} = State) ->
     #request{from=From, stream_to=StreamTo, req_id=ReqId,
              method=Method, response_format = Resp_format,
-             options = Options
+             options = Options, timer_ref = T_ref
             } = CurReq,
     MaxHeaderSize = ibrowse:get_config_value(max_headers_size, infinity),
     case scan_header(Acc, Data) of
@@ -1005,47 +1016,55 @@ parse_response(Data, #state{reply_buffer = Acc, reqs = Reqs,
             LCHeaders = [{to_lower(X), Y} || {X,Y} <- Headers_1],
             ConnClose = to_lower(get_value("connection", LCHeaders, "false")),
             IsClosing = is_connection_closing(HttpVsn, ConnClose),
-            case IsClosing of
-                true ->
-                    shutting_down(State);
-                false ->
-                    ok
-            end,
+            State_0 = case IsClosing of
+                          true ->
+                              shutting_down(State),
+                              State#state{is_closing = IsClosing};
+                          false ->
+                              State
+                      end,
             Give_raw_headers = get_value(give_raw_headers, Options, false),
             State_1 = case Give_raw_headers of
                           true ->
-                              State#state{recvd_headers=Headers_1, status=get_body,
-                                          reply_buffer = <<>>,
-                                          status_line = Status_line,
-                                          raw_headers = Raw_headers,
-                                          http_status_code=StatCode, is_closing=IsClosing};
+                              State_0#state{recvd_headers=Headers_1, status=get_body,
+                                            reply_buffer = <<>>,
+                                            status_line = Status_line,
+                                            raw_headers = Raw_headers,
+                                            http_status_code=StatCode};
                           false ->
-                              State#state{recvd_headers=Headers_1, status=get_body,
-                                          reply_buffer = <<>>,
-                                          http_status_code=StatCode, is_closing=IsClosing}
+                              State_0#state{recvd_headers=Headers_1, status=get_body,
+                                            reply_buffer = <<>>,
+                                            http_status_code=StatCode}
                       end,
             put(conn_close, ConnClose),
             TransferEncoding = to_lower(get_value("transfer-encoding", LCHeaders, "false")),
+            Head_response_with_body = lists:member({workaround, head_response_with_body}, Options),
             case get_value("content-length", LCHeaders, undefined) of
                 _ when Method == connect,
                        hd(StatCode) == $2 ->
-                    cancel_timer(State#state.send_timer),
                     {_, Reqs_1} = queue:out(Reqs),
-                    upgrade_to_ssl(set_cur_request(State#state{reqs = Reqs_1,
-                                                               recvd_headers = [],
-                                                               status = idle
-                                                              }));
+                    cancel_timer(T_ref),
+                    upgrade_to_ssl(set_cur_request(State_0#state{reqs = Reqs_1,
+                                                                 recvd_headers = [],
+                                                                 status = idle
+                                                                }));
                 _ when Method == connect ->
                     {_, Reqs_1} = queue:out(Reqs),
                     do_error_reply(State#state{reqs = Reqs_1},
                                    {error, proxy_tunnel_failed}),
                     {error, proxy_tunnel_failed};
-                _ when Method == head ->
+                _ when Method =:= head,
+                       Head_response_with_body =:= false ->
+                    %% This (HEAD response with body) is not supposed
+                    %% to happen, but it does. An Apache server was
+                    %% observed to send an "empty" body, but in a
+                    %% Chunked-Transfer-Encoding way, which meant
+                    %% there was still a body.  Issue #67 on Github
                     {_, Reqs_1} = queue:out(Reqs),
                     send_async_headers(ReqId, StreamTo, Give_raw_headers, State_1),
                     State_1_1 = do_reply(State_1, From, StreamTo, ReqId, Resp_format,
                                          {ok, StatCode, Headers_1, []}),
-                    cancel_timer(State_1_1#state.send_timer, {eat_message, {req_timedout, From}}),
+                    cancel_timer(T_ref, {eat_message, {req_timedout, From}}),
                     State_2 = reset_state(State_1_1),
                     State_3 = set_cur_request(State_2#state{reqs = Reqs_1}),
                     parse_response(Data_1, State_3);
@@ -1065,7 +1084,7 @@ parse_response(Data, #state{reply_buffer = Acc, reqs = Reqs,
                     send_async_headers(ReqId, StreamTo, Give_raw_headers, State_1),
                     State_1_1 = do_reply(State_1, From, StreamTo, ReqId, Resp_format,
                                          {ok, StatCode, Headers_1, []}),
-                    cancel_timer(State_1_1#state.send_timer, {eat_message, {req_timedout, From}}),
+                    cancel_timer(T_ref, {eat_message, {req_timedout, From}}),
                     State_2 = reset_state(State_1_1),
                     State_3 = set_cur_request(State_2#state{reqs = Reqs_1}),
                     parse_response(Data_1, State_3);
@@ -1084,7 +1103,7 @@ parse_response(Data, #state{reply_buffer = Acc, reqs = Reqs,
                             State_2
                     end;
                 undefined when HttpVsn =:= "HTTP/1.0";
-                ConnClose =:= "close" ->
+                               ConnClose =:= "close" ->
                     send_async_headers(ReqId, StreamTo, Give_raw_headers, State_1),
                     State_1#state{reply_buffer = Data_1};
                 undefined ->
@@ -1291,12 +1310,12 @@ handle_response(#request{from=From, stream_to=StreamTo, req_id=ReqId,
                          save_response_to_file = SaveResponseToFile,
                          tmp_file_name = TmpFilename,
                          tmp_file_fd = Fd,
-                         options       = Options
+                         options       = Options,
+                         timer_ref     = ReqTimer
                         },
                 #state{http_status_code = SCode,
                        status_line   = Status_line,
                        raw_headers   = Raw_headers,
-                       send_timer    = ReqTimer,
                        reply_buffer  = RepBuf,
                        recvd_headers = RespHeaders}=State) when SaveResponseToFile /= false ->
     Body = RepBuf,
@@ -1324,13 +1343,13 @@ handle_response(#request{from=From, stream_to=StreamTo, req_id=ReqId,
     set_cur_request(State_1);
 handle_response(#request{from=From, stream_to=StreamTo, req_id=ReqId,
                          response_format = Resp_format,
-                         options = Options},
+                         options = Options, timer_ref = ReqTimer},
                 #state{http_status_code = SCode,
                        status_line      = Status_line,
                        raw_headers      = Raw_headers,
                        recvd_headers    = Resp_headers,
-                       reply_buffer     = RepBuf,
-                       send_timer       = ReqTimer} = State) ->
+                       reply_buffer     = RepBuf
+                      } = State) ->
     Body = RepBuf,
     {Resp_headers_1, Raw_headers_1} = maybe_add_custom_headers(Resp_headers, Raw_headers, Options),
     Reply = case get_value(give_raw_headers, Options, false) of
@@ -1360,10 +1379,10 @@ reset_state(State) ->
                }.
 
 set_cur_request(#state{reqs = Reqs, socket = Socket} = State) ->
-    case queue:to_list(Reqs) of
-        [] ->
+    case queue:peek(Reqs) of
+        empty ->
             State#state{cur_req = undefined};
-        [#request{caller_controls_socket = Ccs} = NextReq | _] ->
+        {value, #request{caller_controls_socket = Ccs} = NextReq} ->
             case Ccs of
                 true ->
                     do_setopts(Socket, [{active, once}], State);
@@ -1410,7 +1429,19 @@ parse_headers_1([$\n, H |T], [$\r | L], Acc) when H =:= 32;
     parse_headers_1(lists:dropwhile(fun(X) ->
                                             is_whitespace(X)
                                     end, T), [32 | L], Acc);
+parse_headers_1([$\n, H |T], L, Acc) when H =:= 32;
+                                          H =:= $\t ->
+    parse_headers_1(lists:dropwhile(fun(X) ->
+                                            is_whitespace(X)
+                                    end, T), [32 | L], Acc);
 parse_headers_1([$\n|T], [$\r | L], Acc) ->
+    case parse_header(lists:reverse(L)) of
+        invalid ->
+            parse_headers_1(T, [], Acc);
+        NewHeader ->
+            parse_headers_1(T, [], [NewHeader | Acc])
+    end;
+parse_headers_1([$\n|T], L, Acc) ->
     case parse_header(lists:reverse(L)) of
         invalid ->
             parse_headers_1(T, [], Acc);
@@ -1458,9 +1489,12 @@ parse_header([], _) ->
     invalid.
 
 scan_header(Bin) ->
-    case get_crlf_crlf_pos(Bin) of
+    case get_crlf_crlf_pos(Bin, 0) of
         {yes, Pos} ->
             {Headers, <<_:4/binary, Body/binary>>} = split_binary(Bin, Pos),
+            {yes, Headers, Body};
+        {yes_dodgy, Pos} ->
+            {Headers, <<_:2/binary, Body/binary>>} = split_binary(Bin, Pos),
             {yes, Headers, Body};
         no ->
             {no, Bin}
@@ -1474,29 +1508,26 @@ scan_header(Bin1, Bin2) ->
     Bin1_already_scanned_size = size(Bin1) - 4,
     <<Headers_prefix:Bin1_already_scanned_size/binary, Rest/binary>> = Bin1,
     Bin_to_scan = <<Rest/binary, Bin2/binary>>,
-    case get_crlf_crlf_pos(Bin_to_scan) of
+    case get_crlf_crlf_pos(Bin_to_scan, 0) of
         {yes, Pos} ->
             {Headers_suffix, <<_:4/binary, Body/binary>>} = split_binary(Bin_to_scan, Pos),
+            {yes, <<Headers_prefix/binary, Headers_suffix/binary>>, Body};
+        {yes_dodgy, Pos} ->
+            {Headers_suffix, <<_:2/binary, Body/binary>>} = split_binary(Bin_to_scan, Pos),
             {yes, <<Headers_prefix/binary, Headers_suffix/binary>>, Body};
         no ->
             {no, <<Bin1/binary, Bin2/binary>>}
     end.
 
-get_crlf_crlf_pos(Data) ->
-    binary_bif_match(Data, <<$\r, $\n, $\r, $\n>>).
-
-binary_bif_match(Data, Binary) ->
-    case binary:match(Data, Binary) of
-    {Pos, _Len} ->
-        {yes, Pos};
-    _ -> no
-    end.
-
+get_crlf_crlf_pos(<<$\r, $\n, $\r, $\n, _/binary>>, Pos) -> {yes, Pos};
+get_crlf_crlf_pos(<<$\n, $\n, _/binary>>, Pos)           -> {yes_dodgy, Pos};
+get_crlf_crlf_pos(<<_, Rest/binary>>, Pos)               -> get_crlf_crlf_pos(Rest, Pos + 1);
+get_crlf_crlf_pos(<<>>, _)                               -> no.
 
 scan_crlf(Bin) ->
     case get_crlf_pos(Bin) of
-        {yes, Pos} ->
-            {Prefix, <<_, _, Suffix/binary>>} = split_binary(Bin, Pos),
+        {yes, Offset, Pos} ->
+            {Prefix, <<_:Offset/binary, Suffix/binary>>} = split_binary(Bin, Pos),
             {yes, Prefix, Suffix};
         no ->
             {no, Bin}
@@ -1513,16 +1544,20 @@ scan_crlf_1(Bin1_head_size, Bin1, Bin2) ->
     <<Bin1_head:Bin1_head_size/binary, Bin1_tail/binary>> = Bin1,
     Bin3 = <<Bin1_tail/binary, Bin2/binary>>,
     case get_crlf_pos(Bin3) of
-        {yes, Pos} ->
-            {Prefix, <<_, _, Suffix/binary>>} = split_binary(Bin3, Pos),
+        {yes, Offset, Pos} ->
+            {Prefix, <<_:Offset/binary, Suffix/binary>>} = split_binary(Bin3, Pos),
             {yes, list_to_binary([Bin1_head, Prefix]), Suffix};
         no ->
             {no, list_to_binary([Bin1, Bin2])}
     end.
 
-get_crlf_pos(Data) ->
-    binary_bif_match(Data, <<$\r, $\n>>).
+get_crlf_pos(Bin) ->
+    get_crlf_pos(Bin, 0).
 
+get_crlf_pos(<<$\r, $\n, _/binary>>, Pos) -> {yes, 2, Pos};
+get_crlf_pos(<<$\n, _/binary>>, Pos) ->      {yes, 1, Pos};
+get_crlf_pos(<<_, Rest/binary>>, Pos)     -> get_crlf_pos(Rest, Pos + 1);
+get_crlf_pos(<<>>, _)                     -> no.
 
 fmt_val(L) when is_list(L)    -> L;
 fmt_val(I) when is_integer(I) -> integer_to_list(I);
@@ -1531,21 +1566,36 @@ fmt_val(Term)                 -> io_lib:format("~p", [Term]).
 
 crnl() -> "\r\n".
 
-method(get)       -> "GET";
-method(post)      -> "POST";
-method(head)      -> "HEAD";
-method(options)   -> "OPTIONS";
-method(put)       -> "PUT";
-method(delete)    -> "DELETE";
-method(trace)     -> "TRACE";
-method(mkcol)     -> "MKCOL";
-method(propfind)  -> "PROPFIND";
-method(proppatch) -> "PROPPATCH";
-method(lock)      -> "LOCK";
-method(unlock)    -> "UNLOCK";
-method(move)      -> "MOVE";
-method(copy)      -> "COPY";
-method(connect)   -> "CONNECT".
+method(connect)     -> "CONNECT";
+method(delete)      -> "DELETE";
+method(get)         -> "GET";
+method(head)        -> "HEAD";
+method(options)     -> "OPTIONS";
+method(post)        -> "POST";
+method(put)         -> "PUT";
+method(trace)       -> "TRACE";
+%% webdav
+method(copy)        -> "COPY";
+method(lock)        -> "LOCK";
+method(mkcol)       -> "MKCOL";
+method(move)        -> "MOVE";
+method(propfind)    -> "PROPFIND";
+method(proppatch)   -> "PROPPATCH";
+method(search)      -> "SEARCH";
+method(unlock)      -> "UNLOCK";
+%% subversion %%
+method(report)      -> "REPORT";
+method(mkactivity)  -> "MKACTIVITY";
+method(checkout)    -> "CHECKOUT";
+method(merge)       -> "MERGE";
+%% upnp
+method(msearch)     -> "MSEARCH";
+method(notify)      -> "NOTIFY";
+method(subscribe)   -> "SUBSCRIBE";
+method(unsubscribe) -> "UNSUBSCRIBE";
+%% rfc-5789
+method(patch)       -> "PATCH";
+method(purge)       -> "PURGE".
 
 %% From RFC 2616
 %%
@@ -1768,13 +1818,20 @@ to_lower([], Acc) ->
 shutting_down(#state{lb_ets_tid = undefined}) ->
     ok;
 shutting_down(#state{lb_ets_tid = Tid,
-                     cur_pipeline_size = Sz}) ->
-    catch ets:delete(Tid, {Sz, self()}).
+                     cur_pipeline_size = _Sz}) ->
+    catch ets:delete(Tid, self()).
 
 inc_pipeline_counter(#state{is_closing = true} = State) ->
     State;
-inc_pipeline_counter(#state{cur_pipeline_size = Pipe_sz} = State) ->
+inc_pipeline_counter(#state{lb_ets_tid = undefined} = State) ->
+    State;
+inc_pipeline_counter(#state{cur_pipeline_size = Pipe_sz,
+                           lb_ets_tid = Tid} = State) ->
+    update_counter(Tid, self(), {2,1,99999,9999}),
     State#state{cur_pipeline_size = Pipe_sz + 1}.
+
+update_counter(Tid, Key, Args) ->
+    ets:update_counter(Tid, Key, Args).
 
 dec_pipeline_counter(#state{is_closing = true} = State) ->
     State;
@@ -1782,8 +1839,13 @@ dec_pipeline_counter(#state{lb_ets_tid = undefined} = State) ->
     State;
 dec_pipeline_counter(#state{cur_pipeline_size = Pipe_sz,
                             lb_ets_tid = Tid} = State) ->
-    ets:delete(Tid, {Pipe_sz, self()}),
-    ets:insert(Tid, {{Pipe_sz - 1, self()}, []}),
+    try
+        update_counter(Tid, self(), {2,-1,0,0}),
+        update_counter(Tid, self(), {3,-1,0,0})
+    catch
+        _:_ ->
+            ok
+    end,
     State#state{cur_pipeline_size = Pipe_sz - 1}.
 
 flatten([H | _] = L) when is_integer(H) ->
