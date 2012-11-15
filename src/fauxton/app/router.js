@@ -57,7 +57,9 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log) {
         model: doc
       }));
 
-      dashboard.setSidebarContent(new Databases.Views.Sidebar());
+      dashboard.setSidebarContent(new Databases.Views.Sidebar({
+        collection: databases
+      }));
 
       dashboard.setBreadcrumbs(new Fauxton.Breadcrumbs({
         crumbs: crumbs
@@ -88,7 +90,9 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log) {
         model: database
       }));
 
-      dashboard.setSidebarContent(new Databases.Views.Sidebar());
+      dashboard.setSidebarContent(new Databases.Views.Sidebar({
+        collection: databases
+      }));
 
       dashboard.setBreadcrumbs(new Fauxton.Breadcrumbs({
         crumbs: crumbs
@@ -117,7 +121,9 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log) {
         collection: logs
       }));
 
-      dashboard.setSidebarContent(new Databases.Views.Sidebar());
+      dashboard.setSidebarContent(new Databases.Views.Sidebar({
+        collection: databases
+      }));
 
       dashboard.setBreadcrumbs(new Fauxton.Breadcrumbs({
         crumbs: crumbs
@@ -142,7 +148,9 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log) {
         collection: databases
       }));
 
-      dashboard.setSidebarContent(new Databases.Views.Sidebar());
+      dashboard.setSidebarContent(new Databases.Views.Sidebar({
+        collection: databases
+      }));
 
       databases.fetch().done(function(resp) {
         $.when.apply(null, databases.map(function(database) {

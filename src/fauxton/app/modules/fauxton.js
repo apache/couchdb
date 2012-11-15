@@ -69,10 +69,7 @@ function(app, Backbone, Logs) {
 
     update: function(endpoint) {
       // Take endpoint and write it into the api bar.
-      console.log('ApiBar being updated: ' + endpoint);
       this.endpoint = endpoint;
-      console.log('ApiBar updated: ');
-      console.log(this.serialize());
       this.render();
     }
 

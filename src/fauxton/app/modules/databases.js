@@ -34,6 +34,13 @@ function(app, Backbone, Views) {
       });
 
       return this.allDocs;
+    },
+    isNew: function(){
+      // Databases are never new, to make Backbone do a PUT
+      return false;
+    },
+    url: function() {
+      return app.host + "/" + this.id;
     }
   });
 
@@ -52,7 +59,6 @@ function(app, Backbone, Views) {
     model: Databases.Model,
 
     url: function() {
-      console.log('all dbs databases.js');
       return app.host + "/_all_dbs";
     },
 
