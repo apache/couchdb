@@ -66,12 +66,20 @@ function (app, backbone, Fauxton) {
       return { logs: this.collection.toJSON()};
     },
 
+    beforeRender: function () {
+      //temporary fix until we have the layout switcher working
+      $("#sidebar-content").hide();
+      $("#dashboard-content").removeClass("span8").addClass("span12");
+    },
+
     afterRender: function () {
       this.collection.on('reset', this.render, this);
       this.startRefreshInterval();
     },
 
     cleanup: function() {
+      $("#sidebar-content").show();
+      $("#dashboard-content").addClass("span8").removeClass("span12");
       this.stopRefreshInterval();
     },
 

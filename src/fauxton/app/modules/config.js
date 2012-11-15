@@ -108,7 +108,48 @@ function (app, backbone, Fauxton) {
   Config.View = Backbone.View.extend({
     template: "config/dashboard",
 
+    events: {
+      "click #add-section": "addSection",
+      "submit #add-section-form": "submitForm"
+    },
+
+    submitForm: function (event) {
+      event.preventDefault();
+      var option = new Config.OptionModel({
+        section: this.$('input[name="section"]').val(),
+        name: this.$('input[name="name"]').val(),
+        value: this.$('input[name="value"]').val()
+      });
+
+      option.save();
+
+      var section = this.collection.find(function (section) {
+        return section.get("section") === option.get("section"); 
+      });
+
+      if (section) {
+        section.get("options").push(option.attributes);
+      } else {
+        this.collection.add({
+          section: option.get("section"),
+          options: [option.attributes]
+        });
+      }
+
+      this.$("#add-section-modal").modal('hide'); 
+      this.render();
+    },
+
+    addSection: function (event) {
+      event.preventDefault();
+      this.$("#add-section-modal").modal({show:true}); 
+    },
+
     beforeRender: function() {
+      //temporary fix until we have the layout switcher working
+      $("#sidebar-content").hide();
+      $("#dashboard-content").removeClass("span8").addClass("span12");
+
       this.collection.each(function(config) {
         _.each(config.get("options"), function (option, index) {
           this.insertView("table.config tbody", new Config.ViewItem({
@@ -121,6 +162,11 @@ function (app, backbone, Fauxton) {
           }));
         }, this);
       }, this);
+    },
+
+    cleanup: function () {
+      $("#sidebar-content").show();
+      $("#dashboard-content").addClass("span8").removeClass("span12");
     }
   });
 
