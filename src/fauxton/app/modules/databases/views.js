@@ -13,45 +13,9 @@ define([
 function(app, Backbone, Codemirror, JSHint) {
   var Views = {};
 
-  Views.Popover = Backbone.View.extend({
-    template: "databases/popover",
-
-    serialize: function() {
-      return {
-        database: this.model,
-        status: this.model.status
-      };
-    }
-  });
-
   Views.Item = Backbone.View.extend({
     template: "databases/item",
     tagName: "tr",
-
-    events: {
-      "mouseover i.database-info": "displayInfo",
-      "mouseout i.database-info": "hideInfo"
-    },
-
-    displayInfo: function(event) {
-      var ele = $(event.currentTarget);
-      ele.popover("show");
-    },
-
-    hideInfo: function(event) {
-      var ele = $(event.currentTarget);
-      ele.popover("hide");
-    },
-
-    afterRender: function() {
-      var view = this;
-      app.renderView(this, "FAKEITEM", Views.Popover, {model:view.model}, function(popoverEle) {
-        view.$el.find("i.database-info").popover({
-          title: view.model.id + " info",
-          content: popoverEle.el
-        });
-      });
-    },
 
     serialize: function() {
       return {
