@@ -11,7 +11,7 @@ define([
   // Plugins
 ],
 
-function(app, Backbone, Logs) {
+function(app, Backbone) {
   var Fauxton = app.module();
 
   Fauxton.Breadcrumbs = Backbone.View.extend({
@@ -39,6 +39,7 @@ function(app, Backbone, Logs) {
       {href:"#/_all_dbs", title:"Databases"},
       {href:"#/_status", title:"Status"},
       {href:"#/_stats", title:"Stats"},
+      {href:"#/_config", title:"Config"},
       {href:"#/_log", title:"Log"}
     ],
 
