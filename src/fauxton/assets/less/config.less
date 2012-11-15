@@ -1,7 +1,33 @@
-/*!
- *
- * Cloudant less style files
- *
- */
-@import "bootstrap/bootstrap.less";
-@import "config.less";
+.config-item {
+  height: 41px;
+
+  .edit-button {
+    float: right;
+    .btn;
+    .btn-mini;
+    display:none;
+  }
+
+  td:hover .edit-button {
+    display: block;
+  }
+
+  .value-input {
+    width: 98%;
+  }
+
+  #delete-value {
+    cursor: pointer;
+  }
+}
+
+.button-margin {
+  margin-bottom: 15px;
+}
+
+#add-section-modal {
+  width: 400px;
+}
+
+
+
