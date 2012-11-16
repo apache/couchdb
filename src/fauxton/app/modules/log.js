@@ -14,7 +14,6 @@ function (app, backbone, Fauxton) {
   var Log = app.module();
 
   Log.Model = Backbone.Model.extend({ });
-  Log.FilterModel = Backbone.Model.extend({ });
 
   Log.Collection = Backbone.Collection.extend({
     model: Log.Model,
@@ -156,7 +155,7 @@ function (app, backbone, Fauxton) {
       Log.events.trigger("log:filter", filter);
 
       this.insertView("#filter-list", new Log.FilterItemView({
-        model: new Log.FilterModel({value: filter})
+        filter: filter
       })).render();
 
       $filter.val('');
@@ -168,20 +167,24 @@ function (app, backbone, Fauxton) {
     template: "log/filterItem",
     tagName: "li",
 
+    initialize: function (options) {
+      this.filter = options.filter;
+    },
+
     events: {
       "click .remove-filter": "removeFilter"
     },
 
     serialize: function () {
       return {
-        filter: this.model.toJSON()
+        filter: this.filter
       };
     },
 
     removeFilter: function (event) {
       event.preventDefault();
 
-      Log.events.trigger("log:remove", this.model.get("value"));
+      Log.events.trigger("log:remove", this.filter);
       this.remove();
     }
 

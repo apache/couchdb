@@ -69,8 +69,6 @@ function(app, Initialize, Fauxton, Dashboard, Databases, Documents, API, Plugin,
         collection: database
       }));
 
-      $("#app-container").html(dashboard.$el);
-
       doc.fetch().done(function(resp) {
         // Render only the part of the dashboard that needs to be re-rendered
         dashboard.dashboardContent.render();
@@ -111,8 +109,6 @@ function(app, Initialize, Fauxton, Dashboard, Databases, Documents, API, Plugin,
         collection: designDocs
       }));
 
-      $("#app-container").html(dashboard.$el);
-
       database.allDocs.fetch().done(function(resp) {
         dashboard.dashboardContent.render();
       });
@@ -142,8 +138,6 @@ function(app, Initialize, Fauxton, Dashboard, Databases, Documents, API, Plugin,
       }));
 
       dashboard.setSidebarContent(new Log.FilterView({}));
-
-      $("#app-container").html(dashboard.$el);
 
       logs.fetch().done(function (resp) {
         dashboard.dashboardContent.render();
