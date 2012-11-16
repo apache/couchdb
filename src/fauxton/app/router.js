@@ -155,6 +155,8 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log, Confi
       configs.fetch().done(function (resp) {
         dashboard.render();
       });
+
+      this.apiBar.update(configs.url());
     },
 
     index: function() {
