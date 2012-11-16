@@ -167,8 +167,7 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log, Confi
       this.dashboard.clearBreadcrumbs();
 
       var crumbs = [
-        {"name": "Dashboard", "link": app.root},
-        {"name": "Logs","link": app.root}
+        {"name": "Dashboard", "link": app.root}
       ];
 
       dashboard.setBreadcrumbs(new Fauxton.Breadcrumbs({
