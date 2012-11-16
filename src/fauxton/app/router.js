@@ -15,8 +15,7 @@ define([
 
   // this needs to be added as a plugin later
   "modules/log",
-  "modules/config",
-  "modules/log"
+  "modules/config"
 ],
 
 function(app, Initialize, Fauxton, Dashboard, Databases, Documents, API, Plugin, Log, Config) {
@@ -70,8 +69,6 @@ function(app, Initialize, Fauxton, Dashboard, Databases, Documents, API, Plugin,
         collection: database
       }));
 
-      $("#app-container").html(dashboard.$el);
-
       doc.fetch().done(function(resp) {
         // Render only the part of the dashboard that needs to be re-rendered
         dashboard.dashboardContent.render();
@@ -112,8 +109,6 @@ function(app, Initialize, Fauxton, Dashboard, Databases, Documents, API, Plugin,
         collection: designDocs
       }));
 
-      $("#app-container").html(dashboard.$el);
-
       database.allDocs.fetch().done(function(resp) {
         dashboard.dashboardContent.render();
       });
@@ -142,7 +137,7 @@ function(app, Initialize, Fauxton, Dashboard, Databases, Documents, API, Plugin,
         collection: logs
       }));
 
-      $("#app-container").html(dashboard.$el);
+      dashboard.setSidebarContent(new Log.FilterView({}));
 
       logs.fetch().done(function (resp) {
         dashboard.dashboardContent.render();
