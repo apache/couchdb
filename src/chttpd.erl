@@ -493,7 +493,12 @@ body(#httpd{mochi_req=MochiReq, req_body=ReqBody}) ->
     end.
 
 json_body(Httpd) ->
-    ?JSON_DECODE(body(Httpd)).
+    case body(Httpd) of
+        undefined ->
+            throw({bad_request, "Missing request body"});
+        Body ->
+            ?JSON_DECODE(Body)
+    end.
 
 json_body_obj(Httpd) ->
     case json_body(Httpd) of
