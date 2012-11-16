@@ -9,6 +9,7 @@ define([
   "modules/fauxton",
   "modules/dashboard",
   "modules/databases",
+  "modules/documents",
   "modules/api",
   "modules/fauxton_plugin",
 
@@ -18,7 +19,7 @@ define([
   "modules/log"
 ],
 
-function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log, Config) {
+function(app, Initialize, Fauxton, Dashboard, Databases, Documents, API, Plugin, Log, Config) {
 
   // Defining the application router, you can attach sub routers here.
   var Router = app.router = Backbone.Router.extend({
@@ -45,13 +46,14 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log, Confi
     database_doc: function(databaseName, docID) {
       var dashboard = this.dashboard;
       var database = new Databases.Model({id:databaseName});
-      var doc = new Databases.Doc({
+      var doc = new Documents.Doc({
         "_id": docID
       });
       doc.collection = database;
 
       var crumbs = [
         {"name": "Dashboard", "link": app.root},
+        {"name": "Databases", "link": app.root},
         {"name": database.id, "link": Databases.databaseUrl(database)},
         {"name": docID, "link": "#"}
       ];
@@ -60,11 +62,11 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log, Confi
         crumbs: crumbs
       }));
 
-      dashboard.setDashboardContent(new Databases.Views.Doc({
+      dashboard.setDashboardContent(new Documents.Views.Doc({
         model: doc
       }));
 
-      dashboard.setSidebarContent(new Databases.Views.Sidebar({
+      dashboard.setSidebarContent(new Documents.Views.Sidebar({
         collection: database
       }));
 
@@ -81,11 +83,20 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log, Confi
     database_handler: function(databaseName, page) {
       var dashboard = this.dashboard;
       var database = new Databases.Model({id:databaseName});
+
+      var designDocs = new Documents.AllDocs({
+        database: database,
+        params: {startkey: '"_design"',
+                 endkey: '"_design1"',
+                 include_docs: true}
+      });
+
       var options = app.getParams();
       database.buildAllDocs(options);
 
       var crumbs = [
         {"name": "Dashboard", "link": app.root},
+        {"name": "Databases", "link": app.root},
         {"name": database.id, "link": Databases.databaseUrl(database)}
       ];
 
@@ -93,18 +104,22 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log, Confi
         crumbs: crumbs
       }));
 
-      dashboard.setDashboardContent(new Databases.Views.AllDocsList({
+      dashboard.setDashboardContent(new Documents.Views.AllDocsList({
         model: database
       }));
 
-      dashboard.setSidebarContent(new Databases.Views.Sidebar({
-        collection: database
+      dashboard.setSidebarContent(new Documents.Views.Sidebar({
+        collection: designDocs
       }));
 
       $("#app-container").html(dashboard.$el);
 
       database.allDocs.fetch().done(function(resp) {
         dashboard.dashboardContent.render();
+      });
+
+      designDocs.fetch().done(function(resp) {
+        dashboard.sidebarContent.render();
       });
 
       this.apiBar.update(database.allDocs.url());
@@ -148,6 +163,7 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log, Confi
       this.dashboard.setDashboardContent(new Config.View({
         collection: configs
       }));
+
       this.dashboard.setBreadcrumbs(new Fauxton.Breadcrumbs({
         crumbs: crumbs
       }));

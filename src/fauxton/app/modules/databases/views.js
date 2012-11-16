@@ -2,15 +2,12 @@ define([
   "app",
 
   // Libs
-  "backbone",
-  "codemirror",
-  "jshint",
+  "backbone"
 
   // Plugins
-  "plugins/codemirror-javascript"
 ],
 
-function(app, Backbone, Codemirror, JSHint) {
+function(app, Backbone) {
   var Views = {};
 
   Views.Item = Backbone.View.extend({
@@ -50,91 +47,6 @@ function(app, Backbone, Codemirror, JSHint) {
 
     selectAll: function(evt){
       $("input:checkbox").attr('checked', !$(evt.target).hasClass('active'));
-    }
-  });
-
-  Views.AllDocsItem = Backbone.View.extend({
-    template: "documents/all_docs_item",
-    tagName: "tr",
-
-    serialize: function() {
-      return {
-        doc: this.model
-      };
-    }
-  });
-
-  Views.AllDocsList = Backbone.View.extend({
-    template: "documents/all_docs_list",
-
-    serialize: function() {
-      return {
-        database: this.model
-      };
-    },
-
-    beforeRender: function(manage) {
-      this.model.allDocs.each(function(doc) {
-        this.insertView("table.all-docs tbody", new Views.AllDocsItem({
-          model: doc
-        }));
-      }, this);
-    }
-  });
-
-  Views.Doc = Backbone.View.extend({
-    template: "documents/doc",
-
-    events: {
-      "click button.save-doc": "saveDoc"
-    },
-
-    saveDoc: function(event) {
-      alert("Save functionality coming soon.");
-    },
-
-    runJSHint: function() {
-      var json = this.editor.getValue();
-      var output = JSHint(json);
-
-      // Clear existing markers
-      for (var i = 0, l = this.editor.lineCount(); i < l; i++) {
-        this.editor.clearMarker(i);
-      }
-
-      if (output === false) {
-        _.map(JSHint.errors, function(error) {
-          var line = error.line - 1;
-          var className = "view-code-error-line-" + line;
-          this.editor.setMarker(line, "●", "view-code-error "+className);
-
-          setTimeout(function() {
-            $(".CodeMirror ."+className).tooltip({
-              title: "ERROR: " + error.reason
-            });
-          }, 0);
-        }, this);
-      }
-    },
-
-    serialize: function() {
-      return {
-        doc: this.model
-      };
-    },
-
-    afterRender: function() {
-      var that = this;
-      this.editor = Codemirror.fromTextArea(this.$el.find("textarea.doc-code").get()[0], {
-        mode: "application/json",
-        json: false,
-        lineNumbers: true,
-        matchBrackets: true,
-        lineWrapping: true,
-        onChange: function() {
-          that.runJSHint();
-        }
-      });
     }
   });
 
