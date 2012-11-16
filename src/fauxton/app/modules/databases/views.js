@@ -26,6 +26,9 @@ function(app, Backbone, Codemirror, JSHint) {
 
   Views.List = Backbone.View.extend({
     template: "databases/list",
+    events: {
+      "click button.all": "selectAll"
+    },
 
     initialize: function(options) {
       this.collection.on("add", this.render, this);
@@ -43,6 +46,10 @@ function(app, Backbone, Codemirror, JSHint) {
           model: database
         }));
       }, this);
+    },
+
+    selectAll: function(evt){
+      $("input:checkbox").attr('checked', !$(evt.target).hasClass('active'));
     }
   });
 
