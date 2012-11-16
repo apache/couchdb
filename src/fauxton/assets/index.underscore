@@ -25,7 +25,9 @@
     <hr>
 
     <footer>
-      <p>&copy; Project Fauxton 2012</p>
+      <div id="footer-content" class="container">
+        <p>&copy; Project Fauxton 2012</p>
+      </div>
     </footer>
   </div>
 
