@@ -1,0 +1,17 @@
+<% if (option.index === 0) {%>
+<th> <%= option.section %> </th>
+<% } else { %>
+<td></td>
+<% } %>
+<td> <%= option.name %> </td>
+<td>
+  <div id="show-value">
+    <%= option.value %> <button class="edit-button"> Edit </button>
+  </div>
+  <div id="edit-value-form" style="display:none">
+    <input class="value-input" type="text" value="<%= option.value %>" />
+    <button id="save-value" class="btn btn-success btn-small"> Save </button>
+    <button id="cancel-value" class="btn btn-danger btn-small"> Cancel </button>
+  </div>
+</td>
+<td id="delete-value"> <i class="icon-trash"> </i> </td>

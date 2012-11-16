@@ -13,10 +13,11 @@ define([
   "modules/fauxton_plugin",
 
   // this needs to be added as a plugin later
-  "modules/log"
+  "modules/log",
+  "modules/config"
 ],
 
-function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log) {
+function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log, Config) {
 
   // Defining the application router, you can attach sub routers here.
   var Router = app.router = Backbone.Router.extend({
@@ -26,7 +27,8 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log) {
       "_all_dbs": "index",
       "database/:database/_:handler": "database_handler",
       "database/:database/:doc": "database_doc",
-      "_log": "log"
+      "_log": "log",
+      "_config": "config"
     },
 
     initialize: function() {
@@ -132,6 +134,27 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log) {
       });
 
       this.apiBar.update(logs.url());
+    },
+
+    config: function () {
+      var dashboard = this.dashboard,
+          configs = new Config.Collection();
+
+      var crumbs = [
+        {"name": "Home","link": app.root},
+        {"name": "Config","link": app.root}
+      ];
+
+      this.dashboard.setDashboardContent(new Config.View({
+        collection: configs
+      }));
+      this.dashboard.setBreadcrumbs(new Fauxton.Breadcrumbs({
+        crumbs: crumbs
+      }));
+
+      configs.fetch().done(function (resp) {
+        dashboard.render();
+      });
     },
 
     index: function() {
