@@ -14,6 +14,7 @@ function (app, backbone, Fauxton) {
   var Log = app.module();
 
   Log.Model = Backbone.Model.extend({ });
+  Log.FilterModel = Backbone.Model.extend({ });
 
   Log.Collection = Backbone.Collection.extend({
     model: Log.Model,
@@ -55,32 +56,72 @@ function (app, backbone, Fauxton) {
     }
   });
 
+  Log.events = {};
+  _.extend(Log.events, Backbone.Events);
+
   Log.View = Backbone.View.extend({
-    template: "log/log",
+    template: "log/dashboard",
 
     initialize: function (options) {
       this.refreshTime = options.refreshTime || 5000;
+
+      Log.events.on("log:filter", this.filterLogs, this);
+      Log.events.on("log:remove", this.removeFilterLogs, this);
+
+      this.filters = [];
+      this.filteredCollection = new Log.Collection(this.collection.toJSON());
+      this.collection.on("reset", function () {
+        this.createFilteredCollection();
+      }, this);
     },
 
     serialize: function () {
-      return { logs: this.collection.toJSON()};
-    },
-
-    beforeRender: function () {
-      //temporary fix until we have the layout switcher working
-      $("#sidebar-content").hide();
-      $("#dashboard-content").removeClass("span8").addClass("span12");
+      return { logs: this.filteredCollection.toJSON()};
     },
 
     afterRender: function () {
-      this.collection.on('reset', this.render, this);
       this.startRefreshInterval();
     },
 
-    cleanup: function() {
-      $("#sidebar-content").show();
-      $("#dashboard-content").addClass("span8").removeClass("span12");
+    cleanup: function () {
       this.stopRefreshInterval();
+    },
+
+    filterLogs: function (filter) {
+      this.filters.push(filter);
+      this.createFilteredCollection();
+    },
+
+    resetFilterCollectionAndRender: function (logs) {
+      this.filteredCollection.reset(logs); 
+      this.render();
+    },
+
+    createFilteredCollection: function () {
+      var self = this;
+
+      var filtered = _.reduce(this.filters, function (logs, filter) {
+
+        return _.filter(logs, function (log) {
+          var match = false;
+
+          _.each(log, function (value) {
+            if (value.toString().match(new RegExp(filter))) {
+              match = true;
+            }
+          });
+          return match;
+        });
+
+
+      }, this.collection.toJSON(), this);
+     
+      this.resetFilterCollectionAndRender(filtered);
+    },
+
+    removeFilterLogs: function (filter) {
+      this.filters.splice(this.filters.indexOf(filter), 1);
+      this.createFilteredCollection();
     },
 
     startRefreshInterval: function () {
@@ -98,6 +139,52 @@ function (app, backbone, Fauxton) {
     stopRefreshInterval: function () {
       clearInterval(this.intervalId);
     }
+  });
+
+  Log.FilterView = Backbone.View.extend({
+    template: "log/sidebar",
+
+    events: {
+      "submit #log-filter-form": "filterLogs"
+    },
+
+    filterLogs: function (event) {
+      event.preventDefault();
+      var $filter = this.$('input[name="filter"]'),
+          filter = $filter.val();
+
+      Log.events.trigger("log:filter", filter);
+
+      this.insertView("#filter-list", new Log.FilterItemView({
+        model: new Log.FilterModel({value: filter})
+      })).render();
+
+      $filter.val('');
+    }
+
+  });
+
+  Log.FilterItemView = Backbone.View.extend({
+    template: "log/filterItem",
+    tagName: "li",
+
+    events: {
+      "click .remove-filter": "removeFilter"
+    },
+
+    serialize: function () {
+      return {
+        filter: this.model.toJSON()
+      };
+    },
+
+    removeFilter: function (event) {
+      event.preventDefault();
+
+      Log.events.trigger("log:remove", this.model.get("value"));
+      this.remove();
+    }
+
   });
 
 

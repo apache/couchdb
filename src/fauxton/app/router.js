@@ -15,8 +15,7 @@ define([
 
   // this needs to be added as a plugin later
   "modules/log",
-  "modules/config",
-  "modules/log"
+  "modules/config"
 ],
 
 function(app, Initialize, Fauxton, Dashboard, Databases, Documents, API, Plugin, Log, Config) {
@@ -141,6 +140,8 @@ function(app, Initialize, Fauxton, Dashboard, Databases, Documents, API, Plugin,
       dashboard.setDashboardContent(new Log.View({
         collection: logs
       }));
+
+      dashboard.setSidebarContent(new Log.FilterView({}));
 
       $("#app-container").html(dashboard.$el);
 
