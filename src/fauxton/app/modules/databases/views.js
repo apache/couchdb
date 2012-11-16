@@ -47,7 +47,7 @@ function(app, Backbone, Codemirror, JSHint) {
   });
 
   Views.AllDocsItem = Backbone.View.extend({
-    template: "databases/all_docs_item",
+    template: "documents/all_docs_item",
     tagName: "tr",
 
     serialize: function() {
@@ -58,7 +58,7 @@ function(app, Backbone, Codemirror, JSHint) {
   });
 
   Views.AllDocsList = Backbone.View.extend({
-    template: "databases/all_docs_list",
+    template: "documents/all_docs_list",
 
     serialize: function() {
       return {
@@ -76,7 +76,7 @@ function(app, Backbone, Codemirror, JSHint) {
   });
 
   Views.Doc = Backbone.View.extend({
-    template: "databases/doc",
+    template: "documents/doc",
 
     events: {
       "click button.save-doc": "saveDoc"

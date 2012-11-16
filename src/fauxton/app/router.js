@@ -14,7 +14,8 @@ define([
 
   // this needs to be added as a plugin later
   "modules/log",
-  "modules/config"
+  "modules/config",
+  "modules/log"
 ],
 
 function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log, Config) {
@@ -55,16 +56,16 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log, Confi
         {"name": docID, "link": "#"}
       ];
 
+      dashboard.setBreadcrumbs(new Fauxton.Breadcrumbs({
+        crumbs: crumbs
+      }));
+
       dashboard.setDashboardContent(new Databases.Views.Doc({
         model: doc
       }));
 
       dashboard.setSidebarContent(new Databases.Views.Sidebar({
         collection: database
-      }));
-
-      dashboard.setBreadcrumbs(new Fauxton.Breadcrumbs({
-        crumbs: crumbs
       }));
 
       $("#app-container").html(dashboard.$el);
@@ -88,16 +89,16 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log, Confi
         {"name": database.id, "link": Databases.databaseUrl(database)}
       ];
 
+      dashboard.setBreadcrumbs(new Fauxton.Breadcrumbs({
+        crumbs: crumbs
+      }));
+
       dashboard.setDashboardContent(new Databases.Views.AllDocsList({
         model: database
       }));
 
       dashboard.setSidebarContent(new Databases.Views.Sidebar({
         collection: database
-      }));
-
-      dashboard.setBreadcrumbs(new Fauxton.Breadcrumbs({
-        crumbs: crumbs
       }));
 
       $("#app-container").html(dashboard.$el);
@@ -113,18 +114,17 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log, Confi
       var dashboard = this.dashboard;
       var logs = new Log.Collection();
 
-
       var crumbs = [
         {"name": "Dashboard", "link": app.root},
         {"name": "Logs","link": app.root}
       ];
 
-      dashboard.setDashboardContent(new Log.View({
-        collection: logs
-      }));
-
       dashboard.setBreadcrumbs(new Fauxton.Breadcrumbs({
         crumbs: crumbs
+      }));
+
+      dashboard.setDashboardContent(new Log.View({
+        collection: logs
       }));
 
       $("#app-container").html(dashboard.$el);
@@ -159,11 +159,21 @@ function(app, Initialize, Fauxton, Dashboard, Databases, API, Plugin, Log, Confi
       this.apiBar.update(configs.url());
     },
 
+    // TODO: This should be renamed when we have a real dashboar
     index: function() {
       var dashboard = this.dashboard;
       var databases = app.databases = new Databases.List();
 
       this.dashboard.clearBreadcrumbs();
+
+      var crumbs = [
+        {"name": "Dashboard", "link": app.root},
+        {"name": "Logs","link": app.root}
+      ];
+
+      dashboard.setBreadcrumbs(new Fauxton.Breadcrumbs({
+        crumbs: crumbs
+      }));
 
       dashboard.setDashboardContent(new Databases.Views.List({
         collection: databases
