@@ -25,7 +25,7 @@ plate which will install the other dependencies needed.
     ./bootstrap && ./configure && make dev
     cd src/fauxton
     npm install -g bbb
-    npm install grunt-contrib-copy grunt-couchapp underscore
+    npm install grunt-contrib-copy grunt-couchapp underscore couchapp
     bbb couchdb **or** bbb couchdebug
     ../../utils/run &
     open http://localhost:5984/_utils/fauxton/index.html
