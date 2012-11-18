@@ -160,7 +160,7 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
     Cookie ->
         [User, TimeStr | HashParts] = try
             AuthSession = couch_util:decodeBase64Url(Cookie),
-            [_A, _B | _Cs] = string:tokens(?b2l(AuthSession), ":")
+            [_A, _B | _Cs] = re:split(?b2l(AuthSession), ":", [{return, list}])
         catch
             _:_Error ->
                 Reason = <<"Malformed AuthSession cookie. Please clear your cookies.">>,
