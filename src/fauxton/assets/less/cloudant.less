@@ -7,3 +7,49 @@
 @import "config.less";
 @import "logs.less";
 @import "prettyprint.less";
+
+/*!
+ *
+ * OVERRIDES
+ *
+ * Override styles from included less files here. Record where the style is
+ * originally defined.
+ *
+ */
+
+//
+// Breadcrumbs
+
+.breadcrumb {
+  background-color: transparent;
+  padding-left: 0px;
+  li {
+    color: @grayLight;
+    background-color: transparent;
+    a {
+      color: @grayLight;
+    }
+  }
+  .divider {
+    padding: 0 5px;
+    color: @grayLight; //ccc
+  }
+  .active {
+    color: @black;
+    font-weight: bold;
+  }
+}
+
+
+// Navs
+// ------
+
+.nav-tabs > li > a {
+  background-color: @grayLighter;
+}
+
+.nav-list .divider {
+  color: @grayLight;
+  // This function is defined in mixins
+  .nav-divider(transparent, @white);
+}
