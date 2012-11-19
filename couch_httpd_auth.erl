@@ -26,7 +26,7 @@ special_test_authentication_handler(Req) ->
     case header_value(Req, "WWW-Authenticate") of
     "X-Couch-Test-Auth " ++ NamePass ->
         % NamePass is a colon separated string: "joe schmoe:a password".
-        [Name, Pass] = re:split(NamePass, ":", [{return, list}]),
+        [Name, Pass] = re:split(NamePass, ":", [{return, list}, {parts, 2}]),
         case {Name, Pass} of
         {"Jan Lehnardt", "apple"} -> ok;
         {"Christopher Lenz", "dog food"} -> ok;
@@ -47,14 +47,13 @@ basic_name_pw(Req) ->
     AuthorizationHeader = header_value(Req, "Authorization"),
     case AuthorizationHeader of
     "Basic " ++ Base64Value ->
-        case string:tokens(?b2l(base64:decode(Base64Value)),":") of
+        case re:split(base64:decode(Base64Value), ":",
+                      [{return, list}, {parts, 2}]) of
         ["_", "_"] ->
             % special name and pass to be logged out
             nil;
         [User, Pass] ->
             {User, Pass};
-        [User | Pass] ->
-            {User, string:join(Pass, ":")};
         _ ->
             nil
         end;
@@ -158,9 +157,10 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
     undefined -> Req;
     [] -> Req;
     Cookie ->
-        [User, TimeStr | HashParts] = try
+        [User, TimeStr, HashStr] = try
             AuthSession = couch_util:decodeBase64Url(Cookie),
-            [_A, _B | _Cs] = re:split(?b2l(AuthSession), ":", [{return, list}])
+            [_A, _B, _Cs] = re:split(?b2l(AuthSession), ":",
+                                     [{return, list}, {parts, 3}])
         catch
             _:_Error ->
                 Reason = <<"Malformed AuthSession cookie. Please clear your cookies.">>,
@@ -180,7 +180,7 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
                 UserSalt = couch_util:get_value(<<"salt">>, UserProps, <<"">>),
                 FullSecret = <<Secret/binary, UserSalt/binary>>,
                 ExpectedHash = crypto:sha_mac(FullSecret, User ++ ":" ++ TimeStr),
-                Hash = ?l2b(string:join(HashParts, ":")),
+                Hash = ?l2b(HashStr),
                 Timeout = list_to_integer(
                     couch_config:get("couch_httpd_auth", "timeout", "600")),
                 ?LOG_DEBUG("timeout ~p", [Timeout]),
