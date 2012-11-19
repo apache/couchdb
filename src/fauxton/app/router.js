@@ -129,7 +129,7 @@ function(app, Initialize, Fauxton, Dashboard, Databases, Documents, API, Plugin,
 
     log: function() {
       var dashboard = this.dashboard;
-      dashboard.setTemplate('one_pane');
+      dashboard.setTemplate('with_sidebar');
 
       var logs = new Log.Collection();
 
