@@ -283,7 +283,7 @@ module.exports = function(grunt) {
   // Load the copy task
   grunt.loadNpmTasks('grunt-contrib-copy');
   // clean out previous build artefacts, lint and unit test
-  grunt.registerTask('test', 'clean lint qunit');
+  grunt.registerTask('test', 'clean lint'); //qunit
   // build templates, js and css
   grunt.registerTask('build', 'jst requirejs concat:requirejs less')
   // minify code and css, ready for release.

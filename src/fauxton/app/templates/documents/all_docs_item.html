@@ -1,6 +1,10 @@
+<td class="select"><input type="checkbox"></td>
 <td>
-  <a href="#/database/<%= doc.collection.database.id %>/<%= doc.get('key') %>">
-    <%= doc.get("key") %>
-  </a>
+  <div>
+    <pre class="prettyprint"><%= JSON.stringify(doc.get("doc"), null, "  ") %></pre>
+    <div class="btn-group">
+      <a href="design-document.html" class="btn btn-small edits">Edit design doc</a>
+      <a href="#" class="btn btn-small btn-danger delete" title="Delete this document."><i class="icon icon-trash"></i></a>
+    </div>
+  </div>
 </td>
-<td><%= JSON.stringify(doc.get("value")) %></td>

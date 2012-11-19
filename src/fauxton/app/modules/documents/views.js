@@ -7,7 +7,8 @@ define([
   "jshint",
 
   // Plugins
-  "plugins/codemirror-javascript"
+  "plugins/codemirror-javascript",
+  "plugins/prettify"
 ],
 
 function(app, Backbone, Codemirror, JSHint) {
@@ -48,6 +49,14 @@ function(app, Backbone, Codemirror, JSHint) {
   Views.AllDocsList = Backbone.View.extend({
     template: "documents/all_docs_list",
 
+    events: {
+       "click button.all": "selectAll"
+     },
+
+    selectAll: function(evt){
+      $("input:checkbox").attr('checked', !$(evt.target).hasClass('active'));
+    },
+
     serialize: function() {
       return {
         database: this.model
@@ -60,6 +69,11 @@ function(app, Backbone, Codemirror, JSHint) {
           model: doc
         }));
       }, this);
+    },
+
+    afterRender: function(){
+      console.log('AllDocsList afterRender');
+      prettyPrint();
     }
   });
 

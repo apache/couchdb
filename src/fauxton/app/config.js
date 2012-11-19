@@ -43,7 +43,9 @@ require.config({
     // Backbone.LayoutManager depends on Backbone.
     "plugins/backbone.layoutmanager": ["backbone"],
 
-    "plugins/codemirror-javascript": ["codemirror"]
+    "plugins/codemirror-javascript": ["codemirror"],
+
+    "plugins/prettify": []
   }
 
 });

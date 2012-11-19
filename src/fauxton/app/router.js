@@ -93,6 +93,7 @@ function(app, Initialize, Fauxton, Dashboard, Databases, Documents, API, Plugin,
       });
 
       var options = app.getParams();
+      options.include_docs = true;
       database.buildAllDocs(options);
 
       var crumbs = [
