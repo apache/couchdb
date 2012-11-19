@@ -17,9 +17,8 @@ function(app, Fauxton) {
     this.navBar = navBar;
     this.apiBar = apiBar;
 
-
     this.layout = new Backbone.Layout({
-      template: "layouts/dashboard",
+      template: "layouts/with_sidebar",
 
       views: {
         "#primary-navbar": this.navBar,
@@ -35,6 +34,17 @@ function(app, Fauxton) {
 
     render: function () {
       return this.layout.render();
+    },
+
+    setTemplate: function(template) {
+      this.layout.template = "layouts/" + template;
+      this.render();
+    },
+
+    setTabs: function(view){
+      // TODO: Not sure I like this - seems fragile/repetitive
+      this.tabs = this.layout.setView("#tabs", view);
+      this.tabs.render();
     },
 
     setBreadcrumbs: function(view) {

@@ -13,6 +13,10 @@ define([
 function(app, Backbone, Codemirror, JSHint) {
   var Views = {};
 
+  Views.Tabs = Backbone.View.extend({
+    template: "documents/tabs"
+  });
+
   Views.AllDocsItem = Backbone.View.extend({
     template: "documents/all_docs_item",
     tagName: "tr",

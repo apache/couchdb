@@ -29,7 +29,7 @@ function (app, backbone, Fauxton) {
         contentType: 'application/json',
         dataType: 'json',
         data: JSON.stringify(model.get('value'))
-      }; 
+      };
 
       if (method === 'delete') {
         params.type = 'DELETE';
@@ -124,7 +124,7 @@ function (app, backbone, Fauxton) {
       option.save();
 
       var section = this.collection.find(function (section) {
-        return section.get("section") === option.get("section"); 
+        return section.get("section") === option.get("section");
       });
 
       if (section) {
@@ -136,20 +136,16 @@ function (app, backbone, Fauxton) {
         });
       }
 
-      this.$("#add-section-modal").modal('hide'); 
+      this.$("#add-section-modal").modal('hide');
       this.render();
     },
 
     addSection: function (event) {
       event.preventDefault();
-      this.$("#add-section-modal").modal({show:true}); 
+      this.$("#add-section-modal").modal({show:true});
     },
 
     beforeRender: function() {
-      //temporary fix until we have the layout switcher working
-      $("#sidebar-content").hide();
-      $("#dashboard-content").removeClass("span8").addClass("span12");
-
       this.collection.each(function(config) {
         _.each(config.get("options"), function (option, index) {
           this.insertView("table.config tbody", new Config.ViewItem({
@@ -162,11 +158,6 @@ function (app, backbone, Fauxton) {
           }));
         }, this);
       }, this);
-    },
-
-    cleanup: function () {
-      $("#sidebar-content").show();
-      $("#dashboard-content").addClass("span8").removeClass("span12");
     }
   });
 

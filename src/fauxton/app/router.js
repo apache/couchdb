@@ -44,6 +44,8 @@ function(app, Initialize, Fauxton, Dashboard, Databases, Documents, API, Plugin,
 
     database_doc: function(databaseName, docID) {
       var dashboard = this.dashboard;
+      dashboard.setTemplate('with_sidebar');
+
       var database = new Databases.Model({id:databaseName});
       var doc = new Documents.Doc({
         "_id": docID
@@ -76,9 +78,11 @@ function(app, Initialize, Fauxton, Dashboard, Databases, Documents, API, Plugin,
 
       this.apiBar.update(doc.url());
     },
-
+    // TODO: rename?
     database_handler: function(databaseName, page) {
       var dashboard = this.dashboard;
+      dashboard.setTemplate('with_tabs_sidebar');
+
       var database = new Databases.Model({id:databaseName});
 
       var designDocs = new Documents.AllDocs({
@@ -101,6 +105,9 @@ function(app, Initialize, Fauxton, Dashboard, Databases, Documents, API, Plugin,
         crumbs: crumbs
       }));
 
+      // TODO: this may need to take _all_docs or similar
+      dashboard.setTabs(new Documents.Views.Tabs({}));
+
       dashboard.setDashboardContent(new Documents.Views.AllDocsList({
         model: database
       }));
@@ -122,6 +129,8 @@ function(app, Initialize, Fauxton, Dashboard, Databases, Documents, API, Plugin,
 
     log: function() {
       var dashboard = this.dashboard;
+      dashboard.setTemplate('one_pane');
+
       var logs = new Log.Collection();
 
       var crumbs = [
@@ -147,8 +156,10 @@ function(app, Initialize, Fauxton, Dashboard, Databases, Documents, API, Plugin,
     },
 
     config: function () {
-      var dashboard = this.dashboard,
-          configs = new Config.Collection();
+      var dashboard = this.dashboard;
+      dashboard.setTemplate('one_pane');
+
+      var configs = new Config.Collection();
 
       var crumbs = [
         {"name": "Home","link": app.root},
@@ -173,6 +184,8 @@ function(app, Initialize, Fauxton, Dashboard, Databases, Documents, API, Plugin,
     // TODO: This should be renamed when we have a real dashboar
     index: function() {
       var dashboard = this.dashboard;
+      dashboard.setTemplate('with_sidebar');
+
       var databases = app.databases = new Databases.List();
 
       this.dashboard.clearBreadcrumbs();
