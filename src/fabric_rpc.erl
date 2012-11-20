@@ -470,8 +470,21 @@ make_att_readers([#doc{atts=Atts0} = Doc | Rest]) ->
 
 make_att_reader({follows, Parser}) ->
     fun() ->
+        Ref = case get(mp_parser_ref) of
+            undefined ->
+                PRef = erlang:monitor(process, Parser),
+                put(mp_parser_ref, PRef),
+                PRef;
+            Else ->
+                Else
+        end,
         Parser ! {get_bytes, self()},
-        receive {bytes, Bytes} -> Bytes end
+        receive
+            {bytes, Bytes} ->
+                Bytes;
+            {'DOWN', Ref, _, _, Reason} ->
+                throw({mp_parser_died, Reason})
+        end
     end;
 make_att_reader(Else) ->
     Else.
