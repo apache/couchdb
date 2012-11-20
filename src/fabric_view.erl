@@ -15,8 +15,8 @@
 -module(fabric_view).
 
 -export([is_progress_possible/1, remove_overlapping_shards/2, maybe_send_row/1,
-    maybe_pause_worker/3, maybe_resume_worker/2, transform_row/1, keydict/1,
-    extract_view/4, get_shards/2, remove_down_shards/2]).
+    transform_row/1, keydict/1, extract_view/4, get_shards/2,
+    remove_down_shards/2]).
 
 -include("fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
@@ -90,31 +90,6 @@ remove_overlapping_shards(#shard{range=[A,B]} = Shard0, Shards) ->
             true
         end
     end, Shards).
-
-maybe_pause_worker(Worker, From, State) ->
-    #collector{buffer_size = BufferSize, counters = Counters} = State,
-    case fabric_dict:lookup_element(Worker, Counters) of
-    BufferSize ->
-        State#collector{blocked = [{Worker,From} | State#collector.blocked]};
-    _Count ->
-        gen_server:reply(From, ok),
-        State
-    end.
-
-maybe_resume_worker(Worker, State) ->
-    #collector{buffer_size = Buffer, counters = C, blocked = B} = State,
-    case fabric_dict:lookup_element(Worker, C) of
-    Count when Count < Buffer/2 ->
-        case couch_util:get_value(Worker, B) of
-        undefined ->
-            State;
-        From ->
-            gen_server:reply(From, ok),
-            State#collector{blocked = lists:keydelete(Worker, 1, B)}
-        end;
-    _Other ->
-        State
-    end.
 
 maybe_send_row(#collector{limit=0} = State) ->
     #collector{counters=Counters, user_acc=AccIn, callback=Callback} = State,
@@ -226,25 +201,23 @@ get_next_row(#collector{reducer = RedSrc} = St) when RedSrc =/= undefined ->
     case dict:find(Key, RowDict) of
     {ok, Records} ->
         NewRowDict = dict:erase(Key, RowDict),
-        Counters = lists:foldl(fun(#view_row{worker=Worker}, CountersAcc) ->
-            fabric_dict:update_counter(Worker, -1, CountersAcc)
+        Counters = lists:foldl(fun(#view_row{worker={Worker,From}}, CntrsAcc) ->
+            rexi:stream_ack(From),
+            fabric_dict:update_counter(Worker, -1, CntrsAcc)
         end, Counters0, Records),
         Wrapped = [[V] || #view_row{value=V} <- Records],
         {ok, [Reduced]} = couch_query_servers:rereduce(Proc, [RedSrc], Wrapped),
         NewSt = St#collector{keys=RestKeys, rows=NewRowDict, counters=Counters},
-        NewState = lists:foldl(fun(#view_row{worker=Worker}, StateAcc) ->
-            maybe_resume_worker(Worker, StateAcc)
-        end, NewSt, Records),
-        {#view_row{key=Key, id=reduced, value=Reduced}, NewState};
+        {#view_row{key=Key, id=reduced, value=Reduced}, NewSt};
     error ->
         get_next_row(St#collector{keys=RestKeys})
     end;
 get_next_row(State) ->
     #collector{rows = [Row|Rest], counters = Counters0} = State,
-    Worker = Row#view_row.worker,
+    {Worker, From} = Row#view_row.worker,
+    rexi:stream_ack(From),
     Counters1 = fabric_dict:update_counter(Worker, -1, Counters0),
-    NewState = maybe_resume_worker(Worker, State#collector{counters=Counters1}),
-    {Row, NewState#collector{rows = Rest}}.
+    {Row, State#collector{rows = Rest, counters=Counters1}}.
 
 find_next_key(nil, Dir, RowDict) ->
     case lists:sort(sort_fun(Dir), dict:fetch_keys(RowDict)) of

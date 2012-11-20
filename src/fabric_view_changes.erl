@@ -103,14 +103,14 @@ send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn, Timeout) ->
     Seqs = lists:flatmap(fun({#shard{name=Name, node=N} = Shard, Seq}) ->
         case lists:member(Shard, AllLiveShards) of
         true ->
-            Ref = rexi:cast(N, {fabric_rpc, changes, [Name,ChangesArgs,Seq]}),
+            Ref = rexi:cast(N, {fabric_rpc2, changes, [Name,ChangesArgs,Seq]}),
             [{Shard#shard{ref = Ref}, Seq}];
         false ->
             % Find some replacement shards to cover the missing range
             % TODO It's possible in rare cases of shard merging to end up
             % with overlapping shard ranges from this technique
             lists:map(fun(#shard{name=Name2, node=N2} = NewShard) ->
-                Ref = rexi:cast(N2, {fabric_rpc, changes, [Name2,ChangesArgs,0]}),
+                Ref = rexi:cast(N2, {fabric_rpc2, changes, [Name2,ChangesArgs,0]}),
                 {NewShard#shard{ref = Ref}, 0}
             end, find_replacement_shards(Shard, AllLiveShards))
         end

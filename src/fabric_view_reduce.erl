@@ -30,11 +30,10 @@ go(DbName, DDoc, VName, Args, Callback, Acc0) ->
     {NthRed, View} = fabric_view:extract_view(nil, VName, Views, reduce),
     {VName, RedSrc} = lists:nth(NthRed, View#view.reduce_funs),
     Workers = lists:map(fun(#shard{name=Name, node=N} = Shard) ->
-        Ref = rexi:cast(N, {fabric_rpc, reduce_view, [Name,Group,VName,Args]}),
+        Ref = rexi:cast(N, {fabric_rpc2, reduce_view, [Name,Group,VName,Args]}),
         Shard#shard{ref = Ref}
     end, fabric_view:get_shards(DbName, Args)),
     RexiMon = fabric_util:create_monitors(Workers),
-    BufferSize = couch_config:get("fabric", "reduce_buffer_size", "20"),
     #view_query_args{limit = Limit, skip = Skip} = Args,
     OsProc = case os_proc_needed(RedSrc) of
         true -> couch_query_servers:get_os_process(Lang);
@@ -44,7 +43,6 @@ go(DbName, DDoc, VName, Args, Callback, Acc0) ->
         db_name = DbName,
         query_args = Args,
         callback = Callback,
-        buffer_size = list_to_integer(BufferSize),
         counters = fabric_dict:init(Workers, 0),
         keys = Args#view_query_args.keys,
         skip = Skip,
@@ -94,13 +92,12 @@ handle_message(#view_row{key=Key} = Row, {Worker, From}, State) ->
         gen_server:reply(From, stop),
         {ok, State};
     _ ->
-        Rows = dict:append(Key, Row#view_row{worker=Worker}, Rows0),
+        Rows = dict:append(Key, Row#view_row{worker={Worker, From}}, Rows0),
         C1 = fabric_dict:update_counter(Worker, 1, Counters0),
         % TODO time this call, if slow don't do it every time
         C2 = fabric_view:remove_overlapping_shards(Worker, C1),
         State1 = State#collector{rows=Rows, counters=C2},
-        State2 = fabric_view:maybe_pause_worker(Worker, From, State1),
-        fabric_view:maybe_send_row(State2)
+        fabric_view:maybe_send_row(State1)
     end;
 
 handle_message(complete, Worker, #collector{counters = Counters0} = State) ->
