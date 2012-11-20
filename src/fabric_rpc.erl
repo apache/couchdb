@@ -357,7 +357,7 @@ view_fold({{Key,Id}, Value}, _Offset, Acc) ->
     true ->
         Doc = undefined
     end,
-    case rexi:stream(#view_row{key=Key, id=Id, value=Value, doc=Doc}) of
+    case rexi:sync_reply(#view_row{key=Key, id=Id, value=Value, doc=Doc}) of
         ok ->
             {ok, Acc#view_acc{limit=Limit-1}};
         timeout ->
@@ -400,23 +400,13 @@ reduce_fold(K, Red, #view_acc{group_level=I} = Acc) when I > 0 ->
 
 
 send(Key, Value, #view_acc{limit=Limit} = Acc) ->
-    case put(fabric_sent_first_row, true) of
-    undefined ->
-        case rexi:sync_reply(#view_row{key=Key, value=Value}) of
-        ok ->
-            {ok, Acc#view_acc{limit=Limit-1}};
-        stop ->
-            exit(normal);
-        timeout ->
-            exit(timeout)
-        end;
-    true ->
-        case rexi:stream(#view_row{key=Key, value=Value}) of
-        ok ->
-            {ok, Acc#view_acc{limit=Limit-1}};
-        timeout ->
-            exit(timeout)
-        end
+    case rexi:sync_reply(#view_row{key=Key, value=Value}) of
+    ok ->
+        {ok, Acc#view_acc{limit=Limit-1}};
+    stop ->
+        exit(normal);
+    timeout ->
+        exit(timeout)
     end.
 
 changes_enumerator(DocInfo, {Db, _Seq, Args, Options}) ->
