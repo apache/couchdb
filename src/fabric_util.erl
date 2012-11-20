@@ -34,7 +34,7 @@ remove_down_workers(Workers, BadNode) ->
     end.
 
 submit_jobs(Shards, EndPoint, ExtraArgs) ->
-    submit_jobs(Shards, fabric_rpc, EndPoint, ExtraArgs).
+    submit_jobs(Shards, fabric_rpc2, EndPoint, ExtraArgs).
 
 submit_jobs(Shards, Module, EndPoint, ExtraArgs) ->
     lists:map(fun(#shard{node=Node, name=ShardName} = Shard) ->
