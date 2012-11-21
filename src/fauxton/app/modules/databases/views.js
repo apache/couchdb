@@ -65,10 +65,11 @@ function(app, Backbone) {
         id: encodeURIComponent(name),
         name: name
       });
-      db.save();
-      this.collection.add(db);
-      // FIXME: The render that is triggered here fails to get status
-      console.log("The render that is triggered here fails to get status");
+      db.save().done(function() {
+        var route = "#/database/" +  name + "/_all_docs?limit=100";
+        app.router.navigate(route, { trigger: true });
+      }
+      );
     },
 
     showMine: function(){
