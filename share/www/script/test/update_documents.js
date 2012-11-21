@@ -107,7 +107,6 @@ couchTests.update_documents = function(debug) {
   var resp = db.save(doc);
   T(resp.ok);
   var docid = resp.id;
-  T(equals(docid, db.last_req.getResponseHeader("X-Couch-Id"))); 
 
   // update error
   var xhr = CouchDB.request("POST", "/test_suite_db/_design/update/_update/");
@@ -118,8 +117,7 @@ couchTests.update_documents = function(debug) {
   xhr = CouchDB.request("PUT", "/test_suite_db/_design/update/_update/hello/"+docid);
   T(xhr.status == 201);
   T(xhr.responseText == "<p>hello doc</p>");
-  T(/charset=utf-8/.test(xhr.getResponseHeader("Content-Type")));
-  T(equals(docid, xhr.getResponseHeader("X-Couch-Id")));
+  T(/charset=utf-8/.test(xhr.getResponseHeader("Content-Type")))
 
   doc = db.open(docid);
   T(doc.world == "hello");
