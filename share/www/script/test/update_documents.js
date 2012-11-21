@@ -87,6 +87,10 @@ couchTests.update_documents = function(debug) {
          resp = {"code": 302}
          return [null, resp];
        }),
+       "resp-code-and-json" : stringFun(function(doc,req) {
+         resp = {"code": 302, "json": {"ok": true}}
+         return [{"_id": req["uuid"]}, resp];
+       }),
        "binary" : stringFun(function(doc, req) {
          var resp = {
            "headers" : {
@@ -215,6 +219,10 @@ couchTests.update_documents = function(debug) {
 
   xhr = CouchDB.request("POST", "/test_suite_db/_design/update/_update/resp-code/");
   T(xhr.status == 302);
+
+  xhr = CouchDB.request("POST", "/test_suite_db/_design/update/_update/resp-code-and-json/");
+  TEquals(302, xhr.status);
+  T(JSON.parse(xhr.responseText).ok);
 
   // base64 response
   xhr = CouchDB.request("PUT", "/test_suite_db/_design/update/_update/binary/"+docid, {
