@@ -202,7 +202,12 @@ get_next_row(#collector{reducer = RedSrc} = St) when RedSrc =/= undefined ->
     {ok, Records} ->
         NewRowDict = dict:erase(Key, RowDict),
         Counters = lists:foldl(fun(#view_row{worker={Worker,From}}, CntrsAcc) ->
-            rexi:stream_ack(From),
+            case From of
+                {Pid, _} when is_pid(Pid) ->
+                    gen_server:reply(From, ok);
+                Pid when is_pid(Pid) ->
+                    rexi:stream_ack(From)
+            end,
             fabric_dict:update_counter(Worker, -1, CntrsAcc)
         end, Counters0, Records),
         Wrapped = [[V] || #view_row{value=V} <- Records],
