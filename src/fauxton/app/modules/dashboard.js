@@ -26,6 +26,8 @@ function(app, Fauxton) {
       }
     });
 
+    this.layoutViews = {};
+
     this.el = this.layout.el;
   };
 
@@ -66,6 +68,20 @@ function(app, Fauxton) {
     setSidebarContent: function (view) {
       this.sidebarContent = this.layout.setView("#sidebar-content", view);
       this.sidebarContent.render();
+    },
+
+    setView: function(selector, view) {
+      this.layoutViews[selector] = this.layout.setView(selector, view);
+      this.renderView(selector);
+    },
+
+    renderView: function(selector) {
+      var view = this.layoutViews[selector];
+      if (!view) {
+        return false;
+      } else {
+        return view.render();
+      }
     },
 
     clearDasboadContent: function () {

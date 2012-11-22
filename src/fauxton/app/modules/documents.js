@@ -24,7 +24,7 @@ function(app, Backbone, Views) {
   Documents.AllDocs = Backbone.Collection.extend({
     model: Documents.Doc,
 
-    initialize: function(options) {
+    initialize: function(_models, options) {
       this.database = options.database;
       this.params = options.params;
     },

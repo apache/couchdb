@@ -1,16 +1,13 @@
 define([
   "app",
 
-  // Libs
-  "backbone"
-
-  // Plugins
+  "fauxton_api"
 ],
 
-function(app, Backbone) {
+function(app, FauxtonAPI) {
   var Views = {};
 
-  Views.Item = Backbone.View.extend({
+  Views.Item = FauxtonAPI.View.extend({
     template: "databases/item",
     tagName: "tr",
 
@@ -21,7 +18,7 @@ function(app, Backbone) {
     }
   });
 
-  Views.List = Backbone.View.extend({
+  Views.List = FauxtonAPI.View.extend({
     template: "databases/list",
     events: {
       "click button.all": "selectAll"
@@ -50,7 +47,7 @@ function(app, Backbone) {
     }
   });
 
-  Views.Sidebar = Backbone.View.extend({
+  Views.Sidebar = FauxtonAPI.View.extend({
     template: "databases/sidebar",
     events: {
       "click a#new": "newDatabase",

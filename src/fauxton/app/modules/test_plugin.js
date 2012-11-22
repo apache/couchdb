@@ -1,15 +1,15 @@
 require([
-  "modules/fauxton_plugin"
+  "fauxton_api"
 ],
 
-function(Plugin) {
-  var TestPlugin = Plugin.module();
+function(FauxtonAPI) {
+  var TestPlugin = FauxtonAPI.module();
   var link = {"href": "/foo", "title": "Foo"};
 
   console.log("Adding header link!");
-  console.log(Plugin);
-  Plugin.addHeaderLink(link);
+  console.log(FauxtonAPI);
+  FauxtonAPI.addHeaderLink(link);
 
-  Plugin.addRoute({name:"foo",route:"foo", callback: function() {console.log("ROUTING FOO"); }});
+  FauxtonAPI.addRoute({name:"foo",route:"foo", callback: function() {console.log("ROUTING FOO"); }});
 
 });

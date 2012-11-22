@@ -1,8 +1,9 @@
 define([
   "app",
 
+  "fauxton_api",
+
   // Libs
-  "backbone",
   "codemirror",
   "jshint",
 
@@ -11,14 +12,14 @@ define([
   "plugins/prettify"
 ],
 
-function(app, Backbone, Codemirror, JSHint) {
+function(app, FauxtonAPI, Codemirror, JSHint) {
   var Views = {};
 
-  Views.Tabs = Backbone.View.extend({
+  Views.Tabs = FauxtonAPI.View.extend({
     template: "documents/tabs"
   });
 
-  Views.AllDocsItem = Backbone.View.extend({
+  Views.AllDocsItem = FauxtonAPI.View.extend({
     template: "documents/all_docs_item",
     tagName: "tr",
 
@@ -29,7 +30,7 @@ function(app, Backbone, Codemirror, JSHint) {
     }
   });
 
-  Views.IndexItem = Backbone.View.extend({
+  Views.IndexItem = FauxtonAPI.View.extend({
     template: "documents/index_item",
     tagName: "li",
     initialize: function(options){
@@ -38,7 +39,6 @@ function(app, Backbone, Codemirror, JSHint) {
     },
 
     serialize: function() {
-      console.log(this);
       return {
         index: this.index,
         ddoc: this.ddoc
@@ -46,12 +46,16 @@ function(app, Backbone, Codemirror, JSHint) {
     }
   });
 
-  Views.AllDocsList = Backbone.View.extend({
+  Views.AllDocsList = FauxtonAPI.View.extend({
     template: "documents/all_docs_list",
 
     events: {
        "click button.all": "selectAll"
      },
+
+    establish: function() {
+      return [this.model.allDocs.fetch()];
+    },
 
     selectAll: function(evt){
       $("input:checkbox").attr('checked', !$(evt.target).hasClass('active'));
@@ -63,7 +67,7 @@ function(app, Backbone, Codemirror, JSHint) {
       };
     },
 
-    beforeRender: function(manage) {
+    beforeRender: function() {
       this.model.allDocs.each(function(doc) {
         this.insertView("table.all-docs tbody", new Views.AllDocsItem({
           model: doc
@@ -72,16 +76,19 @@ function(app, Backbone, Codemirror, JSHint) {
     },
 
     afterRender: function(){
-      console.log('AllDocsList afterRender');
       prettyPrint();
     }
   });
 
-  Views.Doc = Backbone.View.extend({
+  Views.Doc = FauxtonAPI.View.extend({
     template: "documents/doc",
 
     events: {
       "click button.save-doc": "saveDoc"
+    },
+
+    establish: function() {
+      return [this.model.fetch()];
     },
 
     saveDoc: function(event) {
@@ -133,11 +140,19 @@ function(app, Backbone, Codemirror, JSHint) {
     }
   });
 
-  Views.Sidebar = Backbone.View.extend({
+  Views.Sidebar = FauxtonAPI.View.extend({
     template: "documents/sidebar",
     events: {
       "click a.new#doc": "newDocument",
       "click a.new#index": "newIndex"
+    },
+
+    establish: function() {
+      if (this.collection) {
+        return [this.collection.fetch()];
+      } else {
+        return null;
+      }
     },
 
     serialize: function() {
@@ -157,7 +172,6 @@ function(app, Backbone, Codemirror, JSHint) {
 
     buildIndexList: function(collection, selector, design){
       _.each(_.keys(collection), function(key){
-        console.log(key);
         this.insertView("ul.nav." + selector, new Views.IndexItem({
           ddoc: design,
           index: key
