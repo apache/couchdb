@@ -39,11 +39,16 @@ go(Parent, ParentRef, DbName, Timeout) ->
     %% process to communicate via handle_message/3 we "fake" it as a
     %% a spawned worker.
     Workers = [#worker{ref=ParentRef, pid=Parent} | Notifiers],
-    try
+    Resp = try
         receive_results(Workers, #acc{parent=Parent, state=unset}, Timeout)
     after
         rexi_monitor:stop(RexiMon),
         stop_cleanup_monitor(MonPid)
+    end,
+    case Resp of
+        {ok, _} -> ok;
+        {error, Error} -> erlang:error(Error);
+        Error -> erlang:error(Error)
     end.
 
 start_update_notifiers(DbName) ->
