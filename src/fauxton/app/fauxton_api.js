@@ -2,10 +2,11 @@ define([
   "app",
 
   // Modules
-  "modules/dashboard"
+  "modules/dashboard",
+  "modules/fauxton"
 ],
 
-function(app, Dashboard) {
+function(app, Dashboard, Fauxton) {
   var FauxtonAPI = app.module();
 
   FauxtonAPI.moduleExtensions = {
@@ -34,6 +35,17 @@ function(app, Dashboard) {
 
   FauxtonAPI.module = function() {
     return app.module();
+  };
+
+  FauxtonAPI.addNotification = function(options) {
+    options = _.extend({
+      msg: "Notification Event Triggered!",
+      type: "info",
+      selector: "#global-notifications"
+    }, options);
+    var view = new Fauxton.Notification(options);
+
+    return view.renderNotification();
   };
 
   return app.fauxtonAPI = FauxtonAPI;

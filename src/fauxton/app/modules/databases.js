@@ -37,12 +37,18 @@ function(app, FauxtonAPI, Documents, Views) {
 
       return this.allDocs;
     },
+
     isNew: function(){
       // Databases are never new, to make Backbone do a PUT
       return false;
     },
+
     url: function() {
       return app.host + "/" + this.id;
+    },
+
+    pageUrl: function() {
+      return "/database/" + this.id;
     }
   });
 

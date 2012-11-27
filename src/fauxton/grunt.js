@@ -233,7 +233,7 @@ module.exports = function(grunt) {
           //"../../share/www/fauxton/index.html": "dist/release/index.html",
           "../../share/www/fauxton/js/": "dist/release/js/**",
           // no images... yet
-          //"../../share/www/fauxton/img/": "dist/release/img/**",
+          "../../share/www/fauxton/img/": "dist/release/img/**",
           "../../share/www/fauxton/css/": "dist/release/css/**"
         }
       },
@@ -243,7 +243,7 @@ module.exports = function(grunt) {
           //"../../share/www/fauxton/index.html": "dist/release/index.html",
           "../../share/www/fauxton/js/": "dist/debug/js/**",
           // no images... yet
-          //"../../share/www/fauxton/img/": "dist/release/img/**",
+          "../../share/www/fauxton/img/": "dist/debug/img/**",
           "../../share/www/fauxton/css/": "dist/debug/css/**",
           // Must be possible to improve this...
           "../../share/www/fauxton/app/": "dist/debug/**"
@@ -253,7 +253,7 @@ module.exports = function(grunt) {
         files:{
           "dist/release/js/": "assets/js/**",
           //"dist/release/css/**": "assets/css/**"
-          //"dist/release/img/": "assets/img/**"
+          "dist/release/img/": "assets/img/**"
         }
       },
       debug:{

@@ -1,9 +1,9 @@
-<td class="select"><input type="checkbox"></td>
+ <td class="select"><input type="checkbox"></td>
 <td>
   <div>
     <pre class="prettyprint"><%= JSON.stringify(doc.get("doc"), null, "  ") %></pre>
     <div class="btn-group">
-      <a href="design-document.html" class="btn btn-small edits">Edit design doc</a>
+      <a href="#<%= doc.pageUrl() %>" class="btn btn-small edits">Edit <%= doc.docType() %></a>
       <a href="#" class="btn btn-small btn-danger delete" title="Delete this document."><i class="icon icon-trash"></i></a>
     </div>
   </div>
