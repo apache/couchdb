@@ -1,26 +1,26 @@
 <div id="sidenav">
-  <a href="document.html" class="btn btn-small"><i class="icon-file"></i> New doc</a>
+  <a class="btn btn-small new" id="doc"><i class="icon-file"></i> New doc</a>
   <div class="btn-group">
     <button class="btn btn-small dropdown-toggle" data-toggle="dropdown" href="#">
       New index
       <span class="caret"></span>
     </button>
     <ul class="dropdown-menu">
-      <li><a href="#"><i class="icon-list"></i> Secondary Index (View)</a></li>
-      <li><a href="#"><i class="icon-search"></i> Search Index</a></li>
+      <li><a href="#" class="new" id="index"><i class="icon-list"></i> Secondary Index (View)</a></li>
+      <li><a href="#" class="new" id="index"><i class="icon-search"></i> Search Index</a></li>
     </ul>
   </div>
   <hr>
   <ul class="nav nav-list">
-    <li class="active"><a href="#all-docs" class="toggle-view"><i class="icon-list"></i> All documents</a></li>
-    <li><a href="#design-docs" class="toggle-view"><i class="icon-list"></i> All design docs</a></li>
+    <li class="active"><a id="all-docs" href="/_all_docs" class="toggle-view"><i class="icon-list"></i> All documents</a></li>
+    <li><a id="design-docs" href='/_all_docs?start_key="_design"&end_key="_e"'  class="toggle-view"><i class="icon-list"></i> All design docs</a></li>
   </ul>
   <ul class="nav nav-list views">
     <li class="nav-header">Secondary Indexes</li>
-    <li><a href="#new-view-index" class="toggle-view"><i class="icon-plus"></i> New</a></li>
+    <li><a href="#new-view-index" class="new"><i class="icon-plus"></i> New</a></li>
   </ul>
   <ul class="nav nav-list search">
     <li class="nav-header">Search Indexes</li>
-    <li><a href="#new-search-index" class="toggle-view disabled"><i class="icon-plus"></i> New</a></li>
+    <li><a href="#new-search-index" class="new"><i class="icon-plus"></i> New</a></li>
   </ul>
 </div>

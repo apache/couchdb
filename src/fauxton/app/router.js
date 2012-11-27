@@ -11,8 +11,10 @@ define([
   // Modules
   "modules/fauxton",
   "modules/dashboard",
-  "modules/databases",
-  "modules/documents",
+  // Routes return the module that they define routes for
+  "modules/databases/routes",
+  "modules/documents/routes",
+
   "modules/api",
 
   // this needs to be added as a plugin later
@@ -23,7 +25,8 @@ define([
 function(app, Initialize, FauxtonAPI, Fauxton, Dashboard, Databases, Documents, API, Log, Config) {
 
   var defaultTemplate = 'with_sidebar';
-  var modules = [Databases];
+  // TODO: auto generate this list if possible
+  var modules = [Databases, Documents];
 
   var generateRoute = function(settingsGenerator) {
     return function() {

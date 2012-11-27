@@ -63,12 +63,14 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     initialize: function(options){
       this.index = options.index;
       this.ddoc = options.ddoc;
+      this.database = options.database;
     },
 
     serialize: function() {
       return {
         index: this.index,
-        ddoc: this.ddoc
+        ddoc: this.ddoc,
+        database: this.database
       };
     }
   });
@@ -204,7 +206,13 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     template: "documents/sidebar",
     events: {
       "click a.new#doc": "newDocument",
-      "click a.new#index": "newIndex"
+      "click a.new#index": "newIndex",
+      "click .nav-list.views a.new": "showNew",
+      "click .nav-list.views a.toggle-view": "toggleView",
+      "click .nav-list a.toggle-view#all-docs": "toggleView",
+      "click .nav-list a.toggle-view#design-docs": "toggleView",
+      "click .nav-list.search a.new": "showNew",
+      "click .nav-list.search a.toggle-view": "toggleView"
     },
 
     establish: function() {
@@ -222,19 +230,35 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
       };
     },
 
-    newDocument: function(){
+    newDocument: function(event){
+      event.preventDefault();
       alert('coming soon');
     },
 
-    newIndex:  function(){
+    newIndex:  function(event){
+      event.preventDefault();
       alert('coming soon');
+    },
+
+    showNew: function(event){
+      event.preventDefault();
+      alert('show new search/view dialog');
+    },
+
+    toggleView: function(event){
+      alert('filter data by search/view/type');
+      event.preventDefault();
+      url = event.currentTarget.href.split('#')[1];
+      console.log(url);
+      app.router.navigate(url);
     },
 
     buildIndexList: function(collection, selector, design){
       _.each(_.keys(collection), function(key){
         this.insertView("ul.nav." + selector, new Views.IndexItem({
           ddoc: design,
-          index: key
+          index: key,
+          database: this.collection.database.id
         }));
       }, this);
     },
