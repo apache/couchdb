@@ -92,7 +92,23 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     },
 
     saveDoc: function(event) {
-      alert("Save functionality coming soon.");
+      var json, notification;
+      console.log("CONTENT IS: " + this.hasValidCode());
+      if (this.hasValidCode()) {
+        json = JSON.parse(this.editor.getValue());
+        console.log("SAVING: ", json);
+        notification = FauxtonAPI.addNotification({msg: "Saving document!"});
+      } else {
+        notification = FauxtonAPI.addNotification({
+          msg: "Please fix the JSON errors and try again.",
+          type: "error",
+          selector: "#doc .errors-container"
+        });
+      }
+    },
+
+    hasValidCode: function() {
+      return JSHINT(this.editor.getValue()) !== false;
     },
 
     runJSHint: function() {

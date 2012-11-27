@@ -18,6 +18,22 @@ function(app, Backbone, Views) {
 
     url: function() {
       return app.host + "/" + this.collection.id + "/" + this.id;
+    },
+
+    docType: function() {
+      return this.id.match(/^_design/) ? "design doc" : "doc";
+    },
+
+    // Need this to work around backbone router thinking _design/foo
+    // is a separate route. Alternatively, maybe these should be
+    // treated separately. For instance, we could default into the
+    // json editor for docs, or into a ddoc specific page.
+    safeID: function() {
+      return this.id.replace('/', '%2F');
+    },
+
+    pageUrl: function() {
+      return this.collection.database.pageUrl() + "/" + this.safeID();
     }
   });
 

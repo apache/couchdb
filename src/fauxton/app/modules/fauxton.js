@@ -77,5 +77,29 @@ function(app, Backbone) {
 
   });
 
+  Fauxton.Notification = Backbone.View.extend({
+    template: "fauxton/notification",
+
+    initialize: function(options) {
+      this.msg = options.msg;
+      this.type = options.type || "info";
+      this.selector = options.selector;
+    },
+
+    serialize: function() {
+      return {
+        msg: this.msg,
+        type: this.type
+      };
+    },
+
+    renderNotification: function(selector) {
+      selector = selector || this.selector;
+      $(selector).html('');
+      this.render().view.$el.appendTo(selector);
+      return this;
+    }
+  });
+
   return Fauxton;
 });
