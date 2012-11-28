@@ -17,7 +17,13 @@ function(app, Backbone, Views) {
     idAttribute: "_id",
 
     url: function() {
-      return app.host + "/" + this.collection.id + "/" + this.id;
+      return app.host + "/" + this.getDatabase().id + "/" + this.id;
+    },
+
+    // HACK: the doc needs to know about the database, but it may be
+    // set directly or indirectly in all docs
+    getDatabase: function() {
+      return this.database ? this.database : this.collection.database;
     },
 
     docType: function() {
@@ -32,8 +38,41 @@ function(app, Backbone, Views) {
       return this.id.replace('/', '%2F');
     },
 
+    destroy: function() {
+      var url = this.url() + "?rev=" + this.get('_rev');
+      return $.ajax({
+        url: url,
+        dataType: 'json',
+        type: 'DELETE'
+      });
+    },
+
     pageUrl: function() {
-      return this.collection.database.pageUrl() + "/" + this.safeID();
+      return this.getDatabase().pageUrl() + "/" + this.safeID();
+    },
+
+    parse: function(resp) {
+      if (resp.rev) {
+        resp._rev = resp.rev;
+        delete resp.rev;
+      }
+      if (resp.id) {
+        if (typeof(this.id) === "undefined") {
+          resp._id = resp.id;
+        }
+        delete resp.id;
+      }
+      if (resp.ok) {
+        delete resp.ok;
+      }
+
+      return resp;
+    },
+
+    prettyJSON: function() {
+      var data = this.get("doc") ? this.get("doc") : this;
+
+      return JSON.stringify(data, null, "  ");
     }
   });
 
@@ -54,11 +93,10 @@ function(app, Backbone, Views) {
     },
 
     parse: function(resp) {
-      that = this;
       return _.map(resp.rows, function(row) {
         return {
-          "_id": row.id,
-          rev: row.value.rev,
+          _id: row.id,
+          _rev: row.value.rev,
           value: row.value,
           key: row.key,
           doc: row.doc || undefined

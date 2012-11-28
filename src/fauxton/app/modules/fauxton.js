@@ -79,11 +79,14 @@ function(app, Backbone) {
 
   Fauxton.Notification = Backbone.View.extend({
     template: "fauxton/notification",
+    fadeTimer: 5000,
 
     initialize: function(options) {
       this.msg = options.msg;
       this.type = options.type || "info";
       this.selector = options.selector;
+      this.fade = options.fade === undefined ? true : options.fade;
+      this.clear = options.clear;
     },
 
     serialize: function() {
@@ -93,10 +96,22 @@ function(app, Backbone) {
       };
     },
 
+    delayedFade: function() {
+      var that = this;
+      if (this.fade) {
+        setTimeout(function() {
+          that.$el.fadeOut();
+        }, this.fadeTimer);
+      }
+    },
+
     renderNotification: function(selector) {
       selector = selector || this.selector;
-      $(selector).html('');
+      if (this.clear) {
+        $(selector).html('');
+      }
       this.render().view.$el.appendTo(selector);
+      this.delayedFade();
       return this;
     }
   });
