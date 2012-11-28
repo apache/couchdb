@@ -19,7 +19,7 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     template: "documents/tabs"
   });
 
-  Views.AllDocsItem = FauxtonAPI.View.extend({
+  Views.Document = FauxtonAPI.View.extend({
     template: "documents/all_docs_item",
     tagName: "tr",
 
@@ -57,8 +57,19 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     }
   });
 
+  Views.Row = FauxtonAPI.View.extend({
+    template: "documents/index_row",
+    tagName: "tr",
+
+    serialize: function() {
+      return {
+        doc: this.model
+      };
+    }
+  });
+
   Views.IndexItem = FauxtonAPI.View.extend({
-    template: "documents/index_item",
+    template: "documents/index_menu_item",
     tagName: "li",
     initialize: function(options){
       this.index = options.index;
@@ -75,15 +86,19 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     }
   });
 
+  // TODO: Rename to reflect that this is a list of rows or documents
   Views.AllDocsList = FauxtonAPI.View.extend({
     template: "documents/all_docs_list",
-
     events: {
-       "click button.all": "selectAll"
-     },
+      "click button.all": "selectAll"
+    },
+
+    initialize: function(options){
+      this.nestedView = options.nestedView || Views.Document;
+    },
 
     establish: function() {
-      return [this.model.allDocs.fetch()];
+      return [this.collection.fetch()];
     },
 
     selectAll: function(evt){
@@ -92,13 +107,13 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
 
     serialize: function() {
       return {
-        database: this.model
+        database: this.collection
       };
     },
 
     beforeRender: function() {
-      this.model.allDocs.each(function(doc) {
-        this.insertView("table.all-docs tbody", new Views.AllDocsItem({
+      this.collection.each(function(doc) {
+        this.insertView("table.all-docs tbody", new this.nestedView({
           model: doc
         }));
       }, this);
@@ -208,7 +223,7 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
       "click a.new#doc": "newDocument",
       "click a.new#index": "newIndex",
       "click .nav-list.views a.new": "showNew",
-      "click .nav-list.views a.toggle-view": "toggleView",
+      // "click .nav-list.views a.toggle-view": "toggleView",
       "click .nav-list a.toggle-view#all-docs": "toggleView",
       "click .nav-list a.toggle-view#design-docs": "toggleView",
       "click .nav-list.search a.new": "showNew",
@@ -249,11 +264,11 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
       alert('filter data by search/view/type');
       event.preventDefault();
       url = event.currentTarget.href.split('#')[1];
-      console.log(url);
       app.router.navigate(url);
     },
 
     buildIndexList: function(collection, selector, design){
+
       _.each(_.keys(collection), function(key){
         this.insertView("ul.nav." + selector, new Views.IndexItem({
           ddoc: design,
@@ -278,6 +293,8 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     }
 
   });
+
+  Views.Indexed = FauxtonAPI.View.extend({});
 
   return Views;
 });

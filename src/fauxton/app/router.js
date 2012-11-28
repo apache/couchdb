@@ -71,8 +71,7 @@ function(app, Initialize, FauxtonAPI, Fauxton, Dashboard, Databases, Documents, 
     // need access to the Router instance which is not created in this
     // module
     addModuleRoute: function(generator, route) {
-      //var name = settings.name || route;
-       this.route(route, route.toString(), generateRoute(generator));
+      this.route(route, route.toString(), generateRoute(generator));
     },
 
     setModuleRoutes: function() {

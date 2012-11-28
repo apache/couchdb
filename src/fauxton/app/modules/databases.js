@@ -4,7 +4,7 @@ define([
   "fauxton_api",
 
   // Modules
-  "modules/documents",
+  "modules/documents/models_collections",
 
   // Views
   "modules/databases/views"

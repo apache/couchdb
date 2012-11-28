@@ -105,6 +105,50 @@ function(app, Backbone, Views) {
     }
   });
 
+  Documents.IndexCollection = Backbone.Collection.extend({
+    model: Backbone.Model,
+
+    initialize: function(_models, options) {
+      this.database = options.database;
+      this.view = options.view;
+      this.design = options.design;
+      this.params = _.extend({group: true, limit: 10}, options.params);
+      this.idxType = "_view";
+    },
+
+    url: function() {
+      var query = "";
+      if (this.params) {
+        query = "?" + $.param(this.params);
+      }
+      var url = [app.host, this.database.id, "_design", this.design, this.idxType, this.view];
+      return url.join("/") + query;
+    },
+
+    parse: function(resp) {
+      that = this;
+      return _.map(resp.rows, function(row) {
+        return {
+          value: row.value,
+          key: row.key,
+          doc: row.doc || undefined
+        };
+      });
+    },
+
+    pageUrl: function() {
+      console.log("Documents.Index.pageUrl");
+    },
+
+    buildAllDocs: function(){
+      this.fetch();
+    },
+
+    allDocs: function(){
+      return this.models;
+    }
+  });
+
   Documents.Views = Views;
 
   return Documents;

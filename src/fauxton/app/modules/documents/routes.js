@@ -4,7 +4,7 @@ define([
   "fauxton_api",
 
   // Modules
-  "modules/documents",
+  "modules/documents/models_collections",
   "modules/databases"
 ],
 
@@ -97,7 +97,7 @@ function(app, FauxtonAPI, Documents, Databases) {
 
         views: {
           "#dashboard-content": new Documents.Views.AllDocsList({
-            model: data.database
+            collection: data.database.allDocs
           }),
 
           "#sidebar-content": new Documents.Views.Sidebar({
@@ -112,7 +112,52 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     "database/:database/_design/:ddoc/_view/:view": function(databaseName, ddoc, view) {
-      console.log(databaseName, ddoc, view);
+      // alert("This will filter your data by the " + ddoc + "/" + view + "view.");
+      var data = {
+        database: new Databases.Model({id:databaseName})
+      };
+
+      data.indexedDocs = new Documents.IndexCollection(null, {
+        database: data.database,
+        design: ddoc,
+        view: view,
+        params: {}
+      });
+
+      data.designDocs = new Documents.AllDocs(null, {
+        database: data.database,
+        params: {startkey: '"_design"',
+                 endkey: '"_design1"',
+                 include_docs: true}
+      });
+
+      return {
+        layout: "with_tabs_sidebar",
+
+        data: data,
+        // TODO: change dashboard-content
+        views: {
+          "#dashboard-content": new Documents.Views.AllDocsList({
+            collection: data.indexedDocs,
+            nestedView: Documents.Views.Row
+          }),
+
+          "#sidebar-content": new Documents.Views.Sidebar({
+            collection: data.designDocs
+          }),
+
+          "#tabs": new Documents.Views.Tabs({})
+        },
+
+        crumbs: [
+          {"name": "Dashboard", "link": app.root},
+          {"name": "Databases", "link": app.root},
+          {"name": data.database.id, "link": Databases.databaseUrl(data.database)},
+          {"name": ddoc + "/" + view, "link": data.indexedDocs.url()}
+        ],
+        // TODO: change to view URL
+        apiUrl: data.indexedDocs.url()
+      };
     }
   };
 
