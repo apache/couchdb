@@ -33,8 +33,8 @@ function(app, Dashboard, Fauxton) {
     app.router.route(route.route, route.name, route.callback);
   };
 
-  FauxtonAPI.module = function() {
-    return app.module();
+  FauxtonAPI.module = function(extra) {
+    return app.module(FauxtonAPI.moduleExtensions, extra);
   };
 
   FauxtonAPI.addNotification = function(options) {

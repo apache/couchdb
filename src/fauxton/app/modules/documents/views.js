@@ -23,10 +23,37 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     template: "documents/all_docs_item",
     tagName: "tr",
 
+    events: {
+      "click button.delete": "destroy"
+    },
+
     serialize: function() {
       return {
         doc: this.model
       };
+    },
+
+    destroy: function(event) {
+      event.preventDefault();
+      var that = this;
+
+      if (!window.confirm("Are you sure you want to delete this doc?")) {
+        return false;
+      }
+
+      window.theDoc = this.model;
+      this.model.destroy().then(function(resp) {
+        FauxtonAPI.addNotification({
+          msg: "Succesfully destroyed your doc"
+        });
+        that.$el.fadeOut();
+        that.model.collection.remove(that.id);
+      }, function(resp) {
+        FauxtonAPI.addNotification({
+          msg: "Failed to destroy your doc!",
+          type: "error"
+        });
+      });
     }
   });
 
@@ -87,17 +114,30 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
       "click button.save-doc": "saveDoc"
     },
 
+    initialize: function() {
+      this.model.on("sync", this.updateValues, this);
+    },
+
+    updateValues: function() {
+      notification = FauxtonAPI.addNotification({
+        msg: "Document saved successfully.",
+        type: "success",
+        clear: true
+      });
+      this.editor.setValue(this.model.prettyJSON());
+    },
+
     establish: function() {
       return [this.model.fetch()];
     },
 
     saveDoc: function(event) {
       var json, notification;
-      console.log("CONTENT IS: " + this.hasValidCode());
       if (this.hasValidCode()) {
         json = JSON.parse(this.editor.getValue());
-        console.log("SAVING: ", json);
-        notification = FauxtonAPI.addNotification({msg: "Saving document!"});
+        this.model.set(json);
+        notification = FauxtonAPI.addNotification({msg: "Saving document."});
+        this.model.save();
       } else {
         notification = FauxtonAPI.addNotification({
           msg: "Please fix the JSON errors and try again.",
@@ -151,6 +191,10 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
         lineWrapping: true,
         onChange: function() {
           that.runJSHint();
+        },
+        extraKeys: {
+          "Ctrl-S": function(instance) { that.saveDoc(); },
+          "Ctrl-/": "undo"
         }
       });
     }

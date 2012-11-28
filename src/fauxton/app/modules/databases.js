@@ -149,7 +149,7 @@ function(app, FauxtonAPI, Documents, Views) {
           "_id": docID
         })
       };
-      data.doc.collection = data.database;
+      data.doc.database = data.database;
       data.designDocs = new Documents.AllDocs(null, {
         database: data.database,
         params: {startkey: '"_design"',
