@@ -15,7 +15,6 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <jsapi.h>
 #include "config.h"
 #include "utf8.h"
@@ -84,6 +83,7 @@ http_uri(JSContext* cx, JSObject* req, couch_args* args, jsval* uri_val)
 
 #else
 #include <curl/curl.h>
+#include <unistd.h>
 
 
 void
