@@ -4,14 +4,7 @@
 
 %% @doc send a message as quickly as possible
 send(Dest, Msg) ->
-    case erlang:send(Dest, Msg, [noconnect, nosuspend]) of
-    noconnect ->
-        spawn(erlang, send, [Dest, Msg]);
-    nosuspend ->
-        spawn(erlang, send, [Dest, Msg]);
-    ok ->
-        ok
-    end.
+    rexi_gov_manager:send(Dest, Msg).
 
 %% @doc set up the receive loop with an overall timeout
 -spec recv([any()], integer(), function(), any(), timeout(), timeout()) ->
