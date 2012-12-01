@@ -27,6 +27,8 @@ This version has not been released yet.
  * Include user name in show/list ETags.
  * Per module log levels.
  * Server-wide UUID in some replication ids.
+ * E4X support in views is now deprecated and will be removed
+   in a future version.
 
 Version 1.2.1
 -------------
