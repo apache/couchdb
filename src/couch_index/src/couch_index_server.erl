@@ -160,7 +160,9 @@ reset_indexes(DbName, Root) ->
     % shutdown all the updaters and clear the files, the db got changed
     Fun = fun({_, {DDocId, Sig}}) ->
         [{_, Pid}] = ets:lookup(?BY_SIG, {DbName, Sig}),
-        couch_util:shutdown_sync(Pid),
+        MRef = erlang:monitor(process, Pid),
+        gen_server:cast(Pid, delete),
+        receive {'DOWN', MRef, _, _, _} -> ok end,
         rem_from_ets(DbName, Sig, DDocId, Pid)
     end,
     lists:foreach(Fun, ets:lookup(?BY_DB, DbName)),
