@@ -23,4 +23,4 @@ rem intermittently. But using erl should be fine for production use.
 if "%ERL%x" == "x" set ERL=werl.exe
 
 echo CouchDB %version% - prepare to relax...
-%ERL% -sasl errlog_type error -s couch
+%ERL% -sasl errlog_type error -s couch +A 4 +W w
