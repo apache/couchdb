@@ -1,0 +1,393 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section PUBLIC '-//OASIS//DTD DocBook XML V4.5//EN'
+                         'http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd' [
+<!ENTITY % every.entities SYSTEM "entities.ent">
+%every.entities;
+]>
+<section id="couchdb-single-config-options">
+
+  <title>CouchDB Configuration Options</title>
+
+  <para>
+    &nbsp;
+  </para>
+
+  <para role="meta" id="table-couchdb-single-config-options-summary">
+    <remark role="title">Configuration Groups</remark>
+
+    <remark role="type" condition="config"/>
+
+    <remark role="src" condition="couchdb"/>
+
+    <remark role="output" condition="classsummarytable"/>
+
+    <remark role="version" condition="1.0"/>
+
+<!--     <remark role="idprefix" condition="config-couchdb-options"/>-->
+  </para>
+
+  <section id="couchdb-single-config-options_attachments">
+
+    <title><literal>attachments</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <para role="meta" id="table-couchdb-single-config-options-attachments-summary">
+      <remark role="title">Configuration Groups</remark>
+
+      <remark role="type" condition="config"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="optionsummarytable"/>
+
+      <remark role="version" condition="1.0"/>
+
+      <remark role="itemid" condition="attachments"/>
+
+<!--      <remark role="idprefix" condition="couchdb-single-config-options_attachments"/> -->
+    </para>
+
+  </section>
+
+  <section id="couchdb-single-config-options_couchdb">
+
+    <title><literal>couchdb</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <para role="meta" id="table-couchdb-single-config-options-couchdb-summary">
+      <remark role="title">Configuration Groups</remark>
+
+      <remark role="type" condition="config"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="optionsummarytable"/>
+
+      <remark role="version" condition="1.0"/>
+
+      <remark role="itemid" condition="couchdb"/>
+
+<!--      <remark role="idprefix" condition="couchdb-single-config-options_couchdb"/> -->
+    </para>
+
+  </section>
+
+  <section id="couchdb-single-config-options_daemons">
+
+    <title><literal>daemons</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <para role="meta" id="table-couchdb-single-config-options-daemons-summary">
+      <remark role="title">Configuration Groups</remark>
+
+      <remark role="type" condition="config"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="optionsummarytable"/>
+
+      <remark role="version" condition="1.0"/>
+
+      <remark role="itemid" condition="daemons"/>
+
+<!--      <remark role="idprefix" condition="couchdb-single-config-options_daemons"/> -->
+    </para>
+
+  </section>
+
+  <section id="couchdb-single-config-options_httpd_db_handlers">
+
+    <title><literal>httpd_db_handlers</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <para role="meta" id="table-couchdb-single-config-options-httpd_db_handlers-summary">
+      <remark role="title">Configuration Groups</remark>
+
+      <remark role="type" condition="config"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="optionsummarytable"/>
+
+      <remark role="version" condition="1.0"/>
+
+      <remark role="itemid" condition="httpd_db_handlers"/>
+
+<!--      <remark role="idprefix" condition="couchdb-single-config-options_httpd_db_handlers"/> -->
+    </para>
+
+  </section>
+
+  <section id="couchdb-single-config-options_couch_httpd_auth">
+
+    <title><literal>couch_httpd_auth</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <para role="meta" id="table-couchdb-single-config-options-couch_httpd_auth-summary">
+      <remark role="title">Configuration Groups</remark>
+
+      <remark role="type" condition="config"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="optionsummarytable"/>
+
+      <remark role="version" condition="1.0"/>
+
+      <remark role="itemid" condition="couch_httpd_auth"/>
+
+<!--      <remark role="idprefix" condition="couchdb-single-config-options_couch_httpd_auth"/> -->
+    </para>
+
+  </section>
+
+  <section id="couchdb-single-config-options_httpd">
+
+    <title><literal>httpd</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <para role="meta" id="table-couchdb-single-config-options-httpd-summary">
+      <remark role="title">Configuration Groups</remark>
+
+      <remark role="type" condition="config"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="optionsummarytable"/>
+
+      <remark role="version" condition="1.0"/>
+
+      <remark role="itemid" condition="httpd"/>
+
+<!--       <remark role="idprefix" condition="couchdb-single-config-options_httpd"/> -->
+    </para>
+
+  </section>
+
+  <section id="couchdb-single-config-options_httpd_design_handlers">
+
+    <title><literal>httpd_design_handlers</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <para role="meta" id="table-couchdb-single-config-options-httpd_design_handlers-summary">
+      <remark role="title">Configuration Groups</remark>
+
+      <remark role="type" condition="config"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="optionsummarytable"/>
+
+      <remark role="version" condition="1.0"/>
+
+      <remark role="itemid" condition="httpd_design_handlers"/>
+
+<!--       <remark role="idprefix" condition="couchdb-single-config-options_httpd_design_handlers"/> -->
+    </para>
+
+  </section>
+
+  <section id="couchdb-single-config-options_httpd_global_handlers">
+
+    <title><literal>httpd_global_handlers</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <para role="meta" id="table-couchdb-single-config-options-httpd_global_handlers-summary">
+      <remark role="title">Configuration Groups</remark>
+
+      <remark role="type" condition="config"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="optionsummarytable"/>
+
+      <remark role="version" condition="1.0"/>
+
+      <remark role="itemid" condition="httpd_global_handlers"/>
+
+<!--       <remark role="idprefix" condition="couchdb-single-config-options_httpd_global_handlers"/> -->
+    </para>
+
+  </section>
+
+  <section id="couchdb-single-config-options_log">
+
+    <title><literal>log</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <para role="meta" id="table-couchdb-single-config-options-log-summary">
+      <remark role="title">Configuration Groups</remark>
+
+      <remark role="type" condition="config"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="optionsummarytable"/>
+
+      <remark role="version" condition="1.0"/>
+
+      <remark role="itemid" condition="log"/>
+
+<!--      <remark role="idprefix" condition="couchdb-single-config-options_log"/> -->
+    </para>
+
+  </section>
+
+  <section id="couchdb-single-config-options_query_servers">
+
+    <title><literal>query_servers</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <para role="meta" id="table-couchdb-single-config-options-query_servers-summary">
+      <remark role="title">Configuration Groups</remark>
+
+      <remark role="type" condition="config"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="optionsummarytable"/>
+
+      <remark role="version" condition="1.0"/>
+
+      <remark role="itemid" condition="query_servers"/>
+
+<!--      <remark role="idprefix" condition="couchdb-single-config-options_query_servers"/> -->
+    </para>
+
+  </section>
+
+  <section id="couchdb-single-config-options_query_server_config">
+
+    <title><literal>query_server_config</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <para role="meta" id="table-couchdb-single-config-options-query_server_config-summary">
+      <remark role="title">Configuration Groups</remark>
+
+      <remark role="type" condition="config"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="optionsummarytable"/>
+
+      <remark role="version" condition="1.0"/>
+
+      <remark role="itemid" condition="query_server_config"/>
+
+<!--       <remark role="idprefix" condition="couchdb-single-config-options_query_server_config"/> -->
+    </para>
+
+  </section>
+
+  <section id="couchdb-single-config-options_replicator">
+
+    <title><literal>replicator</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <para role="meta" id="table-couchdb-single-config-options-replicator-summary">
+      <remark role="title">Configuration Groups</remark>
+
+      <remark role="type" condition="config"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="optionsummarytable"/>
+
+      <remark role="version" condition="1.0"/>
+
+      <remark role="itemid" condition="replicator"/>
+
+<!--       <remark role="idprefix" condition="couchdb-single-config-options_replicator"/> -->
+    </para>
+
+  </section>
+
+  <section id="couchdb-single-config-options_stats">
+
+    <title><literal>stats</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <para role="meta" id="table-couchdb-single-config-options-stats-summary">
+      <remark role="title">Configuration Groups</remark>
+
+      <remark role="type" condition="config"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="optionsummarytable"/>
+
+      <remark role="version" condition="1.0"/>
+
+      <remark role="itemid" condition="stats"/>
+
+<!--      <remark role="idprefix" condition="couchdb-single-config-options_stats"/> -->
+    </para>
+
+  </section>
+
+  <section id="couchdb-single-config-options_uuids">
+
+    <title><literal>uuids</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <para role="meta" id="table-couchdb-single-config-options-uuids-summary">
+      <remark role="title">Configuration Groups</remark>
+
+      <remark role="type" condition="config"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="optionsummarytable"/>
+
+      <remark role="version" condition="1.0"/>
+
+      <remark role="itemid" condition="uuids"/>
+
+<!--      <remark role="idprefix" condition="couchdb-single-config-options_uuids"/> -->
+    </para>
+
+  </section>
+
+</section>

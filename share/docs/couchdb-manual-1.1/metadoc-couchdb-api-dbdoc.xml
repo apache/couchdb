@@ -1,0 +1,1091 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE chapter PUBLIC '-//OASIS//DTD DocBook XML V4.5//EN'
+                         'http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd' [
+<!ENTITY % every.entities SYSTEM "entities.ent">
+%every.entities;
+]>
+<chapter id="couchdb-api-dbdoc">
+
+  <title>CouchDB API Server Document Methods</title>
+
+  <para>
+    The CouchDB API Server Document methods detail how to create, read,
+    update and delete documents within a database.
+  </para>
+
+  <para>
+    A list of the available methods and URL paths are provided below:
+  </para>
+
+  <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/JSON.pm"/>
+<table id="table-couchdb-api-dbdoc-summary"><title>Document API Calls</title><tgroup cols="3"><colspec colname="method"/><colspec colname="path"/><colspec colname="desc"/><thead><row><entry>Method</entry><entry>Path</entry><entry>Description</entry></row></thead><tbody><row><entry><literal>POST</literal></entry><entry><literal>/db</literal></entry><entry><link linkend="couchdb-api-dbdoc_db_post">
+ Create a new document
+ </link></entry></row><row><entry><literal>GET</literal></entry><entry><literal>/db/doc</literal></entry><entry><link linkend="couchdb-api-dbdoc_db-doc_get">
+ Returns the latest revision of the document
+ </link></entry></row><row><entry><literal>HEAD</literal></entry><entry><literal>/db/doc</literal></entry><entry><link linkend="couchdb-api-dbdoc_db-doc_head">
+ Returns bare information in the HTTP Headers for the document
+ </link></entry></row><row><entry><literal>PUT</literal></entry><entry><literal>/db/doc</literal></entry><entry><link linkend="couchdb-api-dbdoc_db-doc_put">
+ Inserts a new document, or new version of an existing document
+ </link></entry></row><row><entry><literal>DELETE</literal></entry><entry><literal>/db/doc</literal></entry><entry><link linkend="couchdb-api-dbdoc_db-doc_delete">
+ Deletes the document
+ </link></entry></row><row><entry><literal>COPY</literal></entry><entry><literal>/db/doc</literal></entry><entry><link linkend="couchdb-api-dbdoc_db-doc_copy">
+ Copies the document
+ </link></entry></row><row><entry><literal>GET</literal></entry><entry><literal>/db/doc/attachment</literal></entry><entry><link linkend="couchdb-api-dbdoc_db-doc-attachment_get">
+ Gets the attachment of a document
+ </link></entry></row><row><entry><literal>PUT</literal></entry><entry><literal>/db/doc/attachment</literal></entry><entry><link linkend="couchdb-api-dbdoc_db-doc-attachment_put">
+ Adds an attachment of a document
+ </link></entry></row><row><entry><literal>DELETE</literal></entry><entry><literal>/db/doc/attachment</literal></entry><entry><link linkend="couchdb-api-dbdoc_db-doc-attachment_delete">
+ Deletes an attachment of a document
+ </link></entry></row></tbody></tgroup></table>
+
+  <section id="couchdb-api-dbdoc_db_post">
+
+    <title><literal>POST /db</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/JSON.pm"/>
+<informaltable><textobject><phrase>URL API POST /db</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>POST /db</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ JSON of the new document
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ JSON with the committed document information
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row><row><entry><emphasis role="bold">Query Arguments</emphasis></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>batch</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Allow document store request to be batched with others
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry></entry><entry><emphasis role="bold">Supported Values</emphasis></entry></row><row><entry></entry><entry><literal>ok</literal></entry><entry>Enable</entry></row><row><entry namest="field" nameend="addinfo"><emphasis role="bold">Return Codes</emphasis></entry></row><row><entry>201</entry><entry namest="info" nameend="addinfo">
+ Document has been created successfully
+ </entry></row><row><entry>409</entry><entry namest="info" nameend="addinfo">
+ Conflict - a document with the specified document ID already
+ exists
+ </entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Create a new document in the specified database, using the
+      supplied JSON document structure. If the JSON structure includes
+      the <literal>_id</literal> field, then the document will be
+      created with the specified document ID. If the
+      <literal>_id</literal> field is not specified, a new unique ID
+      will be generated.
+    </para>
+
+    <para>
+      For example, you can generate a new document with a generated UUID
+      using the following request:
+    </para>
+
+<programlisting>
+POST http://couchdb:5984/recipes/
+Content-Type: application/json
+
+{
+   "servings" : 4,
+   "subtitle" : "Delicious with fresh bread",
+   "title" : "Fish Stew"
+}
+</programlisting>
+
+    <para>
+      The return JSON will specify the automatically enerated ID and
+      revision information:
+    </para>
+
+<programlisting>
+{
+   "id" : "64575eef70ab90a2b8d55fc09e00440d",
+   "ok" : true,
+   "rev" : "1-9c65296036141e575d32ba9c034dd3ee"
+}
+</programlisting>
+
+    <section id="couchdb-api-dbdoc_db_post-docid">
+
+      <title>Specifying the Document ID</title>
+
+      <para>
+        The document ID can be specified by including the
+        <literal>_id</literal> field in the JSON of the submitted
+        record. The following request will create the same document with
+        the ID <literal>FishStew</literal>:
+      </para>
+
+<programlisting>
+POST http://couchdb:5984/recipes/
+Content-Type: application/json
+
+{
+   "_id" : "FishStew",
+   "servings" : 4,
+   "subtitle" : "Delicious with fresh bread",
+   "title" : "Fish Stew"
+}
+</programlisting>
+
+      <para>
+        The structure of the submitted document is as shown in the table
+        below:
+      </para>
+
+      <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/JSON/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//json/json.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/JSON.pm"/>
+<table id="table-couchdb-api-json-document" class="jsonstructure"><title>
+ CouchDB Document
+ </title><tgroup cols="2"><colspec colname="item" colwidth="30*"/><colspec colname="desc" colwidth="70*"/><tbody><row><entry ><emphasis role="bold">Field</emphasis></entry><entry><emphasis role="bold">Description</emphasis></entry></row><row><entry ><literal>_id</literal> (optional) </entry><entry>
+ Document ID
+ </entry></row><row><entry ><literal>_rev</literal> (optional) </entry><entry>
+ Revision ID (when updating an existing document)
+ </entry></row></tbody></tgroup></table>
+
+      <para>
+        In either case, the returned JSON will specify the document ID,
+        revision ID, and status message:
+      </para>
+
+<programlisting>
+{
+   "id" : "FishStew",
+   "ok" : true,
+   "rev" : "1-9c65296036141e575d32ba9c034dd3ee"
+}
+    </programlisting>
+
+    </section>
+
+    <section id="couchdb-api-dbdoc_db_batchmode">
+
+      <title>Batch Mode Writes</title>
+
+      <para>
+        You can write documents to the database at a higher rate by
+        using the batch option. This collects document writes together
+        in memory (on a user-by-user basis) before they are committed to
+        disk. This increases the risk of the documents not being stored
+        in the event of a failure, since the documents are not written
+        to disk immediately.
+      </para>
+
+      <para>
+        To use the batched mode, append the <literal>batch=ok</literal>
+        query argument to the URL of the <literal>PUT</literal> or
+        <literal>POST</literal> request. The CouchDB server will respond
+        with a 202 HTTP response code immediately.
+      </para>
+
+    </section>
+
+    <section id="couchdb-api-dbdoc_db-doc-attachments">
+
+      <title>Including Attachments</title>
+
+      <para>
+        You can include one or more attachments with a given document by
+        incorporating the attachment information within the JSON of the
+        document. This provides a simpler alternative to loading
+        documents with attachments than making a separate call (see
+        <xref
+        linkend="couchdb-api-dbdoc_db-doc-attachment_put"/>).
+      </para>
+
+      <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/JSON/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//json/json.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/JSON.pm"/>
+<table id="table-couchdb-api-dbdoc-documentattachments" class="jsonstructure"><title>
+ Document with Attachments
+ </title><tgroup cols="2"><colspec colname="item" colwidth="30*"/><colspec colname="desc" colwidth="70*"/><tbody><row><entry ><emphasis role="bold">Field</emphasis></entry><entry><emphasis role="bold">Description</emphasis></entry></row><row><entry ><literal>_id</literal> (optional) </entry><entry>
+ Document ID
+ </entry></row><row><entry ><literal>_rev</literal> (optional) </entry><entry>
+ Revision ID (when updating an existing document)
+ </entry></row><row><entry ><literal>_attachments</literal> (optional) </entry><entry>
+ Document Attachment
+ </entry></row><row><entry >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<literal>filename</literal>  </entry><entry>
+ Attachment information
+ </entry></row><row><entry >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<literal>content_type</literal>  </entry><entry>
+ MIME Content type string
+ </entry></row><row><entry >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<literal>data</literal>  </entry><entry>
+ File attachment content, Base64 encoded
+ </entry></row></tbody></tgroup></table>
+
+      <para>
+        The <literal>filename</literal> will be the attachment name. For
+        example, when sending the JSON structure below:
+      </para>
+
+<programlisting>
+{
+   "_id" : "FishStew",
+   "servings" : 4,
+   "subtitle" : "Delicious with fresh bread",
+   "title" : "Fish Stew"
+   "_attachments" : {
+      "styling.css" : {
+         "content-type" : "text/css",
+         "data" : "cCB7IGZvbnQtc2l6ZTogMTJwdDsgfQo=",
+         },
+   },
+}
+    </programlisting>
+
+      <para>
+        The attachment <literal>styling.css</literal> can be accessed
+        using <literal>/recipes/FishStew/styling.css</literal>. For more
+        information on attachments, see
+        <xref
+        linkend="couchdb-api-dbdoc_db-doc-attachment_get"/>.
+      </para>
+
+      <para>
+        The document data embedded in to the structure must be encoded
+        using base64.
+      </para>
+
+    </section>
+
+  </section>
+
+  <section id="couchdb-api-dbdoc_db-doc_get">
+
+    <title><literal>GET /db/doc</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/JSON.pm"/>
+<informaltable><textobject><phrase>URL API GET /db/doc</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>GET /db/doc</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ None
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ Returns the JSON for the document
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row><row><entry><emphasis role="bold">Query Arguments</emphasis></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>conflicts</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Returns the conflict tree for the document.
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>boolean</entry></row><row><entry></entry><entry><emphasis role="bold">Default</emphasis></entry><entry>false</entry></row><row><entry></entry><entry><emphasis role="bold">Supported Values</emphasis></entry></row><row><entry></entry><entry><literal>true</literal></entry><entry>Includes the revisions</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>rev</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Specify the revision to return
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry></entry><entry><emphasis role="bold">Supported Values</emphasis></entry></row><row><entry></entry><entry><literal>true</literal></entry><entry>Includes the revisions</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>revs</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Return a list of the revisions for the document
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>boolean</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>revs_info</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Return a list of detailed revision information for the
+ document
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>boolean</entry></row><row><entry></entry><entry><emphasis role="bold">Supported Values</emphasis></entry></row><row><entry></entry><entry><literal>true</literal></entry><entry>Includes the revisions</entry></row><row><entry namest="field" nameend="addinfo"><emphasis role="bold">Return Codes</emphasis></entry></row><row><entry>201</entry><entry namest="info" nameend="addinfo">
+ Document created
+ </entry></row><row><entry>400</entry><entry namest="info" nameend="addinfo">
+ The format of the request or revision was invalid
+ </entry></row><row><entry>404</entry><entry namest="info" nameend="addinfo">
+ The specified document or revision cannot be found, or has been
+ deleted
+ </entry></row><row><entry>409</entry><entry namest="info" nameend="addinfo">
+ Conflict - a document with the specified document ID already
+ exists
+ </entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Returns the specified <literal>doc</literal> from the specified
+      <literal>db</literal>. For example, to retrieve the document with
+      the id <literal>FishStew</literal> you would send the following
+      request:
+    </para>
+
+<programlisting>
+GET http://couchdb:5984/recipes/FishStew
+Content-Type: application/json
+Accept: application/json
+</programlisting>
+
+    <para>
+      The returned JSON is the JSON of the document, including the
+      document ID and revision number:
+    </para>
+
+<programlisting>
+{
+   "_id" : "FishStew",
+   "_rev" : "3-a1a9b39ee3cc39181b796a69cb48521c",
+   "servings" : 4,
+   "subtitle" : "Delicious with a green salad",
+   "title" : "Irish Fish Stew"
+}
+    </programlisting>
+
+    <para>
+      Unless you request a specific revision, the latest revision of the
+      document will always be returned.
+    </para>
+
+    <section id="couchdb-api-dbdoc_db-doc_get-attachments">
+
+      <title>Attachments</title>
+
+      <para>
+        If the document includes attachments, then the returned
+        structure will contain a summary of the attachments associatd
+        with the document, but not the attachment data itself.
+      </para>
+
+      <para>
+        The JSON for the returned document will include the
+        <literal>_attachments</literal> field, with one or more
+        attachment definitions. For example:
+      </para>
+
+<programlisting>
+{
+   "_id" : "FishStew",
+   "servings" : 4,
+   "subtitle" : "Delicious with fresh bread",
+   "title" : "Fish Stew"
+   "_attachments" : {
+      "styling.css" : {
+         "stub" : true,
+         "content-type" : "text/css",
+         "length" : 783426,
+         },
+   },
+}
+</programlisting>
+
+      <para>
+        The format of the returned JSON is shown in the table below:
+      </para>
+
+      <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/JSON/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//json/json.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/JSON.pm"/>
+<table id="table-couchdb-api-dbdoc-returneddocumentattachments" class="jsonstructure"><title>
+ Returned Document with Attachments
+ </title><tgroup cols="2"><colspec colname="item" colwidth="30*"/><colspec colname="desc" colwidth="70*"/><tbody><row><entry ><emphasis role="bold">Field</emphasis></entry><entry><emphasis role="bold">Description</emphasis></entry></row><row><entry ><literal>_id</literal> (optional) </entry><entry>
+ Document ID
+ </entry></row><row><entry ><literal>_rev</literal> (optional) </entry><entry>
+ Revision ID (when updating an existing document)
+ </entry></row><row><entry ><literal>_attachments</literal> (optional) </entry><entry>
+ Document Attachment
+ </entry></row><row><entry >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<literal>filename</literal>  </entry><entry>
+ Attachment
+ </entry></row><row><entry >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<literal>content_type</literal>  </entry><entry>
+ MIME Content type string
+ </entry></row><row><entry >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<literal>length</literal>  </entry><entry>
+ Length (bytes) of the attachment data
+ </entry></row><row><entry >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<literal>revpos</literal>  </entry><entry>
+ Revision where this attachment exists
+ </entry></row><row><entry >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<literal>stub</literal>  </entry><entry>
+ Indicates whether the attachment is a stub
+ </entry></row></tbody></tgroup></table>
+
+    </section>
+
+    <section id="couchdb-api-dbdoc_db-doc_get-revs">
+
+      <title>Getting a List of Revisions</title>
+
+      <para>
+        You can obtain a list of the revisions for a given document by
+        adding the <literal>revs=true</literal> parameter to the request
+        URL. For example:
+      </para>
+
+<programlisting>
+GET http://couchdb:5984/recipes/FishStew?revs=true
+Accept: application/json
+</programlisting>
+
+      <para>
+        The returned JSON structure includes the original document,
+        including a <literal>_revisions</literal> structure that
+        includes the revision information:
+      </para>
+
+<programlisting>
+{
+   "servings" : 4,
+   "subtitle" : "Delicious with a green salad",
+   "_id" : "FishStew",
+   "title" : "Irish Fish Stew",
+   "_revisions" : {
+      "ids" : [
+         "a1a9b39ee3cc39181b796a69cb48521c",
+         "7c4740b4dcf26683e941d6641c00c39d",
+         "9c65296036141e575d32ba9c034dd3ee"
+      ],
+      "start" : 3
+   },
+   "_rev" : "3-a1a9b39ee3cc39181b796a69cb48521c"
+}
+</programlisting>
+
+      <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/JSON/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//json/json.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/JSON.pm"/>
+<table id="table-couchdb-api-dbdoc-document_with_revs" class="jsonstructure"><title>
+ Returned CouchDB Document with Revision Info
+ </title><tgroup cols="2"><colspec colname="item" colwidth="30*"/><colspec colname="desc" colwidth="70*"/><tbody><row><entry ><emphasis role="bold">Field</emphasis></entry><entry><emphasis role="bold">Description</emphasis></entry></row><row><entry ><literal>_id</literal> (optional) </entry><entry>
+ Document ID
+ </entry></row><row><entry ><literal>_rev</literal> (optional) </entry><entry>
+ Revision ID (when updating an existing document)
+ </entry></row><row><entry ><literal>_revisions</literal>  </entry><entry>
+ CouchDB Document Revisions
+ </entry></row><row><entry >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<literal>ids</literal> <literal>[array]</literal> </entry><entry>
+ Array of valid revision IDs, in reverse order (latest first)
+ </entry></row><row><entry >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<literal>start</literal>  </entry><entry>
+ Prefix number for the latest revision
+ </entry></row></tbody></tgroup></table>
+
+    </section>
+
+    <section id="couchdb-api-dbdoc_db-doc_get-revsextended">
+
+      <title>Obtaining an Extended Revision History</title>
+
+      <para>
+        You can get additional information about the revisions for a
+        given document by supplying the <literal>revs_info</literal>
+        argument to the query:
+      </para>
+
+<programlisting>
+GET http://couchdb:5984/recipes/FishStew?revs_info=true
+Accept: application/json
+</programlisting>
+
+      <para>
+        This returns extended revision information, including the
+        availability and status of each revision:
+      </para>
+
+<programlisting>
+{
+   "servings" : 4,
+   "subtitle" : "Delicious with a green salad",
+   "_id" : "FishStew",
+   "_revs_info" : [
+      {
+         "status" : "available",
+         "rev" : "3-a1a9b39ee3cc39181b796a69cb48521c"
+      },
+      {
+         "status" : "available",
+         "rev" : "2-7c4740b4dcf26683e941d6641c00c39d"
+      },
+      {
+         "status" : "available",
+         "rev" : "1-9c65296036141e575d32ba9c034dd3ee"
+      }
+   ],
+   "title" : "Irish Fish Stew",
+   "_rev" : "3-a1a9b39ee3cc39181b796a69cb48521c"
+}
+</programlisting>
+
+      <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/JSON/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//json/json.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/JSON.pm"/>
+<table id="table-couchdb-api-dbdoc-document_with_revs_info" class="jsonstructure"><title>
+ Returned CouchDB Document with Detailed Revision Info
+ </title><tgroup cols="2"><colspec colname="item" colwidth="30*"/><colspec colname="desc" colwidth="70*"/><tbody><row><entry ><emphasis role="bold">Field</emphasis></entry><entry><emphasis role="bold">Description</emphasis></entry></row><row><entry ><literal>_id</literal> (optional) </entry><entry>
+ Document ID
+ </entry></row><row><entry ><literal>_rev</literal> (optional) </entry><entry>
+ Revision ID (when updating an existing document)
+ </entry></row><row><entry ><literal>_revs_info</literal> <literal>[array]</literal> </entry><entry>
+ CouchDB Document Extended Revision Info
+ </entry></row><row><entry >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<literal>rev</literal>  </entry><entry>
+ Full revision string
+ </entry></row><row><entry >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<literal>status</literal>  </entry><entry>
+ Status of the revision
+ </entry></row></tbody></tgroup></table>
+
+    </section>
+
+    <section id="couchdb-api-dbdoc_db-doc_get-specrev">
+
+      <title>Obtaining a Specific Revision</title>
+
+      <para>
+        To get a specific revision, use the <literal>rev</literal>
+        argument to the request, and specify the full revision number:
+      </para>
+
+<programlisting>
+GET http://couchdb:5984/recipes/FishStew?rev=2-7c4740b4dcf26683e941d6641c00c39d
+Accept: application/json
+</programlisting>
+
+      <para>
+        The specified revision of the document will be returned,
+        including a <literal>_rev</literal> field specifying the
+        revision that was requested:
+      </para>
+
+<programlisting>
+{
+   "_id" : "FishStew",
+   "_rev" : "2-7c4740b4dcf26683e941d6641c00c39d",
+   "servings" : 4,
+   "subtitle" : "Delicious with a green salad",
+   "title" : "Fish Stew"
+}
+</programlisting>
+
+    </section>
+
+  </section>
+
+  <section id="couchdb-api-dbdoc_db-doc_head">
+
+    <title><literal>HEAD /db/doc</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API HEAD /db/doc</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>HEAD /db/doc</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ None
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ None
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row><row><entry><emphasis role="bold">Query Arguments</emphasis></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>rev</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Specify the revision to return
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>revs</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Return a list of the revisions for the document
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>boolean</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>revs_info</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Return a list of detailed revision information for the
+ document
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>boolean</entry></row><row><entry namest="field" nameend="addinfo"><emphasis role="bold">Return Codes</emphasis></entry></row><row><entry>404</entry><entry namest="info" nameend="addinfo">
+ The specified document or revision cannot be found, or has been
+ deleted
+ </entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Returns the HTTP Headers containing a minimal amount of
+      information about the specified document. The method supports the
+      same query arguments as the <literal>GET</literal> method, but
+      only the header information (including document size, and the
+      revision as an ETag), is returned. For example, a simple
+      <literal>HEAD</literal> request:
+    </para>
+
+<programlisting>
+HEAD http://couchdb:5984/recipes/FishStew
+Content-Type: application/json
+    </programlisting>
+
+    <para>
+      Returns the following HTTP Headers:
+    </para>
+
+<programlisting>
+HTTP/1.1 200 OK
+Server: CouchDB/1.0.1 (Erlang OTP/R13B)
+Etag: "7-a19a1a5ecd946dad70e85233ba039ab2"
+Date: Fri, 05 Nov 2010 14:54:43 GMT
+Content-Type: text/plain;charset=utf-8
+Content-Length: 136
+Cache-Control: must-revalidate
+</programlisting>
+
+    <para>
+      The <literal>Etag</literal> header shows the current revision for
+      the requested document, and the <literal>Content-Length</literal>
+      specifies the length of the data, if the document were requested
+      in full.
+    </para>
+
+    <para>
+      Adding any of the query arguments (as supported by
+      <link linkend="couchdb-api-dbdoc_db-doc_get"><literal>GET</literal></link>
+      method), then the resulting HTTP Headers will correspond to what
+      would be returned. Note that the current revision is not returned
+      when the <literal>refs_info</literal> argument is used. For
+      example:
+    </para>
+
+<programlisting>
+HTTP/1.1 200 OK
+Server: CouchDB/1.0.1 (Erlang OTP/R13B)
+Date: Fri, 05 Nov 2010 14:57:16 GMT
+Content-Type: text/plain;charset=utf-8
+Content-Length: 609
+Cache-Control: must-revalidate
+</programlisting>
+
+  </section>
+
+  <section id="couchdb-api-dbdoc_db-doc_put">
+
+    <title><literal>PUT /db/doc</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API PUT /db/doc</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>PUT /db/doc</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ JSON of the new document, or updated version of the existed
+ document
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ JSON of the document ID and revision
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row><row><entry><emphasis role="bold">Query Arguments</emphasis></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>batch</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Allow document store request to be batched with others
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry></entry><entry><emphasis role="bold">Supported Values</emphasis></entry></row><row><entry></entry><entry><literal>ok</literal></entry><entry>Enable</entry></row><row><entry><emphasis role="bold">HTTP Headers</emphasis></entry><entry><emphasis role="bold">Header</emphasis></entry><entry><literal>If-Match</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>Current revision of the document for validation</entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry namest="field" nameend="addinfo"><emphasis role="bold">Return Codes</emphasis></entry></row><row><entry>201</entry><entry namest="info" nameend="addinfo">
+ Document has been created successfully
+ </entry></row><row><entry>202</entry><entry namest="info" nameend="addinfo">
+ Document accepted for writing (batch mode)
+ </entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      The <literal>PUT</literal> method creates a new named document, or
+      creates a new revision of the existing document. Unlike the
+      <link linkend="couchdb-api-dbdoc_db_post"><literal>POST</literal></link>
+      method, you must specify the document ID in the request URL.
+    </para>
+
+    <para>
+      For example, to create the docment <literal>FishStew</literal>,
+      you would send the following request:
+    </para>
+
+<programlisting>PUT http://couchdb:5984/recipes/FishStew
+Content-Type: application/json
+
+{
+  "servings" : 4,
+  "subtitle" : "Delicious with fresh bread",
+  "title" : "Fish Stew"
+}
+</programlisting>
+
+    <para>
+      The return type is JSON of the status, document ID,and revision
+      number:
+    </para>
+
+<programlisting>
+{
+   "id" : "FishStew",
+   "ok" : true,
+   "rev" : "1-9c65296036141e575d32ba9c034dd3ee"
+}
+</programlisting>
+
+    <section id="couchdb-api-dbdoc_db-doc_put-update">
+
+      <title>Updating an Existing Document</title>
+
+      <para>
+        To update an existing document you must specify the current
+        revision number within the <literal>_rev</literal> parameter.
+        For example:
+      </para>
+
+<programlisting>
+PUT http://couchdb:5984/recipes/FishStew
+Content-Type: application/json
+
+{
+  "_rev" : "1-9c65296036141e575d32ba9c034dd3ee",
+  "servings" : 4,
+  "subtitle" : "Delicious with fresh salad",
+  "title" : "Fish Stew"
+}
+</programlisting>
+
+      <para>
+        Alternatively, you can supply the current revision number in the
+        <literal>If-Match</literal> HTTP header of the request. For
+        example:
+      </para>
+
+<programlisting>
+PUT http://couchdb:5984/recipes/FishStew
+If-Match: 2-d953b18035b76f2a5b1d1d93f25d3aea
+Content-Type: application/json
+
+{
+   "servings" : 4,
+   "subtitle" : "Delicious with fresh salad",
+   "title" : "Fish Stew"
+}
+</programlisting>
+
+      <para>
+        The JSON returned will include the updated revision number:
+      </para>
+
+<programlisting>
+{
+   "id" : "FishStew99",
+   "ok" : true,
+   "rev" : "2-d953b18035b76f2a5b1d1d93f25d3aea"
+}
+</programlisting>
+
+      <para>
+        For information on batched writes, which can provide improved
+        performance, see
+        <xref linkend="couchdb-api-dbdoc_db_batchmode"/>.
+      </para>
+
+    </section>
+
+  </section>
+
+  <section id="couchdb-api-dbdoc_db-doc_delete">
+
+    <title><literal>DELETE /db/doc</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API DELETE /db/doc</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>DELETE /db/doc</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ None
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ JSON of the deleted revision
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row><row><entry><emphasis role="bold">Query Arguments</emphasis></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>rev</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Current revision of the document for validation
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry><emphasis role="bold">HTTP Headers</emphasis></entry><entry><emphasis role="bold">Header</emphasis></entry><entry><literal>If-Match</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>Current revision of the document for validation</entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry namest="field" nameend="addinfo"><emphasis role="bold">Return Codes</emphasis></entry></row><row><entry>409</entry><entry namest="info" nameend="addinfo">
+ Revision is missing, invalid or not the latest
+ </entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Deletes the specified document from the database. You must supply
+      the current (latest) revision, either by using the
+      <literal>rev</literal> parameter to specify the revision:
+    </para>
+
+<programlisting>
+DELETE http://couchdb:5984/recipes/FishStew?rev=3-a1a9b39ee3cc39181b796a69cb48521c
+Content-Type: application/json
+</programlisting>
+
+    <para>
+      Alternatively, you can use ETags with the
+      <literal>If-Match</literal> field:
+    </para>
+
+<programlisting>
+DELETE http://couchdb:5984/recipes/FishStew
+If-Match: 3-a1a9b39ee3cc39181b796a69cb48521c
+Content-Type: application/json
+    </programlisting>
+
+    <para>
+      The returned JSON contains the document ID, revision and status:
+    </para>
+
+<programlisting>
+{
+   "id" : "FishStew",
+   "ok" : true,
+   "rev" : "4-2719fd41187c60762ff584761b714cfb"
+}
+</programlisting>
+
+    <note>
+      <para>
+        Note that deletion of a record increments the revision number.
+        The use of a revision for deletion of the record allows
+        replication of the database to correctly track the deletion in
+        synchronized copies.
+      </para>
+    </note>
+
+  </section>
+
+  <section id="couchdb-api-dbdoc_db-doc_copy">
+
+    <title><literal>COPY /db/doc</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API COPY /db/doc</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>COPY /db/doc</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ None
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ JSON of the new document and revision
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row><row><entry><emphasis role="bold">Query Arguments</emphasis></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>rev</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Revision to copy from
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry><emphasis role="bold">HTTP Headers</emphasis></entry><entry><emphasis role="bold">Header</emphasis></entry><entry><literal>Destination</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>Destination document (and optional revision)</entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>no</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry namest="field" nameend="addinfo"><emphasis role="bold">Return Codes</emphasis></entry></row><row><entry>201</entry><entry namest="info" nameend="addinfo">
+ Document has been copied and created successfully
+ </entry></row><row><entry>409</entry><entry namest="info" nameend="addinfo">
+ Conflict (target document already exists)
+ </entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      The <literal>COPY</literal> command (which is non-standard HTTP)
+      copies an existing document to a new or existing document.
+    </para>
+
+    <para>
+      The source document is specified on the request line, with the
+      <literal>Destination</literal> HTTP Header of the request
+      specifying the target document.
+    </para>
+
+    <section id="couchdb-api-dbdoc_db-doc_copy-simple">
+
+      <title>Copying a Document</title>
+
+      <para>
+        You can copy the latest version of a document to a new document
+        by specifying the current document and target document:
+      </para>
+
+<programlisting>
+COPY http://couchdb:5984/recipes/FishStew
+Content-Type: application/json
+Destination: IrishFishStew
+</programlisting>
+
+      <para>
+        The above request copies the document
+        <literal>FishStew</literal> to the new document
+        <literal>IrishFishStew</literal>. The response is the ID and
+        revision of the new document.
+      </para>
+
+<programlisting>
+{
+   "id" : "IrishFishStew",
+   "rev" : "1-9c65296036141e575d32ba9c034dd3ee"
+}
+</programlisting>
+
+    </section>
+
+    <section id="couchdb-api-dbdoc_db-doc_copy-specrev">
+
+      <title>Copying from a Specific Revision</title>
+
+      <para>
+        To copy <emphasis>from</emphasis> a specific version, use the
+        <literal>rev</literal> argument to the query string:
+      </para>
+
+<programlisting>
+COPY http://couchdb:5984/recipes/FishStew?rev=5-acfd32d233f07cea4b4f37daaacc0082
+Content-Type: application/json
+Destination: IrishFishStew
+</programlisting>
+
+      <para>
+        The new document will be created using the information in the
+        specified revision of the source document.
+      </para>
+
+    </section>
+
+    <section id="couchdb-api-dbdoc_db-doc_copy-existing">
+
+      <title>Copying to an Existing Document</title>
+
+      <para>
+        To copy to an existing document, you must specify the current
+        revision string for the target document, using the
+        <literal>rev</literal> parameter to the
+        <literal>Destination</literal> HTTP Header string. For example:
+      </para>
+
+<programlisting>
+COPY http://couchdb:5984/recipes/FishStew
+Content-Type: application/json
+Destination: IrishFishStew?rev=1-9c65296036141e575d32ba9c034dd3ee
+</programlisting>
+
+      <para>
+        The return value will be the new revision of the copied
+        document:
+      </para>
+
+<programlisting>
+{
+   "id" : "IrishFishStew",
+   "rev" : "2-55b6a1b251902a2c249b667dab1c6692"
+}
+</programlisting>
+
+    </section>
+
+  </section>
+
+  <section id="couchdb-api-dbdoc_db-doc-attachment_get">
+
+    <title><literal>GET /db/doc/attachment</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API GET /db/doc/attachment</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>GET /db/doc/attachment</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ None
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ Returns the document data
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Returns the file attachment <literal>attachment</literal>
+      associated with the document <literal>doc</literal>. The raw data
+      of the associated attachment is returned (just as if you were
+      accessing a static file. The returned HTTP
+      <literal>Content-type</literal> will be the same as the content
+      type set when the document attachment was submitted into the
+      database.
+    </para>
+
+  </section>
+
+  <section id="couchdb-api-dbdoc_db-doc-attachment_put">
+
+    <title><literal>PUT /db/doc/attachment</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API PUT /db/doc/attachment</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>PUT /db/doc/attachment</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ Raw document data
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ JSON document status
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row><row><entry><emphasis role="bold">Query Arguments</emphasis></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>rev</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Current document revision
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>no</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry><emphasis role="bold">HTTP Headers</emphasis></entry><entry><emphasis role="bold">Header</emphasis></entry><entry><literal>Content-Length</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>Length (bytes) of the attachment being uploaded</entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>no</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Header</emphasis></entry><entry><literal>Content-Type</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>MIME type for the uploaded attachment</entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>no</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Header</emphasis></entry><entry><literal>If-Match</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>Current revision of the document for validation</entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry namest="field" nameend="addinfo"><emphasis role="bold">Return Codes</emphasis></entry></row><row><entry>201</entry><entry namest="info" nameend="addinfo">
+ Attachment has been accepted
+ </entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Upload the supplied content as an attachment to the specified
+      document (<literal>doc</literal>). The
+      <literal>attachment</literal> name provided must be a URL encoded
+      string. You must also supply either the <literal>rev</literal>
+      query argument or the <literal>If-Match</literal> HTTP header for
+      validation, and the HTTP headers (to set the attacment content
+      type). The content type is used when the attachment is requested
+      as the corresponding content-type in the returned document header.
+    </para>
+
+    <para>
+      For example, you could upload a simple text document using the
+      following request:
+    </para>
+
+<programlisting>
+PUT http://couchdb:5984/recipes/FishStew/basic?rev=8-a94cb7e50ded1e06f943be5bfbddf8ca
+Content-Length: 10
+Content-Type: text/plain
+
+Roast it
+
+</programlisting>
+
+    <para>
+      Or by using the <literal>If-Match</literal> HTTP header:
+    </para>
+
+<programlisting>
+PUT http://couchdb:5984/recipes/FishStew/basic
+If-Match: 8-a94cb7e50ded1e06f943be5bfbddf8ca
+Content-Length: 10
+Content-Type: text/plain
+
+Roast it
+
+</programlisting>
+
+    <para>
+      The returned JSON contains the new document information:
+    </para>
+
+<programlisting>
+{
+   "id" : "FishStew",
+   "ok" : true,
+   "rev" : "9-247bb19a41bfd9bfdaf5ee6e2e05be74"
+}
+</programlisting>
+
+    <note>
+      <para>
+        Uploading an attachment updates the corresponding document
+        revision. Revisions are tracked for the parent document, not
+        individual attachments.
+      </para>
+    </note>
+
+    <section id="couchdb-api-dbdoc_db-doc-attachment_put-existing">
+
+      <title>Updating an Existing Attachment</title>
+
+      <para>
+        Uploading an attachment using an existing attachment name will
+        update the corresponding stored content of the database. Since
+        you must supply the revision information to add an attachment to
+        a document, this serves as validation to update the existing
+        attachment.
+      </para>
+
+    </section>
+
+  </section>
+
+  <section id="couchdb-api-dbdoc_db-doc-attachment_delete">
+
+    <title><literal>DELETE /db/doc/attachment</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API DELETE /db/doc/attachment</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>DELETE /db/doc/attachment</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ None
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ JSON status
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row><row><entry><emphasis role="bold">Query Arguments</emphasis></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>rev</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Revision of the document to be deleted
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>no</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry><emphasis role="bold">HTTP Headers</emphasis></entry><entry><emphasis role="bold">Header</emphasis></entry><entry><literal>If-Match</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>Current revision of the document for validation</entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry namest="field" nameend="addinfo"><emphasis role="bold">Return Codes</emphasis></entry></row><row><entry>200</entry><entry namest="info" nameend="addinfo">
+ Attachment deleted successfully
+ </entry></row><row><entry>409</entry><entry namest="info" nameend="addinfo">
+ Supplied revision is incorrect or missing
+ </entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Deletes the attachment <literal>attachment</literal> to the
+      specified <literal>doc</literal>. You must supply the
+      <literal>rev</literal> argument with the current revision to
+      delete the attachment.
+    </para>
+
+    <para>
+      For example to delete the attachment <literal>basic</literal> from
+      the recipe <literal>FishStew</literal>:
+    </para>
+
+<programlisting>
+DELETE http://couchdb:5984/recipes/FishStew/basic?rev=9-247bb19a41bfd9bfdaf5ee6e2e05be74
+Content-Type: application/json
+
+    </programlisting>
+
+    <para>
+      The returned JSON contains the updated revision information:
+    </para>
+
+<programlisting>
+{
+   "id" : "FishStew",
+   "ok" : true,
+   "rev" : "10-561bf6b1e27615cee83d1f48fa65dd3e"
+}
+</programlisting>
+
+  </section>
+
+</chapter>

@@ -1,0 +1,1543 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE chapter PUBLIC '-//OASIS//DTD DocBook XML V4.5//EN'
+                         'http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd' [
+<!ENTITY % every.entities SYSTEM "entities.ent">
+%every.entities;
+]>
+<chapter id="couchdb-api-design">
+
+  <title>CouchDB API Server Design Document Methods</title>
+
+  <para>
+    In CouchDB, design documents provide the main interface for building
+    a CouchDB application. The design document defines the views used to
+    extract information from CouchDB through one or more views. Design
+    documents are created within your CouchDB instance in the same way
+    as you create database documents, but the content and definition of
+    the documents is different. Design Documents are named using an ID
+    defined with the design document URL path, and this URL can then be
+    used to access the database contents.
+  </para>
+
+  <para>
+    Views and lists operate together to provide automated (and
+    formatted) output from your database.
+  </para>
+
+  <para>
+    A list of the available methods and URL paths are provided below:
+  </para>
+
+  <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/JSON.pm"/>
+<table id="table-couchdb-api-design-summary"><title>Design Document API Calls</title><tgroup cols="3"><colspec colname="method"/><colspec colname="path"/><colspec colname="desc"/><thead><row><entry>Method</entry><entry>Path</entry><entry>Description</entry></row></thead><tbody><row><entry><literal>GET</literal></entry><entry><literal>/db/_design/design-doc</literal></entry><entry><link linkend="couchdb-api-design_db-design-designdoc_get">
+ Returns the latest revision of the design document
+ </link></entry></row><row><entry><literal>PUT</literal></entry><entry><literal>/db/_design/design-doc</literal></entry><entry><link linkend="couchdb-api-design_db-design-designdoc_put">
+ Creates or updates a design document
+ </link></entry></row><row><entry><literal>DELETE</literal></entry><entry><literal>/db/_design/design-doc</literal></entry><entry><link linkend="couchdb-api-design_db-design-designdoc_delete">
+ Deletes the design document
+ </link></entry></row><row><entry><literal>COPY</literal></entry><entry><literal>/db/_design/design-doc</literal></entry><entry><link linkend="couchdb-api-design_db-design-designdoc_copy">
+ Copies the design document
+ </link></entry></row><row><entry><literal>GET</literal></entry><entry><literal>/db/_design/design-doc/_info</literal></entry><entry><link linkend="couchdb-api-design_db-design-designdoc-info_get">
+ Returns information about the design document
+ </link></entry></row><row><entry><literal>GET</literal></entry><entry><literal>/db/_design/design-doc/_list/list-name/other-design-doc/view-name</literal></entry><entry><link linkend="couchdb-api-design_db-design-designdoc-list-listname-otherdesigndoc-viewname_get">
+ Invokes the list handler to translate the given view results
+ </link></entry></row><row><entry><literal>POST</literal></entry><entry><literal>/db/_design/design-doc/_list/list-name/other-design-doc/view-name</literal></entry><entry><link linkend="couchdb-api-design_db-design-designdoc-list-listname-otherdesigndoc-viewname_post">
+ Invokes the list handler to translate the given view results for
+ certain documents
+ </link></entry></row><row><entry><literal>GET</literal></entry><entry><literal>/db/_design/design-doc/_list/list-name/view-name</literal></entry><entry><link linkend="couchdb-api-design_db-design-designdoc-list-listname-viewname_get">
+ Invokes the list handler to translate the given view results
+ </link></entry></row><row><entry><literal>POST</literal></entry><entry><literal>/db/_design/design-doc/_list/list-name/view-name</literal></entry><entry><link linkend="couchdb-api-design_db-design-designdoc-list-listname-viewname_post">
+ Invokes the list handler to translate the given view results for
+ certain documents
+ </link></entry></row><row><entry><literal>ALL</literal></entry><entry><literal>/db/_design/design-doc/_rewrite/rewrite-name/anything</literal></entry><entry><link linkend="couchdb-api-design_db-design-designdoc-rewrite-rewritename-anything_all">
+ Invokes the URL rewrite handler and processes the request after
+ rewriting
+ </link></entry></row><row><entry><literal>GET</literal></entry><entry><literal>/db/_design/design-doc/_show/show-name</literal></entry><entry><link linkend="couchdb-api-design_db-design-designdoc-show-showname_get">
+ Invokes the show handler without a document
+ </link></entry></row><row><entry><literal>GET</literal></entry><entry><literal>/db/_design/design-doc/_show/show-name/doc</literal></entry><entry><link linkend="couchdb-api-design_db-design-designdoc-show-showname-doc_get">
+ Invokes the show handler for the given document
+ </link></entry></row><row><entry><literal>POST</literal></entry><entry><literal>/db/_design/design-doc/_update/update-name</literal></entry><entry><link linkend="couchdb-api-design_db-design-designdoc-update-updatename_post">
+ Invokes the update handler without a document ID
+ </link></entry></row><row><entry><literal>PUT</literal></entry><entry><literal>/db/_design/design-doc/_update/update-name/doc</literal></entry><entry><link linkend="couchdb-api-design_db-design-designdoc-update-updatename-doc_put">
+ Invokes the update handler with a specific document ID
+ </link></entry></row><row><entry><literal>GET</literal></entry><entry><literal>/db/_design/design-doc/_view/view-name</literal></entry><entry><link linkend="couchdb-api-design_db-design-designdoc-view-viewname_get">
+ Returns results of the view
+ </link></entry></row><row><entry><literal>POST</literal></entry><entry><literal>/db/_design/design-doc/_view/view-name</literal></entry><entry><link linkend="couchdb-api-design_db-design-designdoc-view-viewname_post">
+ Returns certain rows from the view
+ </link></entry></row><row><entry><literal>GET</literal></entry><entry><literal>/db/_design/design-doc/attachment</literal></entry><entry><link linkend="couchdb-api-design_db-design-designdoc-attachment_get">
+ Gets an attachment of the design document
+ </link></entry></row><row><entry><literal>PUT</literal></entry><entry><literal>/db/_design/design-doc/attachment</literal></entry><entry><link linkend="couchdb-api-design_db-design-designdoc-attachment_put">
+ Inserts an attachment to the design document
+ </link></entry></row><row><entry><literal>DELETE</literal></entry><entry><literal>/db/_design/design-doc/attachment</literal></entry><entry><link linkend="couchdb-api-design_db-design-designdoc-attachment_delete">
+ Deletes an attachment from the design document
+ </link></entry></row></tbody></tgroup></table>
+
+  <section id="couchdb-api-design_db-design-designdoc_get">
+
+    <title><literal>GET /db/_design/design-doc</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/JSON.pm"/>
+<informaltable><textobject><phrase>URL API GET /db/_design/design-doc</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>GET /db/_design/design-doc</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ None
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ JSON of the existing design document
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row><row><entry><emphasis role="bold">Query Arguments</emphasis></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>rev</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Specify the revision to return
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>revs</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Return a list of the revisions for the document
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>boolean</entry></row><row><entry></entry><entry><emphasis role="bold">Supported Values</emphasis></entry></row><row><entry></entry><entry><literal>true</literal></entry><entry>Includes the revisions</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>revs_info</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Return a list of detailed revision information for the
+ document
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>boolean</entry></row><row><entry></entry><entry><emphasis role="bold">Supported Values</emphasis></entry></row><row><entry></entry><entry><literal>true</literal></entry><entry>Includes the revisions</entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Returns the specified design document,
+      <literal>design-doc</literal> from the specified
+      <literal>db</literal>. For example, to retrieve the design
+      document <literal>recipes</literal> you would send the following
+      request:
+    </para>
+
+<programlisting>
+GET http://couchdb:5984/recipes/_design/recipes
+Content-Type: application/json
+</programlisting>
+
+    <para>
+      The returned string will be the JSON of the design document:
+    </para>
+
+<programlisting>
+{
+   "_id" : "_design/recipes",
+   "_rev" : "5-39f56a392b86bbee57e2138921346406"
+   "language" : "javascript",
+   "views" : {
+      "by_recipe" : {
+         "map" : "function(doc) { if (doc.title != null) emit(doc.title, doc) }"
+      },
+   },
+}
+</programlisting>
+
+    <para>
+      A list of the revisions can be obtained by using the
+      <literal>revs</literal> query argument, or an extended list of
+      revisions using the <literal>revs_info</literal> query argument.
+      This operates in the same way as for other documents. Fur further
+      examples, see
+      <xref
+        linkend="couchdb-api-dbdoc_db-doc_get"/>.
+    </para>
+
+  </section>
+
+  <section id="couchdb-api-design_db-design-designdoc_put">
+
+    <title><literal>PUT /db/_design/design-doc</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/JSON.pm"/>
+<informaltable><textobject><phrase>URL API PUT /db/_design/design-doc</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>PUT /db/_design/design-doc</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ JSON of the design document
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ JSON status
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Upload the specified design document,
+      <literal>design-doc</literal>, to the specified database. The
+      design document should follow the definition of a design document,
+      as summarised in the following table.
+    </para>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/JSON/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//json/json.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/JSON.pm"/>
+<table id="table-couchdb-api-json-designdoc" class="jsonstructure"><title>
+ Design Document
+ </title><tgroup cols="2"><colspec colname="item" colwidth="30*"/><colspec colname="desc" colwidth="70*"/><tbody><row><entry ><emphasis role="bold">Field</emphasis></entry><entry><emphasis role="bold">Description</emphasis></entry></row><row><entry ><literal>_id</literal>  </entry><entry>
+ Design Document ID
+ </entry></row><row><entry ><literal>_rev</literal>  </entry><entry>
+ Design Document Revision
+ </entry></row><row><entry ><literal>views</literal>  </entry><entry>
+ View
+ </entry></row><row><entry >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<literal>viewname</literal>  </entry><entry>
+ View Definition
+ </entry></row><row><entry >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<literal>map</literal>  </entry><entry>
+ Map Function for View
+ </entry></row><row><entry >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<literal>reduce</literal> (optional) </entry><entry>
+ Reduce Function for View
+ </entry></row></tbody></tgroup></table>
+
+    <para>
+      For more information on writing views, see
+      <xref
+      linkend="couchdb-api-functional-views"/>.
+    </para>
+
+  </section>
+
+  <section id="couchdb-api-design_db-design-designdoc_delete">
+
+    <title><literal>DELETE /db/_design/design-doc</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/JSON.pm"/>
+<informaltable><textobject><phrase>URL API DELETE /db/_design/design-doc</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>DELETE /db/_design/design-doc</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ None
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ JSON of deleted design document
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row><row><entry><emphasis role="bold">Query Arguments</emphasis></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>rev</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Current revision of the document for validation
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry><emphasis role="bold">HTTP Headers</emphasis></entry><entry><emphasis role="bold">Header</emphasis></entry><entry><literal>If-Match</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>Current revision of the document for validation</entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry namest="field" nameend="addinfo"><emphasis role="bold">Return Codes</emphasis></entry></row><row><entry>409</entry><entry namest="info" nameend="addinfo">
+ Supplied revision is incorrect or missing
+ </entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Delete an existing design document. Deleting a design document
+      also deletes all of the associated view indexes, and recovers the
+      corresponding space on disk for the indexes in question.
+    </para>
+
+    <para>
+      To delete, you must specify the current revision of the design
+      document using the <literal>rev</literal> query argument.
+    </para>
+
+    <para>
+      For example:
+    </para>
+
+<programlisting>
+DELETE http://couchdb:5984/recipes/_design/recipes?rev=2-ac58d589b37d01c00f45a4418c5a15a8
+Content-Type: application/json
+</programlisting>
+
+    <para>
+      The response contains the delete document ID and revision:
+    </para>
+
+<programlisting>
+{
+   "id" : "recipe/_design/recipes"
+   "ok" : true,
+   "rev" : "3-7a05370bff53186cb5d403f861aca154",
+}
+</programlisting>
+
+  </section>
+
+  <section id="couchdb-api-design_db-design-designdoc_copy">
+
+    <title><literal>COPY /db/_design/design-doc</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/JSON.pm"/>
+<informaltable><textobject><phrase>URL API COPY /db/_design/design-doc</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>COPY /db/_design/design-doc</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ None
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ JSON of the copied document and revision
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row><row><entry><emphasis role="bold">Query Arguments</emphasis></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>rev</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Revision to copy from
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry><emphasis role="bold">HTTP Headers</emphasis></entry><entry><emphasis role="bold">Header</emphasis></entry><entry><literal>Destination</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>Destination document (and optional revision)</entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>no</entry></row><row><entry></entry><entry></entry><entry></entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      The <literal>COPY</literal> command (non-standard HTTP) copies an
+      existing design document to a new or existing document.
+    </para>
+
+    <para>
+      The source design document is specified on the request line, with
+      the <literal>Destination</literal> HTTP Header of the request
+      specifying the target document.
+    </para>
+
+    <section id="couchdb-api-design_db-design-designdoc_copy-simple">
+
+      <title>Copying a Design Document</title>
+
+      <para>
+        To copy the latest version of a design document to a new
+        document you specify the base document and target document:
+      </para>
+
+<programlisting>
+COPY http://couchdb:5984/recipes/_design/recipes
+Content-Type: application/json
+Destination: /recipes/_design/recipelist
+</programlisting>
+
+      <para>
+        The above request copies the design document
+        <literal>recipes</literal> to the new design document
+        <literal>recipelist</literal>. The response is the ID and
+        revision of the new document.
+      </para>
+
+<programlisting>
+{
+   "id" : "recipes/_design/recipelist"
+   "rev" : "1-9c65296036141e575d32ba9c034dd3ee",
+}
+</programlisting>
+
+      <note>
+        <para>
+          Copying a design document does automatically reconstruct the
+          view indexes. These will be recreated, as with other views,
+          the first time the new view is accessed.
+        </para>
+      </note>
+
+    </section>
+
+    <section id="couchdb-api-design_db-design-designdoc_copy-specrev">
+
+      <title>Copying from a Specific Revision</title>
+
+      <para>
+        To copy <emphasis>from</emphasis> a specific version, use the
+        <literal>rev</literal> argument to the query string:
+      </para>
+
+<programlisting>
+COPY http://couchdb:5984/recipes/_design/recipes?rev=1-e23b9e942c19e9fb10ff1fde2e50e0f5
+Content-Type: application/json
+Destination: recipes/_design/recipelist
+</programlisting>
+
+      <para>
+        The new design document will be created using the specified
+        revision of the source document.
+      </para>
+
+    </section>
+
+    <section id="couchdb-api-design_db-design-designdoc_copy-existing">
+
+      <title>Copying to an Existing Design Document</title>
+
+      <para>
+        To copy to an existing document, you must specify the current
+        revision string for the target document, using the
+        <literal>rev</literal> parameter to the
+        <literal>Destination</literal> HTTP Header string. For example:
+      </para>
+
+<programlisting>
+COPY http://couchdb:5984/recipes/_design/recipes
+Content-Type: application/json
+Destination: recipes/_design/recipelist?rev=1-9c65296036141e575d32ba9c034dd3ee
+</programlisting>
+
+      <para>
+        The return value will be the new revision of the copied
+        document:
+      </para>
+
+<programlisting>
+{
+   "id" : "recipes/_design/recipes"
+   "rev" : "2-55b6a1b251902a2c249b667dab1c6692",
+}
+</programlisting>
+
+    </section>
+
+  </section>
+
+  <section id="couchdb-api-design_db-design-designdoc-attachment_get">
+
+    <title><literal>GET /db/_design/design-doc/attachment</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/JSON.pm"/>
+<informaltable><textobject><phrase>URL API GET /db/_design/design-doc/attachment</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>GET /db/_design/design-doc/attachment</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ None
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ Document content
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Returns the file attachment <literal>attachment</literal>
+      associated with the design document
+      <literal>/_design_/design-doc</literal>. The raw data of the
+      associated attachment is returned (just as if you were accessing a
+      static file. The returned HTTP <literal>Content-type</literal>
+      will be the same as the content type set when the document
+      attachment was submitted into the database.
+    </para>
+
+  </section>
+
+  <section id="couchdb-api-design_db-design-designdoc-attachment_put">
+
+    <title><literal>PUT /db/_design/design-doc/attachment</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/JSON.pm"/>
+<informaltable><textobject><phrase>URL API PUT /db/_design/design-doc/attachment</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>PUT /db/_design/design-doc/attachment</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ JSON of the design document
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ JSON status statement
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row><row><entry><emphasis role="bold">Query Arguments</emphasis></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>rev</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Current revision of the document for validation
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry><emphasis role="bold">HTTP Headers</emphasis></entry><entry><emphasis role="bold">Header</emphasis></entry><entry><literal>If-Match</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>Current revision of the document for validation</entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry></entry><entry></entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Upload the supplied content as an attachment to the specified
+      design document (<literal>/_design/design-doc</literal>). The
+      <literal>attachment</literal> name provided must be a URL encoded
+      string. You must also supply either the <literal>rev</literal>
+      query argument or the <literal>If-Match</literal> HTTP header for
+      validation, and the HTTP headers (to set the attacment content
+      type). The content type is used when the attachment is requested
+      as the corresponding content-type in the returned document header.
+    </para>
+
+    <para>
+      For example, you could upload a simple text document using the
+      following request:
+    </para>
+
+<programlisting>
+PUT http://couchdb:5984/recipes/_design/recipes/view.css?rev=7-f7114d4d81124b223283f3e89eee043e
+Content-Length: 39
+Content-Type: text/plain
+
+div.recipetitle {
+font-weight: bold;
+}
+
+</programlisting>
+
+    <para>
+      Or by using the <literal>If-Match</literal> HTTP header:
+    </para>
+
+<programlisting>
+PUT http://couchdb:5984/recipes/FishStew/basic
+If-Match: 7-f7114d4d81124b223283f3e89eee043e
+Content-Length: 39
+Content-Type: text/plain
+
+div.recipetitle {
+font-weight: bold;
+}
+
+</programlisting>
+
+    <para>
+      The returned JSON contains the new document information:
+    </para>
+
+<programlisting>
+{
+   "id" : "_design/recipes"
+   "ok" : true,
+   "rev" : "8-cb2b7d94eeac76782a02396ba70dfbf5",
+}
+</programlisting>
+
+    <note>
+      <para>
+        Uploading an attachment updates the corresponding document
+        revision. Revisions are tracked for the parent document, not
+        individual attachments.
+      </para>
+    </note>
+
+  </section>
+
+  <section id="couchdb-api-design_db-design-designdoc-attachment_delete">
+
+    <title><literal>DELETE /db/_design/design-doc/attachment</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/JSON.pm"/>
+<informaltable><textobject><phrase>URL API DELETE /db/_design/design-doc/attachment</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>DELETE /db/_design/design-doc/attachment</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ None
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ JSON of the deleted revision
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row><row><entry><emphasis role="bold">Query Arguments</emphasis></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>rev</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Current revision of the document for validation
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry><emphasis role="bold">HTTP Headers</emphasis></entry><entry><emphasis role="bold">Header</emphasis></entry><entry><literal>If-Match</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>Current revision of the document for validation</entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry namest="field" nameend="addinfo"><emphasis role="bold">Return Codes</emphasis></entry></row><row><entry>409</entry><entry namest="info" nameend="addinfo">
+ Supplied revision is incorrect or missing
+ </entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Deletes the attachment <literal>attachment</literal> to the
+      specified <literal>_design/design-doc</literal>. You must supply
+      the <literal>rev</literal> argument with the current revision to
+      delete the attachment.
+    </para>
+
+    <para>
+      For example to delete the attachment <literal>view.css</literal>
+      from the design document <literal>recipes</literal>:
+    </para>
+
+<programlisting>
+DELETE http://couchdb:5984/recipes/_design/recipes/view.css?rev=9-3db559f13a845c7751d407404cdeaa4a
+    </programlisting>
+
+    <para>
+      The returned JSON contains the updated revision information for
+      the parent document:
+    </para>
+
+<programlisting>
+{
+   "id" : "_design/recipes"
+   "ok" : true,
+   "rev" : "10-f3b15bb408961f8dcc3d86c7d3b54c4c",
+}
+</programlisting>
+
+  </section>
+
+  <section id="couchdb-api-design_db-design-designdoc-info_get">
+
+    <title><literal>GET /db/_design/design-doc/_info</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/JSON.pm"/>
+<informaltable><textobject><phrase>URL API GET /db/_design/design-doc/_info</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>GET /db/_design/design-doc/_info</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ None
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ JSON of the design document information
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Obtains information about a given design document, including the
+      index, index size and current status of the design document and
+      associated index information.
+    </para>
+
+    <para>
+      For example, to get the information for the
+      <literal>recipes</literal> design document:
+    </para>
+
+<programlisting>
+GET http://couchdb:5984/recipes/_design/recipes/_info
+Content-Type: application/json
+</programlisting>
+
+    <para>
+      This returns the following JSON structure:
+    </para>
+
+<programlisting>
+{
+   "name" : "recipes"
+   "view_index" : {
+      "compact_running" : false,
+      "updater_running" : false,
+      "language" : "javascript",
+      "purge_seq" : 10,
+      "waiting_commit" : false,
+      "waiting_clients" : 0,
+      "signature" : "fc65594ee76087a3b8c726caf5b40687",
+      "update_seq" : 375031,
+      "disk_size" : 16491
+   },
+}
+</programlisting>
+
+    <para>
+      The individual fields in the returned JSON structure are detailed
+      in
+      <xref linkend="table-couchdb-api-design_db-designdoc-info-json"/>.
+    </para>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/JSON/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//json/json.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/JSON.pm"/>
+<table id="table-couchdb-api-design_db-designdoc-info-json" class="jsonstructure"><title>Design Document Info JSON Contents</title><tgroup cols="2"><colspec colname="item" colwidth="30*"/><colspec colname="desc" colwidth="70*"/><tbody><row><entry ><emphasis role="bold">Field</emphasis></entry><entry><emphasis role="bold">Description</emphasis></entry></row><row><entry ><literal>name</literal>  </entry><entry>
+ Name/ID of Design Document
+ </entry></row><row><entry ><literal>view_index</literal>  </entry><entry>
+ View Index
+ </entry></row><row><entry >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<literal>compact_running</literal>  </entry><entry>
+ Indicates whether a compaction routine is currently running on
+ the view
+ </entry></row><row><entry >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<literal>disk_size</literal>  </entry><entry>
+ Size in bytes of the view as stored on disk
+ </entry></row><row><entry >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<literal>language</literal>  </entry><entry>
+ Language for the defined views
+ </entry></row><row><entry >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<literal>purge_seq</literal>  </entry><entry>
+ The purge sequence that has been processed
+ </entry></row><row><entry >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<literal>signature</literal>  </entry><entry>
+ MD5 signature of the views for the design document
+ </entry></row><row><entry >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<literal>update_seq</literal>  </entry><entry>
+ The update sequence of the corresponding database that has been
+ indexed
+ </entry></row><row><entry >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<literal>updater_running</literal>  </entry><entry>
+ Indicates if the view is currently being updated
+ </entry></row><row><entry >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<literal>waiting_clients</literal>  </entry><entry>
+ Number of clients waiting on views from this design document
+ </entry></row><row><entry >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<literal>waiting_commit</literal>  </entry><entry>
+ Indicates if there are outstanding commits to the underlying
+ database that need to processed
+ </entry></row></tbody></tgroup></table>
+
+  </section>
+
+  <section id="couchdb-api-design_db-design-designdoc-view-viewname_get">
+
+    <title><literal>GET /db/_design/design-doc/_view/view-name</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API GET /db/_design/design-doc/_view/view-name</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>GET /db/_design/design-doc/_view/view-name</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ None
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ JSON of the documents returned by the view
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row><row><entry><emphasis role="bold">Query Arguments</emphasis></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>descending</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Return the documents in descending by key order
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>boolean</entry></row><row><entry></entry><entry><emphasis role="bold">Default</emphasis></entry><entry>false</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>endkey</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Stop returning records when the specified key is reached
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>endkey_docid</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Stop returning records when the specified document ID is
+ reached
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>group</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Group the results using the reduce function to a group or
+ single row
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>boolean</entry></row><row><entry></entry><entry><emphasis role="bold">Default</emphasis></entry><entry>false</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>group_level</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Specify the group level to be used
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>numeric</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>include_docs</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Include the full content of the documents in the return
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>boolean</entry></row><row><entry></entry><entry><emphasis role="bold">Default</emphasis></entry><entry>false</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>inclusive_end</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Specifies whether the specified end key should be included
+ in the result
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>boolean</entry></row><row><entry></entry><entry><emphasis role="bold">Default</emphasis></entry><entry>true</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>key</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Return only documents that match the specified key
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>limit</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Limit the number of the returned documents to the specified
+ number
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>numeric</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>reduce</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Use the reduction function
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>boolean</entry></row><row><entry></entry><entry><emphasis role="bold">Default</emphasis></entry><entry>true</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>skip</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Skip this number of records before starting to return the
+ results
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>numeric</entry></row><row><entry></entry><entry><emphasis role="bold">Default</emphasis></entry><entry>0</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>stale</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Allow the results from a stale view to be used
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry></entry><entry><emphasis role="bold">Default</emphasis></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Supported Values</emphasis></entry></row><row><entry></entry><entry><literal>ok</literal></entry><entry>Allow stale views</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>startkey</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Return records starting with the specified key
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>startkey_docid</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Return records starting with the specified document ID
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>update_seq</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Include the update sequence in the generated results
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>boolean</entry></row><row><entry></entry><entry><emphasis role="bold">Default</emphasis></entry><entry>false</entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Executes the specified <literal>view-name</literal> from the
+      specified <literal>design-doc</literal> design document.
+    </para>
+
+    <section
+          id="couchdb-api-design_db-design-designdoc-view-viewname_get-indexes">
+
+      <title>Querying Views and Indexes</title>
+
+      <para>
+        The definition of a view within a design document also creates
+        an index based on the key information defined within each view.
+        The production and use of the index significantly increases the
+        speed of access and searching or selecting documents from the
+        view.
+      </para>
+
+      <para>
+        However, the index is not updated when new documents are added
+        or modified in the database. Instead, the index is generated or
+        updated, either when the view is first accessed, or when the
+        view is accessed after a document has been updated. In each
+        case, the index is updated before the view query is executed
+        against the database.
+      </para>
+
+      <para>
+        View indexes are updated incrementally in the following
+        situations:
+      </para>
+
+      <itemizedlist>
+
+        <listitem>
+          <para>
+            A new document has been added to the database.
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            A document has been deleted from the database.
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            A document in the database has been updated.
+          </para>
+        </listitem>
+
+      </itemizedlist>
+
+      <para>
+        View indexes are rebuilt entirely when the view definition
+        changes. To achieve this, a 'fingerprint' of the view definition
+        is created when the design document is updated. If the
+        fingerprint changes, then the view indexes are entirely rebuilt.
+        This ensures that changes to the view definitions are reflected
+        in the view indexes.
+      </para>
+
+      <note>
+        <para>
+          View index rebuilds occur when one view from the same the view
+          group (i.e. all the views defined within a single a design
+          document) has been determined as needing a rebuild. For
+          example, if if you have a design document with different
+          views, and you update the database, all three view indexes
+          within the design document will be updated.
+        </para>
+      </note>
+
+      <para>
+        Because the view is updated when it has been queried, it can
+        result in a delay in returned information when the view is
+        accessed, especially if there are a large number of documents in
+        the database and the view index does not exist. There are a
+        number of ways to mitigate, but not completely eliminate, these
+        issues. These include:
+      </para>
+
+      <itemizedlist>
+
+        <listitem>
+          <para>
+            Create the view definition (and associated design documents)
+            on your database before allowing insertion or updates to the
+            documents. If this is allowed while the view is being
+            accessed, the index can be updated incrementally.
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            Manually force a view request from the database. You can do
+            this either before users are allowed to use the view, or you
+            can access the view manually after documents are added or
+            updated.
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            Use the <literal>/db/_changes</literal> method to monitor
+            for changes to the database and then access the view to
+            force the corresponding view index to be updated. See
+            <xref
+              linkend="couchdb-api-db_db-changes_get"/>
+            for more information.
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            Use a monitor with the
+            <literal>update_notification</literal> section of the
+            CouchDB configuration file to monitor for changes to your
+            database, and trigger a view query to force the view to be
+            updated. For more information, see
+            <xref
+                      linkend="couchdb-single-configuration-update_notification"/>.
+          </para>
+        </listitem>
+
+      </itemizedlist>
+
+      <para>
+        None of these can completely eliminate the need for the indexes
+        to be rebuilt or updated when the view is accessed, but they may
+        lessen the effects on end-users of the index update affecting
+        the user experience.
+      </para>
+
+      <para>
+        Another alternative is to allow users to access a 'stale'
+        version of the view index, rather than forcing the index to be
+        updated and displaying the updated results. Using a stale view
+        may not return the latest information, but will return the
+        results of the view query using an existing version of the
+        index.
+      </para>
+
+      <para>
+        For example, to access the existing stale view
+        <literal>by_recipe</literal> in the <literal>recipes</literal>
+        design document:
+      </para>
+
+<programlisting>http://couchdb:5984/recipes/_design/recipes/_view/by_recipe?stale=ok</programlisting>
+
+      <para>
+        Accessing a stale view:
+      </para>
+
+      <itemizedlist>
+
+        <listitem>
+          <para>
+            Does not trigger a rebuild of the view indexes, even if
+            there have been changes since the last access.
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            Returns the current version of the view index, if a current
+            version exists.
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            Returns an empty result set if the given view index does
+            exist.
+          </para>
+        </listitem>
+
+      </itemizedlist>
+
+      <para>
+        As an alternative, you use the <literal>update_after</literal>
+        value to the <option>stale</option> paramater. This causes the
+        view to be returned as a stale view, but for the update process
+        to be triggered after the view information has been returned to
+        the client.
+      </para>
+
+      <para>
+        In addition to using stale views, you can also make use of the
+        <literal>update_seq</literal> query argument. Using this query
+        argument generates the view information including the update
+        sequence of the database from which the view was generated. The
+        returned value can be compared this to the current update
+        sequence exposed in the database information (returned by
+        <xref linkend="couchdb-api-db_db_get"/>).
+      </para>
+
+    </section>
+
+    <section
+      id="couchdb-api-design_db-design-designdoc-view-viewname_get-sorting">
+
+      <title>Sorting Returned Rows</title>
+
+      <para>
+        Each element within the returned array is sorted using native
+        UTF-8 sorting according to the contents of the key portion of
+        the emitted content. The basic order of output is as follows:
+      </para>
+
+      <itemizedlist>
+
+        <listitem>
+          <para>
+            <literal>null</literal>
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            <literal>false</literal>
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            <literal>true</literal>
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            Numbers
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            Text (case sensitive, lowercase first)
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            Arrays (according to the values of each element, in order)
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            Objects (according to the values of keys, in key order)
+          </para>
+        </listitem>
+
+      </itemizedlist>
+
+
+
+      <para>
+        You can reverse the order of the returned view information by
+        using the <literal>descending</literal> query value set to true.
+        For example, Retrieving the list of recipes using the
+        <literal>by_title</literal> (limited to 5 records) view:
+      </para>
+
+<programlisting>
+{
+   "offset" : 0,
+   "rows" : [
+      {
+         "id" : "3-tiersalmonspinachandavocadoterrine",
+         "key" : "3-tier salmon, spinach and avocado terrine",
+         "value" : [
+            null,
+            "3-tier salmon, spinach and avocado terrine"
+         ]
+      },
+      {
+         "id" : "Aberffrawcake",
+         "key" : "Aberffraw cake",
+         "value" : [
+            null,
+            "Aberffraw cake"
+         ]
+      },
+      {
+         "id" : "Adukiandorangecasserole-microwave",
+         "key" : "Aduki and orange casserole - microwave",
+         "value" : [
+            null,
+            "Aduki and orange casserole - microwave"
+         ]
+      },
+      {
+         "id" : "Aioli-garlicmayonnaise",
+         "key" : "Aioli - garlic mayonnaise",
+         "value" : [
+            null,
+            "Aioli - garlic mayonnaise"
+         ]
+      },
+      {
+         "id" : "Alabamapeanutchicken",
+         "key" : "Alabama peanut chicken",
+         "value" : [
+            null,
+            "Alabama peanut chicken"
+         ]
+      }
+   ],
+   "total_rows" : 2667
+}
+</programlisting>
+
+      <para>
+        Requesting the same in descending order will reverse the entire
+        view content. For example the request
+      </para>
+
+<programlisting>
+GET http://couchdb:5984/recipes/_design/recipes/_view/by_title?limit=5&amp;descending=true
+Accept: application/json
+Content-Type: application/json</programlisting>
+
+      <para>
+        Returns the last 5 records from the view:
+      </para>
+
+<programlisting>
+{
+   "offset" : 0,
+   "rows" : [
+      {
+         "id" : "Zucchiniinagrodolcesweet-sourcourgettes",
+         "key" : "Zucchini in agrodolce (sweet-sour courgettes)",
+         "value" : [
+            null,
+            "Zucchini in agrodolce (sweet-sour courgettes)"
+         ]
+      },
+      {
+         "id" : "Zingylemontart",
+         "key" : "Zingy lemon tart",
+         "value" : [
+            null,
+            "Zingy lemon tart"
+         ]
+      },
+      {
+         "id" : "Zestyseafoodavocado",
+         "key" : "Zesty seafood avocado",
+         "value" : [
+            null,
+            "Zesty seafood avocado"
+         ]
+      },
+      {
+         "id" : "Zabaglione",
+         "key" : "Zabaglione",
+         "value" : [
+            null,
+            "Zabaglione"
+         ]
+      },
+      {
+         "id" : "Yogurtraita",
+         "key" : "Yogurt raita",
+         "value" : [
+            null,
+            "Yogurt raita"
+         ]
+      }
+   ],
+   "total_rows" : 2667
+}
+</programlisting>
+
+      <para>
+        The sorting direction is applied before the filtering applied
+        using the <literal>startkey</literal> and
+        <literal>endkey</literal> query arguments. For example the
+        following query:
+      </para>
+
+<programlisting>
+GET http://couchdb:5984/recipes/_design/recipes/_view/by_ingredient?startkey=%22carrots%22&amp;endkey=%22egg%22
+Accept: application/json
+Content-Type: application/json
+</programlisting>
+
+      <para>
+        Will operate correctly when listing all the matching entries
+        between <quote>carrots</quote> and <literal>egg</literal>. If
+        the order of output is reversed with the
+        <literal>descending</literal> query argument, the view request
+        will return no entries:
+      </para>
+
+<programlisting>
+GET http://couchdb:5984/recipes/_design/recipes/_view/by_ingredient?descending=true&amp;startkey=%22carrots%22&amp;endkey=%22egg%22
+Accept: application/json
+Content-Type: application/json
+</programlisting>
+
+      <para>
+        The returned result is empty:
+      </para>
+
+<programlisting>
+{
+   "total_rows" : 26453,
+   "rows" : [],
+   "offset" : 21882
+}
+</programlisting>
+
+      <para>
+        The results will be empty because the entries in the view are
+        reversed before the key filter is applied, and therefore the
+        <literal>endkey</literal> of <quote>egg</quote> will be seen
+        before the <literal>startkey</literal> of
+        <quote>carrots</quote>, resulting in an empty list.
+      </para>
+
+      <para>
+        Instead, you should reverse the values supplied to the
+        <literal>startkey</literal> and <literal>endkey</literal>
+        parameters to match the descending sorting applied to the keys.
+        Changing the previous example to:
+      </para>
+
+<programlisting>
+GET http://couchdb:5984/recipes/_design/recipes/_view/by_ingredient?descending=true&amp;startkey=%22egg%22&amp;endkey=%22carrots%22
+Accept: application/json
+Content-Type: application/json
+</programlisting>
+
+    </section>
+
+    <section id="couchdb-api-design_db-design-designdoc-view-viewname_get-ranges">
+
+      <title>Specifying Start and End Values</title>
+
+      <para>
+        The <literal>startkey</literal> and <literal>endkey</literal>
+        query arguments can be used to specify the range of values to be
+        displayed when querying the view.
+      </para>
+
+      <note>
+        <para>
+          The values
+        </para>
+      </note>
+
+    </section>
+
+    <section id="couchdb-api-design_db-design-designdoc-view-viewname_get-limit">
+
+      <title>Using Limits and Skipping Rows</title>
+
+      <para>
+        TBC
+      </para>
+
+    </section>
+
+    <section
+      id="couchdb-api-design_db-design-designdoc-view-viewname_get-reduction">
+
+      <title>View Reduction and Grouping</title>
+
+      <para>
+        TBC
+      </para>
+
+    </section>
+
+  </section>
+
+  <section id="couchdb-api-design_db-design-designdoc-view-viewname_post">
+
+    <title><literal>POST /db/_design/design-doc/_view/view-name</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API POST /db/_design/design-doc/_view/view-name</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>POST /db/_design/design-doc/_view/view-name</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ List of keys to be returned from specified view
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ JSON of the documents returned by the view
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row><row><entry><emphasis role="bold">Query Arguments</emphasis></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>descending</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Return the documents in descending by key order
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>boolean</entry></row><row><entry></entry><entry><emphasis role="bold">Default</emphasis></entry><entry>false</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>endkey</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Stop returning records when the specified key is reached
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>endkey_docid</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Stop returning records when the specified document ID is
+ reached
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>group</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Group the results using the reduce function to a group or
+ single row
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>boolean</entry></row><row><entry></entry><entry><emphasis role="bold">Default</emphasis></entry><entry>false</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>group_level</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Specify the group level to be used
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>numeric</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>include_docs</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Include the full content of the documents in the return
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>boolean</entry></row><row><entry></entry><entry><emphasis role="bold">Default</emphasis></entry><entry>false</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>inclusive_end</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Specifies whether the specified end key should be included
+ in the result
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>boolean</entry></row><row><entry></entry><entry><emphasis role="bold">Default</emphasis></entry><entry>true</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>key</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Return only documents that match the specified key
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>limit</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Limit the number of the returned documents to the specified
+ number
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>numeric</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>reduce</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Use the reduction function
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>boolean</entry></row><row><entry></entry><entry><emphasis role="bold">Default</emphasis></entry><entry>true</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>skip</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Skip this number of records before starting to return the
+ results
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>numeric</entry></row><row><entry></entry><entry><emphasis role="bold">Default</emphasis></entry><entry>0</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>stale</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Allow the results from a stale view to be used
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry></entry><entry><emphasis role="bold">Default</emphasis></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Supported Values</emphasis></entry></row><row><entry></entry><entry><literal>ok</literal></entry><entry>Allow stale views</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>startkey</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Return records starting with the specified key
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>startkey_docid</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Return records starting with the specified document ID
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>update_seq</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Include the update sequence in the generated results
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>boolean</entry></row><row><entry></entry><entry><emphasis role="bold">Default</emphasis></entry><entry>false</entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Executes the specified <literal>view-name</literal> from the
+      specified <literal>design-doc</literal> design document. Unlike
+      the <literal>GET</literal> method for accessing views, the
+      <literal>POST</literal> method supports the specification of
+      explicit keys to be retrieved from the view results. The remainder
+      of the <literal>POST</literal> view functionality is identical to
+      the
+      <xref
+              linkend="couchdb-api-design_db-design-designdoc-view-viewname_get"/>
+      fun
+    </para>
+
+    <para>
+      For example, the request below will return all the recipes where
+      the key for the view matches either <quote>claret</quote> or
+      <quote>clear apple cider</quote> :
+    </para>
+
+<programlisting>
+POST http://couchdb:5984/recipes/_design/recipes/_view/by_ingredient
+Content-Type: application/json
+
+{
+   "keys" : [
+      "claret",
+      "clear apple juice"
+   ]
+}
+      </programlisting>
+
+    <para>
+      The returned view data contains the standard view information, but
+      only where the keys match.
+    </para>
+
+<programlisting>
+{
+   "total_rows" : 26484,
+   "rows" : [
+      {
+         "value" : [
+            "Scotch collops"
+         ],
+         "id" : "Scotchcollops",
+         "key" : "claret"
+      },
+      {
+         "value" : [
+            "Stand pie"
+         ],
+         "id" : "Standpie",
+         "key" : "clear apple juice"
+      }
+   ],
+   "offset" : 6324
+}
+</programlisting>
+
+    <section
+          id="couchdb-api-design_db-design-designdoc-view-viewname_post-multidoc">
+
+      <title>Multi-document Fetching</title>
+
+      <para>
+        By combining the <literal>POST</literal> method to a given view
+        with the <literal>include_docs=true</literal> query argument you
+        can obtain multiple documents from a database. The result is
+        more efficient than using multiple
+        <xref
+              linkend="couchdb-api-dbdoc_db-doc_get"/>
+        requests.
+      </para>
+
+      <para>
+        For example, sending the following request for ingredients
+        matching <quote>claret</quote> and <quote>clear apple
+        juice</quote>:
+      </para>
+
+<programlisting>
+POST http://couchdb:5984/recipes/_design/recipes/_view/by_ingredient?include_docs=true
+Content-Type: application/json
+
+{
+   "keys" : [
+      "claret",
+      "clear apple juice"
+   ]
+}
+</programlisting>
+
+      <para>
+        Returns the full document for each recipe:
+      </para>
+
+<programlisting>
+{
+   "offset" : 6324,
+   "rows" : [
+      {
+         "doc" : {
+            "_id" : "Scotchcollops",
+            "_rev" : "1-bcbdf724f8544c89697a1cbc4b9f0178",
+            "cooktime" : "8",
+            "ingredients" : [
+               {
+                  "ingredient" : "onion",
+                  "ingredtext" : "onion, peeled and chopped",
+                  "meastext" : "1"
+               },
+            ...
+            ],
+            "keywords" : [
+               "cook method.hob, oven, grill@hob",
+               "diet@wheat-free",
+               "diet@peanut-free",
+               "special collections@classic recipe",
+               "cuisine@british traditional",
+               "diet@corn-free",
+               "diet@citrus-free",
+               "special collections@very easy",
+               "diet@shellfish-free",
+               "main ingredient@meat",
+               "occasion@christmas",
+               "meal type@main",
+               "diet@egg-free",
+               "diet@gluten-free"
+            ],
+            "preptime" : "10",
+            "servings" : "4",
+            "subtitle" : "This recipe comes from an old recipe book of 1683 called 'The Gentlewoman's Kitchen'. This is an excellent way of making a rich and full-flavoured meat dish in a very short time.",
+            "title" : "Scotch collops",
+            "totaltime" : "18"
+         },
+         "id" : "Scotchcollops",
+         "key" : "claret",
+         "value" : [
+            "Scotch collops"
+         ]
+      },
+      {
+         "doc" : {
+            "_id" : "Standpie",
+            "_rev" : "1-bff6edf3ca2474a243023f2dad432a5a",
+            "cooktime" : "92",
+            "ingredients" : [
+...            ],
+            "keywords" : [
+               "diet@dairy-free",
+               "diet@peanut-free",
+               "special collections@classic recipe",
+               "cuisine@british traditional",
+               "diet@corn-free",
+               "diet@citrus-free",
+               "occasion@buffet party",
+               "diet@shellfish-free",
+               "occasion@picnic",
+               "special collections@lunchbox",
+               "main ingredient@meat",
+               "convenience@serve with salad for complete meal",
+               "meal type@main",
+               "cook method.hob, oven, grill@hob / oven",
+               "diet@cow dairy-free"
+            ],
+            "preptime" : "30",
+            "servings" : "6",
+            "subtitle" : "Serve this pie with pickled vegetables and potato salad.",
+            "title" : "Stand pie",
+            "totaltime" : "437"
+         },
+         "id" : "Standpie",
+         "key" : "clear apple juice",
+         "value" : [
+            "Stand pie"
+         ]
+      }
+   ],
+   "total_rows" : 26484
+}
+</programlisting>
+
+    </section>
+
+  </section>
+
+  <section id="couchdb-api-design_db-design-designdoc-show-showname_get">
+
+    <title><literal>POST /db/_design/design-doc/_show/show-name</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API GET /db/_design/design-doc/_show/show-name</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>GET /db/_design/design-doc/_show/show-name</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ None
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ Returns the result of the show
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row><row><entry><emphasis role="bold">Query Arguments</emphasis></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>details</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Indicates whether details should be included
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>format</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Format of the returned information
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row></tbody></tgroup></informaltable>
+
+    <para></para>
+
+  </section>
+
+  <section id="couchdb-api-design_db-design-designdoc-show-showname-doc_get">
+
+    <title><literal>POST /db/_design/design-doc/_show/show-name/doc</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API GET /db/_design/design-doc/_show/show-name/doc</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>GET /db/_design/design-doc/_show/show-name/doc</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ None
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ Returns the show for the given document
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row></tbody></tgroup></informaltable>
+
+    <para></para>
+
+  </section>
+
+  <section id="couchdb-api-design_db-design-designdoc-list-listname-otherdesigndoc-viewname_get">
+
+    <title><literal>GET
+      /db/_design/design-doc/_list/list-name/other-design-doc/view-name</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API GET /db/_design/design-doc/_list/list-name/other-design-doc/view-name</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>GET /db/_design/design-doc/_list/list-name/other-design-doc/view-name</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ TBC
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ TBC
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row></tbody></tgroup></informaltable>
+
+  </section>
+
+  <section id="couchdb-api-design_db-design-designdoc-list-listname-otherdesigndoc-viewname_post">
+
+    <title><literal>POST
+      /db/_design/design-doc/_list/list-name/other-design-doc/view-name</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API POST /db/_design/design-doc/_list/list-name/other-design-doc/view-name</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>POST /db/_design/design-doc/_list/list-name/other-design-doc/view-name</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ TBC
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ TBC
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row></tbody></tgroup></informaltable>
+
+  </section>
+
+  <section id="couchdb-api-design_db-design-designdoc-list-listname-viewname_get">
+
+    <title><literal>GET /db/_design/design-doc/_list/list-name/view-name</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API GET /db/_design/design-doc/_list/list-name/view-name</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>GET /db/_design/design-doc/_list/list-name/view-name</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ TBC
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ TBC
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row></tbody></tgroup></informaltable>
+
+  </section>
+
+  <section id="couchdb-api-design_db-design-designdoc-list-listname-viewname_post">
+
+    <title><literal>POST /db/_design/design-doc/_list/list-name/view-name</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API POST /db/_design/design-doc/_list/list-name/view-name</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>POST /db/_design/design-doc/_list/list-name/view-name</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ TBC
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ TBC
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row></tbody></tgroup></informaltable>
+
+  </section>
+
+  <section id="couchdb-api-design_db-design-designdoc-update-updatename-doc_put">
+
+    <title><literal>PUT /db/_design/design-doc/_update/updatename/doc</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API PUT /db/_design/design-doc/_update/update-name/doc</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>PUT /db/_design/design-doc/_update/update-name/doc</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ Document update information
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ Updated document
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row></tbody></tgroup></informaltable>
+
+  </section>
+
+  <section
+        id="couchdb-api-design_db-design-designdoc-update-updatename_post">
+
+    <title><literal>POST /db/_design/design-doc/_update/updatename</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API POST /db/_design/design-doc/_update/update-name</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>POST /db/_design/design-doc/_update/update-name</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ Document update information
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ Updated document
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row></tbody></tgroup></informaltable>
+
+  </section>
+
+  <section
+        id="couchdb-api-design_db-design-designdoc-rewrite-rewritename-anything">
+
+    <title><literal>ALL
+      /db/_design/design-doc/_rewrite/rewrite-name/anything</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API ALL /db/_design/design-doc/_rewrite/rewrite-name/anything</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>ALL /db/_design/design-doc/_rewrite/rewrite-name/anything</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ TBC
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ TBC
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row></tbody></tgroup></informaltable>
+
+  </section>
+
+</chapter>

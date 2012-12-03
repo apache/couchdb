@@ -1,0 +1,1357 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE chapter PUBLIC '-//OASIS//DTD DocBook XML V4.5//EN'
+                         'http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd' [
+<!ENTITY % every.entities SYSTEM "entities.ent">
+%every.entities;
+]>
+<chapter id="couchdb-api-misc">
+
+  <title>CouchDB API Server Miscellaneous Methods</title>
+
+  <para>
+    The CouchDB Miscellaneous interface provides the basic interface to
+    a CouchDB server for obtaining CouchDB information and getting and
+    setting configuration information.
+  </para>
+
+  <para>
+    A list of the available methods and URL paths are provided below:
+  </para>
+
+  <para role="meta" id="table-couchdb-api-misc-summary">
+    <remark role="title">Miscellaneous API Calls</remark>
+
+    <remark role="type" condition="urlapi"/>
+
+    <remark role="src" condition="couchdb"/>
+
+    <remark role="output" condition="summarytable"/>
+
+    <remark role="filter_class" condition="misc"/>
+
+    <remark role="version" condition="inherit"/>
+
+    <remark role="idprefix" condition="couchdb-api-misc"/>
+  </para>
+
+  <section id="couchdb-api-misc_root_get">
+
+    <title><literal>GET /</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="root"/>
+
+      <remark role="method" condition="GET"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      Accessing the root of a CouchDB instance returns meta information
+      about the instance. The response is a JSON structure containing
+      information about the server, including a welcome message and the
+      version of the server.
+    </para>
+
+<programlisting>
+{
+   "couchdb" : "Welcome",
+   "version" : "1.0.1"
+}
+</programlisting>
+
+  </section>
+
+  <section id="couchdb-api-misc_active-tasks_get">
+
+    <title><literal>GET /_active_tasks</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="active-tasks"/>
+
+      <remark role="method" condition="GET"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      You can obtain a list of active tasks by using the
+      <literal>/_active_tasks</literal> URL. The result is a JSON array
+      of the currently running tasks, with each task being described
+      with a single object. For example:
+    </para>
+
+<programlisting>
+
+<![CDATA[
+[
+   {
+    "pid" : "<0.11599.0>",
+    "status" : "Copied 0 of 18369 changes (0%)",
+    "task" : "recipes",
+    "type" : "Database Compaction"
+    }
+]
+]]>
+
+    </programlisting>
+
+    <para>
+      The returned structure includes the following fields for each
+      task:
+    </para>
+
+    <para role="meta" id="table-couchdb-api-misc-active-tasks-json">
+      <remark role="type" condition="json"/>
+
+      <remark role="src" condition="json"/>
+
+      <remark role="output" condition="itemtable"/>
+
+      <remark role="itemid" condition="activetasks"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      For operation type, valid values include:
+    </para>
+
+    <itemizedlist>
+
+      <listitem>
+        <para>
+          <literal>Database Compaction</literal>
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          <literal>Replication</literal>
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          <literal>View Group Compaction</literal>
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          <literal>View Group Indexer</literal>
+        </para>
+      </listitem>
+
+    </itemizedlist>
+
+  </section>
+
+  <section id="couchdb-api-misc_all-dbs_get">
+
+    <title><literal>GET /_all_dbs</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="all-dbs"/>
+
+      <remark role="method" condition="GET"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      Returns a list of all the databases in the CouchDB instance. For
+      example:
+    </para>
+
+<programlisting>
+GET http://couchdb:5984/_all_dbs
+Accept: application/json
+</programlisting>
+
+    <para>
+      The return is a JSON array:
+    </para>
+
+<programlisting>
+[
+   "_users",
+   "contacts",
+   "docs",
+   "invoices",
+   "locations"
+]
+
+</programlisting>
+
+  </section>
+
+  <section id="couchdb-api-misc_log_get">
+
+    <title><literal>GET /_log</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="log"/>
+
+      <remark role="method" condition="GET"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      Gets the CouchDB log, equivalent to accessing the local log file
+      of the corresponding CouchDB instance.
+    </para>
+
+    <para>
+      When you request the log, the response is returned as plain
+      (UTF-8) text, with an HTTP <literal>Content-type</literal> header
+      as <literal>text/plain</literal>.
+    </para>
+
+    <para>
+      For example, the request:
+    </para>
+
+<programlisting>
+GET http://couchdb:5984/_log
+Accept: */*
+</programlisting>
+
+    <para>
+      The raw text is returned:
+    </para>
+
+<programlisting>
+<![CDATA[
+[Wed, 27 Oct 2010 10:49:42 GMT] [info] [<0.23338.2>] 192.168.0.2 - - 'PUT' /authdb 401
+
+[Wed, 27 Oct 2010 11:02:19 GMT] [info] [<0.23428.2>] 192.168.0.116 - - 'GET' /recipes/FishStew 200
+
+[Wed, 27 Oct 2010 11:02:19 GMT] [info] [<0.23428.2>] 192.168.0.116 - - 'GET' /_session 200
+
+[Wed, 27 Oct 2010 11:02:19 GMT] [info] [<0.24199.2>] 192.168.0.116 - - 'GET' / 200
+
+[Wed, 27 Oct 2010 13:03:38 GMT] [info] [<0.24207.2>] 192.168.0.116 - - 'GET' /_log?offset=5 200
+]]>
+</programlisting>
+
+    <para>
+      If you want to pick out specific parts of the log information you
+      can use the <literal>bytes</literal> argument, which specifies the
+      number of bytes to be returned, and <literal>offset</literal>,
+      which specifies where the reading of the log should start, counted
+      back from the end. For example, if you use the following request:
+    </para>
+
+<programlisting>
+GET /_log?bytes=500&amp;offset=2000
+</programlisting>
+
+    <para>
+      Reading of the log will start at 2000 bytes from the end of the
+      log, and 500 bytes will be shown.
+    </para>
+
+  </section>
+
+  <section id="couchdb-api-misc_replicate_post">
+
+    <title><literal>POST /_replicate</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="replicate"/>
+
+      <remark role="method" condition="POST"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      Request, configure, or stop, a replication operation.
+    </para>
+
+    <para>
+      The specification of the replication request is controlled through
+      the JSON content of the request. The JSON should be an object with
+      the fields defining the source, target and other options. The
+      fields of the JSON request are shown in the table below:
+    </para>
+
+    <para role="meta" id="table-couchdb-api-misc-json-replication">
+      <remark role="type" condition="json"/>
+
+      <remark role="src" condition="json"/>
+
+      <remark role="output" condition="itemtable"/>
+
+      <remark role="itemid" condition="replication"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <section id="couchdb-api-misc_replicate_post-operation">
+
+      <title>Replication Operation</title>
+
+      <para>
+        The aim of the replication is that at the end of the process,
+        all active documents on the source database are also in the
+        destination database and all documents that were deleted in the
+        source databases are also deleted (if they exist) on the
+        destination database.
+      </para>
+
+      <para>
+        Replication can be described as either push or pull replication:
+      </para>
+
+      <itemizedlist>
+
+        <listitem>
+          <para>
+            <emphasis>Pull replication</emphasis> is where the
+            <literal>source</literal> is the remote CouchDB instance,
+            and the <literal>destination</literal> is the local
+            database.
+          </para>
+
+          <para>
+            Pull replication is the most useful solution to use if your
+            source database has a permanent IP address, and your
+            destination (local) database may have a dynamically assigned
+            IP address (for example, through DHCP). This is particularly
+            important if you are replicating to a mobile or other device
+            from a central server.
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            <emphasis>Push replication</emphasis> is where the
+            <literal>source</literal> is a local database, and
+            <literal>destination</literal> is a remote database.
+          </para>
+        </listitem>
+
+      </itemizedlist>
+
+    </section>
+
+    <section id="couchdb-api-misc_replicate_post-sourcetarget">
+
+      <title>Specifying the Source and Target Database</title>
+
+      <para>
+        You must use the URL specification of the CouchDB database if
+        you want to perform replication in either of the following two
+        situations:
+      </para>
+
+      <itemizedlist>
+
+        <listitem>
+          <para>
+            Replication with a remote database (i.e. another instance of
+            CouchDB on the same host, or a different host)
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            Replication with a database that requires authentication
+          </para>
+        </listitem>
+
+      </itemizedlist>
+
+      <para>
+        For example, to request replication between a database local to
+        the CouchDB instance to which you send the request, and a remote
+        database you might use the following request:
+      </para>
+
+<programlisting>
+POST http://couchdb:5984/_replicate
+Content-Type: application/json
+Accept: application/json
+
+{
+   "source" : "recipes",
+   "target" : "http://coucdb-remote:5984/recipes",
+}
+      </programlisting>
+
+      <para>
+        In all cases, the requested databases in the
+        <literal>source</literal> and <literal>target</literal>
+        specification must exist. If they do not, an error will be
+        returned within the JSON object:
+      </para>
+
+<programlisting>
+{
+   "error" : "db_not_found"
+   "reason" : "could not open http://couchdb-remote:5984/ol1ka/",
+}
+      </programlisting>
+
+      <para>
+        You can create the target database (providing your user
+        credentials allow it) by adding the
+        <literal>create_target</literal> field to the request object:
+      </para>
+
+<programlisting>
+POST http://couchdb:5984/_replicate
+Content-Type: application/json
+Accept: application/json
+
+{
+   "create_target" : true
+   "source" : "recipes",
+   "target" : "http://couchdb-remote:5984/recipes",
+}
+</programlisting>
+
+      <para>
+        The <literal>create_target</literal> field is not destructive.
+        If the database already exists, the replication proceeds as
+        normal.
+      </para>
+
+    </section>
+
+    <section id="couchdb-api-misc_replicate_post-single">
+
+      <title>Single Replication</title>
+
+      <para>
+        You can request replication of a database so that the two
+        databases can be synchronized. By default, the replication
+        process occurs one time and synchronizes the two databases
+        together. For example, you can request a single synchronization
+        between two databases by supplying the <literal>source</literal>
+        and <literal>target</literal> fields within the request JSON
+        content.
+      </para>
+
+<programlisting>
+POST http://couchdb:5984/_replicate
+Content-Type: application/json
+Accept: application/json
+
+{
+   "source" : "recipes",
+   "target" : "recipes-snapshot",
+}
+</programlisting>
+
+      <para>
+        In the above example, the databases <literal>recipes</literal>
+        and <literal>recipes-snapshot</literal> will be synchronized.
+        These databases are local to the CouchDB instance where the
+        request was made. The response will be a JSON structure
+        containing the success (or failure) of the synchronization
+        process, and statistics about the process:
+      </para>
+
+<programlisting>
+{
+   "ok" : true,
+   "history" : [
+      {
+         "docs_read" : 1000,
+         "session_id" : "52c2370f5027043d286daca4de247db0",
+         "recorded_seq" : 1000,
+         "end_last_seq" : 1000,
+         "doc_write_failures" : 0,
+         "start_time" : "Thu, 28 Oct 2010 10:24:13 GMT",
+         "start_last_seq" : 0,
+         "end_time" : "Thu, 28 Oct 2010 10:24:14 GMT",
+         "missing_checked" : 0,
+         "docs_written" : 1000,
+         "missing_found" : 1000
+      }
+   ],
+   "session_id" : "52c2370f5027043d286daca4de247db0",
+   "source_last_seq" : 1000
+}
+</programlisting>
+
+      <para>
+        The structure defines the replication status, as described in
+        the table below:
+      </para>
+
+      <para role="meta" id="table-couchdb-api-misc-json-replication-status">
+        <remark role="type" condition="json"/>
+
+        <remark role="src" condition="json"/>
+
+        <remark role="output" condition="itemtable"/>
+
+        <remark role="itemid" condition="replication-status"/>
+
+        <remark role="version" condition="inherit"/>
+      </para>
+
+    </section>
+
+    <section id="couchdb-api-misc_replicate_post-continuous">
+
+      <title>Continuous Replication</title>
+
+      <para>
+        Synchronization of a database with the previously noted methods
+        happens only once, at the time the replicate request is made. To
+        have the target database permanently replicated from the source,
+        you must set the <literal>continuous</literal> field of the JSON
+        object within the request to true.
+      </para>
+
+      <para>
+        With continuous replication changes in the source database are
+        replicated to the target database in perpetuity until you
+        specifically request that replication ceases.
+      </para>
+
+<programlisting>
+POST http://couchdb:5984/_replicate
+Content-Type: application/json
+Accept: application/json
+
+{
+   "continuous" : true
+   "source" : "recipes",
+   "target" : "http://couchdb-remote:5984/recipes",
+}
+</programlisting>
+
+      <para>
+        Changes will be replicated between the two databases as long as
+        a network connection is available between the two instances.
+      </para>
+
+      <note>
+        <para>
+          Two keep two databases synchronized with each other, you need
+          to set replication in both directions; that is, you must
+          replicate from <literal>databasea</literal> to
+          <literal>databaseb</literal>, and separately from
+          <literal>databaseb</literal> to <literal>databasea</literal>.
+        </para>
+      </note>
+
+    </section>
+
+    <section id="couchdb-api-misc_replicate_post-cancel">
+
+      <title>Canceling Continuous Replication</title>
+
+      <para>
+        You can cancel continuous replication by adding the
+        <literal>cancel</literal> field to the JSON request object and
+        setting the value to true. Note that the structure of the
+        request must be identical to the original for the cancelation
+        request to be honoured. For example, if you requested continuous
+        replication, the cancellation request must also contain the
+        <literal>continuous</literal> field.
+      </para>
+
+      <para>
+        For example, the replication request:
+      </para>
+
+<programlisting>
+POST http://couchdb:5984/_replicate
+Content-Type: application/json
+Accept: application/json
+
+{
+   "source" : "recipes",
+   "target" : "http://couchdb-remote:5984/recipes",
+   "create_target" : true,
+   "continuous" : true
+}
+</programlisting>
+
+      <para>
+        Must be canceled using the request:
+      </para>
+
+<programlisting>
+POST http://couchdb:5984/_replicate
+Content-Type: application/json
+Accept: application/json
+
+{
+    "cancel" : true,
+    "continuous" : true
+    "create_target" : true,
+    "source" : "recipes",
+    "target" : "http://couchdb-remote:5984/recipes",
+}
+</programlisting>
+
+      <para>
+        Requesting cancellation of a replication that does not exist
+        results in a 404 error.
+      </para>
+
+    </section>
+
+  </section>
+
+  <section id="couchdb-api-misc_restart_post">
+
+    <title><literal>POST /_restart</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="restart"/>
+
+      <remark role="method" condition="POST"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      Restarts the CouchDB instance. You must be authenticated as a user
+      with administration privileges for this to work.
+    </para>
+
+    <para>
+      For example:
+    </para>
+
+<programlisting>
+POST http://admin:password@couchdb:5984/_restart
+</programlisting>
+
+    <para>
+      The return value (if the server has not already restarted) is a
+      JSON status object indicating that the request has been received:
+    </para>
+
+<programlisting>
+{
+   "ok" : true,
+}
+</programlisting>
+
+    <para>
+      If the server has already restarted, the header may be returned,
+      but no actual data is contained in the response.
+    </para>
+
+  </section>
+
+  <section id="couchdb-api-misc_stats_get">
+
+    <title><literal>GET /_stats</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="stats"/>
+
+      <remark role="method" condition="GET"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      The <literal>_stats</literal> method returns a JSON object
+      containting the statistics for the running server. The object is
+      structured with top-level sections collating the statistics for a
+      range of entries, with each individual statistic being easily
+      identified, and the content of each statistic is self-describing.
+      For example, the request time statistics, within the
+      <literal>couchdb</literal> section are structured as follows:
+    </para>
+
+<programlisting>
+{
+   "couchdb" : {
+...
+      "request_time" : {
+         "stddev" : "27.509",
+         "min" : "0.333333333333333",
+         "max" : "152",
+         "current" : "400.976",
+         "mean" : "10.837",
+         "sum" : "400.976",
+         "description" : "length of a request inside CouchDB without MochiWeb"
+      },
+...
+    }
+}
+      </programlisting>
+
+    <para>
+      The fields provide the current, minimum and maximum, and a
+      collection of statistical means and quantities. The quantity in
+      each case is not defined, but the descriptions below provide
+    </para>
+
+    <para>
+      The statistics are divided into the following top-level sections:
+    </para>
+
+    <itemizedlist>
+
+      <listitem>
+        <para>
+          <literal>couchdb</literal>
+        </para>
+
+        <para>
+          Describes statistics specific to the internals of CouchDB.
+        </para>
+
+        <table>
+          <title><literal>couchdb</literal> statistics</title>
+          <tgroup cols="3">
+            <colspec colname="stat"/>
+            <colspec colname="desc"/>
+            <colspec colname="unit"/>
+            <thead>
+              <row>
+                <entry>
+                  Statistic ID
+                </entry>
+                <entry>
+                  Description
+                </entry>
+                <entry>
+                  Unit
+                </entry>
+              </row>
+            </thead>
+            <tbody>
+              <row>
+                <entry><literal>auth_cache_hits</literal>
+                </entry>
+                <entry>
+                  Number of authentication cache hits
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>auth_cache_misses</literal>
+                </entry>
+                <entry>
+                  Number of authentication cache misses
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>database_reads</literal>
+                </entry>
+                <entry>
+                  Number of times a document was read from a database
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>database_writes</literal>
+                </entry>
+                <entry>
+                  Number of times a database was changed
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>open_databases</literal>
+                </entry>
+                <entry>
+                  Number of open databases
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>open_os_files</literal>
+                </entry>
+                <entry>
+                  Number of file descriptors CouchDB has open
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>request_time</literal>
+                </entry>
+                <entry>
+                  Length of a request inside CouchDB without MochiWeb
+                </entry>
+                <entry>
+                  milliseconds
+                </entry>
+              </row>
+            </tbody>
+          </tgroup>
+        </table>
+      </listitem>
+
+      <listitem>
+        <para>
+          <literal>httpd_request_methods</literal>
+        </para>
+
+        <table>
+          <title><literal>httpd_request_methods</literal> statistics</title>
+          <tgroup cols="3">
+            <colspec colname="stat"/>
+            <colspec colname="desc"/>
+            <colspec colname="unit"/>
+            <thead>
+              <row>
+                <entry>
+                  Statistic ID
+                </entry>
+                <entry>
+                  Description
+                </entry>
+                <entry>
+                  Unit
+                </entry>
+              </row>
+            </thead>
+            <tbody>
+              <row>
+                <entry><literal>COPY</literal>
+                </entry>
+                <entry>
+                  Number of HTTP COPY requests
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>DELETE</literal>
+                </entry>
+                <entry>
+                  Number of HTTP DELETE requests
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>GET</literal>
+                </entry>
+                <entry>
+                  Number of HTTP GET requests
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>HEAD</literal>
+                </entry>
+                <entry>
+                  Number of HTTP HEAD requests
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>POST</literal>
+                </entry>
+                <entry>
+                  Number of HTTP POST requests
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>PUT</literal>
+                </entry>
+                <entry>
+                  Number of HTTP PUT requests
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+            </tbody>
+          </tgroup>
+        </table>
+      </listitem>
+
+      <listitem>
+        <para>
+          <literal>httpd_status_codes</literal>
+        </para>
+
+        <table>
+          <title><literal>httpd_status_codes</literal> statistics</title>
+          <tgroup cols="3">
+            <colspec colname="stat"/>
+            <colspec colname="desc"/>
+            <colspec colname="unit"/>
+            <thead>
+              <row>
+                <entry>
+                  Statistic ID
+                </entry>
+                <entry>
+                  Description
+                </entry>
+                <entry>
+                  Unit
+                </entry>
+              </row>
+            </thead>
+            <tbody>
+              <row>
+                <entry><literal>200</literal>
+                </entry>
+                <entry>
+                  Number of HTTP 200 OK responses
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>201</literal>
+                </entry>
+                <entry>
+                  Number of HTTP 201 Created responses
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>202</literal>
+                </entry>
+                <entry>
+                  Number of HTTP 202 Accepted responses
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>301</literal>
+                </entry>
+                <entry>
+                  Number of HTTP 301 Moved Permanently responses
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>304</literal>
+                </entry>
+                <entry>
+                  Number of HTTP 304 Not Modified responses
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>400</literal>
+                </entry>
+                <entry>
+                  Number of HTTP 400 Bad Request responses
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>401</literal>
+                </entry>
+                <entry>
+                  Number of HTTP 401 Unauthorized responses
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>403</literal>
+                </entry>
+                <entry>
+                  Number of HTTP 403 Forbidden responses
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>404</literal>
+                </entry>
+                <entry>
+                  Number of HTTP 404 Not Found responses
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>405</literal>
+                </entry>
+                <entry>
+                  Number of HTTP 405 Method Not Allowed responses
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>409</literal>
+                </entry>
+                <entry>
+                  Number of HTTP 409 Conflict responses
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>412</literal>
+                </entry>
+                <entry>
+                  Number of HTTP 412 Precondition Failed responses
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>500</literal>
+                </entry>
+                <entry>
+                  Number of HTTP 500 Internal Server Error responses
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+            </tbody>
+          </tgroup>
+        </table>
+      </listitem>
+
+      <listitem>
+        <para>
+          <literal>httpd</literal>
+        </para>
+
+        <table>
+          <title><literal>httpd</literal> statistics</title>
+          <tgroup cols="3">
+            <colspec colname="stat"/>
+            <colspec colname="desc"/>
+            <colspec colname="unit"/>
+            <thead>
+              <row>
+                <entry>
+                  Statistic ID
+                </entry>
+                <entry>
+                  Description
+                </entry>
+                <entry>
+                  Unit
+                </entry>
+              </row>
+            </thead>
+            <tbody>
+              <row>
+                <entry><literal>bulk_requests</literal>
+                </entry>
+                <entry>
+                  Number of bulk requests
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>clients_requesting_changes</literal>
+                </entry>
+                <entry>
+                  Number of clients for continuous _changes
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>requests</literal>
+                </entry>
+                <entry>
+                  Number of HTTP requests
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>temporary_view_reads</literal>
+                </entry>
+                <entry>
+                  Number of temporary view reads
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+              <row>
+                <entry><literal>view_reads</literal>
+                </entry>
+                <entry>
+                  Number of view reads
+                </entry>
+                <entry>
+                  number
+                </entry>
+              </row>
+            </tbody>
+          </tgroup>
+        </table>
+      </listitem>
+
+    </itemizedlist>
+
+    <para>
+      You can also access individual statistics by quoting the
+      statistics sections and statistic ID as part of the URL path. For
+      example, to get the <literal>request_time</literal> statistics,
+      you can use:
+    </para>
+
+<programlisting>
+GET /_stats/couchdb/request_time
+    </programlisting>
+
+    <para>
+      This returns an entire statistics object, as with the full
+      request, but containining only the request individual statistic.
+      Hence, the returned structure is as follows:
+    </para>
+
+<programlisting>
+{
+   "couchdb" : {
+      "request_time" : {
+         "stddev" : 7454.305,
+         "min" : 1,
+         "max" : 34185,
+         "current" : 34697.803,
+         "mean" : 1652.276,
+         "sum" : 34697.803,
+         "description" : "length of a request inside CouchDB without MochiWeb"
+      }
+   }
+}
+    </programlisting>
+
+  </section>
+
+  <section id="couchdb-api-misc_utils_get">
+
+    <title><literal>GET /_utils</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="utils"/>
+
+      <remark role="method" condition="GET"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      Accesses the built-in Futon administration interface for CouchDB.
+    </para>
+
+  </section>
+
+  <section id="couchdb-api-misc_uuids_get">
+
+    <title><literal>GET /_uuids</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="uuids"/>
+
+      <remark role="method" condition="GET"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      Requests one or more Universally Unique Identifiers (UUIDs) from
+      the CouchDB instance. The response is a JSON object providing a
+      list of UUIDs. For example:
+    </para>
+
+<programlisting>
+{
+   "uuids" : [
+      "7e4b5a14b22ec1cf8e58b9cdd0000da3"
+   ]
+}
+</programlisting>
+
+    <para>
+      You can use the <literal>count</literal> argument to specify the
+      number of UUIDs to be returned. For example:
+    </para>
+
+<programlisting>
+    GET http://couchdb:5984/_uuids?count=5
+</programlisting>
+
+    <para>
+      Returns:
+    </para>
+
+<programlisting>
+{
+   "uuids" : [
+      "c9df0cdf4442f993fc5570225b405a80",
+      "c9df0cdf4442f993fc5570225b405bd2",
+      "c9df0cdf4442f993fc5570225b405e42",
+      "c9df0cdf4442f993fc5570225b4061a0",
+      "c9df0cdf4442f993fc5570225b406a20"
+   ]
+}
+</programlisting>
+
+    <para>
+      The UUID type is determined by the UUID type setting in the
+      CouchDB configuration. See
+      <xref linkend="couchdb-api-config_config-section-key_put"/>.
+    </para>
+
+    <para>
+      For example, changing the UUID type to <literal>random</literal>:
+    </para>
+
+<programlisting>
+PUT http://couchdb:5984/_config/uuids/algorithm
+Content-Type: application/json
+Accept: */*
+
+"random"
+</programlisting>
+
+    <para>
+      When obtaining a list of UUIDs:
+    </para>
+
+<programlisting>
+{
+   "uuids" : [
+      "031aad7b469956cf2826fcb2a9260492",
+      "6ec875e15e6b385120938df18ee8e496",
+      "cff9e881516483911aa2f0e98949092d",
+      "b89d37509d39dd712546f9510d4a9271",
+      "2e0dbf7f6c4ad716f21938a016e4e59f"
+   ]
+}
+</programlisting>
+
+  </section>
+
+  <section id="couchdb-api-misc_favicon_get">
+
+    <title><literal>GET /favicon.ico</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="favicon"/>
+
+      <remark role="method" condition="GET"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      Returns the site icon. The return <literal>Content-type</literal>
+      header is <literal>image/x-icon</literal>, and the content stream
+      is the image data.
+    </para>
+
+  </section>
+
+</chapter>

@@ -1,0 +1,1828 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE chapter PUBLIC '-//OASIS//DTD DocBook XML V4.5//EN'
+                         'http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd' [
+<!ENTITY % every.entities SYSTEM "entities.ent">
+%every.entities;
+]>
+<chapter id="couchdb-api-db">
+
+  <title>CouchDB API Server Database Methods</title>
+
+  <para>
+    The Database methods provide an interface to an entire database
+    withing CouchDB. These are database, rather than document, level
+    requests.
+  </para>
+
+  <para>
+    A list of the available methods and URL paths are provided below:
+  </para>
+
+  <para role="meta" id="table-couchdb-api-db-summary">
+    <remark role="title">Database API Calls</remark>
+
+    <remark role="type" condition="urlapi"/>
+
+    <remark role="src" condition="couchdb"/>
+
+    <remark role="output" condition="summarytable"/>
+
+    <remark role="filter_class" condition="db"/>
+
+    <remark role="version" condition="inherit"/>
+
+    <remark role="idprefix" condition="couchdb-api-db"/>
+  </para>
+
+  <para>
+    For all the database methods, the database name within the URL path
+    should be the database name that you wish to perform the operation
+    on. For example, to obtain the meta information for the database
+    <literal>recipes</literal>, you would use the HTTP request:
+  </para>
+
+<programlisting>
+GET /recipes
+</programlisting>
+
+  <para>
+    For clarity, the form below is used in the URL paths:
+  </para>
+
+<programlisting>
+GET /db
+</programlisting>
+
+  <para>
+    Where <literal>db</literal> is the name of any database.
+  </para>
+
+  <section id="couchdb-api-db_db_get">
+
+    <title><literal>GET /db</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="db"/>
+
+      <remark role="method" condition="GET"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      Gets information about the specified database. For example, to
+      retrieve the information for the database
+      <literal>recipe</literal>:
+    </para>
+
+<programlisting role="httprequest">
+GET http://couchdb:5984/recipes
+Accept: application/json
+</programlisting>
+
+    <para>
+      The JSON response contains meta information about the database. A
+      sample of the JSON returned for an empty database is provided
+      below:
+    </para>
+
+<programlisting role="httpresponse">
+{
+   "compact_running" : false,
+   "committed_update_seq" : 375048,
+   "disk_format_version" : 5,
+   "disk_size" : 33153123,
+   "doc_count" : 18386,
+   "doc_del_count" : 0,
+   "db_name" : "recipes",
+   "instance_start_time" : "1290700340925570",
+   "purge_seq" : 10,
+   "update_seq" : 375048
+}
+    </programlisting>
+
+    <para>
+      The elements of the returned structure are shown in the table
+      below:
+    </para>
+
+    <para role="meta" id="table-couchdb-api-db-json-db-info">
+      <remark role="type" condition="json"/>
+
+      <remark role="src" condition="json"/>
+
+      <remark role="output" condition="itemtable"/>
+
+      <remark role="itemid" condition="db-info"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+  </section>
+
+  <section id="couchdb-api-db_db_put">
+
+    <title><literal>PUT /db</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="db"/>
+
+      <remark role="method" condition="PUT"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      Creates a new database. The database name must be composed of one
+      or more of the following characters:
+    </para>
+
+    <itemizedlist>
+
+      <listitem>
+        <para>
+          Lowercase characters (<literal>a-z</literal>)
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Name must begin with a lowercase letter
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Digits (<literal>0-9</literal>)
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Any of the characters <literal>_</literal>,
+          <literal>$</literal>, <literal>(</literal>,
+          <literal>)</literal>, <literal>+</literal>,
+          <literal>-</literal>, and <literal>/</literal>.
+        </para>
+      </listitem>
+
+    </itemizedlist>
+
+    <para>
+      Trying to create a database that does not meet these requirements
+      will return an error quoting these restrictions.
+    </para>
+
+    <para>
+      To create the database <literal>recipes</literal>:
+    </para>
+
+<programlisting>
+PUT http://couchdb:5984/recipes
+Content-Type: application/json
+</programlisting>
+
+    <para>
+      The returned content contains the JSON status:
+    </para>
+
+<programlisting>
+{
+   "ok" : true
+}
+</programlisting>
+
+    <para>
+      Anything should be treated as an error, and the problem should be
+      taken form the HTTP response code.
+    </para>
+
+  </section>
+
+  <section id="couchdb-api-db_db_delete">
+
+    <title><literal>DELETE /db</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="db"/>
+
+      <remark role="method" condition="DELETE"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      Deletes the specified database, and all the documents and
+      attachments contained within it.
+    </para>
+
+    <para>
+      To delete the database <literal>recipes</literal> you would send
+      the request:
+    </para>
+
+<programlisting>
+DELETE http://couchdb:5984/recipes
+Content-Type: application/json
+</programlisting>
+
+    <para>
+      If successful, the returned JSON will indicate success
+    </para>
+
+<programlisting>
+{
+   "ok" : true
+}
+</programlisting>
+
+  </section>
+
+  <section id="couchdb-api-db_db-changes_get">
+
+    <title><literal>GET /db/_changes</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="db-changes"/>
+
+      <remark role="method" condition="GET"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      Obtains a list of the changes made to the database. This can be
+      used to monitor for update and modifications to the database for
+      post processing or synchronization. There are three different
+      types of supported changes feeds, poll, longpoll, and continuous.
+      All requests are poll requests by default. You can select any feed
+      type explicitly using the <literal>feed</literal> query argument.
+    </para>
+
+    <para>
+      <itemizedlist>
+
+        <listitem>
+          <para>
+            <emphasis role="bold">Poll</emphasis>
+          </para>
+
+          <para>
+            With polling you can request the changes that have occured
+            since a specific sequence number. This returns the JSON
+            structure containing the changed document information. When
+            you perform a poll change request, only the changes since
+            the specific sequence number are returned. For example, the
+            query
+          </para>
+
+<programlisting>
+DELETE http://couchdb:5984/recipes/_changes
+Content-Type: application/json
+</programlisting>
+
+          <para>
+            Will get all of the changes in the database. You can request
+            a starting point using the <literal>since</literal> query
+            argument and specifying the sequence number. You will need
+            to record the latest sequence number in your client and then
+            use this when making another request as the new value to the
+            <literal>since</literal> parameter.
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            <emphasis role="bold">Longpoll</emphasis>
+          </para>
+
+          <para>
+            With long polling the request to the server will remain open
+            until a change is made on the database, when the changes
+            will be reported, and then the connection will close. The
+            long poll is useful when you want to monitor for changes for
+            a specific purpose without wanting to monitoring
+            continuously for changes.
+          </para>
+
+          <para>
+            Because the wait for a change can be significant you can set
+            a timeout before the connection is automatically closed (the
+            <literal>timeout</literal> argument). You can also set a
+            heartbeat interval (using the <literal>heartbeat</literal>
+            query argument), which sends a newline to keep the
+            connection open.
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            <emphasis role="bold">Continuous</emphasis>
+          </para>
+
+          <para>
+            Continuous sends all new changes back to the client
+            immediately, without closing the connection. In continuous
+            mode the format of the changes is slightly different to
+            accommodate the continuous nature while ensuring that the
+            JSON output is still valid for each change notification.
+          </para>
+
+          <para>
+            As with the longpoll feed type you can set both the timeout
+            and heartbeat intervals to ensure that the connection is
+            kept open for new changesand updates.
+          </para>
+        </listitem>
+
+      </itemizedlist>
+    </para>
+
+    <para>
+      The return structure for <literal>normal</literal> and
+      <literal>longpoll</literal> modes is a JSON array of changes
+      objects, and the last update sequence number. The structure is
+      described in the following table.
+    </para>
+
+    <para role="meta" id="table-couchdb-api-db_db-json-changes">
+      <remark role="type" condition="json"/>
+
+      <remark role="src" condition="json"/>
+
+      <remark role="output" condition="itemtable"/>
+
+      <remark role="itemid" condition="changes"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      The return format for <literal>continuous</literal> mode the
+      server sends a CRLF (carriage-return, linefeed) delimited line for
+      each change. Each line contains the
+      <link linkend="table-couchdb-api-db_db-json-changes">JSON
+      object</link>.
+    </para>
+
+    <para>
+      You can also request the full contents of each document change
+      (instead of just the change notification) by using the
+      <literal>include_docs</literal> parameter.
+    </para>
+
+    <section id="couchdb-api-db_db-changes_get-filters">
+
+      <title>Filtering</title>
+
+      <para>
+        You can filter the contents of the changes feed in a number of
+        ways. The most basic way is to specify one or more document IDs
+        to the query. This causes the returned structure value to only
+        contain changes for the specified IDs. Note that the value of
+        this query argument should be a JSON formatted array.
+      </para>
+
+      <para>
+        You can also filter the <literal>_changes</literal> feed by
+        defining a filter function within a design document. The
+        specification for the filter is the same as for replication
+        filters. You specify the name of the filter function to the
+        <literal>filter</literal> parameter, specifying the design
+        document name and filter name. For example:
+      </para>
+
+<programlisting>
+GET /db/_changes?filter=design_doc/filtername
+</programlisting>
+
+      <para>
+        The <literal>_changes</literal> feed can be used to watch
+        changes to specific document ID's or the list of
+        <literal>_design</literal> documents in a database. If the
+        <literal>filters</literal> parameter is set to
+        <literal>_doc_ids</literal> a list of doc IDs can be passed in
+        the <option>doc_ids</option> parameter as a JSON array.
+      </para>
+
+      <para>
+        For more information, see
+        <xref linkend="couchdb-single-changes-filters"/>.
+      </para>
+
+    </section>
+
+  </section>
+
+  <section id="couchdb-api-db_db-compact_post">
+
+    <title><literal>POST /db/_compact</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="db-compact"/>
+
+      <remark role="method" condition="POST"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      Request compaction of the specified database. Compaction
+      compresses the disk database file by performing the following
+      operations:
+    </para>
+
+    <itemizedlist>
+
+      <listitem>
+        <para>
+          Writes a new version of the database file, removing any unused
+          sections from the new version during write. Because a new file
+          is temporary created for this purpose, you will need twice the
+          current storage space of the specified database in order for
+          the compaction routine to complete.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Removes old revisions of documents from the database, up to
+          the per-database limit specified by the
+          <literal>_revs_limit</literal> database parameter. See
+          <xref linkend="couchdb-api-db_db_get"/> .
+        </para>
+      </listitem>
+
+    </itemizedlist>
+
+    <para>
+      Compaction can only be requested on an individual database; you
+      cannot compact all the databases for a CouchDB instance. The
+      compaction process runs as a background process.
+    </para>
+
+    <para>
+      You can determine if the compaction process is operating on a
+      database by obtaining the database meta information, the
+      <literal>compact_running</literal> value of the returned database
+      structure will be set to true. See
+      <xref linkend="couchdb-api-db_db_get"/> .
+    </para>
+
+    <para>
+      You can also obtain a list of running processes to determine
+      whether compaction is currently running. See
+      <xref linkend="couchdb-api-misc_active-tasks_get"/>.
+    </para>
+
+  </section>
+
+  <section id="couchdb-api-db_db-compact-design-doc_post">
+
+    <title><literal>POST /db/_compact/design-doc</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="db-compact-design-doc"/>
+
+      <remark role="method" condition="POST"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      Compacts the view indexes associated with the specified design
+      document. You can use this in place of the full database
+      compaction if you know a specific set of view indexes have been
+      affected by a recent database change.
+    </para>
+
+    <para>
+      For example, to compact the views associated with the
+      <literal>recipes</literal> design document:
+    </para>
+
+<programlisting>
+POST http://couchdb:5984/recipes/_compact/recipes
+Content-Type: application/json
+</programlisting>
+
+    <para>
+      CouchDB will immediately return with a status indicating that the
+      compaction request has been received (HTTP status code 202):
+    </para>
+
+<programlisting>
+{
+   "ok" : true
+}
+    </programlisting>
+
+  </section>
+
+  <section id="couchdb-api-db_db-view-cleanup_post">
+
+    <title><literal>POST /db/_view_cleanup</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="db-view-cleanup"/>
+
+      <remark role="method" condition="POST"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      Cleans up the cached view output on disk for a given view. For
+      example:
+    </para>
+
+<programlisting>
+POST http://couchdb:5984/recipes/_view_cleanup
+Content-Type: application/json
+</programlisting>
+
+    <para>
+      If the request is successful, a basic status message us returned:
+    </para>
+
+<programlisting>
+{
+   "ok" : true
+}
+    </programlisting>
+
+  </section>
+
+  <section id="couchdb-api-db_db-ensure-full-commit_post">
+
+    <title><literal>POST /db/_ensure_full_commit</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="db-ensure-full-commit"/>
+
+      <remark role="method" condition="POST"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      Commits any recent changes to the specified database to disk. You
+      should call this if you want to ensure that recent changes have
+      been written. For example, to commit all the changes to disk for
+      the database <literal>recipes</literal> you would use:
+    </para>
+
+<programlisting>
+POST http://couchdb:5984/recipes/_ensure_full_commit
+Content-Type: application/json
+</programlisting>
+
+    <para>
+      This returns a status message, containing the success message and
+      the timestamp for when the CouchDB instance was started:
+    </para>
+
+<programlisting>
+{
+  "ok" : true,
+  "instance_start_time" : "1288186189373361"
+}
+</programlisting>
+
+<!--    <para>You can also optionally commit to disk all the updates up to a
+          specified update sequence ID by using the <literal>seq</literal>
+          argument to the request. The value should be the sequence ID returned
+          when creating or updating a document:</para>
+      -->
+
+  </section>
+
+  <section id="couchdb-api-db_db-bulk-docs_post">
+
+    <title><literal>POST /db/_bulk_docs</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="db-bulk-docs"/>
+
+      <remark role="method" condition="POST"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      The bulk document API allows you to create and update multiple
+      documents at the same time within a single request. The basic
+      operation is similar to creating or updating a single document,
+      except that you batch the document structure and information and .
+      When creating new documents the document ID is optional. For
+      updating existing documents, you must provide the document ID,
+      revision information, and new document values.
+    </para>
+
+    <para>
+      For both inserts and updates the basic structure of the JSON is
+      the same:
+    </para>
+
+    <para role="meta" id="table-couchdb-api-db_db-bulk-docs-json">
+      <remark role="type" condition="json"/>
+
+      <remark role="src" condition="json"/>
+
+      <remark role="output" condition="itemtable"/>
+
+      <remark role="itemid" condition="bulkdocs"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <section id="couchdb-api-db_db-bulk-docs_post-insert">
+
+      <title>Inserting Documents in Bulk</title>
+
+      <para>
+        To insert documents in bulk into a database you need to supply a
+        JSON structure with the array of documents that you want to add
+        to the database. Using this method you can either include a
+        document ID, or allow the document ID to be automatically
+        generated.
+      </para>
+
+      <para>
+        For example, the following inserts three new documents, two with
+        the supplied document IDs, and one which will have a document ID
+        generated:
+      </para>
+
+<programlisting>
+{
+   "docs" : [
+      {
+         "_id" : "FishStew",
+         "servings" : 4,
+         "subtitle" : "Delicious with fresh bread",
+         "title" : "Fish Stew"
+      },
+      {
+         "_id" : "LambStew",
+         "servings" : 6,
+         "subtitle" : "Delicious with scone topping",
+         "title" : "Lamb Stew"
+      },
+      {
+         "servings" : 8,
+         "subtitle" : "Delicious with suet dumplings",
+         "title" : "Beef Stew"
+      },
+   ]
+}
+      </programlisting>
+
+      <para>
+        The return type from a bulk insertion will be 201, with the
+        content of the returned structure indicating specific success or
+        otherwise messages on a per-document basis.
+      </para>
+
+      <para>
+        The return structure from the example above contains a list of
+        the documents created, here with the combination and their
+        revision IDs:
+      </para>
+
+<programlisting>
+POST http://couchdb:5984/recipes/_bulk_docs
+Content-Type: application/json
+
+[
+   {
+      "id" : "FishStew",
+      "rev" : "1-9c65296036141e575d32ba9c034dd3ee",
+   },
+   {
+      "id" : "LambStew",
+      "rev" : "1-34c318924a8f327223eed702ddfdc66d",
+   },
+   {
+      "id" : "7f7638c86173eb440b8890839ff35433",
+      "rev" : "1-857c7cbeb6c8dd1dd34a0c73e8da3c44",
+   }
+]
+          </programlisting>
+
+      <para>
+        The content and structure of the returned JSON will depend on
+        the transaction semantics being used for the bulk update; see
+        <xref
+            linkend="couchdb-api-db_db-bulk-docs_post-commit"/>
+        for more information. Conflicts and validation errors when
+        updating documents in bulk must be handled separately; see
+        <xref
+            linkend="couchdb-api-db_db-bulk-docs_post-errors"/>.
+      </para>
+
+    </section>
+
+    <section id="couchdb-api-db_db-bulk-docs_post-update">
+
+      <title>Updating Documents in Bulk</title>
+
+      <para>
+        The bulk document update procedure is similar to the insertion
+        procedure, except that you must specify the document ID and
+        current revision for every document in the bulk update JSON
+        string.
+      </para>
+
+      <para>
+        For example, you could send the following request:
+      </para>
+
+<programlisting>
+POST http://couchdb:5984/recipes/_bulk_docs
+Content-Type: application/json
+
+{
+   "docs" : [
+      {
+         "_id" : "FishStew",
+         "_rev" : "1-9c65296036141e575d32ba9c034dd3ee",
+         "servings" : 4,
+         "subtitle" : "Delicious with freshly baked bread",
+         "title" : "Fish Stew"
+      },
+      {
+         "_id" : "LambStew",
+         "_rev" : "1-34c318924a8f327223eed702ddfdc66d",
+         "servings" : 6,
+         "subtitle" : "Serve with a wholemeal scone topping",
+         "title" : "Lamb Stew"
+      },
+      {
+         "_id" : "7f7638c86173eb440b8890839ff35433"
+         "_rev" : "1-857c7cbeb6c8dd1dd34a0c73e8da3c44",
+         "servings" : 8,
+         "subtitle" : "Hand-made dumplings make a great accompaniment",
+         "title" : "Beef Stew"
+      }
+   ]
+}
+</programlisting>
+
+      <para>
+        The return structure is the JSON of the updated documents, with
+        the new revision and ID information:
+      </para>
+
+<programlisting>
+[
+   {
+      "id" : "FishStew",
+      "rev" : "2-e7af4c4e9981d960ecf78605d79b06d1"
+   },
+   {
+      "id" : "LambStew",
+      "rev" : "2-0786321986194c92dd3b57dfbfc741ce"
+   },
+   {
+      "id" : "7f7638c86173eb440b8890839ff35433",
+      "rev" : "2-bdd3bf3563bee516b96885a66c743f8e"
+   }
+]
+</programlisting>
+
+      <para>
+        You can optionally delete documents during a bulk update by
+        adding the <literal>_deleted</literal> field with a value of
+        <literal>true</literal> to each docment ID/revision combination
+        within the submitted JSON structure.
+      </para>
+
+      <para>
+        The return type from a bulk insertion will be 201, with the
+        content of the returned structure indicating specific success or
+        otherwise messages on a per-document basis.
+      </para>
+
+      <para>
+        The content and structure of the returned JSON will depend on
+        the transaction semantics being used for the bulk update; see
+        <xref
+            linkend="couchdb-api-db_db-bulk-docs_post-commit"/>
+        for more information. Conflicts and validation errors when
+        updating documents in bulk must be handled separately; see
+        <xref
+          linkend="couchdb-api-db_db-bulk-docs_post-errors"/>.
+      </para>
+
+    </section>
+
+    <section  id="couchdb-api-db_db-bulk-docs_post-commit">
+
+      <title>Bulk Documents Transaction Semantics</title>
+
+      <para>
+        CouchDB supports two different modes for updating (or inserting)
+        documents using the bulk documentation system. Each mode affects
+        both the state of the documents in the event of system failure,
+        and the level of conflict checking performed on each document.
+        The two modes are:
+      </para>
+
+      <itemizedlist>
+
+        <listitem>
+          <para>
+            <literal>non-atomic</literal>
+          </para>
+
+          <para>
+            The default mode is non-atomic, that is, CouchDB will only
+            guarantee that some of the documents will be saved when you
+            send the request. The response will contain the list of
+            documents successfully inserted or updated during the
+            process. In the event of a crash, some of the documents may
+            have been successfully saved, and some will have been lost.
+          </para>
+
+          <para>
+            In this mode, the response structure will indicate whether
+            the document was updated by supplying the new
+            <literal>_rev</literal> parameter indicating a new document
+            revision was created. If the update failed, then you will
+            get an <literal>error</literal> of type
+            <literal>conflict</literal>. For example:
+          </para>
+
+<programlisting>
+[
+   {
+      "id" : "FishStew",
+      "error" : "conflict",
+      "reason" : "Document update conflict."
+   },
+   {
+      "id" : "LambStew",
+      "error" : "conflict",
+      "reason" : "Document update conflict."
+   },
+   {
+      "id" : "7f7638c86173eb440b8890839ff35433",
+      "error" : "conflict",
+      "reason" : "Document update conflict."
+   }
+]
+    </programlisting>
+
+          <para>
+            In this case no new revision has been created and you will
+            need to submit the document update, with the correct
+            revision tag, to update the document.
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            <literal>all-or-nothing</literal>
+          </para>
+
+          <para>
+            In all-or-nothing mode, either all documents are written to
+            the database, or no documents are written to the database,
+            in the event of a system failure during commit.
+          </para>
+
+          <para>
+            In addition, the per-document conflict checking is not
+            performed. Instead a new revision of the document is
+            created, even if the new revision is in conflict with the
+            current revision in the database. The returned structure
+            contains the list of documents with new revisions:
+          </para>
+
+<programlisting>
+[
+   {
+      "id" : "FishStew",
+      "rev" : "2-e7af4c4e9981d960ecf78605d79b06d1"
+   },
+   {
+      "id" : "LambStew",
+      "rev" : "2-0786321986194c92dd3b57dfbfc741ce"
+   },
+   {
+      "id" : "7f7638c86173eb440b8890839ff35433",
+      "rev" : "2-bdd3bf3563bee516b96885a66c743f8e"
+   }
+]
+</programlisting>
+
+          <para>
+            When updating documents using this mode the revision of a
+            document included in views will be arbitrary. You can check
+            the conflict status for a document by using the
+            <literal>conflicts=true</literal> query argument when
+            accessing the view. Conflicts should be handled individually
+            to ensure the consistency of your database.
+          </para>
+
+<!-- TODO: Add the forward reference to conflict resolution -->
+
+          <para>
+            To use this mode, you must include the
+            <literal>all_or_nothing</literal> field (set to true) within
+            the main body of the JSON of the request.
+          </para>
+        </listitem>
+
+      </itemizedlist>
+
+      <para>
+        The effects of different database operations on the different
+        modes are summarized in the table below:
+      </para>
+
+      <table id="table-couchdb-api-db_db-bulk-docs_post-commit">
+        <title>Conflicts on Bulk Inserts</title>
+        <tgroup cols="4">
+          <thead>
+            <row>
+              <entry>
+                Transaction Mode
+              </entry>
+              <entry>
+                Transaction
+              </entry>
+              <entry>
+                Cause
+              </entry>
+              <entry>
+                Resolution
+              </entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>
+                Non-atomic
+              </entry>
+              <entry>
+                Insert
+              </entry>
+              <entry>
+                Requested document ID already exists
+              </entry>
+              <entry>
+                Resubmit with different document ID, or update the
+                existing document
+              </entry>
+            </row>
+            <row>
+              <entry>
+                Non-atomic
+              </entry>
+              <entry>
+                Update
+              </entry>
+              <entry>
+                Revision missing or incorrect
+              </entry>
+              <entry>
+                Resubmit with correct revision
+              </entry>
+            </row>
+            <row>
+              <entry>
+                All-or-nothing
+              </entry>
+              <entry>
+                Insert
+              </entry>
+              <entry>
+                Additional revision inserted
+              </entry>
+              <entry>
+                Resolve conflicted revisions
+              </entry>
+            </row>
+            <row>
+              <entry>
+                All-or-nothing
+              </entry>
+              <entry>
+                Update
+              </entry>
+              <entry>
+                Additional revision inserted
+              </entry>
+              <entry>
+                Resolve conflicted revisions
+              </entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </table>
+
+      <para>
+        Replication of documents is independent of the type of insert or
+        update. The documents and revisions created during a bulk insert
+        or update are replicated in the same way as any other document.
+        This can mean that if you make use of the all-or-nothing mode
+        the exact list of documents, revisions (and their conflict
+        state) may or may not be replicated to other databases
+        correctly.
+      </para>
+
+    </section>
+
+    <section  id="couchdb-api-db_db-bulk-docs_post-errors">
+
+      <title>Bulk Document Validation and Conflict Errors</title>
+
+      <para>
+        The JSON returned by the <literal>_bulk_docs</literal> operation
+        consists of an array of JSON structures, one for each document
+        in the original submission. The returned JSON structure should
+        be examined to ensure that all of the documents submitted in the
+        original request were successfully added to the database.
+      </para>
+
+      <para>
+        The exact structure of the returned information is shown in
+        <xref
+    linkend="table-couchdb-api-db_db-bulk-docs-return-json"/>.
+      </para>
+
+      <para role="meta" id="table-couchdb-api-db_db-bulk-docs-return-json">
+        <remark role="type" condition="json"/>
+
+        <remark role="src" condition="json"/>
+
+        <remark role="output" condition="itemtable"/>
+
+        <remark role="itemid" condition="bulkdocsreturn"/>
+
+        <remark role="version" condition="inherit"/>
+      </para>
+
+      <para>
+        When a document (or document revision) is not correctly comitted
+        to the database because of an error, you should check the
+        <literal>error</literal> field to determine error type and
+        course of action. Errors will be one of the following type:
+      </para>
+
+      <itemizedlist>
+
+        <listitem>
+          <para>
+            <literal>conflict</literal>
+          </para>
+
+          <para>
+            The document as submitted is in conflict. If you used the
+            default bulk transaction mode then the new revision will not
+            have been created and you will need to re-submit the
+            document to the database. If you used
+            <literal>all-or-nothing</literal> mode then you will need to
+            manually resolve the conflicted revisions of the document.
+          </para>
+
+          <para>
+            Conflict resolution of documents added using the bulk docs
+            interface is identical to the resolution procedures used
+            when resolving conflict errors during replication.
+          </para>
+
+<!-- TODO: Add a reference/link to the conflict/replication docs -->
+        </listitem>
+
+        <listitem>
+          <para>
+            <literal>forbidden</literal>
+          </para>
+
+          <para>
+            Entries with this error type indicate that the validation
+            routine applied to the document during submission has
+            returned an error.
+          </para>
+
+          <para>
+            For example, if your validation routine includes the
+            following:
+          </para>
+
+<programlisting> throw({forbidden: 'invalid recipe ingredient'});</programlisting>
+
+          <para>
+            The error returned will be:
+          </para>
+
+<programlisting>
+{
+   "id" : "7f7638c86173eb440b8890839ff35433",
+   "error" : "forbidden",
+   "reason" : "invalid recipe ingredient"
+}
+      </programlisting>
+
+          <para>
+            For more information, see
+            <xref linkend="couchdb-api-functional-validation"/>.
+          </para>
+        </listitem>
+
+      </itemizedlist>
+
+    </section>
+
+  </section>
+
+  <section id="couchdb-api-db_db-temp-view_post">
+
+    <title><literal>POST /db/_temp_view</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="db-temp-view"/>
+
+      <remark role="method" condition="POST"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      Creates (and executes) a temporary view based on the view function
+      supplied in the JSON request. For example:
+    </para>
+
+<programlisting>
+POST http://couchdb:5984/recipes/_temp_view
+Content-Type: application/json
+
+{
+   "map" : "function(doc) { if (doc.value > 9995) { emit(null, doc.value); } }"
+}
+</programlisting>
+
+    <para>
+      The resulting JSON response is the result from the execution of
+      the temporary view:
+    </para>
+
+<programlisting>
+{
+   "total_rows" : 3,
+   "rows" : [
+      {
+         "value" : 9998.41913029012,
+         "id" : "05361cc6aa42033878acc1bacb1f39c2",
+         "key" : null
+      },
+      {
+         "value" : 9998.94149934853,
+         "id" : "1f443f471e5929dd7b252417625ed170",
+         "key" : null
+      },
+      {
+         "value" : 9998.01511339154,
+         "id" : "1f443f471e5929dd7b252417629c102b",
+         "key" : null
+      }
+   ],
+   "offset" : 0
+}
+</programlisting>
+
+    <para>
+      The arguments also available to standard view requests also apply
+      to temporary views, but the execution of the view may take some
+      time as it relies on being executed at the time of the request. In
+      addition to the time taken, they are also computationally very
+      expensive to produce. You should use a defined view if you want to
+      achieve the best performance.
+    </para>
+
+    <para>
+      For more information, see
+      <xref linkend="couchdb-api-functional-views"/>.
+    </para>
+
+  </section>
+
+  <section id="couchdb-api-db_db-purge_post">
+
+    <title><literal>POST /db/_purge</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="db-purge"/>
+
+      <remark role="method" condition="POST"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      A database purge permanently removes the references to deleted
+      documents from the database. Deleting a document within CouchDB
+      does not actually remove the documen from the database, instead,
+      the document is marked as a deleted (and a new revision is
+      created). This is to ensure that deleted documents are replicated
+      to other databases as having been deleted. This also means that
+      you can check the status of a document and identify that the
+      document has been deleted.
+    </para>
+
+    <para>
+      The purge operation removes the refernces to the deleted documents
+      from the database. The purging of old documents is not replicated
+      to other databases. If you are replicating between databases and
+      have deleted a large number of documents you should run purge on
+      each database.
+    </para>
+
+    <note>
+      <para>
+        Purging documents does not remove the space used by them on
+        disk. To reclaim disk space, you should run a database compact
+        (see <xref
+    linkend="couchdb-api-db_db-compact_post"/>, and
+        compact views (see
+        <xref
+      linkend="couchdb-api-db_db-compact-design-doc_post"/>).
+      </para>
+    </note>
+
+    <para>
+      To perform a purge operation you must send a request including the
+      JSON of the document IDs that you want to purge. For example:
+    </para>
+
+<programlisting>
+POST http://couchdb:5984/recipes/_purge
+Content-Type: application/json
+
+{
+  "FishStew" : [
+    "17-b3eb5ac6fbaef4428d712e66483dcb79"
+    ]
+}
+</programlisting>
+
+    <para>
+      The format of the request must include the document ID and one or
+      more revisions that must be purged.
+    </para>
+
+    <para>
+      The response will contain the purge sequence number, and a list of
+      the document IDs and revisions successfully purged.
+    </para>
+
+<programlisting>
+{
+   "purged" : {
+      "FishStew" : [
+         "17-b3eb5ac6fbaef4428d712e66483dcb79"
+      ]
+   },
+   "purge_seq" : 11
+}
+</programlisting>
+
+    <section id="couchdb-api-db_db-purge_post-indexrebuild">
+
+      <title>Updating Indexes</title>
+
+      <para>
+        The number of purges on a database is tracked using a purge
+        sequence. This is used by the view indexer to optimize the
+        updating of views that contain the purged documents.
+      </para>
+
+      <para>
+        When the indexer identifies that the purge sequence on a
+        database has changed, it compares the purge sequence of the
+        database with that stored in the view index. If the difference
+        between the stored sequence and database is sequence is only 1,
+        then the indexer uses a cached list of the most recently purged
+        documents, and then removes these documents from the index
+        individually. This prevents completely rebuilding the index from
+        scratch.
+      </para>
+
+      <para>
+        If the difference between the stored sequence number and current
+        database sequence is greater than 1, then the view index is
+        entirely rebuilt. This is an expensive operation as every
+        document in the database must be examined.
+      </para>
+
+    </section>
+
+  </section>
+
+  <section id="couchdb-api-db_db-all-docs_get">
+
+    <title><literal>GET /db/_all_docs</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="db-all-docs"/>
+
+      <remark role="method" condition="GET"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      Returns a JSON structure of all of the documents in a given
+      database. The information is returned as a JSON structure
+      containing meta information about the return structure, and the
+      list documents and basic contents, consisting the ID, revision and
+      key. The key is generated from the document ID.
+    </para>
+
+    <para role="meta" id="table-couchdb-api-db_db-all-docs">
+      <remark role="type" condition="json"/>
+
+      <remark role="src" condition="json"/>
+
+      <remark role="output" condition="itemtable"/>
+
+      <remark role="itemid" condition="all-docs"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      By default the information returned contains only the document ID
+      and revision. For example, the request:
+    </para>
+
+<programlisting role="httprequest">
+GET http://couchdb:5984/recipes/_all_docs
+Accept: application/json
+</programlisting>
+
+    <para>
+      Returns the following structure:
+    </para>
+
+<programlisting role="httpresponse">
+{
+   "total_rows" : 18386,
+   "rows" : [
+      {
+         "value" : {
+            "rev" : "1-bc0d5aed1e339b1cc1f29578f3220a45"
+         },
+         "id" : "Aberffrawcake",
+         "key" : "Aberffrawcake"
+      },
+      {
+         "value" : {
+            "rev" : "3-68a20c89a5e70357c20148f8e82ca331"
+         },
+         "id" : "Adukiandorangecasserole-microwave",
+         "key" : "Adukiandorangecasserole-microwave"
+      },
+      {
+         "value" : {
+            "rev" : "3-9b2851ed9b6f655cc4eb087808406c60"
+         },
+         "id" : "Aioli-garlicmayonnaise",
+         "key" : "Aioli-garlicmayonnaise"
+      },
+      ...
+         ],
+   "offset" : 0
+}
+</programlisting>
+
+    <para>
+      The information is returned in the form of a temporary view of all
+      the database documents, with the returned key consisting of the ID
+      of the document. The remainder of the interface is therefore
+      identical to the View query arguments and their behavior.
+    </para>
+
+<!-- TODO Add link to view -->
+
+  </section>
+
+  <section id="couchdb-api-db_db-all-docs_post">
+
+    <title><literal>POST /db/_all_docs</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="db-all-docs"/>
+
+      <remark role="method" condition="POST"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      The <literal>POST</literal> to <literal>_all_docs</literal> allows
+      to specify multiple keys to be selected from the database. This
+      enables you to request multiple documents in a single request, in
+      place of multiple
+      <xref
+    linkend="couchdb-api-dbdoc_db-doc_get"/> requests.
+    </para>
+
+    <para>
+      The request body should contain a list of the keys to be returned
+      as an array to a <literal>keys</literal> object. For example:
+    </para>
+
+<programlisting role="httprequest">
+POST http://couchdb:5984/recipes/_all_docs
+User-Agent: MyApp/0.1 libwww-perl/5.837
+
+{
+   "keys" : [
+      "Zingylemontart",
+      "Yogurtraita"
+   ]
+}
+</programlisting>
+
+    <para>
+      The return JSON is the all documents structure, but with only the
+      selected keys in the output:
+    </para>
+
+<programlisting role="httpresponse">
+{
+   "total_rows" : 2666,
+   "rows" : [
+      {
+         "value" : {
+            "rev" : "1-a3544d296de19e6f5b932ea77d886942"
+         },
+         "id" : "Zingylemontart",
+         "key" : "Zingylemontart"
+      },
+      {
+         "value" : {
+            "rev" : "1-91635098bfe7d40197a1b98d7ee085fc"
+         },
+         "id" : "Yogurtraita",
+         "key" : "Yogurtraita"
+      }
+   ],
+   "offset" : 0
+}
+</programlisting>
+
+<!-- TODO Add link to view -->
+
+  </section>
+
+  <section id="couchdb-api-db_db-missing-revs_post">
+
+    <title><literal>POST /db/_missing_revs</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="db-missing-revs"/>
+
+      <remark role="method" condition="POST"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+  </section>
+
+  <section id="couchdb-api-db_db-revs-diff_post">
+
+    <title><literal>POST /db/_revs_diff</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="db-revs-diff"/>
+
+      <remark role="method" condition="POST"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+  </section>
+
+  <section id="couchdb-api-db_db-security_get">
+
+    <title><literal>GET /db/_security</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="db-security"/>
+
+      <remark role="method" condition="GET"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      Gets the current secrity object from the specified database. The
+      security object consists of two compulsory elements,
+      <literal>admins</literal> and <literal>readers</literal>, which
+      are used to specify the list of users and/or roles that have admin
+      and reader rights to the database respectively. Any additional
+      fields in the security object are optional. The entire security
+      object is made available to validation and other internal
+      functions so that the database can control and limit
+      functionality.
+    </para>
+
+    <para>
+      To get the existing security object you would send the following
+      request:
+    </para>
+
+<programlisting>
+{
+   "admins" : {
+      "roles" : [],
+      "names" : [
+         "mc",
+         "slp"
+      ]
+   },
+   "readers" : {
+      "roles" : [],
+      "names" : [
+         "tim",
+         "brian"
+      ]
+   }
+}
+</programlisting>
+
+    <para role="meta" id="table-couchdb-api-db-json-security">
+      <remark role="type" condition="json"/>
+
+      <remark role="src" condition="json"/>
+
+      <remark role="output" condition="itemtable"/>
+
+      <remark role="itemid" condition="security"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <note>
+      <para>
+        If the security object for a database has never beent set, then
+        the value returned will be empty.
+      </para>
+    </note>
+
+  </section>
+
+  <section id="couchdb-api-db_db-security_put">
+
+    <title><literal>PUT /db/_security</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="db-security"/>
+
+      <remark role="method" condition="PUT"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      Sets the security object for the given database.For example, to
+      set the security object for the <literal>recipes</literal>
+      database:
+    </para>
+
+<programlisting>
+PUT http://couchdb:5984/recipes/_security
+Content-Type: application/json
+
+{
+   "admins" : {
+      "roles" : [],
+      "names" : [
+         "mc",
+         "slp"
+      ]
+   },
+   "readers" : {
+      "roles" : [],
+      "names" : [
+         "tim",
+         "brian"
+      ]
+   }
+}</programlisting>
+
+    <para>
+      If the setting was successful, a JSON status object will be
+      returned:
+    </para>
+
+<programlisting>
+{
+   "ok" : true
+}
+</programlisting>
+
+  </section>
+
+  <section id="couchdb-api-db_db-revs-limit_get">
+
+    <title><literal>GET /db/_revs_limit</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="db-revs-limit"/>
+
+      <remark role="method" condition="GET"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      Gets the current <literal>revs_limit</literal> (revision limit)
+      setting.
+    </para>
+
+    <para>
+      For example to get the current limit:
+    </para>
+
+<programlisting>
+GET http://couchdb:5984/recipes/_revs_limit
+Content-Type: application/json
+</programlisting>
+
+    <para>
+      The returned information is the current setting as a numerical
+      scalar:
+    </para>
+
+<programlisting>
+1000
+</programlisting>
+
+  </section>
+
+  <section id="couchdb-api-db_db-revs-limit_put">
+
+    <title><literal>PUT /db/_revs_limit</literal></title>
+
+    <para role="meta">
+      <remark role="type" condition="urlapi"/>
+
+      <remark role="src" condition="couchdb"/>
+
+      <remark role="output" condition="accesstable"/>
+
+      <remark role="itemid" condition="db-revs-limit"/>
+
+      <remark role="method" condition="PUT"/>
+
+      <remark role="version" condition="inherit"/>
+    </para>
+
+    <para>
+      Sets the maximum number of document revisions that will be tracked
+      by CouchDB, even after compaction has occurred. You can set the
+      revision limit on a database by using <literal>PUT</literal> with
+      a scalar integer of the limit that you want to set as the request
+      body.
+    </para>
+
+    <para>
+      For example to set the revs limit to 100 for the
+      <literal>recipes</literal> database:
+    </para>
+
+<programlisting>
+PUT http://couchdb:5984/recipes/_revs_limit
+Content-Type: application/json
+
+100
+</programlisting>
+
+    <para>
+      If the setting was successful, a JSON status object will be
+      returned:
+    </para>
+
+<programlisting>
+{
+   "ok" : true
+}
+</programlisting>
+
+  </section>
+
+</chapter>

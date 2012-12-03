@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE appendix PUBLIC '-//OASIS//DTD DocBook XML V4.5//EN'
+                         'http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd' [
+<!ENTITY % every.entities SYSTEM "entities.ent">
+%every.entities;
+]>
+<appendix id="couchdb-api-json">
+
+  <title>JSON Structure Reference</title>
+
+  <para>
+    The following appendix provides a quick reference to all the JSON
+    structures that you can supply to CouchDB, or get in return to
+    requests.
+  </para>
+
+  <para role="meta" id="table-couchdb-api-json-summary">
+    <remark role="title">JSON Structures</remark>
+
+    <remark role="type" condition="json"/>
+
+    <remark role="src" condition="json"/>
+
+    <remark role="output" condition="summarytable"/>
+
+    <remark role="version" condition="inherit"/>
+
+    <remark role="idprefix" condition="table-couchdb-api-json"/>
+  </para>
+
+  <para role="meta">
+    <remark role="type" condition="json"/>
+
+    <remark role="src" condition="json"/>
+
+    <remark role="output" condition="alltables"/>
+
+    <remark role="version" condition="inherit"/>
+
+    <remark role="idprefix" condition="table-couchdb-api-json"/>
+  </para>
+
+</appendix>

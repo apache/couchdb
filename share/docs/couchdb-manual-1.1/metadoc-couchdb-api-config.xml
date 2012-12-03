@@ -1,0 +1,348 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE chapter PUBLIC '-//OASIS//DTD DocBook XML V4.5//EN'
+                         'http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd' [
+<!ENTITY % every.entities SYSTEM "entities.ent">
+%every.entities;
+]>
+<chapter id="couchdb-api-config">
+
+  <title>CouchDB API Server Configuration Methods</title>
+
+  <para>
+    The CouchDB API Server Configuration Methods provide an interface to
+    query and update the various configuration values within a running
+    CouchDB instance.
+  </para>
+
+  <para>
+    A list of the available methods and URL paths are provided below:
+  </para>
+
+  <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<table id="table-couchdb-api-config-summary"><title>Configuration API Calls</title><tgroup cols="3"><colspec colname="method"/><colspec colname="path"/><colspec colname="desc"/><thead><row><entry>Method</entry><entry>Path</entry><entry>Description</entry></row></thead><tbody><row><entry><literal>GET</literal></entry><entry><literal>/_config</literal></entry><entry><link linkend="couchdb-api-config_config_get">
+ Obtain a list of the entire server configuration
+ </link></entry></row><row><entry><literal>GET</literal></entry><entry><literal>/_config/section</literal></entry><entry><link linkend="couchdb-api-config_config-section_get">
+ Get all the configuration values for the specified section
+ </link></entry></row><row><entry><literal>GET</literal></entry><entry><literal>/_config/section/key</literal></entry><entry><link linkend="couchdb-api-config_config-section-key_get">
+ Get a specific section/configuration value
+ </link></entry></row><row><entry><literal>PUT</literal></entry><entry><literal>/_config/section/key</literal></entry><entry><link linkend="couchdb-api-config_config-section-key_put">
+ Set the specified configuration value
+ </link></entry></row><row><entry><literal>DELETE</literal></entry><entry><literal>/_config/section/key</literal></entry><entry><link linkend="couchdb-api-config_config-section-key_delete">
+ Delete the current setting
+ </link></entry></row></tbody></tgroup></table>
+
+  <section id="couchdb-api-config_config_get">
+
+    <title><literal>GET /_config</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API GET /_config</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>GET /_config</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ None
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ Returns a structure configuration name and value pairs,
+ organized by section
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Returns the entire CouchDB server configuration as a JSON
+      structure. The structure is organized by different configuration
+      sections, with individual values.
+    </para>
+
+    <para>
+      For example, to get the configuration for a server:
+    </para>
+
+<programlisting>
+GET http://couchdb:5984/_config
+Accept: application/json
+</programlisting>
+
+    <para>
+      The response is the JSON structure:
+    </para>
+
+<programlisting>
+<![CDATA[{
+   "query_server_config" : {
+      "reduce_limit" : "true"
+   },
+   "couchdb" : {
+      "os_process_timeout" : "5000",
+      "max_attachment_chunk_size" : "4294967296",
+      "max_document_size" : "4294967296",
+      "uri_file" : "/var/lib/couchdb/couch.uri",
+      "max_dbs_open" : "100",
+      "view_index_dir" : "/var/lib/couchdb",
+      "util_driver_dir" : "/usr/lib64/couchdb/erlang/lib/couch-1.0.1/priv/lib",
+      "database_dir" : "/var/lib/couchdb",
+      "delayed_commits" : "true"
+   },
+   "attachments" : {
+      "compressible_types" : "text/*, application/javascript, application/json,  application/xml",
+      "compression_level" : "8"
+   },
+   "uuids" : {
+      "algorithm" : "utc_random"
+   },
+   "daemons" : {
+      "view_manager" : "{couch_view, start_link, []}",
+      "auth_cache" : "{couch_auth_cache, start_link, []}",
+      "uuids" : "{couch_uuids, start, []}",
+      "stats_aggregator" : "{couch_stats_aggregator, start, []}",
+      "query_servers" : "{couch_query_servers, start_link, []}",
+      "httpd" : "{couch_httpd, start_link, []}",
+      "stats_collector" : "{couch_stats_collector, start, []}",
+      "db_update_notifier" : "{couch_db_update_notifier_sup, start_link, []}",
+      "external_manager" : "{couch_external_manager, start_link, []}"
+   },
+   "stats" : {
+      "samples" : "[0, 60, 300, 900]",
+      "rate" : "1000"
+   },
+   "httpd" : {
+      "vhost_global_handlers" : "_utils, _uuids, _session, _oauth, _users",
+      "secure_rewrites" : "true",
+      "authentication_handlers" : "{couch_httpd_oauth, oauth_authentication_handler},
+                                   {couch_httpd_auth, cookie_authentication_handler},
+                                   {couch_httpd_auth, default_authentication_handler}",
+      "port" : "5984",
+      "default_handler" : "{couch_httpd_db, handle_request}",
+      "allow_jsonp" : "false",
+      "bind_address" : "192.168.0.2",
+      "max_connections" : "2048"
+   },
+   "query_servers" : {
+      "javascript" : "/usr/bin/couchjs /usr/share/couchdb/server/main.js"
+   },
+   "couch_httpd_auth" : {
+      "authentication_db" : "_users",
+      "require_valid_user" : "false",
+      "authentication_redirect" : "/_utils/session.html",
+      "timeout" : "600",
+      "auth_cache_size" : "50"
+   },
+   "httpd_db_handlers" : {
+      "_design" : "{couch_httpd_db, handle_design_req}",
+      "_compact" : "{couch_httpd_db, handle_compact_req}",
+      "_view_cleanup" : "{couch_httpd_db, handle_view_cleanup_req}",
+      "_temp_view" : "{couch_httpd_view, handle_temp_view_req}",
+      "_changes" : "{couch_httpd_db, handle_changes_req}"
+   },
+   "replicator" : {
+      "max_http_sessions" : "10",
+      "max_http_pipeline_size" : "10"
+   },
+   "log" : {
+      "include_sasl" : "true",
+      "level" : "info",
+      "file" : "/var/log/couchdb/couch.log"
+   },
+   "httpd_design_handlers" : {
+      "_update" : "{couch_httpd_show, handle_doc_update_req}",
+      "_show" : "{couch_httpd_show, handle_doc_show_req}",
+      "_info" : "{couch_httpd_db,   handle_design_info_req}",
+      "_list" : "{couch_httpd_show, handle_view_list_req}",
+      "_view" : "{couch_httpd_view, handle_view_req}",
+      "_rewrite" : "{couch_httpd_rewrite, handle_rewrite_req}"
+   },
+   "httpd_global_handlers" : {
+      "_replicate" : "{couch_httpd_misc_handlers, handle_replicate_req}",
+      "/" : "{couch_httpd_misc_handlers, handle_welcome_req, <<\"Welcome\">>}",
+      "_config" : "{couch_httpd_misc_handlers, handle_config_req}",
+      "_utils" : "{couch_httpd_misc_handlers, handle_utils_dir_req, \"/usr/share/couchdb/www\"}",
+      "_active_tasks" : "{couch_httpd_misc_handlers, handle_task_status_req}",
+      "_session" : "{couch_httpd_auth, handle_session_req}",
+      "_log" : "{couch_httpd_misc_handlers, handle_log_req}",
+      "favicon.ico" : "{couch_httpd_misc_handlers, handle_favicon_req, \"/usr/share/couchdb/www\"}",
+      "_all_dbs" : "{couch_httpd_misc_handlers, handle_all_dbs_req}",
+      "_oauth" : "{couch_httpd_oauth, handle_oauth_req}",
+      "_restart" : "{couch_httpd_misc_handlers, handle_restart_req}",
+      "_uuids" : "{couch_httpd_misc_handlers, handle_uuids_req}",
+      "_stats" : "{couch_httpd_stats_handlers, handle_stats_req}"
+   }
+}]]>
+    </programlisting>
+
+  </section>
+
+  <section id="couchdb-api-config_config-section_get">
+
+    <title><literal>GET /_config/section</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API GET /_config/section</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>GET /_config/section</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ None
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ All the configuration values within a specified section
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Gets the configuration structure for a single section. For
+      example, to retrieve the CouchDB configuration section values:
+    </para>
+
+<programlisting>
+GET http://couchdb:5984/_config/couchdb
+Accept: application/json
+</programlisting>
+
+    <para>
+      The returned JSON contains just the configuration values for this
+      section:
+    </para>
+
+<programlisting>
+{
+   "os_process_timeout" : "5000",
+   "max_attachment_chunk_size" : "4294967296",
+   "max_document_size" : "4294967296",
+   "uri_file" : "/var/lib/couchdb/couch.uri",
+   "max_dbs_open" : "100",
+   "view_index_dir" : "/var/lib/couchdb",
+   "util_driver_dir" : "/usr/lib64/couchdb/erlang/lib/couch-1.0.1/priv/lib",
+   "database_dir" : "/var/lib/couchdb",
+   "delayed_commits" : "true"
+}
+</programlisting>
+
+  </section>
+
+  <section id="couchdb-api-config_config-section-key_get">
+
+    <title><literal>GET /_config/section/key</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API GET /_config/section/key</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>GET /_config/section/key</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ None
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ Value of the specified key/section
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Gets a single configuration value from within a specific
+      configuration section. For example, to obtain the current log
+      level:
+    </para>
+
+<programlisting>
+GET http://couchdb:5984/_config/log/level
+Accept: application/json
+</programlisting>
+
+    <para>
+      Returns the string of the log level:
+    </para>
+
+<programlisting>
+"info"
+</programlisting>
+
+    <note>
+      <para>
+        The returned value will be the JSON of the value, which may be a
+        string or numeric value, or an array or object. Some client
+        environments may not parse simple strings or numeric values as
+        valid JSON.
+      </para>
+    </note>
+
+  </section>
+
+  <section id="couchdb-api-config_config-section-key_put">
+
+    <title><literal>PUT /_config/section/key</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API PUT /_config/section/key</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>PUT /_config/section/key</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ Value structure
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ Previous value
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row><row><entry namest="field" nameend="addinfo"><emphasis role="bold">Return Codes</emphasis></entry></row><row><entry>200</entry><entry namest="info" nameend="addinfo">
+ Configuration option updated successfully
+ </entry></row><row><entry>500</entry><entry namest="info" nameend="addinfo">
+ Error setting configuration
+ </entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Updates a configuration value. The new value should be supplied in
+      the request body in the corresponding JSON format. For example, if
+      you are setting a string value, you must supply a valid JSON
+      string.
+    </para>
+
+    <para>
+      For example, to set the function used to generate UUIDs by the
+      <literal>GET /_uuids</literal> API call to use the
+      <literal>utc_random</literal> generator:
+    </para>
+
+<programlisting>
+PUT http://couchdb:5984/_config/uuids/algorithm
+Content-Type: application/json
+
+"utc_random"
+</programlisting>
+
+    <para>
+      The return value will be empty, with the response code indicating
+      the success or failure of the configuration setting.
+    </para>
+
+  </section>
+
+  <section id="couchdb-api-config_config-section-key_delete">
+
+    <title><literal>DELETE /_config/section/key</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API DELETE /_config/section/key</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>DELETE /_config/section/key</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ None
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ Previous value
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row><row><entry><emphasis role="bold">Query Arguments</emphasis></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>rev</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Current revision of the document for validation
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry><emphasis role="bold">HTTP Headers</emphasis></entry><entry><emphasis role="bold">Header</emphasis></entry><entry><literal>If-Match</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>Current revision of the document for validation</entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry namest="field" nameend="addinfo"><emphasis role="bold">Return Codes</emphasis></entry></row><row><entry>409</entry><entry namest="info" nameend="addinfo">
+ Supplied revision is incorrect or missing
+ </entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Deletes a configuration value. The returned JSON will be the value
+      of the configuration parameter before it was deleted. For example,
+      to delete the UUID parameter:
+    </para>
+
+<programlisting>
+DELETE http://couchdb:5984/_config/uuids/algorithm
+Content-Type: application/json
+</programlisting>
+
+    <para>
+      The returned value is the last configured UUID function:
+    </para>
+
+<programlisting>
+"random"
+</programlisting>
+
+  </section>
+
+</chapter>
