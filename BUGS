@@ -1,6 +1,8 @@
 Apache CouchDB BUGS
 ===================
 
-Please see the [documentation][1] on how to report bugs with Apache CouchDB.
+Visit our issue tracker:
 
-[1] http://couchdb.apache.org/community/issues.html
+    https://issues.apache.org/jira/browse/CouchDB
+
+You can use this to report bugs, request features, or suggest enhancements.
