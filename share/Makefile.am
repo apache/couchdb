@@ -10,6 +10,8 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
+SUBDIRS = doc
+
 JS_FILE = server/main.js
 
 JS_FILE_COMPONENTS = \

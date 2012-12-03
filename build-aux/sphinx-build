@@ -1,0 +1,67 @@
+#!/bin/sh -e
+
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not
+# use this file except in compliance with the License. You may obtain a copy of
+# the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations under
+# the License.
+
+# This script is called by the build system and is used to call sphinx-build if
+# is is available, or alternatively, emit a warning, and perform a no-op. Any
+# required directories or Makefiles are created and stubbed out as appropriate.
+
+if test -z "`which sphinx-build`"; then
+    missing=yes
+    cat << EOF
+WARNING: 'sphinx-build' is needed, and is missing on your system.
+         You might have modified some files without having the
+         proper tools for further handling them.
+EOF
+fi
+
+if test "$2" = "texinfo"; then
+    if test -z "`which makeinfo`"; then
+        missing=yes
+        cat << EOF
+WARNING: 'makeinfo' is needed, and is missing on your system.
+         You might have modified some files without having the
+         proper tools for further handling them.
+EOF
+    fi
+    if test "$missing" != "yes"; then
+        sphinx-build $*
+    else
+        mkdir -p texinfo
+        echo "info:" > texinfo/Makefile
+    fi
+fi
+
+if test "$2" = "latex"; then
+    if test -z "`which pdflatex`"; then
+        missing=yes
+        cat << EOF
+WARNING: 'pdflatex' is needed, and is missing on your system.
+         You might have modified some files without having the
+         proper tools for further handling them.
+EOF
+    fi
+    if test "$missing" != "yes"; then
+        sphinx-build $*
+    else
+        mkdir -p latex
+        echo "all-pdf:" > latex/Makefile
+    fi
+fi
+if test "$2" = "html"; then
+    if test "$missing" != "yes"; then
+        sphinx-build $*
+    else
+        mkdir -p html
+    fi
+fi

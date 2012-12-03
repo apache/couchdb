@@ -43,74 +43,76 @@ EXTRA_DIST = \
     NOTICE \
     README \
     THANKS \
+    build-aux/sphinx-build \
+    build-aux/sphinx-touch \
     license.skip
 
-AUTHORS.gz: $(top_srcdir)/AUTHORS
-	-gzip -9 < $< > $@
+AUTHORS.gz: AUTHORS
+	gzip -9 < $< > $@
 
-BUGS.gz: $(top_srcdir)/BUGS
-	-gzip -9 < $< > $@
+BUGS.gz: BUGS
+	gzip -9 < $< > $@
 
-CHANGES.gz: $(top_srcdir)/CHANGES
-	-gzip -9 < $< > $@
+CHANGES.gz: CHANGES
+	gzip -9 < $< > $@
 
-DEVELOPERS.gz: $(top_srcdir)/DEVELOPERS
-	-gzip -9 < $< > $@
+DEVELOPERS.gz: DEVELOPERS
+	gzip -9 < $< > $@
 
-INSTALL.gz: $(top_srcdir)/INSTALL
-	-gzip -9 < $< > $@
+INSTALL.gz: INSTALL
+	gzip -9 < $< > $@
 
-INSTALL.Unix.gz: $(top_srcdir)/INSTALL.Unix
-	-gzip -9 < $< > $@
+INSTALL.Unix.gz: INSTALL.Unix
+	gzip -9 < $< > $@
 
-INSTALL.Windows.gz: $(top_srcdir)/INSTALL.Windows
-	-gzip -9 < $< > $@
+INSTALL.Windows.gz: INSTALL.Windows
+	gzip -9 < $< > $@
 
-LICENSE.gz: $(top_srcdir)/LICENSE
-	-gzip -9 < $< > $@
+LICENSE.gz: LICENSE
+	gzip -9 < $< > $@
 
-NEWS.gz: $(top_srcdir)/NEWS
-	-gzip -9 < $< > $@
+NEWS.gz: NEWS
+	gzip -9 < $< > $@
 
-NOTICE.gz: $(top_srcdir)/NOTICE
-	-gzip -9 < $< > $@
+NOTICE.gz: NOTICE
+	gzip -9 < $< > $@
 
-README.gz: $(top_srcdir)/README
-	-gzip -9 < $< > $@
+README.gz: README
+	gzip -9 < $< > $@
 
-.PHONY: THANKS.gz
-THANKS.gz: $(top_srcdir)/THANKS
-	@sed -e '/^#.*/d' $< > $(top_builddir)/THANKS.tmp
-	@git shortlog -se 6c976bd..HEAD \
-		| grep -v @apache.org \
-		| sed -E 's/^[[:blank:]]{5}[[:digit:]]+[[:blank:]]/ * /' \
-		>> $(top_builddir)/THANKS.tmp
-	@echo '\nFor a list of authors see the `AUTHORS` file.\n' \
-		>> $(top_builddir)/THANKS.tmp
-	-gzip -9 < $(top_builddir)/THANKS.tmp > $@
-	@rm $(top_builddir)/THANKS.tmp
+THANKS.gz: THANKS
+	gzip -9 < $< > $@
 
 check: dev check-js
+if TESTS
 	$(top_builddir)/test/etap/run $(top_srcdir)/test/etap
+endif
 
 check-js: dev
+if TESTS
 if USE_CURL
 	$(top_builddir)/test/javascript/run
 endif
+endif
 
 check-etap: dev
+if TESTS
 	$(top_builddir)/test/etap/run $(top_srcdir)/test/etap
+endif
 
 cover: dev
+if TESTS
 	rm -f cover/*.coverdata
 	COVER=1 COVER_BIN=./src/couchdb/ $(top_builddir)/test/etap/run
 	SRC=./src/couchdb/ \
 	    $(ERL) -noshell \
-		-pa src/etap \
-		-eval 'etap_report:create()' \
+	    -pa src/etap \
+	    -eval 'etap_report:create()' \
 	    -s init stop > /dev/null 2>&1
+endif
 
 dev: all
+if TESTS
 	@echo "This command is intended for developers to use;"
 	@echo "it creates development ini files as well as a"
 	@echo "$(top_builddir)/tmp structure for development runtime files."
@@ -120,6 +122,7 @@ dev: all
 	mkdir -p $(top_builddir)/tmp/lib
 	mkdir -p $(top_builddir)/tmp/log
 	mkdir -p $(top_builddir)/tmp/run/couchdb
+endif
 
 install-data-hook:
 	@echo
@@ -151,14 +154,15 @@ dist-hook:
 	find $(top_builddir) -type f -name "._*" -exec rm -f {} \;
 
 distcheck-hook:
+	$(MAKE) -C bin distcheck-hook
+	$(MAKE) -C src/couchdb/priv distcheck-hook
+	$(MAKE) -C share/doc/build distcheck-hook
 	grep -rL 'http://www.apache.org/licenses/LICENSE-2.0' * \
-            | grep -vEf license.skip; \
+            | grep --include= -vEf license.skip; \
         test "$$?" -eq 1
 
 .PHONY: distsign
 distsign: distcheck check
-	@# @@ unpack archive and run diff -r to double check missing files
-	@# @@ does automake have anything that does this?
 	gpg --armor --detach-sig $(GPG_ARGS) \
 	    < $(top_srcdir)/$(distdir).tar.gz \
 	    > $(top_srcdir)/$(distdir).tar.gz.asc

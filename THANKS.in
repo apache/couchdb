@@ -93,8 +93,7 @@ suggesting improvements or submitting changes. Some of these people are:
  * Gavin McDonald <gmcdonald@apache.org>
  * Fedor Indutny <fedor@indutny.com>
  * Tim Blair
-# Dear committer who merges a commit from a non-committer:
-# You don't have to manually maintain the THANKS file anymore (yay!).
-# Non-committer authors get automatically appended to THANKS and
-# moved into THANKS.gz by `make`. This note will be stripped as well.
-# Authors from commit 6c976bd and onwards are auto-inserted.
+ * Tady Walsh <hello@tady.me>
+# Authors from commit 6c976bd and onwards are auto-inserted. If you are merging
+# a commit from a non-committer, you should not add an entry to this file. When
+# `bootstrap` is run, the actual THANKS file will be generated.

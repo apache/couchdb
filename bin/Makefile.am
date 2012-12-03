@@ -16,13 +16,23 @@ else
 bin_SCRIPTS = couchdb couch-config
 endif
 
+man1dir = $(mandir)/man1
+
 noinst_SCRIPTS = couchjs_dev couch-config_dev
 
-if HELP2MAN
-dist_man1_MANS = couchdb.1
+man_file = couchdb.1
+
+if BUILD_MAN
+man_file_build = $(man_file)
+else
+man_file_build =
 endif
 
-CLEANFILES = $(bin_SCRIPTS) $(dist_man1_MANS) $(noinst_SCRIPTS)
+BUILT_SOURCES = $(man_file_build)
+
+EXTRA_DIST = $(man_file_build)
+
+CLEANFILES = $(bin_SCRIPTS) $(man_file_build) $(noinst_SCRIPTS)
 
 transform = @program_transform_name@
 couchdb_command_name = `echo couchdb | sed '$(transform)'`
@@ -67,16 +77,16 @@ couch-config: couch-config.tpl
 	    -e "s|%bindir%|@bindir@|g" \
 	    -e "s|%localerlanglibdir%|@localerlanglibdir@|g" \
 	    -e "s|%localconfdir%|@localconfdir@|g" \
-		-e "s|%localdatadir%|$(localdatadir)|g" \
-		-e "s|%localbuilddatadir%|$(localdatadir)|g" \
+	    -e "s|%localdatadir%|$(localdatadir)|g" \
+	    -e "s|%localbuilddatadir%|$(localdatadir)|g" \
 	    -e "s|%localstatelogdir%|@localstatelogdir@|g" \
 	    -e "s|%localstatelibdir%|@localstatelibdir@|g" \
 	    -e "s|%localstatedir%|@localstatedir@|g" \
 	    -e "s|%localstaterundir%|@localstaterundir@|g" \
-		-e "s|%couchlibdir%|@localerlanglibdir@/couch-%version%|g"\
-		-e "s|%couchincludedir%|@localerlanglibdir@/include|g"\
-		-e "s|%couchebindir%|@localerlanglibdir@/ebin|g"\
-		-e "s|%couchprivlibdir%|@localerlanglibdir@/couch-%version%/priv/lib|g"\
+	    -e "s|%couchlibdir%|@localerlanglibdir@/couch-%version%|g"\
+	    -e "s|%couchincludedir%|@localerlanglibdir@/include|g"\
+	    -e "s|%couchebindir%|@localerlanglibdir@/ebin|g"\
+	    -e "s|%couchprivlibdir%|@localerlanglibdir@/couch-%version%/priv/lib|g"\
 	    -e "s|%bug_uri%|@bug_uri@|g" \
 	    -e "s|%package_author_address%|@package_author_address@|g" \
 	    -e "s|%package_author_name%|@package_author_name@|g" \
@@ -90,17 +100,17 @@ couch-config_dev: couch-config.tpl
 	sed -e "s|%ERL%|$(ERL)|g" \
 	    -e "s|%bindir%|$(abs_top_builddir)/bin|g" \
 	    -e "s|%localerlanglibdir%|$(abs_top_builddir)\/src\/couchdb|g" \
-		-e "s|%couchlibdir%|$(abs_top_builddir)\/src\/couchdb|g"\
-		-e "s|%couchincludedir%|$(abs_top_builddir)\/src\/couchdb|g"\
-		-e "s|%couchebindir%|$(abs_top_builddir)\/src\/couchdb|g"\
-		-e "s|%couchprivlibdir%|$(abs_top_builddir)/src/couchdb/priv/.libs|g"\
-		-e "s|%localdatadir%|$(abs_top_srcdir)/share|g" \
-		-e "s|%localbuilddatadir%|$(abs_top_builddir)/share|g" \
+	    -e "s|%couchlibdir%|$(abs_top_builddir)\/src\/couchdb|g"\
+	    -e "s|%couchincludedir%|$(abs_top_builddir)\/src\/couchdb|g"\
+	    -e "s|%couchebindir%|$(abs_top_builddir)\/src\/couchdb|g"\
+	    -e "s|%couchprivlibdir%|$(abs_top_builddir)/src/couchdb/priv/.libs|g"\
+	    -e "s|%localdatadir%|$(abs_top_srcdir)/share|g" \
+	    -e "s|%localbuilddatadir%|$(abs_top_builddir)/share|g" \
 	    -e "s|%localstatelibdir%|$(abs_top_builddir)/tmp/lib|g" \
 	    -e "s|%localstatelogdir%|$(abs_top_builddir)/tmp/log|g" \
-		-e "s|%localstatedir%|$(abs_top_builddir)/tmp|g" \
+	    -e "s|%localstatedir%|$(abs_top_builddir)/tmp|g" \
 	    -e "s|%localstaterundir%|$(abs_top_builddir)/tmp/run|g" \
-		-e "s|%bug_uri%|@bug_uri@|g" \
+	    -e "s|%bug_uri%|@bug_uri@|g" \
 	    -e "s|%package_author_address%|@package_author_address@|g" \
 	    -e "s|%package_author_name%|@package_author_name@|g" \
 	    -e "s|%package_name%|@package_name@|g" \
@@ -109,17 +119,34 @@ couch-config_dev: couch-config.tpl
 	$@ < $<
 	chmod +x $@
 
+# Depend on source files so distributed man pages are not rebuilt for end user.
 
-HELP2MAN_OPTION=--no-info --help-option="-h" --version-option="-V"
+$(man_file): couchdb.tpl.in
+	$(MAKE) -f Makefile couchdb; \
+	$(top_srcdir)/build-aux/missing --run \
+	    help2man \
+	        --no-info \
+	        --help-option="-h" \
+	        --version-option="-V" \
+	        --name="$(package_name) database server" \
+	        ./couchdb --output $@
 
-# XXX: Because the scripts are made at build time for the user we need to
-# XXX: depend on the original templates so as not to cause the rebuilding of
-# XXX: the man pages.
+install-data-local:
+	if test -s $(man_file); then \
+	    if test `cat $(man_file) | wc -l` -gt 1; then \
+	        $(INSTALL) -d $(DESTDIR)$(man1dir); \
+	        $(INSTALL_DATA) $(man_file) $(DESTDIR)$(man1dir)/$(man_file); \
+	    fi \
+	fi
 
-couchdb.1: couchdb.tpl.in
-	touch $@
-	if test -x "$(HELP2MAN_EXECUTABLE)"; then \
-	    $(MAKE) -f Makefile couchdb; \
-	    $(HELP2MAN_EXECUTABLE) $(HELP2MAN_OPTION) \
-	        --name="Apache CouchDB database server" ./couchdb --output $@; \
+uninstall-local:
+	rm -f $(DESTDIR)$(man1dir)/$(man_file)
+
+distcheck-hook:
+	if test ! -s $(man_file); then \
+	    $(top_srcdir)/build-aux/dist-error $(man_file); \
+	else \
+	    if test ! `cat $(man_file) | wc -l` -gt 1; then \
+	        $(top_srcdir)/build-aux/dist-error $(man_file); \
+	    fi \
 	fi

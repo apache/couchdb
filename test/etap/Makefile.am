@@ -26,6 +26,7 @@ run: run.tpl
 	$@ < $<
 	chmod +x $@
 
+# @@ wildcards are NOT portable, please replace with clean-local rules
 CLEANFILES = run *.beam
 DISTCLEANFILES = temp.*
 
