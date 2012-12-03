@@ -36,6 +36,12 @@ Source: "%locallibbindir%\..\share\*.*"; DestDir: "{app}\share"; Flags: ignoreve
 Source: "%locallibbindir%\..\releases\*.*"; DestDir: "{app}\releases"; Flags: ignoreversion uninsrestartdelete restartreplace recursesubdirs
 ; skip ./usr, ./var
 
+; These are erlang requirements and not copied by our makefiles.
+; From R14B01 onwards OTP may be built with a static OpenSSL so
+; thse DLLs are now optional.
+Source: "%openssl_bin_dir%\ssleay32.dll"; DestDir: "{app}\bin"; Flags: ignoreversion uninsrestartdelete restartreplace skipifsourcedoesntexist
+Source: "%openssl_bin_dir%\libeay32.dll"; DestDir: "{app}\bin"; Flags: ignoreversion uninsrestartdelete restartreplace skipifsourcedoesntexist
+
 ; custom stuff...
 ; ./etc/default.ini is unconditional
 Source: "%locallibbindir%\..\etc\couchdb\default.ini"; DestDir: "{app}\etc\couchdb"; Flags: ignoreversion uninsrestartdelete restartreplace
@@ -48,10 +54,6 @@ Source: "README.txt"; DestDir: "{app}"; Flags: isreadme
 ; ( deleteafterinstall - not needed - {tmp} auto cleaned????
 Source: "%msvc_redist_dir%\%msvc_redist_name%"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
-; These are erlang requirements and not copied by our makefiles.
-Source: "%openssl_bin_dir%\ssleay32.dll"; DestDir: "{app}\bin"; Flags: ignoreversion uninsrestartdelete restartreplace
-Source: "%openssl_bin_dir%\libeay32.dll"; DestDir: "{app}\bin"; Flags: ignoreversion uninsrestartdelete restartreplace
-
 [Dirs]
 Name: "{app}\var\lib\couchdb"; Permissions: authusers-modify
 Name: "{app}\var\log\couchdb"; Permissions: authusers-modify
@@ -62,6 +64,8 @@ Name: "{app}\etc\couchdb"; Permissions: authusers-modify
 Name: "{group}\Start CouchDB"; Filename: "{app}\bin\couchdb.bat"
 Name: "{group}\Futon (CouchDB web interface)"; Filename: "http://127.0.0.1:5984/_utils"
 Name: "{group}\CouchDB Web Site"; Filename: "http://couchdb.apache.org/"
+Name: "{group}\CouchDB Online Docs"; Filename: "http://docs.couchdb.org/"
+Name: "{group}\CouchDB Embedded Docs"; Filename: "http://localhost:5984/_utils/docs"
 
 [Tasks]
 Name: service; Description: "Install couchdb as a Windows service"

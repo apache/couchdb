@@ -6,18 +6,6 @@ The Apache Software Foundation (http://www.apache.org/).
 
 This product also includes the following third-party components:
 
- * ac_check_icu.m4 (http://autoconf-archive.cryp.to/ac_check_icu.html)
-
-   Copyright 2008, Akos Maroy <darkeye@tyrell.hu>
-
- * ac_check_curl.m4 (http://autoconf-archive.cryp.to/ac_check_curl.html)
-
-   Copyright 2008, Akos Maroy <darkeye@tyrell.hu>
-
- * pkg.m4 (http://http://pkg-config.freedesktop.org/wiki/)
-
-   Copyright 2004, Scott James Remnant <scott@netsplit.com>
-
  * jQuery (http://jquery.com/)
 
    Copyright 2011, John Resig
@@ -28,7 +16,7 @@ This product also includes the following third-party components:
 
  * json2.js (http://www.json.org/)
 
-   In the public domain
+   Public domain
 
  * MochiWeb (http://code.google.com/p/mochiweb/)
 
@@ -64,7 +52,7 @@ This product also includes the following third-party components:
 
  * snappy (http://code.google.com/p/snappy/)
 
-  Copyright 2005 and onwards Google Inc.
+  Copyright 2005, Google Inc.
 
  * snappy-erlang-nif (https://github.com/fdmanana/snappy-erlang-nif)
 
@@ -73,3 +61,15 @@ This product also includes the following third-party components:
  * CoffeeScript (http://coffeescript.org/)
 
   Copyright 2011, Jeremy Ashkenas
+
+ * Sphinx (http://sphinx-doc.org/)
+ 
+   Copyright 2011, the Sphinx team
+
+ * Sizzle (http://sizzlejs.com/)
+ 
+   Copyright 2010, The Dojo Foundation
+ 
+ * Underscore.js 1.4.2 (http://underscorejs.org)
+
+   Copyright 2012, Jeremy Ashkenas

@@ -10,30 +10,95 @@ Dependencies
 
 You will need the following installed:
 
- * GNU Automake (>=1.6.3) (http://www.gnu.org/software/automake/)
- * GNU Autoconf (>=2.59)  (http://www.gnu.org/software/autoconf/)
  * GNU Libtool            (http://www.gnu.org/software/libtool/)
+ * GNU Automake (>=1.6.3) (http://www.gnu.org/software/automake/)
+ * GNU Autoconf (>=2.68)  (http://www.gnu.org/software/autoconf/)
+ * GNU Autoconf Archive   (http://www.gnu.org/software/autoconf-archive/)
+ * pkg-config             (http://www.freedesktop.org/wiki/Software/pkg-config)
+ 
+You may also need:
+
+ * Sphinx                 (http://sphinx.pocoo.org/)
+ * LaTex                  (http://www.latex-project.org/)
+ * GNU Texinfo            (http://www.gnu.org/software/texinfo/)
  * GNU help2man           (http://www.gnu.org/software/help2man/)
 
-The `help2man` tool is optional, but will generate `man` pages for you.
+These optional dependencies are required for building the documentation.
+
+You will need these optional dependencies installed if:
+
+ * You are preparing a distribution archive
+ 
+However, you do not need them if:
+
+ * You are building from a distribution archive, or
+ * You don't care about building the documentation
 
 Debian-based (inc. Ubuntu) Systems
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can install the dependencies by running:
+You can install the required dependencies by running:
 
-    apt-get install automake autoconf libtool help2man
+    sudo apt-get install libtool
+    sudo apt-get install automake
+    sudo apt-get install autoconf
+    sudo apt-get install autoconf-archive
+    sudo apt-get install pkg-config
+
+Optional dependencies:
+
+    sudo apt-get install help2man
+    sudo apt-get install python-sphinx
+    sudo apt-get install texlive-latex-base
+    sudo apt-get install texlive-latex-recommended
+    sudo apt-get install texlive-latex-extra
+    sudo apt-get install texlive-fonts-recommended
+    sudo apt-get install texinfo
 
 Be sure to update the version numbers to match your system's available packages.
 
 Mac OS X
 ~~~~~~~~
 
-You can install the dependencies by running:
+Install Homebrew, if you do not have it already:
 
-    port install automake autoconf libtool help2man
+    https://github.com/mxcl/homebrew
 
-You will need MacPorts installed to use the `port` command.
+You can install the required dependencies by running:
+
+    brew install libtool
+    brew install automake
+    brew install autoconf
+    brew install autoconf-archive
+    brew install pkg-config
+
+Unless you want to install the optional dependencies, skip to the next section.
+
+Install what else we can with Homebrew:
+
+    brew install help2man
+
+If you don't already have pip installed, install it:
+
+    sudo easy_install pip
+
+Now, install the required Python packages:
+
+    sudo pip install sphinx
+    sudo pip install docutils
+    sudo pip install pygments
+
+Download MaxTeX from here:
+
+    http://www.tug.org/mactex/
+
+Follow the instructions to get a working LaTeX install on your system.
+
+Windows
+~~~~~~~
+
+    Follow the instructions in INSTALL.Windows and build all components
+    from source, using the same Visual C++ compiler and runtime.
 
 Bootstrapping
 -------------
@@ -43,6 +108,29 @@ Bootstrap the pristine source by running:
     ./bootstrap
 
 You must repeat this step every time you update your source checkout.
+
+Configuring
+-----------
+
+Configure the source by running:
+
+    ./configure
+
+Note that this will not fail when the optional dependencies are missing.
+
+To ensure the optional dependencies are installed, run:
+
+    ./configure --enable-strictness
+
+If you don't care about docs and want to skip the whole thing, run:
+
+    ./configure --disable-docs
+
+If you're working on the build system itself, you can run:
+
+    ./configure --disable-tests
+
+This skips the tests allowing quicker `make' cycles.
 
 Testing
 -------
@@ -60,16 +148,12 @@ Please report any problems to the developer's mailing list.
 Releasing
 ---------
 
-The release procedure is documented in the project wiki:
+The release procedure is documented here:
 
     https://wiki.apache.org/couchdb/Release_procedure
 
 Unix-like Systems
 ~~~~~~~~~~~~~~~~~
-
-Configure the source by running:
-
-    ./configure
 
 Prepare the release artefacts by running:
 
@@ -83,10 +167,6 @@ The release artefacts can be found in the root source directory.
 
 Microsoft Windows
 ~~~~~~~~~~~~~~~~~
-
-Configure the source by running:
-
-    ./configure
 
 Prepare the release artefacts by running:
 
