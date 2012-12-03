@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE chapter PUBLIC '-//OASIS//DTD DocBook XML V4.5//EN'
+                         'http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd' [
+<!ENTITY % every.entities SYSTEM "entities.ent">
+%every.entities;
+]>
+<chapter id="couchdb-api-localdb">
+
+  <title>CouchDB API Server Local (non-replicating) Document Methods</title>
+
+  <para>
+    The Local (non-replicating) document interface allows you to create
+    local documents that are not replicated to other databases. These
+    documents can be used to hold configuration or other information
+    that is required specifically on the local CouchDB instance.
+  </para>
+
+  <para>
+    Local documents have the following limitations:
+  </para>
+
+  <itemizedlist>
+
+    <listitem>
+      <para>
+        Local documents are not replicated to other databases.
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+        The ID of the local document must be known for the document to
+        accessed. You cannot obtain a list of local documents from the
+        database.
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+        Local documents are not output by views, or the
+        <literal>_all_docs</literal> view.
+      </para>
+    </listitem>
+
+  </itemizedlist>
+
+  <para>
+    Local documents can be used when you want to store configuration or
+    other information for the curent (local) instance of a given
+    database.
+  </para>
+
+  <para>
+    A list of the available methods and URL paths are provided below:
+  </para>
+
+  <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<table id="table-couchdb-api-localdb-summary"><title>Local (non-replicating) Document API
+    Calls</title><tgroup cols="3"><colspec colname="method"/><colspec colname="path"/><colspec colname="desc"/><thead><row><entry>Method</entry><entry>Path</entry><entry>Description</entry></row></thead><tbody><row><entry><literal>GET</literal></entry><entry><literal>/db/_local/local-doc</literal></entry><entry><link linkend="couchdb-api-localdb_db-local-localdoc_get">
+ Returns the latest revision of the non-replicated document
+ </link></entry></row><row><entry><literal>PUT</literal></entry><entry><literal>/db/_local/local-doc</literal></entry><entry><link linkend="couchdb-api-localdb_db-local-localdoc_put">
+ Inserts a new version of the non-replicated document
+ </link></entry></row><row><entry><literal>DELETE</literal></entry><entry><literal>/db/_local/local-doc</literal></entry><entry><link linkend="couchdb-api-localdb_db-local-localdoc_delete">
+ Deletes the non-replicated document
+ </link></entry></row><row><entry><literal>COPY</literal></entry><entry><literal>/db/_local/local-doc</literal></entry><entry><link linkend="couchdb-api-localdb_db-local-localdoc_copy">
+ Copies the non-replicated document
+ </link></entry></row></tbody></tgroup></table>
+
+  <section id="couchdb-api-localdb_db-local-localdoc_get">
+
+    <title><literal>GET /db/_local/local-doc</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API GET /db/_local/local-doc</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>GET /db/_local/local-doc</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ None
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ JSON of the returned document
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row><row><entry><emphasis role="bold">Query Arguments</emphasis></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>rev</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Specify the revision to return
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry></entry><entry><emphasis role="bold">Supported Values</emphasis></entry></row><row><entry></entry><entry><literal>true</literal></entry><entry>Includes the revisions</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>revs</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Return a list of the revisions for the document
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>boolean</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>revs_info</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Return a list of detailed revision information for the
+ document
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>boolean</entry></row><row><entry></entry><entry><emphasis role="bold">Supported Values</emphasis></entry></row><row><entry></entry><entry><literal>true</literal></entry><entry>Includes the revisions</entry></row><row><entry namest="field" nameend="addinfo"><emphasis role="bold">Return Codes</emphasis></entry></row><row><entry>400</entry><entry namest="info" nameend="addinfo">
+ The format of the request or revision was invalid
+ </entry></row><row><entry>404</entry><entry namest="info" nameend="addinfo">
+ The specified document or revision cannot be found, or has been
+ deleted
+ </entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Gets the specified local document. The semantics are identical to
+      accessing a standard document in the specified database, except
+      that the document is not replicated. See
+      <xref
+    linkend="couchdb-api-dbdoc_db-doc_get"/>.
+    </para>
+
+  </section>
+
+  <section id="couchdb-api-localdb_db-local-localdoc_put">
+
+    <title><literal>PUT /db/_local/local-doc</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API PUT /db/_local/local-doc</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>PUT /db/_local/local-doc</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ JSON of the document
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ JSON with the committed document information
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row><row><entry namest="field" nameend="addinfo"><emphasis role="bold">Return Codes</emphasis></entry></row><row><entry>201</entry><entry namest="info" nameend="addinfo">
+ Document has been created successfully
+ </entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Stores the specified local document. The semantics are identical
+      to storing a standard document in the specified database, except
+      that the document is not replicated. See
+      <xref
+        linkend="couchdb-api-dbdoc_db-doc_put"/>.
+    </para>
+
+  </section>
+
+  <section id="couchdb-api-localdb_db-local-localdoc_delete">
+
+    <title><literal>DELETE /db/_local/local-doc</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API DELETE /db/_local/local-doc</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>DELETE /db/_local/local-doc</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ None
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ JSON with the deleted document information
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row><row><entry><emphasis role="bold">Query Arguments</emphasis></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>rev</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Current revision of the document for validation
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry><emphasis role="bold">HTTP Headers</emphasis></entry><entry><emphasis role="bold">Header</emphasis></entry><entry><literal>If-Match</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>Current revision of the document for validation</entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry></entry><entry></entry></row><row><entry namest="field" nameend="addinfo"><emphasis role="bold">Return Codes</emphasis></entry></row><row><entry>409</entry><entry namest="info" nameend="addinfo">
+ Supplied revision is incorrect or missing
+ </entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Deletes the specified local document. The semantics are identical
+      to deleting a standard document in the specified database, except
+      that the document is not replicated. See
+      <xref
+        linkend="couchdb-api-dbdoc_db-doc_delete"/>.
+    </para>
+
+  </section>
+
+  <section id="couchdb-api-localdb_db-local-localdoc_copy">
+
+    <title><literal>COPY /db/_local/local-doc</literal></title>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/URLAPI/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//urlapi/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/URLAPI.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<informaltable><textobject><phrase>URL API COPY /db/_local/local-doc</phrase></textobject><tgroup cols="3"><colspec colname="field"/><colspec colname="info"/><colspec colname="addinfo"/><tbody><row><entry><emphasis role="bold">Method</emphasis></entry><entry namest="info" nameend="addinfo"><literal>COPY /db/_local/local-doc</literal></entry></row><row><entry><emphasis role="bold">Request</emphasis></entry><entry namest="info" nameend="addinfo">
+ None
+ </entry></row><row><entry><emphasis role="bold">Response</emphasis></entry><entry namest="info" nameend="addinfo">
+ JSON of the copied document
+ </entry></row><row><entry><emphasis role="bold">Admin Privileges Required</emphasis></entry><entry namest="info" nameend="addinfo">no</entry></row><row><entry><emphasis role="bold">Query Arguments</emphasis></entry><entry><emphasis role="bold">Argument</emphasis></entry><entry><literal>rev</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>
+ Revision to copy from
+ </entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>yes</entry></row><row><entry></entry><entry><emphasis role="bold">Type</emphasis></entry><entry>string</entry></row><row><entry><emphasis role="bold">HTTP Headers</emphasis></entry><entry><emphasis role="bold">Header</emphasis></entry><entry><literal>Destination</literal></entry></row><row><entry></entry><entry><emphasis role="bold">Description</emphasis></entry><entry>Destination document (and optional revision)</entry></row><row><entry></entry><entry><emphasis role="bold">Optional</emphasis></entry><entry>no</entry></row><row><entry></entry><entry></entry><entry></entry></row></tbody></tgroup></informaltable>
+
+    <para>
+      Copies the specified local document. The semantics are identical
+      to copying a standard document in the specified database, except
+      that the document is not replicated. See
+      <xref
+        linkend="couchdb-api-dbdoc_db-doc_copy"/>.
+    </para>
+
+  </section>
+
+</chapter>

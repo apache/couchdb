@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE chapter PUBLIC '-//OASIS//DTD DocBook XML V4.5//EN'
+                         'http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd'>
+<chapter id="couchdb-single-configuration">
+
+  <title>Configuring CouchDB</title>
+
+  <para>
+    &nbsp;
+  </para>
+
+  <section id="couchdb-single-configuration-files">
+
+    <title>CouchDB Configuration Files</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+  </section>
+
+  <section id="couchdb-single-configuration-files-locations">
+
+    <title>Configuration File Locations</title>
+
+    <para>
+      CouchDB reads files from the following locations, in the following
+      order.
+    </para>
+
+    <orderedlist>
+
+      <listitem>
+        <para>
+          <filename>PREFIX/default.ini</filename>
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          <filename>PREFIX/default.d/*</filename>
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          <filename>PREFIX/local.ini</filename>
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          <filename>PREFIX/local.d/*</filename>
+        </para>
+      </listitem>
+
+    </orderedlist>
+
+    <para>
+      Settings in successive documents override the settings in earlier
+      entries. For example, setting the <literal>bind_address</literal>
+      parameter in <filename>local.ini</filename> would override any
+      setting in <literal>default.ini</literal>.
+    </para>
+
+    <warning>
+      <para>
+        The <filename>default.ini</filename> file may be overwritten
+        during an upgrade or re-installation, so localised changes
+        should be made to the <filename>local.ini</filename> file or
+        files within the <filename>local.d</filename> directory.
+      </para>
+    </warning>
+
+  </section>
+
+  <section id="couchdb-single-configuration-mochiweb">
+
+    <title>MochiWeb Server Options</title>
+
+    <para>
+      Server options for the MochiWeb component of CouchDB can be added
+      to the configuration files. Settings should be added to the
+      <literal>server_options</literal> option of the
+      <literal>[httpd]</literal> section of
+      <filename>local.ini</filename>. For example:
+    </para>
+
+<programlisting>
+[httpd]
+server_options = [{backlog, 128}, {acceptor_pool_size, 16}]
+       </programlisting>
+
+  </section>
+
+  <section id="couchdb-single-configuration-osprocess">
+
+    <title>OS Daemons</title>
+
+    <para>
+      CouchDB now supports starting external processes. The support is
+      simple and enables CouchDB to start each configured OS daemon. If
+      the daemon stops at any point, CouchDB will restart it (with
+      protection to ensure regularly failing daemons are not repeatedly
+      restarted).
+    </para>
+
+    <para>
+      The daemon starting process is one-to-one; for each each
+      configured daemon in the configuration file, CouchDB will start
+      exactly one instance. If you need to run multiple instances, then
+      you must create separate individual configurations. Daemons are
+      configured within the <literal>[os_daemons]</literal> section of
+      your configuration file (<filename>local.ini</filename>). The
+      format of each configured daemon is:
+    </para>
+
+<programlisting>
+NAME = PATH ARGS
+    </programlisting>
+
+    <para>
+      Where <literal>NAME</literal> is an arbitrary (and unique) name to
+      identify the daemon; <literal>PATH</literal> is the full path to
+      the daemon to be executed; <literal>ARGS</literal> are any
+      required arguments to the daemon.
+    </para>
+
+    <para>
+      For example:
+    </para>
+
+<programlisting>
+[os_daemons]
+basic_responder = /usr/local/bin/responsder.js
+</programlisting>
+
+    <para>
+      There is no interactivity between CouchDB and the running process,
+      but you can use the OS Daemons service to create new HTTP servers
+      and responders and then use the new proxy service to redirect
+      requests and output to the CouchDB managed service. For more
+      information on proxying, see
+      <xref
+      linkend="couchdb-single-features-proxying"/>. For
+      further background on the OS Daemon service, see
+      <ulink url="http://davispj.com/2010/09/26/new-couchdb-externals-api.html">CouchDB
+      Externals API</ulink>
+    </para>
+
+  </section>
+
+  <section id="couchdb-single-configuration-update_notification">
+
+    <title>Update Notifications</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+  </section>
+
+  <section id="couchdb-single-configuration-socketoptions">
+
+    <title>Socket Options Configuration Setting</title>
+
+    <para>
+      The socket options for the listening socket in CouchDB can now be
+      set within the CouchDB configuration file. The setting should be
+      added to the <literal>[httpd]</literal> section of the file using
+      the option name <literal>socket_options</literal>. The
+      specification is as a list of tuples. For example:
+    </para>
+
+<programlisting>
+[httpd]
+socket_options = [{recbuf, 262144}, {sndbuf, 262144}, {nodelay, true}]
+</programlisting>
+
+    <para>
+      The options supported are a subset of full options supported by
+      the TCP/IP stack. A list of the supported options are provided in
+      the
+      <ulink
+        url="http://www.erlang.org/doc/man/inet.html#setopts-2">Erlang
+      inet</ulink> documentation.
+    </para>
+
+  </section>
+
+  <section id="couchdb-single-configuration-vhost">
+
+    <title><literal>vhosts</literal> definitions</title>
+
+    <para>
+      Similar to the rewrites section of a <literal>_design</literal>
+      document, the <literal>vhosts</literal> system uses variables in
+      the form of :varname or wildcards in the form of asterisks. The
+      variable results can be output into the resulting path as they are
+      in the rewriter.
+    </para>
+
+  </section>
+
+  <section id="couchdb-single-configuration-ssl">
+
+    <title>Configuring SSL Network Sockets</title>
+
+    <para>
+      SSL configuration in CouchDB was designed to be as easy as
+      possible. All you need is two files; a certificate and a private
+      key. If you bought an official SSL certificate from a certificate
+      authority, both should be in your possession already.
+    </para>
+
+    <para>
+      If you just want to try this out and don't want to pay anything
+      upfront, you can create a self-signed certificate. Everything will
+      work the same, but clients will get a warning about an insecure
+      certificate.
+    </para>
+
+    <para>
+      You will need the OpenSSL command line tool installed. It probably
+      already is.
+    </para>
+
+<programlisting>
+shell&gt; <userinput>mkdir cert &amp;&amp; cd cert</userinput>
+shell&gt; <userinput>openssl genrsa > privkey.pem</userinput>
+shell&gt; <userinput>openssl req -new -x509 -key privkey.pem -out mycert.pem -days 1095</userinput>
+shell&gt; <userinput>ls</userinput>
+mycert.pem privkey.pem
+</programlisting>
+
+    <para>
+      Now, you need to edit CouchDB's configuration, either by editing
+      your <filename>local.ini</filename> file or using the
+      <literal>/_config</literal> API calls or the configuration screen
+      in Futon. Here is what you need to do in
+      <filename>local.ini</filename>, you can infer what needs doing in
+      the other places.
+    </para>
+
+    <para>
+      Be sure to make these edits. Under <literal>[daemons]</literal>
+      you should see:
+    </para>
+
+<programlisting>
+; enable SSL support by uncommenting the following line and supply the PEM's below.
+; the default ssl port CouchDB listens on is 6984
+;httpsd = {couch_httpd, start_link, [https]}
+</programlisting>
+
+    <para>
+      Here uncomment the last line:
+    </para>
+
+<programlisting>
+httpsd = {couch_httpd, start_link, [https]}
+</programlisting>
+
+    <para>
+      Next, under <literal>[ssl]</literal> you will see:
+    </para>
+
+<programlisting>
+;cert_file = /full/path/to/server_cert.pem
+;key_file = /full/path/to/server_key.pem
+</programlisting>
+
+    <para>
+      Uncomment and adjust the paths so it matches your system's paths:
+    </para>
+
+<programlisting>
+cert_file = /home/jan/cert/mycert.pem
+key_file = /home/jan/cert/privkey.pem
+</programlisting>
+
+    <para>
+      For more information please read
+      <ulink
+            url="http://www.openssl.org/docs/HOWTO/certificates.txt">http://www.openssl.org/docs/HOWTO/certificates.txt</ulink>.
+    </para>
+
+    <para>
+      Now start (or restart) CouchDB. You should be able to connect to
+      it using HTTPS on port 6984:
+    </para>
+
+<programlisting>
+shell&gt; <userinput>curl https://127.0.0.1:6984/</userinput>
+curl: (60) SSL certificate problem, verify that the CA cert is OK. Details:
+error:14090086:SSL routines:SSL3_GET_SERVER_CERTIFICATE:certificate verify failed
+More details here: http://curl.haxx.se/docs/sslcerts.html
+
+curl performs SSL certificate verification by default, using a "bundle"
+of Certificate Authority (CA) public keys (CA certs). If the default
+bundle file isn't adequate, you can specify an alternate file
+using the --cacert option.
+If this HTTPS server uses a certificate signed by a CA represented in
+the bundle, the certificate verification probably failed due to a
+problem with the certificate (it might be expired, or the name might
+not match the domain name in the URL).
+If you'd like to turn off curl's verification of the certificate, use
+the -k (or --insecure) option.
+</programlisting>
+
+    <para>
+      Oh no what happened?! — Remember, clients will notify their
+      users that your certificate is self signed.
+      <command>curl</command> is the client in this case and it notifies
+      you. Luckily you trust yourself (don't you?) and you can specify
+      the <option>-k</option> option as the message reads:
+    </para>
+
+<programlisting>
+shell&gt; <userinput>curl -k https://127.0.0.1:6984/</userinput>
+{"couchdb":"Welcome","version":"1.1.0"}
+</programlisting>
+
+  </section>
+
+  <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="metadoc-couchdb-config-options.xml"/>
+
+</chapter>

@@ -1,0 +1,413 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section PUBLIC '-//OASIS//DTD DocBook XML V4.5//EN'
+                         'http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd' [
+<!ENTITY % every.entities SYSTEM "entities.ent">
+%every.entities;
+]>
+<section id="couchdb-single-config-options">
+
+  <title>CouchDB Configuration Options</title>
+
+  <para>
+    &nbsp;
+  </para>
+
+  <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/Config/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//config/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/Config.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<table id="table-couchdb-single-config-options-summary"><title>Configuration Groups</title><tgroup cols="2"><colspec colname="section"/><colspec colname="desc"/><thead><row><entry>Section</entry><entry>Description</entry></row></thead><tbody><row><entry><literal>attachments</literal></entry><entry>
+ Attachment options
+ </entry></row><row><entry><literal>couchdb</literal></entry><entry>
+ CouchDB specific options
+ </entry></row><row><entry><literal>daemons</literal></entry><entry>
+ Daemons and background processes
+ </entry></row><row><entry><literal>httpd_db_handlers</literal></entry><entry>
+ Database Operation handlers
+ </entry></row><row><entry><literal>couch_httpd_auth</literal></entry><entry>
+ HTTPD Authentication options
+ </entry></row><row><entry><literal>httpd</literal></entry><entry>
+ HTTPD Server options
+ </entry></row><row><entry><literal>httpd_design_handlers</literal></entry><entry>
+ Handlers for design document operations
+ </entry></row><row><entry><literal>httpd_global_handlers</literal></entry><entry>
+ Handlers for global operations
+ </entry></row><row><entry><literal>log</literal></entry><entry>
+ Logging options
+ </entry></row><row><entry><literal>query_servers</literal></entry><entry>
+ Query Server options
+ </entry></row><row><entry><literal>query_server_config</literal></entry><entry>
+ Query server options
+ </entry></row><row><entry><literal>replicator</literal></entry><entry>
+ Replicator Options
+ </entry></row><row><entry><literal>ssl</literal></entry><entry>
+ SSL (Secure Sockets Layer) Options
+ </entry></row><row><entry><literal>stats</literal></entry><entry>
+ Statistics options
+ </entry></row><row><entry><literal>uuids</literal></entry><entry>
+ UUID generation options
+ </entry></row></tbody></tgroup></table>
+
+  <section id="couchdb-single-config-options_attachments">
+
+    <title><literal>attachments</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/Config/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//config/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/Config.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<table id="table-couchdb-single-config-options-attachments-summary"><title>Configuration Groups</title><tgroup cols="2"><colspec colname="option"/><colspec colname="desc"/><thead><row><entry>Option</entry><entry>Description</entry></row></thead><tbody><row><entry><literal>compressible_types</literal></entry><entry>
+ compressible_types
+ </entry></row><row><entry><literal>compression_level</literal></entry><entry>
+ compression_level
+ </entry></row></tbody></tgroup></table>
+
+  </section>
+
+  <section id="couchdb-single-config-options_couchdb">
+
+    <title><literal>couchdb</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/Config/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//config/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/Config.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<table id="table-couchdb-single-config-options-couchdb-summary"><title>Configuration Groups</title><tgroup cols="2"><colspec colname="option"/><colspec colname="desc"/><thead><row><entry>Option</entry><entry>Description</entry></row></thead><tbody><row><entry><literal>database_dir</literal></entry><entry>
+ database_dir
+ </entry></row><row><entry><literal>delayed_commits</literal></entry><entry>
+ delayed_commits
+ </entry></row><row><entry><literal>max_attachment_chunk_size</literal></entry><entry>
+ max_attachment_chunk_size
+ </entry></row><row><entry><literal>max_dbs_open</literal></entry><entry>
+ max_dbs_open
+ </entry></row><row><entry><literal>max_document_size</literal></entry><entry>
+ max_document_size
+ </entry></row><row><entry><literal>os_process_timeout</literal></entry><entry>
+ os_process_timeout
+ </entry></row><row><entry><literal>uri_file</literal></entry><entry>
+ uri_file
+ </entry></row><row><entry><literal>util_driver_dir</literal></entry><entry>
+ util_driver_dir
+ </entry></row><row><entry><literal>view_index_dir</literal></entry><entry>
+ view_index_dir
+ </entry></row></tbody></tgroup></table>
+
+  </section>
+
+  <section id="couchdb-single-config-options_daemons">
+
+    <title><literal>daemons</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/Config/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//config/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/Config.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<table id="table-couchdb-single-config-options-daemons-summary"><title>Configuration Groups</title><tgroup cols="2"><colspec colname="option"/><colspec colname="desc"/><thead><row><entry>Option</entry><entry>Description</entry></row></thead><tbody><row><entry><literal>httpsd</literal></entry><entry>
+ Enabled HTTPS service
+ </entry></row><row><entry><literal>auth_cache</literal></entry><entry>
+ auth_cache
+ </entry></row><row><entry><literal>db_update_notifier</literal></entry><entry>
+ db_update_notifier
+ </entry></row><row><entry><literal>external_manager</literal></entry><entry>
+ external_manager
+ </entry></row><row><entry><literal>httpd</literal></entry><entry>
+ httpd
+ </entry></row><row><entry><literal>query_servers</literal></entry><entry>
+ query_servers
+ </entry></row><row><entry><literal>stats_aggregator</literal></entry><entry>
+ stats_aggregator
+ </entry></row><row><entry><literal>stats_collector</literal></entry><entry>
+ stats_collector
+ </entry></row><row><entry><literal>uuids</literal></entry><entry>
+ uuids
+ </entry></row><row><entry><literal>view_manager</literal></entry><entry>
+ view_manager
+ </entry></row></tbody></tgroup></table>
+
+  </section>
+
+  <section id="couchdb-single-config-options_httpd_db_handlers">
+
+    <title><literal>httpd_db_handlers</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/Config/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//config/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/Config.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<table id="table-couchdb-single-config-options-httpd_db_handlers-summary"><title>Configuration Groups</title><tgroup cols="2"><colspec colname="option"/><colspec colname="desc"/><thead><row><entry>Option</entry><entry>Description</entry></row></thead><tbody><row><entry><literal>_changes</literal></entry><entry>
+ _changes
+ </entry></row><row><entry><literal>_compact</literal></entry><entry>
+ _compact
+ </entry></row><row><entry><literal>_design</literal></entry><entry>
+ _design
+ </entry></row><row><entry><literal>_temp_view</literal></entry><entry>
+ _temp_view
+ </entry></row><row><entry><literal>_view_cleanup</literal></entry><entry>
+ _view_cleanup
+ </entry></row></tbody></tgroup></table>
+
+  </section>
+
+  <section id="couchdb-single-config-options_couch_httpd_auth">
+
+    <title><literal>couch_httpd_auth</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/Config/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//config/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/Config.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<table id="table-couchdb-single-config-options-couch_httpd_auth-summary"><title>Configuration Groups</title><tgroup cols="2"><colspec colname="option"/><colspec colname="desc"/><thead><row><entry>Option</entry><entry>Description</entry></row></thead><tbody><row><entry><literal>auth_cache_size</literal></entry><entry>
+ auth_cache_size
+ </entry></row><row><entry><literal>authentication_db</literal></entry><entry>
+ authentication_db
+ </entry></row><row><entry><literal>authentication_redirect</literal></entry><entry>
+ authentication_redirect
+ </entry></row><row><entry><literal>require_valid_user</literal></entry><entry>
+ require_valid_user
+ </entry></row><row><entry><literal>timeout</literal></entry><entry>
+ timeout
+ </entry></row></tbody></tgroup></table>
+
+  </section>
+
+  <section id="couchdb-single-config-options_httpd">
+
+    <title><literal>httpd</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/Config/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//config/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/Config.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<table id="table-couchdb-single-config-options-httpd-summary"><title>Configuration Groups</title><tgroup cols="2"><colspec colname="option"/><colspec colname="desc"/><thead><row><entry>Option</entry><entry>Description</entry></row></thead><tbody><row><entry><literal>nodelay</literal></entry><entry>
+ Enable TCP_NODELAY
+ </entry></row><row><entry><literal>allow_jsonp</literal></entry><entry>
+ allow_jsonp
+ </entry></row><row><entry><literal>authentication_handlers</literal></entry><entry>
+ authentication_handlers
+ </entry></row><row><entry><literal>bind_address</literal></entry><entry>
+ bind_address
+ </entry></row><row><entry><literal>default_handler</literal></entry><entry>
+ default_handler
+ </entry></row><row><entry><literal>max_connections</literal></entry><entry>
+ max_connections
+ </entry></row><row><entry><literal>port</literal></entry><entry>
+ port
+ </entry></row><row><entry><literal>secure_rewrites</literal></entry><entry>
+ secure_rewrites
+ </entry></row><row><entry><literal>vhost_global_handlers</literal></entry><entry>
+ vhost_global_handlers
+ </entry></row></tbody></tgroup></table>
+
+  </section>
+
+  <section id="couchdb-single-config-options_httpd_design_handlers">
+
+    <title><literal>httpd_design_handlers</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/Config/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//config/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/Config.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<table id="table-couchdb-single-config-options-httpd_design_handlers-summary"><title>Configuration Groups</title><tgroup cols="2"><colspec colname="option"/><colspec colname="desc"/><thead><row><entry>Option</entry><entry>Description</entry></row></thead><tbody><row><entry><literal>_info</literal></entry><entry>
+ _info
+ </entry></row><row><entry><literal>_list</literal></entry><entry>
+ _list
+ </entry></row><row><entry><literal>_rewrite</literal></entry><entry>
+ _rewrite
+ </entry></row><row><entry><literal>_show</literal></entry><entry>
+ _show
+ </entry></row><row><entry><literal>_update</literal></entry><entry>
+ _update
+ </entry></row><row><entry><literal>_view</literal></entry><entry>
+ _view
+ </entry></row></tbody></tgroup></table>
+
+  </section>
+
+  <section id="couchdb-single-config-options_httpd_global_handlers">
+
+    <title><literal>httpd_global_handlers</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/Config/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//config/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/Config.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<table id="table-couchdb-single-config-options-httpd_global_handlers-summary"><title>Configuration Groups</title><tgroup cols="2"><colspec colname="option"/><colspec colname="desc"/><thead><row><entry>Option</entry><entry>Description</entry></row></thead><tbody><row><entry><literal>/</literal></entry><entry>
+ /
+ </entry></row><row><entry><literal>_active_tasks</literal></entry><entry>
+ _active_tasks
+ </entry></row><row><entry><literal>_all_dbs</literal></entry><entry>
+ _all_dbs
+ </entry></row><row><entry><literal>_config</literal></entry><entry>
+ _config
+ </entry></row><row><entry><literal>_log</literal></entry><entry>
+ _log
+ </entry></row><row><entry><literal>_oauth</literal></entry><entry>
+ _oauth
+ </entry></row><row><entry><literal>_replicate</literal></entry><entry>
+ _replicate
+ </entry></row><row><entry><literal>_restart</literal></entry><entry>
+ _restart
+ </entry></row><row><entry><literal>_session</literal></entry><entry>
+ _session
+ </entry></row><row><entry><literal>_stats</literal></entry><entry>
+ _stats
+ </entry></row><row><entry><literal>_utils</literal></entry><entry>
+ _utils
+ </entry></row><row><entry><literal>_uuids</literal></entry><entry>
+ _uuids
+ </entry></row><row><entry><literal>favicon.ico</literal></entry><entry>
+ favicon.ico
+ </entry></row></tbody></tgroup></table>
+
+  </section>
+
+  <section id="couchdb-single-config-options_log">
+
+    <title><literal>log</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/Config/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//config/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/Config.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<table id="table-couchdb-single-config-options-log-summary"><title>Configuration Groups</title><tgroup cols="2"><colspec colname="option"/><colspec colname="desc"/><thead><row><entry>Option</entry><entry>Description</entry></row></thead><tbody><row><entry><literal>file</literal></entry><entry>
+ file
+ </entry></row><row><entry><literal>include_sasl</literal></entry><entry>
+ include_sasl
+ </entry></row><row><entry><literal>level</literal></entry><entry>
+ level
+ </entry></row></tbody></tgroup></table>
+
+  </section>
+
+  <section id="couchdb-single-config-options_query_servers">
+
+    <title><literal>query_servers</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/Config/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//config/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/Config.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<table id="table-couchdb-single-config-options-query_servers-summary"><title>Configuration Groups</title><tgroup cols="2"><colspec colname="option"/><colspec colname="desc"/><thead><row><entry>Option</entry><entry>Description</entry></row></thead><tbody><row><entry><literal>javascript</literal></entry><entry>
+ javascript
+ </entry></row></tbody></tgroup></table>
+
+  </section>
+
+  <section id="couchdb-single-config-options_query_server_config">
+
+    <title><literal>query_server_config</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/Config/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//config/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/Config.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<table id="table-couchdb-single-config-options-query_server_config-summary"><title>Configuration Groups</title><tgroup cols="2"><colspec colname="option"/><colspec colname="desc"/><thead><row><entry>Option</entry><entry>Description</entry></row></thead><tbody><row><entry><literal>reduce_limit</literal></entry><entry>
+ reduce_limit
+ </entry></row></tbody></tgroup></table>
+
+  </section>
+
+  <section id="couchdb-single-config-options_replicator">
+
+    <title><literal>replicator</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/Config/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//config/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/Config.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<table id="table-couchdb-single-config-options-replicator-summary"><title>Configuration Groups</title><tgroup cols="2"><colspec colname="option"/><colspec colname="desc"/><thead><row><entry>Option</entry><entry>Description</entry></row></thead><tbody><row><entry><literal>max_http_pipeline_size</literal></entry><entry>
+ max_http_pipeline_size
+ </entry></row><row><entry><literal>max_http_sessions</literal></entry><entry>
+ max_http_sessions
+ </entry></row></tbody></tgroup></table>
+
+  </section>
+
+  <section id="couchdb-single-config-options_stats">
+
+    <title><literal>stats</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/Config/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//config/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/Config.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<table id="table-couchdb-single-config-options-stats-summary"><title>Configuration Groups</title><tgroup cols="2"><colspec colname="option"/><colspec colname="desc"/><thead><row><entry>Option</entry><entry>Description</entry></row></thead><tbody><row><entry><literal>rate</literal></entry><entry>
+ rate
+ </entry></row><row><entry><literal>samples</literal></entry><entry>
+ samples
+ </entry></row></tbody></tgroup></table>
+
+  </section>
+
+  <section id="couchdb-single-config-options_uuids">
+
+    <title><literal>uuids</literal> Configuration Options</title>
+
+    <para>
+      &nbsp;
+    </para>
+
+    <remark role="dependency-meta" condition="../DocKit/bin/CouchDocs/Config/Parser.pm"/>
+<remark role="dependency-meta" condition="../metadocs//config/couchdb.xml"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs/Config.pm"/>
+<remark role="dependency-tool" condition="../DocKit/bin/CouchDocs.pm"/>
+<table id="table-couchdb-single-config-options-uuids-summary"><title>Configuration Groups</title><tgroup cols="2"><colspec colname="option"/><colspec colname="desc"/><thead><row><entry>Option</entry><entry>Description</entry></row></thead><tbody><row><entry><literal>algorithm</literal></entry><entry>
+ algorithm
+ </entry></row></tbody></tgroup></table>
+
+  </section>
+
+</section>
