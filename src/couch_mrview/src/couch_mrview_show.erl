@@ -250,7 +250,7 @@ list_cb(complete, Acc) ->
     {ok, Resp2}.
 
 start_list_resp(Head, Acc) ->
-    #lacc{db=Db, req=Req, qserver=QServer, lname=LName, etag=ETag} = Acc,
+    #lacc{db=Db, req=Req, qserver=QServer, lname=LName} = Acc,
     JsonReq = couch_httpd_external:json_req_obj(Req, Db),
 
     [<<"start">>,Chunk,JsonResp] = couch_query_servers:ddoc_proc_prompt(QServer,
