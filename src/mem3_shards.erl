@@ -207,7 +207,7 @@ changes_callback({stop, EndSeq}, _) ->
 changes_callback({change, {Change}, _}, _) ->
     DbName = couch_util:get_value(<<"id">>, Change),
     case DbName of <<"_design/", _/binary>> -> ok; _Else ->
-        case couch_util:get_value(deleted, Change, false) of
+        case mem3_util:is_deleted(Change) of
         true ->
             gen_server:cast(?MODULE, {cache_remove, DbName});
         false ->

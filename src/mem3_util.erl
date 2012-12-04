@@ -17,7 +17,7 @@
 -export([hash/1, name_shard/2, create_partition_map/5, build_shards/2,
     n_val/2, to_atom/1, to_integer/1, write_db_doc/1, delete_db_doc/1,
     shard_info/1, ensure_exists/1, open_db_doc/1]).
--export([owner/2]).
+-export([owner/2, is_deleted/1]).
 
 -export([create_partition_map/4, name_shard/1]).
 -deprecated({create_partition_map, 4, eventually}).
@@ -187,3 +187,12 @@ owner(DbName, DocId) ->
     [#shard{node=Node}] = lists:usort(fun(#shard{name=A}, #shard{name=B}) ->
                                               A =< B  end, LiveShards),
     node() =:= Node.
+
+is_deleted(Change) ->
+    case couch_util:get_value(<<"deleted">>, Change) of
+    undefined ->
+        % keep backwards compatibility for a while
+        couch_util:get_value(deleted, Change, false);
+    Else ->
+        Else
+    end.
