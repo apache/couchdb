@@ -24,18 +24,20 @@ define([
 
 function(app, Initialize, FauxtonAPI, Fauxton, Dashboard, Databases, Documents, API, Log, Config) {
 
-  var defaultTemplate = 'with_sidebar';
+  var defaultLayout = 'with_sidebar';
   // TODO: auto generate this list if possible
   var modules = [Databases, Documents];
 
   var generateRoute = function(settingsGenerator) {
     return function() {
       var settings = settingsGenerator.apply(null, arguments);
-      var templateName = settings.template || defaultTemplate;
+      var layoutName = settings.layout || defaultLayout;
       var establish = settings.establish || function() { return null; };
       var dashboard = this.dashboard;
 
-      dashboard.setTemplate(templateName);
+      console.log("Settings generator for: "+layoutName, settings);
+
+      dashboard.setTemplate(layoutName);
       dashboard.clearBreadcrumbs();
 
       if (settings.crumbs) {
@@ -48,11 +50,8 @@ function(app, Initialize, FauxtonAPI, Fauxton, Dashboard, Databases, Documents, 
         _.each(settings.views, function(view, selector) {
           dashboard.setView(selector, view);
 
-          $.when(null, view.establish()).done(function(resp) {
-            // HACK: need to find a permanent solution to this
-            setTimeout(function() {
-              dashboard.renderView(selector);
-            }, 0);
+          $.when.apply(null, view.establish()).done(function(resp) {
+            dashboard.renderView(selector);
           });
         });
       });

@@ -9,7 +9,153 @@ define([
 ],
 
 function(app, FauxtonAPI, Documents, Databases) {
+  var codeEditorCallback = function(databaseName, docID) {
+    var data = {
+      database: new Databases.Model({id:databaseName}),
+      doc: new Documents.Doc({
+        "_id": docID
+      }),
+      selected: "code_editor"
+    };
+    data.doc.database = data.database;
+    data.designDocs = new Documents.AllDocs(null, {
+      database: data.database,
+      params: {startkey: '"_design"',
+               endkey: '"_design1"',
+               include_docs: true}
+    });
+
+    var options = app.getParams();
+    options.include_docs = true;
+    data.database.buildAllDocs(options);
+
+    return {
+      layout: "one_pane",
+
+      data: data,
+
+      crumbs: [
+        {"name": "Dashboard", "link": app.root},
+        {"name": "Databases", "link": app.root},
+        {"name": data.database.id, "link": Databases.databaseUrl(data.database)},
+        {"name": docID, "link": "#"}
+      ],
+
+      views: {
+        "#dashboard-content": new Documents.Views.Doc({
+          model: data.doc
+        }),
+
+        "#tabs": new Documents.Views.FieldEditorTabs({
+          selected: data.selected,
+          model: data.doc
+        })
+      },
+
+      apiUrl: data.doc.url()
+    };
+  };
+
+  // HACK: this kind of works
+  // Basically need a way to share state between different routes, for
+  // instance making a new doc won't work for switching back and forth
+  // between code and field editors
+  var newDocCodeEditorCallback = function(databaseName) {
+    var data = {
+      database: new Databases.Model({id:databaseName}),
+      doc: new Documents.NewDoc(),
+      selected: "code_editor"
+    };
+    data.doc.database = data.database;
+    data.designDocs = new Documents.AllDocs(null, {
+      database: data.database,
+      params: {startkey: '"_design"',
+               endkey: '"_design1"',
+               include_docs: true}
+    });
+
+    var options = app.getParams();
+    options.include_docs = true;
+    data.database.buildAllDocs(options);
+
+    return {
+      layout: "one_pane",
+
+      data: data,
+
+      crumbs: [
+        {"name": "Dashboard", "link": app.root},
+        {"name": "Databases", "link": app.root},
+        {"name": data.database.id, "link": Databases.databaseUrl(data.database)},
+        {"name": "new", "link": "#"}
+      ],
+
+      views: {
+        "#dashboard-content": new Documents.Views.Doc({
+          model: data.doc
+        }),
+
+        "#tabs": new Documents.Views.FieldEditorTabs({
+          selected: data.selected,
+          model: data.doc
+        })
+      },
+
+      apiUrl: data.doc.url()
+    };
+  };
+
   Documents.Routes = {
+    "database/:database/:doc/field_editor": function(databaseName, docID) {
+      var data = {
+        database: new Databases.Model({id:databaseName}),
+        doc: new Documents.Doc({
+          "_id": docID
+        }),
+        selected: "field_editor"
+      };
+      data.doc.database = data.database;
+      data.designDocs = new Documents.AllDocs(null, {
+        database: data.database,
+        params: {startkey: '"_design"',
+                 endkey: '"_design1"',
+                 include_docs: true}
+      });
+
+      var options = app.getParams();
+      options.include_docs = true;
+      data.database.buildAllDocs(options);
+
+      return {
+        layout: "one_pane",
+
+        data: data,
+
+        crumbs: [
+          {"name": "Dashboard", "link": app.root},
+          {"name": "Databases", "link": app.root},
+          {"name": data.database.id, "link": Databases.databaseUrl(data.database)},
+          {"name": docID, "link": "#"}
+        ],
+
+        views: {
+          "#dashboard-content": new Documents.Views.DocFieldEditor({
+            model: data.doc
+          }),
+
+          "#tabs": new Documents.Views.FieldEditorTabs({
+            selected: data.selected,
+            model: data.doc
+          })
+        },
+
+        apiUrl: data.doc.url()
+      };
+    },
+
+    "database/:database/:doc/code_editor": codeEditorCallback,
+    "database/:database/:doc": codeEditorCallback,
+
     // HACK
     // The ordering of routes is different in this object that the
     // routes object in the Backbone.Router. As a result, the
@@ -24,14 +170,14 @@ function(app, FauxtonAPI, Documents, Databases) {
     // when we need it.
     // The inability to use regex based routes here is a design flaw
     // and should be rectified.
-    "database/:database/:doc": function(databaseName, docID) {
+    "old_database/:database/:doc": function(databaseName, docID) {
       var data = {
         database: new Databases.Model({id:databaseName}),
         doc: new Documents.Doc({
           "_id": docID
         })
       };
-      data.doc.collection = data.database;
+      data.doc.database = data.database;
       data.designDocs = new Documents.AllDocs(null, {
         database: data.database,
         params: {startkey: '"_design"',
@@ -110,6 +256,8 @@ function(app, FauxtonAPI, Documents, Databases) {
         apiUrl: data.database.allDocs.url()
       };
     },
+
+    "database/:database/new": newDocCodeEditorCallback,
 
     "database/:database/_design/:ddoc/_view/:view": function(databaseName, ddoc, view) {
       // alert("This will filter your data by the " + ddoc + "/" + view + "view.");

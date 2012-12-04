@@ -43,12 +43,14 @@ function(app, FauxtonAPI, Documents, Views, Routes) {
       return false;
     },
 
-    url: function() {
-      return app.host + "/" + this.id;
-    },
-
-    pageUrl: function() {
-      return "/database/" + this.id;
+    url: function(context) {
+      if (context === "index") {
+        return "/database/" + this.id + "/_all_docs";
+      } else if (context === "app") {
+        return "/database/" + this.id;
+      } else {
+        return app.host + "/" + this.id;
+      }
     }
   });
 

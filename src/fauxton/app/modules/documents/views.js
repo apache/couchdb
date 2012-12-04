@@ -19,6 +19,60 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     template: "documents/tabs"
   });
 
+  Views.FieldEditorTabs = FauxtonAPI.View.extend({
+    template: "documents/doc_field_editor_tabs",
+
+    initialize: function(options) {
+      this.selected = options.selected;
+    },
+
+    events: {
+      "click button.delete": "destroy",
+      "click button.duplicate": "duplicate"
+    },
+
+    destroy: function(event) {
+      if (!window.confirm("Are you sure you want to delete this doc?")) {
+        return false;
+      }
+
+      var database = this.model.database;
+
+      this.model.destroy().then(function(resp) {
+        FauxtonAPI.addNotification({
+          msg: "Succesfully destroyed your doc"
+        });
+        FauxtonAPI.navigate(database.url("index"));
+      }, function(resp) {
+        FauxtonAPI.addNotification({
+          msg: "Failed to destroy your doc!",
+          type: "error"
+        });
+      });
+    },
+
+    duplicate: function(event) {
+      FauxtonAPI.addNotification({
+        type: "warning",
+        msg: "Duplicate functionality coming soon."
+      });
+    },
+
+    serialize: function() {
+      var selected = this.selected;
+      return {
+        doc: this.model,
+        isSelectedClass: function(item) {
+          return item && item === selected ? "active" : "";
+        }
+      };
+    },
+
+    establish: function() {
+      return [this.model.fetch()];
+    }
+  });
+
   Views.Document = FauxtonAPI.View.extend({
     template: "documents/all_docs_item",
     tagName: "tr",
@@ -33,6 +87,10 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
       };
     },
 
+    establish: function() {
+      return [this.model.fetch()];
+    },
+
     destroy: function(event) {
       event.preventDefault();
       var that = this;
@@ -41,7 +99,6 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
         return false;
       }
 
-      window.theDoc = this.model;
       this.model.destroy().then(function(resp) {
         FauxtonAPI.addNotification({
           msg: "Succesfully destroyed your doc"
@@ -217,10 +274,38 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     }
   });
 
+  Views.DocFieldEditor = FauxtonAPI.View.extend({
+    template: "documents/doc_field_editor",
+
+    events: {
+      "click button.save": "saveDoc"
+    },
+
+    saveDoc: function(event) {
+      FauxtonAPI.addNotification({
+        type: "warning",
+        msg: "Save functionality coming soon."
+      });
+    },
+
+    serialize: function() {
+      return {
+        doc: this.getModel()
+      };
+    },
+
+    getModel: function() {
+      return this.model;
+    },
+
+    establish: function() {
+      return [this.model.fetch()];
+    }
+  });
+
   Views.Sidebar = FauxtonAPI.View.extend({
     template: "documents/sidebar",
     events: {
-      "click a.new#doc": "newDocument",
       "click a.new#index": "newIndex",
       "click .nav-list.views a.new": "showNew",
       // "click .nav-list.views a.toggle-view": "toggleView",
@@ -241,13 +326,9 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     serialize: function() {
       return {
         index: [1,2,3],
-        view: [1,2]
+        view: [1,2],
+        database: this.collection.database
       };
-    },
-
-    newDocument: function(event){
-      event.preventDefault();
-      alert('coming soon');
     },
 
     newIndex:  function(event){

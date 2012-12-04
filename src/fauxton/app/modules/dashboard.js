@@ -72,7 +72,7 @@ function(app, Fauxton) {
 
     setView: function(selector, view) {
       this.layoutViews[selector] = this.layout.setView(selector, view);
-      this.renderView(selector);
+      //this.renderView(selector);
     },
 
     renderView: function(selector) {

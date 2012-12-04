@@ -1,8 +1,7 @@
 define([
   "app",
 
-  // Libs
-  "backbone",
+  "fauxton_api",
 
   // Views
   "modules/documents/views"
@@ -10,14 +9,24 @@ define([
   // Plugins
 ],
 
-function(app, Backbone, Views) {
+function(app, FauxtonAPI, Views) {
   var Documents = app.module();
 
   Documents.Doc = Backbone.Model.extend({
     idAttribute: "_id",
 
-    url: function() {
-      return app.host + "/" + this.getDatabase().id + "/" + this.id;
+    url: function(context) {
+      if (context === "app") {
+        return this.getDatabase().url("app") + "/" + this.safeID();
+      } else {
+        return app.host + "/" + this.getDatabase().id + "/" + this.id;
+      }
+    },
+
+    initialize: function() {
+      if (this.collection && this.collection.database) {
+        this.database = this.collection.database;
+      }
     },
 
     // HACK: the doc needs to know about the database, but it may be
@@ -47,10 +56,6 @@ function(app, Backbone, Views) {
       });
     },
 
-    pageUrl: function() {
-      return this.getDatabase().pageUrl() + "/" + this.safeID();
-    },
-
     parse: function(resp) {
       if (resp.rev) {
         resp._rev = resp.rev;
@@ -73,6 +78,21 @@ function(app, Backbone, Views) {
       var data = this.get("doc") ? this.get("doc") : this;
 
       return JSON.stringify(data, null, "  ");
+    }
+  });
+
+  Documents.NewDoc = Documents.Doc.extend({
+    fetch: function() {
+      var uuid = new FauxtonAPI.UUID();
+      var deferred = this.deferred = $.Deferred();
+      var that = this;
+
+      uuid.fetch().done(function() {
+        that.set("_id", uuid.next());
+        deferred.resolve();
+      });
+
+      return deferred.promise();
     }
   });
 
@@ -134,10 +154,6 @@ function(app, Backbone, Views) {
           doc: row.doc || undefined
         };
       });
-    },
-
-    pageUrl: function() {
-      console.log("Documents.Index.pageUrl");
     },
 
     buildAllDocs: function(){

@@ -21,6 +21,10 @@ function(app, Dashboard, Fauxton) {
     }
   });
 
+  FauxtonAPI.navigate = function(url) {
+    Backbone.history.navigate(url, true);
+  };
+
   FauxtonAPI.addHeaderLink = function(link) {
     app.dashboard.navBar.addLink(link);
   };
@@ -47,6 +51,21 @@ function(app, Dashboard, Fauxton) {
 
     return view.renderNotification();
   };
+
+  FauxtonAPI.UUID = Backbone.Model.extend({
+    initialize: function(options) {
+      options = _.extend({count: 1}, options);
+      this.count = options.count;
+    },
+
+    url: function() {
+      return app.host + "/_uuids?count=" + this.count;
+    },
+
+    next: function() {
+      return this.get("uuids").pop();
+    }
+  });
 
   return app.fauxtonAPI = FauxtonAPI;
 });
