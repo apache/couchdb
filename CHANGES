@@ -21,6 +21,8 @@ HTTP Interface:
    See http://www.w3.org/TR/eventsource/ for details.
  * Make password hashing synchronous when using the /_config/admins API.
  * Include user name in show/list ETags.
+ * Experimental support for Cross-Origin Resource Sharing (CORS).
+   See http://www.w3.org/TR/cors/ for details.
 
 Replicator:
 

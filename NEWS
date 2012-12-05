@@ -29,6 +29,7 @@ This version has not been released yet.
  * Server-wide UUID in some replication ids.
  * E4X support in views is now deprecated and will be removed
    in a future version.
+ * Experimental support for Cross-Origin Resource Sharing (CORS).
 
 Version 1.2.1
 -------------

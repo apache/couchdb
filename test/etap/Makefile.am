@@ -91,4 +91,5 @@ EXTRA_DIST = \
     200-view-group-no-db-leaks.t \
     201-view-group-shutdown.t \
     210-os-proc-pool.t \
-    220-compaction-daemon.t
+    220-compaction-daemon.t \
+    231-cors.t
