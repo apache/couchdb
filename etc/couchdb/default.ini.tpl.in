@@ -249,7 +249,7 @@ socket_options = [{keepalive, true}, {nodelay, false}]
 ;cert_file = /full/path/to/server_cert.pem
 ; Path to file containing user's private PEM encoded key.
 ;key_file = /full/path/to/server_key.pem
-; String containing the user's password. Only used if the private keyfile is password protected. 
+; String containing the user's password. Only used if the private keyfile is password protected.
 ;password = somepassword
 ; Set to true to validate peer certificates.
 verify_ssl_certificates = false
