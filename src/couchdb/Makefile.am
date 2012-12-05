@@ -80,7 +80,7 @@ source_files = \
     couch_work_queue.erl \
     json_stream_parse.erl
 
-EXTRA_DIST = $(source_files) couch_db.hrl couch_js_functions.hrl 
+EXTRA_DIST = $(source_files) couch_db.hrl couch_js_functions.hrl
 
 compiled_files = \
     couch.app \
