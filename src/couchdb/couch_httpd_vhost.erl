@@ -15,7 +15,7 @@
 
 -export([start_link/0, config_change/2, reload/0, get_state/0, dispatch_host/1]).
 -export([urlsplit_netloc/2, redirect_to_vhost/2]).
-
+-export([host/1, split_host_port/1]).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
@@ -98,15 +98,7 @@ dispatch_host(MochiReq) ->
     {"/" ++ VPath, Query, Fragment} = mochiweb_util:urlsplit_path(MochiReq:get(raw_path)),
     VPathParts =  string:tokens(VPath, "/"),
 
-    XHost = couch_config:get("httpd", "x_forwarded_host", "X-Forwarded-Host"),
-    VHost = case MochiReq:get_header_value(XHost) of
-        undefined ->
-            case MochiReq:get_header_value("Host") of
-                undefined -> [];
-                Value1 -> Value1
-            end;
-        Value -> Value
-    end,
+    VHost = host(MochiReq),
     {VHostParts, VhostPort} = split_host_port(VHost),
     FinalMochiReq = case try_bind_vhost(VHosts, lists:reverse(VHostParts),
             VhostPort, VPathParts) of
@@ -243,6 +235,19 @@ bind_path(_, _) ->
 
 
 %% create vhost list from ini
+
+host(MochiReq) ->
+    XHost = couch_config:get("httpd", "x_forwarded_host",
+                             "X-Forwarded-Host"),
+    case MochiReq:get_header_value(XHost) of
+        undefined ->
+            case MochiReq:get_header_value("Host") of
+                undefined -> [];
+                Value1 -> Value1
+            end;
+        Value -> Value
+    end.
+
 make_vhosts() ->
     Vhosts = lists:foldl(fun
                 ({_, ""}, Acc) ->

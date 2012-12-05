@@ -30,6 +30,7 @@
 -export([send_response/4,send_method_not_allowed/2,send_error/4, send_redirect/2,send_chunked_error/2]).
 -export([send_json/2,send_json/3,send_json/4,last_chunk/1,parse_multipart_request/3]).
 -export([accepted_encodings/1,handle_request_int/5,validate_referer/1,validate_ctype/2]).
+-export([http_1_0_keep_alive/2]).
 
 start_link() ->
     start_link(http).
@@ -279,7 +280,10 @@ handle_request_int(MochiReq, DefaultFun,
 
     % allow broken HTTP clients to fake a full method vocabulary with an X-HTTP-METHOD-OVERRIDE header
     MethodOverride = MochiReq:get_primary_header_value("X-HTTP-Method-Override"),
-    Method2 = case lists:member(MethodOverride, ["GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT", "COPY"]) of
+    Method2 = case lists:member(MethodOverride, ["GET", "HEAD", "POST",
+                                                 "PUT", "DELETE",
+                                                 "TRACE", "CONNECT",
+                                                 "COPY"]) of
     true ->
         ?LOG_INFO("MethodOverride: ~s (real method was ~s)", [MethodOverride, Method1]),
         case Method1 of
@@ -318,9 +322,14 @@ handle_request_int(MochiReq, DefaultFun,
 
     {ok, Resp} =
     try
+        case couch_httpd_cors:is_preflight_request(HttpReq) of
+        #httpd{} ->
         case authenticate_request(HttpReq, AuthHandlers) of
         #httpd{} = Req ->
             HandlerFun(Req);
+        Response ->
+            Response
+            end;
         Response ->
             Response
         end
@@ -454,10 +463,14 @@ accepted_encodings(#httpd{mochi_req=MochiReq}) ->
 serve_file(Req, RelativePath, DocumentRoot) ->
     serve_file(Req, RelativePath, DocumentRoot, []).
 
-serve_file(#httpd{mochi_req=MochiReq}=Req, RelativePath, DocumentRoot, ExtraHeaders) ->
+serve_file(#httpd{mochi_req=MochiReq}=Req, RelativePath, DocumentRoot,
+           ExtraHeaders) ->
     log_request(Req, 200),
+    ResponseHeaders = server_header()
+        ++ couch_httpd_auth:cookie_auth_header(Req, [])
+        ++ ExtraHeaders,
     {ok, MochiReq:serve_file(RelativePath, DocumentRoot,
-        server_header() ++ couch_httpd_auth:cookie_auth_header(Req, []) ++ ExtraHeaders)}.
+            couch_httpd_cors:cors_headers(Req, ResponseHeaders))}.
 
 qs_value(Req, Key) ->
     qs_value(Req, Key, undefined).
@@ -607,7 +620,10 @@ log_request(#httpd{mochi_req=MochiReq,peer=Peer}, Code) ->
 start_response_length(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Length) ->
     log_request(Req, Code),
     couch_stats_collector:increment({httpd_status_codes, Code}),
-    Resp = MochiReq:start_response_length({Code, Headers ++ server_header() ++ couch_httpd_auth:cookie_auth_header(Req, Headers), Length}),
+    Headers1 = Headers ++ server_header() ++
+               couch_httpd_auth:cookie_auth_header(Req, Headers),
+    Headers2 = couch_httpd_cors:cors_headers(Req, Headers1),
+    Resp = MochiReq:start_response_length({Code, Headers2, Length}),
     case MochiReq:get(method) of
     'HEAD' -> throw({http_head_abort, Resp});
     _ -> ok
@@ -618,7 +634,8 @@ start_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers) ->
     log_request(Req, Code),
     couch_stats_collector:increment({httpd_status_codes, Code}),
     CookieHeader = couch_httpd_auth:cookie_auth_header(Req, Headers),
-    Headers2 = Headers ++ server_header() ++ CookieHeader,
+    Headers1 = Headers ++ server_header() ++ CookieHeader,
+    Headers2 = couch_httpd_cors:cors_headers(Req, Headers1),
     Resp = MochiReq:start_response({Code, Headers2}),
     case MochiReq:get(method) of
         'HEAD' -> throw({http_head_abort, Resp});
@@ -650,8 +667,11 @@ http_1_0_keep_alive(Req, Headers) ->
 start_chunked_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers) ->
     log_request(Req, Code),
     couch_stats_collector:increment({httpd_status_codes, Code}),
-    Headers2 = http_1_0_keep_alive(MochiReq, Headers),
-    Resp = MochiReq:respond({Code, Headers2 ++ server_header() ++ couch_httpd_auth:cookie_auth_header(Req, Headers2), chunked}),
+    Headers1 = http_1_0_keep_alive(MochiReq, Headers),
+    Headers2 = Headers1 ++ server_header() ++
+               couch_httpd_auth:cookie_auth_header(Req, Headers1),
+    Headers3 = couch_httpd_cors:cors_headers(Req, Headers2),
+    Resp = MochiReq:respond({Code, Headers3, chunked}),
     case MochiReq:get(method) of
     'HEAD' -> throw({http_head_abort, Resp});
     _ -> ok
@@ -672,14 +692,18 @@ last_chunk(Resp) ->
 send_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Body) ->
     log_request(Req, Code),
     couch_stats_collector:increment({httpd_status_codes, Code}),
-    Headers2 = http_1_0_keep_alive(MochiReq, Headers),
+    Headers1 = http_1_0_keep_alive(MochiReq, Headers),
     if Code >= 500 ->
         ?LOG_ERROR("httpd ~p error response:~n ~s", [Code, Body]);
     Code >= 400 ->
         ?LOG_DEBUG("httpd ~p error response:~n ~s", [Code, Body]);
     true -> ok
     end,
-    {ok, MochiReq:respond({Code, Headers2 ++ server_header() ++ couch_httpd_auth:cookie_auth_header(Req, Headers2), Body})}.
+    Headers2 = Headers1 ++ server_header() ++
+               couch_httpd_auth:cookie_auth_header(Req, Headers1),
+    Headers3 = couch_httpd_cors:cors_headers(Req, Headers2),
+
+    {ok, MochiReq:respond({Code, Headers3, Body})}.
 
 send_method_not_allowed(Req, Methods) ->
     send_error(Req, 405, [{"Allow", Methods}], <<"method_not_allowed">>, ?l2b("Only " ++ Methods ++ " allowed")).
