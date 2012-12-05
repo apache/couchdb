@@ -31,7 +31,7 @@ save_to_file({{Section, Key}, Value}, File) ->
     Lines = re:split(OldFileContents, "\r\n|\n|\r|\032", [{return, list}]),
 
     SectionLine = "[" ++ Section ++ "]",
-    {ok, Pattern} = re:compile(["^(", Key, "\\s*=)|\\[[a-zA-Z0-9\_-]*\\]"]),
+    {ok, Pattern} = re:compile(["^(", Key, "\\s*=)|\\[[a-zA-Z0-9\.\_-]*\\]"]),
 
     NewLines = process_file_lines(Lines, [], SectionLine, Pattern, Key, Value),
     NewFileContents = reverse_and_add_newline(strip_empty_lines(NewLines), []),
