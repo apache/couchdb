@@ -25,7 +25,7 @@ Dependencies
 
 You should have the following installed:
 
- * Erlang OTP (>=R12B5)       (http://erlang.org/)
+ * Erlang OTP (>=R13B04)      (http://erlang.org/)
  * ICU                        (http://icu.sourceforge.net/)
  * OpenSSL                    (http://www.openssl.org/)
  * Mozilla SpiderMonkey (1.7) (http://www.mozilla.org/js/spidermonkey/)
@@ -34,7 +34,7 @@ You should have the following installed:
  * libcurl                    (http://curl.haxx.se/libcurl/)
  * help2man                   (http://www.gnu.org/s/help2man/)
 
-It is recommended that you install Erlang OTP R12B-5 or above where possible.
+It is recommended that you install Erlang OTP R13B-4 or above where possible.
 You will only need libcurl if you plan to run the JavaScript test suite. And
 help2man is only need if you plan on installing the CouchDB man pages.
 
