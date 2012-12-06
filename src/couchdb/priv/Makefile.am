@@ -10,6 +10,8 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
+MAKE_SAFE = $(MAKE)
+
 couchlibdir = $(localerlanglibdir)/couch-$(version)
 couchprivdir = $(couchlibdir)/priv
 couchprivlibdir = $(couchlibdir)/priv/lib
@@ -77,7 +79,7 @@ couchpriv_PROGRAMS = couchspawnkillable
 # Depend on source files so distributed man pages are not rebuilt for end user.
 
 $(man_file): $(COUCHJS_SRCS)
-	$(MAKE) -f Makefile couchjs; \
+	$(MAKE_SAFE) -f Makefile couchjs; \
 	$(top_srcdir)/build-aux/missing --run \
 	    help2man \
 	        --no-info \

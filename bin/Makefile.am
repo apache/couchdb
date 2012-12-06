@@ -10,6 +10,8 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
+MAKE_SAFE = $(MAKE)
+
 if WINDOWS
 bin_SCRIPTS = couchdb.bat
 else
@@ -122,7 +124,7 @@ couch-config_dev: couch-config.tpl
 # Depend on source files so distributed man pages are not rebuilt for end user.
 
 $(man_file): couchdb.tpl.in
-	$(MAKE) -f Makefile couchdb; \
+	$(MAKE_SAFE) -f Makefile couchdb; \
 	$(top_srcdir)/build-aux/missing --run \
 	    help2man \
 	        --no-info \
