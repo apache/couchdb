@@ -10,9 +10,10 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
+MAKE_SAFE = $(MAKE)
+
 SPHINXOPTS = \
-    -d doctrees \
-    -n -c $(srcdir)/../src \ \
+    -n -c $(srcdir)/../src \
     -A local=1 \
     $(srcdir)/../src
 
@@ -201,47 +202,74 @@ $(html_files): html
 $(info_file_dist): info.stamp
 	@if test -f $@; then :; else \
 	    rm -f info.stamp; \
-	    $(MAKE) $(AM_MAKEFLAGS) info.stamp; \
+	    $(MAKE_SAFE) $(AM_MAKEFLAGS) info.stamp; \
 	fi
 
 info.stamp: $(image_files) $(src_files)
-	@rm -f info.tmp
-	@touch info.tmp
-	$(top_srcdir)/build-aux/sphinx-build \
-	    -b texinfo $(SPHINXOPTS) $(builddir)/texinfo
-	$(MAKE) -C texinfo info
-	$(top_srcdir)/build-aux/sphinx-touch $(info_file_dist)
-	@mv -f info.tmp $@
+	trap "rm -rf info.lock info.stamp" 1 2 13 15; \
+	if mkdir info.lock 2>/dev/null; then \
+	    rm -f info.tmp; \
+	    touch info.tmp; \
+	    $(top_srcdir)/build-aux/sphinx-build \
+	        -b texinfo $(SPHINXOPTS) $(builddir)/texinfo; \
+	    $(MAKE_SAFE) -C texinfo info; \
+	    $(top_srcdir)/build-aux/sphinx-touch $(info_file_dist); \
+	    mv -f info.tmp $@; \
+	    rmdir info.lock; \
+	else \
+	    while test -d info.lock; do \
+	        sleep 1; \
+	    done; \
+	    test -f info.stamp; \
+	fi
 
 $(pdf_file_dist): pdf.stamp
 	@if test -f $@; then :; else \
 	    rm -f pdf.stamp; \
-	    $(MAKE) $(AM_MAKEFLAGS) pdf.stamp; \
+	    $(MAKE_SAFE) $(AM_MAKEFLAGS) pdf.stamp; \
 	fi
 
 pdf.stamp: $(image_files) $(src_files)
-	@rm -f pdf.tmp
-	@touch pdf.tmp
-	$(top_srcdir)/build-aux/sphinx-build \
-	    -b latex $(SPHINXOPTS) $(builddir)/latex
-	$(MAKE) -C latex all-pdf
-	$(top_srcdir)/build-aux/sphinx-touch latex/CouchDB.pdf
-	gzip -9 < latex/CouchDB.pdf > $(pdf_file_dist)
-	@mv -f pdf.tmp $@
+	trap "rm -rf pdf.lock pdf.stamp" 1 2 13 15; \
+	if mkdir pdf.lock 2>/dev/null; then \
+	    rm -f pdf.tmp; \
+	    touch pdf.tmp; \
+	    $(top_srcdir)/build-aux/sphinx-build \
+	        -b latex $(SPHINXOPTS) $(builddir)/latex; \
+	    $(MAKE_SAFE) -C latex all-pdf; \
+	    $(top_srcdir)/build-aux/sphinx-touch latex/CouchDB.pdf; \
+	    gzip -9 < latex/CouchDB.pdf > $(pdf_file_dist); \
+	    mv -f pdf.tmp $@; \
+	    rmdir pdf.lock; \
+	else \
+	    while test -d pdf.lock; do \
+	        sleep 1; \
+	    done; \
+	    test -f pdf.stamp; \
+	fi
 
 $(html_files): html.stamp
 	@if test -f $@; then :; else \
 	    rm -f html.stamp; \
-	    $(MAKE) $(AM_MAKEFLAGS) html.stamp; \
+	    $(MAKE_SAFE) $(AM_MAKEFLAGS) html.stamp; \
 	fi
 
 html.stamp: $(image_files) $(src_files) $(src_files_html)
-	@rm -f html.tmp
-	@touch html.tmp
-	$(top_srcdir)/build-aux/sphinx-build \
-	    -b html $(SPHINXOPTS) $(builddir)/html
-	$(top_srcdir)/build-aux/sphinx-touch $(html_files)
-	@mv -f html.tmp $@
+	trap "rm -rf html.lock html.stamp" 1 2 13 15; \
+	if mkdir html.lock 2>/dev/null; then \
+	    rm -f html.tmp; \
+	    touch html.tmp; \
+	    $(top_srcdir)/build-aux/sphinx-build \
+	        -b html $(SPHINXOPTS) $(builddir)/html; \
+	    $(top_srcdir)/build-aux/sphinx-touch $(html_files); \
+	    mv -f html.tmp $@; \
+	    rmdir html.lock; \
+	else \
+	    while test -d html.lock; do \
+	        sleep 1; \
+	    done; \
+	    test -f html.stamp; \
+	fi
 
 pdf-local:
 	$(MAKE) $(AM_MAKEFLAGS) pdf.stamp
