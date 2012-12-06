@@ -1,4 +1,8 @@
 define([
+  // Load require for use in nested requiring
+  // as per the note in: http://requirejs.org/docs/api.html#multiversion
+  "require",
+
   // Application.
   "app",
 
@@ -19,10 +23,12 @@ define([
 
   // this needs to be added as a plugin later
   "modules/log",
-  "modules/config"
+  "modules/config",
+
+  "load_modules"
 ],
 
-function(app, Initialize, FauxtonAPI, Fauxton, Dashboard, Databases, Documents, API, Log, Config) {
+function(req, app, Initialize, FauxtonAPI, Fauxton, Dashboard, Databases, Documents, API, Log, Config, LoadModules) {
 
   var defaultLayout = 'with_sidebar';
   // TODO: auto generate this list if possible
@@ -75,9 +81,22 @@ function(app, Initialize, FauxtonAPI, Fauxton, Dashboard, Databases, Documents, 
 
     setModuleRoutes: function() {
       var addModuleRoute = this.addModuleRoute;
+      var that = this;
+
       _.each(modules, function(module) {
         _.each(module.Routes, addModuleRoute, this);
       }, this);
+
+      req(LoadModules.modules, function() {
+        var modules = arguments;
+        _.each(modules, function(module) {
+          module.initialize();
+
+          if (module.Routes) {
+            _.each(module.Routes, addModuleRoute, that);
+          }
+        });
+      });
     },
 
     initialize: function() {

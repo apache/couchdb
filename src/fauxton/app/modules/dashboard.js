@@ -18,7 +18,7 @@ function(app, Fauxton) {
     this.apiBar = apiBar;
 
     this.layout = new Backbone.Layout({
-      template: "layouts/with_sidebar",
+      template: "templates/layouts/with_sidebar",
 
       views: {
         "#primary-navbar": this.navBar,
@@ -39,7 +39,7 @@ function(app, Fauxton) {
     },
 
     setTemplate: function(template) {
-      this.layout.template = "layouts/" + template;
+      this.layout.template = "templates/layouts/" + template;
       this.render();
     },
 

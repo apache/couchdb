@@ -59,7 +59,7 @@ function (app, backbone, Fauxton) {
   _.extend(Log.events, Backbone.Events);
 
   Log.View = Backbone.View.extend({
-    template: "log/dashboard",
+    template: "templates/log/dashboard",
 
     initialize: function (options) {
       this.refreshTime = options.refreshTime || 5000;
@@ -141,7 +141,7 @@ function (app, backbone, Fauxton) {
   });
 
   Log.FilterView = Backbone.View.extend({
-    template: "log/sidebar",
+    template: "templates/log/sidebar",
 
     events: {
       "submit #log-filter-form": "filterLogs"
@@ -164,7 +164,7 @@ function (app, backbone, Fauxton) {
   });
 
   Log.FilterItemView = Backbone.View.extend({
-    template: "log/filterItem",
+    template: "templates/log/filterItem",
     tagName: "li",
 
     initialize: function (options) {

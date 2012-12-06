@@ -8,7 +8,7 @@ function(app, FauxtonAPI) {
   var Views = {};
 
   Views.Item = FauxtonAPI.View.extend({
-    template: "databases/item",
+    template: "templates/databases/item",
     tagName: "tr",
 
     serialize: function() {
@@ -19,7 +19,7 @@ function(app, FauxtonAPI) {
   });
 
   Views.List = FauxtonAPI.View.extend({
-    template: "databases/list",
+    template: "templates/databases/list",
     events: {
       "click button.all": "selectAll"
     },
@@ -48,7 +48,7 @@ function(app, FauxtonAPI) {
   });
 
   Views.Sidebar = FauxtonAPI.View.extend({
-    template: "databases/sidebar",
+    template: "templates/databases/sidebar",
     events: {
       "click a#new": "newDatabase",
       "click a#owned": "showMine",

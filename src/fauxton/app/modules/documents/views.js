@@ -16,11 +16,11 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
   var Views = {};
 
   Views.Tabs = FauxtonAPI.View.extend({
-    template: "documents/tabs"
+    template: "templates/documents/tabs"
   });
 
   Views.FieldEditorTabs = FauxtonAPI.View.extend({
-    template: "documents/doc_field_editor_tabs",
+    template: "templates/documents/doc_field_editor_tabs",
 
     initialize: function(options) {
       this.selected = options.selected;
@@ -74,7 +74,7 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
   });
 
   Views.Document = FauxtonAPI.View.extend({
-    template: "documents/all_docs_item",
+    template: "templates/documents/all_docs_item",
     tagName: "tr",
 
     events: {
@@ -115,7 +115,7 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
   });
 
   Views.Row = FauxtonAPI.View.extend({
-    template: "documents/index_row",
+    template: "templates/documents/index_row",
     tagName: "tr",
 
     serialize: function() {
@@ -126,7 +126,7 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
   });
 
   Views.IndexItem = FauxtonAPI.View.extend({
-    template: "documents/index_menu_item",
+    template: "templates/documents/index_menu_item",
     tagName: "li",
     initialize: function(options){
       this.index = options.index;
@@ -145,7 +145,7 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
 
   // TODO: Rename to reflect that this is a list of rows or documents
   Views.AllDocsList = FauxtonAPI.View.extend({
-    template: "documents/all_docs_list",
+    template: "templates/documents/all_docs_list",
     events: {
       "click button.all": "selectAll"
     },
@@ -182,7 +182,7 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
   });
 
   Views.Doc = FauxtonAPI.View.extend({
-    template: "documents/doc",
+    template: "templates/documents/doc",
 
     events: {
       "click button.save-doc": "saveDoc"
@@ -275,7 +275,7 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
   });
 
   Views.DocFieldEditor = FauxtonAPI.View.extend({
-    template: "documents/doc_field_editor",
+    template: "templates/documents/doc_field_editor",
 
     events: {
       "click button.save": "saveDoc"
@@ -304,7 +304,7 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
   });
 
   Views.Sidebar = FauxtonAPI.View.extend({
-    template: "documents/sidebar",
+    template: "templates/documents/sidebar",
     events: {
       "click a.new#index": "newIndex",
       "click .nav-list.views a.new": "showNew",

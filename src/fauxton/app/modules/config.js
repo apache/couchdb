@@ -66,7 +66,7 @@ function (app, backbone, Fauxton) {
   Config.ViewItem = Backbone.View.extend({
     tagName: "tr",
     className: "config-item",
-    template: "config/item",
+    template: "templates/config/item",
 
     events: {
       "click .edit-button": "editValue",
@@ -106,7 +106,7 @@ function (app, backbone, Fauxton) {
   });
 
   Config.View = Backbone.View.extend({
-    template: "config/dashboard",
+    template: "templates/config/dashboard",
 
     events: {
       "click #add-section": "addSection",
