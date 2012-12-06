@@ -20,8 +20,10 @@ function(app, FauxtonAPI) {
 
   Views.List = FauxtonAPI.View.extend({
     template: "databases/list",
+    dbLimit: 10,
     events: {
-      "click button.all": "selectAll"
+      "click button.all": "selectAll",
+      "submit form.database-search": "switchDatabase"
     },
 
     initialize: function(options) {
@@ -34,12 +36,53 @@ function(app, FauxtonAPI) {
       };
     },
 
+    switchDatabase: function(event) {
+      event.preventDefault();
+      var dbname = this.$el.find("input.search-query").val();
+
+      if (dbname) {
+        // TODO: switch to using a model, or Databases.databaseUrl()
+        // Neither of which are in scope right now
+        // var db = new Database.Model({id: dbname});
+        var url = ["/database/", dbname, "/_all_docs?limit=10"].join('');
+        FauxtonAPI.navigate(url);
+      }
+    },
+
     beforeRender: function() {
       this.collection.each(function(database) {
         this.insertView("table.databases tbody", new Views.Item({
           model: database
         }));
       }, this);
+    },
+
+    afterRender: function() {
+      var dbLimit = this.dbLimit;
+      var ajaxReq;
+
+      this.$el.find("input.search-query").typeahead({
+        source: function(query, process) {
+          console.log("SEARCHING FOR: "+query, process);
+          var url = [
+            app.host,
+            "/_all_dbs?startkey=%22",
+            query,
+            "%22&endkey=%22",
+            query,
+            "\u9999%22&limit=",
+            dbLimit
+          ].join('');
+          if (ajaxReq) ajaxReq.abort();
+          ajaxReq = $.ajax({
+            url: url,
+            dataType: 'json',
+            success: function(data) {
+              process(data);
+            }
+          });
+        }
+      });
     },
 
     selectAll: function(evt){
