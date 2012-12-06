@@ -138,7 +138,7 @@ changes_callback({stop, EndSeq}, _) ->
 changes_callback({change, {Change}, _}, _) ->
     Node = couch_util:get_value(<<"id">>, Change),
     case Node of <<"_design/", _/binary>> -> ok; _ ->
-        case is_deleted(Change) of
+        case mem3_util:is_deleted(Change) of
         false ->
             {Props} = couch_util:get_value(doc, Change),
             gen_server:call(?MODULE, {add_node, mem3_util:to_atom(Node), Props});
@@ -149,12 +149,3 @@ changes_callback({change, {Change}, _}, _) ->
     {ok, couch_util:get_value(<<"seq">>, Change)};
 changes_callback(timeout, _) ->
     {ok, nil}.
-
-is_deleted(Change) ->
-    case couch_util:get_value(<<"deleted">>, Change) of
-    undefined ->
-        % keep backwards compatibility for a while
-        couch_util:get_value(deleted, Change, false);
-    Else ->
-        Else
-    end.
