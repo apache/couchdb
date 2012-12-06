@@ -1,7 +1,7 @@
 define([
   "app",
 
-  "fauxton_api",
+  "api",
 
   // Views
   "modules/documents/views"

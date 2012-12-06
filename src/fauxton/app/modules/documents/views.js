@@ -1,7 +1,7 @@
 define([
   "app",
 
-  "fauxton_api",
+  "api",
 
   // Libs
   "codemirror",

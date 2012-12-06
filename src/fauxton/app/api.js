@@ -2,11 +2,10 @@ define([
   "app",
 
   // Modules
-  "modules/dashboard",
-  "modules/fauxton"
+  "modules/fauxton/base"
 ],
 
-function(app, Dashboard, Fauxton) {
+function(app, Fauxton) {
   var FauxtonAPI = app.module();
 
   FauxtonAPI.moduleExtensions = {

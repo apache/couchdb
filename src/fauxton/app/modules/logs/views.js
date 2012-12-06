@@ -3,63 +3,19 @@ define([
 
   // Libs
   "backbone",
+  "codemirror",
+  "jshint",
 
-  // Modules
-  "modules/fauxton"
-
+  // Plugins
+  "plugins/codemirror-javascript",
+  "plugins/prettify"
 ],
 
-function (app, backbone, Fauxton) {
+function(app, Backbone, Codemirror, JSHint) {
+  var Views = {};
 
-  var Log = app.module();
-
-  Log.Model = Backbone.Model.extend({ });
-
-  Log.Collection = Backbone.Collection.extend({
-    model: Log.Model,
-
-    initialize: function (options) {
-      this.params = {bytes: 5000};
-    },
-
-    url: function () {
-      query = "?" + $.param(this.params);
-      return app.host + '/_log' + query;
-    },
-
-    // override fetch because backbone expects json and couchdb sends text/html for logs, 
-    // I think its more elegant to set the dataType here than where ever fetch is called
-    fetch: function (options) {
-      options = options ? options : {};
-
-      return Backbone.Collection.prototype.fetch.call(this, _.extend(options, {dataType: "html"}));
-    },
-
-    parse: function (resp) {
-      var lines =  resp.split(/\n/);
-
-      return _.foldr(lines, function (acc, logLine) {
-        var match = logLine.match(/^\[(.*?)\]\s\[(.*?)\]\s\[(.*?)\]\s(.*)/);
-
-        if (!match) { return acc;}
-
-        acc.push({
-                  date: match[1],
-                  log_level: match[2],
-                  pid: match[3],
-                  args: match[4]
-                 });
-
-        return acc;
-      }, []);
-    }
-  });
-
-  Log.events = {};
-  _.extend(Log.events, Backbone.Events);
-
-  Log.View = Backbone.View.extend({
-    template: "templates/log/dashboard",
+  Views.View = Backbone.View.extend({
+    template: "log/dashboard",
 
     initialize: function (options) {
       this.refreshTime = options.refreshTime || 5000;
@@ -92,7 +48,7 @@ function (app, backbone, Fauxton) {
     },
 
     resetFilterCollectionAndRender: function (logs) {
-      this.filteredCollection.reset(logs); 
+      this.filteredCollection.reset(logs);
       this.render();
     },
 
@@ -114,7 +70,7 @@ function (app, backbone, Fauxton) {
 
 
       }, this.collection.toJSON(), this);
-     
+
       this.resetFilterCollectionAndRender(filtered);
     },
 
@@ -140,8 +96,8 @@ function (app, backbone, Fauxton) {
     }
   });
 
-  Log.FilterView = Backbone.View.extend({
-    template: "templates/log/sidebar",
+  Views.FilterView = Backbone.View.extend({
+    template: "log/sidebar",
 
     events: {
       "submit #log-filter-form": "filterLogs"
@@ -163,8 +119,8 @@ function (app, backbone, Fauxton) {
 
   });
 
-  Log.FilterItemView = Backbone.View.extend({
-    template: "templates/log/filterItem",
+  Views.FilterItemView = Backbone.View.extend({
+    template: "log/filterItem",
     tagName: "li",
 
     initialize: function (options) {
@@ -190,7 +146,5 @@ function (app, backbone, Fauxton) {
 
   });
 
-
-  return Log;
-
+  return Views;
 });

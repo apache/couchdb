@@ -1,6 +1,6 @@
 define([
   "app",
-  "fauxton_api"
+  "api"
 ],
 
 function(app, FauxtonAPI) {

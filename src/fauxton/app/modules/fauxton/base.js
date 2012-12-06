@@ -4,11 +4,6 @@ define([
   // Libs
   "backbone"
 
-  // Modules
-
-  // Views
-
-  // Plugins
 ],
 
 function(app, Backbone) {

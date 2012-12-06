@@ -1,19 +1,14 @@
-define([
-  "app",
+define(["backbone"],
 
-  // Modules
-  "modules/fauxton"
-],
+function(Backbone) {
 
-function(app, Fauxton) {
-
-  // A dashboard wrapper of the main Backbone.layoutmanager
-  // Allows that dashboard to be changed by any plugin.
+  // A wrapper of the main Backbone.layoutmanager
+  // Allows the main layout of the page to be changed by any plugin.
   // Exposes the different views:
   //    navBar -> the top navigation bar
   //    dashboardContent -> Main display view
   //    breadcrumbs -> Breadcrumbs navigation section
-  var Dashboard = function (navBar, apiBar) {
+  var Layout = function (navBar, apiBar) {
     this.navBar = navBar;
     this.apiBar = apiBar;
 
@@ -32,7 +27,7 @@ function(app, Fauxton) {
   };
 
   // creatings the dashboard object same way backbone does
-  _.extend(Dashboard.prototype, {
+  _.extend(Layout.prototype, {
 
     render: function () {
       return this.layout.render();
@@ -60,9 +55,9 @@ function(app, Fauxton) {
       this.breadcrumbs.remove();
     },
 
-    setDashboardContent: function (view) {
-      this.dashboardContent = this.layout.setView("#dashboard-content", view);
-      this.dashboardContent.render();
+    setContent: function (view) {
+      this.content = this.layout.setView("#dashboard-content", view);
+      this.content.render();
     },
 
     setSidebarContent: function (view) {
@@ -84,14 +79,14 @@ function(app, Fauxton) {
       }
     },
 
-    clearDasboadContent: function () {
-      if (!this.dashboardContent) { return ;}
+    clearContent: function () {
+      if (!this.content) { return ;}
 
-      this.dashboardContent.remove();
+      this.content.remove();
     }
 
   });
 
-  return Dashboard;
+  return Layout;
 
 });

@@ -5,7 +5,7 @@ define([
   "backbone",
 
   // Modules
-  "modules/fauxton"
+  "modules/fauxton/base"
 
 ],
 
