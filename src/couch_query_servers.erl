@@ -24,6 +24,11 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
+-define(SUMERROR, <<"The _sum function requires that map values be numbers, "
+    "arrays of numbers, or objects. Objects cannot be mixed with other data "
+    "structures. Objects can be arbitrarily nested, provided that the values "
+    "for all fields are themselves numbers, arrays of numbers, or objects.">>).
+
 % https://gist.github.com/df10284c76d85f988c3f
 -define(SUMREGEX, {re_pattern,3,0,<<69,82,67,80,194,0,0,0,8,0,0,0,5,0,0,0,3,0,
 2,0,0,0,125,2,48,0,9,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,118,97,108,
@@ -204,29 +209,42 @@ builtin_reduce(Re, [<<"_stats",_/binary>>|BuiltinReds], KVs, Acc) ->
     builtin_reduce(Re, BuiltinReds, KVs, [Stats|Acc]).
 
 builtin_sum_rows(KVs) ->
-    lists:foldl(fun
-        ([_Key, Value], Acc) when is_number(Value), is_number(Acc) ->
-            Acc + Value;
-        ([_Key, Value], Acc) when is_list(Value), is_list(Acc) ->
-            sum_terms(Acc, Value);
-        ([_Key, Value], Acc) when is_number(Value), is_list(Acc) ->
-            sum_terms(Acc, [Value]);
-        ([_Key, Value], Acc) when is_list(Value), is_number(Acc) ->
-            sum_terms([Acc], Value);
-        (_Else, _Acc) ->
-            throw({invalid_value, <<"builtin _sum function requires map values to be numbers or lists of numbers">>})
-    end, 0, KVs).
+    lists:foldl(fun([_Key, Value], Acc) -> sum_values(Value, Acc) end, 0, KVs).
 
-sum_terms([], []) ->
+sum_values({Props}, {AccProps}) ->
+    {sum_objects(lists:sort(Props), lists:sort(AccProps))};
+sum_values(Value, Acc) when is_number(Value), is_number(Acc) ->
+    Acc + Value;
+sum_values(Value, Acc) when is_list(Value), is_list(Acc) ->
+    sum_arrays(Acc, Value);
+sum_values(Value, Acc) when is_number(Value), is_list(Acc) ->
+    sum_arrays(Acc, [Value]);
+sum_values(Value, Acc) when is_list(Value), is_number(Acc) ->
+    sum_arrays([Acc], Value);
+sum_values(_Else, _Acc) ->
+    throw({invalid_value, ?SUMERROR}).
+
+sum_objects([{K1, V1} | Rest1], [{K1, V2} | Rest2]) ->
+    [{K1, sum_values(V1, V2)} | sum_objects(Rest1, Rest2)];
+sum_objects([{K1, V1} | Rest1], [{K2, V2} | Rest2]) when K1 < K2 ->
+    [{K1, V1}, {K2, V2} | sum_objects(Rest1, Rest2)];
+sum_objects([{K1, V1} | Rest1], [{K2, V2} | Rest2]) when K1 > K2 ->
+    [{K2, V2}, {K1, V1} | sum_objects(Rest1, Rest2)];
+sum_objects([], Rest) ->
+    Rest;
+sum_objects(Rest, []) ->
+    Rest.
+
+sum_arrays([], []) ->
     [];
-sum_terms([_|_]=Xs, []) ->
+sum_arrays([_|_]=Xs, []) ->
     Xs;
-sum_terms([], [_|_]=Ys) ->
+sum_arrays([], [_|_]=Ys) ->
     Ys;
-sum_terms([X|Xs], [Y|Ys]) when is_number(X), is_number(Y) ->
-    [X+Y | sum_terms(Xs,Ys)];
-sum_terms(_, _) ->
-    throw({invalid_value, <<"builtin _sum function requires map values to be numbers or lists of numbers">>}).
+sum_arrays([X|Xs], [Y|Ys]) when is_number(X), is_number(Y) ->
+    [X+Y | sum_arrays(Xs,Ys)];
+sum_arrays(_, _) ->
+    throw({invalid_value, ?SUMERROR}).
 
 
 builtin_stats(reduce, [[_,First]|Rest]) ->
@@ -397,3 +415,18 @@ ret_os_process(Proc) ->
     true = gen_server:call(couch_proc_manager, {ret_proc, Proc}, infinity),
     catch unlink(Proc#proc.pid),
     ok.
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+sum_values_test() ->
+    ?assertEqual(3, sum_values(1, 2)),
+    ?assertEqual([2,4,6], sum_values(1, [1,4,6])),
+    ?assertEqual([3,5,7], sum_values([3,2,4], [0,3,3])),
+    X = {[{<<"a">>,1}, {<<"b">>,[1,2]}, {<<"c">>, {[{<<"d">>,3}]}}]},
+    Y = {[{<<"a">>,2}, {<<"b">>,3}, {<<"c">>, {[{<<"e">>, 5}]}}]},
+    Z = {[{<<"a">>,3}, {<<"b">>,[4,2]}, {<<"c">>, {[{<<"d">>,3},{<<"e">>,5}]}}]},
+    ?assertEqual(Z, sum_values(X, Y)),
+    ?assertEqual(Z, sum_values(Y, X)).
+
+-endif.
