@@ -63,7 +63,6 @@ function(app, FauxtonAPI) {
 
       this.$el.find("input.search-query").typeahead({
         source: function(query, process) {
-          console.log("SEARCHING FOR: "+query, process);
           var url = [
             app.host,
             "/_all_dbs?startkey=%22",

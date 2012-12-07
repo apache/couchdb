@@ -76,9 +76,16 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
   Views.Document = FauxtonAPI.View.extend({
     template: "documents/all_docs_item",
     tagName: "tr",
+    className: "all-docs-item",
 
     events: {
       "click button.delete": "destroy"
+    },
+
+    attributes: function() {
+      return {
+        "data-id": this.model.id
+      };
     },
 
     serialize: function() {
@@ -147,11 +154,13 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
   Views.AllDocsList = FauxtonAPI.View.extend({
     template: "documents/all_docs_list",
     events: {
-      "click button.all": "selectAll"
+      "click button.all": "selectAll",
+      "click button.bulk-delete": "bulkDelete"
     },
 
     initialize: function(options){
       this.nestedView = options.nestedView || Views.Document;
+      this.rows = {};
     },
 
     establish: function() {
@@ -168,9 +177,43 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
       };
     },
 
+    /*
+     * TODO: this should be reconsidered
+     * This currently performs delete operations on the model level,
+     * when we could be using bulk docs with _deleted = true. Using
+     * individual models is cleaner from a backbone standpoint, but
+     * not from the couchdb api.
+     * Also, the delete method is naive and leaves the body intact,
+     * when we should switch the doc to only having id/rev/deleted.
+     */
+    bulkDelete: function() {
+      var that = this;
+      // yuck, data binding ftw?
+      var eles = this.$el.find("input.row-select:checked").parents("tr.all-docs-item").map(function(e) { return $(this).attr("data-id"); }).get();
+
+      if (!window.confirm("Are you sure you want to delete these " + eles.length + " docs?")) {
+        return false;
+      }
+
+      _.each(eles, function(ele) {
+        var model = this.collection.get(ele);
+
+        model.destroy().then(function(resp) {
+          that.rows[ele].$el.fadeOut();
+
+          model.collection.remove(model.id);
+        }, function(resp) {
+          FauxtonAPI.addNotification({
+            msg: "Failed to destroy your doc!",
+            type: "error"
+          });
+        });
+      }, this);
+    },
+
     beforeRender: function() {
       this.collection.each(function(doc) {
-        this.insertView("table.all-docs tbody", new this.nestedView({
+        this.rows[doc.id] = this.insertView("table.all-docs tbody", new this.nestedView({
           model: doc
         }));
       }, this);
