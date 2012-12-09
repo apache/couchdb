@@ -23,13 +23,13 @@ define([
 
 
   // this needs to be added as a plugin later
-  "modules/logs/base",
-  "modules/config/base",
+  // "modules/logs/base",
+  // "modules/config/base",
 
   "load_addons"
 ],
 
-function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents, Log, Config, LoadAddons) {
+function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents, LoadAddons) {
 
   var defaultLayout = 'with_sidebar';
   // TODO: auto generate this list if possible
@@ -85,14 +85,16 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
       var that = this;
 
       _.each(modules, function(module) {
-        _.each(module.Routes, addModuleRoute, this);
+        console.log(module);
+        if (module){
+          _.each(module.Routes, addModuleRoute, this);
+        }
       }, this);
 
       req(LoadAddons.addons, function() {
         var modules = arguments;
         _.each(modules, function(module) {
           module.initialize();
-
           if (module.Routes) {
             _.each(module.Routes, addModuleRoute, that);
           }

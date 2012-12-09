@@ -1,5 +1,7 @@
 define([
-  "addons/demo/init"
+  "addons/demo/init",
+  "addons/logs/base",
+  "addons/config/base"
 ],
 
 function() {
