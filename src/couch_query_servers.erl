@@ -211,6 +211,8 @@ builtin_reduce(Re, [<<"_stats",_/binary>>|BuiltinReds], KVs, Acc) ->
 builtin_sum_rows(KVs) ->
     lists:foldl(fun([_Key, Value], Acc) -> sum_values(Value, Acc) end, 0, KVs).
 
+sum_values({Props}, 0) ->
+    {Props};
 sum_values({Props}, {AccProps}) ->
     {sum_objects(lists:sort(Props), lists:sort(AccProps))};
 sum_values(Value, Acc) when is_number(Value), is_number(Acc) ->
