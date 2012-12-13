@@ -65,7 +65,7 @@ Name: "{group}\Start CouchDB"; Filename: "{app}\bin\couchdb.bat"
 Name: "{group}\Futon (CouchDB web interface)"; Filename: "http://127.0.0.1:5984/_utils"
 Name: "{group}\CouchDB Web Site"; Filename: "http://couchdb.apache.org/"
 Name: "{group}\CouchDB Online Docs"; Filename: "http://docs.couchdb.org/"
-Name: "{group}\CouchDB Embedded Docs"; Filename: "http://localhost:5984/_utils/docs"
+Name: "{group}\CouchDB Embedded Docs"; Filename: "http://localhost:5984/_utils/docs/"
 
 [Tasks]
 Name: service; Description: "Install couchdb as a Windows service"
