@@ -16,8 +16,6 @@ Apache CouchDB CHANGES
 Version 1.3.0
 -------------
 
-.. note:: This version has not been released yet.
-
 Database core
 ^^^^^^^^^^^^^
 

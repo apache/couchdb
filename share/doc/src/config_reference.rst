@@ -50,6 +50,8 @@ Configuration Groups
 +----------------------------------+-------------------------------------------+
 | uuids                            | UUID generation options                   |
 +----------------------------------+-------------------------------------------+
+| cors                             | Cross Origin Resource Sharing settings    |
++----------------------------------+-------------------------------------------+
 
 attachments Configuration Options
 ---------------------------------
@@ -172,6 +174,8 @@ httpd Configuration Options
 +--------------------------------------+---------------------------------------+
 | vhost_global_handlers                | vhost_global_handlers                 |
 +--------------------------------------+---------------------------------------+
+| enable_cors                          | enables CORS functionality when true  |
++--------------------------------------+---------------------------------------+
 
 httpd_design_handlers Configuration Options
 -------------------------------------------
@@ -286,3 +290,28 @@ uuids Configuration Options
 +======================================+=======================================+
 | algorithm                            | algorithm                             |
 +--------------------------------------+---------------------------------------+
+
+
+cors Configuration Options
+---------------------------
+
++--------------------------------------+---------------------------------------+
+| Option                               | Description                           |
++======================================+=======================================+
+| origins                              | List of origins, separated by a comma |
+|                                      | (protocol, host, optional port)       |
++--------------------------------------+---------------------------------------+
+| methods                              | accepted HTTP methods                 |
++--------------------------------------+---------------------------------------+
+| credentials                          | `true` sends additional header        |
+|                                      | Access-Control-Allow-Credentials=true |
++--------------------------------------+---------------------------------------+
+
+Note that `credentials=true` and `origins=*` are mutually exclusive.
+
+cors vhost Configuration
+------------------------
+
+The same configuration options for `cors` overall may be applied to an
+individual vhost, within a specific section header, for `example.com` the
+appropriate section would be: `[cors:http://example.com]`
