@@ -40,6 +40,7 @@ Contents
     ddocs
     query-servers
     commonjs
+    cors
     errors
     changes
     release
