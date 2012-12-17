@@ -132,7 +132,7 @@ function(app, FauxtonAPI, Views) {
       this.database = options.database;
       this.view = options.view;
       this.design = options.design;
-      this.params = _.extend({group: true, limit: 10}, options.params);
+      this.params = _.extend({limit: 10, reduce: false}, options.params);
       this.idxType = "_view";
     },
 
