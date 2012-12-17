@@ -37,7 +37,9 @@ receiver(Req, Length) when is_integer(Length) ->
     fun() ->
         Middleman ! {self(), gimme_data},
         receive
-            {Middleman, Data} -> iolist_to_binary(Data)
+            {Middleman, Data} ->
+                rexi:reply(attachment_chunk_received),
+                iolist_to_binary(Data)
         after 600000 ->
             exit(timeout)
         end
@@ -66,6 +68,7 @@ write_chunks(MiddleMan, ChunkFun) ->
     MiddleMan ! {self(), gimme_data},
     receive
     {MiddleMan, ChunkRecordList} ->
+        rexi:reply(attachment_chunk_received),
         case flush_chunks(ChunkRecordList, ChunkFun) of
         continue -> write_chunks(MiddleMan, ChunkFun);
         done -> ok

@@ -62,6 +62,8 @@ handle_message(internal_server_error, Worker, Acc0) ->
     {WC,LenDocs,W,GrpDocs,DocReplyDict} = Acc0,
     NewGrpDocs = lists:keydelete(Worker,1,GrpDocs),
     skip_message({WC-1,LenDocs,W,NewGrpDocs,DocReplyDict});
+handle_message(attachment_chunk_received, _Worker, Acc0) ->
+    {ok, Acc0};
 handle_message({ok, Replies}, Worker, Acc0) ->
     {WaitingCount, DocCount, W, GroupedDocs, DocReplyDict0} = Acc0,
     {value, {_, Docs}, NewGrpDocs} = lists:keytake(Worker, 1, GroupedDocs),
