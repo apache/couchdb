@@ -14,7 +14,7 @@ function(app, FauxtonAPI, Log) {
       var logs = new Log.Collection();
 
       return {
-        layout: "one_pane",
+        layout: "with_sidebar",
         crumbs: [
           {"name": "Dashboard", "link": app.root},
           {"name": "Logs","link": app.root}

@@ -88,81 +88,26 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
         }
       }, this);
 
-      req(LoadAddons.addons, function() {
-        var modules = arguments;
-        _.each(modules, function(module) {
-          module.initialize();
-          if (module.Routes) {
-            _.each(module.Routes, addModuleRoute, that);
-          }
-        });
+      _.each(LoadAddons.addons, function(module) {
+        module.initialize();
+        if (module.Routes) {
+          _.each(module.Routes, addModuleRoute, that);
+        }
       });
     },
 
     initialize: function() {
-      this.setModuleRoutes();
-
       this.navBar = app.navBar = new Fauxton.NavBar();
       this.apiBar = app.apiBar = new Fauxton.ApiBar();
 
       app.masterLayout = this.masterLayout = new Layout(this.navBar, this.apiBar);
 
+      // NOTE: This must be below creation of the layout
+      // FauxtonAPI header links and others depend on existence of the layout
+      this.setModuleRoutes();
+
       $("#app-container").html(this.masterLayout.el);
       this.masterLayout.render();
-    },
-
-    log: function() {
-      var masterLayout = this.masterLayout;
-      masterLayout.setTemplate('with_sidebar');
-
-      var logs = new Log.Collection();
-
-      var crumbs = [
-        {"name": "Dashboard", "link": app.root},
-        {"name": "Logs","link": app.root}
-      ];
-
-      masterLayout.setBreadcrumbs(new Fauxton.Breadcrumbs({
-        crumbs: crumbs
-      }));
-
-      masterLayout.setContent(new Log.View({
-        collection: logs
-      }));
-
-      masterLayout.setSidebarContent(new Log.FilterView({}));
-
-      logs.fetch().done(function (resp) {
-        masterLayout.content.render();
-      });
-
-      this.apiBar.update(logs.url());
-    },
-
-    config: function () {
-      var masterLayout = this.masterLayout;
-      masterLayout.setTemplate('one_pane');
-
-      var configs = new Config.Collection();
-
-      var crumbs = [
-        {"name": "Home","link": app.root},
-        {"name": "Config","link": app.root}
-      ];
-
-      this.masterLayout.setContent(new Config.View({
-        collection: configs
-      }));
-
-      this.masterLayout.setBreadcrumbs(new Fauxton.Breadcrumbs({
-        crumbs: crumbs
-      }));
-
-      configs.fetch().done(function (resp) {
-        masterLayout.render();
-      });
-
-      this.apiBar.update(configs.url());
     }
   });
 

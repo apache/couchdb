@@ -8,6 +8,9 @@ define([
 ],
 
 function(app, FauxtonAPI, Log) {
-  return Log;
+  Log.initialize = function() {
+    FauxtonAPI.addHeaderLink({title: "Log", href: "#_log"});
+  };
 
+  return Log;
 });
