@@ -29,6 +29,9 @@
     "structures. Objects can be arbitrarily nested, provided that the values "
     "for all fields are themselves numbers, arrays of numbers, or objects.">>).
 
+-define(STATERROR, <<"The _stats function requires that map values be numbers "
+    "or arrays of numbers.">>).
+
 % https://gist.github.com/df10284c76d85f988c3f
 -define(SUMREGEX, {re_pattern,3,0,<<69,82,67,80,194,0,0,0,8,0,0,0,5,0,0,0,3,0,
 2,0,0,0,125,2,48,0,9,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,118,97,108,
@@ -248,49 +251,57 @@ sum_arrays([X|Xs], [Y|Ys]) when is_number(X), is_number(Y) ->
 sum_arrays(_, _) ->
     throw({invalid_value, ?SUMERROR}).
 
+builtin_stats(_, []) ->
+    {[{sum,0}, {count,0}, {min,0}, {max,0}, {sumsqr,0}]};
+builtin_stats(_, [[_,First]|Rest]) ->
+    Unpacked = lists:foldl(fun([_key, Value], Acc) -> stat_values(Value, Acc) end,
+                           build_initial_accumulator(First), Rest),
+    pack_stats(Unpacked).
 
-builtin_stats(reduce, [[_,First]|Rest]) ->
-    Acc0 = build_initial_accumulator(First),
-    Stats = lists:foldl(fun
-        ([_K,V], {S,C,Mi,Ma,Sq}) when is_number(V) ->
-            {S+V, C+1, erlang:min(Mi,V), erlang:max(Ma,V), Sq+(V*V)};
-        ([_K,{PreRed}], {S,C,Mi,Ma,Sq}) when is_list(PreRed) ->
-            {
-                S + get_number(<<"sum">>, PreRed),
-                C + get_number(<<"count">>, PreRed),
-                erlang:min(get_number(<<"min">>, PreRed), Mi),
-                erlang:max(get_number(<<"max">>, PreRed), Ma),
-                Sq + get_number(<<"sumsqr">>, PreRed)
-            };
-        ([_K,V], _) ->
-            Msg = io_lib:format("non-numeric _stats input: ~w", [V]),
-            throw({invalid_value, iolist_to_binary(Msg)})
-    end, Acc0, Rest),
-    {Sum, Cnt, Min, Max, Sqr} = Stats,
-    {[{sum,Sum}, {count,Cnt}, {min,Min}, {max,Max}, {sumsqr,Sqr}]};
+stat_values(Value, Acc) when is_list(Value), is_list(Acc) ->
+    lists:zipwith(fun stat_values/2, Value, Acc);
+stat_values({PreRed}, Acc) when is_list(PreRed) ->
+    stat_values(unpack_stats({PreRed}), Acc);
+stat_values(Value, Acc) when is_number(Value) ->
+    stat_values({Value, 1, Value, Value, Value*Value}, Acc);
+stat_values(Value, Acc) when is_number(Acc) ->
+    stat_values(Value, {Acc, 1, Acc, Acc, Acc*Acc});
+stat_values(Value, Acc) when is_tuple(Value), is_tuple(Acc) ->
+    {Sum0, Cnt0, Min0, Max0, Sqr0} = Value,
+    {Sum1, Cnt1, Min1, Max1, Sqr1} = Acc,
+    {
+      Sum0 + Sum1,
+      Cnt0 + Cnt1,
+      erlang:min(Min0, Min1),
+      erlang:max(Max0, Max1),
+      Sqr0 + Sqr1
+    };
+stat_values(_Else, _Acc) ->
+    throw({invalid_value, ?STATERROR}).
 
-builtin_stats(rereduce, [[_,First]|Rest]) ->
-    {[{sum,Sum0}, {count,Cnt0}, {min,Min0}, {max,Max0}, {sumsqr,Sqr0}]} = First,
-    Stats = lists:foldl(fun([_K,Red], {S,C,Mi,Ma,Sq}) ->
-        {[{sum,Sum}, {count,Cnt}, {min,Min}, {max,Max}, {sumsqr,Sqr}]} = Red,
-        {Sum+S, Cnt+C, lists:min([Min, Mi]), lists:max([Max, Ma]), Sqr+Sq}
-    end, {Sum0,Cnt0,Min0,Max0,Sqr0}, Rest),
-    {Sum, Cnt, Min, Max, Sqr} = Stats,
-    {[{sum,Sum}, {count,Cnt}, {min,Min}, {max,Max}, {sumsqr,Sqr}]}.
-
+build_initial_accumulator(L) when is_list(L) ->
+    [build_initial_accumulator(X) || X <- L];
 build_initial_accumulator(X) when is_number(X) ->
     {X, 1, X, X, X*X};
 build_initial_accumulator({Props}) ->
-    {
-        get_number(<<"sum">>, Props),
-        get_number(<<"count">>, Props),
-        get_number(<<"min">>, Props),
-        get_number(<<"max">>, Props),
-        get_number(<<"sumsqr">>, Props)
-    };
+    unpack_stats({Props});
 build_initial_accumulator(Else) ->
     Msg = io_lib:format("non-numeric _stats input: ~w", [Else]),
     throw({invalid_value, iolist_to_binary(Msg)}).
+
+unpack_stats({PreRed}) when is_list(PreRed) ->
+    {
+      get_number(<<"sum">>, PreRed),
+      get_number(<<"count">>, PreRed),
+      get_number(<<"min">>, PreRed),
+      get_number(<<"max">>, PreRed),
+      get_number(<<"sumsqr">>, PreRed)
+    }.
+
+pack_stats({Sum, Cnt, Min, Max, Sqr}) ->
+    {[{<<"sum">>,Sum}, {<<"count">>,Cnt}, {<<"min">>,Min}, {<<"max">>,Max}, {<<"sumsqr">>,Sqr}]};
+pack_stats(Stats) when is_list(Stats) ->
+    lists:map(fun pack_stats/1, Stats).
 
 get_number(Key, Props) ->
     case couch_util:get_value(Key, Props) of
@@ -430,5 +441,13 @@ sum_values_test() ->
     Z = {[{<<"a">>,3}, {<<"b">>,[4,2]}, {<<"c">>, {[{<<"d">>,3},{<<"e">>,5}]}}]},
     ?assertEqual(Z, sum_values(X, Y)),
     ?assertEqual(Z, sum_values(Y, X)).
+
+stat_values_test() ->
+    ?assertEqual({1, 2, 0, 1, 1}, stat_values(1, 0)),
+    ?assertEqual({11, 2, 1, 10, 101}, stat_values(1, 10)),
+    ?assertEqual([{9, 2, 2, 7, 53},
+                  {14, 2, 3, 11, 130},
+                  {18, 2, 5, 13, 194}
+                 ], stat_values([2,3,5], [7,11,13])).
 
 -endif.
