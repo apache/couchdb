@@ -15,12 +15,9 @@
 
 function loadScript(url) {
   // disallow loading remote URLs
-  if((url.substr(0, 7) == "http://")
-    || (url.substr(0, 8) == "https://")
-    || (url.substr(0, 2) == "//")
-    || (url.substr(0, 5) == "data:")
-    || (url.substr(0, 11) == "javascript:")) {
-        throw "Not loading remote test scripts";
+  var re = /^[a-z0-9_]+(\/[a-z0-9_]+)*\.js#?$/;
+  if (!re.test(url)) {
+      throw "Not loading remote test scripts";
   }
   if (typeof document != "undefined") document.write('<script src="'+url+'"></script>');
 };
