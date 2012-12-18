@@ -279,6 +279,8 @@ module.exports = function(grunt) {
     grunt.file.write(data.dest, tmpl(data.variables));
   });
 
+  // Load fauxton specific tasks
+  grunt.loadTasks('tasks');
   // Load the couchapp task
   grunt.loadNpmTasks('grunt-couchapp');
   // Load the copy task
