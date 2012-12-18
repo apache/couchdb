@@ -12,7 +12,6 @@ function(app, FauxtonAPI, Log) {
   Log.Routes = {
     "_log": function() {
       var logs = new Log.Collection();
-      var deferred = FauxtonAPI.Deferred();
 
       return {
         layout: "one_pane",
@@ -26,10 +25,7 @@ function(app, FauxtonAPI, Log) {
         },
         apiUrl: logs.url(),
         establish: function() {
-          logs.fetch().done(function(resp) {
-            deferred.resolve();
-          });
-          return [deferred];
+          return [logs.fetch()];
         }
       };
     }

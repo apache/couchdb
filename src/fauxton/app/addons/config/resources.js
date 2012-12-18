@@ -1,17 +1,11 @@
 define([
   "app",
-
-  // Libs
-  "backbone",
-
-  // Modules
-  "modules/fauxton/base"
-
+  "api"
 ],
 
-function (app, backbone, Fauxton) {
+function (app, FauxtonAPI) {
 
-  var Config = app.module();
+  var Config = FauxtonAPI.addon();
 
   Config.Model = Backbone.Model.extend({});
   Config.OptionModel = Backbone.Model.extend({
@@ -63,7 +57,7 @@ function (app, backbone, Fauxton) {
     }
   });
 
-  Config.ViewItem = Backbone.View.extend({
+  Config.ViewItem = FauxtonAPI.View.extend({
     tagName: "tr",
     className: "config-item",
     template: "templates/config/item",
@@ -105,7 +99,7 @@ function (app, backbone, Fauxton) {
 
   });
 
-  Config.View = Backbone.View.extend({
+  Config.View = FauxtonAPI.View.extend({
     template: "templates/config/dashboard",
 
     events: {
@@ -158,6 +152,10 @@ function (app, backbone, Fauxton) {
           }));
         }, this);
       }, this);
+    },
+
+    establish: function() {
+      return [this.collection.fetch()];
     }
   });
 

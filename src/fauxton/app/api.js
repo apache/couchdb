@@ -13,6 +13,10 @@ function(app, Fauxton) {
     }
   };
 
+  FauxtonAPI.addonExtensions = {
+    initialize: function() {}
+  };
+
   FauxtonAPI.View = Backbone.View.extend({
     // This should return an array of promises, an empty array, or null
     establish: function() {
@@ -25,7 +29,7 @@ function(app, Fauxton) {
   };
 
   FauxtonAPI.addHeaderLink = function(link) {
-    app.dashboard.navBar.addLink(link);
+    app.masterLayout.navBar.addLink(link);
   };
 
   FauxtonAPI.Deferred = function() {
@@ -37,7 +41,11 @@ function(app, Fauxton) {
   };
 
   FauxtonAPI.module = function(extra) {
-    return app.module(FauxtonAPI.moduleExtensions, extra);
+    return app.module(_.extend(FauxtonAPI.moduleExtensions, extra));
+  };
+
+  FauxtonAPI.addon = function(extra) {
+    return FauxtonAPI.module(FauxtonAPI.addonExtensions, extra);
   };
 
   FauxtonAPI.addNotification = function(options) {

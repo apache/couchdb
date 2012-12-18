@@ -1,20 +1,12 @@
 define([
   "app",
-
-  // Libs
-  "backbone",
-  "codemirror",
-  "jshint",
-
-  // Plugins
-  "plugins/codemirror-javascript",
-  "plugins/prettify"
+  "api"
 ],
 
-function(app, Backbone, Codemirror, JSHint) {
+function(app, FauxtonAPI) {
   var Views = {};
 
-  Views.View = Backbone.View.extend({
+  Views.View = FauxtonAPI.View.extend({
     template: "log/dashboard",
 
     initialize: function (options) {
@@ -96,7 +88,7 @@ function(app, Backbone, Codemirror, JSHint) {
     }
   });
 
-  Views.FilterView = Backbone.View.extend({
+  Views.FilterView = FauxtonAPI.View.extend({
     template: "log/sidebar",
 
     events: {
@@ -119,7 +111,7 @@ function(app, Backbone, Codemirror, JSHint) {
 
   });
 
-  Views.FilterItemView = Backbone.View.extend({
+  Views.FilterItemView = FauxtonAPI.View.extend({
     template: "log/filterItem",
     tagName: "li",
 

@@ -69,8 +69,6 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
 
   var Router = app.router = Backbone.Router.extend({
     routes: {
-      "_log": "log",
-      "_config": "config"
     },
 
     // These moduleRoutes functions are aguably better outside but
@@ -85,7 +83,6 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
       var that = this;
 
       _.each(modules, function(module) {
-        console.log(module);
         if (module){
           _.each(module.Routes, addModuleRoute, this);
         }

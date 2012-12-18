@@ -5,7 +5,7 @@ define([
 
 function(app, FauxtonAPI) {
 
-  var Demo = FauxtonAPI.module();
+  var Demo = FauxtonAPI.addon();
 
   Demo.initialize = function() {
     console.log("HELLO FROM DEMO LAND!!!!");

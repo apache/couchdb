@@ -4,7 +4,6 @@ define([
   "api",
 
   // Modules
-  // TODO: rename to resources
   "modules/documents/resources",
   "modules/databases/base"
 ],

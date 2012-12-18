@@ -1,17 +1,11 @@
 define([
   "app",
-
-  // Libs
-  "backbone",
-
-  // Modules
-  "modules/fauxton/base"
-
+  "api"
 ],
 
-function (app, backbone, Fauxton) {
+function (app, FauxtonAPI) {
 
-  var Log = app.module();
+  var Log = FauxtonAPI.addon();
 
   Log.Model = Backbone.Model.extend({ });
 
@@ -58,7 +52,7 @@ function (app, backbone, Fauxton) {
   Log.events = {};
   _.extend(Log.events, Backbone.Events);
 
-  Log.View = Backbone.View.extend({
+  Log.View = FauxtonAPI.View.extend({
     template: "templates/log/dashboard",
 
     initialize: function (options) {
@@ -140,7 +134,7 @@ function (app, backbone, Fauxton) {
     }
   });
 
-  Log.FilterView = Backbone.View.extend({
+  Log.FilterView = FauxtonAPI.View.extend({
     template: "templates/log/sidebar",
 
     events: {
@@ -163,7 +157,7 @@ function (app, backbone, Fauxton) {
 
   });
 
-  Log.FilterItemView = Backbone.View.extend({
+  Log.FilterItemView = FauxtonAPI.View.extend({
     template: "templates/log/filterItem",
     tagName: "li",
 

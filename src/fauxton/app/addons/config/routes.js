@@ -8,9 +8,8 @@ define([
 ],
 
 function(app, FauxtonAPI, Config) {
-  var config = function () {
+  var configRoute = function () {
     var configs = new Config.Collection();
-    var deferred = FauxtonAPI.Deferred();
 
     return {
       layout: "one_pane",
@@ -21,18 +20,12 @@ function(app, FauxtonAPI, Config) {
       views: {
         "#dashboard-content": new Config.View({collection: configs})
       },
-      apiUrl: configs.url(),
-      establish: function() {
-        configs.fetch().done(function(resp) {
-          deferred.resolve();
-        });
-        return [deferred];
-      }
+      apiUrl: configs.url()
     };
   };
 
   Config.Routes = {
-    "_config": "config"
+    "_config": configRoute
   };
 
   return Config;
