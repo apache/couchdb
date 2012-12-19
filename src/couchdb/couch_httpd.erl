@@ -652,7 +652,7 @@ start_jsonp(Req) ->
                 case couch_config:get("httpd", "allow_jsonp", "false") of
                 "true" ->
                     validate_callback(CallBack),
-                    CallBack ++ "(";
+                    ["/* CouchDB */", CallBack, "("];
                 _Else ->
                     % this could throw an error message, but instead we just ignore the
                     % jsonp parameter
