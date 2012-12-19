@@ -13,6 +13,23 @@ HTTP Interface:
  * Limit recursion depth in the URL rewriter. Defaults to a maximum
    of 100 invocations but is configurable.
 
+Build System:
+
+ * Fix couchdb start script.
+ * Win: fix linker invocations.
+
+Futon:
+
+ * Disable buttons that aren't available for the logged-in user.
+
+Replication:
+
+ * Fix potential timeouts.
+
+View System:
+
+ * Change use of signals to avoid broken view groups.
+
 Version 1.2.0
 -------------
 
