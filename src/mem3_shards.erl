@@ -131,9 +131,6 @@ handle_call(_Call, _From, St) ->
 handle_cast({cache_hit, DbName}, St) ->
     cache_hit(DbName),
     {noreply, St};
-handle_cast({maybe_cache_hit, DbName}, St) ->
-    maybe_cache_hit(DbName),
-    {noreply, St};
 handle_cast({cache_insert, DbName, Shards}, St) ->
     {noreply, cache_free(cache_insert(St, DbName, Shards))};
 handle_cast({cache_remove, DbName}, St) ->
@@ -297,13 +294,6 @@ cache_remove(#st{cur_size=Cur}=St, DbName) ->
     end.
 
 cache_hit(DbName) ->
-    [{DbName, ATime}] = ets:lookup(?DBS, DbName),
-    NewATime = now(),
-    true = ets:delete(?ATIMES, ATime),
-    true = ets:insert(?ATIMES, {NewATime, DbName}),
-    true = ets:insert(?DBS, {DbName, NewATime}).
-
-maybe_cache_hit(DbName) ->
     case ets:lookup(?DBS, DbName) of
         [{DbName, ATime}] ->
             NewATime = now(),
