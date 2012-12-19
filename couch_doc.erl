@@ -511,7 +511,7 @@ atts_to_mp([Att | RestAtts], Boundary, WriteFun,
 doc_from_multi_part_stream(ContentType, DataFun) ->
     Parent = self(),
     Parser = spawn_link(fun() ->
-        {<<"--">>, _, _} = couch_httpd:parse_multipart_request(
+        {<<"--",_/binary>>, _, _} = couch_httpd:parse_multipart_request(
             ContentType, DataFun,
             fun(Next) -> mp_parse_doc(Next, []) end),
         unlink(Parent),
