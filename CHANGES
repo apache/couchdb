@@ -10,6 +10,9 @@ HTTP Interface:
 
 * ETag of attachment changes only when the attachment changes, not
  the document.
+* Fix retrieval of headers larger than 4k.
+* Allow OPTIONS HTTP method for list requests.
+* Don't attempt to encode invalid json.
 
 Replicator:
 
@@ -23,6 +26,12 @@ View Server:
 Log System:
 
 * Improvements to log messages for file-related errors.
+
+Build System:
+
+* Win: don't ln the couchjs install target.
+* Win: remove icu version dependency.
+* Improve SpiderMonkey version detection.
 
 Version 1.1.1
 -------------
