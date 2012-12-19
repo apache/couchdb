@@ -53,7 +53,7 @@ couchTests.attachments_multipart= function(debug) {
       "\r\n--abc123\r\n" +
       "\r\n" +
       "this is 19 chars lo" +
-      "\r\n--abc123--"
+      "\r\n--abc123--epilogue"
     });
     
   var result = JSON.parse(xhr.responseText);
