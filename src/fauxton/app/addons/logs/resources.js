@@ -1,17 +1,11 @@
 define([
   "app",
-
-  // Libs
-  "backbone",
-
-  // Modules
-  "modules/fauxton"
-
+  "api"
 ],
 
-function (app, backbone, Fauxton) {
+function (app, FauxtonAPI) {
 
-  var Log = app.module();
+  var Log = FauxtonAPI.addon();
 
   Log.Model = Backbone.Model.extend({ });
 
@@ -27,7 +21,7 @@ function (app, backbone, Fauxton) {
       return app.host + '/_log' + query;
     },
 
-    // override fetch because backbone expects json and couchdb sends text/html for logs, 
+    // override fetch because backbone expects json and couchdb sends text/html for logs,
     // I think its more elegant to set the dataType here than where ever fetch is called
     fetch: function (options) {
       options = options ? options : {};
@@ -58,8 +52,8 @@ function (app, backbone, Fauxton) {
   Log.events = {};
   _.extend(Log.events, Backbone.Events);
 
-  Log.View = Backbone.View.extend({
-    template: "log/dashboard",
+  Log.View = FauxtonAPI.View.extend({
+    template: "templates/log/dashboard",
 
     initialize: function (options) {
       this.refreshTime = options.refreshTime || 5000;
@@ -92,7 +86,7 @@ function (app, backbone, Fauxton) {
     },
 
     resetFilterCollectionAndRender: function (logs) {
-      this.filteredCollection.reset(logs); 
+      this.filteredCollection.reset(logs);
       this.render();
     },
 
@@ -114,7 +108,7 @@ function (app, backbone, Fauxton) {
 
 
       }, this.collection.toJSON(), this);
-     
+
       this.resetFilterCollectionAndRender(filtered);
     },
 
@@ -140,8 +134,8 @@ function (app, backbone, Fauxton) {
     }
   });
 
-  Log.FilterView = Backbone.View.extend({
-    template: "log/sidebar",
+  Log.FilterView = FauxtonAPI.View.extend({
+    template: "templates/log/sidebar",
 
     events: {
       "submit #log-filter-form": "filterLogs"
@@ -163,8 +157,8 @@ function (app, backbone, Fauxton) {
 
   });
 
-  Log.FilterItemView = Backbone.View.extend({
-    template: "log/filterItem",
+  Log.FilterItemView = FauxtonAPI.View.extend({
+    template: "templates/log/filterItem",
     tagName: "li",
 
     initialize: function (options) {

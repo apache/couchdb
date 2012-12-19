@@ -58,7 +58,8 @@ module.exports = function(grunt) {
     // remove this, ensure concat is updated accordingly.
     jst: {
       "dist/debug/templates.js": [
-        "app/templates/**/*.html"
+        "app/templates/**/*.html",
+        "app/fauxton_plugins/**/templates/**/*.html"
       ]
     },
 
@@ -278,6 +279,8 @@ module.exports = function(grunt) {
     grunt.file.write(data.dest, tmpl(data.variables));
   });
 
+  // Load fauxton specific tasks
+  grunt.loadTasks('tasks');
   // Load the couchapp task
   grunt.loadNpmTasks('grunt-couchapp');
   // Load the copy task

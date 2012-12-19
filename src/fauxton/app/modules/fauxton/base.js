@@ -4,18 +4,13 @@ define([
   // Libs
   "backbone"
 
-  // Modules
-
-  // Views
-
-  // Plugins
 ],
 
 function(app, Backbone) {
   var Fauxton = app.module();
 
   Fauxton.Breadcrumbs = Backbone.View.extend({
-    template: "fauxton/breadcrumbs",
+    template: "templates/fauxton/breadcrumbs",
 
     serialize: function() {
       var crumbs = _.clone(this.crumbs);
@@ -32,15 +27,11 @@ function(app, Backbone) {
   });
 
   Fauxton.NavBar = Backbone.View.extend({
-    template: "fauxton/nav_bar",
+    template: "templates/fauxton/nav_bar",
     // TODO: can we generate this list from the router?
     navLinks: [
       {href:"#/", title:"Dashboard"},
-      {href:"#/_all_dbs", title:"Databases"},
-      // {href:"#/_status", title:"Status"},
-      // {href:"#/_stats", title:"Stats"},
-      {href:"#/_config", title:"Config"},
-      {href:"#/_log", title:"Log"}
+      {href:"#/_all_dbs", title:"Databases"}
     ],
 
     initialize: function() {
@@ -61,7 +52,7 @@ function(app, Backbone) {
   });
 
   Fauxton.ApiBar = Backbone.View.extend({
-    template: "fauxton/api_bar",
+    template: "templates/fauxton/api_bar",
     endpoint: '_all_docs',
 
     serialize: function() {
@@ -78,7 +69,7 @@ function(app, Backbone) {
   });
 
   Fauxton.Notification = Backbone.View.extend({
-    template: "fauxton/notification",
+    template: "templates/fauxton/notification",
     fadeTimer: 5000,
 
     initialize: function(options) {

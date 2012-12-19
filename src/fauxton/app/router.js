@@ -1,4 +1,8 @@
 define([
+  // Load require for use in nested requiring
+  // as per the note in: http://requirejs.org/docs/api.html#multiversion
+  "require",
+
   // Application.
   "app",
 
@@ -6,23 +10,26 @@ define([
   "initialize",
 
   // Load Fauxton API
-  "fauxton_api",
+  "api",
 
   // Modules
-  "modules/fauxton",
-  "modules/dashboard",
-  // Routes return the module that they define routes for
-  "modules/databases/routes",
-  "modules/documents/routes",
+  "modules/fauxton/base",
+  // Layout
+  "modules/fauxton/layout",
 
-  "modules/api",
+  // Routes return the module that they define routes for
+  "modules/databases/base",
+  "modules/documents/base",
+
 
   // this needs to be added as a plugin later
-  "modules/log",
-  "modules/config"
+  // "modules/logs/base",
+  // "modules/config/base",
+
+  "load_addons"
 ],
 
-function(app, Initialize, FauxtonAPI, Fauxton, Dashboard, Databases, Documents, API, Log, Config) {
+function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents, LoadAddons) {
 
   var defaultLayout = 'with_sidebar';
   // TODO: auto generate this list if possible
@@ -33,25 +40,25 @@ function(app, Initialize, FauxtonAPI, Fauxton, Dashboard, Databases, Documents, 
       var settings = settingsGenerator.apply(null, arguments);
       var layoutName = settings.layout || defaultLayout;
       var establish = settings.establish || function() { return null; };
-      var dashboard = this.dashboard;
+      var masterLayout = this.masterLayout;
 
       console.log("Settings generator for: "+layoutName, settings);
 
-      dashboard.setTemplate(layoutName);
-      dashboard.clearBreadcrumbs();
+      masterLayout.setTemplate(layoutName);
+      masterLayout.clearBreadcrumbs();
 
       if (settings.crumbs) {
-        dashboard.setBreadcrumbs(new Fauxton.Breadcrumbs({
+        masterLayout.setBreadcrumbs(new Fauxton.Breadcrumbs({
           crumbs: settings.crumbs
         }));
       }
 
       $.when.apply(null, establish()).done(function(resp) {
         _.each(settings.views, function(view, selector) {
-          dashboard.setView(selector, view);
+          masterLayout.setView(selector, view);
 
           $.when.apply(null, view.establish()).done(function(resp) {
-            dashboard.renderView(selector);
+            masterLayout.renderView(selector);
           });
         });
       });
@@ -62,8 +69,6 @@ function(app, Initialize, FauxtonAPI, Fauxton, Dashboard, Databases, Documents, 
 
   var Router = app.router = Backbone.Router.extend({
     routes: {
-      "_log": "log",
-      "_config": "config"
     },
 
     // These moduleRoutes functions are aguably better outside but
@@ -75,75 +80,34 @@ function(app, Initialize, FauxtonAPI, Fauxton, Dashboard, Databases, Documents, 
 
     setModuleRoutes: function() {
       var addModuleRoute = this.addModuleRoute;
+      var that = this;
+
       _.each(modules, function(module) {
-        _.each(module.Routes, addModuleRoute, this);
+        if (module){
+          _.each(module.Routes, addModuleRoute, this);
+        }
       }, this);
+
+      _.each(LoadAddons.addons, function(module) {
+        module.initialize();
+        if (module.Routes) {
+          _.each(module.Routes, addModuleRoute, that);
+        }
+      });
     },
 
     initialize: function() {
-      this.setModuleRoutes();
-
       this.navBar = app.navBar = new Fauxton.NavBar();
       this.apiBar = app.apiBar = new Fauxton.ApiBar();
 
-      app.dashboard = this.dashboard = new Dashboard(this.navBar, this.apiBar);
+      app.masterLayout = this.masterLayout = new Layout(this.navBar, this.apiBar);
 
-      $("#app-container").html(this.dashboard.el);
-      this.dashboard.render();
-    },
+      // NOTE: This must be below creation of the layout
+      // FauxtonAPI header links and others depend on existence of the layout
+      this.setModuleRoutes();
 
-    log: function() {
-      var dashboard = this.dashboard;
-      dashboard.setTemplate('with_sidebar');
-
-      var logs = new Log.Collection();
-
-      var crumbs = [
-        {"name": "Dashboard", "link": app.root},
-        {"name": "Logs","link": app.root}
-      ];
-
-      dashboard.setBreadcrumbs(new Fauxton.Breadcrumbs({
-        crumbs: crumbs
-      }));
-
-      dashboard.setDashboardContent(new Log.View({
-        collection: logs
-      }));
-
-      dashboard.setSidebarContent(new Log.FilterView({}));
-
-      logs.fetch().done(function (resp) {
-        dashboard.dashboardContent.render();
-      });
-
-      this.apiBar.update(logs.url());
-    },
-
-    config: function () {
-      var dashboard = this.dashboard;
-      dashboard.setTemplate('one_pane');
-
-      var configs = new Config.Collection();
-
-      var crumbs = [
-        {"name": "Home","link": app.root},
-        {"name": "Config","link": app.root}
-      ];
-
-      this.dashboard.setDashboardContent(new Config.View({
-        collection: configs
-      }));
-
-      this.dashboard.setBreadcrumbs(new Fauxton.Breadcrumbs({
-        crumbs: crumbs
-      }));
-
-      configs.fetch().done(function (resp) {
-        dashboard.render();
-      });
-
-      this.apiBar.update(configs.url());
+      $("#app-container").html(this.masterLayout.el);
+      this.masterLayout.render();
     }
   });
 

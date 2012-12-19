@@ -1,14 +1,18 @@
 define([
   "app",
 
-  "fauxton_api",
+  "api",
 
   // Modules
-  "modules/documents/models_collections",
-  "modules/databases"
+  "modules/documents/resources",
+  "modules/databases/base"
 ],
 
 function(app, FauxtonAPI, Documents, Databases) {
+  // TODO: look at using:
+  // var Documents = require("modules/documents/models_collections");
+  // var Databases = require("modules/databases/module");
+
   var codeEditorCallback = function(databaseName, docID) {
     var data = {
       database: new Databases.Model({id:databaseName}),

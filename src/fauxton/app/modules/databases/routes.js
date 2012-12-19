@@ -1,10 +1,10 @@
 define([
   "app",
 
-  "fauxton_api",
+  "api",
 
   // Modules
-  "modules/databases"
+  "modules/databases/resources"
 ],
 
 function(app, FauxtonAPI, Databases) {

@@ -1,26 +1,14 @@
 define([
   "app",
 
-  "fauxton_api",
+  "api",
 
   // Modules
-  "modules/documents/models_collections",
-
-  // Views
-  "modules/databases/views"
-
-  // Plugins
+  "modules/documents/resources"
 ],
 
-function(app, FauxtonAPI, Documents, Views, Routes) {
+function(app, FauxtonAPI, Documents) {
   var Databases = FauxtonAPI.module();
-
-  // Utility functions
-  Databases.databaseUrl = function(database) {
-    var name = _.isObject(database) ? database.id : database;
-
-    return ["/database/", name, "/_all_docs?limit=10"].join('');
-  };
 
   Databases.Model = Backbone.Model.extend({
     initialize: function(options) {
@@ -82,8 +70,6 @@ function(app, FauxtonAPI, Documents, Views, Routes) {
       });
     }
   });
-
-  Databases.Views = Views;
 
   return Databases;
 });
