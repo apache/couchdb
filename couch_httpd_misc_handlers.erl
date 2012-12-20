@@ -15,7 +15,7 @@
 -export([handle_welcome_req/2,handle_favicon_req/2,handle_utils_dir_req/2,
     handle_all_dbs_req/1,handle_restart_req/1,
     handle_uuids_req/1,handle_config_req/1,handle_log_req/1,
-    handle_task_status_req/1]).
+    handle_task_status_req/1, handle_file_req/2]).
 
 -export([increment_update_seq_req/2]).
 
