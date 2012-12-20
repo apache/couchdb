@@ -50,7 +50,7 @@ ddoc_name() -> <<"foo">>.
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(23),
+    etap:plan(21),
     case (catch test()) of
         ok ->
             etap:end_tests();
