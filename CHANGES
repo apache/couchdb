@@ -4,8 +4,6 @@ Apache CouchDB CHANGES
 Version 1.1.2
 -------------
 
-This version has not been released yet.
-
 HTTP Interface:
 
 * ETag of attachment changes only when the attachment changes, not

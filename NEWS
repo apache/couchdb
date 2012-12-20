@@ -10,8 +10,6 @@ Each release section notes when backwards incompatible changes have been made.
 Version 1.1.2
 -------------
 
-This version has not been released yet.
-
 * ETag of attachment changes only when the attachment changes, not
  the document.
 * Fix pull replication of documents with many revisions.
