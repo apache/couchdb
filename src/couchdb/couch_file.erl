@@ -223,10 +223,12 @@ delete(RootDir, Filepath, Async) ->
 nuke_dir(RootDelDir, Dir) ->
     FoldFun = fun(File) ->
         Path = Dir ++ "/" ++ File,
-        case delete(RootDelDir, Path, false) of
-            {error, eperm} -> ok = nuke_dir(RootDelDir, Path);
-            {error, enoent} -> ok;
-            ok -> ok
+        case filelib:is_dir(Path) of
+            true ->
+                ok = nuke_dir(RootDelDir, Path),
+                file:del_dir(Path);
+            false ->
+                delete(RootDelDir, Path, false)
         end
     end,
     case file:list_dir(Dir) of
