@@ -144,6 +144,15 @@ This release contains backwards incompatible changes.
    to lack of permissions.
  * Added a "change password"-feature to Futon.
 
+Version 1.0.4
+-------------
+
+ * Fix file descriptor leak in _log.
+ * Fix missing revisions in _changes?style=all_docs.
+ * Fix validation of attachment names.
+ * Avoid invalidating view indexes when running out of file descriptors.
+ * Fix a race condition where replications can go stale
+
 Version 1.0.3
 -------------
 

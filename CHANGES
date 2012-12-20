@@ -276,6 +276,28 @@ URL Rewriter & Vhosts:
 
  * Fix for variable substituion
 
+Version 1.0.4
+-------------
+
+Note that this version has not been released yet.
+
+Log System:
+
+ * Fix file descriptor leak in _log.
+
+HTTP Interface:
+
+ * Fix missing revisions in _changes?style=all_docs.
+ * Fix validation of attachment names.
+
+View System:
+
+ * Avoid invalidating view indexes when running out of file descriptors.
+
+Replicator:
+
+ * Fix a race condition where replications can go stale
+
 Version 1.0.3
 -------------
 
