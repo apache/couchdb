@@ -4,8 +4,6 @@ Apache CouchDB CHANGES
 Version 1.2.1
 -------------
 
-This version has not been released yet.
-
 HTTP Interface:
 
  * No longer rewrites the X-CouchDB-Requested-Path during recursive

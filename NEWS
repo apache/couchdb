@@ -10,8 +10,6 @@ Each release section notes when backwards incompatible changes have been made.
 Version 1.2.1
 -------------
 
-This version has not been released yet.
-
  * Fix various bugs in the URL rewriter when recursion is involved.
  * Fix couchdb start script.
  * Futon: Disable buttons that aren't available for the logged-in user.
