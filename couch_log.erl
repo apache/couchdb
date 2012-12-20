@@ -153,10 +153,10 @@ set_level_integer(Module, Int) ->
 handle_event({couch_error, ConMsg, FileMsg}, State) ->
     log(State, ConMsg, FileMsg),
     {ok, State};
-handle_event({couch_info, ConMsg, FileMsg}, #state{level = LogLevel} = State) ->
+handle_event({couch_info, ConMsg, FileMsg}, State) ->
     log(State, ConMsg, FileMsg),
     {ok, State};
-handle_event({couch_debug, ConMsg, FileMsg}, #state{level = LogLevel} = State) ->
+handle_event({couch_debug, ConMsg, FileMsg}, State) ->
     log(State, ConMsg, FileMsg),
     {ok, State};
 handle_event({error_report, _, {Pid, _, _}}=Event, #state{sasl = true} = St) ->
