@@ -1,0 +1,10 @@
+{
+  "deps": [
+    {
+      "name": "fauxton-demo-plugin",
+      "url": "git://github.com/chewbranca/fauxton-demo-plugin.git"
+    },
+    { "name": "config" },
+    { "name": "logs" }
+  ]
+}

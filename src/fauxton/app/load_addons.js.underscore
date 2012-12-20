@@ -1,0 +1,14 @@
+/*
+ * ::WARNING::
+ * THIS IS A GENERATED FILE. DO NOT EDIT.
+ */
+define([
+  <%= '"' + deps.join('","') + '"' %>
+],
+function() {
+  var LoadAddons = {
+    addons: arguments
+  };
+
+  return LoadAddons;
+});

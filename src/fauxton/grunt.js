@@ -266,6 +266,18 @@ module.exports = function(grunt) {
       }
     },
 
+    get_deps: {
+      default: {
+        src: "settings.json"
+      }
+    },
+
+    gen_load_addons: {
+      default: {
+        src: "settings.json"
+      }
+    },
+
     mkcouchdb: couch_config,
     rmcouchdb: couch_config,
     couchapp: couch_config
@@ -279,16 +291,67 @@ module.exports = function(grunt) {
     grunt.file.write(data.dest, tmpl(data.variables));
   });
 
+  grunt.registerMultiTask('get_deps', 'Fetch external dependencies', function() {
+    var child_process = require('child_process');
+    var async = require('async');
+    var path = require('path');
+    var done = this.async();
+    var data = this.data;
+    var target = data.target || "app/addons/";
+    var settingsFile = path.existsSync(data.src) ? data.src : "settings.json.default";
+    var settings = grunt.file.readJSON(settingsFile);
+    var _ = grunt.utils._;
+    var remoteDeps = _.filter(settings.deps, function(dep) { return !! dep.url; });
+
+    async.forEach(remoteDeps, function(dep, cb) {
+      var path = target + dep.name;
+      var command = "git clone " + dep.url + " " + path;
+      console.log("Cloning: " + dep.name + "(" + dep.url + ")");
+
+      child_process.exec(command, function(error, stdout, stderr) {
+        console.log(stderr);
+        console.log(stdout);
+
+        cb(error);
+      });
+    }, function(error) {
+      if (error) {
+        console.log("ERROR: " + error.message);
+        done(false);
+      } else {
+        done();
+      }
+    });
+  });
+
+  grunt.registerMultiTask('gen_load_addons', 'Generate the load_addons.js file', function() {
+    var path = require('path');
+    var data = this.data;
+    var _ = grunt.utils._;
+    var settingsFile = path.existsSync(data.src) ? data.src : "settings.json.default";
+    var settings = grunt.file.readJSON(settingsFile);
+    var template = "app/load_addons.js.underscore";
+    var dest = "app/load_addons.js";
+    var deps = _.map(settings.deps, function(dep) {
+      return "addons/" + dep.name + "/base";
+    });
+    var tmpl = _.template(grunt.file.read(template));
+    grunt.file.write(dest, tmpl({deps: deps}));
+  });
+
   // Load fauxton specific tasks
   grunt.loadTasks('tasks');
   // Load the couchapp task
   grunt.loadNpmTasks('grunt-couchapp');
   // Load the copy task
   grunt.loadNpmTasks('grunt-contrib-copy');
+  // Load the exec task
+  grunt.loadNpmTasks('grunt-exec');
+
   // clean out previous build artefacts, lint and unit test
   grunt.registerTask('test', 'clean lint'); //qunit
   // build templates, js and css
-  grunt.registerTask('build', 'jst requirejs concat:requirejs less')
+  grunt.registerTask('build', 'gen_load_addons:default jst requirejs concat:requirejs less')
   // minify code and css, ready for release.
   grunt.registerTask("minify", "min mincss");
   // deafult task - push to CouchDB

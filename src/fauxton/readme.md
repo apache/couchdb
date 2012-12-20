@@ -25,7 +25,7 @@ plate which will install the other dependencies needed.
     ./bootstrap && ./configure && make dev
     cd src/fauxton
     npm install -g bbb
-    npm install grunt-contrib-copy grunt-couchapp underscore couchapp
+    npm install grunt-contrib-copy grunt-couchapp underscore couchapp grunt-exec async
     bbb couchdb **or** bbb couchdebug
     ../../utils/run &
     open http://localhost:5984/_utils/fauxton/index.html
@@ -36,7 +36,7 @@ plate which will install the other dependencies needed.
     git checkout fauxton
     cd src/fauxton
     npm install -g bbb # install bbb globally
-    npm install grunt-contrib-copy grunt-couchapp underscore couchapp
+    npm install grunt-contrib-copy grunt-couchapp underscore couchapp grunt-exec async
     bbb couchapp_setup couchapp_install
 
 If you don't want bbb installed globally you can install it as a node module in
