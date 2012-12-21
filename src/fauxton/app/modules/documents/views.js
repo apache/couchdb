@@ -353,9 +353,7 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
       "click .nav-list.views a.new": "showNew",
       // "click .nav-list.views a.toggle-view": "toggleView",
       "click .nav-list a.toggle-view#all-docs": "toggleView",
-      "click .nav-list a.toggle-view#design-docs": "toggleView",
-      "click .nav-list.search a.new": "showNew",
-      "click .nav-list.search a.toggle-view": "toggleView"
+      "click .nav-list a.toggle-view#design-docs": "toggleView"
     },
 
     establish: function() {
@@ -408,9 +406,6 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
           var ddoc = design.id.split('/')[1];
           if (design.get('doc').views){
             this.buildIndexList(design.get('doc').views, "views", ddoc);
-          }
-          if (design.get('doc').indexes){
-            this.buildIndexList(design.get('doc').indexes, "search", ddoc);
           }
         }
       }, this);

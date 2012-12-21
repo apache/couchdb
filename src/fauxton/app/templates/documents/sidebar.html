@@ -1,14 +1,7 @@
 <div id="sidenav">
   <a class="btn btn-small new" id="doc" href="#<%= database.url('app') %>/new"><i class="icon-file"></i> New doc</a>
-  <div class="btn-group">
-    <button class="btn btn-small dropdown-toggle" data-toggle="dropdown" href="#">
-      New index
-      <span class="caret"></span>
-    </button>
-    <ul class="dropdown-menu">
-      <li><a href="#" class="new" id="index"><i class="icon-list"></i> Secondary Index (View)</a></li>
-      <li><a href="#" class="new" id="index"><i class="icon-search"></i> Search Index</a></li>
-    </ul>
+  <div class="btn-group" id="new-index">
+    <button class="btn btn-small" href="#">New view</button>
   </div>
   <hr>
   <ul class="nav nav-list">
@@ -18,9 +11,5 @@
   <ul class="nav nav-list views">
     <li class="nav-header">Secondary Indexes</li>
     <li><a href="#new-view-index" class="new"><i class="icon-plus"></i> New</a></li>
-  </ul>
-  <ul class="nav nav-list search">
-    <li class="nav-header">Search Indexes</li>
-    <li><a href="#new-search-index" class="new"><i class="icon-plus"></i> New</a></li>
   </ul>
 </div>
