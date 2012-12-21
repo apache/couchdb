@@ -295,22 +295,24 @@ module.exports = function(grunt) {
 
   // clean out previous build artefacts, lint and unit test
   grunt.registerTask('test', 'clean lint'); //qunit
+  // Fetch dependencies (from git or local dir), lint them and make load_addons
+  grunt.registerTask('dependencies', 'get_deps lint gen_load_addons:default');
   // build templates, js and css
-  grunt.registerTask('build', 'gen_load_addons:default jst requirejs concat:requirejs less')
+  grunt.registerTask('build', 'jst requirejs concat:requirejs less');
   // minify code and css, ready for release.
   grunt.registerTask("minify", "min mincss");
   // deafult task - push to CouchDB
-  grunt.registerTask("default", "test build release install");
+  grunt.registerTask("default", "test dependencies build release install");
   grunt.registerTask("dev", "debug server:debug");
   // make a debug install
-  grunt.registerTask("debug", "test build template:debug copy:debug concat:debug");
+  grunt.registerTask("debug", "test dependencies build template:debug copy:debug concat:debug");
   // make an install that is server by mochiweb under _utils
   grunt.registerTask("couchdebug", "debug template:couchdebug copy:couchdebug");
   // make an install that can be deployed as a couchapp
   grunt.registerTask("couchapp_setup", "debug template:couchapp");
   grunt.registerTask("couchdb", "test build minify template:couchdb copy:couchdb");
   // build a release
-  grunt.registerTask("release", "minify template:release copy:dist");
+  grunt.registerTask("release", "test dependencies build minify template:release copy:dist");
   // install fauxton as couchapp
   grunt.registerTask('couchapp_install', 'rmcouchdb:fauxton mkcouchdb:fauxton couchapp:fauxton');
 };

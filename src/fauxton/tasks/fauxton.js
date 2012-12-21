@@ -65,8 +65,8 @@ module.exports = function(grunt) {
   });
 
   grunt.registerMultiTask('get_deps', 'Fetch external dependencies', function() {
-    var child_process = require('child_process');
-    var async = require('async');
+    grunt.log.writeln("Fetching external dependencies");
+
     var path = require('path');
     var done = this.async();
     var data = this.data;
@@ -74,27 +74,48 @@ module.exports = function(grunt) {
     var settingsFile = path.existsSync(data.src) ? data.src : "settings.json.default";
     var settings = grunt.file.readJSON(settingsFile);
     var _ = grunt.utils._;
-    var remoteDeps = _.filter(settings.deps, function(dep) { return !! dep.url; });
 
-    async.forEach(remoteDeps, function(dep, cb) {
-      var path = target + dep.name;
-      var command = "git clone " + dep.url + " " + path;
-      console.log("Cloning: " + dep.name + "(" + dep.url + ")");
+    // This should probably be a helper, though they seem to have been removed
+    var fetch = function(deps, command){
+      var child_process = require('child_process');
+      var async = require('async');
+      async.forEach(deps, function(dep, cb) {
+        var path = target + dep.name;
+        var location = dep.url || dep.path;
+        grunt.log.writeln("Fetching: " + dep.name + " (" + location + ")");
 
-      child_process.exec(command, function(error, stdout, stderr) {
-        console.log(stderr);
-        console.log(stdout);
-
-        cb(error);
+        child_process.exec(command(dep, path), function(error, stdout, stderr) {
+          grunt.log.writeln(stderr);
+          grunt.log.writeln(stdout);
+          cb(error);
+        });
+      }, function(error) {
+        if (error) {
+          grunt.log.writeln("ERROR: " + error.message);
+          return false;
+        } else {
+          return true;
+        }
       });
-    }, function(error) {
-      if (error) {
-        console.log("ERROR: " + error.message);
-        done(false);
-      } else {
-        done();
-      }
+    };
+
+    var remoteDeps = _.filter(settings.deps, function(dep) { return !! dep.url; });
+    grunt.log.writeln(remoteDeps.length + " remote dependencies");
+    var remote = fetch(remoteDeps, function(dep, destination){
+      return "git clone " + dep.url + " " + destination;
     });
+
+    var localDeps = _.filter(settings.deps, function(dep) { return !! dep.path; });
+    grunt.log.writeln(localDeps.length + " local dependencies");
+    var local = fetch(localDeps, function(dep, destination){
+      // TODO: Windows
+      var command = "cp -r " + dep.path + " " + destination;
+      grunt.log.writeln(command);
+      return command;
+    });
+
+    done(remote && local);
+
   });
 
   grunt.registerMultiTask('gen_load_addons', 'Generate the load_addons.js file', function() {
