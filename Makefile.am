@@ -91,7 +91,7 @@ endif
 check-js: dev
 if TESTS
 if USE_CURL
-	$(top_builddir)/test/javascript/run
+	MAKE=$(MAKE) $(top_builddir)/test/javascript/run
 endif
 endif
 
