@@ -20,6 +20,13 @@ JS_TEST_DIR=$SRC_DIR/test/javascript
 COUCHJS=%abs_top_builddir%/src/couchdb/priv/couchjs
 COUCH_URI_FILE=%localstaterundir%/couch.uri
 
+# make check-js calls us with MAKE=$(MAKE) so BSDish `gmake` invocations
+# will get passed on correctly. If $0 gets run manually, default to
+# `make`
+if [ -z "$MAKE" ]; then
+    MAKE=make
+fi
+
 if [ "$#" -eq 0 ];
 then
     TEST_SRC="$SCRIPT_DIR/test/*.js"
@@ -46,7 +53,7 @@ abort() {
 
 # start CouchDB
 if [ -z $COUCHDB_NO_START ]; then
-        make dev
+    $(MAKE) dev
     trap 'abort' EXIT
 	./utils/run -b -r 1 -n \
 		-a $BUILD_DIR/etc/couchdb/default_dev.ini \
