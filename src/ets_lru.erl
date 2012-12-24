@@ -98,7 +98,7 @@ remove(#ets_lru{objects=Objs, atimes=ATs}=LRU, Key) ->
     ok.
 
 
-hit(#ets_lru{objects=Objs, atimes=ATs}=LRU, Key) ->
+hit(#ets_lru{objects=Objs, atimes=ATs}, Key) ->
     case ets:match(Objs, #entry{key=Key, atime='$1', _='_'}) of
         [[ATime]] ->
             NewATime = erlang:now(),
@@ -114,12 +114,13 @@ hit(#ets_lru{objects=Objs, atimes=ATs}=LRU, Key) ->
 expire(#ets_lru{lifetime=undefined}) ->
     ok;
 expire(#ets_lru{objects=Objs, atimes=ATs, lifetime=LT}=LRU) ->
+    Now = os:timestamp(),
     LTMicro = LT * 1000,
     case ets:first(ATs) of
         '$end_of_table' ->
             ok;
         ATime ->
-            case timer:now_diff(erlang:now(), ATime) > LTMicro of
+            case timer:now_diff(Now, ATime) > LTMicro of
                 true ->
                     [{ATime, Key}] = ets:lookup(ATs, ATime),
                     true = ets:delete(ATs, ATime),

@@ -25,11 +25,15 @@ build: deps
 	$(REBAR) compile
 
 
-eunit:
-	$(REBAR) eunit skip_deps=true
+etap: test/etap.beam test/tutil.beam
+	prove test/*.t
 
 
-check: build eunit
+check: build etap
+
+
+%.beam: %.erl
+	erlc -o test/ $<
 
 
 .PHONY: all clean distclean deps build eunit check
