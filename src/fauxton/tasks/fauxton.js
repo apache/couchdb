@@ -20,17 +20,17 @@ module.exports = function(grunt) {
     {
       name: 'base',
       filename: 'base.js',
-      template: 'define([\n  "app",\n  "api",\n  "addons/<%= module.toLowerCase() %>/routes"\n],\n\nfunction(app, FauxtonAPI, <%= module %>) {\n  return <%= module %>;\n});\n'
+      template: 'define([\n  "app",\n  "api",\n  "addons/<%= module.toLowerCase() %>/routes"\n],\n\nfunction(app, FauxtonAPI, <%= module %>) {\n\tvar <%= module %> = new FauxtonAPI.addon();\n\treturn <%= module %>;\n});\n'
     },
     {
       name: 'resources',
       filename: 'resources.js',
-      template: 'define([\n  "app",\n  "backbone",\n  "modules/fauxton/base"\n],\n\nfunction (app, backbone, Fauxton) {\n\n});\n'
+      template: 'define([\n  "app",\n  "backbone",\n  "modules/fauxton/base"\n],\n\nfunction (app, backbone, Fauxton) {\n\tvar <%= module %> = {};\n\treturn <%= module %>;\n});\n'
     },
     {
       name: 'routes',
       filename: 'routes.js',
-      template: 'define([\n  "app",\n  "api",\n  "addons/<%= module.toLowerCase() %>/resources"\n],\n\nfunction(app, FauxtonAPI, <%= module %>) {\n  return <%= module %>;\n});\n'
+      template: 'define([\n  "app",\n  "api",\n  "addons/<%= module.toLowerCase() %>/resources"\n],\n\nfunction(app, FauxtonAPI, <%= module %>) {\n\treturn <%= module %>;\n});\n'
     }
   ]
 
@@ -40,7 +40,7 @@ module.exports = function(grunt) {
     grunt.helper('prompt', {}, prompts, function (err, result) {
       if (err) { return onErr(err); }
       var module = result.name
-      filepath = result.path + '/' + module.toLowerCase();
+      filepath = result.path + '/' + module.toLowerCase() + '/templates';
       grunt.file.mkdir(filepath);
       _.each(addonTemplates, function(file){
         file.module = module.charAt(0).toUpperCase() + module.substr(1);

@@ -17,7 +17,7 @@ module.exports = function(grunt) {
 
     // The clean task ensures all files are removed from the dist/ directory so
     // that no files linger from previous builds.
-    clean: ["dist/", "app/load_addons.js", "app/addons/search"],
+    clean: ["dist/", "app/load_addons.js", "app/addons/search", "app/addons/dashboard"],
 
     // The lint task will run the build configuration and the application
     // JavaScript through JSHint and report any errors.  You can change the
