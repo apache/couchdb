@@ -379,7 +379,7 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
 
     showNew: function(event){
       event.preventDefault();
-      alert('show new search/view dialog');
+      alert('show new view dialog');
     },
 
     toggleView: function(event){

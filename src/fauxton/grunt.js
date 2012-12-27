@@ -59,7 +59,7 @@ module.exports = function(grunt) {
     jst: {
       "dist/debug/templates.js": [
         "app/templates/**/*.html",
-        "app/fauxton_plugins/**/templates/**/*.html"
+        "app/addons/**/templates/**/*.html"
       ]
     },
 

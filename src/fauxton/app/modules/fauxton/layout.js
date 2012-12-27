@@ -22,6 +22,7 @@ function(Backbone) {
     });
 
     this.layoutViews = {};
+    this.hooks = {};
 
     this.el = this.layout.el;
   };
@@ -67,7 +68,6 @@ function(Backbone) {
 
     setView: function(selector, view) {
       this.layoutViews[selector] = this.layout.setView(selector, view);
-      //this.renderView(selector);
     },
 
     renderView: function(selector) {
