@@ -60,7 +60,7 @@ function (app, FauxtonAPI) {
   Config.ViewItem = FauxtonAPI.View.extend({
     tagName: "tr",
     className: "config-item",
-    template: "templates/config/item",
+    template: "addons/config/templates/item",
 
     events: {
       "click .edit-button": "editValue",
@@ -100,7 +100,7 @@ function (app, FauxtonAPI) {
   });
 
   Config.View = FauxtonAPI.View.extend({
-    template: "templates/config/dashboard",
+    template: "addons/config/templates/dashboard",
 
     events: {
       "click #add-section": "addSection",

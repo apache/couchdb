@@ -7,7 +7,7 @@ function(app, FauxtonAPI) {
   var Views = {};
 
   Views.View = FauxtonAPI.View.extend({
-    template: "log/dashboard",
+    template: "addons/logs/templates/dashboard",
 
     initialize: function (options) {
       this.refreshTime = options.refreshTime || 5000;
@@ -89,7 +89,7 @@ function(app, FauxtonAPI) {
   });
 
   Views.FilterView = FauxtonAPI.View.extend({
-    template: "log/sidebar",
+    template: "addons/logs/templates/sidebar",
 
     events: {
       "submit #log-filter-form": "filterLogs"
@@ -112,7 +112,7 @@ function(app, FauxtonAPI) {
   });
 
   Views.FilterItemView = FauxtonAPI.View.extend({
-    template: "log/filterItem",
+    template: "addons/logs/templates/filterItem",
     tagName: "li",
 
     initialize: function (options) {
