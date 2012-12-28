@@ -18,9 +18,12 @@ run(Plan, Fun) ->
 
 
 with_lru(Fun) ->
-    {ok, LRU} = ets_lru:create(?MODULE, []),
+    {ok, LRU} = ets_lru:start_link(test_lru, []),
+    Ref = erlang:monitor(process, LRU),
     try
         Fun(LRU)
     after
-        ets_lru:destroy(LRU)
+        ets_lru:stop(LRU),
+        receive {'DOWN', Ref, process, LRU, _} -> ok end
     end.
+

@@ -1,15 +1,23 @@
 #! /usr/bin/env escript
 
-lifetime() -> 1024.
+lifetime() -> 100.
 
 main([]) ->
     code:add_pathz("test"),
     code:add_pathz("ebin"),
 
-    tutil:run(unknown, fun() -> test() end).
+    tutil:run(2, fun() -> test() end).
 
 
 test() ->
-    {ok, LRU} = ets_lru:create(lru, [named_tables, {lifetime, lifetime()}]),
-    % Figure out how to test this.
-    ok = ets_lru:destroy(LRU).
+    {ok, LRU} = ets_lru:start_link(lru, [{max_lifetime, lifetime()}]),
+    ok = test_single_entry(LRU),
+    ok = ets_lru:stop(LRU).
+
+
+test_single_entry(LRU) ->
+    ets_lru:insert(LRU, foo, bar),
+    etap:is(ets_lru:lookup(LRU, foo), {ok, bar}, "Expire leaves new entries"),
+    timer:sleep(round(lifetime() * 1.5)),
+    etap:is(ets_lru:lookup(LRU, foo), not_found, "Entry was expired"),
+    ok.

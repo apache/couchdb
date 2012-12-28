@@ -10,9 +10,9 @@ main([]) ->
 
 
 test() ->
-    {ok, LRU} = ets_lru:create(lru, [named_tables, {max_size, max_size()}]),
+    {ok, LRU} = ets_lru:start_link(lru, [{max_size, max_size()}]),
     etap:is(insert_kvs(LRU, 10000), ok, "Max size ok"),
-    ok = ets_lru:destroy(LRU).
+    ok = ets_lru:stop(LRU).
 
 
 insert_kvs(LRU, 0) ->

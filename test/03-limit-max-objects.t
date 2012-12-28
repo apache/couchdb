@@ -10,9 +10,9 @@ main([]) ->
 
 
 test() ->
-    {ok, LRU} = ets_lru:create(lru, [named_tables, {max_objects, objs()}]),
+    {ok, LRU} = ets_lru:start_link(lru, [{max_objects, objs()}]),
     etap:is(insert_kvs(LRU, 100 * objs()), ok, "Max object count ok"),
-    ok = ets_lru:destroy(LRU).
+    ok = ets_lru:stop(LRU).
 
 
 insert_kvs(LRU, 0) ->

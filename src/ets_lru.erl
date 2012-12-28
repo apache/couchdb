@@ -1,201 +1,301 @@
 % Copyright 2012 Cloudant. All rights reserved.
 
 -module(ets_lru).
+-behavior(gen_server).
 
 
 -export([
-    create/2,
-    destroy/1,
+    start_link/2,
+    stop/1,
 
     insert/3,
     lookup/2,
-    member/2,
     remove/2,
-    hit/2,
-    expire/1,
-    clear/1
+    clear/1,
+
+    % Dirty functions read straight from
+    % the ETS tables which means there are
+    % race conditions with concurrent access.
+    lookup_d/2
+]).
+
+-export([
+    init/1,
+    terminate/2,
+
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+
+    code_change/3
 ]).
 
 
 -record(entry, {
     key,
     val,
-    atime
+    atime,
+    ctime
 }).
 
--record(ets_lru, {
+-record(st, {
     objects,
     atimes,
-    named=false,
+    ctimes,
 
     max_objs,
     max_size,
-
-    lifetime
+    max_lifetime
 }).
 
 
-create(Name, Options) ->
-    LRU = set_options(#ets_lru{}, Options),
-    Opts = case LRU#ets_lru.named of
-        true -> [named_table];
-        false -> []
-    end,
-    {OName, ATName} = table_names(Name),
-    {ok, LRU#ets_lru{
-        objects = ets:new(OName,
-                    [set, protected, {keypos, #entry.key}] ++ Opts),
-        atimes = ets:new(ATName,
-                    [ordered_set, protected] ++ Opts)
-    }}.
+start_link(Name, Options) when is_atom(Name) ->
+    gen_server:start_link({local, Name}, ?MODULE, {Name, Options}, []).
 
 
-destroy(#ets_lru{objects=Objs, atimes=ATimes}) ->
-    true = ets:delete(Objs),
-    true = ets:delete(ATimes),
-    ok.
+stop(LRU) ->
+    gen_server:cast(LRU, stop).
 
 
-insert(#ets_lru{objects=Objs, atimes=ATs}=LRU, Key, Val) ->
-    NewATime = erlang:now(),
-    Pattern = #entry{key=Key, atime='$1', _='_'},
-    case ets:match(Objs, Pattern) of
-        [[ATime]] ->
-            true = ets:delete(ATs, ATime),
-            true = ets:insert(ATs, {NewATime, Key}),
-            true = ets:update_element(Objs, Key, {#entry.val, Val});
-        [] ->
-            true = ets:insert(ATs, {NewATime, Key}),
-            true = ets:insert(Objs, #entry{key=Key, val=Val, atime=NewATime})
-    end,
-    trim(LRU).
+lookup(LRU, Key) ->
+    gen_server:call(LRU, {lookup, Key}).
 
 
-lookup(#ets_lru{objects=Objs}=LRU, Key) ->
-    case ets:lookup(Objs, Key) of
+insert(LRU, Key, Val) ->
+    gen_server:call(LRU, {insert, Key, Val}).
+
+
+remove(LRU, Key) ->
+    gen_server:call(LRU, {remove, Key}).
+
+
+clear(LRU) ->
+    gen_server:call(LRU, clear).
+
+
+lookup_d(Name, Key) when is_atom(Name) ->
+    case ets:lookup(obj_table(Name), Key) of
         [#entry{val=Val}] ->
-            hit(LRU, Key),
+            gen_server:cast(Name, {accessed, Key}),
             {ok, Val};
         [] ->
             not_found
     end.
 
 
-member(#ets_lru{objects=Objs}, Key) ->
-    ets:member(Objs, Key).
+init({Name, Options}) ->
+    St = set_options(#st{}, Options),
+    ObjOpts = [set, named_table, protected, {keypos, #entry.key}],
+    TimeOpts = [ordered_set, named_table, protected],
+
+    {ok, St#st{
+        objects = ets:new(obj_table(Name), ObjOpts),
+        atimes = ets:new(at_table(Name), TimeOpts),
+        ctimes = ets:new(ct_table(Name), TimeOpts)
+    }}.
 
 
-remove(#ets_lru{objects=Objs, atimes=ATs}=LRU, Key) ->
-    case ets:match(Objs, #entry{key=Key, atime='$1', _='_'}) of
-        [[ATime]] ->
-            true = ets:delete(ATs, ATime),
-            true = ets:delete(Objs, Key),
-            ok;
-        [] ->
-            ok
-    end,
-    false = member(LRU, Key),
+terminate(_Reason, St) ->
+    true = ets:delete(St#st.objects),
+    true = ets:delete(St#st.atimes),
+    true = ets:delete(St#st.ctimes),
     ok.
 
 
-hit(#ets_lru{objects=Objs, atimes=ATs}, Key) ->
-    case ets:match(Objs, #entry{key=Key, atime='$1', _='_'}) of
+handle_call({lookup, Key}, _From, St) ->
+    Reply = case ets:lookup(St#st.objects, Key) of
+        [#entry{val=Val}] ->
+            accessed(St, Key),
+            {ok, Val};
+        [] ->
+            not_found
+    end,
+    {reply, Reply, St, 0};
+
+handle_call({insert, Key, Val}, _From, St) ->
+    NewATime = erlang:now(),
+    Pattern = #entry{key=Key, atime='$1', _='_'},
+    case ets:match(St#st.objects, Pattern) of
+        [[ATime]] ->
+            Update = {#entry.val, Val},
+            true = ets:update_element(St#st.objects, Key, Update),
+            true = ets:delete(St#st.atimes, ATime),
+            true = ets:insert(St#st.atimes, {NewATime, Key});
+        [] ->
+            Entry = #entry{key=Key, val=Val, atime=NewATime, ctime=NewATime},
+            true = ets:insert(St#st.objects, Entry),
+            true = ets:insert(St#st.atimes, {NewATime, Key}),
+            true = ets:insert(St#st.ctimes, {NewATime, Key})
+    end,
+    {reply, ok, St, 0};
+
+handle_call({remove, Key}, _From, St) ->
+    Pattern = #entry{key=Key, atime='$1', ctime='$2', _='_'},
+    Reply = case ets:match(St#st.objects, Pattern) of
+        [[ATime, CTime]] ->
+            true = ets:delete(St#st.objects, Key),
+            true = ets:delete(St#st.atimes, ATime),
+            true = ets:delete(St#st.ctimes, CTime),
+            ok;
+        [] ->
+            not_found
+    end,
+    {reply, Reply, St, 0};
+
+handle_call(clear, _From, St) ->
+    true = ets:delete_all_objects(St#st.objects),
+    true = ets:delete_all_objects(St#st.atimes),
+    true = ets:delete_all_objects(St#st.ctimes),
+    % No need to timeout here and evict cache
+    % entries because its now empty.
+    {reply, ok, St};
+
+
+handle_call(Msg, _From, St) ->
+    {stop, {invalid_call, Msg}, {invalid_call, Msg}, St}.
+
+
+handle_cast({accessed, Key}, St) ->
+    accessed(Key, St),
+    {noreply, St, 0};
+
+handle_cast(stop, St) ->
+    {stop, normal, St};
+
+handle_cast(Msg, St) ->
+    {stop, {invalid_cast, Msg}, St}.
+
+
+handle_info(timeout, St) ->
+    trim(St),
+    {noreply, St, next_timeout(St)};
+
+handle_info(Msg, St) ->
+    {stop, {invalid_info, Msg}, St}.
+
+
+code_change(_OldVsn, St, _Extra) ->
+    {ok, St}.
+
+
+accessed(St, Key) ->
+    Pattern = #entry{key=Key, atime='$1', _='_'},
+    case ets:match(St#st.objects, Pattern) of
         [[ATime]] ->
             NewATime = erlang:now(),
-            true = ets:delete(ATs, ATime),
-            true = ets:insert(ATs, {NewATime, Key}),
-            true = ets:update_element(Objs, Key, {#entry.atime, NewATime}),
+            Update = {#entry.atime, NewATime},
+            true = ets:update_element(St#st.objects, Key, Update),
+            true = ets:delete(St#st.atimes, ATime),
+            true = ets:insert(St#st.atimes, {NewATime, Key}),
             ok;
         [] ->
             ok
     end.
 
 
-expire(#ets_lru{lifetime=undefined}) ->
+trim(St) ->
+    trim_count(St),
+    trim_size(St),
+    trim_lifetime(St).
+
+
+trim_count(#st{max_objs=undefined}) ->
     ok;
-expire(#ets_lru{objects=Objs, atimes=ATs, lifetime=LT}=LRU) ->
+trim_count(#st{max_objs=Max}=St) ->
+    case ets:info(St#st.objects, size) > Max of
+        true ->
+            drop_lru(St, fun trim_count/1);
+        false ->
+            ok
+    end.
+
+
+trim_size(#st{max_size=undefined}) ->
+    ok;
+trim_size(#st{max_size=Max}=St) ->
+    case ets:info(St#st.objects, memory) > Max of
+        true ->
+            drop_lru(St, fun trim_size/1);
+        false ->
+            ok
+    end.
+
+
+trim_lifetime(#st{max_lifetime=undefined}) ->
+    ok;
+trim_lifetime(#st{max_lifetime=Max}=St) ->
     Now = os:timestamp(),
-    LTMicro = LT * 1000,
-    case ets:first(ATs) of
+    case ets:first(St#st.ctimes) of
         '$end_of_table' ->
             ok;
-        ATime ->
-            case timer:now_diff(Now, ATime) > LTMicro of
+        CTime ->
+            DiffInMilli = timer:now_diff(Now, CTime) div 1000,
+            case DiffInMilli > Max of
                 true ->
-                    [{ATime, Key}] = ets:lookup(ATs, ATime),
-                    true = ets:delete(ATs, ATime),
-                    true = ets:delete(Objs, Key),
-                    expire(LRU);
+                    [{CTime, Key}] = ets:lookup(St#st.ctimes, CTime),
+                    Pattern = #entry{key=Key, atime='$1', _='_'},
+                    [[ATime]] = ets:match(St#st.objects, Pattern),
+                    true = ets:delete(St#st.objects, Key),
+                    true = ets:delete(St#st.atimes, ATime),
+                    true = ets:delete(St#st.ctimes, CTime),
+                    trim_lifetime(St);
                 false ->
                     ok
             end
     end.
 
 
-clear(#ets_lru{objects=Objs, atimes=ATs}) ->
-    true = ets:delete_all_objects(Objs),
-    true = ets:delete_all_objects(ATs),
-    ok.
-
-
-trim(#ets_lru{}=LRU) ->
-    case trim_count(LRU) of
-        trimmed -> trim(LRU);
-        _ -> ok
-    end,
-    case trim_size(LRU) of
-        trimmed -> trim(LRU);
-        _ -> ok
-    end.
-
-
-trim_count(#ets_lru{max_objs=undefined}) ->
-    ok;
-trim_count(#ets_lru{objects=Objs, max_objs=MO}=LRU) ->
-    case ets:info(Objs, size) > MO of
-        true -> drop_entry(LRU);
-        false -> ok
-    end.
-
-
-trim_size(#ets_lru{max_size=undefined}) ->
-    ok;
-trim_size(#ets_lru{objects=Objs, max_size=MS}=LRU) ->
-    case ets:info(Objs, memory) > MS of
-        true -> drop_entry(LRU);
-        false -> ok
-    end.
-
-
-drop_entry(#ets_lru{objects=Objs, atimes=ATs}) ->
-    case ets:first(ATs) of
+drop_lru(St, Continue) ->
+    case ets:first(St#st.atimes) of
         '$end_of_table' ->
             empty;
         ATime ->
-            [{ATime, Key}] = ets:lookup(ATs, ATime),
-            true = ets:delete(ATs, ATime),
-            true = ets:delete(Objs, Key),
-            trimmed
+            [{ATime, Key}] = ets:lookup(St#st.atimes, ATime),
+            Pattern = #entry{key=Key, ctime='$1', _='_'},
+            [[CTime]] = ets:match(St#st.objects, Pattern),
+            true = ets:delete(St#st.objects, Key),
+            true = ets:delete(St#st.atimes, ATime),
+            true = ets:delete(St#st.ctimes, CTime),
+            Continue(St)
     end.
 
 
-set_options(LRU, []) ->
-    LRU;
-set_options(LRU, [named_tables | Rest]) ->
-    set_options(LRU#ets_lru{named=true}, Rest);
-set_options(LRU, [{max_objects, N} | Rest]) when is_integer(N), N > 0 ->
-    set_options(LRU#ets_lru{max_objs=N}, Rest);
-set_options(LRU, [{max_size, N} | Rest]) when is_integer(N), N > 0 ->
-    set_options(LRU#ets_lru{max_size=N}, Rest);
-set_options(LRU, [{lifetime, N} | Rest]) when is_integer(N), N > 0 ->
-    set_options(LRU#ets_lru{lifetime=N}, Rest);
+next_timeout(#st{max_lifetime=undefined}) ->
+    infinity;
+next_timeout(St) ->
+    case ets:first(St#st.ctimes) of
+        '$end_of_table' ->
+            infinity;
+        CTime ->
+            Now = os:timestamp(),
+            DiffInMilli = timer:now_diff(Now, CTime) div 1000,
+            erlang:max(St#st.max_lifetime - DiffInMilli, 0)
+    end.
+
+
+set_options(St, []) ->
+    St;
+set_options(St, [{max_objects, N} | Rest]) when is_integer(N), N > 0 ->
+    set_options(St#st{max_objs=N}, Rest);
+set_options(St, [{max_size, N} | Rest]) when is_integer(N), N > 0 ->
+    set_options(St#st{max_size=N}, Rest);
+set_options(St, [{max_lifetime, N} | Rest]) when is_integer(N), N > 0 ->
+    set_options(St#st{max_lifetime=N}, Rest);
 set_options(_, [Opt | _]) ->
     throw({invalid_option, Opt}).
 
 
-table_names(Base) when is_atom(Base) ->
-    BList = atom_to_list(Base),
-    OName = list_to_atom(BList ++ "_objects"),
-    ATName = list_to_atom(BList ++ "_atimes"),
-    {OName, ATName}.
+obj_table(Name) ->
+    table_name(Name, "_objects").
 
+
+at_table(Name) ->
+    table_name(Name, "_atimes").
+
+
+ct_table(Name) ->
+    table_name(Name, "_ctimes").
+
+
+table_name(Name, Ext) ->
+    list_to_atom(atom_to_list(Name) ++ Ext).
