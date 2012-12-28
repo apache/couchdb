@@ -206,7 +206,7 @@ maybe_apply_cors_headers([], RequestHeaders) ->
 maybe_apply_cors_headers(CorsHeaders, RequestHeaders0) ->
     % for each RequestHeader that isn't in SimpleHeaders,
     % (or Content-Type with SIMPLE_CONTENT_TYPE_VALUES)
-    % append to Access-Control-Exposed-Headers
+    % append to Access-Control-Expose-Headers
     % return: RequestHeaders ++ CorsHeaders ++ ACEH
 
     RequestHeaders = [K || {K,_V} <- RequestHeaders0],
@@ -228,7 +228,7 @@ maybe_apply_cors_headers(CorsHeaders, RequestHeaders0) ->
     end,
     CorsHeaders
     ++ RequestHeaders0
-    ++ [{"Access-Control-Exposed-Headers",
+    ++ [{"Access-Control-Expose-Headers",
             string:join(ExposedHeaders, ", ")}].
 
 
