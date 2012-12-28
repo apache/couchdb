@@ -1,9 +1,10 @@
 <ul class="breadcrumb">
-  <% _.each(crumbs, function(crumb) { %>
+  <% _.each(_.initial(crumbs), function(crumb) { %>
     <li>
       <a href="#<%= crumb.link %>"><%= crumb.name %></a>
       <span class="divider"> / </span>
     </li>
   <% }); %>
+  <% var last = _.last(crumbs) || {name: ''} %>
   <li class="active"><%= last.name %></li>
 </ul>

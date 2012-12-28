@@ -14,10 +14,8 @@ function(app, Backbone) {
 
     serialize: function() {
       var crumbs = _.clone(this.crumbs);
-      var last = crumbs.pop();
       return {
-        crumbs: crumbs,
-        last: last
+        crumbs: crumbs
       };
     },
 
