@@ -49,7 +49,7 @@ get_unhashed_admins() ->
     couch_config:get("admins")).
 
 %% Current scheme, much stronger.
--spec pbkdf2(binary(), binary(), integer()) -> string().
+-spec pbkdf2(binary(), binary(), integer()) -> binary().
 pbkdf2(Password, Salt, Iterations) ->
     {ok, Result} = pbkdf2(Password, Salt, Iterations, ?SHA1_OUTPUT_LENGTH),
     Result.
