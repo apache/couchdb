@@ -28,7 +28,6 @@ function(app, Backbone) {
     template: "templates/fauxton/nav_bar",
     // TODO: can we generate this list from the router?
     navLinks: [
-      {href:"#/", title:"Dashboard"},
       {href:"#/_all_dbs", title:"Databases"}
     ],
 
@@ -41,7 +40,11 @@ function(app, Backbone) {
     },
 
     addLink: function(link) {
-      this.navLinks.push(link);
+      if (link.top){
+        this.navLinks.unshift(link);
+      } else {
+        this.navLinks.push(link);
+      }
       this.trigger("link:add");
       this.render();
     }
