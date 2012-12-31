@@ -20,8 +20,8 @@ function(app, FauxtonAPI, Log) {
           {"name": "Logs","link": app.root}
         ],
         views: {
-          "#dashboard-content": new Log.View({collection: logs}),
-          "#sidebar-content": new Log.FilterView({})
+          "#dashboard-content": new Log.Views.View({collection: logs}),
+          "#sidebar-content": new Log.Views.FilterView({})
         },
         apiUrl: logs.url(),
         establish: function() {

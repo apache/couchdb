@@ -52,8 +52,8 @@ function (app, FauxtonAPI) {
   Log.events = {};
   _.extend(Log.events, Backbone.Events);
 
-  Log.View = FauxtonAPI.View.extend({
-    template: "templates/log/dashboard",
+  Log.Views.View = FauxtonAPI.View.extend({
+    template: "addons/logs/templates/dashboard",
 
     initialize: function (options) {
       this.refreshTime = options.refreshTime || 5000;
@@ -134,8 +134,8 @@ function (app, FauxtonAPI) {
     }
   });
 
-  Log.FilterView = FauxtonAPI.View.extend({
-    template: "templates/log/sidebar",
+  Log.Views.FilterView = FauxtonAPI.View.extend({
+    template: "addons/logs/templates/sidebar",
 
     events: {
       "submit #log-filter-form": "filterLogs"
@@ -157,8 +157,8 @@ function (app, FauxtonAPI) {
 
   });
 
-  Log.FilterItemView = FauxtonAPI.View.extend({
-    template: "templates/log/filterItem",
+  Log.Views.FilterItemView = FauxtonAPI.View.extend({
+    template: "addons/logs/templates/filterItem",
     tagName: "li",
 
     initialize: function (options) {
