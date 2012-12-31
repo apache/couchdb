@@ -35,7 +35,11 @@ function(Backbone) {
     },
 
     setTemplate: function(template) {
-      this.layout.template = "templates/layouts/" + template;
+      if (template.prefix){
+        this.layout.template = template.prefix + template.name;
+      } else{
+        this.layout.template = "templates/layouts/" + template;
+      }
       this.render();
     },
 
