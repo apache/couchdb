@@ -15,7 +15,9 @@ require.config({
     backbone: "../assets/js/libs/backbone",
     bootstrap: "../assets/js/libs/bootstrap",
     codemirror: "../assets/js/libs/codemirror",
-    jshint: "../assets/js/libs/jshint"
+    jshint: "../assets/js/libs/jshint",
+    d3: "../assets/js/libs/d3",
+    rickshaw: "../assets/js/libs/rickshaw"
   },
 
   shim: {
