@@ -20,7 +20,7 @@ function(app, FauxtonAPI, Databases) {
       data: data,
 
       crumbs: [
-        {"name": "Dashboard", "link": app.root}
+        {"name": "Databases", "link": "/_all_dbs"}
       ],
 
       views: {

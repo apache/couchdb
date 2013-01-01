@@ -14,8 +14,7 @@ function(app, FauxtonAPI, Config) {
     return {
       layout: "one_pane",
       crumbs: [
-        {"name": "Home","link": app.root},
-        {"name": "Config","link": app.root}
+        {"name": "Config","link": "_config"}
       ],
       views: {
         "#dashboard-content": new Config.View({collection: configs})

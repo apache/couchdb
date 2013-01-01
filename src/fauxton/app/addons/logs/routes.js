@@ -16,8 +16,7 @@ function(app, FauxtonAPI, Log) {
       return {
         layout: "with_sidebar",
         crumbs: [
-          {"name": "Dashboard", "link": app.root},
-          {"name": "Logs","link": app.root}
+          {"name": "Logs", "link": "_log"}
         ],
         views: {
           "#dashboard-content": new Log.Views.View({collection: logs}),

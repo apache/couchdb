@@ -39,8 +39,7 @@ function(app, FauxtonAPI, Documents, Databases) {
       data: data,
 
       crumbs: [
-        {"name": "Dashboard", "link": app.root},
-        {"name": "Databases", "link": app.root},
+        {"name": "Databases", "link": "/_all_dbs"},
         {"name": data.database.id, "link": Databases.databaseUrl(data.database)},
         {"name": docID, "link": "#"}
       ],
@@ -88,8 +87,7 @@ function(app, FauxtonAPI, Documents, Databases) {
       data: data,
 
       crumbs: [
-        {"name": "Dashboard", "link": app.root},
-        {"name": "Databases", "link": app.root},
+        {"name": "Databases", "link": "/_all_dbs"},
         {"name": data.database.id, "link": Databases.databaseUrl(data.database)},
         {"name": "new", "link": "#"}
       ],
@@ -136,8 +134,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         data: data,
 
         crumbs: [
-          {"name": "Dashboard", "link": app.root},
-          {"name": "Databases", "link": app.root},
+          {"name": "Databases", "link": "/_all_dbs"},
           {"name": data.database.id, "link": Databases.databaseUrl(data.database)},
           {"name": docID, "link": "#"}
         ],
@@ -199,8 +196,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         data: data,
 
         crumbs: [
-          {"name": "Dashboard", "link": app.root},
-          {"name": "Databases", "link": app.root},
+          {"name": "Databases", "link": "/_all_dbs"},
           {"name": data.database.id, "link": Databases.databaseUrl(data.database)},
           {"name": docID, "link": "#"}
         ],
@@ -240,8 +236,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         data: data,
 
         crumbs: [
-          {"name": "Dashboard", "link": app.root},
-          {"name": "Databases", "link": app.root},
+          {"name": "Databases", "link": "/_all_dbs"},
           {"name": data.database.id, "link": Databases.databaseUrl(data.database)}
         ],
 
@@ -302,8 +297,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         },
 
         crumbs: [
-          {"name": "Dashboard", "link": app.root},
-          {"name": "Databases", "link": app.root},
+          {"name": "Databases", "link": "/_all_dbs"},
           {"name": data.database.id, "link": Databases.databaseUrl(data.database)},
           {"name": ddoc + "/" + view, "link": data.indexedDocs.url()}
         ],
