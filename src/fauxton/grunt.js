@@ -137,7 +137,7 @@ module.exports = function(grunt) {
     mincss: {
       "dist/release/css/index.css": [
         "dist/debug/css/index.css", 'assets/css/codemirror.css',
-        'assets/css/cloudant-additions.css'
+        "app/addons/**/assets/css/*.css"
       ]
     },
 
