@@ -1,6 +1,7 @@
 {
   "deps": [
     { "name": "config" },
-    { "name": "logs" }
+    { "name": "logs" },
+    { "name": "stats" }
   ]
 }
