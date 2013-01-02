@@ -40,6 +40,10 @@ function(Backbone) {
       } else{
         this.layout.template = "templates/layouts/" + template;
       }
+      // If we're changing layouts all bets are off, so kill off all the
+      // existing views in the layout.
+      _.each(this.layoutViews, function(view){view.remove();});
+      this.layoutViews = {};
       this.render();
     },
 
@@ -60,18 +64,8 @@ function(Backbone) {
       this.breadcrumbs.remove();
     },
 
-    setContent: function (view) {
-      this.content = this.layout.setView("#dashboard-content", view);
-      this.content.render();
-    },
-
-    setSidebarContent: function (view) {
-      this.sidebarContent = this.layout.setView("#sidebar-content", view);
-      this.sidebarContent.render();
-    },
-
     setView: function(selector, view) {
-      this.layoutViews[selector] = this.layout.setView(selector, view);
+      this.layoutViews[selector] = this.layout.setView(selector, view, false);
     },
 
     renderView: function(selector) {
@@ -81,12 +75,6 @@ function(Backbone) {
       } else {
         return view.render();
       }
-    },
-
-    clearContent: function () {
-      if (!this.content) { return ;}
-
-      this.content.remove();
     }
 
   });
