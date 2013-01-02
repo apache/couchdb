@@ -39,13 +39,13 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
     return function() {
       var boundRoute = route;
       var settings = settingsGenerator.apply(null, arguments);
-      var layoutName = settings.layout || defaultLayout;
+      var layout = settings.layout || defaultLayout;
       var establish = settings.establish || function() { return null; };
       var masterLayout = this.masterLayout;
 
-      console.log("Settings generator for: " + layoutName, settings);
+      console.log("Settings generator for: ", layout, settings);
 
-      masterLayout.setTemplate(layoutName);
+      masterLayout.setTemplate(layout);
       masterLayout.clearBreadcrumbs();
 
       if (settings.crumbs) {
