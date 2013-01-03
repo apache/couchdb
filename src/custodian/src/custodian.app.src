@@ -1,0 +1,17 @@
+% Copyright 2013 Cloudant. All rights reserved.
+
+{application, custodian,
+ [
+  {description, "in your cluster, looking after your stuff"},
+  {vsn, git},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib,
+                  couch,
+                  twig,
+                  mem3
+                 ]},
+  {mod, { custodian_app, []}},
+  {env, []}
+ ]}.
