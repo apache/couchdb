@@ -249,7 +249,10 @@ function(app, FauxtonAPI, Documents, Databases) {
             collection: data.designDocs
           }),
 
-          "#tabs": new Documents.Views.Tabs({})
+          "#tabs": new Documents.Views.Tabs({
+            collection: data.designDocs,
+            database: data.database.id
+          })
         },
 
         apiUrl: data.database.allDocs.url()
@@ -307,7 +310,10 @@ function(app, FauxtonAPI, Documents, Databases) {
             collection: data.designDocs
           }),
 
-          "#tabs": new Documents.Views.Tabs({})
+          "#tabs": new Documents.Views.Tabs({
+            collection: data.designDocs,
+            database: data.database.id
+          })
         },
 
         crumbs: [

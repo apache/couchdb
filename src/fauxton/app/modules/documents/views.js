@@ -16,7 +16,67 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
   var Views = {};
 
   Views.Tabs = FauxtonAPI.View.extend({
-    template: "templates/documents/tabs"
+    template: "templates/documents/tabs",
+    initialize: function(options){
+      this.collection = options.collection;
+      this.database = options.database;
+    },
+    beforeRender: function(manage) {
+      this.insertView("#search", new Views.SearchBox({
+        collection: this.collection,
+        database: this.database
+      }));
+    }
+  });
+
+  Views.SearchBox = FauxtonAPI.View.extend({
+    template: "templates/documents/search",
+    tagName: "form",
+    initialize: function(options){
+      this.collection = options.collection;
+      this.database = options.database;
+    },
+    afterRender: function(){
+      var collection = this.collection;
+      var form = this.$el;
+      var searchbox = form.find("input#searchbox");
+      var database = this.database;
+
+      form.submit(function(evt){
+        evt.preventDefault();
+        var viewname = form.find("input#view").val().split('/');
+        var url = "#database/" + database + "/_design/";
+        url += viewname[0] + "/_view/" + viewname[1];
+        if (searchbox.val() !== ""){
+          // TODO: this'll need to work when val() is a number etc.
+          url += '?start_key="' + searchbox.val() + '"';
+        }
+        FauxtonAPI.navigate(url);
+      });
+
+      searchbox.typeahead({
+        source: function(query, process) {
+          // TODO: include _all_docs and view keys somehow
+          var views = _.map(collection.pluck('doc'), function(d){
+            return _.map(_.keys(d.views), function(view){
+              return d._id.split('/')[1] + "/" + view;
+            });
+          });
+          return _.flatten(views);
+        },
+        minLength: 3,
+        updater: function(item){
+          // TODO: some way to return the original search box
+          this.$element.removeClass('span12');
+          this.$element.addClass('span6');
+          this.$element.attr('placeholder', 'Search by view key');
+          $('<span class="add-on span6">' + item +'</span>').insertBefore(this.$element);
+          $('<input type="hidden" id="view" value="' + item +'"/>').insertBefore(this.$element);
+          // Remove the type ahead for now
+          $('.typehead').unbind();
+        }
+      });
+    }
   });
 
   Views.FieldEditorTabs = FauxtonAPI.View.extend({
