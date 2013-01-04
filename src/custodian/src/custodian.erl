@@ -25,7 +25,7 @@ scan() ->
 
 % private functions.
 
-scan(<<"_design/", _/binary>>, _TrulyDown, _ExpectedN) ->
+scan(<<"_", _/binary>>, _TrulyDown, _ExpectedN) ->
     ok;
 scan(Id, TrulyDown, ExpectedN) ->
     Shards = mem3:shards(Id),
