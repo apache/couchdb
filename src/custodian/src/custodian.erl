@@ -5,49 +5,59 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
--export([scan/0]).
+-export([summary/0, summary/1]).
+-export([report/0, report/1]).
 
 % public functions.
 
-scan() ->
+summary() ->
     {ok, TrulyDown} = custodian_server:truly_down(),
+    summary(TrulyDown).
+
+summary(TrulyDown) ->
+    scan(0, fun summary/5, TrulyDown).
+
+report() ->
+    {ok, TrulyDown} = custodian_server:truly_down(),
+    report(TrulyDown).
+
+report(TrulyDown) ->
+    scan([], fun report/5, TrulyDown).
+
+% private functions.
+
+scan(Init, AccFun, TrulyDown) ->
     ExpectedN = list_to_integer(couch_config:get("cluster", "n", "3")),
     DbName = couch_config:get("mem3", "shards_db", "dbs"),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     try
-        Fun = fun(#full_doc_info{id=Id}, _, _) ->
-            scan(Id, TrulyDown, ExpectedN), {ok, nil} end,
-        {ok, _, _} = couch_db:enum_docs(Db, Fun, ok, []),
-        ok
+        Init1 = {TrulyDown, ExpectedN, Init, AccFun},
+        {ok, _, LastAcc} = couch_db:enum_docs(Db, fun fold_fun/3, Init1, []),
+        {_, _, Acc, _} = LastAcc,
+        {ok, Acc}
     after
         couch_db:close(Db)
     end.
 
-% private functions.
-
-scan(<<"_", _/binary>>, _TrulyDown, _ExpectedN) ->
-    ok;
-scan(Id, TrulyDown, ExpectedN) ->
+fold_fun(#full_doc_info{id = <<"_", _/binary>>}, _, Acc) ->
+    {ok, Acc};
+fold_fun(#full_doc_info{id = Id}, _, Acc) ->
     Shards = mem3:shards(Id),
     Rs = [R || #shard{range=R} <- lists:ukeysort(#shard.range, Shards)],
     ActualN = [{R1, [N || #shard{node=N,range=R2} <- Shards, R1 == R2]} ||  R1 <- Rs],
-    scan(Id, TrulyDown, ExpectedN, ActualN).
-
-scan(_Id, _TrulyDown, _ExpectedN, []) ->
-    ok;
-scan(Id, TrulyDown, ExpectedN, [{[Lo,Hi], Nodes}|Rest]) ->
+    fold_fun(Id, ActualN, Acc);
+fold_fun(Id, [], Acc) ->
+    {ok, Acc};
+fold_fun(Id, [{Range, Nodes}|Rest], {TrulyDown, ExpectedN, Acc, Fun}) ->
     Nodes1 = [maybe_redirect(Node) || Node <- Nodes],
     Nodes2 = Nodes1 -- TrulyDown,
-    case length(Nodes2) < ExpectedN of
+    NewAcc = case length(Nodes2) < ExpectedN of
         true ->
-            twig:log(emerg, "Underprotected shard ~s-~s of ~s (~B/~B)",
-                [couch_util:to_hex(<<Lo:32/integer>>),
-                 couch_util:to_hex(<<Hi:32/integer>>),
-                 Id, length(Nodes2), ExpectedN]);
+            Fun(Id, Range, length(Nodes2), ExpectedN, Acc);
         false ->
-            ok
+            Acc
     end,
-    scan(Id, TrulyDown, ExpectedN, Rest).
+    fold_fun(Id, Rest, {TrulyDown, ExpectedN, NewAcc, Fun}).
 
 maybe_redirect(Node) ->
     case couch_config:get("mem3.redirects", atom_to_list(Node)) of
@@ -56,3 +66,9 @@ maybe_redirect(Node) ->
         Redirect ->
             list_to_existing_atom(Redirect)
     end.
+
+summary(_Id, _Range, _ActualN, _ExpectedN, Acc) ->
+    Acc + 1.
+
+report(Id, Range, ActualN, ExpectedN, Acc) ->
+    [{Id, Range, ActualN, ExpectedN}|Acc].

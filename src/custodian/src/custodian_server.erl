@@ -40,8 +40,13 @@ handle_info({nodeup, Node}, State) ->
     {noreply, not_down(Node, State)};
 handle_info({nodedown, Node}, State) ->
     {noreply, down(Node, State)};
-handle_info(heartbeat, State) ->
-    spawn(fun() -> custodian:scan() end),
+handle_info(heartbeat, #state{down=Down}=State) ->
+    case custodian:summary(truly_down(Down)) of
+        {ok, 0} -> ok;
+        {ok, N} -> twig:log(emerg,
+                            "~B under-protected shards in this cluster",
+                            [N])
+    end,
     {noreply, update_heartbeat(State)}.
 
 terminate(_Reason, _State) ->
