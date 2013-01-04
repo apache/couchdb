@@ -44,11 +44,23 @@ else
 fi
 
 if test -d .git; then
+    OS=`uname -s`
+    case "$OS" in
+    Linux|CYGWIN*) # GNU sed
+        SED_ERE_FLAG=-r
+    ;;
+    *) # BSD sed
+        SED_ERE_FLAG=-E
+    ;;
+    esac
+
     sed -e "/^#.*/d" THANKS.in > THANKS
+    CONTRIB_EMAIL_SED_COMMAND="s/^[[:blank:]]{5}[[:digit:]]+[[:blank:]]/ * /"
     git shortlog -se 6c976bd..HEAD \
         | grep -v @apache.org \
-        | sed -E "s/^[[:blank:]]{5}[[:digit:]]+[[:blank:]]/ * /" >> THANKS
-    echo "\nFor a list of authors see the \`AUTHORS\` file." >> THANKS
+        | sed $SED_ERE_FLAG -e "$CONTRIB_EMAIL_SED_COMMAND" >> THANKS
+    echo "" >> THANKS # simplest portable newline
+    echo "For a list of authors see the \`AUTHORS\` file." >> THANKS
 fi
 
 find_program() {
