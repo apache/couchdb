@@ -34,7 +34,8 @@ go(DbName, AllDocs, Opts) ->
     W = couch_util:get_value(w, Options, integer_to_list(mem3:quorum(DbName))),
     Acc0 = {length(Workers), length(AllDocs), list_to_integer(W), GroupedDocs,
         dict:from_list([{Doc,[]} || Doc <- AllDocs])},
-    try fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
+    Timeout = fabric_util:request_timeout(),
+    try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3, Acc0, infinity, Timeout) of
     {ok, {Health, Results}} when Health =:= ok; Health =:= accepted ->
         {Health, [R || R <- couch_util:reorder_results(AllDocs, Results), R =/= noreply]};
     {timeout, Acc} ->
@@ -62,6 +63,8 @@ handle_message(internal_server_error, Worker, Acc0) ->
     {WC,LenDocs,W,GrpDocs,DocReplyDict} = Acc0,
     NewGrpDocs = lists:keydelete(Worker,1,GrpDocs),
     skip_message({WC-1,LenDocs,W,NewGrpDocs,DocReplyDict});
+handle_message(attachment_chunk_received, _Worker, Acc0) ->
+    {ok, Acc0};
 handle_message({ok, Replies}, Worker, Acc0) ->
     {WaitingCount, DocCount, W, GroupedDocs, DocReplyDict0} = Acc0,
     {value, {_, Docs}, NewGrpDocs} = lists:keytake(Worker, 1, GroupedDocs),

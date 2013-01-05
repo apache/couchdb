@@ -17,6 +17,7 @@
 -export([submit_jobs/3, submit_jobs/4, cleanup/1, recv/4, get_db/1, get_db/2, error_info/1,
         update_counter/3, remove_ancestors/2, create_monitors/1, kv/2,
         remove_down_workers/2]).
+-export([request_timeout/0]).
 
 -include("fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
@@ -46,12 +47,13 @@ cleanup(Workers) ->
     [rexi:kill(Node, Ref) || #shard{node=Node, ref=Ref} <- Workers].
 
 recv(Workers, Keypos, Fun, Acc0) ->
-    Timeout = case couch_config:get("fabric", "request_timeout", "60000") of
-    "infinity" -> infinity;
-    N -> list_to_integer(N)
-    end,
-    rexi_utils:recv(Workers, Keypos, Fun, Acc0, Timeout, infinity).
+    rexi_utils:recv(Workers, Keypos, Fun, Acc0, request_timeout(), infinity).
 
+request_timeout() ->
+    case couch_config:get("fabric", "request_timeout", "60000") of
+        "infinity" -> infinity;
+        N -> list_to_integer(N)
+    end.
 
 get_db(DbName) ->
     get_db(DbName, []).
