@@ -46,7 +46,7 @@ fold_fun(#full_doc_info{id = Id}, _, Acc) ->
     Rs = [R || #shard{range=R} <- lists:ukeysort(#shard.range, Shards)],
     ActualN = [{R1, [N || #shard{node=N,range=R2} <- Shards, R1 == R2]} ||  R1 <- Rs],
     fold_fun(Id, ActualN, Acc);
-fold_fun(Id, [], Acc) ->
+fold_fun(_Id, [], Acc) ->
     {ok, Acc};
 fold_fun(Id, [{Range, Nodes}|Rest], {TrulyDown, ExpectedN, Acc, Fun}) ->
     Nodes1 = [maybe_redirect(Node) || Node <- Nodes],
