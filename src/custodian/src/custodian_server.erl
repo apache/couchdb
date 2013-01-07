@@ -92,5 +92,5 @@ truly_down(Down) ->
     dict:fold(Fun, [], Down).
 
 send_alert(Count) when is_integer(Count) ->
-    os:system("send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcoreProtectionEvent cloudantDbcoreUnderProtected "
-              ++ integer_to_list(Count)).
+    os:cmd("send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcoreProtectionEvent cloudantDbcoreUnderProtected "
+           ++ integer_to_list(Count)).
