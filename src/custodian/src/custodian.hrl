@@ -6,7 +6,7 @@
     if (!doc.by_range) return;
     for (i in doc.by_range) {
       if (doc.by_range[i].length < 3) {
-        emit([doc._id, i], null);
+        emit([doc._id, i], 1);
       }
     }
   }
