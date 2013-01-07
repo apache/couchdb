@@ -41,12 +41,11 @@ handle_info({nodeup, Node}, State) ->
 handle_info({nodedown, Node}, State) ->
     {noreply, down(Node, State)};
 handle_info(heartbeat, #state{down=Down}=State) ->
-    case custodian:summary(truly_down(Down)) of
-        {ok, 0} -> ok;
-        {ok, N} -> twig:log(emerg,
-                            "~B under-protected shards in this cluster",
-                            [N])
+    {ok, N} = custodian:summary(truly_down(Down)),
+    if N =:= 0 -> ok;
+       true -> twig:log(crit, "~B under-protected shards in this cluster", [N])
     end,
+    send_alert(N),
     {noreply, update_heartbeat(State)}.
 
 terminate(_Reason, _State) ->
@@ -91,3 +90,7 @@ truly_down(Down) ->
         end
     end,
     dict:fold(Fun, [], Down).
+
+send_alert(Count) when is_integer(Count) ->
+    os:system("send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcoreProtectionEvent cloudantDbcoreUnderProtected "
+              ++ integer_to_list(Count)).
