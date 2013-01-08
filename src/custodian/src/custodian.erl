@@ -41,6 +41,8 @@ scan(Init, AccFun, TrulyDown) ->
 
 fold_fun(#full_doc_info{id = <<"_", _/binary>>}, _, Acc) ->
     {ok, Acc};
+fold_fun(#full_doc_info{deleted=true}, _, Acc) ->
+    {ok, Acc};
 fold_fun(#full_doc_info{id = Id}, _, Acc) ->
     Shards = mem3:shards(Id),
     Rs = [R || #shard{range=R} <- lists:ukeysort(#shard.range, Shards)],
