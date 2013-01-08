@@ -4,6 +4,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("mem3/include/mem3.hrl").
+-include("custodian.hrl").
 
 -export([summary/0, summary/1]).
 -export([report/0, report/1]).
@@ -28,8 +29,7 @@ report(TrulyDown) ->
 
 scan(Init, AccFun, TrulyDown) ->
     ExpectedN = list_to_integer(couch_config:get("cluster", "n", "3")),
-    DbName = couch_config:get("mem3", "shards_db", "dbs"),
-    {ok, Db} = mem3_util:ensure_exists(DbName),
+    {ok, Db} = ensure_dbs_exists(ExpectedN),
     try
         Init1 = {TrulyDown, ExpectedN, Init, AccFun},
         {ok, _, LastAcc} = couch_db:enum_docs(Db, fun fold_fun/3, Init1, []),
@@ -74,3 +74,58 @@ summary(_Id, _Range, _ActualN, _ExpectedN, Acc) ->
 
 report(Id, Range, ActualN, ExpectedN, Acc) ->
     [{Id, Range, ActualN, ExpectedN}|Acc].
+
+ensure_dbs_exists(N) ->
+    DbName = couch_config:get("mem3", "shards_db", "dbs"),
+    {ok, Db} = mem3_util:ensure_exists(DbName),
+    ensure_custodian_ddoc_exists(Db, N),
+    {ok, Db}.
+
+ensure_custodian_ddoc_exists(Db, N) ->
+    case couch_db:open_doc(Db, <<"_design/custodian">>) of
+        {not_found, _Reason} ->
+            try couch_db:update_doc(Db, custodian_ddoc(N), []) of
+            {ok, _} ->
+                ok
+            catch conflict ->
+                ensure_custodian_ddoc_exists(Db, N)
+            end;
+        {ok, Doc} ->
+            {Props} = couch_doc:to_json_obj(Doc, []),
+            ActualViews = couch_util:get_value(<<"views">>, Props, []),
+            ExpectedViews = custodian_views(N),
+            case ActualViews of
+                ExpectedViews ->
+                    ok;
+                _ ->
+                    Props1 = lists:keystore(<<"views">>, 1, Props, {<<"views">>, ExpectedViews}),
+                    Doc1 = couch_doc:from_json_obj({Props1}),
+                    try couch_db:update_doc(Db, Doc1, []) of
+                    {ok, _} ->
+                        ok
+                    catch conflict ->
+                        ensure_custodian_ddoc_exists(Db, N)
+                    end
+            end
+    end.
+
+custodian_ddoc(N) ->
+    Props = [
+        {<<"_id">>, <<"_design/custodian">>},
+        {<<"language">>, <<"javascript">>},
+        {<<"views">>, custodian_views(N)}
+    ],
+    couch_doc:from_json_obj({Props}).
+
+custodian_views(N) when is_integer(N) ->
+    {[under_n_view(N), by_node_range_view()]}.
+
+under_n_view(N) when is_integer(N) ->
+    N1 = list_to_binary(integer_to_list(N)),
+    {<<"under_n">>, view(?CUSTODIAN_UNDER_N(N1), <<"_sum">>)}.
+
+by_node_range_view() ->
+    {<<"by_node_range">>, view(?CUSTODIAN_BY_NODE_RANGE, <<"_sum">>)}.
+
+view(Map, Reduce) ->
+    {[{<<"map">>, Map},{<<"reduce">>, Reduce}]}.
