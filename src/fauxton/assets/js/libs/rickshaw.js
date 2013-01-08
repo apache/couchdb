@@ -2355,7 +2355,7 @@ Rickshaw.Graph.Renderer.Pie = Rickshaw.Class.create( Rickshaw.Graph.Renderer, {
     var defaults = Rickshaw.extend( $super(), {
       innerRadius: 0,
       outerRadius: 100,
-      scheme: 'classic9',
+      scheme: 'munin',
       unstack: false
     } );
 
@@ -2367,6 +2367,7 @@ Rickshaw.Graph.Renderer.Pie = Rickshaw.Class.create( Rickshaw.Graph.Renderer, {
     args = args || {};
     // TODO: Math.min(width, height) / 2; for outerRadius
     this.innerRadius = args.innerRadius || this.innerRadius;
+    this.outerRadius = args.outerRadius || this.outerRadius;
     this.scheme = args.scheme || this.scheme;
     $super(args);
   },
@@ -2380,7 +2381,9 @@ Rickshaw.Graph.Renderer.Pie = Rickshaw.Class.create( Rickshaw.Graph.Renderer, {
         .sort(null)
         .value(function(d) { return d.y; });
 
-    var palette = new Rickshaw.Color.Palette( { scheme: graph.scheme } );
+    console.log(graph.scheme);
+    console.log(this.scheme);
+    var palette = new Rickshaw.Color.Palette( { scheme: this.scheme } );
 
     var arc = d3.svg.arc()
         .outerRadius(this.outerRadius - 10)
