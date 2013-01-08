@@ -92,15 +92,13 @@ ensure_custodian_ddoc_exists(Db, N) ->
             end;
         {ok, Doc} ->
             {Props} = couch_doc:to_json_obj(Doc, []),
-            ActualViews = couch_util:get_value(<<"views">>, Props, []),
-            ExpectedViews = custodian_views(N),
-            case ActualViews of
-                ExpectedViews ->
+            Props1 = lists:keystore(<<"views">>, 1, Props, {<<"views">>, custodian_views(N)}),
+            Props2 = lists:keystore(<<"validate_doc_update">>, 1, Props1, {<<"validate_doc_update">>, ?CUSTODIAN_VALIDATION}),
+            case Props =:= Props2 of
+                true ->
                     ok;
-                _ ->
-                    Props1 = lists:keystore(<<"views">>, 1, Props, {<<"views">>, ExpectedViews}),
-                    Doc1 = couch_doc:from_json_obj({Props1}),
-                    try couch_db:update_doc(Db, Doc1, []) of
+                false ->
+                    try couch_db:update_doc(Db, couch_doc:from_json_obj({Props2}), []) of
                     {ok, _} ->
                         ok
                     catch conflict ->
@@ -113,7 +111,8 @@ custodian_ddoc(N) ->
     Props = [
         {<<"_id">>, <<"_design/custodian">>},
         {<<"language">>, <<"javascript">>},
-        {<<"views">>, custodian_views(N)}
+        {<<"views">>, custodian_views(N)},
+        {<<"validate_doc_update">>, ?CUSTODIAN_VALIDATION}
     ],
     couch_doc:from_json_obj({Props}).
 
