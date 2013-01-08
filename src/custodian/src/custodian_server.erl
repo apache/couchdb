@@ -43,10 +43,10 @@ handle_info({nodedown, Node}, State) ->
 handle_info(heartbeat, #state{down=Down}=State) ->
     {ok, N} = custodian:summary(truly_down(Down)),
     if N =:= 0 ->
-            clear_alert();
-       true ->
-            twig:log(crit, "~B under-protected shards in this cluster", [N]),
-            send_alert(N)
+        clear_alert();
+    true ->
+        twig:log(crit, "~B under-protected shards in this cluster", [N]),
+        send_alert(N)
     end,
     {noreply, update_heartbeat(State)}.
 
