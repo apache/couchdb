@@ -234,9 +234,17 @@ handle_request(MochiReq) ->
             send_error(HttpReq, database_does_not_exist);
         Tag:Error ->
             Stack = erlang:get_stacktrace(),
-            twig:log(error, "~p ~p ~p ~p", [?MODULE, Tag, Error,
-                json_stack(Error, nill, Stack)]),
-            send_error(HttpReq, {Error, nil, Stack})
+            % TODO improve logging and metrics collection for client disconnects
+            case {Tag, Error, Stack} of
+                {exit, normal, [{mochiweb_request, send, _, _} | _]} ->
+                    exit(normal); % Client disconnect (R15+)
+                {exit, normal, [{mochiweb_request, send, _} | _]} ->
+                    exit(normal); % Client disconnect (R14)
+                _Else ->
+                    JsonStack = json_stack({Error, nil, Stack}),
+                    twig:log(error, "req_err ~p:~p ~p", [Tag, Error, JsonStack]),
+                    send_error(HttpReq, {Error, nil, Stack})
+            end
     end,
 
     RequestTime = timer:now_diff(os:timestamp(), Begin)/1000,
