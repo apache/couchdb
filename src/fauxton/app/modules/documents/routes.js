@@ -258,8 +258,14 @@ function(app, FauxtonAPI, Documents, Databases) {
 
     "database/:database/new": newDocCodeEditorCallback,
 
-    "database/:database/_design/:ddoc/_view/:view": function(databaseName, ddoc, view) {
-      // alert("This will filter your data by the " + ddoc + "/" + view + "view.");
+    // TODO: fix optional search params
+    // Can't get ":view(?*search)" to work
+    // However ":view?*search" does work
+    //"database/:database/_design/:ddoc/_view/:view(\?*options)": function(databaseName, ddoc, view, options) {
+    "database/:database/_design/:ddoc/_view/:view": function(databaseName, ddoc, view, options) {
+      // hack around backbone router limitations
+      view = view.replace(/\?.*$/,'');
+      var params = app.getParams();
       var data = {
         database: new Databases.Model({id:databaseName})
       };
@@ -268,7 +274,7 @@ function(app, FauxtonAPI, Documents, Databases) {
         database: data.database,
         design: ddoc,
         view: view,
-        params: {}
+        params: params
       });
 
       data.designDocs = new Documents.AllDocs(null, {
@@ -278,6 +284,11 @@ function(app, FauxtonAPI, Documents, Databases) {
                  include_docs: true}
       });
 
+      var ddocInfo = {
+        id: "_design/" + ddoc,
+        designDocs: data.designDocs
+      };
+
       return {
         layout: "with_tabs_sidebar",
 
@@ -286,7 +297,10 @@ function(app, FauxtonAPI, Documents, Databases) {
         views: {
           "#dashboard-content": new Documents.Views.AllDocsList({
             collection: data.indexedDocs,
-            nestedView: Documents.Views.Row
+            nestedView: Documents.Views.Row,
+            viewList: true,
+            ddocInfo: ddocInfo,
+            params: params
           }),
 
           "#sidebar-content": new Documents.Views.Sidebar({

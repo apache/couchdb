@@ -122,7 +122,7 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
   });
 
   Views.Row = FauxtonAPI.View.extend({
-    template: "templates/documents/index_row",
+    template: "templates/documents/index_row_docular",
     tagName: "tr",
 
     serialize: function() {
@@ -155,26 +155,77 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     template: "templates/documents/all_docs_list",
     events: {
       "click button.all": "selectAll",
-      "click button.bulk-delete": "bulkDelete"
+      "click button.bulk-delete": "bulkDelete",
+      "submit form.view-query-update": "updateView"
     },
 
     initialize: function(options){
       this.nestedView = options.nestedView || Views.Document;
       this.rows = {};
+      this.viewList = !! options.viewList;
+      this.params = options.params;
+      if (options.ddocInfo) {
+        this.designDocs = options.ddocInfo.designDocs;
+        this.ddocID = options.ddocInfo.id;
+      }
     },
 
     establish: function() {
-      return [this.collection.fetch()];
+      var deferreds = [this.collection.fetch()];
+      if (this.designDocs) {
+        deferreds.push(this.designDocs.fetch());
+      }
+      return deferreds;
     },
 
     selectAll: function(evt){
       $("input:checkbox").attr('checked', !$(evt.target).hasClass('active'));
     },
 
+    // TODO:: HACK::
+    // Hack to grab info about the ddoc and current view to determine whether
+    // or not the view has a reduce function so we can display the advanced
+    // options appropriately.
+    //
+    // NOTE: we have this here temporarily because we have to wait for the
+    // design docs to be present.
+    //
+    // NOTE: We should probably refactor this View out into a separate View
+    // dedicated to displaying view query results.
+    // If nothing else, we should at least switch to something along the lines
+    // of fetchOnce to ensure we're not reloading the ddocs here in addition to
+    // the sidebar.
+    setDdocInfo: function() {
+      if (!this.ddoc && this.designDocs) {
+        this.ddoc = this.designDocs.get(this.ddocID);
+      }
+    },
+
     serialize: function() {
-      return {
-        database: this.collection
+      this.setDdocInfo();
+      var data = {
+        database: this.collection,
+        viewList: this.viewList,
+        hasReduce: false,
+        params: this.params
       };
+      if (this.ddoc) {
+        data.ddoc = this.ddoc;
+        data.hasReduce = this.ddoc.viewHasReduce(this.collection.view);
+      }
+      return data;
+    },
+
+    updateView: function(event) {
+      event.preventDefault();
+      var $form = $(event.currentTarget);
+      // Ignore params without a value
+      var params = _.filter($form.serializeArray(), function(param) {
+        return param.value;
+      });
+      var fragment = window.location.hash.replace(/\?.*$/, '');
+      fragment = fragment + '?' + $.param(params);
+      FauxtonAPI.navigate(fragment);
     },
 
     /*
@@ -221,6 +272,32 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
 
     afterRender: function(){
       prettyPrint();
+      if (this.params) {
+        var $form = this.$el.find("form.view-query-update");
+        _.each(this.params, function(val, key) {
+          switch (key) {
+            case "limit":
+              $form.find("select[name=limit]").val(val);
+              break;
+            case "include_docs":
+              if (val == "true") {
+                $form.find("input[name=include_docs]").prop('checked', true);
+              }
+              break;
+            case "reduce":
+              if (val == "true") {
+                $form.find("input[reduce]").prop('checked', true);
+              }
+              break;
+            case "group_level":
+              $form.find("select[name=group_level]").attr('selected', val);
+              break;
+            default:
+              $form.find("input[name='"+key+"']").val(val);
+              break;
+          }
+        });
+      }
     }
   });
 

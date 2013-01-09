@@ -39,6 +39,29 @@ function(app, FauxtonAPI, Views) {
       return this.id.match(/^_design/) ? "design doc" : "doc";
     },
 
+    isDdoc: function() {
+      return this.docType() === "design doc";
+    },
+
+    hasViews: function() {
+      if (!this.isDdoc()) return false;
+      var doc = this.get('doc');
+      return doc && doc.views && doc.views.length > 0;
+    },
+
+    getDdocView: function(view) {
+      if (!this.isDdoc() || !this.hasViews()) return false;
+
+      var doc = this.get('doc');
+      return doc.views[view];
+    },
+
+    viewHasReduce: function(viewName) {
+      var view = this.getDdocView(viewName);
+
+      return view && view.reduce;
+    },
+
     // Need this to work around backbone router thinking _design/foo
     // is a separate route. Alternatively, maybe these should be
     // treated separately. For instance, we could default into the
@@ -78,6 +101,19 @@ function(app, FauxtonAPI, Views) {
       var data = this.get("doc") ? this.get("doc") : this;
 
       return JSON.stringify(data, null, "  ");
+    }
+  });
+
+  Documents.ViewRow = Backbone.Model.extend({
+    docType: function() {
+      if (!this.id) return "reduction";
+
+      return this.id.match(/^_design/) ? "design doc" : "doc";
+    },
+
+    prettyJSON: function() {
+      //var data = this.get("doc") ? this.get("doc") : this;
+      return JSON.stringify(this, null, "  ");
     }
   });
 
@@ -126,7 +162,7 @@ function(app, FauxtonAPI, Views) {
   });
 
   Documents.IndexCollection = Backbone.Collection.extend({
-    model: Backbone.Model,
+    model: Documents.ViewRow,
 
     initialize: function(_models, options) {
       this.database = options.database;
@@ -151,7 +187,8 @@ function(app, FauxtonAPI, Views) {
         return {
           value: row.value,
           key: row.key,
-          doc: row.doc || undefined
+          doc: row.doc,
+          id: row.id
         };
       });
     },

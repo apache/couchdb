@@ -1,5 +1,5 @@
 <div class="view show">
-  <div>
+  <div class="row">
     <div class="btn-toolbar span6">
       <button type="button" class="btn all" data-toggle="button">✓ All</button>
       <button class="btn btn-small disabled bulk-delete"><i class="icon-trash"></i></button>
@@ -9,6 +9,75 @@
       <a href="#params" class="btn btn-small toggle-params"><i class="icon-plus"></i> API preview</a>
     </div>
   </div>
+
+  <div class="row">
+    <div class="accordion" id="advanced-options-accordion">
+      <div class="accordion-group">
+        <div class="accordion-heading">
+          <a class="accordion-toggle" data-bypass="true" data-toggle="collapse" data-parent="#advanced-options-accordion" href="#collapse-advanced-options">
+            Advanced Options
+          </a>
+        </div>
+        <div id="collapse-advanced-options" class="accordion-body collapse in">
+          <div class="accordion-inner">
+            <form class="view-query-update">
+              <div class="controls controls-row">
+                <label class="span3 inline">
+                  Limit:
+                  <select name="limit" class="input-small">
+                    <option>5</option>
+                    <option selected="selected">10</option>
+                    <option>25</option>
+                    <option>50</option>
+                    <option>100</option>
+                  </select>
+                </label>
+                <label class="span3 checkbox inline">
+                  <input name="include_docs" type="checkbox" id="inlineCheckbox1" value="true"> Include Docs
+                </label>
+                <% if (hasReduce) { %>
+                  <label class="span2 checkbox inline">
+                    <input name="reduce" type="checkbox" id="inlineCheckbox1" value="true"> Reduce
+                  </label>
+                  <label class="span4 inline">
+                    Group Level:
+                    <select name="group_level" class="input-small">
+                      <option value="0">None</option>
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                      <option value="5">5</option>
+                      <option value="6">6</option>
+                      <option value="7">7</option>
+                      <option value="8">8</option>
+                      <option value="9">9</option>
+                      <option value="999" selected="selected">exact</option>
+                    </select>
+                  </label>
+                <% } %>
+              </div>
+
+              <div class="controls controls-row">
+                <input name="key" class="span4" type="text" placeholder="Key">
+                <input name="keys" class="span8" type="text" placeholder="Keys">
+              </div>
+              <div class="controls controls-row">
+                <input name="startkey" class="span6" type="text" placeholder="Start Key">
+                <input name="endkey" class="span6" type="text" placeholder="End Key">
+              </div>
+              <div class="controls controls-row">
+                <button type="submit" class="btn btn-primary">Query</button>
+              </div>
+            </form>
+ 
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
 
   <table class="all-docs table table-striped table-condensed">
     <tbody></tbody>
