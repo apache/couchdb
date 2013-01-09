@@ -5,16 +5,18 @@
 -include_lib("mem3/include/mem3.hrl").
 
 % public api.
--export([start_link/0, truly_down/0]).
+-export([start_link/0]).
 
 % gen_server api.
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
     code_change/3, terminate/2]).
 
+% exported for callback.
+-export([update_event_handler/1]).
+
 % private records.
 -record(state, {
-    heartbeat,
-    down
+    update_notifier
 }).
 
 % public functions.
@@ -22,33 +24,32 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-truly_down() ->
-    gen_server:call(?MODULE, truly_down).
-
 % gen_server functions.
 init(_) ->
     net_kernel:monitor_nodes(true),
-    {ok, update_heartbeat(init_down(#state{}))}.
+    {ok, Pid} = start_update_notifier(),
+    maybe_send_alert(),
+    {ok, #state{update_notifier=Pid}}.
 
-handle_call(truly_down, _From, #state{down=Down}=State) ->
-    {reply, {ok, truly_down(Down)}, State}.
-
-handle_cast(_Msg, State) ->
+handle_call(_Msg, _From, State) ->
     {noreply, State}.
 
-handle_info({nodeup, Node}, State) ->
-    {noreply, not_down(Node, State)};
-handle_info({nodedown, Node}, State) ->
-    {noreply, down(Node, State)};
-handle_info(heartbeat, #state{down=Down}=State) ->
-    {ok, N} = custodian:summary(truly_down(Down)),
-    if N =:= 0 ->
-        clear_alert();
-    true ->
-        twig:log(crit, "~B under-protected shards in this cluster", [N]),
-        send_alert(N)
-    end,
-    {noreply, update_heartbeat(State)}.
+handle_cast(refresh, State) ->
+    maybe_send_alert(),
+    {noreply, State}.
+
+handle_info({nodeup, _}, State) ->
+    maybe_send_alert(),
+    {noreply, State};
+
+handle_info({nodedown, _}, State) ->
+    maybe_send_alert(),
+    {noreply, State};
+
+handle_info({'EXIT', Pid, Reason}, #state{update_notifier=Pid}=State) ->
+    twig:log(notice, "update notifier died ~p", [Reason]),
+    {ok, Pid1} = start_update_notifier(),
+    {noreply, State#state{update_notifier=Pid1}}.
 
 terminate(_Reason, _State) ->
     ok.
@@ -58,44 +59,14 @@ code_change(_OldVsn, State, _Extra) ->
 
 % private functions
 
-init_down(#state{}=State) ->
-    Now = os:timestamp(),
-    Down = dict:from_list([{Node, Now} ||
-        Node <- mem3:nodes() -- [node()|nodes()]]),
-    State#state{down=Down}.
+start_update_notifier() ->
+    couch_db_update_notifier:start_link(fun ?MODULE:update_event_handler/1).
 
-not_down(Node, #state{down=Down}=State) ->
-    State#state{down=dict:erase(Node, Down)}.
+maybe_send_alert() ->
+    ok.
 
-down(Node, #state{down=Down}=State) ->
-    State#state{down=dict:store(Node, os:timestamp(), Down)}.
+update_event_handler({updated, <<"dbs">>}) ->
+    gen_server:cast(?MODULE, refresh);
+update_event_handler(_) ->
+    ok.
 
-update_heartbeat(#state{heartbeat=undefined}=State) ->
-    HeartbeatSecs = list_to_integer(
-        couch_config:get("custodian", "heartbeat_secs", "60")),
-    TimerRef = erlang:send_after(HeartbeatSecs * 1000, self(), heartbeat),
-    State#state{heartbeat=TimerRef};
-update_heartbeat(#state{heartbeat=TimerRef}=State) ->
-    erlang:cancel_timer(TimerRef),
-    update_heartbeat(State#state{heartbeat=undefined}).
-
-truly_down(Down) ->
-    Now = os:timestamp(),
-    TimeoutSecs = list_to_integer(
-        couch_config:get("custodian", "timeout_secs", "172800")),
-    Fun = fun(Node, LastSeen, Acc) ->
-        case timer:now_diff(Now, LastSeen) > TimeoutSecs * 1000000 of
-            true ->
-                [Node|Acc];
-            false ->
-                Acc
-        end
-    end,
-    dict:fold(Fun, [], Down).
-
-send_alert(Count) when is_integer(Count) ->
-    os:cmd("send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcoreProtectionFailureEvent cloudantDbcoreUnderProtected "
-           ++ integer_to_list(Count)).
-
-clear_alert() ->
-    os:cmd("send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcoreProtectionRestoredEvent").

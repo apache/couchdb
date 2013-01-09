@@ -1,13 +1,13 @@
 % Copyright 2013 Cloudant. All rights reserved.
 
--define(CUSTODIAN_UNDER_N(N),
+-define(CUSTODIAN_ID, <<"_design/custodian">>).
+
+-define(CUSTODIAN_BY_N,
 <<"function(doc) {
   var i;
   if (!doc.by_range) return;
   for (i in doc.by_range) {
-    if (doc.by_range[i].length < ", N/binary, ") {
-      emit([doc._id, i], 1);
-    }
+    emit([doc.by_range[i].length, doc._id, i], 1);
   }
 }
 ">>).
