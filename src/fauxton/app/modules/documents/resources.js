@@ -46,7 +46,7 @@ function(app, FauxtonAPI, Views) {
     hasViews: function() {
       if (!this.isDdoc()) return false;
       var doc = this.get('doc');
-      return doc && doc.views && doc.views.length > 0;
+      return doc && doc.views && _.keys(doc.views).length > 0;
     },
 
     getDdocView: function(view) {

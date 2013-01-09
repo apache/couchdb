@@ -277,20 +277,14 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
         _.each(this.params, function(val, key) {
           switch (key) {
             case "limit":
-              $form.find("select[name=limit]").val(val);
+            case "group_level":
+              $form.find("select[name='"+key+"']").val(val);
               break;
             case "include_docs":
-              if (val == "true") {
-                $form.find("input[name=include_docs]").prop('checked', true);
-              }
-              break;
             case "reduce":
               if (val == "true") {
-                $form.find("input[reduce]").prop('checked', true);
+                $form.find("input[name='"+key+"']").prop('checked', true);
               }
-              break;
-            case "group_level":
-              $form.find("select[name=group_level]").attr('selected', val);
               break;
             default:
               $form.find("input[name='"+key+"']").val(val);
