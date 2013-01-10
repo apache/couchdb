@@ -2,28 +2,6 @@
 
 -define(CUSTODIAN_ID, <<"_design/custodian">>).
 
--define(CUSTODIAN_BY_N,
-<<"function(doc) {
-  var i;
-  if (!doc.by_range) return;
-  for (i in doc.by_range) {
-    emit([doc.by_range[i].length, doc._id, i], 1);
-  }
-}
-">>).
-
--define(CUSTODIAN_BY_NODE_RANGE,
-<<"function(doc) {
-  var i, j;
-  if (!doc.by_range) return;
-  for (i in doc.by_range) {
-    for (j in doc.by_range[i]) {
-      emit([doc.by_range[i][j], doc._id, i], 1);
-    }
-  }
-}
-">>).
-
 -define(CUSTODIAN_VALIDATION,
 <<"function(newDoc, oldDoc) {
   var i, range, node;
