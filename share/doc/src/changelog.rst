@@ -174,8 +174,6 @@ Query and View Server
   documents and views. :commit:`b59ac98b`
 * :issue:`1372`: `_stats` builtin reduce function no longer produces error for
   empty view result.
-* :issue:`1334`: Speedup in the communication with external view servers.
-  :commit:`a851c6e5`
 * :issue:`410`: More graceful error handling for JavaScript validate_doc_update
   functions.
 * :issue:`111`: Improve the errors reported by the javascript view server
