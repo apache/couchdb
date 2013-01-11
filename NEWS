@@ -14,7 +14,6 @@ This version has not been released yet.
 
  * The source code repository was migrated from SVN to Git.
  * Added view request duration to Futon.
- * Speedup in the communication with external view servers.
  * Fixed unnecessary conflict when deleting and creating a
    document in the same batch.
  * New and updated passwords are hashed using PBKDF2.

@@ -36,7 +36,6 @@ Storage System:
 
 View Server:
 
- * Speedup in the communication with external view servers.
  * Additional response headers may be varied prior to send().
  * GetRow() is now side-effect free.
 
