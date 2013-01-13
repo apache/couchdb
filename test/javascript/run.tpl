@@ -70,6 +70,7 @@ $COUCHJS -H -u $COUCH_URI_FILE \
 	$SCRIPT_DIR/couch.js \
 	$SCRIPT_DIR/couch_test_runner.js \
 	$SCRIPT_DIR/couch_tests.js \
+    $SCRIPT_DIR/replicator_db_inc.js \
 	$TEST_SRC \
 	$JS_TEST_DIR/couch_http.js \
 	$JS_TEST_DIR/cli_runner.js

@@ -176,7 +176,25 @@ nobase_dist_localdata_DATA = \
     www/script/test/reduce_false.js \
     www/script/test/reduce_false_temp.js \
     www/script/test/replication.js \
-    www/script/test/replicator_db.js \
+    www/script/replicator_db_inc.js \
+    www/script/test/replicator_db_bad_rep_id.js \
+    www/script/test/replicator_db_by_doc_id.js \
+    www/script/test/replicator_db_compact_rep_db.js \
+    www/script/test/replicator_db_continuous.js \
+    www/script/test/replicator_db_credential_delegation.js \
+    www/script/test/replicator_db_field_validation.js \
+    www/script/test/replicator_db_filtered.js \
+    www/script/test/replicator_db_identical.js \
+    www/script/test/replicator_db_identical_continuous.js \
+    www/script/test/replicator_db_invalid_filter.js \
+    www/script/test/replicator_db_security.js \
+    www/script/test/replicator_db_simple.js \
+    www/script/test/replicator_db_successive.js \
+    www/script/test/replicator_db_survives.js \
+    www/script/test/replicator_db_swap_rep_db.js \
+    www/script/test/replicator_db_update_security.js \
+    www/script/test/replicator_db_user_ctx.js \
+    www/script/test/replicator_db_write_auth.js \
     www/script/test/replicator_db_security.js \
     www/script/test/rev_stemming.js \
     www/script/test/rewrite.js \
