@@ -302,10 +302,6 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
       "click button.save-doc": "saveDoc"
     },
 
-    initialize: function() {
-      this.model.on("sync", this.updateValues, this);
-    },
-
     updateValues: function() {
       notification = FauxtonAPI.addNotification({
         msg: "Document saved successfully.",
@@ -370,6 +366,7 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     },
 
     afterRender: function() {
+      this.model.on("sync", this.updateValues, this);
       var that = this;
       this.editor = Codemirror.fromTextArea(this.$el.find("textarea.doc-code").get()[0], {
         mode: "application/json",

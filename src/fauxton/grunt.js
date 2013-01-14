@@ -11,7 +11,7 @@ module.exports = function(grunt) {
                 okay_if_missing: true
               }
             }
-  }
+  };
 
   grunt.initConfig({
 
@@ -267,13 +267,13 @@ module.exports = function(grunt) {
     },
 
     get_deps: {
-      default: {
+      "default": {
         src: "settings.json"
       }
     },
 
     gen_load_addons: {
-      default: {
+      "default": {
         src: "settings.json"
       }
     },
