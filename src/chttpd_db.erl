@@ -116,6 +116,8 @@ changes_callback({stop, EndSeq}, {_, Resp}) ->
 changes_callback(timeout, {Prepend, Resp}) ->
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp, "\n"),
     {ok, {Prepend, Resp1}};
+changes_callback({error, Reason}, {_, #httpd{}=Req}) ->
+    chttpd:send_error(Req, Reason);
 changes_callback({error, Reason}, {_, Resp}) ->
     chttpd:send_delayed_error(Resp, Reason).
 
