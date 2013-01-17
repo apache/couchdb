@@ -130,11 +130,11 @@ maybe_redirect([Node|Rest], Acc) ->
     end.
 
 send_unavailable_alert(Count) when is_integer(Count) ->
-    os:cmd("send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcoreShardsUnavailableEvent -o cloudantDbcoreShardCount="
+    os:cmd("send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcoreShardsUnavailableEvent -o cloudantDbcoreShardCount:INTEGER:"
            ++ integer_to_list(Count)).
 
 send_impaired_alert(Count) when is_integer(Count) ->
-    os:cmd("send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcoreShardsImpairedEvent -o cloudantDbcoreShardCount="
+    os:cmd("send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcoreShardsImpairedEvent -o cloudantDbcoreShardCount:INTEGER:"
            ++ integer_to_list(Count)).
 
 send_all_available_alert() ->
