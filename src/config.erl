@@ -16,7 +16,7 @@
 % ini file is specified, the last one is used to write changes that are made
 % with store/2 back to that ini file.
 
--module(couch_config).
+-module(config).
 -behaviour(gen_server).
 
 -export([start_link/1, stop/0]).
@@ -85,7 +85,7 @@ register(Fun) ->
     ?MODULE:register(Fun, self()).
 
 register(Fun, Pid) ->
-    couch_config_event:register(Fun, Pid).
+    config_event:register(Fun, Pid).
 
 
 init(IniFiles) ->
@@ -114,12 +114,12 @@ handle_call({set, Sec, Key, Val, Persist}, _From, Config) ->
         {true, undefined} ->
             ok;
         {true, FileName} ->
-            couch_config_writer:save_to_file({{Sec, Key}, Val}, FileName);
+            config_writer:save_to_file({{Sec, Key}, Val}, FileName);
         _ ->
             ok
     end,
     Event = {config_change, Sec, Key, Val, Persist},
-    gen_event:sync_notify(couch_config_event, Event),
+    gen_event:sync_notify(config_event, Event),
     {reply, ok, Config};
 handle_call({delete, Sec, Key, Persist}, _From, Config) ->
     true = ets:delete(?MODULE, {Sec,Key}),
@@ -127,12 +127,12 @@ handle_call({delete, Sec, Key, Persist}, _From, Config) ->
         {true, undefined} ->
             ok;
         {true, FileName} ->
-            couch_config_writer:save_to_file({{Sec, Key}, ""}, FileName);
+            config_writer:save_to_file({{Sec, Key}, ""}, FileName);
         _ ->
             ok
     end,
     Event = {config_change, Sec, Key, deleted, Persist},
-    gen_event:sync_notify(couch_config_event, Event),
+    gen_event:sync_notify(config_event, Event),
     {reply, ok, Config}.
 
 
@@ -142,7 +142,7 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info(Info, State) ->
-    twig:log(error, "couch_config:handle_info Info: ~p~n", [Info]),
+    twig:log(error, "config:handle_info Info: ~p~n", [Info]),
     {noreply, State}.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -150,7 +150,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 parse_ini_file(IniFile) ->
-    IniFilename = couch_config_util:abs_pathname(IniFile),
+    IniFilename = config_util:abs_pathname(IniFile),
     IniBin =
     case file:read_file(IniFilename) of
         {ok, IniBin0} ->
@@ -202,7 +202,7 @@ parse_ini_file(IniFile) ->
                 [""|_LineValues] -> % line begins with "=", ignore
                     {AccSectionName, AccValues};
                 [ValueName|LineValues] -> % yeehaw, got a line!
-                    RemainingLine = couch_config_util:implode(LineValues, "="),
+                    RemainingLine = config_util:implode(LineValues, "="),
                     % removes comments
                     case re:split(RemainingLine, " ;|\t;", [{return, list}]) of
                     [[]] ->

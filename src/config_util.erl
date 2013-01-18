@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(couch_config_util).
+-module(config_util).
 
 -export([abs_pathname/1]).
 -export([abs_pathname/2]).

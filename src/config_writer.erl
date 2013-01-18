@@ -16,9 +16,9 @@
 %%      Option and value combination is appended to the Section. If the Section
 %%      does not yet exist in the ini file, it is added and the Option/Value
 %%      pair is appended.
-%% @see couch_config
+%% @see config
 
--module(couch_config_writer).
+-module(config_writer).
 
 -export([save_to_file/2]).
 

@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(couch_config_app).
+-module(config_app).
 
 -behaviour(application).
 
@@ -22,7 +22,7 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-    couch_config_sup:start_link(get_ini_files()).
+    config_sup:start_link(get_ini_files()).
 
 stop(_State) ->
     ok.

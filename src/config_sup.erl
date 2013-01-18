@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(couch_config_sup).
+-module(config_sup).
 -behaviour(supervisor).
 
 %% API
@@ -32,15 +32,15 @@ start_link(IniFiles) ->
 
 init(IniFiles) ->
     Children = [
-        {couch_config,
-            {couch_config, start_link, [IniFiles]},
+        {config,
+            {config, start_link, [IniFiles]},
             permanent,
             5000,
             worker,
-            [couch_config]
+            [config]
         },
-        {couch_config_event,
-            {couch_config_event, start_link, []},
+        {config_event,
+            {config_event, start_link, []},
             permanent,
             5000,
             worker,
