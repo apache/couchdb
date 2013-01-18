@@ -21,7 +21,7 @@
 
 -export([start_link/1, stop/0]).
 -export([all/0, get/1, get/2, get/3, set/3, set/4, delete/2, delete/3]).
--export([register/1, register/2]).
+-export([listen_for_changes/1]).
 -export([parse_ini_file/1]).
 
 -export([init/1, terminate/2, code_change/3]).
@@ -80,13 +80,8 @@ delete(Section, Key, Persist) when is_binary(Section) and is_binary(Key) ->
 delete(Section, Key, Persist) ->
     gen_server:call(?MODULE, {delete, Section, Key, Persist}).
 
-
-register(Fun) ->
-    ?MODULE:register(Fun, self()).
-
-register(Fun, Pid) ->
-    config_event:register(Fun, Pid).
-
+listen_for_changes(CallbackModule) ->
+    config_listener:start(CallbackModule).
 
 init(IniFiles) ->
     ets:new(?MODULE, [named_table, set, protected]),

@@ -40,7 +40,7 @@ init(IniFiles) ->
             [config]
         },
         {config_event,
-            {config_event, start_link, []},
+            {gen_event, start_link, [{local, config_event}]},
             permanent,
             5000,
             worker,
