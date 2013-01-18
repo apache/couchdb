@@ -30,14 +30,14 @@ handle_event({config_change, Sec, Key, Value, Persist}, {Module, State}) ->
             remove_handler
     end.
 
-handle_call(_Request, Module) ->
+handle_call(_Request, St) ->
     {ok, ignored, St}.
 
-handle_info(_Info, Module) ->
+handle_info(_Info, St) ->
     {ok, St}.
 
-terminate(_Reason, Module) ->
+terminate(_Reason, _St) ->
     ok.
 
-code_change(_OldVsn, Module, _Extra) ->
+code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
