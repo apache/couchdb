@@ -3,7 +3,7 @@
 -behaviour(gen_event).
 
 %% Public interface
--export([start/1]).
+-export([start/2]).
 
 -export([behaviour_info/1]).
 
@@ -12,18 +12,23 @@
     code_change/3]).
 
 behaviour_info(callbacks) ->
-    [{handle_config_change/4}];
+    [{handle_config_change,5}];
 behaviour_info(_) ->
     undefined.
 
-start(Module) ->
-    gen_event:add_sup_handler(config_event, {?MODULE, Module}, [Module]).
+start(Module, State) ->
+    gen_event:add_sup_handler(config_event, {?MODULE, Module}, {Module, State}).
 
-init(Module) ->
-    {ok, Module}.
+init({Module, State}) ->
+    {ok, {Module, State}}.
 
-handle_event({config_change, Sec, Key, Value, Persist}, Module) ->
-    Module:handle_config_change(Sec, Key, Value, Persist).
+handle_event({config_change, Sec, Key, Value, Persist}, {Module, State}) ->
+    case Module:handle_config_change(Sec, Key, Value, Persist, State) of
+        {ok, NewState} ->
+            {ok, {Module, NewState}};
+        remove_handler ->
+            remove_handler
+    end.
 
 handle_call(_Request, Module) ->
     {ok, ignored, St}.
