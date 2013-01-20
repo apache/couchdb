@@ -363,12 +363,15 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     },
 
     updateValues: function() {
-      notification = FauxtonAPI.addNotification({
-        msg: "Document saved successfully.",
-        type: "success",
-        clear: true
-      });
-      this.editor.setValue(this.model.prettyJSON());
+      var notification;
+      if (this.model.changedAttributes()) {
+        notification = FauxtonAPI.addNotification({
+          msg: "Document saved successfully.",
+          type: "success",
+          clear: true
+        });
+        this.editor.setValue(this.model.prettyJSON());
+      }
     },
 
     establish: function() {
