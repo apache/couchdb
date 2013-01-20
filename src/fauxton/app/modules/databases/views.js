@@ -104,9 +104,23 @@ function(app, FauxtonAPI) {
         id: encodeURIComponent(name),
         name: name
       });
+      var notification = FauxtonAPI.addNotification({msg: "Creating database."});
       db.save().done(function() {
+        notification = FauxtonAPI.addNotification({
+          msg: "Database created successfully",
+          type: "success",
+          clear: true
+        });
         var route = "#/database/" +  name + "/_all_docs?limit=100";
         app.router.navigate(route, { trigger: true });
+      }
+      ).error(function(xhr) {
+        var responseText = JSON.parse(xhr.responseText).reason;
+        notification = FauxtonAPI.addNotification({
+          msg: "Create database failed: " + responseText,
+          type: "error",
+          clear: true
+        });
       }
       );
     },
