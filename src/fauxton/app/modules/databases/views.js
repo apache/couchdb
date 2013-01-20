@@ -98,13 +98,24 @@ function(app, FauxtonAPI) {
     },
 
     newDatabase: function() {
+      var notification;
       // TODO: use a modal here instead of the prompt
       var name = prompt('Name of database', 'newdatabase');
+      if (name === null) {
+        return;
+      } else if (name.length === 0) {
+        notification = FauxtonAPI.addNotification({
+          msg: "Please enter a valid database name",
+          type: "error",
+          clear: true
+        });
+        return;
+      }
       var db = new this.collection.model({
         id: encodeURIComponent(name),
         name: name
       });
-      var notification = FauxtonAPI.addNotification({msg: "Creating database."});
+      notification = FauxtonAPI.addNotification({msg: "Creating database."});
       db.save().done(function() {
         notification = FauxtonAPI.addNotification({
           msg: "Database created successfully",
