@@ -882,7 +882,9 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
     case [A || A <- Atts, A#att.name == FileName] of
     [] ->
         throw({not_found, "Document is missing attachment"});
-    [#att{type=Type, encoding=Enc, disk_len=DiskLen, att_len=AttLen}=Att] ->
+    [#att{data={Fd,_}, type=Type, encoding=Enc, disk_len=DiskLen, att_len=AttLen}=Att] ->
+        Ref = monitor(process, Fd),
+        try
         Etag = chttpd:doc_etag(Doc),
         ReqAcceptsAttEnc = lists:member(
            atom_to_list(Enc),
@@ -963,6 +965,9 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
                 end
             end
         )
+        after
+            demonitor(Ref)
+        end
     end;
 
 
