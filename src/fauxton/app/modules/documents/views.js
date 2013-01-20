@@ -384,7 +384,16 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
         json = JSON.parse(this.editor.getValue());
         this.model.set(json);
         notification = FauxtonAPI.addNotification({msg: "Saving document."});
-        this.model.save();
+        this.model.save().error(
+          function(xhr) {
+            var responseText = JSON.parse(xhr.responseText).reason;
+            notification = FauxtonAPI.addNotification({
+              msg: "Save failed: " + responseText,
+              type: "error",
+              clear: true
+            });
+          }
+        );
       } else {
         notification = FauxtonAPI.addNotification({
           msg: "Please fix the JSON errors and try again.",
