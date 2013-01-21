@@ -67,7 +67,7 @@ update_event_handler(_) ->
     ok.
 
 send_alerts() ->
-    case custodian_util:summary() of
+    case custodian:summary() of
         {0, 0} ->
             send_all_available_alert();
         {Unavailable, 0} ->

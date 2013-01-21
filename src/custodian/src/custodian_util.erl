@@ -6,7 +6,7 @@
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
--export([summary/0]).
+-export([summary/0, report/0]).
 
 %% public functions.
 
@@ -17,6 +17,14 @@ summary() ->
                   {Unavailable, Impaired + 1}
           end,
     fold_dbs({0, 0}, Fun).
+
+report() ->
+    Fun = fun(Id, Range,  unavailable, Acc) ->
+                  [{Id, Range, unavailable}|Acc];
+             (Id, Range,  {impaired, N}, Acc) ->
+                  [{Id, Range, {impaired, N}}|Acc]
+          end,
+    fold_dbs([], Fun).
 
 %% private functions.
 
