@@ -99,6 +99,7 @@ function(app, FauxtonAPI) {
 
     newDatabase: function() {
       var notification;
+      var db;
       // TODO: use a modal here instead of the prompt
       var name = prompt('Name of database', 'newdatabase');
       if (name === null) {
@@ -111,7 +112,7 @@ function(app, FauxtonAPI) {
         });
         return;
       }
-      var db = new this.collection.model({
+      db = new this.collection.model({
         id: encodeURIComponent(name),
         name: name
       });
