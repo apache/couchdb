@@ -327,7 +327,9 @@ validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj) ->
         {[{<<"forbidden">>, Message}]} ->
             throw({forbidden, Message});
         {[{<<"unauthorized">>, Message}]} ->
-            throw({unauthorized, Message})
+            throw({unauthorized, Message});
+        <<Message/binary>> ->
+            throw({unknown_error, Message})
     end.
 
 json_doc(nil) -> null;
