@@ -251,6 +251,12 @@ open_async(Server, From, DbName, Filepath, Options) ->
     put({async_open, DbName}, now()),
     Opener = spawn_link(fun() ->
         Res = couch_db:start_link(DbName, Filepath, Options),
+        case {Res, lists:member(create, Options)} of
+            {{ok, _Db}, true} ->
+                couch_db_update_notifier:notify({created, DbName});
+            _ ->
+                ok
+        end,
         gen_server:call(Parent, {open_result, DbName, Res}, infinity),
         unlink(Parent)
     end),
