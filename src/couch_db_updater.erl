@@ -732,11 +732,12 @@ update_docs_int(Db, DocsList, NonRepDocs, MergeConflicts, FullCommit) ->
 
     % Check if we just updated any design documents, and update the validation
     % funs if we did.
-    Db4 = case UpdatedDDocIds of
-    [] ->
-        Db3;
-    _ ->
-        refresh_validate_doc_funs(Db3)
+    Db4 = case length(UpdatedDDocIds) > 0 of
+        true ->
+            ddoc_cache:evict(Db3#db.name, UpdatedDDocIds),
+            refresh_validate_doc_funs(Db3);
+        false ->
+            Db3
     end,
 
     {ok, commit_data(Db4, not FullCommit), UpdatedDDocIds}.
