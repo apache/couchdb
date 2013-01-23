@@ -146,7 +146,8 @@ handle_design_req(#httpd{
         path_parts=[_DbName, _Design, Name, <<"_",_/binary>> = Action | _Rest],
         design_url_handlers = DesignUrlHandlers
     }=Req, Db) ->
-    case fabric:open_doc(Db, <<"_design/", Name/binary>>, []) of
+    DbName = mem3:dbname(Db#db.name),
+    case ddoc_cache:open(DbName, <<"_design/", Name/binary>>) of
     {ok, DDoc} ->
         Handler = couch_util:get_value(Action, DesignUrlHandlers,
             fun bad_action_req/3),
