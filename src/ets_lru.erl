@@ -178,7 +178,7 @@ code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
 
 
-accessed(St, Key) ->
+accessed(Key, St) ->
     Pattern = #entry{key=Key, atime='$1', _='_'},
     case ets:match(St#st.objects, Pattern) of
         [[ATime]] ->
