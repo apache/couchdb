@@ -7,7 +7,8 @@
     start/0,
     stop/0,
     
-    open/2
+    open/2,
+    evict/2
 ]).
 
 
@@ -38,4 +39,9 @@ open(Key) ->
         _ ->
             gen_server:call(?OPENER, {open, Key}, infinity)
     end.
+
+
+evict(ShardDbName, DDocIds) ->
+    DbName = mem3:dbname(ShardDbName),
+    gen_server:cast(?OPENER, {evict, DbName, DDocIds}).
 

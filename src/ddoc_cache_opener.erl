@@ -4,6 +4,9 @@
 -behaviour(gen_server).
 
 
+-include_lib("mem3/include/mem3.hrl").
+
+
 -export([
     start_link/0
 ]).
@@ -23,6 +26,10 @@
     code_change/3
 ]).
 
+-export([
+    evictor/1
+]).
+
 
 -define(OPENING, ddoc_cache_opening).
 
@@ -33,6 +40,11 @@
     clients
 }).
 
+-record(st, {
+    db_ddocs,
+    evictor
+}).
+
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -41,10 +53,17 @@ start_link() ->
 init(_) ->
     process_flag(trap_exit, true),
     ets:new(?OPENING, [set, protected, named_table, {keypos, #opener.key}]),
-    {ok, nil}.
+    {ok, Evictor} = couch_db_update_notifier:start_link(fun ?MODULE:evictor/1),
+    {ok, #st{
+        evictor = Evictor
+    }}.
 
 
-terminate(_Reason, _State) ->
+terminate(_Reason, St) ->
+    case is_pid(St#st.evictor) of
+        true -> exit(St#st.evictor, kill);
+        false -> ok
+    end,
     ok.
 
 
@@ -63,9 +82,43 @@ handle_call(Msg, _From, St) ->
     {stop, {invalid_call, Msg}, {invalid_call, Msg}, St}.
 
 
+handle_cast({evict, DbName}, St) ->
+    gen_server:abcast(mem3:nodes(), ?MODULE, {do_evict, DbName}),
+    {noreply, St};
+
+handle_cast({evict, DbName, DDocIds}, St) ->
+    gen_server:abcast(mem3:nodes(), ?MODULE, {do_evict, DbName, DDocIds}),
+    {noreply, St};
+
+handle_cast({do_evict, DbName}, St) ->
+    % Bit of hack to introspect the ets_lru ETS tables directly
+    % but I think this is better than having to manage our own
+    % DbName -> DDocIdList table
+    DDocIds = ets:foldl(fun(Obj, Acc) ->
+        entry = element(1, Obj), % assert this is an entry record
+        {EntryDbName, EntryDDocId} = element(2, Obj),
+        case EntryDbName == DbName of
+            true -> [EntryDDocId | Acc];
+            false -> Acc
+        end
+    end, [], ddoc_cache_lru_objects),
+    handle_cast({do_evict, DbName, DDocIds}, St);
+
+handle_cast({do_evict, DbName, DDocIds}, St) ->
+    ets_lru:remove(ddoc_cache_lru, {DbName, validation_funs}),
+    lists:foreach(fun(DDocId) ->
+        ets_lru:remove(ddoc_cache_lru, {DbName, DDocId})
+    end, DDocIds),
+    {noreply, St};
+
 handle_cast(Msg, St) ->
     {stop, {invalid_cast, Msg}, St}.
 
+
+handle_info({'EXIT', Pid, Reason}, #st{evictor=Pid}=St) ->
+    twig:log(err, "ddoc_cache_opener evictor died ~w", [Reason]),
+    {ok, Evictor} = couch_db_update_notifier:start_link(fun ?MODULE:evictor/1),
+    {noreply, St#st{evictor=Evictor}};
 
 handle_info({'EXIT', _Pid, {ddoc_ok, Key, Doc}}, St) ->
     respond(Key, {ok, Doc}),
@@ -92,6 +145,16 @@ handle_info(Msg, St) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+
+evictor({created, ShardDbName}) ->
+    DbName = mem3:dbname(ShardDbName),
+    gen_server:cast(?MODULE, {evict, DbName});
+evictor({deleted, ShardDbName}) ->
+    DbName = mem3:dbname(ShardDbName),
+    gen_server:cast(?MODULE, {evict, DbName});
+evictor(_) ->
+    ok.
 
 
 open_ddoc({DbName, validation_funs}=Key) ->
