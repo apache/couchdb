@@ -94,6 +94,16 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 
+open_ddoc({DbName, validation_funs}=Key) ->
+    {ok, DDocs} = fabric:design_docs(mem3:dbname(DbName)),
+    Funs = lists:flatmap(fun(DDoc) ->
+        case couch_doc:get_validate_doc_fun(DDoc) of
+            nil -> [];
+            Fun -> [Fun]
+        end
+    end, DDocs),
+    ok = ets_lru:insert(ddoc_cache_lru, {DbName, validation_funs}, Funs),
+    exit({ddoc_ok, Key, Funs});
 open_ddoc({DbName, DDocId}=Key) ->
     case fabric:open_doc(DbName, DDocId) of
         {ok, Doc} ->

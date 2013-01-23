@@ -23,12 +23,19 @@ stop() ->
     application:stop(ddoc_cache).
 
 
+open(DbName, validation_funs) ->
+    open({DbName, validation_funs});
 open(DbName, <<"_design/", _/binary>>=DDocId) when is_binary(DbName) ->
-    case ets_lru:lookup_d(?CACHE, {DbName, DDocId}) of
-        {ok, Doc} ->
-            {ok, Doc};
-        _ ->
-            gen_server:call(?OPENER, {open, {DbName, DDocId}}, infinity)
-    end;
+    open({DbName, DDocId});
 open(DbName, DDocId) when is_binary(DDocId) ->
-    open(DbName, <<"_design/", DDocId/binary>>).
+    open({DbName, <<"_design/", DDocId/binary>>}).
+
+
+open(Key) ->
+    case ets_lru:lookup_d(?CACHE, Key) of
+        {ok, _} = Resp ->
+            Resp;
+        _ ->
+            gen_server:call(?OPENER, {open, Key}, infinity)
+    end.
+
