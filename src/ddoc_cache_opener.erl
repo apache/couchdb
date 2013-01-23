@@ -168,7 +168,7 @@ open_ddoc({DbName, validation_funs}=Key) ->
     ok = ets_lru:insert(ddoc_cache_lru, {DbName, validation_funs}, Funs),
     exit({ddoc_ok, Key, Funs});
 open_ddoc({DbName, DDocId}=Key) ->
-    case fabric:open_doc(DbName, DDocId) of
+    case fabric:open_doc(DbName, DDocId, []) of
         {ok, Doc} ->
             ok = ets_lru:insert(ddoc_cache_lru, {DbName, DDocId}, Doc),
             exit({ddoc_ok, Key, Doc});
