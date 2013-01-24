@@ -67,28 +67,22 @@ update_event_handler(_) ->
     ok.
 
 send_alerts() ->
-    case custodian:summary() of
-        {0, 0} ->
-            send_all_available_alert();
-        {Unavailable, 0} ->
-            send_unavailable_alert(Unavailable),
-            twig:log(crit, "~B unavailable shards in this cluster", [Unavailable]);
-        {0, Impaired} ->
-            send_impaired_alert(Impaired),
-            twig:log(crit, "~B impaired shards in this cluster", [Impaired]);
-        {Unavailable, Impaired} ->
-            send_unavailable_alert(Unavailable),
-            send_impaired_alert(Impaired),
-            twig:log(crit, "~B unavailable and ~B impaired shards in this cluster", [Unavailable, Impaired])
-    end.
+    {Unavailable, Impaired} = custodian:summary(),
+    send_unavailable_alert(Unavailable),
+    send_impaired_alert(Impaired).
 
-send_unavailable_alert(Count) when is_integer(Count) ->
-    os:cmd("send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcoreShardsUnavailableEvent -o cloudantDbcoreShardCount:INTEGER:"
-           ++ integer_to_list(Count)).
-
+send_impaired_alert(0) ->
+    twig:log(notice, "No shards impaired in this cluster", []),
+    os:cmd("send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcoreAllShardsUnimpairedEvent");
 send_impaired_alert(Count) when is_integer(Count) ->
+    twig:log(crit, "~B impaired shards in this cluster", [Count]),
     os:cmd("send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcoreShardsImpairedEvent -o cloudantDbcoreShardCount:INTEGER:"
            ++ integer_to_list(Count)).
 
-send_all_available_alert() ->
-    os:cmd("send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcoreAllShardsAvailableEvent").
+send_unavailable_alert(0) ->
+    twig:log(notice, "All shards are available in this cluster", []),
+    os:cmd("send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcoreAllShardsAvailableEvent");
+send_unavailable_alert(Count) when is_integer(Count) ->
+    twig:log(crit, "~B unavailable shards in this cluster", [Count]),
+    os:cmd("send_snmptrap --trap CLOUDANT-DBCORE-MIB::cloudantDbcoreShardsUnavailableEvent -o cloudantDbcoreShardCount:INTEGER:"
+           ++ integer_to_list(Count)).
