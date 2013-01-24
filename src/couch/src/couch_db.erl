@@ -534,6 +534,7 @@ validate_doc_update_int(Db, Doc, GetDiskDocFun) ->
     end.
 
 
+% to be safe, spawn a middleman here
 load_validation_funs(#db{main_pid=Pid, name = <<"shards/", _/binary>>}=Db) ->
     {_, Ref} = spawn_monitor(fun() ->
         exit(ddoc_cache:open(mem3:dbname(Db#db.name), validation_funs))
