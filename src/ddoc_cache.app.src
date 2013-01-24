@@ -20,6 +20,6 @@
     {env, [
         {max_objects, unlimited},
         {max_size, 104857600}, % 100M
-        {max_lifetime, 60} % 1m
+        {max_lifetime, 60000} % 1m
     ]}
 ]}.
