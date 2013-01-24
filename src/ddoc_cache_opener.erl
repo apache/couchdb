@@ -168,12 +168,15 @@ open_ddoc({DbName, validation_funs}=Key) ->
     ok = ets_lru:insert(ddoc_cache_lru, {DbName, validation_funs}, Funs),
     exit({ddoc_ok, Key, Funs});
 open_ddoc({DbName, DDocId}=Key) ->
-    case fabric:open_doc(DbName, DDocId, []) of
+    try fabric:open_doc(DbName, DDocId, []) of
         {ok, Doc} ->
             ok = ets_lru:insert(ddoc_cache_lru, {DbName, DDocId}, Doc),
-            exit({ddoc_ok, Key, Doc});
-        Else ->
-            exit({ddoc_error, Key, Else})
+            exit({ddoc_ok, Key, Doc})
+    catch
+        error:database_not_found ->
+            exit({ddoc_error, Key, database_not_found});
+        _Type:Reason ->
+            exit({ddoc_error, Key, Reason})
     end.
 
 

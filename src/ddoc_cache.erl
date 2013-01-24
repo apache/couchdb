@@ -37,7 +37,12 @@ open(Key) ->
         {ok, _} = Resp ->
             Resp;
         _ ->
-            gen_server:call(?OPENER, {open, Key}, infinity)
+            case gen_server:call(?OPENER, {open, Key}, infinity) of
+                {ok, _} = Resp ->
+                    Resp;
+                Else ->
+                    throw(Else)
+            end
     end.
 
 
