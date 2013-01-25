@@ -13,16 +13,16 @@
     <% _.each(logs, function (log) { %>
     <tr class="<%= log.log_level %>">
       <td>
-        <%= log.date %> 
+        <%= log.date.replace(/ /g,'') %>
       </td>
       <td>
-        <%= log.log_level %>
+        <%= log.log_level.replace(/ /g,'') %>
       </td>
       <td>
-        <%= log.pid %>
+        <%= _.escape(log.pid) %>
       </td>
       <td>
-        <%= log.args %>
+        <%= _.escape(log.args) %>
       </td>
     </tr>
     <% }); %>
