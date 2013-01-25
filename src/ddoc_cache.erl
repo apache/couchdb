@@ -33,7 +33,7 @@ open(DbName, DDocId) when is_binary(DDocId) ->
 
 
 open(Key) ->
-    case ets_lru:lookup_d(?CACHE, Key) of
+    try ets_lru:lookup_d(?CACHE, Key) of
         {ok, _} = Resp ->
             Resp;
         _ ->
@@ -43,6 +43,9 @@ open(Key) ->
                 Else ->
                     throw(Else)
             end
+    catch
+        error:badarg ->
+            recover(Key)
     end.
 
 
@@ -50,3 +53,15 @@ evict(ShardDbName, DDocIds) ->
     DbName = mem3:dbname(ShardDbName),
     gen_server:cast(?OPENER, {evict, DbName, DDocIds}).
 
+
+recover({DbName, validation_funs}) ->
+    {ok, DDocs} = fabric:design_docs(mem3:dbname(DbName)),
+    Funs = lists:flatmap(fun(DDoc) ->
+        case couch_doc:get_validate_doc_fun(DDoc) of
+            nil -> [];
+            Fun -> [Fun]
+        end
+    end, DDocs),
+    {ok, Funs};
+recover({DbName, DDocId}) ->
+    fabric:open_doc(DbName, DDocId, []).
