@@ -254,7 +254,7 @@ sum_arrays(_, _) ->
 builtin_stats(_, []) ->
     {[{sum,0}, {count,0}, {min,0}, {max,0}, {sumsqr,0}]};
 builtin_stats(_, [[_,First]|Rest]) ->
-    Unpacked = lists:foldl(fun([_key, Value], Acc) -> stat_values(Value, Acc) end,
+    Unpacked = lists:foldl(fun([_Key, Value], Acc) -> stat_values(Value, Acc) end,
                            build_initial_accumulator(First), Rest),
     pack_stats(Unpacked).
 
