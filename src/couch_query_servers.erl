@@ -307,9 +307,11 @@ get_number(Key, Props) ->
     case couch_util:get_value(Key, Props) of
     X when is_number(X) ->
         X;
+    undefined when is_binary(Key) ->
+        get_number(binary_to_atom(Key, latin1), Props);
     undefined ->
-        Msg = io_lib:format("user _stats input missing required field ~s",
-            [Key]),
+        Msg = io_lib:format("user _stats input missing required field ~s (~p)",
+            [Key, Props]),
         throw({invalid_value, iolist_to_binary(Msg)});
     Else ->
         Msg = io_lib:format("non-numeric _stats input received for ~s: ~w",
