@@ -14,22 +14,19 @@ function(app, FauxtonAPI, Stats, Views) {
 
   var routeCallback = function() {
     return {
-      layout: "two_pane",
+      layout: "with_sidebar",
 
       data: data,
 
       crumbs: [],
 
       views: {
-        "#left-content": new Views.Pie({
-          collection: data.stats,
-          template: "by_method",
-          datatype: "httpd_request_methods"
+        "#sidebar-content": new Views.StatSelect({
+          collection: data.stats
         }),
-        "#right-content": new Views.Pie({
-          collection: data.stats,
-          template: "by_code",
-          datatype: "httpd_status_codes"
+
+        "#dashboard-content": new Views.Statistics({
+          collection: data.stats
         })
       },
 

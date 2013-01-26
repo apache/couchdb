@@ -2,48 +2,156 @@ define([
   "app",
 
   "api",
+  'addons/stats/resources',
   "d3",
-  "rickshaw"
+  "nv.d3"
+
 ],
 
-function(app, FauxtonAPI) {
-
+function(app, FauxtonAPI,Stats) {
+  console.log(arguments);
   Views = {};
 
+  datatypeEventer = {};
+  _.extend(datatypeEventer, Backbone.Events);
+
+  Views.Legend = FauxtonAPI.View.extend({
+    tagName: 'ul',
+    template: "addons/stats/templates/legend",
+
+    serialize: function () {
+      return {
+        legend_items: this.collection.toJSON()
+      };
+    }
+  });
+
   Views.Pie = FauxtonAPI.View.extend({
+    className: "datatype-section",
+    template: 'addons/stats/templates/pie_table',
+
     initialize: function(args){
-      this.template = "addons/stats/templates/" + args.template;
       this.datatype = args.datatype;
     },
     serialize: function() {
       return {
-        statistics: this.collection.where({type: this.datatype})
+        statistics: this.collection.where({type: this.datatype}),
+        datatype: this.datatype
       };
     },
     afterRender: function(){
-      var collection = this.collection;
-      var chartelem = "#" + this.datatype;
-      var series = _.map(this.collection.where({type: this.datatype}),
-        function(d){
-          // TODO: x should be a counter
-          var point = {x: 0, y: d.get("sum") || 0, label: d.id};
-          return point;
-        }
-      );
-      series = _.filter(series, function(e){return e.y > 0;});
-      var graph = new Rickshaw.Graph({
-          element: document.querySelector(chartelem),
-          width: 300,
-          height: 300,
-          renderer: "pie",
-          outerRadius: 150,
-          scheme: "spectrum14",
-          series: [{
-            data: series
-          }]
-      });
+      if (this.datatypes != 'couchdb'){
+        var collection = this.collection,
+            chartelem = "#" + this.datatype + '_graph',
+            series = _.map(this.collection.where({type: this.datatype}),
+          function(d, counter){
+            // TODO: x should be a counter
+            var point = {
+              y: d.get("sum") || 0,
+              key: d.id
+            };
+            return point;
+          }
+        );
 
-      graph.render();
+        series = _.filter(series, function(d){return d.y > 0;});
+        series = _.sortBy(series, function(d){return -d.y;});
+
+        nv.addGraph(function() {
+            var width = 400,
+                height = 400;
+
+            var chart = nv.models.pieChart()
+                .x(function(d) { return d.key; })
+                .y(function(d) { return d.y; })
+                .showLabels(true)
+                .showLegend(false)
+                .values(function(d) { return d; })
+                .color(d3.scale.category10().range())
+                .width(width)
+                .height(height);
+
+              d3.select(chartelem)
+                  .datum([series])
+                .transition().duration(300)
+                  .attr('width', width)
+                  .attr('height', height)
+                  .call(chart);
+
+            return chart;
+        });
+
+      }
+      this.$el.addClass(this.datatype + '_section');
+    }
+  });
+
+  Views.StatSelect = FauxtonAPI.View.extend({
+    className: 'nav nav-tabs nav-stacked',
+    tagName: 'ul',
+
+    template: "addons/stats/templates/statselect",
+
+    initialize: function (options) {
+      this.rows = [];
+    },
+
+    events: {
+      'click .datatype-select': "datatype_selected"
+    },
+
+    serialize: function () {
+      return {
+        datatypes: _.uniq(this.collection.pluck("type"))
+      };
+    },
+
+    afterRender: function () {
+      this.$('.datatype-select').first().addClass('active');
+    },
+
+    datatype_selected: function (event) {
+      var $target = $(event.currentTarget);
+
+      event.preventDefault();
+      event.stopPropagation();
+      this.$('.datatype-select').removeClass('active');
+      $target.addClass('active');
+      datatypeEventer.trigger('datatype-select', $target.attr('data-type-select'));
+    }
+  });
+
+  Views.Statistics = FauxtonAPI.View.extend({
+    className: "datatypes",
+    template: "addons/stats/templates/stats",
+
+    initialize: function (options) {
+      this.rows = [];
+      datatypeEventer.on('datatype-select', this.display_datatype, this);
+    },
+
+    serialize: function () {
+      return {
+        datatypes: _.uniq(this.collection.pluck("type"))
+      };
+    },
+
+    beforeRender: function () {
+      _.each(_.uniq(this.collection.pluck("type")), function(datatype) {
+        this.rows[datatype] = this.insertView(".datatypes", new Views.Pie({
+          collection: this.collection,
+          datatype: datatype
+        }));
+      }, this);
+    },
+
+    afterRender: function () {
+      this.$('.datatype-section').hide().first().toggle();
+    },
+
+    display_datatype: function (datatype) {
+      this.$('.datatype-section').hide();
+      this.$('.' + datatype + '_section').show();
     }
   });
 

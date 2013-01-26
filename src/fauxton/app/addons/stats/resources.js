@@ -1,9 +1,9 @@
 define([
-  "app",
-  "api",
-  "backbone",
-  "lodash",
-  "modules/fauxton/base"
+       "app",
+       "api",
+       "backbone",
+       "lodash",
+       "modules/fauxton/base"
 ],
 
 function (app, FauxtonAPI, backbone, _, Fauxton) {

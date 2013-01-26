@@ -315,4 +315,6 @@ module.exports = function(grunt) {
   grunt.registerTask("release", "test dependencies build minify template:release copy:dist");
   // install fauxton as couchapp
   grunt.registerTask('couchapp_install', 'rmcouchdb:fauxton mkcouchdb:fauxton couchapp:fauxton');
+  grunt.registerTask('couchapp_deploy', 'couchapp_setup couchapp_install');
+
 };

@@ -1,0 +1,45 @@
+<div class="row">
+  <div class="span8">
+    <h2>  <%= datatype %> </h2>
+  </div>
+</div>
+
+<% if (datatype != "couchdb"){%>
+<div class="row">
+  <div class="span8" style="height:430px;">
+    <center>
+      <svg id="<%= datatype %>_graph"></svg>
+    </center>
+  </div>
+</div>
+<% } %>
+<div class="row">
+  <div class="span8">
+    <table class="table table-condensed table-striped">
+      <thead>
+        <tr>
+          <th> Description </th>
+          <th> current </th>
+          <th>  sum </th>
+          <th>  mean </th>
+          <th>  stddev </th>
+          <th>  min </th>
+          <th>  max </th>
+        </tr>
+      </thead>
+      <% _.each (statistics, function (stat_line) {
+        if (stat_line.get("sum")){
+       %>
+      <tr>
+        <td><%= stat_line.get("description") %></td>
+        <td><%= stat_line.get("current") %></td>
+        <td><%= stat_line.get("sum") %></td>
+        <td><%= stat_line.get("mean") %></td>
+        <td><%= stat_line.get("stddev") %></td>
+        <td><%= stat_line.get("min") %></td>
+        <td><%= stat_line.get("max") %></td>
+      </tr>
+      <% }}) %>
+    </table>
+  </div>
+</div>

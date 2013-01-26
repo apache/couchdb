@@ -17,7 +17,7 @@ require.config({
     codemirror: "../assets/js/libs/codemirror",
     jshint: "../assets/js/libs/jshint",
     d3: "../assets/js/libs/d3",
-    rickshaw: "../assets/js/libs/rickshaw"
+    "nv.d3": "../assets/js/libs/nv.d3"
   },
 
   shim: {
