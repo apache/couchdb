@@ -363,12 +363,15 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     },
 
     updateValues: function() {
-      notification = FauxtonAPI.addNotification({
-        msg: "Document saved successfully.",
-        type: "success",
-        clear: true
-      });
-      this.editor.setValue(this.model.prettyJSON());
+      var notification;
+      if (this.model.changedAttributes()) {
+        notification = FauxtonAPI.addNotification({
+          msg: "Document saved successfully.",
+          type: "success",
+          clear: true
+        });
+        this.editor.setValue(this.model.prettyJSON());
+      }
     },
 
     establish: function() {
@@ -381,7 +384,16 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
         json = JSON.parse(this.editor.getValue());
         this.model.set(json);
         notification = FauxtonAPI.addNotification({msg: "Saving document."});
-        this.model.save();
+        this.model.save().error(
+          function(xhr) {
+            var responseText = JSON.parse(xhr.responseText).reason;
+            notification = FauxtonAPI.addNotification({
+              msg: "Save failed: " + responseText,
+              type: "error",
+              clear: true
+            });
+          }
+        );
       } else {
         notification = FauxtonAPI.addNotification({
           msg: "Please fix the JSON errors and try again.",
