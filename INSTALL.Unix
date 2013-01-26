@@ -90,6 +90,7 @@ You can install the build tools by running:
 You can install the other dependencies by running:
 
     brew install autoconf
+    brew install autconf-archive
     brew install automake
     brew install libtool
     brew install erlang
