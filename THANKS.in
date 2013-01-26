@@ -94,6 +94,7 @@ suggesting improvements or submitting changes. Some of these people are:
  * Fedor Indutny <fedor@indutny.com>
  * Tim Blair
  * Tady Walsh <hello@tady.me>
+ * Joan Touzet <joant@ieee.org>
 # Authors from commit 6c976bd and onwards are auto-inserted. If you are merging
 # a commit from a non-committer, you should not add an entry to this file. When
 # `bootstrap` is run, the actual THANKS file will be generated.
