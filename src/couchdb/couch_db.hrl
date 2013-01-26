@@ -50,6 +50,13 @@
         false -> ok
     end).
 
+-define(LOG_WARN(Format, Args),
+    case couch_log:warn_on(?MODULE) of
+        true ->
+            couch_log:warn(Format, Args);
+        false -> ok
+    end).
+
 -define(LOG_ERROR(Format, Args), couch_log:error(Format, Args)).
 
 % Tree::term() is really a tree(), but we don't want to require R13B04 yet
