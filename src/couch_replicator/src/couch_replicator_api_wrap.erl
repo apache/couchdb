@@ -89,6 +89,8 @@ db_open(DbName, Options, Create) ->
             couch_db:create(DbName, Options)
         end,
         case couch_db:open(DbName, Options) of
+        {error, illegal_database_name, _} ->
+            throw({db_not_found, DbName});
         {not_found, _Reason} ->
             throw({db_not_found, DbName});
         {ok, _Db} = Success ->

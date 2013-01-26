@@ -497,6 +497,15 @@ couchTests.replication = function(debug) {
   } catch (x) {
     TEquals("db_not_found", x.error);
   }
+
+  // validate COUCHDB-317
+  try {
+    CouchDB.replicate("/foobar", "test_suite_db");
+    T(false, "should have failed with db_not_found error");
+  } catch (x) {
+    TEquals("db_not_found", x.error);
+  }
+
   try {
     CouchDB.replicate(CouchDB.protocol + host + "/foobar", "test_suite_db");
     T(false, "should have failed with db_not_found error");
