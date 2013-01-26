@@ -302,7 +302,7 @@ can_db_compact(#config{db_frag = Threshold} = Config, Db) ->
             true ->
                 true;
             false ->
-                ?LOG_INFO("Compaction daemon - skipping database `~s` "
+                ?LOG_WARN("Compaction daemon - skipping database `~s` "
                     "compaction: the estimated necessary disk space is about ~p"
                     " bytes but the currently available disk space is ~p bytes.",
                    [Db#db.name, SpaceRequired, Free]),
@@ -333,7 +333,7 @@ can_view_compact(Config, DbName, GroupId, GroupInfo) ->
                 true ->
                     true;
                 false ->
-                    ?LOG_INFO("Compaction daemon - skipping view group `~s` "
+                    ?LOG_WARN("Compaction daemon - skipping view group `~s` "
                         "compaction (database `~s`): the estimated necessary "
                         "disk space is about ~p bytes but the currently available"
                         " disk space is ~p bytes.",

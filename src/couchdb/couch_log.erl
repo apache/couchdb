@@ -15,16 +15,17 @@
 
 % public API
 -export([start_link/0, stop/0]).
--export([debug/2, info/2, error/2]).
--export([debug_on/0, info_on/0, get_level/0, get_level_integer/0, set_level/1]).
--export([debug_on/1, info_on/1, get_level/1, get_level_integer/1, set_level/2]).
+-export([debug/2, info/2, warn/2, error/2]).
+-export([debug_on/0, info_on/0, warn_on/0, get_level/0, get_level_integer/0, set_level/1]).
+-export([debug_on/1, info_on/1, warn_on/1, get_level/1, get_level_integer/1, set_level/2]).
 -export([read/2]).
 
 % gen_event callbacks
 -export([init/1, handle_event/2, terminate/2, code_change/3]).
 -export([handle_info/2, handle_call/2]).
 
--define(LEVEL_ERROR, 3).
+-define(LEVEL_ERROR, 4).
+-define(LEVEL_WARN, 3).
 -define(LEVEL_INFO, 2).
 -define(LEVEL_DEBUG, 1).
 
@@ -42,17 +43,23 @@ info(Format, Args) ->
     {ConsoleMsg, FileMsg} = get_log_messages(self(), info, Format, Args),
     gen_event:sync_notify(error_logger, {couch_info, ConsoleMsg, FileMsg}).
 
+warn(Format, Args) ->
+    {ConsoleMsg, FileMsg} = get_log_messages(self(), warn, Format, Args),
+    gen_event:sync_notify(error_logger, {couch_warn, ConsoleMsg, FileMsg}).
+
 error(Format, Args) ->
     {ConsoleMsg, FileMsg} = get_log_messages(self(), error, Format, Args),
     gen_event:sync_notify(error_logger, {couch_error, ConsoleMsg, FileMsg}).
 
 
 level_integer(error)    -> ?LEVEL_ERROR;
+level_integer(warn)     -> ?LEVEL_WARN;
 level_integer(info)     -> ?LEVEL_INFO;
 level_integer(debug)    -> ?LEVEL_DEBUG;
 level_integer(_Else)    -> ?LEVEL_ERROR. % anything else default to ERROR level
 
 level_atom(?LEVEL_ERROR) -> error;
+level_atom(?LEVEL_WARN) -> warn;
 level_atom(?LEVEL_INFO) -> info;
 level_atom(?LEVEL_DEBUG) -> debug.
 
@@ -110,11 +117,17 @@ debug_on() ->
 info_on() ->
     get_level_integer() =< ?LEVEL_INFO.
 
+warn_on() ->
+    get_level_integer() =< ?LEVEL_WARN.
+
 debug_on(Module) ->
     get_level_integer(Module) =< ?LEVEL_DEBUG.
 
 info_on(Module) ->
     get_level_integer(Module) =< ?LEVEL_INFO.
+
+warn_on(Module) ->
+    get_level_integer(Module) =< ?LEVEL_WARN.
 
 set_level(LevelAtom) ->
     set_level_integer(level_integer(LevelAtom)).
@@ -151,6 +164,9 @@ set_level_integer(Module, Int) ->
     gen_event:call(error_logger, couch_log, {set_level_integer, Module, Int}).
 
 handle_event({couch_error, ConMsg, FileMsg}, State) ->
+    log(State, ConMsg, FileMsg),
+    {ok, State};
+handle_event({couch_warn, ConMsg, FileMsg}, State) ->
     log(State, ConMsg, FileMsg),
     {ok, State};
 handle_event({couch_info, ConMsg, FileMsg}, State) ->
