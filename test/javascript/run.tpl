@@ -54,7 +54,7 @@ abort() {
 # start CouchDB
 if [ -z $COUCHDB_NO_START ]; then
     $MAKE dev
-    trap 'abort' EXIT
+    trap 'abort' EXIT INT
 	./utils/run -b -r 1 -n \
 		-a $BUILD_DIR/etc/couchdb/default_dev.ini \
 		-a $SRC_DIR/test/random_port.ini \
