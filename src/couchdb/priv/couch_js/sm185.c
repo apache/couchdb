@@ -345,6 +345,10 @@ main(int argc, const char* argv[])
 
     JS_SetErrorReporter(cx, couch_error);
     JS_ToggleOptions(cx, JSOPTION_XML);
+    JS_SetOptions(cx, JSOPTION_METHODJIT);
+#ifdef JSOPTION_TYPE_INFERENCE
+    JS_SetOptions(cx, JSOPTION_TYPE_INFERENCE);
+#endif
     JS_SetContextPrivate(cx, args);
     
     SETUP_REQUEST(cx);
