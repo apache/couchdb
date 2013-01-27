@@ -144,3 +144,12 @@ Then wire it all together in base.js:
       console.log(Hello);
       return Hello;
     });
+
+Once the code is in place include the add on in your `settings.json` so that it
+gets included by the `require` task. Your addon is included in one of three
+ways; a local path, a git URL or a name. Named plugins assume the plugin is in
+the fauxton base directory, addons with a git URL will be cloned into the
+application, local paths will be copied. Addons included from a local path will
+be cleaned out by the clean task, others are left alone.
+
+**TODO:** addons via npm module
