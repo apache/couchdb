@@ -20,7 +20,7 @@ module.exports = function(grunt) {
     {
       name: 'base',
       filename: 'base.js',
-      template: 'define([\n  "app",\n  "api",\n  "addons/<%= module.toLowerCase() %>/routes"\n],\n\nfunction(app, FauxtonAPI, <%= module %>) {\n\tvar <%= module %> = new FauxtonAPI.addon();\n\treturn <%= module %>;\n});\n'
+      template: 'define([\n  "app",\n  "api",\n  "addons/<%= module.toLowerCase() %>/routes"\n],\n\nfunction(app, FauxtonAPI, <%= module %>Routes) {\n\tvar <%= module %> = new FauxtonAPI.addon();\n\treturn <%= module %>;\n});\n'
     },
     {
       name: 'resources',
@@ -42,6 +42,7 @@ module.exports = function(grunt) {
       var module = result.name
       filepath = result.path + '/' + module.toLowerCase() + '/templates';
       grunt.file.mkdir(filepath);
+      filepath = result.path + '/' + module.toLowerCase();
       _.each(addonTemplates, function(file){
         file.module = module.charAt(0).toUpperCase() + module.substr(1);
         var content = grunt.template.process(file.template, file);
