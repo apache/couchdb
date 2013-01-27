@@ -13,11 +13,29 @@ module.exports = function(grunt) {
             }
   };
 
+  var cleanable = function(){
+    var path = require('path');
+    // You'll always want to clean these two directories
+    var theListToClean = ["dist/", "app/load_addons.js"];
+
+    // Now find the addons you have and add them for cleaning up
+    if (path.existsSync("settings.json")){
+      var settings = grunt.file.readJSON("settings.json") || {deps: []};
+      settings.deps.forEach(function(addon){
+        // Don't clean up the default addons
+        if (['config', 'logs', 'stats'].indexOf(addon.name) == -1){
+          theListToClean.push("app/addons/" + addon.name);
+        }
+      });
+    }
+    return theListToClean;
+  }();
+
   grunt.initConfig({
 
     // The clean task ensures all files are removed from the dist/ directory so
     // that no files linger from previous builds.
-    clean: ["dist/", "app/load_addons.js", "app/addons/search", "app/addons/dashboard"],
+    clean:  cleanable,
 
     // The lint task will run the build configuration and the application
     // JavaScript through JSHint and report any errors.  You can change the
