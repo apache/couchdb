@@ -14,16 +14,16 @@ module.exports = function(grunt) {
   };
 
   var cleanable = function(){
+    // Whitelist files and directories to be cleaned
     var path = require('path');
     // You'll always want to clean these two directories
     var theListToClean = ["dist/", "app/load_addons.js"];
-
-    // Now find the addons you have and add them for cleaning up
+    // Now find the external addons you have and add them for cleaning up
     if (path.existsSync("settings.json")){
       var settings = grunt.file.readJSON("settings.json") || {deps: []};
       settings.deps.forEach(function(addon){
-        // Don't clean up the default addons
-        if (['config', 'logs', 'stats'].indexOf(addon.name) == -1){
+        // Only clean addons that are included from a local dir
+        if (addon.path){
           theListToClean.push("app/addons/" + addon.name);
         }
       });
