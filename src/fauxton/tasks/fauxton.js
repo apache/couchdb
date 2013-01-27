@@ -25,7 +25,7 @@ module.exports = function(grunt) {
     {
       name: 'resources',
       filename: 'resources.js',
-      template: 'define([\n  "app",\n  "backbone",\n  "modules/fauxton/base"\n],\n\nfunction (app, backbone, Fauxton) {\n\tvar <%= module %> = {};\n\treturn <%= module %>;\n});\n'
+      template: 'define([\n  "app",\n  "backbone",\n  "modules/fauxton/base"\n],\n\nfunction (app, backbone, FauxtonAPI) {\n\tvar <%= module %> = {};\n\treturn <%= module %>;\n});\n'
     },
     {
       name: 'routes',

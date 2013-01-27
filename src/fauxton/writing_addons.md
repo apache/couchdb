@@ -53,3 +53,94 @@ selector for a named set of routes, for example:
     return Search;
 
 adds the `searchSidebar` callback to `#sidebar-content` for three routes.
+
+## Hello world addon
+First create the addon skeleton:
+
+    ± bbb addon
+    path.existsSync is now called `fs.existsSync`.
+    Running "addon" task
+
+    Please answer the following:
+    [?] Add on Name (WickedCool) Hello
+    [?] Location of add ons (app/addons)
+    [?] Do you need to make any changes to the above before continuing? (y/N)
+
+    Created addon Hello in app/addons
+
+    Done, without errors.
+
+In `app/addons/hello/templates/hello.html` place:
+
+    <h1>Hello!</h1>
+
+Next, we'll defined a simple view in `resources.js` (for more complex addons
+you may want to have a views.js) that renders that template:
+
+    define([
+      "app",
+      "api"
+    ],
+
+    function (app, FauxtonAPI) {
+      var Resources = {};
+
+      Resources.Hello = FauxtonAPI.View.extend({
+        template: "addons/hello/templates/hello"
+      });
+
+      return Resources;
+    });
+
+
+Then define a route in `routes.js` that the addon is accessible at:
+
+    define([
+      "app",
+      "api",
+      "addons/hello/resources"
+    ],
+
+    function(app, FauxtonAPI, Resources) {
+      var helloRoute = function () {
+        console.log('helloRoute callback yo');
+        return {
+          layout: "one_pane",
+          crumbs: [
+            {"name": "Hello","link": "_hello"}
+          ],
+          views: {
+            "#dashboard-content": new Resources.Hello({})
+          },
+          apiUrl: 'hello'
+        };
+      };
+
+      Routes = {
+        "_hello": helloRoute
+      };
+
+      return Routes;
+    });
+
+
+Then wire it all together in base.js:
+
+    define([
+      "app",
+      "api",
+      "addons/hello/routes"
+    ],
+
+    function(app, FauxtonAPI, HelloRoutes) {
+      var Hello = new FauxtonAPI.addon();
+      console.log('hello from hello');
+
+      Hello.initialize = function() {
+        FauxtonAPI.addHeaderLink({title: "Hello", href: "#_hello"});
+      };
+
+      Hello.Routes = HelloRoutes;
+      console.log(Hello);
+      return Hello;
+    });
