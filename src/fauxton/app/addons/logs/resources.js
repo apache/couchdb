@@ -148,7 +148,7 @@ function (app, FauxtonAPI) {
 
       Log.events.trigger("log:filter", filter);
 
-      this.insertView("#filter-list", new Log.FilterItemView({
+      this.insertView("#filter-list", new Log.Views.FilterItemView({
         filter: filter
       })).render();
 
