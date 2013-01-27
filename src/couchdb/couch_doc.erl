@@ -461,14 +461,14 @@ len_doc_to_multi_part_stream(Boundary, JsonBytes, Atts, SendEncodedAtts) ->
                 AccAttsSize +
                 4 + % "\r\n\r\n"
                 case SendEncodedAtts of
-                false ->
-                    % header
-                    length(integer_to_list(DiskLen)) +
-                    DiskLen;
-                _ ->
+                true ->
                     % header
                     length(integer_to_list(AttLen)) +
-                    AttLen
+                    AttLen;
+                _ ->
+                    % header
+                    length(integer_to_list(DiskLen)) +
+                    DiskLen
                 end +
                 4 + % "\r\n--"
                 size(Boundary) +
@@ -533,8 +533,8 @@ atts_to_mp([Att | RestAtts], Boundary, WriteFun,
 
     % write headers
     LengthBin = case SendEncodedAtts of
-    true -> list_to_binary(integer_to_list(DiskLen));
-    false -> list_to_binary(integer_to_list(AttLen))
+    true -> list_to_binary(integer_to_list(AttLen));
+    false -> list_to_binary(integer_to_list(DiskLen))
     end,
     WriteFun(<<"\r\nContent-Disposition: attachment; filename=\"", Name/binary, "\"">>),
     WriteFun(<<"\r\nContent-Type: ", Type/binary>>),
