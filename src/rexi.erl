@@ -130,7 +130,7 @@ sync_reply(Reply, Timeout) ->
 
 %% @equiv stream(Msg, 100, 300000)
 stream(Msg) ->
-    stream(Msg, 100, 300000).
+    stream(Msg, 10, 300000).
 
 %% @equiv stream(Msg, Limit, 300000)
 stream(Msg, Limit) ->
