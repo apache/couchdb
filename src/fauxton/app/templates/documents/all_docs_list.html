@@ -33,15 +33,15 @@
                   </select>
                 </label>
                 <label class="span3 checkbox inline">
-                  <input name="include_docs" type="checkbox" id="inlineCheckbox1" value="true"> Include Docs
+                  <input name="include_docs" type="checkbox" value="true"> Include Docs
                 </label>
                 <% if (hasReduce) { %>
                   <label class="span2 checkbox inline">
-                    <input name="reduce" type="checkbox" id="inlineCheckbox1" value="true"> Reduce
+                    <input name="reduce" type="checkbox" value="true"> Reduce
                   </label>
                   <label class="span4 inline">
                     Group Level:
-                    <select name="group_level" class="input-small">
+                    <select disabled name="group_level" class="input-small">
                       <option value="0">None</option>
                       <option value="1">1</option>
                       <option value="2">2</option>

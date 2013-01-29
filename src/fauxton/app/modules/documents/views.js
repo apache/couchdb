@@ -216,6 +216,8 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     events: {
       "click button.all": "selectAll",
       "click button.bulk-delete": "bulkDelete",
+      "change form.view-query-update input": "updateFilters",
+      "change form.view-query-update select": "updateFilters",
       "submit form.view-query-update": "updateView"
     },
 
@@ -288,6 +290,34 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
       FauxtonAPI.navigate(fragment);
     },
 
+    updateFilters: function(event) {
+      event.preventDefault();
+      var $ele = $(event.currentTarget);
+      var name = $ele.attr('name');
+      this.updateFiltersFor(name, $ele);
+    },
+
+    updateFiltersFor: function(name, $ele) {
+      var $form = $ele.parents("form.view-query-update:first");
+      switch (name) {
+        // Reduce constraints
+        //   - Can't include_docs for reduce=true
+        //   - can't include group_level for reduce=false
+        case "reduce":
+          if ($ele.prop('checked') === true) {
+            $form.find("input[name=include_docs]").prop("checked", false);
+            $form.find("input[name=include_docs]").prop("disabled", true);
+            $form.find("select[name=group_level]").prop("disabled", false);
+          } else {
+            $form.find("select[name=group_level]").prop("disabled", true);
+            $form.find("input[name=include_docs]").prop("disabled", false);
+          }
+          break;
+        case "include_docs":
+          break;
+      }
+    },
+
     /*
      * TODO: this should be reconsidered
      * This currently performs delete operations on the model level,
@@ -335,22 +365,27 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
       if (this.params) {
         var $form = this.$el.find("form.view-query-update");
         _.each(this.params, function(val, key) {
+          var $ele;
           switch (key) {
             case "limit":
             case "group_level":
               $form.find("select[name='"+key+"']").val(val);
               break;
             case "include_docs":
+              $form.find("input[name='"+key+"']").prop('checked', true);
+              break;
             case "reduce":
+              $ele = $form.find("input[name='"+key+"']");
               if (val == "true") {
-                $form.find("input[name='"+key+"']").prop('checked', true);
+                $ele.prop('checked', true);
               }
+              this.updateFiltersFor(key, $ele);
               break;
             default:
               $form.find("input[name='"+key+"']").val(val);
               break;
           }
-        });
+        }, this);
       }
     }
   });
