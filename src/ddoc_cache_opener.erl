@@ -120,12 +120,12 @@ handle_info({'EXIT', Pid, Reason}, #st{evictor=Pid}=St) ->
     {ok, Evictor} = couch_db_update_notifier:start_link(fun ?MODULE:evictor/1),
     {noreply, St#st{evictor=Evictor}};
 
-handle_info({'EXIT', _Pid, {ddoc_ok, Key, Doc}}, St) ->
-    respond(Key, {ok, Doc}),
+handle_info({'EXIT', _Pid, {open_ok, Key, Resp}}, St) ->
+    respond(Key, {open_ok, Resp}),
     {noreply, St};
 
-handle_info({'EXIT', _Pid, {ddoc_error, Key, Error}}, St) ->
-    respond(Key, Error),
+handle_info({'EXIT', _Pid, {open_error, Key, Type, Error}}, St) ->
+    respond(Key, {open_error, Type, Error}),
     {noreply, St};
 
 handle_info({'EXIT', Pid, Reason}, St) ->
@@ -166,17 +166,17 @@ open_ddoc({DbName, validation_funs}=Key) ->
         end
     end, DDocs),
     ok = ets_lru:insert(ddoc_cache_lru, {DbName, validation_funs}, Funs),
-    exit({ddoc_ok, Key, Funs});
+    exit({open_ok, Key, Funs});
 open_ddoc({DbName, DDocId}=Key) ->
     try fabric:open_doc(DbName, DDocId, []) of
         {ok, Doc} ->
             ok = ets_lru:insert(ddoc_cache_lru, {DbName, DDocId}, Doc),
-            exit({ddoc_ok, Key, Doc})
+            exit({open_ok, Key, {ok, Doc}});
+        Else ->
+            exit({open_ok, Key, Else})
     catch
-        error:database_not_found ->
-            exit({ddoc_error, Key, database_not_found});
-        _Type:Reason ->
-            exit({ddoc_error, Key, Reason})
+        Type:Reason ->
+            exit({open_error, Key, Type, Reason})
     end.
 
 

@@ -40,10 +40,14 @@ open(Key) ->
         _ ->
             margaret_counter:increment([ddoc_cache, miss]),
             case gen_server:call(?OPENER, {open, Key}, infinity) of
-                {ok, _} = Resp ->
+                {open_ok, Resp} ->
                     Resp;
-                Else ->
-                    throw(Else)
+                {open_error, throw, Error} ->
+                    throw(Error);
+                {open_error, error, Error} ->
+                    erlang:error(Error);
+                {open_error, exit, Error} ->
+                    exit(Error)
             end
     catch
         error:badarg ->
