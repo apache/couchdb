@@ -166,7 +166,7 @@ open_ddoc({DbName, validation_funs}=Key) ->
         end
     end, DDocs),
     ok = ets_lru:insert(ddoc_cache_lru, {DbName, validation_funs}, Funs),
-    exit({open_ok, Key, Funs});
+    exit({open_ok, Key, {ok, Funs}});
 open_ddoc({DbName, DDocId}=Key) ->
     try fabric:open_doc(DbName, DDocId, []) of
         {ok, Doc} ->
