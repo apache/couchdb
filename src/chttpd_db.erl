@@ -1265,33 +1265,6 @@ validate_attachment_name(Name) ->
         false -> throw({bad_request, <<"Attachment name is not UTF-8 encoded">>})
     end.
 
-%% borrowed from mochijson2:json_bin_is_safe()
-is_valid_utf8(<<>>) ->
-    true;
-is_valid_utf8(<<C, Rest/binary>>) ->
-    case C of
-        $\" ->
-            false;
-        $\\ ->
-            false;
-        $\b ->
-            false;
-        $\f ->
-            false;
-        $\n ->
-            false;
-        $\r ->
-            false;
-        $\t ->
-            false;
-        C when C >= 0, C < $\s; C >= 16#7f, C =< 16#10FFFF ->
-            false;
-        C when C < 16#7f ->
-            is_valid_utf8(Rest);
-        _ ->
-            false
-    end.
-
 -spec monitor_attachments(#att{} | [#att{}]) -> [reference()].
 monitor_attachments(#att{}=Att) ->
     monitor_attachments([Att]);
