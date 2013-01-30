@@ -30,7 +30,7 @@ Dependencies
 You will need the following installed:
 
  * Erlang OTP (>=14B01)          (http://erlang.org/)
- * ICU        (>=4.*)            (http://icu.sourceforge.net/)
+ * ICU        (>=4.*)            (http://icu-project.org/)
  * OpenSSL    (>=0.9.8r)         (http://www.openssl.org/)
  * Mozilla SpiderMonkey (=1.8.5) (http://www.mozilla.org/js/spidermonkey/)
  * libcurl    (>=7.20)           (http://curl.haxx.se/libcurl/)
