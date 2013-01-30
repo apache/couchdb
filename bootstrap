@@ -32,7 +32,7 @@ get () {
 }
 
 if test -z "$REVISION"; then
-    if test -d .git; then
+    if test -e .git; then
         REVISION=`git describe --always`-git
     fi
 fi
@@ -43,7 +43,7 @@ else
     sed "s/%release%/$REVISION/" < acinclude.m4.in > acinclude.m4
 fi
 
-if test -d .git; then
+if test -e .git; then
     OS=`uname -s`
     case "$OS" in
     Linux|CYGWIN*) # GNU sed
