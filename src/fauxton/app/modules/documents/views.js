@@ -233,7 +233,13 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     },
 
     establish: function() {
-      var deferreds = [this.collection.fetch()];
+      var deferreds = [
+        this.collection.fetch().error(function() {
+          // TODO: handle error requests that slip through
+          // This should just throw a notification, not break the page
+          console.log("ERROR: ", arguments);
+        })
+      ];
       if (this.designDocs) {
         deferreds.push(this.designDocs.fetch());
       }
@@ -281,10 +287,50 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     updateView: function(event) {
       event.preventDefault();
       var $form = $(event.currentTarget);
+
       // Ignore params without a value
       var params = _.filter($form.serializeArray(), function(param) {
         return param.value;
       });
+
+      // Validate *key* params to ensure they're valid JSON
+      var keyParams = ["key","keys","startkey","endkey"];
+      var errorParams = _.filter(params, function(param) {
+        if (_.contains(keyParams, param.name)) {
+          try {
+            JSON.parse(param.value);
+            return false;
+          } catch(e) {
+            return true;
+          }
+        } else {
+          return false;
+        }
+      });
+
+      if (_.any(errorParams)) {
+        _.map(errorParams, function(param) {
+
+          // TODO: Where to add this error?
+          // bootstrap wants the error on a control-group div, but we're not using that
+          //$('form.view-query-update input[name='+param+'], form.view-query-update select[name='+param+']').addClass('error');
+
+          return FauxtonAPI.addNotification({
+            msg: "JSON Parse Error on field: "+param.name,
+            type: "error",
+            selector: ".view.show .errors-container"
+          });
+        });
+
+        FauxtonAPI.addNotification({
+          msg: "Make sure that strings are properly quoted and any other values are valid JSON structures",
+          type: "warning",
+          selector: ".view.show .errors-container"
+        });
+
+        return false;
+      }
+
       var fragment = window.location.hash.replace(/\?.*$/, '');
       fragment = fragment + '?' + $.param(params);
       FauxtonAPI.navigate(fragment);
@@ -305,7 +351,14 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
         //   - can't include group_level for reduce=false
         case "reduce":
           if ($ele.prop('checked') === true) {
-            $form.find("input[name=include_docs]").prop("checked", false);
+            if ($form.find("input[name=include_docs]").prop("checked") === true) {
+              $form.find("input[name=include_docs]").prop("checked", false);
+              var notification = FauxtonAPI.addNotification({
+                msg: "include_docs has been disabled as you cannot include docs on a reduced view",
+                type: "warn",
+                selector: ".view.show .errors-container"
+              });
+            }
             $form.find("input[name=include_docs]").prop("disabled", true);
             $form.find("select[name=group_level]").prop("disabled", false);
           } else {
