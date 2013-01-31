@@ -1,0 +1,37 @@
+{
+  "name": "fauxton",
+  "version": "0.0.1",
+  "description": "Fauxton is a modular CouchDB dashboard and Futon replacement.",
+  "main": "grunt.js",
+  "directories": {
+    "test": "test"
+  },
+  "dependencies": {
+    "async": "~0.1.22",
+    "grunt": "~0.3.17",
+    "bbb": "0.1.10",
+    "grunt-contrib": "~0.0.8",
+    "grunt-contrib-copy": "~0.3.2",
+    "grunt-couchapp": "~0.1.0",
+    "grunt-exec": "~0.3.0",
+    "grunt-jasmine-task": "~0.2.0",
+    "underscore": "~1.4.2",
+    "url": "~0.7.9",
+    "urls": "~0.0.3"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cloudant-labs/couchdb.git"
+  },
+  "keywords": [
+    "couchdb",
+    "futon",
+    "fauxton"
+  ],
+  "author": "",
+  "license": "Apache V2"
+}
