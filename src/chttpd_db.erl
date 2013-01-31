@@ -118,6 +118,8 @@ changes_callback(timeout, {Prepend, Resp}) ->
     {ok, {Prepend, Resp1}};
 changes_callback({error, Reason}, {_, #httpd{}=Req}) ->
     chttpd:send_error(Req, Reason);
+changes_callback({error, Reason}, {"normal", {"Etag", _Etag}, Req}) ->
+    chttpd:send_error(Req, Reason);
 changes_callback({error, Reason}, {_, Resp}) ->
     chttpd:send_delayed_error(Resp, Reason).
 
