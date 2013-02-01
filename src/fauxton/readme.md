@@ -33,13 +33,14 @@ development and build tools.
     npm install
 
     # Add node_modules/.bin to your path
-    export PATH=./node_modules/.bin:$PATH
+    # export PATH=./node_modules/.bin:$PATH
+		# Or just use the wrappers in ./bin/
 
     # Development mode, non minified files
-    bbb couchdebug
+    ./bin/bbb couchdebug
 
     # Or fully compiled install
-    # bbb couchdb
+    # ./bin/bbb couchdb
 
 ### Start CouchDB with Fauxton Installed ###
 
@@ -50,6 +51,6 @@ development and build tools.
 
 Complete the setup process as above and run:
 
-    bbb couchapp_setup couchapp_install
+    ./bin/bbb couchapp_setup couchapp_install
 
 Install [phantomjs](http://phantomjs.org/) for tests.

@@ -1,0 +1,6 @@
+#!/bin/sh
+
+REL_PATH="`dirname \"$0\"`"
+BBB_PATH="$REL_PATH/../node_modules/.bin/bbb"
+
+$BBB_PATH $*

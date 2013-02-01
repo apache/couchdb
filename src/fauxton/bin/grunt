@@ -1,0 +1,6 @@
+#!/bin/sh
+
+REL_PATH="`dirname \"$0\"`"
+GRUNT_PATH="$REL_PATH/../node_modules/.bin/grunt"
+
+$GRUNT_PATH $*
