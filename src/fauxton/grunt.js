@@ -199,6 +199,14 @@ module.exports = function(grunt) {
         }
       },
 
+      proxies: {
+        '': {
+          host: 'localhost',
+          port: 5984,
+          https: false
+        }
+      },
+
       release: {
         // This makes it easier for deploying, by defaulting to any IP.
         host: "0.0.0.0",
