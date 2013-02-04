@@ -513,7 +513,7 @@ compaction_file(DbName, Sig) ->
 
 
 open_file(FName) ->
-    case couch_file:open(FName) of
+    case couch_file:open(FName, [nologifmissing]) of
         {ok, Fd} -> {ok, Fd};
         {error, enoent} -> couch_file:open(FName, [create]);
         Error -> Error
