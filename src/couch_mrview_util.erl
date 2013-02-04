@@ -24,6 +24,7 @@
 -export([calculate_data_size/2]).
 -export([validate_args/1]).
 -export([maybe_load_doc/3, maybe_load_doc/4]).
+-export([maybe_update_index_file/1]).
 
 -define(MOD, couch_mrview_index).
 
@@ -168,6 +169,19 @@ init_state(Db, Fd, #mrst{views=Views}=State, nil) ->
         view_states=[{nil, 0, 0} || _ <- Views]
     },
     init_state(Db, Fd, State, Header);
+% read <= 1.2.x header record and transpile it to >=1.3.x
+% header record
+init_state(Db, Fd, State, #index_header{
+    seq=Seq,
+    purge_seq=PurgeSeq,
+    id_btree_state=IdBtreeState,
+    view_states=ViewStates}) ->
+    init_state(Db, Fd, State, #mrheader{
+        seq=Seq,
+        purge_seq=PurgeSeq,
+        id_btree_state=IdBtreeState,
+        view_states=ViewStates
+        });
 init_state(Db, Fd, State, Header) ->
     #mrst{language=Lang, views=Views} = State,
     #mrheader{
@@ -704,3 +718,90 @@ index_of(Key, [_ | Rest], Idx) ->
 
 mrverror(Mesg) ->
     throw({query_parse_error, Mesg}).
+
+
+%% Updates 1.2.x or earlier view files to 1.3.x or later view files
+%% transparently, the first time the 1.2.x view file is opened by
+%% 1.3.x or later.
+%%
+%% Here's how it works:
+%%
+%% Before opening a view index,
+%% If no matching index file is found in the new location:
+%%  calculate the <= 1.2.x view signature
+%%  if a file with that signature lives in the old location
+%%    rename it to the new location with the new signature in the name.
+%% Then proceed to open the view index as usual.
+%% After opening, read its header.
+%%
+%% If the header matches the <= 1.2.x style #index_header record:
+%%   upgrade the header to the new #mrheader record
+%% The next time the view is used, the new header is used.
+%%
+%% If we crash after the rename, but before the header upgrade,
+%%   the header upgrade is done on the next view opening.
+%%
+%% If we crash between upgrading to the new header and writing
+%%   that header to disk, we start with the old header again,
+%%   do the upgrade and write to disk.
+
+maybe_update_index_file(State) ->
+    DbName = State#mrst.db_name,
+    NewIndexFile = index_file(DbName, State#mrst.sig),
+    % open in read-only mode so we don't create
+    % the file if it doesn't exist.
+    case file:open(NewIndexFile, [read, raw]) of
+    {ok, Fd_Read} ->
+        % the new index file exists, there is nothing to do here.
+        file:close(Fd_Read);
+    _Error ->
+        update_index_file(State)
+    end.
+
+update_index_file(State) ->
+    Sig = sig_vsn_12x(State),
+    DbName = State#mrst.db_name,
+    FileName = couch_index_util:hexsig(Sig) ++ ".view",
+    IndexFile = couch_index_util:index_file("", DbName, FileName),
+
+    % If we have an old index, rename it to the new position.
+    case file:read_file_info(IndexFile) of
+    {ok, _FileInfo} ->
+        % Crash if the rename fails for any reason.
+        % If the target exists, e.g. the next request will find the
+        % new file and we are good. We might need to catch this
+        % further up to avoid a full server crash.
+        ?LOG_INFO("Attempting to update legacy view index file.", []),
+        NewIndexFile = index_file(DbName, State#mrst.sig),
+        ok = filelib:ensure_dir(NewIndexFile),
+        ok = file:rename(IndexFile, NewIndexFile),
+        ?LOG_INFO("Successfully updated legacy view index file.", []),
+        Sig;
+    _ ->
+        % Ignore missing index file
+        ok
+    end.
+
+sig_vsn_12x(State) ->
+    ViewInfo = [old_view_format(V) || V <- State#mrst.views],
+    SigData = case State#mrst.lib of
+    {[]} ->
+        {ViewInfo, State#mrst.language, State#mrst.design_opts};
+    _ ->
+        {ViewInfo, State#mrst.language, State#mrst.design_opts,
+            couch_index_util:sort_lib(State#mrst.lib)}
+    end,
+    couch_util:md5(term_to_binary(SigData)).
+
+old_view_format(View) ->
+{
+    view,
+    View#mrview.id_num,
+    View#mrview.map_names,
+    View#mrview.def,
+    View#mrview.btree,
+    View#mrview.reduce_funs,
+    View#mrview.options
+}.
+
+%% End of <= 1.2.x upgrade code.
