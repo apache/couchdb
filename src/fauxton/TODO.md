@@ -11,7 +11,7 @@ In no particular order
 - [ ] show design docs only
 - [ ] fix delete doc button UI bug
 - [ ] delete multiple docs via _bulk_docs
-- [ ] show change events in database view
+- [x] show change events in database view
 - [ ] pouchdb addon
 - [ ] bespoke bootstrap style
 - [ ] responsive interface

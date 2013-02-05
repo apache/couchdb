@@ -20,10 +20,19 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     initialize: function(options){
       this.collection = options.collection;
       this.database = options.database;
+      this.active_id = options.active_id;
     },
 
     events: {
       "click #delete-database": "delete_database"
+    },
+
+    serialize: function () {
+      return {
+        // TODO make this not hard coded here
+        changes_url: '#database/'+ this.database.id + '/_changes?descending=true&limit=100',
+        db_url: '#database/'+ this.database.id + '/_all_docs?limit=100'
+      };
     },
 
     beforeRender: function(manage) {
@@ -31,6 +40,13 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
         collection: this.collection,
         database: this.database.id
       }));
+    },
+
+    afterRender: function () {
+      if (this.active_id) {
+        this.$('.active').removeClass('active');
+        this.$('#'+this.active_id).addClass('active');
+      }
     },
 
     delete_database: function (event) {
@@ -661,6 +677,24 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
   });
 
   Views.Indexed = FauxtonAPI.View.extend({});
+
+  Views.Changes = FauxtonAPI.View.extend({
+    template: "templates/documents/changes",
+
+    establish: function() {
+      return [
+        this.collection.fetch()
+      ];
+    },
+
+    serialize: function () {
+      return {
+        changes: this.collection.toJSON()
+      };
+    }
+
+  });
+
 
   return Views;
 });
