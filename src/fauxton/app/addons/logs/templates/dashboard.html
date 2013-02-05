@@ -10,21 +10,21 @@
   </thead>
 
   <tbody>
-    <% _.each(logs, function (log) { %>
-    <tr class="<%= log.log_level %>">
+    <% logs.each(function (log) { %>
+    <tr class="<%= log.logLevel() %>">
       <td>
         <!-- TODO: better format the date -->
-        <%= log.date.replace(/ /g,'') %>
+        <%= log.date() %>
       </td>
       <td>
-        <%= log.log_level.replace(/ /g,'') %>
+        <%= log.logLevel() %>
       </td>
       <td>
-        <%= _.escape(log.pid) %>
+        <%= log.pid() %>
       </td>
       <td>
         <!-- TODO: split the line, maybe put method in it's own column -->
-        <%= _.escape(log.args) %>
+        <%= log.args() %>
       </td>
     </tr>
     <% }); %>

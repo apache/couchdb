@@ -7,7 +7,30 @@ function (app, FauxtonAPI) {
 
   var Log = FauxtonAPI.addon();
 
-  Log.Model = Backbone.Model.extend({ });
+  Log.Model = Backbone.Model.extend({
+
+    date: function () {
+      var date = new Date(this.get('date'));
+
+      var formatted_time = date.getHours() + ":" + date.getMinutes() + ":" + date.getSeconds();
+      var formatted_date = date.toDateString().slice(4, 10);
+
+      return formatted_date + ' ' + formatted_time;
+    },
+
+    logLevel: function () {
+      return this.get('log_level').replace(/ /g,'');
+    },
+
+    pid: function () {
+      return _.escape(this.get('pid'));
+    },
+
+    args: function () {
+      return _.escape(this.get('args'));
+    }
+
+  });
 
   Log.Collection = Backbone.Collection.extend({
     model: Log.Model,
@@ -69,7 +92,7 @@ function (app, FauxtonAPI) {
     },
 
     serialize: function () {
-      return { logs: this.filteredCollection.toJSON()};
+      return { logs: this.filteredCollection};
     },
 
     afterRender: function () {

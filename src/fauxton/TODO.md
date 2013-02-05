@@ -20,7 +20,7 @@ In no particular order
 - [ ] edit index button doesn't
 - [ ] replicate UI
 - [x] delete database
-- [ ] format dates better (e.g. in logs plugin)
+- [x] format dates better (e.g. in logs plugin)
 - [ ] format log entry better
 - [ ] filter logs by method
 - [ ] restore unfiltered data in logs UI
