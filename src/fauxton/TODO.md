@@ -19,7 +19,7 @@ In no particular order
 - [ ] "show me" button in API bar doesn't
 - [ ] edit index button doesn't
 - [ ] replicate UI
-- [ ] delete database
+- [x] delete database
 - [ ] format dates better (e.g. in logs plugin)
 - [ ] format log entry better
 - [ ] filter logs by method

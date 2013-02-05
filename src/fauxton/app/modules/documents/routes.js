@@ -251,7 +251,7 @@ function(app, FauxtonAPI, Documents, Databases) {
 
           "#tabs": new Documents.Views.Tabs({
             collection: data.designDocs,
-            database: data.database.id
+            database: data.database
           })
         },
 

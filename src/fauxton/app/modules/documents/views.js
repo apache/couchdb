@@ -21,12 +21,31 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
       this.collection = options.collection;
       this.database = options.database;
     },
+
+    events: {
+      "click #delete-database": "delete_database"
+    },
+
     beforeRender: function(manage) {
       this.insertView("#search", new Views.SearchBox({
         collection: this.collection,
-        database: this.database
+        database: this.database.id
       }));
+    },
+
+    delete_database: function (event) {
+      event.preventDefault();
+
+      var result = confirm("Are you sure you want to delete this database?");
+
+      if (!result) { return; }
+
+      var promise = this.database.destroy();
+      promise.done(function () {
+        app.router.navigate('/', {trigger: true});
+      });
     }
+
   });
 
   Views.SearchBox = FauxtonAPI.View.extend({
