@@ -1,0 +1,16 @@
+<table class="table">
+  <thead>
+    <th> seq </th>
+    <th> id </th>
+    <th changes </th>
+  </thead>
+  <tbody>
+  <% _.each(changes, function (change) { %>
+  <tr>
+    <td> <%= change.seq %> </td>
+    <td> <%= change.id %> </td>
+    <td> <%= JSON.stringify(change.changes) %> </td>
+  </tr>
+  <% }); %>
+  </tbody>
+</table>

@@ -11,7 +11,7 @@ In no particular order
 - [ ] show design docs only
 - [ ] fix delete doc button UI bug
 - [ ] delete multiple docs via _bulk_docs
-- [ ] show change events in database view
+- [x] show change events in database view
 - [ ] pouchdb addon
 - [ ] bespoke bootstrap style
 - [ ] responsive interface
@@ -19,8 +19,8 @@ In no particular order
 - [ ] "show me" button in API bar doesn't
 - [ ] edit index button doesn't
 - [ ] replicate UI
-- [ ] delete database
-- [ ] format dates better (e.g. in logs plugin)
+- [x] delete database
+- [x] format dates better (e.g. in logs plugin)
 - [ ] format log entry better
 - [ ] filter logs by method
 - [ ] restore unfiltered data in logs UI

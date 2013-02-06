@@ -39,6 +39,37 @@ function(app, FauxtonAPI, Documents) {
       } else {
         return app.host + "/" + this.id;
       }
+    },
+
+    buildChanges: function (params) {
+      this.changes = new Databases.Changes({
+        database: this,
+        params: params
+      });
+
+      return this.changes;
+    }
+  });
+
+  Databases.Changes = Backbone.Collection.extend({
+
+    initialize: function(options) {
+      this.database = options.database;
+      this.params = options.params;
+    },
+
+    url: function () {
+      var query = "";
+      if (this.params) {
+        query = "?" + $.param(this.params);
+      }
+
+      return app.host + '/' + this.database.id + '/_changes' + query;
+    },
+
+    parse: function (resp) {
+      this.last_seq = resp.last_seq;
+      return resp.results;
     }
   });
 

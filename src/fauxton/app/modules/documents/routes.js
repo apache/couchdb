@@ -1,11 +1,11 @@
 define([
-  "app",
+       "app",
 
-  "api",
+       "api",
 
-  // Modules
-  "modules/documents/resources",
-  "modules/databases/base"
+       // Modules
+       "modules/documents/resources",
+       "modules/databases/base"
 ],
 
 function(app, FauxtonAPI, Documents, Databases) {
@@ -25,8 +25,8 @@ function(app, FauxtonAPI, Documents, Databases) {
     data.designDocs = new Documents.AllDocs(null, {
       database: data.database,
       params: {startkey: '"_design"',
-               endkey: '"_design1"',
-               include_docs: true}
+        endkey: '"_design1"',
+        include_docs: true}
     });
 
     var options = app.getParams();
@@ -114,8 +114,8 @@ function(app, FauxtonAPI, Documents, Databases) {
     data.designDocs = new Documents.AllDocs(null, {
       database: data.database,
       params: {startkey: '"_design"',
-               endkey: '"_design1"',
-               include_docs: true}
+        endkey: '"_design1"',
+        include_docs: true}
     });
 
     var options = app.getParams();
@@ -161,8 +161,8 @@ function(app, FauxtonAPI, Documents, Databases) {
       data.designDocs = new Documents.AllDocs(null, {
         database: data.database,
         params: {startkey: '"_design"',
-                 endkey: '"_design1"',
-                 include_docs: true}
+          endkey: '"_design1"',
+          include_docs: true}
       });
 
       var options = app.getParams();
@@ -223,8 +223,8 @@ function(app, FauxtonAPI, Documents, Databases) {
       data.designDocs = new Documents.AllDocs(null, {
         database: data.database,
         params: {startkey: '"_design"',
-                 endkey: '"_design1"',
-                 include_docs: true}
+          endkey: '"_design1"',
+          include_docs: true}
       });
 
       var options = app.getParams();
@@ -263,8 +263,8 @@ function(app, FauxtonAPI, Documents, Databases) {
       data.designDocs = new Documents.AllDocs(null, {
         database: data.database,
         params: {startkey: '"_design"',
-                 endkey: '"_design1"',
-                 include_docs: true}
+          endkey: '"_design1"',
+          include_docs: true}
       });
 
       var options = app.getParams();
@@ -292,11 +292,46 @@ function(app, FauxtonAPI, Documents, Databases) {
 
           "#tabs": new Documents.Views.Tabs({
             collection: data.designDocs,
-            database: data.database.id
+            database: data.database
           })
         },
 
         apiUrl: data.database.allDocs.url()
+      };
+    },
+
+    "database/:database/_changes(:params)": function(databaseName, params) {
+      var data = {
+        database: new Databases.Model({id:databaseName})
+      };
+
+      var options = app.getParams();
+      data.database.buildChanges(options);
+
+      return {
+        layout: "with_tabs",
+
+        data: data,
+
+        crumbs: [
+          {"name": "Databases", "link": "/_all_dbs"},
+          {"name": data.database.id, "link": Databases.databaseUrl(data.database)},
+          {"name": "_changes", "link": "/_changes"}
+        ],
+
+        views: {
+          "#dashboard-content": new Documents.Views.Changes({
+            collection: data.database.changes
+          }),
+
+          "#tabs": new Documents.Views.Tabs({
+            collection: data.designDocs,
+            database: data.database,
+            active_id: 'changes'
+          })
+        },
+
+        apiUrl: data.database.changes.url()
       };
     },
 
@@ -325,8 +360,8 @@ function(app, FauxtonAPI, Documents, Databases) {
       data.designDocs = new Documents.AllDocs(null, {
         database: data.database,
         params: {startkey: '"_design"',
-                 endkey: '"_design1"',
-                 include_docs: true}
+          endkey: '"_design1"',
+          include_docs: true}
       });
 
       var ddocInfo = {
