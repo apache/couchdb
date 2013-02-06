@@ -73,3 +73,39 @@ This product also includes the following third-party components:
  * CoffeeScript (http://coffeescript.org/)
 
   Copyright 2011, Jeremy Ashkenas
+
+ * almond.js (http://github.com/jrburke/almond)
+
+  Copyright 2011, The Dojo Foundation
+
+ * backbone.js (http://backbonejs.org/)
+
+  Copyright 2012, Jeremy Ashkenas, DocumentCloud Inc.
+
+ * Bootstrap (http://twitter.github.com/bootstrap/)
+
+  Copyright 2012, Twitter, Inc.
+
+ * d3.js (http://d3js.org)
+
+  Copyright 2012, Michael Bostock
+
+ * JSHint (http://jshint.com/)
+
+  Copyright 2002, Douglas Crockford, modifications by JSHint Community
+
+ * Lodash (http://lodash.com/)
+
+  Copyright 2012, John-David Dalton <http://allyoucanleet.com/>
+
+ * nvd3.js (http://nvd3.org/)
+
+  Copyright 2012, Novus Partners, Inc.
+
+ * backbone.layoutmanager.js (https://github.com/tbranyen/backbone.layoutmanager)
+
+  Copyright 2012, Tim Branyen (@tbranyen)
+
+ * prettify.js (http://code.google.com/p/google-code-prettify/)
+
+  Copyright 2011, Mike Samuel et al
