@@ -99,7 +99,7 @@ function(app, FauxtonAPI, Documents, Databases) {
 
         "#tabs": new Documents.Views.Tabs({
           collection: data.designDocs,
-          database: data.database.id
+          database: data.database
         }),
 
         "#dashboard-content": new Documents.Views.ViewEditor({
@@ -401,7 +401,7 @@ function(app, FauxtonAPI, Documents, Databases) {
 
           "#tabs": new Documents.Views.Tabs({
             collection: data.designDocs,
-            database: data.database.id
+            database: data.database
           })
         },
 
