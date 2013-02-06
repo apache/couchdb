@@ -53,7 +53,7 @@ module.exports = function(grunt) {
           paths: ["assets/less"]
         },
         files: {
-          "dist/debug/css/index.css": "assets/less/cloudant.less"
+          "dist/debug/css/index.css": "assets/less/fauxton.less"
         }
       }
     },
