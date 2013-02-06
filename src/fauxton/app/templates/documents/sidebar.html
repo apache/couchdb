@@ -1,7 +1,7 @@
 <div id="sidenav">
   <a class="btn btn-small new" id="doc" href="#<%= database.url('app') %>/new"><i class="icon-file"></i> New doc</a>
   <div class="btn-group" id="new-index">
-    <button class="btn btn-small" href="#">New view</button>
+    <a class="btn btn-small" href="#<%= database.url('app') %>/new_view">New view</a>
   </div>
   <hr>
   <ul class="nav nav-list">
@@ -10,6 +10,6 @@
   </ul>
   <ul class="nav nav-list views">
     <li class="nav-header">Secondary Indexes</li>
-    <li><a href="#new-view-index" class="new"><i class="icon-plus"></i> New</a></li>
+    <li><a href="#<%= database.url('app') %>/new_view" class="new"><i class="icon-plus"></i> New</a></li>
   </ul>
 </div>

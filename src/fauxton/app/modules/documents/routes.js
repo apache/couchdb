@@ -59,6 +59,47 @@ function(app, FauxtonAPI, Documents, Databases) {
     };
   };
 
+  var newViewEditorCallback = function(databaseName) {
+    var data = {
+      database: new Databases.Model({id:databaseName})
+    };
+    data.designDocs = new Documents.AllDocs(null, {
+      database: data.database,
+      params: {startkey: '"_design"',
+               endkey: '"_design1"',
+               include_docs: true}
+    });
+
+    return {
+      layout: "with_tabs_sidebar",
+
+      data: data,
+
+      crumbs: [
+        {"name": "Databases", "link": "/_all_dbs"},
+        {"name": data.database.id, "link": Databases.databaseUrl(data.database)}
+      ],
+
+      views: {
+        "#sidebar-content": new Documents.Views.Sidebar({
+          collection: data.designDocs
+        }),
+
+        "#tabs": new Documents.Views.Tabs({
+          collection: data.designDocs,
+          database: data.database.id
+        }),
+
+        "#dashboard-content": new Documents.Views.ViewEditor({
+          model: data.database,
+          ddocs: data.designDocs
+        })
+      },
+
+      apiUrl: data.database.url()
+    };
+  };
+
   // HACK: this kind of works
   // Basically need a way to share state between different routes, for
   // instance making a new doc won't work for switching back and forth
@@ -260,6 +301,7 @@ function(app, FauxtonAPI, Documents, Databases) {
     },
 
     "database/:database/new": newDocCodeEditorCallback,
+    "database/:database/new_view": newViewEditorCallback,
 
     // TODO: fix optional search params
     // Can't get ":view(?*search)" to work

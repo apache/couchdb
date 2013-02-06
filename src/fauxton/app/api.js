@@ -17,6 +17,16 @@ function(app, Fauxton) {
     initialize: function() {}
   };
 
+  // List of JSHINT errors to ignore
+  // Gets around problem of anonymous functions not being a valid statement
+  FauxtonAPI.excludedViewErrors = [
+    "Missing name in function declaration."
+  ];
+
+  FauxtonAPI.isIgnorableError = function(msg) {
+    return _.contains(FauxtonAPI.excludedViewErrors, msg);
+  };
+
   FauxtonAPI.View = Backbone.View.extend({
     // This should return an array of promises, an empty array, or null
     establish: function() {

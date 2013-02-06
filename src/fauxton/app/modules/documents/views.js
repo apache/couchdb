@@ -472,16 +472,14 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
         json = JSON.parse(this.editor.getValue());
         this.model.set(json);
         notification = FauxtonAPI.addNotification({msg: "Saving document."});
-        this.model.save().error(
-          function(xhr) {
-            var responseText = JSON.parse(xhr.responseText).reason;
-            notification = FauxtonAPI.addNotification({
-              msg: "Save failed: " + responseText,
-              type: "error",
-              clear: true
-            });
-          }
-        );
+        this.model.save().error(function(xhr) {
+          var responseText = JSON.parse(xhr.responseText).reason;
+          notification = FauxtonAPI.addNotification({
+            msg: "Save failed: " + responseText,
+            type: "error",
+            clear: true
+          });
+        });
       } else {
         notification = FauxtonAPI.addNotification({
           msg: "Please fix the JSON errors and try again.",
@@ -574,11 +572,183 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     }
   });
 
+  Views.ViewEditor = FauxtonAPI.View.extend({
+    template: "templates/documents/view_editor",
+
+    events: {
+      "click button.save": "saveView",
+      "change select#reduce-function-selector": "updateReduce"
+    },
+
+    langTemplates: {
+      "javascript": {
+        map: "function(doc) {\n  emit(null, doc);\n}",
+        reduce: "function(keys, values, rereduce){\n  if (rereduce){\n    return sum(values);\n  } else {\n    return values.length;\n  }\n}"
+      }
+    },
+
+    defaultLang: "javascript",
+
+    initialize: function(options) {
+      this.ddocs = options.ddocs;
+    },
+
+    updateValues: function() {
+      var notification;
+      if (this.model.changedAttributes()) {
+        notification = FauxtonAPI.addNotification({
+          msg: "Document saved successfully.",
+          type: "success",
+          clear: true
+        });
+        this.editor.setValue(this.model.prettyJSON());
+      }
+    },
+
+    updateReduce: function(event) {
+      var $ele = $("#reduce-function-selector");
+      var $reduceContainer = $(".control-group.reduce-function");
+      if ($ele.val() == "CUSTOM") {
+        $reduceContainer.show();
+      } else {
+        $reduceContainer.hide();
+      }
+    },
+
+    establish: function() {
+      return [this.ddocs.fetch(), this.model.fetch()];
+    },
+
+    saveView: function(event) {
+      var json, notification;
+      if (this.hasValidCode()) {
+        var mapVal = this.mapEditor.getValue();
+        var reduceVal = this.reduceEditor.getValue();
+        notification = FauxtonAPI.addNotification({
+          msg: "Saving document.",
+          selector: "#define-view .errors-container"
+        });
+        /*
+        this.model.save().error(function(xhr) {
+          var responseText = JSON.parse(xhr.responseText).reason;
+          notification = FauxtonAPI.addNotification({
+            msg: "Save failed: " + responseText,
+            type: "error",
+            clear: true
+          });
+        });
+        */
+      } else {
+        notification = FauxtonAPI.addNotification({
+          msg: "Please fix the JSON errors and try again.",
+          type: "error",
+          selector: "#define-view .errors-container"
+        });
+      }
+    },
+
+    isCustomReduceEnabled: function() {
+      return $("#reduce-function-selector").val() == "CUSTOM";
+    },
+
+    reduceVal: function() {
+    },
+
+    hasValidCode: function() {
+      return _.every(["mapEditor", "reduceEditor"], function(editorName) {
+        var editor = this[editorName];
+        if (editorName == "reduceEditor" && ! this.isCustomReduceEnabled()) {
+          return true;
+        } else if (JSHINT(editor.getValue()) !== false) {
+          return true;
+        } else {
+          // By default CouchDB view functions don't pass lint
+          return _.every(JSHINT.errors, function(error) {
+            return FauxtonAPI.isIgnorableError(error.reason);
+          });
+        }
+      }, this);
+    },
+
+    runJSHint: function(editorName) {
+      var editor = this[editorName];
+      var json = editor.getValue();
+      var output = JSHint(json);
+
+      // Clear existing markers
+      for (var i = 0, l = editor.lineCount(); i < l; i++) {
+        editor.clearMarker(i);
+      }
+
+      if (output === false) {
+        _.map(JSHint.errors, function(error) {
+          // By default CouchDB view functions don't pass lint
+          if (FauxtonAPI.isIgnorableError(error.reason)) return true;
+
+          var line = error.line - 1;
+          var className = "view-code-error-line-" + line;
+          editor.setMarker(line, "●", "view-code-error "+className);
+
+          setTimeout(function() {
+            $(".CodeMirror ."+className).tooltip({
+              title: "ERROR: " + error.reason
+            });
+          }, 0);
+        }, this);
+      }
+    },
+
+    serialize: function() {
+      return {
+        database: this.model,
+        ddocs: this.ddocs
+      };
+    },
+
+    afterRender: function() {
+      this.model.on("sync", this.updateValues, this);
+      var that = this;
+      var mapFun = $("#map-function");
+      mapFun.val(this.langTemplates[this.defaultLang].map);
+      var reduceFun = $("#reduce-function");
+      reduceFun.val(this.langTemplates[this.defaultLang].reduce);
+      this.mapEditor = Codemirror.fromTextArea(mapFun.get()[0], {
+        mode: "javascript",
+        lineNumbers: true,
+        matchBrackets: true,
+        lineWrapping: true,
+        onChange: function() {
+          that.runJSHint("mapEditor");
+        },
+        extraKeys: {
+          "Ctrl-S": function(instance) { that.saveDoc(); },
+          "Ctrl-/": "undo"
+        }
+      });
+      this.reduceEditor = Codemirror.fromTextArea(reduceFun.get()[0], {
+        mode: "javascript",
+        lineNumbers: true,
+        matchBrackets: true,
+        lineWrapping: true,
+        onChange: function() {
+          that.runJSHint("reduceEditor");
+        },
+        extraKeys: {
+          "Ctrl-S": function(instance) { that.saveDoc(); },
+          "Ctrl-/": "undo"
+        }
+      });
+      // HACK: this should be in the html
+      // but CodeMirror's head explodes and it won't set the hight properly.
+      // So render it first, set the editor, then hide.
+      $(".control-group.reduce-function").hide();
+    }
+  });
+
   Views.Sidebar = FauxtonAPI.View.extend({
     template: "templates/documents/sidebar",
     events: {
       "click a.new#index": "newIndex",
-      "click .nav-list.views a.new": "showNew",
       // "click .nav-list.views a.toggle-view": "toggleView",
       "click .nav-list a.toggle-view#all-docs": "toggleView",
       "click .nav-list a.toggle-view#design-docs": "toggleView"
@@ -603,11 +773,6 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     newIndex:  function(event){
       event.preventDefault();
       alert('coming soon');
-    },
-
-    showNew: function(event){
-      event.preventDefault();
-      alert('show new view dialog');
     },
 
     toggleView: function(event){
