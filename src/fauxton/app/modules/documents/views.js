@@ -30,8 +30,8 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     serialize: function () {
       return {
         // TODO make this not hard coded here
-        changes_url: '#database/'+ this.database.id + '/_changes?descending=true&limit=100',
-        db_url: '#database/'+ this.database.id + '/_all_docs?limit=100'
+        changes_url: '#' + this.database.url('changes'),
+        db_url: '#' + this.database.url('index') + '?limit=100'
       };
     },
 
@@ -56,12 +56,10 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
 
       if (!result) { return; }
 
-      var promise = this.database.destroy();
-      promise.done(function () {
+      return this.database.destroy().done(function () {
         app.router.navigate('/', {trigger: true});
       });
     }
-
   });
 
   Views.SearchBox = FauxtonAPI.View.extend({
@@ -848,13 +846,14 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
 
     establish: function() {
       return [
-        this.collection.fetch()
+        this.model.changes.fetch()
       ];
     },
 
     serialize: function () {
       return {
-        changes: this.collection.toJSON()
+        changes: this.model.changes.toJSON(),
+        database: this.model
       };
     }
 

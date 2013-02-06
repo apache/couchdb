@@ -34,6 +34,8 @@ function(app, FauxtonAPI, Documents) {
     url: function(context) {
       if (context === "index") {
         return "/database/" + this.id + "/_all_docs";
+			} else if (context === "changes") {
+        return "/database/" + this.id + "/_changes?descending=true&limit=100";
       } else if (context === "app") {
         return "/database/" + this.id;
       } else {

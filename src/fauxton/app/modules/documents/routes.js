@@ -1,11 +1,11 @@
 define([
-       "app",
+  "app",
 
-       "api",
+  "api",
 
-       // Modules
-       "modules/documents/resources",
-       "modules/databases/base"
+  // Modules
+  "modules/documents/resources",
+  "modules/databases/base"
 ],
 
 function(app, FauxtonAPI, Documents, Databases) {
@@ -77,7 +77,7 @@ function(app, FauxtonAPI, Documents, Databases) {
 
       crumbs: [
         {"name": "Databases", "link": "/_all_dbs"},
-        {"name": data.database.id, "link": Databases.databaseUrl(data.database)}
+        {"name": data.database.id, "link": data.database.url('app')}
       ],
 
       views: {
@@ -321,7 +321,7 @@ function(app, FauxtonAPI, Documents, Databases) {
 
         views: {
           "#dashboard-content": new Documents.Views.Changes({
-            collection: data.database.changes
+            model: data.database
           }),
 
           "#tabs": new Documents.Views.Tabs({

@@ -2,15 +2,21 @@
   <thead>
     <th> seq </th>
     <th> id </th>
-    <th changes </th>
+    <th> changes </th>
+    <th> deleted? </th>
   </thead>
   <tbody>
   <% _.each(changes, function (change) { %>
-  <tr>
-    <td> <%= change.seq %> </td>
-    <td> <%= change.id %> </td>
-    <td> <%= JSON.stringify(change.changes) %> </td>
-  </tr>
+    <tr>
+      <td> <%= change.seq %> </td>
+      <% if (change.deleted) { %>
+        <td> <%= change.id %> </td>
+      <% } else { %>
+        <td> <a href="#<%= database.url('app') %>/<%= change.id %>"><%= change.id %></a> </td>
+      <% } %>
+      <td> <%= JSON.stringify(change.changes) %> </td>
+      <td><%= change.deleted ? "true" : "false" %></td>
+    </tr>
   <% }); %>
   </tbody>
 </table>
