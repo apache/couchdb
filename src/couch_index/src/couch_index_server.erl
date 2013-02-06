@@ -75,13 +75,6 @@ init([]) ->
     ets:new(?BY_DB, [protected, bag, named_table]),
     couch_db_update_notifier:start_link(fun ?MODULE:update_notify/1),
     RootDir = couch_index_util:root_dir(),
-    % Deprecation warning if it wasn't index_dir
-    case couch_config:get("couchdb", "index_dir") of
-        undefined ->
-            Msg = "Deprecation warning: 'view_index_dir' is now 'index_dir'",
-            ?LOG_ERROR(Msg, []);
-        _ -> ok
-    end,
     couch_file:init_delete_dir(RootDir),
     {ok, #st{root_dir=RootDir}}.
 
