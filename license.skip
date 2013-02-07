@@ -115,6 +115,7 @@
 ^test/etap/Makefile
 ^test/etap/Makefile.in
 ^test/etap/temp..*
+^test/etap/fixtures/*
 ^test/javascript/Makefile
 ^test/javascript/Makefile.in
 ^test/local.ini
