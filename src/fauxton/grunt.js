@@ -63,7 +63,8 @@ module.exports = function(grunt) {
     // route.
     jshint: {
       options: {
-        scripturl: true
+        scripturl: true,
+        evil: true
       }
     },
 
