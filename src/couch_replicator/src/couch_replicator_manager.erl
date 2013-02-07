@@ -515,7 +515,8 @@ stop_all_replications() ->
 
 
 update_rep_doc(RepDbName, RepDocId, KVs) when is_binary(RepDocId) ->
-    spawn_link(fun() ->
+    {Pid, Ref} =
+    spawn_monitor(fun() ->
         try
             case fabric:open_doc(mem3:dbname(RepDbName), RepDocId, []) of
                 {ok, LatestRepDoc} ->
@@ -523,15 +524,26 @@ update_rep_doc(RepDbName, RepDocId, KVs) when is_binary(RepDocId) ->
                 _ ->
                     ok
             end
-        catch throw:conflict ->
-            % Shouldn't happen, as by default only the role _replicator can
-            % update replication documents.
+        catch
+        throw:conflict ->
+            % a race condition may cause an update conflict,
+            % in which cae update_rep_doc is called again to refetch
             twig:log(error, "Conflict error when updating replication document `~s`."
-                " Retrying.", [RepDocId]),
+                         " Retrying.", [RepDocId]),
             ok = timer:sleep(5),
-            update_rep_doc(RepDbName, RepDocId, KVs)
+            update_rep_doc(RepDbName, RepDocId, KVs);
+        Type:Error ->
+            exit({Type, Error})
         end
-    end);
+    end),
+    receive
+    {'DOWN', Ref, process, Pid, normal} ->
+        ok;
+    {'DOWN', Ref, process, Pid, {throw, Error}} ->
+        throw(Error);
+    {'DOWN', Ref, process, Pid, {error, Error}} ->
+        erlang:error(Error)
+    end;
 
 update_rep_doc(RepDbName, #doc{body = {RepDocBody}} = RepDoc, KVs) ->
     NewRepDocBody = lists:foldl(
@@ -555,9 +567,7 @@ update_rep_doc(RepDbName, #doc{body = {RepDocBody}} = RepDoc, KVs) ->
     _ ->
         % Might not succeed - when the replication doc is deleted right
         % before this update (not an error, ignore).
-        spawn_link(fun() ->
-            fabric:update_doc(RepDbName, RepDoc#doc{body = {NewRepDocBody}}, [?CTX])
-        end)
+        fabric:update_doc(RepDbName, RepDoc#doc{body = {NewRepDocBody}}, [?CTX])
     end.
 
 % RFC3339 timestamps.
