@@ -11,14 +11,19 @@
 // the License.
 
 couchTests.replicator_db_security = function(debug) {
+
+  var reset_dbs = function(dbs) {
+    dbs.forEach(function(db) {
+      db.deleteDb();
+      try { db.createDb() } catch (e) {};
+    });
+  };
+
   var dbs = ["couch_test_rep_db", "couch_test_users_db",
     "test_suite_db_a", "test_suite_db_b", "test_suite_db_c"]
     .map(function(db_name) {
-      var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
-      db.deleteDb();
-      db.createDb();
-      return db;
-  });
+      return new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
+    });
 
   var repDb = dbs[0];
   var usersDb = dbs[1];
@@ -94,6 +99,8 @@ couchTests.replicator_db_security = function(debug) {
 
   var testFun = function()
   {
+    reset_dbs(dbs);
+
     // _replicator db
     // in admin party mode, anonymous should be able to create a replication
     var repDoc = {
@@ -371,9 +378,6 @@ couchTests.replicator_db_security = function(debug) {
         TEquals(true, CouchDB.login("jan", "apple").ok);
       });
   };
-
-  usersDb.deleteDb();
-  repDb.deleteDb();
 
   run_on_modified_server([
     {
