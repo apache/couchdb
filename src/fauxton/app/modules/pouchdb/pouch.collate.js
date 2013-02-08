@@ -1,4 +1,13 @@
 /*
+ * NOTE:
+ * This temporarily uses the PouchDB map reduce implementation
+ * These files are modified locally until we make a more general version and
+ * push it back upstream.
+ * Original file:
+ * https://github.com/daleharvey/pouchdb/blob/master/src/pouch.collate.js
+ */
+
+/*
 (function() {
   // a few hacks to get things in the right place for node.js
   if (typeof module !== 'undefined' && module.exports) {

@@ -1,3 +1,12 @@
+/*
+ * NOTE:
+ * This temporarily uses the PouchDB map reduce implementation
+ * These files are modified locally until we make a more general version and
+ * push it back upstream.
+ * Original file:
+ * https://github.com/daleharvey/pouchdb/blob/master/src/plugins/pouchdb.mapreduce.js
+ */
+
 /*global Pouch: true */
 
 //"use strict";
