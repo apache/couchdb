@@ -112,6 +112,16 @@ couchTests.users_db = function(debug) {
     }
     jchrisUserDoc.roles = [];
 
+    // "roles" must be an array of strings
+    jchrisUserDoc.roles = [12];
+    try {
+      usersDb.save(jchrisUserDoc);
+      T(false && "should only allow us to save doc when roles is an array of strings");
+    } catch(e) {
+      TEquals(e.reason, "doc.roles can only contain strings");
+    }
+    jchrisUserDoc.roles = [];
+
     // "roles" must exist
     delete jchrisUserDoc.roles;
     try {
