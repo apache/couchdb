@@ -348,7 +348,6 @@ handle_call({open, DbName, Options}, From, Server) ->
         end;
     [#db{compactor_pid = Froms} = Db] when is_list(Froms) ->
         % icky hack of field values - compactor_pid used to store clients
-        ?LOG_INFO("adding another listener to async open for ~s", [DbName]),
         true = ets:insert(couch_dbs, Db#db{compactor_pid = [From|Froms]}),
         {noreply, Server};
     [#db{} = Db] ->
