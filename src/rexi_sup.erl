@@ -1,5 +1,5 @@
 % Copyright 2010 Cloudant
-% 
+%
 % Licensed under the Apache License, Version 2.0 (the "License"); you may not
 % use this file except in compliance with the License. You may obtain a copy of
 % the License at
@@ -20,10 +20,11 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
+%% Helper macro for declaring children of supervisor
+-define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 100, Type, [I]}).
+
 start_link(Args) ->
     supervisor:start_link({local,?MODULE}, ?MODULE, Args).
 
 init([]) ->
-    Mod = rexi_server,
-    Spec = {Mod, {Mod,start_link,[]}, permanent, 100, worker, [Mod]},
-    {ok, {{one_for_one, 3, 10}, [Spec]}}.
+    {ok, {{one_for_one, 3, 10}, [?CHILD(rexi_server, worker), ?CHILD(rexi_gov_manager, worker)]}}.

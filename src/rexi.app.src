@@ -2,6 +2,6 @@
     {description, "Lightweight RPC server"},
     {vsn, git},
     {registered, [rexi_sup, rexi_server]},
-    {applications, [kernel, stdlib]},
+    {applications, [kernel, stdlib, config]},
     {mod, {rexi_app,[]}}
 ]}.
