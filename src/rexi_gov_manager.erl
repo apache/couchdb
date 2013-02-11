@@ -14,6 +14,7 @@
 -module(rexi_gov_manager).
 
 -behaviour(gen_server).
+-behaviour(config_listener).
 
 % API
 -export([start_link/0, send/2]).
@@ -21,6 +22,7 @@
 % gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
+-export([handle_config_change/5]).
 
 -record(state, {node_timers = ets:new(timers, [set]),
                 nodeout_timeout = 2000,
@@ -54,14 +56,32 @@ get_governor(Node) ->
 init([]) ->
     ets:new(govs, [named_table, set, {read_concurrency, true}]),
     net_kernel:monitor_nodes(true),
-    %% if we install the new config app, the use of couch_config will go away
-    %%
-    %% NodeOutTimeout = list_to_integer(config:get("rexi","nodeout_timeout","500")),
-    %% PidSpawnMax = list_to_integer(config:get("rexi","pid_spawn_max", "10000")),
-    %% {ok, #state{nodeout_timeout = NodeOutTimeout,
-    %%             pid_spawn_max = PidSpawnMax}}
-    {ok, #state{}}.
+    NodeOutTimeout = config:get("rexi","nodeout_timeout","500"),
+    PidSpawnMax = config:get("rexi","pid_spawn_max", "10000"),
+    State = #state{
+        nodeout_timeout = list_to_integer(NodeOutTimeout),
+        pid_spawn_max = list_to_integer(PidSpawnMax)
+    },
+    config:listen_for_changes(?MODULE, State),
+    {ok, State}.
 
+handle_config_change("rexi", "nodeout_timeout", Value, _, State) ->
+    IntValue = list_to_integer(Value),
+    %% Setting the timeout is cheap, no need to check if it actually changed
+    gen_server:call(?MODULE, {set_timeout, IntValue}),
+    {ok, State#state{nodeout_timeout = IntValue}};
+handle_config_change("rexi", "pid_spawn_max", Value, _, State) ->
+    IntValue = list_to_integer(Value),
+    %% Setting the timeout is cheap, no need to check if it actually changed
+    gen_server:call(?MODULE, {set_spawn_max, IntValue}),
+    {ok, State#state{pid_spawn_max = IntValue}};
+handle_config_change(_, _, _, _, State) ->
+    {ok, State}.
+
+handle_call({set_timeout, TO}, _, #state{nodeout_timeout = Old} = State) ->
+    {reply, Old, State#state{nodeout_timeout = TO}};
+handle_call({set_spawn_max, Max}, _, #state{pid_spawn_max = Old} = State) ->
+    {reply, Old, State#state{pid_spawn_max = Max}};
 handle_call({get_governor, Node}, _From,
             #state{pid_spawn_max = PidSpawnMax} = State) ->
     case ets:lookup(govs, Node) of
