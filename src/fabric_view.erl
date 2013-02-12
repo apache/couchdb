@@ -308,6 +308,8 @@ is_progress_possible_test() ->
     ?assertEqual(is_progress_possible(mk_cnts(T5)),false).
 
 remove_overlapping_shards_test() ->
+    meck:new(rexi),
+    meck:expect(rexi, kill, fun(_, _) -> ok end),
     EndPoint = 2 bsl 31,
     T1 = [[0,10],[11,20],[21,EndPoint-1]],
     Shards = mk_cnts(T1,3),
