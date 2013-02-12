@@ -317,7 +317,8 @@ remove_overlapping_shards_test() ->
               remove_overlapping_shards(#shard{name=list_to_atom("node-3"),
                                                node=list_to_atom("node-3"),
                                                range=[11,20]},
-                                        Shards)),7).
+                                        Shards)),7),
+    meck:unload(rexi).
 
 mk_cnts(Ranges) ->
     Shards = lists:map(fun(Range) ->
