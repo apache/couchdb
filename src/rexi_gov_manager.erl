@@ -34,14 +34,19 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-send({_, Node} = Dest, Msg) ->
+send(Dest, Msg) ->
     case erlang:send(Dest, Msg, [noconnect, nosuspend]) of
     ok -> ok;
     _ ->
         % treat nosuspend and noconnect the same
-        {ok, Governor} = get_governor(Node),
+        {ok, Governor} = get_governor(get_node(Dest)),
         gen_server:cast(Governor, {spawn_and_track, Dest, Msg})
     end.
+
+get_node({_, Node}) when is_atom(Node) ->
+    Node;
+get_node(Pid) when is_pid(Pid) ->
+    node(Pid).
 
 get_governor(Node) ->
     case ets:lookup(govs, Node) of
