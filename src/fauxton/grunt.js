@@ -1,8 +1,9 @@
 // This is the main application configuration file.  It is a Grunt
 // configuration file, which you can learn more about here:
 // https://github.com/cowboy/grunt/blob/master/docs/configuring.md
-module.exports = function(grunt) {
 
+module.exports = function(grunt) {
+  var path = require('path');
   var couch_config = {
     fauxton: {
               db: 'http://localhost:5984/fauxton',
@@ -12,25 +13,54 @@ module.exports = function(grunt) {
               }
             }
   };
+  
+  function processAddons(callback){
+    if (path.existsSync("settings.json")){
+      var settings = grunt.file.readJSON("settings.json") || {deps: []};
+      settings.deps.forEach(callback);
+    }
+  }
 
   var cleanable = function(){
     // Whitelist files and directories to be cleaned
-    var path = require('path');
+
     // You'll always want to clean these two directories
     var theListToClean = ["dist/", "app/load_addons.js"];
     // Now find the external addons you have and add them for cleaning up
-    if (path.existsSync("settings.json")){
-      var settings = grunt.file.readJSON("settings.json") || {deps: []};
-      settings.deps.forEach(function(addon){
-        // Only clean addons that are included from a local dir
-        if (addon.path){
-          theListToClean.push("app/addons/" + addon.name);
-        }
-      });
-    }
+    processAddons(function(addon){
+      // Only clean addons that are included from a local dir
+      if (addon.path){
+        theListToClean.push("app/addons/" + addon.name);
+      }
+    });
     return theListToClean;
   }();
 
+  var assets = function(){
+    // Base assets
+    var theAssets = {
+      less:{
+        paths: ["assets/less"], 
+        files: {
+          "dist/debug/css/fauxton.css": "assets/less/fauxton.less"
+        }
+      }
+    };
+    // Less files from addons
+    processAddons(function(addon){
+      var root = addon.path || "app/addons/" + addon.name;
+      var lessPath = root + "/assets/less";
+      if(path.existsSync(lessPath)){
+        // .less files exist for this addon
+        theAssets.less.paths.push(lessPath);
+        theAssets.less.files["dist/debug/css/" + addon.name + ".css"] =
+            lessPath + "/" + addon.name + ".less";
+      }
+    });
+
+    return theAssets;
+  }();
+  
   grunt.initConfig({
 
     // The clean task ensures all files are removed from the dist/ directory so
@@ -50,11 +80,9 @@ module.exports = function(grunt) {
     less: {
       compile: {
         options: {
-          paths: ["assets/less"]
+          paths: assets.less.paths
         },
-        files: {
-          "dist/debug/css/index.css": "assets/less/fauxton.less"
-        }
+        files: assets.less.files
       }
     },
 
@@ -142,7 +170,7 @@ module.exports = function(grunt) {
       },
 
       debug: {
-        src: ["dist/debug/css/index.css", 'assets/css/*.css'],
+        src: ["dist/debug/css/*.css", 'assets/css/*.css'],
         dest: 'dist/debug/css/index.css'
       }
 
