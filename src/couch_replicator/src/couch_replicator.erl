@@ -278,6 +278,7 @@ do_init(#rep{options = Options, id = {BaseId, Ext}, user_ctx=UserCtx} = Rep) ->
         {missing_revisions_found, 0},
         {docs_read, 0},
         {docs_written, 0},
+        {changes_pending, pending(SourceCurSeq, CommittedSeq)},
         {doc_write_failures, 0},
         {source_seq, SourceCurSeq},
         {checkpointed_source_seq, CommittedSeq},
@@ -960,16 +961,21 @@ update_task(State) ->
 rep_stats(State) ->
     #rep_state{
         committed_seq = {_, CommittedSeq},
-        stats = Stats
+        stats = Stats,
+        source_seq = SourceCurSeq
     } = State,
     [
         {revisions_checked, Stats#rep_stats.missing_checked},
         {missing_revisions_found, Stats#rep_stats.missing_found},
         {docs_read, Stats#rep_stats.docs_read},
         {docs_written, Stats#rep_stats.docs_written},
+        {changes_pending, pending(SourceCurSeq, CommittedSeq)},
         {doc_write_failures, Stats#rep_stats.doc_write_failures},
         {checkpointed_source_seq, CommittedSeq}
     ].
+
+pending(SourceCurSeq, CommittedSeq) ->
+    unpack_seq(SourceCurSeq) - unpack_seq(CommittedSeq).
 
 unpack_seq(Seq) when is_number(Seq) ->
     Seq;
