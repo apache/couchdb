@@ -700,6 +700,8 @@ send_doc_efficiently(Req, #doc{atts=[]}=Doc, Headers, Options) ->
 send_doc_efficiently(Req, #doc{atts=Atts}=Doc, Headers, Options) ->
     case lists:member(attachments, Options) of
     true ->
+        Refs = monitor_attachments(Atts),
+        try
         AcceptedTypes = case couch_httpd:header_value(Req, "Accept") of
             undefined       -> [];
             AcceptHeader    -> string:tokens(AcceptHeader, ", ")
@@ -717,6 +719,9 @@ send_doc_efficiently(Req, #doc{atts=Atts}=Doc, Headers, Options) ->
             {ok, Resp} = start_response_length(Req, 200, [CType|Headers], Len),
             couch_doc:doc_to_multi_part_stream(Boundary,JsonBytes,Atts,
                     fun(Data) -> couch_httpd:send(Resp, Data) end, true)
+        end
+        after
+            demonitor_refs(Refs)
         end;
     false ->
         send_json(Req, 200, Headers, couch_doc:to_json_obj(Doc, Options))
@@ -732,6 +737,8 @@ send_docs_multipart(Req, Results, Options1) ->
     couch_httpd:send_chunk(Resp, <<"--", OuterBoundary/binary>>),
     lists:foreach(
         fun({ok, #doc{atts=Atts}=Doc}) ->
+            Refs = monitor_attachments(Doc#doc.atts),
+            try
             JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, Options)),
             {ContentType, _Len} = couch_doc:len_doc_to_multi_part_stream(
                     InnerBoundary, JsonBytes, Atts, true),
@@ -740,7 +747,10 @@ send_docs_multipart(Req, Results, Options1) ->
             couch_doc:doc_to_multi_part_stream(InnerBoundary, JsonBytes, Atts,
                     fun(Data) -> couch_httpd:send_chunk(Resp, Data)
                     end, true),
-             couch_httpd:send_chunk(Resp, <<"\r\n--", OuterBoundary/binary>>);
+             couch_httpd:send_chunk(Resp, <<"\r\n--", OuterBoundary/binary>>)
+            after
+                demonitor_refs(Refs)
+            end;
         ({{not_found, missing}, RevId}) ->
              RevStr = couch_doc:rev_to_str(RevId),
              Json = ?JSON_ENCODE({[{"missing", RevStr}]}),
@@ -887,8 +897,8 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
     case [A || A <- Atts, A#att.name == FileName] of
     [] ->
         throw({not_found, "Document is missing attachment"});
-    [#att{data={Fd,_}, type=Type, encoding=Enc, disk_len=DiskLen, att_len=AttLen}=Att] ->
-        Ref = monitor(process, Fd),
+    [#att{type=Type, encoding=Enc, disk_len=DiskLen, att_len=AttLen}=Att] ->
+        Refs = monitor_attachments(Att),
         try
         Etag = chttpd:doc_etag(Doc),
         ReqAcceptsAttEnc = lists:member(
@@ -971,7 +981,7 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
             end
         )
         after
-            demonitor(Ref)
+            demonitor_refs(Refs)
         end
     end;
 
@@ -1281,3 +1291,12 @@ is_valid_utf8(<<C, Rest/binary>>) ->
         _ ->
             false
     end.
+
+-spec monitor_attachments(#att{} | [#att{}]) -> [reference()].
+monitor_attachments(#att{}=Att) ->
+    monitor_attachments([Att]);
+monitor_attachments(Atts) when is_list(Atts) ->
+    [monitor(process, Fd) || #att{data={Fd,_}} <- Atts].
+
+demonitor_refs(Refs) when is_list(Refs) ->
+    [demonitor(Ref) || Ref <- Refs].
