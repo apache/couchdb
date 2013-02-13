@@ -27,4 +27,4 @@ start_link(Args) ->
     supervisor:start_link({local,?MODULE}, ?MODULE, Args).
 
 init([]) ->
-    {ok, {{one_for_one, 3, 10}, [?CHILD(rexi_server, worker), ?CHILD(rexi_gov_manager, worker)]}}.
+    {ok, {{one_for_one, 3, 10}, [?CHILD(rexi_gov_manager, worker), ?CHILD(rexi_server, worker)]}}.
