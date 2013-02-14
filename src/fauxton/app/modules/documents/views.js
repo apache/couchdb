@@ -240,18 +240,28 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
   Views.IndexItem = FauxtonAPI.View.extend({
     template: "templates/documents/index_menu_item",
     tagName: "li",
+
     initialize: function(options){
       this.index = options.index;
       this.ddoc = options.ddoc;
       this.database = options.database;
+      this.selected = !! options.selected;
     },
 
     serialize: function() {
       return {
         index: this.index,
         ddoc: this.ddoc,
-        database: this.database
+        database: this.database,
+        selected: this.selected
       };
+    },
+
+    afterRender: function() {
+      if (this.selected) {
+        $("#sidenav ul.nav-list li").removeClass("active");
+        this.$el.addClass("active");
+      }
     }
   });
 
@@ -320,7 +330,8 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
         database: this.collection,
         viewList: this.viewList,
         hasReduce: false,
-        params: this.params
+        params: this.params,
+        ddocs: this.designDocs
       };
       if (this.ddoc) {
         data.ddoc = this.ddoc;
@@ -451,6 +462,14 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     },
 
     beforeRender: function() {
+      this.setDdocInfo();
+      if (this.viewList) {
+        this.viewEditorView = this.insertView("#edit-index-container", new Views.ViewEditor({
+          model: this.ddoc,
+          ddocs: this.designDocs,
+          viewCollection: this.collection
+        }));
+      }
       this.collection.each(function(doc) {
         this.rows[doc.id] = this.insertView("table.all-docs tbody", new this.nestedView({
           model: doc
@@ -619,9 +638,11 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
 
   Views.ViewEditor = FauxtonAPI.View.extend({
     template: "templates/documents/view_editor",
+    builtinReduces: ['_sum', '_count', '_stats'],
 
     events: {
       "click button.save": "saveView",
+      "click button.preview": "previewView",
       "change select#reduce-function-selector": "updateReduce"
     },
 
@@ -636,6 +657,9 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
 
     initialize: function(options) {
       this.ddocs = options.ddocs;
+      this.viewCollection = options.viewCollection;
+      this.hasReduce = this.model.viewHasReduce(this.viewCollection.view);
+      this.newView = false;
     },
 
     updateValues: function() {
@@ -661,7 +685,22 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     },
 
     establish: function() {
-      return [this.ddocs.fetch(), this.model.fetch()];
+      //return [this.ddocs.fetch(), this.model.fetch()];
+      return [];
+    },
+
+    previewView: function(event) {
+      FauxtonAPI.addNotification({
+        msg: "<strong>Warning!</strong> Preview executes the Map/Reduce functions in your browser, and may behave differently from CouchDB.",
+        type: "warning",
+        selector: "#define-view .errors-container",
+        fade: false
+      });
+      FauxtonAPI.addNotification({
+        msg: "Preview Functionality Coming Soon",
+        type: "warning",
+        selector: "#define-view .errors-container"
+      });
     },
 
     saveView: function(event) {
@@ -745,18 +784,28 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
 
     serialize: function() {
       return {
-        database: this.model,
-        ddocs: this.ddocs
+        //database: this.model,
+        ddocs: this.ddocs,
+        ddoc: this.model,
+        viewCollection: this.viewCollection,
+        hasReduce: this.hasReduce,
+        newView: this.newView
       };
     },
 
+    hasCustomReduce: function() {
+      return this.hasReduce && ! _.contains(this.builtinReduces, this.hasReduce);
+    },
+
     afterRender: function() {
-      this.model.on("sync", this.updateValues, this);
+      //this.model.on("sync", this.updateValues, this);
       var that = this;
       var mapFun = $("#map-function");
-      mapFun.val(this.langTemplates[this.defaultLang].map);
       var reduceFun = $("#reduce-function");
-      reduceFun.val(this.langTemplates[this.defaultLang].reduce);
+      if (this.newView) {
+        mapFun.val(this.langTemplates[this.defaultLang].map);
+        reduceFun.val(this.langTemplates[this.defaultLang].reduce);
+      }
       this.mapEditor = Codemirror.fromTextArea(mapFun.get()[0], {
         mode: "javascript",
         lineNumbers: true,
@@ -786,7 +835,9 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
       // HACK: this should be in the html
       // but CodeMirror's head explodes and it won't set the hight properly.
       // So render it first, set the editor, then hide.
-      $(".control-group.reduce-function").hide();
+      if ( ! this.hasCustomReduce()) {
+        $(".control-group.reduce-function").hide();
+      }
     }
   });
 
@@ -797,6 +848,13 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
       // "click .nav-list.views a.toggle-view": "toggleView",
       "click .nav-list a.toggle-view#all-docs": "toggleView",
       "click .nav-list a.toggle-view#design-docs": "toggleView"
+    },
+
+    initialize: function(options) {
+      if (options.ddocInfo) {
+        this.ddocID = options.ddocInfo.id;
+        this.currView = options.ddocInfo.currView;
+      }
     },
 
     establish: function() {
@@ -830,10 +888,12 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     buildIndexList: function(collection, selector, design){
 
       _.each(_.keys(collection), function(key){
+        var selected = this.ddocID == "_design/"+design;
         this.insertView("ul.nav." + selector, new Views.IndexItem({
           ddoc: design,
           index: key,
-          database: this.collection.database.id
+          database: this.collection.database.id,
+          selected: selected && key == this.currView
         }));
       }, this);
     },

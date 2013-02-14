@@ -378,6 +378,7 @@ function(app, FauxtonAPI, Documents, Databases) {
 
       var ddocInfo = {
         id: "_design/" + ddoc,
+        currView: view,
         designDocs: data.designDocs
       };
 
@@ -396,7 +397,8 @@ function(app, FauxtonAPI, Documents, Databases) {
           }),
 
           "#sidebar-content": new Documents.Views.Sidebar({
-            collection: data.designDocs
+            collection: data.designDocs,
+            ddocInfo: ddocInfo
           }),
 
           "#tabs": new Documents.Views.Tabs({
