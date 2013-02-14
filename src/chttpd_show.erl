@@ -76,6 +76,8 @@ handle_doc_show(Req, Db, DDoc, ShowName, Doc) ->
     handle_doc_show(Req, Db, DDoc, ShowName, Doc, null).
 
 handle_doc_show(Req, Db, DDoc, ShowName, Doc, DocId) ->
+    %% Will throw an exception if the _show handler is missing
+    couch_util:get_nested_json_value(DDoc, [<<"shows">>, ShowName]),
     % get responder for ddoc/showname
     CurrentEtag = show_etag(Req, Doc, DDoc, []),
     chttpd:etag_respond(Req, CurrentEtag, fun() ->
@@ -119,6 +121,8 @@ handle_doc_update_req(Req, _Db, _DDoc) ->
     chttpd:send_error(Req, 404, <<"update_error">>, <<"Invalid path.">>).
 
 send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
+    %% Will throw an exception if the _update handler is missing
+    couch_util:get_nested_json_value(DDoc, [<<"updates">>, UpdateName]),
     JsonReq = chttpd_external:json_req_obj(Req, Db, DocId),
     JsonDoc = couch_query_servers:json_doc(Doc),
     Cmd = [<<"updates">>, UpdateName],
@@ -183,6 +187,8 @@ handle_view_list_req(Req, _Db, _DDoc) ->
     chttpd:send_method_not_allowed(Req, "GET,POST,HEAD").
 
 handle_view_list(Req, Db, DDoc, LName, {ViewDesignName, ViewName}, Keys) ->
+    %% Will throw an exception if the _list handler is missing
+    couch_util:get_nested_json_value(DDoc, [<<"lists">>, LName]),
     {ok, VDoc} = fabric:open_doc(Db, <<"_design/", ViewDesignName/binary>>, []),
     Group = couch_view_group:design_doc_to_view_group(VDoc),
     IsReduce = chttpd_view:get_reduce_type(Req),
