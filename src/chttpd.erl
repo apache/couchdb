@@ -667,6 +667,8 @@ error_info(bad_request) ->
     {400, <<"bad_request">>, <<>>};
 error_info({bad_request, Reason}) ->
     {400, <<"bad_request">>, Reason};
+error_info({bad_request, Error, Reason}) ->
+    {400, couch_util:to_binary(Error), couch_util:to_binary(Reason)};
 error_info({query_parse_error, Reason}) ->
     {400, <<"query_parse_error">>, Reason};
 error_info(database_does_not_exist) ->
@@ -821,6 +823,8 @@ server_header() ->
 reqid() ->
     {"X-Couch-Request-ID", get(nonce)}.
 
+json_stack({bad_request, _, _}) ->
+    [];
 json_stack({_Error, _Reason, Stack}) ->
     lists:map(fun json_stack_item/1, Stack);
 json_stack(_) ->
