@@ -13,7 +13,7 @@ module.exports = function(grunt) {
               }
             }
   };
-  
+
   function processAddons(callback){
     if (path.existsSync("settings.json")){
       var settings = grunt.file.readJSON("settings.json") || {deps: []};
@@ -40,14 +40,15 @@ module.exports = function(grunt) {
     // Base assets
     var theAssets = {
       less:{
-        paths: ["assets/less"], 
+        paths: ["assets/less"],
         files: {
           "dist/debug/css/fauxton.css": "assets/less/fauxton.less"
         }
-      }
+      },
+      img: ["assets/img/**"]
     };
-    // Less files from addons
     processAddons(function(addon){
+      // Less files from addons
       var root = addon.path || "app/addons/" + addon.name;
       var lessPath = root + "/assets/less";
       if(path.existsSync(lessPath)){
@@ -56,11 +57,17 @@ module.exports = function(grunt) {
         theAssets.less.files["dist/debug/css/" + addon.name + ".css"] =
             lessPath + "/" + addon.name + ".less";
       }
+      // Images
+      var root = addon.path || "app/addons/" + addon.name;
+      var imgPath = root + "/assets/img";
+      if(path.existsSync(imgPath)){
+        theAssets.img.push(imgPath + "/**");
+      }
     });
-
+    grunt.log.write(theAssets.img[0]);
     return theAssets;
   }();
-  
+
   grunt.initConfig({
 
     // The clean task ensures all files are removed from the dist/ directory so
@@ -308,14 +315,14 @@ module.exports = function(grunt) {
         files:{
           "dist/release/js/": "assets/js/**",
           //"dist/release/css/**": "assets/css/**"
-          "dist/release/img/": "assets/img/**"
+          "dist/release/img/": assets.img
         }
       },
       debug:{
         files:{
           "dist/debug/js/": "assets/js/**",
           //"dist/debug/css/": "dist/release/css/**"
-          "dist/debug/img/": "assets/img/**"
+          "dist/debug/img/": assets.img
         }
       }
     },
