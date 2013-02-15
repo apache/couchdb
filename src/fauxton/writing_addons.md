@@ -9,6 +9,10 @@ have the following structure:
  * routes.js - _URL routing for the addon_
  * views.js - _views that the model provides_
 
+ [optional]
+ * assets/less
+   * my_addon.less 
+
 ## Generating an addon
 We have a grunt task that lets you create a skeleton addon, including all the
 boiler plate code. Run `bbb addon` and answer the questions it asks to create
@@ -21,6 +25,7 @@ an addon:
     Please answer the following:
     [?] Add on Name (WickedCool) SuperAddon
     [?] Location of add ons (app/addons)
+    [?] Do you need an assets folder?(for .less) (y/N)
     [?] Do you need to make any changes to the above before continuing? (y/N)
 
     Created addon SuperAddon in app/addons
