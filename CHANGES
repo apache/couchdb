@@ -72,6 +72,8 @@ UUID Algorithms:
 URL Rewriter & Vhosts:
 
   * Database name is encoded during rewriting (allowing embedded /'s, etc)
+  * Reset rewrite counter on new request, avoiding unnecessary request
+    failures due to bogus rewrite limit reports
 
 Log System:
 

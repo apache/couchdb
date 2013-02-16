@@ -226,6 +226,8 @@ make_fun_spec_strs(SpecStr) ->
 
 handle_request(MochiReq, DefaultFun, UrlHandlers, DbUrlHandlers,
     DesignUrlHandlers) ->
+    %% reset rewrite count for new request
+    erlang:put(?REWRITE_COUNT, 0),
 
     MochiReq1 = couch_httpd_vhost:dispatch_host(MochiReq),
 
