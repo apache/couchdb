@@ -119,15 +119,13 @@ handle_rewrite_req(#httpd{
     Prefix = <<"/", (?l2b(couch_util:url_encode(DbName)))/binary, "/", DesignId/binary>>,
     QueryList = lists:map(fun decode_query_value/1, couch_httpd:qs(Req)),
 
-    MaxRewritesList = couch_config:get("httpd", "rewrite_limit", "100"),
-    MaxRewrites = list_to_integer(MaxRewritesList),
-    case get(couch_rewrite_count) of
-        undefined ->
-            put(couch_rewrite_count, 1);
-        NumRewrites when NumRewrites < MaxRewrites ->
-            put(couch_rewrite_count, NumRewrites + 1);
-        _ ->
-            throw({bad_request, <<"Exceeded rewrite recursion limit">>})
+    RewritesSoFar = erlang:get(?REWRITE_COUNT),
+    MaxRewrites = list_to_integer(couch_config:get("httpd", "rewrite_limit", "100")),
+    case RewritesSoFar >= MaxRewrites of
+        true ->
+            throw({bad_request, <<"Exceeded rewrite recursion limit">>});
+        false ->
+            erlang:put(?REWRITE_COUNT, RewritesSoFar + 1)
     end,
 
     #doc{body={Props}} = DDoc,

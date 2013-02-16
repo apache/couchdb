@@ -464,6 +464,7 @@ couchTests.rewrite = function(debug) {
     };
     db.save(ddoc_loop);
 
+    // Assert loop detection
     run_on_modified_server(
       [{section: "httpd",
         key: "rewrite_limit",
@@ -471,7 +472,23 @@ couchTests.rewrite = function(debug) {
       function(){
         var url = "/"+dbName+"/_design/loop/_rewrite/loop";
         var xhr = CouchDB.request("GET", url);
-        T(xhr.status = 400);
+        TEquals(400, xhr.status);
+      });
+
+    // Assert serial execution is not spuriously counted as loop
+    run_on_modified_server(
+      [{section: "httpd",
+        key: "rewrite_limit",
+        value: "2"},
+       {section: "httpd",
+        key: "secure_rewrites",
+        value: "false"}],
+      function(){
+        var url = "/"+dbName+"/_design/test/_rewrite/foo";
+        for (var i=0; i < 5; i++) {
+            var xhr = CouchDB.request("GET", url);
+            TEquals(200, xhr.status);
+        }
       });
   }
 }
