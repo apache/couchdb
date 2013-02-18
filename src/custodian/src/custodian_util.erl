@@ -7,6 +7,7 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -export([summary/0, report/0]).
+-export([ensure_dbs_exists/0]).
 
 %% public functions.
 
@@ -26,6 +27,12 @@ report() ->
           end,
     fold_dbs([], Fun).
 
+ensure_dbs_exists() ->
+    DbName = couch_config:get("mem3", "shards_db", "dbs"),
+    {ok, Db} = mem3_util:ensure_exists(DbName),
+    ensure_custodian_ddoc_exists(Db),
+    {ok, Db}.
+
 %% private functions.
 
 fold_dbs(Acc0, Fun) ->
@@ -38,13 +45,6 @@ fold_dbs(Acc0, Fun) ->
     after
         couch_db:close(Db)
     end.
-
-ensure_dbs_exists() ->
-    DbName = couch_config:get("mem3", "shards_db", "dbs"),
-    erlang:put(io_priority, {low, DbName}),
-    {ok, Db} = mem3_util:ensure_exists(DbName),
-    ensure_custodian_ddoc_exists(Db),
-    {ok, Db}.
 
 fold_dbs(#full_doc_info{id = <<"_design/", _/binary>>}, _, Acc) ->
     {ok, Acc};
