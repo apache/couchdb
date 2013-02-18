@@ -11,11 +11,15 @@
     code_change/3, terminate/2]).
 
 % exported for callback.
--export([update_event_handler/1]).
+-export([
+    check_shards/0,
+    update_event_handler/1
+]).
 
 % private records.
 -record(state, {
-    update_notifier
+    update_notifier,
+    shard_checker
 }).
 
 % public functions.
@@ -25,41 +29,65 @@ start_link() ->
 
 % gen_server functions.
 init(_) ->
+    process_flag(trap_exit, true),
     net_kernel:monitor_nodes(true),
-    {ok, Pid} = start_update_notifier(),
-    {ok, #state{update_notifier=Pid}, 0}.
+    {ok, UNPid} = start_update_notifier(),
+    {ok, SCPid} = start_shard_checker(),
+    {ok, #state{
+        update_notifier=UNPid,
+        shard_checker=SCPid
+    }}.
 
 handle_call(_Msg, _From, State) ->
     {noreply, State}.
 
 handle_cast(refresh, State) ->
-    send_alerts(),
-    {noreply, State}.
-
-handle_info(timeout, State) ->
-    send_alerts(),
-    {noreply, State};
+    NewState = start_shard_checker(State),
+    {noreply, NewState}.
 
 handle_info({nodeup, _}, State) ->
-    send_alerts(),
-    {noreply, State};
+    NewState = start_shard_checker(State),
+    {noreply, NewState};
 
 handle_info({nodedown, _}, State) ->
-    send_alerts(),
-    {noreply, State};
+    NewState = start_shard_checker(State),
+    {noreply, NewState};
+
+handle_info({'EXIT', Pid, normal}, #state{shard_checker=Pid}=State) ->
+    {noreply, State#state{shard_checker=undefined}};
+
+handle_info({'EXIT', Pid, Reason}, #state{shard_checker=Pid}=State) ->
+    twig:log(notice, "custodian shard checker died ~p", [Reason]),
+    {ok, SCPid} = start_shard_checker(),
+    {noreply, State#state{shard_checker=SCPid}};
 
 handle_info({'EXIT', Pid, Reason}, #state{update_notifier=Pid}=State) ->
-    twig:log(notice, "update notifier died ~p", [Reason]),
+    twig:log(notice, "custodian update notifier died ~p", [Reason]),
     {ok, Pid1} = start_update_notifier(),
     {noreply, State#state{update_notifier=Pid1}}.
 
-terminate(_Reason, _State) ->
+terminate(_Reason, State) ->
+    couch_util:shutdown_sync(State#state.update_notifier),
+    couch_util:shutdown_sync(State#state.shard_checker),
     ok.
 
+code_change(_OldVsn, {state, Pid}, _Extra) ->
+    {ok, #state{update_notifier=Pid}};
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 % private functions
+
+start_shard_checker() ->
+    {ok, spawn_link(fun ?MODULE:check_shards/0)}.
+
+
+start_shard_checker(#state{shard_checker=undefined}=State) ->
+    {ok, Pid} = start_shard_checker(),
+    State#state{shard_checker=Pid};
+start_shard_checker(#state{shard_checker=Pid}=State) when is_pid(Pid) ->
+    State.
+
 
 start_update_notifier() ->
     couch_db_update_notifier:start_link(fun ?MODULE:update_event_handler/1).
@@ -69,7 +97,7 @@ update_event_handler({updated, <<"dbs">>}) ->
 update_event_handler(_) ->
     ok.
 
-send_alerts() ->
+check_shards() ->
     {Unavailable, Impaired} = custodian:summary(),
     send_unavailable_alert(Unavailable),
     send_impaired_alert(Impaired).
