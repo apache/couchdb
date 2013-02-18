@@ -232,9 +232,9 @@ sum_values(_Else, _Acc) ->
 sum_objects([{K1, V1} | Rest1], [{K1, V2} | Rest2]) ->
     [{K1, sum_values(V1, V2)} | sum_objects(Rest1, Rest2)];
 sum_objects([{K1, V1} | Rest1], [{K2, V2} | Rest2]) when K1 < K2 ->
-    [{K1, V1}, {K2, V2} | sum_objects(Rest1, Rest2)];
+    [{K1, V1} | sum_objects(Rest1, [{K2, V2} | Rest2])];
 sum_objects([{K1, V1} | Rest1], [{K2, V2} | Rest2]) when K1 > K2 ->
-    [{K2, V2}, {K1, V1} | sum_objects(Rest1, Rest2)];
+    [{K2, V2} | sum_objects([{K1, V1} | Rest1], Rest2)];
 sum_objects([], Rest) ->
     Rest;
 sum_objects(Rest, []) ->
@@ -440,9 +440,12 @@ sum_values_test() ->
     ?assertEqual(3, sum_values(1, 2)),
     ?assertEqual([2,4,6], sum_values(1, [1,4,6])),
     ?assertEqual([3,5,7], sum_values([3,2,4], [0,3,3])),
-    X = {[{<<"a">>,1}, {<<"b">>,[1,2]}, {<<"c">>, {[{<<"d">>,3}]}}]},
-    Y = {[{<<"a">>,2}, {<<"b">>,3}, {<<"c">>, {[{<<"e">>, 5}]}}]},
-    Z = {[{<<"a">>,3}, {<<"b">>,[4,2]}, {<<"c">>, {[{<<"d">>,3},{<<"e">>,5}]}}]},
+    X = {[{<<"a">>,1}, {<<"b">>,[1,2]}, {<<"c">>, {[{<<"d">>,3}]}},
+            {<<"g">>,1}]},
+    Y = {[{<<"a">>,2}, {<<"b">>,3}, {<<"c">>, {[{<<"e">>, 5}]}},
+            {<<"f">>,1}, {<<"g">>,1}]},
+    Z = {[{<<"a">>,3}, {<<"b">>,[4,2]}, {<<"c">>, {[{<<"d">>,3},{<<"e">>,5}]}},
+            {<<"f">>,1}, {<<"g">>,2}]},
     ?assertEqual(Z, sum_values(X, Y)),
     ?assertEqual(Z, sum_values(Y, X)).
 
