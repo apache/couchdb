@@ -44,7 +44,8 @@ go(DbName, Feed, Options, Callback, Acc0) when Feed == "continuous" orelse
                 Since,
                 Acc,
                 Timeout,
-                UpdateListener
+                UpdateListener,
+                os:timestamp()
             )
         after
             fabric_db_update_listener:stop(UpdateListener)
@@ -72,7 +73,7 @@ go(DbName, "normal", Options, Callback, Acc0) ->
         Callback(Error, Acc0)
     end.
 
-keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout, UpListen) ->
+keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout, UpListen, T0) ->
     #changes_args{limit=Limit, feed=Feed, heartbeat=Heartbeat} = Args,
     {ok, Collector} = send_changes(DbName, Args, Callback, Seqs, AccIn, Timeout),
     #collector{limit=Limit2, counters=NewSeqs, user_acc=AccOut} = Collector,
@@ -80,8 +81,15 @@ keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout, UpListen) ->
     if Limit > Limit2, Feed == "longpoll" ->
         Callback({stop, LastSeq}, AccOut);
     true ->
-        case {Heartbeat, wait_db_updated(UpListen)} of
-        {undefined, timeout} ->
+        WaitForUpdate = wait_db_updated(UpListen),
+        AccumulatedTime = timer:now_diff(os:timestamp(), T0) div 1000,
+        Max = list_to_integer(
+            config:get("fabric", "changes_duration", "300000")
+        ),
+        case {Heartbeat, AccumulatedTime > Max, WaitForUpdate} of
+        {undefined, _, timeout} ->
+            Callback({stop, LastSeq}, AccOut);
+        {_, true, timeout} ->
             Callback({stop, LastSeq}, AccOut);
         _ ->
             {ok, AccTimeout} = Callback(timeout, AccOut),
@@ -92,7 +100,8 @@ keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout, UpListen) ->
                 LastSeq,
                 AccTimeout,
                 Timeout,
-                UpListen
+                UpListen,
+                T0
             )
         end
     end.
