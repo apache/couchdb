@@ -195,7 +195,6 @@ nobase_dist_localdata_DATA = \
     www/script/test/replicator_db_update_security.js \
     www/script/test/replicator_db_user_ctx.js \
     www/script/test/replicator_db_write_auth.js \
-    www/script/test/replicator_db_security.js \
     www/script/test/rev_stemming.js \
     www/script/test/rewrite.js \
     www/script/test/security_validation.js \
