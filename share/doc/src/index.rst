@@ -46,6 +46,7 @@ Contents
     release
     api/reference
     json-structure
+    contributing
     changelog
 
 .. This is how you get a TM sign into a link. Haha. Seriously.

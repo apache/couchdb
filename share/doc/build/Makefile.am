@@ -61,6 +61,7 @@ html_files = \
     html/_sources/cors.txt \
     html/_sources/config_reference.txt \
     html/_sources/configuring.txt \
+    html/_sources/contributing.txt \
     html/_sources/ddocs.txt \
     html/_sources/errors.txt \
     html/_sources/http-proxying.txt \
@@ -164,6 +165,7 @@ src_files = \
     ../src/cors.rst \
     ../src/config_reference.rst \
     ../src/configuring.rst \
+    ../src/contributing.rst \
     ../src/ddocs.rst \
     ../src/errors.rst \
     ../src/http-proxying.rst \
