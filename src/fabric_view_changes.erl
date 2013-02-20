@@ -183,16 +183,26 @@ handle_message(#change{key=Seq} = Row0, {Worker, From}, St) ->
     _ ->
         S1 = fabric_dict:store(Worker, Seq, S0),
         S2 = fabric_view:remove_overlapping_shards(Worker, S1),
-        Row = Row0#change{key = pack_seqs(S2)},
-        {Go, Acc} = Callback(changes_row(Row, IncludeDocs), AccIn),
-        gen_server:reply(From, Go),
-        {Go, St#collector{counters=S2, limit=Limit-1, user_acc=Acc}}
+        case fabric_view:is_progress_possible(S2) of
+        true ->
+            Row = Row0#change{key = pack_seqs(S2)},
+            {Go, Acc} = Callback(changes_row(Row, IncludeDocs), AccIn),
+            gen_server:reply(From, Go),
+            {Go, St#collector{counters=S2, limit=Limit-1, user_acc=Acc}};
+        false ->
+            Reason = {range_not_covered, <<"progress not possible">>},
+            Callback({error, Reason}, AccIn),
+            gen_server:reply(From, stop),
+            {stop, St#collector{counters=S2}}
+        end
     end;
 
 handle_message({complete, EndSeq}, Worker, State) ->
     #collector{
+        callback = Callback,
         counters = S0,
-        total_rows = Completed % override
+        total_rows = Completed, % override
+        user_acc = Acc
     } = State,
     case fabric_dict:lookup_element(Worker, S0) of
     undefined ->
@@ -204,7 +214,15 @@ handle_message({complete, EndSeq}, Worker, State) ->
         NewState = State#collector{counters=S2, total_rows=Completed+1},
         case fabric_dict:size(S2) =:= (Completed+1) of
         true ->
-            {stop, NewState};
+            % final check ranges are covered
+            case fabric_view:is_progress_possible(S2) of
+            true ->
+                {stop, NewState};
+            false ->
+                Reason = {range_not_covered, <<"progress not possible">>},
+                Callback({error, Reason}, Acc),
+                {stop, NewState}
+            end;
         false ->
             {ok, NewState}
         end
