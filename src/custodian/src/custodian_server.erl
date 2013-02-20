@@ -27,8 +27,7 @@ start_link() ->
 init(_) ->
     net_kernel:monitor_nodes(true),
     {ok, Pid} = start_update_notifier(),
-    send_alerts(),
-    {ok, #state{update_notifier=Pid}}.
+    {ok, #state{update_notifier=Pid}, 0}.
 
 handle_call(_Msg, _From, State) ->
     {noreply, State}.
@@ -36,6 +35,10 @@ handle_call(_Msg, _From, State) ->
 handle_cast(refresh, State) ->
     send_alerts(),
     {noreply, State}.
+
+handle_info(timeout, State) ->
+    send_alerts(),
+    {noreply, State};
 
 handle_info({nodeup, _}, State) ->
     send_alerts(),

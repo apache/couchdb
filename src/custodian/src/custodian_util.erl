@@ -33,7 +33,7 @@ fold_dbs(Acc0, Fun) ->
     N = list_to_integer(couch_config:get("cluster", "n", "3")),
     {ok, Db} = ensure_dbs_exists(),
     try
-        {ok, _, {_, _, _, Acc1}} = couch_db:enum_docs(Db, fun fold_dbs/3, {Live, N, Fun, Acc0}, []),
+        {ok, _, {_, _, _, _, Acc1}} = couch_db:enum_docs(Db, fun fold_dbs/3, {Live, N, Fun, Db, Acc0}, []),
         Acc1
     after
         couch_db:close(Db)
@@ -41,6 +41,7 @@ fold_dbs(Acc0, Fun) ->
 
 ensure_dbs_exists() ->
     DbName = couch_config:get("mem3", "shards_db", "dbs"),
+    erlang:put(io_priority, {low, DbName}),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     ensure_custodian_ddoc_exists(Db),
     {ok, Db}.
@@ -49,14 +50,14 @@ fold_dbs(#full_doc_info{id = <<"_design/", _/binary>>}, _, Acc) ->
     {ok, Acc};
 fold_dbs(#full_doc_info{deleted=true}, _, Acc) ->
     {ok, Acc};
-fold_dbs(#full_doc_info{id = Id}, _, Acc) ->
-    Shards = mem3:shards(Id),
+fold_dbs(#full_doc_info{id = Id} = FDI, _, {_Live, _N, _Fun, Db, _Acc0} = Acc) ->
+    Shards = load_shards(Db, FDI),
     Rs = [R || #shard{range=R} <- lists:ukeysort(#shard.range, Shards)],
     ActualN = [{R1, [N || #shard{node=N,range=R2} <- Shards, R1 == R2]} ||  R1 <- Rs],
     fold_dbs(Id, ActualN, Acc);
 fold_dbs(_Id, [], Acc) ->
     {ok, Acc};
-fold_dbs(Id, [{Range, Nodes}|Rest], {Live, N, Fun, Acc0}) ->
+fold_dbs(Id, [{Range, Nodes}|Rest], {Live, N, Fun, Db, Acc0}) ->
     Nodes1 = maybe_redirect(Nodes),
     Nodes2 = [Node || Node <- Nodes1, lists:member(Node, Live)],
     Acc1 = case length(Nodes2) of
@@ -67,7 +68,15 @@ fold_dbs(Id, [{Range, Nodes}|Rest], {Live, N, Fun, Acc0}) ->
         _ ->
             Acc0
     end,
-    fold_dbs(Id, Rest, {Live, N, Fun, Acc1}).
+    fold_dbs(Id, Rest, {Live, N, Fun, Db, Acc1}).
+
+load_shards(Db, #full_doc_info{id = Id} = FDI) ->
+    case couch_db:open_doc(Db, FDI, []) of
+        {ok, #doc{body = {Props}}} ->
+            mem3_util:build_shards(Id, Props);
+        {not_found, _} ->
+            erlang:error(database_does_not_exist, ?b2l(Id))
+    end.
 
 maybe_redirect(Nodes) ->
     maybe_redirect(Nodes, []).
