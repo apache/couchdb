@@ -668,7 +668,7 @@ a double due to JavaScript's definition of a number).
 
 Consider this document that we write to CouchDB:
 
-.. code-bloc:: javascript
+.. code-block:: javascript
 
     {
       "_id":"30b3b38cdbd9e3a587de9b8122000cff",
@@ -717,9 +717,7 @@ accept that numbers are stored in doubles).
 Here's a log for a couple of the more common JSON libraries I happen
 to have on my machine:
 
-Spidermonkey
-
-.. code-block:: shell
+Spidermonkey::
 
     $ js -h 2>&1 | head -n 1
     JavaScript-C 1.8.5 2011-03-31
@@ -730,9 +728,7 @@ Spidermonkey
     js> JSON.stringify(JSON.parse(f))
     "1.0123456789012346"
 
-Node
-
-.. code-block:: shell
+Node::
 
     $ node -v
     v0.6.15
@@ -744,9 +740,7 @@ Node
     JSON.stringify(JSON.parse(f))
     '1.0123456789012346'
 
-Python
-
-.. code-block:: shell
+Python::
 
     $ python
     Python 2.7.2 (default, Jun 20 2012, 16:23:33)
@@ -759,14 +753,7 @@ Python
     json.dumps(json.loads(f))
     '1.0123456789012346'
 
-Ruby
-
-..note:: A small aside on Ruby, it requires a top level object or array, so I just
-         wrapped the value. Should be obvious it doesn't affect the result of
-         parsing the number though.
-
-
-.. code-block:: shell
+Ruby::
 
     $ irb --version
     irb 0.9.5(05/04/13)
@@ -780,9 +767,12 @@ Ruby
     => "[1.01234567890123]"
 
 
-# ejson (CouchDB's current parser) at CouchDB sha 168a663b
+.. note:: A small aside on Ruby, it requires a top level object or array, so I just
+         wrapped the value. Should be obvious it doesn't affect the result of
+         parsing the number though.
 
-.. code-block:: shell
+
+Ejson (CouchDB's current parser) at CouchDB sha 168a663b::
 
     $ ./utils/run -i
     Erlang R14B04 (erts-5.8.5) [source] [64-bit] [smp:2:2] [rq:2]
@@ -816,9 +806,7 @@ value that a double can represent.
 
 The important point to understand is that we're mapping from one
 infinite set onto a finite set. An easy way to see this is by
-reflecting on this:
-
-.. code-block:: shell
+reflecting on this::
 
     1.0 == 1.00 == 1.000 = 1.(infinite zeroes)
 
