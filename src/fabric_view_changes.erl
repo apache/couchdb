@@ -287,16 +287,49 @@ unpack_seqs(Packed, DbName) ->
     do_unpack_seqs(Opaque, DbName).
 
 do_unpack_seqs(Opaque, DbName) ->
+    % A preventative fix for FB 13533 to remove duplicate shards.
+    % This just picks each unique shard and keeps the largest seq
+    % value recorded.
+    Decoded = binary_to_term(couch_util:decodeBase64Url(Opaque)),
+    DedupDict = lists:foldl(fun({Node, [A, B], Seq}, Acc) ->
+        dict:append({Node, [A, B]}, Seq, Acc)
+    end, dict:new(), Decoded),
+    Deduped = lists:map(fun({{Node, [A, B]}, SeqList}) ->
+        {Node, [A, B], lists:max(SeqList)}
+    end, dict:to_list(DedupDict)),
+
+    % Create a fabric_dict of {Shard, Seq} entries
     % TODO relies on internal structure of fabric_dict as keylist
-    lists:map(fun({Node, [A,B], Seq}) ->
+    Unpacked = lists:flatmap(fun({Node, [A,B], Seq}) ->
         case mem3:get_shard(DbName, Node, [A,B]) of
         {ok, Shard} ->
-            {Shard, Seq};
+            [{Shard, Seq}];
         {error, not_found} ->
-            PlaceHolder = #shard{node=Node, range=[A,B], dbname=DbName, _='_'},
-            {PlaceHolder, Seq} % will be replaced in find_replacement_shards
+            []
         end
-    end, binary_to_term(couch_util:decodeBase64Url(Opaque))).
+    end, Deduped),
+
+    % Fill holes in the since sequence. If/when we ever start
+    % using overlapping shard ranges this will need to be updated
+    % to not include shard ranges that overlap entries in Upacked.
+    % A quick and dirty approach would be like such:
+    %
+    %   lists:foldl(fun(S, Acc) ->
+    %       fabric_view:remove_overlapping_shards(S, Acc)
+    %   end, mem3:shards(DbName), Unpacked)
+    %
+    % Unfortunately remove_overlapping_shards isn't reusable because
+    % of its calls to rexi:kill/2. When we get to overlapping
+    % shard ranges and have to rewrite shard range management
+    % we can revisit this simpler algorithm.
+    case fabric_view:is_progress_possible(Unpacked) of
+        true ->
+            Unpacked;
+        false ->
+            Ranges = lists:usort([R || #shard{range=R} <- Unpacked]),
+            Filter = fun(S) -> not lists:member(S#shard.range, Ranges) end,
+            Unpacked ++ lists:filter(Filter, mem3:shards(DbName))
+    end.
 
 changes_row(#change{key=Seq, id=Id, value=Value, deleted=true, doc=Doc}, true) ->
     {change, {[{seq,Seq}, {id,Id}, {changes,Value}, {deleted, true}, {doc, Doc}]}};
