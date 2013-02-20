@@ -41,6 +41,7 @@ fold_dbs(Acc0, Fun) ->
 
 ensure_dbs_exists() ->
     DbName = couch_config:get("mem3", "shards_db", "dbs"),
+    erlang:put(io_priority, {low, DbName}),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     ensure_custodian_ddoc_exists(Db),
     {ok, Db}.
