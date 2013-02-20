@@ -74,10 +74,10 @@ The documentation sources live in `src/doc`, you can safely ignore all the
 other files and directories.
 
 First we should determine where we want to document this inside the
-documentation. We can look through https://couchdb-dev.readthedocs.org/en/latest/
+documentation. We can look through http://docs.couchdb.org/en/latest/
 for inspiration. The `JSON Structure Reference`_ looks like a fine place to write this up.
 
-.. _JSON Structure Reference: https://couchdb-dev.readthedocs.org/en/latest/json-structure.html
+.. _JSON Structure Reference: http://docs.couchdb.org/en/latest/json-structure.html
 
 The current state includes mostly tables describing the JSON structure (after
 all, that's the title of this chapter), but some prose about the number
@@ -86,8 +86,8 @@ includes views and different encoding in views (as opposed to the storage
 engine), we should remember to make a note in the views documentation as well,
 but we'll leave this for later.
 
-Let's try and find the source file that builds the file https://couchdb-
-dev.readthedocs.org/en/latest/json-structure.html -- we are in luck, under
+Let's try and find the source file that builds the file
+http://docs.couchdb.org/en/latest/json-structure.html -- we are in luck, under
 `share/docs/src/` we find the file `json-structure.rst`. That looks promising.
 `.rst` stands for ReStructured Text (see
 http://thomas-cokelaer.info/tutorials/sphinx/rest_syntax.html
