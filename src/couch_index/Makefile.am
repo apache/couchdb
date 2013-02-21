@@ -20,17 +20,19 @@ CLEANFILES = $(compiled_files)
 
 source_files = \
     src/couch_index.erl \
+    src/couch_index_api.erl \
+    src/couch_index.app.src \
     src/couch_index_compactor.erl \
     src/couch_index_server.erl \
     src/couch_index_updater.erl \
-	src/couch_index_util.erl
+    src/couch_index_util.erl
 
 compiled_files = \
     ebin/couch_index.beam \
     ebin/couch_index_compactor.beam \
     ebin/couch_index_server.beam \
     ebin/couch_index_updater.beam \
-	ebin/couch_index_util.beam
+    ebin/couch_index_util.beam
 
 ebin/%.beam: src/%.erl
 	@mkdir -p ebin/

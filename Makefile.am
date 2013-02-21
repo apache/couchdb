@@ -43,6 +43,7 @@ EXTRA_DIST = \
     NOTICE \
     README \
     THANKS \
+    build-aux/dist-error \
     build-aux/sphinx-build \
     build-aux/sphinx-touch \
     license.skip
