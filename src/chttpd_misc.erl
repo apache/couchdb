@@ -281,6 +281,7 @@ handle_system_req(Req) ->
         {process_count, erlang:system_info(process_count)},
         {process_limit, erlang:system_info(process_limit)},
         {message_queues, message_queues(registered())},
+        {internal_replication_jobs, mem3_sync:get_backlog()},
         {distribution, {get_distribution_stats()}}
     ]}).
 
