@@ -349,6 +349,10 @@ handle_call({open, DbName, Options}, From, Server) ->
     [#db{compactor_pid = Froms} = Db] when is_list(Froms) ->
         % icky hack of field values - compactor_pid used to store clients
         true = ets:insert(couch_dbs, Db#db{compactor_pid = [From|Froms]}),
+        if length(Froms) =< 10 -> ok; true ->
+            Fmt = "~b clients waiting to open db ~s",
+            ?LOG_INFO(Fmt, [length(Froms), DbName])
+        end,
         {noreply, Server};
     [#db{} = Db] ->
         {reply, {ok, Db}, Server}
