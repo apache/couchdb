@@ -32,8 +32,8 @@
     limit,                  % max # of workers allowed
     free = [],              % free workers (connections)
     busy = [],              % busy workers (connections)
-    waiting = queue:new(),   % blocked clients waiting for a worker
-    callers = ets:new(callers,[set]) % clients who've been given a worker
+    waiting = queue:new(),  % blocked clients waiting for a worker
+    callers = []            % clients who've been given a worker
 }).
 
 
@@ -81,8 +81,11 @@ handle_call(get_worker, From, State) ->
         [Worker | Free2] ->
            ok
         end,
-        monitor_client(Callers, Worker, From),
-        NewState = State#state{free = Free2, busy = [Worker | Busy]},
+        NewState = State#state{
+            free = Free2,
+            busy = [Worker | Busy],
+            callers = monitor_client(Callers, Worker, From)
+        },
         {reply, {ok, Worker}, NewState}
     end;
 
@@ -92,16 +95,17 @@ handle_call(stop, _From, State) ->
 
 handle_cast({release_worker, Worker}, State) ->
     #state{waiting = Waiting, callers = Callers} = State,
-    demonitor_client(Callers, Worker),
+    NewCallers0 = demonitor_client(Callers, Worker),
     case is_process_alive(Worker) andalso
         lists:member(Worker, State#state.busy) of
     true ->
         case queue:out(Waiting) of
         {empty, Waiting2} ->
+            NewCallers1 = NewCallers0,
             Busy2 = State#state.busy -- [Worker],
             Free2 = [Worker | State#state.free];
         {{value, From}, Waiting2} ->
-            monitor_client(Callers, Worker, From),
+            NewCallers1 = monitor_client(Callers, Worker, From),
             gen_server:reply(From, {ok, Worker}),
             Busy2 = State#state.busy,
             Free2 = State#state.free
@@ -109,11 +113,12 @@ handle_cast({release_worker, Worker}, State) ->
         NewState = State#state{
            busy = Busy2,
            free = Free2,
-           waiting = Waiting2
+           waiting = Waiting2,
+           callers = NewCallers1
         },
         {noreply, NewState};
    false ->
-        {noreply, State}
+        {noreply, State#state{callers = NewCallers0}}
    end.
 
 handle_info({'EXIT', Pid, _Reason}, State) ->
@@ -124,37 +129,50 @@ handle_info({'EXIT', Pid, _Reason}, State) ->
         waiting = Waiting,
         callers = Callers
     } = State,
-    demonitor_client(Callers, Pid),
+    NewCallers0 = demonitor_client(Callers, Pid),
     case Free -- [Pid] of
     Free ->
         case Busy -- [Pid] of
         Busy ->
-            {noreply, State};
+            {noreply, State#state{callers = NewCallers0}};
         Busy2 ->
             case queue:out(Waiting) of
             {empty, _} ->
-                {noreply, State#state{busy = Busy2}};
+                {noreply, State#state{busy = Busy2, callers = NewCallers0}};
             {{value, From}, Waiting2} ->
                 {ok, Worker} = ibrowse:spawn_link_worker_process(Url),
-                monitor_client(Callers, Worker, From),
+                NewCallers1 = monitor_client(Callers, Worker, From),
                 gen_server:reply(From, {ok, Worker}),
-                {noreply, State#state{busy = [Worker | Busy2], waiting = Waiting2}}
+                NewState = State#state{
+                    busy = [Worker | Busy2],
+                    waiting = Waiting2,
+                    callers = NewCallers1
+                },
+                {noreply, NewState}
             end
         end;
     Free2 ->
-        {noreply, State#state{free = Free2}}
+        {noreply, State#state{free = Free2, callers = NewCallers0}}
     end;
 
 handle_info({'DOWN', Ref, process, _, _}, #state{callers = Callers} = State) ->
-    case ets:match(Callers, {'$1', Ref}) of
-    [] ->
-        {noreply, State};
-    [[Worker]] ->
-        handle_cast({release_worker, Worker}, State)
+    case lists:keysearch(Ref, 2, Callers) of
+        {value, {Worker, Ref}} ->
+            handle_cast({release_worker, Worker}, State);
+        false ->
+            {noreply, State}
     end.
 
-code_change(_OldVsn, OldState, _Extra) when tuple_size(OldState) =:= 6 ->
-    {ok, erlang:append_element(OldState, ets:new(callers))};
+code_change(_OldVsn, OldState, _Extra) when tuple_size(OldState) =:= 7 ->
+    case element(7, OldState) of
+        EtsTable when is_integer(EtsTable) ->
+            NewState = setelement(7, OldState, ets:tab2list(EtsTable)),
+            ets:delete(EtsTable),
+            {ok, NewState};
+        Callers when is_list(Callers) ->
+            % Already upgraded
+            {ok, OldState}
+    end;
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
@@ -163,13 +181,14 @@ terminate(_Reason, State) ->
     lists:foreach(fun ibrowse_http_client:stop/1, State#state.free),
     lists:foreach(fun ibrowse_http_client:stop/1, State#state.busy).
 
-monitor_client(Tab, Worker, {ClientPid, _}) ->
-    ets:insert(Tab, {Worker, erlang:monitor(process, ClientPid)}).
+monitor_client(Callers, Worker, {ClientPid, _}) ->
+    [{Worker, erlang:monitor(process, ClientPid)} | Callers].
 
-demonitor_client(Tab, Worker) ->
-    case ets:lookup(Tab, Worker) of
-    [] -> ok;
-    [{Worker, MonRef}] ->
-        ets:delete(Tab, Worker),
-        erlang:demonitor(MonRef, [flush])
+demonitor_client(Callers, Worker) ->
+    case lists:keysearch(Worker, 1, Callers) of
+        {value, {Worker, MonRef}} ->
+            erlang:demonitor(MonRef, [flush]),
+            lists:keydelete(Worker, 1, Callers);
+        false ->
+            Callers
     end.
