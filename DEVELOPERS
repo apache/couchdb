@@ -132,6 +132,10 @@ If you're working on the build system itself, you can run:
 
 This skips the tests allowing quicker `make' cycles.
 
+If you want to build it into different destination than `/usr/local`.
+
+    ./configure --prefix=/<your directory path>
+
 Testing
 -------
 
