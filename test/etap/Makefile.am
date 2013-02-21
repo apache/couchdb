@@ -28,11 +28,14 @@ run: run.tpl
 
 # @@ wildcards are NOT portable, please replace with clean-local rules
 CLEANFILES = run *.beam
+
 DISTCLEANFILES = temp.*
 
-EXTRA_DIST = \
-    run.tpl \
-    test_web.erl \
+fixture_files = \
+    fixtures/3b835456c235b1827e012e25666152f3.view \
+    fixtures/test.couch
+
+tap_files = \
     001-load.t \
     002-icu-driver.t \
     010-file-basics.t \
@@ -93,4 +96,13 @@ EXTRA_DIST = \
     201-view-group-shutdown.t \
     210-os-proc-pool.t \
     220-compaction-daemon.t \
-    231-cors.t
+    230-pbkfd2.t \
+    231-cors.t \
+    250-upgrade-legacy-view-files.t
+
+EXTRA_DIST = \
+    run.tpl \
+    test_web.erl \
+    $(fixture_files) \
+    $(tap_files)
+    
