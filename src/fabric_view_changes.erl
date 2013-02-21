@@ -192,16 +192,28 @@ handle_message(#change{key=Seq} = Row0, {Worker, From}, St) ->
     _ ->
         S1 = fabric_dict:store(Worker, Seq, S0),
         S2 = fabric_view:remove_overlapping_shards(Worker, S1),
-        Row = Row0#change{key = pack_seqs(S2)},
-        {Go, Acc} = Callback(changes_row(Row, IncludeDocs), AccIn),
-        gen_server:reply(From, Go),
-        {Go, St#collector{counters=S2, limit=Limit-1, user_acc=Acc}}
+        % this check should not be necessary at all, as holes in the ranges
+        % created from DOWN messages would have led to errors
+        case fabric_view:is_progress_possible(S2) of
+        true ->
+            Row = Row0#change{key = pack_seqs(S2)},
+            {Go, Acc} = Callback(changes_row(Row, IncludeDocs), AccIn),
+            gen_server:reply(From, Go),
+            {Go, St#collector{counters=S2, limit=Limit-1, user_acc=Acc}};
+        false ->
+            Reason = {range_not_covered, <<"progress not possible">>},
+            Callback({error, Reason}, AccIn),
+            gen_server:reply(From, stop),
+            {stop, St#collector{counters=S2}}
+        end
     end;
 
 handle_message({complete, EndSeq}, Worker, State) ->
     #collector{
+        callback = Callback,
         counters = S0,
-        total_rows = Completed % override
+        total_rows = Completed, % override
+        user_acc = Acc
     } = State,
     case fabric_dict:lookup_element(Worker, S0) of
     undefined ->
@@ -213,7 +225,17 @@ handle_message({complete, EndSeq}, Worker, State) ->
         NewState = State#collector{counters=S2, total_rows=Completed+1},
         case fabric_dict:size(S2) =:= (Completed+1) of
         true ->
-            {stop, NewState};
+            % check ranges are covered, again this should not be neccessary
+            % as any holes in the ranges due to DOWN messages would have errored
+            % out sooner
+            case fabric_view:is_progress_possible(S2) of
+            true ->
+                {stop, NewState};
+            false ->
+                Reason = {range_not_covered, <<"progress not possible">>},
+                Callback({error, Reason}, Acc),
+                {stop, NewState}
+            end;
         false ->
             {ok, NewState}
         end
@@ -278,16 +300,49 @@ unpack_seqs(Packed, DbName) ->
     do_unpack_seqs(Opaque, DbName).
 
 do_unpack_seqs(Opaque, DbName) ->
+    % A preventative fix for FB 13533 to remove duplicate shards.
+    % This just picks each unique shard and keeps the largest seq
+    % value recorded.
+    Decoded = binary_to_term(couch_util:decodeBase64Url(Opaque)),
+    DedupDict = lists:foldl(fun({Node, [A, B], Seq}, Acc) ->
+        dict:append({Node, [A, B]}, Seq, Acc)
+    end, dict:new(), Decoded),
+    Deduped = lists:map(fun({{Node, [A, B]}, SeqList}) ->
+        {Node, [A, B], lists:max(SeqList)}
+    end, dict:to_list(DedupDict)),
+
+    % Create a fabric_dict of {Shard, Seq} entries
     % TODO relies on internal structure of fabric_dict as keylist
-    lists:map(fun({Node, [A,B], Seq}) ->
+    Unpacked = lists:flatmap(fun({Node, [A,B], Seq}) ->
         case mem3:get_shard(DbName, Node, [A,B]) of
         {ok, Shard} ->
-            {Shard, Seq};
+            [{Shard, Seq}];
         {error, not_found} ->
-            PlaceHolder = #shard{node=Node, range=[A,B], dbname=DbName, _='_'},
-            {PlaceHolder, Seq} % will be replaced in find_replacement_shards
+            []
         end
-    end, binary_to_term(couch_util:decodeBase64Url(Opaque))).
+    end, Deduped),
+
+    % Fill holes in the since sequence. If/when we ever start
+    % using overlapping shard ranges this will need to be updated
+    % to not include shard ranges that overlap entries in Upacked.
+    % A quick and dirty approach would be like such:
+    %
+    %   lists:foldl(fun(S, Acc) ->
+    %       fabric_view:remove_overlapping_shards(S, Acc)
+    %   end, mem3:shards(DbName), Unpacked)
+    %
+    % Unfortunately remove_overlapping_shards isn't reusable because
+    % of its calls to rexi:kill/2. When we get to overlapping
+    % shard ranges and have to rewrite shard range management
+    % we can revisit this simpler algorithm.
+    case fabric_view:is_progress_possible(Unpacked) of
+        true ->
+            Unpacked;
+        false ->
+            Ranges = lists:usort([R || #shard{range=R} <- Unpacked]),
+            Filter = fun(S) -> not lists:member(S#shard.range, Ranges) end,
+            Unpacked ++ lists:filter(Filter, mem3:shards(DbName))
+    end.
 
 changes_row(#change{key=Seq, id=Id, value=Value, deleted=true, doc=Doc}, true) ->
     {change, {[{seq,Seq}, {id,Id}, {changes,Value}, {deleted, true}, {doc, Doc}]}};
