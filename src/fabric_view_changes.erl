@@ -183,6 +183,8 @@ handle_message(#change{key=Seq} = Row0, {Worker, From}, St) ->
     _ ->
         S1 = fabric_dict:store(Worker, Seq, S0),
         S2 = fabric_view:remove_overlapping_shards(Worker, S1),
+        % this check should not be necessary at all, as holes in the ranges
+        % created from DOWN messages would have led to errors
         case fabric_view:is_progress_possible(S2) of
         true ->
             Row = Row0#change{key = pack_seqs(S2)},
@@ -214,7 +216,9 @@ handle_message({complete, EndSeq}, Worker, State) ->
         NewState = State#collector{counters=S2, total_rows=Completed+1},
         case fabric_dict:size(S2) =:= (Completed+1) of
         true ->
-            % final check ranges are covered
+            % check ranges are covered, again this should not be neccessary
+            % as any holes in the ranges due to DOWN messages would have errored
+            % out sooner
             case fabric_view:is_progress_possible(S2) of
             true ->
                 {stop, NewState};
