@@ -105,4 +105,3 @@ EXTRA_DIST = \
     test_web.erl \
     $(fixture_files) \
     $(tap_files)
-    
