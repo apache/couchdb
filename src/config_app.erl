@@ -30,11 +30,12 @@ stop(_State) ->
 get_ini_files() ->
     Etc = filename:join(code:root_dir(), "etc"),
     Default = [filename:join(Etc,"default.ini"), filename:join(Etc,"local.ini")],
+    DefaultExists = lists:filter(fun filelib:is_file/1, Default),
     case init:get_argument(couch_ini) of
     error ->
-        Default;
+        DefaultExists;
     {ok, [[]]} ->
-        Default;
+        DefaultExists;
     {ok, [Values]} ->
         Values
     end.
