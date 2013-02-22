@@ -692,17 +692,22 @@ parse_changes_line(object_start, UserFun) ->
     end.
 
 json_to_doc_info({Props}) ->
-    RevsInfo = lists:map(
-        fun({Change}) ->
-            Rev = couch_doc:parse_rev(get_value(<<"rev">>, Change)),
-            Del = couch_replicator_utils:is_deleted(Change),
-            #rev_info{rev=Rev, deleted=Del}
-        end, get_value(<<"changes">>, Props)),
-    #doc_info{
-        id = get_value(<<"id">>, Props),
-        high_seq = get_value(<<"seq">>, Props),
-        revs = RevsInfo
-    }.
+    case get_value(<<"changes">>, Props) of
+    undefined ->
+        {last_seq, get_value(<<"last_seq">>, Props)};
+    Changes ->
+        RevsInfo = lists:map(
+            fun({Change}) ->
+                Rev = couch_doc:parse_rev(get_value(<<"rev">>, Change)),
+                Del = couch_replicator_utils:is_deleted(Change),
+                #rev_info{rev=Rev, deleted=Del}
+            end, Changes),
+        #doc_info{
+            id = get_value(<<"id">>, Props),
+            high_seq = get_value(<<"seq">>, Props),
+            revs = RevsInfo
+        }
+    end.
 
 
 bulk_results_to_errors(Docs, {ok, Results}, interactive_edit) ->

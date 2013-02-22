@@ -642,7 +642,21 @@ read_changes(StartSeq, Db, ChangesQueue, Options) ->
                 _ ->
                     ok = couch_work_queue:queue(ChangesQueue, DocInfo)
                 end,
-                put(last_seq, Seq)
+                put(last_seq, Seq);
+            ({last_seq, LS}) ->
+                case get_value(continuous, Options) of
+                true ->
+                    % LS should never be undefined, but it doesn't hurt to be
+                    % defensive inside the replicator.
+                    Seq = case LS of undefined -> get(last_seq); _ -> LS end,
+                    read_changes(Seq, Db, ChangesQueue, Options);
+                _ ->
+                    % This clause is unreachable today, but let's plan ahead
+                    % for the future where we checkpoint against last_seq
+                    % instead of the sequence of the last change.  The two can
+                    % differ substantially in the case of a restrictive filter.
+                    ok
+                end
             end, Options),
         couch_work_queue:close(ChangesQueue)
     catch exit:{http_request_failed, _, _, _} = Error ->
