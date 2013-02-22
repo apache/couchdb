@@ -177,6 +177,20 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
                 end),
             unlink(Self)
         end),
+    % If this process dies normally we can leave
+    % the Streamer process hanging around keeping an
+    % HTTP connection open. This is a bit of a
+    % hammer approach to making sure it releases
+    % that connection back to the pool.
+    spawn(fun() ->
+        Ref = erlang:monitor(process, Self),
+        receive
+            {'DOWN', Ref, process, Self, normal} ->
+                exit(Streamer, {streamer_parent_died, Self});
+            {'DOWN', Ref, process, Self, _} ->
+                ok
+            end
+    end),
     receive
     {started_open_doc_revs, Ref} ->
         receive_docs_loop(Streamer, Fun, Id, Revs, Ref, Acc)
