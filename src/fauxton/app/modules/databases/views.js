@@ -150,12 +150,17 @@ function(app, FauxtonAPI) {
     },
 
     showMine: function(){
-      console.log('will show users databases and hide shared');
+      $.contribute(
+        'Show unshared databases',
+        'app/addons/databases/views.js'
+      );
     },
 
     showShared: function(){
-      console.log('will show shared databases and hide the users');
-      alert('Support for shared databases coming soon');
+      $.contribute(
+        'Show shared databases (e.g. continuous replications to/from the database)',
+        'app/addons/databases/views.js'
+      );
     }
   });
 

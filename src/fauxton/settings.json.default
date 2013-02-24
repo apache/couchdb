@@ -2,6 +2,7 @@
   "deps": [
     { "name": "config" },
     { "name": "logs" },
-    { "name": "stats" }
+    { "name": "stats" },
+    { "name": "contribute" }
   ]
 }

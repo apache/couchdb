@@ -817,12 +817,18 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
 
     newIndex:  function(event){
       event.preventDefault();
-      alert('coming soon');
+      $.contribute(
+        'Create a new view.',
+        'app/addons/documents/views.js'
+      );
     },
 
     toggleView: function(event){
-      alert('filter data by search/view/type');
       event.preventDefault();
+      $.contribute(
+        'Filter data by type or view',
+        'app/addons/databases/views.js'
+      );
       url = event.currentTarget.href.split('#')[1];
       app.router.navigate(url);
     },
