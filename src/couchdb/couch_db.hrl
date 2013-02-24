@@ -21,6 +21,8 @@
 % the lowest possible database sequence number
 -define(LOWEST_SEQ, 0).
 
+-define(REWRITE_COUNT, couch_rewrite_count).
+
 -define(JSON_ENCODE(V), ejson:encode(V)).
 -define(JSON_DECODE(V), ejson:decode(V)).
 
