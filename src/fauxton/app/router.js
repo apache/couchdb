@@ -107,10 +107,12 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
         }
       }, this);
       _.each(LoadAddons.addons, function(module) {
-        module.initialize();
-        // This is pure routes the addon provides
-        if (module.Routes) {
-          _.each(module.Routes, this.addModuleRoute, this);
+        if (module){
+          module.initialize();
+          // This is pure routes the addon provides
+          if (module.Routes) {
+            _.each(module.Routes, this.addModuleRoute, this);
+          }
         }
       }, this);
     },
@@ -118,7 +120,7 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
     setAddonHooks: function() {
       _.each(LoadAddons.addons, function(module) {
         // This is updates to views by the addon
-        if (module.hooks){
+        if (module && module.hooks){
           _.each(module.hooks, function(callback, route){
             if (this.masterLayout.hooks[route]) {
               this.masterLayout.hooks[route].push(callback);

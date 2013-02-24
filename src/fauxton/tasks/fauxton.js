@@ -25,6 +25,11 @@ module.exports = function(grunt) {
       name: "path",
       message: "Location of add ons",
       default: "app/addons"
+    },
+    {
+      name: "assets",
+      message: "Do you need an assets folder? (for .less)",
+      default: 'y/N'
     }
   ];
 
@@ -51,14 +56,29 @@ module.exports = function(grunt) {
     var done = this.async()
     grunt.helper('prompt', {}, prompts, function (err, result) {
       if (err) { return onErr(err); }
-      var module = result.name
+      grunt.log.writeln(result.assets);
+      var module = result.name,
+          assets = result.assets;
+      if (assets == 'y') {
+        //if you need an assets folder
+        filepath = result.path + '/' + module.toLowerCase() + '/assets/less';
+        grunt.file.mkdir(filepath);
+        lessfile = {
+          name: 'less',
+          filename: module.toLowerCase()+'.less',
+          template: '//<%= module %> styles'
+        }
+        lessfile.module = module.charAt(0).toUpperCase() + module.substr(1);
+        var content = grunt.template.process(lessfile.template, lessfile);
+        grunt.file.write(filepath + '/' + lessfile.filename, content);
+      }
       filepath = result.path + '/' + module.toLowerCase() + '/templates';
       grunt.file.mkdir(filepath);
       filepath = result.path + '/' + module.toLowerCase();
       _.each(addonTemplates, function(file){
         file.module = module.charAt(0).toUpperCase() + module.substr(1);
         var content = grunt.template.process(file.template, file);
-        grunt.file.write(filepath + '/' + file.filename, content)
+        grunt.file.write(filepath + '/' + file.filename, content);
       });
       grunt.log.writeln('Created addon ' + result.name + ' in ' + result.path);
       done();
