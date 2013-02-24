@@ -374,14 +374,14 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
           return FauxtonAPI.addNotification({
             msg: "JSON Parse Error on field: "+param.name,
             type: "error",
-            selector: ".view.show .errors-container"
+            selector: ".view.show .all-docs-list.errors-container"
           });
         });
 
         FauxtonAPI.addNotification({
           msg: "Make sure that strings are properly quoted and any other values are valid JSON structures",
           type: "warning",
-          selector: ".view.show .errors-container"
+          selector: ".view.show .all-docs-list.errors-container"
         });
 
         return false;
@@ -412,7 +412,7 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
               var notification = FauxtonAPI.addNotification({
                 msg: "include_docs has been disabled as you cannot include docs on a reduced view",
                 type: "warn",
-                selector: ".view.show .errors-container"
+                selector: ".view.show .all-docs-list.errors-container"
               });
             }
             $form.find("input[name=include_docs]").prop("disabled", true);
@@ -489,6 +489,9 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
               $form.find("select[name='"+key+"']").val(val);
               break;
             case "include_docs":
+            case "stale":
+            case "descending":
+            case "inclusive_end":
               $form.find("input[name='"+key+"']").prop('checked', true);
               break;
             case "reduce":

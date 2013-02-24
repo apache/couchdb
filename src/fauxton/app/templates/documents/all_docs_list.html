@@ -27,7 +27,7 @@ the License.
   <% } %>
 
   <div class="row">
-    <div class="errors-container"></div>
+    <div class="all-docs-list errors-container"></div>
     <div id="edit-index-container"></div>
     <% if (viewList) { %>
       <div class="accordion" id="advanced-options-accordion">
@@ -86,6 +86,20 @@ the License.
                   <input name="endkey" class="span6" type="text" placeholder="End Key">
                 </div>
                 <div class="controls controls-row">
+                  <label class="span2 checkbox inline">
+                    <input name="stale" type="checkbox" value="ok"> Stale
+                  </label>
+                  <label class="span2 checkbox inline">
+                    <input name="descending" type="checkbox" value="true"> Descending
+                  </label>
+                  <label class="span4 checkbox inline">
+                    <input name="inclusive_end" type="checkbox" value="false"> Disable Inclusive End
+                  </label>
+                  <label class="span4 checkbox inline">
+                    <input name="update_seq" type="checkbox" value="true"> Include Update Sequence
+                  </label>
+                </div>
+                <div class="controls controls-row">
                   <button type="submit" class="btn btn-primary">Query</button>
                 </div>
               </form>
@@ -99,7 +113,25 @@ the License.
   </div>
 
 
+  <p>
+    Showing 1-<%= database.models.length %> of <%= database.totalRows() %> rows
+    <% if (database.updateSeq()) { %>
+      -- Update Sequence: <%= database.updateSeq() %>
+    <% } %>
+  </p>
   <table class="all-docs table table-striped table-condensed">
     <tbody></tbody>
   </table>
+  <div class="pagination pagination-centered">
+    <ul>
+      <li class="disabled"><a href="#">&laquo;</a></li>
+      <li class="active"><a href="#">1</a></li>
+      <li><a href="#">2</a></li>
+      <li><a href="#">3</a></li>
+      <li><a href="#">4</a></li>
+      <li><a href="#">5</a></li>
+      <li><a href="#">&raquo;</a></li>
+    </ul>
+  </div>
+
 </div>
