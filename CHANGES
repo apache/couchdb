@@ -12,6 +12,15 @@ Note that this version has not been released yet.
 Version 1.2.1
 -------------
 
+Security:
+
+ * Fixed CVE-2012-5641: Apache CouchDB Information disclosure via unescaped
+   backslashes in URLs on Windows
+ * Fixed CVE-2012-5649: Apache CouchDB JSONP arbitrary code execution with Adobe
+   Flash
+ * Fixed CVE-2012-5650: Apache CouchDB DOM based Cross-Site Scripting via Futon
+   UI
+
 HTTP Interface:
 
  * No longer rewrites the X-CouchDB-Requested-Path during recursive
