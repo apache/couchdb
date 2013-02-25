@@ -14,7 +14,7 @@
 
 -module(fabric_view_changes).
 
--export([go/5, pack_seqs/1]).
+-export([go/5, pack_seqs/1, unpack_seqs/2]).
 
 -include("fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
@@ -341,7 +341,8 @@ do_unpack_seqs(Opaque, DbName) ->
         false ->
             Ranges = lists:usort([R || #shard{range=R} <- Unpacked]),
             Filter = fun(S) -> not lists:member(S#shard.range, Ranges) end,
-            Unpacked ++ lists:filter(Filter, mem3:shards(DbName))
+            Replacements = lists:filter(Filter, mem3:shards(DbName)),
+            Unpacked ++ [{R, 0} || R <- Replacements]
     end.
 
 changes_row(#change{key=Seq, id=Id, value=Value, deleted=true, doc=Doc}, true) ->
