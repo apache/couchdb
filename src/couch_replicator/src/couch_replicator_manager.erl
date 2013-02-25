@@ -107,9 +107,9 @@ replication_error(#rep{id = {BaseId, _} = RepId}, Error) ->
 init(_) ->
     process_flag(trap_exit, true),
     net_kernel:monitor_nodes(true),
-    ?DOC_TO_REP = ets:new(?DOC_TO_REP, [named_table, set, protected]),
-    ?REP_TO_STATE = ets:new(?REP_TO_STATE, [named_table, set, protected]),
-    ?DB_TO_SEQ = ets:new(?DB_TO_SEQ, [named_table, set, protected]),
+    ?DOC_TO_REP = ets:new(?DOC_TO_REP, [named_table, set, public]),
+    ?REP_TO_STATE = ets:new(?REP_TO_STATE, [named_table, set, public]),
+    ?DB_TO_SEQ = ets:new(?DB_TO_SEQ, [named_table, set, public]),
     Server = self(),
     ok = couch_config:register(
         fun("replicator", "max_replication_retry_count", V) ->
@@ -253,7 +253,7 @@ changes_feed_loop(DbName, Since) ->
                 end,
                 {ok, Acc};
             ({stop, EndSeq}, Acc) ->
-                ok = gen_server:call(Server, {rep_db_checkpoint, DbName, EndSeq}),
+                ok = gen_server:call(Server, {rep_db_checkpoint, DbName, EndSeq}, infinity),
                 {ok, Acc};
             (_, Acc) ->
                 {ok, Acc}
@@ -285,14 +285,14 @@ db_update_notifier() ->
         fun({updated, DbName}) ->
             case IsReplicatorDbFun(DbName) of
             true ->
-                ok = gen_server:call(Server, {resume_scan, mem3:dbname(DbName)});
+                ok = gen_server:call(Server, {resume_scan, mem3:dbname(DbName)}, infinity);
             _ ->
                 ok
             end;
            ({deleted, DbName}) ->
             case IsReplicatorDbFun(DbName) of
             true ->
-                ets:delete(?DB_TO_SEQ,DbName);
+                clean_up_replications(mem3:dbname(DbName));
             _ ->
                 ok
             end;
@@ -513,6 +513,18 @@ stop_all_replications() ->
     true = ets:delete_all_objects(?REP_TO_STATE),
     true = ets:delete_all_objects(?DOC_TO_REP),
     true = ets:delete_all_objects(?DB_TO_SEQ).
+
+clean_up_replications(DbName) ->
+    ets:foldl(
+        fun({{Name, DocId}, RepId}, _) when Name =:= DbName ->
+            couch_replicator:cancel_replication(RepId),
+            ets:delete(?DOC_TO_REP,{Name, DocId}),
+            ets:delete(?REP_TO_STATE, RepId);
+           ({_,_}, _) ->
+            ok
+        end,
+        ok, ?DOC_TO_REP),
+    ets:delete(?DB_TO_SEQ,DbName).
 
 
 update_rep_doc(RepDbName, RepDocId, KVs) when is_binary(RepDocId) ->
