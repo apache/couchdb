@@ -159,9 +159,9 @@ module.exports = function(grunt) {
         src: 'assets/index.underscore',
         dest: 'dist/debug/index.html',
         variables: {
-          assets_root: '/fauxton/_design/fauxton/',
+          assets_root: './',
           requirejs: 'require.js',
-          base: '/fauxton/_design/fauxton/index.html'
+          base: null
         }
       }
     },
