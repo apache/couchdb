@@ -115,6 +115,9 @@ is_r_met(Workers, Replies, R) ->
 read_repair(#acc{dbname=DbName, replies=Replies}) ->
     Docs = [Doc || {_, {{ok, #doc{}=Doc}, _}} <- Replies],
     case Docs of
+    % omit local docs from read repair
+    [#doc{id = <<?LOCAL_DOC_PREFIX, _/binary>>} | _] ->
+        choose_reply(Docs);
     [#doc{id=Id} | _] ->
         Ctx = #user_ctx{roles=[<<"_admin">>]},
         Opts = [replicated_changes, {user_ctx, Ctx}],
