@@ -1,10 +1,17 @@
-var couchapp = require('couchapp'), 
+var couchapp = require('couchapp'),
     path = require('path'),
     ddoc;
 
 ddoc = {
   _id: '_design/fauxton',
-  rewrites: {},
+  rewrites: [
+    { "from": "_db" ,    "to"  : "../.." },
+    { "from": "_db/*" ,  "to"  : "../../*" },
+    { "from": "_ddoc" ,  "to"  : "" },
+    { "from": "_ddoc/*", "to"  : "*"},
+    {from: '/', to: 'index.html'},
+    {from: '/*', to: '*'}
+  ],
   views: {},
   shows: {},
   lists: {},
