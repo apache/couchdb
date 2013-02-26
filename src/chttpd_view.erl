@@ -21,7 +21,8 @@
 multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
     Group = couch_view_group:design_doc_to_view_group(DDoc),
     IsReduce = get_reduce_type(Req),
-    ViewType = extract_view_type(ViewName, Group#group.views, IsReduce),
+    ViewType = extract_view_type(ViewName, couch_view_group:get_views(Group),
+        IsReduce),
     % TODO proper calculation of etag
     % Etag = view_group_etag(ViewGroup, Db, Queries),
     Etag = couch_uuids:new(),
@@ -52,7 +53,8 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
 design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
     Group = couch_view_group:design_doc_to_view_group(DDoc),
     IsReduce = get_reduce_type(Req),
-    ViewType = extract_view_type(ViewName, Group#group.views, IsReduce),
+    ViewType = extract_view_type(ViewName, couch_view_group:get_views(Group),
+        IsReduce),
     QueryArgs = parse_view_params(Req, Keys, ViewType),
     % TODO proper calculation of etag
     % Etag = view_group_etag(ViewGroup, Db, Keys),
@@ -367,8 +369,9 @@ validate_view_query(extra, _Value, Args) ->
 view_group_etag(Group, Db) ->
     view_group_etag(Group, Db, nil).
 
-view_group_etag(#group{sig=Sig,current_seq=CurrentSeq}, _Db, Extra) ->
-    % ?LOG_ERROR("Group ~p",[Group]),
+view_group_etag(Group, _Db, Extra) ->
+    Sig = couch_view_group:get_signature(Group),
+    CurrentSeq = couch_view_group:get_current_seq(Group),
     % This is not as granular as it could be.
     % If there are updates to the db that do not effect the view index,
     % they will change the Etag. For more granular Etags we'd need to keep
