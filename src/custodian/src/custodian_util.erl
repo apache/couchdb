@@ -98,7 +98,8 @@ ensure_custodian_ddoc_exists(Db) ->
             {ok, _} ->
                 ok
             catch conflict ->
-                ensure_custodian_ddoc_exists(Db)
+                {ok, NewDb} = couch_db:reopen(Db),
+                ensure_custodian_ddoc_exists(NewDb)
             end;
         {ok, Doc} ->
             {Props} = couch_doc:to_json_obj(Doc, []),
@@ -111,7 +112,8 @@ ensure_custodian_ddoc_exists(Db) ->
                     {ok, _} ->
                         ok
                     catch conflict ->
-                        ensure_custodian_ddoc_exists(Db)
+                        {ok, NewDb} = couch_db:reopen(Db),
+                        ensure_custodian_ddoc_exists(NewDb)
                     end
             end
     end.
