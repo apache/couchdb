@@ -70,7 +70,13 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
         _.each(settings.views, function(view, selector) {
           masterLayout.setView(selector, view);
 
-          $.when.apply(null, view.establish()).done(function(resp) {
+          $.when.apply(null, view.establish()).then(function(resp) {
+            masterLayout.renderView(selector);
+          }, function(resp) {
+            view.establishError = {
+              error: true,
+              reason: resp
+            };
             masterLayout.renderView(selector);
           });
 
