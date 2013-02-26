@@ -137,6 +137,9 @@ map_view(DbName, DDoc, ViewName, QueryArgs) ->
     end,
     final_response(Total, Acc#view_acc.offset).
 
+reduce_view(DbName, #doc{} = DDoc, ViewName, QueryArgs) ->
+    Group = couch_view_group:design_doc_to_view_group(DDoc),
+    reduce_view(DbName, Group, ViewName, QueryArgs);
 reduce_view(DbName, Group0, ViewName, QueryArgs) ->
     erlang:put(io_priority, {interactive, DbName}),
     {ok, Db} = get_or_create_db(DbName, []),
