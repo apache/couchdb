@@ -121,7 +121,7 @@ init(_) ->
         db_notifier = db_update_notifier(),
         scan_pid = ScanPid,
         max_retries = retries_value(
-            couch_config:get("replicator", "max_replication_retry_count", "10"))
+            config:get("replicator", "max_replication_retry_count", "10"))
     }}.
 
 
@@ -669,7 +669,7 @@ state_after_error(#rep_state{retries_left = Left, wait = Wait} = State) ->
 
 scan_all_dbs(Server) when is_pid(Server) ->
     {ok, Db} = mem3_util:ensure_exists(
-        couch_config:get("mem3", "shard_db", "dbs")),
+        config:get("mem3", "shard_db", "dbs")),
     ChangesFun = couch_changes:handle_changes(#changes_args{}, nil, Db),
     IsReplicatorDbFun = is_replicator_db_fun(),
     ChangesFun(fun({change, {Change}, _}, _) ->
