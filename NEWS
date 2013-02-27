@@ -148,6 +148,21 @@ This release contains backwards incompatible changes.
    to lack of permissions.
  * Added a "change password"-feature to Futon.
 
+Version 1.0.4
+-------------
+
+ * Fixed CVE-2012-5641: Apache CouchDB Information disclosure via unescaped
+   backslashes in URLs on Windows
+ * Fixed CVE-2012-5649: Apache CouchDB JSONP arbitrary code execution with Adobe
+   Flash
+ * Fixed CVE-2012-5650: Apache CouchDB DOM based Cross-Site Scripting via Futon
+   UI
+ * Fix file descriptor leak in _log.
+ * Fix missing revisions in _changes?style=all_docs.
+ * Fix validation of attachment names.
+ * Avoid invalidating view indexes when running out of file descriptors.
+ * Fix a race condition where replications can go stale
+
 Version 1.0.3
 -------------
 
