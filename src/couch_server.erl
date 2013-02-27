@@ -196,7 +196,7 @@ config_change("couchdb", "database_dir", _, _) ->
 config_change("couchdb", "max_dbs_open", Max, _) ->
     gen_server:call(couch_server, {set_max_dbs_open, list_to_integer(Max)});
 config_change("admins", _, _, Persist) ->
-    % spawn here so couch_config doesn't try to call itself
+    % spawn here so couch event manager doesn't deadlock
     spawn(fun() -> hash_admin_passwords(Persist) end).
 
 all_databases() ->
