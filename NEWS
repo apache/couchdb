@@ -74,6 +74,26 @@ This release contains backwards incompatible changes.
  * Log correct stacktrace in all cases.
  * Improvements to log messages for file-related errors.
 
+Version 1.1.2
+-------------
+
+* Fixed CVE-2012-5641: Apache CouchDB Information disclosure via unescaped
+   backslashes in URLs on Windows
+* Fixed CVE-2012-5649: Apache CouchDB JSONP arbitrary code execution with Adobe
+   Flash
+* Fixed CVE-2012-5650: Apache CouchDB DOM based Cross-Site Scripting via Futon
+   UI
+* ETag of attachment changes only when the attachment changes, not
+ the document.
+* Fix pull replication of documents with many revisions.
+* Fix replication with an HTTP source and target
+* Avoid invalidating view indexes when running out of file descriptors.
+* Improvements to log messages for file-related errors.
+* Fix retrieval of headers larger than 4k.
+* Allow OPTIONS HTTP method for list requests.
+* Don't attempt to encode invalid json.
+* Improve SpiderMonkey version detection.
+
 Version 1.1.1
 -------------
 
