@@ -47,7 +47,7 @@ Futon:
 Security:
 
  * Passwords are now hashed using the PBKDF2 algorithm with a
-    configurable work factor.
+   configurable work factor.
 
 Test Suite:
 
