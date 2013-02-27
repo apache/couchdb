@@ -158,8 +158,8 @@ Version 1.0.4
 
  * Fixed CVE-2012-5641: Apache CouchDB Information disclosure via unescaped
    backslashes in URLs on Windows
- * Fixed CVE-2012-5649: Apache CouchDB JSONP arbitrary code execution with Adobe
-   Flash
+ * Fixed CVE-2012-5649: Apache CouchDB JSONP arbitrary code execution with
+   Adobe Flash
  * Fixed CVE-2012-5650: Apache CouchDB DOM based Cross-Site Scripting via Futon
    UI
  * Fix file descriptor leak in _log.
