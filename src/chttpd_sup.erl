@@ -16,10 +16,14 @@
 
 -export([start_link/1]).
 
+%% Helper macro for declaring children of supervisor
+-define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 100, Type, [I]}).
+
 start_link(Args) ->
     supervisor:start_link({local,?MODULE}, ?MODULE, Args).
 
 init([]) ->
-    Mod = chttpd,
-    Spec = {Mod, {Mod,start_link,[]}, permanent, 100, worker, [Mod]},
-    {ok, {{one_for_one, 3, 10}, [Spec]}}.
+    {ok, {{one_for_one, 3, 10}, [
+        ?CHILD(chttpd, worker),
+        ?CHILD(chttpd_config_listener, worker)
+    ]}}.

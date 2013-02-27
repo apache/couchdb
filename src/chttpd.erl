@@ -12,10 +12,9 @@
 
 -module(chttpd).
 -include_lib("couch/include/couch_db.hrl").
--behaviour(config_listener).
 
 -export([start_link/0, start_link/1, start_link/2,
-    stop/0, handle_request/1, handle_config_change/5,
+    stop/0, handle_request/1,
     primary_header_value/2, header_value/2, header_value/3, qs_value/2,
     qs_value/3, qs/1, qs_json_value/3, path/1, absolute_uri/2, body_length/1,
     verify_is_server_admin/1, unquote/1, quote/1, recv/2, recv_chunked/4,
@@ -115,21 +114,11 @@ start_link(Name, Options) ->
     Options2 = lists:keymerge(1, lists:sort(Options1), lists:sort(ServerOpts)),
     case mochiweb_http:start(Options2) of
     {ok, Pid} ->
-        ok = config:listen_for_changes(?MODULE, nil),
         {ok, Pid};
     {error, Reason} ->
         io:format("Failure to start Mochiweb: ~s~n", [Reason]),
         {error, Reason}
     end.
-
-handle_config_change("chttpd", "bind_address", _, _, _) ->
-    ?MODULE:stop();
-handle_config_change("chttpd", "port", _, _, _) ->
-    ?MODULE:stop();
-handle_config_change("chttpd", "backlog", _, _, _) ->
-    ?MODULE:stop();
-handle_config_change("chttpd", "server_options", _, _, _) ->
-    ?MODULE:stop().
 
 stop() ->
     catch mochiweb_http:stop(https),
