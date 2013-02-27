@@ -28,7 +28,7 @@ report() ->
     fold_dbs([], Fun).
 
 ensure_dbs_exists() ->
-    DbName = couch_config:get("mem3", "shards_db", "dbs"),
+    DbName = config:get("mem3", "shards_db", "dbs"),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     ensure_custodian_ddoc_exists(Db),
     {ok, Db}.
@@ -37,7 +37,7 @@ ensure_dbs_exists() ->
 
 fold_dbs(Acc0, Fun) ->
     Live = [node() | nodes()],
-    N = list_to_integer(couch_config:get("cluster", "n", "3")),
+    N = list_to_integer(config:get("cluster", "n", "3")),
     {ok, Db} = ensure_dbs_exists(),
     try
         {ok, _, {_, _, _, _, Acc1}} = couch_db:enum_docs(Db, fun fold_dbs/3, {Live, N, Fun, Db, Acc0}, []),
@@ -84,7 +84,7 @@ maybe_redirect(Nodes) ->
 maybe_redirect([], Acc) ->
     Acc;
 maybe_redirect([Node|Rest], Acc) ->
-    case couch_config:get("mem3.redirects", atom_to_list(Node)) of
+    case config:get("mem3.redirects", atom_to_list(Node)) of
         undefined ->
             maybe_redirect(Rest, [Node|Acc]);
         Redirect ->
