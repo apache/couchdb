@@ -467,6 +467,10 @@ View Server:
 Version 1.0.1
 -------------
 
+Security:
+
+ * Fixed CVE-2010-2234: Apache CouchDB Cross Site Request Forgery Attack
+
 Storage System:
 
  * Fix data corruption bug COUCHDB-844. Please see
