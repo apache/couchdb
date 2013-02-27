@@ -70,9 +70,9 @@ This release contains backwards incompatible changes.
  * Fixed incorrect reduce query results when using pagination parameters.
  * Made icu_driver work with Erlang R15B and later.
  * Improvements to the build system and etap test suite.
+ * Improvements to log messages for file-related errors.
  * Avoid invalidating view indexes when running out of file descriptors.
  * Log correct stacktrace in all cases.
- * Improvements to log messages for file-related errors.
 
 Version 1.1.2
 -------------
