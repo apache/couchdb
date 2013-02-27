@@ -187,7 +187,7 @@ unstrip_not_found_missing([Else | Rest]) ->
     [Else | unstrip_not_found_missing(Rest)].
 
 all_revs_test() ->
-    couch_config:start_link([]),
+    config:start_link([]),
     meck:new(fabric),
     meck:expect(fabric, dbname, fun(Name) -> Name end),
     meck:expect(fabric, update_docs, fun(_, _, _) -> {ok, nil} end),
@@ -235,10 +235,10 @@ all_revs_test() ->
         handle_message({ok, [Bar1]}, nil, State2)
       ),
     meck:unload(fabric),
-    couch_config:stop().
+    config:stop().
 
 specific_revs_test() ->
-    couch_config:start_link([]),
+    config:start_link([]),
     meck:new(fabric),
     meck:expect(fabric, dbname, fun(Name) -> Name end),
     meck:expect(fabric, update_docs, fun(_, _, _) -> {ok, nil} end),
@@ -304,4 +304,4 @@ specific_revs_test() ->
         handle_message({ok, [Foo2, Bar1, Baz2]}, nil, State2L)
       ),
     meck:unload(fabric),
-    couch_config:stop().
+    config:stop().

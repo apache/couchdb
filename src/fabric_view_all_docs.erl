@@ -153,7 +153,7 @@ merge_row(rev, Row, Rows) ->
     lists:rkeymerge(#view_row.id, [Row], Rows).
 
 all_docs_concurrency() ->
-    Value = couch_config:get("fabric", "all_docs_concurrency", "10"),
+    Value = config:get("fabric", "all_docs_concurrency", "10"),
     try
         list_to_integer(Value)
     catch _:_ ->

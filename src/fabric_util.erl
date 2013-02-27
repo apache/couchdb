@@ -50,7 +50,7 @@ recv(Workers, Keypos, Fun, Acc0) ->
     rexi_utils:recv(Workers, Keypos, Fun, Acc0, request_timeout(), infinity).
 
 request_timeout() ->
-    case couch_config:get("fabric", "request_timeout", "60000") of
+    case config:get("fabric", "request_timeout", "60000") of
         "infinity" -> infinity;
         N -> list_to_integer(N)
     end.
