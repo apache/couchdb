@@ -65,7 +65,7 @@ remove_node(Node) ->
 
 init([]) ->
     process_flag(trap_exit, true),
-    Concurrency = couch_config:get("mem3", "sync_concurrency", "10"),
+    Concurrency = config:get("mem3", "sync_concurrency", "10"),
     gen_event:add_handler(mem3_events, mem3_sync_event, []),
     {ok, Pid} = start_update_notifier(),
     initial_sync(),
@@ -328,16 +328,16 @@ local_dbs() ->
     [nodes_db(), shards_db(), users_db()].
 
 nodes_db() ->
-    ?l2b(couch_config:get("mem3", "node_db", "nodes")).
+    ?l2b(config:get("mem3", "node_db", "nodes")).
 
 shards_db() ->
-    ?l2b(couch_config:get("mem3", "shard_db", "dbs")).
+    ?l2b(config:get("mem3", "shard_db", "dbs")).
 
 users_db() ->
-    ?l2b(couch_config:get("couch_httpd_auth", "authentication_db", "_users")).
+    ?l2b(config:get("couch_httpd_auth", "authentication_db", "_users")).
 
 maybe_redirect(Node) ->
-    case couch_config:get("mem3.redirects", atom_to_list(Node)) of
+    case config:get("mem3.redirects", atom_to_list(Node)) of
         undefined ->
             Node;
         Redirect ->

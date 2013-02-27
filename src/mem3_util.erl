@@ -69,12 +69,12 @@ attach_nodes([S | Rest], Acc, [Node | Nodes], UsedNodes) ->
     attach_nodes(Rest, [S#shard{node=Node} | Acc], Nodes, [Node | UsedNodes]).
 
 open_db_doc(DocId) ->
-    DbName = ?l2b(couch_config:get("mem3", "shard_db", "dbs")),
+    DbName = ?l2b(config:get("mem3", "shard_db", "dbs")),
     {ok, Db} = couch_db:open(DbName, []),
     try couch_db:open_doc(Db, DocId, []) after couch_db:close(Db) end.
 
 write_db_doc(Doc) ->
-    DbName = ?l2b(couch_config:get("mem3", "shard_db", "dbs")),
+    DbName = ?l2b(config:get("mem3", "shard_db", "dbs")),
     write_db_doc(DbName, Doc, true).
 
 write_db_doc(DbName, #doc{id=Id, body=Body} = Doc, ShouldMutate) ->
@@ -100,7 +100,7 @@ write_db_doc(DbName, #doc{id=Id, body=Body} = Doc, ShouldMutate) ->
 
 delete_db_doc(DocId) ->
     gen_server:cast(mem3_shards, {cache_remove, DocId}),
-    DbName = ?l2b(couch_config:get("mem3", "shard_db", "dbs")),
+    DbName = ?l2b(config:get("mem3", "shard_db", "dbs")),
     delete_db_doc(DbName, DocId, true).
 
 delete_db_doc(DbName, DocId, ShouldMutate) ->
@@ -153,7 +153,7 @@ to_integer(N) when is_list(N) ->
     list_to_integer(N).
 
 n_val(undefined, NodeCount) ->
-    n_val(couch_config:get("cluster", "n", "3"), NodeCount);
+    n_val(config:get("cluster", "n", "3"), NodeCount);
 n_val(N, NodeCount) when is_list(N) ->
     n_val(list_to_integer(N), NodeCount);
 n_val(N, NodeCount) when is_integer(NodeCount), N > NodeCount ->

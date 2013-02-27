@@ -79,7 +79,7 @@ shards(DbName) when is_list(DbName) ->
     shards(list_to_binary(DbName));
 shards(DbName) ->
     ShardDbName =
-        list_to_binary(couch_config:get("mem3", "shard_db", "dbs")),
+        list_to_binary(config:get("mem3", "shard_db", "dbs")),
     case DbName of
     ShardDbName ->
         %% shard_db is treated as a single sharded db to support calls to db_info
@@ -157,7 +157,7 @@ choose_shards(DbName, Nodes, Options) ->
        true -> ok
     end,
     Q = mem3_util:to_integer(couch_util:get_value(q, Options,
-        couch_config:get("cluster", "q", "8"))),
+        config:get("cluster", "q", "8"))),
     %% rotate to a random entry in the nodelist for even distribution
     {A, B} = lists:split(crypto:rand_uniform(1,length(Nodes)+1), Nodes),
     RotatedNodes = B ++ A,
@@ -166,7 +166,7 @@ choose_shards(DbName, Nodes, Options) ->
 get_placement(Options) ->
     case couch_util:get_value(placement, Options) of
         undefined ->
-            case couch_config:get("cluster", "placement") of
+            case config:get("cluster", "placement") of
                 undefined ->
                     undefined;
                 PlacementStr ->

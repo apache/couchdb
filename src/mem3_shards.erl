@@ -14,13 +14,15 @@
 
 -module(mem3_shards).
 -behaviour(gen_server).
+-behaviour(config_listener).
 
 -export([init/1, terminate/2, code_change/3]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
+-export([handle_config_change/5]).
 
 -export([start_link/0]).
 -export([for_db/1, for_docid/2, get/3, local/1, fold/2]).
--export([set_max_size/1, config_change/3]).
+-export([set_max_size/1]).
 
 -record(st, {
     max_size = 25000,
@@ -87,7 +89,7 @@ local(DbName) ->
     lists:filter(Pred, for_db(DbName)).
 
 fold(Fun, Acc) ->
-    DbName = couch_config:get("mem3", "shards_db", "dbs"),
+    DbName = config:get("mem3", "shards_db", "dbs"),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     FAcc = {Db, Fun, Acc},
     try
@@ -101,18 +103,18 @@ fold(Fun, Acc) ->
 set_max_size(Size) when is_integer(Size), Size > 0 ->
     gen_server:call(?MODULE, {set_max_size, Size}).
 
-config_change("mem3", "shard_cache_size", SizeList) ->
+handle_config_change("mem3", "shard_cache_size", SizeList, _, _) ->
     Size = list_to_integer(SizeList),
-    ok = gen_server:call(?MODULE, {set_max_size, Size}, infinity);
-config_change("mem3", "shard_db", _DbName) ->
-    ok = gen_server:call(?MODULE, shard_db_changed, infinity).
+    {ok, gen_server:call(?MODULE, {set_max_size, Size}, infinity)};
+handle_config_change("mem3", "shard_db", _DbName, _, _) ->
+    {ok, gen_server:call(?MODULE, shard_db_changed, infinity)}.
 
 init([]) ->
     ets:new(?SHARDS, [bag, protected, named_table, {keypos,#shard.dbname}]),
     ets:new(?DBS, [set, protected, named_table]),
     ets:new(?ATIMES, [ordered_set, protected, named_table]),
-    ok = couch_config:register(fun ?MODULE:config_change/3),
-    SizeList = couch_config:get("mem3", "shard_cache_size", "25000"),
+    ok = config:listen_for_changes(?MODULE, nil),
+    SizeList = config:get("mem3", "shard_cache_size", "25000"),
     {Pid, _} = spawn_monitor(fun() -> listen_for_changes(get_update_seq()) end),
     {ok, #st{
         max_size = list_to_integer(SizeList),
@@ -156,6 +158,12 @@ handle_info({'DOWN', _, _, Pid, Reason}, #st{changes_pid=Pid}=St) ->
 handle_info({start_listener, Seq}, St) ->
     {NewPid, _} = spawn_monitor(fun() -> listen_for_changes(Seq) end),
     {noreply, St#st{changes_pid=NewPid}};
+handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
+    erlang:send_after(5000, self(), restart_config_listener),
+    {noreply, State};
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {noreply, State};
 handle_info(_Msg, St) ->
     {noreply, St}.
 
@@ -183,13 +191,13 @@ fold_fun(#doc_info{}=DI, _, {Db, UFun, UAcc}) ->
     end.
 
 get_update_seq() ->
-    DbName = couch_config:get("mem3", "shards_db", "dbs"),
+    DbName = config:get("mem3", "shards_db", "dbs"),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     couch_db:close(Db),
     Db#db.update_seq.
 
 listen_for_changes(Since) ->
-    DbName = couch_config:get("mem3", "shards_db", "dbs"),
+    DbName = config:get("mem3", "shards_db", "dbs"),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     Args = #changes_args{
         feed = "continuous",
@@ -228,7 +236,7 @@ changes_callback(timeout, _) ->
     ok.
 
 load_shards_from_disk(DbName) when is_binary(DbName) ->
-    X = ?l2b(couch_config:get("mem3", "shard_db", "dbs")),
+    X = ?l2b(config:get("mem3", "shard_db", "dbs")),
     {ok, Db} = mem3_util:ensure_exists(X),
     try
         load_shards_from_db(Db, DbName)
@@ -252,7 +260,7 @@ load_shards_from_disk(DbName, DocId)->
     [S || #shard{range = [B,E]} = S <- Shards, B =< HashKey, HashKey =< E].
 
 create_if_missing(Name) ->
-    DbDir = couch_config:get("couchdb", "database_dir"),
+    DbDir = config:get("couchdb", "database_dir"),
     Filename = filename:join(DbDir, ?b2l(Name) ++ ".couch"),
     case filelib:is_regular(Filename) of
     true ->
