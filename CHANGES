@@ -780,7 +780,7 @@ Replication:
 Version 0.9.0
 -------------
 
-Futon Utility Client:
+Futon:
 
  * Added pagination to the database listing page.
  * Implemented attachment uploading from the document page.
