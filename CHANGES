@@ -469,6 +469,11 @@ View Server:
 Version 0.11.2
 --------------
 
+Security:
+
+ * Fixed CVE-2010-2234: Apache CouchDB Cross Site Request Forgery Attack
+ * Avoid potential DOS attack by guarding all creation of atoms.
+
 Replicator:
 
  * Fix bug when pushing design docs by non-admins, which was hanging the
@@ -483,10 +488,6 @@ HTTP Interface:
 Authentication:
 
  * User documents can now be deleted by admins or the user.
-
-Security:
-
- * Avoid potential DOS attack by guarding all creation of atoms.
 
 Futon:
 
@@ -665,6 +666,21 @@ Build and System Integration:
    updates to the build system to properly support VPATH builds.
  * Gavin McDonald setup a build-bot instance. More info can be found at
    http://ci.apache.org/buildbot.html
+
+Version 0.10.2
+--------------
+
+Security:
+
+ * Fixed CVE-2010-0009: Apache CouchDB Timing Attack Vulnerability
+
+Replicator:
+
+ * Avoid leaking file descriptors on automatic replication restarts.
+
+Build and System Integration:
+
+ * Fixed distribution preparation for building on Mac OS X.
 
 Version 0.10.1
 --------------
