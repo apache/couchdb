@@ -311,6 +311,7 @@ This version is a feature-freeze release candidate for Apache CouchDB 1.0.
  * Avoid leaking file descriptors on automatic replication restarts.
  * Various improvements to the Futon UI.
  * Provide Content-MD5 header support for attachments.
+ * Adds configurable compression of attachments.
  * Added default cookie-authentication and users db.
  * Added per-db reader access control lists.
  * Added per-db security object for configuration data in validation functions.
@@ -340,7 +341,7 @@ Version 0.10.1
 Version 0.10.0
 --------------
 
-This release contains backwards incompatible changes
+This release contains backwards incompatible changes.
 
  * General performance improvements.
  * View index generation speedups.
