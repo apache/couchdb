@@ -177,7 +177,7 @@ Version 1.0.3
  * Fixed OAuth signature computation in OTP R14B02.
  * Handle passwords with : in them.
  * Made compatible with jQuery 1.5.x.
- * Added support for inclusive_end wiht reduce views.
+ * Added support for inclusive_end with reduce views.
  * Etap tests no longer require use of port 5984.
  * Windows builds now require ICU >= 4.4.0 and Erlang >= R14B03.
 
@@ -206,14 +206,14 @@ Version 1.0.2
 Version 1.0.1
 -------------
 
-  * Fix data corruption bug COUCHDB-844. Please see
-    http://couchdb.apache.org/notice/1.0.1.html for details.
-  * Added support for replication via an HTTP/HTTPS proxy.
-  * Fixed various replicator bugs for interop with older CouchDB versions.
-  * Show fields saved along with _deleted=true. Allows for auditing of deletes.
-  * Enable basic-auth popup when required to access the server, to prevent
-    people from getting locked out.
-  * User interface element for querying stale (cached) views.
+ * Fix data corruption bug COUCHDB-844. Please see
+   http://couchdb.apache.org/notice/1.0.1.html for details.
+ * Added support for replication via an HTTP/HTTPS proxy.
+ * Fixed various replicator bugs for interop with older CouchDB versions.
+ * Show fields saved along with _deleted=true. Allows for auditing of deletes.
+ * Enable basic-auth popup when required to access the server, to prevent
+   people from getting locked out.
+ * User interface element for querying stale (cached) views.
 
 Version 1.0.0
 -------------
@@ -229,12 +229,12 @@ Version 1.0.0
 Version 0.11.2
 --------------
 
-  * Replicator buxfixes for replicating design documents from secured databases.
-  * Better error messages on invalid URL requests.
-  * User documents can now be deleted by admins or the user.
-  * Avoid potential DOS attack by guarding all creation of atoms.
-  * Some Futon and JavaScript library bugfixes.
-  * Fixed CVE-2010-2234: Apache CouchDB Cross Site Request Forgery Attack
+ * Replicator buxfixes for replicating design documents from secured databases.
+ * Better error messages on invalid URL requests.
+ * User documents can now be deleted by admins or the user.
+ * Avoid potential DOS attack by guarding all creation of atoms.
+ * Some Futon and JavaScript library bugfixes.
+ * Fixed CVE-2010-2234: Apache CouchDB Cross Site Request Forgery Attack
 
 Version 0.11.1
 --------------
