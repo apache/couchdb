@@ -354,7 +354,7 @@ cleanup_index_files(DbName) ->
         binary_to_list(couch_util:get_value(signature, Info))
     end, [couch_doc:from_json_obj(DD) || DD <- DesignDocs]),
 
-    FileList = filelib:wildcard([couch_config:get("couchdb", "view_index_dir"),
+    FileList = filelib:wildcard([config:get("couchdb", "view_index_dir"),
         "/.shards/*/", couch_util:to_list(dbname(DbName)), ".[0-9]*_design/*"]),
 
     DeleteFiles = if ActiveSigs =:= [] -> FileList; true ->

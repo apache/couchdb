@@ -102,12 +102,12 @@ middleman(Req, chunked) ->
     Receiver = spawn(fun() -> couch_httpd:recv_chunked(Req,4096,RcvFun,ok) end),
 
     % take requests from the DB writers and get data from the receiver
-    N = erlang:list_to_integer(couch_config:get("cluster","n")),
+    N = erlang:list_to_integer(config:get("cluster","n")),
     middleman_loop(Receiver, N, [], []);
 
 middleman(Req, Length) ->
     Receiver = spawn(fun() -> receive_unchunked_attachment(Req, Length) end),
-    N = erlang:list_to_integer(couch_config:get("cluster","n")),
+    N = erlang:list_to_integer(config:get("cluster","n")),
     middleman_loop(Receiver, N, [], []).
 
 middleman_loop(Receiver, N, Counters0, ChunkList0) ->
