@@ -46,24 +46,24 @@ Futon:
 
 Security:
 
-  * Passwords are now hashed using the PBKDF2 algorithm with a
+ * Passwords are now hashed using the PBKDF2 algorithm with a
     configurable work factor.
 
 Test Suite:
 
-  * Moved the JS test suite to the CLI
-  * Improved tracebacks printed by the JS CLI tests
-  * Improved the reliability of a number of tests
+ * Moved the JS test suite to the CLI
+ * Improved tracebacks printed by the JS CLI tests
+ * Improved the reliability of a number of tests
 
 UUID Algorithms:
 
-  * Added the utc_id algorithm.
+ * Added the utc_id algorithm.
 
 URL Rewriter & Vhosts:
 
-  * Database name is encoded during rewriting (allowing embedded /'s, etc)
-  * Reset rewrite counter on new request, avoiding unnecessary request
-    failures due to bogus rewrite limit reports
+ * Database name is encoded during rewriting (allowing embedded /'s, etc)
+ * Reset rewrite counter on new request, avoiding unnecessary request
+   failures due to bogus rewrite limit reports
 
 Version 1.2.1
 -------------
@@ -202,8 +202,8 @@ Futon:
 
 Log System:
 
-  * Log correct stacktrace in all cases.
-  * Improvements to log messages for file-related errors.
+ * Log correct stacktrace in all cases.
+ * Improvements to log messages for file-related errors.
 
 Version 1.1.2
 -------------
@@ -467,33 +467,33 @@ Version 1.0.1
 
 Storage System:
 
-  * Fix data corruption bug COUCHDB-844. Please see
-    http://couchdb.apache.org/notice/1.0.1.html for details.
+ * Fix data corruption bug COUCHDB-844. Please see
+   http://couchdb.apache.org/notice/1.0.1.html for details.
 
 Replicator:
 
-  * Added support for replication via an HTTP/HTTPS proxy.
-  * Fix pull replication of attachments from 0.11 to 1.0.x.
-  * Make the _changes feed work with non-integer seqnums.
+ * Added support for replication via an HTTP/HTTPS proxy.
+ * Fix pull replication of attachments from 0.11 to 1.0.x.
+ * Make the _changes feed work with non-integer seqnums.
 
 HTTP Interface:
 
-  * Expose `committed_update_seq` for monitoring purposes.
-  * Show fields saved along with _deleted=true. Allows for auditing of deletes.
-  * More robust Accept-header detection.
+ * Expose `committed_update_seq` for monitoring purposes.
+ * Show fields saved along with _deleted=true. Allows for auditing of deletes.
+ * More robust Accept-header detection.
 
 Authentication:
 
-  * Enable basic-auth popup when required to access the server, to prevent
-    people from getting locked out.
+ * Enable basic-auth popup when required to access the server, to prevent
+   people from getting locked out.
 
 Futon:
 
-  * User interface element for querying stale (cached) views.
+ * User interface element for querying stale (cached) views.
 
 Build and System Integration:
 
-  * Included additional source files for distribution.
+ * Included additional source files for distribution.
 
 Version 1.0.0
 -------------
@@ -521,26 +521,26 @@ Version 0.11.2
 
 Replicator:
 
-  * Fix bug when pushing design docs by non-admins, which was hanging the
-    replicator for no good reason.
-  * Fix bug when pulling design documents from a source that requires
-    basic-auth.
+ * Fix bug when pushing design docs by non-admins, which was hanging the
+   replicator for no good reason.
+ * Fix bug when pulling design documents from a source that requires
+   basic-auth.
 
 HTTP Interface:
 
-  * Better error messages on invalid URL requests.
+ * Better error messages on invalid URL requests.
 
 Authentication:
 
-  * User documents can now be deleted by admins or the user.
+ * User documents can now be deleted by admins or the user.
 
 Security:
 
-  * Avoid potential DOS attack by guarding all creation of atoms.
+ * Avoid potential DOS attack by guarding all creation of atoms.
 
 Futon:
 
-  * Add some Futon files that were missing from the Makefile.
+ * Add some Futon files that were missing from the Makefile.
 
 Version 0.11.1
 --------------
@@ -821,7 +821,7 @@ Replication:
 Version 0.9.0
 -------------
 
-Futon Utility Client:
+Futon:
 
  * Added pagination to the database listing page.
  * Implemented attachment uploading from the document page.
