@@ -4,6 +4,7 @@
 
 %% Public interface
 -export([start/2]).
+-export([start/3]).
 
 -export([behaviour_info/1]).
 
@@ -17,7 +18,10 @@ behaviour_info(_) ->
     undefined.
 
 start(Module, State) ->
-    gen_event:add_sup_handler(config_event, {?MODULE, Module}, {Module, State}).
+    start(Module, Module, State).
+
+start(Module, Id, State) ->
+    gen_event:add_sup_handler(config_event, {?MODULE, Id}, {Module, State}).
 
 init({Module, State}) ->
     {ok, {Module, State}}.
