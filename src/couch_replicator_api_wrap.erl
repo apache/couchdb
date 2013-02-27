@@ -321,9 +321,8 @@ update_docs(Db, DocList, Options, UpdateType) ->
     {ok, bulk_results_to_errors(DocList, Result, UpdateType)}.
 
 
-changes_since(#httpdb{headers = Headers1} = HttpDb, Style, StartSeq,
-    UserFun, Options) ->
-    HeartBeat = erlang:max(1000, HttpDb#httpdb.timeout div 3),
+changes_since(#httpdb{headers = Headers1, timeout = Timeout} = HttpDb,
+              Style, StartSeq, UserFun, Options) ->
     BaseQArgs = case get_value(continuous, Options, false) of
     false ->
         [{"feed", "normal"}];
@@ -331,8 +330,8 @@ changes_since(#httpdb{headers = Headers1} = HttpDb, Style, StartSeq,
         [{"feed", "continuous"}]
     end ++ [
         {"style", atom_to_list(Style)}, {"since", ?JSON_ENCODE(StartSeq)},
-        {"heartbeat", integer_to_list(HeartBeat)}
-    ],
+        {"timeout", integer_to_list(Timeout)}
+           ],
     DocIds = get_value(doc_ids, Options),
     {QArgs, Method, Body, Headers} = case DocIds of
     undefined ->
