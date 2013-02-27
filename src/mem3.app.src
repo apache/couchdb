@@ -10,5 +10,5 @@
         mem3_sync_nodes,
         mem3_sup
     ]},
-    {applications, [kernel, stdlib, sasl, crypto, mochiweb, couch, rexi, twig]}
+    {applications, [kernel, stdlib, config, sasl, crypto, mochiweb, couch, rexi, twig]}
 ]}.

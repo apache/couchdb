@@ -130,11 +130,11 @@ nval_test() ->
 
 config_01_setup() ->
     Ini = filename:join([code:lib_dir(mem3, test), "01-config-default.ini"]),
-    {ok, Pid} = couch_config:start_link([Ini]),
+    {ok, Pid} = config:start_link([Ini]),
     Pid.
 
 config_teardown(_Pid) ->
-    couch_config:stop().
+    config:stop().
 
 n_val_test_() ->
     {"n_val tests",

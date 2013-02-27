@@ -95,7 +95,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% internal functions
 
 initialize_nodelist() ->
-    DbName = couch_config:get("mem3", "node_db", "nodes"),
+    DbName = config:get("mem3", "node_db", "nodes"),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     {ok, _, Db} = couch_btree:fold(Db#db.id_tree, fun first_fold/3, Db, []),
     % add self if not already present
@@ -120,7 +120,7 @@ first_fold(#full_doc_info{id=Id}=DocInfo, _, Db) ->
     {ok, Db}.
 
 listen_for_changes(Since) ->
-    DbName = couch_config:get("mem3", "node_db", "nodes"),
+    DbName = config:get("mem3", "node_db", "nodes"),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     Args = #changes_args{
         feed = "continuous",
