@@ -8,6 +8,7 @@
   {applications, [
                   kernel,
                   stdlib,
+                  config,
                   couch,
                   twig,
                   mem3
