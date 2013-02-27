@@ -228,6 +228,7 @@ Version 1.0.2
 Version 1.0.1
 -------------
 
+ * Fixed CVE-2010-2234: Apache CouchDB Cross Site Request Forgery Attack
  * Fix data corruption bug COUCHDB-844. Please see
    http://couchdb.apache.org/notice/1.0.1.html for details.
  * Added support for replication via an HTTP/HTTPS proxy.
