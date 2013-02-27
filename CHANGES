@@ -1,15 +1,14 @@
 Apache CouchDB CHANGES
 ======================
 
-Version 1.4.0
--------------
-
-This version has not been released yet.
-
-Test Suite:
-
- * Split up replicator_db tests into multiple independent tests.
-
+# Version 1.4.0
+# -------------
+#
+# This version has not been released yet.
+#
+# Test Suite:
+#
+#  * Split up replicator_db tests into multiple independent tests.
 
 Version 1.3.0
 -------------
@@ -56,29 +55,28 @@ Futon:
 
 Security:
 
-  * Passwords are now hashed using the PBKDF2 algorithm with a
-    configurable work factor.
+ * Passwords are now hashed using the PBKDF2 algorithm with a
+   configurable work factor.
 
 Test Suite:
 
-  * Moved the JS test suite to the CLI
-  * Improved tracebacks printed by the JS CLI tests
-  * Improved the reliability of a number of tests
+ * Moved the JS test suite to the CLI
+ * Improved tracebacks printed by the JS CLI tests
+ * Improved the reliability of a number of tests
 
 UUID Algorithms:
 
-  * Added the utc_id algorithm.
+ * Added the utc_id algorithm.
 
 URL Rewriter & Vhosts:
 
-  * Database name is encoded during rewriting (allowing embedded /'s, etc)
-  * Reset rewrite counter on new request, avoiding unnecessary request
-    failures due to bogus rewrite limit reports
+ * Database name is encoded during rewriting (allowing embedded /'s, etc)
+ * Reset rewrite counter on new request, avoiding unnecessary request
+   failures due to bogus rewrite limit reports
 
 Log System:
 
-  * Allow per-module configuration of log levels.
-
+ * Allow per-module configuration of log levels.
 
 Version 1.2.1
 -------------
@@ -186,8 +184,8 @@ Futon:
 
 Log System:
 
-  * Log correct stacktrace in all cases.
-  * Improvements to log messages for file-related errors.
+ * Log correct stacktrace in all cases.
+ * Improvements to log messages for file-related errors.
 
 Version 1.1.2
 -------------
@@ -196,41 +194,41 @@ This version has not been released yet.
 
 HTTP Interface:
 
-* ETag of attachment changes only when the attachment changes, not
-  the document.
+ * ETag of attachment changes only when the attachment changes, not
+   the document.
 
 Replicator:
 
-* Fix pull replication of documents with many revisions.
+ * Fix pull replication of documents with many revisions.
 
 Version 1.1.1
 -------------
 
-* Support SpiderMonkey 1.8.5
-* Add configurable maximum to the number of bytes returned by _log.
-* Allow CommonJS modules to be an empty string.
-* Bump minimum Erlang version to R13B02.
-* Do not run deleted validate_doc_update functions.
-* ETags for views include current sequence if include_docs=true.
-* Fix bug where duplicates can appear in _changes feed.
-* Fix bug where update handlers break after conflict resolution.
-* Fix bug with _replicator where include "filter" could crash couch.
-* Fix crashes when compacting large views.
-* Fix file descriptor leak in _log
-* Fix missing revisions in _changes?style=all_docs.
-* Improve handling of compaction at max_dbs_open limit.
-* JSONP responses now send "text/javascript" for Content-Type.
-* Link to ICU 4.2 on Windows.
-* Permit forward slashes in path to update functions.
-* Reap couchjs processes that hit reduce_overflow error.
-* Status code can be specified in update handlers.
-* Support provides() in show functions.
-* _view_cleanup when ddoc has no views now removes all index files.
-* max_replication_retry_count now supports "infinity".
-* Fix replication crash when source database has a document with empty ID.
-* Fix deadlock when assigning couchjs processes to serve requests.
-* Fixes to the document multipart PUT API.
-* Fixes regarding file descriptor leaks for databases with views.
+ * Support SpiderMonkey 1.8.5
+ * Add configurable maximum to the number of bytes returned by _log.
+ * Allow CommonJS modules to be an empty string.
+ * Bump minimum Erlang version to R13B02.
+ * Do not run deleted validate_doc_update functions.
+ * ETags for views include current sequence if include_docs=true.
+ * Fix bug where duplicates can appear in _changes feed.
+ * Fix bug where update handlers break after conflict resolution.
+ * Fix bug with _replicator where include "filter" could crash couch.
+ * Fix crashes when compacting large views.
+ * Fix file descriptor leak in _log
+ * Fix missing revisions in _changes?style=all_docs.
+ * Improve handling of compaction at max_dbs_open limit.
+ * JSONP responses now send "text/javascript" for Content-Type.
+ * Link to ICU 4.2 on Windows.
+ * Permit forward slashes in path to update functions.
+ * Reap couchjs processes that hit reduce_overflow error.
+ * Status code can be specified in update handlers.
+ * Support provides() in show functions.
+ * _view_cleanup when ddoc has no views now removes all index files.
+ * max_replication_retry_count now supports "infinity".
+ * Fix replication crash when source database has a document with empty ID.
+ * Fix deadlock when assigning couchjs processes to serve requests.
+ * Fixes to the document multipart PUT API.
+ * Fixes regarding file descriptor leaks for databases with views.
 
 Version 1.1.0
 -------------
@@ -419,33 +417,33 @@ Version 1.0.1
 
 Storage System:
 
-  * Fix data corruption bug COUCHDB-844. Please see
-    http://couchdb.apache.org/notice/1.0.1.html for details.
+ * Fix data corruption bug COUCHDB-844. Please see
+   http://couchdb.apache.org/notice/1.0.1.html for details.
 
 Replicator:
 
-  * Added support for replication via an HTTP/HTTPS proxy.
-  * Fix pull replication of attachments from 0.11 to 1.0.x.
-  * Make the _changes feed work with non-integer seqnums.
+ * Added support for replication via an HTTP/HTTPS proxy.
+ * Fix pull replication of attachments from 0.11 to 1.0.x.
+ * Make the _changes feed work with non-integer seqnums.
 
 HTTP Interface:
 
-  * Expose `committed_update_seq` for monitoring purposes.
-  * Show fields saved along with _deleted=true. Allows for auditing of deletes.
-  * More robust Accept-header detection.
+ * Expose `committed_update_seq` for monitoring purposes.
+ * Show fields saved along with _deleted=true. Allows for auditing of deletes.
+ * More robust Accept-header detection.
 
 Authentication:
 
-  * Enable basic-auth popup when required to access the server, to prevent
-    people from getting locked out.
+ * Enable basic-auth popup when required to access the server, to prevent
+   people from getting locked out.
 
 Futon:
 
-  * User interface element for querying stale (cached) views.
+ * User interface element for querying stale (cached) views.
 
 Build and System Integration:
 
-  * Included additional source files for distribution.
+ * Included additional source files for distribution.
 
 Version 1.0.0
 -------------
@@ -473,26 +471,26 @@ Version 0.11.2
 
 Replicator:
 
-  * Fix bug when pushing design docs by non-admins, which was hanging the
-    replicator for no good reason.
-  * Fix bug when pulling design documents from a source that requires
-    basic-auth.
+ * Fix bug when pushing design docs by non-admins, which was hanging the
+   replicator for no good reason.
+ * Fix bug when pulling design documents from a source that requires
+   basic-auth.
 
 HTTP Interface:
 
-  * Better error messages on invalid URL requests.
+ * Better error messages on invalid URL requests.
 
 Authentication:
 
-  * User documents can now be deleted by admins or the user.
+ * User documents can now be deleted by admins or the user.
 
 Security:
 
-  * Avoid potential DOS attack by guarding all creation of atoms.
+ * Avoid potential DOS attack by guarding all creation of atoms.
 
 Futon:
 
-  * Add some Futon files that were missing from the Makefile.
+ * Add some Futon files that were missing from the Makefile.
 
 Version 0.11.1
 --------------
@@ -773,7 +771,7 @@ Replication:
 Version 0.9.0
 -------------
 
-Futon Utility Client:
+Futon:
 
  * Added pagination to the database listing page.
  * Implemented attachment uploading from the document page.
