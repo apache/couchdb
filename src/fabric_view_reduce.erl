@@ -25,8 +25,9 @@ go(DbName, GroupId, View, Args, Callback, Acc0) when is_binary(GroupId) ->
     go(DbName, DDoc, View, Args, Callback, Acc0);
 
 go(DbName, DDoc, VName, Args, Callback, Acc0) ->
-    #group{def_lang=Lang, views=Views} = Group =
-        couch_view_group:design_doc_to_view_group(DDoc),
+    Group = couch_view_group:design_doc_to_view_group(DDoc),
+    Lang = couch_view_group:get_language(Group),
+    Views = couch_view_group:get_views(Group),
     {NthRed, View} = fabric_view:extract_view(nil, VName, Views, reduce),
     {VName, RedSrc} = lists:nth(NthRed, View#view.reduce_funs),
     Workers = lists:map(fun(#shard{name=Name, node=N} = Shard) ->
@@ -47,7 +48,7 @@ go(DbName, DDoc, VName, Args, Callback, Acc0) ->
         keys = Args#view_query_args.keys,
         skip = Skip,
         limit = Limit,
-        lang = Group#group.def_lang,
+        lang = Lang,
         os_proc = OsProc,
         reducer = RedSrc,
         rows = dict:new(),

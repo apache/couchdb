@@ -110,8 +110,9 @@ map_view(DbName, DDoc, ViewName, QueryArgs) ->
     {ok, Pid} = gen_server:call(couch_view, {get_group_server, DbName, Group0}),
     {ok, Group} = couch_view_group:request_group(Pid, MinSeq),
     maybe_update_view_group(Pid, LastSeq, Stale),
-    erlang:monitor(process, Group#group.fd),
-    View = fabric_view:extract_view(Pid, ViewName, Group#group.views, ViewType),
+    erlang:monitor(process, couch_view_group:get_fd(Group)),
+    Views = couch_view_group:get_views(Group),
+    View = fabric_view:extract_view(Pid, ViewName, Views, ViewType),
     {ok, Total} = couch_view:get_row_count(View),
     Acc0 = #view_acc{
         db = Db,
@@ -136,6 +137,9 @@ map_view(DbName, DDoc, ViewName, QueryArgs) ->
     end,
     final_response(Total, Acc#view_acc.offset).
 
+reduce_view(DbName, #doc{} = DDoc, ViewName, QueryArgs) ->
+    Group = couch_view_group:design_doc_to_view_group(DDoc),
+    reduce_view(DbName, Group, ViewName, QueryArgs);
 reduce_view(DbName, Group0, ViewName, QueryArgs) ->
     erlang:put(io_priority, {interactive, DbName}),
     {ok, Db} = get_or_create_db(DbName, []),
@@ -153,8 +157,9 @@ reduce_view(DbName, Group0, ViewName, QueryArgs) ->
     {ok, Pid} = gen_server:call(couch_view, {get_group_server, DbName, Group0}),
     {ok, Group} = couch_view_group:request_group(Pid, MinSeq),
     maybe_update_view_group(Pid, LastSeq, Stale),
-    #group{views=Views, def_lang=Lang, fd=Fd} = Group,
-    erlang:monitor(process, Fd),
+    Lang = couch_view_group:get_language(Group),
+    Views = couch_view_group:get_views(Group),
+    erlang:monitor(process, couch_view_group:get_fd(Group)),
     {NthRed, View} = fabric_view:extract_view(Pid, ViewName, Views, reduce),
     ReduceView = {reduce, NthRed, Lang, View},
     Acc0 = #view_acc{group_level = GroupLevel, limit = Limit+Skip},
