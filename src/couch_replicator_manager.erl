@@ -12,6 +12,7 @@
 
 -module(couch_replicator_manager).
 -behaviour(gen_server).
+-behaviour(config_listener).
 
 % public API
 -export([replication_started/1, replication_completed/2, replication_error/2]).
@@ -20,6 +21,9 @@
 % gen_server callbacks
 -export([start_link/0, init/1, handle_call/3, handle_info/2, handle_cast/2]).
 -export([code_change/3, terminate/2]).
+
+% config_listener callback
+-export([handle_config_change/5]).
 
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_replicator.hrl").
@@ -104,6 +108,13 @@ replication_error(#rep{id = {BaseId, _} = RepId}, Error) ->
     end.
 
 
+handle_config_change("replicator", "max_replication_retry_count", V, _, S) ->
+    ok = gen_server:cast(S, {set_max_retries, retries_value(V)}),
+    {ok, S};
+handle_config_change(_, _, _, _, S) ->
+    {ok, S}.
+
+
 init(_) ->
     process_flag(trap_exit, true),
     net_kernel:monitor_nodes(true),
@@ -111,11 +122,7 @@ init(_) ->
     ?REP_TO_STATE = ets:new(?REP_TO_STATE, [named_table, set, public]),
     ?DB_TO_SEQ = ets:new(?DB_TO_SEQ, [named_table, set, public]),
     Server = self(),
-    ok = couch_config:register(
-        fun("replicator", "max_replication_retry_count", V) ->
-            ok = gen_server:cast(Server, {set_max_retries, retries_value(V)})
-        end
-    ),
+    ok = config:listen_for_changes(?MODULE, Server),
     ScanPid = spawn_link(fun() -> scan_all_dbs(Server) end),
     {ok, #state{
         db_notifier = db_update_notifier(),
@@ -209,6 +216,14 @@ handle_info({'EXIT', From, normal}, #state{rep_start_pids = Pids} = State) ->
 
 handle_info({'DOWN', _Ref, _, _, _}, State) ->
     % From a db monitor created by a replication process. Ignore.
+    {noreply, State};
+
+handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
+    erlang:send_after(5000, self(), restart_config_listener),
+    {noreply, State};
+
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, self()),
     {noreply, State};
 
 handle_info(Msg, State) ->
