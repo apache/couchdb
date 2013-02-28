@@ -83,9 +83,12 @@ keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout, UpListen, T0)
     true ->
         WaitForUpdate = wait_db_updated(UpListen),
         AccumulatedTime = timer:now_diff(os:timestamp(), T0) div 1000,
-        Max = list_to_integer(
-            config:get("fabric", "changes_duration", "300000")
-        ),
+        Max = case config:get("fabric", "changes_duration") of
+        undefined ->
+            infinity;
+        MaxStr ->
+            list_to_integer(MaxStr)
+        end,
         case {Heartbeat, AccumulatedTime > Max, WaitForUpdate} of
         {undefined, _, timeout} ->
             Callback({stop, LastSeq}, AccOut);
