@@ -107,7 +107,9 @@ handle_config_change("mem3", "shard_cache_size", SizeList, _, _) ->
     Size = list_to_integer(SizeList),
     {ok, gen_server:call(?MODULE, {set_max_size, Size}, infinity)};
 handle_config_change("mem3", "shard_db", _DbName, _, _) ->
-    {ok, gen_server:call(?MODULE, shard_db_changed, infinity)}.
+    {ok, gen_server:call(?MODULE, shard_db_changed, infinity)};
+handle_config_change(_, _, _, _, _) ->
+    {ok, nil}.
 
 init([]) ->
     ets:new(?SHARDS, [bag, protected, named_table, {keypos,#shard.dbname}]),
