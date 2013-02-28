@@ -321,8 +321,9 @@ update_docs(Db, DocList, Options, UpdateType) ->
     {ok, bulk_results_to_errors(DocList, Result, UpdateType)}.
 
 
-changes_since(#httpdb{headers = Headers1, timeout = Timeout} = HttpDb,
+changes_since(#httpdb{headers = Headers1, timeout = InactiveTimeout} = HttpDb,
               Style, StartSeq, UserFun, Options) ->
+    Timeout = erlang:max(1000, InactiveTimeout - 5000),
     BaseQArgs = case get_value(continuous, Options, false) of
     false ->
         [{"feed", "normal"}];
