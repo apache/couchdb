@@ -105,7 +105,7 @@ handle_cast({release_worker, Worker}, State) ->
             Busy2 = State#state.busy -- [Worker],
             Free2 = [Worker | State#state.free];
         {{value, From}, Waiting2} ->
-            NewCallers1 = monitor_client(Callers, Worker, From),
+            NewCallers1 = monitor_client(NewCallers0, Worker, From),
             gen_server:reply(From, {ok, Worker}),
             Busy2 = State#state.busy,
             Free2 = State#state.free
@@ -141,7 +141,7 @@ handle_info({'EXIT', Pid, _Reason}, State) ->
                 {noreply, State#state{busy = Busy2, callers = NewCallers0}};
             {{value, From}, Waiting2} ->
                 {ok, Worker} = ibrowse:spawn_link_worker_process(Url),
-                NewCallers1 = monitor_client(Callers, Worker, From),
+                NewCallers1 = monitor_client(NewCallers0, Worker, From),
                 gen_server:reply(From, {ok, Worker}),
                 NewState = State#state{
                     busy = [Worker | Busy2],
