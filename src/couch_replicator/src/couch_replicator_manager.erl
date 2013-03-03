@@ -575,7 +575,9 @@ update_rep_doc(RepDbName, RepDocId, KVs) when is_binary(RepDocId) ->
 
 update_rep_doc(RepDbName, #doc{body = {RepDocBody}} = RepDoc, KVs) ->
     NewRepDocBody = lists:foldl(
-        fun({<<"_replication_state">> = K, State} = KV, Body) ->
+        fun({K, undefined}, Body) ->
+                lists:keydelete(K, 1, Body);
+           ({<<"_replication_state">> = K, State} = KV, Body) ->
                 case get_value(K, Body) of
                 State ->
                     Body;
