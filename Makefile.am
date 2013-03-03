@@ -158,16 +158,9 @@ distcheck-hook:
 	$(MAKE) -C bin distcheck-hook
 	$(MAKE) -C src/couchdb/priv distcheck-hook
 	$(MAKE) -C share/doc/build distcheck-hook
+	grep "not released" NEWS CHANGES; test "$$?" -eq 1
+	grep "build" acinclude.m4.in; test "$$?" -eq 1
+	grep "%revision%" acinclude.m4.in; test "$$?" -eq 1
 	grep -rL 'http://www.apache.org/licenses/LICENSE-2.0' * \
-            | grep --include= -vEf license.skip; \
-        test "$$?" -eq 1
-
-.PHONY: distsign
-distsign: distcheck check
-	gpg --armor --detach-sig $(GPG_ARGS) \
-	    < $(top_srcdir)/$(distdir).tar.gz \
-	    > $(top_srcdir)/$(distdir).tar.gz.asc
-	md5sum $(top_srcdir)/$(distdir).tar.gz \
-	    > $(top_srcdir)/$(distdir).tar.gz.md5
-	sha1sum $(top_srcdir)/$(distdir).tar.gz \
-	    > $(top_srcdir)/$(distdir).tar.gz.sha
+	    | grep --include= -vEf license.skip; \
+	    test "$$?" -eq 1
