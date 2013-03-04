@@ -10,15 +10,24 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
-SUBDIRS = \
-    couch_dbupdates \
-    couch_index \
-    couch_mrview \
-    couch_replicator \
-    couchdb \
-    ejson \
-    erlang-oauth \
-    etap \
-    ibrowse \
-    mochiweb \
-    snappy
+couch_dbupdateslibdir = $(localerlanglibdir)/couch_dbupdates-0.1
+couch_dbupdatesebindir = $(couch_dbupdateslibdir)/ebin
+
+couch_dbupdatesebin_DATA = $(compiled_files)
+
+EXTRA_DIST = $(source_files)
+CLEANFILES = $(compiled_files)
+
+source_files = \
+    src/couch_dbupdates.erl \
+    src/couch_dbupdates.app.src \
+    src/couch_dbupdates_httpd.erl
+
+compiled_files = \
+    ebin/couch_dbupdates.beam \
+    ebin/couch_dbupdates_httpd.beam
+
+ebin/%.beam: src/%.erl
+	@mkdir -p ebin/
+	$(ERLC) -I$(top_srcdir)/src/couchdb -o ebin/ $(ERLC_FLAGS) ${TEST} $<;
+

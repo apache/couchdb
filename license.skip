@@ -98,6 +98,7 @@
 ^src/couchdb/priv/couchspawnkillable
 ^src/couchdb/priv/stat_descriptions.cfg
 ^src/erlang-oauth/.*
+^src/couch_dbupdates
 ^src/ejson/.*
 ^src/etap/.*
 ^src/fauxton/app/app.js

@@ -33,6 +33,8 @@ A list of the available methods and URL paths are provided below:
 +--------+-------------------------+-------------------------------------------+
 | GET    | /_all_dbs               |  Get a list of all the DBs                |
 +--------+-------------------------+-------------------------------------------+
+| GET    | /_db_updates            |  A feed of database events                |
++--------+-------------------------+-------------------------------------------+
 | GET    | /_log                   |  Return the server log file               |
 +--------+-------------------------+-------------------------------------------+
 | POST   | /_replicate             |  Set or cancel replication                |
@@ -152,6 +154,66 @@ The return is a JSON array:
        "invoices",
        "locations"
     ]
+
+``GET /_db_updates``
+====================
+
+* **Method**: ``GET /_db_updates``
+* **Request**: None
+* **Admin Privileges Required**: yes
+* **Query ARguments**:
+
+  * **Argument**: feed
+
+    * **Descroption**: Format of the response feed
+    * **Optional**: yes
+    * **Type**: string
+    * **Default**: longpoll
+    * **Supported Values**:
+
+      * **longpoll**: Closes the connection after the first event.
+      * **continuous**: Send a line of JSON per event. Keeps the socket open until ``timeout``.
+      * **eventsource**: Like, ``continuous``, but sends the events in EventSource format. See http://dev.w3.org/html5/eventsource/ for details,
+
+  * **Argument**: timeout
+
+    * **Descroption**: Number of seconds until CouchDB closes the connection.
+    * **Optional**: yes
+    * **Type**: numeric
+    * **Default**: 60
+
+  * **Argument**: heartbeat
+
+    * **Descroption**: Whether CouchDB will send a newline character (``\n``) on ``timeout``.
+    * **Optional**: yes
+    * **Type**: boolean
+    * **Default**: true
+
+* **Return Codes**:
+
+  * **200**
+    Request completed successfully.
+
+Returns a list of all database events in the CouchDB instance.
+
+A database event is one of `created`, `updated`, `deleted`.
+
+For example:
+
+.. code-block:: http
+
+    GET http://couchdb:5984/_db_events?feed=continuous
+    Accept: application/json
+
+.. code-block:: javascript
+
+    {"dbname":"my-database", "type":"created"}
+    {"dbname":"my-database", "type":"updated"}
+    {"dbname":"another-database", "type":"created"}
+    {"dbname":"my-database", "type":"deleted"}
+    {"dbname":"another-database", "type":"updated"}
+
+
 
 ``GET /_log``
 =============
