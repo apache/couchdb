@@ -22,7 +22,7 @@
     set_revs_limit/3, create_shard_db_doc/2, delete_shard_db_doc/2]).
 -export([get_all_security/2]).
 
--include("fabric.hrl").
+-include_lib("fabric/include/fabric.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
 -record (view_acc, {

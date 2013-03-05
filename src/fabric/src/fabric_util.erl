@@ -19,7 +19,7 @@
         remove_down_workers/2]).
 -export([request_timeout/0]).
 
--include("fabric.hrl").
+-include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("eunit/include/eunit.hrl").

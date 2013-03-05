@@ -23,4 +23,5 @@ SUBDIRS = \
     couch \
 	twig \
 	rexi \
-	mem3
+	mem3 \
+	fabric

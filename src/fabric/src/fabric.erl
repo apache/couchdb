@@ -37,7 +37,7 @@
 -export([design_docs/1, reset_validation_funs/1, cleanup_index_files/0,
     cleanup_index_files/1]).
 
--include("fabric.hrl").
+-include_lib("fabric/include/fabric.hrl").
 
 -type dbname() :: (iodata() | #db{}).
 -type docid() :: iodata().

@@ -16,7 +16,7 @@
 
 -export([go/1]).
 
--include("fabric.hrl").
+-include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
