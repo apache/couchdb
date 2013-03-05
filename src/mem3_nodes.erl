@@ -19,7 +19,7 @@
 
 -export([start_link/0, get_nodelist/0, get_node_info/2]).
 
--include("mem3.hrl").
+-include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
 -record(state, {changes_pid, update_seq}).

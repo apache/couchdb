@@ -2,7 +2,7 @@
 
 -export([go/2, go/3, changes_enumerator/3, make_local_id/2]).
 
--include("mem3.hrl").
+-include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
 -define(CTX, #user_ctx{roles = [<<"_admin">>]}).
