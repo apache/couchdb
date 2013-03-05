@@ -14,7 +14,7 @@
 
 -compile(export_all).
 
--include("couch_db.hrl").
+-include_lib("couch/include/couch_db.hrl").
 -define(ADMIN, #user_ctx{roles=[<<"_admin">>]}).
 
 

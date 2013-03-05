@@ -68,6 +68,5 @@ ebin/%.app: src/%.app.src
 
 ebin/%.beam: src/%.erl $(include_files)
 	@mkdir -p ebin/
-	$(ERLC) -Wall -I$(top_srcdir)/src -I$(top_srcdir)/src/couchdb \
-        -o ebin/ $(ERLC_FLAGS) ${TEST} $<;
+	$(ERLC) -Wall -I$(top_srcdir)/src -o ebin/ $(ERLC_FLAGS) ${TEST} $<;
 

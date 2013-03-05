@@ -18,7 +18,7 @@
 -export([compact/2, compact/3, cancel_compaction/2]).
 -export([cleanup/1]).
 
--include("couch_db.hrl").
+-include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
 -record(mracc, {
