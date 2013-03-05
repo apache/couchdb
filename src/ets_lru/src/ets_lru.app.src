@@ -2,7 +2,10 @@
 
 {application, ets_lru, [
     {description, "ETS Base LRU Cache"},
-    {vsn, git},
+    {vsn, "%version%"},
+    {modules, [
+        ets_lru
+    ]},
     {registered, []},
     {applications, [
         kernel,
