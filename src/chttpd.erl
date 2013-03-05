@@ -178,7 +178,7 @@ handle_request(MochiReq) ->
     MethodOverride = MochiReq:get_primary_header_value("X-HTTP-Method-Override"),
     Method2 = case lists:member(MethodOverride, ["GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT", "COPY"]) of
     true ->
-        ?LOG_INFO("MethodOverride: ~s (real method was ~s)", [MethodOverride, Method1]),
+        twig:log(notice, "MethodOverride: ~s (real method was ~s)", [MethodOverride, Method1]),
         case Method1 of
         'POST' -> couch_util:to_existing_atom(MethodOverride);
         _ ->
@@ -225,7 +225,7 @@ handle_request(MochiReq) ->
         throw:{invalid_json, _} ->
             send_error(HttpReq, {bad_request, "invalid UTF-8 JSON"});
         exit:{mochiweb_recv_error, E} ->
-            ?LOG_INFO(LogForClosedSocket ++ " - ~p", [E]),
+            twig:log(notice, LogForClosedSocket ++ " - ~p", [E]),
             exit(normal);
         throw:Error ->
             send_error(HttpReq, Error);
@@ -233,7 +233,7 @@ handle_request(MochiReq) ->
             send_error(HttpReq, database_does_not_exist);
         Tag:Error ->
             Stack = erlang:get_stacktrace(),
-            ?LOG_ERROR("~p ~p ~p ~p", [?MODULE, Tag, Error,
+            twig:log(error, "~p ~p ~p ~p", [?MODULE, Tag, Error,
                 json_stack(Error, nill, Stack)]),
             send_error(HttpReq, {Error, nil, Stack})
     end,
@@ -248,7 +248,7 @@ handle_request(MochiReq) ->
         {aborted, Resp:get(code)}
     end,
     Host = MochiReq:get_header_value("Host"),
-    ?LOG_INFO("~s ~s ~s ~s ~B ~p ~B", [Peer, Host,
+    twig:log(notice, "~s ~s ~s ~s ~B ~p ~B", [Peer, Host,
         atom_to_list(Method1), RawUri, Code, Status, round(RequestTime)]),
     couch_stats_collector:record({couchdb, request_time}, RequestTime),
     case Result of
@@ -257,7 +257,7 @@ handle_request(MochiReq) ->
         {ok, Resp};
     {aborted, _, Reason} ->
         couch_stats_collector:increment({httpd, aborted_requests}),
-        ?LOG_ERROR("Response abnormally terminated: ~p", [Reason]),
+        twig:log(error, "Response abnormally terminated: ~p", [Reason]),
         exit(normal)
     end.
 
@@ -548,7 +548,7 @@ send_chunk(Resp, Data) ->
 send_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Body) ->
     couch_stats_collector:increment({httpd_status_codes, Code}),
     if Code >= 400 ->
-        ?LOG_DEBUG("httpd ~p error response:~n ~s", [Code, Body]);
+        twig:log(debug, "httpd ~p error response:~n ~s", [Code, Body]);
     true -> ok
     end,
     {ok, MochiReq:respond({Code, Headers ++ server_header() ++

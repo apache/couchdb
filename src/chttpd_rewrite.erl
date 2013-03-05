@@ -165,7 +165,7 @@ handle_rewrite_req(#httpd{
             % normalize final path (fix levels "." and "..")
             RawPath1 = ?b2l(iolist_to_binary(normalize_path(RawPath))),
 
-            ?LOG_DEBUG("rewrite to ~p ~n", [RawPath1]),
+            twig:log(debug, "rewrite to ~p ~n", [RawPath1]),
 
             % build a new mochiweb request
             MochiReq1 = mochiweb_request:new(MochiReq:get(socket),
@@ -415,7 +415,7 @@ path_to_list([<<"..">>|R], Acc, DotDotCount) when DotDotCount == 2 ->
     "false" ->
         path_to_list(R, [<<"..">>|Acc], DotDotCount+1);
     _Else ->
-        ?LOG_INFO("insecure_rewrite_rule ~p blocked", [lists:reverse(Acc) ++ [<<"..">>] ++ R]),
+        twig:log(notice, "insecure_rewrite_rule ~p blocked", [lists:reverse(Acc) ++ [<<"..">>] ++ R]),
         throw({insecure_rewrite_rule, "too many ../.. segments"})
     end;
 path_to_list([<<"..">>|R], Acc, DotDotCount) ->

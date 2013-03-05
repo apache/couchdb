@@ -233,7 +233,7 @@ db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
                 {ok, _} -> ok;
                 {accepted, _} -> ok;
                 Error ->
-                    ?LOG_INFO("Batch doc error (~s): ~p",[DocId, Error])
+                    twig:log(notice, "Batch doc error (~s): ~p",[DocId, Error])
                 end
             end),
 
@@ -641,7 +641,7 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
                     {ok, _} -> ok;
                     {accepted, _} -> ok;
                     Error ->
-                        ?LOG_INFO("Batch doc error (~s): ~p",[DocId, Error])
+                        twig:log(notice, "Batch doc error (~s): ~p",[DocId, Error])
                     end
                 end),
             send_json(Req, 202, [], {[
