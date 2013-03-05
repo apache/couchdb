@@ -222,8 +222,7 @@ handle_request(MochiReq) ->
             {ok, Resp0};
         throw:{http_abort, Resp0, Reason0} ->
             {aborted, Resp0, Reason0};
-        throw:{invalid_json, S} ->
-            ?LOG_ERROR("attempted upload of invalid JSON ~s", [S]),
+        throw:{invalid_json, _} ->
             send_error(HttpReq, {bad_request, "invalid UTF-8 JSON"});
         exit:{mochiweb_recv_error, E} ->
             ?LOG_INFO(LogForClosedSocket ++ " - ~p", [E]),
@@ -234,8 +233,8 @@ handle_request(MochiReq) ->
             send_error(HttpReq, database_does_not_exist);
         Tag:Error ->
             Stack = erlang:get_stacktrace(),
-            ?LOG_ERROR("Uncaught error in HTTP request: ~p",[{Tag, Error}]),
-            ?LOG_INFO("Stacktrace: ~p",[Stack]),
+            ?LOG_ERROR("~p ~p ~p ~p", [?MODULE, Tag, Error,
+                json_stack(Error, nill, Stack)]),
             send_error(HttpReq, {Error, nil, Stack})
     end,
 
