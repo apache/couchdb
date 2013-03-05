@@ -23,7 +23,7 @@ AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
 
 AC_CONFIG_HEADERS([config.h])
-AC_CONFIG_HEADERS([src/snappy/google-snappy/config.h])
+AC_CONFIG_HEADERS([src/snappy/c_src/google-snappy/config.h])
 
 AM_INIT_AUTOMAKE([1.6.3 foreign])
 
@@ -730,7 +730,8 @@ AC_CONFIG_FILES([src/oauth/Makefile])
 AC_CONFIG_FILES([src/ibrowse/Makefile])
 AC_CONFIG_FILES([src/mochiweb/Makefile])
 AC_CONFIG_FILES([src/snappy/Makefile])
-AC_CONFIG_FILES([src/snappy/google-snappy/snappy-stubs-public.h])
+AC_CONFIG_FILES([src/snappy/c_src/Makefile])
+AC_CONFIG_FILES([src/snappy/c_src/google-snappy/snappy-stubs-public.h])
 AC_CONFIG_FILES([src/ejson/Makefile])
 AC_CONFIG_FILES([test/Makefile])
 AC_CONFIG_FILES([test/bench/Makefile])
