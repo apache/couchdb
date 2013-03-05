@@ -2,7 +2,14 @@
 
 {application, ddoc_cache, [
     {description, "Design Document Cache"},
-    {vsn, git},
+    {vsn, "%version%"},
+    {modules, [
+        ddoc_cache,
+        ddoc_cache_app,
+        ddoc_cache_opener,
+        ddoc_cache_sup,
+        ddoc_cache_util
+    ]},
     {registered, [
         ddoc_cache_lru,
         ddoc_cache_opener
