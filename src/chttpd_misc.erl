@@ -16,7 +16,8 @@
     handle_all_dbs_req/1,handle_replicate_req/1,handle_restart_req/1,
     handle_uuids_req/1,handle_config_req/1,handle_log_req/1,
     handle_task_status_req/1,handle_sleep_req/1,handle_welcome_req/1,
-    handle_utils_dir_req/1, handle_favicon_req/1, handle_system_req/1]).
+    handle_utils_dir_req/1, handle_favicon_req/1, handle_system_req/1,
+    handle_up_req/1]).
 
 
 -include_lib("couch/include/couch_db.hrl").
@@ -283,3 +284,14 @@ handle_system_req(Req) ->
         {process_limit, erlang:system_info(process_limit)},
         {message_queue_len, MessageQueueLen}
     ]}).
+
+handle_up_req(#httpd{method='GET'} = Req) ->
+    case config:get("couchdb", "maintenance_mode") of
+    "true" ->
+        send_json(Req, 404, {[{status, maintenance_mode}]});
+    _ ->
+        send_json(Req, 200, {[{status, ok}]})
+    end;
+
+handle_up_req(Req) ->
+    send_method_not_allowed(Req, "GET,HEAD").
