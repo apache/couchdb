@@ -11,7 +11,7 @@
 ## the License.
 
 noinst_SCRIPTS = run
-noinst_DATA = test_util.beam test_web.beam
+noinst_DATA = etap.beam test_util.beam test_web.beam
 
 noinst_PROGRAMS = test_cfg_register
 test_cfg_register_SOURCES = test_cfg_register.c
