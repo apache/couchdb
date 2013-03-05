@@ -25,7 +25,7 @@
 
 -define(RINGTOP, 2 bsl 31).  % CRC32 space
 
--include("mem3.hrl").
+-include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
 hash(Item) when is_binary(Item) ->

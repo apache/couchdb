@@ -17,7 +17,7 @@
 -export([maybe_sync/2, maybe_sync_int/2]).
 -export([go/0, go/1]).
 
--include("mem3.hrl").
+-include_lib("mem3/include/mem3.hrl").
 
 
 maybe_sync(#shard{}=Src, #shard{}=Dst) ->

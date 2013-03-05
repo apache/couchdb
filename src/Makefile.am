@@ -22,4 +22,5 @@ SUBDIRS = \
     couch_replicator \
     couch \
 	twig \
-	rexi
+	rexi \
+	mem3
