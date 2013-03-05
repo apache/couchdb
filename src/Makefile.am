@@ -11,13 +11,13 @@
 ## the License.
 
 SUBDIRS = \
-    couch_index \
-    couch_mrview \
-    couch_replicator \
-    couchdb \
+    snappy \
     ejson \
     erlang-oauth \
     etap \
     ibrowse \
     mochiweb \
-    snappy
+    couch_index \
+    couch_mrview \
+    couch_replicator \
+    couchdb
