@@ -680,10 +680,10 @@ error_info(conflict) ->
     {409, <<"conflict">>, <<"Document update conflict.">>};
 error_info({conflict, _}) ->
     {409, <<"conflict">>, <<"Document update conflict.">>};
-error_info({forbidden, Msg}) ->
-    {403, <<"forbidden">>, Msg};
 error_info({forbidden, Error, Msg}) ->
     {403, Error, Msg};
+error_info({forbidden, Msg}) ->
+    {403, <<"forbidden">>, Msg};
 error_info({unauthorized, Msg}) ->
     {401, <<"unauthorized">>, Msg};
 error_info(file_exists) ->
