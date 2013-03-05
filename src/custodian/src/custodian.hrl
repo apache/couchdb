@@ -6,6 +6,7 @@
 <<"function(newDoc, oldDoc) {
   var i, range, node;
   if(newDoc['_id'].substring(0, 8) === \"_design/\") return;
+  if(newDoc['_deleted'] === true) return;
   if (!newDoc.by_node) {
     throw({forbidden: \"by_node is mandatory\"});
   }
