@@ -17,7 +17,7 @@ BUILD_DIR=%abs_top_builddir%
 SCRIPT_DIR=$SRC_DIR/share/www/script
 JS_TEST_DIR=$SRC_DIR/test/javascript
 
-COUCHJS=%abs_top_builddir%/src/couchdb/priv/couchjs
+COUCHJS=%abs_top_builddir%/src/couch/priv/couchjs
 COUCH_URI_FILE=%localstaterundir%/couch.uri
 
 # make check-js calls us with MAKE=$(MAKE) so BSDish `gmake` invocations

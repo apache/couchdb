@@ -15,7 +15,7 @@
 -export([root_dir/0, index_dir/2, index_file/3]).
 -export([load_doc/3, sort_lib/1, hexsig/1]).
 
--include("couch_db.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 
 root_dir() ->

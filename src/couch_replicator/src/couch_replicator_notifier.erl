@@ -21,7 +21,7 @@
 -export([init/1, terminate/2, code_change/3]).
 -export([handle_event/2, handle_call/2, handle_info/2]).
 
--include("couch_db.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 start_link(FunAcc) ->
     couch_event_sup:start_link(couch_replication,

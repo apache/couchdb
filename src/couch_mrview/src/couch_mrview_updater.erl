@@ -14,7 +14,7 @@
 
 -export([start_update/3, purge/4, process_doc/3, finish_update/1]).
 
--include("couch_db.hrl").
+-include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
 

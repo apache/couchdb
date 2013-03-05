@@ -18,10 +18,10 @@
 -export([replication_id/2]).
 -export([sum_stats/2]).
 
--include("couch_db.hrl").
+-include_lib("couch/include/couch_db.hrl").
+-include_lib("ibrowse/include/ibrowse.hrl").
 -include("couch_replicator_api_wrap.hrl").
 -include("couch_replicator.hrl").
--include("../ibrowse/ibrowse.hrl").
 
 -import(couch_util, [
     get_value/2,

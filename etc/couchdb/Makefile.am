@@ -11,7 +11,7 @@
 ## the License.
 
 couchprivlibdir = $(localerlanglibdir)/couch-$(version)/priv/lib
-devcouchprivlibdir = $(abs_top_builddir)/src/couchdb/priv/.libs
+devcouchprivlibdir = $(abs_top_builddir)/src/couch/priv/.libs
 
 localconf_DATA = default.ini
 noinst_DATA = default_dev.ini local_dev.ini

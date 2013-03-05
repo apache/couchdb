@@ -103,8 +103,8 @@ endif
 cover: dev
 if TESTS
 	rm -f cover/*.coverdata
-	COVER=1 COVER_BIN=./src/couchdb/ $(top_builddir)/test/etap/run
-	SRC=./src/couchdb/ \
+	COVER=1 COVER_BIN=./src/couch/ebin $(top_builddir)/test/etap/run
+	SRC=./src/couch/src \
 	    $(ERL) -noshell \
 	    -pa src/etap \
 	    -eval 'etap_report:create()' \
@@ -155,7 +155,7 @@ dist-hook:
 
 distcheck-hook:
 	$(MAKE) -C bin distcheck-hook
-	$(MAKE) -C src/couchdb/priv distcheck-hook
+	$(MAKE) -C src/couch/priv distcheck-hook
 	$(MAKE) -C share/doc/build distcheck-hook
 	grep -rL 'http://www.apache.org/licenses/LICENSE-2.0' * \
             | grep --include= -vEf license.skip; \

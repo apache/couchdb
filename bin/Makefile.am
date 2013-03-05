@@ -67,7 +67,7 @@ install-exec-hook:
 endif
 
 couchjs_dev:
-	$(LN_S) -f "$(abs_top_builddir)/src/couchdb/priv/couchjs" "$@"
+	$(LN_S) -f "$(abs_top_builddir)/src/couch/priv/couchjs" "$@"
 
 couchdb.bat: couchdb.bat.tpl
 	sed -e "s|%ICU_CONFIG%|$(ICU_CONFIG)|g" \
