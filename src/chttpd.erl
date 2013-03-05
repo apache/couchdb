@@ -569,10 +569,6 @@ send_chunk(Resp, Data) ->
 
 send_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Body) ->
     couch_stats_collector:increment({httpd_status_codes, Code}),
-    if Code >= 400 ->
-        twig:log(debug, "httpd ~p error response:~n ~s", [Code, Body]);
-    true -> ok
-    end,
     {ok, MochiReq:respond({Code, Headers ++ server_header() ++
         couch_httpd_auth:cookie_auth_header(Req, Headers), Body})}.
 
