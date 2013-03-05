@@ -15,14 +15,10 @@
 -export([handle_external_req/2, handle_external_req/3]).
 -export([send_external_response/2, json_req_obj/2, json_req_obj/3]).
 -export([default_or_content_type/2, parse_external_response/1]).
--export([handle_search_req/2]).
 
 -import(chttpd,[send_error/4]).
 
 -include_lib("couch/include/couch_db.hrl").
-
-handle_search_req(Req, Db) ->
-    process_external_req(Req, Db, <<"search">>).
 
 % handle_external_req/2
 % for the old type of config usage:
