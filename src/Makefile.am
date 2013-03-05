@@ -16,6 +16,7 @@ SUBDIRS = \
     ibrowse \
     mochiweb \
     oauth \
+    config \
     couch_index \
     couch_mrview \
     couch_replicator \

@@ -1,6 +1,14 @@
 {application, config, [
     {description, "INI file configuration system for Apache CouchDB"},
-    {vsn, git},
+    {vsn, "%version%"},
+    {modules, [
+        config,
+        config_app,
+        config_listener,
+        config_sup,
+        config_util,
+        config_writer
+    ]},
     {registered, [
         config,
         config_event
