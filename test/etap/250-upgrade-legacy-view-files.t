@@ -38,7 +38,7 @@ test() ->
     ok.
 
 fixture_path() ->
-    test_util:srcdir() ++ "/test/etap/fixtures".
+    test_util:source_file("test/etap/fixtures").
 
 old_db() ->
     fixture_path() ++ "/" ++ old_db_name().
@@ -51,6 +51,7 @@ old_view() ->
 
 old_view_name() ->
     "3b835456c235b1827e012e25666152f3.view".
+
 new_view_name() ->
     "a1c5929f912aca32f13446122cc6ce50.view".
 
@@ -113,14 +114,16 @@ test_upgrade() ->
     % copy old db file into db dir
     DbDir = couch_config:get("couchdb", "database_dir"),
     DbTarget = DbDir ++ "/" ++ old_db_name(),
-    filelib:ensure_dir(DbTarget),
-    file:copy(old_db(), DbTarget),
+    filelib:ensure_dir(DbDir),
+    OldDbName = old_db(),
+    {ok, _} = file:copy(OldDbName, DbTarget),
 
     % copy old view file into view dir
-    ViewDir = couch_config:get("couchdb", "index_dir"),
+    ViewDir = couch_config:get("couchdb", "view_index_dir"),
     ViewTarget = ViewDir ++ "/.test_design/" ++ old_view_name(),
     filelib:ensure_dir(ViewTarget),
-    file:copy(old_view(), ViewTarget),
+    OldViewName = old_view(),
+    {ok, _} = file:copy(OldViewName, ViewTarget),
 
     % ensure old header
     ensure_header(ViewTarget, fun(#index_header{}) -> true; (_) -> false end, "old"),
