@@ -12,9 +12,9 @@
 
 -module(couch_replicator_httpc).
 
--include("couch_db.hrl").
+-include_lib("couch/include/couch_db.hrl").
+-include_lib("ibrowse/include/ibrowse.hrl").
 -include("couch_replicator_api_wrap.hrl").
--include("../ibrowse/ibrowse.hrl").
 
 -export([setup/1]).
 -export([send_req/3]).
