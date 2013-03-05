@@ -135,7 +135,7 @@ is_old_couch(Resp) ->
     end.
 
 handle_compact_req(Req, _) ->
-    Msg = <<"Compaction must be triggered on a per-shard basis in BigCouch">>,
+    Msg = <<"Compaction must be triggered on a per-shard basis in CouchDB">>,
     couch_httpd:send_error(Req, 403, forbidden, Msg).
 
 handle_view_cleanup_req(Req, Db) ->
