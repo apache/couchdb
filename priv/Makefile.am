@@ -56,7 +56,15 @@ couch_icu_driver_la_LIBADD = $(ICU_LIBS)
 
 if WINDOWS
 couch_icu_driver_la_LDFLAGS += -no-undefined
+couch_icu_driver_so_name = couch_icu_driver.dll
+else
+couch_icu_driver_so_name = couch_icu_driver.so
 endif
+
+$(couch_icu_driver_so_name): couch_icu_driver.la
+	cp .libs/$(couch_icu_driver_so_name) $@
+
+all: $(couch_icu_driver_so_name)
 
 COUCHJS_SRCS = \
 	couch_js/help.h \
