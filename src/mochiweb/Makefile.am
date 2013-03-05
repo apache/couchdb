@@ -17,94 +17,97 @@ endif
 mochiwebebindir = $(localerlanglibdir)/mochiweb-1.4.1/ebin
 
 mochiweb_file_collection = \
-	mochifmt.erl \
-	mochifmt_records.erl \
-	mochifmt_std.erl \
-	mochiglobal.erl \
-	mochihex.erl \
-	mochijson.erl \
-	mochijson2.erl \
-	mochilists.erl \
-	mochilogfile2.erl \
-	mochinum.erl \
-	mochitemp.erl \
-	mochiutf8.erl \
-	mochiweb.app.in \
-	mochiweb.app.src \
-	mochiweb.erl \
-	mochiweb_acceptor.erl \
-	mochiweb_app.erl \
-	mochiweb_charref.erl \
-	mochiweb_cookies.erl \
-	mochiweb_cover.erl \
-	mochiweb_echo.erl \
-	mochiweb_headers.erl \
-	mochiweb_html.erl \
-	mochiweb_http.erl \
-	mochiweb_io.erl \
-	mochiweb_mime.erl \
-	mochiweb_multipart.erl \
-	mochiweb_request.erl \
-	mochiweb_request_tests.erl \
-	mochiweb_response.erl \
-	mochiweb_skel.erl \
-	mochiweb_socket.erl \
-	mochiweb_socket_server.erl \
-	mochiweb_sup.erl \
-	mochiweb_util.erl \
-	reloader.erl
+	src/mochifmt.erl \
+	src/mochifmt_records.erl \
+	src/mochifmt_std.erl \
+	src/mochiglobal.erl \
+	src/mochihex.erl \
+	src/mochijson.erl \
+	src/mochijson2.erl \
+	src/mochilists.erl \
+	src/mochilogfile2.erl \
+	src/mochinum.erl \
+	src/mochitemp.erl \
+	src/mochiutf8.erl \
+	src/mochiweb.app.in \
+	src/mochiweb.app.src \
+	src/mochiweb.erl \
+	src/mochiweb_acceptor.erl \
+	src/mochiweb_app.erl \
+	src/mochiweb_charref.erl \
+	src/mochiweb_cookies.erl \
+	src/mochiweb_cover.erl \
+	src/mochiweb_echo.erl \
+	src/mochiweb_headers.erl \
+	src/mochiweb_html.erl \
+	src/mochiweb_http.erl \
+	src/mochiweb_io.erl \
+	src/mochiweb_mime.erl \
+	src/mochiweb_multipart.erl \
+	src/mochiweb_request.erl \
+	src/mochiweb_request_tests.erl \
+	src/mochiweb_response.erl \
+	src/mochiweb_skel.erl \
+	src/mochiweb_socket.erl \
+	src/mochiweb_socket_server.erl \
+	src/mochiweb_sup.erl \
+	src/mochiweb_util.erl \
+	src/reloader.erl
 
 mochiwebebin_make_generated_file_list = \
-	mochifmt.beam \
-	mochifmt_records.beam \
-	mochifmt_std.beam \
-	mochiglobal.beam \
-	mochihex.beam \
-	mochijson.beam \
-	mochijson2.beam \
-	mochilists.beam \
-	mochilogfile2.beam \
-	mochinum.beam \
-	mochitemp.beam \
-	mochiutf8.beam \
-	mochiweb.app \
-	mochiweb.beam \
-	mochiweb_acceptor.beam \
-	mochiweb_app.beam \
-	mochiweb_charref.beam \
-	mochiweb_cookies.beam \
-	mochiweb_cover.beam \
-	mochiweb_echo.beam \
-	mochiweb_headers.beam \
-	mochiweb_html.beam \
-	mochiweb_http.beam \
-	mochiweb_io.beam \
-	mochiweb_mime.beam \
-	mochiweb_multipart.beam \
-	mochiweb_request.beam \
-	mochiweb_response.beam \
-	mochiweb_skel.beam \
-	mochiweb_socket.beam \
-	mochiweb_socket_server.beam \
-	mochiweb_sup.beam \
-	mochiweb_util.beam \
-	reloader.beam
+	ebin/mochifmt.beam \
+	ebin/mochifmt_records.beam \
+	ebin/mochifmt_std.beam \
+	ebin/mochiglobal.beam \
+	ebin/mochihex.beam \
+	ebin/mochijson.beam \
+	ebin/mochijson2.beam \
+	ebin/mochilists.beam \
+	ebin/mochilogfile2.beam \
+	ebin/mochinum.beam \
+	ebin/mochitemp.beam \
+	ebin/mochiutf8.beam \
+	ebin/mochiweb.app \
+	ebin/mochiweb.beam \
+	ebin/mochiweb_acceptor.beam \
+	ebin/mochiweb_app.beam \
+	ebin/mochiweb_charref.beam \
+	ebin/mochiweb_cookies.beam \
+	ebin/mochiweb_cover.beam \
+	ebin/mochiweb_echo.beam \
+	ebin/mochiweb_headers.beam \
+	ebin/mochiweb_html.beam \
+	ebin/mochiweb_http.beam \
+	ebin/mochiweb_io.beam \
+	ebin/mochiweb_mime.beam \
+	ebin/mochiweb_multipart.beam \
+	ebin/mochiweb_request.beam \
+	ebin/mochiweb_response.beam \
+	ebin/mochiweb_skel.beam \
+	ebin/mochiweb_socket.beam \
+	ebin/mochiweb_socket_server.beam \
+	ebin/mochiweb_sup.beam \
+	ebin/mochiweb_util.beam \
+	ebin/reloader.beam
 
 mochiwebebin_DATA = \
     $(mochiwebebin_make_generated_file_list)
 
 EXTRA_DIST =  \
     $(mochiweb_file_collection) \
-    internal.hrl
+    src/internal.hrl
 
 CLEANFILES = \
     $(mochiwebebin_make_generated_file_list)
 
-%.app: %.app.in
+ebin/%.app: src/%.app.in
+	@mkdir -p ebin/
 	cp $< $@
 
-mochijson2.beam: mochijson2.erl
-	$(ERLC) $(ERLC_FLAGS) $(MOCHIJSON_ERLC_FLAGS) $<
+ebin/mochijson2.beam: src/mochijson2.erl
+	@mkdir -p ebin/
+	$(ERLC) -o ebin/ $(ERLC_FLAGS) $(MOCHIJSON_ERLC_FLAGS) $<
 
-%.beam: %.erl
-	$(ERLC) $(ERLC_FLAGS) $<
+ebin/%.beam: src/%.erl
+	@mkdir -p ebin/
+	$(ERLC) -o ebin/ $(ERLC_FLAGS) $<
