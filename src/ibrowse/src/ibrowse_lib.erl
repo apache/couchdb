@@ -10,7 +10,7 @@
 -compile(export_all).
 -endif.
 
--include("ibrowse.hrl").
+-include_lib("ibrowse/include/ibrowse.hrl").
 
 -ifdef(EUNIT).
 -include_lib("eunit/include/eunit.hrl").

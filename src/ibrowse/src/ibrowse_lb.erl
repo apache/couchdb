@@ -40,7 +40,7 @@
                 proc_state
                }).
 
--include("ibrowse.hrl").
+-include_lib("ibrowse/include/ibrowse.hrl").
 
 %%====================================================================
 %% External functions

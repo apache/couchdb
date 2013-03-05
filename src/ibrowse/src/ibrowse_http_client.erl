@@ -34,7 +34,7 @@
          code_change/3
         ]).
 
--include("ibrowse.hrl").
+-include_lib("ibrowse/include/ibrowse.hrl").
 -include_lib("kernel/include/inet.hrl").
 
 -record(state, {host, port, connect_timeout,

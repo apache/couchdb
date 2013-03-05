@@ -115,7 +115,7 @@
                       
 -record(state, {trace = false}).
 
--include("ibrowse.hrl").
+-include_lib("ibrowse/include/ibrowse.hrl").
 -include_lib("stdlib/include/ms_transform.hrl").
 
 -define(DEF_MAX_SESSIONS,10).
