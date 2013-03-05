@@ -26,7 +26,7 @@ release = "1.3.0"
 
 project = u"Apache CouchDB"
 
-copyright = u"2012, The Apache Software Foundation"
+copyright = u"2013, The Apache Software Foundation"
 
 highlight_language = "json"
 
