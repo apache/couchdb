@@ -81,10 +81,9 @@ src/ejson/ejson.app
 src/ejson/priv
 src/erlang-oauth/oauth.app
 src/erlang-oauth/oauth.app
-src/ibrowse/ibrowse.app
-src/ibrowse/ibrowse.app
-src/mochiweb/mochiweb.app
-src/mochiweb/mochiweb.app
+src/ibrowse/ebin/
+src/mochiweb/ebin/
+src/oauth/ebin/
 src/snappy/.deps/
 src/snappy/.libs/
 src/snappy/google-snappy/.deps/

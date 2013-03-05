@@ -13,9 +13,9 @@
 SUBDIRS = \
     snappy \
     ejson \
-    erlang-oauth \
     ibrowse \
     mochiweb \
+    oauth \
     couch_index \
     couch_mrview \
     couch_replicator \

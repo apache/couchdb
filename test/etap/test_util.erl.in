@@ -28,7 +28,7 @@ init_code_path() ->
         "etap",
         "couchdb",
         "ejson",
-        "erlang-oauth",
+        "oauth",
         "ibrowse",
         "mochiweb",
         "snappy"
