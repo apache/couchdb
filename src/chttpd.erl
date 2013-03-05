@@ -689,6 +689,9 @@ error_info({missing_stub, Reason}) ->
     {412, <<"missing_stub">>, Reason};
 error_info(not_implemented) ->
     {501, <<"not_implemented">>, <<"this feature is not yet implemented">>};
+error_info(timeout) ->
+    {500, <<"timeout">>, <<"The request could not be processed in a reasonable"
+        " amount of time.">>};
 error_info({Error, null}) ->
     {500, couch_util:to_binary(Error), null};
 error_info({Error, Reason}) ->
