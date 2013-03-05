@@ -16,7 +16,7 @@
 
 -export([set_revs_limit/3, set_security/3, get_all_security/2]).
 
--include("fabric.hrl").
+-include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 

@@ -16,7 +16,7 @@
 
 -export([go/2, go/3]).
 
--include("fabric.hrl").
+-include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
 go(DbName, AllIdsRevs) ->

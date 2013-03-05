@@ -15,7 +15,7 @@
 -module(fabric_db_delete).
 -export([go/2]).
 
--include("fabric.hrl").
+-include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
 %% @doc Options aren't used at all now in couch on delete but are left here

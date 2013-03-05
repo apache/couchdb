@@ -16,7 +16,7 @@
 
 -export([go/4, start_update_notifier/1, stop/1, wait_db_updated/1]).
 
--include("fabric.hrl").
+-include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
 -record(worker, {
