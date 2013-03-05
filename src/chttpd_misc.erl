@@ -56,7 +56,7 @@ get_version() ->
     list_to_binary(Version).
 
 handle_favicon_req(Req) ->
-    handle_favicon_req(Req, couch_config:get("chttpd", "docroot")).
+    handle_favicon_req(Req, config:get("chttpd", "docroot")).
 
 handle_favicon_req(#httpd{method='GET'}=Req, DocumentRoot) ->
     chttpd:serve_file(Req, "favicon.ico", DocumentRoot);
@@ -64,7 +64,7 @@ handle_favicon_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 handle_utils_dir_req(Req) ->
-    handle_utils_dir_req(Req, couch_config:get("chttpd", "docroot")).
+    handle_utils_dir_req(Req, config:get("chttpd", "docroot")).
 
 handle_utils_dir_req(#httpd{method='GET'}=Req, DocumentRoot) ->
     "/" ++ UrlPath = chttpd:path(Req),
@@ -88,7 +88,7 @@ handle_sleep_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 handle_all_dbs_req(#httpd{method='GET'}=Req) ->
-    ShardDbName = couch_config:get("mem3", "shard_db", "dbs"),
+    ShardDbName = config:get("mem3", "shard_db", "dbs"),
     %% shard_db is not sharded but mem3:shards treats it as an edge case
     %% so it can be pushed thru fabric
     {ok, Info} = fabric:get_db_info(ShardDbName),
@@ -202,7 +202,7 @@ handle_config_req(#httpd{method='GET', path_parts=[_]}=Req) ->
         false ->
             dict:store(Section, [{list_to_binary(Key), list_to_binary(Value)}], Acc)
         end
-    end, dict:new(), couch_config:all()),
+    end, dict:new(), config:all()),
     KVs = dict:fold(fun(Section, Values, Acc) ->
         [{list_to_binary(Section), {Values}} | Acc]
     end, [], Grouped),
@@ -210,19 +210,19 @@ handle_config_req(#httpd{method='GET', path_parts=[_]}=Req) ->
 % GET /_config/Section
 handle_config_req(#httpd{method='GET', path_parts=[_,Section]}=Req) ->
     KVs = [{list_to_binary(Key), list_to_binary(Value)}
-            || {Key, Value} <- couch_config:get(Section)],
+            || {Key, Value} <- config:get(Section)],
     send_json(Req, 200, {KVs});
 % PUT /_config/Section/Key
 % "value"
 handle_config_req(#httpd{method='PUT', path_parts=[_, Section, Key]}=Req) ->
     Value = chttpd:json_body(Req),
     Persist = chttpd:header_value(Req, "X-Couch-Persist") /= "false",
-    OldValue = couch_config:get(Section, Key, ""),
-    ok = couch_config:set(Section, Key, ?b2l(Value), Persist),
+    OldValue = config:get(Section, Key, ""),
+    ok = config:set(Section, Key, ?b2l(Value), Persist),
     send_json(Req, 200, list_to_binary(OldValue));
 % GET /_config/Section/Key
 handle_config_req(#httpd{method='GET', path_parts=[_, Section, Key]}=Req) ->
-    case couch_config:get(Section, Key, null) of
+    case config:get(Section, Key, null) of
     null ->
         throw({not_found, unknown_config_value});
     Value ->
@@ -231,11 +231,11 @@ handle_config_req(#httpd{method='GET', path_parts=[_, Section, Key]}=Req) ->
 % DELETE /_config/Section/Key
 handle_config_req(#httpd{method='DELETE',path_parts=[_,Section,Key]}=Req) ->
     Persist = chttpd:header_value(Req, "X-Couch-Persist") /= "false",
-    case couch_config:get(Section, Key, null) of
+    case config:get(Section, Key, null) of
     null ->
         throw({not_found, unknown_config_value});
     OldValue ->
-        couch_config:delete(Section, Key, Persist),
+        config:delete(Section, Key, Persist),
         send_json(Req, 200, list_to_binary(OldValue))
     end;
 handle_config_req(Req) ->

@@ -411,7 +411,7 @@ path_to_list([<<>>|R], Acc, DotDotCount) ->
 path_to_list([<<"*">>|R], Acc, DotDotCount) ->
     path_to_list(R, [?MATCH_ALL|Acc], DotDotCount);
 path_to_list([<<"..">>|R], Acc, DotDotCount) when DotDotCount == 2 ->
-    case couch_config:get("httpd", "secure_rewrites", "true") of
+    case config:get("httpd", "secure_rewrites", "true") of
     "false" ->
         path_to_list(R, [<<"..">>|Acc], DotDotCount+1);
     _Else ->

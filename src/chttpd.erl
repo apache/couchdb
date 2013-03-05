@@ -12,9 +12,10 @@
 
 -module(chttpd).
 -include_lib("couch/include/couch_db.hrl").
+-behaviour(config_listener).
 
 -export([start_link/0, start_link/1, start_link/2,
-    stop/0, handle_request/1, config_change/2,
+    stop/0, handle_request/1, handle_config_change/5,
     primary_header_value/2, header_value/2, header_value/3, qs_value/2,
     qs_value/3, qs/1, qs_json_value/3, path/1, absolute_uri/2, body_length/1,
     verify_is_server_admin/1, unquote/1, quote/1, recv/2, recv_chunked/4,
@@ -45,29 +46,29 @@
 start_link() ->
     start_link(http).
 start_link(http) ->
-    Port = couch_config:get("chttpd", "port", "5984"),
+    Port = config:get("chttpd", "port", "5984"),
     start_link(?MODULE, [{port, Port}]);
 
 start_link(https) ->
-    Port = couch_config:get("chttps", "port", "6984"),
-    CertFile = couch_config:get("chttps", "cert_file", nil),
-    KeyFile = couch_config:get("chttps", "key_file", nil),
+    Port = config:get("chttps", "port", "6984"),
+    CertFile = config:get("chttps", "cert_file", nil),
+    KeyFile = config:get("chttps", "key_file", nil),
     Options = case CertFile /= nil andalso KeyFile /= nil of
         true ->
             SslOpts = [{certfile, CertFile}, {keyfile, KeyFile}],
 
             %% set password if one is needed for the cert
-            SslOpts1 = case couch_config:get("chttps", "password", nil) of
+            SslOpts1 = case config:get("chttps", "password", nil) of
                 nil -> SslOpts;
                 Password ->
                     SslOpts ++ [{password, Password}]
             end,
             % do we verify certificates ?
-            FinalSslOpts = case couch_config:get("chttps",
+            FinalSslOpts = case config:get("chttps",
                     "verify_ssl_certificates", "false") of
                 "false" -> SslOpts1;
                 "true" ->
-                    case couch_config:get("chttps",
+                    case config:get("chttps",
                             "cacert_file", nil) of
                         nil ->
                             io:format("Verify SSL certificate "
@@ -76,7 +77,7 @@ start_link(https) ->
                                 ++"missing", []),
                             throw({error, missing_cacerts});
                         CaCertFile ->
-                            Depth = list_to_integer(couch_config:get("chttps",
+                            Depth = list_to_integer(config:get("chttps",
                                     "ssl_certificate_max_depth",
                                     "1")),
                             FinalOpts = [
@@ -84,7 +85,7 @@ start_link(https) ->
                                 {depth, Depth},
                                 {verify, verify_peer}],
                             % allows custom verify fun.
-                            case couch_config:get("chttps",
+                            case config:get("chttps",
                                     "verify_fun", nil) of
                                 nil -> FinalOpts;
                                 SpecStr ->
@@ -107,27 +108,27 @@ start_link(Name, Options) ->
     Options1 = Options ++ [
         {loop, fun ?MODULE:handle_request/1},
         {name, Name},
-        {ip, couch_config:get("chttpd", "bind_address", any)}
+        {ip, config:get("chttpd", "bind_address", any)}
     ],
-    ServerOptsCfg = couch_config:get("chttpd", "server_options", "[]"),
+    ServerOptsCfg = config:get("chttpd", "server_options", "[]"),
     {ok, ServerOpts} = couch_util:parse_term(ServerOptsCfg),
     Options2 = lists:keymerge(1, lists:sort(Options1), lists:sort(ServerOpts)),
     case mochiweb_http:start(Options2) of
     {ok, Pid} ->
-        ok = couch_config:register(fun ?MODULE:config_change/2, Pid),
+        ok = config:listen_for_changes(?MODULE, nil),
         {ok, Pid};
     {error, Reason} ->
         io:format("Failure to start Mochiweb: ~s~n", [Reason]),
         {error, Reason}
     end.
 
-config_change("chttpd", "bind_address") ->
+handle_config_change("chttpd", "bind_address", _, _, _) ->
     ?MODULE:stop();
-config_change("chttpd", "port") ->
+handle_config_change("chttpd", "port", _, _, _) ->
     ?MODULE:stop();
-config_change("chttpd", "backlog") ->
+handle_config_change("chttpd", "backlog", _, _, _) ->
     ?MODULE:stop();
-config_change("chttpd", "server_options") ->
+handle_config_change("chttpd", "server_options", _, _, _) ->
     ?MODULE:stop().
 
 stop() ->
@@ -137,7 +138,7 @@ stop() ->
 handle_request(MochiReq) ->
     Begin = now(),
 
-    case couch_config:get("chttpd", "socket_options") of
+    case config:get("chttpd", "socket_options") of
     undefined ->
         ok;
     SocketOptsCfg ->
@@ -300,8 +301,8 @@ is_http(_) ->
     false.
 
 make_uri(Req, Raw) ->
-    Url = list_to_binary(["http://", couch_config:get("httpd", "bind_address"),
-                         ":", couch_config:get("chttpd", "port"), "/", Raw]),
+    Url = list_to_binary(["http://", config:get("httpd", "bind_address"),
+                         ":", config:get("chttpd", "port"), "/", Raw]),
     Headers = [
         {<<"authorization">>, ?l2b(header_value(Req,"authorization",""))},
         {<<"cookie">>, ?l2b(header_value(Req,"cookie",""))}
@@ -316,11 +317,11 @@ authenticate_request(#httpd{user_ctx=#user_ctx{}} = Req, _AuthFuns) ->
 authenticate_request(#httpd{} = Req, [AuthFun|Rest]) ->
     authenticate_request(AuthFun(Req), Rest);
 authenticate_request(#httpd{} = Req, []) ->
-    case couch_config:get("chttpd", "require_valid_user", "false") of
+    case config:get("chttpd", "require_valid_user", "false") of
     "true" ->
         throw({unauthorized, <<"Authentication required.">>});
     "false" ->
-        case couch_config:get("admins") of
+        case config:get("admins") of
         [] ->
             Ctx = #user_ctx{roles=[<<"_reader">>, <<"_writer">>, <<"_admin">>]},
             Req#httpd{user_ctx = Ctx};
@@ -411,7 +412,7 @@ path(#httpd{mochi_req=MochiReq}) ->
     MochiReq:get(path).
 
 absolute_uri(#httpd{mochi_req=MochiReq}, Path) ->
-    XHost = couch_config:get("httpd", "x_forwarded_host", "X-Forwarded-Host"),
+    XHost = config:get("httpd", "x_forwarded_host", "X-Forwarded-Host"),
     Host = case MochiReq:get_header_value(XHost) of
         undefined ->
             case MochiReq:get_header_value("Host") of
@@ -423,11 +424,11 @@ absolute_uri(#httpd{mochi_req=MochiReq}, Path) ->
             end;
         Value -> Value
     end,
-    XSsl = couch_config:get("httpd", "x_forwarded_ssl", "X-Forwarded-Ssl"),
+    XSsl = config:get("httpd", "x_forwarded_ssl", "X-Forwarded-Ssl"),
     Scheme = case MochiReq:get_header_value(XSsl) of
         "on" -> "https";
         _ ->
-            XProto = couch_config:get("httpd", "x_forwarded_proto",
+            XProto = config:get("httpd", "x_forwarded_proto",
                 "X-Forwarded-Proto"),
             case MochiReq:get_header_value(XProto) of
                 % Restrict to "https" and "http" schemes only
@@ -706,16 +707,16 @@ error_headers(#httpd{mochi_req=MochiReq}=Req, 401=Code, ErrorStr, ReasonStr) ->
     % this is where the basic auth popup is triggered
     case MochiReq:get_header_value("X-CouchDB-WWW-Authenticate") of
     undefined ->
-        case couch_config:get("httpd", "WWW-Authenticate", nil) of
+        case config:get("httpd", "WWW-Authenticate", nil) of
         nil ->
             % If the client is a browser and the basic auth popup isn't turned on
             % redirect to the session page.
             case ErrorStr of
             <<"unauthorized">> ->
-                case couch_config:get("couch_httpd_auth", "authentication_redirect", nil) of
+                case config:get("couch_httpd_auth", "authentication_redirect", nil) of
                 nil -> {Code, []};
                 AuthRedirect ->
-                    case couch_config:get("couch_httpd_auth", "require_valid_user", "false") of
+                    case config:get("couch_httpd_auth", "require_valid_user", "false") of
                     "true" ->
                         % send the browser popup header no matter what if we are require_valid_user
                         {Code, [{"WWW-Authenticate", "Basic realm=\"server\""}]};
