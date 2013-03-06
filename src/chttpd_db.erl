@@ -234,7 +234,7 @@ db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
                 {ok, _} -> ok;
                 {accepted, _} -> ok;
                 Error ->
-                    twig:log(notice, "Batch doc error (~s): ~p",[DocId, Error])
+                    twig:log(debug, "Batch doc error (~s): ~p",[DocId, Error])
                 end
             end),
 
