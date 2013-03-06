@@ -20,7 +20,7 @@
 -export([get_errors/0, get_last_error/0, set_error_limit/1]).
 -export([stream/1, stream/2, stream/3, stream_ack/1, stream_ack/2]).
 
--include("rexi.hrl").
+-include_lib("rexi/include/rexi.hrl").
 
 -define(SERVER, rexi_server).
 
