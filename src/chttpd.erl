@@ -476,7 +476,13 @@ body(#httpd{mochi_req=MochiReq, req_body=ReqBody}) ->
             % Maximum size of document PUT request body (4GB)
             MaxSize = list_to_integer(
                 config:get("couchdb", "max_document_size", "4294967296")),
-            MochiReq:recv_body(MaxSize);
+            Begin = os:timestamp(),
+            try
+                MochiReq:recv_body(MaxSize)
+            after
+                T = timer:now_diff(os:timestamp(), Begin) div 1000,
+                put(body_time, T)
+            end;
         _Else ->
             ReqBody
     end.
@@ -572,13 +578,13 @@ send_json(Req, Code, Value) ->
     send_json(Req, Code, [], Value).
 
 send_json(Req, Code, Headers, Value) ->
-    couch_httpd:send_json(Req, Code, [reqid() | Headers], Value).
+    couch_httpd:send_json(Req, Code, [timing(), reqid() | Headers], Value).
 
 start_json_response(Req, Code) ->
     start_json_response(Req, Code, []).
 
 start_json_response(Req, Code, Headers) ->
-    couch_httpd:start_json_response(Req, Code, [reqid() | Headers]).
+    couch_httpd:start_json_response(Req, Code, [timing(), reqid() | Headers]).
 
 end_json_response(Resp) ->
     couch_httpd:end_json_response(Resp).
@@ -808,6 +814,14 @@ send_redirect(Req, Path) ->
 
 server_header() ->
     couch_httpd:server_header().
+
+timing() ->
+    case get(body_time) of
+        undefined ->
+            {"X-CouchDB-Body-Time", "0"};
+        Time ->
+            {"X-CouchDB-Body-Time", integer_to_list(Time)}
+    end.
 
 reqid() ->
     {"X-Couch-Request-ID", get(nonce)}.
