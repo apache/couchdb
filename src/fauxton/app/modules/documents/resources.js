@@ -160,7 +160,21 @@ function(app, FauxtonAPI, Views) {
       return app.host + "/" + this.database.id + "/_all_docs" + query;
     },
 
+    totalRows: function() {
+      return this.viewMeta.total_rows || "unknown";
+    },
+
+    updateSeq: function() {
+      return this.viewMeta.update_seq || false;
+    },
+
     parse: function(resp) {
+      that = this;
+      this.viewMeta = {
+        total_rows: resp.total_rows,
+        offest: resp.offest,
+        update_seq: resp.update_seq
+      };
       return _.map(resp.rows, function(row) {
         return {
           _id: row.id,
