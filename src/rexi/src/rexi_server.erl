@@ -19,7 +19,7 @@
 
 -export([start_link/0, init_p/2, init_p/3]).
 
--include("rexi.hrl").
+-include_lib("rexi/include/rexi.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 -record(job, {

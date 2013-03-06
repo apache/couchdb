@@ -21,4 +21,5 @@ SUBDIRS = \
     couch_mrview \
     couch_replicator \
     couch \
-	twig
+	twig \
+	rexi
