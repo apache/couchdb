@@ -32,6 +32,7 @@ define([
   // Routes return the module that they define routes for
   "modules/databases/base",
   "modules/documents/base",
+  "modules/pouchdb/base",
 
 
   // this needs to be added as a plugin later
