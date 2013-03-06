@@ -661,7 +661,7 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
     initialize: function(options) {
       this.ddocs = options.ddocs;
       this.viewCollection = options.viewCollection;
-      this.hasReduce = this.model.viewHasReduce(this.viewCollection.view);
+      this.reduceFunStr = this.model.viewHasReduce(this.viewCollection.view);
       this.newView = false;
     },
 
@@ -711,8 +711,15 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
       if (this.hasValidCode()) {
         var mapVal = this.mapEditor.getValue();
         var reduceVal = this.reduceEditor.getValue();
+        /*
         notification = FauxtonAPI.addNotification({
           msg: "Saving document.",
+          selector: "#define-view .errors-container"
+        });
+        */
+        FauxtonAPI.addNotification({
+          msg: "Save Functionality Coming Soon",
+          type: "warning",
           selector: "#define-view .errors-container"
         });
         /*
@@ -791,17 +798,17 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
         ddocs: this.ddocs,
         ddoc: this.model,
         viewCollection: this.viewCollection,
-        hasReduce: this.hasReduce,
+        reduceFunStr: this.reduceFunStr,
+        isCustomReduce: this.hasCustomReduce(),
         newView: this.newView
       };
     },
 
     hasCustomReduce: function() {
-      return this.hasReduce && ! _.contains(this.builtinReduces, this.hasReduce);
+      return this.reduceFunStr && ! _.contains(this.builtinReduces, this.reduceFunStr);
     },
 
     afterRender: function() {
-      //this.model.on("sync", this.updateValues, this);
       var that = this;
       var mapFun = $("#map-function");
       var reduceFun = $("#reduce-function");
@@ -818,7 +825,7 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
           that.runJSHint("mapEditor");
         },
         extraKeys: {
-          "Ctrl-S": function(instance) { that.saveDoc(); },
+          "Ctrl-S": function(instance) { that.saveView(); },
           "Ctrl-/": "undo"
         }
       });
@@ -831,7 +838,7 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
           that.runJSHint("reduceEditor");
         },
         extraKeys: {
-          "Ctrl-S": function(instance) { that.saveDoc(); },
+          "Ctrl-S": function(instance) { that.saveView(); },
           "Ctrl-/": "undo"
         }
       });

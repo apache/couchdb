@@ -19,7 +19,7 @@ the License.
         <i class="icon-wrench"></i> Edit Index
       </a>
     </div>
-    <div id="collapse-edit-index" class="accordion-body collapse in">
+    <div id="collapse-edit-index" class="accordion-body collapse">
       <div class="accordion-inner">
         <div id="define-view" class="ddoc-alert well">
           <div class="errors-container"></div>
@@ -59,12 +59,11 @@ the License.
               <label class="control-label" for="reduce-function-selector">Reduce function <a target="_couch_docs" href="http://docs.couchdb.org/en/latest/ddocs/#reduce-and-rereduce-functions"><i class="icon-question-sign"></i></a></label>
               <div class="controls">
                 <select id="reduce-function-selector">
-                  <% console.log("HAS REDUCE: ",hasReduce) %>
-                  <option value="" <%= !hasReduce ? 'selected="selected"' : '' %>>None</option>
-                  <option value="_sum">_sum</option>
-                  <option value="_count">_count</option>
-                  <option value="_stats">_stats</option>
-                  <option value="CUSTOM" <%= hasReduce ? 'selected="selected"' : '' %>>Custom reduce</option>
+                  <option value="" <%= !reduceFunStr ? 'selected="selected"' : '' %>>None</option>
+                  <% _.each(["_sum", "_count", "_stats"], function(reduce) { %>
+                    <option value="<%= reduce %>" <% if (reduce == reduceFunStr) { %>selected<% } %>><%= reduce %></option>
+                  <% }) %>
+                  <option value="CUSTOM" <% if (isCustomReduce) { %>selected<% } %>>Custom reduce</option>
                 </select>
                 <span class="help-block">Reduce functions are optional.</span>
               </div>
