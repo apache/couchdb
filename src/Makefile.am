@@ -26,4 +26,5 @@ SUBDIRS = \
 	mem3 \
 	fabric \
 	ets_lru \
-	ddoc_cache
+	ddoc_cache \
+	chttpd
