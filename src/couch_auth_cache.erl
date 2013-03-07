@@ -287,6 +287,8 @@ refresh_entries(AuthDb) ->
     end.
 
 
+refresh_entry(Db, #full_doc_info{} = FDI) ->
+    refresh_entry(Db, couch_doc:to_doc_info(FDI));
 refresh_entry(Db, #doc_info{high_seq = DocSeq} = DocInfo) ->
     case is_user_doc(DocInfo) of
     {true, UserName} ->
