@@ -245,31 +245,45 @@ Build System:
 Version 1.1.1
 -------------
 
- * Support SpiderMonkey 1.8.5
+HTTP Interface:
+
  * Add configurable maximum to the number of bytes returned by _log.
- * Allow CommonJS modules to be an empty string.
- * Bump minimum Erlang version to R13B02.
- * Do not run deleted validate_doc_update functions.
  * ETags for views include current sequence if include_docs=true.
  * Fix bug where duplicates can appear in _changes feed.
- * Fix bug where update handlers break after conflict resolution.
- * Fix bug with _replicator where include "filter" could crash couch.
- * Fix crashes when compacting large views.
- * Fix file descriptor leak in _log
  * Fix missing revisions in _changes?style=all_docs.
- * Improve handling of compaction at max_dbs_open limit.
  * JSONP responses now send "text/javascript" for Content-Type.
- * Link to ICU 4.2 on Windows.
  * Permit forward slashes in path to update functions.
- * Reap couchjs processes that hit reduce_overflow error.
  * Status code can be specified in update handlers.
- * Support provides() in show functions.
  * _view_cleanup when ddoc has no views now removes all index files.
+ * Fixes to the document multipart PUT API.
+
+Core Database:
+
+ * Fixes regarding file descriptor leaks for databases with views.
+ * Fix bug where update handlers break after conflict resolution.
+ * Fix file descriptor leak in _log
+ * Improve handling of compaction at max_dbs_open limit.
+ * Fix crashes when compacting large views.
+
+Query Server:
+
+ * Support SpiderMonkey 1.8.5
+ * Support provides() in show functions.
+ * Fix deadlock when assigning couchjs processes to serve requests.
+ * Allow CommonJS modules to be an empty string.
+ * Reap couchjs processes that hit reduce_overflow error.
+
+Replicator:
+
  * max_replication_retry_count now supports "infinity".
  * Fix replication crash when source database has a document with empty ID.
- * Fix deadlock when assigning couchjs processes to serve requests.
- * Fixes to the document multipart PUT API.
- * Fixes regarding file descriptor leaks for databases with views.
+ * Fix bug with _replicator where include "filter" could crash couch.
+
+Misc:
+
+ * Bump minimum Erlang version to R13B02.
+ * Link to ICU 4.2 on Windows.
+ * Do not run deleted validate_doc_update functions.
 
 Version 1.1.0
 -------------
