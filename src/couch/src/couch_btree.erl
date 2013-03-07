@@ -18,7 +18,6 @@
 -export([less/3]).
 
 -include_lib("couch/include/couch_db.hrl").
--define(CHUNK_THRESHOLD, 16#4ff).
 
 extract(#btree{extract_kv=Extract}, Value) ->
     Extract(Value).
@@ -278,9 +277,10 @@ complete_root(Bt, KPs) ->
 % it's probably really inefficient.
 
 chunkify(InList) ->
+    BaseChunkSize = get_chunk_size(),
     case ?term_size(InList) of
-    Size when Size > ?CHUNK_THRESHOLD ->
-        NumberOfChunksLikely = ((Size div ?CHUNK_THRESHOLD) + 1),
+    Size when Size > BaseChunkSize ->
+        NumberOfChunksLikely = ((Size div BaseChunkSize) + 1),
         ChunkThreshold = Size div NumberOfChunksLikely,
         chunkify(InList, ChunkThreshold, [], 0, []);
     _Else ->
@@ -297,6 +297,14 @@ chunkify([InElement | RestInList], ChunkThreshold, OutList, OutListSize, OutputC
         chunkify(RestInList, ChunkThreshold, [], 0, [lists:reverse([InElement | OutList]) | OutputChunks]);
     Size ->
         chunkify(RestInList, ChunkThreshold, [InElement | OutList], OutListSize + Size, OutputChunks)
+    end.
+
+-compile({inline,[get_chunk_size/0]}).
+get_chunk_size() ->
+    try
+        list_to_integer(config:get("couchdb", "btree_chunk_size", "1279"))
+    catch error:badarg ->
+        1279
     end.
 
 modify_node(Bt, RootPointerInfo, Actions, QueryOutput) ->
