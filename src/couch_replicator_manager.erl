@@ -177,16 +177,6 @@ handle_call({rep_complete, RepId}, _From, State) ->
 handle_call({rep_error, RepId, Error}, _From, State) ->
     {reply, ok, replication_error(State, RepId, Error)};
 
-handle_call({resume_scan, DbName}, _From, State) ->
-    Since = case ets:lookup(?DB_TO_SEQ, DbName) of
-        [] -> 0;
-        [{DbName, EndSeq}] -> EndSeq
-    end,
-    ensure_rep_ddoc_exists(DbName),
-    Pid = changes_feed_loop(DbName, Since),
-    couch_log:debug("Scanning ~s from update_seq ~p", [DbName, Since]),
-    {reply, ok, State#state{rep_start_pids = [Pid | State#state.rep_start_pids]}};
-
 handle_call({rep_db_checkpoint, DbName, EndSeq}, _From, State) ->
     true = ets:insert(?DB_TO_SEQ, {DbName, EndSeq}),
     {reply, ok, State};
@@ -198,6 +188,16 @@ handle_call(Msg, From, State) ->
     couch_log:error("Replication manager received unexpected call ~p from ~p",
         [Msg, From]),
     {stop, {error, {unexpected_call, Msg}}, State}.
+
+handle_cast({resume_scan, DbName}, State) ->
+    Since = case ets:lookup(?DB_TO_SEQ, DbName) of
+        [] -> 0;
+        [{DbName, EndSeq}] -> EndSeq
+    end,
+    ensure_rep_ddoc_exists(DbName),
+    Pid = changes_feed_loop(DbName, Since),
+    couch_log:debug("Scanning ~s from update_seq ~p", [DbName, Since]),
+    {noreply, State#state{rep_start_pids = [Pid | State#state.rep_start_pids]}};
 
 handle_cast({set_max_retries, MaxRetries}, State) ->
     {noreply, State#state{max_retries = MaxRetries}};
@@ -320,7 +320,7 @@ db_update_notifier() ->
                     ensure_rep_ddoc_exists(DbName);
                 updated when IsRepDb ->
                     Msg = {resume_scan, DbName},
-                    ok = gen_server:call(Server, Msg, infinity);
+                    ok = gen_server:cast(Server, Msg);
                 deleted when IsRepDb ->
                     clean_up_replications(DbName);
                 _ ->
@@ -800,7 +800,7 @@ scan_all_dbs(Server) when is_pid(Server) ->
                 RelativeFilename -> ok
             end,
             DbName = ?l2b(filename:rootname(RelativeFilename, ".couch")),
-	    gen_server:call(Server, {resume_scan, DbName}),
+	    gen_server:cast(Server, {resume_scan, DbName}),
 	    ok
 	end, ok).
 
