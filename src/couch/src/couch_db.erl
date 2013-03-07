@@ -1084,7 +1084,15 @@ changes_since(Db, StartSeq, Fun, Acc) ->
     changes_since(Db, StartSeq, Fun, [], Acc).
 
 changes_since(Db, StartSeq, Fun, Options, Acc) ->
-    Wrapper = fun(DocInfo, _Offset, Acc2) -> Fun(DocInfo, Acc2) end,
+    Wrapper = fun(FullDocInfo, _Offset, Acc2) ->
+        DocInfo = case FullDocInfo of
+            #full_doc_info{} ->
+                couch_doc:to_doc_info(FullDocInfo);
+            #doc_info{} ->
+                FullDocInfo
+        end,
+        Fun(DocInfo, Acc2)
+    end,
     {ok, _LastReduction, AccOut} = couch_btree:fold(Db#db.seq_tree,
         Wrapper, Acc, [{start_key, StartSeq + 1}] ++ Options),
     {ok, AccOut}.

@@ -137,12 +137,15 @@ update(Idx, Mod, IdxState) ->
 
         NumChanges = couch_db:count_changes_since(Db, CurrSeq),
 
-        LoadDoc = fun(DocInfo) ->
-            #doc_info{
-                id=DocId,
-                high_seq=Seq,
-                revs=[#rev_info{deleted=Deleted} | _]
-            } = DocInfo,
+        GetInfo = fun
+            (#full_doc_info{id=Id, update_seq=Seq, deleted=Del}=FDI) ->
+                {Id, Seq, Del, couch_doc:to_doc_info(FDI)};
+            (#doc_info{id=Id, high_seq=Seq, revs=[RI|_]}=DI) ->
+                {Id, Seq, RI#rev_info.deleted, DI}
+        end,
+
+        LoadDoc = fun(DI) ->
+            {DocId, Seq, Deleted, DocInfo} = GetInfo(DI),
 
             case {IncludeDesign, DocId} of
                 {false, <<"_design/", _/binary>>} ->
