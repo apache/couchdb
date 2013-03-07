@@ -15,7 +15,7 @@
 -module(mem3).
 
 -export([start/0, stop/0, restart/0, nodes/0, node_info/2, shards/1, shards/2,
-    choose_shards/2, n/1, dbname/1, ushards/1, ushards/2]).
+    choose_shards/2, n/1, dbname/1, ushards/1]).
 -export([get_shard/3, local_shards/1, fold_shards/2]).
 -export([sync_security/0, sync_security/1]).
 -export([compare_nodelists/0, compare_shards/1]).
@@ -105,14 +105,14 @@ shards(DbName, DocId) ->
 ushards(DbName) ->
     Nodes = [node()|erlang:nodes()],
     ZoneMap = zone_map(Nodes),
-    ushards(live_shards(DbName, Nodes), ZoneMap).
+    ushards(DbName, live_shards(DbName, Nodes), ZoneMap).
 
-ushards(Shards0, ZoneMap) ->
+ushards(DbName, Shards0, ZoneMap) ->
     {L,S,D} = group_by_proximity(Shards0, ZoneMap),
     % Prefer shards in the local zone over shards in a different zone,
     % but sort each zone separately to ensure a consistent choice between
     % nodes in the same zone.
-    Shards = choose_ushards(L ++ S) ++ choose_ushards(D),
+    Shards = choose_ushards(DbName, L ++ S) ++ choose_ushards(DbName, D),
     lists:ukeysort(#shard.range, Shards).
 
 get_shard(DbName, Node, Range) ->
@@ -215,12 +215,16 @@ group_by_proximity(Shards, ZoneMap) ->
     {SameZone, DifferentZone} = lists:partition(Fun, Remote),
     {Local, SameZone, DifferentZone}.
 
-choose_ushards(Shards) ->
-    Groups = group_by_range(lists:sort(Shards)),
+choose_ushards(DbName, Shards) ->
+    Groups = group_by_range(rotate_list(DbName, lists:sort(Shards))),
     Fun = fun(Group, {N, Acc}) ->
         {N+1, [lists:nth(1 + N rem length(Group), Group) | Acc]} end,
     {_, Result} = lists:foldl(Fun, {0, []}, Groups),
     Result.
+
+rotate_list(DbName, List) ->
+    {H, T} = lists:split(erlang:crc32(DbName) rem length(List), List),
+    T ++ H.
 
 group_by_range(Shards) ->
     Groups0 = lists:foldl(fun(#shard{range=Range}=Shard, Dict) ->
