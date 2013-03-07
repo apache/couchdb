@@ -31,7 +31,7 @@ go(DbName, DDoc, VName, Args, Callback, Acc0) ->
     {NthRed, View} = fabric_view:extract_view(nil, VName, Views, reduce),
     {VName, RedSrc} = lists:nth(NthRed, View#view.reduce_funs),
     Workers = lists:map(fun(#shard{name=Name, node=N} = Shard) ->
-        Ref = rexi:cast(N, {fabric_rpc, reduce_view, [Name,Group,VName,Args]}),
+        Ref = rexi:cast(N, {fabric_rpc, reduce_view, [Name,DDoc,VName,Args]}),
         Shard#shard{ref = Ref}
     end, fabric_view:get_shards(DbName, Args)),
     RexiMon = fabric_util:create_monitors(Workers),
