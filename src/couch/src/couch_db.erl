@@ -24,10 +24,10 @@
 -export([enum_docs/4,enum_docs_since/5]).
 -export([enum_docs_since_reduce_to_count/1,enum_docs_reduce_to_count/1]).
 -export([increment_update_seq/1,get_purge_seq/1,purge_docs/2,get_last_purged/1]).
--export([start_link/3,open_doc_int/3,ensure_full_commit/1]).
+-export([start_link/3,open_doc_int/3,ensure_full_commit/1,ensure_full_commit/2]).
 -export([set_security/2,get_security/1]).
 -export([changes_since/4,changes_since/5,read_doc/2,new_revid/1]).
--export([check_is_admin/1, check_is_member/1]).
+-export([check_is_admin/1, check_is_member/1, get_doc_count/1]).
 -export([reopen/1, is_system_db/1, compression/1]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -104,6 +104,11 @@ is_system_db(#db{options = Options}) ->
 
 ensure_full_commit(#db{main_pid=Pid, instance_start_time=StartTime}) ->
     ok = gen_server:call(Pid, full_commit, infinity),
+    {ok, StartTime}.
+
+ensure_full_commit(Db, RequiredSeq) ->
+    #db{main_pid=Pid, instance_start_time=StartTime} = Db,
+    ok = gen_server:call(Pid, {full_commit, RequiredSeq}, infinity),
     {ok, StartTime}.
 
 close(#db{fd_monitor=RefCntr}) ->
@@ -281,6 +286,10 @@ get_last_purged(#db{header=#db_header{purged_docs=nil}}) ->
     {ok, []};
 get_last_purged(#db{fd=Fd, header=#db_header{purged_docs=PurgedPointer}}) ->
     couch_file:pread_term(Fd, PurgedPointer).
+
+get_doc_count(Db) ->
+    {ok, {Count, _DelCount}} = couch_btree:full_reduce(Db#db.id_tree),
+    {ok, Count}.
 
 get_db_info(Db) ->
     #db{fd=Fd,

@@ -271,9 +271,9 @@
 -record(btree, {
     fd,
     root,
-    extract_kv = fun({_Key, _Value} = KV) -> KV end,
-    assemble_kv = fun(Key, Value) -> {Key, Value} end,
-    less = fun(A, B) -> A < B end,
+    extract_kv,
+    assemble_kv,
+    less,
     reduce = nil,
     compression = ?DEFAULT_COMPRESSION
 }).
