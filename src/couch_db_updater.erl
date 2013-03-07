@@ -13,7 +13,8 @@
 -module(couch_db_updater).
 -behaviour(gen_server).
 
--export([btree_by_id_reduce/2,btree_by_seq_reduce/2]).
+-export([btree_by_id_split/1, btree_by_id_join/2, btree_by_id_reduce/2]).
+-export([btree_by_seq_split/1, btree_by_seq_join/2, btree_by_seq_reduce/2]).
 -export([make_doc_summary/2]).
 -export([init/1,terminate/2,handle_call/3,handle_cast/2,code_change/3,handle_info/2]).
 
@@ -57,6 +58,11 @@ handle_call(get_db, _From, Db) ->
 handle_call(full_commit, _From, #db{waiting_delayed_commit=nil}=Db) ->
     {reply, ok, Db}; % no data waiting, return ok immediately
 handle_call(full_commit, _From,  Db) ->
+    {reply, ok, commit_data(Db)};
+handle_call({full_commit, RequiredSeq}, _From, Db)
+        when RequiredSeq =< Db#db.committed_update_seq ->
+    {reply, ok, Db};
+handle_call({full_commit, _}, _, Db) ->
     {reply, ok, commit_data(Db)}; % commit the data and return ok
 handle_call(start_compact, _From, Db) ->
     {noreply, NewDb} = handle_cast(start_compact, Db),
@@ -444,14 +450,14 @@ init_db(DbName, Filepath, Fd, Header0, Options) ->
     Compression = couch_compress:get_compression_method(),
 
     {ok, IdBtree} = couch_btree:open(Header#db_header.id_tree_state, Fd,
-        [{split, fun(X) -> btree_by_id_split(X) end},
-        {join, fun(X,Y) -> btree_by_id_join(X,Y) end},
-        {reduce, fun(X,Y) -> btree_by_id_reduce(X,Y) end},
+        [{split, fun ?MODULE:btree_by_id_split/1},
+        {join, fun ?MODULE:btree_by_id_join/2},
+        {reduce, fun ?MODULE:btree_by_id_reduce/2},
         {compression, Compression}]),
     {ok, SeqBtree} = couch_btree:open(Header#db_header.seq_tree_state, Fd,
-            [{split, fun(X) -> btree_by_seq_split(X) end},
-            {join, fun(X,Y) -> btree_by_seq_join(X,Y) end},
-            {reduce, fun(X,Y) -> btree_by_seq_reduce(X,Y) end},
+            [{split, fun ?MODULE:btree_by_seq_split/1},
+            {join, fun ?MODULE:btree_by_seq_join/2},
+            {reduce, fun ?MODULE:btree_by_seq_reduce/2},
             {compression, Compression}]),
     {ok, LocalDocsBtree} = couch_btree:open(Header#db_header.local_tree_state, Fd,
         [{compression, Compression}]),

@@ -13,7 +13,15 @@
 -module(couch_changes).
 -include_lib("couch/include/couch_db.hrl").
 
--export([handle_changes/3]).
+-export([
+    handle_changes/3,
+    get_changes_timeout/2,
+    wait_db_updated/3,
+    get_rest_db_updated/1,
+    make_filter_fun/4,
+    main_only_filter/1,
+    all_docs_filter/1
+]).
 
 % For the builtin filter _docs_ids, this is the maximum number
 % of documents for which we trigger the optimized code path.
@@ -112,9 +120,12 @@ get_callback_acc({Callback, _UserAcc} = Pair) when is_function(Callback, 3) ->
 get_callback_acc(Callback) when is_function(Callback, 2) ->
     {fun(Ev, Data, _) -> Callback(Ev, Data) end, ok}.
 
-%% @type Req -> #httpd{} | {json_req, JsonObj()}
 make_filter_fun([$_ | _] = FilterName, Style, Req, Db) ->
     builtin_filter_fun(FilterName, Style, Req, Db);
+make_filter_fun(_, main_only, _, _) ->
+    fun ?MODULE:main_only_filter/1;
+make_filter_fun(_, all_docs, _, _) ->
+    fun ?MODULE:all_docs_filter/1;
 make_filter_fun(FilterName, Style, Req, Db) ->
     {os_filter_fun(FilterName, Style, Req, Db), []}.
 
@@ -171,6 +182,12 @@ builtin_filter_fun("_view", Style, Req, Db) ->
     {filter_view(ViewName, Style, Db), []};
 builtin_filter_fun(_FilterName, _Style, _Req, _Db) ->
     throw({bad_request, "unknown builtin filter name"}).
+
+main_only_filter(#doc_info{revs=[#rev_info{rev=Rev}|_]}) ->
+    [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]}].
+
+all_docs_filter(#doc_info{revs=Revs}) ->
+    [{[{<<"rev">>, couch_doc:rev_to_str(Rev)}]} || #rev_info{rev=Rev} <- Revs].
 
 filter_docids(DocIds, Style) when is_list(DocIds)->
     fun(_Db, #doc_info{id=DocId, revs=Revs}) ->

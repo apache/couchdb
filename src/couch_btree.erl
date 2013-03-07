@@ -19,12 +19,18 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
+extract(#btree{extract_kv=undefined}, Value) ->
+    Value;
 extract(#btree{extract_kv=Extract}, Value) ->
     Extract(Value).
 
+assemble(#btree{assemble_kv=undefined}, Key, Value) ->
+    {Key, Value};
 assemble(#btree{assemble_kv=Assemble}, Key, Value) ->
     Assemble(Key, Value).
 
+less(#btree{less=undefined}, A, B) ->
+    A < B;
 less(#btree{less=Less}, A, B) ->
     Less(A, B).
 
@@ -111,29 +117,29 @@ convert_fun_arity(Fun) when is_function(Fun, 3) ->
 convert_fun_arity(Fun) when is_function(Fun, 4) ->
     Fun.    % Already arity 4
 
-make_key_in_end_range_function(#btree{less=Less}, fwd, Options) ->
+make_key_in_end_range_function(Bt, fwd, Options) ->
     case couch_util:get_value(end_key_gt, Options) of
     undefined ->
         case couch_util:get_value(end_key, Options) of
         undefined ->
             fun(_Key) -> true end;
         LastKey ->
-            fun(Key) -> not Less(LastKey, Key) end
+            fun(Key) -> not less(Bt, LastKey, Key) end
         end;
     EndKey ->
-        fun(Key) -> Less(Key, EndKey) end
+        fun(Key) -> less(Bt, Key, EndKey) end
     end;
-make_key_in_end_range_function(#btree{less=Less}, rev, Options) ->
+make_key_in_end_range_function(Bt, rev, Options) ->
     case couch_util:get_value(end_key_gt, Options) of
     undefined ->
         case couch_util:get_value(end_key, Options) of
         undefined ->
             fun(_Key) -> true end;
         LastKey ->
-            fun(Key) -> not Less(Key, LastKey) end
+            fun(Key) -> not less(Bt, Key, LastKey) end
         end;
     EndKey ->
-        fun(Key) -> Less(EndKey, Key) end
+        fun(Key) -> less(Bt, EndKey, Key) end
     end.
 
 
@@ -203,7 +209,10 @@ op_order(remove) -> 2;
 op_order(insert) -> 3.
 
 lookup(#btree{root=Root, less=Less}=Bt, Keys) ->
-    SortedKeys = lists:sort(Less, Keys),
+    SortedKeys = case Less of
+        undefined -> lists:sort(Keys);
+        _ -> lists:sort(Less, Keys)
+    end,
     {ok, SortedResults} = lookup(Bt, Root, SortedKeys),
     % We want to return the results in the same order as the keys were input
     % but we may have changed the order when we sorted. So we need to put the
