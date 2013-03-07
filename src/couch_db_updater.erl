@@ -99,8 +99,8 @@ handle_call({purge_docs, _IdRevs}, _From,
 handle_call({purge_docs, IdRevs}, _From, Db) ->
     #db{
         fd = Fd,
-        fulldocinfo_by_id_btree = DocInfoByIdBTree,
-        docinfo_by_seq_btree = DocInfoBySeqBTree,
+        id_tree = DocInfoByIdBTree,
+        seq_tree = DocInfoBySeqBTree,
         update_seq = LastSeq,
         header = Header = #db_header{purge_seq=PurgeSeq},
         compression = Comp
@@ -155,8 +155,8 @@ handle_call({purge_docs, IdRevs}, _From, Db) ->
 
     Db2 = commit_data(
         Db#db{
-            fulldocinfo_by_id_btree = DocInfoByIdBTree2,
-            docinfo_by_seq_btree = DocInfoBySeqBTree2,
+            id_tree = DocInfoByIdBTree2,
+            seq_tree = DocInfoBySeqBTree2,
             update_seq = NewSeq + 1,
             header=Header#db_header{purge_seq=PurgeSeq+1, purged_docs=Pointer}}),
 
@@ -186,12 +186,12 @@ handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
     case Db#db.update_seq == NewSeq of
     true ->
         % suck up all the local docs into memory and write them to the new db
-        {ok, _, LocalDocs} = couch_btree:foldl(Db#db.local_docs_btree,
+        {ok, _, LocalDocs} = couch_btree:foldl(Db#db.local_tree,
                 fun(Value, _Offset, Acc) -> {ok, [Value | Acc]} end, []),
-        {ok, NewLocalBtree} = couch_btree:add(NewDb#db.local_docs_btree, LocalDocs),
+        {ok, NewLocalBtree} = couch_btree:add(NewDb#db.local_tree, LocalDocs),
 
         NewDb2 = commit_data(NewDb#db{
-            local_docs_btree = NewLocalBtree,
+            local_tree = NewLocalBtree,
             main_pid = self(),
             filepath = Filepath,
             instance_start_time = Db#db.instance_start_time,
@@ -446,17 +446,17 @@ init_db(DbName, Filepath, Fd, Header0, Options) ->
 
     Compression = couch_compress:get_compression_method(),
 
-    {ok, IdBtree} = couch_btree:open(Header#db_header.fulldocinfo_by_id_btree_state, Fd,
+    {ok, IdBtree} = couch_btree:open(Header#db_header.id_tree_state, Fd,
         [{split, fun(X) -> btree_by_id_split(X) end},
         {join, fun(X,Y) -> btree_by_id_join(X,Y) end},
         {reduce, fun(X,Y) -> btree_by_id_reduce(X,Y) end},
         {compression, Compression}]),
-    {ok, SeqBtree} = couch_btree:open(Header#db_header.docinfo_by_seq_btree_state, Fd,
+    {ok, SeqBtree} = couch_btree:open(Header#db_header.seq_tree_state, Fd,
             [{split, fun(X) -> btree_by_seq_split(X) end},
             {join, fun(X,Y) -> btree_by_seq_join(X,Y) end},
             {reduce, fun(X,Y) -> btree_by_seq_reduce(X,Y) end},
             {compression, Compression}]),
-    {ok, LocalDocsBtree} = couch_btree:open(Header#db_header.local_docs_btree_state, Fd,
+    {ok, LocalDocsBtree} = couch_btree:open(Header#db_header.local_tree_state, Fd,
         [{compression, Compression}]),
     case Header#db_header.security_ptr of
     nil ->
@@ -474,9 +474,9 @@ init_db(DbName, Filepath, Fd, Header0, Options) ->
         fd=Fd,
         fd_monitor = erlang:monitor(process, Fd),
         header=Header,
-        fulldocinfo_by_id_btree = IdBtree,
-        docinfo_by_seq_btree = SeqBtree,
-        local_docs_btree = LocalDocsBtree,
+        id_tree = IdBtree,
+        seq_tree = SeqBtree,
+        local_tree = LocalDocsBtree,
         committed_update_seq = Header#db_header.update_seq,
         update_seq = Header#db_header.update_seq,
         name = DbName,
@@ -668,8 +668,8 @@ stem_full_doc_infos(#db{revs_limit=Limit}, DocInfos) ->
 
 update_docs_int(Db, DocsList, NonRepDocs, MergeConflicts, FullCommit) ->
     #db{
-        fulldocinfo_by_id_btree = DocInfoByIdBTree,
-        docinfo_by_seq_btree = DocInfoBySeqBTree,
+        id_tree = DocInfoByIdBTree,
+        seq_tree = DocInfoBySeqBTree,
         update_seq = LastSeq,
         revs_limit = RevsLimit
         } = Db,
@@ -703,8 +703,8 @@ update_docs_int(Db, DocsList, NonRepDocs, MergeConflicts, FullCommit) ->
     {ok, DocInfoBySeqBTree2} = couch_btree:add_remove(DocInfoBySeqBTree, IndexDocInfos, RemoveSeqs),
 
     Db3 = Db2#db{
-        fulldocinfo_by_id_btree = DocInfoByIdBTree2,
-        docinfo_by_seq_btree = DocInfoBySeqBTree2,
+        id_tree = DocInfoByIdBTree2,
+        seq_tree = DocInfoBySeqBTree2,
         update_seq = NewSeq},
 
     % Check if we just updated any design documents, and update the validation
@@ -720,7 +720,7 @@ update_docs_int(Db, DocsList, NonRepDocs, MergeConflicts, FullCommit) ->
 
 update_local_docs(Db, []) ->
     {ok, Db};
-update_local_docs(#db{local_docs_btree=Btree}=Db, Docs) ->
+update_local_docs(#db{local_tree=Btree}=Db, Docs) ->
     Ids = [Id || {_Client, {#doc{id=Id}, _Ref}} <- Docs],
     OldDocLookups = couch_btree:lookup(Btree, Ids),
     BtreeEntries = lists:zipwith(
@@ -760,7 +760,7 @@ update_local_docs(#db{local_docs_btree=Btree}=Db, Docs) ->
     {ok, Btree2} =
         couch_btree:add_remove(Btree, BtreeIdsUpdate, BtreeIdsRemove),
 
-    {ok, Db#db{local_docs_btree = Btree2}}.
+    {ok, Db#db{local_tree = Btree2}}.
 
 
 commit_data(Db) ->
@@ -769,9 +769,9 @@ commit_data(Db) ->
 db_to_header(Db, Header) ->
     Header#db_header{
         update_seq = Db#db.update_seq,
-        docinfo_by_seq_btree_state = couch_btree:get_state(Db#db.docinfo_by_seq_btree),
-        fulldocinfo_by_id_btree_state = couch_btree:get_state(Db#db.fulldocinfo_by_id_btree),
-        local_docs_btree_state = couch_btree:get_state(Db#db.local_docs_btree),
+        seq_tree_state = couch_btree:get_state(Db#db.seq_tree),
+        id_tree_state = couch_btree:get_state(Db#db.id_tree),
+        local_tree_state = couch_btree:get_state(Db#db.local_tree),
         security_ptr = Db#db.security_ptr,
         revs_limit = Db#db.revs_limit}.
 
@@ -848,7 +848,7 @@ copy_docs(Db, #db{fd = DestFd} = NewDb, InfoBySeq0, Retry) ->
     InfoBySeq = lists:usort(fun(#doc_info{id=A}, #doc_info{id=B}) -> A =< B end,
         InfoBySeq0),
     Ids = [Id || #doc_info{id=Id} <- InfoBySeq],
-    LookupResults = couch_btree:lookup(Db#db.fulldocinfo_by_id_btree, Ids),
+    LookupResults = couch_btree:lookup(Db#db.id_tree, Ids),
 
     NewFullDocInfos1 = lists:map(
         fun({ok, #full_doc_info{rev_tree=RevTree}=Info}) ->
@@ -880,17 +880,16 @@ copy_docs(Db, #db{fd = DestFd} = NewDb, InfoBySeq0, Retry) ->
     true ->
         % We are retrying a compaction, meaning the documents we are copying may
         % already exist in our file and must be removed from the by_seq index.
-        Existing = couch_btree:lookup(NewDb#db.fulldocinfo_by_id_btree, Ids),
+        Existing = couch_btree:lookup(NewDb#db.id_tree, Ids),
         [Seq || {ok, #full_doc_info{update_seq=Seq}} <- Existing]
     end,
 
-    {ok, DocInfoBTree} = couch_btree:add_remove(
-            NewDb#db.docinfo_by_seq_btree, NewDocInfos, RemoveSeqs),
-    {ok, FullDocInfoBTree} = couch_btree:add_remove(
-            NewDb#db.fulldocinfo_by_id_btree, NewFullDocInfos, []),
+    {ok, SeqTree} = couch_btree:add_remove(
+            NewDb#db.seq_tree, NewDocInfos, RemoveSeqs),
+    {ok, IdTree} = couch_btree:add_remove(
+            NewDb#db.id_tree, NewFullDocInfos, []),
     update_compact_task(length(NewFullDocInfos)),
-    NewDb#db{ fulldocinfo_by_id_btree=FullDocInfoBTree,
-              docinfo_by_seq_btree=DocInfoBTree}.
+    NewDb#db{id_tree=IdTree, seq_tree=SeqTree}.
 
 
 
@@ -946,7 +945,7 @@ copy_compact(Db, NewDb0, Retry) ->
     end,
 
     {ok, _, {NewDb2, Uncopied, _, _}} =
-        couch_btree:foldl(Db#db.docinfo_by_seq_btree, EnumBySeqFun,
+        couch_btree:foldl(Db#db.seq_tree, EnumBySeqFun,
             {NewDb, [], 0, 0},
             [{start_key, NewDb#db.update_seq + 1}]),
 

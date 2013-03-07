@@ -322,7 +322,7 @@ send_changes(Args, Acc0, FirstRound) ->
 
 
 send_changes_doc_ids(DocIds, Db, StartSeq, Dir, Fun, Acc0) ->
-    Lookups = couch_btree:lookup(Db#db.fulldocinfo_by_id_btree, DocIds),
+    Lookups = couch_btree:lookup(Db#db.id_tree, DocIds),
     FullDocInfos = lists:foldl(
         fun({ok, FDI}, Acc) ->
             [FDI | Acc];
@@ -339,7 +339,7 @@ send_changes_design_docs(Db, StartSeq, Dir, Fun, Acc0) ->
     end,
     KeyOpts = [{start_key, <<"_design/">>}, {end_key_gt, <<"_design0">>}],
     {ok, _, FullDocInfos} = couch_btree:fold(
-        Db#db.fulldocinfo_by_id_btree, FoldFun, [], KeyOpts),
+        Db#db.id_tree, FoldFun, [], KeyOpts),
     send_lookup_changes(FullDocInfos, StartSeq, Dir, Db, Fun, Acc0).
 
 
