@@ -222,6 +222,8 @@ choose_ushards(DbName, Shards) ->
     {_, Result} = lists:foldl(Fun, {0, []}, Groups),
     Result.
 
+rotate_list(_DbName, []) ->
+    [];
 rotate_list(DbName, List) ->
     {H, T} = lists:split(erlang:crc32(DbName) rem length(List), List),
     T ++ H.
