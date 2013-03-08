@@ -139,7 +139,9 @@ config_change("daemons", _) ->
     supervisor:terminate_child(couch_server_sup, couch_secondary_services),
     supervisor:restart_child(couch_server_sup, couch_secondary_services);
 config_change("couchdb", "util_driver_dir") ->
-    init:restart().
+    [Pid] = [P || {collation_driver, P, _, _}
+        <- supervisor:which_children(couch_primary_services)],
+    Pid ! reload_driver.
 
 init(ChildSpecs) ->
     {ok, ChildSpecs}.
