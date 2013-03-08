@@ -43,8 +43,10 @@ init({DbName, Filepath, Fd, Options}) ->
         end
     end,
     Db = init_db(DbName, Filepath, Fd, Header, Options),
-    Db2 = refresh_validate_doc_funs(Db),
-    {ok, Db2#db{main_pid = self()}}.
+    % we don't load validation funs here because the fabric query is liable to
+    % race conditions.  Instead see couch_db:validate_doc_update, which loads
+    % them lazily
+    {ok, Db#db{main_pid = self()}}.
 
 
 terminate(_Reason, Db) ->
@@ -170,6 +172,10 @@ handle_call({purge_docs, IdRevs}, _From, Db) ->
     {reply, {ok, (Db2#db.header)#db_header.purge_seq, IdRevsPurged}, Db2}.
 
 
+handle_cast({load_validation_funs, ValidationFuns}, Db) ->
+    Db2 = Db#db{validate_doc_funs = ValidationFuns},
+    ok = gen_server:call(couch_server, {db_updated, Db2}, infinity),
+    {noreply, Db2};
 handle_cast(start_compact, Db) ->
     case Db#db.compactor_pid of
     nil ->
@@ -512,6 +518,12 @@ refresh_validate_doc_funs(Db0) ->
             Fun -> [Fun]
             end
         end, DesignDocs),
+    case Db#db.name of
+        <<"shards/", _:18/binary, DbName/binary>> ->
+            fabric:reset_validation_funs(DbName);
+        _ ->
+            ok
+    end,
     Db0#db{validate_doc_funs=ProcessDocFuns}.
 
 % rev tree functions

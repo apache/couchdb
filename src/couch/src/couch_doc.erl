@@ -398,6 +398,8 @@ att_to_bin(#att{data=DataFun, att_len=Len}) when is_function(DataFun)->
         ))
     ).
 
+get_validate_doc_fun({Props}) ->
+    get_validate_doc_fun(couch_doc:from_json_obj({Props}));
 get_validate_doc_fun(#doc{body={Props}}=DDoc) ->
     case couch_util:get_value(<<"validate_doc_update">>, Props) of
     undefined ->
