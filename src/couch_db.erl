@@ -29,6 +29,7 @@
 -export([changes_since/4,changes_since/5,read_doc/2,new_revid/1]).
 -export([check_is_admin/1, check_is_member/1, get_doc_count/1]).
 -export([reopen/1, is_system_db/1, compression/1]).
+-export([load_validation_funs/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -338,6 +339,11 @@ sum_tree_sizes(Acc, [T | Rest]) ->
         sum_tree_sizes(Acc + Sz, Rest)
     end.
 
+get_design_docs(#db{name = <<"shards/", _:18/binary, DbName/binary>>}) ->
+    {_, Ref} = spawn_monitor(fun() -> exit(fabric:design_docs(DbName)) end),
+    receive {'DOWN', Ref, _, _, Response} ->
+        Response
+    end;
 get_design_docs(#db{id_tree = IdBtree}) ->
     FoldFun = skip_deleted(fun
         (#full_doc_info{deleted = true}, _Reds, Acc) ->
@@ -496,6 +502,9 @@ group_alike_docs([{Doc,Ref}|Rest], [Bucket|RestBuckets]) ->
 
 validate_doc_update(#db{}=Db, #doc{id= <<"_design/",_/binary>>}, _GetDiskDocFun) ->
     catch check_is_admin(Db);
+validate_doc_update(#db{validate_doc_funs = undefined} = Db, Doc, Fun) ->
+    ValidationFuns = load_validation_funs(Db),
+    validate_doc_update(Db#db{validate_doc_funs=ValidationFuns}, Doc, Fun);
 validate_doc_update(#db{validate_doc_funs=[]}, _Doc, _GetDiskDocFun) ->
     ok;
 validate_doc_update(_Db, #doc{id= <<"_local/",_/binary>>}, _GetDiskDocFun) ->
@@ -514,6 +523,35 @@ validate_doc_update(Db, Doc, GetDiskDocFun) ->
             Error
     end.
 
+
+load_validation_funs(#db{main_pid=Pid, name = <<"shards/", _/binary>>}=Db) ->
+    {_, Ref} = spawn_monitor(fun() ->
+        exit(ddoc_cache:open(mem3:dbname(Db#db.name), validation_funs))
+    end),
+    receive
+        {'DOWN', Ref, _, _, {ok, Funs}} ->
+            gen_server:cast(Pid, {load_validation_funs, Funs}),
+            Funs;
+        {'DOWN', Ref, _, _, Reason} ->
+            ?LOG_ERROR("could not load validation funs ~p", [Reason]),
+            throw(internal_server_error)
+    end;
+load_validation_funs(#db{main_pid=Pid}=Db) ->
+    {ok, DDocInfos} = get_design_docs(Db),
+    OpenDocs = fun
+        (#full_doc_info{}=D) ->
+            {ok, Doc} = open_doc_int(Db, D, [ejson_body]),
+            Doc
+    end,
+    DDocs = lists:map(OpenDocs, DDocInfos),
+    Funs = lists:flatmap(fun(DDoc) ->
+        case couch_doc:get_validate_doc_fun(DDoc) of
+            nil -> [];
+            Fun -> [Fun]
+        end
+    end, DDocs),
+    gen_server:cast(Pid, {load_validation_funs, Funs}),
+    Funs.
 
 prep_and_validate_update(Db, #doc{id=Id,revs={RevStart, Revs}}=Doc,
         OldFullDocInfo, LeafRevsDict, AllowConflict) ->
