@@ -734,20 +734,21 @@ update_local_docs(#db{local_tree=Btree}=Db, Docs) ->
     Ids = [Id || {_Client, {#doc{id=Id}, _Ref}} <- Docs],
     OldDocLookups = couch_btree:lookup(Btree, Ids),
     BtreeEntries = lists:zipwith(
-        fun({Client, {#doc{id=Id,deleted=Delete,revs={0,PrevRevs},body=Body}, Ref}}, OldDocLookup) ->
+        fun({Client, {#doc{id=Id,deleted=Delete,revs={0,PrevRevs},body=Body}, Ref}}, _OldDocLookup) ->
             case PrevRevs of
             [RevStr|_] ->
                 PrevRev = list_to_integer(?b2l(RevStr));
             [] ->
                 PrevRev = 0
             end,
-            OldRev =
-            case OldDocLookup of
-                {ok, {_, {OldRev0, _}}} -> OldRev0;
-                not_found -> 0
-            end,
-            case OldRev == PrevRev of
-            true ->
+            %% disabled conflict checking for local docs -- APK 16 June 2010
+            % OldRev =
+            % case OldDocLookup of
+            %     {ok, {_, {OldRev0, _}}} -> OldRev0;
+            %     not_found -> 0
+            % end,
+            % case OldRev == PrevRev of
+            % true ->
                 case Delete of
                     false ->
                         send_result(Client, Ref, {ok,
@@ -757,11 +758,11 @@ update_local_docs(#db{local_tree=Btree}=Db, Docs) ->
                         send_result(Client, Ref,
                                 {ok, {0, <<"0">>}}),
                         {remove, Id}
-                end;
-            false ->
-                send_result(Client, Ref, conflict),
-                ignore
-            end
+                end%;
+            % false ->
+            %     send_result(Client, Ref, conflict),
+            %     ignore
+            % end
         end, Docs, OldDocLookups),
 
     BtreeIdsRemove = [Id || {remove, Id} <- BtreeEntries],
