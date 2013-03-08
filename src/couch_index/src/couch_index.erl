@@ -16,6 +16,7 @@
 
 %% API
 -export([start_link/1, stop/1, get_state/2, get_info/1]).
+-export([trigger_update/2]).
 -export([compact/1, compact/2]).
 -export([config_change/3]).
 
@@ -53,6 +54,10 @@ get_state(Pid, RequestSeq) ->
 
 get_info(Pid) ->
     gen_server:call(Pid, get_info).
+
+
+trigger_update(Pid, UpdateSeq) ->
+    gen_server:cast(Pid, {trigger_update, UpdateSeq}).
 
 
 compact(Pid) ->
@@ -201,6 +206,18 @@ handle_call({compacted, NewIdxState}, _From, State) ->
 handle_cast({config_change, NewDelay}, State) ->
     MsDelay = 1000 * list_to_integer(NewDelay),
     {noreply, State#st{commit_delay=MsDelay}};
+handle_cast({trigger_update, UpdateSeq}, State) ->
+    #st{
+        mod=Mod,
+        idx_state=IdxState
+    } = State,
+    case UpdateSeq =< Mod:get(update_seq, IdxState) of
+        true ->
+            {noreply, State};
+        false ->
+            couch_index_updater:run(State#st.updater, IdxState),
+            {noreply, State}
+    end;
 handle_cast({updated, NewIdxState}, State) ->
     {noreply, NewState} = handle_cast({new_state, NewIdxState}, State),
     case NewState#st.shutdown andalso (NewState#st.waiters =:= []) of
