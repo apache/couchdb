@@ -16,9 +16,9 @@
 -export([att_foldl/3,range_att_foldl/5,att_foldl_decode/3,get_validate_doc_fun/1]).
 -export([from_json_obj/1,to_json_obj/2,has_stubs/1, merge_stubs/2]).
 -export([validate_docid/1]).
--export([doc_from_multi_part_stream/2]).
+-export([doc_from_multi_part_stream/2, doc_from_multi_part_stream/3]).
 -export([doc_to_multi_part_stream/5, len_doc_to_multi_part_stream/4]).
--export([abort_multi_part_stream/1]).
+-export([abort_multi_part_stream/1, restart_open_doc_revs/3]).
 -export([to_path/1]).
 -export([mp_parse_doc/2]).
 -export([with_ejson_body/1]).
@@ -366,7 +366,25 @@ att_foldl(#att{data=Bin}, Fun, Acc) when is_binary(Bin) ->
 att_foldl(#att{data={Fd,Sp},md5=Md5}, Fun, Acc) ->
     couch_stream:foldl(Fd, Sp, Md5, Fun, Acc);
 att_foldl(#att{data=DataFun,att_len=Len}, Fun, Acc) when is_function(DataFun) ->
-   fold_streamed_data(DataFun, Len, Fun, Acc).
+   fold_streamed_data(DataFun, Len, Fun, Acc);
+att_foldl(#att{data={follows, Parser, Ref}}=Att, Fun, Acc) ->
+    ParserRef = erlang:monitor(process, Parser),
+    DataFun = fun() ->
+        Parser ! {get_bytes, Ref, self()},
+        receive
+            {started_open_doc_revs, NewRef} ->
+                couch_doc:restart_open_doc_revs(Parser, Ref, NewRef);
+            {bytes, Ref, Bytes} ->
+                Bytes;
+            {'DOWN', ParserRef, _, _, Reason} ->
+                throw({mp_parser_died, Reason})
+        end
+    end,
+    try
+        att_foldl(Att#att{data=DataFun}, Fun, Acc)
+    after
+        erlang:demonitor(ParserRef, [flush])
+    end.
 
 range_att_foldl(#att{data={Fd,Sp}}, From, To, Fun, Acc) ->
    couch_stream:range_foldl(Fd, Sp, From, To, Fun, Acc).
@@ -563,37 +581,43 @@ atts_to_mp([Att | RestAtts], Boundary, WriteFun,
 
 
 doc_from_multi_part_stream(ContentType, DataFun) ->
+    doc_from_multi_part_stream(ContentType, DataFun, make_ref()).
+
+
+doc_from_multi_part_stream(ContentType, DataFun, Ref) ->
     Parent = self(),
+    NumMpWriters = num_mp_writers(),
     Parser = spawn_link(fun() ->
+        ParentRef = erlang:monitor(process, Parent),
+        put(mp_parent_ref, ParentRef),
+        put(num_mp_writers, NumMpWriters),
         {<<"--",_/binary>>, _, _} = couch_httpd:parse_multipart_request(
             ContentType, DataFun,
             fun(Next) -> mp_parse_doc(Next, []) end),
-        unlink(Parent),
-        Parent ! {self(), finished}
+        unlink(Parent)
         end),
-    Ref = make_ref(),
+    ParserRef = erlang:monitor(process, Parser),
     Parser ! {get_doc_bytes, Ref, self()},
     receive
+    {started_open_doc_revs, NewRef} ->
+        restart_open_doc_revs(Parser, Ref, NewRef);
     {doc_bytes, Ref, DocBytes} ->
         Doc = from_json_obj(?JSON_DECODE(DocBytes)),
-        % go through the attachments looking for 'follows' in the data,
-        % replace with function that reads the data from MIME stream.
-        ReadAttachmentDataFun = fun() ->
-            Parser ! {get_bytes, Ref, self()},
-            receive {bytes, Ref, Bytes} -> Bytes end
-        end,
+        % we'll send the Parser process ID to the remote nodes so they can
+        % retrieve their own copies of the attachment data
         Atts2 = lists:map(
             fun(#att{data=follows}=A) ->
-                A#att{data=ReadAttachmentDataFun};
+                A#att{data={follows, Parser, Ref}};
             (A) ->
                 A
             end, Doc#doc.atts),
         WaitFun = fun() ->
-            receive {Parser, finished} -> ok end,
+            receive {'DOWN', ParserRef, _, _, _} -> ok end,
             erlang:put(mochiweb_request_recv, true)
         end,
         {ok, Doc#doc{atts=Atts2}, WaitFun, Parser}
     end.
+
 
 mp_parse_doc({headers, H}, []) ->
     case couch_util:get_value("content-type", H) of
@@ -610,36 +634,144 @@ mp_parse_doc(body_end, AccBytes) ->
     receive {get_doc_bytes, Ref, From} ->
         From ! {doc_bytes, Ref, lists:reverse(AccBytes)}
     end,
-    fun mp_parse_atts/1.
+    fun(Next) ->
+        mp_parse_atts(Next, {Ref, [], 0, orddict:new(), []})
+    end.
 
-mp_parse_atts(eof) ->
+mp_parse_atts({headers, _}, Acc) ->
+    fun(Next) -> mp_parse_atts(Next, Acc) end;
+mp_parse_atts(body_end, Acc) ->
+    fun(Next) -> mp_parse_atts(Next, Acc) end;
+mp_parse_atts({body, Bytes}, {Ref, Chunks, Offset, Counters, Waiting}) ->
+    case maybe_send_data({Ref, Chunks++[Bytes], Offset, Counters, Waiting}) of
+        abort_parsing ->
+            fun(Next) -> mp_abort_parse_atts(Next, nil) end;
+        NewAcc ->
+            fun(Next) -> mp_parse_atts(Next, NewAcc) end
+    end;
+mp_parse_atts(eof, {Ref, Chunks, Offset, Counters, Waiting}) ->
+    N = num_mp_writers(),
+    M = length(Counters),
+    case (M == N) andalso Chunks == [] of
+    true ->
+        ok;
+    false ->
+        ParentRef = get(mp_parent_ref),
+        receive
+        abort_parsing ->
+            ok;
+        {get_bytes, Ref, From} ->
+            C2 = orddict:update_counter(From, 1, Counters),
+            NewAcc = maybe_send_data({Ref, Chunks, Offset, C2, [From|Waiting]}),
+            mp_parse_atts(eof, NewAcc);
+        {'DOWN', ParentRef, _, _, _} ->
+            exit(mp_reader_coordinator_died)
+        after 3600000 ->
+            ok
+        end
+    end.
+
+mp_abort_parse_atts(eof, _) ->
     ok;
-mp_parse_atts({headers, _H}) ->
-    fun mp_parse_atts/1;
-mp_parse_atts({body, Bytes}) ->
+mp_abort_parse_atts(_, _) ->
+    fun(Next) -> mp_abort_parse_atts(Next, nil) end.
+
+maybe_send_data({Ref, Chunks, Offset, Counters, Waiting}) ->
     receive {get_bytes, Ref, From} ->
-        From ! {bytes, Ref, Bytes}
-    end,
-    fun mp_parse_atts/1;
-mp_parse_atts(body_end) ->
-    fun mp_parse_atts/1.
+        NewCounters = orddict:update_counter(From, 1, Counters),
+        maybe_send_data({Ref, Chunks, Offset, NewCounters, [From|Waiting]})
+    after 0 ->
+        % reply to as many writers as possible
+        NewWaiting = lists:filter(fun(Writer) ->
+            WhichChunk = orddict:fetch(Writer, Counters),
+            ListIndex = WhichChunk - Offset,
+            if ListIndex =< length(Chunks) ->
+                Writer ! {bytes, Ref, lists:nth(ListIndex, Chunks)},
+                false;
+            true ->
+                true
+            end
+        end, Waiting),
+
+        % check if we can drop a chunk from the head of the list
+        case Counters of
+        [] ->
+            SmallestIndex = 0;
+        _ ->
+            SmallestIndex = lists:min(element(2, lists:unzip(Counters)))
+        end,
+        Size = length(Counters),
+        N = num_mp_writers(),
+        if Size == N andalso SmallestIndex == (Offset+1) ->
+            NewChunks = tl(Chunks),
+            NewOffset = Offset+1;
+        true ->
+            NewChunks = Chunks,
+            NewOffset = Offset
+        end,
+
+        % we should wait for a writer if no one has written the last chunk
+        LargestIndex = lists:max([0|element(2, lists:unzip(Counters))]),
+        if LargestIndex  >= (Offset + length(Chunks)) ->
+            % someone has written all possible chunks, keep moving
+            {Ref, NewChunks, NewOffset, Counters, NewWaiting};
+        true ->
+            ParentRef = get(mp_parent_ref),
+            receive
+            abort_parsing ->
+                abort_parsing;
+            {'DOWN', ParentRef, _, _, _} ->
+                exit(mp_reader_coordinator_died);
+            {get_bytes, Ref, X} ->
+                C2 = orddict:update_counter(X, 1, Counters),
+                maybe_send_data({Ref, NewChunks, NewOffset, C2, [X|NewWaiting]})
+            end
+        end
+    end.
+
+
+num_mp_writers() ->
+    case erlang:get(mp_att_writers) of
+        undefined -> 1;
+        Count -> Count
+    end.
 
 
 abort_multi_part_stream(Parser) ->
-    abort_multi_part_stream(Parser, erlang:monitor(process, Parser)).
+    MonRef = erlang:monitor(process, Parser),
+    Parser ! abort_parsing,
+    receive
+        {'DOWN', MonRef, _, _, _} -> ok
+    after 60000 ->
+        % One minute is quite on purpose for this timeout. We
+        % want to try and read data to keep the socket open
+        % when possible but we also don't want to just make
+        % this a super long timeout because people have to
+        % wait this long to see if they just had an error
+        % like a validate_doc_update failure.
+        throw(multi_part_abort_timeout)
+    end.
 
-abort_multi_part_stream(Parser, MonRef) ->
-    case is_process_alive(Parser) of
-    true ->
-        Parser ! {get_bytes, nil, self()},
-        receive
-        {bytes, nil, _Bytes} ->
-             abort_multi_part_stream(Parser, MonRef);
-        {'DOWN', MonRef, _, _, _} ->
-             ok
-        end;
-    false ->
-        erlang:demonitor(MonRef, [flush])
+
+restart_open_doc_revs(Parser, Ref, NewRef) ->
+    unlink(Parser),
+    exit(Parser, kill),
+    flush_parser_messages(Ref),
+    erlang:error({restart_open_doc_revs, NewRef}).
+
+
+flush_parser_messages(Ref) ->
+    receive
+        {headers, Ref, _} ->
+            flush_parser_messages(Ref);
+        {body_bytes, Ref, _} ->
+            flush_parser_messages(Ref);
+        {body_done, Ref} ->
+            flush_parser_messages(Ref);
+        {done, Ref} ->
+            flush_parser_messages(Ref)
+    after 0 ->
+        ok
     end.
 
 

@@ -530,17 +530,18 @@ receive_docs(Streamer, UserFun, Ref, UserAcc) ->
     {headers, Ref, Headers} ->
         case get_value("content-type", Headers) of
         {"multipart/related", _} = ContentType ->
-            case doc_from_multi_part_stream(
+            case couch_doc:doc_from_multi_part_stream(
                 ContentType,
                 fun() -> receive_doc_data(Streamer, Ref) end,
                 Ref) of
-            {ok, Doc, Parser} ->
+            {ok, Doc, WaitFun, Parser} ->
                 case UserFun({ok, Doc}, UserAcc) of
                 {ok, UserAcc2} ->
                     ok;
                 {skip, UserAcc2} ->
                     couch_doc:abort_multi_part_stream(Parser)
                 end,
+                WaitFun(),
                 receive_docs(Streamer, UserFun, Ref, UserAcc2)
             end;
         {"application/json", []} ->

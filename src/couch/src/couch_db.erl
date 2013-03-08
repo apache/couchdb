@@ -1021,7 +1021,26 @@ flush_att(Fd, #att{data=Fun,att_len=undefined}=Att) when is_function(Fun) ->
 flush_att(Fd, #att{data=Fun,att_len=AttLen}=Att) when is_function(Fun) ->
     with_stream(Fd, Att, fun(OutputStream) ->
         write_streamed_attachment(OutputStream, Fun, AttLen)
-    end).
+    end);
+
+flush_att(Fd, #att{data={follows, Parser, Ref}}=Att) when is_pid(Parser) ->
+    ParserRef = erlang:monitor(process, Parser),
+    Fun = fun() ->
+        Parser ! {get_bytes, Ref, self()},
+        receive
+            {started_open_doc_revs, NewRef} ->
+                couch_doc:restart_open_doc_revs(Parser, Ref, NewRef);
+            {bytes, Ref, Bytes} ->
+                Bytes;
+            {'DOWN', ParserRef, _, _, Reason} ->
+                throw({mp_parser_died, Reason})
+        end
+    end,
+    try
+        flush_att(Fd, Att#att{data=Fun})
+    after
+        erlang:demonitor(ParserRef, [flush])
+    end.
 
 
 compressible_att_type(MimeType) when is_binary(MimeType) ->
