@@ -355,7 +355,7 @@ get_design_docs(#db{id_tree = IdBtree}) ->
     end),
     KeyOpts = [{start_key, <<"_design/">>}, {end_key_gt, <<"_design0">>}],
     {ok, _, Docs} = couch_btree:fold(IdBtree, FoldFun, [], KeyOpts),
-    Docs.
+    {ok, Docs}.
 
 check_is_admin(#db{user_ctx=#user_ctx{name=Name,roles=Roles}}=Db) ->
     {Admins} = get_admins(Db),
