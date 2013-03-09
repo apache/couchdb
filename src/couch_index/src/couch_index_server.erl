@@ -136,7 +136,10 @@ handle_info({'EXIT', Pid, Reason}, Server) ->
         _Else ->
             ok
     end,
-    {noreply, Server}.
+    {noreply, Server};
+handle_info(Msg, State) ->
+    twig:log(warn, "~p did not expect ~p", [?MODULE, Msg]),
+    {noreply, State}.
 
 
 code_change(_OldVsn, State, _Extra) ->
