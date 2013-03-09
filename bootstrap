@@ -33,14 +33,14 @@ get () {
 
 if test -z "$REVISION"; then
     if test -e .git; then
-        REVISION=`git describe --always`-git
+        REVISION=`git describe --always`
     fi
 fi
 
 if test -z "`get LOCAL_VERSION_STAGE`" -o -z "$REVISION"; then
-    sed "s/%release%//" < acinclude.m4.in > acinclude.m4
+    sed "s/%revision%//" < acinclude.m4.in > acinclude.m4
 else
-    sed "s/%release%/$REVISION/" < acinclude.m4.in > acinclude.m4
+    sed "s/%revision%/$REVISION/" < acinclude.m4.in > acinclude.m4
 fi
 
 if test -e .git; then
