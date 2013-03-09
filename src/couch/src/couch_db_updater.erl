@@ -528,7 +528,7 @@ close_db(#db{fd_monitor = Ref}) ->
 
 refresh_validate_doc_funs(Db0) ->
     Db = Db0#db{user_ctx = #user_ctx{roles=[<<"_admin">>]}},
-    DesignDocs = couch_db:get_design_docs(Db),
+    {ok, DesignDocs} = couch_db:get_design_docs(Db),
     ProcessDocFuns = lists:flatmap(
         fun(DesignDocInfo) ->
             {ok, DesignDoc} = couch_db:open_doc_int(
