@@ -23,7 +23,7 @@ run(Db) ->
     RootDir = couch_index_util:root_dir(),
     DbName = couch_db:name(Db),
 
-    DesignDocs = couch_db:get_design_docs(Db),
+    {ok, DesignDocs} = couch_db:get_design_docs(Db),
     SigFiles = lists:foldl(fun(DDocInfo, SFAcc) ->
         {ok, DDoc} = couch_db:open_doc_int(Db, DDocInfo, [ejson_body]),
         {ok, InitState} = couch_mrview_util:ddoc_to_mrst(DbName, DDoc),
