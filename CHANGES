@@ -1,6 +1,15 @@
 Apache CouchDB CHANGES
 ======================
 
+Version 1.3.1
+-------------
+
+This version has not been released yet.
+
+HTTP Interface:
+
+* Fix bug in CORS when retrieving attachments.
+
 Version 1.3.0
 -------------
 

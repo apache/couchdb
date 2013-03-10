@@ -32,7 +32,7 @@ server() ->
 main(_) ->
     test_util:init_code_path(),
 
-    etap:plan(28),
+    etap:plan(30),
     case (catch test()) of
         ok ->
             etap:end_tests();
@@ -85,6 +85,8 @@ test() ->
 
     test_preflight_request(),
     test_db_request(),
+    test_doc_with_attachment_request(),
+    test_doc_with_attachment_range_request(),
     test_db_preflight_request(),
     test_db_origin_request(),
     test_db1_origin_request(),
@@ -219,6 +221,37 @@ test_db_request(VHost) ->
         etap:is(proplists:get_value("Access-Control-Expose-Headers", RespHeaders),
             "Content-Type, Server",
             "db Access-Control-Expose-Headers ok");
+    _ ->
+        etap:is(false, true, "ibrowse failed")
+    end.
+
+% COUCHDB-1689
+test_doc_with_attachment_request() ->
+    DocUrl = server() ++ "etap-test-db/doc1",
+    ibrowse:send_req(DocUrl ++ "/attachment.txt",
+        [{"Content-Type", "text/plain"}], put, "this is a text attachment"),
+
+    Headers = [{"Origin", "http://example.com"}],
+    Url = DocUrl ++ "?attachments=true",
+    case ibrowse:send_req(Url, Headers, get, []) of
+    {ok, Code, _RespHeaders, _Body} ->
+        etap:is(Code, "200", "Response without errors");
+    _ ->
+        etap:is(false, true, "ibrowse failed")
+    end.
+
+% COUCHDB-1689
+test_doc_with_attachment_range_request() ->
+    AttachmentUrl = server() ++ "etap-test-db/doc2/attachment.bin",
+    % Use a Content-Type that doesn't get compressed
+    ibrowse:send_req(AttachmentUrl,
+        [{"Content-Type", "application/octet-stream"}], put,
+        "this is an attachment"),
+
+    Headers = [{"Origin", "http://example.com"}, {"Range", "bytes=0-6"}],
+    case ibrowse:send_req(AttachmentUrl, Headers, get, []) of
+    {ok, Code, _RespHeaders, _Body} ->
+        etap:is(Code, "206", "Response without errors");
     _ ->
         etap:is(false, true, "ibrowse failed")
     end.
