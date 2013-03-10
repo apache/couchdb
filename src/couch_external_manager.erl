@@ -12,9 +12,13 @@
 
 -module(couch_external_manager).
 -behaviour(gen_server).
+-behaviour(config_listener).
 
--export([start_link/0, execute/2, config_change/2]).
+-export([start_link/0, execute/2]).
 -export([init/1, terminate/2, code_change/3, handle_call/3, handle_cast/2, handle_info/2]).
+
+% config_listener api
+-export([handle_config_change/5]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -31,15 +35,17 @@ execute(UrlName, JsonReq) ->
         couch_external_server:execute(Pid, JsonReq)
     end.
 
-config_change("external", UrlName) ->
-    gen_server:call(couch_external_manager, {config, UrlName}).
+handle_config_change("external", UrlName, _, _, _) ->
+    {ok, gen_server:call(couch_external_manager, {config, UrlName})};
+handle_config_change(_, _, _, _, _) ->
+    {ok, nil}.
 
 % gen_server API
 
 init([]) ->
     process_flag(trap_exit, true),
     Handlers = ets:new(couch_external_manager_handlers, [set, private]),
-    couch_config:register(fun ?MODULE:config_change/2),
+    ok = config:listen_for_changes(?MODULE, nil),
     {ok, Handlers}.
 
 terminate(_Reason, Handlers) ->
@@ -52,7 +58,7 @@ terminate(_Reason, Handlers) ->
 handle_call({get, UrlName}, _From, Handlers) ->
     case ets:lookup(Handlers, UrlName) of
     [] ->
-        case couch_config:get("external", UrlName, nil) of
+        case config:get("external", UrlName, nil) of
         nil ->
             Msg = lists:flatten(
                 io_lib:format("No server configured for ~p.", [UrlName])),
@@ -94,7 +100,15 @@ handle_info({'EXIT', Pid, Reason}, Handlers) ->
     % Remove Pid from the handlers table so we don't try closing
     % it a second time in terminate/2.
     ets:match_delete(Handlers, {'_', Pid}),
-    {stop, normal, Handlers}.
+    {stop, normal, Handlers};
+
+handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
+    erlang:send_after(5000, self(), restart_config_listener),
+    {noreply, State};
+
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {noreply, State}.
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.

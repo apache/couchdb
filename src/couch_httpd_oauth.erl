@@ -309,17 +309,17 @@ oauth_credentials_info(Token, ConsumerKey) ->
         Result;
     nil ->
         {
-            case couch_config:get("oauth_consumer_secrets", ConsumerKey) of
+            case config:get("oauth_consumer_secrets", ConsumerKey) of
             undefined -> [];
             ConsumerSecret -> [{<<"consumer_secret">>, ?l2b(ConsumerSecret)}]
             end
             ++
-            case couch_config:get("oauth_token_secrets", Token) of
+            case config:get("oauth_token_secrets", Token) of
             undefined -> [];
             TokenSecret -> [{<<"token_secret">>, ?l2b(TokenSecret)}]
             end
             ++
-            case couch_config:get("oauth_token_users", Token) of
+            case config:get("oauth_token_users", Token) of
             undefined -> [];
             User -> [{<<"username">>, ?l2b(User)}]
             end
@@ -328,7 +328,7 @@ oauth_credentials_info(Token, ConsumerKey) ->
 
 
 use_auth_db() ->
-    case couch_config:get("couch_httpd_oauth", "use_users_db", "false") of
+    case config:get("couch_httpd_oauth", "use_users_db", "false") of
     "false" ->
         nil;
     "true" ->
@@ -338,7 +338,7 @@ use_auth_db() ->
 
 
 open_auth_db() ->
-    DbName = ?l2b(couch_config:get("couch_httpd_auth", "authentication_db")),
+    DbName = ?l2b(config:get("couch_httpd_auth", "authentication_db")),
     DbOptions = [{user_ctx, #user_ctx{roles = [<<"_admin">>]}}],
     {ok, AuthDb} = couch_db:open_int(DbName, DbOptions),
     AuthDb.

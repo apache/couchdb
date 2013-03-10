@@ -258,7 +258,7 @@ get_changes_timeout(Args, Callback) ->
         feed = ResponseType
     } = Args,
     DefaultTimeout = list_to_integer(
-        couch_config:get("httpd", "changes_timeout", "60000")
+        config:get("httpd", "changes_timeout", "60000")
     ),
     case Heartbeat of
     undefined ->

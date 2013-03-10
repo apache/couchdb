@@ -18,7 +18,7 @@
 
 
 init() ->
-    LibDir = case couch_config:get("couchdb", "util_driver_dir") of
+    LibDir = case config:get("couchdb", "util_driver_dir") of
     undefined ->
         filename:join(couch_util:priv_dir(), "lib");
     LibDir0 ->

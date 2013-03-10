@@ -12,6 +12,7 @@
 
 -module(couch_log).
 -behaviour(gen_event).
+-behaviour(config_listener).
 
 % public API
 -export([start_link/0, stop/0]).
@@ -23,6 +24,9 @@
 % gen_event callbacks
 -export([init/1, handle_event/2, terminate/2, code_change/3]).
 -export([handle_info/2, handle_call/2]).
+
+% config_listener api
+-export([handle_config_change/5]).
 
 -define(LEVEL_ERROR, 4).
 -define(LEVEL_WARN, 3).
@@ -71,25 +75,12 @@ stop() ->
     couch_event_sup:stop(couch_log).
 
 init([]) ->
-    % read config and register for configuration changes
+    ok = config:listen_for_changes(?MODULE, nil),
 
-    % just stop if one of the config settings change. couch_server_sup
-    % will restart us and then we will pick up the new settings.
-    ok = couch_config:register(
-        fun("log", "file") ->
-            ?MODULE:stop();
-        ("log", "level") ->
-            ?MODULE:stop();
-        ("log", "include_sasl") ->
-            ?MODULE:stop();
-        ("log_level_by_module", _) ->
-            ?MODULE:stop()
-        end),
-
-    Filename = couch_config:get("log", "file", "couchdb.log"),
-    Level = level_integer(list_to_atom(couch_config:get("log", "level", "info"))),
-    Sasl = couch_config:get("log", "include_sasl", "true") =:= "true",
-    LevelByModule = couch_config:get("log_level_by_module"),
+    Filename = config:get("log", "file", "couchdb.log"),
+    Level = level_integer(list_to_atom(config:get("log", "level", "info"))),
+    Sasl = config:get("log", "include_sasl", "true") =:= "true",
+    LevelByModule = config:get("log_level_by_module"),
 
     case ets:info(?MODULE) of
     undefined -> ets:new(?MODULE, [named_table]);
@@ -110,6 +101,18 @@ init([]) ->
         io:format("Error opening log file ~s: ~s", [Filename, ReasonStr]),
         {stop, {error, ReasonStr, Filename}}
     end.
+
+handle_config_change("log", "file", _, _, _) ->
+    ?MODULE:stop(),
+    remove_handler;
+handle_config_change("log", "level", _, _, _) ->
+    ?MODULE:stop(),
+    remove_handler;
+handle_config_change("log", "include_sasl", _, _, _) ->
+    ?MODULE:stop(),
+    remove_handler;
+handle_config_change(_, _, _, _, _) ->
+    {ok, nil}.
 
 debug_on() ->
     get_level_integer() =< ?LEVEL_DEBUG.
@@ -194,6 +197,12 @@ handle_call({set_level_integer, Module, NewLevel}, State) ->
     ets:insert(?MODULE, {Module, NewLevel}),
     {ok, ok, State#state{level = NewLevel}}.
 
+handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
+    erlang:send_after(5000, self(), restart_config_listener),
+    {ok, State};
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {ok, State};
 handle_info(_Info, State) ->
     {ok, State}.
 
@@ -231,10 +240,10 @@ get_log_messages(Pid, Level, Format, Args) ->
 % |__________| 100
 
 read(Bytes, Offset) ->
-    LogFileName = couch_config:get("log", "file"),
+    LogFileName = config:get("log", "file"),
     LogFileSize = filelib:file_size(LogFileName),
     MaxChunkSize = list_to_integer(
-        couch_config:get("httpd", "log_max_chunk_size", "1000000")),
+        config:get("httpd", "log_max_chunk_size", "1000000")),
     case Bytes > MaxChunkSize of
     true ->
         throw({bad_request, "'bytes' cannot exceed " ++

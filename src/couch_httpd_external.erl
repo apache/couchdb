@@ -63,7 +63,7 @@ json_req_obj(#httpd{mochi_req=Req,
     Body = case ReqBody of
         undefined ->
             MaxSize = list_to_integer(
-                couch_config:get("couchdb", "max_document_size", "4294967296")),
+                config:get("couchdb", "max_document_size", "4294967296")),
             Req:recv_body(MaxSize);
         Else -> Else
     end,

@@ -28,7 +28,7 @@ simple(Password, Salt) ->
 %% CouchDB utility functions
 -spec hash_admin_password(binary()) -> binary().
 hash_admin_password(ClearPassword) ->
-    Iterations = couch_config:get("couch_httpd_auth", "iterations", "10000"),
+    Iterations = config:get("couch_httpd_auth", "iterations", "10000"),
     Salt = couch_uuids:random(),
     DerivedKey = couch_passwords:pbkdf2(couch_util:to_binary(ClearPassword),
                                         Salt ,list_to_integer(Iterations)),
@@ -46,7 +46,7 @@ get_unhashed_admins() ->
         ({_User, _ClearPassword}) ->
             true
         end,
-    couch_config:get("admins")).
+    config:get("admins")).
 
 %% Current scheme, much stronger.
 -spec pbkdf2(binary(), binary(), integer()) -> binary().

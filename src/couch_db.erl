@@ -893,7 +893,7 @@ make_first_doc_on_disk(Db, Id, Pos, [{_Rev, RevValue} |_]=DocPath) ->
 set_commit_option(Options) ->
     CommitSettings = {
         [true || O <- Options, O==full_commit orelse O==delay_commit],
-        couch_config:get("couchdb", "delayed_commits", "false")
+        config:get("couchdb", "delayed_commits", "false")
     },
     case CommitSettings of
     {[true], _} ->
@@ -1016,7 +1016,7 @@ flush_att(Fd, #att{data=Data}=Att) when is_binary(Data) ->
 
 flush_att(Fd, #att{data=Fun,att_len=undefined}=Att) when is_function(Fun) ->
     MaxChunkSize = list_to_integer(
-        couch_config:get("couchdb", "attachment_stream_buffer_size", "4096")),
+        config:get("couchdb", "attachment_stream_buffer_size", "4096")),
     with_stream(Fd, Att, fun(OutputStream) ->
         % Fun(MaxChunkSize, WriterFun) must call WriterFun
         % once for each chunk of the attachment,
@@ -1067,7 +1067,7 @@ compressible_att_type(MimeType) when is_binary(MimeType) ->
     compressible_att_type(?b2l(MimeType));
 compressible_att_type(MimeType) ->
     TypeExpList = re:split(
-        couch_config:get("attachments", "compressible_types", ""),
+        config:get("attachments", "compressible_types", ""),
         "\\s*,\\s*",
         [{return, list}]
     ),
@@ -1092,12 +1092,12 @@ compressible_att_type(MimeType) ->
 % pretend that no Content-MD5 exists.
 with_stream(Fd, #att{md5=InMd5,type=Type,encoding=Enc}=Att, Fun) ->
     BufferSize = list_to_integer(
-        couch_config:get("couchdb", "attachment_stream_buffer_size", "4096")),
+        config:get("couchdb", "attachment_stream_buffer_size", "4096")),
     {ok, OutputStream} = case (Enc =:= identity) andalso
         compressible_att_type(Type) of
     true ->
         CompLevel = list_to_integer(
-            couch_config:get("attachments", "compression_level", "0")
+            config:get("attachments", "compression_level", "0")
         ),
         couch_stream:open(Fd, [{buffer_size, BufferSize},
             {encoding, gzip}, {compression_level, CompLevel}]);

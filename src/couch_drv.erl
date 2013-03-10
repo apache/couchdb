@@ -54,7 +54,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 % private API
 util_driver_dir() ->
-    case couch_config:get("couchdb", "util_driver_dir", null) of
+    case config:get("couchdb", "util_driver_dir", null) of
     null ->
         couch_util:priv_dir();
     LibDir0 ->

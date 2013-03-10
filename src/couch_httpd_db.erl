@@ -63,7 +63,7 @@ handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "GET,HEAD,POST").
 
 handle_changes_req1(Req, #db{name=DbName}=Db) ->
-    AuthDbName = ?l2b(couch_config:get("couch_httpd_auth", "authentication_db")),
+    AuthDbName = ?l2b(config:get("couch_httpd_auth", "authentication_db")),
     case AuthDbName of
     DbName ->
         % in the authentication database, _changes is admin-only.

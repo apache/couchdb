@@ -119,7 +119,7 @@ handle_rewrite_req(#httpd{
     Prefix = <<"/", (?l2b(couch_util:url_encode(DbName)))/binary, "/", DesignId/binary>>,
     QueryList = lists:map(fun decode_query_value/1, couch_httpd:qs(Req)),
 
-    MaxRewritesList = couch_config:get("httpd", "rewrite_limit", "100"),
+    MaxRewritesList = config:get("httpd", "rewrite_limit", "100"),
     MaxRewrites = list_to_integer(MaxRewritesList),
     case get(couch_rewrite_count) of
         undefined ->
@@ -438,7 +438,7 @@ path_to_list([<<>>|R], Acc, DotDotCount) ->
 path_to_list([<<"*">>|R], Acc, DotDotCount) ->
     path_to_list(R, [?MATCH_ALL|Acc], DotDotCount);
 path_to_list([<<"..">>|R], Acc, DotDotCount) when DotDotCount == 2 ->
-    case couch_config:get("httpd", "secure_rewrites", "true") of
+    case config:get("httpd", "secure_rewrites", "true") of
     "false" ->
         path_to_list(R, [<<"..">>|Acc], DotDotCount+1);
     _Else ->

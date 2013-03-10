@@ -38,5 +38,5 @@ init([]) ->
                 [Module]}
         end
         || {Name, SpecStr}
-        <- couch_config:get("daemons"), SpecStr /= ""],
+        <- config:get("daemons"), SpecStr /= ""],
     {ok, {{one_for_one, 10, 3600}, Children}}.

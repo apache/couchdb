@@ -12,12 +12,17 @@
 
 -module(couch_stats_aggregator).
 -behaviour(gen_server).
+-behaviour(config_listener).
 
 -export([start/0, start/1, stop/0]).
 -export([all/0, all/1, get/1, get/2, get_json/1, get_json/2, collect_sample/0]).
 
 -export([init/1, terminate/2, code_change/3]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
+
+% config_listener api
+-export([handle_config_change/5]).
+
 
 -record(aggregate, {
     description = <<"">>,
@@ -92,7 +97,7 @@ collect_sample() ->
 init(StatDescsFileName) ->
     % Create an aggregate entry for each {description, rate} pair.
     ets:new(?MODULE, [named_table, set, protected]),
-    SampleStr = couch_config:get("stats", "samples", "[0]"),
+    SampleStr = config:get("stats", "samples", "[0]"),
     {ok, Samples} = couch_util:parse_term(SampleStr),
     {ok, Descs} = file:consult(StatDescsFileName),
     lists:foreach(fun({Sect, Key, Value}) ->
@@ -105,12 +110,9 @@ init(StatDescsFileName) ->
         end, Samples)
     end, Descs),
     
-    Self = self(),
-    ok = couch_config:register(
-        fun("stats", _) -> exit(Self, config_change) end
-    ),
+    ok = config:listen_for_changes(?MODULE, nil),
     
-    Rate = list_to_integer(couch_config:get("stats", "rate", "1000")),
+    Rate = list_to_integer(config:get("stats", "rate", "1000")),
     % TODO: Add timer_start to kernel start options.
     {ok, TRef} = timer:apply_after(Rate, ?MODULE, collect_sample, []),
     {ok, {TRef, Rate}}.
@@ -156,11 +158,24 @@ handle_call(collect_sample, _, {OldTRef, SampleInterval}) ->
 handle_cast(stop, State) ->
     {stop, normal, State}.
 
+handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
+    erlang:send_after(5000, self(), restart_config_listener),
+    {noreply, State};
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {noreply, State};
 handle_info(_Info, State) ->
     {noreply, State}.
 
 code_change(_OldVersion, State, _Extra) ->
     {ok, State}.
+
+
+handle_config_change("stats", _, _, _, _) ->
+    exit(whereis(?MODULE), config_change),
+    remove_handler;
+handle_config_change(_, _, _, _, _) ->
+    {ok, nil}.
 
 
 new_value(incremental, Value, null) ->

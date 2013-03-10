@@ -34,7 +34,7 @@ handle_welcome_req(#httpd{method='GET'}=Req, WelcomeMessage) ->
         {couchdb, WelcomeMessage},
         {uuid, couch_server:get_uuid()},
         {version, list_to_binary(couch_server:get_version())}
-        ] ++ case couch_config:get("vendor") of
+        ] ++ case config:get("vendor") of
         [] ->
             [];
         Properties ->
@@ -137,7 +137,7 @@ handle_config_req(#httpd{method='GET', path_parts=[_]}=Req) ->
         false ->
             dict:store(Section, [{list_to_binary(Key), list_to_binary(Value)}], Acc)
         end
-    end, dict:new(), couch_config:all()),
+    end, dict:new(), config:all()),
     KVs = dict:fold(fun(Section, Values, Acc) ->
         [{list_to_binary(Section), {Values}} | Acc]
     end, [], Grouped),
@@ -146,12 +146,12 @@ handle_config_req(#httpd{method='GET', path_parts=[_]}=Req) ->
 handle_config_req(#httpd{method='GET', path_parts=[_,Section]}=Req) ->
     ok = couch_httpd:verify_is_server_admin(Req),
     KVs = [{list_to_binary(Key), list_to_binary(Value)}
-            || {Key, Value} <- couch_config:get(Section)],
+            || {Key, Value} <- config:get(Section)],
     send_json(Req, 200, {KVs});
 % GET /_config/Section/Key
 handle_config_req(#httpd{method='GET', path_parts=[_, Section, Key]}=Req) ->
     ok = couch_httpd:verify_is_server_admin(Req),
-    case couch_config:get(Section, Key, null) of
+    case config:get(Section, Key, null) of
     null ->
         throw({not_found, unknown_config_value});
     Value ->
@@ -162,7 +162,7 @@ handle_config_req(#httpd{method=Method, path_parts=[_, Section, Key]}=Req)
       when (Method == 'PUT') or (Method == 'DELETE') ->
     ok = couch_httpd:verify_is_server_admin(Req),
     Persist = couch_httpd:header_value(Req, "X-Couch-Persist") /= "false",
-    case couch_config:get(<<"httpd">>, <<"config_whitelist">>, null) of
+    case config:get(<<"httpd">>, <<"config_whitelist">>, null) of
         null ->
             % No whitelist; allow all changes.
             handle_approved_config_req(Req, Persist);
@@ -226,8 +226,8 @@ handle_approved_config_req(#httpd{method='PUT', path_parts=[_, Section, Key]}=Re
     _ ->
         couch_httpd:json_body(Req)
     end,
-    OldValue = couch_config:get(Section, Key, ""),
-    case couch_config:set(Section, Key, ?b2l(Value), Persist) of
+    OldValue = config:get(Section, Key, ""),
+    case config:set(Section, Key, ?b2l(Value), Persist) of
     ok ->
         send_json(Req, 200, list_to_binary(OldValue));
     Error ->
@@ -235,11 +235,11 @@ handle_approved_config_req(#httpd{method='PUT', path_parts=[_, Section, Key]}=Re
     end;
 % DELETE /_config/Section/Key
 handle_approved_config_req(#httpd{method='DELETE',path_parts=[_,Section,Key]}=Req, Persist) ->
-    case couch_config:get(Section, Key, null) of
+    case config:get(Section, Key, null) of
     null ->
         throw({not_found, unknown_config_value});
     OldValue ->
-        couch_config:delete(Section, Key, Persist),
+        config:delete(Section, Key, Persist),
         send_json(Req, 200, list_to_binary(OldValue))
     end.
 
