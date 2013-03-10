@@ -12,13 +12,17 @@
 
 -module(couch_server).
 -behaviour(gen_server).
+-behaviour(config_listener).
 
 -export([open/2,create/2,delete/2,get_version/0,get_uuid/0]).
 -export([all_databases/0, all_databases/2]).
 -export([init/1, handle_call/3,sup_start_link/0]).
 -export([handle_cast/2,code_change/3,handle_info/2,terminate/2]).
--export([dev_start/0,is_admin/2,has_admins/0,get_stats/0,config_change/4]).
+-export([dev_start/0,is_admin/2,has_admins/0,get_stats/0]).
 -export([close_lru/0]).
+
+% config_listener api
+-export([handle_config_change/5]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -46,10 +50,10 @@ get_version() ->
     end.
 
 get_uuid() ->
-    case couch_config:get("couchdb", "uuid", nil) of
+    case config:get("couchdb", "uuid", nil) of
         nil ->
             UUID = couch_uuids:random(),
-            couch_config:set("couchdb", "uuid", ?b2l(UUID)),
+            config:set("couchdb", "uuid", ?b2l(UUID)),
             UUID;
         UUID -> ?l2b(UUID)
     end.
@@ -105,7 +109,7 @@ delete(DbName, Options) ->
 maybe_add_sys_db_callbacks(DbName, Options) when is_binary(DbName) ->
     maybe_add_sys_db_callbacks(?b2l(DbName), Options);
 maybe_add_sys_db_callbacks(DbName, Options) ->
-    case couch_config:get("replicator", "db", "_replicator") of
+    case config:get("replicator", "db", "_replicator") of
     DbName ->
         [
             {before_doc_update, fun couch_replicator_manager:before_doc_update/2},
@@ -113,7 +117,7 @@ maybe_add_sys_db_callbacks(DbName, Options) ->
             sys_db | Options
         ];
     _ ->
-        case couch_config:get("couch_httpd_auth", "authentication_db", "_users") of
+        case config:get("couch_httpd_auth", "authentication_db", "_users") of
         DbName ->
         [
             {before_doc_update, fun couch_users_db:before_doc_update/2},
@@ -139,7 +143,7 @@ check_dbname(#server{dbname_regexp=RegExp}, DbName) ->
     end.
 
 is_admin(User, ClearPwd) ->
-    case couch_config:get("admins", User) of
+    case config:get("admins", User) of
     "-hashed-" ++ HashedPwdAndSalt ->
         [HashedPwd, Salt] = string:tokens(HashedPwdAndSalt, ","),
         couch_util:to_hex(crypto:sha(ClearPwd ++ Salt)) == HashedPwd;
@@ -148,7 +152,7 @@ is_admin(User, ClearPwd) ->
     end.
 
 has_admins() ->
-    couch_config:get("admins") /= [].
+    config:get("admins") /= [].
 
 get_full_filename(Server, DbName) ->
     filename:join([Server#server.root_dir, "./" ++ DbName ++ ".couch"]).
@@ -160,7 +164,7 @@ hash_admin_passwords(Persist) ->
     lists:foreach(
         fun({User, ClearPassword}) ->
             HashedPassword = couch_passwords:hash_admin_password(ClearPassword),
-            couch_config:set("admins", User, ?b2l(HashedPassword), Persist)
+            config:set("admins", User, ?b2l(HashedPassword), Persist)
         end, couch_passwords:get_unhashed_admins()).
 
 init([]) ->
@@ -169,10 +173,10 @@ init([]) ->
     % just stop if one of the config settings change. couch_server_sup
     % will restart us and then we will pick up the new settings.
 
-    RootDir = couch_config:get("couchdb", "database_dir", "."),
+    RootDir = config:get("couchdb", "database_dir", "."),
     MaxDbsOpen = list_to_integer(
-            couch_config:get("couchdb", "max_dbs_open")),
-    ok = couch_config:register(fun ?MODULE:config_change/4),
+            config:get("couchdb", "max_dbs_open")),
+    ok = config:listen_for_changes(?MODULE, nil),
     ok = couch_file:init_delete_dir(RootDir),
     hash_admin_passwords(),
     {ok, RegExp} = re:compile(
@@ -191,13 +195,31 @@ terminate(_Reason, _Srv) ->
         nil, couch_dbs),
     ok.
 
-config_change("couchdb", "database_dir", _, _) ->
-    exit(whereis(couch_server), config_change);
-config_change("couchdb", "max_dbs_open", Max, _) ->
-    gen_server:call(couch_server, {set_max_dbs_open, list_to_integer(Max)});
-config_change("admins", _, _, Persist) ->
+handle_config_change("couchdb", "database_dir", _, _, _) ->
+    exit(whereis(couch_server), config_change),
+    remove_handler;
+handle_config_change("couchdb", "max_dbs_open", Max, _, _) ->
+    {ok, gen_server:call(couch_server,{set_max_dbs_open,list_to_integer(Max)})};
+handle_config_change("admins", _, _, Persist, _) ->
     % spawn here so couch event manager doesn't deadlock
-    spawn(fun() -> hash_admin_passwords(Persist) end).
+    {ok, spawn(fun() -> hash_admin_passwords(Persist) end)};
+handle_config_change("httpd", "authentication_handlers", _, _, _) ->
+    {ok, couch_httpd:stop()};
+handle_config_change("httpd", "bind_address", _, _, _) ->
+    {ok, couch_httpd:stop()};
+handle_config_change("httpd", "port", _, _, _) ->
+    {ok, couch_httpd:stop()};
+handle_config_change("httpd", "max_connections", _, _, _) ->
+    {ok, couch_httpd:stop()};
+handle_config_change("httpd", "default_handler", _, _, _) ->
+    {ok, couch_httpd:stop()};
+handle_config_change("httpd_global_handlers", _, _, _, _) ->
+    {ok, couch_httpd:stop()};
+handle_config_change("httpd_db_handlers", _, _, _, _) ->
+    {ok, couch_httpd:stop()};
+handle_config_change(_, _, _, _, _) ->
+    {ok, nil}.
+
 
 all_databases() ->
     {ok, DbList} = all_databases(

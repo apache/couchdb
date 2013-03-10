@@ -178,7 +178,7 @@ pick_command1(_) ->
 init([Command, Options, PortOptions]) ->
     PrivDir = couch_util:priv_dir(),
     Spawnkiller = filename:join(PrivDir, "couchspawnkillable"),
-    V = couch_config:get("query_server_config", "os_process_idle_limit", "300"),
+    V = config:get("query_server_config", "os_process_idle_limit", "300"),
     IdleLimit = list_to_integer(V) * 1000,
     BaseProc = #os_proc{
         command=Command,
@@ -263,7 +263,7 @@ handle_info(Msg, #os_proc{idle=Idle}=OsProc) ->
     {noreply, OsProc, Idle}.
 
 code_change(_, {os_proc, Cmd, Port, W, R, Timeout} , _) ->
-    V = couch_config:get("query_server_config","os_process_idle_limit","300"),
+    V = config:get("query_server_config","os_process_idle_limit","300"),
     State = #os_proc{
         command = Cmd,
         port = Port,

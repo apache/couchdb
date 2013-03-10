@@ -12,12 +12,16 @@
 
 -module(couch_index_server).
 -behaviour(gen_server).
+-behaviour(config_listener).
 
 -export([start_link/0, get_index/4, get_index/3, get_index/2]).
--export([config_change/2, update_notify/1]).
+-export([update_notify/1]).
 
 -export([init/1, terminate/2, code_change/3]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
+
+% config_listener api
+-export([handle_config_change/5]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -81,14 +85,14 @@ get_index(Module, IdxState) ->
 
 init([]) ->
     process_flag(trap_exit, true),
-    couch_config:register(fun ?MODULE:config_change/2),
+    ok = config:listen_for_changes(?MODULE, nil),
     ets:new(?BY_SIG, [protected, set, named_table]),
     ets:new(?BY_PID, [private, set, named_table]),
     ets:new(?BY_DB, [protected, bag, named_table]),
     couch_db_update_notifier:start_link(fun ?MODULE:update_notify/1),
     RootDir = couch_index_util:root_dir(),
     % Deprecation warning if it wasn't index_dir
-    case couch_config:get("couchdb", "index_dir") of
+    case config:get("couchdb", "index_dir") of
         undefined ->
             Msg = "Deprecation warning: 'view_index_dir' is now 'index_dir'",
             ?LOG_ERROR(Msg, []);
@@ -137,6 +141,12 @@ handle_cast({reset_indexes, DbName}, State) ->
     {noreply, State}.
 
 
+handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
+    erlang:send_after(5000, self(), restart_config_listener),
+    {noreply, State};
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, State#st.root_dir),
+    {noreply, State};
 handle_info({'EXIT', Pid, Reason}, Server) ->
     case ets:lookup(?BY_PID, Pid) of
         [{Pid, {DbName, Sig}}] ->
@@ -157,6 +167,19 @@ handle_info(Msg, State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+
+handle_config_change("couchdb", "index_dir", RootDir, _, RootDir) ->
+    {ok, RootDir};
+handle_config_change("couchdb", "view_index_dir", RootDir, _, RootDir) ->
+    {ok, RootDir};
+handle_config_change("couchdb", "index_dir", _, _, _) ->
+    exit(whereis(couch_index_server), config_change),
+    remove_handler;
+handle_config_change("couchdb", "view_index_dir", _, _, _) ->
+    exit(whereis(couch_index_server), config_change),
+    remove_handler;
+handle_config_change(_, _, _, _, RootDir) ->
+    {ok, RootDir}.
 
 new_index({Mod, IdxState, DbName, Sig}) ->
     DDocId = Mod:get(idx_name, IdxState),
@@ -195,12 +218,6 @@ rem_from_ets(DbName, Sig, DDocId, Pid) ->
     ets:delete(?BY_SIG, {DbName, Sig}),
     ets:delete(?BY_PID, Pid),
     ets:delete_object(?BY_DB, {DbName, {DDocId, Sig}}).
-
-
-config_change("couchdb", "view_index_dir") ->
-    exit(whereis(?MODULE), config_change);
-config_change("couchdb", "index_dir") ->
-    exit(whereis(?MODULE), config_change).
 
 
 update_notify({deleted, DbName}) ->

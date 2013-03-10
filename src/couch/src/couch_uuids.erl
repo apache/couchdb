@@ -13,12 +13,16 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -behaviour(gen_server).
+-behaviour(config_listener).
 
 -export([start/0, stop/0]).
 -export([new/0, random/0, utc_random/0]).
 
 -export([init/1, terminate/2, code_change/3]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
+
+% config_listener api
+-export([handle_config_change/5]).
 
 start() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -44,9 +48,7 @@ utc_suffix(Suffix) ->
     list_to_binary(Prefix ++ Suffix).
 
 init([]) ->
-    ok = couch_config:register(
-        fun("uuids", _) -> gen_server:cast(?MODULE, change) end
-    ),
+    ok = config:listen_for_changes(?MODULE, nil),
     {ok, state()}.
 
 terminate(_Reason, _State) ->
@@ -74,11 +76,22 @@ handle_cast(stop, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
+    erlang:send_after(5000, self(), restart_config_listener),
+    {noreply, State};
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {noreply, State};
 handle_info(_Info, State) ->
     {noreply, State}.
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+handle_config_change("uuids", _, _, _, _) ->
+    {ok, gen_server:cast(?MODULE, change)};
+handle_config_change(_, _, _, _, _) ->
+    {ok, nil}.
 
 new_prefix() ->
     couch_util:to_hex((crypto:rand_bytes(13))).
@@ -87,14 +100,14 @@ inc() ->
     crypto:rand_uniform(1, 16#ffe).
 
 state() ->
-    AlgoStr = couch_config:get("uuids", "algorithm", "random"),
+    AlgoStr = config:get("uuids", "algorithm", "random"),
     case couch_util:to_existing_atom(AlgoStr) of
         random ->
             random;
         utc_random ->
             utc_random;
         utc_id ->
-            UtcIdSuffix = couch_config:get("uuids", "utc_id_suffix", ""),
+            UtcIdSuffix = config:get("uuids", "utc_id_suffix", ""),
             {utc_id, UtcIdSuffix};
         sequential ->
             {sequential, new_prefix(), inc()};

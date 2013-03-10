@@ -83,7 +83,7 @@ default_authentication_handler(Req) ->
         true ->
             Req;
         false ->
-            case couch_config:get("couch_httpd_auth", "require_valid_user", "false") of
+            case config:get("couch_httpd_auth", "require_valid_user", "false") of
                 "true" -> Req;
                 % If no admins, and no user required, then everyone is admin!
                 % Yay, admin party!
@@ -118,11 +118,11 @@ proxy_authentification_handler(Req) ->
     end.
     
 proxy_auth_user(Req) ->
-    XHeaderUserName = couch_config:get("couch_httpd_auth", "x_auth_username",
+    XHeaderUserName = config:get("couch_httpd_auth", "x_auth_username",
                                 "X-Auth-CouchDB-UserName"),
-    XHeaderRoles = couch_config:get("couch_httpd_auth", "x_auth_roles",
+    XHeaderRoles = config:get("couch_httpd_auth", "x_auth_roles",
                                 "X-Auth-CouchDB-Roles"),
-    XHeaderToken = couch_config:get("couch_httpd_auth", "x_auth_token",
+    XHeaderToken = config:get("couch_httpd_auth", "x_auth_token",
                                 "X-Auth-CouchDB-Token"),
     case header_value(Req, XHeaderUserName) of
         undefined -> nil;
@@ -132,9 +132,9 @@ proxy_auth_user(Req) ->
                 Else ->
                     [?l2b(R) || R <- string:tokens(Else, ",")]
             end,
-            case couch_config:get("couch_httpd_auth", "proxy_use_secret", "false") of
+            case config:get("couch_httpd_auth", "proxy_use_secret", "false") of
                 "true" ->
-                    case couch_config:get("couch_httpd_auth", "secret", nil) of
+                    case config:get("couch_httpd_auth", "secret", nil) of
                         nil ->
                             Req#httpd{user_ctx=#user_ctx{name=?l2b(UserName), roles=Roles}};
                         Secret ->
@@ -168,7 +168,7 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
         end,
         % Verify expiry and hash
         CurrentTime = make_cookie_time(),
-        case couch_config:get("couch_httpd_auth", "secret", nil) of
+        case config:get("couch_httpd_auth", "secret", nil) of
         nil ->
             ?LOG_DEBUG("cookie auth secret is not set",[]),
             Req;
@@ -182,7 +182,7 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req) ->
                 ExpectedHash = crypto:sha_mac(FullSecret, User ++ ":" ++ TimeStr),
                 Hash = ?l2b(HashStr),
                 Timeout = list_to_integer(
-                    couch_config:get("couch_httpd_auth", "timeout", "600")),
+                    config:get("couch_httpd_auth", "timeout", "600")),
                 ?LOG_DEBUG("timeout ~p", [Timeout]),
                 case (catch erlang:list_to_integer(TimeStr, 16)) of
                     TimeStamp when CurrentTime < TimeStamp + Timeout ->
@@ -232,10 +232,10 @@ cookie_auth_cookie(Req, User, Secret, TimeStamp) ->
         [{path, "/"}] ++ cookie_scheme(Req) ++ max_age()).
 
 ensure_cookie_auth_secret() ->
-    case couch_config:get("couch_httpd_auth", "secret", nil) of
+    case config:get("couch_httpd_auth", "secret", nil) of
         nil ->
             NewSecret = ?b2l(couch_uuids:random()),
-            couch_config:set("couch_httpd_auth", "secret", NewSecret),
+            config:set("couch_httpd_auth", "secret", NewSecret),
             NewSecret;
         Secret -> Secret
     end.
@@ -311,9 +311,9 @@ handle_session_req(#httpd{method='GET', user_ctx=UserCtx}=Req) ->
                     {roles, UserCtx#user_ctx.roles}
                 ]}},
                 {info, {[
-                    {authentication_db, ?l2b(couch_config:get("couch_httpd_auth", "authentication_db"))},
+                    {authentication_db, ?l2b(config:get("couch_httpd_auth", "authentication_db"))},
                     {authentication_handlers, [auth_name(H) || H <- couch_httpd:make_fun_spec_strs(
-                            couch_config:get("httpd", "authentication_handlers"))]}
+                            config:get("httpd", "authentication_handlers"))]}
                 ] ++ maybe_value(authenticated, UserCtx#user_ctx.handler, fun(Handler) ->
                         auth_name(?b2l(Handler))
                     end)}}
@@ -366,11 +366,11 @@ cookie_scheme(#httpd{mochi_req=MochiReq}) ->
     end.
 
 max_age() ->
-    case couch_config:get("couch_httpd_auth", "allow_persistent_cookies", "false") of
+    case config:get("couch_httpd_auth", "allow_persistent_cookies", "false") of
         "false" ->
             [];
         "true" ->
             Timeout = list_to_integer(
-                couch_config:get("couch_httpd_auth", "timeout", "600")),
+                config:get("couch_httpd_auth", "timeout", "600")),
             [{max_age, Timeout}]
     end.

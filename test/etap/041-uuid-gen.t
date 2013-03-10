@@ -13,36 +13,19 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-default_config() ->
-    test_util:build_file("etc/couchdb/default_dev.ini").
-
-seq_alg_config() ->
-    test_util:source_file("test/etap/041-uuid-gen-seq.ini").
-
-utc_alg_config() ->
-    test_util:source_file("test/etap/041-uuid-gen-utc.ini").
-
-utc_id_alg_config() ->
-    test_util:source_file("test/etap/041-uuid-gen-id.ini").
-
 % Run tests and wait for the gen_servers to shutdown
-run_test(IniFiles, Test) ->
-    {ok, Pid} = couch_config:start_link(IniFiles),
-    erlang:monitor(process, Pid),
+run_test(Config, Test) ->
+    lists:foreach(fun({Key, Value}) ->
+        config:set("uuids", Key, Value, false)
+    end, Config),
     couch_uuids:start(),
     Test(),
-    couch_uuids:stop(),
-    couch_config:stop(),
-    receive
-        {'DOWN', _, _, Pid, _} -> ok;
-        _Other -> etap:diag("OTHER: ~p~n", [_Other])
-    after
-        1000 -> throw({timeout_error, config_stop})
-    end.
+    couch_uuids:stop().
 
 main(_) ->
     test_util:init_code_path(),
     application:start(crypto),
+    application:start(config),
     etap:plan(9),
 
     case (catch test()) of
@@ -55,7 +38,6 @@ main(_) ->
     ok.
 
 test() ->
-
     TestUnique = fun() ->
         etap:is(
             test_unique(10000, couch_uuids:new()),
@@ -63,10 +45,10 @@ test() ->
             "Can generate 10K unique IDs"
         )
     end,
-    run_test([default_config()], TestUnique),
-    run_test([default_config(), seq_alg_config()], TestUnique),
-    run_test([default_config(), utc_alg_config()], TestUnique),
-    run_test([default_config(), utc_id_alg_config()], TestUnique),
+    run_test([{"algorithm", "random"}], TestUnique),
+    run_test([{"algorithm", "sequential"}], TestUnique),
+    run_test([{"algorithm", "utc_random"}], TestUnique),
+    run_test([{"algorithm", "utc_id"}, {"utc_id_suffix", "bozo"}], TestUnique),
 
     TestMonotonic = fun () ->
         etap:is(
@@ -75,9 +57,10 @@ test() ->
             "should produce monotonically increasing ids"
         )
     end,
-    run_test([default_config(), seq_alg_config()], TestMonotonic),
-    run_test([default_config(), utc_alg_config()], TestMonotonic),
-    run_test([default_config(), utc_id_alg_config()], TestMonotonic),
+    run_test([{"algorithm", "sequential"}], TestMonotonic),
+    run_test([{"algorithm", "utc_random"}], TestMonotonic),
+    run_test([{"algorithm", "utc_id"}, {"utc_id_suffix", "bozo"}],
+        TestMonotonic),
 
     % Pretty sure that the average of a uniform distribution is the
     % midpoint of the range. Thus, to exceed a threshold, we need
@@ -99,7 +82,7 @@ test() ->
             "should roll over every so often."
         )
     end,
-    run_test([default_config(), seq_alg_config()], TestRollOver),
+    run_test([{"algorithm", "sequential"}], TestRollOver),
 
     TestSuffix = fun() ->
         UUID = binary_to_list(couch_uuids:new()),
@@ -110,7 +93,7 @@ test() ->
             "utc_id ids should have the same suffix."
         )
     end,
-    run_test([default_config(), utc_id_alg_config()], TestSuffix).
+    run_test([{"algorithm", "utc_id"}, {"utc_id_suffix", "bozo"}], TestSuffix).
 
 test_unique(0, _) ->
     true;

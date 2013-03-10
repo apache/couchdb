@@ -22,8 +22,6 @@ main(_) ->
         couch_btree,
         couch_changes,
         couch_compress,
-        couch_config,
-        couch_config_writer,
         couch_db,
         couch_db_update_notifier,
         couch_db_update_notifier_sup,

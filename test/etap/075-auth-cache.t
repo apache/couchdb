@@ -66,14 +66,14 @@ main(_) ->
 
 test() ->
     couch_server_sup:start_link(test_util:config_files()),
-    OrigName = couch_config:get("couch_httpd_auth", "authentication_db"),
-    couch_config:set(
+    OrigName = config:get("couch_httpd_auth", "authentication_db"),
+    config:set(
         "couch_httpd_auth", "authentication_db",
         binary_to_list(auth_db_name()), false),
 
     test_auth_db_crash(),
 
-    couch_config:set("couch_httpd_auth", "authentication_db", OrigName, false),
+    config:set("couch_httpd_auth", "authentication_db", OrigName, false),
     delete_db(auth_db_name()),
     delete_db(auth_db_2_name()),
     couch_server_sup:stop(),
@@ -136,7 +136,7 @@ test_auth_db_crash() ->
     full_commit(auth_db_name()),
 
     etap:diag("Changing the auth database"),
-    couch_config:set(
+    config:set(
         "couch_httpd_auth", "authentication_db",
         binary_to_list(auth_db_2_name()), false),
     ok = timer:sleep(500),
@@ -171,7 +171,7 @@ test_auth_db_crash() ->
             "Cached credentials have the new password"),
 
     etap:diag("Changing the auth database again"),
-    couch_config:set(
+    config:set(
         "couch_httpd_auth", "authentication_db",
         binary_to_list(auth_db_name()), false),
     ok = timer:sleep(500),

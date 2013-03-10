@@ -39,7 +39,7 @@ main(_) ->
 
 test() ->
     couch_server_sup:start_link(test_util:config_files()),
-    couch_config:set("couchdb", "file_compression", "none", false),
+    config:set("couchdb", "file_compression", "none", false),
 
     create_database(),
     compact_db(),
@@ -47,7 +47,7 @@ test() ->
     DbDiskSize1 = db_disk_size(),
     ViewDiskSize1 = view_disk_size(),
 
-    couch_config:set("couchdb", "file_compression", "snappy", false),
+    config:set("couchdb", "file_compression", "snappy", false),
     compact_db(),
     compact_view(),
     DbDiskSize2 = db_disk_size(),
@@ -56,7 +56,7 @@ test() ->
     etap:is(DbDiskSize2 < DbDiskSize1, true, "Database disk size decreased"),
     etap:is(ViewDiskSize2 < ViewDiskSize1, true, "Index disk size decreased"),
 
-    couch_config:set("couchdb", "file_compression", "deflate_9", false),
+    config:set("couchdb", "file_compression", "deflate_9", false),
     compact_db(),
     compact_view(),
     DbDiskSize3 = db_disk_size(),
@@ -65,7 +65,7 @@ test() ->
     etap:is(DbDiskSize3 < DbDiskSize2, true, "Database disk size decreased again"),
     etap:is(ViewDiskSize3 < ViewDiskSize2, true, "Index disk size decreased again"),
 
-    couch_config:set("couchdb", "file_compression", "deflate_1", false),
+    config:set("couchdb", "file_compression", "deflate_1", false),
     compact_db(),
     compact_view(),
     DbDiskSize4 = db_disk_size(),
@@ -74,7 +74,7 @@ test() ->
     etap:is(DbDiskSize4 > DbDiskSize3, true, "Database disk size increased"),
     etap:is(ViewDiskSize4 > ViewDiskSize3, true, "Index disk size increased"),
 
-    couch_config:set("couchdb", "file_compression", "snappy", false),
+    config:set("couchdb", "file_compression", "snappy", false),
     compact_db(),
     compact_view(),
     DbDiskSize5 = db_disk_size(),
@@ -83,7 +83,7 @@ test() ->
     etap:is(DbDiskSize5 > DbDiskSize4, true, "Database disk size increased again"),
     etap:is(ViewDiskSize5 > ViewDiskSize4, true, "Index disk size increased again"),
 
-    couch_config:set("couchdb", "file_compression", "none", false),
+    config:set("couchdb", "file_compression", "none", false),
     compact_db(),
     compact_view(),
     DbDiskSize6 = db_disk_size(),

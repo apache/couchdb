@@ -28,7 +28,7 @@ main(_) ->
 
 test() ->
     couch_server_sup:start_link(test_util:config_files()),
-    couch_config:set("query_server_config", "os_process_limit", "3", false),
+    config:set("query_server_config", "os_process_limit", "3", false),
 
     test_pool_full(),
     test_client_unexpected_exit(),

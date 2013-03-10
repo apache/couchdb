@@ -32,7 +32,7 @@ main(_) ->
     ok.
 
 test() ->
-    couch_config:start_link([ini_file()]),
+    application:start(config),
     couch_stats_collector:start(),
     couch_stats_aggregator:start(cfg_file()),
     ok = test_all_empty(),

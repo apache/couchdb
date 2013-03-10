@@ -39,7 +39,7 @@ main(_) ->
 
 test() ->
     couch_server_sup:start_link(test_util:config_files()),
-    couch_config:set("couchdb", "delayed_commits", "true", false),
+    config:set("couchdb", "delayed_commits", "true", false),
 
     lists:foreach(
         fun(NumClients) -> test_concurrent_doc_update(NumClients) end,

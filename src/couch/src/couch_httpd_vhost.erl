@@ -12,12 +12,16 @@
 
 -module(couch_httpd_vhost).
 -behaviour(gen_server).
+-behaviour(config_listener).
 
--export([start_link/0, config_change/2, reload/0, get_state/0, dispatch_host/1]).
+-export([start_link/0, reload/0, get_state/0, dispatch_host/1]).
 -export([urlsplit_netloc/2, redirect_to_vhost/2]).
 -export([host/1, split_host_port/1]).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
+
+% config_listener api
+-export([handle_config_change/5]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -237,7 +241,7 @@ bind_path(_, _) ->
 %% create vhost list from ini
 
 host(MochiReq) ->
-    XHost = couch_config:get("httpd", "x_forwarded_host",
+    XHost = config:get("httpd", "x_forwarded_host",
                              "X-Forwarded-Host"),
     case MochiReq:get_header_value(XHost) of
         undefined ->
@@ -254,7 +258,7 @@ make_vhosts() ->
                     Acc;
                 ({Vhost, Path}, Acc) ->
                     [{parse_vhost(Vhost), split_path(Path)}|Acc]
-            end, [], couch_config:get("vhosts")),
+            end, [], config:get("vhosts")),
 
     lists:reverse(lists:usort(Vhosts)).
 
@@ -327,7 +331,7 @@ make_path(Parts) ->
      "/" ++ string:join(Parts,[?SEPARATOR]).
 
 init(_) ->
-    ok = couch_config:register(fun ?MODULE:config_change/2),
+    ok = config:listen_for_changes(?MODULE, nil),
 
     %% load configuration
     {VHostGlobals, VHosts, Fun} = load_conf(),
@@ -351,6 +355,12 @@ handle_call(_Msg, _From, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
+    erlang:send_after(5000, self(), restart_config_listener),
+    {noreply, State};
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {noreply, State};
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -360,16 +370,20 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-config_change("httpd", "vhost_global_handlers") ->
-    ?MODULE:reload();
-config_change("httpd", "redirect_vhost_handler") ->
-    ?MODULE:reload();
-config_change("vhosts", _) ->
-    ?MODULE:reload().
+
+handle_config_change("httpd", "vhost_global_handlers", _, _, _) ->
+    {ok, ?MODULE:reload()};
+handle_config_change("httpd", "redirect_vhost_handler", _, _, _) ->
+    {ok, ?MODULE:reload()};
+handle_config_change("vhosts", _, _, _, _) ->
+    {ok, ?MODULE:reload()};
+handle_config_change(_, _, _, _, _) ->
+    {ok, nil}.
+
 
 load_conf() ->
     %% get vhost globals
-    VHostGlobals = re:split(couch_config:get("httpd",
+    VHostGlobals = re:split(config:get("httpd",
             "vhost_global_handlers",""), "\\s*,\\s*",[{return, list}]),
 
     %% build vhosts matching rules
@@ -377,7 +391,7 @@ load_conf() ->
 
     %% build vhosts handler fun
     DefaultVHostFun = "{couch_httpd_vhost, redirect_to_vhost}",
-    Fun = couch_httpd:make_arity_2_fun(couch_config:get("httpd",
+    Fun = couch_httpd:make_arity_2_fun(config:get("httpd",
             "redirect_vhost_handler", DefaultVHostFun)),
 
     {VHostGlobals, VHosts, Fun}.

@@ -46,11 +46,11 @@ main(_) ->
     ok.
 
 test() ->
-    couch_config:start_link(config_files()),
+    application:start(config),
     couch_os_daemons:start_link(),
 
     etap:diag("Daemons boot after configuration added."),
-    couch_config:set("os_daemons", "foo", daemon_cmd(), false),
+    config:set("os_daemons", "foo", daemon_cmd(), false),
     timer:sleep(1000),
     
     {ok, [D1]} = couch_os_daemons:info([table]),
@@ -62,7 +62,7 @@ test() ->
     check_daemon(T1, "foo"),
 
     etap:diag("Daemons stop after configuration removed."),
-    couch_config:delete("os_daemons", "foo", false),
+    config:delete("os_daemons", "foo", false),
     timer:sleep(500),
     
     {ok, []} = couch_os_daemons:info([table]),
@@ -70,8 +70,8 @@ test() ->
     etap:is(ets:tab2list(Tab2), [], "As table returns empty table."),
     
     etap:diag("Adding multiple daemons causes both to boot."),
-    couch_config:set("os_daemons", "bar", daemon_cmd(), false),
-    couch_config:set("os_daemons", "baz", daemon_cmd(), false),
+    config:set("os_daemons", "bar", daemon_cmd(), false),
+    config:set("os_daemons", "baz", daemon_cmd(), false),
     timer:sleep(500),
     {ok, Daemons} = couch_os_daemons:info([table]),
     lists:foreach(fun(D) ->
@@ -84,7 +84,7 @@ test() ->
     end, ets:tab2list(Tab3)),
     
     etap:diag("Removing one daemon leaves the other alive."),
-    couch_config:delete("os_daemons", "bar", false),
+    config:delete("os_daemons", "bar", false),
     timer:sleep(500),
     
     {ok, [D2]} = couch_os_daemons:info([table]),

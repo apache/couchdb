@@ -80,6 +80,6 @@ loop({error, _Reason}) ->
 
 main([]) ->
     test_util:init_code_path(),
-    couch_config:start_link(test_util:config_files()),
+    application:start(config),
     couch_drv:start_link(),
     do_tests().

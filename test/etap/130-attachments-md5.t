@@ -39,7 +39,7 @@ main(_) ->
 
 test() ->
     couch_server_sup:start_link(test_util:config_files()),
-    Addr = couch_config:get("httpd", "bind_address", any),
+    Addr = config:get("httpd", "bind_address", any),
     put(addr, Addr),
     put(port, mochiweb_socket_server:get(couch_httpd, port)),
     timer:sleep(1000),

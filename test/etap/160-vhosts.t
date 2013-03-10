@@ -78,22 +78,22 @@ test() ->
 
     %% end boilerplate, start test
 
-    ok = couch_config:set("vhosts", "example.com", "/etap-test-db", false),
-    ok = couch_config:set("vhosts", "*.example.com",
+    ok = config:set("vhosts", "example.com", "/etap-test-db", false),
+    ok = config:set("vhosts", "*.example.com",
             "/etap-test-db/_design/doc1/_rewrite", false),
-    ok = couch_config:set("vhosts", "example.com/test", "/etap-test-db", false),
-    ok = couch_config:set("vhosts", "example1.com",
+    ok = config:set("vhosts", "example.com/test", "/etap-test-db", false),
+    ok = config:set("vhosts", "example1.com",
             "/etap-test-db/_design/doc1/_rewrite/", false),
-    ok = couch_config:set("vhosts",":appname.:dbname.example1.com",
+    ok = config:set("vhosts",":appname.:dbname.example1.com",
             "/:dbname/_design/:appname/_rewrite/", false),
-    ok = couch_config:set("vhosts", ":dbname.example1.com", "/:dbname", false),
+    ok = config:set("vhosts", ":dbname.example1.com", "/:dbname", false),
 
-    ok = couch_config:set("vhosts", "*.example2.com", "/*", false),
-    ok = couch_config:set("vhosts", "*.example2.com/test", "/*", false),
-    ok = couch_config:set("vhosts", "*/test", "/etap-test-db", false),
-    ok = couch_config:set("vhosts", "*/test1",
+    ok = config:set("vhosts", "*.example2.com", "/*", false),
+    ok = config:set("vhosts", "*.example2.com/test", "/*", false),
+    ok = config:set("vhosts", "*/test", "/etap-test-db", false),
+    ok = config:set("vhosts", "*/test1",
             "/etap-test-db/_design/doc1/_show/test", false),
-    ok = couch_config:set("vhosts", "example3.com", "/", false),
+    ok = config:set("vhosts", "example3.com", "/", false),
 
     %% reload rules
     couch_httpd_vhost:reload(),
@@ -288,12 +288,12 @@ test_vhost_request_to_root() ->
 test_vhost_request_with_oauth(Db) ->
     {ok, AuthDb} = couch_db:create(
         <<"tap_test_sec_db">>, [admin_user_ctx(), overwrite]),
-    PrevAuthDbName = couch_config:get("couch_httpd_auth", "authentication_db"),
-    couch_config:set("couch_httpd_auth", "authentication_db", "tap_test_sec_db", false),
-    couch_config:set("oauth_token_users", "otoksec1", "joe", false),
-    couch_config:set("oauth_consumer_secrets", "consec1", "foo", false),
-    couch_config:set("oauth_token_secrets", "otoksec1", "foobar", false),
-    couch_config:set("couch_httpd_auth", "require_valid_user", "true", false),
+    PrevAuthDbName = config:get("couch_httpd_auth", "authentication_db"),
+    config:set("couch_httpd_auth", "authentication_db", "tap_test_sec_db", false),
+    config:set("oauth_token_users", "otoksec1", "joe", false),
+    config:set("oauth_consumer_secrets", "consec1", "foo", false),
+    config:set("oauth_token_secrets", "otoksec1", "foobar", false),
+    config:set("couch_httpd_auth", "require_valid_user", "true", false),
 
     DDoc = couch_doc:from_json_obj({[
         {<<"_id">>, <<"_design/test">>},
@@ -308,7 +308,7 @@ test_vhost_request_with_oauth(Db) ->
     {ok, _} = couch_db:update_doc(Db, DDoc, []),
 
     RewritePath = "/etap-test-db/_design/test/_rewrite/foobar",
-    ok = couch_config:set("vhosts", "oauth-example.com", RewritePath, false),
+    ok = config:set("vhosts", "oauth-example.com", RewritePath, false),
     couch_httpd_vhost:reload(),
 
     case ibrowse:send_req(server(), [], get, [], [{host_header, "oauth-example.com"}]) of
@@ -366,6 +366,6 @@ test_vhost_request_with_oauth(Db) ->
                couch_util:to_list(Error3))
     end,
 
-    couch_config:set("couch_httpd_auth", "authentication_db", PrevAuthDbName, false),
-    couch_config:set("couch_httpd_auth", "require_valid_user", "false", false),
+    config:set("couch_httpd_auth", "authentication_db", PrevAuthDbName, false),
+    config:set("couch_httpd_auth", "require_valid_user", "false", false),
     ok = couch_server:delete(couch_db:name(AuthDb), [admin_user_ctx()]).

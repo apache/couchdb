@@ -78,7 +78,7 @@ test() ->
     couch_server_sup:start_link(test_util:config_files()),
     ibrowse:start(),
     crypto:start(),
-    couch_config:set("replicator", "connection_timeout", "90000", false),
+    config:set("replicator", "connection_timeout", "90000", false),
 
     Pairs = [
         {source_db_name(), target_db_name()},
@@ -254,7 +254,7 @@ add_attachments(SourceDb, [{DocId, RevList} | Rest], NumAtts, IdRevsAcc) ->
 
 db_url(DbName) ->
     iolist_to_binary([
-        "http://", couch_config:get("httpd", "bind_address", "127.0.0.1"),
+        "http://", config:get("httpd", "bind_address", "127.0.0.1"),
         ":", integer_to_list(mochiweb_socket_server:get(couch_httpd, port)),
         "/", DbName
     ]).

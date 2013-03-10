@@ -79,7 +79,7 @@ test() ->
         test_web:get_port(),
         "/\">>}"
     ]),
-    couch_config:set("httpd_global_handlers", "_test", Url, false),
+    config:set("httpd_global_handlers", "_test", Url, false),
 
     % let couch_httpd restart
     timer:sleep(100),

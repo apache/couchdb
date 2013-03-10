@@ -11,11 +11,15 @@
 % the License.
 -module(couch_os_daemons).
 -behaviour(gen_server).
+-behaviour(config_listener).
 
--export([start_link/0, info/0, info/1, config_change/2]).
+-export([start_link/0, info/0, info/1]).
 
 -export([init/1, terminate/2, code_change/3]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
+
+% config_listener api
+-export([handle_config_change/5]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -42,12 +46,9 @@ info() ->
 info(Options) ->
     gen_server:call(?MODULE, {daemon_info, Options}).
 
-config_change(Section, Key) ->
-    gen_server:cast(?MODULE, {config_change, Section, Key}).
-
 init(_) ->
     process_flag(trap_exit, true),
-    ok = couch_config:register(fun ?MODULE:config_change/2),
+    ok = config:listen_for_changes(?MODULE, nil),
     Table = ets:new(?MODULE, [protected, set, {keypos, #daemon.port}]),
     reload_daemons(Table),
     {ok, Table}.
@@ -80,6 +81,12 @@ handle_cast(Msg, Table) ->
     ?LOG_ERROR("Unknown cast message to ~p: ~p", [?MODULE, Msg]),
     {stop, error, Table}.
 
+handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
+    erlang:send_after(5000, self(), restart_config_listener),
+    {noreply, State};
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {noreply, State};
 handle_info({'EXIT', Port, Reason}, Table) ->
     case ets:lookup(Table, Port) of
         [] ->
@@ -186,6 +193,12 @@ handle_info(Msg, Table) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+
+handle_config_change(Section, Key, _, _, _) ->
+    gen_server:cast(?MODULE, {config_change, Section, Key}),
+    {ok, nil}.
+
+
 % Internal API
 
 %
@@ -209,13 +222,13 @@ stop_port(#daemon{port=Port}=D) ->
 
 
 handle_port_message(#daemon{port=Port}=Daemon, [<<"get">>, Section]) ->
-    KVs = couch_config:get(Section),
+    KVs = config:get(Section),
     Data = lists:map(fun({K, V}) -> {?l2b(K), ?l2b(V)} end, KVs),
     Json = iolist_to_binary(?JSON_ENCODE({Data})),
     port_command(Port, <<Json/binary, "\n">>),
     {ok, Daemon};
 handle_port_message(#daemon{port=Port}=Daemon, [<<"get">>, Section, Key]) ->
-    Value = case couch_config:get(Section, Key, null) of
+    Value = case config:get(Section, Key, null) of
         null -> null;
         String -> ?l2b(String)
     end,
@@ -260,7 +273,7 @@ handle_log_message(Name, Msg, Level) ->
 
 reload_daemons(Table) ->
     % List of daemons we want to have running.
-    Configured = lists:sort(couch_config:get("os_daemons")),
+    Configured = lists:sort(config:get("os_daemons")),
     
     % Remove records for daemons that were halted.
     MSpecHalted = #daemon{name='$1', cmd='$2', status=halted, _='_'},
@@ -350,7 +363,7 @@ find_to_stop(_, [], Acc) ->
     Acc.
 
 should_halt(Errors) ->
-    RetryTimeCfg = couch_config:get("os_daemon_settings", "retry_time", "5"),
+    RetryTimeCfg = config:get("os_daemon_settings", "retry_time", "5"),
     RetryTime = list_to_integer(RetryTimeCfg),
 
     Now = now(),
@@ -358,7 +371,7 @@ should_halt(Errors) ->
         timer:now_diff(Now, Time) =< RetryTime * 1000000
     end, Errors),
 
-    RetryCfg = couch_config:get("os_daemon_settings", "max_retries", "3"),
+    RetryCfg = config:get("os_daemon_settings", "max_retries", "3"),
     Retries = list_to_integer(RetryCfg),
 
     {length(RecentErrors) >= Retries, RecentErrors}.

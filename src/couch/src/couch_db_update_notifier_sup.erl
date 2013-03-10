@@ -21,17 +21,22 @@
 -module(couch_db_update_notifier_sup).
 
 -behaviour(supervisor).
+-behaviour(config_listener).
 
--export([start_link/0, init/1, config_change/3]).
+-export([start_link/0, init/1]).
+
+% config_listener api
+-export([handle_config_change/5]).
+
 
 start_link() ->
     supervisor:start_link({local, couch_db_update_notifier_sup},
         couch_db_update_notifier_sup, []).
 
 init([]) ->
-    ok = couch_config:register(fun ?MODULE:config_change/3),
+    ok = config:listen_for_changes(?MODULE, nil),
 
-    UpdateNotifierExes = couch_config:get("update_notification"),
+    UpdateNotifierExes = config:get("update_notification"),
 
     {ok,
         {{one_for_one, 10, 3600},
@@ -46,7 +51,7 @@ init([]) ->
 
 %% @doc when update_notification configuration changes, terminate the process
 %%      for that notifier and start a new one with the updated config
-config_change("update_notification", Id, Exe) ->
+handle_config_change("update_notification", Id, Exe, _, _) ->
     ChildSpec = {
         Id,
         {couch_db_update_notifier, start_link, [Exe]},
@@ -57,5 +62,7 @@ config_change("update_notification", Id, Exe) ->
     },
     supervisor:terminate_child(couch_db_update_notifier_sup, Id),
     supervisor:delete_child(couch_db_update_notifier_sup, Id),
-    supervisor:start_child(couch_db_update_notifier_sup, ChildSpec).
-
+    supervisor:start_child(couch_db_update_notifier_sup, ChildSpec),
+    {ok, nil};
+handle_config_change(_, _, _, _, _) ->
+    {ok, nil}.

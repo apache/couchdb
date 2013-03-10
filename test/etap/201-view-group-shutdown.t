@@ -65,8 +65,8 @@ main(_) ->
 
 test() ->
     couch_server_sup:start_link(test_util:config_files()),
-    ok = couch_config:set("couchdb", "max_dbs_open", "3", false),
-    ok = couch_config:set("couchdb", "delayed_commits", "false", false),
+    ok = config:set("couchdb", "max_dbs_open", "3", false),
+    ok = config:set("couchdb", "delayed_commits", "false", false),
     crypto:start(),
 
     % Test that while a view group is being compacted its database can not

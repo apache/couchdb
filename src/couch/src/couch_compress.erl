@@ -26,7 +26,7 @@
 
 
 get_compression_method() ->
-    case couch_config:get("couchdb", "file_compression") of
+    case config:get("couchdb", "file_compression") of
     undefined ->
         ?DEFAULT_COMPRESSION;
     Method1 ->

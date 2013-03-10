@@ -293,8 +293,8 @@ allow_credentials(_Origin, Host) ->
 
 
 cors_config(Host, Key, Default) ->
-    couch_config:get(cors_section(Host), Key,
-                     couch_config:get("cors", Key, Default)).
+    config:get(cors_section(Host), Key,
+                     config:get("cors", Key, Default)).
 
 cors_section(Host0) ->
     {Host, _Port} = split_host_port(Host0),
@@ -304,7 +304,7 @@ enable_cors() ->
     get_bool_config("httpd", "enable_cors", false).
 
 get_bool_config(Section, Key, Default) ->
-    case couch_config:get(Section, Key) of
+    case config:get(Section, Key) of
     undefined ->
         Default;
     "true" ->

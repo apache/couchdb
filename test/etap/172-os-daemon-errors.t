@@ -55,7 +55,7 @@ main(_) ->
     ok.
 
 test() ->
-    couch_config:start_link(config_files()),
+    application:start(config),
     couch_os_daemons:start_link(),
 
     etap:diag("Daemon not executable."),
@@ -73,14 +73,14 @@ test() ->
     ok.
 
 test_halts(Name, Cmd, Time) ->
-    couch_config:set("os_daemons", Name, Cmd ++ " 2> /dev/null", false),
+    config:set("os_daemons", Name, Cmd ++ " 2> /dev/null", false),
     timer:sleep(Time),
     {ok, [D]} = couch_os_daemons:info([table]),
     check_dead(D, Name, Cmd),
-    couch_config:delete("os_daemons", Name, false).
+    config:delete("os_daemons", Name, false).
 
 test_runs(Name, Cmd) ->
-    couch_config:set("os_daemons", Name, Cmd, false),
+    config:set("os_daemons", Name, Cmd, false),
 
     timer:sleep(1000),
     {ok, [D1]} = couch_os_daemons:info([table]),

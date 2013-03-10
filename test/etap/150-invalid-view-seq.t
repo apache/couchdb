@@ -50,7 +50,7 @@ test() ->
     % make DB file backup
     backup_db_file(),
 
-    put(addr, couch_config:get("httpd", "bind_address", "127.0.0.1")),
+    put(addr, config:get("httpd", "bind_address", "127.0.0.1")),
     put(port, integer_to_list(mochiweb_socket_server:get(couch_httpd, port))),
 
     create_new_doc(),

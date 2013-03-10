@@ -12,15 +12,18 @@
 
 -module(couch_server_sup).
 -behaviour(supervisor).
+-behaviour(config_listener).
 
 
--export([start_link/1,stop/0, couch_config_start_link_wrapper/2,
-        restart_core_server/0, config_change/2]).
+-export([start_link/1,stop/0, restart_core_server/0]).
 
 -include_lib("couch/include/couch_db.hrl").
 
 %% supervisor callbacks
 -export([init/1]).
+
+% config_listener api
+-export([handle_config_change/5]).
 
 start_link(IniFiles) ->
     case whereis(couch_server_sup) of
@@ -32,14 +35,6 @@ start_link(IniFiles) ->
 
 restart_core_server() ->
     init:restart().
-
-couch_config_start_link_wrapper(IniFiles, FirstConfigPid) ->
-    case is_process_alive(FirstConfigPid) of
-        true ->
-            link(FirstConfigPid),
-            {ok, FirstConfigPid};
-        false -> couch_config:start_link(IniFiles)
-    end.
 
 start_server(IniFiles) ->
     case init:get_argument(pidfile) of
@@ -53,9 +48,7 @@ start_server(IniFiles) ->
     _ -> ok
     end,
 
-    {ok, ConfigPid} = couch_config:start_link(IniFiles),
-
-    LogLevel = couch_config:get("log", "level", "info"),
+    LogLevel = config:get("log", "level", "info"),
     % announce startup
     io:format("Apache CouchDB ~s (LogLevel=~s) is starting.~n", [
         couch_server:get_version(),
@@ -65,18 +58,12 @@ start_server(IniFiles) ->
     "debug" ->
         io:format("Configuration Settings ~p:~n", [IniFiles]),
         [io:format("  [~s] ~s=~p~n", [Module, Variable, Value])
-            || {{Module, Variable}, Value} <- couch_config:all()];
+            || {{Module, Variable}, Value} <- config:all()];
     _ -> ok
     end,
 
     BaseChildSpecs =
-    {{one_for_one, 10, 60},
-        [{couch_config,
-            {couch_server_sup, couch_config_start_link_wrapper, [IniFiles, ConfigPid]},
-            permanent,
-            brutal_kill,
-            worker,
-            [couch_config]},
+    {{one_for_one, 10, 60}, [
         {couch_primary_services,
             {couch_primary_sup, start_link, []},
             permanent,
@@ -98,13 +85,9 @@ start_server(IniFiles) ->
     {ok, Pid} = supervisor:start_link(
         {local, couch_server_sup}, couch_server_sup, BaseChildSpecs),
 
-    % launch the icu bridge
-    % just restart if one of the config settings change.
-    couch_config:register(fun ?MODULE:config_change/2, Pid),
+    ok = config:listen_for_changes(?MODULE, nil),
 
-    unlink(ConfigPid),
-
-    Ip = couch_config:get("httpd", "bind_address"),
+    Ip = config:get("httpd", "bind_address"),
     io:format("Apache CouchDB has started. Time to relax.~n"),
     Uris = [get_uri(Name, Ip) || Name <- [couch_httpd, https]],
     [begin
@@ -114,7 +97,7 @@ start_server(IniFiles) ->
         end
     end
     || Uri <- Uris],
-    case couch_config:get("couchdb", "uri_file", null) of 
+    case config:get("couchdb", "uri_file", null) of 
     null -> ok;
     UriFile ->
         Lines = [begin case Uri of
@@ -135,13 +118,17 @@ start_server(IniFiles) ->
 stop() ->
     catch exit(whereis(couch_server_sup), normal).
 
-config_change("daemons", _) ->
-    supervisor:terminate_child(couch_server_sup, couch_secondary_services),
-    supervisor:restart_child(couch_server_sup, couch_secondary_services);
-config_change("couchdb", "util_driver_dir") ->
+
+handle_config_change("daemons", _, _, _, _) ->
+    exit(whereis(couch_server_sup), shutdown),
+    remove_handler;
+handle_config_change("couchdb", "util_driver_dir", _, _, _) ->
     [Pid] = [P || {collation_driver, P, _, _}
         <- supervisor:which_children(couch_primary_services)],
-    Pid ! reload_driver.
+    Pid ! reload_driver,
+    {ok, nil};
+handle_config_change(_, _, _, _, _) ->
+    {ok, nil}.
 
 init(ChildSpecs) ->
     {ok, ChildSpecs}.

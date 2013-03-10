@@ -103,7 +103,7 @@ delete_design_doc(DDName, Rev) ->
     couch_db:close(Db).
 
 db_url() ->
-    Addr = couch_config:get("httpd", "bind_address", "127.0.0.1"),
+    Addr = config:get("httpd", "bind_address", "127.0.0.1"),
     Port = integer_to_list(mochiweb_socket_server:get(couch_httpd, port)),
     "http://" ++ Addr ++ ":" ++ Port ++ "/" ++
         binary_to_list(?TEST_DB).
@@ -121,6 +121,6 @@ view_cleanup() ->
 
 count_index_files() ->
     % call server to fetch the index files
-    RootDir = couch_config:get("couchdb", "index_dir"),
+    RootDir = config:get("couchdb", "index_dir"),
     length(filelib:wildcard(RootDir ++ "/." ++
         binary_to_list(?TEST_DB) ++ "_design"++"/mrview/*")).

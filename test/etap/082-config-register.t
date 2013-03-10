@@ -29,18 +29,18 @@ main(_) ->
     ok.
 
 test() ->
-    couch_config:start_link([default_config()]),
+    application:start(config),
 
     etap:is(
-        couch_config:get("httpd", "port"),
+        config:get("httpd", "port"),
         "5984",
         "{httpd, port} is 5984 by default."
     ),
 
-    ok = couch_config:set("httpd", "port", "4895", false),
+    ok = config:set("httpd", "port", "4895", false),
 
     etap:is(
-        couch_config:get("httpd", "port"),
+        config:get("httpd", "port"),
         "4895",
         "{httpd, port} changed to 4895"
     ),
@@ -52,22 +52,22 @@ test() ->
     end,
     SentinelPid = spawn(SentinelFunc),
 
-    couch_config:register(
+    config:register(
         fun("httpd", "port", Value) ->
             etap:is(Value, "8080", "Registered function got notification.")
         end,
         SentinelPid
     ),
 
-    ok = couch_config:set("httpd", "port", "8080", false),
+    ok = config:set("httpd", "port", "8080", false),
 
     % Implicitly checking that we *don't* call the function
     etap:is(
-        couch_config:get("httpd", "bind_address"),
+        config:get("httpd", "bind_address"),
         "127.0.0.1",
         "{httpd, bind_address} is not '0.0.0.0'"
     ),
-    ok = couch_config:set("httpd", "bind_address", "0.0.0.0", false),
+    ok = config:set("httpd", "bind_address", "0.0.0.0", false),
 
     % Ping-Pong kill process
     SentinelPid ! {ping, self()},
@@ -77,18 +77,18 @@ test() ->
         throw({timeout_error, registered_pid})
     end,
 
-    ok = couch_config:set("httpd", "port", "80", false),
+    ok = config:set("httpd", "port", "80", false),
     etap:is(
-        couch_config:get("httpd", "port"),
+        config:get("httpd", "port"),
         "80",
         "Implicitly test that the function got de-registered"
     ),
 
     % test passing of Persist flag
-    couch_config:register(
+    config:register(
         fun("httpd", _, _, Persist) ->
             etap:is(Persist, false)
         end),
-    ok = couch_config:set("httpd", "port", "80", false),
+    ok = config:set("httpd", "port", "80", false),
 
     ok.

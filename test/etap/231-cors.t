@@ -50,7 +50,7 @@ admin_user_ctx() -> {user_ctx, #user_ctx{roles=[<<"_admin">>]}}.
 
 set_admin_password(UserName, Password) ->
     Hashed = couch_passwords:hash_admin_password(Password),
-    couch_config:set("admins", UserName, Hashed, false).
+    config:set("admins", UserName, Hashed, false).
 
 cycle_db(DbName) ->
     couch_server:delete(list_to_binary(DbName), [admin_user_ctx()]),
@@ -76,8 +76,8 @@ test() ->
     test_no_headers_db(),
 
     % Now enable CORS
-    ok = couch_config:set("httpd", "enable_cors", "true", false),
-    ok = couch_config:set("cors", "origins", "http://example.com", false),
+    ok = config:set("httpd", "enable_cors", "true", false),
+    ok = config:set("cors", "origins", "http://example.com", false),
 
     %% do tests
     test_incorrect_origin_simple_request(),
@@ -91,16 +91,16 @@ test() ->
     test_preflight_with_port1(),
     test_preflight_with_scheme1(),
 
-    ok = couch_config:set("cors", "origins", "http://example.com:5984", false),
+    ok = config:set("cors", "origins", "http://example.com:5984", false),
     test_preflight_with_port2(),
 
-    ok = couch_config:set("cors", "origins", "https://example.com:5984", false),
+    ok = config:set("cors", "origins", "https://example.com:5984", false),
     test_preflight_with_scheme2(),
 
-    ok = couch_config:set("cors", "origins", "*", false),
+    ok = config:set("cors", "origins", "*", false),
     test_preflight_with_wildcard(),
 
-    ok = couch_config:set("cors", "origins", "http://example.com", false),
+    ok = config:set("cors", "origins", "http://example.com", false),
     test_case_sensitive_mismatch_of_allowed_origins(),
 
     % http://www.w3.org/TR/cors/#supports-credentials
@@ -116,14 +116,14 @@ test() ->
     % Note: The string "*" cannot be used for a resource
     % that supports credentials.
     test_db_request_credentials_header_off(),
-    ok = couch_config:set("cors", "credentials", "true", false),
+    ok = config:set("cors", "credentials", "true", false),
     test_db_request_credentials_header_on(),
     % We don’t test wildcards & credentials as that would
     % fall into the realm of validating config values
     % which we don’t do at all yet
 
     % test with vhosts
-    ok = couch_config:set("vhosts", "example.com", "/", false),
+    ok = config:set("vhosts", "example.com", "/", false),
     test_preflight_request(true),
     test_db_request(true),
     test_db_preflight_request(true),

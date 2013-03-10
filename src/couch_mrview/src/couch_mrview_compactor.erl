@@ -68,7 +68,7 @@ compact(State) ->
         {progress, 0}
     ]),
 
-    BufferSize0 = couch_config:get(
+    BufferSize0 = config:get(
         "view_compaction", "keyvalue_buffer_size", "2097152"
     ),
     BufferSize = list_to_integer(BufferSize0),

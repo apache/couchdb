@@ -27,25 +27,25 @@ main(_) ->
     ok.
 
 test() ->
-    couch_config:start_link([]),
+    application:start(config),
 
     etap:fun_is(
         fun(KVPairs) -> length(KVPairs) == 0 end,
-        couch_config:all(),
+        config:all(),
         "No INI files specified returns 0 key/value pairs."
     ),
 
-    ok = couch_config:set("httpd", "port", "80", false),
+    ok = config:set("httpd", "port", "80", false),
 
     etap:is(
-        couch_config:get("httpd", "port"),
+        config:get("httpd", "port"),
         "80",
         "Created a new non-persisted k/v pair."
     ),
 
-    ok = couch_config:set("httpd", "bind_address", "127.0.0.1"),
+    ok = config:set("httpd", "bind_address", "127.0.0.1"),
     etap:is(
-        couch_config:get("httpd", "bind_address"),
+        config:get("httpd", "bind_address"),
         "127.0.0.1",
         "Asking for a persistent key/value pair doesn't choke."
     ),
