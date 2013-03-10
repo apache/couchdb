@@ -12,17 +12,19 @@
 
 -module(couch_index).
 -behaviour(gen_server).
-
+-behaviour(config_listener).
 
 %% API
 -export([start_link/1, stop/1, get_state/2, get_info/1]).
 -export([trigger_update/2]).
 -export([compact/1, compact/2]).
--export([config_change/3]).
 
 %% gen_server callbacks
 -export([init/1, terminate/2, code_change/3]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
+
+% config_listener api
+-export([handle_config_change/5]).
 
 
 -include_lib("couch/include/couch_db.hrl").
@@ -72,12 +74,8 @@ compact(Pid, Options) ->
     end.
 
 
-config_change("query_server_config", "commit_freq", NewValue) ->
-    ok = gen_server:cast(?MODULE, {config_update, NewValue}).
-
-
 init({Mod, IdxState}) ->
-    ok = couch_config:register(fun ?MODULE:config_change/3),
+    ok = config:listen_for_changes(?MODULE, nil),
     DbName = Mod:get(db_name, IdxState),
     Resp = couch_util:with_db(DbName, fun(Db) ->
         case Mod:open(Db, IdxState) of
@@ -92,7 +90,7 @@ init({Mod, IdxState}) ->
         {ok, NewIdxState} ->
             {ok, UPid} = couch_index_updater:start_link(self(), Mod),
             {ok, CPid} = couch_index_compactor:start_link(self(), Mod),
-            Delay = couch_config:get("query_server_config", "commit_freq", "5"),
+            Delay = config:get("query_server_config", "commit_freq", "5"),
             MsDelay = 1000 * list_to_integer(Delay),
             State = #st{
                 mod=Mod,
@@ -288,6 +286,12 @@ handle_cast(_Mesg, State) ->
     {stop, unhandled_cast, State}.
 
 
+handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
+    erlang:send_after(5000, self(), restart_config_listener),
+    {noreply, State};
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {noreply, State};
 handle_info(commit, #st{committed=true}=State) ->
     {noreply, State};
 handle_info(commit, State) ->
@@ -319,6 +323,12 @@ handle_info({'DOWN', _, _, _Pid, _}, #st{mod=Mod, idx_state=IdxState}=State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+
+handle_config_change("query_server_config", "commit_freq", Val, _, _) ->
+    {ok, gen_server:cast(?MODULE, {config_update, Val})};
+handle_config_change(_, _, _, _, _) ->
+    {ok, nil}.
 
 
 maybe_restart_updater(#st{waiters=[]}) ->

@@ -19,8 +19,8 @@
 
 
 root_dir() ->
-    case couch_config:get("couchdb", "index_dir") of
-        undefined -> couch_config:get("couchdb", "view_index_dir");
+    case config:get("couchdb", "index_dir") of
+        undefined -> config:get("couchdb", "view_index_dir");
         Value -> Value
     end.
 
