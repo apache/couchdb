@@ -158,10 +158,8 @@ handle_call({purge_docs, IdRevs}, _From, Db) ->
     {DocInfoToUpdate, NewSeq} = lists:mapfoldl(
         fun(#full_doc_info{rev_tree=Tree}=FullInfo, SeqAcc) ->
             Tree2 = couch_key_tree:map_leafs(
-                fun(_RevId, LeafVal) ->
-                    IsDeleted = element(1, LeafVal),
-                    BodyPointer = element(2, LeafVal),
-                    {IsDeleted, BodyPointer, SeqAcc + 1}
+                fun(_RevId, Leaf) ->
+                    Leaf#leaf{seq=SeqAcc+1}
                 end, Tree),
             {FullInfo#full_doc_info{rev_tree=Tree2}, SeqAcc + 1}
         end, LastSeq, FullDocInfoToUpdate),
@@ -340,37 +338,35 @@ rev_tree(DiskTree) ->
     couch_key_tree:mapfold(fun
         (_RevId, {IsDeleted, BodyPointer, UpdateSeq}, leaf, _Acc) ->
             % pre 1.2 format, will be upgraded on compaction
-            {{IsDeleted == 1, BodyPointer, UpdateSeq, nil}, nil};
+            {#leaf{deleted=?i2b(IsDeleted), ptr=BodyPointer, seq=UpdateSeq}, nil};
         (_RevId, {IsDeleted, BodyPointer, UpdateSeq}, branch, Acc) ->
-            {{IsDeleted == 1, BodyPointer, UpdateSeq, nil}, Acc};
+            {#leaf{deleted=?i2b(IsDeleted), ptr=BodyPointer, seq=UpdateSeq}, Acc};
         (_RevId, {IsDeleted, BodyPointer, UpdateSeq, Size}, leaf, Acc) ->
             Acc2 = sum_leaf_sizes(Acc, Size),
-            {{IsDeleted == 1, BodyPointer, UpdateSeq, Size}, Acc2};
+            {#leaf{deleted=?i2b(IsDeleted), ptr=BodyPointer, seq=UpdateSeq, size=Size}, Acc2};
         (_RevId, {IsDeleted, BodyPointer, UpdateSeq, Size}, branch, Acc) ->
-            {{IsDeleted == 1, BodyPointer, UpdateSeq, Size}, Acc};
+            {#leaf{deleted=?i2b(IsDeleted), ptr=BodyPointer, seq=UpdateSeq, size=Size}, Acc};
         (_RevId, ?REV_MISSING, _Type, Acc) ->
             {?REV_MISSING, Acc}
-    end, DiskTree).
+    end, 0, DiskTree).
 
 disk_tree(RevTree) ->
     couch_key_tree:map(fun
         (_RevId, ?REV_MISSING) ->
             ?REV_MISSING;
-        (_RevId, {IsDeleted, BodyPointer, UpdateSeq}) ->
-            {if IsDeleted -> 1; true -> 0 end, BodyPointer, UpdateSeq, nil};
-        (_RevId, {IsDeleted, BodyPointer, UpdateSeq, Size}) ->
-            {if IsDeleted -> 1; true -> 0 end, BodyPointer, UpdateSeq, Size}
+        (_RevId, #leaf{deleted=IsDeleted, ptr=BodyPointer, seq=UpdateSeq, size=Size}) ->
+            {?b2i(IsDeleted), BodyPointer, UpdateSeq, Size}
     end, RevTree).
 
 btree_by_seq_split(#full_doc_info{id=Id, update_seq=Seq, deleted=Del, rev_tree=T}) ->
-    {Seq, {Id, if Del -> 1; true -> 0 end, disk_tree(T)}}.
+    {Seq, {Id, ?b2i(Del), disk_tree(T)}}.
 
 btree_by_seq_join(Seq, {Id, Del, DiskTree}) when is_integer(Del) ->
     {RevTree, LeafsSize} = rev_tree(DiskTree),
     #full_doc_info{
         id = Id,
         update_seq = Seq,
-        deleted = (Del == 1),
+        deleted = ?i2b(Del),
         rev_tree = RevTree,
         leafs_size = LeafsSize
     };
@@ -388,14 +384,14 @@ btree_by_seq_join(KeySeq, {Id, RevInfos, DeletedRevInfos}) ->
 
 btree_by_id_split(#full_doc_info{id=Id, update_seq=Seq,
         deleted=Deleted, rev_tree=Tree}) ->
-    {Id, {Seq, if Deleted -> 1; true -> 0 end, disk_tree(Tree)}}.
+    {Id, {Seq, ?b2i(Deleted), disk_tree(Tree)}}.
 
 btree_by_id_join(Id, {HighSeq, Deleted, DiskTree}) ->
     {Tree, LeafsSize} = rev_tree(DiskTree),
     #full_doc_info{
         id = Id,
         update_seq = HighSeq,
-        deleted = (Deleted == 1),
+        deleted = ?i2b(Deleted),
         rev_tree = Tree,
         leafs_size = LeafsSize
     }.
@@ -573,7 +569,8 @@ flush_trees(#db{fd = Fd} = Db,
                 TotalSize = lists:foldl(
                     fun(#att{att_len = L}, A) -> A + L end,
                     SummarySize, Value#doc.atts),
-                NewValue = {IsDeleted, NewSummaryPointer, UpdateSeq, TotalSize},
+                NewValue = #leaf{deleted=IsDeleted, ptr=NewSummaryPointer,
+                                 seq=UpdateSeq, size=TotalSize},
                 case Type of
                 leaf ->
                     {NewValue, Acc + TotalSize};
@@ -899,10 +896,7 @@ copy_docs(Db, #db{fd = DestFd} = NewDb, MixedInfos, Retry) ->
             Info#full_doc_info{rev_tree=couch_key_tree:map(
                 fun(_, _, branch) ->
                     ?REV_MISSING;
-                (_Rev, LeafVal, leaf) ->
-                    IsDel = element(1, LeafVal),
-                    Sp = element(2, LeafVal),
-                    Seq = element(3, LeafVal),
+                (_Rev, #leaf{ptr=Sp}=Leaf, leaf) ->
                     {_Body, AttsInfo} = Summary = copy_doc_attachments(
                         Db, Sp, DestFd),
                     SummaryChunk = make_doc_summary(NewDb, Summary),
@@ -911,7 +905,7 @@ copy_docs(Db, #db{fd = DestFd} = NewDb, MixedInfos, Retry) ->
                     TotalLeafSize = lists:foldl(
                         fun({_, _, _, AttLen, _, _, _, _}, S) -> S + AttLen end,
                         SummarySize, AttsInfo),
-                    {IsDel, Pos, Seq, TotalLeafSize}
+                    Leaf#leaf{ptr=Pos, size=TotalLeafSize}
                 end, RevTree)}
         end, NewInfos0),
 
