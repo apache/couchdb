@@ -66,7 +66,7 @@ test() ->
     couch_server_sup:start_link(test_util:config_files()),
     ibrowse:start(),
     crypto:start(),
-    couch_config:set("attachments", "compressible_types", "text/*", false),
+    config:set("attachments", "compressible_types", "text/*", false),
 
     Pairs = [
         {source_db_name(), target_db_name()},
@@ -227,7 +227,7 @@ att_decoded_md5(Att) ->
 
 db_url(DbName) ->
     iolist_to_binary([
-        "http://", couch_config:get("httpd", "bind_address", "127.0.0.1"),
+        "http://", config:get("httpd", "bind_address", "127.0.0.1"),
         ":", integer_to_list(mochiweb_socket_server:get(couch_httpd, port)),
         "/", DbName
     ]).

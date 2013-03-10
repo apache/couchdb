@@ -264,7 +264,7 @@ att_decoded_md5(Att) ->
 
 db_url(DbName) ->
     iolist_to_binary([
-        "http://", couch_config:get("httpd", "bind_address", "127.0.0.1"),
+        "http://", config:get("httpd", "bind_address", "127.0.0.1"),
         ":", integer_to_list(mochiweb_socket_server:get(couch_httpd, port)),
         "/", DbName
     ]).
