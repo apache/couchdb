@@ -213,8 +213,8 @@ accumulate_writes(State, W, Acc0) ->
 
 accumulate_more(NumDocIds) ->
     % check if we have enough items now
-    MinItems = couch_config:get("view_updater", "min_writer_items", "100"),
-    MinSize = couch_config:get("view_updater", "min_writer_size", "16777216"),
+    MinItems = config:get("view_updater", "min_writer_items", "100"),
+    MinSize = config:get("view_updater", "min_writer_size", "16777216"),
     {memory, CurrMem} = process_info(self(), memory),
     NumDocIds < list_to_integer(MinItems)
         andalso CurrMem < list_to_integer(MinSize).
