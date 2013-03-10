@@ -580,7 +580,7 @@ prep_and_validate_update(Db, #doc{id=Id,revs={RevStart, Revs}}=Doc,
     case Revs of
     [PrevRev|_] ->
         case dict:find({RevStart, PrevRev}, LeafRevsDict) of
-        {ok, {Deleted, DiskSp, DiskRevs}} ->
+        {ok, {#leaf{deleted=Deleted, ptr=DiskSp}, DiskRevs}} ->
             case couch_doc:has_stubs(Doc) of
             true ->
                 DiskDoc = make_doc(Db, Id, Deleted, DiskSp, DiskRevs),
@@ -643,12 +643,8 @@ prep_and_validate_updates(Db, [DocBucket|RestBuckets],
         AllowConflict, AccPrepped, AccErrors) ->
     Leafs = couch_key_tree:get_all_leafs(OldRevTree),
     LeafRevsDict = dict:from_list([
-        begin
-            Deleted = element(1, LeafVal),
-            Sp = element(2, LeafVal),
-            {{Start, RevId}, {Deleted, Sp, Revs}}
-        end ||
-        {LeafVal, {Start, [RevId | _]} = Revs} <- Leafs
+        {{Start, RevId}, {Leaf, Revs}} ||
+        {Leaf, {Start, [RevId | _]} = Revs} <- Leafs
     ]),
     {PreppedBucket, AccErrors3} = lists:foldl(
         fun({Doc, Ref}, {Docs2Acc, AccErrors2}) ->
@@ -895,9 +891,7 @@ make_first_doc_on_disk(Db, Id, Pos, [{_Rev, #doc{}} | RestPath]) ->
     make_first_doc_on_disk(Db, Id, Pos-1, RestPath);
 make_first_doc_on_disk(Db, Id, Pos, [{_Rev, ?REV_MISSING}|RestPath]) ->
     make_first_doc_on_disk(Db, Id, Pos - 1, RestPath);
-make_first_doc_on_disk(Db, Id, Pos, [{_Rev, RevValue} |_]=DocPath) ->
-    IsDel = element(1, RevValue),
-    Sp = element(2, RevValue),
+make_first_doc_on_disk(Db, Id, Pos, [{_Rev, #leaf{deleted=IsDel, ptr=Sp}} |_]=DocPath) ->
     Revs = [Rev || {Rev, _} <- DocPath],
     make_doc(Db, Id, IsDel, Sp, {Pos, Revs}).
 
@@ -1243,9 +1237,7 @@ open_doc_revs_int(Db, IdRevs, Options) ->
                     ?REV_MISSING ->
                         % we have the rev in our list but know nothing about it
                         {{not_found, missing}, {Pos, Rev}};
-                    RevValue ->
-                        IsDeleted = element(1, RevValue),
-                        SummaryPtr = element(2, RevValue),
+                    #leaf{deleted=IsDeleted, ptr=SummaryPtr} ->
                         {ok, make_doc(Db, Id, IsDeleted, SummaryPtr, FoundRevPath)}
                     end
                 end, FoundRevs),
@@ -1297,8 +1289,8 @@ doc_meta_info(#doc_info{high_seq=Seq,revs=[#rev_info{rev=Rev}|RestInfo]}, RevTre
         [{revs_info, Pos, lists:map(
             fun({Rev1, ?REV_MISSING}) ->
                 {Rev1, missing};
-            ({Rev1, RevValue}) ->
-                case element(1, RevValue) of
+            ({Rev1, Leaf}) ->
+                case Leaf#leaf.deleted of
                 true ->
                     {Rev1, deleted};
                 false ->

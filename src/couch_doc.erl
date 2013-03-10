@@ -330,7 +330,10 @@ max_seq(Tree, UpdateSeq) ->
             {_Deleted, _DiskPos, OldTreeSeq} ->
                 % Older versions didn't track data sizes.
                 erlang:max(MaxOldSeq, OldTreeSeq);
-            {_Deleted, _DiskPos, OldTreeSeq, _Size} ->
+            {_Deleted, _DiskPos, OldTreeSeq, _Size} -> % necessary clause?
+                % Older versions didn't store #leaf records.
+                erlang:max(MaxOldSeq, OldTreeSeq);
+            #leaf{seq=OldTreeSeq} ->
                 erlang:max(MaxOldSeq, OldTreeSeq);
             _ ->
                 MaxOldSeq
@@ -341,11 +344,11 @@ max_seq(Tree, UpdateSeq) ->
 to_doc_info_path(#full_doc_info{id=Id,rev_tree=Tree,update_seq=FDISeq}) ->
     RevInfosAndPath = [
         {#rev_info{
-            deleted = element(1, LeafVal),
-            body_sp = element(2, LeafVal),
-            seq = element(3, LeafVal),
+            deleted = Leaf#leaf.deleted,
+            body_sp = Leaf#leaf.ptr,
+            seq = Leaf#leaf.seq,
             rev = {Pos, RevId}
-        }, Path} || {LeafVal, {Pos, [RevId | _]} = Path} <-
+        }, Path} || {Leaf, {Pos, [RevId | _]} = Path} <-
             couch_key_tree:get_all_leafs(Tree)
     ],
     SortedRevInfosAndPath = lists:sort(

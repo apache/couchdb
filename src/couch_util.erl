@@ -29,6 +29,7 @@
 -export([encode_doc_id/1]).
 -export([with_db/2]).
 -export([rfc1123_date/0, rfc1123_date/1]).
+-export([integer_to_boolean/1, boolean_to_integer/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -487,3 +488,13 @@ month(9) -> "Sep";
 month(10) -> "Oct";
 month(11) -> "Nov";
 month(12) -> "Dec".
+
+integer_to_boolean(1) ->
+    true;
+integer_to_boolean(0) ->
+    false.
+
+boolean_to_integer(true) ->
+    1;
+boolean_to_integer(false) ->
+    0.
