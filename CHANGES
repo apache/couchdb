@@ -6,6 +6,10 @@ Apache CouchDB CHANGES
 #
 # This version has not been released yet.
 #
+# HTTP Interface:
+#
+#  * Fixed bug with CORS and replication (COUCHDB-1689).
+#
 # Test Suite:
 #
 #  * Split up replicator_db tests into multiple independent tests.
