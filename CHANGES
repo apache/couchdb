@@ -13,6 +13,10 @@ Apache CouchDB CHANGES
 # Test Suite:
 #
 #  * Split up replicator_db tests into multiple independent tests.
+#
+# Futon:
+#
+#  * Disabled the link to the Futon test suite.
 
 Version 1.3.0
 -------------
