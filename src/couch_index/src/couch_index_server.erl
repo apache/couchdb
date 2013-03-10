@@ -14,7 +14,7 @@
 -behaviour(gen_server).
 -behaviour(config_listener).
 
--export([start_link/0, get_index/4, get_index/3, get_index/2]).
+-export([start_link/0, validate/2, get_index/4, get_index/3, get_index/2]).
 -export([update_notify/1]).
 
 -export([init/1, terminate/2, code_change/3]).
@@ -34,6 +34,32 @@
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
+
+validate(DbName, DDoc) ->
+    LoadModFun = fun
+        ({ModNameList, "true"}) ->
+            try
+                [list_to_existing_atom(ModNameList)]
+            catch error:badarg ->
+                []
+            end;
+        ({_ModNameList, _Enabled}) ->
+            []
+    end,
+    ValidateFun = fun
+        (ModName, ok) ->
+            try
+                ModName:validate(DbName, DDoc)
+            catch Type:Reason ->
+                {Type, Reason}
+            end;
+        (_ModName, Error) ->
+            Error
+    end,
+    EnabledIndexers = lists:flatmap(LoadModFun, config:get("indexers")),
+    lists:foldl(ValidateFun, ok, EnabledIndexers).
+
 
 get_index(Module, <<"shards/", _/binary>>=DbName, DDoc) ->
     {Pid, Ref} = spawn_monitor(fun() ->

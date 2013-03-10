@@ -12,6 +12,7 @@
 
 -module(couch_query_servers).
 
+-export([try_compile/4]).
 -export([start_doc_map/3, map_docs/2, map_docs_raw/2, stop_doc_map/1, raw_to_ejson/1]).
 -export([reduce/3, rereduce/3,validate_doc_update/5]).
 -export([filter_docs/5]).
@@ -64,6 +65,17 @@
 27,117,27,109,65,9,27,40,56,9,80,0,2,65,9,27,41,65,9,27,58,56,9,80,0,2,65,9,27,
 46,65,9,27,108,27,101,27,110,27,103,27,116,27,104,56,9,34,59,84,0,78,84,1,102,
 65,9,27,125,56,9,84,1,206,0,0,0,0,0,0,0>>}).
+
+
+try_compile(Proc, FunctionType, FunctionName, FunctionSource) ->
+    try
+        proc_prompt(Proc, [<<"add_fun">>, FunctionSource]),
+        ok
+    catch {compilation_error, E} ->
+        Fmt = "Compilation of the ~s function in the '~s' view failed: ~s",
+        Msg = io_lib:format(Fmt, [FunctionType, FunctionName, E]),
+        throw({compilation_error, Msg})
+    end.
 
 start_doc_map(Lang, Functions, Lib) ->
     Proc = get_os_process(Lang),
