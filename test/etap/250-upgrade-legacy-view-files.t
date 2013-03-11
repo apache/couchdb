@@ -162,7 +162,7 @@ test_upgrade() ->
     % TBD no idea how to actually test this.
 
     % ensure new header.
-    timer:sleep(1000),
+    timer:sleep(2000),
     ensure_header(NewViewFile, fun(#mrheader{}) -> true; (_) -> false end, "new"),
 
     ok.
