@@ -267,12 +267,20 @@ EOF
 
 stop_couchdb () {
     PID=`_get_pid`
+    STOP_TIMEOUT=60
     if test -n "$PID"; then
-        if test "$1" = "false"; then
-            echo > $PID_FILE
-        fi
         if kill -0 $PID 2> /dev/null; then
-            if kill -1 $PID 2> /dev/null; then
+            if kill -TERM $PID 2> /dev/null; then
+                count=0
+                while kill -0 $PID 2> /dev/null; do
+                    if [ $count -ge $STOP_TIMEOUT ]; then
+                        echo "Apache CouchDB failed to shutdown."
+                        return $SCRIPT_ERROR
+                    else
+                        count=$[count+1]
+                        sleep 1
+                    fi
+                done
                 if test "$1" = "false"; then
                     echo "Apache CouchDB has been shutdown."
                 else
