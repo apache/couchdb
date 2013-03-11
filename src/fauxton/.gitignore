@@ -1,0 +1,10 @@
+node_modules
+dist
+build
+app/load_addons.js
+!app/addons/
+app/addons/*
+!app/addons/config
+!app/addons/logs
+!app/addons/contribute
+settings.json
