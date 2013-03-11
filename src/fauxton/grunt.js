@@ -337,14 +337,14 @@ module.exports = function(grunt) {
   grunt.registerTask("default", "test dependencies build release install");
   grunt.registerTask("dev", "debug server:debug");
   // make a debug install
-  grunt.registerTask("debug", "test dependencies build template:debug copy:debug concat:debug");
+  grunt.registerTask("debug", "test dependencies build template copy:debug concat:debug");
   // make an install that is server by mochiweb under _utils
-  grunt.registerTask("couchdebug", "debug template:couchdebug copy:couchdebug");
+  grunt.registerTask("couchdebug", "debug template copy:couchdebug");
   // make an install that can be deployed as a couchapp
-  grunt.registerTask("couchapp_setup", "debug template:couchapp");
-  grunt.registerTask("couchdb", "test dependencies build minify template:couchdb copy:couchdb");
+  grunt.registerTask("couchapp_setup", "debug template");
+  grunt.registerTask("couchdb", "test dependencies build minify template copy:couchdb");
   // build a release
-  grunt.registerTask("release", "test dependencies build minify template:release copy:dist");
+  grunt.registerTask("release", "test dependencies build minify template copy:dist");
   // install fauxton as couchapp
   grunt.registerTask('couchapp_install', 'rmcouchdb:fauxton mkcouchdb:fauxton couchapp:fauxton');
   grunt.registerTask('couchapp_deploy', 'couchapp_setup couchapp_install');
