@@ -137,6 +137,11 @@ update(Idx, Mod, IdxState) ->
 
         NumChanges = couch_db:count_changes_since(Db, CurrSeq),
 
+        GetSeq = fun
+            (#full_doc_info{update_seq=Seq}) -> Seq;
+            (#doc_info{high_seq=Seq}) -> Seq
+        end,
+
         GetInfo = fun
             (#full_doc_info{id=Id, update_seq=Seq, deleted=Del}=FDI) ->
                 {Id, Seq, Del, couch_doc:to_doc_info(FDI)};
@@ -159,8 +164,7 @@ update(Idx, Mod, IdxState) ->
         end,
 
         Proc = fun(DocInfo, _, {IdxStateAcc, _}) ->
-            HighSeq = DocInfo#doc_info.high_seq,
-            case CommittedOnly and (HighSeq > DbCommittedSeq) of
+            case CommittedOnly and (GetSeq(DocInfo) > DbCommittedSeq) of
                 true ->
                     {stop, {IdxStateAcc, false}};
                 false ->
