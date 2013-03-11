@@ -829,13 +829,11 @@ sync_header(Db, NewHeader) ->
     ok = couch_file:write_header(Fd, NewHeader),
     if After -> couch_file:sync(FilePath); true -> ok end,
 
-    Db2 = Db#db{
+    Db#db{
         header=NewHeader,
         committed_update_seq=Db#db.update_seq,
         waiting_delayed_commit=nil
-    },
-    tally:update(Db2),
-    Db2.
+    }.
 
 copy_doc_attachments(#db{fd = SrcFd} = SrcDb, SrcSp, DestFd) ->
     {ok, {BodyData, BinInfos0}} = couch_db:read_doc(SrcDb, SrcSp),
