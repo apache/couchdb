@@ -93,6 +93,7 @@ init(IniFiles) ->
         [_|_] -> lists:last(IniFiles);
         _ -> undefined
     end,
+    debug_config(),
     {ok, #config{write_filename=WriteFile}}.
 
 
@@ -214,3 +215,16 @@ parse_ini_file(IniFile) ->
             end
         end, {"", []}, Lines),
     {ok, ParsedIniValues}.
+
+
+debug_config() ->
+    case ?MODULE:get("log", "level") of
+        "debug" ->
+            io:format("Configuration Settings:~n", []),
+            lists:foreach(fun({{Mod, Key}, Val}) ->
+                io:format("  [~s] ~s=~p~n", [Mod, Key, Val])
+            end, lists:sort(ets:tab2list(?MODULE)));
+        _ ->
+            ok
+    end.
+

@@ -39,4 +39,4 @@ init([]) ->
         end
         || {Name, SpecStr}
         <- config:get("daemons"), SpecStr /= ""],
-    {ok, {{one_for_one, 10, 3600}, Children}}.
+    {ok, {{one_for_one, 50, 3600}, Children}}.

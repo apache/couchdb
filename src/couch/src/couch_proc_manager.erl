@@ -127,6 +127,9 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 
+handle_info(shutdown, State) ->
+    {stop, shutdown, State};
+
 handle_info({'EXIT', _, {ok, Proc0, {Client,_} = From}}, State) ->
     link(Proc0#proc.pid),
     Proc = assign_proc(State#state.tab, Client, Proc0),

@@ -70,10 +70,10 @@ source_files = \
     src/couch_query_servers.erl \
     src/couch_secondary_sup.erl \
     src/couch_server.erl \
-    src/couch_server_sup.erl \
     src/couch_stats_aggregator.erl \
     src/couch_stats_collector.erl \
     src/couch_stream.erl \
+    src/couch_sup.erl \
     src/couch_task_status.erl \
     src/couch_users_db.erl \
     src/couch_util.erl \
@@ -131,10 +131,10 @@ compiled_files = \
     ebin/couch_query_servers.beam \
     ebin/couch_secondary_sup.beam \
     ebin/couch_server.beam \
-    ebin/couch_server_sup.beam \
     ebin/couch_stats_aggregator.beam \
     ebin/couch_stats_collector.beam \
     ebin/couch_stream.beam \
+    ebin/couch_sup.beam \
     ebin/couch_task_status.beam \
     ebin/couch_users_db.beam \
     ebin/couch_util.beam \
@@ -167,7 +167,6 @@ compiled_files = \
 #     couch_rep.html \
 #     couch_rep_sup.html \
 #     couch_server.html \
-#     couch_server_sup.html \
 #     couch_stream.html \
 #     couch_util.html
 
