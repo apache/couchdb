@@ -68,6 +68,22 @@ module.exports = function(grunt) {
     return theAssets;
   }();
 
+  var templateSettings = function(){
+    var defaultSettings = {
+      "template": {
+        "src": "assets/index.underscore",
+        "dest": "dist/debug/index.html",
+        "variables": {
+          "assets_root": "./",
+          "requirejs": "require.js",
+          "base": null
+        }
+      }
+    };
+    var settings = grunt.file.readJSON("settings.json") || defaultSettings;
+    return {template: settings.template};
+  }();
+
   grunt.initConfig({
 
     // The clean task ensures all files are removed from the dist/ directory so
@@ -119,53 +135,7 @@ module.exports = function(grunt) {
 
     // Create static html files from templates, for managing change of script
     // or css name.
-    template: {
-      couchdb:{
-        src: 'assets/index.underscore',
-        dest: '../../share/www/fauxton/index.html',
-        variables: {
-          assets_root: '/_utils/fauxton/',
-          requirejs: 'require.min.js',
-          base: '/_utils/fauxton/'
-        }
-      },
-      couchdebug:{
-        src: 'assets/index.underscore',
-        dest: '../../share/www/fauxton/index.html',
-        variables: {
-          assets_root: '/_utils/fauxton/',
-          requirejs: 'require.js',
-          base: '/_utils/fauxton/'
-        }
-      },
-      release: {
-        src: 'assets/index.underscore',
-        dest: 'dist/release/index.html',
-        variables: {
-          assets_root: '/',
-          requirejs: 'require.min.js',
-          base: '/'
-        }
-      },
-      debug: {
-        src: 'assets/index.underscore',
-        dest: 'dist/debug/index.html',
-        variables: {
-          assets_root: '/',
-          requirejs: 'require.js',
-          base: '/'
-        }
-      },
-      couchapp: {
-        src: 'assets/index.underscore',
-        dest: 'dist/debug/index.html',
-        variables: {
-          assets_root: './',
-          requirejs: 'require.js',
-          base: null
-        }
-      }
-    },
+    template: templateSettings,
 
     // The concatenate task is used here to merge the almond require/define
     // shim and the templates into the application code.  It's named
