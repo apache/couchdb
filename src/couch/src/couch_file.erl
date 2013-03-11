@@ -340,12 +340,12 @@ file_open_options(Options) ->
         [append]
     end.
 
-maybe_track_open_os_files(FileOptions) ->
-    case lists:member(sys_db, FileOptions) of
-    true ->
-        ok;
-    false ->
-        couch_stats_collector:track_process_count({couchdb, open_os_files})
+maybe_track_open_os_files(Options) ->
+    case not lists:member(sys_db, Options) of
+        true ->
+            couch_stats_collector:track_process_count({couchdb, open_os_files});
+        false ->
+            ok
     end.
 
 terminate(_Reason, #file{fd = Fd}) ->
@@ -381,7 +381,7 @@ handle_call({set_db_pid, Pid}, _From, #file{db_pid=OldPid}=File) ->
         false -> ok
     end,
     link(Pid),
-    {reply, ok, File#file{db_pid=Pid}, 0};
+    {reply, ok, File#file{db_pid=Pid}};
 
 handle_call(sync, _From, #file{fd=Fd}=File) ->
     {reply, file:sync(Fd), File};
