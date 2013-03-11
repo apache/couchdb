@@ -33,6 +33,7 @@ compiled_files = \
 	ebin/chttpd_app.beam \
 	ebin/chttpd_config_listener.beam \
 	ebin/chttpd_db.beam \
+	ebin/chttpd_external.beam \
 	ebin/chttpd_misc.beam \
 	ebin/chttpd_rewrite.beam \
 	ebin/chttpd_show.beam \
@@ -40,7 +41,6 @@ compiled_files = \
 
 # Conflicts in couch_db.hrl prevent us from building these
 # until after we merge the couch application
-#	ebin/chttpd_external.beam
 #	ebin/chttpd_view.beam
 
 
