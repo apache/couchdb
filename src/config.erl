@@ -105,6 +105,7 @@ handle_call(all, _From, Config) ->
     {reply, Resp, Config};
 handle_call({set, Sec, Key, Val, Persist}, _From, Config) ->
     true = ets:insert(?MODULE, {{Sec, Key}, Val}),
+    twig:log(notice, "~p: [~s] ~s set to ~s", [?MODULE, Sec, Key, Val]),
     case {Persist, Config#config.write_filename} of
         {true, undefined} ->
             ok;
@@ -118,6 +119,7 @@ handle_call({set, Sec, Key, Val, Persist}, _From, Config) ->
     {reply, ok, Config};
 handle_call({delete, Sec, Key, Persist}, _From, Config) ->
     true = ets:delete(?MODULE, {Sec,Key}),
+    twig:log(notice, "~p: [~s] ~s deleted", [?MODULE, Sec, Key]),
     case {Persist, Config#config.write_filename} of
         {true, undefined} ->
             ok;
