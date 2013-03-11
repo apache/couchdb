@@ -19,40 +19,40 @@ CLEANFILES = \
     priv/ejson.so
 
 EJSON_C_SRCS = \
-	ejson.c \
-	decode.c \
-	encode.c \
-	yajl/yajl_alloc.c \
-	yajl/yajl_buf.c \
-	yajl/yajl.c \
-	yajl/yajl_encode.c \
-	yajl/yajl_gen.c \
-	yajl/yajl_lex.c \
-	yajl/yajl_parser.c
+	c_src/ejson.c \
+	c_src/decode.c \
+	c_src/encode.c \
+	c_src/yajl/yajl_alloc.c \
+	c_src/yajl/yajl_buf.c \
+	c_src/yajl/yajl.c \
+	c_src/yajl/yajl_encode.c \
+	c_src/yajl/yajl_gen.c \
+	c_src/yajl/yajl_lex.c \
+	c_src/yajl/yajl_parser.c
 
 EJSON_C_HDRS = \
-    erl_nif_compat.h \
-    yajl/yajl_alloc.h \
-    yajl/yajl_buf.h \
-    yajl/yajl_bytestack.h \
-    yajl/yajl_common.h \
-    yajl/yajl_encode.h \
-    yajl/yajl_gen.h \
-    yajl/yajl_lex.h \
-    yajl/yajl_parse.h \
-    yajl/yajl_parser.h
+    c_src/erl_nif_compat.h \
+    c_src/yajl/yajl_alloc.h \
+    c_src/yajl/yajl_buf.h \
+    c_src/yajl/yajl_bytestack.h \
+    c_src/yajl/yajl_common.h \
+    c_src/yajl/yajl_encode.h \
+    c_src/yajl/yajl_gen.h \
+    c_src/yajl/yajl_lex.h \
+    c_src/yajl/yajl_parse.h \
+    c_src/yajl/yajl_parser.h
 
 ejson_file_collection = \
-    ejson.app.in \
-    ejson.erl \
-    mochijson2.erl \
-    mochinum.erl
+    src/ejson.app.in \
+    src/ejson.erl \
+    src/mochijson2.erl \
+    src/mochinum.erl
 
 ejsonebin_make_generated_file_list = \
-    ejson.app \
-    ejson.beam \
-    mochijson2.beam \
-    mochinum.beam
+    ebin/ejson.app \
+    ebin/ejson.beam \
+    ebin/mochijson2.beam \
+    ebin/mochinum.beam
 
 EXTRA_DIST = \
 	$(EJSON_C_HDRS) \
@@ -82,8 +82,10 @@ priv/$(EJSON_SO_NAME): ejson.la
 all: priv/$(EJSON_SO_NAME)
 endif
 
-%.app: %.app.in
+ebin/%.app: src/%.app.in
+	@mkdir -p ebin/
 	cp $< $@
 
-%.beam: %.erl
-	$(ERLC) $(ERLC_FLAGS) $<
+ebin/%.beam: src/%.erl
+	@mkdir -p ebin/
+	$(ERLC) $(ERLC_FLAGS) -o ebin/ $<
