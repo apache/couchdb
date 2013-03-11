@@ -139,8 +139,7 @@ handle_call({purge_docs, IdRevs}, _From, Db) ->
                     BodyPointer = element(2, LeafVal),
                     {IsDeleted, BodyPointer, SeqAcc + 1}
                 end, Tree),
-            {couch_doc:to_doc_info(FullInfo#full_doc_info{rev_tree=Tree2}),
-                SeqAcc + 1}
+            {FullInfo#full_doc_info{rev_tree=Tree2}, SeqAcc + 1}
         end, LastSeq, FullDocInfoToUpdate),
 
     IdsToRemove = [Id || {#full_doc_info{id=Id,rev_tree=[]},_}
@@ -688,12 +687,12 @@ update_docs_int(Db, DocsList, NonRepDocs, MergeConflicts, FullCommit) ->
     % the trees, the attachments are already written to disk)
     {ok, FlushedFullDocInfos} = flush_trees(Db2, NewFullDocInfos, []),
 
-    {IndexFullDocInfos, IndexDocInfos, UpdatedDDocIds} =
+    {IndexFullDocInfos, UpdatedDDocIds} =
             new_index_entries(FlushedFullDocInfos, [], []),
 
     % and the indexes
     {ok, DocInfoByIdBTree2} = couch_btree:add_remove(DocInfoByIdBTree, IndexFullDocInfos, []),
-    {ok, DocInfoBySeqBTree2} = couch_btree:add_remove(DocInfoBySeqBTree, IndexDocInfos, RemoveSeqs),
+    {ok, DocInfoBySeqBTree2} = couch_btree:add_remove(DocInfoBySeqBTree, IndexFullDocInfos, RemoveSeqs),
 
     Db3 = Db2#db{
         id_tree = DocInfoByIdBTree2,
@@ -853,12 +852,12 @@ copy_docs(Db, #db{fd = DestFd} = NewDb, MixedInfos, Retry) ->
     DocInfoIds = [Id || #doc_info{id=Id} <- MixedInfos],
     LookupResults = couch_btree:lookup(Db#db.id_tree, DocInfoIds),
     % COUCHDB-968, make sure we prune duplicates during compaction
-    NewInfos0 = lists:usort(fun(#doc_info{id=A}, #doc_info{id=B}) ->
+    NewInfos0 = lists:usort(fun(#full_doc_info{id=A}, #full_doc_info{id=B}) ->
         A =< B
     end, merge_lookups(MixedInfos, LookupResults)),
 
     NewInfos1 = lists:map(
-        fun({ok, #full_doc_info{rev_tree=RevTree}=Info}) ->
+        fun(#full_doc_info{rev_tree=RevTree}=Info) ->
             Info#full_doc_info{rev_tree=couch_key_tree:map(
                 fun(_, _, branch) ->
                     ?REV_MISSING;
