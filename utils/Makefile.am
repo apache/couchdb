@@ -23,13 +23,7 @@ run: ../bin/couchdb.tpl
 	    -e "s|%bindir%|$(abs_top_builddir)/bin|g" \
 	    -e "s|%defaultini%|default_dev.ini|g" \
 	    -e "s|%localini%|local_dev.ini|g" \
-	    -e "s|%localerlanglibdir%|$(abs_top_builddir)\/src \
-			-pa $(abs_top_builddir)\/src\/couchdb \
-			-pa $(abs_top_builddir)\/src\/ejson \
-			-pa $(abs_top_builddir)\/src\/oauth \
-			-pa $(abs_top_builddir)\/src\/ibrowse \
-			-pa $(abs_top_builddir)\/src\/mochiweb \
-			-pa $(abs_top_builddir)\/src\/snappy|g" \
+	    -e "s|%localerlanglibdir%|$(abs_top_builddir)\/src|g" \
 	    -e "s|%localconfdir%|$(abs_top_builddir)/etc/couchdb|g" \
 	    -e "s|%localstatelogdir%|$(abs_top_builddir)/tmp/log|g" \
 	    -e "s|%localstatelibdir%|$(abs_top_builddir)/tmp/lib|g" \
