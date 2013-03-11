@@ -226,6 +226,9 @@ handle_info(restart_config_listener, State) ->
     ok = config:listen_for_changes(?MODULE, self()),
     {noreply, State};
 
+handle_info(shutdown, State) ->
+    {stop, shutdown, State};
+
 handle_info(Msg, State) ->
     twig:log(error,"Replication manager received unexpected message ~p", [Msg]),
     {stop, {unexpected_msg, Msg}, State}.
