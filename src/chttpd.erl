@@ -289,12 +289,17 @@ check_request_uri_length(Uri, MaxUriLen) when is_list(MaxUriLen) ->
     end.
 
 fix_uri(Req, Props, Type) ->
-    case is_http(replication_uri(Type, Props)) of
-    true ->
+    case replication_uri(Type, Props) of
+    undefined ->
         Props;
-    false ->
-        Uri = make_uri(Req,replication_uri(Type, Props)),
-        [{Type,Uri}|proplists:delete(Type,Props)]
+    Uri0 ->
+        case is_http(Uri0) of
+        true ->
+            Props;
+        false ->
+            Uri = make_uri(Req,replication_uri(Type, Props)),
+            [{Type,Uri}|proplists:delete(Type,Props)]
+        end
     end.
 
 replication_uri(Type, PostProps) ->
