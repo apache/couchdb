@@ -230,7 +230,7 @@ reinit_cache(State) ->
     true = ets:insert(?STATE, {auth_db_name, AuthDbName}),
     AuthDb = open_auth_db(),
     true = ets:insert(?STATE, {auth_db, AuthDb}),
-    NewState#state{db_mon_ref = AuthDb#db.fd_monitor}.
+    NewState#state{db_mon_ref = erlang:monitor(process, AuthDb#db.main_pid)}.
 
 
 add_cache_entry(_, _, _, #state{max_cache_size = 0} = State) ->
