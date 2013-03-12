@@ -70,18 +70,16 @@ module.exports = function(grunt) {
 
   var templateSettings = function(){
     var defaultSettings = {
-      "template": {
-        "src": "assets/index.underscore",
-        "dest": "dist/debug/index.html",
-        "variables": {
-          "assets_root": "./",
-          "requirejs": "require.js",
-          "base": null
-        }
+      "src": "assets/index.underscore",
+      "dest": "dist/debug/index.html",
+      "variables": {
+        "assets_root": "./",
+        "requirejs": "require.js",
+        "base": null
       }
     };
-    var settings = grunt.file.readJSON("settings.json") || defaultSettings;
-    return {template: settings.template};
+    var settings = grunt.file.readJSON("settings.json");
+    return {template: settings.template || defaultSettings};
   }();
 
   grunt.initConfig({
