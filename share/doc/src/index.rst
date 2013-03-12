@@ -22,7 +22,7 @@ This is a work in progress.
 
 Contents
 ========
-   
+
 .. toctree::
     :maxdepth: 2
     :numbered:
@@ -37,6 +37,7 @@ Contents
     http-proxying
     config_reference
     replication
+    replicator
     ddocs
     query-servers
     commonjs
