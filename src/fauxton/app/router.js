@@ -42,7 +42,7 @@ define([
   "load_addons"
 ],
 
-function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents, LoadAddons) {
+function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents, Pouch, LoadAddons) {
 
   var defaultLayout = 'with_sidebar';
   // TODO: auto generate this list if possible
