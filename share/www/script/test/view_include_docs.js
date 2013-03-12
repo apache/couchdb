@@ -33,7 +33,7 @@ couchTests.view_include_docs = function(debug) {
         map: "function(doc) {if(doc.link_id) { var value = {'_id':doc.link_id}; if (doc.link_rev) {value._rev = doc.link_rev}; emit(doc._id, value);}};"
       },
       summate: {
-        map:"function (doc) {emit(doc.integer, doc.integer)};",
+        map:"function (doc) { if (typeof doc.integer === 'number') {emit(doc.integer, doc.integer)};}",
         reduce:"function (keys, values) { return sum(values); };"
       }
     }

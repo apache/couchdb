@@ -30,7 +30,7 @@ main(_) ->
     ok.
 
 test() ->
-    couch_server_sup:start_link(test_util:config_files()),
+    ok = test_util:start_couch(),
     put(addr, config:get("httpd", "bind_address", "127.0.0.1")),
     put(port, integer_to_list(mochiweb_socket_server:get(couch_httpd, port))),
     timer:sleep(1000),
@@ -75,7 +75,7 @@ test() ->
 
     timer:sleep(3000), % to avoid mochiweb socket closed exceptions
     couch_server:delete(test_db_name(), []),
-    couch_server_sup:stop(),
+    ok = test_util:stop_couch(),
     ok.
 
 db_url() ->

@@ -63,7 +63,7 @@ test() ->
     crypto:start(),
 
     %% launch couchdb
-    couch_server_sup:start_link(test_util:config_files()),
+    ok = test_util:start_couch(),
 
     %% initialize db
     timer:sleep(1000),
@@ -152,7 +152,7 @@ test() ->
     couch_server:delete(list_to_binary(dbname2()), [admin_user_ctx()]),
 
     timer:sleep(3000),
-    couch_server_sup:stop(),
+    ok = test_util:stop_couch(),
     ok.
 
 test_preflight_request() -> test_preflight_request(false).

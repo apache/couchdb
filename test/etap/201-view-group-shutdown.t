@@ -64,7 +64,7 @@ main(_) ->
 
 
 test() ->
-    couch_server_sup:start_link(test_util:config_files()),
+    ok = test_util:start_couch(),
     ok = config:set("couchdb", "max_dbs_open", "3", false),
     ok = config:set("couchdb", "delayed_commits", "false", false),
     crypto:start(),
@@ -73,7 +73,7 @@ test() ->
     % be closed by the database LRU system.
     test_view_group_compaction(),
 
-    couch_server_sup:stop(),
+    ok = test_util:stop_couch(),
     ok.
 
 

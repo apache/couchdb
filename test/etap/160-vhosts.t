@@ -41,7 +41,7 @@ main(_) ->
     ok.
 
 test() ->
-    couch_server_sup:start_link(test_util:config_files()),
+    ok = test_util:start_couch(),
     ibrowse:start(),
     crypto:start(),
 
@@ -119,7 +119,7 @@ test() ->
     couch_db:close(Db),
     ok = couch_server:delete(couch_db:name(Db), [admin_user_ctx()]),
     timer:sleep(3000),
-    couch_server_sup:stop(),
+    ok = test_util:stop_couch(),
 
     ok.
 

@@ -22,13 +22,13 @@ main(_) ->
             etap:end_tests();
         Other ->
             etap:diag(io_lib:format("Test died abnormally: ~p", [Other])),
+            timer:sleep(1000),
             etap:bail(Other)
     end,
     ok.
 
 test() ->
-
-    couch_server_sup:start_link(test_util:config_files()),
+    test_util:start_couch(),
 
     couch_db:create(<<"etap-test-db">>, []),
     {ok, AllDbs} = couch_server:all_databases(),
@@ -70,4 +70,5 @@ test() ->
     end, 0, lists:seq(1, 6)),
     etap:is(6, NumDeleted, "Deleted all databases."),
 
+    ok = test_util:stop_couch(),
     ok.

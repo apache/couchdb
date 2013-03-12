@@ -27,7 +27,7 @@ couchTests.view_compaction = function(debug) {
         map: "function(doc) { emit(doc._id, doc.value) }"
       },
       view2: {
-        map: "function(doc) { emit(doc._id, doc.value); }",
+        map: "function(doc) { if (typeof(doc.integer) === 'number') {emit(doc._id, doc.integer);} }",
         reduce: "function(keys, values, rereduce) { return sum(values); }"
       }
     }
@@ -38,13 +38,13 @@ couchTests.view_compaction = function(debug) {
   db.bulkSave(docs);
 
   var resp = db.view('foo/view1', {});
-  T(resp.rows.length === 10000);
+  TEquals(10000, resp.rows.length);
 
   resp = db.view('foo/view2', {});
-  T(resp.rows.length === 1);
+  TEquals(1, resp.rows.length);
 
   resp = db.designInfo("_design/foo");
-  T(resp.view_index.update_seq === 10001);
+  TEquals(10001, resp.view_index.update_seq);
 
 
   // update docs
@@ -55,13 +55,13 @@ couchTests.view_compaction = function(debug) {
 
 
   resp = db.view('foo/view1', {});
-  T(resp.rows.length === 10000);
+  TEquals(10000, resp.rows.length);
 
   resp = db.view('foo/view2', {});
-  T(resp.rows.length === 1);
+  TEquals(1, resp.rows.length);
 
   resp = db.designInfo("_design/foo");
-  T(resp.view_index.update_seq === 20001);
+  TEquals(20001, resp.view_index.update_seq);
 
 
   // update docs again...
@@ -72,13 +72,13 @@ couchTests.view_compaction = function(debug) {
 
 
   resp = db.view('foo/view1', {});
-  T(resp.rows.length === 10000);
+  TEquals(10000, resp.rows.length);
 
   resp = db.view('foo/view2', {});
-  T(resp.rows.length === 1);
+  TEquals(1, resp.rows.length);
 
   resp = db.designInfo("_design/foo");
-  T(resp.view_index.update_seq === 30001);
+  TEquals(30001, resp.view_index.update_seq);
 
   var disk_size_before_compact = resp.view_index.disk_size;
   var data_size_before_compact = resp.view_index.data_size;
@@ -97,13 +97,13 @@ couchTests.view_compaction = function(debug) {
 
 
   resp = db.view('foo/view1', {});
-  T(resp.rows.length === 10000);
+  TEquals(10000, resp.rows.length);
 
   resp = db.view('foo/view2', {});
-  T(resp.rows.length === 1);
+  TEquals(1, resp.rows.length);
 
   resp = db.designInfo("_design/foo");
-  T(resp.view_index.update_seq === 30001);
+  TEquals(30001, resp.view_index.update_seq);
   T(resp.view_index.disk_size < disk_size_before_compact);
   TEquals("number", typeof resp.view_index.data_size, "data size is a number");
   T(resp.view_index.data_size < resp.view_index.disk_size, "data size < file size");

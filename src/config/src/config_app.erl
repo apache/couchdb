@@ -28,14 +28,25 @@ stop(_State) ->
     ok.
 
 get_ini_files() ->
+    hd([L || L <- [command_line(), env(), default()], L =/= skip]).
+
+env() ->
+    case application:get_env(config, ini_files) of
+        undefined ->
+            skip;
+        {ok, IniFiles} ->
+            IniFiles
+    end.
+
+command_line() ->
+    case init:get_argument(couch_ini) of
+        error ->
+            skip;
+        {ok, [IniFiles]} ->
+            IniFiles
+    end.
+
+default() ->
     Etc = filename:join(code:root_dir(), "etc"),
     Default = [filename:join(Etc,"default.ini"), filename:join(Etc,"local.ini")],
-    DefaultExists = lists:filter(fun filelib:is_file/1, Default),
-    case init:get_argument(couch_ini) of
-    error ->
-        DefaultExists;
-    {ok, [[]]} ->
-        DefaultExists;
-    {ok, [Values]} ->
-        Values
-    end.
+    lists:filter(fun filelib:is_file/1, Default).

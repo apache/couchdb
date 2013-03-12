@@ -30,7 +30,7 @@ main(_) ->
 dbname() -> <<"etap-test-db">>.
 
 test() ->
-    couch_server_sup:start_link(test_util:config_files()),
+    ok = test_util:start_couch(),
     timer:sleep(500),
 
     couch_server:delete(dbname(), []),

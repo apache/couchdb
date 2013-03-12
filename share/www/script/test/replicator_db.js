@@ -240,6 +240,8 @@ couchTests.replicator_db = function(debug) {
     T(copy !== null);
     T(copy.value === 1001);
 
+    wait(250);
+
     var repDoc1 = repDb.open(repDoc._id);
     T(repDoc1 !== null);
     T(repDoc1.source === repDoc.source);
@@ -275,6 +277,8 @@ couchTests.replicator_db = function(debug) {
 
     // stop replication by deleting the replication document
     T(repDb.deleteDoc(repDoc1).ok);
+
+    wait(200);
 
     // add another doc to source, it will NOT be replicated to target
     var docY = {
@@ -498,6 +502,8 @@ couchTests.replicator_db = function(debug) {
       T(copy.value === doc.value);
     }
 
+    wait(250);
+
     repDoc1 = repDb.open("foo_dup_cont_rep_doc_1");
     T(repDoc1 !== null);
     T(repDoc1._replication_state === "triggered");
@@ -542,6 +548,8 @@ couchTests.replicator_db = function(debug) {
 
     // deleting the 1st replication document stops the replication
     T(repDb.deleteDoc(repDoc1).ok);
+    wait(wait_rep_doc); //how to remove wait?
+
     var newDoc3 = {
         _id: "foo1983",
         value: 1983
@@ -655,6 +663,7 @@ couchTests.replicator_db = function(debug) {
       "GET", "/_config/replicator/db").responseText;
 
     repDb.deleteDb();
+    repDb.createDb();
 
     var xhr = CouchDB.request("PUT", "/_config/replicator/db", {
       body : JSON.stringify(repDb.name),
@@ -806,6 +815,8 @@ couchTests.replicator_db = function(debug) {
     TEquals(true, CouchDB.login("joe", "erly").ok);
     TEquals("joe", CouchDB.session().userCtx.name);
     TEquals(-1, CouchDB.session().userCtx.roles.indexOf("_admin"));
+
+    wait(500);
 
     var repDoc = {
       _id: "foo_rep",

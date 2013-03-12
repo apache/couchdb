@@ -27,16 +27,12 @@ local_config_write() ->
 
 % Run tests and wait for the config gen_server to shutdown.
 run_tests(IniFiles, Tests) ->
-    application:start(config),
-    erlang:monitor(process, Pid),
+    application:set_env(config, ini_files, IniFiles),
+    ok = application:start(config),
     Tests(),
-    config:stop(),
-    receive
-        {'DOWN', _, _, Pid, _} -> ok;
-        _Other -> etap:diag("OTHER: ~p~n", [_Other])
-    after
-        1000 -> throw({timeout_error, config_stop})
-    end.
+    timer:sleep(1000),
+    ok = application:stop(config),
+    ok.
 
 main(_) ->
     test_util:init_code_path(),

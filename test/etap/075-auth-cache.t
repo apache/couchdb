@@ -65,7 +65,7 @@ main(_) ->
 
 
 test() ->
-    couch_server_sup:start_link(test_util:config_files()),
+    test_util:start_couch(),
     OrigName = config:get("couch_httpd_auth", "authentication_db"),
     config:set(
         "couch_httpd_auth", "authentication_db",

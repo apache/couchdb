@@ -12,6 +12,8 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
+-mode(compile).
+
 -record(user_ctx, {
     name = null,
     roles = [],
@@ -38,7 +40,7 @@ main(_) ->
 
 
 test() ->
-    couch_server_sup:start_link(test_util:config_files()),
+    test_util:start_couch(),
     config:set("couchdb", "file_compression", "none", false),
 
     create_database(),

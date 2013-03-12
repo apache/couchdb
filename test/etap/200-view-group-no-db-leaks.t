@@ -63,7 +63,7 @@ main(_) ->
     ok.
 
 test() ->
-    couch_server_sup:start_link(test_util:config_files()),
+    ok = test_util:start_couch(),
     timer:sleep(1000),
     put(addr, config:get("httpd", "bind_address", "127.0.0.1")),
     put(port, integer_to_list(mochiweb_socket_server:get(couch_httpd, port))),
@@ -135,7 +135,7 @@ test() ->
 
     ok = timer:sleep(1000),
     delete_db(),
-    couch_server_sup:stop(),
+    ok = test_util:stop_couch(),
     ok.
 
 admin_user_ctx() ->

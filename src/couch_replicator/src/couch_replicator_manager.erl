@@ -17,6 +17,7 @@
 % public API
 -export([replication_started/1, replication_completed/2, replication_error/2]).
 
+-export([before_doc_update/2, after_doc_read/2]).
 
 % gen_server callbacks
 -export([start_link/0, init/1, handle_call/3, handle_info/2, handle_cast/2]).
@@ -50,8 +51,6 @@
 }).
 
 -import(couch_util, [
-    get_value/2,
-    get_value/3,
     to_binary/1
 ]).
 
@@ -108,6 +107,9 @@ replication_error(#rep{id = {BaseId, _} = RepId}, Error) ->
     end.
 
 
+handle_config_change("replicator", "db", _, _, S) ->
+    ok = gen_server:call(S, rep_db_changed),
+    remove_handler;
 handle_config_change("replicator", "max_replication_retry_count", V, _, S) ->
     ok = gen_server:cast(S, {set_max_retries, retries_value(V)}),
     {ok, S};
@@ -124,11 +126,15 @@ init(_) ->
     Server = self(),
     ok = config:listen_for_changes(?MODULE, Server),
     ScanPid = spawn_link(fun() -> scan_all_dbs(Server) end),
+    % Automatically start node local changes feed loop
+    LocalRepDb = ?l2b(config:get("replicator", "db", "_replicator")),
+    Pid = changes_feed_loop(LocalRepDb, 0),
     {ok, #state{
         db_notifier = db_update_notifier(),
         scan_pid = ScanPid,
         max_retries = retries_value(
-            config:get("replicator", "max_replication_retry_count", "10"))
+            config:get("replicator", "max_replication_retry_count", "10")),
+        rep_start_pids = [Pid]
     }}.
 
 
@@ -137,8 +143,8 @@ handle_call({rep_db_update, DbName, {ChangeProps} = Change}, _From, State) ->
         process_update(State, DbName, Change)
     catch
     _Tag:Error ->
-        {RepProps} = get_value(doc, ChangeProps),
-        DocId = get_value(<<"_id">>, RepProps),
+        {RepProps} = get_json_value(doc, ChangeProps),
+        DocId = get_json_value(<<"_id">>, RepProps),
         rep_db_update_error(Error, DbName, DocId),
         State
     end,
@@ -179,6 +185,9 @@ handle_call({resume_scan, DbName}, _From, State) ->
 handle_call({rep_db_checkpoint, DbName, EndSeq}, _From, State) ->
     true = ets:insert(?DB_TO_SEQ, {DbName, EndSeq}),
     {reply, ok, State};
+
+handle_call(rep_db_changed, _From, State) ->
+    {stop, shutdown, ok, State};
 
 handle_call(Msg, From, State) ->
     twig:log(error, "Replication manager received unexpected call ~p from ~p",
@@ -256,7 +265,7 @@ terminate(_Reason, State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-changes_feed_loop(DbName, Since) ->
+changes_feed_loop(<<"shards/", _/binary>>=DbName, Since) ->
     Server = self(),
     Pid = spawn_link(
         fun() ->
@@ -286,11 +295,42 @@ changes_feed_loop(DbName, Since) ->
                 }
             )
         end),
-    Pid.
+    Pid;
+changes_feed_loop(DbName, Since) ->
+    ensure_rep_db_exists(DbName),
+    Server = self(),
+    spawn_link(fun() ->
+        UserCtx = #user_ctx{roles = [<<"_admin">>, <<"_replicator">>]},
+        DbOpenOptions = [{user_ctx, UserCtx}, sys_db],
+        {ok, Db} = couch_db:open_int(DbName, DbOpenOptions),
+        ChangesFeedFun = couch_changes:handle_changes(
+            #changes_args{
+                include_docs = true,
+                since = Since,
+                feed = "continuous",
+                timeout = infinity
+            },
+            {json_req, null},
+            Db
+        ),
+        EnumFun = fun
+        ({change, Change, _}, _) ->
+            case has_valid_rep_id(Change) of
+                true ->
+                    Msg = {rep_db_update, DbName, Change},
+                    ok = gen_server:call(Server, Msg, infinity);
+                false ->
+                    ok
+            end;
+        (_, _) ->
+            ok
+        end,
+        ChangesFeedFun(EnumFun)
+    end).
 
 
 has_valid_rep_id({Change}) ->
-    has_valid_rep_id(get_value(<<"id">>, Change));
+    has_valid_rep_id(get_json_value(<<"id">>, Change));
 has_valid_rep_id(<<?DESIGN_DOC_PREFIX, _Rest/binary>>) ->
     false;
 has_valid_rep_id(_Else) ->
@@ -299,22 +339,24 @@ has_valid_rep_id(_Else) ->
 db_update_notifier() ->
     Server = self(),
     IsReplicatorDbFun = is_replicator_db_fun(),
-    {ok, Notifier} = couch_db_update_notifier:start_link(
-        fun({updated, DbName}) ->
-            case IsReplicatorDbFun(DbName) of
-            true ->
-                ok = gen_server:call(Server, {resume_scan, mem3:dbname(DbName)}, infinity);
-            _ ->
-                ok
+    {ok, Notifier} = couch_db_update_notifier:start_link(fun
+        ({Event, ShardDbName})
+                when Event == created; Event == updated; Event == deleted ->
+            DbName = mem3:dbname(ShardDbName),
+            IsRepDb = IsReplicatorDbFun(DbName),
+            case Event of
+                created when IsRepDb ->
+                    ensure_rep_ddoc_exists(DbName);
+                updated when IsRepDb ->
+                    ensure_rep_ddoc_exists(DbName),
+                    Msg = {resume_scan, DbName},
+                    ok = gen_server:call(Server, Msg, infinity);
+                deleted when IsRepDb ->
+                    clean_up_replications(DbName);
+                _ ->
+                    ok
             end;
-           ({deleted, DbName}) ->
-            case IsReplicatorDbFun(DbName) of
-            true ->
-                clean_up_replications(mem3:dbname(DbName));
-            _ ->
-                ok
-            end;
-           (_) ->
+        (_Event) ->
             ok
         end
     ),
@@ -331,9 +373,9 @@ rescan(#state{scan_pid = ScanPid} = State) ->
     rescan(State#state{scan_pid = nil}).
 
 process_update(State, DbName, {Change}) ->
-    {RepProps} = JsonRepDoc = get_value(doc, Change),
-    DocId = get_value(<<"_id">>, RepProps),
-    case {mem3_util:owner(DbName, DocId), get_value(deleted, Change, false)} of
+    {RepProps} = JsonRepDoc = get_json_value(doc, Change),
+    DocId = get_json_value(<<"_id">>, RepProps),
+    case {is_owner(DbName, DocId), get_json_value(deleted, Change, false)} of
     {false, _} ->
         replication_complete(DbName, DocId),
         State;
@@ -341,7 +383,7 @@ process_update(State, DbName, {Change}) ->
         rep_doc_deleted(DbName, DocId),
         State;
     {true, false} ->
-        case get_value(<<"_replication_state">>, RepProps) of
+        case get_json_value(<<"_replication_state">>, RepProps) of
         undefined ->
             maybe_start_replication(State, DbName, DocId, JsonRepDoc);
         <<"triggered">> ->
@@ -359,6 +401,13 @@ process_update(State, DbName, {Change}) ->
         end
     end.
 
+
+is_owner(<<"shards/", _/binary>>=DbName, DocId) ->
+    mem3_util:owner(DbName, DocId);
+is_owner(_, _) ->
+    true.
+
+
 rep_db_update_error(Error, DbName, DocId) ->
     case Error of
     {bad_rep_doc, Reason} ->
@@ -372,13 +421,13 @@ rep_db_update_error(Error, DbName, DocId) ->
 
 
 rep_user_ctx({RepDoc}) ->
-    case get_value(<<"user_ctx">>, RepDoc) of
+    case get_json_value(<<"user_ctx">>, RepDoc) of
     undefined ->
         #user_ctx{};
     {UserCtx} ->
         #user_ctx{
-            name = get_value(<<"name">>, UserCtx, null),
-            roles = get_value(<<"roles">>, UserCtx, [])
+            name = get_json_value(<<"name">>, UserCtx, null),
+            roles = get_json_value(<<"roles">>, UserCtx, [])
         }
     end.
 
@@ -428,7 +477,7 @@ parse_rep_doc(RepDoc) ->
 
 
 maybe_tag_rep_doc(DbName, DocId, {RepProps}, RepId) ->
-    case get_value(<<"_replication_id">>, RepProps) of
+    case get_json_value(<<"_replication_id">>, RepProps) of
     RepId ->
         ok;
     _ ->
@@ -546,42 +595,26 @@ clean_up_replications(DbName) ->
 
 
 update_rep_doc(RepDbName, RepDocId, KVs) when is_binary(RepDocId) ->
-    {Pid, Ref} =
-    spawn_monitor(fun() ->
-        try
-            case fabric:open_doc(mem3:dbname(RepDbName), RepDocId, []) of
-                {ok, LatestRepDoc} ->
-                    update_rep_doc(RepDbName, LatestRepDoc, KVs);
-                _ ->
-                    ok
-            end
-        catch
-        throw:conflict ->
-            % a race condition may cause an update conflict,
-            % in which cae update_rep_doc is called again to refetch
-            twig:log(error, "Conflict error when updating replication document `~s`."
-                         " Retrying.", [RepDocId]),
-            ok = timer:sleep(5),
-            update_rep_doc(RepDbName, RepDocId, KVs);
-        Type:Error ->
-            exit({Type, Error})
+    try
+        case open_rep_doc(RepDbName, RepDocId) of
+            {ok, LastRepDoc} ->
+                update_rep_doc(RepDbName, LastRepDoc, KVs);
+            _ ->
+                ok
         end
-    end),
-    receive
-    {'DOWN', Ref, process, Pid, normal} ->
-        ok;
-    {'DOWN', Ref, process, Pid, {throw, Error}} ->
-        throw(Error);
-    {'DOWN', Ref, process, Pid, {error, Error}} ->
-        erlang:error(Error)
+    catch
+        throw:conflict ->
+            Msg = "Conflict when updating replication document `~s`. Retrying.",
+            twig:log(error, Msg, [RepDocId]),
+            ok = timer:sleep(5),
+            update_rep_doc(RepDbName, RepDocId, KVs)
     end;
-
 update_rep_doc(RepDbName, #doc{body = {RepDocBody}} = RepDoc, KVs) ->
     NewRepDocBody = lists:foldl(
         fun({K, undefined}, Body) ->
                 lists:keydelete(K, 1, Body);
            ({<<"_replication_state">> = K, State} = KV, Body) ->
-                case get_value(K, Body) of
+                case get_json_value(K, Body) of
                 State ->
                     Body;
                 _ ->
@@ -600,8 +633,54 @@ update_rep_doc(RepDbName, #doc{body = {RepDocBody}} = RepDoc, KVs) ->
     _ ->
         % Might not succeed - when the replication doc is deleted right
         % before this update (not an error, ignore).
-        fabric:update_doc(RepDbName, RepDoc#doc{body = {NewRepDocBody}}, [?CTX])
+        save_rep_doc(RepDbName, RepDoc#doc{body = {NewRepDocBody}})
     end.
+
+
+open_rep_doc(<<"shards/", _/binary>>=ShardDbName, DocId) ->
+    defer_call(fun() ->
+        fabric:open_doc(mem3:dbname(ShardDbName), DocId, [])
+    end);
+open_rep_doc(DbName, DocId) ->
+    {ok, Db} = couch_db:open_int(DbName, [?CTX, sys_db]),
+    try
+        couch_db:open_doc(Db, DocId, [ejson_body])
+    after
+        couch_db:close(Db)
+    end.
+
+save_rep_doc(<<"shards/", _/binary>>=DbName, Doc) ->
+    defer_call(fun() ->
+        fabric:update_doc(DbName, Doc, [?CTX])
+    end);
+save_rep_doc(DbName, Doc) ->
+    {ok, Db} = couch_db:open_int(DbName, [?CTX, sys_db]),
+    try
+        couch_db:update_doc(Db, Doc, [])
+    after
+        couch_db:close(Db)
+    end.
+
+defer_call(Fun) ->
+    {Pid, Ref} = erlang:spawn_monitor(fun() ->
+        try
+            exit({exit_ok, Fun()})
+        catch
+            Type:Reason ->
+                exit({exit_err, Type, Reason})
+        end
+    end),
+    receive
+        {'DOWN', Ref, process, Pid, {exit_ok, Resp}} ->
+            Resp;
+        {'DOWN', Ref, process, Pid, {exit_err, throw, Error}} ->
+            throw(Error);
+        {'DOWN', Ref, process, Pid, {exit_err, error, Error}} ->
+            erlang:error(Error);
+        {'DOWN', Ref, process, Pid, {exit_err, exit, Error}} ->
+            exit(Error)
+    end.
+
 
 % RFC3339 timestamps.
 % Note: doesn't include the time seconds fraction (RFC3339 says it's optional).
@@ -623,31 +702,38 @@ zone(Hr, Min) ->
     io_lib:format("-~2..0w:~2..0w", [abs(Hr), abs(Min)]).
 
 
-ensure_rep_db_exists() ->
-    DbName = ?l2b(couch_config:get("replicator", "db", "_replicator")),
-    UserCtx = #user_ctx{roles = [<<"_admin">>, <<"_replicator">>]},
-    case couch_db:open_int(DbName, [sys_db, {user_ctx, UserCtx}, nologifmissing]) of
-    {ok, Db} ->
-        Db;
-    _Error ->
-        {ok, Db} = couch_db:create(DbName, [sys_db, {user_ctx, UserCtx}])
+ensure_rep_db_exists(DbName) ->
+    Db = case couch_db:open_int(DbName, [?CTX, sys_db, nologifmissing]) of
+        {ok, Db0} ->
+            Db0;
+        _Error ->
+            {ok, Db0} = couch_db:create(DbName, [?CTX, sys_db]),
+            Db0
     end,
-    ensure_rep_ddoc_exists(Db, <<"_design/_replicator">>),
+    ensure_rep_ddoc_exists(DbName),
     {ok, Db}.
 
 
-ensure_rep_ddoc_exists(RepDb, DDocID) ->
-    case couch_db:open_doc(RepDb, DDocID, []) of
-    {ok, _Doc} ->
-        ok;
-    _ ->
-        DDoc = couch_doc:from_json_obj({[
-            {<<"_id">>, DDocID},
-            {<<"language">>, <<"javascript">>},
-            {<<"validate_doc_update">>, ?REP_DB_DOC_VALIDATE_FUN}
-        ]}),
-        {ok, _Rev} = couch_db:update_doc(RepDb, DDoc, [])
-     end.
+ensure_rep_ddoc_exists(RepDb) ->
+    DDocId = <<"_design/_replicator">>,
+    case open_rep_doc(RepDb, DDocId) of
+        {ok, _Doc} ->
+            ok;
+        _ ->
+            DDoc = couch_doc:from_json_obj({[
+                {<<"_id">>, DDocId},
+                {<<"language">>, <<"javascript">>},
+                {<<"validate_doc_update">>, ?REP_DB_DOC_VALIDATE_FUN}
+            ]}),
+            try
+                {ok, _} = save_rep_doc(RepDb, DDoc)
+            catch
+                throw:conflict ->
+                    % NFC what to do about this other than
+                    % not kill the process.
+                    ok
+            end
+    end.
 
 
 % pretty-print replication id
@@ -687,20 +773,85 @@ state_after_error(#rep_state{retries_left = Left, wait = Wait} = State) ->
         State#rep_state{retries_left = Left - 1, wait = Wait2}
     end.
 
+
+before_doc_update(#doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc, _Db) ->
+    Doc;
+before_doc_update(#doc{body = {Body}} = Doc, #db{user_ctx=UserCtx} = Db) ->
+    #user_ctx{roles = Roles, name = Name} = UserCtx,
+    case lists:member(<<"_replicator">>, Roles) of
+    true ->
+        Doc;
+    false ->
+        case couch_util:get_value(?OWNER, Body) of
+        undefined ->
+            Doc#doc{body = {?replace(Body, ?OWNER, Name)}};
+        Name ->
+            Doc;
+        Other ->
+            case (catch couch_db:check_is_admin(Db)) of
+            ok when Other =:= null ->
+                Doc#doc{body = {?replace(Body, ?OWNER, Name)}};
+            ok ->
+                Doc;
+            _ ->
+                throw({forbidden, <<"Can't update replication documents",
+                    " from other users.">>})
+            end
+        end
+    end.
+
+
+after_doc_read(#doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc, _Db) ->
+    Doc;
+after_doc_read(#doc{body = {Body}} = Doc, #db{user_ctx=UserCtx} = Db) ->
+    #user_ctx{name = Name} = UserCtx,
+    case (catch couch_db:check_is_admin(Db)) of
+    ok ->
+        Doc;
+    _ ->
+        case couch_util:get_value(?OWNER, Body) of
+        Name ->
+            Doc;
+        _Other ->
+            Source = strip_credentials(couch_util:get_value(<<"source">>,
+Body)),
+            Target = strip_credentials(couch_util:get_value(<<"target">>,
+Body)),
+            NewBody0 = ?replace(Body, <<"source">>, Source),
+            NewBody = ?replace(NewBody0, <<"target">>, Target),
+            #doc{revs = {Pos, [_ | Revs]}} = Doc,
+            NewDoc = Doc#doc{body = {NewBody}, revs = {Pos - 1, Revs}},
+            NewRevId = couch_db:new_revid(NewDoc),
+            NewDoc#doc{revs = {Pos, [NewRevId | Revs]}}
+        end
+    end.
+
+strip_credentials(Url) when is_binary(Url) ->
+    re:replace(Url,
+        "http(s)?://(?:[^:]+):[^@]+@(.*)$",
+        "http\\1://\\2",
+        [{return, binary}]);
+strip_credentials({Props}) ->
+    {lists:keydelete(<<"oauth">>, 1, Props)}.
+
 scan_all_dbs(Server) when is_pid(Server) ->
-    {ok, Db} = mem3_util:ensure_exists(
-        config:get("mem3", "shard_db", "dbs")),
+    {ok, Db} = mem3_util:ensure_exists(config:get("mem3", "shard_db", "dbs")),
     ChangesFun = couch_changes:handle_changes(#changes_args{}, nil, Db),
     IsReplicatorDbFun = is_replicator_db_fun(),
     ChangesFun(fun({change, {Change}, _}, _) ->
-        DbName = couch_util:get_value(<<"id">>, Change),
+        DbName = get_json_value(<<"id">>, Change),
         case DbName of <<"_design/", _/binary>> -> ok; _Else ->
             case couch_replicator_utils:is_deleted(Change) of
             true ->
                 ok;
             false ->
-                IsReplicatorDbFun(DbName) andalso
-                gen_server:call(Server, {resume_scan, DbName})
+                case IsReplicatorDbFun(DbName) of
+                    true ->
+                        ensure_rep_ddoc_exists(DbName),
+                        gen_server:call(Server, {resume_scan, DbName});
+                    false ->
+                        ok
+                end
             end
         end;
         (_, _) -> ok
@@ -709,6 +860,30 @@ scan_all_dbs(Server) when is_pid(Server) ->
 
 is_replicator_db_fun() ->
     {ok, RegExp} = re:compile("^([a-z][a-z0-9\\_\\$()\\+\\-\\/]*/)?_replicator$"),
-    fun(DbName) ->
-        match =:= re:run(mem3:dbname(DbName), RegExp, [{capture,none}])
+    fun
+        (<<"shards/", _/binary>>=DbName) ->
+            match =:= re:run(mem3:dbname(DbName), RegExp, [{capture,none}]);
+        (DbName) ->
+            LocalRepDb = ?l2b(config:get("replicator", "db", "_replicator")),
+            DbName == LocalRepDb
+    end.
+
+get_json_value(Key, Props) ->
+    get_json_value(Key, Props, undefined).
+
+get_json_value(Key, Props, Default) when is_atom(Key) ->
+    Ref = make_ref(),
+    case couch_util:get_value(Key, Props, Ref) of
+        Ref ->
+            couch_util:get_value(?l2b(atom_to_list(Key)), Props, Default);
+        Else ->
+            Else
+    end;
+get_json_value(Key, Props, Default) when is_binary(Key) ->
+    Ref = make_ref(),
+    case couch_util:get_value(Key, Props, Ref) of
+        Ref ->
+            couch_util:get_value(list_to_atom(?b2l(Key)), Props, Default);
+        Else ->
+            Else
     end.

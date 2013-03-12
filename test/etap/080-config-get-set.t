@@ -29,6 +29,7 @@ main(_) ->
     ok.
 
 test() ->
+    application:set_env(config, ini_files, ["etc/couchdb/default_dev.ini"]),
     application:start(config),
 
 

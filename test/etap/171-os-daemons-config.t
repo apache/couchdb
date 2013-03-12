@@ -46,10 +46,8 @@ main(_) ->
     ok.
 
 test() ->
-    application:start(config),
+    test_util:start_couch(),
     config:set("log", "level", "debug", false),
-    couch_log:start_link(),
-    couch_os_daemons:start_link(),
 
     % "foo" is a required name by this test.
     config:set("os_daemons", "foo", daemon_cmd(), false),
