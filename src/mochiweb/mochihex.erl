@@ -8,9 +8,6 @@
 
 -export([to_hex/1, to_bin/1, to_int/1, dehex/1, hexdigit/1]).
 
-%% @type iolist() = [char() | binary() | iolist()]
-%% @type iodata() = iolist() | binary()
-
 %% @spec to_hex(integer | iolist()) -> string()
 %% @doc Convert an iolist to a hexadecimal string.
 to_hex(0) ->
@@ -68,8 +65,8 @@ to_bin([C1, C2 | Rest], Acc) ->
 %%
 %% Tests
 %%
--include_lib("eunit/include/eunit.hrl").
 -ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
 
 to_hex_test() ->
     "ff000ff1" = to_hex([255, 0, 15, 241]),

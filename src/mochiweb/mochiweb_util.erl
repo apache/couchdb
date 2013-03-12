@@ -9,7 +9,7 @@
 -export([path_split/1]).
 -export([urlsplit/1, urlsplit_path/1, urlunsplit/1, urlunsplit_path/1]).
 -export([guess_mime/1, parse_header/1]).
--export([shell_quote/1, cmd/1, cmd_string/1, cmd_port/2, cmd_status/1]).
+-export([shell_quote/1, cmd/1, cmd_string/1, cmd_port/2, cmd_status/1, cmd_status/2]).
 -export([record_to_proplist/2, record_to_proplist/3]).
 -export([safe_relative_path/1, partition/2]).
 -export([parse_qvalues/1, pick_accepted_encodings/3]).
@@ -124,11 +124,17 @@ cmd_string(Argv) ->
     string:join([shell_quote(X) || X <- Argv], " ").
 
 %% @spec cmd_status([string()]) -> {ExitStatus::integer(), Stdout::binary()}
-%% @doc Accumulate the output and exit status from the given application, will be
-%%      spawned with cmd_port/2.
+%% @doc Accumulate the output and exit status from the given application,
+%%      will be spawned with cmd_port/2.
 cmd_status(Argv) ->
+    cmd_status(Argv, []).
+
+%% @spec cmd_status([string()], [atom()]) -> {ExitStatus::integer(), Stdout::binary()}
+%% @doc Accumulate the output and exit status from the given application,
+%%      will be spawned with cmd_port/2.
+cmd_status(Argv, Options) ->
     Port = cmd_port(Argv, [exit_status, stderr_to_stdout,
-                           use_stdio, binary]),
+                           use_stdio, binary | Options]),
     try cmd_loop(Port, [])
     after catch port_close(Port)
     end.
@@ -578,8 +584,8 @@ make_io(Io) when is_list(Io); is_binary(Io) ->
 %%
 %% Tests
 %%
--include_lib("eunit/include/eunit.hrl").
 -ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
 
 make_io_test() ->
     ?assertEqual(

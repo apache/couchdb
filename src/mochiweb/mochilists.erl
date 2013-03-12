@@ -55,8 +55,8 @@ get_value(Key, Proplist, Default) ->
 %%
 %% Tests
 %%
--include_lib("eunit/include/eunit.hrl").
 -ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
 
 set_defaults_test() ->
     ?assertEqual(

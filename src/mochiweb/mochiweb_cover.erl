@@ -46,8 +46,8 @@ clause_fold(_, Acc) ->
 %%
 %% Tests
 %%
--include_lib("eunit/include/eunit.hrl").
 -ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
 foo_table(a) -> b;
 foo_table("a") -> <<"b">>;
 foo_table(123) -> {4, 3, 2};

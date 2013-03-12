@@ -11,11 +11,14 @@ stop() ->
     mochiweb_socket_server:stop(?MODULE).
 
 start() ->
-    mochiweb_socket_server:start([{name, ?MODULE},
-                                  {port, 6789},
-                                  {ip, "127.0.0.1"},
-                                  {max, 1},
-                                  {loop, {?MODULE, loop}}]).
+    mochiweb_socket_server:start([{link, false} | options()]).
+
+options() ->
+    [{name, ?MODULE},
+     {port, 6789},
+     {ip, "127.0.0.1"},
+     {max, 1},
+     {loop, {?MODULE, loop}}].
 
 loop(Socket) ->
     case mochiweb_socket:recv(Socket, 0, 30000) of
@@ -33,6 +36,6 @@ loop(Socket) ->
 %%
 %% Tests
 %%
--include_lib("eunit/include/eunit.hrl").
 -ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
 -endif.

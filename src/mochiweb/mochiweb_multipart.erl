@@ -128,7 +128,7 @@ default_file_handler_1(Filename, ContentType, Acc) ->
 
 parse_multipart_request(Req, Callback) ->
     %% TODO: Support chunked?
-    Length = list_to_integer(Req:get_header_value("content-length")),
+    Length = list_to_integer(Req:get_combined_header_value("content-length")),
     Boundary = iolist_to_binary(
                  get_boundary(Req:get_header_value("content-type"))),
     Prefix = <<"\r\n--", Boundary/binary>>,
@@ -240,23 +240,21 @@ get_boundary(ContentType) ->
             S
     end.
 
-find_in_binary(B, Data) when size(B) > 0 ->
-    case size(Data) - size(B) of
+%% @spec find_in_binary(Pattern::binary(), Data::binary()) ->
+%%            {exact, N} | {partial, N, K} | not_found
+%% @doc Searches for the given pattern in the given binary.
+find_in_binary(P, Data) when size(P) > 0 ->
+    PS = size(P),
+    DS = size(Data),
+    case DS - PS of
         Last when Last < 0 ->
-            partial_find(B, Data, 0, size(Data));
+            partial_find(P, Data, 0, DS);
         Last ->
-            find_in_binary(B, size(B), Data, 0, Last)
+            case binary:match(Data, P) of
+                {Pos, _} -> {exact, Pos};
+                nomatch -> partial_find(P, Data, Last+1, PS-1)
+            end
     end.
-
-find_in_binary(B, BS, D, N, Last) when N =< Last->
-    case D of
-        <<_:N/binary, B:BS/binary, _/binary>> ->
-            {exact, N};
-        _ ->
-            find_in_binary(B, BS, D, 1 + N, Last)
-    end;
-find_in_binary(B, BS, D, N, Last) when N =:= 1 + Last ->
-    partial_find(B, D, N, BS - 1).
 
 partial_find(_B, _D, _N, 0) ->
     not_found;
@@ -295,8 +293,8 @@ find_boundary(Prefix, Data) ->
 %%
 %% Tests
 %%
--include_lib("eunit/include/eunit.hrl").
 -ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
 
 ssl_cert_opts() ->
     EbinDir = filename:dirname(code:which(?MODULE)),
@@ -313,7 +311,7 @@ with_socket_server(Transport, ServerFun, ClientFun) ->
         ssl ->
             ServerOpts0 ++ [{ssl, true}, {ssl_opts, ssl_cert_opts()}]
     end,
-    {ok, Server} = mochiweb_socket_server:start(ServerOpts),
+    {ok, Server} = mochiweb_socket_server:start_link(ServerOpts),
     Port = mochiweb_socket_server:get(Server, port),
     ClientOpts = [binary, {active, false}],
     {ok, Client} = case Transport of
@@ -378,7 +376,7 @@ parse3(Transport) ->
     TestCallback = fun (Next) -> test_callback(Next, Expect) end,
     ServerFun = fun (Socket) ->
                         ok = mochiweb_socket:send(Socket, BinContent),
-			exit(normal)
+                        exit(normal)
                 end,
     ClientFun = fun (Socket) ->
                         Req = fake_request(Socket, ContentType,
@@ -414,7 +412,7 @@ parse2(Transport) ->
     TestCallback = fun (Next) -> test_callback(Next, Expect) end,
     ServerFun = fun (Socket) ->
                         ok = mochiweb_socket:send(Socket, BinContent),
-			exit(normal)
+                        exit(normal)
                 end,
     ClientFun = fun (Socket) ->
                         Req = fake_request(Socket, ContentType,
@@ -451,7 +449,7 @@ do_parse_form(Transport) ->
     BinContent = iolist_to_binary(Content),
     ServerFun = fun (Socket) ->
                         ok = mochiweb_socket:send(Socket, BinContent),
-			exit(normal)
+                        exit(normal)
                 end,
     ClientFun = fun (Socket) ->
                         Req = fake_request(Socket, ContentType,
@@ -504,7 +502,7 @@ do_parse(Transport) ->
     TestCallback = fun (Next) -> test_callback(Next, Expect) end,
     ServerFun = fun (Socket) ->
                         ok = mochiweb_socket:send(Socket, BinContent),
-			exit(normal)
+                        exit(normal)
                 end,
     ClientFun = fun (Socket) ->
                         Req = fake_request(Socket, ContentType,
@@ -556,7 +554,7 @@ parse_partial_body_boundary(Transport) ->
     TestCallback = fun (Next) -> test_callback(Next, Expect) end,
     ServerFun = fun (Socket) ->
                         ok = mochiweb_socket:send(Socket, BinContent),
-			exit(normal)
+                        exit(normal)
                 end,
     ClientFun = fun (Socket) ->
                         Req = fake_request(Socket, ContentType,
@@ -609,7 +607,7 @@ parse_large_header(Transport) ->
     TestCallback = fun (Next) -> test_callback(Next, Expect) end,
     ServerFun = fun (Socket) ->
                         ok = mochiweb_socket:send(Socket, BinContent),
-			exit(normal)
+                        exit(normal)
                 end,
     ClientFun = fun (Socket) ->
                         Req = fake_request(Socket, ContentType,
@@ -685,7 +683,7 @@ flash_parse(Transport) ->
     TestCallback = fun (Next) -> test_callback(Next, Expect) end,
     ServerFun = fun (Socket) ->
                         ok = mochiweb_socket:send(Socket, BinContent),
-			exit(normal)
+                        exit(normal)
                 end,
     ClientFun = fun (Socket) ->
                         Req = fake_request(Socket, ContentType,
@@ -733,7 +731,7 @@ flash_parse2(Transport) ->
     TestCallback = fun (Next) -> test_callback(Next, Expect) end,
     ServerFun = fun (Socket) ->
                         ok = mochiweb_socket:send(Socket, BinContent),
-			exit(normal)
+                        exit(normal)
                 end,
     ClientFun = fun (Socket) ->
                         Req = fake_request(Socket, ContentType,
@@ -821,4 +819,54 @@ multipart_body_test() ->
                                        10))),
     ok.
 
+%% @todo Move somewhere more appropriate than in the test suite
+
+multipart_parsing_benchmark_test() ->
+  run_multipart_parsing_benchmark(1).
+
+run_multipart_parsing_benchmark(0) -> ok;
+run_multipart_parsing_benchmark(N) ->
+     multipart_parsing_benchmark(),
+     run_multipart_parsing_benchmark(N-1).
+
+multipart_parsing_benchmark() ->
+    ContentType = "multipart/form-data; boundary=----------ei4GI3GI3Ij5Ef1ae0KM7Ij5ei4Ij5",
+    Chunk = binary:copy(<<"This Is_%Some=Quite0Long4String2Used9For7BenchmarKing.5">>, 102400),
+    BinContent = <<"------------ei4GI3GI3Ij5Ef1ae0KM7Ij5ei4Ij5\r\nContent-Disposition: form-data; name=\"Filename\"\r\n\r\nhello.txt\r\n------------ei4GI3GI3Ij5Ef1ae0KM7Ij5ei4Ij5\r\nContent-Disposition: form-data; name=\"success_action_status\"\r\n\r\n201\r\n------------ei4GI3GI3Ij5Ef1ae0KM7Ij5ei4Ij5\r\nContent-Disposition: form-data; name=\"file\"; filename=\"hello.txt\"\r\nContent-Type: application/octet-stream\r\n\r\n", Chunk/binary, "\r\n------------ei4GI3GI3Ij5Ef1ae0KM7Ij5ei4Ij5\r\nContent-Disposition: form-data; name=\"Upload\"\r\n\r\nSubmit Query\r\n------------ei4GI3GI3Ij5Ef1ae0KM7Ij5ei4Ij5--">>,
+    Expect = [{headers,
+               [{"content-disposition",
+                 {"form-data", [{"name", "Filename"}]}}]},
+              {body, <<"hello.txt">>},
+              body_end,
+              {headers,
+               [{"content-disposition",
+                 {"form-data", [{"name", "success_action_status"}]}}]},
+              {body, <<"201">>},
+              body_end,
+              {headers,
+               [{"content-disposition",
+                 {"form-data", [{"name", "file"}, {"filename", "hello.txt"}]}},
+                {"content-type", {"application/octet-stream", []}}]},
+              {body, Chunk},
+              body_end,
+              {headers,
+               [{"content-disposition",
+                 {"form-data", [{"name", "Upload"}]}}]},
+              {body, <<"Submit Query">>},
+              body_end,
+              eof],
+    TestCallback = fun (Next) -> test_callback(Next, Expect) end,
+    ServerFun = fun (Socket) ->
+                        ok = mochiweb_socket:send(Socket, BinContent),
+                        exit(normal)
+                end,
+    ClientFun = fun (Socket) ->
+                        Req = fake_request(Socket, ContentType,
+                                           byte_size(BinContent)),
+                        Res = parse_multipart_request(Req, TestCallback),
+                        {0, <<>>, ok} = Res,
+                        ok
+                end,
+    ok = with_socket_server(plain, ServerFun, ClientFun),
+    ok.
 -endif.

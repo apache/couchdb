@@ -243,8 +243,8 @@ frexp_int(F) ->
 %%
 %% Tests
 %%
--include_lib("eunit/include/eunit.hrl").
 -ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
 
 int_ceil_test() ->
     ?assertEqual(1, int_ceil(0.0001)),

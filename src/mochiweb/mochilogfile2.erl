@@ -57,8 +57,8 @@ find_last_newline(FD, Location) ->
 %%
 %% Tests
 %%
--include_lib("eunit/include/eunit.hrl").
 -ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
 name_test() ->
     D = mochitemp:mkdtemp(),
     FileName = filename:join(D, "open_close_test.log"),

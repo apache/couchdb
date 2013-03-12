@@ -23,6 +23,7 @@
 
 %% @type proplist() = [{Key::string(), Value::string()}].
 %% @type header() = {Name::string(), Value::string()}.
+%% @type int_seconds() = integer().
 
 %% @spec cookie(Key::string(), Value::string()) -> header()
 %% @doc Short-hand for <code>cookie(Key, Value, [])</code>.
@@ -30,7 +31,7 @@ cookie(Key, Value) ->
     cookie(Key, Value, []).
 
 %% @spec cookie(Key::string(), Value::string(), Options::[Option]) -> header()
-%% where Option = {max_age, integer()} | {local_time, {date(), time()}}
+%% where Option = {max_age, int_seconds()} | {local_time, {date(), time()}}
 %%                | {domain, string()} | {path, string()}
 %%                | {secure, true | false} | {http_only, true | false}
 %%
@@ -49,9 +50,9 @@ cookie(Key, Value, Options) ->
             RawAge ->
                 When = case proplists:get_value(local_time, Options) of
                            undefined ->
-                               calendar:universal_time();
+                               calendar:local_time();
                            LocalTime ->
-                               erlang:localtime_to_universaltime(LocalTime)
+                               LocalTime
                        end,
                 Age = case RawAge < 0 of
                           true ->
@@ -115,12 +116,33 @@ quote(V0) ->
         orelse erlang:error({cookie_quoting_required, V}),
     V.
 
-add_seconds(Secs, UniversalTime) ->
-    Greg = calendar:datetime_to_gregorian_seconds(UniversalTime),
+
+%% Return a date in the form of: Wdy, DD-Mon-YYYY HH:MM:SS GMT
+%% See also: rfc2109: 10.1.2
+rfc2109_cookie_expires_date(LocalTime) ->
+    {{YYYY,MM,DD},{Hour,Min,Sec}} =
+        case calendar:local_time_to_universal_time_dst(LocalTime) of
+            [] ->
+                {Date, {Hour1, Min1, Sec1}} = LocalTime,
+                LocalTime2 = {Date, {Hour1 + 1, Min1, Sec1}},
+                case calendar:local_time_to_universal_time_dst(LocalTime2) of
+                    [Gmt]   -> Gmt;
+                    [_,Gmt] -> Gmt
+                end;
+            [Gmt]   -> Gmt;
+            [_,Gmt] -> Gmt
+        end,
+    DayNumber = calendar:day_of_the_week({YYYY,MM,DD}),
+    lists:flatten(
+      io_lib:format("~s, ~2.2.0w-~3.s-~4.4.0w ~2.2.0w:~2.2.0w:~2.2.0w GMT",
+                    [httpd_util:day(DayNumber),DD,httpd_util:month(MM),YYYY,Hour,Min,Sec])).
+
+add_seconds(Secs, LocalTime) ->
+    Greg = calendar:datetime_to_gregorian_seconds(LocalTime),
     calendar:gregorian_seconds_to_datetime(Greg + Secs).
 
-age_to_cookie_date(Age, UniversalTime) ->
-    couch_util:rfc1123_date(add_seconds(Age, UniversalTime)).
+age_to_cookie_date(Age, LocalTime) ->
+    rfc2109_cookie_expires_date(add_seconds(Age, LocalTime)).
 
 %% @spec parse_cookie(string()) -> [{K::string(), V::string()}]
 %% @doc Parse the contents of a Cookie header field, ignoring cookie
@@ -203,8 +225,8 @@ any_to_list(V) when is_integer(V) ->
 %%
 %% Tests
 %%
--include_lib("eunit/include/eunit.hrl").
 -ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
 
 quote_test() ->
     %% ?assertError eunit macro is not compatible with coverage module
@@ -293,14 +315,14 @@ cookie_test() ->
     C2 = {"Set-Cookie",
           "Customer=WILE_E_COYOTE; "
           "Version=1; "
-          "Expires=Tue, 15 May 2007 13:45:33 GMT; "
+          "Expires=Tue, 15-May-2007 13:45:33 GMT; "
           "Max-Age=0"},
     C2 = cookie("Customer", "WILE_E_COYOTE",
                 [{max_age, -111}, {local_time, LocalTime}]),
     C3 = {"Set-Cookie",
           "Customer=WILE_E_COYOTE; "
           "Version=1; "
-          "Expires=Wed, 16 May 2007 13:45:50 GMT; "
+          "Expires=Wed, 16-May-2007 13:45:50 GMT; "
           "Max-Age=86417"},
     C3 = cookie("Customer", "WILE_E_COYOTE",
                 [{max_age, 86417}, {local_time, LocalTime}]),

@@ -15,8 +15,6 @@
 -define(INC_COL(S), S#decoder{column=1+S#decoder.column}).
 -define(INC_LINE(S), S#decoder{column=1, line=1+S#decoder.line}).
 
-%% @type iolist() = [char() | binary() | iolist()]
-%% @type iodata() = iolist() | binary()
 %% @type json_string() = atom | string() | binary()
 %% @type json_number() = integer() | float()
 %% @type json_array() = {array, [json_term()]}
@@ -406,8 +404,8 @@ tokenize(L=[C | _], S) when C >= $0, C =< $9; C == $- ->
 %%
 %% Tests
 %%
--include_lib("eunit/include/eunit.hrl").
 -ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
 
 %% testing constructs borrowed from the Yaws JSON implementation.
 

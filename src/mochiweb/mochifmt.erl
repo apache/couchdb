@@ -369,8 +369,8 @@ parse_std_conversion([Type], Acc) ->
 %%
 %% Tests
 %%
--include_lib("eunit/include/eunit.hrl").
 -ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
 
 tokenize_test() ->
     {?MODULE, [{raw, "ABC"}]} = tokenize("ABC"),

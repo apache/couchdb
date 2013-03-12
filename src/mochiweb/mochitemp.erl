@@ -135,8 +135,9 @@ normalize_dir(L) ->
 %%
 %% Tests
 %%
--include_lib("eunit/include/eunit.hrl").
 -ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
 pushenv(L) ->
     [{K, os:getenv(K)} || K <- L].
 popenv(L) ->
