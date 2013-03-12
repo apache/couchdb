@@ -231,7 +231,7 @@ start_couchdb () {
         touch $PID_FILE
         interactive_option="+Bd -noinput"
     fi
-    command="%ERL% $interactive_option $ERL_START_OPTIONS \
+    command="%ERL% -sname couchdb $interactive_option $ERL_START_OPTIONS \
         -env ERL_LIBS $ERL_LIBS:%localerlanglibdir% -couch_ini $start_arguments -s couch"
     if test "$BACKGROUND" = "true" -a "$RECURSED" = "false"; then
         $0 $background_start_arguments -b -r $RESPAWN_TIMEOUT -p $PID_FILE \
