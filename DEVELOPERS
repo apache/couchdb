@@ -61,6 +61,17 @@ Optional dependencies:
     sudo apt-get install texinfo
     sudo apt-get install gnupg
 
+RedHat-based (Fedora, Centos, RHEL) Systems
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    sudo yum install help2man
+    sudo yum install python-sphinx
+    sudo yum install python-docutils
+    sudo yum install python-pygments
+    sudo yum install texlive-latex
+    sudo yum install texlive-latex-fonts
+    sudo yum install texinfo
+    sudo yum install gnupg
+
 Mac OS X
 ~~~~~~~~
 
