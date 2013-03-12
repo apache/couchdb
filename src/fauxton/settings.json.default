@@ -4,5 +4,14 @@
     { "name": "logs" },
     { "name": "stats" },
     { "name": "contribute" }
-  ]
+  ],
+  "template": {
+    "src": "assets/index.underscore",
+    "dest": "dist/debug/index.html",
+    "variables": {
+      "assets_root": "./",
+      "requirejs": "require.js",
+      "base": null
+    }
+  }
 }
