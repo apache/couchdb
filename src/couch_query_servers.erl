@@ -26,12 +26,12 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -define(SUMERROR, <<"The _sum function requires that map values be numbers, "
-    "arrays of numbers, or objects. Objects cannot be mixed with other data "
-    "structures. Objects can be arbitrarily nested, provided that the values "
+    "arrays of numbers, or objects, not '~p'. Objects cannot be mixed with other "
+    "data structures. Objects can be arbitrarily nested, provided that the values "
     "for all fields are themselves numbers, arrays of numbers, or objects.">>).
 
 -define(STATERROR, <<"The _stats function requires that map values be numbers "
-    "or arrays of numbers.">>).
+    "or arrays of numbers, not '~p'">>).
 
 % https://gist.github.com/df10284c76d85f988c3f
 -define(SUMREGEX, {re_pattern,3,0,<<69,82,67,80,194,0,0,0,8,0,0,0,5,0,0,0,3,0,
@@ -238,8 +238,8 @@ sum_values(Value, Acc) when is_number(Value), is_list(Acc) ->
     sum_arrays(Acc, [Value]);
 sum_values(Value, Acc) when is_list(Value), is_number(Acc) ->
     sum_arrays([Acc], Value);
-sum_values(_Else, _Acc) ->
-    throw({invalid_value, ?SUMERROR}).
+sum_values(Else, _Acc) ->
+    throw_sum_error(Else).
 
 sum_objects([{K1, V1} | Rest1], [{K1, V2} | Rest2]) ->
     [{K1, sum_values(V1, V2)} | sum_objects(Rest1, Rest2)];
@@ -260,8 +260,8 @@ sum_arrays([], [_|_]=Ys) ->
     Ys;
 sum_arrays([X|Xs], [Y|Ys]) when is_number(X), is_number(Y) ->
     [X+Y | sum_arrays(Xs,Ys)];
-sum_arrays(_, _) ->
-    throw({invalid_value, ?SUMERROR}).
+sum_arrays(Else, _) ->
+    throw_sum_error(Else).
 
 builtin_stats(_, []) ->
     {[{sum,0}, {count,0}, {min,0}, {max,0}, {sumsqr,0}]};
@@ -288,8 +288,8 @@ stat_values(Value, Acc) when is_tuple(Value), is_tuple(Acc) ->
       erlang:max(Max0, Max1),
       Sqr0 + Sqr1
     };
-stat_values(_Else, _Acc) ->
-    throw({invalid_value, ?STATERROR}).
+stat_values(Else, _Acc) ->
+    throw_stat_error(Else).
 
 build_initial_accumulator(L) when is_list(L) ->
     [build_initial_accumulator(X) || X <- L];
@@ -444,6 +444,13 @@ ret_os_process(Proc) ->
     true = gen_server:call(couch_proc_manager, {ret_proc, Proc}, infinity),
     catch unlink(Proc#proc.pid),
     ok.
+
+throw_sum_error(Else) ->
+    throw({invalid_value, iolist_to_binary(io_lib:format(?SUMERROR, [Else]))}).
+
+throw_stat_error(Else) ->
+    throw({invalid_value, iolist_to_binary(io_lib:format(?STATERROR, [Else]))}).
+
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
