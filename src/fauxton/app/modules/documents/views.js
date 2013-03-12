@@ -854,10 +854,7 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
   Views.Sidebar = FauxtonAPI.View.extend({
     template: "templates/documents/sidebar",
     events: {
-      "click a.new#index": "newIndex",
-      // "click .nav-list.views a.toggle-view": "toggleView",
-      "click .nav-list a.toggle-view#all-docs": "toggleView",
-      "click .nav-list a.toggle-view#design-docs": "toggleView"
+      "click a.new#index": "newIndex"
     },
 
     initialize: function(options) {
