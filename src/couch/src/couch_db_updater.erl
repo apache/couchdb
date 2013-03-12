@@ -306,11 +306,11 @@ handle_info({'DOWN', Ref, _, _, Reason}, #db{fd_monitor=Ref, name=Name} = Db) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-merge_updates([[{_,#doc{id=X}}|_]=A|RestA], [[{_,#doc{id=X}}|_]=B|RestB]) ->
+merge_updates([[{_,{#doc{id=X},_}}|_]=A|RestA], [[{_,{#doc{id=X},_}}|_]=B|RestB]) ->
     [A++B | merge_updates(RestA, RestB)];
-merge_updates([[{_,#doc{id=X}}|_]|_]=A, [[{_,#doc{id=Y}}|_]|_]=B) when X < Y ->
+merge_updates([[{_,{#doc{id=X},_}}|_]|_]=A, [[{_,{#doc{id=Y},_}}|_]|_]=B) when X < Y ->
     [hd(A) | merge_updates(tl(A), B)];
-merge_updates([[{_,#doc{id=X}}|_]|_]=A, [[{_,#doc{id=Y}}|_]|_]=B) when X > Y ->
+merge_updates([[{_,{#doc{id=X},_}}|_]|_]=A, [[{_,{#doc{id=Y},_}}|_]|_]=B) when X > Y ->
     [hd(B) | merge_updates(A, tl(B))];
 merge_updates([], RestB) ->
     RestB;
