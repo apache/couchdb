@@ -23,6 +23,7 @@
 
 -record(file, {
     fd,
+    is_sys,
     eof = 0,
     db_pid
 }).
@@ -306,7 +307,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                     ok = file:sync(Fd),
                     maybe_track_open_os_files(Options),
                     erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                    {ok, #file{fd=Fd}};
+                    {ok, #file{fd=Fd, is_sys=lists:member(sys_db, Options)}};
                 false ->
                     ok = file:close(Fd),
                     init_status_error(ReturnPid, Ref, {error, eexist})
@@ -314,7 +315,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
             false ->
                 maybe_track_open_os_files(Options),
                 erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                {ok, #file{fd=Fd}}
+                {ok, #file{fd=Fd, is_sys=lists:member(sys_db, Options)}}
             end;
         Error ->
             init_status_error(ReturnPid, Ref, Error)
@@ -328,7 +329,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
             maybe_track_open_os_files(Options),
             {ok, Eof} = file:position(Fd, eof),
             erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-            {ok, #file{fd=Fd, eof=Eof}};
+            {ok, #file{fd=Fd, eof=Eof, is_sys=lists:member(sys_db, Options)}};
         Error ->
             init_status_error(ReturnPid, Ref, Error)
         end
@@ -437,7 +438,7 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 handle_info(maybe_close, File) ->
-    case is_idle() of
+    case is_idle(File) of
         true ->
             {stop, normal, File};
         false ->
@@ -446,7 +447,7 @@ handle_info(maybe_close, File) ->
     end;
 
 handle_info({'EXIT', Pid, _}, #file{db_pid=Pid}=File) ->
-    case is_idle() of
+    case is_idle(File) of
         true -> {stop, normal, File};
         false -> {noreply, File}
     end;
@@ -572,7 +573,13 @@ split_iolist([Byte | Rest], SplitAt, BeginAcc) when is_integer(Byte) ->
     split_iolist(Rest, SplitAt - 1, [Byte | BeginAcc]).
 
 
-is_idle() ->
+% System dbs aren't monitored by couch_stats_collector
+is_idle(#file{is_sys=true}) ->
+    case process_info(self(), monitored_by) of
+        {monitored_by, []} -> true;
+        _ -> false
+    end;
+is_idle(#file{is_sys=false}) ->
     case process_info(self(), monitored_by) of
         {monitored_by, []} -> true;
         {monitored_by, [_]} -> true;
