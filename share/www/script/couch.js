@@ -356,6 +356,12 @@ CouchDB.getVersion = function() {
   return JSON.parse(CouchDB.last_req.responseText).version;
 };
 
+CouchDB.reloadConfig = function() {
+  CouchDB.last_req = CouchDB.request("POST", "/_config/_reload");
+  CouchDB.maybeThrowError(CouchDB.last_req);
+  return JSON.parse(CouchDB.last_req.responseText);
+};
+
 CouchDB.replicate = function(source, target, rep_options) {
   rep_options = rep_options || {};
   var headers = rep_options.headers || {};

@@ -48,6 +48,7 @@ function T(arg1, arg2) {
 }
 
 function runTestConsole(num, name, func) {
+  CouchDB.reloadConfig();
   var passed = false;
   try {
     func();

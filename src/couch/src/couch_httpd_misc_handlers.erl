@@ -157,6 +157,11 @@ handle_config_req(#httpd{method='GET', path_parts=[_, Section, Key]}=Req) ->
     Value ->
         send_json(Req, 200, list_to_binary(Value))
     end;
+% POST /_config/_reload - Flushes unpersisted config values from RAM
+handle_config_req(#httpd{method='POST', path_parts=[_, <<"_reload">>]}=Req) ->
+    ok = couch_httpd:verify_is_server_admin(Req),
+    ok = config:reload(),
+    send_json(Req, 200, {[{ok, true}]});
 % PUT or DELETE /_config/Section/Key
 handle_config_req(#httpd{method=Method, path_parts=[_, Section, Key]}=Req)
       when (Method == 'PUT') or (Method == 'DELETE') ->
@@ -215,7 +220,7 @@ handle_config_req(#httpd{method=Method, path_parts=[_, Section, Key]}=Req)
             end
     end;
 handle_config_req(Req) ->
-    send_method_not_allowed(Req, "GET,PUT,DELETE").
+    send_method_not_allowed(Req, "GET,PUT,POST,DELETE").
 
 % PUT /_config/Section/Key
 % "value"
