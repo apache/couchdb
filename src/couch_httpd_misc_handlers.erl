@@ -94,6 +94,17 @@ handle_task_status_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 
+handle_restart_req(#httpd{method='GET', path_parts=[_, <<"token">>]}=Req) ->
+    ok = couch_httpd:verify_is_server_admin(Req),
+    Token = case application:get_env(couch, instance_token) of
+        {ok, Tok} ->
+            Tok;
+        _ ->
+            Tok = erlang:phash2(make_ref()),
+            application:set_env(couch, instance_token, Tok),
+            Tok
+    end,
+    send_json(Req, 200, {[{token, Token}]});
 handle_restart_req(#httpd{method='POST'}=Req) ->
     couch_httpd:validate_ctype(Req, "application/json"),
     ok = couch_httpd:verify_is_server_admin(Req),
