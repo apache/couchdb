@@ -44,6 +44,13 @@ m4_define([snappy_minor], [0])
 m4_define([snappy_patchlevel], [3])
 
 AC_PROG_CXX
+AC_MSG_CHECKING([that we found a C++ compiler])
+if test -n "$ac_ct_CXX" ; then
+    AC_MSG_RESULT([yes])
+else
+    AC_MSG_RESULT([no])
+    AC_MSG_ERROR([A C++ compiler is required.])
+fi
 AC_LANG([C++])
 AC_C_BIGENDIAN
 AC_CHECK_HEADERS([stdint.h stddef.h sys/mman.h sys/resource.h])
