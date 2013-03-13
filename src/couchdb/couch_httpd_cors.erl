@@ -216,10 +216,14 @@ maybe_apply_cors_headers(CorsHeaders, RequestHeaders0) ->
     % now we need to check whether the Content-Type valus is
     % in ?SIMPLE_CONTENT_TYPE_VALUES and if it isn’t add Content-
     % Type to to ExposedHeaders
-    ContentType = string:to_lower(
-        proplists:get_value("Content-Type", RequestHeaders0)),
-
-    IncludeContentType = lists:member(ContentType, ?SIMPLE_CONTENT_TYPE_VALUES),
+    ContentType =  proplists:get_value("Content-Type", RequestHeaders0),
+    IncludeContentType = case ContentType of
+    undefined ->
+        false;
+    _ ->
+        ContentType_ = string:to_lower(ContentType),
+        lists:member(ContentType_, ?SIMPLE_CONTENT_TYPE_VALUES)
+    end,
     ExposedHeaders = case IncludeContentType of
     false ->
         lists:umerge(ExposedHeaders0, ["Content-Type"]);
