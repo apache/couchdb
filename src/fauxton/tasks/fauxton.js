@@ -37,17 +37,17 @@ module.exports = function(grunt) {
     {
       name: 'base',
       filename: 'base.js',
-      template: 'define([\n  "app",\n  "api",\n  "addons/<%= module.toLowerCase() %>/routes"\n],\n\nfunction(app, FauxtonAPI, <%= module %>Routes) {\n\tvar <%= module %> = new FauxtonAPI.addon();\n\treturn <%= module %>;\n});\n'
+      template: grunt.file.read('./tasks/templates/base.js.underscore')
     },
     {
       name: 'resources',
       filename: 'resources.js',
-      template: 'define([\n  "app",\n  "backbone",\n  "modules/fauxton/base"\n],\n\nfunction (app, backbone, FauxtonAPI) {\n\tvar <%= module %> = {};\n\treturn <%= module %>;\n});\n'
+      template: grunt.file.read('./tasks/templates/resources.js.underscore')
     },
     {
       name: 'routes',
       filename: 'routes.js',
-      template: 'define([\n  "app",\n  "api",\n  "addons/<%= module.toLowerCase() %>/resources"\n],\n\nfunction(app, FauxtonAPI, <%= module %>) {\n\treturn <%= module %>;\n});\n'
+      template: grunt.file.read('./tasks/templates/route.js.underscore')
     }
   ]
 
@@ -81,6 +81,7 @@ module.exports = function(grunt) {
         grunt.file.write(filepath + '/' + file.filename, content);
       });
       grunt.log.writeln('Created addon ' + result.name + ' in ' + result.path);
+      grunt.log.writeln('\n\nAdd ' + result.name + ' to settings.json for it to be compiled and deployed');
       done();
     });
     function onErr(err) {

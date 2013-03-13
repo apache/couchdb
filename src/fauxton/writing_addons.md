@@ -32,6 +32,9 @@ an addon:
 
     Done, without errors.
 
+Once the addon is created add the name to the settings.json file to get it compiled
+and added on the next install.
+
 ## Routes and hooks
 An addon can insert itself into fauxton in two ways; via a route or via a hook.
 
