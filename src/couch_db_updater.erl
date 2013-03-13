@@ -66,7 +66,14 @@ init({DbName, Filepath, Fd, Options}) ->
 
 
 terminate(_Reason, Db) ->
-    ok = couch_file:close(Db#db.fd),
+    % If the reason we died is becuase our fd disappeared
+    % then we don't need to try closing it again.
+    case Db#db.fd of
+        Pid when is_pid(Pid) ->
+            ok = couch_file:close(Db#db.fd);
+        _ ->
+            ok
+    end,
     couch_util:shutdown_sync(Db#db.compactor_pid),
     couch_util:shutdown_sync(Db#db.fd),
     ok.
@@ -301,7 +308,7 @@ handle_info({'EXIT', _Pid, Reason}, Db) ->
     {stop, Reason, Db};
 handle_info({'DOWN', Ref, _, _, Reason}, #db{fd_monitor=Ref, name=Name} = Db) ->
     ?LOG_ERROR("DB ~s shutting down - Fd ~p", [Name, Reason]),
-    {stop, normal, Db}.
+    {stop, normal, Db#db{fd=undefined, fd_monitor=undefined}}.
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
