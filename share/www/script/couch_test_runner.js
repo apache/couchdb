@@ -417,40 +417,35 @@ function waitForSuccess(fun, tag) {
   }
 }
 
-function waitForRestart() {
-  var waiting = true;
-  // Wait for the server to go down but don't
-  // wait too long because we might miss the
-  // the unavailable period.
-  var count = 25;
-  while (waiting && count > 0) {
-    count--;
-    try {
-      CouchDB.request("GET", "/");
-    } catch(e) {
-      waiting = false;
-    }
-  }
-  // Wait for it to come back up
-  waiting = true;
-  while (waiting) {
-    try {
-      CouchDB.request("GET", "/");
-      waiting = false;
-    } catch(e) {
-      // the request will fail until restart completes
-    }
-  }
+function getCurrentToken() {
+  var xhr = CouchDB.request("GET", "/_restart/token");
+  return JSON.parse(xhr.responseText).token;
 };
 
+
 function restartServer() {
-  var xhr;
-  try {
-    CouchDB.request("POST", "/_restart");
-  } catch(e) {
-    // this request may sometimes fail
+  var token = getCurrentToken();
+  var token_changed = false;
+  var tDelta = 5000;
+  var t0 = new Date();
+  var t1;
+
+  CouchDB.request("POST", "/_restart");
+
+  do {
+    try {
+      if(token != getCurrentToken()) {
+        token_changed = true;
+      }
+    } catch (e) {
+      // Ignore errors while the server restarts
+    }
+    t1 = new Date();
+  } while(((t1 - t0) <= tDelta) && !token_changed);
+
+  if(!token_changed) {
+    throw("Server restart failed");
   }
-  waitForRestart();
 }
 
 // legacy functions for CouchDB < 1.2.0
