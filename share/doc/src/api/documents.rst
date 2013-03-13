@@ -650,6 +650,55 @@ The JSON returned will include the updated revision number:
 For information on batched writes, which can provide improved
 performance, see :ref:`api-batch-writes`.
 
+Inline Attachments
+------------------
+
+It is possible to store attachments inline, along with the main
+JSON structure. Attachments go into a special _attachments attribute
+of the document. They are encoded in a JSON structure that holds
+the name, the content_type and the base64 encoded data of an
+attachment.
+
+Creating a document with an attachment: 
+
+.. code-block:: javascript
+
+    {
+      "_id":"attachment_doc",
+      "_attachments":
+      {
+        "foo.txt":
+        {
+          "content_type":"text/plain",
+          "data": "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+        }
+      }
+    }
+
+While metatdata for the attachment (length, MD5-sum, etc.) is
+maintained by the server, it is possible to change the content_type
+field without sending the attachment data. This is useful for cases
+when the supplied content type cannot be trusted (i.e. direct uploads
+via browser).
+
+To change the content type field, PUT the document along with a stub
+attachment structure and the updated content type field:
+
+.. code-block:: javascript
+
+    {
+      "_id":"attachment_doc",
+      "_attachments":
+      {
+        "foo.txt":
+        {
+          "stub": true,
+          "content_type":"text/x-markdown"
+        }
+      }
+    }
+
+
 .. _api-del-doc:
 
 ``DELETE /db/doc``

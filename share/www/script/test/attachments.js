@@ -298,4 +298,37 @@ couchTests.attachments= function(debug) {
   var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc7/attachment.txt");
   TEquals('MntvB0NYESObxH4VRDUycw==', xhr.getResponseHeader("Content-MD5"));
 
+  // test COUCHDB-259 - allow update of content type via stubs
+  var bin_doc8 = {
+    _id: "bin_doc8",
+    _attachments:{
+      "foo.txt": {
+        content_type:"application/octet-stream",
+        data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+      }
+    }
+  };
+
+  TEquals(true, db.save(bin_doc8).ok);
+
+  // reopen the document, change the content type and update
+  bin_doc8 = db.open("bin_doc8");
+  bin_doc8._attachments["foo.txt"] = {stub: true, content_type: "text/plain"};
+  TEquals(true, db.save(bin_doc8).ok);
+  // reopen the docuemnt, check if the new content type persisted
+  bin_doc8 = db.open("bin_doc8");
+  TEquals("text/plain", bin_doc8._attachments["foo.txt"].content_type);
+
+  // try setting to null, this should be ignored by the server
+  bin_doc8._attachments["foo.txt"] = {stub: true, content_type: null};
+  TEquals(true, db.save(bin_doc8).ok);
+  bin_doc8 = db.open("bin_doc8");
+  TEquals("text/plain", bin_doc8._attachments["foo.txt"].content_type);
+
+  // try setting to undefined, this should be ignored by the server
+  bin_doc8._attachments["foo.txt"] = {stub: true, content_type: undefined};
+  TEquals(true, db.save(bin_doc8).ok);
+  bin_doc8 = db.open("bin_doc8");
+  TEquals("text/plain", bin_doc8._attachments["foo.txt"].content_type);
+
 };
