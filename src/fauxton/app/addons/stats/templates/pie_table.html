@@ -12,23 +12,14 @@ License for the specific language governing permissions and limitations under
 the License.
 -->
 
-<div class="row">
+<div class="row-fluid">
   <div class="span8">
     <h2>  <%= datatype %> </h2>
   </div>
 </div>
 
-<% if (datatype != "couchdb"){%>
-<div class="row">
-  <div class="span8" style="height:430px;">
-    <center>
-      <svg id="<%= datatype %>_graph"></svg>
-    </center>
-  </div>
-</div>
-<% } %>
-<div class="row">
-  <div class="span8">
+<div class="row-fluid">
+  <div class="span8" style="margin-top:70px">
     <table class="table table-condensed table-striped">
       <thead>
         <tr>
@@ -55,5 +46,11 @@ the License.
       </tr>
       <% }}) %>
     </table>
+  </div>
+
+  <div class="span4" style="height:430px;min-width: 430px">
+    <center>
+      <svg id="<%= datatype %>_graph"></svg>
+    </center>
   </div>
 </div>

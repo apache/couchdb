@@ -45,14 +45,15 @@ function(app, FauxtonAPI,Stats) {
     initialize: function(args){
       this.datatype = args.datatype;
     },
+
     serialize: function() {
       return {
         statistics: this.collection.where({type: this.datatype}),
         datatype: this.datatype
       };
     },
+
     afterRender: function(){
-      if (this.datatypes != 'couchdb'){
         var collection = this.collection,
             chartelem = "#" + this.datatype + '_graph',
             series = _.map(this.collection.where({type: this.datatype}),
@@ -68,9 +69,11 @@ function(app, FauxtonAPI,Stats) {
 
         series = _.filter(series, function(d){return d.y > 0;});
         series = _.sortBy(series, function(d){return -d.y;});
+        console.log('series');
+        console.log(series);
 
         nv.addGraph(function() {
-            var width = 400,
+            var width = 550,
                 height = 400;
 
             var chart = nv.models.pieChart()
@@ -93,7 +96,6 @@ function(app, FauxtonAPI,Stats) {
             return chart;
         });
 
-      }
       this.$el.addClass(this.datatype + '_section');
     }
   });
@@ -134,7 +136,6 @@ function(app, FauxtonAPI,Stats) {
   });
 
   Views.Statistics = FauxtonAPI.View.extend({
-    className: "datatypes",
     template: "addons/stats/templates/stats",
 
     initialize: function (options) {
