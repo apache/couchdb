@@ -826,11 +826,11 @@ copy_doc_attachments(#db{updater_fd = SrcFd} = SrcDb, SrcSp, DestFd) ->
     NewBinInfos = lists:map(
         fun({Name, Type, BinSp, AttLen, RevPos, Md5}) ->
             % 010 UPGRADE CODE
-            {NewBinSp, AttLen, AttLen, Md5, _IdentityMd5} =
+            {NewBinSp, AttLen, AttLen, Md5, _IdentityMd5} = 
                 couch_stream:copy_to_new_stream(SrcFd, BinSp, DestFd),
             {Name, Type, NewBinSp, AttLen, AttLen, RevPos, Md5, identity};
         ({Name, Type, BinSp, AttLen, DiskLen, RevPos, Md5, Enc1}) ->
-            {NewBinSp, AttLen, _, Md5, _IdentityMd5} =
+            {NewBinSp, AttLen, _, Md5, _IdentityMd5} = 
                 couch_stream:copy_to_new_stream(SrcFd, BinSp, DestFd),
             Enc = case Enc1 of
             true ->
@@ -842,9 +842,14 @@ copy_doc_attachments(#db{updater_fd = SrcFd} = SrcDb, SrcSp, DestFd) ->
             _ ->
                 Enc1
             end,
-            {Name, Type, NewBinSp, AttLen, DiskLen, RevPos, Md5, Enc}
+            {Name, Type, NewBinSp, AttLen, DiskLen, RevPos, Md5, Enc};
+        ({Name, Type, BinSp, AttLen, DiskLen, RevPos, Md5, Enc, AttBody}) ->
+            {NewBinSp, AttLen, _, Md5, _IdentityMd5} = 
+                couch_stream:copy_to_new_stream(SrcFd, BinSp, DestFd),
+            {Name, Type, NewBinSp, AttLen, DiskLen, RevPos, Md5, Enc, AttBody}
         end, BinInfos),
     {BodyData, NewBinInfos}.
+
 
 copy_docs(Db, #db{updater_fd = DestFd} = NewDb, InfoBySeq0, Retry) ->
     % COUCHDB-968, make sure we prune duplicates during compaction
@@ -868,7 +873,7 @@ copy_docs(Db, #db{updater_fd = DestFd} = NewDb, InfoBySeq0, Retry) ->
                     {ok, Pos, SummarySize} = couch_file:append_raw_chunk(
                         DestFd, SummaryChunk),
                     TotalLeafSize = lists:foldl(
-                        fun({_, _, _, AttLen, _, _, _, _}, S) -> S + AttLen end,
+                        fun({_, _, _, AttLen, _, _, _, _, _}, S) -> S + AttLen end,
                         SummarySize, AttsInfo),
                     {IsDel, Pos, Seq, TotalLeafSize}
                 end, RevTree)}

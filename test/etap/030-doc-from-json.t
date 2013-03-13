@@ -18,7 +18,7 @@
 -record(doc, {id= <<"">>, revs={0, []}, body={[]},
             atts=[], deleted=false, meta=[]}).
 -record(att, {name, type, att_len, disk_len, md5= <<>>, revpos=0, data,
-            encoding=identity}).
+            encoding=identity, body={[]}}).
 
 main(_) ->
     test_util:init_code_path(),
@@ -90,7 +90,8 @@ test_from_json_success() ->
                     type = <<"application/awesome">>,
                     att_len = 45,
                     disk_len = 45,
-                    revpos = nil
+                    revpos = nil,
+                    body = {[]}
                 },
                 #att{
                     name = <<"noahs_private_key.gpg">>,
@@ -98,7 +99,8 @@ test_from_json_success() ->
                     type = <<"application/pgp-signature">>,
                     att_len = 18,
                     disk_len = 18,
-                    revpos = 0
+                    revpos = 0,
+                    body = {[]}
                 }
             ]},
             "Attachments are parsed correctly."

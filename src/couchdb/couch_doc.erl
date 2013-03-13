@@ -22,6 +22,7 @@
 -export([to_path/1]).
 -export([mp_parse_doc/2]).
 -export([with_ejson_body/1]).
+-export([att_fields/2]).
 
 -include("couch_db.hrl").
 
@@ -99,7 +100,7 @@ to_json_attachments([], _OutputData, _DataToFollow, _ShowEncInfo) ->
     [];
 to_json_attachments(Atts, OutputData, DataToFollow, ShowEncInfo) ->
     AttProps = lists:map(
-        fun(#att{disk_len=DiskLen, att_len=AttLen, encoding=Enc}=Att) ->
+        fun(#att{disk_len=DiskLen, att_len=AttLen, encoding=Enc, body={AttBody}}=Att) ->
             {Att#att.name, {[
                 {<<"content_type">>, Att#att.type},
                 {<<"revpos">>, Att#att.revpos}] ++
@@ -125,17 +126,18 @@ to_json_attachments(Atts, OutputData, DataToFollow, ShowEncInfo) ->
                         [{<<"data">>, base64:encode(AttData)}]
                     end
                 end ++
-                    case {ShowEncInfo, Enc} of
-                    {false, _} ->
-                        [];
-                    {true, identity} ->
-                        [];
-                    {true, _} ->
-                        [
-                            {<<"encoding">>, couch_util:to_binary(Enc)},
-                            {<<"encoded_length">>, AttLen}
-                        ]
-                    end
+                case {ShowEncInfo, Enc} of
+                {false, _} ->
+                    [];
+                {true, identity} ->
+                    [];
+                {true, _} ->
+                    [
+                        {<<"encoding">>, couch_util:to_binary(Enc)},
+                        {<<"encoded_length">>, AttLen}
+                    ]
+                end ++
+                AttBody
             }}
         end, Atts),
     [{<<"_attachments">>, {AttProps}}].
@@ -236,25 +238,27 @@ transfer_fields([{<<"_attachments">>, {JsonBins}} | Rest], Doc) ->
             Type = couch_util:get_value(<<"content_type">>, BinProps),
             RevPos = couch_util:get_value(<<"revpos">>, BinProps, nil),
             DiskLen = couch_util:get_value(<<"length">>, BinProps),
+            Body = {att_fields(BinProps, [])},
             {Enc, EncLen} = att_encoding_info(BinProps),
             #att{name=Name, data=stub, type=Type, att_len=EncLen,
-                disk_len=DiskLen, encoding=Enc, revpos=RevPos, md5=Md5};
+                disk_len=DiskLen, encoding=Enc, revpos=RevPos, md5=Md5, body=Body};
         _ ->
             Type = couch_util:get_value(<<"content_type">>, BinProps,
                     ?DEFAULT_ATTACHMENT_CONTENT_TYPE),
             RevPos = couch_util:get_value(<<"revpos">>, BinProps, 0),
+            Body = {att_fields(BinProps, [])},
             case couch_util:get_value(<<"follows">>, BinProps) of
             true ->
                 DiskLen = couch_util:get_value(<<"length">>, BinProps),
                 {Enc, EncLen} = att_encoding_info(BinProps),
                 #att{name=Name, data=follows, type=Type, encoding=Enc,
-                    att_len=EncLen, disk_len=DiskLen, revpos=RevPos, md5=Md5};
+                    att_len=EncLen, disk_len=DiskLen, revpos=RevPos, md5=Md5, body=Body};
             _ ->
                 Value = couch_util:get_value(<<"data">>, BinProps),
                 Bin = base64:decode(Value),
                 LenBin = size(Bin),
                 #att{name=Name, data=Bin, type=Type, att_len=LenBin,
-                        disk_len=LenBin, revpos=RevPos}
+                        disk_len=LenBin, revpos=RevPos, body=Body}
             end
         end
     end, JsonBins),
@@ -319,6 +323,23 @@ att_encoding_info(BinProps) ->
         EncodedLen = couch_util:get_value(<<"encoded_length">>, BinProps, DiskLen),
         {list_to_existing_atom(?b2l(Enc)), EncodedLen}
     end.
+
+% ignore special attachment fields on attachment body
+att_fields([{<<"content_type">>, _} = Field | Rest], Body) -> att_fields(Rest, Body);
+att_fields([{<<"data">>, _} = Field | Rest], Body) -> att_fields(Rest, Body);
+att_fields([{<<"stub">>, _} = Field | Rest], Body) -> att_fields(Rest, Body);
+att_fields([{<<"revpos">>, _} = Field | Rest], Body) -> att_fields(Rest, Body);
+att_fields([{<<"length">>, _} = Field | Rest], Body) -> att_fields(Rest, Body);
+att_fields([{<<"encoding">>, _} = Field | Rest], Body) -> att_fields(Rest, Body);
+att_fields([{<<"encoding_length">>, _} = Field | Rest], Body) -> att_fields(Rest, Body);
+att_fields([{<<"follows">>, _} = Field | Rest], Body) -> att_fields(Rest, Body);
+att_fields([{<<"digest">>, _} = Field | Rest], Body) -> att_fields(Rest, Body);
+att_fields([Field | Rest], Body) -> 
+    Body2 = [Field | Body],
+    att_fields(Rest, Body2);
+att_fields([], Body) ->
+    lists:reverse(Body).
+
 
 to_doc_info(FullDocInfo) ->
     {DocInfo, _Path} = to_doc_info_path(FullDocInfo),
@@ -423,11 +444,17 @@ merge_stubs(#doc{id = Id}, nil) ->
 merge_stubs(#doc{id=Id,atts=MemBins}=StubsDoc, #doc{atts=DiskBins}) ->
     BinDict = dict:from_list([{Name, Att} || #att{name=Name}=Att <- DiskBins]),
     MergedBins = lists:map(
-        fun(#att{name=Name, data=stub, revpos=StubRevPos}) ->
+        fun(#att{name=Name, data=stub, revpos=StubRevPos, type=Type, body=Body}) ->
             case dict:find(Name, BinDict) of
             {ok, #att{revpos=DiskRevPos}=DiskAtt}
                     when DiskRevPos == StubRevPos orelse StubRevPos == nil ->
-                DiskAtt;
+                Att2 = case Type of
+                _Binary when is_binary(Type) -> 
+                    DiskAtt#att{type=Type, body=Body};
+                _Else -> 
+                    DiskAtt#att{body=Body}
+                end,
+                Att2;
             _ ->
                 throw({missing_stub,
                         <<"id:", Id/binary, ", name:", Name/binary>>})

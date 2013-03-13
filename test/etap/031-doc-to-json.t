@@ -18,7 +18,7 @@
 -record(doc, {id= <<"">>, revs={0, []}, body={[]},
             atts=[], deleted=false, meta=[]}).
 -record(att, {name, type, att_len, disk_len, md5= <<>>, revpos=0, data,
-            encoding=identity}).
+            encoding=identity,body={[]}}).
 
 main(_) ->
     test_util:init_code_path(),

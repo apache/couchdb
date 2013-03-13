@@ -134,10 +134,11 @@
     md5= <<>>,
     revpos=0,
     data,
-    encoding=identity % currently supported values are:
+    encoding=identity, % currently supported values are:
                       %     identity, gzip
                       % additional values to support in the future:
                       %     deflate, compress
+    body={[]}
     }).
 
 

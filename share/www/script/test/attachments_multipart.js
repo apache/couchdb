@@ -30,7 +30,8 @@ couchTests.attachments_multipart= function(debug) {
           "foo.txt": {
             "follows":true,
             "content_type":"application/test",
-            "length":21
+            "length":21,
+            "arbitrary_field": "arbitrary content"
             },
           "bar.txt": {
             "follows":true,
@@ -176,8 +177,11 @@ couchTests.attachments_multipart= function(debug) {
   
   // parse out the multipart
   var sections = parseMultipart(xhr);
-  TEquals("790", xhr.getResponseHeader("Content-Length"),
+  TEquals("828", xhr.getResponseHeader("Content-Length"),
     "Content-Length should be correct");
+
+
+
   T(sections.length == 3);
   // The first section is the json doc. Check it's content-type.
   // Each part carries their own meta data.

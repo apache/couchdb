@@ -9,6 +9,8 @@ Apache CouchDB CHANGES
 # HTTP Interface:
 #
 #  * Fixed bug with CORS and replication (COUCHDB-1689).
+#  * Allow update of content_type in attachments (COUCHDB-259).
+#  * Allow arbitrary data to be stored in attachments (COUHDB-259).
 #
 # Test Suite:
 #

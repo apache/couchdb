@@ -40,7 +40,8 @@
     md5= <<>>,
     revpos=0,
     data,
-    encoding=identity
+    encoding=identity,
+    body={[]}
 }).
 
 

@@ -773,9 +773,7 @@ update_docs(Db, Docs, Options, interactive_edit) ->
                         check_dup_atts(Doc)), Db#db.updater_fd), Ref}
                 || {Doc, Ref} <- B] || B <- DocBuckets2],
         {DocBuckets4, IdRevs} = new_revs(DocBuckets3, [], []),
-
         {ok, CommitResults} = write_and_commit(Db, DocBuckets4, NonRepDocs, Options2),
-
         ResultsDict = dict:from_list(IdRevs ++ CommitResults ++ PreCommitFailures),
         {ok, lists:map(
             fun({#doc{}, Ref}) ->
@@ -864,9 +862,9 @@ write_and_commit(#db{update_pid=UpdatePid}=Db, DocBuckets1,
 prepare_doc_summaries(Db, BucketList) ->
     [lists:map(
         fun({#doc{body = Body, atts = Atts} = Doc, Ref}) ->
-            DiskAtts = [{N, T, P, AL, DL, R, M, E} ||
+            DiskAtts = [{N, T, P, AL, DL, R, M, E, AttBody} ||
                 #att{name = N, type = T, data = {_, P}, md5 = M, revpos = R,
-                    att_len = AL, disk_len = DL, encoding = E} <- Atts],
+                    att_len = AL, disk_len = DL, encoding = E, body = AttBody} <- Atts],
             AttsFd = case Atts of
             [#att{data = {Fd, _}} | _] ->
                 Fd;
@@ -1271,7 +1269,29 @@ make_doc(#db{updater_fd = Fd} = Db, Id, Deleted, Bp, RevisionPath) ->
         end,
         {BodyData0,
             lists:map(
-                fun({Name,Type,Sp,AttLen,DiskLen,RevPos,Md5,Enc}) ->
+                fun({Name,Type,Sp,AttLen,DiskLen,RevPos,Md5,Enc,AttBody}) ->
+                    #att{name=Name,
+                        type=Type,
+                        att_len=AttLen,
+                        disk_len=DiskLen,
+                        md5=Md5,
+                        revpos=RevPos,
+                        data={Fd,Sp},
+                        encoding=
+                            case Enc of
+                            true ->
+                                % 0110 UPGRADE CODE
+                                gzip;
+                            false ->
+                                % 0110 UPGRADE CODE
+                                identity;
+                            _ ->
+                                Enc
+                            end,
+                        body=AttBody
+                    };
+
+                    ({Name,Type,Sp,AttLen,DiskLen,RevPos,Md5,Enc}) ->
                     #att{name=Name,
                         type=Type,
                         att_len=AttLen,
@@ -1298,7 +1318,8 @@ make_doc(#db{updater_fd = Fd} = Db, Id, Deleted, Bp, RevisionPath) ->
                         disk_len=AttLen,
                         md5=Md5,
                         revpos=RevPos,
-                        data={Fd,Sp}};
+                        data={Fd,Sp}
+                    };
                 ({Name,{Type,Sp,AttLen}}) ->
                     #att{name=Name,
                         type=Type,
@@ -1306,7 +1327,8 @@ make_doc(#db{updater_fd = Fd} = Db, Id, Deleted, Bp, RevisionPath) ->
                         disk_len=AttLen,
                         md5= <<>>,
                         revpos=0,
-                        data={Fd,Sp}}
+                        data={Fd,Sp}
+                    }
                 end, Atts0)}
     end,
     Doc = #doc{
