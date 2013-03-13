@@ -125,7 +125,12 @@ maybe_add_sys_db_callbacks(DbName, Options) ->
             sys_db | Options
         ];
         _ ->
-            Options
+            case config:get("mem3", "shard_db", "dbs") of
+            DbName ->
+                [sys_db | Options];
+            _ ->
+                Options
+            end
         end
     end.
 
