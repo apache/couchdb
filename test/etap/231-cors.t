@@ -256,6 +256,20 @@ test_doc_with_attachment_range_request() ->
         etap:is(false, true, "ibrowse failed")
     end.
 
+% COUCHDB-1697
+test_if_none_match_header() ->
+    Url = server() ++ "etap-test-db/doc2",
+    Headers = [{"Origin", "http://example.com"}],
+    {ok, _, _RespHeaders, _} = ibrowse:send_req(Url, Headers, get, []),
+    ETag = proplists:get_value("ETag", _RespHeaders),
+    Headers2 = [{"Origin", "http://example.com"}, {"If-None-Match", ETag}],
+    case ibrowse:send_req(Url, Headers2, get, []) of
+    {ok, Code, _RespHeaders2, _} ->
+        etap:is(Code, "304", "Responded with Not Modified");
+    _ ->
+        etap:is(false, true, "ibrowse failed")
+    end.
+
 test_db_request_credentials_header_off() ->
     Headers = [{"Origin", "http://example.com"}],
     Url = server() ++ "etap-test-db",
