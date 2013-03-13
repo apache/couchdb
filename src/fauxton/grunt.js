@@ -14,11 +14,18 @@ module.exports = function(grunt) {
             }
   };
 
-  function processAddons(callback){
-    if (path.existsSync("settings.json")){
-      var settings = grunt.file.readJSON("settings.json") || {deps: []};
-      settings.deps.forEach(callback);
+  function readSettingsFile () {
+    if (path.existsSync("settings.json")) {
+      return grunt.file.readJSON("settings.json")
+    } else if (path.existsSync("settings.json.default")) {
+      return grunt.file.readJSON("settings.json.default")
+    } else {
+      return {deps: []};
     }
+  }
+
+  function processAddons(callback){
+    readSettingsFile().deps.forEach(callback);
   }
 
   var cleanable = function(){
