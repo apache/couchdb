@@ -537,6 +537,7 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
       var json, notification;
       if (this.hasValidCode()) {
         json = JSON.parse(this.editor.getValue());
+        this.model.clear({silent:true});
         this.model.set(json);
         notification = FauxtonAPI.addNotification({msg: "Saving document."});
         this.model.save().error(function(xhr) {
