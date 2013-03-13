@@ -36,7 +36,7 @@ function CouchDB(name, httpHeaders) {
 
   // Deletes the database on the server
   this.deleteDb = function() {
-    this.last_req = this.request("DELETE", this.uri);
+    this.last_req = this.request("DELETE", this.uri + "?sync=true");
     if (this.last_req.status == 404) {
       return false;
     }
