@@ -220,7 +220,11 @@ create_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
 
 delete_db_req(#httpd{user_ctx=UserCtx}=Req, DbName) ->
     ok = couch_httpd:verify_is_server_admin(Req),
-    case couch_server:delete(DbName, [{user_ctx, UserCtx}]) of
+    Options = case couch_httpd:qs_value(Req, "sync") of
+        "true" -> [sync, {user_ctx, UserCtx}];
+        _ -> [{user_ctx, UserCtx}]
+    end,
+    case couch_server:delete(DbName, Options) of
     ok ->
         send_json(Req, 200, {[{ok, true}]});
     Error ->

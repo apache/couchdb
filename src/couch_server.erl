@@ -408,7 +408,7 @@ handle_call({create, DbName, Options}, From, Server) ->
     Error ->
         {reply, Error, Server}
     end;
-handle_call({delete, DbName, _Options}, _From, Server) ->
+handle_call({delete, DbName, Options}, _From, Server) ->
     DbNameList = binary_to_list(DbName),
     case check_dbname(Server, DbNameList) of
     ok ->
@@ -436,7 +436,9 @@ handle_call({delete, DbName, _Options}, _From, Server) ->
         end, [".compact", ".compact.data", ".compact.meta"]),
         couch_file:delete(Server#server.root_dir, FullFilepath ++ ".compact"),
 
-        case couch_file:delete(Server#server.root_dir, FullFilepath) of
+        Async = not lists:member(sync, Options),
+
+        case couch_file:delete(Server#server.root_dir, FullFilepath, Async) of
         ok ->
             couch_db_update_notifier:notify({deleted, DbName}),
             {reply, ok, Server2};
