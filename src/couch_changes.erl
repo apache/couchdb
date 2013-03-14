@@ -79,7 +79,7 @@ handle_changes(Args1, Req, Db0) ->
             {Callback, UserAcc} = get_callback_acc(CallbackAcc),
             Self = self(),
             {ok, Notify} = couch_db_update_notifier:start_link(
-                fun({_, DbName}) when  Db0#db.name == DbName ->
+                fun({updated, DbName}) when Db0#db.name == DbName ->
                     Self ! db_updated;
                 (_) ->
                     ok

@@ -738,6 +738,8 @@ update_docs_int(Db, DocsList, NonRepDocs, MergeConflicts, FullCommit) ->
     % funs if we did.
     Db4 = case length(UpdatedDDocIds) > 0 of
         true ->
+            couch_db_update_notifier:notify(
+                {ddoc_updated, Db3#db.name}),
             ddoc_cache:evict(Db3#db.name, UpdatedDDocIds),
             refresh_validate_doc_funs(Db3);
         false ->
