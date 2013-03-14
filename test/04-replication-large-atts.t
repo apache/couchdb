@@ -49,21 +49,11 @@ target_db_name() -> <<"couch_test_rep_db_b">>.
 
 
 main(_) ->
-    test_util:init_code_path(),
-
-    etap:plan(1192),
-    case (catch test()) of
-        ok ->
-            etap:end_tests();
-        Other ->
-            etap:diag(io_lib:format("Test died abnormally: ~p", [Other])),
-            etap:bail(Other)
-    end,
-    ok.
+    test_util:run(1192, fun() -> test() end).
 
 
 test() ->
-    couch_server_sup:start_link(test_util:config_files()),
+    test_util:start_couch(),
     ibrowse:start(),
     crypto:start(),
     config:set("attachments", "compressible_types", "text/*", false),
@@ -98,8 +88,7 @@ test() ->
         Pairs),
 
     delete_db(SourceDb),
-    couch_server_sup:stop(),
-    ok.
+    test_util:stop_couch().
 
 
 populate_db(Db, DocCount) ->
