@@ -28,7 +28,7 @@ function(app, _, Bootstrap) {
     // TODO: pick this up wither at build time or from the browser
     root: "/_utils/fauxton/",
     // Is this sufficient?
-    host: window.location.origin,
+    host: window.location.protocol + "//" + window.location.host,
 
     renderView: function(baseView, selector, view, options, callback) {
       baseView.setView(selector, new view(options)).render().then(callback);
