@@ -61,21 +61,11 @@ doc_num_conflicts(<<"doc3">>) -> 210.
 
 
 main(_) ->
-    test_util:init_code_path(),
-
-    etap:plan(56),
-    case (catch test()) of
-        ok ->
-            etap:end_tests();
-        Other ->
-            etap:diag(io_lib:format("Test died abnormally: ~p", [Other])),
-            etap:bail(Other)
-    end,
-    ok.
+    test_util:run(56, fun() -> test() end).
 
 
 test() ->
-    couch_server_sup:start_link(test_util:config_files()),
+    test_util:start_couch(),
     ibrowse:start(),
     crypto:start(),
     config:set("replicator", "connection_timeout", "90000", false),
@@ -125,8 +115,7 @@ test() ->
         end,
         Pairs),
 
-    couch_server_sup:stop(),
-    ok.
+    test_util:stop_couch().
 
 
 populate_db(Db) ->

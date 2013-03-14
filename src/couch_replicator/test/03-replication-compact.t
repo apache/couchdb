@@ -16,6 +16,8 @@
 % target of a replication doesn't affect the replication and that the
 % replication doesn't hold their reference counters forever.
 
+-mode(compile).
+
 -define(b2l(B), binary_to_list(B)).
 
 -record(user_ctx, {
@@ -66,21 +68,11 @@ target_db_name() -> <<"couch_test_rep_db_b">>.
 
 
 main(_) ->
-    test_util:init_code_path(),
-
-    etap:plan(376),
-    case (catch test()) of
-        ok ->
-            etap:end_tests();
-        Other ->
-            etap:diag(io_lib:format("Test died abnormally: ~p", [Other])),
-            etap:bail(Other)
-    end,
-    ok.
+    test_util:run(376, fun() -> test() end).
 
 
 test() ->
-    couch_server_sup:start_link(test_util:config_files()),
+    test_util:start_couch(),
     ibrowse:start(),
 
     Pairs = [
@@ -112,13 +104,13 @@ test() ->
 
             delete_db(SourceDb),
             delete_db(TargetDb),
-            couch_server_sup:stop(),
+            ok = test_util:stop_couch(),
             ok = timer:sleep(1000),
-            couch_server_sup:start_link(test_util:config_files())
+            ok = test_util:start_couch()
         end,
         Pairs),
 
-    couch_server_sup:stop(),
+    ok = test_util:stop_couch(),
     ok.
 
 
@@ -284,6 +276,7 @@ compare_dbs(#db{name = SourceName}, #db{name = TargetName}) ->
 
 
 check_active_tasks(RepPid, {BaseId, Ext} = _RepId, Src, Tgt) ->
+    timer:sleep(1000),
     Source = case Src of
     {remote, NameSrc} ->
         <<(db_url(NameSrc))/binary, $/>>;
