@@ -39,6 +39,7 @@ config.h.in
 config.log
 config.status
 configure
+couchdb.log
 couchdb.stderr
 couchdb.stdout
 cover/*
