@@ -17,7 +17,7 @@ main(_) ->
     test_util:run(4, fun() -> test() end).
 
 test() ->
-    couch_server_sup:start_link(test_util:config_files()),
+    test_util:start_couch(),
 
     {ok, Db} = couch_mrview_test_util:init_db(<<"foo">>, red),
 
