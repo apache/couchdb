@@ -7,4 +7,5 @@ app/addons/*
 !app/addons/config
 !app/addons/logs
 !app/addons/contribute
-settings.json
+settings.json*
+!settings.json.default
