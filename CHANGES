@@ -79,6 +79,8 @@ URL Rewriter & Vhosts:
 Build System:
 
  * C/C++ compiler detection has been improved.
+ * Autoconf v2.63 is now required if building from git checkout directly.
+    See DEVELOPERS file for more details.
 
 Version 1.2.1
 -------------
