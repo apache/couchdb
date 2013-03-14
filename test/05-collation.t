@@ -18,7 +18,8 @@ main(_) ->
 
 
 test() ->
-    couch_server_sup:start_link(test_util:config_files()),
+    test_util:start_couch(),
+
     {ok, Db0} = couch_mrview_test_util:new_db(<<"foo">>, map),
     {ok, Db1} = couch_mrview_test_util:save_docs(Db0, docs()),
 
