@@ -76,6 +76,10 @@ URL Rewriter & Vhosts:
  * Reset rewrite counter on new request, avoiding unnecessary request
    failures due to bogus rewrite limit reports
 
+Build System:
+
+ * C/C++ compiler detection has been improved.
+
 Version 1.2.1
 -------------
 
