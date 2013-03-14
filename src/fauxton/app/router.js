@@ -32,6 +32,7 @@ define([
   // Routes return the module that they define routes for
   "modules/databases/base",
   "modules/documents/base",
+  "modules/pouchdb/base",
 
 
   // this needs to be added as a plugin later
@@ -41,7 +42,7 @@ define([
   "load_addons"
 ],
 
-function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents, LoadAddons) {
+function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents, Pouch, LoadAddons) {
 
   var defaultLayout = 'with_sidebar';
   // TODO: auto generate this list if possible
@@ -70,7 +71,13 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
         _.each(settings.views, function(view, selector) {
           masterLayout.setView(selector, view);
 
-          $.when.apply(null, view.establish()).done(function(resp) {
+          $.when.apply(null, view.establish()).then(function(resp) {
+            masterLayout.renderView(selector);
+          }, function(resp) {
+            view.establishError = {
+              error: true,
+              reason: resp
+            };
             masterLayout.renderView(selector);
           });
 
