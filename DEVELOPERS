@@ -12,7 +12,7 @@ You will need the following installed:
 
  * GNU Libtool            (http://www.gnu.org/software/libtool/)
  * GNU Automake (>=1.6.3) (http://www.gnu.org/software/automake/)
- * GNU Autoconf (>=2.68)  (http://www.gnu.org/software/autoconf/)
+ * GNU Autoconf (>=2.63)  (http://www.gnu.org/software/autoconf/)
  * GNU Autoconf Archive   (http://www.gnu.org/software/autoconf-archive/)
  * pkg-config             (http://www.freedesktop.org/wiki/Software/pkg-config)
 
