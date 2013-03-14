@@ -7,10 +7,10 @@ For details about backwards incompatible changes, see:
 
 Each release section notes when backwards incompatible changes have been made.
 
-# Version 1.2.2
-# -------------
-#
-# This version has not been released yet.
+Version 1.2.2
+-------------
+
+ * Fixed rewrite counter bug.
 
 Version 1.2.1
 -------------
