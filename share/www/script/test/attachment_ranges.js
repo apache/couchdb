@@ -23,6 +23,11 @@ couchTests.attachment_ranges = function(debug) {
 
     if (debug) debugger;
 
+    if(window.navigator.userAgent.match(/Chrome/)) {
+        // Chrome is broken.
+        return;
+    }
+
     var binAttDoc = {
         _id: "bin_doc",
         _attachments: {
