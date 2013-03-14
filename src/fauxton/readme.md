@@ -43,7 +43,7 @@ A recent of [node.js](http://nodejs.org/) and npm is required.
 
 ### To Deploy Fauxton
 
-    bbb couchapp_deploy - to deploy to your local [Couchdb instance] (http://localhost:5984/fauxton/_design/fauxton/index.html)
+    ./bin/bbb couchapp_deploy - to deploy to your local [Couchdb instance] (http://localhost:5984/fauxton/_design/fauxton/index.html)
 
 ## Understang Fauxton Code layout
 
