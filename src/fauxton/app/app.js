@@ -4,11 +4,13 @@ define([
   "lodash",
   "backbone",
 
+  "helpers",
+
   // Plugins.
   "plugins/backbone.layoutmanager"
 ],
 
-function($, _, Backbone) {
+function($, _, Backbone, Helpers) {
 
   // Provide a global location to place configuration settings and module
   // creation.
@@ -26,6 +28,11 @@ function($, _, Backbone) {
     manage: true,
 
     prefix: "app/",
+
+    // Inject app/helper.js for shared functionality across all html templates
+    render: function(template, context) {
+      return template(_.extend(Helpers, context));
+    },
 
     fetch: function(path) {
       // Initialize done for use in async-mode
