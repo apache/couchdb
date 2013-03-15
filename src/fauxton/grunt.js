@@ -278,7 +278,7 @@ module.exports = function(grunt) {
       couchdebug: {
         files: {
           // this gets built in the template task
-          //"../../share/www/fauxton/index.html": "dist/release/index.html",
+          "../../share/www/fauxton/index.html": "dist/debug/index.html",
           "../../share/www/fauxton/js/": "dist/debug/js/**",
           // no images... yet
           "../../share/www/fauxton/img/": "dist/debug/img/**",
