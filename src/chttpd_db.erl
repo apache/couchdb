@@ -1178,6 +1178,9 @@ parse_doc_query(Req) ->
         {"conflicts", "true"} ->
             Options = [conflicts | Args#doc_query_args.options],
             Args#doc_query_args{options=Options};
+        {"deleted", "true"} ->
+            Options = [deleted | Args#doc_query_args.options],
+            Args#doc_query_args{options=Options};
         {"deleted_conflicts", "true"} ->
             Options = [deleted_conflicts | Args#doc_query_args.options],
             Args#doc_query_args{options=Options};
