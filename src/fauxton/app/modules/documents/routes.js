@@ -209,6 +209,10 @@ function(app, FauxtonAPI, Documents, Databases) {
 
     "database/:database/:doc/code_editor": codeEditorCallback,
     "database/:database/:doc": codeEditorCallback,
+    "database/:database/_design%2F:doc": function(database, doc) {
+      var docID = "_design/"+doc;
+      return codeEditorCallback(database, docID);
+    },
 
     // HACK
     // The ordering of routes is different in this object that the
@@ -268,7 +272,7 @@ function(app, FauxtonAPI, Documents, Databases) {
       };
     },
 
-    "database/:database/_:handler": function(databaseName, page) {
+    "database/:database/_all_docs(:extra)": function(databaseName, page) {
       var data = {
         database: new Databases.Model({id:databaseName})
       };
@@ -378,6 +382,7 @@ function(app, FauxtonAPI, Documents, Databases) {
 
       var ddocInfo = {
         id: "_design/" + ddoc,
+        currView: view,
         designDocs: data.designDocs
       };
 
@@ -396,7 +401,8 @@ function(app, FauxtonAPI, Documents, Databases) {
           }),
 
           "#sidebar-content": new Documents.Views.Sidebar({
-            collection: data.designDocs
+            collection: data.designDocs,
+            ddocInfo: ddocInfo
           }),
 
           "#tabs": new Documents.Views.Tabs({

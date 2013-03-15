@@ -30,7 +30,9 @@
     padding-bottom: 40px;
     }
   </style>
+  <% if (base) { %>
   <base href="<%= base %>"></base>
+  <% } %>
 </head>
 
 <body id="home">
