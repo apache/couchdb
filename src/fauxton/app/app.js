@@ -12,6 +12,13 @@ define([
 
 function($, _, Backbone, Helpers) {
 
+  // Make sure we have a console.log
+  if (typeof console == "undefined") {
+    console = {
+      log: function(){}
+    };
+  }
+
   // Provide a global location to place configuration settings and module
   // creation.
   var app = {
