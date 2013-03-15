@@ -423,11 +423,14 @@ merge_stubs(#doc{id = Id}, nil) ->
 merge_stubs(#doc{id=Id,atts=MemBins}=StubsDoc, #doc{atts=DiskBins}) ->
     BinDict = dict:from_list([{Name, Att} || #att{name=Name}=Att <- DiskBins]),
     MergedBins = lists:map(
-        fun(#att{name=Name, data=stub, revpos=StubRevPos}) ->
+        fun(#att{name=Name, data=stub, revpos=StubRevPos, type=Type}) ->
             case dict:find(Name, BinDict) of
             {ok, #att{revpos=DiskRevPos}=DiskAtt}
                     when DiskRevPos == StubRevPos orelse StubRevPos == nil ->
-                DiskAtt;
+                case Type of
+                _Binary when is_binary(Type) -> DiskAtt#att{type=Type};
+                _Else -> DiskAtt
+                end;
             _ ->
                 throw({missing_stub,
                         <<"id:", Id/binary, ", name:", Name/binary>>})
