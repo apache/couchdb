@@ -23,7 +23,7 @@ couchTests.attachment_ranges = function(debug) {
 
     if (debug) debugger;
 
-    if(window.navigator.userAgent.match(/Chrome/)) {
+    if(window && window.navigator.userAgent.match(/Chrome/)) {
         // Chrome is broken.
         return;
     }
