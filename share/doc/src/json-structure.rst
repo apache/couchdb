@@ -201,42 +201,6 @@ Design Document Information
 |                                | processed                                   |
 +--------------------------------+---------------------------------------------+
 
-Design Document spatial index Information
-=========================================
-
-+--------------------------------+---------------------------------------------+
-| Field                          | Description                                 |
-+================================+=============================================+
-| name                           | Name/ID of Design Document                  |
-+--------------------------------+---------------------------------------------+
-| spatial_index                  | View Index                                  |
-+--------------------------------+---------------------------------------------+
-|     compact_running            | Indicates whether a compaction routine is   |
-|                                | currently running on the view               |
-+--------------------------------+---------------------------------------------+
-|     disk_size                  | Size in bytes of the view as stored on disk |
-+--------------------------------+---------------------------------------------+
-|     language                   | Language for the defined views              |
-+--------------------------------+---------------------------------------------+
-|     purge_seq                  | The purge sequence that has been processed  |
-+--------------------------------+---------------------------------------------+
-|     signature                  | MD5 signature of the views for the design   |
-|                                | document                                    |
-+--------------------------------+---------------------------------------------+
-|     update_seq                 | The update sequence of the corresponding    |
-|                                | database that has been indexed              |
-+--------------------------------+---------------------------------------------+
-|     updater_running            | Indicates if the view is currently being    |
-|                                | updated                                     |
-+--------------------------------+---------------------------------------------+
-|     waiting_clients            | Number of clients waiting on views from this|
-|                                | design document                             |
-+--------------------------------+---------------------------------------------+
-|     waiting_commit             | Indicates if there are outstanding commits  |
-|                                | to the underlying database that need to     |
-|                                | processed                                   |
-+--------------------------------+---------------------------------------------+
-
 Document with Attachments
 =========================
 
