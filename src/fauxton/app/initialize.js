@@ -27,8 +27,8 @@ function(app, _, Bootstrap) {
     // The root path to run the application through.
     // TODO: pick this up wither at build time or from the browser
     root: "/_utils/fauxton/",
-    // Is this sufficient?
-    host: window.location.protocol + "//" + window.location.host,
+    // Firefox does not support window.location.origin so have to check first
+    host: (window.location.origin) ? window.location.origin : window.location.protocol + "//" + window.location.host,
 
     renderView: function(baseView, selector, view, options, callback) {
       baseView.setView(selector, new view(options)).render().then(callback);

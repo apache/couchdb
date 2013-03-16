@@ -41,6 +41,11 @@ A recent of [node.js](http://nodejs.org/) and npm is required.
     # Or fully compiled install
     # ./bin/bbb couchdb
 
+### Dev Server
+    Using the dev server is the easiest way to use fauxton, specially when developing for it.
+
+    bbb dev
+
 ### To Deploy Fauxton
 
     ./bin/bbb couchapp_deploy - to deploy to your local [Couchdb instance] (http://localhost:5984/fauxton/_design/fauxton/index.html)

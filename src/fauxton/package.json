@@ -9,7 +9,7 @@
   "dependencies": {
     "async": "~0.1.22",
     "grunt": "~0.3.17",
-    "bbb": "0.1.10",
+    "bbb": "0.1.16",
     "couchapp": "0.9.1",
     "grunt-contrib": "~0.0.8",
     "grunt-contrib-copy": "~0.3.2",

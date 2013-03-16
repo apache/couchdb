@@ -140,7 +140,110 @@ module.exports = function(grunt) {
 
     // Create static html files from templates, for managing change of script
     // or css name.
+    template: {
+      couchdb:{
+        src: 'assets/index.underscore',
+        dest: '../../share/www/fauxton/index.html',
+        variables: {
+          assets_root: '/_utils/fauxton/',
+          requirejs: 'require.min.js',
+          base: '/_utils/fauxton/'
+        }
+      },
+      couchdebug:{
+        src: 'assets/index.underscore',
+        dest: '../../share/www/fauxton/index.html',
+        variables: {
+          assets_root: '/_utils/fauxton/',
+          requirejs: 'require.js',
+          base: '/_utils/fauxton/'
+        }
+      },
+      release: {
+        src: 'assets/index.underscore',
+        dest: 'dist/release/index.html',
+        variables: {
+          assets_root: '/',
+          requirejs: 'require.min.js',
+          base: '/'
+        }
+      },
+      debug: {
+        src: 'assets/index.underscore',
+        dest: 'dist/debug/index.html',
+        variables: {
+          assets_root: '/',
+          requirejs: 'require.js',
+          base: '/'
+        }
+      },
+      couchapp: {
+        src: 'assets/index.underscore',
+        dest: 'dist/debug/index.html',
+        variables: {
+          assets_root: '/fauxton/_design/fauxton/',
+          requirejs: 'require.js',
+          base: '/fauxton/_design/fauxton/index.html'
+        }
+      }
+    },
     template: templateSettings,
+    template: {
+      couchdb:{
+        src: 'assets/index.underscore',
+        dest: '../../share/www/fauxton/index.html',
+        variables: {
+          assets_root: '/_utils/fauxton/',
+          requirejs: 'require.min.js',
+          base: '/_utils/fauxton/'
+        }
+      },
+      couchdebug:{
+        src: 'assets/index.underscore',
+        dest: '../../share/www/fauxton/index.html',
+        variables: {
+          assets_root: '/_utils/fauxton/',
+          requirejs: 'require.js',
+          base: '/_utils/fauxton/'
+        }
+      },
+      release: {
+        src: 'assets/index.underscore',
+        dest: 'dist/release/index.html',
+        variables: {
+          assets_root: '/',
+          requirejs: 'require.min.js',
+          base: '/'
+        }
+      },
+      debug: {
+        src: 'assets/index.underscore',
+        dest: 'dist/debug/index.html',
+        variables: {
+          assets_root: '/',
+          requirejs: 'require.js',
+          base: '/'
+        }
+      },
+      server: {
+        src: 'assets/index.underscore',
+        dest: 'dist/debug/index.html',
+        variables: {
+          assets_root: '/assets/',
+          requirejs: 'require.js',
+          base: '/'
+        }
+      },
+      couchapp: {
+        src: 'assets/index.underscore',
+        dest: 'dist/debug/index.html',
+        variables: {
+          assets_root: '/fauxton/_design/fauxton/',
+          requirejs: 'require.js',
+          base: '/fauxton/_design/fauxton/index.html'
+        }
+      }
+    },
 
     // The concatenate task is used here to merge the almond require/define
     // shim and the templates into the application code.  It's named
@@ -177,61 +280,20 @@ module.exports = function(grunt) {
       ]
     },
 
-    // Running the server without specifying an action will run the defaults,
-    // port: 8000 and host: 127.0.0.1.  If you would like to change these
-    // defaults, simply add in the properties `port` and `host` respectively.
-    // Alternatively you can omit the port and host properties and the server
-    // task will instead default to process.env.PORT or process.env.HOST.
-    //
-    // Changing the defaults might look something like this:
-    //
-    // server: {
-    //   host: "127.0.0.1", port: 9001
-    //   debug: { ... can set host and port here too ...
-    //  }
-    //
-    //  To learn more about using the server task, please refer to the code
-    //  until documentation has been written.
-    server: {
-      // Ensure the favicon is mapped correctly.
-      files: { "favicon.ico": "favicon.ico" },
-
-      debug: {
-        // Ensure the favicon is mapped correctly.
-        "index": "./dist/debug/index.html",
-        files: { "favicon.ico": "favicon.ico" },
-
-        // Map `server:debug` to `debug` folders.
-        folders: {
-          "app": "dist/debug",
-          "assets/js/libs": "dist/debug",
-          "css": "dist/debug/css",
-          "js": "dist/debug/js"
-        }
-      },
-
-      proxies: {
-        '': {
-          host: 'localhost',
-          port: 5984,
-          https: false
-        }
-      },
-
-      release: {
-        // This makes it easier for deploying, by defaulting to any IP.
-        host: "0.0.0.0",
-
-        // Ensure the favicon is mapped correctly.
-        files: { "favicon.ico": "favicon.ico" },
-
-        // Map `server:release` to `release` folders.
-        folders: {
-          "app": "dist/release",
-          "assets/js/libs": "dist/release",
-          "assets/css": "dist/release"
-        }
+    // Runs a proxy server for easier development, no need to keep deploying to couchdb
+    couchserver: {
+      dist: './dist/debug/',
+      port: 8000,
+      proxy: {
+        host: 'localhost',
+        port: 5984,
+        https: false
       }
+    },
+
+    watch: {
+      files: './app/**/*',
+      tasks: ['debug', 'template:server']
     },
 
     // This task uses James Burke's excellent r.js AMD build tool.  In the
@@ -340,7 +402,7 @@ module.exports = function(grunt) {
   grunt.registerTask("minify", "min mincss");
   // deafult task - push to CouchDB
   grunt.registerTask("default", "test dependencies build release install");
-  grunt.registerTask("dev", "debug server:debug");
+  grunt.registerTask("dev", "debug template:server couchserver");
   // make a debug install
   grunt.registerTask("debug", "test dependencies build template copy:debug concat:debug");
   // make an install that is server by mochiweb under _utils
