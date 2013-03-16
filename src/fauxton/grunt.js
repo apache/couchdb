@@ -85,7 +85,7 @@ module.exports = function(grunt) {
         "base": null
       }
     };
-    var settings = grunt.file.readJSON("settings.json");
+    var settings = readSettingsFile();
     return {template: settings.template || defaultSettings};
   }();
 
