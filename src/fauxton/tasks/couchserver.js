@@ -23,14 +23,9 @@ module.exports = function (grunt) {
     // inform grunt that this task is async
     var done = this.async();
 
-    // images don't have the full path, so have to have own route for them
-    app.get('/img/*', function (req, res) {
-      res.sendfile(path.join(dist_dir,req.url));
-    });
-
     // serve any javascript or css files from here
-    app.get('/assets/*', function (req, res) {
-      res.sendfile(req.url.replace('/assets/',dist_dir));
+    app.get(/\.css$|\.js$|img/, function (req, res) {
+      res.sendfile(path.join(dist_dir,req.url));
     });
 
     // serve main index file from here

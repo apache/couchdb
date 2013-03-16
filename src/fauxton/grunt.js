@@ -138,112 +138,7 @@ module.exports = function(grunt) {
       ]
     },
 
-    // Create static html files from templates, for managing change of script
-    // or css name.
-    template: {
-      couchdb:{
-        src: 'assets/index.underscore',
-        dest: '../../share/www/fauxton/index.html',
-        variables: {
-          assets_root: '/_utils/fauxton/',
-          requirejs: 'require.min.js',
-          base: '/_utils/fauxton/'
-        }
-      },
-      couchdebug:{
-        src: 'assets/index.underscore',
-        dest: '../../share/www/fauxton/index.html',
-        variables: {
-          assets_root: '/_utils/fauxton/',
-          requirejs: 'require.js',
-          base: '/_utils/fauxton/'
-        }
-      },
-      release: {
-        src: 'assets/index.underscore',
-        dest: 'dist/release/index.html',
-        variables: {
-          assets_root: '/',
-          requirejs: 'require.min.js',
-          base: '/'
-        }
-      },
-      debug: {
-        src: 'assets/index.underscore',
-        dest: 'dist/debug/index.html',
-        variables: {
-          assets_root: '/',
-          requirejs: 'require.js',
-          base: '/'
-        }
-      },
-      couchapp: {
-        src: 'assets/index.underscore',
-        dest: 'dist/debug/index.html',
-        variables: {
-          assets_root: '/fauxton/_design/fauxton/',
-          requirejs: 'require.js',
-          base: '/fauxton/_design/fauxton/index.html'
-        }
-      }
-    },
     template: templateSettings,
-    template: {
-      couchdb:{
-        src: 'assets/index.underscore',
-        dest: '../../share/www/fauxton/index.html',
-        variables: {
-          assets_root: '/_utils/fauxton/',
-          requirejs: 'require.min.js',
-          base: '/_utils/fauxton/'
-        }
-      },
-      couchdebug:{
-        src: 'assets/index.underscore',
-        dest: '../../share/www/fauxton/index.html',
-        variables: {
-          assets_root: '/_utils/fauxton/',
-          requirejs: 'require.js',
-          base: '/_utils/fauxton/'
-        }
-      },
-      release: {
-        src: 'assets/index.underscore',
-        dest: 'dist/release/index.html',
-        variables: {
-          assets_root: '/',
-          requirejs: 'require.min.js',
-          base: '/'
-        }
-      },
-      debug: {
-        src: 'assets/index.underscore',
-        dest: 'dist/debug/index.html',
-        variables: {
-          assets_root: '/',
-          requirejs: 'require.js',
-          base: '/'
-        }
-      },
-      server: {
-        src: 'assets/index.underscore',
-        dest: 'dist/debug/index.html',
-        variables: {
-          assets_root: '/assets/',
-          requirejs: 'require.js',
-          base: '/'
-        }
-      },
-      couchapp: {
-        src: 'assets/index.underscore',
-        dest: 'dist/debug/index.html',
-        variables: {
-          assets_root: '/fauxton/_design/fauxton/',
-          requirejs: 'require.js',
-          base: '/fauxton/_design/fauxton/index.html'
-        }
-      }
-    },
 
     // The concatenate task is used here to merge the almond require/define
     // shim and the templates into the application code.  It's named
@@ -402,7 +297,7 @@ module.exports = function(grunt) {
   grunt.registerTask("minify", "min mincss");
   // deafult task - push to CouchDB
   grunt.registerTask("default", "test dependencies build release install");
-  grunt.registerTask("dev", "debug template:server couchserver");
+  grunt.registerTask("dev", "debug template couchserver");
   // make a debug install
   grunt.registerTask("debug", "test dependencies build template copy:debug concat:debug");
   // make an install that is server by mochiweb under _utils
