@@ -2,31 +2,26 @@
 // configuration file, which you can learn more about here:
 // https://github.com/cowboy/grunt/blob/master/docs/configuring.md
 
+
 module.exports = function(grunt) {
-  var path = require('path');
-  var couch_config = {
-    fauxton: {
-              db: 'http://localhost:5984/fauxton',
-              app: './couchapp.js',
-              options: {
-                okay_if_missing: true
-              }
-            }
-  };
+  var helper = require('./tasks/helper').init(grunt),
+  path = require('path');
 
-  function readSettingsFile () {
-    if (path.existsSync("settings.json")) {
-      return grunt.file.readJSON("settings.json")
-    } else if (path.existsSync("settings.json.default")) {
-      return grunt.file.readJSON("settings.json.default")
-    } else {
-      return {deps: []};
-    }
-  }
+  var couch_config = function () {
 
-  function processAddons(callback){
-    readSettingsFile().deps.forEach(callback);
-  }
+    var default_couch_config = {
+      fauxton: {
+        db: 'http://localhost:5984/fauxton',
+        app: './couchapp.js',
+        options: {
+          okay_if_missing: true
+        }
+      }
+    };
+
+    var settings_couch_config = helper.readSettingsFile().couch_config;
+    return settings_couch_config || default_couch_config
+  }();
 
   var cleanable = function(){
     // Whitelist files and directories to be cleaned
@@ -34,7 +29,7 @@ module.exports = function(grunt) {
     // You'll always want to clean these two directories
     var theListToClean = ["dist/", "app/load_addons.js"];
     // Now find the external addons you have and add them for cleaning up
-    processAddons(function(addon){
+    helper.processAddons(function(addon){
       // Only clean addons that are included from a local dir
       if (addon.path){
         theListToClean.push("app/addons/" + addon.name);
@@ -54,7 +49,7 @@ module.exports = function(grunt) {
       },
       img: ["assets/img/**"]
     };
-    processAddons(function(addon){
+    helper.processAddons(function(addon){
       // Less files from addons
       var root = addon.path || "app/addons/" + addon.name;
       var lessPath = root + "/assets/less";
@@ -62,7 +57,7 @@ module.exports = function(grunt) {
         // .less files exist for this addon
         theAssets.less.paths.push(lessPath);
         theAssets.less.files["dist/debug/css/" + addon.name + ".css"] =
-            lessPath + "/" + addon.name + ".less";
+          lessPath + "/" + addon.name + ".less";
       }
       // Images
       var root = addon.path || "app/addons/" + addon.name;
@@ -85,7 +80,7 @@ module.exports = function(grunt) {
         "base": null
       }
     };
-    var settings = readSettingsFile();
+    var settings = helper.readSettingsFile();
     return {template: settings.template || defaultSettings};
   }();
 
