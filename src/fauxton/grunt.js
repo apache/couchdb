@@ -188,23 +188,26 @@ module.exports = function(grunt) {
 
     watch: {
       files: './app/**/*',
-      tasks: ['debug', 'template:server']
+      tasks: ['debug', 'template']
     },
 
-    // This task uses James Burke's excellent r.js AMD build tool.  In the
-    // future other builders may be contributed as drop-in alternatives.
     requirejs: {
-      // Include the main configuration file.
-      mainConfigFile: "app/config.js",
+      compile: {
+        options: {
+          baseUrl: 'app',
+          // Include the main configuration file.
+          mainConfigFile: "app/config.js",
 
-      // Output file.
-      out: "dist/debug/require.js",
+          // Output file.
+          out: "dist/debug/require.js",
 
-      // Root application module.
-      name: "config",
+          // Root application module.
+          name: "config",
 
-      // Do not wrap everything in an IIFE.
-      wrap: false
+          // Do not wrap everything in an IIFE.
+          wrap: false
+      }
+      }
     },
 
     // The headless QUnit testing environment is provided for "free" by Grunt.
@@ -284,9 +287,11 @@ module.exports = function(grunt) {
   grunt.loadNpmTasks('grunt-couchapp');
   // Load the copy task
   grunt.loadNpmTasks('grunt-contrib-copy');
+  grunt.loadNpmTasks('grunt-contrib');
   // Load the exec task
   grunt.loadNpmTasks('grunt-exec');
-
+  // Load Require.js task
+  grunt.loadNpmTasks('grunt-requirejs');
   // clean out previous build artefacts, lint and unit test
   grunt.registerTask('test', 'clean lint'); //qunit
   // Fetch dependencies (from git or local dir), lint them and make load_addons
