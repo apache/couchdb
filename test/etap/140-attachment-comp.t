@@ -60,6 +60,9 @@ test() ->
         "deflate"
     ),
 
+    % COUCHDB-1711 - avoid weird timng/scheduling/request handling issue
+    timer:sleep(100),
+
     test_create_already_compressed_att_with_invalid_content_encoding(
         db_url() ++ "/doc_att_compress",
         "readme.txt",
