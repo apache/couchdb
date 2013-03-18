@@ -18,7 +18,9 @@
     "grunt-jasmine-task": "~0.2.0",
     "underscore": "~1.4.2",
     "url": "~0.7.9",
-    "urls": "~0.0.3"
+    "urls": "~0.0.3",
+    "express": "~3.0.0",
+    "http-proxy": "~0.9.1"
   },
   "devDependencies": {},
   "scripts": {
