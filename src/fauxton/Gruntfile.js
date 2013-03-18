@@ -223,43 +223,41 @@ module.exports = function(grunt) {
     },
 
     // Copy build artifacts and library code into the distribution
-
+    // see - http://gruntjs.com/configuring-tasks#building-the-files-object-dynamically
     copy: {
       couchdb: {
-        files: {
+        files: [
           // this gets built in the template task
-          //"../../share/www/fauxton/index.html": "dist/release/index.html",
-          "../../share/www/fauxton/js/": "dist/release/js/**",
-          // no images... yet
-          "../../share/www/fauxton/img/": "dist/release/img/**",
-          "../../share/www/fauxton/css/": "dist/release/css/**"
-        }
+          {src: "dist/release/index.html", dest: "../../share/www/fauxton/index.html"},
+          {src: ["**"], dest: "../../share/www/fauxton/js/", cwd:'assets/js/',  expand: true},
+          {src: ["**"], dest: "../../share/www/fauxton/img/", cwd:'dist/release/img/', expand: true},
+          {src: ["**"], dest: "../../share/www/fauxton/css/", cwd:"dist/release/css/", expand: true},
+          // Must be possible to improve this...
+          {src: ["**"], dest: "../../share/www/fauxton/app/", cwd:"dist/release/", expand: true}
+        ]
       },
       couchdebug: {
-        files: {
+        files: [
           // this gets built in the template task
-          "../../share/www/fauxton/index.html": "dist/debug/index.html",
-          "../../share/www/fauxton/js/": "dist/debug/js/**",
-          // no images... yet
-          "../../share/www/fauxton/img/": "dist/debug/img/**",
-          "../../share/www/fauxton/css/": "dist/debug/css/**",
+          {src: "dist/debug/index.html", dest: "../../share/www/fauxton/index.html"},
+          {src: ["**"], dest: "../../share/www/fauxton/js/", cwd:'assets/js/',  expand: true},
+          {src: ["**"], dest: "../../share/www/fauxton/img/", cwd:'dist/debug/img/', expand: true},
+          {src: ["**"], dest: "../../share/www/fauxton/css/", cwd:"dist/debug/css/", expand: true},
           // Must be possible to improve this...
-          "../../share/www/fauxton/app/": "dist/debug/**"
-        }
+          {src: ["**"], dest: "../../share/www/fauxton/app/", cwd:"dist/debug/", expand: true}
+        ]
       },
       dist:{
-        files:{
-          "dist/release/js/": "assets/js/**",
-          //"dist/release/css/**": "assets/css/**"
-          "dist/release/img/": assets.img
-        }
+        files:[
+          {src: ["**"], dest: "dist/release/js/", cwd:'assets/js/',  expand: true},
+          {src: assets.img, dest: "dist/debug/img/", flatten: true, expand: true},
+        ]
       },
       debug:{
-        files:{
-          "dist/debug/js/": "assets/js/**",
-          //"dist/debug/css/": "dist/release/css/**"
-          "dist/debug/img/": assets.img
-        }
+        files:[
+          {src: ["**"], dest: "dist/debug/js/", cwd:'assets/js/',  expand: true},
+          {src: assets.img, dest: "dist/debug/img/", flatten: true, expand: true},
+        ]
       }
     },
 
@@ -286,34 +284,33 @@ module.exports = function(grunt) {
   // Load the couchapp task
   grunt.loadNpmTasks('grunt-couchapp');
   // Load the copy task
-  grunt.loadNpmTasks('grunt-contrib-copy');
   grunt.loadNpmTasks('grunt-contrib');
   // Load the exec task
   grunt.loadNpmTasks('grunt-exec');
   // Load Require.js task
   grunt.loadNpmTasks('grunt-requirejs');
   // clean out previous build artefacts, lint and unit test
-  grunt.registerTask('test', 'clean lint'); //qunit
+  grunt.registerTask('test',['clean','jshint']); //qunit
   // Fetch dependencies (from git or local dir), lint them and make load_addons
-  grunt.registerTask('dependencies', 'get_deps lint gen_load_addons:default');
+  grunt.registerTask('dependencies', ['get_deps', 'jshint', 'gen_load_addons:default']);
   // build templates, js and css
-  grunt.registerTask('build', 'jst requirejs concat:requirejs less');
+  grunt.registerTask('build', ['jst', 'requirejs', 'concat:requirejs','less']);
   // minify code and css, ready for release.
-  grunt.registerTask("minify", "min mincss");
+  grunt.registerTask('minify', ['min','mincss']);
   // deafult task - push to CouchDB
-  grunt.registerTask("default", "test dependencies build release install");
-  grunt.registerTask("dev", "debug template couchserver");
+  grunt.registerTask('default', ['test','dependencies','build','release','install']);
+  grunt.registerTask('dev', ['debug','template','couchserver']);
   // make a debug install
-  grunt.registerTask("debug", "test dependencies build template copy:debug concat:debug");
+  grunt.registerTask('debug', ['test','dependencies', 'build','template','copy:debug', 'concat:debug']);
   // make an install that is server by mochiweb under _utils
-  grunt.registerTask("couchdebug", "debug template copy:couchdebug");
+  grunt.registerTask('couchdebug', ['debug', 'template', 'copy:couchdebug']);
   // make an install that can be deployed as a couchapp
-  grunt.registerTask("couchapp_setup", "debug template");
-  grunt.registerTask("couchdb", "test dependencies build minify template copy:couchdb");
+  grunt.registerTask('couchapp_setup', ['debug', 'template']);
+  grunt.registerTask('couchdb', ['test', 'dependencies', 'build', 'minify', 'template', 'copy:couchdb']);
   // build a release
-  grunt.registerTask("release", "test dependencies build minify template copy:dist");
+  grunt.registerTask('release', ['test' ,'dependencies', 'build', 'minify','template', 'copy:dist']);
   // install fauxton as couchapp
-  grunt.registerTask('couchapp_install', 'rmcouchdb:fauxton mkcouchdb:fauxton couchapp:fauxton');
-  grunt.registerTask('couchapp_deploy', 'couchapp_setup couchapp_install');
+  grunt.registerTask('couchapp_install', ['rmcouchdb:fauxton', 'mkcouchdb:fauxton', 'couchapp:fauxton']);
+  grunt.registerTask('couchapp_deploy', ['couchapp_setup', 'couchapp_install']);
 
 };

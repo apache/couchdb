@@ -13,7 +13,7 @@
 // var prompt = require('prompt');
 
 module.exports = function(grunt) {
-  var _ = grunt.utils._;
+  var _ = grunt.util._;
   var prompts = [
     {
       name: "name",
@@ -93,7 +93,7 @@ module.exports = function(grunt) {
 
   grunt.registerMultiTask('template', 'generates an html file from a specified template', function(){
     var data = this.data;
-    var _ = grunt.utils._;
+    var _ = grunt.util._;
     var tmpl = _.template(grunt.file.read(data.src), null, data.variables);
     grunt.file.write(data.dest, tmpl(data.variables));
   });
@@ -107,7 +107,7 @@ module.exports = function(grunt) {
     var target = data.target || "app/addons/";
     var settingsFile = path.existsSync(data.src) ? data.src : "settings.json.default";
     var settings = grunt.file.readJSON(settingsFile);
-    var _ = grunt.utils._;
+    var _ = grunt.util._;
 
     // This should probably be a helper, though they seem to have been removed
     var fetch = function(deps, command){
@@ -155,7 +155,7 @@ module.exports = function(grunt) {
   grunt.registerMultiTask('gen_load_addons', 'Generate the load_addons.js file', function() {
     var path = require('path');
     var data = this.data;
-    var _ = grunt.utils._;
+    var _ = grunt.util._;
     var settingsFile = path.existsSync(data.src) ? data.src : "settings.json.default";
     var settings = grunt.file.readJSON(settingsFile);
     var template = "app/load_addons.js.underscore";
