@@ -96,6 +96,19 @@ function(app, FauxtonAPI, Documents) {
       this.database = options.database;
     },
 
+    numDocs: function() {
+      return this.get("doc_count");
+    },
+
+    updateSeq: function(full) {
+      var updateSeq = this.get("update_seq");
+      if (full) {
+        return updateSeq;
+      } else {
+        return updateSeq.split('-')[0];
+      }
+    },
+
     humanSize: function() {
       // cribbed from http://stackoverflow.com/questions/10420352/converting-file-size-in-bytes-to-human-readable
       var i = -1;
