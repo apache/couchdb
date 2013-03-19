@@ -102,7 +102,7 @@ function(app, FauxtonAPI, Documents) {
 
     updateSeq: function(full) {
       var updateSeq = this.get("update_seq");
-      if (full) {
+      if (full || (typeof(updateSeq) === 'number')) {
         return updateSeq;
       } else {
         return updateSeq.split('-')[0];

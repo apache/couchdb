@@ -200,7 +200,8 @@ module.exports = function(grunt) {
           name: "config",
 
           // Do not wrap everything in an IIFE.
-          wrap: false
+          wrap: false,
+          optimize: "none"
       }
       }
     },
