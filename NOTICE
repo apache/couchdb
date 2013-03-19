@@ -85,3 +85,55 @@ This product also includes the following third-party components:
  * Underscore.js 1.4.2 (http://underscorejs.org)
 
    Copyright 2012, Jeremy Ashkenas
+
+ * almond.js (http://github.com/jrburke/almond)
+
+  Copyright 2011, The Dojo Foundation
+
+ * backbone.js (http://backbonejs.org/)
+
+  Copyright 2012, Jeremy Ashkenas, DocumentCloud Inc.
+
+ * Bootstrap (http://twitter.github.com/bootstrap/)
+
+  Copyright 2012, Twitter, Inc.
+
+ * d3.js (http://d3js.org)
+
+  Copyright 2012, Michael Bostock
+
+ * JSHint (http://jshint.com/)
+
+  Copyright 2002, Douglas Crockford, modifications by JSHint Community
+
+ * Lodash (http://lodash.com/)
+
+  Copyright 2012, John-David Dalton <http://allyoucanleet.com/>
+
+ * nvd3.js (http://nvd3.org/)
+
+  Copyright 2012, Novus Partners, Inc.
+
+ * backbone.layoutmanager.js (https://github.com/tbranyen/backbone.layoutmanager)
+
+  Copyright 2012, Tim Branyen (@tbranyen)
+
+ * prettify.js (http://code.google.com/p/google-code-prettify/)
+
+  Copyright 2011, Mike Samuel et al
+
+ * PouchDB (https://github.com/daleharvey/pouchdb)
+
+  Copyright 2012, Dale Harvey et al
+
+ * require.js (https://github.com/jrburke/requirejs)
+
+	Copyright (c) 2010-2011, The Dojo Foundation
+
+ * codemirror.js (https://github.com/marijnh/CodeMirror)
+
+	Copyright (C) 2013 by Marijn Haverbeke <marijnh@gmail.com>
+
+ * codemirror-javascript.js (https://github.com/marijnh/CodeMirror)
+
+	Copyright (C) 2013 by Marijn Haverbeke <marijnh@gmail.com>
