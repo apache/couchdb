@@ -184,7 +184,7 @@ update_locals(Acc) ->
     rexi_call(Node, {fabric_rpc, update_docs, [Name, [Doc], Options]}).
 
 rexi_call(Node, MFA) ->
-    Mon = rexi_monitor:start([{rexi_server, Node}]),
+    Mon = rexi_monitor:start([rexi_utils:server_pid(Node)]),
     Ref = rexi:cast(Node, self(), MFA, [sync]),
     try
         receive {Ref, {ok, Reply}} ->

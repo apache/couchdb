@@ -36,7 +36,7 @@ handle_call(_Request, State) ->
     {ok, ok, State}.
 
 handle_info({nodeup, Node}, State) ->
-    Nodes0 = lists:usort(drain_nodeups([Node])),
+    Nodes0 = lists:usort([node() | drain_nodeups([Node])]),
     Nodes = lists:filter(fun(N) -> lists:member(N, mem3:nodes()) end, Nodes0),
     wait_for_rexi(Nodes, 5),
     {ok, State};
@@ -67,9 +67,9 @@ wait_for_rexi([], _Retries) ->
 wait_for_rexi(Waiting, Retries) ->
     % Hack around rpc:multicall/4 so that we can
     % be sure which nodes gave which response
-    Msg = {call, erlang, whereis, [rexi_server], group_leader()},
+    Msg = {call, rexi_server_mon, status, [], group_leader()},
     {Resp, _Bad} = gen_server:multi_call(Waiting, rex, Msg, 1000),
-    Up = [N || {N, P} <- Resp, is_pid(P)],
+    Up = [N || {N, R} <- Resp, R == ok],
     NotUp = Waiting -- Up,
     case length(Up) > 0 of
         true ->
