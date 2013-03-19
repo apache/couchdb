@@ -12,7 +12,15 @@
 
 -module(rexi_utils).
 
--export([send/2, recv/6]).
+-export([server_id/1, server_pid/1, send/2, recv/6]).
+
+%% @doc Return a rexi_server id for the given node.
+server_id(Node) ->
+    list_to_atom("rexi_server_" ++ integer_to_list(erlang:phash2(Node))).
+
+%% @doc Return a {server_id(node()), Node} Pid name for the given Node.
+server_pid(Node) ->
+    {server_id(node()), Node}.
 
 %% @doc send a message as quickly as possible
 send(Dest, Msg) ->

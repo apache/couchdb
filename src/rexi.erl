@@ -15,7 +15,6 @@
 -export([cast/2, cast/3, cast/4, kill/2]).
 -export([reply/1, sync_reply/1, sync_reply/2]).
 -export([async_server_call/2, async_server_call/3]).
--export([get_errors/0, get_last_error/0, set_error_limit/1]).
 -export([stream/1, stream/2, stream/3, stream_ack/1, stream_ack/2]).
 
 -include_lib("rexi/include/rexi.hrl").
@@ -31,17 +30,6 @@ stop() ->
 restart() ->
     stop(), start().
 
--spec get_errors() -> {ok, [#error{}]}.
-get_errors() ->
-    gen_server:call(?SERVER, get_errors).
-
--spec get_last_error() -> {ok, #error{}} | {error, empty}.
-get_last_error() ->
-    gen_server:call(?SERVER, get_last_error).
-
--spec set_error_limit(pos_integer()) -> ok.
-set_error_limit(N) when is_integer(N), N > 0 ->
-    gen_server:call(?SERVER, {set_error_limit, N}).
 
 %% @equiv cast(Node, self(), MFA)
 -spec cast(node(), {atom(), atom(), list()}) -> reference().

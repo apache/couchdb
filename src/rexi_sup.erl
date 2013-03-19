@@ -12,17 +12,45 @@
 
 -module(rexi_sup).
 -behaviour(supervisor).
--export([init/1]).
 
 -export([start_link/1]).
-
--include_lib("eunit/include/eunit.hrl").
-
-%% Helper macro for declaring children of supervisor
--define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 100, Type, [I]}).
+-export([init/1]).
 
 start_link(Args) ->
     supervisor:start_link({local,?MODULE}, ?MODULE, Args).
 
 init([]) ->
-    {ok, {{one_for_one, 3, 10}, [?CHILD(rexi_gov_manager, worker), ?CHILD(rexi_server, worker)]}}.
+    {ok, {{one_for_one, 3, 10}, [
+        {
+            rexi_gov_manager,
+            {rexi_gov_manager, start_link, []},
+            permanent,
+            100,
+            worker,
+            [rexi_gov_manager]
+        },
+        {
+            rexi_server,
+            {rexi_server, start_link, [rexi_server]},
+            permanent,
+            100,
+            worker,
+            [rexi_server]
+        },
+        {
+            rexi_server_sup,
+            {rexi_server_sup, start_link, []},
+            permanent,
+            100,
+            supervisor,
+            [rexi_server_sup]
+        },
+        {
+            rexi_server_mon,
+            {rexi_server_mon, start_link, []},
+            permanent,
+            100,
+            worker,
+            [rexi_server_mon]
+        }
+    ]}}.

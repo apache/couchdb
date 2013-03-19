@@ -15,7 +15,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
     code_change/3]).
 
--export([start_link/0, init_p/2, init_p/3]).
+-export([start_link/1, init_p/2, init_p/3]).
 
 -include_lib("rexi/include/rexi.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -35,8 +35,8 @@
     error_count = 0
 }).
 
-start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+start_link(ServerId) ->
+    gen_server:start_link({local, ServerId}, ?MODULE, [], []).
 
 init([]) ->
     {ok, #st{}}.
