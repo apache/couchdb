@@ -50,9 +50,9 @@ cookie(Key, Value, Options) ->
             RawAge ->
                 When = case proplists:get_value(local_time, Options) of
                            undefined ->
-                               calendar:local_time();
+                               calendar:universal_time();
                            LocalTime ->
-                               LocalTime
+                               calendar:local_time_to_universal_time_dst(LocalTime)
                        end,
                 Age = case RawAge < 0 of
                           true ->

@@ -621,9 +621,9 @@ maybe_redirect(RelPath, FullPath, ExtraHeaders,
     end.
 
 maybe_serve_file(File, ExtraHeaders, {?MODULE, [_Socket, _Method, _RawPath, _Version, _Headers]}=THIS) ->
-    case file:read_file_info(File) of
+    case file:read_file_info(File, [{time, universal}]) of
         {ok, FileInfo} ->
-            LastModified = httpd_util:rfc1123_date(FileInfo#file_info.mtime),
+            LastModified = couch_util:rfc1123_date(FileInfo#file_info.mtime),
             case get_header_value("if-modified-since", THIS) of
                 LastModified ->
                     respond({304, ExtraHeaders, ""}, THIS);
@@ -647,7 +647,7 @@ maybe_serve_file(File, ExtraHeaders, {?MODULE, [_Socket, _Method, _RawPath, _Ver
 
 server_headers() ->
     [{"Server", "MochiWeb/1.0 (" ++ ?QUIP ++ ")"},
-     {"Date", httpd_util:rfc1123_date()}].
+     {"Date", couch_util:rfc1123_date()}].
 
 make_code(X) when is_integer(X) ->
     [integer_to_list(X), [" " | httpd_util:reason_phrase(X)]];
