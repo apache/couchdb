@@ -138,7 +138,9 @@ remove_ancestors([Error | Tail], Acc) ->
     remove_ancestors(Tail, [Error | Acc]).
 
 create_monitors(Shards) ->
-    MonRefs = lists:usort([{rexi_server, N} || #shard{node=N} <- Shards]),
+    MonRefs = lists:usort([
+        rexi_utils:server_pid(N) || #shard{node=N} <- Shards
+    ]),
     rexi_monitor:start(MonRefs).
 
 %% verify only id and rev are used in key.
