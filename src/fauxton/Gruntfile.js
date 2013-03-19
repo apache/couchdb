@@ -146,35 +146,31 @@ module.exports = function(grunt) {
         dest: "dist/debug/js/require.js"
       },
 
-      debug: {
+      index_css: {
         src: ["dist/debug/css/*.css", 'assets/css/*.css'],
         dest: 'dist/debug/css/index.css'
       }
 
     },
 
-    // This task uses the MinCSS Node.js project to take all your CSS files in
-    // order and concatenate them into a single CSS file named index.css.  It
-    // also minifies all the CSS as well.  This is named index.css, because we
-    // only want to load one stylesheet in index.html.
-    mincss: {
-      "dist/release/css/index.css": [
-        "dist/debug/css/index.css", 'assets/css/*.css',
-        "app/addons/**/assets/css/*.css"
-      ]
-    },
-
-    // Takes the built require.js file and minifies it for filesize benefits.
-    min: {
-      "dist/release/js/require.min.js": [
-        "dist/debug/js/require.js"
-      ]
+    cssmin: {
+      compress: {
+        files: {
+          "dist/release/css/index.css": [
+            "dist/debug/css/index.css", 'assets/css/*.css',
+            "app/addons/**/assets/css/*.css"
+          ]
+        },
+        options: {
+          report: 'min'
+        }
+      }
     },
 
     uglify: {
       release: {
         files: {
-          "dist/release/js/require.min.js": [
+          "dist/release/js/require.js": [
             "dist/debug/js/require.js"
           ]
         }
@@ -236,33 +232,28 @@ module.exports = function(grunt) {
         files: [
           // this gets built in the template task
           {src: "dist/release/index.html", dest: "../../share/www/fauxton/index.html"},
-          {src: ["**"], dest: "../../share/www/fauxton/js/", cwd:'assets/js/',  expand: true},
+          {src: ["**"], dest: "../../share/www/fauxton/js/", cwd:'dist/release/js/',  expand: true},
           {src: ["**"], dest: "../../share/www/fauxton/img/", cwd:'dist/release/img/', expand: true},
-          {src: ["**"], dest: "../../share/www/fauxton/css/", cwd:"dist/release/css/", expand: true},
-          // Must be possible to improve this...
-          {src: ["**"], dest: "../../share/www/fauxton/app/", cwd:"dist/release/", expand: true}
+          {src: ["**"], dest: "../../share/www/fauxton/css/", cwd:"dist/release/css/", expand: true}
         ]
       },
       couchdebug: {
         files: [
           // this gets built in the template task
           {src: "dist/debug/index.html", dest: "../../share/www/fauxton/index.html"},
-          {src: ["**"], dest: "../../share/www/fauxton/js/", cwd:'assets/js/',  expand: true},
+          {src: ["**"], dest: "../../share/www/fauxton/js/", cwd:'dist/debug/js/',  expand: true},
           {src: ["**"], dest: "../../share/www/fauxton/img/", cwd:'dist/debug/img/', expand: true},
-          {src: ["**"], dest: "../../share/www/fauxton/css/", cwd:"dist/debug/css/", expand: true},
-          // Must be possible to improve this...
-          {src: ["**"], dest: "../../share/www/fauxton/app/", cwd:"dist/debug/", expand: true}
+          {src: ["**"], dest: "../../share/www/fauxton/css/", cwd:"dist/debug/css/", expand: true}
         ]
       },
       dist:{
         files:[
-          {src: ["**"], dest: "dist/release/js/", cwd:'assets/js/',  expand: true},
-          {src: assets.img, dest: "dist/debug/img/", flatten: true, expand: true}
+          {src: "dist/debug/index.html", dest: "dist/release/index.html"},
+          {src: assets.img, dest: "dist/release/img/", flatten: true, expand: true}
         ]
       },
       debug:{
         files:[
-          {src: ["**"], dest: "dist/debug/js/", cwd:'assets/js/',  expand: true},
           {src: assets.img, dest: "dist/debug/img/", flatten: true, expand: true}
         ]
       }
@@ -286,6 +277,9 @@ module.exports = function(grunt) {
 
   });
 
+  /*
+   * Load Grunt plugins
+   */
   // Load fauxton specific tasks
   grunt.loadTasks('tasks');
   // Load the couchapp task
@@ -298,28 +292,48 @@ module.exports = function(grunt) {
   grunt.loadNpmTasks('grunt-requirejs');
   // Load UglifyJS task
   grunt.loadNpmTasks('grunt-contrib-uglify');
+  // Load CSSMin task
+  grunt.loadNpmTasks('grunt-contrib-cssmin');
+
+  /*
+   * Default task
+   */
+  // defult task - install minified app to local CouchDB
+  grunt.registerTask('default', 'couchdb');
+
+  /*
+   * Transformation tasks
+   */
   // clean out previous build artefacts, lint and unit test
-  grunt.registerTask('test',['clean','jshint']); //qunit
+  grunt.registerTask('test', ['clean', 'jshint']); //qunit
   // Fetch dependencies (from git or local dir), lint them and make load_addons
   grunt.registerTask('dependencies', ['get_deps', 'jshint', 'gen_load_addons:default']);
   // build templates, js and css
-  grunt.registerTask('build', ['jst', 'requirejs', 'concat:requirejs','less']);
+  grunt.registerTask('build', ['jst', 'requirejs', 'concat:requirejs', 'less', 'concat:index_css', 'template']);
   // minify code and css, ready for release.
-  grunt.registerTask('minify', ['min','mincss']);
-  // deafult task - push to CouchDB
-  grunt.registerTask('default', ['test','dependencies','build','release','install']);
-  grunt.registerTask('dev', ['debug','template','couchserver']);
-  // make a debug install
-  grunt.registerTask('debug', ['test','dependencies', 'build','template','copy:debug', 'concat:debug']);
-  // make an install that is server by mochiweb under _utils
-  grunt.registerTask('couchdebug', ['debug', 'template', 'copy:couchdebug']);
-  // make an install that can be deployed as a couchapp
-  grunt.registerTask('couchapp_setup', ['debug', 'template']);
-  grunt.registerTask('couchdb', ['test', 'dependencies', 'build', 'minify', 'template', 'copy:couchdb']);
+  grunt.registerTask('minify', ['uglify', 'cssmin:compress']);
+
+  /*
+   * Build the app in either dev, debug, or release mode
+   */
+  // dev server
+  grunt.registerTask('dev', ['debug', 'couchserver']);
+  // build a debug release
+  grunt.registerTask('debug', ['test', 'dependencies', 'build', 'copy:debug']);
   // build a release
-  grunt.registerTask('release', ['test' ,'dependencies', 'build', 'minify','template', 'copy:dist']);
+  grunt.registerTask('release', ['test' ,'dependencies', 'build', 'minify', 'copy:dist']);
+
+  /*
+   * Install into CouchDB in either debug, release, or couchapp mode
+   */
+  // make a development install that is server by mochiweb under _utils
+  grunt.registerTask('couchdebug', ['debug', 'copy:couchdebug']);
+  // make a minimized install that is server by mochiweb under _utils
+  grunt.registerTask('couchdb', ['release', 'copy:couchdb']);
+  // make an install that can be deployed as a couchapp
+  grunt.registerTask('couchapp_setup', ['build', 'minify', 'copy:dist']);
   // install fauxton as couchapp
   grunt.registerTask('couchapp_install', ['rmcouchdb:fauxton', 'mkcouchdb:fauxton', 'couchapp:fauxton']);
+  // setup and install fauxton as couchapp
   grunt.registerTask('couchapp_deploy', ['couchapp_setup', 'couchapp_install']);
-
 };
