@@ -20,7 +20,7 @@ module.exports = function(grunt) {
     };
 
     var settings_couch_config = helper.readSettingsFile().couch_config;
-    return settings_couch_config || default_couch_config
+    return settings_couch_config || default_couch_config;
   }();
 
   var cleanable = function(){
@@ -60,7 +60,7 @@ module.exports = function(grunt) {
           lessPath + "/" + addon.name + ".less";
       }
       // Images
-      var root = addon.path || "app/addons/" + addon.name;
+      root = addon.path || "app/addons/" + addon.name;
       var imgPath = root + "/assets/img";
       if(path.existsSync(imgPath)){
         theAssets.img.push(imgPath + "/**");
@@ -113,6 +113,7 @@ module.exports = function(grunt) {
     // override inside main.js needs to test for them so as to not accidentally
     // route.
     jshint: {
+      all: ['app/**/*.js', 'Gruntfile.js'],
       options: {
         scripturl: true,
         evil: true
@@ -246,13 +247,13 @@ module.exports = function(grunt) {
       dist:{
         files:[
           {src: ["**"], dest: "dist/release/js/", cwd:'assets/js/',  expand: true},
-          {src: assets.img, dest: "dist/debug/img/", flatten: true, expand: true},
+          {src: assets.img, dest: "dist/debug/img/", flatten: true, expand: true}
         ]
       },
       debug:{
         files:[
           {src: ["**"], dest: "dist/debug/js/", cwd:'assets/js/',  expand: true},
-          {src: assets.img, dest: "dist/debug/img/", flatten: true, expand: true},
+          {src: assets.img, dest: "dist/debug/img/", flatten: true, expand: true}
         ]
       }
     },

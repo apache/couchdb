@@ -49,11 +49,11 @@ module.exports = function(grunt) {
       filename: 'routes.js',
       template: grunt.file.read('./tasks/templates/route.js.underscore')
     }
-  ]
+  ];
 
   // Create a new task.
   grunt.registerInitTask('addon', 'Generate a skeleton for an addon"', function() {
-    var done = this.async()
+    var done = this.async();
     grunt.helper('prompt', {}, prompts, function (err, result) {
       if (err) { return onErr(err); }
       grunt.log.writeln(result.assets);
@@ -67,7 +67,7 @@ module.exports = function(grunt) {
           name: 'less',
           filename: module.toLowerCase()+'.less',
           template: '//<%= module %> styles'
-        }
+        };
         lessfile.module = module.charAt(0).toUpperCase() + module.substr(1);
         var content = grunt.template.process(lessfile.template, lessfile);
         grunt.file.write(filepath + '/' + lessfile.filename, content);

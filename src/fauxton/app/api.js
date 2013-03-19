@@ -96,5 +96,6 @@ function(app, Fauxton) {
     }
   });
 
-  return app.fauxtonAPI = FauxtonAPI;
+  app.fauxtonAPI = FauxtonAPI;
+  return app.fauxtonAPI;
 });
