@@ -171,6 +171,16 @@ module.exports = function(grunt) {
       ]
     },
 
+    uglify: {
+      release: {
+        files: {
+          "dist/release/js/require.min.js": [
+            "dist/debug/js/require.js"
+          ]
+        }
+      }
+    },
+
     // Runs a proxy server for easier development, no need to keep deploying to couchdb
     couchserver: {
       dist: './dist/debug/',
@@ -286,6 +296,8 @@ module.exports = function(grunt) {
   grunt.loadNpmTasks('grunt-exec');
   // Load Require.js task
   grunt.loadNpmTasks('grunt-requirejs');
+  // Load UglifyJS task
+  grunt.loadNpmTasks('grunt-contrib-uglify');
   // clean out previous build artefacts, lint and unit test
   grunt.registerTask('test',['clean','jshint']); //qunit
   // Fetch dependencies (from git or local dir), lint them and make load_addons
