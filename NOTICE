@@ -114,4 +114,14 @@ This product also includes the following third-party components:
 
   Copyright 2012, Dale Harvey et al
 
+ * require.js (https://github.com/jrburke/requirejs)
 
+	Copyright (c) 2010-2011, The Dojo Foundation
+
+ * codemirror.js (https://github.com/marijnh/CodeMirror)
+
+	Copyright (C) 2013 by Marijn Haverbeke <marijnh@gmail.com>
+
+ * codemirror-javascript.js (https://github.com/marijnh/CodeMirror)
+
+	Copyright (C) 2013 by Marijn Haverbeke <marijnh@gmail.com>
