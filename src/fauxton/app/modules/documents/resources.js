@@ -51,6 +51,10 @@ function(app, FauxtonAPI, Views) {
       return this.id.match(/^_design/) ? "design doc" : "doc";
     },
 
+    isEditable: function() {
+      return this.docType() != "reduction";
+    },
+
     isDdoc: function() {
       return this.docType() === "design doc";
     },
@@ -121,6 +125,10 @@ function(app, FauxtonAPI, Views) {
       if (!this.id) return "reduction";
 
       return this.id.match(/^_design/) ? "design doc" : "doc";
+    },
+
+    isEditable: function() {
+      return this.docType() != "reduction";
     },
 
     prettyJSON: function() {
