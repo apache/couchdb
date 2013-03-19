@@ -6,7 +6,6 @@ the various pieces of functionality and as a test bed for new ideas.
 Full functionality and design considerations will be added later.
 
 
-[![Build Status](http://ci.couchdb.org:8888/job/Fauxton/badge/icon)](http://ci.couchdb.org:8888/job/Fauxton/)
 
 Current items of interest:
 
