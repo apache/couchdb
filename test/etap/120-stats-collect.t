@@ -84,7 +84,7 @@ test_proc_counting() ->
     etap:is(
         couch_stats_collector:get(hoopla),
         1,
-        "track_process_count incrememnts the counter."
+        "track_process_count increments the counter."
     ),
     
     TwicePid = spawn(fun() ->
@@ -124,21 +124,21 @@ test_all() ->
     couch_stats_collector:record(bar, 0.0),
     couch_stats_collector:record(bar, 1.0),
     etap:is(
-        couch_stats_collector:all(),
-        [{foo, 0}, {hoopla, 0}, {bar, [1.0, 0.0]}],
+        lists:sort(couch_stats_collector:all()),
+        [ {bar,[1.0,0.0]}, {foo,0}, { hoopla,0} ],
         "all/0 returns all counters and absolute values."
     ),
     
     etap:is(
-        couch_stats_collector:all(incremental),
-        [{foo, 0}, {hoopla, 0}],
+        lists:sort(couch_stats_collector:all(incremental)),
+        [ {foo, 0}, {hoopla, 0} ],
         "all/1 returns only the specified type."
     ),
     
     couch_stats_collector:record(zing, 90),
     etap:is(
-        couch_stats_collector:all(absolute),
-        [{zing, [90]}, {bar, [1.0, 0.0]}],
+        lists:sort(couch_stats_collector:all(absolute)),
+        [ {bar,[1.0,0.0]}, {zing,"Z"} ],
         "all/1 returns only the specified type."
     ),
     ok.
