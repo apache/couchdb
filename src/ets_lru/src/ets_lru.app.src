@@ -1,0 +1,11 @@
+% Copyright 2012 Cloudant. All rights reserved.
+
+{application, ets_lru, [
+    {description, "ETS Base LRU Cache"},
+    {vsn, git},
+    {registered, []},
+    {applications, [
+        kernel,
+        stdlib
+    ]}
+]}.
