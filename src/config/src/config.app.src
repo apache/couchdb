@@ -1,0 +1,10 @@
+{application, config, [
+    {description, "INI file configuration system for Apache CouchDB"},
+    {vsn, git},
+    {registered, [
+        config,
+        config_event
+    ]},
+    {applications, [kernel, stdlib]},
+    {mod, {config_app, []}}
+]}.
