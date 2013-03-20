@@ -1,0 +1,7 @@
+{application, chttpd, [
+    {description, "HTTP interface for CouchDB cluster"},
+    {vsn, git},
+    {registered, [chttpd_sup, chttpd]},
+    {applications, [kernel, stdlib, twig, config, couch, fabric]},
+    {mod, {chttpd_app,[]}}
+]}.
