@@ -1,0 +1,25 @@
+% Copyright 2012 Cloudant. All rights reserved.
+
+{application, ddoc_cache, [
+    {description, "Design Document Cache"},
+    {vsn, git},
+    {registered, [
+        ddoc_cache_lru,
+        ddoc_cache_opener
+    ]},
+    {applications, [
+        kernel,
+        stdlib,
+        crypto,
+        ets_lru,
+        mem3,
+        fabric,
+        twig
+    ]},
+    {mod, {ddoc_cache_app, []}},
+    {env, [
+        {max_objects, unlimited},
+        {max_size, 104857600}, % 100M
+        {max_lifetime, 60000} % 1m
+    ]}
+]}.
