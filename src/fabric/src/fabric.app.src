@@ -1,0 +1,6 @@
+{application, fabric, [
+    {description, "Routing and proxying layer for CouchDB cluster"},
+    {vsn, git},
+    {registered, []},
+    {applications, [kernel, stdlib, config, couch, rexi, mem3, twig]}
+]}.
