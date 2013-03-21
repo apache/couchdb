@@ -70,6 +70,8 @@ Build System:
  * C/C++ compiler detection has been improved.
  * Autoconf v2.63 is now required if building from git checkout directly.
     See DEVELOPERS file for more details.
+ * Fixed issue in couchdb script where stopped status returns before process
+   exits.
 
 Version 1.2.1
 -------------
