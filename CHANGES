@@ -4,8 +4,6 @@ Apache CouchDB CHANGES
 Version 1.2.2
 -------------
 
-This version has not been released yet.
-
  * Reset rewrite counter on new request, avoiding unnecessary request failures
    due to bogus rewrite limit reports.
 
