@@ -19,8 +19,6 @@
 
 -include_lib("rexi/include/rexi.hrl").
 
--define(SERVER, rexi_server).
-
 start() ->
     application:start(rexi).
 
@@ -47,7 +45,7 @@ cast(Node, MFA) ->
 cast(Node, Caller, MFA) ->
     Ref = make_ref(),
     Msg = cast_msg({doit, {Caller, Ref}, get(nonce), MFA}),
-    rexi_utils:send({?SERVER, Node}, Msg),
+    rexi_utils:send(rexi_utils:server_pid(Node), Msg),
     Ref.
 
 %% @doc Executes apply(M, F, A) on Node.
@@ -61,7 +59,7 @@ cast(Node, Caller, MFA, Options) ->
         true ->
             Ref = make_ref(),
             Msg = cast_msg({doit, {Caller, Ref}, get(nonce), MFA}),
-            erlang:send({?SERVER, Node}, Msg),
+            erlang:send(rexi_utils:server_pid(Node), Msg),
             Ref;
         false ->
             cast(Node, Caller, MFA)
@@ -71,7 +69,10 @@ cast(Node, Caller, MFA, Options) ->
 %% No rexi_EXIT message will be sent.
 -spec kill(node(), reference()) -> ok.
 kill(Node, Ref) ->
-    rexi_utils:send({?SERVER, Node}, cast_msg({kill, Ref})),
+    % This first version is to tide us over during the upgrade. We'll
+    % remove it in the next commit that will be in a separate release.
+    rexi_utils:send({rexi_server, Node}, cast_msg({kill, Ref})),
+    rexi_utils:send(rexi_utils:server_pid(Node), cast_msg({kill, Ref})),
     ok.
 
 %% @equiv async_server_call(Server, self(), Request)
