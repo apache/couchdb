@@ -10,7 +10,6 @@ Each release section notes when backwards incompatible changes have been made.
 Version 1.3.0
 -------------
 
- * The source code repository was migrated from SVN to Git.
  * Added view request duration to Futon.
  * Fixed unnecessary conflict when deleting and creating a
    document in the same batch.
