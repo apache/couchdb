@@ -13,13 +13,13 @@
 define([
        "app",
        "api",
-       "addons/user/resources"
+       "addons/user/routes"
 ],
 
 function(app, FauxtonAPI, User) {
 
   User.initialize = function() {
-    FauxtonAPI.addHeaderLink({title: "User", href: "#user"});
+    FauxtonAPI.addHeaderLink({title: "User", href: "#_user"});
   };
 
   return User;

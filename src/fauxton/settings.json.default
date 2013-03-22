@@ -3,7 +3,8 @@
   { "name": "config" },
   { "name": "logs" },
   { "name": "stats" },
-  { "name": "contribute" }
+  { "name": "contribute" },
+  { "name": "user" }
   ],
     "template": {
       "src": "assets/index.underscore",
