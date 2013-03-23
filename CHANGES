@@ -17,24 +17,19 @@ Apache CouchDB CHANGES
 Version 1.3.0
 -------------
 
-Source Repository:
-
- * The source repository was migrated from SVN to Git.
-
 HTTP Interface:
 
- * Fix bug in CORS when retrieving attachments.
- * No longer rewrites the X-CouchDB-Requested-Path during recursive
-   calls to the rewriter.
- * Limit recursion depth in the URL rewriter. Defaults to a maximum
-   of 100 invocations but is configurable.
+ * No longer rewrites the X-CouchDB-Requested-Path during recursive calls to the
+   rewriter.
+ * Limit recursion depth in the URL rewriter. Defaults to a maximum of 100
+   invocations but is configurable.
  * Fix _session for IE7.
- * Added Server-Sent Events protocol to db changes API.
-   See http://www.w3.org/TR/eventsource/ for details.
+ * Added Server-Sent Events protocol to db changes API. See
+   http://www.w3.org/TR/eventsource/ for details.
  * Make password hashing synchronous when using the /_config/admins API.
  * Include user name in show/list ETags.
- * Experimental support for Cross-Origin Resource Sharing (CORS).
-   See http://www.w3.org/TR/cors/ for details.
+ * Experimental support for Cross-Origin Resource Sharing (CORS). See 
+   http://www.w3.org/TR/cors/ for details.
 
 Replicator:
 
@@ -59,14 +54,14 @@ Futon:
 
 Security:
 
- * Passwords are now hashed using the PBKDF2 algorithm with a
-   configurable work factor.
+ * Passwords are now hashed using the PBKDF2 algorithm with a configurable work
+   factor.
 
 Test Suite:
 
- * Moved the JS test suite to the CLI
- * Improved tracebacks printed by the JS CLI tests
- * Improved the reliability of a number of tests
+ * Moved the JS test suite to the CLI.
+ * Improved tracebacks printed by the JS CLI tests.
+ * Improved the reliability of a number of tests.
 
 UUID Algorithms:
 
@@ -74,19 +69,17 @@ UUID Algorithms:
 
 URL Rewriter & Vhosts:
 
- * Database name is encoded during rewriting (allowing embedded /'s, etc)
- * Reset rewrite counter on new request, avoiding unnecessary request
-   failures due to bogus rewrite limit reports
-
-Log System:
-
- * Allow per-module configuration of log levels.
+ * Database name is encoded during rewriting (allowing embedded /'s, etc).
+ * Reset rewrite counter on new request, avoiding unnecessary request failures
+   due to bogus rewrite limit reports.
 
 Build System:
 
  * C/C++ compiler detection has been improved.
- * Autoconf v2.63 is now required if building from git checkout directly.
-    See DEVELOPERS file for more details.
+ * Autoconf v2.63 is now required if building from Git checkout directly. See
+   DEVELOPERS file for more details.
+ * Fixed issue in couchdb script where stopped status returns before process
+   exits.
 
 Version 1.2.1
 -------------

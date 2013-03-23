@@ -15,10 +15,9 @@ Each release section notes when backwards incompatible changes have been made.
 Version 1.3.0
 -------------
 
- * The source code repository was migrated from SVN to Git.
  * Added view request duration to Futon.
- * Fixed unnecessary conflict when deleting and creating a
-   document in the same batch.
+ * Fixed unnecessary conflict when deleting and creating a document in the same
+   batch.
  * New and updated passwords are hashed using PBKDF2.
  * Fix various bugs in the URL rewriter when recursion is involved.
  * Added Server-Sent Events protocol to db changes API.
@@ -29,8 +28,8 @@ Version 1.3.0
  * Include user name in show/list ETags.
  * Per module log levels.
  * Server-wide UUID in some replication ids.
- * E4X support in views is now deprecated and will be removed
-   in a future version.
+ * E4X support in views is now deprecated and will be removed in a future
+   version.
  * Experimental support for Cross-Origin Resource Sharing (CORS).
 
 Version 1.2.1
