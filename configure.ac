@@ -407,23 +407,28 @@ case "$(uname -s)" in
 esac
 
 
-erlang_version_error="The installed Erlang version is less than 5.7.4 (R13B04)."
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking Erlang version compatibility" >&5
+$as_echo_n "checking Erlang version compatibility... " >&6; }
+erlang_version_error="The installed Erlang version must be >= R13B04 (erts-5.7.4) and < R16A (erts-5.10)"
 
-version="`${ERL} -version 2>&1 | ${SED} 's/[[^0-9]]/ /g'`"
+version="`${ERL} -version 2>&1 | ${SED} 's/[[^0-9]]/ /g'` 0 0 0"
+major_version=`echo $version | ${AWK} "{print \\$1}"`
+minor_version=`echo $version | ${AWK} "{print \\$2}"`
+patch_version=`echo $version | ${AWK} "{print \\$3}"`
 
-if test `echo $version | ${AWK} "{print \\$1}"` -lt 5; then
-    AC_MSG_ERROR([$erlang_version_error])
+if test $major_version -ne 5; then
+    as_fn_error $? "$erlang_version_error" "$LINENO" 5
 fi
 
-if test `echo $version | ${AWK} "{print \\$2}"` -lt 7; then
-    AC_MSG_ERROR([$erlang_version_error])
+if test $minor_version -lt 7 -o $minor_version -gt 9; then
+    as_fn_error $? "$erlang_version_error" "$LINENO" 5
 fi
 
-if test `echo $version | ${AWK} "{print \\$2}"` -eq 7; then
-    if test `echo $version | ${AWK} "{print \\$3}"` -lt 4; then
-        AC_MSG_ERROR([$erlang_version_error])
-    fi
+if test $minor_version -eq 7 -a $patch_version -lt 4; then
+    as_fn_error $? "$erlang_version_error" "$LINENO" 5
 fi
+
+AC_MSG_RESULT(compatible)
 
 otp_release="`\
     ${ERL} -noshell \
