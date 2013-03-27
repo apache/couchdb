@@ -94,6 +94,7 @@ You can install the dependencies by running:
     sudo yum install erlang-etap
     sudo yum install erlang-erts
     sudo yum install erlang-os_mon
+    sudo yum install erlang-eunit
     sudo yum install libicu-devel
     sudo yum install js-devel
     sudo yum install curl-devel
