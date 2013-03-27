@@ -298,4 +298,31 @@ couchTests.attachments= function(debug) {
   var xhr = CouchDB.request("GET", "/test_suite_db/bin_doc7/attachment.txt");
   TEquals('MntvB0NYESObxH4VRDUycw==', xhr.getResponseHeader("Content-MD5"));
 
+  // test attachment via multipart/form-data
+  var bin_doc8 = {
+    _id: "bin_doc8"
+  };
+  T(db.save(bin_doc8).ok);
+  var doc = db.open("bin_doc8");
+  var body = "------TF\r\n" +
+    "Content-Disposition: form-data; name=\"_rev\"\r\n\r\n" +
+    doc._rev + "\r\n" +
+    "------TF\r\n" +
+    "Content-Disposition: form-data; name=\"_attachments\"; filename=\"file.txt\"\r\n" +
+    "Content-Type: text/plain\r\n\r\n" +
+    "contents of file.txt\r\n\r\n" +
+    "------TF--"
+  xhr = CouchDB.request("POST", "/test_suite_db/bin_doc8", {
+    headers: {
+      "Content-Type": "multipart/form-data; boundary=----TF",
+      "Content-Length": body.length
+    },
+    body: body
+  });
+  TEquals(201, xhr.status);
+  TEquals(true, JSON.parse(xhr.responseText).ok);
+  var doc = db.open("bin_doc8");
+  T(doc._attachments);
+  T(doc._attachments['file.txt']);
+
 };
