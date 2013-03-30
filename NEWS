@@ -32,6 +32,11 @@ Version 1.3.0
    version.
  * Experimental support for Cross-Origin Resource Sharing (CORS).
 
+Version 1.2.2
+-------------
+
+ * Fixed rewrite counter bug.
+
 Version 1.2.1
 -------------
 

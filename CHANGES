@@ -81,6 +81,19 @@ Build System:
  * Fixed issue in couchdb script where stopped status returns before process
    exits.
 
+Version 1.2.2
+-------------
+
+HTTP Interface:
+
+ * Reset rewrite counter on new request, avoiding unnecessary request failures
+   due to bogus rewrite limit reports.
+
+Build System:
+
+ * Fixed issue in couchdb script where stopped status returns before process
+   exits.
+
 Version 1.2.1
 -------------
 
