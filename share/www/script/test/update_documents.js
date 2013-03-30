@@ -50,6 +50,13 @@ couchTests.update_documents = function(debug) {
         doc[field] = value;
         return [doc, message];
       }),
+      "form-update" : stringFun(function(doc, req) {
+        for (var field in req.form) {
+          doc[field] = req.form[field];
+        }
+        var message = "updated doc from form";
+        return [doc, message];
+      }),
       "bump-counter" : stringFun(function(doc, req) {
         if (!doc.counter) doc.counter = 0;
         doc.counter += 1;
@@ -155,6 +162,17 @@ couchTests.update_documents = function(debug) {
   T(xhr.responseText == "set title to test");
   doc = db.open(docid);
   T(doc.title == "test");
+  
+  // form update via application/x-www-form-urlencoded
+  xhr = CouchDB.request("PUT", "/test_suite_db/_design/update/_update/form-update/"+docid, {
+    headers : {"Content-Type":"application/x-www-form-urlencoded"},
+    body    : "formfoo=bar&formbar=foo"
+  });
+  TEquals(201, xhr.status);
+  TEquals("updated doc from form", xhr.responseText);
+  doc = db.open(docid);
+  TEquals("bar", doc.formfoo);
+  TEquals("foo", doc.formbar);
   
   // bump counter
   xhr = CouchDB.request("PUT", "/test_suite_db/_design/update/_update/bump-counter/"+docid, {
