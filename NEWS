@@ -16,6 +16,7 @@ Version 1.3.0
 -------------
 
  * Added view request duration to Futon.
+ * Removed the Futon test suite in favour of the CLI test suite.
  * Fixed unnecessary conflict when deleting and creating a document in the same
    batch.
  * New and updated passwords are hashed using PBKDF2.
