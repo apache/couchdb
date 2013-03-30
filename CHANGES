@@ -48,7 +48,8 @@ View Server:
 
 Futon:
 
- * Disabled the link to the Futon test suite.
+ * Disabled the link to the Futon test suite. These tests were causing problems,
+   and are now available via the CLI instead.
  * Added view request duration to Futon.
  * Disable buttons for actions that the user doesn't have permissions to.
 
