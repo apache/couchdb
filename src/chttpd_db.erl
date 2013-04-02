@@ -684,7 +684,7 @@ db_doc_req(#httpd{method='COPY', user_ctx=Ctx}=Req, Db, SourceDocId) ->
         missing_rev -> nil;
         Rev -> Rev
     end,
-    {TargetDocId, TargetRevs} = parse_copy_destination_header(Req),
+    {TargetDocId, TargetRevs} = couch_httpd_db:parse_copy_destination_header(Req),
     % open old doc
     Doc = couch_doc_open(Db, SourceDocId, SourceRev, []),
     % save new doc
@@ -1277,18 +1277,6 @@ extract_header_rev(Req, ExplicitRev) ->
         throw({bad_request, "Document rev and etag have different values"})
     end.
 
-
-parse_copy_destination_header(Req) ->
-    Destination = chttpd:header_value(Req, "Destination"),
-    case re:run(Destination, "\\?", [{capture, none}]) of
-    nomatch ->
-        {list_to_binary(Destination), {0, []}};
-    match ->
-        [DocId, RevQs] = re:split(Destination, "\\?", [{return, list}]),
-        [_RevQueryKey, Rev] = re:split(RevQs, "=", [{return, list}]),
-        {Pos, RevId} = couch_doc:parse_rev(Rev),
-        {list_to_binary(DocId), {Pos, [RevId]}}
-    end.
 
 validate_attachment_names(Doc) ->
     lists:foreach(fun(#att{name=Name}) ->
