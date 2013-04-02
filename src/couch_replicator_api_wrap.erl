@@ -535,7 +535,7 @@ receive_docs(Streamer, UserFun, Ref, UserAcc) ->
                 fun() -> receive_doc_data(Streamer, Ref) end,
                 Ref) of
             {ok, Doc, Parser} ->
-                case UserFun({ok, Doc}, UserAcc) of
+                case run_user_fun(UserFun, {ok, Doc}, UserAcc, Ref) of
                 {ok, UserAcc2} ->
                     ok;
                 {skip, UserAcc2} ->
@@ -546,17 +546,47 @@ receive_docs(Streamer, UserFun, Ref, UserAcc) ->
         {"application/json", []} ->
             Doc = couch_doc:from_json_obj(
                     ?JSON_DECODE(receive_all(Streamer, Ref, []))),
-            {_, UserAcc2} = UserFun({ok, Doc}, UserAcc),
+            {_, UserAcc2} = run_user_fun(UserFun, {ok, Doc}, UserAcc, Ref),
             receive_docs(Streamer, UserFun, Ref, UserAcc2);
         {"application/json", [{"error","true"}]} ->
             {ErrorProps} = ?JSON_DECODE(receive_all(Streamer, Ref, [])),
             Rev = get_value(<<"missing">>, ErrorProps),
             Result = {{not_found, missing}, couch_doc:parse_rev(Rev)},
-            {_, UserAcc2} = UserFun(Result, UserAcc),
+            {_, UserAcc2} = run_user_fun(UserFun, Result, UserAcc, Ref),
             receive_docs(Streamer, UserFun, Ref, UserAcc2)
         end;
     {done, Ref} ->
         {ok, UserAcc}
+    end.
+
+
+run_user_fun(UserFun, Arg, UserAcc, OldRef) ->
+    {Pid, Ref} = spawn_monitor(fun() ->
+        try UserFun(Arg, UserAcc) of
+            Resp ->
+                exit({exit_ok, Resp})
+        catch
+            throw:Reason ->
+                exit({exit_throw, Reason});
+            error:Reason ->
+                exit({exit_error, Reason});
+            exit:Reason ->
+                exit({exit_exit, Reason})
+        end
+    end),
+    receive
+        {started_open_doc_revs, NewRef} ->
+            erlang:demonitor(Ref, [flush]),
+            exit(Pid, kill),
+            restart_remote_open_doc_revs(OldRef, NewRef);
+        {'DOWN', Ref, process, Pid, {exit_ok, Ret}} ->
+            Ret;
+        {'DOWN', Ref, process, Pid, {exit_throw, Reason}} ->
+            throw(Reason);
+        {'DOWN', Ref, process, Pid, {exit_error, Reason}} ->
+            erlang:error(Reason);
+        {'DOWN', Ref, process, Pid, {exit_exit, Reason}} ->
+            erlang:exit(Reason)
     end.
 
 
