@@ -11,10 +11,10 @@
 // the License.
 
 define([
-  "app",
+       "app",
 
-  // Libs
-  "backbone"
+       // Libs
+       "backbone"
 
 ],
 
@@ -71,14 +71,21 @@ function(app, Backbone) {
       this.render();
     },
 
-    afterRender: function () {
+    beforeRender: function () {
+      this.addLinkViews();
+    },
+
+    addLinkViews: function () {
+      var self = this;
+
       _.each(this.navLinks, function (link) {
-        if (link.view) {
-          this.insertView('#nav-links', link.view).render();
-        }
+        if (!link.view) { return; }
 
+        var establish = link.establish || [];
+        $.when.apply(null, establish).done( function () {
+          self.insertView('#nav-links', link.view).render();
+        });
       }, this);
-
     }
 
     // TODO: ADD ACTIVE CLASS

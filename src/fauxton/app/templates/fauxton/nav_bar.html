@@ -24,26 +24,10 @@ the License.
       <div class="nav-collapse">
         <ul id="nav-links" class="nav pull-right">
           <% _.each(navLinks, function(link) { %>
-          <% if (!link.view) { %>
-            <li><a href="<%= link.href %>"><%= link.title %></a></li>
+            <% if (!link.view) { %>
+              <li><a href="<%= link.href %>"><%= link.title %></a></li>
             <% } %>
           <% }); %>
-          <!-- TODO: pick this up from code - nested dicts in the above -->
-
-          <!-- <li class="dropdown">
-            <a href="#" class="dropdown-toggle" data-toggle="dropdown">drsm79 <b class="caret"></b></a>
-            <ul class="dropdown-menu">
-              <li><a href="account.html#account">Account Info</a></li>
-              <li><a href="account.html#password">Password</a></li>
-              <li><a href="account.html#indexing-rate">Indexing rate</a></li>
-              <li><a href="account.html#support-level">Support level</a></li>
-              <li><a href="account.html#location">Location for your data</a></li>
-              <li><a href="account.html#email-notifications">Email notifications</a></li>
-              <li><a href="account.html#design">Design</a></li>
-              <li class="divider"></li>
-              <li><a href="/sign-out.html">Sign Out</a></li>
-            </ul>
-          </li> -->
         </ul>
       </div><!--/.nav-collapse -->
     </div>
