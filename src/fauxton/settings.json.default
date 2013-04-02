@@ -4,7 +4,7 @@
   { "name": "logs" },
   { "name": "stats" },
   { "name": "contribute" },
-  { "name": "user" }
+  { "name": "auth" }
   ],
     "template": {
       "src": "assets/index.underscore",

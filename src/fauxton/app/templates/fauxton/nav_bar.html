@@ -22,9 +22,11 @@ the License.
       </a>
       <a class="brand" href="#">Project Fauxton</a>
       <div class="nav-collapse">
-        <ul class="nav pull-right">
+        <ul id="nav-links" class="nav pull-right">
           <% _.each(navLinks, function(link) { %>
+          <% if (!link.view) { %>
             <li><a href="<%= link.href %>"><%= link.title %></a></li>
+            <% } %>
           <% }); %>
           <!-- TODO: pick this up from code - nested dicts in the above -->
 

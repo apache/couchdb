@@ -67,7 +67,18 @@ function(app, Backbone) {
         this.navLinks.push(link);
       }
       this.trigger("link:add");
+
       this.render();
+    },
+
+    afterRender: function () {
+      _.each(this.navLinks, function (link) {
+        if (link.view) {
+          this.insertView('#nav-links', link.view).render();
+        }
+
+      }, this);
+
     }
 
     // TODO: ADD ACTIVE CLASS
