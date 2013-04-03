@@ -60,6 +60,7 @@ var DDoc = (function() {
     "lists"     : Render.list,
     "shows"    : Render.show,
     "filters"   : Filter.filter,
+    "rewrites"  : Render.rewrite,
     "views"     : Filter.filter_view, 
     "updates"  : Render.update,
     "validate_doc_update" : Validate.validate

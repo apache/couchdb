@@ -427,6 +427,82 @@ couchTests.rewrite = function(debug) {
           });
       });
 
+    // test function rewrites
+    run_on_modified_server(
+      [{section: "httpd",
+        key: "authentication_handlers",
+        value: "{couch_httpd_auth, special_test_authentication_handler}"},
+       {section:"httpd",
+        key: "WWW-Authenticate",
+        value: "X-Couch-Test-Auth"}],
+      
+      function(){
+        var func_rewrite = function (req, path) {
+          if (path === "foo") return "foo.txt";
+          if (/^simple\//.test(path)) {
+            return "_show/simple?value=" + path.replace(/\//g, "-");
+          }
+          if (path === "echo-method") return "_show/methodic";
+          if (/^change-method=/.test(path)) {
+            var parts = path.split("=")
+            ,   meth = parts[1]
+            ;
+            return { path: "_show/methodic", method: meth };
+          }
+          if (path === "always-get") {
+            return { path: "_show/methodic", method: "GET" };
+          }
+          return false;
+        };
+        var ddoc_func = {
+          _id:        "_design/funcrew",
+          rewrites:   stringFun(func_rewrite),
+          _attachments:{
+            "foo.txt": {
+              content_type:"text/plain",
+              data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+            }
+          },
+          shows: {
+            simple: stringFun(function (doc, req) {
+              return "Value=" + req.query["value"];
+            }),
+            methodic: stringFun(function (doc, req) {
+              return "method=" + req.method;
+            }),
+          },
+        };
+        T(db.save(ddoc_func).ok);
+
+        // very basic rewrite
+        req = CouchDB.request("GET", "/" + dbName + "/_design/funcrew/_rewrite/foo");
+        T(req.responseText == "This is a base64 encoded text");
+        T(req.getResponseHeader("Content-Type") == "text/plain");
+        
+        // rewrite that doesn't exist
+        req = CouchDB.request("GET", "/" + dbName + "/_design/funcrew/_rewrite/does/not/exist");
+        TEquals(500, req.status, "should return 500");
+
+        // show with simple computation
+        req = CouchDB.request("GET", "/" + dbName + "/_design/funcrew/_rewrite/simple/with/value");
+        T(req.responseText == "Value=simple-with-value");
+
+        var meths = "GET POST PUT DELETE".split(" ");
+        meths.forEach(function (m) {
+          req = CouchDB.request(m, "/" + dbName + "/_design/funcrew/_rewrite/echo-method");
+          T(req.responseText == "method=" + m);
+        });
+        meths.forEach(function (m) {
+          req = CouchDB.request("GET", "/" + dbName + "/_design/funcrew/_rewrite/change-method=" + m);
+          T(req.responseText == "method=" + m);
+        });
+        meths.forEach(function (m) {
+          req = CouchDB.request(m, "/" + dbName + "/_design/funcrew/_rewrite/always-get");
+          T(req.responseText == "method=GET");
+        });
+      }
+    );
+
     // test invalid rewrites
     // string
     var ddoc = {
@@ -435,7 +511,7 @@ couchTests.rewrite = function(debug) {
     }
     db.save(ddoc);
     var res = CouchDB.request("GET", "/"+dbName+"/_design/invalid/_rewrite/foo");
-    TEquals(400, res.status, "should return 400");
+    TEquals(500, res.status, "should return 500");
 
     var ddoc_requested_path = {
       _id: "_design/requested_path",
