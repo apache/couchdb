@@ -91,6 +91,7 @@ src/fauxton/app/addons/*
 !src/fauxton/app/addons/logs
 !src/fauxton/app/addons/stats
 !src/fauxton/app/addons/contribute
+!src/fauxton/app/addons/auth
 src/fauxton/settings.json*
 !src/fauxton/settings.json.default
 share/www/fauxton

@@ -1,0 +1,42 @@
+<!--
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this file except in compliance with the License. You may obtain a copy of
+the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations under
+the License.
+-->
+
+<a id="user-drop" class="dropdown-toggle" role="button" data-toggle="dropdown" href="#">
+  <% if (admin_party) { %>
+  Admin Party!
+  <% } else if (user) { %>
+  <%= user.name %>
+  <% } else { %>
+  Login
+  <% } %>
+  <b class="caret"></b>
+</a>
+<ul class="dropdown-menu" role="menu" aria-labelledby="user-drop">
+  <!-- dropdown menu links -->
+  <% if (admin_party) { %>
+  <li> <a id="user-create-admin" href="#"> Create Admin </a> </li>
+  <% } else if (user) { %>
+  <li> <a id="user-create-more-admin" href="#"> Create Admins </a> </li>
+  <li> <a id="user-change-password" href="#"> Change Password </a> </li>
+  <li> <a id="user-logout" href="#"> Logout </a> </li> 
+  <% } else { %>
+  <li> <a id="user-login" href="#"> Login </a> </li> 
+  <li> <a id="user-sign-up"> Sign up </a> </li>
+  <% } %>
+</ul>
+
+<div id="user-create-admin-modal"> </div>
+<div id="login-modal"> </div>
+<div id="change-password-modal"> </div>
+<div id="signup-modal"> </div>
