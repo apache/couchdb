@@ -31,7 +31,7 @@ remove_down_shards(Collector, BadNode) ->
     error ->
         Reason = {nodedown, <<"progress not possible">>},
         Callback({error, Reason}, Acc),
-        {stop, Collector}
+        {error, Reason}
     end.
 
 %% @doc looks for a fully covered keyrange in the list of counters
