@@ -104,8 +104,10 @@ function(app, FauxtonAPI, Documents) {
       var updateSeq = this.get("update_seq");
       if (full || (typeof(updateSeq) === 'number')) {
         return updateSeq;
-      } else {
+      } else if (updateSeq) {
         return updateSeq.split('-')[0];
+      } else {
+        return 0;
       }
     },
 
