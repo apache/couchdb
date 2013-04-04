@@ -87,6 +87,10 @@ function(app, Fauxton, FauxtonAPI) {
       }));
     },
 
+    setPage: function(page) {
+      this.page = page || 1;
+    },
+
     afterRender: function() {
       var dbLimit = this.dbLimit;
       var ajaxReq;

@@ -107,10 +107,21 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
       this.route(route, route.toString(), generateRoute(generator, route));
     },
 
+    addModuleRouteObject: function(routeObject) {
+      var masterLayout = this.masterLayout;
+      _.each(routeObject.get('routes'), function(route) {
+        //this.route(route, route.toString(), _.partial(routeObject.renderWith, route, this.masterLayout));
+        this.route(route, route.toString(), function() {
+          routeObject.render(route, masterLayout, Array.prototype.slice.call(arguments));
+        });
+      }, this);
+    },
+
     setModuleRoutes: function() {
       _.each(modules, function(module) {
         if (module){
           _.each(module.Routes, this.addModuleRoute, this);
+          _.each(module.RouteObjects, this.addModuleRouteObject, this);
         }
       }, this);
       _.each(LoadAddons.addons, function(module) {

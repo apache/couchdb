@@ -25,51 +25,69 @@ function(app, FauxtonAPI, Documents, Databases) {
   // var Documents = require("modules/documents/models_collections");
   // var Databases = require("modules/databases/module");
 
-  var codeEditorCallback = function(databaseName, docID) {
-    var data = {
-      database: new Databases.Model({id:databaseName}),
-      doc: new Documents.Doc({
-        "_id": docID
-      }),
-      selected: "code_editor"
-    };
-    data.doc.database = data.database;
-    data.designDocs = new Documents.AllDocs(null, {
-      database: data.database,
-      params: {startkey: '"_design"',
-        endkey: '"_design1"',
-        include_docs: true}
-    });
+  // TODO:: expand this for new docs and design docs
+  var DocEditorRouteObject = FauxtonAPI.RouteObject.extend({
+    layout: "one_pane",
 
-    var options = app.getParams();
-    options.include_docs = true;
-    data.database.buildAllDocs(options);
+    initialize: function() {
+      this.selected = false;
+    },
 
-    return {
-      layout: "one_pane",
+    routes: function() {
+      return _.keys(this.selectedRoutes);
+    },
 
-      data: data,
+    selectedRoutes: {
+      "database/:database/:doc/field_editor": "field_editor",
+      "database/:database/:doc/code_editor": "code_editor",
+      "database/:database/:doc": "code_editor"
+    },
 
-      crumbs: [
+    crumbs: function() {
+      return [
         {"name": "Databases", "link": "/_all_dbs"},
-        {"name": data.database.id, "link": Databases.databaseUrl(data.database)},
-        {"name": docID, "link": "#"}
-      ],
+        {"name": this.database.id, "link": Databases.databaseUrl(this.database)},
+        {"name": this.docID, "link": "#"}
+      ];
+    },
 
-      views: {
-        "#dashboard-content": new Documents.Views.Doc({
-          model: data.doc
-        }),
+    setEditorView: function() {
+      if (this.selected === "field_editor") {
+        this.docView = this.setView("#dashboard-content", new Documents.Views.DocFieldEditor({
+          model: this.doc
+        }));
+      } else {
+        this.docView = this.setView("#dashboard-content", new Documents.Views.Doc({
+          model: this.doc
+        }));
+      }
+    },
 
-        "#tabs": new Documents.Views.FieldEditorTabs({
-          selected: data.selected,
-          model: data.doc
-        })
-      },
+    route: function(route, args) {
+      var databaseName = args[0], docID = args[1];
 
-      apiUrl: data.doc.url()
-    };
-  };
+      this.database = this.database || new Databases.Model({id: databaseName});
+      this.doc = this.doc || new Documents.Doc({
+        _id: docID
+      }, {
+        database: this.database
+      });
+
+      if (this.selected !== this.selectedRoutes[route]) {
+        this.selected = this.selectedRoutes[route];
+        this.setEditorView();
+      }
+
+      this.tabsView = this.setView("#tabs", new Documents.Views.FieldEditorTabs({
+        selected: this.selected,
+        model: this.doc
+      }));
+    },
+
+    apiUrl: function() {
+      return this.doc.url();
+    }
+  });
 
   var newViewEditorCallback = function(databaseName) {
     var data = {
@@ -161,115 +179,11 @@ function(app, FauxtonAPI, Documents, Databases) {
   };
 
   Documents.Routes = {
-    "database/:database/:doc/field_editor": function(databaseName, docID) {
-      var data = {
-        database: new Databases.Model({id:databaseName}),
-        doc: new Documents.Doc({
-          "_id": docID
-        }),
-        selected: "field_editor"
-      };
-      data.doc.database = data.database;
-      data.designDocs = new Documents.AllDocs(null, {
-        database: data.database,
-        params: {startkey: '"_design"',
-          endkey: '"_design1"',
-          include_docs: true}
-      });
-
-      var options = app.getParams();
-      options.include_docs = true;
-      data.database.buildAllDocs(options);
-
-      return {
-        layout: "one_pane",
-
-        data: data,
-
-        crumbs: [
-          {"name": "Databases", "link": "/_all_dbs"},
-          {"name": data.database.id, "link": Databases.databaseUrl(data.database)},
-          {"name": docID, "link": "#"}
-        ],
-
-        views: {
-          "#dashboard-content": new Documents.Views.DocFieldEditor({
-            model: data.doc
-          }),
-
-          "#tabs": new Documents.Views.FieldEditorTabs({
-            selected: data.selected,
-            model: data.doc
-          })
-        },
-
-        apiUrl: data.doc.url()
-      };
-    },
-
-    "database/:database/:doc/code_editor": codeEditorCallback,
-    "database/:database/:doc": codeEditorCallback,
+    //"database/:database/:doc/code_editor": codeEditorCallback,
+    //"database/:database/:doc": codeEditorCallback,
     "database/:database/_design%2F:doc": function(database, doc) {
       var docID = "_design/"+doc;
       return codeEditorCallback(database, docID);
-    },
-
-    // HACK
-    // The ordering of routes is different in this object that the
-    // routes object in the Backbone.Router. As a result, the
-    // declaration order of show doc and _handler methods has been
-    // switched. This is a brittle solution that needs to be fixed.
-    // Conflicts with route: "database/:database/_:handler"
-    //
-    // TODO: add support for regex based rotues
-    // Javascript does not handle a regex as an object key very well,
-    // and it turns it into its string representation when you use in
-    // non object literal form, which does get recast back as a regex
-    // when we need it.
-    // The inability to use regex based routes here is a design flaw
-    // and should be rectified.
-    "old_database/:database/:doc": function(databaseName, docID) {
-      var data = {
-        database: new Databases.Model({id:databaseName}),
-        doc: new Documents.Doc({
-          "_id": docID
-        })
-      };
-      data.doc.database = data.database;
-      data.designDocs = new Documents.AllDocs(null, {
-        database: data.database,
-        params: {startkey: '"_design"',
-          endkey: '"_design1"',
-          include_docs: true}
-      });
-
-      var options = app.getParams();
-      options.include_docs = true;
-      data.database.buildAllDocs(options);
-
-      return {
-        layout: "with_sidebar",
-
-        data: data,
-
-        crumbs: [
-          {"name": "Databases", "link": "/_all_dbs"},
-          {"name": data.database.id, "link": Databases.databaseUrl(data.database)},
-          {"name": docID, "link": "#"}
-        ],
-
-        views: {
-          "#dashboard-content": new Documents.Views.Doc({
-            model: data.doc
-          }),
-
-          "#sidebar-content": new Documents.Views.Sidebar({
-            collection: data.designDocs
-          })
-        },
-
-        apiUrl: data.doc.url()
-      };
     },
 
     "database/:database/_all_docs(:extra)": function(databaseName, page) {
@@ -421,6 +335,8 @@ function(app, FauxtonAPI, Documents, Databases) {
       };
     }
   };
+
+  Documents.RouteObjects = [new DocEditorRouteObject()];
 
   return Documents;
 });

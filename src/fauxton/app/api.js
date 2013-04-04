@@ -96,6 +96,134 @@ function(app, Fauxton) {
     }
   });
 
+  FauxtonAPI.RouteObject = function(options) {
+    this._options = options;
+
+    this._configure(options || {});
+    this.initialize.apply(this, arguments);
+    this.addEvents();
+  };
+
+  // Piggy-back on Backbone's self-propagating extend function
+  FauxtonAPI.RouteObject.extend = Backbone.Model.extend;
+
+  var routeObjectOptions = ["views", "routes", "events", "data", "crumbs", "layout", "apiUrl", "establish"];
+
+  _.extend(FauxtonAPI.RouteObject.prototype, Backbone.Events, {
+    // Should these be default vals or empty funcs?
+    views: {},
+    routes: {},
+    events: {},
+    data: {},
+    crumbs: [],
+    layout: "with_sidebar",
+    apiUrl: null,
+    renderedState: false,
+    currTab: "databases",
+    establish: function() {},
+    route: function() {},
+    initialize: function() {}
+  }, {
+    // By default, rerender is a full rerender
+    rerender: function() {
+      this.renderWith.apply(this, arguments);
+    },
+
+    // TODO:: combine this and the renderWith function
+    // All the things should go through establish, as it will resolve
+    // immediately if its already done, but this way the RouteObject.route
+    // function can rebuild the deferred as needed
+    render: function(route, masterLayout, args) {
+      this.route.call(this, route, args);
+
+      if (this.renderedState === true) {
+        this.rerender.apply(this, arguments);
+      } else {
+        this.renderWith.apply(this, arguments);
+      }
+    },
+
+    renderWith: function(route, masterLayout, args) {
+      var routeObject = this;
+      //this.route.apply(this, args);
+
+      masterLayout.setTemplate(this.layout);
+      masterLayout.clearBreadcrumbs();
+
+      if (this.crumbs.length) {
+        masterLayout.setBreadcrumbs(new Fauxton.Breadcrumbs({
+          crumbs: this.crumbs
+        }));
+      }
+
+      $.when.apply(this, this.establish()).done(function(resp) {
+        _.each(routeObject.views, function(view, selector) {
+          masterLayout.setView(selector, view);
+
+          $.when.apply(null, view.establish()).then(function(resp) {
+            masterLayout.renderView(selector);
+          }, function(resp) {
+            view.establishError = {
+              error: true,
+              reason: resp
+            };
+            masterLayout.renderView(selector);
+          });
+
+          var hooks = masterLayout.hooks[selector];
+
+          if(hooks){
+            _.each(hooks, function(hook){
+              if (_.any(hook.routes, function(route){return route == boundRoute;})){
+                hook.callback(view);
+              }
+            });
+          }
+        });
+      });
+
+      if (this.get('apiUrl')) masterLayout.apiBar.update(this.get('apiUrl'));
+
+      // Track that we've done a full initial render
+      this.renderedState = true;
+    },
+
+    get: function(key) {
+      return _.isFunction(this[key]) ? this[key]() : this[key];
+    },
+
+    addEvents: function(events) {
+      events = events || this.get('events');
+      _.each(events, function(method, event) {
+        if (!_.isFunction(method) && !_.isFunction(this[method])) {
+          throw new Error("Invalid method: "+method);
+        }
+        method = _.isFunction(method) ? method : this[method];
+
+        this.on(event, method);
+      }, this);
+    },
+
+    _configure: function(options) {
+      _.each(_.intersection(_.keys(options), routeObjectOptions), function(key) {
+        this[key] = options[key];
+      }, this);
+    },
+
+    getView: function(selector) {
+      return this.views[selector];
+    },
+
+    setView: function(selector, view) {
+      this.views[selector] = view;
+      return view;
+    },
+
+    getViews: function() {
+      return this.views;
+    }
+  });
+
   app.fauxtonAPI = FauxtonAPI;
   return app.fauxtonAPI;
 });

@@ -35,9 +35,11 @@ function(app, FauxtonAPI, Views) {
       }
     },
 
-    initialize: function() {
+    initialize: function(_attrs, options) {
       if (this.collection && this.collection.database) {
         this.database = this.collection.database;
+      } else if (options.database) {
+        this.database = options.database;
       }
     },
 
