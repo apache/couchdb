@@ -94,7 +94,7 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
         url += viewname[0] + "/_view/" + viewname[1];
         if (searchbox.val() !== ""){
           // TODO: this'll need to work when val() is a number etc.
-          url += '?start_key="' + searchbox.val() + '"';
+          url += '?startkey="' + searchbox.val() + '"';
         }
         FauxtonAPI.navigate(url);
       });
