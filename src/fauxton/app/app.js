@@ -23,7 +23,8 @@ function($, _, Backbone, Helpers) {
   // creation.
   var app = {
     // The root path to run the application.
-    root: "/"
+    root: "/",
+    version: "0.0.1"
   };
 
   // Localize or create a new JavaScript Template object.

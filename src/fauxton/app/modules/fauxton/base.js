@@ -36,6 +36,15 @@ function(app, Backbone) {
     }
   });
 
+  Fauxton.Footer = Backbone.View.extend({
+    template: "templates/fauxton/footer",
+    serialize: function() {
+      return {
+        version: app.version
+      };
+    }
+  });
+
   Fauxton.NavBar = Backbone.View.extend({
     template: "templates/fauxton/nav_bar",
     // TODO: can we generate this list from the router?

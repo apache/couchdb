@@ -140,10 +140,12 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
     },
 
     initialize: function() {
+      //TODO: It would be nice to handle this with a router
       this.navBar = app.navBar = new Fauxton.NavBar();
       this.apiBar = app.apiBar = new Fauxton.ApiBar();
 
       app.masterLayout = this.masterLayout = new Layout(this.navBar, this.apiBar);
+      app.footer = new Fauxton.Footer({el: "#footer-content"});
 
       // NOTE: This must be below creation of the layout
       // FauxtonAPI header links and others depend on existence of the layout
@@ -152,6 +154,8 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
 
       $("#app-container").html(this.masterLayout.el);
       this.masterLayout.render();
+
+      app.footer.render();
     }
   });
 
