@@ -11,14 +11,14 @@ have the following structure:
 
  [optional]
  * assets/less
-   * my_addon.less 
+   * my_addon.less
 
 ## Generating an addon
-We have a grunt task that lets you create a skeleton addon, including all the
-boiler plate code. Run `bbb addon` and answer the questions it asks to create
-an addon:
+We have a `grunt-init` template that lets you create a skeleton addon,
+including all the boiler plate code. Run `grunt-init tasks/addon` and answer
+the questions it asks to create an addon:
 
-    ± bbb addon
+    ± grunt-init tasks/addon
     path.existsSync is now called `fs.existsSync`.
     Running "addon" task
 
@@ -32,8 +32,8 @@ an addon:
 
     Done, without errors.
 
-Once the addon is created add the name to the settings.json file to get it compiled
-and added on the next install.
+Once the addon is created add the name to the settings.json file to get it
+compiled and added on the next install.
 
 ## Routes and hooks
 An addon can insert itself into fauxton in two ways; via a route or via a hook.

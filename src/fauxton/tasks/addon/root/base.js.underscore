@@ -13,9 +13,9 @@
 define([
   "app",
   "api",
-  "addons/<%= module.toLowerCase() %>/routes"
+  "addons/{%= name.toLowerCase() %}/routes"
 ],
 
-function(app, FauxtonAPI, <%= module %>) {
-  return <%= module %>;
+function(app, FauxtonAPI, {%= name %}) {
+  return {%= name %};
 });

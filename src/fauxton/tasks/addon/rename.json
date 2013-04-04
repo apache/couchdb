@@ -1,0 +1,5 @@
+{
+  "route.js.underscore": "{%= path %}/{%= name.toLowerCase() %}/route.js",
+  "resources.js.underscore": "{%= path %}/{%= name.toLowerCase() %}/resources.js",
+  "base.js.underscore": "{%= path %}/{%= name.toLowerCase() %}/base.js"
+}

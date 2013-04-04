@@ -113,6 +113,7 @@
 ^src/fauxton/TODO.md
 ^src/fauxton/settings.json.*
 ^src/fauxton/test/.*
+^src/fauxton/tasks/rename.json
 ^src/ibrowse/.*
 ^src/mochiweb/.*
 ^src/snappy/.*

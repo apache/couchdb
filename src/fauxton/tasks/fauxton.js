@@ -10,86 +10,8 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-// var prompt = require('prompt');
-
 module.exports = function(grunt) {
   var _ = grunt.util._;
-  var prompts = [
-    {
-      name: "name",
-      message: "Add on Name",
-      validator: /^[\w\-\.]+$/,
-      default: "WickedCool"
-    },
-    {
-      name: "path",
-      message: "Location of add ons",
-      default: "app/addons"
-    },
-    {
-      name: "assets",
-      message: "Do you need an assets folder? (for .less)",
-      default: 'y/N'
-    }
-  ];
-
-  addonTemplates = [
-    {
-      name: 'base',
-      filename: 'base.js',
-      template: grunt.file.read('./tasks/templates/base.js.underscore')
-    },
-    {
-      name: 'resources',
-      filename: 'resources.js',
-      template: grunt.file.read('./tasks/templates/resources.js.underscore')
-    },
-    {
-      name: 'routes',
-      filename: 'routes.js',
-      template: grunt.file.read('./tasks/templates/route.js.underscore')
-    }
-  ];
-
-  // Create a new task.
-  grunt.registerInitTask('addon', 'Generate a skeleton for an addon"', function() {
-    var done = this.async();
-    grunt.helper('prompt', {}, prompts, function (err, result) {
-      if (err) { return onErr(err); }
-      grunt.log.writeln(result.assets);
-      var module = result.name,
-          assets = result.assets;
-      if (assets == 'y') {
-        //if you need an assets folder
-        filepath = result.path + '/' + module.toLowerCase() + '/assets/less';
-        grunt.file.mkdir(filepath);
-        lessfile = {
-          name: 'less',
-          filename: module.toLowerCase()+'.less',
-          template: '//<%= module %> styles'
-        };
-        lessfile.module = module.charAt(0).toUpperCase() + module.substr(1);
-        var content = grunt.template.process(lessfile.template, lessfile);
-        grunt.file.write(filepath + '/' + lessfile.filename, content);
-      }
-      filepath = result.path + '/' + module.toLowerCase() + '/templates';
-      grunt.file.mkdir(filepath);
-      filepath = result.path + '/' + module.toLowerCase();
-      _.each(addonTemplates, function(file){
-        file.module = module.charAt(0).toUpperCase() + module.substr(1);
-        var content = grunt.template.process(file.template, file);
-        grunt.file.write(filepath + '/' + file.filename, content);
-      });
-      grunt.log.writeln('Created addon ' + result.name + ' in ' + result.path);
-      grunt.log.writeln('\n\nAdd ' + result.name + ' to settings.json for it to be compiled and deployed');
-      done();
-    });
-    function onErr(err) {
-      grunt.log.writeln(err);
-      done();
-      return 1;
-    }
-  });
 
   grunt.registerMultiTask('template', 'generates an html file from a specified template', function(){
     var data = this.data;

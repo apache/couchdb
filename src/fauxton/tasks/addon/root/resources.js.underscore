@@ -12,10 +12,10 @@
 
 define([
   "app",
-  "api", 
-  "addons/<%= module.toLowerCase() %>/resources"
+  "api"
 ],
-function(app, FauxtonAPI, <%= module %>) {
-  <%= module %>.Routes = {};
-  return <%= module %>;
+
+function (app, FauxtonAPI) {
+  var {%= name %} = FauxtonAPI.addon();
+  return {%= name %};
 });
