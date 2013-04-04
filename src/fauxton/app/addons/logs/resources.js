@@ -12,10 +12,11 @@
 
 define([
   "app",
-  "api"
+  "api",
+  "backbone"
 ],
 
-function (app, FauxtonAPI) {
+function (app, FauxtonAPI, Backbone) {
 
   var Log = FauxtonAPI.addon();
 
@@ -66,7 +67,6 @@ function (app, FauxtonAPI) {
 
     parse: function (resp) {
       var lines =  resp.split(/\n/);
-
       return _.foldr(lines, function (acc, logLine) {
         var match = logLine.match(/^\[(.*?)\]\s\[(.*?)\]\s\[(.*?)\]\s(.*)/);
 
@@ -98,7 +98,7 @@ function (app, FauxtonAPI) {
 
       this.filters = [];
       this.filteredCollection = new Log.Collection(this.collection.toJSON());
-      this.collection.on("reset", function () {
+      this.collection.on("add", function () {
         this.createFilteredCollection();
       }, this);
     },
