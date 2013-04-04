@@ -135,7 +135,7 @@ function(app, FauxtonAPI, Documents) {
 
     parse: function(resp) {
       // TODO: pagination!
-      return _.map(_.first(resp, 10), function(database) {
+      return _.map(resp, function(database) {
         return {
           id: encodeURIComponent(database),
           name: database

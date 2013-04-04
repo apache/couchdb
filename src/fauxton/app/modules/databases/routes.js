@@ -63,7 +63,7 @@ function(app, FauxtonAPI, Databases) {
   Databases.Routes = {
     "": allDbsCallback,
     "index.html": allDbsCallback,
-    "_all_dbs": allDbsCallback
+    "_all_dbs(:params)": allDbsCallback
   };
 
   return Databases;

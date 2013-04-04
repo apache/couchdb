@@ -32,6 +32,7 @@ function(app, FauxtonAPI) {
 
   Views.List = FauxtonAPI.View.extend({
     dbLimit: 10,
+    perPage: 10,
     template: "templates/databases/list",
     events: {
       "click button.all": "selectAll",
@@ -39,12 +40,18 @@ function(app, FauxtonAPI) {
     },
 
     initialize: function(options) {
+      var params = app.getParams();
       this.collection.on("add", this.render, this);
+      this.page = params.page ? parseInt(params.page, 10) : 1;
     },
 
     serialize: function() {
       return {
-        databases: this.collection
+        databases: this.collection,
+        page: this.page,
+        perPage: this.perPage,
+        totalDbs: this.collection.length,
+        totalPages: Math.ceil(this.collection.length / this.perPage)
       };
     },
 
@@ -61,8 +68,14 @@ function(app, FauxtonAPI) {
       }
     },
 
+    paginated: function() {
+      var start = (this.page - 1) * this.perPage;
+      var end = this.page * this.perPage - 1;
+      return this.collection.slice(start, end);
+    },
+
     beforeRender: function() {
-      this.collection.each(function(database) {
+      _.each(this.paginated(), function(database) {
         this.insertView("table.databases tbody", new Views.Item({
           model: database
         }));
