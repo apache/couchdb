@@ -127,6 +127,12 @@ function(app, FauxtonAPI, Views) {
       return this.id.match(/^_design/) ? "design doc" : "doc";
     },
 
+    url: function(context) {
+      if (!this.isEditable()) return false;
+
+      return this.collection.database.url(context) + "/" + this.id;
+    },
+
     isEditable: function() {
       return this.docType() != "reduction";
     },
