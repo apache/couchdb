@@ -38,8 +38,6 @@ couchTests.replicator_db_survives = function(debug) {
     });
     T(xhr.status === 200);
 
-    repDb.createDb(); // the config put above should create this db
-
     populate_db(dbA, docs1);
     populate_db(dbB, []);
 
