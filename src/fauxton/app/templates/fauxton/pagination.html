@@ -1,0 +1,17 @@
+<div class="pagination pagination-centered">
+  <ul>
+    <% if (page > 1) { %>
+      <li><a href="<%= urlFun(page-1) %>">&laquo;</a></li>
+    <% } else { %>
+      <li class="disabled"><a href="<%= urlFun(page) %>">&laquo;</a></li>
+    <% } %>
+    <% _.each(_.range(1, totalPages+1), function(i) { %>
+      <li <% if (page == i) { %>class="active"<% } %>><a href="<%= urlFun(i) %>"><%= i %></a></li>
+    <% }) %>
+    <% if (page < totalPages) { %>
+      <li><a href="<%= urlFun(page+1) %>">&raquo;</a></li>
+    <% } else { %>
+      <li class="disabled"><a href="<%= urlFun(page) %>">&raquo;</a></li>
+    <% } %>
+  </ul>
+</div>

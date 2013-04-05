@@ -13,10 +13,11 @@
 define([
   "app",
 
+  "modules/fauxton/base",
   "api"
 ],
 
-function(app, FauxtonAPI) {
+function(app, Fauxton, FauxtonAPI) {
   var Views = {};
 
   Views.Item = FauxtonAPI.View.extend({
@@ -47,11 +48,7 @@ function(app, FauxtonAPI) {
 
     serialize: function() {
       return {
-        databases: this.collection,
-        page: this.page,
-        perPage: this.perPage,
-        totalDbs: this.collection.length,
-        totalPages: Math.ceil(this.collection.length / this.perPage)
+        databases: this.collection
       };
     },
 
@@ -80,6 +77,15 @@ function(app, FauxtonAPI) {
           model: database
         }));
       }, this);
+
+      this.insertView("#database-pagination", new Fauxton.Pagination({
+        page: this.page,
+        perPage: this.perPage,
+        total: this.collection.length,
+        urlFun: function(page) {
+          return "#/_all_dbs?page=" + page;
+        }
+      }));
     },
 
     afterRender: function() {

@@ -129,5 +129,27 @@ function(app, Backbone) {
     }
   });
 
+  Fauxton.Pagination = Backbone.View.extend({
+    template: "templates/fauxton/pagination",
+
+    initialize: function(options) {
+      this.page = options.page;
+      this.perPage = options.perPage;
+      this.total = options.total;
+      this.totalPages = Math.ceil(this.total / this.perPage);
+      this.urlFun = options.urlFun;
+    },
+
+    serialize: function() {
+      return {
+        page: this.page,
+        perPage: this.perPage,
+        total: this.total,
+        totalPages: this.totalPages,
+        urlFun: this.urlFun
+      };
+    }
+  });
+
   return Fauxton;
 });
