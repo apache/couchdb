@@ -92,6 +92,7 @@ couchTests.changes = function(debug) {
       if (change2.seq != 2) {
           throw "bad seq, try again";
       }
+      return true;
     }, "bar-only");
 
     T(change1.seq == 1);
@@ -112,6 +113,7 @@ couchTests.changes = function(debug) {
       if (change3.seq != 3) {
         throw "bad seq, try again";
       }
+      return true;
     });
 
     T(change3.seq == 3);
@@ -131,6 +133,7 @@ couchTests.changes = function(debug) {
       if (str.charAt(str.length - 1) != "\n" || str.charAt(str.length - 2) != "\n") {
         throw("keep waiting");
       }
+      return true;
     }, "heartbeat");
 
     T(str.charAt(str.length - 1) == "\n");
@@ -152,8 +155,10 @@ couchTests.changes = function(debug) {
       source.addEventListener('message', sourceListener , false);
 
       waitForSuccess(function() {
-        if (results.length != 3)
+        if (results.length != 3) {
           throw "bad seq, try again";
+        }
+        return true;
       });
 
       source.removeEventListener('message', sourceListener, false);
@@ -177,6 +182,7 @@ couchTests.changes = function(debug) {
       if (lines[5] != '"last_seq":3}') {
         throw("still waiting");
       }
+      return true;
     }, "last_seq");
 
     xhr = CouchDB.newXhr();
@@ -201,6 +207,7 @@ couchTests.changes = function(debug) {
       if (lines[3] != '"last_seq":4}') {
         throw("still waiting");
       }
+      return true;
     }, "change_lines");
 
     var change = parse_changes_line(lines[1]);
@@ -233,6 +240,7 @@ couchTests.changes = function(debug) {
       if (lines[3] != '"last_seq":5}') {
         throw("still waiting");
       }
+      return true;
     }, "change_lines");
 
     var change = parse_changes_line(lines[1]);
@@ -313,6 +321,7 @@ couchTests.changes = function(debug) {
 
     waitForSuccess(function() {
       resp = JSON.parse(xhr.responseText);
+      return true;
     }, "longpoll-since");
 
     T(resp.last_seq == 10);
@@ -337,6 +346,7 @@ couchTests.changes = function(debug) {
         if (xhr.readyState != 4) {
           throw("still waiting");
         }
+        return true;
       }, "continuous-rusty");
       lines = xhr.responseText.split("\n");
       var good = false;
@@ -529,6 +539,7 @@ couchTests.changes = function(debug) {
             if (xhr.readyState != 4) {
               throw("still waiting");
             }
+            return true;
         }, "andmore-only");
 
         var line = JSON.parse(xhr.responseText.split("\n")[0]);
