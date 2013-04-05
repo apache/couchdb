@@ -11,6 +11,9 @@
 // the License.
 
 couchTests.rev_stemming = function(debug) {
+  var db = new CouchDB("test_suite_db", {"X-Couch-Full-Commit":"false"});
+  db.deleteDb();
+  db.createDb();
   var db = new CouchDB("test_suite_db_a", {"X-Couch-Full-Commit":"false"});
   db.deleteDb();
   db.createDb();
