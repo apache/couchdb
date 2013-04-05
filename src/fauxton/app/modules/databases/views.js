@@ -42,7 +42,6 @@ function(app, Fauxton, FauxtonAPI) {
 
     initialize: function(options) {
       var params = app.getParams();
-      this.collection.on("add", this.render, this);
       this.page = params.page ? parseInt(params.page, 10) : 1;
     },
 
