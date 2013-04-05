@@ -27,9 +27,83 @@ if [ -z "$MAKE" ]; then
     MAKE=make
 fi
 
+trap 'abort' EXIT INT
+
+start() {
+	./utils/run -b -r 0 -n \
+		-a $BUILD_DIR/etc/couchdb/default_dev.ini \
+		-a $SRC_DIR/test/random_port.ini \
+		-a $BUILD_DIR/etc/couchdb/local_dev.ini 1>/dev/null
+}
+
+stop() {
+    ./utils/run -d 1>/dev/null
+}
+
+restart() {
+    stop
+    start
+}
+
+abort() {
+    trap - 0
+    stop
+    exit 2
+}
+
+process_response() {
+    while read data
+    do
+        if [ $data = 'restart' ];
+        then
+            restart
+        else
+            echo "$data"
+        fi
+    done
+}
+
+run() {
+    # start the tests
+    echo -n "$1 ... "
+    $COUCHJS -H -u $COUCH_URI_FILE \
+        $SCRIPT_DIR/json2.js \
+        $SCRIPT_DIR/sha1.js \
+        $SCRIPT_DIR/oauth.js \
+        $SCRIPT_DIR/couch.js \
+        $SCRIPT_DIR/replicator_db_inc.js \
+        $SCRIPT_DIR/couch_test_runner.js \
+        $JS_TEST_DIR/couch_http.js \
+        $JS_TEST_DIR/test_setup.js \
+        $1 \
+        $JS_TEST_DIR/cli_runner.js | process_response
+
+    if [ -z $RESULT ]; then
+        RESULT=$?
+    elif [ "$?" -eq 1 ]; then
+        RESULT=$?
+    fi
+
+}
+
+# start CouchDB
+if [ -z $COUCHDB_NO_START ]; then
+    $MAKE dev
+    start
+fi
+
+echo "Running javascript tests ..."
+
 if [ "$#" -eq 0 ];
 then
-    TEST_SRC="$SCRIPT_DIR/test/*.js"
+    COUNTER=1
+    FILES=($SCRIPT_DIR/test/*.js)
+    for TEST_SRC in "${FILES[@]}"
+    do
+        echo -n "$COUNTER/${#FILES[@]} " 
+        let COUNTER=COUNTER+1
+        run $TEST_SRC
+    done
 else
     TEST_SRC="$1"
     if [ ! -f $TEST_SRC ]; then
@@ -40,47 +114,10 @@ else
                 echo "file $1 does not exist"
                 exit 1
             fi
+            run $TEST_SRC
         fi
     fi
 fi
 
-# stop CouchDB on exit from various signals
-abort() {
-    trap - 0
-    ./utils/run -d
-    exit 2
-}
-
-# start CouchDB
-if [ -z $COUCHDB_NO_START ]; then
-    $MAKE dev
-    trap 'abort' EXIT INT
-	./utils/run -b -r 1 -n \
-		-a $BUILD_DIR/etc/couchdb/default_dev.ini \
-		-a $SRC_DIR/test/random_port.ini \
-		-a $BUILD_DIR/etc/couchdb/local_dev.ini
-	sleep 1 # give it a sec
-fi
-
-# start the tests
-$COUCHJS -H -u $COUCH_URI_FILE \
-	$SCRIPT_DIR/json2.js \
-	$SCRIPT_DIR/sha1.js \
-	$SCRIPT_DIR/oauth.js \
-	$SCRIPT_DIR/couch.js \
-	$SCRIPT_DIR/couch_test_runner.js \
-	$SCRIPT_DIR/couch_tests.js \
-    $SCRIPT_DIR/replicator_db_inc.js \
-	$TEST_SRC \
-	$JS_TEST_DIR/couch_http.js \
-	$JS_TEST_DIR/cli_runner.js
-
-RESULT=$?
-
-if [ -z $COUCHDB_NO_START ]; then
-    # stop CouchDB
-    ./utils/run -d
-    trap - 0
-fi
-
+trap - 0
 exit $RESULT
