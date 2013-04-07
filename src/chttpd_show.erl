@@ -18,7 +18,7 @@
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
 % /db/_design/foo/_show/bar/docid
-% show converts a json doc to a response of any content-type. 
+% show converts a json doc to a response of any content-type.
 % it looks up the doc an then passes it to the query server.
 % then it sends the response from the query server to the http client.
 
@@ -44,7 +44,7 @@ handle_doc_show_req(#httpd{
 handle_doc_show_req(#httpd{
         path_parts=[_, _, _, _, ShowName, DocId|Rest]
     }=Req, Db, DDoc) ->
-    
+
     DocParts = [DocId|Rest],
     DocId1 = ?l2b(string:join([?b2l(P)|| P <- DocParts], "/")),
 
@@ -75,7 +75,7 @@ handle_doc_show(Req, Db, DDoc, ShowName, Doc, DocId) ->
     chttpd:etag_respond(Req, CurrentEtag, fun() ->
         JsonReq = chttpd_external:json_req_obj(Req, Db, DocId),
         JsonDoc = couch_query_servers:json_doc(Doc),
-        [<<"resp">>, ExternalResp] = 
+        [<<"resp">>, ExternalResp] =
             couch_query_servers:ddoc_prompt(DDoc, [<<"shows">>, ShowName],
                 [JsonDoc, JsonReq]),
         JsonResp = apply_etag(ExternalResp, CurrentEtag),
