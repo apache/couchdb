@@ -119,27 +119,37 @@ send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
     JsonDoc = couch_query_servers:json_doc(Doc),
     Cmd = [<<"updates">>, UpdateName],
     W = couch_httpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
-    case couch_query_servers:ddoc_prompt(DDoc, Cmd, [JsonDoc, JsonReq]) of
-    [<<"up">>, {NewJsonDoc}, JsonResp] ->
-        case chttpd:header_value(Req, "X-Couch-Full-Commit", "false") of
-        "true" ->
-            Options = [full_commit, {user_ctx, Req#httpd.user_ctx}, {w, W}];
-        _ ->
-            Options = [{user_ctx, Req#httpd.user_ctx}, {w, W}]
-        end,
-        NewDoc = couch_doc:from_json_obj({NewJsonDoc}),
-        case fabric:update_doc(Db, NewDoc, Options) of
-        {ok, _} ->
-            Code = 201;
-        {accepted, _} ->
-            Code = 202
-        end;
-    [<<"up">>, _Other, JsonResp] ->
-        Code = 200
+    UpdateResp = couch_query_servers:ddoc_prompt(DDoc, Cmd, [JsonDoc, JsonReq]),
+    JsonResp = case UpdateResp of
+        [<<"up">>, {NewJsonDoc}, {JsonResp0}] ->
+            case chttpd:header_value(Req, "X-Couch-Full-Commit", "false") of
+            "true" ->
+                Options = [full_commit, {user_ctx, Req#httpd.user_ctx}, {w, W}];
+            _ ->
+                Options = [{user_ctx, Req#httpd.user_ctx}, {w, W}]
+            end,
+            NewDoc = couch_doc:from_json_obj({NewJsonDoc}),
+            couch_doc:validate_docid(NewDoc#doc.id),
+            {UpdateResult, NewRev} = fabric:update_doc(Db, NewDoc, Options),
+            NewRevStr = couch_doc:rev_to_str(NewRev),
+            case {UpdateResult, NewRev} of
+            {ok, _} ->
+                Code = 201;
+            {accepted, _} ->
+                Code = 202
+            end,
+            {[
+                {<<"code">>, Code},
+                {<<"headers">>, {[
+                    {<<"X-Couch-Update-NewRev">>, NewRevStr},
+                    {<<"X-Couch-Id">>, NewDoc#doc.id}
+                ]}}
+                | JsonResp0]};
+        [<<"up">>, _Other, {JsonResp0}] ->
+            {[{<<"code">>, 200} | JsonResp0]}
     end,
-    JsonResp2 = json_apply_field({<<"code">>, Code}, JsonResp),
     % todo set location field
-    chttpd_external:send_external_response(Req, JsonResp2).
+    chttpd_external:send_external_response(Req, JsonResp).
 
 
 % view-list request with view and list from same design doc.
