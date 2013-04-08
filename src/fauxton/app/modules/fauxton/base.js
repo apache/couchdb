@@ -99,11 +99,13 @@ function(app, Backbone) {
       this.selector = options.selector;
       this.fade = options.fade === undefined ? true : options.fade;
       this.clear = options.clear;
+      this.data = options.data || "";
       this.template = options.template || "templates/fauxton/notification";
     },
 
     serialize: function() {
       return {
+        data: this.data,
         msg: this.msg,
         type: this.type
       };
