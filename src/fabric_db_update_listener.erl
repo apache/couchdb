@@ -61,11 +61,12 @@ start_update_notifiers(DbName) ->
 % rexi endpoint
 start_update_notifier(DbNames) ->
     {Caller, Ref} = get(rexi_from),
-    Fun = fun({_, X}) ->
+    Fun = fun({updated, X}) ->
         case lists:member(X, DbNames) of
             true -> erlang:send(Caller, {Ref, db_updated});
             false -> ok
-        end
+        end;
+        (_) -> ok
     end,
     Id = {couch_db_update_notifier, make_ref()},
     ok = gen_event:add_sup_handler(couch_db_update, Id, Fun),
