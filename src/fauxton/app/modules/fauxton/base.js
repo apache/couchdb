@@ -91,7 +91,6 @@ function(app, Backbone) {
   });
 
   Fauxton.Notification = Backbone.View.extend({
-    template: "templates/fauxton/notification",
     fadeTimer: 5000,
 
     initialize: function(options) {
@@ -100,6 +99,7 @@ function(app, Backbone) {
       this.selector = options.selector;
       this.fade = options.fade === undefined ? true : options.fade;
       this.clear = options.clear;
+      this.template = options.template || "templates/fauxton/notification";
     },
 
     serialize: function() {
