@@ -301,7 +301,12 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
     couch_httpd:validate_ctype(Req, "application/json"),
     {JsonProps} = chttpd:json_body_obj(Req),
     DocsArray = couch_util:get_value(<<"docs">>, JsonProps),
-    W = couch_httpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
+    W = case couch_util:get_value(<<"w">>, JsonProps) of
+    Value when is_integer(Value) ->
+        Value;
+    _ ->
+        couch_httpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db)))
+    end,
     case chttpd:header_value(Req, "X-Couch-Full-Commit") of
     "true" ->
         Options = [full_commit, {user_ctx,Ctx}, {w,W}];
