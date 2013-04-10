@@ -119,5 +119,6 @@ else
     fi
 fi
 
+stop
 trap - 0
 exit $RESULT
