@@ -28,7 +28,7 @@ handle_membership_req(#httpd{method='GET',
         {cluster_nodes, lists:sort(ClusterNodes)}
     ]});
 handle_membership_req(#httpd{method='GET',
-        path_parts=[<<"_membership">>, <<"parts">>, DbName]} = Req) ->
+        path_parts=[<<"_membership">>, DbName]} = Req) ->
     ClusterNodes = try mem3:nodes()
     catch _:_ -> {ok,[]} end,
     Shards = mem3:shards(DbName),
@@ -46,6 +46,8 @@ handle_membership_req(#httpd{method='GET',
 json_shards([], AccIn) ->
     List = dict:to_list(AccIn),
     {lists:sort(List)};
-json_shards([#shard{node=Node, range=[B,_E]} | Rest], AccIn) ->
+json_shards([#shard{node=Node, range=[B,E]} | Rest], AccIn) ->
     HexBeg = couch_util:to_hex(<<B:32/integer>>),
-    json_shards(Rest, dict:append(HexBeg, Node, AccIn)).
+    HexEnd = couch_util:to_hex(<<E:32/integer>>),
+    Range = list_to_binary(HexBeg ++ "-" ++ HexEnd),
+    json_shards(Rest, dict:append(Range, Node, AccIn)).
