@@ -16,7 +16,12 @@
 
 %% @doc Return a rexi_server id for the given node.
 server_id(Node) ->
-    list_to_atom("rexi_server_" ++ integer_to_list(erlang:phash2(Node))).
+    case config:get("rexi", "server_per_node", "false") of
+    "true" ->
+        list_to_atom("rexi_server_" ++ integer_to_list(erlang:phash2(Node)));
+    _ ->
+        rexi_server
+    end.
 
 %% @doc Return a {server_id(node()), Node} Pid name for the given Node.
 server_pid(Node) ->
