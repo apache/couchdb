@@ -303,7 +303,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
     DocsArray = couch_util:get_value(<<"docs">>, JsonProps),
     W = case couch_util:get_value(<<"w">>, JsonProps) of
     Value when is_integer(Value) ->
-        Value;
+        integer_to_list(Value);
     _ ->
         couch_httpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db)))
     end,
