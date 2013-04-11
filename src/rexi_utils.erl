@@ -18,7 +18,7 @@
 server_id(Node) ->
     case config:get("rexi", "server_per_node", "false") of
     "true" ->
-        list_to_atom("rexi_server_" ++ integer_to_list(erlang:phash2(Node)));
+        list_to_atom("rexi_server_" ++ atom_to_list(Node));
     _ ->
         rexi_server
     end.
