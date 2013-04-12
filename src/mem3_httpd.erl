@@ -12,7 +12,7 @@
 
 -module(mem3_httpd).
 
--export([handle_membership_req/1]).
+-export([handle_membership_req/1, handle_shards_req/2]).
 
 %% includes
 -include_lib("mem3/include/mem3.hrl").
@@ -26,27 +26,25 @@ handle_membership_req(#httpd{method='GET',
     couch_httpd:send_json(Req, {[
         {all_nodes, lists:sort([node()|nodes()])},
         {cluster_nodes, lists:sort(ClusterNodes)}
-    ]});
-handle_membership_req(#httpd{method='GET',
-        path_parts=[<<"_membership">>, DbName]} = Req) ->
-    ClusterNodes = try mem3:nodes()
-    catch _:_ -> {ok,[]} end,
+    ]}).
+
+handle_shards_req(#httpd{method='GET',
+        path_parts=[_DbName, <<"_shards">>]} = Req, Db) ->
+    DbName = mem3:dbname(Db#db.name),
     Shards = mem3:shards(DbName),
     JsonShards = json_shards(Shards, dict:new()),
     couch_httpd:send_json(Req, {[
-        {all_nodes, lists:sort([node()|nodes()])},
-        {cluster_nodes, lists:sort(ClusterNodes)},
-        {partitions, JsonShards}
+        {shards, JsonShards}
     ]});
-handle_membership_req(#httpd{method='GET',
-        path_parts=[<<"_membership">>, DbName, DocId]} = Req) ->
+handle_shards_req(#httpd{method='GET',
+        path_parts=[_DbName, <<"_shards">>, DocId]} = Req, Db) ->
+    DbName = mem3:dbname(Db#db.name),
     Shards = mem3:shards(DbName, DocId),
     {[{Shard, Dbs}]} = json_shards(Shards, dict:new()),
     couch_httpd:send_json(Req, {[
         {range, Shard},
         {nodes, Dbs}
     ]}).
-
 %%
 %% internal
 %%
