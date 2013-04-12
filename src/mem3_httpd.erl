@@ -37,6 +37,14 @@ handle_membership_req(#httpd{method='GET',
         {all_nodes, lists:sort([node()|nodes()])},
         {cluster_nodes, lists:sort(ClusterNodes)},
         {partitions, JsonShards}
+    ]});
+handle_membership_req(#httpd{method='GET',
+        path_parts=[<<"_membership">>, DbName, DocId]} = Req) ->
+    Shards = mem3:shards(DbName, DocId),
+    {[{Shard, Dbs}]} = json_shards(Shards, dict:new()),
+    couch_httpd:send_json(Req, {[
+        {range, Shard},
+        {nodes, Dbs}
     ]}).
 
 %%
