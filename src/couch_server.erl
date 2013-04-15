@@ -26,10 +26,12 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
+-define(MAX_DBS_OPEN, 100).
+
 -record(server,{
     root_dir = [],
     dbname_regexp,
-    max_dbs_open=100,
+    max_dbs_open=?MAX_DBS_OPEN,
     dbs_open=0,
     start_time="",
     lru = couch_lru:new()
@@ -187,7 +189,7 @@ init([]) ->
 
     RootDir = config:get("couchdb", "database_dir", "."),
     MaxDbsOpen = list_to_integer(
-            config:get("couchdb", "max_dbs_open")),
+            config:get("couchdb", "max_dbs_open", integer_to_list(?MAX_DBS_OPEN))),
     ok = config:listen_for_changes(?MODULE, nil),
     ok = couch_file:init_delete_dir(RootDir),
     hash_admin_passwords(),
@@ -210,8 +212,10 @@ terminate(_Reason, _Srv) ->
 handle_config_change("couchdb", "database_dir", _, _, _) ->
     exit(whereis(couch_server), config_change),
     remove_handler;
-handle_config_change("couchdb", "max_dbs_open", Max, _, _) ->
+handle_config_change("couchdb", "max_dbs_open", Max, _, _) when is_list(Max) ->
     {ok, gen_server:call(couch_server,{set_max_dbs_open,list_to_integer(Max)})};
+handle_config_change("couchdb", "max_dbs_open", _, _, _) ->
+    {ok, gen_server:call(couch_server,{set_max_dbs_open,?MAX_DBS_OPEN})};
 handle_config_change("admins", _, _, Persist, _) ->
     % spawn here so couch event manager doesn't deadlock
     {ok, spawn(fun() -> hash_admin_passwords(Persist) end)};
