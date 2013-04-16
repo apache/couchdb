@@ -55,6 +55,8 @@ to_json_revisions(Options, Start, RevIds) ->
                 {<<"ids">>, [revid_to_str(R) ||R <- RevIds]}]}}]
     end.
 
+revid_to_str([RevId|_]) when size(RevId) =:= 16 ->
+    ?l2b(couch_util:to_hex(RevId));
 revid_to_str(RevId) when size(RevId) =:= 16 ->
     ?l2b(couch_util:to_hex(RevId));
 revid_to_str(RevId) ->
