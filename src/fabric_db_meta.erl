@@ -149,7 +149,7 @@ handle_get_message(Error, W, Acc) ->
     Dst = {W#shard.node, W#shard.name},
     couch_log:error("Failed to get security object on ~p :: ~p", [Dst, Error]),
     NewAcc = Acc#acc{workers = (Acc#acc.workers -- [W])},
-    maybe_finish_set(NewAcc).
+    maybe_finish_get(NewAcc).
 
 maybe_finish_get(#acc{workers=[]}=Acc) ->
     {stop, Acc};
