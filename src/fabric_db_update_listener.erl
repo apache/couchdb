@@ -60,11 +60,12 @@ start_update_notifiers(DbName) ->
 
 % rexi endpoint
 start_update_notifier(DbNames) ->
+    Notify = config:get("cloudant", "non_interactive_mode", "false") /= "true",
     {Caller, Ref} = get(rexi_from),
     Fun = fun({updated, X}) ->
         case lists:member(X, DbNames) of
-            true -> erlang:send(Caller, {Ref, db_updated});
-            false -> ok
+            true when Notify -> erlang:send(Caller, {Ref, db_updated});
+            _ -> ok
         end;
         (_) -> ok
     end,
