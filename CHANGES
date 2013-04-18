@@ -45,6 +45,13 @@ Futon:
  * Added view request duration to Futon.
  * Disable buttons for actions that the user doesn't have permissions to.
 
+Docs:
+
+ * Import initial documentation and converted to RST format.
+ * Set up Sphinx configuration and integrated into the build system.
+ * Serve up HTML manual from Futon, with a link in the sidebar.
+ * PDF and info version of the manual also installed.
+  
 Security:
 
  * Passwords are now hashed using the PBKDF2 algorithm with a configurable work
