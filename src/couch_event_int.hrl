@@ -11,9 +11,9 @@
 % the License.
 
 -define(REGISTRY_TABLE, couch_event_registry).
+-define(MONITOR_TABLE, couch_event_registry_monitors).
 
 -record(client, {
     dbname,
-    pid,
-    ref
+    pid
 }).

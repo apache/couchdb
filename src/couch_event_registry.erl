@@ -36,13 +36,19 @@ start_link() ->
 
 
 init(_) ->
-    EtsOpts = [
+    RegistryOpts = [
         protected,
         named_table,
         bag,
         {keypos, #client.dbname}
     ],
-    ets:new(?REGISTRY_TABLE, EtsOpts),
+    MonitorOpts = [
+        protected,
+        named_table,
+        set
+    ],
+    ets:new(?REGISTRY_TABLE, RegistryOpts),
+    ets:new(?MONITOR_TABLE, MonitorOpts),
     {ok, nil}.
 
 
@@ -53,36 +59,24 @@ terminate(_Reason, _St) ->
 handle_call({register, Pid, DbName}, _From, St) ->
     Client = #client{
         dbname = DbName,
-        pid = Pid,
-        ref = erlang:monitor(process, Pid)
+        pid = Pid
     },
     ets:insert(?REGISTRY_TABLE, Client),
+    case ets:lookup(?MONITOR_TABLE, Pid) of
+        [] ->
+            Ref = erlang:monitor(process, Pid),
+            ets:insert(?MONITOR_TABLE, {Pid, Ref});
+        [{Pid, _}] ->
+            ok
+    end,
     {reply, ok, St};
 
 handle_call({unregister, Pid, DbName}, _From, St) ->
-    Pattern = #client{dbname=DbName, pid=Pid, _='_'},
-    case ets:match_object(?REGISTRY_TABLE, Pattern) of
-        [] ->
-            ok;
-        [#client{ref=Ref}=Cli] ->
-            erlang:demonitor(Ref, [flush]),
-            ets:delete_object(?REGISTRY_TABLE, Cli)
-    end,
+    unregister_pattern(#client{dbname=DbName, pid=Pid, _='_'}),
     {reply, ok, St};
 
 handle_call({unregister_all, Pid}, _From, St) ->
-    Pattern = #client{pid=Pid, _='_'},
-    case ets:match_object(?REGISTRY_TABLE, Pattern) of
-        [] ->
-            ok;
-        Clients ->
-            lists:foreach(fun(Cli) ->
-                erlang:demonitor(Cli#client.ref, [flush]),
-                % I wonder if match_delete/2 is faster
-                % than repeated calls to delete_object.
-                ets:delete_object(Cli)
-            end, Clients)
-    end,
+    unregister_pattern(#client{pid=Pid, _='_'}),
     {reply, ok, St};
 
 handle_call(Msg, From, St) ->
@@ -95,9 +89,8 @@ handle_cast(Msg, St) ->
     {noreply, St, 0}.
 
 
-handle_info({'DOWN', Ref, process, Pid, _Reason}, St) ->
-    Pattern = #client{pid=Pid, ref=Ref, _='_'},
-    ets:match_delete(?REGISTRY_TABLE, Pattern),
+handle_info({'DOWN', _Ref, process, Pid, _Reason}, St) ->
+    unregister_pattern(#client{pid=Pid, _='_'}),
     {noreply, St};
 
 handle_info(Msg, St) ->
@@ -107,3 +100,20 @@ handle_info(Msg, St) ->
 
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
+
+
+unregister_pattern(Pattern) ->
+    Clients = ets:match_object(?REGISTRY_TABLE, Pattern),
+    Refs = lists:foldl(fun(#client{pid=Pid}=Cli, Acc) ->
+        ets:delete_object(?REGISTRY_TABLE, Cli),
+        case ets:lookup(?MONITOR_TABLE, Pid) of
+            [{Pid, Ref}] ->
+                ets:delete(?MONITOR_TABLE, Pid),
+                [Ref | Acc];
+            [] ->
+                Acc
+        end
+    end, [], Clients),
+    lists:foreach(fun(Ref) ->
+        erlang:demonitor(Ref, [flush])
+    end, Refs).
