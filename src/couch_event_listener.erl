@@ -51,7 +51,8 @@ behaviour_info(_) ->
 
 
 start(Mod, Arg, Options) ->
-    erlang:spawn(?MODULE, do_init, [Mod, Arg, Options]).
+    Pid = erlang:spawn(?MODULE, do_init, [Mod, Arg, Options]),
+    {ok, Pid}.
 
 
 start(Name, Mod, Arg, Options) ->
@@ -64,7 +65,8 @@ start(Name, Mod, Arg, Options) ->
 
 
 start_link(Mod, Arg, Options) ->
-    erlang:spawn_link(?MODULE, do_init, [Mod, Arg, Options]).
+    Pid = erlang:spawn_link(?MODULE, do_init, [Mod, Arg, Options]),
+    {ok, Pid}.
 
 
 start_link(Name, Mod, Arg, Options) ->
