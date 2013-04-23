@@ -22,6 +22,7 @@
 -export([code_change/3, terminate/2]).
 
 -export([handle_config_change/5]).
+-export([handle_db_event/3]).
 
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_js_functions.hrl").
@@ -34,7 +35,8 @@
     max_cache_size = 0,
     cache_size = 0,
     db_notifier = nil,
-    db_mon_ref = nil
+    db_mon_ref = nil,
+    event_listener = nil
 }).
 
 
@@ -131,11 +133,14 @@ init(_) ->
     ?STATE = ets:new(?STATE, [set, protected, named_table]),
     ?BY_USER = ets:new(?BY_USER, [set, protected, named_table]),
     ?BY_ATIME = ets:new(?BY_ATIME, [ordered_set, private, named_table]),
+    AuthDbName = config:get("couch_httpd_auth", "authentication_db"),
     process_flag(trap_exit, true),
     ok = config:listen_for_changes(?MODULE, nil),
-    {ok, Notifier} = couch_db_update_notifier:start_link(fun handle_db_event/1),
+    {ok, Listener} = couch_event:link_listener(
+            ?MODULE, handle_db_event, nil, [{dbname, AuthDbName}]
+        ),
     State = #state{
-        db_notifier = Notifier,
+        event_listener = Listener,
         max_cache_size = list_to_integer(
             config:get("couch_httpd_auth", "auth_cache_size", "50")
         )
@@ -143,18 +148,14 @@ init(_) ->
     {ok, reinit_cache(State)}.
 
 
-handle_db_event({Event, DbName}) ->
-    [{auth_db_name, AuthDbName}] = ets:lookup(?STATE, auth_db_name),
-    case DbName =:= AuthDbName of
-    true ->
-        case Event of
-        created -> gen_server:call(?MODULE, reinit_cache, infinity);
-        compacted -> gen_server:call(?MODULE, auth_db_compacted, infinity);
-        _Else   -> ok
-        end;
-    false ->
-        ok
-    end.
+handle_db_event(_DbName, created, St) ->
+    gen_server:call(?MODULE, reinit_cache, infinity),
+    {ok, St};
+handle_db_event(_DbName, compacted, St) ->
+    gen_server:call(?MODULE, auth_db_compacted, infinity),
+    {ok, St};
+handle_db_event(_, _, St) ->
+    {ok, St}.
 
 
 handle_call(reinit_cache, _From, State) ->
@@ -206,6 +207,15 @@ handle_cast({cache_hit, UserName}, State) ->
     {noreply, State}.
 
 
+handle_info({'EXIT', LPid, _Reason}, #state{event_listener=LPid}=State) ->
+    erlang:send_after(5000, self(), restart_event_listener),
+    {noreply, State#state{event_listener=undefined}};
+handle_info(restart_event_listener, State) ->
+    [{auth_db_name, AuthDbName}] = ets:lookup(?STATE, auth_db_name),
+    {ok, NewListener} = couch_event:link_listener(
+            ?MODULE, handle_db_event, nil, [{dbanme, AuthDbName}]
+        ),
+    {noreply, State#state{event_listener=NewListener}};
 handle_info({gen_event_EXIT, {config_listener, ?MODULE}, _Reason}, State) ->
     erlang:send_after(5000, self(), restart_config_listener),
     {noreply, State};
@@ -216,8 +226,8 @@ handle_info({'DOWN', Ref, _, _, _Reason}, #state{db_mon_ref = Ref} = State) ->
     {noreply, reinit_cache(State)}.
 
 
-terminate(_Reason, #state{db_notifier = Notifier}) ->
-    couch_db_update_notifier:stop(Notifier),
+terminate(_Reason, #state{event_listener = Listener}) ->
+    couch_event:stop_listener(Listener),
     exec_if_auth_db(fun(AuthDb) -> catch couch_db:close(AuthDb) end),
     true = ets:delete(?BY_USER),
     true = ets:delete(?BY_ATIME),
