@@ -18,7 +18,8 @@
     start/4,
     start_link/3,
     start_link/4,
-    enter_loop/3
+    enter_loop/3,
+    cast/2
 ]).
 
 -export([
@@ -41,6 +42,7 @@ behaviour_info(callbacks) ->
     [
         {init,1},
         {terminate/2},
+        {handle_cast/2},
         {handle_event/2},
         {handle_info/2}
     ];
@@ -79,6 +81,11 @@ enter_loop(Module, State, Options) ->
     ?MODULE:loop(#st{module=Module, state=State}, infinity).
 
 
+cast(Pid, Message) ->
+    Pid ! {'$couch_event_cast', Message},
+    ok.
+
+
 do_init(Module, Arg, Options) ->
     ok = maybe_name_process(Options),
     ok = register_listeners(Options),
@@ -96,6 +103,8 @@ loop(St, Timeout) ->
     receive
         {'$couch_event', DbName, Event} ->
             do_event(St, DbName, Event);
+        {'$couch_event_cast', Message} ->
+            do_cast(St, Message);
         Else ->
             do_info(St, Else)
     after Timeout ->
@@ -129,6 +138,19 @@ register_listeners(Options) ->
 
 do_event(#st{module=Module, state=State}=St, DbName, Event) ->
     case (catch Module:handle_event(DbName, Event, State)) of
+        {ok, NewState} ->
+            ?MODULE:loop(St#st{state=NewState}, infinity);
+        {ok, NewState, Timeout} when is_integer(Timeout), Timeout >= 0 ->
+            ?MODULE:loop(St#st{state=NewState}, Timeout);
+        {stop, Reason, NewState} ->
+            do_terminate(Reason, St#st{state=NewState});
+        Else ->
+            erlang:error(Else)
+    end.
+
+
+do_cast(#st{module=Module, state=State}=St, Message) ->
+    case (catch Module:handle_cast(Message, State)) of
         {ok, NewState} ->
             ?MODULE:loop(St#st{state=NewState}, infinity);
         {ok, NewState, Timeout} when is_integer(Timeout), Timeout >= 0 ->
