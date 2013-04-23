@@ -19,7 +19,8 @@
     wait_db_updated/3,
     get_rest_db_updated/1,
     configure_filter/4,
-    filter/3
+    filter/3,
+    handle_db_event/3
 ]).
 
 -export([changes_enumerator/2]).
@@ -77,13 +78,8 @@ handle_changes(Args1, Req, Db0) ->
     true ->
         fun(CallbackAcc) ->
             {Callback, UserAcc} = get_callback_acc(CallbackAcc),
-            Self = self(),
-            {ok, Notify} = couch_db_update_notifier:start_link(
-                fun({updated, DbName}) when Db0#db.name == DbName ->
-                    Self ! db_updated;
-                (_) ->
-                    ok
-                end
+            {ok, Listener} = couch_event:link_listener(
+                 ?MODULE, handle_db_event, self(), [{dbname, Db0#db.name}]
             ),
             {Db, StartSeq} = Start(),
             UserAcc2 = start_sending_changes(Callback, UserAcc, Feed),
@@ -96,7 +92,7 @@ handle_changes(Args1, Req, Db0) ->
                     Acc0,
                     true)
             after
-                couch_db_update_notifier:stop(Notify),
+                couch_event:stop_listener(Listener),
                 get_rest_db_updated(ok) % clean out any remaining update messages
             end
         end;
@@ -116,6 +112,15 @@ handle_changes(Args1, Req, Db0) ->
             end_sending_changes(Callback, UserAcc3, LastSeq, Feed)
         end
     end.
+
+
+handle_db_event(_DbName, updated, Parent) ->
+    Parent ! db_updated,
+    {ok, Parent};
+
+handle_db_event(_DbName, _Event, Parent) ->
+    {ok, Parent}.
+
 
 get_callback_acc({Callback, _UserAcc} = Pair) when is_function(Callback, 3) ->
     Pair;
