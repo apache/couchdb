@@ -28,6 +28,7 @@
         kernel,
         stdlib,
         crypto,
+        couch_event,
         ets_lru,
         mem3,
         fabric,

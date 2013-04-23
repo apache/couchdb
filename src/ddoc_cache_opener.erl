@@ -37,7 +37,7 @@
 ]).
 
 -export([
-    evictor/1
+    handle_db_event/3
 ]).
 
 
@@ -63,7 +63,9 @@ start_link() ->
 init(_) ->
     process_flag(trap_exit, true),
     ets:new(?OPENING, [set, protected, named_table, {keypos, #opener.key}]),
-    {ok, Evictor} = couch_db_update_notifier:start_link(fun ?MODULE:evictor/1),
+    {ok, Evictor} = couch_event:link_listener(
+            ?MODULE, handle_db_event, nil, [all_dbs]
+        ),
     {ok, #st{
         evictor = Evictor
     }}.
@@ -127,7 +129,7 @@ handle_cast(Msg, St) ->
 
 handle_info({'EXIT', Pid, Reason}, #st{evictor=Pid}=St) ->
     couch_log:error("ddoc_cache_opener evictor died ~w", [Reason]),
-    {ok, Evictor} = couch_db_update_notifier:start_link(fun ?MODULE:evictor/1),
+    {ok, Evictor} = couch_event:link_listener(?MODULE, evictor, nil, [all_dbs]),
     {noreply, St#st{evictor=Evictor}};
 
 handle_info({'EXIT', _Pid, {open_ok, Key, Resp}}, St) ->
@@ -157,14 +159,14 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 
-evictor({created, ShardDbName}) ->
-    DbName = mem3:dbname(ShardDbName),
-    gen_server:cast(?MODULE, {evict, DbName});
-evictor({deleted, ShardDbName}) ->
-    DbName = mem3:dbname(ShardDbName),
-    gen_server:cast(?MODULE, {evict, DbName});
-evictor(_) ->
-    ok.
+handle_db_event(ShardDbName, created, St) ->
+    gen_server:cast(?MODULE, {evict, mem3:dbname(ShardDbName)}),
+    {ok, St};
+handle_db_event(ShardDbName, deleted, St) ->
+    gen_server:cast(?MODULE, {evict, mem3:dbname(ShardDbName)}),
+    {ok, St};
+handle_db_event(_DbName, _Event, St) ->
+    {ok, St}.
 
 
 open_ddoc({DbName, validation_funs}=Key) ->
