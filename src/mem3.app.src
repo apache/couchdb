@@ -45,6 +45,7 @@
         mochiweb,
         couch,
         rexi,
-        couch_log
+        couch_log,
+        couch_event
     ]}
 ]}.
