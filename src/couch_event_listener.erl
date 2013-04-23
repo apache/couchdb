@@ -183,12 +183,13 @@ do_terminate(Reason, #st{module=Module, state=State}) ->
     % indefinitely.
     catch Module:terminate(Reason, State),
     catch couch_event:unregister_all(self()),
-    case Reason of
-        normal -> ok;
-        shutdown -> ok;
-        ignore -> ok;
-        Else -> erlang:error(Else)
-    end.
+    Status = case Reason of
+        normal -> normal;
+        shutdown -> normal;
+        ignore -> normal;
+        Else -> Else
+    end,
+    erlang:exit(Status).
 
 
 where({global, Name}) -> global:safe_whereis_name(Name);
