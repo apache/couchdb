@@ -14,8 +14,10 @@
 
 -export([
     register/2,
+    register_many/2,
     register_all/1,
     unregister/2,
+    unregister_many/2,
     unregister_all/1,
     notify/2
 ]).
@@ -26,15 +28,23 @@
 
 
 register(Pid, DbName) ->
-    gen_server:call(?REGISTRY, {register, Pid, DbName}).
+    gen_server:call(?REGISTRY, {register, Pid, [DbName]}).
+
+
+register_many(Pid, DbNames) when is_list(DbNames) ->
+    gen_server:call(?REGISTRY, {register, Pid, DbNames}).
 
 
 register_all(Pid) ->
-    gen_server:call(?REGISTRY, {register, Pid, all_dbs}).
+    gen_server:call(?REGISTRY, {register, Pid, [all_dbs]}).
 
 
 unregister(Pid, DbName) ->
-    gen_server:call(?REGISTRY, {unregister, Pid, DbName}).
+    gen_server:call(?REGISTRY, {unregister, Pid, [DbName]}).
+
+
+unregister_many(Pid, DbNames) when is_list(DbNames) ->
+    gen_server:call(?REGISTRY, {unregister, Pid, DbNames}).
 
 
 unregister_all(Pid) ->

@@ -56,12 +56,10 @@ terminate(_Reason, _St) ->
     ok.
 
 
-handle_call({register, Pid, DbName}, _From, St) ->
-    Client = #client{
-        dbname = DbName,
-        pid = Pid
-    },
-    ets:insert(?REGISTRY_TABLE, Client),
+handle_call({register, Pid, DbNames}, _From, St) ->
+    lists:foreach(fun(DbName) ->
+        ets:insert(?REGISTRY_TABLE, #client{dbname=DbName, pid=Pid})
+    end, DbNames),
     case ets:lookup(?MONITOR_TABLE, Pid) of
         [] ->
             Ref = erlang:monitor(process, Pid),
@@ -71,8 +69,10 @@ handle_call({register, Pid, DbName}, _From, St) ->
     end,
     {reply, ok, St};
 
-handle_call({unregister, Pid, DbName}, _From, St) ->
-    unregister_pattern(#client{dbname=DbName, pid=Pid, _='_'}),
+handle_call({unregister, Pid, DbNames}, _From, St) ->
+    lists:foreach(fun(DbName) ->
+        unregister_pattern(#client{dbname=DbName, pid=Pid, _='_'})
+    end, DbNames),
     {reply, ok, St};
 
 handle_call({unregister_all, Pid}, _From, St) ->
