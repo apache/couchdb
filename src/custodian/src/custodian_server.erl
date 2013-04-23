@@ -13,12 +13,12 @@
 % exported for callback.
 -export([
     check_shards/0,
-    update_event_handler/1
+    handle_db_event/3
 ]).
 
 % private records.
 -record(state, {
-    update_notifier,
+    event_listener,
     shard_checker,
     rescan=false
 }).
@@ -32,9 +32,9 @@ start_link() ->
 init(_) ->
     process_flag(trap_exit, true),
     net_kernel:monitor_nodes(true),
-    {ok, UNPid} = start_update_notifier(),
+    {ok, LisPid} = start_event_listener(),
     {ok, start_shard_checker(#state{
-        update_notifier=UNPid
+        event_listener=LisPid
     })}.
 
 handle_call(_Msg, _From, State) ->
@@ -63,19 +63,19 @@ handle_info({'EXIT', Pid, Reason}, #state{shard_checker=Pid}=State) ->
     NewState = State#state{shard_checker=undefined},
     {noreply, start_shard_checker(NewState)};
 
-handle_info({'EXIT', Pid, Reason}, #state{update_notifier=Pid}=State) ->
+handle_info({'EXIT', Pid, Reason}, #state{event_listener=Pid}=State) ->
     twig:log(notice, "custodian update notifier died ~p", [Reason]),
-    {ok, Pid1} = start_update_notifier(),
-    {noreply, State#state{update_notifier=Pid1}}.
+    {ok, Pid1} = start_event_listener(),
+    {noreply, State#state{event_listener=Pid1}}.
 
 terminate(_Reason, State) ->
-    couch_util:shutdown_sync(State#state.update_notifier),
+    couch_event:stop_listener(State#state.event_listener),
     couch_util:shutdown_sync(State#state.shard_checker),
     ok.
 
 code_change(_OldVsn, {state, Pid}, _Extra) ->
     {ok, #state{
-        update_notifier=Pid,
+        event_listener=Pid,
         shard_checker=undefined,
         rescan=false
     }};
@@ -94,13 +94,16 @@ start_shard_checker(#state{shard_checker=Pid}=State) when is_pid(Pid) ->
     State#state{rescan=true}.
 
 
-start_update_notifier() ->
-    couch_db_update_notifier:start_link(fun ?MODULE:update_event_handler/1).
+start_event_listener() ->
+    couch_event:link_listener(
+            ?MODULE, handle_db_event, nil, [{dbname, <<"dbs">>}]
+        ).
 
-update_event_handler({updated, <<"dbs">>}) ->
-    gen_server:cast(?MODULE, refresh);
-update_event_handler(_) ->
-    ok.
+handle_db_event(_DbName, updated, _St) ->
+    gen_server:cast(?MODULE, refresh),
+    {ok, nil};
+handle_db_event(_DbName, _Event, _St) ->
+    {ok, nil}.
 
 check_shards() ->
     {Unavailable, Impaired} = custodian:summary(),
