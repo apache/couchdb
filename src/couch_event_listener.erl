@@ -11,14 +11,14 @@
 % the License.
 
 -module(couch_event_listener).
--behavior(gen_server).
 
 
 -export([
     start/3,
     start/4,
     start_link/3,
-    start_link/4
+    start_link/4,
+    enter_loop/3
 ]).
 
 -export([
@@ -26,144 +26,179 @@
 ]).
 
 -export([
-    init/1,
-    terminate/2,
-    handle_call/3,
-    handle_cast/2,
-    handle_info/2,
-    code_change/3
+    do_init/3,
+    loop/2
 ]).
+
+
+-record(st, {
+    module,
+    state
+}).
 
 
 behaviour_info(callbacks) ->
     [
         {init,1},
         {terminate/2},
-        {handle_event/2}
+        {handle_event/2},
+        {handle_info/2}
     ];
 behaviour_info(_) ->
     undefined.
 
 
-start(Mod, Args, Options) ->
-    gen_server:start(?MODULE, {Mod, Args}, Options).
+start(Mod, Arg, Options) ->
+    erlang:spawn(?MODULE, do_init, [Mod, Arg, Options]).
 
 
-start(Name, Mod, Args, Options) ->
-    gen_server:start(Name, ?MODULE, {Mod, Args}, Options).
+start(Name, Mod, Arg, Options) ->
+    case where(Name) of
+        undefined ->
+            start(Mod, Arg, [{name, Name} | Options]);
+        Pid ->
+            {error, {already_started, Pid}}
+    end.
 
 
-start_link(Mod, Args, Options) ->
-    gen_server:start_link(?MODULE, {Mod, Args}, Options).
+start_link(Mod, Arg, Options) ->
+    erlang:spawn_link(?MODULE, do_init, [Mod, Arg, Options]).
 
 
-start_link(Name, Mod, Args, Options) ->
-    gen_server:start_link(Name, ?MODULE, {Mod, Args}, Options).
+start_link(Name, Mod, Arg, Options) ->
+    case where(Name) of
+        undefined ->
+            start_link(Mod, Arg, [{name, Name} | Options]);
+        Pid ->
+            {error, {already_started, Pid}}
+    end.
 
 
-init({Mod, Args}) ->
-    case Mod:init(Args) of
-        {ok, St} ->
-            {ok, {Mod, St}};
-        {ok, St, Timeout} ->
-            {ok, {Mod, St}, Timeout};
-        {stop, Reason} ->
-            {stop, Reason};
-        ignore ->
-            ignore;
+enter_loop(Module, State, Options) ->
+    ok = register_listeners(Options),
+    ?MODULE:loop(#st{module=Module, state=State}, infinity).
+
+
+do_init(Module, Arg, Options) ->
+    ok = maybe_name_process(Options),
+    ok = register_listeners(Options),
+    case (catch Module:init(Arg)) of
+        {ok, State} ->
+            ?MODULE:loop(#st{module=Module, state=State}, infinity);
+        {ok, State, Timeout} when is_integer(Timeout), Timeout >= 0 ->
+            ?MODULE:loop(#st{module=Module, state=State}, Timeout);
         Else ->
-            erlang:error({bad_return, Else})
+            erlang:exit(Else)
     end.
 
 
-terminate(Reason, {Mod, St}) ->
-    Mod:terminate(Reason, St).
+loop(St, Timeout) ->
+    receive
+        {'$couch_event', DbName, Event} ->
+            do_event(St, DbName, Event);
+        Else ->
+            do_info(St, Else)
+    after Timeout ->
+        do_info(St, timeout)
+    end.
 
 
-handle_call(Msg, From, {Mod, St}) ->
-    case erlang:function_exported(Mod, handle_call, 3) of
-        true ->
-            case Mod:handle_call(Msg, From, St) of
-                {reply, Reply, NewState} ->
-                    {reply, Reply, {Mod, NewState}};
-                {reply, Reply, NewState, Timeout} ->
-                    {reply, Reply, {Mod, NewState}, Timeout};
-                {noreply, NewState} ->
-                    {noreply, {Mod, NewState}};
-                {noreply, NewState, Timeout} ->
-                    {noreply, {Mod, NewState}, Timeout};
-                {stop, Reason, Reply, NewState} ->
-                    {stop, Reason, Reply, {Mod, NewState}};
-                {stop, Reason, NewState} ->
-                    {stop, Reason, {Mod, NewState}};
-                Else ->
-                    erlang:error({bad_return, Else})
+maybe_name_process(Options) ->
+    case proplists:lookup(name, Options) of
+        {name, Name} ->
+            case name_register(Name) of
+                true ->
+                    ok;
+                {false, Pid} ->
+                    erlang:error({already_started, Pid})
             end;
-        false ->
-            {stop, {invalid_call, Msg}, invalid_call, St}
+        undefined ->
+            ok
     end.
 
 
-handle_cast(Msg, {Mod, St}) ->
-    case erlang:function_exported(Mod, handle_cast, 2) of
-        true ->
-            case Mod:handle_cast(Msg, St) of
-                {noreply, NewState} ->
-                    {noreply, {Mod, NewState}};
-                {noreply, NewState, Timeout} ->
-                    {noreply, {Mod, NewState}, Timeout};
-                {stop, Reason, NewState} ->
-                    {stop, Reason, {Mod, NewState}};
-                Else ->
-                    erlang:error({bad_return, Else})
-            end;
-        false ->
-            {stop, {invalid_cast, Msg}, St}
-    end.
+register_listeners(Options) ->
+    case get_all_dbnames(Options) of
+        all_dbs ->
+            couch_event:register_all(self());
+        DbNames ->
+            couch_event:register_many(self(), DbNames)
+    end,
+    ok.
 
 
-handle_info({'$couch_event', DbName, Event}, {Mod, St}) ->
-    case Mod:handle_event(DbName, Event, St) of
-        {noreply, NewState} ->
-            {noreply, {Mod, NewState}};
-        {noreply, NewState, Timeout} ->
-            {noreply, {Mod, NewState}, Timeout};
+do_event(#st{module=Module, state=State}=St, DbName, Event) ->
+    case (catch Module:handle_event(DbName, Event, State)) of
+        {ok, NewState} ->
+            ?MODULE:loop(St#st{state=NewState}, infinity);
+        {ok, NewState, Timeout} when is_integer(Timeout), Timeout >= 0 ->
+            ?MODULE:loop(St#st{state=NewState}, Timeout);
         {stop, Reason, NewState} ->
-            {stop, Reason, {Mod, NewState}};
+            do_terminate(Reason, St#st{state=NewState});
         Else ->
-            erlang:error({bad_return, Else})
+            erlang:error(Else)
+    end.
+
+
+do_info(#st{module=Module, state=State}=St, Message) ->
+    case (catch Module:handle_info(Message, State)) of
+        {ok, NewState} ->
+            ?MODULE:loop(St#st{state=NewState}, infinity);
+        {ok, NewState, Timeout} when is_integer(Timeout), Timeout >= 0 ->
+            ?MODULE:loop(St#st{state=NewState}, Timeout);
+        {stop, Reason, NewState} ->
+            do_terminate(Reason, St#st{state=NewState});
+        Else ->
+            erlang:error(Else)
+    end.
+
+
+do_terminate(Reason, #st{module=Module, state=State}) ->
+    % Order matters. We want to make sure Module:terminate/1
+    % is called even if couch_event:unregister_all/1 hangs
+    % indefinitely.
+    catch Module:terminate(Reason, State),
+    catch couch_event:unregister_all(self()),
+    case Reason of
+        normal -> ok;
+        shutdown -> ok;
+        ignore -> ok;
+        Else -> erlang:error(Else)
+    end.
+
+
+where({global, Name}) -> global:safe_whereis_name(Name);
+where({local, Name}) -> whereis(Name).
+
+
+name_register({global, Name}=GN) ->
+    case global:register_name(Name, self()) of
+        yes -> true;
+        no -> {false, where(GN)}
     end;
-
-handle_info(Msg, {Mod, St}) ->
-    case erlang:function_export(Mod, handle_info, 2) of
-        true ->
-            case Mod:handle_info(Msg, St) of
-                {noreply, NewState} ->
-                    {noreply, {Mod, NewState}};
-                {noreply, NewState, Timeout} ->
-                    {noreply, {Mod, NewState}, Timeout};
-                {stop, Reason, NewState} ->
-                    {stop, Reason, {Mod, NewState}};
-                Else ->
-                    erlang:error({bad_return, Else})
-            end;
-        false ->
-            {stop, {invalid_info, Msg}, St}
+name_register({local, Name}=LN) ->
+    try register(Name, self()) of
+        true -> true
+    catch error:_ ->
+        {false, where(LN)}
     end.
 
 
-code_change(OldVsn, {Mod, St}, Extra) ->
-    case erlang:function_exported(Mod, code_change, 3) of
-        true ->
-            case Mod:code_change(OldVsn, St, Extra) of
-                {ok, NewState} ->
-                    {ok, {Mod, NewState}};
-                {error, Reason} ->
-                    {error, Reason};
-                Else ->
-                    erlang:error({bad_return, Else})
-            end;
-        false ->
-            {ok, {Mod, St}}
+get_all_dbnames(Options) ->
+    case proplists:get_value(all_dbs, Options) of
+        true -> all_dbs;
+        false -> get_all_dbnames(Options, [])
     end.
 
+
+get_all_dbnames([], []) ->
+    erlang:error(no_dbnames_provided);
+get_all_dbnames([], Acc) ->
+    lists:usort(Acc);
+get_all_dbnames([{dbname, DbName} | Rest], Acc) when is_binary(DbName) ->
+    get_all_dbnames(Rest, [DbName | Acc]);
+get_all_dbnames([{dbnames, DbNames} | Rest], Acc) when is_list(DbNames) ->
+    BinDbNames = [DbName || DbName <- DbNames, is_binary(DbName)],
+    get_all_dbnames(Rest, BinDbNames ++ Acc);
+get_all_dbnames([_Ignored | Rest], Acc) ->
+    get_all_dbnames(Rest, Acc).
