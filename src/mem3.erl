@@ -21,6 +21,9 @@
 -export([live_shards/2]).
 -export([belongs/2]).
 
+%% For mem3 use only.
+-export([name/1, node/1, range/1]).
+
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
@@ -74,12 +77,25 @@ node_info(Node, Key) ->
     mem3_nodes:get_node_info(Node, Key).
 
 -spec shards(DbName::iodata()) -> [#shard{}].
-shards(DbName) when is_list(DbName) ->
-    shards(list_to_binary(DbName));
 shards(DbName) ->
+    shards_int(DbName, []).
+
+shards_int(DbName, Options) when is_list(DbName) ->
+    shards_int(list_to_binary(DbName), Options);
+shards_int(DbName, Options) ->
+    Ordered = lists:member(ordered, Options),
     ShardDbName =
         list_to_binary(config:get("mem3", "shard_db", "dbs")),
     case DbName of
+    ShardDbName when Ordered ->
+        %% shard_db is treated as a single sharded db to support calls to db_info
+        %% and view_all_docs
+        [#ordered_shard{
+            node = node(),
+            name = ShardDbName,
+            dbname = ShardDbName,
+            range = [0, 2 bsl 31],
+            order = undefined}];
     ShardDbName ->
         %% shard_db is treated as a single sharded db to support calls to db_info
         %% and view_all_docs
@@ -89,22 +105,27 @@ shards(DbName) ->
             dbname = ShardDbName,
             range = [0, 2 bsl 31]}];
     _ ->
-        mem3_shards:for_db(DbName)
+        mem3_shards:for_db(DbName, Options)
     end.
 
 -spec shards(DbName::iodata(), DocId::binary()) -> [#shard{}].
-shards(DbName, DocId) when is_list(DbName) ->
-    shards(list_to_binary(DbName), DocId);
-shards(DbName, DocId) when is_list(DocId) ->
-    shards(DbName, list_to_binary(DocId));
 shards(DbName, DocId) ->
-    mem3_shards:for_docid(DbName, DocId).
+    shards_int(DbName, DocId, []).
+
+shards_int(DbName, DocId, Options) when is_list(DbName) ->
+    shards_int(list_to_binary(DbName), DocId, Options);
+shards_int(DbName, DocId, Options) when is_list(DocId) ->
+    shards_int(DbName, list_to_binary(DocId), Options);
+shards_int(DbName, DocId, Options) ->
+    mem3_shards:for_docid(DbName, DocId, Options).
+
 
 -spec ushards(DbName::iodata()) -> [#shard{}].
 ushards(DbName) ->
     Nodes = [node()|erlang:nodes()],
     ZoneMap = zone_map(Nodes),
-    ushards(DbName, live_shards(DbName, Nodes), ZoneMap).
+    Shards = ushards(DbName, live_shards(DbName, Nodes, [ordered]), ZoneMap),
+    mem3_util:downcast(Shards).
 
 ushards(DbName, Shards0, ZoneMap) ->
     {L,S,D} = group_by_proximity(Shards0, ZoneMap),
@@ -209,6 +230,8 @@ belongs(Begin, End, DocId) ->
 
 range(#shard{range = Range}) ->
     Range;
+range(#ordered_shard{range = Range}) ->
+    Range;
 range(<<"shards/", Start:8/binary, "-", End:8/binary, "/", _/binary>>) ->
     [httpd_util:hexlist_to_integer(binary_to_list(Start)),
      httpd_util:hexlist_to_integer(binary_to_list(End))].
@@ -217,29 +240,29 @@ nodes_in_zone(Nodes, Zone) ->
     [Node || Node <- Nodes, Zone == mem3:node_info(Node, <<"zone">>)].
 
 live_shards(DbName, Nodes) ->
-    [S || #shard{node=Node} = S <- shards(DbName), lists:member(Node, Nodes)].
+    live_shards(DbName, Nodes, []).
+
+live_shards(DbName, Nodes, Options) ->
+    [S || S <- shards_int(DbName, Options), lists:member(mem3:node(S), Nodes)].
 
 zone_map(Nodes) ->
     [{Node, node_info(Node, <<"zone">>)} || Node <- Nodes].
 
 group_by_proximity(Shards) ->
-    Nodes = [N || #shard{node=N} <- lists:ukeysort(#shard.node, Shards)],
+    Nodes = [mem3:node(S) || S <- lists:ukeysort(#shard.node, Shards)],
     group_by_proximity(Shards, zone_map(Nodes)).
 
 group_by_proximity(Shards, ZoneMap) ->
-    {Local, Remote} = lists:partition(fun(S) -> S#shard.node =:= node() end,
+    {Local, Remote} = lists:partition(fun(S) -> mem3:node(S) =:= node() end,
         Shards),
     LocalZone = proplists:get_value(node(), ZoneMap),
-    Fun = fun(S) -> proplists:get_value(S#shard.node, ZoneMap) =:= LocalZone end,
+    Fun = fun(S) -> proplists:get_value(mem3:node(S), ZoneMap) =:= LocalZone end,
     {SameZone, DifferentZone} = lists:partition(Fun, Remote),
     {Local, SameZone, DifferentZone}.
 
 choose_ushards(DbName, Shards) ->
-    Groups = group_by_range(rotate_list(DbName, lists:sort(Shards))),
-    Fun = fun(Group, {N, Acc}) ->
-        {N+1, [lists:nth(1 + N rem length(Group), Group) | Acc]} end,
-    {_, Result} = lists:foldl(Fun, {0, []}, Groups),
-    Result.
+    [hd(G) || G <- [rotate_list(DbName, order_shards(G)) ||
+        G <- group_by_range(Shards)]].
 
 rotate_list(_DbName, []) ->
     [];
@@ -247,9 +270,14 @@ rotate_list(DbName, List) ->
     {H, T} = lists:split(erlang:crc32(DbName) rem length(List), List),
     T ++ H.
 
+order_shards([#ordered_shard{}|_]=OrderedShards) ->
+    lists:keysort(#ordered_shard.order, OrderedShards);
+order_shards(UnorderedShards) ->
+    UnorderedShards.
+
 group_by_range(Shards) ->
-    Groups0 = lists:foldl(fun(#shard{range=Range}=Shard, Dict) ->
-        orddict:append(Range, Shard, Dict) end, orddict:new(), Shards),
+    Groups0 = lists:foldl(fun(Shard, Dict) ->
+        orddict:append(mem3:range(Shard), Shard, Dict) end, orddict:new(), Shards),
     {_, Groups} = lists:unzip(Groups0),
     Groups.
 
@@ -259,3 +287,13 @@ quorum(#db{name=DbName}) ->
     quorum(DbName);
 quorum(DbName) ->
     n(DbName) div 2 + 1.
+
+node(#shard{node=Node}) ->
+    Node;
+node(#ordered_shard{node=Node}) ->
+    Node.
+
+name(#shard{name=Name}) ->
+    Name;
+name(#ordered_shard{name=Name}) ->
+    Name.

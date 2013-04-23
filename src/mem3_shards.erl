@@ -19,7 +19,7 @@
 -export([handle_config_change/5]).
 
 -export([start_link/0]).
--export([for_db/1, for_docid/2, get/3, local/1, fold/2]).
+-export([for_db/1, for_db/2, for_docid/2, for_docid/3, get/3, local/1, fold/2]).
 -export([set_max_size/1]).
 
 -record(st, {
@@ -39,7 +39,10 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 for_db(DbName) ->
-    try ets:lookup(?SHARDS, DbName) of
+    for_db(DbName, []).
+
+for_db(DbName, Options) ->
+    Shards = try ets:lookup(?SHARDS, DbName) of
         [] ->
             load_shards_from_disk(DbName);
         Else ->
@@ -47,26 +50,47 @@ for_db(DbName) ->
             Else
     catch error:badarg ->
         load_shards_from_disk(DbName)
+    end,
+    case lists:member(ordered, Options) of
+        true  -> Shards;
+        false -> mem3_util:downcast(Shards)
     end.
 
 for_docid(DbName, DocId) ->
+    for_docid(DbName, DocId, []).
+
+for_docid(DbName, DocId, Options) ->
     HashKey = mem3_util:hash(DocId),
-    Head = #shard{
+    ShardHead = #shard{
         name = '_',
         node = '_',
         dbname = DbName,
         range = ['$1','$2'],
         ref = '_'
     },
+    OrderedShardHead = #ordered_shard{
+        name = '_',
+        node = '_',
+        dbname = DbName,
+        range = ['$1','$2'],
+        ref = '_',
+        order = '_'
+    },
     Conditions = [{'=<', '$1', HashKey}, {'=<', HashKey, '$2'}],
-    try ets:select(?SHARDS, [{Head, Conditions, ['$_']}]) of
+    ShardSpec = {ShardHead, Conditions, ['$_']},
+    OrderedShardSpec = {OrderedShardHead, Conditions, ['$_']},
+    Shards = try ets:select(?SHARDS, [ShardSpec, OrderedShardSpec]) of
         [] ->
             load_shards_from_disk(DbName, DocId);
-        Shards ->
+        Else ->
             gen_server:cast(?MODULE, {cache_hit, DbName}),
-            Shards
+            Else
     catch error:badarg ->
         load_shards_from_disk(DbName, DocId)
+    end,
+    case lists:member(ordered, Options) of
+        true  -> Shards;
+        false -> mem3_util:downcast(Shards)
     end.
 
 get(DbName, Node, Range) ->
@@ -221,10 +245,10 @@ changes_callback({change, {Change}, _}, _) ->
                 couch_log:error("missing partition table for ~s: ~p",
                     [DbName, Reason]);
             {Doc} ->
-                Shards = mem3_util:build_shards(DbName, Doc),
+                Shards = mem3_util:build_ordered_shards(DbName, Doc),
                 gen_server:cast(?MODULE, {cache_insert, DbName, Shards}),
-                [create_if_missing(Name) || #shard{name=Name, node=Node}
-                    <- Shards, Node =:= node()]
+                [create_if_missing(mem3:name(S)) || S
+                    <- Shards, mem3:node(S) =:= node()]
             end
         end
     end,
@@ -244,7 +268,7 @@ load_shards_from_disk(DbName) when is_binary(DbName) ->
 load_shards_from_db(#db{} = ShardDb, DbName) ->
     case couch_db:open_doc(ShardDb, DbName, [ejson_body]) of
     {ok, #doc{body = {Props}}} ->
-        Shards = mem3_util:build_shards(DbName, Props),
+        Shards = mem3_util:build_ordered_shards(DbName, Props),
         gen_server:cast(?MODULE, {cache_insert, DbName, Shards}),
         Shards;
     {not_found, _} ->
@@ -326,4 +350,3 @@ cache_clear(St) ->
     true = ets:delete_all_objects(?SHARDS),
     true = ets:delete_all_objects(?ATIMES),
     St#st{cur_size=0}.
-

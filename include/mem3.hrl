@@ -19,6 +19,16 @@
     ref :: reference() | 'undefined' | '_'
 }).
 
+%% Do not reference outside of mem3.
+-record(ordered_shard, {
+    name :: binary() | '_',
+    node :: node() | '_',
+    dbname :: binary(),
+    range :: [non_neg_integer() | '$1' | '$2'],
+    ref :: reference() | 'undefined' | '_',
+    order :: non_neg_integer() | 'undefined' | '_'
+}).
+
 %% types
 -type join_type() :: init | join | replace | leave.
 -type join_order() :: non_neg_integer().

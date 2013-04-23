@@ -17,6 +17,9 @@
     shard_info/1, ensure_exists/1, open_db_doc/1]).
 -export([owner/2, is_deleted/1]).
 
+%% do not use outside mem3.
+-export([build_ordered_shards/2, downcast/1]).
+
 -export([create_partition_map/4, name_shard/1]).
 -deprecated({create_partition_map, 4, eventually}).
 -deprecated({name_shard, 1, eventually}).
@@ -34,10 +37,17 @@ hash(Item) ->
 name_shard(Shard) ->
     name_shard(Shard, "").
 
-name_shard(#shard{dbname = DbName, range=[B,E]} = Shard, Suffix) ->
-    Name = ["shards/", couch_util:to_hex(<<B:32/integer>>), "-",
-        couch_util:to_hex(<<E:32/integer>>), "/", DbName, Suffix],
-    Shard#shard{name = ?l2b(Name)}.
+name_shard(#shard{dbname = DbName, range=Range} = Shard, Suffix) ->
+    Name = make_name(DbName, Range, Suffix),
+    Shard#shard{name = ?l2b(Name)};
+
+name_shard(#ordered_shard{dbname = DbName, range=Range} = Shard, Suffix) ->
+    Name = make_name(DbName, Range, Suffix),
+    Shard#ordered_shard{name = ?l2b(Name)}.
+
+make_name(DbName, [B,E], Suffix) ->
+    ["shards/", couch_util:to_hex(<<B:32/integer>>), "-",
+     couch_util:to_hex(<<E:32/integer>>), "/", DbName, Suffix].
 
 create_partition_map(DbName, N, Q, Nodes) ->
     create_partition_map(DbName, N, Q, Nodes, "").
@@ -122,7 +132,25 @@ delete_db_doc(DbName, DocId, ShouldMutate) ->
         couch_db:close(Db)
     end.
 
+%% Always returns original #shard records.
+-spec build_shards(binary(), list()) -> [#shard{}].
 build_shards(DbName, DocProps) ->
+    build_shards_by_node(DbName, DocProps).
+
+%% Will return #ordered_shard records if by_node and by_range
+%% are symmetrical, #shard records otherwise.
+-spec build_ordered_shards(binary(), list()) ->
+    [#shard{}] | [#ordered_shard{}].
+build_ordered_shards(DbName, DocProps) ->
+    ByNode = build_shards_by_node(DbName, DocProps),
+    ByRange = build_shards_by_range(DbName, DocProps),
+    Symmetrical = lists:sort(ByNode) =:= lists:sort(downcast(ByRange)),
+    case Symmetrical of
+        true  -> ByRange;
+        false -> ByNode
+    end.
+
+build_shards_by_node(DbName, DocProps) ->
     {ByNode} = couch_util:get_value(<<"by_node">>, DocProps, {[]}),
     Suffix = couch_util:get_value(<<"shard_suffix">>, DocProps, ""),
     lists:flatmap(fun({Node, Ranges}) ->
@@ -137,6 +165,23 @@ build_shards(DbName, DocProps) ->
             }, Suffix)
         end, Ranges)
     end, ByNode).
+
+build_shards_by_range(DbName, DocProps) ->
+    {ByRange} = couch_util:get_value(<<"by_range">>, DocProps, {[]}),
+    Suffix = couch_util:get_value(<<"shard_suffix">>, DocProps, ""),
+    lists:flatmap(fun({Range, Nodes}) ->
+        lists:map(fun({Node, Order}) ->
+            [B,E] = string:tokens(?b2l(Range), "-"),
+            Beg = httpd_util:hexlist_to_integer(B),
+            End = httpd_util:hexlist_to_integer(E),
+            name_shard(#ordered_shard{
+                dbname = DbName,
+                node = to_atom(Node),
+                range = [Beg, End],
+                order = Order
+            }, Suffix)
+        end, lists:zip(Nodes, lists:seq(1, length(Nodes))))
+    end, ByRange).
 
 to_atom(Node) when is_binary(Node) ->
     list_to_atom(binary_to_list(Node));
@@ -194,3 +239,16 @@ is_deleted(Change) ->
     Else ->
         Else
     end.
+
+downcast(#shard{}=S) ->
+    S;
+downcast(#ordered_shard{}=S) ->
+    #shard{
+       name = S#ordered_shard.name,
+       node = S#ordered_shard.node,
+       dbname = S#ordered_shard.dbname,
+       range = S#ordered_shard.range,
+       ref = S#ordered_shard.ref
+      };
+downcast(Shards) when is_list(Shards) ->
+    [downcast(Shard) || Shard <- Shards].
