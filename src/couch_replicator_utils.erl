@@ -19,6 +19,8 @@
 -export([sum_stats/2, is_deleted/1]).
 -export([mp_parse_doc/2]).
 
+-export([handle_db_event/3]).
+
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("ibrowse/include/ibrowse.hrl").
 -include("couch_replicator_api_wrap.hrl").
@@ -370,21 +372,25 @@ close_db(_HttpDb) ->
 
 
 start_db_compaction_notifier(#db{name = DbName}, Server) ->
-    {ok, Notifier} = couch_db_update_notifier:start_link(
-        fun({compacted, DbName1}) when DbName1 =:= DbName ->
-                ok = gen_server:cast(Server, {db_compacted, DbName});
-            (_) ->
-                ok
-        end),
-    Notifier;
+    {ok, Pid} = couch_event:link_listener(
+            ?MODULE, handle_db_event, Server, [{dbname, DbName}]
+        ),
+    Pid;
 start_db_compaction_notifier(_, _) ->
     nil.
 
 
 stop_db_compaction_notifier(nil) ->
     ok;
-stop_db_compaction_notifier(Notifier) ->
-    couch_db_update_notifier:stop(Notifier).
+stop_db_compaction_notifier(Listener) ->
+    couch_event:stop_listener(Listener).
+
+
+handle_db_event(DbName, compacted, Server) ->
+    gen_server:cast(Server, {db_compacted, DbName}),
+    {ok, Server};
+handle_db_event(_DbName, _Event, Server) ->
+    {ok, Server}.
 
 
 sum_stats(#rep_stats{} = S1, #rep_stats{} = S2) ->

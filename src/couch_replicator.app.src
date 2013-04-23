@@ -37,7 +37,8 @@
         stdlib,
         couch_log,
         mem3,
-        couch
+        couch,
+        couch_event
     ]}
 ]}.
 
