@@ -37,7 +37,7 @@ init(_) ->
             permanent,
             5000,
             worker,
-            [couch_event_register]
+            [couch_event_registry]
         },
         {couch_event_dist,
             {couch_event_dist, start_link, []},
