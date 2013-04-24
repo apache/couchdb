@@ -45,6 +45,13 @@ init(_) ->
             5000,
             worker,
             [couch_event_dist]
+        },
+        {couch_event_os_sup,
+            {couch_event_os_sup, start_link, []},
+            permanent,
+            5000,
+            supervisor,
+            [couch_event_os_sup]
         }
     ],
     {ok, {{one_for_one, 5, 10}, Children}}.
