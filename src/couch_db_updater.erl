@@ -107,7 +107,7 @@ handle_call(cancel_compact, _From, #db{compactor_pid = Pid} = Db) ->
 handle_call(increment_update_seq, _From, Db) ->
     Db2 = commit_data(Db#db{update_seq=Db#db.update_seq+1}),
     ok = gen_server:call(couch_server, {db_updated, Db2}, infinity),
-    couch_db_update_notifier:notify({updated, Db#db.name}),
+    couch_event:notify(Db#db.name, updated),
     {reply, {ok, Db2#db.update_seq}, Db2};
 
 handle_call({set_security, NewSec}, _From, #db{compression = Comp} = Db) ->
@@ -189,7 +189,7 @@ handle_call({purge_docs, IdRevs}, _From, Db) ->
             header=Header#db_header{purge_seq=PurgeSeq+1, purged_docs=Pointer}}),
 
     ok = gen_server:call(couch_server, {db_updated, Db2}, infinity),
-    couch_db_update_notifier:notify({updated, Db#db.name}),
+    couch_event:notify(Db#db.name, updated),
     {reply, {ok, (Db2#db.header)#db_header.purge_seq, IdRevsPurged}, Db2}.
 
 
@@ -242,7 +242,7 @@ handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
         close_db(Db),
         NewDb3 = refresh_validate_doc_funs(NewDb2),
         ok = gen_server:call(couch_server, {db_updated, NewDb3}, infinity),
-        couch_db_update_notifier:notify({compacted, NewDb3#db.name}),
+        couch_event:notify(NewDb3#db.name, compacted),
         ?LOG_INFO("Compaction for db \"~s\" completed.", [Db#db.name]),
         {noreply, NewDb3#db{compactor_pid=nil}};
     false ->
@@ -278,14 +278,19 @@ handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts,
     {ok, Db2, UpdatedDDocIds} ->
         ok = gen_server:call(couch_server, {db_updated, Db2}, infinity),
         if Db2#db.update_seq /= Db#db.update_seq ->
-            couch_db_update_notifier:notify({updated, Db2#db.name});
+            couch_event:notify(Db2#db.name, updated);
         true -> ok
         end,
         [catch(ClientPid ! {done, self()}) || ClientPid <- Clients],
-        lists:foreach(fun(DDocId) ->
-            couch_db_update_notifier:notify({ddoc_updated, {Db#db.name, DDocId}})
-        end, UpdatedDDocIds),
-        {noreply, Db2, hibernate}
+        Db3 = case length(UpdatedDDocIds) > 0 of
+            true ->
+                couch_event:notify(Db2#db.name, ddoc_updated),
+                ddoc_cache:evict(Db2#db.name, UpdatedDDocIds),
+                refresh_validate_doc_funs(Db2);
+            false ->
+                Db2
+        end,
+        {noreply, Db3, hibernate}
     catch
         throw: retry ->
             [catch(ClientPid ! {retry, self()}) || ClientPid <- Clients],
@@ -738,8 +743,7 @@ update_docs_int(Db, DocsList, NonRepDocs, MergeConflicts, FullCommit) ->
     % funs if we did.
     Db4 = case length(UpdatedDDocIds) > 0 of
         true ->
-            couch_db_update_notifier:notify(
-                {ddoc_updated, Db3#db.name}),
+            couch_event:notify(Db3#db.name, ddoc_updated),
             ddoc_cache:evict(Db3#db.name, UpdatedDDocIds),
             refresh_validate_doc_funs(Db3);
         false ->

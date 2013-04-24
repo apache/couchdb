@@ -291,7 +291,7 @@ open_async(Server, From, DbName, Filepath, Options) ->
         Res = couch_db:start_link(DbName, Filepath, Options),
         case {Res, lists:member(create, Options)} of
             {{ok, _Db}, true} ->
-                couch_db_update_notifier:notify({created, DbName});
+                couch_event:notify(DbName, created);
             _ ->
                 ok
         end,
@@ -456,7 +456,7 @@ handle_call({delete, DbName, Options}, _From, Server) ->
 
         case couch_file:delete(Server#server.root_dir, FullFilepath, Async) of
         ok ->
-            couch_db_update_notifier:notify({deleted, DbName}),
+            couch_event:notify(DbName, deleted),
             {reply, ok, Server2};
         {error, enoent} ->
             {reply, not_found, Server2};
