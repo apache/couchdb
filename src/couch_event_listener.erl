@@ -212,7 +212,7 @@ name_register({local, Name}=LN) ->
 get_all_dbnames(Options) ->
     case proplists:get_value(all_dbs, Options) of
         true -> all_dbs;
-        false -> get_all_dbnames(Options, [])
+        _ -> get_all_dbnames(Options, [])
     end.
 
 
