@@ -45,7 +45,7 @@ stop(Pid) ->
 set_timeout(Pid, TimeOut) when is_integer(TimeOut) ->
     ok = gen_server:call(Pid, {set_timeout, TimeOut}, infinity).
 
-% Used by couch_db_update_notifier.erl
+% Used by couch_event_os_process.erl
 send(Pid, Data) ->
     gen_server:cast(Pid, {send, Data}).
 
