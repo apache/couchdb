@@ -46,7 +46,7 @@ init([]) ->
     {ok, {
         {one_for_one, 10, 3600},
         Children
-    }.
+    }}.
 
 
 handle_config_change("update_notification", Id, deleted, _, _) ->
