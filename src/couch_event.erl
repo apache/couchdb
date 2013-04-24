@@ -17,6 +17,7 @@
 ]).
 
 -export([
+    listen/4,
     link_listener/4,
     stop_listener/1
 ]).
