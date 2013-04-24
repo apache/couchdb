@@ -41,10 +41,10 @@
 behaviour_info(callbacks) ->
     [
         {init,1},
-        {terminate/2},
-        {handle_cast/2},
-        {handle_event/2},
-        {handle_info/2}
+        {terminate,2},
+        {handle_cast,2},
+        {handle_event,2},
+        {handle_info,2}
     ];
 behaviour_info(_) ->
     undefined.
