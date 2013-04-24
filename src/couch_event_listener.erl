@@ -123,7 +123,7 @@ maybe_name_process(Options) ->
                 {false, Pid} ->
                     erlang:error({already_started, Pid})
             end;
-        undefined ->
+        none ->
             ok
     end.
 
