@@ -13,6 +13,7 @@
 -module(fabric_db_update_listener).
 
 -export([go/4, start_update_notifier/1, stop/1, wait_db_updated/1]).
+-export([handle_db_event/3]).
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
@@ -60,20 +61,17 @@ start_update_notifiers(DbName) ->
 
 % rexi endpoint
 start_update_notifier(DbNames) ->
-    Notify = config:get("cloudant", "maintenance_mode", "false") /= "true",
     {Caller, Ref} = get(rexi_from),
-    Fun = fun({updated, X}) ->
-        case lists:member(X, DbNames) of
-            true when Notify -> erlang:send(Caller, {Ref, db_updated});
-            _ -> ok
-        end;
-        (_) -> ok
-    end,
-    Id = {couch_db_update_notifier, make_ref()},
-    ok = gen_event:add_sup_handler(couch_db_update, Id, Fun),
-    receive {gen_event_EXIT, Id, Reason} ->
-        rexi:reply({gen_event_EXIT, node(), Reason})
-    end.
+    Notify = config:get("cloudant", "maintenance_mode", "false") /= "true",
+    State = {Caller, Ref, Notify},
+    Options = [{dbnames, DbNames}],
+    couch_event:listen(?MODULE, handle_db_event, State, Options).
+
+handle_db_event(_DbName, updated, {Caller, Ref, true}=St) ->
+    erlang:send(Caller, {Ref, db_updated}),
+    {ok, St};
+handle_db_event(_DbName, _Event, St) ->
+    {ok, St}.
 
 start_cleanup_monitor(Parent, Notifiers) ->
     spawn(fun() ->
