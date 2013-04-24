@@ -17,7 +17,7 @@
 -export([
     start_link/4,
     enter_loop/4,
-    stop/1,
+    stop/1
 ]).
 
 -export([
@@ -71,7 +71,7 @@ terminate(_Reason, _MFA) ->
 
 handle_event(DbName, Event, #st{mod=Mod, func=Func, state=State}=St) ->
     case (catch Mod:Func(DbName, Event, State)) of
-        {ok, NewSt} ->
+        {ok, NewState} ->
             {ok, St#st{state=NewState}};
         stop ->
             {stop, normal, St};
