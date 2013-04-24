@@ -16,7 +16,8 @@
 
 -export([
     start_link/4,
-    stop/1
+    enter_loop/4,
+    stop/1,
 ]).
 
 -export([
@@ -39,6 +40,15 @@
 start_link(Mod, Func, State, Options) ->
     Arg = {self(), Mod, Func, State},
     couch_event_listener:start_link(?MODULE, Arg, Options).
+
+
+enter_loop(Mod, Func, State, Options) ->
+    St = #st{
+        mod = Mod,
+        func = Func,
+        state = State
+    },
+    couch_event_listener:enter_loop(?MODULE, St, Options).
 
 
 stop(Pid) ->

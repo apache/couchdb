@@ -38,6 +38,10 @@ notify(DbName, Event) ->
     gen_server:cast(?DIST, {DbName, Event}).
 
 
+listen(Module, Function, State, Options) ->
+    couch_event_listener_mfa:enter_loop(Module, Function, State, Options).
+
+
 link_listener(Module, Function, State, Options) ->
     couch_event_listener_mfa:start_link(Module, Function, State, Options).
 
