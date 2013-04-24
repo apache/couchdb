@@ -219,11 +219,20 @@ get_all_dbnames(Options) ->
 get_all_dbnames([], []) ->
     erlang:error(no_dbnames_provided);
 get_all_dbnames([], Acc) ->
-    lists:usort(Acc);
-get_all_dbnames([{dbname, DbName} | Rest], Acc) when is_binary(DbName) ->
+    lists:usort(convert_dbname_list(Acc));
+get_all_dbnames([{dbname, DbName} | Rest], Acc) ->
     get_all_dbnames(Rest, [DbName | Acc]);
 get_all_dbnames([{dbnames, DbNames} | Rest], Acc) when is_list(DbNames) ->
-    BinDbNames = [DbName || DbName <- DbNames, is_binary(DbName)],
-    get_all_dbnames(Rest, BinDbNames ++ Acc);
+    get_all_dbnames(Rest, DbNames ++ Acc);
 get_all_dbnames([_Ignored | Rest], Acc) ->
     get_all_dbnames(Rest, Acc).
+
+
+convert_dbname_list([]) ->
+    [];
+convert_dbname_list([DbName | Rest]) when is_binary(DbName) ->
+    [DbName | convert_dbname_list(Rest)];
+convert_dbname_list([DbName | Rest]) when is_list(DbName) ->
+    [list_to_binary(DbName) | convert_dbname_list(Rest)];
+convert_dbname_list([DbName | _]) ->
+    erlang:error({invalid_dbname, DbName}).
