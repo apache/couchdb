@@ -192,7 +192,7 @@ do_terminate(Reason, #st{module=Module, state=State}) ->
     erlang:exit(Status).
 
 
-where({global, Name}) -> global:safe_whereis_name(Name);
+where({global, Name}) -> global:whereis_name(Name);
 where({local, Name}) -> whereis(Name).
 
 
