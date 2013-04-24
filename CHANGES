@@ -13,6 +13,12 @@ Apache CouchDB CHANGES
 # Futon:
 #
 #  * Disabled the link to the Futon test suite.
+#
+# Dependencies:
+#
+#  * Support Erlang/OTP R16.
+#  * Bump Mochiweb dependency to v2.4.2.
+#  * Minimum Erlang/OTP version is now R14B.
 
 # Version 1.3.1
 # -------------
