@@ -11,37 +11,48 @@
 // the License.
 
 define([
-  "app",
+       "app",
 
-  "api",
+       "api",
 
-  // Modules
-  "addons/logs/resources"
+       // Modules
+       "addons/logs/resources"
 ],
 
 function(app, FauxtonAPI, Log) {
 
-  Log.Routes = {
-    "_log": function() {
-      var logs = new Log.Collection();
+  var  LogRouteObject = FauxtonAPI.RouteObject.extend({
+    layout: "with_sidebar",
 
-      return {
-        layout: "with_sidebar",
-        crumbs: [
-          {"name": "Logs", "link": "_log"}
-        ],
-        views: {
-          "#dashboard-content": new Log.Views.View({collection: logs}),
-          "#sidebar-content": new Log.Views.FilterView({})
-        },
-        apiUrl: logs.url(),
-        establish: function() {
-          return [logs.fetch()];
-        }
-      };
+    crumbs: [
+      {"name": "Logs", "link": "_log"}
+    ],
+
+    routes: ["_log"],
+
+    defaultRoute: "showLog",
+
+    apiUrl: function() {
+      return this.logs.url();
+    },
+
+    initialize: function () {
+      this.logs = new Log.Collection();
+      this.setView("#sidebar-content", new Log.Views.FilterView({}));
+    },
+
+    showLog: function (event) {
+      this.setView("#dashboard-content", new Log.Views.View({collection: this.logs}));
+    },
+
+    e1stablish: function() {
+      return [this.logs.fetch()];
     }
-  };
+  });
+
+  Log.RouteObjects = [LogRouteObject];
 
   return Log;
 
 });
+

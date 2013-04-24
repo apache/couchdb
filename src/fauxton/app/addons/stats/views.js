@@ -168,5 +168,7 @@ function(app, FauxtonAPI,Stats) {
     }
   });
 
-  return Views;
+  Stats.Views = Views;
+
+  return Stats;
 });

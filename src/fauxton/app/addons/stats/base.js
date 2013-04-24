@@ -16,13 +16,11 @@ define([
   "addons/stats/routes"
 ],
 
-function(app, FauxtonAPI, AddonRoutes) {
-  var Stats = new FauxtonAPI.addon();
+function(app, FauxtonAPI, Stats) {
 
   Stats.initialize = function() {
     FauxtonAPI.addHeaderLink({title: "Statistics", href: "#stats"});
   };
 
-  Stats.Routes = AddonRoutes;
   return Stats;
 });

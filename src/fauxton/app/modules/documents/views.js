@@ -163,6 +163,12 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
       });
     },
 
+    updateSelected: function (selected) {
+      this.selected = selected;
+      this.$('.active').removeClass('active');
+      this.$('#'+this.selected).addClass('active');
+    },
+
     serialize: function() {
       var selected = this.selected;
       return {
@@ -390,6 +396,7 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
       var fragment = window.location.hash.replace(/\?.*$/, '');
       fragment = fragment + '?' + $.param(params);
       FauxtonAPI.navigate(fragment);
+      FauxtonAPI.triggerRouteEvent('view_fn', params);
     },
 
     updateFilters: function(event) {
@@ -921,6 +928,11 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
           }
         }
       }, this);
+    },
+
+    setSelectedTab: function (selectedTab) {
+      this.$('li').removeClass('active');
+      this.$('#' + selectedTab).parent().addClass('active');
     }
 
   });

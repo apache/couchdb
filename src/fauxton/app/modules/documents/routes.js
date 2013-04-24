@@ -11,13 +11,13 @@
 // the License.
 
 define([
-  "app",
+       "app",
 
-  "api",
+       "api",
 
-  // Modules
-  "modules/documents/resources",
-  "modules/databases/base"
+       // Modules
+       "modules/documents/resources",
+       "modules/databases/base"
 ],
 
 function(app, FauxtonAPI, Documents, Databases) {
@@ -25,12 +25,24 @@ function(app, FauxtonAPI, Documents, Databases) {
   // var Documents = require("modules/documents/models_collections");
   // var Databases = require("modules/databases/module");
 
-  // TODO:: expand this for new docs and design docs
   var DocEditorRouteObject = FauxtonAPI.RouteObject.extend({
     layout: "one_pane",
 
-    initialize: function() {
-      this.selected = false;
+    initialize: function(options) {
+      var databaseName = options[0], docID = options[1];
+
+      this.database = this.database || new Databases.Model({id: databaseName});
+      this.doc = this.doc || new Documents.Doc({
+        _id: docID
+      }, {
+        database: this.database
+      });
+
+      this.tabsView = this.setView("#tabs", new Documents.Views.FieldEditorTabs({
+        selected: "code_editor",
+        model: this.doc
+      }));
+
     },
 
     routes: function() {
@@ -43,6 +55,13 @@ function(app, FauxtonAPI, Documents, Databases) {
       "database/:database/:doc": "code_editor"
     },
 
+    events: {
+      "route:field_editor": "field_editor",
+      "route:code_editor": "code_editor"
+    },
+
+    defaultRoute: "code_editor",
+
     crumbs: function() {
       return [
         {"name": "Databases", "link": "/_all_dbs"},
@@ -51,35 +70,16 @@ function(app, FauxtonAPI, Documents, Databases) {
       ];
     },
 
-    setEditorView: function() {
-      if (this.selected === "field_editor") {
-        this.docView = this.setView("#dashboard-content", new Documents.Views.DocFieldEditor({
-          model: this.doc
-        }));
-      } else {
-        this.docView = this.setView("#dashboard-content", new Documents.Views.Doc({
-          model: this.doc
-        }));
-      }
+    code_editor: function (event) {
+      this.tabsView.updateSelected('code_editor');
+      this.docView = this.setView("#dashboard-content", new Documents.Views.Doc({
+        model: this.doc
+      }));
     },
 
-    route: function(route, args) {
-      var databaseName = args[0], docID = args[1];
-
-      this.database = this.database || new Databases.Model({id: databaseName});
-      this.doc = this.doc || new Documents.Doc({
-        _id: docID
-      }, {
-        database: this.database
-      });
-
-      if (this.selected !== this.selectedRoutes[route]) {
-        this.selected = this.selectedRoutes[route];
-        this.setEditorView();
-      }
-
-      this.tabsView = this.setView("#tabs", new Documents.Views.FieldEditorTabs({
-        selected: this.selected,
+    field_editor: function(events) {
+      this.tabsView.updateSelected('field_editor');
+      this.docView = this.setView("#dashboard-content", new Documents.Views.DocFieldEditor({
         model: this.doc
       }));
     },
@@ -96,8 +96,8 @@ function(app, FauxtonAPI, Documents, Databases) {
     data.designDocs = new Documents.AllDocs(null, {
       database: data.database,
       params: {startkey: '"_design"',
-               endkey: '"_design1"',
-               include_docs: true}
+        endkey: '"_design1"',
+        include_docs: true}
     });
 
     return {
@@ -178,165 +178,287 @@ function(app, FauxtonAPI, Documents, Databases) {
     };
   };
 
-  Documents.Routes = {
-    //"database/:database/:doc/code_editor": codeEditorCallback,
-    //"database/:database/:doc": codeEditorCallback,
-    "database/:database/_design%2F:doc": function(database, doc) {
-      var docID = "_design/"+doc;
-      return codeEditorCallback(database, docID);
+
+  var DocumentsRouteObject = FauxtonAPI.RouteObject.extend({
+    layout: "with_tabs_sidebar",
+
+    events: {
+      "route:all_docs": "allDocs",
+      "route:all_design_docs": "allDesignDocs",
+      "route:view_fn": "viewFn",
+      "route:new_view": "newViewEditor"
     },
 
-    "database/:database/_all_docs(:extra)": function(databaseName, page) {
-      var data = {
-        database: new Databases.Model({id:databaseName})
+    defaultRoute: "allDocs",
+
+    initialize: function (options) {
+      var docOptions = app.getParams();
+      docOptions.include_docs = true;
+
+      this.databaseName = options[0];
+
+      this.data = {
+        database: new Databases.Model({id:this.databaseName})
       };
-      data.designDocs = new Documents.AllDocs(null, {
-        database: data.database,
+
+      this.data.designDocs = new Documents.AllDocs(null, {
+        database: this.data.database,
         params: {startkey: '"_design"',
           endkey: '"_design1"',
           include_docs: true}
       });
 
-      var options = app.getParams();
-      options.include_docs = true;
-      data.database.buildAllDocs(options);
+      this.sidebar = this.setView("#sidebar-content", new Documents.Views.Sidebar({
+        collection: this.data.designDocs
+      }));
 
-      return {
-        layout: "with_tabs_sidebar",
-
-        data: data,
-
-        crumbs: [
-          {"name": "Databases", "link": "/_all_dbs"},
-          {"name": data.database.id, "link": Databases.databaseUrl(data.database)}
-        ],
-
-        views: {
-          "#dashboard-content": new Documents.Views.AllDocsList({
-            collection: data.database.allDocs
-          }),
-
-          "#sidebar-content": new Documents.Views.Sidebar({
-            collection: data.designDocs
-          }),
-
-          "#tabs": new Documents.Views.Tabs({
-            collection: data.designDocs,
-            database: data.database
-          })
-        },
-
-        apiUrl: data.database.allDocs.url()
-      };
+      this.setView("#tabs", new Documents.Views.Tabs({
+        collection: this.data.designDocs,
+        database: this.data.database
+      }));
     },
 
-    "database/:database/_changes(:params)": function(databaseName, params) {
-      var data = {
-        database: new Databases.Model({id:databaseName})
-      };
-
-      var options = app.getParams();
-      data.database.buildChanges(options);
-
-      return {
-        layout: "with_tabs",
-
-        data: data,
-
-        crumbs: [
-          {"name": "Databases", "link": "/_all_dbs"},
-          {"name": data.database.id, "link": Databases.databaseUrl(data.database)},
-          {"name": "_changes", "link": "/_changes"}
-        ],
-
-        views: {
-          "#dashboard-content": new Documents.Views.Changes({
-            model: data.database
-          }),
-
-          "#tabs": new Documents.Views.Tabs({
-            collection: data.designDocs,
-            database: data.database,
-            active_id: 'changes'
-          })
-        },
-
-        apiUrl: data.database.changes.url()
-      };
+    crumbs: function () {
+      return [
+        {"name": "Databases", "link": "/_all_dbs"},
+        {"name": this.data.database.id, "link": Databases.databaseUrl(this.data.database)}
+      ];
     },
 
-    "database/:database/new": newDocCodeEditorCallback,
-    "database/:database/new_view": newViewEditorCallback,
+    allDocs: function(event) {
+      var docOptions;
 
-    // TODO: fix optional search params
-    // Can't get ":view(?*search)" to work
-    // However ":view?*search" does work
-    //"database/:database/_design/:ddoc/_view/:view(\?*options)": function(databaseName, ddoc, view, options) {
-    "database/:database/_design/:ddoc/_view/:view": function(databaseName, ddoc, view, options) {
-      // hack around backbone router limitations
-      view = view.replace(/\?.*$/,'');
-      var params = app.getParams();
-      var data = {
-        database: new Databases.Model({id:databaseName})
-      };
+      docOptions = app.getParams(event.attr);
+      docOptions.include_docs = true;
 
-      data.indexedDocs = new Documents.IndexCollection(null, {
-        database: data.database,
+      this.data.database.buildAllDocs(docOptions);
+      this.sidebar.setSelectedTab('all-docs');
+
+      this.documentsView = this.setView("#dashboard-content", new Documents.Views.AllDocsList({
+        collection: this.data.database.allDocs
+      }));
+    },
+
+    allDesignDocs: function(event) {
+      var docOptions = app.getParams(event.attr);
+      docOptions.include_docs = true;
+
+      this.data.database.buildAllDocs(docOptions);
+      this.sidebar.setSelectedTab('design-docs');
+
+      this.documentsView = this.setView("#dashboard-content", new Documents.Views.AllDocsList({
+        collection: this.data.database.allDocs
+      }));
+    },
+
+    route: function (route, routeArgs) {
+      console.log('ROUTE ARG ', arguments);
+
+      if (route === 'database/:database/_design/:ddoc/_view/:view') {
+
+        if (!this.docCrumbs && !this.docApiUrl) {
+          // Save the old crumbs and API. Easier to do it here than in each event
+          this.docCrumbs = this.crumbs;
+          this.docApiUrl = this.apiUrl;
+        }
+
+        this.routeArgs = {
+          designDoc: routeArgs[1],
+          view: routeArgs[2].replace(/\?.*$/,'')
+        };
+      } else {
+        this.routeArgs = {};
+        if (this.docCrumbs && this.docApiUrl) {
+          this.crumbs = this.docCrumbs;
+          this.docApiUrl = this.apiUrl;
+        }
+      }
+    },
+
+    viewFn: function (event) {
+      var view = this.routeArgs.view,
+      ddoc = this.routeArgs.designDoc,
+      params = app.getParams(event.attr);
+
+      console.log('PARAMS', params);
+
+      this.data.indexedDocs = new Documents.IndexCollection(null, {
+        database: this.data.database,
         design: ddoc,
         view: view,
         params: params
       });
 
-      data.designDocs = new Documents.AllDocs(null, {
-        database: data.database,
-        params: {startkey: '"_design"',
-          endkey: '"_design1"',
-          include_docs: true}
-      });
-
       var ddocInfo = {
         id: "_design/" + ddoc,
         currView: view,
-        designDocs: data.designDocs
+        designDocs: this.data.designDocs
       };
 
-      return {
-        layout: "with_tabs_sidebar",
+      this.setView("#dashboard-content", new Documents.Views.AllDocsList({
+        collection: this.data.indexedDocs,
+        nestedView: Documents.Views.Row,
+        viewList: true,
+        ddocInfo: ddocInfo,
+        params: params
+      }));
 
-        data: data,
-        // TODO: change dashboard-content
-        views: {
-          "#dashboard-content": new Documents.Views.AllDocsList({
-            collection: data.indexedDocs,
-            nestedView: Documents.Views.Row,
-            viewList: true,
-            ddocInfo: ddocInfo,
-            params: params
-          }),
-
-          "#sidebar-content": new Documents.Views.Sidebar({
-            collection: data.designDocs,
-            ddocInfo: ddocInfo
-          }),
-
-          "#tabs": new Documents.Views.Tabs({
-            collection: data.designDocs,
-            database: data.database
-          })
-        },
-
-        crumbs: [
+      this.crumbs = function () {
+        return [
           {"name": "Databases", "link": "/_all_dbs"},
-          {"name": data.database.id, "link": Databases.databaseUrl(data.database)},
-          {"name": ddoc + "/" + view, "link": data.indexedDocs.url()}
-        ],
-        // TODO: change to view URL
-        apiUrl: data.indexedDocs.url()
+          {"name": this.data.database.id, "link": Databases.databaseUrl(this.data.database)},
+          {"name": ddoc + "/" + view, "link": this.data.indexedDocs.url()}
+        ];
       };
-    }
-  };
 
-  Documents.RouteObjects = [new DocEditorRouteObject()];
+      // TODO: change to view URL
+      this.apiUrl = this.data.indexedDocs.url();
+    },
+
+    newViewEditor: function (event) {
+      // TODO: Get this working
+      this.setView("#dashboard-content", new Documents.Views.ViewEditor({
+        model: this.data.database,
+        ddocs: this.data.designDocs
+      }));
+
+    },
+
+    routes: ["database/:database/_all_docs(:extra)", "database/:database/_design/:ddoc/_view/:view", "database/:database/new_view"],
+
+    apiUrl: function() {
+      return this.data.database.allDocs.url();
+    }
+  });
+
+
+
+  var ChangesRouteObject = FauxtonAPI.RouteObject.extend({
+    layout: "with_tabs",
+
+    crumbs: function () {
+      return [
+        {"name": "Databases", "link": "/_all_dbs"},
+        {"name": this.database.id, "link": Databases.databaseUrl(this.database)},
+        {"name": "_changes", "link": "/_changes"}
+      ];
+    },
+
+    routes: ["database/:database/_changes(:params)"],
+
+    events: {
+      "route:_changes": "changes"
+    },
+
+    defaultRoute: "changes",
+
+    initialize: function (options) {
+      this.databaseName = options[0];
+      this.database = new Databases.Model({id: this.databaseName});
+
+      var docOptions = app.getParams();
+
+      this.database.buildChanges(docOptions);
+
+      this.setView("#tabs", new Documents.Views.Tabs({
+        collection: this.designDocs,
+        database: this.database,
+        active_id: 'changes'
+      }));
+    },
+
+    changes: function (event) {
+      this.setView("#dashboard-content", new Documents.Views.Changes({
+        model: this.database
+      }));
+    },
+
+    apiUrl: function() {
+      return this.database.changes.url();
+    }
+
+  });
+
+  /* Documents.Routes = {
+     "database/:database/_design%2F:doc": function(database, doc) {
+     var docID = "_design/"+doc;
+     return codeEditorCallback(database, docID);
+     },
+
+
+
+     "database/:database/new": newDocCodeEditorCallback,
+     "database/:database/new_view": newViewEditorCallback,
+
+  // TODO: fix optional search params
+  // Can't get ":view(?*search)" to work
+  // However ":view?*search" does work
+  //"database/:database/_design/:ddoc/_view/:view(\?*options)": function(databaseName, ddoc, view, options) {
+  "database/:database/_design/:ddoc/_view/:view": function(databaseName, ddoc, view, options) {
+// hack around backbone router limitations
+view = view.replace(/\?.*$/,'');
+var params = app.getParams();
+var data = {
+database: new Databases.Model({id:databaseName})
+};
+
+data.indexedDocs = new Documents.IndexCollection(null, {
+database: data.database,
+design: ddoc,
+view: view,
+params: params
+});
+
+data.designDocs = new Documents.AllDocs(null, {
+database: data.database,
+params: {startkey: '"_design"',
+endkey: '"_design1"',
+include_docs: true}
+});
+
+var ddocInfo = {
+id: "_design/" + ddoc,
+currView: view,
+designDocs: data.designDocs
+};
+
+return {
+layout: "with_tabs_sidebar",
+
+data: data,
+  // TODO: change dashboard-content
+views: {
+"#dashboard-content": new Documents.Views.AllDocsList({
+collection: data.indexedDocs,
+nestedView: Documents.Views.Row,
+viewList: true,
+ddocInfo: ddocInfo,
+params: params
+}),
+
+"#sidebar-content": new Documents.Views.Sidebar({
+collection: data.designDocs,
+ddocInfo: ddocInfo
+}),
+
+"#tabs": new Documents.Views.Tabs({
+collection: data.designDocs,
+database: data.database
+})
+},
+
+crumbs: [
+{"name": "Databases", "link": "/_all_dbs"},
+{"name": data.database.id, "link": Databases.databaseUrl(data.database)},
+{"name": ddoc + "/" + view, "link": data.indexedDocs.url()}
+],
+  // TODO: change to view URL
+  apiUrl: data.indexedDocs.url()
+  };
+}
+};*/
+
+  Documents.RouteObjects = [DocEditorRouteObject, DocumentsRouteObject, ChangesRouteObject];
 
   return Documents;
 });

@@ -11,8 +11,7 @@
 // the License.
 
 define([
-       "app",
-
+  "app",
        // Libs
        "backbone"
 
@@ -157,6 +156,8 @@ function(app, Backbone) {
       this.total = options.total;
       this.totalPages = Math.ceil(this.total / this.perPage);
       this.urlFun = options.urlFun;
+      this.routeEvent = options.routeEvent;
+
     },
 
     serialize: function() {
@@ -165,7 +166,8 @@ function(app, Backbone) {
         perPage: this.perPage,
         total: this.total,
         totalPages: this.totalPages,
-        urlFun: this.urlFun
+        urlFun: this.urlFun,
+        routeEvent: this.routeEvent
       };
     }
   });

@@ -22,12 +22,19 @@ define([
 ],
 
 function(app, FauxtonAPI, Databases, Views) {
+
   var AllDbsRouteObject = FauxtonAPI.RouteObject.extend({
     layout: "with_sidebar",
 
     crumbs: [
       {"name": "Databases", "link": "/_all_dbs"}
     ],
+
+    events: {
+      "route:all_databases": "allDatabases"
+    },
+
+    defaultRoute: "allDatabases",
 
     routes: ["", "index.html", "_all_dbs(:params)"],
 
@@ -39,21 +46,22 @@ function(app, FauxtonAPI, Databases, Views) {
       this.databases = new Databases.List();
       this.deferred = FauxtonAPI.Deferred();
 
-      this.databasesView = this.setView("#dashboard-content", new Views.List({
-          collection: this.databases
-      }));
       this.sidebarView = this.setView("#sidebar-content", new Views.Sidebar({
           collection: this.databases
       }));
     },
 
-    route: function() {
-      var params = app.getParams();
-      this.databasesView.setPage(params.page);
-    },
+    allDatabases: function(event) {
+      event = event || {};
 
-    rerender: function() {
-      this.databasesView.render();
+      var params = app.getParams(event.attr),
+          dbPage = params.page;
+
+      this.databasesView = this.setView("#dashboard-content", new Views.List({
+          collection: this.databases
+      }));
+
+      this.databasesView.setPage(dbPage);
     },
 
     establish: function() {
@@ -69,66 +77,10 @@ function(app, FauxtonAPI, Databases, Views) {
       });
 
       return [deferred];
-    },
-
-    mrEvent: function() {
-      console.log("Triggering a most excellent event!!!!");
-    },
-
-    events: {
-      "myrandom_event": "mrEvent"
     }
   });
-
-  var allDbsCallback = function() {
-    var data = {
-      databases: new Databases.List()
-    };
-    var deferred = FauxtonAPI.Deferred();
-
-    return {
-      layout: "with_sidebar",
-
-      data: data,
-
-      crumbs: [
-        {"name": "Databases", "link": "/_all_dbs"}
-      ],
-
-      views: {
-        "#dashboard-content": new Databases.Views.List({
-          collection: data.databases
-        }),
-
-        "#sidebar-content": new Databases.Views.Sidebar({
-          collection: data.databases
-        })
-      },
-
-      apiUrl: data.databases.url(),
-
-      establish: function() {
-        data.databases.fetch().done(function(resp) {
-          $.when.apply(null, data.databases.map(function(database) {
-            return database.status.fetch();
-          })).done(function(resp) {
-            deferred.resolve();
-          });
-        });
-        return [deferred];
-      }
-    };
-  };
-
-  /*
-  Databases.Routes = {
-    "": allDbsCallback,
-    "index.html": allDbsCallback,
-    "_all_dbs(:params)": allDbsCallback
-  };
-  */
-
-  Databases.RouteObjects = [new AllDbsRouteObject()];
+  
+  Databases.RouteObjects = [AllDbsRouteObject];
 
   return Databases;
 });

@@ -37,8 +37,12 @@ function(app, _, Bootstrap) {
     // Thanks to: http://stackoverflow.com/a/2880929
     getParams: function(queryString) {
       if (typeof queryString !== "undefined") {
-        if (queryString.substring(0,1) === "?")
+        // I think this could be combined into one if 
+        if (queryString.substring(0,1) === "?") {
           queryString = queryString.substring(1);
+        } else if (queryString.indexOf('?') > -1) {
+          queryString = queryString.split('?')[1];
+        }
       }
       var hash = window.location.hash.split('?')[1];
       queryString = queryString || hash || window.location.search.substring(1);

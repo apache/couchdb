@@ -19,7 +19,7 @@ define([
 ],
 
 function (app, FauxtonAPI, backbone, _, Fauxton) {
-  var Stats = {};
+  var Stats = new FauxtonAPI.addon();
 
   Stats.Collection = Backbone.Collection.extend({
     model: Backbone.Model,

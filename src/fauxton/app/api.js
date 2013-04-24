@@ -43,6 +43,14 @@ function(app, Fauxton) {
     // This should return an array of promises, an empty array, or null
     establish: function() {
       return null;
+    },
+
+    hasRendered: function () {
+      return !!this.__manager__.hasRendered;
+    },
+
+    reRender: function () {
+      this.__manager__.hasRendered = false;
     }
   });
 
@@ -60,6 +68,10 @@ function(app, Fauxton) {
 
   FauxtonAPI.addRoute = function(route) {
     app.router.route(route.route, route.name, route.callback);
+  };
+
+  FauxtonAPI.triggerRouteEvent = function (routeEvent, args) {
+    app.router.triggerRouteEvent("route:"+routeEvent, args);
   };
 
   FauxtonAPI.module = function(extra) {
@@ -96,6 +108,25 @@ function(app, Fauxton) {
     }
   });
 
+  // Not needed, could be removed.
+  FauxtonAPI.routeCallChain = {
+    callChain: {},
+
+    registerBeforeRoute: function (name, fn) {
+      this.callChain[name] = fn;
+    },
+
+    unregisterBeforeRoute: function (name) {
+      delete callChain[name];
+    },
+
+    run: function () {
+      var callChainDeferreds = _.map(this.callChain, function (cb) { return cb(); }); 
+      return $.when(null, callChainDeferreds );
+    }
+  };
+
+
   FauxtonAPI.RouteObject = function(options) {
     this._options = options;
 
@@ -124,10 +155,6 @@ function(app, Fauxton) {
     route: function() {},
     initialize: function() {}
   }, {
-    // By default, rerender is a full rerender
-    rerender: function() {
-      this.renderWith.apply(this, arguments);
-    },
 
     // TODO:: combine this and the renderWith function
     // All the things should go through establish, as it will resolve
@@ -135,30 +162,32 @@ function(app, Fauxton) {
     // function can rebuild the deferred as needed
     render: function(route, masterLayout, args) {
       this.route.call(this, route, args);
-
-      if (this.renderedState === true) {
-        this.rerender.apply(this, arguments);
-      } else {
-        this.renderWith.apply(this, arguments);
-      }
+      this.renderWith.apply(this, Array.prototype.slice.call(arguments));
     },
 
     renderWith: function(route, masterLayout, args) {
       var routeObject = this;
-      //this.route.apply(this, args);
 
-      masterLayout.setTemplate(this.layout);
+      // Only want to redo the template if its a full render
+      if (!this.renderedState) {
+        masterLayout.setTemplate(this.layout);
+      }
+
       masterLayout.clearBreadcrumbs();
+      var crumbs = this.get('crumbs');
 
-      if (this.crumbs.length) {
+      if (crumbs.length) {
         masterLayout.setBreadcrumbs(new Fauxton.Breadcrumbs({
-          crumbs: this.crumbs
+          crumbs: crumbs
         }));
       }
 
       $.when.apply(this, this.establish()).done(function(resp) {
-        _.each(routeObject.views, function(view, selector) {
+        _.each(routeObject.getViews(), function(view, selector) {
+          if(view.hasRendered()) { console.log('view been rendered'); return; }
+
           masterLayout.setView(selector, view);
+          console.log('set and render ', selector, view); 
 
           $.when.apply(null, view.establish()).then(function(resp) {
             masterLayout.renderView(selector);
@@ -172,13 +201,11 @@ function(app, Fauxton) {
 
           var hooks = masterLayout.hooks[selector];
 
-          if(hooks){
-            _.each(hooks, function(hook){
-              if (_.any(hook.routes, function(route){return route == boundRoute;})){
-                hook.callback(view);
-              }
-            });
-          }
+          _.each(hooks, function(hook){
+            if (_.any(hook.routes, function(route){return route == boundRoute;})){
+              hook.callback(view);
+            }
+          });
         });
       });
 
@@ -222,6 +249,7 @@ function(app, Fauxton) {
     getViews: function() {
       return this.views;
     }
+
   });
 
   app.fauxtonAPI = FauxtonAPI;

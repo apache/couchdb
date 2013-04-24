@@ -66,7 +66,7 @@ function(app, Fauxton, FauxtonAPI) {
 
     paginated: function() {
       var start = (this.page - 1) * this.perPage;
-      var end = this.page * this.perPage - 1;
+      var end = this.page * this.perPage;
       return this.collection.slice(start, end);
     },
 
@@ -83,7 +83,8 @@ function(app, Fauxton, FauxtonAPI) {
         total: this.collection.length,
         urlFun: function(page) {
           return "#/_all_dbs?page=" + page;
-        }
+        },
+        routeEvent: "all_databases"
       }));
     },
 

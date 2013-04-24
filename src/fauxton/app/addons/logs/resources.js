@@ -98,9 +98,14 @@ function (app, FauxtonAPI, Backbone) {
 
       this.filters = [];
       this.filteredCollection = new Log.Collection(this.collection.toJSON());
+
       this.collection.on("add", function () {
         this.createFilteredCollection();
       }, this);
+    },
+
+    establish: function () {
+      return [this.collection.fetch()];
     },
 
     serialize: function () {

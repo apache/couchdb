@@ -100,19 +100,24 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
   var Router = app.router = Backbone.Router.extend({
     routes: {},
 
-    // These moduleRoutes functions are aguably better outside but
-    // need access to the Router instance which is not created in this
-    // module
-    addModuleRoute: function(generator, route) {
-      this.route(route, route.toString(), generateRoute(generator, route));
-    },
-
-    addModuleRouteObject: function(routeObject) {
+    addModuleRouteObject: function(RouteObject) {
+      var self = this;
       var masterLayout = this.masterLayout;
-      _.each(routeObject.get('routes'), function(route) {
-        //this.route(route, route.toString(), _.partial(routeObject.renderWith, route, this.masterLayout));
+
+      _.each(RouteObject.prototype.get('routes'), function(route) {
         this.route(route, route.toString(), function() {
-          routeObject.render(route, masterLayout, Array.prototype.slice.call(arguments));
+          var args = Array.prototype.slice.call(arguments);
+
+          if (self.activeRouteObject && self.activeRouteObject.get('routes').indexOf(route) > -1) {
+            //Don't need to do anything here as this route has been initialised
+            self.activeRouteObject.route.call(self.activeRouteObject, route, args);
+            console.log('Avoiding Route creation');
+            return;
+          }
+
+          self.activeRouteObject = new RouteObject(args);
+          self.activeRouteObject[self.activeRouteObject.defaultRoute].apply(self.activeRouteObject, args);
+          self.activeRouteObject.render(route, masterLayout, args);
         });
       }, this);
     },
@@ -120,7 +125,6 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
     setModuleRoutes: function() {
       _.each(modules, function(module) {
         if (module){
-          _.each(module.Routes, this.addModuleRoute, this);
           _.each(module.RouteObjects, this.addModuleRouteObject, this);
         }
       }, this);
@@ -129,7 +133,7 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
           module.initialize();
           // This is pure routes the addon provides
           if (module.Routes) {
-            _.each(module.Routes, this.addModuleRoute, this);
+            _.each(module.RouteObjects, this.addModuleRouteObject, this);
           }
         }
       }, this);
@@ -167,6 +171,15 @@ function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents
       this.masterLayout.render();
 
       app.footer.render();
+    },
+
+    triggerRouteEvent: function(event, args) {
+      if (this.activeRouteObject) {
+        var eventArgs = [event].concat(args);
+        console.log("CALLING ROUTE EVENT ON", this.activeRouteObject, arguments);
+        this.activeRouteObject.trigger.apply(this.activeRouteObject, eventArgs );
+        this.activeRouteObject.renderWith(eventArgs, this.masterLayout, args);
+      }
     }
   });
 
