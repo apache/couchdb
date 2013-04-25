@@ -26,11 +26,13 @@ module.exports = function (grunt) {
     var port = options.port || 8000;
 
     // Proxy options with default localhost
-    var proxy_target = options.proxy || {
-          host: 'localhost',
-          port: 5984,
-          https: false
-        };
+    var proxy_settings = options.proxy || {
+      target: {
+        host: 'localhost',
+        port: 5984,
+        https: false
+      }
+    };
 
     // inform grunt that this task is async
     var done = this.async();
@@ -46,9 +48,7 @@ module.exports = function (grunt) {
     });
 
     // create proxy to couch for all couch requests
-    var proxy = new httpProxy.HttpProxy({ 
-      target: proxy_target
-    });
+    var proxy = new httpProxy.HttpProxy(proxy_settings);
 
     app.all('*', function (req, res) {
       proxy.proxyRequest(req, res);
