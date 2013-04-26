@@ -54,10 +54,10 @@ handle_call(Msg, From, St) ->
 
 
 handle_cast({DbName, Event}, #st{batch_size=BS}=St) when is_binary(DbName) ->
-    P1 = #client{dbname=DbName, _='_'},
-    notify_clients(ets:select(?REGISTRY_TABLE, P1, BS), DbName, Event),
-    P2 = #client{dbname=all_dbs, _='_'},
-    notify_clients(ets:select(?REGISTRY_TABLE, P2, BS), DbName, Event),
+    margaret_counter:increment([couch_event, events_received]),
+    T1 = notify_clients(#client{dbname=DbName, _='_'}, BS, DbName, Event),
+    T2 = notify_clients(#client{dbname=all_dbs, _='_'}, BS, DbName, Event),
+    margaret_counter:increment([couch_event, events_delivered], T1 + T2),
     {noreply, St};
 
 handle_cast(Msg, St) ->
@@ -74,10 +74,15 @@ code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
 
 
-notify_clients('$end_of_table', _DbName, _Event) ->
-    ok;
-notify_clients({Clients, Cont}, DbName, Event) ->
+notify_clients(Pattern, BatchSize, DbName, Event) ->
+    MSpec = [{Pattern, [], ['$_']}],
+    do_notify(ets:select(?REGISTRY_TABLE, MSpec, BatchSize), DbName, Event, 0).
+
+
+do_notify('$end_of_table', _DbName, _Event, Total) ->
+    Total;
+do_notify({Clients, Cont}, DbName, Event, Total) ->
     lists:foreach(fun(#client{pid=Pid}) ->
         Pid ! {'$couch_event', DbName, Event}
     end, Clients),
-    notify_clients(ets:select(Cont), DbName, Event).
+    do_notify(ets:select(Cont), DbName, Event, Total + length(Clients)).
