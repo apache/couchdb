@@ -390,7 +390,7 @@ update_docs(Db, DocList, Options, UpdateType) ->
 
 changes_since(#httpdb{headers = Headers1, timeout = InactiveTimeout} = HttpDb,
               Style, StartSeq, UserFun, Options) ->
-    Timeout = erlang:max(1000, InactiveTimeout - 5000),
+    Timeout = erlang:max(1000, InactiveTimeout div 3),
     BaseQArgs = case get_value(continuous, Options, false) of
     false ->
         [{"feed", "normal"}];
