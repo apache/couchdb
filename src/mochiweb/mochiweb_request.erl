@@ -621,7 +621,7 @@ maybe_redirect(RelPath, FullPath, ExtraHeaders,
     end.
 
 maybe_serve_file(File, ExtraHeaders, {?MODULE, [_Socket, _Method, _RawPath, _Version, _Headers]}=THIS) ->
-    case file:read_file_info(File, [{time, universal}]) of
+    case read_file_info(File) of
         {ok, FileInfo} ->
             LastModified = couch_util:rfc1123_date(FileInfo#file_info.mtime),
             case get_header_value("if-modified-since", THIS) of
@@ -644,6 +644,25 @@ maybe_serve_file(File, ExtraHeaders, {?MODULE, [_Socket, _Method, _RawPath, _Ver
         {error, _} ->
             not_found(ExtraHeaders, THIS)
     end.
+
+read_file_info(File) ->
+    try
+        file:read_file_info(File, [{time, universal}])
+    catch error:undef ->
+        case file:read_file_info(File) of
+            {ok, FileInfo} ->
+                {ok, FileInfo#file_info{
+                       atime=to_universal(FileInfo#file_info.atime),
+                       mtime=to_universal(FileInfo#file_info.mtime),
+                       ctime=to_universal(FileInfo#file_info.ctime)
+                      }};
+            Else ->
+                Else
+        end
+    end.
+
+to_universal(LocalTime) ->
+    calendar:local_time_to_universal_time(LocalTime).
 
 server_headers() ->
     [{"Server", "MochiWeb/1.0 (" ++ ?QUIP ++ ")"},
