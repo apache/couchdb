@@ -101,14 +101,16 @@ middleman(Req, chunked) ->
 
     % take requests from the DB writers and get data from the receiver
     N = erlang:list_to_integer(config:get("cluster","n")),
-    middleman_loop(Receiver, N, [], []);
+    Timeout = fabric_util:request_timeout(),
+    middleman_loop(Receiver, N, [], [], Timeout);
 
 middleman(Req, Length) ->
     Receiver = spawn(fun() -> receive_unchunked_attachment(Req, Length) end),
     N = erlang:list_to_integer(config:get("cluster","n")),
-    middleman_loop(Receiver, N, [], []).
+    Timeout = fabric_util:request_timeout(),
+    middleman_loop(Receiver, N, [], [], Timeout).
 
-middleman_loop(Receiver, N, Counters0, ChunkList0) ->
+middleman_loop(Receiver, N, Counters0, ChunkList0, Timeout) ->
     receive {From, gimme_data} ->
         % Figure out how far along this writer (From) is in the list
         ListIndex = case fabric_dict:lookup_element(From, Counters0) of
@@ -145,7 +147,7 @@ middleman_loop(Receiver, N, Counters0, ChunkList0) ->
             {ChunkList1, Counters1}
         end,
 
-        middleman_loop(Receiver, N, Counters3, ChunkList3)
-    after 10000 ->
+        middleman_loop(Receiver, N, Counters3, ChunkList3, Timeout)
+    after Timeout ->
         ok
     end.
