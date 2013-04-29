@@ -60,7 +60,7 @@ start_update_notifiers(DbName) ->
 
 % rexi endpoint
 start_update_notifier(DbNames) ->
-    Notify = config:get("cloudant", "non_interactive_mode", "false") /= "true",
+    Notify = config:get("cloudant", "maintenance_mode", "false") /= "true",
     {Caller, Ref} = get(rexi_from),
     Fun = fun({updated, X}) ->
         case lists:member(X, DbNames) of

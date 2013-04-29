@@ -76,7 +76,7 @@ handle_set_message(ok, W, Acc) ->
         finished = [W | Acc#acc.finished]
     },
     maybe_finish_set(NewAcc);
-handle_set_message({rexi_EXIT, {non_interactive_mode, _}}, W, Acc) ->
+handle_set_message({rexi_EXIT, {maintenance_mode, _}}, W, Acc) ->
     NewAcc = Acc#acc{workers = (Acc#acc.workers -- [W])},
     maybe_finish_set(NewAcc);
 handle_set_message(Error, W, Acc) ->
@@ -148,7 +148,7 @@ handle_get_message({Props}=SecObj, W, Acc) when is_list(Props) ->
         finished = [{W, SecObj} | Acc#acc.finished]
     },
     maybe_finish_get(NewAcc);
-handle_get_message({rexi_EXIT, {non_interactive_mode, _}}, W, Acc) ->
+handle_get_message({rexi_EXIT, {maintenance_mode, _}}, W, Acc) ->
     NewAcc = Acc#acc{workers = (Acc#acc.workers -- [W])},
     maybe_finish_get(NewAcc);
 handle_get_message(Error, W, Acc) ->
