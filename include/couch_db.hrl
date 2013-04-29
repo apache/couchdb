@@ -151,7 +151,9 @@
      purge_seq = 0,
      purged_docs = nil,
      security_ptr = nil,
-     revs_limit = 1000
+     revs_limit = 1000,
+     uuid = nil,
+     epochs = nil
     }).
 
 -record(db,
@@ -178,7 +180,9 @@
     options = [],
     compression,
     before_doc_update = nil, % nil | fun(Doc, Db) -> NewDoc
-    after_doc_read = nil     % nil | fun(Doc, Db) -> NewDoc
+    after_doc_read = nil,    % nil | fun(Doc, Db) -> NewDoc
+    uuid = nil,
+    epochs = nil
     }).
 
 -record(view_fold_helper_funs, {

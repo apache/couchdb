@@ -227,7 +227,9 @@ handle_cast({compact_done, CompactFilepath}, #db{filepath=Filepath}=Db) ->
             main_pid = self(),
             filepath = Filepath,
             instance_start_time = Db#db.instance_start_time,
-            revs_limit = Db#db.revs_limit
+            revs_limit = Db#db.revs_limit,
+            uuid = Db#db.uuid,
+            epochs = Db#db.epochs
         }),
 
         ?LOG_DEBUG("CouchDB swapping files ~s and ~s.",
@@ -522,7 +524,9 @@ init_db(DbName, Filepath, Fd, Header0, Options) ->
         options = Options,
         compression = Compression,
         before_doc_update = couch_util:get_value(before_doc_update, Options, nil),
-        after_doc_read = couch_util:get_value(after_doc_read, Options, nil)
+        after_doc_read = couch_util:get_value(after_doc_read, Options, nil),
+        uuid = initialize_uuid(Header),
+        epochs = initialize_epochs(Header)
         }.
 
 
@@ -804,7 +808,9 @@ db_to_header(Db, Header) ->
         id_tree_state = couch_btree:get_state(Db#db.id_tree),
         local_tree_state = couch_btree:get_state(Db#db.local_tree),
         security_ptr = Db#db.security_ptr,
-        revs_limit = Db#db.revs_limit}.
+        revs_limit = Db#db.revs_limit,
+        uuid = Db#db.uuid,
+        epochs = update_epochs(Db)}.
 
 commit_data(Db) ->
     commit_data(Db, false).
@@ -1273,3 +1279,48 @@ make_doc_summary(#db{compression = Comp}, {Body0, Atts0}) ->
     end,
     SummaryBin = ?term_to_bin({Body, Atts}),
     couch_file:assemble_file_chunk(SummaryBin, couch_util:md5(SummaryBin)).
+
+initialize_uuid(#db_header{uuid=nil}) ->
+    couch_uuids:random();
+initialize_uuid(#db_header{uuid=Uuid}) ->
+    Uuid.
+
+initialize_epochs(#db_header{epochs=nil}=Db) ->
+    [{node(), Db#db_header.update_seq}];
+initialize_epochs(#db_header{epochs=Epochs}) ->
+    Epochs.
+
+update_epochs(Db) ->
+    case Db#db.epochs of
+        [{Node, _} | _] when Node =:= node() ->
+            Db#db.epochs;
+        Epochs when is_list(Epochs) ->
+            %% Mark the sequence where this node took over.
+            [{node(), Db#db.update_seq} | Epochs]
+    end.
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+initialize_uuid_is_stable_test() ->
+    %% UUID was initialized.
+    ?assertMatch(<<_:32/binary>>, initialize_uuid(#db_header{})),
+    %% UUID was preserved.
+    ?assertEqual(foo, initialize_uuid(#db_header{uuid=foo})).
+
+initialize_epochs_is_stable_test() ->
+    %% Epochs were initialized.
+    ?assertMatch([{'nonode@nohost', 0}], initialize_epochs(#db_header{})),
+    %% Epochs are preserved.
+    ?assertMatch(foo, initialize_epochs(#db_header{epochs=foo})).
+
+update_epochs_test() ->
+    %% Epochs are not extended if node stays the same.
+    ?assertMatch([{'nonode@nohost', 0}],
+                 update_epochs(#db{epochs=[{'nonode@nohost', 0}]})),
+
+    %% Epochs are extended if node changes.
+    ?assertMatch([{'nonode@nohost', 1}, {foo, 0}],
+                 update_epochs(#db{update_seq=1, epochs=[{foo, 0}]})).
+
+-endif.

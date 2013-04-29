@@ -304,7 +304,8 @@ get_db_info(Db) ->
         committed_update_seq=CommittedUpdateSeq,
         id_tree = IdBtree,
         seq_tree = SeqBtree,
-        local_tree = LocalBtree
+        local_tree = LocalBtree,
+        uuid = Uuid
     } = Db,
     {ok, Size} = couch_file:bytes(Fd),
     {ok, DbReduction} = couch_btree:full_reduce(IdBtree),
@@ -319,7 +320,8 @@ get_db_info(Db) ->
         {data_size, db_data_size(DbReduction, [SeqBtree, IdBtree, LocalBtree])},
         {instance_start_time, StartTime},
         {disk_format_version, DiskVersion},
-        {committed_update_seq, CommittedUpdateSeq}
+        {committed_update_seq, CommittedUpdateSeq},
+        {uuid, Uuid}
         ],
     {ok, InfoList}.
 
