@@ -159,5 +159,5 @@ distcheck-hook:
 	$(MAKE) -C src/couchdb/priv distcheck-hook
 	$(MAKE) -C share/doc/build distcheck-hook
 	grep -rL 'http://www.apache.org/licenses/LICENSE-2.0' * \
-	    | grep --include= -vEf license.skip; \
+	    | grep --include= -vEf $(top_srcdir)/license.skip; \
 	    test "$$?" -eq 1
