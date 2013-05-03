@@ -74,6 +74,7 @@ html_files = \
     html/_sources/range.txt \
     html/_sources/release.txt \
     html/_sources/replication.txt \
+    html/_sources/replicator.txt \
     html/_sources/ssl.txt \
     html/_static/ajax-loader.gif \
     html/_static/basic.css \
@@ -126,6 +127,7 @@ html_files = \
     html/range.html \
     html/release.html \
     html/replication.html \
+    html/replicator.html \
     html/ssl.html \
     html/objects.inv \
     html/genindex.html \
@@ -178,6 +180,7 @@ src_files = \
     ../src/range.rst \
     ../src/release.rst \
     ../src/replication.rst \
+    ../src/replicator.rst \
     ../src/ssl.rst \
     ../src/conf.py
 
