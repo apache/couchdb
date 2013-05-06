@@ -692,6 +692,8 @@ after_doc_read(#doc{body = {Body}} = Doc, #db{user_ctx=UserCtx} = Db) ->
     end.
 
 
+strip_credentials(undefined) ->
+    undefined;
 strip_credentials(Url) when is_binary(Url) ->
     re:replace(Url,
         "http(s)?://(?:[^:]+):[^@]+@(.*)$",
