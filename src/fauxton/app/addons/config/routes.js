@@ -36,9 +36,9 @@ function(app, FauxtonAPI, Config) {
       this.configs.url();
     },
 
-    routes: ["_config"],
-
-    defaultRoute: "config",
+    routes: {
+      "_config": "config"
+    },
 
     config: function () {
       this.setView("#dashboard-content", new Config.View({collection: this.configs}));

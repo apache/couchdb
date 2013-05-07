@@ -156,7 +156,6 @@ function(app, Backbone) {
       this.total = options.total;
       this.totalPages = Math.ceil(this.total / this.perPage);
       this.urlFun = options.urlFun;
-      this.routeEvent = options.routeEvent;
 
     },
 
@@ -166,8 +165,7 @@ function(app, Backbone) {
         perPage: this.perPage,
         total: this.total,
         totalPages: this.totalPages,
-        urlFun: this.urlFun,
-        routeEvent: this.routeEvent
+        urlFun: this.urlFun
       };
     }
   });

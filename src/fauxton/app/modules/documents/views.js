@@ -396,7 +396,6 @@ function(app, FauxtonAPI, Codemirror, JSHint) {
       var fragment = window.location.hash.replace(/\?.*$/, '');
       fragment = fragment + '?' + $.param(params);
       FauxtonAPI.navigate(fragment);
-      FauxtonAPI.triggerRouteEvent('view_fn', params);
     },
 
     updateFilters: function(event) {

@@ -30,13 +30,11 @@ function(app, FauxtonAPI, Databases, Views) {
       {"name": "Databases", "link": "/_all_dbs"}
     ],
 
-    events: {
-      "route:all_databases": "allDatabases"
+    routes: {
+      "": "allDatabases",
+      "index.html": "allDatabases", 
+      "_all_dbs(:params)": "allDatabases"
     },
-
-    defaultRoute: "allDatabases",
-
-    routes: ["", "index.html", "_all_dbs(:params)"],
 
     apiUrl: function() {
       return this.databases.url();
@@ -51,10 +49,8 @@ function(app, FauxtonAPI, Databases, Views) {
       }));
     },
 
-    allDatabases: function(event) {
-      event = event || {};
-
-      var params = app.getParams(event.attr),
+    allDatabases: function() {
+      var params = app.getParams(),
           dbPage = params.page;
 
       this.databasesView = this.setView("#dashboard-content", new Views.List({

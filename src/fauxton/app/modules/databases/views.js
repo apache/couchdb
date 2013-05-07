@@ -83,8 +83,7 @@ function(app, Fauxton, FauxtonAPI) {
         total: this.collection.length,
         urlFun: function(page) {
           return "#/_all_dbs?page=" + page;
-        },
-        routeEvent: "all_databases"
+        }
       }));
     },
 

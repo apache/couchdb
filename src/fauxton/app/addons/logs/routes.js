@@ -28,9 +28,9 @@ function(app, FauxtonAPI, Log) {
       {"name": "Logs", "link": "_log"}
     ],
 
-    routes: ["_log"],
-
-    defaultRoute: "showLog",
+    routes: {
+      "_log": "showLog"
+    },
 
     apiUrl: function() {
       return this.logs.url();
@@ -41,7 +41,7 @@ function(app, FauxtonAPI, Log) {
       this.setView("#sidebar-content", new Log.Views.FilterView({}));
     },
 
-    showLog: function (event) {
+    showLog: function () {
       this.setView("#dashboard-content", new Log.Views.View({collection: this.logs}));
     },
 

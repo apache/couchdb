@@ -108,25 +108,6 @@ function(app, Fauxton) {
     }
   });
 
-  // Not needed, could be removed.
-  FauxtonAPI.routeCallChain = {
-    callChain: {},
-
-    registerBeforeRoute: function (name, fn) {
-      this.callChain[name] = fn;
-    },
-
-    unregisterBeforeRoute: function (name) {
-      delete callChain[name];
-    },
-
-    run: function () {
-      var callChainDeferreds = _.map(this.callChain, function (cb) { return cb(); }); 
-      return $.when(null, callChainDeferreds );
-    }
-  };
-
-
   FauxtonAPI.RouteObject = function(options) {
     this._options = options;
 
@@ -150,7 +131,6 @@ function(app, Fauxton) {
     layout: "with_sidebar",
     apiUrl: null,
     renderedState: false,
-    currTab: "databases",
     establish: function() {},
     route: function() {},
     initialize: function() {}
@@ -161,12 +141,14 @@ function(app, Fauxton) {
     // immediately if its already done, but this way the RouteObject.route
     // function can rebuild the deferred as needed
     render: function(route, masterLayout, args) {
-      this.route.call(this, route, args);
       this.renderWith.apply(this, Array.prototype.slice.call(arguments));
     },
 
     renderWith: function(route, masterLayout, args) {
       var routeObject = this;
+
+      // Can look at replacing this with events eg beforeRender, afterRender
+      this.route.call(this, route, args);
 
       // Only want to redo the template if its a full render
       if (!this.renderedState) {
@@ -184,10 +166,10 @@ function(app, Fauxton) {
 
       $.when.apply(this, this.establish()).done(function(resp) {
         _.each(routeObject.getViews(), function(view, selector) {
-          if(view.hasRendered()) { console.log('view been rendered'); return; }
+          if(view.hasRendered()) { return; }
 
           masterLayout.setView(selector, view);
-          console.log('set and render ', selector, view); 
+          console.log('SET SELECTOR AND RENDER ', selector, view); 
 
           $.when.apply(null, view.establish()).then(function(resp) {
             masterLayout.renderView(selector);
@@ -248,6 +230,25 @@ function(app, Fauxton) {
 
     getViews: function() {
       return this.views;
+    },
+
+    // Could move getRouteUrls into the Constructor function and so it defines the urls
+    // only once. This would give us a small speed up.
+    getRouteUrls: function () {
+      return _.keys(this.get('routes'));
+    },
+
+    hasRoute: function (route) {
+      if (this.getRouteUrls().indexOf(route) > -1) {
+        return true;
+      }
+
+      return false;
+    },
+
+    routeCallback: function (route) {
+      var routes = this.get('routes');
+      return this[routes[route]];
     }
 
   });

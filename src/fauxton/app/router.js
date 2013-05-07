@@ -44,80 +44,30 @@ define([
 
 function(req, app, Initialize, FauxtonAPI, Fauxton, Layout, Databases, Documents, Pouch, LoadAddons) {
 
-  var defaultLayout = 'with_sidebar';
   // TODO: auto generate this list if possible
   var modules = [Databases, Documents];
-
-  var generateRoute = function(settingsGenerator, route) {
-    return function() {
-      var boundRoute = route;
-      var settings = settingsGenerator.apply(null, arguments);
-      var layout = settings.layout || defaultLayout;
-      var establish = settings.establish || function() { return null; };
-      var masterLayout = this.masterLayout;
-
-      console.log("Settings generator for: ", layout, settings);
-
-      masterLayout.setTemplate(layout);
-      masterLayout.clearBreadcrumbs();
-
-      if (settings.crumbs) {
-        masterLayout.setBreadcrumbs(new Fauxton.Breadcrumbs({
-          crumbs: settings.crumbs
-        }));
-      }
-
-      $.when.apply(null, establish()).done(function(resp) {
-        _.each(settings.views, function(view, selector) {
-          masterLayout.setView(selector, view);
-
-          $.when.apply(null, view.establish()).then(function(resp) {
-            masterLayout.renderView(selector);
-          }, function(resp) {
-            view.establishError = {
-              error: true,
-              reason: resp
-            };
-            masterLayout.renderView(selector);
-          });
-
-          var hooks = masterLayout.hooks[selector];
-
-          if(hooks){
-            _.each(hooks, function(hook){
-              if (_.any(hook.routes, function(route){return route == boundRoute;})){
-                hook.callback(view);
-              }
-            });
-          }
-        });
-      });
-
-      if (settings.apiUrl) this.apiBar.update(settings.apiUrl);
-    };
-  };
 
   var Router = app.router = Backbone.Router.extend({
     routes: {},
 
     addModuleRouteObject: function(RouteObject) {
       var self = this;
-      var masterLayout = this.masterLayout;
+      var masterLayout = this.masterLayout,
+          routeUrls = RouteObject.prototype.getRouteUrls();
 
-      _.each(RouteObject.prototype.get('routes'), function(route) {
+      _.each(routeUrls, function(route) {
         this.route(route, route.toString(), function() {
           var args = Array.prototype.slice.call(arguments);
 
-          if (self.activeRouteObject && self.activeRouteObject.get('routes').indexOf(route) > -1) {
-            //Don't need to do anything here as this route has been initialised
-            self.activeRouteObject.route.call(self.activeRouteObject, route, args);
-            console.log('Avoiding Route creation');
-            return;
+          if (!self.activeRouteObject || !self.activeRouteObject.hasRoute(route)) {
+            self.activeRouteObject = new RouteObject(args);
           }
 
-          self.activeRouteObject = new RouteObject(args);
-          self.activeRouteObject[self.activeRouteObject.defaultRoute].apply(self.activeRouteObject, args);
-          self.activeRouteObject.render(route, masterLayout, args);
+          var routeObject = self.activeRouteObject,
+              routeCallback = routeObject.routeCallback(route);
+
+          routeCallback.apply(routeObject, args);
+          routeObject.render(route, masterLayout, args);
         });
       }, this);
     },
