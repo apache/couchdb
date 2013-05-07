@@ -346,11 +346,10 @@ process_update(State, DbName, {Change}) ->
     {RepProps} = JsonRepDoc = get_json_value(doc, Change),
     DocId = get_json_value(<<"_id">>, RepProps),
     case {is_owner(DbName, DocId), get_json_value(deleted, Change, false)} of
-    {false, _} ->
-        replication_complete(DbName, DocId),
-        State;
-    {true, true} ->
+    {_, true} ->
         rep_doc_deleted(DbName, DocId),
+        State;
+    {false, false} ->
         State;
     {true, false} ->
         case get_json_value(<<"_replication_state">>, RepProps) of
