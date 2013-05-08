@@ -71,9 +71,11 @@ handle_changes_req(#httpd{method='GET'}=Req, Db) ->
             fabric:changes(Db, fun changes_callback/2, {"normal", {"Etag",Etag}, Req},
                 ChangesArgs)
         end);
-    Feed ->
-        % "longpoll" or "continuous" or "eventsource"
-        fabric:changes(Db, fun changes_callback/2, {Feed, Req}, ChangesArgs)
+    Feed when Feed =:= "continuous"; Feed =:= "longpoll"; Feed =:= "eventsource"  ->
+        fabric:changes(Db, fun changes_callback/2, {Feed, Req}, ChangesArgs);
+    _ ->
+        Msg = <<"Supported `feed` types: normal, continuous, longpoll, eventsource">>,
+        throw({bad_request, Msg})
     end;
 handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "GET,HEAD").
